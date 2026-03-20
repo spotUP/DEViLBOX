@@ -44,6 +44,7 @@ interface FormatStore {
   sc68FileData: ArrayBuffer | null;
   zxtuneFileData: ArrayBuffer | null;
   pumaTrackerFileData: ArrayBuffer | null;
+  steveTurnerFileData: ArrayBuffer | null;
   artOfNoiseFileData: ArrayBuffer | null;
   startrekkerAMFileData: ArrayBuffer | null;
   bdFileData: ArrayBuffer | null;
@@ -71,7 +72,7 @@ interface FormatStore {
   setSongDBInfo: (info: FormatStore['songDBInfo']) => void;
   setSidMetadata: (info: FormatStore['sidMetadata']) => void;
   setOriginalModuleData: (data: FormatStore['originalModuleData']) => void;
-  applyEditorMode: (song: { linearPeriods?: boolean; furnaceNative?: FurnaceNativeData; hivelyNative?: HivelyNativeData; hivelyFileData?: ArrayBuffer; klysNative?: KlysNativeData; klysFileData?: ArrayBuffer; musiclineFileData?: Uint8Array; c64SidFileData?: Uint8Array; jamCrackerFileData?: ArrayBuffer; futurePlayerFileData?: ArrayBuffer; preTrackerFileData?: ArrayBuffer; maFileData?: ArrayBuffer; hippelFileData?: ArrayBuffer; sonixFileData?: ArrayBuffer; pxtoneFileData?: ArrayBuffer; organyaFileData?: ArrayBuffer; eupFileData?: ArrayBuffer; ixsFileData?: ArrayBuffer; psycleFileData?: ArrayBuffer; sc68FileData?: ArrayBuffer; zxtuneFileData?: ArrayBuffer; pumaTrackerFileData?: ArrayBuffer; artOfNoiseFileData?: ArrayBuffer; bdFileData?: ArrayBuffer; sd2FileData?: ArrayBuffer; symphonieFileData?: ArrayBuffer; uadeEditableFileData?: ArrayBuffer; uadeEditableFileName?: string; libopenmptFileData?: ArrayBuffer; hivelyMeta?: { stereoMode: number; mixGain: number; speedMultiplier: number; version: number }; furnaceSubsongs?: FurnaceSubsongPlayback[]; furnaceActiveSubsong?: number; channelTrackTables?: number[][]; channelSpeeds?: number[]; channelGrooves?: number[]; goatTrackerData?: Uint8Array }) => void;
+  applyEditorMode: (song: { linearPeriods?: boolean; furnaceNative?: FurnaceNativeData; hivelyNative?: HivelyNativeData; hivelyFileData?: ArrayBuffer; klysNative?: KlysNativeData; klysFileData?: ArrayBuffer; musiclineFileData?: Uint8Array; c64SidFileData?: Uint8Array; jamCrackerFileData?: ArrayBuffer; futurePlayerFileData?: ArrayBuffer; preTrackerFileData?: ArrayBuffer; maFileData?: ArrayBuffer; hippelFileData?: ArrayBuffer; sonixFileData?: ArrayBuffer; pxtoneFileData?: ArrayBuffer; organyaFileData?: ArrayBuffer; eupFileData?: ArrayBuffer; ixsFileData?: ArrayBuffer; psycleFileData?: ArrayBuffer; sc68FileData?: ArrayBuffer; zxtuneFileData?: ArrayBuffer; pumaTrackerFileData?: ArrayBuffer; steveTurnerFileData?: ArrayBuffer; artOfNoiseFileData?: ArrayBuffer; bdFileData?: ArrayBuffer; sd2FileData?: ArrayBuffer; symphonieFileData?: ArrayBuffer; uadeEditableFileData?: ArrayBuffer; uadeEditableFileName?: string; libopenmptFileData?: ArrayBuffer; hivelyMeta?: { stereoMode: number; mixGain: number; speedMultiplier: number; version: number }; furnaceSubsongs?: FurnaceSubsongPlayback[]; furnaceActiveSubsong?: number; channelTrackTables?: number[][]; channelSpeeds?: number[]; channelGrooves?: number[]; goatTrackerData?: Uint8Array }) => void;
   setFurnaceActiveSubsong: (index: number) => void;
   reset: () => void;
 }
@@ -116,6 +117,7 @@ export const useFormatStore = create<FormatStore>()(
     sc68FileData: null,
     zxtuneFileData: null,
     pumaTrackerFileData: null,
+    steveTurnerFileData: null,
     artOfNoiseFileData: null,
     startrekkerAMFileData: null,
     bdFileData: null,
@@ -171,6 +173,7 @@ export const useFormatStore = create<FormatStore>()(
         state.sc68FileData = song.sc68FileData ?? null;
         state.zxtuneFileData = song.zxtuneFileData ?? null;
         state.pumaTrackerFileData = (song as any).pumaTrackerFileData ?? null;
+        state.steveTurnerFileData = (song as any).steveTurnerFileData ?? null;
         state.artOfNoiseFileData = (song as any).artOfNoiseFileData ?? null;
         state.startrekkerAMFileData = (song as any).startrekkerAMFileData ?? null;
         state.bdFileData = (song as any).bdFileData ?? null;
@@ -255,6 +258,7 @@ export const useFormatStore = create<FormatStore>()(
       state.sc68FileData = null;
       state.zxtuneFileData = null;
       state.pumaTrackerFileData = null;
+      state.steveTurnerFileData = null;
       state.artOfNoiseFileData = null;
       state.startrekkerAMFileData = null;
       state.bdFileData = null;

@@ -67,6 +67,7 @@ import type {
   TFMXConfig,
   HippelCoSoConfig,
   RobHubbardConfig,
+  SteveTurnerConfig,
   SidMon1Config,
   OctaMEDConfig,
   DavidWhittakerConfig,
@@ -265,6 +266,7 @@ export interface InstrumentConfig {
   tfmx?: TFMXConfig;
   hippelCoso?: HippelCoSoConfig;
   robHubbard?: RobHubbardConfig;
+  steveTurner?: SteveTurnerConfig;
   sidmon1?: SidMon1Config;
   octamed?: OctaMEDConfig;
   davidWhittaker?: DavidWhittakerConfig;
@@ -741,6 +743,26 @@ export const DEFAULT_ROB_HUBBARD: RobHubbardConfig = {
   loPos: 0,
   vibTable: [],
   sampleData: [],
+};
+
+export const DEFAULT_STEVE_TURNER: SteveTurnerConfig = {
+  priority: 0,
+  sampleIdx: 0,
+  initDelay: 0,
+  env1Duration: 8,
+  env1Delta: 32,
+  env2Duration: 8,
+  env2Delta: -8,
+  pitchShift: 6,
+  oscCount: 64,
+  oscDelta: 0,
+  oscLoop: 1,
+  decayDelta: -8,
+  numVibrato: 1,
+  vibratoDelay: 0,
+  vibratoSpeed: 0,
+  vibratoMaxDepth: 0,
+  chain: 0,
 };
 
 export const DEFAULT_SIDMON1: SidMon1Config = {

@@ -15,7 +15,7 @@ import {
   DEFAULT_HIVELY, DEFAULT_JAMCRACKER,
   DEFAULT_SOUNDMON, DEFAULT_SIDMON, DEFAULT_DIGMUG, DEFAULT_FC,
   DEFAULT_DELTAMUSIC1, DEFAULT_DELTAMUSIC2, DEFAULT_FRED, DEFAULT_TFMX,
-  DEFAULT_OCTAMED, DEFAULT_SIDMON1, DEFAULT_HIPPEL_COSO, DEFAULT_ROB_HUBBARD,
+  DEFAULT_OCTAMED, DEFAULT_SIDMON1, DEFAULT_HIPPEL_COSO, DEFAULT_ROB_HUBBARD, DEFAULT_STEVE_TURNER,
   DEFAULT_DAVID_WHITTAKER, DEFAULT_SONIC_ARRANGER, DEFAULT_INSTEREO2, DEFAULT_WOBBLE_BASS,
   DEFAULT_FURNACE, DEFAULT_MAME_VFX, DEFAULT_MAME_DOC,
 } from '@typedefs/instrument';
@@ -99,6 +99,9 @@ const HippelCoSoControls = lazy(() =>
 );
 const RobHubbardControls = lazy(() =>
   import('@components/instruments/controls/RobHubbardControls').then(m => ({ default: m.RobHubbardControls }))
+);
+const SteveTurnerControls = lazy(() =>
+  import('@components/instruments/controls/SteveTurnerControls').then(m => ({ default: m.SteveTurnerControls }))
 );
 const DavidWhittakerControls = lazy(() =>
   import('@components/instruments/controls/DavidWhittakerControls').then(m => ({ default: m.DavidWhittakerControls }))
@@ -315,6 +318,10 @@ export const SynthControlsRouter: React.FC<SynthControlsRouterProps> = ({ instru
     if (synthType === 'RobHubbardSynth') {
       const cfg = deepMerge(DEFAULT_ROB_HUBBARD, instrument.robHubbard || {});
       return <RobHubbardControls config={cfg} onChange={(u) => onUpdate({ robHubbard: { ...cfg, ...u } })} uadeChipRam={instrument.uadeChipRam} />;
+    }
+    if (synthType === 'SteveTurnerSynth') {
+      const cfg = deepMerge(DEFAULT_STEVE_TURNER, instrument.steveTurner || {});
+      return <SteveTurnerControls config={cfg} onChange={(u) => onUpdate({ steveTurner: { ...cfg, ...u } })} instrumentIndex={instrument.id} />;
     }
     if (synthType === 'DavidWhittakerSynth') {
       const cfg = deepMerge(DEFAULT_DAVID_WHITTAKER, instrument.davidWhittaker || {});

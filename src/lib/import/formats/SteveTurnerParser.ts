@@ -56,6 +56,7 @@
 
 import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
 import type { InstrumentConfig } from '@/types';
+import type { SteveTurnerConfig } from '@/types/instrument/exotic';
 import type { UADEVariablePatternLayout } from '@/engine/uade/UADEPatternEncoder';
 import { encodeSteveTurnerPattern } from '@/engine/uade/encoders/SteveTurnerEncoder';
 
@@ -89,6 +90,55 @@ function u32BE(buf: Uint8Array, off: number): number {
 function s16BE(buf: Uint8Array, off: number): number {
   const v = u16BE(buf, off);
   return v >= 0x8000 ? v - 0x10000 : v;
+}
+
+// ── Frequency table (from lbW000000 in ASM — 84 period values) ────────────
+
+const FREQ_TABLE = [
+  0xEEE4, 0xE17B, 0xD4D4, 0xC8E1, 0xBD9C, 0xB2F6, 0xA8EC, 0x9F71,
+  0x967D, 0x8E0B, 0x8612, 0x7E8C, 0x7772, 0x70BE, 0x6A6A, 0x6471,
+  0x5ECE, 0x597B, 0x5476, 0x4FB9, 0x4B3F, 0x4706, 0x4309, 0x3F46,
+  0x3BB9, 0x385F, 0x3535, 0x3239, 0x2F67, 0x2CBE, 0x2A3B, 0x27DD,
+  0x25A0, 0x2383, 0x2185, 0x1FA3, 0x1DDD, 0x1C30, 0x1A9B, 0x191D,
+  0x17B4, 0x165F, 0x151E, 0x13EF, 0x12D0, 0x11C2, 0x10C3, 0x0FD2,
+  0x0EEF, 0x0E18, 0x0D4E, 0x0C8F, 0x0BDA, 0x0B30, 0x0A8F, 0x09F8,
+  0x0968, 0x08E1, 0x0862, 0x07E9, 0x0778, 0x070C, 0x06A7, 0x0648,
+  0x05ED, 0x0598, 0x0548, 0x04FC, 0x04B4, 0x0471, 0x0431, 0x03F5,
+  0x03BC, 0x0386, 0x0354, 0x0324, 0x02F7, 0x02CC, 0x02A4, 0x027E,
+  0x025A, 0x0239, 0x0219, 0x01FB,
+];
+
+/**
+ * Derive a note index (0-83) from an instrument's vibrato initial value + pitch shift.
+ * The period is vib_initial >> shift, then we find the closest match in FREQ_TABLE.
+ * Returns -1 if no reasonable match (e.g. period is 0 or ultrasonic).
+ */
+function deriveNoteFromInstrument(buf: Uint8Array, instrOffset: number, instIdx: number): number {
+  const off = instrOffset + instIdx * INSTR_SIZE;
+  if (off + INSTR_SIZE > buf.length) return -1;
+
+  const vibInitial = u16BE(buf, off);  // first word of instrument = vibrato initial value
+  const shift = buf[off + 0x25];       // I_SHIFT
+  if (vibInitial === 0 || shift > 15) return -1;
+
+  const period = vibInitial >>> shift;
+  if (period === 0) return -1;
+
+  // Find closest match in frequency table
+  let bestIdx = -1;
+  let bestDiff = Infinity;
+  for (let i = 0; i < FREQ_TABLE.length; i++) {
+    const diff = Math.abs(FREQ_TABLE[i] - period);
+    if (diff < bestDiff) {
+      bestDiff = diff;
+      bestIdx = i;
+    }
+  }
+
+  // Reject if the match is too far off (> 50% deviation)
+  if (bestIdx >= 0 && bestDiff > FREQ_TABLE[bestIdx] * 0.5) return -1;
+
+  return bestIdx;
 }
 
 // ── Format detection ───────────────────────────────────────────────────────
@@ -212,25 +262,33 @@ interface NoteEvent {
  * @param buf           Full file buffer.
  * @param posListStart  File offset of the position list start.
  * @param offtblOffset  File offset of the offset table.
+ * @param instrOffset   File offset of the instrument table (for deriving notes from B0-CF).
+ *
+ * Returns an array of blocks. Each block is { events, rowCount } where events
+ * have row offsets relative to the block start (0-based).
  */
+interface ChannelBlock {
+  events: NoteEvent[];
+  rowCount: number;
+}
+
 function decodeChannel(
   buf: Uint8Array,
   posListStart: number,
   offtblOffset: number,
-): NoteEvent[] {
-  const events: NoteEvent[] = [];
-  let pos = posListStart; // current position in position list
-  let row = 0;            // current row (duration bytes are already in row units)
+  instrOffset: number,
+): ChannelBlock[] {
+  const blocks: ChannelBlock[] = [];
+  let pos = posListStart;
   let duration = 1;
-  let currentInstrument = 0; // 0-based
+  let currentInstrument = 0;
   let blockCount = 0;
 
   while (pos < buf.length && blockCount < MAX_PATTERN_BLOCKS) {
     const posByte = buf[pos++];
 
-    if (posByte >= 0xfe) break; // 0xFE = channel stop, 0xFF = song end
+    if (posByte >= 0xfe) break;
 
-    // Compute pattern block address via OFFTBL
     const offtblByteOff = offtblOffset + posByte * 2;
     if (offtblByteOff + 1 >= buf.length) break;
 
@@ -240,7 +298,8 @@ function decodeChannel(
     if (patBlockStart < 0 || patBlockStart >= buf.length) break;
     blockCount++;
 
-    // Decode pattern block bytes
+    const events: NoteEvent[] = [];
+    let row = 0;
     let p = patBlockStart;
     let blockDone = false;
 
@@ -248,8 +307,7 @@ function decodeChannel(
       const b = buf[p++];
 
       if (b <= 0x7f) {
-        // Note trigger at pitch b, current instrument
-        const xmNote = b + 13; // map note byte 0-83 → XM 13-96 (C-1..B-7)
+        const xmNote = b + 13;
         events.push({
           row: Math.min(row, MAX_ROWS - 1),
           note: Math.min(xmNote, 96),
@@ -257,52 +315,39 @@ function decodeChannel(
           effTyp: 0, eff: 0,
         });
         row += duration;
-        if (events.length >= MAX_ROWS) { blockDone = true; }
       } else if (b <= 0xaf) {
-        // Set duration: 0x80-0xAF → duration = b - 0x7F (1-48 rows)
         duration = b - 0x7f;
       } else if (b <= 0xcf) {
-        // Instrument change + implicit retrigger at current pitch (b - 0xB0).
-        // Display as instrument-only row (no note pitch): in tracker notation an
-        // instrument number without a note means "retrigger at previous pitch with
-        // new instrument" — avoids flooding the note column with repeated pitches.
         currentInstrument = b - 0xb0;
+        const derivedIdx = deriveNoteFromInstrument(buf, instrOffset, currentInstrument);
+        const derivedNote = derivedIdx >= 0 ? derivedIdx + 13 : 37;
         events.push({
           row: Math.min(row, MAX_ROWS - 1),
-          note: 0,
+          note: Math.min(derivedNote, 96),
           instrument: currentInstrument + 1,
           effTyp: 0, eff: 0,
         });
         row += duration;
-        if (events.length >= MAX_ROWS) { blockDone = true; }
       } else if (b <= 0xef) {
-        // Select instrument (b - 0xD0), no trigger
         currentInstrument = b - 0xd0;
       } else if (b <= 0xf8) {
-        // Pitch effect command (b - 0xF0): 0=none,1=portUp,2=portDown,3=portToNote,
-        // 4=vibrato,5-8=format-specific.  Attach to the last row as an effect.
         const effectNum = b - 0xf0;
         if (effectNum > 0 && events.length > 0) {
-          // Map to a tracker effect code: use E5x (finetune) slot as a generic
-          // "pitch mod" placeholder until exact meanings are confirmed.
           const last = events[events.length - 1];
-          last.effTyp = 0x0e; // Extended effect 'E'
-          last.eff = (5 << 4) | (effectNum & 0x0f); // E5n — pitch effect n
+          last.effTyp = 0x0e;
+          last.eff = (5 << 4) | (effectNum & 0x0f);
         }
       } else if (b === 0xfe) {
-        // Loop point marker — no note triggered; decoding continues after this byte
-        // (runtime: after next note's duration expires, jump back here)
-        // For display: just continue (skip the loop-back behaviour)
+        // Loop point marker — continue decoding
       } else {
-        // 0xFF or 0xF9-0xFD: end of pattern block → back to position list
         blockDone = true;
       }
     }
 
-    if (row >= MAX_ROWS) break;
+    blocks.push({ events, rowCount: row });
   }
 
-  return events;
+  return blocks;
 }
 
 // ── Instrument names ────────────────────────────────────────────────────────
@@ -312,16 +357,45 @@ function decodeChannel(
  * Instrument struct is INSTR_SIZE (0x30) bytes each.
  * No names are stored in the format — use numbered labels.
  */
-function buildInstruments(count: number): InstrumentConfig[] {
-  return Array.from({ length: count }, (_, i) => ({
-    id: i + 1,
-    name: `Instr ${(i + 1).toString().padStart(2, '0')}`,
-    type: 'synth' as const,
-    synthType: 'Synth' as const,
-    effects: [],
-    volume: 0,
-    pan: 0,
-  } as InstrumentConfig));
+function buildInstruments(count: number, buf?: Uint8Array, instrOffset?: number): InstrumentConfig[] {
+  return Array.from({ length: count }, (_, i) => {
+    const inst: InstrumentConfig = {
+      id: i + 1,
+      name: `Instr ${(i + 1).toString().padStart(2, '0')}`,
+      type: 'synth' as const,
+      synthType: 'SteveTurnerSynth' as const,
+      effects: [],
+      volume: 0,
+      pan: 0,
+    };
+    // Extract Steve Turner synth config from instrument binary data
+    if (buf && instrOffset !== undefined) {
+      const off = instrOffset + i * INSTR_SIZE;
+      if (off + INSTR_SIZE <= buf.length) {
+        const s8 = (v: number) => v > 127 ? v - 256 : v;
+        inst.steveTurner = {
+          priority: buf[off + 0x1E],
+          sampleIdx: buf[off + 0x1F],
+          initDelay: buf[off + 0x20],
+          env1Duration: buf[off + 0x21],
+          env1Delta: s8(buf[off + 0x22]),
+          env2Duration: buf[off + 0x23],
+          env2Delta: s8(buf[off + 0x24]),
+          pitchShift: buf[off + 0x25],
+          oscCount: (buf[off + 0x26] << 8) | buf[off + 0x27],
+          oscDelta: s8(buf[off + 0x28]),
+          oscLoop: buf[off + 0x29],
+          decayDelta: s8(buf[off + 0x2A]),
+          numVibrato: buf[off + 0x2B],
+          vibratoDelay: buf[off + 0x2C],
+          vibratoSpeed: buf[off + 0x2D],
+          vibratoMaxDepth: buf[off + 0x2E],
+          chain: buf[off + 0x2F],
+        } satisfies SteveTurnerConfig;
+      }
+    }
+    return inst;
+  });
 }
 
 // ── Row builder ─────────────────────────────────────────────────────────────
@@ -386,7 +460,7 @@ function buildPattern(
 
   return {
     id: `pattern-${patternIndex}`,
-    name: `Subsong ${patternIndex + 1}`,
+    name: `Pattern ${patternIndex}`,
     length: numRows,
     channels: channelRows.map((rows, ch) => ({
       id: `channel-${ch}`,
@@ -460,46 +534,58 @@ export function parseSteveTurnerFile(buffer: ArrayBuffer, filename: string): Tra
 
   // ── Count instruments used (max 16) ──────────────────────────────────────
 
-  const instruments = buildInstruments(16);
+  const instruments = buildInstruments(16, buf, hdr.instrOffset);
 
   // ── Build patterns from subsongs ──────────────────────────────────────────
 
   const patterns: ReturnType<typeof buildPattern>[] = [];
   const songPositions: number[] = [];
 
-  for (let si = 0; si < subsongs.length; si++) {
-    const sub = subsongs[si];
+  // Only decode subsong 0 (the main song). Additional subsongs are SFX/alternate tunes.
+  {
+    const sub = subsongs[0] || { priority: 0, speed: 6, chanPosOffsets: [0, 0, 0, 0] };
 
-    // Decode each of the 4 channels
-    const channelEvents: NoteEvent[][] = [];
+    // Decode each of the 4 channels into per-block arrays
+    const channelBlocks: ChannelBlock[][] = [];
     for (let ch = 0; ch < 4; ch++) {
       const wordOffset = sub.chanPosOffsets[ch];
       if (wordOffset === 0) {
-        channelEvents.push([]); // unused channel
+        channelBlocks.push([]);
         continue;
       }
       const posListStart = hdr.seqOffset + wordOffset;
       if (posListStart >= buf.length) {
-        channelEvents.push([]);
+        channelBlocks.push([]);
         continue;
       }
-      channelEvents.push(
-        decodeChannel(buf, posListStart, hdr.offtblOffset),
+      channelBlocks.push(
+        decodeChannel(buf, posListStart, hdr.offtblOffset, hdr.instrOffset),
       );
     }
 
-    // Determine number of rows: max event row across all channels + 1
-    let maxRow = 15; // minimum 16 rows
-    for (const evs of channelEvents) {
-      for (const ev of evs) {
-        if (ev.row > maxRow) maxRow = ev.row;
-      }
-    }
-    // Round up to nearest multiple of 16 for nice display
-    const numRows = Math.min(Math.ceil((maxRow + 1) / 16) * 16, MAX_ROWS);
+    // The number of order positions = max block count across channels
+    const numSteps = Math.max(...channelBlocks.map(b => b.length), 1);
 
-    patterns.push(buildPattern(si, sub, channelEvents, numRows, filename));
-    songPositions.push(si);
+    for (let step = 0; step < numSteps; step++) {
+      // Gather this step's events from each channel
+      const channelEvents: NoteEvent[][] = [];
+      let maxRow = 15;
+      for (let ch = 0; ch < 4; ch++) {
+        const block = channelBlocks[ch]?.[step];
+        if (block) {
+          channelEvents.push(block.events);
+          if (block.rowCount > maxRow) maxRow = block.rowCount;
+        } else {
+          channelEvents.push([]);
+        }
+      }
+
+      // Round row count to nearest multiple of 4 (minimum 4)
+      const numRows = Math.min(Math.max(Math.ceil((maxRow) / 4) * 4, 4), MAX_ROWS);
+
+      patterns.push(buildPattern(patterns.length, sub, channelEvents, numRows, filename));
+      songPositions.push(patterns.length - 1);
+    }
   }
 
   // ── Build TrackerSong ─────────────────────────────────────────────────────
@@ -553,22 +639,17 @@ export function parseSteveTurnerFile(buffer: ArrayBuffer, filename: string): Tra
     format: 'MOD' as TrackerFormat,
     patterns,
     instruments,
-    songPositions: [0],
-    songLength: 1,
+    songPositions,
+    songLength: songPositions.length,
     restartPosition: 0,
     numChannels: 4,
     initialSpeed: subsongs[0]?.speed ?? 6,
     initialBPM: 125,
     linearPeriods: false,
-    // Mark for UADE playback + subsong switching
-    uadeEditableFileData: buffer.slice(0),
-    uadeEditableFileName: filename,
-    uadeEditableSubsongs: subsongs.length > 1 ? {
-      count: subsongs.length,
-      speeds: subsongs.map(s => s.speed),
-    } : undefined,
+    // WASM engine playback (replaces UADE)
+    steveTurnerFileData: buffer.slice(0),
     uadeVariableLayout,
-  } as TrackerSong & { uadeEditableFileData?: ArrayBuffer; uadeEditableFileName?: string };
+  } as TrackerSong;
 
   // Count instrument entries actually used in INSTR table
   // (instrument structs are at hdr.instrOffset, 0x30 bytes each; up to 16)
@@ -579,7 +660,7 @@ export function parseSteveTurnerFile(buffer: ArrayBuffer, filename: string): Tra
     instrCount++;
   }
   // Replace instrument list with actual count
-  result.instruments = buildInstruments(instrCount);
+  result.instruments = buildInstruments(instrCount, buf, hdr.instrOffset);
 
   return result;
 }
