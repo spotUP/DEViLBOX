@@ -169,7 +169,8 @@ export function samToVotrax(samCode: string): VotraxFrame[] | null {
  * Convert a full array of SAM PhonemeTokens to a flat Votrax frame sequence.
  */
 export function phonemesToVotraxFrames(
-  tokens: Array<{ code: string; stress: number }>
+  tokens: Array<{ code: string; stress: number }>,
+  question = false
 ): VotraxFrame[] {
   const frames: VotraxFrame[] = [];
   for (const token of tokens) {
@@ -182,5 +183,21 @@ export function phonemesToVotraxFrames(
       }
     }
   }
+
+  // Sentence-level pitch contour using inflection
+  if (frames.length > 0) {
+    const len = frames.length;
+    for (let i = 0; i < len; i++) {
+      const pos = i / len;
+      if (question) {
+        // Questions: raise inflection in last 30%
+        if (pos > 0.7) frames[i].inflection = 3;
+      } else {
+        // Statements: lower inflection in last 30%
+        if (pos > 0.7) frames[i].inflection = Math.min(frames[i].inflection ?? 1, 0);
+      }
+    }
+  }
+
   return frames;
 }
