@@ -164,17 +164,55 @@ export function samToMEA8000(samCode: string): MEA8000Frame | null {
 }
 
 /**
- * Convert SAM PhonemeTokens to MEA8000 frames.
+ * Interpolate between two MEA8000 frames for coarticulation.
+ * Returns a frame with values blended at ratio t (0=from, 1=to).
+ */
+function lerpFrame(from: MEA8000Frame, to: MEA8000Frame, t: number): MEA8000Frame {
+  return {
+    f1: Math.round(from.f1 + (to.f1 - from.f1) * t),
+    f2: Math.round(from.f2 + (to.f2 - from.f2) * t),
+    f3: Math.round(from.f3 + (to.f3 - from.f3) * t),
+    noise: t > 0.5 ? to.noise : from.noise,
+    bw: t > 0.5 ? to.bw : from.bw,
+    durationMs: 20, // short transition frame
+  };
+}
+
+/**
+ * Convert SAM PhonemeTokens to MEA8000 frames with coarticulation.
+ * Inserts transition frames between phonemes for smooth formant movement.
  */
 export function phonemesToMEA8000Frames(
   tokens: Array<{ code: string; stress: number }>
 ): MEA8000Frame[] {
-  const frames: MEA8000Frame[] = [];
+  // Map tokens to raw frames
+  const rawFrames: MEA8000Frame[] = [];
   for (const token of tokens) {
     const frame = samToMEA8000(token.code);
     if (frame) {
-      frames.push(frame);
+      rawFrames.push(frame);
     }
   }
-  return frames;
+
+  if (rawFrames.length === 0) return [];
+
+  // Insert coarticulation transition frames between phonemes
+  const result: MEA8000Frame[] = [];
+  for (let i = 0; i < rawFrames.length; i++) {
+    const curr = rawFrames[i];
+
+    // Add transition FROM previous phoneme (2 frames at 33/67%)
+    if (i > 0) {
+      const prev = rawFrames[i - 1];
+      result.push(lerpFrame(prev, curr, 0.33));
+      result.push(lerpFrame(prev, curr, 0.67));
+    }
+
+    // Add the main phoneme frame (steady state)
+    // Reduce duration slightly to make room for transitions
+    const steadyMs = Math.max(20, curr.durationMs - 40);
+    result.push({ ...curr, durationMs: steadyMs });
+  }
+
+  return result;
 }

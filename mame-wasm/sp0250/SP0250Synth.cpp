@@ -217,6 +217,21 @@ public:
             float mixL = 0.0f;
             float mixR = 0.0f;
 
+            // Frame buffer playback (speech TTS path)
+            if (m_fbPlaying) {
+                if (m_fbEnvLevel < 1.0f) { m_fbEnvLevel += 0.002f; if (m_fbEnvLevel > 1.0f) m_fbEnvLevel = 1.0f; }
+                m_fbPhase += m_lpcStep;
+                while (m_fbPhase >= 1.0) {
+                    m_fbPhase -= 1.0;
+                    m_fbPrevSample = m_fbCurrentSample;
+                    m_fbCurrentSample = generateFBSample();
+                }
+                float t = (float)m_fbPhase;
+                float sample = m_fbPrevSample * (1.0f - t) + m_fbCurrentSample * t;
+                mixL = sample * m_fbEnvLevel;
+                mixR = sample * m_fbEnvLevel;
+            }
+
             for (int v = 0; v < NUM_VOICES; v++) {
                 LPCVoice& voi = m_voices[v];
 
@@ -405,6 +420,44 @@ public:
         }
     }
 
+    // Frame buffer mode: pre-packed LPC frames from TypeScript TTS pipeline
+    // Each frame is 15 bytes: [amp, pitch, voiced, F0, B0, F1, B1, F2, B2, F3, B3, F4, B4, F5, B5]
+    // amp = ga()-encoded amplitude, pitch = raw pitch period,
+    // voiced = 0 or 1, Fn/Bn = gc()-encoded filter coefficients
+    void loadFrameBuffer(uintptr_t dataPtr, int numFrames) {
+        m_fbData = reinterpret_cast<const uint8_t*>(dataPtr);
+        m_fbCount = numFrames;
+        m_fbPos = 0;
+    }
+
+    void speakFrameBuffer() {
+        if (!m_fbData || m_fbCount <= 0) return;
+        m_fbPlaying = true;
+        m_fbPos = 0;
+        m_fbSampleCount = 0;
+        m_fbFrameSize = m_lpcRate / 40;  // ~250 samples at 10kHz = 25ms per frame
+        m_fbPhase = 0.0;
+        m_fbPrevSample = 0.0f;
+        m_fbCurrentSample = 0.0f;
+        m_fbEnvLevel = 0.0f;
+        m_fbLfsr = 0x7fff;
+        m_fbPitchCount = 0;
+        for (int f = 0; f < NUM_FILTERS; f++) {
+            m_fbFilter[f].F = 0;
+            m_fbFilter[f].B = 0;
+            m_fbFilter[f].reset();
+        }
+        m_fbAmp = 0;
+        m_fbPitch = 0;
+        m_fbVoiced = true;
+        // Load first frame immediately
+        loadNextFBFrame();
+    }
+
+    void stopSpeaking() {
+        m_fbPlaying = false;
+    }
+
     // Direct FIFO write (15 bytes, matching SP0250 hardware)
     void writeFIFO(int index, int data) {
         if (index < 0 || index > 14) return;
@@ -580,6 +633,82 @@ private:
     }
 
     // ========================================================================
+    // Frame buffer helpers
+    // ========================================================================
+
+    void loadNextFBFrame() {
+        if (!m_fbData || m_fbPos >= m_fbCount) {
+            m_fbPlaying = false;
+            return;
+        }
+        const uint8_t* frame = m_fbData + m_fbPos * 15;
+        uint8_t ampByte = frame[0];
+        uint8_t pitchByte = frame[1];
+        uint8_t voicedByte = frame[2];
+
+        if (ampByte == 0) {
+            // Silent frame — zero amplitude but don't stop
+            m_fbAmp = 0;
+            m_fbPitch = 0;
+            m_fbVoiced = false;
+        } else if (ampByte == 0xFF) {
+            // Stop marker
+            m_fbPlaying = false;
+            return;
+        } else {
+            m_fbAmp = sp0250_ga(ampByte);
+            m_fbPitch = pitchByte;
+            m_fbVoiced = (voicedByte != 0);
+            for (int f = 0; f < NUM_FILTERS; f++) {
+                m_fbFilter[f].F = sp0250_gc(frame[3 + f * 2]);
+                m_fbFilter[f].B = sp0250_gc(frame[4 + f * 2]);
+            }
+        }
+        m_fbPos++;
+        m_fbSampleCount = m_fbFrameSize;
+    }
+
+    float generateFBSample() {
+        if (!m_fbPlaying) return 0.0f;
+
+        if (m_fbSampleCount <= 0) {
+            loadNextFBFrame();
+            if (!m_fbPlaying) return 0.0f;
+        }
+
+        // LFSR
+        m_fbLfsr ^= (m_fbLfsr ^ (m_fbLfsr >> 1)) << 15;
+        m_fbLfsr >>= 1;
+
+        // Excitation
+        int16_t z0;
+        if (m_fbVoiced)
+            z0 = (m_fbPitchCount == 0) ? m_fbAmp : 0;
+        else
+            z0 = (m_fbLfsr & 1) ? m_fbAmp : -m_fbAmp;
+
+        // 6-stage lattice filter
+        for (int f = 0; f < NUM_FILTERS; f++)
+            z0 = m_fbFilter[f].apply(z0);
+
+        // Clamp to 7-bit DAC range
+        int dac = z0 >> 6;
+        if (dac < -64) dac = -64;
+        if (dac > 63) dac = 63;
+
+        // Advance pitch counter
+        if (m_fbVoiced && m_fbPitch > 0) {
+            if (++m_fbPitchCount >= m_fbPitch)
+                m_fbPitchCount = 0;
+        } else {
+            m_fbPitchCount = 0;
+        }
+
+        m_fbSampleCount--;
+        return (float)dac / 64.0f;
+    }
+
+    // ========================================================================
     // State
     // ========================================================================
 
@@ -595,6 +724,24 @@ private:
     int m_currentPreset = 0;
     uint32_t m_noteCounter = 0;
     float m_pitchBend = 0.0f;
+
+    // Frame buffer state
+    const uint8_t* m_fbData = nullptr;
+    int m_fbCount = 0;
+    int m_fbPos = 0;
+    bool m_fbPlaying = false;
+    int m_fbSampleCount = 0;
+    int m_fbFrameSize = 250;  // samples per frame (~25ms at 10kHz)
+    double m_fbPhase = 0.0;
+    float m_fbPrevSample = 0.0f;
+    float m_fbCurrentSample = 0.0f;
+    float m_fbEnvLevel = 0.0f;
+    uint16_t m_fbLfsr = 0x7fff;
+    int m_fbPitchCount = 0;
+    int16_t m_fbAmp = 0;
+    uint8_t m_fbPitch = 0;
+    bool m_fbVoiced = true;
+    LPCFilter m_fbFilter[NUM_FILTERS];
 };
 
 } // namespace devilbox
@@ -624,7 +771,10 @@ EMSCRIPTEN_BINDINGS(SP0250Module) {
         .function("setFilterCoeff", &SP0250Synth::setFilterCoeff)
         .function("writeRegister", &SP0250Synth::writeRegister)
         .function("setVolume", &SP0250Synth::setVolume)
-        .function("setVowel", &SP0250Synth::setVowel);
+        .function("setVowel", &SP0250Synth::setVowel)
+        .function("loadFrameBuffer", &SP0250Synth::loadFrameBuffer)
+        .function("speakFrameBuffer", &SP0250Synth::speakFrameBuffer)
+        .function("stopSpeaking", &SP0250Synth::stopSpeaking);
 }
 
 #endif
