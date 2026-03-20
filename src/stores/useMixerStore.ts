@@ -206,7 +206,9 @@ function forwardWasmChannelGain(ch: number, channels: MixerChannelState[], isSol
   }
 
   // SunVox songs: mute/unmute at the module level inside the WASM
-  if (hasSunVoxSongInstruments()) {
+  const isSunVox = hasSunVoxSongInstruments();
+  console.log('[Mixer] forwardWasmChannelGain: ch=', ch, 'isSunVox=', isSunVox);
+  if (isSunVox) {
     forwardSunVoxModuleMute(channels, isSoloing);
     return;
   }

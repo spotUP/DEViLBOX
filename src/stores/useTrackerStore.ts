@@ -72,13 +72,15 @@ function _applySunVoxMutes(channels: { muted: boolean; solo: boolean }[], anySol
 
   // Collect per-module mute state: unmuted if ANY channel targeting it is unmuted
   const moduleUnmuted = new Map<number, boolean>();
+  console.log('[SunVox Mute] mapping', pattern.channels.length, 'channels →',
+    pattern.channels.map((c: any, i: number) => `ch${i}:instr${c.instrumentId}`).join(', '));
   for (let i = 0; i < pattern.channels.length; i++) {
     const ch = channels[i];
     if (!ch) continue;
     const instrId = (pattern.channels[i] as { instrumentId?: number })?.instrumentId;
     if (!instrId) continue;
     const inst = instruments.find((ins: { id: number }) => ins.id === instrId);
-    if (!inst?.sunvox?.noteTargetModuleId) continue;
+    if (!inst?.sunvox?.noteTargetModuleId) { console.log('[SunVox Mute] ch', i, 'instr', instrId, '→ no noteTargetModuleId'); continue; }
     const modId = inst.sunvox.noteTargetModuleId as number;
     const effectiveMute = anySolo ? !ch.solo : ch.muted;
     if (!effectiveMute) moduleUnmuted.set(modId, true);
