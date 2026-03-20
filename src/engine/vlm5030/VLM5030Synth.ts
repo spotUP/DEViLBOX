@@ -1,6 +1,6 @@
 
 import { MAMEBaseSynth } from '@engine/mame/MAMEBaseSynth';
-import { textToPhonemes, parsePhonemeString, isQuestion, preprocessText } from '@engine/speech/Reciter';
+import { isQuestion, textToTokens } from '@engine/speech/Reciter';
 import { SpeechSequencer, type SpeechFrame } from '@engine/speech/SpeechSequencer';
 import { type SP0250Frame, samToSP0250 } from '@engine/speech/sp0250PhonemeMap';
 import { phonemesToVLM5030Frames, samToVLM5030 } from '@engine/speech/vlm5030PhonemeMap';
@@ -230,16 +230,16 @@ export class VLM5030Synth extends MAMEBaseSynth {
     this._startSpeechAtNote(text, 60, 0.8);
   }
 
-  private _startSpeechAtNote(text: string, _note: number, _velocity: number): void {
+  private async _startSpeechAtNote(text: string, _note: number, _velocity: number): Promise<void> {
     if (!this._isReady || !this.workletNode || this._disposed) return;
 
     this.stopSpeaking();
 
     const question = isQuestion(text);
-    const phonemeStr = textToPhonemes(preprocessText(text));
-    if (!phonemeStr) return;
 
-    const tokens = parsePhonemeString(phonemeStr);
+    // Use eSpeak-NG for phoneme analysis (falls back to SAM)
+    const tokens = await textToTokens(text);
+    if (tokens.length === 0) return;
 
     // Use VLM5030-specific phoneme map with per-phoneme K coefficients
     const vlmFrames = phonemesToVLM5030Frames(tokens, question);

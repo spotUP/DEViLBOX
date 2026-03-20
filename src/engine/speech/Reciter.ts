@@ -1,5 +1,9 @@
 // @ts-expect-error -- SamJs is a JavaScript library without types
 import SamJs from '@engine/sam/samjs';
+import { espeakTextToIPA, parseEspeakIPA, isEspeakAvailable, preloadEspeak } from './EspeakNG';
+
+// Start loading eSpeak-NG in the background on first import
+preloadEspeak();
 
 /**
  * A single phoneme token parsed from SAM's reciter output.
@@ -187,6 +191,27 @@ export function textToPhonemes(text: string): string | false {
   } catch {
     return false;
   }
+}
+
+/**
+ * Convert text to PhonemeTokens using eSpeak-NG (async, better quality).
+ * Falls back to SAM if eSpeak-NG is not loaded yet.
+ *
+ * This is the preferred entry point for TTS pipelines that can await.
+ */
+export async function textToTokens(text: string): Promise<PhonemeToken[]> {
+  // Try eSpeak-NG first (much better pronunciation)
+  if (isEspeakAvailable()) {
+    const ipa = await espeakTextToIPA(preprocessText(text));
+    if (ipa) {
+      return parseEspeakIPA(ipa);
+    }
+  }
+
+  // Fallback to SAM
+  const phonemeStr = textToPhonemes(text);
+  if (!phonemeStr) return [];
+  return parsePhonemeString(phonemeStr);
 }
 
 /**
