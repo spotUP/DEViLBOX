@@ -195,7 +195,8 @@ export class SunVoxEngine {
         this.wasmBinary = await wasmResponse.arrayBuffer();
 
         let code = await jsResponse.text();
-        // Transform Emscripten output for Function() execution inside the worklet
+        // Transform Emscripten output for Function() execution inside the worklet.
+        // The official SunVox library v2.1.4d exports `SunVoxLib` as an IIFE.
         code = code
           .replace(/import\.meta\.url/g, "'.'")
           .replace(/export\s+default\s+\w+;?/g, '')
