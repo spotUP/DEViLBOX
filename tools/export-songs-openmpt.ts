@@ -910,8 +910,20 @@ function exportToXM(song: TrackerSong): ArrayBuffer {
   for (const inst of song.instruments) {
     const xmSamples: XMSampleData[] = [];
 
-    if (inst.sample?.audioBuffer && inst.sample.audioBuffer.byteLength > 0) {
-      const wav = parseWav(inst.sample.audioBuffer);
+    // Get audio buffer — decode data URL fallback if audioBuffer is missing
+    let sampleBuf = inst.sample?.audioBuffer;
+    if ((!sampleBuf || sampleBuf.byteLength === 0) && inst.sample?.url?.startsWith('data:')) {
+      const b64 = inst.sample.url.split(',')[1];
+      if (b64) {
+        const bin = atob(b64);
+        const bytes = new Uint8Array(bin.length);
+        for (let j = 0; j < bin.length; j++) bytes[j] = bin.charCodeAt(j);
+        sampleBuf = bytes.buffer;
+      }
+    }
+
+    if (sampleBuf && sampleBuf.byteLength > 0) {
+      const wav = parseWav(sampleBuf);
       let pcm: Int8Array;
       let sr = 8363;
 
