@@ -23,10 +23,8 @@ function buildDescriptor(entry: typeof SUNVOX_MODULE_TYPES[number]): ModuleDescr
     ports.push({ id: 'output', name: 'Output', direction: 'output', signal: 'audio' });
   }
 
-  // Non-generators and Output module get an input port
-  if (!entry.isGenerator || isOutput) {
-    ports.push({ id: 'input', name: 'Input', direction: 'input', signal: 'audio' });
-  }
+  // All modules get an input port (generators can receive FM/audio input in SunVox)
+  ports.push({ id: 'input', name: 'Input', direction: 'input', signal: 'audio' });
 
   const noopInstance: ModuleInstance = {
     descriptorId: id,

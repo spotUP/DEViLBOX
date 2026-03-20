@@ -442,7 +442,31 @@ function attachSoundMonXM(inst: TrackerSong['instruments'][number], cfg: SoundMo
 
 function attachSidMon1XM(inst: TrackerSong['instruments'][number], cfg: SidMon1Config): void {
   if (!cfg.mainWave || cfg.mainWave.length === 0) return;
-  const wave = new Int8Array(cfg.mainWave);
+
+  // Pre-render phase modulation: blend mainWave + phaseWave over several cycles
+  // to capture the characteristic morphing sound. Without this, instruments sound flat.
+  let wave: Int8Array;
+  const phaseSpeed = cfg.phaseSpeed ?? 0;
+  if (phaseSpeed > 0 && cfg.phaseWave && cfg.phaseWave.length > 0) {
+    // Render enough cycles to capture the full phase rotation
+    const waveLen = cfg.mainWave.length;
+    const fullRotation = Math.ceil(waveLen / Math.max(1, phaseSpeed));
+    const numCycles = Math.max(4, Math.min(fullRotation, 16));
+    const totalLen = waveLen * numCycles;
+    wave = new Int8Array(totalLen);
+    let phaseOffset = 0;
+    for (let cycle = 0; cycle < numCycles; cycle++) {
+      for (let i = 0; i < waveLen; i++) {
+        const mainSample = cfg.mainWave[i];
+        const phaseIdx = (i + Math.floor(phaseOffset)) % waveLen;
+        const phaseSample = cfg.phaseWave[Math.abs(phaseIdx) % cfg.phaseWave.length] ?? 0;
+        wave[cycle * waveLen + i] = Math.max(-128, Math.min(127, Math.round((mainSample + phaseSample) / 2)));
+      }
+      phaseOffset += phaseSpeed;
+    }
+  } else {
+    wave = new Int8Array(cfg.mainWave);
+  }
 
   const atkMax = cfg.attackMax ?? 64;
   const atkTicks = (cfg.attackSpeed ?? 1) > 0 ? Math.ceil(atkMax / (cfg.attackSpeed ?? 1)) : 4;
@@ -460,21 +484,58 @@ function attachSidMon1XM(inst: TrackerSong['instruments'][number], cfg: SidMon1C
   attachWaveformWithEnvelope(inst, wave, envelope);
 }
 
-function attachHippelCoSoXM(inst: TrackerSong['instruments'][number], cfg: HippelCoSoConfig): void {
-  // Sawtooth waveform (HippelCoSo doesn't embed waveforms)
+function attachHippelCoSoXM(inst: TrackerSong['instruments'][number], cfg: HippelCoSoConfig, instIndex?: number): void {
+  // HippelCoSo doesn't embed waveforms — use varied basic shapes per instrument
+  // to give each instrument a distinct timbre instead of all-sawtooth.
   const wave = new Int8Array(32);
-  for (let i = 0; i < 32; i++) wave[i] = Math.round(127 - (255 * i / 31));
+  const shape = (instIndex ?? 0) % 4;
+  for (let i = 0; i < 32; i++) {
+    switch (shape) {
+      case 0: // sawtooth
+        wave[i] = Math.round(127 - (255 * i / 31));
+        break;
+      case 1: // square
+        wave[i] = i < 16 ? 127 : -128;
+        break;
+      case 2: // triangle
+        wave[i] = i < 16 ? Math.round(-128 + (255 * i / 15)) : Math.round(127 - (255 * (i - 16) / 15));
+        break;
+      case 3: // pulse (25% duty)
+        wave[i] = i < 8 ? 127 : -128;
+        break;
+    }
+  }
 
   const envelope = cfg.vseq ? volSeqToEnvelope(cfg.vseq, cfg.volSpeed || 1) : null;
   attachWaveformWithEnvelope(inst, wave, envelope);
 }
 
 function attachDeltaMusic1XM(inst: TrackerSong['instruments'][number], cfg: DeltaMusic1Config): void {
-  // Extract waveform from existing sample data, fallback to sawtooth
-  let wave = extractWaveFromSample(inst);
+  // Extract the correct waveform from sampleData using table indices.
+  // Each table entry < 0x80 is a waveform index: offset = entry * 32.
+  let wave: Int8Array | null = null;
+  if (cfg.sampleData && cfg.sampleData.length > 0 && cfg.table) {
+    let waveOffset = 0;
+    for (let t = 0; t < cfg.table.length; t++) {
+      const entry = cfg.table[t];
+      if (entry === 0xff) break;
+      if (entry < 0x80) { waveOffset = entry * 32; break; }
+    }
+    const waveLen = Math.min(32, cfg.sampleData.length - waveOffset);
+    if (waveLen > 0) {
+      wave = new Int8Array(waveLen);
+      for (let i = 0; i < waveLen; i++) {
+        const v = cfg.sampleData[waveOffset + i];
+        wave[i] = v > 127 ? v - 256 : v;
+      }
+    }
+  }
   if (!wave) {
-    wave = new Int8Array(32);
-    for (let i = 0; i < 32; i++) wave[i] = Math.round(127 - (255 * i / 31));
+    wave = extractWaveFromSample(inst) ?? new Int8Array(32);
+    if (wave.length === 0) {
+      wave = new Int8Array(32);
+      for (let i = 0; i < 32; i++) wave[i] = Math.round(127 - (255 * i / 31));
+    }
   }
 
   const vol = cfg.volume ?? 64;
@@ -487,12 +548,23 @@ function attachDeltaMusic1XM(inst: TrackerSong['instruments'][number], cfg: Delt
 }
 
 function attachDeltaMusic2XM(inst: TrackerSong['instruments'][number], cfg: DeltaMusic2Config): void {
-  // DM2's cfg.table is a wavetable SEQUENCE table (indices), NOT PCM data.
-  // Extract the actual waveform from the instrument's existing sample data.
-  let wave = extractWaveFromSample(inst);
+  // Use the waveform PCM stored at parse time (256 bytes, signed 8-bit).
+  // Take first 32 samples for XM (one cycle of the waveform).
+  let wave: Int8Array | null = null;
+  if (cfg.waveformPCM && cfg.waveformPCM.length > 0) {
+    const len = Math.min(32, cfg.waveformPCM.length);
+    wave = new Int8Array(len);
+    for (let i = 0; i < len; i++) {
+      const v = cfg.waveformPCM[i];
+      wave[i] = v > 127 ? v - 256 : v;
+    }
+  }
   if (!wave) {
-    wave = new Int8Array(32);
-    for (let i = 0; i < 32; i++) wave[i] = Math.round(127 - (255 * i / 31));
+    wave = extractWaveFromSample(inst) ?? new Int8Array(32);
+    if (wave.length === 0) {
+      wave = new Int8Array(32);
+      for (let i = 0; i < 32; i++) wave[i] = Math.round(127 - (255 * i / 31));
+    }
   }
 
   // Convert volTable to envelope points
@@ -554,7 +626,8 @@ export function bakeSynthInstruments(song: TrackerSong, exportAs: 'mod' | 'xm' =
   const hvlSampleRate = isHVL ? 44100 : 8287;
   const useXMEnvelopes = exportAs === 'xm';
 
-  for (const inst of song.instruments) {
+  for (let instIdx = 0; instIdx < song.instruments.length; instIdx++) {
+    const inst = song.instruments[instIdx];
     // Check if instrument has a synth config that XM envelope export can handle
     const hasSynthConfig = !!(inst.fc || inst.soundMon || inst.sidmon1 ||
       (inst.digMug && inst.digMug.waveformData && inst.digMug.waveformData.length > 0) ||
@@ -648,7 +721,7 @@ export function bakeSynthInstruments(song: TrackerSong, exportAs: 'mod' | 'xm' =
 
     if (inst.hippelCoso) {
       if (useXMEnvelopes) {
-        attachHippelCoSoXM(inst, inst.hippelCoso);
+        attachHippelCoSoXM(inst, inst.hippelCoso, instIdx);
       } else {
         const result = renderSynthInstrument(
           hippelCoSoSim, inst.hippelCoso, 24, DEFAULT_SAMPLE_RATE,

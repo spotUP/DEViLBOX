@@ -827,7 +827,7 @@ export function parseFCFile(buffer: ArrayBuffer, filename: string, moduleBase = 
             // FC14: waveRef 10-89 → custom wavetable index 0-79 (capped at 46 for now)
             const maxRef = isFC14 ? 90 : 57;
             if (waveRef >= 10 && waveRef < maxRef) {
-              const fcWaveIdx = Math.min(46, waveRef - 10);
+              const fcWaveIdx = waveRef - 10;
               if (synthTable.length === 0) initialWaveNum = fcWaveIdx;
               synthTable.push({ waveNum: fcWaveIdx, transposition: 0, effect: b === 0xE2 ? 1 : 0 });
             }
@@ -862,8 +862,13 @@ export function parseFCFile(buffer: ArrayBuffer, filename: string, moduleBase = 
       relLength  = Math.min(255, 8 * volSpeed);
     }
 
-    // Extract the actual FC13 waveform PCM (unsigned → signed)
-    const rawWave = extractFC13Wave(initialWaveNum);
+    // Extract waveform PCM: use FC14 custom wavetable if available, else FC13 built-in
+    let rawWave: Uint8Array;
+    if (isFC14 && initialWaveNum < waveTablePCMs.length && waveTablePCMs[initialWaveNum].length > 0) {
+      rawWave = waveTablePCMs[initialWaveNum];
+    } else {
+      rawWave = extractFC13Wave(Math.min(46, initialWaveNum));
+    }
     const wavePCM: number[] = [];
     for (let i = 0; i < rawWave.length; i++) {
       wavePCM.push(rawWave[i] < 128 ? rawWave[i] : rawWave[i] - 256);

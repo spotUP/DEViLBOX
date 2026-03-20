@@ -114,22 +114,53 @@ export function samToTMS5220(samCode: string): TMS5220Frame | null {
 }
 
 /**
- * Convert SAM PhonemeTokens to TMS5220 frames.
+ * Interpolate between two frames for coarticulation.
+ */
+function lerpFrame(from: TMS5220Frame, to: TMS5220Frame, t: number): TMS5220Frame {
+  const k = from.k.map((v, i) => Math.round(v + (to.k[i] - v) * t));
+  return {
+    k,
+    energy: Math.round(from.energy + (to.energy - from.energy) * t),
+    pitch: to.unvoiced ? 0 : Math.round(from.pitch + (to.pitch - from.pitch) * t),
+    unvoiced: t > 0.5 ? to.unvoiced : from.unvoiced,
+    durationMs: 25,
+  };
+}
+
+/**
+ * Convert SAM PhonemeTokens to TMS5220 frames with coarticulation transitions.
  */
 export function phonemesToTMS5220Frames(
   tokens: Array<{ code: string; stress: number }>
 ): TMS5220Frame[] {
-  const frames: TMS5220Frame[] = [];
+  const rawFrames: TMS5220Frame[] = [];
   for (const token of tokens) {
     const frame = samToTMS5220(token.code);
     if (frame) {
-      // Boost energy for stressed phonemes
       const energyBoost = token.stress >= 4 ? 2 : 0;
-      frames.push({
+      rawFrames.push({
         ...frame,
         energy: Math.min(14, frame.energy + energyBoost),
       });
     }
   }
-  return frames;
+
+  if (rawFrames.length === 0) return [];
+
+  // Insert coarticulation transition frames between phonemes
+  const result: TMS5220Frame[] = [];
+  for (let i = 0; i < rawFrames.length; i++) {
+    const curr = rawFrames[i];
+
+    if (i > 0) {
+      const prev = rawFrames[i - 1];
+      result.push(lerpFrame(prev, curr, 0.33));
+      result.push(lerpFrame(prev, curr, 0.67));
+    }
+
+    const steadyMs = Math.max(25, curr.durationMs - 50);
+    result.push({ ...curr, durationMs: steadyMs });
+  }
+
+  return result;
 }
