@@ -77,6 +77,7 @@ export class VLM5030Synth extends MAMEBaseSynth {
   }
 
   protected async initialize(): Promise<void> {
+    console.log('[VLM5030] initialize() called');
     let romData: Uint8Array | null = null;
     try {
       romData = await loadVLM5030ROMs();
