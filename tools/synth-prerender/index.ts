@@ -7,7 +7,10 @@
  */
 
 import type { TrackerSong } from '../../src/engine/TrackerReplayer';
-import type { FCConfig } from '../../src/types/instrument/exotic';
+import type {
+  FCConfig, SoundMonConfig, SidMon1Config, HippelCoSoConfig,
+  DigMugConfig, DeltaMusic1Config, DeltaMusic2Config, DavidWhittakerConfig,
+} from '../../src/types/instrument/exotic';
 import type { EnvelopePoints, EnvelopePoint } from '../../src/types/tracker';
 import {
   renderSynthInstrument,
@@ -241,6 +244,256 @@ function attachFCWaveformSample(
   }
 }
 
+// ── Generic ADSR → XM envelope conversion ───────────────────────────────────
+
+/** Convert simple ADSR parameters to XM envelope points. */
+function adsrToEnvelope(
+  atkVol: number, atkTicks: number,
+  decVol: number, decTicks: number,
+  susVol: number, susTicks: number,
+  relVol: number, relTicks: number,
+): EnvelopePoints | null {
+  const points: EnvelopePoint[] = [];
+  let tick = 0;
+
+  // Attack: 0 → atkVol
+  points.push({ tick: 0, value: 0 });
+  tick += Math.max(1, atkTicks);
+  points.push({ tick, value: Math.min(64, atkVol) });
+
+  // Decay: atkVol → decVol
+  if (decTicks > 0 && decVol !== atkVol) {
+    tick += decTicks;
+    points.push({ tick, value: Math.min(64, decVol) });
+  }
+
+  // Sustain point (hold here until note-off)
+  const sustainIdx = points.length - 1;
+
+  // If sustain has finite length, add a hold then release
+  if (susTicks > 0 && susTicks < 255) {
+    tick += susTicks;
+    points.push({ tick, value: Math.min(64, susVol > 0 ? susVol : decVol) });
+  }
+
+  // Release: → relVol (usually 0)
+  if (relTicks > 0) {
+    tick += relTicks;
+    points.push({ tick, value: Math.max(0, relVol) });
+  } else if (points[points.length - 1].value > 0) {
+    // Ensure envelope ends at 0
+    tick += 10;
+    points.push({ tick, value: 0 });
+  }
+
+  if (points.length < 2) return null;
+
+  return {
+    enabled: true,
+    points: points.slice(0, 12),
+    sustainPoint: sustainIdx,
+    loopStartPoint: null,
+    loopEndPoint: null,
+  };
+}
+
+/** Convert a volume sequence table (per-tick values) to XM envelope points. */
+function volSeqToEnvelope(
+  seq: number[], speed: number = 1, maxPoints: number = 12,
+): EnvelopePoints | null {
+  if (!seq || seq.length === 0) return null;
+
+  const points: EnvelopePoint[] = [];
+  let lastVal = -1;
+  let loopIdx = -1;
+
+  for (let i = 0; i < seq.length && points.length < maxPoints; i++) {
+    const v = seq[i];
+    if (v === -128 || v === 0xE0) { // loop marker
+      loopIdx = 0; // loop to start
+      break;
+    }
+    if (v === -1 || v === 0xE1) break; // end marker
+    const val = Math.max(0, Math.min(64, v));
+    if (val !== lastVal) {
+      points.push({ tick: i * speed, value: val });
+      lastVal = val;
+    }
+  }
+
+  if (points.length < 2) {
+    if (points.length === 1) {
+      // Single value → flat envelope
+      points.push({ tick: points[0].tick + 1, value: points[0].value });
+    } else {
+      return null;
+    }
+  }
+
+  return {
+    enabled: true,
+    points,
+    sustainPoint: points.length > 2 ? points.length - 2 : null,
+    loopStartPoint: loopIdx >= 0 ? loopIdx : null,
+    loopEndPoint: loopIdx >= 0 ? points.length - 1 : null,
+  };
+}
+
+/** Attach a short looping waveform sample + XM envelope to an instrument. */
+function attachWaveformWithEnvelope(
+  inst: TrackerSong['instruments'][number],
+  waveform: Int8Array | number[],
+  envelope: EnvelopePoints | null,
+  sampleRate: number = 16574,
+): void {
+  const wave = waveform instanceof Int8Array ? waveform : new Int8Array(waveform);
+  if (wave.length === 0) return;
+
+  const wavBuf = buildLoopingWAV(wave, 0, wave.length, sampleRate);
+
+  if (!inst.sample) {
+    inst.sample = {
+      audioBuffer: wavBuf, url: '', baseNote: 'C-4', detune: 0,
+      loop: true, loopStart: 0, loopEnd: wave.length,
+      loopType: 'forward', sampleRate, reverse: false, playbackRate: 1,
+    };
+  } else {
+    inst.sample.audioBuffer = wavBuf;
+    inst.sample.sampleRate = sampleRate;
+    inst.sample.loop = true;
+    inst.sample.loopStart = 0;
+    inst.sample.loopEnd = wave.length;
+    inst.sample.loopType = 'forward';
+  }
+
+  if (envelope) {
+    if (!inst.metadata) inst.metadata = {};
+    inst.metadata.originalEnvelope = envelope;
+  }
+}
+
+// ── Format-specific XM waveform + envelope helpers ──────────────────────────
+
+function attachSoundMonXM(inst: TrackerSong['instruments'][number], cfg: SoundMonConfig): void {
+  // Waveform
+  let wave: Int8Array;
+  if (cfg.wavePCM && cfg.wavePCM.length > 0) {
+    wave = new Int8Array(cfg.wavePCM);
+  } else {
+    wave = new Int8Array(32);
+    for (let i = 0; i < 32; i++) wave[i] = Math.round(127 - (255 * i / 31)); // sawtooth
+  }
+
+  const atkTicks = (cfg.attackVolume ?? 64) * (cfg.attackSpeed || 1);
+  const decTicks = ((cfg.attackVolume ?? 64) - (cfg.decayVolume ?? 0)) * (cfg.decaySpeed || 1);
+  const relTicks = (cfg.decayVolume ?? 0) * (cfg.releaseSpeed || 1);
+
+  const envelope = adsrToEnvelope(
+    cfg.attackVolume ?? 64, atkTicks,
+    cfg.decayVolume ?? 0, decTicks,
+    cfg.sustainVolume ?? cfg.decayVolume ?? 0, cfg.sustainLength ?? 0,
+    cfg.releaseVolume ?? 0, relTicks,
+  );
+  attachWaveformWithEnvelope(inst, wave, envelope);
+}
+
+function attachSidMon1XM(inst: TrackerSong['instruments'][number], cfg: SidMon1Config): void {
+  if (!cfg.mainWave || cfg.mainWave.length === 0) return;
+  const wave = new Int8Array(cfg.mainWave);
+
+  const atkMax = cfg.attackMax ?? 64;
+  const atkTicks = (cfg.attackSpeed ?? 1) > 0 ? Math.ceil(atkMax / (cfg.attackSpeed ?? 1)) : 4;
+  const decMin = cfg.decayMin ?? 0;
+  const decTicks = (cfg.decaySpeed ?? 1) > 0 ? Math.ceil((atkMax - decMin) / (cfg.decaySpeed ?? 1)) : 8;
+  const relMin = cfg.releaseMin ?? 0;
+  const relTicks = (cfg.releaseSpeed ?? 1) > 0 ? Math.ceil((decMin - relMin) / Math.max(1, cfg.releaseSpeed ?? 1)) : 8;
+
+  const envelope = adsrToEnvelope(
+    atkMax, atkTicks,
+    decMin, decTicks,
+    decMin, cfg.sustain ?? 0,
+    relMin, Math.max(1, relTicks),
+  );
+  attachWaveformWithEnvelope(inst, wave, envelope);
+}
+
+function attachHippelCoSoXM(inst: TrackerSong['instruments'][number], cfg: HippelCoSoConfig): void {
+  // Sawtooth waveform (HippelCoSo doesn't embed waveforms)
+  const wave = new Int8Array(32);
+  for (let i = 0; i < 32; i++) wave[i] = Math.round(127 - (255 * i / 31));
+
+  const envelope = cfg.vseq ? volSeqToEnvelope(cfg.vseq, cfg.volSpeed || 1) : null;
+  attachWaveformWithEnvelope(inst, wave, envelope);
+}
+
+function attachDeltaMusic1XM(inst: TrackerSong['instruments'][number], cfg: DeltaMusic1Config): void {
+  const wave = new Int8Array(32);
+  for (let i = 0; i < 32; i++) wave[i] = Math.round(127 - (255 * i / 31));
+
+  const vol = cfg.volume ?? 64;
+  const atkTicks = Math.ceil(vol / Math.max(1, cfg.attackStep)) * Math.max(1, cfg.attackDelay);
+  const decTicks = Math.ceil((vol - (cfg.sustain ?? 0)) / Math.max(1, cfg.decayStep)) * Math.max(1, cfg.decayDelay);
+  const relTicks = Math.ceil((cfg.sustain ?? 0) / Math.max(1, cfg.releaseStep)) * Math.max(1, cfg.releaseDelay);
+
+  const envelope = adsrToEnvelope(vol, atkTicks, cfg.sustain ?? 0, decTicks, cfg.sustain ?? 0, 0, 0, relTicks);
+  attachWaveformWithEnvelope(inst, wave, envelope);
+}
+
+function attachDeltaMusic2XM(inst: TrackerSong['instruments'][number], cfg: DeltaMusic2Config): void {
+  let wave: Int8Array;
+  if (cfg.table && cfg.table.length >= 32) {
+    wave = new Int8Array(32);
+    for (let i = 0; i < 32; i++) {
+      const v = cfg.table[i];
+      wave[i] = v > 127 ? v - 256 : v;
+    }
+  } else {
+    wave = new Int8Array(32);
+    for (let i = 0; i < 32; i++) wave[i] = Math.round(127 - (255 * i / 31));
+  }
+
+  // Convert volTable to envelope points
+  let envelope: EnvelopePoints | null = null;
+  if (cfg.volTable && cfg.volTable.length > 0) {
+    const points: EnvelopePoint[] = [];
+    let tick = 0;
+    for (const entry of cfg.volTable) {
+      if (points.length >= 12) break;
+      const vol = Math.min(64, Math.round(entry.level * 64 / 255));
+      points.push({ tick, value: vol });
+      tick += (entry.speed || 1) + (entry.sustain || 0);
+    }
+    if (points.length >= 2) {
+      envelope = { enabled: true, points, sustainPoint: null, loopStartPoint: null, loopEndPoint: null };
+    }
+  }
+  attachWaveformWithEnvelope(inst, wave, envelope);
+}
+
+function attachDavidWhittakerXM(inst: TrackerSong['instruments'][number], cfg: DavidWhittakerConfig): void {
+  const wave = new Int8Array(32);
+  for (let i = 0; i < 32; i++) wave[i] = Math.round(127 - (255 * i / 31));
+
+  const envelope = cfg.volseq ? volSeqToEnvelope(cfg.volseq, 1) : null;
+  attachWaveformWithEnvelope(inst, wave, envelope);
+}
+
+function attachDigMugXM(inst: TrackerSong['instruments'][number], cfg: DigMugConfig): void {
+  // DigMug has waveform data but no envelope — just use waveform with constant volume
+  let wave: Int8Array;
+  if (cfg.waveformData && cfg.waveformData.length >= 32) {
+    wave = new Int8Array(32);
+    for (let i = 0; i < 32; i++) {
+      const v = cfg.waveformData[i];
+      wave[i] = v > 127 ? v - 256 : v;
+    }
+  } else {
+    wave = new Int8Array(32);
+    for (let i = 0; i < 32; i++) wave[i] = Math.round(127 - (255 * i / 31));
+  }
+  attachWaveformWithEnvelope(inst, wave, null);
+}
+
 // ── Main entry point ────────────────────────────────────────────────────────
 
 /**
@@ -301,6 +554,8 @@ export function bakeSynthInstruments(song: TrackerSong, exportAs: 'mod' | 'xm' =
         const loopLen = inst.soundMon.loopLength ?? 0;
         const loopEnd = loopLen > 2 ? loopStart + loopLen : pcm.length;
         attachSampleToInstrument(inst, pcm, loopStart, loopEnd, 8287);
+      } else if (useXMEnvelopes) {
+        attachSoundMonXM(inst, inst.soundMon);
       } else {
         const result = renderSynthInstrument(
           soundMonSim, inst.soundMon, 24, DEFAULT_SAMPLE_RATE,
@@ -312,50 +567,74 @@ export function bakeSynthInstruments(song: TrackerSong, exportAs: 'mod' | 'xm' =
 
     if (inst.sidmon1) {
       if (!inst.sidmon1.mainWave || inst.sidmon1.mainWave.length === 0) continue;
-      const result = renderSynthInstrument(
-        sidMon1Sim, inst.sidmon1, 24, DEFAULT_SAMPLE_RATE,
-      );
-      attachSampleToInstrument(inst, result.pcm, result.loopStart, result.loopEnd, result.sampleRate);
+      if (useXMEnvelopes) {
+        attachSidMon1XM(inst, inst.sidmon1);
+      } else {
+        const result = renderSynthInstrument(
+          sidMon1Sim, inst.sidmon1, 24, DEFAULT_SAMPLE_RATE,
+        );
+        attachSampleToInstrument(inst, result.pcm, result.loopStart, result.loopEnd, result.sampleRate);
+      }
       continue;
     }
 
     if (inst.digMug) {
-      const result = renderSynthInstrument(
-        digMugSim, inst.digMug, 24, DEFAULT_SAMPLE_RATE,
-      );
-      attachSampleToInstrument(inst, result.pcm, result.loopStart, result.loopEnd, result.sampleRate);
+      if (useXMEnvelopes) {
+        attachDigMugXM(inst, inst.digMug);
+      } else {
+        const result = renderSynthInstrument(
+          digMugSim, inst.digMug, 24, DEFAULT_SAMPLE_RATE,
+        );
+        attachSampleToInstrument(inst, result.pcm, result.loopStart, result.loopEnd, result.sampleRate);
+      }
       continue;
     }
 
     if (inst.hippelCoso) {
-      const result = renderSynthInstrument(
-        hippelCoSoSim, inst.hippelCoso, 24, DEFAULT_SAMPLE_RATE,
-      );
-      attachSampleToInstrument(inst, result.pcm, result.loopStart, result.loopEnd, result.sampleRate);
+      if (useXMEnvelopes) {
+        attachHippelCoSoXM(inst, inst.hippelCoso);
+      } else {
+        const result = renderSynthInstrument(
+          hippelCoSoSim, inst.hippelCoso, 24, DEFAULT_SAMPLE_RATE,
+        );
+        attachSampleToInstrument(inst, result.pcm, result.loopStart, result.loopEnd, result.sampleRate);
+      }
       continue;
     }
 
     if (inst.davidWhittaker) {
-      const result = renderSynthInstrument(
-        davidWhittakerSim, inst.davidWhittaker, 24, DEFAULT_SAMPLE_RATE,
-      );
-      attachSampleToInstrument(inst, result.pcm, result.loopStart, result.loopEnd, result.sampleRate);
+      if (useXMEnvelopes) {
+        attachDavidWhittakerXM(inst, inst.davidWhittaker);
+      } else {
+        const result = renderSynthInstrument(
+          davidWhittakerSim, inst.davidWhittaker, 24, DEFAULT_SAMPLE_RATE,
+        );
+        attachSampleToInstrument(inst, result.pcm, result.loopStart, result.loopEnd, result.sampleRate);
+      }
       continue;
     }
 
     if (inst.deltaMusic1 && !inst.deltaMusic1.isSample) {
-      const result = renderSynthInstrument(
-        deltaMusic1Sim, inst.deltaMusic1, 24, DEFAULT_SAMPLE_RATE,
-      );
-      attachSampleToInstrument(inst, result.pcm, result.loopStart, result.loopEnd, result.sampleRate);
+      if (useXMEnvelopes) {
+        attachDeltaMusic1XM(inst, inst.deltaMusic1);
+      } else {
+        const result = renderSynthInstrument(
+          deltaMusic1Sim, inst.deltaMusic1, 24, DEFAULT_SAMPLE_RATE,
+        );
+        attachSampleToInstrument(inst, result.pcm, result.loopStart, result.loopEnd, result.sampleRate);
+      }
       continue;
     }
 
     if (inst.deltaMusic2 && !inst.deltaMusic2.isSample) {
-      const result = renderSynthInstrument(
-        deltaMusic2Sim, inst.deltaMusic2, 24, DEFAULT_SAMPLE_RATE,
-      );
-      attachSampleToInstrument(inst, result.pcm, result.loopStart, result.loopEnd, result.sampleRate);
+      if (useXMEnvelopes) {
+        attachDeltaMusic2XM(inst, inst.deltaMusic2);
+      } else {
+        const result = renderSynthInstrument(
+          deltaMusic2Sim, inst.deltaMusic2, 24, DEFAULT_SAMPLE_RATE,
+        );
+        attachSampleToInstrument(inst, result.pcm, result.loopStart, result.loopEnd, result.sampleRate);
+      }
       continue;
     }
 
