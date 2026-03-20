@@ -203,6 +203,19 @@ export function phonemesToMEA8000Frames(
 
   if (rawFrames.length === 0) return [];
 
+  // Sentence intonation: lower F1 in last 30% (simulates falling pitch)
+  const total = rawFrames.length;
+  for (let i = 0; i < total; i++) {
+    const f = rawFrames[i];
+    if (!f.noise) {
+      const pos = i / total;
+      if (pos > 0.7) {
+        const drop = Math.round((pos - 0.7) / 0.3 * 2);
+        f.f1 = Math.max(0, f.f1 - drop);
+      }
+    }
+  }
+
   // Insert coarticulation transition frames between phonemes
   const result: MEA8000Frame[] = [];
   for (let i = 0; i < rawFrames.length; i++) {
