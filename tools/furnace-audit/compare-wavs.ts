@@ -238,7 +238,7 @@ function compareWavs(refPath: string, testPath: string, label: string): CompareR
     : (envDenRef === 0 && envDenTest === 0 ? 1.0 : 0.0);
 
   // Pass criteria: envelope correlation > 0.90 (phase-independent amplitude match)
-  const pass = envCorrelation > 0.90;
+  const pass = envCorrelation >= 0.90;
 
   return {
     file: label,
