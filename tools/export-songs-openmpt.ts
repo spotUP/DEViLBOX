@@ -1411,8 +1411,7 @@ const TEST_CASES: TestCase[] = [
   { file: 'formats/hot.primemover_01', format: 'AO', parserModule: 'Anders0landParser', parseFn: 'parseAnders0landFile', isAsync: true, noteExportOffset: 36 },
   { file: 'formats/redoctober-sub-docking.ims', format: 'IMS', parserModule: 'ImagesMusicSystemParser', parseFn: 'parseImagesMusicSystemFile', isAsync: false, noteExportOffset: 36 },
   { file: 'formats/ghostbattle_gameover.hip7', format: 'HIP7', parserModule: 'JochenHippel7VParser', parseFn: 'parseJochenHippel7VFile', isAsync: false, noteExportOffset: 36 },
-  // Synth Dream — parser expects "Synth4.0"/"Synth4.2" magic, test files don't have it
-  // { file: 'formats/sdr.nobuddiesland_jigsaw', format: 'SDR', ... },
+  { file: 'formats/space_sound.syn', format: 'SYN', parserModule: 'SynthesisParser', parseFn: 'parseSynthesisFile', isAsync: false, args: 'bytes', noteExportOffset: 36 },
   { file: 'formats/centerbase_soft.osp', format: 'OSP', parserModule: 'SynthPackParser', parseFn: 'parseSynthPackFile', isAsync: false, noteExportOffset: 36 },
   { file: 'formats/mdat.rocknroll', format: 'TFMX', parserModule: 'TFMXParser', parseFn: 'parseTFMXFile', isAsync: false, noteExportOffset: 36 },
   { file: 'formats/warlock_the_avenger.sqt', format: 'QRT', parserModule: 'QuartetParser', parseFn: 'parseQuartetFile', isAsync: true, noteExportOffset: 36 },
