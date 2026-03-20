@@ -390,9 +390,7 @@ export async function importTrackerModule(
     setBPM(song.initialBPM);
     setSpeed(song.initialSpeed);
     setMetadata({ name: song.name, author: '', description: `Imported from ${info.file?.name || 'module'}` });
-    console.log('[UnifiedFileLoader] steveTurnerFileData on song:', !!(song as any).steveTurnerFileData, 'size:', (song as any).steveTurnerFileData?.byteLength);
     applyEditorMode(song);
-    console.log('[UnifiedFileLoader] steveTurnerFileData in store after applyEditorMode:', !!useFormatStore.getState().steveTurnerFileData);
     if (song.c64SidFileData && useFormatStore.getState().editorMode === 'goattracker') {
       const gtStore = (await import('@/stores/useGTUltraStore')).useGTUltraStore.getState();
       const parts = song.name.split(' — ');
@@ -1037,34 +1035,53 @@ async function loadSongFile(file: File, options: FileLoadOptions): Promise<FileL
 
       let patternsToLoad;
       if (svPatterns && svPatterns.length > 0) {
-        const sorted = [...svPatterns].sort((a, b) => a.x - b.x);
-        patternsToLoad = sorted.map((svPat, i) => {
-          const channels = Array.from({ length: svPat.tracks }, (_, t) => {
-            // Find dominant module for channel naming + instrument assignment
-            const modCounts = new Map<number, number>();
-            for (let l = 0; l < svPat.lines; l++) {
-              const ev = svPat.notes[t]?.[l];
-              if (ev && ev.module >= 1) modCounts.set(ev.module, (modCounts.get(ev.module) ?? 0) + 1);
-            }
-            let dominantMod = -1, maxCnt = 0;
-            for (const [id, cnt] of modCounts) { if (cnt > maxCnt) { maxCnt = cnt; dominantMod = id; } }
-            const chName = dominantMod >= 0 ? (moduleNameMap.get(dominantMod) ?? `Track ${t + 1}`) : `Track ${t + 1}`;
-            // Map channel to the instrument for its dominant module
-            const instrId = dominantMod >= 0 ? (svModToInstrIdx.get(dominantMod) ?? 1) : 1;
+        // Group SunVox patterns by x position — patterns at the same x play simultaneously
+        // and should be merged into one multi-channel tracker pattern.
+        const xGroups = new Map<number, typeof svPatterns>();
+        for (const p of svPatterns) {
+          const group = xGroups.get(p.x) ?? [];
+          group.push(p);
+          xGroups.set(p.x, group);
+        }
+        const sortedXs = [...xGroups.keys()].sort((a, b) => a - b);
 
-            const rows = Array.from({ length: svPat.lines }, (_, l) => {
-              const ev = svPat.notes[t]?.[l];
-              if (!ev || (ev.note === 0 && ev.vel === 0 && ev.module < 0 && ev.ctl === 0)) return { ...emptyRow };
-              const volume = ev.vel === 0 ? 0 : Math.max(1, Math.round(ev.vel * 64 / 129));
-              // Map per-event module to instrument
-              const evInstrId = ev.module >= 1 ? (svModToInstrIdx.get(ev.module) ?? instrId) : instrId;
-              const effTyp  = (ev.ctl >> 8) & 0xFF;
-              const effTyp2 = ev.ctl & 0xFF;
-              return { note: ev.note, instrument: evInstrId, volume, effTyp, eff: effTyp > 0 ? ev.ctlVal : 0, effTyp2, eff2: effTyp2 > 0 ? ev.ctlVal : 0 };
-            });
-            return { id: `ch-svox-${Date.now()}-${i}-${t}`, name: chName, muted: false, solo: false, collapsed: false, volume: 100, pan: 0, instrumentId: instrId, color: channelColors[t % channelColors.length], rows };
+        // Helper: build a channel from a SunVox pattern track
+        const buildChannel = (svPat: SunVoxPatternData, t: number, patIdx: number, chIdx: number, maxLines: number) => {
+          const modCounts = new Map<number, number>();
+          for (let l = 0; l < svPat.lines; l++) {
+            const ev = svPat.notes[t]?.[l];
+            if (ev && ev.module >= 1) modCounts.set(ev.module, (modCounts.get(ev.module) ?? 0) + 1);
+          }
+          let dominantMod = -1, maxCnt = 0;
+          for (const [id, cnt] of modCounts) { if (cnt > maxCnt) { maxCnt = cnt; dominantMod = id; } }
+          const chName = dominantMod >= 0 ? (moduleNameMap.get(dominantMod) ?? `Track ${chIdx + 1}`) : `Track ${chIdx + 1}`;
+          const instrId = dominantMod >= 0 ? (svModToInstrIdx.get(dominantMod) ?? 1) : 1;
+
+          const rows = Array.from({ length: maxLines }, (_, l) => {
+            if (l >= svPat.lines) return { ...emptyRow };
+            const ev = svPat.notes[t]?.[l];
+            if (!ev || (ev.note === 0 && ev.vel === 0 && ev.module < 0 && ev.ctl === 0)) return { ...emptyRow };
+            const volume = ev.vel === 0 ? 0 : Math.max(1, Math.round(ev.vel * 64 / 129));
+            const evInstrId = ev.module >= 1 ? (svModToInstrIdx.get(ev.module) ?? instrId) : instrId;
+            const effTyp  = (ev.ctl >> 8) & 0xFF;
+            const effTyp2 = ev.ctl & 0xFF;
+            return { note: ev.note, instrument: evInstrId, volume, effTyp, eff: effTyp > 0 ? ev.ctlVal : 0, effTyp2, eff2: effTyp2 > 0 ? ev.ctlVal : 0 };
           });
-          return { id: `svpat-${Date.now()}-${i}`, name: svPatterns.length > 1 ? `Pattern ${i + 1}` : name, length: svPat.lines, channels };
+          return { id: `ch-svox-${Date.now()}-${patIdx}-${chIdx}`, name: chName, muted: false, solo: false, collapsed: false, volume: 100, pan: 0, instrumentId: instrId, color: channelColors[chIdx % channelColors.length], rows };
+        };
+
+        patternsToLoad = sortedXs.map((x, patIdx) => {
+          const group = xGroups.get(x)!;
+          // Max lines across all patterns in this group
+          const maxLines = Math.max(...group.map(p => p.lines));
+          // Merge all tracks from all patterns into one channel list
+          const channels: ReturnType<typeof buildChannel>[] = [];
+          for (const svPat of group) {
+            for (let t = 0; t < svPat.tracks; t++) {
+              channels.push(buildChannel(svPat, t, patIdx, channels.length, maxLines));
+            }
+          }
+          return { id: `svpat-${Date.now()}-${patIdx}`, name: `Pattern ${patIdx + 1}`, length: maxLines, channels };
         });
       } else {
         // Fallback: single pattern with one channel per generator

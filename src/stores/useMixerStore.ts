@@ -105,7 +105,7 @@ export function getActiveGainEngine(): { setChannelGain(ch: number, gain: number
     } else if (fmt.pumaTrackerFileData) {
       const { PumaTrackerEngine } = require('../engine/pumatracker/PumaTrackerEngine');
       if (PumaTrackerEngine.hasInstance()) return PumaTrackerEngine.getInstance();
-    } else if (fmt.steveTurnerFileData) {
+    } else if (fmt.steveTurnerFileData || (() => { try { const { SteveTurnerEngine } = require('../engine/steveturner/SteveTurnerEngine'); return SteveTurnerEngine.hasInstance(); } catch { return false; } })()) {
       const { SteveTurnerEngine } = require('../engine/steveturner/SteveTurnerEngine');
       if (SteveTurnerEngine.hasInstance()) return SteveTurnerEngine.getInstance();
     } else if (fmt.artOfNoiseFileData) {
