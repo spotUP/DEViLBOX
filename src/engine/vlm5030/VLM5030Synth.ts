@@ -2,8 +2,8 @@
 import { MAMEBaseSynth } from '@engine/mame/MAMEBaseSynth';
 import { textToPhonemes, parsePhonemeString } from '@engine/speech/Reciter';
 import { SpeechSequencer, type SpeechFrame } from '@engine/speech/SpeechSequencer';
-import { type SP0250Frame, phonemesToSP0250Frames, samToSP0250 } from '@engine/speech/sp0250PhonemeMap';
-import { type VLM5030Frame, phonemesToVLM5030Frames } from '@engine/speech/vlm5030PhonemeMap';
+import { type SP0250Frame, samToSP0250 } from '@engine/speech/sp0250PhonemeMap';
+import { phonemesToVLM5030Frames } from '@engine/speech/vlm5030PhonemeMap';
 import { loadVLM5030ROMs } from '@engine/mame/MAMEROMLoader';
 
 /**
@@ -229,22 +229,6 @@ export class VLM5030Synth extends MAMEBaseSynth {
     }
     this._startSpeechAtNote(text, 60, 0.8);
   }
-
-  /**
-   * VLM5030 LPC frame indices for each vowel preset.
-   * [energyIdx, pitchIdx, k0..k9] — indices into VLM5030 coefficient tables.
-   * Voiced vowels get pitch; unvoiced get pitch=0.
-   */
-  private static readonly VOWEL_FRAMES: Record<number, number[]> = {
-    0: [22, 14, 44, 5, 4, 2, 1, 0, 0, 0, 0, 0],  // AH
-    1: [20, 12, 36, 14, 6, 4, 2, 1, 0, 0, 0, 0],  // EE
-    2: [20, 13, 40, 10, 5, 3, 2, 1, 0, 0, 0, 0],  // IH
-    3: [22, 15, 48, 24, 3, 2, 1, 0, 0, 0, 0, 0],  // OH
-    4: [20, 17, 52, 26, 2, 1, 0, 0, 0, 0, 0, 0],  // OO
-    5: [18, 14, 42, 8, 10, 6, 3, 2, 1, 0, 0, 0],  // NN
-    6: [14,  0, 48, 4, 2, 1, 4, 3, 2, 1, 0, 0],   // SS (unvoiced)
-    7: [12,  0, 50, 3, 1, 0, 0, 0, 0, 0, 0, 0],   // HH (unvoiced)
-  };
 
   private _startSpeechAtNote(text: string, _note: number, _velocity: number): void {
     if (!this._isReady || !this.workletNode || this._disposed) return;
