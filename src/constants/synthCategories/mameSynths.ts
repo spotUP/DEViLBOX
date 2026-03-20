@@ -212,9 +212,9 @@ export const mameSynthEntries: Record<string, SynthInfo> = {
     type: 'MAMEUPD931',
     name: 'NEC uPD931',
     shortName: '931',
-    description: 'NEC uPD931 - speech synthesis processor with LPC coding',
-    bestFor: ['Japanese speech', 'Arcade voice', 'Retro talking', 'Speech FX'],
-    icon: 'Mic',
+    description: 'NEC uPD931 - dual waveform keyboard synthesizer (Casio)',
+    bestFor: ['Casio keys', 'Retro organ', 'Dual waveform', 'Keyboard'],
+    icon: 'Piano',
     color: 'text-accent-highlight',
   },
   MAMEUPD933: {
