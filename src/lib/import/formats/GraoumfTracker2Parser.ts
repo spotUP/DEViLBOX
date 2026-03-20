@@ -127,7 +127,8 @@ function readGT2Header(buf: Uint8Array): GT2Header | null {
 
   const headerSize      = u32be(buf, 4);
   const songName        = readString(buf, 8, 32);
-  const year            = u16be(buf, 203);
+  // 3(magic)+1(ver)+4(hdrSize)+32(name)+160(comment)+1(day)+1(month) = offset 202
+  const year            = u16be(buf, 202);
   if (year < 1980 || year > 9999) return null;
 
   // Fields only present in version 0-5
