@@ -17,6 +17,8 @@ import {
   DEFAULT_OCTAMED, DEFAULT_SIDMON1, DEFAULT_HIPPEL_COSO, DEFAULT_ROB_HUBBARD, DEFAULT_STEVE_TURNER, DEFAULT_DAVID_WHITTAKER,
   DEFAULT_SONIC_ARRANGER,
   DEFAULT_INSTEREO2,
+  DEFAULT_FUTUREPLAYER,
+  DEFAULT_SYMPHONIE,
   DEFAULT_SUPERCOLLIDER,
   DEFAULT_WOBBLE_BASS,
 } from '@typedefs/instrument';
@@ -102,11 +104,13 @@ const SonicArrangerControls = lazy(() =>
 const InStereo2Controls = lazy(() =>
   import('../controls/InStereo2Controls').then(m => ({ default: m.InStereo2Controls }))
 );
+const SymphonieControls = lazy(() => import('../controls/SymphonieControls').then(m => ({ default: m.SymphonieControls })));
 const SuperColliderEditor = lazy(() => import('../SuperColliderEditor').then(m => ({ default: m.SuperColliderEditor })));
 const GearmulatorEditor = lazy(() => import('../GearmulatorEditor').then(m => ({ default: m.GearmulatorEditor })));
 const GearmulatorHardware = lazy(() => import('../gearmulator/GearmulatorHardware').then(m => ({ default: m.GearmulatorHardware })));
 const WobbleBassControls = lazy(() => import('../controls/WobbleBassControls').then(m => ({ default: m.WobbleBassControls })));
 const StartrekkerAMControls = lazy(() => import('../controls/StartrekkerAMControls').then(m => ({ default: m.StartrekkerAMControls })));
+const FuturePlayerControls = lazy(() => import('../controls/FuturePlayerControls').then(m => ({ default: m.FuturePlayerControls })));
 
 // Lazy-loaded hardware UI components
 const HivelyHardware = lazy(() => import('../hardware/HivelyHardware').then(m => ({ default: m.HivelyHardware })));
@@ -127,7 +131,7 @@ const WavetableListEditor = lazy(() => import('./WavetableEditor').then(m => ({ 
 
 
 // Types
-export type EditorMode = 'generic' | 'tb303' | 'furnace' | 'buzzmachine' | 'sample' | 'dubsiren' | 'spacelaser' | 'v2' | 'sam' | 'synare' | 'mame' | 'mamechip' | 'dexed' | 'obxd' | 'wam' | 'tonewheelOrgan' | 'melodica' | 'vital' | 'odin2' | 'surge' | 'vstbridge' | 'harmonicsynth' | 'modular' | 'sunvox-modular' | 'hively' | 'jamcracker' | 'soundmon' | 'sidmon' | 'digmug' | 'fc' | 'deltamusic1' | 'deltamusic2' | 'fred' | 'tfmx' | 'octamed' | 'sidmon1' | 'hippelcoso' | 'robhubbard' | 'steveturner' | 'davidwhittaker' | 'sonic-arranger' | 'instereo2' | 'musicline' | 'supercollider' | 'gearmulator' | 'wobblebass' | 'startrekker-am';
+export type EditorMode = 'generic' | 'tb303' | 'furnace' | 'buzzmachine' | 'sample' | 'dubsiren' | 'spacelaser' | 'v2' | 'sam' | 'synare' | 'mame' | 'mamechip' | 'dexed' | 'obxd' | 'wam' | 'tonewheelOrgan' | 'melodica' | 'vital' | 'odin2' | 'surge' | 'vstbridge' | 'harmonicsynth' | 'modular' | 'sunvox-modular' | 'hively' | 'jamcracker' | 'soundmon' | 'sidmon' | 'digmug' | 'fc' | 'deltamusic1' | 'deltamusic2' | 'fred' | 'tfmx' | 'octamed' | 'sidmon1' | 'hippelcoso' | 'robhubbard' | 'steveturner' | 'davidwhittaker' | 'sonic-arranger' | 'instereo2' | 'musicline' | 'supercollider' | 'gearmulator' | 'wobblebass' | 'startrekker-am' | 'futureplayer' | 'symphonie';
 
 // ============================================================================
 // GEARMULATOR EDITOR SECTION
@@ -366,6 +370,10 @@ export const SynthTypeDispatcher: React.FC<SynthTypeDispatcherProps> = ({
     updateAmigaSynth('deltaMusic1', instrument.deltaMusic1 || DEFAULT_DELTAMUSIC1, updates);
   }, [instrument.deltaMusic1, updateAmigaSynth]);
 
+  const handleFuturePlayerChange = useCallback((updates: Partial<typeof instrument.futurePlayer>) => {
+    updateAmigaSynth('futurePlayer', instrument.futurePlayer || DEFAULT_FUTUREPLAYER, updates);
+  }, [instrument.futurePlayer, updateAmigaSynth]);
+
   const handleDeltaMusic2Change = useCallback((updates: Partial<typeof instrument.deltaMusic2>) => {
     updateAmigaSynth('deltaMusic2', instrument.deltaMusic2 || DEFAULT_DELTAMUSIC2, updates);
   }, [instrument.deltaMusic2, updateAmigaSynth]);
@@ -401,6 +409,10 @@ export const SynthTypeDispatcher: React.FC<SynthTypeDispatcherProps> = ({
   const handleSonicArrangerChange = useCallback((updates: Partial<typeof instrument.sonicArranger>) => {
     updateAmigaSynth('sonicArranger', instrument.sonicArranger || DEFAULT_SONIC_ARRANGER, updates);
   }, [instrument.sonicArranger, instrument.id, handleChange]);
+
+  const handleSymphonieChange = useCallback((updates: Partial<typeof instrument.symphonie>) => {
+    updateAmigaSynth('symphonie', instrument.symphonie || DEFAULT_SYMPHONIE, updates);
+  }, [instrument.symphonie, updateAmigaSynth]);
 
   // Handle Space Laser config updates
   const handleSpaceLaserChange = useCallback((updates: Partial<typeof instrument.spaceLaser>) => {
@@ -1021,6 +1033,29 @@ export const SynthTypeDispatcher: React.FC<SynthTypeDispatcherProps> = ({
   }
 
   // ============================================================================
+  // FUTURE PLAYER EDITOR
+  // ============================================================================
+  if (editorMode === 'futureplayer') {
+    const fpConfig = deepMerge(DEFAULT_FUTUREPLAYER, instrument.futurePlayer || {});
+    return (
+      <div className="synth-editor-container bg-gradient-to-b from-[#1a0e00] to-[#080400]">
+        <EditorHeader
+          instrument={instrument}
+          onChange={handleChange}
+          vizMode={vizMode}
+          onVizModeChange={setVizMode}
+        />
+        <Suspense fallback={<LoadingControls />}>
+          <FuturePlayerControls
+            config={fpConfig}
+            onChange={handleFuturePlayerChange}
+          />
+        </Suspense>
+      </div>
+    );
+  }
+
+  // ============================================================================
   // FRED EDITOR
   // ============================================================================
   if (editorMode === 'fred') {
@@ -1206,6 +1241,29 @@ export const SynthTypeDispatcher: React.FC<SynthTypeDispatcherProps> = ({
             config={davidWhittakerConfig}
             onChange={handleDavidWhittakerChange}
             uadeChipRam={instrument.uadeChipRam}
+          />
+        </Suspense>
+      </div>
+    );
+  }
+
+  // ============================================================================
+  // SYMPHONIE PRO EDITOR
+  // ============================================================================
+  if (editorMode === 'symphonie') {
+    const symphonieConfig = deepMerge(DEFAULT_SYMPHONIE, instrument.symphonie || {});
+    return (
+      <div className="synth-editor-container bg-gradient-to-b from-[#120820] to-[#060410]">
+        <EditorHeader
+          instrument={instrument}
+          onChange={handleChange}
+          vizMode={vizMode}
+          onVizModeChange={setVizMode}
+        />
+        <Suspense fallback={<LoadingControls />}>
+          <SymphonieControls
+            config={symphonieConfig}
+            onChange={handleSymphonieChange}
           />
         </Suspense>
       </div>

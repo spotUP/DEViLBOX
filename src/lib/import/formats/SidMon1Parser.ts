@@ -555,6 +555,7 @@ export function parseSidMon1File(buffer: ArrayBuffer, filename: string, moduleBa
     initialBPM: 125,
     linearPeriods: false,
     uadePatternLayout,
+    sidmon1WasmFileData: buffer.slice(0),
   };
 }
 
