@@ -12,6 +12,15 @@ import { Knob } from '@components/controls/Knob';
 
 type STTab = 'envelope' | 'vibrato' | 'misc';
 
+/** Maps SteveTurnerConfig property names to WASM ST_PARAM_* IDs */
+const PARAM_IDS: Record<keyof SteveTurnerConfig, number> = {
+  priority: 0, sampleIdx: 1, initDelay: 2,
+  env1Duration: 3, env1Delta: 4, env2Duration: 5, env2Delta: 6,
+  pitchShift: 7, oscCount: 8, oscDelta: 9, oscLoop: 10,
+  decayDelta: 11, numVibrato: 12, vibratoDelay: 13,
+  vibratoSpeed: 14, vibratoMaxDepth: 15, chain: 16,
+};
+
 interface SteveTurnerControlsProps {
   config: SteveTurnerConfig;
   onChange: (updates: Partial<SteveTurnerConfig>) => void;
@@ -52,7 +61,16 @@ export const SteveTurnerControls: React.FC<SteveTurnerControlsProps> = ({
 
   const upd = useCallback(<K extends keyof SteveTurnerConfig>(key: K, value: SteveTurnerConfig[K]) => {
     onChange({ [key]: value } as Partial<SteveTurnerConfig>);
-  }, [onChange]);
+    // Forward to WASM engine in real-time
+    const paramId = PARAM_IDS[key];
+    if (paramId !== undefined && instrumentIndex !== undefined) {
+      import('@/engine/steveturner/SteveTurnerEngine').then(({ SteveTurnerEngine }) => {
+        if (SteveTurnerEngine.hasInstance()) {
+          SteveTurnerEngine.getInstance().setInstrumentParam(instrumentIndex, paramId, value as number);
+        }
+      }).catch(() => {});
+    }
+  }, [onChange, instrumentIndex]);
 
   const tabs: { key: STTab; label: string }[] = [
     { key: 'envelope', label: 'Envelope' },
