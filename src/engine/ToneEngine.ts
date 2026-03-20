@@ -1041,7 +1041,7 @@ export class ToneEngine {
     const wasmConfigs = configs.filter((c) => 
       ['TB303', 'Buzz3o3', 'V2', 'Sam', 'Synare', 'DubSiren', 'SpaceLaser', 'Dexed', 'OBXd', 'Furnace', 'HivelySynth', 'UADESynth', 'SymphonieSynth', 'MusicLineSynth',
        'SoundMonSynth', 'SidMonSynth', 'DigMugSynth', 'FCSynth', 'FredSynth', 'TFMXSynth',
-       'OctaMEDSynth', 'SidMon1Synth', 'HippelCoSoSynth', 'RobHubbardSynth', 'SteveTurnerSynth', 'DavidWhittakerSynth',
+       'OctaMEDSynth', 'SidMon1Synth', 'HippelCoSoSynth', 'RobHubbardSynth', 'SteveTurnerSynth', 'FredEditorReplayerSynth', 'DavidWhittakerSynth',
        'SonicArrangerSynth', 'InStereo2Synth', 'InStereo1Synth', 'DeltaMusic1Synth', 'DeltaMusic2Synth',
        'StartrekkerAMSynth', 'SunVoxSynth', 'JamCrackerSynth', 'FuturePlayerSynth'].includes(c.synthType || '') ||
       c.synthType?.startsWith('Furnace')
@@ -1475,7 +1475,7 @@ export class ToneEngine {
       'SoundMonSynth', 'SidMonSynth', 'SidMon1Synth',
       'DigMugSynth', 'DeltaMusic1Synth', 'DeltaMusic2Synth',
       'FCSynth', 'TFMXSynth', 'MusicLineSynth', 'SymphonieSynth', 'SunVoxSynth',
-      'FredSynth', 'HippelCoSoSynth', 'RobHubbardSynth', 'SteveTurnerSynth', 'StartrekkerAMSynth',
+      'FredSynth', 'HippelCoSoSynth', 'RobHubbardSynth', 'SteveTurnerSynth', 'FredEditorReplayerSynth', 'StartrekkerAMSynth',
       'OctaMEDSynth', 'DavidWhittakerSynth',
       'HivelySynth', 'KlysSynth', 'MAMEVASynth', 'UADESynth',
       'GearmulatorVirus', 'GearmulatorVirusTI', 'GearmulatorMicroQ',
@@ -2195,6 +2195,7 @@ export class ToneEngine {
       case 'HippelCoSoSynth':
       case 'RobHubbardSynth':
       case 'SteveTurnerSynth':
+      case 'FredEditorReplayerSynth':
       case 'DavidWhittakerSynth':
       case 'SonicArrangerSynth':
       case 'InStereo2Synth':

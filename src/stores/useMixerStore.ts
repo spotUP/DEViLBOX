@@ -121,6 +121,12 @@ export function getActiveGainEngine(): { setChannelGain(ch: number, gain: number
     } else if (fmt.steveTurnerFileData) {
       const { SteveTurnerEngine } = require('../engine/steveturner/SteveTurnerEngine');
       if (SteveTurnerEngine.hasInstance()) return SteveTurnerEngine.getInstance();
+    } else if (fmt.sidmon1WasmFileData) {
+      const { SidMon1ReplayerEngine } = require('../engine/sidmon1/SidMon1ReplayerEngine');
+      if (SidMon1ReplayerEngine.hasInstance()) return SidMon1ReplayerEngine.getInstance();
+    } else if (fmt.fredEditorWasmFileData) {
+      const { FredEditorReplayerEngine } = require('../engine/fred/FredEditorReplayerEngine');
+      if (FredEditorReplayerEngine.hasInstance()) return FredEditorReplayerEngine.getInstance();
     } else if (fmt.artOfNoiseFileData) {
       const { ArtOfNoiseEngine } = require('../engine/artofnoise/ArtOfNoiseEngine');
       if (ArtOfNoiseEngine.hasInstance()) return ArtOfNoiseEngine.getInstance();

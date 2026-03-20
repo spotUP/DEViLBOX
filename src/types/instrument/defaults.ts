@@ -73,6 +73,8 @@ import type {
   DavidWhittakerConfig,
   SunVoxConfig,
   InStereo2Config,
+  FuturePlayerConfig,
+  SymphonieConfig,
 } from './exotic';
 import type {
   DrumMachineConfig,
@@ -270,7 +272,8 @@ export interface InstrumentConfig {
   sidmon1?: SidMon1Config;
   octamed?: OctaMEDConfig;
   davidWhittaker?: DavidWhittakerConfig;
-  symphonie?: import('@/engine/symphonie/SymphoniePlaybackData').SymphoniePlaybackData;
+  futurePlayer?: FuturePlayerConfig;
+  symphonie?: SymphonieConfig;
   // SunVox WASM patch
   sunvox?: SunVoxConfig;
   // StarTrekker AM synthesis (from NT companion file)
@@ -807,10 +810,55 @@ export const DEFAULT_DAVID_WHITTAKER: DavidWhittakerConfig = {
   frqseq: [-128, 0],        // static pitch, loop at 0
 };
 
+export const DEFAULT_SYMPHONIE: SymphonieConfig = {
+  type: 0,              // Normal (one-shot)
+  volume: 100,          // Full volume
+  tune: 0,              // No transpose
+  fineTune: 0,          // No fine-tune
+  noDsp: false,         // DSP enabled
+  multiChannel: 0,      // Mono
+  loopStart: 0,
+  loopLen: 0,
+  numLoops: 0,          // Infinite
+  newLoopSystem: false,
+  sampledFrequency: 8363,
+};
+
 export const DEFAULT_SUNVOX: SunVoxConfig = {
   patchData: null,
   patchName: '',
   controlValues: {},
+};
+
+export const DEFAULT_FUTUREPLAYER: FuturePlayerConfig = {
+  isWavetable: false,
+  volume: 64,
+  attackRate: 16,
+  attackPeak: 255,
+  decayRate: 4,
+  sustainLevel: 128,
+  sustainRate: 0,
+  sustainTarget: 128,
+  releaseRate: 8,
+  pitchMod1Delay: 0,
+  pitchMod1Shift: 0,
+  pitchMod1Mode: 0,
+  pitchMod1Negate: false,
+  hasPitchMod1: false,
+  pitchMod2Delay: 0,
+  pitchMod2Shift: 0,
+  pitchMod2Mode: 0,
+  pitchMod2Negate: false,
+  hasPitchMod2: false,
+  sampleMod1Delay: 0,
+  sampleMod1Shift: 0,
+  sampleMod1Mode: 0,
+  hasSampleMod1: false,
+  sampleMod2Delay: 0,
+  sampleMod2Shift: 0,
+  sampleMod2Mode: 0,
+  hasSampleMod2: false,
+  sampleSize: 0,
 };
 
 export const DEFAULT_SUNVOX_MODULAR_PATCH: import('../modular').ModularPatchConfig = {

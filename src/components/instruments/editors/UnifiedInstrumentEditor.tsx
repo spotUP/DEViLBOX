@@ -170,6 +170,8 @@ function getEditorMode(synthType: SynthType): EditorMode {
   if (synthType === 'RobHubbardSynth') return 'robhubbard';
   if (synthType === 'SteveTurnerSynth') return 'steveturner';
   if (synthType === 'DavidWhittakerSynth') return 'davidwhittaker';
+  if (synthType === 'FuturePlayerSynth') return 'futureplayer';
+  if (synthType === 'SymphonieSynth') return 'symphonie';
   if (synthType === 'HarmonicSynth') return 'harmonicsynth';
   if (synthType === 'ModularSynth') return 'modular';
   if (synthType === 'SunVoxModular') return 'sunvox-modular';

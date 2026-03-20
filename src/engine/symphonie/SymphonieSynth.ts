@@ -13,7 +13,7 @@ import type { SymphoniePlaybackData } from './SymphoniePlaybackData';
 import { getDevilboxAudioContext } from '@/utils/audio-context';
 import { SymphonieEngine } from './SymphonieEngine';
 
-export interface SymphonieConfig {
+export interface SymphonieLoadConfig {
   symphonie: SymphoniePlaybackData;
 }
 
@@ -34,7 +34,7 @@ export class SymphonieSynth implements DevilboxSynth {
     this.engine = SymphonieEngine.getInstance();
   }
 
-  async load(config: SymphonieConfig): Promise<void> {
+  async load(config: SymphonieLoadConfig): Promise<void> {
     await this.engine.loadSong(this.audioContext, config.symphonie);
 
     // Connect engine node to our output after load (node is (re-)created by loadSong)

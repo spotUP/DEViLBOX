@@ -132,6 +132,10 @@ export class TrackerCanvas2DRenderer {
     const { offsets: chanOffsets, widths: chanWidths } = layout;
     const numChan = pattern.channels.length;
 
+    // Mute / solo dimming
+    const anySolo = pattern.channels.some(ch => ch.solo);
+    const MUTED_ALPHA = 0.3;
+
     // ── Row backgrounds ─────────────────────────────────────────────────────
     for (let r = startRow; r < endRow; r++) {
       const y = (r - scrollRow) * rowH;
@@ -180,6 +184,17 @@ export class TrackerCanvas2DRenderer {
       const chanX  = LINE_NUMBER_WIDTH + (chanOffsets[ch] ?? 0);
       const chan   = pattern.channels[ch];
       if (!chan) continue;
+
+      // Muted / non-solo darkening overlay
+      const isDimmed = chan.muted || (anySolo && !chan.solo);
+      if (isDimmed) {
+        const chW = chanWidths[ch] ?? CHAR_WIDTH * 9;
+        ctx.fillStyle = 'rgba(0,0,0,0.45)';
+        ctx.fillRect(chanX, 0, chW, H);
+      }
+
+      // Dim text alpha for muted/non-solo channels
+      if (isDimmed) ctx.globalAlpha = MUTED_ALPHA;
 
       for (let r = startRow; r < endRow; r++) {
         const y   = (r - scrollRow) * rowH + rowH / 2;
@@ -241,6 +256,9 @@ export class TrackerCanvas2DRenderer {
           ctx.fillText(effStr, chanX + 2 + CHAR_WIDTH * 7 + 6, y);
         }
       }
+
+      // Restore alpha after muted channel
+      if (isDimmed) ctx.globalAlpha = 1;
     }
 
     // ── Cursor rect ─────────────────────────────────────────────────────────

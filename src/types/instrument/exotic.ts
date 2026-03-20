@@ -469,6 +469,36 @@ export interface DavidWhittakerConfig {
 }
 
 /**
+ * Symphonie Pro instrument configuration.
+ * Editable per-instrument parameters from the .symmod format.
+ * Volume, tuning, loop, DSP bypass, and multichannel settings.
+ */
+export interface SymphonieConfig {
+  /** Instrument type: 0=Normal(one-shot), 4=Loop, 8=Sustain, -4=Kill, -8=Silent */
+  type: number;
+  /** Instrument volume (0-100) */
+  volume: number;
+  /** Signed semitone offset (includes downsample correction) */
+  tune: number;
+  /** Signed fine-tune adjustment */
+  fineTune: number;
+  /** If true, voice bypasses DSP ring buffer */
+  noDsp: boolean;
+  /** 0=mono, 1=stereoL, 2=stereoR, 3=lineSrc */
+  multiChannel: number;
+  /** Loop start as percentage x 65536 (0%=0, 100%=6553600) */
+  loopStart: number;
+  /** Loop length as percentage x 65536 (same encoding as loopStart) */
+  loopLen: number;
+  /** Number of loop repetitions (0=infinite) */
+  numLoops: number;
+  /** New loop system flag (bit 4 of LineSampleFlags) */
+  newLoopSystem: boolean;
+  /** Original sample rate in Hz (0 = assume 8363) */
+  sampledFrequency: number;
+}
+
+/**
  * StarTrekker AM synthesis configuration.
  * 5-phase ADSR envelope + vibrato + waveform selection.
  * Derived from the NT companion file (120-byte instrument blocks).
@@ -487,6 +517,72 @@ export interface StartrekkerAMConfig {
   vibFreqStep: number;      // NT[28]: vibrato frequency step
   vibAmplitude: number;     // NT[30]: vibrato amplitude (signed 16-bit)
   periodShift: number;      // NT[34]: period left-shift amount (0-15)
+}
+
+/**
+ * Future Player (Paul van der Valk) instrument configuration.
+ *
+ * The instrument "detail" structure in the binary holds envelope, modulation,
+ * and sample parameters. These fields correspond to the offsets in the
+ * FuturePlayer.c update_audio() function.
+ */
+export interface FuturePlayerConfig {
+  /** Whether the instrument uses wavetable mode or PCM sample */
+  isWavetable: boolean;
+  /** Instrument volume (0-255, detail+0x08) */
+  volume: number;
+  /** Attack rate — added to envelope level each tick (0-255, detail+0x12) */
+  attackRate: number;
+  /** Attack peak — envelope target for attack phase (0-255, detail+0x13) */
+  attackPeak: number;
+  /** Decay rate — subtracted from envelope level each tick (0-255, detail+0x14) */
+  decayRate: number;
+  /** Sustain level — decay stops here (0-255, detail+0x15) */
+  sustainLevel: number;
+  /** Sustain rate — rate of change toward sustain target (0-127, bit 7 = subtract; detail+0x16) */
+  sustainRate: number;
+  /** Sustain target — envelope converges to this level (0-255, detail+0x17) */
+  sustainTarget: number;
+  /** Release rate — subtracted from envelope on note-off (0-255, detail+0x18) */
+  releaseRate: number;
+  /** Pitch mod 1 delay in ticks before modulation starts (0-255, detail+0x1F) */
+  pitchMod1Delay: number;
+  /** Pitch mod 1 shift — left-shift amount for modulation depth (0-7, detail+0x1E) */
+  pitchMod1Shift: number;
+  /** Pitch mod 1 mode: 0=loop, 1=continue, 0x80=one-shot (detail+0x20) */
+  pitchMod1Mode: number;
+  /** Pitch mod 1 negate flag (detail+0x21) */
+  pitchMod1Negate: boolean;
+  /** Whether pitch mod 1 table is present */
+  hasPitchMod1: boolean;
+  /** Pitch mod 2 delay in ticks (0-255, detail+0x27) */
+  pitchMod2Delay: number;
+  /** Pitch mod 2 shift (0-7, detail+0x26) */
+  pitchMod2Shift: number;
+  /** Pitch mod 2 mode (detail+0x28) */
+  pitchMod2Mode: number;
+  /** Pitch mod 2 negate flag (detail+0x29) */
+  pitchMod2Negate: boolean;
+  /** Whether pitch mod 2 table is present */
+  hasPitchMod2: boolean;
+  /** Sample mod 1 delay in ticks (0-255, detail+0x2F) */
+  sampleMod1Delay: number;
+  /** Sample mod 1 shift (0-7, detail+0x2E) */
+  sampleMod1Shift: number;
+  /** Sample mod 1 mode (detail+0x30) */
+  sampleMod1Mode: number;
+  /** Whether sample mod 1 table is present */
+  hasSampleMod1: boolean;
+  /** Sample mod 2 delay in ticks (0-255, detail+0x37) */
+  sampleMod2Delay: number;
+  /** Sample mod 2 shift (0-7, detail+0x36) */
+  sampleMod2Shift: number;
+  /** Sample mod 2 mode (detail+0x38) */
+  sampleMod2Mode: number;
+  /** Whether sample mod 2 table is present */
+  hasSampleMod2: boolean;
+  /** PCM sample size in bytes (0 for wavetable instruments) */
+  sampleSize: number;
 }
 
 /**

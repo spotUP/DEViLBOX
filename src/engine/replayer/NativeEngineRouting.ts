@@ -330,6 +330,19 @@ const WASM_ENGINES: NativeEngineDescriptor[] = [
     dynamicResolver: async () => (await import('@/engine/pumatracker/PumaTrackerEngine')).PumaTrackerEngine as unknown as WASMSingletonStatic,
   },
   {
+    key: 'FredEditorReplayer',
+    synthType: 'FredEditorReplayerSynth',
+    suppressNotes: true,
+    fileDataKey: 'fredEditorWasmFileData',
+    formats: null,  // activate whenever fredEditorWasmFileData exists
+    loadMethod: 'loadTune',
+    supportsPause: false,
+    supportsResume: false,
+    needsDirectRouting: true,
+    staticRef: null,
+    dynamicResolver: async () => (await import('@/engine/fred/FredEditorReplayerEngine')).FredEditorReplayerEngine as unknown as WASMSingletonStatic,
+  },
+  {
     key: 'SteveTurner',
     synthType: 'SteveTurnerSynth',
     suppressNotes: true,
@@ -341,6 +354,19 @@ const WASM_ENGINES: NativeEngineDescriptor[] = [
     needsDirectRouting: true,
     staticRef: null,
     dynamicResolver: async () => (await import('@/engine/steveturner/SteveTurnerEngine')).SteveTurnerEngine as unknown as WASMSingletonStatic,
+  },
+  {
+    key: 'SidMon1Replayer',
+    synthType: 'SidMon1Synth',
+    suppressNotes: true,
+    fileDataKey: 'sidmon1WasmFileData',
+    formats: null, // activate whenever sidmon1WasmFileData exists
+    loadMethod: 'loadTune',
+    supportsPause: false,
+    supportsResume: false,
+    needsDirectRouting: true,
+    staticRef: null,
+    dynamicResolver: async () => (await import('@/engine/sidmon1/SidMon1ReplayerEngine')).SidMon1ReplayerEngine as unknown as WASMSingletonStatic,
   },
   {
     key: 'ArtOfNoise',
