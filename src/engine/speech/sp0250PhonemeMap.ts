@@ -96,8 +96,10 @@ export function samToSP0250(samCode: string): SP0250Frame | null {
   return map[samCode] ?? null;
 }
 
+const VOWEL_CODES = new Set(['IY', 'IH', 'EH', 'AE', 'AA', 'AH', 'AO', 'UH', 'AX', 'IX', 'ER', 'UX', 'OH']);
+
 /**
- * Convert SAM PhonemeTokens to SP0250 frames.
+ * Convert SAM PhonemeTokens to SP0250 frames with stress-based timing.
  */
 export function phonemesToSP0250Frames(
   tokens: Array<{ code: string; stress: number }>
@@ -106,7 +108,24 @@ export function phonemesToSP0250Frames(
   for (const token of tokens) {
     const frame = samToSP0250(token.code);
     if (frame) {
-      frames.push(frame);
+      // Vowel reduction: unstressed vowels shorter and lower brightness
+      let duration = frame.durationMs;
+      let brightness = frame.brightness;
+      if (VOWEL_CODES.has(token.code) && token.stress === 0) {
+        duration = Math.round(duration * 0.7);
+        brightness = Math.max(0.1, brightness - 0.15);
+      }
+      // Stressed vowels: slightly longer and brighter
+      if (VOWEL_CODES.has(token.code) && token.stress >= 4) {
+        duration = Math.round(duration * 1.15);
+        brightness = Math.min(1.0, brightness + 0.1);
+      }
+      // Final consonant lengthening
+      const isLast = token === tokens[tokens.length - 1];
+      if (isLast && !VOWEL_CODES.has(token.code) && token.code !== ' ') {
+        duration = Math.round(duration * 1.3);
+      }
+      frames.push({ ...frame, durationMs: duration, brightness });
     }
   }
   return frames;

@@ -180,6 +180,29 @@ export function phonemesToVLM5030Frames(
 
   if (rawFrames.length === 0) return [];
 
+  // #7: Nasal coarticulation — nasals shift neighboring vowels' K2 toward nasal range
+  const NASALS = new Set(['M*', 'N*', 'NX']);
+  for (let i = 0; i < rawFrames.length; i++) {
+    if (NASALS.has(tokenCodes[i])) {
+      // Affect previous vowel (anticipatory nasalization)
+      if (i > 0 && VOWELS.has(tokenCodes[i - 1])) {
+        rawFrames[i - 1].k[2] = Math.round(rawFrames[i - 1].k[2] + (10 - rawFrames[i - 1].k[2]) * 0.3);
+      }
+      // Affect next vowel (carryover nasalization)
+      if (i < rawFrames.length - 1 && VOWELS.has(tokenCodes[i + 1])) {
+        rawFrames[i + 1].k[2] = Math.round(rawFrames[i + 1].k[2] + (10 - rawFrames[i + 1].k[2]) * 0.2);
+      }
+    }
+  }
+
+  // #8: Final consonant lengthening — last consonant gets 40% longer
+  if (rawFrames.length >= 2) {
+    const lastCode = tokenCodes[rawFrames.length - 1];
+    if (!VOWELS.has(lastCode) && lastCode !== ' ') {
+      rawFrames[rawFrames.length - 1].durationMs = Math.round(rawFrames[rawFrames.length - 1].durationMs * 1.4);
+    }
+  }
+
   // Sentence-level intonation
   const totalFrames = rawFrames.length;
   for (let i = 0; i < totalFrames; i++) {
