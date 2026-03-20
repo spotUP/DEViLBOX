@@ -654,6 +654,7 @@ class FurnaceDispatchProcessor extends AudioWorkletProcessor {
         seqSetDispatchHandle: this.module._furnace_seq_set_dispatch_handle,
         seqSetSampleRate: this.module._furnace_seq_set_sample_rate,
         seqSetDivider: this.module._furnace_seq_set_divider,
+        seqGetDivider: this.module._furnace_seq_get_divider,
         seqSetMute: this.module._furnace_seq_set_mute,
         seqTick: this.module._furnace_seq_tick,
         seqGetOrder: this.module._furnace_seq_get_order,
@@ -952,6 +953,14 @@ class FurnaceDispatchProcessor extends AudioWorkletProcessor {
             const pos = this.wasm.seqTick();
             this._lastSeqOrder = (pos >> 16) & 0xFFFF;
             this._lastSeqRow = pos & 0xFFFF;
+            // Update tick rate if sequencer divider changed (effects 0xC0-0xC3/0xF0)
+            if (this.wasm.seqGetDivider) {
+              const newDiv = this.wasm.seqGetDivider();
+              if (newDiv > 0 && newDiv !== this.tickRate) {
+                this.tickRate = newDiv;
+                this.samplesPerTick = sampleRate / this.tickRate;
+              }
+            }
           } catch (e) {
             console.error('[FurnaceDispatch] seqTick WASM trap:', e);
             this.sequencerActive = false;
