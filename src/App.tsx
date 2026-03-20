@@ -667,12 +667,6 @@ function App() {
       return;
     }
 
-    // .sunvox project files — show import dialog (same pattern as audio/TD-3 files)
-    if (/\.sunvox$/i.test(file.name)) {
-      useUIStore.getState().setPendingSunVoxFile(file);
-      return;
-    }
-
     // .dbx project files get a preview dialog showing song info before replacing
     if (/\.dbx$/i.test(file.name)) {
       setPendingSongFile(file);

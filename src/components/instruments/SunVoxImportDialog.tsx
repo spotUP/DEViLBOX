@@ -1,5 +1,6 @@
 /**
- * SunVoxImportDialog — Import a .sunsynth or .sunvox file as a SunVox instrument.
+ * SunVoxImportDialog — Import a .sunsynth file as a SunVox instrument.
+ * (.sunvox song files are loaded directly via UnifiedFileLoader, no dialog needed.)
  */
 import React, { useState, useEffect } from 'react';
 import type { SunVoxConfig } from '@typedefs/instrument';
@@ -25,17 +26,9 @@ export const SunVoxImportDialog: React.FC<SunVoxImportDialogProps> = ({ onClose,
   // Auto-load the initial file when provided (drag-drop path)
   useEffect(() => {
     if (!initialFile) return;
-    const name = initialFile.name.replace(/\.(sunsynth|sunvox)$/i, '');
-    const isSong = initialFile.name.toLowerCase().endsWith('.sunvox');
+    const name = initialFile.name.replace(/\.sunsynth$/i, '');
     setFilename(initialFile.name);
 
-    if (isSong) {
-      // For songs, the import handler uses the original File directly — no need to pre-read.
-      setPending({ name, config: { patchData: new ArrayBuffer(0), patchName: name, isSong: true, controlValues: {} } });
-      return;
-    }
-
-    // For .sunsynth patches, read the buffer so the handler can create the instrument.
     const load = async () => {
       try {
         const buffer = await initialFile.arrayBuffer();
@@ -56,11 +49,11 @@ export const SunVoxImportDialog: React.FC<SunVoxImportDialogProps> = ({ onClose,
     setFilename(file.name);
     try {
       const buffer = await file.arrayBuffer();
-      const name = file.name.replace(/\.(sunsynth|sunvox)$/i, '');
+      const name = file.name.replace(/\.sunsynth$/i, '');
       const config: SunVoxConfig = {
         patchData: buffer,
         patchName: name,
-        isSong: file.name.toLowerCase().endsWith('.sunvox'),
+        isSong: false,
         controlValues: {},
       };
       setPending({ name, config });
@@ -71,15 +64,7 @@ export const SunVoxImportDialog: React.FC<SunVoxImportDialogProps> = ({ onClose,
     }
   };
 
-  const isSong = (initialFile?.name ?? filename).toLowerCase().endsWith('.sunvox');
-
   const handleImport = () => {
-    if (isSong && initialFile) {
-      const name = initialFile.name.replace(/\.(sunsynth|sunvox)$/i, '');
-      onImport(name, { patchData: new ArrayBuffer(0), patchName: name, isSong: true, controlValues: {} });
-      onClose();
-      return;
-    }
     if (!pending) return;
     onImport(pending.name, pending.config);
     onClose();
@@ -92,13 +77,13 @@ export const SunVoxImportDialog: React.FC<SunVoxImportDialogProps> = ({ onClose,
         onClick={e => e.stopPropagation()}
       >
         <h2 className="text-ft2-highlight font-mono font-bold text-sm mb-3">
-          {isSong ? 'Load SunVox Song' : 'Import SunSynth Patch'}
+          Import SunSynth Patch
         </h2>
 
         {!initialFile && (
           <input
             type="file"
-            accept=".sunsynth,.sunvox"
+            accept=".sunsynth"
             onChange={handleFile}
             className="block w-full mb-3 text-ft2-text text-xs font-mono cursor-pointer"
           />
@@ -121,7 +106,7 @@ export const SunVoxImportDialog: React.FC<SunVoxImportDialogProps> = ({ onClose,
           </button>
           <button
             onClick={handleImport}
-            disabled={!isSong && pending === null}
+            disabled={pending === null}
             className="px-3 py-1 text-xs font-mono bg-ft2-highlight text-ft2-bg disabled:opacity-40 disabled:cursor-default"
           >
             Import

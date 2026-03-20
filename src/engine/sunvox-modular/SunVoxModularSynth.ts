@@ -22,6 +22,17 @@ let _sharedSongHandle = -1;
 let _sharedSongRefCount = 0;
 let _sharedSongInitPromise: Promise<void> | null = null;
 
+/**
+ * Wait for any in-flight shared song load to finish before starting new work.
+ * The worklet processes messages sequentially — if a loadSong is still running,
+ * new createHandle calls queue behind it and can timeout during extraction.
+ */
+export async function awaitPendingSharedSongLoad(): Promise<void> {
+  if (_sharedSongInitPromise) {
+    try { await _sharedSongInitPromise; } catch { /* ignore errors */ }
+  }
+}
+
 /** Force-reset shared state (call before loading a new song to prevent WASM crashes) */
 export function resetSharedSunVoxHandle(): void {
   if (_sharedSongHandle >= 0) {
@@ -262,10 +273,9 @@ export class SunVoxModularSynth implements DevilboxSynth {
 
   // ── Sequencer control (used by NativeEngineRouting for song-mode playback) ──
 
-  startSequencer(): void {
-    void this._initPromise.then(() => {
-      if (!this._disposed && this._handle >= 0) this.engine.play(this._handle);
-    });
+  async startSequencer(): Promise<void> {
+    await this._initPromise;
+    if (!this._disposed && this._handle >= 0) this.engine.play(this._handle);
   }
 
   stopSequencer(): void {

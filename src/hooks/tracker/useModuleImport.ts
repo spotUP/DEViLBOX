@@ -22,24 +22,17 @@ export function useModuleImport() {
     else if (result.success === false) notify.error(result.error);
   }, []);
 
-  // ── SunVox import ────────────────────────────────────────────────────────
+  // ── SunVox .sunsynth patch import ────────────────────────────────────────
+  // (.sunvox song files are loaded directly via UnifiedFileLoader, no dialog needed.)
   const handleSunVoxImport = useCallback(async (name: string, config: SunVoxConfig) => {
-    const file = useUIStore.getState().pendingSunVoxFile;
     useUIStore.getState().setPendingSunVoxFile(null);
     try {
-      if (config.isSong && file) {
-        const { loadFile } = await import('@lib/file/UnifiedFileLoader');
-        const result = await loadFile(file, { requireConfirmation: false });
-        if (result.success === true) notify.success(result.message);
-        else if (result.success === false) notify.error(result.error);
-      } else {
-        const { useInstrumentStore } = await import('@stores');
-        useInstrumentStore.getState().createInstrument({ name, synthType: 'SunVoxSynth', sunvox: config });
-        notify.success(`Imported SunVox patch: ${name}`);
-      }
+      const { useInstrumentStore } = await import('@stores');
+      useInstrumentStore.getState().createInstrument({ name, synthType: 'SunVoxSynth', sunvox: config });
+      notify.success(`Imported SunVox patch: ${name}`);
     } catch (err) {
-      notify.error('Failed to import SunVox file');
-      console.error('[useModuleImport] SunVox import failed:', err);
+      notify.error('Failed to import SunVox patch');
+      console.error('[useModuleImport] SunVox patch import failed:', err);
     }
   }, []);
 

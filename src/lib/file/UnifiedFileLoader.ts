@@ -523,6 +523,11 @@ export async function loadFile(
           return await loadSongFile(file, options);
         }
       }
+      // .sunvox files bypass the confirmation dialog — they use their own
+      // SunVox engine loading path in loadSongFile, not importTrackerModule.
+      if (filename.endsWith('.sunvox')) {
+        return await loadSongFile(file, options);
+      }
       if (options.requireConfirmation) {
         return { success: 'pending-confirmation', file };
       }
@@ -659,9 +664,12 @@ async function loadSongFile(file: File, options: FileLoadOptions): Promise<FileL
   if (filename.endsWith('.sunvox')) {
     preReadBuffer = await file.arrayBuffer();
 
-    // Reset shared WASM handle from any previous .sunvox song to prevent memory crashes
+    // Wait for any in-flight shared song load to finish — the worklet processes
+    // messages sequentially, so a pending loadSong blocks new createHandle calls.
+    // Then reset shared WASM handle from any previous .sunvox song.
     try {
-      const { resetSharedSunVoxHandle } = await import('@/engine/sunvox-modular/SunVoxModularSynth');
+      const { awaitPendingSharedSongLoad, resetSharedSunVoxHandle } = await import('@/engine/sunvox-modular/SunVoxModularSynth');
+      await awaitPendingSharedSongLoad();
       resetSharedSunVoxHandle();
     } catch { /* not loaded yet */ }
 
