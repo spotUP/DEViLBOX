@@ -1010,14 +1010,14 @@ struct CmdLogEntry {
 
 static std::vector<CmdLogEntry> g_cmdLog;
 static bool g_cmdLogEnabled = false;
-static int g_cmdLogTick = 0;
+static int g_cmdLogTick = -1; // -1 so first tick() increments to 0 (matches upstream totalTicksR)
 
 EMSCRIPTEN_KEEPALIVE
 void furnace_cmd_log_enable(int enable) {
   g_cmdLogEnabled = (enable != 0);
   if (enable) {
     g_cmdLog.clear();
-    g_cmdLogTick = 0;
+    g_cmdLogTick = -1;
   }
 }
 
@@ -1159,6 +1159,8 @@ void furnace_dispatch_render(int handle, float* outL, float* outR, int numSample
     if (!inst->bb[i]) continue;
     blip_end_frame(inst->bb[i], chipSamples);
     blip_read_samples(inst->bb[i], inst->bbReadOut[i], numSamples, 0);
+    // Post-process (e.g. Amiga hardware low-pass filter)
+    inst->dispatch->postProcess(inst->bbReadOut[i], i, numSamples, inst->sampleRate);
   }
 
   // Step 4: Convert to float and handle mono→stereo
@@ -4117,7 +4119,7 @@ void furnace_dispatch_load_ins2(int insIndex, unsigned char* data, int dataLen) 
           target->rel = data[pos + 3];
           target->mode = data[pos + 4];
           unsigned char wordSizeByte = data[pos + 5];
-          target->open = wordSizeByte & 15;
+          target->open = wordSizeByte & 7; // Ox uses 3 bits (upstream readFeatureOx), not 4
           target->delay = data[pos + 6];
           target->speed = data[pos + 7];
         }
@@ -4221,12 +4223,24 @@ void furnace_dispatch_load_ins2(int insIndex, unsigned char* data, int dataLen) 
     }
     // ── N1: N163 ──
     else if (fc0 == 'N' && fc1 == '1') {
-      if (featLen >= 8) {
+      // Upstream readFeatureN1 (instrument.cpp:2801-2821)
+      if (featLen >= 7) {
         ins->n163.wave = *(int*)(data + pos);
         ins->n163.wavePos = data[pos + 4];
         ins->n163.waveLen = data[pos + 5];
         ins->n163.waveMode = data[pos + 6];
-        ins->n163.perChanPos = data[pos + 7] & 1;
+        int p = pos + 7;
+        if (version >= 164 && p < featEnd) {
+          ins->n163.perChanPos = data[p++];
+          if (ins->n163.perChanPos && p + 16 <= featEnd) {
+            for (int i = 0; i < 8; i++) {
+              ins->n163.wavePosCh[i] = data[p++];
+            }
+            for (int i = 0; i < 8; i++) {
+              ins->n163.waveLenCh[i] = data[p++];
+            }
+          }
+        }
       }
       pos = featEnd;
     }
@@ -4259,18 +4273,26 @@ void furnace_dispatch_load_ins2(int insIndex, unsigned char* data, int dataLen) 
     }
     // ── EF: ESFM ──
     else if (fc0 == 'E' && fc1 == 'F') {
-      // Read ESFM operator data
-      for (int i = 0; i < 4 && pos + 7 <= featEnd; i++) {
-        ins->esfm.op[i].delay = data[pos];
-        ins->esfm.op[i].outLvl = data[pos + 1];
-        ins->esfm.op[i].modIn = data[pos + 2];
-        unsigned char flags = data[pos + 3];
-        ins->esfm.op[i].left = flags & 1;
-        ins->esfm.op[i].right = (flags >> 1) & 1;
-        ins->esfm.op[i].fixed = (flags >> 2) & 1;
-        ins->esfm.op[i].ct = data[pos + 4];
-        ins->esfm.op[i].dt = data[pos + 5];
-        pos += 6;
+      // Upstream readFeatureEF: bit-packed format (instrument.cpp:3204-3227)
+      // First byte: noise(1-0)
+      if (pos < featEnd) {
+        unsigned char noiseByte = data[pos++];
+        ins->esfm.noise = noiseByte & 3;
+      }
+      // Per operator: 4 bytes each, bit-packed
+      for (int i = 0; i < 4 && pos + 4 <= featEnd; i++) {
+        unsigned char b0 = data[pos++]; // delay(7-5) | outLvl(4-2) | right(1) | left(0)
+        ins->esfm.op[i].delay = (b0 >> 5) & 7;
+        ins->esfm.op[i].outLvl = (b0 >> 2) & 7;
+        ins->esfm.op[i].right = (b0 >> 1) & 1;
+        ins->esfm.op[i].left = b0 & 1;
+
+        unsigned char b1 = data[pos++]; // fixed(3) | modIn(2-0)
+        ins->esfm.op[i].modIn = b1 & 7;
+        ins->esfm.op[i].fixed = (b1 >> 3) & 1;
+
+        ins->esfm.op[i].ct = data[pos++];
+        ins->esfm.op[i].dt = data[pos++];
       }
       pos = featEnd;
     }
@@ -4309,6 +4331,25 @@ void furnace_dispatch_load_ins2(int insIndex, unsigned char* data, int dataLen) 
           ins->su.hwSeq[i].val = entry[2];
           ins->su.hwSeq[i].speed = *(unsigned short*)(entry + 3);
         }
+      }
+      pos = featEnd;
+    }
+    // ── PN: PowerNoise ──
+    else if (fc0 == 'P' && fc1 == 'N') {
+      // Upstream readFeaturePN (instrument.cpp:3233): octave (1 byte)
+      if (featLen >= 1) {
+        ins->powernoise.octave = data[pos];
+      }
+      pos = featEnd;
+    }
+    // ── S2: SID2 ──
+    else if (fc0 == 'S' && fc1 == '2') {
+      // Upstream readFeatureS2 (instrument.cpp:3241): packed byte: volume(3-0) | mixMode(5-4) | noiseMode(7-6)
+      if (featLen >= 1) {
+        unsigned char b = data[pos];
+        ins->sid2.volume = b & 15;
+        ins->sid2.mixMode = (b >> 4) & 3;
+        ins->sid2.noiseMode = b >> 6;
       }
       pos = featEnd;
     }
