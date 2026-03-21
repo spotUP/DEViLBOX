@@ -165,36 +165,24 @@ export function parsePattern(
 
       const cell = pat.rows[row];
 
-      // Determine what's present
-      const hasNote = (cmd & 0x01) !== 0;
-      const hasIns = (cmd & 0x02) !== 0;
-      const hasVol = (cmd & 0x04) !== 0;
-      const hasEff0 = (cmd & 0x08) !== 0;
-      const hasEffVal0 = (cmd & 0x10) !== 0;
-      const hasOtherEffs03 = (cmd & 0x20) !== 0;
-      const hasOtherEffs47 = (cmd & 0x40) !== 0;
-
-      let effMask03 = 0;
-      let effMask47 = 0;
-
-      if (hasOtherEffs03) {
-        effMask03 = reader.readUint8();
-      }
-      if (hasOtherEffs47) {
-        effMask47 = reader.readUint8();
-      }
+      // Build unified effectMask matching reference (fur.cpp:1999-2006)
+      // Bits 0-7 from effect mask byte 1, bits 8-15 from byte 2
+      // Bits 0-1 also set from cmd bits 3-4 (effect 0 type/value)
+      let effectMask = 0;
+      if (cmd & 0x20) effectMask |= reader.readUint8();        // bits 0-7 (effects 0-3)
+      if (cmd & 0x40) effectMask |= reader.readUint8() << 8;   // bits 8-15 (effects 4-7)
+      if (cmd & 0x08) effectMask |= 1;                         // effect 0 type from cmd
+      if (cmd & 0x10) effectMask |= 2;                         // effect 0 value from cmd
 
       // Read note
-      if (hasNote) {
+      if (cmd & 0x01) {
         const noteVal = reader.readUint8();
         if (noteVal >= 180) {
-          // Special notes
           cell.note = noteVal;
           cell.octave = 0;
-        } else if (noteVal < 180) {
+        } else {
           cell.note = newFormatNotes[noteVal] || 0;
           cell.octave = newFormatOctaves[noteVal] || 0;
-          // Convert signed octave
           if (cell.octave >= 250) {
             cell.octave = cell.octave - 256;
           }
@@ -202,49 +190,35 @@ export function parsePattern(
       }
 
       // Read instrument
-      if (hasIns) {
+      if (cmd & 0x02) {
         cell.instrument = reader.readUint8();
       }
 
       // Read volume
-      if (hasVol) {
+      if (cmd & 0x04) {
         cell.volume = reader.readUint8();
       }
 
-      // Read effect 0
-      if (hasEff0) {
-        const effType = reader.readUint8();
-        const effVal = hasEffVal0 ? reader.readUint8() : 0;
-        cell.effects.push({ type: effType, value: effVal });
-      } else if (hasEffVal0) {
-        reader.readUint8(); // Skip orphan value
-      }
+      // Read all effects (0-7) from unified effectMask
+      // Each effect has 2 bits: even bit = type present, odd bit = value present
+      // Data bytes are read in bit order (matching reference fur.cpp:2029-2033)
+      for (let k = 0; k < 16; k++) {
+        if (effectMask & (1 << k)) {
+          const val = reader.readUint8();
+          // k=0: eff0 type, k=1: eff0 val, k=2: eff1 type, k=3: eff1 val, etc.
+          const fxIdx = k >> 1;
+          const isVal = k & 1;
 
-      // Read effects 1-3 (bits 2-7 of effMask03; bits 0-1 are effect 0, handled above)
-      for (let fx = 1; fx <= 3; fx++) {
-        const hasEff = (effMask03 & (1 << (fx * 2))) !== 0;
-        const hasVal = (effMask03 & (1 << (fx * 2 + 1))) !== 0;
+          // Ensure effect slot exists
+          while (cell.effects.length <= fxIdx) {
+            cell.effects.push({ type: -1, value: -1 });
+          }
 
-        if (hasEff) {
-          const effType = reader.readUint8();
-          const effVal = hasVal ? reader.readUint8() : 0;
-          cell.effects.push({ type: effType, value: effVal });
-        } else if (hasVal) {
-          reader.readUint8(); // Skip orphan value
-        }
-      }
-
-      // Read effects 4-7
-      for (let fx = 4; fx <= 7; fx++) {
-        const hasEff = (effMask47 & (1 << ((fx - 4) * 2))) !== 0;
-        const hasVal = (effMask47 & (1 << ((fx - 4) * 2 + 1))) !== 0;
-
-        if (hasEff) {
-          const effType = reader.readUint8();
-          const effVal = hasVal ? reader.readUint8() : 0;
-          cell.effects.push({ type: effType, value: effVal });
-        } else if (hasVal) {
-          reader.readUint8(); // Skip orphan value
+          if (isVal) {
+            cell.effects[fxIdx].value = val;
+          } else {
+            cell.effects[fxIdx].type = val;
+          }
         }
       }
 
@@ -354,7 +328,10 @@ export function convertFurnaceNoteValue(cell: FurnacePatternCell): number {
       octave--;
     }
     const val = octave * 12 + note;
-    return Math.max(0, Math.min(179, val));
+    // Don't clamp to [0,179] — negative notes are valid in Furnace (e.g., octave -1)
+    // and the sequencer adds +60 offset when loading into WASM. Clamping to 0 would
+    // turn note -7 into note 0, causing wrong pitches on low octaves.
+    return Math.min(179, val);
   }
   // New format note values (0-179) — already decomposed via lookup tables
   // and will be recomposed through this same path
