@@ -1878,7 +1878,7 @@
     "pass": false,
     "auditStatus": "fixed",
     "divergeAt": 0.03015873015873016,
-    "notes": "lock-step 99.1% (756/763) timeBase fix"
+    "notes": "lock-step 99.9% (762/763) timeBase+noteclamp fix"
   },
   "fur-misc-space_mackerel_bifurcator": {
     "envCorr": 0.2297,
@@ -4436,8 +4436,8 @@
     "notes": "lock-step 99.8% (464/465)"
   },
   "fur-opl-air_combat": {
-    "auditStatus": "fail",
-    "notes": "lock-step 80.8% (1172/1451) negative note clamping"
+    "auditStatus": "fixed",
+    "notes": "lock-step 99.9% (1450/1451) note clamp fix"
   },
   "fur-opm-hope_for_dream": {
     "auditStatus": "fixed",
