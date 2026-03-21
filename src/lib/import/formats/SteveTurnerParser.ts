@@ -641,7 +641,7 @@ export function parseSteveTurnerFile(buffer: ArrayBuffer, filename: string): Tra
 
   const result: TrackerSong = {
     name: `${moduleName} [Steve Turner]`,
-    format: 'MOD' as TrackerFormat,
+    format: 'SteveTurner' as TrackerFormat,
     patterns,
     instruments,
     songPositions,
