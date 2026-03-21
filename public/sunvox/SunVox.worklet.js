@@ -137,8 +137,14 @@ class SunVoxProcessor extends AudioWorkletProcessor {
         if (!m) break;
         const h = data.handle;
         if (this.handles[h]) {
+          // sv_stop: first call stops playing, second call resets all activity
+          try { m._sv_stop(h); m._sv_stop(h); } catch { /* ignore */ }
           try { m._sv_close_slot(h); } catch { /* ignore */ }
           delete this.handles[h];
+          // Clear any muted modules for this handle
+          for (const key of this._mutedModules.keys()) {
+            if (key.startsWith(`${h}:`)) this._mutedModules.delete(key);
+          }
         }
         break;
       }
@@ -383,8 +389,22 @@ class SunVoxProcessor extends AudioWorkletProcessor {
 
       case 'play':
         if (m) {
+          // Clear any muted module state from a previous song
+          for (const [key, saved] of this._mutedModules) {
+            if (key.startsWith(`${data.handle}:`)) {
+              if (saved.volCtlIdx >= 0) {
+                const modId = parseInt(key.split(':')[1]);
+                m._sv_set_module_ctl_value(data.handle, modId, saved.volCtlIdx, saved.savedVal, 0);
+              }
+              this._mutedModules.delete(key);
+            }
+          }
+          // Single stop to halt current playback, then play from beginning.
+          // Do NOT double-stop — second sv_stop() puts engine in standby mode (no audio).
+          m._sv_stop(data.handle);
           m._sv_volume(data.handle, 256); // max volume (0-256)
           m._sv_play_from_beginning(data.handle);
+          console.log('[SunVox Worklet] play: handle', data.handle);
           this._playReceived = true;
           this._debuggedNonZero = false;
           this._debugZeroCount = 0;
