@@ -176,7 +176,9 @@ export class SunVoxEngine {
 
       // Register worklet module with this AudioContext
       try {
-        await context.audioWorklet.addModule(`${baseUrl}sunvox/SunVox.worklet.js`);
+        // Cache-bust the worklet URL — AudioWorklet.addModule caches aggressively
+        // and public/ files don't get Vite hash suffixes.
+        await context.audioWorklet.addModule(`${baseUrl}sunvox/SunVox.worklet.js?v=${Date.now()}`);
         console.log('[SunVoxEngine] addModule done');
       } catch (e) {
         // Module might already be registered in this context
