@@ -26,7 +26,13 @@ async function ensureInitialized(): Promise<void> {
     try {
       // @ts-expect-error -- no type declarations for this WASM package
       const { default: EspeakModule } = await import('@echogarden/espeak-ng-emscripten');
-      espeakModule = await EspeakModule();
+      // Override locateFile to serve stripped espeak-ng.data from public/ (1.1MB, 6 langs)
+      espeakModule = await EspeakModule({
+        locateFile: (path: string) => {
+          if (path === 'espeak-ng.data') return '/espeak-ng.data';
+          return path;
+        },
+      });
       espeakWorker = new espeakModule.eSpeakNGWorker();
       espeakWorker.set_voice('en');
       console.log('[eSpeak-NG] Initialized successfully');

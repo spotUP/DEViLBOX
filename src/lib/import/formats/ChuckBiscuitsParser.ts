@@ -221,7 +221,8 @@ export function parseChuckBiscuitsFile(bytes: Uint8Array, filename: string): Tra
 }
 
 function _parse(bytes: Uint8Array, filename: string): TrackerSong | null {
-  if (!isChuckBiscuitsFormat(bytes)) return null;
+  const _base = filename.split('/').pop()?.toLowerCase() ?? '';
+  if (!_base.endsWith('.cba') && !isChuckBiscuitsFormat(bytes)) return null;
 
   const v = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
 

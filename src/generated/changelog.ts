@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-03-20T21:49:54.017Z
+ * Generated: 2026-03-21T00:30:53.044Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -19,10 +19,10 @@ export interface ChangelogEntry {
 }
 
 // Build info
-export const BUILD_VERSION = '1.0.3166';
-export const BUILD_NUMBER = '3166';
-export const BUILD_HASH = 'd91924b31';
-export const BUILD_DATE = '2026-03-20';
+export const BUILD_VERSION = '1.0.3189';
+export const BUILD_NUMBER = '3189';
+export const BUILD_HASH = '1f50ed6f9';
+export const BUILD_DATE = '2026-03-21';
 
 // Full version (patch IS the build number, so no need to append)
 export const FULL_VERSION = BUILD_VERSION;
@@ -30,9 +30,107 @@ export const FULL_VERSION = BUILD_VERSION;
 // Auto-generated changelog
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: '1.0.3166',
+    version: '1.0.3189',
+    date: '2026-03-21',
+    changes: [
+      {
+        type: 'feature',
+        "description": "Add 5 more format exports (122 total, 0 failures)"
+      },
+      {
+        type: 'feature',
+        "description": "Add 12 more format exports (117 total, 0 failures)"
+      },
+      {
+        type: 'feature',
+        "description": "Add 26 more format exports (105 total, 0 failures)"
+      },
+      {
+        type: 'fix',
+        "description": "Debug(sunvox): add mute/solo routing debug logs"
+      },
+      {
+        type: 'feature',
+        "description": "Add Synthesis format export (79 formats, 0 failures)"
+      },
+      {
+        type: 'feature',
+        "description": "Add CustomMade + Anders0land exports (78 formats, 0 failures)"
+      },
+      {
+        type: 'feature',
+        "description": "Add original DigiBooster 1.x parser (76 exportable formats)"
+      },
+      {
+        type: 'fix',
+        "description": "Debug(sunvox): add mute/solo debug logging to trace routing"
+      },
+      {
+        type: 'fix',
+        "description": "Improve lock-step command comparator"
+      },
+      {
+        type: 'fix',
+        "description": "Off-by-one in year field offset (203→202), enabling GT2 export"
+      },
+      {
+        type: 'feature',
+        "description": "Integrate eSpeak-NG for modern text-to-phoneme analysis"
+      }
+    ]
+  },
+  {
+    version: '2026-03-20',
     date: '2026-03-20',
     changes: [
+      {
+        type: 'fix',
+        "description": "Simple 1:1 pattern mapping instead of timeline linearization"
+      },
+      {
+        type: 'fix',
+        "description": "Proper timeline linearization for pattern display"
+      },
+      {
+        type: 'feature',
+        "description": "Add OctaMED + StartrekkerAM encoders and exporters"
+      },
+      {
+        type: 'feature',
+        "description": "10 refinements — question intonation, pauses, +40 words"
+      },
+      {
+        type: 'fix',
+        "description": "Update votrax phoneme map"
+      },
+      {
+        type: 'fix',
+        "description": "Update exporter"
+      },
+      {
+        type: 'fix',
+        "description": "Phoneme map and reciter improvements"
+      },
+      {
+        type: 'improvement',
+        "description": "Chore: clean up mame-wasm build artifacts, update tools and generated files"
+      },
+      {
+        type: 'feature',
+        "description": "XM synth export fixes + 29 new exportable formats (74 total)"
+      },
+      {
+        type: 'fix',
+        "description": "Tracker rendering and store improvements"
+      },
+      {
+        type: 'fix',
+        "description": "Rename unused FRICATIVES variable for linter"
+      },
+      {
+        type: 'fix',
+        "description": "Improve FuturePlayer, SidMon1, FredEditor, Symphonie parsers"
+      },
       {
         type: 'feature',
         "description": "Vowel reduction, aspiration, energy envelopes, more words"
@@ -140,94 +238,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'feature',
         "description": "Add HC55516, S14001A, and VLM5030 WASM synths"
-      },
-      {
-        type: 'feature',
-        "description": "Add Steve Turner synth engine with WASM playback"
-      },
-      {
-        type: 'fix',
-        "description": "Fix DigMug/DM1/DM2 XM export issues"
-      },
-      {
-        type: 'fix',
-        "description": "Debug: add initialize() entry log to VLM5030"
-      },
-      {
-        type: 'improvement',
-        "description": "Chore: update generated files, WASM binaries, and format state"
-      },
-      {
-        type: 'fix',
-        "description": "Sequencer improvements and lock-step command debugging docs"
-      },
-      {
-        type: 'fix',
-        "description": "Reduce sv_volume from 256 to 128 to prevent clipping"
-      },
-      {
-        type: 'fix',
-        "description": "Set max volume on play, increase graph timeout, fix pattern count"
-      },
-      {
-        type: 'fix',
-        "description": "Fix ROM auto-load init flow to prevent double-init"
-      },
-      {
-        type: 'fix',
-        "description": "Don't skip synth instruments with existing samples for XM"
-      },
-      {
-        type: 'feature',
-        "description": "Upgrade to official SunVox Library v2.1.4d (699KB WASM)"
-      },
-      {
-        type: 'fix',
-        "description": "Match MAME init state for ROM playback"
-      },
-      {
-        type: 'fix',
-        "description": "Route load_file through libopenmpt when useLibopenmpt=true"
-      },
-      {
-        type: 'fix',
-        "description": "Add xmNoteExportOffset: 12 for correct octave in XM"
-      },
-      {
-        type: 'feature',
-        "description": "XM volume envelopes for all synth formats"
-      },
-      {
-        type: 'fix',
-        "description": "Improve song playback — donate handle, suppress notes, async start"
-      },
-      {
-        type: 'fix',
-        "description": "Use 2x sample rate for correct XM pitch mapping"
-      },
-      {
-        type: 'fix',
-        "description": "Revert to period base 3424 — frequency analysis confirms correct pitch"
-      },
-      {
-        type: 'fix',
-        "description": "Use period 1712 as base for note conversion (one octave down)"
-      },
-      {
-        type: 'fix',
-        "description": "Read frqTranspose as signed byte matching FlodJS"
-      },
-      {
-        type: 'fix',
-        "description": "1:1 MAME audit for S14001A and HC55516 ROM playback"
-      },
-      {
-        type: 'fix',
-        "description": "1:1 MAME ROM frame parser and excitation"
-      },
-      {
-        type: 'improvement',
-        "description": "Unify .sunvox import — remove separate dialog, load directly"
       }
     ]
   }

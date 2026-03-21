@@ -10,6 +10,7 @@ import type { DevilboxSynth } from '@typedefs/synth';
 import {
   DEFAULT_SYNARE,
   DEFAULT_SAM,
+  DEFAULT_PINK_TROMBONE,
   VOWEL_FORMANTS,
   DEFAULT_FORMANT_SYNTH,
   DEFAULT_WOBBLE_BASS,
@@ -25,6 +26,7 @@ import { DubSirenSynth } from '../DubSirenSynth';
 import { SpaceLaserSynth } from '../SpaceLaserSynth';
 import { SynareSynth } from '../SynareSynth';
 import { SAMSynth } from '../sam/SAMSynth';
+import { PinkTromboneSynth } from '../pinktrombone/PinkTromboneSynth';
 import { V2Synth } from '../v2/V2Synth';
 import { V2SpeechSynth } from '../v2/V2SpeechSynth';
 import { DB303Synth } from '../db303/DB303Synth';
@@ -843,6 +845,15 @@ export function createSam(config: InstrumentConfig): Tone.ToneAudioNode {
 
   synth.output.gain.value = Tone.dbToGain(getNormalizedVolume('Sam', config.volume));
   
+  return synth as unknown as Tone.ToneAudioNode;
+}
+
+export function createPinkTrombone(config: InstrumentConfig): Tone.ToneAudioNode {
+  const ptConfig = config.pinkTrombone || DEFAULT_PINK_TROMBONE;
+  const synth = new PinkTromboneSynth(ptConfig);
+
+  synth.output.gain.value = Tone.dbToGain(getNormalizedVolume('PinkTrombone', config.volume));
+
   return synth as unknown as Tone.ToneAudioNode;
 }
 

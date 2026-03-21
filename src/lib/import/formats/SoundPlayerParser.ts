@@ -73,7 +73,8 @@ export function isSoundPlayerFormat(buffer: ArrayBuffer | Uint8Array): boolean {
 
 export function parseSoundPlayerFile(buffer: ArrayBuffer, filename: string): TrackerSong {
   const buf = new Uint8Array(buffer);
-  if (!isSoundPlayerFormat(buf)) throw new Error('Not a Sound Player module');
+  const _base = filename.split('/').pop()?.toLowerCase() ?? '';
+  if (!_base.startsWith('sjs.') && !_base.endsWith('.spl') && !isSoundPlayerFormat(buf)) throw new Error('Not a Sound Player module');
 
   const baseName = (filename.split('/').pop() ?? filename).split('\\').pop() ?? filename;
   const moduleName = baseName.replace(/^sjs\./i, '') || baseName;

@@ -4,6 +4,9 @@
 
 import type { BeatSlice, BeatSliceConfig } from '../beatSlicer';
 import type { EnvelopePoints, AutoVibrato } from '../tracker';
+import type { PinkTromboneConfig } from '@engine/pinktrombone/PinkTromboneSynth';
+export type { PinkTromboneConfig } from '@engine/pinktrombone/PinkTromboneSynth';
+export { DEFAULT_PINK_TROMBONE } from '@engine/pinktrombone/PinkTromboneSynth';
 
 import type {
   SynthType,
@@ -234,6 +237,7 @@ export interface InstrumentConfig {
   v2?: V2Config;
   v2Speech?: V2SpeechConfig;
   sam?: SamConfig;
+  pinkTrombone?: PinkTromboneConfig;
   synare?: SynareConfig;
   wam?: WAMConfig;
   // MAME synths

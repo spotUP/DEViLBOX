@@ -671,6 +671,11 @@ async function loadSongFile(file: File, options: FileLoadOptions): Promise<FileL
   if (filename.endsWith('.sunvox')) {
     preReadBuffer = await file.arrayBuffer();
 
+    // Stop transport BEFORE loading — prevents usePatternPlayback's effect from
+    // auto-restarting+stopping when patterns change mid-playback. Without this,
+    // the first play after loading a second song is silent.
+    useTransportStore.getState().stop();
+
     // Wait for any in-flight shared song load to finish — the worklet processes
     // messages sequentially, so a pending loadSong blocks new createHandle calls.
     // Then reset shared WASM handle from any previous .sunvox song.
@@ -1097,16 +1102,6 @@ async function loadSongFile(file: File, options: FileLoadOptions): Promise<FileL
       setMetadata({ name, author: '', description: `Imported from ${file.name} (${generators.length} instruments, ${extractedModules.length} modules)` });
       applyEditorMode({});
 
-      // Auto-start the SunVox sequencer so audio plays immediately after drop.
-      // Without this, loading a second .sunvox while playing leaves the sequencer stopped.
-      try {
-        const { getSharedSunVoxHandle } = await import('@/engine/sunvox-modular/SunVoxModularSynth');
-        const { SunVoxEngine } = await import('@/engine/sunvox/SunVoxEngine');
-        const handle = getSharedSunVoxHandle();
-        if (handle >= 0 && SunVoxEngine.hasInstance()) {
-          SunVoxEngine.getInstance().play(handle);
-        }
-      } catch { /* SunVox not ready */ }
 
       return { success: true, message: `Loaded SunVox: ${name} — ${generators.length} instruments, ${patternsToLoad.length} pattern(s)` };
     }
