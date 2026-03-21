@@ -1430,7 +1430,6 @@ const TEST_CASES: TestCase[] = [
   { file: 'formats/paulsummers_test.psum', format: 'PSUM', parserModule: 'PaulSummersParser', parseFn: 'parsePaulSummersFile', isAsync: false, noteExportOffset: 36 },
   { file: 'formats/richardjoseph_test.rj', format: 'RJP', parserModule: 'RichardJosephParser', parseFn: 'parseRJPFile', isAsync: true, noteExportOffset: 36 },
   // RonKlaren — parser returned null (format detection heuristic mismatch)
-  // { file: 'formats/ronklaren_test.rkl', format: 'RKL', ... },
   { file: 'formats/seanconnolly_test.sc2', format: 'SC2', parserModule: 'SeanConnollyParser', parseFn: 'parseSeanConnollyFile', isAsync: false, noteExportOffset: 36 },
   { file: 'formats/seanconran_test.scr', format: 'SCR', parserModule: 'SeanConranParser', parseFn: 'parseSeanConranFile', isAsync: true, noteExportOffset: 36 },
   { file: 'formats/stevebarrett_test.sb', format: 'SB', parserModule: 'SteveBarrettParser', parseFn: 'parseSteveBarrettFile', isAsync: false, noteExportOffset: 36 },
@@ -1504,6 +1503,14 @@ const TEST_CASES: TestCase[] = [
   { file: 'formats/scumm_test.scumm', format: 'SCUM', parserModule: 'SCUMMParser', parseFn: 'parseSCUMMFile', isAsync: false, noteExportOffset: 36 },
   // { file: 'formats/unic_test.unic', format: 'UNIC', parserModule: 'UNICParser', parseFn: 'parseUNICFile', isAsync: true, noteExportOffset: 36 },
   { file: 'formats/dtm_test.dtm', format: 'DTM', parserModule: 'DTMParser', parseFn: 'parseDTMFile', isAsync: true, exportAs: 'xm' },
+
+  // === Batch 6 — retry with correct files ===
+  // RonKlaren — scanModuleCode() fails on all test files (68k opcode structure mismatch)
+  // { file: 'formats/rk.journey', format: 'RKL', ... },
+  { file: 'formats/musicmaker2_test.mm8', format: 'MM8', parserModule: 'MusicMakerParser', parseFn: 'parseMusicMaker8VFile', isAsync: false, noteExportOffset: 36 },
+  // Symphonie Pro — parser returns null on all available test files
+  // { file: 'formats/symphonie3_test.symmod', format: 'SYMP', ... },
+  { file: 'formats/radiokomppi.smus', format: 'SMUS', parserModule: 'IffSmusParser', parseFn: 'parseIffSmusFile', isAsync: true, noteExportOffset: 36 },
 ];
 
 // ============================================================================
