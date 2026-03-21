@@ -30,6 +30,7 @@ import {
   useTransportStore,
   useAutomationStore,
   useAudioStore,
+  useEditorStore,
   notify,
   useFormatStore,
 } from '@stores';
@@ -289,7 +290,10 @@ export const PixiExportDialog: React.FC<PixiExportDialogProps> = ({ isOpen, onCl
               }
             });
           });
-          exportSong(metadata, bpm, instruments, patterns, sequence, automationData, masterEffects, curves, options);
+          const { speed } = useTransportStore.getState();
+          const { linearPeriods } = useEditorStore.getState();
+          const trackerFormat = patterns[0]?.importMetadata?.sourceFormat as string | undefined;
+          exportSong(metadata, bpm, instruments, patterns, sequence, automationData, masterEffects, curves, options, undefined, { speed, trackerFormat, linearPeriods });
           onClose();
           break;
         }

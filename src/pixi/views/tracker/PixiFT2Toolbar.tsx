@@ -261,12 +261,16 @@ export const PixiFT2Toolbar: React.FC = () => {
           }
         });
       });
+      const { speed } = useTransportStore.getState();
+      const { linearPeriods } = useEditorStore.getState();
+      const trackerFormat = patterns[0]?.importMetadata?.sourceFormat as string | undefined;
       exportSong(
         metadata, bpm, instruments, patterns, sequence,
         Object.keys(automationData).length > 0 ? automationData : undefined,
         masterEffects.length > 0 ? masterEffects : undefined,
         curves.length > 0 ? curves : undefined,
-        { prettify: true }, gtId
+        { prettify: true }, gtId,
+        { speed, trackerFormat, linearPeriods }
       );
       notify.success('Song downloaded!', 2000);
     } catch {

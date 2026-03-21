@@ -4,6 +4,7 @@ import { SpeechSequencer } from '@/engine/speech/SpeechSequencer';
 import type { SpeechFrame } from '@/engine/speech/SpeechSequencer';
 import { getTractShape, type TractShape } from './PhonemeMap';
 import { textToPhonemes } from './SimpleReciter';
+import { espeakTextToIPA, parseEspeakIPA, isEspeakAvailable } from '@/engine/speech/EspeakNG';
 
 export interface PinkTromboneConfig {
   tenseness: number;       // 0-1: breathy (0) → harsh (1)
@@ -177,9 +178,27 @@ export class PinkTromboneSynth implements DevilboxSynth {
     if (!text.trim()) return;
     console.log('[PinkTrombone] speak() called with:', text);
 
-    // Fast synchronous text → phoneme conversion (no WASM)
-    const phonemes = textToPhonemes(text);
-    console.log('[PinkTrombone] Phonemes:', phonemes.join(' '));
+    // Try eSpeak first (better quality), fall back to simple reciter
+    let phonemes: string[];
+    if (isEspeakAvailable()) {
+      try {
+        const ipa = await espeakTextToIPA(text);
+        if (ipa) {
+          const tokens = parseEspeakIPA(ipa);
+          phonemes = tokens.map(t => t.code);
+          console.log('[PinkTrombone] eSpeak phonemes:', phonemes.join(' '));
+        } else {
+          phonemes = textToPhonemes(text);
+          console.log('[PinkTrombone] Simple phonemes:', phonemes.join(' '));
+        }
+      } catch {
+        phonemes = textToPhonemes(text);
+        console.log('[PinkTrombone] Fallback phonemes:', phonemes.join(' '));
+      }
+    } else {
+      phonemes = textToPhonemes(text);
+      console.log('[PinkTrombone] Simple phonemes:', phonemes.join(' '));
+    }
 
     if (phonemes.length === 0) return;
 
