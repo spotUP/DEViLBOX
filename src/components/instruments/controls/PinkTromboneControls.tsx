@@ -110,12 +110,22 @@ export const PinkTromboneControls: React.FC<PinkTromboneControlsProps> = ({
             </button>
           </div>
           <div className="mt-2 flex items-center gap-3">
-            <span className="text-[10px] text-text-muted uppercase">Speed</span>
+            <span className="text-[10px] text-text-muted uppercase w-8">Speed</span>
             <input
               type="range"
               min={0} max={1} step={0.01}
               value={config.speed ?? 0.5}
-              onChange={(e) => onChange({ ...configRef.current, speed: parseFloat(e.target.value) })}
+              onChange={(e) => pushConfig({ ...configRef.current, speed: parseFloat(e.target.value) })}
+              className="flex-1 h-1 accent-pink-500"
+            />
+          </div>
+          <div className="mt-1 flex items-center gap-3">
+            <span className="text-[10px] text-text-muted uppercase w-8">Pitch</span>
+            <input
+              type="range"
+              min={0} max={1} step={0.01}
+              value={config.speechPitch ?? 0.3}
+              onChange={(e) => pushConfig({ ...configRef.current, speechPitch: parseFloat(e.target.value) })}
               className="flex-1 h-1 accent-pink-500"
             />
           </div>
