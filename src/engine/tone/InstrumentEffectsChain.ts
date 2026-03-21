@@ -28,14 +28,8 @@ export interface InstrumentEffectsContext {
  * Supports both Tone.js ToneAudioNodes and native DevilboxSynths.
  * @param key - Composite key (instrumentId-channelIndex) for per-channel chains
  */
-/** Set of native AudioNodes that have been permanently connected to the synth bus.
- *  These bypass the per-instrument effect chain entirely — they're connected once
- *  and never disconnected. Used for singleton engines like SunVoxEngine where
- *  multiple instruments share the same output GainNode. */
-const _permanentNativeConnections = new Set<AudioNode>();
-
 export function clearConnectedNativeOutputs(): void {
-  // No-op: permanent connections survive song changes.
+  // No-op: permanent native connections (SunVox etc.) survive song changes.
 }
 
 export async function buildInstrumentEffectChain(
@@ -47,22 +41,6 @@ export async function buildInstrumentEffectChain(
   console.log('[ToneEngine] buildInstrumentEffectChain called for key:', key,
     'effects:', effects.length,
     'isNative:', isDevilboxSynth(instrument));
-
-  // For native synths with a shared output (e.g. SunVoxModular), connect the output
-  // directly to the synth bus ONCE and skip the per-instrument effect chain entirely.
-  // This prevents chain rebuilds from disconnecting the shared node.
-  if (isDevilboxSynth(instrument)) {
-    const synthOutput = (instrument as DevilboxSynth).output;
-    if (synthOutput) {
-      if (_permanentNativeConnections.has(synthOutput)) {
-        return; // Already permanently connected
-      }
-      // Connect directly to synthBus (stable destination, never disposed)
-      ctx.connectNativeSynth(synthOutput, ctx.synthBus);
-      _permanentNativeConnections.add(synthOutput);
-      return; // Skip effect chain — audio goes direct to synthBus
-    }
-  }
 
   // Dispose existing effect chain if any
   const existing = ctx.instrumentEffectChains.get(key);
