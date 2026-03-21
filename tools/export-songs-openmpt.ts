@@ -1490,6 +1490,20 @@ const TEST_CASES: TestCase[] = [
   { file: 'formats/davelowewtd_test.dlw', format: 'DLW', parserModule: 'WantedTeamDaveLoweParser', parseFn: 'parseWantedTeamDaveLoweFile', isAsync: false, noteExportOffset: 36 },
   // { file: 'formats/iffsmus_test.smus', format: 'SMUS', parserModule: 'IffSmusParser', parseFn: 'parseIffSmusFile', isAsync: true, noteExportOffset: 36 },
   { file: 'formats/bendaglishsid_test.bds', format: 'BSID', parserModule: 'BenDaglishSIDParser', parseFn: 'parseBenDaglishSIDFile', isAsync: true, noteExportOffset: 36 },
+
+  // === Batch 5 ===
+  // { file: 'formats/symphonie2_test.symmod', format: 'SYMP', parserModule: 'SymphonieProParser', parseFn: 'parseSymphonieProFile', isAsync: true, exportAs: 'xm' },
+  // { file: 'formats/musicmaker_test.mm8', format: 'MM8', parserModule: 'MusicMakerParser', parseFn: 'parseMusicMaker4VFile', isAsync: false, noteExportOffset: 36 },
+  { file: 'formats/mmdc_test.mmdc', format: 'MMDC', parserModule: 'MMDCParser', parseFn: 'parseMMDCFile', isAsync: false, noteExportOffset: 36 },
+  { file: 'formats/ims2_test.ims', format: 'IMS2', parserModule: 'IMSParser', parseFn: 'parseIMSFile', isAsync: true, noteExportOffset: 36 },
+  // { file: 'formats/sng.zoundmonitor_test', format: 'ZMON', parserModule: 'ZoundMonitorParser', parseFn: 'parseZoundMonitorFile', isAsync: true, noteExportOffset: 36 },
+  { file: 'formats/kris2_test.kh', format: 'KH', parserModule: 'KRISParser', parseFn: 'parseKRISFile', isAsync: true, noteExportOffset: 36 },
+  // { file: 'formats/soundplayer_test.spl', format: 'SPL', parserModule: 'SoundPlayerParser', parseFn: 'parseSoundPlayerFile', isAsync: false, noteExportOffset: 36 },
+  // { file: 'formats/cm.ice_test', format: 'ICE', parserModule: 'ICEParser', parseFn: 'parseICEFile', isAsync: true, noteExportOffset: 36 },
+  // { file: 'formats/ntsp_test.ntsp', format: 'NTSP', parserModule: 'NTSPParser', parseFn: 'parseNTSPFile', isAsync: false, noteExportOffset: 36 },
+  { file: 'formats/scumm_test.scumm', format: 'SCUM', parserModule: 'SCUMMParser', parseFn: 'parseSCUMMFile', isAsync: false, noteExportOffset: 36 },
+  // { file: 'formats/unic_test.unic', format: 'UNIC', parserModule: 'UNICParser', parseFn: 'parseUNICFile', isAsync: true, noteExportOffset: 36 },
+  { file: 'formats/dtm_test.dtm', format: 'DTM', parserModule: 'DTMParser', parseFn: 'parseDTMFile', isAsync: true, exportAs: 'xm' },
 ];
 
 // ============================================================================
