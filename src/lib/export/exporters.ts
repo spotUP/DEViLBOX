@@ -22,6 +22,10 @@ export interface SongExport {
   automationCurves?: AutomationCurve[]; // New: flat array of all automation curves
   masterEffects?: EffectConfig[]; // Global effects chain
   grooveTemplateId?: string; // Groove/swing template ID
+  speed?: number; // Ticks per row (default 6)
+  trackerFormat?: string; // 'MOD' | 'XM' | 'IT' | 'S3M' | etc.
+  linearPeriods?: boolean; // XM linear frequency mode
+  restartPosition?: number; // Song loop point
 }
 
 export interface SFXExport {
@@ -57,7 +61,8 @@ export function exportSong(
   masterEffects: EffectConfig[] | undefined,
   automationCurves: AutomationCurve[] | undefined,
   options: ExportOptions = {},
-  grooveTemplateId?: string
+  grooveTemplateId?: string,
+  playbackState?: { speed?: number; trackerFormat?: string; linearPeriods?: boolean; restartPosition?: number }
 ): void {
   const songData: SongExport = {
     format: 'devilbox-song',
@@ -73,6 +78,11 @@ export function exportSong(
     ...(masterEffects && masterEffects.length > 0 ? { masterEffects } : {}),
     // Include groove template if not the default
     ...(grooveTemplateId && grooveTemplateId !== 'straight' ? { grooveTemplateId } : {}),
+    // Playback parameters for format-accurate reload
+    ...(playbackState?.speed != null && playbackState.speed !== 6 ? { speed: playbackState.speed } : {}),
+    ...(playbackState?.trackerFormat ? { trackerFormat: playbackState.trackerFormat } : {}),
+    ...(playbackState?.linearPeriods ? { linearPeriods: playbackState.linearPeriods } : {}),
+    ...(playbackState?.restartPosition ? { restartPosition: playbackState.restartPosition } : {}),
   };
 
   const json = options.prettify

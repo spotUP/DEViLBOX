@@ -341,7 +341,7 @@ export const usePatternPlayback = () => {
           instruments: instrumentsRef.current,
           songPositions: effectiveSongPositions,
           songLength: effectiveSongLength,
-          restartPosition: 0,
+          restartPosition: modData?.restartPosition ?? 0,
           numChannels: effectiveNumChannels,
           initialSpeed: modData?.initialSpeed ?? transportSpeed,
           initialBPM: modData?.initialBPM ?? bpmRef.current,

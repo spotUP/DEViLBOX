@@ -9,7 +9,7 @@
  */
 
 import { useEffect, useCallback, useRef } from 'react';
-import { useTrackerStore, useInstrumentStore, useProjectStore, useTransportStore, useAutomationStore, useAudioStore } from '@stores';
+import { useTrackerStore, useInstrumentStore, useProjectStore, useTransportStore, useAutomationStore, useAudioStore, useEditorStore } from '@stores';
 import { useArrangementStore } from '@stores/useArrangementStore';
 import type { AutomationCurve } from '@typedefs/automation';
 import type { EffectConfig } from '@typedefs/instrument';
@@ -107,8 +107,10 @@ const safeCancelIdleCallback = cancelIdleCallbackPolyfill;
  *       accentDecay 0.006→0.057 (47ms→200ms), softAttack 0→0.25 (0.3ms→3ms),
  *       normalDecay 0.164→0.404 (517ms→1230ms), slideTime 0.17→0.162 (63ms→60ms).
  *       Previous values caused harsh/clicky accent sound.
+ * - 17: Added speed, trackerFormat, linearPeriods, restartPosition to saved project.
+ *       XM files saved as .dbx now preserve playback parameters for accurate reload.
  */
-const SCHEMA_VERSION = 16;
+const SCHEMA_VERSION = 17;
 
 interface SavedProject {
   version: string;
@@ -123,6 +125,10 @@ interface SavedProject {
   masterEffects?: EffectConfig[];
   grooveTemplateId?: string;
   arrangement?: ArrangementSnapshot;
+  speed?: number;
+  trackerFormat?: string;
+  linearPeriods?: boolean;
+  restartPosition?: number;
 }
 
 // ============================================================================
@@ -293,6 +299,11 @@ function buildSavedProject(): SavedProject {
   const automationState = useAutomationStore.getState();
   const audioState = useAudioStore.getState();
   const arrangementState = useArrangementStore.getState();
+  const editorState = useEditorStore.getState();
+
+  // Derive trackerFormat from first pattern's importMetadata
+  const firstPattern = trackerState.patterns[0];
+  const trackerFormat = firstPattern?.importMetadata?.sourceFormat as string | undefined;
 
   return {
     version: '1.0.0',
@@ -345,6 +356,9 @@ function buildSavedProject(): SavedProject {
     masterEffects: audioState.masterEffects,
     ...(transportState.grooveTemplateId !== 'straight' ? { grooveTemplateId: transportState.grooveTemplateId } : {}),
     ...(arrangementState.tracks.length > 0 ? { arrangement: arrangementState.getSnapshot() } : {}),
+    ...(transportState.speed !== 6 ? { speed: transportState.speed } : {}),
+    ...(trackerFormat ? { trackerFormat } : {}),
+    ...(editorState.linearPeriods ? { linearPeriods: editorState.linearPeriods } : {}),
   };
 }
 
@@ -435,6 +449,11 @@ export async function loadProjectFromStorage(): Promise<boolean> {
     instrumentStore.loadInstruments(project.instruments);
     projectStore.setMetadata(project.metadata);
     transportStore.setBPM(project.bpm);
+    if (project.speed) transportStore.setSpeed(project.speed);
+
+    if (project.linearPeriods != null) {
+      useEditorStore.getState().setLinearPeriods(project.linearPeriods);
+    }
 
     if (project.automation) {
       automationStore.loadCurves(project.automation);
@@ -449,6 +468,15 @@ export async function loadProjectFromStorage(): Promise<boolean> {
     if (project.arrangement) {
       const arrangementStore = useArrangementStore.getState();
       arrangementStore.loadSnapshot(project.arrangement);
+    }
+
+    // Tag first pattern with sourceFormat so TrackerReplayer gets correct format
+    if (project.trackerFormat && project.patterns.length > 0 && !project.patterns[0].importMetadata?.sourceFormat) {
+      const p0 = project.patterns[0];
+      p0.importMetadata = {
+        ...p0.importMetadata,
+        sourceFormat: project.trackerFormat,
+      } as typeof p0.importMetadata;
     }
 
     instrumentStore.autoBakeInstruments();
@@ -532,6 +560,10 @@ export async function loadProjectFromObject(data: unknown): Promise<boolean> {
     instrumentStore.loadInstruments(project.instruments);
     projectStore.setMetadata(project.metadata);
     transportStore.setBPM(project.bpm);
+    if (project.speed) transportStore.setSpeed(project.speed);
+    if (project.linearPeriods != null) {
+      useEditorStore.getState().setLinearPeriods(project.linearPeriods);
+    }
     if (project.automation) automationStore.loadCurves(project.automation);
     if (project.masterEffects) audioStore.setMasterEffects(project.masterEffects);
     transportStore.setGrooveTemplate(project.grooveTemplateId || 'straight');
@@ -539,6 +571,23 @@ export async function loadProjectFromObject(data: unknown): Promise<boolean> {
       const arrangementStore = useArrangementStore.getState();
       arrangementStore.loadSnapshot(project.arrangement);
     }
+
+    // Tag first pattern with modData so TrackerReplayer receives format info
+    if (project.trackerFormat && project.patterns.length > 0) {
+      const p0 = project.patterns[0];
+      if (!p0.importMetadata?.modData) {
+        p0.importMetadata = {
+          ...p0.importMetadata,
+          sourceFormat: project.trackerFormat,
+          modData: {
+            initialSpeed: project.speed ?? 6,
+            initialBPM: project.bpm ?? 125,
+            format: project.trackerFormat,
+          },
+        };
+      }
+    }
+
     instrumentStore.autoBakeInstruments();
     projectStore.markAsSaved();
     return true;
@@ -593,6 +642,10 @@ export async function loadLocalRevision(key: number): Promise<boolean> {
     instrumentStore.loadInstruments(project.instruments);
     projectStore.setMetadata(project.metadata);
     transportStore.setBPM(project.bpm);
+    if (project.speed) transportStore.setSpeed(project.speed);
+    if (project.linearPeriods != null) {
+      useEditorStore.getState().setLinearPeriods(project.linearPeriods);
+    }
     if (project.automation) automationStore.loadCurves(project.automation);
     if (project.masterEffects) audioStore.setMasterEffects(project.masterEffects);
     transportStore.setGrooveTemplate(project.grooveTemplateId || 'straight');
@@ -600,6 +653,23 @@ export async function loadLocalRevision(key: number): Promise<boolean> {
       const arrangementStore = useArrangementStore.getState();
       arrangementStore.loadSnapshot(project.arrangement);
     }
+
+    // Tag first pattern with modData so TrackerReplayer receives format info
+    if (project.trackerFormat && project.patterns.length > 0) {
+      const p0 = project.patterns[0];
+      if (!p0.importMetadata?.modData) {
+        p0.importMetadata = {
+          ...p0.importMetadata,
+          sourceFormat: project.trackerFormat,
+          modData: {
+            initialSpeed: project.speed ?? 6,
+            initialBPM: project.bpm ?? 125,
+            format: project.trackerFormat,
+          },
+        };
+      }
+    }
+
     instrumentStore.autoBakeInstruments();
     projectStore.markAsSaved();
     // Restoring user's own revision — auto-save is safe

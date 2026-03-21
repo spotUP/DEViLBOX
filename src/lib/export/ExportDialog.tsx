@@ -5,7 +5,7 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { X, Download, Upload, FileMusic, Zap, Settings, Volume2, Music2, Cpu } from 'lucide-react';
-import { useTrackerStore, useInstrumentStore, useProjectStore, useTransportStore, useAutomationStore, useAudioStore, notify } from '@stores';
+import { useTrackerStore, useInstrumentStore, useProjectStore, useTransportStore, useAutomationStore, useAudioStore, useEditorStore, notify } from '@stores';
 import { useUIStore } from '@stores/useUIStore';
 import { getToneEngine } from '@engine/ToneEngine';
 import {
@@ -120,6 +120,9 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({ isOpen, onClose }) =
             });
           });
           // Export with both nested format and flat array
+          const { speed } = useTransportStore.getState();
+          const { linearPeriods } = useEditorStore.getState();
+          const trackerFormat = patterns[0]?.importMetadata?.sourceFormat as string | undefined;
           exportSong(
             metadata,
             bpm,
@@ -129,7 +132,9 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({ isOpen, onClose }) =
             automationData,
             masterEffects,
             curves, // Pass the flat array of curves
-            options
+            options,
+            undefined,
+            { speed, trackerFormat, linearPeriods }
           );
           break;
         }
