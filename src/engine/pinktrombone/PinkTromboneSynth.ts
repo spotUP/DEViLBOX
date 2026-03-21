@@ -1,9 +1,9 @@
 import type { DevilboxSynth } from '@/types/synth';
 import { getDevilboxAudioContext, noteToMidi } from '@/utils/audio-context';
-import { espeakTextToIPA, parseEspeakIPA } from '@/engine/speech/EspeakNG';
 import { SpeechSequencer } from '@/engine/speech/SpeechSequencer';
 import type { SpeechFrame } from '@/engine/speech/SpeechSequencer';
 import { getTractShape, type TractShape } from './PhonemeMap';
+import { textToPhonemes } from './SimpleReciter';
 
 export interface PinkTromboneConfig {
   tenseness: number;       // 0-1: breathy (0) → harsh (1)
@@ -177,37 +177,22 @@ export class PinkTromboneSynth implements DevilboxSynth {
     if (!text.trim()) return;
     console.log('[PinkTrombone] speak() called with:', text);
 
-    // Convert text → IPA → SAM codes → tract shapes
-    let ipa: string | null = null;
-    try {
-      ipa = await espeakTextToIPA(text);
-    } catch (e) {
-      console.warn('[PinkTrombone] eSpeak failed:', e);
-    }
+    // Fast synchronous text → phoneme conversion (no WASM)
+    const phonemes = textToPhonemes(text);
+    console.log('[PinkTrombone] Phonemes:', phonemes.join(' '));
 
-    let frames: SpeechFrame<TractShape>[];
+    if (phonemes.length === 0) return;
 
-    if (ipa) {
-      console.log('[PinkTrombone] IPA:', ipa);
-      const tokens = parseEspeakIPA(ipa);
-      console.log('[PinkTrombone] Tokens:', tokens.map(t => t.code).join(' '));
+    // Speed multiplier: 0=2x duration (slow), 0.5=1x, 1=0.5x (fast)
+    const speedMult = 1.5 - this._config.speed;
 
-      const speedMult = 1.5 - this._config.speed;
-      frames = tokens.map(token => ({
-        data: getTractShape(token.code),
-        durationMs: Math.round(getTractShape(token.code).durationMs * speedMult),
-      }));
-    } else {
-      // Fallback: cycle through basic vowels for each character
-      console.log('[PinkTrombone] eSpeak unavailable, using vowel fallback');
-      const vowels = ['AH', 'EH', 'IY', 'AO', 'UX'];
-      frames = text.split('').filter(c => c !== ' ').map((_, i) => ({
-        data: getTractShape(vowels[i % vowels.length]),
-        durationMs: 120,
-      }));
-    }
-
-    if (frames.length === 0) return;
+    const frames: SpeechFrame<TractShape>[] = phonemes.map(code => {
+      const shape = getTractShape(code);
+      return {
+        data: shape,
+        durationMs: Math.round(shape.durationMs * speedMult),
+      };
+    });
 
     // Add silence at end
     frames.push({ data: getTractShape(' '), durationMs: 100 });
