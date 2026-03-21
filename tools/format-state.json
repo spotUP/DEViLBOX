@@ -1230,7 +1230,7 @@
     "pass": false,
     "auditStatus": "fail",
     "divergeAt": 0.0029705215419501135,
-    "notes": "lock-step 93.9% (1144/1218) ch12 vol mismatch"
+    "notes": "lock-step 93.9% — Genesis ExtCH operator volume sharing (dispatch-level)"
   },
   "fur-genesis-electrickeetimperfectionist": {
     "envCorr": 0.924,

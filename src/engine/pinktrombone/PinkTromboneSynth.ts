@@ -17,6 +17,7 @@ export interface PinkTromboneConfig {
   preset: string;          // current vowel preset name
   text: string;            // text for TTS mode
   speed: number;           // 0-1: speech speed (0=slow, 1=fast)
+  speechPitch: number;     // 0-1: MIDI note for TTS (0=deep bass, 0.5=baritone, 1=soprano)
 }
 
 // Vowel presets: tongue/lip positions from phonetics
@@ -28,17 +29,23 @@ export const PINK_TROMBONE_PRESETS: Record<string, Partial<PinkTromboneConfig>> 
   'OO':      { tongueIndex: 0.07, tongueDiameter: 0.1,  lipDiameter: 0.2, velum: 0, constrictionDiameter: 1, tenseness: 0.6 },
   'AE':      { tongueIndex: 0.36, tongueDiameter: 0.79, lipDiameter: 0.67, velum: 0, constrictionDiameter: 1, tenseness: 0.7 },
   'ER':      { tongueIndex: 0.29, tongueDiameter: 0.38, lipDiameter: 0.4, velum: 0, constrictionDiameter: 1, tenseness: 0.5 },
-  'Robot':   { tongueIndex: 0.46, tongueDiameter: 0.31, lipDiameter: 0.27, velum: 0, constrictionDiameter: 1, tenseness: 0.9 },
-  'Whisper': { tongueIndex: 0.29, tongueDiameter: 0.52, lipDiameter: 0.53, velum: 0, constrictionDiameter: 1, tenseness: 0.1 },
-  'Nasal':   { tongueIndex: 0.29, tongueDiameter: 0.38, lipDiameter: 0.4, velum: 0.8, constrictionDiameter: 1, tenseness: 0.6 },
-  'Choir':   { tongueIndex: 0.21, tongueDiameter: 0.45, lipDiameter: 0.5, velum: 0.15, constrictionDiameter: 1, tenseness: 0.55 },
-  'Android': { tongueIndex: 0.46, tongueDiameter: 0.24, lipDiameter: 0.33, velum: 0, constrictionDiameter: 0.4, tenseness: 1.0 },
-  'Cyborg':  { tongueIndex: 0.6, tongueDiameter: 0.15, lipDiameter: 0.2, velum: 0, constrictionDiameter: 0.2, tenseness: 0.95 },
-  'Alien':   { tongueIndex: 0.9, tongueDiameter: 0.05, lipDiameter: 0.1, velum: 0.6, constrictionDiameter: 0.15, tenseness: 0.8 },
-  'Darth':   { tongueIndex: 0.1, tongueDiameter: 0.7, lipDiameter: 0.25, velum: 0.3, constrictionDiameter: 0.8, tenseness: 0.15 },
-  'Siren':   { tongueIndex: 0.5, tongueDiameter: 0.1, lipDiameter: 0.8, velum: 0, constrictionDiameter: 1, tenseness: 0.85, vibratoAmount: 0.8 },
-  'Growl':   { tongueIndex: 0.14, tongueDiameter: 0.9, lipDiameter: 0.35, velum: 0.1, constrictionDiameter: 0.5, tenseness: 0.05 },
-  'Throat':  { tongueIndex: 0.04, tongueDiameter: 0.55, lipDiameter: 0.15, velum: 0, constrictionDiameter: 0.3, tenseness: 0.4 },
+  'Whisper': { tongueIndex: 0.29, tongueDiameter: 0.52, lipDiameter: 0.53, velum: 0, constrictionDiameter: 1, tenseness: 0.1, speechPitch: 0.35 },
+  'Nasal':   { tongueIndex: 0.29, tongueDiameter: 0.38, lipDiameter: 0.4, velum: 0.8, constrictionDiameter: 1, tenseness: 0.6, speechPitch: 0.35 },
+  'Choir':   { tongueIndex: 0.21, tongueDiameter: 0.45, lipDiameter: 0.5, velum: 0.15, constrictionDiameter: 1, tenseness: 0.55, speechPitch: 0.5 },
+  // ── Evil Robots ──
+  'Terminator': { tongueIndex: 0.35, tongueDiameter: 0.20, lipDiameter: 0.15, velum: 0, constrictionIndex: 0.4, constrictionDiameter: 0.25, tenseness: 1.0, vibratoAmount: 0, speechPitch: 0.05 },
+  'HAL 9000':   { tongueIndex: 0.30, tongueDiameter: 0.35, lipDiameter: 0.30, velum: 0.05, constrictionDiameter: 0.6, tenseness: 0.85, vibratoAmount: 0, speechPitch: 0.15, speed: 0.3 },
+  'Dalek':      { tongueIndex: 0.50, tongueDiameter: 0.10, lipDiameter: 0.10, velum: 0, constrictionIndex: 0.6, constrictionDiameter: 0.1, tenseness: 1.0, vibratoAmount: 0.4, speechPitch: 0.2 },
+  'GLaDOS':     { tongueIndex: 0.55, tongueDiameter: 0.18, lipDiameter: 0.25, velum: 0, constrictionDiameter: 0.35, tenseness: 0.92, vibratoAmount: 0.02, speechPitch: 0.55 },
+  'Skynet':     { tongueIndex: 0.40, tongueDiameter: 0.12, lipDiameter: 0.12, velum: 0.1, constrictionIndex: 0.3, constrictionDiameter: 0.15, tenseness: 1.0, vibratoAmount: 0, speechPitch: 0.0 },
+  'Cylon':      { tongueIndex: 0.45, tongueDiameter: 0.28, lipDiameter: 0.20, velum: 0.2, constrictionDiameter: 0.3, tenseness: 0.95, vibratoAmount: 0.15, speechPitch: 0.1 },
+  'Replicant':  { tongueIndex: 0.25, tongueDiameter: 0.40, lipDiameter: 0.35, velum: 0, constrictionDiameter: 0.5, tenseness: 0.75, vibratoAmount: 0, speechPitch: 0.25 },
+  // ── Monsters ──
+  'Demon':      { tongueIndex: 0.10, tongueDiameter: 0.85, lipDiameter: 0.20, velum: 0.3, constrictionDiameter: 0.4, tenseness: 0.05, vibratoAmount: 0.3, speechPitch: 0.0 },
+  'Growl':      { tongueIndex: 0.14, tongueDiameter: 0.9, lipDiameter: 0.35, velum: 0.1, constrictionDiameter: 0.5, tenseness: 0.05, speechPitch: 0.02 },
+  'Darth':      { tongueIndex: 0.10, tongueDiameter: 0.7, lipDiameter: 0.25, velum: 0.3, constrictionDiameter: 0.8, tenseness: 0.15, speechPitch: 0.08 },
+  'Alien':      { tongueIndex: 0.9, tongueDiameter: 0.05, lipDiameter: 0.1, velum: 0.6, constrictionDiameter: 0.15, tenseness: 0.8, speechPitch: 0.7 },
+  'Siren':      { tongueIndex: 0.5, tongueDiameter: 0.1, lipDiameter: 0.8, velum: 0, constrictionDiameter: 1, tenseness: 0.85, vibratoAmount: 0.8, speechPitch: 0.6 },
 };
 
 export const DEFAULT_PINK_TROMBONE: PinkTromboneConfig = {
@@ -53,6 +60,7 @@ export const DEFAULT_PINK_TROMBONE: PinkTromboneConfig = {
   preset: 'Default',
   text: '',
   speed: 0.5,
+  speechPitch: 0.3,  // baritone by default
 };
 
 // Convert 0-1 normalized values to actual parameter ranges
@@ -152,7 +160,7 @@ export class PinkTromboneSynth implements DevilboxSynth {
     if (!this._workletNode) return;
     const params: Record<string, number> = {};
     for (const [key, value] of Object.entries(this._config)) {
-      if (key === 'preset' || key === 'text' || key === 'speed' || typeof value !== 'number') continue;
+      if (key === 'preset' || key === 'text' || key === 'speed' || key === 'speechPitch' || typeof value !== 'number') continue;
       const d = denormalize(key, value);
       params[d.key] = d.value;
     }
@@ -177,7 +185,6 @@ export class PinkTromboneSynth implements DevilboxSynth {
     if (!text.trim()) return;
     console.log('[PinkTrombone] speak() called with:', text);
 
-    // Use simple reciter (synchronous, no WASM, no freeze)
     const phonemes = textToPhonemes(text);
     console.log('[PinkTrombone] Phonemes:', phonemes.join(' '));
 
@@ -202,7 +209,9 @@ export class PinkTromboneSynth implements DevilboxSynth {
     // Start a sustained note
     this._isSpeaking = true;
     if (this._workletNode) {
-      this._workletNode.port.postMessage({ type: 'noteOn', note: 60, velocity: 0.8 });
+      // Map speechPitch 0-1 to MIDI 30-72 (deep bass to soprano)
+      const midiNote = Math.round(30 + this._config.speechPitch * 42);
+      this._workletNode.port.postMessage({ type: 'noteOn', note: midiNote, velocity: 0.8 });
     }
 
     // Sequence the tract shapes (fire and forget — sequencer handles timing)
