@@ -43,35 +43,53 @@ function getGainEngine(): { setChannelGain(ch: number, gain: number): void } | n
  * Apply mute/solo to SunVox modules by setting their Volume controller to min/restore.
  * Returns true if SunVox was active and handled (caller should skip other engines).
  */
-function _applySunVoxMutes(channels: { muted: boolean; solo: boolean }[], anySolo: boolean): boolean {
-  console.log('[SunVox Mute] _applySunVoxMutes called, channels:', channels.length);
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  let SunVoxEngine: any, getSharedSunVoxHandle: any, useInstrumentStore: any;
+// Cached lazy imports for SunVox mute (avoid require() which doesn't work in Vite ESM)
+let _svMuteEngine: any = null;
+let _svMuteGetHandle: any = null;
+let _svMuteInstrStore: any = null;
+let _svMuteImportDone = false;
+
+async function _ensureSunVoxMuteImports(): Promise<boolean> {
+  if (_svMuteImportDone) return true;
   try {
-    SunVoxEngine = require('../engine/sunvox/SunVoxEngine').SunVoxEngine;
-    getSharedSunVoxHandle = require('../engine/sunvox-modular/SunVoxModularSynth').getSharedSunVoxHandle;
-    useInstrumentStore = require('./useInstrumentStore').useInstrumentStore;
-  } catch (e) {
-    return false; // modules not loaded yet
+    const [svMod, synthMod, instrMod] = await Promise.all([
+      import('../engine/sunvox/SunVoxEngine'),
+      import('../engine/sunvox-modular/SunVoxModularSynth'),
+      import('./useInstrumentStore'),
+    ]);
+    _svMuteEngine = svMod.SunVoxEngine;
+    _svMuteGetHandle = synthMod.getSharedSunVoxHandle;
+    _svMuteInstrStore = instrMod.useInstrumentStore;
+    _svMuteImportDone = true;
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+// Fire-and-forget: apply mute to SunVox modules
+function _applySunVoxMutes(channels: { muted: boolean; solo: boolean }[], anySolo: boolean): boolean {
+  if (!_svMuteImportDone) {
+    // Trigger lazy import for next time, skip this call
+    void _ensureSunVoxMuteImports();
+    return false;
   }
 
-  if (!SunVoxEngine.hasInstance()) return false;
-  const handle = getSharedSunVoxHandle();
+  if (!_svMuteEngine.hasInstance()) return false;
+  const handle = _svMuteGetHandle();
   if (handle < 0) return false;
 
-  const instruments = useInstrumentStore.getState().instruments;
+  const instruments = _svMuteInstrStore.getState().instruments;
   const state = useTrackerStore.getState();
   const pattern = state.patterns[state.currentPatternIndex];
   if (!pattern) return false;
 
-  // Check if any instrument is a SunVox song instrument
   const hasSunVox = instruments.some(
     (i: { synthType?: string; sunvox?: { isSong?: boolean } }) =>
       i.synthType === 'SunVoxModular' && i.sunvox?.isSong === true
   );
   if (!hasSunVox) return false;
 
-  // Collect per-module mute state: unmuted if ANY channel targeting it is unmuted
   const moduleUnmuted = new Map<number, boolean>();
   for (let i = 0; i < pattern.channels.length; i++) {
     const ch = channels[i];
@@ -86,7 +104,7 @@ function _applySunVoxMutes(channels: { muted: boolean; solo: boolean }[], anySol
     else if (!moduleUnmuted.has(modId)) moduleUnmuted.set(modId, false);
   }
 
-  const engine = SunVoxEngine.getInstance();
+  const engine = _svMuteEngine.getInstance();
   for (const [modId, unmuted] of moduleUnmuted) {
     if (unmuted) engine.unmuteModule(handle, modId);
     else engine.muteModule(handle, modId);
@@ -1274,7 +1292,6 @@ export const useTrackerStore = create<TrackerStore>()(
       if (pattern) {
         const engine = getToneEngine();
         engine.updateMuteStates(pattern.channels.map(ch => ({ muted: ch.muted, solo: ch.solo })));
-        // Forward to Furnace WASM dispatch if in Furnace mode
         forwardWasmMuteStates(pattern.channels);
       }
       // Add status message
