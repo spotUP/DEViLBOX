@@ -1464,6 +1464,32 @@ const TEST_CASES: TestCase[] = [
   { file: 'formats/velvet_test.ams', format: 'AMS', parserModule: 'AMSParser', parseFn: 'parseAMSFile', isAsync: false, args: 'bytes', exportAs: 'xm' },
   // PTM / PolyTracker — format validation fails (file from Pollytracker dir, not PolyTracker)
   // { file: 'formats/pollytracker_test.ptm', format: 'PTM', ... },
+
+  // === Batch 4 — Amiga composer formats ===
+  { file: 'formats/ashleyhogg_test.ah', format: 'AH', parserModule: 'AshleyHoggParser', parseFn: 'parseAshleyHoggFile', isAsync: false, noteExportOffset: 36 },
+  // { file: 'formats/chiptracker_test.chip', format: 'CHIP', parserModule: 'ChuckBiscuitsParser', parseFn: 'parseChuckBiscuitsFile', isAsync: false, args: 'bytes', noteExportOffset: 36 },
+  { file: 'formats/coredesign_test.cd', format: 'CORE', parserModule: 'CoreDesignParser', parseFn: 'parseCoreDesignFile', isAsync: false, noteExportOffset: 36 },
+  { file: 'formats/fredmon_test.fredmon', format: 'FRED', parserModule: 'FredEditorParser', parseFn: 'parseFredEditorFile', isAsync: true, noteExportOffset: 36 },
+  { file: 'formats/janko_test.jmf', format: 'JMF', parserModule: 'JankoMrsicFlogelParser', parseFn: 'parseJankoMrsicFlogelFile', isAsync: false, noteExportOffset: 36 },
+  // { file: 'formats/beathoven_test.bvs', format: 'BVS', parserModule: 'JanneSalmijarviParser', parseFn: 'parseJanneSalmijarviFile', isAsync: false, noteExportOffset: 36 },
+  { file: 'formats/jesperolsen_test.jo', format: 'JO', parserModule: 'JesperOlsenParser', parseFn: 'parseJesperOlsenFile', isAsync: false, noteExportOffset: 36 },
+  { file: 'formats/hippelst_test.hst', format: 'HST', parserModule: 'JochenHippelSTParser', parseFn: 'parseJochenHippelSTFile', isAsync: false, noteExportOffset: 36 },
+  // { file: 'formats/soundmaster2_test.sm2', format: 'SM2', parserModule: 'KarlMortonParser', parseFn: 'parseKarlMortonFile', isAsync: false, args: 'bytes', noteExportOffset: 36 },
+  // { file: 'formats/audiosculpture_test.adsc', format: 'ADSC', parserModule: 'KimChristensenParser', parseFn: 'parseKimChristensenFile', isAsync: false, noteExportOffset: 36 },
+  { file: 'formats/maxtrax_test.mxt', format: 'MXT', parserModule: 'MaximumEffectParser', parseFn: 'parseMaximumEffectFile', isAsync: false, noteExportOffset: 36 },
+  { file: 'formats/midiloriciel_test.midi', format: 'MLOR', parserModule: 'MIDILoricielParser', parseFn: 'parseMIDILoricielFile', isAsync: false, noteExportOffset: 36 },
+  // { file: 'formats/howiedavies_test.hd', format: 'NRU', parserModule: 'NRUParser', parseFn: 'parseNRUFile', isAsync: true, noteExportOffset: 36 },
+  // { file: 'formats/delitracker_test.cust', format: 'DELI', parserModule: 'OnEscapeeParser', parseFn: 'parseOnEscapeeFile', isAsync: false, noteExportOffset: 36 },
+  // { file: 'formats/follin_test.fp2', format: 'FP2', parserModule: 'PaulTongeParser', parseFn: 'parsePaulTongeFile', isAsync: false, noteExportOffset: 36 },
+  // { file: 'formats/silmarils2_test.sil', format: 'SIL2', parserModule: 'PierreAdaneParser', parseFn: 'parsePierreAdaneFile', isAsync: false, noteExportOffset: 36 },
+  { file: 'formats/psa_test.psa', format: 'PSA', parserModule: 'PSAParser', parseFn: 'parsePSAFile', isAsync: false, noteExportOffset: 36 },
+  { file: 'formats/robhubbardst_test.rhst', format: 'RHST', parserModule: 'RobHubbardSTParser', parseFn: 'parseRobHubbardSTFile', isAsync: false, noteExportOffset: 36 },
+  // { file: 'formats/riffraff_test.riff', format: 'RIFF', parserModule: 'ThomasHermannParser', parseFn: 'parseThomasHermannFile', isAsync: true, noteExportOffset: 36 },
+  // { file: 'formats/suntronic_test.sun', format: 'SUNT', parserModule: 'TronicParser', parseFn: 'parseTronicFile', isAsync: true, noteExportOffset: 36 },
+  // { file: 'formats/ufo_test.ufo', format: 'UFO', parserModule: 'UFOParser', parseFn: 'parseUFOFile', isAsync: false, noteExportOffset: 36 },
+  { file: 'formats/davelowewtd_test.dlw', format: 'DLW', parserModule: 'WantedTeamDaveLoweParser', parseFn: 'parseWantedTeamDaveLoweFile', isAsync: false, noteExportOffset: 36 },
+  // { file: 'formats/iffsmus_test.smus', format: 'SMUS', parserModule: 'IffSmusParser', parseFn: 'parseIffSmusFile', isAsync: true, noteExportOffset: 36 },
+  { file: 'formats/bendaglishsid_test.bds', format: 'BSID', parserModule: 'BenDaglishSIDParser', parseFn: 'parseBenDaglishSIDFile', isAsync: true, noteExportOffset: 36 },
 ];
 
 // ============================================================================
