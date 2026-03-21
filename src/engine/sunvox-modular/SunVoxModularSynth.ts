@@ -21,6 +21,9 @@ const GENERATOR_TYPES = new Set([
 let _sharedSongHandle = -1;
 let _sharedSongRefCount = 0;
 let _sharedSongInitPromise: Promise<void> | null = null;
+/** Epoch counter — incremented on each resetSharedSunVoxHandle. Old instances with stale
+ *  epochs won't touch the new shared handle during async disposal. */
+let _sharedEpoch = 0;
 
 /**
  * Wait for any in-flight shared song load to finish before starting new work.
@@ -35,6 +38,7 @@ export async function awaitPendingSharedSongLoad(): Promise<void> {
 
 /** Force-reset shared state (call before loading a new song to prevent WASM crashes) */
 export function resetSharedSunVoxHandle(): void {
+  _sharedEpoch++; // Invalidate all existing instances
   if (_sharedSongHandle >= 0) {
     try {
       SunVoxEngine.getInstance().destroyHandle(_sharedSongHandle);
@@ -70,6 +74,7 @@ export class SunVoxModularSynth implements DevilboxSynth {
   private _disposed = false;
   private _handle = -1;
   private _initPromise: Promise<void>;
+  private _epoch = 0; // epoch at creation — stale instances won't touch shared handle
   private _usesSharedHandle = false;
 
   private uiToSv = new Map<string, number>();
@@ -122,6 +127,7 @@ export class SunVoxModularSynth implements DevilboxSynth {
 
     this._handle = _sharedSongHandle;
     this._usesSharedHandle = true;
+    this._epoch = _sharedEpoch;
     _sharedSongRefCount++;
 
     // Build ID mappings from config modules
@@ -356,17 +362,18 @@ export class SunVoxModularSynth implements DevilboxSynth {
     this._disposed = true;
 
     if (this._usesSharedHandle) {
-      // Only decrement refcount if this instance's handle matches the current shared handle.
-      // After resetSharedSunVoxHandle(), old instances have stale handles — don't touch the new one.
-      if (this._handle === _sharedSongHandle) {
+      // Only touch the shared handle if this instance belongs to the CURRENT epoch.
+      // Old instances from a previous song (stale epoch) must not destroy the new handle.
+      if (this._epoch === _sharedEpoch) {
         _sharedSongRefCount--;
+        if (_sharedSongRefCount <= 0 && _sharedSongHandle >= 0) {
+          this.engine.destroyHandle(_sharedSongHandle);
+          _sharedSongHandle = -1;
+          _sharedSongRefCount = 0;
+          _sharedSongInitPromise = null;
+        }
       }
-      if (_sharedSongRefCount <= 0 && this._handle === _sharedSongHandle && _sharedSongHandle >= 0) {
-        this.engine.destroyHandle(_sharedSongHandle);
-        _sharedSongHandle = -1;
-        _sharedSongRefCount = 0;
-        _sharedSongInitPromise = null;
-      }
+      // Stale epoch instances: do nothing — handle already managed by reset
     } else if (this._handle >= 0) {
       this.engine.destroyHandle(this._handle);
     }

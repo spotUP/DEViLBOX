@@ -572,20 +572,13 @@ export async function loadProjectFromObject(data: unknown): Promise<boolean> {
       arrangementStore.loadSnapshot(project.arrangement);
     }
 
-    // Tag first pattern with modData so TrackerReplayer receives format info
-    if (project.trackerFormat && project.patterns.length > 0) {
+    // Tag first pattern with sourceFormat so TrackerReplayer gets correct format
+    if (project.trackerFormat && project.patterns.length > 0 && !project.patterns[0].importMetadata?.sourceFormat) {
       const p0 = project.patterns[0];
-      if (!p0.importMetadata?.modData) {
-        p0.importMetadata = {
-          ...p0.importMetadata,
-          sourceFormat: project.trackerFormat,
-          modData: {
-            initialSpeed: project.speed ?? 6,
-            initialBPM: project.bpm ?? 125,
-            format: project.trackerFormat,
-          },
-        };
-      }
+      p0.importMetadata = {
+        ...p0.importMetadata,
+        sourceFormat: project.trackerFormat,
+      } as typeof p0.importMetadata;
     }
 
     instrumentStore.autoBakeInstruments();
@@ -654,20 +647,13 @@ export async function loadLocalRevision(key: number): Promise<boolean> {
       arrangementStore.loadSnapshot(project.arrangement);
     }
 
-    // Tag first pattern with modData so TrackerReplayer receives format info
-    if (project.trackerFormat && project.patterns.length > 0) {
+    // Tag first pattern with sourceFormat so TrackerReplayer gets correct format
+    if (project.trackerFormat && project.patterns.length > 0 && !project.patterns[0].importMetadata?.sourceFormat) {
       const p0 = project.patterns[0];
-      if (!p0.importMetadata?.modData) {
-        p0.importMetadata = {
-          ...p0.importMetadata,
-          sourceFormat: project.trackerFormat,
-          modData: {
-            initialSpeed: project.speed ?? 6,
-            initialBPM: project.bpm ?? 125,
-            format: project.trackerFormat,
-          },
-        };
-      }
+      p0.importMetadata = {
+        ...p0.importMetadata,
+        sourceFormat: project.trackerFormat,
+      } as typeof p0.importMetadata;
     }
 
     instrumentStore.autoBakeInstruments();
