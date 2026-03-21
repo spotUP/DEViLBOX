@@ -1416,6 +1416,54 @@ const TEST_CASES: TestCase[] = [
   { file: 'formats/mdat.rocknroll', format: 'TFMX', parserModule: 'TFMXParser', parseFn: 'parseTFMXFile', isAsync: false, noteExportOffset: 36 },
   { file: 'formats/warlock_the_avenger.sqt', format: 'QRT', parserModule: 'QuartetParser', parseFn: 'parseQuartetFile', isAsync: true, noteExportOffset: 36 },
   { file: 'formats/cave_story_-_42_-_xxxx.org', format: 'ORG', parserModule: 'OrganyaParser', parseFn: 'parseOrganyaFile', isAsync: true, noteExportOffset: 36 },
+
+  // === Batch 3 — Amiga composer formats ===
+  { file: 'formats/fredgray_test.fred', format: 'FGRAY', parserModule: 'FredGrayParser', parseFn: 'parseFredGrayFile', isAsync: false, noteExportOffset: 36 },
+  { file: 'formats/davelowe_test.dl', format: 'DL', parserModule: 'DaveLoweParser', parseFn: 'parseDaveLoweFile', isAsync: true, noteExportOffset: 36 },
+  { file: 'formats/davelowen_test.dln', format: 'DLN', parserModule: 'DaveLoweNewParser', parseFn: 'parseDaveLoweNewFile', isAsync: false, noteExportOffset: 36 },
+  { file: 'formats/davidhanney_test.dh', format: 'DH', parserModule: 'DavidHanneyParser', parseFn: 'parseDavidHanneyFile', isAsync: false, noteExportOffset: 36 },
+  { file: 'formats/jasonbrooke_test.jb', format: 'JB', parserModule: 'JasonBrookeParser', parseFn: 'parseJasonBrookeFile', isAsync: false, noteExportOffset: 36 },
+  // KrisHatlelid — binary signature mismatch (Amiga executable header check)
+  // { file: 'formats/krishat_test.kh', format: 'KH', ... },
+  { file: 'formats/mon_test.mon', format: 'MON', parserModule: 'ManiacsOfNoiseParser', parseFn: 'parseManiacsOfNoiseFile', isAsync: false, noteExportOffset: 36 },
+  { file: 'formats/paulshields_test.ps', format: 'PS', parserModule: 'PaulShieldsParser', parseFn: 'parsePaulShieldsFile', isAsync: false, noteExportOffset: 36 },
+  { file: 'formats/paulsummers_test.psum', format: 'PSUM', parserModule: 'PaulSummersParser', parseFn: 'parsePaulSummersFile', isAsync: false, noteExportOffset: 36 },
+  { file: 'formats/richardjoseph_test.rj', format: 'RJP', parserModule: 'RichardJosephParser', parseFn: 'parseRJPFile', isAsync: true, noteExportOffset: 36 },
+  // RonKlaren — parser returned null (format detection heuristic mismatch)
+  // { file: 'formats/ronklaren_test.rkl', format: 'RKL', ... },
+  { file: 'formats/seanconnolly_test.sc2', format: 'SC2', parserModule: 'SeanConnollyParser', parseFn: 'parseSeanConnollyFile', isAsync: false, noteExportOffset: 36 },
+  { file: 'formats/seanconran_test.scr', format: 'SCR', parserModule: 'SeanConranParser', parseFn: 'parseSeanConranFile', isAsync: true, noteExportOffset: 36 },
+  { file: 'formats/stevebarrett_test.sb', format: 'SB', parserModule: 'SteveBarrettParser', parseFn: 'parseSteveBarrettFile', isAsync: false, noteExportOffset: 36 },
+  { file: 'formats/wallybeben_test.wb', format: 'WB', parserModule: 'WallyBebenParser', parseFn: 'parseWallyBebenFile', isAsync: false, noteExportOffset: 36 },
+  // Cinemaware/Silmarils — detection requires specific binary header
+  // { file: 'formats/silmarils_test.sil', format: 'SIL', ... },
+
+  // === Batch 3 — Amiga tracker formats ===
+  { file: 'formats/composer669_test.669', format: 'C669', parserModule: 'Composer667Parser', parseFn: 'parseComposer667File', isAsync: false, args: 'bytes', exportAs: 'xm' },
+  { file: 'formats/amnesia_credits.c67', format: 'C670', parserModule: 'CDFM67Parser', parseFn: 'parseCDFM67File', isAsync: false, args: 'bytes', noteExportOffset: 36 },
+  // Symphonie Pro — parser returned null (needs investigation)
+  // { file: 'formats/symphonie_test.symmod', format: 'SYMP', ... },
+  { file: 'formats/startrekker_test.mod', format: 'STKR', parserModule: 'StartrekkerAMParser', parseFn: 'parseStartrekkerAMFile', isAsync: false, noteExportOffset: 36 },
+  // His Master's Noise / IMS — format validation fails on test file
+  // { file: 'formats/hmn_test.mod', format: 'HMN', ... },
+  { file: 'formats/mms_test.mms', format: 'MMS', parserModule: 'MultiMediaSoundParser', parseFn: 'parseMultiMediaSoundFile', isAsync: false, noteExportOffset: 36 },
+  { file: 'formats/lme_test.lme', format: 'LME', parserModule: 'LMEParser', parseFn: 'parseLMEFile', isAsync: false, noteExportOffset: 36 },
+  { file: 'formats/tme_test.tme', format: 'TME', parserModule: 'TMEParser', parseFn: 'parseTMEFile', isAsync: false, noteExportOffset: 36 },
+  // ZoundMonitor — requires 'sng.' or '.sng' filename prefix
+  // { file: 'formats/zoundmonitor_test.sng', format: 'ZMON', ... },
+  { file: 'formats/soundfactory_test.psf', format: 'PSF', parserModule: 'SoundFactoryParser', parseFn: 'parseSoundFactoryFile', isAsync: false, args: 'bytes', noteExportOffset: 36 },
+  // XMF / Mark II — parser returned null (format mismatch)
+  // { file: 'formats/mark2_test.mk2', format: 'MK2', ... },
+  { file: 'formats/medley_test.med', format: 'MDLY', parserModule: 'MedleyParser', parseFn: 'parseMedleyFile', isAsync: false, noteExportOffset: 36 },
+  { file: 'formats/stonetracker_test.mod', format: 'STNK', parserModule: 'STKParser', parseFn: 'parseSTKFile', isAsync: true, noteExportOffset: 36 },
+  { file: 'formats/soundmaster_test.sm', format: 'SMAS', parserModule: 'SoundMasterParser', parseFn: 'parseSoundMasterFile', isAsync: true, noteExportOffset: 36 },
+  { file: 'formats/speedysystem_test.ss', format: 'SPDY', parserModule: 'SpeedySystemParser', parseFn: 'parseSpeedySystemFile', isAsync: true, noteExportOffset: 36 },
+  { file: 'formats/tomytracker_test.tomy', format: 'TOMY', parserModule: 'TomyTrackerParser', parseFn: 'parseTomyTrackerFile', isAsync: false, noteExportOffset: 36 },
+
+  // === Batch 3 — PC tracker formats ===
+  { file: 'formats/velvet_test.ams', format: 'AMS', parserModule: 'AMSParser', parseFn: 'parseAMSFile', isAsync: false, args: 'bytes', exportAs: 'xm' },
+  // PTM / PolyTracker — format validation fails (file from Pollytracker dir, not PolyTracker)
+  // { file: 'formats/pollytracker_test.ptm', format: 'PTM', ... },
 ];
 
 // ============================================================================
