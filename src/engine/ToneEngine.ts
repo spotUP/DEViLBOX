@@ -197,6 +197,8 @@ export class ToneEngine {
   public instruments: Map<number, Tone.ToneAudioNode | DevilboxSynth>;
   // Track synth types for proper release handling
   private instrumentSynthTypes: Map<number, string> = new Map();
+  // SunVox output connected to synthBus (permanent, survives song changes)
+  private _sunvoxOutputConnected = false;
   // Track loading promises for samplers/players (keyed by instrument key)
   private instrumentLoadingPromises: Map<number, Promise<void>> = new Map();
   // Store decoded AudioBuffers for TrackerReplayer access (keyed by instrument ID)
@@ -2273,11 +2275,22 @@ export class ToneEngine {
       this.instrumentSynthTypes.set(key, config.synthType);
     }
 
-    // Create instrument effect chain and connect (fire-and-forget for initial creation)
-    // For effect updates, use rebuildInstrumentEffects() which properly awaits
-    this.buildInstrumentEffectChain(key, config.effects || [], instrument).catch((error) => {
-      console.error('[ToneEngine] Failed to build initial effect chain:', error);
-    });
+    // SunVoxModular: all instances share one GainNode (SunVoxEngine singleton output).
+    // Connect it directly to synthBus ONCE — don't use per-instrument effect chains
+    // which would disconnect/reconnect the shared node on every React re-render.
+    if (config.synthType === 'SunVoxModular' && isDevilboxSynth(instrument)) {
+      const svOutput = (instrument as DevilboxSynth).output;
+      if (svOutput && !this._sunvoxOutputConnected) {
+        this.connectNativeSynth(svOutput, this.synthBus);
+        this._sunvoxOutputConnected = true;
+      }
+    } else {
+      // Create instrument effect chain and connect (fire-and-forget for initial creation)
+      // For effect updates, use rebuildInstrumentEffects() which properly awaits
+      this.buildInstrumentEffectChain(key, config.effects || [], instrument).catch((error) => {
+        console.error('[ToneEngine] Failed to build initial effect chain:', error);
+      });
+    }
 
     // Route native chip engine output to synthBus for master effects processing.
     // Chip engines (FurnaceChipEngine, FurnaceDispatchEngine) use native AudioWorklets
