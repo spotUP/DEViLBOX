@@ -309,6 +309,9 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = React.memo(({
           }
         });
       });
+      const { speed } = useTransportStore.getState();
+      const { linearPeriods } = useEditorStore.getState();
+      const trackerFormat = patterns[0]?.importMetadata?.sourceFormat as string | undefined;
       exportSong(
         metadata,
         bpm,
@@ -319,7 +322,8 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = React.memo(({
         masterEffects.length > 0 ? masterEffects : undefined,
         curves.length > 0 ? curves : undefined,
         { prettify: true },
-        grooveTemplateId
+        grooveTemplateId,
+        { speed, trackerFormat, linearPeriods }
       );
       notify.success('Song downloaded!', 2000);
     } catch (error) {

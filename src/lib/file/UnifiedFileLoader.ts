@@ -16,6 +16,7 @@ import { useTransportStore } from '@/stores/useTransportStore';
 import { useProjectStore } from '@/stores/useProjectStore';
 import { useAutomationStore } from '@/stores/useAutomationStore';
 import { useAudioStore } from '@/stores/useAudioStore';
+import { useEditorStore } from '@/stores/useEditorStore';
 import { getToneEngine } from '@/engine/ToneEngine';
 import { notify } from '@/stores/useNotificationStore';
 import { isSupportedFormat, detectFormat } from '@/lib/import/FormatRegistry';
@@ -605,7 +606,7 @@ async function loadSongFile(file: File, options: FileLoadOptions): Promise<FileL
   const { loadPatterns, setPatternOrder, setCurrentPattern, reset: resetTracker } = useTrackerStore.getState();
   const { applyEditorMode } = useFormatStore.getState();
   const { loadInstruments, addInstrument, reset: resetInstruments } = useInstrumentStore.getState();
-  const { setBPM, setGrooveTemplate, reset: resetTransport, isPlaying, stop: stopTransport } = useTransportStore.getState();
+  const { setBPM, setSpeed, setGrooveTemplate, reset: resetTransport, isPlaying, stop: stopTransport } = useTransportStore.getState();
   const { setMetadata } = useProjectStore.getState();
   const { reset: resetAutomation } = useAutomationStore.getState();
   const engine = getToneEngine();
@@ -819,11 +820,27 @@ async function loadSongFile(file: File, options: FileLoadOptions): Promise<FileL
     if (instruments) loadInstruments(instruments);
     if (songData.masterEffects) useAudioStore.getState().setMasterEffects(songData.masterEffects);
     setBPM(songData.bpm);
+    if (songData.speed) setSpeed(songData.speed);
     setMetadata(songData.metadata);
     setGrooveTemplate(songData.grooveTemplateId || 'straight');
+
+    // Restore linearPeriods if saved (XM files use linear frequency mode)
+    if (songData.linearPeriods != null) {
+      useEditorStore.getState().setLinearPeriods(songData.linearPeriods);
+    }
+
+    // Tag first pattern with sourceFormat so TrackerReplayer gets correct format on reload
+    if (songData.trackerFormat && patterns.length > 0 && !patterns[0].importMetadata?.sourceFormat) {
+      patterns[0].importMetadata = {
+        ...patterns[0].importMetadata,
+        sourceFormat: songData.trackerFormat,
+      } as Pattern['importMetadata'];
+    }
+
     // Reset to classic editor mode — clears stale native state from any
     // previously-loaded musicline/furnace/hively file.
-    applyEditorMode({});
+    // Pass linearPeriods through so it's not wiped by the reset.
+    applyEditorMode({ linearPeriods: songData.linearPeriods ?? false });
 
     return {
       success: true,
