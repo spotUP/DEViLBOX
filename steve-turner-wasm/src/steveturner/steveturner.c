@@ -330,7 +330,9 @@ static void env_phase2(Voice *v) {
     v->env_func = FN_ENV3;
 }
 
-// Phase 3 (lbC0009AA): Set loop-to-silence sample
+// Phase 3 (lbC0009AA): Set loop-to-silence sample + first envelope tick
+// In the ASM, lbC0009AA falls through to lbC0009CE (env_phase4 body).
+// Both the silence setup AND the first apply_envelope happen in the SAME tick.
 static void env_phase3(Voice *v) {
     if (v->env_init == 0) {
         // Set DMA to loop silence (1 word)
@@ -338,6 +340,15 @@ static void env_phase3(Voice *v) {
         paula_set_sample_ptr(v->ch, silence_sample);
     }
     v->env_func = FN_ENV4;
+    // ASM fall-through to lbC0009CE: apply envelope + decrement counter
+    apply_envelope(v);
+    v->env_counter--;
+    if (v->env_counter == 0) {
+        uint8_t *inst = v->inst_ptr;
+        v->env_counter = (int16_t)inst[I_ENV2_DUR];
+        v->env_delta = (int8_t)inst[I_ENV2_DELTA];
+        v->env_func = FN_ENV5;
+    }
 }
 
 // Phase 4 (lbC0009CE): First envelope segment
@@ -1081,14 +1092,10 @@ void st_set_subsong(int n) {
     ps.fade_speed = 255;
     ps.finished = 0;
 
-    // Queue subsong trigger
+    // Queue subsong trigger — update_tempo will call trigger_subsong
     ps.next_subsong = (uint16_t)n;
 
-    // Process one tick to trigger subsong and set up voices
-    update_tempo();
-
-    // Run one more process cycle to prime the pattern parsers
-    process_voices();
+    // Trigger the subsong (sets up pattern pointers and voice states)
     update_tempo();
 }
 
