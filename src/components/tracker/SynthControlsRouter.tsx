@@ -10,7 +10,7 @@ import type { InstrumentConfig, MAMEConfig } from '@typedefs/instrument';
 import { getToneEngine } from '@engine/ToneEngine';
 import {
   DEFAULT_DUB_SIREN, DEFAULT_SPACE_LASER, DEFAULT_V2, DEFAULT_V2_SPEECH,
-  DEFAULT_SYNARE, DEFAULT_DEXED, DEFAULT_OBXD, DEFAULT_SAM,
+  DEFAULT_SYNARE, DEFAULT_DEXED, DEFAULT_OBXD, DEFAULT_SAM, DEFAULT_PINK_TROMBONE,
   DEFAULT_HARMONIC_SYNTH as DEFAULT_HARMONIC_SYNTH_VAL,
   DEFAULT_HIVELY, DEFAULT_JAMCRACKER,
   DEFAULT_SOUNDMON, DEFAULT_SIDMON, DEFAULT_DIGMUG, DEFAULT_FC,
@@ -43,6 +43,9 @@ const V2SpeechControls = lazy(() =>
 );
 const SAMControls = lazy(() =>
   import('@components/instruments/controls/SAMControls').then(m => ({ default: m.SAMControls }))
+);
+const PinkTromboneControls = lazy(() =>
+  import('@components/instruments/controls/PinkTromboneControls').then(m => ({ default: m.PinkTromboneControls }))
 );
 const SynareControls = lazy(() =>
   import('@components/instruments/controls/SynareControls').then(m => ({ default: m.SynareControls }))
@@ -233,6 +236,12 @@ export const SynthControlsRouter: React.FC<SynthControlsRouterProps> = ({ instru
     if (synthType === 'Sam') {
       const cfg = deepMerge(DEFAULT_SAM, instrument.sam || {});
       return <SAMControls config={cfg} onChange={(u) => onUpdate({ sam: { ...cfg, ...u } })} />;
+    }
+
+    // ── Pink Trombone ────────────────────────────────────────
+    if (synthType === 'PinkTrombone') {
+      const cfg = deepMerge(DEFAULT_PINK_TROMBONE, instrument.pinkTrombone || {});
+      return <PinkTromboneControls config={cfg} onChange={(u) => onUpdate({ pinkTrombone: { ...cfg, ...u } })} />;
     }
 
     // ── Synare ──────────────────────────────────────────────

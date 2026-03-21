@@ -43,7 +43,8 @@ export function isJanneSalmijarviFormat(buffer: ArrayBuffer | Uint8Array): boole
 
 export function parseJanneSalmijarviFile(buffer: ArrayBuffer, filename: string): TrackerSong {
   const buf = new Uint8Array(buffer);
-  if (!isJanneSalmijarviFormat(buf)) throw new Error('Not a Janne Salmijarvi Optimizer module');
+  const _base = filename.split('/').pop()?.toLowerCase() ?? '';
+  if (!_base.startsWith('js.') && !_base.endsWith('.bss') && !isJanneSalmijarviFormat(buf)) throw new Error('Not a Janne Salmijarvi Optimizer module');
 
   const baseName = filename.split('/').pop() ?? filename;
   const moduleName = baseName.replace(/^js\./i, '') || baseName;

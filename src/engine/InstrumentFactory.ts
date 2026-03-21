@@ -69,6 +69,7 @@ import {
   createSpaceLaser,
   createV2,
   createSam,
+  createPinkTrombone,
   createSynare,
   createDexed,
   createOBXd,
@@ -331,6 +332,10 @@ export class InstrumentFactory {
 
       case 'Sam':
         instrument = createSam(config);
+        break;
+
+      case 'PinkTrombone':
+        instrument = createPinkTrombone(config);
         break;
 
       case 'Synare':

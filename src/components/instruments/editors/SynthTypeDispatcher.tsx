@@ -21,6 +21,7 @@ import {
   DEFAULT_SYMPHONIE,
   DEFAULT_SUPERCOLLIDER,
   DEFAULT_WOBBLE_BASS,
+  DEFAULT_PINK_TROMBONE,
 } from '@typedefs/instrument';
 import { deepMerge } from '../../../lib/migration';
 import { EditorHeader, type VizMode } from '../shared/EditorHeader';
@@ -66,6 +67,7 @@ const SpaceLaserControls = lazy(() => import('../controls/SpaceLaserControls').t
 const V2Controls = lazy(() => import('../controls/V2Controls').then(m => ({ default: m.V2Controls })));
 const V2SpeechControls = lazy(() => import('../controls/V2SpeechControls').then(m => ({ default: m.V2SpeechControls })));
 const SAMControls = lazy(() => import('../controls/SAMControls').then(m => ({ default: m.SAMControls })));
+const PinkTromboneControls = lazy(() => import('../controls/PinkTromboneControls').then(m => ({ default: m.PinkTromboneControls })));
 const SynareControls = lazy(() => import('../controls/SynareControls').then(m => ({ default: m.SynareControls })));
 const MAMEControls = lazy(() => import('../controls/MAMEControls').then(m => ({ default: m.MAMEControls })));
 const ChipSynthControls = lazy(() => import('../controls/ChipSynthControls').then(m => ({ default: m.ChipSynthControls })));
@@ -131,7 +133,7 @@ const WavetableListEditor = lazy(() => import('./WavetableEditor').then(m => ({ 
 
 
 // Types
-export type EditorMode = 'generic' | 'tb303' | 'furnace' | 'buzzmachine' | 'sample' | 'dubsiren' | 'spacelaser' | 'v2' | 'sam' | 'synare' | 'mame' | 'mamechip' | 'dexed' | 'obxd' | 'wam' | 'tonewheelOrgan' | 'melodica' | 'vital' | 'odin2' | 'surge' | 'vstbridge' | 'harmonicsynth' | 'modular' | 'sunvox-modular' | 'hively' | 'jamcracker' | 'soundmon' | 'sidmon' | 'digmug' | 'fc' | 'deltamusic1' | 'deltamusic2' | 'fred' | 'tfmx' | 'octamed' | 'sidmon1' | 'hippelcoso' | 'robhubbard' | 'steveturner' | 'davidwhittaker' | 'sonic-arranger' | 'instereo2' | 'musicline' | 'supercollider' | 'gearmulator' | 'wobblebass' | 'startrekker-am' | 'futureplayer' | 'symphonie';
+export type EditorMode = 'generic' | 'tb303' | 'furnace' | 'buzzmachine' | 'sample' | 'dubsiren' | 'spacelaser' | 'v2' | 'sam' | 'pinktrombone' | 'synare' | 'mame' | 'mamechip' | 'dexed' | 'obxd' | 'wam' | 'tonewheelOrgan' | 'melodica' | 'vital' | 'odin2' | 'surge' | 'vstbridge' | 'harmonicsynth' | 'modular' | 'sunvox-modular' | 'hively' | 'jamcracker' | 'soundmon' | 'sidmon' | 'digmug' | 'fc' | 'deltamusic1' | 'deltamusic2' | 'fred' | 'tfmx' | 'octamed' | 'sidmon1' | 'hippelcoso' | 'robhubbard' | 'steveturner' | 'davidwhittaker' | 'sonic-arranger' | 'instereo2' | 'musicline' | 'supercollider' | 'gearmulator' | 'wobblebass' | 'startrekker-am' | 'futureplayer' | 'symphonie';
 
 // ============================================================================
 // GEARMULATOR EDITOR SECTION
@@ -1641,6 +1643,73 @@ export const SynthTypeDispatcher: React.FC<SynthTypeDispatcherProps> = ({
           <SAMControls
             config={samConfig}
             onChange={(updates) => handleChange({ sam: { ...instrument.sam!, ...updates } })}
+          />
+        </Suspense>
+      </div>
+    );
+  }
+  // ============================================================================
+  // PINK TROMBONE VOCAL TRACT EDITOR
+  // ============================================================================
+  if (editorMode === 'pinktrombone') {
+    const accentColor = isCyanTheme ? '#00ffff' : '#ff6699';
+    const headerBg = isCyanTheme
+      ? 'bg-[#041010] border-b-2 border-accent-highlight'
+      : 'bg-gradient-to-r from-[#2a2a2a] to-[#1a1a1a] border-b-4 border-[#ff6699]';
+
+    const ptConfig = deepMerge(DEFAULT_PINK_TROMBONE, instrument.pinkTrombone || {});
+
+    return (
+      <div className="synth-editor-container bg-gradient-to-b from-[#1e1e1e] to-[#151515]">
+        <EditorHeader
+          instrument={instrument}
+          onChange={handleChange}
+          vizMode={vizMode}
+          onVizModeChange={setVizMode}
+          onBake={handleBake}
+          onBakePro={handleBakePro}
+          onUnbake={handleUnbake}
+          isBaked={isBaked}
+          isBaking={isBaking}
+          customHeader={
+            <div className={`synth-editor-header px-4 py-3 ${headerBg}`}>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 rounded-lg bg-gradient-to-br from-pink-500 to-pink-700 shadow-lg text-text-primary">
+                    <Mic size={24} />
+                  </div>
+                  <div>
+                    <h2 className="text-xl font-black tracking-tight" style={{ color: accentColor }}>Pink Trombone</h2>
+                    <p className={`text-[10px] uppercase tracking-widest ${isCyanTheme ? 'text-accent-highlight' : 'text-text-secondary'}`}>Vocal Tract Synthesizer</p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => handleChange({ isLive: !instrument.isLive })}
+                    className={`p-1.5 rounded transition-all flex items-center gap-1.5 px-2 ${
+                      instrument.isLive
+                        ? 'bg-accent-success/20 text-accent-success ring-1 ring-accent-success/50 animate-pulse-glow'
+                        : 'bg-dark-bgTertiary text-text-muted hover:text-text-secondary border border-dark-borderLight'
+                    }`}
+                  >
+                    <Radio size={14} />
+                    <span className="text-[10px] font-bold uppercase">LIVE</span>
+                  </button>
+
+                  <PresetDropdown
+                    synthType={instrument.synthType}
+                    onChange={handleChange}
+                  />
+                </div>
+              </div>
+            </div>
+          }
+        />
+        <Suspense fallback={<LoadingControls />}>
+          <PinkTromboneControls
+            config={ptConfig}
+            onChange={(updates) => handleChange({ pinkTrombone: { ...instrument.pinkTrombone!, ...updates } })}
           />
         </Suspense>
       </div>

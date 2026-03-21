@@ -293,7 +293,12 @@ export class SunVoxModularSynth implements DevilboxSynth {
 
   async startSequencer(): Promise<void> {
     await this._initPromise;
-    if (!this._disposed && this._handle >= 0) this.engine.play(this._handle);
+    if (this._disposed || this._handle < 0) {
+      console.warn('[SunVoxModularSynth] startSequencer: disposed or no handle', this._disposed, this._handle);
+      return;
+    }
+    console.log('[SunVoxModularSynth] startSequencer: playing handle', this._handle);
+    this.engine.play(this._handle);
   }
 
   stopSequencer(): void {
@@ -351,8 +356,12 @@ export class SunVoxModularSynth implements DevilboxSynth {
     this._disposed = true;
 
     if (this._usesSharedHandle) {
-      _sharedSongRefCount--;
-      if (_sharedSongRefCount <= 0) {
+      // Only decrement refcount if this instance's handle matches the current shared handle.
+      // After resetSharedSunVoxHandle(), old instances have stale handles — don't touch the new one.
+      if (this._handle === _sharedSongHandle) {
+        _sharedSongRefCount--;
+      }
+      if (_sharedSongRefCount <= 0 && this._handle === _sharedSongHandle && _sharedSongHandle >= 0) {
         this.engine.destroyHandle(_sharedSongHandle);
         _sharedSongHandle = -1;
         _sharedSongRefCount = 0;

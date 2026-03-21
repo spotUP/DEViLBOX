@@ -147,6 +147,7 @@ function getEditorMode(synthType: SynthType): EditorMode {
   if (isSpaceLaserType(synthType)) return 'spacelaser';
   if (isV2Type(synthType)) return 'v2';
   if (synthType === 'Sam') return 'sam';
+  if (synthType === 'PinkTrombone') return 'pinktrombone';
   if (isSynareType(synthType)) return 'synare';
   if (isMAMEChipType(synthType)) return 'mamechip';
   if (isMAMEType(synthType)) return 'mame';

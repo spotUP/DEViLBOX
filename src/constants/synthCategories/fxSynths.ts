@@ -46,4 +46,13 @@ export const fxSynthEntries: Record<string, SynthInfo> = {
     icon: 'MessageSquare',
     color: 'amber',
   },
+  PinkTrombone: {
+    type: 'PinkTrombone',
+    name: 'Pink Trombone',
+    shortName: 'PTrb',
+    description: 'Real-time vocal tract synthesizer with physics-based formant generation. Sing, speak, and create alien voices.',
+    bestFor: ['Vocal', 'Singing', 'Formant', 'Speech', 'Robotic Voices', 'Ambient'],
+    icon: 'Mic',
+    color: 'pink',
+  },
 };

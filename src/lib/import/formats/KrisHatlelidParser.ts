@@ -57,7 +57,8 @@ export function isKrisHatlelidFormat(buffer: ArrayBuffer | Uint8Array): boolean 
 
 export function parseKrisHatlelidFile(buffer: ArrayBuffer, filename: string): TrackerSong {
   const buf = new Uint8Array(buffer);
-  if (!isKrisHatlelidFormat(buf)) throw new Error('Not a Kris Hatlelid module');
+  const _base = filename.split('/').pop()?.toLowerCase() ?? '';
+  if (!_base.startsWith('kh.') && !_base.endsWith('.kh') && !isKrisHatlelidFormat(buf)) throw new Error('Not a Kris Hatlelid module');
 
   const baseName = filename.split('/').pop() ?? filename;
   const moduleName = baseName.replace(/^KH\./i, '') || baseName;

@@ -117,6 +117,7 @@ import {
   removeInstrumentOutputOverride as _removeInstrumentOutputOverride,
   throwInstrumentToEffect as _throwInstrumentToEffect,
   disposeInstrumentEffectChain as _disposeInstrumentEffectChain,
+  clearConnectedNativeOutputs,
 } from './tone/InstrumentEffectsChain';
 
 // Module-level frequency cache: avoids creating transient Tone.Frequency objects on every call.
@@ -2171,6 +2172,7 @@ export class ToneEngine {
       case 'V2':
       case 'V2Speech':
       case 'Sam':
+      case 'PinkTrombone':
       case 'Synare':
       case 'WAM':
       case 'Buzzmachine':
@@ -4033,6 +4035,7 @@ export class ToneEngine {
     this.releaseRestoreTimeouts.forEach((timeout) => clearTimeout(timeout));
     this.releaseRestoreTimeouts.clear();
     this.instrumentOutputOverrides.clear();
+    clearConnectedNativeOutputs();
 
     const allKeys = Array.from(this.instruments.keys());
     allKeys.forEach((key) => {

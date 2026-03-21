@@ -81,7 +81,8 @@ export function isOnEscapeeFormat(buffer: ArrayBuffer | Uint8Array): boolean {
 
 export function parseOnEscapeeFile(buffer: ArrayBuffer, filename: string): TrackerSong {
   const buf = new Uint8Array(buffer);
-  if (!isOnEscapeeFormat(buf)) throw new Error('Not an onEscapee module');
+  const _base = filename.split('/').pop()?.toLowerCase() ?? '';
+  if (!_base.startsWith('one.') && !isOnEscapeeFormat(buf)) throw new Error('Not an onEscapee module');
 
   const baseName = filename.split('/').pop() ?? filename;
   const moduleName = baseName.replace(/^one\./i, '') || baseName;
