@@ -1520,6 +1520,16 @@ const TEST_CASES: TestCase[] = [
   { file: 'formats/futurebrain.stx', format: 'STX', parserModule: 'STXParser', parseFn: 'parseSTXFile', isAsync: false, exportAs: 'xm' },
   { file: 'formats/drwho_final4.dsym', format: 'DSYM', parserModule: 'DigitalSymphonyParser', parseFn: 'parseDigitalSymphonyFile', isAsync: false, args: 'bytes', noteExportOffset: 36 },
   { file: 'formats/rew_vibr.ptm', format: 'PTM', parserModule: 'PTMParser', parseFn: 'parsePTMFile', isAsync: true, exportAs: 'xm' },
+
+  // === Batch 8 — Amiga formats with relaxed detection (prefix OR Modland extension) ===
+  { file: 'formats/riffraff_smallest.riff', format: 'THM', parserModule: 'ThomasHermannParser', parseFn: 'parseThomasHermannFile', isAsync: true, noteExportOffset: 36 },
+  { file: 'formats/hatlelid_smallest.kh', format: 'KHAT', parserModule: 'KrisHatlelidParser', parseFn: 'parseKrisHatlelidFile', isAsync: false, noteExportOffset: 36 },
+  { file: 'formats/silmarils_smallest.mok', format: 'PAP', parserModule: 'PierreAdaneParser', parseFn: 'parsePierreAdaneFile', isAsync: false, noteExportOffset: 36 },
+  { file: 'formats/audiosculpture_smallest.adsc', format: 'ADSC', parserModule: 'KimChristensenParser', parseFn: 'parseKimChristensenFile', isAsync: false, noteExportOffset: 36 },
+  { file: 'formats/beathoven_smallest.bss', format: 'BSS', parserModule: 'JanneSalmijarviParser', parseFn: 'parseJanneSalmijarviFile', isAsync: false, noteExportOffset: 36 },
+  { file: 'formats/follin_smallest.tf', format: 'TF', parserModule: 'PaulTongeParser', parseFn: 'parsePaulTongeFile', isAsync: false, noteExportOffset: 36 },
+  { file: 'formats/howiedavies.nru', format: 'NRU', parserModule: 'NRUParser', parseFn: 'parseNRUFile', isAsync: true, noteExportOffset: 36 },
+  { file: 'formats/chiptracker.cba', format: 'CBA', parserModule: 'ChuckBiscuitsParser', parseFn: 'parseChuckBiscuitsFile', isAsync: false, args: 'bytes', noteExportOffset: 36 },
 ];
 
 // ============================================================================
