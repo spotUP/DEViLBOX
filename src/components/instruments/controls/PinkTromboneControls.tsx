@@ -48,20 +48,33 @@ export const PinkTromboneControls: React.FC<PinkTromboneControlsProps> = ({
   }, [pushConfig]);
 
 
+  // Lazily create a synth instance for TTS if the engine hasn't made one yet
+  const synthRef = useRef<PinkTromboneSynth | null>(null);
+
+  const getSynth = useCallback(async (): Promise<PinkTromboneSynth> => {
+    // Prefer the engine's instance if available
+    const active = PinkTromboneSynth.getActiveInstance();
+    if (active) return active;
+
+    // Create our own on demand
+    if (!synthRef.current) {
+      synthRef.current = new PinkTromboneSynth(configRef.current);
+      const ctx = synthRef.current.output.context as AudioContext;
+      synthRef.current.output.connect(ctx.destination);
+      await synthRef.current.ready();
+    }
+    return synthRef.current;
+  }, []);
+
   const handleSpeak = useCallback(() => {
     const text = configRef.current.text;
     if (!text?.trim()) return;
 
-    const synth = PinkTromboneSynth.getActiveInstance();
-    if (!synth) {
-      console.warn('[PinkTrombone] Play a note first to initialize the synth, then try Speak');
-      return;
-    }
-
-    synth.applyConfig(configRef.current);
-    // speak() is async but we don't await — it drives the sequencer with setTimeout
-    synth.speak(text).catch(e => console.error('[PinkTrombone] Speech failed:', e));
-  }, []);
+    getSynth().then(synth => {
+      synth.applyConfig(configRef.current);
+      synth.speak(text).catch(e => console.error('[PinkTrombone] Speech failed:', e));
+    });
+  }, [getSynth]);
 
   const presetNames = Object.keys(PINK_TROMBONE_PRESETS);
 
