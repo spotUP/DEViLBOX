@@ -16,9 +16,10 @@ static float s_ticks_per_sec  = 99.86f;
 static float s_samples_per_tick = 0.0f;
 
 void player_init(int sample_rate) {
-    (void)sample_rate;
     s_ticks_per_sec = 99.86f;
-    s_samples_per_tick = (float)PAULA_RATE_PAL / s_ticks_per_sec;
+    // Use actual output sample rate for tick timing (not Paula's internal 28150 Hz clock)
+    float rate = sample_rate > 0 ? (float)sample_rate : (float)PAULA_RATE_PAL;
+    s_samples_per_tick = rate / s_ticks_per_sec;
     paula_reset();
     st_init();
     s_loaded = 0;
