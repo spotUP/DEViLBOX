@@ -1511,6 +1511,15 @@ const TEST_CASES: TestCase[] = [
   // Symphonie Pro — parser returns null on all available test files
   // { file: 'formats/symphonie3_test.symmod', format: 'SYMP', ... },
   { file: 'formats/radiokomppi.smus', format: 'SMUS', parserModule: 'IffSmusParser', parseFn: 'parseIffSmusFile', isAsync: true, noteExportOffset: 36 },
+
+  // === Batch 7 — PC tracker formats from NostalgicPlayer/libxmp test suites ===
+  { file: 'formats/pt36_test.ptm', format: 'PT36', parserModule: 'PT36Parser', parseFn: 'parsePT36File', isAsync: true, noteExportOffset: 36 },
+  { file: 'formats/avoid.amf', format: 'AMF', parserModule: 'AMFParser', parseFn: 'parseAMFFile', isAsync: true, exportAs: 'xm' },
+  // Imago Orpheus — channel status bytes don't match expected layout (format version diff)
+  // { file: 'formats/astaris.imf', format: 'IMF', ... },
+  { file: 'formats/futurebrain.stx', format: 'STX', parserModule: 'STXParser', parseFn: 'parseSTXFile', isAsync: false, exportAs: 'xm' },
+  { file: 'formats/drwho_final4.dsym', format: 'DSYM', parserModule: 'DigitalSymphonyParser', parseFn: 'parseDigitalSymphonyFile', isAsync: false, args: 'bytes', noteExportOffset: 36 },
+  { file: 'formats/rew_vibr.ptm', format: 'PTM', parserModule: 'PTMParser', parseFn: 'parsePTMFile', isAsync: true, exportAs: 'xm' },
 ];
 
 // ============================================================================
