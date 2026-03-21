@@ -435,6 +435,7 @@ static bool shallStopSched = false;
 // Defined in FurnaceDispatchWrapper.cpp
 extern "C" int furnace_dispatch_cmd(int handle, int cmd, int chan, int val1, int val2);
 extern "C" void furnace_cmd_log_tick();
+extern "C" void furnace_cmd_log_set_global_chan(int globalChan);
 
 static int dispatchHandle = 0;
 
@@ -455,6 +456,8 @@ static int dispatchCmd(int cmd, int chan, int val1 = 0, int val2 = 0) {
     subChan = chan; // Use global channel index
   }
   if (handle <= 0) return -1;
+  // Set global channel for accurate command log (matches upstream -view commands output)
+  furnace_cmd_log_set_global_chan(chan);
   return furnace_dispatch_cmd(handle, cmd, subChan, val1, val2);
 }
 

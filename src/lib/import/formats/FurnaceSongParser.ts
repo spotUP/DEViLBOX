@@ -2005,6 +2005,17 @@ async function parseOldFormat(
     }
   }
 
+  // Apply timeBase multiplier to all speed values (fur.cpp:1662)
+  // In the old format, timeBase acts as a speed multiplier: effective_speed = speed * (timeBase + 1)
+  if (subsong.timeBase > 0) {
+    const mult = subsong.timeBase + 1;
+    subsong.speed1 *= mult;
+    subsong.speed2 *= mult;
+    if (subsong.speedPattern) {
+      subsong.speedPattern = subsong.speedPattern.map(v => v * mult);
+    }
+  }
+
   // Asset directory pointers
   // Reference: fur.cpp:1665-1669
   if (version >= 156) {

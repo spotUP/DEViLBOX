@@ -284,7 +284,8 @@ export async function parseNRUFile(
   buffer: ArrayBuffer,
   filename: string,
 ): Promise<TrackerSong> {
-  if (!isNRUFormat(buffer)) {
+  const _base = filename.split('/').pop()?.toLowerCase() ?? '';
+  if (!_base.endsWith('.nru') && !isNRUFormat(buffer)) {
     throw new Error('NRUParser: file does not pass NRU format validation');
   }
 

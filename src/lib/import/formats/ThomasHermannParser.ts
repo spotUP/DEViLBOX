@@ -118,8 +118,9 @@ export async function parseThomasHermannFile(
   filename: string,
 ): Promise<TrackerSong> {
   const buf = new Uint8Array(buffer);
+  const _base = filename.split('/').pop()?.toLowerCase() ?? '';
 
-  if (!isThomasHermannFormat(buf)) {
+  if (!_base.startsWith('thm.') && !_base.endsWith('.riff') && !isThomasHermannFormat(buf)) {
     throw new Error('Not a Thomas Hermann module');
   }
 

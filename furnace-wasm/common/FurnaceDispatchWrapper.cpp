@@ -1011,6 +1011,7 @@ struct CmdLogEntry {
 static std::vector<CmdLogEntry> g_cmdLog;
 static bool g_cmdLogEnabled = false;
 static int g_cmdLogTick = -1; // -1 so first tick() increments to 0 (matches upstream totalTicksR)
+static int g_pendingGlobalChan = -1; // Set by sequencer before dispatch for accurate cmdlog channel
 
 EMSCRIPTEN_KEEPALIVE
 void furnace_cmd_log_enable(int enable) {
@@ -1049,6 +1050,15 @@ int* furnace_cmd_log_get() {
 }
 
 /**
+ * Set the global channel index for the next command log entry.
+ * Called by the sequencer before furnace_dispatch_cmd() so the log records
+ * global channel numbers (matching upstream Furnace -view commands output).
+ */
+void furnace_cmd_log_set_global_chan(int globalChan) {
+  g_pendingGlobalChan = globalChan;
+}
+
+/**
  * Send a command to the dispatch.
  */
 EMSCRIPTEN_KEEPALIVE
@@ -1071,7 +1081,10 @@ int furnace_dispatch_cmd(int handle, int cmd, int chan, int val1, int val2) {
   int ret = inst->dispatch->dispatch(dc);
 
   if (g_cmdLogEnabled && g_cmdLog.size() < 100000) {
-    g_cmdLog.push_back({g_cmdLogTick, cmd, chan, val1, val2, ret});
+    // Use pending global channel if set (from sequencer dispatchCmd), otherwise use local channel
+    int logChan = (g_pendingGlobalChan >= 0) ? g_pendingGlobalChan : chan;
+    g_cmdLog.push_back({g_cmdLogTick, cmd, logChan, val1, val2, ret});
+    g_pendingGlobalChan = -1;
   }
 
   return ret;

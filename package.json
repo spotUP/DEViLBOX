@@ -15,6 +15,7 @@
   "type": "module",
   "main": "electron/main.cjs",
   "scripts": {
+    "postinstall": "bash scripts/patch-espeak.sh",
     "start": "npm run dev",
     "prebuild": "node scripts/generate-changelog.cjs && node scripts/generate-file-manifest.js",
     "predev": "node scripts/generate-changelog.cjs && node scripts/generate-file-manifest.js",
@@ -120,6 +121,7 @@
     "mpg123-decoder": "^1.0.3",
     "onnxruntime-web": "^1.23.2",
     "p5": "^2.1.2",
+    "pink-trombone-mod": "^0.1.0",
     "pixi.js": "^8.16.0",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",

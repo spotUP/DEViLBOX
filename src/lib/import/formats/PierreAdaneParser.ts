@@ -146,7 +146,8 @@ export function isPierreAdaneFormat(buffer: ArrayBuffer | Uint8Array): boolean {
 
 export function parsePierreAdaneFile(buffer: ArrayBuffer, filename: string): TrackerSong {
   const buf = new Uint8Array(buffer);
-  if (!isPierreAdaneFormat(buf)) throw new Error('Not a Pierre Adane Packer module');
+  const _base = filename.split('/').pop()?.toLowerCase() ?? '';
+  if (!_base.startsWith('pap.') && !_base.endsWith('.mok') && !isPierreAdaneFormat(buf)) throw new Error('Not a Pierre Adane Packer module');
 
   const baseName = filename.split('/').pop() ?? filename;
   const moduleName = baseName.replace(/^pap\./i, '') || baseName;

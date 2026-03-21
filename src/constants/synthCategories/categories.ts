@@ -41,6 +41,7 @@ export const SYNTH_CATEGORIES: SynthCategory[] = [
     name: 'Speech & Voice',
     description: 'Speech synthesis and voice generation',
     synths: [
+      SYNTH_INFO.PinkTrombone,
       SYNTH_INFO.Sam,
       SYNTH_INFO.V2Speech,
       SYNTH_INFO.MAMETMS5220,

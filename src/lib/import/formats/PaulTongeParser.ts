@@ -102,7 +102,8 @@ export function isPaulTongeFormat(buffer: ArrayBuffer | Uint8Array): boolean {
 
 export function parsePaulTongeFile(buffer: ArrayBuffer, filename: string): TrackerSong {
   const buf = new Uint8Array(buffer);
-  if (!isPaulTongeFormat(buf)) throw new Error('Not a Paul Tonge module');
+  const _base = filename.split('/').pop()?.toLowerCase() ?? '';
+  if (!_base.startsWith('pat.') && !_base.endsWith('.tf') && !isPaulTongeFormat(buf)) throw new Error('Not a Paul Tonge module');
 
   const baseName = filename.split('/').pop() ?? filename;
   const moduleName = baseName.replace(/^pat\./i, '') || baseName;

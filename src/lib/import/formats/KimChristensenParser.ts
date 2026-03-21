@@ -120,7 +120,8 @@ export function isKimChristensenFormat(buffer: ArrayBuffer | Uint8Array): boolea
 
 export function parseKimChristensenFile(buffer: ArrayBuffer, filename: string): TrackerSong {
   const buf = new Uint8Array(buffer);
-  if (!isKimChristensenFormat(buf)) throw new Error('Not a Kim Christensen module');
+  const _base = filename.split('/').pop()?.toLowerCase() ?? '';
+  if (!_base.startsWith('kim.') && !_base.endsWith('.adsc') && !_base.endsWith('.as') && !isKimChristensenFormat(buf)) throw new Error('Not a Kim Christensen module');
 
   const baseName = filename.split('/').pop() ?? filename;
   const moduleName = baseName.replace(/^kim\./i, '') || baseName;

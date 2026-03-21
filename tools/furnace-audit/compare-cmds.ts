@@ -15,7 +15,7 @@ import { readFileSync, existsSync } from 'fs';
 import { execSync } from 'child_process';
 import { join } from 'path';
 
-// DivCommand enum names (matching dispatch.h order)
+// DivCommand enum names — complete list from dispatch.h
 const CMD_NAMES: Record<number, string> = {
   0: 'NOTE_ON', 1: 'NOTE_OFF', 2: 'NOTE_OFF_ENV', 3: 'ENV_RELEASE',
   4: 'INSTRUMENT', 5: 'VOLUME', 6: 'GET_VOLUME', 7: 'GET_VOLMAX',
@@ -27,8 +27,50 @@ const CMD_NAMES: Record<number, string> = {
   23: 'HINT_VOL_SLIDE_TARGET', 24: 'HINT_TREMOLO', 25: 'HINT_PANBRELLO',
   26: 'HINT_PAN_SLIDE', 27: 'HINT_PANNING',
   28: 'SAMPLE_MODE', 29: 'SAMPLE_FREQ', 30: 'SAMPLE_BANK',
-  31: 'SAMPLE_POS', 32: 'SAMPLE_DIR',
-  33: 'FM_HARD_RESET',
+  31: 'SAMPLE_POS', 32: 'SAMPLE_DIR', 33: 'FM_HARD_RESET',
+  34: 'FM_LFO', 35: 'FM_LFO_WAVE', 36: 'FM_TL', 37: 'FM_AM',
+  38: 'FM_AR', 39: 'FM_DR', 40: 'FM_SL', 41: 'FM_D2R', 42: 'FM_RR',
+  43: 'FM_DT', 44: 'FM_DT2', 45: 'FM_RS', 46: 'FM_KSR', 47: 'FM_VIB',
+  48: 'FM_SUS', 49: 'FM_WS', 50: 'FM_SSG', 51: 'FM_REV', 52: 'FM_EG_SHIFT',
+  53: 'FM_FB', 54: 'FM_MULT', 55: 'FM_FINE', 56: 'FM_FIXFREQ', 57: 'FM_EXTCH',
+  58: 'FM_AM_DEPTH', 59: 'FM_PM_DEPTH', 60: 'FM_LFO2', 61: 'FM_LFO2_WAVE',
+  62: 'STD_NOISE_FREQ', 63: 'STD_NOISE_MODE', 64: 'WAVE',
+  65: 'GB_SWEEP_TIME', 66: 'GB_SWEEP_DIR', 67: 'PCE_LFO_MODE', 68: 'PCE_LFO_SPEED',
+  69: 'NES_SWEEP', 70: 'NES_DMC', 71: 'C64_CUTOFF', 72: 'C64_RESONANCE',
+  73: 'C64_FILTER_MODE', 74: 'C64_RESET_TIME', 75: 'C64_RESET_MASK',
+  76: 'C64_FILTER_RESET', 77: 'C64_DUTY_RESET', 78: 'C64_EXTENDED',
+  79: 'C64_FINE_DUTY', 80: 'C64_FINE_CUTOFF', 81: 'AY_ENVELOPE_SET',
+  82: 'AY_ENVELOPE_LOW', 83: 'AY_ENVELOPE_HIGH', 84: 'AY_ENVELOPE_SLIDE',
+  85: 'AY_NOISE_MASK_AND', 86: 'AY_NOISE_MASK_OR', 87: 'AY_AUTO_ENVELOPE',
+  88: 'AY_IO_WRITE', 89: 'AY_AUTO_PWM',
+  90: 'FDS_MOD_DEPTH', 91: 'FDS_MOD_HIGH', 92: 'FDS_MOD_LOW',
+  93: 'FDS_MOD_POS', 94: 'FDS_MOD_WAVE', 95: 'SAA_ENVELOPE',
+  96: 'AMIGA_FILTER', 97: 'AMIGA_AM', 98: 'AMIGA_PM', 99: 'LYNX_LFSR_LOAD',
+  100: 'QSOUND_ECHO_FEEDBACK', 101: 'QSOUND_ECHO_DELAY', 102: 'QSOUND_ECHO_LEVEL',
+  103: 'QSOUND_SURROUND', 104: 'X1_010_ENVELOPE_SHAPE', 105: 'X1_010_ENVELOPE_ENABLE',
+  106: 'X1_010_ENVELOPE_MODE', 107: 'X1_010_ENVELOPE_PERIOD',
+  108: 'X1_010_ENVELOPE_SLIDE', 109: 'X1_010_AUTO_ENVELOPE',
+  110: 'X1_010_SAMPLE_BANK_SLOT', 111: 'WS_SWEEP_TIME', 112: 'WS_SWEEP_AMOUNT',
+  113: 'N163_WAVE_POSITION', 114: 'N163_WAVE_LENGTH', 117: 'N163_WAVE_LOADPOS',
+  118: 'N163_WAVE_LOADLEN', 120: 'N163_CHANNEL_LIMIT',
+  121: 'N163_GLOBAL_WAVE_LOAD', 122: 'N163_GLOBAL_WAVE_LOADPOS',
+  125: 'SU_SWEEP_PERIOD_LOW', 126: 'SU_SWEEP_PERIOD_HIGH',
+  127: 'SU_SWEEP_BOUND', 128: 'SU_SWEEP_ENABLE',
+  129: 'SU_SYNC_PERIOD_LOW', 130: 'SU_SYNC_PERIOD_HIGH',
+  131: 'ADPCMA_GLOBAL_VOLUME', 132: 'SNES_ECHO', 133: 'SNES_PITCH_MOD',
+  134: 'SNES_INVERT', 135: 'SNES_GAIN_MODE', 136: 'SNES_GAIN',
+  137: 'SNES_ECHO_ENABLE', 138: 'SNES_ECHO_DELAY', 139: 'SNES_ECHO_VOL_LEFT',
+  140: 'SNES_ECHO_VOL_RIGHT', 141: 'SNES_ECHO_FEEDBACK', 142: 'SNES_ECHO_FIR',
+  143: 'NES_ENV_MODE', 144: 'NES_LENGTH', 145: 'NES_COUNT_MODE',
+  146: 'MACRO_OFF', 147: 'MACRO_ON', 148: 'SURROUND_PANNING',
+  149: 'FM_AM2_DEPTH', 150: 'FM_PM2_DEPTH',
+  151: 'ES5506_FILTER_MODE', 152: 'ES5506_FILTER_K1', 153: 'ES5506_FILTER_K2',
+  162: 'HINT_ARP_TIME', 163: 'SNES_GLOBAL_VOL_LEFT', 164: 'SNES_GLOBAL_VOL_RIGHT',
+  165: 'NES_LINEAR_LENGTH', 166: 'EXTERNAL',
+  167: 'C64_AD', 168: 'C64_SR', 169: 'ESFM_OP_PANNING',
+  170: 'ESFM_OUTLVL', 171: 'ESFM_MODIN', 172: 'ESFM_ENV_DELAY',
+  173: 'MACRO_RESTART', 184: 'FDS_MOD_AUTO', 185: 'FM_OPMASK',
+  222: 'FM_ALG', 223: 'FM_FMS', 224: 'FM_AMS', 225: 'FM_FMS2', 226: 'FM_AMS2',
 };
 
 interface CmdEntry {
@@ -82,14 +124,18 @@ function parseDvbLog(text: string): CmdEntry[] {
 // - GET_* are queries, not actions
 // - HINT_* are sequencer hints not dispatched to chip
 // - PRE_PORTA/PRE_NOTE are pre-processing markers
-// - VOLUME/PITCH/INSTRUMENT before NOTE_ON are "setup" commands that the reference
-//   consolidates into the NOTE_ON itself, so we skip them to avoid false mismatches
+// - Commands filtered by reference's -view commands (playback.cpp:360-371):
+//   VOLUME, NOTE_PORTA, LEGATO, PITCH, PRE_NOTE are all suppressed in the reference output
 function filterComparable(entries: CmdEntry[]): CmdEntry[] {
   return entries.filter(e =>
     !e.cmd.startsWith('GET_') &&
     !e.cmd.startsWith('HINT_') &&
     e.cmd !== 'PRE_PORTA' &&
     e.cmd !== 'PRE_NOTE' &&
+    e.cmd !== 'VOLUME' &&
+    e.cmd !== 'NOTE_PORTA' &&
+    e.cmd !== 'LEGATO' &&
+    e.cmd !== 'PITCH' &&
     e.cmd !== 'SAMPLE_MODE' &&
     e.cmd !== 'SAMPLE_FREQ' &&
     e.cmd !== 'SAMPLE_BANK' &&
@@ -172,9 +218,8 @@ function compare(refEntries: CmdEntry[], dvbEntries: CmdEntry[], maxDiffs: numbe
     for (let di = 0; di < dCmds.length; di++) {
       if (dvbUsed.has(di)) continue;
       const d = dCmds[di];
-      // Skip "setup" commands (VOLUME, PITCH, INSTRUMENT) that are
-      // implicit in the reference's consolidated NOTE_ON
-      if (d.cmd === 'VOLUME' || d.cmd === 'PITCH' || d.cmd === 'INSTRUMENT') continue;
+      // Skip INSTRUMENT which is implicit in the reference's consolidated NOTE_ON
+      if (d.cmd === 'INSTRUMENT') continue;
       if (diffs < maxDiffs) {
         console.log(`EXTRA DVB  tick=${tick} ch=${d.chan}: ${d.cmd}(${d.val1}, ${d.val2})`);
       }

@@ -152,14 +152,14 @@ function forwardSunVoxModuleMute(channels: MixerChannelState[], isSoloing: boole
     const engine = SunVoxEngine.getInstance();
     const { getSharedSunVoxHandle } = require('../engine/sunvox-modular/SunVoxModularSynth');
     const handle = getSharedSunVoxHandle();
-    if (handle < 0) { console.log('[Mixer] SunVox mute: no shared handle'); return; }
+    if (handle < 0) return;
 
     // Late-bound to avoid circular deps
     const { useTrackerStore } = require('./useTrackerStore');
     const { useInstrumentStore } = require('./useInstrumentStore');
     const trackerState = useTrackerStore.getState();
     const pattern = trackerState.patterns[trackerState.currentPatternIndex];
-    if (!pattern) { console.log('[Mixer] SunVox mute: no current pattern'); return; }
+    if (!pattern) return;
     const instruments = useInstrumentStore.getState().instruments;
 
     // Collect all SunVox module IDs and whether they should be muted
@@ -176,8 +176,6 @@ function forwardSunVoxModuleMute(channels: MixerChannelState[], isSoloing: boole
       if (!effectiveMute) moduleUnmuted.set(modId, true);
       else if (!moduleUnmuted.has(modId)) moduleUnmuted.set(modId, false);
     }
-
-    console.log('[Mixer] SunVox mute: handle=', handle, 'modules:', [...moduleUnmuted.entries()].map(([id, un]) => `${id}:${un ? 'ON' : 'MUTE'}`).join(', '));
 
     // Apply mute/unmute to each SunVox module
     for (const [modId, unmuted] of moduleUnmuted) {
@@ -206,9 +204,7 @@ function forwardWasmChannelGain(ch: number, channels: MixerChannelState[], isSol
   }
 
   // SunVox songs: mute/unmute at the module level inside the WASM
-  const isSunVox = hasSunVoxSongInstruments();
-  console.log('[Mixer] forwardWasmChannelGain: ch=', ch, 'isSunVox=', isSunVox);
-  if (isSunVox) {
+  if (hasSunVoxSongInstruments()) {
     forwardSunVoxModuleMute(channels, isSoloing);
     return;
   }
