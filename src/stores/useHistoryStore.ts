@@ -29,6 +29,8 @@ export type ActionType =
   | 'PASTE_PUSH_FORWARD'
   | 'CUT_TRACK'
   | 'PASTE_TRACK'
+  | 'CUT_PATTERN'
+  | 'PASTE_PATTERN'
   | 'READ_MACRO'
   | 'TRANSPOSE'
   | 'INTERPOLATE'
@@ -348,6 +350,8 @@ export const getActionTypeName = (type: ActionType): string => {
     PASTE_PUSH_FORWARD: 'Push-Forward Paste',
     CUT_TRACK: 'Cut Track',
     PASTE_TRACK: 'Paste Track',
+    CUT_PATTERN: 'Cut Pattern',
+    PASTE_PATTERN: 'Paste Pattern',
     READ_MACRO: 'Apply Macro',
     TRANSPOSE: 'Transpose',
     INTERPOLATE: 'Interpolate',
@@ -389,12 +393,14 @@ export const getActionTypeColor = (type: ActionType): string => {
       return 'text-purple-400';
     case 'CUT_SELECTION':
     case 'CUT_TRACK':
+    case 'CUT_PATTERN':
       return 'text-green-400';
     case 'PASTE':
     case 'PASTE_MIX':
     case 'PASTE_FLOOD':
     case 'PASTE_PUSH_FORWARD':
     case 'PASTE_TRACK':
+    case 'PASTE_PATTERN':
       return 'text-green-400';
     case 'TRANSPOSE':
     case 'INTERPOLATE':

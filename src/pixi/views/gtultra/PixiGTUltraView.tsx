@@ -30,6 +30,7 @@ import { PixiGTStudioTables } from './PixiGTStudioTables';
 import { PixiGTPianoRoll } from './PixiGTPianoRoll';
 import { PixiGTPresetBrowser } from './PixiGTPresetBrowser';
 import { useGTUltraStore } from '@/stores/useGTUltraStore';
+import { useGTKeyboardHandler } from '@/components/gtultra/GTKeyboardHandler';
 import { GTUltraEngine } from '@/engine/gtultra/GTUltraEngine';
 import { getGTUltraASIDBridge } from '@/engine/gtultra/GTUltraASIDBridge';
 
@@ -51,6 +52,10 @@ interface Props {
 
 export const PixiGTUltraView: React.FC<Props> = ({ width, height }) => {
   const theme = usePixiTheme();
+
+  // Wire GT keyboard handler (note entry, block ops, transport, undo/redo)
+  useGTKeyboardHandler(true);
+
   const playing = useGTUltraStore((s) => s.playing);
   const songName = useGTUltraStore((s) => s.songName);
   const songAuthor = useGTUltraStore((s) => s.songAuthor);

@@ -314,6 +314,7 @@ interface TrackerStore {
   currentPatternIndex: number;
   clipboard: ClipboardData | null;
   trackClipboard: TrackerCell[] | null; // FT2: Single-channel clipboard
+  patternClipboard: (TrackerCell[] | null)[] | null; // FT2: All-channel clipboard
   macroSlots: MacroSlot[]; // FT2: 8 quick-entry slots
   // FT2: Pattern Order List (Song Position List)
   patternOrder: number[]; // Array of pattern indices for song arrangement
@@ -351,6 +352,11 @@ interface TrackerStore {
   copyTrack: (channelIndex: number) => void;
   cutTrack: (channelIndex: number) => void;
   pasteTrack: (channelIndex: number) => void;
+
+  // FT2: Pattern operations (all channels)
+  copyPattern: () => void;
+  cutPattern: () => void;
+  pastePattern: () => void;
 
   // FT2: Macro slots (quick-entry)
   writeMacroSlot: (slotIndex: number) => void;  // Store current cell
@@ -451,6 +457,7 @@ export const useTrackerStore = create<TrackerStore>()(
     currentPatternIndex: 0,
     clipboard: null,
     trackClipboard: null, // FT2: Single-channel clipboard
+    patternClipboard: null, // FT2: All-channel clipboard
     macroSlots: Array.from({ length: 8 }, () => createEmptyMacroSlot()), // FT2: 8 macro slots
     // FT2: Pattern Order List (Song Position List)
     patternOrder: [0], // Start with first pattern in order
@@ -759,6 +766,45 @@ export const useTrackerStore = create<TrackerStore>()(
         pasteTrackHelper(p, channelIndex, state.trackClipboard, useEditorStore.getState().pasteMask);
       });
       useHistoryStore.getState().pushAction('PASTE_TRACK', 'Paste track', patternIndex, beforePattern, get().patterns[patternIndex]);
+      syncBulkEdit(patternIndex, get().patterns[patternIndex]);
+    },
+
+    // FT2: Pattern operations (all channels — copies each track)
+    copyPattern: () =>
+      set((state) => {
+        const pattern = state.patterns[state.currentPatternIndex];
+        // Store all tracks as an array of track clipboards
+        const allTracks = pattern.channels.map((_, ch) => copyTrackHelper(pattern, ch)).filter(Boolean);
+        if (allTracks.length > 0) state.patternClipboard = allTracks;
+      }),
+
+    cutPattern: () => {
+      const patternIndex = get().currentPatternIndex;
+      const beforePattern = get().patterns[patternIndex];
+      set((state) => {
+        const p = state.patterns[state.currentPatternIndex];
+        const allTracks = p.channels.map((_, ch) => cutTrackHelper(p, ch)).filter(Boolean);
+        if (allTracks.length > 0) state.patternClipboard = allTracks;
+      });
+      useHistoryStore.getState().pushAction('CUT_PATTERN', 'Cut pattern', patternIndex, beforePattern, get().patterns[patternIndex]);
+      syncBulkEdit(patternIndex, get().patterns[patternIndex]);
+    },
+
+    pastePattern: () => {
+      const clipboard = get().patternClipboard;
+      if (!clipboard || clipboard.length === 0) return;
+      const patternIndex = get().currentPatternIndex;
+      const beforePattern = get().patterns[patternIndex];
+      set((state) => {
+        const p = state.patterns[state.currentPatternIndex];
+        const pasteMask = useEditorStore.getState().pasteMask;
+        clipboard.forEach((trackData, ch) => {
+          if (ch < p.channels.length && trackData) {
+            pasteTrackHelper(p, ch, trackData, pasteMask);
+          }
+        });
+      });
+      useHistoryStore.getState().pushAction('PASTE_PATTERN', 'Paste pattern', patternIndex, beforePattern, get().patterns[patternIndex]);
       syncBulkEdit(patternIndex, get().patterns[patternIndex]);
     },
 
@@ -1768,6 +1814,7 @@ export const useTrackerStore = create<TrackerStore>()(
         state.currentPatternIndex = 0;
         state.clipboard = null;
         state.trackClipboard = null;
+        state.patternClipboard = null;
         state.macroSlots = Array.from({ length: 8 }, () => createEmptyMacroSlot());
         state.patternOrder = [0];
         state.currentPositionIndex = 0;
