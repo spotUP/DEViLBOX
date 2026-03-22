@@ -144,10 +144,33 @@ function filterComparable(entries: CmdEntry[]): CmdEntry[] {
     e.cmd !== 'SAMPLE_FREQ' &&
     e.cmd !== 'SAMPLE_BANK' &&
     e.cmd !== 'SAMPLE_DIR' &&
-    // Macro-generated commands (from dispatch tick, not sequencer):
+    // Macro-generated commands (from dispatch tick, not sequencer).
+    // These are dispatched internally by platform->tick() via dispatch->dispatch(),
+    // visible in reference via engine callback but not in DVB's sequencer cmdlog.
     e.cmd !== 'WAVE' &&
     e.cmd !== 'STD_NOISE_MODE' &&
-    e.cmd !== 'STD_NOISE_FREQ'
+    e.cmd !== 'STD_NOISE_FREQ' &&
+    // FM operator macros:
+    e.cmd !== 'FM_TL' && e.cmd !== 'FM_MULT' && e.cmd !== 'FM_FB' &&
+    e.cmd !== 'FM_DR' && e.cmd !== 'FM_RR' && e.cmd !== 'FM_AR' &&
+    e.cmd !== 'FM_SL' && e.cmd !== 'FM_D2R' && e.cmd !== 'FM_DT' &&
+    e.cmd !== 'FM_RS' && e.cmd !== 'FM_AM' && e.cmd !== 'FM_SSG' &&
+    e.cmd !== 'FM_WS' && e.cmd !== 'FM_DT2' && e.cmd !== 'FM_FINE' &&
+    e.cmd !== 'FM_AM_DEPTH' && e.cmd !== 'FM_PM_DEPTH' &&
+    e.cmd !== 'FM_ALG' && e.cmd !== 'FM_FMS' && e.cmd !== 'FM_AMS' &&
+    // C64/SID macros:
+    e.cmd !== 'C64_FINE_CUTOFF' && e.cmd !== 'C64_CUTOFF_SLIDE' &&
+    e.cmd !== 'C64_FINE_DUTY' && e.cmd !== 'C64_AD' && e.cmd !== 'C64_SR' &&
+    // SID3 macros:
+    e.cmd !== 'SID3_SPECIAL_WAVE' && e.cmd !== 'SID3_WAVE_MIX' &&
+    e.cmd !== 'SID3_CHANNEL_INVERSION' &&
+    // Platform-specific macros:
+    e.cmd !== 'GB_SWEEP_TIME' && e.cmd !== 'GB_SWEEP_DIR' &&
+    e.cmd !== 'FDS_MOD_DEPTH' &&
+    e.cmd !== 'BIFURCATOR_PARAMETER' && e.cmd !== 'BIFURCATOR_STATE_LOAD' &&
+    e.cmd !== 'SU_SWEEP_ENABLE' && e.cmd !== 'SU_SWEEP_PERIOD_LOW' &&
+    e.cmd !== 'SU_SWEEP_PERIOD_HIGH' && e.cmd !== 'SU_SWEEP_BOUND' &&
+    e.cmd !== 'SU_SYNC_PERIOD_LOW' && e.cmd !== 'SU_SYNC_PERIOD_HIGH'
   );
 }
 
