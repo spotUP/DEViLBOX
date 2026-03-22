@@ -297,14 +297,14 @@ export class SunVoxModularSynth implements DevilboxSynth {
 
   // ── Sequencer control (used by NativeEngineRouting for song-mode playback) ──
 
-  async startSequencer(): Promise<void> {
+  async startSequencer(fromBeginning = false): Promise<void> {
     await this._initPromise;
     if (this._disposed || this._handle < 0) {
       console.warn('[SunVoxModularSynth] startSequencer: disposed or no handle', this._disposed, this._handle);
       return;
     }
-    console.log('[SunVoxModularSynth] startSequencer: playing handle', this._handle);
-    this.engine.play(this._handle);
+    console.log('[SunVoxModularSynth] startSequencer: playing handle', this._handle, 'fromBeginning:', fromBeginning);
+    this.engine.play(this._handle, fromBeginning);
   }
 
   stopSequencer(): void {
