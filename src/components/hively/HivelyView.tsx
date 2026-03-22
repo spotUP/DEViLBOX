@@ -57,7 +57,7 @@ export const HivelyView: React.FC<{ width?: number; height?: number }> = () => {
   const handleExport = useCallback((format: 'hvl' | 'ahx') => {
     const song = getTrackerReplayer().getSong();
     if (!song) return;
-    const result = exportAsHively(song, { format });
+    const result = exportAsHively(song, { format, nativeOverride: useFormatStore.getState().hivelyNative });
     const url = URL.createObjectURL(result.data);
     const a = document.createElement('a');
     a.href = url;

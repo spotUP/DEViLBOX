@@ -9,13 +9,15 @@
  * column into a separate track, deduplicate tracks, and build the position list.
  */
 
-import type { TrackerCell } from '../../types/tracker';
+import type { TrackerCell, HivelyNativeData } from '../../types/tracker';
 import type { HivelyConfig } from '../../types/instrument';
 import type { TrackerSong } from '@/engine/TrackerReplayer';
 
 export interface HivelyExportOptions {
   format?: 'hvl' | 'ahx';
   moduleName?: string;
+  /** Pass the live hivelyNative data from the format store to export edits */
+  nativeOverride?: HivelyNativeData | null;
 }
 
 export interface HivelyExportResult {
@@ -89,66 +91,110 @@ export function exportAsHively(
   const isAHX = exportFormat === 'ahx';
   const channelsToExport = isAHX ? Math.min(numChannels, 4) : numChannels;
 
-  // Determine track length from patterns (use first pattern's row count)
-  const trackLength = song.patterns[0]?.length ?? 64;
+  // ── Resolve native data (prefer override, then song field) ──
+  const native: HivelyNativeData | undefined = options.nativeOverride ?? song.hivelyNative ?? undefined;
+
+  // Determine track length
+  const trackLength = native?.trackLength ?? song.patterns[0]?.length ?? 64;
   if (trackLength > 64) {
     warnings.push(`Track length ${trackLength} exceeds HVL max of 64. Truncating.`);
   }
   const trkl = Math.min(trackLength, 64);
 
-  // ── Extract and deduplicate tracks ──
-  // For each pattern position, extract each channel's column as a track
-  const trackMap = new Map<string, { steps: TrackerCell[]; index: number }>();
-  const positionTracks: Array<{ trackIndices: number[]; transposes: number[] }> = [];
+  // ── Build tracks and position list ──
+  let orderedTracks: TrackerCell[][];
+  let positionTracks: Array<{ trackIndices: number[]; transposes: number[] }>;
+  let hasBlankTrack0: boolean;
 
-  // Always include an empty track as track 0
-  const emptySteps: TrackerCell[] = Array.from({ length: trkl }, () => ({
-    note: 0, instrument: 0, volume: 0, effTyp: 0, eff: 0, effTyp2: 0, eff2: 0,
-  }));
-  const emptyHash = hashTrack(emptySteps, trkl);
-  trackMap.set(emptyHash, { steps: emptySteps, index: 0 });
+  // When true, effTyp/eff/effTyp2/eff2 already hold HVL-native fx values (no reverseMapEffect needed)
+  let nativeEffects = false;
 
-  for (const patIdx of song.songPositions) {
-    const pat = song.patterns[patIdx];
-    if (!pat) continue;
+  if (native) {
+    nativeEffects = true;
+    // ── Native path: use hivelyNative tracks/positions directly ──
+    // Convert HivelyNativeStep[] → TrackerCell[] with raw HVL fx values
+    orderedTracks = native.tracks.map(trk =>
+      trk.steps.slice(0, trkl).map(s => ({
+        note: s.note,
+        instrument: s.instrument,
+        volume: 0,
+        effTyp: s.fx,       // Raw HVL effect number
+        eff: s.fxParam,     // Raw HVL effect param
+        effTyp2: s.fxb,     // Raw HVL secondary effect
+        eff2: s.fxbParam,   // Raw HVL secondary effect param
+      } as TrackerCell))
+    );
 
-    const trackIndices: number[] = [];
-    const transposes: number[] = [];
-
-    for (let ch = 0; ch < channelsToExport; ch++) {
-      const channel = pat.channels[ch];
-      if (!channel) {
-        trackIndices.push(0); // empty track
-        transposes.push(0);
-        continue;
+    // Pad tracks shorter than trkl
+    for (const trk of orderedTracks) {
+      while (trk.length < trkl) {
+        trk.push({ note: 0, instrument: 0, volume: 0, effTyp: 0, eff: 0, effTyp2: 0, eff2: 0 });
       }
-
-      const steps = channel.rows.slice(0, trkl);
-      // Pad if needed
-      while (steps.length < trkl) {
-        steps.push({ note: 0, instrument: 0, volume: 0, effTyp: 0, eff: 0, effTyp2: 0, eff2: 0 });
-      }
-
-      const hash = hashTrack(steps, trkl);
-      if (!trackMap.has(hash)) {
-        trackMap.set(hash, { steps, index: trackMap.size });
-      }
-      trackIndices.push(trackMap.get(hash)!.index);
-      transposes.push(0); // No transpose detection (simple approach)
     }
 
-    positionTracks.push({ trackIndices, transposes });
-  }
+    positionTracks = native.positions.map(pos => ({
+      trackIndices: pos.track.slice(0, channelsToExport),
+      transposes: pos.transpose.slice(0, channelsToExport),
+    }));
 
-  // Build ordered track list
-  const orderedTracks: TrackerCell[][] = Array.from({ length: trackMap.size });
-  for (const { steps, index } of trackMap.values()) {
-    orderedTracks[index] = steps;
+    // Check if track 0 is blank
+    const trk0 = orderedTracks[0];
+    hasBlankTrack0 = trk0 ? trk0.every(s =>
+      s.note === 0 && s.instrument === 0 && s.effTyp === 0 && s.eff === 0 &&
+      s.effTyp2 === 0 && s.eff2 === 0
+    ) : true;
+  } else {
+    // ── Fallback path: reconstruct from song.patterns (original behavior) ──
+    const trackMap = new Map<string, { steps: TrackerCell[]; index: number }>();
+
+    // Always include an empty track as track 0
+    const emptySteps: TrackerCell[] = Array.from({ length: trkl }, () => ({
+      note: 0, instrument: 0, volume: 0, effTyp: 0, eff: 0, effTyp2: 0, eff2: 0,
+    }));
+    const emptyHash = hashTrack(emptySteps, trkl);
+    trackMap.set(emptyHash, { steps: emptySteps, index: 0 });
+
+    positionTracks = [];
+    for (const patIdx of song.songPositions) {
+      const pat = song.patterns[patIdx];
+      if (!pat) continue;
+
+      const trackIndices: number[] = [];
+      const transposes: number[] = [];
+
+      for (let ch = 0; ch < channelsToExport; ch++) {
+        const channel = pat.channels[ch];
+        if (!channel) {
+          trackIndices.push(0);
+          transposes.push(0);
+          continue;
+        }
+
+        const steps = channel.rows.slice(0, trkl);
+        while (steps.length < trkl) {
+          steps.push({ note: 0, instrument: 0, volume: 0, effTyp: 0, eff: 0, effTyp2: 0, eff2: 0 });
+        }
+
+        const hash = hashTrack(steps, trkl);
+        if (!trackMap.has(hash)) {
+          trackMap.set(hash, { steps, index: trackMap.size });
+        }
+        trackIndices.push(trackMap.get(hash)!.index);
+        transposes.push(0);
+      }
+
+      positionTracks.push({ trackIndices, transposes });
+    }
+
+    orderedTracks = Array.from({ length: trackMap.size });
+    for (const { steps, index } of trackMap.values()) {
+      orderedTracks[index] = steps;
+    }
+    hasBlankTrack0 = true;
   }
 
   const trkn = orderedTracks.length - 1; // Track count (0-indexed, track 0 is separate)
   const posn = positionTracks.length;
-  const hasBlankTrack0 = true; // Track 0 is our empty track
 
   // ── Gather instruments ──
   const hivelyInstruments: Array<{ name: string; config: HivelyConfig | null }> = [];
@@ -275,11 +321,17 @@ export function exportAsHively(
         const inst = s?.instrument ?? 0;
 
         // Primary effect only for AHX
-        const eff1 = reverseMapEffect(s?.effTyp ?? 0, s?.eff ?? 0, s?.flag1, s?.flag2);
-        // Handle volume column → set volume effect
-        if ((s?.volume ?? 0) > 0 && eff1.fx === 0 && eff1.fxParam === 0) {
-          eff1.fx = 0xC;
-          eff1.fxParam = s!.volume;
+        let eff1: { fx: number; fxParam: number };
+        if (nativeEffects) {
+          // Native path: effTyp/eff already hold HVL fx values
+          eff1 = { fx: s?.effTyp ?? 0, fxParam: s?.eff ?? 0 };
+        } else {
+          eff1 = reverseMapEffect(s?.effTyp ?? 0, s?.eff ?? 0, s?.flag1, s?.flag2);
+          // Handle volume column → set volume effect
+          if ((s?.volume ?? 0) > 0 && eff1.fx === 0 && eff1.fxParam === 0) {
+            eff1.fx = 0xC;
+            eff1.fxParam = s!.volume;
+          }
         }
 
         // AHX packing: 3 bytes
@@ -344,13 +396,20 @@ export function exportAsHively(
         const note = s?.note ?? 0;
         const inst = s?.instrument ?? 0;
 
-        const eff1 = reverseMapEffect(s?.effTyp ?? 0, s?.eff ?? 0, s?.flag1, s?.flag2);
-        const eff2 = reverseMapEffect(s?.effTyp2 ?? 0, s?.eff2 ?? 0);
-
-        // Handle volume column → set volume effect
-        if ((s?.volume ?? 0) > 0 && eff1.fx === 0 && eff1.fxParam === 0) {
-          eff1.fx = 0xC;
-          eff1.fxParam = s!.volume;
+        let eff1: { fx: number; fxParam: number };
+        let eff2: { fx: number; fxParam: number };
+        if (nativeEffects) {
+          // Native path: effTyp/eff already hold HVL fx values
+          eff1 = { fx: s?.effTyp ?? 0, fxParam: s?.eff ?? 0 };
+          eff2 = { fx: s?.effTyp2 ?? 0, fxParam: s?.eff2 ?? 0 };
+        } else {
+          eff1 = reverseMapEffect(s?.effTyp ?? 0, s?.eff ?? 0, s?.flag1, s?.flag2);
+          eff2 = reverseMapEffect(s?.effTyp2 ?? 0, s?.eff2 ?? 0);
+          // Handle volume column → set volume effect
+          if ((s?.volume ?? 0) > 0 && eff1.fx === 0 && eff1.fxParam === 0) {
+            eff1.fx = 0xC;
+            eff1.fxParam = s!.volume;
+          }
         }
 
         // Check if empty

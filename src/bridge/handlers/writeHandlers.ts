@@ -2135,7 +2135,7 @@ export async function exportNative(_params: Record<string, unknown>): Promise<Re
     } else if (format === 'HVL' as string || format === 'AHX' as string || layoutFormatId === 'hivelyHVL' || layoutFormatId === 'hivelyAHX') {
       const { exportAsHively } = await import('../../lib/export/HivelyExporter');
       const hvlFmt = (format === 'AHX' || layoutFormatId === 'hivelyAHX') ? 'ahx' : 'hvl';
-      result = exportAsHively(song, { format: hvlFmt });
+      result = exportAsHively(song, { format: hvlFmt, nativeOverride: fmt.hivelyNative });
     } else if (format === 'DIGI' as string || layoutFormatId === 'digiBooster') {
       const { exportDigiBooster } = await import('../../lib/export/DigiBoosterExporter');
       const buf = exportDigiBooster(song);
