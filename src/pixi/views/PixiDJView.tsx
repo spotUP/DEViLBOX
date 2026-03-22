@@ -3,7 +3,8 @@
  * Layout: Top bar | [Deck A | Mixer | Deck B] (flex row)
  */
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import React, { Suspense, useCallback, useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { PixiButton, PixiViewHeader } from '../components';
 import { PixiDJDeck } from './dj/PixiDJDeck';
 import { PixiDJMixer } from './dj/PixiDJMixer';
@@ -22,12 +23,27 @@ import { PixiDJControllerSelect } from './dj/PixiDJControllerSelect';
 import { PixiDJFxPresets } from './dj/PixiDJFxPresets';
 import { PixiDJSamplerPanel } from './dj/PixiDJSamplerPanel';
 
+// Lazy-load heavy 3D components to avoid bloating the GL DJ bundle
+const DeckVinyl3DView = React.lazy(() => import('@components/dj/DeckVinyl3DView'));
+const MixerVestax3DView = React.lazy(() => import('@components/dj/MixerVestax3DView'));
+const R3FCanvas = React.lazy(() =>
+  import('@react-three/fiber').then((mod) => ({ default: mod.Canvas }))
+);
+const ViewPort = React.lazy(() =>
+  import('@react-three/drei').then((mod) => {
+    const Port = mod.View.Port;
+    return { default: Port as React.ComponentType };
+  })
+);
+
 type DJBrowserPanel = 'none' | 'playlists' | 'modland' | 'serato';
 
 export const PixiDJView: React.FC = () => {
   const engineRef = useRef<DJEngine | null>(null);
+  const overlayRef = useRef<HTMLDivElement | null>(null);
   const setDJModeActive = useDJStore(s => s.setDJModeActive);
   const thirdDeckActive = useDJStore(s => s.thirdDeckActive);
+  const deckViewMode = useDJStore(s => s.deckViewMode);
 
   // DJ keyboard shortcuts
   useDJKeyboardHandler();
@@ -108,9 +124,68 @@ export const PixiDJView: React.FC = () => {
           </pixiContainer>
         )}
       </pixiContainer>
+
+      {/* 3D DOM overlay — rendered on top of the Pixi canvas via portal (like SplitView in App.tsx) */}
+      {deckViewMode === '3d' && createPortal(
+        <DJ3DOverlay thirdDeckActive={thirdDeckActive} overlayRef={overlayRef} />,
+        document.body
+      )}
     </pixiContainer>
   );
 };
+
+// ─── 3D DOM overlay for GL mode ──────────────────────────────────────────────
+
+interface DJ3DOverlayProps {
+  thirdDeckActive: boolean;
+  overlayRef: React.RefObject<HTMLDivElement | null>;
+}
+
+const DJ3DOverlay: React.FC<DJ3DOverlayProps> = ({ thirdDeckActive, overlayRef }) => (
+  <div
+    ref={overlayRef}
+    className="fixed inset-0 z-10"
+    style={{ top: 36, background: 'rgba(10,10,14,0.95)' }}
+  >
+    <Suspense fallback={
+      <div className="flex items-center justify-center w-full h-full text-text-muted text-sm">
+        Loading 3D views...
+      </div>
+    }>
+      <div className={`w-full h-full grid gap-2 p-2 ${
+        thirdDeckActive
+          ? 'grid-cols-[1fr_280px_1fr_1fr]'
+          : 'grid-cols-[1fr_280px_1fr]'
+      }`}>
+        <div className="min-h-0 min-w-0 overflow-hidden">
+          <DeckVinyl3DView deckId="A" />
+        </div>
+        <div className="min-h-0 min-w-0 overflow-hidden">
+          <MixerVestax3DView />
+        </div>
+        <div className="min-h-0 min-w-0 overflow-hidden">
+          <DeckVinyl3DView deckId="B" />
+        </div>
+        {thirdDeckActive && (
+          <div className="min-h-0 min-w-0 overflow-hidden">
+            <DeckVinyl3DView deckId="C" />
+          </div>
+        )}
+      </div>
+
+      {/* Shared R3F Canvas for drei View scissor rendering */}
+      <div className="fixed inset-0 pointer-events-none" style={{ top: 36, zIndex: 1 }}>
+        <R3FCanvas
+          style={{ position: 'absolute', inset: 0 }}
+          eventSource={overlayRef as React.RefObject<HTMLDivElement>}
+          eventPrefix="client"
+        >
+          <ViewPort />
+        </R3FCanvas>
+      </div>
+    </Suspense>
+  </div>
+);
 
 // ─── Top Bar ────────────────────────────────────────────────────────────────
 
