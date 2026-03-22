@@ -551,6 +551,16 @@ export class TrackerScratchController {
     gainParam.cancelScheduledValues(now);
     gainParam.setValueAtTime(0, now);
 
+    // Stop SunVox WASM sequencer — it runs independently in the worklet and
+    // would keep playing audibly even with the replayer gain at zero.
+    import('@/engine/sunvox-modular/SunVoxModularSynth').then(({ getSharedSunVoxHandle }) => {
+      if (getSharedSunVoxHandle() >= 0) {
+        import('@/engine/sunvox/SunVoxEngine').then(({ SunVoxEngine }) => {
+          if (SunVoxEngine.hasInstance()) SunVoxEngine.getInstance().stop(getSharedSunVoxHandle());
+        }).catch(() => {});
+      }
+    }).catch(() => {});
+
     // Slow replayer to crawl + suppress notes (safety)
     replayer.setSuppressNotes(true);
     replayer.setTempoMultiplier(0.001);
@@ -583,6 +593,15 @@ export class TrackerScratchController {
     // Crossfade — scratch buffer out, live tracker in.
     // Restore the full output gain (covers all formats, including native WASM engines).
     replayer.getFullOutput().gain.value = this.originalGainValue;
+
+    // Restart SunVox WASM sequencer (was stopped when entering scratch mode)
+    import('@/engine/sunvox-modular/SunVoxModularSynth').then(({ getSharedSunVoxHandle }) => {
+      if (getSharedSunVoxHandle() >= 0) {
+        import('@/engine/sunvox/SunVoxEngine').then(({ SunVoxEngine }) => {
+          if (SunVoxEngine.hasInstance()) SunVoxEngine.getInstance().play(getSharedSunVoxHandle(), false);
+        }).catch(() => {});
+      }
+    }).catch(() => {});
     console.warn(`[TrackerScratch] Gain restored to ${this.originalGainValue}`);
 
     // Crossfade: ramp scratch buffer gain down over the same duration
