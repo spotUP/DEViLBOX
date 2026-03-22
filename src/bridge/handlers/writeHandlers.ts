@@ -849,13 +849,15 @@ export async function loadFile(params: Record<string, unknown>): Promise<Record<
       const libopenmptExts = /\.(mod|xm|s3m|it|stm|669|far|ult|mtm|med|mmd[0-3]|okt|okta|gdm|psm)$/i;
       const canUseLibopenmpt = useLib && libopenmptExts.test(filename);
 
-      if (canUseLibopenmpt) {
-        // Use libopenmpt via the standard import pipeline (supports volume envelopes, etc.)
+      if (canUseLibopenmpt || format?.nativeOnly) {
+        // Use the standard import pipeline for libopenmpt formats AND nativeOnly
+        // formats (XRNS, Furnace, etc.) that have their own parsers and must NOT
+        // fall through to parseModuleToSong → UADE.
         const { loadModuleFile } = await import('../../lib/import/ModuleLoader');
         const { importTrackerModule } = await import('../../lib/file/UnifiedFileLoader');
         const moduleInfo = await loadModuleFile(file);
         await importTrackerModule(moduleInfo, {
-          useLibopenmpt: true,
+          useLibopenmpt: canUseLibopenmpt,
           subsong,
           companionFiles: companionFiles.size > 0 ? companionFiles : undefined,
         });
