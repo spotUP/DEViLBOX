@@ -12,11 +12,10 @@ import { getDJEngine } from '@/engine/dj/DJEngine';
 
 interface PixiDeckWaveformProps {
   deckId: 'A' | 'B' | 'C';
-  width: number;
   height: number;
 }
 
-export const PixiDeckWaveform: React.FC<PixiDeckWaveformProps> = ({ deckId, width, height }) => {
+export const PixiDeckWaveform: React.FC<PixiDeckWaveformProps> = ({ deckId, height }) => {
   const theme = usePixiTheme();
   const peaks = useDJStore(s => s.decks[deckId].waveformPeaks);
   const position = useDJStore(s => s.decks[deckId].audioPosition);
@@ -28,8 +27,8 @@ export const PixiDeckWaveform: React.FC<PixiDeckWaveformProps> = ({ deckId, widt
 
   const handleSeek = useCallback((e: FederatedPointerEvent) => {
     if (!peaks || peaks.length === 0 || duration <= 0) return;
-    // Get click position relative to container
     const localX = e.getLocalPosition(e.currentTarget).x;
+    const width = (e.currentTarget as any).layout?.computedLayout?.width ?? 280;
     const totalPeaks = peaks.length;
     const progress = duration > 0 ? position / duration : 0;
     const centerPeak = Math.floor(progress * totalPeaks);
@@ -44,10 +43,12 @@ export const PixiDeckWaveform: React.FC<PixiDeckWaveformProps> = ({ deckId, widt
       const deck = engine.getDeck(deckId);
       deck.cue(newPosition / 1000); // cue expects seconds in audio mode
     } catch { /* engine not ready */ }
-  }, [deckId, peaks, position, duration, width]);
+  }, [deckId, peaks, position, duration]);
 
   const drawWaveform = useCallback((g: GraphicsType) => {
     g.clear();
+
+    const width = (g.parent as any)?.layout?.computedLayout?.width ?? 280;
 
     // Background
     g.roundRect(0, 0, width, height, 4);
@@ -87,18 +88,18 @@ export const PixiDeckWaveform: React.FC<PixiDeckWaveformProps> = ({ deckId, widt
     const playheadX = Math.min(width - 1, Math.floor(visiblePeaks / 2));
     g.rect(playheadX, 0, 1, height);
     g.fill({ color: 0xffffff, alpha: 0.8 });
-  }, [peaks, position, duration, width, height, theme, DECK_COLOR]);
+  }, [peaks, position, duration, height, theme, DECK_COLOR]);
 
   return (
-    <pixiContainer eventMode="static" cursor="pointer" onPointerUp={handleSeek} layout={{ width, height }}>
-      <pixiGraphics eventMode="none" draw={drawWaveform} layout={{ width, height }} />
+    <pixiContainer eventMode="static" cursor="pointer" onPointerUp={handleSeek} layout={{ width: '100%', height }}>
+      <pixiGraphics eventMode="none" draw={drawWaveform} layout={{ width: '100%', height }} />
       {(!peaks || peaks.length === 0) && (
         <pixiBitmapText
           eventMode="none"
           text="No waveform data"
           style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 11, fill: 0xffffff }}
           tint={theme.textMuted.color}
-          layout={{ position: 'absolute', top: height / 2 - 6, left: width / 2 - 40 }}
+          layout={{ position: 'absolute', top: height / 2 - 6, left: 0, right: 0, alignSelf: 'center' }}
         />
       )}
     </pixiContainer>
