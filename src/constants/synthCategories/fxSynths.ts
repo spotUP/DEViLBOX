@@ -55,4 +55,13 @@ export const fxSynthEntries: Record<string, SynthInfo> = {
     icon: 'Mic',
     color: 'pink',
   },
+  DECtalk: {
+    type: 'DECtalk',
+    name: 'DECtalk',
+    shortName: 'DCTk',
+    description: 'DECtalk formant speech synthesizer — the iconic Stephen Hawking voice. 9 voices, adjustable rate and pitch.',
+    bestFor: ['Speech', 'Robotic Voices', 'Formant', 'Sci-Fi', 'FX'],
+    icon: 'MessageSquare',
+    color: 'emerald',
+  },
 };

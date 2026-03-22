@@ -106,6 +106,8 @@ export const VOLUME_NORMALIZATION_OFFSETS: Record<string, number> = {
   'SpaceLaser': 17,      // Measured: -3.1dB → target -10dB (required reverb .ready await)
   'V2': 0,               // Reset to 0 - WASM doesn't init in test, was unmeasured guess of 30
   'Sam': 8,              // Measured: -2.3dB → target -10dB
+  'DECtalk': 10,          // WAV output is quiet — boost to match other speech synths
+  'PinkTrombone': 6,      // Vocal tract model runs quiet — boost to audible level
   'SuperSaw': 6,         // Measured: -7.3dB → target -10dB
   'WobbleBass': 12,      // Measured: -9.4dB → on target
   'FormantSynth': -1,    // Measured: -0.5dB → target -10dB
@@ -167,6 +169,27 @@ export const VOLUME_NORMALIZATION_OFFSETS: Record<string, number> = {
   'OctaMEDSynth': 0,   // OctaMED synth instrument — volume managed internally
   'UADESynth': 0,       // UADE exotic Amiga player — volume managed internally
   'SunVoxSynth': 0,     // SunVox WASM patch player — volume managed internally
+  'SunVoxModular': 0,   // SunVox modular — volume managed internally
+  'KlysSynth': 0,       // Klystrack — volume managed internally
+  'Sc68Synth': 0,       // SC68/SNDH — volume managed internally
+  'ZxtuneSynth': 0,     // ZXTune — volume managed internally
+  'WaveSabreSynth': 0,  // WaveSabre (XRNS) — volume managed internally
+  'OidosSynth': 0,      // Oidos (XRNS) — volume managed internally
+  'TunefishSynth': 0,   // Tunefish (XRNS) — volume managed internally
+  'V2Speech': 0,        // V2 Speech module — uses V2 engine
+  'MusicLineSynth': 0,  // MusicLine — volume managed internally
+  'SymphonieSynth': 0,  // Symphonie — volume managed internally
+  'FuturePlayerSynth': 0, // Future Player — volume managed internally
+  'MAMES14001A': 10,    // SSi S14001A speech — quiet output
+  'MAMEVLM5030': 8,     // Konami VLM5030 speech — quiet output
+  'MAMEHC55516': 6,     // Harris HC55516 CVSD — quiet output
+  'MAMEMultiPCM': 0,    // MultiPCM — TBD
+  'GearmulatorVirus': 0,    // Gearmulator — volume managed internally
+  'GearmulatorVirusTI': 0,
+  'GearmulatorMicroQ': 0,
+  'GearmulatorXT': 0,
+  'GearmulatorNord': 0,
+  'GearmulatorJP8000': 0,
 };
 
 /**

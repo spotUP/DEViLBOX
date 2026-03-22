@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-03-21T00:30:53.044Z
+ * Generated: 2026-03-22T12:15:10.791Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -19,10 +19,10 @@ export interface ChangelogEntry {
 }
 
 // Build info
-export const BUILD_VERSION = '1.0.3189';
-export const BUILD_NUMBER = '3189';
-export const BUILD_HASH = '1f50ed6f9';
-export const BUILD_DATE = '2026-03-21';
+export const BUILD_VERSION = '1.0.3205';
+export const BUILD_NUMBER = '3205';
+export const BUILD_HASH = '4c0274633';
+export const BUILD_DATE = '2026-03-22';
 
 // Full version (patch IS the build number, so no need to append)
 export const FULL_VERSION = BUILD_VERSION;
@@ -30,9 +30,79 @@ export const FULL_VERSION = BUILD_VERSION;
 // Auto-generated changelog
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: '1.0.3189',
+    version: '1.0.3205',
+    date: '2026-03-22',
+    changes: [
+      {
+        type: 'fix',
+        "description": "Preserve native engine data in .dbx roundtrip for all formats"
+      },
+      {
+        type: 'fix',
+        "description": "Eagerly warm up mute imports so first click works"
+      }
+    ]
+  },
+  {
+    version: '2026-03-21',
     date: '2026-03-21',
     changes: [
+      {
+        type: 'improvement',
+        "description": "Chore: latest Pink Trombone + format state updates"
+      },
+      {
+        type: 'improvement',
+        "description": "Chore: engine and synth updates from concurrent agents"
+      },
+      {
+        type: 'feature',
+        "description": "Speech synth updates, export dialog, file loader improvements"
+      },
+      {
+        type: 'fix',
+        "description": "Fix mute/solo — replace require() with async import()"
+      },
+      {
+        type: 'fix',
+        "description": "Chore: add Steve Turner WASM debug/test source files"
+      },
+      {
+        type: 'improvement',
+        "description": "Chore: update song exports and format audit state"
+      },
+      {
+        type: 'improvement',
+        "description": "Furnace pattern parser cleanup + tracker store updates"
+      },
+      {
+        type: 'feature',
+        "description": "Relax Amiga format detection — support both prefix and Modland extension naming (137 total, 0 failures)"
+      },
+      {
+        type: 'feature',
+        "description": "PinkTrombone synth, Furnace fixes, parser improvements, format test files"
+      },
+      {
+        type: 'feature',
+        "description": "Add PT36, AMF, STX, DSYM, PTM exports (129 total, 0 failures)"
+      },
+      {
+        type: 'fix',
+        "description": "Envelope timing and format identification"
+      },
+      {
+        type: 'feature',
+        "description": "Add IFF-SMUS + Music Maker 8V exports (124 total, 0 failures)"
+      },
+      {
+        type: 'fix',
+        "description": "Cache-bust worklet URL to prevent stale audio code"
+      },
+      {
+        type: 'fix',
+        "description": "Remove double sv_stop() that put engine in standby mode"
+      },
       {
         type: 'feature',
         "description": "Add 5 more format exports (122 total, 0 failures)"
@@ -174,70 +244,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'feature',
         "description": "Per-phoneme LPC coefficients for TTS"
-      },
-      {
-        type: 'feature',
-        "description": "Frame buffer TTS for VLM5030 + phrase builder for all"
-      },
-      {
-        type: 'fix',
-        "description": "Fix note=12 octave bug in old format patterns and CFLG merge"
-      },
-      {
-        type: 'fix',
-        "description": "Boost ROM speech output level (4x)"
-      },
-      {
-        type: 'fix',
-        "description": "Prevent infinite render loop from _updateRomStatus"
-      },
-      {
-        type: 'fix',
-        "description": "Guard worklet message handler against disposed synth"
-      },
-      {
-        type: 'fix',
-        "description": "Extract waveforms from sample data for DM1/DM2"
-      },
-      {
-        type: 'improvement',
-        "description": "Chore: update aces_high export and synth-prerender tool"
-      },
-      {
-        type: 'fix',
-        "description": "Remaining unstaged changes (loader, mixer, export tool)"
-      },
-      {
-        type: 'fix',
-        "description": "Decode data URL fallback for instruments without audioBuffer"
-      },
-      {
-        type: 'fix',
-        "description": "Add Steve Turner format to unified file loader"
-      },
-      {
-        type: 'fix',
-        "description": "Add Steve Turner engine to active gain engine routing"
-      },
-      {
-        type: 'fix',
-        "description": "Update instrument store _romsLoaded after auto-load"
-      },
-      {
-        type: 'improvement',
-        "description": "Chore: update MOD export files"
-      },
-      {
-        type: 'fix',
-        "description": "20ms envelope window and lock-step command comparator"
-      },
-      {
-        type: 'fix',
-        "description": "Worklet rendering improvements"
-      },
-      {
-        type: 'feature',
-        "description": "Add HC55516, S14001A, and VLM5030 WASM synths"
       }
     ]
   }

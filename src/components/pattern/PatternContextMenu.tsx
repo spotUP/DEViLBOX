@@ -82,6 +82,7 @@ const RenameDialog: React.FC<{
             value={name}
             onChange={(e) => setName(e.target.value)}
             onKeyDown={handleKeyDown}
+            maxLength={64}
             className="w-full px-3 py-2 bg-dark-bg border border-dark-border rounded text-sm text-text-primary
                      focus:outline-none focus:border-accent-primary"
             placeholder="Enter pattern name"

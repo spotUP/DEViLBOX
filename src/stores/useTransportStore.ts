@@ -113,7 +113,7 @@ export const useTransportStore = create<TransportStore>()(
     currentRow: 0,
     currentPatternIndex: 0,
     continuousRow: 0,
-    smoothScrolling: true, // Default to smooth scrolling (eliminates frame-rate aliasing)
+    smoothScrolling: false, // Default to stepped scrolling (classic tracker feel)
     metronomeEnabled: false,
     metronomeVolume: 75, // Default to 75%
     speed: 6, // Default speed (ticks per row) - ProTracker default

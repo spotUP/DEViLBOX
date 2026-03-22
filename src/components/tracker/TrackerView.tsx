@@ -341,7 +341,6 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
   // React to pending module file (set by drag-drop in App.tsx)
   useEffect(() => {
     if (pendingModuleFile) {
-      console.log('[TrackerView] Pending module file detected, opening import dialog:', pendingModuleFile.name);
       setShowImportModule(true);
       // Don't clear yet - ImportModuleDialog needs it
     }

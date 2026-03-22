@@ -1042,11 +1042,13 @@ export class ToneEngine {
    */
   public async ensureWASMSynthsReady(configs: InstrumentConfig[]): Promise<void> {
     const wasmConfigs = configs.filter((c) => 
-      ['TB303', 'Buzz3o3', 'V2', 'Sam', 'Synare', 'DubSiren', 'SpaceLaser', 'Dexed', 'OBXd', 'Furnace', 'HivelySynth', 'UADESynth', 'SymphonieSynth', 'MusicLineSynth',
+      ['TB303', 'Buzz3o3', 'V2', 'V2Speech', 'Sam', 'DECtalk', 'PinkTrombone', 'Synare', 'DubSiren', 'SpaceLaser', 'Dexed', 'OBXd', 'Furnace', 'HivelySynth', 'UADESynth', 'SymphonieSynth', 'MusicLineSynth',
        'SoundMonSynth', 'SidMonSynth', 'DigMugSynth', 'FCSynth', 'FredSynth', 'TFMXSynth',
        'OctaMEDSynth', 'SidMon1Synth', 'HippelCoSoSynth', 'RobHubbardSynth', 'SteveTurnerSynth', 'FredEditorReplayerSynth', 'DavidWhittakerSynth',
        'SonicArrangerSynth', 'InStereo2Synth', 'InStereo1Synth', 'DeltaMusic1Synth', 'DeltaMusic2Synth',
-       'StartrekkerAMSynth', 'SunVoxSynth', 'JamCrackerSynth', 'FuturePlayerSynth'].includes(c.synthType || '') ||
+       'StartrekkerAMSynth', 'SunVoxSynth', 'JamCrackerSynth', 'FuturePlayerSynth',
+       'KlysSynth', 'WaveSabreSynth', 'OidosSynth', 'TunefishSynth'].includes(c.synthType || '') ||
+      c.synthType?.startsWith('Gearmulator') ||
       c.synthType?.startsWith('Furnace')
     );
     if (wasmConfigs.length === 0) return;
@@ -1473,7 +1475,7 @@ export class ToneEngine {
     const isWASMSynth = [
       // AudioWorklet WASM synths — use shared instances (one per instrument ID)
       // to avoid exhausting fixed player-handle pools across channels.
-      'TB303', 'V2', 'Sam', 'DubSiren', 'SpaceLaser', 'Synare', 'Dexed', 'OBXd', 'WAM',
+      'TB303', 'Buzz3o3', 'V2', 'V2Speech', 'Sam', 'DECtalk', 'PinkTrombone', 'DubSiren', 'SpaceLaser', 'Synare', 'Dexed', 'OBXd', 'WAM',
       'SonicArrangerSynth', 'InStereo2Synth', 'InStereo1Synth', 'JamCrackerSynth', 'FuturePlayerSynth',
       'SoundMonSynth', 'SidMonSynth', 'SidMon1Synth',
       'DigMugSynth', 'DeltaMusic1Synth', 'DeltaMusic2Synth',
@@ -2174,6 +2176,7 @@ export class ToneEngine {
       case 'V2':
       case 'V2Speech':
       case 'Sam':
+      case 'DECtalk':
       case 'PinkTrombone':
       case 'Synare':
       case 'WAM':
@@ -3018,6 +3021,8 @@ export class ToneEngine {
         config.synthType === 'SpaceLaser' ||
         // MAME chip synths and hardware WASM synths use triggerRelease(time) - no note
         config.synthType === 'Sam' ||
+        config.synthType === 'DECtalk' ||
+        config.synthType === 'PinkTrombone' ||
         config.synthType === 'V2' ||
         config.synthType === 'V2Speech' ||
         config.synthType === 'MAMEVFX' ||
@@ -3076,7 +3081,7 @@ export class ToneEngine {
     // These synths are architecturally monophonic and will break with polyphonic note allocation
     const monoSynthTypes = new Set([
       // Speech synthesis (have speech sequencers that conflict with polyphony)
-      'MAMEMEA8000', 'MAMETMS5220', 'MAMESP0250', 'MAMEVotrax', 'Sam', 'V2Speech',
+      'MAMEMEA8000', 'MAMETMS5220', 'MAMESP0250', 'MAMEVotrax', 'Sam', 'DECtalk', 'PinkTrombone', 'V2Speech',
       // Single-voice generators
       'MAMECM3394', 'MAMETMS36XX', 'MAMESN76477', 'MAMEUPD931', 'MAMEUPD933',
       // Monophonic synths

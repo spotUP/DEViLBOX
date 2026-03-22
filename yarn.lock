@@ -263,6 +263,13 @@
   dependencies:
     tslib "^2.0.0"
 
+"@echogarden/dectalk-wasm@^0.1.0":
+  version "0.1.0"
+  resolved "https://registry.npmjs.org/@echogarden/dectalk-wasm/-/dectalk-wasm-0.1.0.tgz"
+  integrity sha512-cte19w416JGEZZNqLZh+wY40zqPIyC4/pNqWOXcE0LUM/CMWPwFHWNrjgwFfzfXZd69+xS7/1WsDTgAKxZZJDA==
+  dependencies:
+    wasm-heap-manager "^0.1.0"
+
 "@echogarden/espeak-ng-emscripten@^0.3.5":
   version "0.3.5"
   resolved "https://registry.npmjs.org/@echogarden/espeak-ng-emscripten/-/espeak-ng-emscripten-0.3.5.tgz"
@@ -7482,6 +7489,11 @@ wait-on@^9.0.3:
     lodash "^4.17.21"
     minimist "^1.2.8"
     rxjs "^7.8.2"
+
+wasm-heap-manager@^0.1.0:
+  version "0.1.2"
+  resolved "https://registry.npmjs.org/wasm-heap-manager/-/wasm-heap-manager-0.1.2.tgz"
+  integrity sha512-DFAfmvJ2bQU9pHluvEaf3zqPFIlieHs7f9hilG5MOfY3G3ZOO4AP+zmMnF8naz+GaqKX4lJeMDaZpQRJHGuFEg==
 
 wcwidth@^1.0.1:
   version "1.0.1"

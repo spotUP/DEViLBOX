@@ -1,9 +1,6 @@
 // @ts-expect-error -- SamJs is a JavaScript library without types
 import SamJs from '@engine/sam/samjs';
-import { espeakTextToIPA, parseEspeakIPA, isEspeakAvailable, preloadEspeak } from './EspeakNG';
-
-// Start loading eSpeak-NG in the background on first import
-preloadEspeak();
+import { espeakTextToIPA, parseEspeakIPA, isEspeakAvailable } from './EspeakNG';
 
 /**
  * A single phoneme token parsed from SAM's reciter output.

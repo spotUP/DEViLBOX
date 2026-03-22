@@ -50,7 +50,7 @@ import { importSong, exportSong, getOriginalModuleDataForExport } from '@lib/exp
 import { isSupportedModule, getSupportedExtensions, type ModuleInfo } from '@lib/import/ModuleLoader';
 import { useModuleImport } from '@hooks/tracker/useModuleImport';
 import { importMIDIFile, isMIDIFile, getSupportedMIDIExtensions } from '@lib/import/MIDIImporter';
-import { clearSavedProject, clearExplicitlySaved } from '@hooks/useProjectPersistence';
+import { clearSavedProject, clearExplicitlySaved, saveProjectToStorage } from '@hooks/useProjectPersistence';
 import { parseDb303Pattern, exportCurrentPatternToDb303 } from '@lib/import/Db303PatternConverter';
 import { getASIDDeviceManager } from '@lib/sid/ASIDDeviceManager';
 import { useSettingsStore } from '@stores/useSettingsStore';
@@ -286,7 +286,21 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = React.memo(({
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [showFxPresetsMenu]);
 
-  const handleSave = () => {
+  const handleSave = async () => {
+    try {
+      const saved = await saveProjectToStorage({ explicit: true });
+      if (saved) {
+        notify.success('Project saved!', 2000);
+      } else {
+        notify.error('Failed to save project');
+      }
+    } catch (error) {
+      console.error('Failed to save project:', error);
+      notify.error('Failed to save project');
+    }
+  };
+
+  const handleDownload = () => {
     try {
       const { patternOrder } = useTrackerStore.getState();
       const sequence = patternOrder.map(idx => patterns[idx]?.id).filter(Boolean);
@@ -330,7 +344,7 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = React.memo(({
       );
       notify.success('Song downloaded!', 2000);
     } catch (error) {
-      console.error('Failed to save file:', error);
+      console.error('Failed to download file:', error);
       notify.error('Failed to download file');
     }
   };
@@ -729,7 +743,7 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = React.memo(({
         <Button variant="ghost" size="sm" onClick={() => setShowFileBrowser(true)} disabled={isLoading} loading={isLoading}>Load</Button>
         <Button variant="ghost" size="sm" onClick={handleSave}>{isDirty ? 'Save*' : 'Save'}</Button>
         <Button variant="ghost" size="sm" onClick={() => useUIStore.getState().openModal('revisions')}>Revisions</Button>
-        <Button variant="ghost" size="sm" onClick={handleSave}>Download</Button>
+        <Button variant="ghost" size="sm" onClick={handleDownload}>Download</Button>
         <Button variant="ghost" size="sm" onClick={onShowExport}>Export</Button>
         <Button variant="ghost" size="sm" onClick={() => useUIStore.getState().openNewSongWizard()}>New</Button>
         <Button variant="ghost" size="sm" onClick={() => setShowClearModal(true)}>Clear</Button>
@@ -791,20 +805,11 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = React.memo(({
                   const newInst = createDefaultTB303Instrument();
                   addInstrument(newInst);
                   tb303Instrument = newInst;
-                  console.log('[XML Import] Auto-created TB-303 instrument:', newInst.id);
                 }
                 
                 // Update the instrument with the preset using updateInstrument
                 const mergedConfig = { ...tb303Instrument.tb303, ...presetConfig } as TB303Config;
-                console.log('[XML Import] Before update - tb303Instrument.tb303:', JSON.stringify(tb303Instrument.tb303, null, 2));
-                console.log('[XML Import] Parsed presetConfig:', JSON.stringify(presetConfig, null, 2));
-                console.log('[XML Import] Merged config:', JSON.stringify(mergedConfig, null, 2));
-                
                 updateInstrument(tb303Instrument.id, { tb303: mergedConfig });
-                
-                // Verify the update worked
-                const updatedInstrument = instruments.find(inst => inst.id === tb303Instrument.id);
-                console.log('[XML Import] After update - instrument.tb303:', JSON.stringify(updatedInstrument?.tb303, null, 2));
                 
                 notify.success(`Loaded DB303 preset: ${filename.replace('.xml', '')}`);
                 console.log('[XML Import] Applied preset to instrument:', tb303Instrument.id, presetConfig);
@@ -821,7 +826,6 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = React.memo(({
                   const newInst = createDefaultTB303Instrument();
                   addInstrument(newInst);
                   tb303Instrument = newInst;
-                  console.log('[XML Import] Auto-created TB-303 instrument:', newInst.id);
                 }
                 
                 // Parse pattern with instrument ID

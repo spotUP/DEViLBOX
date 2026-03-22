@@ -166,9 +166,6 @@ function TurntableScene({ deckId, orbitRef }: TurntableSceneProps) {
     for (const m of platters) m.matrixAutoUpdate = false;
     for (const m of tonearms) m.matrixAutoUpdate = false;
 
-    console.log(`[3DTurntable] Platter: ${platters.length} meshes, pivot=(${pCenter.x.toFixed(2)}, ${pCenter.y.toFixed(2)}, ${pCenter.z.toFixed(2)}) cm`);
-    console.log(`[3DTurntable] Tonearm: ${tonearms.length} meshes, pivot=(${tPivot.x.toFixed(2)}, ${tPivot.y.toFixed(2)}, ${tPivot.z.toFixed(2)}) cm`);
-
     return { clonedScene: cloned, platterMeshes: platters, tonearmMeshes: tonearms, platterCenter: pCenter, tonearmPivot: tPivot };
   }, [gltfScene]);
 
@@ -323,7 +320,6 @@ function TurntableScene({ deckId, orbitRef }: TurntableSceneProps) {
   const handleRpmClick = useCallback((e: ThreeEvent<PointerEvent>) => {
     e.stopPropagation();
     rpmRef.current = rpmRef.current === RPM_33 ? RPM_45 : RPM_33;
-    console.log(`[3DTurntable] RPM set to ${rpmRef.current}`);
   }, []);
 
   // ── Wheel nudge ──────────────────────────────────────────────────────────

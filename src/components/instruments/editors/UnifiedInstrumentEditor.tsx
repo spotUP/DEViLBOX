@@ -148,6 +148,7 @@ function getEditorMode(synthType: SynthType): EditorMode {
   if (isV2Type(synthType)) return 'v2';
   if (synthType === 'Sam') return 'sam';
   if (synthType === 'PinkTrombone') return 'pinktrombone';
+  if (synthType === 'DECtalk') return 'dectalk';
   if (isSynareType(synthType)) return 'synare';
   if (isMAMEChipType(synthType)) return 'mamechip';
   if (isMAMEType(synthType)) return 'mame';
@@ -183,6 +184,9 @@ function getEditorMode(synthType: SynthType): EditorMode {
   if (synthType === 'Odin2') return 'odin2';
   if (synthType === 'Surge') return 'surge';
   if (synthType === 'SuperCollider') return 'supercollider';
+  if (synthType === 'MusicLineSynth') return 'musicline';
+  if (synthType === 'WaveSabreSynth' || synthType === 'OidosSynth' || synthType === 'TunefishSynth') return 'xrns-synth';
+  if (synthType === 'SunVoxSynth') return 'sunvox-synth';
   if (synthType === 'StartrekkerAMSynth') return 'startrekker-am';
   if (synthType === 'WobbleBass') return 'wobblebass';
   if (synthType.startsWith('Gearmulator')) return 'gearmulator';

@@ -76,7 +76,7 @@ export const FileBrowser: React.FC<FileBrowserProps> = ({
     <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50" onClick={onClose}>
       <div
         ref={modalRef}
-        className="bg-dark-bgSecondary border border-dark-border rounded-lg shadow-xl w-[800px] max-w-[90vw] h-[600px] max-h-[80vh] flex flex-col"
+        className="bg-dark-bgSecondary border border-dark-border rounded-lg shadow-xl w-full max-w-[90vw] md:max-w-[800px] h-[90vh] md:h-[600px] max-h-[80vh] flex flex-col overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
@@ -425,7 +425,7 @@ export const FileBrowser: React.FC<FileBrowserProps> = ({
       {/* Version History Modal */}
       {nav.showRevisions && (
         <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-[60]">
-          <div className="bg-dark-bgPrimary border border-dark-border rounded-lg w-[400px] h-[500px] max-h-[80vh] flex flex-col">
+          <div className="bg-dark-bgPrimary border border-dark-border rounded-lg w-full max-w-[90vw] md:max-w-[400px] h-[500px] overflow-hidden max-h-[80vh] flex flex-col">
             {/* Header */}
             <div className="flex-shrink-0 flex items-center justify-between px-4 py-3 border-b border-dark-border">
               <div className="flex items-center gap-2">

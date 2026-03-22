@@ -54,14 +54,12 @@ export const RomUploadDialog: React.FC = () => {
         for (let i = 0; i < files.length; i++) {
           const fileData = await files[i].entry.async('uint8array');
           engine.loadSynthROM(instrumentId, synthType, i, fileData);
-          console.log(`[RomUpload] Loaded ${files[i].name} into bank ${i} (${fileData.length} bytes)`);
         }
       } else {
         // Single file upload
         const buffer = await file.arrayBuffer();
         const data = new Uint8Array(buffer);
         engine.loadSynthROM(instrumentId, synthType, 0, data);
-        console.log(`[RomUpload] Loaded ${file.name} (${data.length} bytes)`);
       }
 
       // Update instrument store to reflect ROM loaded

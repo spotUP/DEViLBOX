@@ -262,7 +262,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
       if (LibopenmptEngine.hasInstance()) {
         LibopenmptEngine.getInstance().setStereoSeparation(percent200);
       }
-    }).catch(() => {});
+    }).catch((err) => console.warn('Failed to apply stereo separation:', err));
   };
 
   // Standard modal keyboard handling (Enter/Escape to close)

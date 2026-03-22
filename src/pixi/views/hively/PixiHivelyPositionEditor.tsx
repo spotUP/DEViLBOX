@@ -1,15 +1,9 @@
 /**
- * PixiHivelyPositionEditor - Track Assignment + Transpose Editor
- * Pure Pixi GL rendering — no DOM elements.
+ * PixiHivelyPositionEditor - Editable position matrix (GL rendering).
  *
- * Layout:
- * ┌─────┬──────────┬──────────┬──────────┬──────────┐
- * │ Pos │  CH 0    │  CH 1    │  CH 2    │  CH 3    │
- * │     │ Trk  Trn │ Trk  Trn │ Trk  Trn │ Trk  Trn │
- * ├─────┼──────────┼──────────┼──────────┼──────────┤
- * │  00 │ 007  +00 │ 008  +00 │ 009  +03 │ 010  -05 │
- * │ >02 │ 015  +05 │ 016  +00 │ 017  -03 │ 018  +00 │
- * └─────┴──────────┴──────────┴──────────┴──────────┘
+ * Simple grid: arrow keys move freely, type hex digits to enter values.
+ * Each channel: track (2 hex) + sign + transpose (2 hex).
+ * Cursor is per-digit. Typing writes and moves cursor right.
  */
 
 import React, { useCallback, useMemo, useRef, useState, useEffect } from 'react';
@@ -17,38 +11,41 @@ import type { Container as ContainerType, Graphics as GraphicsType, FederatedPoi
 import { Graphics } from 'pixi.js';
 import { PIXI_FONTS } from '@/pixi/fonts';
 import type { HivelyNativeData } from '@/types';
+import { useFormatStore } from '@stores';
 
 const ROW_HEIGHT    = 18;
 const POS_COL_WIDTH = 32;
-const CHAN_COL_WIDTH = 80;  // Track(3) + space + Transpose(3)
+const CHAN_COL_WIDTH = 80;
 const HEADER_HEIGHT = 20;
-const VISIBLE_ROWS  = 7;   // Show 7 rows centered on current
+const VISIBLE_ROWS  = 7;
 const FONT_SIZE     = 11;
 const TEXT_Y        = 3;
+const CHAR_PX       = 8; // mono char width in pixels
 
-// Sub-column offsets within each channel
-const CH_TRACK_X = 6;
-const CH_TRANS_X = CH_TRACK_X + 3 * 8 + 8;  // 38 (3 chars + gap)
+const HEX = '0123456789abcdef';
+const DIGIT_COLS = 5; // per channel: track_hi, track_lo, sign, trans_hi, trans_lo
 
-// HivelyTracker palette (numeric)
-const HVL_BG        = 0x000000;
-const HVL_HEADER_BG = 0x111111;
-const HVL_HIGHLIGHT = 0x780000;
-const HVL_BORDER    = 0x333333;
-const HVL_COL_BORDER = 0x222222;
-const HVL_DIM       = 0x808080;
-const HVL_TEXT      = 0xffffff;
-const HVL_CURSOR    = 0xffff88;
-const HVL_TRANS_POS = 0x88ff88;
-const HVL_TRANS_NEG = 0xff8888;
-
-function formatTranspose(val: number): string {
-  if (val === 0) return '+00';
-  if (val > 0) return `+${val.toString(16).toUpperCase().padStart(2, '0')}`;
-  return `-${Math.abs(val).toString(16).toUpperCase().padStart(2, '0')}`;
+// Char offset within channel for each digit column
+function digitCharX(d: number): number {
+  // "XX +XX" → 0,1=track  2=space  3=sign  4,5=trans
+  if (d <= 1) return d;
+  if (d === 2) return 3;
+  if (d === 3) return 4;
+  return 5;
 }
 
-interface PositionEditorProps {
+const HVL_BG         = 0x000000;
+const HVL_HEADER_BG  = 0x111111;
+const HVL_HIGHLIGHT  = 0x780000;
+const HVL_BORDER     = 0x333333;
+const HVL_COL_BORDER = 0x222222;
+const HVL_DIM        = 0x808080;
+const HVL_TEXT       = 0xffffff;
+const HVL_CURSOR     = 0xffff88;
+const HVL_TRANS_POS  = 0x88ff88;
+const HVL_TRANS_NEG  = 0xff8888;
+
+interface Props {
   width: number;
   height: number;
   nativeData: HivelyNativeData;
@@ -57,22 +54,25 @@ interface PositionEditorProps {
   onFocusTrackEditor?: () => void;
 }
 
-export const PixiHivelyPositionEditor: React.FC<PositionEditorProps> = ({
+export const PixiHivelyPositionEditor: React.FC<Props> = ({
   width, height, nativeData, currentPosition,
   onPositionChange, onFocusTrackEditor,
 }) => {
-  const numChannels  = nativeData.channels;
-  const numPositions = nativeData.positions.length;
+  const numCh  = nativeData.channels;
+  const numPos = nativeData.positions.length;
 
-  const [cursorChan,  setCursorChan]  = useState(0);
-  const [cursorField, setCursorField] = useState<'track' | 'transpose'>('track');
-  const [focused,     setFocused]     = useState(false);
+  const [curCh,    setCurCh]    = useState(0);
+  const [curDigit, setCurDigit] = useState(0);
+  const [focused,  setFocused]  = useState(false);
+
+  const setCell   = useFormatStore(s => s.setHivelyPositionCell);
+  const insertPos = useFormatStore(s => s.insertHivelyPosition);
+  const deletePos = useFormatStore(s => s.deleteHivelyPosition);
 
   const containerRef = useRef<ContainerType>(null);
   const focusedRef   = useRef(false);
   focusedRef.current = focused;
 
-  // Clip content to component bounds
   useEffect(() => {
     const c = containerRef.current;
     if (!c) return;
@@ -82,52 +82,92 @@ export const PixiHivelyPositionEditor: React.FC<PositionEditorProps> = ({
     return () => { c.mask = null; m.destroy(); };
   }, [width, height]);
 
-  // Keyboard navigation
-  const stateRef = useRef({ currentPosition, cursorChan, cursorField, numChannels, numPositions });
-  stateRef.current = { currentPosition, cursorChan, cursorField, numChannels, numPositions };
+  const stateRef = useRef({ currentPosition, curCh, curDigit, numCh, numPos });
+  stateRef.current = { currentPosition, curCh, curDigit, numCh, numPos };
 
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
       if (!focusedRef.current) return;
-      const { currentPosition: cp, cursorChan: cc, cursorField: cf,
-              numChannels: nc, numPositions: np } = stateRef.current;
+      const { currentPosition: cp, curCh: cc, curDigit: cd, numCh: nc, numPos: np } = stateRef.current;
+
       switch (e.key) {
         case 'ArrowUp':
           e.preventDefault();
           onPositionChange?.(Math.max(0, cp - 1));
-          break;
+          return;
         case 'ArrowDown':
           e.preventDefault();
           onPositionChange?.(Math.min(np - 1, cp + 1));
-          break;
-        case 'ArrowLeft':
-          e.preventDefault();
-          if (cf === 'transpose') { setCursorField('track'); }
-          else if (cc > 0)        { setCursorChan(c => c - 1); setCursorField('transpose'); }
-          break;
+          return;
         case 'ArrowRight':
           e.preventDefault();
-          if (cf === 'track') { setCursorField('transpose'); }
-          else if (cc < nc - 1) { setCursorChan(c => c + 1); setCursorField('track'); }
-          break;
+          if (cd + 1 < DIGIT_COLS) setCurDigit(cd + 1);
+          else if (cc < nc - 1) { setCurCh(cc + 1); setCurDigit(0); }
+          return;
+        case 'ArrowLeft':
+          e.preventDefault();
+          if (cd - 1 >= 0) setCurDigit(cd - 1);
+          else if (cc > 0) { setCurCh(cc - 1); setCurDigit(DIGIT_COLS - 1); }
+          return;
         case 'Tab':
           e.preventDefault();
-          setCursorChan(c => e.shiftKey ? Math.max(0, c - 1) : Math.min(nc - 1, c + 1));
-          break;
+          if (e.shiftKey) { if (cc > 0) { setCurCh(cc - 1); setCurDigit(0); } }
+          else { if (cc < nc - 1) { setCurCh(cc + 1); setCurDigit(0); } }
+          return;
         case 'Enter':
           e.preventDefault();
           onFocusTrackEditor?.();
-          break;
+          return;
+        case 'Insert':
+          e.preventDefault();
+          insertPos(cp);
+          return;
       }
+
+      if (e.ctrlKey && e.key === 'Backspace') { e.preventDefault(); deletePos(cp); return; }
+
+      const p = nativeData.positions[cp];
+      if (!p) return;
+
+      // Sign column
+      if (cd === 2) {
+        if (e.key === '+' || e.key === '=' || e.key === '-') {
+          e.preventDefault();
+          const cur = p.transpose[cc];
+          setCell(cp, cc, 'transpose', e.key === '-' ? -Math.abs(cur || 1) : Math.abs(cur));
+          return;
+        }
+      }
+
+      // Hex digit
+      const hi = HEX.indexOf(e.key.toLowerCase());
+      if (hi < 0) return;
+      e.preventDefault();
+
+      if (cd <= 1) {
+        const cur = p.track[cc] ?? 0;
+        setCell(cp, cc, 'track', cd === 0 ? (hi << 4) | (cur & 0x0F) : (cur & 0xF0) | hi);
+      } else if (cd >= 3) {
+        const cur = p.transpose[cc] ?? 0;
+        const sign = cur < 0 ? -1 : 1;
+        const abs = Math.abs(cur);
+        const ni = cd - 3;
+        const newAbs = ni === 0 ? (hi << 4) | (abs & 0x0F) : (abs & 0xF0) | hi;
+        setCell(cp, cc, 'transpose', sign * newAbs);
+      }
+
+      // Move right, skip sign
+      const next = cd + 1;
+      if (next < DIGIT_COLS) setCurDigit(next === 2 ? 3 : next);
+      else if (cc < nc - 1) { setCurCh(cc + 1); setCurDigit(0); }
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [onPositionChange, onFocusTrackEditor]);
+  }, [onPositionChange, onFocusTrackEditor, nativeData, setCell, insertPos, deletePos]);
 
-  // Window of VISIBLE_ROWS centered on currentPosition
-  const halfVisible = Math.floor(VISIBLE_ROWS / 2);
-  const startPos    = Math.max(0, currentPosition - halfVisible);
-  const endPos      = Math.min(numPositions, startPos + VISIBLE_ROWS);
+  const halfVis  = Math.floor(VISIBLE_ROWS / 2);
+  const startPos = Math.max(0, currentPosition - halfVis);
+  const endPos   = Math.min(numPos, startPos + VISIBLE_ROWS);
 
   const handlePointerDown = useCallback((e: FederatedPointerEvent) => {
     setFocused(true);
@@ -135,21 +175,23 @@ export const PixiHivelyPositionEditor: React.FC<PositionEditorProps> = ({
     if (!c) return;
     const local = c.toLocal(e.global);
     if (local.y < HEADER_HEIGHT) return;
-    const rowIdx = Math.floor((local.y - HEADER_HEIGHT) / ROW_HEIGHT);
-    const pos = startPos + rowIdx;
-    if (pos >= 0 && pos < numPositions) onPositionChange?.(pos);
-    const lx = local.x;
-    if (lx >= POS_COL_WIDTH) {
-      const ch = Math.floor((lx - POS_COL_WIDTH) / CHAN_COL_WIDTH);
-      if (ch >= 0 && ch < numChannels) {
-        const rel = lx - (POS_COL_WIDTH + ch * CHAN_COL_WIDTH);
-        setCursorChan(ch);
-        setCursorField(rel < CH_TRANS_X ? 'track' : 'transpose');
+    const row = Math.floor((local.y - HEADER_HEIGHT) / ROW_HEIGHT);
+    const pos = startPos + row;
+    if (pos >= 0 && pos < numPos) onPositionChange?.(pos);
+    if (local.x >= POS_COL_WIDTH) {
+      const ch = Math.floor((local.x - POS_COL_WIDTH) / CHAN_COL_WIDTH);
+      if (ch >= 0 && ch < numCh) {
+        setCurCh(ch);
+        const rel = local.x - (POS_COL_WIDTH + ch * CHAN_COL_WIDTH);
+        const ci = Math.floor(rel / CHAR_PX);
+        if (ci <= 1) setCurDigit(ci);
+        else if (ci === 3) setCurDigit(2);
+        else if (ci >= 4) setCurDigit(ci <= 4 ? 3 : 4);
+        else setCurDigit(0);
       }
     }
-  }, [startPos, numPositions, numChannels, onPositionChange]);
+  }, [startPos, numPos, numCh, onPositionChange]);
 
-  // Draw all backgrounds, current position highlight, cursor, borders
   const drawBg = useCallback((g: GraphicsType) => {
     g.clear();
     g.rect(0, 0, width, height).fill({ color: HVL_BG });
@@ -158,99 +200,61 @@ export const PixiHivelyPositionEditor: React.FC<PositionEditorProps> = ({
 
     for (let i = 0; i < endPos - startPos; i++) {
       const pos = startPos + i;
-      const y   = HEADER_HEIGHT + i * ROW_HEIGHT;
+      const y = HEADER_HEIGHT + i * ROW_HEIGHT;
       if (pos === currentPosition) {
         g.rect(0, y, width, ROW_HEIGHT).fill({ color: HVL_HIGHLIGHT });
+        // Per-digit cursor
+        const cx = POS_COL_WIDTH + curCh * CHAN_COL_WIDTH + 6 + digitCharX(curDigit) * CHAR_PX;
+        g.rect(cx, y, CHAR_PX, ROW_HEIGHT).fill({ color: HVL_CURSOR, alpha: 0.4 });
       }
     }
 
-    // Cursor field highlight (only on current position row)
-    const curRowIdx = currentPosition - startPos;
-    if (curRowIdx >= 0 && curRowIdx < VISIBLE_ROWS) {
-      const curY    = HEADER_HEIGHT + curRowIdx * ROW_HEIGHT;
-      const chBaseX = POS_COL_WIDTH + cursorChan * CHAN_COL_WIDTH;
-      const fx      = cursorField === 'track' ? CH_TRACK_X : CH_TRANS_X;
-      const fw      = cursorField === 'track' ? 3 * 8 : 3 * 8;
-      g.rect(chBaseX + fx, curY, fw, ROW_HEIGHT).fill({ color: HVL_CURSOR, alpha: 0.25 });
-    }
-
-    // Column borders
-    for (let ch = 0; ch <= numChannels; ch++) {
+    for (let ch = 0; ch <= numCh; ch++) {
       const bx = POS_COL_WIDTH + ch * CHAN_COL_WIDTH;
-      if (bx < width) {
-        g.rect(bx, 0, 1, height).fill({ color: HVL_COL_BORDER });
-      }
+      if (bx < width) g.rect(bx, 0, 1, height).fill({ color: HVL_COL_BORDER });
     }
-  }, [width, height, startPos, endPos, currentPosition, cursorChan, cursorField, numChannels]);
+  }, [width, height, startPos, endPos, currentPosition, curCh, curDigit, numCh]);
 
-  // All text labels
   const cellLabels = useMemo(() => {
     const labels: { x: number; y: number; text: string; color: number }[] = [];
 
-    // Header
     labels.push({ x: 4, y: TEXT_Y, text: 'Pos', color: HVL_DIM });
-    for (let ch = 0; ch < numChannels; ch++) {
+    for (let ch = 0; ch < numCh; ch++) {
       const chX = POS_COL_WIDTH + ch * CHAN_COL_WIDTH;
       if (chX >= width) break;
       labels.push({ x: chX + 4, y: TEXT_Y, text: `CH ${ch}`, color: HVL_DIM });
     }
 
-    // Position rows
     for (let i = 0; i < endPos - startPos; i++) {
       const pos = startPos + i;
-      const y   = HEADER_HEIGHT + i * ROW_HEIGHT + TEXT_Y;
+      const y = HEADER_HEIGHT + i * ROW_HEIGHT + TEXT_Y;
       if (y + FONT_SIZE > height) break;
+      const isCur = pos === currentPosition;
+      const p = nativeData.positions[pos];
 
-      const isCurrent  = pos === currentPosition;
-      const position   = nativeData.positions[pos];
+      labels.push({ x: 4, y, text: `${isCur ? '>' : ' '}${pos.toString().padStart(2, '0')}`, color: isCur ? HVL_CURSOR : HVL_DIM });
+      if (!p) continue;
 
-      // Position number with '>' indicator
-      labels.push({
-        x: 4, y,
-        text: `${isCurrent ? '>' : ' '}${pos.toString().padStart(2, '0')}`,
-        color: isCurrent ? HVL_CURSOR : HVL_DIM,
-      });
-
-      if (!position) continue;
-      for (let ch = 0; ch < numChannels; ch++) {
-        const chX      = POS_COL_WIDTH + ch * CHAN_COL_WIDTH;
+      for (let ch = 0; ch < numCh; ch++) {
+        const chX = POS_COL_WIDTH + ch * CHAN_COL_WIDTH;
         if (chX >= width) break;
-        const trackIdx = position.track[ch] ?? 0;
-        const transpose = position.transpose[ch] ?? 0;
+        const trk = p.track[ch] ?? 0;
+        const tr = p.transpose[ch] ?? 0;
+        const sign = tr >= 0 ? '+' : '-';
+        const trAbs = Math.abs(tr).toString(16).toUpperCase().padStart(2, '0');
 
-        labels.push({
-          x: chX + CH_TRACK_X, y,
-          text: trackIdx.toString().padStart(3, '0'),
-          color: HVL_TEXT,
-        });
-        labels.push({
-          x: chX + CH_TRANS_X, y,
-          text: formatTranspose(transpose),
-          color: transpose === 0 ? HVL_DIM : (transpose > 0 ? HVL_TRANS_POS : HVL_TRANS_NEG),
-        });
+        labels.push({ x: chX + 6, y, text: trk.toString(16).toUpperCase().padStart(2, '0'), color: HVL_TEXT });
+        labels.push({ x: chX + 6 + 3 * CHAR_PX, y, text: `${sign}${trAbs}`, color: tr === 0 ? HVL_DIM : (tr > 0 ? HVL_TRANS_POS : HVL_TRANS_NEG) });
       }
     }
-
     return labels;
-  }, [nativeData, numChannels, startPos, endPos, currentPosition, width, height]);
+  }, [nativeData, numCh, startPos, endPos, currentPosition, width, height]);
 
   return (
-    <pixiContainer
-      ref={containerRef}
-      layout={{ width, height }}
-      eventMode="static"
-      onPointerDown={handlePointerDown}
-    >
+    <pixiContainer ref={containerRef} layout={{ width, height }} eventMode="static" onPointerDown={handlePointerDown}>
       <pixiGraphics draw={drawBg} layout={{ position: 'absolute', width, height }} />
       {cellLabels.map((l, i) => (
-        <pixiBitmapText
-          key={i}
-          text={l.text}
-          style={{ fontFamily: PIXI_FONTS.MONO, fontSize: FONT_SIZE, fill: 0xffffff }}
-          tint={l.color}
-          x={l.x}
-          y={l.y}
-        />
+        <pixiBitmapText key={i} text={l.text} style={{ fontFamily: PIXI_FONTS.MONO, fontSize: FONT_SIZE, fill: 0xffffff }} tint={l.color} x={l.x} y={l.y} />
       ))}
     </pixiContainer>
   );

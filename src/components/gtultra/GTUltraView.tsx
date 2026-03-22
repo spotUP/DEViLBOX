@@ -74,7 +74,6 @@ export const GTUltraView: React.FC<{ width?: number; height?: number }> = ({ wid
       gtEngine = new GTUltraEngine(audioCtx, {
         onReady: () => {
           if (disposed) return;
-          console.log('[GTUltra] Engine ready');
           setEngine(gtEngine);
           const store = useGTUltraStore.getState();
           if (store.pendingSongData) {

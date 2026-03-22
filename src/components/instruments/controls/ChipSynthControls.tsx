@@ -91,13 +91,10 @@ export const ChipSynthControls: React.FC<ChipSynthControlsProps> = ({
         });
 
         files.sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' }));
-        console.log(`🎹 ROM: Extracting ${files.length} files from ZIP starting at bank ${bank}...`);
-
         for (let i = 0; i < files.length; i++) {
           const targetBank = bank + i;
           const fileData = await files[i].entry.async('uint8array');
           onRomUpload(targetBank, fileData);
-          console.log(`🎹 ROM: Loaded ${files[i].name} into bank ${targetBank} (${fileData.length} bytes)`);
         }
 
         onParamChange('_romsLoaded', 1);
@@ -109,7 +106,6 @@ export const ChipSynthControls: React.FC<ChipSynthControlsProps> = ({
       const data = new Uint8Array(buffer);
       onRomUpload(bank, data);
       onParamChange('_romsLoaded', 1);
-      console.log(`🎹 ROM: Loaded ROM bank ${bank} (${data.length} bytes)`);
     }
 
     // Reset the input so the same file can be re-uploaded

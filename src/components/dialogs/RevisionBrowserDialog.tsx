@@ -57,7 +57,7 @@ export const RevisionBrowserDialog: React.FC<RevisionBrowserDialogProps> = ({ is
 
   return (
     <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-[9999]">
-      <div className="bg-dark-bgPrimary border border-dark-border rounded-lg w-[440px] max-h-[520px] flex flex-col">
+      <div className="bg-dark-bgPrimary border border-dark-border rounded-lg w-full max-w-[90vw] md:max-w-[440px] max-h-[520px] overflow-hidden flex flex-col">
         {/* Header */}
         <div className="flex items-center justify-between px-4 py-3 border-b border-dark-border">
           <div className="flex items-center gap-2">
