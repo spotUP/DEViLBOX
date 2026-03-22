@@ -46,7 +46,7 @@ import { SettingsModal } from '@components/dialogs/SettingsModal';
 
 import { ImportModuleDialog, type ImportOptions } from '@components/dialogs/ImportModuleDialog';
 import { FileBrowser } from '@components/dialogs/FileBrowser';
-import { importSong, exportSong } from '@lib/export/exporters';
+import { importSong, exportSong, getOriginalModuleDataForExport } from '@lib/export/exporters';
 import { isSupportedModule, getSupportedExtensions, type ModuleInfo } from '@lib/import/ModuleLoader';
 import { useModuleImport } from '@hooks/tracker/useModuleImport';
 import { importMIDIFile, isMIDIFile, getSupportedMIDIExtensions } from '@lib/import/MIDIImporter';
@@ -288,7 +288,8 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = React.memo(({
 
   const handleSave = () => {
     try {
-      const sequence = patterns.map((p) => p.id);
+      const { patternOrder } = useTrackerStore.getState();
+      const sequence = patternOrder.map(idx => patterns[idx]?.id).filter(Boolean);
       const automationData: Record<string, Record<number, Record<string, unknown>>> = {};
       patterns.forEach((pattern) => {
         pattern.channels.forEach((_channel, channelIndex) => {
@@ -323,7 +324,9 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = React.memo(({
         curves.length > 0 ? curves : undefined,
         { prettify: true },
         grooveTemplateId,
-        { speed, trackerFormat, linearPeriods }
+        { speed, trackerFormat, linearPeriods },
+        patternOrder,
+        getOriginalModuleDataForExport(),
       );
       notify.success('Song downloaded!', 2000);
     } catch (error) {

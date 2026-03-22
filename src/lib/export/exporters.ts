@@ -8,6 +8,146 @@ import type { InstrumentConfig, EffectConfig } from '@typedefs/instrument';
 import type { ProjectMetadata } from '@typedefs/project';
 import { APP_VERSION } from '@constants/version';
 import type { AutomationCurve } from '@typedefs/automation';
+import { useFormatStore } from '@stores/useFormatStore';
+
+// ── Binary FileData field names in useFormatStore ──
+// These are all the ArrayBuffer/Uint8Array fields that carry native engine data.
+const BINARY_FILE_DATA_FIELDS = [
+  'hivelyFileData', 'klysFileData', 'musiclineFileData', 'c64SidFileData',
+  'goatTrackerData', 'jamCrackerFileData', 'futurePlayerFileData', 'preTrackerFileData',
+  'maFileData', 'hippelFileData', 'sonixFileData', 'pxtoneFileData', 'organyaFileData',
+  'eupFileData', 'ixsFileData', 'psycleFileData', 'sc68FileData', 'zxtuneFileData',
+  'pumaTrackerFileData', 'steveTurnerFileData', 'sidmon1WasmFileData',
+  'fredEditorWasmFileData', 'artOfNoiseFileData', 'startrekkerAMFileData',
+  'bdFileData', 'sd2FileData', 'symphonieFileData', 'uadeEditableFileData',
+  'libopenmptFileData',
+] as const;
+
+/** Encode an ArrayBuffer or Uint8Array to base64 */
+function bufferToBase64(buf: ArrayBuffer | Uint8Array): string {
+  const bytes = buf instanceof Uint8Array ? buf : new Uint8Array(buf);
+  let binary = '';
+  for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
+  return btoa(binary);
+}
+
+/** Decode base64 to ArrayBuffer */
+export function base64ToBuffer(b64: string): ArrayBuffer {
+  const binary = atob(b64);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+  return bytes.buffer;
+}
+
+/**
+ * Get the original module data for saving in .dbx files.
+ * Prefers the already-encoded originalModuleData from format store,
+ * falls back to encoding libopenmptFileData (ArrayBuffer) to base64.
+ */
+export function getOriginalModuleDataForExport(): { base64: string; format: string; sourceFile?: string } | null {
+  const { originalModuleData, libopenmptFileData } = useFormatStore.getState();
+  if (originalModuleData?.base64) return originalModuleData;
+  if (libopenmptFileData) {
+    const bytes = new Uint8Array(libopenmptFileData);
+    // Detect format from magic bytes
+    let format = 'UNKNOWN';
+    if (bytes.length > 60) {
+      const magic4 = String.fromCharCode(bytes[0], bytes[1], bytes[2], bytes[3]);
+      if (magic4 === 'IMPM') format = 'IT';
+      else if (bytes[44] === 0x53 && bytes[45] === 0x43 && bytes[46] === 0x52 && bytes[47] === 0x4D) format = 'S3M';
+      else {
+        const xmSig = String.fromCharCode(...bytes.slice(0, 17));
+        if (xmSig === 'Extended Module: ') format = 'XM';
+        else if (bytes.length > 1083) {
+          const modId = String.fromCharCode(bytes[1080], bytes[1081], bytes[1082], bytes[1083]);
+          if (['M.K.', 'M!K!', 'FLT4', 'FLT8', '4CHN', '6CHN', '8CHN'].includes(modId)) format = 'MOD';
+        }
+      }
+    }
+    return { base64: bufferToBase64(libopenmptFileData), format };
+  }
+  return null;
+}
+
+/**
+ * Collect all native engine binary data from the format store as base64.
+ * Returns a map of { fieldName: base64String } for all non-null FileData fields.
+ */
+export function getNativeEngineDataForExport(): Record<string, string> | null {
+  const state = useFormatStore.getState() as unknown as Record<string, unknown>;
+  const result: Record<string, string> = {};
+  for (const field of BINARY_FILE_DATA_FIELDS) {
+    const val = state[field];
+    if (val && (val instanceof ArrayBuffer || val instanceof Uint8Array)) {
+      result[field] = bufferToBase64(val as ArrayBuffer | Uint8Array);
+    }
+  }
+  return Object.keys(result).length > 0 ? result : null;
+}
+
+/**
+ * Collect JSON-serializable native engine metadata for saving.
+ */
+export function getNativeEngineMetaForExport(): Record<string, unknown> | null {
+  const state = useFormatStore.getState();
+  const result: Record<string, unknown> = {};
+  if (state.furnaceNative) result.furnaceNative = state.furnaceNative;
+  if (state.hivelyNative) result.hivelyNative = state.hivelyNative;
+  if (state.klysNative) result.klysNative = state.klysNative;
+  if (state.hivelyMeta) result.hivelyMeta = state.hivelyMeta;
+  if (state.furnaceSubsongs) result.furnaceSubsongs = state.furnaceSubsongs;
+  if (state.furnaceActiveSubsong) result.furnaceActiveSubsong = state.furnaceActiveSubsong;
+  if (state.channelTrackTables) result.channelTrackTables = state.channelTrackTables;
+  if (state.channelSpeeds) result.channelSpeeds = state.channelSpeeds;
+  if (state.channelGrooves) result.channelGrooves = state.channelGrooves;
+  if (state.uadeEditableFileName) result.uadeEditableFileName = state.uadeEditableFileName;
+  if (state.uadeEditableSubsongs) result.uadeEditableSubsongs = state.uadeEditableSubsongs;
+  if (state.editorMode !== 'classic') result.editorMode = state.editorMode;
+  return Object.keys(result).length > 0 ? result : null;
+}
+
+/**
+ * Restore native engine data into format store from saved .dbx data.
+ * Decodes base64 binaries, reconstructs a song-like object, and calls applyEditorMode.
+ */
+export function restoreNativeEngineData(
+  nativeEngineData: Record<string, string> | undefined,
+  nativeEngineMeta: Record<string, unknown> | undefined,
+  linearPeriods?: boolean,
+): void {
+  if (!nativeEngineData && !nativeEngineMeta) return;
+
+  // Build a song-like object for applyEditorMode
+  const songObj: Record<string, unknown> = { linearPeriods: linearPeriods ?? false };
+
+  // Decode binary fields
+  if (nativeEngineData) {
+    for (const [field, b64] of Object.entries(nativeEngineData)) {
+      const buf = base64ToBuffer(b64);
+      // c64SidFileData, goatTrackerData, musiclineFileData are Uint8Array in the store
+      if (field === 'c64SidFileData' || field === 'goatTrackerData' || field === 'musiclineFileData') {
+        songObj[field] = new Uint8Array(buf);
+      } else {
+        songObj[field] = buf;
+      }
+    }
+  }
+
+  // Copy JSON-serializable metadata
+  if (nativeEngineMeta) {
+    for (const [key, val] of Object.entries(nativeEngineMeta)) {
+      if (key !== 'editorMode') {
+        songObj[key] = val;
+      }
+    }
+  }
+
+  const fmtStore = useFormatStore.getState();
+  fmtStore.applyEditorMode(songObj as any);
+
+  // Restore originalModuleData separately (not handled by applyEditorMode)
+  // This is already handled by the caller if present
+}
 
 // Export Format Types
 export interface SongExport {
@@ -18,6 +158,7 @@ export interface SongExport {
   instruments: InstrumentConfig[];
   patterns: Pattern[];
   sequence: string[]; // Pattern IDs in playback order
+  patternOrder?: number[]; // Actual playback order (may have repeats)
   automation?: Record<string, unknown>; // Legacy nested format or array of curves
   automationCurves?: AutomationCurve[]; // New: flat array of all automation curves
   masterEffects?: EffectConfig[]; // Global effects chain
@@ -26,6 +167,9 @@ export interface SongExport {
   trackerFormat?: string; // 'MOD' | 'XM' | 'IT' | 'S3M' | etc.
   linearPeriods?: boolean; // XM linear frequency mode
   restartPosition?: number; // Song loop point
+  originalModuleData?: { base64: string; format: string; sourceFile?: string }; // Original module for libopenmpt playback
+  nativeEngineData?: Record<string, string>; // Base64-encoded binary FileData for native WASM engines
+  nativeEngineMeta?: Record<string, unknown>; // JSON-serializable native engine metadata
 }
 
 export interface SFXExport {
@@ -62,7 +206,9 @@ export function exportSong(
   automationCurves: AutomationCurve[] | undefined,
   options: ExportOptions = {},
   grooveTemplateId?: string,
-  playbackState?: { speed?: number; trackerFormat?: string; linearPeriods?: boolean; restartPosition?: number }
+  playbackState?: { speed?: number; trackerFormat?: string; linearPeriods?: boolean; restartPosition?: number },
+  patternOrder?: number[],
+  originalModuleData?: { base64: string; format: string; sourceFile?: string } | null,
 ): void {
   const songData: SongExport = {
     format: 'devilbox-song',
@@ -72,6 +218,8 @@ export function exportSong(
     instruments,
     patterns,
     sequence,
+    // Actual playback order (may have repeats — sequence is just unique pattern IDs)
+    ...(patternOrder && patternOrder.length > 0 ? { patternOrder } : {}),
     // Always include automation data (both formats for compatibility)
     ...(automation && Object.keys(automation).length > 0 ? { automation } : {}),
     ...(automationCurves && automationCurves.length > 0 ? { automationCurves } : {}),
@@ -83,6 +231,17 @@ export function exportSong(
     ...(playbackState?.trackerFormat ? { trackerFormat: playbackState.trackerFormat } : {}),
     ...(playbackState?.linearPeriods ? { linearPeriods: playbackState.linearPeriods } : {}),
     ...(playbackState?.restartPosition ? { restartPosition: playbackState.restartPosition } : {}),
+    // Original module data for libopenmpt-based playback roundtrip
+    ...(originalModuleData?.base64 ? { originalModuleData } : {}),
+    // Native engine binary data (all WASM engine formats)
+    ...(() => {
+      const ned = getNativeEngineDataForExport();
+      return ned ? { nativeEngineData: ned } : {};
+    })(),
+    ...(() => {
+      const nem = getNativeEngineMetaForExport();
+      return nem ? { nativeEngineMeta: nem } : {};
+    })(),
   };
 
   const json = options.prettify

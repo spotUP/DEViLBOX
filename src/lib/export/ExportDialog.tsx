@@ -16,6 +16,7 @@ import {
   importSFX,
   importInstrument,
   detectFileFormat,
+  getOriginalModuleDataForExport,
   type ExportOptions,
 } from './exporters';
 import { NanoExporter } from './NanoExporter';
@@ -97,7 +98,8 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({ isOpen, onClose }) =
     try {
       switch (exportMode) {
         case 'song': {
-          const sequence = patterns.map((p) => p.id);
+          const { patternOrder } = useTrackerStore.getState();
+          const sequence = patternOrder.map(idx => patterns[idx]?.id).filter(Boolean);
           // Convert automation curves to export format (nested structure for legacy compat)
           const automationData: Record<string, Record<number, Record<string, AutomationCurve>>> = {};
           patterns.forEach((pattern) => {
@@ -134,7 +136,9 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({ isOpen, onClose }) =
             curves, // Pass the flat array of curves
             options,
             undefined,
-            { speed, trackerFormat, linearPeriods }
+            { speed, trackerFormat, linearPeriods },
+            patternOrder,
+            getOriginalModuleDataForExport(),
           );
           break;
         }

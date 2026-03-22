@@ -9,12 +9,13 @@
  */
 
 import { useEffect, useCallback, useRef } from 'react';
-import { useTrackerStore, useInstrumentStore, useProjectStore, useTransportStore, useAutomationStore, useAudioStore, useEditorStore } from '@stores';
+import { useTrackerStore, useInstrumentStore, useProjectStore, useTransportStore, useAutomationStore, useAudioStore, useEditorStore, useFormatStore } from '@stores';
 import { useArrangementStore } from '@stores/useArrangementStore';
 import type { AutomationCurve } from '@typedefs/automation';
 import type { EffectConfig } from '@typedefs/instrument';
 import type { ArrangementSnapshot } from '@typedefs/arrangement';
 import { needsMigration, migrateProject } from '@/lib/migration';
+import { getOriginalModuleDataForExport, getNativeEngineDataForExport, getNativeEngineMetaForExport, restoreNativeEngineData } from '@/lib/export/exporters';
 
 
 const AUTO_SAVE_INTERVAL = 30000; // 30 seconds
@@ -129,6 +130,9 @@ interface SavedProject {
   trackerFormat?: string;
   linearPeriods?: boolean;
   restartPosition?: number;
+  originalModuleData?: { base64: string; format: string; sourceFile?: string };
+  nativeEngineData?: Record<string, string>;
+  nativeEngineMeta?: Record<string, unknown>;
 }
 
 // ============================================================================
@@ -359,6 +363,18 @@ function buildSavedProject(): SavedProject {
     ...(transportState.speed !== 6 ? { speed: transportState.speed } : {}),
     ...(trackerFormat ? { trackerFormat } : {}),
     ...(editorState.linearPeriods ? { linearPeriods: editorState.linearPeriods } : {}),
+    ...(() => {
+      const omd = getOriginalModuleDataForExport();
+      return omd ? { originalModuleData: omd } : {};
+    })(),
+    ...(() => {
+      const ned = getNativeEngineDataForExport();
+      return ned ? { nativeEngineData: ned } : {};
+    })(),
+    ...(() => {
+      const nem = getNativeEngineMetaForExport();
+      return nem ? { nativeEngineMeta: nem } : {};
+    })(),
   };
 }
 
@@ -479,6 +495,12 @@ export async function loadProjectFromStorage(): Promise<boolean> {
       } as typeof p0.importMetadata;
     }
 
+    // Restore native engine data (all WASM formats)
+    restoreNativeEngineData(project.nativeEngineData, project.nativeEngineMeta, project.linearPeriods);
+    if (project.originalModuleData?.base64) {
+      useFormatStore.getState().setOriginalModuleData(project.originalModuleData as any);
+    }
+
     instrumentStore.autoBakeInstruments();
     projectStore.markAsSaved();
     // Restoring user's own saved project — auto-save is safe
@@ -581,6 +603,12 @@ export async function loadProjectFromObject(data: unknown): Promise<boolean> {
       } as typeof p0.importMetadata;
     }
 
+    // Restore native engine data (all WASM formats)
+    restoreNativeEngineData(project.nativeEngineData, project.nativeEngineMeta, project.linearPeriods);
+    if (project.originalModuleData?.base64) {
+      useFormatStore.getState().setOriginalModuleData(project.originalModuleData as any);
+    }
+
     instrumentStore.autoBakeInstruments();
     projectStore.markAsSaved();
     return true;
@@ -654,6 +682,12 @@ export async function loadLocalRevision(key: number): Promise<boolean> {
         ...p0.importMetadata,
         sourceFormat: project.trackerFormat,
       } as typeof p0.importMetadata;
+    }
+
+    // Restore native engine data (all WASM formats)
+    restoreNativeEngineData(project.nativeEngineData, project.nativeEngineMeta, project.linearPeriods);
+    if (project.originalModuleData?.base64) {
+      useFormatStore.getState().setOriginalModuleData(project.originalModuleData as any);
     }
 
     instrumentStore.autoBakeInstruments();
