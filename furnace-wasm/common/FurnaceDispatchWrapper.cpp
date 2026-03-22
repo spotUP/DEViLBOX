@@ -1010,7 +1010,7 @@ struct CmdLogEntry {
 
 static std::vector<CmdLogEntry> g_cmdLog;
 static bool g_cmdLogEnabled = false;
-static int g_cmdLogTick = -1; // -1 so first tick() increments to 0 (matches upstream totalTicksR)
+static int g_cmdLogTick = 0; // Incremented AFTER processing (matches upstream totalTicksR)
 static int g_pendingGlobalChan = -1; // Set by sequencer before dispatch for accurate cmdlog channel
 
 EMSCRIPTEN_KEEPALIVE
@@ -1018,7 +1018,7 @@ void furnace_cmd_log_enable(int enable) {
   g_cmdLogEnabled = (enable != 0);
   if (enable) {
     g_cmdLog.clear();
-    g_cmdLogTick = -1;
+    g_cmdLogTick = 0;
   }
 }
 

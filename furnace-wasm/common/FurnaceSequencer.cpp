@@ -2379,8 +2379,9 @@ static bool seqNextTick() {
           int loopModality = getLoopModality();
           if (loopModality != 2) {
             // Reset channels on loop (matches Furnace playSub(true) → reset())
+            // Note: reference does NOT dispatch NOTE_OFF here — it calls dispatch->reset()
+            // internally. We only reset the sequencer channel state.
             for (int c = 0; c < g_seq.numChannels; c++) {
-              dispatchCmd(DIV_CMD_NOTE_OFF, c);
               g_seq.chan[c].reset();
               int vm = dispatchCmd(DIV_CMD_GET_VOLMAX, c);
               if (vm > 0) {
@@ -2411,10 +2412,6 @@ static bool seqNextTick() {
           // Track loop count
           if (g_seq.remainingLoops > 0) {
             g_seq.remainingLoops--;
-            if (g_seq.remainingLoops <= 0) {
-              g_seq.playing = false;
-              break;
-            }
           }
           g_seq.totalLoops++;
         }
@@ -2426,7 +2423,15 @@ static bool seqNextTick() {
           g_seq.prevRow = g_seq.curRow;
         }
 
+        // Process the first row of the loop (dispatches NOTE_ON etc.)
+        // This must happen BEFORE the stop check so the loop's first row
+        // is included in the command log (matching reference Furnace behavior).
         seqNextRow();
+
+        // Stop after processing the loop's first row
+        if (g_seq.remainingLoops <= 0 && g_seq.remainingLoops != -1) {
+          g_seq.playing = false;
+        }
         break;
       }
     }
@@ -3012,8 +3017,9 @@ EMSCRIPTEN_KEEPALIVE
 int furnace_seq_tick(void) {
   if (!g_seq.playing || g_seq.halted) return (g_seq.curOrder << 16) | g_seq.curRow;
 
-  furnace_cmd_log_tick();
   seqNextTick();
+  // Increment tick counter AFTER processing (matches reference playback.cpp:2595)
+  furnace_cmd_log_tick();
 
   // halt engine if requested (debug menu)
   if (g_seq.haltOn == 3) g_seq.halted = true;

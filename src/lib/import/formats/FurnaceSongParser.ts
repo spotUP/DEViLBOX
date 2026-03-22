@@ -846,8 +846,15 @@ const CHIP_DEFAULT_INS_TYPE: Record<number, number> = {
 const CHIP_CHANNELS: Record<number, number> = {
   0x00: 0,    // End of list
   0x01: 17,   // YMU759
-  0x02: 10,   // Genesis (compound - should be flattened)
+  0x02: 10,   // Genesis (compound)
   0x03: 4,    // SN76489/SMS
+  // Compound systems (old format < v119 stores these as single system IDs)
+  0x08: 13,   // Arcade (compound: YM2151 + SegaPCM)
+  0x09: 13,   // YM2610_CRAP (compound)
+  0x42: 13,   // Genesis Extended (compound: YM2612_EXT + SMS)
+  0x43: 13,   // SMS_OPLL (compound: SMS + OPLL)
+  0x46: 11,   // NES_VRC7 (compound: NES + VRC7)
+  0x49: 16,   // YM2610_CRAP_EXT (compound)
   0x04: 4,    // Game Boy
   0x05: 6,    // PC Engine
   0x06: 5,    // NES
@@ -885,7 +892,7 @@ const CHIP_CHANNELS: Record<number, number> = {
   0x9d: 6,    // VRC7
   0x9e: 16,   // YM2610B
   0x9f: 6,    // ZX Beeper SFX
-  0xa0: 9,    // YM2612 extended
+  0xa0: 9,    // YM2612 extended (sysDef says 9; dispatch creates 13 but order table uses 9)
   0xa1: 5,    // SCC
   0xa2: 11,   // OPL drums
   0xa3: 11,   // OPL2 drums
