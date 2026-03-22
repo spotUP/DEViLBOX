@@ -13,6 +13,7 @@ import type { ModularModuleInstance, PortRef } from '../../../../../types/modula
 import { ModuleRegistry } from '../../../../../engine/modular/ModuleRegistry';
 import { JackPort } from './JackPort';
 import { Knob } from '../../../../controls/Knob';
+import { ModuleScopeCanvas } from './ModuleScopeCanvas';
 
 interface RackStripProps {
   module: ModularModuleInstance;
@@ -26,6 +27,8 @@ interface RackStripProps {
   onPortHover: (portRef: PortRef | null) => void;
   onParameterChange: (moduleId: string, paramId: string, value: number) => void;
   registerPortPosition: (portId: string, element: HTMLElement | null) => void;
+  svModuleId?: number;
+  isPlaying?: boolean;
 }
 
 export const RackStrip: React.FC<RackStripProps> = ({
@@ -40,6 +43,8 @@ export const RackStrip: React.FC<RackStripProps> = ({
   onPortHover,
   onParameterChange,
   registerPortPosition,
+  svModuleId = -1,
+  isPlaying = false,
 }) => {
   const [isCollapsed, setIsCollapsed] = useState(module.collapsed || false);
 
@@ -119,6 +124,16 @@ export const RackStrip: React.FC<RackStripProps> = ({
         <span className="flex-1 text-xs font-bold text-text-primary uppercase tracking-wider truncate drop-shadow-md">
           {module.label || descriptor.name}
         </span>
+
+        {/* Inline oscilloscope */}
+        {svModuleId >= 0 && (
+          <ModuleScopeCanvas
+            svModuleId={svModuleId}
+            isPlaying={isPlaying}
+            width={80}
+            height={24}
+          />
+        )}
 
         {/* Delete button */}
         <button

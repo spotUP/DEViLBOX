@@ -12,6 +12,7 @@ import type { InstrumentConfig } from '@/types/instrument';
 import type { ModularPatchConfig } from '@/types/modular';
 import { DEFAULT_SUNVOX_MODULAR_PATCH } from '@/types/instrument/defaults';
 import { registerSunVoxModules } from '@/engine/sunvox-modular/SunVoxModuleDescriptors';
+import { useTransportStore } from '@/stores/useTransportStore';
 import type { SunVoxModularSynth } from '@/engine/sunvox-modular/SunVoxModularSynth';
 import { ModularToolbar } from './ModularToolbar';
 import { ModularRackView } from './views/ModularRackView';
@@ -29,6 +30,7 @@ interface SunVoxModularEditorProps {
 export const SunVoxModularEditor: React.FC<SunVoxModularEditorProps> = ({ config, onChange }) => {
   const patchConfig = config.sunvoxModular || DEFAULT_SUNVOX_MODULAR_PATCH;
   const prevPatchRef = useRef<ModularPatchConfig>(patchConfig);
+  const isPlaying = useTransportStore(s => s.isPlaying);
 
   // Sync UI patch changes to the live SunVoxModularSynth
   const configRef = useRef(config);
@@ -86,7 +88,7 @@ export const SunVoxModularEditor: React.FC<SunVoxModularEditorProps> = ({ config
 
       <div className="flex-1 overflow-hidden">
         {patchConfig.viewMode === 'rack' && (
-          <ModularRackView config={patchConfig} onChange={handlePatchChange} />
+          <ModularRackView config={patchConfig} onChange={handlePatchChange} isPlaying={isPlaying} />
         )}
         {patchConfig.viewMode === 'canvas' && (
           <ModularCanvasView config={patchConfig} onChange={handlePatchChange} />
@@ -101,6 +103,51 @@ export const SunVoxModularEditor: React.FC<SunVoxModularEditorProps> = ({ config
         <span>Modules: {patchConfig.modules.length}</span>
         <span>Connections: {patchConfig.connections.length}</span>
         <div className="flex-1" />
+        <button
+          onClick={async () => {
+            try {
+              const input = document.createElement('input');
+              input.type = 'file';
+              input.accept = '.sunsynth';
+              input.onchange = async () => {
+                const file = input.files?.[0];
+                if (!file) return;
+                const buffer = await file.arrayBuffer();
+                const { getToneEngine } = await import('@/engine/ToneEngine');
+                const synth = getToneEngine().getInstrument(configRef.current.id, configRef.current) as SunVoxModularSynth | null;
+                if (!synth || !('loadSunsynthModule' in synth)) return;
+                const moduleId = await synth.loadSunsynthModule(buffer);
+                if (moduleId >= 0) {
+                  const graph = await synth.getModuleGraph();
+                  const newMod = graph.find(m => m.id === moduleId);
+                  if (newMod) {
+                    const uiId = `sv_m${moduleId}`;
+                    const newModule = {
+                      id: uiId,
+                      descriptorId: `sv_${newMod.typeName.toLowerCase().replace(/\s+/g, '_')}`,
+                      label: newMod.name || newMod.typeName,
+                      parameters: {} as Record<string, number>,
+                      rackSlot: patchConfig.modules.length,
+                    };
+                    for (let c = 0; c < newMod.controls.length; c++) {
+                      newModule.parameters[`ctl_${c}`] = newMod.controls[c].value;
+                    }
+                    handlePatchChange({
+                      ...patchConfig,
+                      modules: [...patchConfig.modules, newModule],
+                    });
+                  }
+                }
+              };
+              input.click();
+            } catch (err) {
+              console.error('[SunVoxModularEditor] Load .sunsynth failed:', err);
+            }
+          }}
+          className="px-2 py-0.5 bg-dark-bgTertiary border border-dark-border rounded hover:bg-accent-primary/20 hover:border-accent-primary transition-colors text-text-secondary hover:text-text-primary"
+        >
+          Load .sunsynth
+        </button>
         <button
           onClick={async () => {
             try {

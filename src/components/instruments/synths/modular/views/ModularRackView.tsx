@@ -31,9 +31,10 @@ import { ModuleRegistry } from '../../../../../engine/modular/ModuleRegistry';
 interface ModularRackViewProps {
   config: ModularPatchConfig;
   onChange: (config: ModularPatchConfig) => void;
+  isPlaying?: boolean;
 }
 
-export const ModularRackView: React.FC<ModularRackViewProps> = ({ config, onChange }) => {
+export const ModularRackView: React.FC<ModularRackViewProps> = ({ config, onChange, isPlaying }) => {
   const containerRef = React.useRef<HTMLDivElement>(null);
   const scrollContainerRef = React.useRef<HTMLDivElement>(null);
   const configRef = React.useRef(config);
@@ -362,21 +363,27 @@ export const ModularRackView: React.FC<ModularRackViewProps> = ({ config, onChan
         <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
           <SortableContext items={config.modules.map((m) => m.id)} strategy={verticalListSortingStrategy}>
             <div className="flex flex-col gap-12 px-20 max-w-5xl mx-auto">
-              {config.modules.map((module) => (
-                <RackStrip
-                  key={module.id}
-                  module={module}
-                  isSelected={module.id === selectedModuleId}
-                  isConnected={isConnected}
-                  isWiringSource={isWiringSource}
-                  onModuleClick={selectModule}
-                  onModuleDelete={handleModuleDelete}
-                  onPortClick={handlePortClick}
-                  onPortHover={hoverPort}
-                  onParameterChange={handleParameterChange}
-                  registerPortPosition={registerPort}
-                />
-              ))}
+              {config.modules.map((module) => {
+                const svMatch = module.id.match(/^sv_m(\d+)$/);
+                const svModId = svMatch ? parseInt(svMatch[1], 10) : -1;
+                return (
+                  <RackStrip
+                    key={module.id}
+                    module={module}
+                    isSelected={module.id === selectedModuleId}
+                    isConnected={isConnected}
+                    isWiringSource={isWiringSource}
+                    onModuleClick={selectModule}
+                    onModuleDelete={handleModuleDelete}
+                    onPortClick={handlePortClick}
+                    onPortHover={hoverPort}
+                    onParameterChange={handleParameterChange}
+                    registerPortPosition={registerPort}
+                    svModuleId={svModId}
+                    isPlaying={isPlaying}
+                  />
+                );
+              })}
             </div>
           </SortableContext>
         </DndContext>

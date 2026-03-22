@@ -100,6 +100,7 @@ export class SunVoxEngine {
   private _connectQueue: Map<string, PendingResolvers<number>> = new Map();
   private _disconnectQueue: Map<string, PendingResolvers<number>> = new Map();
   private _moduleGraphQueue: Map<number, PendingResolvers<SunVoxModuleGraphEntry[]>> = new Map();
+  private _moduleScopeQueue: Map<string, PendingResolvers<Float32Array>> = new Map();
 
   private constructor() {
     this.audioContext = getDevilboxAudioContext();
@@ -257,6 +258,7 @@ export class SunVoxEngine {
     handle?: number;
     moduleId?: number;
     buffer?: ArrayBuffer;
+    data?: ArrayBuffer;
     modules?: SunVoxModuleInfo[] | SunVoxModuleGraphEntry[];
     controls?: SunVoxControl[];
     patterns?: SunVoxPatternData[];
@@ -391,6 +393,16 @@ export class SunVoxEngine {
         break;
       }
 
+      case 'moduleScope': {
+        const key = `${data.handle}:${data.moduleId}`;
+        const resolver = this._moduleScopeQueue.get(key);
+        if (resolver) {
+          this._moduleScopeQueue.delete(key);
+          resolver.resolve(data.data ? new Float32Array(data.data) : new Float32Array(0));
+        }
+        break;
+      }
+
       case 'error': {
         const err = new Error(data.message ?? 'SunVox worklet error');
         console.error('[SunVoxEngine]', data.message);
@@ -441,6 +453,8 @@ export class SunVoxEngine {
     this._disconnectQueue.clear();
     for (const r of this._moduleGraphQueue.values()) r.reject(err);
     this._moduleGraphQueue.clear();
+    for (const r of this._moduleScopeQueue.values()) r.reject(err);
+    this._moduleScopeQueue.clear();
   }
 
   // ── Public API ─────────────────────────────────────────────────────────────
@@ -682,6 +696,17 @@ export class SunVoxEngine {
     return new Promise<SunVoxModuleGraphEntry[]>((resolve, reject) => {
       this._moduleGraphQueue.set(handle, { resolve, reject });
       this.workletNode!.port.postMessage({ type: 'getModuleGraph', handle });
+    });
+  }
+
+  /** Get oscilloscope waveform data for a specific module (1024 int16 samples → float32). */
+  async getModuleScope(handle: number, moduleId: number, channel = 0): Promise<Float32Array> {
+    await this._initPromise;
+    if (this._disposed || !this.workletNode) return new Float32Array(0);
+    const key = `${handle}:${moduleId}`;
+    return new Promise<Float32Array>((resolve, reject) => {
+      this._moduleScopeQueue.set(key, { resolve, reject });
+      this.workletNode!.port.postMessage({ type: 'getModuleScope', handle, moduleId, channel });
     });
   }
 
