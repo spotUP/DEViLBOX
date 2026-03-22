@@ -4828,6 +4828,19 @@ export class TrackerReplayer {
         return;
       }
 
+      // Stop SunVox sequencer during seek — it runs independently in the WASM
+      // worklet and would keep playing from its old position, causing double audio.
+      // It will restart on the next play().
+      import('@/engine/sunvox-modular/SunVoxModularSynth').then(({ getSharedSunVoxHandle }) => {
+        if (getSharedSunVoxHandle() >= 0) {
+          import('@/engine/sunvox/SunVoxEngine').then(({ SunVoxEngine }) => {
+            if (SunVoxEngine.hasInstance()) {
+              SunVoxEngine.getInstance().stop(getSharedSunVoxHandle());
+            }
+          }).catch(() => {});
+        }
+      }).catch(() => {});
+
       // Per-channel seek: all channels jump to the requested position
       if (this.song.channelTrackTables) {
         for (let ch = 0; ch < this.channelTickCounters.length; ch++) {
