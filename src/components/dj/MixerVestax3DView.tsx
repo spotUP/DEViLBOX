@@ -14,7 +14,7 @@
 
 import { useRef, useEffect, useCallback, useMemo } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
-import { useGLTF, OrbitControls, View, PerspectiveCamera, Environment } from '@react-three/drei';
+import { useGLTF, OrbitControls, View, PerspectiveCamera } from '@react-three/drei';
 import * as THREE from 'three';
 import { useDJStore } from '@/stores/useDJStore';
 import { getDJEngine } from '@/engine/dj/DJEngine';
@@ -450,6 +450,33 @@ function MixerScene({ viewRef }: { viewRef: React.RefObject<HTMLDivElement | nul
         });
       }
 
+      // Fix PBR properties — GLB export from Maya lost metalness on untextured parts
+      if (mesh.material && 'metalness' in mesh.material) {
+        const m = mesh.material as THREE.MeshStandardMaterial;
+        const name = m.name || '';
+        // Only fix untextured materials (textured ones like faceplate render correctly)
+        if (!m.map) {
+          mesh.material = m.clone();
+          const mc = mesh.material as THREE.MeshStandardMaterial;
+          if (name.includes('windowSG')) {
+            // VU meter — dark with blue emissive glow
+            mc.emissive = new THREE.Color(0x2060cc);
+            mc.emissiveIntensity = 0.5;
+            mc.roughness = 0.2;
+          } else if (name.includes('fader')) {
+            mc.metalness = 0.7; mc.roughness = 0.2;
+          } else if (name.includes('knobSG')) {
+            mc.color.set(0x1a1a1a); mc.metalness = 0.1; mc.roughness = 0.75;
+          } else if (name.includes('Cylinder05') || name.includes('polySurface') || name.includes('pCylinder7')) {
+            mc.metalness = 0.6; mc.roughness = 0.35;
+          } else if (name.includes('Rectangle01')) {
+            mc.metalness = 0.5; mc.roughness = 0.4;
+          } else {
+            mc.metalness = 0.4; mc.roughness = 0.45;
+          }
+        }
+      }
+
       // Disable auto-update on interactive meshes for manual matrix control
       if (type === 'knob' || type === 'fader' || type === 'hfader') {
         mesh.matrixAutoUpdate = false;
@@ -694,12 +721,11 @@ export function MixerVestax3DView() {
           near={0.01}
           far={10}
         />
-        <ambientLight intensity={0.3} />
-        <directionalLight position={[0, 5, 3]} intensity={1.5} castShadow={false} />
-        <directionalLight position={[-2, 3, -1]} intensity={0.4} />
-        <directionalLight position={[2, 1, 2]} intensity={0.3} />
-        <pointLight position={[0, 0.06, 0]} color="#4080ff" intensity={0.5} distance={0.4} />
-        <Environment preset="apartment" />
+        {/* Low-key dramatic lighting (matches CGTrader reference) */}
+        <ambientLight intensity={0.04} />
+        <spotLight position={[0, 6, 2]} intensity={2.0} angle={0.4} penumbra={0.6} castShadow={false} />
+        <directionalLight position={[-1, 2, -1]} intensity={0.15} />
+        <pointLight position={[0, 0.06, 0]} color="#4488ff" intensity={1.0} distance={0.35} decay={2} />
 
         <MixerScene viewRef={viewDivRef} />
 
