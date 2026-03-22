@@ -54,8 +54,10 @@ class SunVoxProcessor extends AudioWorkletProcessor {
     this._wasmCrashed = false;
     this._wasmBinary = null;
     this._ticks = 0;
-    // Module mute state: Map<`${slot}:${modId}`, { savedVolCtlIdx, savedVolValue }>
+    // Module mute state: Map<`${slot}:${modId}`, { volCtlIdx, savedVal }>
     this._mutedModules = new Map();
+    // Cached module graph chains: Map<`${slot}:${modId}`, Set<number>>
+    this._chainCache = new Map();
 
     this.port.onmessage = (event) => {
       if (event.data.type === 'init') {
@@ -64,6 +66,71 @@ class SunVoxProcessor extends AudioWorkletProcessor {
         this.handleMessage(event.data);
       }
     };
+  }
+
+  // Helper: get all downstream modules from a start module (BFS), excluding Output (module 0).
+  // Returns a Set of module IDs including the start module.
+  _getDownstreamModules(handle, startModId) {
+    const cacheKey = `${handle}:${startModId}`;
+    if (this._chainCache.has(cacheKey)) return this._chainCache.get(cacheKey);
+    const m = this.svlib;
+    if (!m) return new Set([startModId]);
+    const visited = new Set();
+    const queue = [startModId];
+    while (queue.length > 0) {
+      const modId = queue.shift();
+      if (visited.has(modId)) continue;
+      if (modId === 0) continue; // Don't mute Output module
+      const flags = m._sv_get_module_flags(handle, modId);
+      if (!(flags & SV_MODULE_FLAG_EXISTS)) continue;
+      visited.add(modId);
+      const numOutputs = (flags & SV_MODULE_OUTPUTS_MASK) >> SV_MODULE_OUTPUTS_OFF;
+      const outputsPtr = m._sv_get_module_outputs(handle, modId);
+      if (outputsPtr) {
+        for (let j = 0; j < numOutputs; j++) {
+          const out = m.HEAP32[(outputsPtr >> 2) + j];
+          if (out >= 0 && !visited.has(out)) queue.push(out);
+        }
+      }
+    }
+    this._chainCache.set(cacheKey, visited);
+    return visited;
+  }
+
+  // Helper: mute a single module (save volume, set to min). Returns true if newly muted.
+  _muteOneModule(handle, moduleId) {
+    const m = this.svlib;
+    const key = `${handle}:${moduleId}`;
+    if (this._mutedModules.has(key)) return false;
+    const ctlCount = m._sv_get_number_of_module_ctls(handle, moduleId);
+    let volCtlIdx = -1;
+    for (let i = 0; i < ctlCount; i++) {
+      const name = m.UTF8ToString(m._sv_get_module_ctl_name(handle, moduleId, i));
+      if (name.toLowerCase() === 'volume') { volCtlIdx = i; break; }
+    }
+    if (volCtlIdx >= 0) {
+      const savedVal = m._sv_get_module_ctl_value(handle, moduleId, volCtlIdx, 0);
+      const minVal = m._sv_get_module_ctl_min(handle, moduleId, volCtlIdx, 0);
+      this._mutedModules.set(key, { volCtlIdx, savedVal });
+      m._sv_set_module_ctl_value(handle, moduleId, volCtlIdx, minVal, 0);
+    } else {
+      m._sv_send_event(handle, 0, 140, 0, moduleId + 1, 0, 0); // NOTECMD_CLEAN_MODULE
+      this._mutedModules.set(key, { volCtlIdx: -1, savedVal: 0 });
+    }
+    return true;
+  }
+
+  // Helper: unmute a single module (restore volume). Returns true if was muted.
+  _unmuteOneModule(handle, moduleId) {
+    const m = this.svlib;
+    const key = `${handle}:${moduleId}`;
+    const saved = this._mutedModules.get(key);
+    if (!saved) return false;
+    if (saved.volCtlIdx >= 0) {
+      m._sv_set_module_ctl_value(handle, moduleId, saved.volCtlIdx, saved.savedVal, 0);
+    }
+    this._mutedModules.delete(key);
+    return true;
   }
 
   // Helper: allocate a C string from a JS string
@@ -141,9 +208,12 @@ class SunVoxProcessor extends AudioWorkletProcessor {
           try { m._sv_stop(h); m._sv_stop(h); } catch { /* ignore */ }
           try { m._sv_close_slot(h); } catch { /* ignore */ }
           delete this.handles[h];
-          // Clear any muted modules for this handle
+          // Clear any muted modules and chain cache for this handle
           for (const key of this._mutedModules.keys()) {
             if (key.startsWith(`${h}:`)) this._mutedModules.delete(key);
+          }
+          for (const key of this._chainCache.keys()) {
+            if (key.startsWith(`${h}:`)) this._chainCache.delete(key);
           }
         }
         break;
@@ -167,6 +237,16 @@ class SunVoxProcessor extends AudioWorkletProcessor {
         if (!m) break;
         const buf = new Uint8Array(data.buffer);
         try {
+          // Stop any playback on this handle before loading new song data.
+          // sv_stop twice: first stops playing, second resets all activity.
+          try { m._sv_stop(data.handle); m._sv_stop(data.handle); } catch { /* ignore */ }
+          // Clear muted-module state and chain cache for this handle
+          for (const key of this._mutedModules.keys()) {
+            if (key.startsWith(`${data.handle}:`)) this._mutedModules.delete(key);
+          }
+          for (const key of this._chainCache.keys()) {
+            if (key.startsWith(`${data.handle}:`)) this._chainCache.delete(key);
+          }
           const ptr = this._allocBytes(buf);
           const rv = m._sv_load_from_memory(data.handle, ptr, buf.length);
           m._free(ptr);
@@ -351,39 +431,52 @@ class SunVoxProcessor extends AudioWorkletProcessor {
       }
 
       case 'muteModule': {
-        // Mute a module by finding its "Volume" controller, saving its value, and setting to min
+        // Mute a single module (legacy — prefer setModuleMuteState for chain-aware muting)
         if (!m) break;
-        const muteKey = `${data.handle}:${data.moduleId}`;
-        if (this._mutedModules.has(muteKey)) break; // already muted
-        // Find the "Volume" controller by name (case-insensitive)
-        const ctlCount = m._sv_get_number_of_module_ctls(data.handle, data.moduleId);
-        let volCtlIdx = -1;
-        for (let i = 0; i < ctlCount; i++) {
-          const name = m.UTF8ToString(m._sv_get_module_ctl_name(data.handle, data.moduleId, i));
-          if (name.toLowerCase() === 'volume') { volCtlIdx = i; break; }
-        }
-        if (volCtlIdx >= 0) {
-          const savedVal = m._sv_get_module_ctl_value(data.handle, data.moduleId, volCtlIdx, 0);
-          const minVal = m._sv_get_module_ctl_min(data.handle, data.moduleId, volCtlIdx, 0);
-          this._mutedModules.set(muteKey, { volCtlIdx, savedVal });
-          m._sv_set_module_ctl_value(data.handle, data.moduleId, volCtlIdx, minVal, 0);
-        } else {
-          // No Volume controller — use CLEAN_MODULE command to silence it
-          m._sv_send_event(data.handle, 0, 140, 0, data.moduleId + 1, 0, 0); // NOTECMD_CLEAN_MODULE=140
-          this._mutedModules.set(muteKey, { volCtlIdx: -1, savedVal: 0 });
-        }
+        this._muteOneModule(data.handle, data.moduleId);
         break;
       }
 
       case 'unmuteModule': {
         if (!m) break;
-        const unmuteKey = `${data.handle}:${data.moduleId}`;
-        const saved = this._mutedModules.get(unmuteKey);
-        if (!saved) break;
-        if (saved.volCtlIdx >= 0) {
-          m._sv_set_module_ctl_value(data.handle, data.moduleId, saved.volCtlIdx, saved.savedVal, 0);
+        this._unmuteOneModule(data.handle, data.moduleId);
+        break;
+      }
+
+      case 'setModuleMuteState': {
+        // Chain-aware muting: walks the module graph from each root module to Output,
+        // muting/unmuting entire signal chains. Shared modules stay unmuted if ANY
+        // chain through them is active.
+        if (!m) break;
+        const h = data.handle;
+        const unmutedRoots = data.unmutedRoots || [];
+        const mutedRoots = data.mutedRoots || [];
+
+        // Collect all modules that should be unmuted (in any active chain)
+        const shouldBeUnmuted = new Set();
+        for (const rootId of unmutedRoots) {
+          for (const modId of this._getDownstreamModules(h, rootId)) {
+            shouldBeUnmuted.add(modId);
+          }
         }
-        this._mutedModules.delete(unmuteKey);
+
+        // Collect all modules that should be muted (in muted chains, but NOT in any active chain)
+        const shouldBeMuted = new Set();
+        for (const rootId of mutedRoots) {
+          for (const modId of this._getDownstreamModules(h, rootId)) {
+            if (!shouldBeUnmuted.has(modId)) shouldBeMuted.add(modId);
+          }
+        }
+
+        // Unmute modules that should be active but are currently muted
+        for (const modId of shouldBeUnmuted) {
+          this._unmuteOneModule(h, modId);
+        }
+
+        // Mute modules that should be silent
+        for (const modId of shouldBeMuted) {
+          this._muteOneModule(h, modId);
+        }
         break;
       }
 

@@ -25,12 +25,11 @@ import type {
 function furnaceNoteToXM(note: number): number {
   if (note < 0 || note === 252) return 0; // Empty / null
   if (note === 253 || note === 254 || note === 255) return 97; // Off/release → XM note off
-  // Furnace native: 60 = C-4. XM: 1 = C-0.
-  // So XM = furnace - 60 + 1 = furnace - 59
-  const xm = note - 59;
-  if (xm < 1) return 0;
-  if (xm > 96) return 96;
-  return xm;
+  // FurnaceFileOps already strips the +60 offset from raw WASM values,
+  // producing XM-compatible note numbers (C-0=1, C-4=49). Just clamp range.
+  if (note < 1) return 0;
+  if (note > 96) return 96;
+  return note;
 }
 
 /**

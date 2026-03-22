@@ -604,6 +604,12 @@ export class SunVoxEngine {
     this.sendMessage({ type: 'unmuteModule', handle, moduleId });
   }
 
+  /** Chain-aware muting: walks the module graph from each root to Output,
+   *  muting entire signal chains. Shared modules stay unmuted if ANY chain is active. */
+  setModuleMuteState(handle: number, unmutedRoots: number[], mutedRoots: number[]): void {
+    this.sendMessage({ type: 'setModuleMuteState', handle, unmutedRoots, mutedRoots });
+  }
+
   play(handle: number, fromBeginning = false): void {
     this.sendMessage({ type: 'play', handle, fromBeginning });
   }

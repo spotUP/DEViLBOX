@@ -428,6 +428,7 @@ class FurnaceDispatchProcessor extends AudioWorkletProcessor {
       }
       case 'seqStop': {
         if (this.wasm && this.sequencerActive) this.wasm.seqStop();
+        this.sequencerActive = false;
         break;
       }
       case 'seqSeek': {
