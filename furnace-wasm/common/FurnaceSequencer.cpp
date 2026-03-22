@@ -434,8 +434,11 @@ static bool shallStopSched = false;
 
 // Defined in FurnaceDispatchWrapper.cpp
 extern "C" int furnace_dispatch_cmd(int handle, int cmd, int chan, int val1, int val2);
+extern "C" void furnace_dispatch_reset(int handle);
 extern "C" void furnace_cmd_log_tick();
 extern "C" void furnace_cmd_log_set_global_chan(int globalChan);
+extern "C" void furnace_cmd_log_pause();
+extern "C" void furnace_cmd_log_resume();
 
 static int dispatchHandle = 0;
 
@@ -2378,7 +2381,26 @@ static bool seqNextTick() {
         } else if (endOfSong) {
           int loopModality = getLoopModality();
           if (loopModality != 2) {
-            // Reset channels on loop (matches Furnace playSub(true) → reset())
+            // Reset dispatches on loop (matches Furnace playSub → reset → dispatch->reset())
+            {
+              // Collect unique dispatch handles and reset each once
+              int resetHandles[SEQ_MAX_CHANNELS];
+              int numResetHandles = 0;
+              for (int c = 0; c < g_seq.numChannels; c++) {
+                int h = g_seq.chanDispatchHandle[c];
+                if (h <= 0) h = dispatchHandle;
+                bool found = false;
+                for (int k = 0; k < numResetHandles; k++) {
+                  if (resetHandles[k] == h) { found = true; break; }
+                }
+                if (!found && h > 0) {
+                  resetHandles[numResetHandles++] = h;
+                  furnace_dispatch_reset(h);
+                }
+              }
+            }
+
+            // Reset sequencer channel state
             for (int c = 0; c < g_seq.numChannels; c++) {
               g_seq.chan[c].reset();
               int vm = dispatchCmd(DIV_CMD_GET_VOLMAX, c);
@@ -2392,7 +2414,11 @@ static bool seqNextTick() {
                 g_seq.chan[c].vibratoFine = 4;
               }
             }
-            // Reset sequencer state
+            // Save loop target position (walked-detected or order-overflow)
+            int loopOrder = g_seq.curOrder;
+            int loopRow = g_seq.curRow;
+
+            // Reset sequencer state to order 0
             g_seq.curOrder = 0;
             g_seq.curRow = 0;
             g_seq.prevOrder = 0;
@@ -2403,8 +2429,36 @@ static bool seqNextTick() {
             g_arpLen = 1;
             g_seq.nextSpeed = g_seq.speeds.val[0];
             g_seq.prevSpeed = g_seq.nextSpeed;
-            // Clear walked array so loop detection starts fresh
             memset(g_seq.walked, 0, sizeof(g_seq.walked));
+
+            // Re-seek to the loop position (matches reference playSub(true) seek).
+            // Process rows from order 0 to the loop point with dispatch commands
+            // (for state restoration) but suppress command logging.
+            if (loopOrder > 0 || loopRow > 0) {
+              furnace_cmd_log_pause();  // suppress logging during seek
+
+              // Clear walked array and endOfSong during seek to prevent
+              // re-detection of the loop while seeking through the same rows
+              memset(g_seq.walked, 0, sizeof(g_seq.walked));
+              endOfSong = false;
+
+              while (g_seq.curOrder < loopOrder ||
+                     (g_seq.curOrder == loopOrder && g_seq.curRow < loopRow)) {
+                seqNextRow();
+                endOfSong = false;  // prevent loop re-detection during seek
+                if (!g_seq.playing) break; // safety
+              }
+              furnace_cmd_log_resume();
+              endOfSong = true; // restore for the loop handling below
+
+              // Reset timing for the loop row
+              g_seq.curSpeed = 0;
+              g_seq.ticks = 1;
+              g_seq.tempoAccum = 0;
+              g_seq.nextSpeed = g_seq.speeds.val[0];
+              g_seq.prevSpeed = g_seq.nextSpeed;
+              memset(g_seq.walked, 0, sizeof(g_seq.walked));
+            }
           }
           // Track loop count
           if (g_seq.remainingLoops > 0) {

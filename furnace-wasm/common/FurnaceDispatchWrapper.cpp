@@ -1022,9 +1022,18 @@ void furnace_cmd_log_enable(int enable) {
   }
 }
 
+// Pause/resume logging without clearing the buffer (used during loop re-seek)
+void furnace_cmd_log_pause() { g_cmdLogEnabled = false; }
+void furnace_cmd_log_resume() { g_cmdLogEnabled = true; }
+
 EMSCRIPTEN_KEEPALIVE
 void furnace_cmd_log_tick() {
   g_cmdLogTick++;
+}
+
+EMSCRIPTEN_KEEPALIVE
+int furnace_cmd_log_is_enabled() {
+  return g_cmdLogEnabled ? 1 : 0;
 }
 
 EMSCRIPTEN_KEEPALIVE
