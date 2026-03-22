@@ -123,11 +123,8 @@ interface DJTopBarProps {
 
 const PixiDJTopBar: React.FC<DJTopBarProps> = ({ browserPanel, onBrowserPanelChange, samplerOpen, onSamplerToggle }) => {
   const modalOpen = useUIStore(s => s.modalOpen);
-
-  const handleBrowser = useCallback(() => {
-    const s = useUIStore.getState();
-    s.modalOpen === 'fileBrowser' ? s.closeModal() : s.openModal('fileBrowser');
-  }, []);
+  const deckViewMode = useDJStore(s => s.deckViewMode);
+  const thirdDeckActive = useDJStore(s => s.thirdDeckActive);
 
   const togglePanel = useCallback((panel: DJBrowserPanel) => {
     onBrowserPanelChange(browserPanel === panel ? 'none' : panel);
@@ -138,23 +135,80 @@ const PixiDJTopBar: React.FC<DJTopBarProps> = ({ browserPanel, onBrowserPanelCha
     s.modalOpen === 'masterFx' ? s.closeModal() : s.openModal('masterFx');
   }, []);
 
-  const handleSettings = useCallback(() => {
-    const s = useUIStore.getState();
-    s.modalOpen === 'settings' ? s.closeModal() : s.openModal('settings');
-  }, []);
-
   return (
-    <PixiViewHeader activeView="dj" title="DEViLBOX DJ">
+    <PixiViewHeader activeView="dj" title="DEVILBOX DJ" subtitle="DUAL DECK MIXER">
 
-      {/* Browser panels */}
+      {/* Controller selector */}
+      <PixiDJControllerSelect width={140} height={24} layout={{ height: 28, width: 140 }} />
+
+      {/* FX Quick Presets */}
+      <PixiDJFxPresets width={130} height={24} layout={{ height: 28, width: 130 }} />
+
+      {/* Deck view mode */}
       <PixiButton
-        label="Files"
+        label={`Deck: ${deckViewMode === 'vinyl' ? 'Vinyl' : 'Visualizer'}`}
+        variant="ghost"
+        size="sm"
+        onClick={() => useDJStore.getState().setDeckViewMode(deckViewMode === 'vinyl' ? 'visualizer' : 'vinyl')}
+      />
+
+      {/* Deck C toggle */}
+      <PixiButton
+        label="Deck C"
+        variant={thirdDeckActive ? 'ft2' : 'ghost'}
+        color={thirdDeckActive ? 'green' : undefined}
+        size="sm"
+        active={thirdDeckActive}
+        onClick={() => useDJStore.getState().setThirdDeckActive(!thirdDeckActive)}
+      />
+
+      {/* FX Editor */}
+      <PixiButton
+        label="FX Editor"
+        variant={modalOpen === 'masterFx' ? 'ft2' : 'ghost'}
+        color={modalOpen === 'masterFx' ? 'green' : undefined}
+        size="sm"
+        active={modalOpen === 'masterFx'}
+        onClick={handleFX}
+      />
+
+      {/* Drumpads */}
+      <PixiButton
+        label="Drumpads"
+        variant="ghost"
+        size="sm"
+        onClick={() => {
+          const s = useUIStore.getState();
+          s.modalOpen === 'drumpad' ? s.closeModal() : s.openModal('drumpad');
+        }}
+        active={modalOpen === 'drumpad'}
+        color={modalOpen === 'drumpad' ? 'yellow' : undefined}
+      />
+
+      {/* Sampler */}
+      <PixiButton
+        label="Sampler"
+        variant={samplerOpen ? 'ft2' : 'ghost'}
+        color={samplerOpen ? 'yellow' : undefined}
+        size="sm"
+        active={samplerOpen}
+        onClick={onSamplerToggle}
+      />
+
+      {/* Browser */}
+      <PixiButton
+        label="Browser"
         variant={modalOpen === 'fileBrowser' ? 'ft2' : 'ghost'}
         color={modalOpen === 'fileBrowser' ? 'blue' : undefined}
         size="sm"
         active={modalOpen === 'fileBrowser'}
-        onClick={handleBrowser}
+        onClick={() => {
+          const s = useUIStore.getState();
+          s.modalOpen === 'fileBrowser' ? s.closeModal() : s.openModal('fileBrowser');
+        }}
       />
+
+      {/* Playlists */}
       <PixiButton
         label="Playlists"
         variant={browserPanel === 'playlists' ? 'ft2' : 'ghost'}
@@ -163,54 +217,25 @@ const PixiDJTopBar: React.FC<DJTopBarProps> = ({ browserPanel, onBrowserPanelCha
         active={browserPanel === 'playlists'}
         onClick={() => togglePanel('playlists')}
       />
+
+      {/* Modland */}
       <PixiButton
         label="Modland"
         variant={browserPanel === 'modland' ? 'ft2' : 'ghost'}
-        color={browserPanel === 'modland' ? 'blue' : undefined}
+        color={browserPanel === 'modland' ? 'green' : undefined}
         size="sm"
         active={browserPanel === 'modland'}
         onClick={() => togglePanel('modland')}
       />
+
+      {/* Serato */}
       <PixiButton
         label="Serato"
         variant={browserPanel === 'serato' ? 'ft2' : 'ghost'}
-        color={browserPanel === 'serato' ? 'blue' : undefined}
+        color={browserPanel === 'serato' ? 'purple' : undefined}
         size="sm"
         active={browserPanel === 'serato'}
         onClick={() => togglePanel('serato')}
-      />
-
-      <pixiContainer layout={{ flex: 1 }} />
-
-      {/* Controller selector */}
-      <PixiDJControllerSelect width={130} height={24} layout={{ height: 28, width: 130 }} />
-
-      {/* FX Quick Presets */}
-      <PixiDJFxPresets width={130} height={24} layout={{ height: 28, width: 130 }} />
-
-      <PixiButton
-        label="FX"
-        variant={modalOpen === 'masterFx' ? 'ft2' : 'ghost'}
-        color={modalOpen === 'masterFx' ? 'green' : undefined}
-        size="sm"
-        active={modalOpen === 'masterFx'}
-        onClick={handleFX}
-      />
-      <PixiButton
-        label="Pads"
-        variant={samplerOpen ? 'ft2' : 'ghost'}
-        color={samplerOpen ? 'yellow' : undefined}
-        size="sm"
-        active={samplerOpen}
-        onClick={onSamplerToggle}
-      />
-      <PixiButton
-        label="Settings"
-        variant={modalOpen === 'settings' ? 'ft2' : 'ghost'}
-        color={modalOpen === 'settings' ? 'blue' : undefined}
-        size="sm"
-        active={modalOpen === 'settings'}
-        onClick={handleSettings}
       />
     </PixiViewHeader>
   );
