@@ -24,6 +24,8 @@ export interface PixiViewHeaderProps {
   activeView: string;
   /** Bold accent title shown after the dropdown */
   title: string;
+  /** Dimmer text after the title */
+  subtitle?: string;
   /** View-specific controls rendered after the title */
   children?: React.ReactNode;
   /** Custom onChange — if not provided, uses default view switching logic */
@@ -33,6 +35,7 @@ export interface PixiViewHeaderProps {
 export const PixiViewHeader: React.FC<PixiViewHeaderProps> = ({
   activeView,
   title,
+  subtitle,
   children,
   onViewChange,
 }) => {
@@ -68,6 +71,7 @@ export const PixiViewHeader: React.FC<PixiViewHeaderProps> = ({
       />
 
       <PixiLabel text={title} size="sm" weight="bold" color="accent" />
+      {subtitle && <PixiLabel text={subtitle} size="sm" color="textMuted" />}
 
       {children}
     </layoutContainer>

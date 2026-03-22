@@ -1271,10 +1271,12 @@ export const PixiDJDeck: React.FC<PixiDJDeckProps> = ({ deckId }) => {
     <pixiContainer
       layout={{
         flex: 1,
+        flexBasis: 0,
         height: '100%',
         flexDirection: 'column',
         padding: 8,
         gap: 6,
+        overflow: 'hidden',
       }}
     >
       {/* Deck header + track info */}
@@ -1318,13 +1320,14 @@ export const PixiDJDeck: React.FC<PixiDJDeckProps> = ({ deckId }) => {
       {viewMode === 'visualizer' && (
         <>
           {/* Spectrum visualizer with beat flash border */}
-          <pixiContainer layout={{ width: 280, height: 80 }}>
+          <pixiContainer layout={{ width: '100%', height: 80 }}>
             <PixiSpectrumDisplay deckId={deckId} width={280} height={80} deckColor={DECK_COLOR} vizMode={vizMode} onBeatFlash={handleBeatFlash} />
             {beatFlash > 0 && (
               <pixiGraphics
                 draw={(g: GraphicsType) => {
                   g.clear();
-                  g.roundRect(0, 0, 280, 80, 4).stroke({ color: DECK_COLOR, width: 3, alpha: beatFlash });
+                  const bw = (g.parent as any)?.layout?.computedLayout?.width ?? 280;
+                  g.roundRect(0, 0, bw, 80, 4).stroke({ color: DECK_COLOR, width: 3, alpha: beatFlash });
                 }}
                 layout={{ position: 'absolute', top: 0, left: 0, width: 280, height: 80 }}
                 eventMode="none"
@@ -1408,11 +1411,11 @@ export const PixiDJDeck: React.FC<PixiDJDeckProps> = ({ deckId }) => {
       )}
 
       {/* Track overview / progress bar */}
-      <pixiContainer layout={{ height: 16, width: 280 }}>
+      <pixiContainer layout={{ height: 16, width: '100%' }}>
         <pixiGraphics
           draw={(g: GraphicsType) => {
             g.clear();
-            const barW = 280;
+            const barW = (g.parent as any)?.layout?.computedLayout?.width ?? 280;
             const barH = 16;
             // Background
             g.roundRect(0, 0, barW, barH, 2);
@@ -1434,7 +1437,7 @@ export const PixiDJDeck: React.FC<PixiDJDeckProps> = ({ deckId }) => {
             g.roundRect(0, 0, barW, barH, 2);
             g.stroke({ color: theme.border.color, alpha: 0.2, width: 1 });
           }}
-          layout={{ width: 280, height: 16 }}
+          layout={{ width: '100%', height: 16 }}
         />
         {/* Time display */}
         <pixiBitmapText
@@ -1501,16 +1504,16 @@ export const PixiDJDeck: React.FC<PixiDJDeckProps> = ({ deckId }) => {
       </pixiContainer>
 
       {/* Scratch presets + Fader LFO */}
-      <PixiDeckScratch deckId={deckId} layout={{ width: 280, height: 56 }} />
+      <PixiDeckScratch deckId={deckId} layout={{ width: '100%', height: 56 }} />
 
       {/* Cue points */}
-      <PixiDeckCuePoints deckId={deckId} layout={{ width: 280, height: 36 }} />
+      <PixiDeckCuePoints deckId={deckId} layout={{ width: '100%', height: 36 }} />
 
       {/* Beat grid */}
       <PixiDeckBeatGrid deckId={deckId} />
 
       {/* Oscilloscope / spectrum scopes */}
-      <PixiDeckScopes deckId={deckId} size={48} layout={{ width: 280, height: 64, paddingLeft: 2, paddingTop: 4, flexDirection: 'row', gap: 2 }} />
+      <PixiDeckScopes deckId={deckId} size={48} layout={{ width: '100%', height: 64, paddingLeft: 2, paddingTop: 4, flexDirection: 'row', gap: 2 }} />
 
       {/* Spacer */}
       <pixiContainer layout={{ flex: 1 }} />

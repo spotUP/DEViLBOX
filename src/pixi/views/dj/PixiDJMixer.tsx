@@ -32,6 +32,7 @@ export const PixiDJMixer: React.FC = () => {
     <pixiContainer
       layout={{
         width: MIXER_WIDTH,
+        flexShrink: 0,
         height: '100%',
         flexDirection: 'column',
         alignItems: 'center',

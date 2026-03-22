@@ -763,7 +763,6 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = React.memo(({
         <Button variant="ghost" size="sm" onClick={handleSave}>{isDirty ? 'Save*' : 'Save'}</Button>
         <Button variant="ghost" size="sm" onClick={handleUndo} disabled={!canUndo()} title="Undo (Ctrl+Z)">Undo</Button>
         <Button variant="ghost" size="sm" onClick={handleRedo} disabled={!canRedo()} title="Redo (Ctrl+Shift+Z)">Redo</Button>
-        <Button variant="ghost" size="sm" onClick={() => useUIStore.getState().openModal('revisions')}>Revisions</Button>
         <Button variant="ghost" size="sm" onClick={handleDownload} title="Download as .dbx file">Download</Button>
         <Button variant="ghost" size="sm" onClick={onShowExport} title="Export (Ctrl+Shift+E)">Export</Button>
         <Button variant="ghost" size="sm" onClick={() => useUIStore.getState().openNewSongWizard()} title="New song">New</Button>

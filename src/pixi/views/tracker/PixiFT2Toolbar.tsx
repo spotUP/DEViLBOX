@@ -252,7 +252,6 @@ export const PixiFT2Toolbar: React.FC = () => {
   const handleShowDrumpads     = useCallback(() => useUIStore.getState().openModal('drumpads'), []);
   const handleShowSettings     = useCallback(() => useUIStore.getState().openModal('settings'), []);
   const handleShowGroove       = useCallback(() => useUIStore.getState().openModal('grooveSettings'), []);
-  const handleShowRevisions    = useCallback(() => useUIStore.getState().openModal('revisions'), []);
 
   // ── File operations ───────────────────────────────────────────────────────
   const handleLoad = useCallback(() => {
@@ -653,7 +652,6 @@ export const PixiFT2Toolbar: React.FC = () => {
         <PixiButton label={isDirty ? 'Save*' : 'Save'} variant="ghost" size="sm" onClick={handleSave} />
         <PixiButton label="Undo" variant="ghost" size="sm" onClick={handleUndo} disabled={!canUndo()} />
         <PixiButton label="Redo" variant="ghost" size="sm" onClick={handleRedo} disabled={!canRedo()} />
-        <PixiButton label="Revisions"               variant="ghost" size="sm" onClick={handleShowRevisions} />
         <PixiButton label="Download"                variant="ghost" size="sm" onClick={handleDownload} />
         <PixiButton label="Export"      variant="ghost" size="sm" onClick={handleShowExport} />
         <PixiButton label="New"         variant="ghost" size="sm" onClick={() => useUIStore.getState().openNewSongWizard()} />
