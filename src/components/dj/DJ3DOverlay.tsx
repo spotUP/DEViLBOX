@@ -157,8 +157,8 @@ const UnifiedDJScene: React.FC<{
         <TurntableScene deckId="A" orbitRef={orbitRef} embedded />
       </group>
 
-      {/* Center mixer — raised to match turntable surface height */}
-      <group position={[0, 0.06, 0]}>
+      {/* Center mixer — raised so top surface matches turntable surface */}
+      <group position={[0, 0.12, 0]}>
         <MixerScene viewRef={canvasContainerRef} />
       </group>
 
