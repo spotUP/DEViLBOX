@@ -1074,11 +1074,10 @@ async function loadSongFile(file: File, options: FileLoadOptions): Promise<FileL
 
       let patternsToLoad;
       if (svPatterns && svPatterns.length > 0) {
-        // ── Simple 1:1 pattern mapping ──
-        // Each SunVox pattern maps directly to one DEViLBOX tracker pattern.
-        // SunVox IS a tracker — patterns have tracks (columns) and lines (rows).
-        // The timeline x position determines playback order.
-        const sorted = [...svPatterns].sort((a, b) => a.x - b.x || a.y - b.y);
+        // ── Timeline-aware pattern merging ──
+        // SunVox uses a 2D timeline: patterns at the same X position play simultaneously.
+        // Group by X, merge tracks from all patterns in the group into one multi-channel
+        // tracker pattern. This lets the user mute/solo individual parts.
 
         // Helper: convert a SunVox event to a tracker row
         const eventToRow = (ev: { note: number; vel: number; module: number; ctl: number; ctlVal: number } | undefined, fallbackInstrId: number) => {
@@ -1091,9 +1090,9 @@ async function loadSongFile(file: File, options: FileLoadOptions): Promise<FileL
           return { note, instrument: evInstrId, volume, effTyp: ee, eff: ee > 0 ? ev.ctlVal : 0, effTyp2: cc, eff2: cc > 0 ? ev.ctlVal : 0 };
         };
 
-        patternsToLoad = sorted.map((svPat, i) => {
-          const channels = Array.from({ length: svPat.tracks }, (_, t) => {
-            // Find dominant module for channel naming
+        // Helper: build channels from a single SunVox pattern
+        const buildChannels = (svPat: typeof svPatterns[0], colorOffset: number) => {
+          return Array.from({ length: svPat.tracks }, (_, t) => {
             const modCounts = new Map<number, number>();
             for (let l = 0; l < svPat.lines; l++) {
               const ev = svPat.notes[t]?.[l];
@@ -1101,21 +1100,57 @@ async function loadSongFile(file: File, options: FileLoadOptions): Promise<FileL
             }
             let dominantMod = -1, maxCnt = 0;
             for (const [id, cnt] of modCounts) { if (cnt > maxCnt) { maxCnt = cnt; dominantMod = id; } }
-            const chName = dominantMod >= 0 ? (moduleNameMap.get(dominantMod) ?? `Track ${t + 1}`) : `Track ${t + 1}`;
+            const chName = dominantMod >= 0 ? (moduleNameMap.get(dominantMod) ?? (svPat.patName || `Track ${t + 1}`)) : (svPat.patName || `Track ${t + 1}`);
             const instrId = dominantMod >= 0 ? (svModToInstrIdx.get(dominantMod) ?? 1) : 1;
-
-            const rows = Array.from({ length: svPat.lines }, (_, l) => eventToRow(svPat.notes[t]?.[l], instrId));
-            return {
-              id: `ch-svox-${Date.now()}-${i}-${t}`,
-              name: chName, muted: false, solo: false, collapsed: false,
-              volume: 100, pan: 0, instrumentId: instrId,
-              color: channelColors[t % channelColors.length], rows,
-            };
+            return { chName, instrId, svPat, trackIdx: t, colorIdx: colorOffset + t };
           });
-          const patName = svPat.patName || `Pattern ${i + 1}`;
-          return { id: `svpat-${Date.now()}-${i}`, name: patName, length: svPat.lines, channels };
+        };
+
+        // Group patterns by X position (simultaneous patterns share an X)
+        const xMap = new Map<number, typeof svPatterns>();
+        for (const p of svPatterns) {
+          const group = xMap.get(p.x) ?? [];
+          group.push(p);
+          xMap.set(p.x, group);
+        }
+        // Sort by X position (timeline order)
+        const sortedXPositions = [...xMap.keys()].sort((a, b) => a - b);
+
+        let globalChIdx = 0;
+        patternsToLoad = sortedXPositions.map((xPos, groupIdx) => {
+          const group = xMap.get(xPos)!;
+          // Sort within group by Y position (vertical track order)
+          group.sort((a, b) => a.y - b.y);
+
+          // Find the longest pattern in this group (pad shorter ones with empty rows)
+          const maxLines = Math.max(...group.map(p => p.lines));
+
+          // Build channels from all patterns in this group
+          const channels: any[] = [];
+          const names: string[] = [];
+          for (const svPat of group) {
+            const chInfos = buildChannels(svPat, globalChIdx);
+            for (const info of chInfos) {
+              const rows = Array.from({ length: maxLines }, (_, l) =>
+                l < info.svPat.lines ? eventToRow(info.svPat.notes[info.trackIdx]?.[l], info.instrId) : { ...emptyRow }
+              );
+              channels.push({
+                id: `ch-svox-${Date.now()}-${groupIdx}-${channels.length}`,
+                name: info.chName, muted: false, solo: false, collapsed: false,
+                volume: 100, pan: 0, instrumentId: info.instrId,
+                color: channelColors[info.colorIdx % channelColors.length], rows,
+              });
+            }
+            names.push(svPat.patName || '');
+            globalChIdx += svPat.tracks;
+          }
+
+          // Name: join pattern names in the group, or use first non-empty
+          const patName = names.filter(Boolean).join(' + ') || `Position ${groupIdx + 1}`;
+          return { id: `svpat-${Date.now()}-${groupIdx}`, name: patName, length: maxLines, channels };
         });
-        console.log('[SunVox] loaded', patternsToLoad.length, 'patterns (1:1 from SunVox)',
+        console.log('[SunVox] loaded', patternsToLoad.length, 'merged patterns from', svPatterns.length, 'SunVox patterns',
+          `(${sortedXPositions.length} timeline positions)`,
           patternsToLoad.slice(0, 5).map(p => `"${p.name}":${p.channels.length}ch/${p.length}l`));
       } else {
         // Fallback: single pattern with one channel per generator
