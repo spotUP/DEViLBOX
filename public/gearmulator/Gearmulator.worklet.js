@@ -34,6 +34,8 @@ class GearmulatorProcessor extends AudioWorkletProcessor {
     // Fractional read position for linear interpolation resampling
     this.fracPos = 0.0;
 
+    this.stopped = false;
+
     this.port.onmessage = (event) => {
       const data = event.data;
       if (data.type === 'setSAB') {
@@ -45,11 +47,17 @@ class GearmulatorProcessor extends AudioWorkletProcessor {
         if (Math.abs(this.resampleRatio - 1.0) > 0.001) {
           console.log('[Gearmulator Worklet] Resampling ratio=' + this.resampleRatio.toFixed(4));
         }
+      } else if (data.type === 'stop') {
+        this.stopped = true;
+        this.sabInt32 = null;
+        this.sabFloat32 = null;
+        console.log('[Gearmulator Worklet] Stopped — SAB released');
       }
     };
   }
 
   process(inputs, outputs, parameters) {
+    if (this.stopped) return false;
     if (!this.sabInt32) return true;
 
     const output = outputs[0];
