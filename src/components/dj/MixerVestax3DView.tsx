@@ -450,6 +450,62 @@ function MixerScene({ viewRef }: { viewRef: React.RefObject<HTMLDivElement | nul
         });
       }
 
+      // Override materials for dark DJ aesthetic (model ships with flat gray defaults)
+      if (mesh.material && 'color' in mesh.material) {
+        const mat = mesh.material as THREE.MeshStandardMaterial;
+        mesh.material = mat.clone();
+        const m = mesh.material as THREE.MeshStandardMaterial;
+        const matName = m.name || '';
+
+        if (matName.includes('windowSG')) {
+          // VU meter window — dark translucent
+          m.color.set(0x0a0a0a);
+          m.metalness = 0.1;
+          m.roughness = 0.3;
+        } else if (matName.includes('FaceplateSG') || matName.includes('BoxFBXASC032Outer')) {
+          // Faceplate / outer box — has texture, darken tint
+          m.color.set(0x303030);
+          m.metalness = 0.3;
+          m.roughness = 0.4;
+        } else if (matName.includes('fader')) {
+          // Fader caps — silver metal
+          m.color.set(0x808080);
+          m.metalness = 0.8;
+          m.roughness = 0.2;
+        } else if (matName.includes('knobSG')) {
+          // Knobs — dark rubberized
+          m.color.set(0x1a1a1a);
+          m.metalness = 0.1;
+          m.roughness = 0.7;
+        } else if (matName.includes('Cylinder06') || matName.includes('Cylinder05')) {
+          // Cylinder parts (knob shafts) — brushed metal
+          m.color.set(0x2a2a2a);
+          m.metalness = 0.7;
+          m.roughness = 0.3;
+        } else if (matName.includes('Rectangle01')) {
+          // Dark trim pieces — already dark, add metalness
+          m.color.set(0x0e0e0e);
+          m.metalness = 0.5;
+          m.roughness = 0.4;
+        } else if (matName.includes('pCylinder')) {
+          // Main body cylinders — dark chassis
+          m.color.set(0x151518);
+          m.metalness = 0.5;
+          m.roughness = 0.35;
+        } else if (matName.includes('polySurface')) {
+          // Body panels — dark matte metal
+          m.color.set(0x1a1a1e);
+          m.metalness = 0.6;
+          m.roughness = 0.4;
+        } else if (!m.map) {
+          // Any other untextured — dark default
+          m.color.set(0x1a1a1e);
+          m.metalness = 0.4;
+          m.roughness = 0.5;
+        }
+        m.envMapIntensity = 1.2;
+      }
+
       // Disable auto-update on interactive meshes for manual matrix control
       if (type === 'knob' || type === 'fader' || type === 'hfader') {
         mesh.matrixAutoUpdate = false;
@@ -694,12 +750,12 @@ export function MixerVestax3DView() {
           near={0.01}
           far={10}
         />
-        <ambientLight intensity={0.6} />
-        <directionalLight position={[2, 4, 2]} intensity={1.2} castShadow={false} />
-        <directionalLight position={[-1, 2, -1]} intensity={0.5} />
-        <directionalLight position={[0, -1, 2]} intensity={0.3} />
-        <pointLight position={[0, 0.05, 0]} color="#60a5fa" intensity={0.4} distance={0.5} />
-        <Environment preset="studio" />
+        <ambientLight intensity={0.3} />
+        <directionalLight position={[2, 4, 2]} intensity={0.8} castShadow={false} />
+        <directionalLight position={[-1, 2, -1]} intensity={0.4} />
+        <directionalLight position={[0, -1, 2]} intensity={0.2} />
+        <pointLight position={[0, 0.05, 0]} color="#60a5fa" intensity={0.3} distance={0.5} />
+        <Environment preset="night" />
 
         <MixerScene viewRef={viewDivRef} />
 
