@@ -115,6 +115,10 @@ export const PixiFurnacePatternEditor: React.FC<FurnacePatternEditorProps> = ({
   const focusedRef    = useRef(false);
   focusedRef.current  = focused;
 
+  // Use ref for playback row to avoid React re-renders on every row tick
+  const playbackRowRef = useRef(playbackRow);
+  playbackRowRef.current = playbackRow;
+
   // Per-channel pixel widths (respects collapse state)
   const channelWidths = useMemo(() => {
     if (!sub) return [] as number[];
@@ -156,16 +160,44 @@ export const PixiFurnacePatternEditor: React.FC<FurnacePatternEditorProps> = ({
   }, [width, height]);
 
   // Auto-scroll vertical to keep cursor/playback row visible
+  // During playback, use RAF to check playback row from ref (avoids React re-render per row)
+  const bgGraphicsRef = useRef<GraphicsType>(null);
   useEffect(() => {
-    const targetRow = isPlaying ? playbackRow : cursorRow;
-    const rowY = targetRow * ROW_HEIGHT;
-    const s    = scrollTopRef.current;
-    if (rowY < s || rowY >= s + visRows * ROW_HEIGHT) {
-      const next = Math.max(0, Math.min(maxScrollY, rowY - Math.floor(visRows / 2) * ROW_HEIGHT));
-      scrollTopRef.current = next;
-      setScrollTop(next);
+    if (!isPlaying) {
+      // Idle: scroll to cursor
+      const rowY = cursorRow * ROW_HEIGHT;
+      const s = scrollTopRef.current;
+      if (rowY < s || rowY >= s + visRows * ROW_HEIGHT) {
+        const next = Math.max(0, Math.min(maxScrollY, rowY - Math.floor(visRows / 2) * ROW_HEIGHT));
+        scrollTopRef.current = next;
+        setScrollTop(next);
+      }
+      return;
     }
-  }, [cursorRow, playbackRow, isPlaying, visRows, maxScrollY]);
+    // Playing: RAF loop for smooth scroll + playback highlight
+    let rafId = 0;
+    let lastRow = -1;
+    const tick = () => {
+      const row = playbackRowRef.current;
+      if (row !== lastRow) {
+        lastRow = row;
+        const rowY = row * ROW_HEIGHT;
+        const s = scrollTopRef.current;
+        if (rowY < s || rowY >= s + visRows * ROW_HEIGHT) {
+          const next = Math.max(0, Math.min(maxScrollY, rowY - Math.floor(visRows / 2) * ROW_HEIGHT));
+          scrollTopRef.current = next;
+          setScrollTop(next);
+        }
+        // Imperatively redraw the background graphics for playback cursor
+        if (bgGraphicsRef.current) {
+          drawBgRef.current(bgGraphicsRef.current);
+        }
+      }
+      rafId = requestAnimationFrame(tick);
+    };
+    rafId = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(rafId);
+  }, [cursorRow, isPlaying, visRows, maxScrollY]);
 
   // Auto-scroll horizontal to keep cursor channel visible
   useEffect(() => {
@@ -353,6 +385,8 @@ export const PixiFurnacePatternEditor: React.FC<FurnacePatternEditorProps> = ({
     }
   }, [sub, numChannels, chanXStarts, channelWidths, currentPosition]);
 
+  const drawBgRef = useRef<(g: GraphicsType) => void>(() => {});
+
   // Draw all backgrounds, row highlights, cursor column, and channel borders
   const drawBg = useCallback((g: GraphicsType) => {
     g.clear();
@@ -363,7 +397,7 @@ export const PixiFurnacePatternEditor: React.FC<FurnacePatternEditorProps> = ({
     for (let row = startRow; row < endRow; row++) {
       const y = HEADER_HEIGHT + row * ROW_HEIGHT - scrollTop;
       if (y + ROW_HEIGHT <= HEADER_HEIGHT || y >= height) continue;
-      const isPlayRow   = isPlaying && row === playbackRow;
+      const isPlayRow   = isPlaying && row === playbackRowRef.current;
       const isCursorRow = row === cursorRow;
       const isHilightB  = row % 16 === 0;
       const isHilightA  = !isHilightB && row % 4 === 0;
@@ -393,8 +427,9 @@ export const PixiFurnacePatternEditor: React.FC<FurnacePatternEditorProps> = ({
         g.rect(bx, 0, 1, height).fill({ color: theme.border.color, alpha: 0.2 });
       }
     }
-  }, [width, height, theme, scrollTop, scrollLeft, startRow, endRow, isPlaying, playbackRow,
+  }, [width, height, theme, scrollTop, scrollLeft, startRow, endRow, isPlaying,
       cursorRow, cursorChan, cursorCol, chanXStarts, numChannels]);
+  drawBgRef.current = drawBg;
 
   // All text labels
   const cellLabels = useMemo(() => {
@@ -497,7 +532,7 @@ export const PixiFurnacePatternEditor: React.FC<FurnacePatternEditorProps> = ({
       onPointerDown={handlePointerDown}
       onRightClick={handleRightClick}
     >
-      <pixiGraphics draw={drawBg} layout={{ position: 'absolute', width, height }} />
+      <pixiGraphics ref={bgGraphicsRef} draw={drawBg} layout={{ position: 'absolute', width, height }} />
       {cellLabels.map((l, i) => (
         <pixiBitmapText
           key={i}
