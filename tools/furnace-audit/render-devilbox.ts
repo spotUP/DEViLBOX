@@ -722,10 +722,16 @@ async function renderFurFile(furPath: string, outPath: string): Promise<RenderRe
     }
 
     // Channel → chip mapping + per-channel dispatch handle for multi-chip routing
+    // Use parser's channel count (sysDef), NOT dispatch runtime count.
+    // The dispatch may create more channels than the order table has (e.g., YM2612_EXT:
+    // sysDef=9ch but dispatch=13ch). The order table uses the sysDef count.
     if (chipInstances.length > 0) {
       let chanOffset = 0;
-      for (const { handle, chipId } of chipInstances) {
-        const chipChans = wasm._furnace_dispatch_get_num_channels(handle);
+      for (let ci = 0; ci < chipInstances.length; ci++) {
+        const { handle, chipId } = chipInstances[ci];
+        // Prefer parser's channel count (matches order table), fall back to dispatch count
+        const chipChans = native.systemChans?.[ci]
+          ?? wasm._furnace_dispatch_get_num_channels(handle);
         for (let subIdx = 0; subIdx < chipChans && (chanOffset + subIdx) < numChannels; subIdx++) {
           wasm._furnace_seq_set_channel_chip(chanOffset + subIdx, chipId, subIdx);
           wasm._furnace_seq_set_channel_dispatch(chanOffset + subIdx, handle);

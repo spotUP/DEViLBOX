@@ -136,12 +136,16 @@ export async function uploadFurnaceToSequencer(
 
   // 8. Upload per-channel chip type + dispatch handle for multi-chip routing
   if (native.chipIds && native.chipIds.length > 0) {
-    // Build channel → (chipId, subIdx, handle) mapping from chip channel counts
-    // Each chip owns N sequential channels; subIdx is the channel's index within its chip
+    // Build channel → (chipId, subIdx, handle) mapping from parser channel counts.
+    // IMPORTANT: Use systemChans (from sysDef/parser), NOT dispatch runtime channel count.
+    // The dispatch may create more channels than the sysDef declares (e.g., YM2612_EXT:
+    // sysDef=9ch but dispatch=13ch). The order table uses the sysDef count, so the
+    // sequencer channel mapping must match.
     let chanOffset = 0;
-    for (const chipId of native.chipIds) {
-      const chipChans = engine.getChannelCount(chipId);
-      // Get the dispatch handle for this chip (used for multi-chip command routing)
+    for (let ci = 0; ci < native.chipIds.length; ci++) {
+      const chipId = native.chipIds[ci];
+      // Use parser's channel count (sysDef), falling back to dispatch count
+      const chipChans = native.systemChans?.[ci] ?? engine.getChannelCount(chipId);
       const chipHandle = engine.getChipHandle(chipId);
       for (let subIdx = 0; subIdx < chipChans && (chanOffset + subIdx) < numChannels; subIdx++) {
         engine.seqPostMessage({

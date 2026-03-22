@@ -510,6 +510,7 @@ export interface FurnaceNativeData {
   subsongs: FurnaceSubsong[];
   activeSubsong: number;
   chipIds: number[];  // Furnace system IDs (= FurnaceDispatchPlatform values) for each chip
+  systemChans?: number[];  // Per-chip channel counts from parser (sysDef; may differ from dispatch runtime)
   compatFlags?: Record<string, unknown>;  // Furnace compat flags (passed to WASM sequencer)
   grooves?: Array<{ len: number; val: number[] }>;  // Groove patterns for 09xx effect
   chipFlags?: string[];  // Per-chip flag strings (key=value\n format) for clock/model selection
