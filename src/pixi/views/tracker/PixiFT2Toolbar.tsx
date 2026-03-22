@@ -36,6 +36,8 @@ import { useShallow } from 'zustand/react/shallow';
 import { useTapTempo } from '@hooks/useTapTempo';
 import { GROOVE_TEMPLATES } from '@typedefs/audio';
 import { notify } from '@stores/useNotificationStore';
+import { useHistoryStore } from '@stores/useHistoryStore';
+import { saveProjectToStorage } from '@hooks/useProjectPersistence';
 import { getTrackerScratchController } from '@engine/TrackerScratchController';
 
 // ─── Layout constants ────────────────────────────────────────────────────────
@@ -125,7 +127,7 @@ export const PixiFT2Toolbar: React.FC = () => {
     patternOrder, setPatternOrder,
     currentPositionIndex, setCurrentPosition,
     duplicatePosition, removeFromOrder,
-    resizePattern, updatePatternName,
+    resizePattern, updatePatternName, replacePattern,
   } = useTrackerStore(useShallow(s => ({
     patterns: s.patterns,
     currentPatternIndex: s.currentPatternIndex,
@@ -138,7 +140,25 @@ export const PixiFT2Toolbar: React.FC = () => {
     removeFromOrder: s.removeFromOrder,
     resizePattern: s.resizePattern,
     updatePatternName: s.updatePatternName,
+    replacePattern: s.replacePattern,
   })));
+
+  // ── History store (undo/redo) ───────────────────────────────────────────
+  const { undo, redo, canUndo, canRedo } = useHistoryStore(useShallow(s => ({
+    undo: s.undo, redo: s.redo, canUndo: s.canUndo, canRedo: s.canRedo,
+  })));
+
+  const handleUndo = useCallback(() => {
+    if (!canUndo()) return;
+    const pattern = undo();
+    if (pattern) replacePattern(currentPatternIndex, pattern);
+  }, [undo, canUndo, replacePattern, currentPatternIndex]);
+
+  const handleRedo = useCallback(() => {
+    if (!canRedo()) return;
+    const pattern = redo();
+    if (pattern) replacePattern(currentPatternIndex, pattern);
+  }, [redo, canRedo, replacePattern, currentPatternIndex]);
 
   const editStep = useEditorStore(s => s.editStep);
   const setEditStep = useEditorStore(s => s.setEditStep);
@@ -239,7 +259,20 @@ export const PixiFT2Toolbar: React.FC = () => {
     useUIStore.getState().setShowFileBrowser(true);
   }, []);
 
-  const handleSave = useCallback(() => {
+  const handleSave = useCallback(async () => {
+    try {
+      const saved = await saveProjectToStorage({ explicit: true });
+      if (saved) {
+        notify.success('Project saved!', 2000);
+      } else {
+        notify.error('Failed to save project');
+      }
+    } catch {
+      notify.error('Failed to save project');
+    }
+  }, []);
+
+  const handleDownload = useCallback(() => {
     try {
       const { patterns } = useTrackerStore.getState();
       const { metadata } = useProjectStore.getState();
@@ -618,8 +651,10 @@ export const PixiFT2Toolbar: React.FC = () => {
 
         <PixiButton label="Load"                    variant="ghost" size="sm" onClick={handleLoad} />
         <PixiButton label={isDirty ? 'Save*' : 'Save'} variant="ghost" size="sm" onClick={handleSave} />
+        <PixiButton label="Undo" variant="ghost" size="sm" onClick={handleUndo} disabled={!canUndo()} />
+        <PixiButton label="Redo" variant="ghost" size="sm" onClick={handleRedo} disabled={!canRedo()} />
         <PixiButton label="Revisions"               variant="ghost" size="sm" onClick={handleShowRevisions} />
-        <PixiButton label="Download"                variant="ghost" size="sm" onClick={handleSave} />
+        <PixiButton label="Download"                variant="ghost" size="sm" onClick={handleDownload} />
         <PixiButton label="Export"      variant="ghost" size="sm" onClick={handleShowExport} />
         <PixiButton label="New"         variant="ghost" size="sm" onClick={() => useUIStore.getState().openNewSongWizard()} />
         <PixiButton label="Clear"       variant="ghost" size="sm" onClick={handleClearProject} />
