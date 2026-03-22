@@ -53,9 +53,7 @@ export const AddToHomeScreenModal: React.FC<AddToHomeScreenModalProps> = ({
     deferredPrompt.prompt();
 
     // Wait for the user's response
-    const { outcome } = await deferredPrompt.userChoice;
-    console.log(`User ${outcome} the install prompt`);
-
+    await deferredPrompt.userChoice;
     // Clear the deferredPrompt
     setDeferredPrompt(null);
     onClose();

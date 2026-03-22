@@ -462,10 +462,6 @@ function MixerScene({ viewRef }: { viewRef: React.RefObject<HTMLDivElement | nul
       }
     });
 
-    // Log classified controls
-    const interactiveCount = [...registry.entries()].filter(([, v]) => v.type !== 'static').length;
-    console.log(`[Mixer3D] ${meshCount} meshes, ${registry.size} groups, ${interactiveCount} interactive`);
-
     return { sceneGroup: cloned, meshRegistry: registry };
   }, [gltfScene]);
 

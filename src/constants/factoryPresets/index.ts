@@ -15,6 +15,7 @@ import { DRUMNIBUS_PRESETS as DRUMNIBUS_KIT_PRESETS } from '../drumnibusPresets'
 import { V2_FACTORY_PRESETS } from '../v2FactoryPresets';
 import { SAM_PRESETS } from '../samPresets';
 import { PINK_TROMBONE_FACTORY_PRESETS } from '../pinkTrombonePresets';
+import { DECTALK_PRESETS } from '../dectalkPresets';
 import { MAME_CHIP_PRESETS } from '../mameChipPresets';
 import { DEXED_FACTORY_PRESETS, OBXD_FACTORY_PRESETS } from '../jucePresets';
 import { FURNACE_CHIP_PRESETS } from '../furnaceChipPresets';
@@ -87,6 +88,7 @@ export const FACTORY_PRESETS: InstrumentPreset['config'][] = [
   ...V2_FACTORY_PRESETS,
   ...SAM_PRESETS,
   ...PINK_TROMBONE_FACTORY_PRESETS,
+  ...DECTALK_PRESETS,
   ...DRUMNIBUS_PRESETS,
   ...DRUMNIBUS_KIT_PRESETS,
   ...DEXED_FACTORY_PRESETS,

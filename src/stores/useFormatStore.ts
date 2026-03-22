@@ -71,6 +71,12 @@ interface FormatStore {
   setFurnaceNative: (data: FurnaceNativeData | null) => void;
   setFurnaceOrderEntry: (channel: number, position: number, patternIndex: number) => void;
   setHivelyNative: (data: HivelyNativeData | null) => void;
+  /** Update a single track or transpose value in the Hively position matrix */
+  setHivelyPositionCell: (pos: number, ch: number, field: 'track' | 'transpose', value: number) => void;
+  /** Insert a new position (copy of current, or blank) at the given index */
+  insertHivelyPosition: (pos: number) => void;
+  /** Delete a position */
+  deleteHivelyPosition: (pos: number) => void;
   setSongDBInfo: (info: FormatStore['songDBInfo']) => void;
   setSidMetadata: (info: FormatStore['sidMetadata']) => void;
   setOriginalModuleData: (data: FormatStore['originalModuleData']) => void;
@@ -153,6 +159,32 @@ export const useFormatStore = create<FormatStore>()(
       sub.orders[channel][position] = patternIndex;
     }),
     setHivelyNative: (data) => set((state) => { state.hivelyNative = data; }),
+    setHivelyPositionCell: (pos, ch, field, value) => set((state) => {
+      if (!state.hivelyNative) return;
+      const p = state.hivelyNative.positions[pos];
+      if (!p) return;
+      if (field === 'track') {
+        p.track[ch] = Math.max(0, Math.min(value, state.hivelyNative.tracks.length - 1));
+      } else {
+        p.transpose[ch] = Math.max(-128, Math.min(127, value));
+      }
+    }),
+    insertHivelyPosition: (pos) => set((state) => {
+      if (!state.hivelyNative) return;
+      const positions = state.hivelyNative.positions;
+      const ch = state.hivelyNative.channels;
+      // Clone the current position or create blank
+      const src = positions[pos];
+      const newPos = src
+        ? { track: [...src.track], transpose: [...src.transpose] }
+        : { track: Array(ch).fill(0), transpose: Array(ch).fill(0) };
+      positions.splice(pos + 1, 0, newPos);
+    }),
+    deleteHivelyPosition: (pos) => set((state) => {
+      if (!state.hivelyNative) return;
+      if (state.hivelyNative.positions.length <= 1) return; // Keep at least 1
+      state.hivelyNative.positions.splice(pos, 1);
+    }),
     setSongDBInfo: (info) => set((state) => { state.songDBInfo = info; }),
     setSidMetadata: (info) => set((state) => { state.sidMetadata = info; }),
     setOriginalModuleData: (data) => set((state) => { state.originalModuleData = data; }),

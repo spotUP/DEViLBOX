@@ -10,6 +10,13 @@
 
 import React, { useEffect, useCallback, useRef } from 'react';
 
+/** Focusable element selector for focus trap */
+const FOCUSABLE_SELECTOR = [
+  'a[href]', 'button:not([disabled])', 'input:not([disabled])',
+  'select:not([disabled])', 'textarea:not([disabled])',
+  '[tabindex]:not([tabindex="-1"])',
+].join(', ');
+
 interface ModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -54,11 +61,12 @@ export const Modal: React.FC<ModalProps> = ({
   className = '',
 }) => {
   const modalRef = useRef<HTMLDivElement>(null);
-  
-  // Handle keyboard events
+  const previouslyFocusedRef = useRef<HTMLElement | null>(null);
+
+  // Handle keyboard events (including focus trap)
   const handleKeyDown = useCallback((e: KeyboardEvent) => {
     if (!isOpen) return;
-    
+
     const target = e.target as HTMLElement;
     const isTextarea = target.tagName === 'TEXTAREA';
     const isSelect = target.tagName === 'SELECT';
@@ -66,6 +74,28 @@ export const Modal: React.FC<ModalProps> = ({
     const isInput = target.tagName === 'INPUT';
     const inputType = isInput ? (target as HTMLInputElement).type : '';
     const isTextInput = isInput && ['text', 'search', 'url', 'email', 'password'].includes(inputType);
+
+    // Focus trap: Tab/Shift+Tab cycles within modal
+    if (e.key === 'Tab' && modalRef.current) {
+      const focusable = Array.from(
+        modalRef.current.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR)
+      );
+      if (focusable.length === 0) return;
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (e.shiftKey) {
+        if (document.activeElement === first || !modalRef.current.contains(document.activeElement)) {
+          e.preventDefault();
+          last.focus();
+        }
+      } else {
+        if (document.activeElement === last || !modalRef.current.contains(document.activeElement)) {
+          e.preventDefault();
+          first.focus();
+        }
+      }
+      return;
+    }
 
     // Escape to close
     if (closeOnEscape && e.key === 'Escape') {
@@ -113,16 +143,34 @@ export const Modal: React.FC<ModalProps> = ({
     }
   }, [isOpen, onClose, onConfirm, confirmDisabled, closeOnEscape, closeOnEnter]);
 
-  // Keyboard listener and focus management
+  // Focus management: save previous focus, restore on close
   useEffect(() => {
     if (!isOpen) return;
 
-    // Focus modal for keyboard events
-    modalRef.current?.focus();
+    // Save the element that had focus before modal opened
+    previouslyFocusedRef.current = document.activeElement as HTMLElement;
+
+    // Focus the first focusable element inside the modal, or the modal itself
+    requestAnimationFrame(() => {
+      if (!modalRef.current) return;
+      const firstFocusable = modalRef.current.querySelector<HTMLElement>(FOCUSABLE_SELECTOR);
+      if (firstFocusable) {
+        firstFocusable.focus();
+      } else {
+        modalRef.current.focus();
+      }
+    });
 
     // Add at capture phase to intercept before other handlers
     document.addEventListener('keydown', handleKeyDown, { capture: true });
-    return () => document.removeEventListener('keydown', handleKeyDown, { capture: true });
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown, { capture: true });
+      // Restore focus to previously focused element
+      const prev = previouslyFocusedRef.current;
+      if (prev && typeof prev.focus === 'function') {
+        requestAnimationFrame(() => prev.focus());
+      }
+    };
   }, [isOpen, handleKeyDown]);
 
   // Handle backdrop click

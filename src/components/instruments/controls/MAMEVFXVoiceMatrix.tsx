@@ -68,7 +68,6 @@ export const MAMEVFXVoiceMatrix: React.FC<MAMEVFXVoiceMatrixProps> = ({
     const buffer = await file.arrayBuffer();
     const data = new Uint8Array(buffer);
     
-    console.log(`🎹 MAME: Sending SysEx to handle ${handle} (${data.length} bytes)...`);
     engine.addMidiEvent(handle, data);
   }, [engine, handle]);
 

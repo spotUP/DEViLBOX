@@ -3,7 +3,8 @@ import { getDevilboxAudioContext, noteToMidi } from '@/utils/audio-context';
 import { SpeechSequencer } from '@/engine/speech/SpeechSequencer';
 import type { SpeechFrame } from '@/engine/speech/SpeechSequencer';
 import { getTractShape, type TractShape } from './PhonemeMap';
-import { textToPhonemes } from './SimpleReciter';
+import { textToPhonemes as simpleTextToPhonemes } from './SimpleReciter';
+import { espeakTextToIPA, parseEspeakIPA, isEspeakAvailable, preloadEspeak } from '@engine/speech/EspeakNG';
 
 export interface PinkTromboneConfig {
   tenseness: number;       // 0-1: breathy (0) → harsh (1)
@@ -95,6 +96,11 @@ export class PinkTromboneSynth implements DevilboxSynth {
   private _readyResolve!: () => void;
   private _speechSequencer: SpeechSequencer<TractShape>;
   private _isSpeaking = false;
+  private _currentShape: TractShape | null = null;
+  private _targetShape: TractShape | null = null;
+  private _lerpStartTime = 0;
+  private _lerpDurationMs = 20; // transition time between phonemes
+  private _rafId: number | null = null;
 
   constructor(config?: Partial<PinkTromboneConfig>) {
     this.audioContext = getDevilboxAudioContext();
@@ -106,6 +112,9 @@ export class PinkTromboneSynth implements DevilboxSynth {
     });
 
     PinkTromboneSynth._activeInstance = this;
+
+    // Start loading eSpeak-NG in background (non-blocking, with 8s timeout)
+    preloadEspeak();
 
     // Speech sequencer: drives tract parameters from phoneme sequence
     this._speechSequencer = new SpeechSequencer<TractShape>(
@@ -167,17 +176,80 @@ export class PinkTromboneSynth implements DevilboxSynth {
     this._workletNode.port.postMessage({ type: 'params', params });
   }
 
-  /** Apply a tract shape from the phoneme map directly to the worklet */
-  private _applyTractShape(shape: TractShape): void {
+  private static readonly SHAPE_KEYS = [
+    'tongueIndex', 'tongueDiameter', 'lipDiameter', 'velum',
+    'constrictionIndex', 'constrictionDiameter', 'tenseness',
+  ] as const;
+
+  /** Send a tract shape to the worklet (denormalized) */
+  private _sendShape(shape: TractShape): void {
     if (!this._workletNode) return;
     const params: Record<string, number> = {};
-    // Convert normalized shape values to real worklet params
-    for (const key of ['tongueIndex', 'tongueDiameter', 'lipDiameter', 'velum',
-                        'constrictionIndex', 'constrictionDiameter', 'tenseness'] as const) {
+    for (const key of PinkTromboneSynth.SHAPE_KEYS) {
       const d = denormalize(key, shape[key]);
       params[d.key] = d.value;
     }
     this._workletNode.port.postMessage({ type: 'params', params });
+  }
+
+  /** Lerp between two shapes */
+  private _lerpShape(a: TractShape, b: TractShape, t: number): TractShape {
+    const clamped = Math.max(0, Math.min(1, t));
+    const result = { ...a };
+    for (const key of PinkTromboneSynth.SHAPE_KEYS) {
+      result[key] = a[key] + (b[key] - a[key]) * clamped;
+    }
+    result.isVoiced = clamped < 0.5 ? a.isVoiced : b.isVoiced;
+    return result;
+  }
+
+  /** Start smooth interpolation toward a target tract shape */
+  private _applyTractShape(shape: TractShape): void {
+    if (!this._workletNode) return;
+
+    // First frame — snap immediately
+    if (!this._currentShape) {
+      this._currentShape = { ...shape };
+      this._targetShape = shape;
+      this._sendShape(shape);
+      return;
+    }
+
+    // Start lerp from current position to new target
+    this._targetShape = shape;
+    this._lerpStartTime = performance.now();
+
+    // Stops and affricates need faster transitions for the "burst" effect
+    const isStop = shape.constrictionDiameter <= 0.05;
+    this._lerpDurationMs = isStop ? 8 : 20;
+
+    if (!this._rafId) {
+      this._startLerpLoop();
+    }
+  }
+
+  private _startLerpLoop(): void {
+    const tick = () => {
+      if (!this._targetShape || !this._currentShape || !this._isSpeaking) {
+        this._rafId = null;
+        return;
+      }
+
+      const elapsed = performance.now() - this._lerpStartTime;
+      const t = Math.min(1, elapsed / this._lerpDurationMs);
+      const interpolated = this._lerpShape(this._currentShape, this._targetShape, t);
+      this._sendShape(interpolated);
+
+      if (t >= 1) {
+        // Transition complete — snap current to target
+        this._currentShape = { ...this._targetShape };
+        this._rafId = null;
+        return;
+      }
+
+      this._rafId = requestAnimationFrame(tick);
+    };
+    this._rafId = requestAnimationFrame(tick);
   }
 
   /** Convert text to phonemes and speak it through the vocal tract */
@@ -185,8 +257,22 @@ export class PinkTromboneSynth implements DevilboxSynth {
     if (!text.trim()) return;
     console.log('[PinkTrombone] speak() called with:', text);
 
-    const phonemes = textToPhonemes(text);
-    console.log('[PinkTrombone] Phonemes:', phonemes.join(' '));
+    // Try eSpeak-NG first (much better pronunciation), fall back to SimpleReciter
+    let phonemes: string[];
+    if (isEspeakAvailable()) {
+      const ipa = await espeakTextToIPA(text);
+      if (ipa) {
+        const tokens = parseEspeakIPA(ipa);
+        phonemes = tokens.map(t => t.code);
+        console.log('[PinkTrombone] eSpeak phonemes:', phonemes.join(' '));
+      } else {
+        phonemes = simpleTextToPhonemes(text);
+        console.log('[PinkTrombone] SimpleReciter phonemes:', phonemes.join(' '));
+      }
+    } else {
+      phonemes = simpleTextToPhonemes(text);
+      console.log('[PinkTrombone] SimpleReciter phonemes:', phonemes.join(' '));
+    }
 
     if (phonemes.length === 0) return;
 
@@ -222,6 +308,9 @@ export class PinkTromboneSynth implements DevilboxSynth {
   public stopSpeech(): void {
     this._speechSequencer.stop();
     this._isSpeaking = false;
+    this._currentShape = null;
+    this._targetShape = null;
+    if (this._rafId) { cancelAnimationFrame(this._rafId); this._rafId = null; }
     if (this._workletNode) {
       this._workletNode.port.postMessage({ type: 'allNotesOff' });
     }
@@ -304,6 +393,7 @@ export class PinkTromboneSynth implements DevilboxSynth {
 
   public dispose(): void {
     if (PinkTromboneSynth._activeInstance === this) PinkTromboneSynth._activeInstance = null;
+    if (this._rafId) { cancelAnimationFrame(this._rafId); this._rafId = null; }
     this._speechSequencer.dispose();
     if (this._workletNode) {
       this._workletNode.port.postMessage({ type: 'allNotesOff' });

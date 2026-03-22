@@ -322,7 +322,6 @@ export const TD3PatternDialog: React.FC<TD3PatternDialogProps> = ({ isOpen, onCl
       const newInst = createDefaultTB303Instrument();
       addInstrument(newInst);
       tb303Instrument = newInst;
-      console.log('[TD3Import] Auto-created TB-303 instrument:', newInst.id);
     }
     
     // Get instrument index (1-based for tracker)

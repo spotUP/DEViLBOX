@@ -8,6 +8,10 @@ import type { PinkTromboneConfig } from '@engine/pinktrombone/PinkTromboneSynth'
 export type { PinkTromboneConfig } from '@engine/pinktrombone/PinkTromboneSynth';
 export { DEFAULT_PINK_TROMBONE } from '@engine/pinktrombone/PinkTromboneSynth';
 
+import type { DECtalkConfig } from '@engine/dectalk/DECtalkSynth';
+export type { DECtalkConfig } from '@engine/dectalk/DECtalkSynth';
+export { DEFAULT_DECTALK } from '@engine/dectalk/DECtalkSynth';
+
 import type {
   SynthType,
   OscillatorConfig,
@@ -238,6 +242,7 @@ export interface InstrumentConfig {
   v2Speech?: V2SpeechConfig;
   sam?: SamConfig;
   pinkTrombone?: PinkTromboneConfig;
+  dectalk?: DECtalkConfig;
   synare?: SynareConfig;
   wam?: WAMConfig;
   // MAME synths

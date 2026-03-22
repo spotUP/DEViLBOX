@@ -966,7 +966,7 @@ void furnace_dispatch_destroy(int handle) {
 /**
  * Reset a dispatch instance.
  */
-EMSCRIPTEN_KEEPALIVE
+extern "C" EMSCRIPTEN_KEEPALIVE
 void furnace_dispatch_reset(int handle) {
   auto it = g_instances.find(handle);
   if (it != g_instances.end()) {
@@ -1023,15 +1023,15 @@ void furnace_cmd_log_enable(int enable) {
 }
 
 // Pause/resume logging without clearing the buffer (used during loop re-seek)
-void furnace_cmd_log_pause() { g_cmdLogEnabled = false; }
-void furnace_cmd_log_resume() { g_cmdLogEnabled = true; }
+extern "C" void furnace_cmd_log_pause() { g_cmdLogEnabled = false; }
+extern "C" void furnace_cmd_log_resume() { g_cmdLogEnabled = true; }
 
 EMSCRIPTEN_KEEPALIVE
 void furnace_cmd_log_tick() {
   g_cmdLogTick++;
 }
 
-EMSCRIPTEN_KEEPALIVE
+extern "C" EMSCRIPTEN_KEEPALIVE
 int furnace_cmd_log_is_enabled() {
   return g_cmdLogEnabled ? 1 : 0;
 }
@@ -1063,7 +1063,7 @@ int* furnace_cmd_log_get() {
  * Called by the sequencer before furnace_dispatch_cmd() so the log records
  * global channel numbers (matching upstream Furnace -view commands output).
  */
-void furnace_cmd_log_set_global_chan(int globalChan) {
+extern "C" void furnace_cmd_log_set_global_chan(int globalChan) {
   g_pendingGlobalChan = globalChan;
 }
 

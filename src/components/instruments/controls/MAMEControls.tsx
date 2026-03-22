@@ -71,14 +71,11 @@ export const MAMEControls: React.FC<MAMEControlsProps> = ({
         // Sort files alphabetically to ensure consistent bank mapping
         files.sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' }));
 
-        console.log(`🎹 MAME: Extracting ${files.length} files from ZIP starting at bank ${bank}...`);
-        
         for (let i = 0; i < files.length; i++) {
           const targetBank = bank + i;
           const fileData = await files[i].entry.async('uint8array');
-          
+
           engine.setRom(targetBank, fileData);
-          console.log(`🎹 MAME: Loaded ${files[i].name} into bank ${targetBank} (${fileData.length} bytes)`);
         }
         
         onChange({ romsLoaded: true });
@@ -90,7 +87,6 @@ export const MAMEControls: React.FC<MAMEControlsProps> = ({
       const data = new Uint8Array(buffer);
       engine.setRom(bank, data);
       onChange({ romsLoaded: true });
-      console.log(`🎹 MAME: Loaded ROM bank ${bank} (${data.length} bytes)`);
     }
   }, [engine, onChange]);
 

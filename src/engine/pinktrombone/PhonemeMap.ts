@@ -26,15 +26,15 @@ const NEUTRAL: TractShape = {
   tenseness: 0.6, durationMs: 80, isVoiced: true,
 };
 
-function vowel(tongueIndex: number, tongueDiameter: number, lipDiameter: number, durationMs = 100): TractShape {
+function vowel(tongueIndex: number, tongueDiameter: number, lipDiameter: number, durationMs = 120): TractShape {
   return { ...NEUTRAL, tongueIndex, tongueDiameter, lipDiameter, durationMs, constrictionDiameter: 1 };
 }
 
-function consonant(constrictionIndex: number, constrictionDiameter: number, voiced: boolean, durationMs = 60, overrides?: Partial<TractShape>): TractShape {
+function consonant(constrictionIndex: number, constrictionDiameter: number, voiced: boolean, durationMs = 70, overrides?: Partial<TractShape>): TractShape {
   return { ...NEUTRAL, constrictionIndex, constrictionDiameter, tenseness: voiced ? 0.6 : 0.4, durationMs, isVoiced: voiced, ...overrides };
 }
 
-function nasal(constrictionIndex: number, durationMs = 70): TractShape {
+function nasal(constrictionIndex: number, durationMs = 90): TractShape {
   return { ...NEUTRAL, constrictionIndex, constrictionDiameter: 0, velum: 0.8, durationMs, isVoiced: true };
 }
 
@@ -46,24 +46,24 @@ function nasal(constrictionIndex: number, durationMs = 70): TractShape {
 export const PHONEME_TRACT_MAP: Record<string, TractShape> = {
   // ── Vowels ──────────────────────────────────────────────
   // IPA vowel quadrilateral mapped to tongue position (front-back) and height (open-close)
-  'IY': vowel(0.71, 0.10, 0.47, 100),  // iː — high front (beet)
-  'IH': vowel(0.64, 0.17, 0.50, 80),   // ɪ — near-high front (bit)
-  'EH': vowel(0.57, 0.38, 0.55, 90),   // ɛ — mid front (bet)
-  'AE': vowel(0.43, 0.72, 0.65, 100),  // æ — near-low front (bat)
-  'AA': vowel(0.14, 0.76, 0.60, 110),  // ɑ — low back (father)
-  'AH': vowel(0.29, 0.55, 0.55, 90),   // ʌ — mid central (but)
-  'AO': vowel(0.11, 0.62, 0.35, 100),  // ɔ — mid-low back rounded (bought)
-  'UH': vowel(0.18, 0.17, 0.30, 80),   // ʊ — near-high back (book)
-  'UX': vowel(0.07, 0.10, 0.20, 100),  // uː — high back rounded (boot)
-  'AX': vowel(0.29, 0.38, 0.50, 70),   // ə — schwa (about)
-  'ER': vowel(0.32, 0.35, 0.40, 100),  // ɜ — r-colored mid (bird)
+  'IY': vowel(0.71, 0.10, 0.47),        // iː — high front (beet)
+  'IH': vowel(0.64, 0.17, 0.50, 50),   // ɪ — near-high front (bit) — short
+  'EH': vowel(0.57, 0.38, 0.55, 55),   // ɛ — mid front (bet)
+  'AE': vowel(0.43, 0.72, 0.65, 70),   // æ — near-low front (bat)
+  'AA': vowel(0.14, 0.76, 0.60, 75),   // ɑ — low back (father)
+  'AH': vowel(0.29, 0.55, 0.55, 55),   // ʌ — mid central (but)
+  'AO': vowel(0.11, 0.62, 0.35),       // ɔ — mid-low back rounded (bought)
+  'UH': vowel(0.18, 0.17, 0.30, 50),   // ʊ — near-high back (book)
+  'UX': vowel(0.07, 0.10, 0.20),       // uː — high back rounded (boot)
+  'AX': vowel(0.29, 0.38, 0.50, 40),   // ə — schwa (about) — very short
+  'ER': vowel(0.32, 0.35, 0.40),       // ɜ — r-colored mid (bird)
 
   // ── Diphthongs (use midpoint, sequencer will interpolate) ──
-  'EY': vowel(0.57, 0.30, 0.52, 130),  // eɪ — (bay)
-  'AY': vowel(0.36, 0.55, 0.58, 140),  // aɪ — (buy)
-  'OY': vowel(0.21, 0.45, 0.30, 140),  // ɔɪ — (boy)
-  'AW': vowel(0.21, 0.55, 0.40, 140),  // aʊ — (how)
-  'OW': vowel(0.14, 0.38, 0.30, 130),  // oʊ — (go)
+  'EY': vowel(0.57, 0.30, 0.52, 90),   // eɪ — (bay)
+  'AY': vowel(0.36, 0.55, 0.58, 95),   // aɪ — (buy)
+  'OY': vowel(0.21, 0.45, 0.30, 95),   // ɔɪ — (boy)
+  'AW': vowel(0.21, 0.55, 0.40, 95),   // aʊ — (how)
+  'OW': vowel(0.14, 0.38, 0.30, 85),   // oʊ — (go)
 
   // ── Stops ───────────────────────────────────────────────
   'P*': consonant(0.90, 0, false, 50),    // p — bilabial stop

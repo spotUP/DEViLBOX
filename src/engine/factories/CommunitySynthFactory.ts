@@ -11,6 +11,7 @@ import {
   DEFAULT_SYNARE,
   DEFAULT_SAM,
   DEFAULT_PINK_TROMBONE,
+  DEFAULT_DECTALK,
   VOWEL_FORMANTS,
   DEFAULT_FORMANT_SYNTH,
   DEFAULT_WOBBLE_BASS,
@@ -27,6 +28,7 @@ import { SpaceLaserSynth } from '../SpaceLaserSynth';
 import { SynareSynth } from '../SynareSynth';
 import { SAMSynth } from '../sam/SAMSynth';
 import { PinkTromboneSynth } from '../pinktrombone/PinkTromboneSynth';
+import { DECtalkSynth } from '../dectalk/DECtalkSynth';
 import { V2Synth } from '../v2/V2Synth';
 import { V2SpeechSynth } from '../v2/V2SpeechSynth';
 import { DB303Synth } from '../db303/DB303Synth';
@@ -853,6 +855,15 @@ export function createPinkTrombone(config: InstrumentConfig): Tone.ToneAudioNode
   const synth = new PinkTromboneSynth(ptConfig);
 
   synth.output.gain.value = Tone.dbToGain(getNormalizedVolume('PinkTrombone', config.volume));
+
+  return synth as unknown as Tone.ToneAudioNode;
+}
+
+export function createDECtalk(config: InstrumentConfig): Tone.ToneAudioNode {
+  const dtConfig = config.dectalk || DEFAULT_DECTALK;
+  const synth = new DECtalkSynth(dtConfig);
+
+  synth.output.gain.value = Tone.dbToGain(getNormalizedVolume('DECtalk', config.volume));
 
   return synth as unknown as Tone.ToneAudioNode;
 }

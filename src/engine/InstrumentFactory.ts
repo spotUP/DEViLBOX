@@ -70,6 +70,7 @@ import {
   createV2,
   createSam,
   createPinkTrombone,
+  createDECtalk,
   createSynare,
   createDexed,
   createOBXd,
@@ -338,6 +339,10 @@ export class InstrumentFactory {
         instrument = createPinkTrombone(config);
         break;
 
+      case 'DECtalk':
+        instrument = createDECtalk(config);
+        break;
+
       case 'Synare':
         instrument = createSynare(config);
         break;
@@ -553,9 +558,15 @@ export class InstrumentFactory {
         instrument = createToneJSBasicSynth(config);
         break;
 
-      case 'HivelySynth':
-        instrument = new HivelySynth();
+      case 'HivelySynth': {
+        const hvlSynth = new HivelySynth();
+        if (config.hively) {
+          hvlSynth.setInstrument(config.hively).catch(err =>
+            console.warn('[InstrumentFactory] HivelySynth.setInstrument failed:', err));
+        }
+        instrument = hvlSynth;
         break;
+      }
 
       case 'KlysSynth':
         instrument = new KlysSynth();

@@ -50,8 +50,8 @@ export const ModlandPanel: React.FC<ModlandPanelProps> = ({ isOpen, onLoadTracke
   // Fetch modland status + formats when tab activates
   useEffect(() => {
     if (!isOpen) return;
-    getModlandStatus().then(setModlandStatus).catch(() => {});
-    getModlandFormats().then(setModlandFormats).catch(() => {});
+    getModlandStatus().then(setModlandStatus).catch((err) => console.warn('Modland status unavailable:', err));
+    getModlandFormats().then(setModlandFormats).catch((err) => console.warn('Modland formats unavailable:', err));
     setTimeout(() => modlandSearchRef.current?.focus(), 100);
   }, [isOpen]);
 
@@ -325,7 +325,7 @@ export const HVSCPanel: React.FC<HVSCPanelProps> = ({ isOpen, onLoadTrackerModul
     if (!query) {
       setHvscSearchResults([]);
       if (!hvscPath) {
-        getFeaturedTunes().then(setHvscEntries).catch(() => {});
+        getFeaturedTunes().then(setHvscEntries).catch((err) => console.warn('HVSC featured tunes unavailable:', err));
       } else {
         browseHVSCDirectory(hvscPath);
       }
