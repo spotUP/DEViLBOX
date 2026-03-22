@@ -106,6 +106,7 @@ export const GlModal: React.FC<GlModalProps> = ({
         }}
         eventMode="static"
         onPointerDown={handlePanelClick}
+        onPointerUp={handlePanelClick}
       >
         {/* Header */}
         {title && (
