@@ -484,8 +484,13 @@ export async function startNativeEngines(
   activeSilenceDetectors.clear();
 
   // --- Singleton WASM engines (registry-driven) ---
+  const startedEngineKeys = new Set<string>();
   for (const desc of WASM_ENGINES) {
     if (!shouldActivate(desc, song)) continue;
+
+    // Skip wildcard engines (formats: null) when a format-specific engine
+    // already handles this song — prevents dual audio (e.g. Hively + UADE).
+    if (desc.formats === null && startedEngineKeys.size > 0) continue;
 
     if (desc.suppressNotes) suppressNotes = true;
 
@@ -514,6 +519,8 @@ export async function startNativeEngines(
       if (firstInst) {
         toneEngine.getInstrument(firstInst.id, firstInst);
       }
+
+      startedEngineKeys.add(desc.key);
 
       if (!muted) {
         instance.play();
@@ -775,6 +782,13 @@ export function stopNativeEngines(
           (svSynth as import('@/types/synth').DevilboxSynth).triggerRelease?.();
         }
       } catch { /* ignored */ }
+    }
+    // Reset the shared SunVox handle so a subsequent song load starts clean.
+    // This destroys the old WASM handle and clears ref counts / epoch.
+    if (sunvoxSongInsts.length > 0) {
+      import('@/engine/sunvox-modular/SunVoxModularSynth').then(
+        ({ resetSharedSunVoxHandle }) => resetSharedSunVoxHandle(),
+      ).catch(() => {});
     }
   }
 

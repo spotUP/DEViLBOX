@@ -49,16 +49,46 @@ function forwardReplayerMuteMask(channels: MixerChannelState[], isSoloing: boole
   }
 }
 
-/** Check if the current song has SunVox modular instruments (song mode) */
-function hasSunVoxSongInstruments(): boolean {
+// Lazy-cached SunVox engine references (same pattern as Furnace below)
+let _sunVoxEngine: any = null;
+let _getSharedSunVoxHandle: (() => number) | null = null;
+let _useInstrumentStore: any = null;
+let _useTrackerStore: any = null;
+
+function getSunVoxEngine(): any {
+  if (!_sunVoxEngine) {
+    _sunVoxEngine = require('../engine/sunvox/SunVoxEngine').SunVoxEngine;
+  }
+  return _sunVoxEngine;
+}
+
+function getSharedHandle(): number {
+  if (!_getSharedSunVoxHandle) {
+    _getSharedSunVoxHandle = require('../engine/sunvox-modular/SunVoxModularSynth').getSharedSunVoxHandle;
+  }
+  return _getSharedSunVoxHandle!();
+}
+
+function getInstrumentStore(): any {
+  if (!_useInstrumentStore) {
+    _useInstrumentStore = require('./useInstrumentStore').useInstrumentStore;
+  }
+  return _useInstrumentStore;
+}
+
+function getTrackerStore(): any {
+  if (!_useTrackerStore) {
+    _useTrackerStore = require('./useTrackerStore').useTrackerStore;
+  }
+  return _useTrackerStore;
+}
+
+/** Check if there's an active SunVox song by checking for a shared WASM handle. */
+function hasActiveSunVoxSong(): boolean {
   try {
-    // Late-bound to avoid circular deps (useTrackerStore → useMixerStore)
-    const { useInstrumentStore } = require('./useInstrumentStore');
-    const instruments = useInstrumentStore.getState().instruments;
-    return instruments.some(
-      (i: { synthType?: string; sunvox?: { isSong?: boolean } }) =>
-        i.synthType === 'SunVoxModular' && i.sunvox?.isSong === true
-    );
+    const Engine = getSunVoxEngine();
+    if (!Engine.hasInstance()) return false;
+    return getSharedHandle() >= 0;
   } catch { return false; }
 }
 
@@ -146,25 +176,23 @@ export function getActiveGainEngine(): { setChannelGain(ch: number, gain: number
  */
 function forwardSunVoxModuleMute(channels: MixerChannelState[], isSoloing: boolean): void {
   try {
-    // Lazy import to avoid circular deps at module level
-    const { SunVoxEngine } = require('../engine/sunvox/SunVoxEngine');
-    if (!SunVoxEngine.hasInstance()) return;
-    const engine = SunVoxEngine.getInstance();
-    const { getSharedSunVoxHandle } = require('../engine/sunvox-modular/SunVoxModularSynth');
-    const handle = getSharedSunVoxHandle();
+    const Engine = getSunVoxEngine();
+    if (!Engine.hasInstance()) return;
+    const engine = Engine.getInstance();
+    const handle = getSharedHandle();
     if (handle < 0) return;
 
-    // Late-bound to avoid circular deps
-    const { useTrackerStore } = require('./useTrackerStore');
-    const { useInstrumentStore } = require('./useInstrumentStore');
-    const trackerState = useTrackerStore.getState();
+    const trackerState = getTrackerStore().getState();
     const pattern = trackerState.patterns[trackerState.currentPatternIndex];
     if (!pattern) return;
-    const instruments = useInstrumentStore.getState().instruments;
+    const instruments = getInstrumentStore().getState().instruments;
 
-    // Collect all SunVox module IDs and whether they should be muted
-    // A module is unmuted if ANY channel targeting it is unmuted
-    const moduleUnmuted = new Map<number, boolean>();
+    // Collect SunVox root module IDs into unmuted/muted lists.
+    // The worklet walks the graph downstream from each root to mute entire signal chains.
+    // Shared modules (e.g. reverb used by multiple channels) stay unmuted if ANY chain is active.
+    const unmutedRoots: number[] = [];
+    const mutedRoots: number[] = [];
+    const seen = new Set<number>();
     for (let i = 0; i < pattern.channels.length; i++) {
       const ch = channels[i];
       if (!ch) continue;
@@ -172,16 +200,28 @@ function forwardSunVoxModuleMute(channels: MixerChannelState[], isSoloing: boole
       const inst = instruments.find((ins: { id: number }) => ins.id === instrId);
       if (!inst?.sunvox?.noteTargetModuleId && inst?.sunvox?.noteTargetModuleId !== 0) continue;
       const modId = inst.sunvox.noteTargetModuleId as number;
+      if (seen.has(modId)) continue; // Already handled by a previous channel
+      seen.add(modId);
       const effectiveMute = isSoloing ? !ch.soloed : ch.muted;
-      if (!effectiveMute) moduleUnmuted.set(modId, true);
-      else if (!moduleUnmuted.has(modId)) moduleUnmuted.set(modId, false);
+      // Check if ANY channel targeting this module is unmuted
+      let anyUnmuted = !effectiveMute;
+      if (!anyUnmuted) {
+        for (let j = i + 1; j < pattern.channels.length; j++) {
+          const ch2 = channels[j];
+          if (!ch2) continue;
+          const instrId2 = pattern.channels[j]?.instrumentId;
+          const inst2 = instruments.find((ins: { id: number }) => ins.id === instrId2);
+          if (inst2?.sunvox?.noteTargetModuleId !== modId) continue;
+          const mute2 = isSoloing ? !ch2.soloed : ch2.muted;
+          if (!mute2) { anyUnmuted = true; break; }
+        }
+      }
+      if (anyUnmuted) unmutedRoots.push(modId);
+      else mutedRoots.push(modId);
     }
 
-    // Apply mute/unmute to each SunVox module
-    for (const [modId, unmuted] of moduleUnmuted) {
-      if (unmuted) engine.unmuteModule(handle, modId);
-      else engine.muteModule(handle, modId);
-    }
+    // Send full mute state to worklet — it walks the graph and handles shared modules
+    engine.setModuleMuteState(handle, unmutedRoots, mutedRoots);
   } catch (err) {
     console.warn('[Mixer] forwardSunVoxModuleMute error:', err);
   }
@@ -204,7 +244,7 @@ function forwardWasmChannelGain(ch: number, channels: MixerChannelState[], isSol
   }
 
   // SunVox songs: mute/unmute at the module level inside the WASM
-  if (hasSunVoxSongInstruments()) {
+  if (hasActiveSunVoxSong()) {
     forwardSunVoxModuleMute(channels, isSoloing);
     return;
   }
@@ -240,7 +280,7 @@ function forwardAllWasmChannelGains(channels: MixerChannelState[], isSoloing: bo
   }
 
   // SunVox songs: mute/unmute at the module level
-  if (hasSunVoxSongInstruments()) {
+  if (hasActiveSunVoxSong()) {
     forwardSunVoxModuleMute(channels, isSoloing);
     return;
   }

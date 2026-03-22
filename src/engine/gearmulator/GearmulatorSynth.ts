@@ -540,6 +540,9 @@ export class GearmulatorSynth implements DevilboxSynth {
     }
 
     if (this.workletNode) {
+      // Signal worklet to stop reading the SAB and release references.
+      // Returning false from process() lets the browser GC the processor.
+      this.workletNode.port.postMessage({ type: 'stop' });
       this.workletNode.disconnect();
       this.workletNode = null;
     }
