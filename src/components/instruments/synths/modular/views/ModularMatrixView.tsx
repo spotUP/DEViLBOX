@@ -13,7 +13,7 @@
 import React, { useCallback, useMemo, useState } from 'react';
 import type { ModularPatchConfig, ModularConnection } from '../../../../../types/modular';
 import { ModuleRegistry } from '../../../../../engine/modular/ModuleRegistry';
-import { Knob } from '../../../../controls/Knob';
+import { getSunVoxControlMeta } from '../../../../../engine/sunvox-modular/graphToConfig';
 
 interface ModularMatrixViewProps {
   config: ModularPatchConfig;
@@ -250,31 +250,44 @@ export const ModularMatrixView: React.FC<ModularMatrixViewProps> = ({ config, on
             })}
           </select>
 
-          {/* Parameters */}
-          {selectedModule && selectedDescriptor && (
-            <div className="space-y-4">
-              {selectedDescriptor.parameters.length === 0 && (
-                <p className="text-xs text-text-muted">No parameters available.</p>
-              )}
+          {/* Parameters — use descriptor params, or fall back to SunVox dynamic controls */}
+          {selectedModule && selectedDescriptor && (() => {
+            const params = selectedDescriptor.parameters.length > 0
+              ? selectedDescriptor.parameters
+              : getSunVoxControlMeta(selectedModule.id).map(m => ({
+                  id: `ctl_${m.id}`, name: m.name, min: m.min, max: m.max, default: 0,
+                }));
+            return (
+              <div className="space-y-1">
+                {params.length === 0 && (
+                  <p className="text-xs text-text-muted">No parameters available.</p>
+                )}
 
-              {selectedDescriptor.parameters.map((param) => (
-                <div key={param.id} className="flex flex-col items-center gap-2">
-                  <Knob
-                    value={selectedModule.parameters[param.id] ?? param.default}
-                    min={param.min}
-                    max={param.max}
-                    onChange={(value) => handleParameterChange(selectedModule.id, param.id, value)}
-                    size="sm"
-                    label={param.name}
-                  />
-                  <div className="text-xs text-text-muted">
-                    {(selectedModule.parameters[param.id] ?? param.default).toFixed(2)}
-                    {param.unit && ` ${param.unit}`}
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
+                {params.map((param) => {
+                  const val = selectedModule.parameters[param.id] ?? param.default;
+                  return (
+                    <div key={param.id} className="flex items-center gap-2">
+                      <span className="text-[10px] text-text-muted w-20 truncate shrink-0" title={param.name}>
+                        {param.name}
+                      </span>
+                      <input
+                        type="range"
+                        min={param.min}
+                        max={param.max}
+                        step={(param.max - param.min) > 100 ? 1 : (param.max - param.min) / 100}
+                        value={val}
+                        onChange={(e) => handleParameterChange(selectedModule.id, param.id, parseFloat(e.target.value))}
+                        className="flex-1 h-1 accent-accent-primary cursor-pointer"
+                      />
+                      <span className="text-[10px] text-text-muted w-10 text-right font-mono shrink-0">
+                        {Number.isInteger(val) ? val : val.toFixed(1)}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            );
+          })()}
         </div>
       </div>
     </div>

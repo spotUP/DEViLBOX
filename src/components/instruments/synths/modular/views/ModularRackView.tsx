@@ -311,58 +311,60 @@ export const ModularRackView: React.FC<ModularRackViewProps> = ({ config, onChan
   const laneOffsets = calculateLaneOffsets();
 
   return (
-    <div ref={containerRef} className="relative flex flex-col h-full bg-dark-bg overflow-hidden">
-      {/* SVG overlay for cables */}
-      <svg className="absolute inset-0 pointer-events-none z-10" style={{ width: '100%', height: '100%' }}>
-        {/* Existing connections */}
-        {config.connections.map((conn) => {
-          const sourcePos = positions.get(getPortId(conn.source));
-          const targetPos = positions.get(getPortId(conn.target));
-
-          if (!sourcePos || !targetPos) return null;
-
-          const laneOffset = laneOffsets.get(conn.id) || 0;
-
-          // Determine signal type from source port
-          const sourceModule = configRef.current.modules.find((m) => m.id === conn.source.moduleId);
-          const sourceDescriptor = sourceModule
-            ? ModuleRegistry.get(sourceModule.descriptorId)
-            : null;
-          const sourcePort = sourceDescriptor?.ports.find((p) => p.id === conn.source.portId);
-          const signalType = sourcePort?.signal || 'audio';
-
-          return (
-            <PatchCable
-              key={conn.id}
-              x1={sourcePos.x}
-              y1={sourcePos.y}
-              x2={targetPos.x}
-              y2={targetPos.y}
-              color={conn.color}
-              signal={signalType}
-              isSelected={conn.id === selectedConnectionId}
-              onClick={() => handleConnectionClick(conn.id)}
-              laneOffset={laneOffset}
-            />
-          );
-        })}
-
-        {/* Wiring preview */}
-        {wiringSource && wiringPreview && positions.get(getPortId(wiringSource)) && (
-          <PatchCable
-            x1={positions.get(getPortId(wiringSource))!.x}
-            y1={positions.get(getPortId(wiringSource))!.y}
-            x2={wiringPreview.x}
-            y2={wiringPreview.y}
-          />
-        )}
-      </svg>
-
-      {/* Module rack */}
+    <div className="relative flex flex-col h-full bg-dark-bg overflow-hidden">
+      {/* Module rack — SVG cable overlay lives inside the scroll container
+          so cables scroll with the modules they're connected to */}
       <div ref={scrollContainerRef} className="flex-1 overflow-y-auto p-4">
-        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-          <SortableContext items={config.modules.map((m) => m.id)} strategy={verticalListSortingStrategy}>
-            <div className="flex flex-col gap-12 px-20 max-w-5xl mx-auto">
+        <div ref={containerRef} className="relative">
+          {/* SVG overlay for cables */}
+          <svg className="absolute inset-0 pointer-events-none z-10" style={{ width: '100%', height: '100%' }}>
+            {/* Existing connections */}
+            {config.connections.map((conn) => {
+              const sourcePos = positions.get(getPortId(conn.source));
+              const targetPos = positions.get(getPortId(conn.target));
+
+              if (!sourcePos || !targetPos) return null;
+
+              const laneOffset = laneOffsets.get(conn.id) || 0;
+
+              // Determine signal type from source port
+              const sourceModule = configRef.current.modules.find((m) => m.id === conn.source.moduleId);
+              const sourceDescriptor = sourceModule
+                ? ModuleRegistry.get(sourceModule.descriptorId)
+                : null;
+              const sourcePort = sourceDescriptor?.ports.find((p) => p.id === conn.source.portId);
+              const signalType = sourcePort?.signal || 'audio';
+
+              return (
+                <PatchCable
+                  key={conn.id}
+                  x1={sourcePos.x}
+                  y1={sourcePos.y}
+                  x2={targetPos.x}
+                  y2={targetPos.y}
+                  color={conn.color}
+                  signal={signalType}
+                  isSelected={conn.id === selectedConnectionId}
+                  onClick={() => handleConnectionClick(conn.id)}
+                  laneOffset={laneOffset}
+                />
+              );
+            })}
+
+            {/* Wiring preview */}
+            {wiringSource && wiringPreview && positions.get(getPortId(wiringSource)) && (
+              <PatchCable
+                x1={positions.get(getPortId(wiringSource))!.x}
+                y1={positions.get(getPortId(wiringSource))!.y}
+                x2={wiringPreview.x}
+                y2={wiringPreview.y}
+              />
+            )}
+          </svg>
+
+          <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+            <SortableContext items={config.modules.map((m) => m.id)} strategy={verticalListSortingStrategy}>
+              <div className="flex flex-col gap-12 px-20 max-w-5xl mx-auto">
               {config.modules.map((module) => {
                 const svMatch = module.id.match(/^sv_m(\d+)$/);
                 const svModId = svMatch ? parseInt(svMatch[1], 10) : -1;
@@ -384,16 +386,17 @@ export const ModularRackView: React.FC<ModularRackViewProps> = ({ config, onChan
                   />
                 );
               })}
-            </div>
-          </SortableContext>
-        </DndContext>
+              </div>
+            </SortableContext>
+          </DndContext>
 
-        {/* Empty state */}
-        {config.modules.length === 0 && (
-          <div className="flex items-center justify-center h-full text-text-muted">
-            <p className="text-sm">No modules yet. Click "Add Module" to get started.</p>
-          </div>
-        )}
+          {/* Empty state */}
+          {config.modules.length === 0 && (
+            <div className="flex items-center justify-center h-full text-text-muted">
+              <p className="text-sm">No modules yet. Click "Add Module" to get started.</p>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
