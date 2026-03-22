@@ -77,12 +77,14 @@ function makeRotationAroundPivot(angle: number, pivot: THREE.Vector3, out: THREE
 
 // ── Inner 3D Scene Component ─────────────────────────────────────────────────
 
-interface TurntableSceneProps {
+export interface TurntableSceneProps {
   deckId: 'A' | 'B' | 'C';
   orbitRef: React.RefObject<OrbitControlsImpl | null>;
+  /** When true, skip per-scene lights and OrbitControls (used in unified scene) */
+  embedded?: boolean;
 }
 
-function TurntableScene({ deckId, orbitRef }: TurntableSceneProps) {
+export function TurntableScene({ deckId, orbitRef, embedded }: TurntableSceneProps) {
   const { scene: gltfScene } = useGLTF(MODEL_PATH);
 
   // Refs
@@ -347,10 +349,10 @@ function TurntableScene({ deckId, orbitRef }: TurntableSceneProps) {
   //   33/45 RPM:         left-front  → X≈-12cm,   Z≈+13cm
   return (
     <>
-      {/* Lighting */}
-      <ambientLight intensity={0.5} />
-      <directionalLight position={[2, 5, 3]} intensity={0.9} castShadow={false} />
-      <directionalLight position={[-2, 3, -1]} intensity={0.3} />
+      {/* Per-scene lighting (skipped in unified/embedded mode) */}
+      {!embedded && <ambientLight intensity={0.5} />}
+      {!embedded && <directionalLight position={[2, 5, 3]} intensity={0.9} castShadow={false} />}
+      {!embedded && <directionalLight position={[-2, 3, -1]} intensity={0.3} />}
       <pointLight position={[0, 0.05, 0]} color={accentColor} intensity={0.4} distance={0.6} />
 
       {/* Turntable model — scaled from cm to metres */}
@@ -395,23 +397,26 @@ function TurntableScene({ deckId, orbitRef }: TurntableSceneProps) {
         <meshBasicMaterial transparent opacity={0} depthWrite={false} />
       </mesh>
 
-      <OrbitControls
-        ref={orbitRef}
-        enablePan={false}
-        enableZoom={false}
-        enableRotate={false}
-        enableDamping
-        dampingFactor={0.1}
-        minPolarAngle={Math.PI * 0.05}
-        maxPolarAngle={Math.PI * 0.45}
-        minDistance={0.1}
-        maxDistance={2.0}
-        mouseButtons={{
-          LEFT: undefined as unknown as THREE.MOUSE,
-          MIDDLE: undefined as unknown as THREE.MOUSE,
-          RIGHT: undefined as unknown as THREE.MOUSE,
-        }}
-      />
+      {/* Per-scene orbit controls (skipped in unified/embedded mode) */}
+      {!embedded && (
+        <OrbitControls
+          ref={orbitRef}
+          enablePan={false}
+          enableZoom={false}
+          enableRotate={false}
+          enableDamping
+          dampingFactor={0.1}
+          minPolarAngle={Math.PI * 0.05}
+          maxPolarAngle={Math.PI * 0.45}
+          minDistance={0.1}
+          maxDistance={2.0}
+          mouseButtons={{
+            LEFT: undefined as unknown as THREE.MOUSE,
+            MIDDLE: undefined as unknown as THREE.MOUSE,
+            RIGHT: undefined as unknown as THREE.MOUSE,
+          }}
+        />
+      )}
     </>
   );
 }
