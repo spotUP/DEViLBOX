@@ -177,7 +177,7 @@ export const PixiNewSongWizard: React.FC = () => {
       <pixiGraphics
         draw={drawOverlay}
         eventMode="static"
-        onPointerUp={handleOverlayClick}
+        onPointerTap={handleOverlayClick}
         onWheel={blockWheel}
         layout={{ position: 'absolute', width: screenW, height: screenH }}
       />

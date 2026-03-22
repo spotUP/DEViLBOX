@@ -84,7 +84,7 @@ export const GlModal: React.FC<GlModalProps> = ({
       <pixiGraphics
         draw={drawOverlay}
         eventMode="static"
-        onPointerUp={handleOverlayClick}
+        onPointerTap={handleOverlayClick}
         onWheel={blockWheel}
         layout={{ position: 'absolute', width: screenW, height: screenH }}
       />

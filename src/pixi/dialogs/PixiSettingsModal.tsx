@@ -429,7 +429,7 @@ export const PixiSettingsModal: React.FC<PixiSettingsModalProps> = ({ isOpen, on
       <pixiGraphics
         draw={drawOverlay}
         eventMode="static"
-        onPointerUp={handleOverlayClick}
+        onPointerTap={handleOverlayClick}
         onWheel={blockWheel}
         layout={{ position: 'absolute', width: screenW, height: screenH }}
       />
