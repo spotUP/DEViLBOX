@@ -45,6 +45,7 @@ import {
   importSFX,
   importInstrument,
   detectFileFormat,
+  getOriginalModuleDataForExport,
   type ExportOptions,
 } from '@lib/export/exporters';
 import { NanoExporter } from '@lib/export/NanoExporter';
@@ -274,7 +275,8 @@ export const PixiExportDialog: React.FC<PixiExportDialogProps> = ({ isOpen, onCl
     try {
       switch (exportMode) {
         case 'song': {
-          const sequence = patterns.map((p) => p.id);
+          const { patternOrder } = useTrackerStore.getState();
+          const sequence = patternOrder.map(idx => patterns[idx]?.id).filter(Boolean);
           const automationData: Record<string, Record<number, Record<string, AutomationCurve>>> = {};
           patterns.forEach((pattern) => {
             pattern.channels.forEach((_channel, channelIndex) => {
@@ -293,7 +295,7 @@ export const PixiExportDialog: React.FC<PixiExportDialogProps> = ({ isOpen, onCl
           const { speed } = useTransportStore.getState();
           const { linearPeriods } = useEditorStore.getState();
           const trackerFormat = patterns[0]?.importMetadata?.sourceFormat as string | undefined;
-          exportSong(metadata, bpm, instruments, patterns, sequence, automationData, masterEffects, curves, options, undefined, { speed, trackerFormat, linearPeriods });
+          exportSong(metadata, bpm, instruments, patterns, sequence, automationData, masterEffects, curves, options, undefined, { speed, trackerFormat, linearPeriods }, patternOrder, getOriginalModuleDataForExport());
           onClose();
           break;
         }
