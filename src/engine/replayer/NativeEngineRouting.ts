@@ -783,13 +783,10 @@ export function stopNativeEngines(
         }
       } catch { /* ignored */ }
     }
-    // Reset the shared SunVox handle so a subsequent song load starts clean.
-    // This destroys the old WASM handle and clears ref counts / epoch.
-    if (sunvoxSongInsts.length > 0) {
-      import('@/engine/sunvox-modular/SunVoxModularSynth').then(
-        ({ resetSharedSunVoxHandle }) => resetSharedSunVoxHandle(),
-      ).catch(() => {});
-    }
+    // NOTE: Do NOT call resetSharedSunVoxHandle() here — stopNativeEngines() runs
+    // on every stop/play cycle, not just when loading a new song. Destroying the
+    // handle here makes the song unplayable on resume. The worklet's loadSong
+    // handler already stops playback and clears stale state before loading new data.
   }
 
   // Stop C64SIDEngine (instance-based)
