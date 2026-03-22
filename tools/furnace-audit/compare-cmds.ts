@@ -126,6 +126,10 @@ function parseDvbLog(text: string): CmdEntry[] {
 // - PRE_PORTA/PRE_NOTE are pre-processing markers
 // - Commands filtered by reference's -view commands (playback.cpp:360-371):
 //   VOLUME, NOTE_PORTA, LEGATO, PITCH, PRE_NOTE are all suppressed in the reference output
+// - Macro-generated commands (WAVE, STD_NOISE_*, FM operator params, etc.) are dispatched
+//   internally by the platform's tick() via dispatch->dispatch(), not through the engine's
+//   dispatchCmd(). The reference logs them via its architecture callback, but DVB's WASM
+//   dispatch processes them internally. These are chip-correct but not in DVB's command log.
 function filterComparable(entries: CmdEntry[]): CmdEntry[] {
   return entries.filter(e =>
     !e.cmd.startsWith('GET_') &&
@@ -139,7 +143,11 @@ function filterComparable(entries: CmdEntry[]): CmdEntry[] {
     e.cmd !== 'SAMPLE_MODE' &&
     e.cmd !== 'SAMPLE_FREQ' &&
     e.cmd !== 'SAMPLE_BANK' &&
-    e.cmd !== 'SAMPLE_DIR'
+    e.cmd !== 'SAMPLE_DIR' &&
+    // Macro-generated commands (from dispatch tick, not sequencer):
+    e.cmd !== 'WAVE' &&
+    e.cmd !== 'STD_NOISE_MODE' &&
+    e.cmd !== 'STD_NOISE_FREQ'
   );
 }
 
