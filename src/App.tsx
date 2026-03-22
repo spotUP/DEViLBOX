@@ -729,6 +729,9 @@ function App() {
           <ToastNotification />
           <SynthErrorDialog />
           <RomUploadDialog />
+          <USBSIDWizard />
+          <MIDIControllerWizard />
+          <NKSSetupWizard />
           <ModlandContributionModal
             isOpen={modlandIsOpen}
             onClose={() => useModlandContributionModal.getState().closeModal()}
