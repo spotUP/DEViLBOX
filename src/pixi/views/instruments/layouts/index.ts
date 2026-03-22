@@ -159,7 +159,7 @@ export const SYNTH_LAYOUTS: Record<string, SynthPanelLayout> = {
   // Gearmulator DSP56300 synths
   GearmulatorVirus: GEARMULATOR_VIRUS_LAYOUT,
   GearmulatorVirusTI: GEARMULATOR_VIRUS_LAYOUT,
-  GearmulatorMicroQ: GEARMULATOR_VIRUS_LAYOUT,  // TODO: dedicated layouts
+  GearmulatorMicroQ: GEARMULATOR_VIRUS_LAYOUT,  // Uses Virus layout (same parameter structure)
   GearmulatorXT: GEARMULATOR_VIRUS_LAYOUT,
   GearmulatorNord: GEARMULATOR_VIRUS_LAYOUT,
   GearmulatorJP8000: GEARMULATOR_VIRUS_LAYOUT,

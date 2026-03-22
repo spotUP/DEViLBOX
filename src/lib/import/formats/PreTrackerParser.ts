@@ -25,8 +25,8 @@ import type { InstrumentConfig } from '@/types';
  */
 export function isPreTrackerFormat(buffer: ArrayBuffer): boolean {
   if (buffer.byteLength < 36) return false;
-  // TODO Phase 12: add magic byte validation once format spec is confirmed
-  // For now, this is called only when the file extension matches (.prt)
+  // No known magic bytes — PreTracker has no published format spec.
+  // Detection relies on file extension (.prt) at the call site.
   return true;
 }
 
