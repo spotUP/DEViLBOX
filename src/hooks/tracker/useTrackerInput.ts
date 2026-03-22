@@ -13,6 +13,7 @@ import { useFormatStore } from '@stores/useFormatStore';
 import { useHistoryStore } from '@stores/useHistoryStore';
 import { getToneEngine } from '@engine/ToneEngine';
 import { getTrackerReplayer } from '@engine/TrackerReplayer';
+import { parseMPTClipboard } from '@lib/import/MPTClipboardParser';
 import { getTrackerScratchController } from '@engine/TrackerScratchController';
 import { useNoteInput, useEffectInput, useNavigationInput } from './input';
 
@@ -429,8 +430,39 @@ export const useTrackerInput = () => {
           pasteMix();
           useUIStore.getState().setStatusMessage('MIX PASTE');
         } else {
-          paste();
-          useUIStore.getState().setStatusMessage('PASTE');
+          // Try internal clipboard first, then system clipboard for MPT format
+          const hasInternal = !!useTrackerStore.getState().clipboard;
+          if (hasInternal) {
+            paste();
+            useUIStore.getState().setStatusMessage('PASTE');
+          } else {
+            // Try reading MPT/Furnace format from system clipboard
+            navigator.clipboard.readText().then(text => {
+              const mpt = parseMPTClipboard(text);
+              if (mpt && mpt.rows.length > 0) {
+                const { cursor } = useCursorStore.getState();
+                const store = useTrackerStore.getState();
+                const pattern = store.patterns[store.currentPatternIndex];
+                if (!pattern) return;
+                for (let r = 0; r < mpt.rows.length; r++) {
+                  const targetRow = cursor.rowIndex + r;
+                  if (targetRow >= pattern.length) break;
+                  for (let ch = 0; ch < mpt.rows[r].length; ch++) {
+                    const targetCh = cursor.channelIndex + ch;
+                    if (targetCh >= pattern.channels.length) break;
+                    store.setCell(targetCh, targetRow, mpt.rows[r][ch]);
+                  }
+                }
+                useUIStore.getState().setStatusMessage('PASTE (MPT)');
+              } else {
+                paste(); // fallback to internal
+                useUIStore.getState().setStatusMessage('PASTE');
+              }
+            }).catch(() => {
+              paste(); // clipboard API denied, use internal
+              useUIStore.getState().setStatusMessage('PASTE');
+            });
+          }
         }
         return;
       }
