@@ -359,6 +359,7 @@ export interface DisplayState {
   pattern: number;   // Pattern number
   position: number;  // Song position index
   tick: number;      // Current tick within row
+  duration: number;  // Expected duration of this row in seconds
 }
 
 export class TrackerReplayer {
@@ -434,7 +435,7 @@ export class TrackerReplayer {
   // then dequeued in render loop as audioContext.currentTime advances.
   // Ring buffer avoids O(n) shift() and per-push object allocation.
   private static readonly MAX_STATE_QUEUE_SIZE = 256; // ~5 seconds at 50Hz
-  private stateRing: DisplayState[] = Array.from({ length: 256 }, () => ({ time: 0, row: 0, pattern: 0, position: 0, tick: 0 }));
+  private stateRing: DisplayState[] = Array.from({ length: 256 }, () => ({ time: 0, row: 0, pattern: 0, position: 0, tick: 0, duration: 0 }));
   private stateRingHead = 0;   // Next write index
   private stateRingTail = 0;   // Next read index
   private stateRingCount = 0;  // Number of items in ring
@@ -1291,7 +1292,7 @@ export class TrackerReplayer {
           this.pattPos = update.row;
           const patternNum = this.song.songPositions[update.position] ?? 0;
           const time = Tone.now();
-          this.queueDisplayState(time, update.row, patternNum, update.position, 0);
+          this.queueDisplayState(time, update.row, patternNum, update.position, 0, (2.5 / this.bpm) * this.speed);
           if (this.onRowChange) {
             this.onRowChange(update.row, patternNum, update.position);
           }
@@ -1337,7 +1338,7 @@ export class TrackerReplayer {
           this.pattPos = row;
           const patternNum = this.song!.songPositions[position] ?? 0;
           const time = Tone.now();
-          this.queueDisplayState(time, row, patternNum, position, 0);
+          this.queueDisplayState(time, row, patternNum, position, 0, (2.5 / this.bpm) * this.speed);
           if (this.onRowChange) {
             this.onRowChange(row, patternNum, position);
           }
@@ -1396,18 +1397,22 @@ export class TrackerReplayer {
         // Create all chips needed by this song. For multi-chip songs (e.g. 5E01+NAMCO_CUS30)
         // every secondary chip must also exist or those channels will fall back to the wrong
         // chip handle and crash with "memory access out of bounds" / "table index out of bounds".
+        // Stop the sequencer BEFORE destroying old chips — the process() loop calls
+        // seqTick() which dispatches commands through dispatch handles. If those handles
+        // are destroyed while the sequencer is still ticking, we get WASM traps
+        // ("function signature mismatch", "memory access out of bounds").
+        dispatchEngine.seqStop();
+
         // Also destroy chips from the previous song that this song doesn't use, so they don't
         // accumulate and get rendered unnecessarily.
         const chipIds = this.song.furnaceNative.chipIds ?? [];
-        const newChipSet = new Set(chipIds);
 
-        // Destroy old chips not needed by new song
+        // Destroy ALL old chips to ensure clean state.
+        // Chips shared between songs will be recreated below with fresh dispatch handles.
         const oldChipIds = [...(dispatchEngine as any).chips.keys() as IterableIterator<number>];
         for (const platformType of oldChipIds) {
-          if (!newChipSet.has(platformType)) {
-            console.log('[TrackerReplayer] WASM seq: destroying old chip for platform', platformType);
-            dispatchEngine.destroyChip(platformType);
-          }
+          console.log('[TrackerReplayer] WASM seq: destroying old chip for platform', platformType);
+          dispatchEngine.destroyChip(platformType);
         }
 
         // Create all chips for new song
@@ -1491,7 +1496,7 @@ export class TrackerReplayer {
           const rawCtx = Tone.context.rawContext as AudioContext;
           const latency = rawCtx.outputLatency ?? rawCtx.baseLatency ?? 0;
           const time = audioTime != null ? audioTime + latency : Tone.now();
-          this.queueDisplayState(time, row, patternNum, order, 0);
+          this.queueDisplayState(time, row, patternNum, order, 0, (2.5 / this.bpm) * this.speed);
           // Fire row change callback for UI (pattern editor, transport store)
           if (this.onRowChange) {
             this.onRowChange(row, patternNum, order);
@@ -1580,7 +1585,7 @@ export class TrackerReplayer {
             const rawCtx = Tone.context.rawContext as AudioContext;
             const latency = rawCtx.outputLatency ?? rawCtx.baseLatency ?? 0;
             const time = audioTime != null ? audioTime + latency : Tone.now();
-            this.queueDisplayState(time, row, patternNum, order, 0);
+            this.queueDisplayState(time, row, patternNum, order, 0, (2.5 / this.bpm) * this.speed);
             if (this.onRowChange) {
               this.onRowChange(row, patternNum, order);
             }
@@ -1903,7 +1908,7 @@ export class TrackerReplayer {
     // Queue display state for audio-synced UI (tick 0 = start of row)
     // Use swung time (safeTime) so visual follows the same timing as audio
     if (this.currentTick === 0) {
-      this.queueDisplayState(safeTime, this.pattPos, patternNum, this.songPos, 0);
+      this.queueDisplayState(safeTime, this.pattPos, patternNum, this.songPos, 0, tickInterval * this.speed);
     }
 
     // Process all channels (skipped during scratch note suppression —
@@ -2015,13 +2020,14 @@ export class TrackerReplayer {
    * Queue a display state for audio-synced UI updates.
    * Ring buffer: O(1) enqueue, reuses pre-allocated DisplayState objects.
    */
-  private queueDisplayState(time: number, row: number, pattern: number, position: number, tick: number): void {
+  private queueDisplayState(time: number, row: number, pattern: number, position: number, tick: number, duration: number = 0): void {
     const s = this.stateRing[this.stateRingHead];
     s.time = time;
     s.row = row;
     s.pattern = pattern;
     s.position = position;
     s.tick = tick;
+    s.duration = duration;
     this.stateRingHead = (this.stateRingHead + 1) % TrackerReplayer.MAX_STATE_QUEUE_SIZE;
     if (this.stateRingCount < TrackerReplayer.MAX_STATE_QUEUE_SIZE) {
       this.stateRingCount++;
@@ -4571,7 +4577,10 @@ export class TrackerReplayer {
       const ch0Song = this.channelSongPos[0];
       const ch0Patt = this.channelPattPos[0];
       const ch0Pat  = tables[0]?.[ch0Song] ?? 0;
-      this.queueDisplayState(time, ch0Patt, ch0Pat, ch0Song, 0);
+      const ch0Speed = (grooves?.[0] ?? 0) > 0 && this.channelGrooveToggle[0]
+        ? ((grooves ?? [])[0] ?? fallback)
+        : (speeds?.[0] ?? fallback);
+      this.queueDisplayState(time, ch0Patt, ch0Pat, ch0Song, 0, tickInterval * ch0Speed);
       if (this.onRowChange) this.onRowChange(ch0Patt, ch0Pat, ch0Song);
     }
 
