@@ -17,6 +17,7 @@ import type { Container as ContainerType, Graphics as GraphicsType, FederatedPoi
 import { Graphics } from 'pixi.js';
 import { usePixiTheme } from '@/pixi/theme';
 import { useTransportStore } from '@/stores/useTransportStore';
+import { useUIStore } from '@/stores/useUIStore';
 import { PIXI_FONTS } from '@/pixi/fonts';
 import type { FurnaceNativeData, FurnaceRow } from '@/types';
 
@@ -127,7 +128,7 @@ export const PixiFurnacePatternEditor: React.FC<FurnacePatternEditorProps> = ({
   }, [sub, chanCollapse]);
 
   // Cumulative channel start x (absolute, before scroll offset)
-  const chanXStarts = useMemo(() => {
+  const chanXStartsRaw = useMemo(() => {
     const starts: number[] = [];
     let x = ROW_NUM_WIDTH;
     for (const w of channelWidths) { starts.push(x); x += w; }
@@ -135,6 +136,11 @@ export const PixiFurnacePatternEditor: React.FC<FurnacePatternEditorProps> = ({
   }, [channelWidths]);
 
   const totalW     = ROW_NUM_WIDTH + channelWidths.reduce((s, w) => s + w, 0);
+  // Center pattern horizontally when content is narrower than viewport
+  const centerOffsetX = totalW < width ? Math.floor((width - totalW) / 2) : 0;
+  const chanXStarts = useMemo(() =>
+    chanXStartsRaw.map(x => x + centerOffsetX),
+  [chanXStartsRaw, centerOffsetX]);
   const visRows    = Math.floor((height - HEADER_HEIGHT) / ROW_HEIGHT);
   const maxScrollY = Math.max(0, patLen * ROW_HEIGHT - visRows * ROW_HEIGHT);
   const maxScrollX = Math.max(0, totalW - width);
@@ -320,6 +326,33 @@ export const PixiFurnacePatternEditor: React.FC<FurnacePatternEditorProps> = ({
     }
   }, [patLen, numChannels, chanXStarts, channelWidths, sub]);
 
+  // Right-click on instrument column: open instrument editor for that instrument
+  const handleRightClick = useCallback((e: FederatedPointerEvent) => {
+    const c = containerRef.current;
+    if (!c || !sub) return;
+    const local = c.toLocal(e.global);
+    if (local.y < HEADER_HEIGHT) return;
+    const row = Math.floor((local.y - HEADER_HEIGHT + scrollTopRef.current) / ROW_HEIGHT);
+    const lx = local.x + scrollLeftRef.current;
+    if (lx < ROW_NUM_WIDTH) return;
+    for (let ch = 0; ch < numChannels; ch++) {
+      const chX = chanXStarts[ch] ?? 0;
+      if (lx < chX + channelWidths[ch]) {
+        const rel = lx - chX;
+        // Only handle right-click on instrument column
+        if (rel >= NOTE_WIDTH && rel < NOTE_WIDTH + INS_WIDTH) {
+          const patIdx = sub.orders[ch]?.[currentPosition];
+          const fRow = patIdx !== undefined ? sub.channels[ch]?.patterns.get(patIdx)?.rows[row] : null;
+          if (fRow && fRow.ins >= 0) {
+            // Open instrument editor for this instrument
+            useUIStore.getState().openModal('instruments', { instrumentId: fRow.ins });
+          }
+        }
+        break;
+      }
+    }
+  }, [sub, numChannels, chanXStarts, channelWidths, currentPosition]);
+
   // Draw all backgrounds, row highlights, cursor column, and channel borders
   const drawBg = useCallback((g: GraphicsType) => {
     g.clear();
@@ -368,7 +401,7 @@ export const PixiFurnacePatternEditor: React.FC<FurnacePatternEditorProps> = ({
     const labels: { x: number; y: number; text: string; color: number }[] = [];
 
     // Header
-    labels.push({ x: 4, y: TEXT_Y, text: 'Row', color: theme.textMuted.color });
+    labels.push({ x: 4 + centerOffsetX, y: TEXT_Y, text: 'Row', color: theme.textMuted.color });
     if (sub) {
       for (let ch = 0; ch < numChannels; ch++) {
         const chX = chanXStarts[ch] - scrollLeft;
@@ -391,7 +424,7 @@ export const PixiFurnacePatternEditor: React.FC<FurnacePatternEditorProps> = ({
         if (y < HEADER_HEIGHT || y + FONT_SIZE > height) continue;
         const isHilightB = row % 16 === 0;
         labels.push({
-          x: 4, y,
+          x: 4 + centerOffsetX, y,
           text: row.toString(16).toUpperCase().padStart(2, '0'),
           color: isHilightB ? theme.text.color : theme.textMuted.color,
         });
@@ -454,7 +487,7 @@ export const PixiFurnacePatternEditor: React.FC<FurnacePatternEditorProps> = ({
 
     return labels;
   }, [sub, numChannels, startRow, endRow, scrollTop, scrollLeft, height, width, theme,
-      currentPosition, chanXStarts, channelWidths, chanCollapse]);
+      currentPosition, chanXStarts, channelWidths, chanCollapse, centerOffsetX]);
 
   return (
     <pixiContainer
@@ -462,6 +495,7 @@ export const PixiFurnacePatternEditor: React.FC<FurnacePatternEditorProps> = ({
       layout={{ width, height }}
       eventMode="static"
       onPointerDown={handlePointerDown}
+      onRightClick={handleRightClick}
     >
       <pixiGraphics draw={drawBg} layout={{ position: 'absolute', width, height }} />
       {cellLabels.map((l, i) => (
