@@ -174,7 +174,7 @@ export const MasterEffectsPanel = forwardRef<MasterEffectsPanelHandle, MasterEff
   const syncPresetsToServer = useCallback((presets: UserMasterFxPreset[]) => {
     import('@/lib/cloudSync').then(({ pushToCloud }) => {
       import('@/hooks/useCloudSync').then(({ SYNC_KEYS }) => {
-        pushToCloud(SYNC_KEYS.MASTER_FX_PRESETS, presets).catch(() => {});
+        pushToCloud(SYNC_KEYS.MASTER_FX_PRESETS, presets).catch((err) => console.warn('FX preset cloud sync failed:', err));
       });
     });
   }, []);
@@ -429,6 +429,7 @@ export const MasterEffectsPanel = forwardRef<MasterEffectsPanelHandle, MasterEff
                 if (e.key === 'Enter') handleSavePreset();
                 if (e.key === 'Escape') setShowSaveDialog(false);
               }}
+              maxLength={64}
               className="flex-1 px-3 py-1.5 text-sm bg-dark-bg border border-dark-border rounded text-text-primary
                        placeholder-text-muted focus:outline-none focus:border-accent-primary"
               autoFocus

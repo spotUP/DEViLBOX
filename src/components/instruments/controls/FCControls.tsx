@@ -93,7 +93,7 @@ export const FCControls: React.FC<FCControlsProps> = ({ config, onChange, uadeCh
     (key: keyof FCConfig, value: FCConfig[keyof FCConfig], byteOffset: number) => {
       upd(key as Parameters<typeof upd>[0], value as Parameters<typeof upd>[1]);
       if (uadeChipRam && typeof value === 'number' && UADEEngine.hasInstance()) {
-        void getEditor().writeU8(uadeChipRam.instrBase + byteOffset, value & 0xFF).catch(() => {});
+        void getEditor().writeU8(uadeChipRam.instrBase + byteOffset, value & 0xFF).catch((err) => console.warn('FC chip RAM write failed:', err));
       }
     },
     [upd, uadeChipRam, getEditor],
@@ -113,7 +113,7 @@ export const FCControls: React.FC<FCControlsProps> = ({ config, onChange, uadeCh
         // Write opcodes to bytes [5..63] — pad with 0xE1 (end) if shorter than 59
         const fullBuf = new Array(59).fill(0xE1);
         for (let i = 0; i < opcodes.length; i++) fullBuf[i] = opcodes[i];
-        void getEditor().writeBlock(uadeChipRam.instrBase + 5, fullBuf).catch(() => {});
+        void getEditor().writeBlock(uadeChipRam.instrBase + 5, fullBuf).catch((err) => console.warn('FC chip RAM write failed:', err));
       }
     },
     [upd, uadeChipRam, getEditor],

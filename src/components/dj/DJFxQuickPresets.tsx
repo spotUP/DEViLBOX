@@ -91,7 +91,7 @@ export const DJFxQuickPresets: React.FC = () => {
   // ── Server sync helper (uses centralized cloudSync) ─────────────────────
 
   const syncToServer = useCallback((presets: UserMasterFxPreset[]) => {
-    pushToCloud(SYNC_KEYS.MASTER_FX_PRESETS, presets).catch(() => {});
+    pushToCloud(SYNC_KEYS.MASTER_FX_PRESETS, presets).catch((err) => console.warn('FX preset cloud sync failed:', err));
   }, []);
 
   // ── Apply preset ───────────────────────────────────────────────────────

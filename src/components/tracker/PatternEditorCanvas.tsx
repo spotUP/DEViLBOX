@@ -111,6 +111,11 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
   const formatChannelsRef     = useRef<FormatChannel[] | undefined>(undefined);
   const formatPatternSnapshotRef = useRef<PatternSnapshot[]>([]);
 
+  // Auto-focus in format mode so keyboard navigation works immediately
+  useEffect(() => {
+    if (isFormatMode) containerRef.current?.focus();
+  }, [isFormatMode]);
+
   // Keep refs in sync with props on every render
   isFormatModeRef.current     = isFormatMode;
   formatCurrentRowRef.current = formatCurrentRow ?? 0;
@@ -161,6 +166,10 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
     channelIndex: 0, rowIndex: 0, columnIndex: 0,
   });
   const [formatOctave, setFormatOctave] = useState(3);
+
+  // RAF-based held-arrow scrolling for format mode (matches useNavigationInput behavior)
+  const formatHeldArrowRef = useRef<{ dir: number } | null>(null);
+  const formatArrowRafRef = useRef(0);
 
   // Bridge to the OffscreenCanvas worker
   const bridgeRef = useRef<TrackerOffscreenBridge | null>(null);
@@ -702,9 +711,33 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
     if (e.key === '[' || e.key === '-') { e.preventDefault(); setFormatOctave(o => Math.max(0, o - 1)); return; }
     if (e.key === ']' || e.key === '=') { e.preventDefault(); setFormatOctave(o => Math.min(7, o + 1)); return; }
 
+    // Arrow up/down: RAF-based hold-to-scroll (no initial delay, 50ms interval)
+    if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+      e.preventDefault();
+      if (e.repeat) return; // RAF loop handles repeats
+      const dir = e.key === 'ArrowUp' ? -1 : 1;
+      moveCursor({ rowIndex: dir });
+      formatHeldArrowRef.current = { dir };
+      if (!formatArrowRafRef.current) {
+        let lastMove = performance.now();
+        const tick = (now: number) => {
+          if (!formatHeldArrowRef.current) { formatArrowRafRef.current = 0; return; }
+          if (now - lastMove >= 50) {
+            lastMove = now;
+            setFormatCursor(prev => ({
+              ...prev,
+              rowIndex: Math.max(0, Math.min(numRows - 1,
+                prev.rowIndex + formatHeldArrowRef.current!.dir)),
+            }));
+          }
+          formatArrowRafRef.current = requestAnimationFrame(tick);
+        };
+        formatArrowRafRef.current = requestAnimationFrame(tick);
+      }
+      return;
+    }
+
     switch (e.key) {
-      case 'ArrowUp':    e.preventDefault(); moveCursor({ rowIndex: -1 }); return;
-      case 'ArrowDown':  e.preventDefault(); moveCursor({ rowIndex: +1 }); return;
       case 'ArrowLeft':  e.preventDefault(); moveCursor({ columnIndex: -1 }); return;
       case 'ArrowRight': e.preventDefault(); moveCursor({ columnIndex: +1 }); return;
       case 'Tab':        e.preventDefault(); moveCursor({ channelIndex: e.shiftKey ? -1 : +1 }); return;
@@ -1628,15 +1661,10 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
             activePatternIdx = audioState.pattern;
             
             // Compute smooth offset for worker rendering
-            if (transportState.smoothScrolling) {
-              const nextState = replayer.getStateAtTime(audioTime + 0.5, true);
-              const effectiveDuration = (nextState && nextState.row !== audioState.row)
-                ? nextState.time - audioState.time
-                : (2.5 / transportState.bpm) * transportState.speed;
-              if (effectiveDuration > 0) {
-                const progress = Math.min(Math.max((audioTime - audioState.time) / effectiveDuration, 0), 1);
-                smoothOffset = progress * rowHeightRef.current;
-              }
+            if (transportState.smoothScrolling && audioState.duration > 0) {
+              const progress = Math.min(Math.max(
+                (audioTime - audioState.time) / audioState.duration, 0), 1);
+              smoothOffset = progress * rowHeightRef.current;
             }
           } else {
             // UADE / opaque playback: replayer has no state, use transport store row
@@ -2245,11 +2273,16 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
                 <div
                   ref={containerRef}
                   className="flex-1 relative bg-dark-bg overflow-hidden touch-none focus:outline-none focus:ring-1 focus:ring-accent-primary/30"
-
+                  data-pattern-editor="true"
         style={{ minHeight: 200 }}
         tabIndex={0}
         onContextMenu={handleContextMenu}
         onKeyDown={isFormatMode ? handleFormatKeyDown : undefined}
+        onKeyUp={isFormatMode ? (e: React.KeyboardEvent) => {
+          if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+            formatHeldArrowRef.current = null;
+          }
+        } : undefined}
         onMouseDown={handleMouseDown}
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}

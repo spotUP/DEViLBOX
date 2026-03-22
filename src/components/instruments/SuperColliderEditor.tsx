@@ -290,7 +290,7 @@ export const SuperColliderEditor: React.FC<Props> = ({ config, onChange }) => {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ name: data.synthDefName, result: data }),
-        }).catch(() => {});
+        }).catch((err) => console.warn('SC cache write failed:', err));
       } else {
         finishProgress(false);
         setStatus({ state: 'error', message: data.error, line: data.line, rawOutput: data.rawOutput });
@@ -575,7 +575,7 @@ export const SuperColliderEditor: React.FC<Props> = ({ config, onChange }) => {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ name: data.synthDefName, result: data }),
-        }).catch(() => {});
+        }).catch((err) => console.warn('SC cache write failed:', err));
       } else {
         finishProgress(false);
         setStatus({ state: 'error', message: data.error, line: data.line, rawOutput: data.rawOutput });

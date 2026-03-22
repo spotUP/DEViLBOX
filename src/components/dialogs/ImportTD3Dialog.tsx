@@ -87,7 +87,7 @@ export const ImportTD3Dialog: React.FC<ImportTD3DialogProps> = ({
 
   return (
     <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
-      <div className="bg-dark-bgSecondary border border-dark-border rounded-lg shadow-xl w-[420px] max-h-[75vh] overflow-hidden flex flex-col">
+      <div className="bg-dark-bgSecondary border border-dark-border rounded-lg shadow-xl w-full max-w-[90vw] md:max-w-[420px] max-h-[75vh] overflow-hidden flex flex-col">
 
         {/* Header */}
         <div className="flex items-center justify-between px-4 py-3 border-b border-dark-border flex-shrink-0">

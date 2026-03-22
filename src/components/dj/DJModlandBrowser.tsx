@@ -55,8 +55,8 @@ export const DJModlandBrowser: React.FC<DJModlandBrowserProps> = ({ onClose }) =
   // ── Init: fetch status + formats ────────────────────────────────────────
 
   useEffect(() => {
-    getModlandStatus().then(setStatus).catch(() => {});
-    getModlandFormats().then(fmts => setFormats(fmts.sort((a, b) => a.format.localeCompare(b.format)))).catch(() => {});
+    getModlandStatus().then(setStatus).catch((err) => console.warn('Modland status unavailable:', err));
+    getModlandFormats().then(fmts => setFormats(fmts.sort((a, b) => a.format.localeCompare(b.format)))).catch((err) => console.warn('Modland formats unavailable:', err));
     // Auto-focus search input
     requestAnimationFrame(() => inputRef.current?.focus());
   }, []);

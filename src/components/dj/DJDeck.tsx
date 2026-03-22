@@ -313,7 +313,6 @@ export const DJDeck: React.FC<DJDeckProps> = ({ deckId }) => {
           // Switch to visualizer view for modules
           useDJStore.getState().setDeckViewMode('visualizer');
           
-          console.log(`[DJDeck] Loaded ${file.name} in audio mode (skipped tracker bugs)`);
         } catch (err) {
           console.error(`[DJDeck] Pipeline failed:`, err);
         }

@@ -1,11 +1,10 @@
 /**
  * eSpeak-NG WebAssembly text-to-phoneme engine.
  *
- * Replaces SAM's 1982 reciter with modern eSpeak-NG (100+ languages,
- * proper stress, correct pronunciation for irregular English words).
+ * Loads eSpeak-NG directly from public/ via dynamic import, bypassing
+ * Vite's dep optimizer which breaks Emscripten's import.meta.url resolution.
  *
  * Only uses the phoneme analysis pipeline — no audio synthesis.
- * The phoneme output feeds into our existing LPC/formant chip engines.
  */
 
 import type { PhonemeToken } from './Reciter';
@@ -13,45 +12,56 @@ import type { PhonemeToken } from './Reciter';
 let espeakModule: any = null;
 let espeakWorker: any = null;
 let initPromise: Promise<void> | null = null;
+let initFailed = false;
 
 /**
- * Lazy-initialize eSpeak-NG WASM module.
- * First call loads ~24MB of language data; subsequent calls are instant.
+ * Initialize eSpeak-NG WASM module.
+ * Excluded from Vite's dep optimizer (vite.config.ts optimizeDeps.exclude)
+ * so import.meta.url inside the module resolves correctly to node_modules.
  */
 async function ensureInitialized(): Promise<void> {
   if (espeakWorker) return;
+  if (initFailed) return;
   if (initPromise) return initPromise;
 
   initPromise = (async () => {
     try {
+      const t0 = performance.now();
+
       // @ts-expect-error -- no type declarations for this WASM package
       const { default: EspeakModule } = await import('@echogarden/espeak-ng-emscripten');
-      // Override locateFile to serve stripped espeak-ng.data from public/ (1.1MB, 6 langs)
-      espeakModule = await EspeakModule({
-        locateFile: (path: string) => {
-          if (path === 'espeak-ng.data') return '/espeak-ng.data';
-          return path;
-        },
-      });
+
+      espeakModule = await EspeakModule();
+
       espeakWorker = new espeakModule.eSpeakNGWorker();
       espeakWorker.set_voice('en');
-      console.log('[eSpeak-NG] Initialized successfully');
+
+      // Self-test: verify convert_to_phonemes works and log return type
+      const testResult = espeakWorker.convert_to_phonemes('hi', true);
+      console.log(`[eSpeak-NG] Self-test result type: ${typeof testResult}`, testResult);
+      if (testResult && typeof testResult === 'object') {
+        console.log(`[eSpeak-NG] Self-test keys:`, Object.keys(testResult));
+      }
+      console.log(`[eSpeak-NG] Initialized in ${(performance.now() - t0).toFixed(0)}ms`);
     } catch (e) {
-      console.warn('[eSpeak-NG] Failed to initialize, falling back to SAM:', e);
+      console.warn('[eSpeak-NG] Failed to initialize:', e);
       espeakModule = null;
       espeakWorker = null;
+      initFailed = true;
+      initPromise = null;
     }
   })();
 
   return initPromise;
 }
 
-/** Read a C string from WASM heap */
+/** Read a C string from WASM heap (with safety limit to prevent infinite loops) */
 function readCString(ptr: number): string {
-  if (!espeakModule || !ptr) return '';
+  if (!espeakModule || typeof ptr !== 'number' || ptr <= 0 || !isFinite(ptr)) return '';
   const heap = espeakModule.HEAPU8 as Uint8Array;
   let end = ptr;
-  while (heap[end] !== 0) end++;
+  const maxLen = Math.min(ptr + 10000, heap.length); // safety limit
+  while (end < maxLen && heap[end] !== 0) end++;
   return new TextDecoder().decode(heap.slice(ptr, end));
 }
 
@@ -65,10 +75,23 @@ export async function espeakTextToIPA(text: string, voice = 'en'): Promise<strin
   if (!espeakWorker) return null;
 
   try {
-    // Set voice if different
     espeakWorker.set_voice(voice);
-    const ptr = espeakWorker.convert_to_phonemes(text, true); // true = IPA
-    return readCString(ptr.ptr);
+    const result = espeakWorker.convert_to_phonemes(text, true); // true = IPA
+
+    // Result may be { ptr: number } (Embind object) or a raw number
+    let ptrVal: number;
+    if (result && typeof result === 'object' && 'ptr' in result) {
+      ptrVal = result.ptr;
+    } else if (typeof result === 'number') {
+      ptrVal = result;
+    } else {
+      console.warn('[eSpeak-NG] Unexpected return type from convert_to_phonemes:', typeof result, result);
+      return null;
+    }
+
+    const ipa = readCString(ptrVal);
+    console.log(`[eSpeak-NG] "${text}" → IPA: "${ipa}"`);
+    return ipa || null;
   } catch (e) {
     console.warn('[eSpeak-NG] Phoneme conversion failed:', e);
     return null;
@@ -182,7 +205,6 @@ export function parseEspeakIPA(ipa: string): PhonemeToken[] {
 
       if (!matched && remaining !== 'ː' && remaining !== 'ˑ') {
         // Unknown IPA symbol — skip silently
-        // console.warn(`[eSpeak-NG] Unknown IPA: "${remaining}" (${remaining.codePointAt(0)})`);
       }
 
       nextStress = 1; // reset for next phoneme

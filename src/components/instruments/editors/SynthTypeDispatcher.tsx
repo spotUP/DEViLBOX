@@ -22,6 +22,7 @@ import {
   DEFAULT_SUPERCOLLIDER,
   DEFAULT_WOBBLE_BASS,
   DEFAULT_PINK_TROMBONE,
+  DEFAULT_DECTALK,
 } from '@typedefs/instrument';
 import { deepMerge } from '../../../lib/migration';
 import { EditorHeader, type VizMode } from '../shared/EditorHeader';
@@ -68,6 +69,7 @@ const V2Controls = lazy(() => import('../controls/V2Controls').then(m => ({ defa
 const V2SpeechControls = lazy(() => import('../controls/V2SpeechControls').then(m => ({ default: m.V2SpeechControls })));
 const SAMControls = lazy(() => import('../controls/SAMControls').then(m => ({ default: m.SAMControls })));
 const PinkTromboneControls = lazy(() => import('../controls/PinkTromboneControls').then(m => ({ default: m.PinkTromboneControls })));
+const DECtalkControls = lazy(() => import('../controls/DECtalkControls').then(m => ({ default: m.DECtalkControls })));
 const SynareControls = lazy(() => import('../controls/SynareControls').then(m => ({ default: m.SynareControls })));
 const MAMEControls = lazy(() => import('../controls/MAMEControls').then(m => ({ default: m.MAMEControls })));
 const ChipSynthControls = lazy(() => import('../controls/ChipSynthControls').then(m => ({ default: m.ChipSynthControls })));
@@ -133,7 +135,7 @@ const WavetableListEditor = lazy(() => import('./WavetableEditor').then(m => ({ 
 
 
 // Types
-export type EditorMode = 'generic' | 'tb303' | 'furnace' | 'buzzmachine' | 'sample' | 'dubsiren' | 'spacelaser' | 'v2' | 'sam' | 'pinktrombone' | 'synare' | 'mame' | 'mamechip' | 'dexed' | 'obxd' | 'wam' | 'tonewheelOrgan' | 'melodica' | 'vital' | 'odin2' | 'surge' | 'vstbridge' | 'harmonicsynth' | 'modular' | 'sunvox-modular' | 'hively' | 'jamcracker' | 'soundmon' | 'sidmon' | 'digmug' | 'fc' | 'deltamusic1' | 'deltamusic2' | 'fred' | 'tfmx' | 'octamed' | 'sidmon1' | 'hippelcoso' | 'robhubbard' | 'steveturner' | 'davidwhittaker' | 'sonic-arranger' | 'instereo2' | 'musicline' | 'supercollider' | 'gearmulator' | 'wobblebass' | 'startrekker-am' | 'futureplayer' | 'symphonie';
+export type EditorMode = 'generic' | 'tb303' | 'furnace' | 'buzzmachine' | 'sample' | 'dubsiren' | 'spacelaser' | 'v2' | 'sam' | 'pinktrombone' | 'dectalk' | 'synare' | 'mame' | 'mamechip' | 'dexed' | 'obxd' | 'wam' | 'tonewheelOrgan' | 'melodica' | 'vital' | 'odin2' | 'surge' | 'vstbridge' | 'harmonicsynth' | 'modular' | 'sunvox-modular' | 'hively' | 'jamcracker' | 'soundmon' | 'sidmon' | 'digmug' | 'fc' | 'deltamusic1' | 'deltamusic2' | 'fred' | 'tfmx' | 'octamed' | 'sidmon1' | 'hippelcoso' | 'robhubbard' | 'steveturner' | 'davidwhittaker' | 'sonic-arranger' | 'instereo2' | 'musicline' | 'supercollider' | 'gearmulator' | 'wobblebass' | 'startrekker-am' | 'futureplayer' | 'symphonie' | 'xrns-synth' | 'sunvox-synth';
 
 // ============================================================================
 // GEARMULATOR EDITOR SECTION
@@ -1715,6 +1717,74 @@ export const SynthTypeDispatcher: React.FC<SynthTypeDispatcherProps> = ({
       </div>
     );
   }
+  // ============================================================================
+  // DECTALK SPEECH SYNTHESIZER EDITOR
+  // ============================================================================
+  if (editorMode === 'dectalk') {
+    const accentColor = isCyanTheme ? '#00ffff' : '#00ff88';
+    const headerBg = isCyanTheme
+      ? 'bg-[#041010] border-b-2 border-accent-highlight'
+      : 'bg-gradient-to-r from-[#1a2a1a] to-[#151515] border-b-4 border-[#00ff88]';
+
+    const dtConfig = deepMerge(DEFAULT_DECTALK, instrument.dectalk || {});
+
+    return (
+      <div className="synth-editor-container bg-gradient-to-b from-[#1e1e1e] to-[#151515]">
+        <EditorHeader
+          instrument={instrument}
+          onChange={handleChange}
+          vizMode={vizMode}
+          onVizModeChange={setVizMode}
+          onBake={handleBake}
+          onBakePro={handleBakePro}
+          onUnbake={handleUnbake}
+          isBaked={isBaked}
+          isBaking={isBaking}
+          customHeader={
+            <div className={`synth-editor-header px-4 py-3 ${headerBg}`}>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 rounded-lg bg-gradient-to-br from-emerald-500 to-emerald-700 shadow-lg text-text-primary">
+                    <MessageSquare size={24} />
+                  </div>
+                  <div>
+                    <h2 className="text-xl font-black tracking-tight" style={{ color: accentColor }}>DECtalk</h2>
+                    <p className={`text-[10px] uppercase tracking-widest ${isCyanTheme ? 'text-accent-highlight' : 'text-text-secondary'}`}>Formant Speech Synthesizer</p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => handleChange({ isLive: !instrument.isLive })}
+                    className={`p-1.5 rounded transition-all flex items-center gap-1.5 px-2 ${
+                      instrument.isLive
+                        ? 'bg-accent-success/20 text-accent-success ring-1 ring-accent-success/50 animate-pulse-glow'
+                        : 'bg-dark-bgTertiary text-text-muted hover:text-text-secondary border border-dark-borderLight'
+                    }`}
+                  >
+                    <Radio size={14} />
+                    <span className="text-[10px] font-bold uppercase">LIVE</span>
+                  </button>
+
+                  <PresetDropdown
+                    synthType={instrument.synthType}
+                    onChange={handleChange}
+                  />
+                </div>
+              </div>
+            </div>
+          }
+        />
+        <Suspense fallback={<LoadingControls />}>
+          <DECtalkControls
+            config={dtConfig}
+            instrumentId={instrument.id}
+            onChange={(updates) => handleChange({ dectalk: { ...instrument.dectalk!, ...updates } })}
+          />
+        </Suspense>
+      </div>
+    );
+  }
   if (editorMode === 'synare') {
     const synareConfig = deepMerge(DEFAULT_SYNARE, instrument.synare || {});
 
@@ -2507,6 +2577,97 @@ export const SynthTypeDispatcher: React.FC<SynthTypeDispatcherProps> = ({
               onChange={(updates) => handleChange({ harmonicSynth: { ...harmonicConfig, ...updates } })}
             />
           </Suspense>
+        </div>
+      </div>
+    );
+  }
+
+  // ============================================================================
+  // XRNS DEMOSCENE SYNTHS (WaveSabre, Oidos, Tunefish)
+  // ============================================================================
+  if (editorMode === 'xrns-synth') {
+    const xrnsSynthType = instrument.xrns?.synthType || instrument.synthType;
+    const paramCount = instrument.xrns?.parameters?.length || 0;
+    const displayName = xrnsSynthType.replace('wavesabre-', '').replace('WaveSabreSynth', 'WaveSabre').replace('OidosSynth', 'Oidos').replace('TunefishSynth', 'Tunefish 4');
+    return (
+      <div className="synth-editor-container bg-gradient-to-b from-[#1e1e1e] to-[#151515]">
+        <EditorHeader
+          instrument={instrument}
+          onChange={handleChange}
+          vizMode={vizMode}
+          onVizModeChange={setVizMode}
+          onBake={handleBake}
+          onBakePro={handleBakePro}
+          onUnbake={handleUnbake}
+          isBaked={isBaked}
+          isBaking={isBaking}
+          customHeader={
+            <div className="synth-editor-header px-4 py-3 bg-gradient-to-r from-[#1a1a2e] to-[#16162a] border-b border-[#2a2a4e]">
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-lg bg-gradient-to-br from-purple-600 to-purple-800 shadow-lg text-text-primary">
+                  <Cpu size={20} />
+                </div>
+                <div>
+                  <h2 className="text-base font-bold tracking-wide text-purple-300">{displayName.toUpperCase()}</h2>
+                  <p className="text-[10px] uppercase tracking-widest text-purple-500">XRNS WASM Synth · {paramCount} parameters</p>
+                </div>
+              </div>
+            </div>
+          }
+        />
+        <div className="px-4 py-6 text-text-secondary text-sm">
+          <p>Parameters loaded from XRNS file.</p>
+          {instrument.xrns?.pluginIdentifier && (
+            <p className="mt-2 text-xs opacity-60">Plugin: {instrument.xrns.pluginIdentifier}</p>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  // ============================================================================
+  // SUNVOX SYNTH EDITOR (single patch, not modular)
+  // ============================================================================
+  if (editorMode === 'sunvox-synth') {
+    const patchName = instrument.sunvox?.patchName || 'Untitled Patch';
+    const controlCount = instrument.sunvox?.controlValues ? Object.keys(instrument.sunvox.controlValues).length : 0;
+    const isSong = instrument.sunvox?.isSong ?? false;
+    return (
+      <div className="synth-editor-container bg-gradient-to-b from-[#1a1a1a] to-[#121212]">
+        <EditorHeader
+          instrument={instrument}
+          onChange={handleChange}
+          vizMode={vizMode}
+          onVizModeChange={setVizMode}
+          onBake={handleBake}
+          onBakePro={handleBakePro}
+          onUnbake={handleUnbake}
+          isBaked={isBaked}
+          isBaking={isBaking}
+          customHeader={
+            <div className="synth-editor-header px-4 py-3 bg-gradient-to-r from-[#1a2a1a] to-[#142a14] border-b border-[#2a4a2a]">
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-lg bg-gradient-to-br from-green-600 to-green-800 shadow-lg text-text-primary">
+                  <Music size={20} />
+                </div>
+                <div>
+                  <h2 className="text-base font-bold tracking-wide text-green-300">SunVox</h2>
+                  <p className="text-[10px] uppercase tracking-widest text-green-600">
+                    {isSong ? 'Song' : 'Patch'} · {patchName}
+                  </p>
+                </div>
+              </div>
+            </div>
+          }
+        />
+        <div className="px-4 py-6 text-text-secondary text-sm">
+          <p>SunVox {isSong ? 'song' : 'instrument patch'}: <span className="text-text-primary font-medium">{patchName}</span></p>
+          {controlCount > 0 && (
+            <p className="mt-1">{controlCount} control{controlCount !== 1 ? 's' : ''} mapped</p>
+          )}
+          {instrument.sunvox?.noteTargetModuleId != null && (
+            <p className="mt-1 text-xs opacity-60">Target module ID: {instrument.sunvox.noteTargetModuleId}</p>
+          )}
         </div>
       </div>
     );

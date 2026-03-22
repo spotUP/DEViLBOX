@@ -170,6 +170,7 @@ export type SynthType =
   | 'V2Speech'         // Farbrausch V2 Speech Synth
   | 'Sam'              // Commodore SAM Speech Synth
   | 'PinkTrombone'     // Pink Trombone vocal tract synthesizer
+  | 'DECtalk'          // DECtalk formant speech synthesizer (Stephen Hawking voice)
   | 'Synare'           // Synare 3 (Electronic Percussion)
   | 'WAM'              // Web Audio Module (External Plugin)
   // Demoscene 4k/64k intro synths

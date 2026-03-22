@@ -68,7 +68,7 @@ export const SteveTurnerControls: React.FC<SteveTurnerControlsProps> = ({
         if (SteveTurnerEngine.hasInstance()) {
           SteveTurnerEngine.getInstance().setInstrumentParam(instrumentIndex, paramId, value as number);
         }
-      }).catch(() => {});
+      }).catch((err) => console.warn('SteveTurner param forward failed:', err));
     }
   }, [onChange, instrumentIndex]);
 

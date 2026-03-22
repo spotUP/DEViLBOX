@@ -194,11 +194,15 @@ export class V2SpeechSynth implements DevilboxSynth {
       singmode: true,
       phonetic: true,
     });
-    const buf32 = sam.buf32(code, true);
-    if (!buf32) return null;
-    const audioBuf = this.audioContext.createBuffer(1, buf32.length, 22050);
-    audioBuf.getChannelData(0).set(buf32);
-    return audioBuf;
+    try {
+      const buf32 = sam.buf32(code, true);
+      if (!buf32) return null;
+      const audioBuf = this.audioContext.createBuffer(1, buf32.length, 22050);
+      audioBuf.getChannelData(0).set(buf32);
+      return audioBuf;
+    } catch {
+      return null;
+    }
   }
 
   public triggerAttack(note: string | number, time?: number, velocity: number = 1) {

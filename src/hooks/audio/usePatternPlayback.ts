@@ -459,29 +459,32 @@ export const usePatternPlayback = () => {
         let lastPatternNum = -1;
         let lastPosition = -1;
 
+        // Format-mode views (HivelyView, etc.) read currentRow from the transport
+        // store and don't use getStateAtTime(), so they need every-row updates.
+        const isFormatEngine = !!hivelyNative;
+
         replayer.onRowChange = (row, patternNum, position) => {
-          // During playback, the pattern editor RAF loop reads position directly
-          // from getStateAtTime() — no React store updates needed for row scrolling.
-          // Only update React stores on pattern/position jumps (infrequent).
-          if (row === 0 && (patternNum !== lastPatternNum || position !== lastPosition)) {
+          // Format engines: update currentRow on every row (throttled to 50Hz)
+          if (isFormatEngine) {
+            const currentPatterns = patternsRef.current;
+            setCurrentRowThrottled(row, currentPatterns[patternNum]?.length ?? 64, true);
+          }
+
+          // During playback, the standard pattern editor RAF loop reads position
+          // directly from getStateAtTime() — no React store updates needed for
+          // row scrolling. Only update React stores on pattern/position jumps.
+          if (patternNum !== lastPatternNum || position !== lastPosition) {
             lastPatternNum = patternNum;
             lastPosition = position;
             replayerAdvancedRef.current++;
-            // Use setTimeout(0) instead of queueMicrotask: microtasks drain before
-            // the next macrotask (setInterval), so React re-renders from Zustand
-            // store updates would block the scheduler's next interval callback.
-            // setTimeout(0) defers to the macrotask queue, letting the scheduler
-            // fire on time even when React work is heavy at pattern boundaries.
             setTimeout(() => {
-              // startTransition: marks these store updates as non-urgent so React
-              // doesn't block higher-priority work (WASM postMessage processing,
-              // Pixi RAF callbacks) to run them immediately.
               startTransition(() => {
                 setCurrentPattern(patternNum, true);
                 setCurrentPosition(position, true);
-                // Update global row and status bar only on pattern boundaries
-                const currentPatterns = patternsRef.current;
-                setCurrentRowThrottled(row, currentPatterns[patternNum]?.length ?? 64, true);
+                if (!isFormatEngine) {
+                  const currentPatterns = patternsRef.current;
+                  setCurrentRowThrottled(row, currentPatterns[patternNum]?.length ?? 64, true);
+                }
               });
               const globalRow = position * 64 + row;
               useTransportStore.getState().setCurrentGlobalRow(globalRow);

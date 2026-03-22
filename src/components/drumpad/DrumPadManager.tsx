@@ -156,16 +156,12 @@ export const DrumPadManager: React.FC<DrumPadManagerProps> = ({ onClose }) => {
         throw new Error('Kit source not found');
       }
 
-      console.log(`[DrumPadManager] Loading kit: ${selectedSource.name} (${selectedSource.type})`);
-
       // Load kit and create instruments
       const createdIds = loadKitSource(
         selectedSource,
         allSamplePacks,
         createInstrument
       );
-
-      console.log(`[DrumPadManager] Created ${createdIds.length} instruments`);
 
       // Show success message
       setConfirmDialog({

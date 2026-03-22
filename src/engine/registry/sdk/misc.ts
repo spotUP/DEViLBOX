@@ -15,6 +15,7 @@ import { SpaceLaserSynth } from '../../SpaceLaserSynth';
 import { V2Synth } from '../../v2/V2Synth';
 import { V2SpeechSynth } from '../../v2/V2SpeechSynth';
 import { SAMSynth } from '../../sam/SAMSynth';
+import { DECtalkSynth } from '../../dectalk/DECtalkSynth';
 import { SynareSynth } from '../../SynareSynth';
 import { DexedSynth } from '../../dexed/DexedSynth';
 import { OBXdSynth } from '../../obxd/OBXdSynth';
@@ -29,12 +30,12 @@ import { ES5503Synth } from '../../es5503/ES5503Synth';
 import { DrumKitSynth } from '../../DrumKitSynth';
 import { WavetableSynth } from '../../WavetableSynth';
 import {
-  DEFAULT_DUB_SIREN, DEFAULT_SPACE_LASER, DEFAULT_SAM, DEFAULT_SYNARE,
+  DEFAULT_DUB_SIREN, DEFAULT_SPACE_LASER, DEFAULT_SAM, DEFAULT_DECTALK, DEFAULT_SYNARE,
   DEFAULT_DRUMKIT,
 } from '@/types/instrument';
 
 const VOLUME_OFFSETS: Record<string, number> = {
-  DubSiren: 13, SpaceLaser: 24, V2: 0, V2Speech: 0, Sam: 16, Synare: 7,
+  DubSiren: 13, SpaceLaser: 24, V2: 0, V2Speech: 0, Sam: 16, DECtalk: 10, PinkTrombone: 6, Synare: 7,
   Dexed: 41, OBXd: 9, CZ101: 0, CEM3394: 19, SCSP: 15,
   MAMEVFX: 0, VFX: 0, D50: 0, MAMEDOC: 0, MAMERSA: 0, MAMESWP30: 0,
   DrumKit: 0, Wavetable: 5, SuperSaw: 9, PolySynth: 8, Organ: 3,
@@ -128,6 +129,24 @@ const speechAndSpecialDescs: SynthDescriptor[] = [
     create: (config) => {
       const synth = new SAMSynth(config.sam || DEFAULT_SAM);
       synth.output.gain.value = Tone.dbToGain(getNormalizedVolume('Sam', config.volume));
+      return synth as unknown as Tone.ToneAudioNode;
+    },
+    onTriggerRelease: (synth, _note, time) => {
+      (synth as any).triggerRelease(time);
+      return true;
+    },
+  },
+  {
+    id: 'DECtalk',
+    name: 'DECtalk Speech',
+    category: 'wasm',
+    loadMode: 'lazy',
+    sharedInstance: true,
+    useSynthBus: true,
+    volumeOffsetDb: 16,
+    create: (config) => {
+      const synth = new DECtalkSynth(config.dectalk || DEFAULT_DECTALK);
+      synth.output.gain.value = Tone.dbToGain(getNormalizedVolume('DECtalk', config.volume));
       return synth as unknown as Tone.ToneAudioNode;
     },
     onTriggerRelease: (synth, _note, time) => {

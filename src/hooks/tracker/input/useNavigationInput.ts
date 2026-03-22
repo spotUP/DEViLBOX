@@ -6,7 +6,7 @@
 
 import { useCallback, useMemo, useRef } from 'react';
 import { useShallow } from 'zustand/react/shallow';
-import { useTrackerStore, useCursorStore, useTransportStore } from '@stores';
+import { useTrackerStore, useCursorStore, useTransportStore, useFormatStore } from '@stores';
 import { useEditorStore } from '@stores/useEditorStore';
 import { getToneEngine } from '@engine/ToneEngine';
 import { ALT_TRACK_MAP_1, ALT_TRACK_MAP_2, type TrackerInputRefs } from './inputConstants';
@@ -58,6 +58,13 @@ export const useNavigationInput = (refs: TrackerInputRefs) => {
   // Handle navigation keydown events. Returns true if handled.
   const handleKeyDown = useCallback(
     (e: KeyboardEvent): boolean => {
+      // Format modes handle arrows/tab/page in PatternEditorCanvas.handleFormatKeyDown.
+      // Skip when that div has focus to avoid double-move.
+      if (useFormatStore.getState().editorMode !== 'classic') {
+        const target = e.target as HTMLElement;
+        if (target?.dataset?.patternEditor) return false;
+      }
+
       const key = e.key;
       const keyLower = key.toLowerCase();
 
@@ -199,7 +206,8 @@ export const useNavigationInput = (refs: TrackerInputRefs) => {
         return true;
       }
 
-      // Arrow keys (up/down) — disabled during playback
+      // Arrow keys (up/down) — disabled during playback and in format modes
+      // (format modes handle arrows in PatternEditorCanvas.handleFormatKeyDown)
       if (key === 'ArrowUp' || key === 'ArrowDown') {
         if (isPlaying) return false;
         e.preventDefault();

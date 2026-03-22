@@ -59,7 +59,7 @@ SynthRegistry.registerLazy(
 // ── Misc synths (speech, JUCE WASM, special) ─────────────────────────────────
 SynthRegistry.registerLazy(
   [
-    'DubSiren', 'SpaceLaser', 'V2', 'V2Speech', 'Sam', 'Synare',
+    'DubSiren', 'SpaceLaser', 'V2', 'V2Speech', 'Sam', 'DECtalk', 'Synare',
     'Dexed', 'OBXd', 'CZ101', 'CEM3394', 'SCSP',
     'MAMEVFX', 'VFX', 'D50', 'MAMEDOC', 'MAMERSA', 'MAMESWP30',
     'DrumKit', 'Wavetable', 'ChiptuneModule',

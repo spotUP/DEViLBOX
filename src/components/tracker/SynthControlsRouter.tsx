@@ -10,7 +10,7 @@ import type { InstrumentConfig, MAMEConfig } from '@typedefs/instrument';
 import { getToneEngine } from '@engine/ToneEngine';
 import {
   DEFAULT_DUB_SIREN, DEFAULT_SPACE_LASER, DEFAULT_V2, DEFAULT_V2_SPEECH,
-  DEFAULT_SYNARE, DEFAULT_DEXED, DEFAULT_OBXD, DEFAULT_SAM, DEFAULT_PINK_TROMBONE,
+  DEFAULT_SYNARE, DEFAULT_DEXED, DEFAULT_OBXD, DEFAULT_SAM, DEFAULT_PINK_TROMBONE, DEFAULT_DECTALK,
   DEFAULT_HARMONIC_SYNTH as DEFAULT_HARMONIC_SYNTH_VAL,
   DEFAULT_HIVELY, DEFAULT_JAMCRACKER,
   DEFAULT_SOUNDMON, DEFAULT_SIDMON, DEFAULT_DIGMUG, DEFAULT_FC,
@@ -46,6 +46,9 @@ const SAMControls = lazy(() =>
 );
 const PinkTromboneControls = lazy(() =>
   import('@components/instruments/controls/PinkTromboneControls').then(m => ({ default: m.PinkTromboneControls }))
+);
+const DECtalkControls = lazy(() =>
+  import('@components/instruments/controls/DECtalkControls').then(m => ({ default: m.DECtalkControls }))
 );
 const SynareControls = lazy(() =>
   import('@components/instruments/controls/SynareControls').then(m => ({ default: m.SynareControls }))
@@ -181,9 +184,6 @@ interface SynthControlsRouterProps {
 export const SynthControlsRouter: React.FC<SynthControlsRouterProps> = ({ instrument, onUpdate, fallback }) => {
   const synthType = instrument.synthType;
 
-  // Debug: always log for debugging
-  console.log(`[SynthControlsRouter] Routing: synthType=${synthType} id=${instrument.id} name="${instrument.name}" hasXrns=${!!instrument.xrns}`);
-
   /** Wrap onUpdate to also push live config to running WASM synth engine */
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const onUpdateLive = useCallback((configKey: string, cfg: any, updates: any) => {
@@ -242,6 +242,12 @@ export const SynthControlsRouter: React.FC<SynthControlsRouterProps> = ({ instru
     if (synthType === 'PinkTrombone') {
       const cfg = deepMerge(DEFAULT_PINK_TROMBONE, instrument.pinkTrombone || {});
       return <PinkTromboneControls config={cfg} onChange={(u) => onUpdate({ pinkTrombone: { ...cfg, ...u } })} />;
+    }
+
+    // ── DECtalk ────────────────────────────────────────────
+    if (synthType === 'DECtalk') {
+      const cfg = deepMerge(DEFAULT_DECTALK, instrument.dectalk || {});
+      return <DECtalkControls config={cfg} onChange={(u) => onUpdate({ dectalk: { ...cfg, ...u } })} />;
     }
 
     // ── Synare ──────────────────────────────────────────────

@@ -66,12 +66,6 @@ export const DJScenarioSelector: React.FC = () => {
       mapper.setPreset(hybridPreset);
     }
 
-    console.log(`Applied DJ scenario: ${scenario.name}`, {
-      jogWheelSensitivity: scenario.jogWheelSensitivity,
-      crossfaderCurve: scenario.crossfaderCurve,
-      autoSync: scenario.autoSync,
-      keyLockDefault: scenario.keyLockDefault,
-    });
   }, []);
 
   const handleChange = useCallback((e: React.ChangeEvent<HTMLSelectElement>) => {
