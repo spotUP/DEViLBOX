@@ -51,6 +51,7 @@ import { isSupportedModule, getSupportedExtensions, type ModuleInfo } from '@lib
 import { useModuleImport } from '@hooks/tracker/useModuleImport';
 import { importMIDIFile, isMIDIFile, getSupportedMIDIExtensions } from '@lib/import/MIDIImporter';
 import { clearSavedProject, clearExplicitlySaved, saveProjectToStorage } from '@hooks/useProjectPersistence';
+import { useHistoryStore } from '@stores/useHistoryStore';
 import { parseDb303Pattern, exportCurrentPatternToDb303 } from '@lib/import/Db303PatternConverter';
 import { getASIDDeviceManager } from '@lib/sid/ASIDDeviceManager';
 import { useSettingsStore } from '@stores/useSettingsStore';
@@ -113,6 +114,7 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = React.memo(({
     reset: s.reset,
     duplicatePosition: s.duplicatePosition,
     removeFromOrder: s.removeFromOrder,
+    replacePattern: s.replacePattern,
   })));
 
   const {
@@ -152,6 +154,22 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = React.memo(({
     setGrooveTemplate: s.setGrooveTemplate,
     reset: s.reset,
   })));
+
+  const { undo, redo, canUndo, canRedo } = useHistoryStore(useShallow((s) => ({
+    undo: s.undo, redo: s.redo, canUndo: s.canUndo, canRedo: s.canRedo,
+  })));
+
+  const handleUndo = useCallback(() => {
+    if (!canUndo()) return;
+    const pattern = undo();
+    if (pattern) replacePattern(currentPatternIndex, pattern);
+  }, [undo, canUndo, replacePattern, currentPatternIndex]);
+
+  const handleRedo = useCallback(() => {
+    if (!canRedo()) return;
+    const pattern = redo();
+    if (pattern) replacePattern(currentPatternIndex, pattern);
+  }, [redo, canRedo, replacePattern, currentPatternIndex]);
 
   const { isDirty, setMetadata, metadata } = useProjectStore(useShallow((s) => ({
     isDirty: s.isDirty,

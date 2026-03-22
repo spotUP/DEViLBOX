@@ -182,8 +182,6 @@ export const DJModlandBrowser: React.FC<DJModlandBrowserProps> = ({ onClose }) =
         // Switch to visualizer view for modules
         useDJStore.getState().setDeckViewMode('visualizer');
 
-        console.log(`[DJModlandBrowser] Loaded ${file.filename} in audio mode (skipped tracker bugs)`);
-
         // Track loaded decks and auto-close when all active decks are filled
         setLoadedDecks((prev) => {
           const next = new Set(prev).add(deckId);

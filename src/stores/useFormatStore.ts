@@ -73,6 +73,8 @@ interface FormatStore {
   setHivelyNative: (data: HivelyNativeData | null) => void;
   /** Update a single track or transpose value in the Hively position matrix */
   setHivelyPositionCell: (pos: number, ch: number, field: 'track' | 'transpose', value: number) => void;
+  /** Update a track step field (note, instrument, fx1, fx2) */
+  setHivelyTrackStep: (trackIdx: number, rowIdx: number, columnKey: string, value: number) => void;
   /** Insert a new position (copy of current, or blank) at the given index */
   insertHivelyPosition: (pos: number) => void;
   /** Delete a position */
@@ -167,6 +169,19 @@ export const useFormatStore = create<FormatStore>()(
         p.track[ch] = Math.max(0, Math.min(value, state.hivelyNative.tracks.length - 1));
       } else {
         p.transpose[ch] = Math.max(-128, Math.min(127, value));
+      }
+    }),
+    setHivelyTrackStep: (trackIdx, rowIdx, columnKey, value) => set((state) => {
+      if (!state.hivelyNative) return;
+      const track = state.hivelyNative.tracks[trackIdx];
+      if (!track) return;
+      const step = track.steps[rowIdx];
+      if (!step) return;
+      switch (columnKey) {
+        case 'note': step.note = value; break;
+        case 'instrument': step.instrument = value; break;
+        case 'fx1': step.fx = (value >> 8) & 0xF; step.fxParam = value & 0xFF; break;
+        case 'fx2': step.fxb = (value >> 8) & 0xF; step.fxbParam = value & 0xFF; break;
       }
     }),
     insertHivelyPosition: (pos) => set((state) => {

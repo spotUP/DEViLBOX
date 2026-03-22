@@ -63,7 +63,6 @@ export const MAMERSAVoiceMatrix: React.FC<MAMERSAVoiceMatrixProps> = ({
     setRoms(newRoms);
 
     if (newRoms.ic5 && newRoms.ic6 && newRoms.ic7) {
-      console.log("🎹 MAME: All Roland SA ROMs ready, injecting...");
       engine.rsaLoadRoms(handle, newRoms.ic5, newRoms.ic6, newRoms.ic7);
     }
   }, [engine, handle, roms]);

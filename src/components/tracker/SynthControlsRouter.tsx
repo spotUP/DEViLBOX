@@ -166,7 +166,8 @@ const FurnaceControls = lazy(() =>
 // ─── Loading fallback ────────────────────────────────────────────────────────
 
 const LoadingFallback = () => (
-  <div className="flex items-center justify-center py-8 text-text-muted text-xs">
+  <div className="flex items-center justify-center gap-2 py-8 text-text-muted text-xs">
+    <div className="w-3 h-3 border border-text-muted border-t-transparent rounded-full animate-spin" />
     Loading controls…
   </div>
 );

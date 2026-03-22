@@ -16,6 +16,7 @@ import React, { useCallback, useMemo, useRef, useState, useEffect } from 'react'
 import type { Container as ContainerType, Graphics as GraphicsType, FederatedPointerEvent } from 'pixi.js';
 import { Graphics } from 'pixi.js';
 import { useTransportStore } from '@/stores/useTransportStore';
+import { useEditorStore } from '@/stores/useEditorStore';
 import { PIXI_FONTS } from '@/pixi/fonts';
 import type { HivelyNativeData } from '@/types';
 
@@ -88,16 +89,19 @@ function hvlColW(col: 'note' | 'ins' | 'fx' | 'fxb'): number {
   return FX_WIDTH;
 }
 
+type CellChangeCallback = (channelIdx: number, rowIdx: number, columnKey: string, value: number) => void;
+
 interface TrackEditorProps {
   width: number;
   height: number;
   nativeData: HivelyNativeData;
   currentPosition: number;
   onFocusPositionEditor?: () => void;
+  onCellChange?: CellChangeCallback;
 }
 
 export const PixiHivelyTrackEditor: React.FC<TrackEditorProps> = ({
-  width, height, nativeData, currentPosition, onFocusPositionEditor,
+  width, height, nativeData, currentPosition, onFocusPositionEditor, onCellChange,
 }) => {
   const isPlaying  = useTransportStore(s => s.isPlaying);
   const displayRow = useTransportStore(s => s.currentRow);
@@ -189,54 +193,174 @@ export const PixiHivelyTrackEditor: React.FC<TrackEditorProps> = ({
     return () => canvas.removeEventListener('wheel', onWheel);
   }, []);
 
-  // Keyboard navigation
+  // Keyboard navigation + editing (matches DOM PatternEditorCanvas format mode)
   const stateRef = useRef({ cursorRow, cursorChan, cursorCol, trackLength, numChannels });
   stateRef.current = { cursorRow, cursorChan, cursorCol, trackLength, numChannels };
 
+  const octaveRef = useRef(3);
+  const setOctave = useCallback((fn: number | ((o: number) => number)) => {
+    octaveRef.current = typeof fn === 'function' ? fn(octaveRef.current) : fn;
+  }, []);
+  const heldArrowRef = useRef<{ dir: number } | null>(null);
+  const arrowRafRef  = useRef(0);
+
   useEffect(() => {
+    const KEY_TO_SEMI: Record<string, number> = {
+      'z': 0, 's': 1, 'x': 2, 'd': 3, 'c': 4, 'v': 5,
+      'g': 6, 'b': 7, 'h': 8, 'n': 9, 'j': 10, 'm': 11,
+      'q': 12, '2': 13, 'w': 14, '3': 15, 'e': 16, 'r': 17,
+      '5': 18, 't': 19, '6': 20, 'y': 21, '7': 22, 'u': 23,
+      'i': 24, '9': 25, 'o': 26, '0': 27, 'p': 28,
+    };
+
     const onKeyDown = (e: KeyboardEvent) => {
       if (!focusedRef.current) return;
       const { cursorChan: cc, cursorCol: ccol, trackLength: tl, numChannels: nc } = stateRef.current;
+      const editStep = useEditorStore.getState().editStep;
+
+      const advanceRow = () => {
+        if (editStep > 0) setCursorRow(r => Math.min(tl - 1, r + editStep));
+      };
+
+      // F1-F7: octave
+      if (e.key >= 'F1' && e.key <= 'F7' && !e.ctrlKey && !e.metaKey && !e.altKey && !e.shiftKey) {
+        e.preventDefault(); setOctave(parseInt(e.key[1]) - 1); return;
+      }
+      // [ ] octave ±1
+      if (e.key === '[') { e.preventDefault(); setOctave(o => Math.max(0, o - 1)); return; }
+      if (e.key === ']') { e.preventDefault(); setOctave(o => Math.min(7, o + 1)); return; }
+      // Numpad +/- octave
+      if (e.key === '+' && e.location === 3) { e.preventDefault(); setOctave(o => Math.min(7, o + 1)); return; }
+      if (e.key === '-' && e.location === 3) { e.preventDefault(); setOctave(o => Math.max(0, o - 1)); return; }
+
+      // Grave: cycle edit step
+      if (e.key === '`' || e.key === '~') {
+        e.preventDefault();
+        useEditorStore.getState().setEditStep((editStep + 1) % 17);
+        return;
+      }
+
+      // Arrow up/down: RAF hold-to-scroll
+      if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+        e.preventDefault();
+        if (e.repeat) return;
+        const dir = e.key === 'ArrowUp' ? -1 : 1;
+        setCursorRow(r => Math.max(0, Math.min(tl - 1, r + dir)));
+        heldArrowRef.current = { dir };
+        if (!arrowRafRef.current) {
+          let lastMove = performance.now();
+          const tick = (now: number) => {
+            if (!heldArrowRef.current) { arrowRafRef.current = 0; return; }
+            if (now - lastMove >= 50) {
+              lastMove = now;
+              const s = stateRef.current;
+              setCursorRow(r => Math.max(0, Math.min(s.trackLength - 1, r + heldArrowRef.current!.dir)));
+            }
+            arrowRafRef.current = requestAnimationFrame(tick);
+          };
+          arrowRafRef.current = requestAnimationFrame(tick);
+        }
+        return;
+      }
+
       switch (e.key) {
-        case 'ArrowUp':
-          e.preventDefault();
-          setCursorRow(r => Math.max(0, r - 1));
-          break;
-        case 'ArrowDown':
-          e.preventDefault();
-          setCursorRow(r => Math.min(tl - 1, r + 1));
-          break;
         case 'ArrowLeft':
           e.preventDefault();
           if      (ccol === 'fxb') { setCursorCol('fx'); }
           else if (ccol === 'fx')  { setCursorCol('ins'); }
           else if (ccol === 'ins') { setCursorCol('note'); }
           else if (cc > 0)         { setCursorChan(c => c - 1); setCursorCol('fxb'); }
-          break;
+          return;
         case 'ArrowRight':
           e.preventDefault();
           if      (ccol === 'note') { setCursorCol('ins'); }
           else if (ccol === 'ins')  { setCursorCol('fx'); }
           else if (ccol === 'fx')   { setCursorCol('fxb'); }
           else if (cc < nc - 1)     { setCursorChan(c => c + 1); setCursorCol('note'); }
-          break;
+          return;
         case 'Tab':
           e.preventDefault();
           setCursorChan(c => e.shiftKey ? Math.max(0, c - 1) : Math.min(nc - 1, c + 1));
           setCursorCol('note');
-          break;
+          return;
         case 'Enter':
+          e.preventDefault(); onFocusPositionEditor?.(); return;
+        case 'PageUp':   e.preventDefault(); setCursorRow(r => Math.max(0, r - 16)); return;
+        case 'PageDown': e.preventDefault(); setCursorRow(r => Math.min(tl - 1, r + 16)); return;
+        case 'Home':     e.preventDefault(); setCursorRow(0); return;
+        case 'End':      e.preventDefault(); setCursorRow(tl - 1); return;
+        case 'Delete':
+        case 'Backspace': {
           e.preventDefault();
-          onFocusPositionEditor?.();
-          break;
-        case 'PageUp':   e.preventDefault(); setCursorRow(r => Math.max(0, r - 16));       break;
-        case 'PageDown': e.preventDefault(); setCursorRow(r => Math.min(tl - 1, r + 16));  break;
-        case 'Home':     e.preventDefault(); setCursorRow(0);                               break;
-        case 'End':      e.preventDefault(); setCursorRow(tl - 1);                          break;
+          const colKeyMap: Record<string, string> = { note: 'note', ins: 'instrument', fx: 'fx1', fxb: 'fx2' };
+          onCellChange?.(cc, stateRef.current.cursorRow, colKeyMap[ccol] ?? ccol, 0);
+          advanceRow();
+          return;
+        }
+        case 'CapsLock':
+          if (ccol === 'note') {
+            e.preventDefault();
+            onCellChange?.(cc, stateRef.current.cursorRow, 'note', 97);
+            advanceRow();
+          }
+          return;
+      }
+
+      // Column key mapping: Pixi cursor names → format column keys
+      const COL_KEY: Record<string, string> = { note: 'note', ins: 'instrument', fx: 'fx1', fxb: 'fx2' };
+
+      // Note entry on note column
+      if (ccol === 'note') {
+        const semi = KEY_TO_SEMI[e.key.toLowerCase()];
+        if (semi !== undefined) {
+          e.preventDefault();
+          const midi = semi + octaveRef.current * 12;
+          if (midi >= 0 && midi <= 95) {
+            onCellChange?.(cc, stateRef.current.cursorRow, 'note', midi);
+          }
+          advanceRow();
+          return;
+        }
+      }
+
+      // Hex entry on ins/fx/fxb columns
+      if (ccol !== 'note' && /^[0-9a-fA-F]$/i.test(e.key)) {
+        e.preventDefault();
+        const digit = parseInt(e.key, 16);
+        const key = COL_KEY[ccol] ?? ccol;
+        // Read current value from nativeData
+        const pos = nativeData.positions[currentPosition];
+        const trackIdx = pos?.track?.[cc] ?? -1;
+        const step = trackIdx >= 0 ? nativeData.tracks[trackIdx]?.steps[stateRef.current.cursorRow] : null;
+        let cur = 0;
+        if (step) {
+          switch (ccol) {
+            case 'ins': cur = step.instrument; break;
+            case 'fx':  cur = ((step.fx & 0xF) << 8) | (step.fxParam & 0xFF); break;
+            case 'fxb': cur = ((step.fxb & 0xF) << 8) | (step.fxbParam & 0xFF); break;
+          }
+        }
+        const hexDigits = ccol === 'ins' ? 2 : 3;
+        const mask = (1 << (hexDigits * 4)) - 1;
+        onCellChange?.(cc, stateRef.current.cursorRow, key, ((cur << 4) | digit) & mask);
+        advanceRow();
       }
     };
+
+    const onKeyUp = (e: KeyboardEvent) => {
+      if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+        heldArrowRef.current = null;
+      }
+    };
+
     window.addEventListener('keydown', onKeyDown);
-    return () => window.removeEventListener('keydown', onKeyDown);
+    window.addEventListener('keyup', onKeyUp);
+    return () => {
+      window.removeEventListener('keydown', onKeyDown);
+      window.removeEventListener('keyup', onKeyUp);
+      heldArrowRef.current = null;
+      if (arrowRafRef.current) { cancelAnimationFrame(arrowRafRef.current); arrowRafRef.current = 0; }
+    };
   }, [onFocusPositionEditor]);
 
   const startRow = Math.floor(scrollTop / ROW_HEIGHT);

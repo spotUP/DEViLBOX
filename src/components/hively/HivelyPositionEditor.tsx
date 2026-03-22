@@ -44,10 +44,11 @@ interface Props {
   nativeData: HivelyNativeData;
   currentPosition: number;
   onPositionChange: (pos: number) => void;
+  onFocusTrackEditor?: () => void;
 }
 
 export const HivelyPositionEditor: React.FC<Props> = ({
-  width, height, nativeData, currentPosition, onPositionChange,
+  width, height, nativeData, currentPosition, onPositionChange, onFocusTrackEditor,
 }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const numPos = nativeData.positions.length;
@@ -226,6 +227,9 @@ export const HivelyPositionEditor: React.FC<Props> = ({
     }
 
     // Insert/delete position
+    // Enter: jump to track editor
+    if (key === 'Enter') { e.preventDefault(); onFocusTrackEditor?.(); return; }
+
     if (key === 'Insert') { e.preventDefault(); insertPos(currentPosition); return; }
     if (e.ctrlKey && key === 'Backspace') { e.preventDefault(); deletePos(currentPosition); return; }
 
@@ -279,7 +283,7 @@ export const HivelyPositionEditor: React.FC<Props> = ({
       setCurCh(c => c + 1);
       setCurDigit(0);
     }
-  }, [currentPosition, numPos, numCh, curCh, curDigit, onPositionChange, setCell, insertPos, deletePos, nativeData]);
+  }, [currentPosition, numPos, numCh, curCh, curDigit, onPositionChange, onFocusTrackEditor, setCell, insertPos, deletePos, nativeData]);
 
   useEffect(() => { canvasRef.current?.focus(); }, []);
 

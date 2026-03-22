@@ -736,6 +736,12 @@ export const SamplePackBrowser: React.FC<SamplePackBrowserProps> = ({ onClose, m
               <h3 className="text-ft2-text font-bold text-xs mb-2">AVAILABLE PACKS</h3>
             </div>
             <div className="flex-1 overflow-y-auto p-2 scrollbar-ft2">
+              {allPacks.length === 0 && (
+                <div className="flex flex-col items-center justify-center py-8 text-ft2-textDim text-xs">
+                  <Package size={24} className="mb-2 opacity-40" />
+                  No sample packs loaded
+                </div>
+              )}
               {allPacks.map((pack: SamplePack) => (
                 <button
                   key={pack.id}

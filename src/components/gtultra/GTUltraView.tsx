@@ -119,32 +119,50 @@ export const GTUltraView: React.FC<{ width?: number; height?: number }> = ({ wid
   const currentOrderPos = isPlaying ? playbackPos.songPos : orderCursor;
 
   const channels = useMemo(() => {
-    const result: FormatChannel[] = [];
-
-    // GT Ultra stores pattern data per-pattern (not per-channel). Each pattern contains
-    // all channels' data in a single binary blob (channelCount * patternLength * 4 bytes).
-    // We use channel 0's order list to determine which pattern to display.
-    // TODO: If GT Ultra supports per-channel patterns at different order positions,
-    // this needs to look up each channel's pattern independently.
-    const patIdx = orderData[0]?.[currentOrderPos] ?? 0;
-    const patEntry = patternData.get(patIdx);
-
-    if (!patEntry) {
-      for (let ch = 0; ch < channelCount; ch++) {
-        result.push({ label: `CH${(ch + 1).toString().padStart(2, '0')}`, patternLength: 64, rows: [] });
+    // Each channel has its own order list and can point to different patterns.
+    // Look up each channel's pattern independently.
+    const allSamePattern = (() => {
+      const first = orderData[0]?.[currentOrderPos] ?? 0;
+      for (let ch = 1; ch < channelCount; ch++) {
+        if ((orderData[ch]?.[currentOrderPos] ?? 0) !== first) return false;
       }
-      return result;
+      return true;
+    })();
+
+    // Fast path: all channels use the same pattern (common case)
+    if (allSamePattern) {
+      const patIdx = orderData[0]?.[currentOrderPos] ?? 0;
+      const patEntry = patternData.get(patIdx);
+      if (!patEntry) {
+        return Array.from({ length: channelCount }, (_, ch) => ({
+          label: `CH${(ch + 1).toString().padStart(2, '0')}`, patternLength: 64, rows: [],
+        } as FormatChannel));
+      }
+      const structured = parseBinaryPatternData(patEntry.data, channelCount, patEntry.length);
+      return gtuToFormatChannels(structured, channelCount, patEntry.length);
     }
 
-    const structured = parseBinaryPatternData(patEntry.data, channelCount, patEntry.length);
-    const formatted = gtuToFormatChannels(structured, channelCount, patEntry.length);
-    return formatted;
+    // Per-channel patterns: each channel may be at a different pattern
+    const result: FormatChannel[] = [];
+    for (let ch = 0; ch < channelCount; ch++) {
+      const patIdx = orderData[ch]?.[currentOrderPos] ?? 0;
+      const patEntry = patternData.get(patIdx);
+      if (!patEntry) {
+        result.push({ label: `CH${(ch + 1).toString().padStart(2, '0')}`, patternLength: 64, rows: [] });
+        continue;
+      }
+      // Parse full pattern blob, extract just this channel's data
+      const structured = parseBinaryPatternData(patEntry.data, channelCount, patEntry.length);
+      const allFormatted = gtuToFormatChannels(structured, channelCount, patEntry.length);
+      result.push(allFormatted[ch] || { label: `CH${(ch + 1).toString().padStart(2, '0')}`, patternLength: patEntry.length, rows: [] });
+    }
+    return result;
   }, [channelCount, orderData, patternData, currentOrderPos]);
 
-  const handleCellChange = useCallback((_channelIdx: number, rowIdx: number, columnKey: string, value: number) => {
+  const handleCellChange = useCallback((channelIdx: number, rowIdx: number, columnKey: string, value: number) => {
     const engine = useGTUltraStore.getState().engine;
     if (!engine) return;
-    const patIdx = orderData[0]?.[currentOrderPos] ?? 0;
+    const patIdx = orderData[channelIdx]?.[currentOrderPos] ?? orderData[0]?.[currentOrderPos] ?? 0;
     // GT Ultra binary layout: col 0=note, 1=instrument, 2=command, 3=data
     const colMap: Record<string, number> = { note: 0, instrument: 1, command: 2, data: 3 };
     const col = colMap[columnKey];

@@ -127,8 +127,6 @@ const SYNTH_TO_DIV_INS_TYPE: Record<string, number> = {
 function configToBuffer(config: FurnaceConfig, synthType?: SynthType): Uint8Array {
   // Prefer rawBinaryData (native Furnace format) when available
   if (config.rawBinaryData && config.rawBinaryData.length > 4) {
-    const magic = String.fromCharCode(...config.rawBinaryData.slice(0, 4));
-    console.log(`[FurnaceInsEd] configToBuffer: using rawBinaryData (${config.rawBinaryData.length} bytes, magic="${magic}")`);
     return config.rawBinaryData;
   }
 
@@ -142,7 +140,6 @@ function configToBuffer(config: FurnaceConfig, synthType?: SynthType): Uint8Arra
   dv.setUint16(2, 240, true);
   const divInsType = synthType ? (SYNTH_TO_DIV_INS_TYPE[synthType] ?? config.chipType) : config.chipType;
   buf[4] = divInsType & 0xFF;
-  console.log(`[FurnaceInsEd] configToBuffer: 0xDE format, synthType=${synthType}, divInsType=${divInsType}`);
 
   // FM section (offset 8)
   buf[8] = config.algorithm;

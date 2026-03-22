@@ -33,6 +33,7 @@ import { DRUM_MACHINE_LAYOUT } from './drumMachine';
 import { DRUM_KIT_LAYOUT } from './drumKit';
 import { POLY_SYNTH_LAYOUT } from './polySynth';
 import { GEARMULATOR_VIRUS_LAYOUT } from './gearmulatorVirus';
+import { GEARMULATOR_MICROQ_LAYOUT, GEARMULATOR_XT_LAYOUT, GEARMULATOR_NORD_LAYOUT, GEARMULATOR_JP8000_LAYOUT } from './gearmulatorGeneric';
 
 /** Map from SynthType string to layout descriptor */
 export const SYNTH_LAYOUTS: Record<string, SynthPanelLayout> = {
@@ -159,10 +160,10 @@ export const SYNTH_LAYOUTS: Record<string, SynthPanelLayout> = {
   // Gearmulator DSP56300 synths
   GearmulatorVirus: GEARMULATOR_VIRUS_LAYOUT,
   GearmulatorVirusTI: GEARMULATOR_VIRUS_LAYOUT,
-  GearmulatorMicroQ: GEARMULATOR_VIRUS_LAYOUT,  // TODO: dedicated layouts
-  GearmulatorXT: GEARMULATOR_VIRUS_LAYOUT,
-  GearmulatorNord: GEARMULATOR_VIRUS_LAYOUT,
-  GearmulatorJP8000: GEARMULATOR_VIRUS_LAYOUT,
+  GearmulatorMicroQ: GEARMULATOR_MICROQ_LAYOUT,
+  GearmulatorXT: GEARMULATOR_XT_LAYOUT,
+  GearmulatorNord: GEARMULATOR_NORD_LAYOUT,
+  GearmulatorJP8000: GEARMULATOR_JP8000_LAYOUT,
 };
 
 /**

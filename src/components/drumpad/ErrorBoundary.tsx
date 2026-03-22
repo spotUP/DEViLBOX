@@ -40,9 +40,9 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
       errorInfo,
     });
 
-    // Log to external error service in production
+    // Log error in production (console only — no external service configured)
     if (process.env.NODE_ENV === 'production') {
-      // TODO: Send to error tracking service (e.g., Sentry)
+      console.error('[DrumPad] Uncaught error:', error, errorInfo);
     }
   }
 

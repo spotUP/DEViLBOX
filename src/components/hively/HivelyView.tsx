@@ -25,12 +25,14 @@ const POSITION_H = 160;
 
 export const HivelyView: React.FC<{ width?: number; height?: number }> = () => {
   const nativeData = useFormatStore(s => s.hivelyNative);
+  const setHivelyTrackStep = useFormatStore(s => s.setHivelyTrackStep);
   const currentPositionIndex = useTrackerStore(s => s.currentPositionIndex);
   const setCurrentPosition = useTrackerStore(s => s.setCurrentPosition);
   const isPlaying = useTransportStore(s => s.isPlaying);
   const currentRow = useTransportStore(s => s.currentRow);
 
   const [editPosition, setEditPosition] = useState(0);
+  const patternEditorRef = useRef<HTMLDivElement>(null);
 
   // Measure container width for HivelyPositionEditor (canvas-based, needs numeric width)
   const containerRef = useRef<HTMLDivElement>(null);
@@ -53,6 +55,24 @@ export const HivelyView: React.FC<{ width?: number; height?: number }> = () => {
     setEditPosition(pos);
     if (!isPlaying) setCurrentPosition(pos);
   }, [isPlaying, setCurrentPosition]);
+
+  // Focus the pattern editor (called from position editor Enter key)
+  const handleFocusTrackEditor = useCallback(() => {
+    const el = patternEditorRef.current?.querySelector('[data-pattern-editor]') as HTMLElement;
+    el?.focus();
+  }, []);
+
+  // Cell editing: resolve channel+row to track step and update store
+  const handleCellChange = useCallback((channelIdx: number, rowIdx: number, columnKey: string, value: number) => {
+    if (!nativeData) return;
+    const posEntry = nativeData.positions[activePosition];
+    if (!posEntry) return;
+    const trackIdx = posEntry.track[channelIdx];
+    if (trackIdx == null || trackIdx < 0 || trackIdx >= nativeData.tracks.length) return;
+    const track = nativeData.tracks[trackIdx];
+    if (!track || rowIdx >= track.steps.length) return;
+    setHivelyTrackStep(trackIdx, rowIdx, columnKey, value);
+  }, [nativeData, activePosition, setHivelyTrackStep]);
 
   const handleExport = useCallback((format: 'hvl' | 'ahx') => {
     const song = getTrackerReplayer().getSong();
@@ -136,16 +156,18 @@ export const HivelyView: React.FC<{ width?: number; height?: number }> = () => {
           nativeData={nativeData}
           currentPosition={activePosition}
           onPositionChange={handlePositionChange}
+          onFocusTrackEditor={handleFocusTrackEditor}
         />
       </div>
 
       {/* Pattern Editor */}
-      <div style={{ flex: 1, minHeight: 0, overflow: 'hidden' }}>
+      <div ref={patternEditorRef} style={{ flex: 1, minHeight: 0, overflow: 'hidden' }}>
         <PatternEditorCanvas
           formatColumns={HIVELY_COLUMNS}
           formatChannels={channels}
           formatCurrentRow={currentRow}
           formatIsPlaying={isPlaying}
+          onFormatCellChange={handleCellChange}
         />
       </div>
     </div>

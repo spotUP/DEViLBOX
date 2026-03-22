@@ -79,6 +79,20 @@ export const PixiHivelyView: React.FC<HivelyViewProps> = ({ width, height }) => 
     setFocusTarget('position');
   }, []);
 
+  const setHivelyTrackStep = useFormatStore(s => s.setHivelyTrackStep);
+
+  // Cell editing: resolve channel+row to track step and update store
+  const handleCellChange = useCallback((channelIdx: number, rowIdx: number, columnKey: string, value: number) => {
+    if (!nativeData) return;
+    const posEntry = nativeData.positions[activePosition];
+    if (!posEntry) return;
+    const trackIdx = posEntry.track[channelIdx];
+    if (trackIdx == null || trackIdx < 0 || trackIdx >= nativeData.tracks.length) return;
+    const track = nativeData.tracks[trackIdx];
+    if (!track || rowIdx >= track.steps.length) return;
+    setHivelyTrackStep(trackIdx, rowIdx, columnKey, value);
+  }, [nativeData, activePosition, setHivelyTrackStep]);
+
   // ─── Draw callbacks ────────────────────────────────────────────────────────
 
   const drawBg = useCallback((g: GraphicsType) => {
@@ -243,6 +257,7 @@ export const PixiHivelyView: React.FC<HivelyViewProps> = ({ width, height }) => 
           nativeData={nativeData}
           currentPosition={activePosition}
           onFocusPositionEditor={handleFocusPositionEditor}
+          onCellChange={handleCellChange}
         />
       </pixiContainer>
     </pixiContainer>

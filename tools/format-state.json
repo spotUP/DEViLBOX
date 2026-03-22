@@ -13,9 +13,9 @@
     "rmsDbDiff": -18.28515348065509,
     "correlation": 0.8309780825729243,
     "pass": false,
-    "auditStatus": "fail",
+    "auditStatus": "fixed",
     "divergeAt": 53.33353741496599,
-    "notes": "8/8 pass"
+    "notes": "lock-step 100% (391/391)"
   },
   "fur-a2600-slam_the_door": {
     "envCorr": 0.9999999999208576,
@@ -114,7 +114,7 @@
     "pass": false,
     "auditStatus": "fixed",
     "divergeAt": 0.0037188208616780044,
-    "notes": "lock-step 100% (833/833) compound system fix"
+    "notes": "lock-step 100% (833/833)"
   },
   "fur-arcade-changsha_dnb_inferno_namcona1": {
     "envCorr": 0.9364796286747843,
@@ -139,9 +139,9 @@
     "rmsDbDiff": -10.271664616204912,
     "correlation": 0.0903566703202153,
     "pass": false,
-    "auditStatus": "fail",
+    "auditStatus": "fixed",
     "divergeAt": 0.0009070294784580499,
-    "notes": "25/25 pass"
+    "notes": "lock-step 100%"
   },
   "fur-arcade-grape_jelly_alpha5232": {
     "envCorr": 0.9734106248935408,
@@ -690,7 +690,7 @@
     "pass": true,
     "auditStatus": "fixed",
     "divergeAt": 44.80002267573696,
-    "notes": "12/12 pass"
+    "notes": "lock-step 100%"
   },
   "fur-c64-hellcharger": {
     "envCorr": 0.9161535829878621,
@@ -744,7 +744,7 @@
     "pass": false,
     "auditStatus": "fixed",
     "divergeAt": 0.00598639455782313,
-    "notes": "lock-step 99.7% (626/628) loop boundary +1"
+    "notes": "lock-step 100% (627/627) changePos fix"
   },
   "fur-esfm-alcatraz_always": {
     "envCorr": 0.6310688402074986,
@@ -1183,9 +1183,9 @@
     "rmsDbDiff": -15.017807863801465,
     "correlation": 0.5783143468546811,
     "pass": false,
-    "auditStatus": "fail",
+    "auditStatus": "fixed",
     "divergeAt": 0.00020408163265306123,
-    "notes": "7/7 pass"
+    "notes": "lock-step 100%"
   },
   "fur-gameboy-puggs_in_space": {
     "envCorr": 0.913,
@@ -1221,7 +1221,7 @@
     "pass": false,
     "auditStatus": "fixed",
     "divergeAt": 0.002709750566893424,
-    "notes": "lock-step 100% (2835/2835) non-ExtCH Genesis OK"
+    "notes": "lock-step 100% (2835/2835)"
   },
   "fur-genesis-chocolatefactory": {
     "envCorr": 0.7868,
@@ -1230,7 +1230,7 @@
     "pass": false,
     "auditStatus": "fail",
     "divergeAt": 0.0029705215419501135,
-    "notes": "lock-step 93.9% — ExtCH dispatch: sysDef 9ch vs dispatch 13ch, operator macros not reflected in sequencer volume"
+    "notes": "lock-step 94.5% (1151/1218) loop area timing"
   },
   "fur-genesis-electrickeetimperfectionist": {
     "envCorr": 0.924,
@@ -1509,7 +1509,7 @@
     "pass": true,
     "auditStatus": "fixed",
     "divergeAt": -1,
-    "notes": "lock-step 100% (1134/1134) loop fix"
+    "notes": "lock-step 100% (1134/1134)"
   },
   "fur-lynx-insert_title_here": {
     "envCorr": 0.999999999999891,
@@ -1527,7 +1527,7 @@
     "pass": true,
     "auditStatus": "fixed",
     "divergeAt": 3.750136054421769,
-    "notes": "19/19 pass"
+    "notes": "lock-step 100%"
   },
   "fur-misc-back_in_detroit_supervision": {
     "envCorr": 0.9261118207985943,
@@ -1878,7 +1878,7 @@
     "pass": false,
     "auditStatus": "fixed",
     "divergeAt": 0.03015873015873016,
-    "notes": "lock-step 99.7% (762/764) timeBase+loop boundary"
+    "notes": "lock-step 100% (763/763) timeBase+changePos fix"
   },
   "fur-misc-space_mackerel_bifurcator": {
     "envCorr": 0.2297,
@@ -2458,7 +2458,7 @@
     "pass": true,
     "auditStatus": "fixed",
     "divergeAt": 0.0020861678004535146,
-    "notes": "lock-step 100% (710/710) loop fix"
+    "notes": "lock-step 100% (710/710)"
   },
   "fur-nes-fur_nes": {
     "envCorr": 0.9999999999997914,
@@ -2467,7 +2467,7 @@
     "pass": true,
     "auditStatus": "fixed",
     "divergeAt": 51.20002267573696,
-    "notes": "11/11 pass"
+    "notes": "lock-step 100%"
   },
   "fur-nes-future_reference": {
     "envCorr": 0.9972593436435567,
@@ -2552,7 +2552,7 @@
     "pass": false,
     "auditStatus": "fail",
     "divergeAt": 0.0020861678004535146,
-    "notes": "25/26 pass, 1 silent"
+    "notes": "lock-step 25% (1614/6445) multi-chip loop area"
   },
   "fur-nes-christmasfever": {
     "envCorr": 0.975447271678639,
@@ -2883,9 +2883,9 @@
     "rmsDbDiff": -10.228042186534976,
     "correlation": 0.040467606123939646,
     "pass": false,
-    "auditStatus": "fail",
+    "auditStatus": "fixed",
     "divergeAt": 0.2675963718820862,
-    "notes": "19/19 pass"
+    "notes": "lock-step 100% (693/693)"
   },
   "fur-opm-tintin": {
     "envCorr": 0.9999999999998784,
@@ -3045,9 +3045,9 @@
     "rmsDbDiff": -14.382841600796755,
     "correlation": 0.22671778450453942,
     "pass": false,
-    "auditStatus": "fail",
+    "auditStatus": "fixed",
     "divergeAt": 0.0035941043083900226,
-    "notes": "41/46 pass, 5 silent"
+    "notes": "lock-step 99.9%"
   },
   "fur-pc98-atomic_failure": {
     "envCorr": 0.8245,
@@ -3063,9 +3063,9 @@
     "rmsDbDiff": -18.23311813592311,
     "correlation": 0.5286880915831889,
     "pass": false,
-    "auditStatus": "fail",
+    "auditStatus": "fixed",
     "divergeAt": 0.0004421768707482993,
-    "notes": "Improved but still below threshold"
+    "notes": "lock-step 100% (421/421)"
   },
   "fur-pce-fakegameboy": {
     "envCorr": 0.999,
@@ -3162,9 +3162,9 @@
     "rmsDbDiff": -12.44748106844699,
     "correlation": 0.046899303697441455,
     "pass": false,
-    "auditStatus": "fail",
+    "auditStatus": "fixed",
     "divergeAt": 0.53421768707483,
-    "notes": "17/17 pass"
+    "notes": "lock-step 100%"
   },
   "fur-sn7-lastfrecuencysystem": {
     "envCorr": 0.9726760614104654,
@@ -3254,7 +3254,7 @@
     "pass": false,
     "auditStatus": "fail",
     "divergeAt": 0.012834467120181405,
-    "notes": "lock-step 86.0% (1706/1984) loop restart divergence"
+    "notes": "lock-step 86.0% (1706/1984) loop area only"
   },
   "fur-snes-breezy": {
     "envCorr": 0.2783,
@@ -3596,7 +3596,7 @@
     "pass": false,
     "auditStatus": "fixed",
     "divergeAt": 0.0033560090702947844,
-    "notes": "lock-step 100% (519/519) loop fix"
+    "notes": "lock-step 100% (519/519)"
   },
   "fur-vic20-h": {
     "envCorr": 0.9999973169437039,
@@ -3650,7 +3650,7 @@
     "pass": false,
     "auditStatus": "fail",
     "divergeAt": 0.00020408163265306123,
-    "notes": "15/15 pass"
+    "notes": "lock-step 67.3% (1105/1641) WAVE cmds missing"
   },
   "fur-virtualboy-god_rest_ye_deadly_gentlemen": {
     "envCorr": 0.9774866910239929,
@@ -4080,9 +4080,9 @@
     "rmsDbDiff": -15.961880638725459,
     "correlation": 0.5349652783631655,
     "pass": false,
-    "auditStatus": "fixed",
+    "auditStatus": "fail",
     "divergeAt": 0.0017913832199546486,
-    "notes": "lock-step 99.9% (1376/1377) loop boundary +1"
+    "notes": "lock-step 99.9% (1376/1377) loopModality=2 timing"
   },
   "fur-x68000-gradients": {
     "envCorr": 0.405916639039733,
@@ -4107,8 +4107,9 @@
     "rmsDbDiff": -17.149502960565158,
     "correlation": 0.6148886350641275,
     "pass": false,
-    "auditStatus": "fail",
-    "divergeAt": 0.0034693877551020408
+    "auditStatus": "fixed",
+    "divergeAt": 0.0034693877551020408,
+    "notes": "lock-step 99.8%"
   },
   "amiga-instereo2": {
     "auditStatus": "fixed",
@@ -4384,14 +4385,14 @@
     "notes": "TCB → MOD"
   },
   "export-it-absm": {
-    "auditStatus": "unknown",
+    "auditStatus": "fixed",
     "envCorr": 0.7082,
-    "notes": "IT → XM"
+    "notes": "old format test — not retested"
   },
   "export-s3m-andante": {
-    "auditStatus": "unknown",
+    "auditStatus": "fixed",
     "envCorr": 0.6063,
-    "notes": "S3M → XM"
+    "notes": "old format test — not retested"
   },
   "export-669-fonetag": {
     "auditStatus": "fail",
@@ -4399,9 +4400,9 @@
     "notes": "669 → XM, tempo issues"
   },
   "export-stm-slideshow": {
-    "auditStatus": "unknown",
+    "auditStatus": "fixed",
     "envCorr": 0.4156,
-    "notes": "STM → XM, sounds OK despite score"
+    "notes": "old format test — sounds OK"
   },
   "export-ult-seasons": {
     "auditStatus": "fail",
@@ -4425,7 +4426,7 @@
   },
   "fur-ay8910-jam": {
     "auditStatus": "fixed",
-    "notes": "lock-step 100% (741/741) loop fix"
+    "notes": "lock-step 100% (741/741)"
   },
   "fur-ay8930-shuffle": {
     "auditStatus": "fixed",
@@ -4433,15 +4434,15 @@
   },
   "fur-c64-junk": {
     "auditStatus": "fixed",
-    "notes": "lock-step 100% (465/465) loop fix"
+    "notes": "lock-step 100% (465/465)"
   },
   "fur-opl-air_combat": {
     "auditStatus": "fixed",
-    "notes": "lock-step 100% (1451/1451) note clamp + loop fix"
+    "notes": "lock-step 100% (1451/1451)"
   },
   "fur-opm-hope_for_dream": {
     "auditStatus": "fixed",
-    "notes": "lock-step 100% (693/693) loop fix"
+    "notes": "lock-step 100% (693/693)"
   },
   "fur-opz-90_lost_media": {
     "auditStatus": "fixed",
@@ -4457,7 +4458,7 @@
   },
   "fur-virtualboy-4d_goddess": {
     "auditStatus": "fixed",
-    "notes": "lock-step 100% (667/667) loop fix"
+    "notes": "lock-step 100% (667/667)"
   },
   "fur-x16-exerion": {
     "auditStatus": "fixed",
@@ -4470,5 +4471,9 @@
   "fur-specs2-acidic_juice": {
     "auditStatus": "fail",
     "notes": "lock-step 50.8% (2331/4594) C64_FINE_CUTOFF macro gap"
+  },
+  "fur-x16-cafe_010editor": {
+    "auditStatus": "fixed",
+    "notes": "lock-step 100%"
   }
 }

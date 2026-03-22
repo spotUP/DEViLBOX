@@ -6,7 +6,7 @@
 
 import { useEffect, useCallback, useRef } from 'react';
 import { useShallow } from 'zustand/react/shallow';
-import { useTrackerStore, useCursorStore, useTransportStore } from '@stores';
+import { useTrackerStore, useCursorStore, useTransportStore, useFormatStore } from '@stores';
 import { useEditorStore } from '@stores/useEditorStore';
 import { useUIStore } from '@stores/useUIStore';
 import { useHistoryStore } from '@stores/useHistoryStore';
@@ -531,11 +531,15 @@ export const useTrackerInput = () => {
         return;
       }
 
-      // ── Delegate to note input (CapsLock, F1-F7, octave, grave, piano keys) ──
-      if (noteInput.handleKeyDown(e)) return;
+      // In format modes, note/effect input is handled by handleFormatKeyDown
+      // in PatternEditorCanvas (or PixiHivelyTrackEditor). Skip to avoid conflicts.
+      if (useFormatStore.getState().editorMode === 'classic') {
+        // ── Delegate to note input (CapsLock, F1-F7, octave, grave, piano keys) ──
+        if (noteInput.handleKeyDown(e)) return;
 
-      // ── Delegate to effect input (instrument, volume, effect, flag, probability columns) ──
-      if (effectInput.handleKeyDown(e)) return;
+        // ── Delegate to effect input (instrument, volume, effect, flag, probability columns) ──
+        if (effectInput.handleKeyDown(e)) return;
+      }
     },
     [
       pattern,

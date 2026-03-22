@@ -114,6 +114,14 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
   // Auto-focus in format mode so keyboard navigation works immediately
   useEffect(() => {
     if (isFormatMode) containerRef.current?.focus();
+    return () => {
+      // Clean up held-arrow RAF when leaving format mode
+      formatHeldArrowRef.current = null;
+      if (formatArrowRafRef.current) {
+        cancelAnimationFrame(formatArrowRafRef.current);
+        formatArrowRafRef.current = 0;
+      }
+    };
   }, [isFormatMode]);
 
   // Keep refs in sync with props on every render
@@ -696,6 +704,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
     if (!isFormatMode || !formatColumns || !formatChannels) return;
     const col = formatColumns[formatCursor.columnIndex];
     const numRows = formatChannels[0]?.patternLength ?? 0;
+    const editStep = useEditorStore.getState().editStep;
 
     const moveCursor = (delta: { channelIndex?: number; rowIndex?: number; columnIndex?: number }) => {
       setFormatCursor(prev => ({
@@ -708,10 +717,37 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
       }));
     };
 
-    if (e.key === '[' || e.key === '-') { e.preventDefault(); setFormatOctave(o => Math.max(0, o - 1)); return; }
-    if (e.key === ']' || e.key === '=') { e.preventDefault(); setFormatOctave(o => Math.min(7, o + 1)); return; }
+    const advanceByEditStep = () => {
+      if (editStep > 0) {
+        setFormatCursor(prev => ({
+          ...prev,
+          rowIndex: Math.min(numRows - 1, prev.rowIndex + editStep),
+        }));
+      }
+    };
 
-    // Arrow up/down: RAF-based hold-to-scroll (no initial delay, 50ms interval)
+    // ── Octave control ──
+    // F1-F7: Select octave (FT2-style)
+    if (e.key >= 'F1' && e.key <= 'F7' && !e.ctrlKey && !e.metaKey && !e.altKey && !e.shiftKey) {
+      e.preventDefault();
+      setFormatOctave(parseInt(e.key[1]) - 1);
+      return;
+    }
+    // [ ] for octave ±1
+    if (e.key === '[') { e.preventDefault(); setFormatOctave(o => Math.max(0, o - 1)); return; }
+    if (e.key === ']') { e.preventDefault(); setFormatOctave(o => Math.min(7, o + 1)); return; }
+    // Numpad +/- for octave
+    if (e.key === '+' && e.location === 3) { e.preventDefault(); setFormatOctave(o => Math.min(7, o + 1)); return; }
+    if (e.key === '-' && e.location === 3) { e.preventDefault(); setFormatOctave(o => Math.max(0, o - 1)); return; }
+
+    // Grave key: cycle edit step 0-16
+    if (e.key === '`' || e.key === '~') {
+      e.preventDefault();
+      useEditorStore.getState().setEditStep((editStep + 1) % 17);
+      return;
+    }
+
+    // ── Arrow up/down: RAF-based hold-to-scroll ──
     if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
       e.preventDefault();
       if (e.repeat) return; // RAF loop handles repeats
@@ -737,6 +773,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
       return;
     }
 
+    // ── Navigation ──
     switch (e.key) {
       case 'ArrowLeft':  e.preventDefault(); moveCursor({ columnIndex: -1 }); return;
       case 'ArrowRight': e.preventDefault(); moveCursor({ columnIndex: +1 }); return;
@@ -750,24 +787,36 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
         e.preventDefault();
         if (col) {
           onFormatCellChange?.(formatCursor.channelIndex, formatCursor.rowIndex, col.key, col.emptyValue ?? 0);
-          moveCursor({ rowIndex: +1 });
+          advanceByEditStep();
         }
         return;
     }
 
     if (!col) return;
 
+    // ── Note entry ──
     if (col.type === 'note') {
+      // CapsLock: note-off
+      if (e.key === 'CapsLock') {
+        e.preventDefault();
+        onFormatCellChange?.(formatCursor.channelIndex, formatCursor.rowIndex, col.key, 97);
+        advanceByEditStep();
+        return;
+      }
       const semitone = KEY_TO_SEMITONE[e.key.toLowerCase()];
       if (semitone !== undefined) {
         e.preventDefault();
         const midi = semitone + formatOctave * 12;
         if (midi >= 0 && midi <= 95) {
           onFormatCellChange?.(formatCursor.channelIndex, formatCursor.rowIndex, col.key, midi);
-          moveCursor({ rowIndex: +1 });
+          advanceByEditStep();
         }
+        return;
       }
-    } else if (col.type === 'hex' || col.type === 'ctrl') {
+    }
+
+    // ── Hex/ctrl entry (instrument, effects) ──
+    if (col.type === 'hex' || col.type === 'ctrl') {
       if (/^[0-9a-fA-F]$/i.test(e.key)) {
         e.preventDefault();
         const digit = parseInt(e.key, 16);
@@ -777,7 +826,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
         const mask = (1 << (hexDigits * 4)) - 1;
         onFormatCellChange?.(formatCursor.channelIndex, formatCursor.rowIndex, col.key,
           ((cur << 4) | digit) & mask);
-        moveCursor({ rowIndex: +1 });
+        advanceByEditStep();
       }
     }
   }, [isFormatMode, formatColumns, formatChannels, formatCursor, formatOctave, onFormatCellChange]);
