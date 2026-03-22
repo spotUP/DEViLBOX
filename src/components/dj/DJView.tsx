@@ -5,7 +5,7 @@
  * Inspired by Pioneer DJM-900 hardware mixer aesthetic.
  */
 
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useDJStore } from '@/stores/useDJStore';
 import { getDJEngine, disposeDJEngine } from '@/engine/dj/DJEngine';
 import { clearSongCache } from '@/engine/dj/DJSongCache';
@@ -27,6 +27,20 @@ import { DJSamplerPanel } from './DJSamplerPanel';
 import { useDJKeyboardHandler } from './DJKeyboardHandler';
 import type { SeratoTrack } from '@/lib/serato';
 import { getDJPipeline } from '@/engine/dj/DJPipeline';
+
+// Lazy-load heavy 3D components to avoid bloating the main DJ bundle
+const DeckVinyl3DView = React.lazy(() => import('./DeckVinyl3DView'));
+const MixerVestax3DView = React.lazy(() => import('./MixerVestax3DView'));
+const R3FCanvas = React.lazy(() =>
+  import('@react-three/fiber').then((mod) => ({ default: mod.Canvas }))
+);
+const ViewPort = React.lazy(() =>
+  import('@react-three/drei').then((mod) => {
+    // View.Port is a static property on View, returned as a named export
+    const Port = mod.View.Port;
+    return { default: Port as React.ComponentType };
+  })
+);
 
 
 // ============================================================================
@@ -284,14 +298,15 @@ export const DJView: React.FC<DJViewProps> = ({ onShowDrumpads }) => {
           <DJControllerSelector />
           <DJFxQuickPresets />
           <select
-            value={deckViewMode === '3d' ? 'visualizer' : deckViewMode}
-            onChange={(e) => useDJStore.getState().setDeckViewMode(e.target.value as 'visualizer' | 'vinyl')}
+            value={deckViewMode}
+            onChange={(e) => useDJStore.getState().setDeckViewMode(e.target.value as 'visualizer' | 'vinyl' | '3d')}
             className="px-3 py-1.5 rounded-md text-xs font-mono border transition-all cursor-pointer
               border-dark-borderLight bg-dark-bgTertiary text-text-secondary hover:bg-dark-bgHover hover:text-text-primary"
             title="Select deck view mode"
           >
             <option value="visualizer">Deck: Visualizer</option>
             <option value="vinyl">Deck: Vinyl</option>
+            <option value="3d">Deck: 3D</option>
           </select>
           <button
             onClick={() => setThirdDeckActive(!thirdDeckActive)}
@@ -430,31 +445,76 @@ export const DJView: React.FC<DJViewProps> = ({ onShowDrumpads }) => {
       {/* ================================================================== */}
       {/* MAIN LAYOUT: Deck A | Mixer | Deck B [| Deck C]                   */}
       {/* ================================================================== */}
-      <div className={`flex-1 grid gap-2 p-2 overflow-hidden min-h-0 ${
+      <div className={`relative flex-1 grid gap-2 p-2 overflow-hidden min-h-0 ${
         thirdDeckActive
           ? 'grid-cols-[1fr_280px_1fr_1fr]'
           : 'grid-cols-[1fr_280px_1fr]'
       }`}>
-        {/* ---- Deck A (left) ---- */}
-        <div className="min-h-0 min-w-0 overflow-hidden">
-          <DJDeck deckId="A" />
-        </div>
+        {deckViewMode === '3d' ? (
+          /* ── 3D mode: Three.js Canvas with scissor Views ─────────────── */
+          <Suspense fallback={
+            <div className="col-span-full flex items-center justify-center text-text-muted text-sm">
+              Loading 3D views...
+            </div>
+          }>
+            {/* Deck A 3D turntable */}
+            <div className="min-h-0 min-w-0 overflow-hidden">
+              <DeckVinyl3DView deckId="A" />
+            </div>
 
-        {/* ---- Center Mixer ---- */}
-        <div className="min-h-0 min-w-0 overflow-hidden">
-          <DJMixer />
-        </div>
+            {/* Center 3D mixer */}
+            <div className="min-h-0 min-w-0 overflow-hidden">
+              <MixerVestax3DView />
+            </div>
 
-        {/* ---- Deck B (right) ---- */}
-        <div className="min-h-0 min-w-0 overflow-hidden">
-          <DJDeck deckId="B" />
-        </div>
+            {/* Deck B 3D turntable */}
+            <div className="min-h-0 min-w-0 overflow-hidden">
+              <DeckVinyl3DView deckId="B" />
+            </div>
 
-        {/* ---- Deck C (far right, conditional) ---- */}
-        {thirdDeckActive && (
-          <div className="min-h-0 min-w-0 overflow-hidden">
-            <DJDeck deckId="C" />
-          </div>
+            {/* Deck C 3D turntable (conditional) */}
+            {thirdDeckActive && (
+              <div className="min-h-0 min-w-0 overflow-hidden">
+                <DeckVinyl3DView deckId="C" />
+              </div>
+            )}
+
+            {/* Shared R3F Canvas overlaying the deck area for drei View scissor rendering */}
+            <div className="absolute inset-0 pointer-events-none" style={{ zIndex: 1 }}>
+              <R3FCanvas
+                style={{ position: 'absolute', inset: 0 }}
+                eventSource={djViewRef as React.RefObject<HTMLDivElement>}
+                eventPrefix="client"
+              >
+                <ViewPort />
+              </R3FCanvas>
+            </div>
+          </Suspense>
+        ) : (
+          /* ── Standard 2D modes (Visualizer / Vinyl) ──────────────────── */
+          <>
+            {/* ---- Deck A (left) ---- */}
+            <div className="min-h-0 min-w-0 overflow-hidden">
+              <DJDeck deckId="A" />
+            </div>
+
+            {/* ---- Center Mixer ---- */}
+            <div className="min-h-0 min-w-0 overflow-hidden">
+              <DJMixer />
+            </div>
+
+            {/* ---- Deck B (right) ---- */}
+            <div className="min-h-0 min-w-0 overflow-hidden">
+              <DJDeck deckId="B" />
+            </div>
+
+            {/* ---- Deck C (far right, conditional) ---- */}
+            {thirdDeckActive && (
+              <div className="min-h-0 min-w-0 overflow-hidden">
+                <DJDeck deckId="C" />
+              </div>
+            )}
+          </>
         )}
       </div>
 
