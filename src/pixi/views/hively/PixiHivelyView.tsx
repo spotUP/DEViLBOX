@@ -169,21 +169,24 @@ export const PixiHivelyView: React.FC<HivelyViewProps> = ({ width, height }) => 
         {/* Flex spacer */}
         <pixiContainer layout={{ flex: 1, height: TOOLBAR_HEIGHT }} />
 
-        {/* Export buttons */}
-        <PixiButton
-          label="HVL↓"
-          variant="ft2"
-          size="sm"
-          color="green"
-          onClick={() => handleExport('hvl')}
-        />
-        <PixiButton
-          label="AHX↓"
-          variant="ft2"
-          size="sm"
-          color="green"
-          onClick={() => handleExport('ahx')}
-        />
+        {/* Export to the OTHER format (no point exporting AHX→AHX) */}
+        {formatLabel === 'AHX' ? (
+          <PixiButton
+            label="Export HVL↓"
+            variant="ft2"
+            size="sm"
+            color="green"
+            onClick={() => handleExport('hvl')}
+          />
+        ) : (
+          <PixiButton
+            label="Export AHX↓"
+            variant="ft2"
+            size="sm"
+            color="green"
+            onClick={() => handleExport('ahx')}
+          />
+        )}
 
         <pixiBitmapText
           text="|"

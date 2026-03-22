@@ -114,14 +114,18 @@ export const HivelyView: React.FC<{ width?: number; height?: number }> = () => {
         <span style={{ fontWeight: 'bold', color: '#fde047', fontSize: '12px' }}>{formatLabel}</span>
         <span style={{ color: 'var(--color-text-muted)' }}>|</span>
         <span style={{ fontSize: '11px', color: 'var(--color-text-muted)', flex: 1 }}>{toolbarInfo}</span>
-        <button
-          className="px-2 py-0.5 text-xs bg-green-800 hover:bg-green-700 text-green-100 rounded border border-green-600"
-          onClick={() => handleExport('hvl')}
-        >HVL</button>
-        <button
-          className="px-2 py-0.5 text-xs bg-green-800 hover:bg-green-700 text-green-100 rounded border border-green-600"
-          onClick={() => handleExport('ahx')}
-        >AHX</button>
+        {/* Export to the OTHER format (no point exporting AHX→AHX) */}
+        {formatLabel === 'AHX' ? (
+          <button
+            className="px-2 py-0.5 text-xs bg-green-800 hover:bg-green-700 text-green-100 rounded border border-green-600"
+            onClick={() => handleExport('hvl')}
+          >Export HVL</button>
+        ) : (
+          <button
+            className="px-2 py-0.5 text-xs bg-green-800 hover:bg-green-700 text-green-100 rounded border border-green-600"
+            onClick={() => handleExport('ahx')}
+          >Export AHX</button>
+        )}
       </div>
 
       {/* Position editor */}
