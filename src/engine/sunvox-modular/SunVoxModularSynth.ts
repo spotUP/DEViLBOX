@@ -11,6 +11,7 @@ import { getDevilboxAudioContext, noteToMidi } from '@/utils/audio-context';
 import { SunVoxEngine } from '@/engine/sunvox/SunVoxEngine';
 import type { SunVoxModuleGraphEntry } from '@/engine/sunvox/SunVoxEngine';
 import { SV_ID_TO_TYPE_STRING } from './SunVoxModuleDescriptors';
+import { registerSunVoxMuteBridge, unregisterSunVoxMuteBridge } from '@/stores/useMixerStore';
 
 const GENERATOR_TYPES = new Set([
   'Analog generator', 'Generator', 'FM', 'Kicker', 'DrumSynth',
@@ -38,6 +39,7 @@ export async function awaitPendingSharedSongLoad(): Promise<void> {
 
 /** Force-reset shared state (call before loading a new song to prevent WASM crashes) */
 export function resetSharedSunVoxHandle(): void {
+  unregisterSunVoxMuteBridge();
   _sharedEpoch++; // Invalidate all existing instances
   if (_sharedSongHandle >= 0) {
     try {
@@ -63,6 +65,27 @@ export function donatePreloadedHandle(handle: number): void {
   _sharedSongHandle = handle;
   _sharedSongRefCount = 1; // prevent _loadSongShared cleanup from destroying it
   _sharedSongInitPromise = Promise.resolve(); // already loaded
+
+  // Register mute bridge so the mixer store can mute SunVox modules
+  // without require() (which fails in Vite ESM).
+  const engine = SunVoxEngine.getInstance();
+  registerSunVoxMuteBridge({
+    engine,
+    getHandle: () => _sharedSongHandle,
+    getInstruments: () => {
+      try {
+        // eslint-disable-next-line @typescript-eslint/no-require-imports
+        return require('@/stores/useInstrumentStore').useInstrumentStore.getState().instruments;
+      } catch { return []; }
+    },
+    getPattern: () => {
+      try {
+        // eslint-disable-next-line @typescript-eslint/no-require-imports
+        const s = require('@/stores/useTrackerStore').useTrackerStore.getState();
+        return s.patterns[s.currentPatternIndex] ?? null;
+      } catch { return null; }
+    },
+  });
 }
 
 export class SunVoxModularSynth implements DevilboxSynth {

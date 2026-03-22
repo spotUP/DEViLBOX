@@ -49,47 +49,28 @@ function forwardReplayerMuteMask(channels: MixerChannelState[], isSoloing: boole
   }
 }
 
-// Lazy-cached SunVox engine references (same pattern as Furnace below)
-let _sunVoxEngine: any = null;
-let _getSharedSunVoxHandle: (() => number) | null = null;
-let _useInstrumentStore: any = null;
-let _useTrackerStore: any = null;
+// ── SunVox mute bridge ─────────────────────────────────────────────────────
+// Instead of require() (which can return wrong module instances in Vite ESM),
+// the SunVox engine registers itself here when a song loads.
+let _sunVoxMuteBridge: {
+  engine: { muteModule(h: number, m: number): void; unmuteModule(h: number, m: number): void; setModuleMuteState(h: number, u: number[], m: number[]): void };
+  getHandle: () => number;
+  getInstruments: () => any[];
+  getPattern: () => any | null;
+} | null = null;
 
-function getSunVoxEngine(): any {
-  if (!_sunVoxEngine) {
-    _sunVoxEngine = require('../engine/sunvox/SunVoxEngine').SunVoxEngine;
-  }
-  return _sunVoxEngine;
+/** Called by SunVoxModularSynth when a song loads to register the mute bridge */
+export function registerSunVoxMuteBridge(bridge: typeof _sunVoxMuteBridge): void {
+  _sunVoxMuteBridge = bridge;
 }
 
-function getSharedHandle(): number {
-  if (!_getSharedSunVoxHandle) {
-    _getSharedSunVoxHandle = require('../engine/sunvox-modular/SunVoxModularSynth').getSharedSunVoxHandle;
-  }
-  return _getSharedSunVoxHandle!();
+/** Called when SunVox song is unloaded */
+export function unregisterSunVoxMuteBridge(): void {
+  _sunVoxMuteBridge = null;
 }
 
-function getInstrumentStore(): any {
-  if (!_useInstrumentStore) {
-    _useInstrumentStore = require('./useInstrumentStore').useInstrumentStore;
-  }
-  return _useInstrumentStore;
-}
-
-function getTrackerStore(): any {
-  if (!_useTrackerStore) {
-    _useTrackerStore = require('./useTrackerStore').useTrackerStore;
-  }
-  return _useTrackerStore;
-}
-
-/** Check if there's an active SunVox song by checking for a shared WASM handle. */
 function hasActiveSunVoxSong(): boolean {
-  try {
-    const Engine = getSunVoxEngine();
-    if (!Engine.hasInstance()) return false;
-    return getSharedHandle() >= 0;
-  } catch { return false; }
+  return _sunVoxMuteBridge !== null && _sunVoxMuteBridge.getHandle() >= 0;
 }
 
 // Lazy references to WASM engines to avoid circular imports
@@ -176,16 +157,15 @@ export function getActiveGainEngine(): { setChannelGain(ch: number, gain: number
  */
 function forwardSunVoxModuleMute(channels: MixerChannelState[], isSoloing: boolean): void {
   try {
-    const Engine = getSunVoxEngine();
-    if (!Engine.hasInstance()) return;
-    const engine = Engine.getInstance();
-    const handle = getSharedHandle();
+    if (!_sunVoxMuteBridge) return;
+    const bridge = _sunVoxMuteBridge;
+    const engine = bridge.engine;
+    const handle = bridge.getHandle();
     if (handle < 0) return;
 
-    const trackerState = getTrackerStore().getState();
-    const pattern = trackerState.patterns[trackerState.currentPatternIndex];
+    const pattern = bridge.getPattern();
     if (!pattern) return;
-    const instruments = getInstrumentStore().getState().instruments;
+    const instruments = bridge.getInstruments();
 
     // Collect SunVox root module IDs into unmuted/muted lists.
     // The worklet walks the graph downstream from each root to mute entire signal chains.
