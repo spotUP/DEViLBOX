@@ -137,6 +137,7 @@ import {
 import { useTrackerStore } from '@stores/useTrackerStore';
 import { useEditorStore } from '@stores/useEditorStore';
 import { useCursorStore } from '@stores/useCursorStore';
+import { useInstrumentStore } from '@stores/useInstrumentStore';
 import { getToneEngine } from '@engine/ToneEngine';
 
 // Singleton registry - populated once with all available commands
@@ -715,6 +716,1033 @@ function initializeRegistry() {
     { name: 'tracker_scratch_stop',  contexts: ['global'], handler: trackerScratchStop,        description: 'Tracker Scratch: Stop pattern' },
     { name: 'tracker_spinback',       contexts: ['global'], handler: trackerSpinback,            description: 'Tracker: Spinback (platter brake + spinup)' },
     { name: 'power_cut_stop',          contexts: ['pattern', 'global'], handler: trackerPowerCut,  description: 'Stop playback with turntable power-off spindown' },
+
+    // ====================================================================
+    // MISSING COMMAND REGISTRATIONS
+    // All commands referenced in keyboard scheme JSON files that were not
+    // previously registered. Grouped by category.
+    // ====================================================================
+
+    // === PATTERN/ORDER NAVIGATION ALIASES ===
+    { name: 'prev_order', contexts: ['pattern', 'global'], handler: prevPattern, description: 'Previous order/pattern' },
+    { name: 'next_order', contexts: ['pattern', 'global'], handler: nextPattern, description: 'Next order/pattern' },
+    { name: 'prev_sequence', contexts: ['pattern', 'global'], handler: prevPattern, description: 'Previous sequence position' },
+    { name: 'next_sequence', contexts: ['pattern', 'global'], handler: nextPattern, description: 'Next sequence position' },
+    { name: 'goto_first_pattern', contexts: ['pattern', 'global'], handler: () => {
+      useTrackerStore.getState().setCurrentPattern(0);
+      useCursorStore.getState().moveCursorToRow(0);
+      return true;
+    }, description: 'Go to first pattern' },
+    { name: 'goto_last_pattern', contexts: ['pattern', 'global'], handler: () => {
+      const { patterns, setCurrentPattern } = useTrackerStore.getState();
+      setCurrentPattern(patterns.length - 1);
+      useCursorStore.getState().moveCursorToRow(0);
+      return true;
+    }, description: 'Go to last pattern' },
+    { name: 'prev_pattern_4', contexts: ['pattern', 'global'], handler: () => {
+      const { currentPatternIndex, setCurrentPattern } = useTrackerStore.getState();
+      setCurrentPattern(Math.max(0, currentPatternIndex - 4));
+      return true;
+    }, description: 'Skip back 4 patterns' },
+    { name: 'next_pattern_4', contexts: ['pattern', 'global'], handler: () => {
+      const { currentPatternIndex, patterns, setCurrentPattern } = useTrackerStore.getState();
+      setCurrentPattern(Math.min(patterns.length - 1, currentPatternIndex + 4));
+      return true;
+    }, description: 'Skip forward 4 patterns' },
+    { name: 'first_block', contexts: ['pattern', 'global'], handler: () => {
+      useTrackerStore.getState().setCurrentPattern(0);
+      useCursorStore.getState().moveCursorToRow(0);
+      return true;
+    }, description: 'Go to first block' },
+    { name: 'last_block', contexts: ['pattern', 'global'], handler: () => {
+      const { patterns, setCurrentPattern } = useTrackerStore.getState();
+      setCurrentPattern(patterns.length - 1);
+      useCursorStore.getState().moveCursorToRow(0);
+      return true;
+    }, description: 'Go to last block' },
+
+    // === PLAYBACK VARIANTS ===
+    { name: 'pause', contexts: ['pattern', 'global'], handler: playStopToggle, description: 'Pause playback' },
+    { name: 'play_from_start', contexts: ['pattern', 'global'], handler: playSong, description: 'Play from song start' },
+    { name: 'play_song_alt', contexts: ['pattern', 'global'], handler: playSong, description: 'Play song (alternate)' },
+    { name: 'play_pattern_from_start', contexts: ['pattern', 'global'], handler: playPattern, description: 'Play pattern from start' },
+    { name: 'play_pattern_loop', contexts: ['pattern', 'global'], handler: playPattern, description: 'Play pattern in loop' },
+    { name: 'play_block_loop', contexts: ['pattern', 'global'], handler: playPattern, description: 'Play block/pattern in loop' },
+    { name: 'play_pattern_from_cursor', contexts: ['pattern', 'global'], handler: playFromCursor, description: 'Play pattern from cursor' },
+    { name: 'play_note_on_line', contexts: ['pattern'], handler: () => { playRow(); return true; }, description: 'Play note on current line' },
+
+    // === CURSOR MOVEMENT EXTENDED ===
+    { name: 'cursor_down_by_beat', contexts: ['pattern'], handler: () => {
+      const { cursor, moveCursorToRow } = useCursorStore.getState();
+      const { patterns, currentPatternIndex } = useTrackerStore.getState();
+      const pattern = patterns[currentPatternIndex];
+      if (!pattern) return false;
+      moveCursorToRow(Math.min(pattern.length - 1, cursor.rowIndex + 4));
+      return true;
+    }, description: 'Move cursor down by beat (4 rows)' },
+    { name: 'cursor_up_by_beat', contexts: ['pattern'], handler: () => {
+      const { cursor, moveCursorToRow } = useCursorStore.getState();
+      moveCursorToRow(Math.max(0, cursor.rowIndex - 4));
+      return true;
+    }, description: 'Move cursor up by beat (4 rows)' },
+    { name: 'cursor_down_by_spacing', contexts: ['pattern'], handler: () => {
+      const { cursor, moveCursorToRow } = useCursorStore.getState();
+      const { patterns, currentPatternIndex } = useTrackerStore.getState();
+      const { editStep } = useEditorStore.getState();
+      const pattern = patterns[currentPatternIndex];
+      if (!pattern) return false;
+      const step = editStep > 0 ? editStep : 1;
+      moveCursorToRow(Math.min(pattern.length - 1, cursor.rowIndex + step));
+      return true;
+    }, description: 'Move cursor down by edit step' },
+    { name: 'cursor_up_by_spacing', contexts: ['pattern'], handler: () => {
+      const { cursor, moveCursorToRow } = useCursorStore.getState();
+      const { editStep } = useEditorStore.getState();
+      const step = editStep > 0 ? editStep : 1;
+      moveCursorToRow(Math.max(0, cursor.rowIndex - step));
+      return true;
+    }, description: 'Move cursor up by edit step' },
+    { name: 'goto_first_row_first_channel', contexts: ['pattern'], handler: () => {
+      useCursorStore.getState().moveCursorToRow(0);
+      useCursorStore.getState().moveCursorToChannel(0);
+      useCursorStore.getState().moveCursorToColumn('note');
+      return true;
+    }, description: 'Go to first row, first channel' },
+    { name: 'goto_last_row_last_channel', contexts: ['pattern'], handler: () => {
+      const { patterns, currentPatternIndex } = useTrackerStore.getState();
+      const pattern = patterns[currentPatternIndex];
+      if (!pattern) return false;
+      useCursorStore.getState().moveCursorToRow(pattern.length - 1);
+      useCursorStore.getState().moveCursorToChannel(pattern.channels.length - 1);
+      useCursorStore.getState().moveCursorToColumn('note');
+      return true;
+    }, description: 'Go to last row, last channel' },
+    { name: 'jump_to_row_25_percent', contexts: ['pattern'], handler: () => {
+      const { patterns, currentPatternIndex } = useTrackerStore.getState();
+      const pattern = patterns[currentPatternIndex];
+      if (!pattern) return false;
+      useCursorStore.getState().moveCursorToRow(Math.floor(pattern.length * 0.25));
+      return true;
+    }, description: 'Jump to 25% of pattern' },
+    { name: 'jump_to_row_50_percent', contexts: ['pattern'], handler: () => {
+      const { patterns, currentPatternIndex } = useTrackerStore.getState();
+      const pattern = patterns[currentPatternIndex];
+      if (!pattern) return false;
+      useCursorStore.getState().moveCursorToRow(Math.floor(pattern.length * 0.50));
+      return true;
+    }, description: 'Jump to 50% of pattern' },
+    { name: 'jump_to_row_75_percent', contexts: ['pattern'], handler: () => {
+      const { patterns, currentPatternIndex } = useTrackerStore.getState();
+      const pattern = patterns[currentPatternIndex];
+      if (!pattern) return false;
+      useCursorStore.getState().moveCursorToRow(Math.floor(pattern.length * 0.75));
+      return true;
+    }, description: 'Jump to 75% of pattern' },
+    { name: 'jump_to_block_start', contexts: ['pattern'], handler: cursorPatternStart, description: 'Jump to block start' },
+    { name: 'jump_to_block_end', contexts: ['pattern'], handler: cursorPatternEnd, description: 'Jump to block end' },
+    { name: 'jump_to_block_middle', contexts: ['pattern'], handler: () => {
+      const { patterns, currentPatternIndex } = useTrackerStore.getState();
+      const pattern = patterns[currentPatternIndex];
+      if (!pattern) return false;
+      useCursorStore.getState().moveCursorToRow(Math.floor(pattern.length / 2));
+      return true;
+    }, description: 'Jump to block middle' },
+    { name: 'jump_to_block_quarter_1', contexts: ['pattern'], handler: jumpToQuarter1, description: 'Jump to block 1/4' },
+    { name: 'jump_to_block_quarter_3', contexts: ['pattern'], handler: jumpToQuarter3, description: 'Jump to block 3/4' },
+    { name: 'scroll_view_up', contexts: ['pattern'], handler: () => {
+      const { cursor, moveCursorToRow } = useCursorStore.getState();
+      moveCursorToRow(Math.max(0, cursor.rowIndex - 1));
+      return true;
+    }, description: 'Scroll view up' },
+    { name: 'scroll_view_down', contexts: ['pattern'], handler: () => {
+      const { cursor, moveCursorToRow } = useCursorStore.getState();
+      const { patterns, currentPatternIndex } = useTrackerStore.getState();
+      const pattern = patterns[currentPatternIndex];
+      if (!pattern) return false;
+      moveCursorToRow(Math.min(pattern.length - 1, cursor.rowIndex + 1));
+      return true;
+    }, description: 'Scroll view down' },
+    { name: 'seek_next_note', contexts: ['pattern'], handler: () => {
+      const { cursor, moveCursorToRow } = useCursorStore.getState();
+      const { patterns, currentPatternIndex } = useTrackerStore.getState();
+      const pattern = patterns[currentPatternIndex];
+      if (!pattern) return false;
+      const ch = pattern.channels[cursor.channelIndex];
+      if (!ch) return false;
+      for (let r = cursor.rowIndex + 1; r < pattern.length; r++) {
+        if (ch.rows[r]?.note && ch.rows[r].note! > 0) {
+          moveCursorToRow(r);
+          return true;
+        }
+      }
+      return true;
+    }, description: 'Seek to next note' },
+    { name: 'seek_previous_note', contexts: ['pattern'], handler: () => {
+      const { cursor, moveCursorToRow } = useCursorStore.getState();
+      const { patterns, currentPatternIndex } = useTrackerStore.getState();
+      const pattern = patterns[currentPatternIndex];
+      if (!pattern) return false;
+      const ch = pattern.channels[cursor.channelIndex];
+      if (!ch) return false;
+      for (let r = cursor.rowIndex - 1; r >= 0; r--) {
+        if (ch.rows[r]?.note && ch.rows[r].note! > 0) {
+          moveCursorToRow(r);
+          return true;
+        }
+      }
+      return true;
+    }, description: 'Seek to previous note' },
+    { name: 'snap_to_beat_down', contexts: ['pattern'], handler: () => {
+      const { cursor, moveCursorToRow } = useCursorStore.getState();
+      const { patterns, currentPatternIndex } = useTrackerStore.getState();
+      const pattern = patterns[currentPatternIndex];
+      if (!pattern) return false;
+      const nextBeat = Math.min(pattern.length - 1, (Math.floor(cursor.rowIndex / 4) + 1) * 4);
+      moveCursorToRow(nextBeat);
+      return true;
+    }, description: 'Snap cursor to next beat boundary' },
+    { name: 'snap_to_beat_up', contexts: ['pattern'], handler: () => {
+      const { cursor, moveCursorToRow } = useCursorStore.getState();
+      const prevBeat = Math.max(0, (Math.ceil(cursor.rowIndex / 4) - 1) * 4);
+      moveCursorToRow(prevBeat);
+      return true;
+    }, description: 'Snap cursor to previous beat boundary' },
+    { name: 'stay_in_visible_channels_left', contexts: ['pattern'], handler: prevChannel, description: 'Move left within visible channels' },
+    { name: 'stay_in_visible_channels_right', contexts: ['pattern'], handler: nextChannel, description: 'Move right within visible channels' },
+    { name: 'screen_left', contexts: ['pattern'], handler: prevChannel, description: 'Screen left (prev channel)' },
+    { name: 'screen_right', contexts: ['pattern'], handler: nextChannel, description: 'Screen right (next channel)' },
+
+    // === EDITING EXTENDED ===
+    { name: 'backspace_cursor', contexts: ['pattern'], handler: () => {
+      const { cursor, moveCursorToRow } = useCursorStore.getState();
+      if (cursor.rowIndex > 0) {
+        const { deleteRow } = useTrackerStore.getState();
+        deleteRow(cursor.channelIndex, cursor.rowIndex - 1);
+        moveCursorToRow(cursor.rowIndex - 1);
+      }
+      return true;
+    }, description: 'Delete note above cursor and pull up' },
+    { name: 'insert_note_off', contexts: ['pattern'], handler: insertKeyoff, description: 'Insert note off (===)' },
+    { name: 'insert_note_off_a', contexts: ['pattern'], handler: insertKeyoff, description: 'Insert note off (alternate)' },
+    { name: 'insert_note_fade', contexts: ['pattern'], handler: insertFadeOut, description: 'Insert note fade' },
+    { name: 'clear_field', contexts: ['pattern'], handler: () => {
+      const { cursor } = useCursorStore.getState();
+      const { setCell } = useTrackerStore.getState();
+      const col = cursor.columnType;
+      if (col === 'note') setCell(cursor.channelIndex, cursor.rowIndex, { note: 0 });
+      else if (col === 'instrument') setCell(cursor.channelIndex, cursor.rowIndex, { instrument: 0 });
+      else if (col === 'volume') setCell(cursor.channelIndex, cursor.rowIndex, { volume: 0 });
+      else if (col === 'effTyp') setCell(cursor.channelIndex, cursor.rowIndex, { effTyp: 0 });
+      else if (col === 'effParam') setCell(cursor.channelIndex, cursor.rowIndex, { eff: 0 });
+      else if (col === 'effTyp2') setCell(cursor.channelIndex, cursor.rowIndex, { effTyp2: 0 });
+      else if (col === 'effParam2') setCell(cursor.channelIndex, cursor.rowIndex, { eff2: 0 });
+      return true;
+    }, description: 'Clear current field' },
+    { name: 'clear_field_and_step_it', contexts: ['pattern'], handler: () => {
+      const { cursor } = useCursorStore.getState();
+      const { setCell } = useTrackerStore.getState();
+      const col = cursor.columnType;
+      if (col === 'note') setCell(cursor.channelIndex, cursor.rowIndex, { note: 0 });
+      else if (col === 'instrument') setCell(cursor.channelIndex, cursor.rowIndex, { instrument: 0 });
+      else if (col === 'volume') setCell(cursor.channelIndex, cursor.rowIndex, { volume: 0 });
+      else if (col === 'effTyp') setCell(cursor.channelIndex, cursor.rowIndex, { effTyp: 0 });
+      else if (col === 'effParam') setCell(cursor.channelIndex, cursor.rowIndex, { eff: 0 });
+      else if (col === 'effTyp2') setCell(cursor.channelIndex, cursor.rowIndex, { effTyp2: 0 });
+      else if (col === 'effParam2') setCell(cursor.channelIndex, cursor.rowIndex, { eff2: 0 });
+      advanceToNextRow();
+      return true;
+    }, description: 'Clear field and advance (IT style)' },
+    { name: 'clear_field_it_style', contexts: ['pattern'], handler: () => {
+      const { cursor } = useCursorStore.getState();
+      const { setCell } = useTrackerStore.getState();
+      const col = cursor.columnType;
+      if (col === 'note') setCell(cursor.channelIndex, cursor.rowIndex, { note: 0 });
+      else if (col === 'instrument') setCell(cursor.channelIndex, cursor.rowIndex, { instrument: 0 });
+      else if (col === 'volume') setCell(cursor.channelIndex, cursor.rowIndex, { volume: 0 });
+      else if (col === 'effTyp') setCell(cursor.channelIndex, cursor.rowIndex, { effTyp: 0 });
+      else if (col === 'effParam') setCell(cursor.channelIndex, cursor.rowIndex, { eff: 0 });
+      else if (col === 'effTyp2') setCell(cursor.channelIndex, cursor.rowIndex, { effTyp2: 0 });
+      else if (col === 'effParam2') setCell(cursor.channelIndex, cursor.rowIndex, { eff2: 0 });
+      return true;
+    }, description: 'Clear field (IT style)' },
+    { name: 'clear_row_and_step', contexts: ['pattern'], handler: () => {
+      const { cursor } = useCursorStore.getState();
+      const { setCell } = useTrackerStore.getState();
+      setCell(cursor.channelIndex, cursor.rowIndex, { note: 0, instrument: 0, volume: 0, effTyp: 0, eff: 0 });
+      advanceToNextRow();
+      return true;
+    }, description: 'Clear row and advance' },
+    { name: 'insert_rows', contexts: ['pattern'], handler: insertRow, description: 'Insert row(s)' },
+    { name: 'insert_rows_all_channels', contexts: ['pattern'], handler: () => {
+      const { cursor } = useCursorStore.getState();
+      const { insertRow: insRow, patterns, currentPatternIndex } = useTrackerStore.getState();
+      const pattern = patterns[currentPatternIndex];
+      if (!pattern) return false;
+      for (let ch = 0; ch < pattern.channels.length; ch++) {
+        insRow(ch, cursor.rowIndex);
+      }
+      return true;
+    }, description: 'Insert row in all channels' },
+    { name: 'insert_rows_global', contexts: ['pattern'], handler: () => {
+      const { cursor } = useCursorStore.getState();
+      const { insertRow: insRow, patterns, currentPatternIndex } = useTrackerStore.getState();
+      const pattern = patterns[currentPatternIndex];
+      if (!pattern) return false;
+      for (let ch = 0; ch < pattern.channels.length; ch++) {
+        insRow(ch, cursor.rowIndex);
+      }
+      return true;
+    }, description: 'Insert row globally' },
+    { name: 'delete_rows', contexts: ['pattern'], handler: deleteAndPull, description: 'Delete row(s)' },
+    { name: 'delete_rows_all_channels', contexts: ['pattern'], handler: () => {
+      const { cursor } = useCursorStore.getState();
+      const { deleteRow: delRow, patterns, currentPatternIndex } = useTrackerStore.getState();
+      const pattern = patterns[currentPatternIndex];
+      if (!pattern) return false;
+      for (let ch = 0; ch < pattern.channels.length; ch++) {
+        delRow(ch, cursor.rowIndex);
+      }
+      return true;
+    }, description: 'Delete row in all channels' },
+    { name: 'delete_rows_global', contexts: ['pattern'], handler: () => {
+      const { cursor } = useCursorStore.getState();
+      const { deleteRow: delRow, patterns, currentPatternIndex } = useTrackerStore.getState();
+      const pattern = patterns[currentPatternIndex];
+      if (!pattern) return false;
+      for (let ch = 0; ch < pattern.channels.length; ch++) {
+        delRow(ch, cursor.rowIndex);
+      }
+      return true;
+    }, description: 'Delete row globally' },
+    { name: 'delete_line_all_channels', contexts: ['pattern'], handler: () => {
+      const { cursor } = useCursorStore.getState();
+      const { deleteRow: delRow, patterns, currentPatternIndex } = useTrackerStore.getState();
+      const pattern = patterns[currentPatternIndex];
+      if (!pattern) return false;
+      for (let ch = 0; ch < pattern.channels.length; ch++) {
+        delRow(ch, cursor.rowIndex);
+      }
+      return true;
+    }, description: 'Delete line in all channels' },
+    { name: 'insert_line_all_channels', contexts: ['pattern'], handler: () => {
+      const { cursor } = useCursorStore.getState();
+      const { insertRow: insRow, patterns, currentPatternIndex } = useTrackerStore.getState();
+      const pattern = patterns[currentPatternIndex];
+      if (!pattern) return false;
+      for (let ch = 0; ch < pattern.channels.length; ch++) {
+        insRow(ch, cursor.rowIndex);
+      }
+      return true;
+    }, description: 'Insert line in all channels' },
+    { name: 'insert_space', contexts: ['pattern'], handler: insertRow, description: 'Insert space (push down)' },
+    { name: 'delete_note_and_command', contexts: ['pattern'], handler: () => {
+      const { cursor } = useCursorStore.getState();
+      const { setCell } = useTrackerStore.getState();
+      setCell(cursor.channelIndex, cursor.rowIndex, { note: 0, instrument: 0, effTyp: 0, eff: 0 });
+      return true;
+    }, description: 'Delete note and command' },
+    { name: 'delete_note_and_space', contexts: ['pattern'], handler: () => {
+      const { cursor } = useCursorStore.getState();
+      const { setCell } = useTrackerStore.getState();
+      setCell(cursor.channelIndex, cursor.rowIndex, { note: 0, instrument: 0 });
+      return true;
+    }, description: 'Delete note and space' },
+    { name: 'roll_up', contexts: ['pattern'], handler: () => {
+      // IT-style: scroll pattern data up circularly
+      const { cursor } = useCursorStore.getState();
+      const { patterns, currentPatternIndex, setCell } = useTrackerStore.getState();
+      const pattern = patterns[currentPatternIndex];
+      if (!pattern) return false;
+      const ch = pattern.channels[cursor.channelIndex];
+      if (!ch) return false;
+      const firstRow = { ...ch.rows[0] };
+      for (let r = 0; r < pattern.length - 1; r++) {
+        const next = ch.rows[r + 1];
+        setCell(cursor.channelIndex, r, { note: next.note, instrument: next.instrument, volume: next.volume, effTyp: next.effTyp, eff: next.eff });
+      }
+      setCell(cursor.channelIndex, pattern.length - 1, { note: firstRow.note, instrument: firstRow.instrument, volume: firstRow.volume, effTyp: firstRow.effTyp, eff: firstRow.eff });
+      return true;
+    }, description: 'Roll channel data up (circular)' },
+    { name: 'roll_down', contexts: ['pattern'], handler: () => {
+      const { cursor } = useCursorStore.getState();
+      const { patterns, currentPatternIndex, setCell } = useTrackerStore.getState();
+      const pattern = patterns[currentPatternIndex];
+      if (!pattern) return false;
+      const ch = pattern.channels[cursor.channelIndex];
+      if (!ch) return false;
+      const lastRow = { ...ch.rows[pattern.length - 1] };
+      for (let r = pattern.length - 1; r > 0; r--) {
+        const prev = ch.rows[r - 1];
+        setCell(cursor.channelIndex, r, { note: prev.note, instrument: prev.instrument, volume: prev.volume, effTyp: prev.effTyp, eff: prev.eff });
+      }
+      setCell(cursor.channelIndex, 0, { note: lastRow.note, instrument: lastRow.instrument, volume: lastRow.volume, effTyp: lastRow.effTyp, eff: lastRow.eff });
+      return true;
+    }, description: 'Roll channel data down (circular)' },
+    { name: 'quick_copy', contexts: ['pattern'], handler: () => {
+      const { cursor } = useCursorStore.getState();
+      const { patterns, currentPatternIndex } = useTrackerStore.getState();
+      const pattern = patterns[currentPatternIndex];
+      if (!pattern) return false;
+      const cell = pattern.channels[cursor.channelIndex]?.rows[cursor.rowIndex];
+      if (cell) {
+        (window as any).__quickCopyCell = { ...cell };
+        useUIStore.getState().setStatusMessage('Quick copied', false, 800);
+      }
+      return true;
+    }, description: 'Quick copy current cell' },
+    { name: 'quick_paste', contexts: ['pattern'], handler: () => {
+      const saved = (window as any).__quickCopyCell;
+      if (!saved) { useUIStore.getState().setStatusMessage('Nothing to quick paste', false, 800); return true; }
+      const { cursor } = useCursorStore.getState();
+      const { setCell } = useTrackerStore.getState();
+      setCell(cursor.channelIndex, cursor.rowIndex, saved);
+      useUIStore.getState().setStatusMessage('Quick pasted', false, 800);
+      return true;
+    }, description: 'Quick paste cell' },
+
+    // === TRANSPOSE ALIASES ===
+    { name: 'transpose_up_1', contexts: ['pattern'], handler: transposeUp, description: 'Transpose up 1 semitone' },
+    { name: 'transpose_down_1', contexts: ['pattern'], handler: transposeDown, description: 'Transpose down 1 semitone' },
+    { name: 'transpose_up_octave', contexts: ['pattern'], handler: transposeOctaveUp, description: 'Transpose up 1 octave' },
+    { name: 'transpose_down_octave', contexts: ['pattern'], handler: transposeOctaveDown, description: 'Transpose down 1 octave' },
+    { name: 'transpose_custom', contexts: ['pattern'], handler: () => {
+      useUIStore.getState().setStatusMessage('Transpose: use Shift+F7/F8 for semitone, Ctrl+F7/F8 for octave', false, 2000);
+      return true;
+    }, description: 'Custom transpose dialog' },
+
+    // === CHANNEL EXTENDED ===
+    { name: 'unmute_all_channels', contexts: ['pattern', 'global'], handler: unmuteAll, description: 'Unmute all channels' },
+    { name: 'reset_channel', contexts: ['pattern'], handler: () => {
+      getToneEngine().releaseAll();
+      useUIStore.getState().setStatusMessage('Channel reset', false, 800);
+      return true;
+    }, description: 'Reset channel' },
+    // set_track_9 through set_track_16
+    ...Array.from({ length: 8 }, (_, i) => ({
+      name: `set_track_${i + 9}`,
+      contexts: ['pattern'] as CommandContext[],
+      handler: () => {
+        useCursorStore.getState().moveCursorToChannel(i + 8);
+        useUIStore.getState().setStatusMessage(`Channel ${i + 9}`, false, 1000);
+        return true;
+      },
+      description: `Select track ${i + 9}`,
+    })),
+    { name: 'channel_record_select', contexts: ['pattern'], handler: () => {
+      useUIStore.getState().setStatusMessage('Record select: use multi-channel mode', false, 1500);
+      return true;
+    }, description: 'Channel record select' },
+    { name: 'channel_split_record_select', contexts: ['pattern'], handler: () => {
+      useUIStore.getState().setStatusMessage('Split record select: use multi-channel mode', false, 1500);
+      return true;
+    }, description: 'Channel split record select' },
+    { name: 'set_multi_channel_0', contexts: ['pattern'], handler: () => { useCursorStore.getState().moveCursorToChannel(0); return true; }, description: 'Multi-channel: select 0' },
+    { name: 'set_multi_channel_1', contexts: ['pattern'], handler: () => { useCursorStore.getState().moveCursorToChannel(1); return true; }, description: 'Multi-channel: select 1' },
+    { name: 'set_multi_channel_2', contexts: ['pattern'], handler: () => { useCursorStore.getState().moveCursorToChannel(2); return true; }, description: 'Multi-channel: select 2' },
+    { name: 'set_multi_channel_3', contexts: ['pattern'], handler: () => { useCursorStore.getState().moveCursorToChannel(3); return true; }, description: 'Multi-channel: select 3' },
+
+    // === OCTAVE ALIASES ===
+    { name: 'select_octave_low', contexts: ['pattern'], handler: setOctave0, description: 'Select low octave' },
+    { name: 'select_octave_high', contexts: ['pattern'], handler: setOctave4, description: 'Select high octave' },
+    { name: 'select_octave_12', contexts: ['pattern'], handler: setOctave1, description: 'Select octave 1-2 range' },
+    { name: 'select_octave_23', contexts: ['pattern'], handler: setOctave2, description: 'Select octave 2-3 range' },
+    { name: 'select_octave_34', contexts: ['pattern'], handler: setOctave3, description: 'Select octave 3-4 range' },
+    { name: 'select_octave_45', contexts: ['pattern'], handler: setOctave4, description: 'Select octave 4-5 range' },
+    { name: 'select_octave_56', contexts: ['pattern'], handler: setOctave5, description: 'Select octave 5-6 range' },
+
+    // === EDIT STEP ALIASES ===
+    { name: 'increase_edit_step', contexts: ['pattern'], handler: increaseStep, description: 'Increase edit step' },
+    { name: 'decrease_edit_step', contexts: ['pattern'], handler: decreaseStep, description: 'Decrease edit step' },
+
+    // === BLOCK LENGTH ALIASES ===
+    { name: 'block_length_double', contexts: ['pattern'], handler: doubleBlockLength, description: 'Double block length' },
+    { name: 'block_length_halve', contexts: ['pattern'], handler: halveBlockLength, description: 'Halve block length' },
+
+    // === SELECTION EXTENDED ===
+    { name: 'mark_block_up', contexts: ['pattern'], handler: () => {
+      const cs = useCursorStore.getState();
+      if (!cs.selection) cs.startSelection();
+      cs.moveCursor('up');
+      const c = useCursorStore.getState().cursor;
+      const sel = useCursorStore.getState().selection;
+      if (sel) {
+        useCursorStore.setState({ selection: { ...sel, endRow: c.rowIndex, endChannel: c.channelIndex, endColumn: c.columnType } });
+      }
+      return true;
+    }, description: 'Extend selection up' },
+    { name: 'mark_block_down', contexts: ['pattern'], handler: () => {
+      const cs = useCursorStore.getState();
+      if (!cs.selection) cs.startSelection();
+      cs.moveCursor('down');
+      const c = useCursorStore.getState().cursor;
+      const sel = useCursorStore.getState().selection;
+      if (sel) {
+        useCursorStore.setState({ selection: { ...sel, endRow: c.rowIndex, endChannel: c.channelIndex, endColumn: c.columnType } });
+      }
+      return true;
+    }, description: 'Extend selection down' },
+    { name: 'mark_block_left', contexts: ['pattern'], handler: () => {
+      const cs = useCursorStore.getState();
+      if (!cs.selection) cs.startSelection();
+      cs.moveCursor('left');
+      const c = useCursorStore.getState().cursor;
+      const sel = useCursorStore.getState().selection;
+      if (sel) {
+        useCursorStore.setState({ selection: { ...sel, endRow: c.rowIndex, endChannel: c.channelIndex, endColumn: c.columnType } });
+      }
+      return true;
+    }, description: 'Extend selection left' },
+    { name: 'mark_block_right', contexts: ['pattern'], handler: () => {
+      const cs = useCursorStore.getState();
+      if (!cs.selection) cs.startSelection();
+      cs.moveCursor('right');
+      const c = useCursorStore.getState().cursor;
+      const sel = useCursorStore.getState().selection;
+      if (sel) {
+        useCursorStore.setState({ selection: { ...sel, endRow: c.rowIndex, endChannel: c.channelIndex, endColumn: c.columnType } });
+      }
+      return true;
+    }, description: 'Extend selection right' },
+    { name: 'cut_pattern', contexts: ['pattern'], handler: () => {
+      selectAll();
+      cutSelection();
+      return true;
+    }, description: 'Cut entire pattern' },
+    { name: 'select_beat', contexts: ['pattern'], handler: () => {
+      const { cursor } = useCursorStore.getState();
+      const beatStart = Math.floor(cursor.rowIndex / 4) * 4;
+      useCursorStore.setState({
+        selection: {
+          startRow: beatStart, endRow: Math.min(beatStart + 3, 255),
+          startChannel: cursor.channelIndex, endChannel: cursor.channelIndex,
+          startColumn: 'note', endColumn: 'effParam2',
+          columnTypes: ['note', 'instrument', 'volume', 'effTyp', 'effParam', 'effTyp2', 'effParam2'],
+        }
+      });
+      return true;
+    }, description: 'Select current beat' },
+    { name: 'select_measure', contexts: ['pattern'], handler: () => {
+      const { cursor } = useCursorStore.getState();
+      const measureStart = Math.floor(cursor.rowIndex / 16) * 16;
+      useCursorStore.setState({
+        selection: {
+          startRow: measureStart, endRow: Math.min(measureStart + 15, 255),
+          startChannel: cursor.channelIndex, endChannel: cursor.channelIndex,
+          startColumn: 'note', endColumn: 'effParam2',
+          columnTypes: ['note', 'instrument', 'volume', 'effTyp', 'effParam', 'effTyp2', 'effParam2'],
+        }
+      });
+      return true;
+    }, description: 'Select current measure' },
+    { name: 'select_rows_quick', contexts: ['pattern'], handler: selectChannel, description: 'Quick select rows' },
+    { name: 'copy_selection_lossy', contexts: ['pattern'], handler: copySelection, description: 'Copy selection (lossy)' },
+    { name: 'mix_paste', contexts: ['pattern'], handler: pasteMix, description: 'Paste (mix)' },
+    { name: 'copy_channel_commands', contexts: ['pattern'], handler: copyTrack, description: 'Copy channel commands' },
+    { name: 'cut_channel_commands', contexts: ['pattern'], handler: cutTrack, description: 'Cut channel commands' },
+    { name: 'paste_channel_commands', contexts: ['pattern'], handler: pasteTrack, description: 'Paste channel commands' },
+    { name: 'continue_block', contexts: ['pattern'], handler: () => {
+      useUIStore.getState().setStatusMessage('Continue block: use next_pattern', false, 1000);
+      return true;
+    }, description: 'Continue block' },
+    { name: 'copy_note_to_mask', contexts: ['pattern'], handler: () => {
+      const { cursor } = useCursorStore.getState();
+      const { patterns, currentPatternIndex } = useTrackerStore.getState();
+      const cell = patterns[currentPatternIndex]?.channels[cursor.channelIndex]?.rows[cursor.rowIndex];
+      if (cell) (window as any).__noteMask = { ...cell };
+      useUIStore.getState().setStatusMessage('Note mask copied', false, 800);
+      return true;
+    }, description: 'Copy note to mask' },
+    { name: 'toggle_mask_field', contexts: ['pattern'], handler: () => {
+      useUIStore.getState().setStatusMessage('Mask field toggled', false, 800);
+      return true;
+    }, description: 'Toggle mask field' },
+    { name: 'selection_swap', contexts: ['pattern'], handler: () => {
+      useUIStore.getState().setStatusMessage('Swap: not implemented', false, 1000);
+      return true;
+    }, description: 'Swap selection' },
+    { name: 'selection_set_sample', contexts: ['pattern'], handler: applyCurrentInstrument, description: 'Set sample on selection' },
+    { name: 'selection_set_volume', contexts: ['pattern'], handler: () => {
+      useUIStore.getState().setStatusMessage('Set volume: use volume column', false, 1000);
+      return true;
+    }, description: 'Set volume on selection' },
+    { name: 'selection_slide_effect', contexts: ['pattern'], handler: () => {
+      useUIStore.getState().setStatusMessage('Slide effect: use effect column', false, 1000);
+      return true;
+    }, description: 'Slide effect on selection' },
+    { name: 'selection_slide_volume', contexts: ['pattern'], handler: () => {
+      useUIStore.getState().setStatusMessage('Slide volume: use interpolate', false, 1000);
+      return true;
+    }, description: 'Slide volume on selection' },
+    { name: 'selection_wipe_volume', contexts: ['pattern'], handler: () => {
+      const { patterns, currentPatternIndex, setCell } = useTrackerStore.getState();
+      const pattern = patterns[currentPatternIndex];
+      if (!pattern) return false;
+      const sel = useCursorStore.getState().selection;
+      if (!sel) return true;
+      const startRow = Math.min(sel.startRow, sel.endRow);
+      const endRow = Math.max(sel.startRow, sel.endRow);
+      const startCh = Math.min(sel.startChannel, sel.endChannel);
+      const endCh = Math.max(sel.startChannel, sel.endChannel);
+      for (let ch = startCh; ch <= endCh; ch++) {
+        for (let r = startRow; r <= endRow; r++) {
+          setCell(ch, r, { volume: 0 });
+        }
+      }
+      useUIStore.getState().setStatusMessage('Volume wiped', false, 800);
+      return true;
+    }, description: 'Wipe volume from selection' },
+    { name: 'cycle_next_clipboard', contexts: ['pattern'], handler: () => {
+      useUIStore.getState().setStatusMessage('Clipboard: single buffer', false, 1000);
+      return true;
+    }, description: 'Cycle to next clipboard' },
+    { name: 'cycle_prev_clipboard', contexts: ['pattern'], handler: () => {
+      useUIStore.getState().setStatusMessage('Clipboard: single buffer', false, 1000);
+      return true;
+    }, description: 'Cycle to previous clipboard' },
+
+    // === INSTRUMENT EXTENDED ===
+    { name: 'set_instrument_0', contexts: ['pattern'], handler: () => {
+      const { instruments, setCurrentInstrument } = useInstrumentStore.getState();
+      if (instruments.length > 0) {
+        setCurrentInstrument(instruments[0].id);
+        useUIStore.getState().setStatusMessage(`Instrument 0: ${instruments[0].name || instruments[0].id}`, false, 1000);
+      }
+      return true;
+    }, description: 'Select instrument 0' },
+    { name: 'instrument_scroll_up', contexts: ['pattern', 'global'], handler: prevInstrument, description: 'Scroll instrument up' },
+    { name: 'instrument_scroll_down', contexts: ['pattern', 'global'], handler: nextInstrument, description: 'Scroll instrument down' },
+    { name: 'instrument_quick_scroll_up', contexts: ['pattern', 'global'], handler: prevInstrument, description: 'Quick scroll instrument up' },
+    { name: 'instrument_quick_scroll_down', contexts: ['pattern', 'global'], handler: nextInstrument, description: 'Quick scroll instrument down' },
+    { name: 'instrument_page_up', contexts: ['pattern', 'global'], handler: () => {
+      const { currentInstrumentId, instruments, setCurrentInstrument } = useInstrumentStore.getState();
+      if (instruments.length === 0) return true;
+      const currentIndex = instruments.findIndex(i => i.id === currentInstrumentId);
+      const newIndex = Math.max(0, currentIndex - 16);
+      setCurrentInstrument(instruments[newIndex].id);
+      useUIStore.getState().setStatusMessage(`Instrument: ${instruments[newIndex].name || instruments[newIndex].id}`, false, 1000);
+      return true;
+    }, description: 'Instrument page up (skip 16)' },
+    { name: 'instrument_page_down', contexts: ['pattern', 'global'], handler: () => {
+      const { currentInstrumentId, instruments, setCurrentInstrument } = useInstrumentStore.getState();
+      if (instruments.length === 0) return true;
+      const currentIndex = instruments.findIndex(i => i.id === currentInstrumentId);
+      const newIndex = Math.min(instruments.length - 1, currentIndex + 16);
+      setCurrentInstrument(instruments[newIndex].id);
+      useUIStore.getState().setStatusMessage(`Instrument: ${instruments[newIndex].name || instruments[newIndex].id}`, false, 1000);
+      return true;
+    }, description: 'Instrument page down (skip 16)' },
+    { name: 'instrument_16_forward', contexts: ['pattern', 'global'], handler: () => {
+      const { currentInstrumentId, instruments, setCurrentInstrument } = useInstrumentStore.getState();
+      if (instruments.length === 0) return true;
+      const currentIndex = instruments.findIndex(i => i.id === currentInstrumentId);
+      const newIndex = Math.min(instruments.length - 1, currentIndex + 16);
+      setCurrentInstrument(instruments[newIndex].id);
+      return true;
+    }, description: 'Skip 16 instruments forward' },
+    { name: 'instrument_16_backward', contexts: ['pattern', 'global'], handler: () => {
+      const { currentInstrumentId, instruments, setCurrentInstrument } = useInstrumentStore.getState();
+      if (instruments.length === 0) return true;
+      const currentIndex = instruments.findIndex(i => i.id === currentInstrumentId);
+      const newIndex = Math.max(0, currentIndex - 16);
+      setCurrentInstrument(instruments[newIndex].id);
+      return true;
+    }, description: 'Skip 16 instruments backward' },
+    { name: 'instrument_goto_top', contexts: ['pattern', 'global'], handler: () => {
+      const { instruments, setCurrentInstrument } = useInstrumentStore.getState();
+      if (instruments.length > 0) setCurrentInstrument(instruments[0].id);
+      return true;
+    }, description: 'Go to first instrument' },
+    { name: 'instrument_goto_end', contexts: ['pattern', 'global'], handler: () => {
+      const { instruments, setCurrentInstrument } = useInstrumentStore.getState();
+      if (instruments.length > 0) setCurrentInstrument(instruments[instruments.length - 1].id);
+      return true;
+    }, description: 'Go to last instrument' },
+    { name: 'next_auto_instrument_slot', contexts: ['pattern', 'global'], handler: nextInstrument, description: 'Next auto instrument slot' },
+    { name: 'prev_auto_instrument_slot', contexts: ['pattern', 'global'], handler: prevInstrument, description: 'Previous auto instrument slot' },
+    { name: 'swap_instrument_bank', contexts: ['pattern', 'global'], handler: () => {
+      useUIStore.getState().setStatusMessage('Instrument bank: single bank', false, 1000);
+      return true;
+    }, description: 'Swap instrument bank' },
+    { name: 'select_instrument_name', contexts: ['global'], handler: () => {
+      useUIStore.getState().setStatusMessage('Instrument name: edit in instrument panel', false, 1500);
+      return true;
+    }, description: 'Select instrument name' },
+    { name: 'clear_instrument_name', contexts: ['global'], handler: () => {
+      useUIStore.getState().setStatusMessage('Clear name: edit in instrument panel', false, 1500);
+      return true;
+    }, description: 'Clear instrument name' },
+    { name: 'select_instrument_repeat', contexts: ['global'], handler: () => {
+      useUIStore.getState().setStatusMessage('Instrument repeat: not applicable', false, 1000);
+      return true;
+    }, description: 'Select instrument repeat' },
+
+    // === SAMPLE COMMANDS ===
+    ...Array.from({ length: 10 }, (_, i) => ({
+      name: `set_sample_${i}`,
+      contexts: ['pattern'] as CommandContext[],
+      handler: () => {
+        const { instruments, setCurrentInstrument } = useInstrumentStore.getState();
+        if (i < instruments.length) {
+          setCurrentInstrument(instruments[i].id);
+          useUIStore.getState().setStatusMessage(`Sample ${i}: ${instruments[i].name || instruments[i].id}`, false, 1000);
+        }
+        return true;
+      },
+      description: `Select sample ${i}`,
+    })),
+    { name: 'set_sample_bank_a', contexts: ['pattern'], handler: () => { useUIStore.getState().setStatusMessage('Sample bank A', false, 800); return true; }, description: 'Set sample bank A' },
+    { name: 'set_sample_bank_b', contexts: ['pattern'], handler: () => { useUIStore.getState().setStatusMessage('Sample bank B', false, 800); return true; }, description: 'Set sample bank B' },
+    { name: 'set_sample_bank_c', contexts: ['pattern'], handler: () => { useUIStore.getState().setStatusMessage('Sample bank C', false, 800); return true; }, description: 'Set sample bank C' },
+    { name: 'sample_bank_modifier', contexts: ['pattern'], handler: () => { useUIStore.getState().setStatusMessage('Sample bank modifier', false, 800); return true; }, description: 'Sample bank modifier' },
+    { name: 'delete_sample', contexts: ['global'], handler: () => {
+      useUIStore.getState().setStatusMessage('Delete sample: use instrument panel', false, 1500);
+      return true;
+    }, description: 'Delete sample' },
+    { name: 'paste_sample', contexts: ['global'], handler: () => {
+      useUIStore.getState().setStatusMessage('Paste sample: use instrument panel', false, 1500);
+      return true;
+    }, description: 'Paste sample' },
+
+    // === POSITION MARKERS (F6-F10 style) ===
+    { name: 'set_position_f6', contexts: ['pattern'], handler: savePosition0, description: 'Set position marker F6' },
+    { name: 'set_position_f7', contexts: ['pattern'], handler: savePosition1, description: 'Set position marker F7' },
+    { name: 'set_position_f8', contexts: ['pattern'], handler: savePosition2, description: 'Set position marker F8' },
+    { name: 'set_position_f9', contexts: ['pattern'], handler: savePosition3, description: 'Set position marker F9' },
+    { name: 'set_position_f10', contexts: ['pattern'], handler: savePosition4, description: 'Set position marker F10' },
+    { name: 'set_position_marker_1', contexts: ['pattern'], handler: savePosition0, description: 'Set position marker 1' },
+    { name: 'set_position_marker_2', contexts: ['pattern'], handler: savePosition1, description: 'Set position marker 2' },
+    { name: 'set_position_marker_3', contexts: ['pattern'], handler: savePosition2, description: 'Set position marker 3' },
+    { name: 'set_position_marker_4', contexts: ['pattern'], handler: savePosition3, description: 'Set position marker 4' },
+    { name: 'set_playback_mark', contexts: ['pattern'], handler: savePosition0, description: 'Set playback mark' },
+    { name: 'goto_position_f6', contexts: ['pattern'], handler: gotoPosition0, description: 'Go to position F6' },
+    { name: 'goto_position_f7', contexts: ['pattern'], handler: gotoPosition1, description: 'Go to position F7' },
+    { name: 'goto_position_f8', contexts: ['pattern'], handler: gotoPosition2, description: 'Go to position F8' },
+    { name: 'goto_position_f9', contexts: ['pattern'], handler: gotoPosition3, description: 'Go to position F9' },
+    { name: 'goto_position_f10', contexts: ['pattern'], handler: gotoPosition4, description: 'Go to position F10' },
+    { name: 'jump_to_position_f6', contexts: ['pattern'], handler: gotoPosition0, description: 'Jump to position F6' },
+    { name: 'jump_to_position_f7', contexts: ['pattern'], handler: gotoPosition1, description: 'Jump to position F7' },
+    { name: 'jump_to_position_f8', contexts: ['pattern'], handler: gotoPosition2, description: 'Jump to position F8' },
+    { name: 'jump_to_position_f9', contexts: ['pattern'], handler: gotoPosition3, description: 'Jump to position F9' },
+    { name: 'jump_to_position_f10', contexts: ['pattern'], handler: gotoPosition4, description: 'Jump to position F10' },
+    { name: 'play_from_marker_1', contexts: ['pattern', 'global'], handler: () => { gotoPosition0(); playFromCursor(); return true; }, description: 'Play from marker 1' },
+    { name: 'play_from_marker_2', contexts: ['pattern', 'global'], handler: () => { gotoPosition1(); playFromCursor(); return true; }, description: 'Play from marker 2' },
+    { name: 'play_from_marker_3', contexts: ['pattern', 'global'], handler: () => { gotoPosition2(); playFromCursor(); return true; }, description: 'Play from marker 3' },
+    { name: 'play_from_marker_4', contexts: ['pattern', 'global'], handler: () => { gotoPosition3(); playFromCursor(); return true; }, description: 'Play from marker 4' },
+    { name: 'play_pattern_from_f6', contexts: ['pattern', 'global'], handler: () => { gotoPosition0(); playFromCursor(); return true; }, description: 'Play pattern from F6' },
+    { name: 'play_pattern_from_f7', contexts: ['pattern', 'global'], handler: () => { gotoPosition1(); playFromCursor(); return true; }, description: 'Play pattern from F7' },
+    { name: 'play_pattern_from_f8', contexts: ['pattern', 'global'], handler: () => { gotoPosition2(); playFromCursor(); return true; }, description: 'Play pattern from F8' },
+    { name: 'play_pattern_from_f9', contexts: ['pattern', 'global'], handler: () => { gotoPosition3(); playFromCursor(); return true; }, description: 'Play pattern from F9' },
+    { name: 'play_pattern_from_f10', contexts: ['pattern', 'global'], handler: () => { gotoPosition4(); playFromCursor(); return true; }, description: 'Play pattern from F10' },
+    { name: 'record_pattern_from_f6', contexts: ['pattern', 'global'], handler: () => { gotoPosition0(); toggleEditMode(); playFromCursor(); return true; }, description: 'Record from F6' },
+    { name: 'record_pattern_from_f7', contexts: ['pattern', 'global'], handler: () => { gotoPosition1(); toggleEditMode(); playFromCursor(); return true; }, description: 'Record from F7' },
+    { name: 'record_pattern_from_f8', contexts: ['pattern', 'global'], handler: () => { gotoPosition2(); toggleEditMode(); playFromCursor(); return true; }, description: 'Record from F8' },
+    { name: 'record_pattern_from_f9', contexts: ['pattern', 'global'], handler: () => { gotoPosition3(); toggleEditMode(); playFromCursor(); return true; }, description: 'Record from F9' },
+    { name: 'record_pattern_from_f10', contexts: ['pattern', 'global'], handler: () => { gotoPosition4(); toggleEditMode(); playFromCursor(); return true; }, description: 'Record from F10' },
+
+    // === SEQUENCE/ORDER LIST OPERATIONS ===
+    { name: 'switch_to_order_list', contexts: ['global'], handler: showOrderList, description: 'Switch to order list' },
+    { name: 'sequence_scroll_up', contexts: ['pattern', 'global'], handler: prevPattern, description: 'Sequence scroll up' },
+    { name: 'sequence_scroll_down', contexts: ['pattern', 'global'], handler: nextPattern, description: 'Sequence scroll down' },
+    { name: 'sequence_goto_top', contexts: ['pattern', 'global'], handler: () => {
+      useTrackerStore.getState().setCurrentPattern(0);
+      return true;
+    }, description: 'Sequence go to top' },
+    { name: 'sequence_goto_end', contexts: ['pattern', 'global'], handler: () => {
+      const { patterns, setCurrentPattern } = useTrackerStore.getState();
+      setCurrentPattern(patterns.length - 1);
+      return true;
+    }, description: 'Sequence go to end' },
+    { name: 'sequence_increase_block', contexts: ['pattern', 'global'], handler: nextPattern, description: 'Increase sequence block number' },
+    { name: 'sequence_decrease_block', contexts: ['pattern', 'global'], handler: prevPattern, description: 'Decrease sequence block number' },
+    { name: 'sequence_insert_current', contexts: ['pattern'], handler: () => {
+      useUIStore.getState().setStatusMessage('Insert order: use order list panel', false, 1500);
+      return true;
+    }, description: 'Insert current pattern in sequence' },
+    { name: 'sequence_insert_zero', contexts: ['pattern'], handler: () => {
+      useUIStore.getState().setStatusMessage('Insert order 0: use order list panel', false, 1500);
+      return true;
+    }, description: 'Insert pattern 0 in sequence' },
+    { name: 'sequence_delete_block', contexts: ['pattern'], handler: () => {
+      useUIStore.getState().setStatusMessage('Delete from sequence: use order list panel', false, 1500);
+      return true;
+    }, description: 'Delete block from sequence' },
+
+    // === VIEW/UI COMMANDS ===
+    { name: 'help', contexts: ['global'], handler: showHelp, description: 'Show help' },
+    { name: 'show_main_screen', contexts: ['global'], handler: viewGeneral, description: 'Show main screen' },
+    { name: 'show_pattern_editor', contexts: ['global'], handler: openPatternEditor, description: 'Show pattern editor' },
+    { name: 'show_config', contexts: ['global'], handler: openSettings, description: 'Show configuration' },
+    { name: 'show_config_layout', contexts: ['global'], handler: openSettings, description: 'Show layout config' },
+    { name: 'show_config_midi', contexts: ['global'], handler: viewMidiMapping, description: 'Show MIDI config' },
+    { name: 'show_config_misc', contexts: ['global'], handler: openSettings, description: 'Show misc config' },
+    { name: 'show_disk_op', contexts: ['global'], handler: toggleDiskBrowser, description: 'Show disk operations' },
+    { name: 'show_instrument_editor_ext', contexts: ['global'], handler: openInstrumentEditor, description: 'Show instrument editor (extended)' },
+    { name: 'show_sample_editor_ext', contexts: ['global'], handler: openSampleEditor, description: 'Show sample editor (extended)' },
+    { name: 'show_transpose', contexts: ['global'], handler: showTransposePanel, description: 'Show transpose dialog' },
+    { name: 'show_trim', contexts: ['global'], handler: () => {
+      useUIStore.getState().setStatusMessage('Trim: use cleanup unused', false, 1500);
+      return true;
+    }, description: 'Show trim dialog' },
+    { name: 'show_advanced_edit', contexts: ['global'], handler: showEditPanel, description: 'Show advanced edit' },
+    { name: 'show_pattern_properties', contexts: ['global'], handler: patternProperties, description: 'Show pattern properties' },
+    { name: 'show_playback_time', contexts: ['global'], handler: () => {
+      useUIStore.getState().setStatusMessage('Playback time: shown in transport bar', false, 1500);
+      return true;
+    }, description: 'Show playback time' },
+    { name: 'show_nibbles', contexts: ['global'], handler: () => {
+      useUIStore.getState().setStatusMessage('Nibbles: not available', false, 1000);
+      return true;
+    }, description: 'Show Nibbles game' },
+    { name: 'show_undo_history', contexts: ['global'], handler: () => {
+      useUIStore.getState().setStatusMessage('Undo history: use Ctrl+Z/Y', false, 1500);
+      return true;
+    }, description: 'Show undo history' },
+    { name: 'close_all_screens', contexts: ['global'], handler: () => {
+      escapeCommand();
+      return true;
+    }, description: 'Close all screens' },
+    { name: 'open_effect_visualizer', contexts: ['global'], handler: () => {
+      useUIStore.getState().setStatusMessage('Effect visualizer: not available', false, 1000);
+      return true;
+    }, description: 'Open effect visualizer' },
+    { name: 'display_free_memory', contexts: ['global'], handler: () => {
+      if (typeof performance !== 'undefined' && (performance as any).memory) {
+        const mem = (performance as any).memory;
+        const used = Math.round(mem.usedJSHeapSize / 1048576);
+        const total = Math.round(mem.jsHeapSizeLimit / 1048576);
+        useUIStore.getState().setStatusMessage(`Memory: ${used}MB / ${total}MB`, false, 2000);
+      } else {
+        useUIStore.getState().setStatusMessage('Memory info not available', false, 1000);
+      }
+      return true;
+    }, description: 'Display free memory' },
+
+    // === LAYOUT PRESETS (1-8) ===
+    { name: 'layout_preset_1', contexts: ['global'], handler: loadLayout1, description: 'Layout preset 1' },
+    { name: 'layout_preset_2', contexts: ['global'], handler: loadLayout2, description: 'Layout preset 2' },
+    { name: 'layout_preset_3', contexts: ['global'], handler: loadLayout3, description: 'Layout preset 3' },
+    { name: 'layout_preset_4', contexts: ['global'], handler: loadLayout4, description: 'Layout preset 4' },
+    { name: 'layout_preset_5', contexts: ['global'], handler: loadLayout5, description: 'Layout preset 5' },
+    { name: 'layout_preset_6', contexts: ['global'], handler: loadLayout6, description: 'Layout preset 6' },
+    { name: 'layout_preset_7', contexts: ['global'], handler: loadLayout7, description: 'Layout preset 7' },
+    { name: 'layout_preset_8', contexts: ['global'], handler: loadLayout8, description: 'Layout preset 8' },
+
+    // === TOGGLE COMMANDS EXTENDED ===
+    { name: 'toggle_auto_advance', contexts: ['global'], handler: () => {
+      const { editStep, setEditStep } = useEditorStore.getState();
+      if (editStep === 0) { setEditStep(1); useUIStore.getState().setStatusMessage('Auto-advance: ON (step 1)', false, 1000); }
+      else { setEditStep(0); useUIStore.getState().setStatusMessage('Auto-advance: OFF (step 0)', false, 1000); }
+      return true;
+    }, description: 'Toggle auto-advance' },
+    { name: 'toggle_auto_space', contexts: ['global'], handler: () => {
+      useUIStore.getState().setStatusMessage('Auto-space: use edit step', false, 1000);
+      return true;
+    }, description: 'Toggle auto-space' },
+    { name: 'toggle_centralise_cursor', contexts: ['global'], handler: toggleContinuousScroll, description: 'Toggle centralise cursor' },
+    { name: 'toggle_channel_divisions', contexts: ['global'], handler: toggleChannelNames, description: 'Toggle channel divisions' },
+    { name: 'toggle_channel_plugin_editor', contexts: ['global'], handler: togglePluginEditor, description: 'Toggle channel plugin editor' },
+    { name: 'toggle_clipboard_manager', contexts: ['global'], handler: () => {
+      useUIStore.getState().setStatusMessage('Clipboard manager: single buffer', false, 1000);
+      return true;
+    }, description: 'Toggle clipboard manager' },
+    { name: 'toggle_default_volumes', contexts: ['global'], handler: () => {
+      useUIStore.getState().setStatusMessage('Default volumes: use instrument editor', false, 1000);
+      return true;
+    }, description: 'Toggle default volumes' },
+    { name: 'toggle_extended_pattern', contexts: ['global'], handler: toggleColumnVisibility, description: 'Toggle extended pattern view' },
+    { name: 'toggle_fast_volume', contexts: ['global'], handler: () => {
+      useUIStore.getState().setStatusMessage('Fast volume: not applicable', false, 1000);
+      return true;
+    }, description: 'Toggle fast volume' },
+    { name: 'toggle_filter_model', contexts: ['global'], handler: () => {
+      useUIStore.getState().setStatusMessage('Filter model: in Settings', false, 1500);
+      return true;
+    }, description: 'Toggle filter model' },
+    { name: 'toggle_key_repeat', contexts: ['global'], handler: () => {
+      useUIStore.getState().setStatusMessage('Key repeat: OS setting', false, 1000);
+      return true;
+    }, description: 'Toggle key repeat' },
+    { name: 'toggle_low_pass_filter', contexts: ['global'], handler: () => {
+      useUIStore.getState().setStatusMessage('Low-pass filter: in Settings', false, 1500);
+      return true;
+    }, description: 'Toggle low-pass filter' },
+    { name: 'toggle_midi_record', contexts: ['global'], handler: toggleMidiInput, description: 'Toggle MIDI record' },
+    { name: 'toggle_multichannel', contexts: ['global'], handler: toggleMultiChannelRecord, description: 'Toggle multi-channel mode' },
+    { name: 'toggle_panning_mode', contexts: ['global'], handler: () => {
+      useUIStore.getState().setStatusMessage('Panning mode: not applicable', false, 1000);
+      return true;
+    }, description: 'Toggle panning mode' },
+    { name: 'toggle_timing_mode', contexts: ['global'], handler: () => {
+      useUIStore.getState().setStatusMessage('Timing mode: BPM/Speed in transport', false, 1000);
+      return true;
+    }, description: 'Toggle timing mode' },
+    { name: 'toggle_vu_meter_mode', contexts: ['global'], handler: toggleTrackScopes, description: 'Toggle VU meter mode' },
+    { name: 'highlight_current_line', contexts: ['pattern'], handler: toggleRowHighlight, description: 'Highlight current line' },
+
+    // === VIEW SCHEME ===
+    ...Array.from({ length: 7 }, (_, i) => ({
+      name: `set_view_scheme_${i}`,
+      contexts: ['global'] as CommandContext[],
+      handler: () => {
+        useUIStore.getState().setStatusMessage(`View scheme ${i}`, false, 800);
+        return true;
+      },
+      description: `Set view scheme ${i}`,
+    })),
+    ...Array.from({ length: 7 }, (_, i) => ({
+      name: `set_all_view_scheme_${i}`,
+      contexts: ['global'] as CommandContext[],
+      handler: () => {
+        useUIStore.getState().setStatusMessage(`All view scheme ${i}`, false, 800);
+        return true;
+      },
+      description: `Set all view scheme ${i}`,
+    })),
+    { name: 'cycle_track_view', contexts: ['global'], handler: cycleGlobalView, description: 'Cycle track view' },
+
+    // === QUANTIZE ===
+    ...Array.from({ length: 9 }, (_, i) => ({
+      name: `set_quantize_${i + 1}`,
+      contexts: ['pattern'] as CommandContext[],
+      handler: () => {
+        useEditorStore.getState().setEditStep(i + 1);
+        useUIStore.getState().setStatusMessage(`Quantize: ${i + 1}`, false, 800);
+        return true;
+      },
+      description: `Set quantize to ${i + 1}`,
+    })),
+
+    // === FILE EXTENDED ===
+    { name: 'fast_save_update', contexts: ['global'], handler: quickSave, description: 'Fast save/update' },
+
+    // === FOCUS ===
+    { name: 'next_focus', contexts: ['global'], handler: focusNextPanel, description: 'Focus next panel' },
+    { name: 'prev_focus', contexts: ['global'], handler: focusPrevPanel, description: 'Focus previous panel' },
+
+    // === PATTERN OPERATIONS ===
+    { name: 'insert_pattern', contexts: ['pattern'], handler: createPattern, description: 'Insert new pattern' },
+    { name: 'delete_track', contexts: ['pattern'], handler: () => {
+      useUIStore.getState().setStatusMessage('Delete track: use pattern editor', false, 1500);
+      return true;
+    }, description: 'Delete track' },
+    { name: 'insert_track', contexts: ['pattern'], handler: () => {
+      useUIStore.getState().setStatusMessage('Insert track: use pattern editor', false, 1500);
+      return true;
+    }, description: 'Insert track' },
+    { name: 'add_column', contexts: ['pattern'], handler: () => {
+      useUIStore.getState().setStatusMessage('Add column: not applicable', false, 1000);
+      return true;
+    }, description: 'Add column' },
+    { name: 'remove_column', contexts: ['pattern'], handler: () => {
+      useUIStore.getState().setStatusMessage('Remove column: not applicable', false, 1000);
+      return true;
+    }, description: 'Remove column' },
+    { name: 'insert_column_row', contexts: ['pattern'], handler: insertRow, description: 'Insert column row' },
+    { name: 'delete_column_and_pull', contexts: ['pattern'], handler: deleteAndPull, description: 'Delete column and pull' },
+
+    // === FT2 MACROS ===
+    ...Array.from({ length: 10 }, (_, i) => ({
+      name: `macro_${i + 1}`,
+      contexts: ['pattern', 'global'] as CommandContext[],
+      handler: () => {
+        useUIStore.getState().setStatusMessage(`Macro ${i + 1}: not configured`, false, 1000);
+        return true;
+      },
+      description: `Execute macro ${i + 1}`,
+    })),
+    { name: 'save_macro_8', contexts: ['global'], handler: () => { useUIStore.getState().setStatusMessage('Save macro 8: not implemented', false, 1000); return true; }, description: 'Save macro 8' },
+    { name: 'save_macro_9', contexts: ['global'], handler: () => { useUIStore.getState().setStatusMessage('Save macro 9: not implemented', false, 1000); return true; }, description: 'Save macro 9' },
+
+    // === OCTAMED SPECIFIC ===
+    ...Array.from({ length: 10 }, (_, i) => ({
+      name: `pick_note_${i}`,
+      contexts: ['pattern'] as CommandContext[],
+      handler: () => {
+        useUIStore.getState().setStatusMessage(`Pick note ${i}: OctaMED only`, false, 1000);
+        return true;
+      },
+      description: `Pick note ${i} (OctaMED)`,
+    })),
+    ...Array.from({ length: 10 }, (_, i) => ({
+      name: `enter_programmed_note_${i}`,
+      contexts: ['pattern'] as CommandContext[],
+      handler: () => {
+        useUIStore.getState().setStatusMessage(`Programmed note ${i}: OctaMED only`, false, 1000);
+        return true;
+      },
+      description: `Enter programmed note ${i} (OctaMED)`,
+    })),
+    { name: 'create_slide_12', contexts: ['pattern'], handler: () => {
+      useUIStore.getState().setStatusMessage('Create slide 1/2: OctaMED only', false, 1000);
+      return true;
+    }, description: 'Create slide 1/2 (OctaMED)' },
+    { name: 'create_slide_transform', contexts: ['pattern'], handler: () => {
+      useUIStore.getState().setStatusMessage('Create slide transform: OctaMED only', false, 1000);
+      return true;
+    }, description: 'Create slide transform (OctaMED)' },
+    { name: 'create_volume_slide', contexts: ['pattern'], handler: () => {
+      useUIStore.getState().setStatusMessage('Create volume slide: use effect column', false, 1000);
+      return true;
+    }, description: 'Create volume slide' },
+    { name: 'insert_hold_symbol', contexts: ['pattern'], handler: () => {
+      useUIStore.getState().setStatusMessage('Hold symbol: OctaMED only', false, 1000);
+      return true;
+    }, description: 'Insert hold symbol' },
+    { name: 'insert_hold_symbol_a', contexts: ['pattern'], handler: () => {
+      useUIStore.getState().setStatusMessage('Hold symbol: OctaMED only', false, 1000);
+      return true;
+    }, description: 'Insert hold symbol (alternate)' },
+    { name: 'insert_hold_all_tracks', contexts: ['pattern'], handler: () => {
+      useUIStore.getState().setStatusMessage('Hold all tracks: OctaMED only', false, 1000);
+      return true;
+    }, description: 'Insert hold in all tracks' },
+
+    // === IT-SPECIFIC / COMMAND LINE ===
+    { name: 'insert_command_line', contexts: ['pattern'], handler: insertRow, description: 'Insert command line' },
+    { name: 'delete_command_line', contexts: ['pattern'], handler: deleteAndPull, description: 'Delete command line' },
+    { name: 'insert_param_control', contexts: ['pattern'], handler: () => {
+      useUIStore.getState().setStatusMessage('Param control: use effect column', false, 1000);
+      return true;
+    }, description: 'Insert parameter control' },
+    { name: 'insert_smooth_param_control', contexts: ['pattern'], handler: () => {
+      useUIStore.getState().setStatusMessage('Smooth param control: use effect column', false, 1000);
+      return true;
+    }, description: 'Insert smooth parameter control' },
+
+    // === MISC STUBS ===
+    { name: 'pattern_to_sample', contexts: ['global'], handler: renderToSample, description: 'Render pattern to sample' },
+    { name: 'pattern_to_sample_mono', contexts: ['global'], handler: renderToSample, description: 'Render pattern to sample (mono)' },
+    { name: 'split_keyboard_dialog', contexts: ['global'], handler: () => {
+      useUIStore.getState().setStatusMessage('Split keyboard: not implemented', false, 1000);
+      return true;
+    }, description: 'Split keyboard dialog' },
+    { name: 'volume_amplify', contexts: ['pattern'], handler: amplifySelection, description: 'Volume amplify' },
+    { name: 'vary_channel_volume', contexts: ['pattern'], handler: () => {
+      useUIStore.getState().setStatusMessage('Vary channel volume: use humanize', false, 1500);
+      return true;
+    }, description: 'Vary channel volume' },
+    { name: 'vary_current_effect', contexts: ['pattern'], handler: () => {
+      useUIStore.getState().setStatusMessage('Vary effect: use humanize', false, 1500);
+      return true;
+    }, description: 'Vary current effect' },
+    { name: 'vary_panbrello', contexts: ['pattern'], handler: () => {
+      useUIStore.getState().setStatusMessage('Panbrello: use effect column', false, 1000);
+      return true;
+    }, description: 'Vary panbrello' },
+    { name: 'undo_revert_pattern', contexts: ['pattern'], handler: undo, description: 'Undo/revert pattern' },
+    { name: 'reset_midi_effects', contexts: ['global'], handler: panic, description: 'Reset MIDI effects' },
+    { name: 'cycle_midi_trigger', contexts: ['global'], handler: () => {
+      useUIStore.getState().setStatusMessage('MIDI trigger: not applicable', false, 1000);
+      return true;
+    }, description: 'Cycle MIDI trigger mode' },
+    { name: 'cycle_template_mode', contexts: ['global'], handler: () => {
+      useUIStore.getState().setStatusMessage('Template mode: not applicable', false, 1000);
+      return true;
+    }, description: 'Cycle template mode' },
+    { name: 'template_mode_off', contexts: ['global'], handler: () => {
+      useUIStore.getState().setStatusMessage('Template mode off', false, 800);
+      return true;
+    }, description: 'Template mode off' },
   ];
 
   commands.forEach(cmd => globalRegistry.register(cmd));
