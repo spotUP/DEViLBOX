@@ -67,10 +67,13 @@ async function _ensureSunVoxMuteImports(): Promise<boolean> {
   }
 }
 
+// Eagerly warm up imports when module is loaded (so first mute click works)
+void _ensureSunVoxMuteImports();
+
 // Fire-and-forget: apply mute to SunVox modules
 function _applySunVoxMutes(channels: { muted: boolean; solo: boolean }[], anySolo: boolean): boolean {
   if (!_svMuteImportDone) {
-    // Trigger lazy import for next time, skip this call
+    // Imports not ready yet — trigger and skip this call
     void _ensureSunVoxMuteImports();
     return false;
   }
