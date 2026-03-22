@@ -58,6 +58,12 @@ export const useTrackerInput = () => {
   const pasteMix = useTrackerStore((state) => state.pasteMix);
   const pasteFlood = useTrackerStore((state) => state.pasteFlood);
   const pastePushForward = useTrackerStore((state) => state.pastePushForward);
+  const copyTrack = useTrackerStore((state) => state.copyTrack);
+  const cutTrack = useTrackerStore((state) => state.cutTrack);
+  const pasteTrack = useTrackerStore((state) => state.pasteTrack);
+  const copyPattern = useTrackerStore((state) => state.copyPattern);
+  const cutPattern = useTrackerStore((state) => state.cutPattern);
+  const pastePattern = useTrackerStore((state) => state.pastePattern);
   const transposeSelection = useTrackerStore((state) => state.transposeSelection);
   const toggleRecordMode = useEditorStore((state) => state.toggleRecordMode);
   const writeMacroSlot = useTrackerStore((state) => state.writeMacroSlot);
@@ -340,28 +346,67 @@ export const useTrackerInput = () => {
         return;
       }
 
-      // F3/F4/F5 with modifiers: Cut/Copy/Paste operations
+      // F3/F4/F5: Cut/Copy/Paste with FT2 scoping
+      // Shift = Track (single channel), Ctrl = Pattern (all channels), Alt = Block (selection)
       if (key === 'F3') {
         e.preventDefault();
-        if (e.altKey || e.ctrlKey || e.metaKey || e.shiftKey) {
+        if (e.shiftKey) {
+          cutTrack(cursorRef.current.channelIndex);
+          useUIStore.getState().setStatusMessage('CUT TRACK');
+        } else if (e.ctrlKey || e.metaKey) {
+          cutPattern();
+          useUIStore.getState().setStatusMessage('CUT PATTERN');
+        } else if (e.altKey) {
           cutSelection();
+          useUIStore.getState().setStatusMessage('CUT BLOCK');
         }
         return;
       }
 
       if (key === 'F4') {
         e.preventDefault();
-        if (e.altKey || e.ctrlKey || e.metaKey || e.shiftKey) {
+        if (e.shiftKey) {
+          copyTrack(cursorRef.current.channelIndex);
+          useUIStore.getState().setStatusMessage('COPY TRACK');
+        } else if (e.ctrlKey || e.metaKey) {
+          copyPattern();
+          useUIStore.getState().setStatusMessage('COPY PATTERN');
+        } else if (e.altKey) {
           copySelection();
+          useUIStore.getState().setStatusMessage('COPY BLOCK');
         }
         return;
       }
 
       if (key === 'F5') {
         e.preventDefault();
-        if (e.altKey || e.ctrlKey || e.metaKey || e.shiftKey) {
+        if (e.shiftKey) {
+          pasteTrack(cursorRef.current.channelIndex);
+          useUIStore.getState().setStatusMessage('PASTE TRACK');
+        } else if (e.ctrlKey || e.metaKey) {
+          pastePattern();
+          useUIStore.getState().setStatusMessage('PASTE PATTERN');
+        } else if (e.altKey) {
           paste();
+          useUIStore.getState().setStatusMessage('PASTE BLOCK');
         }
+        return;
+      }
+
+      // F7/F8: Transpose with FT2 scoping
+      // Shift = Track, Ctrl = Pattern, Alt = Block; F7 = up, F8 = down
+      if (key === 'F7' && (e.shiftKey || e.ctrlKey || e.metaKey || e.altKey)) {
+        e.preventDefault();
+        const semitones = e.shiftKey && (e.ctrlKey || e.metaKey) ? 12 : 1;
+        transposeSelection(semitones);
+        useUIStore.getState().setStatusMessage(`TRANSPOSE +${semitones}`);
+        return;
+      }
+      if (key === 'F8' && (e.shiftKey || e.ctrlKey || e.metaKey || e.altKey)) {
+        e.preventDefault();
+        const semitones = e.shiftKey && (e.ctrlKey || e.metaKey) ? 12 : 1;
+        transposeSelection(-semitones);
+        useUIStore.getState().setStatusMessage(`TRANSPOSE -${semitones}`);
         return;
       }
 
@@ -568,6 +613,8 @@ export const useTrackerInput = () => {
       clearSelection,
       copySelection,
       cutSelection,
+      copyTrack, cutTrack, pasteTrack,
+      copyPattern, cutPattern, pastePattern,
       paste,
       pasteMix,
       pasteFlood,
