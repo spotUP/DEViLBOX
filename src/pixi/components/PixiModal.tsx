@@ -120,6 +120,7 @@ export const PixiModal: React.FC<PixiModalProps> = ({
       <layoutContainer
         eventMode="static"
         onPointerDown={handlePanelClick}
+        onPointerUp={handlePanelClick}
         layout={{
           position: 'absolute',
           left: Math.round((screenW - width) / 2),

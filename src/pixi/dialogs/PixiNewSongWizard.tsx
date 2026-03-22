@@ -185,6 +185,7 @@ export const PixiNewSongWizard: React.FC = () => {
       <layoutContainer
         eventMode="static"
         onPointerDown={handlePanelClick}
+        onPointerUp={handlePanelClick}
         layout={{
           position: 'absolute',
           left: Math.round((screenW - MODAL_W) / 2),
