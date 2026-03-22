@@ -1436,7 +1436,7 @@ export class TrackerReplayer {
         const moduleSamples = dispatchEngine.getModuleSamples();
         if (moduleSamples && moduleSamples.length > 0) {
           for (const chipId of chipIds) {
-            dispatchEngine.uploadModuleSamplesToPlatform(chipId);
+            dispatchEngine.uploadModuleSamplesToPlatform(chipId, true);
           }
           // Reset all chips so the DSP re-initializes with new sampleMem contents
           for (const chipId of chipIds) {

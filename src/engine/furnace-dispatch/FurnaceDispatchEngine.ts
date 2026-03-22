@@ -935,6 +935,11 @@ export class FurnaceDispatchEngine {
   private _moduleSamples: Array<{ data: Int16Array | Int8Array | Uint8Array; rate: number; depth: number;
     samples?: number; loopStart: number; loopEnd: number; loopMode: number; name: string }> | null = null;
 
+  // Track which platforms have already had samples/wavetables uploaded for the current song.
+  // Prevents redundant re-uploads when multiple instruments share the same chip platform.
+  private _samplesUploadedForPlatform: Set<number> = new Set();
+  private _wavetablesUploadedForPlatform: Set<number> = new Set();
+
   private constructor() {}
 
   static getInstance(): FurnaceDispatchEngine {
@@ -1271,6 +1276,8 @@ export class FurnaceDispatchEngine {
     if (!this.chips.has(platformType)) return;
     this.workletNode?.port.postMessage({ type: 'destroyChip', platformType });
     this.chips.delete(platformType);
+    this._samplesUploadedForPlatform.delete(platformType);
+    this._wavetablesUploadedForPlatform.delete(platformType);
   }
 
   /**
@@ -1516,6 +1523,7 @@ export class FurnaceDispatchEngine {
    */
   setModuleWavetables(wavetables: Array<{ data: number[]; width: number; height: number }> | null): void {
     this._moduleWavetables = wavetables;
+    this._wavetablesUploadedForPlatform.clear();
   }
 
   /**
@@ -1524,6 +1532,7 @@ export class FurnaceDispatchEngine {
   setModuleSamples(samples: Array<{ data: Int16Array | Int8Array | Uint8Array; rate: number; depth: number;
     samples?: number; loopStart: number; loopEnd: number; loopMode: number; name: string }> | null): void {
     this._moduleSamples = samples;
+    this._samplesUploadedForPlatform.clear();
   }
 
   /** Get stored module wavetables (used by FurnaceDispatchSynth during chip init). */
@@ -1541,8 +1550,9 @@ export class FurnaceDispatchEngine {
    * Upload all stored module wavetables to a specific platform.
    * Called by FurnaceDispatchSynth after chip creation.
    */
-  uploadModuleWavetablesToPlatform(platformType: number): void {
+  uploadModuleWavetablesToPlatform(platformType: number, force?: boolean): void {
     if (!this._moduleWavetables || this._moduleWavetables.length === 0) return;
+    if (!force && this._wavetablesUploadedForPlatform.has(platformType)) return;
     console.log(`[FurnaceDispatch] Uploading ${this._moduleWavetables.length} module wavetables to platform ${platformType}`);
     for (let i = 0; i < this._moduleWavetables.length; i++) {
       const wt = this._moduleWavetables[i];
@@ -1556,14 +1566,19 @@ export class FurnaceDispatchEngine {
       }
       this.setWavetable(i, waveData, platformType);
     }
+    this._wavetablesUploadedForPlatform.add(platformType);
   }
 
   /**
    * Upload all stored module samples to a specific platform.
    * Called by FurnaceDispatchSynth after chip creation.
    */
-  uploadModuleSamplesToPlatform(platformType: number): void {
+  uploadModuleSamplesToPlatform(platformType: number, force?: boolean): void {
     if (!this._moduleSamples || this._moduleSamples.length === 0) return;
+    // Skip if samples were already uploaded for this platform (e.g., by another instrument
+    // sharing the same chip). The sequencer path in TrackerReplayer passes force=true to
+    // ensure samples are re-uploaded when a new song starts playing.
+    if (!force && this._samplesUploadedForPlatform.has(platformType)) return;
     console.log(`[FurnaceDispatch] Uploading ${this._moduleSamples.length} module samples to platform ${platformType}`);
     for (let i = 0; i < this._moduleSamples.length; i++) {
       const s = this._moduleSamples[i];
@@ -1608,6 +1623,7 @@ export class FurnaceDispatchEngine {
       this.setSample(i, data, platformType);
     }
     this.renderSamples(platformType);
+    this._samplesUploadedForPlatform.add(platformType);
   }
 
   // ========== Macro Control ==========
