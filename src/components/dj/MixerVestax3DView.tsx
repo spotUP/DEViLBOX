@@ -267,28 +267,28 @@ export function MixerScene({ viewRef }: { viewRef: React.RefObject<HTMLDivElemen
     const faders: FaderControl[] = [
       {
         meshName: 'exp_fader1', label: 'CH1 Volume',
-        axis: 'z', dragAxis: 'y', travel: 4.5, defaultValue: 2.5,
+        axis: 'z', dragAxis: 'y', travel: 5.0, defaultValue: 0.75,
         action: (v) => { store().setDeckVolume('A', v); try { getDJEngine().getDeck('A').setVolume(v); } catch {} },
         readValue: () => store().decks.A.volume,
         min: 0, max: 1.5,
       },
       {
         meshName: 'fader1', label: 'CH2 Volume',
-        axis: 'z', dragAxis: 'y', travel: 4.5, defaultValue: 2.5,
+        axis: 'z', dragAxis: 'y', travel: 5.0, defaultValue: 0.75,
         action: (v) => { store().setDeckVolume('B', v); try { getDJEngine().getDeck('B').setVolume(v); } catch {} },
         readValue: () => store().decks.B.volume,
         min: 0, max: 1.5,
       },
       {
         meshName: 'fader4', label: 'Master Volume',
-        axis: 'z', dragAxis: 'y', travel: 4.5, defaultValue: 2.5,
+        axis: 'z', dragAxis: 'y', travel: 5.0, defaultValue: 0.75,
         action: (v) => { store().setMasterVolume(v); try { getDJEngine().mixer.setMasterVolume(v); } catch {} },
         readValue: () => store().masterVolume,
         min: 0, max: 1.5,
       },
       {
         meshName: 'hfader1', label: 'Crossfader',
-        axis: 'x', dragAxis: 'x', travel: 5.0, defaultValue: 0.5,
+        axis: 'x', dragAxis: 'x', travel: 5.0, defaultValue: 0.75,
         action: (v) => {
           const hamster = store().hamsterSwitch;
           const pos = hamster ? 1 - v : v;
@@ -304,7 +304,7 @@ export function MixerScene({ viewRef }: { viewRef: React.RefObject<HTMLDivElemen
       },
       {
         meshName: 'exp_hfader1', label: 'Crossfader Alt',
-        axis: 'x', dragAxis: 'x', travel: 5.0, defaultValue: 0.5,
+        axis: 'x', dragAxis: 'x', travel: 5.0, defaultValue: 0.75,
         action: (v) => {
           const hamster = store().hamsterSwitch;
           const pos = hamster ? 1 - v : v;
@@ -529,7 +529,7 @@ export function MixerScene({ viewRef }: { viewRef: React.RefObject<HTMLDivElemen
       if (control.axis === 'x') {
         _faderTransMat.makeTranslation(delta * control.travel, 0, 0);
       } else {
-        _faderTransMat.makeTranslation(0, 0, -delta * control.travel);
+        _faderTransMat.makeTranslation(0, 0, delta * control.travel);
       }
 
       for (let i = 0; i < entry.meshes.length; i++) {
