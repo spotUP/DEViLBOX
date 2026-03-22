@@ -9,6 +9,7 @@ import { useShallow } from 'zustand/react/shallow';
 import { useTrackerStore, useCursorStore, useTransportStore } from '@stores';
 import { useEditorStore } from '@stores/useEditorStore';
 import { useUIStore } from '@stores/useUIStore';
+import { useFormatStore } from '@stores/useFormatStore';
 import { useHistoryStore } from '@stores/useHistoryStore';
 import { getToneEngine } from '@engine/ToneEngine';
 import { getTrackerReplayer } from '@engine/TrackerReplayer';
@@ -125,6 +126,18 @@ export const useTrackerInput = () => {
 
       const key = e.key;
       const keyLower = key.toLowerCase();
+
+      // In format mode (Hively, Furnace, etc.), let the format-specific handler
+      // in PatternEditorCanvas handle edit operations (undo, redo, transpose).
+      // Classic navigation (F-keys, transport) still handled below.
+      const editorMode = useFormatStore.getState().editorMode;
+      if (editorMode !== 'classic') {
+        const isCtrlCmd = e.ctrlKey || e.metaKey;
+        // Bail on Ctrl+Z/Y (undo/redo) — format handler owns these
+        if (isCtrlCmd && (keyLower === 'z' || keyLower === 'y') && !e.altKey) return;
+        // Bail on Ctrl+Arrow (transpose) — format handler owns these
+        if (isCtrlCmd && (key === 'ArrowUp' || key === 'ArrowDown') && !e.altKey) return;
+      }
 
       // ── Delegate to sub-hooks (order matters) ──
 
