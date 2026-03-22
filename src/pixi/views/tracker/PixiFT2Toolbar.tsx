@@ -31,7 +31,7 @@ import { PixiVisualizer } from './PixiVisualizer';
 import { useTransportStore, useTrackerStore, useUIStore, useInstrumentStore, useProjectStore, useAudioStore, useAutomationStore, useEditorStore } from '@stores';
 import { useAIStore } from '@stores/useAIStore';
 import { useSettingsStore } from '@stores/useSettingsStore';
-import { exportSong } from '@lib/export/exporters';
+import { exportSong, getOriginalModuleDataForExport } from '@lib/export/exporters';
 import { useShallow } from 'zustand/react/shallow';
 import { useTapTempo } from '@hooks/useTapTempo';
 import { GROOVE_TEMPLATES } from '@typedefs/audio';
@@ -247,7 +247,8 @@ export const PixiFT2Toolbar: React.FC = () => {
       const { instruments } = useInstrumentStore.getState();
       const { masterEffects } = useAudioStore.getState();
       const { curves } = useAutomationStore.getState();
-      const sequence = patterns.map((p) => p.id);
+      const { patternOrder } = useTrackerStore.getState();
+      const sequence = patternOrder.map(idx => patterns[idx]?.id).filter(Boolean);
       const automationData: Record<string, Record<number, Record<string, unknown>>> = {};
       patterns.forEach((pattern) => {
         pattern.channels.forEach((_ch, channelIndex) => {
@@ -270,7 +271,9 @@ export const PixiFT2Toolbar: React.FC = () => {
         masterEffects.length > 0 ? masterEffects : undefined,
         curves.length > 0 ? curves : undefined,
         { prettify: true }, gtId,
-        { speed, trackerFormat, linearPeriods }
+        { speed, trackerFormat, linearPeriods },
+        patternOrder,
+        getOriginalModuleDataForExport(),
       );
       notify.success('Song downloaded!', 2000);
     } catch {

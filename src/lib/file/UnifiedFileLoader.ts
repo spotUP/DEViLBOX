@@ -126,6 +126,13 @@ export async function importTrackerModule(
       const { parseWithOpenMPT } = await import('@lib/import/wasm/OpenMPTConverter');
       const song = await parseWithOpenMPT(info.arrayBuffer, info.file?.name || 'module');
       console.log(`[Import] OpenMPT parsed: ${song.patterns.length} patterns, ${song.instruments.length} instruments, format=${song.format}`);
+      // Tag first pattern with sourceFormat so it's preserved in .dbx saves
+      if (song.patterns.length > 0 && song.format) {
+        song.patterns[0].importMetadata = {
+          ...song.patterns[0].importMetadata,
+          sourceFormat: song.format,
+        } as typeof song.patterns[0]['importMetadata'];
+      }
       loadInstruments(song.instruments);
       loadPatterns(song.patterns);
       setCurrentPattern(0);
@@ -672,10 +679,14 @@ async function loadSongFile(file: File, options: FileLoadOptions): Promise<FileL
   if (filename.endsWith('.sunvox')) {
     preReadBuffer = await file.arrayBuffer();
 
-    // Stop transport BEFORE loading — prevents usePatternPlayback's effect from
-    // auto-restarting+stopping when patterns change mid-playback. Without this,
-    // the first play after loading a second song is silent.
-    useTransportStore.getState().stop();
+    // Stop transport and reset position BEFORE loading — prevents:
+    // 1. usePatternPlayback effect from auto-restarting when patterns change mid-playback
+    // 2. Replayer position from first song (e.g. pattern 150) exceeding second song's
+    //    pattern count (e.g. 103), causing immediate "song end" on first play
+    const transport = useTransportStore.getState();
+    transport.stop();
+    transport.setCurrentRow(0);
+    transport.setCurrentPattern(0);
 
     // Wait for any in-flight shared song load to finish — the worklet processes
     // messages sequentially, so a pending loadSong blocks new createHandle calls.
@@ -809,7 +820,10 @@ async function loadSongFile(file: File, options: FileLoadOptions): Promise<FileL
 
     loadPatterns(patterns);
 
-    if (songData.sequence && Array.isArray(songData.sequence)) {
+    // Restore pattern order: prefer numeric patternOrder, fall back to sequence (pattern IDs)
+    if (songData.patternOrder && Array.isArray(songData.patternOrder) && songData.patternOrder.length > 0) {
+      setPatternOrder(songData.patternOrder);
+    } else if (songData.sequence && Array.isArray(songData.sequence)) {
       const patternIdToIndex = new Map(patterns.map((p: Pattern, i: number) => [p.id, i]));
       const order = songData.sequence
         .map((patternId: string) => patternIdToIndex.get(patternId))
@@ -837,10 +851,13 @@ async function loadSongFile(file: File, options: FileLoadOptions): Promise<FileL
       } as Pattern['importMetadata'];
     }
 
-    // Reset to classic editor mode — clears stale native state from any
-    // previously-loaded musicline/furnace/hively file.
-    // Pass linearPeriods through so it's not wiped by the reset.
-    applyEditorMode({ linearPeriods: songData.linearPeriods ?? false });
+    // Restore native engine data (all WASM formats)
+    const { restoreNativeEngineData } = await import('@lib/export/exporters');
+    restoreNativeEngineData(songData.nativeEngineData, songData.nativeEngineMeta, songData.linearPeriods);
+
+    if (songData.originalModuleData?.base64) {
+      useFormatStore.getState().setOriginalModuleData(songData.originalModuleData as any);
+    }
 
     return {
       success: true,
