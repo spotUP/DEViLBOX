@@ -48,6 +48,8 @@ import { Button } from '@components/ui/Button';
 import { useVersionCheck } from '@hooks/useVersionCheck';
 import { useDevServerStatus } from '@hooks/useDevServerStatus';
 import { DevServerDownBanner } from '@components/ui/DevServerDownBanner';
+import { MobileMenu } from '@components/layout/MobileMenu';
+import { useResponsive } from '@contexts/ResponsiveContext';
 import { usePatternPlayback } from '@hooks/audio/usePatternPlayback';
 import { GlobalDragDropHandler } from '@components/ui/GlobalDragDropHandler';
 import { notify } from '@stores/useNotificationStore';
@@ -709,6 +711,7 @@ function App() {
 
   // WebGL render mode — render PixiJS UI instead of DOM
   const renderMode = useSettingsStore(state => state.renderMode);
+  const { isMobile } = useResponsive();
 
   // Extract hook calls that appear in the webgl branch JSX — must be called
   // unconditionally to satisfy React's rules of hooks (same count every render).
@@ -725,6 +728,32 @@ function App() {
       }>
         <GlobalDragDropHandler onFileLoaded={handleFileDrop} onFolderLoaded={handleFolderDrop}>
           <PixiApp />
+          {/* DOM SplitView overlay — GL mode has no native split view, so we render the DOM version */}
+          {activeView === 'split' && (
+            <div className="fixed inset-0 z-10 bg-dark-bg">
+              <Suspense fallback={<div className="flex-1 flex items-center justify-center text-text-muted">Loading split view...</div>}>
+                <SplitView />
+              </Suspense>
+            </div>
+          )}
+          {/* Mobile menu overlay for GL mode */}
+          {isMobile && (
+            <MobileMenu
+              onShowSettings={() => openModal('settings')}
+              onShowExport={() => openModal('export')}
+              onShowHelp={() => openModal('help')}
+              onShowMasterFX={() => { const s = useUIStore.getState(); s.modalOpen === 'masterFx' ? s.closeModal() : s.openModal('masterFx'); }}
+              onShowPatterns={() => togglePatterns()}
+              onLoad={() => openModal('fileBrowser')}
+              onSave={() => saveProject()}
+              onNew={() => useUIStore.getState().openNewSongWizard()}
+              onShowInstruments={() => openModal('instruments')}
+              onShowPatternOrder={() => openModal('patternOrder')}
+              onShowDrumpads={() => openModal('drumpads')}
+              onShowGrooveSettings={() => openModal('grooveSettings')}
+              onShowAuth={() => openModal('auth')}
+            />
+          )}
           {/* Store-driven overlays — render null when inactive */}
           <ToastNotification />
           <SynthErrorDialog />
