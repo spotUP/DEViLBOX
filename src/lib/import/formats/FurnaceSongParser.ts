@@ -3024,6 +3024,7 @@ export function buildFurnaceNativeData(module: FurnaceModule): FurnaceNativeData
     subsongs,
     activeSubsong: 0,
     chipIds: module.systems.slice(0, module.systemLen).map(id => FILE_ID_TO_ENUM[id] ?? id),
+    systemChans: module.systemChans?.slice(0, module.systemLen),
     compatFlags: module.compatFlags,
     grooves: module.grooves.length > 0 ? module.grooves : undefined,
     chipFlags: module.chipFlags?.slice(0, module.systemLen),
