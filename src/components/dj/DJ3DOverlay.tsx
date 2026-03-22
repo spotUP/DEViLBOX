@@ -1,65 +1,225 @@
 /**
- * DJ3DOverlay — Three.js 3D turntable + mixer overlay for GL mode.
- * Rendered in the DOM React tree (not Pixi) to avoid reconciler conflicts.
+ * DJ3DOverlay — Unified Three.js 3D turntable + mixer scene for GL mode.
+ *
+ * Renders all 3 objects (2 turntables + 1 mixer) in a single Three.js scene
+ * with one camera and unified orbit/pan/zoom controls.
  */
 
-import React, { Suspense, useRef } from 'react';
+import React, { Suspense, useRef, useCallback } from 'react';
+import { Canvas } from '@react-three/fiber';
+import { OrbitControls, PerspectiveCamera } from '@react-three/drei';
+import * as THREE from 'three';
 import { useDJStore } from '@/stores/useDJStore';
+import { TurntableScene } from './DeckVinyl3DView';
+import { MixerScene } from './MixerVestax3DView';
+import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib';
 
-const DeckVinyl3DView = React.lazy(() => import('./DeckVinyl3DView'));
-const MixerVestax3DView = React.lazy(() => import('./MixerVestax3DView'));
-const R3FCanvas = React.lazy(() =>
-  import('@react-three/fiber').then((mod) => ({ default: mod.Canvas }))
-);
-const ViewPort = React.lazy(() =>
-  import('@react-three/drei').then((mod) => {
-    const Port = mod.View.Port;
-    return { default: Port as React.ComponentType };
-  })
-);
+// ── Default camera position: DJ standing behind the decks, looking down ──────
+
+const DEFAULT_CAM_POS: [number, number, number] = [0, 0.55, 0.65];
+const DEFAULT_CAM_TARGET: [number, number, number] = [0, 0, -0.02];
+
+// ── Camera Control Buttons ───────────────────────────────────────────────────
+
+interface CameraButtonsProps {
+  orbitRef: React.RefObject<OrbitControlsImpl | null>;
+}
+
+const CameraButtons: React.FC<CameraButtonsProps> = ({ orbitRef }) => {
+  const dragMode = useRef<'rotate' | 'pan' | 'zoom' | null>(null);
+  const lastPos = useRef({ x: 0, y: 0 });
+
+  const onDragStart = useCallback((mode: 'rotate' | 'pan' | 'zoom', e: React.PointerEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    dragMode.current = mode;
+    lastPos.current = { x: e.clientX, y: e.clientY };
+    (e.target as HTMLElement).setPointerCapture(e.pointerId);
+  }, []);
+
+  const onDragMove = useCallback((e: React.PointerEvent) => {
+    if (!dragMode.current) return;
+    e.preventDefault();
+    e.stopPropagation();
+    const dx = e.clientX - lastPos.current.x;
+    const dy = e.clientY - lastPos.current.y;
+    lastPos.current = { x: e.clientX, y: e.clientY };
+
+    const c = orbitRef.current;
+    if (!c) return;
+
+    switch (dragMode.current) {
+      case 'rotate':
+        c.setAzimuthalAngle(c.getAzimuthalAngle() - dx * 0.008);
+        c.setPolarAngle(c.getPolarAngle() + dy * 0.008);
+        c.update();
+        break;
+      case 'pan': {
+        const cam = c.object;
+        const forward = new THREE.Vector3();
+        cam.getWorldDirection(forward);
+        const right = new THREE.Vector3().crossVectors(cam.up, forward).normalize();
+        const up = new THREE.Vector3().crossVectors(forward, right).normalize();
+        const offset = right.multiplyScalar(dx * 0.002).addScaledVector(up, dy * 0.002);
+        c.target.add(offset);
+        cam.position.add(offset);
+        c.update();
+        break;
+      }
+      case 'zoom': {
+        const dir = c.object.position.clone().sub(c.target).normalize();
+        c.object.position.addScaledVector(dir, dy * 0.01);
+        c.update();
+        break;
+      }
+    }
+  }, [orbitRef]);
+
+  const onDragEnd = useCallback((e: React.PointerEvent) => {
+    if (dragMode.current) {
+      (e.target as HTMLElement).releasePointerCapture(e.pointerId);
+      dragMode.current = null;
+    }
+  }, []);
+
+  const resetView = useCallback(() => {
+    const c = orbitRef.current;
+    if (!c) return;
+    c.target.set(...DEFAULT_CAM_TARGET);
+    c.object.position.set(...DEFAULT_CAM_POS);
+    c.update();
+  }, [orbitRef]);
+
+  const pad = "w-10 h-10 flex items-center justify-center rounded bg-black/50 hover:bg-white/20 text-white/70 hover:text-text-primary text-[10px] leading-tight select-none cursor-grab active:cursor-grabbing border border-white/10 transition-colors touch-none";
+  const btn = "w-10 h-6 flex items-center justify-center rounded bg-black/50 hover:bg-white/20 text-white/70 hover:text-text-primary text-[10px] select-none cursor-pointer border border-white/10 transition-colors";
+
+  return (
+    <div
+      className="absolute bottom-2 right-2 flex flex-col gap-0.5 z-10 pointer-events-auto"
+      onPointerDown={(e) => e.stopPropagation()}
+    >
+      <div
+        className={pad}
+        title="Drag to rotate"
+        onPointerDown={(e) => onDragStart('rotate', e)}
+        onPointerMove={onDragMove}
+        onPointerUp={onDragEnd}
+        onPointerCancel={onDragEnd}
+      >Orbit</div>
+      <div
+        className={pad}
+        title="Drag to pan"
+        onPointerDown={(e) => onDragStart('pan', e)}
+        onPointerMove={onDragMove}
+        onPointerUp={onDragEnd}
+        onPointerCancel={onDragEnd}
+      >Pan</div>
+      <div
+        className={pad}
+        title="Drag up/down to zoom"
+        onPointerDown={(e) => onDragStart('zoom', e)}
+        onPointerMove={onDragMove}
+        onPointerUp={onDragEnd}
+        onPointerCancel={onDragEnd}
+      >Zoom</div>
+      <button className={btn} title="Reset camera" onClick={resetView}>Reset</button>
+    </div>
+  );
+};
+
+// ── Unified 3D Scene ─────────────────────────────────────────────────────────
+
+const UnifiedDJScene: React.FC<{
+  orbitRef: React.RefObject<OrbitControlsImpl | null>;
+  canvasContainerRef: React.RefObject<HTMLDivElement | null>;
+  thirdDeckActive: boolean;
+}> = ({ orbitRef, canvasContainerRef, thirdDeckActive }) => {
+  return (
+    <>
+      {/* Unified camera */}
+      <PerspectiveCamera
+        makeDefault
+        position={DEFAULT_CAM_POS}
+        fov={50}
+        near={0.01}
+        far={20}
+      />
+
+      {/* Unified lighting */}
+      <ambientLight intensity={0.3} />
+      <directionalLight position={[2, 5, 3]} intensity={0.8} />
+      <directionalLight position={[-2, 3, -1]} intensity={0.3} />
+      <spotLight position={[0, 4, 1]} intensity={1.5} angle={0.5} penumbra={0.6} />
+      <pointLight position={[0, 0.1, 0]} color="#4488ff" intensity={0.6} distance={1.0} decay={2} />
+
+      {/* Left turntable (Deck A) */}
+      <group position={[-0.5, 0, 0]}>
+        <TurntableScene deckId="A" orbitRef={orbitRef} embedded />
+      </group>
+
+      {/* Center mixer */}
+      <group position={[0, 0, 0.05]}>
+        <MixerScene viewRef={canvasContainerRef} />
+      </group>
+
+      {/* Right turntable (Deck B) */}
+      <group position={[0.5, 0, 0]}>
+        <TurntableScene deckId="B" orbitRef={orbitRef} embedded />
+      </group>
+
+      {/* Third deck (Deck C) — offset to the far right */}
+      {thirdDeckActive && (
+        <group position={[1.1, 0, 0]}>
+          <TurntableScene deckId="C" orbitRef={orbitRef} embedded />
+        </group>
+      )}
+
+      {/* Unified orbit controls */}
+      <OrbitControls
+        ref={orbitRef}
+        target={DEFAULT_CAM_TARGET}
+        enableDamping
+        dampingFactor={0.1}
+        minPolarAngle={Math.PI * 0.05}
+        maxPolarAngle={Math.PI * 0.48}
+        minDistance={0.15}
+        maxDistance={3.0}
+        /* Disable default mouse buttons — camera is controlled via the drag pads */
+        mouseButtons={{
+          LEFT: undefined as unknown as THREE.MOUSE,
+          MIDDLE: undefined as unknown as THREE.MOUSE,
+          RIGHT: undefined as unknown as THREE.MOUSE,
+        }}
+      />
+    </>
+  );
+};
 
 export const DJ3DOverlay: React.FC = () => {
   const thirdDeckActive = useDJStore(s => s.thirdDeckActive);
-  const overlayRef = useRef<HTMLDivElement>(null);
+  const orbitRef = useRef<OrbitControlsImpl>(null);
+  const canvasContainerRef = useRef<HTMLDivElement>(null);
 
   return (
-    <div ref={overlayRef} className="w-full h-full">
+    <div ref={canvasContainerRef} className="w-full h-full relative" style={{ touchAction: 'none' }}>
       <Suspense fallback={
         <div className="flex items-center justify-center w-full h-full text-text-muted text-sm">
-          Loading 3D views...
+          Loading 3D scene...
         </div>
       }>
-        <div className={`w-full h-full grid gap-2 p-2 ${
-          thirdDeckActive
-            ? 'grid-cols-[1fr_400px_1fr_1fr]'
-            : 'grid-cols-[1fr_400px_1fr]'
-        }`}>
-          <div className="min-h-0 min-w-0 overflow-hidden">
-            <DeckVinyl3DView deckId="A" />
-          </div>
-          <div className="min-h-0 min-w-0 overflow-hidden">
-            <MixerVestax3DView />
-          </div>
-          <div className="min-h-0 min-w-0 overflow-hidden">
-            <DeckVinyl3DView deckId="B" />
-          </div>
-          {thirdDeckActive && (
-            <div className="min-h-0 min-w-0 overflow-hidden">
-              <DeckVinyl3DView deckId="C" />
-            </div>
-          )}
-        </div>
-
-        {/* Shared R3F Canvas for drei View scissor rendering */}
-        <div className="fixed inset-0 pointer-events-none" style={{ top: 36, zIndex: 1 }}>
-          <R3FCanvas
-            style={{ position: 'absolute', inset: 0 }}
-            eventSource={overlayRef as React.RefObject<HTMLDivElement>}
-            eventPrefix="client"
-          >
-            <ViewPort />
-          </R3FCanvas>
-        </div>
+        <Canvas
+          style={{ position: 'absolute', inset: 0 }}
+          gl={{ antialias: true, alpha: false }}
+          dpr={[1, 2]}
+        >
+          <color attach="background" args={['#0a0a0a']} />
+          <UnifiedDJScene
+            orbitRef={orbitRef}
+            canvasContainerRef={canvasContainerRef}
+            thirdDeckActive={thirdDeckActive}
+          />
+        </Canvas>
+        <CameraButtons orbitRef={orbitRef} />
       </Suspense>
     </div>
   );
