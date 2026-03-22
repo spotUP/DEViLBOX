@@ -300,10 +300,11 @@ export const PixiExposeOverlay: React.FC<PixiExposeOverlayProps> = ({ width, hei
               <pixiGraphics
                 draw={(g) => {
                   g.clear();
-                  g.circle(cardW / 2 + view.label.length * 3.5 + 8, cardH - LABEL_H + 14, 3);
+                  g.circle(0, 0, 3);
                   g.fill({ color: theme.accent.color });
                 }}
-                layout={{ position: 'absolute', width: cardW, height: cardH }}
+                x={cardW / 2 + view.label.length * 3.5 + 8}
+                y={cardH - LABEL_H + 14}
               />
             )}
           </pixiContainer>

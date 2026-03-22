@@ -18,7 +18,7 @@ import { needsMigration, migrateProject } from '@/lib/migration';
 import { getOriginalModuleDataForExport, getNativeEngineDataForExport, getNativeEngineMetaForExport, restoreNativeEngineData } from '@/lib/export/exporters';
 
 
-const AUTO_SAVE_INTERVAL = 30000; // 30 seconds
+const AUTO_SAVE_INTERVAL = 300000; // 5 minutes
 
 // ============================================================================
 // EXPLICIT SAVE TRACKING
@@ -821,11 +821,11 @@ export function useProjectPersistence() {
     };
   }, [isDirty, scheduleAutoSave]);
 
-  // Save before unload (only if project was explicitly saved before)
+  // Warn before unload if there are unsaved changes
   useEffect(() => {
     const handleBeforeUnload = (e: BeforeUnloadEvent) => {
-      if (isDirty && explicitlySaved) {
-        void saveProjectToStorage();
+      if (isDirty) {
+        if (explicitlySaved) void saveProjectToStorage();
         e.preventDefault();
         e.returnValue = '';
       }

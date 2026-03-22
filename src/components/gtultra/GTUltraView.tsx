@@ -124,8 +124,8 @@ export const GTUltraView: React.FC<{ width?: number; height?: number }> = ({ wid
     // GT Ultra stores pattern data per-pattern (not per-channel). Each pattern contains
     // all channels' data in a single binary blob (channelCount * patternLength * 4 bytes).
     // We use channel 0's order list to determine which pattern to display.
-    // TODO: If GT Ultra supports per-channel patterns at different order positions,
-    // this needs to look up each channel's pattern independently.
+    // GT Ultra uses shared patterns across all channels at each order position.
+    // All channels share the same pattern index from channel 0's order list.
     const patIdx = orderData[0]?.[currentOrderPos] ?? 0;
     const patEntry = patternData.get(patIdx);
 
