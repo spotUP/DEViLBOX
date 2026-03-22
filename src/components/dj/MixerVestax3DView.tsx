@@ -450,83 +450,6 @@ function MixerScene({ viewRef }: { viewRef: React.RefObject<HTMLDivElement | nul
         });
       }
 
-      // Override materials for dark DJ aesthetic (model ships with flat gray defaults)
-      if (mesh.material && 'color' in mesh.material) {
-        const mat = mesh.material as THREE.MeshStandardMaterial;
-        mesh.material = mat.clone();
-        const m = mesh.material as THREE.MeshStandardMaterial;
-        const matName = m.name || '';
-
-        // Textured materials: preserve texture, just tweak PBR properties
-        if (m.map || (m as any).metalnessMap || (m as any).roughnessMap) {
-          // Faceplate — silver panel with printed labels
-          if (matName.includes('FaceplateSG')) {
-            m.color.set(0xe0e0e0); // slight silver tint over texture
-            m.metalness = 0.1;
-            m.roughness = 0.5;
-          }
-          // Outer box — dark body with texture
-          else if (matName.includes('BoxFBXASC032Outer')) {
-            m.color.set(0x505050);
-            m.metalness = 0.2;
-            m.roughness = 0.6;
-          }
-          // Knob shafts with anisotropic metal spec texture
-          else if (matName.includes('Cylinder06')) {
-            m.color.set(0x888888);
-            m.metalness = 1.0;
-            m.roughness = 0.2;
-          }
-          // Noise pattern texture (knob tops)
-          else if (matName.includes('pCylinder1SG')) {
-            m.color.set(0x999999);
-            m.metalness = 0.6;
-            m.roughness = 0.3;
-          }
-        } else {
-          // Untextured materials — style based on part
-          if (matName.includes('windowSG')) {
-            // VU meter window — blue glow
-            m.color.set(0x050510);
-            m.emissive = new THREE.Color(0x3070ff);
-            m.emissiveIntensity = 0.6;
-            m.metalness = 0.1;
-            m.roughness = 0.15;
-          } else if (matName.includes('fader')) {
-            // Fader caps — silver brushed metal
-            m.color.set(0x909090);
-            m.metalness = 0.8;
-            m.roughness = 0.15;
-          } else if (matName.includes('knobSG')) {
-            // Knobs — dark rubberized
-            m.color.set(0x111111);
-            m.metalness = 0.05;
-            m.roughness = 0.8;
-          } else if (matName.includes('Rectangle01')) {
-            // Dark trim/rails
-            m.color.set(0x0c0c0c);
-            m.metalness = 0.4;
-            m.roughness = 0.5;
-          } else if (matName.includes('Cylinder05')) {
-            // Matte cylinders
-            m.color.set(0x333333);
-            m.metalness = 0.2;
-            m.roughness = 0.7;
-          } else if (matName.includes('polySurface')) {
-            // Body side panels
-            m.color.set(0x1a1a1a);
-            m.metalness = 0.5;
-            m.roughness = 0.4;
-          } else {
-            // Default untextured — medium dark
-            m.color.set(0x303030);
-            m.metalness = 0.3;
-            m.roughness = 0.5;
-          }
-        }
-        m.envMapIntensity = 1.2;
-      }
-
       // Disable auto-update on interactive meshes for manual matrix control
       if (type === 'knob' || type === 'fader' || type === 'hfader') {
         mesh.matrixAutoUpdate = false;
@@ -771,12 +694,12 @@ export function MixerVestax3DView() {
           near={0.01}
           far={10}
         />
-        <ambientLight intensity={0.25} />
-        <directionalLight position={[0, 5, 3]} intensity={1.0} castShadow={false} />
-        <directionalLight position={[-2, 3, -1]} intensity={0.3} />
-        <directionalLight position={[2, 1, 2]} intensity={0.2} color="#8888ff" />
+        <ambientLight intensity={0.3} />
+        <directionalLight position={[0, 5, 3]} intensity={1.5} castShadow={false} />
+        <directionalLight position={[-2, 3, -1]} intensity={0.4} />
+        <directionalLight position={[2, 1, 2]} intensity={0.3} />
         <pointLight position={[0, 0.06, 0]} color="#4080ff" intensity={0.5} distance={0.4} />
-        <Environment preset="night" />
+        <Environment preset="apartment" />
 
         <MixerScene viewRef={viewDivRef} />
 
