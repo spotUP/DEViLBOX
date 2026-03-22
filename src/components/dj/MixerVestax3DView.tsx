@@ -457,51 +457,72 @@ function MixerScene({ viewRef }: { viewRef: React.RefObject<HTMLDivElement | nul
         const m = mesh.material as THREE.MeshStandardMaterial;
         const matName = m.name || '';
 
-        if (matName.includes('windowSG')) {
-          // VU meter window — dark translucent
-          m.color.set(0x0a0a0a);
-          m.metalness = 0.1;
-          m.roughness = 0.3;
-        } else if (matName.includes('FaceplateSG') || matName.includes('BoxFBXASC032Outer')) {
-          // Faceplate / outer box — has texture, darken tint
-          m.color.set(0x303030);
-          m.metalness = 0.3;
-          m.roughness = 0.4;
-        } else if (matName.includes('fader')) {
-          // Fader caps — silver metal
-          m.color.set(0x808080);
-          m.metalness = 0.8;
-          m.roughness = 0.2;
-        } else if (matName.includes('knobSG')) {
-          // Knobs — dark rubberized
-          m.color.set(0x1a1a1a);
-          m.metalness = 0.1;
-          m.roughness = 0.7;
-        } else if (matName.includes('Cylinder06') || matName.includes('Cylinder05')) {
-          // Cylinder parts (knob shafts) — brushed metal
-          m.color.set(0x2a2a2a);
-          m.metalness = 0.7;
-          m.roughness = 0.3;
-        } else if (matName.includes('Rectangle01')) {
-          // Dark trim pieces — already dark, add metalness
-          m.color.set(0x0e0e0e);
-          m.metalness = 0.5;
-          m.roughness = 0.4;
-        } else if (matName.includes('pCylinder')) {
-          // Main body cylinders — dark chassis
-          m.color.set(0x151518);
-          m.metalness = 0.5;
-          m.roughness = 0.35;
-        } else if (matName.includes('polySurface')) {
-          // Body panels — dark matte metal
-          m.color.set(0x1a1a1e);
-          m.metalness = 0.6;
-          m.roughness = 0.4;
-        } else if (!m.map) {
-          // Any other untextured — dark default
-          m.color.set(0x1a1a1e);
-          m.metalness = 0.4;
-          m.roughness = 0.5;
+        // Textured materials: preserve texture, just tweak PBR properties
+        if (m.map || (m as any).metalnessMap || (m as any).roughnessMap) {
+          // Faceplate — silver panel with printed labels
+          if (matName.includes('FaceplateSG')) {
+            m.color.set(0xe0e0e0); // slight silver tint over texture
+            m.metalness = 0.1;
+            m.roughness = 0.5;
+          }
+          // Outer box — dark body with texture
+          else if (matName.includes('BoxFBXASC032Outer')) {
+            m.color.set(0x505050);
+            m.metalness = 0.2;
+            m.roughness = 0.6;
+          }
+          // Knob shafts with anisotropic metal spec texture
+          else if (matName.includes('Cylinder06')) {
+            m.color.set(0x888888);
+            m.metalness = 1.0;
+            m.roughness = 0.2;
+          }
+          // Noise pattern texture (knob tops)
+          else if (matName.includes('pCylinder1SG')) {
+            m.color.set(0x999999);
+            m.metalness = 0.6;
+            m.roughness = 0.3;
+          }
+        } else {
+          // Untextured materials — style based on part
+          if (matName.includes('windowSG')) {
+            // VU meter window — blue glow
+            m.color.set(0x050510);
+            m.emissive = new THREE.Color(0x3070ff);
+            m.emissiveIntensity = 0.6;
+            m.metalness = 0.1;
+            m.roughness = 0.15;
+          } else if (matName.includes('fader')) {
+            // Fader caps — silver brushed metal
+            m.color.set(0x909090);
+            m.metalness = 0.8;
+            m.roughness = 0.15;
+          } else if (matName.includes('knobSG')) {
+            // Knobs — dark rubberized
+            m.color.set(0x111111);
+            m.metalness = 0.05;
+            m.roughness = 0.8;
+          } else if (matName.includes('Rectangle01')) {
+            // Dark trim/rails
+            m.color.set(0x0c0c0c);
+            m.metalness = 0.4;
+            m.roughness = 0.5;
+          } else if (matName.includes('Cylinder05')) {
+            // Matte cylinders
+            m.color.set(0x333333);
+            m.metalness = 0.2;
+            m.roughness = 0.7;
+          } else if (matName.includes('polySurface')) {
+            // Body side panels
+            m.color.set(0x1a1a1a);
+            m.metalness = 0.5;
+            m.roughness = 0.4;
+          } else {
+            // Default untextured — medium dark
+            m.color.set(0x303030);
+            m.metalness = 0.3;
+            m.roughness = 0.5;
+          }
         }
         m.envMapIntensity = 1.2;
       }
@@ -750,11 +771,11 @@ export function MixerVestax3DView() {
           near={0.01}
           far={10}
         />
-        <ambientLight intensity={0.3} />
-        <directionalLight position={[2, 4, 2]} intensity={0.8} castShadow={false} />
-        <directionalLight position={[-1, 2, -1]} intensity={0.4} />
-        <directionalLight position={[0, -1, 2]} intensity={0.2} />
-        <pointLight position={[0, 0.05, 0]} color="#60a5fa" intensity={0.3} distance={0.5} />
+        <ambientLight intensity={0.25} />
+        <directionalLight position={[0, 5, 3]} intensity={1.0} castShadow={false} />
+        <directionalLight position={[-2, 3, -1]} intensity={0.3} />
+        <directionalLight position={[2, 1, 2]} intensity={0.2} color="#8888ff" />
+        <pointLight position={[0, 0.06, 0]} color="#4080ff" intensity={0.5} distance={0.4} />
         <Environment preset="night" />
 
         <MixerScene viewRef={viewDivRef} />
