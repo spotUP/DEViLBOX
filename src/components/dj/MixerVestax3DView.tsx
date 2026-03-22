@@ -27,7 +27,7 @@ const MODEL_PATH = '/models/vestax-mixer.glb';
 
 // Model coordinate system: Y-up, X=left-right, Z=front-back (negative Z = back/rear)
 // Scale factor: model is in cm-ish units, we normalize to ~0.3 meters tall
-const MODEL_SCALE = 0.02;
+const MODEL_SCALE = 0.01;
 
 // Knob rotation range (radians) — most DJ knobs rotate ~270°
 const KNOB_MIN_ANGLE = -Math.PI * 0.75; // -135°
