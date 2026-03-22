@@ -1407,12 +1407,15 @@ export class TrackerReplayer {
         // accumulate and get rendered unnecessarily.
         const chipIds = this.song.furnaceNative.chipIds ?? [];
 
-        // Destroy ALL old chips to ensure clean state.
-        // Chips shared between songs will be recreated below with fresh dispatch handles.
+        // Destroy old chips not needed by new song so they don't accumulate.
+        // Keep chips that the new song also uses — avoids slow recreate on replay.
+        const newChipSet = new Set(chipIds);
         const oldChipIds = [...(dispatchEngine as any).chips.keys() as IterableIterator<number>];
         for (const platformType of oldChipIds) {
-          console.log('[TrackerReplayer] WASM seq: destroying old chip for platform', platformType);
-          dispatchEngine.destroyChip(platformType);
+          if (!newChipSet.has(platformType)) {
+            console.log('[TrackerReplayer] WASM seq: destroying old chip for platform', platformType);
+            dispatchEngine.destroyChip(platformType);
+          }
         }
 
         // Create all chips for new song
