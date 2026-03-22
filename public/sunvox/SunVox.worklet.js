@@ -514,6 +514,36 @@ class SunVoxProcessor extends AudioWorkletProcessor {
         if (m) m._sv_stop(data.handle);
         break;
 
+      // ── Per-module oscilloscope ─────────────────────────────────────────
+
+      case 'getModuleScope': {
+        // sv_get_module_scope2(slot, mod_num, channel, dest_buf, samples_to_read) → actual count
+        if (!m) break;
+        try {
+          const SCOPE_LEN = 1024;
+          const destPtr = m._malloc(SCOPE_LEN * 2); // int16 = 2 bytes each
+          const received = m._sv_get_module_scope2(
+            data.handle, data.moduleId, data.channel || 0, destPtr, SCOPE_LEN
+          );
+          const out = new Float32Array(received);
+          const heap16 = new Int16Array(m.HEAPU8.buffer, destPtr, received);
+          for (let i = 0; i < received; i++) out[i] = heap16[i] / 32768;
+          m._free(destPtr);
+          this.port.postMessage(
+            { type: 'moduleScope', handle: data.handle, moduleId: data.moduleId, data: out.buffer },
+            [out.buffer]
+          );
+        } catch (err) {
+          console.error('[SunVox Worklet] getModuleScope error:', err.message);
+          const empty = new Float32Array(0);
+          this.port.postMessage(
+            { type: 'moduleScope', handle: data.handle, moduleId: data.moduleId, data: empty.buffer },
+            [empty.buffer]
+          );
+        }
+        break;
+      }
+
       // ── Module graph (with full type info from official API) ──────────────
 
       case 'getModuleGraph': {
