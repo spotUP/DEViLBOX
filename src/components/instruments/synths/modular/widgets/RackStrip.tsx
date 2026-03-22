@@ -11,6 +11,7 @@ import { CSS } from '@dnd-kit/utilities';
 import { GripVertical, X, ChevronDown, ChevronRight } from 'lucide-react';
 import type { ModularModuleInstance, PortRef } from '../../../../../types/modular';
 import { ModuleRegistry } from '../../../../../engine/modular/ModuleRegistry';
+import { getSunVoxControlMeta } from '../../../../../engine/sunvox-modular/graphToConfig';
 import { JackPort } from './JackPort';
 import { Knob } from '../../../../controls/Knob';
 import { ModuleScopeCanvas } from './ModuleScopeCanvas';
@@ -175,9 +176,14 @@ export const RackStrip: React.FC<RackStripProps> = ({
             })}
           </div>
 
-          {/* Parameters (knobs) */}
-          <div className="flex-1 flex gap-3 justify-center relative z-10">
-            {descriptor.parameters.map((param) => (
+          {/* Parameters (knobs) — use descriptor params, or fall back to SunVox dynamic controls */}
+          <div className="flex-1 flex gap-3 flex-wrap justify-center relative z-10">
+            {(descriptor.parameters.length > 0
+              ? descriptor.parameters
+              : getSunVoxControlMeta(module.id).map(m => ({
+                  id: `ctl_${m.id}`, name: m.name, min: m.min, max: m.max, default: 0,
+                }))
+            ).map((param) => (
               <div key={param.id} className="flex flex-col items-center gap-1">
                 <Knob
                   value={module.parameters[param.id] ?? param.default}
@@ -189,7 +195,7 @@ export const RackStrip: React.FC<RackStripProps> = ({
                 />
                 <span className="text-[10px] text-text-muted font-mono">
                   {(module.parameters[param.id] ?? param.default).toFixed(2)}
-                  {param.unit || ''}
+                  {'unit' in param ? (param as { unit?: string }).unit || '' : ''}
                 </span>
               </div>
             ))}
