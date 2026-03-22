@@ -415,7 +415,8 @@ export const PixiSettingsModal: React.FC<PixiSettingsModalProps> = ({ isOpen, on
   };
 
   const handleOverlayClick = (_e: FederatedPointerEvent) => { onClose(); };
-  const handlePanelClick = (e: FederatedPointerEvent) => { e.stopPropagation(); };
+  const handlePanelPointerDown = (e: FederatedPointerEvent) => { e.stopPropagation(); };
+  const handlePanelPointerUp = (e: FederatedPointerEvent) => { e.stopPropagation(); };
   const blockWheel = useCallback((e: FederatedWheelEvent) => {
     e.stopPropagation();
     (e.nativeEvent as WheelEvent | undefined)?.preventDefault?.();
@@ -435,7 +436,8 @@ export const PixiSettingsModal: React.FC<PixiSettingsModalProps> = ({ isOpen, on
 
       <layoutContainer
         eventMode="static"
-        onPointerDown={handlePanelClick}
+        onPointerDown={handlePanelPointerDown}
+        onPointerUp={handlePanelPointerUp}
         layout={{
           position: 'absolute',
           left: Math.round((screenW - MODAL_W) / 2),
