@@ -152,24 +152,24 @@ const UnifiedDJScene: React.FC<{
       <spotLight position={[0, 4, 1]} intensity={1.5} angle={0.5} penumbra={0.6} />
       <pointLight position={[0, 0.1, 0]} color="#4488ff" intensity={0.6} distance={1.0} decay={2} />
 
-      {/* Left turntable (Deck A) */}
-      <group position={[-0.5, 0, 0]}>
+      {/* Left turntable (Deck A) — SL-1200 ~0.45 wide at scale 0.01 */}
+      <group position={[-0.35, 0, 0]}>
         <TurntableScene deckId="A" orbitRef={orbitRef} embedded />
       </group>
 
-      {/* Center mixer */}
-      <group position={[0, 0, 0.05]}>
+      {/* Center mixer — Vestax ~0.25 wide at scale 0.01 */}
+      <group position={[0, 0, 0]}>
         <MixerScene viewRef={canvasContainerRef} />
       </group>
 
       {/* Right turntable (Deck B) */}
-      <group position={[0.5, 0, 0]}>
+      <group position={[0.35, 0, 0]}>
         <TurntableScene deckId="B" orbitRef={orbitRef} embedded />
       </group>
 
-      {/* Third deck (Deck C) — offset to the far right */}
+      {/* Third deck (Deck C) — next to Deck B */}
       {thirdDeckActive && (
-        <group position={[1.1, 0, 0]}>
+        <group position={[0.8, 0, 0]}>
           <TurntableScene deckId="C" orbitRef={orbitRef} embedded />
         </group>
       )}
