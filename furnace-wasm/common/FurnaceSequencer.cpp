@@ -3017,9 +3017,8 @@ EMSCRIPTEN_KEEPALIVE
 int furnace_seq_tick(void) {
   if (!g_seq.playing || g_seq.halted) return (g_seq.curOrder << 16) | g_seq.curRow;
 
-  seqNextTick();
-  // Increment tick counter AFTER processing (matches reference playback.cpp:2595)
   furnace_cmd_log_tick();
+  seqNextTick();
 
   // halt engine if requested (debug menu)
   if (g_seq.haltOn == 3) g_seq.halted = true;
