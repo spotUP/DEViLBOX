@@ -399,12 +399,18 @@ class SunVoxProcessor extends AudioWorkletProcessor {
               this._mutedModules.delete(key);
             }
           }
-          // Single stop to halt current playback, then play from beginning.
-          // Do NOT double-stop — second sv_stop() puts engine in standby mode (no audio).
-          m._sv_stop(data.handle);
+          // Ensure volume is set before play.
+          // Do NOT call sv_stop before sv_play — a double-stop puts the engine in
+          // standby mode (no audio). sv_play_from_beginning already resets state.
           m._sv_volume(data.handle, 256); // max volume (0-256)
-          m._sv_play_from_beginning(data.handle);
-          console.log('[SunVox Worklet] play: handle', data.handle);
+          if (data.fromBeginning) {
+            m._sv_stop(data.handle);
+            m._sv_play_from_beginning(data.handle);
+          } else {
+            // Resume from current position (after stop or first play on fresh load)
+            m._sv_play(data.handle);
+          }
+          console.log('[SunVox Worklet] play: handle', data.handle, 'fromBeginning:', !!data.fromBeginning);
           this._playReceived = true;
           this._debuggedNonZero = false;
           this._debugZeroCount = 0;

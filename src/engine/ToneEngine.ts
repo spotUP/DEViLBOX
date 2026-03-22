@@ -197,7 +197,7 @@ export class ToneEngine {
   public instruments: Map<number, Tone.ToneAudioNode | DevilboxSynth>;
   // Track synth types for proper release handling
   private instrumentSynthTypes: Map<number, string> = new Map();
-  // SunVox output connected to synthBus (permanent, survives song changes)
+  // SunVox output connected to synthBus (reset on disposeAllInstruments to reconnect on next song)
   private _sunvoxOutputConnected = false;
   // Track loading promises for samplers/players (keyed by instrument key)
   private instrumentLoadingPromises: Map<number, Promise<void>> = new Map();
@@ -2279,9 +2279,16 @@ export class ToneEngine {
     // Connect it directly to synthBus ONCE — don't use per-instrument effect chains
     // which would disconnect/reconnect the shared node on every React re-render.
     if (config.synthType === 'SunVoxModular' && isDevilboxSynth(instrument)) {
-      const svOutput = (instrument as DevilboxSynth).output;
-      if (svOutput && !this._sunvoxOutputConnected) {
-        this.connectNativeSynth(svOutput, this.synthBus);
+      if (!this._sunvoxOutputConnected) {
+        // Connect the worklet's raw output directly to synthBus's native node.
+        // Using the intermediate engine.output GainNode is unreliable — Tone.js/SAC
+        // dispose cycles silently sever native-level connections between songs.
+        const nativeSynthBus = getNativeAudioNode(this.synthBus as any);
+        if (nativeSynthBus) {
+          import('./sunvox/SunVoxEngine').then(({ SunVoxEngine }) => {
+            SunVoxEngine.getInstance().connectWorkletTo(nativeSynthBus);
+          });
+        }
         this._sunvoxOutputConnected = true;
       }
     } else {
@@ -4048,6 +4055,7 @@ export class ToneEngine {
     this.releaseRestoreTimeouts.forEach((timeout) => clearTimeout(timeout));
     this.releaseRestoreTimeouts.clear();
     this.instrumentOutputOverrides.clear();
+    this._sunvoxOutputConnected = false;
     clearConnectedNativeOutputs();
 
     const allKeys = Array.from(this.instruments.keys());
