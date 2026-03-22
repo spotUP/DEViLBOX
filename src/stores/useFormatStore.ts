@@ -14,11 +14,22 @@ import type {
   EditorMode,
   FurnaceNativeData,
   HivelyNativeData,
+  HivelyNativeStep,
   KlysNativeData,
   FurnaceSubsongPlayback,
 } from '@typedefs';
 import { useEditorStore } from './useEditorStore';
 import { useUIStore } from './useUIStore';
+
+/** Undo entry for a single Hively track step edit */
+export interface HivelyTrackStepUndoEntry {
+  trackIndex: number;
+  stepIndex: number;
+  before: HivelyNativeStep;
+  after: HivelyNativeStep;
+  description: string;
+  timestamp: number;
+}
 
 interface FormatStore {
   editorMode: EditorMode;
@@ -67,6 +78,10 @@ interface FormatStore {
   songDBInfo: { authors: string[]; publishers: string[]; album: string; year: string; format: string; duration_ms: number } | null;
   sidMetadata: { format: string; version: number; title: string; author: string; copyright: string; chipModel: '6581' | '8580' | 'Unknown'; clockSpeed: 'PAL' | 'NTSC' | 'Unknown'; subsongs: number; defaultSubsong: number; currentSubsong: number; secondSID: boolean; thirdSID: boolean } | null;
 
+  // Hively track step undo/redo
+  hivelyUndoStack: HivelyTrackStepUndoEntry[];
+  hivelyRedoStack: HivelyTrackStepUndoEntry[];
+
   setEditorMode: (mode: EditorMode) => void;
   setFurnaceNative: (data: FurnaceNativeData | null) => void;
   setFurnaceOrderEntry: (channel: number, position: number, patternIndex: number) => void;
@@ -77,6 +92,16 @@ interface FormatStore {
   insertHivelyPosition: (pos: number) => void;
   /** Delete a position */
   deleteHivelyPosition: (pos: number) => void;
+  /** Update a single step in a Hively track with undo support */
+  setHivelyTrackStep: (trackIndex: number, stepIndex: number, update: Partial<HivelyNativeStep>) => void;
+  /** Undo the last Hively track step edit */
+  undoHivelyTrackStep: () => void;
+  /** Redo the last undone Hively track step edit */
+  redoHivelyTrackStep: () => void;
+  /** Check if Hively undo is available */
+  canUndoHively: () => boolean;
+  /** Check if Hively redo is available */
+  canRedoHively: () => boolean;
   setSongDBInfo: (info: FormatStore['songDBInfo']) => void;
   setSidMetadata: (info: FormatStore['sidMetadata']) => void;
   setOriginalModuleData: (data: FormatStore['originalModuleData']) => void;
@@ -101,7 +126,7 @@ const clearNative = (state: any) => {
 };
 
 export const useFormatStore = create<FormatStore>()(
-  immer((set) => ({
+  immer((set, get) => ({
     editorMode: 'classic' as EditorMode,
     furnaceNative: null,
     hivelyNative: null,
@@ -147,6 +172,8 @@ export const useFormatStore = create<FormatStore>()(
     originalModuleData: null,
     songDBInfo: null,
     sidMetadata: null,
+    hivelyUndoStack: [],
+    hivelyRedoStack: [],
 
     setEditorMode: (mode) => set((state) => { state.editorMode = mode; }),
     setFurnaceNative: (data) => set((state) => { state.furnaceNative = data; }),
@@ -158,7 +185,7 @@ export const useFormatStore = create<FormatStore>()(
       if (position < 0 || position >= sub.ordersLen) return;
       sub.orders[channel][position] = patternIndex;
     }),
-    setHivelyNative: (data) => set((state) => { state.hivelyNative = data; }),
+    setHivelyNative: (data) => set((state) => { state.hivelyNative = data; state.hivelyUndoStack = []; state.hivelyRedoStack = []; }),
     setHivelyPositionCell: (pos, ch, field, value) => set((state) => {
       if (!state.hivelyNative) return;
       const p = state.hivelyNative.positions[pos];
@@ -185,6 +212,86 @@ export const useFormatStore = create<FormatStore>()(
       if (state.hivelyNative.positions.length <= 1) return; // Keep at least 1
       state.hivelyNative.positions.splice(pos, 1);
     }),
+    setHivelyTrackStep: (trackIndex, stepIndex, update) => set((state) => {
+      if (!state.hivelyNative) return;
+      const track = state.hivelyNative.tracks[trackIndex];
+      if (!track) return;
+      const step = track.steps[stepIndex];
+      if (!step) return;
+      // Capture before state (plain copy from immer draft)
+      const before: HivelyNativeStep = {
+        note: step.note,
+        instrument: step.instrument,
+        fx: step.fx,
+        fxParam: step.fxParam,
+        fxb: step.fxb,
+        fxbParam: step.fxbParam,
+      };
+      // Apply update
+      if (update.note !== undefined) step.note = update.note;
+      if (update.instrument !== undefined) step.instrument = update.instrument;
+      if (update.fx !== undefined) step.fx = update.fx;
+      if (update.fxParam !== undefined) step.fxParam = update.fxParam;
+      if (update.fxb !== undefined) step.fxb = update.fxb;
+      if (update.fxbParam !== undefined) step.fxbParam = update.fxbParam;
+      // Capture after state
+      const after: HivelyNativeStep = {
+        note: step.note,
+        instrument: step.instrument,
+        fx: step.fx,
+        fxParam: step.fxParam,
+        fxb: step.fxb,
+        fxbParam: step.fxbParam,
+      };
+      // Push undo entry
+      state.hivelyUndoStack.push({
+        trackIndex, stepIndex, before, after,
+        description: 'Edit Hively track step',
+        timestamp: Date.now(),
+      });
+      // Cap at 100 entries
+      if (state.hivelyUndoStack.length > 100) {
+        state.hivelyUndoStack.shift();
+      }
+      // Clear redo on new edit
+      state.hivelyRedoStack = [];
+    }),
+    undoHivelyTrackStep: () => set((state) => {
+      if (!state.hivelyNative || state.hivelyUndoStack.length === 0) return;
+      const entry = state.hivelyUndoStack.pop()!;
+      const track = state.hivelyNative.tracks[entry.trackIndex];
+      if (!track) return;
+      const step = track.steps[entry.stepIndex];
+      if (!step) return;
+      // Restore before state
+      step.note = entry.before.note;
+      step.instrument = entry.before.instrument;
+      step.fx = entry.before.fx;
+      step.fxParam = entry.before.fxParam;
+      step.fxb = entry.before.fxb;
+      step.fxbParam = entry.before.fxbParam;
+      // Push to redo
+      state.hivelyRedoStack.push(entry);
+    }),
+    redoHivelyTrackStep: () => set((state) => {
+      if (!state.hivelyNative || state.hivelyRedoStack.length === 0) return;
+      const entry = state.hivelyRedoStack.pop()!;
+      const track = state.hivelyNative.tracks[entry.trackIndex];
+      if (!track) return;
+      const step = track.steps[entry.stepIndex];
+      if (!step) return;
+      // Restore after state
+      step.note = entry.after.note;
+      step.instrument = entry.after.instrument;
+      step.fx = entry.after.fx;
+      step.fxParam = entry.after.fxParam;
+      step.fxb = entry.after.fxb;
+      step.fxbParam = entry.after.fxbParam;
+      // Push back to undo
+      state.hivelyUndoStack.push(entry);
+    }),
+    canUndoHively: () => get().hivelyUndoStack.length > 0,
+    canRedoHively: () => get().hivelyRedoStack.length > 0,
     setSongDBInfo: (info) => set((state) => { state.songDBInfo = info; }),
     setSidMetadata: (info) => set((state) => { state.sidMetadata = info; }),
     setOriginalModuleData: (data) => set((state) => { state.originalModuleData = data; }),

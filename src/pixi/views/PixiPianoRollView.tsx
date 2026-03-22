@@ -23,6 +23,7 @@ import { TITLE_H } from '../workbench/workbenchLayout';
 import { getMIDIManager } from '@/midi/MIDIManager';
 import type { MIDIMessage } from '@/midi/types';
 import { detectChord } from '@/lib/music/chordDetection';
+import { PixiAcidPatternDialog } from '../dialogs/PixiAcidPatternDialog';
 
 const VELOCITY_HEIGHT = 80;
 const TOOLBAR_HEIGHT = 36;
@@ -61,6 +62,7 @@ export const PixiPianoRollView: React.FC<{ isActive?: boolean; windowId?: string
   windowId = 'pianoroll',
 }) => {
   const [followPlayback, setFollowPlayback] = useState(true);
+  const [showAcidDialog, setShowAcidDialog] = useState(false);
   const tool = usePianoRollStore(s => s.tool);
   const setTool = usePianoRollStore(s => s.setTool);
   const view = usePianoRollStore(s => s.view);
@@ -635,6 +637,15 @@ export const PixiPianoRollView: React.FC<{ isActive?: boolean; windowId?: string
           onClick={() => usePianoRollStore.getState().setMultiChannel(!view.multiChannel)}
         />
 
+        {/* Acid pattern generator */}
+        <PixiButton
+          label="Acid"
+          icon="waveform"
+          variant="ghost"
+          size="sm"
+          onClick={() => setShowAcidDialog(true)}
+        />
+
         {/* Chord name display — shown when 2+ notes are selected and a chord is detected */}
         {chordName !== '' && (
           <PixiLabel text={chordName} size="sm" weight="bold" color="accent" />
@@ -847,6 +858,13 @@ export const PixiPianoRollView: React.FC<{ isActive?: boolean; windowId?: string
           }}
         />
       </pixiContainer>
+
+      {/* Acid Pattern Generator Dialog */}
+      <PixiAcidPatternDialog
+        isOpen={showAcidDialog}
+        onClose={() => setShowAcidDialog(false)}
+        channelIndex={view.channelIndex}
+      />
     </pixiContainer>
   );
 };

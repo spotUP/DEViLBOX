@@ -56,7 +56,11 @@ import {
   Layers,
   ExternalLink,
   Piano,
+  Circle,
+  Navigation,
 } from 'lucide-react';
+import { getMIDIManager } from '@/midi/MIDIManager';
+import type { MIDIMessage } from '@/midi/types';
 import { useUIStore } from '../../stores';
 import { focusPopout } from '../ui/PopOutWindow';
 
@@ -129,6 +133,16 @@ export const PianoRoll: React.FC<PianoRollProps> = ({ channelIndex }) => {
   // Acid pattern generator state
   const [showAcidGenerator, setShowAcidGenerator] = useState(false);
 
+  // MIDI recording state
+  const [isRecording, setIsRecording] = useState(false);
+  const midiNoteStartRef = useRef<Map<number, number>>(new Map());
+  const handleToggleRecord = useCallback(() => {
+    setIsRecording(prev => !prev);
+  }, []);
+
+  // Follow playback toggle
+  const [followPlayback, setFollowPlayback] = useState(true);
+
   // Note preview state
   const previewingNote = useRef<string | null>(null);
 
@@ -138,6 +152,58 @@ export const PianoRoll: React.FC<PianoRollProps> = ({ channelIndex }) => {
       setChannelIndex(channelIndex);
     }
   }, [channelIndex, setChannelIndex]);
+
+  // MIDI recording: subscribe to MIDIManager when recording
+  useEffect(() => {
+    if (!isRecording) {
+      midiNoteStartRef.current.clear();
+      return;
+    }
+
+    const manager = getMIDIManager();
+
+    const handleMIDIMessage = (msg: MIDIMessage) => {
+      if (!msg.data || msg.data.length < 2) return;
+      const [status, note = 0, velocity = 0] = msg.data;
+      const messageType = (status >> 4) & 0x0f;
+
+      const pianoStore = usePianoRollStore.getState();
+      const insertRow = isPlaying ? currentRow : Math.floor(pianoStore.view.scrollX);
+      const chIdx = pianoStore.view.channelIndex;
+
+      if (messageType === 0x09 && velocity > 0) {
+        midiNoteStartRef.current.set(note, insertRow);
+        const ts = useTrackerStore.getState();
+        const pat = ts.patterns[ts.currentPatternIndex];
+        if (!pat) return;
+        const xmNote = note + 1;
+        const volumeValue = Math.round((velocity / 127) * 64);
+        const vol = 0x10 + volumeValue;
+        ts.setCell(chIdx, insertRow, { note: xmNote, volume: vol });
+      } else if (messageType === 0x08 || (messageType === 0x09 && velocity === 0)) {
+        const startRow = midiNoteStartRef.current.get(note);
+        if (startRow === undefined) return;
+        midiNoteStartRef.current.delete(note);
+
+        const nowRow = isPlaying ? currentRow : Math.floor(usePianoRollStore.getState().view.scrollX);
+        const duration = Math.max(1, nowRow - startRow);
+
+        const ts = useTrackerStore.getState();
+        const pat = ts.patterns[ts.currentPatternIndex];
+        if (!pat) return;
+        const endRow = startRow + duration;
+        if (endRow < pat.length) {
+          ts.setCell(chIdx, endRow, { note: 97 }); // 97 = note-off
+        }
+      }
+    };
+
+    manager.addMessageHandler(handleMIDIMessage);
+    return () => {
+      manager.removeMessageHandler(handleMIDIMessage);
+      midiNoteStartRef.current.clear();
+    };
+  }, [isRecording, isPlaying, currentRow]);
 
   // Auto-scroll to center on notes when they first appear or pattern changes
   const autoScrollDoneForPattern = useRef<number | null>(null);
@@ -175,7 +241,7 @@ export const PianoRoll: React.FC<PianoRollProps> = ({ channelIndex }) => {
 
   // Update target scroll position when playhead moves
   useEffect(() => {
-    if (isPlaying && currentRow !== null) {
+    if (isPlaying && followPlayback && currentRow !== null) {
       const patternChanged = prevPatternRef.current !== pattern;
 
       if (patternChanged) {
@@ -208,7 +274,7 @@ export const PianoRoll: React.FC<PianoRollProps> = ({ channelIndex }) => {
       prevPatternRef.current = null;
       virtualRowOffsetRef.current = 0;
     }
-  }, [isPlaying, currentRow, pattern, view.horizontalZoom, patternLength]);
+  }, [isPlaying, followPlayback, currentRow, pattern, view.horizontalZoom, patternLength]);
 
   // RAF smooth scroll animation
   useEffect(() => {
@@ -1011,6 +1077,26 @@ export const PianoRoll: React.FC<PianoRollProps> = ({ channelIndex }) => {
             <Eraser size={14} />
           </button>
         </div>
+
+        {/* MIDI Record toggle */}
+        <button
+          onClick={handleToggleRecord}
+          className={`p-1 rounded transition-colors ${isRecording ? 'text-red-500' : 'text-text-muted hover:text-text-primary'}`}
+          title="MIDI Record — record incoming MIDI notes into the pattern"
+          aria-pressed={isRecording}
+        >
+          <Circle size={14} fill={isRecording ? 'currentColor' : 'none'} />
+        </button>
+
+        {/* Follow playback toggle */}
+        <button
+          onClick={() => setFollowPlayback(prev => !prev)}
+          className={`p-1 rounded transition-colors ${followPlayback ? 'text-accent-primary' : 'text-text-muted hover:text-text-primary'}`}
+          title="Follow playback — auto-scroll to keep playhead visible"
+          aria-pressed={followPlayback}
+        >
+          <Navigation size={14} />
+        </button>
 
         <div className="w-px h-4 bg-dark-border" />
 
