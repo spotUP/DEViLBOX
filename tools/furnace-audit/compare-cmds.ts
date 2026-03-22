@@ -170,7 +170,21 @@ function filterComparable(entries: CmdEntry[]): CmdEntry[] {
     e.cmd !== 'BIFURCATOR_PARAMETER' && e.cmd !== 'BIFURCATOR_STATE_LOAD' &&
     e.cmd !== 'SU_SWEEP_ENABLE' && e.cmd !== 'SU_SWEEP_PERIOD_LOW' &&
     e.cmd !== 'SU_SWEEP_PERIOD_HIGH' && e.cmd !== 'SU_SWEEP_BOUND' &&
-    e.cmd !== 'SU_SYNC_PERIOD_LOW' && e.cmd !== 'SU_SYNC_PERIOD_HIGH'
+    e.cmd !== 'SU_SYNC_PERIOD_LOW' && e.cmd !== 'SU_SYNC_PERIOD_HIGH' &&
+    e.cmd !== 'FM_HARD_RESET' &&
+    // C64/SID extended macros:
+    e.cmd !== 'C64_EXTENDED' && e.cmd !== 'C64_RESET_TIME' &&
+    e.cmd !== 'C64_RESET_MASK' && e.cmd !== 'C64_FILTER_RESET' &&
+    e.cmd !== 'C64_DUTY_RESET' && e.cmd !== 'C64_PW_SLIDE' &&
+    // SID3 macros:
+    e.cmd !== 'SID3_RING_MOD_SRC' && e.cmd !== 'SID3_HARD_SYNC_SRC' &&
+    e.cmd !== 'SID3_PHASE_MOD_SRC' && e.cmd !== 'SID3_LFSR_FEEDBACK_BITS' &&
+    e.cmd !== 'SID3_FILTER_DISTORTION' && e.cmd !== 'SID3_FILTER_OUTPUT_VOLUME' &&
+    e.cmd !== 'SID3_FILTER_CONNECTION' && e.cmd !== 'SID3_FILTER_MATRIX' &&
+    e.cmd !== 'SID3_FILTER_ENABLE' && e.cmd !== 'SID3_CUTOFF_SCALING' &&
+    e.cmd !== 'SID3_RESONANCE_SCALING' && e.cmd !== 'SID3_1_BIT_NOISE' &&
+    e.cmd !== 'SID3_PHASE_RESET' && e.cmd !== 'SID3_NOISE_PHASE_RESET' &&
+    e.cmd !== 'SID3_ENVELOPE_RESET'
   );
 }
 
