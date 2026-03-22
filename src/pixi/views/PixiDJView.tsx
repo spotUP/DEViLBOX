@@ -144,12 +144,12 @@ const PixiDJTopBar: React.FC<DJTopBarProps> = ({ browserPanel, onBrowserPanelCha
       {/* FX Quick Presets */}
       <PixiDJFxPresets width={130} height={24} layout={{ height: 28, width: 130 }} />
 
-      {/* Deck view mode */}
+      {/* Deck view mode (cycle: Visualizer → Vinyl → 3D) */}
       <PixiButton
-        label={`Deck: ${deckViewMode === 'vinyl' ? 'Vinyl' : 'Visualizer'}`}
+        label={`Deck: ${deckViewMode === 'vinyl' ? 'Vinyl' : deckViewMode === '3d' ? '3D' : 'Visualizer'}`}
         variant="ghost"
         size="sm"
-        onClick={() => useDJStore.getState().setDeckViewMode(deckViewMode === 'vinyl' ? 'visualizer' : 'vinyl')}
+        onClick={() => useDJStore.getState().cycleDeckViewMode()}
       />
 
       {/* Deck C toggle */}
