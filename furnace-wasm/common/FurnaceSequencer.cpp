@@ -2379,8 +2379,6 @@ static bool seqNextTick() {
           int loopModality = getLoopModality();
           if (loopModality != 2) {
             // Reset channels on loop (matches Furnace playSub(true) → reset())
-            // Note: reference does NOT dispatch NOTE_OFF here — it calls dispatch->reset()
-            // internally. We only reset the sequencer channel state.
             for (int c = 0; c < g_seq.numChannels; c++) {
               g_seq.chan[c].reset();
               int vm = dispatchCmd(DIV_CMD_GET_VOLMAX, c);
@@ -2394,7 +2392,7 @@ static bool seqNextTick() {
                 g_seq.chan[c].vibratoFine = 4;
               }
             }
-            // Reset sequencer state (matches playSub(true) → reset() path)
+            // Reset sequencer state
             g_seq.curOrder = 0;
             g_seq.curRow = 0;
             g_seq.prevOrder = 0;
@@ -2403,7 +2401,6 @@ static bool seqNextTick() {
             g_seq.ticks = 1;
             g_seq.tempoAccum = 0;
             g_arpLen = 1;
-            // Re-initialize nextSpeed from speed table (matches playSub reset)
             g_seq.nextSpeed = g_seq.speeds.val[0];
             g_seq.prevSpeed = g_seq.nextSpeed;
             // Clear walked array so loop detection starts fresh
@@ -2849,7 +2846,7 @@ void furnace_seq_play(int order, int row) {
   g_seq.ticks = 1;  // Force nextRow on first tick
   g_seq.tempoAccum = 0;
   g_seq.changeOrd = -1;
-  g_seq.changePos = -1;
+  g_seq.changePos = 0;
   g_seq.nextSpeed = g_seq.speeds.val[0];  // Initialize for first-row delay comparison
 
   endOfSong = false;
@@ -2903,7 +2900,7 @@ void furnace_seq_seek(int order, int row) {
   g_seq.prevOrder = g_seq.curOrder;
   g_seq.prevRow = g_seq.curRow;
   g_seq.changeOrd = -1;
-  g_seq.changePos = -1;
+  g_seq.changePos = 0;
   g_seq.ticks = 1;  // Force nextRow on next tick
   g_seq.tempoAccum = 0;
   memset(g_seq.walked, 0, sizeof(g_seq.walked));
