@@ -14,7 +14,7 @@
 
 import { useRef, useEffect, useCallback, useMemo } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
-import { useGLTF, OrbitControls, View, PerspectiveCamera } from '@react-three/drei';
+import { useGLTF, OrbitControls, View, PerspectiveCamera, Environment } from '@react-three/drei';
 import * as THREE from 'three';
 import { useDJStore } from '@/stores/useDJStore';
 import { getDJEngine } from '@/engine/dj/DJEngine';
@@ -694,10 +694,12 @@ export function MixerVestax3DView() {
           near={0.01}
           far={10}
         />
-        <ambientLight intensity={0.4} />
-        <directionalLight position={[2, 4, 2]} intensity={0.8} castShadow={false} />
-        <directionalLight position={[-1, 2, -1]} intensity={0.3} />
+        <ambientLight intensity={0.6} />
+        <directionalLight position={[2, 4, 2]} intensity={1.2} castShadow={false} />
+        <directionalLight position={[-1, 2, -1]} intensity={0.5} />
+        <directionalLight position={[0, -1, 2]} intensity={0.3} />
         <pointLight position={[0, 0.05, 0]} color="#60a5fa" intensity={0.4} distance={0.5} />
+        <Environment preset="studio" />
 
         <MixerScene viewRef={viewDivRef} />
 

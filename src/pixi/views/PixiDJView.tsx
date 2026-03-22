@@ -154,8 +154,8 @@ const DJ3DOverlay: React.FC<DJ3DOverlayProps> = ({ thirdDeckActive, overlayRef }
     }>
       <div className={`w-full h-full grid gap-2 p-2 ${
         thirdDeckActive
-          ? 'grid-cols-[1fr_280px_1fr_1fr]'
-          : 'grid-cols-[1fr_280px_1fr]'
+          ? 'grid-cols-[1fr_400px_1fr_1fr]'
+          : 'grid-cols-[1fr_400px_1fr]'
       }`}>
         <div className="min-h-0 min-w-0 overflow-hidden">
           <DeckVinyl3DView deckId="A" />
