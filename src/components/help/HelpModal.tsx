@@ -8,6 +8,7 @@ import { X, Keyboard, Zap, BookOpen, Cpu } from 'lucide-react';
 import { CHIP_EFFECT_REFERENCE } from '../../data/ChipEffectReference';
 import { useTrackerStore, useCursorStore, useInstrumentStore } from '../../stores';
 import { FurnaceChipType } from '../../engine/chips/FurnaceChipEngine';
+import { useKeyboardStore } from '../../stores/useKeyboardStore';
 
 type HelpTab = 'shortcuts' | 'effects' | 'chip-effects' | 'tutorial';
 
@@ -33,83 +34,65 @@ interface EffectCommand {
   example?: string;
 }
 
-const KEYBOARD_SHORTCUTS: ShortcutGroup[] = [
-  {
-    title: 'Navigation',
-    shortcuts: [
-      { keys: '↑ ↓ ← →', description: 'Move cursor in pattern' },
-      { keys: 'Tab', description: 'Next channel' },
-      { keys: 'Shift+Tab', description: 'Previous channel' },
-      { keys: 'Home', description: 'Jump to row 0' },
-      { keys: 'End', description: 'Jump to last row' },
-      { keys: 'Page Up/Down', description: 'Jump 16 rows up/down' },
-      { keys: 'Ctrl+↑/↓', description: 'Fast cursor (16 rows)' },
-      { keys: 'F9', description: 'Jump to row 0 (0%)' },
-      { keys: 'F10', description: 'Jump to 25% of pattern' },
-      { keys: 'F11', description: 'Jump to 50% of pattern' },
-      { keys: 'F12', description: 'Jump to 75% of pattern' },
-    ],
-  },
-  {
+/** Build shortcut groups dynamically from the active keyboard scheme JSON */
+function buildShortcutGroups(schemeData: Record<string, string> | null): ShortcutGroup[] {
+  if (!schemeData || Object.keys(schemeData).length === 0) {
+    // Fallback: minimal hardcoded set
+    return [{
+      title: 'Note Entry',
+      shortcuts: [
+        { keys: 'Z,S,X,D,C...', description: 'Piano keys lower row (C-B)' },
+        { keys: 'Q,2,W,3,E...', description: 'Piano keys upper row (+1 octave)' },
+        { keys: '0-9, A-F', description: 'Hex digits (instrument, volume, effect)' },
+      ],
+    }];
+  }
+
+  // Categorize by command name prefix
+  const cats: Record<string, { keys: string; description: string }[]> = {};
+  const addTo = (cat: string, keys: string, cmd: string) => {
+    if (!cats[cat]) cats[cat] = [];
+    cats[cat].push({ keys, description: cmd.replace(/_/g, ' ') });
+  };
+
+  for (const [key, cmd] of Object.entries(schemeData)) {
+    if (typeof cmd !== 'string') continue;
+    if (/^(play_|stop|pause|continue_)/.test(cmd)) addTo('Transport', key, cmd);
+    else if (/^(cursor_|jump_to_|goto_|seek_|scroll_|snap_|screen_|song_start|song_end|stay_in)/.test(cmd)) addTo('Navigation', key, cmd);
+    else if (/^(insert_|delete_|clear_|roll_|advance_|backspace)/.test(cmd)) addTo('Editing', key, cmd);
+    else if (/^(select_|mark_block|block_|unmark|copy_|cut_|paste_|quick_)/.test(cmd)) addTo('Selection & Clipboard', key, cmd);
+    else if (/^transpose_/.test(cmd)) addTo('Transpose', key, cmd);
+    else if (/^(set_octave|next_octave|prev_octave)/.test(cmd)) addTo('Octave', key, cmd);
+    else if (/^(set_instrument|next_instrument|prev_instrument|set_sample|instrument_|swap_instrument)/.test(cmd)) addTo('Instruments', key, cmd);
+    else if (/^(mute_|solo_|unmute_|set_track|set_multi|reset_channel|channel_)/.test(cmd)) addTo('Channels', key, cmd);
+    else if (/^(next_pattern|prev_pattern|next_block|prev_block|clone_|next_order|prev_order|next_sequence|prev_sequence|set_position|save_position|goto_position|sequence_|set_playback)/.test(cmd)) addTo('Patterns & Position', key, cmd);
+    else if (/^(increase_|decrease_|set_step|set_edit|set_quantize|double_block|halve_block)/.test(cmd)) addTo('Step & Volume', key, cmd);
+    else if (/^(toggle_|show_|open_|view_|close_|help$|configure|order_list|layout_|display_|cycle_|switch_to)/.test(cmd)) addTo('View & Settings', key, cmd);
+    else if (/^(undo|redo|save_|export_|load_|new_|fast_save)/.test(cmd)) addTo('File & History', key, cmd);
+    else if (/^(tracker_|power_cut|dj_)/.test(cmd)) addTo('DJ & Scratch', key, cmd);
+    else addTo('Other', key, cmd);
+  }
+
+  // Always prepend note entry (not in schemes — handled by keyboard piano input)
+  const groups: ShortcutGroup[] = [{
     title: 'Note Entry',
     shortcuts: [
       { keys: 'Z,S,X,D,C...', description: 'Piano keys lower row (C-B)' },
       { keys: 'Q,2,W,3,E...', description: 'Piano keys upper row (+1 octave)' },
-      { keys: 'F1-F7', description: 'Select octave 1-7' },
       { keys: '0-9, A-F', description: 'Hex digits (instrument, volume, effect)' },
-      { keys: 'CapsLock', description: 'Note off (===)' },
-      { keys: 'Space', description: 'Stop + Toggle Edit mode' },
-      { keys: 'Enter', description: 'Toggle Edit/Record mode' },
     ],
-  },
-  {
-    title: 'Editing',
-    shortcuts: [
-      { keys: 'Delete', description: 'Clear note' },
-      { keys: 'Shift+Del', description: 'Clear note + instrument' },
-      { keys: 'Ctrl+Del', description: 'Clear all columns' },
-      { keys: 'Backspace', description: 'Clear and move up' },
-      { keys: 'Insert', description: 'Insert row (shift down)' },
-      { keys: 'Shift+↑/↓', description: 'Change instrument number' },
-    ],
-  },
-  {
-    title: 'Block Operations (FT2 Style)',
-    shortcuts: [
-      { keys: 'Alt+Arrow', description: 'Mark block selection' },
-      { keys: 'Shift+F3/F4/F5', description: 'Cut / Copy / Paste track (channel)' },
-      { keys: 'Ctrl+F3/F4/F5', description: 'Cut / Copy / Paste pattern (all channels)' },
-      { keys: 'Alt+F3/F4/F5', description: 'Cut / Copy / Paste block (selection)' },
-      { keys: 'Shift+F7/F8', description: 'Transpose selection up / down 1 semitone' },
-      { keys: 'Shift+Ctrl+F7/F8', description: 'Transpose selection up / down 1 octave' },
-      { keys: 'Ctrl+↑/↓', description: 'Transpose selection ±1 semitone' },
-      { keys: 'Ctrl+Shift+↑/↓', description: 'Transpose selection ±1 octave' },
-    ],
-  },
-  {
-    title: 'Track Jump (FT2 Style)',
-    shortcuts: [
-      { keys: 'Alt+Q,W,E,R,T,Y,U,I', description: 'Jump to tracks 1-8' },
-      { keys: 'Alt+A,S,D,F,G,H,J,K', description: 'Jump to tracks 9-16' },
-    ],
-  },
-  {
-    title: 'General',
-    shortcuts: [
-      { keys: '?', description: 'Show this help' },
-      { keys: 'Ctrl+Z', description: 'Undo' },
-      { keys: 'Ctrl+Shift+Z', description: 'Redo' },
-      { keys: 'Ctrl+S', description: 'Save project' },
-      { keys: 'Ctrl+Shift+E', description: 'Export dialog' },
-      { keys: 'Ctrl+Shift+V', description: 'Mix paste (merge with existing)' },
-      { keys: 'Ctrl+Shift+F', description: 'Flood paste (repeat to fill)' },
-      { keys: 'Shift+1-9', description: 'Store macro slot' },
-      { keys: '1-9', description: 'Recall macro slot' },
-      { keys: 'Ctrl+Shift+P', description: 'Toggle patterns panel' },
-      { keys: 'Escape', description: 'Close dialogs / Stop playback' },
-    ],
-  },
-];
+  }];
+
+  const catOrder = ['Transport', 'Navigation', 'Editing', 'Selection & Clipboard', 'Transpose',
+    'Octave', 'Instruments', 'Channels', 'Patterns & Position', 'Step & Volume',
+    'View & Settings', 'File & History', 'DJ & Scratch', 'Other'];
+  for (const cat of catOrder) {
+    if (cats[cat]?.length) {
+      groups.push({ title: cat, shortcuts: cats[cat] });
+    }
+  }
+  return groups;
+}
 
 const EFFECT_COMMANDS: EffectCommand[] = [
   // Main Effects 0-9
@@ -449,6 +432,23 @@ const TUTORIAL_STEPS = [
 
 export const HelpModal: React.FC<HelpModalProps> = ({ isOpen, onClose, initialTab = 'shortcuts' }) => {
   const [activeTab, setActiveTab] = useState<HelpTab>(initialTab);
+  const [schemeData, setSchemeData] = useState<Record<string, string> | null>(null);
+  const activeScheme = useKeyboardStore((s) => s.activeScheme);
+
+  // Load the active keyboard scheme JSON for the shortcuts tab
+  useEffect(() => {
+    if (!isOpen) return;
+    const isMac = navigator.platform?.includes('Mac') || navigator.userAgent?.includes('Mac');
+    fetch(`/keyboard-schemes/${activeScheme}.json`)
+      .then(r => r.json())
+      .then(data => {
+        const plat = data.platform || data;
+        setSchemeData(plat[isMac ? 'mac' : 'pc'] || plat.pc || {});
+      })
+      .catch(() => setSchemeData(null));
+  }, [isOpen, activeScheme]);
+
+  const shortcutGroups = useMemo(() => buildShortcutGroups(schemeData), [schemeData]);
 
   // Sync tab when initialTab changes or modal re-opens
   useEffect(() => {
@@ -616,7 +616,10 @@ export const HelpModal: React.FC<HelpModalProps> = ({ isOpen, onClose, initialTa
           {/* Keyboard Shortcuts Tab */}
           {activeTab === 'shortcuts' && (
             <div className="space-y-6">
-              {KEYBOARD_SHORTCUTS.map((group, idx) => (
+              <div className="text-xs font-mono text-ft2-textDim mb-2">
+                Active scheme: <span className="text-ft2-highlight">{activeScheme}</span>
+              </div>
+              {shortcutGroups.map((group, idx) => (
                 <div key={idx} className="bg-ft2-panel border border-ft2-border p-4">
                   <h3 className="text-sm font-mono font-bold text-ft2-highlight mb-3">
                     {group.title.toUpperCase()}
