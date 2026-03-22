@@ -83,9 +83,11 @@ export const ModularCanvasView: React.FC<ModularCanvasViewProps> = ({ config, on
     recalculateAll();
   }, [cameraState]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Helper to convert screen-space container coords to world coords for cables
-  const screenToWorld = useCallback((x: number, y: number) => {
-    return cameraRef.current.screenToWorld(x + (containerRef.current?.getBoundingClientRect().left || 0), y + (containerRef.current?.getBoundingClientRect().top || 0));
+  // Convert container-relative coords to world coords for cables.
+  // Port positions from usePortPositions are already relative to containerRef,
+  // so we just need to invert the camera transform (pan + zoom).
+  const containerToWorld = useCallback((x: number, y: number) => {
+    return cameraRef.current.screenToWorld(x, y);
   }, []);
 
   // Pan with middle mouse button or space+drag
@@ -386,8 +388,8 @@ export const ModularCanvasView: React.FC<ModularCanvasViewProps> = ({ config, on
 
             if (!sourcePosRaw || !targetPosRaw) return null;
 
-            const sourcePos = screenToWorld(sourcePosRaw.x, sourcePosRaw.y);
-            const targetPos = screenToWorld(targetPosRaw.x, targetPosRaw.y);
+            const sourcePos = containerToWorld(sourcePosRaw.x, sourcePosRaw.y);
+            const targetPos = containerToWorld(targetPosRaw.x, targetPosRaw.y);
 
             return (
               <PatchCable
@@ -414,8 +416,8 @@ export const ModularCanvasView: React.FC<ModularCanvasViewProps> = ({ config, on
           {wiringSource && wiringPreview && positions.get(getPortId(wiringSource)) && (
             (() => {
               const sourcePosRaw = positions.get(getPortId(wiringSource))!;
-              const sourcePos = screenToWorld(sourcePosRaw.x, sourcePosRaw.y);
-              const targetPos = screenToWorld(wiringPreview.x, wiringPreview.y);
+              const sourcePos = containerToWorld(sourcePosRaw.x, sourcePosRaw.y);
+              const targetPos = containerToWorld(wiringPreview.x, wiringPreview.y);
               
               return (
                 <PatchCable
