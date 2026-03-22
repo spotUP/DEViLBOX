@@ -105,6 +105,8 @@ export const PixiFurnacePatternEditor: React.FC<FurnacePatternEditorProps> = ({
   const [scrollTop,  setScrollTop]  = useState(0);
   const [scrollLeft, setScrollLeft] = useState(0);
   const [focused,    setFocused]    = useState(false);
+  // Per-channel collapse: 0=full, 1=hide effects, 2=hide vol+effects, 3=note only
+  const [chanCollapse, setChanCollapse] = useState<number[]>([]);
 
   const containerRef  = useRef<ContainerType>(null);
   const scrollTopRef  = useRef(0);
@@ -112,13 +114,17 @@ export const PixiFurnacePatternEditor: React.FC<FurnacePatternEditorProps> = ({
   const focusedRef    = useRef(false);
   focusedRef.current  = focused;
 
-  // Per-channel pixel widths
+  // Per-channel pixel widths (respects collapse state)
   const channelWidths = useMemo(() => {
     if (!sub) return [] as number[];
-    return sub.channels.map(ch =>
-      NOTE_WIDTH + INS_WIDTH + VOL_WIDTH + ch.effectCols * EFF_WIDTH + CHANNEL_GAP
-    );
-  }, [sub]);
+    return sub.channels.map((ch, i) => {
+      const collapse = chanCollapse[i] ?? 0;
+      if (collapse >= 3) return NOTE_WIDTH + CHANNEL_GAP;  // note only
+      if (collapse >= 2) return NOTE_WIDTH + INS_WIDTH + CHANNEL_GAP;  // hide vol + fx
+      if (collapse >= 1) return NOTE_WIDTH + INS_WIDTH + VOL_WIDTH + CHANNEL_GAP;  // hide fx
+      return NOTE_WIDTH + INS_WIDTH + VOL_WIDTH + ch.effectCols * EFF_WIDTH + CHANNEL_GAP;  // full
+    });
+  }, [sub, chanCollapse]);
 
   // Cumulative channel start x (absolute, before scroll offset)
   const chanXStarts = useMemo(() => {
@@ -273,7 +279,24 @@ export const PixiFurnacePatternEditor: React.FC<FurnacePatternEditorProps> = ({
     const c = containerRef.current;
     if (!c || !sub) return;
     const local = c.toLocal(e.global);
-    if (local.y < HEADER_HEIGHT) return;
+    // Header click: toggle channel collapse (right-click or ctrl-click)
+    if (local.y < HEADER_HEIGHT) {
+      const lx = local.x + scrollLeftRef.current;
+      if (lx >= ROW_NUM_WIDTH && (e.ctrlKey || e.metaKey || e.button === 2)) {
+        for (let ch = 0; ch < numChannels; ch++) {
+          if (lx < (chanXStarts[ch] ?? 0) + channelWidths[ch]) {
+            setChanCollapse(prev => {
+              const next = [...prev];
+              while (next.length <= ch) next.push(0);
+              next[ch] = (next[ch] + 1) % 4;
+              return next;
+            });
+            break;
+          }
+        }
+      }
+      return;
+    }
     const row = Math.floor((local.y - HEADER_HEIGHT + scrollTopRef.current) / ROW_HEIGHT);
     if (row >= 0 && row < patLen) setCursorRow(row);
     const lx = local.x + scrollLeftRef.current;
@@ -351,11 +374,12 @@ export const PixiFurnacePatternEditor: React.FC<FurnacePatternEditorProps> = ({
         const chX = chanXStarts[ch] - scrollLeft;
         if (chX >= width || chX + channelWidths[ch] <= 0) continue;
         const chanName = sub.channels[ch]?.name?.substring(0, 6) || `CH${ch}`;
-        const effCols  = sub.channels[ch]?.effectCols ?? 1;
+        const collapse = chanCollapse[ch] ?? 0;
+        const collapseTag = collapse > 0 ? ` [${['', '-fx', '-vf', 'N'][collapse]}]` : '';
         labels.push({
           x: chX + 4, y: TEXT_Y,
-          text: `${chanName} ${effCols}fx`.substring(0, 12),
-          color: theme.textSecondary.color,
+          text: `${chanName}${collapseTag}`.substring(0, 14),
+          color: collapse > 0 ? theme.textMuted.color : theme.textSecondary.color,
         });
       }
     }
@@ -382,33 +406,47 @@ export const PixiFurnacePatternEditor: React.FC<FurnacePatternEditorProps> = ({
             ? (sub.channels[ch]?.patterns.get(patIdx)?.rows[row] ?? null)
             : null;
 
+          const collapse = chanCollapse[ch] ?? 0;
+
+          // Note column (always visible)
           labels.push({
             x: chX + 2, y,
             text: fRow ? formatFurnaceNote(fRow.note) : '---',
             color: fRow && fRow.note !== -1 ? theme.cellNote.color : theme.cellEmpty.color,
           });
-          labels.push({
-            x: chX + NOTE_WIDTH + 2, y,
-            text: fRow ? formatHex(fRow.ins, 2) : '--',
-            color: fRow && fRow.ins !== -1 ? theme.cellInstrument.color : theme.cellEmpty.color,
-          });
-          labels.push({
-            x: chX + NOTE_WIDTH + INS_WIDTH + 2, y,
-            text: fRow ? formatHex(fRow.vol, 2) : '--',
-            color: fRow && fRow.vol !== -1 ? theme.cellVolume.color : theme.cellEmpty.color,
-          });
 
-          const effCols = sub.channels[ch]?.effectCols ?? 1;
-          for (let fxIdx = 0; fxIdx < effCols; fxIdx++) {
-            const fxData = fRow?.effects[fxIdx];
-            const hasData = !!fxData && (fxData.cmd > 0 || fxData.val > 0);
-            const fxX = chX + NOTE_WIDTH + INS_WIDTH + VOL_WIDTH + fxIdx * EFF_WIDTH + 2;
-            if (fxX >= width || fxX + EFF_WIDTH <= 0) continue;
+          // Instrument column (hidden at collapse >= 3)
+          if (collapse < 3) {
             labels.push({
-              x: fxX, y,
-              text: hasData ? `${formatHex(fxData.cmd, 2)}${formatHex(fxData.val, 2)}` : '----',
-              color: hasData ? effectColor(fxData.cmd, theme) : theme.cellEmpty.color,
+              x: chX + NOTE_WIDTH + 2, y,
+              text: fRow ? formatHex(fRow.ins, 2) : '--',
+              color: fRow && fRow.ins !== -1 ? theme.cellInstrument.color : theme.cellEmpty.color,
             });
+          }
+
+          // Volume column (hidden at collapse >= 2)
+          if (collapse < 2) {
+            labels.push({
+              x: chX + NOTE_WIDTH + INS_WIDTH + 2, y,
+              text: fRow ? formatHex(fRow.vol, 2) : '--',
+              color: fRow && fRow.vol !== -1 ? theme.cellVolume.color : theme.cellEmpty.color,
+            });
+          }
+
+          // Effect columns (hidden at collapse >= 1)
+          if (collapse < 1) {
+            const effCols = sub.channels[ch]?.effectCols ?? 1;
+            for (let fxIdx = 0; fxIdx < effCols; fxIdx++) {
+              const fxData = fRow?.effects[fxIdx];
+              const hasData = !!fxData && (fxData.cmd > 0 || fxData.val > 0);
+              const fxX = chX + NOTE_WIDTH + INS_WIDTH + VOL_WIDTH + fxIdx * EFF_WIDTH + 2;
+              if (fxX >= width || fxX + EFF_WIDTH <= 0) continue;
+              labels.push({
+                x: fxX, y,
+                text: hasData ? `${formatHex(fxData.cmd, 2)}${formatHex(fxData.val, 2)}` : '----',
+                color: hasData ? effectColor(fxData.cmd, theme) : theme.cellEmpty.color,
+              });
+            }
           }
         }
       }
@@ -416,7 +454,7 @@ export const PixiFurnacePatternEditor: React.FC<FurnacePatternEditorProps> = ({
 
     return labels;
   }, [sub, numChannels, startRow, endRow, scrollTop, scrollLeft, height, width, theme,
-      currentPosition, chanXStarts, channelWidths]);
+      currentPosition, chanXStarts, channelWidths, chanCollapse]);
 
   return (
     <pixiContainer
