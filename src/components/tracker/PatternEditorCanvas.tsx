@@ -27,6 +27,7 @@ import { getTrackerScratchController } from '@engine/TrackerScratchController';
 import * as Tone from 'tone';
 import { useBDAnimations } from '@hooks/tracker/useBDAnimations';
 import { useSettingsStore } from '@stores/useSettingsStore';
+import { useFormatStore } from '@stores/useFormatStore';
 import type { CursorPosition } from '@typedefs';
 import { useCollaborationStore, getCollabClient } from '@stores/useCollaborationStore';
 // OffscreenCanvas + WebGL2 worker bridge
@@ -710,6 +711,44 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
 
     if (e.key === '[' || e.key === '-') { e.preventDefault(); setFormatOctave(o => Math.max(0, o - 1)); return; }
     if (e.key === ']' || e.key === '=') { e.preventDefault(); setFormatOctave(o => Math.min(7, o + 1)); return; }
+
+    const isCtrlCmd = e.ctrlKey || e.metaKey;
+
+    // Undo / Redo (Ctrl+Z / Ctrl+Shift+Z)
+    if (isCtrlCmd && e.key.toLowerCase() === 'z' && !e.altKey) {
+      e.preventDefault();
+      const store = useFormatStore.getState();
+      if (e.shiftKey) {
+        if (store.canRedoHively()) {
+          store.redoHivelyTrackStep();
+          useUIStore.getState().setStatusMessage('REDO');
+        } else {
+          useUIStore.getState().setStatusMessage('NOTHING TO REDO');
+        }
+      } else {
+        if (store.canUndoHively()) {
+          store.undoHivelyTrackStep();
+          useUIStore.getState().setStatusMessage('UNDO');
+        } else {
+          useUIStore.getState().setStatusMessage('NOTHING TO UNDO');
+        }
+      }
+      return;
+    }
+
+    // Transpose: Ctrl+ArrowUp/Down = +/-1 semitone, Ctrl+Shift = +/-12
+    if (isCtrlCmd && (e.key === 'ArrowUp' || e.key === 'ArrowDown') && !e.altKey) {
+      e.preventDefault();
+      if (col && col.type === 'note') {
+        const curVal = formatChannels[formatCursor.channelIndex]?.rows[formatCursor.rowIndex]?.[col.key] ?? 0;
+        if (curVal > 0) { // Don't transpose empty/zero notes
+          const delta = e.key === 'ArrowUp' ? (e.shiftKey ? 12 : 1) : (e.shiftKey ? -12 : -1);
+          const newVal = Math.max(1, Math.min(95, curVal + delta));
+          onFormatCellChange?.(formatCursor.channelIndex, formatCursor.rowIndex, col.key, newVal);
+        }
+      }
+      return;
+    }
 
     // Arrow up/down: RAF-based hold-to-scroll (no initial delay, 50ms interval)
     if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
