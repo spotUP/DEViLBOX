@@ -6,7 +6,7 @@
  */
 
 import React, { Suspense, useRef, useCallback } from 'react';
-import { Canvas } from '@react-three/fiber';
+import { Canvas, useThree, useFrame } from '@react-three/fiber';
 import { OrbitControls, PerspectiveCamera } from '@react-three/drei';
 import * as THREE from 'three';
 import { useDJStore } from '@/stores/useDJStore';
@@ -127,6 +127,19 @@ const CameraButtons: React.FC<CameraButtonsProps> = ({ orbitRef }) => {
   );
 };
 
+// ── On-demand rendering: only re-render when decks are playing or camera moves ─
+
+function DemandInvalidator() {
+  const { invalidate } = useThree();
+  useFrame(() => {
+    const decks = useDJStore.getState().decks;
+    if (decks.A.isPlaying || decks.B.isPlaying || decks.C.isPlaying) {
+      invalidate();
+    }
+  });
+  return null;
+}
+
 // ── Unified 3D Scene ─────────────────────────────────────────────────────────
 
 const UnifiedDJScene: React.FC<{
@@ -211,8 +224,10 @@ export const DJ3DOverlay: React.FC = () => {
           style={{ position: 'absolute', inset: 0 }}
           gl={{ antialias: true, alpha: false, powerPreference: 'low-power' }}
           dpr={[1, 1.5]}
+          frameloop="demand"
         >
           <color attach="background" args={['#0a0a0a']} />
+          <DemandInvalidator />
           <UnifiedDJScene
             orbitRef={orbitRef}
             canvasContainerRef={canvasContainerRef}
