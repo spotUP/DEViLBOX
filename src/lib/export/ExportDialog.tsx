@@ -271,7 +271,7 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({ isOpen, onClose }) =
           } else if (format === 'HVL' as string || format === 'AHX' as string || layoutFormatId === 'hivelyHVL' || layoutFormatId === 'hivelyAHX') {
             const { exportAsHively } = await import('./HivelyExporter');
             const hvlFormat = (format === 'AHX' || layoutFormatId === 'hivelyAHX') ? 'ahx' : 'hvl';
-            result = exportAsHively(song, { format: hvlFormat });
+            result = exportAsHively(song, { format: hvlFormat, nativeOverride: useFormatStore.getState().hivelyNative });
           } else if (format === 'DIGI' as string || layoutFormatId === 'digiBooster') {
             const { exportDigiBooster } = await import('./DigiBoosterExporter');
             const buf = exportDigiBooster(song);

@@ -168,6 +168,16 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
   });
   const [formatOctave, setFormatOctave] = useState(3);
 
+  // Format mode selection: normalized range (startRow <= endRow, startCol <= endCol)
+  const [formatSelection, setFormatSelection] = useState<{
+    startRow: number; endRow: number;
+    startCol: number; endCol: number;
+    anchorRow: number; anchorCol: number;  // original anchor before normalization
+  } | null>(null);
+
+  // Format mode clipboard: array of rows, each row is column-key → value
+  const formatClipboardRef = useRef<Record<string, number>[]>([]);
+
   // RAF-based held-arrow scrolling for format mode (matches useNavigationInput behavior)
   const formatHeldArrowRef = useRef<{ dir: number } | null>(null);
   const formatArrowRafRef = useRef(0);
@@ -693,26 +703,157 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
     }
   }, [getCellFromCoords, cellContextMenu]);
 
+  // ── Format mode: copy rows from selection (or current row) to clipboard ──
+  const formatCopySelection = useCallback(() => {
+    if (!formatColumns || !formatChannels) return;
+    const ch = formatChannels[formatCursor.channelIndex];
+    if (!ch) return;
+    const sel = formatSelection;
+    const startRow = sel ? sel.startRow : formatCursor.rowIndex;
+    const endRow = sel ? sel.endRow : formatCursor.rowIndex;
+    const startCol = sel ? sel.startCol : 0;
+    const endCol = sel ? sel.endCol : formatColumns.length - 1;
+    const clipboard: Record<string, number>[] = [];
+    for (let r = startRow; r <= endRow; r++) {
+      const row = ch.rows[r];
+      if (!row) { clipboard.push({}); continue; }
+      const entry: Record<string, number> = {};
+      for (let c = startCol; c <= endCol; c++) {
+        const colDef = formatColumns[c];
+        if (colDef) entry[colDef.key] = row[colDef.key] ?? (colDef.emptyValue ?? 0);
+      }
+      clipboard.push(entry);
+    }
+    formatClipboardRef.current = clipboard;
+    const rowCount = endRow - startRow + 1;
+    useUIStore.getState().setStatusMessage(`COPIED ${rowCount} ROW${rowCount > 1 ? 'S' : ''}`);
+  }, [formatColumns, formatChannels, formatCursor, formatSelection]);
+
+  // ── Format mode: clear cells in selection (or current row) ──
+  const formatClearSelection = useCallback(() => {
+    if (!formatColumns || !formatChannels || !onFormatCellChange) return;
+    const sel = formatSelection;
+    const startRow = sel ? sel.startRow : formatCursor.rowIndex;
+    const endRow = sel ? sel.endRow : formatCursor.rowIndex;
+    const startCol = sel ? sel.startCol : 0;
+    const endCol = sel ? sel.endCol : formatColumns.length - 1;
+    const chIdx = formatCursor.channelIndex;
+    for (let r = startRow; r <= endRow; r++) {
+      for (let c = startCol; c <= endCol; c++) {
+        const colDef = formatColumns[c];
+        if (colDef) onFormatCellChange(chIdx, r, colDef.key, colDef.emptyValue ?? 0);
+      }
+    }
+  }, [formatColumns, formatChannels, formatCursor, formatSelection, onFormatCellChange]);
+
+  // ── Format mode: paste clipboard at cursor position ──
+  const formatPasteClipboard = useCallback(() => {
+    if (!formatColumns || !formatChannels || !onFormatCellChange) return;
+    const clipboard = formatClipboardRef.current;
+    if (clipboard.length === 0) {
+      useUIStore.getState().setStatusMessage('CLIPBOARD EMPTY');
+      return;
+    }
+    const ch = formatChannels[formatCursor.channelIndex];
+    if (!ch) return;
+    const numRows = ch.patternLength;
+    let pasted = 0;
+    for (let i = 0; i < clipboard.length; i++) {
+      const targetRow = formatCursor.rowIndex + i;
+      if (targetRow >= numRows) break;
+      const entry = clipboard[i];
+      for (const [key, value] of Object.entries(entry)) {
+        onFormatCellChange(formatCursor.channelIndex, targetRow, key, value);
+      }
+      pasted++;
+    }
+    useUIStore.getState().setStatusMessage(`PASTED ${pasted} ROW${pasted > 1 ? 'S' : ''}`);
+  }, [formatColumns, formatChannels, formatCursor, onFormatCellChange]);
+
   const handleFormatKeyDown = useCallback((e: React.KeyboardEvent) => {
     if (!isFormatMode || !formatColumns || !formatChannels) return;
     const col = formatColumns[formatCursor.columnIndex];
     const numRows = formatChannels[0]?.patternLength ?? 0;
+    const numCols = formatColumns.length;
 
-    const moveCursor = (delta: { channelIndex?: number; rowIndex?: number; columnIndex?: number }) => {
-      setFormatCursor(prev => ({
-        channelIndex: Math.max(0, Math.min(formatChannels!.length - 1,
-          prev.channelIndex + (delta.channelIndex ?? 0))),
-        rowIndex: Math.max(0, Math.min(numRows - 1,
-          prev.rowIndex + (delta.rowIndex ?? 0))),
-        columnIndex: Math.max(0, Math.min(formatColumns!.length - 1,
-          prev.columnIndex + (delta.columnIndex ?? 0))),
-      }));
+    // ── Helper: move cursor and optionally extend/clear selection ──
+    const moveCursor = (delta: { channelIndex?: number; rowIndex?: number; columnIndex?: number }, extend?: boolean) => {
+      setFormatCursor(prev => {
+        const next = {
+          channelIndex: Math.max(0, Math.min(formatChannels!.length - 1,
+            prev.channelIndex + (delta.channelIndex ?? 0))),
+          rowIndex: Math.max(0, Math.min(numRows - 1,
+            prev.rowIndex + (delta.rowIndex ?? 0))),
+          columnIndex: Math.max(0, Math.min(numCols - 1,
+            prev.columnIndex + (delta.columnIndex ?? 0))),
+        };
+        if (extend) {
+          // Extend selection from anchor to new cursor position
+          setFormatSelection(prevSel => {
+            const anchorRow = prevSel ? prevSel.anchorRow : prev.rowIndex;
+            const anchorCol = prevSel ? prevSel.anchorCol : prev.columnIndex;
+            return {
+              startRow: Math.min(anchorRow, next.rowIndex),
+              endRow: Math.max(anchorRow, next.rowIndex),
+              startCol: Math.min(anchorCol, next.columnIndex),
+              endCol: Math.max(anchorCol, next.columnIndex),
+              anchorRow,
+              anchorCol,
+            };
+          });
+        } else {
+          // Clear selection on non-shift movement
+          setFormatSelection(null);
+        }
+        return next;
+      });
     };
 
     if (e.key === '[' || e.key === '-') { e.preventDefault(); setFormatOctave(o => Math.max(0, o - 1)); return; }
     if (e.key === ']' || e.key === '=') { e.preventDefault(); setFormatOctave(o => Math.min(7, o + 1)); return; }
 
     const isCtrlCmd = e.ctrlKey || e.metaKey;
+
+    // Escape: clear selection
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      setFormatSelection(null);
+      return;
+    }
+
+    // Select All (Ctrl+A): select all rows in current channel, all columns
+    if (isCtrlCmd && e.key.toLowerCase() === 'a') {
+      e.preventDefault();
+      setFormatSelection({
+        startRow: 0, endRow: Math.max(0, numRows - 1),
+        startCol: 0, endCol: Math.max(0, numCols - 1),
+        anchorRow: 0, anchorCol: 0,
+      });
+      return;
+    }
+
+    // Copy (Ctrl+C / F4)
+    if ((isCtrlCmd && e.key.toLowerCase() === 'c' && !e.shiftKey) || e.key === 'F4') {
+      e.preventDefault();
+      formatCopySelection();
+      return;
+    }
+
+    // Cut (Ctrl+X / F3)
+    if ((isCtrlCmd && e.key.toLowerCase() === 'x') || e.key === 'F3') {
+      e.preventDefault();
+      formatCopySelection();
+      formatClearSelection();
+      setFormatSelection(null);
+      return;
+    }
+
+    // Paste (Ctrl+V / F5)
+    if ((isCtrlCmd && e.key.toLowerCase() === 'v') || e.key === 'F5') {
+      e.preventDefault();
+      formatPasteClipboard();
+      return;
+    }
 
     // Undo / Redo (Ctrl+Z / Ctrl+Shift+Z)
     if (isCtrlCmd && e.key.toLowerCase() === 'z' && !e.altKey) {
@@ -751,43 +892,51 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
     }
 
     // Arrow up/down: RAF-based hold-to-scroll (no initial delay, 50ms interval)
+    // Shift+Arrow extends selection
     if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
       e.preventDefault();
       if (e.repeat) return; // RAF loop handles repeats
       const dir = e.key === 'ArrowUp' ? -1 : 1;
-      moveCursor({ rowIndex: dir });
-      formatHeldArrowRef.current = { dir };
-      if (!formatArrowRafRef.current) {
-        let lastMove = performance.now();
-        const tick = (now: number) => {
-          if (!formatHeldArrowRef.current) { formatArrowRafRef.current = 0; return; }
-          if (now - lastMove >= 50) {
-            lastMove = now;
-            setFormatCursor(prev => ({
-              ...prev,
-              rowIndex: Math.max(0, Math.min(numRows - 1,
-                prev.rowIndex + formatHeldArrowRef.current!.dir)),
-            }));
-          }
+      moveCursor({ rowIndex: dir }, e.shiftKey);
+      if (!e.shiftKey) {
+        // Only start RAF scroll for non-shift arrows
+        formatHeldArrowRef.current = { dir };
+        if (!formatArrowRafRef.current) {
+          let lastMove = performance.now();
+          const tick = (now: number) => {
+            if (!formatHeldArrowRef.current) { formatArrowRafRef.current = 0; return; }
+            if (now - lastMove >= 50) {
+              lastMove = now;
+              setFormatCursor(prev => ({
+                ...prev,
+                rowIndex: Math.max(0, Math.min(numRows - 1,
+                  prev.rowIndex + formatHeldArrowRef.current!.dir)),
+              }));
+            }
+            formatArrowRafRef.current = requestAnimationFrame(tick);
+          };
           formatArrowRafRef.current = requestAnimationFrame(tick);
-        };
-        formatArrowRafRef.current = requestAnimationFrame(tick);
+        }
       }
       return;
     }
 
     switch (e.key) {
-      case 'ArrowLeft':  e.preventDefault(); moveCursor({ columnIndex: -1 }); return;
-      case 'ArrowRight': e.preventDefault(); moveCursor({ columnIndex: +1 }); return;
+      case 'ArrowLeft':  e.preventDefault(); moveCursor({ columnIndex: -1 }, e.shiftKey); return;
+      case 'ArrowRight': e.preventDefault(); moveCursor({ columnIndex: +1 }, e.shiftKey); return;
       case 'Tab':        e.preventDefault(); moveCursor({ channelIndex: e.shiftKey ? -1 : +1 }); return;
-      case 'PageUp':     e.preventDefault(); moveCursor({ rowIndex: -16 }); return;
-      case 'PageDown':   e.preventDefault(); moveCursor({ rowIndex: +16 }); return;
-      case 'Home':       e.preventDefault(); setFormatCursor(p => ({ ...p, rowIndex: 0 })); return;
-      case 'End':        e.preventDefault(); setFormatCursor(p => ({ ...p, rowIndex: Math.max(0, numRows - 1) })); return;
+      case 'PageUp':     e.preventDefault(); moveCursor({ rowIndex: -16 }, e.shiftKey); return;
+      case 'PageDown':   e.preventDefault(); moveCursor({ rowIndex: +16 }, e.shiftKey); return;
+      case 'Home':       e.preventDefault(); setFormatCursor(p => ({ ...p, rowIndex: 0 })); setFormatSelection(null); return;
+      case 'End':        e.preventDefault(); setFormatCursor(p => ({ ...p, rowIndex: Math.max(0, numRows - 1) })); setFormatSelection(null); return;
       case 'Delete':
       case 'Backspace':
         e.preventDefault();
-        if (col) {
+        if (formatSelection) {
+          // Delete clears entire selection
+          formatClearSelection();
+          setFormatSelection(null);
+        } else if (col) {
           onFormatCellChange?.(formatCursor.channelIndex, formatCursor.rowIndex, col.key, col.emptyValue ?? 0);
           moveCursor({ rowIndex: +1 });
         }
@@ -796,10 +945,12 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
 
     if (!col) return;
 
+    // Data entry clears selection
     if (col.type === 'note') {
       const semitone = KEY_TO_SEMITONE[e.key.toLowerCase()];
       if (semitone !== undefined) {
         e.preventDefault();
+        setFormatSelection(null);
         const midi = semitone + formatOctave * 12;
         if (midi >= 0 && midi <= 95) {
           onFormatCellChange?.(formatCursor.channelIndex, formatCursor.rowIndex, col.key, midi);
@@ -809,6 +960,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
     } else if (col.type === 'hex' || col.type === 'ctrl') {
       if (/^[0-9a-fA-F]$/i.test(e.key)) {
         e.preventDefault();
+        setFormatSelection(null);
         const digit = parseInt(e.key, 16);
         const hexDigits = col.hexDigits ?? 2;
         const cur = formatChannels[formatCursor.channelIndex]?.rows[formatCursor.rowIndex]?.[col.key]
@@ -819,7 +971,8 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
         moveCursor({ rowIndex: +1 });
       }
     }
-  }, [isFormatMode, formatColumns, formatChannels, formatCursor, formatOctave, onFormatCellChange]);
+  }, [isFormatMode, formatColumns, formatChannels, formatCursor, formatOctave,
+      onFormatCellChange, formatSelection, formatCopySelection, formatClearSelection, formatPasteClipboard]);
 
   // Handle tap on pattern canvas - move cursor to tapped cell
   const handlePatternTap = useCallback((tapX: number, tapY: number) => {
@@ -1474,7 +1627,12 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
             columnType:  cursorState.cursor.columnType,
             digitIndex:  cursorState.cursor.digitIndex,
           },
-          selection: isFormatMode ? null : (cursorState.selection ? {
+          selection: isFormatMode ? (formatSelection ? {
+            startChannel: formatCursor.channelIndex,
+            endChannel:   formatCursor.channelIndex,
+            startRow:     formatSelection.startRow,
+            endRow:       formatSelection.endRow,
+          } : null) : (cursorState.selection ? {
             startChannel: cursorState.selection.startChannel,
             endChannel:   cursorState.selection.endChannel,
             startRow:     cursorState.selection.startRow,
@@ -1611,6 +1769,22 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
     });
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isFormatMode, formatCursor]);
+
+  // Format mode: sync selection to worker
+  useEffect(() => {
+    if (!isFormatMode) return;
+    bridgeRef.current?.post({
+      type: 'selection',
+      selection: formatSelection ? {
+        startChannel: formatCursor.channelIndex,
+        endChannel:   formatCursor.channelIndex,
+        startRow:     formatSelection.startRow,
+        endRow:       formatSelection.endRow,
+        columnTypes:  undefined,
+      } : null,
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isFormatMode, formatSelection, formatCursor.channelIndex]);
 
 
   // ─── Thin overlay RAF (updates macroOverlayRef + posts playback state) ─────

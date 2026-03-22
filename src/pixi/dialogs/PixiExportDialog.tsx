@@ -507,7 +507,7 @@ export const PixiExportDialog: React.FC<PixiExportDialogProps> = ({ isOpen, onCl
           } else if (format === 'HVL' as string || format === 'AHX' as string || layoutFmtId === 'hivelyHVL' || layoutFmtId === 'hivelyAHX') {
             const { exportAsHively } = await import('@lib/export/HivelyExporter');
             const hvlFmt = (format === 'AHX' || layoutFmtId === 'hivelyAHX') ? 'ahx' : 'hvl';
-            nativeResult = exportAsHively(song, { format: hvlFmt });
+            nativeResult = exportAsHively(song, { format: hvlFmt, nativeOverride: useFormatStore.getState().hivelyNative });
           } else if (format === 'DIGI' as string || layoutFmtId === 'digiBooster') {
             const { exportDigiBooster } = await import('@lib/export/DigiBoosterExporter');
             const buf = exportDigiBooster(song);
