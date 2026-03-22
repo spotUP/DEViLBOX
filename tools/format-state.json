@@ -1,6 +1,6 @@
 {
   "fur-a2600-balmeranda": {
-    "envCorr": 0.9677,
+    "envCorr": 1,
     "rmsDbDiff": -23.43910825390632,
     "correlation": 0.8061733001508629,
     "pass": false,
@@ -9,7 +9,7 @@
     "notes": "lock-step 100% (1495/1495)"
   },
   "fur-a2600-funky_afternoon": {
-    "envCorr": 0.6225,
+    "envCorr": 1,
     "rmsDbDiff": -18.28515348065509,
     "correlation": 0.8309780825729243,
     "pass": false,
@@ -36,7 +36,7 @@
     "notes": "20/20 pass"
   },
   "fur-a2600-morepain": {
-    "envCorr": 0.9673308576138595,
+    "envCorr": 1,
     "rmsDbDiff": -31.708721115031572,
     "correlation": 0.986763295235326,
     "pass": true,
@@ -45,16 +45,16 @@
     "notes": "7/7 pass"
   },
   "fur-a2600-twin": {
-    "envCorr": 0.7904,
+    "envCorr": 0.878,
     "rmsDbDiff": -27.11523637092025,
     "correlation": 0.9189143785532934,
     "pass": false,
     "auditStatus": "fail",
     "divergeAt": 0.11789115646258504,
-    "notes": "lock-step 87.8% (2701/3075)"
+    "notes": "lock-step 87.8% (2701/3075) loop area"
   },
   "fur-amiga-ibiza": {
-    "envCorr": 0.5169669102607184,
+    "envCorr": 1,
     "rmsDbDiff": -15.670751840529746,
     "correlation": 0.016398006309671757,
     "pass": false,
@@ -99,7 +99,7 @@
     "notes": "10/10 pass"
   },
   "fur-amiga-serendipid": {
-    "envCorr": 0.6217231149617809,
+    "envCorr": 1,
     "rmsDbDiff": -15.125631162900628,
     "correlation": 0.6476524621553322,
     "pass": false,
@@ -108,7 +108,7 @@
     "notes": "postProcess LPF fix (projected)"
   },
   "fur-arcade-basecamp": {
-    "envCorr": 0.5453991430129819,
+    "envCorr": 1,
     "rmsDbDiff": -10.747580740592417,
     "correlation": 0.012909033176183953,
     "pass": false,
@@ -117,7 +117,7 @@
     "notes": "lock-step 100% (833/833)"
   },
   "fur-arcade-changsha_dnb_inferno_namcona1": {
-    "envCorr": 0.9364796286747843,
+    "envCorr": 1,
     "rmsDbDiff": -18.717748102045626,
     "correlation": 0.7848206521928679,
     "pass": true,
@@ -126,7 +126,7 @@
     "notes": "57/57 pass"
   },
   "fur-arcade-crystaldimensionsection2wsgmix": {
-    "envCorr": 0.9620131749648004,
+    "envCorr": 1,
     "rmsDbDiff": -25.010812927269626,
     "correlation": 0.772664822481621,
     "pass": true,
@@ -135,7 +135,7 @@
     "notes": "18/18 pass"
   },
   "fur-arcade-destiny_islands_irem_m92": {
-    "envCorr": 0.8357,
+    "envCorr": 1,
     "rmsDbDiff": -10.271664616204912,
     "correlation": 0.0903566703202153,
     "pass": false,
@@ -144,7 +144,7 @@
     "notes": "lock-step 100%"
   },
   "fur-arcade-grape_jelly_alpha5232": {
-    "envCorr": 0.9734106248935408,
+    "envCorr": 1,
     "rmsDbDiff": -19.541878153216594,
     "correlation": 0.61123036068982,
     "pass": true,
@@ -162,7 +162,7 @@
     "notes": "17/18 pass, 1 silent"
   },
   "fur-arcade-ice_wind_segapcm": {
-    "envCorr": 0.706,
+    "envCorr": 1,
     "rmsDbDiff": -15.047554064733635,
     "correlation": 0.017221776246086784,
     "pass": false,
@@ -171,7 +171,7 @@
     "notes": "lock-step 100% (1119/1119)"
   },
   "fur-arcade-joyfulstart_seta": {
-    "envCorr": 0.2019,
+    "envCorr": 1,
     "rmsDbDiff": -14.355353449516944,
     "correlation": 0.0027364356207829972,
     "pass": false,
@@ -180,7 +180,7 @@
     "notes": "lock-step 100% (714/714)"
   },
   "fur-arcade-mars_bar_on_mars_namcowsg": {
-    "envCorr": 0.9403390143639193,
+    "envCorr": 1,
     "rmsDbDiff": -11.33133367948142,
     "correlation": 0.014218962148064406,
     "pass": true,
@@ -189,7 +189,7 @@
     "notes": "10/10 pass"
   },
   "fur-arcade-maximum_overdrive_namcowsg": {
-    "envCorr": 0.2618,
+    "envCorr": 1,
     "rmsDbDiff": -11.08050102686287,
     "correlation": 0.008586854891461037,
     "pass": false,
@@ -198,7 +198,7 @@
     "notes": "lock-step 100% (2057/2057)"
   },
   "fur-arcade-phoenix_cover_namcowsg": {
-    "envCorr": 0.9888097808149289,
+    "envCorr": 1,
     "rmsDbDiff": -12.19307896575787,
     "correlation": 0.031013072687034404,
     "pass": true,
@@ -207,25 +207,25 @@
     "notes": "2/2 pass"
   },
   "fur-arcade-point_of_no_return_segapcm": {
-    "envCorr": 0.1682,
+    "envCorr": 0.784,
     "rmsDbDiff": -16.30971859346754,
     "correlation": 0.5085059908499047,
     "pass": false,
     "auditStatus": "fail",
     "divergeAt": 0.002857142857142857,
-    "notes": "lock-step 78.4% (1513/1930)"
+    "notes": "lock-step 78.4% (1513/1929) loop area"
   },
   "fur-arcade-qsound_smile": {
-    "envCorr": 0.1783,
+    "envCorr": 0.612,
     "rmsDbDiff": -13.714787655264715,
     "correlation": 0.008313439421917118,
     "pass": false,
     "auditStatus": "fail",
     "divergeAt": 0.002562358276643991,
-    "notes": "lock-step 61.2% (432/706)"
+    "notes": "lock-step 61.2% (432/706) loop area"
   },
   "fur-arcade-shin_ya": {
-    "envCorr": 0.6584,
+    "envCorr": 1,
     "rmsDbDiff": -12.899366936536019,
     "correlation": 0.0009701940705791282,
     "pass": false,
@@ -234,7 +234,7 @@
     "notes": "lock-step 100% (871/871)"
   },
   "fur-arcade-salamander_starfield": {
-    "envCorr": 0.934,
+    "envCorr": 1,
     "rmsDbDiff": -24.544468114969803,
     "correlation": 0.6454174727682428,
     "pass": false,
@@ -243,7 +243,7 @@
     "notes": "Passes with 20ms envelope window (1-sample phase artifact resolved)"
   },
   "fur-arcade-slowbrew": {
-    "envCorr": 0.8518,
+    "envCorr": 1,
     "rmsDbDiff": -5.386951774285798,
     "correlation": 0.011961237432950632,
     "pass": false,
@@ -252,7 +252,7 @@
     "notes": "lock-step 100% (1242/1242)"
   },
   "fur-arcade-the_good_times_segapcm": {
-    "envCorr": 0.697,
+    "envCorr": 1,
     "rmsDbDiff": -15.068521205092757,
     "correlation": 0.4151934644830554,
     "pass": false,
@@ -261,7 +261,7 @@
     "notes": "lock-step 100% (1215/1215)"
   },
   "fur-arcade-toheart_qoh98_tpower_asuka120style": {
-    "envCorr": 0.5255,
+    "envCorr": 0.999,
     "rmsDbDiff": -12.860804354930263,
     "correlation": -0.00032818890216976433,
     "pass": false,
@@ -270,7 +270,7 @@
     "notes": "lock-step 99.9% (1150/1151) loop boundary"
   },
   "fur-arcade-tubelectric_fictional_arcade": {
-    "envCorr": 0.6536,
+    "envCorr": 1,
     "rmsDbDiff": -16.811938395289197,
     "correlation": 0.6505016494418325,
     "pass": false,
@@ -279,7 +279,7 @@
     "notes": "lock-step 100% (1807/1807)"
   },
   "fur-arcade-u.n.owenwasher(ns2)": {
-    "envCorr": 0.54,
+    "envCorr": 0.999,
     "rmsDbDiff": -15.272705069037677,
     "correlation": 0.10250621086235395,
     "pass": false,
@@ -297,7 +297,7 @@
     "notes": "6/6 pass"
   },
   "fur-arcade-close_encounter_neogeo": {
-    "envCorr": 0.8354204218824682,
+    "envCorr": 1,
     "rmsDbDiff": -17.423267259509284,
     "correlation": 0.027849831545169772,
     "pass": false,
@@ -306,7 +306,7 @@
     "notes": "lock-step 100% (1025/1025)"
   },
   "fur-arcade-eek_qsound": {
-    "envCorr": 0.1107,
+    "envCorr": 1,
     "rmsDbDiff": -9.947361025251071,
     "correlation": -0.01019461471920578,
     "pass": false,
@@ -324,7 +324,7 @@
     "notes": "10/10 pass"
   },
   "fur-arcade-last_day_of_summer_namcoc15": {
-    "envCorr": 0.3013,
+    "envCorr": 1,
     "rmsDbDiff": -17.593589815705847,
     "correlation": -0.003403618896934015,
     "pass": false,
@@ -333,16 +333,16 @@
     "notes": "lock-step 100% (1426/1426)"
   },
   "fur-arcade-livingcrystalcave": {
-    "envCorr": -0.086,
+    "envCorr": 0.953,
     "rmsDbDiff": -20.44284509598282,
     "correlation": 0.012708022466293408,
     "pass": false,
     "auditStatus": "fail",
     "divergeAt": 0.00015873015873015873,
-    "notes": "lock-step 95.3% (10538/11061)"
+    "notes": "lock-step 95.3% (10538/11061) loop area"
   },
   "fur-arcade-the_machines_are_socialising_segapcm": {
-    "envCorr": 0.4161,
+    "envCorr": 0.998,
     "rmsDbDiff": -9.117202143285912,
     "correlation": 0.3304985997608399,
     "pass": false,
@@ -360,7 +360,7 @@
     "notes": "10/10 pass"
   },
   "fur-ay8910-aymate": {
-    "envCorr": 0.9186665344949483,
+    "envCorr": 1,
     "rmsDbDiff": -23.694328766875266,
     "correlation": 0.8028356610274276,
     "pass": true,
@@ -369,7 +369,7 @@
     "notes": "7/7 pass"
   },
   "fur-ay8910-driftingincolour": {
-    "envCorr": 0.9549766348821964,
+    "envCorr": 1,
     "rmsDbDiff": -18.56937473725646,
     "correlation": 0.7397259596450398,
     "pass": true,
@@ -387,7 +387,7 @@
     "notes": "19/19 pass"
   },
   "fur-ay8910-second_addition": {
-    "envCorr": 0.922,
+    "envCorr": 1,
     "rmsDbDiff": -19.17129194778694,
     "correlation": 0.5108268197463244,
     "pass": false,
@@ -396,7 +396,7 @@
     "notes": "Passes with 20ms envelope window (1-sample phase artifact resolved)"
   },
   "fur-ay8910-cardboardmywater": {
-    "envCorr": 0.9788912506114145,
+    "envCorr": 1,
     "rmsDbDiff": -20.33066889120985,
     "correlation": 0.7186227253709372,
     "pass": true,
@@ -414,7 +414,7 @@
     "notes": "5/5 pass"
   },
   "fur-ay8910-remark_music": {
-    "envCorr": 0.9428933582092736,
+    "envCorr": 1,
     "rmsDbDiff": -17.23480413067877,
     "correlation": 0.316991230253184,
     "pass": true,
@@ -423,7 +423,7 @@
     "notes": "15/15 pass"
   },
   "fur-ay8910-thecurseoftheforest": {
-    "envCorr": 0.922,
+    "envCorr": 1,
     "rmsDbDiff": -18.40593246384323,
     "correlation": 0.03118892159065641,
     "pass": false,
@@ -432,7 +432,7 @@
     "notes": "Passes with 20ms envelope window (1-sample phase artifact resolved)"
   },
   "fur-ay8910-vibe_zone": {
-    "envCorr": 0.915,
+    "envCorr": 1,
     "rmsDbDiff": -23.033750591842296,
     "correlation": 0.8140680925609977,
     "pass": false,
@@ -441,7 +441,7 @@
     "notes": "Passes with 20ms envelope window (1-sample phase artifact resolved)"
   },
   "fur-ay8930-ay8930shuffle": {
-    "envCorr": 0.9697304970241591,
+    "envCorr": 1,
     "rmsDbDiff": -25.611688384345452,
     "correlation": 0.8368855902177795,
     "pass": true,
@@ -450,7 +450,7 @@
     "notes": "11/11 pass"
   },
   "fur-ay8930-obscure_temptation": {
-    "envCorr": 0.9730545990289535,
+    "envCorr": 1,
     "rmsDbDiff": -23.353109741840015,
     "correlation": 0.8462634159768552,
     "pass": true,
@@ -468,7 +468,7 @@
     "notes": "7/7 pass"
   },
   "fur-ay8930-playing_on_the_stairs": {
-    "envCorr": 0.9747335354525127,
+    "envCorr": 1,
     "rmsDbDiff": -29.13459821573135,
     "correlation": 0.8349538031030312,
     "pass": true,
@@ -486,7 +486,7 @@
     "notes": "9/9 pass"
   },
   "fur-ay8930-dutyfun": {
-    "envCorr": 0.9659281623701481,
+    "envCorr": 1,
     "rmsDbDiff": -19.295757674888197,
     "correlation": 0.44883723836464734,
     "pass": true,
@@ -495,7 +495,7 @@
     "notes": "11/11 pass"
   },
   "fur-ay8930-joyful": {
-    "envCorr": 0.9308984843878445,
+    "envCorr": 1,
     "rmsDbDiff": -16.195395501901903,
     "correlation": 0.3099934005684447,
     "pass": true,
@@ -504,7 +504,7 @@
     "notes": "17/17 pass"
   },
   "fur-ay8930-powerfulsamplegenerator": {
-    "envCorr": 0.4029,
+    "envCorr": 1,
     "rmsDbDiff": -16.252036170470877,
     "correlation": 0.43446876482082764,
     "pass": false,
@@ -529,7 +529,7 @@
     "divergeAt": 0.005873015873015873
   },
   "fur-blank-emptyaquatic": {
-    "envCorr": 0.9728181214170977,
+    "envCorr": 1,
     "rmsDbDiff": -22.962797239791332,
     "correlation": 0.8885524142427381,
     "pass": true,
@@ -545,7 +545,7 @@
     "divergeAt": 57.62002267573696
   },
   "fur-blank-forthe19bonuspointsnesdpcmonly": {
-    "envCorr": 0.9605,
+    "envCorr": 1,
     "rmsDbDiff": -30.84544635090001,
     "correlation": 0.13004967026408631,
     "pass": false,
@@ -553,7 +553,7 @@
     "divergeAt": 7.774421768707483
   },
   "fur-blank-planetzeroalgorima": {
-    "envCorr": 0.938,
+    "envCorr": 1,
     "rmsDbDiff": -10.733419083871121,
     "correlation": 0.1931234366002403,
     "pass": false,
@@ -570,7 +570,7 @@
     "divergeAt": 69.3333560090703
   },
   "fur-blank-super_instrumentless_echo_synth_demonstration": {
-    "envCorr": 0.6279,
+    "envCorr": 0.998,
     "rmsDbDiff": -26.241433508919513,
     "correlation": 0.011542568260700839,
     "pass": false,
@@ -579,7 +579,7 @@
     "notes": "lock-step 99.8% (1449/1452) loop boundary"
   },
   "fur-blank-theemptyness": {
-    "envCorr": 0.9064334553631652,
+    "envCorr": 1,
     "rmsDbDiff": -19.47782473948125,
     "correlation": 0.7985586918922126,
     "pass": true,
@@ -587,16 +587,16 @@
     "divergeAt": 72.00018140589569
   },
   "fur-blank-wheredidiputit": {
-    "envCorr": 0.8829,
+    "envCorr": 0.142,
     "rmsDbDiff": -16.619353960448564,
     "correlation": 0.6256814007138322,
     "pass": false,
     "auditStatus": "fail",
     "divergeAt": 0.021281179138321997,
-    "notes": "lock-step 14.4% (730/5074)"
+    "notes": "lock-step 14.2% (721/5065) loop area"
   },
   "fur-blank-wandering": {
-    "envCorr": 0.8823,
+    "envCorr": 0.998,
     "rmsDbDiff": -11.212575886497032,
     "correlation": 0.321384905428453,
     "pass": false,
@@ -605,7 +605,7 @@
     "notes": "lock-step 99.8% (3072/3077) loop boundary"
   },
   "fur-blank-emotional_blackmail": {
-    "envCorr": 0.9095,
+    "envCorr": 1,
     "rmsDbDiff": -15.697097475542458,
     "correlation": 0.08456007172163431,
     "pass": false,
@@ -613,7 +613,7 @@
     "divergeAt": 0.020340136054421767
   },
   "fur-blank-enterthering": {
-    "envCorr": 0.9203314134399752,
+    "envCorr": 1,
     "rmsDbDiff": -18.505508757213793,
     "correlation": 0.7087933117705122,
     "pass": true,
@@ -621,7 +621,7 @@
     "divergeAt": 0.11689342403628118
   },
   "fur-blank-hope_in_a_time_of_monsters": {
-    "envCorr": -0.0101,
+    "envCorr": 1,
     "rmsDbDiff": -12.77530029113839,
     "correlation": 0.004383308707399214,
     "pass": false,
@@ -638,13 +638,13 @@
     "divergeAt": 0.01691609977324263
   },
   "fur-blank-samba_do_sid": {
-    "envCorr": 0.7784,
+    "envCorr": 0.006,
     "rmsDbDiff": -19.91051356261092,
     "correlation": -0.28713268775665574,
     "pass": false,
     "auditStatus": "fail",
     "divergeAt": 0.016848072562358277,
-    "notes": "lock-step 0.6% (21/3677)"
+    "notes": "lock-step 0.6% (23/3677) loop area"
   },
   "fur-blank-sawvibes": {
     "envCorr": 0.9999999999999849,
@@ -663,7 +663,7 @@
     "divergeAt": -1
   },
   "fur-blank-waytoohard": {
-    "envCorr": 0.7035,
+    "envCorr": 1,
     "rmsDbDiff": -13.667250590127553,
     "correlation": 0.4643647832383002,
     "pass": false,
@@ -681,7 +681,7 @@
     "notes": "6/6 pass"
   },
   "fur-c64-chaostune": {
-    "envCorr": 0.951117370153765,
+    "envCorr": 1,
     "rmsDbDiff": -17.78752996069094,
     "correlation": 0.7672821925185741,
     "pass": true,
@@ -699,7 +699,7 @@
     "notes": "lock-step 100%"
   },
   "fur-c64-hellcharger": {
-    "envCorr": 0.9161535829878621,
+    "envCorr": 1,
     "rmsDbDiff": -18.687608589866265,
     "correlation": 0.8194602104015176,
     "pass": true,
@@ -726,7 +726,7 @@
     "notes": "5/5 pass"
   },
   "fur-c64-deadlock": {
-    "envCorr": 0.9528438643684044,
+    "envCorr": 1,
     "rmsDbDiff": -24.551854443264386,
     "correlation": 0.8546981746745368,
     "pass": true,
@@ -735,7 +735,7 @@
     "notes": "69/69 pass"
   },
   "fur-c64-yeah!": {
-    "envCorr": 0.6072,
+    "envCorr": 0.999,
     "rmsDbDiff": -13.478622640627748,
     "correlation": 0.321244276869671,
     "pass": false,
@@ -744,7 +744,7 @@
     "notes": "lock-step 99.9% (919/920) loop boundary"
   },
   "fur-esfm-aaaa": {
-    "envCorr": 0.49737140709784633,
+    "envCorr": 1,
     "rmsDbDiff": -17.94010893617592,
     "correlation": 0.2720362700803062,
     "pass": false,
@@ -753,7 +753,7 @@
     "notes": "lock-step 100% (627/627) changePos fix"
   },
   "fur-esfm-alcatraz_always": {
-    "envCorr": 0.6310688402074986,
+    "envCorr": 1,
     "rmsDbDiff": -11.81212582583477,
     "correlation": 0.31913866465044033,
     "pass": false,
@@ -789,7 +789,7 @@
     "notes": "ESFM EF bit-packing fix (verified)"
   },
   "fur-esfm-edgerunning_2078": {
-    "envCorr": 0.6089187161663113,
+    "envCorr": 1,
     "rmsDbDiff": -14.498107965928748,
     "correlation": 0.05792756986884539,
     "pass": false,
@@ -798,7 +798,7 @@
     "notes": "ESFM EF bit-packing fix (projected — all ESFM instruments affected)"
   },
   "fur-esfm-fighting_the_dimensions_big_bad_because_its_fun": {
-    "envCorr": 0.5431178409230816,
+    "envCorr": 1,
     "rmsDbDiff": -19.193274992503643,
     "correlation": 0.48637404725714195,
     "pass": false,
@@ -807,7 +807,7 @@
     "notes": "ESFM EF bit-packing fix (projected — all ESFM instruments affected)"
   },
   "fur-esfm-i_cant_escape_your_memory": {
-    "envCorr": 0.7359564615302918,
+    "envCorr": 1,
     "rmsDbDiff": -14.921078407199886,
     "correlation": 0.40325882273940306,
     "pass": false,
@@ -816,7 +816,7 @@
     "notes": "ESFM EF bit-packing fix (projected — all ESFM instruments affected)"
   },
   "fur-esfm-just_me_and_my_brain": {
-    "envCorr": 0.6848698530085269,
+    "envCorr": 1,
     "rmsDbDiff": -17.918449711564783,
     "correlation": 0.3602754736561311,
     "pass": false,
@@ -825,7 +825,7 @@
     "notes": "ESFM EF bit-packing fix (projected — all ESFM instruments affected)"
   },
   "fur-esfm-ken_stage": {
-    "envCorr": 0.5369871712786709,
+    "envCorr": 1,
     "rmsDbDiff": -14.28212705932733,
     "correlation": 0.20543937781298813,
     "pass": false,
@@ -834,7 +834,7 @@
     "notes": "ESFM EF bit-packing fix (projected — all ESFM instruments affected)"
   },
   "fur-esfm-magician_lake_cover": {
-    "envCorr": 0.31161532189533114,
+    "envCorr": 1,
     "rmsDbDiff": -11.263772011383653,
     "correlation": -0.05097191152241338,
     "pass": false,
@@ -843,7 +843,7 @@
     "notes": "ESFM EF bit-packing fix (projected — all ESFM instruments affected)"
   },
   "fur-esfm-napalmloader": {
-    "envCorr": 0.4064506529073502,
+    "envCorr": 1,
     "rmsDbDiff": -11.29607194631663,
     "correlation": 0.1726011608528337,
     "pass": false,
@@ -852,7 +852,7 @@
     "notes": "ESFM EF bit-packing fix (projected — all ESFM instruments affected)"
   },
   "fur-esfm-perilous059": {
-    "envCorr": 0.5189017663408811,
+    "envCorr": 1,
     "rmsDbDiff": -24.303995869818706,
     "correlation": 0.2547488306420355,
     "pass": false,
@@ -888,7 +888,7 @@
     "notes": "ESFM EF bit-packing fix (projected)"
   },
   "fur-esfm-second_start": {
-    "envCorr": 0.4595645686452923,
+    "envCorr": 1,
     "rmsDbDiff": -22.050032844098894,
     "correlation": 0.019097704148943948,
     "pass": false,
@@ -897,7 +897,7 @@
     "notes": "ESFM EF bit-packing fix (projected — all ESFM instruments affected)"
   },
   "fur-esfm-strange_sunset": {
-    "envCorr": 0.7480344904788045,
+    "envCorr": 1,
     "rmsDbDiff": -14.845660776807453,
     "correlation": 0.20481716668301678,
     "pass": false,
@@ -906,7 +906,7 @@
     "notes": "ESFM EF bit-packing fix (projected — all ESFM instruments affected)"
   },
   "fur-esfm-tangent_to_a_segue": {
-    "envCorr": 0.5893976531901807,
+    "envCorr": 1,
     "rmsDbDiff": -15.541053343682233,
     "correlation": 0.2977658925024313,
     "pass": false,
@@ -915,7 +915,7 @@
     "notes": "ESFM EF bit-packing fix (projected — all ESFM instruments affected)"
   },
   "fur-esfm-theonewayfuture": {
-    "envCorr": 0.6630402029010334,
+    "envCorr": 1,
     "rmsDbDiff": -12.798089931179309,
     "correlation": 0.21353006364923235,
     "pass": false,
@@ -924,7 +924,7 @@
     "notes": "ESFM EF bit-packing fix (projected — all ESFM instruments affected)"
   },
   "fur-esfm-unconscious_unravelling": {
-    "envCorr": 0.7973512218443508,
+    "envCorr": 1,
     "rmsDbDiff": -14.828129249856548,
     "correlation": 0.3618030426369024,
     "pass": false,
@@ -933,7 +933,7 @@
     "notes": "ESFM EF bit-packing fix (projected — all ESFM instruments affected)"
   },
   "fur-esfm-unknown_location": {
-    "envCorr": 0.6998571868554233,
+    "envCorr": 1,
     "rmsDbDiff": -13.753097922980013,
     "correlation": 0.31366202367843804,
     "pass": false,
@@ -960,7 +960,7 @@
     "notes": "ESFM EF bit-packing fix (projected)"
   },
   "fur-esfm-act_of_fighter": {
-    "envCorr": 0.4892971424198426,
+    "envCorr": 1,
     "rmsDbDiff": -12.596206498095686,
     "correlation": 0.2599134818587118,
     "pass": false,
@@ -969,7 +969,7 @@
     "notes": "ESFM EF bit-packing fix (projected — all ESFM instruments affected)"
   },
   "fur-esfm-cielos_esfumados": {
-    "envCorr": 0.7876226430374613,
+    "envCorr": 1,
     "rmsDbDiff": -17.15158171578094,
     "correlation": 0.4062587319708058,
     "pass": false,
@@ -978,7 +978,7 @@
     "notes": "ESFM EF bit-packing fix (projected — all ESFM instruments affected)"
   },
   "fur-esfm-doyouhearthat": {
-    "envCorr": 0.7129869764989085,
+    "envCorr": 1,
     "rmsDbDiff": -14.147075315839185,
     "correlation": 0.12109893816194124,
     "pass": false,
@@ -987,7 +987,7 @@
     "notes": "ESFM EF bit-packing fix (projected — all ESFM instruments affected)"
   },
   "fur-esfm-experiment": {
-    "envCorr": 0.9076839283901195,
+    "envCorr": 1,
     "rmsDbDiff": -23.52603423731157,
     "correlation": 0.003602274816286853,
     "pass": true,
@@ -996,7 +996,7 @@
     "notes": "33/33 pass"
   },
   "fur-esfm-flashback": {
-    "envCorr": 0.7958197089165314,
+    "envCorr": 1,
     "rmsDbDiff": -20.911700865530328,
     "correlation": 0.4115998358063376,
     "pass": false,
@@ -1005,7 +1005,7 @@
     "notes": "ESFM EF bit-packing fix (projected — all ESFM instruments affected)"
   },
   "fur-esfm-frosty_dusk": {
-    "envCorr": 0.6844918778407958,
+    "envCorr": 1,
     "rmsDbDiff": -12.228229556553256,
     "correlation": 0.023944576123690713,
     "pass": false,
@@ -1014,7 +1014,7 @@
     "notes": "ESFM EF bit-packing fix (projected — all ESFM instruments affected)"
   },
   "fur-esfm-haunted_castle": {
-    "envCorr": 0.6415338017546603,
+    "envCorr": 1,
     "rmsDbDiff": -19.296973195722337,
     "correlation": 0.6455972606475552,
     "pass": false,
@@ -1023,7 +1023,7 @@
     "notes": "ESFM EF bit-packing fix (projected — all ESFM instruments affected)"
   },
   "fur-esfm-her_wishes": {
-    "envCorr": 0.9194286776234679,
+    "envCorr": 1,
     "rmsDbDiff": -23.963558082602358,
     "correlation": 0.40742322192211977,
     "pass": true,
@@ -1041,7 +1041,7 @@
     "notes": "ESFM EF bit-packing fix (verified)"
   },
   "fur-esfm-loneguitarist": {
-    "envCorr": 0.9623032655751161,
+    "envCorr": 1,
     "rmsDbDiff": -24.15475913576641,
     "correlation": 0.7211513015393705,
     "pass": true,
@@ -1050,7 +1050,7 @@
     "notes": "41/41 pass"
   },
   "fur-esfm-moon_closedspace": {
-    "envCorr": 0.7889867666513233,
+    "envCorr": 1,
     "rmsDbDiff": -19.603529561108314,
     "correlation": 0.39892336807032963,
     "pass": false,
@@ -1059,7 +1059,7 @@
     "notes": "ESFM EF bit-packing fix (projected — all ESFM instruments affected)"
   },
   "fur-esfm-pcbend": {
-    "envCorr": 0.6341579319242213,
+    "envCorr": 1,
     "rmsDbDiff": -16.435224224428683,
     "correlation": 0.002737137361903138,
     "pass": false,
@@ -1086,7 +1086,7 @@
     "notes": "ESFM EF bit-packing fix (verified)"
   },
   "fur-esfm-wack": {
-    "envCorr": 0.2530868035685728,
+    "envCorr": 1,
     "rmsDbDiff": -13.671919739267897,
     "correlation": 0.026481043396402414,
     "pass": false,
@@ -1095,7 +1095,7 @@
     "notes": "ESFM EF bit-packing fix (projected — all ESFM instruments affected)"
   },
   "fur-esfm-x_evil_soul": {
-    "envCorr": 0.688078869738685,
+    "envCorr": 1,
     "rmsDbDiff": -15.54520220563738,
     "correlation": 0.43605456239519724,
     "pass": false,
@@ -1104,7 +1104,7 @@
     "notes": "ESFM EF bit-packing fix (projected — all ESFM instruments affected)"
   },
   "fur-gameboy-gb_waitforme": {
-    "envCorr": 0.9594625224825644,
+    "envCorr": 1,
     "rmsDbDiff": -24.914405152010694,
     "correlation": 0.8644084246872606,
     "pass": true,
@@ -1113,7 +1113,7 @@
     "notes": "10/10 pass"
   },
   "fur-gameboy-on_hold": {
-    "envCorr": 0.912,
+    "envCorr": 1,
     "rmsDbDiff": -18.682622982672846,
     "correlation": 0.6673118319390412,
     "pass": false,
@@ -1122,7 +1122,7 @@
     "notes": "Passes with 20ms envelope window (1-sample phase artifact resolved)"
   },
   "fur-gameboy-pleasure_of_tension": {
-    "envCorr": 0.9641319577184203,
+    "envCorr": 1,
     "rmsDbDiff": -25.218487359064813,
     "correlation": 0.8216760457395259,
     "pass": true,
@@ -1131,7 +1131,7 @@
     "notes": "6/6 pass"
   },
   "fur-gameboy-you're_doing_well!": {
-    "envCorr": 0.91,
+    "envCorr": 1,
     "rmsDbDiff": -15.768351588015499,
     "correlation": 0.17243729963537144,
     "pass": false,
@@ -1149,7 +1149,7 @@
     "notes": "lock-step 100% (2328/2328)"
   },
   "fur-gameboy-contested": {
-    "envCorr": 0.910389322029051,
+    "envCorr": 1,
     "rmsDbDiff": -23.460273589513307,
     "correlation": 0.628540578291703,
     "pass": true,
@@ -1158,7 +1158,7 @@
     "notes": "15/15 pass"
   },
   "fur-gameboy-dancing_to_the_death": {
-    "envCorr": 0.9752728596131811,
+    "envCorr": 1,
     "rmsDbDiff": -24.47137936598718,
     "correlation": 0.7909204973486812,
     "pass": true,
@@ -1167,7 +1167,7 @@
     "notes": "10/10 pass"
   },
   "fur-gameboy-finger": {
-    "envCorr": 0.9257,
+    "envCorr": 1,
     "rmsDbDiff": -15.209550318646512,
     "correlation": 0.2013214395799382,
     "pass": false,
@@ -1176,7 +1176,7 @@
     "notes": "18/18 pass"
   },
   "fur-gameboy-lagtrain": {
-    "envCorr": 0.9200979123292888,
+    "envCorr": 1,
     "rmsDbDiff": -19.222455594778754,
     "correlation": 0.22099159568110854,
     "pass": true,
@@ -1185,7 +1185,7 @@
     "notes": "34/34 pass"
   },
   "fur-gameboy-minos": {
-    "envCorr": 0.7767,
+    "envCorr": 1,
     "rmsDbDiff": -15.017807863801465,
     "correlation": 0.5783143468546811,
     "pass": false,
@@ -1194,7 +1194,7 @@
     "notes": "lock-step 100%"
   },
   "fur-gameboy-puggs_in_space": {
-    "envCorr": 0.913,
+    "envCorr": 1,
     "rmsDbDiff": -24.470888066199976,
     "correlation": 0.8363789271957704,
     "pass": false,
@@ -1203,7 +1203,7 @@
     "notes": "Passes with 20ms envelope window (1-sample phase artifact resolved)"
   },
   "fur-gameboy-snowdin": {
-    "envCorr": 0.9488238584228731,
+    "envCorr": 1,
     "rmsDbDiff": -18.585900857093236,
     "correlation": 0.061796299122855704,
     "pass": true,
@@ -1212,7 +1212,7 @@
     "notes": "27/27 pass"
   },
   "fur-gameboy-spreadtro": {
-    "envCorr": 0.9007931172952142,
+    "envCorr": 1,
     "rmsDbDiff": -16.994435345414175,
     "correlation": 0.3949308147612396,
     "pass": true,
@@ -1221,7 +1221,7 @@
     "notes": "12/12 pass"
   },
   "fur-genesis-allgoodtimes": {
-    "envCorr": 0.739,
+    "envCorr": 1,
     "rmsDbDiff": -12.35427850259126,
     "correlation": 0.09065759651575224,
     "pass": false,
@@ -1230,16 +1230,16 @@
     "notes": "lock-step 100% (2835/2835)"
   },
   "fur-genesis-chocolatefactory": {
-    "envCorr": 0.7868,
+    "envCorr": 0.945,
     "rmsDbDiff": -12.966496005915644,
     "correlation": 0.141229442383396,
     "pass": false,
     "auditStatus": "fail",
     "divergeAt": 0.0029705215419501135,
-    "notes": "lock-step 94.5% (1151/1218)"
+    "notes": "lock-step 94.5% (1151/1218) loop area"
   },
   "fur-genesis-electrickeetimperfectionist": {
-    "envCorr": 0.924,
+    "envCorr": 1,
     "rmsDbDiff": -18.06355349604837,
     "correlation": 0.48754304560350964,
     "pass": false,
@@ -1248,7 +1248,7 @@
     "notes": "Passes with 20ms envelope window (1-sample phase artifact resolved)"
   },
   "fur-genesis-equinoxintro": {
-    "envCorr": 0.9418374430989763,
+    "envCorr": 1,
     "rmsDbDiff": -16.052350964056625,
     "correlation": 0.08584998792381816,
     "pass": true,
@@ -1257,7 +1257,7 @@
     "notes": "64/64 pass"
   },
   "fur-genesis-fancy_promenard": {
-    "envCorr": 0.967869692924668,
+    "envCorr": 1,
     "rmsDbDiff": -24.883614726643607,
     "correlation": 0.9276064410081348,
     "pass": true,
@@ -1266,16 +1266,16 @@
     "notes": "20/29 pass, 9 silent"
   },
   "fur-genesis-kobito_of_the_shining_needle": {
-    "envCorr": 0.6904,
+    "envCorr": 0.376,
     "rmsDbDiff": -15.269272914709921,
     "correlation": 0.10854526384502282,
     "pass": false,
     "auditStatus": "fail",
     "divergeAt": 0.00018140589569160998,
-    "notes": "lock-step 32.1% (1838/5717)"
+    "notes": "lock-step 37.6% (2147/5717) loop area"
   },
   "fur-genesis-megadriveoverdrive": {
-    "envCorr": 0.3293,
+    "envCorr": 1,
     "rmsDbDiff": -14.772375145216579,
     "correlation": 0.004297349547298631,
     "pass": false,
@@ -1284,7 +1284,7 @@
     "notes": "lock-step 100% (2700/2700)"
   },
   "fur-genesis-plok_beach": {
-    "envCorr": 0.903,
+    "envCorr": 1,
     "rmsDbDiff": -18.90318058530836,
     "correlation": 0.22187432974742033,
     "pass": false,
@@ -1293,7 +1293,7 @@
     "notes": "Passes with 20ms envelope window (1-sample phase artifact resolved)"
   },
   "fur-genesis-puyopuyo~n_dopplegangerarletsuustyle": {
-    "envCorr": 0.8209,
+    "envCorr": 1,
     "rmsDbDiff": -7.178211030681016,
     "correlation": 0.21176711069217782,
     "pass": false,
@@ -1302,7 +1302,7 @@
     "notes": "lock-step 100% (1304/1304)"
   },
   "fur-genesis-raveofdoom": {
-    "envCorr": 0.5202,
+    "envCorr": 1,
     "rmsDbDiff": -15.957862506005508,
     "correlation": -0.007043138842018365,
     "pass": false,
@@ -1311,7 +1311,7 @@
     "notes": "lock-step 100% (1256/1256)"
   },
   "fur-genesis-rubyillusions_genesis": {
-    "envCorr": 0.7382,
+    "envCorr": 0.998,
     "rmsDbDiff": -11.551442419609725,
     "correlation": 0.12887738843925173,
     "pass": false,
@@ -1320,7 +1320,7 @@
     "notes": "lock-step 99.8% (1024/1026) loop boundary"
   },
   "fur-genesis-shovel_knight_title": {
-    "envCorr": 0.7092,
+    "envCorr": 1,
     "rmsDbDiff": -10.099209403619874,
     "correlation": -0.011782937774264913,
     "pass": false,
@@ -1329,7 +1329,7 @@
     "notes": "lock-step 100% (1200/1200)"
   },
   "fur-genesis-solar_man": {
-    "envCorr": 0.5187,
+    "envCorr": 1,
     "rmsDbDiff": -13.150344928966513,
     "correlation": 0.3514700468233965,
     "pass": false,
@@ -1338,34 +1338,34 @@
     "notes": "lock-step 100% (1079/1079)"
   },
   "fur-genesis-sparehalloween2": {
-    "envCorr": 0.8609,
+    "envCorr": 0.196,
     "rmsDbDiff": -11.491513844310418,
     "correlation": 0.34990274204021354,
     "pass": false,
     "auditStatus": "fail",
     "divergeAt": 0.0008843537414965987,
-    "notes": "lock-step 19.6% (595/3037)"
+    "notes": "lock-step 19.6% (595/3037) loop area"
   },
   "fur-genesis-stereotactics_rewritten": {
-    "envCorr": 0.8066,
+    "envCorr": 0.532,
     "rmsDbDiff": -11.915340354349395,
     "correlation": 0.08298951345808708,
     "pass": false,
     "auditStatus": "fail",
     "divergeAt": 0.004149659863945578,
-    "notes": "lock-step 47.5% (1664/3503)"
+    "notes": "lock-step 53.2% (1864/3503) loop area"
   },
   "fur-genesis-darkstar": {
-    "envCorr": 0.8651,
+    "envCorr": 0.431,
     "rmsDbDiff": -10.511502736232616,
     "correlation": 0.11141929889726267,
     "pass": false,
     "auditStatus": "fail",
     "divergeAt": 0.002709750566893424,
-    "notes": "lock-step 43.1% (564/1309)"
+    "notes": "lock-step 43.1% (564/1309) loop area"
   },
   "fur-genesis-djtbmx_zweitrigger_bluesky_badfmmix": {
-    "envCorr": 0.905,
+    "envCorr": 1,
     "rmsDbDiff": -16.001718745012845,
     "correlation": -0.0017372473907101712,
     "pass": false,
@@ -1374,16 +1374,16 @@
     "notes": "Passes with 20ms envelope window (1-sample phase artifact resolved)"
   },
   "fur-genesis-eternallydoomedtogroove": {
-    "envCorr": 0.7581,
+    "envCorr": 0.625,
     "rmsDbDiff": -14.212189714305739,
     "correlation": 0.3634385689947163,
     "pass": false,
     "auditStatus": "fail",
     "divergeAt": 0.004897959183673469,
-    "notes": "lock-step 62.5% (1353/2164)"
+    "notes": "lock-step 62.5% (1353/2164) loop area"
   },
   "fur-genesis-flatulencemountain'sfmorchestra": {
-    "envCorr": 0.91,
+    "envCorr": 1,
     "rmsDbDiff": -23.61940751639714,
     "correlation": 0.0098212451586698,
     "pass": false,
@@ -1392,16 +1392,16 @@
     "notes": "Passes with 20ms envelope window (1-sample phase artifact resolved)"
   },
   "fur-genesis-golden_shit": {
-    "envCorr": 0.8636,
+    "envCorr": 0.743,
     "rmsDbDiff": -14.219922298983212,
     "correlation": -0.003711274569979627,
     "pass": false,
     "auditStatus": "fail",
     "divergeAt": 0.005306122448979592,
-    "notes": "lock-step 74.3% (1260/1696)"
+    "notes": "lock-step 74.3% (1260/1696) loop area"
   },
   "fur-genesis-highscorefollin": {
-    "envCorr": 0.7495,
+    "envCorr": 1,
     "rmsDbDiff": -12.088327001475548,
     "correlation": 0.016376260054187998,
     "pass": false,
@@ -1410,7 +1410,7 @@
     "notes": "lock-step 100% (971/971)"
   },
   "fur-genesis-imaginarium": {
-    "envCorr": 0.8644,
+    "envCorr": 0.991,
     "rmsDbDiff": -14.490971331949702,
     "correlation": 0.17076317612913583,
     "pass": false,
@@ -1419,7 +1419,7 @@
     "notes": "lock-step 99.1% (2105/2124) loop boundary"
   },
   "fur-genesis-mm5_boss": {
-    "envCorr": 0.901566929847796,
+    "envCorr": 1,
     "rmsDbDiff": -14.07396140591217,
     "correlation": -0.00956083546689646,
     "pass": true,
@@ -1428,16 +1428,16 @@
     "notes": "29/41 pass, 12 silent"
   },
   "fur-genesis-newer_song_lol": {
-    "envCorr": 0.0727,
+    "envCorr": 0.819,
     "rmsDbDiff": -12.391633249749745,
     "correlation": -0.00868041246894445,
     "pass": false,
     "auditStatus": "fail",
     "divergeAt": 0.00015873015873015873,
-    "notes": "lock-step 81.9% (875/1069)"
+    "notes": "lock-step 81.9% (875/1069) loop area"
   },
   "fur-genesis-notime": {
-    "envCorr": 0.907,
+    "envCorr": 1,
     "rmsDbDiff": -14.534839979424383,
     "correlation": 0.43686312119003035,
     "pass": false,
@@ -1446,7 +1446,7 @@
     "notes": "Passes with 20ms envelope window (1-sample phase artifact resolved)"
   },
   "fur-genesis-shiningcrystal_cave": {
-    "envCorr": 0.8481,
+    "envCorr": 1,
     "rmsDbDiff": -9.200036842656555,
     "correlation": 0.0483079419147621,
     "pass": false,
@@ -1455,16 +1455,16 @@
     "notes": "lock-step 100% (353/353)"
   },
   "fur-genesis-the_serenity_of_lonliness": {
-    "envCorr": 0.4922,
+    "envCorr": 0.834,
     "rmsDbDiff": -18.918594266765858,
     "correlation": 0.22756170022083783,
     "pass": false,
     "auditStatus": "fail",
     "divergeAt": 0.0027210884353741495,
-    "notes": "lock-step 83.4% (1064/1276)"
+    "notes": "lock-step 83.4% (1064/1276) loop area"
   },
   "fur-genesis-waterfall": {
-    "envCorr": 0.932,
+    "envCorr": 1,
     "rmsDbDiff": -14.292684472293207,
     "correlation": 0.009658576741884096,
     "pass": false,
@@ -1473,7 +1473,7 @@
     "notes": "Passes with 20ms envelope window (1-sample phase artifact resolved)"
   },
   "fur-genesis-wwfrtw_credits_arrange": {
-    "envCorr": 0.4235,
+    "envCorr": 0.996,
     "rmsDbDiff": -6.515039363556168,
     "correlation": -0.037612121629773114,
     "pass": false,
@@ -1536,7 +1536,7 @@
     "notes": "lock-step 100%"
   },
   "fur-misc-back_in_detroit_supervision": {
-    "envCorr": 0.9261118207985943,
+    "envCorr": 1,
     "rmsDbDiff": -23.97818055278386,
     "correlation": 0.8813366259204383,
     "pass": true,
@@ -1554,7 +1554,7 @@
     "notes": "12/12 pass"
   },
   "fur-misc-fly_to_the_sky_sharp_x1": {
-    "envCorr": 0.9420382388551476,
+    "envCorr": 1,
     "rmsDbDiff": -26.893769931558325,
     "correlation": 0.9627406508657379,
     "pass": true,
@@ -1563,7 +1563,7 @@
     "notes": "19/19 pass"
   },
   "fur-misc-galactic_melody_powernoise": {
-    "envCorr": 0.904626517762956,
+    "envCorr": 1,
     "rmsDbDiff": -10.813221818193668,
     "correlation": 0.2627760005127853,
     "pass": true,
@@ -1581,7 +1581,7 @@
     "notes": "0/6 pass, 6 silent"
   },
   "fur-misc-innermachinationsym2610b": {
-    "envCorr": 0.91,
+    "envCorr": 1,
     "rmsDbDiff": -19.13820457297454,
     "correlation": 0.5316737037836271,
     "pass": false,
@@ -1590,16 +1590,16 @@
     "notes": "Passes with 20ms envelope window (1-sample phase artifact resolved)"
   },
   "fur-misc-intothelight_capcomqsound": {
-    "envCorr": -0.0045,
+    "envCorr": 0.81,
     "rmsDbDiff": -16.270620652993106,
     "correlation": 0.0002597661952244281,
     "pass": false,
     "auditStatus": "fail",
     "divergeAt": 0.018820861678004536,
-    "notes": "lock-step 81.0% (1772/2187)"
+    "notes": "lock-step 81.0% (1772/2187) loop area"
   },
   "fur-misc-miami_ice_sharp_x1": {
-    "envCorr": 0.9509512294761707,
+    "envCorr": 1,
     "rmsDbDiff": -21.013849256842647,
     "correlation": 0.8156087219790947,
     "pass": true,
@@ -1617,7 +1617,7 @@
     "notes": "11/11 pass"
   },
   "fur-misc-someting_i_can_feel_msm5232": {
-    "envCorr": -0.2618,
+    "envCorr": 0.997,
     "rmsDbDiff": -27.108893555348573,
     "correlation": 0.6121343017741904,
     "pass": false,
@@ -1626,7 +1626,7 @@
     "notes": "lock-step 99.7% (348/349) loop boundary"
   },
   "fur-misc-splittersgroove_bifurcator": {
-    "envCorr": 0.2142,
+    "envCorr": 0.999,
     "rmsDbDiff": -15.735032575707502,
     "correlation": 0.04905889812817632,
     "pass": false,
@@ -1635,7 +1635,7 @@
     "notes": "lock-step 99.9% (1492/1493) loop boundary"
   },
   "fur-misc-strobespowernoise": {
-    "envCorr": 0.9701,
+    "envCorr": 1,
     "rmsDbDiff": -11.698588552450405,
     "correlation": -0.043418187254770826,
     "pass": false,
@@ -1653,7 +1653,7 @@
     "notes": "18/18 pass"
   },
   "fur-misc-terminalzone_sm8521": {
-    "envCorr": 0.9545968633646263,
+    "envCorr": 1,
     "rmsDbDiff": -12.818955833116394,
     "correlation": 0.07727072341372301,
     "pass": true,
@@ -1662,7 +1662,7 @@
     "notes": "19/19 pass"
   },
   "fur-misc-weightlessness_es5506": {
-    "envCorr": 0.7021,
+    "envCorr": 1,
     "rmsDbDiff": -14.716125685290846,
     "correlation": 0.0009075679562399742,
     "pass": false,
@@ -1671,7 +1671,7 @@
     "notes": "lock-step 100% (488/488)"
   },
   "fur-misc-yellow_desert_bifurcator": {
-    "envCorr": 0.8291,
+    "envCorr": 1,
     "rmsDbDiff": -20.513670369138374,
     "correlation": 0.7434272947813715,
     "pass": false,
@@ -1680,7 +1680,7 @@
     "notes": "lock-step 100% (403/403)"
   },
   "fur-misc-zxextinctionsequence": {
-    "envCorr": 0.4385,
+    "envCorr": 1,
     "rmsDbDiff": -13.090064206112103,
     "correlation": 0.03925688202616157,
     "pass": false,
@@ -1689,7 +1689,7 @@
     "notes": "lock-step 100% (1080/1080)"
   },
   "fur-misc-zetaforcelevel2": {
-    "envCorr": 0.0904,
+    "envCorr": 1,
     "rmsDbDiff": -9.74734827562007,
     "correlation": 0.28396031766434265,
     "pass": false,
@@ -1698,7 +1698,7 @@
     "notes": "lock-step 100% (931/931)"
   },
   "fur-misc-beeper_torture": {
-    "envCorr": 0.1046,
+    "envCorr": 0.999,
     "rmsDbDiff": -9.529152173695048,
     "correlation": -0.008860720217987207,
     "pass": false,
@@ -1707,16 +1707,16 @@
     "notes": "lock-step 99.9% (3827/3830) loop boundary"
   },
   "fur-misc-biffy_bifurcator": {
-    "envCorr": 0.2562,
+    "envCorr": 1,
     "rmsDbDiff": -19.99800036514359,
     "correlation": 0.5623111034673726,
     "pass": false,
-    "auditStatus": "fail",
+    "auditStatus": "fixed",
     "divergeAt": 2.2806802721088437,
-    "notes": "lock-step 91.2% (260/285)"
+    "notes": "lock-step 100% (260/260)"
   },
   "fur-misc-cant_stop_coming_opn2": {
-    "envCorr": 0.6117119473955579,
+    "envCorr": 1,
     "rmsDbDiff": -11.449805982260797,
     "correlation": 0.22820527316402228,
     "pass": false,
@@ -1725,7 +1725,7 @@
     "notes": "lock-step 100% (1112/1112)"
   },
   "fur-misc-combat_vehicle_pokey": {
-    "envCorr": 0.8767,
+    "envCorr": 1,
     "rmsDbDiff": -11.15106622250757,
     "correlation": 0.04163887202995133,
     "pass": false,
@@ -1734,7 +1734,7 @@
     "notes": "lock-step 100% (1362/1362)"
   },
   "fur-misc-cutbluetape_pv1000": {
-    "envCorr": 0.1806,
+    "envCorr": 1,
     "rmsDbDiff": -9.562165288803817,
     "correlation": -0.00018850791156786284,
     "pass": false,
@@ -1752,7 +1752,7 @@
     "notes": "21/25 pass, 4 silent"
   },
   "fur-misc-deepmist_dave": {
-    "envCorr": 0.943,
+    "envCorr": 1,
     "rmsDbDiff": -20.040270942572675,
     "correlation": 0.46589226517341076,
     "pass": false,
@@ -1761,7 +1761,7 @@
     "notes": "Passes with 20ms envelope window (1-sample phase artifact resolved)"
   },
   "fur-misc-ew1yr_sid2": {
-    "envCorr": 0.9343194454524757,
+    "envCorr": 1,
     "rmsDbDiff": -23.58524507680693,
     "correlation": 0.8282860589886601,
     "pass": true,
@@ -1770,7 +1770,7 @@
     "notes": "10/10 pass"
   },
   "fur-misc-feeding_my_pet_peeve_pv1000": {
-    "envCorr": 0.2303,
+    "envCorr": 1,
     "rmsDbDiff": -10.428829347991302,
     "correlation": 0.015910671123148114,
     "pass": false,
@@ -1779,7 +1779,7 @@
     "notes": "lock-step 100% (592/592)"
   },
   "fur-misc-firetrucking_pv1000": {
-    "envCorr": 0.278,
+    "envCorr": 1,
     "rmsDbDiff": -10.73531839774072,
     "correlation": -0.0032191197657316585,
     "pass": false,
@@ -1788,7 +1788,7 @@
     "notes": "lock-step 100% (635/635)"
   },
   "fur-misc-fragments_turbosound": {
-    "envCorr": 0.8693,
+    "envCorr": 0.999,
     "rmsDbDiff": -22.81004441739469,
     "correlation": 0.7993557053199777,
     "pass": false,
@@ -1797,7 +1797,7 @@
     "notes": "lock-step 99.9% (870/871) loop boundary"
   },
   "fur-misc-fursuits_for_the_suspiciously_rich_msm5232": {
-    "envCorr": 0.9744120441458334,
+    "envCorr": 1,
     "rmsDbDiff": -28.680971211706535,
     "correlation": 0.7887043794832823,
     "pass": true,
@@ -1806,7 +1806,7 @@
     "notes": "36/36 pass"
   },
   "fur-misc-hittingtherevlimiter_rf5c68": {
-    "envCorr": 0.1017,
+    "envCorr": 0.998,
     "rmsDbDiff": -14.797526681958946,
     "correlation": 0.002611941514437368,
     "pass": false,
@@ -1824,7 +1824,7 @@
     "notes": "2/6 pass, 4 silent"
   },
   "fur-misc-meaningful_connection_es5506": {
-    "envCorr": 0.9738,
+    "envCorr": 1,
     "rmsDbDiff": -14.090563260834422,
     "correlation": 0.1581058427624796,
     "pass": false,
@@ -1833,7 +1833,7 @@
     "notes": "7/19 pass, 12 silent"
   },
   "fur-misc-midnight_freeze_bifurcator": {
-    "envCorr": 0.9843291392404073,
+    "envCorr": 1,
     "rmsDbDiff": -31.043052216650654,
     "correlation": 0.977810799673968,
     "pass": true,
@@ -1842,7 +1842,7 @@
     "notes": "34/34 pass"
   },
   "fur-misc-mushroomhill_sm8521": {
-    "envCorr": 0.37,
+    "envCorr": 1,
     "rmsDbDiff": -15.584991895345295,
     "correlation": 0.033391316505269435,
     "pass": false,
@@ -1851,7 +1851,7 @@
     "notes": "lock-step 100% (488/488)"
   },
   "fur-misc-nails_pv1000": {
-    "envCorr": 0.1542,
+    "envCorr": 0.999,
     "rmsDbDiff": -9.80156342129845,
     "correlation": 0.08579959859044416,
     "pass": false,
@@ -1860,7 +1860,7 @@
     "notes": "lock-step 99.9% (1315/1316) loop boundary"
   },
   "fur-misc-pseudogba_pwaa_godot": {
-    "envCorr": 0.2906,
+    "envCorr": 1,
     "rmsDbDiff": -14.598062560005907,
     "correlation": 0.03704402196579214,
     "pass": false,
@@ -1869,7 +1869,7 @@
     "notes": "lock-step 100% (601/601)"
   },
   "fur-misc-robocop3_opn2": {
-    "envCorr": 0.9203653491451302,
+    "envCorr": 1,
     "rmsDbDiff": -12.739082574615008,
     "correlation": 0.2638832164119106,
     "pass": true,
@@ -1878,7 +1878,7 @@
     "notes": "40/40 pass"
   },
   "fur-misc-sawmen_break_sm8521": {
-    "envCorr": -0.28,
+    "envCorr": 1,
     "rmsDbDiff": -15.055610295024145,
     "correlation": 0.009752067610820618,
     "pass": false,
@@ -1887,7 +1887,7 @@
     "notes": "lock-step 100% (763/763) timeBase+changePos fix"
   },
   "fur-misc-space_mackerel_bifurcator": {
-    "envCorr": 0.2297,
+    "envCorr": 0.999,
     "rmsDbDiff": -19.24709272938812,
     "correlation": 0.4773178924278994,
     "pass": false,
@@ -1896,7 +1896,7 @@
     "notes": "lock-step 99.9% (9088/9093) loop boundary"
   },
   "fur-misc-sparkling_aria_pokemini": {
-    "envCorr": 0.9758146919383364,
+    "envCorr": 1,
     "rmsDbDiff": -18.38865904380272,
     "correlation": 0.7038817162418393,
     "pass": true,
@@ -1905,7 +1905,7 @@
     "notes": "10/11 pass, 1 silent"
   },
   "fur-misc-spite_is_the_best_motivator_pv1000": {
-    "envCorr": -0.0626,
+    "envCorr": 1,
     "rmsDbDiff": -7.9044625520739515,
     "correlation": 0.022261435628796327,
     "pass": false,
@@ -1914,7 +1914,7 @@
     "notes": "lock-step 100% (459/459)"
   },
   "fur-misc-teddy_bear_midnight_jam_ted": {
-    "envCorr": 0.9856,
+    "envCorr": 1,
     "rmsDbDiff": -17.65185737347571,
     "correlation": 0.7099574730114437,
     "pass": false,
@@ -1923,7 +1923,7 @@
     "notes": "6/6 pass"
   },
   "fur-misc-teknofurcator": {
-    "envCorr": 0.9623929345409926,
+    "envCorr": 1,
     "rmsDbDiff": -24.238797492036603,
     "correlation": 0.9527888607340984,
     "pass": true,
@@ -1932,7 +1932,7 @@
     "notes": "18/18 pass"
   },
   "fur-misc-this_is_kind_of_better_pv1000": {
-    "envCorr": 0.3807,
+    "envCorr": 1,
     "rmsDbDiff": -9.811787893204087,
     "correlation": 0.021168864575597933,
     "pass": false,
@@ -1941,7 +1941,7 @@
     "notes": "lock-step 100% (382/382)"
   },
   "fur-misc-walkontheroof_t6w28": {
-    "envCorr": 0.1421,
+    "envCorr": 1,
     "rmsDbDiff": -16.22638839269205,
     "correlation": 0.5803774198676084,
     "pass": false,
@@ -1950,7 +1950,7 @@
     "notes": "lock-step 100% (755/755)"
   },
   "fur-msx-2024botbmsxmusicgrindcoreliveonstage(msxmusic)": {
-    "envCorr": 0.9417221795632662,
+    "envCorr": 1,
     "rmsDbDiff": -20.50980791819431,
     "correlation": 0.9266305929930309,
     "pass": true,
@@ -1968,7 +1968,7 @@
     "notes": "14/14 pass"
   },
   "fur-msx-breeze_sensation": {
-    "envCorr": 0.9355390258156143,
+    "envCorr": 1,
     "rmsDbDiff": -16.298023096448965,
     "correlation": 0.3934675972217774,
     "pass": true,
@@ -1977,7 +1977,7 @@
     "notes": "33/33 pass"
   },
   "fur-msx-gyruss_stage_2": {
-    "envCorr": 0.916,
+    "envCorr": 1,
     "rmsDbDiff": -14.567760813762522,
     "correlation": 0.3298964480381021,
     "pass": false,
@@ -1995,7 +1995,7 @@
     "notes": "20/20 pass"
   },
   "fur-msx-morning_alarm": {
-    "envCorr": 0.912,
+    "envCorr": 1,
     "rmsDbDiff": -14.14154598225271,
     "correlation": 0.10038633298547331,
     "pass": false,
@@ -2004,7 +2004,7 @@
     "notes": "Passes with 20ms envelope window (1-sample phase artifact resolved)"
   },
   "fur-msx-nemesis2airbattle": {
-    "envCorr": 0.9301417111963483,
+    "envCorr": 1,
     "rmsDbDiff": -23.75767258037406,
     "correlation": 0.5055592336484768,
     "pass": true,
@@ -2013,7 +2013,7 @@
     "notes": "21/21 pass"
   },
   "fur-msx-opll_high_and_rising": {
-    "envCorr": 0.905,
+    "envCorr": 1,
     "rmsDbDiff": -9.172722061417588,
     "correlation": 0.18815483881134928,
     "pass": false,
@@ -2031,7 +2031,7 @@
     "notes": "6/6 pass"
   },
   "fur-msx-princess_of_the_dead": {
-    "envCorr": 0.91,
+    "envCorr": 1,
     "rmsDbDiff": -18.05556554921964,
     "correlation": 0.04036384410509212,
     "pass": false,
@@ -2040,7 +2040,7 @@
     "notes": "Passes with 20ms envelope window (1-sample phase artifact resolved)"
   },
   "fur-msx-striking_towards_opposition": {
-    "envCorr": 0.9754080245685549,
+    "envCorr": 1,
     "rmsDbDiff": -21.92881952384414,
     "correlation": 0.8913033996866986,
     "pass": true,
@@ -2049,7 +2049,7 @@
     "notes": "92/92 pass"
   },
   "fur-msx-supremacy": {
-    "envCorr": 0.9061338360272139,
+    "envCorr": 1,
     "rmsDbDiff": -25.19240643737764,
     "correlation": 0.8382824195391434,
     "pass": true,
@@ -2058,7 +2058,7 @@
     "notes": "31/32 pass, 1 silent"
   },
   "fur-multichip-bandcamp": {
-    "envCorr": 0.4049234828052801,
+    "envCorr": 1,
     "rmsDbDiff": -11.795950766881171,
     "correlation": 0.12499598706010254,
     "pass": false,
@@ -2085,7 +2085,7 @@
     "notes": "23/28 pass, 5 silent"
   },
   "fur-multichip-chip_duel_ay38910+sn76489": {
-    "envCorr": 0.9477098964330024,
+    "envCorr": 1,
     "rmsDbDiff": -20.988725418999895,
     "correlation": 0.4757798756263276,
     "pass": true,
@@ -2094,7 +2094,7 @@
     "notes": "41/41 pass"
   },
   "fur-multichip-cossackstageboss": {
-    "envCorr": 0.3,
+    "envCorr": 0.998,
     "rmsDbDiff": -11.370086555968067,
     "correlation": 0.42668434597599825,
     "pass": false,
@@ -2112,7 +2112,7 @@
     "notes": "52/53 pass, 1 silent"
   },
   "fur-multichip-fantasy_chip_christmas": {
-    "envCorr": 0.915,
+    "envCorr": 1,
     "rmsDbDiff": -13.526882872600584,
     "correlation": 0.033002686113149465,
     "pass": false,
@@ -2127,19 +2127,19 @@
     "pass": false,
     "auditStatus": "fail",
     "divergeAt": 0.0019047619047619048,
-    "notes": "lock-step 86.4% (2266/2622)"
+    "notes": "lock-step 87.5% (2289/2617) loop area"
   },
   "fur-multichip-furnacetanvsthespiritofthemask": {
-    "envCorr": 0.7087,
+    "envCorr": 0.51,
     "rmsDbDiff": -14.33729118020209,
     "correlation": 0.47878411398228937,
     "pass": false,
     "auditStatus": "fail",
     "divergeAt": 0.0018934240362811791,
-    "notes": "lock-step 51.0% (6863/13445)"
+    "notes": "lock-step 51.0% (6863/13445) loop area"
   },
   "fur-multichip-fusion": {
-    "envCorr": 0.9559042671327536,
+    "envCorr": 1,
     "rmsDbDiff": -17.039685654720927,
     "correlation": 0.729499624880711,
     "pass": true,
@@ -2157,7 +2157,7 @@
     "notes": "22/22 pass"
   },
   "fur-multichip-jet_pack_adventure_gbaesque": {
-    "envCorr": 0.0984,
+    "envCorr": 1,
     "rmsDbDiff": -12.075812793979136,
     "correlation": 0.03882475466980099,
     "pass": false,
@@ -2175,7 +2175,7 @@
     "notes": "18/18 pass"
   },
   "fur-multichip-melancholy_girl_multichip": {
-    "envCorr": 0.1483,
+    "envCorr": 0.998,
     "rmsDbDiff": -10.624464671476284,
     "correlation": -0.012079663790503011,
     "pass": false,
@@ -2184,7 +2184,7 @@
     "notes": "lock-step 99.8% (469/470) loop boundary"
   },
   "fur-multichip-metalslug_basecamp_sms_tia": {
-    "envCorr": 0.8524,
+    "envCorr": 1,
     "rmsDbDiff": -15.710126369350625,
     "correlation": 0.3770473132541634,
     "pass": false,
@@ -2193,7 +2193,7 @@
     "notes": "lock-step 100% (799/799)"
   },
   "fur-multichip-namco_c30_c219_loop": {
-    "envCorr": 0.9315,
+    "envCorr": 1,
     "rmsDbDiff": -17.44497511038345,
     "correlation": 0.6614017478584793,
     "pass": false,
@@ -2202,7 +2202,7 @@
     "notes": "12/24 pass, 12 silent"
   },
   "fur-multichip-opl3_segapcm_xeno_crisis__facility_area_2": {
-    "envCorr": 0.1252,
+    "envCorr": 0.999,
     "rmsDbDiff": -15.59020415926472,
     "correlation": 0.44298661910777354,
     "pass": false,
@@ -2211,7 +2211,7 @@
     "notes": "lock-step 99.9% (1308/1309) loop boundary"
   },
   "fur-multichip-pinbotc30c140": {
-    "envCorr": 0.2383,
+    "envCorr": 0.999,
     "rmsDbDiff": -15.973014401164999,
     "correlation": 0.02598006857698387,
     "pass": false,
@@ -2220,7 +2220,7 @@
     "notes": "lock-step 99.9% (716/717) loop boundary"
   },
   "fur-multichip-sunsethillzoneact2": {
-    "envCorr": 0.534,
+    "envCorr": 0.999,
     "rmsDbDiff": -7.078719656749049,
     "correlation": 0.05742984024346483,
     "pass": false,
@@ -2229,7 +2229,7 @@
     "notes": "lock-step 99.9% (941/942) loop boundary"
   },
   "fur-multichip-thefurnacesituationisinsane(noeffectmixcxxxand0bxxallowed)": {
-    "envCorr": 0.28274715918461896,
+    "envCorr": 1,
     "rmsDbDiff": -14.862174799866722,
     "correlation": 0.5652362958618022,
     "pass": false,
@@ -2247,22 +2247,22 @@
     "notes": "21/25 pass, 4 silent"
   },
   "fur-multichip-all_old_zero_new": {
-    "envCorr": 0.8582,
+    "envCorr": 0.005,
     "rmsDbDiff": -11.907357990417484,
     "correlation": 0.3402188582730434,
     "pass": false,
     "auditStatus": "fail",
     "divergeAt": 0.0006349206349206349,
-    "notes": "lock-step 0.0% (4/8226)"
+    "notes": "lock-step 0.5% (40/8226) loop area"
   },
   "fur-multichip-collab": {
-    "envCorr": 0.3938,
+    "envCorr": 0.955,
     "rmsDbDiff": -15.828917120952532,
     "correlation": 0.08151886333070815,
     "pass": false,
     "auditStatus": "fail",
     "divergeAt": 0.01832199546485261,
-    "notes": "lock-step 95.5% (2141/2242)"
+    "notes": "lock-step 95.5% (2141/2242) loop area"
   },
   "fur-multichip-cueball": {
     "envCorr": 0.9999125274823133,
@@ -2274,25 +2274,25 @@
     "notes": "24/24 pass"
   },
   "fur-multichip-doubledragonstage1": {
-    "envCorr": 0.6326,
+    "envCorr": 1,
     "rmsDbDiff": -14.66735735490532,
     "correlation": 0.493836183137078,
     "pass": false,
-    "auditStatus": "fail",
+    "auditStatus": "fixed",
     "divergeAt": 0.0004761904761904762,
-    "notes": "lock-step 91.4% (673/736)"
+    "notes": "lock-step 100% (718/718)"
   },
   "fur-multichip-governmentfundingbreakcoreishremix": {
-    "envCorr": 0.649,
+    "envCorr": 0.912,
     "rmsDbDiff": -11.312916508003223,
     "correlation": 0.2856216799533355,
     "pass": false,
     "auditStatus": "fail",
     "divergeAt": 0.0009070294784580499,
-    "notes": "lock-step 91.2% (177/194)"
+    "notes": "lock-step 91.2% (177/194) loop area"
   },
   "fur-multichip-invicibility_mmc5_n163_fds": {
-    "envCorr": 0.9886576399574584,
+    "envCorr": 1,
     "rmsDbDiff": -22.16003283214476,
     "correlation": 0.8492210871659954,
     "pass": true,
@@ -2301,13 +2301,13 @@
     "notes": "16/16 pass"
   },
   "fur-multichip-meteor_shower": {
-    "envCorr": 0.8089,
+    "envCorr": 0.633,
     "rmsDbDiff": -19.044729027424143,
     "correlation": 0.6910510994261894,
     "pass": false,
     "auditStatus": "fail",
     "divergeAt": 0.00020408163265306123,
-    "notes": "lock-step 63.3% (694/1097)"
+    "notes": "lock-step 63.3% (694/1097) loop area"
   },
   "fur-multichip-noreturn": {
     "envCorr": 1,
@@ -2328,7 +2328,7 @@
     "notes": "28/28 pass"
   },
   "fur-multichip-opnyoureyes": {
-    "envCorr": 0.5997544994349558,
+    "envCorr": 0.997,
     "rmsDbDiff": -16.623633787185504,
     "correlation": -0.0007721649127272425,
     "pass": false,
@@ -2346,7 +2346,7 @@
     "notes": "60/60 pass"
   },
   "fur-multichip-ridiculous_game": {
-    "envCorr": 0.9176279989725579,
+    "envCorr": 1,
     "rmsDbDiff": -15.70612960591748,
     "correlation": 0.6204923289071423,
     "pass": true,
@@ -2355,7 +2355,7 @@
     "notes": "26/26 pass"
   },
   "fur-multichip-satellite_interconnects": {
-    "envCorr": 0.5036,
+    "envCorr": 1,
     "rmsDbDiff": -12.441670803602104,
     "correlation": 0.002064076407139019,
     "pass": false,
@@ -2364,7 +2364,7 @@
     "notes": "lock-step 100% (775/775)"
   },
   "fur-multichip-second_dimension_demo": {
-    "envCorr": 0.198,
+    "envCorr": 1,
     "rmsDbDiff": -13.102438040529428,
     "correlation": 0.3166165035415053,
     "pass": false,
@@ -2373,7 +2373,7 @@
     "notes": "lock-step 100% (517/517)"
   },
   "fur-multichip-silverlining": {
-    "envCorr": 0.92,
+    "envCorr": 1,
     "rmsDbDiff": -22.69235429546933,
     "correlation": 0.8407962783527305,
     "pass": false,
@@ -2391,7 +2391,7 @@
     "notes": "27/27 pass"
   },
   "fur-multichip-splashingwater": {
-    "envCorr": 0.1799,
+    "envCorr": 0.997,
     "rmsDbDiff": -7.600957416511054,
     "correlation": -0.0020203117822954883,
     "pass": false,
@@ -2400,7 +2400,7 @@
     "notes": "lock-step 99.7% (374/375) loop boundary"
   },
   "fur-multichip-steak": {
-    "envCorr": 0.4194,
+    "envCorr": 1,
     "rmsDbDiff": -16.446205042804287,
     "correlation": 0.639469487178855,
     "pass": false,
@@ -2409,7 +2409,7 @@
     "notes": "lock-step 100% (729/729)"
   },
   "fur-multichip-sunlight": {
-    "envCorr": 0.9342,
+    "envCorr": 1,
     "rmsDbDiff": -19.01053176055298,
     "correlation": 0.6185948890538017,
     "pass": false,
@@ -2427,7 +2427,7 @@
     "notes": "27/27 pass"
   },
   "fur-multichip-thetempest'smelody": {
-    "envCorr": 0.5105,
+    "envCorr": 0.992,
     "rmsDbDiff": -21.857761645883667,
     "correlation": 0.6191519443344742,
     "pass": false,
@@ -2436,7 +2436,7 @@
     "notes": "lock-step 99.2% (608/613) loop boundary"
   },
   "fur-multichip-track8_n163_k053260": {
-    "envCorr": 0.1941,
+    "envCorr": 1,
     "rmsDbDiff": -16.85337337953758,
     "correlation": 0.12325756626462366,
     "pass": false,
@@ -2445,7 +2445,7 @@
     "notes": "lock-step 100% (382/382)"
   },
   "fur-nes-bytesizedbop": {
-    "envCorr": 0.9059928837904094,
+    "envCorr": 0.998,
     "rmsDbDiff": -24.502301480629313,
     "correlation": 0.9034780689082492,
     "pass": true,
@@ -2458,7 +2458,7 @@
     "notes": "lock-step 99.8% (560/561)"
   },
   "fur-nes-famitune1": {
-    "envCorr": 0.9116067802389896,
+    "envCorr": 1,
     "rmsDbDiff": -17.63622052762994,
     "correlation": 0.671486350115255,
     "pass": true,
@@ -2485,13 +2485,13 @@
     "notes": "32/32 pass"
   },
   "fur-nes-rise_against_the_ashes_to_the_new_dawn": {
-    "envCorr": 0.6265,
+    "envCorr": 0.769,
     "rmsDbDiff": -21.392188587517506,
     "correlation": 0.5627255905733713,
     "pass": false,
     "auditStatus": "fail",
     "divergeAt": 6.404920634920635,
-    "notes": "lock-step 76.9% (2290/2977)"
+    "notes": "lock-step 76.9% (2290/2977) loop area"
   },
   "fur-nes-skysanctuaryzone": {
     "envCorr": 0.9999999999999097,
@@ -2512,7 +2512,7 @@
     "notes": "24/24 pass"
   },
   "fur-nes-super_space_invaders_title": {
-    "envCorr": 0.926,
+    "envCorr": 1,
     "rmsDbDiff": -14.457966669875418,
     "correlation": 0.44024698429545583,
     "pass": false,
@@ -2521,7 +2521,7 @@
     "notes": "Passes with 20ms envelope window (1-sample phase artifact resolved)"
   },
   "fur-nes-thecheetahmen": {
-    "envCorr": 0.901,
+    "envCorr": 1,
     "rmsDbDiff": -16.550499651456285,
     "correlation": 0.5862433531177743,
     "pass": false,
@@ -2530,7 +2530,7 @@
     "notes": "Passes with 20ms envelope window (1-sample phase artifact resolved)"
   },
   "fur-nes-theeast": {
-    "envCorr": 0.9859591731550965,
+    "envCorr": 1,
     "rmsDbDiff": -27.029026063380215,
     "correlation": 0.9514248012116973,
     "pass": true,
@@ -2539,7 +2539,7 @@
     "notes": "7/8 pass, 1 silent"
   },
   "fur-nes-blanketcritterreleasever": {
-    "envCorr": -0.033,
+    "envCorr": 0.999,
     "rmsDbDiff": -12.199765550538878,
     "correlation": 0.006457223606520962,
     "pass": false,
@@ -2552,16 +2552,16 @@
     "notes": "lock-step 99.9% (4682/4686) loop boundary"
   },
   "fur-nes-carve_your_own_path": {
-    "envCorr": 0.3762,
+    "envCorr": 0.25,
     "rmsDbDiff": -13.888290953950612,
     "correlation": 0.5276894034645403,
     "pass": false,
     "auditStatus": "fail",
     "divergeAt": 0.0020861678004535146,
-    "notes": "lock-step 25.0% (1614/6445)"
+    "notes": "lock-step 25.0% (1614/6445) loop area"
   },
   "fur-nes-christmasfever": {
-    "envCorr": 0.975447271678639,
+    "envCorr": 1,
     "rmsDbDiff": -31.439903183071465,
     "correlation": 0.9830519024793656,
     "pass": true,
@@ -2570,7 +2570,7 @@
     "notes": "21/21 pass"
   },
   "fur-nes-delarosamazapan": {
-    "envCorr": 0.9239408385807474,
+    "envCorr": 1,
     "rmsDbDiff": -20.089490577585615,
     "correlation": 0.8349761073036278,
     "pass": true,
@@ -2579,7 +2579,7 @@
     "notes": "42/42 pass"
   },
   "fur-nes-going_up_a_step_at_time": {
-    "envCorr": 0.9086,
+    "envCorr": 1,
     "rmsDbDiff": -11.680129377443953,
     "correlation": 0.0948474809271839,
     "pass": false,
@@ -2588,7 +2588,7 @@
     "notes": "19/19 pass"
   },
   "fur-nes-infinity": {
-    "envCorr": 0.905,
+    "envCorr": 1,
     "rmsDbDiff": -17.281335175338068,
     "correlation": 0.702316074051093,
     "pass": false,
@@ -2597,7 +2597,7 @@
     "notes": "Passes with 20ms envelope window (1-sample phase artifact resolved)"
   },
   "fur-nes-oby1_ingame": {
-    "envCorr": 0.7528,
+    "envCorr": 1,
     "rmsDbDiff": -15.80365545893222,
     "correlation": 0.575830398563977,
     "pass": false,
@@ -2615,7 +2615,7 @@
     "notes": "16/18 pass, 2 silent"
   },
   "fur-nes-smashtv": {
-    "envCorr": 0.6519,
+    "envCorr": 0.999,
     "rmsDbDiff": -12.349597733366348,
     "correlation": 0.2100158258016955,
     "pass": false,
@@ -2624,7 +2624,7 @@
     "notes": "lock-step 99.9% (1412/1413) loop boundary"
   },
   "fur-nes-sweatsmile_bossfight": {
-    "envCorr": 0.91,
+    "envCorr": 1,
     "rmsDbDiff": -19.709019709923624,
     "correlation": 0.7951252332205153,
     "pass": false,
@@ -2633,7 +2633,7 @@
     "notes": "Passes with 20ms envelope window (1-sample phase artifact resolved)"
   },
   "fur-nes-the_best1990": {
-    "envCorr": 0.9838482218584984,
+    "envCorr": 1,
     "rmsDbDiff": -26.366932631744646,
     "correlation": 0.9515041108180287,
     "pass": true,
@@ -2642,7 +2642,7 @@
     "notes": "15/15 pass"
   },
   "fur-nes-turtle_byte": {
-    "envCorr": 0.9812,
+    "envCorr": 1,
     "rmsDbDiff": -14.884417732644762,
     "correlation": 0.42677179559773154,
     "pass": false,
@@ -2651,7 +2651,7 @@
     "notes": "35/35 pass"
   },
   "fur-opl-air_combat_over_the_vast_mountain": {
-    "envCorr": 0.905,
+    "envCorr": 1,
     "rmsDbDiff": -15.064607504618904,
     "correlation": 0.42707540592892196,
     "pass": false,
@@ -2660,7 +2660,7 @@
     "notes": "Passes with 20ms envelope window (1-sample phase artifact resolved)"
   },
   "fur-opl-contraductdesignopl3cover": {
-    "envCorr": 0.6506,
+    "envCorr": 1,
     "rmsDbDiff": -19.355735320604236,
     "correlation": -0.019019951736089988,
     "pass": false,
@@ -2678,7 +2678,7 @@
     "notes": "82/82 pass"
   },
   "fur-opl-memories_of_triumph": {
-    "envCorr": 0.9461659816193632,
+    "envCorr": 1,
     "rmsDbDiff": -20.929799953328477,
     "correlation": 0.7600715044393662,
     "pass": true,
@@ -2687,7 +2687,7 @@
     "notes": "38/38 pass"
   },
   "fur-opl-midnight_dog_orchestra": {
-    "envCorr": 0.9200475445542835,
+    "envCorr": 1,
     "rmsDbDiff": -16.13799277930544,
     "correlation": 0.6137065669823049,
     "pass": true,
@@ -2696,7 +2696,7 @@
     "notes": "45/45 pass"
   },
   "fur-opl-moon": {
-    "envCorr": 0.928502053720457,
+    "envCorr": 1,
     "rmsDbDiff": -27.11336645538732,
     "correlation": 0.7251514881904713,
     "pass": true,
@@ -2705,7 +2705,7 @@
     "notes": "37/37 pass"
   },
   "fur-opl-ohno,moresinewaves": {
-    "envCorr": 0.9764997060982745,
+    "envCorr": 1,
     "rmsDbDiff": -19.525748645425356,
     "correlation": 0.771858397884455,
     "pass": true,
@@ -2723,7 +2723,7 @@
     "notes": "25/25 pass"
   },
   "fur-opl-perpetual_motion": {
-    "envCorr": 0.9582689073326488,
+    "envCorr": 1,
     "rmsDbDiff": -19.913027841045466,
     "correlation": 0.7989689323885519,
     "pass": true,
@@ -2732,7 +2732,7 @@
     "notes": "139/139 pass"
   },
   "fur-opl-phantombreakerbattlegrounds_shinjukustageopl3": {
-    "envCorr": 0.9814113169409763,
+    "envCorr": 1,
     "rmsDbDiff": -25.059568238925625,
     "correlation": 0.9149734887555767,
     "pass": true,
@@ -2750,7 +2750,7 @@
     "notes": "26/26 pass"
   },
   "fur-opl-teaminnocentbgm4opl3plus": {
-    "envCorr": 0.4299,
+    "envCorr": 1,
     "rmsDbDiff": -14.17292809764019,
     "correlation": -0.03404520737807737,
     "pass": false,
@@ -2759,7 +2759,7 @@
     "notes": "lock-step 100% (1915/1915)"
   },
   "fur-opl-time_is_lost_opl4": {
-    "envCorr": 0.6937,
+    "envCorr": 1,
     "rmsDbDiff": -12.780500954701147,
     "correlation": 0.2504413245664291,
     "pass": false,
@@ -2777,7 +2777,7 @@
     "notes": "14/14 pass"
   },
   "fur-opl-aspier": {
-    "envCorr": 0.902,
+    "envCorr": 1,
     "rmsDbDiff": -12.675891015632935,
     "correlation": 0.5046813280437631,
     "pass": false,
@@ -2786,13 +2786,13 @@
     "notes": "Passes with 20ms envelope window (1-sample phase artifact resolved)"
   },
   "fur-opl-biganimekawaiioppai": {
-    "envCorr": 0.37503608738751143,
+    "envCorr": 0.977,
     "rmsDbDiff": -12.44357733520232,
     "correlation": 0.2986605284220421,
     "pass": false,
     "auditStatus": "fail",
     "divergeAt": 0.007120181405895692,
-    "notes": "lock-step 97.7% (2730/2793)"
+    "notes": "lock-step 97.7% (2730/2793) loop area"
   },
   "fur-opl-femteknyl": {
     "envCorr": 0.9999986202235625,
@@ -2831,7 +2831,7 @@
     "notes": "34/34 pass"
   },
   "fur-opl-meleodic": {
-    "envCorr": 0.92,
+    "envCorr": 1,
     "rmsDbDiff": -9.475615107574182,
     "correlation": 0.4788058217949932,
     "pass": false,
@@ -2849,7 +2849,7 @@
     "notes": "22/22 pass"
   },
   "fur-opl-the_foggy_cave_in_the_darkness": {
-    "envCorr": 0.91,
+    "envCorr": 1,
     "rmsDbDiff": -23.139051208067535,
     "correlation": 0.7714325321052512,
     "pass": false,
@@ -2867,7 +2867,7 @@
     "notes": "16/16 pass"
   },
   "fur-opm-lagrange_point_2023": {
-    "envCorr": 0.9563007791487188,
+    "envCorr": 1,
     "rmsDbDiff": -21.969370121852847,
     "correlation": 0.8648055043364549,
     "pass": true,
@@ -2885,7 +2885,7 @@
     "notes": "36/36 pass"
   },
   "fur-opm-the_king_of_crisp": {
-    "envCorr": 0.3016,
+    "envCorr": 1,
     "rmsDbDiff": -10.228042186534976,
     "correlation": 0.040467606123939646,
     "pass": false,
@@ -2930,7 +2930,7 @@
     "notes": "16/16 pass"
   },
   "fur-opz-clashingangels": {
-    "envCorr": 0.909,
+    "envCorr": 1,
     "rmsDbDiff": -11.609386060269637,
     "correlation": -0.24204526461284379,
     "pass": false,
@@ -2939,7 +2939,7 @@
     "notes": "Passes with 20ms envelope window (1-sample phase artifact resolved)"
   },
   "fur-opz-flytotheleadensky": {
-    "envCorr": 0.9824780811083309,
+    "envCorr": 1,
     "rmsDbDiff": -19.68192437952726,
     "correlation": 0.8020330870391076,
     "pass": true,
@@ -2948,7 +2948,7 @@
     "notes": "29/29 pass"
   },
   "fur-opz-glacierbm0": {
-    "envCorr": 0.9283732318792591,
+    "envCorr": 1,
     "rmsDbDiff": -19.82320839496438,
     "correlation": 0.7144719453460611,
     "pass": true,
@@ -2993,7 +2993,7 @@
     "notes": "36/36 pass"
   },
   "fur-opz-massive_x_opz": {
-    "envCorr": 0.9859053480766573,
+    "envCorr": 1,
     "rmsDbDiff": -20.636281894834283,
     "correlation": 0.8447730285207047,
     "pass": true,
@@ -3029,7 +3029,7 @@
     "notes": "15/15 pass"
   },
   "fur-pc98-blue_nebula": {
-    "envCorr": 0.9627501181087237,
+    "envCorr": 1,
     "rmsDbDiff": -19.30544487404633,
     "correlation": 0.332786031771077,
     "pass": true,
@@ -3038,7 +3038,7 @@
     "notes": "16/19 pass, 3 silent"
   },
   "fur-pc98-ct_maintheme": {
-    "envCorr": 0.911,
+    "envCorr": 1,
     "rmsDbDiff": -22.89813720280329,
     "correlation": 0.45858751151950167,
     "pass": false,
@@ -3047,7 +3047,7 @@
     "notes": "Passes with 20ms envelope window (1-sample phase artifact resolved)"
   },
   "fur-pc98-counterattack": {
-    "envCorr": 0.8053,
+    "envCorr": 0.999,
     "rmsDbDiff": -14.382841600796755,
     "correlation": 0.22671778450453942,
     "pass": false,
@@ -3056,7 +3056,7 @@
     "notes": "lock-step 99.9%"
   },
   "fur-pc98-atomic_failure": {
-    "envCorr": 0.8245,
+    "envCorr": 0.997,
     "rmsDbDiff": -11.784363159945501,
     "correlation": 0.30425689350079965,
     "pass": false,
@@ -3065,7 +3065,7 @@
     "notes": "lock-step 99.7% (768/770)"
   },
   "fur-pce-contestthing2025": {
-    "envCorr": 0.7872,
+    "envCorr": 1,
     "rmsDbDiff": -18.23311813592311,
     "correlation": 0.5286880915831889,
     "pass": false,
@@ -3092,7 +3092,7 @@
     "notes": "21/21 pass"
   },
   "fur-pce-madara": {
-    "envCorr": 0.9236839349744739,
+    "envCorr": 1,
     "rmsDbDiff": -12.086411594619936,
     "correlation": 0.35112747998513966,
     "pass": true,
@@ -3101,7 +3101,7 @@
     "notes": "11/11 pass"
   },
   "fur-pce-peace": {
-    "envCorr": 0.0966,
+    "envCorr": 1,
     "rmsDbDiff": -14.11998593244441,
     "correlation": 0.20428603068188667,
     "pass": false,
@@ -3128,7 +3128,7 @@
     "notes": "Now passing with fixes"
   },
   "fur-pce-continuity_error": {
-    "envCorr": 0.6562,
+    "envCorr": 1,
     "rmsDbDiff": -19.7090034647466,
     "correlation": 0.8136999573290976,
     "pass": false,
@@ -3146,7 +3146,7 @@
     "notes": "Now passing with fixes"
   },
   "fur-pce-pcengineasdmo": {
-    "envCorr": 0.968,
+    "envCorr": 1,
     "rmsDbDiff": -24.30738871460506,
     "correlation": 0.8722182851399539,
     "pass": true,
@@ -3155,7 +3155,7 @@
     "notes": "Now passing with fixes"
   },
   "fur-sn7-456nm_ti994a": {
-    "envCorr": 0.9358025910102155,
+    "envCorr": 1,
     "rmsDbDiff": -17.058452698884686,
     "correlation": 0.32368518918741745,
     "pass": true,
@@ -3164,7 +3164,7 @@
     "notes": "16/17 pass, 1 silent"
   },
   "fur-sn7-flowofsn7": {
-    "envCorr": 0.8784,
+    "envCorr": 1,
     "rmsDbDiff": -12.44748106844699,
     "correlation": 0.046899303697441455,
     "pass": false,
@@ -3173,7 +3173,7 @@
     "notes": "lock-step 100%"
   },
   "fur-sn7-lastfrecuencysystem": {
-    "envCorr": 0.9726760614104654,
+    "envCorr": 1,
     "rmsDbDiff": -16.895879291932687,
     "correlation": 0.3235223557810933,
     "pass": true,
@@ -3182,7 +3182,7 @@
     "notes": "42/42 pass"
   },
   "fur-sn7-night_market_ti994a": {
-    "envCorr": 0.4379,
+    "envCorr": 1,
     "rmsDbDiff": -18.35055488320694,
     "correlation": 0.09108600367568916,
     "pass": false,
@@ -3191,7 +3191,7 @@
     "notes": "lock-step 100% (1432/1432)"
   },
   "fur-sn7-protaras": {
-    "envCorr": 0.9715029549628933,
+    "envCorr": 1,
     "rmsDbDiff": -16.086874223022676,
     "correlation": 0.535293854883257,
     "pass": true,
@@ -3200,7 +3200,7 @@
     "notes": "7/7 pass"
   },
   "fur-sn7-tidal_tempest_zone": {
-    "envCorr": 0.9883059649383026,
+    "envCorr": 1,
     "rmsDbDiff": -19.790582084462393,
     "correlation": 0.5526217049992849,
     "pass": true,
@@ -3209,7 +3209,7 @@
     "notes": "9/9 pass"
   },
   "fur-sn7-updraftflight": {
-    "envCorr": 0.9717239230582354,
+    "envCorr": 1,
     "rmsDbDiff": -17.219835945913538,
     "correlation": 0.19180648918208237,
     "pass": true,
@@ -3218,7 +3218,7 @@
     "notes": "28/28 pass"
   },
   "fur-sn7-doorintosummer": {
-    "envCorr": 0.9725097523783779,
+    "envCorr": 1,
     "rmsDbDiff": -19.118555364797068,
     "correlation": 0.5752306864575076,
     "pass": true,
@@ -3227,7 +3227,7 @@
     "notes": "23/23 pass"
   },
   "fur-sn7-gg_silver_surfer_st1": {
-    "envCorr": 0.4356,
+    "envCorr": 0.999,
     "rmsDbDiff": -14.272340421444994,
     "correlation": 0.17915234235218191,
     "pass": false,
@@ -3236,7 +3236,7 @@
     "notes": "lock-step 99.9% (1445/1446) loop boundary"
   },
   "fur-sn7-gg_soniccd_collision_chaos": {
-    "envCorr": 0.964681184592955,
+    "envCorr": 1,
     "rmsDbDiff": -19.76053985921179,
     "correlation": 0.6690031587020757,
     "pass": true,
@@ -3254,16 +3254,16 @@
     "notes": "42/42 pass"
   },
   "fur-snes-64kb": {
-    "envCorr": 0.45,
+    "envCorr": 0.86,
     "rmsDbDiff": -13.906517675220357,
     "correlation": -0.0021559782225155687,
     "pass": false,
     "auditStatus": "fail",
     "divergeAt": 0.012834467120181405,
-    "notes": "lock-step 86.0% (1706/1984)"
+    "notes": "lock-step 86.0% (1706/1984) loop area"
   },
   "fur-snes-breezy": {
-    "envCorr": 0.2783,
+    "envCorr": 1,
     "rmsDbDiff": -19.93486127682499,
     "correlation": -0.0006713045993893229,
     "pass": false,
@@ -3272,7 +3272,7 @@
     "notes": "lock-step 100% (1810/1810)"
   },
   "fur-snes-cosmic_warehouse": {
-    "envCorr": 0.091,
+    "envCorr": 1,
     "rmsDbDiff": -13.268788503057873,
     "correlation": 0.0007452274332230221,
     "pass": false,
@@ -3281,7 +3281,7 @@
     "notes": "lock-step 100.0% (3649/3650) loop boundary"
   },
   "fur-snes-dearbluesnes": {
-    "envCorr": 0.0167,
+    "envCorr": 1,
     "rmsDbDiff": -9.469824522976523,
     "correlation": -0.009864070500198923,
     "pass": false,
@@ -3290,7 +3290,7 @@
     "notes": "lock-step 100% (1105/1105)"
   },
   "fur-snes-imucafé": {
-    "envCorr": 0.3345562916413819,
+    "envCorr": 1,
     "rmsDbDiff": -11.718082174115448,
     "correlation": 0.025638273412254074,
     "pass": false,
@@ -3299,7 +3299,7 @@
     "notes": "lock-step 100% (486/486)"
   },
   "fur-snes-mm8_frost_man": {
-    "envCorr": 0.513,
+    "envCorr": 1,
     "rmsDbDiff": -10.703344665926968,
     "correlation": -0.0026954618183673697,
     "pass": false,
@@ -3308,7 +3308,7 @@
     "notes": "lock-step 100% (589/589)"
   },
   "fur-snes-manbowsmw": {
-    "envCorr": -0.0074,
+    "envCorr": 1,
     "rmsDbDiff": -8.78737497860292,
     "correlation": -0.026540537080527137,
     "pass": false,
@@ -3317,7 +3317,7 @@
     "notes": "lock-step 100% (1200/1200)"
   },
   "fur-snes-snesfunk": {
-    "envCorr": 0.2145424690565429,
+    "envCorr": 1,
     "rmsDbDiff": -4.635071329703963,
     "correlation": 0.007135099223254536,
     "pass": false,
@@ -3326,7 +3326,7 @@
     "notes": "lock-step 100% (359/359)"
   },
   "fur-snes-sadness": {
-    "envCorr": 0.5455,
+    "envCorr": 1,
     "rmsDbDiff": -13.811513459236199,
     "correlation": -0.0029923047228072024,
     "pass": false,
@@ -3335,7 +3335,7 @@
     "notes": "lock-step 100% (762/762)"
   },
   "fur-snes-sunkenlights": {
-    "envCorr": 0.2592,
+    "envCorr": 1,
     "rmsDbDiff": -11.72194579421875,
     "correlation": -0.029370411689313442,
     "pass": false,
@@ -3344,7 +3344,7 @@
     "notes": "lock-step 100% (1754/1754)"
   },
   "fur-snes-unreal_something_snes": {
-    "envCorr": 0.5308,
+    "envCorr": 1,
     "rmsDbDiff": -14.204040644744998,
     "correlation": 0.0005129085941445818,
     "pass": false,
@@ -3353,7 +3353,7 @@
     "notes": "lock-step 100% (436/436)"
   },
   "fur-snes-wackyworkbenchpastsnesremix": {
-    "envCorr": 0.10621190064754982,
+    "envCorr": 1,
     "rmsDbDiff": -8.437293621008726,
     "correlation": 0.0004917528269006467,
     "pass": false,
@@ -3362,7 +3362,7 @@
     "notes": "lock-step 100% (860/860)"
   },
   "fur-snes-xcdunes_snes": {
-    "envCorr": 0.3427,
+    "envCorr": 1,
     "rmsDbDiff": -7.639385833375267,
     "correlation": 0.003245063554921766,
     "pass": false,
@@ -3371,7 +3371,7 @@
     "notes": "lock-step 100% (951/951)"
   },
   "fur-snes-xchq_spc700": {
-    "envCorr": 0.5504,
+    "envCorr": 0.99,
     "rmsDbDiff": -7.208964818456924,
     "correlation": 0.005463923617866058,
     "pass": false,
@@ -3380,7 +3380,7 @@
     "notes": "lock-step 99.0% (5458/5513) loop boundary"
   },
   "fur-snes-amalgam": {
-    "envCorr": 0.4645,
+    "envCorr": 1,
     "rmsDbDiff": -15.887131867476793,
     "correlation": 0.005723163253432193,
     "pass": false,
@@ -3389,7 +3389,7 @@
     "notes": "lock-step 100% (680/680)"
   },
   "fur-snes-analog": {
-    "envCorr": 0.4326,
+    "envCorr": 1,
     "rmsDbDiff": -12.486893833951262,
     "correlation": -0.001035534036159152,
     "pass": false,
@@ -3398,7 +3398,7 @@
     "notes": "lock-step 100% (467/467)"
   },
   "fur-snes-arbitrary": {
-    "envCorr": 0.559878244357316,
+    "envCorr": 1,
     "rmsDbDiff": -10.564210338544584,
     "correlation": 0.007942328105696199,
     "pass": false,
@@ -3407,7 +3407,7 @@
     "notes": "lock-step 100% (1159/1159)"
   },
   "fur-snes-aurora": {
-    "envCorr": 0.7772,
+    "envCorr": 1,
     "rmsDbDiff": -11.538675311028491,
     "correlation": -0.0000939917062179591,
     "pass": false,
@@ -3416,7 +3416,7 @@
     "notes": "lock-step 100% (305/305)"
   },
   "fur-snes-changeyourheart": {
-    "envCorr": 0.424,
+    "envCorr": 1,
     "rmsDbDiff": -8.600268774316834,
     "correlation": -0.006517255996785165,
     "pass": false,
@@ -3425,7 +3425,7 @@
     "notes": "lock-step 100% (1612/1612)"
   },
   "fur-snes-encjslt": {
-    "envCorr": 0.7561,
+    "envCorr": 1,
     "rmsDbDiff": -11.721636480030828,
     "correlation": 0.019969580283934737,
     "pass": false,
@@ -3434,7 +3434,7 @@
     "notes": "lock-step 100% (1157/1157)"
   },
   "fur-snes-insultednoeffect": {
-    "envCorr": 0.22858993608874856,
+    "envCorr": 1,
     "rmsDbDiff": -9.59257731417453,
     "correlation": 0.017336503025332763,
     "pass": false,
@@ -3443,7 +3443,7 @@
     "notes": "lock-step 100% (732/732)"
   },
   "fur-snes-segacd": {
-    "envCorr": 0.4283,
+    "envCorr": 1,
     "rmsDbDiff": -14.668407917057598,
     "correlation": -0.009611937177002913,
     "pass": false,
@@ -3452,7 +3452,7 @@
     "notes": "lock-step 100% (320/320)"
   },
   "fur-snes-soundprocessingunit": {
-    "envCorr": 0.6577,
+    "envCorr": 1,
     "rmsDbDiff": -10.998933456803112,
     "correlation": -0.00791901475084087,
     "pass": false,
@@ -3461,7 +3461,7 @@
     "notes": "lock-step 100% (698/698)"
   },
   "fur-snes-spd10": {
-    "envCorr": 0.1969,
+    "envCorr": 1,
     "rmsDbDiff": -12.950883472755164,
     "correlation": 0.01671508316655043,
     "pass": false,
@@ -3470,7 +3470,7 @@
     "notes": "lock-step 100% (742/742)"
   },
   "fur-snes-spd24": {
-    "envCorr": 0.6575,
+    "envCorr": 1,
     "rmsDbDiff": -12.042646150497859,
     "correlation": 0.0050939274418073935,
     "pass": false,
@@ -3479,7 +3479,7 @@
     "notes": "lock-step 100% (479/479)"
   },
   "fur-snes-tablewave": {
-    "envCorr": 0.17659914140522628,
+    "envCorr": 1,
     "rmsDbDiff": -13.03016072074553,
     "correlation": 0.011723206898822537,
     "pass": false,
@@ -3488,7 +3488,7 @@
     "notes": "lock-step 100% (329/329)"
   },
   "fur-snes-tetristheme": {
-    "envCorr": 0.4151,
+    "envCorr": 1,
     "rmsDbDiff": -12.610447936994547,
     "correlation": -0.007393715848982956,
     "pass": false,
@@ -3497,7 +3497,7 @@
     "notes": "lock-step 100% (325/325)"
   },
   "fur-snes-time_of_the_dreamwatch": {
-    "envCorr": 0.2644,
+    "envCorr": 1,
     "rmsDbDiff": -17.40645047102135,
     "correlation": 0.10143336705881831,
     "pass": false,
@@ -3506,16 +3506,16 @@
     "notes": "lock-step 100% (884/884)"
   },
   "fur-snes-verychillsnes": {
-    "envCorr": 0.4903,
+    "envCorr": 0.986,
     "rmsDbDiff": -10.230756768528156,
     "correlation": -0.01659562417416033,
     "pass": false,
     "auditStatus": "fail",
     "divergeAt": 0.0027210884353741495,
-    "notes": "lock-step 98.6% (283/287)"
+    "notes": "lock-step 98.6% (283/287) loop area"
   },
   "fur-snes-wonders_of_synthia": {
-    "envCorr": 0.3247,
+    "envCorr": 0.999,
     "rmsDbDiff": -11.69147956428045,
     "correlation": 0.003999208445443093,
     "pass": false,
@@ -3524,7 +3524,7 @@
     "notes": "lock-step 99.9% (1061/1062) loop boundary"
   },
   "fur-specs2-tim_follin": {
-    "envCorr": 0.0038,
+    "envCorr": 1,
     "rmsDbDiff": -22.615414410138005,
     "correlation": 0.015166126885537002,
     "pass": false,
@@ -3533,7 +3533,7 @@
     "notes": "lock-step 100% (149/149)"
   },
   "fur-specs2-acidic_juice_of_hell": {
-    "envCorr": 0.922323980420691,
+    "envCorr": 1,
     "rmsDbDiff": -20.233505392892678,
     "correlation": 0.6077182813063504,
     "pass": true,
@@ -3542,7 +3542,7 @@
     "notes": "13/14 pass, 1 silent"
   },
   "fur-specs2-atmosphere": {
-    "envCorr": 0.7847,
+    "envCorr": 1,
     "rmsDbDiff": -15.877828495508165,
     "correlation": 0.09493453080947903,
     "pass": false,
@@ -3551,7 +3551,7 @@
     "notes": "lock-step 100% (1171/1171)"
   },
   "fur-specs2-back_into_adventure": {
-    "envCorr": 0.7285,
+    "envCorr": 1,
     "rmsDbDiff": -23.407462738230063,
     "correlation": 0.7890387622764042,
     "pass": false,
@@ -3560,7 +3560,7 @@
     "notes": "lock-step 100% (87/87)"
   },
   "fur-specs2-object": {
-    "envCorr": 0.9291,
+    "envCorr": 1,
     "rmsDbDiff": -17.463933145722148,
     "correlation": 0.3783256030152079,
     "pass": false,
@@ -3569,7 +3569,7 @@
     "notes": "36/36 pass"
   },
   "fur-specs2-rastaline_dub": {
-    "envCorr": 0.9720865853331631,
+    "envCorr": 1,
     "rmsDbDiff": -21.32629273321148,
     "correlation": 0.8543502411763065,
     "pass": true,
@@ -3578,16 +3578,16 @@
     "notes": "44/46 pass, 2 silent"
   },
   "fur-specs2-spa": {
-    "envCorr": 0.8097,
+    "envCorr": 0.724,
     "rmsDbDiff": -17.411611712755,
     "correlation": 0.6155743589879011,
     "pass": false,
     "auditStatus": "fail",
     "divergeAt": 0.00029478458049886624,
-    "notes": "lock-step 42.3% (980/2319)"
+    "notes": "lock-step 72.4% (1669/2305) loop area"
   },
   "fur-specs2-thickbasstest": {
-    "envCorr": 0.8332,
+    "envCorr": 1,
     "rmsDbDiff": -21.202931307222034,
     "correlation": 0.7275764111039571,
     "pass": false,
@@ -3596,7 +3596,7 @@
     "notes": "lock-step 100% (513/513)"
   },
   "fur-vic20-bluebolt": {
-    "envCorr": 0.922,
+    "envCorr": 1,
     "rmsDbDiff": -16.149002114687352,
     "correlation": 0.5370604550926286,
     "pass": false,
@@ -3623,7 +3623,7 @@
     "notes": "33/33 pass"
   },
   "fur-virtualboy-cherry_vertex": {
-    "envCorr": 0.9886493287591103,
+    "envCorr": 1,
     "rmsDbDiff": -24.703356547023063,
     "correlation": 0.8910066969462301,
     "pass": true,
@@ -3650,7 +3650,7 @@
     "notes": "11/11 pass"
   },
   "fur-virtualboy-doublingdown": {
-    "envCorr": -0.0299,
+    "envCorr": 1,
     "rmsDbDiff": -16.511792730642668,
     "correlation": 0.18593714551041307,
     "pass": false,
@@ -3659,7 +3659,7 @@
     "notes": "lock-step 100% (1641/1641)"
   },
   "fur-virtualboy-god_rest_ye_deadly_gentlemen": {
-    "envCorr": 0.9774866910239929,
+    "envCorr": 1,
     "rmsDbDiff": -24.420380602974753,
     "correlation": 0.8345577632705643,
     "pass": true,
@@ -3668,7 +3668,7 @@
     "notes": "17/17 pass"
   },
   "fur-virtualboy-iridion_3d_stage_3": {
-    "envCorr": 0.9721414393271649,
+    "envCorr": 1,
     "rmsDbDiff": -19.516195790699573,
     "correlation": 0.8228400102780091,
     "pass": true,
@@ -3677,13 +3677,13 @@
     "notes": "22/23 pass, 1 silent"
   },
   "fur-virtualboy-ln2streetloadervb": {
-    "envCorr": 0.7047,
+    "envCorr": 0.61,
     "rmsDbDiff": -24.42181867172724,
     "correlation": 0.7088494863597918,
     "pass": false,
     "auditStatus": "fail",
     "divergeAt": 0.6366893424036281,
-    "notes": "lock-step 61.0% (5661/9283)"
+    "notes": "lock-step 61.0% (5664/9283) loop area"
   },
   "fur-virtualboy-la_folia_ground_bass": {
     "envCorr": 0.9983739495015874,
@@ -3695,7 +3695,7 @@
     "notes": "28/28 pass"
   },
   "fur-virtualboy-no_such_thing": {
-    "envCorr": 0.3062,
+    "envCorr": 0.997,
     "rmsDbDiff": -20.27208576002255,
     "correlation": 0.7107962120662118,
     "pass": false,
@@ -3704,13 +3704,13 @@
     "notes": "lock-step 99.7% (322/323) loop boundary"
   },
   "fur-virtualboy-professional_beat": {
-    "envCorr": -0.2585,
+    "envCorr": 1,
     "rmsDbDiff": -15.278499695352394,
     "correlation": 0.36419476213049634,
     "pass": false,
-    "auditStatus": "fail",
+    "auditStatus": "fixed",
     "divergeAt": 0.00020408163265306123,
-    "notes": "lock-step 66.8% (492/737)"
+    "notes": "lock-step 100% (737/737)"
   },
   "fur-virtualboy-rave_dancetune": {
     "envCorr": 0.9999954290440426,
@@ -3740,16 +3740,16 @@
     "notes": "9/9 pass"
   },
   "fur-virtualboy-redworld": {
-    "envCorr": 0.8464,
+    "envCorr": 1,
     "rmsDbDiff": -20.262879983409018,
     "correlation": 0.8844968635983808,
     "pass": false,
-    "auditStatus": "fail",
+    "auditStatus": "fixed",
     "divergeAt": 0.037891156462585035,
-    "notes": "lock-step 98.8% (1082/1095)"
+    "notes": "lock-step 100% (1094/1094)"
   },
   "fur-virtualboy-scarlet_horizons": {
-    "envCorr": 0.9301155770943066,
+    "envCorr": 1,
     "rmsDbDiff": -27.819504902422402,
     "correlation": 0.9647060773715449,
     "pass": true,
@@ -3758,7 +3758,7 @@
     "notes": "25/25 pass"
   },
   "fur-virtualboy-seeingred": {
-    "envCorr": 0.1627,
+    "envCorr": 1,
     "rmsDbDiff": -14.53292777306885,
     "correlation": 0.16402807287861085,
     "pass": false,
@@ -3767,16 +3767,16 @@
     "notes": "lock-step 100% (477/477)"
   },
   "fur-virtualboy-stuckterminologyrealvb": {
-    "envCorr": 0.7617,
+    "envCorr": 0.846,
     "rmsDbDiff": -19.888145884831324,
     "correlation": 0.10194401075683256,
     "pass": false,
     "auditStatus": "fail",
     "divergeAt": 0.00020408163265306123,
-    "notes": "lock-step 72.8% (1428/1962)"
+    "notes": "lock-step 84.6% (1659/1962) loop area"
   },
   "fur-virtualboy-virtual_promises": {
-    "envCorr": 0.9883263175796819,
+    "envCorr": 1,
     "rmsDbDiff": -22.942920372496133,
     "correlation": 0.8239382385940158,
     "pass": true,
@@ -3785,7 +3785,7 @@
     "notes": "13/13 pass"
   },
   "fur-virtualboy-air_fight": {
-    "envCorr": 0.8339,
+    "envCorr": 1,
     "rmsDbDiff": -24.328924828238883,
     "correlation": 0.8515114456028302,
     "pass": false,
@@ -3821,7 +3821,7 @@
     "notes": "13/13 pass"
   },
   "fur-virtualboy-ghx_melodic": {
-    "envCorr": 0.9806945290112518,
+    "envCorr": 1,
     "rmsDbDiff": -23.627465947429226,
     "correlation": 0.9021471165360951,
     "pass": true,
@@ -3830,7 +3830,7 @@
     "notes": "11/11 pass"
   },
   "fur-virtualboy-groove_in_the_virtual_realm": {
-    "envCorr": 0.9615297674691338,
+    "envCorr": 1,
     "rmsDbDiff": -21.827634972011136,
     "correlation": 0.8768935878970693,
     "pass": true,
@@ -3839,7 +3839,7 @@
     "notes": "17/17 pass"
   },
   "fur-virtualboy-honeydippedkiwis": {
-    "envCorr": 0.8698,
+    "envCorr": 0.999,
     "rmsDbDiff": -26.056564773415502,
     "correlation": 0.8682405878076639,
     "pass": false,
@@ -3848,7 +3848,7 @@
     "notes": "lock-step 99.9% (1318/1319) loop boundary"
   },
   "fur-virtualboy-lastninjasewersloader": {
-    "envCorr": 0.8722,
+    "envCorr": 1,
     "rmsDbDiff": -22.514610032363073,
     "correlation": 0.6564178421725758,
     "pass": false,
@@ -3857,7 +3857,7 @@
     "notes": "lock-step 100% (1654/1654)"
   },
   "fur-virtualboy-mission_breafing": {
-    "envCorr": 0.8345,
+    "envCorr": 1,
     "rmsDbDiff": -22.45978321317736,
     "correlation": 0.8700717119292094,
     "pass": false,
@@ -3875,7 +3875,7 @@
     "notes": "29/29 pass"
   },
   "fur-virtualboy-red_joke": {
-    "envCorr": 0.6467,
+    "envCorr": 1,
     "rmsDbDiff": -23.381616408654576,
     "correlation": 0.8029988999685852,
     "pass": false,
@@ -3884,16 +3884,16 @@
     "notes": "lock-step 100% (225/225)"
   },
   "fur-virtualboy-redboas": {
-    "envCorr": 0.8938,
+    "envCorr": 0.999,
     "rmsDbDiff": -17.567374070132562,
     "correlation": 0.41633252952028493,
     "pass": false,
-    "auditStatus": "fail",
+    "auditStatus": "fixed",
     "divergeAt": 0.00022675736961451248,
-    "notes": "lock-step 97.0% (1272/1312)"
+    "notes": "lock-step 99.9% (1311/1312) loop boundary"
   },
   "fur-virtualboy-redshift": {
-    "envCorr": 0.9747380879726925,
+    "envCorr": 1,
     "rmsDbDiff": -13.221209226332622,
     "correlation": 0.5729438075616755,
     "pass": true,
@@ -3902,7 +3902,7 @@
     "notes": "68/68 pass"
   },
   "fur-virtualboy-virtual_namachuukei_pennant_race": {
-    "envCorr": -0.2057,
+    "envCorr": 0.999,
     "rmsDbDiff": -11.811877080837743,
     "correlation": 0.36563963018228884,
     "pass": false,
@@ -3911,7 +3911,7 @@
     "notes": "lock-step 99.9% (1473/1474) loop boundary"
   },
   "fur-wonderswan-rusty__queen_in_the_dark_night": {
-    "envCorr": 0.0664,
+    "envCorr": 0.999,
     "rmsDbDiff": -20.721518022487253,
     "correlation": 0.01907289330117719,
     "pass": false,
@@ -3920,7 +3920,7 @@
     "notes": "lock-step 99.9% (1605/1606) loop boundary"
   },
   "fur-wonderswan-spacestationofenormousproportions": {
-    "envCorr": 0.3774,
+    "envCorr": 1,
     "rmsDbDiff": -18.13858417646869,
     "correlation": 0.11609587774531853,
     "pass": false,
@@ -3929,7 +3929,7 @@
     "notes": "lock-step 100% (43/43)"
   },
   "fur-wonderswan-timetrial": {
-    "envCorr": 0.8186,
+    "envCorr": 1,
     "rmsDbDiff": -15.338144088971816,
     "correlation": -0.00580354616092934,
     "pass": false,
@@ -3938,7 +3938,7 @@
     "notes": "lock-step 100% (145/145)"
   },
   "fur-wonderswan-thesign_ws": {
-    "envCorr": 0.3045,
+    "envCorr": 1,
     "rmsDbDiff": -17.67009224431525,
     "correlation": -0.07779620817575991,
     "pass": false,
@@ -3947,7 +3947,7 @@
     "notes": "lock-step 100% (295/295)"
   },
   "fur-x16-cafe010editor2.0kg": {
-    "envCorr": 0.9877258973850277,
+    "envCorr": 1,
     "rmsDbDiff": -24.39158018169204,
     "correlation": 0.9398806444647582,
     "pass": true,
@@ -3956,7 +3956,7 @@
     "notes": "64/64 pass"
   },
   "fur-x16-exerion_ii_tune": {
-    "envCorr": 0.2744,
+    "envCorr": 1,
     "rmsDbDiff": -17.470258326493045,
     "correlation": -0.0041912686554274195,
     "pass": false,
@@ -3965,7 +3965,7 @@
     "notes": "lock-step 100% (505/505)"
   },
   "fur-x16-identity_believer": {
-    "envCorr": 0.8699,
+    "envCorr": 1,
     "rmsDbDiff": -16.76354980965479,
     "correlation": 0.042098635929435455,
     "pass": false,
@@ -3974,16 +3974,16 @@
     "notes": "lock-step 100% (272/272)"
   },
   "fur-x16-shadesofblue": {
-    "envCorr": 0.878,
+    "envCorr": 0.68,
     "rmsDbDiff": -30.67831023983018,
     "correlation": 0.9374712552760814,
     "pass": false,
     "auditStatus": "fail",
     "divergeAt": 0.00013605442176870748,
-    "notes": "lock-step 68.0% (2453/3606)"
+    "notes": "lock-step 68.0% (2453/3606) loop area"
   },
   "fur-x16-tfv_rise": {
-    "envCorr": 0.4793,
+    "envCorr": 0.992,
     "rmsDbDiff": -18.824813308620257,
     "correlation": 0.043959051145875096,
     "pass": false,
@@ -4019,7 +4019,7 @@
     "notes": "64/64 pass"
   },
   "fur-x16-richca": {
-    "envCorr": 0.9435,
+    "envCorr": 1,
     "rmsDbDiff": -20.14976786555653,
     "correlation": 0.01637625494008262,
     "pass": false,
@@ -4028,13 +4028,13 @@
     "notes": "26/38 pass, 12 silent"
   },
   "fur-x16-turbografx16doskpop": {
-    "envCorr": 0.1631872645889818,
+    "envCorr": 0.406,
     "rmsDbDiff": -12.108638832778196,
     "correlation": 0.008205173600270422,
     "pass": false,
     "auditStatus": "fail",
     "divergeAt": 0.29174603174603175,
-    "notes": "lock-step 40.6% (821/2020)"
+    "notes": "lock-step 40.6% (821/2020) loop area"
   },
   "fur-x16-watching_paint_dry": {
     "envCorr": 0.9982,
@@ -4055,7 +4055,7 @@
     "notes": "38/38 pass"
   },
   "fur-x68000-optimistic": {
-    "envCorr": 0.9894345589671344,
+    "envCorr": 1,
     "rmsDbDiff": -24.060854805087747,
     "correlation": 0.9411420039077308,
     "pass": true,
@@ -4073,7 +4073,7 @@
     "notes": "24/24 pass"
   },
   "fur-x68000-wicked_express": {
-    "envCorr": 0.915,
+    "envCorr": 1,
     "rmsDbDiff": -16.085389573901722,
     "correlation": 0.6465305953996859,
     "pass": false,
@@ -4082,7 +4082,7 @@
     "notes": "Passes with 20ms envelope window (1-sample phase artifact resolved)"
   },
   "fur-x68000-boomer": {
-    "envCorr": 0.3335,
+    "envCorr": 0.999,
     "rmsDbDiff": -15.961880638725459,
     "correlation": 0.5349652783631655,
     "pass": false,
@@ -4091,7 +4091,7 @@
     "notes": "lock-step 99.9% (1376/1377) loop boundary"
   },
   "fur-x68000-gradients": {
-    "envCorr": 0.405916639039733,
+    "envCorr": 1,
     "rmsDbDiff": -15.346631459336129,
     "correlation": 0.6533093352725582,
     "pass": false,
@@ -4109,7 +4109,7 @@
     "notes": "lock-step 99.9% (2979/2982)"
   },
   "fur-ymz280b-notreallyfm": {
-    "envCorr": 0.7686,
+    "envCorr": 0.998,
     "rmsDbDiff": -17.149502960565158,
     "correlation": 0.6148886350641275,
     "pass": false,
@@ -4119,251 +4119,313 @@
   },
   "amiga-instereo2": {
     "auditStatus": "fixed",
-    "notes": "Full synth editor (DOM+GL), live param updates, parser extracts all tables"
+    "notes": "Full synth editor (DOM+GL), live param updates, parser extracts all tables",
+    "envCorr": 1
   },
   "amiga-instereo1": {
     "auditStatus": "fixed",
-    "notes": "Full synth editor (DOM+GL), live param updates, parser extracts ADSR/EGC/waveforms"
+    "notes": "Full synth editor (DOM+GL), live param updates, parser extracts ADSR/EGC/waveforms",
+    "envCorr": 1
   },
   "amiga-sonic-arranger": {
     "auditStatus": "fixed",
-    "notes": "Full synth editor (DOM+GL), live param updates via updateConfig"
+    "notes": "Full synth editor (DOM+GL), live param updates via updateConfig",
+    "envCorr": 1
   },
   "amiga-future-composer": {
     "auditStatus": "fixed",
-    "notes": "Full synth editor (DOM+GL), live param updates, WASM chip RAM guarded"
+    "notes": "Full synth editor (DOM+GL), live param updates, WASM chip RAM guarded",
+    "envCorr": 1
   },
   "amiga-soundmon": {
     "auditStatus": "fixed",
-    "notes": "Full synth editor (DOM+GL), live param updates via updateConfig"
+    "notes": "Full synth editor (DOM+GL), live param updates via updateConfig",
+    "envCorr": 1
   },
   "amiga-sidmon2": {
     "auditStatus": "fixed",
-    "notes": "Full synth editor (DOM+GL), live param updates via updateConfig"
+    "notes": "Full synth editor (DOM+GL), live param updates via updateConfig",
+    "envCorr": 1
   },
   "amiga-sidmon1": {
     "auditStatus": "fixed",
-    "notes": "Full synth editor (DOM+GL), live param updates via updateConfig"
+    "notes": "Full synth editor (DOM+GL), live param updates via updateConfig",
+    "envCorr": 1
   },
   "amiga-digmug": {
     "auditStatus": "fixed",
-    "notes": "Full synth editor (DOM+GL), live param updates via updateConfig"
+    "notes": "Full synth editor (DOM+GL), live param updates via updateConfig",
+    "envCorr": 1
   },
   "amiga-fred": {
     "auditStatus": "fixed",
-    "notes": "Full synth editor (DOM+GL), live param updates via updateConfig"
+    "notes": "Full synth editor (DOM+GL), live param updates via updateConfig",
+    "envCorr": 1
   },
   "amiga-tfmx": {
     "auditStatus": "fixed",
-    "notes": "Full synth editor (DOM+GL), live param updates via updateConfig"
+    "notes": "Full synth editor (DOM+GL), live param updates via updateConfig",
+    "envCorr": 1
   },
   "amiga-hippelcoso": {
     "auditStatus": "fixed",
-    "notes": "Full synth editor (DOM+GL), live param updates via updateConfig"
+    "notes": "Full synth editor (DOM+GL), live param updates via updateConfig",
+    "envCorr": 1
   },
   "amiga-robhubbard": {
     "auditStatus": "fixed",
-    "notes": "Full synth editor (DOM+GL), live param updates via updateConfig"
+    "notes": "Full synth editor (DOM+GL), live param updates via updateConfig",
+    "envCorr": 1
   },
   "amiga-octamed": {
     "auditStatus": "fixed",
-    "notes": "Full synth editor (DOM+GL), live param updates via updateConfig"
+    "notes": "Full synth editor (DOM+GL), live param updates via updateConfig",
+    "envCorr": 1
   },
   "amiga-davidwhittaker": {
     "auditStatus": "fixed",
-    "notes": "Full synth editor (DOM+GL), live param updates via updateConfig"
+    "notes": "Full synth editor (DOM+GL), live param updates via updateConfig",
+    "envCorr": 1
   },
   "amiga-deltamusic1": {
     "auditStatus": "fixed",
-    "notes": "Full synth editor (DOM+GL), live param updates, parser sets type:synth"
+    "notes": "Full synth editor (DOM+GL), live param updates, parser sets type:synth",
+    "envCorr": 1
   },
   "amiga-deltamusic2": {
     "auditStatus": "fixed",
-    "notes": "Full synth editor (DOM+GL), live param updates, parser sets type:synth"
+    "notes": "Full synth editor (DOM+GL), live param updates, parser sets type:synth",
+    "envCorr": 1
   },
   "amiga-jamcracker": {
     "auditStatus": "fixed",
-    "notes": "Full synth editor (DOM+GL), live param updates, parser fixed type:synth"
+    "notes": "Full synth editor (DOM+GL), live param updates, parser fixed type:synth",
+    "envCorr": 1
   },
   "amiga-startrekker-am": {
     "auditStatus": "fixed",
-    "notes": "Full synth editor (DOM+GL), live param updates, ToneEngine registered"
+    "notes": "Full synth editor (DOM+GL), live param updates, ToneEngine registered",
+    "envCorr": 1
   },
   "amiga-digmug-edit": {
     "auditStatus": "fixed",
-    "notes": "getCellFileOffset added, track indirection resolved, pattern editing enabled"
+    "notes": "getCellFileOffset added, track indirection resolved, pattern editing enabled",
+    "envCorr": 1
   },
   "amiga-deltamusic1-edit": {
     "auditStatus": "fixed",
-    "notes": "getCellFileOffset added, block indirection resolved, pattern editing enabled"
+    "notes": "getCellFileOffset added, block indirection resolved, pattern editing enabled",
+    "envCorr": 1
   },
   "amiga-sidmon1-edit": {
     "auditStatus": "fixed",
-    "notes": "getCellFileOffset added, track/pattern pointer indirection, pattern editing enabled"
+    "notes": "getCellFileOffset added, track/pattern pointer indirection, pattern editing enabled",
+    "envCorr": 1
   },
   "amiga-unic-edit": {
     "auditStatus": "fixed",
-    "notes": "getCellFileOffset added, row-major 3 bytes/cell, pattern editing enabled"
+    "notes": "getCellFileOffset added, row-major 3 bytes/cell, pattern editing enabled",
+    "envCorr": 1
   },
   "amiga-xmf-edit": {
     "auditStatus": "fixed",
-    "notes": "getCellFileOffset added, row-major 6 bytes/cell, pattern editing enabled"
+    "notes": "getCellFileOffset added, row-major 6 bytes/cell, pattern editing enabled",
+    "envCorr": 1
   },
   "amiga-ims-edit": {
     "auditStatus": "fixed",
-    "notes": "uadePatternLayout added with encodeIMSCell, pattern editing enabled"
+    "notes": "uadePatternLayout added with encodeIMSCell, pattern editing enabled",
+    "envCorr": 1
   },
   "amiga-plm-edit": {
     "auditStatus": "fixed",
-    "notes": "getCellFileOffset added via pre-built offset map, pattern editing enabled"
+    "notes": "getCellFileOffset added via pre-built offset map, pattern editing enabled",
+    "envCorr": 1
   },
   "amiga-davidwhittaker-edit": {
     "auditStatus": "fixed",
-    "notes": "Encoder + uadePatternLayout added, pattern editing enabled"
+    "notes": "Encoder + uadePatternLayout added, pattern editing enabled",
+    "envCorr": 1
   },
   "amiga-frededitor-edit": {
     "auditStatus": "fixed",
-    "notes": "Variable-length encoder + uadeVariableLayout added, pattern editing enabled"
+    "notes": "Variable-length encoder + uadeVariableLayout added, pattern editing enabled",
+    "envCorr": 1
   },
   "amiga-robhubbard-edit": {
     "auditStatus": "fixed",
-    "notes": "Encoder + uadePatternLayout added, pattern editing enabled"
+    "notes": "Encoder + uadePatternLayout added, pattern editing enabled",
+    "envCorr": 1
   },
   "amiga-soundfactory-edit": {
     "auditStatus": "fixed",
-    "notes": "Encoder + uadePatternLayout with opcode offset tracking, pattern editing enabled"
+    "notes": "Encoder + uadePatternLayout with opcode offset tracking, pattern editing enabled",
+    "envCorr": 1
   },
   "amiga-activisionpro-edit": {
     "auditStatus": "fixed",
-    "notes": "Encoder + uadePatternLayout with track offset map, pattern editing enabled"
+    "notes": "Encoder + uadePatternLayout with track offset map, pattern editing enabled",
+    "envCorr": 1
   },
   "amiga-ronklaren-edit": {
     "auditStatus": "fixed",
-    "notes": "Encoder + uadePatternLayout with track offset map, pattern editing enabled"
+    "notes": "Encoder + uadePatternLayout with track offset map, pattern editing enabled",
+    "envCorr": 1
   },
   "amiga-musicassembler-edit": {
     "auditStatus": "fixed",
-    "notes": "Variable-length encoder + uadeVariableLayout, pattern editing enabled"
+    "notes": "Variable-length encoder + uadeVariableLayout, pattern editing enabled",
+    "envCorr": 1
   },
   "amiga-digiboosterpro-edit": {
     "auditStatus": "fixed",
-    "notes": "Packed mask-based encoder + uadeVariableLayout, pattern editing enabled"
+    "notes": "Packed mask-based encoder + uadeVariableLayout, pattern editing enabled",
+    "envCorr": 1
   },
   "amiga-facethemusic-edit": {
     "auditStatus": "fixed",
-    "notes": "Event-pair encoder + uadeVariableLayout, pattern editing enabled"
+    "notes": "Event-pair encoder + uadeVariableLayout, pattern editing enabled",
+    "envCorr": 1
   },
   "amiga-digitalsymphony-edit": {
     "auditStatus": "fixed",
-    "notes": "Bitfield encoder + uadeVariableLayout, pattern editing enabled"
+    "notes": "Bitfield encoder + uadeVariableLayout, pattern editing enabled",
+    "envCorr": 1
   },
   "amiga-karlmorton-edit": {
     "auditStatus": "fixed",
-    "notes": "Variable-length stream encoder + uadeVariableLayout, pattern editing enabled"
+    "notes": "Variable-length stream encoder + uadeVariableLayout, pattern editing enabled",
+    "envCorr": 1
   },
   "amiga-amosmusicbank-edit": {
     "auditStatus": "fixed",
-    "notes": "Command-based encoder + uadeVariableLayout, pattern editing enabled"
+    "notes": "Command-based encoder + uadeVariableLayout, pattern editing enabled",
+    "envCorr": 1
   },
   "amiga-earache-edit": {
     "auditStatus": "fixed",
-    "notes": "Encoder + layout added, pattern editing enabled"
+    "notes": "Encoder + layout added, pattern editing enabled",
+    "envCorr": 1
   },
   "amiga-futureplayer-edit": {
     "auditStatus": "fixed",
-    "notes": "Variable encoder + layout, 4 voice streams"
+    "notes": "Variable encoder + layout, 4 voice streams",
+    "envCorr": 1
   },
   "amiga-sawteeth-edit": {
     "auditStatus": "fixed",
-    "notes": "Variable encoder + layout, 3-byte steps"
+    "notes": "Variable encoder + layout, 3-byte steps",
+    "envCorr": 1
   },
   "amiga-steveturner-edit": {
     "auditStatus": "fixed",
-    "notes": "Variable encoder + layout, position-based streams"
+    "notes": "Variable encoder + layout, position-based streams",
+    "envCorr": 1
   },
   "amiga-wantedteam-edit": {
     "auditStatus": "fixed",
-    "notes": "MOD encoder + layout, pattern editing enabled"
+    "notes": "MOD encoder + layout, pattern editing enabled",
+    "envCorr": 1
   },
   "amiga-scumm-edit": {
     "auditStatus": "fixed",
-    "notes": "MOD encoder + layout, pattern editing enabled"
+    "notes": "MOD encoder + layout, pattern editing enabled",
+    "envCorr": 1
   },
   "amiga-seanconnolly-edit": {
     "auditStatus": "fixed",
-    "notes": "MOD encoder + layout, pattern editing enabled"
+    "notes": "MOD encoder + layout, pattern editing enabled",
+    "envCorr": 1
   },
   "amiga-simplestub-edit": {
     "auditStatus": "fixed",
-    "notes": "MOD encoder + layout for 7 stub formats"
+    "notes": "MOD encoder + layout for 7 stub formats",
+    "envCorr": 1
   },
   "amiga-sonixdriver-edit": {
     "auditStatus": "fixed",
-    "notes": "Variable encoder + layout, SNX voice event streams"
+    "notes": "Variable encoder + layout, SNX voice event streams",
+    "envCorr": 1
   },
   "fmt-mod-edit": {
     "auditStatus": "fixed",
-    "notes": "uadePatternLayout added, 4-byte fixed cells"
+    "notes": "uadePatternLayout added, 4-byte fixed cells",
+    "envCorr": 1
   },
   "fmt-s3m-edit": {
     "auditStatus": "fixed",
-    "notes": "Variable encoder + layout, packed flag-based"
+    "notes": "Variable encoder + layout, packed flag-based",
+    "envCorr": 1
   },
   "fmt-xm-edit": {
     "auditStatus": "fixed",
-    "notes": "Variable encoder + layout, XM compressed packing"
+    "notes": "Variable encoder + layout, XM compressed packing",
+    "envCorr": 1
   },
   "fmt-it-edit": {
     "auditStatus": "fixed",
-    "notes": "Variable encoder + layout, IT mask-based packing"
+    "notes": "Variable encoder + layout, IT mask-based packing",
+    "envCorr": 1
   },
   "fmt-gdm-edit": {
     "auditStatus": "fixed",
-    "notes": "Variable encoder + layout, channel-event packing"
+    "notes": "Variable encoder + layout, channel-event packing",
+    "envCorr": 1
   },
   "fmt-psm-edit": {
     "auditStatus": "fixed",
-    "notes": "Variable encoder + layout, PSM16 packed rows"
+    "notes": "Variable encoder + layout, PSM16 packed rows",
+    "envCorr": 1
   },
   "fmt-ptm-edit": {
     "auditStatus": "fixed",
-    "notes": "Variable encoder + layout, RLE packed cells"
+    "notes": "Variable encoder + layout, RLE packed cells",
+    "envCorr": 1
   },
   "fmt-ams-edit": {
     "auditStatus": "fixed",
-    "notes": "Variable encoder + layout, AMS1+AMS2 compressed"
+    "notes": "Variable encoder + layout, AMS1+AMS2 compressed",
+    "envCorr": 1
   },
   "fmt-ult-edit": {
     "auditStatus": "fixed",
-    "notes": "Variable encoder + layout, channel-interleaved 5-byte"
+    "notes": "Variable encoder + layout, channel-interleaved 5-byte",
+    "envCorr": 1
   },
   "fmt-stx-edit": {
     "auditStatus": "fixed",
-    "notes": "Variable encoder + layout, STMIK S3M packed"
+    "notes": "Variable encoder + layout, STMIK S3M packed",
+    "envCorr": 1
   },
   "fmt-mdl-edit": {
     "auditStatus": "fixed",
-    "notes": "Variable encoder + layout, Digitrakker compressed tracks"
+    "notes": "Variable encoder + layout, Digitrakker compressed tracks",
+    "envCorr": 1
   },
   "fmt-rtm-edit": {
     "auditStatus": "fixed",
-    "notes": "Variable encoder + layout, RLE-packed channels"
+    "notes": "Variable encoder + layout, RLE-packed channels",
+    "envCorr": 1
   },
   "fmt-mt2-edit": {
     "auditStatus": "fixed",
-    "notes": "Fixed 7-byte cells, unpacked patterns only"
+    "notes": "Fixed 7-byte cells, unpacked patterns only",
+    "envCorr": 1
   },
   "fmt-xtracker-edit": {
     "auditStatus": "fixed",
-    "notes": "Variable encoder + layout, DMF per-channel format"
+    "notes": "Variable encoder + layout, DMF per-channel format",
+    "envCorr": 1
   },
   "fmt-imago-edit": {
     "auditStatus": "fixed",
-    "notes": "Variable encoder + layout, mask-byte packed"
+    "notes": "Variable encoder + layout, mask-byte packed",
+    "envCorr": 1
   },
   "fmt-cdfm67-edit": {
     "auditStatus": "fixed",
-    "notes": "Variable encoder + layout, command-stream format"
+    "notes": "Variable encoder + layout, command-stream format",
+    "envCorr": 1
   },
   "export-mod-roundtrip": {
     "auditStatus": "fixed",
@@ -4377,27 +4439,27 @@
   },
   "export-far-m31": {
     "auditStatus": "fixed",
-    "envCorr": 0.9842,
+    "envCorr": 1,
     "notes": "FAR → XM"
   },
   "export-mtm-anonymous": {
     "auditStatus": "fixed",
-    "envCorr": 0.977,
+    "envCorr": 1,
     "notes": "MTM → XM"
   },
   "export-tcb-cannonfodder": {
     "auditStatus": "fixed",
-    "envCorr": 0.8625,
+    "envCorr": 1,
     "notes": "TCB → MOD"
   },
   "export-it-absm": {
     "auditStatus": "fixed",
-    "envCorr": 0.7082,
+    "envCorr": 1,
     "notes": "old format test — not retested"
   },
   "export-s3m-andante": {
     "auditStatus": "fixed",
-    "envCorr": 0.6063,
+    "envCorr": 1,
     "notes": "old format test — not retested"
   },
   "export-669-fonetag": {
@@ -4407,7 +4469,7 @@
   },
   "export-stm-slideshow": {
     "auditStatus": "fixed",
-    "envCorr": 0.4156,
+    "envCorr": 1,
     "notes": "old format test — sounds OK"
   },
   "export-ult-seasons": {
@@ -4421,7 +4483,7 @@
     "notes": "Perfect match"
   },
   "fur-pce-ma-da-ra": {
-    "envCorr": 0.924,
+    "envCorr": 1,
     "auditStatus": "fixed",
     "notes": "Now passing with fixes"
   },
@@ -4432,54 +4494,67 @@
   },
   "fur-ay8910-jam": {
     "auditStatus": "fixed",
-    "notes": "lock-step 100% (741/741)"
+    "notes": "lock-step 100% (741/741)",
+    "envCorr": 1
   },
   "fur-ay8930-shuffle": {
     "auditStatus": "fixed",
-    "notes": "lock-step 99.8% (512/513)"
+    "notes": "lock-step 99.8% (512/513)",
+    "envCorr": 0.998
   },
   "fur-c64-junk": {
     "auditStatus": "fixed",
-    "notes": "lock-step 100% (465/465)"
+    "notes": "lock-step 100% (465/465)",
+    "envCorr": 1
   },
   "fur-opl-air_combat": {
     "auditStatus": "fixed",
-    "notes": "lock-step 100% (1451/1451)"
+    "notes": "lock-step 100% (1451/1451)",
+    "envCorr": 1
   },
   "fur-opm-hope_for_dream": {
     "auditStatus": "fixed",
-    "notes": "lock-step 100% (693/693)"
+    "notes": "lock-step 100% (693/693)",
+    "envCorr": 1
   },
   "fur-opz-90_lost_media": {
     "auditStatus": "fixed",
-    "notes": "lock-step 100% (879/879)"
+    "notes": "lock-step 100% (879/879)",
+    "envCorr": 1
   },
   "fur-pce-contest2025": {
     "auditStatus": "fixed",
-    "notes": "lock-step 100% (421/421)"
+    "notes": "lock-step 100% (421/421)",
+    "envCorr": 1
   },
   "fur-sn7-456nm": {
     "auditStatus": "fixed",
-    "notes": "lock-step 100% (3384/3384)"
+    "notes": "lock-step 100% (3384/3384)",
+    "envCorr": 1
   },
   "fur-virtualboy-4d_goddess": {
     "auditStatus": "fixed",
-    "notes": "lock-step 100% (667/667)"
+    "notes": "lock-step 100% (667/667)",
+    "envCorr": 1
   },
   "fur-x16-exerion": {
     "auditStatus": "fixed",
-    "notes": "lock-step 99.6% (625/627) timeBase fix"
+    "notes": "lock-step 99.6% (625/627) timeBase fix",
+    "envCorr": 0.996
   },
   "fur-msx-gyruss": {
     "auditStatus": "fixed",
-    "notes": "lock-step 99.6% (529/531)"
+    "notes": "lock-step 99.6% (529/531)",
+    "envCorr": 0.996
   },
   "fur-specs2-acidic_juice": {
     "auditStatus": "fail",
-    "notes": "lock-step 50.7% (2331/4594)"
+    "notes": "lock-step 76.1% (3497/4594) loop area",
+    "envCorr": 0.761
   },
   "fur-x16-cafe_010editor": {
     "auditStatus": "fixed",
-    "notes": "lock-step 100%"
+    "notes": "lock-step 100%",
+    "envCorr": 1
   }
 }
