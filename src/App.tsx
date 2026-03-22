@@ -933,6 +933,26 @@ function App() {
     );
   }
 
+  // Browser compatibility check
+  const unsupportedBrowser = typeof WebAssembly === 'undefined' ||
+    (typeof AudioContext === 'undefined' && typeof (window as unknown as Record<string, unknown>).webkitAudioContext === 'undefined');
+
+  if (unsupportedBrowser) {
+    return (
+      <div className="flex-1 flex flex-col items-center justify-center px-4 bg-dark-bg text-text-primary min-h-screen">
+        <div className="text-center max-w-lg">
+          <h1 className="text-4xl font-bold mb-4">Unsupported Browser</h1>
+          <p className="text-lg text-text-secondary mb-6">
+            DEViLBOX requires WebAssembly and Web Audio API support.
+          </p>
+          <p className="text-sm text-text-muted">
+            Please use a recent version of Chrome, Firefox, Edge, or Safari 15+.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   // Show welcome screen if audio context hasn't been started
   if (showWelcome && contextState !== 'running') {
     return (
@@ -967,6 +987,9 @@ function App() {
             >
               Start Audio Engine
             </Button>
+            <p className="mt-3 text-sm text-text-muted">
+              Press <kbd className="px-1.5 py-0.5 rounded bg-dark-bgTertiary border border-dark-border text-text-secondary font-mono text-xs">?</kbd> anytime for keyboard shortcuts and help
+            </p>
 
             {/* Features Grid */}
             <div className="mt-12 grid grid-cols-2 gap-4 text-left">

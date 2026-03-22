@@ -51,6 +51,7 @@ import { isSupportedModule, getSupportedExtensions, type ModuleInfo } from '@lib
 import { useModuleImport } from '@hooks/tracker/useModuleImport';
 import { importMIDIFile, isMIDIFile, getSupportedMIDIExtensions } from '@lib/import/MIDIImporter';
 import { clearSavedProject, clearExplicitlySaved, saveProjectToStorage } from '@hooks/useProjectPersistence';
+import { useHistoryStore } from '@stores/useHistoryStore';
 import { parseDb303Pattern, exportCurrentPatternToDb303 } from '@lib/import/Db303PatternConverter';
 import { getASIDDeviceManager } from '@lib/sid/ASIDDeviceManager';
 import { useSettingsStore } from '@stores/useSettingsStore';
@@ -100,6 +101,7 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = React.memo(({
     reset: resetTracker,
     duplicatePosition,
     removeFromOrder,
+    replacePattern,
   } = useTrackerStore(useShallow((s) => ({
     patterns: s.patterns,
     currentPatternIndex: s.currentPatternIndex,
@@ -113,7 +115,24 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = React.memo(({
     reset: s.reset,
     duplicatePosition: s.duplicatePosition,
     removeFromOrder: s.removeFromOrder,
+    replacePattern: s.replacePattern,
   })));
+
+  const { undo, redo, canUndo, canRedo } = useHistoryStore(useShallow((s) => ({
+    undo: s.undo, redo: s.redo, canUndo: s.canUndo, canRedo: s.canRedo,
+  })));
+
+  const handleUndo = useCallback(() => {
+    if (!canUndo()) return;
+    const pattern = undo();
+    if (pattern) replacePattern(currentPatternIndex, pattern);
+  }, [undo, canUndo, replacePattern, currentPatternIndex]);
+
+  const handleRedo = useCallback(() => {
+    if (!canRedo()) return;
+    const pattern = redo();
+    if (pattern) replacePattern(currentPatternIndex, pattern);
+  }, [redo, canRedo, replacePattern, currentPatternIndex]);
 
   const {
     editStep,
@@ -742,25 +761,28 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = React.memo(({
         />
         <Button variant="ghost" size="sm" onClick={() => setShowFileBrowser(true)} disabled={isLoading} loading={isLoading}>Load</Button>
         <Button variant="ghost" size="sm" onClick={handleSave}>{isDirty ? 'Save*' : 'Save'}</Button>
+        <Button variant="ghost" size="sm" onClick={handleUndo} disabled={!canUndo()} title="Undo (Ctrl+Z)">Undo</Button>
+        <Button variant="ghost" size="sm" onClick={handleRedo} disabled={!canRedo()} title="Redo (Ctrl+Shift+Z)">Redo</Button>
         <Button variant="ghost" size="sm" onClick={() => useUIStore.getState().openModal('revisions')}>Revisions</Button>
-        <Button variant="ghost" size="sm" onClick={handleDownload}>Download</Button>
-        <Button variant="ghost" size="sm" onClick={onShowExport}>Export</Button>
-        <Button variant="ghost" size="sm" onClick={() => useUIStore.getState().openNewSongWizard()}>New</Button>
-        <Button variant="ghost" size="sm" onClick={() => setShowClearModal(true)}>Clear</Button>
-        <Button variant="ghost" size="sm" onClick={() => fileInputRef.current?.click()}>Import</Button>
-        <Button variant="ghost" size="sm" onClick={onShowPatternOrder}>Order</Button>
-        <Button variant="ghost" size="sm" onClick={onShowInstruments}>Instruments</Button>
-        <Button variant="ghost" size="sm" onClick={onShowDrumpads}>Pads</Button>
-        <Button variant={showMasterFX ? 'primary' : 'ghost'} size="sm" onClick={onShowMasterFX}>Master FX</Button>
+        <Button variant="ghost" size="sm" onClick={handleDownload} title="Download as .dbx file">Download</Button>
+        <Button variant="ghost" size="sm" onClick={onShowExport} title="Export (Ctrl+Shift+E)">Export</Button>
+        <Button variant="ghost" size="sm" onClick={() => useUIStore.getState().openNewSongWizard()} title="New song">New</Button>
+        <Button variant="ghost" size="sm" onClick={() => setShowClearModal(true)} title="Clear all patterns">Clear</Button>
+        <Button variant="ghost" size="sm" onClick={() => fileInputRef.current?.click()} title="Import module file">Import</Button>
+        <Button variant="ghost" size="sm" onClick={onShowPatternOrder} title="Pattern order list">Order</Button>
+        <Button variant="ghost" size="sm" onClick={onShowInstruments} title="Instrument editor">Instruments</Button>
+        <Button variant="ghost" size="sm" onClick={onShowDrumpads} title="Drum pads">Pads</Button>
+        <Button variant={showMasterFX ? 'primary' : 'ghost'} size="sm" onClick={onShowMasterFX} title="Master effects chain">Master FX</Button>
         <Button
           variant={modalOpen === 'instrumentFx' ? 'primary' : 'ghost'}
           size="sm"
           onClick={() => { const s = useUIStore.getState(); s.modalOpen === 'instrumentFx' ? s.closeModal() : s.openModal('instrumentFx'); }}
+          title="Per-instrument effects"
         >Inst FX</Button>
-        <Button variant={aiOpen ? 'primary' : 'ghost'} size="sm" onClick={toggleAI}>AI</Button>
-        <Button variant="ghost" size="sm" onClick={() => onShowHelp?.('chip-effects')}>Reference</Button>
-        <Button variant="ghost" size="sm" onClick={() => onShowHelp?.('shortcuts')}>Help</Button>
-        <Button variant="ghost" size="sm" onClick={() => setShowSettings(true)}>Settings</Button>
+        <Button variant={aiOpen ? 'primary' : 'ghost'} size="sm" onClick={toggleAI} title="AI composition tools">AI</Button>
+        <Button variant="ghost" size="sm" onClick={() => onShowHelp?.('chip-effects')} title="Effect commands reference">Reference</Button>
+        <Button variant="ghost" size="sm" onClick={() => onShowHelp?.('shortcuts')} title="Help & keyboard shortcuts (?)">Help</Button>
+        <Button variant="ghost" size="sm" onClick={() => setShowSettings(true)} title="Settings (Ctrl+,)">Settings</Button>
         <Button
           variant={isFullscreen ? 'primary' : 'ghost'}
           size="sm"
