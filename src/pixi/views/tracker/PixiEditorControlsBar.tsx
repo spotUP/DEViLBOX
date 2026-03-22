@@ -652,9 +652,9 @@ export const PixiEditorControlsBar: React.FC<PixiEditorControlsBarProps> = ({
         onClick={handleToggleRecord}
       />
 
-      {/* REC settings */}
+      {/* Settings */}
       <PixiButton
-        label="..."
+        label="Settings"
         variant="ghost"
         size="sm"
         onClick={handleRecSettings}

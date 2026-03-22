@@ -46,12 +46,11 @@ const VIZ_LABELS: Record<VizMode, string> = {
 
 const PixiSpectrumDisplay: React.FC<{
   deckId: 'A' | 'B' | 'C';
-  width: number;
   height: number;
   deckColor: number;
   vizMode: VizMode;
   onBeatFlash?: () => void;
-}> = ({ deckId, width, height, deckColor, vizMode, onBeatFlash }) => {
+}> = ({ deckId, height, deckColor, vizMode, onBeatFlash }) => {
   const theme = usePixiTheme();
   const graphicsRef = useRef<GraphicsType | null>(null);
   const rafRef = useRef(0);
@@ -82,6 +81,7 @@ const PixiSpectrumDisplay: React.FC<{
       lastTimeRef.current = now;
       vizTimeRef.current += dt;
 
+      const width = (g as any).layout?.computedLayout?.width ?? 280;
       g.rect(0, 0, width, height).fill({ color: theme.bg.color });
 
       const isPlaying = useDJStore.getState().decks[deckId]?.isPlaying ?? false;
@@ -131,9 +131,9 @@ const PixiSpectrumDisplay: React.FC<{
     };
     rafRef.current = requestAnimationFrame(draw);
     return () => cancelAnimationFrame(rafRef.current);
-  }, [deckId, width, height, deckColor, vizMode, onBeatFlash]);
+  }, [deckId, height, deckColor, vizMode, onBeatFlash]);
 
-  return <pixiGraphics ref={graphicsRef} draw={() => {}} layout={{ width, height }} />;
+  return <pixiGraphics ref={graphicsRef} draw={() => {}} layout={{ width: '100%', height }} />;
 };
 
 function drawSpectrumBars(g: GraphicsType, fft: Float32Array, w: number, h: number, accentColor: number) {
@@ -766,9 +766,8 @@ const _PixiTonearm: React.FC<{
 const PixiTurntable2D: React.FC<{
   deckId: 'A' | 'B' | 'C';
   deckColor: number;
-  width: number;
   height: number;
-}> = ({ deckId, deckColor, width: deckW, height: deckH }) => {
+}> = ({ deckId, deckColor, height: deckH }) => {
   const theme = usePixiTheme();
   const isPlaying = useDJStore(s => s.decks[deckId].isPlaying);
   const trackName = useDJStore(s => s.decks[deckId].trackName);
@@ -776,6 +775,8 @@ const PixiTurntable2D: React.FC<{
 
   const [rpm, setRpm] = useState<33 | 45>(33);
   const [powerOn, setPowerOn] = useState(true);
+  const [measuredW, setMeasuredW] = useState(290);
+  const deckW = measuredW;
 
   // Physics-driven rotation (same pattern as PixiVinylDisplay)
   const physicsRef = useRef(new TurntablePhysics());
@@ -861,10 +862,21 @@ const PixiTurntable2D: React.FC<{
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [deckId]);
 
+  // Track measured width to update geometry when container resizes
+  const measuredWRef = useRef(290);
+
   // Imperative graphics draw
   const drawDeck = useCallback(() => {
     const g = graphicsRef.current;
     if (!g) return;
+
+    // Read computed layout width each frame
+    const computedW = (g as any).layout?.computedLayout?.width;
+    if (computedW && computedW > 0 && Math.abs(computedW - measuredWRef.current) > 1) {
+      measuredWRef.current = computedW;
+      setMeasuredW(computedW);
+    }
+
     const playing = playStateRef.current.isPlaying && powerOnRef.current;
     const rotation = angleRef.current;
     const currentRpm = rpmRef.current;
@@ -1121,12 +1133,12 @@ const PixiTurntable2D: React.FC<{
   const pitchPct = ((pitchOffset ?? 0) / 0.08) * 100;
 
   return (
-    <pixiContainer layout={{ width: deckW, height: deckH }}>
+    <pixiContainer layout={{ width: '100%', height: deckH }}>
       {/* Main deck graphics (drawn imperatively via rAF) */}
       <pixiGraphics
         ref={graphicsRef}
         draw={() => {}}
-        layout={{ width: deckW, height: deckH }}
+        layout={{ width: '100%', height: deckH }}
       />
 
       {/* Platter scratch hitbox */}
@@ -1321,7 +1333,7 @@ export const PixiDJDeck: React.FC<PixiDJDeckProps> = ({ deckId }) => {
         <>
           {/* Spectrum visualizer with beat flash border */}
           <pixiContainer layout={{ width: '100%', height: 80 }}>
-            <PixiSpectrumDisplay deckId={deckId} width={280} height={80} deckColor={DECK_COLOR} vizMode={vizMode} onBeatFlash={handleBeatFlash} />
+            <PixiSpectrumDisplay deckId={deckId} height={80} deckColor={DECK_COLOR} vizMode={vizMode} onBeatFlash={handleBeatFlash} />
             {beatFlash > 0 && (
               <pixiGraphics
                 draw={(g: GraphicsType) => {
@@ -1329,7 +1341,7 @@ export const PixiDJDeck: React.FC<PixiDJDeckProps> = ({ deckId }) => {
                   const bw = (g.parent as any)?.layout?.computedLayout?.width ?? 280;
                   g.roundRect(0, 0, bw, 80, 4).stroke({ color: DECK_COLOR, width: 3, alpha: beatFlash });
                 }}
-                layout={{ position: 'absolute', top: 0, left: 0, width: 280, height: 80 }}
+                layout={{ position: 'absolute', top: 0, left: 0, width: '100%', height: 80 }}
                 eventMode="none"
               />
             )}
@@ -1368,7 +1380,7 @@ export const PixiDJDeck: React.FC<PixiDJDeckProps> = ({ deckId }) => {
           </pixiContainer>
 
           {/* Waveform */}
-          <PixiDeckWaveform deckId={deckId} width={280} height={60} />
+          <PixiDeckWaveform deckId={deckId} height={60} />
         </>
       )}
 
@@ -1405,7 +1417,6 @@ export const PixiDJDeck: React.FC<PixiDJDeckProps> = ({ deckId }) => {
         <PixiTurntable2D
           deckId={deckId}
           deckColor={DECK_COLOR}
-          width={290}
           height={260}
         />
       )}

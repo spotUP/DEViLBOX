@@ -41,7 +41,8 @@ export type WindowId =
   | 'vj'
   | 'instrument'
   | 'mixer'
-  | 'master-fx';
+  | 'master-fx'
+  | 'split';
 
 // ─── 3D Tilt Presets ──────────────────────────────────────────────────────────
 
@@ -113,6 +114,7 @@ function computeDefaultWindows(): Record<WindowId, WindowState> {
     'master-fx': { x: mixerW + gap * 2,       y: row3Y + arrH + gap, width: 280,  height: 360,  zIndex: 8, visible: false, minimized: false, maximized: false },
     dj:          { x: trackerW + gap * 2,     y: gap,   width: djW,       height: 500,       zIndex: 4, visible: false, minimized: false, maximized: false },
     vj:          { x: trackerW + gap * 2,     y: gap,   width: vjW,       height: vjH,       zIndex: 5, visible: false, minimized: false, maximized: false },
+    split:       { x: gap,                    y: gap,   width: ww - gap * 2, height: trackerH, zIndex: 9, visible: false, minimized: false, maximized: false },
   };
 }
 

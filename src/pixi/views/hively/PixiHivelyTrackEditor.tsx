@@ -16,8 +16,25 @@ import React, { useCallback, useMemo, useRef, useState, useEffect } from 'react'
 import type { Container as ContainerType, Graphics as GraphicsType, FederatedPointerEvent } from 'pixi.js';
 import { Graphics } from 'pixi.js';
 import { useTransportStore } from '@/stores/useTransportStore';
+import { useFormatStore } from '@/stores/useFormatStore';
+import { useEditorStore } from '@/stores/useEditorStore';
 import { PIXI_FONTS } from '@/pixi/fonts';
-import type { HivelyNativeData } from '@/types';
+import type { HivelyNativeData, HivelyNativeStep } from '@/types';
+
+// Keyboard note map: keyboard keys -> semitone offset from current octave base
+const KEY_NOTE_MAP: Record<string, number> = {
+  // Lower octave (Z row)
+  z: 0, s: 1, x: 2, d: 3, c: 4, v: 5, g: 6, b: 7, h: 8, n: 9, j: 10, m: 11,
+  // Upper octave (Q row)
+  q: 12, '2': 13, w: 14, '3': 15, e: 16, r: 17, '5': 18, t: 19, '6': 20, y: 21, '7': 22, u: 23,
+  i: 24, '9': 25, o: 26, '0': 27, p: 28,
+};
+
+// Hex character to value
+function hexCharToVal(ch: string): number {
+  const v = parseInt(ch, 16);
+  return isNaN(v) ? -1 : v;
+}
 
 const ROW_HEIGHT    = 20;
 const ROW_NUM_WIDTH = 28;
@@ -101,6 +118,9 @@ export const PixiHivelyTrackEditor: React.FC<TrackEditorProps> = ({
 }) => {
   const isPlaying  = useTransportStore(s => s.isPlaying);
   const displayRow = useTransportStore(s => s.currentRow);
+  const setHivelyTrackStep = useFormatStore(s => s.setHivelyTrackStep);
+  const undoHivelyTrackStep = useFormatStore(s => s.undoHivelyTrackStep);
+  const redoHivelyTrackStep = useFormatStore(s => s.redoHivelyTrackStep);
 
   const trackLength  = nativeData.trackLength;
   const numChannels  = nativeData.channels;
@@ -108,6 +128,8 @@ export const PixiHivelyTrackEditor: React.FC<TrackEditorProps> = ({
   const [cursorRow,  setCursorRow]  = useState(0);
   const [cursorChan, setCursorChan] = useState(0);
   const [cursorCol,  setCursorCol]  = useState<'note' | 'ins' | 'fx' | 'fxb'>('note');
+  const [hexDigitPos, setHexDigitPos] = useState(0); // sub-cursor for hex entry (0=high nibble, 1=low nibble)
+  const [octave] = useState(3);
   const [scrollTop,  setScrollTop]  = useState(0);
   const [scrollLeft, setScrollLeft] = useState(0);
   const [focused,    setFocused]    = useState(false);
@@ -189,61 +211,206 @@ export const PixiHivelyTrackEditor: React.FC<TrackEditorProps> = ({
     return () => canvas.removeEventListener('wheel', onWheel);
   }, []);
 
-  // Keyboard navigation
-  const stateRef = useRef({ cursorRow, cursorChan, cursorCol, trackLength, numChannels });
-  stateRef.current = { cursorRow, cursorChan, cursorCol, trackLength, numChannels };
+  // Resolve the track index for the current cursor channel at the current position
+  const getTrackIndex = useCallback((): number => {
+    const pos = nativeData.positions[currentPosition];
+    if (!pos) return -1;
+    return pos.track[cursorChan] ?? -1;
+  }, [nativeData, currentPosition, cursorChan]);
+
+  // Helper: advance cursor row by editStep amount after entering data
+  const advanceCursor = useCallback(() => {
+    const step = useEditorStore.getState().editStep;
+    if (step > 0) {
+      setCursorRow(r => Math.min(trackLength - 1, r + step));
+    }
+  }, [trackLength]);
+
+  // Keyboard navigation + editing
+  const stateRef = useRef({ cursorRow, cursorChan, cursorCol, trackLength, numChannels, hexDigitPos, octave });
+  stateRef.current = { cursorRow, cursorChan, cursorCol, trackLength, numChannels, hexDigitPos, octave };
 
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
       if (!focusedRef.current) return;
-      const { cursorChan: cc, cursorCol: ccol, trackLength: tl, numChannels: nc } = stateRef.current;
+      // Ignore if typing in an input
+      if ((window as any).__pixiInputFocused || e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+
+      const { cursorChan: cc, cursorCol: ccol, trackLength: tl, numChannels: nc, hexDigitPos: hdp, octave: oct } = stateRef.current;
+
+      // Undo: Ctrl/Cmd+Z
+      if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) {
+        e.preventDefault();
+        undoHivelyTrackStep();
+        return;
+      }
+      // Redo: Ctrl/Cmd+Shift+Z or Ctrl/Cmd+Y
+      if (((e.ctrlKey || e.metaKey) && e.key === 'z' && e.shiftKey) ||
+          ((e.ctrlKey || e.metaKey) && e.key === 'y')) {
+        e.preventDefault();
+        redoHivelyTrackStep();
+        return;
+      }
+
+      // Navigation keys
       switch (e.key) {
         case 'ArrowUp':
           e.preventDefault();
           setCursorRow(r => Math.max(0, r - 1));
-          break;
+          setHexDigitPos(0);
+          return;
         case 'ArrowDown':
           e.preventDefault();
           setCursorRow(r => Math.min(tl - 1, r + 1));
-          break;
+          setHexDigitPos(0);
+          return;
         case 'ArrowLeft':
           e.preventDefault();
           if      (ccol === 'fxb') { setCursorCol('fx'); }
           else if (ccol === 'fx')  { setCursorCol('ins'); }
           else if (ccol === 'ins') { setCursorCol('note'); }
           else if (cc > 0)         { setCursorChan(c => c - 1); setCursorCol('fxb'); }
-          break;
+          setHexDigitPos(0);
+          return;
         case 'ArrowRight':
           e.preventDefault();
           if      (ccol === 'note') { setCursorCol('ins'); }
           else if (ccol === 'ins')  { setCursorCol('fx'); }
           else if (ccol === 'fx')   { setCursorCol('fxb'); }
           else if (cc < nc - 1)     { setCursorChan(c => c + 1); setCursorCol('note'); }
-          break;
+          setHexDigitPos(0);
+          return;
         case 'Tab':
           e.preventDefault();
           setCursorChan(c => e.shiftKey ? Math.max(0, c - 1) : Math.min(nc - 1, c + 1));
           setCursorCol('note');
-          break;
+          setHexDigitPos(0);
+          return;
         case 'Enter':
           e.preventDefault();
           onFocusPositionEditor?.();
-          break;
-        case 'PageUp':   e.preventDefault(); setCursorRow(r => Math.max(0, r - 16));       break;
-        case 'PageDown': e.preventDefault(); setCursorRow(r => Math.min(tl - 1, r + 16));  break;
-        case 'Home':     e.preventDefault(); setCursorRow(0);                               break;
-        case 'End':      e.preventDefault(); setCursorRow(tl - 1);                          break;
+          return;
+        case 'PageUp':   e.preventDefault(); setCursorRow(r => Math.max(0, r - 16));       return;
+        case 'PageDown': e.preventDefault(); setCursorRow(r => Math.min(tl - 1, r + 16));  return;
+        case 'Home':     e.preventDefault(); setCursorRow(0);                               return;
+        case 'End':      e.preventDefault(); setCursorRow(tl - 1);                          return;
+      }
+
+      // Skip data entry keys if modifier held (except shift for uppercase)
+      if (e.ctrlKey || e.metaKey || e.altKey) return;
+
+      // Resolve track index for editing
+      const trackIdx = getTrackIndex();
+      if (trackIdx < 0) return;
+      const row = stateRef.current.cursorRow;
+
+      // Delete key: clear the current column's field(s)
+      if (e.key === 'Delete' || e.key === 'Backspace') {
+        e.preventDefault();
+        const update: Partial<HivelyNativeStep> = {};
+        if (ccol === 'note') { update.note = 0; update.instrument = 0; }
+        else if (ccol === 'ins') { update.instrument = 0; }
+        else if (ccol === 'fx') { update.fx = 0; update.fxParam = 0; }
+        else if (ccol === 'fxb') { update.fxb = 0; update.fxbParam = 0; }
+        setHivelyTrackStep(trackIdx, row, update);
+        setHexDigitPos(0);
+        advanceCursor();
+        return;
+      }
+
+      const key = e.key.toLowerCase();
+
+      // Note column: keyboard piano entry
+      if (ccol === 'note') {
+        const semitone = KEY_NOTE_MAP[key];
+        if (semitone !== undefined) {
+          e.preventDefault();
+          // HVL notes: 1-60 (C-0=1, C#0=2, ..., B-4=60)
+          const noteVal = oct * 12 + semitone + 1;
+          if (noteVal >= 1 && noteVal <= 60) {
+            setHivelyTrackStep(trackIdx, row, { note: noteVal });
+            setHexDigitPos(0);
+            advanceCursor();
+          }
+          return;
+        }
+        // Period/dot for note-off (if supported) — Hively uses note 0 for empty
+        return;
+      }
+
+      // Instrument column: 2 hex digits (00-3F)
+      if (ccol === 'ins') {
+        const hv = hexCharToVal(key);
+        if (hv >= 0) {
+          e.preventDefault();
+          const step = nativeData.tracks[trackIdx]?.steps[row];
+          const cur = step?.instrument ?? 0;
+          let newVal: number;
+          if (hdp === 0) {
+            // High nibble
+            newVal = (hv << 4) | (cur & 0x0F);
+            setHexDigitPos(1);
+          } else {
+            // Low nibble
+            newVal = (cur & 0xF0) | hv;
+            setHexDigitPos(0);
+            advanceCursor();
+          }
+          setHivelyTrackStep(trackIdx, row, { instrument: Math.min(63, newVal) });
+          return;
+        }
+        return;
+      }
+
+      // Effect columns (fx/fxb): 1 hex digit for effect type + 2 hex digits for param = 3 digits total
+      if (ccol === 'fx' || ccol === 'fxb') {
+        const hv = hexCharToVal(key);
+        if (hv >= 0) {
+          e.preventDefault();
+          const step = nativeData.tracks[trackIdx]?.steps[row];
+          const isFxB = ccol === 'fxb';
+          const curParam = isFxB ? (step?.fxbParam ?? 0) : (step?.fxParam ?? 0);
+
+          if (hdp === 0) {
+            // Effect type digit (0-F)
+            const update: Partial<HivelyNativeStep> = isFxB
+              ? { fxb: hv & 0x0F }
+              : { fx: hv & 0x0F };
+            setHivelyTrackStep(trackIdx, row, update);
+            setHexDigitPos(1);
+          } else if (hdp === 1) {
+            // Param high nibble
+            const newParam = (hv << 4) | (curParam & 0x0F);
+            const update: Partial<HivelyNativeStep> = isFxB
+              ? { fxbParam: newParam }
+              : { fxParam: newParam };
+            setHivelyTrackStep(trackIdx, row, update);
+            setHexDigitPos(2);
+          } else {
+            // Param low nibble
+            const newParam = (curParam & 0xF0) | hv;
+            const update: Partial<HivelyNativeStep> = isFxB
+              ? { fxbParam: newParam }
+              : { fxParam: newParam };
+            setHivelyTrackStep(trackIdx, row, update);
+            setHexDigitPos(0);
+            advanceCursor();
+          }
+          return;
+        }
+        return;
       }
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [onFocusPositionEditor]);
+  }, [onFocusPositionEditor, getTrackIndex, setHivelyTrackStep, undoHivelyTrackStep, redoHivelyTrackStep, advanceCursor]);
 
   const startRow = Math.floor(scrollTop / ROW_HEIGHT);
   const endRow   = Math.min(trackLength, startRow + visRows + 2);
 
   const handlePointerDown = useCallback((e: FederatedPointerEvent) => {
     setFocused(true);
+    setHexDigitPos(0);
     const c = containerRef.current;
     if (!c) return;
     const local = c.toLocal(e.global);
