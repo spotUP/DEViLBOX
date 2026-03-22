@@ -209,8 +209,8 @@ export const DJ3DOverlay: React.FC = () => {
       }>
         <Canvas
           style={{ position: 'absolute', inset: 0 }}
-          gl={{ antialias: true, alpha: false }}
-          dpr={[1, 2]}
+          gl={{ antialias: true, alpha: false, powerPreference: 'low-power' }}
+          dpr={[1, 1.5]}
         >
           <color attach="background" args={['#0a0a0a']} />
           <UnifiedDJScene
