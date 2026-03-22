@@ -715,6 +715,273 @@ function initializeRegistry() {
     { name: 'tracker_scratch_stop',  contexts: ['global'], handler: trackerScratchStop,        description: 'Tracker Scratch: Stop pattern' },
     { name: 'tracker_spinback',       contexts: ['global'], handler: trackerSpinback,            description: 'Tracker: Spinback (platter brake + spinup)' },
     { name: 'power_cut_stop',          contexts: ['pattern', 'global'], handler: trackerPowerCut,  description: 'Stop playback with turntable power-off spindown' },
+
+    // === OPENMPT ALIASES ===
+    { name: 'help', contexts: ['global'], handler: showHelp, description: 'Show help' },
+    { name: 'play_from_start', contexts: ['pattern', 'global'], handler: playSong, description: 'Play from start of song' },
+    { name: 'play_pattern_from_start', contexts: ['pattern', 'global'], handler: playPattern, description: 'Play pattern from start' },
+    { name: 'play_pattern_from_cursor', contexts: ['pattern', 'global'], handler: playFromCursor, description: 'Play pattern from cursor' },
+    { name: 'pause', contexts: ['pattern', 'global'], handler: stopPlayback, description: 'Pause playback' },
+    { name: 'prev_order', contexts: ['pattern', 'global'], handler: prevPattern, description: 'Previous order/pattern' },
+    { name: 'next_order', contexts: ['pattern', 'global'], handler: nextPattern, description: 'Next order/pattern' },
+    { name: 'prev_sequence', contexts: ['pattern', 'global'], handler: prevPattern, description: 'Previous sequence' },
+    { name: 'next_sequence', contexts: ['pattern', 'global'], handler: nextPattern, description: 'Next sequence' },
+    { name: 'insert_note_off', contexts: ['pattern'], handler: insertKeyoff, description: 'Insert note off' },
+    { name: 'insert_note_off_a', contexts: ['pattern'], handler: insertKeyoff, description: 'Insert note off (A key)' },
+    { name: 'insert_note_fade', contexts: ['pattern'], handler: insertFadeOut, description: 'Insert note fade' },
+    { name: 'transpose_up_1', contexts: ['pattern'], handler: transposeUp, description: 'Transpose up 1 semitone' },
+    { name: 'transpose_down_1', contexts: ['pattern'], handler: transposeDown, description: 'Transpose down 1 semitone' },
+    { name: 'transpose_up_octave', contexts: ['pattern'], handler: transposeOctaveUp, description: 'Transpose up 1 octave' },
+    { name: 'transpose_down_octave', contexts: ['pattern'], handler: transposeOctaveDown, description: 'Transpose down 1 octave' },
+    { name: 'unmute_all_channels', contexts: ['pattern', 'global'], handler: unmuteAll, description: 'Unmute all channels' },
+    { name: 'toggle_midi_record', contexts: ['global'], handler: toggleMidiInput, description: 'Toggle MIDI record' },
+    { name: 'mix_paste', contexts: ['pattern'], handler: () => { useTrackerStore.getState().pasteMix(); useUIStore.getState().setStatusMessage('Paste mixed', false, 800); return true; }, description: 'Paste (mix)' },
+    { name: 'switch_to_order_list', contexts: ['global'], handler: showOrderList, description: 'Switch to order list' },
+    { name: 'show_pattern_properties', contexts: ['pattern'], handler: patternProperties, description: 'Show pattern properties' },
+    { name: 'export_wav', contexts: ['global'], handler: renderSong, description: 'Export WAV' },
+    { name: 'delete_rows', contexts: ['pattern'], handler: deleteAndPull, description: 'Delete row(s)' },
+    { name: 'insert_rows', contexts: ['pattern'], handler: insertRow, description: 'Insert row(s)' },
+
+    // OpenMPT clear field variants
+    { name: 'clear_field', contexts: ['pattern'], handler: deleteNote, description: 'Clear field at cursor' },
+    { name: 'clear_field_it_style', contexts: ['pattern'], handler: deleteNote, description: 'Clear field (IT style)' },
+    { name: 'clear_field_and_step_it', contexts: ['pattern'], handler: () => { deleteNote(); cursorDown(); return true; }, description: 'Clear field and step (IT style)' },
+    { name: 'clear_row_and_step', contexts: ['pattern'], handler: () => {
+      const { cursor } = useCursorStore.getState();
+      const { clearCell } = useTrackerStore.getState();
+      const { patterns, currentPatternIndex } = useTrackerStore.getState();
+      const pattern = patterns[currentPatternIndex];
+      if (pattern) {
+        for (let ch = 0; ch < pattern.channels.length; ch++) {
+          clearCell(ch, cursor.rowIndex);
+        }
+      }
+      cursorDown();
+      return true;
+    }, description: 'Clear entire row and advance' },
+
+    // OpenMPT multi-channel delete/insert
+    { name: 'delete_rows_all_channels', contexts: ['pattern'], handler: () => {
+      const { cursor } = useCursorStore.getState();
+      const { deleteRow } = useTrackerStore.getState();
+      const { patterns, currentPatternIndex } = useTrackerStore.getState();
+      const pattern = patterns[currentPatternIndex];
+      if (pattern) {
+        for (let ch = 0; ch < pattern.channels.length; ch++) {
+          deleteRow(ch, cursor.rowIndex);
+        }
+      }
+      return true;
+    }, description: 'Delete rows in all channels' },
+    { name: 'delete_rows_global', contexts: ['pattern'], handler: () => {
+      const { cursor } = useCursorStore.getState();
+      const { deleteRow } = useTrackerStore.getState();
+      const { patterns, currentPatternIndex } = useTrackerStore.getState();
+      const pattern = patterns[currentPatternIndex];
+      if (pattern) {
+        for (let ch = 0; ch < pattern.channels.length; ch++) {
+          deleteRow(ch, cursor.rowIndex);
+        }
+      }
+      return true;
+    }, description: 'Delete rows globally' },
+    { name: 'insert_rows_all_channels', contexts: ['pattern'], handler: () => {
+      const { cursor } = useCursorStore.getState();
+      const { insertRow: insRow } = useTrackerStore.getState();
+      const { patterns, currentPatternIndex } = useTrackerStore.getState();
+      const pattern = patterns[currentPatternIndex];
+      if (pattern) {
+        for (let ch = 0; ch < pattern.channels.length; ch++) {
+          insRow(ch, cursor.rowIndex);
+        }
+      }
+      return true;
+    }, description: 'Insert rows in all channels' },
+    { name: 'insert_rows_global', contexts: ['pattern'], handler: () => {
+      const { cursor } = useCursorStore.getState();
+      const { insertRow: insRow } = useTrackerStore.getState();
+      const { patterns, currentPatternIndex } = useTrackerStore.getState();
+      const pattern = patterns[currentPatternIndex];
+      if (pattern) {
+        for (let ch = 0; ch < pattern.channels.length; ch++) {
+          insRow(ch, cursor.rowIndex);
+        }
+      }
+      return true;
+    }, description: 'Insert rows globally' },
+
+    // OpenMPT cursor movement by spacing/beat
+    { name: 'cursor_down_by_spacing', contexts: ['pattern'], handler: () => {
+      const { cursor, moveCursorToRow } = useCursorStore.getState();
+      const { editStep } = useEditorStore.getState();
+      const spacing = Math.max(1, editStep);
+      const { patterns, currentPatternIndex } = useTrackerStore.getState();
+      const pattern = patterns[currentPatternIndex];
+      if (!pattern) return false;
+      moveCursorToRow(Math.min(pattern.length - 1, cursor.rowIndex + spacing));
+      return true;
+    }, description: 'Move cursor down by spacing' },
+    { name: 'cursor_up_by_spacing', contexts: ['pattern'], handler: () => {
+      const { cursor, moveCursorToRow } = useCursorStore.getState();
+      const { editStep } = useEditorStore.getState();
+      const spacing = Math.max(1, editStep);
+      moveCursorToRow(Math.max(0, cursor.rowIndex - spacing));
+      return true;
+    }, description: 'Move cursor up by spacing' },
+    { name: 'cursor_down_by_beat', contexts: ['pattern'], handler: () => {
+      const { cursor, moveCursorToRow } = useCursorStore.getState();
+      const { patterns, currentPatternIndex } = useTrackerStore.getState();
+      const pattern = patterns[currentPatternIndex];
+      if (!pattern) return false;
+      const beatSize = 4;
+      moveCursorToRow(Math.min(pattern.length - 1, cursor.rowIndex + beatSize));
+      return true;
+    }, description: 'Move cursor down by beat' },
+    { name: 'cursor_up_by_beat', contexts: ['pattern'], handler: () => {
+      const { cursor, moveCursorToRow } = useCursorStore.getState();
+      const beatSize = 4;
+      moveCursorToRow(Math.max(0, cursor.rowIndex - beatSize));
+      return true;
+    }, description: 'Move cursor up by beat' },
+    { name: 'snap_to_beat_down', contexts: ['pattern'], handler: () => {
+      const { cursor, moveCursorToRow } = useCursorStore.getState();
+      const { patterns, currentPatternIndex } = useTrackerStore.getState();
+      const pattern = patterns[currentPatternIndex];
+      if (!pattern) return false;
+      const beatSize = 4;
+      const nextBeat = Math.ceil((cursor.rowIndex + 1) / beatSize) * beatSize;
+      moveCursorToRow(Math.min(pattern.length - 1, nextBeat));
+      return true;
+    }, description: 'Snap to next beat boundary' },
+    { name: 'snap_to_beat_up', contexts: ['pattern'], handler: () => {
+      const { cursor, moveCursorToRow } = useCursorStore.getState();
+      const beatSize = 4;
+      const prevBeat = (Math.ceil(cursor.rowIndex / beatSize) - 1) * beatSize;
+      moveCursorToRow(Math.max(0, prevBeat));
+      return true;
+    }, description: 'Snap to previous beat boundary' },
+
+    // OpenMPT position navigation
+    { name: 'goto_first_row_first_channel', contexts: ['pattern'], handler: () => {
+      useCursorStore.getState().moveCursorToRow(0);
+      useCursorStore.getState().moveCursorToChannel(0);
+      useCursorStore.getState().moveCursorToColumn('note');
+      return true;
+    }, description: 'Go to first row, first channel' },
+    { name: 'goto_last_row_last_channel', contexts: ['pattern'], handler: () => {
+      const { patterns, currentPatternIndex } = useTrackerStore.getState();
+      const pattern = patterns[currentPatternIndex];
+      if (!pattern) return false;
+      useCursorStore.getState().moveCursorToRow(pattern.length - 1);
+      useCursorStore.getState().moveCursorToChannel(pattern.channels.length - 1);
+      useCursorStore.getState().moveCursorToColumn('note');
+      return true;
+    }, description: 'Go to last row, last channel' },
+
+    // OpenMPT quick copy/paste (Enter/Space in OpenMPT)
+    { name: 'quick_copy', contexts: ['pattern'], handler: () => {
+      const { cursor } = useCursorStore.getState();
+      const { patterns, currentPatternIndex } = useTrackerStore.getState();
+      const cell = patterns[currentPatternIndex]?.channels[cursor.channelIndex]?.rows[cursor.rowIndex];
+      if (cell) {
+        (window as any).__quickCopyCell = { ...cell };
+        useUIStore.getState().setStatusMessage('Quick copied', false, 600);
+      }
+      return true;
+    }, description: 'Quick copy cell at cursor' },
+    { name: 'quick_paste', contexts: ['pattern'], handler: () => {
+      const stored = (window as any).__quickCopyCell;
+      if (!stored) {
+        useUIStore.getState().setStatusMessage('Nothing to quick-paste', false, 800);
+        return true;
+      }
+      const { cursor } = useCursorStore.getState();
+      const { setCell } = useTrackerStore.getState();
+      setCell(cursor.channelIndex, cursor.rowIndex, stored);
+      useUIStore.getState().setStatusMessage('Quick pasted', false, 600);
+      return true;
+    }, description: 'Quick paste cell at cursor' },
+
+    // OpenMPT stubs (features that need tracker-specific infrastructure)
+    { name: 'channel_record_select', contexts: ['pattern'], handler: () => { useUIStore.getState().setStatusMessage('Record channel select: use multi-channel mode', false, 1500); return true; }, description: 'Channel record select' },
+    { name: 'channel_split_record_select', contexts: ['pattern'], handler: () => { useUIStore.getState().setStatusMessage('Split record: not available', false, 1500); return true; }, description: 'Channel split record select' },
+    { name: 'reset_channel', contexts: ['pattern'], handler: clearChannel, description: 'Reset channel' },
+    { name: 'transpose_custom', contexts: ['pattern'], handler: () => { useUIStore.getState().setStatusMessage('Custom transpose: use Shift+F1/F2', false, 1500); return true; }, description: 'Custom transpose dialog' },
+    { name: 'toggle_channel_plugin_editor', contexts: ['global'], handler: togglePluginEditor, description: 'Toggle channel plugin editor' },
+    { name: 'toggle_clipboard_manager', contexts: ['global'], handler: () => { useUIStore.getState().setStatusMessage('Clipboard manager: not available', false, 1500); return true; }, description: 'Toggle clipboard manager' },
+    { name: 'cycle_prev_clipboard', contexts: ['pattern'], handler: () => { useUIStore.getState().setStatusMessage('Clipboard cycling: not available', false, 1500); return true; }, description: 'Cycle to previous clipboard' },
+    { name: 'cycle_next_clipboard', contexts: ['pattern'], handler: () => { useUIStore.getState().setStatusMessage('Clipboard cycling: not available', false, 1500); return true; }, description: 'Cycle to next clipboard' },
+    { name: 'select_beat', contexts: ['pattern'], handler: selectColumn, description: 'Select beat' },
+    { name: 'select_measure', contexts: ['pattern'], handler: selectChannel, description: 'Select measure' },
+    { name: 'split_keyboard_dialog', contexts: ['global'], handler: () => { useUIStore.getState().setStatusMessage('Split keyboard: not available', false, 1500); return true; }, description: 'Split keyboard dialog' },
+    { name: 'open_effect_visualizer', contexts: ['global'], handler: () => { useUIStore.getState().setStatusMessage('Effect visualizer: not available', false, 1500); return true; }, description: 'Open effect visualizer' },
+    { name: 'show_playback_time', contexts: ['global'], handler: () => { useUIStore.getState().setStatusMessage('Playback time shown in transport bar', false, 1500); return true; }, description: 'Show playback time' },
+    { name: 'insert_param_control', contexts: ['pattern'], handler: () => { useUIStore.getState().setStatusMessage('Parameter control: OpenMPT only', false, 1500); return true; }, description: 'Insert parameter control' },
+    { name: 'insert_smooth_param_control', contexts: ['pattern'], handler: () => { useUIStore.getState().setStatusMessage('Smooth parameter control: OpenMPT only', false, 1500); return true; }, description: 'Insert smooth parameter control' },
+
+    // === RENOISE ALIASES ===
+    { name: 'layout_preset_1', contexts: ['global'], handler: loadLayout1, description: 'Layout preset 1' },
+    { name: 'layout_preset_2', contexts: ['global'], handler: loadLayout2, description: 'Layout preset 2' },
+    { name: 'layout_preset_3', contexts: ['global'], handler: loadLayout3, description: 'Layout preset 3' },
+    { name: 'layout_preset_4', contexts: ['global'], handler: loadLayout4, description: 'Layout preset 4' },
+    { name: 'layout_preset_5', contexts: ['global'], handler: loadLayout5, description: 'Layout preset 5' },
+    { name: 'layout_preset_6', contexts: ['global'], handler: loadLayout6, description: 'Layout preset 6' },
+    { name: 'layout_preset_7', contexts: ['global'], handler: loadLayout7, description: 'Layout preset 7' },
+    { name: 'layout_preset_8', contexts: ['global'], handler: loadLayout8, description: 'Layout preset 8' },
+    { name: 'play_block_loop', contexts: ['pattern', 'global'], handler: playPattern, description: 'Play block/pattern loop' },
+    { name: 'decrease_edit_step', contexts: ['pattern'], handler: decreaseStep, description: 'Decrease edit step' },
+    { name: 'increase_edit_step', contexts: ['pattern'], handler: increaseStep, description: 'Increase edit step' },
+    { name: 'cut_pattern', contexts: ['pattern'], handler: () => {
+      useCursorStore.getState().selectPattern();
+      useTrackerStore.getState().cutSelection();
+      useUIStore.getState().setStatusMessage('Pattern cut', false, 800);
+      return true;
+    }, description: 'Cut entire pattern' },
+    { name: 'insert_pattern', contexts: ['pattern', 'global'], handler: createPattern, description: 'Insert new pattern' },
+    { name: 'goto_first_pattern', contexts: ['global'], handler: () => {
+      useTrackerStore.getState().setCurrentPattern(0);
+      useUIStore.getState().setStatusMessage('Jumped to first pattern', false, 800);
+      return true;
+    }, description: 'Go to first pattern' },
+    { name: 'goto_last_pattern', contexts: ['global'], handler: () => {
+      const { patterns, setCurrentPattern } = useTrackerStore.getState();
+      setCurrentPattern(patterns.length - 1);
+      useUIStore.getState().setStatusMessage('Jumped to last pattern', false, 800);
+      return true;
+    }, description: 'Go to last pattern' },
+    { name: 'next_focus', contexts: ['global'], handler: focusNextPanel, description: 'Focus next panel' },
+    { name: 'prev_focus', contexts: ['global'], handler: focusPrevPanel, description: 'Focus previous panel' },
+    { name: 'instrument_page_up', contexts: ['pattern', 'global'], handler: () => {
+      // Jump instrument selection by 10 (calls prevInstrument 10 times)
+      for (let i = 0; i < 10; i++) prevInstrument();
+      return true;
+    }, description: 'Instrument page up' },
+    { name: 'instrument_page_down', contexts: ['pattern', 'global'], handler: () => {
+      for (let i = 0; i < 10; i++) nextInstrument();
+      return true;
+    }, description: 'Instrument page down' },
+
+    // Renoise percentage-based row jumps
+    { name: 'jump_to_row_25_percent', contexts: ['pattern'], handler: jumpToQuarter1, description: 'Jump to 25% of pattern' },
+    { name: 'jump_to_row_50_percent', contexts: ['pattern'], handler: jumpToQuarter2, description: 'Jump to 50% of pattern' },
+    { name: 'jump_to_row_75_percent', contexts: ['pattern'], handler: jumpToQuarter3, description: 'Jump to 75% of pattern' },
+
+    // Renoise column operations (stubs)
+    { name: 'delete_column_and_pull', contexts: ['pattern'], handler: deleteAndPull, description: 'Delete column row and pull up' },
+    { name: 'insert_column_row', contexts: ['pattern'], handler: insertRow, description: 'Insert column row' },
+    { name: 'add_column', contexts: ['pattern'], handler: () => { useUIStore.getState().setStatusMessage('Add column: not available', false, 1500); return true; }, description: 'Add effect column' },
+    { name: 'remove_column', contexts: ['pattern'], handler: () => { useUIStore.getState().setStatusMessage('Remove column: not available', false, 1500); return true; }, description: 'Remove effect column' },
+
+    // Renoise quantize presets
+    { name: 'set_quantize_1', contexts: ['pattern'], handler: setStep1, description: 'Set quantize/step 1' },
+    { name: 'set_quantize_2', contexts: ['pattern'], handler: setStep2, description: 'Set quantize/step 2' },
+    { name: 'set_quantize_3', contexts: ['pattern'], handler: setStep3, description: 'Set quantize/step 3' },
+    { name: 'set_quantize_4', contexts: ['pattern'], handler: setStep4, description: 'Set quantize/step 4' },
+    { name: 'set_quantize_5', contexts: ['pattern'], handler: setStep5, description: 'Set quantize/step 5' },
+    { name: 'set_quantize_6', contexts: ['pattern'], handler: setStep6, description: 'Set quantize/step 6' },
+    { name: 'set_quantize_7', contexts: ['pattern'], handler: setStep7, description: 'Set quantize/step 7' },
+    { name: 'set_quantize_8', contexts: ['pattern'], handler: setStep8, description: 'Set quantize/step 8' },
+    { name: 'set_quantize_9', contexts: ['pattern'], handler: setStep9, description: 'Set quantize/step 9' },
   ];
 
   commands.forEach(cmd => globalRegistry.register(cmd));

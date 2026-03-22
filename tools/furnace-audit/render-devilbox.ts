@@ -760,8 +760,8 @@ async function renderFurFile(furPath: string, outPath: string): Promise<RenderRe
       wasm._furnace_cmd_log_enable(1);
     }
 
-    // Set remaining loops to 1: play through once, stop at first loop detection
-    // Note: Furnace CLI `-loops 0` also does exportLoopCount=1, stops after first loop
+    // Set remaining loops to 1: play through once, process loop restart row, then stop.
+    // Matches reference Furnace CLI `-loops 0` which outputs commands through the loop point.
     wasm._furnace_seq_set_remaining_loops(1);
     wasm._furnace_seq_play(0, 0);
 

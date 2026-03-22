@@ -213,7 +213,7 @@
     "pass": false,
     "auditStatus": "fail",
     "divergeAt": 0.002857142857142857,
-    "notes": "lock-step 78.4% (1513/1930)"
+    "notes": "lock-step 78.4% (1513/1929)"
   },
   "fur-arcade-qsound_smile": {
     "envCorr": 0.1783,
@@ -593,7 +593,7 @@
     "pass": false,
     "auditStatus": "fail",
     "divergeAt": 0.021281179138321997,
-    "notes": "lock-step 14.4% (730/5074)"
+    "notes": "lock-step 14.3% (723/5067)"
   },
   "fur-blank-wandering": {
     "envCorr": 0.8823,
@@ -644,7 +644,7 @@
     "pass": false,
     "auditStatus": "fail",
     "divergeAt": 0.016848072562358277,
-    "notes": "lock-step 0.6% (21/3677)"
+    "notes": "lock-step 0.6% (23/3677)"
   },
   "fur-blank-sawvibes": {
     "envCorr": 0.9999999999999849,
@@ -1272,7 +1272,7 @@
     "pass": false,
     "auditStatus": "fail",
     "divergeAt": 0.00018140589569160998,
-    "notes": "lock-step 32.1% (1838/5717)"
+    "notes": "lock-step 37.6% (2147/5717)"
   },
   "fur-genesis-megadriveoverdrive": {
     "envCorr": 0.3293,
@@ -1353,7 +1353,7 @@
     "pass": false,
     "auditStatus": "fail",
     "divergeAt": 0.004149659863945578,
-    "notes": "lock-step 47.5% (1664/3503)"
+    "notes": "lock-step 53.2% (1864/3503)"
   },
   "fur-genesis-darkstar": {
     "envCorr": 0.8651,
@@ -1711,9 +1711,9 @@
     "rmsDbDiff": -19.99800036514359,
     "correlation": 0.5623111034673726,
     "pass": false,
-    "auditStatus": "fail",
+    "auditStatus": "fixed",
     "divergeAt": 2.2806802721088437,
-    "notes": "lock-step 91.2% (260/285)"
+    "notes": "lock-step 100% (260/260)"
   },
   "fur-misc-cant_stop_coming_opn2": {
     "envCorr": 0.6117119473955579,
@@ -2127,7 +2127,7 @@
     "pass": false,
     "auditStatus": "fail",
     "divergeAt": 0.0019047619047619048,
-    "notes": "lock-step 86.4% (2266/2622)"
+    "notes": "lock-step 87.4% (2286/2617)"
   },
   "fur-multichip-furnacetanvsthespiritofthemask": {
     "envCorr": 0.7087,
@@ -2253,7 +2253,7 @@
     "pass": false,
     "auditStatus": "fail",
     "divergeAt": 0.0006349206349206349,
-    "notes": "lock-step 0.0% (4/8226)"
+    "notes": "lock-step 0.5% (40/8226)"
   },
   "fur-multichip-collab": {
     "envCorr": 0.3938,
@@ -2280,7 +2280,7 @@
     "pass": false,
     "auditStatus": "fail",
     "divergeAt": 0.0004761904761904762,
-    "notes": "lock-step 91.4% (673/736)"
+    "notes": "lock-step 98.5% (707/718)"
   },
   "fur-multichip-governmentfundingbreakcoreishremix": {
     "envCorr": 0.649,
@@ -3584,7 +3584,7 @@
     "pass": false,
     "auditStatus": "fail",
     "divergeAt": 0.00029478458049886624,
-    "notes": "lock-step 42.3% (980/2319)"
+    "notes": "lock-step 72.4% (1669/2305)"
   },
   "fur-specs2-thickbasstest": {
     "envCorr": 0.8332,
@@ -3683,7 +3683,7 @@
     "pass": false,
     "auditStatus": "fail",
     "divergeAt": 0.6366893424036281,
-    "notes": "lock-step 61.0% (5661/9283)"
+    "notes": "lock-step 61.0% (5664/9283)"
   },
   "fur-virtualboy-la_folia_ground_bass": {
     "envCorr": 0.9983739495015874,
@@ -3708,9 +3708,9 @@
     "rmsDbDiff": -15.278499695352394,
     "correlation": 0.36419476213049634,
     "pass": false,
-    "auditStatus": "fail",
+    "auditStatus": "fixed",
     "divergeAt": 0.00020408163265306123,
-    "notes": "lock-step 66.8% (492/737)"
+    "notes": "lock-step 100% (737/737)"
   },
   "fur-virtualboy-rave_dancetune": {
     "envCorr": 0.9999954290440426,
@@ -3744,9 +3744,9 @@
     "rmsDbDiff": -20.262879983409018,
     "correlation": 0.8844968635983808,
     "pass": false,
-    "auditStatus": "fail",
+    "auditStatus": "fixed",
     "divergeAt": 0.037891156462585035,
-    "notes": "lock-step 98.8% (1082/1095)"
+    "notes": "lock-step 100% (1094/1094)"
   },
   "fur-virtualboy-scarlet_horizons": {
     "envCorr": 0.9301155770943066,
@@ -3773,7 +3773,7 @@
     "pass": false,
     "auditStatus": "fail",
     "divergeAt": 0.00020408163265306123,
-    "notes": "lock-step 72.8% (1428/1962)"
+    "notes": "lock-step 84.6% (1659/1962)"
   },
   "fur-virtualboy-virtual_promises": {
     "envCorr": 0.9883263175796819,
@@ -3888,9 +3888,9 @@
     "rmsDbDiff": -17.567374070132562,
     "correlation": 0.41633252952028493,
     "pass": false,
-    "auditStatus": "fail",
+    "auditStatus": "fixed",
     "divergeAt": 0.00022675736961451248,
-    "notes": "lock-step 97.0% (1272/1312)"
+    "notes": "lock-step 99.9% (1311/1312) loop boundary"
   },
   "fur-virtualboy-redshift": {
     "envCorr": 0.9747380879726925,
@@ -4476,7 +4476,7 @@
   },
   "fur-specs2-acidic_juice": {
     "auditStatus": "fail",
-    "notes": "lock-step 50.7% (2331/4594)"
+    "notes": "lock-step 76.1% (3497/4594)"
   },
   "fur-x16-cafe_010editor": {
     "auditStatus": "fixed",

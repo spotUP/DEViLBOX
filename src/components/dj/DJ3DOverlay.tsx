@@ -6,7 +6,7 @@
  */
 
 import React, { Suspense, useRef, useCallback } from 'react';
-import { Canvas } from '@react-three/fiber';
+import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { OrbitControls, PerspectiveCamera } from '@react-three/drei';
 import * as THREE from 'three';
 import { useDJStore } from '@/stores/useDJStore';
@@ -23,9 +23,10 @@ const DEFAULT_CAM_TARGET: [number, number, number] = [0, 0, -0.02];
 
 interface CameraButtonsProps {
   orbitRef: React.RefObject<OrbitControlsImpl | null>;
+  onInvalidate?: () => void;
 }
 
-const CameraButtons: React.FC<CameraButtonsProps> = ({ orbitRef }) => {
+const CameraButtons: React.FC<CameraButtonsProps> = ({ orbitRef, onInvalidate }) => {
   const dragMode = useRef<'rotate' | 'pan' | 'zoom' | null>(null);
   const lastPos = useRef({ x: 0, y: 0 });
 
@@ -52,7 +53,7 @@ const CameraButtons: React.FC<CameraButtonsProps> = ({ orbitRef }) => {
       case 'rotate':
         c.setAzimuthalAngle(c.getAzimuthalAngle() - dx * 0.008);
         c.setPolarAngle(c.getPolarAngle() + dy * 0.008);
-        c.update();
+        c.update(); onInvalidate?.();
         break;
       case 'pan': {
         const cam = c.object;
@@ -63,13 +64,13 @@ const CameraButtons: React.FC<CameraButtonsProps> = ({ orbitRef }) => {
         const offset = right.multiplyScalar(dx * 0.002).addScaledVector(up, dy * 0.002);
         c.target.add(offset);
         cam.position.add(offset);
-        c.update();
+        c.update(); onInvalidate?.();
         break;
       }
       case 'zoom': {
         const dir = c.object.position.clone().sub(c.target).normalize();
         c.object.position.addScaledVector(dir, dy * 0.01);
-        c.update();
+        c.update(); onInvalidate?.();
         break;
       }
     }
@@ -87,8 +88,8 @@ const CameraButtons: React.FC<CameraButtonsProps> = ({ orbitRef }) => {
     if (!c) return;
     c.target.set(...DEFAULT_CAM_TARGET);
     c.object.position.set(...DEFAULT_CAM_POS);
-    c.update();
-  }, [orbitRef]);
+    c.update(); onInvalidate?.();
+  }, [orbitRef, onInvalidate]);
 
   const pad = "w-10 h-10 flex items-center justify-center rounded bg-black/50 hover:bg-white/20 text-white/70 hover:text-text-primary text-[10px] leading-tight select-none cursor-grab active:cursor-grabbing border border-white/10 transition-colors touch-none";
   const btn = "w-10 h-6 flex items-center justify-center rounded bg-black/50 hover:bg-white/20 text-white/70 hover:text-text-primary text-[10px] select-none cursor-pointer border border-white/10 transition-colors";
@@ -126,6 +127,28 @@ const CameraButtons: React.FC<CameraButtonsProps> = ({ orbitRef }) => {
     </div>
   );
 };
+
+// ── Capture invalidate function for use outside Canvas ───────────────────────
+
+const InvalidateCapture = React.forwardRef<{ current: () => void }>((_props, ref) => {
+  const { invalidate } = useThree();
+  React.useImperativeHandle(ref, () => ({ current: invalidate }), [invalidate]);
+  return null;
+});
+InvalidateCapture.displayName = 'InvalidateCapture';
+
+// ── Demand-mode invalidation: only re-render when a deck is playing ──────────
+
+function DemandInvalidator() {
+  const { invalidate } = useThree();
+  useFrame(() => {
+    const decks = useDJStore.getState().decks;
+    if (decks.A.isPlaying || decks.B.isPlaying || decks.C.isPlaying) {
+      invalidate();
+    }
+  });
+  return null;
+}
 
 // ── Unified 3D Scene ─────────────────────────────────────────────────────────
 
@@ -199,6 +222,7 @@ export const DJ3DOverlay: React.FC = () => {
   const thirdDeckActive = useDJStore(s => s.thirdDeckActive);
   const orbitRef = useRef<OrbitControlsImpl>(null);
   const canvasContainerRef = useRef<HTMLDivElement>(null);
+  const invalidateRef = useRef<() => void>(() => {});
 
   return (
     <div ref={canvasContainerRef} className="w-full h-full relative" style={{ touchAction: 'none' }}>
@@ -209,10 +233,13 @@ export const DJ3DOverlay: React.FC = () => {
       }>
         <Canvas
           style={{ position: 'absolute', inset: 0 }}
-          gl={{ antialias: true, alpha: false }}
-          dpr={[1, 2]}
+          gl={{ antialias: true, alpha: false, powerPreference: 'low-power' }}
+          dpr={[1, 1.5]}
+          frameloop="demand"
         >
           <color attach="background" args={['#0a0a0a']} />
+          <InvalidateCapture ref={invalidateRef} />
+          <DemandInvalidator />
           <UnifiedDJScene
             orbitRef={orbitRef}
             canvasContainerRef={canvasContainerRef}

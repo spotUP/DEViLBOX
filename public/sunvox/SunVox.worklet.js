@@ -54,6 +54,7 @@ class SunVoxProcessor extends AudioWorkletProcessor {
     this._wasmCrashed = false;
     this._wasmBinary = null;
     this._ticks = 0;
+    this._scopeDbg = 0;
     // Module mute state: Map<`${slot}:${modId}`, { volCtlIdx, savedVal }>
     this._mutedModules = new Map();
     // Cached module graph chains: Map<`${slot}:${modId}`, Set<number>>
@@ -515,6 +516,37 @@ class SunVoxProcessor extends AudioWorkletProcessor {
         break;
 
       // ── Module graph (with full type info from official API) ──────────────
+
+      case 'getModuleScope': {
+        // Read oscilloscope waveform data for a specific module
+        // sv_get_module_scope2(slot, mod_num, channel, dest_buf, samples_to_read) → actual count
+        if (!m) break;
+        try {
+          const SCOPE_LEN = 1024;
+          const destPtr = m._malloc(SCOPE_LEN * 2); // int16 = 2 bytes each
+          const received = m._sv_get_module_scope2(
+            data.handle, data.moduleId, data.channel || 0, destPtr, SCOPE_LEN
+          );
+          // Convert int16 → normalized float32 for the UI
+          const out = new Float32Array(received);
+          const heap16 = new Int16Array(m.HEAPU8.buffer, destPtr, received);
+          for (let i = 0; i < received; i++) out[i] = heap16[i] / 32768;
+          m._free(destPtr);
+          this.port.postMessage(
+            { type: 'moduleScope', handle: data.handle, moduleId: data.moduleId, data: out.buffer },
+            [out.buffer]
+          );
+        } catch (err) {
+          console.error('[SunVox Worklet] getModuleScope error:', err.message);
+          // Send empty buffer so the promise resolves
+          const empty = new Float32Array(0);
+          this.port.postMessage(
+            { type: 'moduleScope', handle: data.handle, moduleId: data.moduleId, data: empty.buffer },
+            [empty.buffer]
+          );
+        }
+        break;
+      }
 
       case 'getModuleGraph': {
         if (!m) break;
