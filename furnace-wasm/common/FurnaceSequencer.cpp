@@ -761,6 +761,44 @@ static bool seqPerSystemEffect(int ch, int effect, int effectVal) {
       }
       break;
 
+    // --- Virtual Boy (VSU): effectHandlers ---
+    case 46: // DIV_SYSTEM_VBOY
+      switch (effect) {
+        case 0x10: dispatchCmd(DIV_CMD_WAVE, ch, effectVal); return true;
+        case 0x11: dispatchCmd(DIV_CMD_STD_NOISE_MODE, ch, effectVal); return true;
+        case 0x12: dispatchCmd(DIV_CMD_STD_NOISE_FREQ, ch, effectVal); return true;
+        case 0x15: dispatchCmd(94 /* DIV_CMD_FDS_MOD_WAVE */, ch, effectVal); return true;
+      }
+      break;
+
+    // --- WonderSwan: effectHandlers ---
+    case 42: // DIV_SYSTEM_SWAN
+      switch (effect) {
+        case 0x10: dispatchCmd(DIV_CMD_WAVE, ch, effectVal); return true;
+        case 0x11: dispatchCmd(DIV_CMD_STD_NOISE_MODE, ch, effectVal); return true;
+        case 0x12: dispatchCmd(111 /* DIV_CMD_WS_SWEEP_TIME */, ch, effectVal); return true;
+        case 0x13: dispatchCmd(112 /* DIV_CMD_WS_SWEEP_AMOUNT */, ch, effectVal); return true;
+        case 0x15: dispatchCmd(221 /* DIV_CMD_WS_GLOBAL_SPEAKER_VOLUME */, ch, effectVal); return true;
+      }
+      break;
+
+    // --- PV1000: effectHandlers ---
+    case 94: // DIV_SYSTEM_PV1000
+      switch (effect) {
+        case 0x10: dispatchCmd(DIV_CMD_STD_NOISE_MODE, ch, effectVal); return true;
+      }
+      break;
+
+    // --- Bifurcator: effectHandlers ---
+    case 106: // DIV_SYSTEM_BIFURCATOR
+      switch (effect) {
+        case 0x10: dispatchCmd(182 /* DIV_CMD_BIFURCATOR_STATE_LOAD */, ch, 0, effectVal); return true;
+        case 0x11: dispatchCmd(182 /* DIV_CMD_BIFURCATOR_STATE_LOAD */, ch, 1, effectVal); return true;
+        case 0x12: dispatchCmd(183 /* DIV_CMD_BIFURCATOR_PARAMETER */, ch, 0, effectVal); return true;
+        case 0x13: dispatchCmd(183 /* DIV_CMD_BIFURCATOR_PARAMETER */, ch, 1, effectVal); return true;
+      }
+      break;
+
     // --- N163: effectHandlers ---
     case SEQ_CHIP_N163:
       switch (effect) {
