@@ -447,8 +447,8 @@ export const DJView: React.FC<DJViewProps> = ({ onShowDrumpads }) => {
       {/* ================================================================== */}
       <div className={`relative flex-1 grid gap-2 p-2 overflow-hidden min-h-0 ${
         thirdDeckActive
-          ? 'grid-cols-[1fr_280px_1fr_1fr]'
-          : 'grid-cols-[1fr_280px_1fr]'
+          ? 'grid-cols-[1fr_400px_1fr_1fr]'
+          : 'grid-cols-[1fr_400px_1fr]'
       }`}>
         {deckViewMode === '3d' ? (
           /* ── 3D mode: Three.js Canvas with scissor Views ─────────────── */

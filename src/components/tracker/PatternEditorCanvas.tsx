@@ -1800,7 +1800,6 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
     const tick = () => {
       // FORMAT MODE: use format engine's playback state (skip all tracker store reads)
       if (isFormatModeRef.current) {
-        const newRow     = formatCurrentRowRef.current;
         const newPlaying = formatIsPlayingRef.current;
         const bridge     = bridgeRef.current;
 
@@ -1822,14 +1821,35 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
             prevRow = -1;
           }
 
-          // PERF: Dedup — only post when row or playing state actually changes
-          if (newRow !== prevRow || newPlaying !== prevPlaying) {
+          // Read frame-accurate row from replayer instead of throttled transport store
+          let newRow = formatCurrentRowRef.current;
+          let smoothOffset = 0;
+          if (newPlaying) {
+            const replayer = getTrackerReplayer();
+            const audioTime = Tone.now() + 0.01;
+            const audioState = replayer.getStateAtTime(audioTime);
+            if (audioState) {
+              newRow = audioState.row;
+              // Compute smooth scroll offset (same formula as classic mode)
+              const transportState = useTransportStore.getState();
+              if (transportState.smoothScrolling && audioState.duration > 0) {
+                const progress = Math.min(Math.max(
+                  (audioTime - audioState.time) / audioState.duration, 0), 1);
+                smoothOffset = progress * rowHeightRef.current;
+              }
+            }
+          }
+
+          // Always send during playback for smooth scrolling; dedup when stopped
+          const shouldSend = newPlaying ||
+            newRow !== prevRow || newPlaying !== prevPlaying;
+          if (shouldSend) {
             prevRow     = newRow;
             prevPlaying = newPlaying;
             bridge.post({
               type: 'playback',
               row: newRow,
-              smoothOffset: 0,
+              smoothOffset,
               patternIndex: 0,
               isPlaying: newPlaying,
             });
