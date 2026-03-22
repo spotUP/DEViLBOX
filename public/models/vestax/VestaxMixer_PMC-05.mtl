@@ -1,0 +1,76 @@
+# Vestax PMC-05 Pro III Material Library
+
+newmtl pCylinder1SG
+Kd 0.6 0.6 0.6
+Ks 0.3 0.3 0.3
+Ns 50
+map_Kd Textures/nOISEpaTTERN.jpg
+
+newmtl Klamz_uv_Death_DJ_02:mixer_EXP:FaceplateSG
+Kd 0.85 0.85 0.85
+Ks 0.2 0.2 0.2
+Ns 30
+map_Kd Textures/Faceplate_Diff_01_2.png
+
+newmtl Klamz_uv_Death_DJ_02:mixer_EXP:windowSG
+Kd 0.05 0.05 0.08
+Ks 0.4 0.4 0.5
+Ns 90
+map_Kd Textures/InputLevel.jpg
+
+newmtl Klamz_uv_Death_DJ_02:mixer_EXP:Cylinder06SG
+Kd 0.4 0.4 0.4
+Ks 0.8 0.8 0.8
+Ns 80
+map_Kd Textures/Anis_Metal_Spec.jpg
+
+newmtl Klamz_uv_Death_DJ_02:mixer_EXP:Cylinder05SG
+Kd 0.3 0.3 0.3
+Ks 0.2 0.2 0.2
+Ns 40
+
+newmtl Klamz_uv_Death_DJ_02:mixer_EXP:Rectangle01SG
+Kd 0.1 0.1 0.1
+Ks 0.3 0.3 0.3
+Ns 60
+
+newmtl Klamz_uv_Death_DJ_02:mixer_EXP:BoxFBXASC032OuterSG
+Kd 0.35 0.35 0.35
+Ks 0.2 0.2 0.2
+Ns 30
+map_Kd Textures/Backplate_GFX_01.jpg
+
+newmtl Klamz_uv_Death_DJ_02:mixer_EXP:fader1SG
+Kd 0.5 0.5 0.5
+Ks 0.6 0.6 0.6
+Ns 70
+
+newmtl knobSG
+Kd 0.12 0.12 0.12
+Ks 0.1 0.1 0.1
+Ns 20
+
+newmtl pCylinder7SG
+Kd 0.4 0.4 0.4
+Ks 0.5 0.5 0.5
+Ns 60
+
+newmtl pCylinder7SG1
+Kd 0.4 0.4 0.4
+Ks 0.5 0.5 0.5
+Ns 60
+
+newmtl pCylinder7SG2
+Kd 0.4 0.4 0.4
+Ks 0.5 0.5 0.5
+Ns 60
+
+newmtl polySurface1SG
+Kd 0.15 0.15 0.15
+Ks 0.3 0.3 0.3
+Ns 50
+
+newmtl polySurface5SG
+Kd 0.15 0.15 0.15
+Ks 0.3 0.3 0.3
+Ns 50
