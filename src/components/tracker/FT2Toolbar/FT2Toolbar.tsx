@@ -770,6 +770,12 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = React.memo(({
         <Button variant="ghost" size="sm" onClick={() => setShowClearModal(true)} title="Clear all patterns">Clear</Button>
         <Button variant="ghost" size="sm" onClick={() => fileInputRef.current?.click()} title="Import module file">Import</Button>
         <Button variant="ghost" size="sm" onClick={onShowPatternOrder} title="Pattern order list">Order</Button>
+        <Button
+          variant={modalOpen === 'findReplace' ? 'primary' : 'ghost'}
+          size="sm"
+          onClick={() => { const s = useUIStore.getState(); s.modalOpen === 'findReplace' ? s.closeModal() : s.openModal('findReplace'); }}
+          title="Effect search & replace"
+        >FX Search</Button>
         <Button variant="ghost" size="sm" onClick={onShowInstruments} title="Instrument editor">Instruments</Button>
         <Button variant="ghost" size="sm" onClick={onShowDrumpads} title="Drum pads">Pads</Button>
         <Button variant={showMasterFX ? 'primary' : 'ghost'} size="sm" onClick={onShowMasterFX} title="Master effects chain">Master FX</Button>
