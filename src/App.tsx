@@ -83,6 +83,7 @@ const AuthModal = lazy(() => import('@components/dialogs/AuthModal').then(m => (
 const SettingsModal = lazy(() => import('@components/dialogs/SettingsModal').then(m => ({ default: m.SettingsModal })));
 const RevisionBrowserDialog = lazy(() => import('@components/dialogs/RevisionBrowserDialog').then(m => ({ default: m.RevisionBrowserDialog })));
 const PixiApp = lazy(() => import('./pixi/PixiApp').then(m => ({ default: m.PixiApp })));
+const DJ3DOverlay = lazy(() => import('./components/dj/DJ3DOverlay').then(m => ({ default: m.DJ3DOverlay })));
 const WebGLModalBridge = lazy(() => import('./pixi/WebGLModalBridge').then(m => ({ default: m.WebGLModalBridge })));
 const CollaborationSplitView = lazy(() => import('@components/collaboration/CollaborationSplitView').then(m => ({ default: m.CollaborationSplitView })));
 const MixerPanel = lazy(() => import('./components/panels/MixerPanel').then(m => ({ default: m.MixerPanel })));
@@ -154,6 +155,7 @@ function App() {
   const [pendingSongFile, setPendingSongFile]             = useState<File | null>(null);
   const [pendingInstrumentFile, setPendingInstrumentFile] = useState<File | null>(null);
   const djModeActive = useDJStore(s => s.djModeActive);
+  const deckViewMode = useDJStore(s => s.deckViewMode);
   const pendingTD3File = useUIStore(s => s.pendingTD3File);
 
   // Modal state from store (single source of truth for DOM + WebGL)
@@ -728,6 +730,14 @@ function App() {
       }>
         <GlobalDragDropHandler onFileLoaded={handleFileDrop} onFolderLoaded={handleFolderDrop}>
           <PixiApp />
+          {/* DJ 3D overlay — Three.js rendered in DOM tree, on top of Pixi canvas */}
+          {activeView === 'dj' && deckViewMode === '3d' && (
+            <div className="fixed inset-0 z-10" style={{ top: 36, background: 'rgba(10,10,14,0.97)' }}>
+              <Suspense fallback={<div className="flex-1 flex items-center justify-center text-text-muted">Loading 3D views...</div>}>
+                <DJ3DOverlay />
+              </Suspense>
+            </div>
+          )}
           {/* DOM SplitView overlay — GL mode has no native split view, so we render the DOM version */}
           {activeView === 'split' && (
             <div className="fixed inset-0 z-10 bg-dark-bg">
