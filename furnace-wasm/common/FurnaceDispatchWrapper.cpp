@@ -966,6 +966,17 @@ void furnace_dispatch_destroy(int handle) {
 /**
  * Reset a dispatch instance.
  */
+/**
+ * Set skip-register-writes mode on a dispatch (used during loop re-seek).
+ * When enabled, the dispatch processes commands/macros but doesn't write to chip registers.
+ */
+extern "C" void furnace_dispatch_set_skip_writes(int handle, int skip) {
+  auto it = g_instances.find(handle);
+  if (it != g_instances.end()) {
+    it->second->dispatch->setSkipRegisterWrites(skip != 0);
+  }
+}
+
 extern "C" EMSCRIPTEN_KEEPALIVE
 void furnace_dispatch_reset(int handle) {
   auto it = g_instances.find(handle);
