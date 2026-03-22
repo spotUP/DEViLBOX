@@ -604,8 +604,21 @@ export class SunVoxEngine {
     this.sendMessage({ type: 'unmuteModule', handle, moduleId });
   }
 
-  play(handle: number): void {
-    this.sendMessage({ type: 'play', handle });
+  play(handle: number, fromBeginning = false): void {
+    this.sendMessage({ type: 'play', handle, fromBeginning });
+  }
+
+  /**
+   * Connect the worklet's raw output directly to a native AudioNode.
+   * Tone.js/SAC dispose cycles silently sever native-level connections
+   * made through intermediate GainNodes, so ToneEngine routes the worklet
+   * directly to synthBus's native node instead.
+   * Web Audio connect() is idempotent — safe to call repeatedly.
+   */
+  connectWorkletTo(destination: AudioNode): void {
+    if (this.workletNode) {
+      this.workletNode.connect(destination);
+    }
   }
 
   stop(handle: number): void {
