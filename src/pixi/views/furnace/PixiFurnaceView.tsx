@@ -4,12 +4,11 @@
  * Layout:
  * ┌──────────────────────────────────────────────────┐
  * │ Toolbar (subsong selector, pattern controls)     │
- * ├────────────┬─────────────────────────────────────┤
- * │ Order      │ Pattern Editor                      │
- * │ Matrix     │ (per-channel patterns from current  │
- * │ (left      │  order position)                    │
- * │  panel)    │                                     │
- * └────────────┴─────────────────────────────────────┘
+ * ├──────────────────────────────────────────────────┤
+ * │ Order Matrix (~160px tall)                       │
+ * ├──────────────────────────────────────────────────┤
+ * │ Pattern Editor (fills remaining space)           │
+ * └──────────────────────────────────────────────────┘
  */
 
 import React, { useCallback, useState } from 'react';
@@ -22,7 +21,7 @@ import { PIXI_FONTS } from '@/pixi/fonts';
 import { PixiFurnaceOrderMatrix } from './PixiFurnaceOrderMatrix';
 import { PixiFurnacePatternEditor } from './PixiFurnacePatternEditor';
 
-const ORDER_MATRIX_WIDTH = 220;
+const ORDER_MATRIX_HEIGHT = 160;
 const TOOLBAR_HEIGHT = 32;
 
 interface FurnaceViewProps {
@@ -85,8 +84,7 @@ export const PixiFurnaceView: React.FC<FurnaceViewProps> = ({ width, height }) =
   }
 
   const sub = nativeData.subsongs[nativeData.activeSubsong];
-  const editorWidth = width - ORDER_MATRIX_WIDTH;
-  const editorHeight = height - TOOLBAR_HEIGHT;
+  const patternEditorHeight = height - TOOLBAR_HEIGHT - ORDER_MATRIX_HEIGHT;
 
   // Build toolbar info string
   const toolbarLeft = `FURNACE`;
@@ -128,13 +126,13 @@ export const PixiFurnaceView: React.FC<FurnaceViewProps> = ({ width, height }) =
         />
       </pixiContainer>
 
-      {/* Main content: Order Matrix (left) + Pattern Editor (right) */}
-      <pixiContainer layout={{ flex: 1, width, height: editorHeight, flexDirection: 'row' }}>
+      {/* Main content: Order Matrix (top) + Pattern Editor (bottom) */}
+      <pixiContainer layout={{ flex: 1, width, flexDirection: 'column' }}>
         {/* Order Matrix */}
-        <pixiContainer layout={{ width: ORDER_MATRIX_WIDTH, height: editorHeight }}>
+        <pixiContainer layout={{ width, height: ORDER_MATRIX_HEIGHT }}>
           <PixiFurnaceOrderMatrix
-            width={ORDER_MATRIX_WIDTH}
-            height={editorHeight}
+            width={width}
+            height={ORDER_MATRIX_HEIGHT}
             nativeData={nativeData}
             currentPosition={activePosition}
             onPositionChange={handlePositionChange}
@@ -144,8 +142,8 @@ export const PixiFurnaceView: React.FC<FurnaceViewProps> = ({ width, height }) =
 
         {/* Pattern Editor */}
         <PixiFurnacePatternEditor
-          width={editorWidth}
-          height={editorHeight}
+          width={width}
+          height={patternEditorHeight}
           nativeData={nativeData}
           currentPosition={activePosition}
           playbackRow={displayRow}

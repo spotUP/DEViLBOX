@@ -56,6 +56,7 @@ import { GTUltraView } from '@components/gtultra/GTUltraView';
 import { HivelyView } from '@components/hively/HivelyView';
 import { KlysView } from '@components/klystrack/KlysView';
 import { JamCrackerView } from '@components/jamcracker/JamCrackerView';
+import { FurnaceView } from '@components/furnace/FurnaceView';
 import { Sc68Visualizer } from './Sc68Visualizer';
 
 interface TrackerViewProps {
@@ -533,10 +534,10 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
           {viewMode === 'tracker' ? (
             (() => {
               // Determine if this is a custom format editor that can be popped out
-              const isCustomFormat = ['goattracker', 'hively', 'klystrack', 'jamcracker', 'musicline'].includes(editorMode);
+              const isCustomFormat = ['goattracker', 'hively', 'klystrack', 'jamcracker', 'musicline', 'furnace'].includes(editorMode);
               const formatLabels: Record<string, string> = {
                 goattracker: 'GoatTracker', hively: 'AHX / Hively', klystrack: 'Klystrack',
-                jamcracker: 'JamCracker', musicline: 'MusicLine',
+                jamcracker: 'JamCracker', musicline: 'MusicLine', furnace: 'Furnace',
               };
 
               // Build the editor content
@@ -548,6 +549,8 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
                 <KlysView />
               ) : editorMode === 'jamcracker' ? (
                 <JamCrackerView />
+              ) : editorMode === 'furnace' ? (
+                <FurnaceView />
               ) : editorMode === 'sc68' ? (
                 <Sc68Visualizer />
               ) : editorMode === 'musicline' ? (
