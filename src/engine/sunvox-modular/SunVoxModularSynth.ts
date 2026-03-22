@@ -310,6 +310,20 @@ export class SunVoxModularSynth implements DevilboxSynth {
     return this.uiToSv.get(uiId);
   }
 
+  /** Get oscilloscope waveform data for a module (float32, -1..1). */
+  async getModuleScope(svModuleId: number, channel = 0): Promise<Float32Array> {
+    await this._initPromise;
+    if (this._disposed || this._handle < 0) return new Float32Array(0);
+    return this.engine.getModuleScope(this._handle, svModuleId, channel);
+  }
+
+  /** Load a .sunsynth module into this SunVox instance. Returns the new SunVox module ID. */
+  async loadSunsynthModule(buffer: ArrayBuffer): Promise<number> {
+    await this._initPromise;
+    if (this._disposed || this._handle < 0) throw new Error('[SunVoxModularSynth] No slot');
+    return this.engine.loadSynth(this._handle, buffer);
+  }
+
   // ── Save/Load ───────────────────────────────────────────────────────────
 
   async save(): Promise<ArrayBuffer> {
