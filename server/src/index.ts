@@ -18,6 +18,7 @@ import deepsidRoutes from './routes/deepsid';
 import aiRoutes from './routes/ai';
 import analysisRoutes from './routes/analysis';
 import djsetsRoutes from './routes/djsets';
+import { handleStreamConnection, checkFfmpeg } from './routes/stream';
 import { initDatabase } from './db/database';
 import { initDataDirectories } from './utils/fileSystem';
 import { initModlandIndex, scheduleModlandUpdates } from './services/modlandIndexer';
@@ -179,8 +180,27 @@ scheduleSongDBUpdates();
 startMcpRelay();
 
 // Start server
-app.listen(PORT, () => {
+const server = app.listen(PORT, () => {
   console.log(`[Server] DEViLBOX API running on port ${PORT}`);
   console.log(`[Server] Environment: ${process.env.NODE_ENV || 'development'}`);
   console.log(`[Server] Data root: ${process.env.DATA_ROOT || '/var/www/devilbox/data'}`);
+  if (checkFfmpeg()) {
+    console.log(`[Server] ffmpeg available — live streaming enabled`);
+  } else {
+    console.log(`[Server] ffmpeg not found — live streaming disabled`);
+  }
+});
+
+// WebSocket upgrade handler for live stream relay
+server.on('upgrade', (req, socket, head) => {
+  const url = new URL(req.url || '', `http://localhost:${PORT}`);
+  if (url.pathname === '/api/stream/ingest') {
+    const { WebSocketServer } = require('ws') as typeof import('ws');
+    const wss = new WebSocketServer({ noServer: true });
+    wss.handleUpgrade(req, socket, head, (ws) => {
+      const streamKey = url.searchParams.get('key') || '';
+      handleStreamConnection(ws, streamKey);
+    });
+  }
+  // Other WebSocket upgrades (MCP relay) are handled by their own server on port 4003
 });
