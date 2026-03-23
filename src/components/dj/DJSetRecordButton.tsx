@@ -11,7 +11,6 @@ import { useAuthStore } from '@/stores/useAuthStore';
 import { DJSetRecorder } from '@/engine/dj/recording/DJSetRecorder';
 import { saveDJSet, uploadBlob } from '@/lib/djSetApi';
 import type { DJSet } from '@/engine/dj/recording/DJSetFormat';
-import type { TrackSource } from '@/engine/dj/recording/DJSetEvent';
 
 let _activeRecorder: DJSetRecorder | null = null;
 
@@ -24,8 +23,7 @@ export const DJSetRecordButton: React.FC = () => {
   const isRecording = useDJSetStore(s => s.isRecording);
   const recordingDuration = useDJSetStore(s => s.recordingDuration);
   const token = useAuthStore(s => s.token);
-  const username = useAuthStore(s => s.username);
-  const userId = useAuthStore(s => s.userId);
+  const user = useAuthStore(s => s.user);
   const [saving, setSaving] = useState(false);
   const timerRef = useRef<number>(0);
 
@@ -47,7 +45,7 @@ export const DJSetRecordButton: React.FC = () => {
       const name = prompt('Name your DJ set:', `DJ Set ${new Date().toLocaleString()}`);
       if (!name) return; // cancelled
 
-      const set: DJSet = _activeRecorder.stopRecording(name, userId || 'local', username || 'DJ');
+      const set: DJSet = _activeRecorder.stopRecording(name, user?.id || 'local', user?.username || 'DJ');
 
       // Detach from DJEngine
       try {
