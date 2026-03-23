@@ -48,12 +48,22 @@ export const DJDeck: React.FC<DJDeckProps> = ({ deckId }) => {
     return !!(peaks && peaks.length > 0);
   });
 
-  // Poll playback position and update store at ~30fps
+  // Poll playback position and update store at ~20fps (throttled from RAF)
   useEffect(() => {
     let running = true;
+    let lastPoll = 0;
+    const POLL_INTERVAL = 50; // 50ms = 20fps — sufficient for position display
 
     const poll = () => {
       if (!running) return;
+
+      // Throttle: skip frames to reduce store broadcasts
+      const now = performance.now();
+      if (now - lastPoll < POLL_INTERVAL) {
+        animFrameRef.current = requestAnimationFrame(poll);
+        return;
+      }
+      lastPoll = now;
 
       try {
         const engine = getDJEngine();
