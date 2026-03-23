@@ -10,11 +10,12 @@ import { randomBytes, createHash } from 'crypto';
 import multer from 'multer';
 import db from '../db/database';
 import { authenticateToken, optionalAuth, type AuthRequest } from '../middleware/auth';
+import { transcodeToOpus } from '../utils/transcode';
 
 const router = Router();
 
-// Multer for blob uploads (10MB limit)
-const upload = multer({ limits: { fileSize: 10 * 1024 * 1024 } });
+// Multer for blob uploads (100MB limit)
+const upload = multer({ limits: { fileSize: 100 * 1024 * 1024 } });
 
 // ── DJ Sets ─────────────────────────────────────────────────────────────
 
@@ -84,6 +85,14 @@ router.get('/', optionalAuth as any, (req: AuthRequest, res: Response) => {
       `).all(limit, offset);
     }
 
+    let totalRow;
+    if (mine) {
+      totalRow = db.prepare('SELECT COUNT(*) as count FROM dj_sets WHERE user_id = ?').get(req.userId) as { count: number };
+    } else {
+      totalRow = db.prepare('SELECT COUNT(*) as count FROM dj_sets').get() as { count: number };
+    }
+    const total = totalRow.count;
+
     const sets = (rows as any[]).map(r => ({
       id: r.id,
       name: r.name,
@@ -96,7 +105,7 @@ router.get('/', optionalAuth as any, (req: AuthRequest, res: Response) => {
       hasMic: !!r.mic_audio_id,
     }));
 
-    res.json({ sets, offset, limit });
+    res.json({ sets, total, offset, limit });
   } catch (err) {
     console.error('[djsets] List error:', err);
     res.status(500).json({ error: 'Failed to list sets' });
@@ -160,17 +169,39 @@ router.post('/:id/play', (req: Request, res: Response) => {
 // ── Blobs (module files + mic recordings) ───────────────────────────────
 
 /** POST /api/djsets/blobs — Upload a blob (multipart form-data) */
-router.post('/blobs', authenticateToken as any, upload.single('file'), (req: AuthRequest, res: Response) => {
+router.post('/blobs', authenticateToken as any, upload.single('file'), async (req: AuthRequest, res: Response) => {
   try {
     if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
 
-    const data = req.file.buffer;
-    const sha256 = createHash('sha256').update(data).digest('hex');
-
-    // Deduplicate: if blob with same hash exists, return existing ID
-    const existing = db.prepare('SELECT id FROM dj_blobs WHERE sha256 = ?').get(sha256) as { id: string } | undefined;
+    // First check dedup on original data
+    const originalSha256 = createHash('sha256').update(req.file.buffer).digest('hex');
+    const existing = db.prepare('SELECT id FROM dj_blobs WHERE sha256 = ?').get(originalSha256) as { id: string } | undefined;
     if (existing) {
       return res.json({ id: existing.id, deduplicated: true });
+    }
+
+    let fileData: Buffer = req.file.buffer;
+    let mimeType: string = req.file.mimetype || 'application/octet-stream';
+
+    const isUncompressed = mimeType === 'audio/wav' || mimeType === 'audio/x-wav'
+      || mimeType === 'audio/aiff' || mimeType === 'audio/x-aiff'
+      || req.file.originalname?.match(/\.(wav|aiff|aif)$/i);
+
+    if (isUncompressed) {
+      const compressed = await transcodeToOpus(fileData);
+      if (compressed) {
+        fileData = compressed;
+        mimeType = 'audio/webm;codecs=opus';
+      }
+    }
+
+    // Recompute SHA256 on (possibly transcoded) data for correct dedup
+    const sha256 = createHash('sha256').update(fileData).digest('hex');
+
+    // Check dedup again on transcoded data
+    const existingTranscoded = db.prepare('SELECT id FROM dj_blobs WHERE sha256 = ?').get(sha256) as { id: string } | undefined;
+    if (existingTranscoded) {
+      return res.json({ id: existingTranscoded.id, deduplicated: true });
     }
 
     const id = randomBytes(16).toString('hex');
@@ -180,11 +211,11 @@ router.post('/blobs', authenticateToken as any, upload.single('file'), (req: Aut
     `).run(
       id, req.userId,
       req.file.originalname || 'blob',
-      req.file.mimetype || 'application/octet-stream',
-      data, data.length, sha256, Date.now(),
+      mimeType,
+      fileData, fileData.length, sha256, Date.now(),
     );
 
-    res.json({ id, size: data.length });
+    res.json({ id, size: fileData.length });
   } catch (err) {
     console.error('[djsets] Blob upload error:', err);
     res.status(500).json({ error: 'Failed to upload blob' });
