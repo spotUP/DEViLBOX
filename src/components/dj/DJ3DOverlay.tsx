@@ -5,8 +5,8 @@
  * with one camera and unified orbit/pan/zoom controls.
  */
 
-import React, { Suspense, useRef, useCallback } from 'react';
-import { Canvas, useThree, useFrame } from '@react-three/fiber';
+import React, { Suspense, useRef, useCallback, useEffect } from 'react';
+import { Canvas, useThree } from '@react-three/fiber';
 import { OrbitControls, PerspectiveCamera } from '@react-three/drei';
 import * as THREE from 'three';
 import { useDJStore } from '@/stores/useDJStore';
@@ -128,21 +128,27 @@ const CameraButtons: React.FC<CameraButtonsProps> = ({ orbitRef }) => {
 };
 
 // ── On-demand rendering: only re-render when decks are playing or camera moves ─
+// Uses setInterval outside the render loop so it can kick-start rendering
+// even when the canvas is idle (useFrame doesn't run in demand mode until invalidated).
 
 function DemandInvalidator() {
   const { invalidate } = useThree();
-  const lastRef = React.useRef(0);
-  useFrame(() => {
-    // Throttle 3D renders to 30fps during playback (platter rotation is smooth enough)
-    const now = performance.now();
-    if (now - lastRef.current < 33) return; // 33ms = ~30fps
-    lastRef.current = now;
+  const invalidateRef = useRef(invalidate);
+  invalidateRef.current = invalidate;
 
-    const decks = useDJStore.getState().decks;
-    if (decks.A.isPlaying || decks.B.isPlaying || decks.C.isPlaying) {
-      invalidate();
-    }
-  });
+  useEffect(() => {
+    let id: ReturnType<typeof setInterval>;
+    const poll = () => {
+      const decks = useDJStore.getState().decks;
+      if (decks.A.isPlaying || decks.B.isPlaying || decks.C.isPlaying) {
+        invalidateRef.current();
+      }
+    };
+    // Poll at ~60fps to keep turntables spinning while a deck is playing
+    id = setInterval(poll, 16);
+    return () => clearInterval(id);
+  }, []);
+
   return null;
 }
 
