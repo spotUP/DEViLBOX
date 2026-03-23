@@ -536,6 +536,7 @@ export function useFileNavigation({
       }
 
       // Check if this is a binary file (tracker module, .sqs/.seq, etc.)
+      console.log('[FileNav] handleLoad:', selectedFile.name, 'source:', selectedFile.source, 'path:', selectedFile.path, 'isBinary:', isBinaryFile(selectedFile.name), 'hasModuleLoader:', !!onLoadTrackerModule);
       if (isBinaryFile(selectedFile.name)) {
         if (!onLoadTrackerModule) {
           throw new Error('Binary file loading not supported');
