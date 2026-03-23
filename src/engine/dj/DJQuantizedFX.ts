@@ -388,6 +388,13 @@ export function echoOut(
       if (progress < 1) {
         sweep.id = requestAnimationFrame(animate);
       } else {
+        // Fade complete — stop the deck and restore volume for next play
+        try {
+          const engine = getDJEngine();
+          engine.getDeck(deckId).pause();
+          useDJStore.getState().setDeckPlaying(deckId, false);
+          engine.getDeck(deckId).setVolume(startVol);
+        } catch { /* engine not ready */ }
         activeSweeps.delete(key);
         onDone?.();
       }
