@@ -91,59 +91,6 @@ export const MobileMenu: React.FC<MobileMenuProps> = ({
 
             {/* Menu Items - Scrollable */}
             <div className="flex-1 overflow-y-auto p-4 space-y-2">
-              {/* User Account - Show at top if server is available */}
-              {isServerAvailable && (
-                <div className="mb-4">
-                  <h3 className="text-xs font-bold text-text-muted uppercase mb-2 px-3">
-                    Account
-                  </h3>
-                  {user ? (
-                    <div className="bg-dark-bgSecondary rounded-lg p-3">
-                      <div className="flex items-center gap-3 mb-3">
-                        <div className="p-2 rounded-full bg-accent-primary/20 text-accent-primary">
-                          <User size={16} />
-                        </div>
-                        <div className="flex-1">
-                          <div className="text-sm font-medium text-text-primary">{user.username}</div>
-                          <div className="text-xs text-text-muted">Signed in</div>
-                        </div>
-                      </div>
-                      <button
-                        onClick={() => {
-                          logout();
-                          setIsOpen(false);
-                        }}
-                        className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded bg-dark-bgTertiary hover:bg-dark-bgHover transition-colors text-text-secondary hover:text-text-primary text-sm"
-                      >
-                        <LogOut size={14} />
-                        Sign Out
-                      </button>
-                    </div>
-                  ) : onShowAuth ? (
-                    <button
-                      onClick={() => handleMenuClick(onShowAuth)}
-                      className="w-full flex items-center gap-3 px-3 py-3 rounded-lg bg-dark-bgSecondary hover:bg-dark-bgHover transition-colors text-left"
-                    >
-                      <LogIn size={20} className="text-accent-primary" />
-                      <div>
-                        <div className="text-text-primary font-medium">Sign In</div>
-                        <div className="text-xs text-text-muted">Save files to the cloud</div>
-                      </div>
-                    </button>
-                  ) : null}
-                </div>
-              )}
-
-              {/* MIDI Settings */}
-              <div className="mb-4">
-                <h3 className="text-xs font-bold text-text-muted uppercase mb-2 px-3">
-                  MIDI Settings
-                </h3>
-                <div className="bg-dark-bgSecondary rounded-lg p-3">
-                  <MIDIToolbarDropdown inline={true} />
-                </div>
-              </div>
-
               {/* File Operations */}
               <h3 className="text-xs font-bold text-text-muted uppercase mb-2 px-3 mt-6">
                 File
@@ -299,6 +246,57 @@ export const MobileMenu: React.FC<MobileMenuProps> = ({
                   <HelpCircle size={20} className="text-accent-primary" />
                   <span className="text-text-primary font-medium">Help</span>
                 </button>
+              )}
+
+              {/* MIDI Settings — at bottom, not needed for most sessions */}
+              <h3 className="text-xs font-bold text-text-muted uppercase mb-2 px-3 mt-6">
+                MIDI
+              </h3>
+              <div className="bg-dark-bgSecondary rounded-lg p-3">
+                <MIDIToolbarDropdown inline={true} />
+              </div>
+
+              {/* User Account */}
+              {isServerAvailable && (
+                <div className="mt-4">
+                  <h3 className="text-xs font-bold text-text-muted uppercase mb-2 px-3">
+                    Account
+                  </h3>
+                  {user ? (
+                    <div className="bg-dark-bgSecondary rounded-lg p-3">
+                      <div className="flex items-center gap-3 mb-3">
+                        <div className="p-2 rounded-full bg-accent-primary/20 text-accent-primary">
+                          <User size={16} />
+                        </div>
+                        <div className="flex-1">
+                          <div className="text-sm font-medium text-text-primary">{user.username}</div>
+                          <div className="text-xs text-text-muted">Signed in</div>
+                        </div>
+                      </div>
+                      <button
+                        onClick={() => {
+                          logout();
+                          setIsOpen(false);
+                        }}
+                        className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded bg-dark-bgTertiary hover:bg-dark-bgHover transition-colors text-text-secondary hover:text-text-primary text-sm"
+                      >
+                        <LogOut size={14} />
+                        Sign Out
+                      </button>
+                    </div>
+                  ) : onShowAuth ? (
+                    <button
+                      onClick={() => handleMenuClick(onShowAuth)}
+                      className="w-full flex items-center gap-3 px-3 py-3 rounded-lg bg-dark-bgSecondary hover:bg-dark-bgHover transition-colors text-left"
+                    >
+                      <LogIn size={20} className="text-accent-primary" />
+                      <div>
+                        <div className="text-text-primary font-medium">Sign In</div>
+                        <div className="text-xs text-text-muted">Save files to the cloud</div>
+                      </div>
+                    </button>
+                  ) : null}
+                </div>
               )}
             </div>
           </div>
