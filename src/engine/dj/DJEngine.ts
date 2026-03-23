@@ -13,6 +13,7 @@ import type { TrackerSong } from '@/engine/TrackerReplayer';
 import type { AudioFileInfo } from './DeckAudioPlayer';
 import type { DJSetRecorder } from './recording/DJSetRecorder';
 import type { TrackSource } from './recording/DJSetEvent';
+import { DJMicEngine } from './DJMicEngine';
 
 // Instrument ID offsets to avoid collisions with the tracker view (IDs 1-999)
 // and between decks. Each deck gets a 10000-wide namespace.
@@ -33,9 +34,27 @@ export class DJEngine {
   /** Track source for the next loadToDeck/loadAudioToDeck call (set by UI before load) */
   private _pendingTrackSource: TrackSource | null = null;
 
+  /** Microphone engine (lazy-init on first toggleMic) */
+  mic: DJMicEngine | null = null;
+
   /** Set the track source for the next load operation (called by UI/browser before loading) */
   setTrackSource(source: TrackSource): void {
     this._pendingTrackSource = source;
+  }
+
+  /** Toggle microphone on/off. Lazy-initializes on first call. */
+  async toggleMic(): Promise<boolean> {
+    if (!this.mic) {
+      if (!DJMicEngine.isSupported()) return false;
+      this.mic = new DJMicEngine(this.mixer.samplerInput);
+    }
+    if (this.mic.isActive) {
+      this.mic.stop();
+      return false;
+    } else {
+      await this.mic.start();
+      return true;
+    }
   }
 
   constructor() {
