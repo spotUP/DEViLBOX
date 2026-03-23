@@ -131,7 +131,13 @@ const CameraButtons: React.FC<CameraButtonsProps> = ({ orbitRef }) => {
 
 function DemandInvalidator() {
   const { invalidate } = useThree();
+  const lastRef = React.useRef(0);
   useFrame(() => {
+    // Throttle 3D renders to 30fps during playback (platter rotation is smooth enough)
+    const now = performance.now();
+    if (now - lastRef.current < 33) return; // 33ms = ~30fps
+    lastRef.current = now;
+
     const decks = useDJStore.getState().decks;
     if (decks.A.isPlaying || decks.B.isPlaying || decks.C.isPlaying) {
       invalidate();
