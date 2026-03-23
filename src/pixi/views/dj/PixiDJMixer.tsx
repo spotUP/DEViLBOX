@@ -12,6 +12,7 @@ import { getDJEngine, getDJEngineIfActive } from '@/engine/dj/DJEngine';
 import type { CrossfaderCurve } from '@/engine/dj/DJMixerEngine';
 import { DJVideoCapture, getCaptureCanvas } from '@/engine/dj/streaming/DJVideoCapture';
 import { DJVideoRecorder } from '@/engine/dj/streaming/DJVideoRecorder';
+import * as DJActions from '@/engine/dj/DJActions';
 
 const MIXER_WIDTH = 220;
 
@@ -83,7 +84,6 @@ const MixerFilterSection: React.FC = () => {
   const theme = usePixiTheme();
   const filterA = useDJStore(s => s.decks.A.filterPosition);
   const filterB = useDJStore(s => s.decks.B.filterPosition);
-  const setDeckFilter = useDJStore(s => s.setDeckFilter);
 
   const drawBorder = useCallback((g: GraphicsType) => {
     g.clear();
@@ -99,13 +99,13 @@ const MixerFilterSection: React.FC = () => {
         {/* Deck A Filter: -1 (HPF) to 0 (off) to +1 (LPF) */}
         <pixiContainer layout={{ flexDirection: 'column', gap: 4, alignItems: 'center' }}>
           <PixiLabel text="A" size="xs" color="textMuted" />
-          <PixiKnob value={filterA} min={-1} max={1} defaultValue={0} size="sm" label="FLT" bipolar onChange={(v) => setDeckFilter('A', v)} />
+          <PixiKnob value={filterA} min={-1} max={1} defaultValue={0} size="sm" label="FLT" bipolar onChange={(v) => DJActions.setDeckFilter('A', v)} />
         </pixiContainer>
 
         {/* Deck B Filter */}
         <pixiContainer layout={{ flexDirection: 'column', gap: 4, alignItems: 'center' }}>
           <PixiLabel text="B" size="xs" color="textMuted" />
-          <PixiKnob value={filterB} min={-1} max={1} defaultValue={0} size="sm" label="FLT" bipolar onChange={(v) => setDeckFilter('B', v)} />
+          <PixiKnob value={filterB} min={-1} max={1} defaultValue={0} size="sm" label="FLT" bipolar onChange={(v) => DJActions.setDeckFilter('B', v)} />
         </pixiContainer>
       </pixiContainer>
 
@@ -124,7 +124,6 @@ const MixerEQSection: React.FC = () => {
   const eqHighB = useDJStore(s => s.decks.B.eqHigh);
   const eqMidB = useDJStore(s => s.decks.B.eqMid);
   const eqLowB = useDJStore(s => s.decks.B.eqLow);
-  const setDeckEQ = useDJStore(s => s.setDeckEQ);
 
   const drawBorder = useCallback((g: GraphicsType) => {
     g.clear();
@@ -140,17 +139,17 @@ const MixerEQSection: React.FC = () => {
         {/* Deck A EQ — dB range: -24 to +6 */}
         <pixiContainer layout={{ flexDirection: 'column', gap: 4, alignItems: 'center' }}>
           <PixiLabel text="A" size="xs" color="textMuted" />
-          <PixiKnob value={eqHighA} min={-24} max={6} defaultValue={0} size="sm" label="HI" bipolar onChange={(v) => setDeckEQ('A', 'high', v)} />
-          <PixiKnob value={eqMidA} min={-24} max={6} defaultValue={0} size="sm" label="MID" bipolar onChange={(v) => setDeckEQ('A', 'mid', v)} />
-          <PixiKnob value={eqLowA} min={-24} max={6} defaultValue={0} size="sm" label="LO" bipolar onChange={(v) => setDeckEQ('A', 'low', v)} />
+          <PixiKnob value={eqHighA} min={-24} max={6} defaultValue={0} size="sm" label="HI" bipolar onChange={(v) => DJActions.setDeckEQ('A', 'high', v)} />
+          <PixiKnob value={eqMidA} min={-24} max={6} defaultValue={0} size="sm" label="MID" bipolar onChange={(v) => DJActions.setDeckEQ('A', 'mid', v)} />
+          <PixiKnob value={eqLowA} min={-24} max={6} defaultValue={0} size="sm" label="LO" bipolar onChange={(v) => DJActions.setDeckEQ('A', 'low', v)} />
         </pixiContainer>
 
         {/* Deck B EQ */}
         <pixiContainer layout={{ flexDirection: 'column', gap: 4, alignItems: 'center' }}>
           <PixiLabel text="B" size="xs" color="textMuted" />
-          <PixiKnob value={eqHighB} min={-24} max={6} defaultValue={0} size="sm" label="HI" bipolar onChange={(v) => setDeckEQ('B', 'high', v)} />
-          <PixiKnob value={eqMidB} min={-24} max={6} defaultValue={0} size="sm" label="MID" bipolar onChange={(v) => setDeckEQ('B', 'mid', v)} />
-          <PixiKnob value={eqLowB} min={-24} max={6} defaultValue={0} size="sm" label="LO" bipolar onChange={(v) => setDeckEQ('B', 'low', v)} />
+          <PixiKnob value={eqHighB} min={-24} max={6} defaultValue={0} size="sm" label="HI" bipolar onChange={(v) => DJActions.setDeckEQ('B', 'high', v)} />
+          <PixiKnob value={eqMidB} min={-24} max={6} defaultValue={0} size="sm" label="MID" bipolar onChange={(v) => DJActions.setDeckEQ('B', 'mid', v)} />
+          <PixiKnob value={eqLowB} min={-24} max={6} defaultValue={0} size="sm" label="LO" bipolar onChange={(v) => DJActions.setDeckEQ('B', 'low', v)} />
         </pixiContainer>
       </pixiContainer>
 
@@ -254,7 +253,6 @@ const MixerVUMeters: React.FC = () => {
 const MixerChannelStrips: React.FC = () => {
   const volumeA = useDJStore(s => s.decks.A.volume);
   const volumeB = useDJStore(s => s.decks.B.volume);
-  const setDeckVolume = useDJStore(s => s.setDeckVolume);
 
   return (
     <pixiContainer layout={{ flexDirection: 'row', gap: 24, alignItems: 'center' }}>
@@ -267,7 +265,7 @@ const MixerChannelStrips: React.FC = () => {
           max={1}
           orientation="vertical"
           length={100}
-          onChange={(v) => setDeckVolume?.('A', v)}
+          onChange={(v) => DJActions.setDeckVolume('A', v)}
         />
       </pixiContainer>
 
@@ -280,7 +278,7 @@ const MixerChannelStrips: React.FC = () => {
           max={1}
           orientation="vertical"
           length={100}
-          onChange={(v) => setDeckVolume?.('B', v)}
+          onChange={(v) => DJActions.setDeckVolume('B', v)}
         />
       </pixiContainer>
     </pixiContainer>
@@ -292,12 +290,10 @@ const MixerChannelStrips: React.FC = () => {
 const MixerCrossfader: React.FC = () => {
   const theme = usePixiTheme();
   const crossfader = useDJStore(s => s.crossfaderPosition);
-  const setCrossfader = useDJStore(s => s.setCrossfader);
   const crossfaderCurve = useDJStore(s => s.crossfaderCurve);
 
   const handleCurveChange = useCallback((curve: CrossfaderCurve) => {
-    useDJStore.getState().setCrossfaderCurve(curve);
-    try { getDJEngine().mixer.setCurve(curve); } catch { /* not ready */ }
+    DJActions.setCrossfaderCurve(curve);
   }, []);
 
   const drawBorder = useCallback((g: GraphicsType) => {
@@ -317,7 +313,7 @@ const MixerCrossfader: React.FC = () => {
         orientation="horizontal"
         length={MIXER_WIDTH - 40}
         detent={0.5}
-        onChange={(v) => setCrossfader?.(v)}
+        onChange={(v) => DJActions.setCrossfader(v)}
       />
       <pixiContainer layout={{ flexDirection: 'row', justifyContent: 'space-between', width: MIXER_WIDTH - 40 }}>
         <PixiLabel text="A" size="xs" color="textMuted" />
@@ -361,8 +357,7 @@ const MixerMaster: React.FC = () => {
   const masterVolume = useDJStore(s => s.masterVolume);
 
   const handleVolumeChange = useCallback((value: number) => {
-    useDJStore.getState().setMasterVolume(value);
-    getDJEngine().mixer.setMasterVolume(value);
+    DJActions.setMasterVolume(value);
   }, []);
 
   const drawBorder = useCallback((g: GraphicsType) => {
@@ -395,10 +390,7 @@ const MixerCueSection: React.FC = () => {
   const cueVolume = useDJStore(s => s.cueVolume);
 
   const handlePFLToggle = useCallback((deck: 'A' | 'B' | 'C') => {
-    const current = deck === 'A'
-      ? useDJStore.getState().decks.A.pflEnabled
-      : useDJStore.getState().decks.B.pflEnabled;
-    useDJStore.getState().setDeckPFL(deck, !current);
+    DJActions.togglePFL(deck);
   }, []);
 
   const handleCueVolumeChange = useCallback((value: number) => {
