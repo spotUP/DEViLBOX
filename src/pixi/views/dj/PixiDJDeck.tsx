@@ -374,7 +374,7 @@ function drawParticles(
   theme: PixiTheme,
 ) {
   g.clear();
-  g.rect(0, 0, w, h).fill(0x040303);
+  g.rect(0, 0, w, h).fill(theme.bg.color);
 
   const rms = fftData.reduce((s, v) => s + (v + 100), 0) / fftData.length / 100;
   const bass = (fftData[2] + 100) / 100;

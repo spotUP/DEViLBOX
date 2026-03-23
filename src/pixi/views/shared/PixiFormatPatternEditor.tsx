@@ -70,7 +70,7 @@ export const PixiFormatPatternEditor: React.FC<Props> = ({
     g.clear();
 
     g.rect(0, 0, width, height);
-    g.fill({ color: 0x0d0d0d });
+    g.fill({ color: theme.bg.color });
 
     // Header background
     g.rect(0, 0, width, HEADER_H);

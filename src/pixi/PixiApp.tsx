@@ -13,7 +13,8 @@ import { setYoga, setYogaConfig } from '@pixi/layout';
 import { LayoutContainer } from '@pixi/layout/components';
 import { loadYoga } from 'yoga-layout/load';
 import { loadPixiFonts } from './fonts';
-import { usePixiTheme } from './theme';
+import { usePixiTheme, cssColorToPixi } from './theme';
+import { useThemeStore } from '@stores/useThemeStore';
 import { PixiRoot } from './PixiRoot';
 import { attachFPSLimiter, setIsPlayingFn } from './performance';
 import { setScrollPerfApp } from './scrollPerf';
@@ -191,6 +192,8 @@ function initPixiLayout(): Promise<void> {
 export const PixiApp: React.FC = () => {
   const [ready, setReady] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
+  const themeBg = useThemeStore((s) => s.getCurrentTheme().colors.bg);
+  const themeBgNum = cssColorToPixi(themeBg).color;
 
   // NOTE: useProjectPersistence() and useGlobalKeyboardHandler() are called
   // in the parent App.tsx. Do NOT duplicate them here — it causes double
@@ -210,7 +213,7 @@ export const PixiApp: React.FC = () => {
       <div
         ref={containerRef}
         className="h-screen w-screen flex items-center justify-center"
-        style={{ background: '#0a0a0b' }}
+        style={{ background: themeBg }}
       >
         <span style={{ color: '#606068', fontFamily: 'JetBrains Mono, monospace', fontSize: 14 }}>
           Loading WebGL UI...
@@ -225,7 +228,7 @@ export const PixiApp: React.FC = () => {
         <Application
           preference="webgl"
           backgroundAlpha={1}
-          backgroundColor={0x0a0a0b}
+          backgroundColor={themeBgNum}
           antialias
           autoDensity
           resolution={window.devicePixelRatio || 1}

@@ -61,21 +61,9 @@ function fxStr(typ: number | undefined, par: number | undefined): string {
   return `${t}${p}`;
 }
 
-// ── Colors (Pixi hex) ────────────────────────────────────────────────────────
-const C_BG_HEADER    = 0x1a1a1a;
-const C_BG_ODD       = 0x0a0a0a;
+// ── Fallback colors for non-themeable accents ────────────────────────────────
 const C_BG_PLAYHEAD  = 0x1a3a1a;
-const C_BORDER       = 0x333333;
-const C_SEP          = 0x1e1e1e;
-const C_ROW_BEAT     = 0x555555;
-const C_ROW_OTHER    = 0x333333;
-const C_NOTE         = 0xcccccc;
 const C_NOTE_PH      = 0x88ff88;
-const C_INSTR        = 0xffaa44;
-const C_EFFECT       = 0x66aaff;
-const C_EMPTY        = 0x333333;
-const C_CHAN_HEADER  = 0xaaaaaa;
-const C_SCROLLBAR_TRACK = 0x333333;
 const C_SCROLLBAR_THUMB = 0x666666;
 const SCROLLBAR_W    = 6;
 
@@ -148,23 +136,23 @@ export const PixiMusicLinePatternViewer: React.FC<Props> = ({ width, height }) =
 
     // Header background
     g.rect(0, 0, width, HEADER_H);
-    g.fill({ color: C_BG_HEADER });
+    g.fill({ color: theme.bgTertiary.color });
 
     // Header bottom border
     g.rect(0, HEADER_H - 1, width, 1);
-    g.fill({ color: C_BORDER });
+    g.fill({ color: theme.border.color });
 
     // Channel separator lines in header
     for (let ch = 0; ch < numChannels; ch++) {
       const x = ROW_NUM_W + ch * CHAN_W;
       g.rect(x, 0, 1, HEADER_H);
-      g.fill({ color: C_BORDER });
+      g.fill({ color: theme.border.color });
     }
 
     // Anchor rect to establish Yoga content bounds
     g.rect(0, 0, width, HEADER_H);
     g.fill({ color: theme.bg.color, alpha: 0 });
-  }, [width, numChannels, CHAN_W]);
+  }, [width, numChannels, CHAN_W, theme]);
 
   // ── Draw scrollable content background ──────────────────────────────────
   const drawContent = useCallback((g: GraphicsType) => {
@@ -190,20 +178,20 @@ export const PixiMusicLinePatternViewer: React.FC<Props> = ({ width, height }) =
         g.fill({ color: C_BG_PLAYHEAD });
       } else if (!isEvenGroup) {
         g.rect(0, y, totalWidth, ROW_H);
-        g.fill({ color: C_BG_ODD });
+        g.fill({ color: theme.trackerRowOdd.color });
       }
 
       // Beat group bottom border (every 4 rows)
       if (rowIdx % 4 === 3) {
         g.rect(0, y + ROW_H - 1, totalWidth, 1);
-        g.fill({ color: C_SEP });
+        g.fill({ color: theme.borderLight.color });
       }
 
       // Channel separators
       for (let ch = 0; ch < numChannels; ch++) {
         const x = ROW_NUM_W + ch * CHAN_W;
         g.rect(x, y, 1, ROW_H);
-        g.fill({ color: C_SEP });
+        g.fill({ color: theme.borderLight.color });
       }
     }
 
@@ -214,7 +202,7 @@ export const PixiMusicLinePatternViewer: React.FC<Props> = ({ width, height }) =
       const thumbY = 2 + (scrollY / maxScroll) * (trackH - thumbH);
 
       g.roundRect(width - SCROLLBAR_W - 2, 2, SCROLLBAR_W, trackH, 3);
-      g.fill({ color: C_SCROLLBAR_TRACK, alpha: 0.4 });
+      g.fill({ color: theme.border.color, alpha: 0.4 });
 
       g.roundRect(width - SCROLLBAR_W - 2, thumbY, SCROLLBAR_W, thumbH, 3);
       g.fill({ color: C_SCROLLBAR_THUMB, alpha: 0.6 });
@@ -223,7 +211,7 @@ export const PixiMusicLinePatternViewer: React.FC<Props> = ({ width, height }) =
     // Anchor rect to establish Yoga content bounds
     g.rect(0, 0, width, viewH);
     g.fill({ color: theme.bg.color, alpha: 0 });
-  }, [width, viewH, scrollY, numRows, currentRow, totalWidth, numChannels, maxScroll, contentH]);
+  }, [width, viewH, scrollY, numRows, currentRow, totalWidth, numChannels, maxScroll, contentH, theme]);
 
   // ── Text labels ──────────────────────────────────────────────────────────
   const headerLabels = useMemo(() => {
@@ -246,12 +234,12 @@ export const PixiMusicLinePatternViewer: React.FC<Props> = ({ width, height }) =
         x: ROW_NUM_W + ch * CHAN_W + 4,
         y: (HEADER_H - FONT_SIZE) / 2,
         text: label,
-        color: C_CHAN_HEADER,
+        color: theme.textSecondary.color,
       });
     }
 
     return out;
-  }, [numChannels, channelTrackTables, currentPos, patterns, CHAN_W]);
+  }, [numChannels, channelTrackTables, currentPos, patterns, CHAN_W, theme]);
 
   const contentLabels = useMemo(() => {
     const out: { x: number; y: number; text: string; color: number }[] = [];
@@ -266,7 +254,7 @@ export const PixiMusicLinePatternViewer: React.FC<Props> = ({ width, height }) =
       const isPlayhead = rowIdx === currentRow;
 
       // Row number
-      const rowNumColor = rowIdx % 4 === 0 ? C_ROW_BEAT : C_ROW_OTHER;
+      const rowNumColor = rowIdx % 4 === 0 ? theme.textSecondary.color : theme.textMuted.color;
       out.push({
         x: 2,
         y,
@@ -282,10 +270,10 @@ export const PixiMusicLinePatternViewer: React.FC<Props> = ({ width, height }) =
         const cellX = ROW_NUM_W + ch * CHAN_W + 4;
 
         const noteColor = hasNote
-          ? isPlayhead ? C_NOTE_PH : C_NOTE
-          : C_EMPTY;
+          ? isPlayhead ? C_NOTE_PH : theme.cellNote.color
+          : theme.cellEmpty.color;
         const instrColor =
-          hasNote && cell && cell.instrument ? C_INSTR : C_EMPTY;
+          hasNote && cell && cell.instrument ? theme.cellInstrument.color : theme.cellEmpty.color;
 
         out.push({
           x: cellX,
@@ -311,14 +299,14 @@ export const PixiMusicLinePatternViewer: React.FC<Props> = ({ width, height }) =
             x: cellX + NOTE_W + INSTR_W + ec * FX_W,
             y,
             text: fxStr(typ, par),
-            color: hasFx ? C_EFFECT : C_EMPTY,
+            color: hasFx ? theme.cellEffect.color : theme.cellEmpty.color,
           });
         }
       }
     }
 
     return out;
-  }, [scrollY, numRows, viewH, currentRow, numChannels, channelPatterns, effectCols, CHAN_W]);
+  }, [scrollY, numRows, viewH, currentRow, numChannels, channelPatterns, effectCols, CHAN_W, theme]);
 
   // ── No data guard ────────────────────────────────────────────────────────
   if (!channelTrackTables || channelTrackTables.length === 0) {
