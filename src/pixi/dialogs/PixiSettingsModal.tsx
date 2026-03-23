@@ -415,8 +415,9 @@ export const PixiSettingsModal: React.FC<PixiSettingsModalProps> = ({ isOpen, on
   };
 
   const handleOverlayClick = (_e: FederatedPointerEvent) => { onClose(); };
-  const handlePanelPointerDown = (e: FederatedPointerEvent) => { e.stopPropagation(); };
-  const handlePanelPointerUp = (e: FederatedPointerEvent) => { e.stopPropagation(); };
+  // Panel click handlers removed — overlay uses onPointerTap which only fires
+  // when both press+release happen on the overlay itself, so no need to block
+  // propagation from the panel.
   const blockWheel = useCallback((e: FederatedWheelEvent) => {
     e.stopPropagation();
     (e.nativeEvent as WheelEvent | undefined)?.preventDefault?.();
@@ -435,9 +436,7 @@ export const PixiSettingsModal: React.FC<PixiSettingsModalProps> = ({ isOpen, on
       />
 
       <layoutContainer
-        eventMode="static"
-        onPointerDown={handlePanelPointerDown}
-        onPointerUp={handlePanelPointerUp}
+        eventMode="auto"
         layout={{
           position: 'absolute',
           left: Math.round((screenW - MODAL_W) / 2),
