@@ -184,7 +184,7 @@ export const FT2NumericInput: React.FC<FT2NumericInputProps> = ({
             left: presetMenuPos.x,
             top: presetMenuPos.y,
             zIndex: 1000,
-            backgroundColor: '#1a1a1d',
+            backgroundColor: 'var(--color-bg-secondary)',
             border: '1px solid var(--color-border-light)',
             borderRadius: '4px',
             padding: '4px 0',
@@ -209,7 +209,7 @@ export const FT2NumericInput: React.FC<FT2NumericInputProps> = ({
                 fontSize: '12px',
                 fontFamily: 'monospace',
               }}
-              onMouseEnter={(e) => (e.currentTarget.style.background = '#2a2a2d')}
+              onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--color-bg-tertiary)')}
               onMouseLeave={(e) => (e.currentTarget.style.background = value === preset.value ? 'var(--color-border-light)' : 'transparent')}
             >
               {preset.label}

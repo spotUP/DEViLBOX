@@ -270,7 +270,7 @@ export const KlysView: React.FC<{ width?: number; height?: number }> = ({ width:
         display: 'flex', flexDirection: 'column',
         width: propW ? width : '100%',
         height: propH ? height : '100%',
-        backgroundColor: '#0d0d0d',
+        backgroundColor: 'var(--color-bg)',
         fontFamily: '"JetBrains Mono", "Fira Code", monospace',
         fontSize: '12px',
         color: 'var(--color-text-secondary)',

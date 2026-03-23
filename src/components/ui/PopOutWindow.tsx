@@ -107,7 +107,7 @@ export const PopOutWindow: React.FC<PopOutWindowProps> = ({
     // Immediately write document content to replace about:blank display
     // The title in <title> tag will show in the window title bar
     popup.document.write(`<!DOCTYPE html><html><head><title>${title}</title><style>
-      html, body { margin: 0; padding: 0; background: #0b0909; color: #f2f0f0; overflow: auto; height: 100%; }
+      html, body { margin: 0; padding: 0; background: var(--color-bg, #0b0909); color: var(--color-text, #f2f0f0); overflow: auto; height: 100%; }
       #popout-root { display: inline-block; min-width: 100%; }
     </style></head><body><div id="popout-root"></div></body></html>`);
     popup.document.close();

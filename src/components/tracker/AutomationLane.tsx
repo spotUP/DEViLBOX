@@ -78,11 +78,12 @@ export const AutomationLane: React.FC<AutomationLaneProps> = ({
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    ctx.fillStyle = '#1a1a2e';
+    const cs = getComputedStyle(canvas);
+    ctx.fillStyle = cs.getPropertyValue('--color-bg-secondary').trim() || '#1a1a2e';
     ctx.fillRect(0, 0, width, height);
 
     // Grid lines
-    ctx.strokeStyle = '#2a2a3e';
+    ctx.strokeStyle = cs.getPropertyValue('--color-border').trim() || '#2a2a3e';
     ctx.lineWidth = 1;
     ctx.beginPath();
     ctx.moveTo(0, height / 2);
@@ -128,7 +129,7 @@ export const AutomationLane: React.FC<AutomationLaneProps> = ({
     }
 
     if (!activeCurve || activeCurve.points.length === 0) {
-      ctx.fillStyle = '#4a4a5e';
+      ctx.fillStyle = cs.getPropertyValue('--color-text-muted').trim() || '#4a4a5e';
       ctx.font = '10px system-ui';
       ctx.textAlign = 'center';
       ctx.fillText('Click to add points', width / 2, height / 2 + 4);

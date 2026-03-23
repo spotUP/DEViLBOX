@@ -113,7 +113,7 @@ export const JamCrackerView: React.FC = () => {
     <div style={{
       display: 'flex', flexDirection: 'column',
       width: '100%', height: '100%',
-      backgroundColor: '#0d0d0d',
+      backgroundColor: 'var(--color-bg)',
       fontFamily: '"JetBrains Mono", "Fira Code", monospace',
       fontSize: '12px',
       color: 'var(--color-text-secondary)',

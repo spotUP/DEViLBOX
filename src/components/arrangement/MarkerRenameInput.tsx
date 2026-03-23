@@ -64,7 +64,7 @@ export const MarkerRenameInput: React.FC = () => {
         left,
         top: screenY + 2,
         width: inputWidth,
-        background: '#1e1e2e',
+        background: 'var(--color-bg-secondary)',
         border: `1px solid ${marker.color}`,
         borderRadius: 4,
         color: 'var(--color-text)',

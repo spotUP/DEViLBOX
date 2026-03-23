@@ -373,7 +373,7 @@ export const MusicLinePatternViewer: React.FC = () => {
         fontFamily: 'monospace',
         fontSize: 12,
         lineHeight: `${ROW_H}px`,
-        backgroundColor: '#0d0d0d',
+        backgroundColor: 'var(--color-bg)',
         color: 'var(--color-text-muted)',
         outline: 'none',
       }}
@@ -471,7 +471,7 @@ export const MusicLinePatternViewer: React.FC = () => {
                     paddingLeft: 4,
                     paddingRight: 4,
                     borderLeft: '1px solid #1e1e1e',
-                    backgroundColor: isChPlayhead ? '#1a3a1a' : undefined,
+                    backgroundColor: isChPlayhead ? 'var(--color-bg-highlight)' : undefined,
                     color: hasNote
                       ? isChPlayhead
                         ? '#88ff88'
