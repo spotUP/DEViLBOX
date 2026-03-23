@@ -442,6 +442,28 @@ export class TrackerScratchController {
   }
 
   /**
+   * Electronic brake — stop with turntable physics deceleration (~0.8s).
+   * Used for normal stop button (vs power-cut which is shift+stop, ~19s coast).
+   * Playback stops completely when the platter reaches zero.
+   */
+  triggerElectronicBrake(onComplete?: () => void): void {
+    const replayer = getTrackerReplayer();
+    if (!replayer.isPlaying()) {
+      onComplete?.();
+      return;
+    }
+
+    if (!this._isActive) {
+      this.enterScratchMode(replayer);
+    }
+
+    this.physics.triggerElectronicBrake(() => {
+      this.exitScratchModeAndStop();
+      onComplete?.();
+    });
+  }
+
+  /**
    * Exit scratch mode and stop playback entirely.
    * Used when power-cut spindown completes — the record has stopped,
    * no point resuming normal playback.
