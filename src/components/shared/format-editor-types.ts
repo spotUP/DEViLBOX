@@ -56,6 +56,8 @@ export interface FormatChannel {
   patternLength: number;
   /** Rows of pattern data, indexed by step number */
   rows: FormatCell[];
+  /** Native track index (e.g. Hively track pool index) for insert/delete row operations */
+  trackIndex?: number;
 }
 
 /**

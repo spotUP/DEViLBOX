@@ -921,6 +921,34 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
       return;
     }
 
+    // ── Insert row (Insert key) ──────────────────────────────────────────────
+    if (e.key === 'Insert') {
+      e.preventDefault();
+      const ch = formatChannels[formatCursor.channelIndex];
+      const trackIdx = ch?.trackIndex;
+      if (trackIdx != null) {
+        const store = useFormatStore.getState();
+        if (store.editorMode === 'hively') {
+          store.insertHivelyTrackRow(trackIdx, formatCursor.rowIndex);
+        }
+      }
+      return;
+    }
+
+    // ── Delete row (Shift+Backspace) ──────────────────────────────────────────
+    if (e.key === 'Backspace' && e.shiftKey) {
+      e.preventDefault();
+      const ch = formatChannels[formatCursor.channelIndex];
+      const trackIdx = ch?.trackIndex;
+      if (trackIdx != null) {
+        const store = useFormatStore.getState();
+        if (store.editorMode === 'hively') {
+          store.deleteHivelyTrackRow(trackIdx, formatCursor.rowIndex);
+        }
+      }
+      return;
+    }
+
     switch (e.key) {
       case 'ArrowLeft':  e.preventDefault(); moveCursor({ columnIndex: -1 }, e.shiftKey); return;
       case 'ArrowRight': e.preventDefault(); moveCursor({ columnIndex: +1 }, e.shiftKey); return;

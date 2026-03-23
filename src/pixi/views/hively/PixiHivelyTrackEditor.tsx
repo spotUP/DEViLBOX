@@ -68,6 +68,7 @@ const HVL_FX2       = 0x55aaff;
 const HVL_TRANS_POS = 0x88ff88;
 const HVL_TRANS_NEG = 0xff8888;
 const HVL_CURSOR_HL = 0xffff88;
+const HVL_SELECTION_BG = 0x003366;
 
 const NOTE_NAMES = ['C-', 'C#', 'D-', 'D#', 'E-', 'F-', 'F#', 'G-', 'G#', 'A-', 'A#', 'B-'];
 
@@ -133,6 +134,11 @@ export const PixiHivelyTrackEditor: React.FC<TrackEditorProps> = ({
   const [scrollTop,  setScrollTop]  = useState(0);
   const [scrollLeft, setScrollLeft] = useState(0);
   const [focused,    setFocused]    = useState(false);
+
+  // Selection state: row range within current channel (null = no selection)
+  const [selection, setSelection] = useState<{ startRow: number; endRow: number; anchorRow: number } | null>(null);
+  // Clipboard: copied step data
+  const clipboardRef = useRef<HivelyNativeStep[]>([]);
 
   const containerRef  = useRef<ContainerType>(null);
   const scrollTopRef  = useRef(0);
@@ -227,8 +233,8 @@ export const PixiHivelyTrackEditor: React.FC<TrackEditorProps> = ({
   }, [trackLength]);
 
   // Keyboard navigation + editing
-  const stateRef = useRef({ cursorRow, cursorChan, cursorCol, trackLength, numChannels, hexDigitPos, octave });
-  stateRef.current = { cursorRow, cursorChan, cursorCol, trackLength, numChannels, hexDigitPos, octave };
+  const stateRef = useRef({ cursorRow, cursorChan, cursorCol, trackLength, numChannels, hexDigitPos, octave, selection });
+  stateRef.current = { cursorRow, cursorChan, cursorCol, trackLength, numChannels, hexDigitPos, octave, selection };
 
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
@@ -236,19 +242,108 @@ export const PixiHivelyTrackEditor: React.FC<TrackEditorProps> = ({
       // Ignore if typing in an input
       if ((window as any).__pixiInputFocused || e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
 
-      const { cursorChan: cc, cursorCol: ccol, trackLength: tl, numChannels: nc, hexDigitPos: hdp, octave: oct } = stateRef.current;
+      const { cursorChan: cc, cursorCol: ccol, trackLength: tl, numChannels: nc, hexDigitPos: hdp, octave: oct, selection: sel } = stateRef.current;
+      const isCtrlCmd = e.ctrlKey || e.metaKey;
 
       // Undo: Ctrl/Cmd+Z
-      if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) {
+      if (isCtrlCmd && e.key === 'z' && !e.shiftKey) {
         e.preventDefault();
         undoHivelyTrackStep();
         return;
       }
       // Redo: Ctrl/Cmd+Shift+Z or Ctrl/Cmd+Y
-      if (((e.ctrlKey || e.metaKey) && e.key === 'z' && e.shiftKey) ||
-          ((e.ctrlKey || e.metaKey) && e.key === 'y')) {
+      if ((isCtrlCmd && e.key === 'z' && e.shiftKey) ||
+          (isCtrlCmd && e.key === 'y')) {
         e.preventDefault();
         redoHivelyTrackStep();
+        return;
+      }
+
+      // Select All: Ctrl/Cmd+A
+      if (isCtrlCmd && e.key === 'a') {
+        e.preventDefault();
+        setSelection({ startRow: 0, endRow: tl - 1, anchorRow: 0 });
+        setCursorRow(tl - 1);
+        return;
+      }
+
+      // Copy: Ctrl/Cmd+C
+      if (isCtrlCmd && e.key === 'c' && !e.shiftKey) {
+        e.preventDefault();
+        const trackIdx = getTrackIndex();
+        if (trackIdx < 0) return;
+        const track = nativeData.tracks[trackIdx];
+        if (!track) return;
+        const sRow = sel ? sel.startRow : stateRef.current.cursorRow;
+        const eRow = sel ? sel.endRow : stateRef.current.cursorRow;
+        const copied: HivelyNativeStep[] = [];
+        for (let r = sRow; r <= eRow; r++) {
+          const step = track.steps[r];
+          if (step) {
+            copied.push({ ...step });
+          } else {
+            copied.push({ note: 0, instrument: 0, fx: 0, fxParam: 0, fxb: 0, fxbParam: 0 });
+          }
+        }
+        clipboardRef.current = copied;
+        return;
+      }
+
+      // Cut: Ctrl/Cmd+X
+      if (isCtrlCmd && e.key === 'x') {
+        e.preventDefault();
+        const trackIdx = getTrackIndex();
+        if (trackIdx < 0) return;
+        const track = nativeData.tracks[trackIdx];
+        if (!track) return;
+        const sRow = sel ? sel.startRow : stateRef.current.cursorRow;
+        const eRow = sel ? sel.endRow : stateRef.current.cursorRow;
+        // Copy first
+        const copied: HivelyNativeStep[] = [];
+        for (let r = sRow; r <= eRow; r++) {
+          const step = track.steps[r];
+          if (step) {
+            copied.push({ ...step });
+          } else {
+            copied.push({ note: 0, instrument: 0, fx: 0, fxParam: 0, fxb: 0, fxbParam: 0 });
+          }
+        }
+        clipboardRef.current = copied;
+        // Then clear
+        for (let r = sRow; r <= eRow; r++) {
+          setHivelyTrackStep(trackIdx, r, { note: 0, instrument: 0, fx: 0, fxParam: 0, fxb: 0, fxbParam: 0 });
+        }
+        setSelection(null);
+        return;
+      }
+
+      // Paste: Ctrl/Cmd+V
+      if (isCtrlCmd && e.key === 'v') {
+        e.preventDefault();
+        const trackIdx = getTrackIndex();
+        if (trackIdx < 0) return;
+        const clipboard = clipboardRef.current;
+        if (clipboard.length === 0) return;
+        const row = stateRef.current.cursorRow;
+        for (let i = 0; i < clipboard.length; i++) {
+          const targetRow = row + i;
+          if (targetRow >= tl) break;
+          setHivelyTrackStep(trackIdx, targetRow, { ...clipboard[i] });
+        }
+        // Move cursor to end of pasted region
+        setCursorRow(Math.min(tl - 1, row + clipboard.length - 1));
+        setSelection(null);
+        return;
+      }
+
+      // Escape: clear selection
+      if (e.key === 'Escape') {
+        if (sel) {
+          e.preventDefault();
+          setSelection(null);
+          return;
+        }
+        // Let other escape handlers run if no selection
         return;
       }
 
@@ -256,16 +351,46 @@ export const PixiHivelyTrackEditor: React.FC<TrackEditorProps> = ({
       switch (e.key) {
         case 'ArrowUp':
           e.preventDefault();
-          setCursorRow(r => Math.max(0, r - 1));
+          if (e.shiftKey) {
+            // Extend selection
+            setCursorRow(r => {
+              const newRow = Math.max(0, r - 1);
+              const anchor = sel ? sel.anchorRow : r;
+              setSelection({
+                startRow: Math.min(anchor, newRow),
+                endRow: Math.max(anchor, newRow),
+                anchorRow: anchor,
+              });
+              return newRow;
+            });
+          } else {
+            setCursorRow(r => Math.max(0, r - 1));
+            setSelection(null);
+          }
           setHexDigitPos(0);
           return;
         case 'ArrowDown':
           e.preventDefault();
-          setCursorRow(r => Math.min(tl - 1, r + 1));
+          if (e.shiftKey) {
+            setCursorRow(r => {
+              const newRow = Math.min(tl - 1, r + 1);
+              const anchor = sel ? sel.anchorRow : r;
+              setSelection({
+                startRow: Math.min(anchor, newRow),
+                endRow: Math.max(anchor, newRow),
+                anchorRow: anchor,
+              });
+              return newRow;
+            });
+          } else {
+            setCursorRow(r => Math.min(tl - 1, r + 1));
+            setSelection(null);
+          }
           setHexDigitPos(0);
           return;
         case 'ArrowLeft':
           e.preventDefault();
+          setSelection(null);
           if      (ccol === 'fxb') { setCursorCol('fx'); }
           else if (ccol === 'fx')  { setCursorCol('ins'); }
           else if (ccol === 'ins') { setCursorCol('note'); }
@@ -274,6 +399,7 @@ export const PixiHivelyTrackEditor: React.FC<TrackEditorProps> = ({
           return;
         case 'ArrowRight':
           e.preventDefault();
+          setSelection(null);
           if      (ccol === 'note') { setCursorCol('ins'); }
           else if (ccol === 'ins')  { setCursorCol('fx'); }
           else if (ccol === 'fx')   { setCursorCol('fxb'); }
@@ -282,6 +408,7 @@ export const PixiHivelyTrackEditor: React.FC<TrackEditorProps> = ({
           return;
         case 'Tab':
           e.preventDefault();
+          setSelection(null);
           setCursorChan(c => e.shiftKey ? Math.max(0, c - 1) : Math.min(nc - 1, c + 1));
           setCursorCol('note');
           setHexDigitPos(0);
@@ -290,31 +417,39 @@ export const PixiHivelyTrackEditor: React.FC<TrackEditorProps> = ({
           e.preventDefault();
           onFocusPositionEditor?.();
           return;
-        case 'PageUp':   e.preventDefault(); setCursorRow(r => Math.max(0, r - 16));       return;
-        case 'PageDown': e.preventDefault(); setCursorRow(r => Math.min(tl - 1, r + 16));  return;
-        case 'Home':     e.preventDefault(); setCursorRow(0);                               return;
-        case 'End':      e.preventDefault(); setCursorRow(tl - 1);                          return;
+        case 'PageUp':   e.preventDefault(); setSelection(null); setCursorRow(r => Math.max(0, r - 16));       return;
+        case 'PageDown': e.preventDefault(); setSelection(null); setCursorRow(r => Math.min(tl - 1, r + 16));  return;
+        case 'Home':     e.preventDefault(); setSelection(null); setCursorRow(0);                               return;
+        case 'End':      e.preventDefault(); setSelection(null); setCursorRow(tl - 1);                          return;
       }
 
       // Skip data entry keys if modifier held (except shift for uppercase)
-      if (e.ctrlKey || e.metaKey || e.altKey) return;
+      if (isCtrlCmd || e.altKey) return;
 
       // Resolve track index for editing
       const trackIdx = getTrackIndex();
       if (trackIdx < 0) return;
       const row = stateRef.current.cursorRow;
 
-      // Delete key: clear the current column's field(s)
+      // Delete key: clear selection range or current column
       if (e.key === 'Delete' || e.key === 'Backspace') {
         e.preventDefault();
-        const update: Partial<HivelyNativeStep> = {};
-        if (ccol === 'note') { update.note = 0; update.instrument = 0; }
-        else if (ccol === 'ins') { update.instrument = 0; }
-        else if (ccol === 'fx') { update.fx = 0; update.fxParam = 0; }
-        else if (ccol === 'fxb') { update.fxb = 0; update.fxbParam = 0; }
-        setHivelyTrackStep(trackIdx, row, update);
+        if (sel) {
+          // Clear all fields in selection range
+          for (let r = sel.startRow; r <= sel.endRow; r++) {
+            setHivelyTrackStep(trackIdx, r, { note: 0, instrument: 0, fx: 0, fxParam: 0, fxb: 0, fxbParam: 0 });
+          }
+          setSelection(null);
+        } else {
+          const update: Partial<HivelyNativeStep> = {};
+          if (ccol === 'note') { update.note = 0; update.instrument = 0; }
+          else if (ccol === 'ins') { update.instrument = 0; }
+          else if (ccol === 'fx') { update.fx = 0; update.fxParam = 0; }
+          else if (ccol === 'fxb') { update.fxb = 0; update.fxbParam = 0; }
+          setHivelyTrackStep(trackIdx, row, update);
+          advanceCursor();
+        }
         setHexDigitPos(0);
-        advanceCursor();
         return;
       }
 
@@ -325,6 +460,7 @@ export const PixiHivelyTrackEditor: React.FC<TrackEditorProps> = ({
         const semitone = KEY_NOTE_MAP[key];
         if (semitone !== undefined) {
           e.preventDefault();
+          setSelection(null);
           // HVL notes: 1-60 (C-0=1, C#0=2, ..., B-4=60)
           const noteVal = oct * 12 + semitone + 1;
           if (noteVal >= 1 && noteVal <= 60) {
@@ -343,6 +479,7 @@ export const PixiHivelyTrackEditor: React.FC<TrackEditorProps> = ({
         const hv = hexCharToVal(key);
         if (hv >= 0) {
           e.preventDefault();
+          setSelection(null);
           const step = nativeData.tracks[trackIdx]?.steps[row];
           const cur = step?.instrument ?? 0;
           let newVal: number;
@@ -367,6 +504,7 @@ export const PixiHivelyTrackEditor: React.FC<TrackEditorProps> = ({
         const hv = hexCharToVal(key);
         if (hv >= 0) {
           e.preventDefault();
+          setSelection(null);
           const step = nativeData.tracks[trackIdx]?.steps[row];
           const isFxB = ccol === 'fxb';
           const curParam = isFxB ? (step?.fxbParam ?? 0) : (step?.fxParam ?? 0);
@@ -403,7 +541,7 @@ export const PixiHivelyTrackEditor: React.FC<TrackEditorProps> = ({
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [onFocusPositionEditor, getTrackIndex, setHivelyTrackStep, undoHivelyTrackStep, redoHivelyTrackStep, advanceCursor]);
+  }, [onFocusPositionEditor, getTrackIndex, setHivelyTrackStep, undoHivelyTrackStep, redoHivelyTrackStep, advanceCursor, nativeData]);
 
   const startRow = Math.floor(scrollTop / ROW_HEIGHT);
   const endRow   = Math.min(trackLength, startRow + visRows + 2);
@@ -411,6 +549,7 @@ export const PixiHivelyTrackEditor: React.FC<TrackEditorProps> = ({
   const handlePointerDown = useCallback((e: FederatedPointerEvent) => {
     setFocused(true);
     setHexDigitPos(0);
+    setSelection(null);
     const c = containerRef.current;
     if (!c) return;
     const local = c.toLocal(e.global);
@@ -449,6 +588,16 @@ export const PixiHivelyTrackEditor: React.FC<TrackEditorProps> = ({
       else if (isCursorRow) g.rect(0, y, width, ROW_HEIGHT).fill({ color: HVL_CURSOR_BG });
     }
 
+    // Selection highlight
+    if (selection) {
+      const chBaseX = ROW_NUM_WIDTH + cursorChan * CHANNEL_WIDTH - scrollLeft;
+      for (let row = selection.startRow; row <= selection.endRow; row++) {
+        const y = HEADER_HEIGHT + row * ROW_HEIGHT - scrollTop;
+        if (y + ROW_HEIGHT <= HEADER_HEIGHT || y >= height) continue;
+        g.rect(chBaseX, y, CHANNEL_WIDTH, ROW_HEIGHT).fill({ color: HVL_SELECTION_BG, alpha: 0.5 });
+      }
+    }
+
     // Cursor column highlight
     const curY = HEADER_HEIGHT + cursorRow * ROW_HEIGHT - scrollTop;
     if (curY + ROW_HEIGHT > HEADER_HEIGHT && curY < height) {
@@ -470,7 +619,7 @@ export const PixiHivelyTrackEditor: React.FC<TrackEditorProps> = ({
 
     void position; // used in cellLabels
   }, [width, height, scrollTop, scrollLeft, startRow, endRow, isPlaying, displayRow,
-      cursorRow, cursorChan, cursorCol, numChannels, nativeData, currentPosition]);
+      cursorRow, cursorChan, cursorCol, numChannels, nativeData, currentPosition, selection]);
 
   // All text labels
   const cellLabels = useMemo(() => {

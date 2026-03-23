@@ -7,6 +7,7 @@
 
 import React, { useRef, useEffect, useCallback, useState } from 'react';
 import type { FurnaceNativeData } from '@/types/tracker';
+import { useFormatStore } from '@stores';
 
 const CHAR_W = 8;
 const CHAR_H = 14;
@@ -43,6 +44,8 @@ export const FurnaceOrderEditor: React.FC<Props> = ({
 }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const sub = nativeData.subsongs[nativeData.activeSubsong];
+  const insertRow = useFormatStore(s => s.insertFurnaceOrderRow);
+  const deleteRow = useFormatStore(s => s.deleteFurnaceOrderRow);
   const numPos = sub?.ordersLen ?? 0;
   const numCh = sub?.channels.length ?? 0;
   const visibleRows = Math.floor((height - HEADER_H) / ROW_H);
@@ -194,6 +197,10 @@ export const FurnaceOrderEditor: React.FC<Props> = ({
       return;
     }
 
+    // Insert/delete order row
+    if (key === 'Insert') { e.preventDefault(); insertRow(currentPosition); return; }
+    if (e.ctrlKey && key === 'Backspace') { e.preventDefault(); deleteRow(currentPosition); return; }
+
     // Hex digit entry
     const hexIdx = HEX.indexOf(key.toLowerCase());
     if (hexIdx < 0) return;
@@ -213,7 +220,9 @@ export const FurnaceOrderEditor: React.FC<Props> = ({
       setCurCh(c => c + 1);
       setCurDigit(0);
     }
-  }, [sub, currentPosition, numPos, numCh, curCh, curDigit, onPositionChange, onOrderChange]);
+  }, [sub, currentPosition, numPos, numCh, curCh, curDigit, onPositionChange, onOrderChange, insertRow, deleteRow]);
+
+  useEffect(() => { canvasRef.current?.focus(); }, []);
 
   return (
     <canvas
