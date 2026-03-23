@@ -873,7 +873,7 @@ int furnace_dispatch_create(int platformType, int sampleRate) {
       break;
     case DIV_SYSTEM_SID3:
       inst->dispatch = new DivPlatformSID3();
-      inst->numChannels = 4;
+      inst->numChannels = 7;
       break;
     case DIV_SYSTEM_C64_PCM:
       inst->dispatch = new DivPlatformC64();
@@ -1100,7 +1100,7 @@ int furnace_dispatch_cmd(int handle, int cmd, int chan, int val1, int val2) {
   DivCommand dc((DivDispatchCmds)cmd, (unsigned char)chan, val1, val2);
   int ret = inst->dispatch->dispatch(dc);
 
-  if (g_cmdLogEnabled && g_cmdLog.size() < 100000) {
+  if (g_cmdLogEnabled && g_cmdLog.size() < 500000) {
     // Use pending global channel if set (from sequencer dispatchCmd), otherwise use local channel
     int logChan = (g_pendingGlobalChan >= 0) ? g_pendingGlobalChan : chan;
     g_cmdLog.push_back({g_cmdLogTick, cmd, logChan, val1, val2, ret});
