@@ -11,7 +11,7 @@
 
 import React, { useCallback, useRef, useState, useEffect } from 'react';
 import { useDJStore } from '@/stores/useDJStore';
-import { getDJEngine } from '@/engine/dj/DJEngine';
+import * as DJActions from '@/engine/dj/DJActions';
 
 interface MixerChannelStripProps {
   deckId: 'A' | 'B' | 'C';
@@ -41,21 +41,11 @@ export const MixerChannelStrip: React.FC<MixerChannelStripProps> = ({ deckId }) 
 
   // Sync trim gain to engine whenever it changes (auto-gain or manual trim)
   useEffect(() => {
-    try {
-      getDJEngine().getDeck(deckId).setTrimGain(trimGain);
-    } catch {
-      // Engine not ready
-    }
+    DJActions.setDeckTrimGain(deckId, trimGain);
   }, [deckId, trimGain]);
 
   const setVolume = useCallback((value: number) => {
-    const clamped = Math.max(0, Math.min(1, value));
-    useDJStore.getState().setDeckVolume(deckId, clamped);
-    try {
-      getDJEngine().getDeck(deckId).setVolume(clamped);
-    } catch {
-      // Engine might not be initialized yet
-    }
+    DJActions.setDeckVolume(deckId, value);
   }, [deckId]);
 
   const getVolumeFromY = useCallback((clientY: number) => {

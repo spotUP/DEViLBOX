@@ -9,8 +9,8 @@
 import React, { useCallback } from 'react';
 import { Knob } from '@components/controls/Knob';
 import { useDJStore } from '@/stores/useDJStore';
-import { getDJEngine } from '@/engine/dj/DJEngine';
-import { quantizedEQKill, getQuantizeMode } from '@/engine/dj/DJQuantizedFX';
+import { getQuantizeMode } from '@/engine/dj/DJQuantizedFX';
+import * as DJActions from '@/engine/dj/DJActions';
 
 interface MixerEQProps {
   deckId: 'A' | 'B' | 'C';
@@ -34,25 +34,13 @@ export const MixerEQ: React.FC<MixerEQProps> = ({ deckId }) => {
   const killValues = { high: killHigh, mid: killMid, low: killLow };
 
   const handleEQChange = useCallback((band: 'low' | 'mid' | 'high', dB: number) => {
-    useDJStore.getState().setDeckEQ(deckId, band, dB);
-    getDJEngine().getDeck(deckId).setEQ(band, dB);
+    DJActions.setDeckEQ(deckId, band, dB);
   }, [deckId]);
 
   const handleKillToggle = useCallback((band: 'low' | 'mid' | 'high') => {
-    const current = useDJStore.getState().decks[deckId][
-      `eq${band.charAt(0).toUpperCase() + band.slice(1)}Kill` as 'eqLowKill' | 'eqMidKill' | 'eqHighKill'
-    ];
-    const newKill = !current;
-
-    // Update store immediately for UI feedback
-    useDJStore.getState().setDeckEQKill(deckId, band, newKill);
-
-    // Apply via quantized system (snaps to beat boundary if quantize is on)
-    if (getQuantizeMode() !== 'off') {
-      quantizedEQKill(deckId, band, newKill);
-    } else {
-      getDJEngine().getDeck(deckId).setEQKill(band, newKill);
-    }
+    const killKey = `eq${band.charAt(0).toUpperCase() + band.slice(1)}Kill` as 'eqLowKill' | 'eqMidKill' | 'eqHighKill';
+    const current = useDJStore.getState().decks[deckId][killKey];
+    DJActions.setDeckEQKill(deckId, band, !current);
   }, [deckId]);
 
   const formatEQ = useCallback((val: number) => {

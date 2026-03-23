@@ -9,6 +9,7 @@ import React, { useCallback, useRef, useEffect, useState } from 'react';
 import { Knob } from '@components/controls/Knob';
 import { useDJStore } from '@/stores/useDJStore';
 import { getDJEngine } from '@/engine/dj/DJEngine';
+import * as DJActions from '@/engine/dj/DJActions';
 
 const VU_SEGMENTS = 12;
 
@@ -37,8 +38,7 @@ export const MixerMaster: React.FC = () => {
   const mountedRef = useRef(true);
 
   const handleVolumeChange = useCallback((value: number) => {
-    useDJStore.getState().setMasterVolume(value);
-    getDJEngine().mixer.setMasterVolume(value);
+    DJActions.setMasterVolume(value);
   }, []);
 
   // Animate stereo VU meter via requestAnimationFrame

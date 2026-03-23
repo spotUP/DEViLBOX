@@ -9,8 +9,9 @@ import { Play, Pause, Disc3, Link, Lock } from 'lucide-react';
 import { useDJStore } from '@/stores/useDJStore';
 import { getDJEngine } from '@/engine/dj/DJEngine';
 import { DJBeatSync } from '@/engine/dj/DJBeatSync';
-import { syncBPMToOther, phaseAlign, quantizedPlay } from '@/engine/dj/DJAutoSync';
+import { syncBPMToOther, phaseAlign } from '@/engine/dj/DJAutoSync';
 import { getQuantizeMode, setQuantizeMode, type QuantizeMode } from '@/engine/dj/DJQuantizedFX';
+import * as DJActions from '@/engine/dj/DJActions';
 
 interface DeckTransportProps {
   deckId: 'A' | 'B' | 'C';
@@ -20,38 +21,19 @@ export const DeckTransport: React.FC<DeckTransportProps> = ({ deckId }) => {
   const isPlaying = useDJStore((s) => s.decks[deckId].isPlaying);
   const cuePoint = useDJStore((s) => s.decks[deckId].cuePoint);
   const keyLockEnabled = useDJStore((s) => s.decks[deckId].keyLockEnabled);
-  const setDeckPlaying = useDJStore((s) => s.setDeckPlaying);
   const otherDeckId = deckId === 'A' ? 'B' : 'A';
   const thisBPM = useDJStore((s) => s.decks[deckId].effectiveBPM);
   const otherBPM = useDJStore((s) => s.decks[otherDeckId].effectiveBPM);
-  const otherIsPlaying = useDJStore((s) => s.decks[otherDeckId].isPlaying);
   const isSynced = Math.abs(thisBPM - otherBPM) < 0.5;
 
   const [qMode, setQMode] = useState<QuantizeMode>(getQuantizeMode);
   const [isPending, setIsPending] = useState(false);
 
   const handlePlayPause = useCallback(async () => {
-    const engine = getDJEngine();
-    const deck = engine.getDeck(deckId);
-
-    if (isPlaying) {
-      deck.pause();
-      setDeckPlaying(deckId, false);
-    } else {
-      // Use quantized play if:
-      // 1. Quantize mode is 'beat' or 'bar'
-      // 2. The other deck is currently playing
-      const currentQMode = getQuantizeMode();
-      if (currentQMode !== 'off' && otherIsPlaying) {
-        setIsPending(true);
-        await quantizedPlay(deckId, currentQMode);
-        setIsPending(false);
-      } else {
-        await deck.play();
-        setDeckPlaying(deckId, true);
-      }
-    }
-  }, [deckId, isPlaying, otherIsPlaying, setDeckPlaying]);
+    if (!isPlaying) setIsPending(true);
+    await DJActions.togglePlay(deckId);
+    setIsPending(false);
+  }, [deckId, isPlaying]);
 
   const handleCue = useCallback(() => {
     const engine = getDJEngine();
@@ -68,13 +50,7 @@ export const DeckTransport: React.FC<DeckTransportProps> = ({ deckId }) => {
   }, [qMode]);
 
   const handleKeyLock = useCallback(() => {
-    const next = !keyLockEnabled;
-    useDJStore.getState().setDeckKeyLock(deckId, next);
-    try {
-      getDJEngine().getDeck(deckId).setKeyLock(next);
-    } catch {
-      // Engine not ready
-    }
+    DJActions.setDeckKeyLock(deckId, !keyLockEnabled);
   }, [deckId, keyLockEnabled]);
 
   const handleSync = useCallback(() => {
