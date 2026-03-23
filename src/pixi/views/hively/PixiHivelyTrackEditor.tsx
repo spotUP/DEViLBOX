@@ -122,6 +122,8 @@ export const PixiHivelyTrackEditor: React.FC<TrackEditorProps> = ({
   const setHivelyTrackStep = useFormatStore(s => s.setHivelyTrackStep);
   const undoHivelyTrackStep = useFormatStore(s => s.undoHivelyTrackStep);
   const redoHivelyTrackStep = useFormatStore(s => s.redoHivelyTrackStep);
+  const insertHivelyTrackRow = useFormatStore(s => s.insertHivelyTrackRow);
+  const deleteHivelyTrackRow = useFormatStore(s => s.deleteHivelyTrackRow);
 
   const trackLength  = nativeData.trackLength;
   const numChannels  = nativeData.channels;
@@ -423,6 +425,26 @@ export const PixiHivelyTrackEditor: React.FC<TrackEditorProps> = ({
         case 'End':      e.preventDefault(); setSelection(null); setCursorRow(tl - 1);                          return;
       }
 
+      // Insert row (Insert key)
+      if (e.key === 'Insert') {
+        e.preventDefault();
+        const trackIdx = getTrackIndex();
+        if (trackIdx >= 0) {
+          insertHivelyTrackRow(trackIdx, stateRef.current.cursorRow);
+        }
+        return;
+      }
+
+      // Delete row (Shift+Backspace)
+      if (e.key === 'Backspace' && e.shiftKey) {
+        e.preventDefault();
+        const trackIdx = getTrackIndex();
+        if (trackIdx >= 0) {
+          deleteHivelyTrackRow(trackIdx, stateRef.current.cursorRow);
+        }
+        return;
+      }
+
       // Skip data entry keys if modifier held (except shift for uppercase)
       if (isCtrlCmd || e.altKey) return;
 
@@ -541,7 +563,7 @@ export const PixiHivelyTrackEditor: React.FC<TrackEditorProps> = ({
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [onFocusPositionEditor, getTrackIndex, setHivelyTrackStep, undoHivelyTrackStep, redoHivelyTrackStep, advanceCursor, nativeData]);
+  }, [onFocusPositionEditor, getTrackIndex, setHivelyTrackStep, undoHivelyTrackStep, redoHivelyTrackStep, insertHivelyTrackRow, deleteHivelyTrackRow, advanceCursor, nativeData]);
 
   const startRow = Math.floor(scrollTop / ROW_HEIGHT);
   const endRow   = Math.min(trackLength, startRow + visRows + 2);

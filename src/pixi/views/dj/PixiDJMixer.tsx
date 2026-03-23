@@ -7,7 +7,8 @@ import type { Graphics as GraphicsType } from 'pixi.js';
 import { usePixiTheme } from '../../theme';
 import { PixiButton, PixiKnob, PixiSlider, PixiLabel } from '../../components';
 import { useDJStore } from '@/stores/useDJStore';
-import { getDJEngine } from '@/engine/dj/DJEngine';
+import { useDJSetStore } from '@/stores/useDJSetStore';
+import { getDJEngine, getDJEngineIfActive } from '@/engine/dj/DJEngine';
 import type { CrossfaderCurve } from '@/engine/dj/DJMixerEngine';
 
 const MIXER_WIDTH = 220;
@@ -67,6 +68,9 @@ export const PixiDJMixer: React.FC = () => {
         <MixerMaster />
         <MixerCueSection />
       </pixiContainer>
+
+      {/* Record + Mic */}
+      <MixerRecordMic />
     </pixiContainer>
   );
 };
@@ -435,6 +439,92 @@ const MixerCueSection: React.FC = () => {
           onClick={() => handlePFLToggle('B')}
         />
       </pixiContainer>
+    </pixiContainer>
+  );
+};
+
+// ─── Record + Mic ───────────────────────────────────────────────────────────
+
+const MixerRecordMic: React.FC = () => {
+  const isRecording = useDJSetStore(s => s.isRecording);
+  const micEnabled = useDJSetStore(s => s.micEnabled);
+  const micGain = useDJSetStore(s => s.micGain);
+
+  const handleRecordToggle = useCallback(async () => {
+    if (isRecording) {
+      // Stop — delegate to the DOM DJSetRecordButton logic via store
+      // (the actual save flow happens in the DOM component; here we just toggle state)
+      const { DJSetRecorder } = await import('@/engine/dj/recording/DJSetRecorder');
+      const engine = getDJEngineIfActive();
+      if (engine?.recorder) {
+        const name = prompt('Name your DJ set:', `DJ Set ${new Date().toLocaleString()}`);
+        if (!name) return;
+        const { useAuthStore } = await import('@/stores/useAuthStore');
+        const auth = useAuthStore.getState();
+        const set = engine.recorder.stopRecording(name, auth.userId || 'local', auth.username || 'DJ');
+        engine.recorder = null;
+        useDJSetStore.getState().setRecording(false);
+        useDJSetStore.getState().setRecordingDuration(0);
+        // Save to server
+        if (auth.token) {
+          try {
+            const { saveDJSet } = await import('@/lib/djSetApi');
+            await saveDJSet(set);
+          } catch (err) { console.error('[PixiDJMixer] Save failed:', err); }
+        }
+      }
+    } else {
+      // Start
+      const { DJSetRecorder } = await import('@/engine/dj/recording/DJSetRecorder');
+      const recorder = new DJSetRecorder();
+      recorder.startRecording();
+      const engine = getDJEngineIfActive();
+      if (engine) engine.recorder = recorder;
+      useDJSetStore.getState().setRecording(true);
+      useDJSetStore.getState().setRecordingStartTime(Date.now());
+    }
+  }, [isRecording]);
+
+  const handleMicToggle = useCallback(async () => {
+    const engine = getDJEngineIfActive();
+    if (!engine) return;
+    const active = await engine.toggleMic();
+    useDJSetStore.getState().setMicEnabled(active);
+  }, []);
+
+  const handleMicGain = useCallback((v: number) => {
+    useDJSetStore.getState().setMicGain(v);
+    const engine = getDJEngineIfActive();
+    engine?.mic?.setGain(v);
+  }, []);
+
+  return (
+    <pixiContainer layout={{ flexDirection: 'row', gap: 6, alignItems: 'center', paddingTop: 4 }}>
+      <PixiButton
+        label={isRecording ? 'STOP' : 'REC'}
+        size="sm"
+        color={isRecording ? 'red' : undefined}
+        active={isRecording}
+        onClick={handleRecordToggle}
+      />
+      <PixiButton
+        label="MIC"
+        size="sm"
+        color={micEnabled ? 'green' : undefined}
+        active={micEnabled}
+        onClick={handleMicToggle}
+      />
+      {micEnabled && (
+        <PixiSlider
+          value={micGain}
+          min={0}
+          max={1.5}
+          width={50}
+          height={10}
+          orientation="horizontal"
+          onChange={handleMicGain}
+        />
+      )}
     </pixiContainer>
   );
 };
