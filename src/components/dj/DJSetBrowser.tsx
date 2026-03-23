@@ -128,18 +128,18 @@ export const DJSetBrowser: React.FC = () => {
       {open && (
         <div style={{
           position: 'absolute', top: '100%', right: 0, zIndex: 10000,
-          width: 360, maxHeight: 480, background: '#1a1a1a', border: '1px solid #333',
+          width: 360, maxHeight: 480, background: 'var(--color-bg-secondary)', border: '1px solid var(--color-border)',
           borderRadius: 6, overflow: 'hidden', boxShadow: '0 8px 24px rgba(0,0,0,0.6)',
           pointerEvents: 'auto',
         }}>
           {/* Header */}
           <div style={{
             display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-            padding: '8px 12px', borderBottom: '1px solid #333',
+            padding: '8px 12px', borderBottom: '1px solid var(--color-border)',
           }}>
-            <span style={{ fontWeight: 600, fontSize: 13, color: '#eee' }}>DJ Sets</span>
+            <span style={{ fontWeight: 600, fontSize: 13, color: 'var(--color-text)' }}>DJ Sets</span>
             <button onClick={() => setOpen(false)} style={{
-              background: 'none', border: 'none', color: '#888', cursor: 'pointer', fontSize: 16,
+              background: 'none', border: 'none', color: 'var(--color-text-muted)', cursor: 'pointer', fontSize: 16,
             }}>
               x
             </button>
@@ -155,7 +155,7 @@ export const DJSetBrowser: React.FC = () => {
           {/* Set list */}
           <div style={{ overflowY: 'auto', maxHeight: 400 }}>
             {entries.length === 0 ? (
-              <div style={{ padding: 24, textAlign: 'center', color: '#666', fontSize: 12 }}>
+              <div style={{ padding: 24, textAlign: 'center', color: 'var(--color-text-muted)', fontSize: 12 }}>
                 No recorded sets yet
               </div>
             ) : (
@@ -166,18 +166,18 @@ export const DJSetBrowser: React.FC = () => {
 
                 return (
                   <div key={s.id} style={{
-                    padding: '8px 12px', borderBottom: '1px solid #222',
-                    background: isActive ? '#222' : 'transparent',
+                    padding: '8px 12px', borderBottom: '1px solid var(--color-border)',
+                    background: isActive ? 'var(--color-bg-tertiary)' : 'transparent',
                   }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <div style={{
-                          fontWeight: 500, fontSize: 12, color: '#eee',
+                          fontWeight: 500, fontSize: 12, color: 'var(--color-text)',
                           overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
                         }}>
                           {s.name}
                         </div>
-                        <div style={{ fontSize: 10, color: '#888', marginTop: 2 }}>
+                        <div style={{ fontSize: 10, color: 'var(--color-text-muted)', marginTop: 2 }}>
                           {s.authorName || 'Anonymous'}
                           {' \u00b7 '}{formatDuration(s.durationMs)}
                           {' \u00b7 '}{s.trackList?.length || 0} tracks

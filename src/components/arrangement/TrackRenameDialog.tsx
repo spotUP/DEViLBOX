@@ -52,7 +52,7 @@ export const TrackRenameDialog: React.FC = () => {
       onMouseDown={(e) => { if (e.target === e.currentTarget) cancel(); }}
     >
       <div style={{
-        background: '#1e1e2e',
+        background: 'var(--color-bg-secondary)',
         border: '1px solid var(--color-border-light)',
         borderRadius: 6,
         padding: '16px 20px',
@@ -69,7 +69,7 @@ export const TrackRenameDialog: React.FC = () => {
           ref={inputRef}
           defaultValue={resolveTrackName(renamingTrackId)}
           style={{
-            background: '#2a2a3e',
+            background: 'var(--color-bg-tertiary)',
             border: '1px solid #555',
             borderRadius: 4,
             color: 'var(--color-text)',
