@@ -9,6 +9,7 @@ import { usePixiTheme } from '../../theme';
 import { useDJStore } from '@/stores/useDJStore';
 import { getDJEngine } from '@/engine/dj/DJEngine';
 import { DJBeatSync } from '@/engine/dj/DJBeatSync';
+import * as DJActions from '@/engine/dj/DJActions';
 
 interface PixiDeckTransportProps {
   deckId: 'A' | 'B' | 'C';
@@ -26,16 +27,8 @@ export const PixiDeckTransport: React.FC<PixiDeckTransportProps> = ({ deckId }) 
   const isSynced = Math.abs(thisBPM - otherBPM) < 0.5;
 
   const handlePlayPause = useCallback(async () => {
-    const engine = getDJEngine();
-    const deck = engine.getDeck(deckId);
-    if (isPlaying) {
-      deck.pause();
-      useDJStore.getState().setDeckPlaying(deckId, false);
-    } else {
-      await deck.play();
-      useDJStore.getState().setDeckPlaying(deckId, true);
-    }
-  }, [deckId, isPlaying]);
+    await DJActions.togglePlay(deckId);
+  }, [deckId]);
 
   const handleCue = useCallback(() => {
     const engine = getDJEngine();
