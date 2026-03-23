@@ -9,6 +9,11 @@ import { useEditorStore } from '@stores/useEditorStore';
 import { useSettingsStore } from '@stores/useSettingsStore';
 import { useDJStore } from '@/stores/useDJStore';
 import { useCollaborationStore } from '@/stores/useCollaborationStore';
+import { usePianoRollStore } from '@/stores/usePianoRollStore';
+import { useArrangementStore } from '@/stores/useArrangementStore';
+import { useDrumPadStore } from '@/stores/useDrumPadStore';
+import { useMixerStore } from '@/stores/useMixerStore';
+import { useWorkbenchStore } from '@stores/useWorkbenchStore';
 import { useShallow } from 'zustand/react/shallow';
 import { KNOB_BANKS, type KnobAssignment } from '@/midi/knobBanks';
 import type { KnobBankMode } from '@/midi/types';
@@ -123,9 +128,10 @@ const TrackerStatusContent: React.FC = () => {
       patternLength: s.patterns[s.currentPatternIndex]?.length || 64,
     }))
   );
-  const { songDBInfo } = useFormatStore(
+  const { songDBInfo, sidMetadata } = useFormatStore(
     useShallow((s) => ({
       songDBInfo: s.songDBInfo,
+      sidMetadata: s.sidMetadata,
     }))
   );
 
@@ -158,6 +164,28 @@ const TrackerStatusContent: React.FC = () => {
       <span className={`px-2 py-0.5 rounded ${recordMode ? 'bg-accent-error/20 text-accent-error' : 'text-text-primary'}`}>
         {recordMode ? 'REC' : 'EDIT'}
       </span>
+      {sidMetadata && (
+        <>
+          <div className="w-px h-3 bg-border opacity-50" />
+          <div className="flex items-center gap-2 text-text-muted text-xs">
+            {sidMetadata.title && (
+              <span className="text-text-primary">{sidMetadata.title}</span>
+            )}
+            {sidMetadata.author && (
+              <span>by <span className="text-text-primary font-semibold">{sidMetadata.author}</span></span>
+            )}
+            {sidMetadata.chipModel !== 'Unknown' && (
+              <span className="text-text-muted">[MOS {sidMetadata.chipModel}]</span>
+            )}
+            {sidMetadata.clockSpeed !== 'Unknown' && (
+              <span className="text-text-muted">{sidMetadata.clockSpeed}</span>
+            )}
+            {sidMetadata.subsongs > 1 && (
+              <span className="text-text-muted">Sub {sidMetadata.currentSubsong + 1}/{sidMetadata.subsongs}</span>
+            )}
+          </div>
+        </>
+      )}
       {songDBInfo && (
         <>
           <div className="w-px h-3 bg-border opacity-50" />
@@ -183,6 +211,127 @@ const TrackerStatusContent: React.FC = () => {
           </div>
         </>
       )}
+    </div>
+  );
+};
+
+// ─── Piano Roll Status Bar Content ───────────────────────────────────────────
+
+const PianoRollStatusContent: React.FC = () => {
+  const tool = usePianoRollStore(s => s.tool);
+  const view = usePianoRollStore(s => s.view);
+  const channelCount = useTrackerStore(s => s.patterns[0]?.channels.length ?? 4);
+
+  const sep = <div className="w-px h-3 bg-border opacity-50" />;
+
+  return (
+    <div className="flex items-center gap-4">
+      <span className="text-accent-primary font-semibold">Tool: {tool.toUpperCase()}</span>
+      {sep}
+      <span className="text-text-primary">Ch {view.channelIndex + 1}/{channelCount}</span>
+      {sep}
+      <span className="text-text-primary">Grid: 1/{view.gridDivision}</span>
+      {sep}
+      <span className={view.snapToGrid ? 'text-accent-success' : 'text-text-muted'}>
+        {view.snapToGrid ? 'Snap ON' : 'Snap OFF'}
+      </span>
+    </div>
+  );
+};
+
+// ─── Arrangement Status Bar Content ──────────────────────────────────────────
+
+const ArrangementStatusContent: React.FC = () => {
+  const tool = useArrangementStore(s => s.tool);
+  const trackCount = useArrangementStore(s => s.tracks.length);
+  const view = useArrangementStore(s => s.view);
+
+  const sep = <div className="w-px h-3 bg-border opacity-50" />;
+
+  return (
+    <div className="flex items-center gap-4">
+      <span className="text-accent-primary font-semibold">Tool: {tool.toUpperCase()}</span>
+      {sep}
+      <span className="text-text-primary">{trackCount} track{trackCount !== 1 ? 's' : ''}</span>
+      {sep}
+      <span className="text-text-primary">Snap: {view.snapDivision}</span>
+      {sep}
+      <span className="text-text-muted">Row: {view.scrollRow}</span>
+    </div>
+  );
+};
+
+// ─── Drum Pad Status Bar Content ─────────────────────────────────────────────
+
+const DrumPadStatusContent: React.FC = () => {
+  const currentBank = useDrumPadStore(s => s.currentBank);
+  const programCount = useDrumPadStore(s => s.programs.size);
+  const noteRepeatEnabled = useDrumPadStore(s => s.noteRepeatEnabled);
+  const noteRepeatRate = useDrumPadStore(s => s.noteRepeatRate);
+
+  const sep = <div className="w-px h-3 bg-border opacity-50" />;
+
+  return (
+    <div className="flex items-center gap-4">
+      <span className="text-accent-primary font-semibold">Bank {currentBank}</span>
+      {sep}
+      <span className="text-text-primary">{programCount} program{programCount !== 1 ? 's' : ''}</span>
+      {sep}
+      <span className="text-text-muted">16 pads</span>
+      {noteRepeatEnabled && (
+        <>
+          {sep}
+          <span className="text-accent-warning">Repeat: {noteRepeatRate}</span>
+        </>
+      )}
+    </div>
+  );
+};
+
+// ─── Mixer Status Bar Content ────────────────────────────────────────────────
+
+const MixerStatusContent: React.FC = () => {
+  const mutedChannels = useMixerStore(s => s.channels.filter(c => c.muted).length);
+  const soloChannels = useMixerStore(s => s.channels.filter(c => c.soloed).length);
+
+  const sep = <div className="w-px h-3 bg-border opacity-50" />;
+
+  return (
+    <div className="flex items-center gap-4">
+      <span className="text-accent-primary font-semibold">MIXER</span>
+      {sep}
+      <span className="text-text-primary">16 channels</span>
+      {mutedChannels > 0 && (
+        <>
+          {sep}
+          <span className="text-accent-warning">{mutedChannels} muted</span>
+        </>
+      )}
+      {soloChannels > 0 && (
+        <>
+          {sep}
+          <span className="text-accent-success">{soloChannels} solo</span>
+        </>
+      )}
+    </div>
+  );
+};
+
+// ─── Studio Status Bar Content ───────────────────────────────────────────────
+
+const StudioStatusContent: React.FC = () => {
+  const windowCount = useWorkbenchStore(s => Object.keys(s.windows).length);
+  const zoom = useWorkbenchStore(s => s.camera.scale);
+
+  const sep = <div className="w-px h-3 bg-border opacity-50" />;
+
+  return (
+    <div className="flex items-center gap-4">
+      <span className="text-accent-primary font-semibold">STUDIO</span>
+      {sep}
+      <span className="text-text-primary">{windowCount} window{windowCount !== 1 ? 's' : ''}</span>
+      {sep}
+      <span className="text-text-muted">Zoom: {Math.round(zoom * 100)}%</span>
     </div>
   );
 };
@@ -314,12 +463,19 @@ export const StatusBar: React.FC<StatusBarProps> = React.memo(({ onShowTips }) =
       {/* Main Status Bar */}
       <div className="bg-dark-bgSecondary border-t border-dark-border flex items-center justify-between px-4 py-1.5 text-xs font-mono">
         {/* Left: View-specific content */}
-        {activeView === 'dj' ? <DJStatusContent /> : activeView === 'vj' ? (
-          <div className="flex items-center gap-3 text-text-muted">
-            <span className="text-accent">VJ</span>
-            <span className="text-[10px]">Esc: back • ⌘⇧V: toggle • Milkdrop | ISF | 3D</span>
-          </div>
-        ) : <TrackerStatusContent />}
+        {activeView === 'dj' ? <DJStatusContent />
+          : activeView === 'vj' ? (
+            <div className="flex items-center gap-3 text-text-muted">
+              <span className="text-accent">VJ</span>
+              <span className="text-[10px]">Esc: back | Milkdrop | ISF | 3D</span>
+            </div>
+          )
+          : activeView === 'pianoroll' ? <PianoRollStatusContent />
+          : activeView === 'arrangement' ? <ArrangementStatusContent />
+          : activeView === 'drumpad' ? <DrumPadStatusContent />
+          : activeView === 'mixer' ? <MixerStatusContent />
+          : activeView === 'studio' ? <StudioStatusContent />
+          : <TrackerStatusContent />}
 
         {/* Right: MIDI Device, Audio State & Tips */}
         <div className="flex items-center gap-4">
