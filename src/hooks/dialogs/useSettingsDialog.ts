@@ -9,7 +9,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useUIStore } from '@stores/useUIStore';
 import { useThemeStore } from '@stores/useThemeStore';
-import { useSettingsStore, type SIDEngineType, type CRTParams } from '@stores/useSettingsStore';
+import { useSettingsStore, type CRTParams } from '@stores/useSettingsStore';
 import { useKeyboardStore } from '@stores/useKeyboardStore';
 import { useEditorStore } from '@stores/useEditorStore';
 import { useAudioStore } from '@stores/useAudioStore';
@@ -18,9 +18,6 @@ import { getTrackerReplayer } from '@engine/TrackerReplayer';
 import { getDJEngineIfActive } from '@engine/dj/DJEngine';
 import { BG_MODES, getBgModeLabel } from '@/components/tracker/TrackerVisualBackground';
 import { getASIDDeviceManager, isASIDSupported } from '@lib/sid/ASIDDeviceManager';
-
-// Suppress unused import warning — SIDEngineType is part of the public API surface of this module
-void (undefined as unknown as SIDEngineType);
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -272,10 +269,6 @@ export function useSettingsDialog({ isOpen }: UseSettingsDialogOptions) {
 
   // Keep WebUSB state setters available for callers that extend the hook's returned value
   // (they are not returned directly but can be destructured by dialogs as needed)
-  void setWebusbConnected;
-  void setWebusbDeviceName;
-  void setWebusbFirmware;
-  void setWebusbChips;
 
   // ── Effects (gated by isOpen for Pixi persistent-mount lifecycle) ────────
   useEffect(() => {
@@ -422,7 +415,10 @@ export function useSettingsDialog({ isOpen }: UseSettingsDialogOptions) {
     clearDismissedHashes,
     // Local state
     isFullscreen, asidDevices, asidSupported,
-    webusbSupported, webusbConnected, webusbDeviceName, webusbFirmware, webusbChips,
+    webusbSupported, webusbConnected, setWebusbConnected,
+    webusbDeviceName, setWebusbDeviceName,
+    webusbFirmware, setWebusbFirmware,
+    webusbChips, setWebusbChips,
     // Handlers
     toggleFullscreen, setStereoMode, setStereoSeparationValue, setModplugSeparationValue,
     handleClearState,
