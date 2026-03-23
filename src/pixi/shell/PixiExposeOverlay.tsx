@@ -295,7 +295,7 @@ export const PixiExposeOverlay: React.FC<PixiExposeOverlayProps> = ({ width, hei
               }}
             />
 
-            {/* Active dot next to label */}
+            {/* Active dot — upper-left corner */}
             {isActive && (
               <pixiGraphics
                 draw={(g) => {
@@ -303,8 +303,8 @@ export const PixiExposeOverlay: React.FC<PixiExposeOverlayProps> = ({ width, hei
                   g.circle(0, 0, 3);
                   g.fill({ color: theme.accent.color });
                 }}
-                x={cardW / 2 + view.label.length * 3.5 + 8}
-                y={cardH - LABEL_H + 14}
+                x={8}
+                y={8}
               />
             )}
           </pixiContainer>

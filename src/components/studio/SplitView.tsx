@@ -223,7 +223,7 @@ export const SplitView: React.FC = () => {
         <select
           value="split"
           onChange={(e) => switchView(e.target.value, 'split')}
-          className="text-xs bg-dark-bgSecondary border border-dark-border rounded px-2 py-0.5 text-text-secondary hover:border-accent-primary/50 focus:outline-none focus:border-accent-primary cursor-pointer"
+          className="px-3 py-1.5 rounded-md text-xs font-mono font-bold tracking-widest uppercase border transition-all cursor-pointer border-dark-borderLight bg-dark-bgTertiary text-text-secondary hover:bg-dark-bgHover hover:text-text-primary"
           title="Switch view"
         >
           {VIEW_OPTIONS.map(opt => (

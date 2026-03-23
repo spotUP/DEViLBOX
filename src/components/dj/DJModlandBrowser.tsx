@@ -179,8 +179,10 @@ export const DJModlandBrowser: React.FC<DJModlandBrowserProps> = ({ onClose }) =
         // Load the pre-rendered WAV directly in audio mode
         await engine.loadAudioToDeck(deckId, result.wavData, cacheKey, song.name || file.filename, result.analysis?.bpm || bpmResult.bpm, song);
 
-        // Switch to visualizer view for modules
-        useDJStore.getState().setDeckViewMode('visualizer');
+        // Switch to visualizer view for modules (only if not in 3D mode)
+        if (useDJStore.getState().deckViewMode !== '3d') {
+          useDJStore.getState().setDeckViewMode('visualizer');
+        }
 
         console.log(`[DJModlandBrowser] Loaded ${file.filename} in audio mode (skipped tracker bugs)`);
 
