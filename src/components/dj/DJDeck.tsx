@@ -13,7 +13,6 @@ import { detectBPM } from '@/engine/dj/DJBeatDetector';
 import { cacheSong } from '@/engine/dj/DJSongCache';
 import { isAudioFile } from '@/lib/audioFileUtils';
 import { getDJPipeline } from '@/engine/dj/DJPipeline';
-import { isSeekActive } from './seekGuard';
 import { DeckTransport } from './DeckTransport';
 import { DeckPitchSlider } from './DeckPitchSlider';
 import { DeckNudge } from './DeckNudge';
@@ -36,7 +35,6 @@ interface DJDeckProps {
 }
 
 export const DJDeck: React.FC<DJDeckProps> = ({ deckId }) => {
-  const animFrameRef = useRef<number>(0);
   const [isDragOver, setIsDragOver] = useState(false);
   const [isLoadingDrop, setIsLoadingDrop] = useState(false);
   const [vizResetKey, setVizResetKey] = useState(0);
@@ -47,116 +45,6 @@ export const DJDeck: React.FC<DJDeckProps> = ({ deckId }) => {
     const peaks = s.decks[deckId].waveformPeaks;
     return !!(peaks && peaks.length > 0);
   });
-
-  // Poll playback position and update store at ~20fps (throttled from RAF)
-  useEffect(() => {
-    let running = true;
-    let lastPoll = 0;
-    const POLL_INTERVAL = 50; // 50ms = 20fps — sufficient for position display
-
-    const poll = () => {
-      if (!running) return;
-
-      // Throttle: skip frames to reduce store broadcasts
-      const now = performance.now();
-      if (now - lastPoll < POLL_INTERVAL) {
-        animFrameRef.current = requestAnimationFrame(poll);
-        return;
-      }
-      lastPoll = now;
-
-      try {
-        const engine = getDJEngine();
-        const deck = engine.getDeck(deckId);
-        const store = useDJStore.getState();
-
-        if (deck.playbackMode === 'audio') {
-          // Audio file mode — poll audio player position
-          if (deck.audioPlayer.isCurrentlyPlaying() && !isSeekActive(deckId)) {
-            const pos = deck.audioPlayer.getPosition();
-            const dur = deck.audioPlayer.getDuration();
-            const update: Record<string, unknown> = {
-              audioPosition: pos,
-              elapsedMs: pos * 1000,
-              durationMs: dur * 1000,
-            };
-            // Derive pattern position from audio time for pre-rendered modules
-            const tp = deck.getPositionAtTime(pos * 1000);
-            if (tp) {
-              update.songPos = tp.songPos;
-              update.pattPos = tp.pattPos;
-            }
-            store.setDeckState(deckId, update);
-          }
-          // Detect end of audio playback
-          if (!deck.audioPlayer.isCurrentlyPlaying() && store.decks[deckId].isPlaying) {
-            store.setDeckPlaying(deckId, false);
-          }
-        } else {
-          // Tracker module mode — poll replayer position
-          const replayer = deck.replayer;
-          if (replayer.isPlaying()) {
-            store.setDeckPosition(deckId, replayer.getSongPos(), replayer.getPattPos());
-
-            // During pattern scratch the sequencer is frozen (tempoMultiplier ≈ 0)
-            // so effectiveBPM would read near-zero. Skip BPM/elapsed updates to
-            // keep the pre-scratch values visible and prevent sync indicator flickering.
-            if (deck.isPatternActive()) {
-              // Push scratch velocity + fader gain to store so UI reacts
-              const { velocity, faderGain } = deck.getScratchState();
-              const prevV = store.decks[deckId].scratchVelocity;
-              const prevF = store.decks[deckId].scratchFaderGain;
-              const update: Partial<typeof store.decks.A> = {};
-              if (Math.abs(velocity - prevV) > 0.05) update.scratchVelocity = velocity;
-              if (faderGain !== prevF) update.scratchFaderGain = faderGain;
-              if (Object.keys(update).length > 0) {
-                store.setDeckState(deckId, update);
-              }
-            } else {
-              const liveBPM = Math.round(replayer.getBPM() * replayer.getTempoMultiplier() * 100) / 100;
-              store.setDeckState(deckId, {
-                elapsedMs: replayer.getElapsedMs(),
-                effectiveBPM: liveBPM,
-              });
-              // Relay BPM changes to ScratchPlayback for LFO resync
-              try { deck.notifyBPMChange(liveBPM); } catch { /* engine not ready */ }
-
-              // Fader LFO without pattern: estimate visual fader state from timing
-              const lfoDiv = store.decks[deckId].faderLFODivision;
-              if (store.decks[deckId].faderLFOActive && lfoDiv) {
-                const divBeats: Record<string, number> = { '1/4': 1, '1/8': 0.5, '1/16': 0.25, '1/32': 0.125 };
-                const periodMs = (60000 / liveBPM) * (divBeats[lfoDiv] ?? 1);
-                const elapsed = replayer.getElapsedMs();
-                const posInPeriod = elapsed % periodMs;
-                const lfoFaderGain = posInPeriod < periodMs * 0.5 ? 1 : 0;
-                if (lfoFaderGain !== store.decks[deckId].scratchFaderGain) {
-                  store.setDeckState(deckId, { scratchFaderGain: lfoFaderGain });
-                }
-              } else if (store.decks[deckId].scratchVelocity !== 0 || store.decks[deckId].scratchFaderGain !== 1) {
-                // Clear scratch state when not scratching
-                store.setDeckState(deckId, { scratchVelocity: 0, scratchFaderGain: 1 });
-              }
-            }
-          }
-
-          // Auto-clear activePatternName when a one-shot pattern finishes naturally
-          if (!deck.isPatternActive() && store.decks[deckId].activePatternName !== null) {
-            store.setDeckPattern(deckId, null);
-          }
-        }
-      } catch {
-        // Engine might not be initialized yet
-      }
-
-      animFrameRef.current = requestAnimationFrame(poll);
-    };
-
-    animFrameRef.current = requestAnimationFrame(poll);
-    return () => {
-      running = false;
-      cancelAnimationFrame(animFrameRef.current);
-    };
-  }, [deckId]);
 
   // Subscribe to pitch changes in store and propagate to engine
   // This catches ALL pitch sources (slider, keyboard, sync button) in one place

@@ -27,6 +27,14 @@ import { DJSamplerPanel } from './DJSamplerPanel';
 import { useDJKeyboardHandler } from './DJKeyboardHandler';
 import type { SeratoTrack } from '@/lib/serato';
 import { getDJPipeline } from '@/engine/dj/DJPipeline';
+import { useDeckStateSync } from '@/hooks/dj/useDeckStateSync';
+import type { DeckId } from '@/engine/dj/DeckEngine';
+
+/** Headless bridge — polls engine state and updates the store for one deck. */
+function DeckStateSyncBridge({ deckId }: { deckId: DeckId }) {
+  useDeckStateSync(deckId);
+  return null;
+}
 
 // Lazy-load heavy 3D components to avoid bloating the main DJ bundle
 const DJ3DOverlay = React.lazy(() => import('./DJ3DOverlay').then(m => ({ default: m.DJ3DOverlay })));
@@ -239,6 +247,11 @@ export const DJView: React.FC<DJViewProps> = ({ onShowDrumpads }) => {
 
   return (
     <div ref={djViewRef} className="relative flex flex-col h-full w-full overflow-hidden select-none bg-dark-bg font-mono">
+      {/* Headless state sync — runs in ALL view modes (DOM, Vinyl, 3D) */}
+      <DeckStateSyncBridge deckId="A" />
+      <DeckStateSyncBridge deckId="B" />
+      {thirdDeckActive && <DeckStateSyncBridge deckId="C" />}
+
       {/* ================================================================== */}
       {/* TOP BAR                                                            */}
       {/* ================================================================== */}
