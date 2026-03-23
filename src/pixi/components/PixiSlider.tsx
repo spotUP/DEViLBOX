@@ -249,9 +249,11 @@ export const PixiSlider: React.FC<PixiSliderProps> = ({
         />
       )}
 
-      {/* Slider track + handle */}
+      {/* Slider track + handle — eventMode="static" so it registers for hit testing
+          (PixiJS v8 defaults to "passive" which doesn't participate in events) */}
       <pixiGraphics
         draw={drawSlider}
+        eventMode="static"
         layout={{ width: containerWidth, height: containerHeight }}
       />
 
