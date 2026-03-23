@@ -112,6 +112,40 @@ export function initDatabase() {
       value TEXT NOT NULL
     );
 
+    -- DJ set recordings (event-based, not waveform)
+    CREATE TABLE IF NOT EXISTS dj_sets (
+      id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL,
+      name TEXT NOT NULL,
+      duration_ms INTEGER NOT NULL,
+      track_list TEXT NOT NULL,
+      events TEXT NOT NULL,
+      mic_audio_id TEXT,
+      play_count INTEGER DEFAULT 0,
+      created_at INTEGER NOT NULL,
+      updated_at INTEGER NOT NULL,
+      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_dj_sets_user ON dj_sets(user_id);
+    CREATE INDEX IF NOT EXISTS idx_dj_sets_created ON dj_sets(created_at DESC);
+
+    -- Binary blobs for non-Modland module files and mic recordings
+    CREATE TABLE IF NOT EXISTS dj_blobs (
+      id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL,
+      filename TEXT NOT NULL,
+      mime_type TEXT NOT NULL,
+      data BLOB NOT NULL,
+      size_bytes INTEGER NOT NULL,
+      sha256 TEXT,
+      created_at INTEGER NOT NULL,
+      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_dj_blobs_user ON dj_blobs(user_id);
+    CREATE INDEX IF NOT EXISTS idx_dj_blobs_sha256 ON dj_blobs(sha256);
+
     -- Song analysis cache (shared across all users)
     -- Binary-packed arrays for compact storage (~5KB/song vs ~15KB JSON)
     CREATE TABLE IF NOT EXISTS song_analysis (
