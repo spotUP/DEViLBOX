@@ -117,6 +117,18 @@ export const DJSetRecordButton: React.FC = () => {
         }
       }
     } else {
+      // Warn if not signed in — set can't be saved to server
+      if (!token) {
+        const proceed = window.confirm(
+          'You are not signed in!\n\n' +
+          'Your DJ set will be recorded, but it CANNOT be saved to the server without an account. ' +
+          'If you close the browser or navigate away, your recording will be lost.\n\n' +
+          'Sign in first to save your sets safely.\n\n' +
+          'Record anyway?'
+        );
+        if (!proceed) return;
+      }
+
       // Start recording
       _activeRecorder = new DJSetRecorder();
       _activeRecorder.startRecording();

@@ -46,7 +46,7 @@ export class DeckAudioPlayer {
 
   constructor(outputNode: Tone.ToneAudioNode) {
     this.player = new Tone.Player({
-      loop: true,
+      loop: false,
       autostart: false,
     });
     this.player.connect(outputNode);
@@ -156,8 +156,9 @@ export class DeckAudioPlayer {
     this._rateChangeTime = Tone.now();
     this._rateTrackingActive = wasPlaying;
     if (wasPlaying) {
-      this.player.stop();
-      this.player.start(undefined, clamped);
+      const t = Tone.now();
+      this.player.stop(t);
+      this.player.start(t + 0.005, clamped);
     } else {
       this._pendingOffset = clamped;
       this._rateTrackingActive = false;
