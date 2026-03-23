@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-03-22T23:35:37.369Z
+ * Generated: 2026-03-23T07:26:02.289Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -19,10 +19,10 @@ export interface ChangelogEntry {
 }
 
 // Build info
-export const BUILD_VERSION = '1.0.3274';
-export const BUILD_NUMBER = '3274';
-export const BUILD_HASH = 'dd8993434';
-export const BUILD_DATE = '2026-03-22';
+export const BUILD_VERSION = '1.0.3294';
+export const BUILD_NUMBER = '3294';
+export const BUILD_HASH = '2e7deecfc';
+export const BUILD_DATE = '2026-03-23';
 
 // Full version (patch IS the build number, so no need to append)
 export const FULL_VERSION = BUILD_VERSION;
@@ -30,9 +30,89 @@ export const FULL_VERSION = BUILD_VERSION;
 // Auto-generated changelog
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: '1.0.3274',
+    version: '1.0.3294',
     date: '2026-03-23',
     changes: [
+      {
+        type: 'fix',
+        "description": "Eagerly init scratch buffer on play for SunVox audio"
+      },
+      {
+        type: 'improvement',
+        "description": "Chore: update format state and furnace audit tools"
+      },
+      {
+        type: 'feature',
+        "description": "Add DJ set recording and playback engine"
+      },
+      {
+        type: 'fix',
+        "description": "Suppress font cache warnings by checking Cache.has() before install"
+      },
+      {
+        type: 'improvement',
+        "description": "Only poll module scope when canvas is visible"
+      },
+      {
+        type: 'fix',
+        "description": "Tighter knob sensitivity, center detent snap, faster tonearm tracking"
+      },
+      {
+        type: 'fix',
+        "description": "Read computedLayout.width from element itself, not parent"
+      },
+      {
+        type: 'fix',
+        "description": "Smooth slider drag using native DOM coordinates"
+      },
+      {
+        type: 'feature',
+        "description": "Editable Klystrack positions + MusicLine hex nibble entry"
+      },
+      {
+        type: 'fix',
+        "description": "Remove panel stopPropagation blocking slider pointerDown"
+      },
+      {
+        type: 'fix',
+        "description": "Use hitArea on slider container (same pattern as checkbox)"
+      },
+      {
+        type: 'feature',
+        "description": "Insert/delete rows, Pixi block ops, Furnace order editing"
+      },
+      {
+        type: 'improvement',
+        "description": "Chore: CLAUDE.md update, FurnaceSequencer improvements, changelog, format state"
+      },
+      {
+        type: 'fix',
+        "description": "Default Div eventMode to \"auto\" for event pass-through"
+      },
+      {
+        type: 'fix',
+        "description": "Move onPointerDown to slider graphics element directly"
+      },
+      {
+        type: 'fix',
+        "description": "Filter null-note NOTE_ON from macro volume updates"
+      },
+      {
+        type: 'fix',
+        "description": "Set eventMode=\"static\" on slider graphics for hit testing"
+      },
+      {
+        type: 'fix',
+        "description": "Add hitArea to PixiSlider for reliable drag interaction"
+      },
+      {
+        type: 'fix',
+        "description": "Add hitArea to PixiCheckbox for reliable click detection"
+      },
+      {
+        type: 'fix',
+        "description": "Use onPointerTap for modal overlay close instead of onPointerUp"
+      },
       {
         type: 'improvement',
         "description": "Chore: update format audit state"
@@ -158,86 +238,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'fix',
         "description": "Raise mixer to same level as turntables"
-      },
-      {
-        type: 'fix',
-        "description": "Mixer scale 0.02→0.01 to match turntables, tighter side-by-side layout"
-      },
-      {
-        type: 'feature',
-        "description": "Unified 3D scene — all decks + mixer in one camera view"
-      },
-      {
-        type: 'fix',
-        "description": "Move 3D overlay to DOM tree — fixes Pixi reconciler crash"
-      },
-      {
-        type: 'fix',
-        "description": "Filter macro-generated commands from lock-step comparison"
-      },
-      {
-        type: 'fix',
-        "description": "Vestax mixer — rebuilt GLB from OBJ+textures with proper materials"
-      },
-      {
-        type: 'fix',
-        "description": "Vestax mixer — remove material overrides, use original model materials"
-      },
-      {
-        type: 'fix',
-        "description": "Vestax mixer — preserve textures, only override untextured parts"
-      },
-      {
-        type: 'fix',
-        "description": "Eliminate UI freeze on pattern wrap during playback"
-      },
-      {
-        type: 'fix',
-        "description": "Vestax mixer 3D materials — dark metallic finish matching turntables"
-      },
-      {
-        type: 'fix',
-        "description": "Vestax mixer textures/width, AHX scroll, zero TS errors"
-      },
-      {
-        type: 'feature',
-        "description": "Furnace center pattern, right-click macro, MPT clipboard paste"
-      },
-      {
-        type: 'feature',
-        "description": "Stacked layout — order matrix on top, pattern editor below"
-      },
-      {
-        type: 'fix',
-        "description": "Show only cross-format export button, move popout to bottom-right"
-      },
-      {
-        type: 'feature',
-        "description": "Wire 3D turntable and mixer views into both DOM and GL modes"
-      },
-      {
-        type: 'improvement',
-        "description": "Deduplicate sample/wavetable uploads across instruments"
-      },
-      {
-        type: 'improvement',
-        "description": "Chore: Furnace pattern editor collapse, help modal, DJ view, format state updates"
-      },
-      {
-        type: 'fix',
-        "description": "Add VBoy/WonderSwan/PV1000/Bifurcator effect handlers, filter macro cmds"
-      },
-      {
-        type: 'feature',
-        "description": "Copy/paste/selection in format mode + Hively export reflects edits"
-      },
-      {
-        type: 'feature',
-        "description": "FT2 keyboard parity + GT Ultra Pixi editor input"
-      },
-      {
-        type: 'feature',
-        "description": "Undo/redo and transpose in format mode pattern editors"
       }
     ]
   }
