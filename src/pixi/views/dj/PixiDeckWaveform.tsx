@@ -48,7 +48,7 @@ export const PixiDeckWaveform: React.FC<PixiDeckWaveformProps> = ({ deckId, heig
   const drawWaveform = useCallback((g: GraphicsType) => {
     g.clear();
 
-    const width = (g.parent as any)?.layout?.computedLayout?.width ?? 280;
+    const width = (g as any).layout?.computedLayout?.width ?? 280;
 
     // Background
     g.roundRect(0, 0, width, height, 4);
