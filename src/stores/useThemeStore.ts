@@ -174,41 +174,55 @@ const cyanLineartTheme: Theme = {
 };
 
 // DEViLBOX Theme - Red-tinted dark theme
+// Inspired by Behringer TD-3 "Red Devil" — cherry red body, silver knobs, black keys
 const devilboxTheme: Theme = {
   id: 'devilbox',
   name: 'DEViLBOX',
   colors: {
-    bg: '#110808',
-    bgSecondary: '#180c0c',
-    bgTertiary: '#221010',
-    bgHover: '#2e1414',
-    bgActive: '#381818',
-    border: '#3a1818',
-    borderLight: '#4d2222',
-    accent: '#e02020',
-    accentSecondary: '#cc3333',
-    accentHighlight: '#22d3ee',
-    accentGlow: 'rgba(224, 32, 32, 0.2)',
-    text: '#f2eded',
-    textSecondary: '#b09898',
-    textMuted: '#705858',
-    textInverse: '#110808',
-    error: '#ef4444',
-    success: '#10b981',
-    warning: '#f59e0b',
-    trackerRowEven: '#120909',
-    trackerRowOdd: '#180c0c',
-    trackerRowHighlight: '#1e1010',
-    trackerRowCurrent: '#301414',
-    trackerRowCursor: '#2c0e0e',
-    cellNote: '#f2eded',
-    cellInstrument: '#fbbf24',
+    // Backgrounds — dark with strong red undertone (like TD-3 in shadow)
+    bg: '#140808',           // deepest: near-black with red blood
+    bgSecondary: '#1c0c0c',  // panels: dark mahogany
+    bgTertiary: '#2a1212',   // toolbars: dark cherry
+    bgHover: '#3d1a1a',      // hover: warming up
+    bgActive: '#4a1e1e',     // active: rich dark red
+
+    // Borders — visible red, like the TD-3 panel edges
+    border: '#5c2222',
+    borderLight: '#6e2d2d',
+
+    // Accent — TD-3 cherry red body (#b91c1c) and hot highlights
+    accent: '#dc2626',        // vivid red — the devil's color
+    accentSecondary: '#b91c1c', // darker cherry — TD-3 body color
+    accentHighlight: '#f87171', // light red glow — LED indicator feel
+    accentGlow: 'rgba(220, 38, 38, 0.25)',
+
+    // Text — white on red like TD-3 silkscreen labels
+    text: '#f5f0f0',
+    textSecondary: '#c4a8a8',  // warm silver — like aged metallic labels
+    textMuted: '#7a5555',      // dark rose — recessed text
+    textInverse: '#140808',
+
+    // Semantic
+    error: '#f87171',
+    success: '#34d399',
+    warning: '#fbbf24',
+
+    // Tracker rows — alternating dark reds like circuit board traces
+    trackerRowEven: '#160909',
+    trackerRowOdd: '#1c0c0c',
+    trackerRowHighlight: '#261010',
+    trackerRowCurrent: '#3d1616',
+    trackerRowCursor: '#4a1a1a',
+
+    // Cell colors — vivid against the dark red
+    cellNote: '#f5f0f0',
+    cellInstrument: '#fbbf24',   // gold — like the TD-3's amber LEDs
     cellVolume: '#34d399',
-    cellEffect: '#e85040',
-    cellAccent: '#e02020',
-    cellSlide: '#fb7185',
-    cellEmpty: '#504040',
-    playbackCursor: '#e02020',
+    cellEffect: '#f87171',       // light red
+    cellAccent: '#dc2626',       // main red
+    cellSlide: '#fb7185',        // pink slide
+    cellEmpty: '#5a3838',        // dark rose
+    playbackCursor: '#dc2626',
     currentRowText: '#ffffff',
     panelShadow: '#0a0404',
   },
