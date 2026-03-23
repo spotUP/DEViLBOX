@@ -31,6 +31,7 @@ import * as THREE from 'three';
 import { useDJStore } from '@/stores/useDJStore';
 import { getDJEngine } from '@/engine/dj/DJEngine';
 import { TurntablePhysics, OMEGA_NORMAL } from '@/engine/turntable/TurntablePhysics';
+import * as DJActions from '@/engine/dj/DJActions';
 import { CameraControlOverlay } from './DJ3DCameraControls';
 import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib';
 
@@ -89,7 +90,7 @@ export function TurntableScene({ deckId, orbitRef, embedded }: TurntableScenePro
   const { scene: gltfScene } = useGLTF(MODEL_PATH);
 
   // Refs
-  const physicsRef = useRef(new TurntablePhysics());
+  const physicsRef = useRef<TurntablePhysics | null>(null);
   const platterAngleRef = useRef(0);
   const tonearmAngleRef = useRef(TONEARM_ANGLE_REST);
   const isScratchActiveRef = useRef(false);
@@ -298,6 +299,9 @@ export function TurntableScene({ deckId, orbitRef, embedded }: TurntableScenePro
   useFrame((_state, delta) => {
     const { isPlaying: playing, songPos: sPos, totalPositions: total,
       audioPosition: aPos, durationMs: dur, playbackMode: mode } = playStateRef.current;
+    if (!physicsRef.current) {
+      try { physicsRef.current = getDJEngine().getDeck(deckId).physics; } catch { return; }
+    }
     const physics = physicsRef.current;
 
     // ── Platter rotation ──
@@ -318,15 +322,14 @@ export function TurntableScene({ deckId, orbitRef, embedded }: TurntableScenePro
         // Feed physics rate to audio only during scratch (hand on vinyl).
         // Power-cut / eBrake are visual-only — audio stops immediately via button handler.
         if (isScratchActiveRef.current && Math.abs(rate - prevRateRef.current) > 0.01) {
-          try { getDJEngine().getDeck(deckId).setScratchVelocity(rate); } catch { /* not ready */ }
+          DJActions.setScratchVelocity(deckId, rate);
           prevRateRef.current = rate;
         }
 
         if (isScratchActiveRef.current && !physics.touching && !physics.spinbackActive && !physics.powerCutActive && !physics.eBrakeActive) {
           if (Math.abs(rate - 1.0) < 0.02) {
             isScratchActiveRef.current = false;
-            try { getDJEngine().getDeck(deckId).stopScratch(50); } catch { /* not ready */ }
-            useDJStore.getState().setDeckScratchActive(deckId, false);
+            DJActions.stopScratch(deckId, 50);
             prevRateRef.current = 1;
           }
         }
@@ -432,8 +435,7 @@ export function TurntableScene({ deckId, orbitRef, embedded }: TurntableScenePro
   const enterScratch = useCallback(() => {
     if (isScratchActiveRef.current) return;
     isScratchActiveRef.current = true;
-    useDJStore.getState().setDeckScratchActive(deckId, true);
-    try { getDJEngine().getDeck(deckId).startScratch(); } catch { /* not ready */ }
+    DJActions.startScratch(deckId);
   }, [deckId]);
 
   const handlePlatterPointerDown = useCallback((e: ThreeEvent<PointerEvent>) => {
@@ -450,8 +452,8 @@ export function TurntableScene({ deckId, orbitRef, embedded }: TurntableScenePro
     enterScratch();
     lastPointerRef.current = { x: e.nativeEvent.clientX, y: e.nativeEvent.clientY };
     lastPointerTimeRef.current = performance.now();
-    physicsRef.current.setTouching(true);
-    physicsRef.current.setHandVelocity(0);
+    physicsRef.current?.setTouching(true);
+    physicsRef.current?.setHandVelocity(0);
   }, [enterScratch]);
 
   const handlePlatterPointerMove = useCallback((e: ThreeEvent<PointerEvent>) => {
@@ -462,13 +464,13 @@ export function TurntableScene({ deckId, orbitRef, embedded }: TurntableScenePro
     lastPointerTimeRef.current = now;
     const pixelVelocity = -dx / dt;
     const omega = (pixelVelocity / 400) * OMEGA_NORMAL;
-    physicsRef.current.setHandVelocity(omega);
+    physicsRef.current?.setHandVelocity(omega);
     lastPointerRef.current = { x: e.nativeEvent.clientX, y: e.nativeEvent.clientY };
   }, []);
 
   const handlePlatterPointerUp = useCallback(() => {
     lastPointerRef.current = null;
-    physicsRef.current.setTouching(false);
+    physicsRef.current?.setTouching(false);
   }, []);
 
   // ── Start/Stop button — quick motor-driven brake/start (~0.5s) ──────────
@@ -476,22 +478,17 @@ export function TurntableScene({ deckId, orbitRef, embedded }: TurntableScenePro
   const handleStartStopClick = useCallback((e: ThreeEvent<PointerEvent>) => {
     e.stopPropagation();
     if (!powerOnRef.current) return; // Start/stop requires power
-    try {
-      const deck = getDJEngine().getDeck(deckId);
-      const store = useDJStore.getState();
-      const playing = store.decks[deckId].isPlaying;
-      if (playing) {
-        // Stop audio immediately, visual platter brakes via physics
-        deck.pause();
-        store.setDeckPlaying(deckId, false);
-        physicsRef.current.triggerElectronicBrake();
-      } else {
-        // Start audio immediately, visual platter spins up via physics
-        physicsRef.current.triggerMotorStart();
-        void deck.play();
-        store.setDeckPlaying(deckId, true);
-      }
-    } catch (err) { console.error('[TT] Start/Stop error:', err); }
+    const store = useDJStore.getState();
+    const playing = store.decks[deckId].isPlaying;
+    if (playing) {
+      // Stop audio immediately, visual platter brakes via physics
+      void DJActions.togglePlay(deckId, { spinDownMs: 0 });
+      physicsRef.current?.triggerElectronicBrake();
+    } else {
+      // Start audio immediately, visual platter spins up via physics
+      physicsRef.current?.triggerMotorStart();
+      void DJActions.togglePlay(deckId, { quantize: false });
+    }
   }, [deckId, powerOn]);
 
   // ── Power button — slow friction-only coast-down / motor spin-up ───────
@@ -501,16 +498,12 @@ export function TurntableScene({ deckId, orbitRef, embedded }: TurntableScenePro
     if (powerOn) {
       // Power off — everything shuts down
       setPowerOn(false);
-      try {
-        const deck = getDJEngine().getDeck(deckId);
-        const store = useDJStore.getState();
-        if (store.decks[deckId].isPlaying) {
-          // Stop audio immediately, visual platter coasts via physics
-          deck.pause();
-          store.setDeckPlaying(deckId, false);
-          physicsRef.current.triggerPowerCut();
-        }
-      } catch { /* not ready */ }
+      const store = useDJStore.getState();
+      if (store.decks[deckId].isPlaying) {
+        // Stop audio immediately, visual platter coasts via physics
+        void DJActions.togglePlay(deckId, { spinDownMs: 0 });
+        physicsRef.current?.triggerPowerCut();
+      }
     } else {
       // Power on — just enables the deck, doesn't start spinning
       setPowerOn(true);
@@ -573,7 +566,7 @@ export function TurntableScene({ deckId, orbitRef, embedded }: TurntableScenePro
     e.stopPropagation();
     if (!isScratchActiveRef.current) enterScratch();
     const impulse = TurntablePhysics.deltaToImpulse(e.nativeEvent.deltaY, e.nativeEvent.deltaMode);
-    physicsRef.current.applyImpulse(impulse);
+    physicsRef.current?.applyImpulse(impulse);
   }, [enterScratch]);
 
   // ── Tonearm/pickup seek ──────────────────────────────────────────────────
