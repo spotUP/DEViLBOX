@@ -18,6 +18,7 @@ import { PixiRoot } from './PixiRoot';
 import { attachFPSLimiter, setIsPlayingFn } from './performance';
 import { setScrollPerfApp } from './scrollPerf';
 import { useTransportStore } from '@stores';
+import { registerCaptureCanvas } from '@/engine/dj/streaming/DJVideoCapture';
 
 // Register PixiJS classes for use in @pixi/react JSX
 extend({ Container, Graphics, BitmapText, Sprite, Text, LayoutContainer });
@@ -260,6 +261,13 @@ const PixiAppContent: React.FC = () => {
     setIsPlayingFn(() => useTransportStore.getState().isPlaying);
     setScrollPerfApp(app);
     return attachFPSLimiter(app);
+  }, [app]);
+
+  // Register Pixi canvas for DJ video capture
+  useEffect(() => {
+    if (!app?.canvas) return;
+    registerCaptureCanvas('dj-ui', app.canvas as HTMLCanvasElement);
+    return () => registerCaptureCanvas('dj-ui', null);
   }, [app]);
 
   return <PixiRoot />;

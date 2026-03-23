@@ -2,7 +2,7 @@
  * PixiDJMixer — Center mixer panel: Filter | EQ | Channel strips | Crossfader | Master
  */
 
-import { useCallback, useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import type { Graphics as GraphicsType } from 'pixi.js';
 import { usePixiTheme } from '../../theme';
 import { PixiButton, PixiKnob, PixiSlider, PixiLabel } from '../../components';
@@ -10,6 +10,8 @@ import { useDJStore } from '@/stores/useDJStore';
 import { useDJSetStore } from '@/stores/useDJSetStore';
 import { getDJEngine, getDJEngineIfActive } from '@/engine/dj/DJEngine';
 import type { CrossfaderCurve } from '@/engine/dj/DJMixerEngine';
+import { DJVideoCapture, getCaptureCanvas } from '@/engine/dj/streaming/DJVideoCapture';
+import { DJVideoRecorder } from '@/engine/dj/streaming/DJVideoRecorder';
 
 const MIXER_WIDTH = 220;
 
@@ -449,6 +451,9 @@ const MixerRecordMic: React.FC = () => {
   const isRecording = useDJSetStore(s => s.isRecording);
   const micEnabled = useDJSetStore(s => s.micEnabled);
   const micGain = useDJSetStore(s => s.micGain);
+  const [videoRecording, setVideoRecording] = useState(false);
+  const videoCaptureRef = useRef<DJVideoCapture | null>(null);
+  const videoRecorderRef = useRef<DJVideoRecorder | null>(null);
 
   const handleRecordToggle = useCallback(async () => {
     if (isRecording) {
@@ -497,6 +502,34 @@ const MixerRecordMic: React.FC = () => {
     engine?.mic?.setGain(v);
   }, []);
 
+  const handleVideoToggle = useCallback(async () => {
+    if (videoRecording) {
+      // Stop
+      if (videoRecorderRef.current) {
+        const blob = await videoRecorderRef.current.stopRecording();
+        videoCaptureRef.current?.stopCapture();
+        videoCaptureRef.current = null;
+        videoRecorderRef.current = null;
+        setVideoRecording(false);
+        if (blob.size > 0) {
+          const filename = `dj-set-${Date.now()}.webm`;
+          DJVideoRecorder.download(blob, filename);
+        }
+      }
+    } else {
+      // Start — try VJ first, then DJ UI
+      const source = getCaptureCanvas('vj') ? 'vj' as const : 'dj-ui' as const;
+      if (!getCaptureCanvas(source)) { alert('No capture canvas available'); return; }
+      const capture = new DJVideoCapture();
+      const stream = capture.startCapture(source, source === 'vj' ? 60 : 30);
+      const recorder = new DJVideoRecorder();
+      recorder.startRecording(stream);
+      videoCaptureRef.current = capture;
+      videoRecorderRef.current = recorder;
+      setVideoRecording(true);
+    }
+  }, [videoRecording]);
+
   return (
     <pixiContainer layout={{ flexDirection: 'row', gap: 6, alignItems: 'center', paddingTop: 4 }}>
       <PixiButton
@@ -505,6 +538,13 @@ const MixerRecordMic: React.FC = () => {
         color={isRecording ? 'red' : undefined}
         active={isRecording}
         onClick={handleRecordToggle}
+      />
+      <PixiButton
+        label={videoRecording ? 'VSTOP' : 'VIDEO'}
+        size="sm"
+        color={videoRecording ? 'purple' : undefined}
+        active={videoRecording}
+        onClick={handleVideoToggle}
       />
       <PixiButton
         label="MIC"
