@@ -20,7 +20,7 @@ import { createRequire } from 'module';
 
 const SAMPLE_RATE = 44100;
 const BUFFER_SIZE = 128; // Match worklet quantum
-const MAX_RENDER_SECONDS = 300; // 5 minute safety limit
+const MAX_RENDER_SECONDS = 900; // 15 minute safety limit
 const PROJECT_ROOT = join(dirname(new URL(import.meta.url).pathname), '../..');
 const WASM_JS_PATH = join(PROJECT_ROOT, 'public/furnace-dispatch/FurnaceDispatch.js');
 const WASM_BIN_PATH = join(PROJECT_ROOT, 'public/furnace-dispatch/FurnaceDispatch.wasm');
@@ -935,7 +935,7 @@ async function renderFurFile(furPath: string, outPath: string): Promise<RenderRe
         const logData = new Int32Array(wasm.HEAP32.buffer, logPtr, logCount * 6);
         const logPath = outPath.replace('.wav', '.cmdlog.txt');
         const lines: string[] = [`# tick cmd chan val1 val2 ret (${logCount} entries)`];
-        for (let i = 0; i < Math.min(logCount, 50000); i++) {
+        for (let i = 0; i < Math.min(logCount, 200000); i++) {
           const tick = logData[i * 6 + 0];
           const cmd = logData[i * 6 + 1];
           const chan = logData[i * 6 + 2];
