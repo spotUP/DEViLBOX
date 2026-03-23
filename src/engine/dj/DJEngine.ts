@@ -11,6 +11,8 @@ import { DJCueEngine } from './DJCueEngine';
 import { useDJStore } from '@/stores/useDJStore';
 import type { TrackerSong } from '@/engine/TrackerReplayer';
 import type { AudioFileInfo } from './DeckAudioPlayer';
+import type { DJSetRecorder } from './recording/DJSetRecorder';
+import type { TrackSource } from './recording/DJSetEvent';
 
 // Instrument ID offsets to avoid collisions with the tracker view (IDs 1-999)
 // and between decks. Each deck gets a 10000-wide namespace.
@@ -24,6 +26,17 @@ export class DJEngine {
   readonly cueEngine: DJCueEngine;
 
   private disposed = false;
+
+  /** Active set recorder (null when not recording) */
+  recorder: DJSetRecorder | null = null;
+
+  /** Track source for the next loadToDeck/loadAudioToDeck call (set by UI before load) */
+  private _pendingTrackSource: TrackSource | null = null;
+
+  /** Set the track source for the next load operation (called by UI/browser before loading) */
+  setTrackSource(source: TrackSource): void {
+    this._pendingTrackSource = source;
+  }
 
   constructor() {
     // Create cue engine for headphone monitoring
@@ -70,6 +83,13 @@ export class DJEngine {
 
     const deck = this.getDeck(id);
     await deck.loadSong(song);
+
+    // Record track load event
+    if (this.recorder?.isRecording) {
+      const source = this._pendingTrackSource ?? { type: 'local' as const, fileName: filename };
+      this.recorder.recordTrackLoad(id, source, filename, song.name || filename, bpm);
+      this._pendingTrackSource = null;
+    }
 
     // Update store state
     useDJStore.getState().setDeckState(id, {
@@ -132,6 +152,13 @@ export class DJEngine {
 
     const info = await deck.loadAudioFile(buffer, filename);
     console.log(`[DJEngine] loadAudioFile returned: duration=${info.duration.toFixed(2)}s, sampleRate=${info.sampleRate}, channels=${info.numberOfChannels}`);
+
+    // Record track load event
+    if (this.recorder?.isRecording) {
+      const source = this._pendingTrackSource ?? { type: 'local' as const, fileName: filename };
+      this.recorder.recordTrackLoad(id, source, filename, trackName || filename, bpm || 125);
+      this._pendingTrackSource = null;
+    }
 
     // Update store state
     useDJStore.getState().setDeckState(id, {
