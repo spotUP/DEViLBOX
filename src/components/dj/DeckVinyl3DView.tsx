@@ -227,7 +227,9 @@ export function TurntableScene({ deckId, orbitRef, embedded }: TurntableScenePro
         ? TONEARM_ANGLE_START + progress * (TONEARM_ANGLE_END - TONEARM_ANGLE_START)
         : TONEARM_ANGLE_REST;
 
-      tonearmAngleRef.current += (targetAngle - tonearmAngleRef.current) * Math.min(1, delta * 5);
+      // Tighter tracking — delta*12 reaches target in ~5 frames at 60fps
+      // (was delta*5 which felt floaty/laggy behind the playback position)
+      tonearmAngleRef.current += (targetAngle - tonearmAngleRef.current) * Math.min(1, delta * 12);
 
       makeRotationAroundPivot(tonearmAngleRef.current, tonearmPivot, _compositeMat);
       for (const mesh of tonearmMeshes) {

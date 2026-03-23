@@ -663,8 +663,15 @@ export function MixerScene({ viewRef }: { viewRef: React.RefObject<HTMLDivElemen
         const knob = knobMap.get(knobName);
         if (!knob) return;
         const dy = dragStartRef.current.y - e.clientY;
-        const delta = (dy / 200) * (knob.max - knob.min);
-        const newVal = Math.max(knob.min, Math.min(knob.max, dragStartValueRef.current + delta));
+        // Tighter sensitivity (150px = full range, matches standard Knob component)
+        const delta = (dy / 150) * (knob.max - knob.min);
+        let newVal = Math.max(knob.min, Math.min(knob.max, dragStartValueRef.current + delta));
+        // Snap to center detent (default value) when crossing it
+        if (knob.centerDetent) {
+          const detent = knob.defaultValue;
+          const snapRange = (knob.max - knob.min) * 0.02; // 2% of range
+          if (Math.abs(newVal - detent) < snapRange) newVal = detent;
+        }
         knob.action(newVal);
         return;
       }
