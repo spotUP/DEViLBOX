@@ -388,15 +388,10 @@ export class ToneEngine {
     // PitchResampler inserted async between synthBus and masterEffectsInput (see initPitchResampler)
     this.synthBus.connect(this.masterEffectsInput);
 
-    // Meter on synthBus for WASM engine level metering (per-channel meters
-    // don't work for WASM engines since they mix internally)
+    // Meters start disconnected to avoid idle CPU usage from AnalyserNode processing.
+    // Connected on play via connectMeters(), disconnected on stop via disconnectMeters().
     this.synthBusMeter = new Tone.Meter({ normalRange: true });
-    this.synthBus.connect(this.synthBusMeter);
-
-    // Master meter at the merge point - catches ALL audio (libopenmpt goes through masterInput,
-    // native synths through synthBus - both meet at masterEffectsInput)
     this.masterMeter = new Tone.Meter({ normalRange: true });
-    this.masterEffectsInput.connect(this.masterMeter);
 
     // Init pitch resampler for WASM engine pitch shifting (async — falls back to direct connection)
     this.initPitchResampler();
@@ -4701,6 +4696,25 @@ export class ToneEngine {
       this.masterChannel.disconnect(this.fft);
       this.analysersConnected = false;
     }
+  }
+
+  // ── Level meter connect/disconnect (idle CPU savings) ─────────────────
+  private metersConnected = false;
+
+  /** Connect level meters — call when playback starts or UI needs levels */
+  public connectMeters(): void {
+    if (this.metersConnected) return;
+    this.synthBus.connect(this.synthBusMeter);
+    this.masterEffectsInput.connect(this.masterMeter);
+    this.metersConnected = true;
+  }
+
+  /** Disconnect level meters — call when playback stops to save CPU */
+  public disconnectMeters(): void {
+    if (!this.metersConnected) return;
+    try { this.synthBus.disconnect(this.synthBusMeter); } catch { /* already disconnected */ }
+    try { this.masterEffectsInput.disconnect(this.masterMeter); } catch { /* already disconnected */ }
+    this.metersConnected = false;
   }
 
   // ============================================
