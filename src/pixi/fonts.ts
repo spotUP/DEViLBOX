@@ -14,7 +14,7 @@
  * License: Icons CC BY 4.0, Font SIL OFL 1.1, Code MIT
  */
 
-import { BitmapFontManager, type TextStyleFontWeight } from 'pixi.js';
+import { BitmapFontManager, Cache, type TextStyleFontWeight } from 'pixi.js';
 import { FAD_ICONS } from './fontaudioIcons';
 
 declare global {
@@ -107,6 +107,8 @@ function installFonts(): void {
   ];
 
   for (const fb of fonts) {
+    // Skip if already in PixiJS cache (avoids "[Cache] already has key" warnings on HMR)
+    if (Cache.has(`${fb.name}-bitmap`)) continue;
     try {
       BitmapFontManager.install({
         name: fb.name,
