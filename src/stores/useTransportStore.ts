@@ -10,6 +10,7 @@ import { GROOVE_TEMPLATES } from '@typedefs/audio';
 import { useInstrumentStore } from './useInstrumentStore';
 import { unlockIOSAudio } from '@utils/ios-audio-unlock';
 import { useUIStore } from './useUIStore';
+import { getToneEngine } from '@engine/ToneEngine';
 
 interface TransportStore extends TransportState {
   // State
@@ -203,21 +204,27 @@ export const useTransportStore = create<TransportStore>()(
         // Initialize continuousRow from current position for smooth scrolling
         state.continuousRow = state.currentRow;
       });
+      // Connect level meters (idle CPU savings — disconnected when not playing)
+      try { getToneEngine().connectMeters(); } catch { /* engine not ready */ }
     },
 
-    pause: () =>
+    pause: () => {
       set((state) => {
         state.isPlaying = false;
         state.isPaused = true;
-      }),
+      });
+      try { getToneEngine().disconnectMeters(); } catch { /* engine not ready */ }
+    },
 
-    stop: () =>
+    stop: () => {
       set((state) => {
         // Keep currentRow at last playback position (don't reset to 0)
         // so the pattern editor stays where playback stopped.
         state.isPlaying = false;
         state.isPaused = false;
-      }),
+      });
+      try { getToneEngine().disconnectMeters(); } catch { /* engine not ready */ }
+    },
 
     togglePlayPause: async () => {
       const isPlaying = _get().isPlaying;
