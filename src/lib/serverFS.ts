@@ -124,7 +124,8 @@ export async function listServerDirectory(dirPath: string): Promise<ServerFileEn
     subpath = cleanPath;
   }
 
-  const response = await fetch(`${API_BASE}/demo/${type}/${subpath}`);
+  const encodedSubpath = subpath.split('/').map(s => encodeURIComponent(s)).join('/');
+  const response = await fetch(`${API_BASE}/demo/${type}/${encodedSubpath}`);
 
   if (!response.ok) {
     throw new Error(`Failed to list directory: ${response.statusText}`);
@@ -175,7 +176,8 @@ export async function readServerFile(filePath: string): Promise<ArrayBuffer> {
     subpath = cleanPath;
   }
 
-  const response = await fetch(`${API_BASE}/demo/${type}/${subpath}`);
+  const encodedSubpath = subpath.split('/').map(s => encodeURIComponent(s)).join('/');
+  const response = await fetch(`${API_BASE}/demo/${type}/${encodedSubpath}`);
 
   if (!response.ok) {
     throw new Error(`Failed to read file: ${response.statusText}`);
@@ -191,7 +193,9 @@ export async function readServerFile(filePath: string): Promise<ArrayBuffer> {
 export async function readStaticFile(filePath: string): Promise<ArrayBuffer> {
   const cleanPath = filePath.replace(/^\/+/, '');
   const base = import.meta.env.BASE_URL || '/';
-  const url = `${base}data/${cleanPath}`;
+  // Encode each path segment to handle spaces and special characters (iOS Safari requires this)
+  const encodedPath = cleanPath.split('/').map(s => encodeURIComponent(s)).join('/');
+  const url = `${base}data/${encodedPath}`;
   const response = await fetch(url);
 
   if (!response.ok) {
