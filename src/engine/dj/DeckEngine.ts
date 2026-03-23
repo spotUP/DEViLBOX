@@ -15,6 +15,7 @@ import { useDJStore } from '@/stores/useDJStore';
 import { ScratchPlayback, getPatternByName } from './DJScratchEngine';
 import { DeckScratchBuffer } from './DeckScratchBuffer';
 import { DeckAudioPlayer, type AudioFileInfo } from './DeckAudioPlayer';
+import { TurntablePhysics } from '@/engine/turntable/TurntablePhysics';
 
 export type PlaybackMode = 'tracker' | 'audio';
 
@@ -43,6 +44,7 @@ export class DeckEngine {
   readonly id: DeckId;
   readonly replayer: TrackerReplayer;
   readonly audioPlayer: DeckAudioPlayer;
+  readonly physics: TurntablePhysics;
   private _playbackMode: PlaybackMode = 'audio';
 
   // Audio chain nodes
@@ -147,6 +149,9 @@ export class DeckEngine {
 
     // Create AudioPlayer for audio file playback (MP3/WAV/FLAC etc.)
     this.audioPlayer = new DeckAudioPlayer(this.deckGain);
+
+    // Per-deck turntable physics (one instance shared by all views)
+    this.physics = new TurntablePhysics();
 
     // Create ScratchPlayback (per-deck scratch pattern + fader LFO engine)
     this.scratchPlayback = new ScratchPlayback(
