@@ -13,8 +13,9 @@ import type { DJSetEvent, TrackSource } from './DJSetEvent';
 export interface DJSetTrack {
   source: TrackSource;
   fileName: string;
-  trackName: string;
-  bpm: number;
+  trackName?: string;
+  bpm?: number;
+  duration?: number;
   /** When this track was first loaded in the set (microseconds) */
   loadedAt: number;
 }

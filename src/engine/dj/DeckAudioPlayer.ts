@@ -42,6 +42,7 @@ export class DeckAudioPlayer {
   private _loopIn: number | null = null;
   private _loopOut: number | null = null;
   private _loopCheckTimer: number | null = null;
+  private _originalFileBytes: ArrayBuffer | null = null;
 
   constructor(outputNode: Tone.ToneAudioNode) {
     this.player = new Tone.Player({
@@ -56,7 +57,12 @@ export class DeckAudioPlayer {
    * Decodes the audio and computes overview waveform peaks.
    * Uses WASM fallback decoders for cross-browser format support.
    */
+  getOriginalFileBytes(): ArrayBuffer | null {
+    return this._originalFileBytes;
+  }
+
   async loadAudioFile(buffer: ArrayBuffer, filename: string): Promise<AudioFileInfo> {
+    this._originalFileBytes = buffer.slice(0);
     console.log(`[DeckAudioPlayer] loadAudioFile: ${filename}, buffer size: ${buffer.byteLength} bytes`);
     
     // Decode audio with cross-browser support
@@ -332,5 +338,6 @@ export class DeckAudioPlayer {
     this.player.dispose();
     this._loaded = false;
     this._waveformPeaks = null;
+    this._originalFileBytes = null;
   }
 }

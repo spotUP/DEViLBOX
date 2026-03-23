@@ -46,6 +46,7 @@ export async function saveDJSet(set: DJSet): Promise<{ id: string }> {
 
 export async function listDJSets(options?: { mine?: boolean; limit?: number; offset?: number }): Promise<{
   sets: (DJSetMetadata & { playCount: number; hasMic: boolean })[];
+  total: number;
 }> {
   const params = new URLSearchParams();
   if (options?.mine) params.set('mine', 'true');
