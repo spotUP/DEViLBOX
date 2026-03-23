@@ -6,7 +6,7 @@
  * synth instances may be disposed during playback.
  */
 
-import React, { useRef, useEffect, useCallback } from 'react';
+import React, { useRef, useEffect, useCallback, useState } from 'react';
 import { SunVoxEngine } from '@/engine/sunvox/SunVoxEngine';
 import { getSharedSunVoxHandle } from '@/engine/sunvox-modular/SunVoxModularSynth';
 
@@ -26,7 +26,20 @@ export const ModuleScopeCanvas: React.FC<ModuleScopeCanvasProps> = ({
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const rafRef = useRef<number>(0);
   const lastPollRef = useRef<number>(0);
+  const [isVisible, setIsVisible] = useState(false);
   const POLL_INTERVAL = 50; // ~20Hz
+
+  // Only poll when the canvas is in the viewport (saves WASM calls for off-screen modules)
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const observer = new IntersectionObserver(
+      ([entry]) => setIsVisible(entry.isIntersecting),
+      { threshold: 0 }
+    );
+    observer.observe(canvas);
+    return () => observer.disconnect();
+  }, []);
 
   const draw = useCallback((samples: Float32Array) => {
     const canvas = canvasRef.current;
@@ -70,7 +83,7 @@ export const ModuleScopeCanvas: React.FC<ModuleScopeCanvasProps> = ({
   }, []);
 
   useEffect(() => {
-    if (!isPlaying || svModuleId < 0) {
+    if (!isPlaying || svModuleId < 0 || !isVisible) {
       draw(new Float32Array(0));
       return;
     }
@@ -105,7 +118,7 @@ export const ModuleScopeCanvas: React.FC<ModuleScopeCanvasProps> = ({
       cancelled = true;
       cancelAnimationFrame(rafRef.current);
     };
-  }, [isPlaying, svModuleId, draw]);
+  }, [isPlaying, svModuleId, isVisible, draw]);
 
   return (
     <canvas
