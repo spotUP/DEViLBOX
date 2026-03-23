@@ -721,7 +721,9 @@ function App() {
   const modlandFilename = useModlandContributionModal((s) => s.filename);
   const modlandHash = useModlandContributionModal((s) => s.hash);
 
-  if (renderMode === 'webgl') {
+  // Disable WebGL/PixiJS on mobile — too heavy for phones, causes overheating.
+  // Mobile gets the lighter DOM-based React UI instead.
+  if (renderMode === 'webgl' && !isMobile) {
     return (
       <Suspense fallback={
         <div className="h-screen w-screen flex items-center justify-center bg-dark-bg">
