@@ -74,7 +74,7 @@ export const PatternMinimap: React.FC<PatternMinimapProps> = React.memo(({ heigh
   return (
     <div
       ref={containerRef}
-      className="w-4 bg-neutral-900 border-l border-neutral-700 cursor-pointer flex-shrink-0"
+      className="w-4 bg-dark-bg border-l border-dark-border cursor-pointer flex-shrink-0"
       style={{ height }}
       onClick={handleClick}
       title="Click to jump to row"

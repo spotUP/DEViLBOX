@@ -365,7 +365,7 @@ export const AdvancedEditModal: React.FC<AdvancedEditModalProps> = ({
                       const event = new KeyboardEvent('keydown', { key: '?' });
                       window.dispatchEvent(event);
                     }}
-                    className="px-3 py-1.5 text-xs bg-neutral-700 hover:bg-neutral-600 text-text-primary rounded flex items-center justify-center gap-1 transition-colors"
+                    className="px-3 py-1.5 text-xs bg-dark-bgTertiary hover:bg-dark-bgHover text-text-primary rounded flex items-center justify-center gap-1 transition-colors"
                   >
                     <BookOpen size={12} />
                     Full Reference (?)

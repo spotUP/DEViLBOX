@@ -167,13 +167,13 @@ export const EffectPicker: React.FC<EffectPickerProps> = ({ isOpen, position, on
       <div className="fixed inset-0 bg-black/40 z-50" onClick={onClose} />
       <div
         ref={ref}
-        className="bg-neutral-900 border border-neutral-700 rounded-lg shadow-2xl w-[380px] max-h-[480px] flex flex-col z-[60]"
+        className="bg-dark-bg border border-dark-border rounded-lg shadow-2xl w-[380px] max-h-[480px] flex flex-col z-[60]"
         style={style}
       >
         {/* Header */}
-        <div className="flex items-center justify-between px-3 py-2 border-b border-neutral-700">
+        <div className="flex items-center justify-between px-3 py-2 border-b border-dark-border">
           <div className="flex items-center gap-2">
-            <h3 className="text-sm font-semibold text-neutral-100">Effect Commands</h3>
+            <h3 className="text-sm font-semibold text-text-primary">Effect Commands</h3>
             <button
               onClick={() => {
                 onClose();
@@ -182,38 +182,38 @@ export const EffectPicker: React.FC<EffectPickerProps> = ({ isOpen, position, on
                 const event = new KeyboardEvent('keydown', { key: '?' });
                 window.dispatchEvent(event);
               }}
-              className="p-1 text-neutral-500 hover:text-accent-primary transition-colors"
+              className="p-1 text-text-muted hover:text-accent-primary transition-colors"
               title="Open full reference"
             >
               <HelpCircle size={14} />
             </button>
           </div>
-          <button onClick={onClose} className="text-neutral-400 hover:text-neutral-200" aria-label="Close effect picker">
+          <button onClick={onClose} className="text-text-secondary hover:text-text-primary" aria-label="Close effect picker">
             <X size={16} />
           </button>
         </div>
 
         {/* Search */}
-        <div className="px-3 py-2 border-b border-neutral-800">
+        <div className="px-3 py-2 border-b border-dark-bgSecondary">
           <input
             ref={inputRef}
             type="text"
             placeholder="Search effects..."
             value={filter}
             onChange={(e) => setFilter(e.target.value)}
-            className="w-full bg-neutral-800 border border-neutral-600 rounded px-2 py-1 text-xs text-neutral-200 focus:outline-none focus:border-blue-500"
+            className="w-full bg-dark-bgSecondary border border-dark-borderLight rounded px-2 py-1 text-xs text-text-primary focus:outline-none focus:border-blue-500"
             aria-label="Search effects"
           />
         </div>
 
         {/* Category tabs */}
-        <div className="flex flex-wrap gap-1 px-3 py-1.5 border-b border-neutral-800">
+        <div className="flex flex-wrap gap-1 px-3 py-1.5 border-b border-dark-bgSecondary">
           <button
             onClick={() => setSelectedCategory('all')}
             className={`px-2 py-0.5 text-[10px] rounded ${
               selectedCategory === 'all'
-                ? 'bg-neutral-700 text-text-primary'
-                : 'text-neutral-400 hover:text-neutral-200'
+                ? 'bg-dark-bgTertiary text-text-primary'
+                : 'text-text-secondary hover:text-text-primary'
             }`}
           >
             All
@@ -224,7 +224,7 @@ export const EffectPicker: React.FC<EffectPickerProps> = ({ isOpen, position, on
               onClick={() => setSelectedCategory(cat)}
               className={`px-2 py-0.5 text-[10px] rounded ${
                 selectedCategory === cat
-                  ? 'bg-neutral-700 text-text-primary'
+                  ? 'bg-dark-bgTertiary text-text-primary'
                   : `${EXTENDED_CATEGORY_COLORS[cat]} hover:opacity-80`
               }`}
             >
@@ -249,7 +249,7 @@ export const EffectPicker: React.FC<EffectPickerProps> = ({ isOpen, position, on
         {/* Effects list */}
         <div className="overflow-y-auto flex-1 p-1">
           {filtered.length === 0 ? (
-            <div className="text-center text-neutral-500 text-xs py-4">No effects match</div>
+            <div className="text-center text-text-muted text-xs py-4">No effects match</div>
           ) : (
             filtered.map((eff) => {
               const colorClass = eff.isFurnace
@@ -259,19 +259,19 @@ export const EffectPicker: React.FC<EffectPickerProps> = ({ isOpen, position, on
                 <button
                   key={eff.isFurnace ? `f-${eff.key}` : eff.isExtended ? `e-${eff.key}` : `n-${eff.key}`}
                   onClick={() => handleSelect(eff)}
-                  className="w-full flex items-center gap-2 px-2 py-1.5 rounded hover:bg-neutral-800 transition-colors text-left group"
+                  className="w-full flex items-center gap-2 px-2 py-1.5 rounded hover:bg-dark-bgSecondary transition-colors text-left group"
                 >
                   <span className={`font-mono text-xs font-bold w-8 ${colorClass}`}>
                     {eff.command.substring(0, 3)}
                   </span>
                   <div className="flex-1 min-w-0">
-                    <div className="text-xs text-neutral-200 truncate">
+                    <div className="text-xs text-text-primary truncate">
                       {eff.name}
                       {eff.isFurnace && <span className="ml-1 text-[9px] text-pink-400">(Chip)</span>}
                     </div>
-                    <div className="text-[10px] text-neutral-500 truncate">{eff.description}</div>
+                    <div className="text-[10px] text-text-muted truncate">{eff.description}</div>
                   </div>
-                  <span className="text-[9px] text-neutral-600 group-hover:text-neutral-400">
+                  <span className="text-[9px] text-text-muted group-hover:text-text-secondary">
                     {eff.tick === 'tick-0' ? 'T0' : eff.tick === 'tick-N' ? 'TN' : 'T*'}
                   </span>
                 </button>
