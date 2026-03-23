@@ -100,9 +100,15 @@ export function TurntableScene({ deckId, orbitRef, embedded }: TurntableScenePro
   const pitchDragStartYRef = useRef(0);
   const pitchDragStartValueRef = useRef(0);
   const rpmRef = useRef(RPM_33);
-  const loggedOnceRef = useRef(false);
+  const ledYRef = useRef(0); // animated Y offset for LED sink/pop
+  const tonearmHitboxRef = useRef<THREE.Mesh>(null);
+  const labelMeshRef = useRef<THREE.Mesh>(null);
+  const labelTextureRef = useRef<THREE.CanvasTexture | null>(null);
   const [rpm, setRpm] = useState(RPM_33);
   const [stylusLight, setStylusLight] = useState(true);
+  const [powerOn, setPowerOn] = useState(false);
+  const powerOnRef = useRef(false);
+  powerOnRef.current = powerOn;
 
   // Store subscriptions
   const isPlaying = useDJStore((s) => s.decks[deckId].isPlaying);
@@ -174,10 +180,7 @@ export function TurntableScene({ deckId, orbitRef, embedded }: TurntableScenePro
       (swivleMesh as THREE.Mesh).geometry.boundingBox!.getCenter(tPivot);
     }
 
-    const allNames: string[] = [];
-    cloned.traverse((c) => { if ('isMesh' in c && c.isMesh) allNames.push((c as THREE.Mesh).name); });
-    console.log(`[TT] ALL mesh names: ${allNames.join(', ')}`);
-    console.log(`[TT] Scene setup: platters=[${platters.map(m=>m.name)}] tonearms=[${tonearms.map(m=>m.name)}] pitch=${!!pitchsliderMesh} led=${!!ledMesh}`);
+    // Debug removed — mesh names confirmed working
 
     // Disable auto-update on animated meshes — we set .matrix directly each frame
     for (const m of platters) m.matrixAutoUpdate = false;
@@ -185,6 +188,110 @@ export function TurntableScene({ deckId, orbitRef, embedded }: TurntableScenePro
 
     return { clonedScene: cloned, platterMeshes: platters, tonearmMeshes: tonearms, platterCenter: pCenter, tonearmPivot: tPivot, pitchsliderMesh: pitchsliderMesh as THREE.Mesh | null, ledMesh: ledMesh as THREE.Mesh | null };
   }, [gltfScene]);
+
+  // ── Dynamic vinyl label texture ──────────────────────────────────────────
+  // Renders artist/song name as circular text on the record label.
+  useMemo(() => {
+    const size = 512;
+    const canvas = document.createElement('canvas');
+    canvas.width = size;
+    canvas.height = size;
+    const tex = new THREE.CanvasTexture(canvas);
+    tex.colorSpace = THREE.SRGBColorSpace;
+    labelTextureRef.current = tex;
+    return tex;
+  }, []);
+
+  // Redraw label when track changes
+  useMemo(() => {
+    const tex = labelTextureRef.current;
+    if (!tex) return;
+    const canvas = tex.image as HTMLCanvasElement;
+    const ctx = canvas.getContext('2d')!;
+    const S = canvas.width;
+    const cx = S / 2, cy = S / 2;
+
+    // Clear with label background color
+    ctx.clearRect(0, 0, S, S);
+
+    // Draw label disc background
+    ctx.beginPath();
+    ctx.arc(cx, cy, S / 2, 0, Math.PI * 2);
+    ctx.fillStyle = '#1a1a1a';
+    ctx.fill();
+
+    // Inner ring
+    ctx.beginPath();
+    ctx.arc(cx, cy, S * 0.38, 0, Math.PI * 2);
+    ctx.strokeStyle = '#333';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+
+    // Spindle hole
+    ctx.beginPath();
+    ctx.arc(cx, cy, S * 0.03, 0, Math.PI * 2);
+    ctx.fillStyle = '#000';
+    ctx.fill();
+
+    // Deck ID in center
+    ctx.fillStyle = accentColor;
+    ctx.font = `bold ${S * 0.12}px monospace`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(`DECK ${deckId}`, cx, cy - S * 0.10);
+
+    if (trackName) {
+      // Draw song name as circular text (outer ring)
+      const text = trackName.toUpperCase();
+      const radius = S * 0.42;
+      ctx.fillStyle = '#ffffff';
+      ctx.font = `bold ${S * 0.07}px monospace`;
+      const charAngle = 0.07; // radians per character
+      const totalAngle = Math.min(Math.PI * 1.8, text.length * charAngle);
+      const startAngle = -Math.PI / 2 - totalAngle / 2;
+      for (let i = 0; i < text.length; i++) {
+        const angle = startAngle + (i / text.length) * totalAngle;
+        ctx.save();
+        ctx.translate(cx + Math.cos(angle) * radius, cy + Math.sin(angle) * radius);
+        ctx.rotate(angle + Math.PI / 2);
+        ctx.fillText(text[i], 0, 0);
+        ctx.restore();
+      }
+
+      // Draw repeated in inner ring (bottom arc)
+      const innerRadius = S * 0.28;
+      ctx.fillStyle = '#888';
+      ctx.font = `${S * 0.055}px monospace`;
+      const innerStart = Math.PI / 2 - totalAngle / 2;
+      for (let i = 0; i < text.length; i++) {
+        const angle = innerStart + (i / text.length) * totalAngle;
+        ctx.save();
+        ctx.translate(cx + Math.cos(angle) * innerRadius, cy + Math.sin(angle) * innerRadius);
+        ctx.rotate(angle + Math.PI / 2);
+        ctx.fillText(text[i], 0, 0);
+        ctx.restore();
+      }
+
+      // DEViLBOX branding in center
+      ctx.fillStyle = '#666';
+      ctx.font = `bold ${S * 0.06}px monospace`;
+      ctx.textAlign = 'center';
+      ctx.fillText('DEViLBOX', cx, cy + S * 0.03);
+      ctx.fillStyle = '#444';
+      ctx.font = `${S * 0.04}px monospace`;
+      ctx.fillText('RECORDS', cx, cy + S * 0.08);
+    } else {
+      // No track — show DEViLBOX logo
+      ctx.fillStyle = accentColor;
+      ctx.font = `bold ${S * 0.09}px monospace`;
+      ctx.fillText('DEViLBOX', cx, cy + S * 0.03);
+      ctx.fillStyle = '#555';
+      ctx.font = `${S * 0.045}px monospace`;
+      ctx.fillText('NO TRACK LOADED', cx, cy + S * 0.10);
+    }
+
+    tex.needsUpdate = true;
+  }, [trackName, deckId, accentColor]);
 
   // ── Animation: platter rotation + tonearm position ───────────────────────
 
@@ -194,10 +301,6 @@ export function TurntableScene({ deckId, orbitRef, embedded }: TurntableScenePro
     const physics = physicsRef.current;
 
     // ── Platter rotation ──
-    if (platterMeshes.length === 0 && !loggedOnceRef.current) {
-      loggedOnceRef.current = true;
-      console.warn(`[TT:${deckId}] NO platter meshes found!`);
-    }
     if (platterMeshes.length > 0) {
       const baseRps = rpmRef.current === RPM_45 ? RPS_45 : RPS_33;
       const pitchMultiplier = Math.pow(2, playStateRef.current.pitchOffset / 12);
@@ -212,14 +315,14 @@ export function TurntableScene({ deckId, orbitRef, embedded }: TurntableScenePro
 
         platterAngleRef.current -= rps * rate * 2 * Math.PI * delta;
 
-        // Feed physics rate to audio during any physics-driven mode
-        const isRamping = physics.powerCutActive || physics.eBrakeActive || physics.spinbackActive;
-        if ((isScratchActiveRef.current || isRamping) && Math.abs(rate - prevRateRef.current) > 0.005) {
+        // Feed physics rate to audio only during scratch (hand on vinyl).
+        // Power-cut / eBrake are visual-only — audio stops immediately via button handler.
+        if (isScratchActiveRef.current && Math.abs(rate - prevRateRef.current) > 0.01) {
           try { getDJEngine().getDeck(deckId).setScratchVelocity(rate); } catch { /* not ready */ }
           prevRateRef.current = rate;
         }
 
-        if (isScratchActiveRef.current && !physics.touching && !isRamping) {
+        if (isScratchActiveRef.current && !physics.touching && !physics.spinbackActive && !physics.powerCutActive && !physics.eBrakeActive) {
           if (Math.abs(rate - 1.0) < 0.02) {
             isScratchActiveRef.current = false;
             try { getDJEngine().getDeck(deckId).stopScratch(50); } catch { /* not ready */ }
@@ -233,6 +336,18 @@ export function TurntableScene({ deckId, orbitRef, embedded }: TurntableScenePro
       for (const mesh of platterMeshes) {
         mesh.matrix.copy(_compositeMat);
       }
+      // Label disc follows platter rotation
+      if (labelMeshRef.current) {
+        // Label is a flat disc in XZ plane (rotated -90° X), so Y-rotation = platter spin
+        const lp = labelMeshRef.current.position;
+        // Build: translate to label pos → rotate Y by platter angle → rotate X -90° for flat disc
+        _compositeMat.makeTranslation(lp.x, lp.y, lp.z);
+        _rotMat.makeRotationY(platterAngleRef.current);
+        _compositeMat.multiply(_rotMat);
+        _rotMat.makeRotationX(-Math.PI / 2);
+        _compositeMat.multiply(_rotMat);
+        labelMeshRef.current.matrix.copy(_compositeMat);
+      }
     }
 
     // ── Tonearm follows song position ──
@@ -245,7 +360,8 @@ export function TurntableScene({ deckId, orbitRef, embedded }: TurntableScenePro
       }
       progress = Math.max(0, Math.min(1, progress));
 
-      const targetAngle = trackName
+      // Tonearm on record only when playing, otherwise parked at rest
+      const targetAngle = (playing && trackName)
         ? TONEARM_ANGLE_START + progress * (TONEARM_ANGLE_END - TONEARM_ANGLE_START)
         : TONEARM_ANGLE_REST;
 
@@ -257,24 +373,50 @@ export function TurntableScene({ deckId, orbitRef, embedded }: TurntableScenePro
       for (const mesh of tonearmMeshes) {
         mesh.matrix.copy(_compositeMat);
       }
+      // Tonearm drag hitbox follows the arm rotation
+      if (tonearmHitboxRef.current) {
+        // Position hitbox at the midpoint of the tonearm arm (between pivot and cartridge)
+        // Pivot is at tonearmPivot, arm extends roughly 0.12m toward the record
+        const midX = (tonearmPivot.x + (-0.049)) / 2; // midpoint between pivot and platter center
+        const midZ = (tonearmPivot.z + (-0.010)) / 2;
+        // Apply same rotation as tonearm, offset to arm center
+        const cos = Math.cos(tonearmAngleRef.current);
+        const sin = Math.sin(tonearmAngleRef.current);
+        const dx = midX - tonearmPivot.x;
+        const dz = midZ - tonearmPivot.z;
+        const rx = tonearmPivot.x + dx * cos - dz * sin;
+        const rz = tonearmPivot.z + dx * sin + dz * cos;
+        tonearmHitboxRef.current.position.set(rx, tonearmPivot.y, rz);
+        tonearmHitboxRef.current.rotation.set(0, tonearmAngleRef.current, 0);
+        tonearmHitboxRef.current.updateMatrix();
+      }
     }
 
     // ── Pitch slider follows pitch value ──
     if (pitchsliderMesh) {
-      // Map pitch (-8..+8) to Z offset on the slider track
-      // Positive pitch = slider moves toward front (+Z), negative = toward back (-Z)
+      // SL-1200: pitch 0 = center of track, +pitch = slider moves toward back (-Z)
+      // Full range: -8..+8 semitones maps to +4cm..-4cm Z offset in model space
       const pitchNorm = (playStateRef.current.pitchOffset ?? 0) / 8; // -1..+1
-      const slideRange = 5.0; // cm of travel in model space (pre-scale)
-      const zOffset = pitchNorm * slideRange;
+      const slideRange = 4.0; // cm of half-travel in model space
+      const zOffset = -pitchNorm * slideRange; // inverted: positive pitch = back
       _compositeMat.makeTranslation(0, 0, zOffset);
       pitchsliderMesh.matrix.copy(_compositeMat);
     }
 
-    // ── LED light emissive ──
+    // ── LED light: cylinder position is mechanical (stylusLight), glow needs power ──
     if (ledMesh) {
+      // Cylinder position: only follows stylusLight (push in = retracted, pop out = extended)
+      const targetY = stylusLight ? 0 : -3.0; // cm in model space
+      ledYRef.current += (targetY - ledYRef.current) * Math.min(1, delta * 6);
+      ledMesh.matrixAutoUpdate = false;
+      _compositeMat.makeTranslation(0, ledYRef.current, 0);
+      ledMesh.matrix.copy(_compositeMat);
+
+      // Lamp glow: needs both power AND cylinder extended
       const mat = ledMesh.material as THREE.MeshStandardMaterial;
       if (mat && 'emissive' in mat) {
-        if (stylusLight) {
+        const extended = ledYRef.current > -0.5;
+        if (powerOn && stylusLight && extended) {
           mat.emissive.set(0xffdd44);
           mat.emissiveIntensity = 2.0;
         } else {
@@ -297,7 +439,7 @@ export function TurntableScene({ deckId, orbitRef, embedded }: TurntableScenePro
   const handlePlatterPointerDown = useCallback((e: ThreeEvent<PointerEvent>) => {
     e.stopPropagation();
     (e.nativeEvent.target as HTMLElement)?.setPointerCapture?.(e.nativeEvent.pointerId);
-    if (!playStateRef.current.isPlaying) return;
+    if (!powerOnRef.current || !playStateRef.current.isPlaying) return;
     enterScratch();
     lastPointerRef.current = { x: e.nativeEvent.clientX, y: e.nativeEvent.clientY };
     lastPointerTimeRef.current = performance.now();
@@ -326,63 +468,53 @@ export function TurntableScene({ deckId, orbitRef, embedded }: TurntableScenePro
 
   const handleStartStopClick = useCallback((e: ThreeEvent<PointerEvent>) => {
     e.stopPropagation();
+    if (!powerOnRef.current) return; // Start/stop requires power
     try {
       const deck = getDJEngine().getDeck(deckId);
       const store = useDJStore.getState();
       const playing = store.decks[deckId].isPlaying;
       if (playing) {
-        // Electronic brake: motor actively stops platter in ~0.5s.
-        // Audio keeps playing during ramp — physics feeds rate to setScratchVelocity
-        // each frame. Audio pauses when physics reaches zero.
-        physicsRef.current.triggerElectronicBrake(() => {
-          deck.pause();
-          store.setDeckPlaying(deckId, false);
-          prevRateRef.current = 1;
-        });
+        // Stop audio immediately, visual platter brakes via physics
+        deck.pause();
+        store.setDeckPlaying(deckId, false);
+        physicsRef.current.triggerElectronicBrake();
       } else {
-        // Motor start: spin up from zero (~0.7s to full speed).
-        // Start audio immediately — physics feeds increasing rate each frame.
+        // Start audio immediately, visual platter spins up via physics
         physicsRef.current.triggerMotorStart();
         void deck.play();
         store.setDeckPlaying(deckId, true);
-        // Set initial very slow rate so audio doesn't start at full speed
-        try { deck.setScratchVelocity(0.01); } catch { /* not ready */ }
-        prevRateRef.current = 0;
       }
     } catch (err) { console.error('[TT] Start/Stop error:', err); }
-  }, [deckId]);
+  }, [deckId, powerOn]);
 
   // ── Power button — slow friction-only coast-down / motor spin-up ───────
 
   const handlePowerToggle = useCallback((e: ThreeEvent<PointerEvent>) => {
     e.stopPropagation();
-    try {
-      const deck = getDJEngine().getDeck(deckId);
-      const store = useDJStore.getState();
-      if (store.decks[deckId].isPlaying) {
-        // Power off: motor disengages, platter coasts on friction alone (~2-3s).
-        // Audio keeps playing during coast — physics feeds rate each frame.
-        // Audio pauses when physics reaches zero.
-        physicsRef.current.triggerPowerCut(() => {
+    if (powerOn) {
+      // Power off — everything shuts down
+      setPowerOn(false);
+      try {
+        const deck = getDJEngine().getDeck(deckId);
+        const store = useDJStore.getState();
+        if (store.decks[deckId].isPlaying) {
+          // Stop audio immediately, visual platter coasts via physics
           deck.pause();
           store.setDeckPlaying(deckId, false);
-          prevRateRef.current = 1;
-        });
-      } else {
-        // Power on: motor engages from zero, spins up naturally (~0.7s).
-        physicsRef.current.triggerMotorStart();
-        void deck.play();
-        store.setDeckPlaying(deckId, true);
-        try { deck.setScratchVelocity(0.01); } catch { /* not ready */ }
-        prevRateRef.current = 0;
-      }
-    } catch (err) { console.error('[TT] Power error:', err); }
-  }, [deckId]);
+          physicsRef.current.triggerPowerCut();
+        }
+      } catch { /* not ready */ }
+    } else {
+      // Power on — just enables the deck, doesn't start spinning
+      setPowerOn(true);
+    }
+  }, [deckId, powerOn]);
 
   // ── Pitch slider ─────────────────────────────────────────────────────────
 
   const handlePitchPointerDown = useCallback((e: ThreeEvent<PointerEvent>) => {
     e.stopPropagation();
+    if (!powerOnRef.current) return;
     pitchDragRef.current = true;
     pitchDragStartYRef.current = e.nativeEvent.clientY;
     pitchDragStartValueRef.current = playStateRef.current.pitchOffset;
@@ -392,7 +524,7 @@ export function TurntableScene({ deckId, orbitRef, embedded }: TurntableScenePro
   const handlePitchPointerMove = useCallback((e: ThreeEvent<PointerEvent>) => {
     if (!pitchDragRef.current) return;
     const dy = e.nativeEvent.clientY - pitchDragStartYRef.current;
-    const pitchDelta = (dy / 200) * 8;
+    const pitchDelta = (dy / 80) * 8; // 80px = full ±8 semitone range
     const newPitch = Math.max(-8, Math.min(8, pitchDragStartValueRef.current + pitchDelta));
     useDJStore.getState().setDeckPitch(deckId, newPitch);
   }, [deckId]);
@@ -418,7 +550,7 @@ export function TurntableScene({ deckId, orbitRef, embedded }: TurntableScenePro
   // ── Wheel nudge ──────────────────────────────────────────────────────────
 
   const handleWheel = useCallback((e: ThreeEvent<WheelEvent>) => {
-    if (!playStateRef.current.isPlaying) return;
+    if (!powerOnRef.current || !playStateRef.current.isPlaying) return;
     e.stopPropagation();
     if (!isScratchActiveRef.current) enterScratch();
     const impulse = TurntablePhysics.deltaToImpulse(e.nativeEvent.deltaY, e.nativeEvent.deltaMode);
@@ -435,8 +567,9 @@ export function TurntableScene({ deckId, orbitRef, embedded }: TurntableScenePro
 
   const handlePickupDown = useCallback((e: ThreeEvent<PointerEvent>) => {
     e.stopPropagation();
+    // Tonearm is mechanical — can always be moved physically, even with power off
     pickupDragRef.current = true;
-    pickupDragStartXRef.current = e.nativeEvent.clientX;
+    pickupDragStartXRef.current = e.nativeEvent.clientY;
     const { audioPosition: aPos, durationMs: dur, songPos: sPos, totalPositions: total, playbackMode: mode } = playStateRef.current;
     pickupDragStartProgressRef.current = mode === 'audio' && dur > 0
       ? (aPos / (dur / 1000))
@@ -446,10 +579,13 @@ export function TurntableScene({ deckId, orbitRef, embedded }: TurntableScenePro
 
   const handlePickupMove = useCallback((e: ThreeEvent<PointerEvent>) => {
     if (!pickupDragRef.current) return;
-    const dx = e.nativeEvent.clientX - pickupDragStartXRef.current;
-    // Map pixel movement to progress delta: 300px = full song
-    const progressDelta = dx / 300;
+    const dy = e.nativeEvent.clientY - pickupDragStartXRef.current;
+    // Map vertical drag to progress: drag down = forward in song, 200px = full song
+    const progressDelta = dy / 200;
     const newProgress = Math.max(0, Math.min(1, pickupDragStartProgressRef.current + progressDelta));
+
+    // Move tonearm immediately (visual feedback before audio seeks)
+    tonearmAngleRef.current = TONEARM_ANGLE_START + newProgress * (TONEARM_ANGLE_END - TONEARM_ANGLE_START);
 
     try {
       const deck = getDJEngine().getDeck(deckId);
@@ -491,6 +627,24 @@ export function TurntableScene({ deckId, orbitRef, embedded }: TurntableScenePro
       {/* Turntable model — scaled from cm to metres */}
       <primitive object={clonedScene} scale={MODEL_SCALE} />
 
+      {/* Dynamic vinyl label — rotates with platter */}
+      {labelTextureRef.current && (
+        <mesh
+          ref={labelMeshRef}
+          position={[-0.049, 0.1068, -0.010]}
+          rotation={[-Math.PI / 2, 0, 0]}
+          matrixAutoUpdate={false}
+        >
+          <circleGeometry args={[0.048, 48]} />
+          <meshStandardMaterial
+            map={labelTextureRef.current}
+            transparent
+            roughness={0.7}
+            metalness={0.05}
+          />
+        </mesh>
+      )}
+
       {/* Platter interaction (scratch / wheel nudge) */}
       <mesh
         position={[-0.049, 0.108, -0.010]}
@@ -516,16 +670,27 @@ export function TurntableScene({ deckId, orbitRef, embedded }: TurntableScenePro
         <boxGeometry args={[0.0280, 0.0230, 0.0260]} />
         <meshBasicMaterial transparent opacity={0} depthWrite={false} />
       </mesh>
-      {/* Power LED — glows when playing */}
-      <mesh position={[-0.2120, 0.1100, 0.0980]} rotation={[-Math.PI / 2, 0, 0]}>
-        <circleGeometry args={[0.003, 12]} />
+      {/* Power LED — tinted window on the inward side of power switch, facing the platter */}
+      <mesh position={[-0.1980, 0.0970, 0.0980]} rotation={[0, 0, 0]}>
+        <planeGeometry args={[0.003, 0.012]} />
         <meshStandardMaterial
-          color={isPlaying ? '#00ff44' : '#111111'}
-          emissive={isPlaying ? '#00ff44' : '#000000'}
-          emissiveIntensity={isPlaying ? 3.0 : 0}
+          color={powerOn ? '#00ff44' : '#111111'}
+          emissive={powerOn ? '#00ff44' : '#000000'}
+          emissiveIntensity={powerOn ? 4.0 : 0}
+          side={THREE.DoubleSide}
           depthWrite={false}
         />
       </mesh>
+      {/* Power LED light cast toward the platter */}
+      {powerOn && (
+        <pointLight
+          position={[-0.1960, 0.0970, 0.0980]}
+          color="#00ff44"
+          intensity={0.3}
+          distance={0.12}
+          decay={2}
+        />
+      )}
 
       {/* ── 33 RPM button + LED ── */}
       <mesh position={[-0.1640, 0.0920, 0.1610]} onClick={handleRpmClick}>
@@ -535,9 +700,9 @@ export function TurntableScene({ deckId, orbitRef, embedded }: TurntableScenePro
       <mesh position={[-0.1570, 0.0935, 0.1570]} rotation={[-Math.PI / 2, 0, 0]}>
         <planeGeometry args={[0.007, 0.002]} />
         <meshStandardMaterial
-          color={rpm === RPM_33 ? accentColor : '#111111'}
-          emissive={rpm === RPM_33 ? accentColor : '#000000'}
-          emissiveIntensity={rpm === RPM_33 ? 3.0 : 0}
+          color={powerOn && rpm === RPM_33 ? accentColor : '#111111'}
+          emissive={powerOn && rpm === RPM_33 ? accentColor : '#000000'}
+          emissiveIntensity={powerOn && rpm === RPM_33 ? 3.0 : 0}
           depthWrite={false}
         />
       </mesh>
@@ -550,64 +715,90 @@ export function TurntableScene({ deckId, orbitRef, embedded }: TurntableScenePro
       <mesh position={[-0.1300, 0.0935, 0.1570]} rotation={[-Math.PI / 2, 0, 0]}>
         <planeGeometry args={[0.007, 0.002]} />
         <meshStandardMaterial
-          color={rpm === RPM_45 ? accentColor : '#111111'}
-          emissive={rpm === RPM_45 ? accentColor : '#000000'}
-          emissiveIntensity={rpm === RPM_45 ? 3.0 : 0}
+          color={powerOn && rpm === RPM_45 ? accentColor : '#111111'}
+          emissive={powerOn && rpm === RPM_45 ? accentColor : '#000000'}
+          emissiveIntensity={powerOn && rpm === RPM_45 ? 3.0 : 0}
           depthWrite={false}
         />
       </mesh>
 
-      {/* ── Pitch fader ── */}
+      {/* ── Pitch fader — tall hitbox covering the full slider track ── */}
       <mesh
-        position={[0.2070, 0.0930, 0.0660]}
+        position={[0.2070, 0.0930, 0.0200]}
         onPointerDown={handlePitchPointerDown}
         onPointerMove={handlePitchPointerMove}
         onPointerUp={handlePitchPointerUp}
         onPointerCancel={handlePitchPointerUp}
         onDoubleClick={handlePitchDoubleClick}
       >
-        <boxGeometry args={[0.0200, 0.0080, 0.0160]} />
+        <boxGeometry args={[0.025, 0.015, 0.10]} />
         <meshBasicMaterial transparent opacity={0} depthWrite={false} />
       </mesh>
+      {/* Pitch center indicator LED — green dot when pitch is at 0% */}
+      {(() => {
+        const atCenter = powerOn && Math.abs(pitchOffset) < 0.15;
+        return (
+          <mesh position={[0.1950, 0.0935, 0.0660]} rotation={[-Math.PI / 2, 0, 0]}>
+            <circleGeometry args={[0.002, 10]} />
+            <meshStandardMaterial
+              color={atCenter ? '#00ff44' : '#111111'}
+              emissive={atCenter ? '#00ff44' : '#000000'}
+              emissiveIntensity={atCenter ? 3.0 : 0}
+              depthWrite={false}
+            />
+          </mesh>
+        );
+      })()}
 
-      {/* ── Stylus light (LED cylinder) ── */}
-      <mesh position={[0.0400, 0.1070, 0.1530]}>
-        <cylinderGeometry args={[0.005, 0.005, 0.030, 8]} />
-        <meshStandardMaterial
-          color={stylusLight ? '#ffee88' : '#222222'}
-          emissive={stylusLight ? '#ffdd44' : '#000000'}
-          emissiveIntensity={stylusLight ? 2.0 : 0}
-          transparent
-          opacity={0.8}
-        />
+      {/* ── Stylus light — click cylinder to push down (off), click button to pop up (on) ── */}
+      {/* LED cylinder hitbox — click to retract */}
+      <mesh position={[0.0400, 0.1070, 0.1530]} onClick={(e: ThreeEvent<PointerEvent>) => { e.stopPropagation(); if (powerOnRef.current) setStylusLight(false); }}>
+        <boxGeometry args={[0.0120, 0.0350, 0.0110]} />
+        <meshBasicMaterial transparent opacity={0} depthWrite={false} />
       </mesh>
-      {/* Stylus light — warm point light illuminating the record area */}
-      {stylusLight && (
-        <pointLight
-          position={[0.0400, 0.1300, 0.1530]}
-          color="#ffee88"
-          intensity={0.5}
-          distance={0.15}
-          decay={2}
-        />
+      {/* Cone spotlight aimed at platter center when extended */}
+      {powerOn && stylusLight && (
+        <group>
+          <spotLight
+            position={[0.0400, 0.1300, 0.1530]}
+            color="#ffee88"
+            intensity={1.5}
+            angle={0.6}
+            penumbra={0.5}
+            distance={0.2}
+            decay={2}
+          />
+          {/* Invisible target at platter center — spotLight looks at this */}
+          <mesh position={[-0.049, 0.107, -0.010]} ref={(m) => {
+            if (m) {
+              const parent = m.parent;
+              const spot = parent?.children.find(c => (c as any).isSpotLight) as THREE.SpotLight | undefined;
+              if (spot) spot.target = m;
+            }
+          }}>
+            <boxGeometry args={[0.001, 0.001, 0.001]} />
+            <meshBasicMaterial visible={false} />
+          </mesh>
+        </group>
       )}
-
-      {/* ── Stylus light on/off button ── */}
-      <mesh position={[0.0520, 0.0910, 0.1570]} onClick={(e: ThreeEvent<PointerEvent>) => { e.stopPropagation(); setStylusLight(v => !v); }}>
+      {/* Button next to cylinder — click to pop up (on) */}
+      <mesh position={[0.0520, 0.0910, 0.1570]} onClick={(e: ThreeEvent<PointerEvent>) => { e.stopPropagation(); if (powerOn) setStylusLight(true); }}>
         <boxGeometry args={[0.0090, 0.0010, 0.0090]} />
         <meshBasicMaterial transparent opacity={0} depthWrite={false} />
       </mesh>
 
-      {/* ── Pickup/tonearm seek — drag left/right to seek ── */}
+      {/* ── Tonearm drag-to-seek — covers full arm, rotates with tonearm ── */}
+      {/* Position set initially, updated each frame to follow tonearm rotation */}
       <mesh
-        position={[0.1140, 0.1200, 0.1160]}
-        rotation={[0, -0.6, 0]}
-        onPointerDown={handlePickupDown}
+        ref={tonearmHitboxRef}
+        position={[0.05, 0.125, 0.0]}
+        renderOrder={10}
+        onPointerDown={(e: ThreeEvent<PointerEvent>) => { e.stopPropagation(); handlePickupDown(e); }}
         onPointerMove={handlePickupMove}
         onPointerUp={handlePickupUp}
         onPointerCancel={handlePickupUp}
       >
-        <boxGeometry args={[0.0150, 0.0100, 0.0620]} />
+        <boxGeometry args={[0.015, 0.020, 0.18]} />
         <meshBasicMaterial transparent opacity={0} depthWrite={false} />
       </mesh>
 
