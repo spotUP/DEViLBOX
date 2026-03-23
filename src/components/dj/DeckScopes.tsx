@@ -50,7 +50,7 @@ const ScopeCanvas: React.FC<ScopeCanvasProps> = ({ deckId, channel, size, muted,
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
     const cs = getComputedStyle(canvas);
-    const borderColor = cs.getPropertyValue('--color-border').trim() || '#2f2525';
+    const borderColor = cs.getPropertyValue('--color-border').trim() || '#581014';
     const successColor = cs.getPropertyValue('--color-success').trim() || '#10b981';
     const mutedColor = cs.getPropertyValue('--color-text-muted').trim() || '#686060';
     const accentColor = cs.getPropertyValue('--color-accent').trim() || '#ef4444';

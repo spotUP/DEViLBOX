@@ -24,8 +24,8 @@ let offCanvas: OffscreenCanvas | null = null;
 let ctx: OffscreenCanvasRenderingContext2D | null = null;
 let dpr = 1, width = 96, height = 96;
 let colors: DeckColors = {
-  bg: '#0b0909', bgSecondary: '#131010', bgTertiary: '#1d1818',
-  border: '#2f2525', borderLight: '#403535',
+  bg: '#6e1418', bgSecondary: '#7c1a1e', bgTertiary: '#8c2028',
+  border: '#581014', borderLight: '#9c2028',
 };
 let deckId: 'A' | 'B' | 'C' = 'A';
 let isPlaying = false, effectiveBPM = 120;
