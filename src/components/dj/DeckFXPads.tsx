@@ -42,7 +42,7 @@ const FX_PADS: PadDef[] = [
   { id: 'hpf-sweep', label: 'HPF', sublabel: '▲', color: 'violet', activeColor: 'violet', mode: 'momentary' },
   { id: 'lpf-sweep', label: 'LPF', sublabel: '▼', color: 'blue', activeColor: 'blue', mode: 'momentary' },
   { id: 'filter-reset', label: 'FLT', sublabel: 'RST', color: 'gray', activeColor: 'green', mode: 'momentary' },
-  { id: 'echo-out', label: 'ECHO', sublabel: 'OUT', color: 'amber', activeColor: 'red', mode: 'momentary' },
+  { id: 'echo-out', label: 'ECHO', sublabel: 'OUT', color: 'amber', activeColor: 'red', mode: 'toggle' },
   { id: 'kill-low', label: 'KILL', sublabel: 'LO', color: 'orange', activeColor: 'red', mode: 'toggle' },
   { id: 'kill-mid', label: 'KILL', sublabel: 'MID', color: 'gray', activeColor: 'red', mode: 'toggle' },
   { id: 'kill-hi', label: 'KILL', sublabel: 'HI', color: 'cyan', activeColor: 'red', mode: 'toggle' },
@@ -108,6 +108,12 @@ export const DeckFXPads: React.FC<DeckFXPadsProps> = ({ deckId }) => {
   }, []);
 
   const activateFXPad = useCallback((padId: string) => {
+    // For toggle-style pads: if already active, just cancel (don't restart)
+    if (padId === 'echo-out' && cancelRefs.current.has(padId)) {
+      cancelPad(padId);
+      return;
+    }
+
     cancelPad(padId);
     setActivePads((prev) => new Set(prev).add(padId));
 
