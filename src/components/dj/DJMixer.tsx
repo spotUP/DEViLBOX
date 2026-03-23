@@ -21,6 +21,7 @@ import { MixerCueSection } from '@/components/dj/MixerCueSection';
 import { DJSetRecordButton } from '@/components/dj/DJSetRecordButton';
 import { DJMicControl } from '@/components/dj/DJMicControl';
 import { DJVideoExport } from '@/components/dj/DJVideoExport';
+import { DJStreamControl } from '@/components/dj/DJStreamControl';
 
 export const DJMixer: React.FC = () => {
   const thirdDeck = useDJStore((s) => s.thirdDeckActive);
@@ -84,10 +85,11 @@ export const DJMixer: React.FC = () => {
         <MixerCueSection />
       </div>
 
-      {/* Row 5: Record + Video + Mic */}
-      <div className="flex items-center justify-center gap-3 w-full pt-2 border-t border-dark-border">
+      {/* Row 5: Record + Video + Live + Mic */}
+      <div className="flex items-center justify-center gap-2 w-full pt-2 border-t border-dark-border flex-wrap">
         <DJSetRecordButton />
         <DJVideoExport />
+        <DJStreamControl />
         <DJMicControl />
       </div>
     </div>
