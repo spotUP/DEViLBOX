@@ -18,6 +18,7 @@ import * as Tone from 'tone';
 import { AudioDataBus } from '@engine/vj/AudioDataBus';
 import { TurntablePhysics } from '@engine/turntable/TurntablePhysics';
 import { getDJEngine } from '@engine/dj/DJEngine';
+import * as DJActions from '@engine/dj/DJActions';
 import { ExternalLink, SkipForward, Shuffle, Pause, Play, List, Maximize, Minimize, Music } from 'lucide-react';
 import { useUIStore } from '@stores/useUIStore';
 import { useDJStore } from '@stores/useDJStore';
@@ -606,7 +607,7 @@ export const VJView: React.FC<VJViewProps> = ({ isPopout = false }) => {
       e.preventDefault();
 
       if (!scratchPhysicsRef.current) {
-        scratchPhysicsRef.current = new TurntablePhysics();
+        try { scratchPhysicsRef.current = getDJEngine().getDeck(deckId).physics; } catch { return; }
       }
       const physics = scratchPhysicsRef.current;
 
@@ -614,7 +615,7 @@ export const VJView: React.FC<VJViewProps> = ({ isPopout = false }) => {
       if (!scratchActiveRef.current || scratchDeckRef.current !== deckId) {
         scratchActiveRef.current = true;
         scratchDeckRef.current = deckId;
-        try { getDJEngine().getDeck(deckId).startScratch(); } catch { /* engine not ready */ }
+        DJActions.startScratch(deckId);
 
         // Physics rAF loop — forwards rate to DeckEngine
         if (scratchRafRef.current !== null) cancelAnimationFrame(scratchRafRef.current);
@@ -628,7 +629,7 @@ export const VJView: React.FC<VJViewProps> = ({ isPopout = false }) => {
           const rate = physics.tick(dt);
 
           if (Math.abs(rate - prevRate) > 0.01) {
-            try { getDJEngine().getDeck(deckId).setScratchVelocity(rate); } catch { /* */ }
+            DJActions.setScratchVelocity(deckId, rate);
             prevRate = rate;
           }
 
@@ -636,7 +637,7 @@ export const VJView: React.FC<VJViewProps> = ({ isPopout = false }) => {
           if (!physics.touching && Math.abs(rate - 1.0) < 0.02) {
             scratchActiveRef.current = false;
             scratchDeckRef.current = null;
-            try { getDJEngine().getDeck(deckId).stopScratch(50); } catch { /* */ }
+            DJActions.stopScratch(deckId, 50);
             scratchRafRef.current = null;
             return;
           }
