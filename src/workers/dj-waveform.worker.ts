@@ -202,7 +202,7 @@ function renderScrollingWaveform(): void {
   const wfH  = height - OVERVIEW_H;
   const midY = topY + wfH / 2;
 
-  ctx.fillStyle = '#0b0909';
+  ctx.fillStyle = colors.bg;
   ctx.fillRect(0, topY, width, wfH);
 
   const windowSec = 10;
