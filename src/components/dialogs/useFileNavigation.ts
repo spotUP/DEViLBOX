@@ -333,32 +333,8 @@ export function useFileNavigation({
           });
         }
       } else {
-        if (hasServerFS) {
-          try {
-            const targetPath = currentPath || 'songs';
-            const entries = await listServerDirectory(targetPath);
-            items = entries.map((e: ServerFileEntry) => ({
-            id: e.path,
-            name: e.name,
-            isDirectory: e.isDirectory,
-            path: e.path,
-            size: e.size,
-            modifiedAt: e.modifiedAt ? new Date(e.modifiedAt) : undefined,
-            source: 'filesystem' as const,
-          }));
-
-          items.sort((a, b) => {
-            if (a.isDirectory && !b.isDirectory) return -1;
-            if (!a.isDirectory && b.isDirectory) return 1;
-            return a.name.localeCompare(b.name);
-          });
-          } catch {
-            // Server not available, fall through to manifest
-          }
-        }
-
-        // Fallback: use build-time file manifest (works on GitHub Pages)
-        if (items.length === 0 && isManifestAvailable()) {
+        // Start with the build-time manifest (bundled static files — works everywhere including iOS)
+        if (isManifestAvailable()) {
           const targetPath = currentPath || '';
           const entries = listManifestDirectory(targetPath);
           items = entries.map((e: ServerFileEntry) => ({
@@ -369,6 +345,36 @@ export function useFileNavigation({
             source: 'filesystem' as const,
           }));
         }
+
+        // Supplement with server API entries (adds files not in the static bundle)
+        if (hasServerFS) {
+          try {
+            const targetPath = currentPath || 'songs';
+            const entries = await listServerDirectory(targetPath);
+            const existingIds = new Set(items.map(i => i.id));
+            for (const e of entries) {
+              if (!existingIds.has(e.path)) {
+                items.push({
+                  id: e.path,
+                  name: e.name,
+                  isDirectory: e.isDirectory,
+                  path: e.path,
+                  size: e.size,
+                  modifiedAt: e.modifiedAt ? new Date(e.modifiedAt) : undefined,
+                  source: 'filesystem' as const,
+                });
+              }
+            }
+          } catch {
+            // Server not available — manifest entries are enough
+          }
+        }
+
+        items.sort((a, b) => {
+          if (a.isDirectory && !b.isDirectory) return -1;
+          if (!a.isDirectory && b.isDirectory) return 1;
+          return a.name.localeCompare(b.name);
+        });
 
         if (items.length === 0) {
           const dirHandle = getCurrentDirectory();
@@ -535,26 +541,38 @@ export function useFileNavigation({
           throw new Error('Binary file loading not supported');
         }
 
-        let buffer: ArrayBuffer;
+        let buffer!: ArrayBuffer;
 
         if (selectedFile.source === 'filesystem') {
           if (hasElectronFS() && window.electron?.fs && selectedFile.path) {
             buffer = await window.electron.fs.readFile(selectedFile.path);
-          } else if (hasServerFS && selectedFile.path) {
-            try {
-              buffer = await readServerFile(selectedFile.path);
-            } catch {
-              if (selectedFile.path && isManifestAvailable()) {
+          } else if (selectedFile.path) {
+            // Try static file first (bundled in deploy, works on all platforms including iOS),
+            // then fall back to server API for files only available on the backend.
+            let loaded = false;
+            if (isManifestAvailable()) {
+              try {
                 buffer = await readStaticFile(selectedFile.path);
-              } else {
-                throw new Error('Cannot read tracker module');
-              }
+                loaded = true;
+              } catch { /* not in static bundle */ }
+            }
+            if (!loaded && hasServerFS) {
+              try {
+                buffer = await readServerFile(selectedFile.path);
+                loaded = true;
+              } catch { /* server doesn't have it either */ }
+            }
+            if (!loaded && selectedFile.handle) {
+              const file = await (selectedFile.handle as FileSystemFileHandle).getFile();
+              buffer = await file.arrayBuffer();
+              loaded = true;
+            }
+            if (!loaded) {
+              throw new Error('Cannot read tracker module');
             }
           } else if (selectedFile.handle) {
             const file = await (selectedFile.handle as FileSystemFileHandle).getFile();
             buffer = await file.arrayBuffer();
-          } else if (selectedFile.path && isManifestAvailable()) {
-            buffer = await readStaticFile(selectedFile.path);
           } else {
             throw new Error('Cannot read tracker module');
           }
@@ -575,17 +593,16 @@ export function useFileNavigation({
         const buffer = await window.electron.fs.readFile(selectedFile.path);
         const text = new TextDecoder().decode(buffer);
         data = isXmlFile ? text : JSON.parse(text);
-      } else if (hasServerFS && selectedFile.path) {
-        let buffer: ArrayBuffer;
-        try {
-          buffer = await readServerFile(selectedFile.path);
-        } catch {
-          if (selectedFile.path && isManifestAvailable()) {
-            buffer = await readStaticFile(selectedFile.path);
-          } else {
-            throw new Error('Cannot read file');
-          }
+      } else if (selectedFile.path) {
+        // Try static first, then server API (same priority as binary files)
+        let buffer: ArrayBuffer | null = null;
+        if (isManifestAvailable()) {
+          try { buffer = await readStaticFile(selectedFile.path); } catch { /* not in static bundle */ }
         }
+        if (!buffer && hasServerFS) {
+          try { buffer = await readServerFile(selectedFile.path); } catch { /* server doesn't have it */ }
+        }
+        if (!buffer) throw new Error('Cannot read file');
         const text = new TextDecoder().decode(buffer);
         data = isXmlFile ? text : JSON.parse(text);
       } else if (selectedFile.handle) {
