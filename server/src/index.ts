@@ -199,7 +199,8 @@ server.on('upgrade', (req, socket, head) => {
     const wss = new WebSocketServer({ noServer: true });
     wss.handleUpgrade(req, socket, head, (ws) => {
       const streamKey = url.searchParams.get('key') || '';
-      handleStreamConnection(ws, streamKey);
+      const platform = url.searchParams.get('platform') || 'youtube';
+      handleStreamConnection(ws, streamKey, platform);
     });
   }
   // Other WebSocket upgrades (MCP relay) are handled by their own server on port 4003
