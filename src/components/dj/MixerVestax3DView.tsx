@@ -18,6 +18,7 @@ import { useGLTF, OrbitControls, View, PerspectiveCamera, Environment } from '@r
 import * as THREE from 'three';
 import { useDJStore } from '@/stores/useDJStore';
 import { getDJEngine } from '@/engine/dj/DJEngine';
+import * as DJActions from '@/engine/dj/DJActions';
 import { CameraControlOverlay } from './DJ3DCameraControls';
 import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib';
 
@@ -150,25 +151,25 @@ export function MixerScene({ viewRef }: { viewRef: React.RefObject<HTMLDivElemen
       // CH-1 (Deck A) strip — x ~ -9.6
       {
         meshName: 'knob2', label: 'CH1 Trim',
-        action: (v) => { store().setDeckTrimGain('A', v); try { getDJEngine().getDeck('A').setTrimGain(v); } catch {} },
+        action: (v) => DJActions.setDeckTrimGain('A', v),
         readValue: () => store().decks.A.trimGain,
         min: -12, max: 12, defaultValue: 0, centerDetent: true,
       },
       {
         meshName: 'knob3', label: 'CH1 EQ High',
-        action: (v) => { store().setDeckEQ('A', 'high', v); try { getDJEngine().getDeck('A').setEQ('high', v); } catch {} },
+        action: (v) => DJActions.setDeckEQ('A', 'high', v),
         readValue: () => store().decks.A.eqHigh,
         min: -24, max: 6, defaultValue: 0, centerDetent: true,
       },
       {
         meshName: 'knob4', label: 'CH1 EQ Mid',
-        action: (v) => { store().setDeckEQ('A', 'mid', v); try { getDJEngine().getDeck('A').setEQ('mid', v); } catch {} },
+        action: (v) => DJActions.setDeckEQ('A', 'mid', v),
         readValue: () => store().decks.A.eqMid,
         min: -24, max: 6, defaultValue: 0, centerDetent: true,
       },
       {
         meshName: 'knob5', label: 'CH1 EQ Low',
-        action: (v) => { store().setDeckEQ('A', 'low', v); try { getDJEngine().getDeck('A').setEQ('low', v); } catch {} },
+        action: (v) => DJActions.setDeckEQ('A', 'low', v),
         readValue: () => store().decks.A.eqLow,
         min: -24, max: 6, defaultValue: 0, centerDetent: true,
       },
@@ -176,25 +177,25 @@ export function MixerScene({ viewRef }: { viewRef: React.RefObject<HTMLDivElemen
       // CH-2 (Deck B) strip — x ~ 3.3
       {
         meshName: 'knob13', label: 'CH2 Trim',
-        action: (v) => { store().setDeckTrimGain('B', v); try { getDJEngine().getDeck('B').setTrimGain(v); } catch {} },
+        action: (v) => DJActions.setDeckTrimGain('B', v),
         readValue: () => store().decks.B.trimGain,
         min: -12, max: 12, defaultValue: 0, centerDetent: true,
       },
       {
         meshName: 'knob12', label: 'CH2 EQ High',
-        action: (v) => { store().setDeckEQ('B', 'high', v); try { getDJEngine().getDeck('B').setEQ('high', v); } catch {} },
+        action: (v) => DJActions.setDeckEQ('B', 'high', v),
         readValue: () => store().decks.B.eqHigh,
         min: -24, max: 6, defaultValue: 0, centerDetent: true,
       },
       {
         meshName: 'knob11', label: 'CH2 EQ Mid',
-        action: (v) => { store().setDeckEQ('B', 'mid', v); try { getDJEngine().getDeck('B').setEQ('mid', v); } catch {} },
+        action: (v) => DJActions.setDeckEQ('B', 'mid', v),
         readValue: () => store().decks.B.eqMid,
         min: -24, max: 6, defaultValue: 0, centerDetent: true,
       },
       {
         meshName: 'knob10', label: 'CH2 EQ Low',
-        action: (v) => { store().setDeckEQ('B', 'low', v); try { getDJEngine().getDeck('B').setEQ('low', v); } catch {} },
+        action: (v) => DJActions.setDeckEQ('B', 'low', v),
         readValue: () => store().decks.B.eqLow,
         min: -24, max: 6, defaultValue: 0, centerDetent: true,
       },
@@ -214,13 +215,13 @@ export function MixerScene({ viewRef }: { viewRef: React.RefObject<HTMLDivElemen
       },
       {
         meshName: 'knob7', label: 'Master Level',
-        action: (v) => { store().setMasterVolume(v); try { getDJEngine().mixer.setMasterVolume(v); } catch {} },
+        action: (v) => DJActions.setMasterVolume(v),
         readValue: () => store().masterVolume,
         min: 0, max: 1.5, defaultValue: 1,
       },
       {
         meshName: 'knob6', label: 'Booth Level',
-        action: (v) => store().setBoothVolume(v),
+        action: (v) => DJActions.setBoothVolume(v),
         readValue: () => store().boothVolume,
         min: 0, max: 1.5, defaultValue: 1,
       },
@@ -231,8 +232,7 @@ export function MixerScene({ viewRef }: { viewRef: React.RefObject<HTMLDivElemen
         action: (v) => {
           // Map 0-1 to curve types: <0.33=cut, 0.33-0.66=smooth, >0.66=linear
           const curve = v < 0.33 ? 'cut' : v < 0.66 ? 'smooth' : 'linear';
-          store().setCrossfaderCurve(curve);
-          try { getDJEngine().setCrossfaderCurve(curve); } catch {}
+          DJActions.setCrossfaderCurve(curve);
         },
         readValue: () => {
           const c = store().crossfaderCurve;
@@ -253,12 +253,8 @@ export function MixerScene({ viewRef }: { viewRef: React.RefObject<HTMLDivElemen
         action: (v) => {
           // Map 0-1 to filter position -1 to +1
           const pos = (v - 0.5) * 2;
-          store().setDeckFilter('A', pos);
-          store().setDeckFilter('B', pos);
-          try {
-            getDJEngine().getDeck('A').setFilterPosition(pos);
-            getDJEngine().getDeck('B').setFilterPosition(pos);
-          } catch {}
+          DJActions.setDeckFilter('A', pos);
+          DJActions.setDeckFilter('B', pos);
         },
         readValue: () => (store().decks.A.filterPosition + 1) / 2,
         min: 0, max: 1, defaultValue: 0.5, centerDetent: true,
@@ -269,21 +265,21 @@ export function MixerScene({ viewRef }: { viewRef: React.RefObject<HTMLDivElemen
       {
         meshName: 'exp_fader1', label: 'CH1 Volume',
         axis: 'y', dragAxis: 'y', travel: 5.0, defaultValue: 0.75,
-        action: (v) => { store().setDeckVolume('A', v); try { getDJEngine().getDeck('A').setVolume(v); } catch {} },
+        action: (v) => DJActions.setDeckVolume('A', v),
         readValue: () => store().decks.A.volume,
         min: 0, max: 1.5,
       },
       {
         meshName: 'fader1', label: 'CH2 Volume',
         axis: 'y', dragAxis: 'y', travel: 5.0, defaultValue: 0.75,
-        action: (v) => { store().setDeckVolume('B', v); try { getDJEngine().getDeck('B').setVolume(v); } catch {} },
+        action: (v) => DJActions.setDeckVolume('B', v),
         readValue: () => store().decks.B.volume,
         min: 0, max: 1.5,
       },
       {
         meshName: 'fader4', label: 'Master Volume',
         axis: 'y', dragAxis: 'y', travel: 5.0, defaultValue: 0.75,
-        action: (v) => { store().setMasterVolume(v); try { getDJEngine().mixer.setMasterVolume(v); } catch {} },
+        action: (v) => DJActions.setMasterVolume(v),
         readValue: () => store().masterVolume,
         min: 0, max: 1.5,
       },
@@ -293,8 +289,7 @@ export function MixerScene({ viewRef }: { viewRef: React.RefObject<HTMLDivElemen
         action: (v) => {
           const hamster = store().hamsterSwitch;
           const pos = hamster ? 1 - v : v;
-          store().setCrossfader(pos);
-          try { getDJEngine().setCrossfader(pos); } catch {};
+          DJActions.setCrossfader(pos);
         },
         readValue: () => {
           const hamster = store().hamsterSwitch;
@@ -309,8 +304,7 @@ export function MixerScene({ viewRef }: { viewRef: React.RefObject<HTMLDivElemen
         action: (v) => {
           const hamster = store().hamsterSwitch;
           const pos = hamster ? 1 - v : v;
-          store().setCrossfader(pos);
-          try { getDJEngine().setCrossfader(pos); } catch {};
+          DJActions.setCrossfader(pos);
         },
         readValue: () => {
           const hamster = store().hamsterSwitch;
@@ -331,42 +325,22 @@ export function MixerScene({ viewRef }: { viewRef: React.RefObject<HTMLDivElemen
     const buttons: ButtonControl[] = [
       {
         meshName: 'button1', label: 'CUE CH1',
-        action: () => {
-          const s = store();
-          const next = !s.decks.A.pflEnabled;
-          s.togglePFL('A');
-          try { getDJEngine().mixer.setPFL('A', next); } catch {}
-        },
+        action: () => DJActions.togglePFL('A'),
         readActive: () => store().decks.A.pflEnabled,
       },
       {
         meshName: 'button2', label: 'CUE CH2',
-        action: () => {
-          const s = store();
-          const next = !s.decks.B.pflEnabled;
-          s.togglePFL('B');
-          try { getDJEngine().mixer.setPFL('B', next); } catch {}
-        },
+        action: () => DJActions.togglePFL('B'),
         readActive: () => store().decks.B.pflEnabled,
       },
       {
         meshName: 'exp_button1', label: 'CUE CH1 Alt',
-        action: () => {
-          const s = store();
-          const next = !s.decks.A.pflEnabled;
-          s.togglePFL('A');
-          try { getDJEngine().mixer.setPFL('A', next); } catch {}
-        },
+        action: () => DJActions.togglePFL('A'),
         readActive: () => store().decks.A.pflEnabled,
       },
       {
         meshName: 'exp_button2', label: 'CUE CH2 Alt',
-        action: () => {
-          const s = store();
-          const next = !s.decks.B.pflEnabled;
-          s.togglePFL('B');
-          try { getDJEngine().mixer.setPFL('B', next); } catch {}
-        },
+        action: () => DJActions.togglePFL('B'),
         readActive: () => store().decks.B.pflEnabled,
       },
     ];
