@@ -388,21 +388,21 @@ export function echoOut(
       if (progress < 1) {
         sweep.id = requestAnimationFrame(animate);
       } else {
-        // Fade complete — ensure volume is zero, pause after a brief silence to avoid pop
+        // Fade complete — set volume to 0, pause, then restore volume after audio has stopped
         try {
           const engine = getDJEngine();
           engine.getDeck(deckId).setVolume(0);
+          engine.getDeck(deckId).pause();
+          useDJStore.getState().setDeckPlaying(deckId, false);
         } catch { /* engine not ready */ }
+        // Restore volume after pause has fully taken effect (audio graph is silent)
         setTimeout(() => {
           try {
-            const engine = getDJEngine();
-            engine.getDeck(deckId).pause();
-            useDJStore.getState().setDeckPlaying(deckId, false);
-            engine.getDeck(deckId).setVolume(startVol);
+            getDJEngine().getDeck(deckId).setVolume(startVol);
           } catch { /* engine not ready */ }
-          activeSweeps.delete(key);
-          onDone?.();
-        }, 50);
+        }, 200);
+        activeSweeps.delete(key);
+        onDone?.();
       }
     }
 
