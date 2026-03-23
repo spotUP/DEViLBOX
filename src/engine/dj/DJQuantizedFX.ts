@@ -363,8 +363,9 @@ export function echoOut(
     durationMs = (beats * 60 / bpm) * 1000;
   } catch { /* fallback */ }
 
+  let startVol = 1;
+
   const cancelSchedule = scheduleQuantized(deckId, () => {
-    let startVol = 1;
     try {
       startVol = getDJEngine().getDeck(deckId).getVolume();
     } catch { /* fallback */ }
@@ -400,6 +401,10 @@ export function echoOut(
     cancelAnimationFrame(sweep.id);
     activeSweeps.delete(key);
     cancelSchedule();
+    // Restore volume to pre-echo level
+    try {
+      getDJEngine().getDeck(deckId).setVolume(startVol);
+    } catch { /* engine not ready */ }
   };
 }
 
