@@ -5,7 +5,7 @@
  * Uses sprite images for photorealistic rendering with CSS transforms
  * for platter/record/tonearm rotation synced to audio position.
  *
- * Pointer drag on the record = scratch (routed through TurntablePhysics).
+ * Pointer drag on the record = scratch (routed through engine-owned TurntablePhysics).
  * Scroll wheel = nudge impulse through TurntablePhysics.
  */
 
@@ -13,6 +13,7 @@ import React, { useRef, useEffect, useCallback, useState } from 'react';
 import { useDJStore } from '@/stores/useDJStore';
 import { getDJEngine } from '@/engine/dj/DJEngine';
 import { TurntablePhysics, OMEGA_NORMAL } from '@/engine/turntable/TurntablePhysics';
+import * as DJActions from '@/engine/dj/DJActions';
 import './DeckCssTurntable.css';
 
 interface DeckCssTurntableProps {
@@ -28,7 +29,7 @@ export const DeckCssTurntable: React.FC<DeckCssTurntableProps> = ({ deckId }) =>
   const spindleRef = useRef<HTMLDivElement>(null);
   const tonearmRef = useRef<HTMLDivElement>(null);
 
-  const physicsRef = useRef(new TurntablePhysics());
+  const physicsRef = useRef<TurntablePhysics | null>(null);
   const rafIdRef = useRef<number | null>(null);
   const lastTickRef = useRef(0);
   const angleRef = useRef(0); // radians
@@ -69,7 +70,6 @@ export const DeckCssTurntable: React.FC<DeckCssTurntableProps> = ({ deckId }) =>
   // ── Physics rAF loop ──────────────────────────────────────────────────────
 
   useEffect(() => {
-    const physics = physicsRef.current;
     let prevRate = 1;
     let scratchIntegrating = false;
 
@@ -77,13 +77,19 @@ export const DeckCssTurntable: React.FC<DeckCssTurntableProps> = ({ deckId }) =>
       const dt = lastTickRef.current > 0 ? (now - lastTickRef.current) / 1000 : 0;
       lastTickRef.current = now;
 
+      // Lazy-init engine physics
+      if (!physicsRef.current) {
+        try { physicsRef.current = getDJEngine().getDeck(deckId).physics; } catch { /* engine not ready */ }
+      }
+      const physics = physicsRef.current;
+
       const { isPlaying: playing, effectiveBPM: bpm } = playStateRef.current;
       const baseBPM = bpm || 120;
       const rps = (baseBPM / 120) * 0.5556; // 33⅓ RPM normalized
       const omegaNormal = rps * 2 * Math.PI;
 
       if (playing || isScratchActiveRef.current) {
-        if (isScratchActiveRef.current || physics.spinbackActive || physics.powerCutActive) {
+        if (physics && (isScratchActiveRef.current || physics.spinbackActive || physics.powerCutActive)) {
           const rate = physics.tick(dt);
 
           if (isScratchActiveRef.current && !scratchIntegrating) {
@@ -100,7 +106,7 @@ export const DeckCssTurntable: React.FC<DeckCssTurntableProps> = ({ deckId }) =>
           }
 
           if (isScratchActiveRef.current && Math.abs(rate - prevRate) > 0.01) {
-            try { getDJEngine().getDeck(deckId).setScratchVelocity(rate); } catch { /* not ready */ }
+            DJActions.setScratchVelocity(deckId, rate);
             prevRate = rate;
           }
 
@@ -113,8 +119,7 @@ export const DeckCssTurntable: React.FC<DeckCssTurntableProps> = ({ deckId }) =>
               isScratchActiveRef.current = false;
               setIsScratchActive(false);
               scratchIntegrating = false;
-              try { getDJEngine().getDeck(deckId).stopScratch(50); } catch { /* not ready */ }
-              useDJStore.getState().setDeckScratchActive(deckId, false);
+              DJActions.stopScratch(deckId, 50);
               prevRate = 1;
             }
           }
@@ -181,8 +186,7 @@ export const DeckCssTurntable: React.FC<DeckCssTurntableProps> = ({ deckId }) =>
     if (isScratchActiveRef.current) return;
     isScratchActiveRef.current = true;
     setIsScratchActive(true);
-    useDJStore.getState().setDeckScratchActive(deckId, true);
-    try { getDJEngine().getDeck(deckId).startScratch(); } catch { /* not ready */ }
+    DJActions.startScratch(deckId);
   }, [deckId]);
 
   const handlePointerDown = useCallback((e: React.PointerEvent) => {
@@ -194,8 +198,8 @@ export const DeckCssTurntable: React.FC<DeckCssTurntableProps> = ({ deckId }) =>
 
     lastPointerRef.current = { x: e.clientX, y: e.clientY };
     lastPointerTimeRef.current = performance.now();
-    physicsRef.current.setTouching(true);
-    physicsRef.current.setHandVelocity(0);
+    physicsRef.current?.setTouching(true);
+    physicsRef.current?.setHandVelocity(0);
   }, [enterScratch]);
 
   const handlePointerMove = useCallback((e: React.PointerEvent) => {
@@ -223,7 +227,7 @@ export const DeckCssTurntable: React.FC<DeckCssTurntableProps> = ({ deckId }) =>
       const pixelVelocity = tangential / dt;
       const platterSize = rect.width * 0.72; // platter is ~72% of turntable width
       const omega = (pixelVelocity / (platterSize * 0.8)) * OMEGA_NORMAL;
-      physicsRef.current.setHandVelocity(omega);
+      physicsRef.current?.setHandVelocity(omega);
     }
 
     lastPointerRef.current = { x: e.clientX, y: e.clientY };
@@ -232,7 +236,7 @@ export const DeckCssTurntable: React.FC<DeckCssTurntableProps> = ({ deckId }) =>
   const handlePointerUp = useCallback((e: React.PointerEvent) => {
     (e.target as HTMLElement).releasePointerCapture(e.pointerId);
     lastPointerRef.current = null;
-    physicsRef.current.setTouching(false);
+    physicsRef.current?.setTouching(false);
   }, []);
 
   // ── Wheel handler (nudge) ─────────────────────────────────────────────────
@@ -247,7 +251,7 @@ export const DeckCssTurntable: React.FC<DeckCssTurntableProps> = ({ deckId }) =>
 
       if (!isScratchActiveRef.current) enterScratch();
       const impulse = TurntablePhysics.deltaToImpulse(e.deltaY, e.deltaMode);
-      physicsRef.current.applyImpulse(impulse);
+      physicsRef.current?.applyImpulse(impulse);
     };
 
     el.addEventListener('wheel', onWheel, { passive: false });
