@@ -10,6 +10,7 @@ import { useSettingsStore } from '@stores/useSettingsStore';
 import { BUILD_HASH, BUILD_DATE, BUILD_NUMBER } from '@constants/version';
 import { Plus, X, Palette, Download, LogIn, LogOut, Cloud, Users, Monitor } from 'lucide-react';
 import { MIDIToolbarDropdown } from '@components/midi/MIDIToolbarDropdown';
+import { DJSetBrowser } from '@components/dj/DJSetBrowser';
 import { DownloadModal } from '@components/dialogs/DownloadModal';
 import { AuthModal } from '@components/dialogs/AuthModal';
 import { CollaborationModal } from '@components/collaboration/CollaborationModal';
@@ -251,6 +252,9 @@ const NavBarComponent: React.FC = () => {
               <span className="hidden sm:inline">DOM</span>
             </Button>
           )}
+
+          {/* DJ Sets */}
+          <DJSetBrowser />
 
           {/* MIDI Settings */}
           <MIDIToolbarDropdown />
