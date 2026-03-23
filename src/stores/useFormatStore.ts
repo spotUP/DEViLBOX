@@ -85,6 +85,10 @@ interface FormatStore {
   setEditorMode: (mode: EditorMode) => void;
   setFurnaceNative: (data: FurnaceNativeData | null) => void;
   setFurnaceOrderEntry: (channel: number, position: number, patternIndex: number) => void;
+  /** Insert a new order row (copy of current) after the given position */
+  insertFurnaceOrderRow: (position: number) => void;
+  /** Delete the order row at the given position */
+  deleteFurnaceOrderRow: (position: number) => void;
   setHivelyNative: (data: HivelyNativeData | null) => void;
   /** Update a single track or transpose value in the Hively position matrix */
   setHivelyPositionCell: (pos: number, ch: number, field: 'track' | 'transpose', value: number) => void;
@@ -102,6 +106,10 @@ interface FormatStore {
   canUndoHively: () => boolean;
   /** Check if Hively redo is available */
   canRedoHively: () => boolean;
+  /** Insert an empty row at rowIndex in a Hively track, shifting rows down. Last row is lost. */
+  insertHivelyTrackRow: (trackIndex: number, rowIndex: number) => void;
+  /** Delete the row at rowIndex in a Hively track, shifting rows up. An empty row is added at the bottom. */
+  deleteHivelyTrackRow: (trackIndex: number, rowIndex: number) => void;
   setSongDBInfo: (info: FormatStore['songDBInfo']) => void;
   setSidMetadata: (info: FormatStore['sidMetadata']) => void;
   setOriginalModuleData: (data: FormatStore['originalModuleData']) => void;
@@ -184,6 +192,28 @@ export const useFormatStore = create<FormatStore>()(
       if (channel < 0 || channel >= sub.orders.length) return;
       if (position < 0 || position >= sub.ordersLen) return;
       sub.orders[channel][position] = patternIndex;
+    }),
+    insertFurnaceOrderRow: (position) => set((state) => {
+      if (!state.furnaceNative) return;
+      const sub = state.furnaceNative.subsongs[state.furnaceNative.activeSubsong];
+      if (!sub) return;
+      if (sub.ordersLen >= 256) return; // Furnace max 256 orders
+      // Insert a copy of the current row after the given position
+      for (let ch = 0; ch < sub.orders.length; ch++) {
+        const srcVal = sub.orders[ch][position] ?? 0;
+        sub.orders[ch].splice(position + 1, 0, srcVal);
+      }
+      sub.ordersLen++;
+    }),
+    deleteFurnaceOrderRow: (position) => set((state) => {
+      if (!state.furnaceNative) return;
+      const sub = state.furnaceNative.subsongs[state.furnaceNative.activeSubsong];
+      if (!sub) return;
+      if (sub.ordersLen <= 1) return; // Keep at least 1
+      for (let ch = 0; ch < sub.orders.length; ch++) {
+        sub.orders[ch].splice(position, 1);
+      }
+      sub.ordersLen--;
     }),
     setHivelyNative: (data) => set((state) => { state.hivelyNative = data; state.hivelyUndoStack = []; state.hivelyRedoStack = []; }),
     setHivelyPositionCell: (pos, ch, field, value) => set((state) => {
@@ -292,6 +322,24 @@ export const useFormatStore = create<FormatStore>()(
     }),
     canUndoHively: () => get().hivelyUndoStack.length > 0,
     canRedoHively: () => get().hivelyRedoStack.length > 0,
+    insertHivelyTrackRow: (trackIndex, rowIndex) => set((state) => {
+      if (!state.hivelyNative) return;
+      const track = state.hivelyNative.tracks[trackIndex];
+      if (!track) return;
+      const emptyStep: HivelyNativeStep = { note: 0, instrument: 0, fx: 0, fxParam: 0, fxb: 0, fxbParam: 0 };
+      // Insert empty row at rowIndex, shift everything down, drop last row
+      track.steps.splice(rowIndex, 0, emptyStep);
+      track.steps.length = state.hivelyNative.trackLength;
+    }),
+    deleteHivelyTrackRow: (trackIndex, rowIndex) => set((state) => {
+      if (!state.hivelyNative) return;
+      const track = state.hivelyNative.tracks[trackIndex];
+      if (!track) return;
+      const emptyStep: HivelyNativeStep = { note: 0, instrument: 0, fx: 0, fxParam: 0, fxb: 0, fxbParam: 0 };
+      // Remove row at rowIndex, shift everything up, add empty row at bottom
+      track.steps.splice(rowIndex, 1);
+      track.steps.push(emptyStep);
+    }),
     setSongDBInfo: (info) => set((state) => { state.songDBInfo = info; }),
     setSidMetadata: (info) => set((state) => { state.sidMetadata = info; }),
     setOriginalModuleData: (data) => set((state) => { state.originalModuleData = data; }),

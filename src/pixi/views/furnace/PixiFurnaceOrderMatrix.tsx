@@ -2,6 +2,10 @@
  * PixiFurnaceOrderMatrix - 2D Order Matrix Grid Editor
  * Pure Pixi GL rendering — no DOM elements.
  *
+ * Per-digit cursor: each cell has 2 hex digits (hi/lo nibble).
+ * Arrow keys navigate (up/down = positions, left/right = digit positions across channels).
+ * Type 0-9/A-F to enter hex nibbles. Insert key inserts row, Ctrl+Backspace deletes row.
+ *
  * Layout:
  * ┌─────┬────────┬────────┬────────┬────────┐
  * │ Pos │  CH 0  │  CH 1  │  CH 2  │  CH 3  │
@@ -14,6 +18,7 @@ import type { Container as ContainerType, Graphics as GraphicsType, FederatedPoi
 import { usePixiTheme } from '@/pixi/theme';
 import { PIXI_FONTS } from '@/pixi/fonts';
 import { useTransportStore } from '@/stores/useTransportStore';
+import { useFormatStore } from '@stores';
 import type { FurnaceNativeData } from '@/types';
 
 const ROW_HEIGHT    = 20;
@@ -22,6 +27,11 @@ const CHAN_COL_WIDTH = 48;
 const HEADER_HEIGHT = 22;
 const FONT_SIZE     = 11;
 const TEXT_Y        = 4; // top-padding within each row
+const DIGIT_COLS    = 2; // hi and lo nibble per channel
+// Approximate char width for digit highlight (monospace at FONT_SIZE)
+const DIGIT_W       = 7;
+
+const HEX = '0123456789abcdef';
 
 interface OrderMatrixProps {
   width: number;
@@ -38,16 +48,18 @@ export const PixiFurnaceOrderMatrix: React.FC<OrderMatrixProps> = ({
 }) => {
   const theme = usePixiTheme();
   const isPlaying = useTransportStore(s => s.isPlaying);
+  const insertRow = useFormatStore(s => s.insertFurnaceOrderRow);
+  const deleteRow = useFormatStore(s => s.deleteFurnaceOrderRow);
 
   const sub         = nativeData.subsongs[nativeData.activeSubsong];
   const numChannels = sub?.channels.length ?? 0;
   const ordersLen   = sub?.ordersLen ?? 0;
 
-  const [cursorPos,  setCursorPos]  = useState(0);
-  const [cursorChan, setCursorChan] = useState(0);
-  const [scrollTop,  setScrollTop]  = useState(0);
-  const [focused,    setFocused]    = useState(false);
-  const [editBuffer, setEditBuffer] = useState('');
+  const [cursorPos,   setCursorPos]   = useState(0);
+  const [cursorChan,  setCursorChan]  = useState(0);
+  const [cursorDigit, setCursorDigit] = useState(0); // 0=hi, 1=lo
+  const [scrollTop,   setScrollTop]   = useState(0);
+  const [focused,     setFocused]     = useState(false);
 
   const containerRef  = useRef<ContainerType>(null);
   const scrollTopRef  = useRef(0);
@@ -91,13 +103,14 @@ export const PixiFurnaceOrderMatrix: React.FC<OrderMatrixProps> = ({
   }, []);
 
   // Keyboard navigation — fresh state via ref pattern to avoid stale closures
-  const stateRef = useRef({ cursorPos, cursorChan, editBuffer, ordersLen, numChannels });
-  stateRef.current = { cursorPos, cursorChan, editBuffer, ordersLen, numChannels };
+  const stateRef = useRef({ cursorPos, cursorChan, cursorDigit, ordersLen, numChannels });
+  stateRef.current = { cursorPos, cursorChan, cursorDigit, ordersLen, numChannels };
 
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
       if (!focusedRef.current || !sub) return;
-      const { cursorPos: cp, cursorChan: cc, editBuffer: eb, ordersLen: ol, numChannels: nc } = stateRef.current;
+      const { cursorPos: cp, cursorChan: cc, cursorDigit: cd, ordersLen: ol, numChannels: nc } = stateRef.current;
+
       switch (e.key) {
         case 'ArrowUp':
           e.preventDefault();
@@ -109,38 +122,70 @@ export const PixiFurnaceOrderMatrix: React.FC<OrderMatrixProps> = ({
           break;
         case 'ArrowLeft':
           e.preventDefault();
-          setCursorChan(c => Math.max(0, c - 1));
+          if (cd > 0) {
+            setCursorDigit(cd - 1);
+          } else if (cc > 0) {
+            setCursorChan(cc - 1);
+            setCursorDigit(DIGIT_COLS - 1);
+          }
           break;
         case 'ArrowRight':
           e.preventDefault();
-          setCursorChan(c => Math.min(nc - 1, c + 1));
+          if (cd < DIGIT_COLS - 1) {
+            setCursorDigit(cd + 1);
+          } else if (cc < nc - 1) {
+            setCursorChan(cc + 1);
+            setCursorDigit(0);
+          }
+          break;
+        case 'Tab':
+          e.preventDefault();
+          if (e.shiftKey) {
+            if (cc > 0) { setCursorChan(cc - 1); setCursorDigit(0); }
+          } else {
+            if (cc < nc - 1) { setCursorChan(cc + 1); setCursorDigit(0); }
+          }
+          break;
+        case 'Insert':
+          e.preventDefault();
+          insertRow(cp);
+          break;
+        case 'Backspace':
+          if (e.ctrlKey) {
+            e.preventDefault();
+            deleteRow(cp);
+          }
           break;
         case 'Escape':
           e.preventDefault();
-          setEditBuffer('');
           break;
         default:
           if (/^[0-9a-fA-F]$/.test(e.key)) {
             e.preventDefault();
-            const newBuf = eb + e.key;
-            if (newBuf.length >= 2) {
-              onOrderChange?.(cc, cp, parseInt(newBuf, 16));
-              setEditBuffer('');
-              setCursorPos(p => Math.min(ol - 1, p + 1));
-            } else {
-              setEditBuffer(newBuf);
+            const hexIdx = HEX.indexOf(e.key.toLowerCase());
+            const cur = sub.orders[cc]?.[cp] ?? 0;
+            const newVal = cd === 0
+              ? (hexIdx << 4) | (cur & 0x0F)
+              : (cur & 0xF0) | hexIdx;
+            onOrderChange?.(cc, cp, newVal & 0xFF);
+            // Advance cursor right after typing
+            if (cd < DIGIT_COLS - 1) {
+              setCursorDigit(cd + 1);
+            } else if (cc < nc - 1) {
+              setCursorChan(cc + 1);
+              setCursorDigit(0);
             }
           }
       }
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [sub, onPositionChange, onOrderChange]);
+  }, [sub, onPositionChange, onOrderChange, insertRow, deleteRow]);
 
   const startRow = Math.floor(scrollTop / ROW_HEIGHT);
   const endRow   = Math.min(ordersLen, startRow + visibleRows + 2);
 
-  // Convert pointer event to local row/chan and update cursor
+  // Convert pointer event to local row/chan/digit and update cursor
   const handlePointerDown = useCallback((e: FederatedPointerEvent) => {
     setFocused(true);
     const c = containerRef.current;
@@ -148,9 +193,16 @@ export const PixiFurnaceOrderMatrix: React.FC<OrderMatrixProps> = ({
     const local = c.toLocal(e.global);
     if (local.y < HEADER_HEIGHT) return;
     const row = Math.floor((local.y - HEADER_HEIGHT + scrollTopRef.current) / ROW_HEIGHT);
-    const col = local.x < POS_COL_WIDTH ? -1 : Math.floor((local.x - POS_COL_WIDTH) / CHAN_COL_WIDTH);
     if (row >= 0 && row < ordersLen) { setCursorPos(row); onPositionChange?.(row); }
-    if (col >= 0 && col < numChannels) setCursorChan(col);
+    if (local.x >= POS_COL_WIDTH) {
+      const col = Math.floor((local.x - POS_COL_WIDTH) / CHAN_COL_WIDTH);
+      if (col >= 0 && col < numChannels) {
+        setCursorChan(col);
+        // Determine which digit within the cell was clicked
+        const relX = local.x - (POS_COL_WIDTH + col * CHAN_COL_WIDTH + 4);
+        setCursorDigit(relX > DIGIT_W ? 1 : 0);
+      }
+    }
   }, [ordersLen, numChannels, onPositionChange]);
 
   // Draw all backgrounds, highlights and column borders
@@ -172,11 +224,15 @@ export const PixiFurnaceOrderMatrix: React.FC<OrderMatrixProps> = ({
       }
     }
 
-    // Cursor cell highlight
+    // Cursor cell highlight (full cell)
     const cy = HEADER_HEIGHT + cursorPos * ROW_HEIGHT - scrollTop;
     if (cy + ROW_HEIGHT > HEADER_HEIGHT && cy < height) {
       g.rect(POS_COL_WIDTH + cursorChan * CHAN_COL_WIDTH, cy, CHAN_COL_WIDTH, ROW_HEIGHT)
-        .fill({ color: theme.accent.color, alpha: 0.25 });
+        .fill({ color: theme.accent.color, alpha: 0.15 });
+      // Per-digit cursor highlight
+      const dx = POS_COL_WIDTH + cursorChan * CHAN_COL_WIDTH + 4 + cursorDigit * DIGIT_W;
+      g.rect(dx, cy, DIGIT_W, ROW_HEIGHT)
+        .fill({ color: theme.accent.color, alpha: 0.35 });
     }
 
     // Column borders
@@ -185,7 +241,7 @@ export const PixiFurnaceOrderMatrix: React.FC<OrderMatrixProps> = ({
       if (x > width) break;
       g.rect(x, 0, 1, height).fill({ color: theme.border.color, alpha: 0.2 });
     }
-  }, [width, height, theme, scrollTop, startRow, endRow, currentPosition, cursorPos, cursorChan, numChannels]);
+  }, [width, height, theme, scrollTop, startRow, endRow, currentPosition, cursorPos, cursorChan, cursorDigit, numChannels]);
 
   // All text labels — positioned via x/y (not layout) to avoid Yoga BindingErrors
   const cellLabels = useMemo(() => {
@@ -211,10 +267,7 @@ export const PixiFurnaceOrderMatrix: React.FC<OrderMatrixProps> = ({
         labels.push({ x: 4, y, text: row.toString(16).toUpperCase().padStart(2, '0'), color: theme.textMuted.color });
         for (let ch = 0; ch < numChannels; ch++) {
           const patIdx = sub.orders[ch]?.[row] ?? 0;
-          // Show edit buffer in cursor cell
-          const text = (row === cursorPos && ch === cursorChan && editBuffer.length > 0)
-            ? editBuffer.padEnd(2, '-')
-            : patIdx.toString(16).toUpperCase().padStart(2, '0');
+          const text = patIdx.toString(16).toUpperCase().padStart(2, '0');
           labels.push({
             x: POS_COL_WIDTH + ch * CHAN_COL_WIDTH + 4, y,
             text, color: theme.cellNote.color,
@@ -224,7 +277,7 @@ export const PixiFurnaceOrderMatrix: React.FC<OrderMatrixProps> = ({
     }
 
     return labels;
-  }, [sub, numChannels, startRow, endRow, scrollTop, height, theme, cursorPos, cursorChan, editBuffer]);
+  }, [sub, numChannels, startRow, endRow, scrollTop, height, theme]);
 
   return (
     <pixiContainer
