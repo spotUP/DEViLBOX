@@ -118,10 +118,14 @@ export const PixiScrollView: React.FC<PixiScrollViewProps> = ({
     g.fill({ color: bgColor ?? 0x000000 });
   }, [width, height, bgColor]);
 
-  // Apply the mask to the content container after both refs are set
+  // Apply the mask to the content container after both refs are set.
+  // IMPORTANT: interactiveChildren must remain true (default) or events
+  // won't reach children inside the masked container.
   useEffect(() => {
     if (contentRef.current && maskRef.current) {
       contentRef.current.mask = maskRef.current;
+      // Ensure event propagation isn't blocked by the mask
+      contentRef.current.interactiveChildren = true;
     }
     return () => {
       if (contentRef.current) {
