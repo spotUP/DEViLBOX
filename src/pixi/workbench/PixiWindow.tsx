@@ -590,7 +590,7 @@ export const PixiWindow: React.FC<PixiWindowProps> = ({
     g.rect(0, 0, w, h);
     g.stroke({ color: borderColor, alpha: borderAlpha, width: borderWidth });
     g.rect(0, 0, w, TITLE_H);
-    g.fill({ color: focused ? 0x1c1c30 : selected ? 0x1a1a2e : 0x16161f });
+    g.fill({ color: focused ? theme.bgActive.color : selected ? theme.bgHover.color : theme.bgTertiary.color });
     g.rect(0, TITLE_H - 1, w, 1);
     g.fill({ color: theme.border.color, alpha: 0.5 });
   }, [w, h, focused, selected, hovered, theme]);
