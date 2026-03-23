@@ -365,6 +365,12 @@ Find the first tick where commands diverge. The diverging command reveals which 
 
 **Key insight from V2M debugging:** Running both implementations in lock-step with internal state comparison finds issues that would take hours to find via WAV comparison.
 
+### Loop Seek Infrastructure (2026-03-23):
+- `furnace_dispatch_set_skip_writes(handle, skip)` added to wrapper (extern "C")
+- 33 remaining lock-step fails need tick-level seek with this flag
+- Row-level seek crashes (Bxx/Dxx re-trigger loops), tick-level seek without skip corrupts state
+- The reference's playSub(true) does: reset → setSkipRegisterWrites(true) → tick-seek → setSkipRegisterWrites(false)
+
 *** IMPORTANT ***
 
 ---
