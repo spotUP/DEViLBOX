@@ -57,6 +57,11 @@ class MPT extends AudioWorkletProcessor {
 	process(inputList, outputList, parameters) {
 		if (!this.modulePtr || !this.leftPtr || !this.rightPtr || this.paused) return true	//silence
 
+		if (!this._loggedRate) {
+			console.log('[chiptune3.worklet] sampleRate:', sampleRate, 'type:', typeof sampleRate, 'outputLen:', outputList[0][0].length)
+			this._loggedRate = true
+		}
+
 		const left = outputList[0][0]
 		const right = outputList[0][1]
 
