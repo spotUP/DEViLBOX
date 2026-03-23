@@ -18,7 +18,6 @@ import { useShallow } from 'zustand/react/shallow';
 import { notify } from '@stores/useNotificationStore';
 import { useTapTempo } from '@hooks/useTapTempo';
 import { getToneEngine } from '@engine/ToneEngine';
-import { getTrackerReplayer } from '@engine/TrackerReplayer';
 import { getTrackerScratchController } from '@engine/TrackerScratchController';
 import { Maximize2, Minimize2, MousePointerClick, ExternalLink } from 'lucide-react';
 import { focusPopout } from '@components/ui/PopOutWindow';
@@ -526,12 +525,11 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = React.memo(({
     // before any async work (engine.init fetches WASM). Fire-and-forget is fine.
     Tone.start();
 
-    // Toggle: if already playing, stop only. If not playing, start from beginning.
-    // This allows the "Stop Song" button to actually stop instead of always restarting.
+    // Toggle: if already playing, stop with turntable spin-down. If not playing, start.
     if (isPlaying) {
-      getTrackerReplayer().stop();
-      stop();
-      engine.releaseAll();
+      getTrackerScratchController().triggerElectronicBrake(() => {
+        engine.releaseAll();
+      });
       return;
     }
     setIsLooping(false);
@@ -544,10 +542,10 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = React.memo(({
     // CRITICAL for iOS: Tone.start() MUST be called synchronously within user gesture
     Tone.start();
     
-    // Toggle: if already playing pattern, stop. Otherwise start pattern.
-    if (isPlaying && isLooping) { getTrackerReplayer().stop(); stop(); engine.releaseAll(); }
+    // Toggle: if already playing pattern, stop with spin-down. Otherwise start pattern.
+    if (isPlaying && isLooping) { getTrackerScratchController().triggerElectronicBrake(() => engine.releaseAll()); }
     else {
-      if (isPlaying) { getTrackerReplayer().stop(); stop(); engine.releaseAll(); }
+      if (isPlaying) { getTrackerScratchController().triggerElectronicBrake(() => engine.releaseAll()); }
       setIsLooping(true);
       setCurrentRow(0); // Always start from first row of current pattern
       await engine.init();
