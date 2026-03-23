@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-03-23T07:26:02.289Z
+ * Generated: 2026-03-23T07:35:08.139Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -19,9 +19,9 @@ export interface ChangelogEntry {
 }
 
 // Build info
-export const BUILD_VERSION = '1.0.3294';
-export const BUILD_NUMBER = '3294';
-export const BUILD_HASH = '2e7deecfc';
+export const BUILD_VERSION = '1.0.3296';
+export const BUILD_NUMBER = '3296';
+export const BUILD_HASH = '192d4a5bc';
 export const BUILD_DATE = '2026-03-23';
 
 // Full version (patch IS the build number, so no need to append)
@@ -30,9 +30,17 @@ export const FULL_VERSION = BUILD_VERSION;
 // Auto-generated changelog
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: '1.0.3294',
+    version: '1.0.3296',
     date: '2026-03-23',
     changes: [
+      {
+        type: 'improvement',
+        "description": "Chore: server database, DJ engine updates, changelog"
+      },
+      {
+        type: 'feature',
+        "description": "Per-channel VU meters via module scope RMS polling"
+      },
       {
         type: 'fix',
         "description": "Eagerly init scratch buffer on play for SunVox audio"
@@ -230,14 +238,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'feature',
         "description": "Chore: add Vestax mixer source assets (OBJ + textures + MTL)"
-      },
-      {
-        type: 'fix',
-        "description": "Reduce 3D GPU load — lower DPR, low-power preference"
-      },
-      {
-        type: 'fix',
-        "description": "Raise mixer to same level as turntables"
       }
     ]
   }

@@ -18,6 +18,8 @@ import { MixerCrossfader } from '@/components/dj/MixerCrossfader';
 import { MixerTransition } from '@/components/dj/MixerTransition';
 import { MixerMaster } from '@/components/dj/MixerMaster';
 import { MixerCueSection } from '@/components/dj/MixerCueSection';
+import { DJSetRecordButton } from '@/components/dj/DJSetRecordButton';
+import { DJMicControl } from '@/components/dj/DJMicControl';
 
 export const DJMixer: React.FC = () => {
   const thirdDeck = useDJStore((s) => s.thirdDeckActive);
@@ -79,6 +81,12 @@ export const DJMixer: React.FC = () => {
         <MixerMaster />
         <div className="w-px bg-dark-borderLight self-stretch" />
         <MixerCueSection />
+      </div>
+
+      {/* Row 5: Record + Mic */}
+      <div className="flex items-center justify-center gap-3 w-full pt-2 border-t border-dark-border">
+        <DJSetRecordButton />
+        <DJMicControl />
       </div>
     </div>
   );
