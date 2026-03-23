@@ -110,6 +110,14 @@ interface FormatStore {
   insertHivelyTrackRow: (trackIndex: number, rowIndex: number) => void;
   /** Delete the row at rowIndex in a Hively track, shifting rows up. An empty row is added at the bottom. */
   deleteHivelyTrackRow: (trackIndex: number, rowIndex: number) => void;
+  /** Update a Klystrack sequence entry field (pattern or noteOffset) */
+  setKlysSequenceEntry: (channel: number, position: number, field: 'pattern' | 'noteOffset', value: number) => void;
+  /** Insert a new Klystrack sequence entry (copy of current or blank) at the given position */
+  insertKlysSequenceEntry: (position: number) => void;
+  /** Delete the Klystrack sequence entry at the given position across all channels */
+  deleteKlysSequenceEntry: (position: number) => void;
+  /** Update a single pattern index in the MusicLine per-channel track table */
+  setMusicLineTrackEntry: (channel: number, position: number, patternIndex: number) => void;
   setSongDBInfo: (info: FormatStore['songDBInfo']) => void;
   setSidMetadata: (info: FormatStore['sidMetadata']) => void;
   setOriginalModuleData: (data: FormatStore['originalModuleData']) => void;
@@ -339,6 +347,62 @@ export const useFormatStore = create<FormatStore>()(
       // Remove row at rowIndex, shift everything up, add empty row at bottom
       track.steps.splice(rowIndex, 1);
       track.steps.push(emptyStep);
+    }),
+    setKlysSequenceEntry: (channel, position, field, value) => set((state) => {
+      if (!state.klysNative) return;
+      const seq = state.klysNative.sequences[channel];
+      if (!seq) return;
+      const entry = seq.entries.find(e => e.position === position);
+      if (!entry) {
+        // Create a new entry at this position if it doesn't exist
+        const newEntry = { position, pattern: 0, noteOffset: 0, [field]: value };
+        seq.entries.push(newEntry);
+        seq.entries.sort((a, b) => a.position - b.position);
+        return;
+      }
+      if (field === 'pattern') {
+        entry.pattern = Math.max(0, Math.min(value, state.klysNative.patterns.length - 1));
+      } else {
+        entry.noteOffset = Math.max(-128, Math.min(127, value));
+      }
+    }),
+    insertKlysSequenceEntry: (position) => set((state) => {
+      if (!state.klysNative) return;
+      // Insert a new position: shift all entries at positions > position down by 1
+      for (const seq of state.klysNative.sequences) {
+        for (const entry of seq.entries) {
+          if (entry.position > position) entry.position++;
+        }
+        // Clone the entry at the current position (or create blank) at position+1
+        const src = seq.entries.find(e => e.position === position);
+        const newEntry = src
+          ? { position: position + 1, pattern: src.pattern, noteOffset: src.noteOffset }
+          : { position: position + 1, pattern: 0, noteOffset: 0 };
+        seq.entries.push(newEntry);
+        seq.entries.sort((a, b) => a.position - b.position);
+      }
+      state.klysNative.songLength++;
+    }),
+    deleteKlysSequenceEntry: (position) => set((state) => {
+      if (!state.klysNative) return;
+      if (state.klysNative.songLength <= 1) return; // Keep at least 1
+      for (const seq of state.klysNative.sequences) {
+        // Remove entries at this position
+        const idx = seq.entries.findIndex(e => e.position === position);
+        if (idx >= 0) seq.entries.splice(idx, 1);
+        // Shift entries after this position up by 1
+        for (const entry of seq.entries) {
+          if (entry.position > position) entry.position--;
+        }
+      }
+      state.klysNative.songLength--;
+    }),
+    setMusicLineTrackEntry: (channel, position, patternIndex) => set((state) => {
+      if (!state.channelTrackTables) return;
+      if (channel < 0 || channel >= state.channelTrackTables.length) return;
+      const track = state.channelTrackTables[channel];
+      if (position < 0 || position >= track.length) return;
+      track[position] = patternIndex;
     }),
     setSongDBInfo: (info) => set((state) => { state.songDBInfo = info; }),
     setSidMetadata: (info) => set((state) => { state.sidMetadata = info; }),
