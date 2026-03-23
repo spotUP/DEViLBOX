@@ -5,8 +5,7 @@
  * Used for: DeckPitchSlider, MixerCrossfader, channel faders.
  */
 
-import { useRef, useCallback, useEffect, useState, useMemo } from 'react';
-import { Rectangle } from 'pixi.js';
+import { useRef, useCallback, useEffect, useState } from 'react';
 import type { Graphics as GraphicsType, Container as ContainerType, FederatedPointerEvent } from 'pixi.js';
 import { PIXI_FONTS } from '../fonts';
 import { usePixiTheme } from '../theme';
@@ -210,8 +209,6 @@ export const PixiSlider: React.FC<PixiSliderProps> = ({
   const labelHeight = label ? 14 : 0;
   const valueHeight = showValue ? 14 : 0;
   const totalHeight = containerHeight + labelHeight + valueHeight + 4;
-  // Explicit hitArea — PixiJS can't hit test containers without drawn content
-  const hitArea = useMemo(() => new Rectangle(0, 0, containerWidth, totalHeight), [containerWidth, totalHeight]);
 
   const defaultFormatVal = (v: number) => {
     if (Math.abs(v) < 0.01) return '0';
@@ -222,10 +219,7 @@ export const PixiSlider: React.FC<PixiSliderProps> = ({
   return (
     <pixiContainer
       ref={containerRef}
-      eventMode={disabled ? 'none' : 'static'}
-      hitArea={hitArea}
-      cursor={disabled ? 'not-allowed' : isVert ? 'ns-resize' : 'ew-resize'}
-      onPointerDown={handlePointerDown}
+      eventMode="auto"
       alpha={disabled ? 0.4 : 1}
       layout={{
         width: containerWidth,
@@ -249,11 +243,12 @@ export const PixiSlider: React.FC<PixiSliderProps> = ({
         />
       )}
 
-      {/* Slider track + handle — eventMode="static" so it registers for hit testing
-          (PixiJS v8 defaults to "passive" which doesn't participate in events) */}
+      {/* Slider track + handle — must be interactive for drag to work */}
       <pixiGraphics
         draw={drawSlider}
-        eventMode="static"
+        eventMode={disabled ? 'none' : 'static'}
+        cursor={disabled ? 'not-allowed' : isVert ? 'ns-resize' : 'ew-resize'}
+        onPointerDown={handlePointerDown}
         layout={{ width: containerWidth, height: containerHeight }}
       />
 
