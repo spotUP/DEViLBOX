@@ -103,7 +103,7 @@ export const WorkbenchBackground: React.FC<Props> = ({
   return (
     <>
       <layoutContainer
-        layout={{ position: 'absolute', width, height, backgroundColor: 0x0e0e14 }}
+        layout={{ position: 'absolute', width, height, backgroundColor: theme.bg.color }}
       />
       <pixiContainer
         ref={dotsContainerRef}
