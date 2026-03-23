@@ -2,17 +2,18 @@
  * DeckVinylView — Large spinning vinyl for DJ mode.
  *
  * Renders a 250px vinyl record with grooves, label, and tonearm.
- * Pointer drag = hand-on-record grab routed through TurntablePhysics
+ * Pointer drag = hand-on-record grab routed through engine-owned TurntablePhysics
  * for proper inertia/motor/friction simulation.
  * Scroll wheel = nudge impulse through TurntablePhysics.
  *
- * Physics output drives DeckEngine scratch API (startScratch/setScratchVelocity/stopScratch).
+ * Physics output drives DeckEngine scratch API via DJActions.
  */
 
 import React, { useRef, useEffect, useCallback, useState } from 'react';
 import { useDJStore } from '@/stores/useDJStore';
 import { getDJEngine } from '@/engine/dj/DJEngine';
 import { TurntablePhysics, OMEGA_NORMAL } from '@/engine/turntable/TurntablePhysics';
+import * as DJActions from '@/engine/dj/DJActions';
 
 interface DeckVinylViewProps {
   deckId: 'A' | 'B' | 'C';
@@ -31,7 +32,7 @@ const DECK_LABEL_BG: Record<string, string> = { A: '#1e2a3f', B: '#3f1e2a', C: '
 
 export const DeckVinylView: React.FC<DeckVinylViewProps> = ({ deckId, size = DEFAULT_SIZE }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const physicsRef = useRef(new TurntablePhysics());
+  const physicsRef = useRef<TurntablePhysics | null>(null);
   const rafIdRef = useRef<number | null>(null);
   const lastTickRef = useRef(0);
   const angleRef = useRef(0);
@@ -55,7 +56,6 @@ export const DeckVinylView: React.FC<DeckVinylViewProps> = ({ deckId, size = DEF
   // ── Physics rAF loop — drives scratch velocity to DeckEngine ──────────────
 
   useEffect(() => {
-    const physics = physicsRef.current;
     let prevRate = 1;
     // When not scratching, snap angle to audioPosition.
     // When scratching, integrate angle from physics rate (smooth, no store-lag jitter).
@@ -65,6 +65,12 @@ export const DeckVinylView: React.FC<DeckVinylViewProps> = ({ deckId, size = DEF
       const dt = lastTickRef.current > 0 ? (now - lastTickRef.current) / 1000 : 0;
       lastTickRef.current = now;
 
+      // Lazy-init engine physics
+      if (!physicsRef.current) {
+        try { physicsRef.current = getDJEngine().getDeck(deckId).physics; } catch { /* engine not ready */ }
+      }
+      const physics = physicsRef.current;
+
       const { isPlaying: playing, effectiveBPM: bpm } = playStateRef.current;
       const baseBPM = bpm || 120;
       const rps = (baseBPM / 120) * 0.5556; // 33⅓ RPM normalized
@@ -72,7 +78,7 @@ export const DeckVinylView: React.FC<DeckVinylViewProps> = ({ deckId, size = DEF
 
       if (playing || isScratchActiveRef.current) {
         // Tick physics for scratch velocity forwarding
-        if (isScratchActiveRef.current || physics.spinbackActive || physics.powerCutActive) {
+        if (physics && (isScratchActiveRef.current || physics.spinbackActive || physics.powerCutActive)) {
           const rate = physics.tick(dt);
 
           // When scratch starts, switch to integration mode
@@ -84,9 +90,9 @@ export const DeckVinylView: React.FC<DeckVinylViewProps> = ({ deckId, size = DEF
             angleRef.current = posSec * omegaNormal;
           }
 
-          // Forward physics rate to DeckEngine scratch API
+          // Forward physics rate to DeckEngine scratch API via DJActions
           if (isScratchActiveRef.current && Math.abs(rate - prevRate) > 0.01) {
-            try { getDJEngine().getDeck(deckId).setScratchVelocity(rate); } catch { /* not ready */ }
+            DJActions.setScratchVelocity(deckId, rate);
             prevRate = rate;
           }
 
@@ -101,8 +107,7 @@ export const DeckVinylView: React.FC<DeckVinylViewProps> = ({ deckId, size = DEF
               isScratchActiveRef.current = false;
               setIsScratchActive(false);
               scratchIntegrating = false;
-              try { getDJEngine().getDeck(deckId).stopScratch(50); } catch { /* not ready */ }
-              useDJStore.getState().setDeckScratchActive(deckId, false);
+              DJActions.stopScratch(deckId, 50);
               prevRate = 1;
             }
           }
@@ -225,7 +230,7 @@ export const DeckVinylView: React.FC<DeckVinylViewProps> = ({ deckId, size = DEF
     ctx.textBaseline = 'middle';
     // Truncate name to fit label
     const maxChars = Math.floor(labelRadius * 2 / (labelRadius * 0.17));
-    const truncName = displayName.length > maxChars ? displayName.slice(0, maxChars - 1) + '…' : displayName;
+    const truncName = displayName.length > maxChars ? displayName.slice(0, maxChars - 1) + '\u2026' : displayName;
     ctx.fillText(truncName, 0, -labelRadius * 0.18);
     // BPM
     ctx.font = `${Math.round(labelRadius * 0.22)}px monospace`;
@@ -281,8 +286,7 @@ export const DeckVinylView: React.FC<DeckVinylViewProps> = ({ deckId, size = DEF
     if (isScratchActiveRef.current) return;
     isScratchActiveRef.current = true;
     setIsScratchActive(true);
-    useDJStore.getState().setDeckScratchActive(deckId, true);
-    try { getDJEngine().getDeck(deckId).startScratch(); } catch { /* not ready */ }
+    DJActions.startScratch(deckId);
   }, [deckId]);
 
   const handlePointerDown = useCallback((e: React.PointerEvent<HTMLCanvasElement>) => {
@@ -297,8 +301,8 @@ export const DeckVinylView: React.FC<DeckVinylViewProps> = ({ deckId, size = DEF
     lastPointerTimeRef.current = performance.now();
 
     // Tell physics: hand on record
-    physicsRef.current.setTouching(true);
-    physicsRef.current.setHandVelocity(0); // Just placed hand, no velocity yet
+    physicsRef.current?.setTouching(true);
+    physicsRef.current?.setHandVelocity(0); // Just placed hand, no velocity yet
   }, [enterScratch]);
 
   const handlePointerMove = useCallback((e: React.PointerEvent<HTMLCanvasElement>) => {
@@ -331,7 +335,7 @@ export const DeckVinylView: React.FC<DeckVinylViewProps> = ({ deckId, size = DEF
 
       // Pure hand velocity — no bias. With slipmat physics, holding still = stopped.
       // The motor platter keeps spinning underneath through slipmat coupling.
-      physicsRef.current.setHandVelocity(omega);
+      physicsRef.current?.setHandVelocity(omega);
     }
 
     lastPointerRef.current = { x: e.clientX, y: e.clientY };
@@ -342,7 +346,7 @@ export const DeckVinylView: React.FC<DeckVinylViewProps> = ({ deckId, size = DEF
     lastPointerRef.current = null;
 
     // Release hand from record — motor will pull platter back to normal
-    physicsRef.current.setTouching(false);
+    physicsRef.current?.setTouching(false);
   }, []);
 
   // ── Wheel handler (nudge) ─────────────────────────────────────────────────
@@ -360,7 +364,7 @@ export const DeckVinylView: React.FC<DeckVinylViewProps> = ({ deckId, size = DEF
       }
 
       const impulse = TurntablePhysics.deltaToImpulse(e.deltaY, e.deltaMode);
-      physicsRef.current.applyImpulse(impulse);
+      physicsRef.current?.applyImpulse(impulse);
     };
 
     canvas.addEventListener('wheel', onWheel, { passive: false });

@@ -17,6 +17,7 @@ import { PixiDeckScopes } from './PixiDeckScopes';
 import { PixiDeckBeatGrid } from './PixiDeckBeatGrid';
 import { getDJEngine } from '@engine/dj/DJEngine';
 import { TurntablePhysics, OMEGA_NORMAL } from '@/engine/turntable/TurntablePhysics';
+import * as DJActions from '@/engine/dj/DJActions';
 
 /** Format milliseconds as M:SS */
 function formatTime(ms: number): string {
@@ -473,7 +474,7 @@ const PixiVinylDisplay: React.FC<{
   const labelR = outerR * 0.32;
 
   // ── Physics-driven rotation ──────────────────────────────────────────────
-  const physicsRef = useRef(new TurntablePhysics());
+  const physicsRef = useRef<TurntablePhysics | null>(null);
   const angleRef = useRef(0);
   const lastTickRef = useRef(0);
   const isScratchActiveRef = useRef(false);
@@ -491,37 +492,41 @@ const PixiVinylDisplay: React.FC<{
 
   // ── Physics rAF loop ─────────────────────────────────────────────────────
   useEffect(() => {
-    const physics = physicsRef.current;
     let prevRate = 1;
 
     const tick = (now: number) => {
       const dt = lastTickRef.current > 0 ? (now - lastTickRef.current) / 1000 : 0;
       lastTickRef.current = now;
 
+      // Lazy-init engine physics
+      if (!physicsRef.current) {
+        try { physicsRef.current = getDJEngine().getDeck(deckId).physics; } catch { /* engine not ready */ }
+      }
+      const physics = physicsRef.current;
+
       const baseBPM = playStateRef.current.effectiveBPM || 120;
       const rps = (baseBPM / 120) * 0.5556; // 33⅓ RPM normalized
 
       if (playStateRef.current.isPlaying || isScratchActiveRef.current) {
         let rate = 1;
-        if (isScratchActiveRef.current || physics.spinbackActive || physics.powerCutActive) {
+        if (physics && (isScratchActiveRef.current || physics.spinbackActive || physics.powerCutActive)) {
           rate = physics.tick(dt);
         }
 
         angleRef.current += rps * rate * 2 * Math.PI * dt;
 
-        // Forward physics rate to DeckEngine scratch API
+        // Forward physics rate to DeckEngine scratch API via DJActions
         if (isScratchActiveRef.current && Math.abs(rate - prevRate) > 0.01) {
-          try { getDJEngine().getDeck(deckId).setScratchVelocity(rate); } catch { /* not ready */ }
+          DJActions.setScratchVelocity(deckId, rate);
           prevRate = rate;
         }
 
         // Check if physics settled back to normal — exit scratch
-        if (isScratchActiveRef.current && !physics.touching && !physics.spinbackActive && !physics.powerCutActive) {
+        if (physics && isScratchActiveRef.current && !physics.touching && !physics.spinbackActive && !physics.powerCutActive) {
           if (Math.abs(rate - 1.0) < 0.02) {
             isScratchActiveRef.current = false;
             setIsScratchActive(false);
-            try { getDJEngine().getDeck(deckId).stopScratch(50); } catch { /* not ready */ }
-            useDJStore.getState().setDeckScratchActive(deckId, false);
+            DJActions.stopScratch(deckId, 50);
             prevRate = 1;
           }
         }
@@ -586,8 +591,7 @@ const PixiVinylDisplay: React.FC<{
     if (isScratchActiveRef.current) return;
     isScratchActiveRef.current = true;
     setIsScratchActive(true);
-    useDJStore.getState().setDeckScratchActive(deckId, true);
-    try { getDJEngine().getDeck(deckId).startScratch(); } catch { /* not ready */ }
+    DJActions.startScratch(deckId);
   }, [deckId]);
 
   // ── Pointer handlers (scratch grab) ──────────────────────────────────────
@@ -602,8 +606,8 @@ const PixiVinylDisplay: React.FC<{
     lastPointerTimeRef.current = performance.now();
 
     // Tell physics: hand on record
-    physicsRef.current.setTouching(true);
-    physicsRef.current.setHandVelocity(0);
+    physicsRef.current?.setTouching(true);
+    physicsRef.current?.setHandVelocity(0);
 
     const onMove = (ev: PointerEvent) => {
       if (!lastPointerRef.current) return;
@@ -632,7 +636,7 @@ const PixiVinylDisplay: React.FC<{
         const pixelVelocity = tangential / dt;
         const omega = (pixelVelocity / (size * 0.8)) * OMEGA_NORMAL;
 
-        physicsRef.current.setHandVelocity(omega);
+        physicsRef.current?.setHandVelocity(omega);
       }
 
       lastPointerRef.current = { x: ev.clientX, y: ev.clientY };
@@ -640,7 +644,7 @@ const PixiVinylDisplay: React.FC<{
 
     const onUp = () => {
       lastPointerRef.current = null;
-      physicsRef.current.setTouching(false);
+      physicsRef.current?.setTouching(false);
       document.removeEventListener('pointermove', onMove);
       document.removeEventListener('pointerup', onUp);
     };
@@ -664,13 +668,13 @@ const PixiVinylDisplay: React.FC<{
 
     const normalizedDelta = e.deltaMode === 1 ? e.deltaY * 12 : e.deltaMode === 2 ? e.deltaY * 400 : e.deltaY;
     const omega = TurntablePhysics.deltaToAngularVelocity(normalizedDelta, dt);
-    physicsRef.current.setTouching(true);
-    physicsRef.current.setHandVelocity(omega);
+    physicsRef.current?.setTouching(true);
+    physicsRef.current?.setHandVelocity(omega);
 
     if (scrollReleaseTimerRef.current !== null) clearTimeout(scrollReleaseTimerRef.current);
     scrollReleaseTimerRef.current = setTimeout(() => {
       scrollReleaseTimerRef.current = null;
-      physicsRef.current.setTouching(false);
+      physicsRef.current?.setTouching(false);
     }, 150);
   }, [enterScratch]);
 
@@ -779,7 +783,7 @@ const PixiTurntable2D: React.FC<{
   const deckW = measuredW;
 
   // Physics-driven rotation (same pattern as PixiVinylDisplay)
-  const physicsRef = useRef(new TurntablePhysics());
+  const physicsRef = useRef<TurntablePhysics | null>(null);
   const angleRef = useRef(0);
   const lastTickRef = useRef(0);
   const isScratchActiveRef = useRef(false);
@@ -818,12 +822,17 @@ const PixiTurntable2D: React.FC<{
 
   // Physics rAF loop
   useEffect(() => {
-    const physics = physicsRef.current;
     let prevRate = 1;
 
     const tick = (now: number) => {
       const dt = lastTickRef.current > 0 ? (now - lastTickRef.current) / 1000 : 0;
       lastTickRef.current = now;
+
+      // Lazy-init engine physics
+      if (!physicsRef.current) {
+        try { physicsRef.current = getDJEngine().getDeck(deckId).physics; } catch { /* engine not ready */ }
+      }
+      const physics = physicsRef.current;
 
       const baseRps = rpmRef.current === 45 ? (45 / 60) : (33.333 / 60);
       const pitchMultiplier = Math.pow(2, (playStateRef.current.pitchOffset ?? 0) / 12);
@@ -831,23 +840,22 @@ const PixiTurntable2D: React.FC<{
 
       if ((playStateRef.current.isPlaying && powerOnRef.current) || isScratchActiveRef.current) {
         let rate = 1;
-        if (isScratchActiveRef.current || physics.spinbackActive || physics.powerCutActive) {
+        if (physics && (isScratchActiveRef.current || physics.spinbackActive || physics.powerCutActive)) {
           rate = physics.tick(dt);
         }
 
         angleRef.current += rps * rate * 2 * Math.PI * dt;
 
         if (isScratchActiveRef.current && Math.abs(rate - prevRate) > 0.01) {
-          try { getDJEngine().getDeck(deckId).setScratchVelocity(rate); } catch { /* not ready */ }
+          DJActions.setScratchVelocity(deckId, rate);
           prevRate = rate;
         }
 
-        if (isScratchActiveRef.current && !physics.touching && !physics.spinbackActive && !physics.powerCutActive) {
+        if (physics && isScratchActiveRef.current && !physics.touching && !physics.spinbackActive && !physics.powerCutActive) {
           if (Math.abs(rate - 1.0) < 0.02) {
             isScratchActiveRef.current = false;
             setIsScratchActive(false);
-            try { getDJEngine().getDeck(deckId).stopScratch(50); } catch { /* not ready */ }
-            useDJStore.getState().setDeckScratchActive(deckId, false);
+            DJActions.stopScratch(deckId, 50);
             prevRate = 1;
           }
         }
@@ -995,8 +1003,7 @@ const PixiTurntable2D: React.FC<{
     if (isScratchActiveRef.current) return;
     isScratchActiveRef.current = true;
     setIsScratchActive(true);
-    useDJStore.getState().setDeckScratchActive(deckId, true);
-    try { getDJEngine().getDeck(deckId).startScratch(); } catch { /* not ready */ }
+    DJActions.startScratch(deckId);
   }, [deckId]);
 
   // Platter pointer handlers (scratch)
@@ -1008,8 +1015,8 @@ const PixiTurntable2D: React.FC<{
 
     lastPointerRef.current = { x: e.clientX, y: e.clientY };
     lastPointerTimeRef.current = performance.now();
-    physicsRef.current.setTouching(true);
-    physicsRef.current.setHandVelocity(0);
+    physicsRef.current?.setTouching(true);
+    physicsRef.current?.setHandVelocity(0);
 
     const onMove = (ev: PointerEvent) => {
       if (!lastPointerRef.current) return;
@@ -1032,7 +1039,7 @@ const PixiTurntable2D: React.FC<{
         lastPointerTimeRef.current = now;
         const pixelVelocity = tangential / dt;
         const omega = (pixelVelocity / (platterR * 4)) * OMEGA_NORMAL;
-        physicsRef.current.setHandVelocity(omega);
+        physicsRef.current?.setHandVelocity(omega);
       }
 
       lastPointerRef.current = { x: ev.clientX, y: ev.clientY };
@@ -1040,7 +1047,7 @@ const PixiTurntable2D: React.FC<{
 
     const onUp = () => {
       lastPointerRef.current = null;
-      physicsRef.current.setTouching(false);
+      physicsRef.current?.setTouching(false);
       document.removeEventListener('pointermove', onMove);
       document.removeEventListener('pointerup', onUp);
     };
@@ -1064,13 +1071,13 @@ const PixiTurntable2D: React.FC<{
 
     const normalizedDelta = e.deltaMode === 1 ? e.deltaY * 12 : e.deltaMode === 2 ? e.deltaY * 400 : e.deltaY;
     const omega = TurntablePhysics.deltaToAngularVelocity(normalizedDelta, dt);
-    physicsRef.current.setTouching(true);
-    physicsRef.current.setHandVelocity(omega);
+    physicsRef.current?.setTouching(true);
+    physicsRef.current?.setHandVelocity(omega);
 
     if (scrollReleaseTimerRef.current !== null) clearTimeout(scrollReleaseTimerRef.current);
     scrollReleaseTimerRef.current = setTimeout(() => {
       scrollReleaseTimerRef.current = null;
-      physicsRef.current.setTouching(false);
+      physicsRef.current?.setTouching(false);
     }, 150);
   }, [enterScratch]);
 
