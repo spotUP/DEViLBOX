@@ -174,57 +174,59 @@ const cyanLineartTheme: Theme = {
 };
 
 // DEViLBOX Theme - Red-tinted dark theme
-// Inspired by Behringer TD-3 "Red Devil" — cherry red body, silver knobs, black keys
+// Inspired by Behringer TD-3 "Red Devil" hi-res reference
+// Body: bold matte red #c4282e, knobs: brushed silver #b0b0b0,
+// labels: cream silk #e8e0d8, keys: charcoal #2a2a2a, shadow: burgundy #6e1418
 const devilboxTheme: Theme = {
   id: 'devilbox',
   name: 'DEViLBOX',
   colors: {
-    // Backgrounds — dark with strong red undertone (like TD-3 in shadow)
-    bg: '#140808',           // deepest: near-black with red blood
-    bgSecondary: '#1c0c0c',  // panels: dark mahogany
-    bgTertiary: '#2a1212',   // toolbars: dark cherry
-    bgHover: '#3d1a1a',      // hover: warming up
-    bgActive: '#4a1e1e',     // active: rich dark red
+    // Backgrounds — the TD-3's black sequencer keys and shadow areas
+    bg: '#12060a',            // deepest black with red-purple blood
+    bgSecondary: '#1a0a0e',   // panels: like the dark tinted LED windows
+    bgTertiary: '#2c1018',    // toolbars: burgundy shadow under knobs
+    bgHover: '#421820',       // hover: warming toward the red chassis
+    bgActive: '#581e28',      // active: approaching body red
 
-    // Borders — visible red, like the TD-3 panel edges
-    border: '#5c2222',
-    borderLight: '#6e2d2d',
+    // Borders — TD-3 panel edge catches, clearly red
+    border: '#6e1418',        // burgundy shadow from the hi-res photo
+    borderLight: '#8c2028',   // brighter edge — body red in shadow
 
-    // Accent — TD-3 cherry red body (#b91c1c) and hot highlights
-    accent: '#dc2626',        // vivid red — the devil's color
-    accentSecondary: '#b91c1c', // darker cherry — TD-3 body color
-    accentHighlight: '#f87171', // light red glow — LED indicator feel
-    accentGlow: 'rgba(220, 38, 38, 0.25)',
+    // Accent — the bold matte red body of the TD-3 (#c4282e)
+    accent: '#c4282e',        // TD-3 body red — THE color
+    accentSecondary: '#a01e24', // side cheek / darker body red
+    accentHighlight: '#e84850', // hot red glow — like the LED when lit
+    accentGlow: 'rgba(196, 40, 46, 0.3)',
 
-    // Text — white on red like TD-3 silkscreen labels
-    text: '#f5f0f0',
-    textSecondary: '#c4a8a8',  // warm silver — like aged metallic labels
-    textMuted: '#7a5555',      // dark rose — recessed text
-    textInverse: '#140808',
+    // Text — TD-3 cream silkscreen labels + brushed silver knob feel
+    text: '#e8e0d8',          // cream silk — matches the label printing
+    textSecondary: '#b0a8a0', // brushed silver — like the knob surface
+    textMuted: '#6e5558',     // recessed label in shadow
+    textInverse: '#12060a',
 
     // Semantic
-    error: '#f87171',
+    error: '#e84850',         // matches accentHighlight
     success: '#34d399',
     warning: '#fbbf24',
 
-    // Tracker rows — alternating dark reds like circuit board traces
-    trackerRowEven: '#160909',
-    trackerRowOdd: '#1c0c0c',
-    trackerRowHighlight: '#261010',
-    trackerRowCurrent: '#3d1616',
-    trackerRowCursor: '#4a1a1a',
+    // Tracker rows — dark red alternation like PCB traces under the sequencer
+    trackerRowEven: '#14070a',
+    trackerRowOdd: '#1a0a0e',
+    trackerRowHighlight: '#24101a',
+    trackerRowCurrent: '#421820',  // selected: strong red presence
+    trackerRowCursor: '#521e28',
 
-    // Cell colors — vivid against the dark red
-    cellNote: '#f5f0f0',
-    cellInstrument: '#fbbf24',   // gold — like the TD-3's amber LEDs
+    // Cell colors — vivid data on the dark red canvas
+    cellNote: '#e8e0d8',       // cream silk label color
+    cellInstrument: '#fbbf24', // gold — TD-3's amber LED indicators
     cellVolume: '#34d399',
-    cellEffect: '#f87171',       // light red
-    cellAccent: '#dc2626',       // main red
-    cellSlide: '#fb7185',        // pink slide
-    cellEmpty: '#5a3838',        // dark rose
-    playbackCursor: '#dc2626',
+    cellEffect: '#e84850',     // hot red
+    cellAccent: '#c4282e',     // body red
+    cellSlide: '#fb7185',      // pink slide
+    cellEmpty: '#4a3038',      // muted burgundy
+    playbackCursor: '#c4282e', // body red
     currentRowText: '#ffffff',
-    panelShadow: '#0a0404',
+    panelShadow: '#080306',
   },
 };
 
