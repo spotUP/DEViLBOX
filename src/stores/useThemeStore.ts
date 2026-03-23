@@ -198,10 +198,10 @@ const devilboxTheme: Theme = {
     accentHighlight: '#ff6b6b', // glowing red — lit LED
     accentGlow: 'rgba(232, 72, 80, 0.35)',
 
-    // Text — cream silkscreen labels on red body
-    text: '#f0e8e0',          // cream silk — printed labels on the red
-    textSecondary: '#d4c0b8', // softer cream — secondary info
-    textMuted: '#98706c',     // faded label on red surface
+    // Text — white with varying opacity on red (grey looks muddy on red)
+    text: 'rgba(255,255,255,0.95)',          // primary: near-white
+    textSecondary: 'rgba(255,255,255,0.65)', // secondary: white at 65%
+    textMuted: 'rgba(255,255,255,0.35)',     // muted: white at 35%
     textInverse: '#6e1418',
 
     // Semantic
@@ -216,14 +216,14 @@ const devilboxTheme: Theme = {
     trackerRowCurrent: '#a82830',   // current row: bright red
     trackerRowCursor: '#982430',    // cursor row
 
-    // Cell colors — must pop against red background
-    cellNote: '#f0e8e0',       // cream silk
+    // Cell colors — vivid on red, white-based where possible
+    cellNote: 'rgba(255,255,255,0.92)',
     cellInstrument: '#ffd060', // warm gold — amber LED
     cellVolume: '#5eeaa0',     // bright green
     cellEffect: '#ffb0b0',     // light pink — effect on red bg
     cellAccent: '#ff6b6b',     // glowing red
     cellSlide: '#ffb8c8',      // soft pink
-    cellEmpty: '#905050',      // muted on red
+    cellEmpty: 'rgba(255,255,255,0.2)', // subtle on red
     playbackCursor: '#e84850', // hot red
     currentRowText: '#ffffff',
     panelShadow: '#480c10',

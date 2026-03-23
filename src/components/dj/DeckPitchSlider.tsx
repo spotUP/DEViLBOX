@@ -121,43 +121,47 @@ export const DeckPitchSlider: React.FC<DeckPitchSliderProps> = ({ deckId }) => {
         onDoubleClick={handleDoubleClick}
         onContextMenu={(e) => { e.preventDefault(); setDeckPitch(deckId, 0); }}
       >
-        {/* Groove track */}
+        {/* Groove track — recessed black slot like the TD-3 sequencer groove */}
         <div
-          className="absolute left-1/2 -translate-x-1/2 rounded-sm top-0 bottom-0 bg-dark-bg"
+          className="absolute left-1/2 -translate-x-1/2 rounded-sm top-0 bottom-0"
           style={{
             width: 6,
-            boxShadow: 'inset 0 1px 3px var(--color-panel-shadow, rgba(0,0,0,0.6))',
+            backgroundColor: 'rgba(0,0,0,0.6)',
+            boxShadow: 'inset 0 1px 3px rgba(0,0,0,0.8)',
           }}
         />
 
         {/* Center detent mark */}
         <div
-          className="absolute left-0 right-0 bg-dark-borderLight"
+          className="absolute left-0 right-0"
           style={{
             top: centerY + HANDLE_HEIGHT / 2 - 1,
             height: 2,
+            backgroundColor: 'rgba(255,255,255,0.3)',
           }}
         />
 
-        {/* Rectangular handle */}
+        {/* Rectangular handle — brushed silver like TD-3 knobs */}
         <div
-          className="absolute left-0 right-0 rounded-sm bg-dark-bgHover border border-dark-borderLight"
+          className="absolute left-0 right-0 rounded-sm"
           style={{
             top: handleY,
             height: HANDLE_HEIGHT,
+            background: 'linear-gradient(to bottom, rgba(255,255,255,0.35) 0%, rgba(255,255,255,0.2) 40%, rgba(255,255,255,0.15) 100%)',
+            border: '1px solid rgba(255,255,255,0.2)',
             boxShadow: isDragging
-              ? '0 0 6px var(--color-accent-glow, rgba(255,255,255,0.2)), inset 0 1px 0 rgba(255,255,255,0.1)'
-              : 'inset 0 1px 0 rgba(255,255,255,0.1), 0 1px 3px var(--color-panel-shadow, rgba(0,0,0,0.5))',
+              ? '0 0 8px var(--color-accent-glow, rgba(255,255,255,0.3)), inset 0 1px 0 rgba(255,255,255,0.2)'
+              : 'inset 0 1px 0 rgba(255,255,255,0.2), 0 1px 3px rgba(0,0,0,0.5)',
             cursor: isDragging ? 'grabbing' : 'grab',
           }}
         >
           {/* Grip lines */}
           <div className="absolute inset-x-1 top-1/2 -translate-y-1/2 flex flex-col gap-[2px]">
-            <div className="h-[1px] bg-dark-border" />
-            <div className="h-[1px] bg-white/10" />
-            <div className="h-[1px] bg-dark-border" />
-            <div className="h-[1px] bg-white/10" />
-            <div className="h-[1px] bg-dark-border" />
+            <div className="h-[1px] bg-black/30" />
+            <div className="h-[1px] bg-white/20" />
+            <div className="h-[1px] bg-black/30" />
+            <div className="h-[1px] bg-white/20" />
+            <div className="h-[1px] bg-black/30" />
           </div>
         </div>
       </div>
