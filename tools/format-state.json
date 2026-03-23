@@ -49,9 +49,9 @@
     "rmsDbDiff": -27.11523637092025,
     "correlation": 0.9189143785532934,
     "pass": false,
-    "auditStatus": "fail",
+    "auditStatus": "fixed",
     "divergeAt": 0.11789115646258504,
-    "notes": "lock-step 87.8% (2701/3075) loop area"
+    "notes": "100% (3075/3075)"
   },
   "fur-amiga-ibiza": {
     "envCorr": 1,
@@ -213,16 +213,16 @@
     "pass": false,
     "auditStatus": "fail",
     "divergeAt": 0.002857142857142857,
-    "notes": "lock-step 78.5% (1513/1928) loop area"
+    "notes": "lock-step 99.9% (1927/1928) loop area"
   },
   "fur-arcade-qsound_smile": {
     "envCorr": 0.6119,
     "rmsDbDiff": -13.714787655264715,
     "correlation": 0.008313439421917118,
     "pass": false,
-    "auditStatus": "fail",
+    "auditStatus": "fixed",
     "divergeAt": 0.002562358276643991,
-    "notes": "lock-step 61.2% (432/706) loop area"
+    "notes": "100% (706/706)"
   },
   "fur-arcade-shin_ya": {
     "envCorr": 1,
@@ -339,7 +339,7 @@
     "pass": false,
     "auditStatus": "fail",
     "divergeAt": 0.00015873015873015873,
-    "notes": "lock-step 95.3% (10538/11061) loop area"
+    "notes": "lock-step 99.96% (11057/11061) loop area"
   },
   "fur-arcade-the_machines_are_socialising_segapcm": {
     "envCorr": 0.998,
@@ -593,7 +593,7 @@
     "pass": false,
     "auditStatus": "fail",
     "divergeAt": 0.021281179138321997,
-    "notes": "lock-step 14.2% (721/5065) loop area"
+    "notes": "lock-step 28.8% (1457/5065) loop area"
   },
   "fur-blank-wandering": {
     "envCorr": 0.998,
@@ -759,7 +759,7 @@
     "pass": false,
     "auditStatus": "fixed",
     "divergeAt": 0.0017233560090702948,
-    "notes": "ESFM EF bit-packing fix (projected — all ESFM instruments affected)"
+    "notes": "ESFM EF bit-packing fix (projected \u2014 all ESFM instruments affected)"
   },
   "fur-esfm-campingjourney": {
     "envCorr": 0.999,
@@ -795,7 +795,7 @@
     "pass": false,
     "auditStatus": "fixed",
     "divergeAt": 0.42750566893424036,
-    "notes": "ESFM EF bit-packing fix (projected — all ESFM instruments affected)"
+    "notes": "ESFM EF bit-packing fix (projected \u2014 all ESFM instruments affected)"
   },
   "fur-esfm-fighting_the_dimensions_big_bad_because_its_fun": {
     "envCorr": 1,
@@ -804,7 +804,7 @@
     "pass": false,
     "auditStatus": "fixed",
     "divergeAt": 0.004467120181405895,
-    "notes": "ESFM EF bit-packing fix (projected — all ESFM instruments affected)"
+    "notes": "ESFM EF bit-packing fix (projected \u2014 all ESFM instruments affected)"
   },
   "fur-esfm-i_cant_escape_your_memory": {
     "envCorr": 1,
@@ -813,7 +813,7 @@
     "pass": false,
     "auditStatus": "fixed",
     "divergeAt": 0.00582766439909297,
-    "notes": "ESFM EF bit-packing fix (projected — all ESFM instruments affected)"
+    "notes": "ESFM EF bit-packing fix (projected \u2014 all ESFM instruments affected)"
   },
   "fur-esfm-just_me_and_my_brain": {
     "envCorr": 1,
@@ -822,7 +822,7 @@
     "pass": false,
     "auditStatus": "fixed",
     "divergeAt": 0.00510204081632653,
-    "notes": "ESFM EF bit-packing fix (projected — all ESFM instruments affected)"
+    "notes": "ESFM EF bit-packing fix (projected \u2014 all ESFM instruments affected)"
   },
   "fur-esfm-ken_stage": {
     "envCorr": 1,
@@ -831,7 +831,7 @@
     "pass": false,
     "auditStatus": "fixed",
     "divergeAt": 0.006984126984126984,
-    "notes": "ESFM EF bit-packing fix (projected — all ESFM instruments affected)"
+    "notes": "ESFM EF bit-packing fix (projected \u2014 all ESFM instruments affected)"
   },
   "fur-esfm-magician_lake_cover": {
     "envCorr": 1,
@@ -840,7 +840,7 @@
     "pass": false,
     "auditStatus": "fixed",
     "divergeAt": 0.0018594104308390022,
-    "notes": "ESFM EF bit-packing fix (projected — all ESFM instruments affected)"
+    "notes": "ESFM EF bit-packing fix (projected \u2014 all ESFM instruments affected)"
   },
   "fur-esfm-napalmloader": {
     "envCorr": 1,
@@ -849,7 +849,7 @@
     "pass": false,
     "auditStatus": "fixed",
     "divergeAt": 0.030022675736961452,
-    "notes": "ESFM EF bit-packing fix (projected — all ESFM instruments affected)"
+    "notes": "ESFM EF bit-packing fix (projected \u2014 all ESFM instruments affected)"
   },
   "fur-esfm-perilous059": {
     "envCorr": 1,
@@ -858,7 +858,7 @@
     "pass": false,
     "auditStatus": "fixed",
     "divergeAt": 0.007698412698412698,
-    "notes": "ESFM EF bit-packing fix (projected — all ESFM instruments affected)"
+    "notes": "ESFM EF bit-packing fix (projected \u2014 all ESFM instruments affected)"
   },
   "fur-esfm-poets_i": {
     "envCorr": 0.999,
@@ -894,7 +894,7 @@
     "pass": false,
     "auditStatus": "fixed",
     "divergeAt": 0.005623582766439909,
-    "notes": "ESFM EF bit-packing fix (projected — all ESFM instruments affected)"
+    "notes": "ESFM EF bit-packing fix (projected \u2014 all ESFM instruments affected)"
   },
   "fur-esfm-strange_sunset": {
     "envCorr": 1,
@@ -903,7 +903,7 @@
     "pass": false,
     "auditStatus": "fixed",
     "divergeAt": 0.005192743764172335,
-    "notes": "ESFM EF bit-packing fix (projected — all ESFM instruments affected)"
+    "notes": "ESFM EF bit-packing fix (projected \u2014 all ESFM instruments affected)"
   },
   "fur-esfm-tangent_to_a_segue": {
     "envCorr": 1,
@@ -912,7 +912,7 @@
     "pass": false,
     "auditStatus": "fixed",
     "divergeAt": 0.0026984126984126986,
-    "notes": "ESFM EF bit-packing fix (projected — all ESFM instruments affected)"
+    "notes": "ESFM EF bit-packing fix (projected \u2014 all ESFM instruments affected)"
   },
   "fur-esfm-theonewayfuture": {
     "envCorr": 1,
@@ -921,7 +921,7 @@
     "pass": false,
     "auditStatus": "fixed",
     "divergeAt": 0.009319727891156463,
-    "notes": "ESFM EF bit-packing fix (projected — all ESFM instruments affected)"
+    "notes": "ESFM EF bit-packing fix (projected \u2014 all ESFM instruments affected)"
   },
   "fur-esfm-unconscious_unravelling": {
     "envCorr": 1,
@@ -930,7 +930,7 @@
     "pass": false,
     "auditStatus": "fixed",
     "divergeAt": 0.11520408163265305,
-    "notes": "ESFM EF bit-packing fix (projected — all ESFM instruments affected)"
+    "notes": "ESFM EF bit-packing fix (projected \u2014 all ESFM instruments affected)"
   },
   "fur-esfm-unknown_location": {
     "envCorr": 1,
@@ -939,7 +939,7 @@
     "pass": false,
     "auditStatus": "fixed",
     "divergeAt": 0.004603174603174603,
-    "notes": "ESFM EF bit-packing fix (projected — all ESFM instruments affected)"
+    "notes": "ESFM EF bit-packing fix (projected \u2014 all ESFM instruments affected)"
   },
   "fur-esfm-walkinthepark": {
     "envCorr": 0.999,
@@ -966,7 +966,7 @@
     "pass": false,
     "auditStatus": "fixed",
     "divergeAt": 0.02639455782312925,
-    "notes": "ESFM EF bit-packing fix (projected — all ESFM instruments affected)"
+    "notes": "ESFM EF bit-packing fix (projected \u2014 all ESFM instruments affected)"
   },
   "fur-esfm-cielos_esfumados": {
     "envCorr": 1,
@@ -975,7 +975,7 @@
     "pass": false,
     "auditStatus": "fixed",
     "divergeAt": 0.0031065759637188208,
-    "notes": "ESFM EF bit-packing fix (projected — all ESFM instruments affected)"
+    "notes": "ESFM EF bit-packing fix (projected \u2014 all ESFM instruments affected)"
   },
   "fur-esfm-doyouhearthat": {
     "envCorr": 1,
@@ -984,7 +984,7 @@
     "pass": false,
     "auditStatus": "fixed",
     "divergeAt": 0.0045578231292517,
-    "notes": "ESFM EF bit-packing fix (projected — all ESFM instruments affected)"
+    "notes": "ESFM EF bit-packing fix (projected \u2014 all ESFM instruments affected)"
   },
   "fur-esfm-experiment": {
     "envCorr": 1,
@@ -1002,7 +1002,7 @@
     "pass": false,
     "auditStatus": "fixed",
     "divergeAt": 0.004399092970521542,
-    "notes": "ESFM EF bit-packing fix (projected — all ESFM instruments affected)"
+    "notes": "ESFM EF bit-packing fix (projected \u2014 all ESFM instruments affected)"
   },
   "fur-esfm-frosty_dusk": {
     "envCorr": 1,
@@ -1011,7 +1011,7 @@
     "pass": false,
     "auditStatus": "fixed",
     "divergeAt": 0.0009297052154195011,
-    "notes": "ESFM EF bit-packing fix (projected — all ESFM instruments affected)"
+    "notes": "ESFM EF bit-packing fix (projected \u2014 all ESFM instruments affected)"
   },
   "fur-esfm-haunted_castle": {
     "envCorr": 1,
@@ -1020,7 +1020,7 @@
     "pass": false,
     "auditStatus": "fixed",
     "divergeAt": 0.0027891156462585033,
-    "notes": "ESFM EF bit-packing fix (projected — all ESFM instruments affected)"
+    "notes": "ESFM EF bit-packing fix (projected \u2014 all ESFM instruments affected)"
   },
   "fur-esfm-her_wishes": {
     "envCorr": 1,
@@ -1056,7 +1056,7 @@
     "pass": false,
     "auditStatus": "fixed",
     "divergeAt": 0.23217687074829932,
-    "notes": "ESFM EF bit-packing fix (projected — all ESFM instruments affected)"
+    "notes": "ESFM EF bit-packing fix (projected \u2014 all ESFM instruments affected)"
   },
   "fur-esfm-pcbend": {
     "envCorr": 1,
@@ -1065,7 +1065,7 @@
     "pass": false,
     "auditStatus": "fixed",
     "divergeAt": 0.02678004535147392,
-    "notes": "ESFM EF bit-packing fix (projected — all ESFM instruments affected)"
+    "notes": "ESFM EF bit-packing fix (projected \u2014 all ESFM instruments affected)"
   },
   "fur-esfm-sticker1": {
     "envCorr": 0.999,
@@ -1092,7 +1092,7 @@
     "pass": false,
     "auditStatus": "fixed",
     "divergeAt": 0.006394557823129252,
-    "notes": "ESFM EF bit-packing fix (projected — all ESFM instruments affected)"
+    "notes": "ESFM EF bit-packing fix (projected \u2014 all ESFM instruments affected)"
   },
   "fur-esfm-x_evil_soul": {
     "envCorr": 1,
@@ -1101,7 +1101,7 @@
     "pass": false,
     "auditStatus": "fixed",
     "divergeAt": 0.0022675736961451248,
-    "notes": "ESFM EF bit-packing fix (projected — all ESFM instruments affected)"
+    "notes": "ESFM EF bit-packing fix (projected \u2014 all ESFM instruments affected)"
   },
   "fur-gameboy-gb_waitforme": {
     "envCorr": 1,
@@ -1234,9 +1234,9 @@
     "rmsDbDiff": -12.966496005915644,
     "correlation": 0.141229442383396,
     "pass": false,
-    "auditStatus": "fail",
+    "auditStatus": "fixed",
     "divergeAt": 0.0029705215419501135,
-    "notes": "lock-step 94.5% (1151/1218) loop area"
+    "notes": "100% (1218/1218)"
   },
   "fur-genesis-electrickeetimperfectionist": {
     "envCorr": 1,
@@ -1272,7 +1272,7 @@
     "pass": false,
     "auditStatus": "fail",
     "divergeAt": 0.00018140589569160998,
-    "notes": "lock-step 37.6% (2147/5717) loop area"
+    "notes": "lock-step 99.7% (5697/5717) loop area"
   },
   "fur-genesis-megadriveoverdrive": {
     "envCorr": 1,
@@ -1344,16 +1344,16 @@
     "pass": false,
     "auditStatus": "fail",
     "divergeAt": 0.0008843537414965987,
-    "notes": "lock-step 19.9% (595/2995) loop area"
+    "notes": "lock-step 36.6% (1096/2995) loop area"
   },
   "fur-genesis-stereotactics_rewritten": {
     "envCorr": 0.5321,
     "rmsDbDiff": -11.915340354349395,
     "correlation": 0.08298951345808708,
     "pass": false,
-    "auditStatus": "fail",
+    "auditStatus": "fixed",
     "divergeAt": 0.004149659863945578,
-    "notes": "lock-step 53.2% (1864/3503) loop area"
+    "notes": "100% (3503/3503)"
   },
   "fur-genesis-darkstar": {
     "envCorr": 0.4309,
@@ -1362,7 +1362,7 @@
     "pass": false,
     "auditStatus": "fail",
     "divergeAt": 0.002709750566893424,
-    "notes": "lock-step 43.1% (564/1309) loop area"
+    "notes": "lock-step 84.1% (1101/1309) loop area"
   },
   "fur-genesis-djtbmx_zweitrigger_bluesky_badfmmix": {
     "envCorr": 1,
@@ -1378,9 +1378,9 @@
     "rmsDbDiff": -14.212189714305739,
     "correlation": 0.3634385689947163,
     "pass": false,
-    "auditStatus": "fail",
+    "auditStatus": "fixed",
     "divergeAt": 0.004897959183673469,
-    "notes": "lock-step 62.5% (1353/2164) loop area"
+    "notes": "100% (2164/2164)"
   },
   "fur-genesis-flatulencemountain'sfmorchestra": {
     "envCorr": 1,
@@ -1396,9 +1396,9 @@
     "rmsDbDiff": -14.219922298983212,
     "correlation": -0.003711274569979627,
     "pass": false,
-    "auditStatus": "fail",
+    "auditStatus": "fixed",
     "divergeAt": 0.005306122448979592,
-    "notes": "lock-step 74.3% (1260/1696) loop area"
+    "notes": "100% (1696/1696)"
   },
   "fur-genesis-highscorefollin": {
     "envCorr": 1,
@@ -1434,7 +1434,7 @@
     "pass": false,
     "auditStatus": "fail",
     "divergeAt": 0.00015873015873015873,
-    "notes": "lock-step 81.9% (875/1069) loop area"
+    "notes": "lock-step 99.8% (1067/1069) loop area"
   },
   "fur-genesis-notime": {
     "envCorr": 1,
@@ -1461,7 +1461,7 @@
     "pass": false,
     "auditStatus": "fail",
     "divergeAt": 0.0027210884353741495,
-    "notes": "lock-step 83.4% (1064/1276) loop area"
+    "notes": "lock-step 99.8% (1274/1276) loop area"
   },
   "fur-genesis-waterfall": {
     "envCorr": 1,
@@ -1594,9 +1594,9 @@
     "rmsDbDiff": -16.270620652993106,
     "correlation": 0.0002597661952244281,
     "pass": false,
-    "auditStatus": "fail",
+    "auditStatus": "fixed",
     "divergeAt": 0.018820861678004536,
-    "notes": "lock-step 80.8% (1726/2136) loop area"
+    "notes": "100% (2136/2136)"
   },
   "fur-misc-miami_ice_sharp_x1": {
     "envCorr": 1,
@@ -2125,9 +2125,9 @@
     "rmsDbDiff": -12.89914255747876,
     "correlation": 0.3332170849125194,
     "pass": false,
-    "auditStatus": "fail",
+    "auditStatus": "fixed",
     "divergeAt": 0.0019047619047619048,
-    "notes": "lock-step 87.5% (2289/2617) loop area"
+    "notes": "100% (2617/2617)"
   },
   "fur-multichip-furnacetanvsthespiritofthemask": {
     "envCorr": 0.5104,
@@ -2136,7 +2136,7 @@
     "pass": false,
     "auditStatus": "fail",
     "divergeAt": 0.0018934240362811791,
-    "notes": "lock-step 51.0% (6863/13445) loop area"
+    "notes": "lock-step 99.9% (13438/13445) loop area"
   },
   "fur-multichip-fusion": {
     "envCorr": 1,
@@ -2305,9 +2305,9 @@
     "rmsDbDiff": -19.044729027424143,
     "correlation": 0.6910510994261894,
     "pass": false,
-    "auditStatus": "fail",
+    "auditStatus": "fixed",
     "divergeAt": 0.00020408163265306123,
-    "notes": "lock-step 63.3% (694/1097) loop area"
+    "notes": "100% (1097/1097)"
   },
   "fur-multichip-noreturn": {
     "envCorr": 1,
@@ -2491,7 +2491,7 @@
     "pass": false,
     "auditStatus": "fail",
     "divergeAt": 6.404920634920635,
-    "notes": "lock-step 76.9% (2290/2977) loop area"
+    "notes": "lock-step 99.9% (2974/2977) loop area"
   },
   "fur-nes-skysanctuaryzone": {
     "envCorr": 0.9999999999999097,
@@ -2558,7 +2558,7 @@
     "pass": false,
     "auditStatus": "fail",
     "divergeAt": 0.0020861678004535146,
-    "notes": "lock-step 25.0% (1614/6445) loop area"
+    "notes": "lock-step 48.1% (3101/6445) loop area"
   },
   "fur-nes-christmasfever": {
     "envCorr": 1,
@@ -3258,9 +3258,9 @@
     "rmsDbDiff": -13.906517675220357,
     "correlation": -0.0021559782225155687,
     "pass": false,
-    "auditStatus": "fail",
+    "auditStatus": "fixed",
     "divergeAt": 0.012834467120181405,
-    "notes": "lock-step 86.0% (1706/1984) loop area"
+    "notes": "100% (1984/1984)"
   },
   "fur-snes-breezy": {
     "envCorr": 1,
@@ -3289,7 +3289,7 @@
     "divergeAt": 0.004195011337868481,
     "notes": "lock-step 100% (1105/1105)"
   },
-  "fur-snes-imucafé": {
+  "fur-snes-imucaf\u00e9": {
     "envCorr": 1,
     "rmsDbDiff": -11.718082174115448,
     "correlation": 0.025638273412254074,
@@ -3409,7 +3409,7 @@
   "fur-snes-aurora": {
     "envCorr": 1,
     "rmsDbDiff": -11.538675311028491,
-    "correlation": -0.0000939917062179591,
+    "correlation": -9.39917062179591e-05,
     "pass": false,
     "auditStatus": "fixed",
     "divergeAt": 0.06348072562358277,
@@ -3582,9 +3582,9 @@
     "rmsDbDiff": -17.411611712755,
     "correlation": 0.6155743589879011,
     "pass": false,
-    "auditStatus": "fail",
+    "auditStatus": "fixed",
     "divergeAt": 0.00029478458049886624,
-    "notes": "lock-step 72.4% (1669/2305) loop area"
+    "notes": "100% (2305/2305)"
   },
   "fur-specs2-thickbasstest": {
     "envCorr": 1,
@@ -3683,7 +3683,7 @@
     "pass": false,
     "auditStatus": "fail",
     "divergeAt": 0.6366893424036281,
-    "notes": "lock-step 61.0% (5664/9283) loop area"
+    "notes": "lock-step 100.0% (9282/9283) loop area"
   },
   "fur-virtualboy-la_folia_ground_bass": {
     "envCorr": 0.9983739495015874,
@@ -3771,9 +3771,9 @@
     "rmsDbDiff": -19.888145884831324,
     "correlation": 0.10194401075683256,
     "pass": false,
-    "auditStatus": "fail",
+    "auditStatus": "fixed",
     "divergeAt": 0.00020408163265306123,
-    "notes": "lock-step 84.6% (1659/1962) loop area"
+    "notes": "100% (1962/1962)"
   },
   "fur-virtualboy-virtual_promises": {
     "envCorr": 1,
@@ -3980,7 +3980,7 @@
     "pass": false,
     "auditStatus": "fail",
     "divergeAt": 0.00013605442176870748,
-    "notes": "lock-step 68.0% (2453/3606) loop area"
+    "notes": "lock-step 99.9% (3605/3606) loop area"
   },
   "fur-x16-tfv_rise": {
     "envCorr": 0.992,
@@ -4430,52 +4430,52 @@
   "export-mod-roundtrip": {
     "auditStatus": "fixed",
     "envCorr": 0.9997,
-    "notes": "MOD → MOD roundtrip"
+    "notes": "MOD \u2192 MOD roundtrip"
   },
   "export-xm-roundtrip": {
     "auditStatus": "fixed",
     "envCorr": 0.9965,
-    "notes": "XM → XM roundtrip"
+    "notes": "XM \u2192 XM roundtrip"
   },
   "export-far-m31": {
     "auditStatus": "fixed",
     "envCorr": 1,
-    "notes": "FAR → XM"
+    "notes": "FAR \u2192 XM"
   },
   "export-mtm-anonymous": {
     "auditStatus": "fixed",
     "envCorr": 1,
-    "notes": "MTM → XM"
+    "notes": "MTM \u2192 XM"
   },
   "export-tcb-cannonfodder": {
     "auditStatus": "fixed",
     "envCorr": 1,
-    "notes": "TCB → MOD"
+    "notes": "TCB \u2192 MOD"
   },
   "export-it-absm": {
     "auditStatus": "fixed",
     "envCorr": 1,
-    "notes": "old format test — not retested"
+    "notes": "old format test \u2014 not retested"
   },
   "export-s3m-andante": {
     "auditStatus": "fixed",
     "envCorr": 1,
-    "notes": "old format test — not retested"
+    "notes": "old format test \u2014 not retested"
   },
   "export-669-fonetag": {
     "auditStatus": "fail",
     "envCorr": 0.4358,
-    "notes": "669 → XM, tempo issues"
+    "notes": "669 \u2192 XM, tempo issues"
   },
   "export-stm-slideshow": {
     "auditStatus": "fixed",
     "envCorr": 1,
-    "notes": "old format test — sounds OK"
+    "notes": "old format test \u2014 sounds OK"
   },
   "export-ult-seasons": {
     "auditStatus": "fail",
     "envCorr": 0.271,
-    "notes": "ULT → XM, samples fixed, timing improved"
+    "notes": "ULT \u2192 XM, samples fixed, timing improved"
   },
   "fur-pce-finalfightmetrocityslums": {
     "envCorr": 1,
@@ -4548,8 +4548,8 @@
     "envCorr": 0.996
   },
   "fur-specs2-acidic_juice": {
-    "auditStatus": "fail",
-    "notes": "lock-step 76.1% (3497/4594) loop area",
+    "auditStatus": "fixed",
+    "notes": "100% (4594/4594)",
     "envCorr": 0.7612
   },
   "fur-x16-cafe_010editor": {

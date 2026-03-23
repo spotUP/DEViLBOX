@@ -309,7 +309,7 @@ async function main() {
     const tmpWav = '/tmp/_compare_cmds_dvb.wav';
     console.log('Rendering DEViLBOX (WASM headless)...');
     execSync(
-      `npx tsx tools/furnace-audit/render-devilbox.ts "${furPath}" "${tmpWav}" --cmdlog 2>/dev/null`,
+      `npx tsx --tsconfig tsconfig.app.json tools/furnace-audit/render-devilbox.ts "${furPath}" "${tmpWav}" --cmdlog 2>/dev/null`,
       { maxBuffer: 100 * 1024 * 1024, timeout: 300000 }
     );
 
