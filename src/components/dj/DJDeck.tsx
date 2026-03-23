@@ -257,7 +257,7 @@ export const DJDeck: React.FC<DJDeckProps> = ({ deckId }) => {
 
       {/* Track info + turntable */}
       <div className="flex items-start gap-2">
-        <div className="flex-1 min-w-0">
+        <div className="relative z-10 flex-1 min-w-0 overflow-hidden">
           <div className={`text-xs font-mono font-bold tracking-[0.3em] uppercase ${deckColor} opacity-60 mb-1`}>
             Deck {deckNum}
           </div>
