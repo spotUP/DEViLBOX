@@ -181,52 +181,52 @@ const devilboxTheme: Theme = {
   id: 'devilbox',
   name: 'DEViLBOX',
   colors: {
-    // Backgrounds — the TD-3's black sequencer keys and shadow areas
-    bg: '#12060a',            // deepest black with red-purple blood
-    bgSecondary: '#1a0a0e',   // panels: like the dark tinted LED windows
-    bgTertiary: '#2c1018',    // toolbars: burgundy shadow under knobs
-    bgHover: '#421820',       // hover: warming toward the red chassis
-    bgActive: '#581e28',      // active: approaching body red
+    // Backgrounds — IT'S A RED THEME. The TD-3 body IS the background.
+    bg: '#6e1418',            // deep burgundy — darkest shadow on the body
+    bgSecondary: '#7c1a1e',   // panels: body red in shadow
+    bgTertiary: '#8c2028',    // toolbars: body red mid-tone
+    bgHover: '#a02430',       // hover: brighter body red
+    bgActive: '#b52838',      // active: full lit body red
 
-    // Borders — TD-3 panel edge catches, clearly red
-    border: '#6e1418',        // burgundy shadow from the hi-res photo
-    borderLight: '#8c2028',   // brighter edge — body red in shadow
+    // Borders — darker grooves and lighter edges on the chassis
+    border: '#581014',        // recessed groove — darker than bg
+    borderLight: '#9c2028',   // raised edge — catches light
 
-    // Accent — the bold matte red body of the TD-3 (#c4282e)
-    accent: '#c4282e',        // TD-3 body red — THE color
-    accentSecondary: '#a01e24', // side cheek / darker body red
-    accentHighlight: '#e84850', // hot red glow — like the LED when lit
-    accentGlow: 'rgba(196, 40, 46, 0.3)',
+    // Accent — bright highlights and interactive elements
+    accent: '#e84850',        // hot red — LEDs, active controls
+    accentSecondary: '#c4282e', // TD-3 body red at full brightness
+    accentHighlight: '#ff6b6b', // glowing red — lit LED
+    accentGlow: 'rgba(232, 72, 80, 0.35)',
 
-    // Text — TD-3 cream silkscreen labels + brushed silver knob feel
-    text: '#e8e0d8',          // cream silk — matches the label printing
-    textSecondary: '#b0a8a0', // brushed silver — like the knob surface
-    textMuted: '#6e5558',     // recessed label in shadow
-    textInverse: '#12060a',
+    // Text — cream silkscreen labels on red body
+    text: '#f0e8e0',          // cream silk — printed labels on the red
+    textSecondary: '#d4c0b8', // softer cream — secondary info
+    textMuted: '#98706c',     // faded label on red surface
+    textInverse: '#6e1418',
 
     // Semantic
-    error: '#e84850',         // matches accentHighlight
-    success: '#34d399',
-    warning: '#fbbf24',
+    error: '#ff8888',         // lighter red on red bg needs to pop
+    success: '#5eeaa0',       // bright green to contrast red
+    warning: '#ffd060',       // warm gold
 
-    // Tracker rows — dark red alternation like PCB traces under the sequencer
-    trackerRowEven: '#14070a',
-    trackerRowOdd: '#1a0a0e',
-    trackerRowHighlight: '#24101a',
-    trackerRowCurrent: '#421820',  // selected: strong red presence
-    trackerRowCursor: '#521e28',
+    // Tracker rows — red-on-red alternation like the TD-3 panel surface
+    trackerRowEven: '#6e1418',  // matches bg
+    trackerRowOdd: '#781820',   // slightly brighter
+    trackerRowHighlight: '#882028', // highlighted row
+    trackerRowCurrent: '#a82830',   // current row: bright red
+    trackerRowCursor: '#982430',    // cursor row
 
-    // Cell colors — vivid data on the dark red canvas
-    cellNote: '#e8e0d8',       // cream silk label color
-    cellInstrument: '#fbbf24', // gold — TD-3's amber LED indicators
-    cellVolume: '#34d399',
-    cellEffect: '#e84850',     // hot red
-    cellAccent: '#c4282e',     // body red
-    cellSlide: '#fb7185',      // pink slide
-    cellEmpty: '#4a3038',      // muted burgundy
-    playbackCursor: '#c4282e', // body red
+    // Cell colors — must pop against red background
+    cellNote: '#f0e8e0',       // cream silk
+    cellInstrument: '#ffd060', // warm gold — amber LED
+    cellVolume: '#5eeaa0',     // bright green
+    cellEffect: '#ffb0b0',     // light pink — effect on red bg
+    cellAccent: '#ff6b6b',     // glowing red
+    cellSlide: '#ffb8c8',      // soft pink
+    cellEmpty: '#905050',      // muted on red
+    playbackCursor: '#e84850', // hot red
     currentRowText: '#ffffff',
-    panelShadow: '#080306',
+    panelShadow: '#480c10',
   },
 };
 
