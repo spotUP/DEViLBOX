@@ -16,7 +16,6 @@ interface MixerVUMeterProps {
 const VU_SEGMENTS = 20;
 const PEAK_HOLD_MS = 1500;
 const PEAK_DECAY_SEGMENTS_PER_SEC = 12;
-const THROTTLE_MS = 66; // ~15fps — sufficient for VU visual response
 
 /** Map a dB level to 0-20 segment count */
 function levelToSegments(dBLevel: number): number {
@@ -44,7 +43,6 @@ export const MixerVUMeter: React.FC<MixerVUMeterProps> = ({ deckId }) => {
   const mountedRef = useRef(true);
   const peakRef = useRef(-1);
   const peakTimeRef = useRef(0);
-  const lastUpdateRef = useRef(0);
   const prevSegmentsRef = useRef(-1);
   const prevPeakRef = useRef(-1);
 
@@ -54,13 +52,6 @@ export const MixerVUMeter: React.FC<MixerVUMeterProps> = ({ deckId }) => {
 
     const tick = (now: number) => {
       if (!mountedRef.current) return;
-
-      // Throttle: skip frames to reduce work
-      if (now - lastUpdateRef.current < THROTTLE_MS) {
-        rafRef.current = requestAnimationFrame(tick);
-        return;
-      }
-      lastUpdateRef.current = now;
 
       const dt = (now - lastTime) / 1000;
       lastTime = now;
