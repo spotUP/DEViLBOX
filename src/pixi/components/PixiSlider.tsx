@@ -167,7 +167,7 @@ export const PixiSlider: React.FC<PixiSliderProps> = ({
     }
   }, [isVert, length, thickness, handleWidth, handleHeight, norm, accent, theme, isDragging, detent, min, max]);
 
-  // Drag interaction
+  // Drag interaction — uses DOM events for smooth tracking after initial PixiJS pointerDown
   const handlePointerDown = useCallback((e: FederatedPointerEvent) => {
     if (disabled) return;
     e.stopPropagation();
@@ -182,14 +182,18 @@ export const PixiSlider: React.FC<PixiSliderProps> = ({
     }
     lastClickTime.current = now;
 
-    setIsDragging(true);
-    const startPos = isVert ? e.clientY : e.clientX;
+    // Use the native DOM event coordinates for consistent tracking
+    const nativeEvent = e.nativeEvent as PointerEvent;
+    const startPos = isVert ? nativeEvent.clientY : nativeEvent.clientX;
     const startNorm = norm;
+
+    setIsDragging(true);
 
     const onMove = (ev: PointerEvent) => {
       const currentPos = isVert ? ev.clientY : ev.clientX;
-      const delta = (startPos - currentPos) / length; // Invert for vertical (up = increase)
-      const newNorm = Math.max(0, Math.min(1, startNorm + (isVert ? delta : (currentPos - startPos) / length)));
+      const pixelDelta = currentPos - startPos;
+      const normDelta = isVert ? -pixelDelta / length : pixelDelta / length;
+      const newNorm = Math.max(0, Math.min(1, startNorm + normDelta));
       const newValue = clampAndSnap(min + newNorm * (max - min));
       onChangeRef.current(newValue);
     };
