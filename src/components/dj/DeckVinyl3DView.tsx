@@ -24,7 +24,7 @@
  * Lazy-loaded in DJDeck to avoid bloating the initial bundle.
  */
 
-import { useRef, useCallback, useMemo, useState } from 'react';
+import { useRef, useCallback, useEffect, useMemo, useState } from 'react';
 import { useFrame, type ThreeEvent } from '@react-three/fiber';
 import { useGLTF, OrbitControls, View, PerspectiveCamera } from '@react-three/drei';
 import * as THREE from 'three';
@@ -518,20 +518,32 @@ export function TurntableScene({ deckId, orbitRef, embedded }: TurntableScenePro
     pitchDragRef.current = true;
     pitchDragStartYRef.current = e.nativeEvent.clientY;
     pitchDragStartValueRef.current = playStateRef.current.pitchOffset;
-    (e.nativeEvent.target as HTMLElement)?.setPointerCapture?.(e.nativeEvent.pointerId);
+    // Capture pointer on the canvas so moves continue outside the mesh
+    const canvas = (e.nativeEvent.target as HTMLElement)?.closest?.('canvas');
+    if (canvas) canvas.setPointerCapture(e.nativeEvent.pointerId);
   }, []);
 
-  const handlePitchPointerMove = useCallback((e: ThreeEvent<PointerEvent>) => {
-    if (!pitchDragRef.current) return;
-    const dy = e.nativeEvent.clientY - pitchDragStartYRef.current;
-    const pitchDelta = (dy / 80) * 8; // 80px = full ±8 semitone range
-    const newPitch = Math.max(-8, Math.min(8, pitchDragStartValueRef.current + pitchDelta));
-    useDJStore.getState().setDeckPitch(deckId, newPitch);
+  // Use window-level move/up so dragging works even when pointer leaves the small hitbox
+  useEffect(() => {
+    const onMove = (e: PointerEvent) => {
+      if (!pitchDragRef.current) return;
+      const dy = e.clientY - pitchDragStartYRef.current;
+      const pitchDelta = (dy / 120) * 8; // 120px = full ±8 semitone range
+      const newPitch = Math.max(-8, Math.min(8, pitchDragStartValueRef.current + pitchDelta));
+      useDJStore.getState().setDeckPitch(deckId, newPitch);
+    };
+    const onUp = () => { pitchDragRef.current = false; };
+    window.addEventListener('pointermove', onMove);
+    window.addEventListener('pointerup', onUp);
+    return () => {
+      window.removeEventListener('pointermove', onMove);
+      window.removeEventListener('pointerup', onUp);
+    };
   }, [deckId]);
 
-  const handlePitchPointerUp = useCallback(() => {
-    pitchDragRef.current = false;
-  }, []);
+  // Keep the Three.js handlers minimal — just stop propagation
+  const handlePitchPointerMove = useCallback(() => {}, []);
+  const handlePitchPointerUp = useCallback(() => { pitchDragRef.current = false; }, []);
 
   const handlePitchDoubleClick = useCallback((e: ThreeEvent<MouseEvent>) => {
     e.stopPropagation();
@@ -722,7 +734,7 @@ export function TurntableScene({ deckId, orbitRef, embedded }: TurntableScenePro
         />
       </mesh>
 
-      {/* ── Pitch fader — tall hitbox covering the full slider track ── */}
+      {/* ── Pitch fader — generous hitbox so it's easy to grab ── */}
       <mesh
         position={[0.2070, 0.0930, 0.0200]}
         onPointerDown={handlePitchPointerDown}
@@ -731,7 +743,7 @@ export function TurntableScene({ deckId, orbitRef, embedded }: TurntableScenePro
         onPointerCancel={handlePitchPointerUp}
         onDoubleClick={handlePitchDoubleClick}
       >
-        <boxGeometry args={[0.025, 0.015, 0.10]} />
+        <boxGeometry args={[0.04, 0.04, 0.12]} />
         <meshBasicMaterial transparent opacity={0} depthWrite={false} />
       </mesh>
       {/* Pitch center indicator LED — green dot when pitch is at 0% */}
