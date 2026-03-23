@@ -144,8 +144,8 @@ function DemandInvalidator() {
         invalidateRef.current();
       }
     };
-    // Poll at ~60fps to keep turntables spinning while a deck is playing
-    id = setInterval(poll, 16);
+    // Poll at ~30fps — enough for smooth turntable animation, half the CPU cost
+    id = setInterval(poll, 33);
     return () => clearInterval(id);
   }, []);
 
