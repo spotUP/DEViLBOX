@@ -147,25 +147,25 @@ export const KeyboardShortcutSheet: React.FC<KeyboardShortcutSheetProps> = ({ is
       onClick={onClose}
     >
       <div
-        className="bg-neutral-900 border border-neutral-700 rounded-lg shadow-2xl w-[720px] max-w-[90vw] max-h-[80vh] flex flex-col"
+        className="bg-dark-bg border border-dark-border rounded-lg shadow-2xl w-[720px] max-w-[90vw] max-h-[80vh] flex flex-col"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="flex items-center justify-between px-5 py-3 border-b border-neutral-700">
-          <h2 className="text-lg font-semibold text-neutral-100">Keyboard Shortcuts</h2>
+        <div className="flex items-center justify-between px-5 py-3 border-b border-dark-border">
+          <h2 className="text-lg font-semibold text-text-primary">Keyboard Shortcuts</h2>
           <div className="flex items-center gap-3">
             <input
               type="text"
               placeholder="Filter..."
               value={filter}
               onChange={(e) => setFilter(e.target.value)}
-              className="bg-neutral-800 border border-neutral-600 rounded px-2 py-1 text-xs text-neutral-200 w-32 focus:outline-none focus:border-blue-500"
+              className="bg-dark-bgSecondary border border-dark-borderLight rounded px-2 py-1 text-xs text-text-primary w-32 focus:outline-none focus:border-blue-500"
               autoFocus
               aria-label="Filter keyboard shortcuts"
             />
             <button
               onClick={onClose}
-              className="text-neutral-400 hover:text-neutral-200 transition-colors"
+              className="text-text-secondary hover:text-text-primary transition-colors"
             >
               <X size={18} />
             </button>
@@ -182,10 +182,10 @@ export const KeyboardShortcutSheet: React.FC<KeyboardShortcutSheetProps> = ({ is
                 </h3>
                 {section.shortcuts.map((shortcut, i) => (
                   <div key={`${section.title}-${i}`} className="flex items-center justify-between gap-2 py-0.5">
-                    <kbd className="text-[10px] font-mono bg-neutral-800 border border-neutral-600 rounded px-1.5 py-0.5 text-yellow-300 whitespace-nowrap">
+                    <kbd className="text-[10px] font-mono bg-dark-bgSecondary border border-dark-borderLight rounded px-1.5 py-0.5 text-yellow-300 whitespace-nowrap">
                       {shortcut.keys}
                     </kbd>
-                    <span className="text-[11px] text-neutral-300 text-right">{shortcut.action}</span>
+                    <span className="text-[11px] text-text-secondary text-right">{shortcut.action}</span>
                   </div>
                 ))}
               </div>
@@ -194,8 +194,8 @@ export const KeyboardShortcutSheet: React.FC<KeyboardShortcutSheetProps> = ({ is
         </div>
 
         {/* Footer */}
-        <div className="px-5 py-2 border-t border-neutral-700 text-[10px] text-neutral-500 text-center">
-          Press <kbd className="bg-neutral-800 border border-neutral-600 rounded px-1 text-yellow-400">Esc</kbd> to close
+        <div className="px-5 py-2 border-t border-dark-border text-[10px] text-text-muted text-center">
+          Press <kbd className="bg-dark-bgSecondary border border-dark-borderLight rounded px-1 text-yellow-400">Esc</kbd> to close
           {' '} | Ctrl/Cmd shown as Ctrl (use Cmd on macOS)
         </div>
       </div>
