@@ -209,12 +209,12 @@ const devilboxTheme: Theme = {
     success: '#5eeaa0',       // bright green to contrast red
     warning: '#ffd060',       // warm gold
 
-    // Tracker rows — red-on-red alternation like the TD-3 panel surface
-    trackerRowEven: '#6e1418',  // matches bg
-    trackerRowOdd: '#781820',   // slightly brighter
-    trackerRowHighlight: '#882028', // highlighted row
-    trackerRowCurrent: '#a82830',   // current row: bright red
-    trackerRowCursor: '#982430',    // cursor row
+    // Tracker rows — darker red for the pattern editor (recessed panel feel)
+    trackerRowEven: '#4a0e12',    // dark burgundy — recessed from main bg
+    trackerRowOdd: '#521014',     // slightly lighter alternation
+    trackerRowHighlight: '#601418', // beat highlight
+    trackerRowCurrent: '#8c2028',   // current row: bright pop
+    trackerRowCursor: '#721820',    // cursor row
 
     // Cell colors — vivid on red, white-based where possible
     cellNote: 'rgba(255,255,255,0.92)',
