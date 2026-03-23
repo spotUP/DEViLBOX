@@ -21,13 +21,21 @@ const activeStreams = new Map<string, ChildProcess>();
  * WebSocket handler — attach to Express server's upgrade event.
  * Call registerStreamWebSocket(wss) from index.ts.
  */
-export function handleStreamConnection(ws: WebSocket, streamKey: string): void {
+/** RTMP ingest URLs per platform */
+const RTMP_SERVERS: Record<string, string> = {
+  youtube: 'rtmp://a.rtmp.youtube.com/live2',
+  twitch: 'rtmp://live.twitch.tv/app',
+  custom: '', // User provides full RTMP URL as the stream key
+};
+
+export function handleStreamConnection(ws: WebSocket, streamKey: string, platform = 'youtube'): void {
   if (!streamKey) {
     ws.close(4001, 'Missing stream key');
     return;
   }
 
-  const rtmpUrl = `rtmp://a.rtmp.youtube.com/live2/${streamKey}`;
+  const baseUrl = RTMP_SERVERS[platform] || RTMP_SERVERS.youtube;
+  const rtmpUrl = platform === 'custom' ? streamKey : `${baseUrl}/${streamKey}`;
   console.log(`[Stream] Starting ffmpeg relay for stream`);
 
   // Spawn ffmpeg: read WebM from stdin, remux to FLV, output to RTMP
