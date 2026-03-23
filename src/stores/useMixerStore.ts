@@ -59,13 +59,97 @@ let _sunVoxMuteBridge: {
   getPattern: () => any | null;
 } | null = null;
 
+// ── SunVox VU meter polling ────────────────────────────────────────────────
+// Polls module scope data at ~15Hz and feeds per-channel RMS levels into
+// ToneEngine's realtime channel levels (picked up by mixer VU meters).
+let _sunVoxVuInterval: ReturnType<typeof setInterval> | null = null;
+let _sunVoxVuInFlight = false;
+
+function startSunVoxVuPolling(): void {
+  if (_sunVoxVuInterval) return;
+  _sunVoxVuInterval = setInterval(pollSunVoxLevels, 67); // ~15Hz
+}
+
+function stopSunVoxVuPolling(): void {
+  if (_sunVoxVuInterval) {
+    clearInterval(_sunVoxVuInterval);
+    _sunVoxVuInterval = null;
+  }
+  _sunVoxVuInFlight = false;
+}
+
+function pollSunVoxLevels(): void {
+  if (_sunVoxVuInFlight || !_sunVoxMuteBridge) return;
+  const bridge = _sunVoxMuteBridge;
+  const handle = bridge.getHandle();
+  if (handle < 0) return;
+
+  // Build channel→moduleId mapping
+  const pattern = bridge.getPattern();
+  if (!pattern) return;
+  const instruments = bridge.getInstruments();
+  const channels = pattern.channels as { instrumentId?: number }[];
+  const moduleIds: number[] = [];
+  const channelMap: number[] = []; // index into moduleIds → channel index
+
+  for (let i = 0; i < channels.length; i++) {
+    const instrId = channels[i]?.instrumentId;
+    const inst = instruments.find((ins: { id: number }) => ins.id === instrId);
+    const modId = inst?.sunvox?.noteTargetModuleId as number | undefined;
+    if (modId !== undefined && modId >= 0) {
+      // Check if this moduleId is already in the list
+      let existing = moduleIds.indexOf(modId);
+      if (existing === -1) {
+        existing = moduleIds.length;
+        moduleIds.push(modId);
+      }
+      channelMap[i] = existing;
+    } else {
+      channelMap[i] = -1;
+    }
+  }
+
+  if (moduleIds.length === 0) return;
+
+  _sunVoxVuInFlight = true;
+
+  // Use dynamic import pattern to avoid circular deps
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { SunVoxEngine } = require('../engine/sunvox/SunVoxEngine');
+    if (!SunVoxEngine.hasInstance()) { _sunVoxVuInFlight = false; return; }
+    const engine = SunVoxEngine.getInstance();
+    engine.getModuleLevels(handle, moduleIds).then((levels: Float32Array) => {
+      _sunVoxVuInFlight = false;
+      if (!_sunVoxMuteBridge || levels.length === 0) return;
+      // Map module levels back to per-channel levels
+      const chLevels: number[] = new Array(channels.length).fill(0);
+      for (let i = 0; i < channels.length; i++) {
+        const idx = channelMap[i];
+        if (idx >= 0 && idx < levels.length) {
+          chLevels[i] = levels[idx];
+        }
+      }
+      try {
+        getToneEngine().updateRealtimeChannelLevels(chLevels);
+      } catch { /* ToneEngine not ready */ }
+    }).catch(() => {
+      _sunVoxVuInFlight = false;
+    });
+  } catch {
+    _sunVoxVuInFlight = false;
+  }
+}
+
 /** Called by SunVoxModularSynth when a song loads to register the mute bridge */
 export function registerSunVoxMuteBridge(bridge: typeof _sunVoxMuteBridge): void {
   _sunVoxMuteBridge = bridge;
+  startSunVoxVuPolling();
 }
 
 /** Called when SunVox song is unloaded */
 export function unregisterSunVoxMuteBridge(): void {
+  stopSunVoxVuPolling();
   _sunVoxMuteBridge = null;
 }
 

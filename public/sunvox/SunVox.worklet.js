@@ -544,6 +544,46 @@ class SunVoxProcessor extends AudioWorkletProcessor {
         break;
       }
 
+      // ── Bulk per-module RMS levels for VU meters ─────────────────────────
+
+      case 'getModuleLevels': {
+        // data.handle: slot, data.moduleIds: number[]
+        // Returns RMS level (0-1) per module using sv_get_module_scope2
+        if (!m) break;
+        try {
+          const ids = data.moduleIds;
+          const levels = new Float32Array(ids.length);
+          const SCOPE_LEN = 256; // fewer samples = faster
+          const destPtr = m._malloc(SCOPE_LEN * 2);
+          for (let idx = 0; idx < ids.length; idx++) {
+            const received = m._sv_get_module_scope2(
+              data.handle, ids[idx], 0, destPtr, SCOPE_LEN
+            );
+            if (received > 0) {
+              const heap16 = new Int16Array(m.HEAPU8.buffer, destPtr, received);
+              let sumSq = 0;
+              for (let i = 0; i < received; i++) {
+                const s = heap16[i] / 32768;
+                sumSq += s * s;
+              }
+              levels[idx] = Math.sqrt(sumSq / received);
+            }
+          }
+          m._free(destPtr);
+          this.port.postMessage(
+            { type: 'moduleLevels', handle: data.handle, levels: levels.buffer },
+            [levels.buffer]
+          );
+        } catch (err) {
+          console.error('[SunVox Worklet] getModuleLevels error:', err.message);
+          this.port.postMessage(
+            { type: 'moduleLevels', handle: data.handle, levels: new Float32Array(0).buffer },
+            []
+          );
+        }
+        break;
+      }
+
       // ── Module graph (with full type info from official API) ──────────────
 
       case 'getModuleGraph': {
