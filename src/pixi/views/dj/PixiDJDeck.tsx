@@ -1338,7 +1338,7 @@ export const PixiDJDeck: React.FC<PixiDJDeckProps> = ({ deckId }) => {
               <pixiGraphics
                 draw={(g: GraphicsType) => {
                   g.clear();
-                  const bw = (g.parent as any)?.layout?.computedLayout?.width ?? 280;
+                  const bw = (g as any).layout?.computedLayout?.width ?? 280;
                   g.roundRect(0, 0, bw, 80, 4).stroke({ color: DECK_COLOR, width: 3, alpha: beatFlash });
                 }}
                 layout={{ position: 'absolute', top: 0, left: 0, width: '100%', height: 80 }}
@@ -1426,7 +1426,7 @@ export const PixiDJDeck: React.FC<PixiDJDeckProps> = ({ deckId }) => {
         <pixiGraphics
           draw={(g: GraphicsType) => {
             g.clear();
-            const barW = (g.parent as any)?.layout?.computedLayout?.width ?? 280;
+            const barW = (g as any).layout?.computedLayout?.width ?? 280;
             const barH = 16;
             // Background
             g.roundRect(0, 0, barW, barH, 2);
