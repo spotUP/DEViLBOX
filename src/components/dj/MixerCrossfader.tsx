@@ -7,7 +7,7 @@
 
 import React, { useCallback, useRef, useEffect } from 'react';
 import { useDJStore, type CrossfaderCurve } from '@/stores/useDJStore';
-import { getDJEngine } from '@/engine/dj/DJEngine';
+import * as DJActions from '@/engine/dj/DJActions';
 
 interface CrossfaderState {
   position: number;
@@ -31,22 +31,11 @@ export const MixerCrossfader: React.FC = () => {
   }, [position, curve]);
 
   const handlePositionChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = parseFloat(e.target.value);
-    useDJStore.getState().setCrossfader(value);
-    try {
-      getDJEngine().mixer.setCrossfader(value);
-    } catch {
-      // Engine might not be initialized yet
-    }
+    DJActions.setCrossfader(parseFloat(e.target.value));
   }, []);
 
   const handleCurveChange = useCallback((newCurve: CrossfaderCurve) => {
-    useDJStore.getState().setCrossfaderCurve(newCurve);
-    try {
-      getDJEngine().mixer.setCurve(newCurve);
-    } catch {
-      // Engine might not be initialized yet
-    }
+    DJActions.setCrossfaderCurve(newCurve);
   }, []);
 
   return (
