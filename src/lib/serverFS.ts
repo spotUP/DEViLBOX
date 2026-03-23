@@ -202,6 +202,13 @@ export async function readStaticFile(filePath: string): Promise<ArrayBuffer> {
     throw new Error(`Failed to fetch static file: ${response.status} ${url}`);
   }
 
+  // Guard against SPA catch-all: if the server returned HTML instead of a binary file,
+  // the requested file doesn't actually exist in the static deployment.
+  const ct = response.headers.get('content-type') || '';
+  if (ct.includes('text/html')) {
+    throw new Error(`Static file not found (SPA fallback returned HTML): ${url}`);
+  }
+
   return response.arrayBuffer();
 }
 
