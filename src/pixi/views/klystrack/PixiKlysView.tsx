@@ -22,9 +22,10 @@ import { exportAsKlystrack } from '@lib/export/KlysExporter';
 import { usePixiTheme } from '@/pixi/theme';
 import { PIXI_FONTS } from '@/pixi/fonts';
 import { PixiButton } from '@/pixi/components/PixiButton';
+import { PixiKlysPositionEditor } from './PixiKlysPositionEditor';
 
 const TOOLBAR_H = 32;
-const SEQ_H = 120;
+const SEQ_H = 140;
 const ROW_H = 16;
 const NOTE_NAMES = ['C-', 'C#', 'D-', 'D#', 'E-', 'F-', 'F#', 'G-', 'G#', 'A-', 'A#', 'B-'];
 const KT_ACCENT = 0x88ffaa;
@@ -67,9 +68,16 @@ export const PixiKlysView: React.FC<Props> = ({ width, height }) => {
   const currentRow = useTransportStore(s => s.currentRow);
   const recordMode = useEditorStore(s => s.recordMode);
 
+  const setCurrentPosition = useTrackerStore(s => s.setCurrentPosition);
   const [scrollOffset, setScrollOffset] = useState(0);
+  const [editPosition, setEditPosition] = useState(0);
 
-  const activePosition = isPlaying ? currentPositionIndex : 0;
+  const activePosition = isPlaying ? currentPositionIndex : editPosition;
+
+  const handlePositionChange = useCallback((pos: number) => {
+    setEditPosition(pos);
+    if (!isPlaying) setCurrentPosition(pos);
+  }, [isPlaying, setCurrentPosition]);
 
   const handleExport = useCallback(async () => {
     const song = getTrackerReplayer().getSong();
@@ -124,14 +132,6 @@ export const PixiKlysView: React.FC<Props> = ({ width, height }) => {
     g.fill({ color: theme.border.color });
   }, [width]);
 
-  const drawSeqBg = useCallback((g: GraphicsType) => {
-    g.clear();
-    g.rect(0, 0, width, SEQ_H);
-    g.fill({ color: theme.bg.color });
-    g.rect(0, SEQ_H - 1, width, 1);
-    g.fill({ color: theme.border.color });
-  }, [width]);
-
   const drawPatternBg = useCallback((g: GraphicsType) => {
     g.clear();
     const maxSteps = nativeData?.patterns[channelPatterns[0]]?.numSteps ?? 0;
@@ -179,18 +179,6 @@ export const PixiKlysView: React.FC<Props> = ({ width, height }) => {
     `Pos: ${activePosition}`,
   ].join('  |  ');
 
-  // Build sequence overview text (per-channel: pattern assignments)
-  const seqLines: string[] = [];
-  for (let ch = 0; ch < Math.min(numChannels, 8); ch++) {
-    const seq = nativeData.sequences[ch];
-    if (!seq) continue;
-    const entries = seq.entries.slice(0, 16).map((e) =>
-      e.position === activePosition ? `[${e.pattern.toString(16).toUpperCase().padStart(2, '0')}]` :
-      ` ${e.pattern.toString(16).toUpperCase().padStart(2, '0')} `
-    ).join('');
-    seqLines.push(`CH${ch}: ${entries}`);
-  }
-
   // Build pattern lines
   const patternLines: string[] = [];
   const lineColors: number[] = [];
@@ -235,22 +223,15 @@ export const PixiKlysView: React.FC<Props> = ({ width, height }) => {
         <PixiButton label="KT↓" variant="ft2" size="sm" color="green" onClick={handleExport} />
       </pixiContainer>
 
-      {/* Sequence Overview */}
-      <pixiContainer layout={{ width, height: SEQ_H, paddingLeft: 8, paddingTop: 4, flexDirection: 'column' }}>
-        <pixiGraphics draw={drawSeqBg} layout={{ position: 'absolute', width, height: SEQ_H }} />
-        <pixiBitmapText
-          text="Sequences:"
-          style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 10, fill: 0xffffff }}
-          tint={KT_ACCENT}
+      {/* Editable Position Editor */}
+      <pixiContainer layout={{ width, height: SEQ_H }}>
+        <PixiKlysPositionEditor
+          width={width}
+          height={SEQ_H}
+          nativeData={nativeData}
+          currentPosition={activePosition}
+          onPositionChange={handlePositionChange}
         />
-        {seqLines.map((line, i) => (
-          <pixiBitmapText
-            key={i}
-            text={line}
-            style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 9, fill: 0xffffff }}
-            tint={theme.textSecondary.color}
-          />
-        ))}
       </pixiContainer>
 
       {/* Pattern Grid */}
