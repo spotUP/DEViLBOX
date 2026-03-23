@@ -107,17 +107,27 @@ export const TRACKER_EXTENSIONS = [
   '.sng', '.tiny', '.one', '.two',
 ];
 
-// Binary file formats that need ArrayBuffer loading (not JSON)
-const BINARY_EXTENSIONS = [...TRACKER_EXTENSIONS, '.sqs', '.seq', '.mid', '.midi'];
+// Binary file formats that need ArrayBuffer loading (not JSON).
+// Only .json, .xml, and .xt are text — everything else is binary.
+// This avoids maintaining an ever-growing whitelist of 200+ format extensions.
+const TEXT_EXTENSIONS = ['.json', '.xml', '.xt'];
 
 export function isTrackerModule(filename: string): boolean {
-  const ext = filename.toLowerCase().slice(filename.lastIndexOf('.'));
-  return TRACKER_EXTENSIONS.includes(ext);
+  const lower = filename.toLowerCase();
+  const ext = lower.slice(lower.lastIndexOf('.'));
+  if (TRACKER_EXTENSIONS.includes(ext)) return true;
+  // Also check Amiga prefix format: prefix.songname (e.g. "cm.viking_child")
+  const dot = lower.indexOf('.');
+  if (dot > 0) {
+    const prefix = '.' + lower.slice(0, dot);
+    if (TRACKER_EXTENSIONS.includes(prefix)) return true;
+  }
+  return false;
 }
 
 function isBinaryFile(filename: string): boolean {
   const ext = filename.toLowerCase().slice(filename.lastIndexOf('.'));
-  return BINARY_EXTENSIONS.includes(ext);
+  return !TEXT_EXTENSIONS.includes(ext);
 }
 
 interface UseFileNavigationOptions {
