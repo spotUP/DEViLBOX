@@ -97,7 +97,6 @@ export const PixiButton: React.FC<PixiButtonProps> = ({
   const [pressed, setPressed] = useState(false);
 
   const config = SIZE_CONFIG[size];
-  const btnWidth = widthProp ?? config.minWidth;
   const btnHeight = heightProp ?? config.height;
 
   const ft2Colors = useMemo(() => getFT2Colors(theme, themeId), [theme, themeId]);
@@ -169,7 +168,7 @@ export const PixiButton: React.FC<PixiButtonProps> = ({
       onClick={handleClick}
       alpha={disabled ? 0.5 : 1}
       layout={{
-        width: btnWidth,
+        ...(widthProp != null ? { width: widthProp } : { paddingLeft: config.paddingH, paddingRight: config.paddingH, minWidth: config.minWidth }),
         height: btnHeight,
         flexDirection: isVertical ? 'column' : 'row',
         justifyContent: 'center',

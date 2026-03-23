@@ -263,7 +263,6 @@ export const PixiNavBar: React.FC = () => {
               label={label}
               variant="ft2"
               size="sm"
-              width={72}
               active={isActive}
               onClick={() => {
                 // Close any active expose when switching views

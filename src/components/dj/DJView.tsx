@@ -29,18 +29,7 @@ import type { SeratoTrack } from '@/lib/serato';
 import { getDJPipeline } from '@/engine/dj/DJPipeline';
 
 // Lazy-load heavy 3D components to avoid bloating the main DJ bundle
-const DeckVinyl3DView = React.lazy(() => import('./DeckVinyl3DView'));
-const MixerVestax3DView = React.lazy(() => import('./MixerVestax3DView'));
-const R3FCanvas = React.lazy(() =>
-  import('@react-three/fiber').then((mod) => ({ default: mod.Canvas }))
-);
-const ViewPort = React.lazy(() =>
-  import('@react-three/drei').then((mod) => {
-    // View.Port is a static property on View, returned as a named export
-    const Port = mod.View.Port;
-    return { default: Port as React.ComponentType };
-  })
-);
+const DJ3DOverlay = React.lazy(() => import('./DJ3DOverlay').then(m => ({ default: m.DJ3DOverlay })));
 
 
 // ============================================================================
@@ -273,7 +262,7 @@ export const DJView: React.FC<DJViewProps> = ({ onShowDrumpads }) => {
                 useUIStore.getState().setActiveView(val as any);
               }
             }}
-            className="px-2 py-0.5 text-[10px] font-bold tracking-widest uppercase bg-dark-bgTertiary text-text-muted border border-dark-border rounded hover:bg-dark-bgHover transition-colors cursor-pointer"
+            className="px-3 py-1.5 rounded-md text-xs font-mono font-bold tracking-widest uppercase border transition-all cursor-pointer border-dark-borderLight bg-dark-bgTertiary text-text-secondary hover:bg-dark-bgHover hover:text-text-primary"
             title="Switch view"
           >
             <option value="tracker">Tracker</option>
@@ -451,45 +440,16 @@ export const DJView: React.FC<DJViewProps> = ({ onShowDrumpads }) => {
           : 'grid-cols-[1fr_400px_1fr]'
       }`}>
         {deckViewMode === '3d' ? (
-          /* ── 3D mode: Three.js Canvas with scissor Views ─────────────── */
-          <Suspense fallback={
-            <div className="col-span-full flex items-center justify-center text-text-muted text-sm">
-              Loading 3D views...
-            </div>
-          }>
-            {/* Deck A 3D turntable */}
-            <div className="min-h-0 min-w-0 overflow-hidden">
-              <DeckVinyl3DView deckId="A" />
-            </div>
-
-            {/* Center 3D mixer */}
-            <div className="min-h-0 min-w-0 overflow-hidden">
-              <MixerVestax3DView />
-            </div>
-
-            {/* Deck B 3D turntable */}
-            <div className="min-h-0 min-w-0 overflow-hidden">
-              <DeckVinyl3DView deckId="B" />
-            </div>
-
-            {/* Deck C 3D turntable (conditional) */}
-            {thirdDeckActive && (
-              <div className="min-h-0 min-w-0 overflow-hidden">
-                <DeckVinyl3DView deckId="C" />
+          /* ── 3D mode: Unified scene with decks + mixer side by side ──── */
+          <div className="col-span-full min-h-0 min-w-0 overflow-hidden">
+            <Suspense fallback={
+              <div className="flex items-center justify-center w-full h-full text-text-muted text-sm">
+                Loading 3D scene...
               </div>
-            )}
-
-            {/* Shared R3F Canvas overlaying the deck area for drei View scissor rendering */}
-            <div className="absolute inset-0 pointer-events-none" style={{ zIndex: 1 }}>
-              <R3FCanvas
-                style={{ position: 'absolute', inset: 0 }}
-                eventSource={djViewRef as React.RefObject<HTMLDivElement>}
-                eventPrefix="client"
-              >
-                <ViewPort />
-              </R3FCanvas>
-            </div>
-          </Suspense>
+            }>
+              <DJ3DOverlay />
+            </Suspense>
+          </div>
         ) : (
           /* ── Standard 2D modes (Visualizer / Vinyl) ──────────────────── */
           <>

@@ -1029,7 +1029,7 @@ export const PianoRoll: React.FC<PianoRollProps> = ({ channelIndex }) => {
           <select
             value="pianoroll"
             onChange={(e) => useUIStore.getState().setActiveView(e.target.value as any)}
-            className="px-2 py-1 text-xs bg-dark-bgSecondary text-text-primary border border-dark-border rounded hover:bg-dark-bgHover transition-colors"
+            className="px-3 py-1.5 rounded-md text-xs font-mono border transition-all cursor-pointer border-dark-borderLight bg-dark-bgTertiary text-text-secondary hover:bg-dark-bgHover hover:text-text-primary"
             title="Select editor view"
           >
             <option value="tracker">Tracker</option>
