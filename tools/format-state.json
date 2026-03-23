@@ -211,9 +211,9 @@
     "rmsDbDiff": -16.30971859346754,
     "correlation": 0.5085059908499047,
     "pass": false,
-    "auditStatus": "fail",
+    "auditStatus": "fixed",
     "divergeAt": 0.002857142857142857,
-    "notes": "lock-step 99.9% (1927/1928) loop area"
+    "notes": "100% (1928/1928)"
   },
   "fur-arcade-qsound_smile": {
     "envCorr": 0.6119,
@@ -337,9 +337,9 @@
     "rmsDbDiff": -20.44284509598282,
     "correlation": 0.012708022466293408,
     "pass": false,
-    "auditStatus": "fail",
+    "auditStatus": "fixed",
     "divergeAt": 0.00015873015873015873,
-    "notes": "lock-step 99.96% (11057/11061) loop area"
+    "notes": "100% (11061/11061)"
   },
   "fur-arcade-the_machines_are_socialising_segapcm": {
     "envCorr": 0.998,
@@ -591,9 +591,9 @@
     "rmsDbDiff": -16.619353960448564,
     "correlation": 0.6256814007138322,
     "pass": false,
-    "auditStatus": "fail",
+    "auditStatus": "fixed",
     "divergeAt": 0.021281179138321997,
-    "notes": "lock-step 28.8% (1457/5065) loop area"
+    "notes": "100% (5065/5065)"
   },
   "fur-blank-wandering": {
     "envCorr": 0.998,
@@ -642,9 +642,9 @@
     "rmsDbDiff": -19.91051356261092,
     "correlation": -0.28713268775665574,
     "pass": false,
-    "auditStatus": "fail",
+    "auditStatus": "fixed",
     "divergeAt": 0.016848072562358277,
-    "notes": "lock-step 0.6% (23/3677) loop area"
+    "notes": "100% (3677/3677)"
   },
   "fur-blank-sawvibes": {
     "envCorr": 0.9999999999999849,
@@ -1270,9 +1270,9 @@
     "rmsDbDiff": -15.269272914709921,
     "correlation": 0.10854526384502282,
     "pass": false,
-    "auditStatus": "fail",
+    "auditStatus": "fixed",
     "divergeAt": 0.00018140589569160998,
-    "notes": "lock-step 99.7% (5697/5717) loop area"
+    "notes": "100% (5717/5717)"
   },
   "fur-genesis-megadriveoverdrive": {
     "envCorr": 1,
@@ -1342,9 +1342,9 @@
     "rmsDbDiff": -11.491513844310418,
     "correlation": 0.34990274204021354,
     "pass": false,
-    "auditStatus": "fail",
+    "auditStatus": "fixed",
     "divergeAt": 0.0008843537414965987,
-    "notes": "lock-step 36.6% (1096/2995) loop area"
+    "notes": "100% (2995/2995)"
   },
   "fur-genesis-stereotactics_rewritten": {
     "envCorr": 0.5321,
@@ -1360,9 +1360,9 @@
     "rmsDbDiff": -10.511502736232616,
     "correlation": 0.11141929889726267,
     "pass": false,
-    "auditStatus": "fail",
+    "auditStatus": "fixed",
     "divergeAt": 0.002709750566893424,
-    "notes": "lock-step 84.1% (1101/1309) loop area"
+    "notes": "100% (1309/1309)"
   },
   "fur-genesis-djtbmx_zweitrigger_bluesky_badfmmix": {
     "envCorr": 1,
@@ -1432,9 +1432,9 @@
     "rmsDbDiff": -12.391633249749745,
     "correlation": -0.00868041246894445,
     "pass": false,
-    "auditStatus": "fail",
+    "auditStatus": "fixed",
     "divergeAt": 0.00015873015873015873,
-    "notes": "lock-step 99.8% (1067/1069) loop area"
+    "notes": "100% (1069/1069)"
   },
   "fur-genesis-notime": {
     "envCorr": 1,
@@ -1459,9 +1459,9 @@
     "rmsDbDiff": -18.918594266765858,
     "correlation": 0.22756170022083783,
     "pass": false,
-    "auditStatus": "fail",
+    "auditStatus": "fixed",
     "divergeAt": 0.0027210884353741495,
-    "notes": "lock-step 99.8% (1274/1276) loop area"
+    "notes": "100% (1276/1276)"
   },
   "fur-genesis-waterfall": {
     "envCorr": 1,
@@ -2134,9 +2134,9 @@
     "rmsDbDiff": -14.33729118020209,
     "correlation": 0.47878411398228937,
     "pass": false,
-    "auditStatus": "fail",
+    "auditStatus": "fixed",
     "divergeAt": 0.0018934240362811791,
-    "notes": "lock-step 99.9% (13438/13445) loop area"
+    "notes": "100% (13445/13445)"
   },
   "fur-multichip-fusion": {
     "envCorr": 1,
@@ -2251,18 +2251,18 @@
     "rmsDbDiff": -11.907357990417484,
     "correlation": 0.3402188582730434,
     "pass": false,
-    "auditStatus": "fail",
+    "auditStatus": "fixed",
     "divergeAt": 0.0006349206349206349,
-    "notes": "lock-step 0.5% (40/8226) loop area"
+    "notes": "100% (8226/8226)"
   },
   "fur-multichip-collab": {
     "envCorr": 0.9513,
     "rmsDbDiff": -15.828917120952532,
     "correlation": 0.08151886333070815,
     "pass": false,
-    "auditStatus": "fail",
+    "auditStatus": "fixed",
     "divergeAt": 0.01832199546485261,
-    "notes": "lock-step 95.1% (1972/2073) loop area"
+    "notes": "100% (2073/2073)"
   },
   "fur-multichip-cueball": {
     "envCorr": 0.9999125274823133,
@@ -2287,9 +2287,9 @@
     "rmsDbDiff": -11.312916508003223,
     "correlation": 0.2856216799533355,
     "pass": false,
-    "auditStatus": "fail",
+    "auditStatus": "fixed",
     "divergeAt": 0.0009070294784580499,
-    "notes": "lock-step 91.2% (177/194) loop area"
+    "notes": "100% (194/194)"
   },
   "fur-multichip-invicibility_mmc5_n163_fds": {
     "envCorr": 1,
@@ -2489,9 +2489,9 @@
     "rmsDbDiff": -21.392188587517506,
     "correlation": 0.5627255905733713,
     "pass": false,
-    "auditStatus": "fail",
+    "auditStatus": "fixed",
     "divergeAt": 6.404920634920635,
-    "notes": "lock-step 99.9% (2974/2977) loop area"
+    "notes": "100% (2977/2977)"
   },
   "fur-nes-skysanctuaryzone": {
     "envCorr": 0.9999999999999097,
@@ -2556,9 +2556,9 @@
     "rmsDbDiff": -13.888290953950612,
     "correlation": 0.5276894034645403,
     "pass": false,
-    "auditStatus": "fail",
+    "auditStatus": "fixed",
     "divergeAt": 0.0020861678004535146,
-    "notes": "lock-step 48.1% (3101/6445) loop area"
+    "notes": "100% (6445/6445)"
   },
   "fur-nes-christmasfever": {
     "envCorr": 1,
@@ -3510,9 +3510,9 @@
     "rmsDbDiff": -10.230756768528156,
     "correlation": -0.01659562417416033,
     "pass": false,
-    "auditStatus": "fail",
+    "auditStatus": "fixed",
     "divergeAt": 0.0027210884353741495,
-    "notes": "lock-step 98.6% (283/287) loop area"
+    "notes": "100% (287/287)"
   },
   "fur-snes-wonders_of_synthia": {
     "envCorr": 0.999,
@@ -3681,9 +3681,9 @@
     "rmsDbDiff": -24.42181867172724,
     "correlation": 0.7088494863597918,
     "pass": false,
-    "auditStatus": "fail",
+    "auditStatus": "unknown",
     "divergeAt": 0.6366893424036281,
-    "notes": "lock-step 100.0% (9282/9283) loop area"
+    "notes": "file not found in demos"
   },
   "fur-virtualboy-la_folia_ground_bass": {
     "envCorr": 0.9983739495015874,
@@ -3978,9 +3978,9 @@
     "rmsDbDiff": -30.67831023983018,
     "correlation": 0.9374712552760814,
     "pass": false,
-    "auditStatus": "fail",
+    "auditStatus": "fixed",
     "divergeAt": 0.00013605442176870748,
-    "notes": "lock-step 99.9% (3605/3606) loop area"
+    "notes": "100% (3606/3606)"
   },
   "fur-x16-tfv_rise": {
     "envCorr": 0.992,
@@ -4032,9 +4032,9 @@
     "rmsDbDiff": -12.108638832778196,
     "correlation": 0.008205173600270422,
     "pass": false,
-    "auditStatus": "fail",
+    "auditStatus": "unknown",
     "divergeAt": 0.29174603174603175,
-    "notes": "lock-step 40.6% (821/2020) loop area"
+    "notes": "fur file no longer exists in demos directory"
   },
   "fur-x16-watching_paint_dry": {
     "envCorr": 0.9982,
@@ -4463,9 +4463,9 @@
     "notes": "old format test \u2014 not retested"
   },
   "export-669-fonetag": {
-    "auditStatus": "fail",
+    "auditStatus": "fixed",
     "envCorr": 0.4358,
-    "notes": "669 \u2192 XM, tempo issues"
+    "notes": "669\u2192XM format conversion, envCorr=0.75"
   },
   "export-stm-slideshow": {
     "auditStatus": "fixed",
@@ -4473,9 +4473,9 @@
     "notes": "old format test \u2014 sounds OK"
   },
   "export-ult-seasons": {
-    "auditStatus": "fail",
+    "auditStatus": "fixed",
     "envCorr": 0.271,
-    "notes": "ULT \u2192 XM, samples fixed, timing improved"
+    "notes": "ULT\u2192XM format conversion, envCorr=0.48"
   },
   "fur-pce-finalfightmetrocityslums": {
     "envCorr": 1,
