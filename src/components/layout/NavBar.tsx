@@ -3,12 +3,12 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { useProjectStore, useAudioStore, useTabsStore, useThemeStore, themes } from '@stores';
+import { useProjectStore, useAudioStore, useTabsStore, useThemeStore, useUIStore, themes } from '@stores';
 import { useAuthStore } from '@stores/useAuthStore';
 import { useCollaborationStore } from '@stores/useCollaborationStore';
 import { useSettingsStore } from '@stores/useSettingsStore';
 import { BUILD_HASH, BUILD_DATE, BUILD_NUMBER } from '@constants/version';
-import { Plus, X, Palette, Download, LogIn, LogOut, Cloud, Users, Monitor } from 'lucide-react';
+import { Plus, X, Palette, Download, LogIn, LogOut, Cloud, Users, Monitor, Info } from 'lucide-react';
 import { MIDIToolbarDropdown } from '@components/midi/MIDIToolbarDropdown';
 import { DJSetBrowser } from '@components/dj/DJSetBrowser';
 import { DownloadModal } from '@components/dialogs/DownloadModal';
@@ -252,6 +252,18 @@ const NavBarComponent: React.FC = () => {
               <span className="hidden sm:inline">DOM</span>
             </Button>
           )}
+
+          {/* Song Info */}
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => useUIStore.getState().openModal('moduleInfo')}
+            icon={<Info size={14} />}
+            iconPosition="left"
+            title="Song / module info"
+          >
+            <span className="hidden sm:inline">Info</span>
+          </Button>
 
           {/* DJ Sets */}
           <DJSetBrowser />
