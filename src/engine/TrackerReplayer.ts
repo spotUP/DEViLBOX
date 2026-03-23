@@ -1621,6 +1621,14 @@ export class TrackerReplayer {
       }
     }
 
+    // Eagerly initialize the scratch buffer so it starts capturing audio from
+    // the moment playback begins. Without this, the first scratch attempt would
+    // lazily init the buffer and immediately freeze it — resulting in silence
+    // because no audio has accumulated yet. Fire-and-forget (non-blocking).
+    import('@/engine/TrackerScratchController').then(({ getTrackerScratchController }) => {
+      void getTrackerScratchController().initScratchBuffer();
+    }).catch(() => { /* scratch not available */ });
+
     _playLog('startScheduler (total)');
     this.startScheduler();
   }
