@@ -159,8 +159,8 @@ export class DJSetPlayer {
         if (deck && event.value != null) store.setDeckFilter(deck, event.value);
         break;
       case 'filterRes':
-        if (deck && event.values?.resonance != null) {
-          store.setDeckState(deck, { filterResonance: event.values.resonance as number });
+        if (deck && event.value != null) {
+          store.setDeckState(deck, { filterResonance: event.value });
         }
         break;
 
