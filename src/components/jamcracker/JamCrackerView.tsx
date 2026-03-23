@@ -11,7 +11,7 @@
  * └──────────────────────────────────────────────────┘
  */
 
-import React, { useRef, useEffect, useCallback } from 'react';
+import React, { useCallback } from 'react';
 import { useTransportStore } from '@stores/useTransportStore';
 import { PatternEditorCanvas } from '@/components/tracker/PatternEditorCanvas';
 import { JAMCRACKER_COLUMNS } from './jamcrackerAdapter';
@@ -19,25 +19,14 @@ import { JamCrackerEngine } from '@engine/jamcracker/JamCrackerEngine';
 import { useJamCrackerData } from '@/hooks/useJamCrackerData';
 
 const TOOLBAR_H = 36;
-const ORDER_H = 120;
 
 export const JamCrackerView: React.FC = () => {
   const speed = useTransportStore(s => s.speed);
   const {
-    songInfo, channels, setEditPos, activePos,
+    songInfo, channels, activePos,
     currentRow, isPlaying, patIdx, numRows, refreshPatternData,
   } = useJamCrackerData();
 
-  const orderRef = useRef<HTMLDivElement>(null);
-
-  // Auto-scroll order list to current position during playback
-  useEffect(() => {
-    if (!orderRef.current || !isPlaying) return;
-    const el = orderRef.current;
-    const itemW = 44;
-    const targetLeft = activePos * itemW - el.clientWidth / 2 + itemW / 2;
-    el.scrollLeft = Math.max(0, targetLeft);
-  }, [activePos, isPlaying]);
 
   const handleCellChange = useCallback((channelIdx: number, rowIdx: number, columnKey: string, value: number) => {
     if (!JamCrackerEngine.hasInstance() || patIdx < 0) return;
@@ -82,33 +71,6 @@ export const JamCrackerView: React.FC = () => {
     </button>
   );
 
-  const positionEditor = (
-    <div style={{ height: ORDER_H }}>
-      <div className="px-3 pt-2 pb-1">
-        <span className="text-xs text-ft2-textDim">Song Order</span>
-      </div>
-      <div
-        ref={orderRef}
-        className="px-3 pb-2 flex gap-1 overflow-x-auto"
-        style={{ maxHeight: ORDER_H - 30 }}
-      >
-        {songInfo?.entries.map((entry, idx) => (
-          <button
-            key={idx}
-            onClick={() => { if (!isPlaying) setEditPos(idx); }}
-            className={`flex-shrink-0 w-10 h-8 text-xs font-mono rounded border flex items-center justify-center ${
-              idx === activePos
-                ? 'bg-accent-primary/20 border-accent-primary text-accent-primary font-bold'
-                : 'bg-dark-bgSecondary border-dark-border text-ft2-textDim hover:border-ft2-text/30'
-            }`}
-          >
-            {entry.toString(16).toUpperCase().padStart(2, '0')}
-          </button>
-        )) ?? <span className="text-ft2-textDim text-xs">Loading...</span>}
-      </div>
-    </div>
-  );
-
   return (
     <div style={{
       display: 'flex', flexDirection: 'column',
@@ -128,16 +90,6 @@ export const JamCrackerView: React.FC = () => {
         <div style={{ fontWeight: 'bold', minWidth: '40px' }}>JAM</div>
         <div style={{ flex: 1, fontSize: '11px', color: 'var(--color-text-muted)' }}>{toolbarInfo}</div>
         {toolbarSlot}
-      </div>
-
-      {/* Song Order */}
-      <div style={{
-        height: `${ORDER_H}px`,
-        borderBottom: '1px solid var(--color-border)',
-        overflow: 'auto',
-        backgroundColor: 'var(--color-bg-secondary)',
-      }}>
-        {positionEditor}
       </div>
 
       {/* Pattern Editor — only mount once pattern data is loaded so the worker
