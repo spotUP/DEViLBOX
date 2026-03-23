@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-03-22T12:15:10.791Z
+ * Generated: 2026-03-22T23:35:37.369Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -19,9 +19,9 @@ export interface ChangelogEntry {
 }
 
 // Build info
-export const BUILD_VERSION = '1.0.3205';
-export const BUILD_NUMBER = '3205';
-export const BUILD_HASH = '4c0274633';
+export const BUILD_VERSION = '1.0.3274';
+export const BUILD_NUMBER = '3274';
+export const BUILD_HASH = 'dd8993434';
 export const BUILD_DATE = '2026-03-22';
 
 // Full version (patch IS the build number, so no need to append)
@@ -30,220 +30,214 @@ export const FULL_VERSION = BUILD_VERSION;
 // Auto-generated changelog
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: '1.0.3205',
+    version: '1.0.3274',
+    date: '2026-03-23',
+    changes: [
+      {
+        type: 'improvement',
+        "description": "Chore: update format audit state"
+      },
+      {
+        type: 'fix',
+        "description": "Prevent modal close when clicking checkboxes/buttons inside panel"
+      },
+      {
+        type: 'fix',
+        "description": "Route nativeOnly formats through native parser in MCP load"
+      },
+      {
+        type: 'fix',
+        "description": "Cable positioning, matrix params, rack SunVox controls"
+      },
+      {
+        type: 'improvement',
+        "description": "Frameloop=demand — only render when decks playing or camera moves"
+      },
+      {
+        type: 'fix',
+        "description": "Faders slide on Y axis (vertical), crossfader on X — measured from mesh bounds"
+      }
+    ]
+  },
+  {
+    version: '2026-03-22',
     date: '2026-03-22',
     changes: [
       {
-        type: 'fix',
-        "description": "Preserve native engine data in .dbx roundtrip for all formats"
+        type: 'improvement',
+        "description": "Chore(modular): update ModularMatrixView and ModularRackView"
       },
       {
         type: 'fix',
-        "description": "Eagerly warm up mute imports so first click works"
-      }
-    ]
-  },
-  {
-    version: '2026-03-21',
-    date: '2026-03-21',
-    changes: [
+        "description": "Expand macro filter, add setSkipRegisterWrites to dispatch"
+      },
       {
-        type: 'improvement',
-        "description": "Chore: latest Pink Trombone + format state updates"
+        type: 'feature',
+        "description": "Dynamic keyboard shortcuts from active scheme"
+      },
+      {
+        type: 'fix',
+        "description": "Flip fader Z direction + set default from mesh measurement"
       },
       {
         type: 'improvement',
-        "description": "Chore: engine and synth updates from concurrent agents"
+        "description": "Add comprehensive keyboard shortcuts reference"
+      },
+      {
+        type: 'fix',
+        "description": "Fader default 2.1→2.5 — match left fader position from screenshot"
+      },
+      {
+        type: 'fix',
+        "description": "Fader default 2.2→2.1 — back off slightly"
+      },
+      {
+        type: 'fix',
+        "description": "Fader default 2.0→2.2 (closer), travel 3.5→4.5 (more range)"
+      },
+      {
+        type: 'fix',
+        "description": "Fader defaultValue 1.8→2.0 — nudge forward ~1cm"
+      },
+      {
+        type: 'fix',
+        "description": "Show SunVox module controls in DOM rack view"
+      },
+      {
+        type: 'fix',
+        "description": "Fader defaultValue 1.1→1.8 — much closer to viewer"
       },
       {
         type: 'feature',
-        "description": "Speech synth updates, export dialog, file loader improvements"
+        "description": "Register all 327 missing scheme command handlers"
       },
       {
         type: 'fix',
-        "description": "Fix mute/solo — replace require() with async import()"
+        "description": "Fader defaultValue 0.75→1.1 — shift toward viewer to align with grooves"
       },
       {
         type: 'fix',
-        "description": "Chore: add Steve Turner WASM debug/test source files"
+        "description": "Vestax fader travel 5.5→3.5, defaultValue 1→0.75 to fit grooves"
+      },
+      {
+        type: 'fix',
+        "description": "Turntable spacing 0.38→0.40 — clear mixer edges"
+      },
+      {
+        type: 'fix',
+        "description": "Turntable spacing 0.42→0.38 — slightly closer"
+      },
+      {
+        type: 'fix',
+        "description": "Spread turntables outward (0.35→0.42) to clear mixer edges"
+      },
+      {
+        type: 'fix',
+        "description": "Mixer Y 0.18→0.15 — split the difference"
+      },
+      {
+        type: 'fix',
+        "description": "Mixer Y 0.12→0.18 — still below turntable surface"
+      },
+      {
+        type: 'fix',
+        "description": "Raise mixer Y=0.12 to align with turntable surface"
+      },
+      {
+        type: 'feature',
+        "description": "Module oscilloscope scope canvas in modular rack view"
+      },
+      {
+        type: 'feature',
+        "description": "Chore: add Vestax mixer source assets (OBJ + textures + MTL)"
+      },
+      {
+        type: 'fix',
+        "description": "Reduce 3D GPU load — lower DPR, low-power preference"
+      },
+      {
+        type: 'fix',
+        "description": "Raise mixer to same level as turntables"
+      },
+      {
+        type: 'fix',
+        "description": "Mixer scale 0.02→0.01 to match turntables, tighter side-by-side layout"
+      },
+      {
+        type: 'feature',
+        "description": "Unified 3D scene — all decks + mixer in one camera view"
+      },
+      {
+        type: 'fix',
+        "description": "Move 3D overlay to DOM tree — fixes Pixi reconciler crash"
+      },
+      {
+        type: 'fix',
+        "description": "Filter macro-generated commands from lock-step comparison"
+      },
+      {
+        type: 'fix',
+        "description": "Vestax mixer — rebuilt GLB from OBJ+textures with proper materials"
+      },
+      {
+        type: 'fix',
+        "description": "Vestax mixer — remove material overrides, use original model materials"
+      },
+      {
+        type: 'fix',
+        "description": "Vestax mixer — preserve textures, only override untextured parts"
+      },
+      {
+        type: 'fix',
+        "description": "Eliminate UI freeze on pattern wrap during playback"
+      },
+      {
+        type: 'fix',
+        "description": "Vestax mixer 3D materials — dark metallic finish matching turntables"
+      },
+      {
+        type: 'fix',
+        "description": "Vestax mixer textures/width, AHX scroll, zero TS errors"
+      },
+      {
+        type: 'feature',
+        "description": "Furnace center pattern, right-click macro, MPT clipboard paste"
+      },
+      {
+        type: 'feature',
+        "description": "Stacked layout — order matrix on top, pattern editor below"
+      },
+      {
+        type: 'fix',
+        "description": "Show only cross-format export button, move popout to bottom-right"
+      },
+      {
+        type: 'feature',
+        "description": "Wire 3D turntable and mixer views into both DOM and GL modes"
       },
       {
         type: 'improvement',
-        "description": "Chore: update song exports and format audit state"
+        "description": "Deduplicate sample/wavetable uploads across instruments"
       },
       {
         type: 'improvement',
-        "description": "Furnace pattern parser cleanup + tracker store updates"
-      },
-      {
-        type: 'feature',
-        "description": "Relax Amiga format detection — support both prefix and Modland extension naming (137 total, 0 failures)"
-      },
-      {
-        type: 'feature',
-        "description": "PinkTrombone synth, Furnace fixes, parser improvements, format test files"
-      },
-      {
-        type: 'feature',
-        "description": "Add PT36, AMF, STX, DSYM, PTM exports (129 total, 0 failures)"
+        "description": "Chore: Furnace pattern editor collapse, help modal, DJ view, format state updates"
       },
       {
         type: 'fix',
-        "description": "Envelope timing and format identification"
+        "description": "Add VBoy/WonderSwan/PV1000/Bifurcator effect handlers, filter macro cmds"
       },
       {
         type: 'feature',
-        "description": "Add IFF-SMUS + Music Maker 8V exports (124 total, 0 failures)"
-      },
-      {
-        type: 'fix',
-        "description": "Cache-bust worklet URL to prevent stale audio code"
-      },
-      {
-        type: 'fix',
-        "description": "Remove double sv_stop() that put engine in standby mode"
+        "description": "Copy/paste/selection in format mode + Hively export reflects edits"
       },
       {
         type: 'feature',
-        "description": "Add 5 more format exports (122 total, 0 failures)"
+        "description": "FT2 keyboard parity + GT Ultra Pixi editor input"
       },
       {
         type: 'feature',
-        "description": "Add 12 more format exports (117 total, 0 failures)"
-      },
-      {
-        type: 'feature',
-        "description": "Add 26 more format exports (105 total, 0 failures)"
-      },
-      {
-        type: 'fix',
-        "description": "Debug(sunvox): add mute/solo routing debug logs"
-      },
-      {
-        type: 'feature',
-        "description": "Add Synthesis format export (79 formats, 0 failures)"
-      },
-      {
-        type: 'feature',
-        "description": "Add CustomMade + Anders0land exports (78 formats, 0 failures)"
-      },
-      {
-        type: 'feature',
-        "description": "Add original DigiBooster 1.x parser (76 exportable formats)"
-      },
-      {
-        type: 'fix',
-        "description": "Debug(sunvox): add mute/solo debug logging to trace routing"
-      },
-      {
-        type: 'fix',
-        "description": "Improve lock-step command comparator"
-      },
-      {
-        type: 'fix',
-        "description": "Off-by-one in year field offset (203→202), enabling GT2 export"
-      },
-      {
-        type: 'feature',
-        "description": "Integrate eSpeak-NG for modern text-to-phoneme analysis"
-      }
-    ]
-  },
-  {
-    version: '2026-03-20',
-    date: '2026-03-20',
-    changes: [
-      {
-        type: 'fix',
-        "description": "Simple 1:1 pattern mapping instead of timeline linearization"
-      },
-      {
-        type: 'fix',
-        "description": "Proper timeline linearization for pattern display"
-      },
-      {
-        type: 'feature',
-        "description": "Add OctaMED + StartrekkerAM encoders and exporters"
-      },
-      {
-        type: 'feature',
-        "description": "10 refinements — question intonation, pauses, +40 words"
-      },
-      {
-        type: 'fix',
-        "description": "Update votrax phoneme map"
-      },
-      {
-        type: 'fix',
-        "description": "Update exporter"
-      },
-      {
-        type: 'fix',
-        "description": "Phoneme map and reciter improvements"
-      },
-      {
-        type: 'improvement',
-        "description": "Chore: clean up mame-wasm build artifacts, update tools and generated files"
-      },
-      {
-        type: 'feature',
-        "description": "XM synth export fixes + 29 new exportable formats (74 total)"
-      },
-      {
-        type: 'fix',
-        "description": "Tracker rendering and store improvements"
-      },
-      {
-        type: 'fix',
-        "description": "Rename unused FRICATIVES variable for linter"
-      },
-      {
-        type: 'fix',
-        "description": "Improve FuturePlayer, SidMon1, FredEditor, Symphonie parsers"
-      },
-      {
-        type: 'feature',
-        "description": "Vowel reduction, aspiration, energy envelopes, more words"
-      },
-      {
-        type: 'feature',
-        "description": "Add SAM reciter exception dictionary"
-      },
-      {
-        type: 'feature',
-        "description": "Sentence intonation, diphthong glides, CV energy ramps"
-      },
-      {
-        type: 'feature',
-        "description": "Add prosody (pitch/stress variation) to all speech synths"
-      },
-      {
-        type: 'improvement',
-        "description": "Chore: multi-agent updates — speech synths, exports, format audit state"
-      },
-      {
-        type: 'fix',
-        "description": "Mute/solo, speed, looping, note preview, live params"
-      },
-      {
-        type: 'feature',
-        "description": "SP0250 frame buffer TTS + MEA8000 coarticulation"
-      },
-      {
-        type: 'fix',
-        "description": "Stop filtering out unvoiced consonants from TTS"
-      },
-      {
-        type: 'feature',
-        "description": "Add coarticulation transitions to TTS"
-      },
-      {
-        type: 'fix',
-        "description": "Remove unused imports and VOWEL_FRAMES"
-      },
-      {
-        type: 'feature',
-        "description": "Per-phoneme LPC coefficients for TTS"
+        "description": "Undo/redo and transpose in format mode pattern editors"
       }
     ]
   }

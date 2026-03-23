@@ -428,6 +428,9 @@ static bool endOfSong = false;
 // shallStopSched flag (set by 0xFF effect)
 static bool shallStopSched = false;
 
+// seeking flag — true during tick-level loop re-seek (prevents recursive loop handling)
+static bool seeking = false;
+
 // ============================================================
 // Dispatch bridge
 // ============================================================
@@ -435,6 +438,8 @@ static bool shallStopSched = false;
 // Defined in FurnaceDispatchWrapper.cpp
 extern "C" int furnace_dispatch_cmd(int handle, int cmd, int chan, int val1, int val2);
 extern "C" void furnace_dispatch_reset(int handle);
+extern "C" void furnace_dispatch_set_skip_writes(int handle, int skip);
+extern "C" void furnace_dispatch_force_ins(int handle, int chan);
 extern "C" void furnace_cmd_log_tick();
 extern "C" void furnace_cmd_log_set_global_chan(int globalChan);
 extern "C" void furnace_cmd_log_pause();
@@ -2412,30 +2417,36 @@ static bool seqNextTick() {
       g_seq.tempoAccum -= g_seq.virtualTempoD;
       if (--g_seq.ticks <= 0) {
         ret = endOfSong;
+        bool didTickSeek = false;
         if (shallStopSched) {
           g_seq.playing = false;
           shallStopSched = false;
           break;
         } else if (endOfSong) {
+          if (seeking) {
+            // During tick-level seek, just break — caller handles it
+            break;
+          }
           int loopModality = getLoopModality();
           if (loopModality != 2) {
-            // Reset dispatches on loop (matches Furnace playSub → reset → dispatch->reset())
-            {
-              // Collect unique dispatch handles and reset each once
-              int resetHandles[SEQ_MAX_CHANNELS];
-              int numResetHandles = 0;
-              for (int c = 0; c < g_seq.numChannels; c++) {
-                int h = g_seq.chanDispatchHandle[c];
-                if (h <= 0) h = dispatchHandle;
-                bool found = false;
-                for (int k = 0; k < numResetHandles; k++) {
-                  if (resetHandles[k] == h) { found = true; break; }
-                }
-                if (!found && h > 0) {
-                  resetHandles[numResetHandles++] = h;
-                  furnace_dispatch_reset(h);
-                }
+            // Collect unique dispatch handles
+            int resetHandles[SEQ_MAX_CHANNELS];
+            int numResetHandles = 0;
+            for (int c = 0; c < g_seq.numChannels; c++) {
+              int h = g_seq.chanDispatchHandle[c];
+              if (h <= 0) h = dispatchHandle;
+              bool found = false;
+              for (int k = 0; k < numResetHandles; k++) {
+                if (resetHandles[k] == h) { found = true; break; }
               }
+              if (!found && h > 0) {
+                resetHandles[numResetHandles++] = h;
+              }
+            }
+
+            // Reset dispatches (matches Furnace playSub → reset → dispatch->reset())
+            for (int k = 0; k < numResetHandles; k++) {
+              furnace_dispatch_reset(resetHandles[k]);
             }
 
             // Reset sequencer channel state
@@ -2469,33 +2480,55 @@ static bool seqNextTick() {
             g_seq.prevSpeed = g_seq.nextSpeed;
             memset(g_seq.walked, 0, sizeof(g_seq.walked));
 
-            // Re-seek to the loop position (matches reference playSub(true) seek).
-            // Process rows from order 0 to the loop point with dispatch commands
-            // (for state restoration) but suppress command logging.
+            // Tick-level re-seek to the loop position.
+            // Matches reference playSub(true): setSkipRegisterWrites(true) →
+            // tick through entire song → setSkipRegisterWrites(false) → forceIns().
+            // This processes ALL per-tick effects (arp, vibrato, portamento, volume
+            // slides) during seek, unlike the old row-level seek which only ran
+            // seqNextRow() and missed inter-tick state changes.
             if (loopOrder > 0 || loopRow > 0) {
-              furnace_cmd_log_pause();  // suppress logging during seek
+              furnace_cmd_log_pause();
 
-              // Clear walked array and endOfSong during seek to prevent
-              // re-detection of the loop while seeking through the same rows
+              // Enable skip-register-writes for all dispatches
+              for (int k = 0; k < numResetHandles; k++) {
+                furnace_dispatch_set_skip_writes(resetHandles[k], 1);
+              }
+
               memset(g_seq.walked, 0, sizeof(g_seq.walked));
               endOfSong = false;
+              seeking = true;
 
-              while (g_seq.curOrder < loopOrder ||
-                     (g_seq.curOrder == loopOrder && g_seq.curRow < loopRow)) {
-                seqNextRow();
-                endOfSong = false;  // prevent loop re-detection during seek
-                if (!g_seq.playing) break; // safety
+              // Phase 1: tick until we reach the goal order
+              while (g_seq.playing && g_seq.curOrder < loopOrder) {
+                seqNextTick();
+                if (endOfSong) { endOfSong = false; break; }
               }
-              furnace_cmd_log_resume();
-              endOfSong = true; // restore for the loop handling below
 
-              // Reset timing for the loop row
-              g_seq.curSpeed = 0;
-              g_seq.ticks = 1;
-              g_seq.tempoAccum = 0;
-              g_seq.nextSpeed = g_seq.speeds.val[0];
-              g_seq.prevSpeed = g_seq.nextSpeed;
+              // Phase 2: tick until we reach the goal row within the goal order
+              // (matches reference: curRow < goalRow || ticks > 1)
+              if (g_seq.playing && g_seq.curOrder == loopOrder && !endOfSong) {
+                while (g_seq.playing && (g_seq.curRow < loopRow || g_seq.ticks > 1)) {
+                  int oldOrder = g_seq.curOrder;
+                  seqNextTick();
+                  if (endOfSong) { endOfSong = false; break; }
+                  if (g_seq.curOrder != oldOrder) break; // Bxx/Dxx jumped order
+                }
+              }
+
+              seeking = false;
+
+              // Disable skip-register-writes and force instrument reload
+              for (int k = 0; k < numResetHandles; k++) {
+                furnace_dispatch_set_skip_writes(resetHandles[k], 0);
+                furnace_dispatch_force_ins(resetHandles[k], 0);
+              }
+
+              furnace_cmd_log_resume();
+              endOfSong = true; // restore for loop handling below
+
+              // Walked array cleared — fresh for next loop detection
               memset(g_seq.walked, 0, sizeof(g_seq.walked));
+              didTickSeek = true;
             }
           }
           // Track loop count
@@ -2513,9 +2546,11 @@ static bool seqNextTick() {
         }
 
         // Process the first row of the loop (dispatches NOTE_ON etc.)
-        // This must happen BEFORE the stop check so the loop's first row
-        // is included in the command log (matching reference Furnace behavior).
-        seqNextRow();
+        // Only needed when no tick-level seek was done (loop to 0,0).
+        // Tick-level seek already processed the goal row during seeking.
+        if (!didTickSeek) {
+          seqNextRow();
+        }
 
         // Stop after processing the loop's first row
         if (g_seq.remainingLoops <= 0 && g_seq.remainingLoops != -1) {
@@ -2867,6 +2902,7 @@ void furnace_seq_load_song(int numChannels, int patLen, int ordersLen) {
   firstTick = false;
   endOfSong = false;
   shallStopSched = false;
+  seeking = false;
 
   printf("[FurnaceSequencer] load_song: %d channels, %d rows/pat, %d orders\n",
          g_seq.numChannels, g_seq.patLen, g_seq.ordersLen);
