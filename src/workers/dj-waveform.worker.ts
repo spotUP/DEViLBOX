@@ -39,7 +39,7 @@ let patternLoopStart = 0;
 let patternLoopEnd   = 0;
 let cuePoint         = -1;
 let totalPositions   = 1;
-let colors: DeckColors = { bg: '#0b0909', bgSecondary: '#131010', bgTertiary: '#1d1818', border: '#2f2525' };
+let colors: DeckColors = { bg: '#6e1418', bgSecondary: '#7c1a1e', bgTertiary: '#8c2028', border: '#581014' };
 
 function applyOverview(ov: WaveformOverviewState): void {
   frequencyPeaks   = ov.frequencyPeaks;

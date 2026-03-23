@@ -20,7 +20,7 @@ let offCanvas: OffscreenCanvas | null = null;
 let ctx: OffscreenCanvasRenderingContext2D | null = null;
 let dpr = 1, width = 400, height = 24;
 let colors: DeckColors = {
-  bg: '#0b0909', bgSecondary: '#131010', bgTertiary: '#1d1818', border: '#2f2525',
+  bg: '#6e1418', bgSecondary: '#7c1a1e', bgTertiary: '#8c2028', border: '#581014',
 };
 
 let playbackMode    = 'tracker';
