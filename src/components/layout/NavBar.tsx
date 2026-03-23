@@ -147,7 +147,7 @@ const NavBarComponent: React.FC = () => {
         {/* Left: App Title */}
         <div className="flex items-center gap-4">
           <h1 className="font-bold text-lg tracking-tight">
-            <span className="text-accent-primary">DEViLBOX</span>
+            <span className="text-text-primary">DEViLBOX</span>
           </h1>
           <span
             className="text-xs font-medium text-text-inverse bg-accent-primary px-2 py-0.5 rounded cursor-help"
