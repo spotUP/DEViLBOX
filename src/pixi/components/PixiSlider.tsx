@@ -5,7 +5,8 @@
  * Used for: DeckPitchSlider, MixerCrossfader, channel faders.
  */
 
-import { useRef, useCallback, useEffect, useState } from 'react';
+import { useRef, useCallback, useEffect, useState, useMemo } from 'react';
+import { Rectangle } from 'pixi.js';
 import type { Graphics as GraphicsType, Container as ContainerType, FederatedPointerEvent } from 'pixi.js';
 import { PIXI_FONTS } from '../fonts';
 import { usePixiTheme } from '../theme';
@@ -219,7 +220,10 @@ export const PixiSlider: React.FC<PixiSliderProps> = ({
   return (
     <pixiContainer
       ref={containerRef}
-      eventMode="auto"
+      eventMode={disabled ? 'none' : 'static'}
+      hitArea={useMemo(() => new Rectangle(0, 0, containerWidth, totalHeight), [containerWidth, totalHeight])}
+      cursor={disabled ? 'not-allowed' : isVert ? 'ns-resize' : 'ew-resize'}
+      onPointerDown={handlePointerDown}
       alpha={disabled ? 0.4 : 1}
       layout={{
         width: containerWidth,
@@ -243,12 +247,10 @@ export const PixiSlider: React.FC<PixiSliderProps> = ({
         />
       )}
 
-      {/* Slider track + handle — must be interactive for drag to work */}
+      {/* Slider track + handle */}
       <pixiGraphics
         draw={drawSlider}
-        eventMode={disabled ? 'none' : 'static'}
-        cursor={disabled ? 'not-allowed' : isVert ? 'ns-resize' : 'ew-resize'}
-        onPointerDown={handlePointerDown}
+        eventMode="none"
         layout={{ width: containerWidth, height: containerHeight }}
       />
 
