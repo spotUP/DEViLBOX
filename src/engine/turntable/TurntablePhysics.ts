@@ -113,15 +113,16 @@ const SPINBACK_MAX_REVERSE_RATE = 1.0; // × normal speed
 
 // ─── Power-cut (turntable power off) constants ──────────────────────────────
 
-/** Friction multiplier during power-cut.
- *  Lower than spinback — just bearing/stylus drag, no hand resistance.
- *  This makes the coast-down take noticeably longer than a spinback. */
-const POWERCUT_FRICTION_MULT = 0.5;
+/** Friction multiplier during power-cut (main power off).
+ *  Real SL-1200 takes ~14 seconds to coast from 33⅓ RPM with healthy bearings.
+ *  Very low — just bearing friction + stylus drag, no motor or electronic brake.
+ *  Calculated: for τ≈3.3s decay constant → mult ≈ 0.075 */
+const POWERCUT_FRICTION_MULT = 0.075;
 
 /** Small friction floor so the platter always eventually stops.
  *  Without this, very low angular velocity could coast indefinitely
  *  due to the velocity-proportional friction approaching zero. */
-const POWERCUT_STATIC_FRICTION = 0.001; // N·m — tiny constant drag
+const POWERCUT_STATIC_FRICTION = 0.0005; // N·m — tiny constant drag
 
 // ─── Physics simulation ──────────────────────────────────────────────────────
 
@@ -172,6 +173,12 @@ export class TurntablePhysics {
   /** Callback when power-cut completes (platter stopped) */
   private _onPowerCutComplete: (() => void) | null = null;
 
+  /** Whether electronic brake is active (motor brakes to zero in ~0.5s) */
+  private _eBrakeActive = false;
+
+  /** Callback when electronic brake completes */
+  private _onEBrakeComplete: (() => void) | null = null;
+
   // ── Slipmat release state ──────────────────────────────────
 
   /** Time elapsed since hand was released (seconds). -1 = not in release ramp. */
@@ -199,6 +206,7 @@ export class TurntablePhysics {
 
   /** Whether power-cut spindown is in progress */
   get powerCutActive(): boolean { return this._powerCutActive; }
+  get eBrakeActive(): boolean { return this._eBrakeActive; }
 
   /** Angular position (0..2π) */
   get theta(): number { return this._theta; }
@@ -321,6 +329,41 @@ export class TurntablePhysics {
   }
 
   /**
+   * Trigger electronic brake: motor actively decelerates the platter to zero.
+   *
+   * The real SL-1200 Start/Stop button engages an electronic brake that stops
+   * the platter in ~0.5 seconds. The motor actively fights the rotation (like
+   * regenerative braking), much faster than the passive coast of a power-cut.
+   * Adjustable via a pot under the platter on the real unit.
+   *
+   * @param onComplete Callback when platter reaches zero
+   */
+  triggerElectronicBrake(onComplete?: () => void): void {
+    this._eBrakeActive = true;
+    this._spinbackActive = false;
+    this._powerCutActive = false;
+    this._motorEnabled = true; // Motor ON — actively braking
+    this._targetOmega = 0; // Target is zero (stop)
+    this._onEBrakeComplete = onComplete ?? null;
+  }
+
+  /**
+   * Start from zero: motor engages and spins the platter up to target speed.
+   * The real SL-1200 reaches 33⅓ in ~0.7 seconds from standstill.
+   * Used for the Start/Stop button press (motor-driven spin-up).
+   */
+  triggerMotorStart(): void {
+    this._omega = 0;
+    this._motorPlatterOmega = 0;
+    this._motorEnabled = true;
+    this._targetOmega = OMEGA_33;
+    this._spinbackActive = false;
+    this._powerCutActive = false;
+    this._eBrakeActive = false;
+    this._releaseElapsed = -1;
+  }
+
+  /**
    * Force-reset to normal playback state (e.g., when transport stops).
    */
   reset(): void {
@@ -336,6 +379,9 @@ export class TurntablePhysics {
     this._onSpinbackComplete = null;
     this._powerCutActive = false;
     this._onPowerCutComplete = null;
+    this._eBrakeActive = false;
+    this._onEBrakeComplete = null;
+    this._targetOmega = OMEGA_33;
     this._releaseElapsed = -1;
   }
 
@@ -412,7 +458,9 @@ export class TurntablePhysics {
     torqueNet += slipmatTorque;
 
     // 2. Bearing/stylus friction on the RECORD (always opposes record motion)
-    const frictionMult = this._spinbackActive ? SPINBACK_FRICTION_MULT
+    //    Electronic brake uses very high friction (motor actively decelerating)
+    const frictionMult = this._eBrakeActive ? 8.0 // ~0.5s stop from 33⅓
+                       : this._spinbackActive ? SPINBACK_FRICTION_MULT
                        : this._powerCutActive ? POWERCUT_FRICTION_MULT
                        : 1.0;
     const linearFriction = -FRICTION_LINEAR * frictionMult * this._omega;
@@ -510,6 +558,23 @@ export class TurntablePhysics {
         if (this._onPowerCutComplete) {
           const cb = this._onPowerCutComplete;
           this._onPowerCutComplete = null;
+          cb();
+        }
+      }
+    }
+
+    // ── Electronic brake state machine ──────────────────────
+    //    Motor ON but targeting zero. High friction stops platter in ~0.5s.
+    if (this._eBrakeActive) {
+      if (Math.abs(this._omega) < OMEGA_33 * 0.01) {
+        this._eBrakeActive = false;
+        this._omega = 0;
+        this._targetOmega = OMEGA_33; // Restore target for next start
+        this._motorEnabled = true;
+
+        if (this._onEBrakeComplete) {
+          const cb = this._onEBrakeComplete;
+          this._onEBrakeComplete = null;
           cb();
         }
       }
