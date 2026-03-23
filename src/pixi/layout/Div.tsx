@@ -63,7 +63,7 @@ export const Div: React.FC<DivProps> = ({
   return (
     <layoutContainer
       layout={computedLayout}
-      eventMode={eventMode}
+      eventMode={eventMode ?? 'auto'}
       cursor={cursor}
       alpha={alpha}
       onPointerDown={onPointerDown}
