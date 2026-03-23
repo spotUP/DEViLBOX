@@ -438,6 +438,13 @@ export function TurntableScene({ deckId, orbitRef, embedded }: TurntableScenePro
 
   const handlePlatterPointerDown = useCallback((e: ThreeEvent<PointerEvent>) => {
     e.stopPropagation();
+    // Reject clicks in the tonearm zone (right side of platter) so tonearm gets them
+    if (e.point) {
+      const localX = e.point.x + 0.049; // platter center offset
+      const localZ = e.point.z + 0.010;
+      // Tonearm occupies roughly X > 0.03 (right side of platter)
+      if (localX > 0.03 && Math.abs(localZ) < 0.12) return;
+    }
     (e.nativeEvent.target as HTMLElement)?.setPointerCapture?.(e.nativeEvent.pointerId);
     if (!powerOnRef.current || !playStateRef.current.isPlaying) return;
     enterScratch();
