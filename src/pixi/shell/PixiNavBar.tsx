@@ -30,6 +30,7 @@ import { serializeProjectToBlob } from '@hooks/useProjectPersistence';
 import { PixiTransportBar } from './PixiTransportBar';
 import { BUILD_VERSION } from '@constants/version';
 import { usePixiDropdownStore } from '../stores/usePixiDropdownStore';
+import { PixiDJSetBrowser } from '../views/dj/PixiDJSetBrowser';
 
 const NAV_ROW_H = 52;
 const TAB_ROW_H = MODERN_NAV_H - NAV_ROW_H; // 24px
@@ -318,6 +319,9 @@ export const PixiNavBar: React.FC = () => {
           onClick={handleOpenCollab}
           width={48}
         />
+
+        {/* DJ Sets */}
+        <PixiDJSetBrowser />
 
         {/* Auth — shows sign-out dropdown when logged in */}
         <pixiContainer ref={authContainerRef} layout={{ flexShrink: 0 }}>
