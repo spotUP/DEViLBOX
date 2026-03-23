@@ -39,17 +39,17 @@ export const ScaleVolumeDialog: React.FC<ScaleVolumeDialogProps> = ({
       onClick={onCancel}
     >
       <div
-        className="bg-neutral-900 border border-neutral-700 rounded-lg shadow-xl p-6 min-w-[400px]"
+        className="bg-dark-bg border border-dark-border rounded-lg shadow-xl p-6 min-w-[400px]"
         onClick={(e) => e.stopPropagation()}
         onKeyDown={handleKeyDown}
       >
-        <h3 className="text-lg font-semibold mb-4 text-neutral-100">
+        <h3 className="text-lg font-semibold mb-4 text-text-primary">
           Scale Volume ({scope})
         </h3>
 
         <div className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-neutral-300 mb-2">
+            <label className="block text-sm font-medium text-text-secondary mb-2">
               Scale Factor
             </label>
             <div className="flex items-center gap-4">
@@ -60,23 +60,23 @@ export const ScaleVolumeDialog: React.FC<ScaleVolumeDialogProps> = ({
                 step="0.05"
                 value={factor}
                 onChange={(e) => setFactor(parseFloat(e.target.value))}
-                className="flex-1 h-2 bg-neutral-700 rounded-lg appearance-none cursor-pointer accent-blue-500"
+                className="flex-1 h-2 bg-dark-bgTertiary rounded-lg appearance-none cursor-pointer accent-blue-500"
                 autoFocus
               />
-              <span className="text-neutral-100 font-mono text-sm w-20 text-right">
+              <span className="text-text-primary font-mono text-sm w-20 text-right">
                 {factor.toFixed(2)}× ({Math.round(factor * 100)}%)
               </span>
             </div>
-            <div className="flex justify-between text-xs text-neutral-500 mt-1">
+            <div className="flex justify-between text-xs text-text-muted mt-1">
               <span>0× (silence)</span>
               <span>1× (unchanged)</span>
               <span>2× (double)</span>
             </div>
           </div>
 
-          <div className="bg-neutral-800 border border-neutral-700 rounded p-3 text-xs text-neutral-400">
+          <div className="bg-dark-bgSecondary border border-dark-border rounded p-3 text-xs text-text-secondary">
             <p className="mb-1">
-              <strong className="text-neutral-300">Tip:</strong> Scale volume multiplies all volume values by the factor.
+              <strong className="text-text-secondary">Tip:</strong> Scale volume multiplies all volume values by the factor.
             </p>
             <ul className="list-disc list-inside space-y-0.5 ml-2">
               <li>0.5× = half volume (50%)</li>
@@ -89,9 +89,9 @@ export const ScaleVolumeDialog: React.FC<ScaleVolumeDialogProps> = ({
         <div className="flex justify-end gap-2 mt-6">
           <button
             onClick={onCancel}
-            className="px-4 py-2 text-sm font-medium text-neutral-300 bg-neutral-800 border border-neutral-700 rounded hover:bg-neutral-750 transition-colors"
+            className="px-4 py-2 text-sm font-medium text-text-secondary bg-dark-bgSecondary border border-dark-border rounded hover:bg-dark-bgHover transition-colors"
           >
-            Cancel <span className="text-neutral-500">(Esc)</span>
+            Cancel <span className="text-text-muted">(Esc)</span>
           </button>
           <button
             onClick={handleConfirm}

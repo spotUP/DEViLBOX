@@ -40,17 +40,17 @@ export const RemapInstrumentDialog: React.FC<RemapInstrumentDialogProps> = ({
       onClick={onCancel}
     >
       <div
-        className="bg-neutral-900 border border-neutral-700 rounded-lg shadow-xl p-6 min-w-[400px]"
+        className="bg-dark-bg border border-dark-border rounded-lg shadow-xl p-6 min-w-[400px]"
         onClick={(e) => e.stopPropagation()}
         onKeyDown={handleKeyDown}
       >
-        <h3 className="text-lg font-semibold mb-4 text-neutral-100">
+        <h3 className="text-lg font-semibold mb-4 text-text-primary">
           Remap Instrument ({scope})
         </h3>
 
         <div className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-neutral-300 mb-2">
+            <label className="block text-sm font-medium text-text-secondary mb-2">
               Source Instrument
             </label>
             <input
@@ -59,16 +59,16 @@ export const RemapInstrumentDialog: React.FC<RemapInstrumentDialogProps> = ({
               max="255"
               value={source}
               onChange={(e) => setSource(Math.max(0, Math.min(255, parseInt(e.target.value) || 0)))}
-              className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded text-neutral-100 font-mono focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-3 py-2 bg-dark-bgSecondary border border-dark-border rounded text-text-primary font-mono focus:outline-none focus:ring-2 focus:ring-blue-500"
               autoFocus
             />
-            <p className="text-xs text-neutral-500 mt-1">
+            <p className="text-xs text-text-muted mt-1">
               Instrument ID to find (0-255)
             </p>
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-neutral-300 mb-2">
+            <label className="block text-sm font-medium text-text-secondary mb-2">
               Destination Instrument
             </label>
             <input
@@ -77,22 +77,22 @@ export const RemapInstrumentDialog: React.FC<RemapInstrumentDialogProps> = ({
               max="255"
               value={dest}
               onChange={(e) => setDest(Math.max(0, Math.min(255, parseInt(e.target.value) || 0)))}
-              className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded text-neutral-100 font-mono focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-3 py-2 bg-dark-bgSecondary border border-dark-border rounded text-text-primary font-mono focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
-            <p className="text-xs text-neutral-500 mt-1">
+            <p className="text-xs text-text-muted mt-1">
               Instrument ID to replace with (0-255)
             </p>
           </div>
 
-          <div className="bg-neutral-800 border border-neutral-700 rounded p-3 text-xs text-neutral-400">
+          <div className="bg-dark-bgSecondary border border-dark-border rounded p-3 text-xs text-text-secondary">
             <p className="mb-1">
-              <strong className="text-neutral-300">Tip:</strong> Remap instrument replaces all occurrences of the source instrument ID with the destination ID.
+              <strong className="text-text-secondary">Tip:</strong> Remap instrument replaces all occurrences of the source instrument ID with the destination ID.
             </p>
             <ul className="list-disc list-inside space-y-0.5 ml-2">
-              <li><strong className="text-neutral-300">Block:</strong> Only in selected region</li>
-              <li><strong className="text-neutral-300">Track:</strong> Entire current channel</li>
-              <li><strong className="text-neutral-300">Pattern:</strong> Entire current pattern</li>
-              <li><strong className="text-neutral-300">Song:</strong> All patterns</li>
+              <li><strong className="text-text-secondary">Block:</strong> Only in selected region</li>
+              <li><strong className="text-text-secondary">Track:</strong> Entire current channel</li>
+              <li><strong className="text-text-secondary">Pattern:</strong> Entire current pattern</li>
+              <li><strong className="text-text-secondary">Song:</strong> All patterns</li>
             </ul>
           </div>
 
@@ -106,9 +106,9 @@ export const RemapInstrumentDialog: React.FC<RemapInstrumentDialogProps> = ({
         <div className="flex justify-end gap-2 mt-6">
           <button
             onClick={onCancel}
-            className="px-4 py-2 text-sm font-medium text-neutral-300 bg-neutral-800 border border-neutral-700 rounded hover:bg-neutral-750 transition-colors"
+            className="px-4 py-2 text-sm font-medium text-text-secondary bg-dark-bgSecondary border border-dark-border rounded hover:bg-dark-bgHover transition-colors"
           >
-            Cancel <span className="text-neutral-500">(Esc)</span>
+            Cancel <span className="text-text-muted">(Esc)</span>
           </button>
           <button
             onClick={handleConfirm}
