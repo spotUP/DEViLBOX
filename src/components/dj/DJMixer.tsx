@@ -8,7 +8,7 @@
  *   4. Master | CueSection
  */
 
-import React from 'react';
+import React, { useState } from 'react';
 import { useDJStore } from '@/stores/useDJStore';
 import { MixerEQ } from '@/components/dj/MixerEQ';
 import { MixerFilter } from '@/components/dj/MixerFilter';
@@ -25,6 +25,7 @@ import { DJStreamControl } from '@/components/dj/DJStreamControl';
 
 export const DJMixer: React.FC = () => {
   const thirdDeck = useDJStore((s) => s.thirdDeckActive);
+  const [showBroadcast, setShowBroadcast] = useState(false);
 
   return (
     <div
@@ -85,12 +86,26 @@ export const DJMixer: React.FC = () => {
         <MixerCueSection />
       </div>
 
-      {/* Row 5: Record + Video + Live + Mic */}
+      {/* Row 5: Broadcast toggle — collapsed by default, expands to show REC/VIDEO/LIVE/MIC */}
       <div className="flex items-center justify-center gap-2 w-full pt-2 border-t border-dark-border flex-wrap">
-        <DJSetRecordButton />
-        <DJVideoExport />
-        <DJStreamControl />
-        <DJMicControl />
+        <button
+          onClick={() => setShowBroadcast(v => !v)}
+          className={`px-2 py-0.5 text-xs font-mono rounded border transition-colors ${
+            showBroadcast
+              ? 'bg-red-900/40 border-red-700/60 text-red-300'
+              : 'bg-dark-surface border-dark-border text-dark-textSecondary hover:text-dark-text'
+          }`}
+        >
+          BROADCAST
+        </button>
+        {showBroadcast && (
+          <>
+            <DJSetRecordButton />
+            <DJVideoExport />
+            <DJStreamControl />
+            <DJMicControl />
+          </>
+        )}
       </div>
     </div>
   );

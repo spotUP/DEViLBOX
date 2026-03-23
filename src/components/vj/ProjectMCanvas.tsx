@@ -95,6 +95,9 @@ interface ProjectMCanvasProps {
   visible?: boolean;
 }
 
+// Fade-to-black transition duration (ms) for each half (fade-out + fade-in)
+const FADE_DURATION_MS = 350;
+
 export const ProjectMCanvas = React.forwardRef<VJCanvasHandle, ProjectMCanvasProps>(
   ({ onReady, onPresetChange, visible = true }, ref) => {
     const containerRef = useRef<HTMLDivElement>(null);
@@ -106,6 +109,10 @@ export const ProjectMCanvas = React.forwardRef<VJCanvasHandle, ProjectMCanvasPro
     const [ready, setReady] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const audioBusRef = useRef<AudioDataBus | null>(null);
+
+    // Fade overlay for smooth preset transitions
+    const fadeRef = useRef<HTMLDivElement>(null);
+    const fadeTimerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
 
     // Stuck-detection: timestamp of last preset load (grace period before checking)
     const presetLoadTimeRef = useRef(0);
@@ -175,6 +182,7 @@ export const ProjectMCanvas = React.forwardRef<VJCanvasHandle, ProjectMCanvasPro
         cancelled = true;
         cancelAnimationFrame(raf);
         cancelAnimationFrame(rafRef.current);
+        if (fadeTimerRef.current !== undefined) clearTimeout(fadeTimerRef.current);
         audioBusRef.current?.disable();
         audioBusRef.current = null;
         engineRef.current?.destroy();
@@ -182,18 +190,55 @@ export const ProjectMCanvas = React.forwardRef<VJCanvasHandle, ProjectMCanvasPro
       };
     }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-    // Load preset by index (async — fetches .milk on demand)
+    // Load preset by index. Uses projectM's native soft cut (crossfade) by default.
+    // Falls back to a fade-to-black transition if soft cuts produce visual glitches.
     const doLoadPreset = useCallback(async (idx: number, smooth = true) => {
       const names = allPresetNames ?? Object.keys(BUILTIN_PRESETS);
       if (!engineRef.current || names.length === 0) return;
       const wrappedIdx = ((idx % names.length) + names.length) % names.length;
       const name = names[wrappedIdx];
+
       const content = await fetchPresetContent(name);
       if (!content || !engineRef.current) return;
-      presetLoadTimeRef.current = performance.now();
-      engineRef.current.loadPresetData(content, smooth);
-      currentIdxRef.current = wrappedIdx;
-      onPresetChange?.(wrappedIdx, name);
+
+      // Cancel any in-progress fade
+      if (fadeTimerRef.current !== undefined) clearTimeout(fadeTimerRef.current);
+
+      if (smooth) {
+        // Native projectM soft cut — crossfade via internal transition shaders
+        presetLoadTimeRef.current = performance.now();
+        engineRef.current.loadPresetData(content, true);
+        currentIdxRef.current = wrappedIdx;
+        onPresetChange?.(wrappedIdx, name);
+      } else {
+        // Fade-to-black: CSS overlay fades out, hard-cut preset, fade back in
+        const fade = fadeRef.current;
+        if (fade) {
+          fade.style.transition = `opacity ${FADE_DURATION_MS}ms ease-in`;
+          fade.style.opacity = '1';
+
+          fadeTimerRef.current = setTimeout(() => {
+            presetLoadTimeRef.current = performance.now();
+            engineRef.current?.loadPresetData(content, false);
+            currentIdxRef.current = wrappedIdx;
+            onPresetChange?.(wrappedIdx, name);
+
+            requestAnimationFrame(() => {
+              if (fade) {
+                fade.style.transition = `opacity ${FADE_DURATION_MS}ms ease-out`;
+                fade.style.opacity = '0';
+              }
+            });
+            fadeTimerRef.current = undefined;
+          }, FADE_DURATION_MS);
+        } else {
+          presetLoadTimeRef.current = performance.now();
+          engineRef.current.loadPresetData(content, false);
+          currentIdxRef.current = wrappedIdx;
+          onPresetChange?.(wrappedIdx, name);
+        }
+      }
+
       // Pre-fetch next random preset in background
       const nextIdx = Math.floor(Math.random() * names.length);
       fetchPresetContent(names[nextIdx]); // fire-and-forget
@@ -320,6 +365,12 @@ export const ProjectMCanvas = React.forwardRef<VJCanvasHandle, ProjectMCanvasPro
           ref={canvasRef}
           className="w-full h-full block"
           style={{ imageRendering: 'auto' }}
+        />
+        {/* Fade-to-black overlay for smooth preset transitions */}
+        <div
+          ref={fadeRef}
+          className="absolute inset-0 bg-black pointer-events-none"
+          style={{ opacity: 0 }}
         />
         {!ready && !error && (
           <div className="absolute inset-0 flex items-center justify-center bg-black">
