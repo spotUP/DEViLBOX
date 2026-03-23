@@ -7,7 +7,7 @@
  * DOM reference: src/components/dialogs/SettingsModal.tsx
  */
 
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useCallback } from 'react';
 import type { FederatedPointerEvent, FederatedWheelEvent, Graphics as GraphicsType } from 'pixi.js';
 import { useApplication } from '@pixi/react';
 import { PixiButton, PixiCheckbox, PixiSlider, PixiNumericInput, PixiIcon } from '../components';
@@ -19,34 +19,30 @@ import { Div, Txt } from '../layout';
 
 import { useUIStore } from '@stores/useUIStore';
 import { useThemeStore, themes } from '@stores/useThemeStore';
-import { useSettingsStore, type SIDEngineType, type CRTParams } from '@stores/useSettingsStore';
+import { type SIDEngineType } from '@stores/useSettingsStore';
 import { pickFile } from '../services/glFilePicker';
 import { LENS_PRESETS, LENS_PRESET_ORDER } from '../LensFilter';
 import { SID_ENGINES } from '@engine/deepsid/DeepSIDEngineManager';
-import { useKeyboardStore } from '@stores/useKeyboardStore';
-import { useEditorStore } from '@stores/useEditorStore';
-import { useAudioStore } from '@stores/useAudioStore';
-import { useModlandContributionModal } from '@stores/useModlandContributionModal';
-import { getTrackerReplayer } from '@engine/TrackerReplayer';
-import { getDJEngineIfActive } from '@engine/dj/DJEngine';
-import { BG_MODES, getBgModeLabel } from '@/components/tracker/TrackerVisualBackground';
-import { getASIDDeviceManager, isASIDSupported } from '@lib/sid/ASIDDeviceManager';
+import { getASIDDeviceManager } from '@lib/sid/ASIDDeviceManager';
 import { notify } from '@stores';
 import { useModalClose } from '@hooks/useDialogKeyboard';
-
-// ── Tab definitions ────────────────────────────────────────────────────────────
-
-type SettingsTab = 'general' | 'audio' | 'visual' | 'recording' | 'input' | 'sid' | 'about';
-
-const TABS: Array<{ id: SettingsTab; label: string }> = [
-  { id: 'general', label: 'General' },
-  { id: 'audio', label: 'Audio' },
-  { id: 'visual', label: 'Visual' },
-  { id: 'recording', label: 'Recording' },
-  { id: 'input', label: 'Input' },
-  { id: 'sid', label: 'SID' },
-  { id: 'about', label: 'About' },
-];
+import {
+  useSettingsDialog,
+  SETTINGS_TABS,
+  KEYBOARD_SCHEMES,
+  CRT_SLIDERS,
+  LENS_SLIDERS,
+  RENDER_MODE_OPTIONS,
+  NUMBER_FORMAT_OPTIONS,
+  EDIT_MODE_OPTIONS,
+  QUANT_RES_OPTIONS,
+  PLATFORM_OPTIONS,
+  STEREO_MODE_OPTIONS,
+  VU_MODE_OPTIONS,
+  type SettingsTab,
+  type CRTSliderDef,
+  type LensSliderDef,
+} from '@hooks/dialogs/useSettingsDialog';
 
 // ── Constants ──────────────────────────────────────────────────────────────────
 
@@ -56,85 +52,10 @@ const CONTENT_W = MODAL_W - 30;
 const SLIDER_W = 200;
 const LABEL_W = 130;
 
-const KEYBOARD_SCHEMES = [
-  { value: 'fasttracker2', label: 'FastTracker 2', description: 'Classic FT2 layout (DOS/PC) - from ft2-clone source' },
-  { value: 'impulse-tracker', label: 'Impulse Tracker', description: 'IT/Schism Tracker style - from schismtracker source' },
-  { value: 'protracker', label: 'ProTracker', description: 'Amiga MOD tracker layout - from pt2-clone source' },
-  { value: 'octamed', label: 'OctaMED SoundStudio', description: 'Amiga OctaMED layout - from official documentation' },
-  { value: 'renoise', label: 'Renoise', description: 'Modern DAW/tracker layout - from official documentation' },
-  { value: 'openmpt', label: 'OpenMPT', description: 'ModPlug Tracker layout - from official wiki documentation' },
-];
-
-const KEYBOARD_SCHEME_OPTIONS: SelectOption[] = KEYBOARD_SCHEMES.map(s => ({ value: s.value, label: s.label }));
-
 // Built dynamically since themes list can change when custom theme is added
 function getThemeOptions(): SelectOption[] {
   return themes.map((t) => ({ value: t.id, label: t.name }));
 }
-
-const RENDER_MODE_OPTIONS: SelectOption[] = [
-  { value: 'dom', label: 'DOM (React + Tailwind)' },
-  { value: 'webgl', label: 'WebGL (PixiJS v8)' },
-];
-
-const NUMBER_FORMAT_OPTIONS: SelectOption[] = [
-  { value: 'hex', label: 'Hexadecimal' },
-  { value: 'dec', label: 'Decimal' },
-];
-
-const EDIT_MODE_OPTIONS: SelectOption[] = [
-  { value: 'overwrite', label: 'Overwrite' },
-  { value: 'insert', label: 'Insert (Shift Rows)' },
-];
-
-const QUANT_RES_OPTIONS: SelectOption[] = [
-  { value: '1', label: '1 row' },
-  { value: '2', label: '2 rows' },
-  { value: '4', label: '4 rows (1/4)' },
-  { value: '8', label: '8 rows (1/2)' },
-  { value: '16', label: '16 rows (1 beat)' },
-];
-
-const PLATFORM_OPTIONS: SelectOption[] = [
-  { value: 'auto', label: 'Auto-detect' },
-  { value: 'mac', label: 'Mac (Cmd)' },
-  { value: 'pc', label: 'PC (Ctrl)' },
-];
-
-const STEREO_MODE_OPTIONS: SelectOption[] = [
-  { value: 'pt2', label: 'PT2-Clone' },
-  { value: 'modplug', label: 'ModPlug' },
-];
-
-const VU_MODE_OPTIONS: SelectOption[] = [
-  { value: 'trigger', label: 'Trigger' },
-  { value: 'realtime', label: 'Realtime' },
-];
-
-// CRT slider definitions — labels match DOM SettingsModal 1:1
-interface CRTSliderDef {
-  key: keyof CRTParams;
-  label: string;
-  min: number;
-  max: number;
-  step: number;
-  group: string;
-}
-
-const CRT_SLIDERS: CRTSliderDef[] = [
-  { key: 'scanlineIntensity', label: 'Intensity',       min: 0,   max: 1,    step: 0.01,  group: 'SCANLINES' },
-  { key: 'scanlineCount',     label: 'Count',           min: 50,  max: 1200, step: 1,     group: 'SCANLINES' },
-  { key: 'adaptiveIntensity', label: 'Adaptive',        min: 0,   max: 1,    step: 0.01,  group: 'SCANLINES' },
-  { key: 'brightness',        label: 'Brightness',      min: 0.6, max: 1.8,  step: 0.01,  group: 'COLOR' },
-  { key: 'contrast',          label: 'Contrast',        min: 0.6, max: 1.8,  step: 0.01,  group: 'COLOR' },
-  { key: 'saturation',        label: 'Saturation',      min: 0,   max: 2,    step: 0.01,  group: 'COLOR' },
-  { key: 'bloomIntensity',    label: 'Bloom Intensity', min: 0,   max: 1.5,  step: 0.01,  group: 'EFFECTS' },
-  { key: 'bloomThreshold',    label: 'Bloom Threshold', min: 0,   max: 1,    step: 0.01,  group: 'EFFECTS' },
-  { key: 'rgbShift',          label: 'RGB Shift',       min: 0,   max: 1,    step: 0.01,  group: 'EFFECTS' },
-  { key: 'vignetteStrength',  label: 'Vignette',        min: 0,   max: 2,    step: 0.01,  group: 'FRAMING' },
-  { key: 'curvature',         label: 'Curvature',       min: 0,   max: 0.5,  step: 0.005, group: 'FRAMING' },
-  { key: 'flickerStrength',   label: 'Flicker',         min: 0,   max: 0.15, step: 0.001, group: 'FRAMING' },
-];
 
 // ── Sub-components ─────────────────────────────────────────────────────────────
 
@@ -170,238 +91,27 @@ interface PixiSettingsModalProps {
 export const PixiSettingsModal: React.FC<PixiSettingsModalProps> = ({ isOpen, onClose }) => {
   const theme = usePixiTheme();
   const { app } = useApplication();
-  const [activeTab, setActiveTab] = useState<SettingsTab>('general');
 
   // Standard modal keyboard handling (Enter/Escape to close)
   useModalClose({ isOpen, onClose });
 
-  // ── Store hooks ──────────────────────────────────────────────────────────
-  const useHexNumbers = useUIStore((s) => s.useHexNumbers);
-  const setUseHexNumbers = useUIStore((s) => s.setUseHexNumbers);
-  const blankEmptyCells = useUIStore((s) => s.blankEmptyCells);
-  const setBlankEmptyCells = useUIStore((s) => s.setBlankEmptyCells);
-  const tb303Collapsed = useUIStore((s) => s.tb303Collapsed);
-  const setTB303Collapsed = useUIStore((s) => s.setTB303Collapsed);
-  const oscilloscopeVisible = useUIStore((s) => s.oscilloscopeVisible);
-  const setOscilloscopeVisible = useUIStore((s) => s.setOscilloscopeVisible);
-  const scratchEnabled = useUIStore((s) => s.scratchEnabled);
-  const setScratchEnabled = useUIStore((s) => s.setScratchEnabled);
-  const scratchAcceleration = useUIStore((s) => s.scratchAcceleration);
-  const setScratchAcceleration = useUIStore((s) => s.setScratchAcceleration);
-  const platterMass = useUIStore((s) => s.platterMass);
-  const setPlatterMass = useUIStore((s) => s.setPlatterMass);
+  // ── Shared settings dialog logic ─────────────────────────────────────────
+  const s = useSettingsDialog({ isOpen });
 
-  const currentThemeId = useThemeStore((s) => s.currentThemeId);
-  const setTheme = useThemeStore((s) => s.setTheme);
-  const customThemeColors = useThemeStore((s) => s.customThemeColors);
-  const copyThemeToCustom = useThemeStore((s) => s.copyThemeToCustom);
-
-  const customBannerImage = useSettingsStore((s) => s.customBannerImage);
-  const setCustomBannerImage = useSettingsStore((s) => s.setCustomBannerImage);
-  const welcomeJingleEnabled = useSettingsStore((s) => s.welcomeJingleEnabled);
-  const setWelcomeJingleEnabled = useSettingsStore((s) => s.setWelcomeJingleEnabled);
-
-  const amigaLimits = useSettingsStore((s) => s.amigaLimits);
-  const setAmigaLimits = useSettingsStore((s) => s.setAmigaLimits);
-  const linearInterpolation = useSettingsStore((s) => s.linearInterpolation);
-  const setLinearInterpolation = useSettingsStore((s) => s.setLinearInterpolation);
-  const useBLEP = useSettingsStore((s) => s.useBLEP);
-  const setUseBLEP = useSettingsStore((s) => s.setUseBLEP);
-  const stereoSeparation = useSettingsStore((s) => s.stereoSeparation);
-  const setStereoSeparation = useSettingsStore((s) => s.setStereoSeparation);
-  const stereoSeparationMode = useSettingsStore((s) => s.stereoSeparationMode);
-  const setStereoSeparationMode = useSettingsStore((s) => s.setStereoSeparationMode);
-  const modplugSeparation = useSettingsStore((s) => s.modplugSeparation);
-  const setModplugSeparation = useSettingsStore((s) => s.setModplugSeparation);
-  const midiPolyphonic = useSettingsStore((s) => s.midiPolyphonic);
-  const setMidiPolyphonic = useSettingsStore((s) => s.setMidiPolyphonic);
-  const vuMeterMode = useSettingsStore((s) => s.vuMeterMode);
-  const setVuMeterMode = useSettingsStore((s) => s.setVuMeterMode);
-  const vuMeterSwing = useSettingsStore((s) => s.vuMeterSwing);
-  const setVuMeterSwing = useSettingsStore((s) => s.setVuMeterSwing);
-  const wobbleWindows = useSettingsStore((s) => s.wobbleWindows);
-  const setWobbleWindows = useSettingsStore((s) => s.setWobbleWindows);
-  const trackerVisualBg = useSettingsStore((s) => s.trackerVisualBg);
-  const setTrackerVisualBg = useSettingsStore((s) => s.setTrackerVisualBg);
-  const trackerVisualMode = useSettingsStore((s) => s.trackerVisualMode);
-  const setTrackerVisualMode = useSettingsStore((s) => s.setTrackerVisualMode);
-  const renderMode = useSettingsStore((s) => s.renderMode);
-  const setRenderMode = useSettingsStore((s) => s.setRenderMode);
-  const crtEnabled = useSettingsStore((s) => s.crtEnabled);
-  const setCrtEnabled = useSettingsStore((s) => s.setCrtEnabled);
-  const crtParams = useSettingsStore((s) => s.crtParams);
-  const setCrtParam = useSettingsStore((s) => s.setCrtParam);
-  const resetCrtParams = useSettingsStore((s) => s.resetCrtParams);
-  const lensEnabled = useSettingsStore((s) => s.lensEnabled);
-  const setLensEnabled = useSettingsStore((s) => s.setLensEnabled);
-  const lensPreset = useSettingsStore((s) => s.lensPreset);
-  const setLensPreset = useSettingsStore((s) => s.setLensPreset);
-  const lensParams = useSettingsStore((s) => s.lensParams);
-  const setLensParam = useSettingsStore((s) => s.setLensParam);
-  const resetLensParams = useSettingsStore((s) => s.resetLensParams);
-  const sidEngine = useSettingsStore((s) => s.sidEngine);
-  const setSidEngine = useSettingsStore((s) => s.setSidEngine);
-  const setAsidEnabled = useSettingsStore((s) => s.setAsidEnabled);
-  const asidDeviceId = useSettingsStore((s) => s.asidDeviceId);
-  const setAsidDeviceId = useSettingsStore((s) => s.setAsidDeviceId);
-  const asidDeviceAddress = useSettingsStore((s) => s.asidDeviceAddress);
-  const setAsidDeviceAddress = useSettingsStore((s) => s.setAsidDeviceAddress);
-  const sidHardwareMode = useSettingsStore((s) => s.sidHardwareMode);
-  const setSidHardwareMode = useSettingsStore((s) => s.setSidHardwareMode);
-  const webusbClockRate = useSettingsStore((s) => s.webusbClockRate);
-  const setWebusbClockRate = useSettingsStore((s) => s.setWebusbClockRate);
-  const webusbStereo = useSettingsStore((s) => s.webusbStereo);
-  const setWebusbStereo = useSettingsStore((s) => s.setWebusbStereo);
-
-  const sampleBusGain = useAudioStore((s) => s.sampleBusGain);
-  const setSampleBusGain = useAudioStore((s) => s.setSampleBusGain);
-  const synthBusGain = useAudioStore((s) => s.synthBusGain);
-  const setSynthBusGain = useAudioStore((s) => s.setSynthBusGain);
-  const autoGain = useAudioStore((s) => s.autoGain);
-  const setAutoGain = useAudioStore((s) => s.setAutoGain);
-
-  const editStep = useEditorStore((s) => s.editStep);
-  const setEditStep = useEditorStore((s) => s.setEditStep);
-  const insertMode = useEditorStore((s) => s.insertMode);
-  const toggleInsertMode = useEditorStore((s) => s.toggleInsertMode);
-  const recQuantEnabled = useEditorStore((s) => s.recQuantEnabled);
-  const setRecQuantEnabled = useEditorStore((s) => s.setRecQuantEnabled);
-  const recQuantRes = useEditorStore((s) => s.recQuantRes);
-  const setRecQuantRes = useEditorStore((s) => s.setRecQuantRes);
-  const recReleaseEnabled = useEditorStore((s) => s.recReleaseEnabled);
-  const setRecReleaseEnabled = useEditorStore((s) => s.setRecReleaseEnabled);
-
-  const activeScheme = useKeyboardStore((s) => s.activeScheme);
-  const setActiveScheme = useKeyboardStore((s) => s.setActiveScheme);
-  const platformOverride = useKeyboardStore((s) => s.platformOverride);
-  const setPlatformOverride = useKeyboardStore((s) => s.setPlatformOverride);
-
-  // ── Local state ──────────────────────────────────────────────────────────
-  const [isFullscreen, setIsFullscreen] = useState(!!document.fullscreenElement);
-  const [asidDevices, setAsidDevices] = useState<Array<{ id: string; name: string }>>([]);
-  const [asidSupported, setAsidSupported] = useState(false);
-  const [webusbSupported] = useState(() => typeof navigator !== 'undefined' && 'usb' in navigator);
-  const [webusbConnected, setWebusbConnected] = useState(false);
-  const [webusbDeviceName, setWebusbDeviceName] = useState<string | null>(null);
-  const [webusbFirmware, setWebusbFirmware] = useState<string | null>(null);
-  const [webusbChips, setWebusbChips] = useState<Array<{ slot: number; detected: boolean; type?: string }> | null>(null);
-
-  // Fullscreen change listener
-  useEffect(() => {
-    if (!isOpen) return;
-    const handleFSChange = () => setIsFullscreen(!!document.fullscreenElement);
-    document.addEventListener('fullscreenchange', handleFSChange);
-    return () => document.removeEventListener('fullscreenchange', handleFSChange);
-  }, [isOpen]);
-
-  // ASID device init
-  useEffect(() => {
-    if (!isOpen) return;
-    setAsidSupported(isASIDSupported());
-    if (isASIDSupported()) {
-      const manager = getASIDDeviceManager();
-      manager.init().then(() => {
-        setAsidDevices(manager.getDevices().map((d) => ({ id: d.id, name: d.name })));
-      });
-      const unsubscribe = manager.onStateChange((state) => {
-        setAsidDevices(state.devices.map((d) => ({ id: d.id, name: d.name })));
-      });
-      return unsubscribe;
-    }
-  }, [isOpen]);
-
-  // ── Handlers ─────────────────────────────────────────────────────────────
-  const toggleFullscreen = useCallback(async () => {
-    try {
-      if (!document.fullscreenElement) {
-        await document.documentElement.requestFullscreen();
-      } else {
-        await document.exitFullscreen();
-      }
-    } catch (err) {
-      console.error('Failed to toggle fullscreen:', err);
-    }
-  }, []);
-
-  const handleStereoSepChange = useCallback(
-    (v: number) => {
-      setStereoSeparation(v);
-      getTrackerReplayer().setStereoSeparation(v);
-      const djEng = getDJEngineIfActive();
-      if (djEng) {
-        djEng.deckA.replayer.setStereoSeparation(v);
-        djEng.deckB.replayer.setStereoSeparation(v);
-      }
-    },
-    [setStereoSeparation],
-  );
-
-  const handleModplugSepChange = useCallback(
-    (v: number) => {
-      setModplugSeparation(v);
-      getTrackerReplayer().setModplugSeparation(v);
-      const djEng = getDJEngineIfActive();
-      if (djEng) {
-        djEng.deckA.replayer.setModplugSeparation(v);
-        djEng.deckB.replayer.setModplugSeparation(v);
-      }
-    },
-    [setModplugSeparation],
-  );
-
-  const handleStereoModeChange = useCallback(
-    (v: string) => {
-      const mode = v as 'pt2' | 'modplug';
-      setStereoSeparationMode(mode);
-      getTrackerReplayer().setStereoSeparationMode(mode);
-      const djEng = getDJEngineIfActive();
-      if (djEng) {
-        djEng.deckA.replayer.setStereoSeparationMode(mode);
-        djEng.deckB.replayer.setStereoSeparationMode(mode);
-      }
-    },
-    [setStereoSeparationMode],
-  );
-
-  const handleClearState = useCallback(() => {
-    navigator.serviceWorker
-      .getRegistrations()
-      .then((regs) => Promise.all(regs.map((r) => r.unregister())))
-      .then(() => caches.keys())
-      .then((keys) => Promise.all(keys.map((k) => caches.delete(k))))
-      .then(() => {
-        localStorage.clear();
-        return indexedDB.databases();
-      })
-      .then((dbs) => Promise.all(dbs.map((db) => indexedDB.deleteDatabase(db.name!))))
-      .then(() => location.reload());
-  }, []);
-
-  // ── Derived data ─────────────────────────────────────────────────────────
-  const visualModeOptions: SelectOption[] = useMemo(
-    () => BG_MODES.map((bg, i) => ({ value: String(i), label: getBgModeLabel(bg) })),
-    [],
-  );
-
-  const asidDeviceOptions: SelectOption[] = useMemo(
-    () =>
-      asidDevices.length === 0
-        ? [{ value: '', label: 'No ASID devices found' }]
-        : [{ value: '', label: 'Select a device...' }, ...asidDevices.map((d) => ({ value: d.id, label: d.name }))],
-    [asidDevices],
-  );
+  // Compute keyboard scheme options from shared constant (id/name → value/label)
+  const keyboardSchemeOptions: SelectOption[] = KEYBOARD_SCHEMES.map(k => ({ value: k.id, label: k.name }));
 
   // Computations are safe regardless of isOpen (no null dereference risk)
 
   // Estimate total content height for the scroll view
-  const crtSectionH = crtEnabled ? CRT_SLIDERS.length * 28 + 4 * 18 + 60 : 40;
-  const lensSectionH = lensEnabled ? 3 * 28 + 2 * 18 + 60 + 40 : 40;
+  const crtSectionH = s.crtEnabled ? CRT_SLIDERS.length * 28 + 4 * 18 + 60 : 40;
+  const lensSectionH = s.lensEnabled ? LENS_SLIDERS.length * 28 + 2 * 18 + 60 + 40 : 40;
   const contentH = 2000 + crtSectionH + lensSectionH;
   const scrollAreaH = MODAL_H - 48 - 44; // header + footer
 
   // CRT sliders grouped
   const crtGroups: string[] = [];
-  CRT_SLIDERS.forEach((s) => { if (!crtGroups.includes(s.group)) crtGroups.push(s.group); });
+  CRT_SLIDERS.forEach((slider) => { if (!crtGroups.includes(slider.group)) crtGroups.push(slider.group); });
 
   let screenW = 1920;
   let screenH = 1080;
@@ -500,15 +210,15 @@ export const PixiSettingsModal: React.FC<PixiSettingsModalProps> = ({ isOpen, on
             alignItems: 'center',
           }}
         >
-          {TABS.map((tab) => {
-            const isActive = activeTab === tab.id;
+          {SETTINGS_TABS.map((tab) => {
+            const isActive = s.s.activeTab === tab.id;
             return (
               <layoutContainer
                 key={tab.id}
                 eventMode="static"
                 cursor="pointer"
-                onPointerDown={() => setActiveTab(tab.id)}
-                onClick={() => setActiveTab(tab.id)}
+                onPointerDown={() => s.setActiveTab(tab.id)}
+                onClick={() => s.setActiveTab(tab.id)}
                 layout={{
                   paddingLeft: 12,
                   paddingRight: 12,
@@ -544,7 +254,7 @@ export const PixiSettingsModal: React.FC<PixiSettingsModalProps> = ({ isOpen, on
           {/* ═══════════════════════════════════════════════════════════════════
               GENERAL TAB — Display, Layout
               ═══════════════════════════════════════════════════════════════════ */}
-          <layoutContainer renderable={activeTab === 'general'} layout={{ width: CONTENT_W, height: activeTab === 'general' ? contentH : 0, overflow: 'hidden', flexDirection: 'column', gap: 12 }}>
+          <layoutContainer renderable={s.activeTab === 'general'} layout={{ width: CONTENT_W, height: s.activeTab === 'general' ? contentH : 0, overflow: 'hidden', flexDirection: 'column', gap: 12 }}>
           {/* ═══════ DISPLAY ═══════ */}
           <SectionHeader text="DISPLAY" />
 
@@ -647,7 +357,7 @@ export const PixiSettingsModal: React.FC<PixiSettingsModalProps> = ({ isOpen, on
           {/* ═══════════════════════════════════════════════════════════════════
               VISUAL TAB — Visual Background, CRT, Lens, Workbench
               ═══════════════════════════════════════════════════════════════════ */}
-          <layoutContainer renderable={activeTab === 'visual'} layout={{ width: CONTENT_W, height: activeTab === 'visual' ? contentH : 0, overflow: 'hidden', flexDirection: 'column', gap: 12 }}>
+          <layoutContainer renderable={s.activeTab === 'visual'} layout={{ width: CONTENT_W, height: s.activeTab === 'visual' ? contentH : 0, overflow: 'hidden', flexDirection: 'column', gap: 12 }}>
           <SettingRow label="Visual Background:" description="Audio-reactive effects behind tracker">
             <PixiCheckbox checked={trackerVisualBg} onChange={setTrackerVisualBg} />
           </SettingRow>
@@ -801,7 +511,7 @@ export const PixiSettingsModal: React.FC<PixiSettingsModalProps> = ({ isOpen, on
           {/* ═══════════════════════════════════════════════════════════════════
               RECORDING TAB
               ═══════════════════════════════════════════════════════════════════ */}
-          <layoutContainer renderable={activeTab === 'recording'} layout={{ width: CONTENT_W, height: activeTab === 'recording' ? contentH : 0, overflow: 'hidden', flexDirection: 'column', gap: 12 }}>
+          <layoutContainer renderable={s.activeTab === 'recording'} layout={{ width: CONTENT_W, height: s.activeTab === 'recording' ? contentH : 0, overflow: 'hidden', flexDirection: 'column', gap: 12 }}>
           {/* ═══════ RECORDING ═══════ */}
           <SectionHeader text="RECORDING" />
 
@@ -849,7 +559,7 @@ export const PixiSettingsModal: React.FC<PixiSettingsModalProps> = ({ isOpen, on
           {/* ═══════════════════════════════════════════════════════════════════
               INPUT TAB — MIDI, Keyboard, Vinyl Scratch
               ═══════════════════════════════════════════════════════════════════ */}
-          <layoutContainer renderable={activeTab === 'input'} layout={{ width: CONTENT_W, height: activeTab === 'input' ? contentH : 0, overflow: 'hidden', flexDirection: 'column', gap: 12 }}>
+          <layoutContainer renderable={s.activeTab === 'input'} layout={{ width: CONTENT_W, height: s.activeTab === 'input' ? contentH : 0, overflow: 'hidden', flexDirection: 'column', gap: 12 }}>
           {/* ═══════ MIDI ═══════ */}
           <SectionHeader text="MIDI" />
 
@@ -918,7 +628,7 @@ export const PixiSettingsModal: React.FC<PixiSettingsModalProps> = ({ isOpen, on
           {/* ═══════════════════════════════════════════════════════════════════
               AUDIO TAB — Engine settings
               ═══════════════════════════════════════════════════════════════════ */}
-          <layoutContainer renderable={activeTab === 'audio'} layout={{ width: CONTENT_W, height: activeTab === 'audio' ? contentH : 0, overflow: 'hidden', flexDirection: 'column', gap: 12 }}>
+          <layoutContainer renderable={s.activeTab === 'audio'} layout={{ width: CONTENT_W, height: s.activeTab === 'audio' ? contentH : 0, overflow: 'hidden', flexDirection: 'column', gap: 12 }}>
           {/* ═══════ ENGINE ═══════ */}
           <SectionHeader text="ENGINE" />
 
@@ -1053,7 +763,7 @@ export const PixiSettingsModal: React.FC<PixiSettingsModalProps> = ({ isOpen, on
           </layoutContainer>
 
           {/* Keyboard section is part of INPUT tab */}
-          <layoutContainer renderable={activeTab === 'input'} layout={{ width: CONTENT_W, height: activeTab === 'input' ? contentH : 0, overflow: 'hidden', flexDirection: 'column', gap: 12 }}>
+          <layoutContainer renderable={s.activeTab === 'input'} layout={{ width: CONTENT_W, height: s.activeTab === 'input' ? contentH : 0, overflow: 'hidden', flexDirection: 'column', gap: 12 }}>
           {/* ═══════ KEYBOARD ═══════ */}
           <SectionHeader text="KEYBOARD" />
 
@@ -1083,7 +793,7 @@ export const PixiSettingsModal: React.FC<PixiSettingsModalProps> = ({ isOpen, on
           {/* ═══════════════════════════════════════════════════════════════════
               SID TAB — SID Engine, SID Hardware
               ═══════════════════════════════════════════════════════════════════ */}
-          <layoutContainer renderable={activeTab === 'sid'} layout={{ width: CONTENT_W, height: activeTab === 'sid' ? contentH : 0, overflow: 'hidden', flexDirection: 'column', gap: 12 }}>
+          <layoutContainer renderable={s.activeTab === 'sid'} layout={{ width: CONTENT_W, height: s.activeTab === 'sid' ? contentH : 0, overflow: 'hidden', flexDirection: 'column', gap: 12 }}>
           {/* ═══════ C64 SID ENGINE ═══════ */}
           <SectionHeader text="C64 SID PLAYER ENGINE" />
 
@@ -1321,7 +1031,7 @@ export const PixiSettingsModal: React.FC<PixiSettingsModalProps> = ({ isOpen, on
           {/* ═══════════════════════════════════════════════════════════════════
               ABOUT TAB — Modland, Danger Zone, Info
               ═══════════════════════════════════════════════════════════════════ */}
-          <layoutContainer renderable={activeTab === 'about'} layout={{ width: CONTENT_W, height: activeTab === 'about' ? contentH : 0, overflow: 'hidden', flexDirection: 'column', gap: 12 }}>
+          <layoutContainer renderable={s.activeTab === 'about'} layout={{ width: CONTENT_W, height: s.activeTab === 'about' ? contentH : 0, overflow: 'hidden', flexDirection: 'column', gap: 12 }}>
           {/* ═══════ MODLAND ═══════ */}
           <SectionHeader text="MODLAND INTEGRATION" />
 

@@ -105,10 +105,18 @@ export const TRACKER_EXTENSIONS = [
   '.ast', '.aps', '.amc', '.mmdc', '.qpa', '.sqt', '.qts',
   '.jd', '.doda', '.ym', '.ymst', '.agi', '.mso',
   '.sng', '.tiny', '.one', '.two',
+  // Additional formats found in test files
+  '.ah', '.bvs', '.c67', '.cba', '.cd', '.chip', '.dlw', '.dsym', '.dtm',
+  '.fp2', '.fredmon', '.gt2', '.hd', '.midi', '.mxt', '.nru', '.nt', '.ntsp',
+  '.okta', '.org', '.plm', '.psum', '.rhst', '.rj', '.rkl', '.rtm',
+  '.sc2', '.sil', '.sm2', '.st', '.stp', '.stx', '.symmod', '.syn',
+  '.tme', '.tomy', '.unic',
 ];
 
-// Binary file formats that need ArrayBuffer loading (not JSON)
-const BINARY_EXTENSIONS = [...TRACKER_EXTENSIONS, '.sqs', '.seq', '.mid', '.midi'];
+// Text file formats that use JSON or XML loading — everything else is binary.
+// This is intentionally a small whitelist of TEXT formats rather than trying
+// to enumerate all 200+ binary tracker format extensions.
+const TEXT_EXTENSIONS = ['.json', '.xml', '.xt'];
 
 export function isTrackerModule(filename: string): boolean {
   const ext = filename.toLowerCase().slice(filename.lastIndexOf('.'));
@@ -117,7 +125,7 @@ export function isTrackerModule(filename: string): boolean {
 
 function isBinaryFile(filename: string): boolean {
   const ext = filename.toLowerCase().slice(filename.lastIndexOf('.'));
-  return BINARY_EXTENSIONS.includes(ext);
+  return !TEXT_EXTENSIONS.includes(ext);
 }
 
 interface UseFileNavigationOptions {

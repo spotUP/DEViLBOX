@@ -309,6 +309,11 @@ export const PixiNavBar: React.FC = () => {
         <PixiButton label="SAVE" variant="ghost" size="sm" onClick={handleSaveFile} width={44} />
         <PixiButton label="LOAD" variant="ghost" size="sm" onClick={handleLoadFile} width={44} />
 
+        {/* Song Info */}
+        <PixiButton label="INFO" variant="ghost" size="sm" onClick={() => {
+          requestAnimationFrame(() => useUIStore.getState().openModal('moduleInfo'));
+        }} width={40} />
+
         {/* Collaboration */}
         <PixiButton
           label={collabStatus === 'connected' ? 'LIVE' : 'COLLAB'}

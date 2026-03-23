@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-03-23T07:35:08.139Z
+ * Generated: 2026-03-23T22:15:53.093Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -19,9 +19,9 @@ export interface ChangelogEntry {
 }
 
 // Build info
-export const BUILD_VERSION = '1.0.3296';
-export const BUILD_NUMBER = '3296';
-export const BUILD_HASH = '192d4a5bc';
+export const BUILD_VERSION = '1.0.3338';
+export const BUILD_NUMBER = '3338';
+export const BUILD_HASH = '87fc570fe';
 export const BUILD_DATE = '2026-03-23';
 
 // Full version (patch IS the build number, so no need to append)
@@ -30,9 +30,177 @@ export const FULL_VERSION = BUILD_VERSION;
 // Auto-generated changelog
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: '1.0.3296',
+    version: '1.0.3338',
     date: '2026-03-23',
     changes: [
+      {
+        type: 'improvement',
+        "description": "All turntable views share engine physics + DJActions"
+      },
+      {
+        type: 'fix',
+        "description": "Echo-out toggle — clicking again restores volume"
+      },
+      {
+        type: 'fix',
+        "description": "Loop distortion + auth warning on recording"
+      },
+      {
+        type: 'improvement',
+        "description": "3D views use shared DJActions + engine physics"
+      },
+      {
+        type: 'fix',
+        "description": "Move MIDI to bottom of mobile menu, add file load diagnostics"
+      },
+      {
+        type: 'fix',
+        "description": "Pixi transport gains spinDown+quantize, mixer becomes functional"
+      },
+      {
+        type: 'improvement',
+        "description": "DOM mixer + transport use shared DJActions"
+      },
+      {
+        type: 'fix',
+        "description": "Bump hamburger menu z-index to always be on top"
+      },
+      {
+        type: 'feature',
+        "description": "DeckEngine owns TurntablePhysics per deck"
+      },
+      {
+        type: 'fix',
+        "description": "Headless position polling — fixes broken 3D mode position updates"
+      },
+      {
+        type: 'feature',
+        "description": "Add shared DJActions for atomic store+engine sync"
+      },
+      {
+        type: 'feature',
+        "description": "Add DJ set browser to Pixi nav bar"
+      },
+      {
+        type: 'feature',
+        "description": "Add DJ set browser dropdown to DOM nav bar"
+      },
+      {
+        type: 'fix',
+        "description": "Diag: add file loading debug logs for iOS troubleshooting"
+      },
+      {
+        type: 'feature',
+        "description": "Upload local tracks on recording stop, disable REC during playback"
+      },
+      {
+        type: 'feature',
+        "description": "Add playSet/stopPlayback/fetchSets/deleteSet store actions"
+      },
+      {
+        type: 'feature',
+        "description": "Opus transcoding for DJ set blobs, 100MB upload limit, total count"
+      },
+      {
+        type: 'feature',
+        "description": "Retain file bytes, update format types, add total to API"
+      },
+      {
+        type: 'improvement',
+        "description": "Add DJ set playback implementation plan"
+      },
+      {
+        type: 'improvement',
+        "description": "Disconnect Tone.Meter when not playing to save idle CPU"
+      },
+      {
+        type: 'improvement',
+        "description": "Add DJ set playback design spec"
+      },
+      {
+        type: 'improvement',
+        "description": "Disable PixiJS on mobile, throttle DJ 3D polling"
+      },
+      {
+        type: 'fix',
+        "description": "Unified file loading — static first, server API supplement"
+      },
+      {
+        type: 'fix',
+        "description": "Guard readStaticFile against SPA catch-all returning HTML"
+      },
+      {
+        type: 'fix',
+        "description": "FilterRes replay bug + playCount in single-set API response"
+      },
+      {
+        type: 'fix',
+        "description": "Encode URL path segments for file loading"
+      },
+      {
+        type: 'fix',
+        "description": "Skip tests in deploy — fixtures only exist locally"
+      },
+      {
+        type: 'fix',
+        "description": "Use test:ci instead of test:all — skip tests needing local fixtures"
+      },
+      {
+        type: 'feature',
+        "description": "Diag: add iOS sample rate diagnostic logs to AudioContext and worklets"
+      },
+      {
+        type: 'fix',
+        "description": "Prevent platter scratch from stealing tonearm clicks"
+      },
+      {
+        type: 'fix',
+        "description": "ProjectM soft cut transitions, broadcast toggle, 3D render loop"
+      },
+      {
+        type: 'fix',
+        "description": "Fix 3D pitch slider — bigger hitbox, window-level drag events"
+      },
+      {
+        type: 'fix',
+        "description": "Decouple turntable physics from audio playback rate"
+      },
+      {
+        type: 'fix',
+        "description": "Restore 60fps for VU meters and 3D scene"
+      },
+      {
+        type: 'improvement',
+        "description": "Reduce CPU usage — throttle VU meters, position polling, 3D renders"
+      },
+      {
+        type: 'feature',
+        "description": "Physics-driven turntable start/stop and power on/off"
+      },
+      {
+        type: 'fix',
+        "description": "Install multer for DJ set blob uploads"
+      },
+      {
+        type: 'feature',
+        "description": "Add Twitch and custom RTMP live streaming support"
+      },
+      {
+        type: 'feature',
+        "description": "YouTube upload, live streaming, and stream control UI"
+      },
+      {
+        type: 'feature',
+        "description": "Video capture and recording for DJ sets"
+      },
+      {
+        type: 'feature',
+        "description": "Server API, mic input, and recording UI for DJ sets"
+      },
+      {
+        type: 'feature',
+        "description": "DJ mixer mic control, set recording, Hively track editor improvements"
+      },
       {
         type: 'improvement',
         "description": "Chore: server database, DJ engine updates, changelog"
@@ -64,180 +232,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'fix',
         "description": "Tighter knob sensitivity, center detent snap, faster tonearm tracking"
-      },
-      {
-        type: 'fix',
-        "description": "Read computedLayout.width from element itself, not parent"
-      },
-      {
-        type: 'fix',
-        "description": "Smooth slider drag using native DOM coordinates"
-      },
-      {
-        type: 'feature',
-        "description": "Editable Klystrack positions + MusicLine hex nibble entry"
-      },
-      {
-        type: 'fix',
-        "description": "Remove panel stopPropagation blocking slider pointerDown"
-      },
-      {
-        type: 'fix',
-        "description": "Use hitArea on slider container (same pattern as checkbox)"
-      },
-      {
-        type: 'feature',
-        "description": "Insert/delete rows, Pixi block ops, Furnace order editing"
-      },
-      {
-        type: 'improvement',
-        "description": "Chore: CLAUDE.md update, FurnaceSequencer improvements, changelog, format state"
-      },
-      {
-        type: 'fix',
-        "description": "Default Div eventMode to \"auto\" for event pass-through"
-      },
-      {
-        type: 'fix',
-        "description": "Move onPointerDown to slider graphics element directly"
-      },
-      {
-        type: 'fix',
-        "description": "Filter null-note NOTE_ON from macro volume updates"
-      },
-      {
-        type: 'fix',
-        "description": "Set eventMode=\"static\" on slider graphics for hit testing"
-      },
-      {
-        type: 'fix',
-        "description": "Add hitArea to PixiSlider for reliable drag interaction"
-      },
-      {
-        type: 'fix',
-        "description": "Add hitArea to PixiCheckbox for reliable click detection"
-      },
-      {
-        type: 'fix',
-        "description": "Use onPointerTap for modal overlay close instead of onPointerUp"
-      },
-      {
-        type: 'improvement',
-        "description": "Chore: update format audit state"
-      },
-      {
-        type: 'fix',
-        "description": "Prevent modal close when clicking checkboxes/buttons inside panel"
-      },
-      {
-        type: 'fix',
-        "description": "Route nativeOnly formats through native parser in MCP load"
-      },
-      {
-        type: 'fix',
-        "description": "Cable positioning, matrix params, rack SunVox controls"
-      },
-      {
-        type: 'improvement',
-        "description": "Frameloop=demand — only render when decks playing or camera moves"
-      },
-      {
-        type: 'fix',
-        "description": "Faders slide on Y axis (vertical), crossfader on X — measured from mesh bounds"
-      }
-    ]
-  },
-  {
-    version: '2026-03-22',
-    date: '2026-03-22',
-    changes: [
-      {
-        type: 'improvement',
-        "description": "Chore(modular): update ModularMatrixView and ModularRackView"
-      },
-      {
-        type: 'fix',
-        "description": "Expand macro filter, add setSkipRegisterWrites to dispatch"
-      },
-      {
-        type: 'feature',
-        "description": "Dynamic keyboard shortcuts from active scheme"
-      },
-      {
-        type: 'fix',
-        "description": "Flip fader Z direction + set default from mesh measurement"
-      },
-      {
-        type: 'improvement',
-        "description": "Add comprehensive keyboard shortcuts reference"
-      },
-      {
-        type: 'fix',
-        "description": "Fader default 2.1→2.5 — match left fader position from screenshot"
-      },
-      {
-        type: 'fix',
-        "description": "Fader default 2.2→2.1 — back off slightly"
-      },
-      {
-        type: 'fix',
-        "description": "Fader default 2.0→2.2 (closer), travel 3.5→4.5 (more range)"
-      },
-      {
-        type: 'fix',
-        "description": "Fader defaultValue 1.8→2.0 — nudge forward ~1cm"
-      },
-      {
-        type: 'fix',
-        "description": "Show SunVox module controls in DOM rack view"
-      },
-      {
-        type: 'fix',
-        "description": "Fader defaultValue 1.1→1.8 — much closer to viewer"
-      },
-      {
-        type: 'feature',
-        "description": "Register all 327 missing scheme command handlers"
-      },
-      {
-        type: 'fix',
-        "description": "Fader defaultValue 0.75→1.1 — shift toward viewer to align with grooves"
-      },
-      {
-        type: 'fix',
-        "description": "Vestax fader travel 5.5→3.5, defaultValue 1→0.75 to fit grooves"
-      },
-      {
-        type: 'fix',
-        "description": "Turntable spacing 0.38→0.40 — clear mixer edges"
-      },
-      {
-        type: 'fix',
-        "description": "Turntable spacing 0.42→0.38 — slightly closer"
-      },
-      {
-        type: 'fix',
-        "description": "Spread turntables outward (0.35→0.42) to clear mixer edges"
-      },
-      {
-        type: 'fix',
-        "description": "Mixer Y 0.18→0.15 — split the difference"
-      },
-      {
-        type: 'fix',
-        "description": "Mixer Y 0.12→0.18 — still below turntable surface"
-      },
-      {
-        type: 'fix',
-        "description": "Raise mixer Y=0.12 to align with turntable surface"
-      },
-      {
-        type: 'feature',
-        "description": "Module oscilloscope scope canvas in modular rack view"
-      },
-      {
-        type: 'feature',
-        "description": "Chore: add Vestax mixer source assets (OBJ + textures + MTL)"
       }
     ]
   }
