@@ -10,7 +10,7 @@
 export type TrackSource =
   | { type: 'modland'; fullPath: string }
   | { type: 'hvsc'; path: string }
-  | { type: 'embedded'; blobId: string }
+  | { type: 'embedded'; blobId: string; originalSource?: TrackSource }
   | { type: 'local'; fileName: string };
 
 // ── Event types ─────────────────────────────────────────────────────────
