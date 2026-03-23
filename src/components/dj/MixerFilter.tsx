@@ -9,8 +9,7 @@
 import React, { useCallback } from 'react';
 import { Knob } from '@components/controls/Knob';
 import { useDJStore } from '@/stores/useDJStore';
-import { getDJEngine } from '@/engine/dj/DJEngine';
-import { setTrackedFilterPosition } from '@/engine/dj/DJQuantizedFX';
+import * as DJActions from '@/engine/dj/DJActions';
 
 interface MixerFilterProps {
   deckId: 'A' | 'B' | 'C';
@@ -20,10 +19,7 @@ export const MixerFilter: React.FC<MixerFilterProps> = ({ deckId }) => {
   const filterPosition = useDJStore((s) => s.decks[deckId].filterPosition);
 
   const handleChange = useCallback((value: number) => {
-    useDJStore.getState().setDeckFilter(deckId, value);
-    getDJEngine().getDeck(deckId).setFilterPosition(value);
-    // Keep the tracked position in sync for filter sweep starting point
-    setTrackedFilterPosition(deckId, value);
+    DJActions.setDeckFilter(deckId, value);
   }, [deckId]);
 
   const formatFilter = useCallback((val: number) => {
