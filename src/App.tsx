@@ -80,6 +80,7 @@ const DJView = lazy(() => import('./components/dj/DJView').then(m => ({ default:
 const VJView = lazy(() => import('./components/vj/VJView').then(m => ({ default: m.VJView })));
 const FileBrowser = lazy(() => import('@components/dialogs/FileBrowser').then(m => ({ default: m.FileBrowser })));
 const AuthModal = lazy(() => import('@components/dialogs/AuthModal').then(m => ({ default: m.AuthModal })));
+const ModuleInfoModal = lazy(() => import('@components/dialogs/ModuleInfoModal').then(m => ({ default: m.ModuleInfoModal })));
 const SettingsModal = lazy(() => import('@components/dialogs/SettingsModal').then(m => ({ default: m.SettingsModal })));
 const RevisionBrowserDialog = lazy(() => import('@components/dialogs/RevisionBrowserDialog').then(m => ({ default: m.RevisionBrowserDialog })));
 const PixiApp = lazy(() => import('./pixi/PixiApp').then(m => ({ default: m.PixiApp })));
@@ -1211,6 +1212,7 @@ function App() {
 
       {/* Modals */}
       <Suspense fallback={null}>
+        {modalOpen === 'moduleInfo' && <ModuleInfoModal isOpen={true} onClose={closeModal} />}
         {modalOpen === 'settings' && <SettingsModal onClose={closeModal} />}
         {modalOpen === 'help' && <HelpModal isOpen={true} onClose={closeModal} initialTab={(modalData?.initialTab as any) || 'shortcuts'} />}
         {modalOpen === 'export' && <ExportDialog isOpen={true} onClose={closeModal} />}
