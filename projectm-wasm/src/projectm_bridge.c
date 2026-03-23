@@ -91,13 +91,15 @@ int pm_init(int width, int height)
     return 0;
 }
 
-/* Render one frame. Call this from requestAnimationFrame. */
+/* Render one frame. Call this from requestAnimationFrame.
+ * NOTE: No SDL_GL_SwapWindow — the browser's rAF callback handles presentation.
+ * An explicit swap here caused alternating-frame artifacts during soft cut transitions
+ * because the browser would present twice (once from swap, once from rAF completion). */
 EMSCRIPTEN_KEEPALIVE
 void pm_render_frame(void)
 {
     if (!g_pm) return;
     projectm_opengl_render_frame(g_pm);
-    SDL_GL_SwapWindow(g_win);
 }
 
 /* Push interleaved stereo float PCM data.
