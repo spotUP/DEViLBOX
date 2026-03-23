@@ -550,17 +550,24 @@ export function useFileNavigation({
             // Try static file first (bundled in deploy, works on all platforms including iOS),
             // then fall back to server API for files only available on the backend.
             let loaded = false;
+            console.log('[FileNav] Loading binary:', selectedFile.path, 'manifest:', isManifestAvailable(), 'serverFS:', hasServerFS);
             if (isManifestAvailable()) {
               try {
                 buffer = await readStaticFile(selectedFile.path);
                 loaded = true;
-              } catch { /* not in static bundle */ }
+                console.log('[FileNav] Static file loaded:', buffer.byteLength, 'bytes');
+              } catch (e) {
+                console.warn('[FileNav] Static file failed:', e instanceof Error ? e.message : e);
+              }
             }
             if (!loaded && hasServerFS) {
               try {
                 buffer = await readServerFile(selectedFile.path);
                 loaded = true;
-              } catch { /* server doesn't have it either */ }
+                console.log('[FileNav] Server file loaded:', buffer.byteLength, 'bytes');
+              } catch (e) {
+                console.warn('[FileNav] Server file failed:', e instanceof Error ? e.message : e);
+              }
             }
             if (!loaded && selectedFile.handle) {
               const file = await (selectedFile.handle as FileSystemFileHandle).getFile();
