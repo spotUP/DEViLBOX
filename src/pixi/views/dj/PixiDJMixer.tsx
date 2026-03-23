@@ -451,6 +451,7 @@ const MixerRecordMic: React.FC = () => {
   const isRecording = useDJSetStore(s => s.isRecording);
   const micEnabled = useDJSetStore(s => s.micEnabled);
   const micGain = useDJSetStore(s => s.micGain);
+  const [showBroadcast, setShowBroadcast] = useState(false);
   const [videoRecording, setVideoRecording] = useState(false);
   const videoCaptureRef = useRef<DJVideoCapture | null>(null);
   const videoRecorderRef = useRef<DJVideoRecorder | null>(null);
@@ -533,35 +534,46 @@ const MixerRecordMic: React.FC = () => {
   return (
     <pixiContainer layout={{ flexDirection: 'row', gap: 6, alignItems: 'center', paddingTop: 4 }}>
       <PixiButton
-        label={isRecording ? 'STOP' : 'REC'}
+        label="BROADCAST"
         size="sm"
-        color={isRecording ? 'red' : undefined}
-        active={isRecording}
-        onClick={handleRecordToggle}
+        color={showBroadcast ? 'red' : undefined}
+        active={showBroadcast}
+        onClick={() => setShowBroadcast(v => !v)}
       />
-      <PixiButton
-        label={videoRecording ? 'VSTOP' : 'VIDEO'}
-        size="sm"
-        color={videoRecording ? 'purple' : undefined}
-        active={videoRecording}
-        onClick={handleVideoToggle}
-      />
-      <PixiButton
-        label="MIC"
-        size="sm"
-        color={micEnabled ? 'green' : undefined}
-        active={micEnabled}
-        onClick={handleMicToggle}
-      />
-      {micEnabled && (
-        <PixiSlider
-          value={micGain}
-          min={0}
-          max={1.5}
-          length={50}
-          orientation="horizontal"
-          onChange={handleMicGain}
-        />
+      {showBroadcast && (
+        <>
+          <PixiButton
+            label={isRecording ? 'STOP' : 'REC'}
+            size="sm"
+            color={isRecording ? 'red' : undefined}
+            active={isRecording}
+            onClick={handleRecordToggle}
+          />
+          <PixiButton
+            label={videoRecording ? 'VSTOP' : 'VIDEO'}
+            size="sm"
+            color={videoRecording ? 'purple' : undefined}
+            active={videoRecording}
+            onClick={handleVideoToggle}
+          />
+          <PixiButton
+            label="MIC"
+            size="sm"
+            color={micEnabled ? 'green' : undefined}
+            active={micEnabled}
+            onClick={handleMicToggle}
+          />
+          {micEnabled && (
+            <PixiSlider
+              value={micGain}
+              min={0}
+              max={1.5}
+              length={50}
+              orientation="horizontal"
+              onChange={handleMicGain}
+            />
+          )}
+        </>
       )}
     </pixiContainer>
   );
