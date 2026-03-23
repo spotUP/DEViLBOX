@@ -935,7 +935,7 @@ async function renderFurFile(furPath: string, outPath: string): Promise<RenderRe
         const logData = new Int32Array(wasm.HEAP32.buffer, logPtr, logCount * 6);
         const logPath = outPath.replace('.wav', '.cmdlog.txt');
         const lines: string[] = [`# tick cmd chan val1 val2 ret (${logCount} entries)`];
-        for (let i = 0; i < Math.min(logCount, 200000); i++) {
+        for (let i = 0; i < Math.min(logCount, 500000); i++) {
           const tick = logData[i * 6 + 0];
           const cmd = logData[i * 6 + 1];
           const chan = logData[i * 6 + 2];
