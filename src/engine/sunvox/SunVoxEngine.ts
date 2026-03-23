@@ -101,6 +101,7 @@ export class SunVoxEngine {
   private _disconnectQueue: Map<string, PendingResolvers<number>> = new Map();
   private _moduleGraphQueue: Map<number, PendingResolvers<SunVoxModuleGraphEntry[]>> = new Map();
   private _moduleScopeQueue: Map<string, PendingResolvers<Float32Array>> = new Map();
+  private _moduleLevelsQueue: Map<number, PendingResolvers<Float32Array>> = new Map();
 
   private constructor() {
     this.audioContext = getDevilboxAudioContext();
@@ -270,6 +271,7 @@ export class SunVoxEngine {
     sourceId?: number;
     destId?: number;
     result?: number;
+    levels?: ArrayBuffer;
   }): void {
     switch (data.type) {
       case 'ready':
@@ -403,6 +405,15 @@ export class SunVoxEngine {
         break;
       }
 
+      case 'moduleLevels': {
+        const resolver = this._moduleLevelsQueue.get(data.handle!);
+        if (resolver) {
+          this._moduleLevelsQueue.delete(data.handle!);
+          resolver.resolve(data.levels ? new Float32Array(data.levels) : new Float32Array(0));
+        }
+        break;
+      }
+
       case 'error': {
         const err = new Error(data.message ?? 'SunVox worklet error');
         console.error('[SunVoxEngine]', data.message);
@@ -455,6 +466,8 @@ export class SunVoxEngine {
     this._moduleGraphQueue.clear();
     for (const r of this._moduleScopeQueue.values()) r.reject(err);
     this._moduleScopeQueue.clear();
+    for (const r of this._moduleLevelsQueue.values()) r.reject(err);
+    this._moduleLevelsQueue.clear();
   }
 
   // ── Public API ─────────────────────────────────────────────────────────────
@@ -707,6 +720,16 @@ export class SunVoxEngine {
     return new Promise<Float32Array>((resolve, reject) => {
       this._moduleScopeQueue.set(key, { resolve, reject });
       this.workletNode!.port.postMessage({ type: 'getModuleScope', handle, moduleId, channel });
+    });
+  }
+
+  /** Get RMS levels for multiple modules in one round-trip (for VU meters). */
+  async getModuleLevels(handle: number, moduleIds: number[]): Promise<Float32Array> {
+    await this._initPromise;
+    if (this._disposed || !this.workletNode || moduleIds.length === 0) return new Float32Array(0);
+    return new Promise<Float32Array>((resolve, reject) => {
+      this._moduleLevelsQueue.set(handle, { resolve, reject });
+      this.workletNode!.port.postMessage({ type: 'getModuleLevels', handle, moduleIds });
     });
   }
 
