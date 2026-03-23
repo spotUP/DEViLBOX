@@ -27,6 +27,7 @@ import { focusPopout } from '@components/ui/PopOutWindow';
 import { VIEW_OPTIONS, switchView } from '@/constants/viewOptions';
 import { VJPresetBrowser } from './VJPresetBrowser';
 import { VJPatternOverlay } from './VJPatternOverlay';
+import { registerCaptureCanvas } from '@/engine/dj/streaming/DJVideoCapture';
 
 // Lazy-load ProjectMCanvas (heavy WASM dependency)
 const ProjectMCanvas = React.lazy(() => import('./ProjectMCanvas').then(m => ({ default: m.ProjectMCanvas })));
@@ -100,6 +101,12 @@ export const VJCanvas = React.forwardRef<VJCanvasHandle, VJCanvasProps>(
     const [ready, setReady] = useState(false);
 
     useEffect(() => { visibleRef.current = visible; }, [visible]);
+
+    // Register canvas for video capture
+    useEffect(() => {
+      registerCaptureCanvas('vj', canvasRef.current);
+      return () => registerCaptureCanvas('vj', null);
+    }, []);
 
     // Init butterchurn
     useEffect(() => {
