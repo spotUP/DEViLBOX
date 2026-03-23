@@ -39,12 +39,12 @@
     --color-success: #5eeaa0;
     --color-warning: #ffd060;
 
-    /* Tracker row colors */
-    --color-tracker-row-even: #6e1418;
-    --color-tracker-row-odd: #781820;
-    --color-tracker-row-highlight: #882028;
-    --color-tracker-row-current: #a82830;
-    --color-tracker-row-cursor: #982430;
+    /* Tracker row colors — darker red for recessed pattern editor */
+    --color-tracker-row-even: #4a0e12;
+    --color-tracker-row-odd: #521014;
+    --color-tracker-row-highlight: #601418;
+    --color-tracker-row-current: #8c2028;
+    --color-tracker-row-cursor: #721820;
 
     /* Cell colors */
     --color-cell-note: rgba(255,255,255,0.92);
