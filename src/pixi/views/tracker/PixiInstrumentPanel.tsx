@@ -419,8 +419,8 @@ export const PixiInstrumentPanel: React.FC<PixiInstrumentPanelProps> = ({ width,
                 />
               )}
 
-              {/* Type badge */}
-              <pixiContainer layout={{ flexShrink: 0, marginLeft: 2, marginRight: 2 }}>
+              {/* Type badge — right-aligned */}
+              <pixiContainer layout={{ flexShrink: 0, marginLeft: 'auto', marginRight: 2 }}>
                 <pixiGraphics
                   draw={(g) => {
                     g.clear();
