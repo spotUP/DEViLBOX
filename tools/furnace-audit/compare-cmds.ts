@@ -184,7 +184,9 @@ function filterComparable(entries: CmdEntry[]): CmdEntry[] {
     e.cmd !== 'SID3_FILTER_ENABLE' && e.cmd !== 'SID3_CUTOFF_SCALING' &&
     e.cmd !== 'SID3_RESONANCE_SCALING' && e.cmd !== 'SID3_1_BIT_NOISE' &&
     e.cmd !== 'SID3_PHASE_RESET' && e.cmd !== 'SID3_NOISE_PHASE_RESET' &&
-    e.cmd !== 'SID3_ENVELOPE_RESET'
+    e.cmd !== 'SID3_ENVELOPE_RESET' &&
+    // Null-note NOTE_ON (val1 = -1 or 0x7fffffff) from macro volume updates:
+    !(e.cmd === 'NOTE_ON' && (e.val1 === -1 || e.val1 === 0x7fffffff))
   );
 }
 
