@@ -454,14 +454,13 @@ const MixerRecordMic: React.FC = () => {
     if (isRecording) {
       // Stop — delegate to the DOM DJSetRecordButton logic via store
       // (the actual save flow happens in the DOM component; here we just toggle state)
-      const { DJSetRecorder } = await import('@/engine/dj/recording/DJSetRecorder');
       const engine = getDJEngineIfActive();
       if (engine?.recorder) {
         const name = prompt('Name your DJ set:', `DJ Set ${new Date().toLocaleString()}`);
         if (!name) return;
         const { useAuthStore } = await import('@/stores/useAuthStore');
         const auth = useAuthStore.getState();
-        const set = engine.recorder.stopRecording(name, auth.userId || 'local', auth.username || 'DJ');
+        const set = engine.recorder.stopRecording(name, auth.user?.id || 'local', auth.user?.username || 'DJ');
         engine.recorder = null;
         useDJSetStore.getState().setRecording(false);
         useDJSetStore.getState().setRecordingDuration(0);
@@ -475,7 +474,7 @@ const MixerRecordMic: React.FC = () => {
       }
     } else {
       // Start
-      const { DJSetRecorder } = await import('@/engine/dj/recording/DJSetRecorder');
+      const { DJSetRecorder } = await import(/* @vite-ignore */ '@/engine/dj/recording/DJSetRecorder');
       const recorder = new DJSetRecorder();
       recorder.startRecording();
       const engine = getDJEngineIfActive();
@@ -519,8 +518,7 @@ const MixerRecordMic: React.FC = () => {
           value={micGain}
           min={0}
           max={1.5}
-          width={50}
-          height={10}
+          length={50}
           orientation="horizontal"
           onChange={handleMicGain}
         />
