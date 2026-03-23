@@ -341,6 +341,11 @@ export class ToneEngine {
     // forcing 44100 can cause silent output or context creation failure.
     // Let the browser pick the optimal rate for the device hardware.
     this._nativeContext = new AudioContext({ latencyHint: 'interactive' });
+    console.log('[ToneEngine] AudioContext created — sampleRate:', this._nativeContext.sampleRate,
+      'state:', this._nativeContext.state,
+      'baseLatency:', (this._nativeContext as any).baseLatency,
+      'outputLatency:', (this._nativeContext as any).outputLatency,
+      'UA:', navigator.userAgent.slice(0, 80));
     Tone.setContext(this._nativeContext);
     // Register globally so WAM/WASM synths can access it without importing ToneEngine
     setDevilboxAudioContext(this._nativeContext);
