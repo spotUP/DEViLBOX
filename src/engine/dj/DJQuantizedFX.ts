@@ -388,14 +388,20 @@ export function echoOut(
       if (progress < 1) {
         sweep.id = requestAnimationFrame(animate);
       } else {
-        // Fade complete — set volume to 0, pause, then restore volume after audio has stopped
+        // Fade complete — mute, stop deck, then restore volume after audio is silent
         try {
           const engine = getDJEngine();
-          engine.getDeck(deckId).setVolume(0);
-          engine.getDeck(deckId).pause();
+          const deck = engine.getDeck(deckId);
+          deck.setVolume(0);
+          // Use stop() not pause() — resets position to 0 so next play() works cleanly
+          if (deck.playbackMode === 'audio') {
+            deck.audioPlayer.stop();
+          } else {
+            deck.pause();
+          }
           useDJStore.getState().setDeckPlaying(deckId, false);
         } catch { /* engine not ready */ }
-        // Restore volume after pause has fully taken effect (audio graph is silent)
+        // Restore volume after stop has fully taken effect
         setTimeout(() => {
           try {
             getDJEngine().getDeck(deckId).setVolume(startVol);
