@@ -387,7 +387,7 @@ export const VJControls: React.FC<VJControlsProps> = ({
                     switchView(v, 'vj');
                   }
                 }}
-                className="px-2 py-0.5 text-[10px] font-bold tracking-widest uppercase bg-white/10 text-text-primary border border-white/20 rounded hover:bg-white/20 transition-colors cursor-pointer flex-shrink-0"
+                className="px-3 py-1.5 rounded-md text-xs font-mono font-bold tracking-widest uppercase border transition-all cursor-pointer border-dark-borderLight bg-dark-bgTertiary text-text-secondary hover:bg-dark-bgHover hover:text-text-primary"
                 title="Switch view"
               >
                 {VIEW_OPTIONS.map(({ value, label }) => (

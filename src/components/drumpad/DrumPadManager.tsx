@@ -326,7 +326,7 @@ export const DrumPadManager: React.FC<DrumPadManagerProps> = ({ onClose }) => {
                       useUIStore.getState().setActiveView(val as any);
                     }
                   }}
-                  className="px-2 py-0.5 text-[10px] font-bold tracking-widest uppercase bg-dark-bgTertiary text-text-muted border border-dark-border rounded hover:bg-dark-bgHover transition-colors cursor-pointer"
+                  className="px-3 py-1.5 rounded-md text-xs font-mono font-bold tracking-widest uppercase border transition-all cursor-pointer border-dark-borderLight bg-dark-bgTertiary text-text-secondary hover:bg-dark-bgHover hover:text-text-primary"
                   title="Switch view"
                 >
                   <option value="tracker">Tracker</option>

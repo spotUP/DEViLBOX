@@ -14,7 +14,7 @@
 
 import { useRef, useEffect, useCallback, useMemo } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
-import { useGLTF, OrbitControls, View, PerspectiveCamera } from '@react-three/drei';
+import { useGLTF, OrbitControls, View, PerspectiveCamera, Environment } from '@react-three/drei';
 import * as THREE from 'three';
 import { useDJStore } from '@/stores/useDJStore';
 import { getDJEngine } from '@/engine/dj/DJEngine';
@@ -134,6 +134,7 @@ function getControlName(mesh: THREE.Object3D): string {
 
 export function MixerScene({ viewRef }: { viewRef: React.RefObject<HTMLDivElement | null> }) {
   const { scene: gltfScene } = useGLTF(MODEL_PATH);
+  const { camera, scene: threeScene, invalidate } = useThree();
 
   // Drag state refs
   const activeKnobRef = useRef<string | null>(null);
@@ -450,30 +451,49 @@ export function MixerScene({ viewRef }: { viewRef: React.RefObject<HTMLDivElemen
         });
       }
 
-      // Fix PBR properties — GLB export from Maya lost metalness on untextured parts
+      // Fix PBR properties — GLB export from Maya specular workflow needs metalness tuning
       if (mesh.material && 'metalness' in mesh.material) {
         const m = mesh.material as THREE.MeshStandardMaterial;
         const name = m.name || '';
-        // Only fix untextured materials (textured ones like faceplate render correctly)
-        if (!m.map) {
-          mesh.material = m.clone();
-          const mc = mesh.material as THREE.MeshStandardMaterial;
-          if (name.includes('windowSG')) {
-            // VU meter — dark with blue emissive glow
-            mc.emissive = new THREE.Color(0x2060cc);
-            mc.emissiveIntensity = 0.5;
-            mc.roughness = 0.2;
-          } else if (name.includes('fader')) {
-            mc.metalness = 0.7; mc.roughness = 0.2;
-          } else if (name.includes('knobSG')) {
-            mc.color.set(0x1a1a1a); mc.metalness = 0.1; mc.roughness = 0.75;
-          } else if (name.includes('Cylinder05') || name.includes('polySurface') || name.includes('pCylinder7')) {
-            mc.metalness = 0.6; mc.roughness = 0.35;
-          } else if (name.includes('Rectangle01')) {
-            mc.metalness = 0.5; mc.roughness = 0.4;
-          } else {
-            mc.metalness = 0.4; mc.roughness = 0.45;
-          }
+        mesh.material = m.clone();
+        const mc = mesh.material as THREE.MeshStandardMaterial;
+
+        // ── Textured materials ──
+        if (name.includes('Cylinder06')) {
+          // Brushed aluminum body/frame (Anis_Metal_Spec.jpg)
+          // Low metalness so texture reads via diffuse (no envMap in unified scene)
+          mc.metalness = 0.15; mc.roughness = 0.4;
+          mc.color.set(0xcccccc);
+        } else if (name.includes('FaceplateSG')) {
+          // Main faceplate — silver-gray with brushed metal grain
+          mc.metalness = 0.15; mc.roughness = 0.4;
+          mc.color.set(0x888888);
+        } else if (name.includes('windowSG')) {
+          // VU meter (InputLevel.jpg) — dark with blue emissive glow
+          mc.emissive = new THREE.Color(0x2060cc);
+          mc.emissiveIntensity = 0.5;
+          mc.roughness = 0.2;
+        } else if (name.includes('pCylinder1SG')) {
+          // Noise pattern texture
+          mc.metalness = 0.3; mc.roughness = 0.5;
+        } else if (name.includes('BoxFBX') || name.includes('OuterSG')) {
+          // Degenerate mesh in this OBJ — no visible geometry
+          mc.metalness = 0.05; mc.roughness = 0.5;
+        // ── Untextured materials ──
+        } else if (name.includes('fader')) {
+          mc.metalness = 0.7; mc.roughness = 0.2;
+        } else if (name.includes('knobSG')) {
+          mc.color.set(0x1a1a1a); mc.metalness = 0.1; mc.roughness = 0.75;
+        } else if (name.includes('polySurface1SG')) {
+          // Upper knob panel — dark matte surface (backplate labels unavailable in this mesh's UVs)
+          mc.metalness = 0.1; mc.roughness = 0.6;
+          mc.color.set(0x111111);
+        } else if (name.includes('Cylinder05') || name.includes('polySurface') || name.includes('pCylinder7')) {
+          mc.metalness = 0.6; mc.roughness = 0.35;
+        } else if (name.includes('Rectangle01')) {
+          mc.metalness = 0.5; mc.roughness = 0.4;
+        } else {
+          mc.metalness = 0.4; mc.roughness = 0.45;
         }
       }
 
@@ -491,6 +511,85 @@ export function MixerScene({ viewRef }: { viewRef: React.RefObject<HTMLDivElemen
 
     return { sceneGroup: cloned, meshRegistry: registry };
   }, [gltfScene]);
+
+  // ── Dynamic VU meter canvas texture ──────────────────────────────────────
+  // Renders LED segments per-deck onto a canvas, used as emissiveMap on windowSG.
+  const vuCanvasRef = useRef<HTMLCanvasElement | null>(null);
+  const vuTextureRef = useRef<THREE.CanvasTexture | null>(null);
+  const vuBaseImageRef = useRef<HTMLImageElement | null>(null);
+
+  useEffect(() => {
+    const canvas = document.createElement('canvas');
+    canvas.width = 512;
+    canvas.height = 512;
+    vuCanvasRef.current = canvas;
+
+    const tex = new THREE.CanvasTexture(canvas);
+    tex.colorSpace = THREE.SRGBColorSpace;
+    vuTextureRef.current = tex;
+
+    // Load the base InputLevel image as background
+    const img = new Image();
+    img.src = '/models/vestax/Textures/InputLevel.jpg';
+    img.onload = () => { vuBaseImageRef.current = img; };
+
+    // Apply to all windowSG meshes
+    const vuEntry = meshRegistry.get('window');
+    if (vuEntry) {
+      for (const mesh of vuEntry.meshes) {
+        const mat = mesh.material as THREE.MeshStandardMaterial;
+        mat.emissiveMap = tex;
+        mat.emissive = new THREE.Color(0xffffff);
+        mat.emissiveIntensity = 1.5;
+        mat.needsUpdate = true;
+      }
+    }
+
+    return () => { tex.dispose(); };
+  }, [meshRegistry]);
+
+  // ── Async texture loading ────────────────────────────────────────────────
+  // gltfScene.clone(true) drops embedded blob textures. Load all from source.
+  useEffect(() => {
+    const loader = new THREE.TextureLoader();
+    const texCache = new Map<string, THREE.Texture>();
+    let pending = 0;
+
+    const loadTex = (path: string, srgb: boolean, cb: (t: THREE.Texture) => void) => {
+      const cached = texCache.get(path);
+      if (cached) { cb(cached); return; }
+      pending++;
+      loader.load(path, (tex) => {
+        tex.colorSpace = srgb ? THREE.SRGBColorSpace : THREE.LinearSRGBColorSpace;
+        texCache.set(path, tex);
+        cb(tex);
+        pending--;
+        invalidate();
+        if (pending === 0) setTimeout(() => invalidate(), 100);
+      });
+    };
+
+    sceneGroup.traverse((child) => {
+      if (!('isMesh' in child && child.isMesh)) return;
+      const mc = (child as THREE.Mesh).material as THREE.MeshStandardMaterial;
+      if (!mc?.name) return;
+
+      // Brushed aluminum body — diffuse texture lost during clone
+      if (mc.name.includes('Cylinder06') && !mc.map) {
+        loadTex('/models/vestax/Textures/Anis_Metal_Spec.jpg', true, (tex) => {
+          mc.map = tex;
+          mc.needsUpdate = true;
+        });
+      }
+      // Faceplate — add brushed metal as roughness map for grain
+      if (mc.name.includes('FaceplateSG') && !mc.roughnessMap) {
+        loadTex('/models/vestax/Textures/Anis_Metal_Spec.jpg', false, (tex) => {
+          mc.roughnessMap = tex;
+          mc.needsUpdate = true;
+        });
+      }
+    });
+  }, [sceneGroup, invalidate]);
 
   // ── Per-Frame Updates ────────────────────────────────────────────────────
 
@@ -541,28 +640,68 @@ export function MixerScene({ viewRef }: { viewRef: React.RefObject<HTMLDivElemen
       }
     }
 
-    // Update VU meter emissive (window mesh)
-    const vuEntry = meshRegistry.get('window');
-    if (vuEntry) {
-      // Blend VU color based on peak level of both decks
-      const peakA = store.decks.A.peakDb ?? -60;
-      const peakB = store.decks.B.peakDb ?? -60;
-      const maxPeak = Math.max(peakA, peakB);
+    // Update VU meter canvas texture
+    const canvas = vuCanvasRef.current;
+    const vuTex = vuTextureRef.current;
+    const baseImg = vuBaseImageRef.current;
+    if (canvas && vuTex) {
+      const ctx = canvas.getContext('2d')!;
+      const W = canvas.width, H = canvas.height;
 
-      // Map -60..0 dB to brightness 0..1
-      const brightness = Math.max(0, Math.min(1, (maxPeak + 60) / 60));
+      // Draw base image (labels: INPUT LEVEL, PGM-1, PGM-2, dB markings)
+      ctx.fillStyle = '#000';
+      ctx.fillRect(0, 0, W, H);
+      if (baseImg) ctx.drawImage(baseImg, 0, 0, W, H);
 
-      // Color: green → yellow → red
-      const r = brightness > 0.6 ? 1 : brightness / 0.6;
-      const g = brightness < 0.8 ? 1 : 1 - (brightness - 0.8) / 0.2;
+      // LED segment positions (normalized 0-1 in texture space, mapped to canvas)
+      // 7 segments from bottom (-20dB) to top (+6dB)
+      const segmentDbValues = [-20, -10, -6, -3, 0, 3, 6]; // bottom to top
+      const segY0 = 0.625; // bottom segment center (normalized)
+      const segY6 = 0.44;  // top segment center (normalized)
+      const segH = 0.018;  // segment height
+      // PGM-1: two dash columns at ~x=0.38,0.44  PGM-2: ~x=0.54,0.58
+      const pgm1X = [0.375, 0.385, 0.430, 0.450]; // outer dash, inner dash pairs
+      const pgm2X = [0.535, 0.545, 0.570, 0.580];
 
-      for (const mesh of vuEntry.meshes) {
-        const mat = mesh.material as THREE.MeshStandardMaterial;
-        if (mat.emissive) {
-          mat.emissive.setRGB(r * brightness * 0.5, g * brightness * 0.5, 0);
-          mat.emissiveIntensity = brightness * 2;
+      // Read real-time audio levels from deck meters (not static peakDb)
+      let peakA = -60, peakB = -60;
+      try {
+        const engine = getDJEngine();
+        if (store.decks.A.isPlaying) peakA = engine.getDeck('A').getLevel();
+        if (store.decks.B.isPlaying) peakB = engine.getDeck('B').getLevel();
+      } catch { /* engine not ready */ }
+
+      for (let i = 0; i < 7; i++) {
+        const db = segmentDbValues[i];
+        const t = i / 6; // 0=bottom, 1=top
+        const cy = (segY0 + (segY6 - segY0) * t) * H;
+
+        // LED color by dB level: green < 0dB, yellow 0-3dB, red > 3dB
+        let ledColor: string;
+        if (db >= 3) ledColor = '#ff2200';
+        else if (db >= 0) ledColor = '#ffaa00';
+        else ledColor = '#00dd44';
+
+        // PGM-1 (Deck A)
+        const litA = peakA >= db;
+        if (litA) {
+          ctx.fillStyle = ledColor;
+          // Outer dash
+          ctx.fillRect(pgm1X[0] * W, cy - segH * H / 2, (pgm1X[1] - pgm1X[0]) * W, segH * H);
+          // Inner dash
+          ctx.fillRect(pgm1X[2] * W, cy - segH * H / 2, (pgm1X[3] - pgm1X[2]) * W, segH * H);
+        }
+
+        // PGM-2 (Deck B)
+        const litB = peakB >= db;
+        if (litB) {
+          ctx.fillStyle = ledColor;
+          ctx.fillRect(pgm2X[0] * W, cy - segH * H / 2, (pgm2X[1] - pgm2X[0]) * W, segH * H);
+          ctx.fillRect(pgm2X[2] * W, cy - segH * H / 2, (pgm2X[3] - pgm2X[2]) * W, segH * H);
         }
       }
+
+      vuTex.needsUpdate = true;
     }
 
     // Update button emissive for PFL state
@@ -584,7 +723,7 @@ export function MixerScene({ viewRef }: { viewRef: React.RefObject<HTMLDivElemen
   // R3F event bubbling through <primitive> is unreliable for cloned scenes.
   // Instead, we raycast manually on pointerdown and walk the hit mesh's userData.
 
-  const { camera, scene } = useThree();
+  const scene = threeScene; // alias for raycasting below
   const raycaster = useMemo(() => new THREE.Raycaster(), []);
   const pointer = useMemo(() => new THREE.Vector2(), []);
 
@@ -730,10 +869,11 @@ export function MixerVestax3DView() {
           near={0.01}
           far={10}
         />
-        {/* Low-key dramatic lighting (matches CGTrader reference) */}
-        <ambientLight intensity={0.04} />
-        <spotLight position={[0, 6, 2]} intensity={2.0} angle={0.4} penumbra={0.6} castShadow={false} />
-        <directionalLight position={[-1, 2, -1]} intensity={0.15} />
+        {/* Environment map for PBR reflections + key lighting */}
+        <Environment preset="studio" environmentIntensity={0.6} />
+        <ambientLight intensity={0.15} />
+        <spotLight position={[0, 6, 2]} intensity={1.5} angle={0.4} penumbra={0.6} castShadow={false} />
+        <directionalLight position={[-1, 2, -1]} intensity={0.3} />
         <pointLight position={[0, 0.06, 0]} color="#4488ff" intensity={1.0} distance={0.35} decay={2} />
 
         <MixerScene viewRef={viewDivRef} />

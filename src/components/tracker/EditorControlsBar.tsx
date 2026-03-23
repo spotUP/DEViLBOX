@@ -172,7 +172,7 @@ export const EditorControlsBar: React.FC<EditorControlsBarProps> = React.memo(({
           <select
             value={viewMode}
             onChange={handleViewModeChange}
-            className="px-2 py-1 text-xs bg-dark-bgSecondary text-text-primary border border-dark-border rounded hover:bg-dark-bgHover transition-colors"
+            className="px-3 py-1.5 rounded-md text-xs font-mono border transition-all cursor-pointer border-dark-borderLight bg-dark-bgTertiary text-text-secondary hover:bg-dark-bgHover hover:text-text-primary"
             title="Select editor view"
           >
             <option value="tracker">Tracker</option>
@@ -193,7 +193,7 @@ export const EditorControlsBar: React.FC<EditorControlsBarProps> = React.memo(({
         <div className="flex items-center gap-1.5 ml-1 pl-2 border-l border-dark-border">
           <Cpu size={14} className="shrink-0 text-text-secondary" />
           <select
-            className="px-2 py-1 text-xs bg-dark-bgSecondary text-text-primary border border-dark-border rounded hover:bg-dark-bgHover transition-colors cursor-pointer outline-none"
+            className="px-3 py-1.5 rounded-md text-xs font-mono border transition-all cursor-pointer border-dark-borderLight bg-dark-bgTertiary text-text-secondary hover:bg-dark-bgHover hover:text-text-primary"
             onChange={handleHardwarePresetChange}
             defaultValue="none"
             title="Select Hardware System Preset (NES, SMS, Genesis, etc.)"
@@ -222,7 +222,7 @@ export const EditorControlsBar: React.FC<EditorControlsBarProps> = React.memo(({
             <select
               value={gridChannelIndex}
               onChange={(e) => onGridChannelChange(Number(e.target.value))}
-              className="px-2 py-1 text-xs bg-dark-bgSecondary text-text-primary border border-dark-border rounded hover:bg-dark-bgHover transition-colors"
+              className="px-3 py-1.5 rounded-md text-xs font-mono border transition-all cursor-pointer border-dark-borderLight bg-dark-bgTertiary text-text-secondary hover:bg-dark-bgHover hover:text-text-primary"
             >
               {Array.from({ length: channelCount }, (_, idx) => (
                 <option key={idx} value={idx}>
