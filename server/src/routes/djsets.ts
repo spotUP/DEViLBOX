@@ -123,6 +123,7 @@ router.get('/:id', optionalAuth as any, (req: Request, res: Response) => {
         createdAt: row.created_at,
         durationMs: row.duration_ms,
         trackList: JSON.parse(row.track_list || '[]'),
+        playCount: row.play_count || 0,
         version: 1,
       },
       events: JSON.parse(row.events || '[]'),
