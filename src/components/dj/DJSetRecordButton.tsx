@@ -24,6 +24,7 @@ export const DJSetRecordButton: React.FC = () => {
   const recordingDuration = useDJSetStore(s => s.recordingDuration);
   const token = useAuthStore(s => s.token);
   const user = useAuthStore(s => s.user);
+  const isPlayingSet = useDJSetStore(s => s.isPlayingSet);
   const [saving, setSaving] = useState(false);
   const timerRef = useRef<number>(0);
 
@@ -62,11 +63,33 @@ export const DJSetRecordButton: React.FC = () => {
       if (token) {
         setSaving(true);
         try {
-          // Check which tracks need blob upload
+          // Upload local tracks as blobs
+          const { getDJEngine } = await import('../../engine/dj/DJEngine');
+          const engine = getDJEngine();
+
           for (const track of set.metadata.trackList) {
             if (track.source.type === 'local') {
-              // TODO: We'd need the original file data here — for now mark as local
-              console.warn(`[DJSetRecord] Track "${track.fileName}" is local — won't be available for remote playback`);
+              // Find which deck has this track loaded
+              for (const deckId of ['A', 'B', 'C'] as const) {
+                try {
+                  const deck = engine.getDeck(deckId);
+                  const bytes = deck.audioPlayer?.getOriginalFileBytes?.();
+                  if (bytes) {
+                    const blob = new Blob([bytes], { type: 'application/octet-stream' });
+                    const { id: blobId } = await uploadBlob(blob, track.fileName);
+                    const originalSource = { ...track.source };
+                    (track as any).source = { type: 'embedded', blobId, originalSource };
+
+                    // Rewrite matching load events
+                    for (const evt of set.events) {
+                      if (evt.type === 'load' && evt.values?.fileName === track.fileName) {
+                        (evt.values as any).source = track.source;
+                      }
+                    }
+                    break; // Found the deck, move to next track
+                  }
+                } catch { /* deck might not exist */ }
+              }
             }
           }
 
@@ -84,6 +107,7 @@ export const DJSetRecordButton: React.FC = () => {
           } catch { /* no mic */ }
 
           await saveDJSet(set);
+          useDJSetStore.getState().fetchSets();
           console.log('[DJSetRecord] Set saved:', set.metadata.name);
         } catch (err) {
           console.error('[DJSetRecord] Save failed:', err);
@@ -120,14 +144,14 @@ export const DJSetRecordButton: React.FC = () => {
   return (
     <button
       onClick={handleToggle}
-      disabled={saving}
+      disabled={saving || isPlayingSet}
       className={`
         flex items-center gap-2 px-3 py-1.5 rounded text-xs font-bold transition-all
         ${isRecording
           ? 'bg-red-600 hover:bg-red-700 text-white animate-pulse'
           : 'bg-dark-bgTertiary hover:bg-dark-bgHover border border-dark-border text-text-secondary hover:text-text-primary'
         }
-        ${saving ? 'opacity-50 cursor-wait' : ''}
+        ${saving ? 'opacity-50 cursor-wait' : isPlayingSet ? 'opacity-40 cursor-not-allowed' : ''}
       `}
       title={isRecording ? 'Stop recording' : 'Record DJ set'}
     >
