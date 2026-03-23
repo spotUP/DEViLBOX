@@ -116,6 +116,11 @@ export async function togglePlay(
     }
   } else {
     // ── PLAY ──
+    // Sync engine volume from store (may be out of sync after echo-out or other FX)
+    try {
+      getDJEngine().getDeck(deckId).setVolume(store.decks[deckId].volume);
+    } catch { /* engine not ready */ }
+
     const otherDeckId: DeckId = deckId === 'A' ? 'B' : 'A';
     const otherIsPlaying = store.decks[otherDeckId].isPlaying;
     const qMode = getQuantizeMode();
