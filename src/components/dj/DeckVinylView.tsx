@@ -164,7 +164,7 @@ export const DeckVinylView: React.FC<DeckVinylViewProps> = ({ deckId, size = DEF
     // Get CSS colors from computed style
     const el = canvas.parentElement;
     const cs = el ? getComputedStyle(el) : null;
-    const bgColor = cs?.getPropertyValue('--color-bg').trim() || '#0b0909';
+    const bgColor = cs?.getPropertyValue('--color-bg').trim() || '#6e1418';
     const bgSecondary = cs?.getPropertyValue('--color-bg-secondary').trim() || '#131010';
     const bgTertiary = cs?.getPropertyValue('--color-bg-tertiary').trim() || '#1d1818';
     const borderColor = cs?.getPropertyValue('--color-border').trim() || '#2f2525';

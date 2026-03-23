@@ -26,10 +26,10 @@ const OVERVIEW_H = 16; // must match worker constant
 function snapshotColors(el: HTMLElement): DeckColors {
   const cs = getComputedStyle(el);
   return {
-    bg:          cs.getPropertyValue('--color-bg').trim()           || '#0b0909',
-    bgSecondary: cs.getPropertyValue('--color-bg-secondary').trim() || '#131010',
-    bgTertiary:  cs.getPropertyValue('--color-bg-tertiary').trim()  || '#1d1818',
-    border:      cs.getPropertyValue('--color-border').trim()       || '#2f2525',
+    bg:          cs.getPropertyValue('--color-bg').trim()           || '#6e1418',
+    bgSecondary: cs.getPropertyValue('--color-bg-secondary').trim() || '#7c1a1e',
+    bgTertiary:  cs.getPropertyValue('--color-bg-tertiary').trim()  || '#8c2028',
+    border:      cs.getPropertyValue('--color-border').trim()       || '#581014',
   };
 }
 
