@@ -96,8 +96,14 @@ export function drawSampleWaveform(
 ): void {
   const midY = height / 2;
 
+  // Resolve theme colors from CSS variables (canvas can't use var() directly)
+  const cs = getComputedStyle(ctx.canvas);
+  const bgColor = cs.getPropertyValue('--color-bg').trim() || COLORS.bg;
+  const gridColor = cs.getPropertyValue('--color-bg-secondary').trim() || COLORS.grid;
+  const centerColor = cs.getPropertyValue('--color-border').trim() || COLORS.center;
+
   // Background
-  ctx.fillStyle = COLORS.bg;
+  ctx.fillStyle = bgColor;
   ctx.fillRect(0, 0, width, height);
 
   if (opts.simplified) {
@@ -106,7 +112,7 @@ export function drawSampleWaveform(
   }
 
   // Grid
-  ctx.strokeStyle = COLORS.grid;
+  ctx.strokeStyle = gridColor;
   ctx.lineWidth = 1;
   for (let i = 1; i < 4; i++) {
     ctx.beginPath();
@@ -114,7 +120,7 @@ export function drawSampleWaveform(
     ctx.lineTo(width, (height / 4) * i);
     ctx.stroke();
   }
-  ctx.strokeStyle = COLORS.center;
+  ctx.strokeStyle = centerColor;
   ctx.beginPath();
   ctx.moveTo(0, midY);
   ctx.lineTo(width, midY);
