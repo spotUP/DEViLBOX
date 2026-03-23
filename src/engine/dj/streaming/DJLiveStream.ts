@@ -21,8 +21,8 @@ export class DJLiveStream {
   onStatusChange?: (status: 'connecting' | 'live' | 'error' | 'stopped') => void;
   onError?: (error: string) => void;
 
-  /** Start live streaming a MediaStream to YouTube */
-  async startStream(stream: MediaStream, streamKey: string): Promise<void> {
+  /** Start live streaming a MediaStream to a platform (youtube, twitch, or custom RTMP) */
+  async startStream(stream: MediaStream, streamKey: string, platform: 'youtube' | 'twitch' | 'custom' = 'youtube'): Promise<void> {
     if (this._active) return;
 
     // Pick best video codec
@@ -33,7 +33,7 @@ export class DJLiveStream {
     // Connect WebSocket to server relay
     this.onStatusChange?.('connecting');
 
-    this._ws = new WebSocket(`${WS_URL}/api/stream/ingest?key=${encodeURIComponent(streamKey)}`);
+    this._ws = new WebSocket(`${WS_URL}/api/stream/ingest?key=${encodeURIComponent(streamKey)}&platform=${platform}`);
     this._ws.binaryType = 'arraybuffer';
 
     await new Promise<void>((resolve, reject) => {
