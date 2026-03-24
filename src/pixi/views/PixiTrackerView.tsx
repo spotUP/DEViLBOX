@@ -10,7 +10,7 @@
  * are hooked here — they only attach window event listeners, no DOM rendering.
  */
 
-import React, { useCallback } from 'react';
+import React from 'react';
 import { usePixiTheme } from '../theme';
 import { PIXI_FONTS } from '../fonts';
 import { PixiFT2Toolbar, FT2_TOOLBAR_HEIGHT } from './tracker/PixiFT2Toolbar';
@@ -40,18 +40,13 @@ import { PixiSunVoxChannelView } from './sunvox/PixiSunVoxChannelView';
 import { PixiPianoRollView } from './PixiPianoRollView';
 import { PixiGTUltraView } from './gtultra/PixiGTUltraView';
 import { PixiSc68View } from './sc68/PixiSc68View';
-import { useTrackerInput } from '@/hooks/tracker/useTrackerInput';
-import { useBlockOperations } from '@/hooks/tracker/BlockOperations';
-import { useTrackerStore, useUIStore, useInstrumentStore , useFormatStore } from '@stores';
+import { useTrackerView } from '@/hooks/views/useTrackerView';
+import { useTrackerStore, useUIStore, useInstrumentStore } from '@stores';
 import { useWorkbenchStore } from '@stores/useWorkbenchStore';
 import { useMIDIStore } from '@stores/useMIDIStore';
-import { useTransportStore } from '@stores/useTransportStore';
-import { useProjectStore } from '@stores/useProjectStore';
 import { TITLE_H } from '../workbench/workbenchLayout';
 import { getTrackerReplayer } from '@engine/TrackerReplayer';
 import { PixiButton } from '../components/PixiButton';
-import { exportMusicLineFile } from '@lib/export/MusicLineExporter';
-import type { TrackerSong } from '@engine/TrackerReplayer';
 
 
 const MUSICLINE_MATRIX_HEIGHT = 220;
@@ -60,17 +55,18 @@ const MIDI_KNOB_BAR_H_EXPANDED = 56;
 
 export const PixiTrackerView: React.FC = () => {
   const theme = usePixiTheme();
-  // Enable FT2-style keyboard input (window event listeners — no DOM needed)
-  useTrackerInput();
-  useBlockOperations();
+  // Shared logic: keyboard hooks, view mode, grid channel, editor mode, ML export
+  const {
+    viewMode,
+    setViewMode,
+    gridChannelIndex,
+    setGridChannelIndex,
+    editorMode,
+    handleExportML,
+  } = useTrackerView();
 
-  const viewMode = useUIStore(s => s.trackerViewMode);
-  const setViewMode = useUIStore(s => s.setTrackerViewMode);
-  const gridChannelIndex = useUIStore(s => s.gridChannelIndex);
-  const setGridChannelIndex = useUIStore(s => s.setGridChannelIndex);
   const modalOpen = useUIStore(s => s.modalOpen);
   const closeModal = useUIStore(s => s.closeModal);
-  const editorMode = useFormatStore(s => s.editorMode);
   const showMacroSlots = useUIStore(s => s.showMacroSlots);
   const showKnobBar = useMIDIStore(s => s.showKnobBar);
   const showInstrumentPanel = useUIStore(s => s.showInstrumentPanel);
@@ -137,38 +133,6 @@ export const PixiTrackerView: React.FC = () => {
   const midiKnobBarH = showKnobBar ? MIDI_KNOB_BAR_H_EXPANDED : MIDI_KNOB_BAR_H_COLLAPSED;
   const instrumentPanelHeight = contentH - toolbarH - CONTROLS_BAR_H - MACRO_SLOTS_H - tb303PanelH - scPanelH - midiKnobBarH;
   const editorWidth = windowWidth - (instrumentPanelVisible ? INSTRUMENT_PANEL_W : 0) - 16; // minus instrument panel and minimap
-
-  // MusicLine export handler
-  const handleExportML = useCallback(() => {
-    const s = useTrackerStore.getState();
-    const f = useFormatStore.getState();
-    const t = useTransportStore.getState();
-    const song: TrackerSong = {
-      name: useProjectStore.getState().metadata.name || 'MusicLine Song',
-      format: 'ML',
-      patterns: s.patterns,
-      instruments: useInstrumentStore.getState().instruments,
-      songPositions: s.patternOrder,
-      songLength: s.patternOrder.length,
-      restartPosition: 0,
-      numChannels: s.patterns[0]?.channels.length ?? 4,
-      initialSpeed: t.speed,
-      initialBPM: t.bpm,
-      channelTrackTables: f.channelTrackTables ?? undefined,
-      channelSpeeds: f.channelSpeeds ?? undefined,
-      channelGrooves: f.channelGrooves ?? undefined,
-    };
-    const data = exportMusicLineFile(song);
-    const blob = new Blob([data.buffer as ArrayBuffer], { type: 'application/octet-stream' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `${song.name.replace(/[^a-zA-Z0-9_\-]/g, '_')}.ml`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-  }, []);
 
   return (
     <pixiContainer
