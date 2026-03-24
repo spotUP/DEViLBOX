@@ -238,17 +238,51 @@ EXPORT int32_t gm_create(const uint8_t* romData, uint32_t romSize, int32_t synth
     gm->type = static_cast<GmSynthType>(synthType);
 
     // Find an empty slot or append
+    int32_t handle = -1;
     for (size_t i = 0; i < g_devices.size(); ++i)
     {
         if (!g_devices[i])
         {
             g_devices[i] = std::move(gm);
-            return static_cast<int32_t>(i);
+            handle = static_cast<int32_t>(i);
+            break;
         }
     }
+    if (handle < 0)
+    {
+        g_devices.push_back(std::move(gm));
+        handle = static_cast<int32_t>(g_devices.size() - 1);
+    }
 
-    g_devices.push_back(std::move(gm));
-    return static_cast<int32_t>(g_devices.size() - 1);
+    // Warm-up: process several blocks to let the DSP drain the HDI08 queue
+    // from createDefaultState() (preset load). Without this, the preset data
+    // is still pending when the first MIDI event arrives, causing HDI08
+    // protocol desynchronization and silent output.
+    {
+        constexpr uint32_t warmupSamples = 64;
+        std::vector<float> dummyL(warmupSamples, 0.0f);
+        std::vector<float> dummyR(warmupSamples, 0.0f);
+        std::vector<float> dummyBuf(warmupSamples, 0.0f);
+
+        auto& dev = *g_devices[handle];
+        const synthLib::TAudioInputs inputs = {dummyBuf.data(), dummyBuf.data(), dummyBuf.data(), dummyBuf.data()};
+        const synthLib::TAudioOutputs outputs = {
+            dummyL.data(), dummyR.data(),
+            dummyBuf.data(), dummyBuf.data(), dummyBuf.data(), dummyBuf.data(),
+            dummyBuf.data(), dummyBuf.data(), dummyBuf.data(), dummyBuf.data(),
+            dummyBuf.data(), dummyBuf.data()
+        };
+
+        std::vector<synthLib::SMidiEvent> noMidi;
+        for (int i = 0; i < 32; ++i)
+        {
+            dev.midiOut.clear();
+            dev.device->process(inputs, outputs, warmupSamples, noMidi, dev.midiOut);
+        }
+        printf("[EM] gm_create: warm-up complete (32 x %u samples)\n", warmupSamples);
+    }
+
+    return handle;
 }
 
 /**
@@ -310,8 +344,13 @@ EXPORT void gm_process(int32_t handle, float* outputL, float* outputR, uint32_t 
         dummy, dummy
     };
 
+    const auto midiInSize = gm.midiIn.size();
     gm.midiOut.clear();
     gm.device->process(inputs, outputs, numSamples, gm.midiIn, gm.midiOut);
+    const auto midiOutSize = gm.midiOut.size();
+    if (midiInSize > 0 || midiOutSize > 0)
+        printf("[EM] gm_process: midiIn=%d midiOut=%d numSamples=%u\n",
+               static_cast<int>(midiInSize), static_cast<int>(midiOutSize), numSamples);
     gm.midiIn.clear();
 }
 
@@ -399,6 +438,8 @@ EXPORT void gm_sendMidi(int32_t handle, uint8_t status, uint8_t data1, uint8_t d
     auto& gm = *g_devices[handle];
     synthLib::SMidiEvent ev(synthLib::MidiEventSource::Host, status, data1, data2);
     gm.midiIn.push_back(ev);
+    printf("[EM] gm_sendMidi: handle=%d status=0x%02X data1=%d data2=%d queueSize=%d\n",
+           handle, status, data1, data2, static_cast<int>(gm.midiIn.size()));
 }
 
 /**

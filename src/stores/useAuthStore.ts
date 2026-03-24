@@ -126,7 +126,7 @@ export const useAuthStore = create<AuthStore>()(
           const available = response.ok;
           set({ isServerAvailable: available });
           return available;
-        } catch (error) {
+        } catch (_error) {
           set({ isServerAvailable: false });
           return false;
         }

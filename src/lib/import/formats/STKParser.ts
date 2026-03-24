@@ -245,7 +245,7 @@ export async function parseSTKFile(
   }
 
   const sampleInfos: STKSampleInfo[] = [];
-  let totalSampleLen = 0;  // in words
+  let _totalSampleLen = 0;  // in words (accumulated but not used for validation in this path)
 
   for (let smp = 0; smp < NUM_SAMPLES; smp++) {
     const base = SONG_NAME_SIZE + smp * SAMPLE_HDR_SIZE;
@@ -257,7 +257,7 @@ export async function parseSTKFile(
     const loopLengthWords = u16be(v, base + 28);
 
     sampleInfos.push({ name, lengthWords, volume, loopStart, loopLengthWords });
-    totalSampleLen += lengthWords;
+    _totalSampleLen += lengthWords;
   }
 
   // ── File header (MODFileHeader) ───────────────────────────────────────────

@@ -558,31 +558,47 @@ export class TrackerGLRenderer {
     if (!pattern.channels[cursor.channelIndex]?.collapsed) {
       const colX = channelOffsets[cursor.channelIndex] - scrollX;
       const chW  = channelWidths[cursor.channelIndex];
-      const cursorEffectCols = pattern.channels[cursor.channelIndex]?.effectCols ?? 2;
-      const cursorContentWidth = contentWidth + cursorEffectCols * (CHAR_WIDTH * 3 + 4);
-      const cursorX = colX + Math.floor((chW - cursorContentWidth) / 2);
-
-      const paramBase = noteWidth + 4;
-      const hasAcidC  = pattern.channels[cursor.channelIndex]?.rows[0]?.flag1 !== undefined
-                     || pattern.channels[cursor.channelIndex]?.rows[0]?.flag2 !== undefined;
-      const acidOff = CHAR_WIDTH * 10 + 16;
-      const probOff = acidOff + (hasAcidC ? CHAR_WIDTH * 2 + 8 : 0);
+      const chData = pattern.channels[cursor.channelIndex];
+      const chColumns = chData?.columnSpecs ?? ui.columns;
+      const colIdx = parseInt(cursor.columnType, 10);
 
       let caretOffX = 0;
       let caretW    = CHAR_WIDTH;
+      let cursorX: number;
 
-      switch (cursor.columnType) {
-        case 'note':       caretOffX = 0;                                                               caretW = noteWidth; break;
-        case 'instrument': caretOffX = paramBase + cursor.digitIndex * CHAR_WIDTH;                      break;
-        case 'volume':     caretOffX = paramBase + (CHAR_WIDTH * 2 + 4) + cursor.digitIndex * CHAR_WIDTH; break;
-        case 'effTyp':     caretOffX = paramBase + CHAR_WIDTH * 4 + 8;                                  break;
-        case 'effParam':   caretOffX = paramBase + CHAR_WIDTH * 4 + 8 + CHAR_WIDTH + cursor.digitIndex * CHAR_WIDTH; break;
-        case 'effTyp2':    caretOffX = paramBase + CHAR_WIDTH * 7 + 12;                                 break;
-        case 'effParam2':  caretOffX = paramBase + CHAR_WIDTH * 7 + 12 + CHAR_WIDTH + cursor.digitIndex * CHAR_WIDTH; break;
-        case 'flag1':      caretOffX = paramBase + acidOff;                                             break;
-        case 'flag2':      caretOffX = paramBase + acidOff + CHAR_WIDTH + 4;                            break;
-        case 'probability':caretOffX = paramBase + probOff + cursor.digitIndex * CHAR_WIDTH;            break;
-        default:           caretOffX = paramBase + CHAR_WIDTH * 4 + 8;                                  break;
+      if (!isNaN(colIdx) && chColumns) {
+        // DATA-DRIVEN CURSOR — format mode uses numeric column indices
+        const dataContentWidth = chColumns.reduce((s, c) => s + c.charWidth * CHAR_WIDTH + COL_GAP, 0) - COL_GAP;
+        cursorX = colX + Math.floor((chW - dataContentWidth) / 2);
+        for (let ci = 0; ci < colIdx && ci < chColumns.length; ci++) {
+          caretOffX += chColumns[ci].charWidth * CHAR_WIDTH + COL_GAP;
+        }
+        caretW = (chColumns[colIdx]?.charWidth ?? 1) * CHAR_WIDTH;
+      } else {
+        // FIXED-COLUMN CURSOR
+        const cursorEffectCols = chData?.effectCols ?? 2;
+        const cursorContentWidth = contentWidth + cursorEffectCols * (CHAR_WIDTH * 3 + 4);
+        cursorX = colX + Math.floor((chW - cursorContentWidth) / 2);
+
+        const paramBase = noteWidth + 4;
+        const hasAcidC  = chData?.rows[0]?.flag1 !== undefined
+                       || chData?.rows[0]?.flag2 !== undefined;
+        const acidOff = CHAR_WIDTH * 10 + 16;
+        const probOff = acidOff + (hasAcidC ? CHAR_WIDTH * 2 + 8 : 0);
+
+        switch (cursor.columnType) {
+          case 'note':       caretOffX = 0;                                                               caretW = noteWidth; break;
+          case 'instrument': caretOffX = paramBase + cursor.digitIndex * CHAR_WIDTH;                      break;
+          case 'volume':     caretOffX = paramBase + (CHAR_WIDTH * 2 + 4) + cursor.digitIndex * CHAR_WIDTH; break;
+          case 'effTyp':     caretOffX = paramBase + CHAR_WIDTH * 4 + 8;                                  break;
+          case 'effParam':   caretOffX = paramBase + CHAR_WIDTH * 4 + 8 + CHAR_WIDTH + cursor.digitIndex * CHAR_WIDTH; break;
+          case 'effTyp2':    caretOffX = paramBase + CHAR_WIDTH * 7 + 12;                                 break;
+          case 'effParam2':  caretOffX = paramBase + CHAR_WIDTH * 7 + 12 + CHAR_WIDTH + cursor.digitIndex * CHAR_WIDTH; break;
+          case 'flag1':      caretOffX = paramBase + acidOff;                                             break;
+          case 'flag2':      caretOffX = paramBase + acidOff + CHAR_WIDTH + 4;                            break;
+          case 'probability':caretOffX = paramBase + probOff + cursor.digitIndex * CHAR_WIDTH;            break;
+          default:           caretOffX = paramBase + CHAR_WIDTH * 4 + 8;                                  break;
+        }
       }
 
       const caretX = cursorX + caretOffX;
@@ -687,11 +703,10 @@ export class TrackerGLRenderer {
 
         const isCollapsed = chData.collapsed;
         const effectCols = chData.effectCols ?? 2;
-        const chContentWidth = contentWidth + effectCols * (CHAR_WIDTH * 3 + 4);
-        const x = colX + Math.floor((chW - (isCollapsed ? noteWidth : chContentWidth)) / 2);
         const gy = y + (rowH - atlas.glyphLogicalHeight) / 2;
 
         if (isCollapsed) {
+          const x = colX + Math.floor((chW - noteWidth) / 2);
           const noteHas = (cell.note ?? 0) > 0;
           const nc = lerpWhiteRGBA(noteHas ? colors.textNote : colors.textMuted, noteHas ? glow : 0);
           this.setTmpColor(nc, cellAlpha);
@@ -701,9 +716,12 @@ export class TrackerGLRenderer {
 
         if (ui.columns && cell.params) {
           // DATA-DRIVEN PATH — renders custom format columns
+          const chColumns = chData.columnSpecs ?? ui.columns;
+          const dataContentWidth = chColumns.reduce((s, c) => s + c.charWidth * CHAR_WIDTH + COL_GAP, 0) - COL_GAP;
+          const x = colX + Math.floor((chW - dataContentWidth) / 2);
           let px = x;
-          for (let ci = 0; ci < ui.columns.length; ci++) {
-            const col = ui.columns[ci];
+          for (let ci = 0; ci < chColumns.length; ci++) {
+            const col = chColumns[ci];
             const val = cell.params[ci] ?? col.emptyValue;
             const isEmpty = val === col.emptyValue;
             const baseColor: [number, number, number, number] = isEmpty ? col.emptyColor : col.color;
@@ -728,6 +746,8 @@ export class TrackerGLRenderer {
           }
         } else {
           // EXISTING FIXED-COLUMN PATH (note/inst/vol/eff) — UNCHANGED
+          const chContentWidth = contentWidth + effectCols * (CHAR_WIDTH * 3 + 4);
+          const x = colX + Math.floor((chW - chContentWidth) / 2);
 
           // Note — use pre-computed note table
           const cellNote = cell.note ?? 0;

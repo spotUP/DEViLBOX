@@ -97,7 +97,7 @@ export class WebSIDPlayEngine {
         if (this.sourceNode) {
           this.sourceNode.connect(audioContext.destination);
         }
-      } catch (error) {
+      } catch (_error) {
         console.warn('[WebSIDPlay] AudioWorklet not available, using ScriptProcessor fallback');
         this.playWithScriptProcessor(audioContext);
         return;

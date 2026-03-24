@@ -133,7 +133,7 @@ const PixiDJTopBar: React.FC<DJTopBarProps> = ({ browserPanel, onBrowserPanelCha
 
   const handleFX = useCallback(() => {
     const s = useUIStore.getState();
-    s.modalOpen === 'masterFx' ? s.closeModal() : s.openModal('masterFx');
+    if (s.modalOpen === 'masterFx') { s.closeModal(); } else { s.openModal('masterFx'); }
   }, []);
 
   return (
@@ -180,7 +180,7 @@ const PixiDJTopBar: React.FC<DJTopBarProps> = ({ browserPanel, onBrowserPanelCha
         size="sm"
         onClick={() => {
           const s = useUIStore.getState();
-          s.modalOpen === 'drumpad' ? s.closeModal() : s.openModal('drumpad');
+          if (s.modalOpen === 'drumpad') { s.closeModal(); } else { s.openModal('drumpad'); }
         }}
         active={modalOpen === 'drumpad'}
         color={modalOpen === 'drumpad' ? 'yellow' : undefined}
@@ -205,7 +205,7 @@ const PixiDJTopBar: React.FC<DJTopBarProps> = ({ browserPanel, onBrowserPanelCha
         active={modalOpen === 'fileBrowser'}
         onClick={() => {
           const s = useUIStore.getState();
-          s.modalOpen === 'fileBrowser' ? s.closeModal() : s.openModal('fileBrowser');
+          if (s.modalOpen === 'fileBrowser') { s.closeModal(); } else { s.openModal('fileBrowser'); }
         }}
       />
 

@@ -31,6 +31,7 @@ import { PixiJamCrackerView } from './jamcracker/PixiJamCrackerView';
 import { PixiPitchSlider } from './tracker/PixiPitchSlider';
 import { PixiTB303KnobPanel, TB303_PANEL_COLLAPSED_H, TB303_PANEL_EXPANDED_H } from './tracker/PixiTB303KnobPanel';
 import { PixiSCKnobPanel, SC_PANEL_COLLAPSED_H, SC_PANEL_EXPANDED_H } from './tracker/PixiSCKnobPanel';
+import { PixiCMIKnobPanel, CMI_PANEL_COLLAPSED_H, CMI_PANEL_EXPANDED_H } from './tracker/PixiCMIKnobPanel';
 import { PixiMusicLineTrackTable } from './tracker/PixiMusicLineTrackTable';
 import { PixiMusicLinePatternViewer } from './tracker/PixiMusicLinePatternViewer';
 import { PixiPatternEditor } from './tracker/PixiPatternEditor';
@@ -93,8 +94,10 @@ export const PixiTrackerView: React.FC = () => {
   const showMacroLanes = useUIStore(s => s.showMacroLanes);
   const tb303Collapsed = useUIStore(s => s.tb303Collapsed);
   const scCollapsed = useUIStore(s => s.scCollapsed ?? true);
+  const cmiCollapsed = useUIStore(s => s.cmiCollapsed ?? true);
   const hasTB303 = useInstrumentStore(s => s.instruments.some(i => i.synthType === 'TB303'));
   const hasSC = useInstrumentStore(s => s.instruments.some(i => i.synthType === 'SuperCollider' && !!i.superCollider?.binary));
+  const hasCMI = useInstrumentStore(s => s.instruments.some(i => i.synthType === 'MAMECMI'));
   const patternId     = useTrackerStore(s => s.patterns[s.currentPatternIndex]?.id ?? '');
   const patternLength = useTrackerStore(s => s.patterns[s.currentPatternIndex]?.length ?? 64);
   const channelCount  = useTrackerStore(s => s.patterns[s.currentPatternIndex]?.channels?.length ?? 4);
@@ -130,8 +133,11 @@ export const PixiTrackerView: React.FC = () => {
   const scPanelH = hasSC && viewMode !== 'tb303' && viewMode !== 'sunvox'
     ? (scCollapsed ? SC_PANEL_COLLAPSED_H : SC_PANEL_EXPANDED_H)
     : 0;
+  const cmiPanelH = hasCMI && viewMode !== 'tb303' && viewMode !== 'sunvox'
+    ? (cmiCollapsed ? CMI_PANEL_COLLAPSED_H : CMI_PANEL_EXPANDED_H)
+    : 0;
   const midiKnobBarH = showKnobBar ? MIDI_KNOB_BAR_H_EXPANDED : MIDI_KNOB_BAR_H_COLLAPSED;
-  const instrumentPanelHeight = contentH - toolbarH - CONTROLS_BAR_H - MACRO_SLOTS_H - tb303PanelH - scPanelH - midiKnobBarH;
+  const instrumentPanelHeight = contentH - toolbarH - CONTROLS_BAR_H - MACRO_SLOTS_H - tb303PanelH - scPanelH - cmiPanelH - midiKnobBarH;
   const editorWidth = windowWidth - (instrumentPanelVisible ? INSTRUMENT_PANEL_W : 0) - 16; // minus instrument panel and minimap
 
   return (
@@ -153,6 +159,11 @@ export const PixiTrackerView: React.FC = () => {
       {/* SuperCollider Knob Panel — shown when an SC instrument with compiled binary is active */}
       <pixiContainer layout={{ width: '100%', height: scPanelH }} alpha={scPanelH > 0 ? 1 : 0} renderable={scPanelH > 0}>
         <PixiSCKnobPanel width={windowWidth} />
+      </pixiContainer>
+
+      {/* Fairlight CMI Knob Panel — shown when a MAMECMI instrument is active */}
+      <pixiContainer layout={{ width: '100%', height: cmiPanelH }} alpha={cmiPanelH > 0 ? 1 : 0} renderable={cmiPanelH > 0}>
+        <PixiCMIKnobPanel width={windowWidth} />
       </pixiContainer>
 
       {/* Editor controls bar — pure Pixi, no DOM overlay */}

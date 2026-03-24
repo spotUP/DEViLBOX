@@ -58,6 +58,8 @@ export interface FormatChannel {
   rows: FormatCell[];
   /** Native track index (e.g. Hively track pool index) for insert/delete row operations */
   trackIndex?: number;
+  /** Per-channel column override — when set, this channel uses these columns instead of the global formatColumns */
+  columns?: ColumnDef[];
 }
 
 /**
@@ -139,6 +141,7 @@ export function formatChannelsToSnapshot(
     : 0;
 
   const channelSnapshots: ChannelSnapshot[] = channels.map((ch, chIdx) => {
+    const chCols = ch.columns ?? columns;
     const rows: CellSnapshot[] = Array.from({ length }, (_, ri) => {
       const cell = ch.rows[ri];
       return {
@@ -148,7 +151,7 @@ export function formatChannelsToSnapshot(
         effTyp: cell?.command ?? cell?.effTyp ?? 0,
         eff: cell?.data ?? cell?.eff ?? 0,
         effTyp2: 0, eff2: 0,
-        params: columns.map(col => {
+        params: chCols.map(col => {
           const v = cell?.[col.key];
           return v === undefined ? (col.emptyValue ?? 0) : v;
         }),
@@ -159,6 +162,7 @@ export function formatChannelsToSnapshot(
       name: ch.label,
       effectCols: 0,
       rows,
+      columnSpecs: ch.columns ? ch.columns.map(toColumnSpec) : undefined,
     };
   });
 

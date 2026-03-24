@@ -278,11 +278,11 @@ export async function exportDigiBoosterPro(
 
   // ── Extract sample data for all instruments ────────────────────────────────
   const sampleDatas: (SampleData | null)[] = [];
-  let numSamplesWithData = 0;
+  let _numSamplesWithData = 0;
   for (let i = 0; i < numInstruments; i++) {
     const sd = extractSampleData(song.instruments[i]);
     sampleDatas.push(sd);
-    if (sd) numSamplesWithData++;
+    if (sd) _numSamplesWithData++;
   }
   // numSamples = numInstruments (1:1 mapping, matching parser convention)
   const numSamples = numInstruments;

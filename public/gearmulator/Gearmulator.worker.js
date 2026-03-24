@@ -37,8 +37,8 @@ let disposed = false;
 let sabInt32 = null;
 let sabFloat32 = null;
 
-// Internal render buffer — small blocks for non-blocking DSP (microQ runs at ~1/17 real-time)
-const RENDER_BLOCK = 64;
+// Internal render buffer — larger blocks reduce JS↔WASM call overhead
+const RENDER_BLOCK = 256;
 let outputPtrL = 0;
 let outputPtrR = 0;
 
@@ -49,6 +49,14 @@ let renderTimer = null;
 let totalFramesRendered = 0;
 let firstAudioTime = 0;
 let peakSeen = 0;
+
+// Auto-calibration state
+let currentClockPercent = 10; // Start conservative — auto-calibration adjusts
+let calibrationDone = false;
+let calibrationStartTime = 0;
+let calibrationStartFrames = 0;
+let currentSynthType = 0;
+let currentSampleRate = 44100;
 
 // Catch unhandled errors
 self.onerror = function(e) {
@@ -110,7 +118,11 @@ self.onmessage = async function (e) {
 
     case 'setClockPercent':
       if (handle >= 0 && module) {
-        module._gm_setDspClockPercent(handle, data.percent || 100);
+        const pct = Math.max(1, Math.min(100, data.percent || 100));
+        currentClockPercent = pct;
+        calibrationDone = true; // Manual override disables auto-calibration
+        module._gm_setDspClockPercent(handle, pct);
+        console.log(`[Gearmulator Worker] Clock set to ${pct}% (manual override)`);
       }
       break;
 
@@ -149,6 +161,9 @@ async function initSynth(data) {
   if (!wasmBinary || !romData) {
     throw new Error('Missing wasmBinary or romData');
   }
+
+  currentSynthType = synthType || 0;
+  currentSampleRate = sr || 44100;
 
   // Set up SharedArrayBuffer views
   sabInt32 = new Int32Array(sab);
@@ -267,10 +282,21 @@ async function initSynth(data) {
   }
 
   const actualRate = module._gm_getSamplerate(handle);
+  currentSampleRate = actualRate || currentSampleRate;
   console.log(`[Gearmulator Worker] Device created in ${createMs}ms — handle=${handle}, rate=${actualRate}, valid=${valid}`);
 
-  // Full speed for WASM interpreter
-  module._gm_setDspClockPercent(handle, 100);
+  // Start with reduced clock speed — the DSP56300 interpreter in WASM runs at
+  // ~5.5% real-time at 100% clock. Auto-calibration will find the optimal value.
+  // JP-8000 (type 5) doesn't support clock adjustment, leave at 100%.
+  if (synthType === 5) {
+    currentClockPercent = 100;
+    calibrationDone = true; // No calibration for JP-8000
+  } else {
+    currentClockPercent = 100;
+    calibrationDone = true; // Start at 100% so MIDI works — user can lower via slider
+  }
+  module._gm_setDspClockPercent(handle, currentClockPercent);
+  console.log(`[Gearmulator Worker] Initial clock: ${currentClockPercent}%`);
 
   initialized = true;
   totalFramesRendered = 0;
@@ -349,19 +375,59 @@ function startRenderLoop(sampleRate) {
   let renderCount = 0;
   hasUcProcessing = !!(module._gm_processUc);
 
+  // Reset calibration state
+  calibrationStartTime = performance.now();
+  calibrationStartFrames = totalFramesRendered;
+
+  // Pre-fill the ring buffer before starting the render loop.
+  // This ensures the worklet has audio available immediately, reducing initial underruns.
+  console.log('[Gearmulator Worker] Pre-filling ring buffer...');
+  const prefillTarget = Math.floor(RING_FRAMES * 0.5); // Fill to 50%
+  let prefillFrames = 0;
+  const prefillStart = performance.now();
+  while (prefillFrames < prefillTarget && !disposed) {
+    const before = totalFramesRendered;
+    fillRingBuffer();
+    const rendered = totalFramesRendered - before;
+    if (rendered === 0) break; // Buffer full or no progress
+    prefillFrames += rendered;
+  }
+  const prefillMs = (performance.now() - prefillStart).toFixed(0);
+  console.log(`[Gearmulator Worker] Pre-filled ${prefillFrames} frames in ${prefillMs}ms`);
+  self.postMessage({ type: 'prefilled', frames: prefillFrames });
+
+  // Reset calibration timing after pre-fill
+  calibrationStartTime = performance.now();
+  calibrationStartFrames = totalFramesRendered;
+
   function renderTick() {
     if (!initialized || handle < 0 || !module || disposed) return;
 
     const t0 = performance.now();
-    fillRingBuffer();
+
+    // Render multiple fills per tick to maximize buffer level.
+    // At 10% clock we're ~50% real-time, so we need to render as much as
+    // possible per yield to keep the buffer from draining completely.
+    const bufSize = Atomics.load(sabInt32, 2);
+    let fills = 0;
+    const maxFillTime = 200; // Don't block event loop for more than 200ms
+    while (fills < 4) {
+      const wp = Atomics.load(sabInt32, 0);
+      const rp = Atomics.load(sabInt32, 1);
+      let used = wp - rp;
+      if (used < 0) used += bufSize;
+      const free = bufSize - used - 1;
+      if (free < RENDER_BLOCK) break; // Buffer full
+      fillRingBuffer();
+      fills++;
+      if (performance.now() - t0 > maxFillTime) break;
+    }
+
     const renderMs = performance.now() - t0;
 
     // After rendering audio, run a small burst of MC68K cycles for MIDI processing.
-    // This ensures audio always gets priority and UC gets remaining time budget.
     if (hasUcProcessing) {
       try {
-        // Run 32 MC68K cycles with 1ms time limit — just enough to process
-        // queued MIDI without starving the render loop
         module._gm_processUc(handle, 32, 1);
       } catch (e) {
         console.error('[Gearmulator Worker] ucTick error:', e);
@@ -371,15 +437,81 @@ function startRenderLoop(sampleRate) {
 
     const totalMs = performance.now() - t0;
     renderCount++;
-    if (renderCount <= 5 || (renderCount % 1000 === 0)) {
-      console.log(`[Gearmulator Worker] tick #${renderCount}: render=${renderMs.toFixed(1)}ms total=${totalMs.toFixed(1)}ms frames=${totalFramesRendered} peak=${peakSeen.toFixed(6)}`);
+
+    // Auto-calibration: after 5 ticks, measure real-time ratio and adjust clock
+    if (!calibrationDone && renderCount === 5) {
+      autoCalibrateClock();
     }
 
-    // Use setTimeout(0) to yield to the event loop between passes
+    // Periodic re-calibration every 500 ticks to adapt to changing conditions
+    if (!calibrationDone && renderCount > 5 && renderCount % 500 === 0) {
+      autoCalibrateClock();
+    }
+
+    if (renderCount <= 5 || (renderCount % 1000 === 0)) {
+      console.log(`[Gearmulator Worker] tick #${renderCount}: render=${renderMs.toFixed(1)}ms total=${totalMs.toFixed(1)}ms frames=${totalFramesRendered} peak=${peakSeen.toFixed(6)} clock=${currentClockPercent}% fills=${fills}`);
+    }
+
+    // Use setTimeout(0) to yield to the event loop for MIDI messages
     renderTimer = setTimeout(renderTick, 0);
   }
   // Schedule first tick async so startRenderLoop returns immediately
   renderTimer = setTimeout(renderTick, 0);
+}
+
+/**
+ * Auto-calibrate DSP clock speed based on measured real-time ratio.
+ * Target: ~90% real-time (0.9 ratio) — leaves 10% headroom for jitter.
+ */
+function autoCalibrateClock() {
+  const wallMs = performance.now() - calibrationStartTime;
+  const framesRendered = totalFramesRendered - calibrationStartFrames;
+  if (wallMs < 100 || framesRendered < 256) return; // Not enough data
+
+  const audioMs = (framesRendered / currentSampleRate) * 1000;
+  const ratio = audioMs / wallMs; // 1.0 = perfect real-time
+
+  // Calculate target clock percent to achieve ~0.9 ratio.
+  // IMPORTANT: Lower clock % = fewer DSP cycles per sample = faster render = higher ratio.
+  // So the relationship is INVERSE: to increase ratio, we must DECREASE clock%.
+  // ratio = audioMs/wallMs. If ratio < target, we're too slow → decrease clock.
+  // newClock = currentClock * (ratio / targetRatio)
+  const targetRatio = 0.9;
+  let newClock = Math.round(currentClockPercent * (ratio / targetRatio));
+
+  // Clamp to reasonable range
+  newClock = Math.max(2, Math.min(100, newClock));
+
+  // Only change if difference is significant (> 1%)
+  if (Math.abs(newClock - currentClockPercent) > 1) {
+    console.log(`[Gearmulator Worker] Auto-calibration: ratio=${ratio.toFixed(3)}, clock ${currentClockPercent}% → ${newClock}% (target ratio=${targetRatio})`);
+    currentClockPercent = newClock;
+    module._gm_setDspClockPercent(handle, newClock);
+
+    // Report to main thread
+    self.postMessage({
+      type: 'performance',
+      clockPercent: newClock,
+      realtimeRatio: ratio,
+      framesRendered,
+      wallMs: Math.round(wallMs),
+    });
+  } else {
+    console.log(`[Gearmulator Worker] Auto-calibration: ratio=${ratio.toFixed(3)}, clock=${currentClockPercent}% — no change needed`);
+    calibrationDone = true; // Stable, stop recalibrating
+    self.postMessage({
+      type: 'performance',
+      clockPercent: currentClockPercent,
+      realtimeRatio: ratio,
+      framesRendered,
+      wallMs: Math.round(wallMs),
+      calibrated: true,
+    });
+  }
+
+  // Reset measurement window
+  calibrationStartTime = performance.now();
+  calibrationStartFrames = totalFramesRendered;
 }
 
 function fillRingBuffer() {
@@ -391,9 +523,8 @@ function fillRingBuffer() {
   if (used < 0) used += bufSize;
   let free = bufSize - used - 1;
 
-  // Render up to 32 blocks per tick (2048 samples). Non-blocking DSP path
-  // returns partial data (zeros for frames DSP hasn't produced yet).
-  const maxBlocks = Math.min(32, Math.floor(free / RENDER_BLOCK));
+  // Render up to 8 blocks per tick (8 × 256 = 2048 samples).
+  const maxBlocks = Math.min(8, Math.floor(free / RENDER_BLOCK));
 
   for (let b = 0; b < maxBlocks; b++) {
     module._gm_process(handle, outputPtrL, outputPtrR, RENDER_BLOCK);

@@ -71,8 +71,8 @@ export async function ensureMAMEModuleLoaded(
   if (!loaded.has('__mame_init_helper__')) {
     try {
       await context.audioWorklet.addModule(`${baseUrl}mame/mame-worklet-init.js${WORKLET_CACHE_BUST}`);
-    } catch {
-      // Module might already be added
+    } catch (e) {
+      console.warn('[MAME] mame-worklet-init.js not found (inline init used instead):', (e as Error).message);
     }
     loaded.add('__mame_init_helper__');
   }
@@ -80,9 +80,12 @@ export async function ensureMAMEModuleLoaded(
   // Then load the chip-specific worklet processor
   if (!loaded.has(chipName)) {
     try {
+      console.log(`[MAME] Loading worklet: ${baseUrl}mame/${workletFile}`);
       await context.audioWorklet.addModule(`${baseUrl}mame/${workletFile}${WORKLET_CACHE_BUST}`);
-    } catch {
-      // Module might already be added
+      console.log(`[MAME] Worklet ${workletFile} loaded successfully`);
+    } catch (e) {
+      console.error(`[MAME] Failed to load worklet ${workletFile}:`, e);
+      throw e; // Don't silently swallow — this is a real error
     }
     loaded.add(chipName);
   }

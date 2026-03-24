@@ -61,6 +61,13 @@
     <div id="meter"><div id="meterFill"></div></div>
   </div>
 
+  <div class="controls">
+    <label>DSP Clock:</label>
+    <input type="range" id="clockSlider" min="5" max="100" value="100" step="1">
+    <span id="clockLabel">100%</span>
+    <span style="color:#888; font-size:11px">(lower = faster render, fewer DSP cycles for MIDI)</span>
+  </div>
+
   <div id="log"></div>
 
   <script>
@@ -102,6 +109,17 @@
       const db = parseFloat(volSlider.value);
       volLabel.textContent = db + ' dB';
       if (gainNode) gainNode.gain.value = Math.pow(10, db / 20);
+    });
+
+    const clockSlider = document.getElementById('clockSlider');
+    const clockLabel = document.getElementById('clockLabel');
+    clockSlider.addEventListener('input', () => {
+      const pct = parseInt(clockSlider.value);
+      clockLabel.textContent = pct + '%';
+      if (dspWorker) {
+        dspWorker.postMessage({ type: 'setClockPercent', percent: pct });
+        log(`Clock set to ${pct}%`);
+      }
     });
 
     function log(msg, cls) {
@@ -253,11 +271,21 @@
         const result = await readyPromise;
         const elapsed = ((performance.now() - initStart) / 1000).toFixed(1);
         log(`✓ Device ready! sampleRate=${result.sampleRate}, handle=${result.handle} (${elapsed}s)`, 'ok');
+
+        // Set resample ratio if DSP rate differs from audio context rate
+        if (result.sampleRate && result.sampleRate !== audioCtx.sampleRate) {
+          const ratio = result.sampleRate / audioCtx.sampleRate;
+          workletNode.port.postMessage({ type: 'setResampleRatio', ratio });
+          log(`Resample ratio: ${ratio.toFixed(4)} (${result.sampleRate} → ${audioCtx.sampleRate})`, 'ok');
+        }
+
         ready = true;
         initStatus.textContent = '✅ Ready';
         btnNote.disabled = false;
         btnChord.disabled = false;
         btnStop.disabled = false;
+        btnScan.disabled = false;
+        btnCC.disabled = false;
         startMeter();
         startSABMonitor();
 
@@ -273,8 +301,17 @@
     }
 
     btnNote.addEventListener('click', () => {
-      sendMidi('noteOn', { note: 60, velocity: 127, channel: 0 });
-      log('Note On: C4 (60) vel=127 — NO auto note-off (use All Notes Off)');
+      // Send program change 0 first (ensure a valid patch is loaded)
+      sendMidi('programChange', { program: 0, channel: 0 });
+      log('Sent Program Change 0 on ch 0');
+      // Then send CC7 (volume) = 127
+      sendMidi('cc', { cc: 7, value: 127, channel: 0 });
+      log('Sent CC7 (Volume) = 127 on ch 0');
+      // Then send note
+      setTimeout(() => {
+        sendMidi('noteOn', { note: 60, velocity: 127, channel: 0 });
+        log('Note On: C4 (60) vel=127 ch=0 — NO auto note-off (use All Notes Off)');
+      }, 500);
     });
 
     btnChord.addEventListener('click', () => {
@@ -287,9 +324,39 @@
     });
 
     btnStop.addEventListener('click', () => {
-      for (let n = 0; n < 128; n++) sendMidi('noteOff', { note: n, channel: 0 });
-      log('All notes off');
+      for (let ch = 0; ch < 16; ch++)
+        for (let n = 0; n < 128; n++) sendMidi('noteOff', { note: n, channel: ch });
+      log('All notes off (all channels)');
     });
+
+    // Send ONLY a single CC message (no note) to test if any MIDI kills audio
+    const btnCC = document.createElement('button');
+    btnCC.textContent = 'CC Only';
+    btnCC.title = 'Send only CC7=127 on ch0 (no note) — tests if any MIDI kills audio';
+    btnCC.disabled = true;
+    document.querySelector('.controls:nth-child(2)').appendChild(btnCC);
+    btnCC.addEventListener('click', () => {
+      sendMidi('cc', { cc: 7, value: 127, channel: 0 });
+      log('Sent ONLY CC7=127 on ch0 — watch if audio dies', 'warn');
+    });
+
+    // Channel scan: try sending Note On on all 16 channels to find which one works
+    const btnScan = document.createElement('button');
+    btnScan.textContent = 'Ch Scan';
+    btnScan.title = 'Send Note On C4 on all 16 MIDI channels to find which works';
+    btnScan.disabled = true;
+    document.querySelector('.controls:nth-child(2)').appendChild(btnScan);
+    btnScan.addEventListener('click', () => {
+      log('--- MIDI Channel Scan: sending C4 vel=127 on all 16 channels ---', 'ok');
+      for (let ch = 0; ch < 16; ch++) {
+        sendMidi('programChange', { program: 0, channel: ch });
+        sendMidi('cc', { cc: 7, value: 127, channel: ch });
+        sendMidi('noteOn', { note: 60, velocity: 127, channel: ch });
+      }
+      log('All 16 channels triggered — watch peak level');
+    });
+
+    // Note: btnScan.disabled is cleared below when ready=true
 
     // Dispose current synth
     document.getElementById('btnDispose').addEventListener('click', () => {
@@ -386,6 +453,12 @@
           });
 
           log(`INIT OK: sampleRate=${result.sampleRate}, handle=${result.handle}`, 'ok');
+
+          // Set resample ratio if needed
+          if (result.sampleRate && result.sampleRate !== 44100) {
+            const ratio = result.sampleRate / 44100;
+            wn.port.postMessage({ type: 'setResampleRatio', ratio });
+          }
 
           // Send a note and wait for audio
           w.postMessage({ type: 'noteOn', note: 60, velocity: 127, channel: 0 });

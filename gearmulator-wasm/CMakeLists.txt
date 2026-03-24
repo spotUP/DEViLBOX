@@ -286,6 +286,14 @@ else()
         synthLib hardwareLib baseLib dsp56kEmu dsp56kBase
         mc68k rLib esp asmjit libresample
     )
+
+    # Native Virus B MIDI test tool
+    add_executable(virus_midi_test src/virus_midi_test.cpp src/musashi_unified.cpp)
+    target_link_libraries(virus_midi_test PRIVATE
+        virusLib mqLib xtLib nordLib ronaldoLib wLib
+        synthLib hardwareLib baseLib dsp56kEmu dsp56kBase
+        mc68k rLib esp asmjit libresample
+    )
 endif()
 
 if(EMSCRIPTEN)

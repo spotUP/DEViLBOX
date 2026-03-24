@@ -203,9 +203,10 @@ export class TrackerCanvas2DRenderer {
 
         if (ui.columns && cell?.params) {
           // DATA-DRIVEN PATH — renders custom format columns
+          const chColumns = chan.columnSpecs ?? ui.columns;
           let px = chanX + 2;
-          for (let ci = 0; ci < ui.columns.length; ci++) {
-            const col = ui.columns[ci];
+          for (let ci = 0; ci < chColumns.length; ci++) {
+            const col = chColumns[ci];
             const val = cell.params[ci] ?? col.emptyValue;
             const isEmpty = val === col.emptyValue;
             let str: string;

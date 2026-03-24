@@ -57,6 +57,8 @@ export interface ChannelSnapshot {
   collapsed?: boolean;
   effectCols: number; // from channelMeta.effectCols, default 2
   rows: CellSnapshot[];
+  /** Per-channel column specs — overrides global ui.columns when present */
+  columnSpecs?: ColumnSpec[];
 }
 
 export interface PatternSnapshot {

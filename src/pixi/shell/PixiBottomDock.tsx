@@ -199,7 +199,7 @@ export const PixiBottomDock: React.FC<PixiBottomDockProps> = ({
           size="sm"
           onClick={() => {
             const s = useUIStore.getState();
-            s.modalOpen === 'instrumentFx' ? s.closeModal() : s.openModal('instrumentFx');
+            if (s.modalOpen === 'instrumentFx') { s.closeModal(); } else { s.openModal('instrumentFx'); }
           }}
         />
 
