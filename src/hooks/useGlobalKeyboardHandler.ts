@@ -1858,16 +1858,30 @@ export function useGlobalKeyboardHandler(options: UseGlobalKeyboardHandlerOption
         return;
       }
 
+      // ProTracker: Right Shift = play song, Right Alt/Option = play pattern
+      // These are bare modifier keys that can't be represented in the scheme JSON.
+      // On the Amiga, Right Amiga key = play song from start.
+      if (e.code === 'ShiftRight' || e.code === 'AltRight') {
+        e.preventDefault();
+        e.stopPropagation();
+        if (e.code === 'ShiftRight') {
+          playSong();
+        } else {
+          playPattern();
+        }
+        return;
+      }
+
       // Normalize the event
       const normalized = KeyboardNormalizer.normalize(e);
       const platform = getPlatform();
-      
+
       // Format to combo string - use Cmd on Mac for lookup
       const combo = KeyComboFormatter.format(normalized, platform === 'mac');
 
       // Look up command in current scheme
       const commandName = schemeLoaderRef.current.getCommand(combo, platform);
-      
+
       if (!commandName) {
         // No mapping found - let browser handle it
         return;
