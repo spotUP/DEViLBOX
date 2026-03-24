@@ -155,7 +155,7 @@ export const InstrumentEffectsModal: React.FC<InstrumentEffectsModalProps> = ({ 
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/80"
+      className="fixed inset-0 z-[9990] flex items-center justify-center bg-black/80"
       onClick={handleBackdropClick}
     >
       <div className="bg-dark-bg border border-dark-border rounded-xl shadow-2xl w-[95vw] h-[90vh] max-w-[1200px] flex flex-col overflow-hidden animate-scale-in">
@@ -184,7 +184,7 @@ export const InstrumentEffectsModal: React.FC<InstrumentEffectsModalProps> = ({ 
               </button>
 
               {showPresetMenu && (
-                <div className="absolute left-0 top-full mt-2 w-72 bg-dark-bgSecondary border border-dark-border rounded-lg shadow-xl z-50 max-h-[60vh] overflow-y-auto scrollbar-modern">
+                <div className="absolute left-0 top-full mt-2 w-72 bg-dark-bgSecondary border border-dark-border rounded-lg shadow-xl z-[9990] max-h-[60vh] overflow-y-auto scrollbar-modern">
                   {/* Factory Presets by Category */}
                   {Object.entries(INSTRUMENT_FX_PRESETS.reduce((acc, preset) => {
                     if (!acc[preset.category]) acc[preset.category] = [];

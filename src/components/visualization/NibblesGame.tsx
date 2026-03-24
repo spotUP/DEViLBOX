@@ -1223,7 +1223,7 @@ export const NibblesGame: React.FC<NibblesGameProps> = ({ height = 120, onExit }
       {/* High Score Name Entry */}
       {showNameEntry && (
         <div
-          className="absolute inset-0 bg-black/90 z-50 flex items-center justify-center"
+          className="absolute inset-0 bg-black/90 z-[9990] flex items-center justify-center"
           onClick={(e) => e.stopPropagation()}
         >
           <div className="bg-dark-bgSecondary border border-accent-primary rounded p-4 flex flex-col gap-3 min-w-[200px]">

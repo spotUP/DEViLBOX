@@ -580,7 +580,7 @@ export const Knob: React.FC<KnobProps> = React.memo(({
     {/* Mobile numeric input modal */}
     {showNumericInput && (
       <div
-        className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center"
+        className="fixed inset-0 z-[9990] bg-black/50 flex items-center justify-center"
         onClick={() => setShowNumericInput(false)}
       >
         <div
@@ -627,7 +627,7 @@ export const Knob: React.FC<KnobProps> = React.memo(({
     {/* Mobile preset menu */}
     {showPresetMenu && (
       <div
-        className="fixed inset-0 z-50 bg-black/50"
+        className="fixed inset-0 z-[9990] bg-black/50"
         onClick={() => setShowPresetMenu(false)}
       >
         <div

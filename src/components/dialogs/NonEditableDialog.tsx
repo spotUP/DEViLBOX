@@ -21,7 +21,7 @@ export const NonEditableDialog: React.FC = () => {
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
+    <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-[9990]">
       <div className="bg-dark-bgSecondary border border-dark-border rounded-lg shadow-xl w-full max-w-[90vw] md:max-w-[420px] overflow-hidden">
         {/* Header */}
         <div className="flex items-center gap-3 px-5 py-4 border-b border-dark-border">

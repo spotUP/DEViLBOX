@@ -115,7 +115,7 @@ export const CollaborationToolbar: React.FC = () => {
         </button>
 
         {showListenMenu && (
-          <div className="absolute top-full left-0 mt-1 py-1 min-w-[130px] bg-dark-bgPrimary border border-dark-border rounded-lg shadow-lg z-50">
+          <div className="absolute top-full left-0 mt-1 py-1 min-w-[130px] bg-dark-bgPrimary border border-dark-border rounded-lg shadow-lg z-[9990]">
             {(['shared', 'mine', 'both', 'theirs'] as ListenMode[]).map((m) => (
               <button
                 key={m}

@@ -75,7 +75,7 @@ export const PresetDropdown: React.FC<PresetDropdownProps> = ({
 
       {/* Dropdown panel */}
       {isOpen && (
-        <div className="absolute top-full right-0 mt-1 w-64 bg-dark-bgSecondary border border-dark-border rounded-lg shadow-xl z-50 overflow-hidden">
+        <div className="absolute top-full right-0 mt-1 w-64 bg-dark-bgSecondary border border-dark-border rounded-lg shadow-xl z-[9990] overflow-hidden">
           <div className="p-2 border-b border-dark-border bg-dark-bgTertiary flex items-center justify-between">
             <span className="text-[10px] font-bold text-text-muted uppercase tracking-wider">
               {getSynthInfo(synthType).name} Presets

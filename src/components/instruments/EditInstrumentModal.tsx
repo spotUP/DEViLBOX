@@ -290,7 +290,7 @@ export const EditInstrumentModal: React.FC<EditInstrumentModalProps> = ({
   // CREATE MODE UI
   if (isCreating) {
     return (
-      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/90">
+      <div className="fixed inset-0 z-[9990] flex items-center justify-center bg-black/90">
         <div className="w-full h-full bg-dark-bg flex flex-col overflow-hidden">
           {/* Header */}
           <div className="flex items-center justify-between px-4 py-2 bg-dark-bgSecondary border-b border-dark-border shrink-0">
@@ -416,7 +416,7 @@ export const EditInstrumentModal: React.FC<EditInstrumentModalProps> = ({
   ];
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/90">
+    <div className="fixed inset-0 z-[9990] bg-black/90">
       <div className="bg-dark-bg w-full h-full flex flex-col overflow-hidden">
         <div className="flex h-full">
           {/* Left Sidebar: Instrument List (Collapsible) */}
@@ -579,7 +579,7 @@ export const EditInstrumentModal: React.FC<EditInstrumentModalProps> = ({
 
                 {/* Synth Browser Modal */}
                 {showSynthBrowser && (
-                  <div className="absolute inset-0 z-50 bg-black/80 flex items-center justify-center">
+                  <div className="absolute inset-0 z-[9990] bg-black/80 flex items-center justify-center">
                     <div className="bg-dark-bg border border-dark-border rounded-lg shadow-2xl w-[90%] max-w-4xl max-h-[85vh] flex flex-col">
                       <div className="flex items-center justify-between px-4 py-3 border-b border-dark-border">
                         <h3 className="text-lg font-semibold text-text-primary flex items-center gap-2">

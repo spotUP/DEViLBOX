@@ -130,7 +130,7 @@ const MIDIToolbarDropdownComponent: React.FC<MIDIToolbarDropdownProps> = ({ inli
 
       {/* Dropdown / Inline Content */}
       {isOpen && (
-        <div className={inline ? "w-full" : "absolute right-0 top-full mt-1 w-80 max-h-[80vh] bg-dark-bgTertiary border border-dark-border rounded-lg shadow-xl z-50 overflow-y-auto"}>
+        <div className={inline ? "w-full" : "absolute right-0 top-full mt-1 w-80 max-h-[80vh] bg-dark-bgTertiary border border-dark-border rounded-lg shadow-xl z-[9990] overflow-y-auto"}>
           {/* Header (only in dropdown mode) */}
           {!inline && (
             <div className="px-4 py-3 border-b border-dark-border bg-dark-bgSecondary">

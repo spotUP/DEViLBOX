@@ -119,7 +119,7 @@ export const DJVideoExport: React.FC = () => {
 
       {/* Source picker dropdown */}
       {showMenu && !isRecording && (
-        <div className="absolute bottom-full mb-1 left-0 bg-dark-bgSecondary border border-dark-border rounded shadow-xl z-50 min-w-[160px]">
+        <div className="absolute bottom-full mb-1 left-0 bg-dark-bgSecondary border border-dark-border rounded shadow-xl z-[9990] min-w-[160px]">
           {sources.map(s => (
             <button
               key={s.id}

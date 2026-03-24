@@ -306,7 +306,7 @@ export const DrumPadManager: React.FC<DrumPadManagerProps> = ({ onClose }) => {
     <div className={
       isViewMode
         ? 'flex flex-col h-full w-full overflow-hidden select-none bg-dark-bg font-mono'
-        : 'fixed inset-0 z-50 bg-dark-bg/95 backdrop-blur-sm flex items-center justify-center animate-in fade-in-0 duration-300'
+        : 'fixed inset-0 z-[9990] bg-dark-bg/95 backdrop-blur-sm flex items-center justify-center animate-in fade-in-0 duration-300'
     }>
       <div className={
         isViewMode
@@ -670,7 +670,7 @@ export const DrumPadManager: React.FC<DrumPadManagerProps> = ({ onClose }) => {
 
         {/* Pad Editor Modal */}
         {showPadEditor && selectedPadId !== null && (
-          <div className="fixed inset-0 z-50 bg-dark-bg/95 backdrop-blur-sm flex items-center justify-center animate-in fade-in-0 duration-200">
+          <div className="fixed inset-0 z-[9990] bg-dark-bg/95 backdrop-blur-sm flex items-center justify-center animate-in fade-in-0 duration-200">
             <div className="max-w-2xl w-full mx-4 animate-in fade-in-0 zoom-in-95 slide-in-from-bottom-4 duration-300">
               <PadEditor
                 padId={selectedPadId}
