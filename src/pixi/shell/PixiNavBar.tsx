@@ -7,46 +7,27 @@
  *   Right:  Volume knob, Save, Load, Collab, Auth, MIDI, Theme, Dock, DOM
  */
 
-import React, { useCallback, useMemo, useRef } from 'react';
-import type { FederatedPointerEvent, Container as ContainerType } from 'pixi.js';
+import React, { useCallback, useRef } from 'react';
+import type { Container as ContainerType } from 'pixi.js';
 import { PIXI_FONTS } from '../fonts';
 import { usePixiTheme } from '../theme';
 import { PixiButton } from '../components/PixiButton';
 import { PixiKnob } from '../components/PixiKnob';
-import { PixiSelect, type SelectOption } from '../components/PixiSelect';
+import { PixiSelect } from '../components/PixiSelect';
 import { usePixiResponsive } from '../hooks/usePixiResponsive';
-import { useThemeStore, themes, useTabsStore, type ProjectTab } from '@stores';
-import { useSettingsStore } from '@stores/useSettingsStore';
 import { useUIStore } from '@stores/useUIStore';
-import { useProjectStore } from '@stores/useProjectStore';
-import { useAudioStore } from '@stores/useAudioStore';
-import { useWorkbenchStore } from '@stores/useWorkbenchStore';
-import { useCollaborationStore } from '@stores/useCollaborationStore';
-import { useAuthStore } from '@stores/useAuthStore';
 import { useMIDIStore } from '@stores/useMIDIStore';
-import { useAIStore } from '@stores/useAIStore';
 import { MODERN_NAV_H } from '../workbench/workbenchLayout';
-import { serializeProjectToBlob } from '@hooks/useProjectPersistence';
 import { PixiTransportBar } from './PixiTransportBar';
 import { BUILD_VERSION } from '@constants/version';
 import { usePixiDropdownStore } from '../stores/usePixiDropdownStore';
 import { PixiDJSetBrowser } from '../views/dj/PixiDJSetBrowser';
+import { useNavBar, VIEW_TABS, type ViewTabId } from '@hooks/views/useNavBar';
+import type { FederatedPointerEvent } from 'pixi.js';
+import type { ProjectTab } from '@stores';
 
 const NAV_ROW_H = 52;
 const TAB_ROW_H = MODERN_NAV_H - NAV_ROW_H; // 24px
-
-// ─── View selector pills ─────────────────────────────────────────────────────
-
-const VIEW_TABS = [
-  { id: 'tracker',     label: 'Tracker' },
-  { id: 'arrangement', label: 'Arrange' },
-  { id: 'pianoroll',   label: 'Piano' },
-  { id: 'mixer',       label: 'Mixer' },
-  { id: 'dj',          label: 'DJ'  },
-  { id: 'vj',          label: 'VJ'  },
-  { id: 'studio',      label: 'Studio' },
-  { id: 'split',       label: 'Split' },
-] as const;
 
 // ─── PixiNavBar ──────────────────────────────────────────────────────────────
 
@@ -54,126 +35,12 @@ export const PixiNavBar: React.FC = () => {
   const theme = usePixiTheme();
   const { width } = usePixiResponsive();
 
-  // UI store — view switching
-  const activeView = useUIStore((s) => s.activeView);
-  const setActiveView = useUIStore((s) => s.setActiveView);
+  const n = useNavBar();
 
-  // Theme store
-  const currentThemeId = useThemeStore((s) => s.currentThemeId);
-  const setTheme = useThemeStore((s) => s.setTheme);
+  // Pixi-specific: themeOptions need SelectOption shape (already compatible via NavBarThemeOption)
+  const themeOptions = n.themeOptions;
 
-  // Tabs store
-  const tabs = useTabsStore((s) => s.tabs);
-  const activeTabId = useTabsStore((s) => s.activeTabId);
-  const addTab = useTabsStore((s) => s.addTab);
-  const closeTab = useTabsStore((s) => s.closeTab);
-  const setActiveTab = useTabsStore((s) => s.setActiveTab);
-
-  // Settings store
-  const setRenderMode = useSettingsStore((s) => s.setRenderMode);
-
-  // Audio store — master volume
-  const masterVolume = useAudioStore((s) => s.masterVolume);
-  const setMasterVolume = useAudioStore((s) => s.setMasterVolume);
-
-  // Collaboration store
-  const collabStatus = useCollaborationStore((s) => s.status);
-
-  // Auth store
-  const authUser = useAuthStore((s) => s.user);
-
-  // MIDI store
-  const hasMIDI = useMIDIStore((s) => s.isInitialized && s.inputDevices.length > 0);
-
-  // AI store
-  const aiPanelOpen = useAIStore((s) => s.isOpen);
-  const toggleAI = useAIStore((s) => s.toggle);
-
-  // Exposé state
-  const isStudio = activeView === 'studio';
-  const workbenchExposeActive = useWorkbenchStore((s) => s.exposeActive);
-  const toggleWorkbenchExpose = useWorkbenchStore((s) => s.toggleExpose);
-  const viewExposeActive = useUIStore((s) => s.viewExposeActive);
-  const toggleViewExpose = useUIStore((s) => s.toggleViewExpose);
-  const exposeActive = isStudio ? workbenchExposeActive : viewExposeActive;
-  const handleExpose = useCallback(() => {
-    if (isStudio) toggleWorkbenchExpose();
-    else toggleViewExpose();
-  }, [isStudio, toggleWorkbenchExpose, toggleViewExpose]);
-
-  // Project store
-  const projectName = useProjectStore((s) => s.metadata?.name ?? 'project');
-
-  // ─── Project Save ────────────────────────────────────────────────────────
-  const handleSaveFile = useCallback(() => {
-    try {
-      const blob = serializeProjectToBlob();
-      const safeName = (projectName || 'project').replace(/[^a-z0-9_\-. ]/gi, '_');
-      const filename = `${safeName}.dvbx`;
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = filename;
-      a.click();
-      URL.revokeObjectURL(url);
-    } catch (err) {
-      console.error('[PixiNavBar] Failed to save project file:', err);
-    }
-  }, [projectName]);
-
-  // ─── Project Load — open full file browser ────────────────────────────────
-  const handleLoadFile = useCallback(() => {
-    useUIStore.getState().setShowFileBrowser(true);
-  }, []);
-
-  // Theme options for dropdown
-  const themeOptions = useMemo<SelectOption[]>(
-    () => themes.map(t => ({ value: t.id, label: t.name.toUpperCase(), color: t.colors.accent })),
-    [], // themes is module-level stable
-  );
-
-  const handleSwitchToDom = useCallback(() => {
-    setRenderMode('dom');
-  }, [setRenderMode]);
-
-  // Collaboration modal
-  const handleOpenCollab = useCallback(() => {
-    useUIStore.getState().openModal('collaboration');
-  }, []);
-
-  // Auth modal / user dropdown
-  const authContainerRef = useRef<ContainerType>(null);
-  const AUTH_DROPDOWN_ID = 'nav-auth';
-  const logout = useAuthStore((s) => s.logout);
-  const handleOpenAuth = useCallback(() => {
-    useUIStore.getState().openModal('auth');
-  }, []);
-  const handleAuthClick = useCallback(() => {
-    if (!authUser) { handleOpenAuth(); return; }
-    const el = authContainerRef.current;
-    if (!el) return;
-    const pos = el.toGlobal({ x: 0, y: NAV_ROW_H });
-    requestAnimationFrame(() => {
-      usePixiDropdownStore.getState().openDropdown({
-        kind: 'select',
-        id: AUTH_DROPDOWN_ID,
-        x: pos.x,
-        y: pos.y,
-        width: 130,
-        options: [
-          { value: '__user__', label: `@${authUser.username}`, disabled: true },
-          { value: 'logout', label: 'Sign Out' },
-        ],
-        onSelect: (v) => {
-          if (v === 'logout') logout();
-          usePixiDropdownStore.getState().closeDropdown(AUTH_DROPDOWN_ID);
-        },
-        onClose: () => usePixiDropdownStore.getState().closeDropdown(AUTH_DROPDOWN_ID),
-      });
-    });
-  }, [authUser, handleOpenAuth, logout]);
-
-  // MIDI device quick-picker
+  // MIDI device quick-picker (Pixi-specific dropdown UX)
   const midiContainerRef = useRef<ContainerType>(null);
   const MIDI_DROPDOWN_ID = 'nav-midi';
   const handleMIDIClick = useCallback(() => {
@@ -181,7 +48,7 @@ export const PixiNavBar: React.FC = () => {
     if (!el) return;
     const pos = el.toGlobal({ x: 0, y: NAV_ROW_H });
     const { inputDevices: devs, selectedInputId: selId } = useMIDIStore.getState();
-    const deviceOptions = devs.map(d => ({
+    const deviceOptions = devs.map((d) => ({
       value: d.id,
       label: (selId === d.id ? '\u25cf ' : '\u25cb ') + d.name.slice(0, 18),
     }));
@@ -210,10 +77,33 @@ export const PixiNavBar: React.FC = () => {
     });
   }, []);
 
-  // Download App modal
-  const handleDownloadApp = useCallback(() => {
-    useUIStore.getState().openModal('download');
-  }, []);
+  // Auth dropdown (Pixi-specific UX)
+  const authContainerRef = useRef<ContainerType>(null);
+  const AUTH_DROPDOWN_ID = 'nav-auth';
+  const handleAuthClick = useCallback(() => {
+    if (!n.authUser) { n.handleOpenAuth(); return; }
+    const el = authContainerRef.current;
+    if (!el) return;
+    const pos = el.toGlobal({ x: 0, y: NAV_ROW_H });
+    requestAnimationFrame(() => {
+      usePixiDropdownStore.getState().openDropdown({
+        kind: 'select',
+        id: AUTH_DROPDOWN_ID,
+        x: pos.x,
+        y: pos.y,
+        width: 130,
+        options: [
+          { value: '__user__', label: `@${n.authUser!.username}`, disabled: true },
+          { value: 'logout', label: 'Sign Out' },
+        ],
+        onSelect: (v) => {
+          if (v === 'logout') n.logout();
+          usePixiDropdownStore.getState().closeDropdown(AUTH_DROPDOWN_ID);
+        },
+        onClose: () => usePixiDropdownStore.getState().closeDropdown(AUTH_DROPDOWN_ID),
+      });
+    });
+  }, [n.authUser, n.handleOpenAuth, n.logout]);
 
   // Transport bar width: center zone gets whatever's left after left/right
   const LEFT_W = 460;
@@ -257,7 +147,7 @@ export const PixiNavBar: React.FC = () => {
 
         {/* View selector buttons */}
         {VIEW_TABS.map(({ id, label }) => {
-          const isActive = activeView === id;
+          const isActive = n.activeView === id;
           return (
             <PixiButton
               key={id}
@@ -265,12 +155,7 @@ export const PixiNavBar: React.FC = () => {
               variant="ft2"
               size="sm"
               active={isActive}
-              onClick={() => {
-                // Close any active expose when switching views
-                if (workbenchExposeActive) useWorkbenchStore.getState().setExposeActive(false);
-                if (viewExposeActive) useUIStore.getState().setViewExposeActive(false);
-                setActiveView(id as any);
-              }}
+              onClick={() => n.handleSwitchView(id as ViewTabId)}
             />
           );
         })}
@@ -294,10 +179,10 @@ export const PixiNavBar: React.FC = () => {
       >
         {/* Master Volume */}
         <PixiKnob
-          value={masterVolume}
+          value={n.masterVolume}
           min={-60}
           max={0}
-          onChange={setMasterVolume}
+          onChange={n.setMasterVolume}
           label="VOL"
           unit="dB"
           size="sm"
@@ -306,20 +191,18 @@ export const PixiNavBar: React.FC = () => {
           layout={{ marginRight: 4 }}
         />
 
-        <PixiButton label="SAVE" variant="ghost" size="sm" onClick={handleSaveFile} width={44} />
-        <PixiButton label="LOAD" variant="ghost" size="sm" onClick={handleLoadFile} width={44} />
-        <PixiButton label="INFO" variant="ghost" size="sm" onClick={() => {
-          requestAnimationFrame(() => useUIStore.getState().openModal('moduleInfo'));
-        }} width={40} />
+        <PixiButton label="SAVE" variant="ghost" size="sm" onClick={n.handleSaveFile} width={44} />
+        <PixiButton label="LOAD" variant="ghost" size="sm" onClick={n.handleLoadFile} width={44} />
+        <PixiButton label="INFO" variant="ghost" size="sm" onClick={n.handleOpenModuleInfo} width={40} />
 
         {/* Collaboration */}
         <PixiButton
-          label={collabStatus === 'connected' ? 'LIVE' : 'COLLAB'}
-          variant={collabStatus === 'connected' ? 'ft2' : 'ghost'}
-          color={collabStatus === 'connected' ? 'green' : 'default'}
+          label={n.collabStatus === 'connected' ? 'LIVE' : 'COLLAB'}
+          variant={n.collabStatus === 'connected' ? 'ft2' : 'ghost'}
+          color={n.collabStatus === 'connected' ? 'green' : 'default'}
           size="sm"
-          active={collabStatus === 'connected'}
-          onClick={handleOpenCollab}
+          active={n.collabStatus === 'connected'}
+          onClick={n.handleOpenCollab}
           width={48}
         />
 
@@ -329,7 +212,7 @@ export const PixiNavBar: React.FC = () => {
         {/* Auth — shows sign-out dropdown when logged in */}
         <pixiContainer ref={authContainerRef} layout={{ flexShrink: 0 }}>
           <PixiButton
-            label={authUser ? authUser.username.slice(0, 6) : 'LOGIN'}
+            label={n.authUser ? n.authUser.username.slice(0, 6) : 'LOGIN'}
             variant="ghost"
             size="sm"
             onClick={handleAuthClick}
@@ -338,7 +221,7 @@ export const PixiNavBar: React.FC = () => {
         </pixiContainer>
 
         {/* MIDI — opens device picker dropdown */}
-        {hasMIDI && (
+        {n.hasMIDI && (
           <pixiContainer ref={midiContainerRef} layout={{ flexShrink: 0 }}>
             <PixiButton label="MIDI" variant="ghost" size="sm" onClick={handleMIDIClick} width={40} />
           </pixiContainer>
@@ -347,33 +230,33 @@ export const PixiNavBar: React.FC = () => {
         {/* Exposé — shows in all views */}
         <PixiButton
           label="EXPOSÉ"
-          variant={exposeActive ? 'ft2' : 'ghost'}
+          variant={n.exposeActive ? 'ft2' : 'ghost'}
           size="sm"
-          active={exposeActive}
-          onClick={handleExpose}
+          active={n.exposeActive}
+          onClick={n.handleExpose}
           width={56}
         />
 
         {/* AI Assistant */}
         <PixiButton
           label="AI"
-          variant={aiPanelOpen ? 'ft2' : 'ghost'}
+          variant={n.aiPanelOpen ? 'ft2' : 'ghost'}
           size="sm"
-          active={aiPanelOpen}
-          onClick={toggleAI}
+          active={n.aiPanelOpen}
+          onClick={n.toggleAI}
           width={28}
         />
 
         <PixiSelect
           options={themeOptions}
-          value={currentThemeId}
-          onChange={setTheme}
+          value={n.currentThemeId}
+          onChange={n.setTheme}
           width={80}
           height={24}
           searchable
         />
-        <PixiButton label="APP" variant="ghost" size="sm" onClick={handleDownloadApp} width={36} />
-        <PixiButton label="DOM" variant="ghost" size="sm" onClick={handleSwitchToDom} width={36} />
+        <PixiButton label="APP" variant="ghost" size="sm" onClick={n.handleOpenDownload} width={36} />
+        <PixiButton label="DOM" variant="ghost" size="sm" onClick={n.handleSwitchToDom} width={36} />
 
         {/* Build version badge */}
         <pixiBitmapText
@@ -402,21 +285,21 @@ export const PixiNavBar: React.FC = () => {
           flexShrink: 0,
         }}
       >
-        {tabs.map((tab: ProjectTab) => {
-          const isActive = tab.id === activeTabId;
+        {n.tabs.map((tab: ProjectTab) => {
+          const isActive = tab.id === n.activeTabId;
           return (
             <layoutContainer
               key={tab.id}
               eventMode="static"
               cursor="pointer"
-              onPointerUp={() => setActiveTab(tab.id)}
+              onPointerUp={() => n.setActiveTab(tab.id)}
               layout={{
                 height: TAB_ROW_H - 4,
                 flexDirection: 'row',
                 alignItems: 'center',
                 gap: 4,
                 paddingLeft: 8,
-                paddingRight: tabs.length > 1 ? 4 : 8,
+                paddingRight: n.tabs.length > 1 ? 4 : 8,
                 backgroundColor: isActive ? theme.bg.color : theme.bgTertiary.color,
                 borderWidth: 1,
                 borderColor: isActive ? theme.accent.color : theme.border.color,
@@ -430,11 +313,11 @@ export const PixiNavBar: React.FC = () => {
                 layout={{}}
                 eventMode="none"
               />
-              {tabs.length > 1 && (
+              {n.tabs.length > 1 && (
                 <layoutContainer
                   eventMode="static"
                   cursor="pointer"
-                  onPointerUp={(e: FederatedPointerEvent) => { e.stopPropagation(); closeTab(tab.id); }}
+                  onPointerUp={(e: FederatedPointerEvent) => { e.stopPropagation(); n.closeTab(tab.id); }}
                   layout={{ width: 12, height: 12, justifyContent: 'center', alignItems: 'center' }}
                 >
                   <pixiBitmapText
@@ -454,7 +337,7 @@ export const PixiNavBar: React.FC = () => {
         <layoutContainer
           eventMode="static"
           cursor="pointer"
-          onPointerUp={() => addTab()}
+          onPointerUp={() => n.addTab()}
           layout={{
             width: TAB_ROW_H - 4,
             height: TAB_ROW_H - 4,
