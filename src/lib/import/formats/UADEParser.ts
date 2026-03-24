@@ -929,7 +929,7 @@ export async function parseUADEFile(
         return parseQuartetFile(buffer, filename);
       },
     };
-    const route = NATIVE_ROUTES[fmt];
+    const route = NATIVE_ROUTES[fmt] || NATIVE_ROUTES[fmt?.trim()];
     if (route) {
       try {
         const nativeSong = await route();
