@@ -44,65 +44,47 @@ export function playStopToggle(): boolean {
 }
 
 /**
- * Play pattern - Always plays from row 0 of current pattern.
- * Resets replayer position directly to avoid React state batching issues.
+ * Play pattern from row 0.
  */
 export function playPattern(): boolean {
-  // CRITICAL for iOS: Tone.start() MUST be called synchronously within user gesture
   unlockIOSAudio();
   Tone.start();
+  console.log('[transport] playPattern called, replayer.isPlaying=', getTrackerReplayer().isPlaying());
 
   const replayer = getTrackerReplayer();
-  const store = useTransportStore.getState();
-
-  store.setIsLooping(true);
-  store.setCurrentRow(0);
+  useTransportStore.getState().setIsLooping(true);
 
   if (replayer.isPlaying()) {
-    // Reset replayer position directly — no stop/start cycle needed
-    replayer.seekTo(replayer.getSongPos(), 0);
-    replayer.resyncSchedulerToNow();
+    replayer.forcePosition(replayer.getSongPos(), 0);
   } else {
-    getToneEngine()
-      .init()
+    useTransportStore.getState().setCurrentRow(0);
+    getToneEngine().init()
       .then(() => useTransportStore.getState().play())
-      .catch((error) => {
-        console.error('[playPattern] Failed to initialize audio engine:', error);
-      });
+      .catch(e => console.error('[playPattern]', e));
   }
-
   return true;
 }
 
 /**
- * Play song - Always plays from pattern 0 / row 0.
- * Resets replayer position directly to avoid React state batching issues.
+ * Play song from pattern 0 / row 0.
  */
 export function playSong(): boolean {
-  // CRITICAL for iOS: Tone.start() MUST be called synchronously within user gesture
   unlockIOSAudio();
   Tone.start();
+  console.log('[transport] playSong called, replayer.isPlaying=', getTrackerReplayer().isPlaying());
 
   const replayer = getTrackerReplayer();
-  const store = useTransportStore.getState();
-
-  store.setIsLooping(false);
-  store.setCurrentPattern(0);
-  store.setCurrentRow(0);
+  useTransportStore.getState().setIsLooping(false);
 
   if (replayer.isPlaying()) {
-    // Reset replayer position directly — no stop/start cycle needed
-    replayer.seekTo(0, 0);
-    replayer.resyncSchedulerToNow();
+    replayer.forcePosition(0, 0);
   } else {
-    getToneEngine()
-      .init()
+    useTransportStore.getState().setCurrentPattern(0);
+    useTransportStore.getState().setCurrentRow(0);
+    getToneEngine().init()
       .then(() => useTransportStore.getState().play())
-      .catch((error) => {
-        console.error('[playSong] Failed to initialize audio engine:', error);
-      });
+      .catch(e => console.error('[playSong]', e));
   }
-
   return true;
 }
 
