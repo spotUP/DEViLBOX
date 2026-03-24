@@ -359,6 +359,8 @@ export const SynthTypeDispatcher: React.FC<SynthTypeDispatcherProps> = ({
       if ('ad' in updates) engine.setInstrumentAD(idx, newConfig.ad);
       if ('sr' in updates) engine.setInstrumentSR(idx, newConfig.sr);
       if ('firstwave' in updates) engine.setInstrumentFirstwave(idx, newConfig.firstwave);
+      if ('vibdelay' in updates) engine.setInstrumentVibdelay(idx, newConfig.vibdelay);
+      if ('gatetimer' in updates) engine.setInstrumentGatetimer(idx, newConfig.gatetimer);
       if ('wavePtr' in updates) engine.setInstrumentTablePtr(idx, 0, newConfig.wavePtr);
       if ('pulsePtr' in updates) engine.setInstrumentTablePtr(idx, 1, newConfig.pulsePtr);
       if ('filterPtr' in updates) engine.setInstrumentTablePtr(idx, 2, newConfig.filterPtr);

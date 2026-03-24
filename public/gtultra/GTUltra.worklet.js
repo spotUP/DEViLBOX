@@ -78,6 +78,8 @@ class GTUltraProcessor extends AudioWorkletProcessor {
           this._setInstrumentSR = this.module.cwrap('gt_set_instrument_sr', null, ['number', 'number', 'number']);
           this._setInstrumentFirstwave = this.module.cwrap('gt_set_instrument_firstwave', null, ['number', 'number']);
           this._setInstrumentTablePtr = this.module.cwrap('gt_set_instrument_table_ptr', null, ['number', 'number', 'number']);
+          this._setInstrumentVibdelay = this.module.cwrap('gt_set_instrument_vibdelay', null, ['number', 'number']);
+          this._setInstrumentGatetimer = this.module.cwrap('gt_set_instrument_gatetimer', null, ['number', 'number']);
           this._setSongName = this.module.cwrap('gt_set_song_name', null, ['string']);
           this._setAuthorName = this.module.cwrap('gt_set_author_name', null, ['string']);
           this._setCopyright = this.module.cwrap('gt_set_copyright', null, ['string']);
@@ -362,6 +364,18 @@ class GTUltraProcessor extends AudioWorkletProcessor {
       case 'setInstrumentTablePtr': {
         if (!this.ready) return;
         this._setInstrumentTablePtr(msg.instrument, msg.tableType, msg.value);
+        break;
+      }
+
+      case 'setInstrumentVibdelay': {
+        if (!this.ready) return;
+        this._setInstrumentVibdelay(msg.instrument, msg.value);
+        break;
+      }
+
+      case 'setInstrumentGatetimer': {
+        if (!this.ready) return;
+        this._setInstrumentGatetimer(msg.instrument, msg.value);
         break;
       }
 

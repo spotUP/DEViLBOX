@@ -325,6 +325,14 @@ export class GTUltraEngine {
     this.post({ type: 'setInstrumentTablePtr', instrument, tableType, value });
   }
 
+  setInstrumentVibdelay(instrument: number, value: number): void {
+    this.post({ type: 'setInstrumentVibdelay', instrument, value });
+  }
+
+  setInstrumentGatetimer(instrument: number, value: number): void {
+    this.post({ type: 'setInstrumentGatetimer', instrument, value });
+  }
+
   // --- Song metadata ---
 
   setSongName(name: string): void {
