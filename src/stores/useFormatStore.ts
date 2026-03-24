@@ -473,7 +473,7 @@ export const useFormatStore = create<FormatStore>()(
           newEditorMode = 'jamcracker';
           state.editorMode = 'jamcracker';
           clearNative(state);
-        } else if (song.goatTrackerData || song.c64SidFileData) {
+        } else if (song.goatTrackerData) {
           newEditorMode = 'goattracker';
           state.editorMode = 'goattracker';
           clearNative(state);
