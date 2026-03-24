@@ -11,14 +11,14 @@
 
 import { useCallback, useMemo } from 'react';
 import type { Graphics as GraphicsType } from 'pixi.js';
-import { useTrackerStore, useTransportStore, useAudioStore, useUIStore, useEditorStore , useFormatStore } from '@stores';
+import { useUIStore, useFormatStore, useTrackerStore, useTransportStore } from '@stores';
 import type { TrackerViewMode } from '@stores/useUIStore';
 import { switchView } from '@/constants/viewOptions';
 import { useShallow } from 'zustand/react/shallow';
-import { useFPSMonitor } from '@/hooks/useFPSMonitor';
-import { SYSTEM_PRESETS, getGroupedPresets } from '@/constants/systemPresets';
+import { useEditorControls } from '@hooks/views/useEditorControls';
 import { notify } from '@stores/useNotificationStore';
 import { useTrackerAnalysisDisplay } from '@/hooks/useTrackerAnalysis';
+import { getGroupedPresets } from '@/constants/systemPresets';
 import { usePixiTheme } from '../../theme';
 import { PIXI_FONTS } from '../../fonts';
 import { PixiButton } from '../../components/PixiButton';
@@ -144,7 +144,7 @@ const Sep: React.FC = () => {
 // ─── Hardware Preset Selector ────────────────────────────────────────────────
 
 const HardwarePresetSelector: React.FC = () => {
-  const applySystemPreset = useTrackerStore(s => s.applySystemPreset);
+  const { handleHardwarePresetChange } = useEditorControls();
 
   // Build flat SelectOption list from grouped presets, inserting group headers
   const options = useMemo<SelectOption[]>(() => {
@@ -159,18 +159,11 @@ const HardwarePresetSelector: React.FC = () => {
     return result;
   }, []);
 
-  const handleChange = useCallback((presetId: string) => {
-    if (presetId === '__group__') return;
-    applySystemPreset(presetId);
-    const preset = SYSTEM_PRESETS.find(p => p.id === presetId);
-    notify.success(`Hardware System: ${preset?.name.toUpperCase() ?? presetId}`);
-  }, [applySystemPreset]);
-
   return (
     <PixiSelect
       options={options}
       value="__none__"
-      onChange={handleChange}
+      onChange={handleHardwarePresetChange}
       width={150}
       height={24}
       placeholder="HW SYSTEM..."
@@ -465,49 +458,17 @@ export const PixiEditorControlsBar: React.FC<PixiEditorControlsBarProps> = ({
   onGridChannelChange,
 }) => {
   const theme = usePixiTheme();
-  const fps = useFPSMonitor();
 
-  // ── Tracker store ─────────────────────────────────────────────────────────
-  const {
-    recordMode,
-    showGhostPatterns,
-  } = useEditorStore(useShallow(s => ({
-    recordMode: s.recordMode,
-    showGhostPatterns: s.showGhostPatterns,
-  })));
-  const channelCount = useTrackerStore(useShallow(s =>
-    s.patterns[s.currentPatternIndex]?.channels?.length || 4
-  ));
-
-  // ── Transport store ───────────────────────────────────────────────────────
-  const {
-    grooveTemplateId,
-    swing,
-    jitter,
-    smoothScrolling,
-  } = useTransportStore(useShallow(s => ({
-    grooveTemplateId: s.grooveTemplateId,
-    swing: s.swing,
-    jitter: s.jitter,
-    smoothScrolling: s.smoothScrolling,
-  })));
-
-  // ── Audio store ───────────────────────────────────────────────────────────
-  const masterMuted = useAudioStore(s => s.masterMuted);
-
-  // ── UI store ──────────────────────────────────────────────────────────────
-  const statusMessage = useUIStore(s => s.statusMessage);
-
-  // ── Groove ────────────────────────────────────────────────────────────────
-  const grooveActive = (grooveTemplateId !== 'straight' && swing > 0) || jitter > 0;
+  // ── Shared hook ───────────────────────────────────────────────────────────
+  const c = useEditorControls();
 
   // ── Channel selector options ──────────────────────────────────────────────
   const channelOptions = useMemo<SelectOption[]>(
-    () => Array.from({ length: channelCount }, (_, i) => ({ value: String(i), label: `Ch ${i + 1}` })),
-    [channelCount],
+    () => Array.from({ length: c.channelCount }, (_, i) => ({ value: String(i), label: `Ch ${i + 1}` })),
+    [c.channelCount],
   );
 
-  // ── Handlers ─────────────────────────────────────────────────────────────
+  // ── Pixi-specific handlers ────────────────────────────────────────────────
   const handleViewModeChange = useCallback((val: string) => {
     // Local sub-modes stay in tracker view; global views use shared switchView
     if (val === 'tracker' || val === 'grid' || val === 'tb303' || val === 'sunvox') {
@@ -521,48 +482,10 @@ export const PixiEditorControlsBar: React.FC<PixiEditorControlsBarProps> = ({
     setTimeout(() => onGridChannelChange(Number(val)), 0);
   }, [onGridChannelChange]);
 
-  const handleToggleRecord = useCallback(() => {
-    useEditorStore.getState().toggleRecordMode();
-  }, []);
-
-  const handleToggleGhosts = useCallback(() => {
-    const s = useEditorStore.getState();
-    s.setShowGhostPatterns(!s.showGhostPatterns);
-  }, []);
-
-  const handleToggleMute = useCallback(() => {
-    useAudioStore.getState().toggleMasterMute();
-  }, []);
-
-  const handleToggleSmooth = useCallback(() => {
-    const s = useTransportStore.getState();
-    s.setSmoothScrolling(!s.smoothScrolling);
-  }, []);
-
-  const handleGrooveSettings = useCallback(() => {
-    useUIStore.getState().openModal('grooveSettings');
-  }, []);
-
-  const handleShowAutoEditor = useCallback(() => {
-    useUIStore.getState().openModal('automation');
-  }, []);
-
-  const handleAdvancedEdit = useCallback(() => {
-    useUIStore.getState().openModal('advancedEdit');
-  }, []);
-
-  const handleShowDrumpads = useCallback(() => {
-    useUIStore.getState().openModal('drumpads');
-  }, []);
-
-  const handleRecSettings = useCallback(() => {
-    useUIStore.getState().openModal('settings');
-  }, []);
-
   // ── FPS tint ──────────────────────────────────────────────────────────────
-  const fpsTint = fps.quality === 'high'
+  const fpsTint = c.fps.quality === 'high'
     ? theme.success.color
-    : fps.quality === 'medium'
+    : c.fps.quality === 'medium'
     ? theme.warning.color
     : theme.error.color;
 
@@ -608,11 +531,11 @@ export const PixiEditorControlsBar: React.FC<PixiEditorControlsBarProps> = ({
       {/* Ghost Patterns — only in tracker view */}
       <PixiButton
         label="Ghosts"
-        variant={showGhostPatterns ? 'ft2' : 'ghost'}
-        color={showGhostPatterns ? 'blue' : undefined}
+        variant={c.showGhostPatterns ? 'ft2' : 'ghost'}
+        color={c.showGhostPatterns ? 'blue' : undefined}
         size="sm"
-        active={showGhostPatterns}
-        onClick={handleToggleGhosts}
+        active={c.showGhostPatterns}
+        onClick={c.handleToggleGhosts}
         layout={{ display: viewMode === 'tracker' ? 'flex' : 'none' }}
       />
 
@@ -621,7 +544,7 @@ export const PixiEditorControlsBar: React.FC<PixiEditorControlsBarProps> = ({
         label="Edit"
         variant="ghost"
         size="sm"
-        onClick={handleAdvancedEdit}
+        onClick={c.handleAdvancedEdit}
         layout={{ display: viewMode === 'tracker' ? 'flex' : 'none' }}
       />
 
@@ -630,7 +553,7 @@ export const PixiEditorControlsBar: React.FC<PixiEditorControlsBarProps> = ({
         label="Auto"
         variant="ghost"
         size="sm"
-        onClick={handleShowAutoEditor}
+        onClick={c.handleShowAutoEditor}
         layout={{ display: viewMode === 'tracker' ? 'flex' : 'none' }}
       />
 
@@ -639,17 +562,17 @@ export const PixiEditorControlsBar: React.FC<PixiEditorControlsBarProps> = ({
         label="Pads"
         variant="ghost"
         size="sm"
-        onClick={handleShowDrumpads}
+        onClick={c.handleShowDrumpads}
       />
 
       {/* REC button */}
       <PixiButton
         label="REC"
-        variant={recordMode ? 'ft2' : 'ghost'}
-        color={recordMode ? 'red' : undefined}
+        variant={c.recordMode ? 'ft2' : 'ghost'}
+        color={c.recordMode ? 'red' : undefined}
         size="sm"
-        active={recordMode}
-        onClick={handleToggleRecord}
+        active={c.recordMode}
+        onClick={c.handleToggleRecord}
       />
 
       {/* Settings */}
@@ -657,39 +580,39 @@ export const PixiEditorControlsBar: React.FC<PixiEditorControlsBarProps> = ({
         label="Settings"
         variant="ghost"
         size="sm"
-        onClick={handleRecSettings}
+        onClick={c.handleRecSettings}
       />
 
       <Sep />
 
       {/* Master Mute */}
       <PixiButton
-        label={masterMuted ? 'Unmute' : 'Mute'}
-        variant={masterMuted ? 'ft2' : 'ghost'}
-        color={masterMuted ? 'red' : undefined}
+        label={c.masterMuted ? 'Unmute' : 'Mute'}
+        variant={c.masterMuted ? 'ft2' : 'ghost'}
+        color={c.masterMuted ? 'red' : undefined}
         size="sm"
-        active={masterMuted}
-        onClick={handleToggleMute}
+        active={c.masterMuted}
+        onClick={c.handleToggleMute}
       />
 
       {/* Smooth / Stepped scrolling */}
       <PixiButton
-        label={smoothScrolling ? 'Smooth' : 'Stepped'}
-        variant={smoothScrolling ? 'ft2' : 'ghost'}
-        color={smoothScrolling ? 'blue' : undefined}
+        label={c.smoothScrolling ? 'Smooth' : 'Stepped'}
+        variant={c.smoothScrolling ? 'ft2' : 'ghost'}
+        color={c.smoothScrolling ? 'blue' : undefined}
         size="sm"
-        active={smoothScrolling}
-        onClick={handleToggleSmooth}
+        active={c.smoothScrolling}
+        onClick={c.handleToggleSmooth}
       />
 
       {/* Groove — single button matching DOM EditorControlsBar */}
       <PixiButton
         label="GROOVE"
-        variant={grooveActive ? 'ft2' : 'ghost'}
-        color={grooveActive ? 'blue' : undefined}
+        variant={c.grooveActive ? 'ft2' : 'ghost'}
+        color={c.grooveActive ? 'blue' : undefined}
         size="sm"
-        active={grooveActive}
-        onClick={handleGrooveSettings}
+        active={c.grooveActive}
+        onClick={c.handleGrooveSettings}
       />
 
       {/* Spacer */}
@@ -700,15 +623,15 @@ export const PixiEditorControlsBar: React.FC<PixiEditorControlsBarProps> = ({
 
       {/* Status message */}
       <pixiBitmapText
-        text={statusMessage?.toUpperCase() ?? ''}
+        text={c.statusMessage?.toUpperCase() ?? ''}
         style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 12, fill: 0xffffff }}
         tint={theme.accent.color}
-        layout={{ display: statusMessage ? 'flex' : 'none', marginRight: 8 }}
+        layout={{ display: c.statusMessage ? 'flex' : 'none', marginRight: 8 }}
       />
 
       {/* FPS pill */}
       <pixiBitmapText
-        text={`${fps.averageFps}FPS`}
+        text={`${c.fps.averageFps}FPS`}
         style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 11, fill: 0xffffff }}
         tint={fpsTint}
         layout={{}}
