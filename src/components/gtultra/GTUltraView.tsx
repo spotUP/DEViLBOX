@@ -49,7 +49,7 @@ export const GTUltraView: React.FC<{ width?: number; height?: number }> = () => 
     <div ref={containerRef} style={{
       display: 'flex', flexDirection: 'column',
       width: '100%', height: '100%',
-      background: '#0a0a1e', color: '#c0c0c0',
+      background: 'var(--color-tracker-row-even)', color: '#c0c0c0',
       fontFamily: 'monospace',
     }}>
       <div style={{ height: `${TOOLBAR_H}px`, flexShrink: 0 }}>

@@ -1,18 +1,12 @@
 /**
- * GTOrderMatrix — Horizontal panel: Orders + 4 table editors side by side.
- *
- * Layout: [Orders (flex)] [Wave] [Pulse] [Filter] [Speed]
- * All visible at once — no tabs, direct access.
+ * GTOrderMatrix — Orders editor panel above the pattern editor.
+ * Uses theme CSS variables for background colors to stay in sync with the pattern editor.
  */
 
 import React, { useRef, useEffect, useState, useCallback } from 'react';
 import { useGTUltraStore } from '../../stores/useGTUltraStore';
 
 export const GT_ORDER_MATRIX_HEIGHT = 160;
-
-const SECTION_COLORS: Record<string, string> = {
-  orders: '#ff6666',
-};
 
 const CHAR_W = 8;
 const ROW_H = 14;
@@ -40,6 +34,11 @@ function formatOrderVal(val: number): string {
   if (val >= 0xE0 && val <= 0xEF) return `-${(val & 0x0F).toString(16).toUpperCase()}`;
   if (val >= 0xF0 && val <= 0xFE) return `+${(val & 0x0F).toString(16).toUpperCase()}`;
   return val.toString(16).toUpperCase().padStart(2, '0');
+}
+
+/** Read a CSS variable from :root, with fallback */
+function cssVar(name: string, fallback: string): string {
+  return getComputedStyle(document.documentElement).getPropertyValue(name).trim() || fallback;
 }
 
 // ─── Orders Canvas ──────────────────────────────────────────────────────────
@@ -79,35 +78,43 @@ const OrdersCanvas: React.FC<{ width: number; height: number }> = ({ width, heig
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
+    // Read theme colors from CSS variables (set by useThemeStore)
+    const bgEven      = cssVar('--color-tracker-row-even', '#1a1a2e');
+    const bgOdd       = cssVar('--color-tracker-row-odd', '#1e1e34');
+    const bgHighlight = cssVar('--color-tracker-row-highlight', '#222244');
+    const bgCurrent   = cssVar('--color-tracker-row-current', '#2a2a50');
+    const textMuted   = cssVar('--color-text-muted', '#555');
+    const accent      = cssVar('--color-accent', '#ff6666');
+
     const dpr = window.devicePixelRatio || 1;
     canvas.width = width * dpr;
     canvas.height = height * dpr;
     ctx.scale(dpr, dpr);
 
-    ctx.fillStyle = '#1a1a2e';
+    ctx.fillStyle = bgEven;
     ctx.fillRect(0, 0, width, height);
     ctx.font = `11px "JetBrains Mono", monospace`;
     ctx.textBaseline = 'top';
 
     // Section label
-    ctx.fillStyle = '#111122';
+    ctx.fillStyle = bgOdd;
     ctx.fillRect(0, 0, width, LABEL_H);
-    ctx.fillStyle = SECTION_COLORS.orders;
+    ctx.fillStyle = accent;
     ctx.font = `bold 10px "JetBrains Mono", monospace`;
     ctx.fillText('ORDERS', 4, 2);
     ctx.font = `11px "JetBrains Mono", monospace`;
 
-    // Column header — tight: 2-char hex values + small gap
+    // Column header
     const posColW = CHAR_W * 3;
-    const chColW = CHAR_W * 3; // "XX " = 3 chars wide
+    const chColW = CHAR_W * 3;
     const hdrY = LABEL_H;
 
-    ctx.fillStyle = '#151528';
+    ctx.fillStyle = bgHighlight;
     ctx.fillRect(0, hdrY, width, HEADER_H);
-    ctx.fillStyle = '#555';
+    ctx.fillStyle = textMuted;
     ctx.fillText('Pos', 2, hdrY + 2);
     for (let ch = 0; ch < channelCount; ch++) {
-      ctx.fillStyle = ch === orderChannelCol ? '#ccc' : '#555';
+      ctx.fillStyle = ch === orderChannelCol ? '#ccc' : textMuted;
       ctx.fillText(`C${ch + 1}`, posColW + ch * chColW, hdrY + 2);
     }
 
@@ -122,7 +129,7 @@ const OrdersCanvas: React.FC<{ width: number; height: number }> = ({ width, heig
       const isCursor = idx === orderCursor;
 
       if (isPlay) {
-        ctx.fillStyle = 'rgba(233, 69, 96, 0.15)';
+        ctx.fillStyle = bgCurrent;
         ctx.fillRect(0, y, width, ROW_H);
       }
       if (isCursor) {
@@ -134,7 +141,7 @@ const OrdersCanvas: React.FC<{ width: number; height: number }> = ({ width, heig
         ctx.strokeRect(0.5, y + 0.5, width - 1, ROW_H - 1);
       }
 
-      ctx.fillStyle = isPlay ? '#ff6666' : '#555';
+      ctx.fillStyle = isPlay ? accent : textMuted;
       ctx.fillText(idx.toString(16).toUpperCase().padStart(2, '0'), 4, y + 1);
 
       for (let ch = 0; ch < channelCount; ch++) {
@@ -151,7 +158,7 @@ const OrdersCanvas: React.FC<{ width: number; height: number }> = ({ width, heig
       if (cy >= dataY0 && cy < height) {
         ctx.fillStyle = 'rgba(255, 102, 102, 0.3)';
         ctx.fillRect(cx - 2, cy, CHAR_W, ROW_H);
-        ctx.fillStyle = '#ff6666';
+        ctx.fillStyle = accent;
         ctx.fillText(hexDigit.toString(16).toUpperCase(), cx, cy + 1);
       }
     }
@@ -251,7 +258,7 @@ export const GTOrderMatrix: React.FC<GTOrderMatrixProps> = ({ width, height }) =
         height,
         display: 'flex',
         flexDirection: 'row',
-        background: '#1a1a2e',
+        background: 'var(--color-tracker-row-even)',
       }}
     >
       <OrdersCanvas width={width} height={height} />
