@@ -121,10 +121,14 @@ export async function importTrackerModule(
 
   // ── Try OpenMPT WASM soundlib for PC tracker formats ──
   const isOpenMPTFormat = /^(MOD|XM|IT|S3M)$/i.test(format) || /\.(mod|xm|it|s3m|mptm|mo3|med|mmd[0-3]|okt|okta)$/i.test(info.file?.name || '');
+  const isIOS = typeof navigator !== 'undefined' && /iPhone|iPad/.test(navigator.userAgent);
+  if (isIOS) alert(`OpenMPT path: arrayBuffer=${!!info.arrayBuffer} (${info.arrayBuffer?.byteLength}), isOpenMPT=${isOpenMPTFormat}, format=${format}`);
   if (info.arrayBuffer && isOpenMPTFormat) {
     try {
       const { parseWithOpenMPT } = await import('@lib/import/wasm/OpenMPTConverter');
+      if (isIOS) alert('OpenMPT module loaded, parsing...');
       const song = await parseWithOpenMPT(info.arrayBuffer, info.file?.name || 'module');
+      if (isIOS) alert(`OpenMPT result: ${song.patterns.length} patterns, ${song.instruments.length} instruments`);
       console.log(`[Import] OpenMPT parsed: ${song.patterns.length} patterns, ${song.instruments.length} instruments, format=${song.format}`);
       // Tag first pattern with sourceFormat so it's preserved in .dbx saves
       if (song.patterns.length > 0 && song.format) {
@@ -154,10 +158,12 @@ export async function importTrackerModule(
       return;
     } catch (err) {
       console.warn('[Import] OpenMPT WASM parse failed, falling back:', err);
+      if (isIOS) alert(`OpenMPT FAILED: ${err instanceof Error ? err.message : err}`);
     }
   }
 
   // ── Native TS parser data (XM/MOD/FUR/DMF from ModuleLoader) ──
+  if (isIOS) alert(`Native parser path: hasNativeData=${!!info.nativeData}, format=${format}`);
   if (info.nativeData) {
     const { convertXMModule, convertMODModule } = await import('@lib/import/ModuleConverter');
     const { convertToInstrument } = await import('@lib/import/InstrumentConverter');
