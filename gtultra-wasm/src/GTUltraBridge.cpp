@@ -479,6 +479,13 @@ void gt_new_song(void) {
 EMSCRIPTEN_KEEPALIVE
 void gt_play(int songNum, int fromPos, int fromRow) {
     (void)fromRow;
+    /* Safety: ensure critical editorInfo fields are initialized.
+     * loadsong() sets these from the ID=0x1f block, but older .sng files
+     * may lack it, leaving all fields at zero. Match the export-path defaults. */
+    if (editorInfo.maxSIDChannels == 0) editorInfo.maxSIDChannels = 3;
+    if (editorInfo.adparam == 0) editorInfo.adparam = 0x0f00;
+    if (editorInfo.multiplier == 0) editorInfo.multiplier = 1;
+
     gt_playroutine_accumulator = 0;
     gtObject.psnum = songNum;
     gtObject.startpattpos = fromPos;
