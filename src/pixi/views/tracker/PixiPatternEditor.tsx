@@ -22,19 +22,16 @@ import type { Graphics as GraphicsType, FederatedPointerEvent, Container as Cont
 import { usePixiTheme, type PixiTheme } from '../../theme';
 import { PIXI_FONTS } from '../../fonts';
 import { MegaText, type GlyphLabel } from '../../utils/MegaText';
-import { useTrackerStore, useTransportStore, useUIStore, useCursorStore, useEditorStore } from '@stores';
-import { useShallow } from 'zustand/react/shallow';
-import { useSettingsStore } from '@/stores/useSettingsStore';
-import { useCollaborationStore, getCollabClient } from '@stores/useCollaborationStore';
+import { useTrackerStore, useTransportStore, useUIStore, useCursorStore } from '@stores';
 import { getTrackerReplayer } from '@engine/TrackerReplayer';
 import { getTrackerScratchController } from '@engine/TrackerScratchController';
-import { useBDAnimations } from '@hooks/tracker/useBDAnimations';
 import { GENERATORS, type GeneratorType } from '@utils/patternGenerators';
 import { PixiContextMenu, type ContextMenuItem } from '../../input/PixiContextMenu';
 import { PixiChannelHeaders } from './PixiChannelHeaders';
 import { haptics } from '@/utils/haptics';
 import * as Tone from 'tone';
 import type { CursorPosition, BlockSelection } from '@typedefs';
+import { usePatternEditor } from '@hooks/views/usePatternEditor';
 const SCROLLBAR_HEIGHT = 12;
 
 // ─── Layout constants (must match worker-types / TrackerGLRenderer) ──────────
@@ -596,7 +593,7 @@ export const PixiPatternEditor: React.FC<PixiPatternEditorProps> = ({ width, hei
   FILL_PURPLE_045 = { color: theme.accentSecondary.color, alpha: 0.45 };
   FILL_PURPLE_055 = { color: theme.accentSecondary.color, alpha: 0.55 };
 
-  // ── Store subscriptions ────────────────────────────────────────────────────
+  // ── Shared pattern editor logic ────────────────────────────────────────────
   const {
     pattern,
     patterns,
@@ -611,52 +608,30 @@ export const PixiPatternEditor: React.FC<PixiPatternEditorProps> = ({ width, hei
     copyTrack,
     cutTrack,
     pasteTrack,
-  } = useTrackerStore(useShallow((s) => ({
-    pattern: s.patterns[s.currentPatternIndex],
-    patterns: s.patterns,
-    currentPatternIndex: s.currentPatternIndex,
-    addChannel: s.addChannel,
-    toggleChannelMute: s.toggleChannelMute,
-    toggleChannelSolo: s.toggleChannelSolo,
-    toggleChannelCollapse: s.toggleChannelCollapse,
-    setChannelColor: s.setChannelColor,
-    updateChannelName: s.updateChannelName,
-    setCell: s.setCell,
-    copyTrack: s.copyTrack,
-    cutTrack: s.cutTrack,
-    pasteTrack: s.pasteTrack,
-  })));
-
-  const showGhostPatterns = useEditorStore(s => s.showGhostPatterns);
-  const columnVisibility = useEditorStore(s => s.columnVisibility);
-  const recordMode = useEditorStore(s => s.recordMode);
-  // Derived boolean arrays — must NOT live inside the useShallow object above.
-  // .map() always creates a new array reference; inside a useShallow object,
-  // Zustand compares with Object.is (reference equality), so the new array is
-  // always seen as changed → forceStoreRerender → infinite loop.
-  // Separate useShallow selectors compare array elements directly.
-  const channelMuted = useTrackerStore(useShallow((s) =>
-    (s.patterns[s.currentPatternIndex]?.channels ?? []).map(ch => ch.muted)));
-  const channelSolo = useTrackerStore(useShallow((s) =>
-    (s.patterns[s.currentPatternIndex]?.channels ?? []).map(ch => ch.solo)));
+    showGhostPatterns,
+    columnVisibility,
+    recordMode,
+    channelMuted,
+    channelSolo,
+    isPlaying,
+    rowHeight,
+    rowHeightRef,
+    trackerVisualBg,
+    cursorRef,
+    selectionRef,
+    peerCursorRef,
+    peerSelectionRef,
+    bdAnimations,
+    numChannels,
+    channelOffsets,
+    channelWidths,
+    totalChannelsWidth,
+  } = usePatternEditor();
 
   const useHex = useUIStore(s => s.useHexNumbers);
   const blankEmpty = useUIStore(s => s.blankEmptyCells);
-  const trackerZoom = useUIStore(s => s.trackerZoom);
   const rowHighlightInterval = useUIStore(s => s.rowHighlightInterval);
   const showBeatLabels = useUIStore(s => s.showBeatLabels);
-  const rowHeight = Math.round(24 * (trackerZoom / 100));
-  const rowHeightRef = useRef(rowHeight);
-  useEffect(() => { rowHeightRef.current = rowHeight; }, [rowHeight]);
-  const trackerVisualBg = useSettingsStore(s => s.trackerVisualBg);
-  const isPlaying = useTransportStore(s => s.isPlaying);
-
-  // ── Cursor/selection refs — updated via subscription, NOT React state ──────
-  // Cursor/selection changes are the hottest path (every keypress). By keeping
-  // them in refs and redrawing imperatively we bypass @pixi/react reconciliation,
-  // which previously caused "Maximum update depth exceeded" crashes on key-repeat.
-  const cursorRef = useRef(useCursorStore.getState().cursor);
-  const selectionRef = useRef(useCursorStore.getState().selection);
 
   // ── Cell context menu (GL-native via PixiContextMenu) ─────────────────────
   const [ctxMenuState, setCtxMenuState] = useState<{
@@ -688,8 +663,6 @@ export const PixiPatternEditor: React.FC<PixiPatternEditorProps> = ({ width, hei
   }, [ctxMenuState, pattern, openModal, closeCellContextMenu]);
 
   // ── B/D Animation handlers ────────────────────────────────────────────────
-  const bdAnimations = useBDAnimations();
-
   const getBDAnimationOptions = useCallback((channelIndex: number) => {
     const sel = selectionRef.current;
     const startRow = sel ? Math.min(sel.startRow, sel.endRow) : 0;
@@ -941,44 +914,6 @@ export const PixiPatternEditor: React.FC<PixiPatternEditorProps> = ({ width, hei
     };
   }, []);
 
-  // ── Collaboration ─────────────────────────────────────────────────────────
-  const peerCursorRef = useRef({ row: 0, channel: 0, active: false, patternIndex: -1 });
-  const peerSelectionRef = useRef<{ startChannel: number; endChannel: number; startRow: number; endRow: number; patternIndex: number } | null>(null);
-
-  useEffect(() => {
-    const unsub = useCollaborationStore.subscribe((state) => {
-      peerCursorRef.current = {
-        row: state.peerCursorRow,
-        channel: state.peerCursorChannel,
-        active: state.status === 'connected' && state.listenMode === 'shared',
-        patternIndex: state.peerPatternIndex,
-      };
-      peerSelectionRef.current = (state.status === 'connected' && state.listenMode === 'shared')
-        ? state.peerSelection : null;
-    });
-    return unsub;
-  }, []);
-
-  // Broadcast local selection to peer
-  useEffect(() => {
-    const unsub = useCursorStore.subscribe((state, prev) => {
-      if (state.selection === prev.selection) return;
-      if (useCollaborationStore.getState().status !== 'connected') return;
-      const sel = state.selection;
-      if (sel) {
-        getCollabClient()?.send({
-          type: 'peer_selection',
-          patternIndex: useTrackerStore.getState().currentPatternIndex,
-          startChannel: sel.startChannel, endChannel: sel.endChannel,
-          startRow: sel.startRow, endRow: sel.endRow,
-        });
-      } else {
-        getCollabClient()?.send({ type: 'peer_selection_clear' });
-      }
-    });
-    return unsub;
-  }, []);
-
   // ── Scroll state ──────────────────────────────────────────────────────────
   const [scrollLeft, setScrollLeft] = useState(0);
   const scrollLeftRef = useRef(0);
@@ -1021,42 +956,6 @@ export const PixiPatternEditor: React.FC<PixiPatternEditorProps> = ({ width, hei
       megaTextRef.current = null;
     };
   }, []);
-
-  // ── Channel layout ────────────────────────────────────────────────────────
-  const { numChannels, channelOffsets, channelWidths, totalChannelsWidth } = useMemo(() => {
-    if (!pattern) return { numChannels: 0, channelOffsets: [] as number[], channelWidths: [] as number[], totalChannelsWidth: 0 };
-    const nc = pattern.channels.length;
-    const noteWidth = CHAR_WIDTH * 3 + 4;
-    const showAcid = columnVisibility.flag1 || columnVisibility.flag2;
-    const showProb = columnVisibility.probability;
-
-    const offsets: number[] = [];
-    const widths: number[] = [];
-    let currentX = LINE_NUMBER_WIDTH;
-
-    for (let ch = 0; ch < nc; ch++) {
-      const channel = pattern.channels[ch];
-      const isCollapsed = channel?.collapsed;
-      if (isCollapsed) {
-        const cw = noteWidth + 40;
-        offsets.push(currentX);
-        widths.push(cw);
-        currentX += cw;
-      } else {
-        const effectCols = channel?.channelMeta?.effectCols ?? 2;
-        const effectWidth = effectCols * (CHAR_WIDTH * 3 + 4);
-        const paramWidth = CHAR_WIDTH * 4 + 8 + effectWidth
-          + (showAcid ? CHAR_WIDTH * 2 + 8 : 0)
-          + (showProb ? CHAR_WIDTH * 2 + 4 : 0);
-        const chWidth = noteWidth + paramWidth + 60;
-        offsets.push(currentX);
-        widths.push(chWidth);
-        currentX += chWidth;
-      }
-    }
-
-    return { numChannels: nc, channelOffsets: offsets, channelWidths: widths, totalChannelsWidth: currentX - LINE_NUMBER_WIDTH };
-  }, [pattern, columnVisibility]);
 
   // All channels fit? (disable horizontal scroll)
   const allChannelsFit = useMemo(() => {

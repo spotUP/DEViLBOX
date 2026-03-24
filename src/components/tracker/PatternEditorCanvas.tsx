@@ -11,6 +11,7 @@ import { AutomationLanes } from './AutomationLanes';
 import { MacroLanes } from './MacroLanes';
 import { useUIStore } from '@stores/useUIStore';
 import { useShallow } from 'zustand/react/shallow';
+import { usePatternEditor } from '@hooks/views/usePatternEditor';
 import { ChannelVUMeter } from './ChannelVUMeter';
 import { ChannelVUMeters } from './ChannelVUMeters';
 import { ChannelColorPicker } from './ChannelColorPicker';
@@ -25,11 +26,9 @@ import { haptics } from '@/utils/haptics';
 import { getTrackerReplayer } from '@engine/TrackerReplayer';
 import { getTrackerScratchController } from '@engine/TrackerScratchController';
 import * as Tone from 'tone';
-import { useBDAnimations } from '@hooks/tracker/useBDAnimations';
 import { useSettingsStore } from '@stores/useSettingsStore';
 import { useFormatStore } from '@stores/useFormatStore';
 import type { CursorPosition } from '@typedefs';
-import { useCollaborationStore, getCollabClient } from '@stores/useCollaborationStore';
 // OffscreenCanvas + WebGL2 worker bridge
 import { TrackerOffscreenBridge } from '@engine/renderer/OffscreenBridge';
 import { reportSynthError } from '@stores/useSynthErrorStore';
@@ -139,14 +138,8 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
   const visibleStartRef = useRef(0);
   const macroOverlayRef = useRef<HTMLDivElement>(null);
   const peerCursorDivRef = useRef<HTMLDivElement>(null);
-  // PERF: Track cursor/selection in ref to avoid re-renders on every cursor move (30-50 fps drop!)
-  const cursorRef = useRef(useCursorStore.getState().cursor);
-  const selectionRef = useRef(useCursorStore.getState().selection);
-  // Ref-tracked peer cursor so the RAF loop can read it without React re-renders
-  const peerCursorRef = useRef({ row: 0, channel: 0, active: false, patternIndex: -1 });
-  // Peer selection overlay
+  // Peer selection overlay (DOM overlay div — kept local)
   const peerSelectionDivRef = useRef<HTMLDivElement>(null);
-  const peerSelectionRef = useRef<{ startChannel: number; endChannel: number; startRow: number; endRow: number; patternIndex: number } | null>(null);
   // Ref-tracked channel layout so the RAF loop always has current values
   const channelOffsetsRef = useRef<number[]>([]);
   const channelWidthsRef = useRef<number[]>([]);
@@ -186,10 +179,8 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
   const bridgeRef = useRef<TrackerOffscreenBridge | null>(null);
   // Ref-tracked scroll for immediate worker updates (avoids React re-renders on scroll)
   const scrollLeftRef = useRef(0);
-  // Ref-tracked row height for RAF loop (avoids restarting effect on zoom change)
-  const rowHeightRef = useRef(24);
 
-  // Get pattern and actions (moved BEFORE callbacks that use them)
+  // ── Shared pattern editor logic ────────────────────────────────────────────
   const {
     pattern,
     patterns,
@@ -204,35 +195,17 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
     copyTrack,
     cutTrack,
     pasteTrack,
-  } = useTrackerStore(useShallow((state) => ({
-    pattern: state.patterns[state.currentPatternIndex],
-    patterns: state.patterns,
-    currentPatternIndex: state.currentPatternIndex,
-    addChannel: state.addChannel,
-    toggleChannelMute: state.toggleChannelMute,
-    toggleChannelSolo: state.toggleChannelSolo,
-    toggleChannelCollapse: state.toggleChannelCollapse,
-    setChannelColor: state.setChannelColor,
-    updateChannelName: state.updateChannelName,
-    setCell: state.setCell,
-    copyTrack: state.copyTrack,
-    cutTrack: state.cutTrack,
-    pasteTrack: state.pasteTrack,
-  })));
+    showGhostPatterns,
+    columnVisibility,
+    rowHeight,
+    rowHeightRef,
+    cursorRef,
+    selectionRef,
+    peerCursorRef,
+    peerSelectionRef,
+    bdAnimations,
+  } = usePatternEditor();
 
-  const showGhostPatterns = useEditorStore(s => s.showGhostPatterns);
-  const columnVisibility = useEditorStore(s => s.columnVisibility);
-
-  // PERF: Read cursor imperatively to avoid re-render on every cursor move (30-50 fps drop!)
-  // Subscribe to cursor changes and update refs (no React re-render)
-  useEffect(() => {
-    const unsub = useCursorStore.subscribe((state) => {
-      cursorRef.current = state.cursor;
-      selectionRef.current = state.selection;
-    });
-    return unsub;
-  }, []);
-  
   const moveCursorToChannelAndColumn = useCursorStore((s) => s.moveCursorToChannelAndColumn);
   const mobileChannelIndex = cursorRef.current.channelIndex;
 
@@ -240,52 +213,9 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
     instruments: state.instruments
   })));
 
-  const trackerZoom = useUIStore(s => s.trackerZoom);
   const showChannelNames = useUIStore(s => s.showChannelNames);
   const showAutomationLanes = useUIStore(s => s.showAutomationLanes);
   const showMacroLanes = useUIStore(s => s.showMacroLanes);
-  const rowHeight = Math.round(24 * (trackerZoom / 100));
-
-  // Keep rowHeightRef in sync so the RAF loop always sees the current value
-  useEffect(() => { rowHeightRef.current = rowHeight; }, [rowHeight]);
-
-  // Keep peerCursorRef, peerMouseRef, and peerSelectionRef in sync with collaboration store (no React re-renders)
-  useEffect(() => {
-    const unsub = useCollaborationStore.subscribe((state) => {
-      peerCursorRef.current = {
-        row: state.peerCursorRow,
-        channel: state.peerCursorChannel,
-        active: state.status === 'connected' && state.listenMode === 'shared',
-        patternIndex: state.peerPatternIndex,
-      };
-      peerSelectionRef.current = (state.status === 'connected' && state.listenMode === 'shared')
-        ? state.peerSelection : null;
-    });
-    return unsub;
-  }, []);
-
-  // Broadcast peer_selection whenever local selection changes
-  useEffect(() => {
-    const unsub = useCursorStore.subscribe((state, prev) => {
-      if (state.selection === prev.selection) return;
-      if (useCollaborationStore.getState().status !== 'connected') return;
-      const sel = state.selection;
-      if (sel) {
-        getCollabClient()?.send({
-          type: 'peer_selection',
-          patternIndex: useTrackerStore.getState().currentPatternIndex,
-          startChannel: sel.startChannel, endChannel: sel.endChannel,
-          startRow: sel.startRow, endRow: sel.endRow,
-        });
-      } else {
-        getCollabClient()?.send({ type: 'peer_selection_clear' });
-      }
-    });
-    return unsub;
-  }, []);
-
-  // B/D Animation handlers
-  const bdAnimations = useBDAnimations();
 
   // Channel Metrics: calculate numChannels, offsets, and widths once per pattern/theme change
   const { numChannels, channelOffsets, channelWidths, totalChannelsWidth } = useMemo(() => {
