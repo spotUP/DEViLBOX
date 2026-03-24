@@ -1,5 +1,18 @@
 # DEViLBOX Project Memory
 
+## CRITICAL: Never Guess or Assume
+
+**!!! ALWAYS CHECK THE FACTS — GO BY THE FACTS !!!**
+
+- **NEVER guess** what code does — read it.
+- **NEVER assume** what a function returns, what state a variable is in, or why something fails — verify it.
+- **NEVER theorize** for multiple paragraphs about what "might" be happening — add diagnostics, build, run, and look at the actual output.
+- **Guessing and assuming takes you nowhere.** It wastes time and leads to wrong fixes.
+- When debugging: add targeted diagnostics → build → run → read the output → act on facts.
+- When implementing: read the actual source code first, not docs or summaries that may be stale.
+
+---
+
 ## CRITICAL: Build Verification Rules
 
 **!!! ALWAYS RUN STRICT BUILD CHECK AFTER CODE CHANGES !!!**
@@ -16,6 +29,30 @@ This runs `tsc -b --force` which catches errors that `npx tsc --noEmit` misses:
 - Other strict mode violations
 
 **DO NOT mark a task complete until `npm run type-check` passes with no errors.**
+
+---
+
+## CRITICAL: DOM/Pixi UI Architecture Rules
+
+**!!! SINGLE SOURCE OF TRUTH — NO DUPLICATED CODE — NO DOM OVERLAYS !!!**
+
+### Shared Data, Separate Renderers
+
+DEViLBOX has two rendering modes: DOM (React HTML) and Pixi/GL (WebGL).
+Both **MUST** share the same data/logic layer but render natively in their own system.
+
+**Architecture:**
+```
+Stores + Hooks (shared)  →  DOM Components (React HTML/canvas)
+                          →  Pixi Components (WebGL scene graph)
+```
+
+### Rules
+
+1. **Share stores and hooks** — `useGTUltraStore`, `useGTUltraFormatData`, etc. are the single source of truth for data. Both DOM and Pixi views consume them.
+2. **Never duplicate logic** — Data transforms, cell change handlers, adapter functions live in shared hooks/utils (e.g., `useGTUltraFormatData.ts`, `gtuAdapter.ts`). Renderers only handle presentation.
+3. **Never use DOM overlays in the Pixi/GL UI** — `PixiDOMOverlay` breaks CRT shaders and post-processing effects. All Pixi views must render natively using Pixi components.
+4. **Pattern editors are modular** — Use `PatternEditorCanvas` (DOM) and `PixiPatternEditor`/format-specific grid (Pixi) with shared format channel data from the adapter layer.
 
 ---
 
