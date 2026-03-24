@@ -18,6 +18,7 @@ import { useShallow } from 'zustand/react/shallow';
 import { notify } from '@stores/useNotificationStore';
 import { useTapTempo } from '@hooks/useTapTempo';
 import { getToneEngine } from '@engine/ToneEngine';
+import { getTrackerReplayer } from '@engine/TrackerReplayer';
 import { getTrackerScratchController } from '@engine/TrackerScratchController';
 import { Maximize2, Minimize2, MousePointerClick, ExternalLink } from 'lucide-react';
 import { focusPopout } from '@components/ui/PopOutWindow';
@@ -601,18 +602,38 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = React.memo(({
             </div>
             <div className="ft2-section ft2-section-playback">
               <Button variant={isPlayingSong ? 'danger' : 'primary'} size="sm"
-                onClick={(e) => { if (isPlayingSong && e.shiftKey) { e.preventDefault(); getTrackerScratchController().triggerPowerCut(); } else { handlePlaySong(); } }}
+                onClick={(e) => {
+                  if (isPlayingSong && e.shiftKey) { e.preventDefault(); getTrackerScratchController().triggerPowerCut(); }
+                  else if (isPlaying && (e.altKey || e.metaKey)) {
+                    // Alt/Option+click or Cmd+click while playing: restart from beginning
+                    e.preventDefault();
+                    const replayer = getTrackerReplayer();
+                    replayer.forcePosition(0, 0);
+                    setIsLooping(false);
+                  }
+                  else { handlePlaySong(); }
+                }}
                 onContextMenu={(e) => {
                   if (isPlayingSong) { e.preventDefault(); getTrackerScratchController().triggerPowerCut(); }
                 }}
-                title={isPlayingSong ? 'Click: Stop · Shift+click/Right-click: Power off' : 'Play Song'}
+                title={isPlayingSong ? 'Click: Stop · Alt+click: Restart · Shift+click: Power off' : 'Play Song'}
                 className="min-w-[72px]">{isPlayingSong ? 'Stop Song' : 'Play Song'}</Button>
               <Button variant={isPlayingPattern ? 'danger' : 'primary'} size="sm"
-                onClick={(e) => { if (isPlayingPattern && e.shiftKey) { e.preventDefault(); getTrackerScratchController().triggerPowerCut(); } else { handlePlayPattern(); } }}
+                onClick={(e) => {
+                  if (isPlayingPattern && e.shiftKey) { e.preventDefault(); getTrackerScratchController().triggerPowerCut(); }
+                  else if (isPlaying && (e.altKey || e.metaKey)) {
+                    // Alt/Option+click or Cmd+click while playing: restart pattern from row 0
+                    e.preventDefault();
+                    const replayer = getTrackerReplayer();
+                    replayer.forcePosition(replayer.getSongPos(), 0);
+                    setIsLooping(true);
+                  }
+                  else { handlePlayPattern(); }
+                }}
                 onContextMenu={(e) => {
                   if (isPlayingPattern) { e.preventDefault(); getTrackerScratchController().triggerPowerCut(); }
                 }}
-                title={isPlayingPattern ? 'Click: Stop · Shift+click/Right-click: Power off' : 'Play Pattern'}
+                title={isPlayingPattern ? 'Click: Stop · Alt+click: Restart · Shift+click: Power off' : 'Play Pattern'}
                 className="min-w-[88px]">{isPlayingPattern ? 'Stop Pattern' : 'Play Pattern'}</Button>
               <Button
                 variant={asidEnabled ? 'primary' : 'default'}
