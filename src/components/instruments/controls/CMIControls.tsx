@@ -101,7 +101,7 @@ const HarmonicBarsCanvas: React.FC<{
       ref={canvasRef}
       width={width}
       height={height}
-      style={{ cursor: 'crosshair', borderRadius: 4 }}
+      style={{ cursor: 'crosshair', borderRadius: 4, width, height }}
       onMouseDown={(e) => { const c = getRelativeCoords(e); onStartDrag(c.nx, c.ny); }}
       onMouseMove={(e) => { if (dragActive.current) { const c = getRelativeCoords(e); onDrag(c.nx, c.ny); } }}
       onMouseUp={onEndDrag}
@@ -156,7 +156,7 @@ const WaveformCanvas: React.FC<{
     ctx.strokeRect(0, 0, width, height);
   }, [waveform, width, height]);
 
-  return <canvas ref={canvasRef} width={width} height={height} style={{ borderRadius: 4 }} />;
+  return <canvas ref={canvasRef} width={width} height={height} style={{ width, height, borderRadius: 4 }} />;
 };
 
 // ── Canvas: Filter Response ──────────────────────────────────────────────────
@@ -216,7 +216,7 @@ const FilterCanvas: React.FC<{
     ctx.strokeRect(0, 0, width, height);
   }, [cutoff, width, height]);
 
-  return <canvas ref={canvasRef} width={width} height={height} style={{ borderRadius: 4 }} />;
+  return <canvas ref={canvasRef} width={width} height={height} style={{ width, height, borderRadius: 4 }} />;
 };
 
 // ── Canvas: Envelope ─────────────────────────────────────────────────────────
@@ -263,7 +263,7 @@ const EnvelopeCanvas: React.FC<{
     ctx.strokeRect(0, 0, width, height);
   }, [curve, width, height]);
 
-  return <canvas ref={canvasRef} width={width} height={height} style={{ borderRadius: 4 }} />;
+  return <canvas ref={canvasRef} width={width} height={height} style={{ width, height, borderRadius: 4 }} />;
 };
 
 // ── Main Component ───────────────────────────────────────────────────────────
@@ -293,7 +293,6 @@ export const CMIControls: React.FC<CMIControlsProps> = ({
   }, [cmi]);
 
   const VIS_W = 420;
-  const CURVE_H = 160;
   const BAR_H = 140;
   const WAVE_PREVIEW_H = 60;
 
@@ -341,67 +340,77 @@ export const CMIControls: React.FC<CMIControlsProps> = ({
 
         {/* ════════════ Page 7: HARMONIC ════════════ */}
         {cmi.activeTab === 'harmonic' && (
-          <div className="flex gap-3">
-            <div className="flex flex-col gap-1">
-              <HarmonicBarsCanvas
-                harmonics={cmi.harmonics}
-                width={VIS_W}
-                height={BAR_H}
-                onStartDrag={cmi.startHarmonicDrag}
-                onDrag={cmi.updateHarmonicAt}
-                onEndDrag={cmi.endHarmonicDrag}
-                dragActive={cmi.harmonicDragActive}
-              />
-              <WaveformCanvas waveform={cmi.customWaveform} width={VIS_W} height={WAVE_PREVIEW_H} />
-              <div className="flex items-center gap-2 mt-1">
-                <button
-                  onClick={cmi.syncHarmonicsToEngine}
-                  className="px-3 py-1 text-[10px] font-mono font-bold rounded-sm transition-all"
-                  style={{ color: '#000', backgroundColor: CMI_GREEN, border: `1px solid ${CMI_GREEN}` }}
-                >
-                  APPLY TO ENGINE
-                </button>
-                <span className="text-[9px] font-mono" style={{ color: CMI_GREEN_DIM }}>
-                  {cmi.sampleLoaded ? `Loaded: ${cmi.sampleName}` : 'Draw harmonics then click Apply'}
-                </span>
-              </div>
+          <div className="flex flex-col gap-3">
+            <div className="flex flex-wrap gap-3">
+              <Knob value={cmi.volume} min={0} max={255} onChange={(v) => cmi.handleParamChange('volume', v)} label="Volume" size="sm" color={CMI_GREEN} formatValue={fmtInt} />
+              <Knob value={cmi.waveSelect} min={0} max={7} onChange={(v) => cmi.handleParamChange('wave_select', v)} label="Wave" size="sm" color={CMI_GREEN} formatValue={fmtWave} />
             </div>
-            <div className="flex flex-col gap-1 pt-1">
-              <div className="text-[9px] font-mono font-bold mb-1" style={{ color: CMI_GREEN_DIM }}>PRESETS</div>
-              {WAVE_NAMES.map((name, i) => (
-                <button
-                  key={i}
-                  onClick={() => cmi.selectWavePreset(i)}
-                  className="px-2 py-0.5 text-[10px] font-mono rounded-sm text-left transition-all"
-                  style={{
-                    color: cmi.waveBank === i ? '#000' : CMI_GREEN,
-                    backgroundColor: cmi.waveBank === i ? CMI_GREEN : 'transparent',
-                    border: `1px solid ${cmi.waveBank === i ? CMI_GREEN : CMI_GREEN_DIM}`,
-                  }}
-                >
-                  {name.toUpperCase()}
-                </button>
-              ))}
+            <div className="flex gap-3">
+              <div className="flex flex-col gap-1">
+                <HarmonicBarsCanvas
+                  harmonics={cmi.harmonics}
+                  width={VIS_W}
+                  height={BAR_H}
+                  onStartDrag={cmi.startHarmonicDrag}
+                  onDrag={cmi.updateHarmonicAt}
+                  onEndDrag={cmi.endHarmonicDrag}
+                  dragActive={cmi.harmonicDragActive}
+                />
+                <WaveformCanvas waveform={cmi.customWaveform} width={VIS_W} height={WAVE_PREVIEW_H} />
+                <div className="flex items-center gap-2 mt-1">
+                  <button
+                    onClick={cmi.syncHarmonicsToEngine}
+                    className="px-3 py-1 text-[10px] font-mono font-bold rounded-sm transition-all"
+                    style={{ color: '#000', backgroundColor: CMI_GREEN, border: `1px solid ${CMI_GREEN}` }}
+                  >
+                    APPLY TO ENGINE
+                  </button>
+                  <span className="text-[9px] font-mono" style={{ color: CMI_GREEN_DIM }}>
+                    {cmi.sampleLoaded ? `Loaded: ${cmi.sampleName}` : 'Draw harmonics then click Apply'}
+                  </span>
+                </div>
+              </div>
+              <div className="flex flex-col gap-1 pt-1">
+                <div className="text-[9px] font-mono font-bold mb-1" style={{ color: CMI_GREEN_DIM }}>PRESETS</div>
+                {WAVE_NAMES.map((name, i) => (
+                  <button
+                    key={i}
+                    onClick={() => cmi.selectWavePreset(i)}
+                    className="px-2 py-0.5 text-[10px] font-mono rounded-sm text-left transition-all"
+                    style={{
+                      color: cmi.waveBank === i ? '#000' : CMI_GREEN,
+                      backgroundColor: cmi.waveBank === i ? CMI_GREEN : 'transparent',
+                      border: `1px solid ${cmi.waveBank === i ? CMI_GREEN : CMI_GREEN_DIM}`,
+                    }}
+                  >
+                    {name.toUpperCase()}
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
         )}
 
         {/* ════════════ Page 5: WAVE ════════════ */}
         {cmi.activeTab === 'wave' && (
-          <div className="flex gap-4">
+          <div className="flex flex-col gap-3">
+            <div className="flex flex-wrap gap-3">
+              <Knob value={cmi.waveSelect} min={0} max={7} onChange={(v) => cmi.handleParamChange('wave_select', v)} label="Wave" size="sm" color={CMI_GREEN} formatValue={fmtWave} />
+              <Knob value={cmi.volume} min={0} max={255} onChange={(v) => cmi.handleParamChange('volume', v)} label="Volume" size="sm" color={CMI_GREEN} formatValue={fmtInt} />
+            </div>
             <div className="flex flex-col gap-1">
               {/* Sample drop zone / waveform display */}
               <div
                 className="relative cursor-pointer rounded"
-                style={{ border: `1px dashed ${CMI_GREEN_DIM}`, width: VIS_W, height: CURVE_H }}
+                style={{ border: `1px dashed ${CMI_GREEN_DIM}`, width: VIS_W, height: 120 }}
                 onDragOver={(e) => e.preventDefault()}
                 onDrop={handleFileDrop}
                 onClick={() => fileInputRef.current?.click()}
               >
                 {cmi.sampleLoaded && cmi.sampleWaveform ? (
-                  <WaveformCanvas waveform={cmi.sampleWaveform} width={VIS_W} height={CURVE_H} />
+                  <WaveformCanvas waveform={cmi.sampleWaveform} width={VIS_W} height={120} />
                 ) : (
-                  <WaveformCanvas waveform={cmi.builtinWaveform} width={VIS_W} height={CURVE_H} />
+                  <WaveformCanvas waveform={cmi.builtinWaveform} width={VIS_W} height={120} />
                 )}
                 {!cmi.sampleLoaded && (
                   <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
@@ -420,10 +429,6 @@ export const CMIControls: React.FC<CMIControlsProps> = ({
                   {WAVE_SAMPLES} samples | 8-bit unsigned PCM | 16KB/voice
                 </div>
               </div>
-            </div>
-            <div className="flex flex-col gap-3 pt-4">
-              <Knob value={cmi.waveSelect} min={0} max={7} onChange={(v) => cmi.handleParamChange('wave_select', v)} label="Wave" size="md" color={CMI_GREEN} formatValue={fmtWave} />
-              <Knob value={cmi.volume} min={0} max={255} onChange={(v) => cmi.handleParamChange('volume', v)} label="Volume" size="md" color={CMI_GREEN} formatValue={fmtInt} />
             </div>
           </div>
         )}
@@ -455,39 +460,39 @@ export const CMIControls: React.FC<CMIControlsProps> = ({
 
         {/* ════════════ Page F: FILTER ════════════ */}
         {cmi.activeTab === 'filter' && (
-          <div className="flex gap-4">
+          <div className="flex flex-col gap-3">
+            <div className="flex flex-wrap gap-3">
+              <Knob value={cmi.cutoff} min={0} max={255} onChange={(v) => cmi.handleParamChange('filter_cutoff', v)} label="Cutoff" size="sm" color={CMI_GREEN} formatValue={fmtCutoff} />
+              <Knob value={cmi.filterTrack} min={0} max={255} onChange={(v) => cmi.handleParamChange('filter_track', v)} label="Key Track" size="sm" color={CMI_GREEN} formatValue={fmtTrack} />
+            </div>
             <div className="flex flex-col gap-1">
               <div className="text-[10px] font-mono font-bold" style={{ color: CMI_GREEN }}>
                 SSM2045 x2 CASCADED LOWPASS (-24dB/oct)
               </div>
-              <FilterCanvas cutoff={cmi.cutoff} width={VIS_W} height={CURVE_H} />
+              <FilterCanvas cutoff={cmi.cutoff} width={VIS_W} height={120} />
               <div className="text-[9px] font-mono" style={{ color: CMI_GREEN_DIM }}>
                 Cutoff: {formatCutoffHz(cmi.cutoff)}Hz | Max: 14kHz
               </div>
-            </div>
-            <div className="flex flex-col gap-3 pt-4">
-              <Knob value={cmi.cutoff} min={0} max={255} onChange={(v) => cmi.handleParamChange('filter_cutoff', v)} label="Cutoff" size="lg" color={CMI_GREEN} formatValue={fmtCutoff} unit="Hz" />
-              <Knob value={cmi.filterTrack} min={0} max={255} onChange={(v) => cmi.handleParamChange('filter_track', v)} label="Key Track" size="md" color={CMI_GREEN} formatValue={fmtTrack} />
             </div>
           </div>
         )}
 
         {/* ════════════ Page E: ENVELOPE ════════════ */}
         {cmi.activeTab === 'envelope' && (
-          <div className="flex gap-4">
+          <div className="flex flex-col gap-3">
+            <div className="flex flex-wrap gap-3">
+              <Knob value={cmi.attackTime} min={0} max={255} onChange={(v) => cmi.handleParamChange('attack_time', v)} label="Attack" size="sm" color={CMI_GREEN} formatValue={fmtInt} />
+              <Knob value={cmi.releaseTime} min={0} max={255} onChange={(v) => cmi.handleParamChange('release_time', v)} label="Release" size="sm" color={CMI_GREEN} formatValue={fmtInt} />
+              <Knob value={cmi.envRate} min={0} max={255} onChange={(v) => cmi.handleParamChange('envelope_rate', v)} label="Rate" size="sm" color={CMI_GREEN} formatValue={fmtInt} />
+            </div>
             <div className="flex flex-col gap-1">
               <div className="text-[10px] font-mono font-bold" style={{ color: CMI_GREEN }}>
                 HARDWARE ENVELOPE GENERATOR
               </div>
-              <EnvelopeCanvas curve={cmi.envelopeCurve} width={VIS_W} height={CURVE_H} />
+              <EnvelopeCanvas curve={cmi.envelopeCurve} width={VIS_W} height={120} />
               <div className="text-[9px] font-mono" style={{ color: CMI_GREEN_DIM }}>
                 8-bit up/down counter | 6-bit divider chain | PTM6840 timer-driven
               </div>
-            </div>
-            <div className="flex flex-col gap-3 pt-4">
-              <Knob value={cmi.attackTime} min={0} max={255} onChange={(v) => cmi.handleParamChange('attack_time', v)} label="Attack" size="lg" color={CMI_GREEN} formatValue={fmtInt} />
-              <Knob value={cmi.releaseTime} min={0} max={255} onChange={(v) => cmi.handleParamChange('release_time', v)} label="Release" size="lg" color={CMI_GREEN} formatValue={fmtInt} />
-              <Knob value={cmi.envRate} min={0} max={255} onChange={(v) => cmi.handleParamChange('envelope_rate', v)} label="Rate" size="lg" color={CMI_GREEN} formatValue={fmtInt} />
             </div>
           </div>
         )}

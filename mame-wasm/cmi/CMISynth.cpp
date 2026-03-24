@@ -551,6 +551,7 @@ struct CMI01A {
 
     // Envelope
     uint8_t  env;
+    double   env_acc;  // smooth accumulator (avoids uint8_t truncation)
     uint8_t  rp;
     int      env_dir;
     bool     tri;
@@ -655,6 +656,7 @@ struct CMI01A {
         vol_latch = 0;
         flt_latch = 0;
         env = 0;
+        env_acc = 0.0;
         rp = 0;
         env_dir = ENV_DIR_UP;
         tri = false;
@@ -1136,6 +1138,7 @@ public:
         v.sample_phase = 0;
         v.ha0 = v.ha1 = v.hb0 = v.hb1 = v.hc0 = v.hc1 = 0;
         v.env = 0;
+        v.env_acc = 0.0;
         v.env_dir = ENV_DIR_UP;
         v.tri = false;
         v.rp = 200; // High envelope rate for attack
@@ -1163,6 +1166,7 @@ public:
             m_voices[i].active = false;
             m_voices[i].m_run = false;
             m_voices[i].env = 0;
+            m_voices[i].env_acc = 0.0;
         }
     }
 
@@ -1220,20 +1224,23 @@ public:
             if (!v.active) continue;
 
             for (int s = 0; s < numSamples; s++) {
-                // Simple envelope for attack/release (driven by sample clock)
+                // Envelope attack/release using double accumulator
                 if (!v.in_release) {
-                    if (v.env < 255) {
+                    if (v.env_acc < 255.0) {
                         double inc = 255.0 / (std::max(0.001, m_globalAttack) * m_sampleRate);
-                        v.env = (uint8_t)std::min(255.0, (double)v.env + inc);
+                        v.env_acc = std::min(255.0, v.env_acc + inc);
+                        v.env = (uint8_t)v.env_acc;
                     }
                 } else {
-                    if (v.env > 0) {
+                    if (v.env_acc > 0.0) {
                         double dec = 255.0 / (std::max(0.001, m_globalRelease) * m_sampleRate);
-                        int newEnv = (int)v.env - (int)std::max(1.0, dec);
-                        v.env = (uint8_t)std::max(0, newEnv);
-                        if (v.env == 0) {
+                        v.env_acc = std::max(0.0, v.env_acc - dec);
+                        v.env = (uint8_t)v.env_acc;
+                        if (v.env_acc < 0.5) {
                             v.active = false;
                             v.m_run = false;
+                            v.env = 0;
+                            v.env_acc = 0.0;
                             break;
                         }
                     }
