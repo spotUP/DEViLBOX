@@ -6,6 +6,7 @@
  */
 
 import React, { useCallback, useState, lazy, Suspense } from 'react';
+import { useGTUltraStore } from '@stores/useGTUltraStore';
 import type { InstrumentConfig, EffectConfig } from '@typedefs/instrument';
 import type { GTUltraConfig } from '@typedefs/instrument/exotic';
 import {
@@ -344,13 +345,25 @@ export const SynthTypeDispatcher: React.FC<SynthTypeDispatcherProps> = ({
     handleChange({ hively: fullConfig });
   }, [handleChange]);
 
-  // Handle GTUltra config updates
+  // Handle GTUltra config updates — push to WASM engine too
   const handleGTUltraChange = useCallback((updates: Partial<GTUltraConfig>) => {
     const current = instrument.gtUltra || DEFAULT_GTULTRA;
-    handleChange({
-      gtUltra: { ...current, ...updates },
-    });
-  }, [instrument.gtUltra, handleChange]);
+    const newConfig = { ...current, ...updates };
+    handleChange({ gtUltra: newConfig });
+
+    // Push to WASM engine
+    const engine = useGTUltraStore.getState().engine;
+    if (engine) {
+      const idx = instrument.id;
+      if ('ad' in updates) engine.setInstrumentAD(idx, newConfig.ad);
+      if ('sr' in updates) engine.setInstrumentSR(idx, newConfig.sr);
+      if ('firstwave' in updates) engine.setInstrumentFirstwave(idx, newConfig.firstwave);
+      if ('wavePtr' in updates) engine.setInstrumentTablePtr(idx, 0, newConfig.wavePtr);
+      if ('pulsePtr' in updates) engine.setInstrumentTablePtr(idx, 1, newConfig.pulsePtr);
+      if ('filterPtr' in updates) engine.setInstrumentTablePtr(idx, 2, newConfig.filterPtr);
+      if ('speedPtr' in updates) engine.setInstrumentTablePtr(idx, 3, newConfig.speedPtr);
+    }
+  }, [instrument.gtUltra, instrument.id, handleChange]);
 
   // Handle JamCracker config updates
   /** Helper: update an Amiga synth config and push live to the running WASM engine */

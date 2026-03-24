@@ -1,16 +1,17 @@
 /**
- * PixiGTUltraView — Top-level GoatTracker Ultra editor in WebGL/Pixi.
+ * PixiGTUltraView — GoatTracker Ultra editor in WebGL/Pixi.
  *
- * Layout:
- * ┌──────────────────────────────────────────────────┐
- * │ Toolbar (song info, transport, SID config)       │
- * ├────────────────────────────┬─────────────────────┤
- * │                            │ Order List          │
- * │  Pattern Editor (MegaText) ├─────────────────────┤
- * │  3 or 6 channels           │ Instrument panel    │
- * │                            ├─────────────────────┤
- * │                            │ Table editor        │
- * └────────────────────────────┴─────────────────────┘
+ * AHX-style layout (matching DOM GTUltraView):
+ * ┌──────────────────────────────────────────────┐
+ * │ Toolbar (song info, octave, step, REC/JAM)   │  32px
+ * ├──────────────────────────────────────────────┤
+ * │ PixiGTOrderList (per-channel order lists)     │  ORDER_H
+ * ├──────────────────────────────────────────────┤
+ * │ PixiGTPatternGrid (fills remaining)           │  flex
+ * └──────────────────────────────────────────────┘
+ *
+ * Instruments are in the standard DEViLBOX instrument panel (right sidebar)
+ * via GTUltraControls in the SynthTypeDispatcher. No custom sidebar needed.
  */
 
 import React, { useCallback, useMemo } from 'react';
@@ -19,22 +20,13 @@ import { PIXI_FONTS } from '@/pixi/fonts';
 import { usePixiTheme } from '@/pixi/theme';
 import { PixiGTPatternGrid } from './PixiGTPatternGrid';
 import { PixiGTOrderList } from './PixiGTOrderList';
-import { PixiGTInstrumentPanel } from './PixiGTInstrumentPanel';
-import { PixiGTTableEditor } from './PixiGTTableEditor';
-import { PixiGTSIDMonitor } from './PixiGTSIDMonitor';
-import { PixiGTOscilloscope } from './PixiGTOscilloscope';
-import { PixiGTStudioInstrument } from './PixiGTStudioInstrument';
-import { PixiGTStudioTables } from './PixiGTStudioTables';
-import { PixiGTPianoRoll } from './PixiGTPianoRoll';
-import { PixiGTPresetBrowser } from './PixiGTPresetBrowser';
 import { useGTUltraStore } from '@/stores/useGTUltraStore';
 import { useGTKeyboardHandler } from '@/components/gtultra/GTKeyboardHandler';
 import { useGTUltraEngineInit } from '@/engine/gtultra/useGTUltraEngineInit';
 
 const TOOLBAR_H = 32;
-const SIDEBAR_W = 280;
+const ORDER_H = 160;
 
-// GoatTracker color palette
 const GT_BG        = 0x0d0d0d;
 const GT_TOOLBAR   = 0x1a1a1a;
 const GT_ACCENT    = 0xe94560;
@@ -50,8 +42,8 @@ interface Props {
 export const PixiGTUltraView: React.FC<Props> = ({ width, height }) => {
   const theme = usePixiTheme();
 
-  // Wire GT keyboard handler (note entry, block ops, transport, undo/redo)
   useGTKeyboardHandler(true);
+  useGTUltraEngineInit();
 
   const songName = useGTUltraStore((s) => s.songName);
   const songAuthor = useGTUltraStore((s) => s.songAuthor);
@@ -61,37 +53,13 @@ export const PixiGTUltraView: React.FC<Props> = ({ width, height }) => {
   const playbackPos = useGTUltraStore((s) => s.playbackPos);
   const followPlay = useGTUltraStore((s) => s.followPlay);
   const engine = useGTUltraStore((s) => s.engine);
-  const viewMode = useGTUltraStore((s) => s.viewMode);
   const currentOctave = useGTUltraStore((s) => s.currentOctave);
   const editStep = useGTUltraStore((s) => s.editStep);
   const recordMode = useGTUltraStore((s) => s.recordMode);
   const jamMode = useGTUltraStore((s) => s.jamMode);
-  const currentSong = useGTUltraStore((s) => s.currentSong);
-  const patternLength = useGTUltraStore((s) => s.patternLength);
 
-  // Initialize engine (shared hook — single source of truth)
-  useGTUltraEngineInit();
+  const patternHeight = height - TOOLBAR_H - ORDER_H;
 
-  const editorWidth = width - SIDEBAR_W;
-  const editorHeight = height - TOOLBAR_H;
-  const oscH = 80;
-  // Pro mode layout
-  const orderH = Math.floor((editorHeight - oscH) * 0.2);
-  const instrH = Math.floor((editorHeight - oscH) * 0.3);
-  const sideRemain = editorHeight - oscH - orderH - instrH;
-  const tableH = Math.floor(sideRemain * (sidCount === 2 ? 0.33 : 0.5));
-  const regMonTotal = sideRemain - tableH;
-  const regMonH = sidCount === 2 ? Math.floor(regMonTotal / 2) : regMonTotal;
-  const regMon2H = regMonTotal - regMonH;
-  // Studio mode layout
-  const studioInstrH = Math.floor((editorHeight - oscH) * 0.3);
-  const studioPresetH = Math.floor((editorHeight - oscH) * 0.22);
-  const studioTableH = Math.floor((editorHeight - oscH) * (sidCount === 2 ? 0.18 : 0.25));
-  const studioRegTotal = editorHeight - oscH - studioInstrH - studioPresetH - studioTableH;
-  const studioRegH = sidCount === 2 ? Math.floor(studioRegTotal / 2) : studioRegTotal;
-  const studioReg2H = studioRegTotal - studioRegH;
-
-  // Toolbar info
   const infoText = useMemo(() => {
     const pos = playbackPos.position.toString(16).toUpperCase().padStart(2, '0');
     const row = playbackPos.row.toString(16).toUpperCase().padStart(2, '0');
@@ -100,19 +68,9 @@ export const PixiGTUltraView: React.FC<Props> = ({ width, height }) => {
     return `Pos:${pos} Row:${row} | ${sid} ${ch}ch | Tempo:${tempo}`;
   }, [playbackPos, sidModel, sidCount, tempo]);
 
-  const octaveText = useMemo(() => `Oct:${currentOctave}`, [currentOctave]);
-  const stepText = useMemo(() => `Stp:${editStep}`, [editStep]);
-  const songText = useMemo(() => `Song:${currentSong}`, [currentSong]);
-  const plenText = useMemo(() => `Len:${patternLength.toString(16).toUpperCase()}`, [patternLength]);
-
   const toggleFollow = useCallback(() => {
     useGTUltraStore.getState().setFollowPlay(!followPlay);
   }, [followPlay]);
-
-  const toggleViewMode = useCallback(() => {
-    const store = useGTUltraStore.getState();
-    store.setViewMode(store.viewMode === 'pro' ? 'studio' : 'pro');
-  }, []);
 
   const toggleRecord = useCallback(() => {
     useGTUltraStore.getState().setRecordMode(!recordMode);
@@ -132,16 +90,6 @@ export const PixiGTUltraView: React.FC<Props> = ({ width, height }) => {
     useGTUltraStore.getState().setEditStep(next);
   }, [editStep]);
 
-  const handleApplyPreset = useCallback((preset: import('@/constants/gtultraPresets').GTSIDPreset) => {
-    if (!engine) return;
-    const idx = useGTUltraStore.getState().currentInstrument;
-    engine.setInstrumentAD(idx, preset.ad);
-    engine.setInstrumentSR(idx, preset.sr);
-    engine.setInstrumentFirstwave(idx, preset.waveform | 0x01); // set gate bit
-    engine.requestInstrumentData(idx);
-  }, [engine]);
-
-  // Draw callbacks
   const drawBg = useCallback((g: GraphicsType) => {
     g.clear();
     g.rect(0, 0, width, height).fill({ color: GT_BG });
@@ -153,20 +101,13 @@ export const PixiGTUltraView: React.FC<Props> = ({ width, height }) => {
     g.rect(0, TOOLBAR_H - 1, width, 1).fill({ color: GT_SEP });
   }, [width]);
 
-  const drawSidebarSep = useCallback((g: GraphicsType) => {
-    g.clear();
-    g.rect(editorWidth - 1, 0, 1, editorHeight).fill({ color: GT_SEP });
-  }, [editorWidth, editorHeight]);
-
-  // Always render the same tree structure to avoid @pixi/layout yoga BindingErrors.
-  // Use alpha/renderable to hide content when engine is not yet loaded.
   const ready = !!engine;
 
   return (
     <pixiContainer layout={{ width, height, flexDirection: 'column' }}>
       <pixiGraphics draw={drawBg} layout={{ position: 'absolute', width, height }} />
 
-      {/* Initializing overlay — shown when engine is not yet loaded */}
+      {/* Initializing overlay */}
       <pixiContainer
         alpha={ready ? 0 : 1}
         renderable={!ready}
@@ -195,14 +136,12 @@ export const PixiGTUltraView: React.FC<Props> = ({ width, height }) => {
       >
         <pixiGraphics draw={drawToolbar} layout={{ position: 'absolute', width, height: TOOLBAR_H }} />
 
-        {/* Song name */}
         <pixiBitmapText
           text={songName || 'Untitled'}
           style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 11, fill: 0xffffff }}
           tint={GT_ACCENT}
         />
 
-        {/* Always mount to avoid Yoga BindingError — hide via alpha */}
         <pixiBitmapText
           text={songAuthor ? `by ${songAuthor}` : ''}
           alpha={songAuthor ? 1 : 0}
@@ -214,7 +153,7 @@ export const PixiGTUltraView: React.FC<Props> = ({ width, height }) => {
         <pixiContainer eventMode="static" cursor="pointer" onPointerUp={() => cycleOctave(-1)}>
           <pixiBitmapText eventMode="none" text="-" style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 10, fill: 0xffffff }} tint={GT_TEXT_DIM} />
         </pixiContainer>
-        <pixiBitmapText text={octaveText} style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 10, fill: 0xffffff }} tint={theme.textSecondary.color} />
+        <pixiBitmapText text={`Oct:${currentOctave}`} style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 10, fill: 0xffffff }} tint={theme.textSecondary.color} />
         <pixiContainer eventMode="static" cursor="pointer" onPointerUp={() => cycleOctave(1)}>
           <pixiBitmapText eventMode="none" text="+" style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 10, fill: 0xffffff }} tint={GT_TEXT_DIM} />
         </pixiContainer>
@@ -223,24 +162,18 @@ export const PixiGTUltraView: React.FC<Props> = ({ width, height }) => {
         <pixiContainer eventMode="static" cursor="pointer" onPointerUp={() => cycleStep(-1)}>
           <pixiBitmapText eventMode="none" text="-" style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 10, fill: 0xffffff }} tint={GT_TEXT_DIM} />
         </pixiContainer>
-        <pixiBitmapText text={stepText} style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 10, fill: 0xffffff }} tint={theme.textSecondary.color} />
+        <pixiBitmapText text={`Stp:${editStep}`} style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 10, fill: 0xffffff }} tint={theme.textSecondary.color} />
         <pixiContainer eventMode="static" cursor="pointer" onPointerUp={() => cycleStep(1)}>
           <pixiBitmapText eventMode="none" text="+" style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 10, fill: 0xffffff }} tint={GT_TEXT_DIM} />
         </pixiContainer>
 
-        {/* Record mode */}
+        {/* Record / Jam */}
         <pixiContainer eventMode="static" cursor="pointer" onPointerUp={toggleRecord}>
           <pixiBitmapText eventMode="none" text={recordMode ? '[REC]' : '[rec]'} style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 10, fill: 0xffffff }} tint={recordMode ? 0xef4444 : GT_TEXT_DIM} />
         </pixiContainer>
-
-        {/* Jam mode */}
         <pixiContainer eventMode="static" cursor="pointer" onPointerUp={toggleJam}>
           <pixiBitmapText eventMode="none" text={jamMode ? '[JAM]' : '[jam]'} style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 10, fill: 0xffffff }} tint={jamMode ? GT_GREEN : GT_TEXT_DIM} />
         </pixiContainer>
-
-        {/* Song / Pattern length */}
-        <pixiBitmapText text={songText} style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 10, fill: 0xffffff }} tint={GT_TEXT_DIM} />
-        <pixiBitmapText text={plenText} style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 10, fill: 0xffffff }} tint={GT_TEXT_DIM} />
 
         <pixiContainer layout={{ flex: 1 }} />
 
@@ -254,73 +187,20 @@ export const PixiGTUltraView: React.FC<Props> = ({ width, height }) => {
           />
         </pixiContainer>
 
-        {/* Pro/Studio mode switcher */}
-        <pixiContainer eventMode="static" cursor="pointer" onPointerUp={toggleViewMode}>
-          <pixiBitmapText
-            eventMode="none"
-            text={viewMode === 'pro' ? '[PRO]' : '[STUDIO]'}
-            style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 10, fill: 0xffffff }}
-            tint={viewMode === 'pro' ? GT_ACCENT : GT_GREEN}
-          />
-        </pixiContainer>
-
-        {/* Info */}
-        <pixiBitmapText
-          text={infoText}
-          style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 10, fill: 0xffffff }}
-          tint={GT_TEXT_DIM}
-        />
+        <pixiBitmapText text={infoText} style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 10, fill: 0xffffff }} tint={GT_TEXT_DIM} />
       </pixiContainer>
 
-      {/* ─── Main area ─── */}
-      <pixiContainer alpha={ready ? 1 : 0} renderable={ready} layout={{ flexDirection: 'row', flex: 1, width, height: editorHeight }}>
-        {/* Pattern editor: hex grid in Pro, piano roll in Studio.
-            Both always mounted to avoid @pixi/layout Yoga BindingErrors
-            when switching modes. Inactive view hidden via alpha/renderable. */}
-        <pixiContainer alpha={viewMode === 'pro' ? 1 : 0} renderable={viewMode === 'pro'} eventMode={viewMode === 'pro' ? 'static' : 'none'} layout={{ width: editorWidth, height: editorHeight }}>
-          <PixiGTPatternGrid
-            width={Math.max(100, editorWidth)}
-            height={Math.max(100, editorHeight)}
-          />
-        </pixiContainer>
-        <pixiContainer alpha={viewMode !== 'pro' ? 1 : 0} renderable={viewMode !== 'pro'} eventMode={viewMode !== 'pro' ? 'static' : 'none'} layout={{ position: 'absolute', top: 0, left: 0, width: editorWidth, height: editorHeight }}>
-          <PixiGTPianoRoll
-            width={Math.max(100, editorWidth)}
-            height={Math.max(100, editorHeight)}
-          />
-        </pixiContainer>
+      {/* ─── Order List (AHX-style position editor) ─── */}
+      <pixiContainer alpha={ready ? 1 : 0} renderable={ready} layout={{ width, height: ORDER_H }}>
+        <PixiGTOrderList width={width} height={ORDER_H} />
+      </pixiContainer>
 
-        {/* Sidebar separator */}
-        <pixiGraphics draw={drawSidebarSep} layout={{ position: 'absolute', left: editorWidth, width: 1, height: editorHeight }} />
-
-        {/* Sidebar */}
-        <pixiContainer layout={{ width: SIDEBAR_W, flexDirection: 'column' }}>
-          <PixiGTOscilloscope
-            width={SIDEBAR_W}
-            height={oscH}
-          />
-          {/* Always mount both sidebar modes to avoid Yoga BindingErrors */}
-          <pixiContainer alpha={viewMode === 'pro' ? 1 : 0} renderable={viewMode === 'pro'} eventMode={viewMode === 'pro' ? 'static' : 'none'} layout={{ width: SIDEBAR_W, flexDirection: 'column' }}>
-            {/* Pro mode: hex-based editors */}
-            <PixiGTOrderList width={SIDEBAR_W} height={orderH} />
-            <PixiGTInstrumentPanel width={SIDEBAR_W} height={instrH} />
-            <PixiGTTableEditor width={SIDEBAR_W} height={tableH} />
-            <PixiGTSIDMonitor width={SIDEBAR_W} height={regMonH} sidIndex={0} />
-            <pixiContainer alpha={sidCount === 2 ? 1 : 0} renderable={sidCount === 2} layout={{ height: sidCount === 2 ? regMon2H : 0 }}>
-              <PixiGTSIDMonitor width={SIDEBAR_W} height={regMon2H} sidIndex={1} />
-            </pixiContainer>
-          </pixiContainer>
-          <pixiContainer alpha={viewMode !== 'pro' ? 1 : 0} renderable={viewMode !== 'pro'} eventMode={viewMode !== 'pro' ? 'static' : 'none'} layout={{ position: 'absolute', top: oscH, width: SIDEBAR_W, flexDirection: 'column' }}>
-            {/* Studio mode: visual instrument designer + presets + visual tables + register monitor */}
-            <PixiGTStudioInstrument width={SIDEBAR_W} height={studioInstrH} />
-            <PixiGTPresetBrowser width={SIDEBAR_W} height={studioPresetH} onApplyPreset={handleApplyPreset} />
-            <PixiGTStudioTables width={SIDEBAR_W} height={studioTableH} />
-            <PixiGTSIDMonitor width={SIDEBAR_W} height={studioRegH} sidIndex={0} />
-            <pixiContainer alpha={sidCount === 2 ? 1 : 0} renderable={sidCount === 2} layout={{ height: sidCount === 2 ? studioReg2H : 0 }}>
-              <PixiGTSIDMonitor width={SIDEBAR_W} height={studioReg2H} sidIndex={1} />
-            </pixiContainer>
-          </pixiContainer>
-        </pixiContainer>
+      {/* ─── Pattern Grid (fills remaining space) ─── */}
+      <pixiContainer alpha={ready ? 1 : 0} renderable={ready} layout={{ width, flex: 1 }}>
+        <PixiGTPatternGrid
+          width={Math.max(100, width)}
+          height={Math.max(100, patternHeight)}
+        />
       </pixiContainer>
     </pixiContainer>
   );
