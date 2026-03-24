@@ -60,7 +60,31 @@ export function useGTUltraEngineInit(): void {
         onAsidWrite: (chip, reg, value) => getGTUltraASIDBridge().writeRegister(chip, reg, value),
         onPatternData: (pattern, length, data) => useGTUltraStore.getState().updatePatternData(pattern, length, data),
         onOrderData: (channel, data) => useGTUltraStore.getState().updateOrderData(channel, data),
-        onInstrumentData: (instrument, data) => useGTUltraStore.getState().updateInstrumentData(instrument, data),
+        onInstrumentData: (instrument, data) => {
+          useGTUltraStore.getState().updateInstrumentData(instrument, data);
+          // Sync to DEViLBOX instrument store
+          const instStore = useInstrumentStore.getState();
+          const existing = instStore.instruments.find(i => i.id === instrument);
+          if (existing && existing.synthType === 'GTUltraSynth') {
+            const instView = useGTUltraStore.getState().instrumentData[instrument];
+            if (instView) {
+              instStore.updateInstrument(instrument, {
+                gtUltra: {
+                  ad: instView.ad,
+                  sr: instView.sr,
+                  vibdelay: instView.vibdelay,
+                  gatetimer: instView.gatetimer,
+                  firstwave: instView.firstwave,
+                  name: instView.name || '',
+                  wavePtr: instView.wavePtr,
+                  pulsePtr: instView.pulsePtr,
+                  filterPtr: instView.filterPtr,
+                  speedPtr: instView.speedPtr,
+                },
+              });
+            }
+          }
+        },
         onTableData: (tableType, left, right) => useGTUltraStore.getState().updateTableData(tableType, left, right),
         onSidRegisters: (sidIdx, data) => useGTUltraStore.getState().updateSidRegisters(sidIdx, data),
         onSongInfo: (info) => {

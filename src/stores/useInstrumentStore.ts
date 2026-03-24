@@ -282,7 +282,8 @@ export const useInstrumentStore = create<InstrumentStore>()(
         updates.gearmulator ||
         updates.parameters ||
         updates.sample ||
-        updates.superCollider
+        updates.superCollider ||
+        updates.gtUltra
       );
 
       set((state) => {
