@@ -192,6 +192,20 @@ public:
         for (int s = 0; s < numSamples; s++) {
             float mixL = 0.0f, mixR = 0.0f;
 
+            // Frame buffer mode: count chip-rate samples to advance frames
+            if (m_fbPlaying) {
+                m_fbChipPhase += m_chipStep;
+                while (m_fbChipPhase >= 1.0) {
+                    m_fbChipPhase -= 1.0;
+                    if (m_fbSamplesLeft > 0) {
+                        m_fbSamplesLeft--;
+                        if (m_fbSamplesLeft == 0) {
+                            loadNextFrame();
+                        }
+                    }
+                }
+            }
+
             if (m_romPlaying) {
                 if (m_romEnvLevel < 1.0f) { m_romEnvLevel += 0.002f; if (m_romEnvLevel > 1.0f) m_romEnvLevel = 1.0f; }
                 m_romPhase += m_chipStep;
@@ -345,9 +359,79 @@ public:
         m_romPhase = 0.0; m_romPrevSample = 0.0f; m_romCurrentSample = 0.0f; m_romEnvLevel = 0.0f;
         m_romShiftReg = 0; m_romSylFilter = 0x3f; m_romIntFilter = 0;
     }
-    void stopSpeaking() { m_romPlaying = false; }
+    void stopSpeaking() { m_romPlaying = false; m_fbPlaying = false; }
+
+    // ===========================================================================
+    // Frame Buffer Mode (TTS pipeline preset sequencing)
+    // Frame format: 2 bytes per frame
+    //   [0] presetIndex (uint8) - which CVSD pattern (0-7)
+    //   [1] duration    (uint8) - duration in 10ms units (0-255)
+    // ===========================================================================
+
+    void loadFrameBuffer(uintptr_t dataPtr, int numFrames) {
+        m_fbData = reinterpret_cast<const uint8_t*>(dataPtr);
+        m_fbCount = numFrames;
+        m_fbPos = 0;
+    }
+
+    void speakFrameBuffer() {
+        if (!m_fbData || m_fbCount <= 0) return;
+
+        m_fbPos = 0;
+        m_fbPlaying = true;
+        m_fbSamplesLeft = 0;
+
+        // Stop any MIDI voices
+        for (int v = 0; v < NUM_VOICES; v++) m_voices[v].releasing = true;
+
+        // Load the first frame
+        loadNextFrame();
+    }
 
 private:
+    void loadNextFrame() {
+        if (m_fbPos >= m_fbCount) {
+            m_fbPlaying = false;
+            // Release the playback voice
+            if (m_voices[0].active) m_voices[0].releasing = true;
+            return;
+        }
+
+        const uint8_t* frame = m_fbData + (m_fbPos * 2);
+        int presetIdx = frame[0];
+        int durationUnits = frame[1];
+
+        // Apply preset to voice 0 (mono frame buffer playback)
+        CVSDVoice& voi = m_voices[0];
+        if (m_fbPos == 0 || !voi.active) {
+            // First frame: full init
+            voi.active = true;
+            voi.releasing = false;
+            voi.envLevel = 0.0f;
+            voi.velocity = 127;
+            voi.midiNote = 60;
+            voi.age = m_noteCounter++;
+            voi.phase = 0.0;
+            voi.prevSample = 0.0f;
+            voi.currentSample = 0.0f;
+            voi.shiftReg = 0;
+            voi.sylFilter = 0x3f;
+            voi.intFilter = 0;
+            voi.bitIndex = 0;
+            voi.bitCount = 0;
+            voi.bitsPerPeriod = 256;
+            voi.lfsr = 0x7fff;
+        }
+
+        if (presetIdx >= 0 && presetIdx < NUM_PRESETS) {
+            loadPresetData(0, presetIdx);
+        }
+
+        // Duration in samples: durationUnits * 10ms * chipRate / 1000
+        m_fbSamplesLeft = durationUnits * m_chipRate / 100;
+
+        m_fbPos++;
+    }
     // MAME-exact HC55516 CVSD process_bit(), called once per bit.
     // MAME calls process_bit on BOTH rising and falling clock edges.
     // We simulate both edges per bit here.
@@ -545,6 +629,14 @@ private:
     uint8_t m_romShiftReg = 0;
     int32_t m_romSylFilter = 0;
     int32_t m_romIntFilter = 0;
+
+    // Frame buffer state
+    const uint8_t* m_fbData = nullptr;
+    int m_fbCount = 0;
+    int m_fbPos = 0;
+    bool m_fbPlaying = false;
+    int m_fbSamplesLeft = 0;
+    double m_fbChipPhase = 0.0;
 };
 
 } // namespace devilbox
@@ -569,6 +661,8 @@ EMSCRIPTEN_BINDINGS(HC55516Module) {
         .function("writeRegister", &HC55516Synth::writeRegister)
         .function("loadROM", &HC55516Synth::loadROM)
         .function("playBitstream", &HC55516Synth::playBitstream)
-        .function("stopSpeaking", &HC55516Synth::stopSpeaking);
+        .function("stopSpeaking", &HC55516Synth::stopSpeaking)
+        .function("loadFrameBuffer", &HC55516Synth::loadFrameBuffer)
+        .function("speakFrameBuffer", &HC55516Synth::speakFrameBuffer);
 }
 #endif

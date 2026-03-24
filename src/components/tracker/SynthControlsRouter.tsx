@@ -153,6 +153,9 @@ const BuzzmachineControls = lazy(() =>
 const ChipSynthControls = lazy(() =>
   import('@components/instruments/controls/ChipSynthControls').then(m => ({ default: m.ChipSynthControls }))
 );
+const CMIControls = lazy(() =>
+  import('@components/instruments/controls/CMIControls').then(m => ({ default: m.CMIControls }))
+);
 const MAMEControls = lazy(() =>
   import('@components/instruments/controls/MAMEControls').then(m => ({ default: m.MAMEControls }))
 );

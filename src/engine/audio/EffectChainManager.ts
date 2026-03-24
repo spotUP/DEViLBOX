@@ -211,7 +211,7 @@ export class EffectChainManager {
       try {
         effect.node.disconnect();
         effect.node.dispose();
-      } catch (error) {
+      } catch (_error) {
         // Ignore disposal errors
       }
     }

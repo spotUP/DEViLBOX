@@ -53,6 +53,7 @@ interface UIStore {
   // Responsive layout state
   tb303Collapsed: boolean;
   scCollapsed: boolean;
+  cmiCollapsed: boolean;
   oscilloscopeVisible: boolean;
   autoCompactApplied: boolean; // Track if we've already auto-compacted this session
   showSamplePackModal: boolean;
@@ -124,6 +125,8 @@ interface UIStore {
   setTB303Collapsed: (collapsed: boolean) => void;
   toggleSCCollapsed: () => void;
   setSCCollapsed: (collapsed: boolean) => void;
+  toggleCMICollapsed: () => void;
+  setCMICollapsed: (collapsed: boolean) => void;
   toggleOscilloscopeVisible: () => void;
   setOscilloscopeVisible: (visible: boolean) => void;
   applyAutoCompact: () => void; // Auto-collapse panels on small screens
@@ -223,6 +226,7 @@ export const useUIStore = create<UIStore>()(
       // Responsive layout state (default to expanded/visible)
       tb303Collapsed: true, // TB-303 panel ALWAYS collapsed by default
       scCollapsed: true, // SC panel collapsed by default
+      cmiCollapsed: false, // CMI panel expanded by default to show rich editor
       oscilloscopeVisible: true,
       autoCompactApplied: false,
       showSamplePackModal: false,
@@ -420,6 +424,16 @@ export const useUIStore = create<UIStore>()(
       setSCCollapsed: (collapsed) =>
         set((state) => {
           state.scCollapsed = collapsed;
+        }),
+
+      toggleCMICollapsed: () =>
+        set((state) => {
+          state.cmiCollapsed = !state.cmiCollapsed;
+        }),
+
+      setCMICollapsed: (collapsed) =>
+        set((state) => {
+          state.cmiCollapsed = collapsed;
         }),
 
       toggleOscilloscopeVisible: () =>
@@ -651,6 +665,7 @@ export const useUIStore = create<UIStore>()(
         showMacroSlots: state.showMacroSlots,
         tb303Collapsed: state.tb303Collapsed,
         scCollapsed: state.scCollapsed,
+        cmiCollapsed: state.cmiCollapsed,
         oscilloscopeVisible: state.oscilloscopeVisible,
         sidebarCollapsed: state.sidebarCollapsed,
         trackerZoom: state.trackerZoom,

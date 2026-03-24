@@ -294,16 +294,18 @@ export class FurnaceRegisterMapper {
 
       // Control register (waveform + gate)
       // bits: noise(7), pulse(6), saw(5), tri(4), test(3), ring(2), sync(1), gate(0)
-      let control = 0;
+      // Computed but not written at init — gate off with 0x00 to prevent click/beep;
+      // waveform is enabled in writeKeyOn() when the note is triggered.
+      let _control = 0;
       if (c64) {
-        if (c64.noiseOn) control |= 0x80;
-        if (c64.pulseOn) control |= 0x40;
-        if (c64.sawOn) control |= 0x20;
-        if (c64.triOn) control |= 0x10;
-        if (c64.ringMod) control |= 0x04;
-        if (c64.oscSync) control |= 0x02;
+        if (c64.noiseOn) _control |= 0x80;
+        if (c64.pulseOn) _control |= 0x40;
+        if (c64.sawOn) _control |= 0x20;
+        if (c64.triOn) _control |= 0x10;
+        if (c64.ringMod) _control |= 0x04;
+        if (c64.oscSync) _control |= 0x02;
       } else {
-        control = 0x40; // Default pulse wave
+        _control = 0x40; // Default pulse wave
       }
       // Gate off initially - also DISABLE waveform to prevent click/beep at init
       // The waveform will be enabled properly in writeKeyOn() when the note is triggered

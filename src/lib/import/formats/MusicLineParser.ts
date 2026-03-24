@@ -312,7 +312,7 @@ export function parseMusicLineFile(data: Uint8Array): TrackerSong | null {
       speed = data[t++];
       groove = data[t++];
       /* volume = */ v.getUint16(t); t += 2;  // master volume 0-64
-      /* playMode = */ data[t++];              // 0=4ch, 1=8ch
+      t++;                                          // skip playMode (0=4ch, 1=8ch)
       numChannels = data[t++];
 
       if (numChannels === 0 || numChannels > 8) numChannels = 4; // safety

@@ -187,6 +187,20 @@ public:
         for (int s = 0; s < numSamples; s++) {
             float mixL = 0.0f, mixR = 0.0f;
 
+            // Frame buffer mode: count chip-rate samples to advance frames
+            if (m_fbPlaying) {
+                m_fbChipPhase += m_chipStep;
+                while (m_fbChipPhase >= 1.0) {
+                    m_fbChipPhase -= 1.0;
+                    if (m_fbSamplesLeft > 0) {
+                        m_fbSamplesLeft--;
+                        if (m_fbSamplesLeft == 0) {
+                            loadNextFrame();
+                        }
+                    }
+                }
+            }
+
             // ROM playback mode (mono, centered)
             if (m_romPlaying) {
                 if (m_romEnvLevel < 1.0f) { m_romEnvLevel += 0.002f; if (m_romEnvLevel > 1.0f) m_romEnvLevel = 1.0f; }
@@ -376,9 +390,85 @@ public:
         m_romEnvLevel = 0.0f;
     }
 
-    void stopSpeaking() { m_romPlaying = false; }
+    void stopSpeaking() { m_romPlaying = false; m_fbPlaying = false; }
+
+    // ===========================================================================
+    // Frame Buffer Mode (TTS pipeline preset sequencing)
+    // Frame format: 4 bytes per frame
+    //   [0] presetIndex (uint8) - which delta preset (0-7)
+    //   [1] pitchPeriod (uint8) - pitch period (0-255, 0=use current)
+    //   [2] voiced      (uint8) - 1=voiced, 0=unvoiced
+    //   [3] duration    (uint8) - duration in 10ms units (0-255)
+    // ===========================================================================
+
+    void loadFrameBuffer(uintptr_t dataPtr, int numFrames) {
+        m_fbData = reinterpret_cast<const uint8_t*>(dataPtr);
+        m_fbCount = numFrames;
+        m_fbPos = 0;
+    }
+
+    void speakFrameBuffer() {
+        if (!m_fbData || m_fbCount <= 0) return;
+
+        m_fbPos = 0;
+        m_fbPlaying = true;
+        m_fbSamplesLeft = 0;
+
+        // Stop any MIDI voices
+        for (int v = 0; v < NUM_VOICES; v++) m_voices[v].releasing = true;
+
+        // Load the first frame
+        loadNextFrame();
+    }
 
 private:
+    void loadNextFrame() {
+        if (m_fbPos >= m_fbCount) {
+            m_fbPlaying = false;
+            return;
+        }
+
+        const uint8_t* frame = m_fbData + (m_fbPos * 4);
+        int presetIdx = frame[0];
+        int pitchPeriod = frame[1];
+        int voiced = frame[2];
+        int durationUnits = frame[3];
+
+        // Apply preset to voice 0 (mono frame buffer playback)
+        DeltaVoice& voi = m_voices[0];
+        if (m_fbPos == 0 || !voi.active) {
+            // First frame: full init
+            voi.active = true;
+            voi.releasing = false;
+            voi.envLevel = 0.0f;
+            voi.velocity = 127;
+            voi.midiNote = 60;
+            voi.age = m_noteCounter++;
+            voi.phase = 0.0;
+            voi.prevSample = 0.0f;
+            voi.currentSample = 0.0f;
+            voi.output = DAC_CENTER;
+            voi.deltaOld = 2;
+            voi.pitchCount = 0;
+            voi.ppQuarter = 0;
+            voi.deltaAddr = 0;
+            voi.lfsr = 0x7fff;
+        }
+
+        if (presetIdx >= 0 && presetIdx < NUM_PRESETS) {
+            loadPresetData(0, presetIdx);
+        }
+        if (pitchPeriod > 0) {
+            voi.pitchPeriod = pitchPeriod;
+        }
+        voi.voiced = (voiced != 0);
+
+        // Duration in samples: durationUnits * 10ms * sampleRate / 1000
+        // But we tick at chip rate, so convert: durationUnits * 10ms * chipRate / 1000
+        m_fbSamplesLeft = durationUnits * m_chipRate / 100;
+
+        m_fbPos++;
+    }
     enum RomState { ROM_STATE_IDLE = 0, ROM_STATE_DARMSB, ROM_STATE_CTRLBITS, ROM_STATE_PLAY };
 
     uint8_t readROMByte(uint16_t addr) {
@@ -665,6 +755,14 @@ private:
     float m_romPrevSample = 0.0f;
     float m_romCurrentSample = 0.0f;
     float m_romEnvLevel = 0.0f;
+
+    // Frame buffer state
+    const uint8_t* m_fbData = nullptr;
+    int m_fbCount = 0;
+    int m_fbPos = 0;
+    bool m_fbPlaying = false;
+    int m_fbSamplesLeft = 0;
+    double m_fbChipPhase = 0.0;
 };
 
 } // namespace devilbox
@@ -690,6 +788,8 @@ EMSCRIPTEN_BINDINGS(S14001AModule) {
         .function("writeRegister", &S14001ASynth::writeRegister)
         .function("loadROM", &S14001ASynth::loadROM)
         .function("speakWord", &S14001ASynth::speakWord)
-        .function("stopSpeaking", &S14001ASynth::stopSpeaking);
+        .function("stopSpeaking", &S14001ASynth::stopSpeaking)
+        .function("loadFrameBuffer", &S14001ASynth::loadFrameBuffer)
+        .function("speakFrameBuffer", &S14001ASynth::speakFrameBuffer);
 }
 #endif

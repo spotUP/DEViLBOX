@@ -17,6 +17,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { PatternEditorCanvas } from '@/components/tracker/PatternEditorCanvas';
 import { GTU_COLUMNS } from './gtuAdapter';
 import { GTToolbar } from './GTToolbar';
+import { GTOrderMatrix, GT_ORDER_MATRIX_HEIGHT } from './GTOrderMatrix';
 import { useGTKeyboardHandler } from './GTKeyboardHandler';
 import { useGTUltraEngineInit } from '../../engine/gtultra/useGTUltraEngineInit';
 import { useGTUltraFormatData } from './useGTUltraFormatData';
@@ -27,7 +28,7 @@ export const GTUltraView: React.FC<{ width?: number; height?: number }> = () => 
   const { channels, currentRow, isPlaying, handleCellChange } = useGTUltraFormatData();
 
   const containerRef = useRef<HTMLDivElement>(null);
-  const [_containerWidth, setContainerWidth] = useState(800);
+  const [containerWidth, setContainerWidth] = useState(800);
 
   useEffect(() => {
     const el = containerRef.current;
@@ -53,6 +54,10 @@ export const GTUltraView: React.FC<{ width?: number; height?: number }> = () => 
     }}>
       <div style={{ height: `${TOOLBAR_H}px`, flexShrink: 0 }}>
         <GTToolbar />
+      </div>
+
+      <div style={{ height: `${GT_ORDER_MATRIX_HEIGHT}px`, flexShrink: 0 }}>
+        <GTOrderMatrix width={containerWidth} height={GT_ORDER_MATRIX_HEIGHT} />
       </div>
 
       <div style={{ flex: 1, minHeight: 0, overflow: 'hidden' }}>

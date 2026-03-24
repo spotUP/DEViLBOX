@@ -287,7 +287,7 @@ export class MoogFilterEffect extends Tone.ToneAudioNode {
       this.fallbackFilter.setCutoff(this._options.cutoff);
       this.fallbackFilter.setResonance(this._options.resonance);
 
-      let fallbackFrameCount = 0;
+      let _fallbackFrameCount = 0;
       this.fallbackNode.onaudioprocess = (e) => {
         const inL = e.inputBuffer.getChannelData(0);
         const inR = e.inputBuffer.getChannelData(1);
@@ -296,7 +296,7 @@ export class MoogFilterEffect extends Tone.ToneAudioNode {
         this.fallbackFilter!.process(inL, inR, outL, outR);
 
         // DIAGNOSTIC: Log fallback audio levels — disabled to reduce console noise
-        fallbackFrameCount++;
+        _fallbackFrameCount++;
         // const shouldLog = fallbackFrameCount <= 200
         //   ? (fallbackFrameCount % 50 === 1)   // Every ~0.3sec for first ~1.2sec
         //   : (fallbackFrameCount % 2000 === 1); // Every ~12sec after
