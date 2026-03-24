@@ -2197,7 +2197,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
               </div>
               <input
                 type="text"
-                className="bg-dark-bgPrimary/50 border border-dark-border/30 rounded px-2 py-0.5 mt-1 font-mono text-[10px] text-accent-primary text-center uppercase focus:border-accent-primary outline-none min-w-[120px]"
+                className="bg-dark-bgPrimary/50 border border-dark-border rounded px-2 py-0.5 mt-1 font-mono text-[10px] text-accent-primary text-center uppercase focus:border-accent-primary outline-none min-w-[120px]"
                 value={mobileChannel?.name || `Channel ${mobileChannelIndex + 1}`}
                 onChange={(e) => updateChannelName(mobileChannelIndex, e.target.value)}
                 onKeyDown={(e) => {
@@ -2219,7 +2219,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
             </button>
           </div>
 
-          <div className="flex items-center justify-center gap-2 px-3 py-1 border-t border-dark-border/50">
+          <div className="flex items-center justify-center gap-2 px-3 py-1 border-t border-dark-border">
             <button
               onClick={() => toggleChannelMute(mobileChannelIndex)}
               className={`px-3 py-1 rounded text-xs font-medium transition-colors ${
@@ -2280,15 +2280,15 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
                 ))}
               </div>
               {/* Row 2: column labels (20px) */}
-              <div className="flex h-[20px] border-t border-dark-border/40">
-                <div className="flex-shrink-0 border-r border-dark-border/40" style={{ width: LINE_NUMBER_WIDTH }} />
+              <div className="flex h-[20px] border-t border-dark-border">
+                <div className="flex-shrink-0 border-r border-dark-border" style={{ width: LINE_NUMBER_WIDTH }} />
                 {formatChannels.map((_, chIdx) => {
                   const FORMAT_COL_GAP = 4;
                   let px = 2;
                   return (
                     <div
                       key={chIdx}
-                      className="flex-shrink-0 relative border-r border-dark-border/40"
+                      className="flex-shrink-0 relative border-r border-dark-border"
                       style={{ width: channelWidths[chIdx] }}
                     >
                       {formatColumns.map((col, ci) => {
