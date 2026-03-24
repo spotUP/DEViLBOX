@@ -17,6 +17,7 @@ import { useWorkbenchStore } from '@stores/useWorkbenchStore';
 import { TITLE_H } from '../workbench/workbenchLayout';
 import type { ArrangementToolMode } from '@/types/arrangement';
 import { useArrangementKeyboardShortcuts } from '@/components/arrangement/ArrangementKeyboardShortcuts';
+import { useArrangementView } from '@/hooks/views/useArrangementView';
 import { MarkerRenameInput } from '@/components/arrangement/MarkerRenameInput';
 import { TrackRenameDialog } from '@/components/arrangement/TrackRenameDialog';
 import { usePixiDropdownStore } from '../stores/usePixiDropdownStore';
@@ -40,10 +41,6 @@ const ARR_RULER_HEIGHT = 24;
 
 export const PixiArrangementView: React.FC = () => {
   const isPlaying = useTransportStore(s => s.isPlaying);
-  const playbackRowRef = useRef(0);
-  // Track the last pattern id we switched to during arrangement playback
-  // to avoid redundant setCurrentPattern calls on every frame.
-  const lastArrangementPatternIdRef = useRef<string | null>(null);
 
   // Resolve actual window pixel dimensions
   const win = useWorkbenchStore(s => s.windows['arrangement']);
@@ -88,10 +85,6 @@ export const PixiArrangementView: React.FC = () => {
   const arrangementTracks = useArrangementStore(s => s.tracks);
   const groups = useArrangementStore(s => s.groups);
   const automationLanes = useArrangementStore(s => s.automationLanes);
-  // NOTE: do NOT subscribe to isArrangementMode here — we set it on mount and
-  // the synchronous Zustand notification fires during React's commit phase in
-  // @pixi/react, causing "Maximum update depth exceeded". Use a ref instead.
-  const isArrangementModeRef = useRef(false);
   const playbackRow = useArrangementStore(s => s.playbackRow);
   const tool = useArrangementStore(s => s.tool);
   const setTool = useArrangementStore(s => s.setTool);
@@ -260,96 +253,8 @@ export const PixiArrangementView: React.FC = () => {
   // Track interaction: mute/solo
   const useArrangementData = arrangementTracks.length > 0;
 
-  // Activate arrangement mode on mount, deactivate on unmount
-  useEffect(() => {
-    isArrangementModeRef.current = true;
-    useArrangementStore.getState().setIsArrangementMode(true);
-
-    // Auto-import from pattern order if no arrangement tracks exist
-    const arr = useArrangementStore.getState();
-    if (arr.tracks.length === 0) {
-      const ts = useTrackerStore.getState();
-      if (ts.patternOrder.length > 0) {
-        arr.importFromPatternOrder(ts.patternOrder, ts.patterns);
-        arr.zoomToFit();
-      }
-    }
-
-    return () => {
-      isArrangementModeRef.current = false;
-      useArrangementStore.getState().setIsArrangementMode(false);
-    };
-  }, []);
-
-
-  // Playback row sync via rAF loop
-  useEffect(() => {
-    if (!isPlaying) return;
-
-    let rafId: number;
-    const update = () => {
-      if (!isArrangementModeRef.current) return;
-      const globalRow = useTransportStore.getState().currentGlobalRow;
-      if (globalRow !== playbackRowRef.current) {
-        playbackRowRef.current = globalRow;
-        const arr = useArrangementStore.getState();
-        arr.setPlaybackRow(globalRow);
-
-        // Follow playback: auto-scroll to keep playhead visible
-        if (arr.view.followPlayback) {
-          const { scrollRow, pixelsPerRow } = arr.view;
-          const visibleRows = canvasW / pixelsPerRow;
-          const playheadX = (globalRow - scrollRow) * pixelsPerRow;
-          if (playheadX < 0 || playheadX > canvasW - 20) {
-            arr.setScrollRow(Math.max(0, globalRow - visibleRows * 0.1));
-          }
-        }
-
-        // Arrangement clip switching: find which clip covers the current global row
-        // and update the tracker's current pattern to reflect it in the UI.
-        // We pass fromReplayer=true so setCurrentPattern only updates the UI
-        // and does NOT call replayer.jumpToPattern() — the replayer is already
-        // playing the correct virtual arrangement built by resolveArrangement.
-        if (arr.isArrangementMode) {
-          const ts = useTrackerStore.getState();
-          const activeClip = arr.clips.find((clip) => {
-            if (clip.muted) return false;
-            const pat = ts.patterns.find(p => p.id === clip.patternId);
-            const clipLen = clip.clipLengthRows ?? (pat ? pat.length - clip.offsetRows : 64);
-            return globalRow >= clip.startRow && globalRow < clip.startRow + clipLen;
-          });
-          if (activeClip) {
-            if (activeClip.patternId !== lastArrangementPatternIdRef.current) {
-              lastArrangementPatternIdRef.current = activeClip.patternId;
-              const patIdx = ts.patterns.findIndex(p => p.id === activeClip.patternId);
-              if (patIdx >= 0 && patIdx !== ts.currentPatternIndex) {
-                ts.setCurrentPattern(patIdx, true);
-              }
-            }
-          } else {
-            // No clip covers this row — clear the last active clip tracking
-            lastArrangementPatternIdRef.current = null;
-          }
-        }
-
-        // Visual playhead wrap-around for loop region.
-        // When the loop is active and the playhead reaches or passes loopEnd,
-        // reset the visual playhead to loopStart. Audio looping is handled
-        // by the replayer's virtual pattern sequence — this is visual-only.
-        const isLooping = useTransportStore.getState().isLooping;
-        const ls = arr.view.loopStart;
-        const le = arr.view.loopEnd;
-        if (isLooping && ls != null && le != null && globalRow >= le) {
-          playbackRowRef.current = ls;
-          arr.setPlaybackRow(ls);
-        }
-      }
-      rafId = requestAnimationFrame(update);
-    };
-    rafId = requestAnimationFrame(update);
-
-    return () => cancelAnimationFrame(rafId);
-  }, [isPlaying]);
+  // Shared logic: arrangement mode lifecycle, auto-import, playback rAF loop, automation lanes
+  useArrangementView({ canvasWidth: canvasW });
 
   // Full arrangement keyboard shortcuts (Cmd+D duplicate, Cmd+E split, zoom presets, etc.)
   useArrangementKeyboardShortcuts();

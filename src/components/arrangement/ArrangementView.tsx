@@ -7,51 +7,17 @@
 
 import React, { useCallback, useEffect, useMemo, useRef } from 'react';
 import { useArrangementStore } from '@stores/useArrangementStore';
-import { useTrackerStore } from '@stores';
-import { useTransportStore } from '@stores';
-import { useMixerStore } from '@stores/useMixerStore';
-import { useInstrumentStore } from '@stores/useInstrumentStore';
-import { notify } from '@stores/useNotificationStore';
 import { useArrangementKeyboard } from '@/hooks/arrangement/useArrangementKeyboard';
+import { useArrangementView } from '@/hooks/views/useArrangementView';
 import { ArrangementToolbar } from './ArrangementToolbar';
 import { TrackHeaderPanel } from './TrackHeaderPanel';
 import { ArrangementCanvas } from './ArrangementCanvas';
 import { ArrangementContextMenu } from './ArrangementContextMenu';
-import type { TimelineAutomationPoint } from '@/types/arrangement';
-
-/**
- * Linearly interpolate automation value at a given row.
- * - Flat before the first point (returns first point's value).
- * - Flat after the last point (returns last point's value).
- * - Linear interpolation between surrounding points.
- * Points must be sorted by row (ascending).
- */
-function getAutomationValue(points: TimelineAutomationPoint[], row: number): number {
-  if (points.length === 0) return 0;
-  if (points.length === 1) return points[0].value;
-
-  // Before first point: hold first value
-  if (row <= points[0].row) return points[0].value;
-
-  // After last point: hold last value
-  if (row >= points[points.length - 1].row) return points[points.length - 1].value;
-
-  // Find surrounding pair
-  for (let i = 0; i < points.length - 1; i++) {
-    const a = points[i];
-    const b = points[i + 1];
-    if (row >= a.row && row <= b.row) {
-      const span = b.row - a.row;
-      if (span === 0) return a.value;
-      const t = (row - a.row) / span;
-      return a.value + t * (b.value - a.value);
-    }
-  }
-
-  return points[points.length - 1].value;
-}
 
 export const ArrangementView: React.FC = () => {
+  // Shared logic: arrangement mode lifecycle, auto-import, playback rAF loop
+  useArrangementView();
+
   // Register keyboard shortcuts for arrangement view
   useArrangementKeyboard();
 
@@ -61,100 +27,8 @@ export const ArrangementView: React.FC = () => {
     selectedClipIds, removeClips, duplicateClips,
     clearSelection, selectAllClipsOnTrack,
     pushUndo, undo, redo,
-    importFromPatternOrder,
-    isArrangementMode,
-    setIsArrangementMode,
     setClipContextMenu,
   } = useArrangementStore();
-  const isPlaying = useTransportStore(s => s.isPlaying);
-  const hasMigratedRef = useRef(false);
-  const hasZoomedRef = useRef(false);
-
-  // Auto-migrate from pattern order when arrangement is first opened with no data
-  useEffect(() => {
-    if (hasMigratedRef.current) return;
-    if (tracks.length > 0) return; // Already has arrangement data
-
-    const { patternOrder, patterns } = useTrackerStore.getState();
-    if (patterns.length > 0 && patternOrder.length > 0) {
-      hasMigratedRef.current = true;
-      importFromPatternOrder(patternOrder, patterns);
-      notify.success('Converted pattern order to arrangement');
-    }
-  }, [tracks.length, importFromPatternOrder]);
-
-  // Zoom-to-fit on initial load
-  useEffect(() => {
-    if (hasZoomedRef.current || tracks.length === 0) return;
-    hasZoomedRef.current = true;
-    useArrangementStore.getState().zoomToFit();
-  }, [tracks.length]);
-
-  // Enable arrangement mode when view is active
-  useEffect(() => {
-    if (!isArrangementMode && tracks.length > 0) {
-      setIsArrangementMode(true);
-      notify.info('Arrangement mode enabled');
-    }
-  }, [isArrangementMode, setIsArrangementMode, tracks.length]);
-
-  // Sync playback position with arrangement and apply automation lanes
-  useEffect(() => {
-    if (!isPlaying || !isArrangementMode) return;
-
-    // Immediately sync playback row on mount/view-switch so the playhead
-    // doesn't stay stale until the next replayer row-change fires.
-    const initialGlobalRow = useTransportStore.getState().currentGlobalRow;
-    useArrangementStore.getState().setPlaybackRow(initialGlobalRow);
-
-    const rafId = requestAnimationFrame(function updatePlayback() {
-      // Read current global row from store state (not reactive — avoids 50Hz re-renders)
-      const globalRow = useTransportStore.getState().currentGlobalRow;
-
-      // Update arrangement playback position
-      useArrangementStore.getState().setPlaybackRow(globalRow);
-
-      // Apply automation lanes
-      const { automationLanes, tracks } = useArrangementStore.getState();
-      const sortedTracks = [...tracks].sort((a, b) => a.index - b.index);
-      for (const lane of automationLanes) {
-        if (!lane.enabled || lane.points.length === 0) continue;
-        const value = getAutomationValue(lane.points, globalRow);
-
-        if (lane.parameter === 'volume') {
-          const chIdx = sortedTracks.findIndex(t => t.id === lane.trackId);
-          if (chIdx >= 0) {
-            useMixerStore.getState().setChannelVolume(chIdx, value);
-          }
-        } else if (lane.parameter === 'pan') {
-          const chIdx = sortedTracks.findIndex(t => t.id === lane.trackId);
-          if (chIdx >= 0) {
-            useMixerStore.getState().setChannelPan(chIdx, value);
-          }
-        } else if (
-          lane.parameter === 'cutoff' ||
-          lane.parameter === 'resonance' ||
-          lane.parameter === 'envMod'
-        ) {
-          // Synth parameter: find the instrument assigned to this track
-          const track = tracks.find(t => t.id === lane.trackId);
-          const instrumentId = track?.instrumentId ?? null;
-          if (instrumentId !== null) {
-            useInstrumentStore.getState().updateInstrument(instrumentId, {
-              tb303: { [lane.parameter]: value },
-            });
-          }
-        }
-      }
-
-      // Continue updating while playing
-      if (useTransportStore.getState().isPlaying && useArrangementStore.getState().isArrangementMode) {
-        requestAnimationFrame(updatePlayback);
-      }
-    });
-
-    return () => cancelAnimationFrame(rafId);
-  }, [isPlaying, isArrangementMode]);
 
   const layoutEntries = useMemo(() => {
     const sorted = tracks
