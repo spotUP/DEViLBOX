@@ -1860,27 +1860,21 @@ export function useGlobalKeyboardHandler(options: UseGlobalKeyboardHandlerOption
         return;
       }
 
-      // ProTracker: Right Shift = play song from start, Right Alt/Option = play pattern from start
-      // When already playing, directly set replayer position — bypasses React state entirely.
+      // Right Shift = play song from start, Right Alt/Option = play pattern from start.
+      // Always resets to row 0. If something is/was playing, force position directly.
+      // Uses replayer.hasEverPlayed to survive the brief isPlaying=false windows
+      // caused by usePatternPlayback's effect restart cycles.
       if (e.code === 'ShiftRight' || e.code === 'AltRight') {
         e.preventDefault();
         e.stopPropagation();
         const replayer = getTrackerReplayer();
         const store = useTransportStore.getState();
-        if (store.isPlaying || replayer.isPlaying()) {
-          // Direct position reset — no React, no store updates, no effect triggers
-          if (e.code === 'ShiftRight') {
-            replayer.forcePosition(0, 0);
-          } else {
-            replayer.forcePosition(replayer.getSongPos(), 0);
-          }
+        const wasPlaying = store.isPlaying || replayer.isPlaying() || replayer.getSong() !== null;
+        console.log(`[KB] ${e.code}: store.isPlaying=${store.isPlaying} replayer.isPlaying=${replayer.isPlaying()} hasSong=${replayer.getSong() !== null}`);
+        if (wasPlaying && replayer.getSong()) {
+          replayer.forcePosition(e.code === 'ShiftRight' ? 0 : replayer.getSongPos(), 0);
         } else {
-          // Not playing — start fresh
-          if (e.code === 'ShiftRight') {
-            playSong();
-          } else {
-            playPattern();
-          }
+          if (e.code === 'ShiftRight') playSong(); else playPattern();
         }
         return;
       }
