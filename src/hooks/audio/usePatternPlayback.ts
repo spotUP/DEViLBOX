@@ -279,12 +279,12 @@ export const usePatternPlayback = () => {
         return;
       }
 
-      // Skip reload if forcePosition was just called — the replayer already seeked
-      if (replayer.skipNextReload && replayer.isPlaying()) {
+      // Skip reload if forcePosition was just called — the replayer already seeked.
+      // Check skipNextReload regardless of isPlaying — the cleanup may have briefly stopped it.
+      if (replayer.skipNextReload) {
         replayer.skipNextReload = false;
         return;
       }
-      replayer.skipNextReload = false;
 
       if (!hasStartedRef.current || needsReload) {
         hasStartedRef.current = true;
@@ -517,6 +517,11 @@ export const usePatternPlayback = () => {
         });
       }
     } else if (!isPlaying && hasStartedRef.current) {
+      // Skip stop if forcePosition is active — it just seeked, don't interrupt
+      if (replayerRef.current.skipNextReload) {
+        replayerRef.current.skipNextReload = false;
+        return;
+      }
       // Stop playback — keep current position (don't reset row/position)
       console.log('[Playback] Stopping playback');
       hasStartedRef.current = false;
@@ -540,6 +545,8 @@ export const usePatternPlayback = () => {
     }
 
     return () => {
+      // Don't stop during forcePosition seek
+      if (replayerRef.current.skipNextReload) return;
       if (!isPlaying && hasStartedRef.current) {
         replayerRef.current.stop();
         replayerRef.current.onRowChange = null;
