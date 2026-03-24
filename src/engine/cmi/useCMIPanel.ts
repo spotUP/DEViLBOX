@@ -26,6 +26,37 @@ import {
   floatToUint8PCM,
 } from './cmi-dsp-utils';
 
+// ── Fairlight CMI Sample Library manifest types & loader ───────────────────
+
+interface CMIManifestSample { name: string; file: string; }
+interface CMIManifestCategory { name: string; count: number; samples: CMIManifestSample[]; }
+interface CMIManifest {
+  id: string; name: string; sampleCount: number;
+  categories: CMIManifestCategory[];
+}
+
+const CMI_SAMPLES_BASE = 'data/samples/packs/fairlight-cmi';
+let _manifestCache: CMIManifest | null = null;
+let _manifestLoading = false;
+const _manifestListeners: Array<(m: CMIManifest) => void> = [];
+
+async function loadManifest(): Promise<CMIManifest> {
+  if (_manifestCache) return _manifestCache;
+  if (_manifestLoading) {
+    return new Promise((resolve) => { _manifestListeners.push(resolve); });
+  }
+  _manifestLoading = true;
+  try {
+    const resp = await fetch(`/${CMI_SAMPLES_BASE}/manifest.json`);
+    _manifestCache = await resp.json() as CMIManifest;
+    _manifestListeners.forEach((cb) => cb(_manifestCache!));
+    _manifestListeners.length = 0;
+    return _manifestCache;
+  } finally {
+    _manifestLoading = false;
+  }
+}
+
 // ── Helper to get the live CMISynth instance from ToneEngine ───────────────
 
 function getCMISynthInstance(instrumentId: number | undefined): any | null {
@@ -111,6 +142,17 @@ export interface CMIPanelState {
   sampleName: string;
   sampleWaveform: Float32Array | null;
 
+  // Library browser
+  libraryCategories: string[];
+  libraryCategoryIndex: number;
+  librarySamples: CMIManifestSample[];
+  librarySampleIndex: number;
+  libraryLoading: boolean;
+  setLibraryCategoryIndex: (index: number) => void;
+  loadLibrarySample: (sampleIndex: number) => void;
+  prevLibrarySample: () => void;
+  nextLibrarySample: () => void;
+
   // Tab
   activeTab: CMITab;
   setActiveTab: (tab: CMITab) => void;
@@ -188,6 +230,27 @@ export function useCMIPanel(props?: UseCMIPanelProps): CMIPanelState {
   const [sampleLoaded, setSampleLoaded] = useState(false);
   const [sampleName, setSampleName] = useState('');
   const [sampleWaveform, setSampleWaveform] = useState<Float32Array | null>(null);
+
+  // ── Library browser state ────────────────────────────────────────────────
+
+  const [manifest, setManifest] = useState<CMIManifest | null>(_manifestCache);
+  const [libraryCategoryIndex, setLibraryCategoryIndex] = useState(0);
+  const [librarySampleIndex, setLibrarySampleIndex] = useState(-1);
+  const [libraryLoading, setLibraryLoading] = useState(false);
+
+  useEffect(() => {
+    loadManifest().then(setManifest);
+  }, []);
+
+  const libraryCategories = useMemo(
+    () => manifest?.categories.map((c) => c.name) ?? [],
+    [manifest]
+  );
+
+  const librarySamples = useMemo(
+    () => manifest?.categories[libraryCategoryIndex]?.samples ?? [],
+    [manifest, libraryCategoryIndex]
+  );
 
   // ── Computed data (all from shared cmi-dsp-utils) ────────────────────────
 
@@ -299,6 +362,78 @@ export function useCMIPanel(props?: UseCMIPanelProps): CMIPanelState {
     }
   }, [targetInstrument]);
 
+  // ── Load sample from Fairlight library (fetch URL → raw 8-bit PCM) ───────
+
+  const loadLibrarySample = useCallback((sampleIndex: number) => {
+    if (!manifest) return;
+    const cat = manifest.categories[libraryCategoryIndex];
+    if (!cat) return;
+    const sample = cat.samples[sampleIndex];
+    if (!sample) return;
+
+    setLibrarySampleIndex(sampleIndex);
+    setLibraryLoading(true);
+
+    const url = `/${CMI_SAMPLES_BASE}/${cat.name}/${sample.file}`;
+    fetch(url)
+      .then((resp) => resp.arrayBuffer())
+      .then((buf) => {
+        // These are 8-bit unsigned PCM WAVs — extract raw PCM from WAV
+        const view = new DataView(buf);
+        let dataOffset = 44; // standard WAV header
+        let dataSize = buf.byteLength - 44;
+
+        // Parse WAV to find actual data chunk (some have extra headers)
+        if (view.getUint32(0, false) === 0x52494646) { // "RIFF"
+          let off = 12;
+          while (off < buf.byteLength - 8) {
+            const chunkId = view.getUint32(off, false);
+            const chunkSize = view.getUint32(off + 4, true);
+            if (chunkId === 0x64617461) { // "data"
+              dataOffset = off + 8;
+              dataSize = chunkSize;
+              break;
+            }
+            off += 8 + chunkSize;
+            if (chunkSize % 2 !== 0) off++; // padding byte
+          }
+        }
+
+        // Raw 8-bit unsigned PCM — direct to wave RAM (no conversion needed!)
+        const rawPCM = new Uint8Array(buf, dataOffset, Math.min(dataSize, 16384));
+
+        // Load into engine
+        const synth = getCMISynthInstance(targetInstrument?.id);
+        if (synth) synth.loadSampleAll(rawPCM);
+
+        // Create float waveform for display
+        const display = new Float32Array(rawPCM.length);
+        for (let i = 0; i < rawPCM.length; i++) {
+          display[i] = (rawPCM[i] - 128) / 127;
+        }
+
+        setSampleName(sample.name);
+        setSampleLoaded(true);
+        setSampleWaveform(display);
+        setLibraryLoading(false);
+        console.log(`[CMI] Loaded "${sample.name}" from library — ${rawPCM.length} bytes → all voices`);
+      })
+      .catch((err) => {
+        console.error('[CMI] Library sample load error:', err);
+        setLibraryLoading(false);
+      });
+  }, [manifest, libraryCategoryIndex, targetInstrument]);
+
+  const prevLibrarySample = useCallback(() => {
+    const idx = librarySampleIndex <= 0 ? librarySamples.length - 1 : librarySampleIndex - 1;
+    loadLibrarySample(idx);
+  }, [librarySampleIndex, librarySamples.length, loadLibrarySample]);
+
+  const nextLibrarySample = useCallback(() => {
+    const idx = librarySampleIndex >= librarySamples.length - 1 ? 0 : librarySampleIndex + 1;
+    loadLibrarySample(idx);
+  }, [librarySampleIndex, librarySamples.length, loadLibrarySample]);
+
   // ── Harmonic editor (renderer-agnostic: normalized 0..1 coords) ──────────
 
   const updateHarmonicAt = useCallback((normalizedX: number, normalizedY: number) => {
@@ -334,6 +469,10 @@ export function useCMIPanel(props?: UseCMIPanelProps): CMIPanelState {
     harmonics, customWaveform, builtinWaveform, envelopeCurve,
 
     sampleLoaded, sampleName, sampleWaveform,
+
+    libraryCategories, libraryCategoryIndex, librarySamples, librarySampleIndex,
+    libraryLoading, setLibraryCategoryIndex, loadLibrarySample,
+    prevLibrarySample, nextLibrarySample,
 
     activeTab, setActiveTab,
     collapsed: cmiCollapsed,

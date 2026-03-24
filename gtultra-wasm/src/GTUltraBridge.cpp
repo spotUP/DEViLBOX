@@ -544,7 +544,9 @@ void gt_render_audio(float* outL, float* outR, int frames) {
 
 EMSCRIPTEN_KEEPALIVE
 int gt_get_current_row(void) {
-    return gtObject.chn[0].pattptr;
+    int ptr = gtObject.chn[0].pattptr;
+    if (ptr == 0x7fffffff) return 0; // ENDPATT sentinel
+    return ptr / 4; // pattptr is a byte offset; 4 bytes per row
 }
 
 EMSCRIPTEN_KEEPALIVE
