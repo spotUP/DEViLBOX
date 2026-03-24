@@ -121,6 +121,8 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
   formatCurrentRowRef.current = formatCurrentRow ?? 0;
   formatIsPlayingRef.current  = formatIsPlaying ?? false;
   formatChannelsRef.current   = formatChannels;
+  const onFormatCellChangeRef = useRef(onFormatCellChange);
+  onFormatCellChangeRef.current = onFormatCellChange;
   if (isFormatMode && formatColumns && formatChannels) {
     formatPatternSnapshotRef.current = [formatChannelsToSnapshot(formatChannels, formatColumns)];
   }
@@ -1322,53 +1324,116 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
     totalWidth: totalChannelsWidth,
   }), [channelOffsets, channelWidths, totalChannelsWidth]);
 
-  // Channel context menu handlers
+  // Channel context menu handlers — work in both normal and format modes
   const handleFillPattern = useCallback((channelIndex: number, generatorType: GeneratorType) => {
+    const fmtCh = isFormatMode ? formatChannelsRef.current?.[channelIndex] : undefined;
+    const fmtChange = onFormatCellChangeRef.current;
+    if (isFormatMode && fmtCh && fmtChange) {
+      const generator = GENERATORS[generatorType];
+      if (!generator) return;
+      const cells = generator.generate({ patternLength: fmtCh.patternLength, instrumentId: 1, note: 49, velocity: 0x40 });
+      const cols = fmtCh.columns ?? formatColumns;
+      cells.forEach((cell, row) => {
+        if (row >= fmtCh.patternLength) return;
+        const noteCol = cols?.find(c => c.type === 'note');
+        if (noteCol && cell.note) fmtChange(channelIndex, row, noteCol.key, cell.note);
+        const insCol = cols?.find(c => c.key === 'instrument');
+        if (insCol && cell.instrument) fmtChange(channelIndex, row, insCol.key, cell.instrument);
+      });
+      return;
+    }
     if (!pattern) return;
     const generator = GENERATORS[generatorType];
     if (!generator) return;
-
     const channel = pattern.channels[channelIndex];
     const instrumentId = channel.instrumentId ?? 1;
-    const cells = generator.generate({
-      patternLength: pattern.length,
-      instrumentId,
-      note: 49,
-      velocity: 0x40,
-    });
-
-    cells.forEach((cell, row) => {
-      setCell(channelIndex, row, cell);
-    });
-  }, [pattern, setCell]);
+    const cells = generator.generate({ patternLength: pattern.length, instrumentId, note: 49, velocity: 0x40 });
+    cells.forEach((cell, row) => { setCell(channelIndex, row, cell); });
+  }, [pattern, setCell, isFormatMode, formatColumns]);
 
   const handleClearChannel = useCallback((channelIndex: number) => {
+    const fmtCh = isFormatMode ? formatChannelsRef.current?.[channelIndex] : undefined;
+    const fmtChange = onFormatCellChangeRef.current;
+    if (isFormatMode && fmtCh && fmtChange) {
+      const cols = fmtCh.columns ?? formatColumns;
+      for (let row = 0; row < fmtCh.patternLength; row++) {
+        cols?.forEach(col => fmtChange(channelIndex, row, col.key, col.emptyValue ?? 0));
+      }
+      useUIStore.getState().setStatusMessage('CHANNEL CLEARED');
+      return;
+    }
     if (!pattern) return;
     for (let row = 0; row < pattern.length; row++) {
-      setCell(channelIndex, row, {
-        note: 0,
-        instrument: 0,
-        volume: 0,
-        effTyp: 0,
-        eff: 0,
-      });
+      setCell(channelIndex, row, { note: 0, instrument: 0, volume: 0, effTyp: 0, eff: 0 });
     }
     useUIStore.getState().setStatusMessage('CHANNEL CLEARED');
-  }, [pattern, setCell]);
+  }, [pattern, setCell, isFormatMode, formatColumns]);
 
   const handleCopyChannel = useCallback((channelIndex: number) => {
+    if (isFormatMode) {
+      const fmtCh = formatChannelsRef.current?.[channelIndex];
+      if (fmtCh) {
+        const cols = fmtCh.columns ?? formatColumns;
+        const clipboard: Record<string, number>[] = [];
+        for (let r = 0; r < fmtCh.patternLength; r++) {
+          const entry: Record<string, number> = {};
+          cols?.forEach(col => { entry[col.key] = fmtCh.rows[r]?.[col.key] ?? (col.emptyValue ?? 0); });
+          clipboard.push(entry);
+        }
+        formatClipboardRef.current = clipboard;
+        useUIStore.getState().setStatusMessage('CHANNEL COPIED');
+      }
+      return;
+    }
     copyTrack(channelIndex);
-  }, [copyTrack]);
+  }, [copyTrack, isFormatMode, formatColumns]);
 
   const handleCutChannel = useCallback((channelIndex: number) => {
+    if (isFormatMode) {
+      handleCopyChannel(channelIndex);
+      handleClearChannel(channelIndex);
+      useUIStore.getState().setStatusMessage('CHANNEL CUT');
+      return;
+    }
     cutTrack(channelIndex);
-  }, [cutTrack]);
+  }, [cutTrack, isFormatMode, handleCopyChannel, handleClearChannel]);
 
   const handlePasteChannel = useCallback((channelIndex: number) => {
+    const fmtChange = onFormatCellChangeRef.current;
+    if (isFormatMode && fmtChange) {
+      const clipboard = formatClipboardRef.current;
+      const fmtCh = formatChannelsRef.current?.[channelIndex];
+      if (!clipboard || clipboard.length === 0 || !fmtCh) return;
+      const len = Math.min(clipboard.length, fmtCh.patternLength);
+      for (let row = 0; row < len; row++) {
+        const entry = clipboard[row];
+        for (const [key, value] of Object.entries(entry)) {
+          fmtChange(channelIndex, row, key, value as number);
+        }
+      }
+      useUIStore.getState().setStatusMessage('CHANNEL PASTED');
+      return;
+    }
     pasteTrack(channelIndex);
-  }, [pasteTrack]);
+  }, [pasteTrack, isFormatMode]);
 
   const handleTranspose = useCallback((channelIndex: number, semitones: number) => {
+    const fmtCh = isFormatMode ? formatChannelsRef.current?.[channelIndex] : undefined;
+    const fmtChange = onFormatCellChangeRef.current;
+    if (isFormatMode && fmtCh && fmtChange) {
+      const cols = fmtCh.columns ?? formatColumns;
+      const noteCol = cols?.find(c => c.type === 'note');
+      if (!noteCol) return;
+      for (let row = 0; row < fmtCh.patternLength; row++) {
+        const note = fmtCh.rows[row]?.[noteCol.key] ?? 0;
+        if (note > 0 && note < 0xBD) {
+          const newNote = Math.max(1, Math.min(0xBC, note + semitones));
+          fmtChange(channelIndex, row, noteCol.key, newNote);
+        }
+      }
+      useUIStore.getState().setStatusMessage(`TRANSPOSE ${semitones > 0 ? '+' : ''}${semitones}`);
+      return;
+    }
     if (!pattern) return;
     for (let row = 0; row < pattern.length; row++) {
       const cell = pattern.channels[channelIndex].rows[row];
@@ -1379,9 +1444,13 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
       }
     }
     useUIStore.getState().setStatusMessage(`TRANSPOSE ${semitones > 0 ? '+' : ''}${semitones}`);
-  }, [pattern, setCell]);
+  }, [pattern, setCell, isFormatMode, formatColumns]);
 
   const handleHumanize = useCallback((channelIndex: number) => {
+    if (isFormatMode) {
+      useUIStore.getState().setStatusMessage('HUMANIZE N/A');
+      return;
+    }
     if (!pattern) return;
     for (let row = 0; row < pattern.length; row++) {
       const cell = pattern.channels[channelIndex].rows[row];
@@ -1392,9 +1461,13 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
       }
     }
     useUIStore.getState().setStatusMessage('HUMANIZED');
-  }, [pattern, setCell]);
+  }, [pattern, setCell, isFormatMode]);
 
   const handleInterpolate = useCallback((channelIndex: number) => {
+    if (isFormatMode) {
+      useUIStore.getState().setStatusMessage('INTERPOLATE N/A');
+      return;
+    }
     if (!pattern) return;
     const channel = pattern.channels[channelIndex];
     if (!channel) return;
@@ -1426,7 +1499,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
       setCell(channelIndex, row, { ...cell, volume: interpolatedVolume });
     }
     useUIStore.getState().setStatusMessage('INTERPOLATED');
-  }, [pattern, setCell]);
+  }, [pattern, setCell, isFormatMode]);
 
   // B/D Animation handler wrappers - use full channel or selection range
   const getBDAnimationOptions = useCallback((channelIndex: number) => {
