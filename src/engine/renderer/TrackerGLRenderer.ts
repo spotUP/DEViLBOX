@@ -425,7 +425,7 @@ export class TrackerGLRenderer {
       this.colors.textInstrument      = parseColor(theme.textInstrument);
       this.colors.textVolume          = parseColor(theme.textVolume);
       this.colors.textEffect          = parseColor(theme.textEffect);
-      this.colors.border              = parseColor(theme.border);
+      this.colors.border              = parseColor(theme.trackerBorder || theme.border);
       this.colors.lineNumber          = parseColor(theme.lineNumber);
       this.colors.lineNumberHighlight = parseColor(theme.lineNumberHighlight);
       this.colors.selection           = parseRgba(theme.selection);

@@ -166,7 +166,7 @@ export class TrackerCanvas2DRenderer {
     }
 
     // ── Channel separator lines ─────────────────────────────────────────────
-    ctx.strokeStyle = theme.border;
+    ctx.strokeStyle = theme.trackerBorder || theme.border;
     ctx.lineWidth   = 1;
     for (let ch = 0; ch < numChan; ch++) {
       const x = LINE_NUMBER_WIDTH + (chanOffsets[ch] ?? 0);
