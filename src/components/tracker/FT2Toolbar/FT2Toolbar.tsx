@@ -20,6 +20,8 @@ import { useTapTempo } from '@hooks/useTapTempo';
 import { getToneEngine } from '@engine/ToneEngine';
 import { getTrackerReplayer } from '@engine/TrackerReplayer';
 import { getTrackerScratchController } from '@engine/TrackerScratchController';
+import { useFormatStore } from '@stores/useFormatStore';
+import { useGTUltraStore } from '@stores/useGTUltraStore';
 import { Maximize2, Minimize2, MousePointerClick, ExternalLink } from 'lucide-react';
 import { focusPopout } from '@components/ui/PopOutWindow';
 import { VisualizerFrame } from '@components/visualization/VisualizerFrame';
@@ -199,6 +201,9 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = React.memo(({
 
 
   const { handleModuleImport: importModule } = useModuleImport();
+
+  const editorMode = useFormatStore((s) => s.editorMode);
+  const gtPlaying = useGTUltraStore((s) => s.playing);
 
   const engine = getToneEngine();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -526,6 +531,24 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = React.memo(({
     // before any async work (engine.init fetches WASM). Fire-and-forget is fine.
     Tone.start();
 
+    // GT Ultra: delegate to its own engine
+    const editorMode = useFormatStore.getState().editorMode;
+    if (editorMode === 'goattracker') {
+      const gtStore = useGTUltraStore.getState();
+      const gtEngine = gtStore.engine;
+      if (!gtEngine) return;
+      const ctx = Tone.getContext().rawContext as AudioContext;
+      if (ctx.state !== 'running') await ctx.resume();
+      if (gtStore.playing) {
+        gtEngine.stop();
+        gtStore.setPlaying(false);
+      } else {
+        gtEngine.play();
+        gtStore.setPlaying(true);
+      }
+      return;
+    }
+
     // If already playing, stop with turntable spin-down
     if (isPlaying) {
       getTrackerScratchController().triggerElectronicBrake(() => {
@@ -543,6 +566,24 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = React.memo(({
     // CRITICAL for iOS: Tone.start() MUST be called synchronously within user gesture
     Tone.start();
 
+    // GT Ultra: delegate to its own engine (pattern play = same as song play for GT)
+    const editorMode = useFormatStore.getState().editorMode;
+    if (editorMode === 'goattracker') {
+      const gtStore = useGTUltraStore.getState();
+      const gtEngine = gtStore.engine;
+      if (!gtEngine) return;
+      const ctx = Tone.getContext().rawContext as AudioContext;
+      if (ctx.state !== 'running') await ctx.resume();
+      if (gtStore.playing) {
+        gtEngine.stop();
+        gtStore.setPlaying(false);
+      } else {
+        gtEngine.play();
+        gtStore.setPlaying(true);
+      }
+      return;
+    }
+
     // If already playing, stop with turntable spin-down
     if (isPlaying) {
       getTrackerScratchController().triggerElectronicBrake(() => {
@@ -556,8 +597,9 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = React.memo(({
     await play();
   };
 
-  const isPlayingSong = isPlaying && !isLooping;
-  const isPlayingPattern = isPlaying && isLooping;
+  const isGT = editorMode === 'goattracker';
+  const isPlayingSong = isGT ? gtPlaying : (isPlaying && !isLooping);
+  const isPlayingPattern = isGT ? false : (isPlaying && isLooping);
 
   const handleLengthChange = (newLength: number) => {
     if (newLength >= 1 && newLength <= 256) resizePattern(currentPatternIndex, newLength);

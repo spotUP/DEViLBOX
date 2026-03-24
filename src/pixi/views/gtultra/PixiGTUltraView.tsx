@@ -17,7 +17,6 @@ import React, { useCallback, useMemo } from 'react';
 import type { Graphics as GraphicsType } from 'pixi.js';
 import { PIXI_FONTS } from '@/pixi/fonts';
 import { usePixiTheme } from '@/pixi/theme';
-import { PixiButton } from '@/pixi/components/PixiButton';
 import { PixiGTPatternGrid } from './PixiGTPatternGrid';
 import { PixiGTOrderList } from './PixiGTOrderList';
 import { PixiGTInstrumentPanel } from './PixiGTInstrumentPanel';
@@ -54,7 +53,6 @@ export const PixiGTUltraView: React.FC<Props> = ({ width, height }) => {
   // Wire GT keyboard handler (note entry, block ops, transport, undo/redo)
   useGTKeyboardHandler(true);
 
-  const playing = useGTUltraStore((s) => s.playing);
   const songName = useGTUltraStore((s) => s.songName);
   const songAuthor = useGTUltraStore((s) => s.songAuthor);
   const tempo = useGTUltraStore((s) => s.tempo);
@@ -106,17 +104,6 @@ export const PixiGTUltraView: React.FC<Props> = ({ width, height }) => {
   const stepText = useMemo(() => `Stp:${editStep}`, [editStep]);
   const songText = useMemo(() => `Song:${currentSong}`, [currentSong]);
   const plenText = useMemo(() => `Len:${patternLength.toString(16).toUpperCase()}`, [patternLength]);
-
-  const togglePlay = useCallback(() => {
-    if (!engine) return;
-    if (playing) {
-      engine.stop();
-      useGTUltraStore.getState().setPlaying(false);
-    } else {
-      engine.play();
-      useGTUltraStore.getState().setPlaying(true);
-    }
-  }, [engine, playing]);
 
   const toggleFollow = useCallback(() => {
     useGTUltraStore.getState().setFollowPlay(!followPlay);
@@ -207,16 +194,6 @@ export const PixiGTUltraView: React.FC<Props> = ({ width, height }) => {
         }}
       >
         <pixiGraphics draw={drawToolbar} layout={{ position: 'absolute', width, height: TOOLBAR_H }} />
-
-        {/* Play/Stop */}
-        <PixiButton
-          label=""
-          icon={playing ? 'stop' : 'play'}
-          variant="ft2"
-          size="sm"
-          color={playing ? 'red' : 'green'}
-          onClick={togglePlay}
-        />
 
         {/* Song name */}
         <pixiBitmapText
