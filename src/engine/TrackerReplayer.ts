@@ -23,6 +23,7 @@ import { StereoSeparationNode } from './StereoSeparationNode';
 // getNativeAudioNode used in audio-context utilities
 import { getPatternScheduler } from './PatternScheduler';
 import { useTransportStore, cancelPendingRowUpdate } from '@/stores/useTransportStore';
+import { useCursorStore } from '@/stores/useCursorStore';
 import { unlockIOSAudio } from '@utils/ios-audio-unlock';
 import { ft2NoteToPeriod, ft2Period2Hz, ft2GetSampleC4Rate } from './effects/FT2Tables';
 // HivelyEngine used via dynamic import
@@ -1672,12 +1673,17 @@ export class TrackerReplayer {
     // of PixiPatternEditor). Use lastDequeuedState (what was on screen) rather
     // than pattPos (which is ahead due to look-ahead scheduling).
     if (this.playing) {
+      // Drain the ring buffer up to NOW to get the most current audible position,
+      // not the stale lastDequeuedState from the previous rAF frame.
+      this.getStateAtTime(Tone.now());
       const lastVisual = this.lastDequeuedState;
-      if (lastVisual) {
-        useTransportStore.getState().setCurrentRow(lastVisual.row);
-      } else {
-        useTransportStore.getState().setCurrentRow(this.pattPos);
-      }
+      const stopRow = lastVisual ? lastVisual.row : this.pattPos;
+      useTransportStore.getState().setCurrentRow(stopRow);
+      // Move the editing cursor to the stop position so the pattern editor
+      // doesn't jump back to the pre-play cursor position on stop.
+      // Set cursor directly (not moveCursorToRow which would trigger a seek).
+      const cursorState = useCursorStore.getState();
+      useCursorStore.setState({ cursor: { ...cursorState.cursor, rowIndex: stopRow } });
     }
 
     this.playing = false;
