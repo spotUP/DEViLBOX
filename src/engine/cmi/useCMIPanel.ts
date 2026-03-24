@@ -14,15 +14,31 @@
  *  - Tab state
  */
 
-import { useState, useCallback, useMemo, useRef } from 'react';
+import { useState, useCallback, useMemo, useRef, useEffect } from 'react';
 import { useInstrumentStore, useUIStore } from '@stores';
 import { useMIDIStore } from '@stores/useMIDIStore';
 import { useShallow } from 'zustand/react/shallow';
+import { getToneEngine } from '@engine/ToneEngine';
 import {
   NUM_HARMONICS, WAVE_SAMPLES, WAVE_NAMES,
   generateFromHarmonics, getBuiltinHarmonics, getBuiltinWaveform,
   cutoffToHz, filterResponseDb, formatCutoffHz, generateEnvelopeCurve,
+  floatToUint8PCM,
 } from './cmi-dsp-utils';
+
+// ── Helper to get the live CMISynth instance from ToneEngine ───────────────
+
+function getCMISynthInstance(instrumentId: number | undefined): any | null {
+  if (instrumentId == null) return null;
+  try {
+    const engine = getToneEngine();
+    // MAME synths use shared key: (id << 16) | 0xFFFF
+    const key = (instrumentId << 16) | 0xFFFF;
+    const synth = engine.instruments.get(key);
+    if (synth && typeof (synth as any).loadSampleAll === 'function') return synth;
+    return null;
+  } catch { return null; }
+}
 
 // ── Re-export constants so renderers don't import cmi-dsp-utils directly ───
 export { NUM_HARMONICS, WAVE_SAMPLES, WAVE_NAMES, cutoffToHz, filterResponseDb, formatCutoffHz };
@@ -72,6 +88,7 @@ export interface CMIPanelState {
   found: boolean;
   instrumentName: string;
   chLabel: string;
+  instrumentId: number | undefined;
 
   // Params
   volume: number;
@@ -89,6 +106,11 @@ export interface CMIPanelState {
   builtinWaveform: Float32Array;
   envelopeCurve: { x: number; y: number }[];
 
+  // Sample state
+  sampleLoaded: boolean;
+  sampleName: string;
+  sampleWaveform: Float32Array | null;
+
   // Tab
   activeTab: CMITab;
   setActiveTab: (tab: CMITab) => void;
@@ -100,6 +122,8 @@ export interface CMIPanelState {
   // Callbacks
   handleParamChange: (key: string, value: number) => void;
   selectWavePreset: (bank: number) => void;
+  loadSampleFromFile: (file: File) => Promise<void>;
+  syncHarmonicsToEngine: () => void;
 
   // Harmonic editor (renderer-agnostic: takes x,y in 0..1 space)
   harmonicDragActive: React.MutableRefObject<boolean>;
@@ -161,6 +185,9 @@ export function useCMIPanel(props?: UseCMIPanelProps): CMIPanelState {
   const [activeTab, setActiveTab] = useState<CMITab>('harmonic');
   const [harmonics, setHarmonics] = useState<number[]>(() => getBuiltinHarmonics(0));
   const harmonicDragActive = useRef(false);
+  const [sampleLoaded, setSampleLoaded] = useState(false);
+  const [sampleName, setSampleName] = useState('');
+  const [sampleWaveform, setSampleWaveform] = useState<Float32Array | null>(null);
 
   // ── Computed data (all from shared cmi-dsp-utils) ────────────────────────
 
@@ -203,9 +230,74 @@ export function useCMIPanel(props?: UseCMIPanelProps): CMIPanelState {
     (bank: number) => {
       setHarmonics(getBuiltinHarmonics(bank));
       handleParamChange('wave_select', bank);
+      // Sync built-in waveform to engine
+      const synth = getCMISynthInstance(targetInstrument?.id);
+      if (synth) {
+        const wf = getBuiltinWaveform(bank);
+        synth.loadSampleAll(floatToUint8PCM(wf));
+      }
     },
-    [handleParamChange]
+    [handleParamChange, targetInstrument]
   );
+
+  // ── Sync harmonic editor waveform → WASM engine ─────────────────────────
+
+  const syncHarmonicsToEngine = useCallback(() => {
+    const synth = getCMISynthInstance(targetInstrument?.id);
+    if (!synth) return;
+    const wf = generateFromHarmonics(harmonics);
+    synth.loadSampleAll(floatToUint8PCM(wf));
+    setSampleName('Harmonic');
+    setSampleLoaded(true);
+    setSampleWaveform(wf);
+  }, [harmonics, targetInstrument]);
+
+  // Auto-sync harmonics to engine when drag ends
+  const prevHarmonicsRef = useRef(harmonics);
+  useEffect(() => {
+    if (prevHarmonicsRef.current !== harmonics && !harmonicDragActive.current) {
+      syncHarmonicsToEngine();
+    }
+    prevHarmonicsRef.current = harmonics;
+  }, [harmonics, syncHarmonicsToEngine]);
+
+  // ── Sample import from file (WAV/AIFF → 8-bit PCM → all voices) ─────────
+
+  const loadSampleFromFile = useCallback(async (file: File) => {
+    try {
+      const arrayBuffer = await file.arrayBuffer();
+      const audioCtx = new AudioContext();
+      const decoded = await audioCtx.decodeAudioData(arrayBuffer);
+      audioCtx.close();
+
+      // Take mono channel, resample to 16KB max
+      const src = decoded.getChannelData(0);
+      const maxSamples = 16384;
+      const outLen = Math.min(src.length, maxSamples);
+      const ratio = src.length / outLen;
+      const floatSamples = new Float32Array(outLen);
+      for (let i = 0; i < outLen; i++) {
+        floatSamples[i] = src[Math.min(Math.floor(i * ratio), src.length - 1)];
+      }
+
+      // Normalize peak to ±1
+      let peak = 0;
+      for (let i = 0; i < floatSamples.length; i++) peak = Math.max(peak, Math.abs(floatSamples[i]));
+      if (peak > 0) for (let i = 0; i < floatSamples.length; i++) floatSamples[i] /= peak;
+
+      // Load into engine
+      const synth = getCMISynthInstance(targetInstrument?.id);
+      if (synth) synth.loadSampleAll(floatToUint8PCM(floatSamples));
+
+      setSampleName(file.name.replace(/\.[^.]+$/, ''));
+      setSampleLoaded(true);
+      setSampleWaveform(floatSamples);
+
+      console.log(`[CMI] Loaded "${file.name}" — ${outLen} samples → 8-bit PCM → all voices`);
+    } catch (err) {
+      console.error('[CMI] Sample load error:', err);
+    }
+  }, [targetInstrument]);
 
   // ── Harmonic editor (renderer-agnostic: normalized 0..1 coords) ──────────
 
@@ -235,16 +327,19 @@ export function useCMIPanel(props?: UseCMIPanelProps): CMIPanelState {
     found: !!targetInstrument,
     instrumentName: targetInstrument?.name ?? '',
     chLabel,
+    instrumentId: targetInstrument?.id,
 
     volume, waveSelect, waveBank, cutoff, filterTrack, attackTime, releaseTime, envRate,
 
     harmonics, customWaveform, builtinWaveform, envelopeCurve,
 
+    sampleLoaded, sampleName, sampleWaveform,
+
     activeTab, setActiveTab,
     collapsed: cmiCollapsed,
     toggleCollapsed: toggleCMICollapsed,
 
-    handleParamChange, selectWavePreset,
+    handleParamChange, selectWavePreset, loadSampleFromFile, syncHarmonicsToEngine,
     harmonicDragActive, updateHarmonicAt, startHarmonicDrag, endHarmonicDrag,
   };
 }
