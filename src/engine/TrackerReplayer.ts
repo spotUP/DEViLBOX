@@ -1667,6 +1667,13 @@ export class TrackerReplayer {
   }
 
   stop(): void {
+    // Sync transport store to actual playback position before stopping.
+    // The pattern editor reads currentRow from the store when stopped —
+    // if we don't sync, it shows a stale/throttled value (often row 0).
+    if (this.playing) {
+      useTransportStore.getState().setCurrentRow(this.pattPos);
+    }
+
     this.playing = false;
     this._playGeneration++; // Invalidate any in-flight async play()
 
