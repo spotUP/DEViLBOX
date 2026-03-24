@@ -25,6 +25,7 @@ import { useResponsiveSafe } from '@contexts/ResponsiveContext';
 import { haptics } from '@/utils/haptics';
 import { getTrackerReplayer } from '@engine/TrackerReplayer';
 import { getTrackerScratchController } from '@engine/TrackerScratchController';
+import { getFormatPlaybackState } from '@engine/FormatPlaybackState';
 import * as Tone from 'tone';
 import { useSettingsStore } from '@stores/useSettingsStore';
 import { useFormatStore } from '@stores/useFormatStore';
@@ -1857,8 +1858,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
     const tick = () => {
       // FORMAT MODE: use format engine's playback state (skip all tracker store reads)
       if (isFormatModeRef.current) {
-        const newPlaying = formatIsPlayingRef.current;
-        const bridge     = bridgeRef.current;
+        const bridge = bridgeRef.current;
 
         if (bridge) {
           // FIX: If formatChannels changed since last send, post 'patterns' FIRST so
@@ -1878,26 +1878,23 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
             prevRow = -1;
           }
 
-          // Read frame-accurate row from replayer instead of throttled transport store
-          let newRow = formatCurrentRowRef.current;
+          // Read frame-accurate row from FormatPlaybackState (updated by format engines)
+          // instead of the standard TrackerReplayer which has no format engine state.
+          const fps = getFormatPlaybackState();
+          const newPlaying = fps.isPlaying;
+          let newRow = fps.isPlaying ? fps.row : formatCurrentRowRef.current;
           let smoothOffset = 0;
-          if (newPlaying) {
-            const replayer = getTrackerReplayer();
-            const audioTime = Tone.now() + 0.01;
-            const audioState = replayer.getStateAtTime(audioTime);
-            if (audioState) {
-              newRow = audioState.row;
-              // Compute smooth scroll offset (same formula as classic mode)
-              const transportState = useTransportStore.getState();
-              if (transportState.smoothScrolling && audioState.duration > 0) {
-                const progress = Math.min(Math.max(
-                  (audioTime - audioState.time) / audioState.duration, 0), 1);
-                smoothOffset = progress * rowHeightRef.current;
-              }
+
+          if (fps.isPlaying && fps.rowDuration > 0) {
+            const elapsed = performance.now() - fps.rowChangeTime;
+            const progress = Math.min(Math.max(elapsed / fps.rowDuration, 0), 1);
+            const transportState = useTransportStore.getState();
+            if (transportState.smoothScrolling) {
+              smoothOffset = progress * rowHeightRef.current;
             }
           }
 
-          // Always send during playback for smooth scrolling; dedup when stopped
+          // Send EVERY frame during playback for smooth scrolling; dedup when stopped
           const shouldSend = newPlaying ||
             newRow !== prevRow || newPlaying !== prevPlaying;
           if (shouldSend) {
