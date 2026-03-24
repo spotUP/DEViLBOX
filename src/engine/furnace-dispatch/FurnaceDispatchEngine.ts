@@ -1264,7 +1264,7 @@ export class FurnaceDispatchEngine {
         break;
 
       case 'debug':
-        console.log(data.msg);
+        if ((window as any).FURNACE_DEBUG) console.log(data.msg);
         break;
     }
   }
@@ -1347,8 +1347,8 @@ export class FurnaceDispatchEngine {
    */
   dispatch(cmd: number, chan: number, val1: number = 0, val2: number = 0, platformType?: number, time?: number): void {
     if (!this.workletNode) return;
-    // Log note/instrument commands for debugging
-    if (cmd === DivCmd.NOTE_ON || cmd === DivCmd.INSTRUMENT) {
+    // Log note/instrument commands for debugging (gated — fires per note)
+    if ((window as any).FURNACE_DEBUG && (cmd === DivCmd.NOTE_ON || cmd === DivCmd.INSTRUMENT)) {
       const cmdName = cmd === DivCmd.NOTE_ON ? 'NOTE_ON' : 'INSTRUMENT';
       console.log(`[FurnaceDispatch] ${cmdName} ch=${chan} val1=${val1} val2=${val2} platform=${platformType} time=${time?.toFixed(4)}`);
     }
