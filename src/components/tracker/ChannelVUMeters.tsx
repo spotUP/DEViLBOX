@@ -212,8 +212,8 @@ export const ChannelVUMeters: React.FC<ChannelVUMetersProps> = memo(({ channelOf
         const channelW = widths[i] || 260;
         const channelX = offsets[i] !== undefined ? offsets[i] - LINE_NUMBER_WIDTH - sl : i * 260 - sl;
 
-        // Edit row Y — segments extrude from this line both up and down
-        const ery = editRowYRef.current;
+        // Edit row Y — segments extrude from this line, offset up to avoid drawing over the edit bar
+        const ery = editRowYRef.current - 12;
 
         if (vuStyle === 'fill') {
           // Fill style: theme-colored rectangle, very subtle
