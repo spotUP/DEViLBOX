@@ -7,7 +7,7 @@
  * DOM reference: src/components/dialogs/SettingsModal.tsx
  */
 
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useCallback } from 'react';
 import type { FederatedPointerEvent, FederatedWheelEvent, Graphics as GraphicsType } from 'pixi.js';
 import { useApplication } from '@pixi/react';
 import { PixiButton, PixiCheckbox, PixiSlider, PixiNumericInput, PixiIcon } from '../components';
@@ -18,35 +18,28 @@ import { PIXI_FONTS } from '../fonts';
 import { Div, Txt } from '../layout';
 
 import { useUIStore } from '@stores/useUIStore';
-import { useThemeStore, themes } from '@stores/useThemeStore';
-import { useSettingsStore, type SIDEngineType, type CRTParams } from '@stores/useSettingsStore';
+import { themes } from '@stores/useThemeStore';
+import { type SIDEngineType } from '@stores/useSettingsStore';
 import { pickFile } from '../services/glFilePicker';
 import { LENS_PRESETS, LENS_PRESET_ORDER } from '../LensFilter';
 import { SID_ENGINES } from '@engine/deepsid/DeepSIDEngineManager';
-import { useKeyboardStore } from '@stores/useKeyboardStore';
-import { useEditorStore } from '@stores/useEditorStore';
-import { useAudioStore } from '@stores/useAudioStore';
-import { useModlandContributionModal } from '@stores/useModlandContributionModal';
-import { getTrackerReplayer } from '@engine/TrackerReplayer';
-import { getDJEngineIfActive } from '@engine/dj/DJEngine';
-import { BG_MODES, getBgModeLabel } from '@/components/tracker/TrackerVisualBackground';
-import { getASIDDeviceManager, isASIDSupported } from '@lib/sid/ASIDDeviceManager';
+import { getASIDDeviceManager } from '@lib/sid/ASIDDeviceManager';
 import { notify } from '@stores';
 import { useModalClose } from '@hooks/useDialogKeyboard';
-
-// ── Tab definitions ────────────────────────────────────────────────────────────
-
-type SettingsTab = 'general' | 'audio' | 'visual' | 'recording' | 'input' | 'sid' | 'about';
-
-const TABS: Array<{ id: SettingsTab; label: string }> = [
-  { id: 'general', label: 'General' },
-  { id: 'audio', label: 'Audio' },
-  { id: 'visual', label: 'Visual' },
-  { id: 'recording', label: 'Recording' },
-  { id: 'input', label: 'Input' },
-  { id: 'sid', label: 'SID' },
-  { id: 'about', label: 'About' },
-];
+import {
+  useSettingsDialog,
+  SETTINGS_TABS,
+  KEYBOARD_SCHEMES,
+  CRT_SLIDERS,
+  LENS_SLIDERS,
+  RENDER_MODE_OPTIONS,
+  NUMBER_FORMAT_OPTIONS,
+  EDIT_MODE_OPTIONS,
+  QUANT_RES_OPTIONS,
+  PLATFORM_OPTIONS,
+  STEREO_MODE_OPTIONS,
+  VU_MODE_OPTIONS,
+} from '@hooks/dialogs/useSettingsDialog';
 
 // ── Constants ──────────────────────────────────────────────────────────────────
 
@@ -56,85 +49,12 @@ const CONTENT_W = MODAL_W - 30;
 const SLIDER_W = 200;
 const LABEL_W = 130;
 
-const KEYBOARD_SCHEMES = [
-  { value: 'fasttracker2', label: 'FastTracker 2', description: 'Classic FT2 layout (DOS/PC) - from ft2-clone source' },
-  { value: 'impulse-tracker', label: 'Impulse Tracker', description: 'IT/Schism Tracker style - from schismtracker source' },
-  { value: 'protracker', label: 'ProTracker', description: 'Amiga MOD tracker layout - from pt2-clone source' },
-  { value: 'octamed', label: 'OctaMED SoundStudio', description: 'Amiga OctaMED layout - from official documentation' },
-  { value: 'renoise', label: 'Renoise', description: 'Modern DAW/tracker layout - from official documentation' },
-  { value: 'openmpt', label: 'OpenMPT', description: 'ModPlug Tracker layout - from official wiki documentation' },
-];
-
-const KEYBOARD_SCHEME_OPTIONS: SelectOption[] = KEYBOARD_SCHEMES.map(s => ({ value: s.value, label: s.label }));
 
 // Built dynamically since themes list can change when custom theme is added
 function getThemeOptions(): SelectOption[] {
   return themes.map((t) => ({ value: t.id, label: t.name }));
 }
 
-const RENDER_MODE_OPTIONS: SelectOption[] = [
-  { value: 'dom', label: 'DOM (React + Tailwind)' },
-  { value: 'webgl', label: 'WebGL (PixiJS v8)' },
-];
-
-const NUMBER_FORMAT_OPTIONS: SelectOption[] = [
-  { value: 'hex', label: 'Hexadecimal' },
-  { value: 'dec', label: 'Decimal' },
-];
-
-const EDIT_MODE_OPTIONS: SelectOption[] = [
-  { value: 'overwrite', label: 'Overwrite' },
-  { value: 'insert', label: 'Insert (Shift Rows)' },
-];
-
-const QUANT_RES_OPTIONS: SelectOption[] = [
-  { value: '1', label: '1 row' },
-  { value: '2', label: '2 rows' },
-  { value: '4', label: '4 rows (1/4)' },
-  { value: '8', label: '8 rows (1/2)' },
-  { value: '16', label: '16 rows (1 beat)' },
-];
-
-const PLATFORM_OPTIONS: SelectOption[] = [
-  { value: 'auto', label: 'Auto-detect' },
-  { value: 'mac', label: 'Mac (Cmd)' },
-  { value: 'pc', label: 'PC (Ctrl)' },
-];
-
-const STEREO_MODE_OPTIONS: SelectOption[] = [
-  { value: 'pt2', label: 'PT2-Clone' },
-  { value: 'modplug', label: 'ModPlug' },
-];
-
-const VU_MODE_OPTIONS: SelectOption[] = [
-  { value: 'trigger', label: 'Trigger' },
-  { value: 'realtime', label: 'Realtime' },
-];
-
-// CRT slider definitions — labels match DOM SettingsModal 1:1
-interface CRTSliderDef {
-  key: keyof CRTParams;
-  label: string;
-  min: number;
-  max: number;
-  step: number;
-  group: string;
-}
-
-const CRT_SLIDERS: CRTSliderDef[] = [
-  { key: 'scanlineIntensity', label: 'Intensity',       min: 0,   max: 1,    step: 0.01,  group: 'SCANLINES' },
-  { key: 'scanlineCount',     label: 'Count',           min: 50,  max: 1200, step: 1,     group: 'SCANLINES' },
-  { key: 'adaptiveIntensity', label: 'Adaptive',        min: 0,   max: 1,    step: 0.01,  group: 'SCANLINES' },
-  { key: 'brightness',        label: 'Brightness',      min: 0.6, max: 1.8,  step: 0.01,  group: 'COLOR' },
-  { key: 'contrast',          label: 'Contrast',        min: 0.6, max: 1.8,  step: 0.01,  group: 'COLOR' },
-  { key: 'saturation',        label: 'Saturation',      min: 0,   max: 2,    step: 0.01,  group: 'COLOR' },
-  { key: 'bloomIntensity',    label: 'Bloom Intensity', min: 0,   max: 1.5,  step: 0.01,  group: 'EFFECTS' },
-  { key: 'bloomThreshold',    label: 'Bloom Threshold', min: 0,   max: 1,    step: 0.01,  group: 'EFFECTS' },
-  { key: 'rgbShift',          label: 'RGB Shift',       min: 0,   max: 1,    step: 0.01,  group: 'EFFECTS' },
-  { key: 'vignetteStrength',  label: 'Vignette',        min: 0,   max: 2,    step: 0.01,  group: 'FRAMING' },
-  { key: 'curvature',         label: 'Curvature',       min: 0,   max: 0.5,  step: 0.005, group: 'FRAMING' },
-  { key: 'flickerStrength',   label: 'Flicker',         min: 0,   max: 0.15, step: 0.001, group: 'FRAMING' },
-];
 
 // ── Sub-components ─────────────────────────────────────────────────────────────
 
@@ -170,238 +90,27 @@ interface PixiSettingsModalProps {
 export const PixiSettingsModal: React.FC<PixiSettingsModalProps> = ({ isOpen, onClose }) => {
   const theme = usePixiTheme();
   const { app } = useApplication();
-  const [activeTab, setActiveTab] = useState<SettingsTab>('general');
 
   // Standard modal keyboard handling (Enter/Escape to close)
   useModalClose({ isOpen, onClose });
 
-  // ── Store hooks ──────────────────────────────────────────────────────────
-  const useHexNumbers = useUIStore((s) => s.useHexNumbers);
-  const setUseHexNumbers = useUIStore((s) => s.setUseHexNumbers);
-  const blankEmptyCells = useUIStore((s) => s.blankEmptyCells);
-  const setBlankEmptyCells = useUIStore((s) => s.setBlankEmptyCells);
-  const tb303Collapsed = useUIStore((s) => s.tb303Collapsed);
-  const setTB303Collapsed = useUIStore((s) => s.setTB303Collapsed);
-  const oscilloscopeVisible = useUIStore((s) => s.oscilloscopeVisible);
-  const setOscilloscopeVisible = useUIStore((s) => s.setOscilloscopeVisible);
-  const scratchEnabled = useUIStore((s) => s.scratchEnabled);
-  const setScratchEnabled = useUIStore((s) => s.setScratchEnabled);
-  const scratchAcceleration = useUIStore((s) => s.scratchAcceleration);
-  const setScratchAcceleration = useUIStore((s) => s.setScratchAcceleration);
-  const platterMass = useUIStore((s) => s.platterMass);
-  const setPlatterMass = useUIStore((s) => s.setPlatterMass);
+  // ── Shared settings dialog logic ─────────────────────────────────────────
+  const s = useSettingsDialog({ isOpen });
 
-  const currentThemeId = useThemeStore((s) => s.currentThemeId);
-  const setTheme = useThemeStore((s) => s.setTheme);
-  const customThemeColors = useThemeStore((s) => s.customThemeColors);
-  const copyThemeToCustom = useThemeStore((s) => s.copyThemeToCustom);
-
-  const customBannerImage = useSettingsStore((s) => s.customBannerImage);
-  const setCustomBannerImage = useSettingsStore((s) => s.setCustomBannerImage);
-  const welcomeJingleEnabled = useSettingsStore((s) => s.welcomeJingleEnabled);
-  const setWelcomeJingleEnabled = useSettingsStore((s) => s.setWelcomeJingleEnabled);
-
-  const amigaLimits = useSettingsStore((s) => s.amigaLimits);
-  const setAmigaLimits = useSettingsStore((s) => s.setAmigaLimits);
-  const linearInterpolation = useSettingsStore((s) => s.linearInterpolation);
-  const setLinearInterpolation = useSettingsStore((s) => s.setLinearInterpolation);
-  const useBLEP = useSettingsStore((s) => s.useBLEP);
-  const setUseBLEP = useSettingsStore((s) => s.setUseBLEP);
-  const stereoSeparation = useSettingsStore((s) => s.stereoSeparation);
-  const setStereoSeparation = useSettingsStore((s) => s.setStereoSeparation);
-  const stereoSeparationMode = useSettingsStore((s) => s.stereoSeparationMode);
-  const setStereoSeparationMode = useSettingsStore((s) => s.setStereoSeparationMode);
-  const modplugSeparation = useSettingsStore((s) => s.modplugSeparation);
-  const setModplugSeparation = useSettingsStore((s) => s.setModplugSeparation);
-  const midiPolyphonic = useSettingsStore((s) => s.midiPolyphonic);
-  const setMidiPolyphonic = useSettingsStore((s) => s.setMidiPolyphonic);
-  const vuMeterMode = useSettingsStore((s) => s.vuMeterMode);
-  const setVuMeterMode = useSettingsStore((s) => s.setVuMeterMode);
-  const vuMeterSwing = useSettingsStore((s) => s.vuMeterSwing);
-  const setVuMeterSwing = useSettingsStore((s) => s.setVuMeterSwing);
-  const wobbleWindows = useSettingsStore((s) => s.wobbleWindows);
-  const setWobbleWindows = useSettingsStore((s) => s.setWobbleWindows);
-  const trackerVisualBg = useSettingsStore((s) => s.trackerVisualBg);
-  const setTrackerVisualBg = useSettingsStore((s) => s.setTrackerVisualBg);
-  const trackerVisualMode = useSettingsStore((s) => s.trackerVisualMode);
-  const setTrackerVisualMode = useSettingsStore((s) => s.setTrackerVisualMode);
-  const renderMode = useSettingsStore((s) => s.renderMode);
-  const setRenderMode = useSettingsStore((s) => s.setRenderMode);
-  const crtEnabled = useSettingsStore((s) => s.crtEnabled);
-  const setCrtEnabled = useSettingsStore((s) => s.setCrtEnabled);
-  const crtParams = useSettingsStore((s) => s.crtParams);
-  const setCrtParam = useSettingsStore((s) => s.setCrtParam);
-  const resetCrtParams = useSettingsStore((s) => s.resetCrtParams);
-  const lensEnabled = useSettingsStore((s) => s.lensEnabled);
-  const setLensEnabled = useSettingsStore((s) => s.setLensEnabled);
-  const lensPreset = useSettingsStore((s) => s.lensPreset);
-  const setLensPreset = useSettingsStore((s) => s.setLensPreset);
-  const lensParams = useSettingsStore((s) => s.lensParams);
-  const setLensParam = useSettingsStore((s) => s.setLensParam);
-  const resetLensParams = useSettingsStore((s) => s.resetLensParams);
-  const sidEngine = useSettingsStore((s) => s.sidEngine);
-  const setSidEngine = useSettingsStore((s) => s.setSidEngine);
-  const setAsidEnabled = useSettingsStore((s) => s.setAsidEnabled);
-  const asidDeviceId = useSettingsStore((s) => s.asidDeviceId);
-  const setAsidDeviceId = useSettingsStore((s) => s.setAsidDeviceId);
-  const asidDeviceAddress = useSettingsStore((s) => s.asidDeviceAddress);
-  const setAsidDeviceAddress = useSettingsStore((s) => s.setAsidDeviceAddress);
-  const sidHardwareMode = useSettingsStore((s) => s.sidHardwareMode);
-  const setSidHardwareMode = useSettingsStore((s) => s.setSidHardwareMode);
-  const webusbClockRate = useSettingsStore((s) => s.webusbClockRate);
-  const setWebusbClockRate = useSettingsStore((s) => s.setWebusbClockRate);
-  const webusbStereo = useSettingsStore((s) => s.webusbStereo);
-  const setWebusbStereo = useSettingsStore((s) => s.setWebusbStereo);
-
-  const sampleBusGain = useAudioStore((s) => s.sampleBusGain);
-  const setSampleBusGain = useAudioStore((s) => s.setSampleBusGain);
-  const synthBusGain = useAudioStore((s) => s.synthBusGain);
-  const setSynthBusGain = useAudioStore((s) => s.setSynthBusGain);
-  const autoGain = useAudioStore((s) => s.autoGain);
-  const setAutoGain = useAudioStore((s) => s.setAutoGain);
-
-  const editStep = useEditorStore((s) => s.editStep);
-  const setEditStep = useEditorStore((s) => s.setEditStep);
-  const insertMode = useEditorStore((s) => s.insertMode);
-  const toggleInsertMode = useEditorStore((s) => s.toggleInsertMode);
-  const recQuantEnabled = useEditorStore((s) => s.recQuantEnabled);
-  const setRecQuantEnabled = useEditorStore((s) => s.setRecQuantEnabled);
-  const recQuantRes = useEditorStore((s) => s.recQuantRes);
-  const setRecQuantRes = useEditorStore((s) => s.setRecQuantRes);
-  const recReleaseEnabled = useEditorStore((s) => s.recReleaseEnabled);
-  const setRecReleaseEnabled = useEditorStore((s) => s.setRecReleaseEnabled);
-
-  const activeScheme = useKeyboardStore((s) => s.activeScheme);
-  const setActiveScheme = useKeyboardStore((s) => s.setActiveScheme);
-  const platformOverride = useKeyboardStore((s) => s.platformOverride);
-  const setPlatformOverride = useKeyboardStore((s) => s.setPlatformOverride);
-
-  // ── Local state ──────────────────────────────────────────────────────────
-  const [isFullscreen, setIsFullscreen] = useState(!!document.fullscreenElement);
-  const [asidDevices, setAsidDevices] = useState<Array<{ id: string; name: string }>>([]);
-  const [asidSupported, setAsidSupported] = useState(false);
-  const [webusbSupported] = useState(() => typeof navigator !== 'undefined' && 'usb' in navigator);
-  const [webusbConnected, setWebusbConnected] = useState(false);
-  const [webusbDeviceName, setWebusbDeviceName] = useState<string | null>(null);
-  const [webusbFirmware, setWebusbFirmware] = useState<string | null>(null);
-  const [webusbChips, setWebusbChips] = useState<Array<{ slot: number; detected: boolean; type?: string }> | null>(null);
-
-  // Fullscreen change listener
-  useEffect(() => {
-    if (!isOpen) return;
-    const handleFSChange = () => setIsFullscreen(!!document.fullscreenElement);
-    document.addEventListener('fullscreenchange', handleFSChange);
-    return () => document.removeEventListener('fullscreenchange', handleFSChange);
-  }, [isOpen]);
-
-  // ASID device init
-  useEffect(() => {
-    if (!isOpen) return;
-    setAsidSupported(isASIDSupported());
-    if (isASIDSupported()) {
-      const manager = getASIDDeviceManager();
-      manager.init().then(() => {
-        setAsidDevices(manager.getDevices().map((d) => ({ id: d.id, name: d.name })));
-      });
-      const unsubscribe = manager.onStateChange((state) => {
-        setAsidDevices(state.devices.map((d) => ({ id: d.id, name: d.name })));
-      });
-      return unsubscribe;
-    }
-  }, [isOpen]);
-
-  // ── Handlers ─────────────────────────────────────────────────────────────
-  const toggleFullscreen = useCallback(async () => {
-    try {
-      if (!document.fullscreenElement) {
-        await document.documentElement.requestFullscreen();
-      } else {
-        await document.exitFullscreen();
-      }
-    } catch (err) {
-      console.error('Failed to toggle fullscreen:', err);
-    }
-  }, []);
-
-  const handleStereoSepChange = useCallback(
-    (v: number) => {
-      setStereoSeparation(v);
-      getTrackerReplayer().setStereoSeparation(v);
-      const djEng = getDJEngineIfActive();
-      if (djEng) {
-        djEng.deckA.replayer.setStereoSeparation(v);
-        djEng.deckB.replayer.setStereoSeparation(v);
-      }
-    },
-    [setStereoSeparation],
-  );
-
-  const handleModplugSepChange = useCallback(
-    (v: number) => {
-      setModplugSeparation(v);
-      getTrackerReplayer().setModplugSeparation(v);
-      const djEng = getDJEngineIfActive();
-      if (djEng) {
-        djEng.deckA.replayer.setModplugSeparation(v);
-        djEng.deckB.replayer.setModplugSeparation(v);
-      }
-    },
-    [setModplugSeparation],
-  );
-
-  const handleStereoModeChange = useCallback(
-    (v: string) => {
-      const mode = v as 'pt2' | 'modplug';
-      setStereoSeparationMode(mode);
-      getTrackerReplayer().setStereoSeparationMode(mode);
-      const djEng = getDJEngineIfActive();
-      if (djEng) {
-        djEng.deckA.replayer.setStereoSeparationMode(mode);
-        djEng.deckB.replayer.setStereoSeparationMode(mode);
-      }
-    },
-    [setStereoSeparationMode],
-  );
-
-  const handleClearState = useCallback(() => {
-    navigator.serviceWorker
-      .getRegistrations()
-      .then((regs) => Promise.all(regs.map((r) => r.unregister())))
-      .then(() => caches.keys())
-      .then((keys) => Promise.all(keys.map((k) => caches.delete(k))))
-      .then(() => {
-        localStorage.clear();
-        return indexedDB.databases();
-      })
-      .then((dbs) => Promise.all(dbs.map((db) => indexedDB.deleteDatabase(db.name!))))
-      .then(() => location.reload());
-  }, []);
-
-  // ── Derived data ─────────────────────────────────────────────────────────
-  const visualModeOptions: SelectOption[] = useMemo(
-    () => BG_MODES.map((bg, i) => ({ value: String(i), label: getBgModeLabel(bg) })),
-    [],
-  );
-
-  const asidDeviceOptions: SelectOption[] = useMemo(
-    () =>
-      asidDevices.length === 0
-        ? [{ value: '', label: 'No ASID devices found' }]
-        : [{ value: '', label: 'Select a device...' }, ...asidDevices.map((d) => ({ value: d.id, label: d.name }))],
-    [asidDevices],
-  );
+  // Compute keyboard scheme options from shared constant (id/name → value/label)
+  const keyboardSchemeOptions: SelectOption[] = KEYBOARD_SCHEMES.map(k => ({ value: k.id, label: k.name }));
 
   // Computations are safe regardless of isOpen (no null dereference risk)
 
   // Estimate total content height for the scroll view
-  const crtSectionH = crtEnabled ? CRT_SLIDERS.length * 28 + 4 * 18 + 60 : 40;
-  const lensSectionH = lensEnabled ? 3 * 28 + 2 * 18 + 60 + 40 : 40;
+  const crtSectionH = s.crtEnabled ? CRT_SLIDERS.length * 28 + 4 * 18 + 60 : 40;
+  const lensSectionH = s.lensEnabled ? LENS_SLIDERS.length * 28 + 2 * 18 + 60 + 40 : 40;
   const contentH = 2000 + crtSectionH + lensSectionH;
   const scrollAreaH = MODAL_H - 48 - 44; // header + footer
 
   // CRT sliders grouped
   const crtGroups: string[] = [];
-  CRT_SLIDERS.forEach((s) => { if (!crtGroups.includes(s.group)) crtGroups.push(s.group); });
+  CRT_SLIDERS.forEach((slider) => { if (!crtGroups.includes(slider.group)) crtGroups.push(slider.group); });
 
   let screenW = 1920;
   let screenH = 1080;
@@ -500,15 +209,15 @@ export const PixiSettingsModal: React.FC<PixiSettingsModalProps> = ({ isOpen, on
             alignItems: 'center',
           }}
         >
-          {TABS.map((tab) => {
-            const isActive = activeTab === tab.id;
+          {SETTINGS_TABS.map((tab) => {
+            const isActive = s.activeTab === tab.id;
             return (
               <layoutContainer
                 key={tab.id}
                 eventMode="static"
                 cursor="pointer"
-                onPointerDown={() => setActiveTab(tab.id)}
-                onClick={() => setActiveTab(tab.id)}
+                onPointerDown={() => s.setActiveTab(tab.id)}
+                onClick={() => s.setActiveTab(tab.id)}
                 layout={{
                   paddingLeft: 12,
                   paddingRight: 12,
@@ -544,20 +253,20 @@ export const PixiSettingsModal: React.FC<PixiSettingsModalProps> = ({ isOpen, on
           {/* ═══════════════════════════════════════════════════════════════════
               GENERAL TAB — Display, Layout
               ═══════════════════════════════════════════════════════════════════ */}
-          <layoutContainer renderable={activeTab === 'general'} layout={{ width: CONTENT_W, height: activeTab === 'general' ? contentH : 0, overflow: 'hidden', flexDirection: 'column', gap: 12 }}>
+          <layoutContainer renderable={s.activeTab === 'general'} layout={{ width: CONTENT_W, height: s.activeTab === 'general' ? contentH : 0, overflow: 'hidden', flexDirection: 'column', gap: 12 }}>
           {/* ═══════ DISPLAY ═══════ */}
           <SectionHeader text="DISPLAY" />
 
           <SettingRow label="Theme:">
             <PixiSelect
               options={getThemeOptions()}
-              value={currentThemeId}
-              onChange={setTheme}
+              value={s.currentThemeId}
+              onChange={s.setTheme}
               width={180}
             />
           </SettingRow>
 
-          {currentThemeId === 'custom' && customThemeColors && (
+          {s.currentThemeId === 'custom' && s.customThemeColors && (
             <SettingRow label="" description="Edit colors in DOM mode (Settings > Theme)">
               <Div className="flex-row gap-1">
                 {themes.filter(t => t.id !== 'custom').map(t => (
@@ -566,7 +275,7 @@ export const PixiSettingsModal: React.FC<PixiSettingsModalProps> = ({ isOpen, on
                     label={t.name}
                     variant="ghost"
                     size="sm"
-                    onClick={() => copyThemeToCustom(t.id)}
+                    onClick={() => s.copyThemeToCustom(t.id)}
                   />
                 ))}
               </Div>
@@ -587,16 +296,16 @@ export const PixiSettingsModal: React.FC<PixiSettingsModalProps> = ({ isOpen, on
                     return;
                   }
                   const reader = new FileReader();
-                  reader.onload = () => setCustomBannerImage(reader.result as string);
+                  reader.onload = () => s.setCustomBannerImage(reader.result as string);
                   reader.readAsDataURL(file);
                 }}
               />
-              {customBannerImage && (
+              {s.customBannerImage && (
                 <PixiButton
                   label="Remove"
                   variant="ghost"
                   size="sm"
-                  onClick={() => setCustomBannerImage(null)}
+                  onClick={() => s.setCustomBannerImage(null)}
                 />
               )}
             </Div>
@@ -605,8 +314,8 @@ export const PixiSettingsModal: React.FC<PixiSettingsModalProps> = ({ isOpen, on
           <SettingRow label="UI Render Mode:" description="Switch between DOM and WebGL rendering">
             <PixiSelect
               options={RENDER_MODE_OPTIONS}
-              value={renderMode}
-              onChange={(v) => setRenderMode(v as 'dom' | 'webgl')}
+              value={s.renderMode}
+              onChange={(v) => s.setRenderMode(v as 'dom' | 'webgl')}
               width={200}
             />
           </SettingRow>
@@ -614,50 +323,50 @@ export const PixiSettingsModal: React.FC<PixiSettingsModalProps> = ({ isOpen, on
           <SettingRow label="Number Format:">
             <PixiSelect
               options={NUMBER_FORMAT_OPTIONS}
-              value={useHexNumbers ? 'hex' : 'dec'}
-              onChange={(v) => setUseHexNumbers(v === 'hex')}
+              value={s.useHexNumbers ? 'hex' : 'dec'}
+              onChange={(v) => s.setUseHexNumbers(v === 'hex')}
               width={150}
             />
           </SettingRow>
 
           <SettingRow label="Blank Empty Cells:" description="Hide ---, .., ... on empty rows">
-            <PixiCheckbox checked={blankEmptyCells} onChange={setBlankEmptyCells} />
+            <PixiCheckbox checked={s.blankEmptyCells} onChange={s.setBlankEmptyCells} />
           </SettingRow>
 
           {/* ═══════ LAYOUT ═══════ */}
           <SectionHeader text="LAYOUT" />
 
           <SettingRow label="TB-303 Panel:">
-            <PixiCheckbox checked={!tb303Collapsed} onChange={(v) => setTB303Collapsed(!v)} />
+            <PixiCheckbox checked={!s.tb303Collapsed} onChange={(v) => s.setTB303Collapsed(!v)} />
           </SettingRow>
 
           <SettingRow label="Oscilloscope:">
-            <PixiCheckbox checked={oscilloscopeVisible} onChange={setOscilloscopeVisible} />
+            <PixiCheckbox checked={s.oscilloscopeVisible} onChange={s.setOscilloscopeVisible} />
           </SettingRow>
 
           <SettingRow label="Fullscreen:">
-            <PixiCheckbox checked={isFullscreen} onChange={toggleFullscreen} />
+            <PixiCheckbox checked={s.isFullscreen} onChange={s.toggleFullscreen} />
           </SettingRow>
 
           <SettingRow label="Welcome Jingle:" description="Play startup audio on first interaction">
-            <PixiCheckbox checked={welcomeJingleEnabled} onChange={setWelcomeJingleEnabled} />
+            <PixiCheckbox checked={s.welcomeJingleEnabled} onChange={s.setWelcomeJingleEnabled} />
           </SettingRow>
           </layoutContainer>
 
           {/* ═══════════════════════════════════════════════════════════════════
               VISUAL TAB — Visual Background, CRT, Lens, Workbench
               ═══════════════════════════════════════════════════════════════════ */}
-          <layoutContainer renderable={activeTab === 'visual'} layout={{ width: CONTENT_W, height: activeTab === 'visual' ? contentH : 0, overflow: 'hidden', flexDirection: 'column', gap: 12 }}>
+          <layoutContainer renderable={s.activeTab === 'visual'} layout={{ width: CONTENT_W, height: s.activeTab === 'visual' ? contentH : 0, overflow: 'hidden', flexDirection: 'column', gap: 12 }}>
           <SettingRow label="Visual Background:" description="Audio-reactive effects behind tracker">
-            <PixiCheckbox checked={trackerVisualBg} onChange={setTrackerVisualBg} />
+            <PixiCheckbox checked={s.trackerVisualBg} onChange={s.setTrackerVisualBg} />
           </SettingRow>
 
-          {trackerVisualBg && (
+          {s.trackerVisualBg && (
             <SettingRow label="Visual Mode:">
               <PixiSelect
-                options={visualModeOptions}
-                value={String(trackerVisualMode)}
-                onChange={(v) => setTrackerVisualMode(Number(v))}
+                options={s.visualModeOptions}
+                value={String(s.trackerVisualMode)}
+                onChange={(v) => s.setTrackerVisualMode(Number(v))}
                 width={180}
               />
             </SettingRow>
@@ -667,18 +376,18 @@ export const PixiSettingsModal: React.FC<PixiSettingsModalProps> = ({ isOpen, on
           <SectionHeader text="CRT SHADER" />
 
           <SettingRow label="CRT Effect:" description="WebGL post-processing — scanlines, curvature, bloom">
-            <PixiCheckbox checked={crtEnabled} onChange={setCrtEnabled} />
+            <PixiCheckbox checked={s.crtEnabled} onChange={s.setCrtEnabled} />
           </SettingRow>
 
-          {crtEnabled && (
+          {s.crtEnabled && (
             <Div className="flex-col gap-1" layout={{ width: CONTENT_W, borderTopWidth: 1, borderColor: theme.border.color, paddingTop: 8 }}>
               {crtGroups.map((group, gi) => (
                 <React.Fragment key={group}>
                   <Div className={gi > 0 ? "pt-2" : "pt-1"}>
                     <Txt className="text-[10px] font-bold font-mono text-accent-primary uppercase">{group}</Txt>
                   </Div>
-                  {CRT_SLIDERS.filter((s) => s.group === group).map((slider) => {
-                    const val = crtParams[slider.key];
+                  {CRT_SLIDERS.filter((sl) => sl.group === group).map((slider) => {
+                    const val = s.crtParams[slider.key];
                     const decimals = slider.step < 0.01 ? 3 : slider.step < 0.1 ? 2 : 1;
                     return (
                       <Div
@@ -694,7 +403,7 @@ export const PixiSettingsModal: React.FC<PixiSettingsModalProps> = ({ isOpen, on
                           min={slider.min}
                           max={slider.max}
                           step={slider.step}
-                          onChange={(v) => setCrtParam(slider.key, v)}
+                          onChange={(v) => s.setCrtParam(slider.key, v)}
                           orientation="horizontal"
                           length={SLIDER_W}
                           thickness={4}
@@ -711,7 +420,7 @@ export const PixiSettingsModal: React.FC<PixiSettingsModalProps> = ({ isOpen, on
                 </React.Fragment>
               ))}
 
-              <PixiButton label="Reset CRT to Defaults" variant="ghost" onClick={resetCrtParams} width={200} />
+              <PixiButton label="Reset CRT to Defaults" variant="ghost" onClick={s.resetCrtParams} width={200} />
             </Div>
           )}
 
@@ -719,10 +428,10 @@ export const PixiSettingsModal: React.FC<PixiSettingsModalProps> = ({ isOpen, on
           <SectionHeader text="LENS DISTORTION" />
 
           <SettingRow label="Lens Effect:" description="Fish-eye, barrel, chromatic aberration">
-            <PixiCheckbox checked={lensEnabled} onChange={setLensEnabled} />
+            <PixiCheckbox checked={s.lensEnabled} onChange={s.setLensEnabled} />
           </SettingRow>
 
-          {lensEnabled && (
+          {s.lensEnabled && (
             <Div className="flex-col gap-1" layout={{ width: CONTENT_W }}>
               <Div className="pt-1">
                 <Txt className="text-[10px] font-bold font-mono text-accent-primary uppercase">PRESET</Txt>
@@ -734,14 +443,14 @@ export const PixiSettingsModal: React.FC<PixiSettingsModalProps> = ({ isOpen, on
                     <PixiButton
                       key={presetKey}
                       label={preset.label}
-                      variant={lensPreset === presetKey ? 'ft2' : 'ghost'}
-                      color={lensPreset === presetKey ? 'blue' : undefined}
+                      variant={s.lensPreset === presetKey ? 'ft2' : 'ghost'}
+                      color={s.lensPreset === presetKey ? 'blue' : undefined}
                       size="sm"
                       onClick={() => {
-                        setLensPreset(presetKey);
-                        setLensParam('barrel', preset.params.barrel);
-                        setLensParam('chromatic', preset.params.chromatic);
-                        setLensParam('vignette', preset.params.vignette);
+                        s.setLensPreset(presetKey);
+                        s.setLensParam('barrel', preset.params.barrel);
+                        s.setLensParam('chromatic', preset.params.chromatic);
+                        s.setLensParam('vignette', preset.params.vignette);
                       }}
                     />
                   );
@@ -750,12 +459,8 @@ export const PixiSettingsModal: React.FC<PixiSettingsModalProps> = ({ isOpen, on
               <Div className="pt-1">
                 <Txt className="text-[10px] font-bold font-mono text-accent-primary uppercase">MANUAL</Txt>
               </Div>
-              {([
-                { key: 'barrel'    as const, label: 'Barrel',    min: -0.5, max: 1,   step: 0.01 },
-                { key: 'chromatic' as const, label: 'Chromatic', min: 0,    max: 1,   step: 0.01 },
-                { key: 'vignette'  as const, label: 'Vignette',  min: 0,    max: 1,   step: 0.01 },
-              ]).map((slider) => {
-                const val = lensParams[slider.key];
+              {LENS_SLIDERS.map((slider) => {
+                const val = s.lensParams[slider.key];
                 return (
                   <Div
                     key={slider.key}
@@ -770,7 +475,7 @@ export const PixiSettingsModal: React.FC<PixiSettingsModalProps> = ({ isOpen, on
                       min={slider.min}
                       max={slider.max}
                       step={slider.step}
-                      onChange={(v) => { setLensParam(slider.key, v); setLensPreset('custom'); }}
+                      onChange={(v) => { s.setLensParam(slider.key, v); s.setLensPreset('custom'); }}
                       orientation="horizontal"
                       length={SLIDER_W}
                       thickness={4}
@@ -785,7 +490,7 @@ export const PixiSettingsModal: React.FC<PixiSettingsModalProps> = ({ isOpen, on
                 );
               })}
 
-              <PixiButton label="Reset Lens to Defaults" variant="ghost" onClick={resetLensParams} width={200} />
+              <PixiButton label="Reset Lens to Defaults" variant="ghost" onClick={s.resetLensParams} width={200} />
             </Div>
           )}
 
@@ -801,17 +506,17 @@ export const PixiSettingsModal: React.FC<PixiSettingsModalProps> = ({ isOpen, on
           {/* ═══════════════════════════════════════════════════════════════════
               RECORDING TAB
               ═══════════════════════════════════════════════════════════════════ */}
-          <layoutContainer renderable={activeTab === 'recording'} layout={{ width: CONTENT_W, height: activeTab === 'recording' ? contentH : 0, overflow: 'hidden', flexDirection: 'column', gap: 12 }}>
+          <layoutContainer renderable={s.activeTab === 'recording'} layout={{ width: CONTENT_W, height: s.activeTab === 'recording' ? contentH : 0, overflow: 'hidden', flexDirection: 'column', gap: 12 }}>
           {/* ═══════ RECORDING ═══════ */}
           <SectionHeader text="RECORDING" />
 
           <SettingRow label="Edit Step:">
             <PixiNumericInput
-              value={editStep}
+              value={s.editStep}
               min={0}
               max={16}
               step={1}
-              onChange={setEditStep}
+              onChange={s.setEditStep}
               width={50}
             />
           </SettingRow>
@@ -819,28 +524,28 @@ export const PixiSettingsModal: React.FC<PixiSettingsModalProps> = ({ isOpen, on
           <SettingRow label="Edit Mode:">
             <PixiSelect
               options={EDIT_MODE_OPTIONS}
-              value={insertMode ? 'insert' : 'overwrite'}
+              value={s.insertMode ? 'insert' : 'overwrite'}
               onChange={(v) => {
                 const wantInsert = v === 'insert';
-                if (wantInsert !== insertMode) toggleInsertMode();
+                if (wantInsert !== s.insertMode) s.toggleInsertMode();
               }}
               width={180}
             />
           </SettingRow>
 
           <SettingRow label="Record Key-Off:" description="Record === when keys are released">
-            <PixiCheckbox checked={recReleaseEnabled} onChange={setRecReleaseEnabled} />
+            <PixiCheckbox checked={s.recReleaseEnabled} onChange={s.setRecReleaseEnabled} />
           </SettingRow>
 
           <SettingRow label="Quantization:">
             <Div className="flex-row items-center gap-2">
-              <PixiCheckbox checked={recQuantEnabled} onChange={setRecQuantEnabled} />
+              <PixiCheckbox checked={s.recQuantEnabled} onChange={s.setRecQuantEnabled} />
               <PixiSelect
                 options={QUANT_RES_OPTIONS}
-                value={String(recQuantRes)}
-                onChange={(v) => setRecQuantRes(Number(v))}
+                value={String(s.recQuantRes)}
+                onChange={(v) => s.setRecQuantRes(Number(v))}
                 width={140}
-                disabled={!recQuantEnabled}
+                disabled={!s.recQuantEnabled}
               />
             </Div>
           </SettingRow>
@@ -849,12 +554,12 @@ export const PixiSettingsModal: React.FC<PixiSettingsModalProps> = ({ isOpen, on
           {/* ═══════════════════════════════════════════════════════════════════
               INPUT TAB — MIDI, Keyboard, Vinyl Scratch
               ═══════════════════════════════════════════════════════════════════ */}
-          <layoutContainer renderable={activeTab === 'input'} layout={{ width: CONTENT_W, height: activeTab === 'input' ? contentH : 0, overflow: 'hidden', flexDirection: 'column', gap: 12 }}>
+          <layoutContainer renderable={s.activeTab === 'input'} layout={{ width: CONTENT_W, height: s.activeTab === 'input' ? contentH : 0, overflow: 'hidden', flexDirection: 'column', gap: 12 }}>
           {/* ═══════ MIDI ═══════ */}
           <SectionHeader text="MIDI" />
 
           <SettingRow label="Polyphonic Mode:" description="Play multiple notes simultaneously">
-            <PixiCheckbox checked={midiPolyphonic} onChange={setMidiPolyphonic} />
+            <PixiCheckbox checked={s.midiPolyphonic} onChange={s.setMidiPolyphonic} />
           </SettingRow>
 
           <Div className="flex-row gap-2" layout={{ width: CONTENT_W, paddingTop: 6 }}>
@@ -878,21 +583,21 @@ export const PixiSettingsModal: React.FC<PixiSettingsModalProps> = ({ isOpen, on
           <SectionHeader text="VINYL SCRATCH" />
 
           <SettingRow label="Always On:" description="Scratch even when playback is stopped">
-            <PixiCheckbox checked={scratchEnabled} onChange={setScratchEnabled} />
+            <PixiCheckbox checked={s.scratchEnabled} onChange={s.setScratchEnabled} />
           </SettingRow>
 
           <SettingRow label="Velocity Curve:" description="Smooth momentum (off = direct 1:1 response)">
-            <PixiCheckbox checked={scratchAcceleration} onChange={setScratchAcceleration} />
+            <PixiCheckbox checked={s.scratchAcceleration} onChange={s.setScratchAcceleration} />
           </SettingRow>
 
           <SettingRow label="Platter Weight:" description="Light (CDJ) → Medium (1200) → Heavy">
             <Div className="flex-row items-center gap-2">
               <PixiSlider
-                value={Math.round(platterMass * 100)}
+                value={Math.round(s.platterMass * 100)}
                 min={0}
                 max={100}
                 step={1}
-                onChange={(v) => setPlatterMass(v / 100)}
+                onChange={(v) => s.setPlatterMass(v / 100)}
                 orientation="horizontal"
                 length={120}
                 thickness={4}
@@ -900,7 +605,7 @@ export const PixiSettingsModal: React.FC<PixiSettingsModalProps> = ({ isOpen, on
                 handleHeight={10}
                 color={theme.accent.color}
               />
-              <Txt className="text-[10px] font-mono text-text-primary">{`${Math.round(platterMass * 100)}%`}</Txt>
+              <Txt className="text-[10px] font-mono text-text-primary">{`${Math.round(s.platterMass * 100)}%`}</Txt>
             </Div>
           </SettingRow>
 
@@ -918,59 +623,59 @@ export const PixiSettingsModal: React.FC<PixiSettingsModalProps> = ({ isOpen, on
           {/* ═══════════════════════════════════════════════════════════════════
               AUDIO TAB — Engine settings
               ═══════════════════════════════════════════════════════════════════ */}
-          <layoutContainer renderable={activeTab === 'audio'} layout={{ width: CONTENT_W, height: activeTab === 'audio' ? contentH : 0, overflow: 'hidden', flexDirection: 'column', gap: 12 }}>
+          <layoutContainer renderable={s.activeTab === 'audio'} layout={{ width: CONTENT_W, height: s.activeTab === 'audio' ? contentH : 0, overflow: 'hidden', flexDirection: 'column', gap: 12 }}>
           {/* ═══════ ENGINE ═══════ */}
           <SectionHeader text="ENGINE" />
 
           <SettingRow label="Amiga Limits:" description="Clamp periods to 113-856">
-            <PixiCheckbox checked={amigaLimits} onChange={setAmigaLimits} />
+            <PixiCheckbox checked={s.amigaLimits} onChange={s.setAmigaLimits} />
           </SettingRow>
 
           <SettingRow label="Sample Interpolation:" description="Linear (clean) vs None (crunchy)">
-            <PixiCheckbox checked={linearInterpolation} onChange={setLinearInterpolation} />
+            <PixiCheckbox checked={s.linearInterpolation} onChange={s.setLinearInterpolation} />
           </SettingRow>
 
           <SettingRow label="BLEP Synthesis:" description="Band-limited (reduces aliasing)">
-            <PixiCheckbox checked={useBLEP} onChange={setUseBLEP} />
+            <PixiCheckbox checked={s.useBLEP} onChange={s.setUseBLEP} />
           </SettingRow>
 
           {/* VU Meter Mode */}
-          <SettingRow label="VU Meters:" description={vuMeterMode === 'realtime' ? 'Continuous audio levels' : 'Triggered on note-on'}>
+          <SettingRow label="VU Meters:" description={s.vuMeterMode === 'realtime' ? 'Continuous audio levels' : 'Triggered on note-on'}>
             <PixiSelect
               options={VU_MODE_OPTIONS}
-              value={vuMeterMode}
-              onChange={(v: string) => setVuMeterMode(v as 'trigger' | 'realtime')}
+              value={s.vuMeterMode}
+              onChange={(v: string) => s.setVuMeterMode(v as 'trigger' | 'realtime')}
               width={130}
             />
           </SettingRow>
 
           <SettingRow label="VU Swing:" description="Sine wave sway animation">
-            <PixiCheckbox checked={vuMeterSwing} onChange={setVuMeterSwing} />
+            <PixiCheckbox checked={s.vuMeterSwing} onChange={s.setVuMeterSwing} />
           </SettingRow>
 
           <SettingRow label="Wobble Windows:" description="Compiz-style wobbly windows (GL UI)">
-            <PixiCheckbox checked={wobbleWindows} onChange={setWobbleWindows} />
+            <PixiCheckbox checked={s.wobbleWindows} onChange={s.setWobbleWindows} />
           </SettingRow>
 
           {/* Stereo Separation */}
           <SettingRow label="Stereo Mode:">
             <PixiSelect
               options={STEREO_MODE_OPTIONS}
-              value={stereoSeparationMode}
-              onChange={handleStereoModeChange}
+              value={s.stereoSeparationMode}
+              onChange={(v) => s.setStereoMode(v as 'pt2' | 'modplug')}
               width={130}
             />
           </SettingRow>
 
-          {stereoSeparationMode === 'pt2' ? (
+          {s.stereoSeparationMode === 'pt2' ? (
             <SettingRow label="Stereo Separation:" description="0% mono · 20% Amiga · 100% full">
               <Div className="flex-row items-center gap-2">
                 <PixiSlider
-                  value={stereoSeparation}
+                  value={s.stereoSeparation}
                   min={0}
                   max={100}
                   step={5}
-                  onChange={handleStereoSepChange}
+                  onChange={s.setStereoSeparationValue}
                   orientation="horizontal"
                   length={120}
                   thickness={4}
@@ -978,18 +683,18 @@ export const PixiSettingsModal: React.FC<PixiSettingsModalProps> = ({ isOpen, on
                   handleHeight={10}
                   color={theme.accent.color}
                 />
-                <Txt className="text-[10px] font-mono text-text-primary">{`${stereoSeparation}%`}</Txt>
+                <Txt className="text-[10px] font-mono text-text-primary">{`${s.stereoSeparation}%`}</Txt>
               </Div>
             </SettingRow>
           ) : (
             <SettingRow label="Stereo Separation:" description="0% mono · 100% normal · 200% wide">
               <Div className="flex-row items-center gap-2">
                 <PixiSlider
-                  value={modplugSeparation}
+                  value={s.modplugSeparation}
                   min={0}
                   max={200}
                   step={5}
-                  onChange={handleModplugSepChange}
+                  onChange={s.setModplugSeparationValue}
                   orientation="horizontal"
                   length={120}
                   thickness={4}
@@ -997,34 +702,34 @@ export const PixiSettingsModal: React.FC<PixiSettingsModalProps> = ({ isOpen, on
                   handleHeight={10}
                   color={theme.accent.color}
                 />
-                <Txt className="text-[10px] font-mono text-text-primary">{`${modplugSeparation}%`}</Txt>
+                <Txt className="text-[10px] font-mono text-text-primary">{`${s.modplugSeparation}%`}</Txt>
               </Div>
             </SettingRow>
           )}
 
           {/* Bus Gain Balance — matches DOM layout */}
-          <SettingRow label="Bus Gain Balance:" description={autoGain ? 'Auto-balancing active — plays at least 1s to calibrate' : 'Balance sample vs synth/chip engine levels'}>
-            <PixiCheckbox checked={autoGain} onChange={setAutoGain} />
+          <SettingRow label="Bus Gain Balance:" description={s.autoGain ? 'Auto-balancing active — plays at least 1s to calibrate' : 'Balance sample vs synth/chip engine levels'}>
+            <PixiCheckbox checked={s.autoGain} onChange={s.setAutoGain} />
           </SettingRow>
 
           <SettingRow label="Samples Gain:">
             <Div className="flex-row items-center gap-2">
               <PixiSlider
-                value={sampleBusGain}
+                value={s.sampleBusGain}
                 min={-12}
                 max={12}
                 step={1}
-                onChange={setSampleBusGain}
+                onChange={s.setSampleBusGain}
                 orientation="horizontal"
                 length={120}
                 thickness={4}
                 handleWidth={10}
                 handleHeight={10}
-                disabled={autoGain}
+                disabled={s.autoGain}
                 color={theme.accent.color}
               />
               <Txt className="text-[10px] font-mono text-text-primary">
-                {`${sampleBusGain > 0 ? '+' : ''}${sampleBusGain} dB`}
+                {`${s.sampleBusGain > 0 ? '+' : ''}${s.sampleBusGain} dB`}
               </Txt>
             </Div>
           </SettingRow>
@@ -1032,49 +737,49 @@ export const PixiSettingsModal: React.FC<PixiSettingsModalProps> = ({ isOpen, on
           <SettingRow label="Synths Gain:">
             <Div className="flex-row items-center gap-2">
               <PixiSlider
-                value={synthBusGain}
+                value={s.synthBusGain}
                 min={-12}
                 max={12}
                 step={1}
-                onChange={setSynthBusGain}
+                onChange={s.setSynthBusGain}
                 orientation="horizontal"
                 length={120}
                 thickness={4}
                 handleWidth={10}
                 handleHeight={10}
-                disabled={autoGain}
+                disabled={s.autoGain}
                 color={theme.accent.color}
               />
               <Txt className="text-[10px] font-mono text-text-primary">
-                {`${synthBusGain > 0 ? '+' : ''}${synthBusGain} dB`}
+                {`${s.synthBusGain > 0 ? '+' : ''}${s.synthBusGain} dB`}
               </Txt>
             </Div>
           </SettingRow>
           </layoutContainer>
 
           {/* Keyboard section is part of INPUT tab */}
-          <layoutContainer renderable={activeTab === 'input'} layout={{ width: CONTENT_W, height: activeTab === 'input' ? contentH : 0, overflow: 'hidden', flexDirection: 'column', gap: 12 }}>
+          <layoutContainer renderable={s.activeTab === 'input'} layout={{ width: CONTENT_W, height: s.activeTab === 'input' ? contentH : 0, overflow: 'hidden', flexDirection: 'column', gap: 12 }}>
           {/* ═══════ KEYBOARD ═══════ */}
           <SectionHeader text="KEYBOARD" />
 
           <SettingRow label="Keyboard Scheme:">
             <PixiSelect
-              options={KEYBOARD_SCHEME_OPTIONS}
-              value={activeScheme}
-              onChange={setActiveScheme}
+              options={keyboardSchemeOptions}
+              value={s.activeScheme}
+              onChange={s.setActiveScheme}
               width={180}
             />
           </SettingRow>
 
           <Txt className="text-[9px] font-mono text-text-muted" layout={{ width: CONTENT_W }}>
-            {KEYBOARD_SCHEMES.find(s => s.value === activeScheme)?.description || 'Select a tracker layout'}
+            {KEYBOARD_SCHEMES.find(k => k.id === s.activeScheme)?.description || 'Select a tracker layout'}
           </Txt>
 
           <SettingRow label="Platform:" description="Override Cmd/Ctrl detection">
             <PixiSelect
               options={PLATFORM_OPTIONS}
-              value={platformOverride}
-              onChange={(v) => setPlatformOverride(v as 'auto' | 'mac' | 'pc')}
+              value={s.platformOverride}
+              onChange={(v) => s.setPlatformOverride(v as 'auto' | 'mac' | 'pc')}
               width={150}
             />
           </SettingRow>
@@ -1083,7 +788,7 @@ export const PixiSettingsModal: React.FC<PixiSettingsModalProps> = ({ isOpen, on
           {/* ═══════════════════════════════════════════════════════════════════
               SID TAB — SID Engine, SID Hardware
               ═══════════════════════════════════════════════════════════════════ */}
-          <layoutContainer renderable={activeTab === 'sid'} layout={{ width: CONTENT_W, height: activeTab === 'sid' ? contentH : 0, overflow: 'hidden', flexDirection: 'column', gap: 12 }}>
+          <layoutContainer renderable={s.activeTab === 'sid'} layout={{ width: CONTENT_W, height: s.activeTab === 'sid' ? contentH : 0, overflow: 'hidden', flexDirection: 'column', gap: 12 }}>
           {/* ═══════ C64 SID ENGINE ═══════ */}
           <SectionHeader text="C64 SID PLAYER ENGINE" />
 
@@ -1092,13 +797,13 @@ export const PixiSettingsModal: React.FC<PixiSettingsModalProps> = ({ isOpen, on
           </Txt>
 
           {Object.values(SID_ENGINES).map((engine) => {
-            const isSelected = sidEngine === engine.id;
+            const isSelected = s.sidEngine === engine.id;
             return (
               <layoutContainer
                 key={engine.id}
                 eventMode="static"
                 cursor="pointer"
-                onClick={() => setSidEngine(engine.id as SIDEngineType)}
+                onClick={() => s.setSidEngine(engine.id as SIDEngineType)}
                 layout={{
                   width: CONTENT_W,
                   flexDirection: 'row',
@@ -1149,19 +854,19 @@ export const PixiSettingsModal: React.FC<PixiSettingsModalProps> = ({ isOpen, on
                 { value: 'webusb', label: 'WebUSB — Direct USB (recommended)' },
                 { value: 'asid', label: 'ASID — MIDI SysEx (legacy)' },
               ]}
-              value={sidHardwareMode}
+              value={s.sidHardwareMode}
               onChange={(v) => {
                 const mode = (v || 'off') as 'off' | 'asid' | 'webusb';
-                setSidHardwareMode(mode);
-                setAsidEnabled(mode === 'asid');
+                s.setSidHardwareMode(mode);
+                s.setAsidEnabled(mode === 'asid');
               }}
               width={260}
             />
           </SettingRow>
 
-          {sidHardwareMode === 'webusb' && (
+          {s.sidHardwareMode === 'webusb' && (
             <>
-              {!webusbSupported ? (
+              {!s.webusbSupported ? (
                 <Div className="flex-col gap-1" layout={{ width: CONTENT_W, paddingLeft: 8, paddingRight: 8, paddingTop: 6, paddingBottom: 6, borderWidth: 1, borderColor: theme.border.color, borderRadius: 2 }}>
                   <Txt className="text-[10px] font-mono text-accent-error">WebUSB Not Supported</Txt>
                   <Txt className="text-[9px] font-mono text-text-muted">
@@ -1170,35 +875,35 @@ export const PixiSettingsModal: React.FC<PixiSettingsModalProps> = ({ isOpen, on
                 </Div>
               ) : (
                 <>
-                  <SettingRow label="Device:" description={webusbConnected ? `Connected: ${webusbDeviceName}` : 'Click Connect to pair device'}>
+                  <SettingRow label="Device:" description={s.webusbConnected ? `Connected: ${s.webusbDeviceName}` : 'Click Connect to pair device'}>
                     <PixiButton
-                      label={webusbConnected ? 'Disconnect' : 'Connect USB-SID-Pico'}
-                      variant={webusbConnected ? 'danger' : 'primary'}
+                      label={s.webusbConnected ? 'Disconnect' : 'Connect USB-SID-Pico'}
+                      variant={s.webusbConnected ? 'danger' : 'primary'}
                       onClick={async () => {
                         const { getSIDHardwareManager } = await import('@lib/sid/SIDHardwareManager');
                         const mgr = getSIDHardwareManager();
-                        if (webusbConnected) {
+                        if (s.webusbConnected) {
                           await mgr.deactivate();
-                          setSidHardwareMode('off');
-                          setWebusbConnected(false);
-                          setWebusbDeviceName(null);
-                          setWebusbFirmware(null);
-                          setWebusbChips(null);
+                          s.setSidHardwareMode('off');
+                          s.setWebusbConnected(false);
+                          s.setWebusbDeviceName(null);
+                          s.setWebusbFirmware(null);
+                          s.setWebusbChips(null);
                         } else {
                           const ok = await mgr.connectWebUSB();
-                          setWebusbConnected(ok);
+                          s.setWebusbConnected(ok);
                           if (ok) {
                             const st = mgr.getStatus();
-                            setWebusbDeviceName(st.deviceName);
-                            setWebusbFirmware(st.firmwareVersion ?? null);
-                            setWebusbChips(st.detectedChips ?? null);
+                            s.setWebusbDeviceName(st.deviceName);
+                            s.setWebusbFirmware(st.firmwareVersion ?? null);
+                            s.setWebusbChips(st.detectedChips ?? null);
                           }
                         }
                       }}
                     />
                   </SettingRow>
 
-                  {webusbConnected && (
+                  {s.webusbConnected && (
                     <>
                       <SettingRow label="Clock Rate:" description="Match your SID chip region">
                         <PixiSelect
@@ -1208,10 +913,10 @@ export const PixiSettingsModal: React.FC<PixiSettingsModalProps> = ({ isOpen, on
                             { value: '3', label: 'DREAN (1023440 Hz)' },
                             { value: '0', label: 'Default (1000000 Hz)' },
                           ]}
-                          value={String(webusbClockRate)}
+                          value={String(s.webusbClockRate)}
                           onChange={async (v) => {
                             const rate = parseInt(v || '1', 10) as import('@lib/sid/USBSIDPico').ClockRateValue;
-                            setWebusbClockRate(rate);
+                            s.setWebusbClockRate(rate);
                             const { getSIDHardwareManager } = await import('@lib/sid/SIDHardwareManager');
                             getSIDHardwareManager().setClock(rate);
                           }}
@@ -1221,24 +926,24 @@ export const PixiSettingsModal: React.FC<PixiSettingsModalProps> = ({ isOpen, on
 
                       <SettingRow label="Audio Output:" description="Stereo requires v1.3+ board">
                         <PixiCheckbox
-                          checked={webusbStereo}
+                          checked={s.webusbStereo}
                           onChange={async (stereo) => {
-                            setWebusbStereo(stereo);
+                            s.setWebusbStereo(stereo);
                             const { getSIDHardwareManager } = await import('@lib/sid/SIDHardwareManager');
                             getSIDHardwareManager().setAudioMode(stereo);
                           }}
-                          label={webusbStereo ? 'Stereo' : 'Mono'}
+                          label={s.webusbStereo ? 'Stereo' : 'Mono'}
                         />
                       </SettingRow>
 
                       {/* Device info */}
-                      {(webusbFirmware || webusbChips) && (
+                      {(s.webusbFirmware || s.webusbChips) && (
                         <Div className="flex-col gap-1" layout={{ width: CONTENT_W, paddingLeft: 8, paddingRight: 8, paddingTop: 4, paddingBottom: 4 }}>
-                          {webusbFirmware && (
-                            <Txt className="text-[9px] font-mono text-text-muted">{`Firmware: ${webusbFirmware}`}</Txt>
+                          {s.webusbFirmware && (
+                            <Txt className="text-[9px] font-mono text-text-muted">{`Firmware: ${s.webusbFirmware}`}</Txt>
                           )}
-                          {webusbChips && webusbChips.length > 0 && (
-                            <Txt className="text-[9px] font-mono text-text-muted">{`SID chips: ${webusbChips.filter(c => c.detected).map(c => `Slot ${c.slot}: ${c.type || 'Unknown'}`).join(', ') || 'None detected'}`}</Txt>
+                          {s.webusbChips && s.webusbChips.length > 0 && (
+                            <Txt className="text-[9px] font-mono text-text-muted">{`SID chips: ${s.webusbChips.filter(c => c.detected).map(c => `Slot ${c.slot}: ${c.type || 'Unknown'}`).join(', ') || 'None detected'}`}</Txt>
                           )}
                         </Div>
                       )}
@@ -1256,9 +961,9 @@ export const PixiSettingsModal: React.FC<PixiSettingsModalProps> = ({ isOpen, on
             </>
           )}
 
-          {sidHardwareMode === 'asid' && (
+          {s.sidHardwareMode === 'asid' && (
             <>
-              {!asidSupported ? (
+              {!s.asidSupported ? (
                 <Div className="flex-col gap-1" layout={{ width: CONTENT_W, paddingLeft: 8, paddingRight: 8, paddingTop: 6, paddingBottom: 6, borderWidth: 1, borderColor: theme.border.color, borderRadius: 2 }}>
                   <Txt className="text-[10px] font-mono text-accent-error">Not Supported</Txt>
                   <Txt className="text-[9px] font-mono text-text-muted">
@@ -1269,18 +974,18 @@ export const PixiSettingsModal: React.FC<PixiSettingsModalProps> = ({ isOpen, on
                 <>
                   <SettingRow label="MIDI Device:">
                     <PixiSelect
-                      options={asidDeviceOptions}
-                      value={asidDeviceId || ''}
+                      options={s.asidDeviceOptions}
+                      value={s.asidDeviceId || ''}
                       onChange={(v) => {
                         const deviceId = v || null;
-                        setAsidDeviceId(deviceId);
+                        s.setAsidDeviceId(deviceId);
                         getASIDDeviceManager().selectDevice(deviceId);
                       }}
                       width={220}
                     />
                   </SettingRow>
 
-                  {asidDevices.length === 0 && (
+                  {s.asidDevices.length === 0 && (
                     <Div className="flex-col gap-1" layout={{ width: CONTENT_W, paddingLeft: 8, paddingRight: 8, paddingTop: 6, paddingBottom: 6, borderWidth: 1, borderColor: theme.border.color, borderRadius: 2 }}>
                       <Txt className="text-[9px] font-bold font-mono text-text-primary">No ASID devices detected.</Txt>
                       <Txt className="text-[8px] font-mono text-text-muted">1. Connect USB-SID-Pico or TherapSID via USB</Txt>
@@ -1293,15 +998,15 @@ export const PixiSettingsModal: React.FC<PixiSettingsModalProps> = ({ isOpen, on
                   <SettingRow label="Device Address:" description={`USB-SID-Pico default: 0x4D (77)`}>
                     <Div className="flex-row items-center gap-2">
                       <PixiNumericInput
-                        value={asidDeviceAddress}
+                        value={s.asidDeviceAddress}
                         min={0}
                         max={255}
                         step={1}
-                        onChange={(v) => setAsidDeviceAddress(v || 0x4d)}
+                        onChange={(v) => s.setAsidDeviceAddress(v || 0x4d)}
                         width={60}
                       />
                       <Txt className="text-[10px] font-mono text-text-muted">
-                        {`(0x${asidDeviceAddress.toString(16).toUpperCase().padStart(2, '0')})`}
+                        {`(0x${s.asidDeviceAddress.toString(16).toUpperCase().padStart(2, '0')})`}
                       </Txt>
                     </Div>
                   </SettingRow>
@@ -1321,7 +1026,7 @@ export const PixiSettingsModal: React.FC<PixiSettingsModalProps> = ({ isOpen, on
           {/* ═══════════════════════════════════════════════════════════════════
               ABOUT TAB — Modland, Danger Zone, Info
               ═══════════════════════════════════════════════════════════════════ */}
-          <layoutContainer renderable={activeTab === 'about'} layout={{ width: CONTENT_W, height: activeTab === 'about' ? contentH : 0, overflow: 'hidden', flexDirection: 'column', gap: 12 }}>
+          <layoutContainer renderable={s.activeTab === 'about'} layout={{ width: CONTENT_W, height: s.activeTab === 'about' ? contentH : 0, overflow: 'hidden', flexDirection: 'column', gap: 12 }}>
           {/* ═══════ MODLAND ═══════ */}
           <SectionHeader text="MODLAND INTEGRATION" />
 
@@ -1334,7 +1039,7 @@ export const PixiSettingsModal: React.FC<PixiSettingsModalProps> = ({ isOpen, on
             variant="ghost"
             width={200}
             onClick={() => {
-              useModlandContributionModal.getState().clearDismissedHashes();
+              s.clearDismissedHashes();
               notify.success('Dismissed files cleared.');
             }}
           />
@@ -1350,7 +1055,7 @@ export const PixiSettingsModal: React.FC<PixiSettingsModalProps> = ({ isOpen, on
             label="Clear All State & Reload"
             variant="danger"
             width={220}
-            onClick={handleClearState}
+            onClick={s.handleClearState}
           />
 
           {/* ═══════ INFO ═══════ */}
