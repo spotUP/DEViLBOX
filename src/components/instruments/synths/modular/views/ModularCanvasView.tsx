@@ -470,7 +470,7 @@ export const ModularCanvasView: React.FC<ModularCanvasViewProps> = ({ config, on
       )}
 
       {/* Zoom and view controls */}
-      <div className="absolute bottom-4 right-4 flex items-center gap-2 bg-dark-bgSecondary/90 backdrop-blur-md border border-dark-border p-1 rounded-lg shadow-xl z-50">
+      <div className="absolute bottom-4 right-4 flex items-center gap-2 bg-dark-bgSecondary/90 backdrop-blur-md border border-dark-border p-1 rounded-lg shadow-xl z-[9990]">
         <div className="px-2 text-[10px] font-mono text-text-secondary border-r border-dark-border mr-1">
           {Math.round(cameraState.zoom * 100)}%
         </div>

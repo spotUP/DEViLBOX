@@ -768,7 +768,7 @@ export const PianoRoll: React.FC<PianoRollProps> = ({ channelIndex }) => {
       if (e.target instanceof HTMLSelectElement) return;
 
       // Ignore if modal is open
-      if (document.querySelector('.fixed.inset-0.z-50')) return;
+      if (document.querySelector('.fixed.inset-0.z-[9990]')) return;
 
       const key = e.key;
       const keyLower = key.toLowerCase();

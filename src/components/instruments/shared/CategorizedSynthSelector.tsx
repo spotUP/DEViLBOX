@@ -525,7 +525,7 @@ export const CategorizedSynthSelector: React.FC<CategorizedSynthSelectorProps> =
 
       {/* Synth Info Panel (when hovering) */}
       {hoveredSynth && (
-        <div className="fixed bottom-4 left-1/2 -translate-x-1/2 bg-dark-bgTertiary border border-dark-border rounded-lg p-3 shadow-xl z-50 max-w-sm">
+        <div className="fixed bottom-4 left-1/2 -translate-x-1/2 bg-dark-bgTertiary border border-dark-border rounded-lg p-3 shadow-xl z-[9990] max-w-sm">
           {(() => {
             const info = getSynthInfo(hoveredSynth);
             if (!info || !info.icon) return null;

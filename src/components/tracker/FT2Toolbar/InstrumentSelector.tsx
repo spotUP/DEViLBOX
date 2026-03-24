@@ -164,7 +164,7 @@ export const InstrumentSelector: React.FC<InstrumentSelectorProps> = ({
 
       {/* Dropdown list */}
       {showDropdown && (
-        <div className="absolute top-full left-0 mt-1 w-56 max-h-64 overflow-y-auto bg-dark-bgTertiary border border-dark-border rounded shadow-xl z-50 scrollbar-modern">
+        <div className="absolute top-full left-0 mt-1 w-56 max-h-64 overflow-y-auto bg-dark-bgTertiary border border-dark-border rounded shadow-xl z-[9990] scrollbar-modern">
           {sortedInstruments.map((instrument) => {
             const info = getSynthInfo(instrument.synthType);
             const IconComponent = getIcon(info.icon);

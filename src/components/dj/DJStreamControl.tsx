@@ -133,7 +133,7 @@ export const DJStreamControl: React.FC = () => {
 
       {/* Stream setup dropdown */}
       {showSetup && !isLive && (
-        <div className="absolute bottom-full mb-1 left-0 bg-dark-bgSecondary border border-dark-border rounded shadow-xl z-50 p-3 min-w-[280px]">
+        <div className="absolute bottom-full mb-1 left-0 bg-dark-bgSecondary border border-dark-border rounded shadow-xl z-[9990] p-3 min-w-[280px]">
           {/* Platform selector */}
           <div className="flex gap-1 mb-3">
             {(Object.keys(PLATFORM_INFO) as StreamPlatform[]).map(p => (

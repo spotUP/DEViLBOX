@@ -648,7 +648,7 @@ export const SamplePackBrowser: React.FC<SamplePackBrowserProps> = ({ onClose, m
       <div className="w-full h-full bg-ft2-bg flex flex-col overflow-hidden border-t-2 border-ft2-border relative">
         {/* Loading Overlay */}
         {(isUploading || isDecoding) && (
-          <div className="absolute inset-0 z-50 flex flex-col items-center justify-center bg-black/60 backdrop-blur-sm">
+          <div className="absolute inset-0 z-[9990] flex flex-col items-center justify-center bg-black/60 backdrop-blur-sm">
             <div className="p-6 bg-ft2-header border-2 border-ft2-highlight rounded-xl shadow-2xl flex flex-col items-center gap-4">
               <Package size={48} className="text-ft2-highlight animate-bounce" />
               <div className="text-center">

@@ -340,7 +340,7 @@ export const LoadPresetModal: React.FC<LoadPresetModalProps> = ({ onClose }) => 
   const presetCount = browseMode === 'factory' ? filteredFactoryPresets.length : filteredUserPresets.length;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/90">
+    <div className="fixed inset-0 z-[9990] flex items-center justify-center bg-black/90">
       <div className="w-full h-full bg-ft2-bg flex flex-col overflow-hidden">
         {/* Header */}
         <div className="flex items-center justify-between px-4 py-3 bg-ft2-header border-b-2 border-ft2-border">

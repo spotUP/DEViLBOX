@@ -128,7 +128,7 @@ export const HelpModal: React.FC<HelpModalProps> = ({ isOpen, onClose, initialTa
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-60"
+      className="fixed inset-0 z-[9990] flex items-center justify-center bg-black bg-opacity-60"
       onClick={onClose}
       onKeyDown={handleKeyDown}
     >

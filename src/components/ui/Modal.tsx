@@ -190,7 +190,7 @@ export const Modal: React.FC<ModalProps> = ({
   };
 
   const backdropClasses = `
-    fixed inset-0 z-50 flex items-center justify-center p-4
+    fixed inset-0 z-[9990] flex items-center justify-center p-4
     ${backdropOpacityMap[backdropOpacity]}
   `;
 
