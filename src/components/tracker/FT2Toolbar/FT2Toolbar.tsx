@@ -22,6 +22,7 @@ import { getTrackerReplayer } from '@engine/TrackerReplayer';
 import { getTrackerScratchController } from '@engine/TrackerScratchController';
 import { useFormatStore } from '@stores/useFormatStore';
 import { useGTUltraStore } from '@stores/useGTUltraStore';
+import { setFormatPlaybackPlaying, resetFormatPlaybackState } from '@engine/FormatPlaybackState';
 import { Maximize2, Minimize2, MousePointerClick, ExternalLink } from 'lucide-react';
 import { focusPopout } from '@components/ui/PopOutWindow';
 import { VisualizerFrame } from '@components/visualization/VisualizerFrame';
@@ -542,9 +543,12 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = React.memo(({
       if (gtStore.playing) {
         gtEngine.stop();
         gtStore.setPlaying(false);
+        setFormatPlaybackPlaying(false);
       } else {
+        resetFormatPlaybackState();
         gtEngine.play();
         gtStore.setPlaying(true);
+        setFormatPlaybackPlaying(true);
       }
       return;
     }
@@ -567,8 +571,8 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = React.memo(({
     Tone.start();
 
     // GT Ultra: delegate to its own engine (pattern play = same as song play for GT)
-    const editorMode = useFormatStore.getState().editorMode;
-    if (editorMode === 'goattracker') {
+    const editorMode2 = useFormatStore.getState().editorMode;
+    if (editorMode2 === 'goattracker') {
       const gtStore = useGTUltraStore.getState();
       const gtEngine = gtStore.engine;
       if (!gtEngine) return;
@@ -577,9 +581,12 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = React.memo(({
       if (gtStore.playing) {
         gtEngine.stop();
         gtStore.setPlaying(false);
+        setFormatPlaybackPlaying(false);
       } else {
+        resetFormatPlaybackState();
         gtEngine.play();
         gtStore.setPlaying(true);
+        setFormatPlaybackPlaying(true);
       }
       return;
     }

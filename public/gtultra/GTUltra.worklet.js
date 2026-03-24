@@ -438,8 +438,8 @@ class GTUltraProcessor extends AudioWorkletProcessor {
       if (outR !== outL) outR[i] = heapF32[offR + i];
     }
 
-    // Send position updates ~every 180ms
-    if (++this.posCounter >= 32) {
+    // Send position updates every 2 blocks (~5.8ms at 44.1kHz) for smooth scrolling
+    if (++this.posCounter >= 2) {
       this.posCounter = 0;
       this.port.postMessage({
         type: 'position',
