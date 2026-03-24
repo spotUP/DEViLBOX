@@ -743,6 +743,16 @@ export class TrackerReplayer {
     this.nextScheduleTime = Tone.now();
   }
 
+  /** Pause all active WASM engines (for scratch mode) */
+  pauseNativeEnginesForScratch(): void {
+    pauseNativeEngines(this.routedNativeEngines);
+  }
+
+  /** Resume all active WASM engines (after scratch mode) */
+  resumeNativeEnginesAfterScratch(): void {
+    resumeNativeEngines(this.routedNativeEngines, this._muted);
+  }
+
   /** Set per-deck synth detune in cents */
   setDetuneCents(cents: number): void {
     this.deckDetuneCents = cents;
