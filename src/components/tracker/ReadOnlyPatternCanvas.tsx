@@ -157,7 +157,9 @@ export const ReadOnlyPatternCanvas: React.FC<ReadOnlyPatternCanvasProps> = React
 
   useEffect(() => {
     const container = containerRef.current;
-    if (!container || !('transferControlToOffscreen' in HTMLCanvasElement.prototype)) return;
+    // Skip on iOS — WebGL2 on OffscreenCanvas in Worker hangs
+    const isIOS = /iPhone|iPad|iPod/.test(navigator.userAgent);
+    if (!container || isIOS || !('transferControlToOffscreen' in HTMLCanvasElement.prototype)) return;
 
     // Fresh canvas element every time — safe to transfer control
     const canvas = document.createElement('canvas');
