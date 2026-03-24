@@ -28,8 +28,7 @@ const TOOLBAR_H = 32;
 const SEQ_H = 140;
 const ROW_H = 16;
 const NOTE_NAMES = ['C-', 'C#', 'D-', 'D#', 'E-', 'F-', 'F#', 'G-', 'G#', 'A-', 'A#', 'B-'];
-const KT_ACCENT = 0x88ffaa;
-const KT_SEP = 0x555555;
+// theme.accent.color and theme.border.color removed — use theme.accent and theme.border instead
 
 function noteStr(note: number): string {
   if (note === 0 || note === 0xff) return '---';
@@ -207,7 +206,7 @@ export const PixiKlysView: React.FC<Props> = ({ width, height }) => {
     patternLines.push(line);
     lineColors.push(
       isPlaying && rowIdx === currentRow ? theme.currentRowText.color :
-      rowIdx % 8 === 0 ? 0xaaccaa : 0x888888
+      rowIdx % 8 === 0 ? theme.textSecondary.color : theme.textMuted.color
     );
   }
 
@@ -220,8 +219,8 @@ export const PixiKlysView: React.FC<Props> = ({ width, height }) => {
         layout={{ width, height: TOOLBAR_H, flexDirection: 'row', alignItems: 'center', paddingLeft: 8, paddingRight: 8, gap: 6 }}
       >
         <pixiGraphics draw={drawToolbarBg} layout={{ position: 'absolute', width, height: TOOLBAR_H }} />
-        <pixiBitmapText text="KT" style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 11, fill: 0xffffff }} tint={KT_ACCENT} />
-        <pixiBitmapText text="|" style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 11, fill: 0xffffff }} tint={KT_SEP} />
+        <pixiBitmapText text="KT" style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 11, fill: 0xffffff }} tint={theme.accent.color} />
+        <pixiBitmapText text="|" style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 11, fill: 0xffffff }} tint={theme.border.color} />
         <pixiBitmapText
           text={toolbarInfo}
           style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 11, fill: 0xffffff }}
@@ -248,7 +247,7 @@ export const PixiKlysView: React.FC<Props> = ({ width, height }) => {
         <pixiBitmapText
           text={headerLine}
           style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 10, fill: 0xffffff }}
-          tint={KT_ACCENT}
+          tint={theme.accent.color}
           layout={{ marginLeft: 4, height: ROW_H }}
         />
         {patternLines.map((line, i) => (

@@ -12,6 +12,7 @@ import { Graphics } from 'pixi.js';
 import { PIXI_FONTS } from '@/pixi/fonts';
 import type { KlysNativeData } from '@/types';
 import { useFormatStore } from '@stores';
+import { usePixiTheme } from '@/pixi/theme';
 
 const ROW_HEIGHT    = 18;
 const POS_COL_WIDTH = 32;
@@ -35,16 +36,7 @@ function digitCharX(d: number): number {
   return 6;                  // offset lo
 }
 
-const KT_BG          = 0x000000;
-const KT_HEADER_BG   = 0x111111;
-const KT_HIGHLIGHT   = 0x780000;
-const KT_BORDER      = 0x333333;
-const KT_COL_BORDER  = 0x222222;
-const KT_DIM         = 0x808080;
-const KT_TEXT        = 0xffffff;
-const KT_CURSOR      = 0xffff88;
-const KT_TRANS_POS   = 0x88ff88;
-const KT_TRANS_NEG   = 0xff8888;
+// Colors resolved from theme inside the component via useKtColors()
 
 interface Props {
   width: number;
@@ -59,6 +51,18 @@ export const PixiKlysPositionEditor: React.FC<Props> = ({
   width, height, nativeData, currentPosition,
   onPositionChange, onFocusPatternEditor,
 }) => {
+  const theme = usePixiTheme();
+  const KT_BG = theme.bg.color;
+  const KT_HEADER_BG = theme.bgSecondary.color;
+  const KT_HIGHLIGHT = theme.trackerRowCurrent.color;
+  const KT_BORDER = theme.border.color;
+  const KT_COL_BORDER = theme.border.color;
+  const KT_DIM = theme.textMuted.color;
+  const KT_TEXT = theme.text.color;
+  const KT_CURSOR = theme.accent.color;
+  const KT_TRANS_POS = theme.success.color;
+  const KT_TRANS_NEG = theme.error.color;
+
   const numCh  = nativeData.channels;
   const numPos = nativeData.songLength;
 
