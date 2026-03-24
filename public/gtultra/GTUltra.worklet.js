@@ -117,8 +117,30 @@ class GTUltraProcessor extends AudioWorkletProcessor {
 
       case 'play': {
         if (!this.ready) return;
+        // Debug: wrap debug functions if available
+        if (!this._dbgSonginit && this.module._gt_debug_songinit) {
+          this._dbgSonginit = this.module.cwrap('gt_debug_songinit', 'number', []);
+          this._dbgMaxCh = this.module.cwrap('gt_debug_maxchannels', 'number', []);
+          this._dbgFramerate = this.module.cwrap('gt_debug_framerate', 'number', []);
+          this._dbgAdparam = this.module.cwrap('gt_debug_adparam', 'number', []);
+          this._dbgMultiplier = this.module.cwrap('gt_debug_multiplier', 'number', []);
+          this._dbgTempoCh0 = this.module.cwrap('gt_debug_tempo_ch0', 'number', []);
+          this._dbgSidregSum = this.module.cwrap('gt_debug_sidreg_sum', 'number', []);
+        }
+        if (this._dbgSonginit) {
+          console.log('[GTWorklet] PRE-PLAY state:', {
+            songinit: this._dbgSonginit(),
+            maxSIDChannels: this._dbgMaxCh(),
+            framerate: this._dbgFramerate(),
+            adparam: '0x' + this._dbgAdparam().toString(16),
+            multiplier: this._dbgMultiplier(),
+            tempo_ch0: this._dbgTempoCh0(),
+            sidregSum: this._dbgSidregSum(),
+          });
+        }
         this._play(msg.songNum || 0, msg.fromPos || 0, msg.fromRow || 0);
         this.playing = true;
+        this._debugCounter = 0;
         break;
       }
 
