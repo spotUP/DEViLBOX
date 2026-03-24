@@ -231,7 +231,7 @@ export const RandomizeDialog: React.FC<RandomizeDialogProps> = ({
   if (showOverwriteConfirm) {
     return (
       <div
-        className="fixed inset-0 bg-black/60 flex items-center justify-center z-[9999] p-4"
+        className="fixed inset-0 bg-black/60 flex items-center justify-center z-[99990] p-4"
         onClick={() => { setShowOverwriteConfirm(false); setPendingAction(null); }}
       >
         <div
@@ -270,7 +270,7 @@ export const RandomizeDialog: React.FC<RandomizeDialogProps> = ({
 
   return (
     <div
-      className="fixed inset-0 bg-black/60 flex items-center justify-center z-[9999] p-4"
+      className="fixed inset-0 bg-black/60 flex items-center justify-center z-[99990] p-4"
       onClick={onClose}
     >
       <div

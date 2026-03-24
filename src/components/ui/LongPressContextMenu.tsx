@@ -80,7 +80,7 @@ export const LongPressContextMenu: React.FC<LongPressContextMenuProps> = ({
 
   return createPortal(
     <div
-      className="fixed inset-0 z-[9990]"
+      className="fixed inset-0 z-[99990]"
       onClick={onClose}
     >
       {/* Backdrop */}

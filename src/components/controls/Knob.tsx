@@ -566,7 +566,7 @@ export const Knob: React.FC<KnobProps> = React.memo(({
     {/* Floating tooltip during drag */}
     {isDragging && createPortal(
       <div
-        className="fixed pointer-events-none z-[9999] px-2 py-1 bg-black/90 border border-accent-primary rounded text-xs font-mono font-bold text-text-primary shadow-xl transform -translate-x-1/2 -translate-y-full"
+        className="fixed pointer-events-none z-[99990] px-2 py-1 bg-black/90 border border-accent-primary rounded text-xs font-mono font-bold text-text-primary shadow-xl transform -translate-x-1/2 -translate-y-full"
         style={{
           left: (knobRef.current?.getBoundingClientRect().left || 0) + knobSize / 2,
           top: (knobRef.current?.getBoundingClientRect().top || 0) - 8,
@@ -580,7 +580,7 @@ export const Knob: React.FC<KnobProps> = React.memo(({
     {/* Mobile numeric input modal */}
     {showNumericInput && (
       <div
-        className="fixed inset-0 z-[9990] bg-black/50 flex items-center justify-center"
+        className="fixed inset-0 z-[99990] bg-black/50 flex items-center justify-center"
         onClick={() => setShowNumericInput(false)}
       >
         <div
@@ -627,7 +627,7 @@ export const Knob: React.FC<KnobProps> = React.memo(({
     {/* Mobile preset menu */}
     {showPresetMenu && (
       <div
-        className="fixed inset-0 z-[9990] bg-black/50"
+        className="fixed inset-0 z-[99990] bg-black/50"
         onClick={() => setShowPresetMenu(false)}
       >
         <div

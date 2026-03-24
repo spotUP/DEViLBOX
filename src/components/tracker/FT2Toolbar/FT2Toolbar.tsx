@@ -1032,7 +1032,7 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = React.memo(({
 
       {/* Clear Modal */}
       {showClearModal && (
-        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60">
+        <div className="fixed inset-0 z-[99990] flex items-center justify-center bg-black/60">
           <div className="bg-dark-bgSecondary border border-dark-border rounded-lg p-6 max-w-sm w-full mx-4 shadow-xl">
             <h2 className="text-lg font-bold text-text-primary mb-4">Clear Project</h2>
             <p className="text-sm text-text-secondary mb-6">What would you like to clear?</p>

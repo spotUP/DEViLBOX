@@ -83,7 +83,7 @@ export const ExposeOverlay: React.FC = () => {
 
   return (
     <div
-      className="fixed inset-0 z-[9999] flex items-center justify-center"
+      className="fixed inset-0 z-[99990] flex items-center justify-center"
       style={{ backgroundColor: 'rgba(0, 0, 0, 0.85)', backdropFilter: 'blur(8px)' }}
       onClick={() => useUIStore.getState().setViewExposeActive(false)}
     >

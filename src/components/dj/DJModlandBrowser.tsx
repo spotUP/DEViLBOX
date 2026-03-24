@@ -297,7 +297,7 @@ export const DJModlandBrowser: React.FC<DJModlandBrowserProps> = ({ onClose }) =
   return (
     <div
       ref={panelRef}
-      className="bg-dark-bgSecondary border border-dark-border rounded-lg p-3 flex flex-col gap-2 max-h-[400px] relative z-[9990]"
+      className="bg-dark-bgSecondary border border-dark-border rounded-lg p-3 flex flex-col gap-2 max-h-[400px] relative z-[99990]"
       onKeyDown={handleKeyDown}
       tabIndex={-1}
     >

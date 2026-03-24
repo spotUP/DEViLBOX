@@ -35,7 +35,7 @@ export const ScaleVolumeDialog: React.FC<ScaleVolumeDialogProps> = ({
 
   return (
     <div
-      className="fixed inset-0 z-[9990] flex items-center justify-center bg-black/50"
+      className="fixed inset-0 z-[99990] flex items-center justify-center bg-black/50"
       onClick={onCancel}
     >
       <div

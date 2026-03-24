@@ -207,7 +207,7 @@ export const DJFxQuickPresets: React.FC = () => {
 
       {/* Dropdown menu */}
       {isOpen && (
-        <div className="absolute right-0 top-full mt-1 z-[9990] w-64 max-h-[70vh] overflow-y-auto rounded-lg border border-dark-border bg-dark-bgSecondary shadow-xl">
+        <div className="absolute right-0 top-full mt-1 z-[99990] w-64 max-h-[70vh] overflow-y-auto rounded-lg border border-dark-border bg-dark-bgSecondary shadow-xl">
           {/* Clear / Bypass */}
           <button
             onClick={clearPresets}

@@ -71,7 +71,7 @@ async function fetchPresetContent(name: string): Promise<string | null> {
     const text = await resp.text();
     presetContentCache.set(name, text);
     return text;
-  } catch (err) {
+  } catch (_err) {
     return null;
   }
 }

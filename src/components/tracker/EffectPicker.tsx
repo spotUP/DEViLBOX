@@ -164,7 +164,7 @@ export const EffectPicker: React.FC<EffectPickerProps> = ({ isOpen, position, on
 
   return (
     <>
-      <div className="fixed inset-0 bg-black/40 z-[9990]" onClick={onClose} />
+      <div className="fixed inset-0 bg-black/40 z-[99990]" onClick={onClose} />
       <div
         ref={ref}
         className="bg-dark-bg border border-dark-border rounded-lg shadow-2xl w-[380px] max-h-[480px] flex flex-col z-[60]"

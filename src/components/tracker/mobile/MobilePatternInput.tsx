@@ -387,7 +387,7 @@ const ContextMenu: React.FC<ContextMenuProps> = ({
 }) => {
   return (
     <div
-      className="fixed inset-0 z-[9990] bg-black/50 flex items-end"
+      className="fixed inset-0 z-[99990] bg-black/50 flex items-end"
       onClick={onClose}
     >
       <div

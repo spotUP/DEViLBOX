@@ -335,7 +335,7 @@ export const AmiResamplerModal: React.FC<AmiResamplerModalProps> = ({
 
   return (
     <div
-      className="fixed inset-0 z-[9990] flex items-center justify-center p-4 bg-black/60"
+      className="fixed inset-0 z-[99990] flex items-center justify-center p-4 bg-black/60"
       onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
     >
       <div className="bg-dark-bgSecondary border border-dark-border rounded-xl shadow-2xl w-full max-w-2xl overflow-hidden">

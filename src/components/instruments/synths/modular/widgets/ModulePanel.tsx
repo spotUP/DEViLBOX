@@ -88,7 +88,7 @@ export const ModulePanel: React.FC<ModulePanelProps> = ({
   if (!descriptor) {
     return (
       <div
-        className="absolute bg-dark-bgSecondary rounded border border-dark-border p-2 z-[9990]"
+        className="absolute bg-dark-bgSecondary rounded border border-dark-border p-2 z-[99990]"
         style={{
           left: module.position?.x || 0,
           top: module.position?.y || 0,
@@ -144,7 +144,7 @@ export const ModulePanel: React.FC<ModulePanelProps> = ({
         absolute flex flex-col bg-dark-bgSecondary rounded-sm border border-black/50 overflow-hidden
         ${isSelected ? 'ring-2 ring-accent-primary' : ''}
         shadow-xl transition-shadow
-        ${isDragging ? 'cursor-grabbing shadow-2xl scale-[1.02] z-[9990]' : 'cursor-default'}
+        ${isDragging ? 'cursor-grabbing shadow-2xl scale-[1.02] z-[99990]' : 'cursor-default'}
         pointer-events-auto
       `}
       style={{

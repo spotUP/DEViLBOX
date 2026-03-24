@@ -45,7 +45,7 @@ export const NewSongWizard: React.FC = () => {
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-[9999] p-4 backdrop-blur-sm">
+    <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-[99990] p-4 backdrop-blur-sm">
       <div className="bg-dark-bgSecondary border border-dark-border rounded-lg shadow-2xl w-full max-w-2xl flex flex-col" style={{ height: 'min(92vh, 700px)' }}>
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-dark-border shrink-0">
