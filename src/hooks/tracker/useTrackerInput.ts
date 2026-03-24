@@ -592,12 +592,9 @@ export const useTrackerInput = () => {
         e.preventDefault();
 
         if (isPlaying) {
-          const stoppedRow = playbackRow;
-          getTrackerReplayer().stop();
+          getTrackerReplayer().stop();  // syncs cursor to accurate stop position
           stop();
           getToneEngine().releaseAll();
-          // Move edit cursor to where playback stopped
-          useCursorStore.getState().moveCursorToRow(stoppedRow);
           useUIStore.getState().setStatusMessage('STOPPED');
         } else {
           if (!recordMode && !isPatternEditable) {
