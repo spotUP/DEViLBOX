@@ -285,7 +285,7 @@ export const ImportAudioDialog: React.FC<ImportAudioDialogProps> = ({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-[9990]">
+    <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-[99990]">
       <div className="bg-dark-bgSecondary border border-dark-border rounded-lg shadow-xl w-full max-w-[90vw] md:max-w-[440px] max-h-[85vh] overflow-hidden flex flex-col">
 
         {/* Header */}

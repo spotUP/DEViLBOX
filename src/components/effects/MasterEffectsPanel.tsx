@@ -360,7 +360,7 @@ export const MasterEffectsPanel = forwardRef<MasterEffectsPanelHandle, MasterEff
 
       {/* Preset dropdown — rendered outside header so it works in both modes */}
       {showPresetMenu && (
-        <div className="absolute right-0 top-0 mt-1 w-56 bg-dark-bgSecondary border border-dark-border rounded-lg shadow-xl z-[9990] max-h-[70vh] overflow-y-auto"
+        <div className="absolute right-0 top-0 mt-1 w-56 bg-dark-bgSecondary border border-dark-border rounded-lg shadow-xl z-[99990] max-h-[70vh] overflow-y-auto"
           style={hideHeader ? { top: 0, right: 8 } : { top: '100%', right: 16 }}>
           {/* User Presets */}
           {userPresets.length > 0 && (

@@ -42,7 +42,7 @@ export const MixerCueSection: React.FC = () => {
       try {
         const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
         stream.getTracks().forEach(track => track.stop()); // Immediately release
-      } catch (err) {
+      } catch (_err) {
         console.warn('[MixerCueSection] Microphone permission denied, device labels may be unavailable');
       }
 

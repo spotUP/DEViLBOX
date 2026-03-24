@@ -48,7 +48,7 @@ export const PatternMatchModal: React.FC = () => {
   };
 
   return (
-    <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/70 backdrop-blur-sm">
+    <div className="fixed inset-0 z-[99990] flex items-center justify-center bg-black/70 backdrop-blur-sm">
       <div className="relative w-full max-w-3xl max-h-[80vh] bg-ft2-bg border-2 border-ft2-border shadow-2xl flex flex-col">
         {/* Header */}
         <div className="flex items-center justify-between px-4 py-3 border-b border-ft2-border bg-ft2-rowEven">

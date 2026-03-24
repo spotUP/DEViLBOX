@@ -66,7 +66,7 @@ export const NKSSetupWizard: React.FC = () => {
   const steps: WizardStep[] = ['intro', 'pages', 'export', 'done'];
   const stepLabels = ['Intro', 'Pages', 'Export', 'Ready'];
 
-  const overlayClass = 'fixed inset-0 z-[9999] flex items-center justify-center bg-black/70 backdrop-blur-sm';
+  const overlayClass = 'fixed inset-0 z-[99990] flex items-center justify-center bg-black/70 backdrop-blur-sm';
   const panelClass = 'bg-dark-bgPrimary border border-dark-border rounded-xl shadow-2xl w-full max-w-[90vw] md:max-w-[480px] max-h-[85vh] overflow-hidden';
 
   const synthName = nksActiveSynthType || currentInstrument?.type || 'Synth';

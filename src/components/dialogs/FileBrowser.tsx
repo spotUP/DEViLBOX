@@ -73,7 +73,7 @@ export const FileBrowser: React.FC<FileBrowserProps> = ({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-[9990]" onClick={onClose}>
+    <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-[99990]" onClick={onClose}>
       <div
         ref={modalRef}
         className="bg-dark-bgSecondary border border-dark-border rounded-lg shadow-xl w-full max-w-[90vw] md:max-w-[800px] h-[90vh] md:h-[600px] max-h-[80vh] flex flex-col overflow-hidden"

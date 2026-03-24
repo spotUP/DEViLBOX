@@ -364,7 +364,7 @@ export const PedalboardManager: React.FC<PedalboardManagerProps> = ({
       {/* Clear All Confirmation */}
       {showClearConfirm && (
         <div
-          className="fixed inset-0 z-[9990] flex items-center justify-center bg-black/60"
+          className="fixed inset-0 z-[99990] flex items-center justify-center bg-black/60"
           onClick={() => setShowClearConfirm(false)}
           role="dialog"
           aria-modal="true"

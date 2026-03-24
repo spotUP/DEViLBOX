@@ -609,8 +609,8 @@ export const StudioCanvasView: React.FC = () => {
           <TrackerView
             onShowExport={() => openModal('export')}
             onShowHelp={(tab) => openModal('help', { initialTab: tab || 'shortcuts' })}
-            onShowMasterFX={() => { const s = useUIStore.getState(); s.modalOpen === 'masterFx' ? s.closeModal() : s.openModal('masterFx'); }}
-            onShowInstrumentFX={() => { const s = useUIStore.getState(); s.modalOpen === 'instrumentFx' ? s.closeModal() : s.openModal('instrumentFx'); }}
+            onShowMasterFX={() => { const s = useUIStore.getState(); if (s.modalOpen === 'masterFx') { s.closeModal(); } else { s.openModal('masterFx'); } }}
+            onShowInstrumentFX={() => { const s = useUIStore.getState(); if (s.modalOpen === 'instrumentFx') { s.closeModal(); } else { s.openModal('instrumentFx'); } }}
             onShowInstruments={() => openModal('instruments')}
             onShowDrumpads={() => openModal('drumpads')}
             showPatterns={false}

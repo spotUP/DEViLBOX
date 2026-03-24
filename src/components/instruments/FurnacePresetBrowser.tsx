@@ -179,7 +179,7 @@ export const FurnacePresetBrowser: React.FC<FurnacePresetBrowserProps> = ({ onCl
   const content = (
     // Backdrop
     <div
-      className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60"
+      className="fixed inset-0 z-[99990] flex items-center justify-center bg-black/60"
       onClick={handleBackdropClick}
     >
       {/* Modal panel */}

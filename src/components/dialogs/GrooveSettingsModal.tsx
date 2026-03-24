@@ -27,7 +27,7 @@ export const GrooveSettingsModal: React.FC<GrooveSettingsModalProps> = ({ onClos
   } = useGrooveSettings();
 
   return (
-    <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-[9999] p-4 backdrop-blur-sm">
+    <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-[99990] p-4 backdrop-blur-sm">
       <div className="bg-ft2-bg border-2 border-ft2-border w-full max-w-2xl shadow-2xl flex flex-col max-h-[90vh]">
         {/* Header */}
         <div className="flex items-center justify-between px-4 py-3 bg-ft2-header border-b-2 border-ft2-border">

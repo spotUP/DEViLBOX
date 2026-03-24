@@ -81,7 +81,7 @@ export const SIDInfoModal: React.FC<SIDInfoModalProps> = ({ onClose }) => {
   const displayTunes = showAllTunes ? tunes : tunes.slice(0, 10);
 
   return (
-    <div className="fixed inset-0 z-[9990] flex items-center justify-center bg-black/70 backdrop-blur-sm" onClick={onClose}>
+    <div className="fixed inset-0 z-[99990] flex items-center justify-center bg-black/70 backdrop-blur-sm" onClick={onClose}>
       <div
         className="bg-dark-bgPrimary border border-blue-700/50 rounded-xl shadow-2xl shadow-blue-900/20 w-full max-w-4xl mx-4 max-h-[85vh] flex flex-col overflow-hidden"
         onClick={(e) => e.stopPropagation()}

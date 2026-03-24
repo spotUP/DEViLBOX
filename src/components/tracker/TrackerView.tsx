@@ -612,7 +612,7 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
                   <div className="relative flex-1 min-h-0 flex flex-col">
                     {editorContent}
                     <button
-                      className="absolute bottom-1 right-1 z-[9990] p-1 rounded bg-dark-bg/80 hover:bg-dark-bgTertiary text-text-muted hover:text-accent-primary border border-dark-border/50 transition-colors"
+                      className="absolute bottom-1 right-1 z-[99990] p-1 rounded bg-dark-bg/80 hover:bg-dark-bgTertiary text-text-muted hover:text-accent-primary border border-dark-border/50 transition-colors"
                       onClick={() => setPatternEditorPoppedOut(true)}
                       title="Pop out editor to separate window"
                     >
@@ -826,7 +826,7 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
         />
       )}
       {showAutomation && (
-        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/50 animate-fade-in">
+        <div className="fixed inset-0 z-[99990] flex items-center justify-center p-4 bg-black/50 animate-fade-in">
           <div className="bg-dark-bgPrimary border border-dark-border rounded-lg shadow-2xl max-w-6xl w-full max-h-[90vh] flex flex-col overflow-hidden">
             {/* Header */}
             <div className="flex items-center justify-between px-6 py-4 border-b border-dark-border bg-dark-bgSecondary">

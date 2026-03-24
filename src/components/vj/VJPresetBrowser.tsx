@@ -124,7 +124,7 @@ async function loadProjectMPresets(): Promise<PresetEntry[]> {
       idx: i,
     }));
     return cachedPMPresets!;
-  } catch (err) {
+  } catch (_err) {
     return [];
   }
 }
