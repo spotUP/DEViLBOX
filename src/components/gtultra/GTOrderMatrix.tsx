@@ -30,7 +30,7 @@ const CHAR_W = 8;
 const ROW_H = 14;
 const LABEL_H = 16;
 const HEADER_H = 16;
-const TABLE_W = 110;
+const TABLE_W = 80;
 
 interface GTOrderMatrixProps {
   width: number;
@@ -110,9 +110,9 @@ const OrdersCanvas: React.FC<{ width: number; height: number }> = ({ width, heig
     ctx.fillText('ORDERS', 4, 2);
     ctx.font = `11px "JetBrains Mono", monospace`;
 
-    // Column header
-    const posColW = CHAR_W * 3 + 4;
-    const chColW = Math.max(CHAR_W * 3, Math.floor((width - posColW) / channelCount));
+    // Column header — tight: 2-char hex values + small gap
+    const posColW = CHAR_W * 3;
+    const chColW = CHAR_W * 3; // "XX " = 3 chars wide
     const hdrY = LABEL_H;
 
     ctx.fillStyle = '#151528';
@@ -187,8 +187,8 @@ const OrdersCanvas: React.FC<{ width: number; height: number }> = ({ width, heig
     if (idx >= totalLen) return;
     setOrderCursor(idx);
 
-    const posColW = CHAR_W * 3 + 4;
-    const chColW = Math.max(CHAR_W * 3, Math.floor((width - posColW) / channelCount));
+    const posColW = CHAR_W * 3;
+    const chColW = CHAR_W * 3;
     const relX = x - posColW;
     if (relX >= 0) {
       const ch = Math.min(channelCount - 1, Math.floor(relX / chColW));
