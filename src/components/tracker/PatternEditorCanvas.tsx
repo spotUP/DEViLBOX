@@ -1589,6 +1589,8 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
     const isIOS = /iPhone|iPad|iPod/.test(navigator.userAgent);
     if (isIOS || !('transferControlToOffscreen' in HTMLCanvasElement.prototype)) {
       console.warn('[PatternEditorCanvas] OffscreenCanvas worker skipped (iOS or unsupported)');
+      // Clear any stale children before React renders fallback table
+      while (container.firstChild) container.removeChild(container.firstChild);
       setWebglUnsupported(true);
       return;
     }
@@ -1782,7 +1784,9 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
       unsubSettings();
       bridge.dispose();
       bridgeRef.current = null;
-      canvas.remove();
+      if (canvasRef.current && containerRef.current?.contains(canvas)) {
+        canvas.remove();
+      }
       canvasRef.current = null;
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
