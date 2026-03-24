@@ -1,17 +1,8 @@
 /**
- * GTOrderMatrix — Tabbed panel with order list + table editors for GoatTracker Ultra.
+ * GTOrderMatrix — Horizontal panel: Orders + 4 table editors side by side.
  *
- * AHX/Hively-style position editor pattern: a compact tabbed panel (~160px height)
- * sitting between the toolbar and pattern editor.
- *
- * Tabs:
- *   Orders — Per-channel order list (pattern sequence)
- *   Wave   — Wave table editor (255 entries, left+right)
- *   Pulse  — Pulse table editor
- *   Filter — Filter table editor
- *   Speed  — Speed table editor
- *
- * Uses canvas-based rendering with monospace hex display.
+ * Layout: [Orders (flex)] [Wave] [Pulse] [Filter] [Speed]
+ * All visible at once — no tabs, direct access.
  */
 
 import React, { useRef, useEffect, useState, useCallback } from 'react';
@@ -19,16 +10,7 @@ import { useGTUltraStore } from '../../stores/useGTUltraStore';
 
 export const GT_ORDER_MATRIX_HEIGHT = 160;
 
-type TabId = 'orders' | 'wave' | 'pulse' | 'filter' | 'speed';
-const TABS: { id: TabId; label: string }[] = [
-  { id: 'orders', label: 'Orders' },
-  { id: 'wave', label: 'Wave' },
-  { id: 'pulse', label: 'Pulse' },
-  { id: 'filter', label: 'Filter' },
-  { id: 'speed', label: 'Speed' },
-];
-
-const TAB_COLORS: Record<TabId, string> = {
+const SECTION_COLORS: Record<string, string> = {
   orders: '#ff6666',
   wave: '#60e060',
   pulse: '#ff8866',
@@ -46,8 +28,9 @@ const TABLE_PTR_FIELD: Record<string, 'wavePtr' | 'pulsePtr' | 'filterPtr' | 'sp
 
 const CHAR_W = 8;
 const ROW_H = 14;
-const TAB_BAR_H = 24;
+const LABEL_H = 16;
 const HEADER_H = 16;
+const TABLE_W = 110;
 
 interface GTOrderMatrixProps {
   width: number;
@@ -89,7 +72,7 @@ const OrdersCanvas: React.FC<{ width: number; height: number }> = ({ width, heig
   const [hexDigit, setHexDigit] = useState<number | null>(null);
 
   const channelCount = sidCount * 3;
-  const contentH = height - HEADER_H;
+  const contentH = height - LABEL_H - HEADER_H;
   const visibleRows = Math.floor(contentH / ROW_H);
   const totalLen = orderData.length > 0 ? orderData[0].length : 0;
 
@@ -119,34 +102,42 @@ const OrdersCanvas: React.FC<{ width: number; height: number }> = ({ width, heig
     ctx.font = `11px "JetBrains Mono", monospace`;
     ctx.textBaseline = 'top';
 
-    // Header
+    // Section label
+    ctx.fillStyle = '#111122';
+    ctx.fillRect(0, 0, width, LABEL_H);
+    ctx.fillStyle = SECTION_COLORS.orders;
+    ctx.font = `bold 10px "JetBrains Mono", monospace`;
+    ctx.fillText('ORDERS', 4, 2);
+    ctx.font = `11px "JetBrains Mono", monospace`;
+
+    // Column header
     const posColW = CHAR_W * 3 + 4;
     const chColW = Math.max(CHAR_W * 3, Math.floor((width - posColW) / channelCount));
+    const hdrY = LABEL_H;
 
-    ctx.fillStyle = '#111122';
-    ctx.fillRect(0, 0, width, HEADER_H);
+    ctx.fillStyle = '#151528';
+    ctx.fillRect(0, hdrY, width, HEADER_H);
     ctx.fillStyle = '#555';
-    ctx.fillText('Pos', 2, 2);
+    ctx.fillText('Pos', 2, hdrY + 2);
     for (let ch = 0; ch < channelCount; ch++) {
       ctx.fillStyle = ch === orderChannelCol ? '#ccc' : '#555';
-      ctx.fillText(`C${ch + 1}`, posColW + ch * chColW, 2);
+      ctx.fillText(`C${ch + 1}`, posColW + ch * chColW, hdrY + 2);
     }
+
+    const dataY0 = LABEL_H + HEADER_H;
 
     // Rows
     for (let vi = 0; vi < visibleRows; vi++) {
       const idx = scrollOffset + vi;
       if (idx >= totalLen) break;
-      const y = HEADER_H + vi * ROW_H;
+      const y = dataY0 + vi * ROW_H;
       const isPlay = idx === playbackPos.position;
       const isCursor = idx === orderCursor;
 
-      // Playback highlight
       if (isPlay) {
         ctx.fillStyle = 'rgba(233, 69, 96, 0.15)';
         ctx.fillRect(0, y, width, ROW_H);
       }
-
-      // Cursor highlight
       if (isCursor) {
         const activeX = posColW + orderChannelCol * chColW;
         ctx.fillStyle = 'rgba(255,255,255,0.08)';
@@ -156,11 +147,9 @@ const OrdersCanvas: React.FC<{ width: number; height: number }> = ({ width, heig
         ctx.strokeRect(0.5, y + 0.5, width - 1, ROW_H - 1);
       }
 
-      // Position index
       ctx.fillStyle = isPlay ? '#ff6666' : '#555';
       ctx.fillText(idx.toString(16).toUpperCase().padStart(2, '0'), 4, y + 1);
 
-      // Channel values
       for (let ch = 0; ch < channelCount; ch++) {
         const val = orderData[ch]?.[idx] ?? 0;
         ctx.fillStyle = getOrderColor(val);
@@ -171,8 +160,8 @@ const OrdersCanvas: React.FC<{ width: number; height: number }> = ({ width, heig
     // Hex entry indicator
     if (hexDigit !== null) {
       const cx = posColW + orderChannelCol * chColW;
-      const cy = HEADER_H + (orderCursor - scrollOffset) * ROW_H;
-      if (cy >= HEADER_H && cy < height) {
+      const cy = dataY0 + (orderCursor - scrollOffset) * ROW_H;
+      if (cy >= dataY0 && cy < height) {
         ctx.fillStyle = 'rgba(255, 102, 102, 0.3)';
         ctx.fillRect(cx - 2, cy, CHAR_W, ROW_H);
         ctx.fillStyle = '#ff6666';
@@ -192,8 +181,9 @@ const OrdersCanvas: React.FC<{ width: number; height: number }> = ({ width, heig
     const rect = canvasRef.current!.getBoundingClientRect();
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
-    if (y < HEADER_H) return;
-    const idx = scrollOffset + Math.floor((y - HEADER_H) / ROW_H);
+    const dataY0 = LABEL_H + HEADER_H;
+    if (y < dataY0) return;
+    const idx = scrollOffset + Math.floor((y - dataY0) / ROW_H);
     if (idx >= totalLen) return;
     setOrderCursor(idx);
 
@@ -283,10 +273,10 @@ const TableCanvas: React.FC<{
   const [activeCol, setActiveCol] = useState<0 | 1>(0);
   const [hexDigit, setHexDigit] = useState<number | null>(null);
 
-  const contentH = height - HEADER_H;
+  const contentH = height - LABEL_H - HEADER_H;
   const visibleRows = Math.floor(contentH / ROW_H);
   const table = tableData[tableType] ?? { left: new Uint8Array(255), right: new Uint8Array(255) };
-  const color = TAB_COLORS[tableType];
+  const color = SECTION_COLORS[tableType];
 
   // Get current instrument's table pointer for highlight
   const instrView = instrumentData[currentInstrument];
@@ -319,62 +309,66 @@ const TableCanvas: React.FC<{
     ctx.font = `11px "JetBrains Mono", monospace`;
     ctx.textBaseline = 'top';
 
-    // Header
+    // Section label
     ctx.fillStyle = '#111122';
-    ctx.fillRect(0, 0, width, HEADER_H);
+    ctx.fillRect(0, 0, width, LABEL_H);
+    ctx.fillStyle = color;
+    ctx.font = `bold 10px "JetBrains Mono", monospace`;
+    ctx.fillText(tableType.toUpperCase(), 4, 2);
+    ctx.font = `11px "JetBrains Mono", monospace`;
+
+    // Column header
+    const hdrY = LABEL_H;
+    ctx.fillStyle = '#151528';
+    ctx.fillRect(0, hdrY, width, HEADER_H);
     ctx.fillStyle = '#555';
-    ctx.fillText('IDX', 4, 2);
+    ctx.fillText('#', 4, hdrY + 2);
     ctx.fillStyle = activeCol === 0 ? '#ccc' : '#555';
-    ctx.fillText('LEFT', 36, 2);
+    ctx.fillText('L', 28, hdrY + 2);
     ctx.fillStyle = activeCol === 1 ? '#ccc' : '#555';
-    ctx.fillText('RIGHT', 76, 2);
+    ctx.fillText('R', 56, hdrY + 2);
+
+    const dataY0 = LABEL_H + HEADER_H;
 
     // Rows
     for (let vi = 0; vi < visibleRows; vi++) {
       const idx = scrollOffset + vi;
       if (idx >= 255) break;
-      const y = HEADER_H + vi * ROW_H;
+      const y = dataY0 + vi * ROW_H;
       const isCursor = idx === tableCursor;
       const isPtr = idx === instrPtr;
 
-      // Instrument pointer highlight
       if (isPtr) {
         ctx.fillStyle = 'rgba(255, 102, 102, 0.12)';
         ctx.fillRect(0, y, width, ROW_H);
       }
-
-      // Cursor highlight
       if (isCursor) {
         ctx.fillStyle = 'rgba(255,255,255,0.08)';
         ctx.fillRect(0, y, width, ROW_H);
-        const colX = activeCol === 0 ? 34 : 74;
+        const colX = activeCol === 0 ? 24 : 52;
         ctx.fillStyle = 'rgba(255,255,255,0.1)';
-        ctx.fillRect(colX, y, 28, ROW_H);
+        ctx.fillRect(colX, y, 22, ROW_H);
         ctx.strokeStyle = 'rgba(255,255,255,0.4)';
         ctx.lineWidth = 1;
         ctx.strokeRect(0.5, y + 0.5, width - 1, ROW_H - 1);
       }
 
-      // Index
       ctx.fillStyle = isPtr ? color : '#555';
-      ctx.fillText(idx.toString(16).toUpperCase().padStart(2, '0'), 8, y + 1);
+      ctx.fillText(idx.toString(16).toUpperCase().padStart(2, '0'), 4, y + 1);
 
-      // Left value
       const left = table.left[idx];
       ctx.fillStyle = left === 0 ? '#333' : color;
-      ctx.fillText(left.toString(16).toUpperCase().padStart(2, '0'), 38, y + 1);
+      ctx.fillText(left.toString(16).toUpperCase().padStart(2, '0'), 28, y + 1);
 
-      // Right value
       const right = table.right[idx];
       ctx.fillStyle = right === 0 ? '#333' : color;
-      ctx.fillText(right.toString(16).toUpperCase().padStart(2, '0'), 78, y + 1);
+      ctx.fillText(right.toString(16).toUpperCase().padStart(2, '0'), 56, y + 1);
     }
 
-    // Hex entry indicator
     if (hexDigit !== null) {
-      const colX = activeCol === 0 ? 38 : 78;
-      const cy = HEADER_H + (tableCursor - scrollOffset) * ROW_H;
-      if (cy >= HEADER_H && cy < height) {
+      const colX = activeCol === 0 ? 28 : 56;
+      const cy = dataY0 + (tableCursor - scrollOffset) * ROW_H;
+      if (cy >= dataY0 && cy < height) {
         ctx.fillStyle = 'rgba(255, 102, 102, 0.3)';
         ctx.fillRect(colX - 2, cy, CHAR_W, ROW_H);
         ctx.fillStyle = color;
@@ -382,7 +376,7 @@ const TableCanvas: React.FC<{
       }
     }
   }, [width, height, table, tableCursor, scrollOffset, visibleRows, activeCol,
-      hexDigit, instrPtr, color]);
+      hexDigit, instrPtr, color, tableType]);
 
   const handleWheel = useCallback((e: React.WheelEvent) => {
     e.preventDefault();
@@ -394,10 +388,11 @@ const TableCanvas: React.FC<{
     const rect = canvasRef.current!.getBoundingClientRect();
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
-    if (y < HEADER_H) return;
-    const idx = scrollOffset + Math.floor((y - HEADER_H) / ROW_H);
+    const dataY0 = LABEL_H + HEADER_H;
+    if (y < dataY0) return;
+    const idx = scrollOffset + Math.floor((y - dataY0) / ROW_H);
     if (idx < 255) setTableCursor(idx);
-    setActiveCol(x >= 64 && x < 110 ? 1 : 0);
+    setActiveCol(x >= 44 ? 1 : 0);
     setHexDigit(null);
     canvasRef.current?.focus();
   }, [scrollOffset, setTableCursor]);
@@ -459,9 +454,12 @@ const TableCanvas: React.FC<{
 
 // ─── Main Component ─────────────────────────────────────────────────────────
 
+const TABLE_TYPES = ['wave', 'pulse', 'filter', 'speed'] as const;
+
 export const GTOrderMatrix: React.FC<GTOrderMatrixProps> = ({ width, height }) => {
-  const [activeTab, setActiveTab] = useState<TabId>('orders');
-  const contentH = height - TAB_BAR_H;
+  // Orders gets remaining space; each table gets TABLE_W
+  const tablesW = TABLE_W * 4;
+  const ordersW = Math.max(80, width - tablesW - 4); // 4px for separators
 
   return (
     <div
@@ -469,53 +467,17 @@ export const GTOrderMatrix: React.FC<GTOrderMatrixProps> = ({ width, height }) =
         width,
         height,
         display: 'flex',
-        flexDirection: 'column',
+        flexDirection: 'row',
         background: '#1a1a2e',
       }}
     >
-      {/* Tab bar */}
-      <div
-        style={{
-          display: 'flex',
-          gap: 1,
-          height: TAB_BAR_H,
-          alignItems: 'stretch',
-          borderBottom: '1px solid #222244',
-          flexShrink: 0,
-        }}
-      >
-        {TABS.map(({ id, label }) => (
-          <button
-            key={id}
-            onClick={() => setActiveTab(id)}
-            style={{
-              flex: 1,
-              background: activeTab === id ? '#2a2a4e' : 'transparent',
-              color: activeTab === id ? TAB_COLORS[id] : '#888',
-              border: 'none',
-              borderBottom: activeTab === id ? `2px solid ${TAB_COLORS[id]}` : '2px solid transparent',
-              cursor: 'pointer',
-              fontFamily: '"JetBrains Mono", monospace',
-              fontSize: 10,
-              fontWeight: activeTab === id ? 'bold' : 'normal',
-              textTransform: 'uppercase',
-              padding: 0,
-              letterSpacing: '0.05em',
-            }}
-          >
-            {label}
-          </button>
-        ))}
-      </div>
-
-      {/* Content */}
-      <div style={{ flex: 1, minHeight: 0, overflow: 'hidden' }}>
-        {activeTab === 'orders' ? (
-          <OrdersCanvas width={width} height={contentH} />
-        ) : (
-          <TableCanvas width={width} height={contentH} tableType={activeTab} />
-        )}
-      </div>
+      <OrdersCanvas width={ordersW} height={height} />
+      {TABLE_TYPES.map((t) => (
+        <React.Fragment key={t}>
+          <div style={{ width: 1, background: '#222244', flexShrink: 0 }} />
+          <TableCanvas width={TABLE_W} height={height} tableType={t} />
+        </React.Fragment>
+      ))}
     </div>
   );
 };
