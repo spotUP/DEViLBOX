@@ -2131,7 +2131,9 @@ export class TrackerReplayer {
     this.stateRingHead = 0;
     this.stateRingTail = 0;
     this.stateRingCount = 0;
-    this.lastDequeuedState = null;
+    // Keep lastDequeuedState — pattern editor reads it after stop to show
+    // where playback was. Nulling it causes the editor to fall back to
+    // cursor.rowIndex (usually 0), jumping the view to the top.
   }
 
   // ==========================================================================

@@ -15,15 +15,9 @@ export function playStopToggle(): boolean {
   const { isPlaying, stop, setCurrentRow } = useTransportStore.getState();
   
   if (isPlaying) {
-    // Save playback position — pattern editor reads cursor.rowIndex when stopped
-    const savedRow = useTransportStore.getState().currentRow;
     getTrackerReplayer().stop();
     stop();
     getToneEngine().stop();
-    // Move cursor to where playback was to prevent scroll jump to top
-    import('@/stores/useCursorStore').then(({ useCursorStore }) => {
-      useCursorStore.getState().moveCursorToRow(savedRow);
-    });
   } else {
     // CRITICAL for iOS: Tone.start() MUST be called synchronously within user gesture
     // before engine.init() which does async WASM loading

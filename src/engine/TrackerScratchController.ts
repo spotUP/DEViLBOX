@@ -506,10 +506,6 @@ export class TrackerScratchController {
       this.scratchBuffer.unfreezeCapture();
     }
 
-    // Save current position before stopping — async engine callbacks may reset to 0.
-    const savedRow = useTransportStore.getState().currentRow;
-    const savedPattern = useTrackerStore.getState().currentPatternIndex;
-
     // Stop the tracker replayer and full transport chain.
     const replayer = getTrackerReplayer();
     replayer.stop();
@@ -525,17 +521,6 @@ export class TrackerScratchController {
     // Restore original smooth scrolling state
     useTransportStore.getState().setSmoothScrolling(this.originalSmoothScrolling);
 
-    // Move cursor to last playback position so the pattern editor stays there.
-    // The editor reads cursor.rowIndex when stopped (not playbackRow).
-    import('@/stores/useCursorStore').then(({ useCursorStore }) => {
-      useCursorStore.getState().moveCursorToRow(savedRow);
-    });
-
-    // Also restore store position after async engine callbacks land
-    setTimeout(() => {
-      useTransportStore.getState().setCurrentRow(savedRow);
-      useTrackerStore.getState().setCurrentPattern(savedPattern);
-    }, 50);
   }
 
   // ── Internal state machine ───────────────────────────────────────────────
