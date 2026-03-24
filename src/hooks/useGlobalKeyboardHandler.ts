@@ -23,7 +23,6 @@ import { playFromCursor } from '@engine/keyboard/commands/playFromCursor';
 import { clonePattern } from '@engine/keyboard/commands/clonePattern';
 import { playStopToggle, playPattern, playSong, stopPlayback } from '@engine/keyboard/commands/transport';
 import { getTrackerReplayer } from '@engine/TrackerReplayer';
-import { useTransportStore } from '@stores/useTransportStore';
 import {
   cursorUp, cursorDown, cursorLeft, cursorRight,
   cursorPageUp, cursorPageDown, cursorHome, cursorEnd,
@@ -1861,17 +1860,14 @@ export function useGlobalKeyboardHandler(options: UseGlobalKeyboardHandlerOption
       }
 
       // Right Shift = play song from start, Right Alt/Option = play pattern from start.
-      // Always resets to row 0. If something is/was playing, force position directly.
-      // Uses replayer.hasEverPlayed to survive the brief isPlaying=false windows
-      // caused by usePatternPlayback's effect restart cycles.
+      // If a song is loaded, forcePosition handles both playing and stopped states
+      // (tight restart — bypasses async React effect cycle).
+      // Cold start (no song loaded) falls through to playSong/playPattern.
       if (e.code === 'ShiftRight' || e.code === 'AltRight') {
         e.preventDefault();
         e.stopPropagation();
         const replayer = getTrackerReplayer();
-        const store = useTransportStore.getState();
-        const wasPlaying = store.isPlaying || replayer.isPlaying();
-        console.log(`[KB] ${e.code}: store.isPlaying=${store.isPlaying} replayer.isPlaying=${replayer.isPlaying()} hasSong=${replayer.getSong() !== null}`);
-        if (wasPlaying && replayer.getSong()) {
+        if (replayer.getSong()) {
           replayer.forcePosition(e.code === 'ShiftRight' ? 0 : replayer.getSongPos(), 0);
         } else {
           if (e.code === 'ShiftRight') playSong(); else playPattern();
