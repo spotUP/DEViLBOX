@@ -38,57 +38,61 @@ export function playStopToggle(): boolean {
 }
 
 /**
- * Play pattern - Start playing current pattern from beginning
+ * Play pattern - Start playing current pattern from beginning.
+ * If already playing, restart from row 0 without stopping.
  */
 export function playPattern(): boolean {
-  const { setCurrentRow, play, isPlaying, stop } = useTransportStore.getState();
+  const { setCurrentRow, play, isPlaying, setIsLooping } = useTransportStore.getState();
+
+  setIsLooping(true);
+  setCurrentRow(0);
 
   if (isPlaying) {
-    getTrackerReplayer().stop();
-    stop();
+    // Already playing — just reset position, don't stop/restart
+    return true;
   }
-  
+
   // CRITICAL for iOS: Tone.start() MUST be called synchronously within user gesture
   unlockIOSAudio();
   Tone.start();
-  
-  setCurrentRow(0);
-  
+
   getToneEngine()
     .init()
     .then(() => play())
     .catch((error) => {
       console.error('[playPattern] Failed to initialize audio engine:', error);
     });
-  
+
   return true;
 }
 
 /**
- * Play song - Start playing from beginning of song
+ * Play song - Start playing from beginning of song.
+ * If already playing, restart from row 0 / pattern 0 without stopping.
  */
 export function playSong(): boolean {
-  const { setCurrentRow, setCurrentPattern, play, isPlaying, stop } = useTransportStore.getState();
+  const { setCurrentRow, setCurrentPattern, play, isPlaying, setIsLooping } = useTransportStore.getState();
+
+  setIsLooping(false);
+  setCurrentPattern(0);
+  setCurrentRow(0);
 
   if (isPlaying) {
-    getTrackerReplayer().stop();
-    stop();
+    // Already playing — just reset position, don't stop/restart
+    return true;
   }
-  
+
   // CRITICAL for iOS: Tone.start() MUST be called synchronously within user gesture
   unlockIOSAudio();
   Tone.start();
-  
-  setCurrentPattern(0);
-  setCurrentRow(0);
-  
+
   getToneEngine()
     .init()
     .then(() => play())
     .catch((error) => {
       console.error('[playSong] Failed to initialize audio engine:', error);
     });
-  
+
   return true;
 }
 
