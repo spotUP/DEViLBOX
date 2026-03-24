@@ -55,20 +55,8 @@ export function useGTUltraFormatData(): GTUltraFormatData {
         return;
       }
 
-      // Order channels: channelCount..channelCount*2-1
-      const orderBase = channelCount;
-      if (channelIdx < orderBase + channelCount) {
-        const ch = channelIdx - orderBase;
-        if (columnKey === 'note') {
-          engine.setOrderEntry(ch, rowIdx, value);
-          store.refreshAllOrders();
-        }
-        return;
-      }
-
-      // Table channels: channelCount*2..channelCount*2+3
-      const tableBase = channelCount * 2;
-      const tableIdx = channelIdx - tableBase;
+      // Table channels: channelCount..channelCount+3 (WAVE/PULSE/FLTR/SPEED)
+      const tableIdx = channelIdx - channelCount;
       if (tableIdx >= 0 && tableIdx < 4) {
         const side = columnKey === 'note' ? 0 : columnKey === 'instrument' ? 1 : -1;
         if (side >= 0) {
