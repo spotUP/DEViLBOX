@@ -9,9 +9,10 @@
  */
 
 import React, { useRef, useEffect, useState } from 'react';
-import { getBeatPhaseInfo, type PhaseInfo } from '@/engine/dj/DJAutoSync';
+import type { PhaseInfo } from '@/engine/dj/DJAutoSync';
 import { useDJStore } from '@/stores/useDJStore';
 import type { DeckId } from '@/engine/dj/DeckEngine';
+import { useDeckVisualizationData } from '@/hooks/dj/useDeckVisualizationData';
 
 interface DeckBeatPhaseProps {
   deckId: DeckId;
@@ -25,6 +26,7 @@ const ON_BEAT_THRESHOLD = 0.12;
 export const DeckBeatPhase: React.FC<DeckBeatPhaseProps> = ({ deckId }) => {
   const hasBeatGrid = useDJStore((s) => !!s.decks[deckId].beatGrid);
   const timeSignature = useDJStore((s) => s.decks[deckId].beatGrid?.timeSignature ?? 4);
+  const viz = useDeckVisualizationData(deckId);
 
   const [phase, setPhase] = useState<PhaseInfo | null>(null);
   const rafRef = useRef<number>(0);
@@ -35,8 +37,7 @@ export const DeckBeatPhase: React.FC<DeckBeatPhaseProps> = ({ deckId }) => {
 
     const tick = () => {
       if (!mountedRef.current) return;
-      const info = getBeatPhaseInfo(deckId);
-      setPhase(info);
+      setPhase(viz.getBeatPhase());
       rafRef.current = requestAnimationFrame(tick);
     };
 
@@ -46,7 +47,7 @@ export const DeckBeatPhase: React.FC<DeckBeatPhaseProps> = ({ deckId }) => {
       mountedRef.current = false;
       cancelAnimationFrame(rafRef.current);
     };
-  }, [deckId]);
+  }, [deckId, viz]);
 
   // Which beat of the bar are we on? (0-indexed)
   const currentBeat = phase
