@@ -1139,7 +1139,7 @@ export class FurnaceDispatchSynth implements DevilboxSynth {
     // Use force=true so insChanged is always set — the instrument data
     // in slot 0 may have been replaced by a preset load, and without
     // forcing, the dispatch skips copying params when the index matches.
-    console.log(`[FurnaceDispatchSynth] triggerAttack: note=${midiNote} chan=${chan} inst=${this.furnaceInstrumentIndex} platform=${pt} time=${_time?.toFixed(4)}`);
+    if ((window as any).FURNACE_DEBUG) console.log(`[FurnaceDispatchSynth] triggerAttack: note=${midiNote} chan=${chan} inst=${this.furnaceInstrumentIndex} platform=${pt} time=${_time?.toFixed(4)}`);
     this.engine.setInstrument(chan, this.furnaceInstrumentIndex, pt, true, _time);
 
     // Set volume based on velocity
@@ -1231,7 +1231,7 @@ export class FurnaceDispatchSynth implements DevilboxSynth {
    * Set which channel to play notes on.
    */
   setChannel(chan: number): void {
-    console.log(`[FurnaceDispatchSynth] setChannel: ${chan} (platform ${this.platformType})`);
+    if ((window as any).FURNACE_DEBUG) console.log(`[FurnaceDispatchSynth] setChannel: ${chan} (platform ${this.platformType})`);
     this.currentChannel = chan;
   }
 

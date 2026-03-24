@@ -298,11 +298,9 @@ export class TrackerScratchController {
   onGrabStart(clientY: number, timestamp: number): boolean {
     const replayer = getTrackerReplayer();
     if (!replayer.isPlaying()) {
-      console.log('[TrackerScratch] onGrabStart: replayer not playing, ignoring');
       return false;
     }
 
-    console.log('[TrackerScratch] onGrabStart: activating grab scratch');
 
     if (!this._isActive) {
       this.enterScratchMode(replayer);

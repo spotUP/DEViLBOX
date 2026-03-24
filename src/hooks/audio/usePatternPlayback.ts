@@ -62,7 +62,7 @@ export const usePatternPlayback = () => {
     furnaceActiveSubsong: s.furnaceActiveSubsong,
   })));
   const linearPeriods = useEditorStore((s) => s.linearPeriods);
-  const { isPlaying, isLooping, bpm, speed: transportSpeed, setCurrentRow, setCurrentRowThrottled } = useTransportStore(useShallow((s) => ({
+  const { isPlaying, isLooping, bpm, speed: transportSpeed, setCurrentRowThrottled } = useTransportStore(useShallow((s) => ({
     isPlaying: s.isPlaying,
     isLooping: s.isLooping,
     bpm: s.bpm,
@@ -296,11 +296,11 @@ export const usePatternPlayback = () => {
         hasStartedRef.current = true;
 
         if (needsReload) {
-          console.log(`[Playback] Reloading: replayerPos=${replayer.getCurrentPosition()}, storePos=${currentPositionIndexRef.current}`);
+          if ((window as any).PLAYBACK_DEBUG) console.log(`[Playback] Reloading: replayerPos=${replayer.getCurrentPosition()}, storePos=${currentPositionIndexRef.current}`);
         }
         const modData = pattern.importMetadata?.modData;
 
-        console.log(`[Playback] ${needsReload ? 'Reloading' : 'Starting'} real-time playback (${format}), arrangement=${arrangement.isArrangementMode}`);
+        if ((window as any).PLAYBACK_DEBUG) console.log(`[Playback] ${needsReload ? 'Reloading' : 'Starting'} real-time playback (${format}), arrangement=${arrangement.isArrangementMode}`);
 
         let effectivePatterns = patterns;
         let effectiveSongPositions: number[];
