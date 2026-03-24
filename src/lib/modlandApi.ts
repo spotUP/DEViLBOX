@@ -15,6 +15,8 @@ export interface ModlandFile {
   filename: string;
   full_path: string;
   extension: string;
+  avg_rating?: number;
+  vote_count?: number;
 }
 
 export interface ModlandSearchResult {

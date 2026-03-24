@@ -146,6 +146,22 @@ export function initDatabase() {
     CREATE INDEX IF NOT EXISTS idx_dj_blobs_user ON dj_blobs(user_id);
     CREATE INDEX IF NOT EXISTS idx_dj_blobs_sha256 ON dj_blobs(sha256);
 
+    -- Module ratings (Modland + HVSC star ratings by logged-in users)
+    CREATE TABLE IF NOT EXISTS module_ratings (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id TEXT NOT NULL,
+      source TEXT NOT NULL,
+      item_key TEXT NOT NULL,
+      rating INTEGER NOT NULL CHECK(rating >= 1 AND rating <= 5),
+      created_at INTEGER NOT NULL,
+      updated_at INTEGER NOT NULL,
+      UNIQUE(user_id, source, item_key),
+      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_ratings_item ON module_ratings(source, item_key);
+    CREATE INDEX IF NOT EXISTS idx_ratings_user ON module_ratings(user_id);
+
     -- Song analysis cache (shared across all users)
     -- Binary-packed arrays for compact storage (~5KB/song vs ~15KB JSON)
     CREATE TABLE IF NOT EXISTS song_analysis (

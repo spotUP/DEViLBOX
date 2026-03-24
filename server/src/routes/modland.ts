@@ -103,9 +103,15 @@ router.get('/search', (req: Request, res: Response) => {
       const ftsQuery = terms.map((t) => `"${t}"*`).join(' ');
 
       let sql = `
-        SELECT f.id, f.format, f.author, f.filename, f.full_path, f.extension
+        SELECT f.id, f.format, f.author, f.filename, f.full_path, f.extension,
+               r.avg_rating, r.vote_count
         FROM modland_fts fts
         JOIN modland_files f ON f.id = fts.rowid
+        LEFT JOIN (
+          SELECT item_key, AVG(rating) as avg_rating, COUNT(*) as vote_count
+          FROM module_ratings WHERE source = 'modland'
+          GROUP BY item_key
+        ) r ON r.item_key = f.full_path
         WHERE modland_fts MATCH ?
       `;
       const params: any[] = [ftsQuery];
@@ -119,25 +125,36 @@ router.get('/search', (req: Request, res: Response) => {
         params.push(author);
       }
 
-      sql += ' ORDER BY rank LIMIT ? OFFSET ?';
+      // Boost rated items: FTS rank (negative = better) minus a rating bonus
+      sql += ' ORDER BY (rank - COALESCE(r.avg_rating * ln(r.vote_count + 1) * 0.5, 0)) LIMIT ? OFFSET ?';
       params.push(limit, offset);
 
       results = db.prepare(sql).all(...params);
     } else {
       // No text search — filter by format/author
-      let sql = 'SELECT id, format, author, filename, full_path, extension FROM modland_files WHERE 1=1';
+      let sql = `
+        SELECT f.id, f.format, f.author, f.filename, f.full_path, f.extension,
+               r.avg_rating, r.vote_count
+        FROM modland_files f
+        LEFT JOIN (
+          SELECT item_key, AVG(rating) as avg_rating, COUNT(*) as vote_count
+          FROM module_ratings WHERE source = 'modland'
+          GROUP BY item_key
+        ) r ON r.item_key = f.full_path
+        WHERE 1=1
+      `;
       const params: any[] = [];
 
       if (format) {
-        sql += ' AND format = ?';
+        sql += ' AND f.format = ?';
         params.push(format);
       }
       if (author) {
-        sql += ' AND author = ?';
+        sql += ' AND f.author = ?';
         params.push(author);
       }
 
-      sql += ' ORDER BY author, filename LIMIT ? OFFSET ?';
+      sql += ' ORDER BY COALESCE(r.avg_rating, 0) DESC, f.author, f.filename LIMIT ? OFFSET ?';
       params.push(limit, offset);
 
       results = db.prepare(sql).all(...params);
