@@ -66,9 +66,10 @@ const NOTE_TABLE_CACHE = new Map<number, string[]>();
 function getNoteTable(displayOffset: number): string[] {
   let table = NOTE_TABLE_CACHE.get(displayOffset);
   if (table) return table;
-  table = new Array(98);
+  // 192 entries covers GT Ultra's range (notes 1-188) plus standard (1-96) and OFF (97)
+  table = new Array(192);
   table[0] = '---';
-  for (let n = 1; n < 97; n++) {
+  for (let n = 1; n < 189; n++) {
     const adj = n + displayOffset - 1;
     const semitone = ((adj % 12) + 12) % 12;
     const octave = Math.floor(adj / 12);
