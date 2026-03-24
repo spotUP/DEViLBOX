@@ -86,8 +86,8 @@ export class GTUltraEngine {
     if (!modulePromise) {
       modulePromise = (async () => {
         const [wasmResp, jsResp] = await Promise.all([
-          fetch(`${baseUrl}gtultra/GTUltra.wasm`),
-          fetch(`${baseUrl}gtultra/GTUltra.js`),
+          fetch(`${baseUrl}gtultra/GTUltra.wasm${CACHE_BUST}`),
+          fetch(`${baseUrl}gtultra/GTUltra.js${CACHE_BUST}`),
         ]);
         if (!wasmResp.ok) throw new Error(`Failed to load GTUltra.wasm: ${wasmResp.status}`);
         if (!jsResp.ok) throw new Error(`Failed to load GTUltra.js: ${jsResp.status}`);
