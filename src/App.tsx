@@ -1251,8 +1251,8 @@ function App() {
                 const result = await loadFile(file, { requireConfirmation: false });
                 if (result.success === 'pending-import') {
                   // Auto-import without showing dialog (mobile/quick-load path)
-                  const { ModuleLoader } = await import('@lib/import/ModuleLoader');
-                  const moduleInfo = await ModuleLoader.load(file);
+                  const { loadModuleFile } = await import('@lib/import/ModuleLoader');
+                  const moduleInfo = await loadModuleFile(file);
                   const { importTrackerModule } = await import('@lib/file/UnifiedFileLoader');
                   await importTrackerModule(moduleInfo, { useLibopenmpt: true });
                 } else if (result.success === true) {
