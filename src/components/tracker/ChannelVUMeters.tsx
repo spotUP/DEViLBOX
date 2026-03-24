@@ -16,7 +16,7 @@ import { useTransportStore } from '@stores/useTransportStore';
 
 // VU meter timing constants - ProTracker style
 const DECAY_RATE = 0.92;
-const SWING_RANGE = 25;
+const SWING_RANGE = 50;        // wider horizontal travel
 const SWING_FREQ = 0.0025;     // radians per ms (~2.5s full cycle)
 const SWING_PHASE_STEP = 0.45; // radians between adjacent channels
 const NUM_SEGMENTS = 26;
