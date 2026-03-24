@@ -2557,7 +2557,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
         {/* VU Meters overlay — full height, segments extrude from edit row (behind everything) */}
         <div
           className="absolute right-0 pointer-events-none overflow-hidden"
-          style={{ top: 0, left: LINE_NUMBER_WIDTH, bottom: 0, zIndex: 0 }}
+          style={{ top: 0, left: LINE_NUMBER_WIDTH, bottom: 48, zIndex: 0 }}
         >
           <ChannelVUMeters
             channelOffsets={channelOffsets}
