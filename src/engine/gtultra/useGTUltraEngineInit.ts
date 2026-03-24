@@ -8,8 +8,21 @@
 import { useEffect } from 'react';
 import * as Tone from 'tone';
 import { useGTUltraStore } from '@/stores/useGTUltraStore';
+import { useInstrumentStore } from '@/stores/useInstrumentStore';
 import { GTUltraEngine } from './GTUltraEngine';
 import { getGTUltraASIDBridge } from './GTUltraASIDBridge';
+
+/** Populate DEViLBOX instrument store from GT Ultra WASM instrument data */
+function populateInstrumentStore(): void {
+  // Small delay to ensure instrument data has arrived from WASM callbacks
+  setTimeout(() => {
+    const gtStore = useGTUltraStore.getState();
+    const instruments = gtStore.buildInstrumentConfigs();
+    if (instruments.length > 0) {
+      useInstrumentStore.getState().loadInstruments(instruments);
+    }
+  }, 100);
+}
 
 export function useGTUltraEngineInit(): void {
   const setEngine = useGTUltraStore((s) => s.setEngine);
@@ -41,6 +54,7 @@ export function useGTUltraEngineInit(): void {
           store.refreshAllOrders();
           store.refreshAllInstruments();
           store.refreshAllTables();
+          populateInstrumentStore();
         },
         onPosition: (pos) => useGTUltraStore.getState().updatePlaybackPos(pos),
         onAsidWrite: (chip, reg, value) => getGTUltraASIDBridge().writeRegister(chip, reg, value),
@@ -65,6 +79,7 @@ export function useGTUltraEngineInit(): void {
           store.refreshAllOrders();
           store.refreshAllInstruments();
           store.refreshAllTables();
+          populateInstrumentStore();
         },
         onError: (err) => console.error('[GTUltra] Engine error:', err),
       });

@@ -60,6 +60,7 @@ import type {
 } from './furnace';
 import type {
   ChiptuneModuleConfig,
+  GTUltraConfig,
   HivelyConfig,
   JamCrackerConfig,
   UADEConfig,
@@ -259,6 +260,8 @@ export interface InstrumentConfig {
   chiptuneModule?: ChiptuneModuleConfig;
   // HivelyTracker / AHX instrument
   hively?: HivelyConfig;
+  // GoatTracker Ultra (C64 SID tracker)
+  gtUltra?: GTUltraConfig;
   // JamCracker Pro (AM synth / PCM instruments)
   jamCracker?: JamCrackerConfig;
   // UADE exotic Amiga format (playback-only)
@@ -522,6 +525,19 @@ export const DEFAULT_HIVELY: HivelyConfig = {
     speed: 1,
     entries: [{ note: 0, waveform: 2, fixed: false, fx: [0, 0], fxParam: [0, 0] }],
   },
+};
+
+export const DEFAULT_GTULTRA: GTUltraConfig = {
+  ad: 0x09,            // Attack=0, Decay=9
+  sr: 0x00,            // Sustain=0, Release=0
+  vibdelay: 0,
+  gatetimer: 2,
+  firstwave: 0x41,     // Pulse + gate bit
+  name: '',
+  wavePtr: 0,
+  pulsePtr: 0,
+  filterPtr: 0,
+  speedPtr: 0,
 };
 
 export const DEFAULT_JAMCRACKER: JamCrackerConfig = {
