@@ -14,14 +14,14 @@ import { getGTUltraASIDBridge } from './GTUltraASIDBridge';
 
 /** Populate DEViLBOX instrument store from GT Ultra WASM instrument data */
 function populateInstrumentStore(): void {
-  // Small delay to ensure instrument data has arrived from WASM callbacks
+  // Wait for WASM instrument data callbacks (63 instruments sent individually)
   setTimeout(() => {
     const gtStore = useGTUltraStore.getState();
     const instruments = gtStore.buildInstrumentConfigs();
     if (instruments.length > 0) {
       useInstrumentStore.getState().loadInstruments(instruments);
     }
-  }, 100);
+  }, 500);
 }
 
 export function useGTUltraEngineInit(): void {
@@ -54,7 +54,7 @@ export function useGTUltraEngineInit(): void {
           store.refreshAllOrders();
           store.refreshAllInstruments();
           store.refreshAllTables();
-          populateInstrumentStore();
+          // Don't populate instruments here — wait for onSongLoaded when data is ready
         },
         onPosition: (pos) => useGTUltraStore.getState().updatePlaybackPos(pos),
         onAsidWrite: (chip, reg, value) => getGTUltraASIDBridge().writeRegister(chip, reg, value),
