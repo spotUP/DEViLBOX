@@ -593,6 +593,29 @@ export class TrackerReplayer {
   /** Get current pattern row position */
   getPattPos(): number { return this.pattPos; }
 
+  /** Force position reset — sets internal state directly and resyncs scheduler.
+   *  Also forwards to libopenmpt/WASM worklets if active. */
+  forcePosition(songPos: number, pattPos: number): void {
+    console.log(`[TrackerReplayer] forcePosition(${songPos}, ${pattPos}) playing=${this.playing}`);
+    this.songPos = songPos;
+    this.pattPos = pattPos;
+    this.currentTick = 0;
+    this.nextScheduleTime = Tone.now();
+
+    // Update UI
+    useTransportStore.getState().setCurrentRow(pattPos);
+    if (songPos === 0) useTransportStore.getState().setCurrentPattern(0);
+
+    // Forward to libopenmpt if active
+    if (this.useLibopenmptPlayback) {
+      import('@engine/libopenmpt/LibopenmptEngine').then(({ LibopenmptEngine }) => {
+        if (LibopenmptEngine.hasInstance()) {
+          LibopenmptEngine.getInstance().seekTo(songPos, pattPos);
+        }
+      }).catch(() => {});
+    }
+  }
+
   /** Get total song positions */
   getTotalPositions(): number { return this.song?.songLength ?? 0; }
 
