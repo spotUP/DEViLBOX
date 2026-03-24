@@ -7,8 +7,8 @@
 
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
-import { readFile } from 'fs/promises';
-import { basename } from 'path';
+import { readFile, readdir } from 'fs/promises';
+import { basename, dirname, join } from 'path';
 import { callBrowser } from './wsRelay';
 
 const API_BASE = `http://localhost:${process.env.PORT || 3001}`;
@@ -1147,11 +1147,74 @@ export function createMcpServer(): McpServer {
         const fileData = await readFile(p.path);
         const base64 = fileData.toString('base64');
         const filename = basename(p.path);
+        const dir = dirname(p.path);
+
+        // Auto-discover companion files in the same directory.
+        // Many Amiga formats use multi-file layouts:
+        //   TFMX: mdat.songname + smpl.songname
+        //   MIDI-Loriciel: MIDI.songname + SMPL.songname
+        //   StartrekkerAM: song.mod + song.mod.nt
+        //   MusicMaker: song.ip + song.ip.l + song.ip.n + song.sdata
+        //   SUNTronic: song.src + instr/ directory with .x files
+        //   AudioSculpture: song.adsc + song.adsc.as
+        // All companion files in the same directory with matching base name are included.
+        const companionFiles: Record<string, string> = {};
+        const lowerFilename = filename.toLowerCase();
+        try {
+          const dirFiles = await readdir(dir);
+
+          // Prefix-pair formats: mdat↔smpl, MIDI↔SMPL
+          const prefixPairs: [string, string][] = [['mdat.', 'smpl.'], ['smpl.', 'mdat.'], ['midi.', 'smpl.'], ['smpl.', 'midi.']];
+          for (const [myPrefix, pairPrefix] of prefixPairs) {
+            if (lowerFilename.startsWith(myPrefix)) {
+              const suffix = filename.slice(myPrefix.length);
+              const pairName = dirFiles.find(f => f.toLowerCase() === `${pairPrefix}${suffix.toLowerCase()}`);
+              if (pairName) {
+                const pairData = await readFile(join(dir, pairName));
+                companionFiles[pairName] = pairData.toString('base64');
+              }
+            }
+          }
+
+          // Extension-suffix companions: song.mod.nt, song.adsc.as, song.ip.l, song.ip.n
+          const suffixCompanions = ['.nt', '.as', '.l', '.n'];
+          for (const suffix of suffixCompanions) {
+            const companionName = dirFiles.find(f => f.toLowerCase() === lowerFilename + suffix);
+            if (companionName) {
+              const data = await readFile(join(dir, companionName));
+              companionFiles[companionName] = data.toString('base64');
+            }
+          }
+
+          // Same-basename companion: song.sdata alongside song.ip
+          const dotPos = lowerFilename.lastIndexOf('.');
+          if (dotPos > 0) {
+            const baseName = filename.slice(0, dotPos);
+            const sdataName = dirFiles.find(f => f.toLowerCase() === `${baseName.toLowerCase()}.sdata`);
+            if (sdataName && sdataName.toLowerCase() !== lowerFilename) {
+              const data = await readFile(join(dir, sdataName));
+              companionFiles[sdataName] = data.toString('base64');
+            }
+          }
+
+          // SUNTronic: look for instr/ subdirectory with .x sample files
+          if (dirFiles.includes('instr')) {
+            try {
+              const instrFiles = await readdir(join(dir, 'instr'));
+              for (const instrFile of instrFiles.filter(f => f.endsWith('.x'))) {
+                const data = await readFile(join(dir, 'instr', instrFile));
+                companionFiles[`instr/${instrFile}`] = data.toString('base64');
+              }
+            } catch { /* instr dir might not be readable */ }
+          }
+        } catch { /* companion discovery is best-effort */ }
+
         return textResult(await callBrowser('load_file', {
           filename,
           data: base64,
           subsong: p.subsong,
           useLibopenmpt: p.useLibopenmpt,
+          ...(Object.keys(companionFiles).length > 0 ? { companionFiles } : {}),
         }));
       } catch (e) {
         return textResult({ error: `Failed to read file: ${(e as Error).message}` });
