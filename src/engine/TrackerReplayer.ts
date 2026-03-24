@@ -598,11 +598,12 @@ export class TrackerReplayer {
    *  Does NOT update transport store to avoid triggering usePatternPlayback reload.
    *  The onRowChange callback updates the UI naturally on the next tick. */
   forcePosition(songPos: number, pattPos: number): void {
-    console.log(`[TrackerReplayer] forcePosition(${songPos}, ${pattPos}) playing=${this.playing}`);
+    console.log(`[TrackerReplayer] forcePosition(${songPos}, ${pattPos}) playing=${this.playing} was songPos=${this.songPos} pattPos=${this.pattPos} tick=${this.currentTick} libopenmpt=${this.useLibopenmptPlayback}`);
     this.songPos = songPos;
     this.pattPos = pattPos;
     this.currentTick = 0;
     this.nextScheduleTime = Tone.now();
+    console.log(`[TrackerReplayer] forcePosition DONE → songPos=${this.songPos} pattPos=${this.pattPos} nextSchedule=${this.nextScheduleTime.toFixed(3)}`);
 
     // Forward to libopenmpt if active
     if (this.useLibopenmptPlayback) {
