@@ -156,6 +156,7 @@ export function klysToFormatChannels(
       label,
       patternLength,
       rows,
+      isPatternChannel: true,
     });
   }
 

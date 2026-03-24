@@ -164,6 +164,7 @@ export function jcToChannels(
       label: `CH ${(ch + 1).toString().padStart(2, '0')}`,
       patternLength: numRows || 32,
       rows,
+      isPatternChannel: true,
     });
   }
   return result;

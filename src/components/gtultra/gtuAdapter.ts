@@ -180,6 +180,7 @@ export function gtUltraToFormatChannels(
       label: `CH${(ch + 1).toString().padStart(2, '0')}`,
       patternLength: patLen,
       rows,
+      isPatternChannel: true,
     });
   }
 

@@ -40,6 +40,7 @@ export interface ThemeColors {
   trackerRowHighlight: string;
   trackerRowCurrent: string;
   trackerRowCursor: string;
+  trackerBorder: string;     // Channel dividers / borders inside pattern editor
 
   // Cell colors
   cellNote: string;
@@ -106,6 +107,7 @@ const neoDarkTheme: Theme = {
     trackerRowHighlight: '#222244',
     trackerRowCurrent: '#2a2a50',
     trackerRowCursor: '#1a1a40',
+    trackerBorder: '#222244',
     cellNote: '#f0f0f2',
     cellInstrument: '#fbbf24',
     cellVolume: '#34d399',
@@ -158,6 +160,7 @@ const cyanLineartTheme: Theme = {
     trackerRowHighlight: '#061414',
     trackerRowCurrent: '#081818',
     trackerRowCursor: '#0a1c1c',
+    trackerBorder: '#061414',
 
     // Cell colors - monochrome cyan palette
     cellNote: '#00ffff',      // Bright cyan
@@ -215,6 +218,7 @@ const devilboxTheme: Theme = {
     trackerRowHighlight: '#222244',
     trackerRowCurrent: '#2a2a50',
     trackerRowCursor: '#1a1a40',
+    trackerBorder: '#222244',
 
     // Cell colors — vivid on red, white-based where possible
     cellNote: 'rgba(255,255,255,0.92)',
@@ -269,6 +273,7 @@ const modernTheme: Theme = {
     trackerRowHighlight: '#282828',
     trackerRowCurrent: '#2a2219',
     trackerRowCursor: '#f59e0b33',
+    trackerBorder: '#282828',
 
     // Cell colors
     cellNote: '#f0f0f0',
@@ -324,6 +329,7 @@ const tr808Theme: Theme = {
     trackerRowHighlight: '#2e3032',
     trackerRowCurrent: '#3a2810',
     trackerRowCursor: '#4a1808',
+    trackerBorder: '#2e3032',
     cellNote: '#f6edc6',
     cellInstrument: '#dfd442',
     cellVolume: '#e98e2f',
@@ -379,6 +385,7 @@ const tr909Theme: Theme = {
     trackerRowHighlight: '#3c4250',
     trackerRowCurrent: '#443828',
     trackerRowCursor: '#4a3018',
+    trackerBorder: '#3c4250',
     cellNote: '#DFDBDA',
     cellInstrument: '#FB9250',
     cellVolume: '#8D8885',
@@ -434,6 +441,7 @@ const dmxTheme: Theme = {
     trackerRowHighlight: '#22202c',
     trackerRowCurrent: '#1a2438',
     trackerRowCursor: '#2a1018',
+    trackerBorder: '#22202c',
     cellNote: '#F8FCFB',
     cellInstrument: '#4785B4',
     cellVolume: '#D00E0E',
@@ -489,6 +497,7 @@ const linnLm1Theme: Theme = {
     trackerRowHighlight: '#242322',
     trackerRowCurrent: '#2c1c0a',
     trackerRowCursor: '#301008',
+    trackerBorder: '#242322',
     cellNote: '#d8d4d0',
     cellInstrument: '#FC650C',
     cellVolume: '#CA1B20',
@@ -544,6 +553,7 @@ const mpc60Theme: Theme = {
     trackerRowHighlight: '#4c4a58',
     trackerRowCurrent: '#3a4858',
     trackerRowCursor: '#4a3838',
+    trackerBorder: '#4c4a58',
     cellNote: '#E6E4E7',
     cellInstrument: '#8AAAC3',
     cellVolume: '#E0635D',
@@ -599,6 +609,7 @@ const cr78Theme: Theme = {
     trackerRowHighlight: '#24262e',
     trackerRowCurrent: '#282410',
     trackerRowCursor: '#281010',
+    trackerBorder: '#24262e',
     cellNote: '#e8e6e0',
     cellInstrument: '#FFC631',
     cellVolume: '#5E9CD9',
@@ -654,6 +665,7 @@ const emuSp12Theme: Theme = {
     trackerRowHighlight: '#303440',
     trackerRowCurrent: '#1a2c50',
     trackerRowCursor: '#102860',
+    trackerBorder: '#303440',
     cellNote: '#EAE6E5',
     cellInstrument: '#448ABD',
     cellVolume: '#A5A3A6',
@@ -709,6 +721,7 @@ const maestroRhythmKingTheme: Theme = {
     trackerRowHighlight: '#22182a',
     trackerRowCurrent: '#2e1818',
     trackerRowCursor: '#381414',
+    trackerBorder: '#22182a',
     cellNote: '#F2ECEE',
     cellInstrument: '#F7BE29',
     cellVolume: '#ACE0F8',
@@ -764,6 +777,7 @@ const maestroRhythmSoundTheme: Theme = {
     trackerRowHighlight: '#1c1428',
     trackerRowCurrent: '#281808',
     trackerRowCursor: '#302004',
+    trackerBorder: '#1c1428',
     cellNote: '#FEFCFF',
     cellInstrument: '#FBE900',
     cellVolume: '#B8E9E3',
@@ -819,6 +833,7 @@ const aceToneTheme: Theme = {
     trackerRowHighlight: '#322814',
     trackerRowCurrent: '#342408',
     trackerRowCursor: '#3a1406',
+    trackerBorder: '#322814',
     cellNote: '#FBE6AF',
     cellInstrument: '#E19907',
     cellVolume: '#4F8632',
@@ -874,6 +889,7 @@ const hammondAutoVariTheme: Theme = {
     trackerRowHighlight: '#3e3a2e',
     trackerRowCurrent: '#3e3418',
     trackerRowCursor: '#402c18',
+    trackerBorder: '#3e3a2e',
     cellNote: '#F1F0EC',
     cellInstrument: '#FBA02E',
     cellVolume: '#E1806D',
@@ -929,6 +945,7 @@ const bossHc2Theme: Theme = {
     trackerRowHighlight: '#1e1e28',
     trackerRowCurrent: '#102838',
     trackerRowCursor: '#0a2040',
+    trackerBorder: '#1e1e28',
     cellNote: '#BDBEB8',
     cellInstrument: '#329BD4',
     cellVolume: '#496F9C',
@@ -986,6 +1003,7 @@ const wurlitzerSideManTheme: Theme = {
     trackerRowHighlight: '#301c08',
     trackerRowCurrent: '#3c2408',
     trackerRowCursor: '#4e2e00',
+    trackerBorder: '#301c08',
     cellNote: '#F0E0C0',         // ivory text
     cellInstrument: '#C88B30',   // amber
     cellVolume: '#8C6020',       // brass
@@ -1038,6 +1056,7 @@ const tr606Theme: Theme = {
     trackerRowHighlight: '#240C0C',
     trackerRowCurrent: '#3A1000',
     trackerRowCursor: '#4A1000',
+    trackerBorder: '#240C0C',
     cellNote: '#F0E8E0',
     cellInstrument: '#E86020',
     cellVolume: '#E02010',
@@ -1087,6 +1106,7 @@ const tr707Theme: Theme = {
     trackerRowHighlight: '#282018',
     trackerRowCurrent: '#3A2010',
     trackerRowCursor: '#4A2808',
+    trackerBorder: '#282018',
     cellNote: '#E8DCC8',
     cellInstrument: '#A87840',
     cellVolume: '#CC2820',
@@ -1135,6 +1155,7 @@ const tr77Theme: Theme = {
     trackerRowHighlight: '#222010',
     trackerRowCurrent: '#302808',
     trackerRowCursor: '#3C3000',
+    trackerBorder: '#222010',
     cellNote: '#E0D8B0',
     cellInstrument: '#A8901C',
     cellVolume: '#7A6810',
@@ -1183,6 +1204,7 @@ const linnDrumTheme: Theme = {
     trackerRowHighlight: '#222222',
     trackerRowCurrent: '#2E1C08',
     trackerRowCursor: '#3A2000',
+    trackerBorder: '#222222',
     cellNote: '#E8E0D0',
     cellInstrument: '#E06020',
     cellVolume: '#D4B820',
@@ -1233,6 +1255,7 @@ const simmonsSdsVTheme: Theme = {
     trackerRowHighlight: '#DDDDE8',
     trackerRowCurrent: '#C8D8F0',
     trackerRowCursor: '#B8CCE8',
+    trackerBorder: '#DDDDE8',
     cellNote: '#101018',
     cellInstrument: '#1848C8',
     cellVolume: '#0898D0',
@@ -1281,6 +1304,7 @@ const korgKr55Theme: Theme = {
     trackerRowHighlight: '#1A1A16',
     trackerRowCurrent: '#281E08',
     trackerRowCursor: '#342400',
+    trackerBorder: '#1A1A16',
     cellNote: '#F0E8D0',
     cellInstrument: '#D47820',
     cellVolume: '#C05010',
@@ -1329,6 +1353,7 @@ const bossDr55Theme: Theme = {
     trackerRowHighlight: '#E4DEBC',
     trackerRowCurrent: '#D8C890',
     trackerRowCursor: '#CCBC80',
+    trackerBorder: '#E4DEBC',
     cellNote: '#1C1408',
     cellInstrument: '#E05010',
     cellVolume: '#208030',
@@ -1378,6 +1403,7 @@ const emuDrumulatorTheme: Theme = {
     trackerRowHighlight: '#1C1C1E',
     trackerRowCurrent: '#2A1010',
     trackerRowCursor: '#381010',
+    trackerBorder: '#1C1C1E',
     cellNote: '#E8E0D0',
     cellInstrument: '#CC1818',
     cellVolume: '#884444',
@@ -1426,6 +1452,7 @@ const casioRz1Theme: Theme = {
     trackerRowHighlight: '#C4C4C8',
     trackerRowCurrent: '#B8C4D8',
     trackerRowCursor: '#A8B8D0',
+    trackerBorder: '#C4C4C8',
     cellNote: '#141420',
     cellInstrument: '#CC1818',
     cellVolume: '#1868C0',
@@ -1475,6 +1502,7 @@ const sequentialTomTheme: Theme = {
     trackerRowHighlight: '#181818',
     trackerRowCurrent: '#280808',
     trackerRowCursor: '#340808',
+    trackerBorder: '#181818',
     cellNote: '#E8E4DC',
     cellInstrument: '#C81818',
     cellVolume: '#904040',
@@ -1645,6 +1673,7 @@ const applyTheme = (theme: Theme) => {
   root.style.setProperty('--color-tracker-row-highlight', colors.trackerRowHighlight);
   root.style.setProperty('--color-tracker-row-current', colors.trackerRowCurrent);
   root.style.setProperty('--color-tracker-row-cursor', colors.trackerRowCursor);
+  root.style.setProperty('--color-tracker-border', colors.trackerBorder);
   root.style.setProperty('--color-cell-note', colors.cellNote);
   root.style.setProperty('--color-cell-instrument', colors.cellInstrument);
   root.style.setProperty('--color-cell-volume', colors.cellVolume);

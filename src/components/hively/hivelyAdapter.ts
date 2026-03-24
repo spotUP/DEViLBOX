@@ -112,7 +112,7 @@ export function hivelyToFormatChannels(
       ? `CH${(ch + 1).toString().padStart(2, '0')}:T${trackIdx.toString().padStart(3, '0')}${transpose ? (transpose > 0 ? `+${transpose}` : `${transpose}`) : ''}`
       : `CH${(ch + 1).toString().padStart(2, '0')}`;
 
-    result.push({ label, patternLength, rows, trackIndex: trackIdx >= 0 ? trackIdx : undefined });
+    result.push({ label, patternLength, rows, trackIndex: trackIdx >= 0 ? trackIdx : undefined, isPatternChannel: true });
   }
 
   return result;
