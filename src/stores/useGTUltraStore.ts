@@ -376,21 +376,23 @@ export const useGTUltraStore = create<GTUltraState>()((set, get) => ({
 
   updateInstrumentData: (instrument, rawData) => set((s) => {
     const next = [...s.instrumentData];
-    // Parse raw bytes: ad(1), sr(1), vibdelay(1), gatetimer(1), firstwave(1), name(16), wave(1), pulse(1), filter(1), speed(1)
+    // INSTR struct layout (gcommon.h):
+    //   ad(1), sr(1), ptr[4](4), vibdelay(1), gatetimer(1), firstwave(1), pan(1), name[16]
     const ad = rawData[0];
     const sr = rawData[1];
-    const vibdelay = rawData[2];
-    const gatetimer = rawData[3];
-    const firstwave = rawData[4];
+    const wavePtr = rawData[2];
+    const pulsePtr = rawData[3];
+    const filterPtr = rawData[4];
+    const speedPtr = rawData[5];
+    const vibdelay = rawData[6];
+    const gatetimer = rawData[7];
+    const firstwave = rawData[8];
+    // rawData[9] = pan (not used in UI yet)
     let name = '';
-    for (let i = 5; i < 21; i++) {
+    for (let i = 10; i < 26; i++) {
       if (rawData[i] === 0) break;
       name += String.fromCharCode(rawData[i]);
     }
-    const wavePtr = rawData[21];
-    const pulsePtr = rawData[22];
-    const filterPtr = rawData[23];
-    const speedPtr = rawData[24];
     next[instrument] = { ad, sr, vibdelay, gatetimer, firstwave, name, wavePtr, pulsePtr, filterPtr, speedPtr };
     return { instrumentData: next };
   }),

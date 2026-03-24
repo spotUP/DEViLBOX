@@ -77,7 +77,11 @@ export const GTUltraView: React.FC<{ width?: number; height?: number }> = ({ wid
           setEngine(gtEngine);
           const store = useGTUltraStore.getState();
           if (store.pendingSongData) {
-            gtEngine!.loadSong(store.pendingSongData.buffer as ArrayBuffer);
+            // Uint8Array.buffer may be a larger pooled ArrayBuffer —
+            // slice to extract ONLY the file data, not the entire pool.
+            const pd = store.pendingSongData;
+            const songBuffer = pd.buffer.slice(pd.byteOffset, pd.byteOffset + pd.byteLength) as ArrayBuffer;
+            gtEngine!.loadSong(songBuffer);
             store.setPendingSongData(null);
           }
           store.refreshSongInfo();
@@ -97,6 +101,17 @@ export const GTUltraView: React.FC<{ width?: number; height?: number }> = ({ wid
           store.setSongName(info.name);
           store.setSongAuthor(info.author);
           if (info.numPatterns > 0) store.refreshAllPatterns(info.numPatterns);
+        },
+        onSongLoaded: (ok) => {
+          if (!ok) {
+            console.error('[GTUltra] Song load failed in WASM engine');
+            return;
+          }
+          const store = useGTUltraStore.getState();
+          store.refreshSongInfo();
+          store.refreshAllOrders();
+          store.refreshAllInstruments();
+          store.refreshAllTables();
         },
         onError: (err) => { console.error('[GTUltra] Engine error:', err); },
       });
