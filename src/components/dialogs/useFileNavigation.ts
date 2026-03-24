@@ -562,13 +562,23 @@ export function useFileNavigation({
             // then fall back to server API for files only available on the backend.
             let loaded = false;
             console.log('[FileNav] Loading binary:', selectedFile.path, 'manifest:', isManifestAvailable(), 'serverFS:', hasServerFS);
+            // iOS debug: use alert since Safari remote inspector misses console.log
+            if (typeof window !== 'undefined' && /iPhone|iPad/.test(navigator.userAgent)) {
+              alert(`Loading: ${selectedFile.path}\nmanifest: ${isManifestAvailable()}\nserverFS: ${hasServerFS}`);
+            }
             if (isManifestAvailable()) {
               try {
                 buffer = await readStaticFile(selectedFile.path);
                 loaded = true;
                 console.log('[FileNav] Static file loaded:', buffer.byteLength, 'bytes');
+                if (typeof window !== 'undefined' && /iPhone|iPad/.test(navigator.userAgent)) {
+                  alert(`Static OK: ${buffer.byteLength} bytes`);
+                }
               } catch (e) {
                 console.warn('[FileNav] Static file failed:', e instanceof Error ? e.message : e);
+                if (typeof window !== 'undefined' && /iPhone|iPad/.test(navigator.userAgent)) {
+                  alert(`Static FAILED: ${e instanceof Error ? e.message : e}`);
+                }
               }
             }
             if (!loaded && hasServerFS) {
