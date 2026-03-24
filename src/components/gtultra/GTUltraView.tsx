@@ -19,7 +19,7 @@ import { useTransportStore } from '@stores/useTransportStore';
 import { useGTUltraStore } from '../../stores/useGTUltraStore';
 import { PatternEditorCanvas } from '@/components/tracker/PatternEditorCanvas';
 import type { FormatChannel } from '@/components/shared/format-editor-types';
-import { GTU_COLUMNS, gtuToFormatChannels, parseBinaryPatternData } from './gtuAdapter';
+import { GTU_COLUMNS, gtuToFormatChannels, parseBinaryPatternData, resolveOrderPattern } from './gtuAdapter';
 import { GTToolbar } from './GTToolbar';
 import { GTInstrumentPanel } from './GTInstrumentPanel';
 import { GTOrderList } from './GTOrderList';
@@ -141,7 +141,7 @@ export const GTUltraView: React.FC<{ width?: number; height?: number }> = ({ wid
     // We use channel 0's order list to determine which pattern to display.
     // GT Ultra uses shared patterns across all channels at each order position.
     // All channels share the same pattern index from channel 0's order list.
-    const patIdx = orderData[0]?.[currentOrderPos] ?? 0;
+    const patIdx = resolveOrderPattern(orderData[0], currentOrderPos);
     const patEntry = patternData.get(patIdx);
 
     if (!patEntry) {
@@ -159,7 +159,7 @@ export const GTUltraView: React.FC<{ width?: number; height?: number }> = ({ wid
   const handleCellChange = useCallback((_channelIdx: number, rowIdx: number, columnKey: string, value: number) => {
     const engine = useGTUltraStore.getState().engine;
     if (!engine) return;
-    const patIdx = orderData[0]?.[currentOrderPos] ?? 0;
+    const patIdx = resolveOrderPattern(orderData[0], currentOrderPos);
     // GT Ultra binary layout: col 0=note, 1=instrument, 2=command, 3=data
     const colMap: Record<string, number> = { note: 0, instrument: 1, command: 2, data: 3 };
     const col = colMap[columnKey];

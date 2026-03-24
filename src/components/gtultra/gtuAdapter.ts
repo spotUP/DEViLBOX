@@ -22,6 +22,20 @@ function hex2(val: number): string {
   return val.toString(16).toUpperCase().padStart(2, '0');
 }
 
+// GoatTracker order list command bytes: 0xD0+ are commands, not pattern numbers
+const GT_MAX_PATT = 0xD0;
+
+/** Resolve an order position to an actual pattern number, skipping GT commands (>=0xD0). */
+export function resolveOrderPattern(orderData: Uint8Array | undefined, pos: number): number {
+  if (!orderData) return 0;
+  for (let i = pos; i < orderData.length; i++) {
+    const v = orderData[i];
+    if (v < GT_MAX_PATT) return v;
+    if (v === 0xFF) return 0; // LOOPSONG
+  }
+  return 0;
+}
+
 // Column definitions for GT Ultra: Note | Inst | Command | Data
 export const GTU_COLUMNS: ColumnDef[] = [
   {

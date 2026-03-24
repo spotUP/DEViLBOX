@@ -16,6 +16,7 @@ import type { Container as ContainerType, Graphics as GraphicsType } from 'pixi.
 import { PIXI_FONTS } from '@/pixi/fonts';
 import { MegaText, type GlyphLabel } from '@/pixi/utils/MegaText';
 import { useGTUltraStore } from '@/stores/useGTUltraStore';
+import { resolveOrderPattern } from '@/components/gtultra/gtuAdapter';
 import { usePixiTheme } from '../../theme';
 
 // ── Layout constants ──
@@ -49,21 +50,6 @@ const C_CHAN_SEP    = 0x222222;
 
 // ── Helpers ──
 const NOTE_NAMES = ['C-', 'C#', 'D-', 'D#', 'E-', 'F-', 'F#', 'G-', 'G#', 'A-', 'A#', 'B-'];
-
-// GoatTracker order list command bytes
-const GT_MAX_PATT = 0xD0;  // pattern numbers are 0x00-0xCF (0-207)
-
-/** Resolve an order position to an actual pattern number, skipping GT commands. */
-function resolveOrderPattern(orderData: Uint8Array | undefined, pos: number): number {
-  if (!orderData) return 0;
-  // Walk forward from `pos`, skipping command bytes (>= 0xD0) until we find a pattern number
-  for (let i = pos; i < orderData.length; i++) {
-    const v = orderData[i];
-    if (v < GT_MAX_PATT) return v;  // Valid pattern number
-    if (v === 0xFF) return 0;       // LOOPSONG — end of list
-  }
-  return 0; // Fallback
-}
 
 function noteStr(n: number): string {
   if (n === 0 || n === 0xBD) return '...'; // 0=empty, 0xBD=REST
