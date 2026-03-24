@@ -525,7 +525,7 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = React.memo(({
     // before any async work (engine.init fetches WASM). Fire-and-forget is fine.
     Tone.start();
 
-    // Toggle: if already playing, stop with turntable spin-down. If not playing, start.
+    // If already playing, stop with turntable spin-down
     if (isPlaying) {
       getTrackerScratchController().triggerElectronicBrake(() => {
         engine.releaseAll();
@@ -533,7 +533,7 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = React.memo(({
       return;
     }
     setIsLooping(false);
-    setCurrentRow(0); // Always start from first row of current pattern
+    setCurrentRow(0);
     await engine.init();
     await play();
   };
@@ -541,16 +541,18 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = React.memo(({
   const handlePlayPattern = async () => {
     // CRITICAL for iOS: Tone.start() MUST be called synchronously within user gesture
     Tone.start();
-    
-    // Toggle: if already playing pattern, stop with spin-down. Otherwise start pattern.
-    if (isPlaying && isLooping) { getTrackerScratchController().triggerElectronicBrake(() => engine.releaseAll()); }
-    else {
-      if (isPlaying) { getTrackerScratchController().triggerElectronicBrake(() => engine.releaseAll()); }
-      setIsLooping(true);
-      setCurrentRow(0); // Always start from first row of current pattern
-      await engine.init();
-      await play();
+
+    // If already playing, stop with turntable spin-down
+    if (isPlaying) {
+      getTrackerScratchController().triggerElectronicBrake(() => {
+        engine.releaseAll();
+      });
+      return;
     }
+    setIsLooping(true);
+    setCurrentRow(0);
+    await engine.init();
+    await play();
   };
 
   const isPlayingSong = isPlaying && !isLooping;
