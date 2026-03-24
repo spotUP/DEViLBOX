@@ -14,7 +14,6 @@
  */
 
 import React, { useCallback, useEffect, useRef, useState, useMemo } from 'react';
-import * as Tone from 'tone';
 import { useTransportStore } from '@stores/useTransportStore';
 import { useGTUltraStore } from '../../stores/useGTUltraStore';
 import { PatternEditorCanvas } from '@/components/tracker/PatternEditorCanvas';
@@ -25,13 +24,11 @@ import { GTInstrumentPanel } from './GTInstrumentPanel';
 import { GTOrderList } from './GTOrderList';
 import { GTTableEditor } from './GTTableEditor';
 import { useGTKeyboardHandler } from './GTKeyboardHandler';
-import { GTUltraEngine } from '../../engine/gtultra/GTUltraEngine';
-import { getGTUltraASIDBridge } from '../../engine/gtultra/GTUltraASIDBridge';
+import { useGTUltraEngineInit } from '../../engine/gtultra/useGTUltraEngineInit';
 
 const SIDEBAR_WIDTH = 300;
 
 export const GTUltraView: React.FC<{ width?: number; height?: number }> = ({ width: propW, height: propH }) => {
-  const setEngine = useGTUltraStore((s) => s.setEngine);
   const sidCount = useGTUltraStore((s) => s.sidCount);
   const channelCount = sidCount * 3;
   const currentRow = useTransportStore((s) => s.currentRow);
@@ -63,72 +60,8 @@ export const GTUltraView: React.FC<{ width?: number; height?: number }> = ({ wid
   // Keyboard input
   useGTKeyboardHandler(true);
 
-  // Initialize engine on mount
-  useEffect(() => {
-    let gtEngine: GTUltraEngine | null = null;
-    let disposed = false;
-
-    const setup = async () => {
-      const audioCtx = Tone.getContext().rawContext as AudioContext;
-      if (audioCtx.state === 'suspended') await audioCtx.resume();
-      gtEngine = new GTUltraEngine(audioCtx, {
-        onReady: () => {
-          if (disposed) return;
-          setEngine(gtEngine);
-          const store = useGTUltraStore.getState();
-          if (store.pendingSongData) {
-            // Uint8Array.buffer may be a larger pooled ArrayBuffer —
-            // slice to extract ONLY the file data, not the entire pool.
-            const pd = store.pendingSongData;
-            const songBuffer = pd.buffer.slice(pd.byteOffset, pd.byteOffset + pd.byteLength) as ArrayBuffer;
-            gtEngine!.loadSong(songBuffer);
-            store.setPendingSongData(null);
-          }
-          store.refreshSongInfo();
-          store.refreshAllOrders();
-          store.refreshAllInstruments();
-          store.refreshAllTables();
-        },
-        onPosition: (pos) => { useGTUltraStore.getState().updatePlaybackPos(pos); },
-        onAsidWrite: (chip, reg, value) => { getGTUltraASIDBridge().writeRegister(chip, reg, value); },
-        onPatternData: (pattern, length, data) => { useGTUltraStore.getState().updatePatternData(pattern, length, data); },
-        onOrderData: (channel, data) => { useGTUltraStore.getState().updateOrderData(channel, data); },
-        onInstrumentData: (instrument, data) => { useGTUltraStore.getState().updateInstrumentData(instrument, data); },
-        onTableData: (tableType, left, right) => { useGTUltraStore.getState().updateTableData(tableType, left, right); },
-        onSidRegisters: (sidIdx, data) => { useGTUltraStore.getState().updateSidRegisters(sidIdx, data); },
-        onSongInfo: (info) => {
-          const store = useGTUltraStore.getState();
-          store.setSongName(info.name);
-          store.setSongAuthor(info.author);
-          if (info.numPatterns > 0) store.refreshAllPatterns(info.numPatterns);
-        },
-        onSongLoaded: (ok) => {
-          if (!ok) {
-            console.error('[GTUltra] Song load failed in WASM engine');
-            return;
-          }
-          const store = useGTUltraStore.getState();
-          store.refreshSongInfo();
-          store.refreshAllOrders();
-          store.refreshAllInstruments();
-          store.refreshAllTables();
-        },
-        onError: (err) => { console.error('[GTUltra] Engine error:', err); },
-      });
-      await gtEngine.init();
-      await gtEngine.ready;
-      if (disposed) { gtEngine.dispose(); return; }
-      gtEngine.output.connect(audioCtx.destination);
-    };
-
-    setup().catch(console.error);
-
-    return () => {
-      disposed = true;
-      gtEngine?.dispose();
-      setEngine(null);
-    };
-  }, [setEngine]);
+  // Initialize engine (shared hook — single source of truth)
+  useGTUltraEngineInit();
 
   const orderCursor = useGTUltraStore((s) => s.orderCursor);
   const currentOrderPos = isPlaying ? playbackPos.songPos : orderCursor;

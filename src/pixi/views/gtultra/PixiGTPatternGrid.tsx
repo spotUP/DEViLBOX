@@ -16,7 +16,7 @@ import type { Container as ContainerType, Graphics as GraphicsType } from 'pixi.
 import { PIXI_FONTS } from '@/pixi/fonts';
 import { MegaText, type GlyphLabel } from '@/pixi/utils/MegaText';
 import { useGTUltraStore } from '@/stores/useGTUltraStore';
-import { resolveOrderPattern } from '@/components/gtultra/gtuAdapter';
+import { resolveOrderPattern, gtNoteToString, gtHex2 } from '@/components/gtultra/gtuAdapter';
 import { usePixiTheme } from '../../theme';
 
 // ── Layout constants ──
@@ -49,20 +49,6 @@ const C_SEL        = 0x3355aa;
 const C_CHAN_SEP    = 0x222222;
 
 // ── Helpers ──
-const NOTE_NAMES = ['C-', 'C#', 'D-', 'D#', 'E-', 'F-', 'F#', 'G-', 'G#', 'A-', 'A#', 'B-'];
-
-function noteStr(n: number): string {
-  if (n === 0 || n === 0xBD) return '...'; // 0=empty, 0xBD=REST
-  if (n === 0xBE) return '==='; // keyoff
-  if (n === 0xBF) return '+++'; // keyon
-  if (n >= 0xC0) return '...'; // ENDPATT and other special values
-  const v = n - 1;
-  return `${NOTE_NAMES[v % 12]}${Math.floor(v / 12)}`;
-}
-
-function hexStr(v: number): string {
-  return v === 0 ? '..' : v.toString(16).toUpperCase().padStart(2, '0');
-}
 
 interface Props {
   width: number;
@@ -219,19 +205,19 @@ export const PixiGTPatternGrid: React.FC<Props> = ({ width, height }) => {
         let colX = baseX;
 
         // Note
-        labels.push({ x: colX, y: y + 2, text: noteStr(note), color: (note === 0 || note >= 0xBD) ? C_EMPTY : C_NOTE, fontFamily });
+        labels.push({ x: colX, y: y + 2, text: gtNoteToString(note), color: (note === 0 || note >= 0xBD) ? C_EMPTY : C_NOTE, fontFamily });
         colX += NOTE_W + COL_GAP;
 
         // Instrument
-        labels.push({ x: colX, y: y + 2, text: hexStr(instr), color: instr === 0 ? C_EMPTY : C_INSTR, fontFamily });
+        labels.push({ x: colX, y: y + 2, text: gtHex2(instr), color: instr === 0 ? C_EMPTY : C_INSTR, fontFamily });
         colX += HEX_W + COL_GAP;
 
         // Command
-        labels.push({ x: colX, y: y + 2, text: hexStr(cmd), color: cmd === 0 ? C_EMPTY : C_CMD, fontFamily });
+        labels.push({ x: colX, y: y + 2, text: gtHex2(cmd), color: cmd === 0 ? C_EMPTY : C_CMD, fontFamily });
         colX += HEX_W + COL_GAP;
 
         // Data
-        labels.push({ x: colX, y: y + 2, text: hexStr(param), color: (param === 0 && cmd === 0) ? C_EMPTY : C_DATA, fontFamily });
+        labels.push({ x: colX, y: y + 2, text: gtHex2(param), color: (param === 0 && cmd === 0) ? C_EMPTY : C_DATA, fontFamily });
       }
     }
 
