@@ -212,7 +212,7 @@ export class TrackerCanvas2DRenderer {
             let str: string;
             if (col.type === 'note') {
               const table = NOTE_CACHE.get(displayOffset) ?? buildNoteTable(displayOffset);
-              str = val === 0 ? '···' : (table[val] ?? '???');
+              str = isEmpty ? '---' : (table[val] ?? '???');
             } else {
               switch (col.hexDigits) {
                 case 1:  str = isEmpty ? '·' : (HEX1[val & 0xF] ?? '0'); break;

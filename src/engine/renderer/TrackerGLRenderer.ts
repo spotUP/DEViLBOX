@@ -729,7 +729,15 @@ export class TrackerGLRenderer {
 
             let str: string;
             if (col.type === 'note') {
-              str = noteTable[val] ?? '---';
+              str = isEmpty ? '---' : (noteTable[val] ?? '---');
+            } else if (isEmpty) {
+              // Show dots for empty hex cells, matching normal mode
+              switch (col.hexDigits) {
+                case 1:  str = '.'; break;
+                case 2:  str = '..'; break;
+                case 3:  str = '...'; break;
+                default: str = '....'; break;
+              }
             } else {
               switch (col.hexDigits) {
                 case 1:  str = HEX1_TABLE[val & 0xF]; break;
