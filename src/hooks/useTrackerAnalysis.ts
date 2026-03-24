@@ -216,11 +216,11 @@ export function useTrackerAnalysis(): void {
   // Effect: Start/stop capture based on playback
   useEffect(() => {
     if (!fileHash) {
-      console.log('[TrackerAnalysis] No fileHash, skipping capture');
+      if ((window as any).ANALYSIS_DEBUG) console.log('[TrackerAnalysis] No fileHash, skipping capture');
       return;
     }
     
-    console.log(`[TrackerAnalysis] Playback effect: isPlaying=${isPlaying}, state=${analysisState}, capturing=${isCurrentlyCapturing()}`);
+    if ((window as any).ANALYSIS_DEBUG) console.log(`[TrackerAnalysis] Playback effect: isPlaying=${isPlaying}, state=${analysisState}, capturing=${isCurrentlyCapturing()}`);
     
     if (isPlaying) {
       // Start capture if not already capturing/analyzed

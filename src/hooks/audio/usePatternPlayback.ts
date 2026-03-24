@@ -103,10 +103,12 @@ export const usePatternPlayback = () => {
   // re-trigger on every cell edit (transpose, fill, humanize, etc.)
   const patternRef = useRef(pattern);
   const patternsRef = useRef(patterns);
+  const patternOrderRef = useRef(patternOrder);
   const bpmRef = useRef(bpm);
   useEffect(() => {
     patternRef.current = pattern;
     patternsRef.current = patterns;
+    patternOrderRef.current = patternOrder;
     bpmRef.current = bpm;
   });
 
@@ -121,13 +123,17 @@ export const usePatternPlayback = () => {
   // (add/remove channels, change length, different module format), NOT on cell
   // content edits. This prevents the heavy stop/loadSong/play cycle on every edit.
   // Also includes arrangement loop bounds so a loop region change triggers a reload.
+  // Stable key for pattern order — only changes when the order content changes,
+  // not on every unrelated Immer mutation that produces a new array reference.
+  const patternOrderKey = useMemo(() => patternOrder.join(','), [patternOrder]);
+
   const patternStructureKey = useMemo(() => {
     if (!pattern) return '';
     const loopBoundsKey = (isArrangementMode && isLooping && loopStart != null && loopEnd != null)
       ? `:loop:${loopStart}-${loopEnd}`
       : '';
-    return `${patterns.length}:${pattern.channels.length}:${pattern.length}:${pattern.importMetadata?.sourceFormat ?? ''}${loopBoundsKey}`;
-  }, [patterns.length, pattern?.channels.length, pattern?.length, pattern?.importMetadata?.sourceFormat, isArrangementMode, isLooping, loopStart, loopEnd]);
+    return `${patterns.length}:${pattern.channels.length}:${pattern.length}:${pattern.importMetadata?.sourceFormat ?? ''}:${patternOrderKey}${loopBoundsKey}`;
+  }, [patterns.length, pattern?.channels.length, pattern?.length, pattern?.importMetadata?.sourceFormat, patternOrderKey, isArrangementMode, isLooping, loopStart, loopEnd]);
 
   // Track if we've started playback
   const hasStartedRef = useRef(false);
@@ -224,7 +230,7 @@ export const usePatternPlayback = () => {
         if (!hasStartedRef.current) {
           hasStartedRef.current = true;
           uadeLiveRowRef.current = 0;
-          console.log('[Playback] Starting UADE playback (opaque song player)');
+          if ((window as any).PLAYBACK_DEBUG) console.log('[Playback] Starting UADE playback (opaque song player)');
           // Find the UADESynth instrument instance and trigger playback directly.
           // Must await engine readiness — setInstrument() is fire-and-forget during preload.
           const engine = getToneEngine();
@@ -234,13 +240,13 @@ export const usePatternPlayback = () => {
             let synth = engine.instruments.get(key);
             // If the synth isn't in the map yet (preload race), create it now
             if (!synth) {
-              console.log('[Playback] UADESynth not cached, creating via getInstrument');
+              if ((window as any).PLAYBACK_DEBUG) console.log('[Playback] UADESynth not cached, creating via getInstrument');
               synth = engine.getInstrument(uadeInst.id, uadeInst) ?? undefined;
             }
             if (synth && 'getEngine' in synth) {
               const uadeEngine = (synth as { getEngine: () => UADEEngine }).getEngine();
               uadeEngine.ready().then(() => {
-                console.log('[Playback] UADE engine ready, starting playback');
+                if ((window as any).PLAYBACK_DEBUG) console.log('[Playback] UADE engine ready, starting playback');
                 uadeEngine.play();
 
                 // Subscribe to channel data for playback position tracking.
@@ -327,9 +333,10 @@ export const usePatternPlayback = () => {
           effectiveNumChannels = resolved.virtualPatterns[0]?.channels?.length ?? pattern.channels.length;
         } else {
           // --- Legacy Pattern Order Mode ---
-          const loopPatternOrder = isLooping ? [currentPatternIndex] : patternOrder;
+          const currentOrder = patternOrderRef.current;
+          const loopPatternOrder = isLooping ? [currentPatternIndex] : currentOrder;
           effectiveSongPositions = loopPatternOrder;
-          effectiveSongLength = isLooping ? 1 : (modData?.songLength ?? patternOrder.length);
+          effectiveSongLength = isLooping ? 1 : (modData?.songLength ?? currentOrder.length);
         }
 
         // Save current replayer state if reloading
@@ -507,7 +514,7 @@ export const usePatternPlayback = () => {
         };
 
         replayer.onSongEnd = () => {
-          console.log('[Playback] Song ended');
+          if ((window as any).PLAYBACK_DEBUG) console.log('[Playback] Song ended');
         };
 
         // Start or resume real-time playback
@@ -523,7 +530,7 @@ export const usePatternPlayback = () => {
         return;
       }
       // Stop playback — keep current position (don't reset row/position)
-      console.log('[Playback] Stopping playback');
+      if ((window as any).PLAYBACK_DEBUG) console.log('[Playback] Stopping playback');
       hasStartedRef.current = false;
 
       // UADE: stop the song player and clean up channel subscription
@@ -553,7 +560,9 @@ export const usePatternPlayback = () => {
         replayerRef.current.onSongEnd = null;
       }
     };
-  }, [isPlaying, isLooping, loopTargetKey, patternStructureKey, patternOrder, setCurrentPattern, setCurrentPosition, setCurrentRow, setCurrentRowThrottled, isArrangementMode, loopStart, loopEnd]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- store actions are stable refs;
+  // patternOrder tracked via patternOrderKey in patternStructureKey + ref
+  }, [isPlaying, isLooping, loopTargetKey, patternStructureKey, isArrangementMode, loopStart, loopEnd]);
 
   return {
     isPlaying,
