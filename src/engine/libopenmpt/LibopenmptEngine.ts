@@ -115,7 +115,7 @@ export class LibopenmptEngine {
     const { cmd, order, pattern, row, chLevels, audioTime } = msg.data;
     switch (cmd) {
       case 'pos':
-        this._onPosition?.(order, pattern, row, audioTime);
+        if (this._playing) this._onPosition?.(order, pattern, row, audioTime);
         if (chLevels) {
           try {
             const engine = getToneEngine();

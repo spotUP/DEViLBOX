@@ -64,6 +64,7 @@ export class TrackerScratchController {
 
   /** Whether we're actively scratching (user has interacted during playback) */
   private _isActive = false;
+  private _pendingStop = false;  // Set when e-brake/power-cut stop is in progress
 
   /** Timestamp of last input event */
   private lastEventTime = 0;
@@ -457,10 +458,12 @@ export class TrackerScratchController {
     // The buffer inits eagerly on play start but is async — if the user
     // hits stop quickly, it may not be ready yet.
     if (!this.scratchBufferReady) {
+      this._pendingStop = true;
       this.initScratchBuffer().then(() => {
-        if (!replayer.isPlaying()) { onComplete?.(); return; }
+        if (!replayer.isPlaying()) { this._pendingStop = false; onComplete?.(); return; }
         if (!this._isActive) this.enterScratchMode(replayer);
         this.physics.triggerElectronicBrake(() => {
+          this._pendingStop = false;
           this.exitScratchModeAndStop();
           onComplete?.();
         });
@@ -478,7 +481,9 @@ export class TrackerScratchController {
       this.enterScratchMode(replayer);
     }
 
+    this._pendingStop = true;
     this.physics.triggerElectronicBrake(() => {
+      this._pendingStop = false;
       this.exitScratchModeAndStop();
       onComplete?.();
     });
@@ -491,6 +496,7 @@ export class TrackerScratchController {
    */
   private exitScratchModeAndStop(): void {
     this._isActive = false;
+    this._pendingStop = false;
     this.clearScrollReleaseTimer();
     this.stopPhysicsLoop();
 
@@ -708,6 +714,7 @@ export class TrackerScratchController {
       const idleMs = now - this.lastEventTime;
       if (
         idleMs > IDLE_TIMEOUT_MS &&
+        !this._pendingStop &&
         !this.physics.touching &&
         !this.physics.spinbackActive &&
         !this.physics.powerCutActive &&
