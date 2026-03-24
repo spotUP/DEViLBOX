@@ -41,15 +41,14 @@ export function playStopToggle(): boolean {
  * Play pattern from row 0.
  */
 export function playPattern(): boolean {
-  unlockIOSAudio();
-  Tone.start();
-
   const replayer = getTrackerReplayer();
 
   if (replayer.isPlaying()) {
-    // Just seek — don't touch store state (setIsLooping triggers usePatternPlayback reload)
+    // Already playing — just seek, touch NOTHING else (no Tone.start, no store updates)
     replayer.forcePosition(replayer.getSongPos(), 0);
   } else {
+    unlockIOSAudio();
+    Tone.start();
     useTransportStore.getState().setIsLooping(true);
     useTransportStore.getState().setCurrentRow(0);
     getToneEngine().init()
@@ -63,15 +62,14 @@ export function playPattern(): boolean {
  * Play song from pattern 0 / row 0.
  */
 export function playSong(): boolean {
-  unlockIOSAudio();
-  Tone.start();
-
   const replayer = getTrackerReplayer();
 
   if (replayer.isPlaying()) {
-    // Just seek — don't touch store state (setIsLooping triggers usePatternPlayback reload)
+    // Already playing — just seek, touch NOTHING else (no Tone.start, no store updates)
     replayer.forcePosition(0, 0);
   } else {
+    unlockIOSAudio();
+    Tone.start();
     useTransportStore.getState().setIsLooping(false);
     useTransportStore.getState().setCurrentPattern(0);
     useTransportStore.getState().setCurrentRow(0);
