@@ -212,7 +212,7 @@ export function useMIDIActions() {
             if (tb303Config.devilFish) tb303Config.devilFish.vegSustain = value;
             break;
           case 'filterFM':
-            if (tb303Config.devilFish) tb303Config.devilFish.filterFM = value;
+            if (tb303Config.devilFish) tb303Config.devilFish.filterFmDepth = value;
             break;
           case 'filterTracking':
             if (tb303Config.devilFish) tb303Config.devilFish.filterTracking = value;
