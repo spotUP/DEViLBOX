@@ -405,13 +405,6 @@ export async function importTrackerModule(
     setSpeed(song.initialSpeed);
     setMetadata({ name: song.name, author: '', description: `Imported from ${info.file?.name || 'module'}` });
     applyEditorMode(song);
-    if (song.c64SidFileData && useFormatStore.getState().editorMode === 'goattracker') {
-      const gtStore = (await import('@/stores/useGTUltraStore')).useGTUltraStore.getState();
-      const parts = song.name.split(' — ');
-      gtStore.setSongName(parts[0] || song.name);
-      if (parts[1]) gtStore.setSongAuthor(parts[1]);
-      gtStore.setSidCount(song.numChannels > 3 ? 2 : 1);
-    }
     const samplerCount = song.instruments.filter(i => i.synthType === 'Sampler').length;
     if (samplerCount > 0) await engine.preloadInstruments(song.instruments);
     notify.success(`Imported "${song.name}" — ${song.patterns.length} patterns, ${song.instruments.length} instruments`);
@@ -541,7 +534,7 @@ export async function loadFile(
         const { isGoatTrackerSong } = await import('../import/formats/GoatTrackerDetect');
         const buf = await file.arrayBuffer();
         if (isGoatTrackerSong(buf)) {
-          return await loadSongFile(file, options);
+          return await loadSongFile(file, options, buf);
         }
       }
       // .sunvox files bypass the confirmation dialog — they use their own
@@ -612,7 +605,7 @@ function isAudioFile(filename: string): boolean {
 /**
  * Load a song file (replaces entire project).
  */
-async function loadSongFile(file: File, options: FileLoadOptions): Promise<FileLoadResult> {
+async function loadSongFile(file: File, options: FileLoadOptions, preReadBuffer?: ArrayBuffer): Promise<FileLoadResult> {
   // Loading an external song — prevent auto-save from overwriting user's saved project
   clearExplicitlySaved();
 
@@ -632,7 +625,8 @@ async function loadSongFile(file: File, options: FileLoadOptions): Promise<FileL
   // React flushes a black pattern editor during the async gap.
   if (filename.endsWith('.sng')) {
     const { isGoatTrackerSong } = await import('../import/formats/GoatTrackerDetect');
-    const gtBuf = await file.arrayBuffer();
+    // Use pre-read buffer if available (avoids double file.arrayBuffer() call)
+    const gtBuf = preReadBuffer ?? await file.arrayBuffer();
     if (isGoatTrackerSong(gtBuf)) {
       console.log('[UnifiedFileLoader] GoatTracker .sng detected — routing to GTUltra engine');
       // Stop playback but do NOT reset instruments/patterns — GT has its own state
@@ -642,7 +636,6 @@ async function loadSongFile(file: File, options: FileLoadOptions): Promise<FileL
       const { useGTUltraStore } = await import('@/stores/useGTUltraStore');
       const gtStore = useGTUltraStore.getState();
 
-      const songBytes = new Uint8Array(gtBuf);
       if (gtStore.engine) {
         gtStore.engine.loadSong(gtBuf);
         gtStore.setSongName(file.name.replace(/\.sng$/i, ''));
@@ -652,11 +645,14 @@ async function loadSongFile(file: File, options: FileLoadOptions): Promise<FileL
         gtStore.refreshAllInstruments();
         gtStore.refreshAllTables();
       } else {
-        gtStore.setPendingSongData(songBytes);
+        // Store the raw ArrayBuffer for pending load — avoids Uint8Array.buffer
+        // offset issues if the typed array wraps a pooled/shared buffer.
+        gtStore.setPendingSongData(new Uint8Array(gtBuf));
         gtStore.setSongName(file.name.replace(/\.sng$/i, ''));
       }
 
       // Switch to GoatTracker editor mode
+      const songBytes = new Uint8Array(gtBuf);
       applyEditorMode({ goatTrackerData: songBytes });
 
       // Ensure tracker view is visible
@@ -676,14 +672,14 @@ async function loadSongFile(file: File, options: FileLoadOptions): Promise<FileL
   // Pre-read binary formats before the reset so there is no `await` between
   // resetInstruments() and the subsequent loadPatterns/createInstrument calls.
   // Without this, React flushes after the reset and renders an empty (black) scene.
-  let preReadBuffer: ArrayBuffer | null = null;
+  let preReadBuf: ArrayBuffer | null = null;
   let preSunVoxModules: Array<{ name: string; id: number; synthData: ArrayBuffer }> | null = null;
   let preSunVoxPatterns: SunVoxPatternData[] | null = null;
   let preSunVoxMeta: SunVoxSongMeta | null = null;
   let preSunVoxGraph: import('@/engine/sunvox/SunVoxEngine').SunVoxModuleGraphEntry[] | null = null;
 
   if (filename.endsWith('.sunvox')) {
-    preReadBuffer = await file.arrayBuffer();
+    preReadBuf = await file.arrayBuffer();
 
     // Stop transport and reset position BEFORE loading — prevents:
     // 1. usePatternPlayback effect from auto-restarting when patterns change mid-playback
@@ -735,8 +731,8 @@ async function loadSongFile(file: File, options: FileLoadOptions): Promise<FileL
         console.log('[SunVox] extract handle', extractHandle, '— loading song…');
         let extractOk = false;
         try {
-          // loadSong internally slices the buffer before transfer — preReadBuffer stays intact.
-          preSunVoxMeta = await svEngine.loadSong(extractHandle, preReadBuffer!);
+          // loadSong internally slices the buffer before transfer — preReadBuf stays intact.
+          preSunVoxMeta = await svEngine.loadSong(extractHandle, preReadBuf!);
           console.log('[SunVox] song loaded — fetching module list and patterns…');
           const [modules, patterns] = await Promise.all([
             svEngine.getModules(extractHandle),
@@ -1000,7 +996,7 @@ async function loadSongFile(file: File, options: FileLoadOptions): Promise<FileL
 
   // === .sunvox - SunVox project (replace project) ===
   if (filename.endsWith('.sunvox')) {
-    // preReadBuffer was populated before the reset — no await here, preventing
+    // preReadBuf was populated before the reset — no await here, preventing
     // React from flushing an empty scene between reset and data load.
     const name = file.name.replace(/\.sunvox$/i, '');
     const PATTERN_LEN = 256;
@@ -1028,7 +1024,7 @@ async function loadSongFile(file: File, options: FileLoadOptions): Promise<FileL
             synthType: 'SunVoxModular' as const,
             sunvoxModular: subGraph,
             sunvox: {
-              patchData: preReadBuffer!,
+              patchData: preReadBuf!,
               patchName: name,
               isSong: true,
               noteTargetModuleId: gen.id,
@@ -1044,7 +1040,7 @@ async function loadSongFile(file: File, options: FileLoadOptions): Promise<FileL
           name,
           synthType: 'SunVoxModular' as const,
           sunvoxModular: { modules: [], connections: [], polyphony: 1, viewMode: 'canvas' as const, backend: 'sunvox' as const },
-          sunvox: { patchData: preReadBuffer!, patchName: name, isSong: true, controlValues: {} as Record<string, number> },
+          sunvox: { patchData: preReadBuf!, patchName: name, isSong: true, controlValues: {} as Record<string, number> },
         });
       }
 
@@ -1182,7 +1178,7 @@ async function loadSongFile(file: File, options: FileLoadOptions): Promise<FileL
     }
 
     // Fallback: song mode — load the whole project as a single instrument.
-    const buffer = preReadBuffer!;
+    const buffer = preReadBuf!;
     useInstrumentStore.getState().createInstrument({
       name,
       synthType: 'SunVoxModular' as const,
@@ -1393,7 +1389,7 @@ async function loadAudioSample(file: File): Promise<FileLoadResult> {
       success: true,
       message: `Imported audio sample as instrument ${newId}: ${name}`
     };
-  } catch (error) {
+  } catch (_error) {
     notify.info(`Audio sample: ${file.name} — Could not auto-import. Open instrument editor to add manually.`);
     return {
       success: true,
