@@ -703,7 +703,8 @@ export class TrackerScratchController {
         idleMs > IDLE_TIMEOUT_MS &&
         !this.physics.touching &&
         !this.physics.spinbackActive &&
-        !this.physics.powerCutActive
+        !this.physics.powerCutActive &&
+        !this.physics.eBrakeActive
       ) {
         const replayer = getTrackerReplayer();
         this.exitScratchMode(replayer);
