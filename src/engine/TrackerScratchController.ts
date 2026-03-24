@@ -527,6 +527,7 @@ export class TrackerScratchController {
 
     // Restore position after a tick — engines send async position=0 via postMessage
     // during their stop sequence. This overrides those after they've landed.
+    // Restore position after engines have processed their async stop callbacks
     setTimeout(() => {
       useTransportStore.getState().setCurrentRow(savedRow);
       useTrackerStore.getState().setCurrentPattern(savedPattern);
