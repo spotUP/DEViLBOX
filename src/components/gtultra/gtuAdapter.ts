@@ -4,20 +4,20 @@
 
 import type { ColumnDef, FormatCell, FormatChannel } from '@/components/shared/format-editor-types';
 
-const NOTE_NAMES = ['C-', 'C#', 'D-', 'D#', 'E-', 'F-', 'F#', 'G-', 'G#', 'A-', 'A#', 'B-'];
+export const GT_NOTE_NAMES = ['C-', 'C#', 'D-', 'D#', 'E-', 'F-', 'F#', 'G-', 'G#', 'A-', 'A#', 'B-'];
 
-function noteToString(note: number): string {
+export function gtNoteToString(note: number): string {
   if (note === 0 || note === 0xBD) return '...'; // 0=empty, 0xBD=REST
   if (note === 0xBE) return '==='; // keyoff
   if (note === 0xBF) return '+++'; // keyon
   if (note >= 0xC0) return '...'; // ENDPATT and other special values
   const n = note - 1;
   const octave = Math.floor(n / 12);
-  const name = NOTE_NAMES[n % 12];
+  const name = GT_NOTE_NAMES[n % 12];
   return `${name}${octave}`;
 }
 
-function hex2(val: number): string {
+export function gtHex2(val: number): string {
   if (val === 0) return '..';
   return val.toString(16).toUpperCase().padStart(2, '0');
 }
@@ -46,7 +46,7 @@ export const GTU_COLUMNS: ColumnDef[] = [
     color: 'var(--color-text-secondary)',
     emptyColor: 'var(--color-border-light)',
     emptyValue: 0,
-    formatter: noteToString,
+    formatter: gtNoteToString,
   },
   {
     key: 'instrument',
@@ -57,7 +57,7 @@ export const GTU_COLUMNS: ColumnDef[] = [
     emptyColor: 'var(--color-border-light)',
     emptyValue: 0,
     hexDigits: 2,
-    formatter: hex2,
+    formatter: gtHex2,
   },
   {
     key: 'command',
@@ -68,7 +68,7 @@ export const GTU_COLUMNS: ColumnDef[] = [
     emptyColor: 'var(--color-border-light)',
     emptyValue: 0,
     hexDigits: 2,
-    formatter: hex2,
+    formatter: gtHex2,
   },
   {
     key: 'data',
@@ -79,7 +79,7 @@ export const GTU_COLUMNS: ColumnDef[] = [
     emptyColor: 'var(--color-border-light)',
     emptyValue: 0,
     hexDigits: 2,
-    formatter: hex2,
+    formatter: gtHex2,
   },
 ];
 

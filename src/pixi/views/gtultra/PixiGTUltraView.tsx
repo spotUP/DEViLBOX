@@ -13,9 +13,8 @@
  * └────────────────────────────┴─────────────────────┘
  */
 
-import React, { useCallback, useEffect, useMemo } from 'react';
+import React, { useCallback, useMemo } from 'react';
 import type { Graphics as GraphicsType } from 'pixi.js';
-import * as Tone from 'tone';
 import { PIXI_FONTS } from '@/pixi/fonts';
 import { usePixiTheme } from '@/pixi/theme';
 import { PixiButton } from '@/pixi/components/PixiButton';
@@ -31,8 +30,7 @@ import { PixiGTPianoRoll } from './PixiGTPianoRoll';
 import { PixiGTPresetBrowser } from './PixiGTPresetBrowser';
 import { useGTUltraStore } from '@/stores/useGTUltraStore';
 import { useGTKeyboardHandler } from '@/components/gtultra/GTKeyboardHandler';
-import { GTUltraEngine } from '@/engine/gtultra/GTUltraEngine';
-import { getGTUltraASIDBridge } from '@/engine/gtultra/GTUltraASIDBridge';
+import { useGTUltraEngineInit } from '@/engine/gtultra/useGTUltraEngineInit';
 
 const TOOLBAR_H = 32;
 const SIDEBAR_W = 280;
@@ -73,85 +71,8 @@ export const PixiGTUltraView: React.FC<Props> = ({ width, height }) => {
   const currentSong = useGTUltraStore((s) => s.currentSong);
   const patternLength = useGTUltraStore((s) => s.patternLength);
 
-  // Initialize engine on mount (mirrors GTUltraView.tsx logic)
-  useEffect(() => {
-    // Skip if engine already exists (e.g. DOM view initialized it)
-    if (useGTUltraStore.getState().engine) return;
-
-    let gtEngine: GTUltraEngine | null = null;
-    let disposed = false;
-
-    const setup = async () => {
-      const audioCtx = Tone.getContext().rawContext as AudioContext;
-      if (audioCtx.state === 'suspended') await audioCtx.resume();
-      gtEngine = new GTUltraEngine(audioCtx, {
-        onReady: () => {
-          if (disposed) return;
-          const store = useGTUltraStore.getState();
-          // Set engine in store FIRST so refresh methods can use it
-          useGTUltraStore.getState().setEngine(gtEngine);
-          // Load any pending song data that arrived before engine was ready
-          if (store.pendingSongData) {
-            // Uint8Array.buffer may be a larger pooled ArrayBuffer —
-            // slice to extract ONLY the file data, not the entire pool.
-            const pd = store.pendingSongData;
-            const songBuffer = pd.buffer.slice(pd.byteOffset, pd.byteOffset + pd.byteLength) as ArrayBuffer;
-            gtEngine!.loadSong(songBuffer);
-            store.setPendingSongData(null);
-          }
-          store.refreshSongInfo();
-          store.refreshAllOrders();
-          store.refreshAllInstruments();
-          store.refreshAllTables();
-        },
-        onPosition: (pos) => useGTUltraStore.getState().updatePlaybackPos(pos),
-        onAsidWrite: (chip, reg, value) => getGTUltraASIDBridge().writeRegister(chip, reg, value),
-        onPatternData: (pattern, length, data) => useGTUltraStore.getState().updatePatternData(pattern, length, data),
-        onOrderData: (channel, data) => useGTUltraStore.getState().updateOrderData(channel, data),
-        onInstrumentData: (instrument, data) => useGTUltraStore.getState().updateInstrumentData(instrument, data),
-        onTableData: (tableType, left, right) => useGTUltraStore.getState().updateTableData(tableType, left, right),
-        onSidRegisters: (sidIdx, data) => useGTUltraStore.getState().updateSidRegisters(sidIdx, data),
-        onSongInfo: (info) => {
-          const store = useGTUltraStore.getState();
-          store.setSongName(info.name);
-          store.setSongAuthor(info.author);
-          if (info.numPatterns > 0) {
-            store.refreshAllPatterns(info.numPatterns);
-          }
-        },
-        onSongLoaded: (ok) => {
-          if (!ok) {
-            console.error('[GTUltra/Pixi] Song load failed in WASM engine');
-            return;
-          }
-          // Safety net: refresh all data after WASM confirms the song is loaded.
-          // This guarantees correctness even if the initial refresh from onReady
-          // races with the loadSng message processing in the worklet.
-          const store = useGTUltraStore.getState();
-          store.refreshSongInfo();
-          store.refreshAllOrders();
-          store.refreshAllInstruments();
-          store.refreshAllTables();
-        },
-        onError: (err) => console.error('[GTUltra/Pixi] Engine error:', err),
-      });
-      await gtEngine.init();
-      await gtEngine.ready;
-      if (disposed) { gtEngine.dispose(); return; }
-      gtEngine.output.connect(audioCtx.destination);
-      // Engine already set in store by onReady callback above
-    };
-
-    setup().catch(console.error);
-
-    return () => {
-      disposed = true;
-      if (gtEngine) {
-        gtEngine.dispose();
-        useGTUltraStore.getState().setEngine(null);
-      }
-    };
-  }, []);
+  // Initialize engine (shared hook — single source of truth)
+  useGTUltraEngineInit();
 
   const editorWidth = width - SIDEBAR_W;
   const editorHeight = height - TOOLBAR_H;
