@@ -75,7 +75,6 @@ export const PixiGTUltraView: React.FC<Props> = ({ width, height }) => {
 
   // Initialize engine on mount (mirrors GTUltraView.tsx logic)
   useEffect(() => {
-    console.log('[GTUltra/Pixi] PixiGTUltraView mounted, engine:', !!useGTUltraStore.getState().engine, 'pendingSong:', !!useGTUltraStore.getState().pendingSongData);
     // Skip if engine already exists (e.g. DOM view initialized it)
     if (useGTUltraStore.getState().engine) return;
 
@@ -88,13 +87,16 @@ export const PixiGTUltraView: React.FC<Props> = ({ width, height }) => {
       gtEngine = new GTUltraEngine(audioCtx, {
         onReady: () => {
           if (disposed) return;
-          console.log('[GTUltra/Pixi] Engine ready');
           const store = useGTUltraStore.getState();
           // Set engine in store FIRST so refresh methods can use it
           useGTUltraStore.getState().setEngine(gtEngine);
           // Load any pending song data that arrived before engine was ready
           if (store.pendingSongData) {
-            gtEngine!.loadSong(store.pendingSongData.buffer as ArrayBuffer);
+            // Uint8Array.buffer may be a larger pooled ArrayBuffer —
+            // slice to extract ONLY the file data, not the entire pool.
+            const pd = store.pendingSongData;
+            const songBuffer = pd.buffer.slice(pd.byteOffset, pd.byteOffset + pd.byteLength) as ArrayBuffer;
+            gtEngine!.loadSong(songBuffer);
             store.setPendingSongData(null);
           }
           store.refreshSongInfo();
@@ -113,10 +115,23 @@ export const PixiGTUltraView: React.FC<Props> = ({ width, height }) => {
           const store = useGTUltraStore.getState();
           store.setSongName(info.name);
           store.setSongAuthor(info.author);
-          // Request all pattern data now that we know how many patterns exist
           if (info.numPatterns > 0) {
             store.refreshAllPatterns(info.numPatterns);
           }
+        },
+        onSongLoaded: (ok) => {
+          if (!ok) {
+            console.error('[GTUltra/Pixi] Song load failed in WASM engine');
+            return;
+          }
+          // Safety net: refresh all data after WASM confirms the song is loaded.
+          // This guarantees correctness even if the initial refresh from onReady
+          // races with the loadSng message processing in the worklet.
+          const store = useGTUltraStore.getState();
+          store.refreshSongInfo();
+          store.refreshAllOrders();
+          store.refreshAllInstruments();
+          store.refreshAllTables();
         },
         onError: (err) => console.error('[GTUltra/Pixi] Engine error:', err),
       });
