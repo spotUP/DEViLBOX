@@ -1678,22 +1678,12 @@ export class TrackerReplayer {
       this.getStateAtTime(Tone.now());
       const lastVisual = this.lastDequeuedState;
       const stopRow = lastVisual ? lastVisual.row : this.pattPos;
-      console.log(`[STOP-DEBUG] stopRow=${stopRow} lastVisual.row=${lastVisual?.row} pattPos=${this.pattPos} ringCount=${this.stateRingCount}`);
       useTransportStore.getState().setCurrentRow(stopRow);
       // Move the editing cursor to the stop position so the pattern editor
       // doesn't jump back to the pre-play cursor position on stop.
       // Set cursor directly (not moveCursorToRow which would trigger a seek).
       const cursorState = useCursorStore.getState();
       useCursorStore.setState({ cursor: { ...cursorState.cursor, rowIndex: stopRow } });
-      // DEBUG: watch for something overwriting the cursor after we set it
-      const unsub = useCursorStore.subscribe((state) => {
-        if (state.cursor.rowIndex !== stopRow) {
-          console.log(`[STOP-DEBUG] cursor OVERWRITTEN to ${state.cursor.rowIndex} (was ${stopRow})`, new Error().stack);
-          unsub();
-        } else {
-          setTimeout(() => unsub(), 2000);
-        }
-      });
     }
 
     this.playing = false;
