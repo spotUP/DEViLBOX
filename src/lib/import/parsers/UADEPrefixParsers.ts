@@ -85,6 +85,32 @@ const UADE_ONLY_PREFIXES = [
 ] as const;
 
 /**
+ * Map non-standard file extensions to the correct UADE eagleplayer prefix.
+ * Many Amiga formats use different names in file extensions vs. UADE's eagleplayer.conf.
+ * e.g. ".bvs" files need UADE prefix "bss." (BeathovenSynthesizer).
+ */
+const EXT_TO_UADE_PREFIX: Record<string, string> = {
+  'ah':       'ash',       // Ashley Hogg → eagleplayer prefix "ash"
+  'bvs':      'bss',       // Beathoven Synth v2 → "bss" (BeathovenSynthesizer)
+  'cd':       'core',      // Core Design → "core"
+  'chip':     'kris',      // ChipTracker → "kris"
+  'dlw':      'dl',        // Dave Lowe WTD → "dl" (DaveLowe)
+  'fp2':      'fp',        // Future Player 2 → "fp" (FuturePlayer)
+  'fredmon':  'fred',      // Fred Editor Monitor → "fred"
+  'mxt':      'mxt',       // MaxTrax (no eagleplayer — uses content detection)
+  'nt':       'mod',       // NoiseTracker → "mod" (PTK-Prowiz)
+  'ntsp':     'two',       // NTSP → "two" (NTSP-system)
+  'psum':     'snk',       // Paul Summers → "snk"
+  'rhst':     'rho',       // Rob Hubbard ST → "rho"
+  'rkl':      'rkl',       // Ron Klaren (no eagleplayer entry — content detection)
+  'sc2':      'scn',       // Sean Connolly 2 → "scn"
+  'sil':      'mok',       // Silmarils v2 → "mok"
+  'tomy':     'sg',        // TomyTracker → "sg"
+  'tme':      'tme',       // TheMusicalEnlightenment → "tme"
+  'unic':     'unic',      // UNIC Tracker → "unic" (in PTK-Prowiz list)
+};
+
+/**
  * Try to route a file to UADE via prefix matching or catch-all detection.
  * Returns TrackerSong or null if not matched.
  */
@@ -107,7 +133,12 @@ export async function tryUADEPrefixParse(
     let uadeFileName = originalFileName;
     if (!base.startsWith(matchedPrefix)) {
       const dot = base.lastIndexOf('.');
-      if (dot > 0) uadeFileName = `${base.slice(dot + 1)}.${base.slice(0, dot)}`;
+      if (dot > 0) {
+        // Check if this extension needs mapping to a different UADE prefix
+        const uadePrefix = EXT_TO_UADE_PREFIX[ext] || ext;
+        const namePart = base.slice(0, dot);
+        uadeFileName = `${uadePrefix}.${namePart}`;
+      }
     }
     const { parseUADEFile } = await import('@lib/import/formats/UADEParser');
     return parseUADEFile(buffer, uadeFileName, prefs.uade ?? 'enhanced', subsong, preScannedMeta);

@@ -2151,6 +2151,20 @@ export const FORMAT_REGISTRY: FormatDefinition[] = [
   },
 
   // ═══════════════════════════════════════════════════════════════════════════
+  // Amiga format extensions routed by AmigaFormatParsers.ts
+  // (catch-all so isSupportedFormat() accepts them before the parser routes)
+  // ═══════════════════════════════════════════════════════════════════════════
+  {
+    key: 'amiga_formats_catchall',
+    label: 'Amiga Format',
+    description: 'Amiga music formats handled by AmigaFormatParsers',
+    family: 'amiga',
+    matchMode: 'extension',
+    extRegex: /\.(adpcm|adsc|alp|amc|aps|ash|bds|bye|cin|cm|dat|dln|dm|dm1|doda|dsc|dsr|ex|gray|hip7|hst|jb|jcb|jcbo|jd|jmf|jo|jp|jpn|jpnd|jpo|jpold|js|jt|kh|kim|max|mc|mco|mcr|mdst|mon|mon_old|mosh|mxtx|npp|ntp|one|osp|pap|pat|powt|prt|pt|pvp|qpa|qts|rho|s7g|sb|scr|sg|sjs|sm|sm1|sm2|sm3|smpro|snd|thm|tits|tmk|ts|two|uds|wb)$/i,
+    uadeFallback: true,
+  },
+
+  // ═══════════════════════════════════════════════════════════════════════════
   // UADE-ONLY — Prefix-based formats with no native parser
   // ═══════════════════════════════════════════════════════════════════════════
   ...([
