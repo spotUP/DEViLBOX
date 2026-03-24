@@ -453,6 +453,16 @@ export class TrackerScratchController {
       return;
     }
 
+    // If scratch buffer isn't ready, skip spin-down and stop immediately.
+    // Without the buffer, there's no audio to play during deceleration anyway.
+    if (!this.scratchBufferReady) {
+      replayer.stop();
+      useTransportStore.getState().stop();
+      getToneEngine().stop();
+      onComplete?.();
+      return;
+    }
+
     if (!this._isActive) {
       this.enterScratchMode(replayer);
     }
