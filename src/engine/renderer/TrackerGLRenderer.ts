@@ -127,17 +127,17 @@ for (let i = 0; i < 256; i++) {
 // Pre-compute single hex digit strings (0-F)
 const HEX1_TABLE: string[] = Array.from({ length: 16 }, (_, i) => i.toString(16).toUpperCase());
 
-// Pre-compute note strings for all 98 notes × range of display offsets (-24 to +24)
+// Pre-compute note strings — 192 entries covers GT Ultra range (1-188), standard (1-96), and OFF (97)
 const NOTE_CACHE = new Map<number, string[]>();
 function getNoteTable(displayOffset: number): string[] {
   let table = NOTE_CACHE.get(displayOffset);
   if (table) return table;
-  table = new Array(98);
+  table = new Array(192);
   table[0] = '---';
-  for (let n = 1; n < 97; n++) {
-    const adjusted = n + displayOffset;
-    const noteIndex = ((adjusted - 1) % 12 + 12) % 12;
-    const octave = Math.floor((adjusted - 1) / 12);
+  for (let n = 1; n < 189; n++) {
+    const adj = n + displayOffset - 1;
+    const noteIndex = ((adj % 12) + 12) % 12;
+    const octave = Math.floor(adj / 12);
     table[n] = `${NOTE_NAMES[noteIndex]}${octave}`;
   }
   table[97] = 'OFF';
