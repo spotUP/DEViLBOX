@@ -88,7 +88,7 @@ const MiniFader: React.FC<MiniFaderProps> = ({ value, min, max, color, label, fo
       {/* Tooltip-like label on hover/drag */}
       {(hovered || dragging) && (
         <div
-          className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 px-1 rounded text-[9px] whitespace-nowrap pointer-events-none z-50"
+          className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 px-1 rounded text-[9px] whitespace-nowrap pointer-events-none z-[9990]"
           style={{
             backgroundColor: 'rgba(0,0,0,0.85)',
             color: 'var(--color-text-secondary)',
@@ -200,7 +200,7 @@ const PanIndicator: React.FC<PanIndicatorProps> = ({ pan, color, onChange }) => 
       </div>
       {(hovered || dragging) && (
         <div
-          className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 px-1 rounded text-[9px] whitespace-nowrap pointer-events-none z-50"
+          className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 px-1 rounded text-[9px] whitespace-nowrap pointer-events-none z-[9990]"
           style={{
             backgroundColor: 'rgba(0,0,0,0.85)',
             color: 'var(--color-text-secondary)',

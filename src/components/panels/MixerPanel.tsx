@@ -286,7 +286,7 @@ export const MixerPanel: React.FC = () => {
 
   return (
     <div
-      className="fixed bottom-8 left-1/2 -translate-x-1/2 z-50 bg-[#0e0e14] border border-white/10 rounded-lg shadow-2xl"
+      className="fixed bottom-8 left-1/2 -translate-x-1/2 z-[9990] bg-[#0e0e14] border border-white/10 rounded-lg shadow-2xl"
       style={{ minWidth: 'min(98vw, 1100px)' }}
     >
       {/* Header */}

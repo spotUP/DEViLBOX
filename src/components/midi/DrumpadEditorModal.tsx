@@ -311,7 +311,7 @@ export const DrumpadEditorModal: React.FC<DrumpadEditorModalProps> = ({ isOpen, 
   const visiblePads = DEFAULT_PADS.filter(p => p.bank === activeBank);
 
   return (
-    <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50">
+    <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-[9990]">
       <div className="bg-dark-bg border border-dark-border rounded-lg w-[800px] h-[600px] flex flex-col">
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-dark-border">

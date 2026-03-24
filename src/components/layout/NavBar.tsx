@@ -117,7 +117,7 @@ const NavBarComponent: React.FC = () => {
                     <span className="text-sm hidden sm:inline">{n.authUser.username}</span>
                   </button>
                   {showUserMenu && (
-                    <div className="absolute right-0 top-full mt-1 bg-dark-bgTertiary border border-dark-border rounded-md shadow-lg z-50 min-w-[160px]">
+                    <div className="absolute right-0 top-full mt-1 bg-dark-bgTertiary border border-dark-border rounded-md shadow-lg z-[9990] min-w-[160px]">
                       <div className="px-3 py-2 border-b border-dark-border">
                         <p className="text-xs text-text-muted">Signed in as</p>
                         <p className="text-sm font-medium text-text-primary truncate">{n.authUser.username}</p>
@@ -225,7 +225,7 @@ const NavBarComponent: React.FC = () => {
               <span className="text-sm">{n.currentTheme.name}</span>
             </button>
             {showThemeMenu && (
-              <div className="absolute right-0 top-full mt-1 bg-dark-bgTertiary border border-dark-border rounded-md shadow-lg z-50 min-w-[140px]">
+              <div className="absolute right-0 top-full mt-1 bg-dark-bgTertiary border border-dark-border rounded-md shadow-lg z-[9990] min-w-[140px]">
                 {themes.map((theme) => (
                   <button
                     key={theme.id}

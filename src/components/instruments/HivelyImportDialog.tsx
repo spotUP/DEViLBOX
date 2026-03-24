@@ -51,7 +51,7 @@ export const HivelyImportDialog: React.FC<HivelyImportDialogProps> = ({ onClose,
   const selectedCount = entries.filter(e => e.selected).length;
 
   return (
-    <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50" onClick={onClose}>
+    <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-[9990]" onClick={onClose}>
       <div
         className="bg-ft2-bg border border-ft2-border p-4 rounded min-w-[340px] max-w-[500px] shadow-xl"
         onClick={e => e.stopPropagation()}

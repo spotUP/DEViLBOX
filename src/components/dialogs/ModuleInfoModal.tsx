@@ -121,7 +121,7 @@ export const ModuleInfoModal: React.FC<Props> = ({ isOpen, onClose }) => {
   const hasSongDB = !!(info.album || info.year || info.authors.length || info.publishers.length);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60" onClick={onClose}>
+    <div className="fixed inset-0 z-[9990] flex items-center justify-center bg-black/60" onClick={onClose}>
       <div
         className="bg-dark-bg border border-dark-border rounded-lg w-full max-w-md max-h-[80vh] flex flex-col"
         onClick={(e) => e.stopPropagation()}

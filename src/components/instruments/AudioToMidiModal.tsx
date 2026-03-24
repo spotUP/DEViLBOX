@@ -469,7 +469,7 @@ export const AudioToMidiModal: React.FC<AudioToMidiModalProps> = ({
     : `${Math.floor(durationSec / 60)}:${(durationSec % 60).toFixed(0).padStart(2, '0')}`;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70">
+    <div className="fixed inset-0 z-[9990] flex items-center justify-center bg-black/70">
       <div className="bg-dark-bg border border-ft2-border rounded-lg shadow-2xl w-[520px] max-h-[90vh] overflow-y-auto">
         {/* ─── Header ─────────────────────────────────────────────── */}
         <div className="flex items-center justify-between px-4 py-3 border-b border-ft2-border bg-ft2-header">

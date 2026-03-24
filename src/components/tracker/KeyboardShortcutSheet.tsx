@@ -143,7 +143,7 @@ export const KeyboardShortcutSheet: React.FC<KeyboardShortcutSheetProps> = ({ is
   return (
     <div
       ref={overlayRef}
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60"
+      className="fixed inset-0 z-[9990] flex items-center justify-center bg-black/60"
       onClick={onClose}
     >
       <div
