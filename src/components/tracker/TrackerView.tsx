@@ -6,11 +6,8 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { PatternEditorCanvas } from './PatternEditorCanvas';
 import { GridSequencer } from '@components/grid/GridSequencer';
 import { useTrackerStore, useCursorStore, useInstrumentStore, useUIStore , useFormatStore } from '@stores';
-import { useTransportStore } from '@stores/useTransportStore';
-import { useProjectStore } from '@stores/useProjectStore';
 import { useShallow } from 'zustand/react/shallow';
-import { useTrackerInput } from '@hooks/tracker/useTrackerInput';
-import { useBlockOperations } from '@hooks/tracker/BlockOperations';
+import { useTrackerView } from '@hooks/views/useTrackerView';
 import { useModuleImport } from '@hooks/tracker/useModuleImport';
 import { InterpolateDialog } from '@components/dialogs/InterpolateDialog';
 import { HumanizeDialog } from '@components/dialogs/HumanizeDialog';
@@ -42,10 +39,9 @@ import { useResponsive } from '@hooks/useResponsive';
 import { Music2, Activity, ExternalLink, Undo2 } from 'lucide-react';
 import { PopOutWindow } from '@components/ui/PopOutWindow';
 import { InstrumentList } from '@components/instruments/InstrumentList';
-import { getTrackerReplayer, type TrackerSong } from '@engine/TrackerReplayer';
+import { getTrackerReplayer } from '@engine/TrackerReplayer';
 import { MusicLineTrackTableEditor } from './MusicLineTrackTableEditor';
 import { MusicLinePatternViewer } from './MusicLinePatternViewer';
-import { exportMusicLineFile } from '@lib/export/MusicLineExporter';
 import { downloadPattern } from '@lib/export/PatternExport';
 import { downloadTrack } from '@lib/export/TrackExport';
 import { DJPitchSlider } from '@components/transport/DJPitchSlider';
@@ -110,6 +106,17 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
   const { isMobile, width: windowWidth } = useResponsive();
 
   // PERFORMANCE OPTIMIZATION: Group selectors with useShallow to reduce re-render overhead
+  // Shared logic: keyboard hooks, view mode, grid channel, editor mode, ML export
+  const {
+    viewMode,
+    setViewMode,
+    gridChannelIndex,
+    setGridChannelIndex,
+    editorMode,
+    blockOps,
+    handleExportML,
+  } = useTrackerView();
+
   const {
     patterns,
     currentPatternIndex,
@@ -123,7 +130,6 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
     fadeVolume: state.fadeVolume,
     remapInstrument: state.remapInstrument,
   })));
-  const editorMode = useFormatStore((s) => s.editorMode);
   // Fine-grained selector for cursor.channelIndex only — avoids re-rendering
   // the entire TrackerView on every cursor row/column move
   const cursorChannelIndex = useCursorStore((state) => state.cursor.channelIndex);
@@ -142,12 +148,6 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
 
   // Import handlers (extracted to hook)
   const { handleModuleImport, handleSunVoxImport } = useModuleImport();
-
-  // View mode state (shared with GL via store)
-  const viewMode = useUIStore((s) => s.trackerViewMode);
-  const setViewMode = useUIStore((s) => s.setTrackerViewMode);
-  const gridChannelIndex = useUIStore((s) => s.gridChannelIndex);
-  const setGridChannelIndex = useUIStore((s) => s.setGridChannelIndex);
 
   // Dialog state
   const [showInterpolate, setShowInterpolate] = useState(false);
@@ -184,37 +184,6 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
     if (!isMobile) return;
     useCursorStore.getState().moveCursor('right');
   }, [isMobile]);
-
-  // MusicLine export handler
-  const handleExportML = useCallback(() => {
-    const s = useTrackerStore.getState();
-    const t = useTransportStore.getState();
-    const song: TrackerSong = {
-      name: useProjectStore.getState().metadata.name || 'MusicLine Song',
-      format: 'ML',
-      patterns: s.patterns,
-      instruments: useInstrumentStore.getState().instruments,
-      songPositions: s.patternOrder,
-      songLength: s.patternOrder.length,
-      restartPosition: 0,
-      numChannels: s.patterns[0]?.channels.length ?? 4,
-      initialSpeed: t.speed,
-      initialBPM: t.bpm,
-      channelTrackTables: useFormatStore.getState().channelTrackTables ?? undefined,
-      channelSpeeds: useFormatStore.getState().channelSpeeds ?? undefined,
-      channelGrooves: useFormatStore.getState().channelGrooves ?? undefined,
-    };
-    const data = exportMusicLineFile(song);
-    const blob = new Blob([data.buffer as ArrayBuffer], { type: 'application/octet-stream' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `${song.name.replace(/[^a-zA-Z0-9_\-]/g, '_')}.ml`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-  }, []);
 
   // Use external or internal import state
   const showImportModule = externalShowImportModule ?? internalShowImportModule;
@@ -346,10 +315,6 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
       // Don't clear yet - ImportModuleDialog needs it
     }
   }, [pendingModuleFile, setShowImportModule]);
-
-  // Enable keyboard input
-  useTrackerInput();
-  const blockOps = useBlockOperations();
 
   // NOTE: usePatternPlayback() is called in App.tsx so it persists across view switches
 
