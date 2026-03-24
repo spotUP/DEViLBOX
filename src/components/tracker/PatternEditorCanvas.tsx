@@ -225,22 +225,22 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
       const FORMAT_CHAN_GAP = 8;
       const widths: number[] = [];
       const offsets: number[] = [];
-      let totalW = 0;
+      let currentX = LINE_NUMBER_WIDTH;
       for (let i = 0; i < formatChannels.length; i++) {
         const cols = formatChannels[i].columns ?? formatColumns;
         const contentWidth = cols.reduce(
           (sum, col) => sum + col.charWidth * CHAR_WIDTH + FORMAT_COL_GAP, 0
         ) - FORMAT_COL_GAP;
-        const chanW = LINE_NUMBER_WIDTH + contentWidth + FORMAT_CHAN_GAP;
-        offsets.push(totalW);
+        const chanW = contentWidth + FORMAT_CHAN_GAP;
+        offsets.push(currentX);
         widths.push(chanW);
-        totalW += chanW;
+        currentX += chanW;
       }
       return {
         numChannels: formatChannels.length,
         channelOffsets: offsets,
         channelWidths: widths,
-        totalChannelsWidth: totalW,
+        totalChannelsWidth: currentX,
       };
     }
 
@@ -530,7 +530,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
       // Find channel
       let chIdx = -1;
       for (let ch = 0; ch < channelOffsets.length; ch++) {
-        const absX = LINE_NUMBER_WIDTH + channelOffsets[ch];
+        const absX = channelOffsets[ch];
         if (relX >= absX && relX < absX + (channelWidths[ch] ?? 0)) {
           chIdx = ch;
           break;
@@ -550,7 +550,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
       // Find column
       const FORMAT_COL_GAP = 4;
       const chCols = formatChannels[chIdx]?.columns ?? formatColumns;
-      const localX = relX - LINE_NUMBER_WIDTH - channelOffsets[chIdx] - 2;
+      const localX = relX - channelOffsets[chIdx] - 2;
       let colIdx = 0;
       let px = 0;
       for (let ci = 0; ci < chCols.length; ci++) {
