@@ -14,6 +14,7 @@
 import { useDJStore, type CrossfaderCurve } from '@/stores/useDJStore';
 import { useDJSetStore } from '@/stores/useDJSetStore';
 import { getDJEngine, getDJEngineIfActive } from './DJEngine';
+import type { DJSet } from './recording/DJSetFormat';
 import { quantizedEQKill, getQuantizeMode, setTrackedFilterPosition } from './DJQuantizedFX';
 import { quantizedPlay, syncBPMToOther, phaseAlign } from './DJAutoSync';
 import { DJBeatSync } from './DJBeatSync';
@@ -617,4 +618,40 @@ export function stopDeckFaderLFO(deckId: DeckId): void {
   try {
     getDJEngine().getDeck(deckId).stopFaderLFO();
   } catch { /* engine not ready */ }
+}
+
+// ============================================================================
+// RECORDING
+// ============================================================================
+
+/**
+ * Start recording a DJ set. Creates a new DJSetRecorder, starts it, and
+ * attaches it to the engine (if active). Updates store state.
+ */
+export async function startRecording(): Promise<void> {
+  const { DJSetRecorder } = await import('@/engine/dj/recording/DJSetRecorder');
+  const recorder = new DJSetRecorder();
+  recorder.startRecording();
+  const engine = getDJEngineIfActive();
+  if (engine) engine.recorder = recorder;
+  useDJSetStore.getState().setRecording(true);
+  useDJSetStore.getState().setRecordingStartTime(Date.now());
+}
+
+/**
+ * Stop recording and return the DJSet object. Detaches recorder from engine.
+ * Updates store state. Returns null if no recording is active.
+ */
+export async function stopRecording(
+  name: string,
+  userId: string,
+  username: string,
+): Promise<DJSet | null> {
+  const engine = getDJEngineIfActive();
+  if (!engine?.recorder) return null;
+  const set = engine.recorder.stopRecording(name, userId, username);
+  engine.recorder = null;
+  useDJSetStore.getState().setRecording(false);
+  useDJSetStore.getState().setRecordingDuration(0);
+  return set;
 }

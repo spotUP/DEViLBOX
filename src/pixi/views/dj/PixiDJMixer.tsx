@@ -8,7 +8,7 @@ import { usePixiTheme } from '../../theme';
 import { PixiButton, PixiKnob, PixiSlider, PixiLabel } from '../../components';
 import { useDJStore } from '@/stores/useDJStore';
 import { useDJSetStore } from '@/stores/useDJSetStore';
-import { getDJEngine, getDJEngineIfActive } from '@/engine/dj/DJEngine';
+import { getDJEngine } from '@/engine/dj/DJEngine';
 import type { CrossfaderCurve } from '@/engine/dj/DJMixerEngine';
 import { DJVideoCapture, getCaptureCanvas } from '@/engine/dj/streaming/DJVideoCapture';
 import { DJVideoRecorder } from '@/engine/dj/streaming/DJVideoRecorder';
@@ -450,35 +450,22 @@ const MixerRecordMic: React.FC = () => {
 
   const handleRecordToggle = useCallback(async () => {
     if (isRecording) {
-      // Stop — delegate to the DOM DJSetRecordButton logic via store
-      // (the actual save flow happens in the DOM component; here we just toggle state)
-      const engine = getDJEngineIfActive();
-      if (engine?.recorder) {
-        const name = prompt('Name your DJ set:', `DJ Set ${new Date().toLocaleString()}`);
-        if (!name) return;
-        const { useAuthStore } = await import('@/stores/useAuthStore');
-        const auth = useAuthStore.getState();
-        const set = engine.recorder.stopRecording(name, auth.user?.id || 'local', auth.user?.username || 'DJ');
-        engine.recorder = null;
-        useDJSetStore.getState().setRecording(false);
-        useDJSetStore.getState().setRecordingDuration(0);
-        // Save to server
-        if (auth.token) {
-          try {
-            const { saveDJSet } = await import('@/lib/djSetApi');
-            await saveDJSet(set);
-          } catch (err) { console.error('[PixiDJMixer] Save failed:', err); }
-        }
+      // Stop — prompt for name, then use DJActions to stop and detach recorder
+      const name = prompt('Name your DJ set:', `DJ Set ${new Date().toLocaleString()}`);
+      if (!name) return;
+      const { useAuthStore } = await import('@/stores/useAuthStore');
+      const auth = useAuthStore.getState();
+      const set = await DJActions.stopRecording(name, auth.user?.id || 'local', auth.user?.username || 'DJ');
+      // Save to server if authenticated
+      if (set && auth.token) {
+        try {
+          const { saveDJSet } = await import('@/lib/djSetApi');
+          await saveDJSet(set);
+        } catch (err) { console.error('[PixiDJMixer] Save failed:', err); }
       }
     } else {
-      // Start
-      const { DJSetRecorder } = await import(/* @vite-ignore */ '@/engine/dj/recording/DJSetRecorder');
-      const recorder = new DJSetRecorder();
-      recorder.startRecording();
-      const engine = getDJEngineIfActive();
-      if (engine) engine.recorder = recorder;
-      useDJSetStore.getState().setRecording(true);
-      useDJSetStore.getState().setRecordingStartTime(Date.now());
+      // Start recording via DJActions
+      await DJActions.startRecording();
     }
   }, [isRecording]);
 
