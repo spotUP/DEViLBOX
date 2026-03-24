@@ -126,8 +126,8 @@ export function toColumnSpec(col: ColumnDef): ColumnSpec {
 /**
  * Convert FormatChannel[] + ColumnDef[] to a PatternSnapshot for the WebGL worker.
  * Each cell's values are stored in CellSnapshot.params[] (index = column index).
- * The fixed Note/Inst/Vol/Eff fields are zeroed — the renderer uses the column-driven
- * path when params is present.
+ * The standard note/instrument fields are also populated from FormatCell keys
+ * so the renderer can display them without a dedicated column-driven path.
  */
 export function formatChannelsToSnapshot(
   channels: FormatChannel[],
@@ -142,8 +142,12 @@ export function formatChannelsToSnapshot(
     const rows: CellSnapshot[] = Array.from({ length }, (_, ri) => {
       const cell = ch.rows[ri];
       return {
-        note: 0, instrument: 0, volume: 0,
-        effTyp: 0, eff: 0, effTyp2: 0, eff2: 0,
+        note: cell?.note ?? 0,
+        instrument: cell?.instrument ?? 0,
+        volume: cell?.volume ?? 0,
+        effTyp: cell?.command ?? cell?.effTyp ?? 0,
+        eff: cell?.data ?? cell?.eff ?? 0,
+        effTyp2: 0, eff2: 0,
         params: columns.map(col => {
           const v = cell?.[col.key];
           return v === undefined ? (col.emptyValue ?? 0) : v;
