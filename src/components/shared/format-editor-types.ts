@@ -142,8 +142,11 @@ export function formatChannelsToSnapshot(
   columns: ColumnDef[],
   patternId = 'fmt-0',
 ): PatternSnapshot {
-  const length = channels.length > 0
-    ? Math.max(...channels.map(c => c.patternLength))
+  // Use pattern channels to determine length; fall back to all channels if none marked
+  const patternChannels = channels.filter(c => c.isPatternChannel);
+  const lengthSource = patternChannels.length > 0 ? patternChannels : channels;
+  const length = lengthSource.length > 0
+    ? Math.max(...lengthSource.map(c => c.patternLength))
     : 0;
 
   const channelSnapshots: ChannelSnapshot[] = channels.map((ch, chIdx) => {
