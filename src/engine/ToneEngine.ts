@@ -2286,10 +2286,15 @@ export class ToneEngine {
         // Connect the worklet's raw output directly to synthBus's native node.
         // Using the intermediate engine.output GainNode is unreliable — Tone.js/SAC
         // dispose cycles silently sever native-level connections between songs.
+        // Guard with hasInstance() to avoid eagerly initializing WASM on project
+        // restore from IndexedDB — the heavy init should only happen on first play.
         const nativeSynthBus = getNativeAudioNode(this.synthBus as any);
         if (nativeSynthBus) {
           import('./sunvox/SunVoxEngine').then(({ SunVoxEngine }) => {
-            SunVoxEngine.getInstance().connectWorkletTo(nativeSynthBus);
+            if (SunVoxEngine.hasInstance()) {
+              SunVoxEngine.getInstance().connectWorkletTo(nativeSynthBus);
+            }
+            // else: will connect lazily when engine is actually created on play
           });
         }
         this._sunvoxOutputConnected = true;
