@@ -525,9 +525,13 @@ export class TrackerScratchController {
     // Restore original smooth scrolling state
     useTransportStore.getState().setSmoothScrolling(this.originalSmoothScrolling);
 
-    // Restore position after a tick — engines send async position=0 via postMessage
-    // during their stop sequence. This overrides those after they've landed.
-    // Restore position after engines have processed their async stop callbacks
+    // Move cursor to last playback position so the pattern editor stays there.
+    // The editor reads cursor.rowIndex when stopped (not playbackRow).
+    import('@/stores/useCursorStore').then(({ useCursorStore }) => {
+      useCursorStore.getState().moveCursorToRow(savedRow);
+    });
+
+    // Also restore store position after async engine callbacks land
     setTimeout(() => {
       useTransportStore.getState().setCurrentRow(savedRow);
       useTrackerStore.getState().setCurrentPattern(savedPattern);
