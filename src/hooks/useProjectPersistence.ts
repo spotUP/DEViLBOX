@@ -418,10 +418,22 @@ export async function saveProjectToStorage(options?: { explicit?: boolean }): Pr
 }
 
 /**
- * Load project from IndexedDB
+ * Load project from IndexedDB.
+ * Pass ?reset in the URL to skip restore and clear stored data (emergency recovery).
  */
 export async function loadProjectFromStorage(): Promise<boolean> {
   try {
+    // Emergency escape hatch: ?reset in URL clears all stored data
+    if (typeof window !== 'undefined' && window.location.search.includes('reset')) {
+      console.warn('[Persistence] ?reset detected — clearing stored project data');
+      await idbDelete().catch(() => {});
+      // Remove the ?reset param so subsequent reloads work normally
+      const url = new URL(window.location.href);
+      url.searchParams.delete('reset');
+      window.history.replaceState({}, '', url.toString());
+      return false;
+    }
+
     const project = await idbGet();
     if (!project) return false;
 
