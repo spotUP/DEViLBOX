@@ -594,16 +594,18 @@ export class TrackerReplayer {
   /** Get current pattern row position */
   getPattPos(): number { return this.pattPos; }
 
-  /** Force position reset — sets internal replayer state and resyncs scheduler.
-   *  Does NOT update transport store to avoid triggering usePatternPlayback reload.
-   *  The onRowChange callback updates the UI naturally on the next tick. */
+  /** Guard flag: when true, usePatternPlayback should not stop/restart the replayer.
+   *  Set by forcePosition, cleared after one React render cycle. */
+  public skipNextReload = false;
+
+  /** Force position reset — sets internal replayer state and resyncs scheduler. */
   forcePosition(songPos: number, pattPos: number): void {
-    console.log(`[TrackerReplayer] forcePosition(${songPos}, ${pattPos}) playing=${this.playing} was songPos=${this.songPos} pattPos=${this.pattPos} tick=${this.currentTick} libopenmpt=${this.useLibopenmptPlayback}`);
     this.songPos = songPos;
     this.pattPos = pattPos;
     this.currentTick = 0;
     this.nextScheduleTime = Tone.now();
-    console.log(`[TrackerReplayer] forcePosition DONE → songPos=${this.songPos} pattPos=${this.pattPos} nextSchedule=${this.nextScheduleTime.toFixed(3)}`);
+    // Tell usePatternPlayback to skip its next stop/restart cycle
+    this.skipNextReload = true;
 
     // Forward to libopenmpt if active
     if (this.useLibopenmptPlayback) {
@@ -1676,12 +1678,22 @@ export class TrackerReplayer {
       this.getStateAtTime(Tone.now());
       const lastVisual = this.lastDequeuedState;
       const stopRow = lastVisual ? lastVisual.row : this.pattPos;
+      console.log(`[STOP-DEBUG] stopRow=${stopRow} lastVisual.row=${lastVisual?.row} pattPos=${this.pattPos} ringCount=${this.stateRingCount}`);
       useTransportStore.getState().setCurrentRow(stopRow);
       // Move the editing cursor to the stop position so the pattern editor
       // doesn't jump back to the pre-play cursor position on stop.
       // Set cursor directly (not moveCursorToRow which would trigger a seek).
       const cursorState = useCursorStore.getState();
       useCursorStore.setState({ cursor: { ...cursorState.cursor, rowIndex: stopRow } });
+      // DEBUG: watch for something overwriting the cursor after we set it
+      const unsub = useCursorStore.subscribe((state) => {
+        if (state.cursor.rowIndex !== stopRow) {
+          console.log(`[STOP-DEBUG] cursor OVERWRITTEN to ${state.cursor.rowIndex} (was ${stopRow})`, new Error().stack);
+          unsub();
+        } else {
+          setTimeout(() => unsub(), 2000);
+        }
+      });
     }
 
     this.playing = false;
