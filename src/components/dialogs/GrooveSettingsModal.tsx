@@ -5,8 +5,7 @@
 import React from 'react';
 import { X, Info } from 'lucide-react';
 import { useModalClose } from '@hooks/useDialogKeyboard';
-import { useTransportStore } from '@stores/useTransportStore';
-import { GROOVE_TEMPLATES } from '@typedefs/audio';
+import { useGrooveSettings, GROOVE_TEMPLATES, GROOVE_CATEGORIES, GROOVE_RESOLUTIONS } from '@hooks/dialogs/useGrooveSettings';
 
 interface GrooveSettingsModalProps {
   onClose: () => void;
@@ -25,7 +24,7 @@ export const GrooveSettingsModal: React.FC<GrooveSettingsModalProps> = ({ onClos
     setUseMpcScale,
     grooveTemplateId,
     setGrooveTemplate,
-  } = useTransportStore();
+  } = useGrooveSettings();
 
   return (
     <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-[9999] p-4 backdrop-blur-sm">
@@ -53,7 +52,7 @@ export const GrooveSettingsModal: React.FC<GrooveSettingsModalProps> = ({ onClos
               </h3>
               
               <div className="flex-1 overflow-y-auto pr-2 scrollbar-ft2 space-y-4">
-                {['straight', 'shuffle', 'swing', 'funk', 'hip-hop', 'custom'].map(category => {
+                {GROOVE_CATEGORIES.map(category => {
                   const grooves = GROOVE_TEMPLATES.filter(g => g.category === category);
                   if (grooves.length === 0) return null;
                   
@@ -147,20 +146,18 @@ export const GrooveSettingsModal: React.FC<GrooveSettingsModalProps> = ({ onClos
             <section className="bg-dark-bgSecondary p-4 border border-ft2-border rounded-lg space-y-4">
               <h3 className="text-ft2-highlight text-xs font-bold tracking-wider uppercase">Swing Resolution</h3>
               <div className="grid grid-cols-3 gap-2">
-                {[2, 4, 8, 16, 32, 64].map(s => (
+                {GROOVE_RESOLUTIONS.map(({ steps, label }) => (
                   <button
-                    key={s}
-                    onClick={() => {
-                      setGrooveSteps(s);
-                    }}
+                    key={steps}
+                    onClick={() => setGrooveSteps(steps)}
                     className={`px-2 py-2 text-[10px] font-mono border rounded transition-all ${
-                      grooveSteps === s
+                      grooveSteps === steps
                         ? 'bg-accent-primary border-accent-primary text-text-primary font-bold'
                         : 'bg-dark-bgTertiary border-ft2-border text-text-secondary hover:border-text-muted'
                     }`}
                   >
-                    {s === 2 ? '16th' : s === 4 ? '8th' : s === 8 ? '4th' : `${s/16}b`}
-                    <div className="text-[8px] opacity-60">({s} stp)</div>
+                    {label}
+                    <div className="text-[8px] opacity-60">({steps} stp)</div>
                   </button>
                 ))}
               </div>
