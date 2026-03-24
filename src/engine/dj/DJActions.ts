@@ -17,7 +17,7 @@ import { getDJEngine, getDJEngineIfActive } from './DJEngine';
 import { quantizedEQKill, getQuantizeMode, setTrackedFilterPosition } from './DJQuantizedFX';
 import { quantizedPlay, syncBPMToOther, phaseAlign } from './DJAutoSync';
 import { DJBeatSync } from './DJBeatSync';
-import type { DeckId } from './DeckEngine';
+import type { DeckId, FaderLFODivision } from './DeckEngine';
 
 // ============================================================================
 // TYPES
@@ -448,4 +448,173 @@ export function setMicGain(gain: number): void {
   useDJSetStore.getState().setMicGain(clamped);
   const engine = getDJEngineIfActive();
   engine?.mic?.setGain(clamped);
+}
+
+// ============================================================================
+// NUDGE
+// ============================================================================
+
+/**
+ * Nudge a deck forward or backward by a number of ticks.
+ *
+ * @param offset - Positive = forward, negative = backward
+ * @param ticks - Duration of nudge in ticks (default 8)
+ */
+export function nudgeDeck(deckId: DeckId, offset: number, ticks = 8): void {
+  try {
+    getDJEngine().getDeck(deckId).nudge(offset, ticks);
+  } catch { /* engine not ready */ }
+}
+
+// ============================================================================
+// LOOP
+// ============================================================================
+
+/**
+ * Set a line loop on the deck (loop N rows from current position).
+ */
+export function setDeckLineLoop(deckId: DeckId, size: number): void {
+  try {
+    getDJEngine().getDeck(deckId).setLineLoop(size);
+  } catch { /* engine not ready */ }
+}
+
+/**
+ * Clear the active line loop on the deck.
+ */
+export function clearDeckLineLoop(deckId: DeckId): void {
+  try {
+    getDJEngine().getDeck(deckId).clearLineLoop();
+  } catch { /* engine not ready */ }
+}
+
+// ============================================================================
+// SLIP
+// ============================================================================
+
+/**
+ * Enable or disable slip mode on a deck.
+ */
+export function setDeckSlipEnabled(deckId: DeckId, enabled: boolean): void {
+  try {
+    getDJEngine().getDeck(deckId).setSlipEnabled(enabled);
+  } catch { /* engine not ready */ }
+}
+
+// ============================================================================
+// KILL ALL
+// ============================================================================
+
+/**
+ * Kill all audio on all decks (emergency stop).
+ */
+export function killAllDecks(): void {
+  useDJStore.getState().setDeckPlaying('A', false);
+  useDJStore.getState().setDeckPlaying('B', false);
+  try {
+    getDJEngine().killAll();
+  } catch { /* engine not ready */ }
+}
+
+// ============================================================================
+// PITCH
+// ============================================================================
+
+/**
+ * Set the pitch offset (in semitones) for a deck.
+ * Updates the store and propagates to the engine.
+ */
+export function setDeckPitch(deckId: DeckId, semitones: number): void {
+  useDJStore.getState().setDeckPitch(deckId, semitones);
+  try {
+    getDJEngine().getDeck(deckId).setPitch(semitones);
+  } catch { /* engine not ready */ }
+}
+
+// ============================================================================
+// CHANNEL MUTE MASK
+// ============================================================================
+
+/**
+ * Set the channel mute mask on a deck's replayer.
+ */
+export function setDeckChannelMuteMask(deckId: DeckId, mask: number): void {
+  try {
+    getDJEngine().getDeck(deckId).replayer.setChannelMuteMask(mask);
+  } catch { /* engine not ready */ }
+}
+
+// ============================================================================
+// SEEK
+// ============================================================================
+
+/**
+ * Seek a deck to a position (pattern index for tracker, seconds for audio).
+ */
+export function seekDeck(deckId: DeckId, position: number, pattPos = 0): void {
+  try {
+    getDJEngine().getDeck(deckId).cue(position, pattPos);
+  } catch { /* engine not ready */ }
+}
+
+/**
+ * Seek an audio-mode deck to a specific time in seconds.
+ */
+export function seekDeckAudio(deckId: DeckId, seconds: number): void {
+  try {
+    getDJEngine().getDeck(deckId).audioPlayer.seek(seconds);
+  } catch { /* engine not ready */ }
+}
+
+// ============================================================================
+// SCRATCH PATTERNS
+// ============================================================================
+
+/**
+ * Start a named scratch pattern on a deck.
+ */
+export function playDeckPattern(
+  deckId: DeckId,
+  name: string,
+  onWaiting?: (ms: number) => void,
+): void {
+  try {
+    getDJEngine().getDeck(deckId).playPattern(name, onWaiting);
+  } catch { /* engine not ready */ }
+}
+
+/**
+ * Stop the active scratch pattern immediately.
+ */
+export function stopDeckPattern(deckId: DeckId): void {
+  try {
+    getDJEngine().getDeck(deckId).stopPattern();
+  } catch { /* engine not ready */ }
+}
+
+/**
+ * Let the current scratch pattern cycle finish, then stop.
+ */
+export function finishDeckPatternCycle(deckId: DeckId): void {
+  try {
+    getDJEngine().getDeck(deckId).finishPatternCycle();
+  } catch { /* engine not ready */ }
+}
+
+/**
+ * Start a fader LFO at the given beat division.
+ */
+export function startDeckFaderLFO(deckId: DeckId, division: FaderLFODivision): void {
+  try {
+    getDJEngine().getDeck(deckId).startFaderLFO(division);
+  } catch { /* engine not ready */ }
+}
+
+/**
+ * Stop the fader LFO on a deck.
+ */
+export function stopDeckFaderLFO(deckId: DeckId): void {
+  try {
+    getDJEngine().getDeck(deckId).stopFaderLFO();
+  } catch { /* engine not ready */ }
 }
