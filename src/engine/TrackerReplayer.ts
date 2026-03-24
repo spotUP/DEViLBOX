@@ -598,7 +598,13 @@ export class TrackerReplayer {
    *  Set by forcePosition, cleared after one React render cycle. */
   public skipNextReload = false;
 
-  /** Force position reset — sets internal replayer state and resyncs scheduler. */
+  /** Track whether play() has completed at least once (audio infra is set up). */
+  private _hasPlayedOnce = false;
+
+  /** Force position reset — sets internal replayer state and resyncs scheduler.
+   *  If the replayer was previously playing (warm restart), restarts immediately
+   *  bypassing the slow React effect → async play() chain.
+   *  Cold start (first play) must go through the normal path for full audio init. */
   forcePosition(songPos: number, pattPos: number): void {
     this.songPos = songPos;
     this.pattPos = pattPos;
@@ -614,6 +620,39 @@ export class TrackerReplayer {
           LibopenmptEngine.getInstance().seekTo(songPos, pattPos);
         }
       }).catch(() => {});
+    }
+
+    // Warm restart: audio infra already set up from a previous play().
+    // Restart directly — no React effect cycle needed.
+    if (!this.playing && this.song && this._hasPlayedOnce) {
+      this.playing = true;
+      this._suppressNotes = false;
+      this.clearStateQueue();
+      this.lastDequeuedState = null;
+      // Restart libopenmpt if this is a libopenmpt-backed format
+      if (this.useLibopenmptPlayback) {
+        import('@engine/libopenmpt/LibopenmptEngine').then(({ LibopenmptEngine }) => {
+          if (LibopenmptEngine.hasInstance()) {
+            const mptEngine = LibopenmptEngine.getInstance();
+            if (!this._muted) {
+              mptEngine.play();
+              if (songPos > 0 || pattPos > 0) {
+                mptEngine.seekTo(songPos, pattPos);
+              }
+            }
+          }
+        }).catch(() => {});
+      }
+      this.startScheduler();
+      // Ensure store reflects playing state
+      const store = useTransportStore.getState();
+      if (!store.isPlaying) store.play();
+    } else if (!this.playing && this.song) {
+      // Cold start — let the normal React effect → play() handle full init.
+      // Don't skip the reload since we need the effect to run.
+      this.skipNextReload = false;
+      const store = useTransportStore.getState();
+      if (!store.isPlaying) store.play();
     }
   }
 
@@ -913,6 +952,7 @@ export class TrackerReplayer {
 
   loadSong(song: TrackerSong): void {
     this.stop();
+    this._hasPlayedOnce = false;
 
     // Restore any native engines rerouted to separation chain (UADE/Hively)
     restoreNativeRouting(this.routedNativeEngines);
@@ -1665,6 +1705,7 @@ export class TrackerReplayer {
 
     _playLog('startScheduler (total)');
     this.startScheduler();
+    this._hasPlayedOnce = true;
   }
 
   stop(): void {

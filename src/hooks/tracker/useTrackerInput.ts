@@ -14,7 +14,6 @@ import { useHistoryStore } from '@stores/useHistoryStore';
 import { getToneEngine } from '@engine/ToneEngine';
 import { getTrackerReplayer } from '@engine/TrackerReplayer';
 import { parseMPTClipboard } from '@lib/import/MPTClipboardParser';
-import { getTrackerScratchController } from '@engine/TrackerScratchController';
 import { useNoteInput, useEffectInput, useNavigationInput } from './input';
 
 export const useTrackerInput = () => {
@@ -550,42 +549,18 @@ export const useTrackerInput = () => {
       // Miscellaneous
       // ============================================
 
-      // FT2: Right Shift = Record pattern (play with recording)
-      if (e.key === 'Shift' && e.location === 2) {
-        if (getTrackerScratchController().isActive) return;
-        e.preventDefault();
-        if (!recordMode) {
-          if (!isPatternEditable) {
-            useUIStore.getState().openNonEditableDialog();
-            return;
-          }
-          toggleRecordMode();
-        }
-        if (isPlaying) stop();
-        setIsLooping(true);
-        getToneEngine().init().then(() => play());
-        return;
-      }
+      // FT2: Right Shift = Play song from start, Right Alt = Play pattern from start
+      // Handled by the global keyboard handler (useGlobalKeyboardHandler.ts) which uses
+      // forcePosition() for tight restart. Do NOT duplicate here — the dual handling
+      // caused stop/play cycles that broke rapid-fire restart.
+      if (e.key === 'Shift' && e.location === 2) return;
 
-      // FT2: Right Ctrl = Play song
-      if (e.key === 'Control' && e.location === 2) {
-        if (getTrackerScratchController().isActive) return;
-        e.preventDefault();
-        if (isPlaying) stop();
-        setIsLooping(false);
-        getToneEngine().init().then(() => play());
-        return;
-      }
+      // FT2: Right Ctrl = Play song (handled by global handler via scheme)
+      if (e.key === 'Control' && e.location === 2) return;
 
-      // FT2: Right Alt = Play pattern
-      if (e.key === 'Alt' && e.location === 2) {
-        if (getTrackerScratchController().isActive) return;
-        e.preventDefault();
-        if (isPlaying) stop();
-        setIsLooping(true);
-        getToneEngine().init().then(() => play());
-        return;
-      }
+      // FT2: Right Alt = Play pattern from start
+      // Handled by global keyboard handler via forcePosition() for tight restart.
+      if (e.key === 'Alt' && e.location === 2) return;
 
       // Space: Toggle edit mode or stop (FT2 style)
       if (key === ' ') {
