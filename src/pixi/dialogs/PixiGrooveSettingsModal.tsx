@@ -6,8 +6,7 @@
  */
 
 import React, { useCallback, useState } from 'react';
-import { useTransportStore } from '@stores/useTransportStore';
-import { GROOVE_TEMPLATES } from '@typedefs/audio';
+import { useGrooveSettings, GROOVE_TEMPLATES, GROOVE_CATEGORIES, GROOVE_RESOLUTIONS } from '@hooks/dialogs/useGrooveSettings';
 import { PixiButton, PixiCheckbox, PixiSlider } from '../components';
 import { usePixiTheme } from '../theme';
 import { useModalClose } from '@hooks/useDialogKeyboard';
@@ -18,17 +17,6 @@ const MODAL_W = 620;
 const MODAL_H = 500;
 const LEFT_W = 240;
 const RIGHT_W = MODAL_W - LEFT_W;
-
-const CATEGORIES = ['straight', 'shuffle', 'swing', 'funk', 'hip-hop', 'custom'] as const;
-
-const RESOLUTIONS: { steps: number; label: string }[] = [
-  { steps: 2, label: '16th' },
-  { steps: 4, label: '8th' },
-  { steps: 8, label: '4th' },
-  { steps: 16, label: '1b' },
-  { steps: 32, label: '2b' },
-  { steps: 64, label: '4b' },
-];
 
 interface PixiGrooveSettingsModalProps {
   isOpen: boolean;
@@ -43,16 +31,14 @@ export const PixiGrooveSettingsModal: React.FC<PixiGrooveSettingsModalProps> = (
 
   useModalClose({ isOpen, onClose });
 
-  const swing = useTransportStore((s) => s.swing);
-  const setSwing = useTransportStore((s) => s.setSwing);
-  const grooveSteps = useTransportStore((s) => s.grooveSteps);
-  const setGrooveSteps = useTransportStore((s) => s.setGrooveSteps);
-  const jitter = useTransportStore((s) => s.jitter);
-  const setJitter = useTransportStore((s) => s.setJitter);
-  const useMpcScale = useTransportStore((s) => s.useMpcScale);
-  const setUseMpcScale = useTransportStore((s) => s.setUseMpcScale);
-  const grooveTemplateId = useTransportStore((s) => s.grooveTemplateId);
-  const setGrooveTemplate = useTransportStore((s) => s.setGrooveTemplate);
+  const {
+    swing, setSwing,
+    grooveSteps, setGrooveSteps,
+    jitter, setJitter,
+    useMpcScale, setUseMpcScale,
+    grooveTemplateId, setGrooveTemplate,
+    swingMin, swingMax, swingDefaultValue,
+  } = useGrooveSettings();
 
   const [scrollY, setScrollY] = useState(0);
 
@@ -63,13 +49,11 @@ export const PixiGrooveSettingsModal: React.FC<PixiGrooveSettingsModalProps> = (
 
   if (!isOpen) return null;
 
-  const swingMin = useMpcScale ? 50 : 0;
-  const swingMax = useMpcScale ? 75 : 200;
-  const swingDisplay = useMpcScale ? `${swing}%` : `${swing}%`;
+  const swingDisplay = `${swing}%`;
 
   // Estimate total content height for scroll clamping
   const templateCount = GROOVE_TEMPLATES.length;
-  const estimatedContentH = templateCount * 26 + CATEGORIES.length * 22 + 40;
+  const estimatedContentH = templateCount * 26 + GROOVE_CATEGORIES.length * 22 + 40;
   const listAreaH = MODAL_H - 44 - 44 - 32; // modal - header - footer - padding
   const maxScroll = Math.max(0, estimatedContentH - listAreaH);
   const clampedScrollY = Math.min(scrollY, maxScroll);
@@ -102,7 +86,7 @@ export const PixiGrooveSettingsModal: React.FC<PixiGrooveSettingsModalProps> = (
           >
             <pixiContainer y={-clampedScrollY}>
               <Div className="flex-col gap-4 px-6 pb-6" layout={{ width: LEFT_W - 12 }}>
-                {CATEGORIES.map((category) => {
+                {GROOVE_CATEGORIES.map((category) => {
                   const grooves = GROOVE_TEMPLATES.filter((g) => g.category === category);
                   if (grooves.length === 0) return null;
                   return (
@@ -183,7 +167,7 @@ export const PixiGrooveSettingsModal: React.FC<PixiGrooveSettingsModalProps> = (
                   thickness={6}
                   handleWidth={14}
                   handleHeight={14}
-                  defaultValue={useMpcScale ? 50 : 100}
+                  defaultValue={swingDefaultValue}
                   step={1}
                   color={theme.accent.color}
                 />
@@ -220,7 +204,7 @@ export const PixiGrooveSettingsModal: React.FC<PixiGrooveSettingsModalProps> = (
             </Txt>
 
             <Div className="flex-row flex-wrap gap-2">
-              {RESOLUTIONS.map(({ steps, label }) => (
+              {GROOVE_RESOLUTIONS.map(({ steps, label }) => (
                 <PixiButton
                   key={steps}
                   label={`${label}\n(${steps} stp)`}
