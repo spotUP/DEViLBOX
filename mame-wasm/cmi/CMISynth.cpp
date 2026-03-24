@@ -581,6 +581,10 @@ struct CMI01A {
     double sample_phase;
     double sample_inc;
 
+    // Sample mode: when true, plays full wave_ram linearly instead of CMI page mode
+    bool   sample_mode;
+    int    sample_length;  // actual loaded sample length (up to WAVE_RAM_SIZE)
+
     // For MIDI control
     int  midi_note;
     double velocity;
@@ -688,6 +692,8 @@ struct CMI01A {
 
         sample_phase = 0;
         sample_inc = 0;
+        sample_mode = false;
+        sample_length = 128;
         midi_note = -1;
         velocity = 0;
         active = false;
@@ -1010,13 +1016,21 @@ struct CMI01A {
             return 0.0;
         }
 
-        // Advance sample position
-        sample_phase += sample_inc;
-        while (sample_phase >= 1.0) {
-            sample_phase -= 1.0;
-            // 1:1 from MAME update_sample()
-            current_sample = wave_ram[((wave_addr_msb << 7) | wave_addr_lsb) & 0x3FFF];
-            set_wave_addr_lsb((wave_addr_lsb + 1) & 0x7F);
+        if (sample_mode) {
+            // Linear sample playback — sample_phase is the absolute position
+            current_sample = wave_ram[(int)sample_phase & 0x3FFF];
+            sample_phase += sample_inc;
+            if (sample_phase >= (double)sample_length) {
+                sample_phase -= (double)sample_length;  // loop
+            }
+        } else {
+            // CMI hardware page-stepping mode
+            sample_phase += sample_inc;
+            while (sample_phase >= 1.0) {
+                sample_phase -= 1.0;
+                current_sample = wave_ram[((wave_addr_msb << 7) | wave_addr_lsb) & 0x3FFF];
+                set_wave_addr_lsb((wave_addr_lsb + 1) & 0x7F);
+            }
         }
 
         // Tick hardware timing (bcas divider drives PTM clocks)
@@ -1144,7 +1158,17 @@ public:
         v.rp = 200; // High envelope rate for attack
 
         v.update_filters(m_sampleRate);
-        v.run_voice_at_rate(m_sampleRate);
+        if (v.sample_mode) {
+            // Direct sample playback: step through full sample at correct pitch
+            double freq = 440.0 * pow(2.0, (midiNote - 69) / 12.0);
+            // The samples are recorded at ~14080 Hz. At middle C (261.63 Hz),
+            // we want to play back at the original rate. Scale by freq/261.63.
+            double baseRate = 14080.0;
+            double playRate = baseRate * (freq / 261.63);
+            v.sample_inc = playRate / m_sampleRate;
+        } else {
+            v.run_voice_at_rate(m_sampleRate);
+        }
         v.m_run = true;
         v.ptm.set_g1(0);
         v.ptm.set_g2(0);
@@ -1204,13 +1228,19 @@ public:
         uint8_t* data = reinterpret_cast<uint8_t*>(dataPtr);
         int copySize = std::min(size, WAVE_RAM_SIZE);
         memcpy(m_voices[voiceIndex].wave_ram, data, copySize);
+        m_voices[voiceIndex].sample_mode = (copySize > 256);
+        m_voices[voiceIndex].sample_length = copySize;
     }
 
     void loadSampleAll(uintptr_t dataPtr, int size) {
         uint8_t* data = reinterpret_cast<uint8_t*>(dataPtr);
         int copySize = std::min(size, WAVE_RAM_SIZE);
-        for (int i = 0; i < MAX_POLY; i++)
+        bool isSample = (copySize > 256);
+        for (int i = 0; i < MAX_POLY; i++) {
             memcpy(m_voices[i].wave_ram, data, copySize);
+            m_voices[i].sample_mode = isSample;
+            m_voices[i].sample_length = copySize;
+        }
     }
 
     void process(uintptr_t outputLPtr, uintptr_t outputRPtr, int numSamples) {
@@ -1264,7 +1294,12 @@ public:
         for (int i = 0; i < MAX_POLY; i++) {
             if (m_voices[i].active) {
                 double freq = 440.0 * pow(2.0, (m_voices[i].midi_note - 69 + semitones) / 12.0);
-                m_voices[i].sample_inc = freq * 128.0 / m_sampleRate;
+                if (m_voices[i].sample_mode) {
+                    double playRate = 14080.0 * (freq / 261.63);
+                    m_voices[i].sample_inc = playRate / m_sampleRate;
+                } else {
+                    m_voices[i].sample_inc = freq * 128.0 / m_sampleRate;
+                }
             }
         }
     }
