@@ -347,7 +347,7 @@ export const MIDILearnModal: React.FC<MIDILearnModalProps> = ({ isOpen, onClose 
   );
 
   return (
-    <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-[9990]">
+    <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-[99990]">
       <div className="bg-dark-bg border border-dark-border rounded-lg w-[800px] max-h-[85vh] flex flex-col">
         {/* Header */}
         <div className="flex items-center justify-between px-4 py-3 border-b border-dark-border">

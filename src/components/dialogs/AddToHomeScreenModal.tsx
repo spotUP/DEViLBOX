@@ -65,12 +65,12 @@ export const AddToHomeScreenModal: React.FC<AddToHomeScreenModalProps> = ({
     <>
       {/* Backdrop */}
       <div
-        className="fixed inset-0 bg-black/70 z-[10001]"
+        className="fixed inset-0 bg-black/70 z-[99990]"
         onClick={onClose}
       />
 
       {/* Modal */}
-      <div className="fixed inset-x-4 top-1/2 -translate-y-1/2 max-w-md mx-auto bg-dark-bgTertiary border-2 border-dark-border rounded-lg shadow-2xl z-[10002]">
+      <div className="fixed inset-x-4 top-1/2 -translate-y-1/2 max-w-md mx-auto bg-dark-bgTertiary border-2 border-dark-border rounded-lg shadow-2xl z-[99990]">
         {/* Header */}
         <div className="flex items-center justify-between p-4 border-b border-dark-border bg-dark-bgSecondary">
           <h2 className="font-bold text-lg text-text-primary">Add to Home Screen</h2>

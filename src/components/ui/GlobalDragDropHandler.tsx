@@ -265,7 +265,7 @@ export const GlobalDragDropHandler: React.FC<GlobalDragDropHandlerProps> = ({
       
       {/* Drag overlay */}
       {isDragging && (
-        <div className="fixed inset-0 z-[9999] bg-black/80 flex items-center justify-center pointer-events-none animate-fade-in">
+        <div className="fixed inset-0 z-[99990] bg-black/80 flex items-center justify-center pointer-events-none animate-fade-in">
           <div className="bg-dark-bgPrimary border-2 border-accent-primary border-dashed rounded-xl p-12 flex flex-col items-center gap-4 shadow-2xl">
             <Upload size={64} className="text-accent-primary animate-bounce" />
             <div className="text-center">

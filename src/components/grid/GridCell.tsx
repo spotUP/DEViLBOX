@@ -125,7 +125,7 @@ const NoteContextMenu: React.FC<NoteContextMenuProps> = ({
       <div className="fixed inset-0 z-40" onClick={onClose} />
       {/* Menu */}
       <div
-        className="fixed z-[9990] bg-dark-bgSecondary border border-dark-border rounded shadow-lg py-1 min-w-[160px]"
+        className="fixed z-[99990] bg-dark-bgSecondary border border-dark-border rounded shadow-lg py-1 min-w-[160px]"
         style={{ left: x, top: y }}
       >
         <button

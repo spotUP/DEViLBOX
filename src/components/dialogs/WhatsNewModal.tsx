@@ -40,7 +40,7 @@ export const WhatsNewModal: React.FC<WhatsNewModalProps> = ({ onClose }) => {
   };
 
   return (
-    <div className="fixed inset-0 z-[9990] flex items-center justify-center bg-black/80">
+    <div className="fixed inset-0 z-[99990] flex items-center justify-center bg-black/80">
       <div className="w-full max-w-xl bg-dark-bgSecondary border border-dark-border rounded-xl shadow-2xl overflow-hidden">
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-4 bg-gradient-to-r from-accent-primary/20 to-purple-500/20 border-b border-dark-border">

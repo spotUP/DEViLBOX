@@ -101,7 +101,7 @@ export const PatternOrderModal: React.FC<PatternOrderModalProps> = ({ onClose })
 
   return (
     <div
-      className="fixed inset-0 bg-black/60 flex items-center justify-center z-[9999] p-4"
+      className="fixed inset-0 bg-black/60 flex items-center justify-center z-[99990] p-4"
       onClick={onClose}
     >
       <div

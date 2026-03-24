@@ -62,7 +62,7 @@ export const ModuleShelf: React.FC<ModuleShelfProps> = ({ onAddModule, prefix })
 
       {/* Dropdown menu */}
       {isOpen && (
-        <div className="absolute top-full left-0 mt-1 w-64 bg-dark-bgSecondary border border-dark-border rounded-lg shadow-2xl z-[9999] max-h-96 overflow-y-auto scrollbar-modern">
+        <div className="absolute top-full left-0 mt-1 w-64 bg-dark-bgSecondary border border-dark-border rounded-lg shadow-2xl z-[99990] max-h-96 overflow-y-auto scrollbar-modern">
           {categories.map((category) => {
             const modules = modulesByCategory[category];
             if (modules.length === 0) return null;

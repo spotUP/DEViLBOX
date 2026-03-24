@@ -604,7 +604,7 @@ export const InstrumentKnobPanel: React.FC = memo(() => {
             </span>
             <span className="text-text-muted">Popped Out</span>
           </div>
-          <div className="absolute top-0 right-0 z-[9990]">
+          <div className="absolute top-0 right-0 z-[99990]">
             <button
               className="p-2 text-text-secondary hover:text-text-primary bg-black/50 hover:bg-black/80 rounded-bl-lg flex items-center gap-1 text-xs"
               onClick={() => setTB303PoppedOut(false)}
@@ -650,7 +650,7 @@ export const InstrumentKnobPanel: React.FC = memo(() => {
       </div>
 
       {/* Action buttons — always pinned to top-right */}
-      <div className="absolute top-1 right-1 z-[9990] flex items-center gap-1">
+      <div className="absolute top-1 right-1 z-[99990] flex items-center gap-1">
         {tb303Collapsed ? (
           <button
             className="p-2 text-text-secondary hover:text-text-primary bg-black/50 hover:bg-black/80 rounded-bl-lg"

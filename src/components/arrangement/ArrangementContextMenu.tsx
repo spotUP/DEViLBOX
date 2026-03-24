@@ -136,7 +136,7 @@ export const ArrangementContextMenu: React.FC = () => {
   return createPortal(
     <div
       ref={menuRef}
-      className="fixed z-[10000] bg-dark-bgSecondary border border-dark-border rounded-lg shadow-xl py-1 text-xs"
+      className="fixed z-[99990] bg-dark-bgSecondary border border-dark-border rounded-lg shadow-xl py-1 text-xs"
       style={{ left, top, width: MENU_W }}
       onMouseDown={e => e.stopPropagation()}
     >

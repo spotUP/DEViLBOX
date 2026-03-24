@@ -381,10 +381,10 @@ export function MixerScene({ viewRef }: { viewRef: React.RefObject<HTMLDivElemen
     }>();
 
     // Classify meshes
-    let meshCount = 0;
+    let _meshCount = 0;
     cloned.traverse((child) => {
       if (!('isMesh' in child && child.isMesh)) return;
-      meshCount++;
+      _meshCount++;
       const mesh = child as THREE.Mesh;
       const sName = getControlName(mesh);
 

@@ -464,7 +464,7 @@ export const AmigaPalModal: React.FC<AmigaPalModalProps> = ({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-[9990] flex items-center justify-center bg-black/90 p-4">
+    <div className="fixed inset-0 z-[99990] flex items-center justify-center bg-black/90 p-4">
       <div className="w-full max-w-[640px] max-h-full bg-ft2-bg flex flex-col overflow-hidden text-ft2-text font-mono text-xs border-2 border-ft2-border rounded shadow-2xl">
         {/* Title Bar */}
         <div className="flex items-center justify-between px-3 py-2 border-b-2 border-ft2-border bg-ft2-header">

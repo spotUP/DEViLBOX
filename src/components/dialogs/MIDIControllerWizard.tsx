@@ -149,7 +149,7 @@ export const MIDIControllerWizard: React.FC = () => {
   const steps: WizardStep[] = ['detect', 'select', 'profile', 'done'];
   const stepLabels = ['Detect', 'Device', 'Profile', 'Ready'];
 
-  const overlayClass = 'fixed inset-0 z-[9999] flex items-center justify-center bg-black/70 backdrop-blur-sm';
+  const overlayClass = 'fixed inset-0 z-[99990] flex items-center justify-center bg-black/70 backdrop-blur-sm';
   const panelClass = 'bg-dark-bgPrimary border border-dark-border rounded-xl shadow-2xl w-full max-w-[90vw] md:max-w-[480px] max-h-[85vh] overflow-hidden';
 
   return (

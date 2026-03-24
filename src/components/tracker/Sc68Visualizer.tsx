@@ -92,7 +92,7 @@ export const Sc68Visualizer: React.FC = () => {
             for (let x = 0; x < w; x++) {
               const idx = Math.floor(x * waveform.length / w);
               const y = midY - waveform[idx] * amp;
-              x === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+              if (x === 0) { ctx.moveTo(x, y); } else { ctx.lineTo(x, y); }
             }
             ctx.stroke();
             // Main line
@@ -102,7 +102,7 @@ export const Sc68Visualizer: React.FC = () => {
             for (let x = 0; x < w; x++) {
               const idx = Math.floor(x * waveform.length / w);
               const y = midY - waveform[idx] * amp;
-              x === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+              if (x === 0) { ctx.moveTo(x, y); } else { ctx.lineTo(x, y); }
             }
             ctx.stroke();
           }
@@ -142,7 +142,7 @@ export const Sc68Visualizer: React.FC = () => {
             for (let i = 0; i < half; i++) {
               const x = cx + waveform[i] * radius;
               const y = cy - waveform[i + half] * radius;
-              i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+              if (i === 0) { ctx.moveTo(x, y); } else { ctx.lineTo(x, y); }
             }
             ctx.stroke();
           }
