@@ -91,8 +91,11 @@ export const useTrackerInput = () => {
 
   const pattern = patterns[currentPatternIndex];
 
-  // A pattern is read-only when it was imported in UADE classic (playback-only) mode.
-  const isPatternEditable = pattern?.importMetadata?.sourceFormat !== 'UADE';
+  // A pattern is read-only when it was imported from a playback-only format
+  // (UADE classic mode, C64 SID files). Editing has no effect on playback
+  // because native engines play the raw binary, not the extracted patterns.
+  const sourceFormat = pattern?.importMetadata?.sourceFormat;
+  const isPatternEditable = sourceFormat !== 'UADE' && sourceFormat !== 'SID';
 
   // Track last Esc press for double-Esc panic (kill all notes)
   const lastEscPressRef = useRef<number>(0);
