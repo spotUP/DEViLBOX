@@ -2178,6 +2178,16 @@ export const FORMAT_REGISTRY: FormatDefinition[] = [
     ['tfhd1.5', 'TFMX HD 1.5'], ['tfhd7v', 'TFMX HD 7V'], ['tfhdpro', 'TFMX HD Pro'],
     ['tfmx1.5', 'TFMX 1.5'], ['tfmx7v', 'TFMX 7V'], ['tfmxpro', 'TFMX Pro'],
     ['vss', 'Voodoo Supreme Synthesizer'],
+    // Additional UADE-only prefixes (added for format test coverage)
+    ['ah', 'Ashley Hogg'], ['bvs', 'Beathoven Synthesizer v2'],
+    ['cba', 'ChipTracker Archive'], ['chip', 'ChipTracker'],
+    ['cd', 'Core Design'], ['dlw', 'Dave Lowe WTD'],
+    ['fp2', 'Future Player 2'], ['fredmon', 'Fred Editor Monitor'],
+    ['mxt', 'MaxTrax'], ['nt', 'NoiseTracker'],
+    ['ntsp', 'NTSP'], ['psum', 'Paul Summers'],
+    ['rhst', 'Rob Hubbard ST'], ['rkl', 'Ron Klaren'],
+    ['sc2', 'Sean Connolly 2'], ['sil', 'Silmarils v2'],
+    ['tomy', 'TomyTracker'], ['st', 'SoundTracker prefix'],
   ] as const).map(([prefix, label]): FormatDefinition => ({
     key: `uade_${prefix.replace(/[.-]/g, '_')}`,
     label,
