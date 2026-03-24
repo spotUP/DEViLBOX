@@ -22,6 +22,8 @@ import { playRow } from '@engine/keyboard/commands/playRow';
 import { playFromCursor } from '@engine/keyboard/commands/playFromCursor';
 import { clonePattern } from '@engine/keyboard/commands/clonePattern';
 import { playStopToggle, playPattern, playSong, stopPlayback } from '@engine/keyboard/commands/transport';
+import { getTrackerReplayer } from '@engine/TrackerReplayer';
+import { useTransportStore } from '@stores/useTransportStore';
 import {
   cursorUp, cursorDown, cursorLeft, cursorRight,
   cursorPageUp, cursorPageDown, cursorHome, cursorEnd,
@@ -1858,16 +1860,27 @@ export function useGlobalKeyboardHandler(options: UseGlobalKeyboardHandlerOption
         return;
       }
 
-      // ProTracker: Right Shift = play song, Right Alt/Option = play pattern
-      // These are bare modifier keys that can't be represented in the scheme JSON.
-      // On the Amiga, Right Amiga key = play song from start.
+      // ProTracker: Right Shift = play song from start, Right Alt/Option = play pattern from start
+      // When already playing, directly set replayer position — bypasses React state entirely.
       if (e.code === 'ShiftRight' || e.code === 'AltRight') {
         e.preventDefault();
         e.stopPropagation();
-        if (e.code === 'ShiftRight') {
-          playSong();
+        const replayer = getTrackerReplayer();
+        const store = useTransportStore.getState();
+        if (store.isPlaying || replayer.isPlaying()) {
+          // Direct position reset — no React, no store updates, no effect triggers
+          if (e.code === 'ShiftRight') {
+            replayer.forcePosition(0, 0);
+          } else {
+            replayer.forcePosition(replayer.getSongPos(), 0);
+          }
         } else {
-          playPattern();
+          // Not playing — start fresh
+          if (e.code === 'ShiftRight') {
+            playSong();
+          } else {
+            playPattern();
+          }
         }
         return;
       }
