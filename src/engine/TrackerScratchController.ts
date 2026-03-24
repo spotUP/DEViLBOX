@@ -479,12 +479,16 @@ export class TrackerScratchController {
       this.scratchBuffer.unfreezeCapture();
     }
 
-    // Stop the tracker replayer and full transport chain
+    // Stop the tracker replayer and full transport chain.
+    // Keep gain at 0 during stop — WASM engines (Hively, JamCracker, etc.) process
+    // their stop message asynchronously via postMessage. Restoring gain before the
+    // stop takes effect would briefly unmute the engine, causing audible playback.
     const replayer = getTrackerReplayer();
-    replayer.getFullOutput().gain.rampTo(this.originalGainValue, 0.01);
     replayer.stop();
     useTransportStore.getState().stop();
     getToneEngine().stop();
+    // Restore gain AFTER stop so future playback isn't muted
+    replayer.getFullOutput().gain.value = this.originalGainValue;
 
     // Reset physics to normal state
     this.physics.reset();
