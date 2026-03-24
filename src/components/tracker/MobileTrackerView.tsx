@@ -290,40 +290,11 @@ export const MobileTrackerView: React.FC<MobileTrackerViewProps> = ({
 
         {activeTab === 'instruments' && (
           <div className="h-full flex flex-col">
-            {/* Sticky Header for Instruments Tab */}
-            <div className="flex-shrink-0 sticky top-0 z-10 bg-dark-bg/95 backdrop-blur-md border-b border-dark-border shadow-lg">
-              <div className="p-3">
-                <div className="flex items-center justify-between mb-2">
-                  <h3 className="text-[10px] font-black text-text-muted uppercase tracking-widest flex items-center gap-1.5">
-                    <SlidersHorizontal size={12} className="text-accent-primary" />
-                    Live Ops
-                  </h3>
-                  <div className="h-px flex-1 bg-dark-border mx-3 opacity-30" />
-                </div>
-                <div className="overflow-x-auto pb-1 no-scrollbar">
-                  <FT2Toolbar
-                    onShowPatterns={onShowPatterns}
-                    onShowExport={onShowExport}
-                    onShowHelp={onShowHelp}
-                    onShowMasterFX={onShowMasterFX}
-                    onShowInstruments={onShowInstruments}
-                    showPatterns={showPatterns}
-                    showMasterFX={showMasterFX}
-                    compact={true}
-                  />
-                </div>
-              </div>
-            </div>
-
-            {/* Scrollable Instrument List */}
-            <div 
+            {/* Instrument list only — synth editor opens via Edit button */}
+            <div
               className="flex-1 overflow-y-auto p-2"
               style={{ paddingBottom: 'calc(64px + env(safe-area-inset-bottom, 0px))' }}
             >
-              <div className="mb-4">
-                <TB303KnobPanel />
-              </div>
-              
               <h3 className="text-[10px] font-black text-text-muted uppercase tracking-widest mb-3 px-2 flex items-center gap-1.5">
                 <Music2 size={12} className="text-accent-primary" />
                 Instruments
