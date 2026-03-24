@@ -7,7 +7,6 @@
  */
 
 import { useCallback, useMemo } from 'react';
-import { useTransportStore } from '@stores/useTransportStore';
 import { useGTUltraStore } from '../../stores/useGTUltraStore';
 import { gtUltraToFormatChannels, resolveOrderPattern } from './gtuAdapter';
 import type { FormatChannel } from '@/components/shared/format-editor-types';
@@ -23,16 +22,18 @@ export interface GTUltraFormatData {
 export function useGTUltraFormatData(): GTUltraFormatData {
   const sidCount = useGTUltraStore((s) => s.sidCount);
   const channelCount = sidCount * 3;
-  const currentRow = useTransportStore((s) => s.currentRow);
-  const isPlaying = useTransportStore((s) => s.isPlaying);
+  // GT Ultra has its own engine — read playback state from the GT Ultra store,
+  // NOT from useTransportStore (which tracks the standard tracker engine).
+  const gtPlaying = useGTUltraStore((s) => s.playing);
+  const playbackRow = useGTUltraStore((s) => s.playbackPos.row);
   const orderData = useGTUltraStore((s) => s.orderData);
   const patternData = useGTUltraStore((s) => s.patternData);
   const playbackPos = useGTUltraStore((s) => s.playbackPos);
   const orderCursor = useGTUltraStore((s) => s.orderCursor);
   const tableData = useGTUltraStore((s) => s.tableData);
 
-  const currentOrderPos = isPlaying ? playbackPos.songPos : orderCursor;
-  const displayRow = isPlaying ? playbackPos.row : currentRow;
+  const currentOrderPos = gtPlaying ? playbackPos.songPos : orderCursor;
+  const displayRow = gtPlaying ? playbackRow : 0;
 
   const channels = useMemo(
     () => gtUltraToFormatChannels(channelCount, orderData, patternData, currentOrderPos, tableData),
@@ -68,5 +69,5 @@ export function useGTUltraFormatData(): GTUltraFormatData {
     [currentOrderPos, channelCount],
   );
 
-  return { channels, currentRow: displayRow, isPlaying, channelCount, handleCellChange };
+  return { channels, currentRow: displayRow, isPlaying: gtPlaying, channelCount, handleCellChange };
 }
