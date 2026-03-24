@@ -38,19 +38,11 @@ export function playStopToggle(): boolean {
 }
 
 /**
- * Play pattern - Start playing current pattern from beginning.
- * If already playing, seek replayer to row 0 without stopping.
+ * Play pattern - Always restarts from row 0 of current pattern.
+ * If already playing, seeks without stopping. If not, starts playback.
  */
 export function playPattern(): boolean {
   const { setCurrentRow, play, isPlaying, setIsLooping } = useTransportStore.getState();
-
-  if (isPlaying) {
-    // Already playing — seek replayer to row 0 of current pattern
-    setIsLooping(true);
-    setCurrentRow(0);
-    getTrackerReplayer().seekTo(getTrackerReplayer().getSongPos(), 0);
-    return true;
-  }
 
   // CRITICAL for iOS: Tone.start() MUST be called synchronously within user gesture
   unlockIOSAudio();
@@ -59,31 +51,32 @@ export function playPattern(): boolean {
   setIsLooping(true);
   setCurrentRow(0);
 
-  getToneEngine()
-    .init()
-    .then(() => play())
-    .catch((error) => {
-      console.error('[playPattern] Failed to initialize audio engine:', error);
-    });
+  // Seek replayer if it's active (covers rapid re-trigger while already playing)
+  const replayer = getTrackerReplayer();
+  if (replayer.isPlaying()) {
+    replayer.seekTo(replayer.getSongPos(), 0);
+    return true;
+  }
+
+  // Not playing — start fresh
+  if (!isPlaying) {
+    getToneEngine()
+      .init()
+      .then(() => play())
+      .catch((error) => {
+        console.error('[playPattern] Failed to initialize audio engine:', error);
+      });
+  }
 
   return true;
 }
 
 /**
- * Play song - Start playing from beginning of song.
- * If already playing, seek replayer to pattern 0 / row 0 without stopping.
+ * Play song - Always restarts from pattern 0 / row 0.
+ * If already playing, seeks without stopping. If not, starts playback.
  */
 export function playSong(): boolean {
   const { setCurrentRow, setCurrentPattern, play, isPlaying, setIsLooping } = useTransportStore.getState();
-
-  if (isPlaying) {
-    // Already playing — seek replayer to song start
-    setIsLooping(false);
-    setCurrentPattern(0);
-    setCurrentRow(0);
-    getTrackerReplayer().seekTo(0, 0);
-    return true;
-  }
 
   // CRITICAL for iOS: Tone.start() MUST be called synchronously within user gesture
   unlockIOSAudio();
@@ -93,12 +86,22 @@ export function playSong(): boolean {
   setCurrentPattern(0);
   setCurrentRow(0);
 
-  getToneEngine()
-    .init()
-    .then(() => play())
-    .catch((error) => {
-      console.error('[playSong] Failed to initialize audio engine:', error);
-    });
+  // Seek replayer if it's active (covers rapid re-trigger while already playing)
+  const replayer = getTrackerReplayer();
+  if (replayer.isPlaying()) {
+    replayer.seekTo(0, 0);
+    return true;
+  }
+
+  // Not playing — start fresh
+  if (!isPlaying) {
+    getToneEngine()
+      .init()
+      .then(() => play())
+      .catch((error) => {
+        console.error('[playSong] Failed to initialize audio engine:', error);
+      });
+  }
 
   return true;
 }
