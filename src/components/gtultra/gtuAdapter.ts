@@ -89,20 +89,34 @@ export const GTU_COLUMNS: ColumnDef[] = [
  * GT patterns are single-channel: each channel has its own order list pointing
  * to shared pattern numbers. This resolves each channel's current pattern and
  * builds the FormatChannel array from the raw Uint8Array pattern data.
+ *
+ * After the pattern channels, appends special channels for:
+ *   Orders (per SID-channel), Wave table, Pulse table, Filter table, Speed table
+ * These use the same column layout: note=value1, instrument=value2, command/data=0.
  */
 export function gtUltraToFormatChannels(
   channelCount: number,
   orderData: Record<number, Uint8Array>,
   patternData: Map<number, { length: number; data: Uint8Array }>,
   currentOrderPos: number,
+  tableData?: Record<string, { left: Uint8Array; right: Uint8Array }>,
 ): FormatChannel[] {
   const result: FormatChannel[] = [];
 
+  // Determine max pattern length for consistent row count
+  let maxPatLen = 64;
+  for (let ch = 0; ch < channelCount; ch++) {
+    const patIdx = resolveOrderPattern(orderData[ch], currentOrderPos);
+    const pat = patternData.get(patIdx);
+    if (pat && pat.length > maxPatLen) maxPatLen = pat.length;
+  }
+
+  // Pattern channels
   for (let ch = 0; ch < channelCount; ch++) {
     const patIdx = resolveOrderPattern(orderData[ch], currentOrderPos);
     const pat = patternData.get(patIdx);
     const rows: FormatCell[] = [];
-    const patLen = pat?.length ?? 64;
+    const patLen = pat?.length ?? maxPatLen;
 
     for (let row = 0; row < patLen; row++) {
       if (pat && row < pat.length) {
@@ -121,6 +135,43 @@ export function gtUltraToFormatChannels(
     result.push({
       label: `CH${(ch + 1).toString().padStart(2, '0')}`,
       patternLength: patLen,
+      rows,
+    });
+  }
+
+  // Order channels — one per SID channel, showing the order list as a vertical column
+  for (let ch = 0; ch < channelCount; ch++) {
+    const order = orderData[ch];
+    const len = order?.length ?? 0;
+    const rows: FormatCell[] = [];
+    for (let i = 0; i < Math.max(len, maxPatLen); i++) {
+      const val = i < len ? (order[i] ?? 0) : 0;
+      rows.push({ note: val, instrument: 0, command: 0, data: 0 });
+    }
+    result.push({
+      label: `ORD${ch + 1}`,
+      patternLength: Math.max(len, maxPatLen),
+      rows,
+    });
+  }
+
+  // Table channels — Wave, Pulse, Filter, Speed (L + R as note + instrument columns)
+  const TABLE_NAMES = ['WAVE', 'PULSE', 'FLTR', 'SPEED'];
+  const TABLE_KEYS = ['wave', 'pulse', 'filter', 'speed'];
+  for (let t = 0; t < 4; t++) {
+    const tbl = tableData?.[TABLE_KEYS[t]];
+    const rows: FormatCell[] = [];
+    for (let i = 0; i < 255; i++) {
+      rows.push({
+        note: tbl ? tbl.left[i] : 0,
+        instrument: tbl ? tbl.right[i] : 0,
+        command: 0,
+        data: 0,
+      });
+    }
+    result.push({
+      label: TABLE_NAMES[t],
+      patternLength: 255,
       rows,
     });
   }

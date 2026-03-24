@@ -1,25 +1,22 @@
 /**
  * GTUltraView — Main GoatTracker Ultra editor layout (DOM mode).
  *
- * AHX-style layout (matching HivelyView pattern):
+ * AHX-style layout:
  * ┌──────────────────────────────────────────────┐
  * │ GTToolbar (Save/PRG/SID/REC/JAM/SID config)  │  ~36px
  * ├──────────────────────────────────────────────┤
- * │ [Orders][Wave][Pulse][Filter][Speed] ← tabs   │
- * │ GTOrderMatrix (order lists / table editors)   │  160px
- * ├──────────────────────────────────────────────┤
- * │ PatternEditorCanvas (via gtuAdapter columns)  │  flex
+ * │ PatternEditorCanvas (pattern + order + table  │  flex
+ * │ channels side by side)                        │
  * └──────────────────────────────────────────────┘
  *
- * Instruments show in the standard DEViLBOX instrument panel (right sidebar)
- * via GTUltraControls in the SynthTypeDispatcher.
+ * Orders and tables (Wave/Pulse/Filter/Speed) are integrated as
+ * special channels on the right side of the pattern editor.
  */
 
 import React, { useEffect, useRef, useState } from 'react';
 import { PatternEditorCanvas } from '@/components/tracker/PatternEditorCanvas';
 import { GTU_COLUMNS } from './gtuAdapter';
 import { GTToolbar } from './GTToolbar';
-import { GTOrderMatrix, GT_ORDER_MATRIX_HEIGHT } from './GTOrderMatrix';
 import { useGTKeyboardHandler } from './GTKeyboardHandler';
 import { useGTUltraEngineInit } from '../../engine/gtultra/useGTUltraEngineInit';
 import { useGTUltraFormatData } from './useGTUltraFormatData';
@@ -30,7 +27,7 @@ export const GTUltraView: React.FC<{ width?: number; height?: number }> = () => 
   const { channels, currentRow, isPlaying, handleCellChange } = useGTUltraFormatData();
 
   const containerRef = useRef<HTMLDivElement>(null);
-  const [containerWidth, setContainerWidth] = useState(800);
+  const [_containerWidth, setContainerWidth] = useState(800);
 
   useEffect(() => {
     const el = containerRef.current;
@@ -56,10 +53,6 @@ export const GTUltraView: React.FC<{ width?: number; height?: number }> = () => 
     }}>
       <div style={{ height: `${TOOLBAR_H}px`, flexShrink: 0 }}>
         <GTToolbar />
-      </div>
-
-      <div style={{ height: `${GT_ORDER_MATRIX_HEIGHT}px`, flexShrink: 0 }}>
-        <GTOrderMatrix width={containerWidth} height={GT_ORDER_MATRIX_HEIGHT} />
       </div>
 
       <div style={{ flex: 1, minHeight: 0, overflow: 'hidden' }}>
