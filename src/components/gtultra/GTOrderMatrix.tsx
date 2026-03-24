@@ -1,20 +1,21 @@
 /**
  * GTOrderMatrix — Orders editor panel above the pattern editor.
- * Uses theme CSS variables for background colors to stay in sync with the pattern editor.
+ * Uses SequenceMatrixEditor for shared chrome/canvas/collapse.
  */
 
-import React, { useRef, useEffect, useState, useCallback } from 'react';
+import React, { useState, useCallback } from 'react';
 import { useGTUltraStore } from '../../stores/useGTUltraStore';
-import { ChevronDown, ChevronRight } from 'lucide-react';
+import {
+  SequenceMatrixEditor, MATRIX_CHAR_W, MATRIX_ROW_H, MATRIX_HEADER_H,
+  MATRIX_HEIGHT, MATRIX_COLLAPSED_HEIGHT,
+  type MatrixRenderContext,
+} from '../shared/SequenceMatrixEditor';
 
-export const GT_ORDER_MATRIX_HEIGHT = 200;
-export const GT_ORDER_MATRIX_COLLAPSED_HEIGHT = 28;
+export const GT_ORDER_MATRIX_HEIGHT = MATRIX_HEIGHT;
+export const GT_ORDER_MATRIX_COLLAPSED_HEIGHT = MATRIX_COLLAPSED_HEIGHT;
 
-const CHAR_W = 10;
-const ROW_H = 20;
-const HEADER_H = 24;
-const FONT_SIZE = '14px';
-const FONT = `${FONT_SIZE} "JetBrains Mono", "Fira Code", monospace`;
+const POS_COL_W = MATRIX_CHAR_W * 4;
+const CH_COL_W = MATRIX_CHAR_W * 4;
 
 interface GTOrderMatrixProps {
   width: number;
@@ -41,15 +42,9 @@ function formatOrderVal(val: number): string {
   return val.toString(16).toUpperCase().padStart(2, '0');
 }
 
-/** Read a CSS variable from :root, with fallback */
-function cssVar(name: string, fallback: string): string {
-  return getComputedStyle(document.documentElement).getPropertyValue(name).trim() || fallback;
-}
+// ─── Component ──────────────────────────────────────────────────────────────
 
-// ─── Orders Canvas ──────────────────────────────────────────────────────────
-
-const OrdersCanvas: React.FC<{ width: number; height: number }> = ({ width, height }) => {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
+export const GTOrderMatrix: React.FC<GTOrderMatrixProps> = ({ width, height, collapsed, onToggleCollapse }) => {
   const orderData = useGTUltraStore((s) => s.orderData);
   const playbackPos = useGTUltraStore((s) => s.playbackPos);
   const orderCursor = useGTUltraStore((s) => s.orderCursor);
@@ -59,134 +54,67 @@ const OrdersCanvas: React.FC<{ width: number; height: number }> = ({ width, heig
   const sidCount = useGTUltraStore((s) => s.sidCount);
   const engine = useGTUltraStore((s) => s.engine);
 
-  const [scrollOffset, setScrollOffset] = useState(0);
   const [hexDigit, setHexDigit] = useState<number | null>(null);
 
   const channelCount = sidCount * 3;
-  const contentH = height - HEADER_H;
-  const visibleRows = Math.floor(contentH / ROW_H);
   const totalLen = orderData.length > 0 ? orderData[0].length : 0;
 
-  // Auto-scroll to keep cursor visible
-  useEffect(() => {
-    if (orderCursor < scrollOffset) {
-      setScrollOffset(orderCursor);
-    } else if (orderCursor >= scrollOffset + visibleRows) {
-      setScrollOffset(orderCursor - visibleRows + 1);
-    }
-  }, [orderCursor, scrollOffset, visibleRows]);
-
-  // Render
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-
-    // Read theme colors from CSS variables (set by useThemeStore)
-    const bgEven      = cssVar('--color-tracker-row-even', '#1a1a2e');
-    const bgHighlight = cssVar('--color-tracker-row-highlight', '#222244');
-    const bgCurrent   = cssVar('--color-tracker-row-current', '#2a2a50');
-    const textMuted   = cssVar('--color-text-muted', '#555');
-    const accent      = cssVar('--color-accent', '#ff6666');
-
-    const dpr = window.devicePixelRatio || 1;
-    canvas.width = width * dpr;
-    canvas.height = height * dpr;
-    ctx.scale(dpr, dpr);
-
-    ctx.fillStyle = bgEven;
-    ctx.fillRect(0, 0, width, height);
-    ctx.font = FONT;
-    ctx.textBaseline = 'middle';
+  const onRender = useCallback((rc: MatrixRenderContext) => {
+    const { ctx, width: w, theme, visibleRows, scrollOffset } = rc;
 
     // Column header
-    const posColW = CHAR_W * 4;
-    const chColW = CHAR_W * 4;
-    const hdrY = 0;
-
-    ctx.fillStyle = bgHighlight;
-    ctx.fillRect(0, hdrY, width, HEADER_H);
-    ctx.fillStyle = textMuted;
-    ctx.fillText('Pos', 4, hdrY + HEADER_H / 2);
+    ctx.fillStyle = theme.bgHighlight;
+    ctx.fillRect(0, 0, w, MATRIX_HEADER_H);
+    ctx.fillStyle = theme.textMuted;
+    ctx.fillText('Pos', 4, MATRIX_HEADER_H / 2);
     for (let ch = 0; ch < channelCount; ch++) {
-      ctx.fillStyle = ch === orderChannelCol ? '#ccc' : textMuted;
-      ctx.fillText(`C${ch + 1}`, posColW + ch * chColW, hdrY + HEADER_H / 2);
+      ctx.fillStyle = ch === orderChannelCol ? '#ccc' : theme.textMuted;
+      ctx.fillText(`C${ch + 1}`, POS_COL_W + ch * CH_COL_W, MATRIX_HEADER_H / 2);
     }
 
-    const dataY0 = HEADER_H;
-
-    // Rows
+    const dataY0 = MATRIX_HEADER_H;
     for (let vi = 0; vi < visibleRows; vi++) {
       const idx = scrollOffset + vi;
       if (idx >= totalLen) break;
-      const y = dataY0 + vi * ROW_H;
+      const y = dataY0 + vi * MATRIX_ROW_H;
       const isPlay = idx === playbackPos.position;
       const isCursor = idx === orderCursor;
 
       if (isPlay) {
-        ctx.fillStyle = bgCurrent;
-        ctx.fillRect(0, y, width, ROW_H);
+        ctx.fillStyle = theme.bgCurrent;
+        ctx.fillRect(0, y, w, MATRIX_ROW_H);
       }
       if (isCursor) {
-        const activeX = posColW + orderChannelCol * chColW;
+        const activeX = POS_COL_W + orderChannelCol * CH_COL_W;
         ctx.fillStyle = 'rgba(255,255,255,0.08)';
-        ctx.fillRect(activeX - 2, y, chColW, ROW_H);
+        ctx.fillRect(activeX - 2, y, CH_COL_W, MATRIX_ROW_H);
         ctx.strokeStyle = 'rgba(255,255,255,0.4)';
         ctx.lineWidth = 1;
-        ctx.strokeRect(0.5, y + 0.5, width - 1, ROW_H - 1);
+        ctx.strokeRect(0.5, y + 0.5, w - 1, MATRIX_ROW_H - 1);
       }
 
-      ctx.fillStyle = isPlay ? accent : textMuted;
-      ctx.fillText(idx.toString(16).toUpperCase().padStart(2, '0'), 4, y + ROW_H / 2);
+      ctx.fillStyle = isPlay ? theme.accent : theme.textMuted;
+      ctx.fillText(idx.toString(16).toUpperCase().padStart(2, '0'), 4, y + MATRIX_ROW_H / 2);
 
       for (let ch = 0; ch < channelCount; ch++) {
         const val = orderData[ch]?.[idx] ?? 0;
         ctx.fillStyle = getOrderColor(val);
-        ctx.fillText(formatOrderVal(val), posColW + ch * chColW, y + ROW_H / 2);
+        ctx.fillText(formatOrderVal(val), POS_COL_W + ch * CH_COL_W, y + MATRIX_ROW_H / 2);
       }
     }
 
     // Hex entry indicator
     if (hexDigit !== null) {
-      const cx = posColW + orderChannelCol * chColW;
-      const cy = dataY0 + (orderCursor - scrollOffset) * ROW_H;
-      if (cy >= dataY0 && cy < height) {
+      const cx = POS_COL_W + orderChannelCol * CH_COL_W;
+      const cy = dataY0 + (orderCursor - scrollOffset) * MATRIX_ROW_H;
+      if (cy >= dataY0 && cy < rc.height) {
         ctx.fillStyle = 'rgba(255, 102, 102, 0.3)';
-        ctx.fillRect(cx - 2, cy, CHAR_W, ROW_H);
-        ctx.fillStyle = accent;
-        ctx.fillText(hexDigit.toString(16).toUpperCase(), cx, cy + ROW_H / 2);
+        ctx.fillRect(cx - 2, cy, MATRIX_CHAR_W, MATRIX_ROW_H);
+        ctx.fillStyle = theme.accent;
+        ctx.fillText(hexDigit.toString(16).toUpperCase(), cx, cy + MATRIX_ROW_H / 2);
       }
     }
-  }, [width, height, orderData, playbackPos.position, orderCursor, orderChannelCol,
-      channelCount, scrollOffset, visibleRows, totalLen, hexDigit]);
-
-  const handleWheel = useCallback((e: React.WheelEvent) => {
-    e.preventDefault();
-    const delta = e.deltaY > 0 ? 3 : -3;
-    setScrollOffset((s) => Math.max(0, Math.min(totalLen - visibleRows, s + delta)));
-  }, [totalLen, visibleRows]);
-
-  const handleClick = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
-    const rect = canvasRef.current!.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
-    const dataY0 = HEADER_H;
-    if (y < dataY0) return;
-    const idx = scrollOffset + Math.floor((y - dataY0) / ROW_H);
-    if (idx >= totalLen) return;
-    setOrderCursor(idx);
-
-    const posColW = CHAR_W * 4;
-    const chColW = CHAR_W * 4;
-    const relX = x - posColW;
-    if (relX >= 0) {
-      const ch = Math.min(channelCount - 1, Math.floor(relX / chColW));
-      setOrderChannelCol(ch);
-    }
-    setHexDigit(null);
-    canvasRef.current?.focus();
-  }, [scrollOffset, totalLen, setOrderCursor, setOrderChannelCol, width, channelCount]);
+  }, [orderData, playbackPos.position, orderCursor, orderChannelCol, channelCount, totalLen, hexDigit]);
 
   const handleDoubleClick = useCallback(() => {
     if (engine) {
@@ -196,25 +124,35 @@ const OrdersCanvas: React.FC<{ width: number; height: number }> = ({ width, heig
     }
   }, [engine, orderCursor]);
 
-  const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
-    const { key } = e;
+  const onClick = useCallback((x: number, y: number, rc: MatrixRenderContext) => {
+    const idx = rc.scrollOffset + Math.floor(y / MATRIX_ROW_H);
+    if (idx >= totalLen) return;
+    setOrderCursor(idx);
+    const relX = x - POS_COL_W;
+    if (relX >= 0) {
+      const ch = Math.min(channelCount - 1, Math.floor(relX / CH_COL_W));
+      setOrderChannelCol(ch);
+    }
+    setHexDigit(null);
+  }, [totalLen, setOrderCursor, setOrderChannelCol, channelCount]);
+
+  const onKeyDown = useCallback((e: React.KeyboardEvent, rc: MatrixRenderContext): boolean => {
     e.stopPropagation();
+    const { key } = e;
 
-    if (key === 'ArrowUp') { e.preventDefault(); setOrderCursor(Math.max(0, orderCursor - 1)); setHexDigit(null); return; }
-    if (key === 'ArrowDown') { e.preventDefault(); setOrderCursor(Math.min(totalLen - 1, orderCursor + 1)); setHexDigit(null); return; }
-    if (key === 'ArrowLeft') { e.preventDefault(); setOrderChannelCol(Math.max(0, orderChannelCol - 1)); setHexDigit(null); return; }
-    if (key === 'ArrowRight') { e.preventDefault(); setOrderChannelCol(Math.min(channelCount - 1, orderChannelCol + 1)); setHexDigit(null); return; }
-    if (key === 'PageUp') { e.preventDefault(); setOrderCursor(Math.max(0, orderCursor - visibleRows)); setHexDigit(null); return; }
-    if (key === 'PageDown') { e.preventDefault(); setOrderCursor(Math.min(totalLen - 1, orderCursor + visibleRows)); setHexDigit(null); return; }
-    if (key === 'Home') { e.preventDefault(); setOrderCursor(0); setHexDigit(null); return; }
-    if (key === 'End') { e.preventDefault(); setOrderCursor(totalLen - 1); setHexDigit(null); return; }
-
-    if (key === 'Enter') { e.preventDefault(); handleDoubleClick(); return; }
-    if (key === 'Escape') { setHexDigit(null); return; }
+    if (key === 'ArrowUp') { setOrderCursor(Math.max(0, orderCursor - 1)); setHexDigit(null); return true; }
+    if (key === 'ArrowDown') { setOrderCursor(Math.min(totalLen - 1, orderCursor + 1)); setHexDigit(null); return true; }
+    if (key === 'ArrowLeft') { setOrderChannelCol(Math.max(0, orderChannelCol - 1)); setHexDigit(null); return true; }
+    if (key === 'ArrowRight') { setOrderChannelCol(Math.min(channelCount - 1, orderChannelCol + 1)); setHexDigit(null); return true; }
+    if (key === 'PageUp') { setOrderCursor(Math.max(0, orderCursor - rc.visibleRows)); setHexDigit(null); return true; }
+    if (key === 'PageDown') { setOrderCursor(Math.min(totalLen - 1, orderCursor + rc.visibleRows)); setHexDigit(null); return true; }
+    if (key === 'Home') { setOrderCursor(0); setHexDigit(null); return true; }
+    if (key === 'End') { setOrderCursor(totalLen - 1); setHexDigit(null); return true; }
+    if (key === 'Enter') { handleDoubleClick(); return true; }
+    if (key === 'Escape') { setHexDigit(null); return true; }
 
     const hexChar = key.toUpperCase();
     if (/^[0-9A-F]$/.test(hexChar)) {
-      e.preventDefault();
       const nibble = parseInt(hexChar, 16);
       if (hexDigit === null) {
         setHexDigit(nibble);
@@ -227,93 +165,26 @@ const OrdersCanvas: React.FC<{ width: number; height: number }> = ({ width, heig
         setHexDigit(null);
         setOrderCursor(Math.min(totalLen - 1, orderCursor + 1));
       }
+      return true;
     }
+    return false;
   }, [orderCursor, totalLen, orderChannelCol, channelCount, hexDigit, engine,
-      setOrderCursor, setOrderChannelCol, visibleRows, handleDoubleClick]);
+      setOrderCursor, setOrderChannelCol, handleDoubleClick]);
 
   return (
-    <canvas
-      ref={canvasRef}
-      style={{ width, height, outline: 'none', cursor: 'pointer' }}
-      tabIndex={0}
-      onClick={handleClick}
+    <SequenceMatrixEditor
+      label="ORDERS"
+      width={width}
+      height={height}
+      collapsed={collapsed}
+      onToggleCollapse={onToggleCollapse}
+      totalRows={totalLen}
+      activeRow={orderCursor}
+      onRender={onRender}
+      onClick={onClick}
       onDoubleClick={handleDoubleClick}
-      onKeyDown={handleKeyDown}
-      onWheel={handleWheel}
+      onKeyDown={onKeyDown}
+      renderDeps={[orderData, playbackPos.position, orderCursor, orderChannelCol, channelCount, totalLen, hexDigit]}
     />
-  );
-};
-
-// ─── Main Component ─────────────────────────────────────────────────────────
-
-export const GTOrderMatrix: React.FC<GTOrderMatrixProps> = ({ width, height, collapsed, onToggleCollapse }) => {
-  if (collapsed) {
-    return (
-      <div
-        style={{
-          width,
-          height: GT_ORDER_MATRIX_COLLAPSED_HEIGHT,
-          display: 'flex',
-          alignItems: 'center',
-          gap: 6,
-          padding: '0 8px',
-          background: 'var(--color-tracker-row-highlight)',
-          cursor: 'pointer',
-          borderBottom: '1px solid var(--color-tracker-border, var(--color-border))',
-        }}
-        onClick={onToggleCollapse}
-      >
-        <ChevronRight size={14} style={{ color: 'var(--color-text-muted)', flexShrink: 0 }} />
-        <span style={{
-          fontFamily: '"JetBrains Mono", "Fira Code", monospace',
-          fontSize: 12,
-          fontWeight: 700,
-          color: 'var(--color-accent)',
-        }}>
-          ORDERS
-        </span>
-      </div>
-    );
-  }
-
-  const canvasH = height - GT_ORDER_MATRIX_COLLAPSED_HEIGHT;
-
-  return (
-    <div
-      style={{
-        width,
-        height,
-        display: 'flex',
-        flexDirection: 'column',
-        background: 'var(--color-tracker-row-even)',
-      }}
-    >
-      {/* Collapse header */}
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: 6,
-          padding: '0 8px',
-          height: GT_ORDER_MATRIX_COLLAPSED_HEIGHT,
-          flexShrink: 0,
-          background: 'var(--color-tracker-row-highlight)',
-          cursor: 'pointer',
-          borderBottom: '1px solid var(--color-tracker-border, var(--color-border))',
-        }}
-        onClick={onToggleCollapse}
-      >
-        <ChevronDown size={14} style={{ color: 'var(--color-text-muted)', flexShrink: 0 }} />
-        <span style={{
-          fontFamily: '"JetBrains Mono", "Fira Code", monospace',
-          fontSize: 12,
-          fontWeight: 700,
-          color: 'var(--color-accent)',
-        }}>
-          ORDERS
-        </span>
-      </div>
-      <OrdersCanvas width={width} height={canvasH} />
-    </div>
   );
 };
