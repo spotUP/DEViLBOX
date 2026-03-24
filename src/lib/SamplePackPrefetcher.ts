@@ -17,6 +17,8 @@ const BATCH_SIZE = 4;
 function getAllSampleUrls(): string[] {
   const seen = new Set<string>();
   for (const pack of SAMPLE_PACKS) {
+    // Skip large packs (e.g. Fairlight CMI 3300+ samples) — load on demand only
+    if (pack.sampleCount > 1000) continue;
     for (const samples of Object.values(pack.samples)) {
       for (const sample of samples) {
         if (sample.url) seen.add(sample.url);
