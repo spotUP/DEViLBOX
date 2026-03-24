@@ -34,7 +34,7 @@ const BG = 0x0a0a0a;
 const VIS_W = 480;
 const BAR_H = 160;
 const WAVE_PREVIEW_H = 70;
-const CURVE_H = 180;
+const CURVE_H = 120;
 
 // ─── Props ───────────────────────────────────────────────────────────────────
 
@@ -244,29 +244,39 @@ export const PixiCMIKnobPanel: React.FC<PixiCMIKnobPanelProps> = ({ width }) => 
 
         {/* Page 7: HARMONIC */}
         {cmi.activeTab === 'harmonic' && (
-          <pixiContainer layout={{ width, height: CMI_CONTENT_H, flexDirection: 'row', paddingLeft: 12, paddingTop: 8, gap: 12 }}>
-            <pixiContainer layout={{ width: VIS_W, flexDirection: 'column', gap: 4 }}>
-              <pixiContainer eventMode="static" cursor="crosshair" onPointerDown={handleBarPointerDown} onPointerMove={handleBarPointerMove} onPointerUp={handleBarPointerUp} onPointerUpOutside={handleBarPointerUp} layout={{ width: VIS_W, height: BAR_H }}>
-                <pixiGraphics draw={drawHarmonicBars} layout={{ width: VIS_W, height: BAR_H }} />
-              </pixiContainer>
-              <pixiGraphics draw={drawWavePreview} layout={{ width: VIS_W, height: WAVE_PREVIEW_H }} />
-              <pixiContainer layout={{ flexDirection: 'row', gap: 8, alignItems: 'center', paddingTop: 2 }}>
-                <PixiButton label="APPLY TO ENGINE" variant="ft2" size="sm" onClick={cmi.syncHarmonicsToEngine} />
-                <pixiBitmapText text={cmi.sampleLoaded ? `Loaded: ${cmi.sampleName}` : 'Draw harmonics then click Apply'} style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 9, fill: 0xffffff }} tint={G_DIM} layout={{}} />
-              </pixiContainer>
+          <pixiContainer layout={{ width, height: CMI_CONTENT_H, flexDirection: 'column', paddingLeft: 12, paddingTop: 8, gap: 8 }}>
+            <pixiContainer layout={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+              <PixiKnob value={cmi.volume} min={0} max={255} defaultValue={200} onChange={(v) => cmi.handleParamChange('volume', v)} label="VOLUME" size="sm" color={G} formatValue={fmtInt} />
+              <PixiKnob value={cmi.waveSelect} min={0} max={7} defaultValue={0} onChange={(v) => cmi.handleParamChange('wave_select', v)} label="WAVE" size="sm" color={G} formatValue={fmtWave} />
             </pixiContainer>
-            <pixiContainer layout={{ flexDirection: 'column', gap: 4, paddingTop: 2 }}>
-              <pixiBitmapText text="PRESETS" style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 10, fill: 0xffffff }} tint={G_DIM} layout={{}} />
-              {WAVE_NAMES.map((name, i) => (
-                <PixiButton key={i} label={name.toUpperCase()} variant={cmi.waveBank === i ? 'ft2' : 'ghost'} size="sm" active={cmi.waveBank === i} onClick={() => cmi.selectWavePreset(i)} />
-              ))}
+            <pixiContainer layout={{ flexDirection: 'row', gap: 12 }}>
+              <pixiContainer layout={{ width: VIS_W, flexDirection: 'column', gap: 4 }}>
+                <pixiContainer eventMode="static" cursor="crosshair" onPointerDown={handleBarPointerDown} onPointerMove={handleBarPointerMove} onPointerUp={handleBarPointerUp} onPointerUpOutside={handleBarPointerUp} layout={{ width: VIS_W, height: BAR_H }}>
+                  <pixiGraphics draw={drawHarmonicBars} layout={{ width: VIS_W, height: BAR_H }} />
+                </pixiContainer>
+                <pixiGraphics draw={drawWavePreview} layout={{ width: VIS_W, height: WAVE_PREVIEW_H }} />
+                <pixiContainer layout={{ flexDirection: 'row', gap: 8, alignItems: 'center', paddingTop: 2 }}>
+                  <PixiButton label="APPLY TO ENGINE" variant="ft2" size="sm" onClick={cmi.syncHarmonicsToEngine} />
+                  <pixiBitmapText text={cmi.sampleLoaded ? `Loaded: ${cmi.sampleName}` : 'Draw harmonics then click Apply'} style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 9, fill: 0xffffff }} tint={G_DIM} layout={{}} />
+                </pixiContainer>
+              </pixiContainer>
+              <pixiContainer layout={{ flexDirection: 'column', gap: 4, paddingTop: 2 }}>
+                <pixiBitmapText text="PRESETS" style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 10, fill: 0xffffff }} tint={G_DIM} layout={{}} />
+                {WAVE_NAMES.map((name, i) => (
+                  <PixiButton key={i} label={name.toUpperCase()} variant={cmi.waveBank === i ? 'ft2' : 'ghost'} size="sm" active={cmi.waveBank === i} onClick={() => cmi.selectWavePreset(i)} />
+                ))}
+              </pixiContainer>
             </pixiContainer>
           </pixiContainer>
         )}
 
         {/* Page 5: WAVE */}
         {cmi.activeTab === 'wave' && (
-          <pixiContainer layout={{ width, height: CMI_CONTENT_H, flexDirection: 'row', paddingLeft: 12, paddingTop: 8, gap: 16 }}>
+          <pixiContainer layout={{ width, height: CMI_CONTENT_H, flexDirection: 'column', paddingLeft: 12, paddingTop: 8, gap: 8 }}>
+            <pixiContainer layout={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+              <PixiKnob value={cmi.waveSelect} min={0} max={7} defaultValue={0} onChange={(v) => cmi.handleParamChange('wave_select', v)} label="WAVE" size="sm" color={G} formatValue={fmtWave} />
+              <PixiKnob value={cmi.volume} min={0} max={255} defaultValue={200} onChange={(v) => cmi.handleParamChange('volume', v)} label="VOLUME" size="sm" color={G} formatValue={fmtInt} />
+            </pixiContainer>
             <pixiContainer layout={{ width: VIS_W, flexDirection: 'column', gap: 4 }}>
               <pixiBitmapText text={cmi.sampleLoaded ? cmi.sampleName : `BANK ${cmi.waveBank}: ${WAVE_NAMES[cmi.waveBank] ?? '?'}`} style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 11, fill: 0xffffff }} tint={G} layout={{}} />
               <pixiGraphics draw={drawWaveDisplay} layout={{ width: VIS_W, height: CURVE_H }} />
@@ -274,10 +284,6 @@ export const PixiCMIKnobPanel: React.FC<PixiCMIKnobPanelProps> = ({ width }) => 
                 <pixiBitmapText text={`${WAVE_SAMPLES} samples | 8-bit unsigned PCM | 16KB/voice`} style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 9, fill: 0xffffff }} tint={G_DIM} layout={{}} />
               </pixiContainer>
               <PixiButton label="LOAD SAMPLE" variant="ft2" size="sm" onClick={triggerFilePicker} />
-            </pixiContainer>
-            <pixiContainer layout={{ flexDirection: 'column', gap: 12, paddingTop: 16 }}>
-              <PixiKnob value={cmi.waveSelect} min={0} max={7} defaultValue={0} onChange={(v) => cmi.handleParamChange('wave_select', v)} label="WAVE" size="sm" color={G} formatValue={fmtWave} />
-              <PixiKnob value={cmi.volume} min={0} max={255} defaultValue={200} onChange={(v) => cmi.handleParamChange('volume', v)} label="VOLUME" size="sm" color={G} formatValue={fmtInt} />
             </pixiContainer>
           </pixiContainer>
         )}
@@ -309,31 +315,31 @@ export const PixiCMIKnobPanel: React.FC<PixiCMIKnobPanelProps> = ({ width }) => 
 
         {/* Page F: FILTER */}
         {cmi.activeTab === 'filter' && (
-          <pixiContainer layout={{ width, height: CMI_CONTENT_H, flexDirection: 'row', paddingLeft: 12, paddingTop: 8, gap: 16 }}>
+          <pixiContainer layout={{ width, height: CMI_CONTENT_H, flexDirection: 'column', paddingLeft: 12, paddingTop: 8, gap: 8 }}>
+            <pixiContainer layout={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+              <PixiKnob value={cmi.cutoff} min={0} max={255} defaultValue={200} onChange={(v) => cmi.handleParamChange('filter_cutoff', v)} label="CUTOFF" size="sm" color={G} formatValue={fmtCutoff} />
+              <PixiKnob value={cmi.filterTrack} min={0} max={255} defaultValue={128} onChange={(v) => cmi.handleParamChange('filter_track', v)} label="KEY TRACK" size="sm" color={G} formatValue={fmtTrack} />
+            </pixiContainer>
             <pixiContainer layout={{ width: VIS_W, flexDirection: 'column', gap: 4 }}>
               <pixiBitmapText text="SSM2045 x2 CASCADED LOWPASS (-24dB/oct)" style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 10, fill: 0xffffff }} tint={G} layout={{}} />
               <pixiGraphics draw={drawFilterCurve} layout={{ width: VIS_W, height: CURVE_H }} />
               <pixiBitmapText text={`Cutoff: ${formatCutoffHz(cmi.cutoff)}Hz | Max: 14kHz`} style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 9, fill: 0xffffff }} tint={G_DIM} layout={{}} />
-            </pixiContainer>
-            <pixiContainer layout={{ flexDirection: 'column', gap: 12, paddingTop: 16 }}>
-              <PixiKnob value={cmi.cutoff} min={0} max={255} defaultValue={200} onChange={(v) => cmi.handleParamChange('filter_cutoff', v)} label="CUTOFF" size="md" color={G} formatValue={fmtCutoff} />
-              <PixiKnob value={cmi.filterTrack} min={0} max={255} defaultValue={128} onChange={(v) => cmi.handleParamChange('filter_track', v)} label="KEY TRACK" size="md" color={G} formatValue={fmtTrack} />
             </pixiContainer>
           </pixiContainer>
         )}
 
         {/* Page E: ENVELOPE */}
         {cmi.activeTab === 'envelope' && (
-          <pixiContainer layout={{ width, height: CMI_CONTENT_H, flexDirection: 'row', paddingLeft: 12, paddingTop: 8, gap: 16 }}>
+          <pixiContainer layout={{ width, height: CMI_CONTENT_H, flexDirection: 'column', paddingLeft: 12, paddingTop: 8, gap: 8 }}>
+            <pixiContainer layout={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+              <PixiKnob value={cmi.attackTime} min={0} max={255} defaultValue={10} onChange={(v) => cmi.handleParamChange('attack_time', v)} label="ATTACK" size="sm" color={G} formatValue={fmtInt} />
+              <PixiKnob value={cmi.releaseTime} min={0} max={255} defaultValue={80} onChange={(v) => cmi.handleParamChange('release_time', v)} label="RELEASE" size="sm" color={G} formatValue={fmtInt} />
+              <PixiKnob value={cmi.envRate} min={0} max={255} defaultValue={200} onChange={(v) => cmi.handleParamChange('envelope_rate', v)} label="RATE" size="sm" color={G} formatValue={fmtInt} />
+            </pixiContainer>
             <pixiContainer layout={{ width: VIS_W, flexDirection: 'column', gap: 4 }}>
               <pixiBitmapText text="HARDWARE ENVELOPE GENERATOR" style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 10, fill: 0xffffff }} tint={G} layout={{}} />
               <pixiGraphics draw={drawEnvelopeCurve} layout={{ width: VIS_W, height: CURVE_H }} />
               <pixiBitmapText text="8-bit up/down counter | 6-bit divider chain | PTM6840 timer-driven" style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 9, fill: 0xffffff }} tint={G_DIM} layout={{}} />
-            </pixiContainer>
-            <pixiContainer layout={{ flexDirection: 'column', gap: 12, paddingTop: 16 }}>
-              <PixiKnob value={cmi.attackTime} min={0} max={255} defaultValue={10} onChange={(v) => cmi.handleParamChange('attack_time', v)} label="ATTACK" size="md" color={G} formatValue={fmtInt} />
-              <PixiKnob value={cmi.releaseTime} min={0} max={255} defaultValue={80} onChange={(v) => cmi.handleParamChange('release_time', v)} label="RELEASE" size="md" color={G} formatValue={fmtInt} />
-              <PixiKnob value={cmi.envRate} min={0} max={255} defaultValue={200} onChange={(v) => cmi.handleParamChange('envelope_rate', v)} label="RATE" size="md" color={G} formatValue={fmtInt} />
             </pixiContainer>
           </pixiContainer>
         )}
