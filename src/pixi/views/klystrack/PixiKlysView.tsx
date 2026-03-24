@@ -179,6 +179,14 @@ export const PixiKlysView: React.FC<Props> = ({ width, height }) => {
     `Pos: ${activePosition}`,
   ].join('  |  ');
 
+  // Build header line aligned with pattern columns
+  // Each channel column: "NNN II C VV CCCC" = 16 chars, separator " | " = 3 chars
+  let headerLine = 'RW ';
+  for (let ch = 0; ch < Math.min(numChannels, 4); ch++) {
+    headerLine += `CH ${ch + 1}`.padEnd(16);
+    if (ch < numChannels - 1 && ch < 3) headerLine += ' | ';
+  }
+
   // Build pattern lines
   const patternLines: string[] = [];
   const lineColors: number[] = [];
@@ -237,6 +245,12 @@ export const PixiKlysView: React.FC<Props> = ({ width, height }) => {
       {/* Pattern Grid */}
       <pixiContainer layout={{ flex: 1, width }}>
         <pixiGraphics draw={drawPatternBg} layout={{ position: 'absolute', width, height: patternHeight }} />
+        <pixiBitmapText
+          text={headerLine}
+          style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 10, fill: 0xffffff }}
+          tint={KT_ACCENT}
+          layout={{ marginLeft: 4, height: ROW_H }}
+        />
         {patternLines.map((line, i) => (
           <pixiBitmapText
             key={i}
