@@ -453,13 +453,24 @@ export class TrackerScratchController {
       return;
     }
 
-    // If scratch buffer isn't ready, skip spin-down and stop immediately.
-    // Without the buffer, there's no audio to play during deceleration anyway.
+    // If scratch buffer isn't ready yet, init it now and wait.
+    // The buffer inits eagerly on play start but is async — if the user
+    // hits stop quickly, it may not be ready yet.
     if (!this.scratchBufferReady) {
-      replayer.stop();
-      useTransportStore.getState().stop();
-      getToneEngine().stop();
-      onComplete?.();
+      this.initScratchBuffer().then(() => {
+        if (!replayer.isPlaying()) { onComplete?.(); return; }
+        if (!this._isActive) this.enterScratchMode(replayer);
+        this.physics.triggerElectronicBrake(() => {
+          this.exitScratchModeAndStop();
+          onComplete?.();
+        });
+      }).catch(() => {
+        // Buffer init failed — stop immediately without spin-down
+        replayer.stop();
+        useTransportStore.getState().stop();
+        getToneEngine().stop();
+        onComplete?.();
+      });
       return;
     }
 
