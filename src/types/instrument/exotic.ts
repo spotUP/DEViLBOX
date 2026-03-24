@@ -596,3 +596,24 @@ export interface SunVoxConfig {
   /** SunVox module ID to send note events to (for per-instrument targeting) */
   noteTargetModuleId?: number;
 }
+
+/**
+ * GoatTracker Ultra (C64 SID tracker) instrument configuration.
+ *
+ * All values are raw bytes matching the GT Ultra WASM engine's internal format.
+ * AD/SR bytes encode SID ADSR: upper nibble = attack/sustain, lower = decay/release.
+ * Firstwave encodes initial waveform (bits 4-7) + gate bit (bit 0).
+ * Table pointers index into 4 global shared tables (wave/pulse/filter/speed).
+ */
+export interface GTUltraConfig {
+  ad: number;           // Attack/Decay byte (0-255): upper nibble=attack, lower=decay
+  sr: number;           // Sustain/Release byte (0-255): upper nibble=sustain, lower=release
+  vibdelay: number;     // Vibrato delay frames (0-255)
+  gatetimer: number;    // Gate timer control (0-255)
+  firstwave: number;    // Initial waveform + gate bit (0-255)
+  name: string;         // Instrument name (max 16 chars)
+  wavePtr: number;      // Index into global wave table (0-255)
+  pulsePtr: number;     // Index into global pulse table (0-255)
+  filterPtr: number;    // Index into global filter table (0-255)
+  speedPtr: number;     // Index into global speed table (0-255)
+}

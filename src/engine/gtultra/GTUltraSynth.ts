@@ -1,0 +1,89 @@
+import { useGTUltraStore } from '../../stores/useGTUltraStore';
+import type { GTUltraConfig } from '../../types/instrument/exotic';
+import type { DevilboxSynth } from '../../types/synth';
+import * as Tone from 'tone';
+
+const GT_NOTE_NAMES = ['C-', 'C#', 'D-', 'D#', 'E-', 'F-', 'F#', 'G-', 'G#', 'A-', 'A#', 'B-'];
+
+/** Convert a note string ("C-4", "F#3") or MIDI number to GT note number (1-based). */
+function toGTNote(note: string | number): number {
+  if (typeof note === 'number') {
+    // MIDI note number — GT notes are 1-based, MIDI C-0 = 0 maps to GT 1
+    return Math.max(1, Math.min(note + 1, 0xBC));
+  }
+  // String like "C-4" or "C#4"
+  const match = note.match(/^([A-G][#-]?)(\d)$/);
+  if (!match) return 1;
+  const idx = GT_NOTE_NAMES.indexOf(match[1]);
+  if (idx < 0) return 1;
+  const octave = parseInt(match[2], 10);
+  return octave * 12 + idx + 1;
+}
+
+const MAX_CHANNELS_1SID = 3;
+
+/**
+ * Thin proxy to the shared GTUltraEngine WASM instance.
+ *
+ * All GT Ultra instruments share the same SID chip — there is no per-instrument
+ * audio output. The output GainNode exists only to satisfy the DevilboxSynth
+ * interface and is always silent (gain = 0).
+ */
+export class GTUltraSynth implements DevilboxSynth {
+  readonly name = 'GTUltraSynth';
+  readonly output: GainNode;
+
+  private _instrumentIndex = 1;
+  private _lastChannel = -1;
+
+  /** Round-robin counter shared across all instances */
+  private static _channelAlloc = 0;
+
+  constructor() {
+    const ctx = Tone.getContext().rawContext as AudioContext;
+    this.output = ctx.createGain();
+    this.output.gain.value = 0;
+  }
+
+  setInstrumentIndex(idx: number): void {
+    this._instrumentIndex = Math.max(1, Math.min(idx, 63));
+  }
+
+  /** Push instrument parameters to the WASM engine. */
+  setInstrument(config: GTUltraConfig): void {
+    const engine = useGTUltraStore.getState().engine;
+    if (!engine) return;
+
+    const i = this._instrumentIndex;
+    engine.setInstrumentAD(i, config.ad);
+    engine.setInstrumentSR(i, config.sr);
+    engine.setInstrumentFirstwave(i, config.firstwave);
+    engine.setInstrumentTablePtr(i, 0, config.wavePtr);   // wave
+    engine.setInstrumentTablePtr(i, 1, config.pulsePtr);   // pulse
+    engine.setInstrumentTablePtr(i, 2, config.filterPtr);  // filter
+    engine.setInstrumentTablePtr(i, 3, config.speedPtr);   // speed
+  }
+
+  triggerAttack(note: string | number, _time?: number, _velocity?: number): void {
+    const engine = useGTUltraStore.getState().engine;
+    if (!engine) return;
+
+    const numChannels = MAX_CHANNELS_1SID;
+    const channel = GTUltraSynth._channelAlloc % numChannels;
+    GTUltraSynth._channelAlloc++;
+    this._lastChannel = channel;
+
+    engine.jamNoteOn(channel, toGTNote(note), this._instrumentIndex);
+  }
+
+  triggerRelease(_note?: string | number, _time?: number): void {
+    const engine = useGTUltraStore.getState().engine;
+    if (!engine || this._lastChannel < 0) return;
+
+    engine.jamNoteOff(this._lastChannel);
+  }
+
+  dispose(): void {
+    this.output.disconnect();
+  }
+}

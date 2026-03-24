@@ -13,6 +13,7 @@ import {
   DEFAULT_SUPERCOLLIDER,
 } from '@/types/instrument';
 import { HivelySynth } from './hively/HivelySynth';
+import { GTUltraSynth } from './gtultra/GTUltraSynth';
 import { KlysSynth } from './klystrack/KlysSynth';
 import { JamCrackerSynth } from './jamcracker/JamCrackerSynth';
 import { SoundMonSynth } from './soundmon/SoundMonSynth';
@@ -565,6 +566,17 @@ export class InstrumentFactory {
             console.warn('[InstrumentFactory] HivelySynth.setInstrument failed:', err));
         }
         instrument = hvlSynth;
+        break;
+      }
+
+      case 'GTUltraSynth': {
+        // GT Ultra shares a single WASM SID engine — the synth is a thin proxy
+        const gtSynth = new GTUltraSynth();
+        if (config.gtUltra) {
+          gtSynth.setInstrumentIndex(config.id);
+          gtSynth.setInstrument(config.gtUltra);
+        }
+        instrument = gtSynth;
         break;
       }
 
