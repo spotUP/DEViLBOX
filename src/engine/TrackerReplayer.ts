@@ -1667,11 +1667,17 @@ export class TrackerReplayer {
   }
 
   stop(): void {
-    // Sync transport store to actual playback position before stopping.
-    // The pattern editor reads currentRow from the store when stopped —
-    // if we don't sync, it shows a stale/throttled value (often row 0).
+    // Sync transport store to the last visually-displayed row before stopping.
+    // The pattern editor reads currentRow from the store when stopped (line 1134
+    // of PixiPatternEditor). Use lastDequeuedState (what was on screen) rather
+    // than pattPos (which is ahead due to look-ahead scheduling).
     if (this.playing) {
-      useTransportStore.getState().setCurrentRow(this.pattPos);
+      const lastVisual = this.lastDequeuedState;
+      if (lastVisual) {
+        useTransportStore.getState().setCurrentRow(lastVisual.row);
+      } else {
+        useTransportStore.getState().setCurrentRow(this.pattPos);
+      }
     }
 
     this.playing = false;
