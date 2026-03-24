@@ -506,21 +506,16 @@ export class TrackerScratchController {
       this.scratchBuffer.unfreezeCapture();
     }
 
-    // Save current position before stopping — stop can trigger async position
-    // callbacks (libopenmpt worklet) that reset to row 0 before onPosition is nulled.
+    // Save current position before stopping — async engine callbacks may reset to 0.
     const savedRow = useTransportStore.getState().currentRow;
+    const savedPattern = useTrackerStore.getState().currentPatternIndex;
 
     // Stop the tracker replayer and full transport chain.
-    // Keep gain at 0 during stop — WASM engines (Hively, JamCracker, etc.) process
-    // their stop message asynchronously via postMessage. Restoring gain before the
-    // stop takes effect would briefly unmute the engine, causing audible playback.
     const replayer = getTrackerReplayer();
     replayer.stop();
     useTransportStore.getState().stop();
     getToneEngine().stop();
 
-    // Restore row position — stop should stay where playback was, not jump to 0
-    useTransportStore.getState().setCurrentRow(savedRow);
     // Restore gain AFTER stop so future playback isn't muted
     replayer.getFullOutput().gain.value = this.originalGainValue;
 
@@ -529,6 +524,13 @@ export class TrackerScratchController {
 
     // Restore original smooth scrolling state
     useTransportStore.getState().setSmoothScrolling(this.originalSmoothScrolling);
+
+    // Restore position after a tick — engines send async position=0 via postMessage
+    // during their stop sequence. This overrides those after they've landed.
+    setTimeout(() => {
+      useTransportStore.getState().setCurrentRow(savedRow);
+      useTrackerStore.getState().setCurrentPattern(savedPattern);
+    }, 50);
   }
 
   // ── Internal state machine ───────────────────────────────────────────────
