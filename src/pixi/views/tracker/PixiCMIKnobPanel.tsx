@@ -65,6 +65,18 @@ export const PixiCMIKnobPanel: React.FC<PixiCMIKnobPanelProps> = ({ width }) => 
     cmi.endHarmonicDrag();
   }, [cmi]);
 
+  // File picker for sample loading (uses a hidden DOM input — not a DOM overlay)
+  const triggerFilePicker = useCallback(() => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.wav,.aiff,.aif,.mp3,.ogg,.flac';
+    input.onchange = () => {
+      const file = input.files?.[0];
+      if (file) cmi.loadSampleFromFile(file);
+    };
+    input.click();
+  }, [cmi]);
+
   // ═══════════════════════════════════════════════════════════════════════════
   // Draw callbacks (computation from shared hook, rendering is Pixi-specific)
   // ═══════════════════════════════════════════════════════════════════════════
@@ -123,7 +135,8 @@ export const PixiCMIKnobPanel: React.FC<PixiCMIKnobPanelProps> = ({ width }) => 
     for (let q = 1; q < 4; q++) g.moveTo((q / 4) * VIS_W, 0).lineTo((q / 4) * VIS_W, CURVE_H);
     g.stroke({ width: 0.5, color: G_FAINT });
 
-    const s = cmi.builtinWaveform;
+    // Show sample waveform if loaded, otherwise built-in
+    const s = (cmi.sampleLoaded && cmi.sampleWaveform) ? cmi.sampleWaveform : cmi.builtinWaveform;
     if (s.length > 0) {
       const amp = mid - 6;
       g.moveTo(0, mid - s[0] * amp);
@@ -131,7 +144,7 @@ export const PixiCMIKnobPanel: React.FC<PixiCMIKnobPanelProps> = ({ width }) => 
       g.stroke({ width: 2, color: G });
     }
     g.rect(0, 0, VIS_W, CURVE_H); g.stroke({ width: 1, color: G_DIM });
-  }, [cmi.builtinWaveform]);
+  }, [cmi.builtinWaveform, cmi.sampleLoaded, cmi.sampleWaveform]);
 
   const drawFilterCurve = useCallback((g: GraphicsType) => {
     g.clear();
@@ -237,6 +250,10 @@ export const PixiCMIKnobPanel: React.FC<PixiCMIKnobPanelProps> = ({ width }) => 
                 <pixiGraphics draw={drawHarmonicBars} layout={{ width: VIS_W, height: BAR_H }} />
               </pixiContainer>
               <pixiGraphics draw={drawWavePreview} layout={{ width: VIS_W, height: WAVE_PREVIEW_H }} />
+              <pixiContainer layout={{ flexDirection: 'row', gap: 8, alignItems: 'center', paddingTop: 2 }}>
+                <PixiButton label="APPLY TO ENGINE" variant="ft2" size="sm" onClick={cmi.syncHarmonicsToEngine} />
+                <pixiBitmapText text={cmi.sampleLoaded ? `Loaded: ${cmi.sampleName}` : 'Draw harmonics then click Apply'} style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 9, fill: 0xffffff }} tint={G_DIM} layout={{}} />
+              </pixiContainer>
             </pixiContainer>
             <pixiContainer layout={{ flexDirection: 'column', gap: 4, paddingTop: 2 }}>
               <pixiBitmapText text="PRESETS" style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 10, fill: 0xffffff }} tint={G_DIM} layout={{}} />
@@ -251,9 +268,12 @@ export const PixiCMIKnobPanel: React.FC<PixiCMIKnobPanelProps> = ({ width }) => 
         {cmi.activeTab === 'wave' && (
           <pixiContainer layout={{ width, height: CMI_CONTENT_H, flexDirection: 'row', paddingLeft: 12, paddingTop: 8, gap: 16 }}>
             <pixiContainer layout={{ width: VIS_W, flexDirection: 'column', gap: 4 }}>
-              <pixiBitmapText text={`BANK ${cmi.waveBank}: ${WAVE_NAMES[cmi.waveBank] ?? '?'}`} style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 11, fill: 0xffffff }} tint={G} layout={{}} />
+              <pixiBitmapText text={cmi.sampleLoaded ? cmi.sampleName : `BANK ${cmi.waveBank}: ${WAVE_NAMES[cmi.waveBank] ?? '?'}`} style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 11, fill: 0xffffff }} tint={G} layout={{}} />
               <pixiGraphics draw={drawWaveDisplay} layout={{ width: VIS_W, height: CURVE_H }} />
-              <pixiBitmapText text={`${WAVE_SAMPLES} samples | 8-bit unsigned PCM | 16KB/voice`} style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 9, fill: 0xffffff }} tint={G_DIM} layout={{}} />
+              <pixiContainer layout={{ flexDirection: 'row', gap: 8, alignItems: 'center' }}>
+                <pixiBitmapText text={`${WAVE_SAMPLES} samples | 8-bit unsigned PCM | 16KB/voice`} style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 9, fill: 0xffffff }} tint={G_DIM} layout={{}} />
+              </pixiContainer>
+              <PixiButton label="LOAD SAMPLE" variant="ft2" size="sm" onClick={triggerFilePicker} />
             </pixiContainer>
             <pixiContainer layout={{ flexDirection: 'column', gap: 12, paddingTop: 16 }}>
               <PixiKnob value={cmi.waveSelect} min={0} max={7} defaultValue={0} onChange={(v) => cmi.handleParamChange('wave_select', v)} label="WAVE" size="sm" color={G} formatValue={fmtWave} />

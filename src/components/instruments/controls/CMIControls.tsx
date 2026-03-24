@@ -278,6 +278,19 @@ export const CMIControls: React.FC<CMIControlsProps> = ({
     externalOnChange: onParamChange,
     instrumentId,
   });
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleFileDrop = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    const file = e.dataTransfer.files[0];
+    if (file) cmi.loadSampleFromFile(file);
+  }, [cmi]);
+
+  const handleFileSelect = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) cmi.loadSampleFromFile(file);
+    e.target.value = ''; // reset for re-select
+  }, [cmi]);
 
   const VIS_W = 420;
   const CURVE_H = 160;
@@ -340,6 +353,18 @@ export const CMIControls: React.FC<CMIControlsProps> = ({
                 dragActive={cmi.harmonicDragActive}
               />
               <WaveformCanvas waveform={cmi.customWaveform} width={VIS_W} height={WAVE_PREVIEW_H} />
+              <div className="flex items-center gap-2 mt-1">
+                <button
+                  onClick={cmi.syncHarmonicsToEngine}
+                  className="px-3 py-1 text-[10px] font-mono font-bold rounded-sm transition-all"
+                  style={{ color: '#000', backgroundColor: CMI_GREEN, border: `1px solid ${CMI_GREEN}` }}
+                >
+                  APPLY TO ENGINE
+                </button>
+                <span className="text-[9px] font-mono" style={{ color: CMI_GREEN_DIM }}>
+                  {cmi.sampleLoaded ? `Loaded: ${cmi.sampleName}` : 'Draw harmonics then click Apply'}
+                </span>
+              </div>
             </div>
             <div className="flex flex-col gap-1 pt-1">
               <div className="text-[9px] font-mono font-bold mb-1" style={{ color: CMI_GREEN_DIM }}>PRESETS</div>
@@ -365,12 +390,35 @@ export const CMIControls: React.FC<CMIControlsProps> = ({
         {cmi.activeTab === 'wave' && (
           <div className="flex gap-4">
             <div className="flex flex-col gap-1">
-              <div className="text-xs font-mono font-bold" style={{ color: CMI_GREEN }}>
-                BANK {cmi.waveBank}: {WAVE_NAMES[cmi.waveBank] ?? '?'}
+              {/* Sample drop zone / waveform display */}
+              <div
+                className="relative cursor-pointer rounded"
+                style={{ border: `1px dashed ${CMI_GREEN_DIM}`, width: VIS_W, height: CURVE_H }}
+                onDragOver={(e) => e.preventDefault()}
+                onDrop={handleFileDrop}
+                onClick={() => fileInputRef.current?.click()}
+              >
+                {cmi.sampleLoaded && cmi.sampleWaveform ? (
+                  <WaveformCanvas waveform={cmi.sampleWaveform} width={VIS_W} height={CURVE_H} />
+                ) : (
+                  <WaveformCanvas waveform={cmi.builtinWaveform} width={VIS_W} height={CURVE_H} />
+                )}
+                {!cmi.sampleLoaded && (
+                  <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                    <span className="text-[10px] font-mono opacity-50" style={{ color: CMI_GREEN }}>
+                      DROP WAV/AIFF HERE or CLICK TO BROWSE
+                    </span>
+                  </div>
+                )}
               </div>
-              <WaveformCanvas waveform={cmi.builtinWaveform} width={VIS_W} height={CURVE_H} />
-              <div className="text-[9px] font-mono" style={{ color: CMI_GREEN_DIM }}>
-                {WAVE_SAMPLES} samples | 8-bit unsigned PCM | 16KB/voice
+              <input ref={fileInputRef} type="file" accept=".wav,.aiff,.aif,.mp3,.ogg,.flac" className="hidden" onChange={handleFileSelect} />
+              <div className="flex items-center gap-2 mt-1">
+                <div className="text-xs font-mono font-bold" style={{ color: CMI_GREEN }}>
+                  {cmi.sampleLoaded ? cmi.sampleName : `BANK ${cmi.waveBank}: ${WAVE_NAMES[cmi.waveBank] ?? '?'}`}
+                </div>
+                <div className="text-[9px] font-mono" style={{ color: CMI_GREEN_DIM }}>
+                  {WAVE_SAMPLES} samples | 8-bit unsigned PCM | 16KB/voice
+                </div>
               </div>
             </div>
             <div className="flex flex-col gap-3 pt-4">
