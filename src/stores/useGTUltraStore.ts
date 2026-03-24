@@ -475,10 +475,10 @@ export const useGTUltraStore = create<GTUltraState>()((set, get) => ({
     for (let i = 1; i <= 63; i++) {
       const inst = instrumentData[i];
       if (!inst) continue;
-      // Skip empty instruments (all zeros, no name)
-      const isEmpty = inst.ad === 0 && inst.sr === 0 && inst.firstwave === 0
-                      && inst.wavePtr === 0 && (!inst.name || inst.name.trim() === '');
-      if (isEmpty) continue;
+      // Skip empty instruments — must have at least ADSR or a waveform to be useful
+      const hasSound = inst.ad !== 0 || inst.sr !== 0 || inst.firstwave !== 0;
+      const hasName = inst.name && inst.name.trim() !== '';
+      if (!hasSound && !hasName) continue;
 
       configs.push({
         id: i,
