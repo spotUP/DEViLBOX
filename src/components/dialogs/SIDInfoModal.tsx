@@ -4,23 +4,18 @@
  * Below: discography, YouTube links, tags, player distribution, career, external links.
  */
 
-import React, { useCallback, useEffect, useState } from 'react';
+import React from 'react';
 import {
   X, Loader2, Cpu, Music, Clock, User, Disc, Globe, Calendar,
   Star, ExternalLink, Briefcase, Tag, Play, Youtube, ChevronDown, ChevronUp,
   Zap, Download,
 } from 'lucide-react';
-import { useFormatStore } from '@stores';
 import { useModalClose } from '@hooks/useDialogKeyboard';
-import { useShallow } from 'zustand/react/shallow';
 import { notify } from '@stores/useNotificationStore';
-import { useSettingsStore } from '@stores/useSettingsStore';
+import { getComposerPhotoUrl } from '@/lib/sid/composerApi';
 import { SID_ENGINES } from '@engine/deepsid/DeepSIDEngineManager';
 import type { SIDEngineType } from '@engine/deepsid/DeepSIDEngineManager';
-import { fetchComposerProfile, fetchComposerTunes, fetchFileInfoByPath, getComposerPhotoUrl } from '@/lib/sid/composerApi';
-import type { ComposerProfile as ComposerData, DeepSIDFileInfo, ComposerTune } from '@/lib/sid/composerApi';
-import { downloadHVSCFile } from '@/lib/hvscApi';
-import { loadFile } from '@/lib/file/UnifiedFileLoader';
+import { useSIDInfoDialog, SID_TABS } from '@hooks/dialogs/useSIDInfoDialog';
 import { SIDScopeTab } from './sid/SIDScopeTab';
 import { SIDStereoTab } from './sid/SIDStereoTab';
 import { SIDFilterTab } from './sid/SIDFilterTab';
@@ -34,118 +29,32 @@ import { SIDSettingsTab } from './sid/SIDSettingsTab';
 import { SIDTagsTab } from './sid/SIDTagsTab';
 import { SIDTransportBar } from './sid/SIDTransportBar';
 
-type SIDTabId = 'profile' | 'scope' | 'stereo' | 'filter' | 'visuals' | 'stil' | 'player' | 'csdb' | 'gb64' | 'remix' | 'tags' | 'settings';
-
-const SID_TABS: { id: SIDTabId; label: string }[] = [
-  { id: 'profile', label: 'Profile' },
-  { id: 'scope', label: 'Scope' },
-  { id: 'stereo', label: 'Stereo' },
-  { id: 'filter', label: 'Filter' },
-  { id: 'visuals', label: 'Visuals' },
-  { id: 'stil', label: 'STIL' },
-  { id: 'player', label: 'Player' },
-  { id: 'csdb', label: 'CSDb' },
-  { id: 'gb64', label: 'GB64' },
-  { id: 'remix', label: 'Remix' },
-  { id: 'tags', label: 'Tags' },
-  { id: 'settings', label: 'Settings' },
-];
-
 interface SIDInfoModalProps {
   onClose: () => void;
 }
 
 export const SIDInfoModal: React.FC<SIDInfoModalProps> = ({ onClose }) => {
   useModalClose({ isOpen: true, onClose });
-  const { sidMetadata, setSidMetadata, songDBInfo } = useFormatStore(
-    useShallow((state) => ({
-      sidMetadata: state.sidMetadata,
-      setSidMetadata: state.setSidMetadata,
-      songDBInfo: state.songDBInfo,
-    }))
-  );
 
-  const sidEngine = useSettingsStore(s => s.sidEngine);
-  const setSidEngine = useSettingsStore(s => s.setSidEngine);
-  const sidHwMode = useSettingsStore(s => s.sidHardwareMode);
-
-  const [composer, setComposer] = useState<ComposerData | null>(null);
-  const [composerLoading, setComposerLoading] = useState(false);
-  const [fileInfo, setFileInfo] = useState<DeepSIDFileInfo | null>(null);
-  const [tunes, setTunes] = useState<ComposerTune[]>([]);
-  const [tunesTotal, setTunesTotal] = useState(0);
-  const [showAllTunes, setShowAllTunes] = useState(false);
-  const [loadingTuneId, setLoadingTuneId] = useState<number | null>(null);
-  const [activeTab, setActiveTab] = useState<SIDTabId>('profile');
-
-  const handleLoadTune = useCallback(async (tune: ComposerTune) => {
-    if (loadingTuneId !== null) return;
-    setLoadingTuneId(tune.id);
-    try {
-      const buffer = await downloadHVSCFile(tune.path);
-      const file = new File([buffer], tune.filename || tune.path.split('/').pop() || 'tune.sid');
-      const result = await loadFile(file, { requireConfirmation: false });
-      if (result.success === true) {
-        notify.success(result.message);
-        onClose();
-      } else if (result.success === false) {
-        notify.error(result.error);
-      }
-    } catch (err) {
-      notify.error(err instanceof Error ? err.message : 'Failed to load tune');
-    } finally {
-      setLoadingTuneId(null);
-    }
-  }, [loadingTuneId, onClose]);
-
-  const handleSubsongChange = useCallback(
-    async (newIdx: number) => {
-      if (!sidMetadata || newIdx === sidMetadata.currentSubsong) return;
-      try {
-        const { getTrackerReplayer } = await import('@engine/TrackerReplayer');
-        const engine = getTrackerReplayer().getC64SIDEngine();
-        if (engine) {
-          engine.setSubsong(newIdx);
-          setSidMetadata({ ...sidMetadata, currentSubsong: newIdx });
-          notify.success(`SID Subsong ${newIdx + 1}/${sidMetadata.subsongs}`);
-        }
-      } catch {
-        notify.error('Failed to switch SID subsong');
-      }
-    },
-    [sidMetadata, setSidMetadata]
-  );
-
-  // Fetch composer profile
-  useEffect(() => {
-    if (!sidMetadata?.author) return;
-    setComposerLoading(true);
-    fetchComposerProfile({ author: sidMetadata.author })
-      .then((result) => {
-        if (result.found) setComposer(result);
-      })
-      .finally(() => setComposerLoading(false));
-  }, [sidMetadata?.author]);
-
-  // Fetch file info from DeepSID (for tags, YouTube, lengths)
-  useEffect(() => {
-    if (!sidMetadata?.title) return;
-    // Try by author to find the file
-    if (composer?.fullname && sidMetadata.title) {
-      fetchFileInfoByPath(composer.fullname + '/' + sidMetadata.title.replace(/\s+/g, '_') + '.sid')
-        .then(info => { if (info) setFileInfo(info); });
-    }
-  }, [composer?.fullname, sidMetadata?.title]);
-
-  // Fetch discography
-  useEffect(() => {
-    if (!sidMetadata?.author) return;
-    fetchComposerTunes({ author: sidMetadata.author, limit: 50 })
-      .then(result => {
-        setTunes(result.tunes);
-        setTunesTotal(result.total);
-      });
-  }, [sidMetadata?.author]);
+  const {
+    sidMetadata,
+    songDBInfo,
+    sidEngine,
+    setSidEngine,
+    sidHwMode,
+    composer,
+    composerLoading,
+    fileInfo,
+    tunes,
+    tunesTotal,
+    showAllTunes,
+    setShowAllTunes,
+    loadingTuneId,
+    activeTab,
+    setActiveTab,
+    handleLoadTune,
+    handleSubsongChange,
+  } = useSIDInfoDialog({ onClose });
 
   if (!sidMetadata) return null;
 
