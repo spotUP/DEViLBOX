@@ -9,8 +9,8 @@ import React, { useRef, useEffect, useCallback } from 'react';
 import type { Graphics as GraphicsType, FederatedPointerEvent } from 'pixi.js';
 import { PIXI_FONTS } from '@/pixi/fonts';
 import { usePixiTheme } from '@/pixi/theme';
-import { getDJEngine } from '@/engine/dj/DJEngine';
 import { useDJStore } from '@/stores/useDJStore';
+import { useDeckVisualizationData } from '@/hooks/dj/useDeckVisualizationData';
 
 const NUM_CHANNELS = 4;
 
@@ -28,6 +28,7 @@ const ScopeBox: React.FC<{
   onClick: (e: FederatedPointerEvent) => void;
 }> = ({ deckId, channel, size, muted, onClick }) => {
   const theme = usePixiTheme();
+  const viz = useDeckVisualizationData(deckId);
   const graphicsRef = useRef<GraphicsType | null>(null);
   const rafRef = useRef(0);
   const isAll = channel === -1;
@@ -51,12 +52,9 @@ const ScopeBox: React.FC<{
         g.rect(0, 0, size, size).fill({ color: theme.error.color, alpha: 0.08 });
       }
 
-      // Waveform
+      // Waveform — read from shared visualization cache
       const isPlaying = useDJStore.getState().decks[deckId]?.isPlaying ?? false;
-      let waveform: Float32Array | null = null;
-      if (isPlaying) {
-        try { waveform = getDJEngine().getDeck(deckId).getWaveform(); } catch { /* */ }
-      }
+      const waveform = isPlaying ? viz.getWaveform() : null;
 
       if (waveform && waveform.length >= 256) {
         const waveColor = muted ? theme.textMuted.color : theme.success.color;

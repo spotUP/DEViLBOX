@@ -7,7 +7,7 @@
  */
 
 import React, { useRef, useEffect } from 'react';
-import { getDJEngine } from '@/engine/dj/DJEngine';
+import { useDeckVisualizationData } from '@/hooks/dj/useDeckVisualizationData';
 
 interface MixerVUMeterProps {
   deckId: 'A' | 'B' | 'C';
@@ -38,6 +38,7 @@ function getSegmentColor(index: number): string {
 }
 
 export const MixerVUMeter: React.FC<MixerVUMeterProps> = ({ deckId }) => {
+  const viz = useDeckVisualizationData(deckId);
   const containerRef = useRef<HTMLDivElement>(null);
   const rafRef = useRef<number>(0);
   const mountedRef = useRef(true);
@@ -60,7 +61,7 @@ export const MixerVUMeter: React.FC<MixerVUMeterProps> = ({ deckId }) => {
       let peak = -1;
 
       try {
-        const dB = getDJEngine().getDeck(deckId).getLevel();
+        const dB = viz.getLevel();
         const dbVal = typeof dB === 'number' ? dB : -Infinity;
         segments = levelToSegments(dbVal);
 

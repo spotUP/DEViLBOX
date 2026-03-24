@@ -7,8 +7,8 @@
  */
 
 import React, { useRef, useEffect, useCallback } from 'react';
-import { getDJEngine } from '@/engine/dj/DJEngine';
 import { useDJStore } from '@/stores/useDJStore';
+import { useDeckVisualizationData } from '@/hooks/dj/useDeckVisualizationData';
 
 interface DeckScopesProps {
   deckId: 'A' | 'B' | 'C';
@@ -31,6 +31,7 @@ const ScopeCanvas: React.FC<ScopeCanvasProps> = ({ deckId, channel, size, muted,
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const rafRef = useRef<number>(0);
   const isAll = channel === -1;
+  const viz = useDeckVisualizationData(deckId);
 
   const draw = useCallback(() => {
     const canvas = canvasRef.current;
@@ -67,16 +68,9 @@ const ScopeCanvas: React.FC<ScopeCanvasProps> = ({ deckId, channel, size, muted,
     ctx.lineWidth = 0.5;
     ctx.stroke();
 
-    // Waveform trace — only fetch live data when playing
+    // Waveform trace — read from shared visualization cache
     const isPlaying = useDJStore.getState().decks[deckId]?.isPlaying ?? false;
-    let waveform: Float32Array | null = null;
-    if (isPlaying) {
-      try {
-        waveform = getDJEngine().getDeck(deckId).getWaveform();
-      } catch {
-        // Engine not ready
-      }
-    }
+    const waveform = isPlaying ? viz.getWaveform() : null;
 
     if (waveform && waveform.length >= 256) {
       if (isAll) {
