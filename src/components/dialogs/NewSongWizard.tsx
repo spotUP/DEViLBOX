@@ -7,135 +7,42 @@
  *
  * On Finish: resets stores, applies preset + Amiga settings,
  * optionally loads starter instruments, tracks active system.
+ *
+ * Shared logic lives in: src/hooks/dialogs/useNewSongWizard.ts
  */
 
-import React, { useState, useCallback, useMemo } from 'react';
+import React, { useState, useMemo } from 'react';
 import { X, Music2, Cpu, ChevronRight, ChevronLeft, Check, Search } from 'lucide-react';
-import { useUIStore } from '@stores/useUIStore';
-import { useTrackerStore } from '@stores/useTrackerStore';
-import { useInstrumentStore } from '@stores/useInstrumentStore';
-import { useTabsStore } from '@stores/useTabsStore';
-import { getGroupedPresets, SYSTEM_PRESETS } from '@constants/systemPresets';
-import type { SystemPreset } from '@constants/systemPresets';
-import { AMIGA_UADE_PRESET_IDS, getInstrumentPresetsForSystem } from '@constants/uadeInstrumentPresets';
+import { SYSTEM_PRESETS } from '@constants/systemPresets';
+import { getInstrumentPresetsForSystem } from '@constants/uadeInstrumentPresets';
 import { useModalClose } from '@hooks/useDialogKeyboard';
-
-type WizardStep = 1 | 2 | 3;
-type StartMode = 'empty' | 'preset';
-
-const GROUPED_PRESETS = getGroupedPresets();
+import { useNewSongWizard, GROUPED_PRESETS } from '@hooks/dialogs/useNewSongWizard';
+import type { StartMode } from '@hooks/dialogs/useNewSongWizard';
 
 export const NewSongWizard: React.FC = () => {
-  const isOpen = useUIStore((s) => s.newSongWizardOpen);
-  const close = useUIStore((s) => s.closeNewSongWizard);
+  const {
+    isOpen,
+    close,
+    step,
+    startMode,
+    setStartMode,
+    selectedPresetId,
+    setSelectedPresetId,
+    withPresetInstruments,
+    setWithPresetInstruments,
+    selectedPreset,
+    starterInstruments,
+    stepCount,
+    nextLabel,
+    handleNext,
+    handleBack,
+    handleCancel,
+    handleFinish,
+  } = useNewSongWizard();
+
   useModalClose({ isOpen, onClose: close });
 
-  const [step, setStep] = useState<WizardStep>(1);
-  const [startMode, setStartMode] = useState<StartMode>('empty');
-  const [selectedPresetId, setSelectedPresetId] = useState<string>('amiga_protracker');
-  const [withPresetInstruments, setWithPresetInstruments] = useState(true);
-
-  // useCallback must be called before any early return to keep hook order stable
-  const finish = useCallback(
-    (mode: StartMode, loadInstruments: boolean) => {
-      const presetId = selectedPresetId;
-      // 1. addTab() saves current project state and resets stores to blank
-      // NOTE: addTab → restoreState → loadInstruments uses queueMicrotask to
-      // defer the instrument state reset. We must defer our work too, otherwise
-      // the microtask overwrites any instruments we create synchronously here.
-      useTabsStore.getState().addTab();
-
-      // Defer preset application so it runs AFTER loadInstruments' microtask
-      queueMicrotask(() => {
-        // 2. Apply system preset (channel names, colors, count)
-        if (mode === 'preset' && presetId) {
-          useTrackerStore.getState().applySystemPreset(presetId);
-
-          // 3. Apply Amiga song settings (hard-panning + BPM) if Amiga format
-          if (AMIGA_UADE_PRESET_IDS.has(presetId)) {
-            useTrackerStore.getState().applyAmigaSongSettings(presetId);
-          }
-        }
-
-        // 4. Load starter instruments
-        if (mode === 'preset' && loadInstruments && presetId) {
-          const presets = getInstrumentPresetsForSystem(presetId);
-          presets.forEach((inst) => {
-            useInstrumentStore.getState().createInstrument(inst);
-          });
-        }
-
-        // 5. Track active system for filtering
-        useUIStore.getState().setActiveSystemPreset(
-          mode === 'preset' ? presetId : null
-        );
-
-        useUIStore.getState().setStatusMessage('New project', false, 1500);
-      });
-
-      setStep(1);
-      setStartMode('empty');
-      setSelectedPresetId('amiga_protracker');
-      setWithPresetInstruments(true);
-      close();
-    },
-    [selectedPresetId, close]
-  );
-
   if (!isOpen) return null;
-
-  const selectedPreset: SystemPreset | undefined = SYSTEM_PRESETS.find(
-    (p) => p.id === selectedPresetId
-  );
-
-  const hasStarterInstruments =
-    selectedPresetId !== '' &&
-    (getInstrumentPresetsForSystem(selectedPresetId).length) > 0;
-
-  const starterInstruments = getInstrumentPresetsForSystem(selectedPresetId);
-
-  // --- Navigation ---
-  const handleNext = () => {
-    if (step === 1) {
-      if (startMode === 'empty') {
-        finish('empty', false);
-      } else {
-        setStep(2);
-      }
-    } else if (step === 2) {
-      if (hasStarterInstruments) {
-        setStep(3);
-      } else {
-        finish('preset', false);
-      }
-    }
-  };
-
-  const handleBack = () => {
-    if (step === 2) setStep(1);
-    else if (step === 3) setStep(2);
-  };
-
-  const handleCancel = () => {
-    setStep(1);
-    setStartMode('empty');
-    setSelectedPresetId('amiga_protracker');
-    setWithPresetInstruments(true);
-    close();
-  };
-
-  const handleFinish = () => {
-    finish('preset', withPresetInstruments);
-  };
-
-  const nextLabel =
-    step === 1
-      ? 'Next'
-      : step === 2
-        ? hasStarterInstruments
-          ? 'Next'
-          : 'Finish'
-        : 'Finish';
 
   return (
     <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-[9999] p-4 backdrop-blur-sm">
@@ -146,7 +53,7 @@ export const NewSongWizard: React.FC = () => {
             <Music2 size={18} className="text-accent-primary" />
             <h2 className="text-sm font-semibold text-text-primary">New Song</h2>
             <span className="text-xs text-text-muted">
-              Step {step} of {startMode === 'preset' ? (hasStarterInstruments ? 3 : 2) : 1}
+              Step {step} of {stepCount}
             </span>
           </div>
           <button
