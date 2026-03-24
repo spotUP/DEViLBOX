@@ -11,6 +11,7 @@ import { useGTUltraStore } from '@/stores/useGTUltraStore';
 import { useInstrumentStore } from '@/stores/useInstrumentStore';
 import { GTUltraEngine } from './GTUltraEngine';
 import { getGTUltraASIDBridge } from './GTUltraASIDBridge';
+import { setFormatPlaybackRow } from '@engine/FormatPlaybackState';
 
 /** Populate DEViLBOX instrument store from GT Ultra WASM instrument data */
 function populateInstrumentStore(): void {
@@ -56,7 +57,10 @@ export function useGTUltraEngineInit(): void {
           store.refreshAllTables();
           // Don't populate instruments here — wait for onSongLoaded when data is ready
         },
-        onPosition: (pos) => useGTUltraStore.getState().updatePlaybackPos(pos),
+        onPosition: (pos) => {
+          useGTUltraStore.getState().updatePlaybackPos(pos);
+          setFormatPlaybackRow(pos.row);
+        },
         onAsidWrite: (chip, reg, value) => getGTUltraASIDBridge().writeRegister(chip, reg, value),
         onPatternData: (pattern, length, data) => useGTUltraStore.getState().updatePatternData(pattern, length, data),
         onOrderData: (channel, data) => useGTUltraStore.getState().updateOrderData(channel, data),
