@@ -7,9 +7,6 @@
 import React, { useCallback, useState } from 'react';
 import { Play, Pause, Disc3, Link, Lock } from 'lucide-react';
 import { useDJStore } from '@/stores/useDJStore';
-import { getDJEngine } from '@/engine/dj/DJEngine';
-import { DJBeatSync } from '@/engine/dj/DJBeatSync';
-import { syncBPMToOther, phaseAlign } from '@/engine/dj/DJAutoSync';
 import { getQuantizeMode, setQuantizeMode, type QuantizeMode } from '@/engine/dj/DJQuantizedFX';
 import * as DJActions from '@/engine/dj/DJActions';
 
@@ -36,9 +33,7 @@ export const DeckTransport: React.FC<DeckTransportProps> = ({ deckId }) => {
   }, [deckId, isPlaying]);
 
   const handleCue = useCallback(() => {
-    const engine = getDJEngine();
-    const deck = engine.getDeck(deckId);
-    deck.cue(cuePoint);
+    DJActions.cueDeck(deckId, cuePoint);
   }, [deckId, cuePoint]);
 
   const handleQuantizeCycle = useCallback(() => {
@@ -54,52 +49,7 @@ export const DeckTransport: React.FC<DeckTransportProps> = ({ deckId }) => {
   }, [deckId, keyLockEnabled]);
 
   const handleSync = useCallback(() => {
-    try {
-      const engine = getDJEngine();
-      const thisDeck = engine.getDeck(deckId);
-      const otherDeck = engine.getDeck(otherDeckId);
-      const store = useDJStore.getState();
-      const otherState = store.decks[otherDeckId];
-      const thisState = store.decks[deckId];
-
-      // Check if other deck has a track loaded (either mode)
-      if (!otherState.fileName) return;
-
-      // Ensure crossfader is fully on the OTHER deck so no audio leaks
-      // crossfader: 0 = deck A, 1 = deck B
-      const cf = store.crossfaderPosition;
-      if (deckId === 'A' && cf < 1) store.setCrossfader(1);
-      else if (deckId === 'B' && cf > 0) store.setCrossfader(0);
-
-      // If both decks have analysis beat grids, use precise BPM sync + phase align
-      if (thisState.beatGrid && otherState.beatGrid) {
-        const semitones = syncBPMToOther(deckId, otherDeckId);
-        store.setDeckPitch(deckId, semitones);
-        phaseAlign(deckId, otherDeckId);
-      } else if (otherDeck.playbackMode === 'audio' || thisDeck.playbackMode === 'audio') {
-        // For audio mode, match BPM via the detected values in the store
-        const targetBPM = otherState.detectedBPM;
-        const thisBPMBase = thisState.detectedBPM;
-        if (targetBPM > 0 && thisBPMBase > 0) {
-          const ratio = targetBPM / thisBPMBase;
-          const semitones = 12 * Math.log2(ratio);
-          store.setDeckPitch(deckId, semitones);
-        }
-      } else {
-        if (!otherDeck.replayer.getSong()) return;
-        const semitones = DJBeatSync.syncBPM(otherDeck, thisDeck);
-        store.setDeckPitch(deckId, semitones);
-      }
-
-      // Auto-play if this deck isn't playing yet
-      if (!thisState.isPlaying) {
-        thisDeck.play().then(() => {
-          useDJStore.getState().setDeckPlaying(deckId, true);
-        });
-      }
-    } catch {
-      // Engine might not be initialized yet
-    }
+    DJActions.syncDeckBPM(deckId, otherDeckId);
   }, [deckId, otherDeckId]);
 
   return (
