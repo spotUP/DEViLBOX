@@ -521,7 +521,7 @@ function App() {
       if ((e.ctrlKey || e.metaKey) && e.key === 'i' && !e.shiftKey) {
         e.preventDefault();
         const s = useUIStore.getState();
-        s.modalOpen === 'instruments' ? s.closeModal() : s.openModal('instruments');
+        if (s.modalOpen === 'instruments') { s.closeModal(); } else { s.openModal('instruments'); }
         return;
       }
 
@@ -536,7 +536,7 @@ function App() {
       if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'X') {
         e.preventDefault();
         const s = useUIStore.getState();
-        s.modalOpen === 'masterFx' ? s.closeModal() : s.openModal('masterFx');
+        if (s.modalOpen === 'masterFx') { s.closeModal(); } else { s.openModal('masterFx'); }
         return;
       }
 
@@ -544,7 +544,7 @@ function App() {
       if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'F') {
         e.preventDefault();
         const s = useUIStore.getState();
-        s.modalOpen === 'instrumentFx' ? s.closeModal() : s.openModal('instrumentFx');
+        if (s.modalOpen === 'instrumentFx') { s.closeModal(); } else { s.openModal('instrumentFx'); }
         return;
       }
 
@@ -755,7 +755,7 @@ function App() {
               onShowSettings={() => openModal('settings')}
               onShowExport={() => openModal('export')}
               onShowHelp={() => openModal('help')}
-              onShowMasterFX={() => { const s = useUIStore.getState(); s.modalOpen === 'masterFx' ? s.closeModal() : s.openModal('masterFx'); }}
+              onShowMasterFX={() => { const s = useUIStore.getState(); if (s.modalOpen === 'masterFx') { s.closeModal(); } else { s.openModal('masterFx'); } }}
               onShowPatterns={() => togglePatterns()}
               onLoad={() => openModal('fileBrowser')}
               onSave={() => saveProject()}
@@ -1004,7 +1004,7 @@ function App() {
       <AppLayout
         onShowExport={() => openModal('export')}
         onShowHelp={() => openModal('help')}
-        onShowMasterFX={() => { const s = useUIStore.getState(); s.modalOpen === 'masterFx' ? s.closeModal() : s.openModal('masterFx'); }}
+        onShowMasterFX={() => { const s = useUIStore.getState(); if (s.modalOpen === 'masterFx') { s.closeModal(); } else { s.openModal('masterFx'); } }}
         onShowPatterns={() => togglePatterns()}
         onShowInstruments={() => openModal('instruments')}
         onLoad={() => setShowFileBrowser(true)}
@@ -1103,7 +1103,7 @@ function App() {
       <AppLayout
         onShowExport={() => openModal('export')}
         onShowHelp={() => openModal('help')}
-        onShowMasterFX={() => { const s = useUIStore.getState(); s.modalOpen === 'masterFx' ? s.closeModal() : s.openModal('masterFx'); }}
+        onShowMasterFX={() => { const s = useUIStore.getState(); if (s.modalOpen === 'masterFx') { s.closeModal(); } else { s.openModal('masterFx'); } }}
         onShowPatterns={() => togglePatterns()}
         onShowInstruments={() => openModal('instruments')}
         onLoad={() => setShowFileBrowser(true)}
@@ -1122,8 +1122,8 @@ function App() {
                   onShowPatterns={() => togglePatterns()}
                   onShowExport={() => openModal('export')}
                   onShowHelp={(tab) => openModal('help', { initialTab: tab || 'shortcuts' })}
-                  onShowMasterFX={() => { const s = useUIStore.getState(); s.modalOpen === 'masterFx' ? s.closeModal() : s.openModal('masterFx'); }}
-                  onShowInstrumentFX={() => { const s = useUIStore.getState(); s.modalOpen === 'instrumentFx' ? s.closeModal() : s.openModal('instrumentFx'); }}
+                  onShowMasterFX={() => { const s = useUIStore.getState(); if (s.modalOpen === 'masterFx') { s.closeModal(); } else { s.openModal('masterFx'); } }}
+                  onShowInstrumentFX={() => { const s = useUIStore.getState(); if (s.modalOpen === 'instrumentFx') { s.closeModal(); } else { s.openModal('instrumentFx'); } }}
                   onShowInstruments={() => openModal('instruments')}
                   onShowDrumpads={() => openModal('drumpads')}
                   showPatterns={showPatterns}
@@ -1141,8 +1141,8 @@ function App() {
                     onShowPatterns={() => togglePatterns()}
                     onShowExport={() => openModal('export')}
                     onShowHelp={(tab) => openModal('help', { initialTab: tab || 'shortcuts' })}
-                    onShowMasterFX={() => { const s = useUIStore.getState(); s.modalOpen === 'masterFx' ? s.closeModal() : s.openModal('masterFx'); }}
-                    onShowInstrumentFX={() => { const s = useUIStore.getState(); s.modalOpen === 'instrumentFx' ? s.closeModal() : s.openModal('instrumentFx'); }}
+                    onShowMasterFX={() => { const s = useUIStore.getState(); if (s.modalOpen === 'masterFx') { s.closeModal(); } else { s.openModal('masterFx'); } }}
+                    onShowInstrumentFX={() => { const s = useUIStore.getState(); if (s.modalOpen === 'instrumentFx') { s.closeModal(); } else { s.openModal('instrumentFx'); } }}
                     onShowInstruments={() => openModal('instruments')}
                     onShowDrumpads={() => openModal('drumpads')}
                     showPatterns={showPatterns}
@@ -1247,9 +1247,11 @@ function App() {
             onLoadTrackerModule={async (buffer: ArrayBuffer, filename: string) => {
               setShowFileBrowser(false);
               try {
-                // All binary formats (.mid, .mod, .xm, .it, .fur, .hvl, .ahx, .sqs, .seq, etc.)
+                const isIOS = /iPhone|iPad|iPod/.test(navigator.userAgent);
+                if (isIOS) alert(`App.tsx loadFile: ${buffer.byteLength} bytes, ${filename}`);
                 const file = new File([buffer], filename);
                 const result = await loadFile(file, { requireConfirmation: false });
+                if (isIOS) alert(`App.tsx result: success=${result.success}, msg=${'message' in result ? result.message : 'error' in result ? result.error : ''}`);
                 if (result.success === true) {
                   notify.success(result.message);
                 } else if (result.success === false) {
@@ -1257,6 +1259,7 @@ function App() {
                 }
               } catch (error) {
                 console.error('Failed to load tracker module:', error);
+                if (/iPhone|iPad|iPod/.test(navigator.userAgent)) alert(`App.tsx CATCH: ${error instanceof Error ? error.message : error}`);
                 notify.error('Failed to load file');
               }
             }}
