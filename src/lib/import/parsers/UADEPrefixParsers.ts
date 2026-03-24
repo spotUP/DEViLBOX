@@ -18,35 +18,59 @@ import { getBasename } from './withFallback';
 const UADE_ONLY_PREFIXES = [
   // ArtAndMagic, AMOS, Sierra-AGI
   'aam.', 'abk.', 'agi.',
+  // AshleyHogg
+  'ah.',
   // ActionAmics (prefix form), BeathovenSynthesizer
-  'ast.', 'bss.',
+  'ast.', 'bss.', 'bvs.',
+  // ChipTracker (Chuck Biscuits Archive)
+  'chip.', 'cba.',
+  // CoreDesign
+  'cd.',
   // FutureComposer-BSI, custom
   'bfc.', 'bsi.', 'fc-bsi.', 'cus.', 'cust.', 'custom.',
+  // DaveLowe WTD variant
+  'dlw.',
   // DynamicSynthesizer, DariusZendeh (DavidHanney handled by DavidHanneyParser)
   'dns.', 'dz.', 'mkiio.',
   // EarAche, EMS (mg.* was GlueMon alias — handled by GlueMonParser; ea.* = EarAche still UADE)
   'ea.', 'ems.', 'emsv6.',
   // ForgottenWorlds (GlueMon handled by GlueMonParser)
   'fw.',
+  // FredEditor/Monitor (fredmon prefix)
+  'fredmon.',
+  // FuturePlayer2 (fp2 prefix, also pat. follin)
+  'fp2.',
   // HowieDavies, MajorTom variants
   'hd.', 'hn.', 'thn.', 'mtp2.', 'arp.',
   // JochenHippel base (hip.*, mcmd.*, sog.*) — different from CoSo and 7V
   'hip.', 'mcmd.', 'sog.',
   // MarkII, MusiclineEditor (MikeDavies handled by AmigaFormatParsers with classic mode)
   'mk2.', 'mkii.', 'ml.',
+  // MaxTrax
+  'mxt.',
   // Silmarils
-  'mok.',
+  'mok.', 'sil.',
+  // NoiseTracker/ProTracker variant
+  'nt.',
+  // NTSP
+  'ntsp.',
+  // PaulSummers
+  'psum.',
   // Pokeynoise
   'pn.',
-  // RiffRaff, SeanConnolly
-  'riff.', 's-c.', 'scn.',
+  // RiffRaff, SeanConnolly (sc2 = SeanConnolly2)
+  'riff.', 's-c.', 'scn.', 'sc2.',
+  // RobHubbardST
+  'rhst.', 'rho.',
+  // RonKlaren
+  'rkl.',
   // SonicArranger variants, SpeedyA1System
   'sa-p.', 'lion.', 'sa_old.', 'sas.',
   // SCUMM, SynthDream
   'scumm.', 'sdr.',
   // SoundProgrammingLanguage, SoundImages
   'spl.', 'tw.',
-  // SUN-Tronic, SynTracker
+  // SUN-Tronic, SynTracker, StoneTracker
   'sun.', 'synmod.', 'st.',
   // TimFollin
   'tf.',
@@ -54,6 +78,8 @@ const UADE_ONLY_PREFIXES = [
   'thx.',
   // TFMX variant prefixes (all handled by UADE)
   'tfhd1.5.', 'tfhd7v.', 'tfhdpro.', 'tfmx1.5.', 'tfmx7v.', 'tfmxpro.',
+  // TomyTracker
+  'tomy.',
   // VoodooSupremeSynthesizer
   'vss.',
 ] as const;
