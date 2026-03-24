@@ -8,6 +8,7 @@
 import React, { useEffect, useRef, useCallback, useState } from 'react';
 import { useDJStore } from '@/stores/useDJStore';
 import { getDJEngine } from '@/engine/dj/DJEngine';
+import { setDeckPitch, setDeckChannelMuteMask } from '@/engine/dj/DJActions';
 import { parseModuleToSong } from '@/lib/import/parseModuleToSong';
 import { detectBPM } from '@/engine/dj/DJBeatDetector';
 import { cacheSong } from '@/engine/dj/DJSongCache';
@@ -54,11 +55,7 @@ export const DJDeck: React.FC<DJDeckProps> = ({ deckId }) => {
       const newPitch = state.decks[deckId].pitchOffset;
       if (newPitch !== prevPitch) {
         prevPitch = newPitch;
-        try {
-          getDJEngine().getDeck(deckId).setPitch(newPitch);
-        } catch {
-          // Engine might not be initialized yet
-        }
+        setDeckPitch(deckId, newPitch);
       }
     });
     return unsubscribe;
@@ -72,11 +69,7 @@ export const DJDeck: React.FC<DJDeckProps> = ({ deckId }) => {
       const newMask = state.decks[deckId].channelMask;
       if (newMask !== prevMask) {
         prevMask = newMask;
-        try {
-          getDJEngine().getDeck(deckId).replayer.setChannelMuteMask(newMask);
-        } catch {
-          // Engine might not be initialized yet
-        }
+        setDeckChannelMuteMask(deckId, newMask);
       }
     });
     return unsubscribe;

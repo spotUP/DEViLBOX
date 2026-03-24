@@ -11,7 +11,7 @@
 import React, { useRef, useEffect, useCallback } from 'react';
 import { useDJStore } from '@/stores/useDJStore';
 import { useThemeStore } from '@stores';
-import { getDJEngine } from '@/engine/dj/DJEngine';
+import { seekDeckAudio } from '@/engine/dj/DJActions';
 import { OffscreenBridge } from '@engine/renderer/OffscreenBridge';
 import WaveformWorkerFactory from '@/workers/dj-waveform.worker.ts?worker';
 import { markSeek } from './seekGuard';
@@ -203,13 +203,10 @@ export const DeckAudioWaveform: React.FC<DeckAudioWaveformProps> = ({ deckId }) 
 
   const seekToFraction = useCallback((fraction: number) => {
     const f = Math.max(0, Math.min(1, fraction));
-    try {
-      const deck = getDJEngine().getDeck(deckId);
-      const seekSec = f * (useDJStore.getState().decks[deckId].durationMs / 1000);
-      markSeek(deckId);
-      deck.audioPlayer.seek(seekSec);
-      useDJStore.getState().setDeckState(deckId, { audioPosition: seekSec, elapsedMs: seekSec * 1000 });
-    } catch { /* engine not ready */ }
+    const seekSec = f * (useDJStore.getState().decks[deckId].durationMs / 1000);
+    markSeek(deckId);
+    seekDeckAudio(deckId, seekSec);
+    useDJStore.getState().setDeckState(deckId, { audioPosition: seekSec, elapsedMs: seekSec * 1000 });
   }, [deckId]);
 
   const isDraggingRef = useRef(false);

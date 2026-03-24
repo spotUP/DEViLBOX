@@ -10,7 +10,16 @@ import { useDJStore } from '@/stores/useDJStore';
 import { registerViewHandler } from '@/engine/keyboard/KeyboardRouter';
 import type { NormalizedKeyEvent } from '@/engine/keyboard/types';
 import { getDJEngine } from '@/engine/dj/DJEngine';
-import { togglePlay } from '@/engine/dj/DJActions';
+import {
+  togglePlay,
+  cueDeck,
+  nudgeDeck,
+  setDeckLineLoop,
+  clearDeckLineLoop,
+  setCrossfader,
+  killAllDecks,
+  setDeckSlipEnabled,
+} from '@/engine/dj/DJActions';
 import { DJBeatSync } from '@/engine/dj/DJBeatSync';
 import { beatJump, triggerHotCue, activateSeratoLoop } from '@/engine/dj/DJBeatJump';
 import {
@@ -96,12 +105,12 @@ export function useDJKeyboardHandler(): void {
           store.setDeckPitch('A', store.decks.A.pitchOffset + 1);
         } else {
           // Cue (jump to cue point)
-          engine.deckA.cue(store.decks.A.cuePoint);
+          cueDeck('A', store.decks.A.cuePoint);
         }
         break;
 
       case 'e': // Slip cue — jump at next pattern boundary
-        engine.deckA.cue(store.decks.A.songPos + 1);
+        cueDeck('A', store.decks.A.songPos + 1);
         break;
 
       case 'r': // Set cue point at current position
@@ -109,11 +118,11 @@ export function useDJKeyboardHandler(): void {
         break;
 
       case 'a': // Nudge back
-        engine.deckA.nudge(shift ? -5 : -2, shift ? 16 : 8);
+        nudgeDeck('A', shift ? -5 : -2, shift ? 16 : 8);
         break;
 
       case 'd': // Nudge forward
-        engine.deckA.nudge(shift ? 5 : 2, shift ? 16 : 8);
+        nudgeDeck('A', shift ? 5 : 2, shift ? 16 : 8);
         break;
 
       case 's':
@@ -128,10 +137,10 @@ export function useDJKeyboardHandler(): void {
 
       case 'z': // Loop on/off
         if (store.decks.A.loopActive) {
-          engine.deckA.clearLineLoop();
+          clearDeckLineLoop('A');
           store.setDeckLoop('A', 'off', false);
         } else {
-          engine.deckA.setLineLoop(store.decks.A.lineLoopSize);
+          setDeckLineLoop('A', store.decks.A.lineLoopSize);
           store.setDeckLoop('A', 'line', true);
         }
         break;
@@ -141,7 +150,7 @@ export function useDJKeyboardHandler(): void {
         if (idx > 0) {
           const newSize = LOOP_SIZES[idx - 1];
           store.setDeckLoopSize('A', newSize);
-          if (store.decks.A.loopActive) engine.deckA.setLineLoop(newSize);
+          if (store.decks.A.loopActive) setDeckLineLoop('A', newSize);
         }
         break;
       }
@@ -151,7 +160,7 @@ export function useDJKeyboardHandler(): void {
         if (idx < LOOP_SIZES.length - 1) {
           const newSize = LOOP_SIZES[idx + 1];
           store.setDeckLoopSize('A', newSize);
-          if (store.decks.A.loopActive) engine.deckA.setLineLoop(newSize);
+          if (store.decks.A.loopActive) setDeckLineLoop('A', newSize);
         }
         break;
       }
@@ -190,12 +199,12 @@ export function useDJKeyboardHandler(): void {
           store.setDeckPitch('B', store.decks.B.pitchOffset + 1);
         } else {
           // Cue
-          engine.deckB.cue(store.decks.B.cuePoint);
+          cueDeck('B', store.decks.B.cuePoint);
         }
         break;
 
       case 'i': // Slip cue
-        engine.deckB.cue(store.decks.B.songPos + 1);
+        cueDeck('B', store.decks.B.songPos + 1);
         break;
 
       case 'u': // Set cue point
@@ -203,11 +212,11 @@ export function useDJKeyboardHandler(): void {
         break;
 
       case 'j': // Nudge back
-        engine.deckB.nudge(shift ? -5 : -2, shift ? 16 : 8);
+        nudgeDeck('B', shift ? -5 : -2, shift ? 16 : 8);
         break;
 
       case 'l': // Nudge forward
-        engine.deckB.nudge(shift ? 5 : 2, shift ? 16 : 8);
+        nudgeDeck('B', shift ? 5 : 2, shift ? 16 : 8);
         break;
 
       case 'k':
@@ -222,10 +231,10 @@ export function useDJKeyboardHandler(): void {
 
       case 'm': // Loop on/off
         if (store.decks.B.loopActive) {
-          engine.deckB.clearLineLoop();
+          clearDeckLineLoop('B');
           store.setDeckLoop('B', 'off', false);
         } else {
-          engine.deckB.setLineLoop(store.decks.B.lineLoopSize);
+          setDeckLineLoop('B', store.decks.B.lineLoopSize);
           store.setDeckLoop('B', 'line', true);
         }
         break;
@@ -235,7 +244,7 @@ export function useDJKeyboardHandler(): void {
         if (idx > 0) {
           const newSize = LOOP_SIZES[idx - 1];
           store.setDeckLoopSize('B', newSize);
-          if (store.decks.B.loopActive) engine.deckB.setLineLoop(newSize);
+          if (store.decks.B.loopActive) setDeckLineLoop('B', newSize);
         }
         break;
       }
@@ -245,7 +254,7 @@ export function useDJKeyboardHandler(): void {
         if (idx < LOOP_SIZES.length - 1) {
           const newSize = LOOP_SIZES[idx + 1];
           store.setDeckLoopSize('B', newSize);
-          if (store.decks.B.loopActive) engine.deckB.setLineLoop(newSize);
+          if (store.decks.B.loopActive) setDeckLineLoop('B', newSize);
         }
         break;
       }
@@ -275,18 +284,15 @@ export function useDJKeyboardHandler(): void {
       // ================================================================
       case ' ': // Crossfader: snap to center
         e.preventDefault();
-        store.setCrossfader(0.5);
-        engine.mixer.setCrossfader(0.5);
+        setCrossfader(0.5);
         break;
 
       case 'f': // Crossfader toward A
-        store.setCrossfader(Math.max(0, store.crossfaderPosition - 0.05));
-        engine.mixer.setCrossfader(store.crossfaderPosition);
+        setCrossfader(Math.max(0, store.crossfaderPosition - 0.05));
         break;
 
       case 'g': // Crossfader toward B
-        store.setCrossfader(Math.min(1, store.crossfaderPosition + 0.05));
-        engine.mixer.setCrossfader(store.crossfaderPosition);
+        setCrossfader(Math.min(1, store.crossfaderPosition + 0.05));
         break;
 
       case 't': // Sync Deck B BPM to Deck A (use phase-locked if available)
@@ -305,9 +311,7 @@ export function useDJKeyboardHandler(): void {
         break;
 
       case '`': // Kill all audio
-        engine.killAll();
-        store.setDeckPlaying('A', false);
-        store.setDeckPlaying('B', false);
+        killAllDecks();
         break;
 
       case 'f1': // PFL Deck A toggle
@@ -322,9 +326,12 @@ export function useDJKeyboardHandler(): void {
 
       case 'f4': // Slip mode toggle (whichever deck was last active)
         e.preventDefault();
-        // Toggle slip on deck A by default
-        store.setDeckSlip('A', !store.decks.A.slipEnabled);
-        engine.deckA.setSlipEnabled(!store.decks.A.slipEnabled);
+        {
+          // Toggle slip on deck A by default
+          const newSlip = !store.decks.A.slipEnabled;
+          store.setDeckSlip('A', newSlip);
+          setDeckSlipEnabled('A', newSlip);
+        }
         break;
 
       // ================================================================
