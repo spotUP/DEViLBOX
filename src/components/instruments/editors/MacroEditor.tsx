@@ -634,7 +634,6 @@ export const MacroListEditor: React.FC<MacroListEditorProps> = ({
   onChange,
   playbackPositions,
 }) => {
-  const [expandedMacro, setExpandedMacro] = useState<number | null>(null);
   const [showAddMenu, setShowAddMenu] = useState(false);
 
   const getMacroRange = (macroType: number): { min: number; max: number; bipolar: boolean } => {
@@ -672,13 +671,11 @@ export const MacroListEditor: React.FC<MacroListEditorProps> = ({
       speed:   1,
     };
     onChange([...macros, newMacro]);
-    setExpandedMacro(macros.length);
     setShowAddMenu(false);
   };
 
   const removeMacro = (index: number) => {
     onChange(macros.filter((_, i) => i !== index));
-    if (expandedMacro === index) setExpandedMacro(null);
   };
 
   const updateMacro = (index: number, updated: FurnaceMacro) => {
@@ -693,60 +690,53 @@ export const MacroListEditor: React.FC<MacroListEditorProps> = ({
     .map(([typeNum, name]) => ({ type: parseInt(typeNum), name }));
 
   return (
-    <div className="space-y-2">
-      {/* Existing macros */}
-      {macros.map((macro, index) => (
-        <div key={index} className="border border-dark-border rounded-lg overflow-hidden">
-          {/* Collapsed header */}
-          <div
-            className="flex items-center justify-between px-3 py-2 bg-dark-bg cursor-pointer hover:bg-dark-bgSecondary select-none"
-            onClick={() => setExpandedMacro(expandedMacro === index ? null : index)}
-          >
-            <div className="flex items-center gap-2">
-              <div
-                className="w-3 h-3 rounded-sm flex-shrink-0"
-                style={{ backgroundColor: getMacroColor(macro.type) }}
-              />
-              <span className="font-mono text-xs font-bold text-text-primary">
-                {MACRO_TYPE_NAMES[macro.type] || `Macro ${macro.type}`}
-              </span>
-              <span className="text-[10px] text-text-muted">
-                {macro.data.length}st
-                {macro.loop    >= 0 && ` · loop@${macro.loop}`}
-                {macro.release >= 0 && ` · rel@${macro.release}`}
-              </span>
-              {typeof playbackPositions?.[macro.type] === 'number' && (
-                <span className="text-[9px] text-yellow-400">▶ {playbackPositions[macro.type]}</span>
-              )}
+    <div className="flex flex-col gap-2">
+      {/* Macros — side by side grid, always visible */}
+      <div className="grid gap-2" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))' }}>
+        {macros.map((macro, index) => (
+          <div key={index} className="border border-dark-border rounded-lg overflow-hidden flex flex-col">
+            {/* Header */}
+            <div className="flex items-center justify-between px-2 py-1 bg-dark-bg select-none">
+              <div className="flex items-center gap-1.5">
+                <div
+                  className="w-2.5 h-2.5 rounded-sm flex-shrink-0"
+                  style={{ backgroundColor: getMacroColor(macro.type) }}
+                />
+                <span className="font-mono text-[10px] font-bold text-text-primary">
+                  {MACRO_TYPE_NAMES[macro.type] || `Macro ${macro.type}`}
+                </span>
+                {typeof playbackPositions?.[macro.type] === 'number' && (
+                  <span className="text-[9px] text-yellow-400">▶ {playbackPositions[macro.type]}</span>
+                )}
+              </div>
+              <button
+                onClick={() => removeMacro(index)}
+                className="text-red-400 hover:text-red-300 text-xs px-1 hover:bg-red-500/10 rounded"
+              >
+                ×
+              </button>
             </div>
-            <button
-              onClick={(e) => { e.stopPropagation(); removeMacro(index); }}
-              className="text-red-400 hover:text-red-300 text-xs px-1 hover:bg-red-500/10 rounded"
-            >
-              ×
-            </button>
-          </div>
 
-          {/* Expanded editor */}
-          {expandedMacro === index && (
+            {/* Always-visible editor */}
             <MacroEditor
               macro={macro}
               macroType={macro.type}
               onChange={(m) => updateMacro(index, m)}
               {...getMacroRange(macro.type)}
               color={getMacroColor(macro.type)}
+              height={50}
               playbackPosition={playbackPositions?.[macro.type]}
             />
-          )}
-        </div>
-      ))}
+          </div>
+        ))}
+      </div>
 
-      {/* Add macro — click-toggle dropdown (not hover) */}
+      {/* Add macro — click-toggle dropdown */}
       {availableTypes.length > 0 && (
         <div className="relative">
           <button
             onClick={() => setShowAddMenu(!showAddMenu)}
-            className={`w-full py-2 border border-dashed rounded-lg text-xs font-mono flex items-center justify-center gap-2 transition-colors ${
+            className={`w-full py-1.5 border border-dashed rounded-lg text-xs font-mono flex items-center justify-center gap-2 transition-colors ${
               showAddMenu
                 ? 'border-accent text-text-primary bg-dark-bgSecondary'
                 : 'border-dark-border text-text-muted hover:text-text-primary hover:border-accent'
