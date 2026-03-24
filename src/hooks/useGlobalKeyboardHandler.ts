@@ -1869,7 +1869,7 @@ export function useGlobalKeyboardHandler(options: UseGlobalKeyboardHandlerOption
         e.stopPropagation();
         const replayer = getTrackerReplayer();
         const store = useTransportStore.getState();
-        const wasPlaying = store.isPlaying || replayer.isPlaying() || replayer.getSong() !== null;
+        const wasPlaying = store.isPlaying || replayer.isPlaying();
         console.log(`[KB] ${e.code}: store.isPlaying=${store.isPlaying} replayer.isPlaying=${replayer.isPlaying()} hasSong=${replayer.getSong() !== null}`);
         if (wasPlaying && replayer.getSong()) {
           replayer.forcePosition(e.code === 'ShiftRight' ? 0 : replayer.getSongPos(), 0);
