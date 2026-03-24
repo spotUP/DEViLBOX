@@ -10,15 +10,19 @@
  */
 
 import React, { useRef, useEffect, useCallback, useState } from 'react';
+import { ChevronDown, ChevronRight } from 'lucide-react';
 import type { KlysNativeData } from '@/types/tracker';
 import { useFormatStore } from '@stores';
 
-const CHAR_W = 8;
+const CHAR_W = 10;
 const CHAR_H = 14;
-const ROW_H = CHAR_H + 2;
-const HEADER_H = ROW_H + 4;
+const ROW_H = 20;
+const HEADER_H = 24;
 const POS_NUM_W = CHAR_W * 4 + 4;
 const CH_W = CHAR_W * 8 + 4;      // "P000+00 " = 8 chars
+
+export const KLYS_MATRIX_HEIGHT = 200;
+export const KLYS_MATRIX_COLLAPSED_HEIGHT = 28;
 
 const HEX = '0123456789abcdef';
 
@@ -47,6 +51,8 @@ interface KlysPositionEditorProps {
   nativeData: KlysNativeData;
   currentPosition: number;
   onPositionChange: (pos: number) => void;
+  collapsed?: boolean;
+  onToggleCollapse?: () => void;
 }
 
 // Map digit column to char offset within the channel cell
@@ -60,11 +66,13 @@ function digitCharX(d: number): number {
 
 export const KlysPositionEditor: React.FC<KlysPositionEditorProps> = ({
   width, height, nativeData, currentPosition, onPositionChange,
+  collapsed, onToggleCollapse,
 }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const numChannels = nativeData.channels;
   const numPositions = nativeData.songLength;
-  const visibleRows = Math.floor((height - HEADER_H) / ROW_H);
+  const canvasH = height - KLYS_MATRIX_COLLAPSED_HEIGHT;
+  const visibleRows = Math.floor((canvasH - HEADER_H) / ROW_H);
 
   // Cursor: channel + digit column within channel
   const [curCh, setCurCh] = useState(0);
@@ -87,22 +95,22 @@ export const KlysPositionEditor: React.FC<KlysPositionEditorProps> = ({
 
     const dpr = window.devicePixelRatio || 1;
     canvas.width = width * dpr;
-    canvas.height = height * dpr;
+    canvas.height = canvasH * dpr;
     ctx.scale(dpr, dpr);
 
     ctx.fillStyle = COLORS.bg;
-    ctx.fillRect(0, 0, width, height);
+    ctx.fillRect(0, 0, width, canvasH);
     ctx.font = `${CHAR_H}px "JetBrains Mono", "Fira Code", monospace`;
-    ctx.textBaseline = 'top';
+    ctx.textBaseline = 'middle';
 
     // Header
     ctx.fillStyle = COLORS.headerBg;
     ctx.fillRect(0, 0, width, HEADER_H);
     ctx.fillStyle = COLORS.headerText;
-    ctx.fillText('POS', 2, 4);
+    ctx.fillText('POS', 2, HEADER_H / 2);
     for (let ch = 0; ch < numChannels; ch++) {
       const x = POS_NUM_W + ch * CH_W;
-      ctx.fillText(`CH${(ch + 1).toString().padStart(2, '0')}`, x, 4);
+      ctx.fillText(`CH${(ch + 1).toString().padStart(2, '0')}`, x, HEADER_H / 2);
     }
 
     // Rows — each position maps to per-channel sequence entries
@@ -123,7 +131,7 @@ export const KlysPositionEditor: React.FC<KlysPositionEditorProps> = ({
       }
 
       ctx.fillStyle = isCurrent ? '#ffff88' : COLORS.posNum;
-      ctx.fillText(pos.toString().padStart(3, '0'), 2, y + 1);
+      ctx.fillText(pos.toString().padStart(3, '0'), 2, y + ROW_H / 2);
 
       // Separator lines
       for (let ch = 1; ch < numChannels; ch++) {
@@ -143,21 +151,21 @@ export const KlysPositionEditor: React.FC<KlysPositionEditorProps> = ({
         const entry = seq.entries.find(e => e.position === pos);
         if (!entry) {
           ctx.fillStyle = COLORS.posNum;
-          ctx.fillText('---', x, y + 1);
+          ctx.fillText('---', x, y + ROW_H / 2);
           continue;
         }
 
         ctx.fillStyle = COLORS.pattern;
-        ctx.fillText(`P${entry.pattern.toString().padStart(3, '0')}`, x, y + 1);
+        ctx.fillText(`P${entry.pattern.toString().padStart(3, '0')}`, x, y + ROW_H / 2);
 
         const offset = entry.noteOffset;
         const sign = offset >= 0 ? '+' : '-';
         const offAbs = Math.abs(offset).toString().padStart(2, '0');
         ctx.fillStyle = offset === 0 ? COLORS.transDim : (offset > 0 ? COLORS.transPos : COLORS.transNeg);
-        ctx.fillText(`${sign}${offAbs}`, x + CHAR_W * 4, y + 1);
+        ctx.fillText(`${sign}${offAbs}`, x + CHAR_W * 4, y + ROW_H / 2);
       }
     }
-  }, [width, height, nativeData, currentPosition, numPositions, numChannels, scrollPos, visibleRows, curCh, curDigit]);
+  }, [width, height, canvasH, nativeData, currentPosition, numPositions, numChannels, scrollPos, visibleRows, curCh, curDigit]);
 
   const handleClick = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
     canvasRef.current?.focus();
@@ -299,15 +307,52 @@ export const KlysPositionEditor: React.FC<KlysPositionEditorProps> = ({
 
   useEffect(() => { canvasRef.current?.focus(); }, []);
 
+  const collapseLabel = (
+    <span style={{
+      fontFamily: '"JetBrains Mono", "Fira Code", monospace',
+      fontSize: 12, fontWeight: 700, color: 'var(--color-accent)',
+    }}>SEQUENCE</span>
+  );
+
+  if (collapsed) {
+    return (
+      <div
+        style={{
+          width,
+          height: KLYS_MATRIX_COLLAPSED_HEIGHT,
+          display: 'flex', alignItems: 'center', gap: 6, padding: '0 8px',
+          background: 'var(--color-tracker-row-highlight)',
+          cursor: 'pointer',
+          borderBottom: '1px solid var(--color-tracker-border, var(--color-border))',
+        }}
+        onClick={onToggleCollapse}
+      >
+        <ChevronRight size={14} style={{ color: 'var(--color-text-muted)', flexShrink: 0 }} />
+        {collapseLabel}
+      </div>
+    );
+  }
+
   return (
-    <canvas
-      ref={canvasRef}
-      width={width}
-      height={height}
-      style={{ width, height, outline: 'none', cursor: 'pointer' }}
-      tabIndex={0}
-      onClick={handleClick}
-      onKeyDown={handleKeyDown}
-    />
+    <div style={{ width, height, display: 'flex', flexDirection: 'column', background: 'var(--color-tracker-row-even)' }}>
+      <div style={{
+        display: 'flex', alignItems: 'center', gap: 6, padding: '0 8px',
+        height: KLYS_MATRIX_COLLAPSED_HEIGHT, flexShrink: 0,
+        background: 'var(--color-tracker-row-highlight)', cursor: 'pointer',
+        borderBottom: '1px solid var(--color-tracker-border, var(--color-border))',
+      }} onClick={onToggleCollapse}>
+        <ChevronDown size={14} style={{ color: 'var(--color-text-muted)', flexShrink: 0 }} />
+        {collapseLabel}
+      </div>
+      <canvas
+        ref={canvasRef}
+        width={width}
+        height={canvasH}
+        style={{ width, height: canvasH, outline: 'none', cursor: 'pointer' }}
+        tabIndex={0}
+        onClick={handleClick}
+        onKeyDown={handleKeyDown}
+      />
+    </div>
   );
 };

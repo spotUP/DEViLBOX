@@ -18,10 +18,9 @@ import { getTrackerReplayer } from '@engine/TrackerReplayer';
 import { exportAsHively } from '@lib/export/HivelyExporter';
 import { PatternEditorCanvas } from '@/components/tracker/PatternEditorCanvas';
 import { HIVELY_COLUMNS, hivelyToFormatChannels } from './hivelyAdapter';
-import { HivelyPositionEditor } from './HivelyPositionEditor';
+import { HivelyPositionEditor, HIVELY_MATRIX_HEIGHT, HIVELY_MATRIX_COLLAPSED_HEIGHT } from './HivelyPositionEditor';
 
 const TOOLBAR_H = 36;
-const POSITION_H = 160;
 
 export const HivelyView: React.FC<{ width?: number; height?: number }> = () => {
   const nativeData = useFormatStore(s => s.hivelyNative);
@@ -31,6 +30,9 @@ export const HivelyView: React.FC<{ width?: number; height?: number }> = () => {
   const currentRow = useTransportStore(s => s.currentRow);
 
   const [editPosition, setEditPosition] = useState(0);
+  const [matrixCollapsed, setMatrixCollapsed] = useState(false);
+
+  const positionH = matrixCollapsed ? HIVELY_MATRIX_COLLAPSED_HEIGHT : HIVELY_MATRIX_HEIGHT;
 
   // Measure container width for HivelyPositionEditor (canvas-based, needs numeric width)
   const containerRef = useRef<HTMLDivElement>(null);
@@ -130,16 +132,18 @@ export const HivelyView: React.FC<{ width?: number; height?: number }> = () => {
 
       {/* Position editor */}
       <div style={{
-        height: `${POSITION_H}px`,
+        height: `${positionH}px`,
         borderBottom: '1px solid var(--color-border)',
         flexShrink: 0,
       }}>
         <HivelyPositionEditor
           width={containerWidth}
-          height={POSITION_H}
+          height={positionH}
           nativeData={nativeData}
           currentPosition={activePosition}
           onPositionChange={handlePositionChange}
+          collapsed={matrixCollapsed}
+          onToggleCollapse={() => setMatrixCollapsed(!matrixCollapsed)}
         />
       </div>
 

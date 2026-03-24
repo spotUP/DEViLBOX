@@ -222,7 +222,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
     // FORMAT MODE: compute widths from column definitions (per-channel columns supported)
     if (isFormatMode && formatColumns && formatChannels) {
       const FORMAT_COL_GAP  = 4;
-      const FORMAT_CHAN_GAP = 8;
+      const FORMAT_CHAN_PAD = 40;  // Padding inside channel (matches normal mode feel)
       const widths: number[] = [];
       const offsets: number[] = [];
       let currentX = LINE_NUMBER_WIDTH;
@@ -231,7 +231,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
         const contentWidth = cols.reduce(
           (sum, col) => sum + col.charWidth * CHAR_WIDTH + FORMAT_COL_GAP, 0
         ) - FORMAT_COL_GAP;
-        const chanW = contentWidth + FORMAT_CHAN_GAP;
+        const chanW = contentWidth + FORMAT_CHAN_PAD;
         offsets.push(currentX);
         widths.push(chanW);
         currentX += chanW;

@@ -17,7 +17,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { PatternEditorCanvas } from '@/components/tracker/PatternEditorCanvas';
 import { GTU_COLUMNS } from './gtuAdapter';
 import { GTToolbar } from './GTToolbar';
-import { GTOrderMatrix, GT_ORDER_MATRIX_HEIGHT } from './GTOrderMatrix';
+import { GTOrderMatrix, GT_ORDER_MATRIX_HEIGHT, GT_ORDER_MATRIX_COLLAPSED_HEIGHT } from './GTOrderMatrix';
 import { useGTKeyboardHandler } from './GTKeyboardHandler';
 import { useGTUltraEngineInit } from '../../engine/gtultra/useGTUltraEngineInit';
 import { useGTUltraFormatData } from './useGTUltraFormatData';
@@ -29,6 +29,7 @@ export const GTUltraView: React.FC<{ width?: number; height?: number }> = () => 
 
   const containerRef = useRef<HTMLDivElement>(null);
   const [containerWidth, setContainerWidth] = useState(800);
+  const [ordersCollapsed, setOrdersCollapsed] = useState(false);
 
   useEffect(() => {
     const el = containerRef.current;
@@ -45,6 +46,8 @@ export const GTUltraView: React.FC<{ width?: number; height?: number }> = () => 
   useGTKeyboardHandler(true);
   useGTUltraEngineInit();
 
+  const matrixH = ordersCollapsed ? GT_ORDER_MATRIX_COLLAPSED_HEIGHT : GT_ORDER_MATRIX_HEIGHT;
+
   return (
     <div ref={containerRef} style={{
       display: 'flex', flexDirection: 'column',
@@ -56,8 +59,13 @@ export const GTUltraView: React.FC<{ width?: number; height?: number }> = () => 
         <GTToolbar />
       </div>
 
-      <div style={{ height: `${GT_ORDER_MATRIX_HEIGHT}px`, flexShrink: 0 }}>
-        <GTOrderMatrix width={containerWidth} height={GT_ORDER_MATRIX_HEIGHT} />
+      <div style={{ height: matrixH, flexShrink: 0 }}>
+        <GTOrderMatrix
+          width={containerWidth}
+          height={matrixH}
+          collapsed={ordersCollapsed}
+          onToggleCollapse={() => setOrdersCollapsed(!ordersCollapsed)}
+        />
       </div>
 
       <div style={{ flex: 1, minHeight: 0, overflow: 'hidden' }}>
