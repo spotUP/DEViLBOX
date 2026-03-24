@@ -15,8 +15,14 @@
 
 import React, { useState, useRef, useCallback } from 'react';
 import { useDJStore } from '@/stores/useDJStore';
-import { getDJEngine } from '@/engine/dj/DJEngine';
 import { SCRATCH_PATTERNS } from '@/engine/dj/DJScratchEngine';
+import {
+  playDeckPattern,
+  stopDeckPattern,
+  finishDeckPatternCycle,
+  startDeckFaderLFO,
+  stopDeckFaderLFO,
+} from '@/engine/dj/DJActions';
 
 interface DeckScratchProps {
   deckId: 'A' | 'B' | 'C';
@@ -49,8 +55,6 @@ export const DeckScratch: React.FC<DeckScratchProps> = ({ deckId }) => {
   const deckActiveBg = isB ? 'bg-red-900/40 border-red-500/60' : 'bg-blue-900/40 border-blue-500/60';
   const deckWaitBg = isB ? 'bg-red-900/20 border-red-500/30' : 'bg-blue-900/20 border-blue-500/30';
 
-  const getDeck = useCallback(() => getDJEngine().getDeck(deckId), [deckId]);
-
   // ── Pattern buttons ──────────────────────────────────────────────────────
 
   const handlePatternPointerDown = useCallback((patternName: string, e: React.PointerEvent) => {
@@ -67,7 +71,7 @@ export const DeckScratch: React.FC<DeckScratchProps> = ({ deckId }) => {
     let quantizeWaitMs = 0;
 
     try {
-      getDeck().playPattern(patternName, (waitMs) => {
+      playDeckPattern(deckId, patternName, (waitMs) => {
         quantizeWaitMs = waitMs;
         setTimeout(() => {
           setWaitingPattern(null);
@@ -83,21 +87,21 @@ export const DeckScratch: React.FC<DeckScratchProps> = ({ deckId }) => {
       setWaitingPattern(null);
       store.setDeckPattern(deckId, patternName);
     }
-  }, [deckId, activePatternName, getDeck]);
+  }, [deckId, activePatternName]);
 
   const handlePatternPointerUp = useCallback((_patternName: string) => {
     const held = performance.now() - pressTimeRef.current;
     if (held < TAP_MS) {
       // Tap: one-shot — let current cycle finish then stop
-      try { getDeck().finishPatternCycle(); } catch { /* engine not ready */ }
+      finishDeckPatternCycle(deckId);
     } else {
       // Hold release: stop immediately
-      try { getDeck().stopPattern(); } catch { /* engine not ready */ }
+      stopDeckPattern(deckId);
     }
     // Always clear active state so button goes inactive immediately
     useDJStore.getState().setDeckPattern(deckId, null);
     setWaitingPattern(null);
-  }, [deckId, getDeck]);
+  }, [deckId]);
 
   // ── Fader LFO buttons ────────────────────────────────────────────────────
 
@@ -106,14 +110,14 @@ export const DeckScratch: React.FC<DeckScratchProps> = ({ deckId }) => {
 
     if (division === null || (faderLFOActive && faderLFODivision === division)) {
       // Turn off
-      try { getDeck().stopFaderLFO(); } catch { /* engine not ready */ }
+      stopDeckFaderLFO(deckId);
       store.setDeckFaderLFO(deckId, false);
       return;
     }
 
-    try { getDeck().startFaderLFO(division); } catch { /* engine not ready */ }
+    startDeckFaderLFO(deckId, division);
     store.setDeckFaderLFO(deckId, true, division);
-  }, [deckId, faderLFOActive, faderLFODivision, getDeck]);
+  }, [deckId, faderLFOActive, faderLFODivision]);
 
   return (
     <div className="flex items-center gap-2 flex-wrap">

@@ -16,7 +16,7 @@ import {
   getQuantizeMode,
 } from '@/engine/dj/DJQuantizedFX';
 import { onNextDownbeat } from '@/engine/dj/DJAutoSync';
-import { getDJEngine } from '@/engine/dj/DJEngine';
+import { setCrossfader } from '@/engine/dj/DJActions';
 import type { DeckId } from '@/engine/dj/DeckEngine';
 
 export const MixerTransition: React.FC = () => {
@@ -67,17 +67,13 @@ export const MixerTransition: React.FC = () => {
       setAutomating(true);
       setDirection(to === 'A' ? 'B→A' : 'A→B');
       cancelRef.current = onNextDownbeat(from, () => {
-        try {
-          getDJEngine().setCrossfader(target);
-        } catch { /* engine not ready */ }
+        setCrossfader(target);
         setAutomating(false);
         setDirection(null);
         cancelRef.current = null;
       });
     } else {
-      try {
-        getDJEngine().setCrossfader(target);
-      } catch { /* engine not ready */ }
+      setCrossfader(target);
     }
   }, [cancelCurrent]);
 

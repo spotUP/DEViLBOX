@@ -9,7 +9,7 @@ import React, { useRef, useEffect, useCallback } from 'react';
 import { useDJStore } from '@/stores/useDJStore';
 import { useThemeStore } from '@stores';
 import { markSeek } from './seekGuard';
-import { getDJEngine } from '@/engine/dj/DJEngine';
+import { seekDeckAudio, cueDeck } from '@/engine/dj/DJActions';
 import { OffscreenBridge } from '@engine/renderer/OffscreenBridge';
 import OverviewWorkerFactory from '@/workers/dj-overview.worker.ts?worker';
 
@@ -129,20 +129,18 @@ export const DeckTrackOverview: React.FC<DeckTrackOverviewProps> = ({ deckId }) 
   /** Perform an actual audio seek to a fraction of the song */
   const seekToFraction = useCallback((fraction: number) => {
     const f = Math.max(0, Math.min(1, fraction));
-    try {
-      const deck = getDJEngine().getDeck(deckId);
-      if (deck.playbackMode === 'audio') {
-        const seekSec = f * (useDJStore.getState().decks[deckId].durationMs / 1000);
-        markSeek(deckId);
-        deck.audioPlayer.seek(seekSec);
-        useDJStore.getState().setDeckState(deckId, { audioPosition: seekSec, elapsedMs: seekSec * 1000 });
-      } else {
-        const total = Math.max(useDJStore.getState().decks[deckId].totalPositions, 1);
-        const targetPos = Math.min(Math.floor(f * total), total - 1);
-        deck.cue(targetPos, 0);
-        useDJStore.getState().setDeckPosition(deckId, targetPos, 0);
-      }
-    } catch { /* Engine not ready */ }
+    const state = useDJStore.getState().decks[deckId];
+    if (state.playbackMode === 'audio') {
+      const seekSec = f * (state.durationMs / 1000);
+      markSeek(deckId);
+      seekDeckAudio(deckId, seekSec);
+      useDJStore.getState().setDeckState(deckId, { audioPosition: seekSec, elapsedMs: seekSec * 1000 });
+    } else {
+      const total = Math.max(state.totalPositions, 1);
+      const targetPos = Math.min(Math.floor(f * total), total - 1);
+      cueDeck(deckId, targetPos, 0);
+      useDJStore.getState().setDeckPosition(deckId, targetPos, 0);
+    }
   }, [deckId]);
 
   /** Update only the visual position marker (no audio seek — prevents noise during drag) */
