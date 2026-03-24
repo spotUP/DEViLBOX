@@ -21,7 +21,7 @@ export class ArrangementEditCommand {
    * Begin a new edit command. Snapshots the current arrangement state.
    */
   begin(snapshot: ArrangementSnapshot, description: string): void {
-    this.beforeState = JSON.parse(JSON.stringify(snapshot));
+    this.beforeState = structuredClone(snapshot);
     this.description = description;
     this.committed = false;
   }

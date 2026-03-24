@@ -255,7 +255,7 @@ export function parseV2M(data: ArrayBuffer): V2MFile {
  */
 export function patchBytesToConfig(patchData: Uint8Array): V2InstrumentConfig {
   // Start with defaults
-  const config: V2InstrumentConfig = JSON.parse(JSON.stringify(DEFAULT_V2_INSTRUMENT));
+  const config: V2InstrumentConfig = structuredClone(DEFAULT_V2_INSTRUMENT);
   
   if (patchData.length < 89) {
     console.warn('[V2M] Patch data too short:', patchData.length);
@@ -407,7 +407,7 @@ export function patchBytesToConfig(patchData: Uint8Array): V2InstrumentConfig {
  * Parse global effects bytes to V2GlobalEffects
  */
 export function globalBytesToEffects(globData: Uint8Array): V2GlobalEffects {
-  const effects: V2GlobalEffects = JSON.parse(JSON.stringify(DEFAULT_V2_GLOBALS));
+  const effects: V2GlobalEffects = structuredClone(DEFAULT_V2_GLOBALS);
   
   if (globData.length < 22) {
     console.warn('[V2M] Global data too short:', globData.length);

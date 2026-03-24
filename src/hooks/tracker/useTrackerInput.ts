@@ -11,6 +11,7 @@ import { useEditorStore } from '@stores/useEditorStore';
 import { useUIStore } from '@stores/useUIStore';
 import { useFormatStore } from '@stores/useFormatStore';
 import { useHistoryStore } from '@stores/useHistoryStore';
+import * as Tone from 'tone';
 import { getToneEngine } from '@engine/ToneEngine';
 import { getTrackerReplayer } from '@engine/TrackerReplayer';
 import { parseMPTClipboard } from '@lib/import/MPTClipboardParser';
@@ -588,7 +589,13 @@ export const useTrackerInput = () => {
         e.preventDefault();
         if (isPlaying) stop();
         setIsLooping(false);
-        getToneEngine().init().then(() => play());
+        // Fast path: skip async init when AudioContext is already running
+        const ctx = (Tone.getContext() as any).rawContext as AudioContext;
+        if (ctx.state === 'running') {
+          play();
+        } else {
+          getToneEngine().init().then(() => play());
+        }
         useUIStore.getState().setStatusMessage('PLAYING');
         return;
       }

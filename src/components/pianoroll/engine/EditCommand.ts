@@ -22,7 +22,7 @@ export class EditCommand {
    * Begin a new edit command. Snapshots the current pattern state.
    */
   begin(pattern: Pattern, patternIndex: number, description: string): void {
-    this.beforeState = JSON.parse(JSON.stringify(pattern));
+    this.beforeState = structuredClone(pattern);
     this.patternIndex = patternIndex;
     this.description = description;
     this.committed = false;
@@ -66,7 +66,7 @@ export class EditCommand {
       this.description,
       this.patternIndex,
       this.beforeState,
-      JSON.parse(JSON.stringify(afterPattern)),
+      structuredClone(afterPattern),
     );
 
     this.committed = true;
