@@ -1241,6 +1241,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
       rowNormal:           theme.colors.trackerRowOdd,
       rowHighlight:        theme.colors.trackerRowHighlight,
       border:              theme.colors.border,
+      trackerBorder:       theme.colors.trackerBorder,
       textNote:            theme.colors.textSecondary,
       textNoteActive:      theme.colors.text,
       textMuted:           theme.colors.cellEmpty,
@@ -2276,7 +2277,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
 
           {isFormatMode && formatColumns && formatChannels ? (
             <div className="flex-shrink-0 bg-dark-bgTertiary border-b border-dark-border z-20">
-              {/* Row 1: channel names (28px) */}
+              {/* Row 1: channel headers — full controls for pattern channels, label-only for synthetic */}
               <div className="flex h-[28px]">
                 <div
                   className="flex-shrink-0 border-r border-dark-border flex items-center justify-center text-text-muted text-xs font-medium"
@@ -2284,52 +2285,191 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
                 >
                   ROW
                 </div>
-                {formatChannels.map((ch, idx) => (
-                  <div
-                    key={idx}
-                    className="flex-shrink-0 flex items-center px-2 border-r border-dark-border overflow-hidden"
-                    style={{ width: channelWidths[idx] }}
-                  >
-                    <span className="font-bold font-mono text-[11px] text-accent-primary opacity-80 truncate">
-                      {ch.label || `CH ${(idx + 1).toString().padStart(2, '0')}`}
-                    </span>
+                <div
+                  ref={headerScrollRef}
+                  onScroll={handleHeaderScroll}
+                  className="overflow-x-hidden overflow-y-hidden flex-1"
+                  data-vu-scroll
+                >
+                  <div className="flex" style={{ width: totalChannelsWidth - LINE_NUMBER_WIDTH }}>
+                    {formatChannels.map((ch, idx) => {
+                      const channel = ch.isPatternChannel ? pattern?.channels[idx] : undefined;
+                      const isCollapsed = channel?.collapsed;
+                      const channelWidth = channelWidths[idx];
+
+                      return (
+                        <div
+                          key={idx}
+                          className={`flex-shrink-0 flex items-center justify-between gap-1 ${isCollapsed ? 'px-1' : 'px-2'} py-1
+                            border-r border-dark-border transition-colors relative
+                            ${channel?.muted ? 'opacity-50' : ''}
+                            ${channel?.solo ? 'bg-accent-primary/10' : ''}`}
+                          style={{
+                            width: channelWidth,
+                            backgroundColor: channel?.color ? `${channel.color}15` : undefined,
+                            boxShadow: channel?.color ? `inset 2px 0 0 ${channel.color}` : undefined,
+                          }}
+                        >
+                          {/* Pattern channel: full controls */}
+                          {channel && !isCollapsed && (
+                            <>
+                              <div className="flex items-center gap-1.5 overflow-hidden flex-1 min-w-0">
+                                <span
+                                  className="font-bold font-mono text-[11px] flex-shrink-0 opacity-80"
+                                  style={{ color: channel.color || 'var(--color-accent)' }}
+                                >
+                                  {(idx + 1).toString().padStart(2, '0')}
+                                </span>
+                                {showChannelNames && (
+                                  <input
+                                    type="text"
+                                    className="bg-transparent border-none outline-none font-mono text-[10px] font-bold text-text-primary focus:text-accent-primary transition-colors min-w-0 flex-1 overflow-hidden text-ellipsis uppercase px-0 placeholder:text-text-muted/50"
+                                    value={channel.name || ''}
+                                    placeholder={`CH${idx + 1}`}
+                                    onChange={(e) => updateChannelName(idx, e.target.value)}
+                                    onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); }}
+                                    title={`Click to rename channel (Short: ${channel.shortName || (idx + 1)})`}
+                                  />
+                                )}
+                                <div className="flex-shrink-0">
+                                  <ChannelVUMeter level={0} isActive={false} />
+                                </div>
+                              </div>
+                              <div className="flex items-center gap-0.5 flex-shrink-0 ml-1">
+                                <ChannelContextMenu
+                                  channelIndex={idx}
+                                  channel={channel}
+                                  patternId={pattern?.id ?? ''}
+                                  patternLength={pattern?.length ?? 0}
+                                  onFillPattern={handleFillPattern}
+                                  onClearChannel={handleClearChannel}
+                                  onCopyChannel={handleCopyChannel}
+                                  onCutChannel={handleCutChannel}
+                                  onPasteChannel={handlePasteChannel}
+                                  onTranspose={handleTranspose}
+                                  onHumanize={handleHumanize}
+                                  onInterpolate={handleInterpolate}
+                                  onAcidGenerator={onAcidGenerator || (() => {})}
+                                  onRandomize={onRandomize || (() => {})}
+                                  onReverseVisual={handleReverseVisual}
+                                  onPolyrhythm={handlePolyrhythm}
+                                  onFibonacci={handleFibonacci}
+                                  onEuclidean={handleEuclidean}
+                                  onPingPong={handlePingPong}
+                                  onGlitch={handleGlitch}
+                                  onStrobe={handleStrobe}
+                                  onVisualEcho={handleVisualEcho}
+                                  onConverge={handleConverge}
+                                  onSpiral={handleSpiral}
+                                  onBounce={handleBounce}
+                                  onChaos={handleChaos}
+                                />
+                                <ChannelColorPicker
+                                  currentColor={channel.color}
+                                  onColorSelect={(color) => setChannelColor(idx, color)}
+                                />
+                                <button
+                                  onClick={() => toggleChannelMute(idx)}
+                                  className={`p-1 rounded transition-colors ${
+                                    channel.muted
+                                      ? 'bg-accent-error/20 text-accent-error'
+                                      : 'text-text-muted hover:text-text-primary hover:bg-dark-bgHover'
+                                  }`}
+                                  title={channel.muted ? 'Unmute' : 'Mute'}
+                                >
+                                  {channel.muted ? <VolumeX size={12} /> : <Volume2 size={12} />}
+                                </button>
+                                <button
+                                  onClick={() => toggleChannelSolo(idx)}
+                                  className={`p-1 rounded transition-colors ${
+                                    channel.solo
+                                      ? 'bg-accent-primary/20 text-accent-primary'
+                                      : 'text-text-muted hover:text-text-primary hover:bg-dark-bgHover'
+                                  }`}
+                                  title={channel.solo ? 'Unsolo' : 'Solo'}
+                                >
+                                  <Headphones size={12} />
+                                </button>
+                                <button
+                                  onClick={() => _toggleChannelCollapse(idx)}
+                                  className="p-1 rounded transition-colors text-text-muted hover:text-text-primary hover:bg-dark-bgHover"
+                                  title="Collapse Channel"
+                                >
+                                  <ChevronLeft size={12} />
+                                </button>
+                              </div>
+                            </>
+                          )}
+
+                          {/* Pattern channel collapsed state */}
+                          {channel && isCollapsed && (
+                            <div className="flex items-center justify-between w-full px-1">
+                              <span
+                                className="font-bold font-mono text-[9px] flex-shrink-0 opacity-80"
+                                style={{ color: channel.color || 'var(--color-accent)' }}
+                              >
+                                {(idx + 1).toString().padStart(2, '0')}
+                              </span>
+                              <button
+                                onClick={() => _toggleChannelCollapse(idx)}
+                                className="p-0.5 rounded transition-colors text-text-muted hover:text-text-primary hover:bg-dark-bgHover"
+                                title="Expand Channel"
+                              >
+                                <ChevronRight size={10} />
+                              </button>
+                            </div>
+                          )}
+
+                          {/* Synthetic / table channel: label only */}
+                          {!channel && (
+                            <span className="font-bold font-mono text-[11px] text-accent-primary opacity-80 truncate">
+                              {ch.label || `CH ${(idx + 1).toString().padStart(2, '0')}`}
+                            </span>
+                          )}
+                        </div>
+                      );
+                    })}
                   </div>
-                ))}
+                </div>
               </div>
               {/* Row 2: column labels (20px) */}
               <div className="flex h-[20px] border-t border-dark-border">
                 <div className="flex-shrink-0 border-r border-dark-border" style={{ width: LINE_NUMBER_WIDTH }} />
-                {formatChannels.map((ch, chIdx) => {
-                  const chCols = ch.columns ?? formatColumns;
-                  const FORMAT_COL_GAP = 4;
-                  let px = 2;
-                  return (
-                    <div
-                      key={chIdx}
-                      className="flex-shrink-0 relative border-r border-dark-border"
-                      style={{ width: channelWidths[chIdx] }}
-                    >
-                      {chCols.map((col, ci) => {
-                        const colLeft = px;
-                        const colWidth = col.charWidth * CHAR_WIDTH + FORMAT_COL_GAP;
-                        px += colWidth;
-                        return (
-                          <span
-                            key={ci}
-                            className="absolute top-0 bottom-0 flex items-center text-[9px] font-mono uppercase truncate pointer-events-none"
-                            style={{
-                              left: colLeft,
-                              width: colWidth,
-                              opacity: 0.55,
-                            }}
-                          >
-                            {col.label}
-                          </span>
-                        );
-                      })}
-                    </div>
-                  );
-                })}
+                <div className="overflow-hidden flex-1">
+                  <div className="flex" style={{ width: totalChannelsWidth - LINE_NUMBER_WIDTH }}>
+                    {formatChannels.map((ch, chIdx) => {
+                      const chCols = ch.columns ?? formatColumns;
+                      const FORMAT_COL_GAP = 4;
+                      let px = 2;
+                      return (
+                        <div
+                          key={chIdx}
+                          className="flex-shrink-0 relative border-r border-dark-border"
+                          style={{ width: channelWidths[chIdx] }}
+                        >
+                          {chCols.map((col, ci) => {
+                            const colLeft = px;
+                            const colWidth = col.charWidth * CHAR_WIDTH + FORMAT_COL_GAP;
+                            px += colWidth;
+                            return (
+                              <span
+                                key={ci}
+                                className="absolute top-0 bottom-0 flex items-center text-[9px] font-mono uppercase truncate pointer-events-none"
+                                style={{
+                                  left: colLeft,
+                                  width: colWidth,
+                                  opacity: 0.55,
+                                }}
+                              >
+                                {col.label}
+                              </span>
+                            );
+                          })}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
               </div>
             </div>
           ) : (

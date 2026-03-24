@@ -70,6 +70,7 @@ const DEFAULT_THEME: ThemeSnapshot = {
   rowNormal: '#0d0d0e',
   rowHighlight: '#111113',
   border: '#252530',
+  trackerBorder: '#252530',
   textNote: '#909090',
   textNoteActive: '#ffffff',
   textMuted: '#505050',

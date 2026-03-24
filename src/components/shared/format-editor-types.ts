@@ -60,6 +60,12 @@ export interface FormatChannel {
   trackIndex?: number;
   /** Per-channel column override — when set, this channel uses these columns instead of the global formatColumns */
   columns?: ColumnDef[];
+  /**
+   * When true, this format channel maps to a real tracker-store pattern channel at the same index.
+   * Enables mute/solo/collapse/context-menu/color-picker in the channel header.
+   * Defaults to false (synthetic/auxiliary channel — label-only header).
+   */
+  isPatternChannel?: boolean;
 }
 
 /**

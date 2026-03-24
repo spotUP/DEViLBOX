@@ -15,6 +15,7 @@ export interface ThemeSnapshot {
   rowNormal: string;
   rowHighlight: string;
   border: string;
+  trackerBorder: string;
   textNote: string;
   textNoteActive: string;
   textMuted: string;
