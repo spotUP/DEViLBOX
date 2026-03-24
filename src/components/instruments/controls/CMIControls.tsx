@@ -398,38 +398,93 @@ export const CMIControls: React.FC<CMIControlsProps> = ({
               <Knob value={cmi.waveSelect} min={0} max={7} onChange={(v) => cmi.handleParamChange('wave_select', v)} label="Wave" size="sm" color={CMI_GREEN} formatValue={fmtWave} />
               <Knob value={cmi.volume} min={0} max={255} onChange={(v) => cmi.handleParamChange('volume', v)} label="Volume" size="sm" color={CMI_GREEN} formatValue={fmtInt} />
             </div>
+            {/* Waveform display */}
             <div className="flex flex-col gap-1">
-              {/* Sample drop zone / waveform display */}
               <div
                 className="relative cursor-pointer rounded"
-                style={{ border: `1px dashed ${CMI_GREEN_DIM}`, width: VIS_W, height: 120 }}
+                style={{ border: `1px dashed ${CMI_GREEN_DIM}`, width: VIS_W, height: 80 }}
                 onDragOver={(e) => e.preventDefault()}
                 onDrop={handleFileDrop}
                 onClick={() => fileInputRef.current?.click()}
               >
                 {cmi.sampleLoaded && cmi.sampleWaveform ? (
-                  <WaveformCanvas waveform={cmi.sampleWaveform} width={VIS_W} height={120} />
+                  <WaveformCanvas waveform={cmi.sampleWaveform} width={VIS_W} height={80} />
                 ) : (
-                  <WaveformCanvas waveform={cmi.builtinWaveform} width={VIS_W} height={120} />
+                  <WaveformCanvas waveform={cmi.builtinWaveform} width={VIS_W} height={80} />
                 )}
                 {!cmi.sampleLoaded && (
                   <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
                     <span className="text-[10px] font-mono opacity-50" style={{ color: CMI_GREEN }}>
-                      DROP WAV/AIFF HERE or CLICK TO BROWSE
+                      DROP WAV/AIFF or CLICK TO BROWSE FILES
                     </span>
                   </div>
                 )}
               </div>
               <input ref={fileInputRef} type="file" accept=".wav,.aiff,.aif,.mp3,.ogg,.flac" className="hidden" onChange={handleFileSelect} />
-              <div className="flex items-center gap-2 mt-1">
+              <div className="flex items-center gap-2">
                 <div className="text-xs font-mono font-bold" style={{ color: CMI_GREEN }}>
                   {cmi.sampleLoaded ? cmi.sampleName : `BANK ${cmi.waveBank}: ${WAVE_NAMES[cmi.waveBank] ?? '?'}`}
                 </div>
                 <div className="text-[9px] font-mono" style={{ color: CMI_GREEN_DIM }}>
-                  {WAVE_SAMPLES} samples | 8-bit unsigned PCM | 16KB/voice
+                  {WAVE_SAMPLES} samples | 8-bit PCM | 16KB/voice
                 </div>
               </div>
             </div>
+            {/* Library browser */}
+            {cmi.libraryCategories.length > 0 && (
+              <div className="flex flex-col gap-1.5">
+                <div className="text-[9px] font-mono font-bold" style={{ color: CMI_GREEN_DIM }}>
+                  FAIRLIGHT SAMPLE LIBRARY ({cmi.libraryCategories.length} categories)
+                </div>
+                <div className="flex gap-2" style={{ maxWidth: VIS_W }}>
+                  {/* Category selector */}
+                  <select
+                    value={cmi.libraryCategoryIndex}
+                    onChange={(e) => { cmi.setLibraryCategoryIndex(Number(e.target.value)); }}
+                    className="text-[10px] font-mono px-2 py-1 rounded-sm"
+                    style={{
+                      color: CMI_GREEN, backgroundColor: '#0a0a0a',
+                      border: `1px solid ${CMI_GREEN_DIM}`, width: 140,
+                      outline: 'none',
+                    }}
+                  >
+                    {cmi.libraryCategories.map((cat, i) => (
+                      <option key={cat} value={i}>
+                        {cat.toUpperCase()} ({cmi.librarySamples.length === 0 && i === cmi.libraryCategoryIndex ? '...' : i === cmi.libraryCategoryIndex ? cmi.librarySamples.length : ''})
+                      </option>
+                    ))}
+                  </select>
+                  {/* Sample selector */}
+                  <select
+                    value={cmi.librarySampleIndex}
+                    onChange={(e) => cmi.loadLibrarySample(Number(e.target.value))}
+                    className="text-[10px] font-mono px-2 py-1 rounded-sm flex-1"
+                    style={{
+                      color: CMI_GREEN, backgroundColor: '#0a0a0a',
+                      border: `1px solid ${CMI_GREEN_DIM}`,
+                      outline: 'none',
+                    }}
+                  >
+                    <option value={-1}>— SELECT SAMPLE —</option>
+                    {cmi.librarySamples.map((s, i) => (
+                      <option key={s.file} value={i}>{s.name}</option>
+                    ))}
+                  </select>
+                  {/* Prev/Next buttons */}
+                  <button onClick={cmi.prevLibrarySample} className="px-2 py-1 text-[10px] font-mono rounded-sm"
+                    style={{ color: CMI_GREEN, border: `1px solid ${CMI_GREEN_DIM}`, background: 'transparent' }}>
+                    PREV
+                  </button>
+                  <button onClick={cmi.nextLibrarySample} className="px-2 py-1 text-[10px] font-mono rounded-sm"
+                    style={{ color: CMI_GREEN, border: `1px solid ${CMI_GREEN_DIM}`, background: 'transparent' }}>
+                    NEXT
+                  </button>
+                </div>
+                {cmi.libraryLoading && (
+                  <div className="text-[9px] font-mono" style={{ color: CMI_GREEN_BRIGHT }}>Loading...</div>
+                )}
+              </div>
+            )}
           </div>
         )}
 

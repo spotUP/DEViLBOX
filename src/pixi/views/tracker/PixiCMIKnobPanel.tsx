@@ -272,18 +272,38 @@ export const PixiCMIKnobPanel: React.FC<PixiCMIKnobPanelProps> = ({ width }) => 
 
         {/* Page 5: WAVE */}
         {cmi.activeTab === 'wave' && (
-          <pixiContainer layout={{ width, height: CMI_CONTENT_H, flexDirection: 'column', paddingLeft: 12, paddingTop: 8, gap: 8 }}>
+          <pixiContainer layout={{ width, height: CMI_CONTENT_H, flexDirection: 'column', paddingLeft: 12, paddingTop: 8, gap: 6 }}>
             <pixiContainer layout={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
               <PixiKnob value={cmi.waveSelect} min={0} max={7} defaultValue={0} onChange={(v) => cmi.handleParamChange('wave_select', v)} label="WAVE" size="sm" color={G} formatValue={fmtWave} />
               <PixiKnob value={cmi.volume} min={0} max={255} defaultValue={200} onChange={(v) => cmi.handleParamChange('volume', v)} label="VOLUME" size="sm" color={G} formatValue={fmtInt} />
             </pixiContainer>
-            <pixiContainer layout={{ width: VIS_W, flexDirection: 'column', gap: 4 }}>
+            {/* Waveform display */}
+            <pixiContainer layout={{ width: VIS_W, flexDirection: 'column', gap: 2 }}>
               <pixiBitmapText text={cmi.sampleLoaded ? cmi.sampleName : `BANK ${cmi.waveBank}: ${WAVE_NAMES[cmi.waveBank] ?? '?'}`} style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 11, fill: 0xffffff }} tint={G} layout={{}} />
-              <pixiGraphics draw={drawWaveDisplay} layout={{ width: VIS_W, height: CURVE_H }} />
-              <pixiContainer layout={{ flexDirection: 'row', gap: 8, alignItems: 'center' }}>
-                <pixiBitmapText text={`${WAVE_SAMPLES} samples | 8-bit unsigned PCM | 16KB/voice`} style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 9, fill: 0xffffff }} tint={G_DIM} layout={{}} />
+              <pixiGraphics draw={drawWaveDisplay} layout={{ width: VIS_W, height: 70 }} />
+              <pixiBitmapText text={`${WAVE_SAMPLES} samples | 8-bit PCM | 16KB/voice`} style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 9, fill: 0xffffff }} tint={G_DIM} layout={{}} />
+            </pixiContainer>
+            {/* Library browser */}
+            <pixiContainer layout={{ width: VIS_W, flexDirection: 'column', gap: 4 }}>
+              <pixiBitmapText text={`FAIRLIGHT LIBRARY (${cmi.libraryCategories.length} categories)`} style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 9, fill: 0xffffff }} tint={G_DIM} layout={{}} />
+              <pixiContainer layout={{ flexDirection: 'row', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
+                <PixiButton label="< CAT" variant="ghost" size="sm" onClick={() => cmi.setLibraryCategoryIndex(Math.max(0, cmi.libraryCategoryIndex - 1))} />
+                <pixiBitmapText
+                  text={(cmi.libraryCategories[cmi.libraryCategoryIndex] ?? '').toUpperCase()}
+                  style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 10, fill: 0xffffff }} tint={G} layout={{ width: 120 }}
+                />
+                <PixiButton label="CAT >" variant="ghost" size="sm" onClick={() => cmi.setLibraryCategoryIndex(Math.min(cmi.libraryCategories.length - 1, cmi.libraryCategoryIndex + 1))} />
+                <PixiButton label="PREV" variant="ghost" size="sm" onClick={cmi.prevLibrarySample} />
+                <pixiBitmapText
+                  text={cmi.librarySampleIndex >= 0 ? `${cmi.librarySampleIndex + 1}/${cmi.librarySamples.length}` : `${cmi.librarySamples.length} samples`}
+                  style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 9, fill: 0xffffff }} tint={G_DIM} layout={{ width: 80 }}
+                />
+                <PixiButton label="NEXT" variant="ghost" size="sm" onClick={cmi.nextLibrarySample} />
+                <PixiButton label="LOAD FILE" variant="ft2" size="sm" onClick={triggerFilePicker} />
               </pixiContainer>
-              <PixiButton label="LOAD SAMPLE" variant="ft2" size="sm" onClick={triggerFilePicker} />
+              {cmi.libraryLoading && (
+                <pixiBitmapText text="Loading..." style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 9, fill: 0xffffff }} tint={G_BRIGHT} layout={{}} />
+              )}
             </pixiContainer>
           </pixiContainer>
         )}
