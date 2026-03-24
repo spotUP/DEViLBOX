@@ -11,6 +11,7 @@ export { PixiSwitch3Way } from './PixiSwitch3Way';
 export { PixiModal, PixiModalHeader, PixiModalFooter } from './PixiModal';
 export { PixiScrollView } from './PixiScrollView';
 export { PixiList } from './PixiList';
+export type { PixiListItem, PixiListItemRating } from './PixiList';
 export { PixiNumericInput } from './PixiNumericInput';
 export { PixiToast } from './PixiToast';
 export { PixiCheckbox } from './PixiCheckbox';

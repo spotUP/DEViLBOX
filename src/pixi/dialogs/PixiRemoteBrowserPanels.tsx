@@ -33,6 +33,14 @@ import {
   getFeaturedTunes,
   type HVSCEntry,
 } from '@/lib/hvscApi';
+import {
+  batchGetRatings,
+  setRating,
+  removeRating,
+  type RatingMap,
+} from '@/lib/ratingsApi';
+import { useAuthStore } from '@/stores/useAuthStore';
+import type { PixiListItemRating } from '../components/PixiList';
 
 // ---------------------------------------------------------------------------
 // Shared constants
@@ -76,6 +84,8 @@ export const PixiModlandPanel: React.FC<ModlandPanelProps> = ({
   const [error, setError] = useState<string | null>(null);
   const [offset, setOffset] = useState(0);
   const [hasMore, setHasMore] = useState(false);
+  const [ratings, setRatings] = useState<RatingMap>({});
+  const isLoggedIn = useAuthStore(s => !!s.token);
   
   const searchTimer = useRef<ReturnType<typeof setTimeout>>(null);
 
@@ -108,6 +118,14 @@ export const PixiModlandPanel: React.FC<ModlandPanelProps> = ({
         }
         setHasMore(data.results.length === MODLAND_LIMIT);
         setOffset(newOffset);
+
+        // Fetch ratings for new results
+        const keys = data.results.map(r => r.full_path);
+        if (keys.length > 0) {
+          batchGetRatings('modland', keys).then(r => {
+            setRatings(prev => append ? { ...prev, ...r } : r);
+          }).catch(() => {});
+        }
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Search failed');
       } finally {
@@ -149,6 +167,20 @@ export const PixiModlandPanel: React.FC<ModlandPanelProps> = ({
     }
   }, [onLoadTrackerModule, onClose]);
 
+  const handleRate = useCallback(async (id: string, star: number) => {
+    if (!isLoggedIn) return; // silently ignore if not logged in
+    const key = id; // id === full_path
+    try {
+      if (star === 0) {
+        const res = await removeRating('modland', key);
+        setRatings(prev => ({ ...prev, [key]: { avg: res.avg, count: res.count } }));
+      } else {
+        const res = await setRating('modland', key, star);
+        setRatings(prev => ({ ...prev, [key]: { avg: res.avg, count: res.count, userRating: res.userRating } }));
+      }
+    } catch { /* ignore rating errors */ }
+  }, [isLoggedIn]);
+
   // Format options for select — sorted alphabetically
   const formatOptions: SelectOption[] = useMemo(() => {
     const opts: SelectOption[] = [{ value: '', label: 'All formats' }];
@@ -157,15 +189,23 @@ export const PixiModlandPanel: React.FC<ModlandPanelProps> = ({
     return opts;
   }, [formats]);
 
-  // List items from search results
+  // List items from search results (with ratings)
   const listItems = useMemo(() =>
-    results.map(file => ({
-      id: file.full_path,
-      label: file.filename,
-      sublabel: `${file.format} — ${file.author}`,
-      dotColor: 0x22c55e,
-    })),
-    [results],
+    results.map(file => {
+      const r = ratings[file.full_path];
+      // Also use server-returned avg_rating as fallback if batch hasn't loaded yet
+      const ratingData = r || (file.avg_rating != null
+        ? { avg: file.avg_rating, count: file.vote_count ?? 0 }
+        : undefined);
+      return {
+        id: file.full_path,
+        label: file.filename,
+        sublabel: `${file.format} — ${file.author}`,
+        dotColor: 0x22c55e,
+        rating: ratingData ? { avg: ratingData.avg, count: ratingData.count, userRating: r?.userRating } as PixiListItemRating : undefined,
+      };
+    }),
+    [results, ratings],
   );
 
   const listH = height - SEARCH_H - PAD * 2;
@@ -266,6 +306,7 @@ export const PixiModlandPanel: React.FC<ModlandPanelProps> = ({
                 const file = results.find(r => r.full_path === id);
                 if (file) handleLoad(file);
               }}
+              onRate={isLoggedIn ? handleRate : undefined}
             />
 
             {hasMore && (
@@ -322,6 +363,8 @@ export const PixiHVSCPanel: React.FC<HVSCPanelProps> = ({
   const [error, setError] = useState<string | null>(null);
   const [query, setQuery] = useState('');
   const [searchResults, setSearchResults] = useState<HVSCEntry[]>([]);
+  const [ratings, setRatings] = useState<RatingMap>({});
+  const isLoggedIn = useAuthStore(s => !!s.token);
   
   const searchTimer = useRef<ReturnType<typeof setTimeout>>(null);
 
@@ -368,6 +411,12 @@ export const PixiHVSCPanel: React.FC<HVSCPanelProps> = ({
     try {
       const res = await searchHVSC(q, 100, 0);
       setSearchResults(res);
+
+      // Fetch ratings for search results
+      const keys = res.filter(e => !e.isDirectory).map(e => e.path);
+      if (keys.length > 0) {
+        batchGetRatings('hvsc', keys).then(setRatings).catch(() => {});
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Search failed');
     } finally {
@@ -387,7 +436,8 @@ export const PixiHVSCPanel: React.FC<HVSCPanelProps> = ({
     setError(null);
     try {
       const buffer = await downloadHVSCFile(entry.path);
-      await onLoadTrackerModule(buffer, entry.name);
+      const filename = entry.path.split('/').pop() || entry.name;
+      await onLoadTrackerModule(buffer, filename);
       onClose();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to download');
@@ -404,11 +454,24 @@ export const PixiHVSCPanel: React.FC<HVSCPanelProps> = ({
     }
   }, [browseDirectory, handleLoad]);
 
+  const handleRate = useCallback(async (id: string, star: number) => {
+    if (!isLoggedIn) return;
+    try {
+      if (star === 0) {
+        const res = await removeRating('hvsc', id);
+        setRatings(prev => ({ ...prev, [id]: { avg: res.avg, count: res.count } }));
+      } else {
+        const res = await setRating('hvsc', id, star);
+        setRatings(prev => ({ ...prev, [id]: { avg: res.avg, count: res.count, userRating: res.userRating } }));
+      }
+    } catch { /* ignore rating errors */ }
+  }, [isLoggedIn]);
+
   // Build list items from either search results or browse entries
   const displayEntries = query ? searchResults : entries;
 
   const listItems = useMemo(() => {
-    const items: { id: string; label: string; sublabel?: string; dotColor?: number }[] = [];
+    const items: { id: string; label: string; sublabel?: string; dotColor?: number; rating?: PixiListItemRating }[] = [];
 
     // Back button when browsing a directory
     if (path && !query) {
@@ -421,6 +484,10 @@ export const PixiHVSCPanel: React.FC<HVSCPanelProps> = ({
     }
 
     displayEntries.forEach(entry => {
+      const r = ratings[entry.path];
+      const ratingData = r || (entry.avg_rating != null
+        ? { avg: entry.avg_rating, count: entry.vote_count ?? 0 }
+        : undefined);
       items.push({
         id: entry.path,
         label: entry.name,
@@ -428,11 +495,14 @@ export const PixiHVSCPanel: React.FC<HVSCPanelProps> = ({
           ? ''
           : `${entry.author ? `${entry.author} — ` : ''}${entry.size ? `${(entry.size / 1024).toFixed(1)} KB` : ''}`,
         dotColor: entry.isDirectory ? 0x4a9eff : 0x888888,
+        rating: !entry.isDirectory && ratingData
+          ? { avg: ratingData.avg, count: ratingData.count, userRating: r?.userRating } as PixiListItemRating
+          : undefined,
       });
     });
 
     return items;
-  }, [displayEntries, path, query]);
+  }, [displayEntries, path, query, ratings]);
 
   const listH = height - SEARCH_H - PAD * 2;
 
@@ -530,6 +600,7 @@ export const PixiHVSCPanel: React.FC<HVSCPanelProps> = ({
               const entry = displayEntries.find(e => e.path === id);
               if (entry) handleEntryClick(entry);
             }}
+            onRate={isLoggedIn ? handleRate : undefined}
           />
         )}
 

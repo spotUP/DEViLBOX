@@ -24,6 +24,8 @@ export interface HVSCEntry {
   player?: string;
   sidModel?: string;
   subtunes?: number;
+  avg_rating?: number;
+  vote_count?: number;
 }
 
 export interface HVSCBrowseResult {

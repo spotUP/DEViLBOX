@@ -24,6 +24,14 @@ import { parseModuleToSong } from '@/lib/import/parseModuleToSong';
 import { cacheSong } from '@/engine/dj/DJSongCache';
 import { getDJPipeline } from '@/engine/dj/DJPipeline';
 import { useDJPlaylistStore } from '@/stores/useDJPlaylistStore';
+import {
+  batchGetRatings,
+  setRating,
+  removeRating,
+  type RatingMap,
+} from '@/lib/ratingsApi';
+import { useAuthStore } from '@/stores/useAuthStore';
+import { StarRating } from '@/components/shared/StarRating';
 
 // ── Component ────────────────────────────────────────────────────────────────
 
@@ -44,6 +52,9 @@ export const DJModlandBrowser: React.FC<DJModlandBrowserProps> = ({ onClose }) =
   const [downloadingPaths, setDownloadingPaths] = useState<Set<string>>(new Set());
   const [selectedIndex, setSelectedIndex] = useState(-1);
   const [, setLoadedDecks] = useState<Set<string>>(new Set());
+  const [ratings, setRatings] = useState<RatingMap>({});
+
+  const isLoggedIn = useAuthStore(s => !!s.token);
 
   const searchTimerRef = useRef<ReturnType<typeof setTimeout>>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -101,6 +112,16 @@ export const DJModlandBrowser: React.FC<DJModlandBrowserProps> = ({ onClose }) =
         }
         setHasMore(data.results.length === LIMIT);
         setOffset(newOffset);
+
+        // Fetch ratings for results
+        const keys = data.results.map((f: ModlandFile) => f.full_path);
+        if (keys.length > 0) {
+          batchGetRatings('modland', keys).then(rm => {
+            setRatings(prev => append ? { ...prev, ...rm } : rm);
+          }).catch(() => {});
+        } else if (!append) {
+          setRatings({});
+        }
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Search failed');
       } finally {
@@ -126,6 +147,44 @@ export const DJModlandBrowser: React.FC<DJModlandBrowserProps> = ({ onClose }) =
     const newOffset = offset + LIMIT;
     doSearch(query, format, newOffset, true);
   }, [query, format, offset, doSearch]);
+
+  // ── Rate handler ──────────────────────────────────────────────────────
+
+  const handleRate = useCallback(async (itemKey: string, star: number) => {
+    if (!isLoggedIn) return;
+    // Optimistic update
+    setRatings(prev => {
+      const existing = prev[itemKey];
+      if (star === 0) {
+        if (!existing) return prev;
+        const newCount = Math.max(0, existing.count - 1);
+        const newAvg = newCount > 0
+          ? (existing.avg * existing.count - (existing.userRating || 0)) / newCount
+          : 0;
+        return { ...prev, [itemKey]: { avg: newAvg, count: newCount } };
+      }
+      const oldUser = existing?.userRating;
+      const oldCount = existing?.count || 0;
+      const oldAvg = existing?.avg || 0;
+      const newCount = oldUser ? oldCount : oldCount + 1;
+      const newAvg = oldUser
+        ? (oldAvg * oldCount - oldUser + star) / newCount
+        : (oldAvg * oldCount + star) / newCount;
+      return { ...prev, [itemKey]: { avg: newAvg, count: newCount, userRating: star } };
+    });
+    try {
+      if (star === 0) {
+        await removeRating('modland', itemKey);
+      } else {
+        await setRating('modland', itemKey, star);
+      }
+    } catch {
+      // Re-fetch on error
+      batchGetRatings('modland', [itemKey]).then(rm => {
+        setRatings(prev => ({ ...prev, ...rm }));
+      }).catch(() => {});
+    }
+  }, [isLoggedIn]);
 
   // ── Scroll selected item into view ───────────────────────────────────
   useEffect(() => {
@@ -390,9 +449,15 @@ export const DJModlandBrowser: React.FC<DJModlandBrowserProps> = ({ onClose }) =
                   <div className="text-text-primary text-xs font-mono truncate">
                     {file.filename}
                   </div>
-                  <div className="flex gap-3 text-[10px] text-text-muted font-mono">
+                  <div className="flex gap-3 text-[10px] text-text-muted font-mono items-center">
                     <span>{file.format}</span>
                     <span className="text-text-muted/60">{file.author}</span>
+                    <StarRating
+                      avg={ratings[file.full_path]?.avg ?? file.avg_rating ?? 0}
+                      count={ratings[file.full_path]?.count ?? file.vote_count ?? 0}
+                      userRating={ratings[file.full_path]?.userRating}
+                      onRate={isLoggedIn ? (star) => handleRate(file.full_path, star) : undefined}
+                    />
                   </div>
                 </div>
 

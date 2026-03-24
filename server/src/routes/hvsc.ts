@@ -169,17 +169,38 @@ router.get('/search', async (req: Request, res: Response) => {
           LIMIT ? OFFSET ?
         `).all(`%${query}%`, `%${query}%`, `%${query}%`, `%${query}%`, limit, offset) as any[];
 
+        // Enrich with ratings from main database
+        const mainDb = (await import('../db/database')).default;
+        const paths = rows.map((r: any) => normalizeHVSCPath(r.fullname));
+        const ratingsMap: Record<string, { avg_rating: number; vote_count: number }> = {};
+        if (paths.length > 0) {
+          const ratingRows = mainDb.prepare(`
+            SELECT item_key, AVG(rating) as avg_rating, COUNT(*) as vote_count
+            FROM module_ratings WHERE source = 'hvsc' AND item_key IN (SELECT value FROM json_each(?))
+            GROUP BY item_key
+          `).all(JSON.stringify(paths)) as { item_key: string; avg_rating: number; vote_count: number }[];
+          for (const rr of ratingRows) {
+            ratingsMap[rr.item_key] = { avg_rating: rr.avg_rating, vote_count: rr.vote_count };
+          }
+        }
+
         return res.json({
           total: countRow.cnt,
-          results: rows.map(r => ({
-            name: r.name || r.fullname.split('/').pop(),
-            path: normalizeHVSCPath(r.fullname),
-            isDirectory: false,
-            author: r.author,
-            player: r.player,
-            sidModel: r.sidmodel,
-            subtunes: r.subtunes,
-          })),
+          results: rows.map((r: any) => {
+            const p = normalizeHVSCPath(r.fullname);
+            const rating = ratingsMap[p];
+            return {
+              name: r.name || r.fullname.split('/').pop(),
+              path: p,
+              isDirectory: false,
+              author: r.author,
+              player: r.player,
+              sidModel: r.sidmodel,
+              subtunes: r.subtunes,
+              avg_rating: rating ? Math.round(rating.avg_rating * 100) / 100 : undefined,
+              vote_count: rating?.vote_count,
+            };
+          }),
         });
       }
     } catch { /* DeepSID DB not available */ }

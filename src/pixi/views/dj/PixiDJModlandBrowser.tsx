@@ -27,6 +27,13 @@ import { parseModuleToSong } from '@/lib/import/parseModuleToSong';
 import { cacheSong } from '@/engine/dj/DJSongCache';
 import { getDJPipeline } from '@/engine/dj/DJPipeline';
 import { useDJPlaylistStore } from '@/stores/useDJPlaylistStore';
+import {
+  batchGetRatings,
+  setRating,
+  removeRating,
+  type RatingMap,
+} from '@/lib/ratingsApi';
+import { useAuthStore } from '@/stores/useAuthStore';
 import { PixiButton } from '../../components/PixiButton';
 import { PixiLabel } from '../../components/PixiLabel';
 import { PixiSelect } from '../../components/PixiSelect';
@@ -46,6 +53,28 @@ const FOOTER_H = 28;
 const HINT_H = 14;
 const LIST_H = PANEL_H - HEADER_H - SEARCH_ROW_H - FOOTER_H - HINT_H - 16;
 const LIMIT = 50;
+
+// ── Star rating helpers ──────────────────────────────────────────────────────
+
+const STAR_SIZE = 16;
+const STAR_GAP = 2;
+const STAR_FILLED = 0xf59e0b;
+const STAR_EMPTY = 0xffffff;
+const STAR_USER = 0xfbbf24;
+const STAR_HOVER = 0xfcd34d;
+
+function drawStar(g: GraphicsType, cx: number, cy: number, r: number, color: number, alpha = 1) {
+  const inner = r * 0.45;
+  const step = Math.PI / 5;
+  g.moveTo(cx + r * Math.sin(0), cy - r * Math.cos(0));
+  for (let i = 1; i < 10; i++) {
+    const radius = i % 2 === 0 ? r : inner;
+    const angle = i * step;
+    g.lineTo(cx + radius * Math.sin(angle), cy - radius * Math.cos(angle));
+  }
+  g.closePath();
+  g.fill({ color, alpha });
+}
 
 // ── Props ────────────────────────────────────────────────────────────────────
 
@@ -75,6 +104,10 @@ export const PixiDJModlandBrowser: React.FC<PixiDJModlandBrowserProps> = ({
   const [selectedIndex, setSelectedIndex] = useState(-1);
   const [hoveredIndex, setHoveredIndex] = useState(-1);
   const [scrollY, setScrollY] = useState(0);
+  const [ratings, setRatings] = useState<RatingMap>({});
+  const [hoveredStar, setHoveredStar] = useState<{ path: string; star: number } | null>(null);
+
+  const isLoggedIn = useAuthStore(s => !!s.token);
 
   const searchTimerRef = useRef<ReturnType<typeof setTimeout>>(null);
   const resultsRef = useRef(results);
@@ -125,6 +158,16 @@ export const PixiDJModlandBrowser: React.FC<PixiDJModlandBrowserProps> = ({
         }
         setHasMore(data.results.length === LIMIT);
         setOffset(newOffset);
+
+        // Fetch ratings for results
+        const keys = data.results.map((f: ModlandFile) => f.full_path);
+        if (keys.length > 0) {
+          batchGetRatings('modland', keys).then(rm => {
+            setRatings(prev => append ? { ...prev, ...rm } : rm);
+          }).catch(() => {});
+        } else if (!append) {
+          setRatings({});
+        }
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Search failed');
       } finally {
@@ -148,6 +191,41 @@ export const PixiDJModlandBrowser: React.FC<PixiDJModlandBrowserProps> = ({
   const loadMore = useCallback(() => {
     doSearch(query, format, offset + LIMIT, true);
   }, [query, format, offset, doSearch]);
+
+  // ── Rate handler ──────────────────────────────────────────────────────────
+  const handleRate = useCallback(async (itemKey: string, star: number) => {
+    if (!isLoggedIn) return;
+    setRatings(prev => {
+      const existing = prev[itemKey];
+      if (star === 0) {
+        if (!existing) return prev;
+        const newCount = Math.max(0, existing.count - 1);
+        const newAvg = newCount > 0
+          ? (existing.avg * existing.count - (existing.userRating || 0)) / newCount
+          : 0;
+        return { ...prev, [itemKey]: { avg: newAvg, count: newCount } };
+      }
+      const oldUser = existing?.userRating;
+      const oldCount = existing?.count || 0;
+      const oldAvg = existing?.avg || 0;
+      const newCount = oldUser ? oldCount : oldCount + 1;
+      const newAvg = oldUser
+        ? (oldAvg * oldCount - oldUser + star) / newCount
+        : (oldAvg * oldCount + star) / newCount;
+      return { ...prev, [itemKey]: { avg: newAvg, count: newCount, userRating: star } };
+    });
+    try {
+      if (star === 0) {
+        await removeRating('modland', itemKey);
+      } else {
+        await setRating('modland', itemKey, star);
+      }
+    } catch {
+      batchGetRatings('modland', [itemKey]).then(rm => {
+        setRatings(prev => ({ ...prev, ...rm }));
+      }).catch(() => {});
+    }
+  }, [isLoggedIn]);
 
   // ── Download → Parse → Load to Deck ──────────────────────────────────────
   const loadToDeck = useCallback(
@@ -464,7 +542,7 @@ export const PixiDJModlandBrowser: React.FC<PixiDJModlandBrowserProps> = ({
                   tint={theme.text.color}
                   layout={{ maxWidth: contentW - 180 }}
                 />
-                <layoutContainer layout={{ flexDirection: 'row', gap: 8 }}>
+                <layoutContainer layout={{ flexDirection: 'row', gap: 8, alignItems: 'center' }}>
                   <pixiBitmapText
                     text={file.format}
                     style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 11, fill: 0xffffff }}
@@ -478,6 +556,45 @@ export const PixiDJModlandBrowser: React.FC<PixiDJModlandBrowserProps> = ({
                     alpha={0.6}
                     layout={{}}
                   />
+                  {/* Star ratings */}
+                  <layoutContainer layout={{ flexDirection: 'row', gap: STAR_GAP, marginLeft: 4 }}>
+                    {[1, 2, 3, 4, 5].map(star => {
+                      const r = ratings[file.full_path];
+                      const avg = r?.avg ?? file.avg_rating ?? 0;
+                      const userR = r?.userRating;
+                      const isStarHovered = hoveredStar?.path === file.full_path && hoveredStar.star >= star;
+                      const isFilled = star <= (hoveredStar?.path === file.full_path ? hoveredStar.star : (userR || Math.round(avg)));
+                      const color = isStarHovered ? STAR_HOVER : (userR && star <= userR) ? STAR_USER : isFilled ? STAR_FILLED : STAR_EMPTY;
+                      const starAlpha = color === STAR_EMPTY ? 0.4 : 1;
+                      return (
+                        <pixiGraphics
+                          key={star}
+                          eventMode={isLoggedIn ? 'static' : 'none'}
+                          cursor={isLoggedIn ? 'pointer' : undefined}
+                          onPointerOver={() => isLoggedIn && setHoveredStar({ path: file.full_path, star })}
+                          onPointerOut={() => setHoveredStar(null)}
+                          onPointerUp={() => {
+                            if (!isLoggedIn) return;
+                            handleRate(file.full_path, userR === star ? 0 : star);
+                          }}
+                          draw={(g: GraphicsType) => {
+                            g.clear();
+                            drawStar(g, STAR_SIZE / 2, STAR_SIZE / 2, STAR_SIZE / 2, color, starAlpha);
+                          }}
+                          layout={{ width: STAR_SIZE, height: STAR_SIZE }}
+                        />
+                      );
+                    })}
+                    {(ratings[file.full_path]?.count ?? file.vote_count ?? 0) > 0 && (
+                      <pixiBitmapText
+                        text={`(${ratings[file.full_path]?.count ?? file.vote_count ?? 0})`}
+                        style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 9, fill: 0xffffff }}
+                        tint={theme.textMuted.color}
+                        alpha={0.4}
+                        layout={{ marginLeft: 2 }}
+                      />
+                    )}
+                  </layoutContainer>
                 </layoutContainer>
               </layoutContainer>
 
