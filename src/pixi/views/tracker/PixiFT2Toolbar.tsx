@@ -31,6 +31,9 @@ import { PixiVisualizer } from './PixiVisualizer';
 import { useTransportStore, useTrackerStore, useUIStore, useInstrumentStore, useProjectStore, useAudioStore, useAutomationStore, useEditorStore } from '@stores';
 import { useAIStore } from '@stores/useAIStore';
 import { useSettingsStore } from '@stores/useSettingsStore';
+import { useFormatStore } from '@stores/useFormatStore';
+import { useGTUltraStore } from '@stores/useGTUltraStore';
+import * as Tone from 'tone';
 import { exportSong, getOriginalModuleDataForExport } from '@lib/export/exporters';
 import { useShallow } from 'zustand/react/shallow';
 import { useTapTempo } from '@hooks/useTapTempo';
@@ -190,8 +193,11 @@ export const PixiFT2Toolbar: React.FC = () => {
   const grooveActive = (grooveTemplateId !== 'straight' && swing > 0) || jitter > 0;
   const grooveName = GROOVE_TEMPLATES.find(g => g.id === grooveTemplateId)?.name ?? 'Groove';
 
-  const isPlayingSong    = isPlaying && !isLooping;
-  const isPlayingPattern = isPlaying && isLooping;
+  const editorMode = useFormatStore((s) => s.editorMode);
+  const gtPlaying = useGTUltraStore((s) => s.playing);
+  const isGT = editorMode === 'goattracker';
+  const isPlayingSong    = (isGT ? gtPlaying : isPlaying && !isLooping);
+  const isPlayingPattern = (isGT ? gtPlaying : isPlaying && isLooping);
 
   // ── Pattern name local state ──────────────────────────────────────────────
   const [localName, setLocalName] = useState(patternName);
@@ -246,7 +252,7 @@ export const PixiFT2Toolbar: React.FC = () => {
   // ── Modal handlers ────────────────────────────────────────────────────────
   const handleShowExport      = useCallback(() => useUIStore.getState().openModal('export'), []);
   const handleShowHelp        = useCallback((tab?: string) => useUIStore.getState().openModal('help', { initialTab: tab ?? 'shortcuts' }), []);
-  const handleShowMasterFX    = useCallback(() => { const s = useUIStore.getState(); s.modalOpen === 'masterFx' ? s.closeModal() : s.openModal('masterFx'); }, []);
+  const handleShowMasterFX    = useCallback(() => { const s = useUIStore.getState(); if (s.modalOpen === 'masterFx') { s.closeModal(); } else { s.openModal('masterFx'); } }, []);
   const handleShowInstruments  = useCallback(() => useUIStore.getState().openModal('instruments'), []);
   const handleShowPatternOrder = useCallback(() => useUIStore.getState().openModal('patternOrder'), []);
   const handleShowDrumpads     = useCallback(() => useUIStore.getState().openModal('drumpads'), []);
@@ -336,16 +342,41 @@ export const PixiFT2Toolbar: React.FC = () => {
   }, []);
 
   // ── Transport handlers ────────────────────────────────────────────────────
+
   const handlePlaySong = useCallback(async () => {
+    // GT Ultra: delegate to its own engine
+    if (isGT) {
+      await Tone.start();
+      const gtStore = useGTUltraStore.getState();
+      const gtEngine = gtStore.engine;
+      if (!gtEngine) return;
+      const ctx = Tone.getContext().rawContext as AudioContext;
+      if (ctx.state !== 'running') await ctx.resume();
+      if (gtStore.playing) { gtEngine.stop(); gtStore.setPlaying(false); }
+      else { gtEngine.play(); gtStore.setPlaying(true); }
+      return;
+    }
     if (isPlayingSong) {
       if (shiftKeyRef.current) { getTrackerScratchController().triggerPowerCut(); return; }
       stop(); return;
     }
     setIsLooping(false);
     await play().catch(() => {});
-  }, [isPlayingSong, stop, setIsLooping, play]);
+  }, [isGT, isPlayingSong, stop, setIsLooping, play]);
 
   const handlePlayPattern = useCallback(async () => {
+    // GT Ultra: delegate (pattern play = same as song play for GT)
+    if (isGT) {
+      await Tone.start();
+      const gtStore = useGTUltraStore.getState();
+      const gtEngine = gtStore.engine;
+      if (!gtEngine) return;
+      const ctx = Tone.getContext().rawContext as AudioContext;
+      if (ctx.state !== 'running') await ctx.resume();
+      if (gtStore.playing) { gtEngine.stop(); gtStore.setPlaying(false); }
+      else { gtEngine.play(); gtStore.setPlaying(true); }
+      return;
+    }
     if (isPlayingPattern) {
       if (shiftKeyRef.current) { getTrackerScratchController().triggerPowerCut(); return; }
       stop(); return;
@@ -353,9 +384,17 @@ export const PixiFT2Toolbar: React.FC = () => {
     if (isPlaying) stop();
     setIsLooping(true);
     await play().catch(() => {});
-  }, [isPlayingPattern, isPlaying, stop, setIsLooping, play]);
+  }, [isGT, isPlayingPattern, isPlaying, stop, setIsLooping, play]);
 
-  const handleStop = useCallback(() => { stop(); }, [stop]);
+  const handleStop = useCallback(() => {
+    if (isGT) {
+      const gtStore = useGTUltraStore.getState();
+      gtStore.engine?.stop();
+      gtStore.setPlaying(false);
+      return;
+    }
+    stop();
+  }, [isGT, stop]);
 
   // ── Pattern position / order handlers ─────────────────────────────────────
   const handlePositionChange = useCallback((v: number) => setCurrentPosition(v), [setCurrentPosition]);
@@ -682,7 +721,7 @@ export const PixiFT2Toolbar: React.FC = () => {
           color={modalOpen === 'instrumentFx' ? 'purple' : 'default'}
           size="sm"
           active={modalOpen === 'instrumentFx'}
-          onClick={() => { const s = useUIStore.getState(); s.modalOpen === 'instrumentFx' ? s.closeModal() : s.openModal('instrumentFx'); }}
+          onClick={() => { const s = useUIStore.getState(); if (s.modalOpen === 'instrumentFx') { s.closeModal(); } else { s.openModal('instrumentFx'); } }}
         />
         <PixiButton
           label="AI"
