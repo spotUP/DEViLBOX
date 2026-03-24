@@ -13,7 +13,6 @@ const BTN_DEFAULT = `${BTN} bg-ft2-header text-ft2-textDim border-ft2-border hov
 const SEL = 'bg-ft2-header text-ft2-text border border-ft2-border font-mono text-[11px] px-1 py-0';
 
 export const GTToolbar: React.FC<{ width?: number; height?: number }> = () => {
-  const playing = useGTUltraStore((s) => s.playing);
   const songName = useGTUltraStore((s) => s.songName);
   const songAuthor = useGTUltraStore((s) => s.songAuthor);
   const sidCount = useGTUltraStore((s) => s.sidCount);
@@ -36,25 +35,6 @@ export const GTToolbar: React.FC<{ width?: number; height?: number }> = () => {
   const currentSong = useGTUltraStore((s) => s.currentSong);
   const setCurrentSong = useGTUltraStore((s) => s.setCurrentSong);
   const patternLength = useGTUltraStore((s) => s.patternLength);
-
-  const togglePlay = useCallback(() => {
-    if (!engine) return;
-    if (playing) {
-      engine.stop();
-      useGTUltraStore.getState().setPlaying(false);
-    } else {
-      engine.play();
-      useGTUltraStore.getState().setPlaying(true);
-    }
-  }, [engine, playing]);
-
-  const handleNewSong = useCallback(() => {
-    if (!engine) return;
-    engine.newSong();
-    useGTUltraStore.getState().setPlaying(false);
-    useGTUltraStore.getState().setSongName('Untitled');
-    useGTUltraStore.getState().setSongAuthor('');
-  }, [engine]);
 
   const handleSave = useCallback(() => { engine?.saveSng(); }, [engine]);
   const handleExportPrg = useCallback(() => { engine?.exportPrg(); }, [engine]);
@@ -84,21 +64,12 @@ export const GTToolbar: React.FC<{ width?: number; height?: number }> = () => {
 
   return (
     <div className={`flex items-center gap-1.5 px-2 bg-ft2-header border-b border-ft2-border font-mono text-xs h-9 ${recordMode ? 'ring-1 ring-inset ring-red-500/60' : ''}`}>
-      {/* File ops */}
-      <button onClick={handleNewSong} className={BTN_DEFAULT} title="New Song">New</button>
+      {/* GT-specific file ops */}
       <button onClick={handleSave} className={BTN_DEFAULT} title="Save .sng">Save</button>
       <button onClick={handleExportPrg} className={BTN_DEFAULT} title="Export C64 .prg">PRG</button>
       <button onClick={handleExportSid} className={BTN_DEFAULT} title="Export .sid">SID</button>
 
       <div className="w-px h-5 bg-ft2-border mx-0.5" />
-
-      {/* Transport */}
-      <button
-        onClick={togglePlay}
-        className={`${BTN} border-transparent font-bold ${playing ? 'bg-red-600 text-text-primary hover:bg-red-700' : 'bg-emerald-600 text-text-primary hover:bg-emerald-700'}`}
-      >
-        {playing ? 'STOP' : 'PLAY'}
-      </button>
 
       {/* Record */}
       <button
