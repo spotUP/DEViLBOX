@@ -50,6 +50,21 @@ const C_CHAN_SEP    = 0x222222;
 // ── Helpers ──
 const NOTE_NAMES = ['C-', 'C#', 'D-', 'D#', 'E-', 'F-', 'F#', 'G-', 'G#', 'A-', 'A#', 'B-'];
 
+// GoatTracker order list command bytes
+const GT_MAX_PATT = 0xD0;  // pattern numbers are 0x00-0xCF (0-207)
+
+/** Resolve an order position to an actual pattern number, skipping GT commands. */
+function resolveOrderPattern(orderData: Uint8Array | undefined, pos: number): number {
+  if (!orderData) return 0;
+  // Walk forward from `pos`, skipping command bytes (>= 0xD0) until we find a pattern number
+  for (let i = pos; i < orderData.length; i++) {
+    const v = orderData[i];
+    if (v < GT_MAX_PATT) return v;  // Valid pattern number
+    if (v === 0xFF) return 0;       // LOOPSONG — end of list
+  }
+  return 0; // Fallback
+}
+
 function noteStr(n: number): string {
   if (n === 0 || n === 0xBD) return '...'; // 0=empty, 0xBD=REST
   if (n === 0xBE) return '==='; // keyoff
@@ -144,7 +159,7 @@ export const PixiGTPatternGrid: React.FC<Props> = ({ width, height }) => {
     labels.push({ x: 2, y: 3, text: 'ROW', color: C_HEADER_TXT, fontFamily });
     const orderData = orderDataRef.current;
     for (let ch = 0; ch < channelCount; ch++) {
-      const patNum = orderData[ch]?.[orderCursor] ?? 0;
+      const patNum = resolveOrderPattern(orderData[ch], orderCursor);
       const label = `CH${ch + 1}:${patNum.toString(16).toUpperCase().padStart(2, '0')}`;
       const x = ROW_NUM_W + ch * (CHANNEL_W + CHAN_GAP) + CHANNEL_W / 2 - CHAR_W * label.length / 2;
       labels.push({ x, y: 3, text: label, color: C_HEADER_TXT, fontFamily });
@@ -204,7 +219,7 @@ export const PixiGTPatternGrid: React.FC<Props> = ({ width, height }) => {
         // Read from store's patternData cache
         const pData = patternDataRef.current;
         const chOrderData = orderDataRef.current[ch];
-        const patIdx = chOrderData ? chOrderData[orderPos] : 0;
+        const patIdx = resolveOrderPattern(chOrderData, orderPos);
         const pat = pData.get(patIdx);
         let note = 0, instr = 0, cmd = 0, param = 0;
         if (pat && row < pat.length) {
