@@ -53,6 +53,7 @@ export function useGTUltraFormatData(): GTUltraFormatData {
         const col = colMap[columnKey];
         if (col === undefined) return;
         engine.setPatternCell(patIdx, rowIdx, col, value);
+        store.refreshPatternData(patIdx);
         return;
       }
 

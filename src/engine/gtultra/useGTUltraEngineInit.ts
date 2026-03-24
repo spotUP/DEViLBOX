@@ -58,7 +58,11 @@ export function useGTUltraEngineInit(): void {
           // Don't populate instruments here — wait for onSongLoaded when data is ready
         },
         onPosition: (pos) => {
-          useGTUltraStore.getState().updatePlaybackPos(pos);
+          useGTUltraStore.getState().updatePlaybackPos({
+            row: pos.row,
+            songPos: pos.pos,
+            position: pos.pos,
+          });
           setFormatPlaybackRow(pos.row);
         },
         onAsidWrite: (chip, reg, value) => getGTUltraASIDBridge().writeRegister(chip, reg, value),
