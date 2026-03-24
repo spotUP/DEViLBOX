@@ -36,6 +36,15 @@ export function resolveOrderPattern(orderData: Uint8Array | undefined, pos: numb
   return 0;
 }
 
+// Shared color palette (matches GTOrderMatrix section colors)
+const GT_COLORS = {
+  orders: '#ff6666',
+  wave:   '#60e060',
+  pulse:  '#ff8866',
+  filter: '#ffcc00',
+  speed:  '#6699ff',
+};
+
 // Column definitions for GT Ultra: Note | Inst | Command | Data
 export const GTU_COLUMNS: ColumnDef[] = [
   {
@@ -43,7 +52,7 @@ export const GTU_COLUMNS: ColumnDef[] = [
     label: 'Note',
     charWidth: 3,
     type: 'note',
-    color: 'var(--color-text-secondary)',
+    color: GT_COLORS.orders,
     emptyColor: 'var(--color-border-light)',
     emptyValue: 0,
     formatter: gtNoteToString,
@@ -53,7 +62,7 @@ export const GTU_COLUMNS: ColumnDef[] = [
     label: 'Ins',
     charWidth: 2,
     type: 'hex',
-    color: '#60e060',
+    color: GT_COLORS.wave,
     emptyColor: 'var(--color-border-light)',
     emptyValue: 0,
     hexDigits: 2,
@@ -64,7 +73,7 @@ export const GTU_COLUMNS: ColumnDef[] = [
     label: 'Cmd',
     charWidth: 2,
     type: 'hex',
-    color: '#ffcc00',
+    color: GT_COLORS.filter,
     emptyColor: 'var(--color-border-light)',
     emptyValue: 0,
     hexDigits: 2,
@@ -75,7 +84,7 @@ export const GTU_COLUMNS: ColumnDef[] = [
     label: 'Data',
     charWidth: 2,
     type: 'hex',
-    color: '#ff8866',
+    color: GT_COLORS.pulse,
     emptyColor: 'var(--color-border-light)',
     emptyValue: 0,
     hexDigits: 2,
@@ -83,31 +92,40 @@ export const GTU_COLUMNS: ColumnDef[] = [
   },
 ];
 
-// Table channel columns: L (left) and R (right) hex values
-export const GTU_TABLE_COLUMNS: ColumnDef[] = [
-  {
-    key: 'note',
-    label: 'L',
-    charWidth: 2,
-    type: 'hex',
-    color: '#60e060',
-    emptyColor: 'var(--color-border-light)',
-    emptyValue: 0,
-    hexDigits: 2,
-    formatter: gtHex2,
-  },
-  {
-    key: 'instrument',
-    label: 'R',
-    charWidth: 2,
-    type: 'hex',
-    color: '#ff8866',
-    emptyColor: 'var(--color-border-light)',
-    emptyValue: 0,
-    hexDigits: 2,
-    formatter: gtHex2,
-  },
-];
+// Per-table column factories using section colors
+function makeTableColumns(color: string): ColumnDef[] {
+  return [
+    {
+      key: 'note',
+      label: 'L',
+      charWidth: 2,
+      type: 'hex' as const,
+      color,
+      emptyColor: 'var(--color-border-light)',
+      emptyValue: 0,
+      hexDigits: 2,
+      formatter: gtHex2,
+    },
+    {
+      key: 'instrument',
+      label: 'R',
+      charWidth: 2,
+      type: 'hex' as const,
+      color,
+      emptyColor: 'var(--color-border-light)',
+      emptyValue: 0,
+      hexDigits: 2,
+      formatter: gtHex2,
+    },
+  ];
+}
+
+export const GTU_WAVE_COLUMNS   = makeTableColumns(GT_COLORS.wave);
+export const GTU_PULSE_COLUMNS  = makeTableColumns(GT_COLORS.pulse);
+export const GTU_FILTER_COLUMNS = makeTableColumns(GT_COLORS.filter);
+export const GTU_SPEED_COLUMNS  = makeTableColumns(GT_COLORS.speed);
+
+const TABLE_COLUMN_DEFS = [GTU_WAVE_COLUMNS, GTU_PULSE_COLUMNS, GTU_FILTER_COLUMNS, GTU_SPEED_COLUMNS];
 
 /**
  * Convert GT Ultra store data to FormatChannel[] for the shared pattern editor.
@@ -183,7 +201,7 @@ export function gtUltraToFormatChannels(
       label: TABLE_NAMES[t],
       patternLength: 255,
       rows,
-      columns: GTU_TABLE_COLUMNS,
+      columns: TABLE_COLUMN_DEFS[t],
     });
   }
 
