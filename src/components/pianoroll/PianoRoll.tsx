@@ -22,6 +22,7 @@
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import * as Tone from 'tone';
+import { usePianoRoll, QWERTY_NOTE_MAP as SHARED_QWERTY_NOTE_MAP } from '@/hooks/views/usePianoRoll';
 import { usePianoRollKeyboard } from '@/hooks/pianoroll/usePianoRollKeyboard';
 import { PianoKeyboardCanvas } from './PianoKeyboardCanvas';
 import { PianoRollCanvas } from './PianoRollCanvas';
@@ -59,17 +60,11 @@ import {
   Circle,
   Navigation,
 } from 'lucide-react';
-import { getMIDIManager } from '@/midi/MIDIManager';
-import type { MIDIMessage } from '@/midi/types';
 import { useUIStore } from '../../stores';
 import { focusPopout } from '../ui/PopOutWindow';
 
-// QWERTY keyboard note mapping (defined outside component to avoid re-creation per render)
-const QWERTY_NOTE_MAP: Record<string, number> = {
-  z: 0, s: 1, x: 2, d: 3, c: 4, v: 5, g: 6, b: 7, h: 8, n: 9, j: 10, m: 11,
-  q: 12, '2': 13, w: 14, '3': 15, e: 16, r: 17, '5': 18, t: 19, '6': 20, y: 21, '7': 22, u: 23,
-  i: 24, '9': 25, o: 26, '0': 27, p: 28,
-};
+// QWERTY keyboard note mapping — imported from shared hook
+const QWERTY_NOTE_MAP = SHARED_QWERTY_NOTE_MAP;
 
 interface PianoRollProps {
   channelIndex?: number;
@@ -124,6 +119,13 @@ export const PianoRoll: React.FC<PianoRollProps> = ({ channelIndex }) => {
   const isPlaying = useTransportStore((state) => state.isPlaying);
   const currentRow = useTransportStore((state) => state.currentRow);
 
+  // Shared piano roll logic (MIDI recording, follow-playback, note version, note length)
+  const {
+    followPlayback, setFollowPlayback,
+    isRecording, handleToggleRecord,
+    getEffectiveNoteLength,
+  } = usePianoRoll();
+
   const { instruments, currentInstrumentId } = useInstrumentStore();
 
   // Container ref for measuring height
@@ -132,16 +134,6 @@ export const PianoRoll: React.FC<PianoRollProps> = ({ channelIndex }) => {
 
   // Acid pattern generator state
   const [showAcidGenerator, setShowAcidGenerator] = useState(false);
-
-  // MIDI recording state
-  const [isRecording, setIsRecording] = useState(false);
-  const midiNoteStartRef = useRef<Map<number, number>>(new Map());
-  const handleToggleRecord = useCallback(() => {
-    setIsRecording(prev => !prev);
-  }, []);
-
-  // Follow playback toggle
-  const [followPlayback, setFollowPlayback] = useState(true);
 
   // Note preview state
   const previewingNote = useRef<string | null>(null);
@@ -152,58 +144,6 @@ export const PianoRoll: React.FC<PianoRollProps> = ({ channelIndex }) => {
       setChannelIndex(channelIndex);
     }
   }, [channelIndex, setChannelIndex]);
-
-  // MIDI recording: subscribe to MIDIManager when recording
-  useEffect(() => {
-    if (!isRecording) {
-      midiNoteStartRef.current.clear();
-      return;
-    }
-
-    const manager = getMIDIManager();
-
-    const handleMIDIMessage = (msg: MIDIMessage) => {
-      if (!msg.data || msg.data.length < 2) return;
-      const [status, note = 0, velocity = 0] = msg.data;
-      const messageType = (status >> 4) & 0x0f;
-
-      const pianoStore = usePianoRollStore.getState();
-      const insertRow = isPlaying ? currentRow : Math.floor(pianoStore.view.scrollX);
-      const chIdx = pianoStore.view.channelIndex;
-
-      if (messageType === 0x09 && velocity > 0) {
-        midiNoteStartRef.current.set(note, insertRow);
-        const ts = useTrackerStore.getState();
-        const pat = ts.patterns[ts.currentPatternIndex];
-        if (!pat) return;
-        const xmNote = note + 1;
-        const volumeValue = Math.round((velocity / 127) * 64);
-        const vol = 0x10 + volumeValue;
-        ts.setCell(chIdx, insertRow, { note: xmNote, volume: vol });
-      } else if (messageType === 0x08 || (messageType === 0x09 && velocity === 0)) {
-        const startRow = midiNoteStartRef.current.get(note);
-        if (startRow === undefined) return;
-        midiNoteStartRef.current.delete(note);
-
-        const nowRow = isPlaying ? currentRow : Math.floor(usePianoRollStore.getState().view.scrollX);
-        const duration = Math.max(1, nowRow - startRow);
-
-        const ts = useTrackerStore.getState();
-        const pat = ts.patterns[ts.currentPatternIndex];
-        if (!pat) return;
-        const endRow = startRow + duration;
-        if (endRow < pat.length) {
-          ts.setCell(chIdx, endRow, { note: 97 }); // 97 = note-off
-        }
-      }
-    };
-
-    manager.addMessageHandler(handleMIDIMessage);
-    return () => {
-      manager.removeMessageHandler(handleMIDIMessage);
-      midiNoteStartRef.current.clear();
-    };
-  }, [isRecording, isPlaying, currentRow]);
 
   // Auto-scroll to center on notes when they first appear or pattern changes
   const autoScrollDoneForPattern = useRef<number | null>(null);
@@ -390,12 +330,6 @@ export const PianoRoll: React.FC<PianoRollProps> = ({ channelIndex }) => {
     const deltaPitch = -Math.round((drag.currentY - drag.startY) / view.verticalZoom);
     return Math.max(0, Math.min(127, note.midiNote + deltaPitch));
   }, [drag.isDragging, drag.mode, drag.noteId, drag.currentY, drag.startY, view.verticalZoom, notes]);
-
-  // Get effective note length
-  const getEffectiveNoteLength = useCallback(() => {
-    if (view.noteLengthPreset > 0) return view.noteLengthPreset;
-    return view.snapToGrid ? Math.max(1, Math.floor(4 / view.gridDivision)) : 1;
-  }, [view.noteLengthPreset, view.snapToGrid, view.gridDivision]);
 
   // Snap MIDI note to nearest scale note
   const snapToScale = useCallback((midiNote: number): number => {
