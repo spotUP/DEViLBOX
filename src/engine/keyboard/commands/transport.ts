@@ -42,9 +42,9 @@ export function playStopToggle(): boolean {
  */
 export function playPattern(): boolean {
   const replayer = getTrackerReplayer();
+  const playing = replayer.isPlaying() || useTransportStore.getState().isPlaying;
 
-  if (replayer.isPlaying()) {
-    // Already playing — just seek, touch NOTHING else (no Tone.start, no store updates)
+  if (playing) {
     replayer.forcePosition(replayer.getSongPos(), 0);
   } else {
     unlockIOSAudio();
@@ -63,9 +63,9 @@ export function playPattern(): boolean {
  */
 export function playSong(): boolean {
   const replayer = getTrackerReplayer();
+  const playing = replayer.isPlaying() || useTransportStore.getState().isPlaying;
 
-  if (replayer.isPlaying()) {
-    // Already playing — just seek, touch NOTHING else (no Tone.start, no store updates)
+  if (playing) {
     replayer.forcePosition(0, 0);
   } else {
     unlockIOSAudio();
