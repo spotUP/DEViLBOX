@@ -31,7 +31,7 @@ if (_origOnSourceEnd && !(Tone.Player.prototype as any).__scratchPatched) {
   };
 }
 
-type FaderLFODivision = '1/4' | '1/8' | '1/16' | '1/32';
+export type FaderLFODivision = '1/4' | '1/8' | '1/16' | '1/32';
 
 export type DeckId = 'A' | 'B' | 'C';
 
