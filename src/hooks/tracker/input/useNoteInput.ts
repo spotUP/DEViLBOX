@@ -238,6 +238,7 @@ export const useNoteInput = (refs: TrackerInputRefs) => {
   // Handle note-related keydown events. Returns true if handled.
   const handleKeyDown = useCallback(
     (e: KeyboardEvent): boolean => {
+      if ((e as any).__handled) return false;
       const key = e.key;
       const keyLower = key.toLowerCase();
 

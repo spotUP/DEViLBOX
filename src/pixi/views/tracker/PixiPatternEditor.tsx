@@ -1155,6 +1155,7 @@ export const PixiPatternEditor: React.FC<PixiPatternEditorProps> = ({ width, hei
 
   // ── Render params ref — captured each React render, read by imperativeRedraw ──
   const renderParamsRef = useRef<RenderParams>(null!);
+  const _song = getTrackerReplayer().getSong(); // cache once per render
   renderParamsRef.current = {
     width, gridHeight, theme, visibleLines, topLines, baseY, patternLength,
     showGhostPatterns, trackerVisualBg, numChannels, channelOffsets, channelWidths,
@@ -1162,11 +1163,11 @@ export const PixiPatternEditor: React.FC<PixiPatternEditorProps> = ({ width, hei
     scrollLeft: scrollLeftRef.current, rowHeight, rowHighlightInterval,
     channelMuted, channelSolo, useHex, blankEmpty, showBeatLabels, columnVisibility,
     currentPatternIndex, playbackRow: playbackRowRef.current, playbackPatternIdx,
-    noteDisplayOffset: getTrackerReplayer().getSong()?.noteDisplayOffset ?? 0,
+    noteDisplayOffset: _song?.noteDisplayOffset ?? 0,
     smoothScrollActive: false,
     songPosition: -1,
-    songPositions: getTrackerReplayer().getSong()?.songPositions ?? [],
-    songLength: getTrackerReplayer().getSong()?.songPositions?.length ?? 0,
+    songPositions: _song?.songPositions ?? [],
+    songLength: _song?.songPositions?.length ?? 0,
     songRowCache: renderParamsRef.current?.songRowCache ?? new Map(),
   };
 
@@ -1677,8 +1678,8 @@ export const PixiPatternEditor: React.FC<PixiPatternEditorProps> = ({ width, hei
         totalChannelsWidth={totalChannelsWidth}
         scrollLeft={scrollLeft}
         width={width}
-        channelSpeeds={getTrackerReplayer().getSong()?.channelSpeeds}
-        songInitialSpeed={getTrackerReplayer().getSong()?.initialSpeed}
+        channelSpeeds={_song?.channelSpeeds}
+        songInitialSpeed={_song?.initialSpeed}
         onToggleMute={toggleChannelMute}
         onToggleSolo={toggleChannelSolo}
         onToggleCollapse={toggleChannelCollapse}
