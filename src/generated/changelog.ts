@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-03-24T21:06:15.560Z
+ * Generated: 2026-03-24T23:01:06.611Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -19,9 +19,9 @@ export interface ChangelogEntry {
 }
 
 // Build info
-export const BUILD_VERSION = '1.0.3501';
-export const BUILD_NUMBER = '3501';
-export const BUILD_HASH = '93bd4f65c';
+export const BUILD_VERSION = '1.0.3518';
+export const BUILD_NUMBER = '3518';
+export const BUILD_HASH = '3682be662';
 export const BUILD_DATE = '2026-03-24';
 
 // Full version (patch IS the build number, so no need to append)
@@ -30,9 +30,77 @@ export const FULL_VERSION = BUILD_VERSION;
 // Auto-generated changelog
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: '1.0.3501',
+    version: '1.0.3518',
     date: '2026-03-24',
     changes: [
+      {
+        type: 'fix',
+        "description": "Fix GT Ultra pattern editor not following playback"
+      },
+      {
+        type: 'feature',
+        "description": "Add CMI WASM build dir to gitignore"
+      },
+      {
+        type: 'improvement',
+        "description": "CMI synth: smooth envelope accumulator, UI layout improvements"
+      },
+      {
+        type: 'fix',
+        "description": "Fix PatternEditorCanvas cleanup for iOS fallback and safe canvas removal"
+      },
+      {
+        type: 'fix',
+        "description": "Fix GT Ultra silent playback: initialize editorInfo in gt_play()"
+      },
+      {
+        type: 'fix',
+        "description": "Fix format editors rendering zeros instead of dots for empty cells"
+      },
+      {
+        type: 'improvement',
+        "description": "Wire format context menu + shared SequenceMatrixEditor"
+      },
+      {
+        type: 'feature',
+        "description": "Unify format editor sizing and add collapsible matrix editors"
+      },
+      {
+        type: 'improvement',
+        "description": "Unify format/normal pattern editor headers with full channel controls"
+      },
+      {
+        type: 'improvement',
+        "description": "Update DEViLBOX theme tracker rows to navy background"
+      },
+      {
+        type: 'fix',
+        "description": "Fix format mode channel header alignment with pattern content"
+      },
+      {
+        type: 'improvement',
+        "description": "Use theme CSS variables in GTOrderMatrix and GTUltraView"
+      },
+      {
+        type: 'improvement',
+        "description": "Remove table sections from GTOrderMatrix — tables live in pattern editor now"
+      },
+      {
+        type: 'improvement',
+        "description": "Update default dark theme tracker rows to navy color scheme"
+      },
+      {
+        type: 'improvement',
+        "description": "Match pattern editor colors to GTOrderMatrix color scheme"
+      },
+      {
+        type: 'improvement',
+        "description": "Remove order channels from pattern editor — orders live only in GTOrderMatrix"
+      },
+      {
+        type: 'feature',
+        "description": "Add per-channel column support to pattern editor"
+      },
       {
         type: 'improvement',
         "description": "GT Ultra: integrate orders + tables as pattern editor channels"
@@ -164,70 +232,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'fix',
         "description": "Remove unused setCurrentRow from usePatternPlayback"
-      },
-      {
-        type: 'improvement',
-        "description": "Gate per-note/per-tick console.log in Furnace dispatch and playback"
-      },
-      {
-        type: 'improvement',
-        "description": "Stabilize playback effect deps and gate transition logging"
-      },
-      {
-        type: 'improvement',
-        "description": "Eliminate dual keyboard handler execution and reduce render overhead"
-      },
-      {
-        type: 'fix',
-        "description": "Correct filterFM → filterFmDepth property name in MIDI actions"
-      },
-      {
-        type: 'improvement',
-        "description": "Replace JSON.parse(JSON.stringify()) with structuredClone"
-      },
-      {
-        type: 'fix',
-        "description": "Remove stale config dep from handlePortClick useCallback"
-      },
-      {
-        type: 'fix',
-        "description": "DetectFormat matches extension-form Amiga files (songname.prefix)"
-      },
-      {
-        type: 'improvement',
-        "description": "Diag: alert import result on iOS"
-      },
-      {
-        type: 'fix',
-        "description": "Tight transport restart — eliminate dual-handler conflicts and async delays"
-      },
-      {
-        type: 'improvement',
-        "description": "Diag: alert screen dimensions on iOS"
-      },
-      {
-        type: 'improvement',
-        "description": "Extract recording start/stop to DJActions"
-      },
-      {
-        type: 'fix',
-        "description": "Instrument tab shows only list, no synth editor"
-      },
-      {
-        type: 'improvement',
-        "description": "Wire all visualization components to shared data hook"
-      },
-      {
-        type: 'feature',
-        "description": "Add shared visualization data hook — polls once per frame"
-      },
-      {
-        type: 'improvement',
-        "description": "Wire all remaining DJ views to DJActions"
-      },
-      {
-        type: 'feature',
-        "description": "Add nudge, loop, slip, seek, pitch, scratch pattern actions to DJActions"
       }
     ]
   }

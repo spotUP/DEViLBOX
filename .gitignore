@@ -184,3 +184,6 @@ wavesabre-wasm/build/
 # Private notes / sensitive files
 \!TODO.TXT
 mame-wasm/cmi/build/
+
+# Fairlight CMI sample library (65MB, deployed separately)
+public/data/samples/packs/fairlight-cmi/
