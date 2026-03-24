@@ -608,7 +608,20 @@ export function useFileNavigation({
           throw new Error('Cannot read tracker module');
         }
 
-        await onLoadTrackerModule(buffer, selectedFile.name);
+        try {
+          if (/iPhone|iPad/.test(navigator.userAgent)) {
+            alert(`Calling onLoadTrackerModule: ${buffer.byteLength} bytes, name=${selectedFile.name}`);
+          }
+          await onLoadTrackerModule(buffer, selectedFile.name);
+          if (/iPhone|iPad/.test(navigator.userAgent)) {
+            alert('Import completed successfully');
+          }
+        } catch (importErr) {
+          if (/iPhone|iPad/.test(navigator.userAgent)) {
+            alert(`Import FAILED: ${importErr instanceof Error ? importErr.message : importErr}`);
+          }
+          throw importErr;
+        }
         onClose();
         return;
       }
