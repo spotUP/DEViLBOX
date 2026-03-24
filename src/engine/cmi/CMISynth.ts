@@ -1,54 +1,40 @@
 import { MAMEBaseSynth } from '@engine/mame/MAMEBaseSynth';
 
 /**
- * CMI Parameter IDs (matching C++ enum in CMI WASM bridge)
+ * CMI Parameter IDs — must match C++ enum in mame-wasm/cmi/CMISynth.cpp
  */
 const CMIParam = {
-  MASTER_VOLUME: 0,
-  VOICE_COUNT: 1,
-  SAMPLE_RATE: 2,
-  WAVEFORM: 3,
+  VOLUME: 0,
+  FILTER_CUTOFF: 1,
+  ENVELOPE_RATE: 2,
+  WAVE_SELECT: 3,
+  ATTACK_TIME: 4,
+  RELEASE_TIME: 5,
+  ENV_MODE: 6,
+  FILTER_TRACK: 7,
 } as const;
 
 /**
- * CMISynth - Fairlight CMI IIx 8-Voice Sampling Synthesizer (WASM)
+ * CMISynth — Fairlight CMI IIx Channel Card (CMI01A) Emulation
  *
- * Based on MAME's Fairlight CMI IIx emulator.
- * The Fairlight CMI IIx (1982) is a landmark sampling synthesizer:
+ * DSP extracted 1:1 from MAME's cmi01a.cpp with behavioral models of
+ * the PIA6821 and PTM6840 peripherals for authentic hardware timing.
  *
- * Hardware facts:
- * - 8 independent voices, each driven by its own Z80 CPU at 4 MHz
- * - 8-bit PCM samples stored in onboard RAM
- * - Real-time additive synthesis ("Page R" real-time composer mode)
- * - Famous for its orchestral sample library (strings, brass, woodwinds)
- * - Used extensively in 1980s pop records by Peter Gabriel, Kate Bush,
- *   Stevie Wonder, Herbie Hancock, Harold Faltermeyer, and many others
+ * Hardware architecture (per voice):
+ * - 16KB wave RAM, 8-bit unsigned PCM (0x80 = center)
+ * - Two cascaded SSM2045 2nd-order lowpass filters
+ *   fc = 6410 * pow(1.02162, fval - 256) where fval = (octave << 5) + flt_latch
+ * - Hardware envelope: 8-bit up/down counter with 6-bit divider chain
+ * - PTM6840 timer drives envelope clock, PIA6821 mediates control signals
  *
- * WASM status:
- * - CMI chip is defined in the MAME source as `cmi01a_device` and `cmi_sound_device`
- * - WASM binary must be compiled from the MAME CMI source and placed at:
- *     public/mame/CMI.wasm + public/mame/CMI.js
- *   with a corresponding processor at:
- *     public/mame/CMI.worklet.js
- * - Until the WASM is compiled, this class will fail gracefully (logs an error)
- *   and produce no audio.
- *
- * Architecture:
- * - Extends MAMEBaseSynth for macro system, effects, and voice management
- * - 8 voices (one per CMI channel)
- * - 8-bit PCM playback with pitch control
- * - Sample ROM loaded into WASM memory via loadSample()
+ * Famous users: Peter Gabriel, Kate Bush, Herbie Hancock, Art of Noise
  */
 export class CMISynth extends MAMEBaseSynth {
   readonly name = 'CMISynth';
 
-  // MAMEBaseSynth chip configuration
   protected readonly chipName = 'CMI';
   protected readonly workletFile = 'CMI.worklet.js';
   protected readonly processorName = 'cmi-processor';
-
-  // CMI-specific state
-  private currentVoice: number = 0;
 
   constructor() {
     super();
@@ -59,66 +45,34 @@ export class CMISynth extends MAMEBaseSynth {
   // MAMEBaseSynth Abstract Method Implementations
   // ===========================================================================
 
-  /**
-   * Write key-on to CMI voice
-   */
   protected writeKeyOn(note: number, velocity: number): void {
     if (!this.workletNode || this._disposed) return;
     this.workletNode.port.postMessage({
       type: 'noteOn',
       note,
       velocity: Math.floor(velocity * 127),
-      voice: this.currentVoice,
     });
   }
 
-  /**
-   * Write key-off to CMI voice
-   */
   protected writeKeyOff(): void {
     if (!this.workletNode || this._disposed) return;
     this.workletNode.port.postMessage({
       type: 'noteOff',
       note: this.currentNote,
-      voice: this.currentVoice,
     });
   }
 
-  /**
-   * Write frequency to CMI voice
-   */
-  protected writeFrequency(freq: number): void {
-    if (!this.workletNode || this._disposed) return;
-    this.workletNode.port.postMessage({
-      type: 'setFrequency',
-      freq,
-      voice: this.currentVoice,
-    });
+  protected writeFrequency(_freq: number): void {
+    // Frequency is set via noteOn — CMI converts MIDI note to pitch/octave registers internally
   }
 
-  /**
-   * Write volume to CMI voice (0-1 normalized)
-   * CMI volume is 8-bit (0-255)
-   */
   protected writeVolume(volume: number): void {
     if (!this.workletNode || this._disposed) return;
-    this.workletNode.port.postMessage({
-      type: 'setVolume',
-      value: Math.round(volume * 255),
-      voice: this.currentVoice,
-    });
+    this.setParameterById(CMIParam.VOLUME, Math.round(volume * 255));
   }
 
-  /**
-   * Write panning to CMI voice (0-255, 128 = center)
-   */
-  protected writePanning(pan: number): void {
-    if (!this.workletNode || this._disposed) return;
-    this.workletNode.port.postMessage({
-      type: 'setPanning',
-      pan,
-      voice: this.currentVoice,
-    });
+  protected writePanning(_pan: number): void {
+    // CMI01A is mono per channel — panning handled at mixer level
   }
 
   // ===========================================================================
@@ -126,38 +80,33 @@ export class CMISynth extends MAMEBaseSynth {
   // ===========================================================================
 
   /**
-   * Select which voice to control (0-7)
-   * The CMI IIx has 8 voices.
-   */
-  setVoice(voice: number): void {
-    this.currentVoice = Math.max(0, Math.min(7, voice));
-  }
-
-  /**
-   * Load sample data into CMI voice RAM.
-   * The CMI stores 8-bit unsigned PCM samples.
-   *
-   * @param voiceIndex Voice index (0-7)
+   * Load 8-bit unsigned PCM sample data into a specific voice's wave RAM.
+   * @param voiceIndex Voice index (0-15, CMI01A has up to 16 polyphonic voices)
    * @param data 8-bit PCM sample data (unsigned, 0x80 = center)
    */
   loadVoiceSample(voiceIndex: number, data: Uint8Array): void {
     if (!this.workletNode || this._disposed) return;
-    const clampedVoice = Math.max(0, Math.min(7, voiceIndex));
+    const buf = data.buffer.slice(data.byteOffset, data.byteOffset + data.byteLength);
     this.workletNode.port.postMessage({
       type: 'loadSample',
-      voice: clampedVoice,
-      offset: 0,
-      data: data.buffer.slice(0),
-      size: data.length,
-    }, [data.buffer.slice(0)]);
+      voice: Math.max(0, Math.min(15, voiceIndex)),
+      data: buf,
+    }, [buf]);
   }
 
   /**
-   * Write to a CMI register directly (low-level access).
-   *
-   * @param offset Register offset
-   * @param value 8-bit value
+   * Load 8-bit unsigned PCM sample into ALL voices' wave RAM.
    */
+  loadSampleAll(data: Uint8Array): void {
+    if (!this.workletNode || this._disposed) return;
+    const buf = data.buffer.slice(data.byteOffset, data.byteOffset + data.byteLength);
+    this.workletNode.port.postMessage({
+      type: 'loadSample',
+      voice: -1,
+      data: buf,
+    }, [buf]);
+  }
+
   writeRegister(offset: number, value: number): void {
     if (!this.workletNode || this._disposed) return;
     this.workletNode.port.postMessage({ type: 'writeRegister', offset, value });
@@ -178,11 +127,17 @@ export class CMISynth extends MAMEBaseSynth {
       return;
     }
     const paramMap: Record<string, number> = {
-      'master_volume': CMIParam.MASTER_VOLUME,
-      'volume': CMIParam.MASTER_VOLUME,
-      'voice_count': CMIParam.VOICE_COUNT,
-      'sample_rate': CMIParam.SAMPLE_RATE,
-      'waveform': CMIParam.WAVEFORM,
+      'volume': CMIParam.VOLUME,
+      'filter_cutoff': CMIParam.FILTER_CUTOFF,
+      'cutoff': CMIParam.FILTER_CUTOFF,
+      'envelope_rate': CMIParam.ENVELOPE_RATE,
+      'wave_select': CMIParam.WAVE_SELECT,
+      'attack': CMIParam.ATTACK_TIME,
+      'attack_time': CMIParam.ATTACK_TIME,
+      'release': CMIParam.RELEASE_TIME,
+      'release_time': CMIParam.RELEASE_TIME,
+      'env_mode': CMIParam.ENV_MODE,
+      'filter_track': CMIParam.FILTER_TRACK,
     };
 
     const paramId = paramMap[param];
@@ -192,11 +147,10 @@ export class CMISynth extends MAMEBaseSynth {
   }
 
   setMasterVolume(val: number): void {
-    this.setParameterById(CMIParam.MASTER_VOLUME, val);
+    this.setParameterById(CMIParam.VOLUME, Math.round(val * 255));
   }
 }
 
-// Export constants
 export { CMIParam };
 
 export default CMISynth;

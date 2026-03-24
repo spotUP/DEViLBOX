@@ -1288,8 +1288,14 @@ export class TrackerReplayer {
   async play(): Promise<void> {
     if (!this.song) return;
 
-    const _playT0 = performance.now();
-    const _playLog = (label: string) => console.log(`[TrackerReplayer.play] ${label}: ${(performance.now() - _playT0).toFixed(0)}ms`);
+    const _debug = (window as any).REPLAYER_DEBUG;
+    const _playT0 = _debug ? performance.now() : 0;
+    const _playLog = _debug
+      ? (label: string) => console.log(`[TrackerReplayer.play] ${label}: ${(performance.now() - _playT0).toFixed(0)}ms`)
+      : () => {};
+    // Gate all play-path logging behind debug flag to avoid latency from console I/O
+    const _log = _debug ? console.log.bind(console) : () => {};
+    const _warn = _debug ? console.warn.bind(console) : () => {};
 
     // If already playing (e.g. reload path), stop first so we don't orphan schedulers
     if (this.playing) {
@@ -1437,14 +1443,14 @@ export class TrackerReplayer {
     // WASM sequencer path: if Furnace native data exists, upload it to the WASM sequencer
     // (which lives in the AudioWorklet) and delegate all tick processing there.
     // Must happen AFTER ensureWASMSynthsReady() so the dispatch engine worklet exists.
-    console.log('[TrackerReplayer] WASM seq check: furnaceNative =', !!this.song.furnaceNative,
+    _log('[TrackerReplayer] WASM seq check: furnaceNative =', !!this.song.furnaceNative,
       'subsongs:', this.song.furnaceNative?.subsongs?.length,
       'channels:', this.song.furnaceNative?.subsongs?.[0]?.channels?.length);
     if (this.song.furnaceNative) {
       try {
-        console.log('[TrackerReplayer] WASM seq: importing FurnaceDispatchEngine...');
+        _log('[TrackerReplayer] WASM seq: importing FurnaceDispatchEngine...');
         const { FurnaceDispatchEngine } = await import('@engine/furnace-dispatch/FurnaceDispatchEngine');
-        if (gen !== this._playGeneration) { console.log('[TrackerReplayer] WASM seq: gen mismatch after import'); return; }
+        if (gen !== this._playGeneration) { _log('[TrackerReplayer] WASM seq: gen mismatch after import'); return; }
         const dispatchEngine = FurnaceDispatchEngine.getInstance();
 
         // Ensure the dispatch engine worklet is initialized.
@@ -1452,18 +1458,18 @@ export class TrackerReplayer {
         // but many .fur songs use generic 'ChipSynth' instruments. We need the worklet
         // for the WASM sequencer regardless of instrument types.
         if (!dispatchEngine.isInitialized) {
-          console.log('[TrackerReplayer] WASM seq: dispatch engine not initialized, initializing...');
+          _log('[TrackerReplayer] WASM seq: dispatch engine not initialized, initializing...');
           const { getDevilboxAudioContext } = await import('@/utils/audio-context');
           const ctx = getDevilboxAudioContext();
           await dispatchEngine.init(ctx as unknown as Record<string, unknown>);
           if (gen !== this._playGeneration) return;
         } else if (!dispatchEngine.getWorkletNode() && (dispatchEngine as any)._initPromise) {
-          console.log('[TrackerReplayer] WASM seq: waiting for dispatch engine init...');
+          _log('[TrackerReplayer] WASM seq: waiting for dispatch engine init...');
           await (dispatchEngine as any)._initPromise;
           if (gen !== this._playGeneration) return;
         }
         const workletNode = dispatchEngine.getWorkletNode();
-        console.log('[TrackerReplayer] WASM seq: workletNode =', !!workletNode);
+        _log('[TrackerReplayer] WASM seq: workletNode =', !!workletNode);
         if (!workletNode) {
           throw new Error('FurnaceDispatchEngine worklet not initialized');
         }
@@ -1487,7 +1493,7 @@ export class TrackerReplayer {
         const oldChipIds = [...(dispatchEngine as any).chips.keys() as IterableIterator<number>];
         for (const platformType of oldChipIds) {
           if (!newChipSet.has(platformType)) {
-            console.log('[TrackerReplayer] WASM seq: destroying old chip for platform', platformType);
+            _log('[TrackerReplayer] WASM seq: destroying old chip for platform', platformType);
             dispatchEngine.destroyChip(platformType);
           }
         }
@@ -1495,7 +1501,7 @@ export class TrackerReplayer {
         // Create all chips for new song
         for (const chipId of chipIds) {
           if (!dispatchEngine.hasChip(chipId)) {
-            console.log('[TrackerReplayer] WASM seq: creating chip for platform', chipId);
+            _log('[TrackerReplayer] WASM seq: creating chip for platform', chipId);
             await dispatchEngine.createChip(chipId);
             if (gen !== this._playGeneration) return;
             await dispatchEngine.waitForChipCreated(chipId);
@@ -1516,7 +1522,7 @@ export class TrackerReplayer {
           for (const chipId of chipIds) {
             dispatchEngine.reset(chipId);
           }
-          console.log(`[TrackerReplayer] WASM seq: uploaded ${moduleSamples.length} module samples + reset chips`);
+          _log(`[TrackerReplayer] WASM seq: uploaded ${moduleSamples.length} module samples + reset chips`);
         }
 
         // Ensure the dispatch engine audio output is routed to speakers.
@@ -1530,7 +1536,7 @@ export class TrackerReplayer {
             if (nativeSynthBus) {
               sharedGain.connect(nativeSynthBus);
               (dispatchEngine as any)._audioRouted = true;
-              console.log('[TrackerReplayer] WASM seq: routed dispatch engine audio → synthBus');
+              _log('[TrackerReplayer] WASM seq: routed dispatch engine audio → synthBus');
             }
           }
         }
@@ -1549,18 +1555,18 @@ export class TrackerReplayer {
               uploaded++;
             }
           }
-          console.log(`[TrackerReplayer] WASM seq: pre-uploaded ${uploaded}/${this.song.instruments.length} instruments via INS2`);
+          _log(`[TrackerReplayer] WASM seq: pre-uploaded ${uploaded}/${this.song.instruments.length} instruments via INS2`);
         }
 
         // Upload song data to the WASM sequencer in the worklet
-        console.log('[TrackerReplayer] WASM seq: uploading song data...');
+        _log('[TrackerReplayer] WASM seq: uploading song data...');
         const { uploadFurnaceToSequencer } = await import('@/lib/export/FurnaceSequencerSerializer');
-        if (gen !== this._playGeneration) { console.log('[TrackerReplayer] WASM seq: gen mismatch after serializer import'); return; }
+        if (gen !== this._playGeneration) { _log('[TrackerReplayer] WASM seq: gen mismatch after serializer import'); return; }
         await uploadFurnaceToSequencer(this.song.furnaceNative, this.song.furnaceActiveSubsong ?? 0);
-        if (gen !== this._playGeneration) { console.log('[TrackerReplayer] WASM seq: gen mismatch after upload'); return; }
+        if (gen !== this._playGeneration) { _log('[TrackerReplayer] WASM seq: gen mismatch after upload'); return; }
 
         this.useWasmSequencer = true;
-        console.log('[TrackerReplayer] WASM seq: upload complete, subscribing to position updates...');
+        _log('[TrackerReplayer] WASM seq: upload complete, subscribing to position updates...');
 
         // Subscribe to position updates from the WASM sequencer (~60fps)
         this._seqPositionUnsub = dispatchEngine.onSeqPosition((order, row, audioTime) => {
@@ -1581,12 +1587,12 @@ export class TrackerReplayer {
         });
 
         // Start WASM sequencer from current position
-        console.log('[TrackerReplayer] WASM seq: calling seqPlay(%d, %d)', this.songPos, this.pattPos);
+        _log('[TrackerReplayer] WASM seq: calling seqPlay(%d, %d)', this.songPos, this.pattPos);
         dispatchEngine.seqPlay(this.songPos, this.pattPos);
-        console.log('[TrackerReplayer] Using WASM sequencer for Furnace playback');
+        _log('[TrackerReplayer] Using WASM sequencer for Furnace playback');
         return;
       } catch (err) {
-        console.warn('[TrackerReplayer] WASM sequencer failed, falling back to TS replayer:', err);
+        _warn('[TrackerReplayer] WASM sequencer failed, falling back to TS replayer:', err);
         this.useWasmSequencer = false;
         this._seqPositionUnsub = null;
       }
@@ -1595,7 +1601,7 @@ export class TrackerReplayer {
     // libopenmpt playback: if we have raw module data, use the libopenmpt WASM worklet
     // for audio and forward position updates to the UI. Falls back to ToneEngine if unavailable.
     if (this.song.libopenmptFileData && !this.useWasmSequencer) {
-      console.log('[TrackerReplayer] libopenmpt path: fileData size =', this.song.libopenmptFileData.byteLength);
+      _log('[TrackerReplayer] libopenmpt path: fileData size =', this.song.libopenmptFileData.byteLength);
       try {
         const { LibopenmptEngine } = await import('@engine/libopenmpt/LibopenmptEngine');
         if (gen !== this._playGeneration) return;
@@ -1604,7 +1610,7 @@ export class TrackerReplayer {
         await mptEngine.ready();
         if (gen !== this._playGeneration) return;
 
-        console.log('[TrackerReplayer] libopenmpt available:', mptEngine.isAvailable());
+        _log('[TrackerReplayer] libopenmpt available:', mptEngine.isAvailable());
         if (mptEngine.isAvailable()) {
           // If edits have been made, re-serialize from the soundlib to get updated module data
           let tuneData = this.song.libopenmptFileData;
@@ -1618,19 +1624,19 @@ export class TrackerReplayer {
             }
           }
 
-          console.log('[TrackerReplayer] libopenmpt: loading tune, size =', tuneData.byteLength);
+          _log('[TrackerReplayer] libopenmpt: loading tune, size =', tuneData.byteLength);
           await mptEngine.loadTune(tuneData);
 
           // Route audio through stereo separation chain
           if (!this.isDJDeck && !this.routedNativeEngines.has('LibopenmptSynth')) {
             const { getNativeAudioNode } = await import('@/utils/audio-context');
             const nativeInput = getNativeAudioNode(this.separationNode.inputTone as any);
-            console.log('[TrackerReplayer] libopenmpt: routing audio, nativeInput =', !!nativeInput,
+            _log('[TrackerReplayer] libopenmpt: routing audio, nativeInput =', !!nativeInput,
               'output ctx state =', mptEngine.output.context.state);
             if (nativeInput) {
               mptEngine.output.connect(nativeInput);
             } else {
-              console.warn('[TrackerReplayer] libopenmpt: no native input, connecting to destination');
+              _warn('[TrackerReplayer] libopenmpt: no native input, connecting to destination');
               mptEngine.output.connect(mptEngine.output.context.destination);
             }
             this.routedNativeEngines.add('LibopenmptSynth');
@@ -1676,21 +1682,21 @@ export class TrackerReplayer {
           this._suppressNotes = true;
 
           if (!this._muted) {
-            console.log('[TrackerReplayer] libopenmpt: calling play(), muted =', this._muted);
+            _log('[TrackerReplayer] libopenmpt: calling play(), muted =', this._muted);
             mptEngine.play();
             // Seek to current position if not at start
             if (this.songPos > 0 || this.pattPos > 0) {
               mptEngine.seekTo(this.songPos, this.pattPos);
             }
           } else {
-            console.log('[TrackerReplayer] libopenmpt: SKIPPING play() because muted');
+            _log('[TrackerReplayer] libopenmpt: SKIPPING play() because muted');
           }
 
-          console.log('[TrackerReplayer] Using libopenmpt for playback, suppressNotes =', this._suppressNotes);
+          _log('[TrackerReplayer] Using libopenmpt for playback, suppressNotes =', this._suppressNotes);
           return;
         }
       } catch (err) {
-        console.warn('[TrackerReplayer] libopenmpt failed, falling back to ToneEngine:', err);
+        _warn('[TrackerReplayer] libopenmpt failed, falling back to ToneEngine:', err);
         this.useLibopenmptPlayback = false;
       }
     }

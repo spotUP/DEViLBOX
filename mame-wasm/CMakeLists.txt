@@ -156,9 +156,14 @@ add_subdirectory(tr707)
 add_subdirectory(roland_sa)
 
 # ============================================================================
+# Fairlight CMI IIx channel card (CMI01A)
+# ============================================================================
+add_subdirectory(cmi)
+
+# ============================================================================
 # Combined build target
 # ============================================================================
 add_custom_target(all_mame_chips
-    DEPENDS SCSP_WASM AICA_WASM CEM3394_WASM YMF271_WASM K054539_WASM C352_WASM RF5C400_WASM ICS2115_WASM SN76477_WASM ES5503_WASM YMOPQ_WASM MSM5232_WASM ASTROCADE_WASM SNKWAVE_WASM SP0250_WASM VOTRAX_WASM TMS36XX_WASM MEA8000_WASM TMS5220_WASM UPD933_WASM TIA_WASM UPD931_WASM ASC_WASM VASYNTH_WASM TR707_WASM RolandSA_WASM
+    DEPENDS SCSP_WASM AICA_WASM CEM3394_WASM YMF271_WASM K054539_WASM C352_WASM RF5C400_WASM ICS2115_WASM SN76477_WASM ES5503_WASM YMOPQ_WASM MSM5232_WASM ASTROCADE_WASM SNKWAVE_WASM SP0250_WASM VOTRAX_WASM TMS36XX_WASM MEA8000_WASM TMS5220_WASM UPD933_WASM TIA_WASM UPD931_WASM ASC_WASM VASYNTH_WASM TR707_WASM RolandSA_WASM CMI_WASM
     COMMENT "Building all MAME sound chip emulators"
 )

@@ -46,9 +46,9 @@ export function useButtonMappings(): void {
 
     cleanups.push(
       manager.registerAction('transport.playFromStart', () => {
-        // Stop and play from start
-        stop();
-        setTimeout(() => togglePlayPause(), 50);
+        // Stop then play immediately — no artificial delay
+        if (isPlaying) stop();
+        togglePlayPause();
       })
     );
 

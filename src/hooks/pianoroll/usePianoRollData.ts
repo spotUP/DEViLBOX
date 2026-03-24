@@ -99,7 +99,7 @@ export function patternToPianoRollNotes(
  * Save pattern state for undo before modification (deep clone)
  */
 function saveForUndo(pattern: Pattern): Pattern {
-  return JSON.parse(JSON.stringify(pattern));
+  return structuredClone(pattern);
 }
 
 /**
@@ -117,7 +117,7 @@ function recordEdit(
     description,
     patternIndex,
     beforeState,
-    JSON.parse(JSON.stringify(pattern))
+    structuredClone(pattern)
   );
 }
 
