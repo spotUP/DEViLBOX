@@ -39,22 +39,25 @@ export function playStopToggle(): boolean {
 
 /**
  * Play pattern - Start playing current pattern from beginning.
- * If already playing, restart from row 0 without stopping.
+ * If already playing, seek replayer to row 0 without stopping.
  */
 export function playPattern(): boolean {
   const { setCurrentRow, play, isPlaying, setIsLooping } = useTransportStore.getState();
 
-  setIsLooping(true);
-  setCurrentRow(0);
-
   if (isPlaying) {
-    // Already playing — just reset position, don't stop/restart
+    // Already playing — seek replayer to row 0 of current pattern
+    setIsLooping(true);
+    setCurrentRow(0);
+    getTrackerReplayer().seekTo(getTrackerReplayer().getSongPos(), 0);
     return true;
   }
 
   // CRITICAL for iOS: Tone.start() MUST be called synchronously within user gesture
   unlockIOSAudio();
   Tone.start();
+
+  setIsLooping(true);
+  setCurrentRow(0);
 
   getToneEngine()
     .init()
@@ -68,23 +71,27 @@ export function playPattern(): boolean {
 
 /**
  * Play song - Start playing from beginning of song.
- * If already playing, restart from row 0 / pattern 0 without stopping.
+ * If already playing, seek replayer to pattern 0 / row 0 without stopping.
  */
 export function playSong(): boolean {
   const { setCurrentRow, setCurrentPattern, play, isPlaying, setIsLooping } = useTransportStore.getState();
 
-  setIsLooping(false);
-  setCurrentPattern(0);
-  setCurrentRow(0);
-
   if (isPlaying) {
-    // Already playing — just reset position, don't stop/restart
+    // Already playing — seek replayer to song start
+    setIsLooping(false);
+    setCurrentPattern(0);
+    setCurrentRow(0);
+    getTrackerReplayer().seekTo(0, 0);
     return true;
   }
 
   // CRITICAL for iOS: Tone.start() MUST be called synchronously within user gesture
   unlockIOSAudio();
   Tone.start();
+
+  setIsLooping(false);
+  setCurrentPattern(0);
+  setCurrentRow(0);
 
   getToneEngine()
     .init()
