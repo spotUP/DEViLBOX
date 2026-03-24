@@ -46,6 +46,7 @@ export const useEffectInput = (refs: TrackerInputRefs) => {
   // Handle effect/data entry keydown events. Returns true if handled.
   const handleKeyDown = useCallback(
     (e: KeyboardEvent): boolean => {
+      if ((e as any).__handled) return false;
       if (!recordMode) return false;
 
       const key = e.key;

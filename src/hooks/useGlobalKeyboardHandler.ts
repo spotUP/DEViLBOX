@@ -1904,6 +1904,10 @@ export function useGlobalKeyboardHandler(options: UseGlobalKeyboardHandlerOption
         // Command was executed - prevent default browser behavior
         e.preventDefault();
         e.stopPropagation();
+        // Mark event as handled so React-level handlers (useTrackerInput,
+        // useNavigationInput) don't double-execute the same action.
+        // stopPropagation doesn't help because both are capture-phase on window.
+        (e as any).__handled = true;
       }
     };
 

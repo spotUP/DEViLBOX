@@ -116,6 +116,9 @@ export const useTrackerInput = () => {
         return;
       }
 
+      // Skip if already handled by the global keyboard handler
+      if ((e as any).__handled) return;
+
       // Ignore if typing in input field or operating a dropdown
       if (
         (window as any).__pixiInputFocused ||

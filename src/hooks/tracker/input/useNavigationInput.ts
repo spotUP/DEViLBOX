@@ -59,6 +59,9 @@ export const useNavigationInput = (refs: TrackerInputRefs) => {
   // Handle navigation keydown events. Returns true if handled.
   const handleKeyDown = useCallback(
     (e: KeyboardEvent): boolean => {
+      // Skip if already handled by the global keyboard handler (capture-phase)
+      if ((e as any).__handled) return false;
+
       // Format modes handle arrows/tab/page in PatternEditorCanvas.handleFormatKeyDown.
       // Skip when that div has focus to avoid double-move.
       if (useFormatStore.getState().editorMode !== 'classic') {
