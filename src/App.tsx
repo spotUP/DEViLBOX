@@ -1247,19 +1247,21 @@ function App() {
             onLoadTrackerModule={async (buffer: ArrayBuffer, filename: string) => {
               setShowFileBrowser(false);
               try {
-                const isIOS = /iPhone|iPad|iPod/.test(navigator.userAgent);
-                if (isIOS) alert(`App.tsx loadFile: ${buffer.byteLength} bytes, ${filename}`);
                 const file = new File([buffer], filename);
                 const result = await loadFile(file, { requireConfirmation: false });
-                if (isIOS) alert(`App.tsx result: success=${result.success}, msg=${'message' in result ? result.message : 'error' in result ? result.error : ''}`);
-                if (result.success === true) {
+                if (result.success === 'pending-import') {
+                  // Auto-import without showing dialog (mobile/quick-load path)
+                  const { ModuleLoader } = await import('@lib/import/ModuleLoader');
+                  const moduleInfo = await ModuleLoader.load(file);
+                  const { importTrackerModule } = await import('@lib/file/UnifiedFileLoader');
+                  await importTrackerModule(moduleInfo, { useLibopenmpt: true });
+                } else if (result.success === true) {
                   notify.success(result.message);
                 } else if (result.success === false) {
                   notify.error(result.error);
                 }
               } catch (error) {
                 console.error('Failed to load tracker module:', error);
-                if (/iPhone|iPad|iPod/.test(navigator.userAgent)) alert(`App.tsx CATCH: ${error instanceof Error ? error.message : error}`);
                 notify.error('Failed to load file');
               }
             }}
