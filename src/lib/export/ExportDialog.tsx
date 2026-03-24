@@ -5,34 +5,13 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { X, Download, Upload, FileMusic, Zap, Settings, Volume2, Music2, Cpu } from 'lucide-react';
-import { useTrackerStore, useInstrumentStore, useProjectStore, useTransportStore, useAutomationStore, useAudioStore, useEditorStore, notify } from '@stores';
 import { useUIStore } from '@stores/useUIStore';
-import { getToneEngine } from '@engine/ToneEngine';
-import {
-  exportSong,
-  exportSFX,
-  exportInstrument,
-  importSong,
-  importSFX,
-  importInstrument,
-  detectFileFormat,
-  getOriginalModuleDataForExport,
-  type ExportOptions,
-} from './exporters';
-import { NanoExporter } from './NanoExporter';
-import { saveFurFileWasm } from '@lib/import/wasm/FurnaceFileOps';
-import { useFormatStore } from '@stores/useFormatStore';
-import type { AutomationCurve } from '@typedefs/automation';
+import { saveAs } from 'file-saver';
+import { useExportDialog } from '@hooks/dialogs/useExportDialog';
 import { AudioExportPanel } from './AudioExportPanel';
 import { MidiExportPanel } from './MidiExportPanel';
 import { ModuleExportPanel } from './ModuleExportPanel';
 import { ChipExportPanel } from './ChipExportPanel';
-import { exportAsJamCracker } from './JamCrackerExporter';
-import { exportAsSoundMon } from './SoundMonExporter';
-import { saveAs } from 'file-saver';
-
-type ExportMode = 'song' | 'sfx' | 'instrument' | 'audio' | 'midi' | 'xm' | 'mod' | 'it' | 's3m' | 'chip' | 'nano' | 'fur' | 'native';
-type DialogMode = 'export' | 'import';
 
 interface ExportDialogProps {
   isOpen: boolean;
@@ -40,29 +19,9 @@ interface ExportDialogProps {
 }
 
 export const ExportDialog: React.FC<ExportDialogProps> = ({ isOpen, onClose }) => {
-  const { patterns, currentPatternIndex, importPattern, setCurrentPattern, loadPatterns } = useTrackerStore();
-  const { instruments, currentInstrumentId, addInstrument, setCurrentInstrument, loadInstruments } = useInstrumentStore();
-  const { metadata, setMetadata } = useProjectStore();
-  const { bpm, setBPM, isPlaying, stop } = useTransportStore();
-  const { curves, loadCurves } = useAutomationStore();
-  const { masterEffects, setMasterEffects } = useAudioStore();
+  const ex = useExportDialog({ isOpen });
 
-  const [dialogMode, setDialogMode] = useState<DialogMode>('export');
-  const [exportMode, setExportMode] = useState<ExportMode>('song');
-  const [options, setOptions] = useState<ExportOptions>({
-    includeAutomation: true,
-    prettify: true,
-  });
-
-  const [sfxName, setSfxName] = useState('MySound');
-  const [selectedPatternIndex, setSelectedPatternIndex] = useState(currentPatternIndex);
-  const [selectedInstrumentId, setSelectedInstrumentId] = useState(currentInstrumentId || 0);
-  const [isRendering, setIsRendering] = useState(false);
-  const [renderProgress, setRenderProgress] = useState(0);
   const [chipExtension, setChipExtension] = useState('vgm');
-
-  const modalData = useUIStore(s => s.modalData);
-  const editorMode = useFormatStore(s => s.editorMode);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const audioHandlerRef = useRef<(() => Promise<false | void>) | null>(null);
@@ -85,84 +44,19 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({ isOpen, onClose }) =
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isOpen, onClose]);
 
-  // Auto-select arrangement scope when opened from arrangement toolbar
-  useEffect(() => {
-    if (isOpen && modalData?.audioScope === 'arrangement') {
-      setExportMode('audio');
-    }
-  }, [isOpen, modalData]);
-
   if (!isOpen) return null;
 
   const handleExport = async () => {
     try {
-      switch (exportMode) {
-        case 'song': {
-          const { patternOrder } = useTrackerStore.getState();
-          const sequence = patternOrder.map(idx => patterns[idx]?.id).filter(Boolean);
-          // Convert automation curves to export format (nested structure for legacy compat)
-          const automationData: Record<string, Record<number, Record<string, AutomationCurve>>> = {};
-          patterns.forEach((pattern) => {
-            pattern.channels.forEach((_channel, channelIndex) => {
-              const channelCurves = curves.filter(
-                (c) => c.patternId === pattern.id && c.channelIndex === channelIndex
-              );
-              if (channelCurves.length > 0) {
-                if (!automationData[pattern.id]) {
-                  automationData[pattern.id] = {};
-                }
-                automationData[pattern.id][channelIndex] = channelCurves.reduce(
-                  (acc, curve) => {
-                    acc[curve.parameter] = curve;
-                    return acc;
-                  },
-                  {} as Record<string, AutomationCurve>
-                );
-              }
-            });
-          });
-          // Export with both nested format and flat array
-          const { speed } = useTransportStore.getState();
-          const { linearPeriods } = useEditorStore.getState();
-          const trackerFormat = patterns[0]?.importMetadata?.sourceFormat as string | undefined;
-          exportSong(
-            metadata,
-            bpm,
-            instruments,
-            patterns,
-            sequence,
-            automationData,
-            masterEffects,
-            curves, // Pass the flat array of curves
-            options,
-            undefined,
-            { speed, trackerFormat, linearPeriods },
-            patternOrder,
-            getOriginalModuleDataForExport(),
-          );
-          break;
-        }
+      switch (ex.exportMode) {
+        case 'song':
+          return ex.handleExportSong(onClose);
 
-        case 'sfx': {
-          const pattern = patterns[selectedPatternIndex];
-          const instrument = instruments.find((i) => i.id === selectedInstrumentId);
-          if (!pattern || !instrument) {
-            notify.warning('Please select a valid pattern and instrument');
-            return;
-          }
-          exportSFX(sfxName, instrument, pattern, bpm, options);
-          break;
-        }
+        case 'sfx':
+          return ex.handleExportSFX(onClose);
 
-        case 'instrument': {
-          const instrument = instruments.find((i) => i.id === selectedInstrumentId);
-          if (!instrument) {
-            notify.warning('Please select a valid instrument');
-            return;
-          }
-          exportInstrument(instrument, options);
-          break;
-        }
+        case 'instrument':
+          return ex.handleExportInstrument(onClose);
 
         case 'audio': {
           if (await audioHandlerRef.current?.() === false) return;
@@ -187,286 +81,22 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({ isOpen, onClose }) =
           break;
         }
 
-        case 'fur': {
-          const furBuffer = await saveFurFileWasm();
-          const blob = new Blob([furBuffer], { type: 'application/octet-stream' });
-          const url = URL.createObjectURL(blob);
-          const a = document.createElement('a');
-          a.href = url;
-          a.download = `${metadata.name || 'song'}.fur`;
-          document.body.appendChild(a);
-          a.click();
-          document.body.removeChild(a);
-          URL.revokeObjectURL(url);
-          notify.success(`Furnace file "${metadata.name || 'song'}.fur" exported successfully! (${furBuffer.byteLength} bytes)`);
-          onClose();
-          break;
-        }
+        case 'fur':
+          return ex.handleExportFur((b, n) => saveAs(b, n), onClose);
 
-        case 'nano': {
-          // NanoExporter expects pattern indices (numbers)
-          const sequence = patterns.map((_, idx) => idx);
-          const nanoData = NanoExporter.export(
-            instruments,
-            patterns,
-            sequence,
-            bpm,
-            6 // Speed default
-          );
+        case 'nano':
+          return ex.handleExportNano((b, n) => saveAs(b, n), onClose);
 
-          // Fresh Uint8Array to ensure standard ArrayBuffer
-          const blob = new Blob([new Uint8Array(nanoData)], { type: 'application/octet-stream' });
-          const url = URL.createObjectURL(blob);
-          const a = document.createElement('a');
-          a.href = url;
-          a.download = `${metadata.name || 'song'}.dbn`;
-          document.body.appendChild(a);
-          a.click();
-          document.body.removeChild(a);
-          URL.revokeObjectURL(url);
-
-          notify.success(`Nano binary "${metadata.name || 'song'}.dbn" exported successfully! (${nanoData.length} bytes)`);
-          onClose();
-          break;
-        }
-
-        case 'native': {
-          const { getTrackerReplayer } = await import('@engine/TrackerReplayer');
-          const song = getTrackerReplayer().getSong();
-          if (!song) { notify.error('No song loaded'); return; }
-
-          const preset = useUIStore.getState().activeSystemPreset || '';
-          const format = song.format;
-          const layoutFormatId = song.uadePatternLayout?.formatId || song.uadeVariableLayout?.formatId || '';
-          let result: { data: Blob; filename: string; warnings: string[] } | null = null;
-
-          if (preset.includes('jamcracker') || format === 'JamCracker' as string) {
-            result = await exportAsJamCracker(song);
-          } else if (preset.includes('soundmon') || format === ('SMON' as string)) {
-            result = await exportAsSoundMon(song);
-          } else if (preset.includes('protracker') || (format === 'MOD' && !layoutFormatId)) {
-            const { exportSongToMOD } = await import('./modExport');
-            const modResult = await exportSongToMOD(song, { bakeSynths: true });
-            result = { data: modResult.blob, filename: modResult.filename, warnings: modResult.warnings };
-          } else if (preset.includes('futurecomposer') || format === 'FC' as string) {
-            const { exportFC } = await import('./FCExporter');
-            const buf = exportFC(song);
-            const baseName = (song.name || 'untitled').replace(/[^a-zA-Z0-9_-]/g, '_');
-            result = { data: new Blob([buf], { type: 'application/octet-stream' }), filename: `${baseName}.fc`, warnings: [] };
-          } else if (preset.includes('sidmon') || format === 'SidMon2' as string) {
-            const { exportSidMon2File } = await import('./SidMon2Exporter');
-            const buf = await exportSidMon2File(song);
-            const baseName = (song.name || 'untitled').replace(/[^a-zA-Z0-9_-]/g, '_');
-            result = { data: new Blob([buf], { type: 'application/octet-stream' }), filename: `${baseName}.sd2`, warnings: [] };
-          } else if (preset.includes('pumatracker') || format === 'PumaTracker' as string) {
-            const { exportPumaTrackerFile } = await import('./PumaTrackerExporter');
-            const buf = exportPumaTrackerFile(song);
-            const baseName = (song.name || 'untitled').replace(/[^a-zA-Z0-9_-]/g, '_');
-            result = { data: new Blob([buf as unknown as Uint8Array<ArrayBuffer>], { type: 'application/octet-stream' }), filename: `${baseName}.puma`, warnings: [] };
-          } else if (preset.includes('octamed') || format === 'OctaMED' as string) {
-            const { exportMED } = await import('./MEDExporter');
-            const buf = exportMED(song);
-            const baseName = (song.name || 'untitled').replace(/[^a-zA-Z0-9_-]/g, '_');
-            result = { data: new Blob([buf], { type: 'application/octet-stream' }), filename: `${baseName}.mmd0`, warnings: [] };
-          } else if (format === 'HVL' as string || format === 'AHX' as string || layoutFormatId === 'hivelyHVL' || layoutFormatId === 'hivelyAHX') {
-            const { exportAsHively } = await import('./HivelyExporter');
-            const hvlFormat = (format === 'AHX' || layoutFormatId === 'hivelyAHX') ? 'ahx' : 'hvl';
-            result = exportAsHively(song, { format: hvlFormat, nativeOverride: useFormatStore.getState().hivelyNative });
-          } else if (format === 'DIGI' as string || layoutFormatId === 'digiBooster') {
-            const { exportDigiBooster } = await import('./DigiBoosterExporter');
-            const buf = exportDigiBooster(song);
-            const baseName = (song.name || 'untitled').replace(/[^a-zA-Z0-9_-]/g, '_');
-            result = { data: new Blob([new Uint8Array(buf)], { type: 'application/octet-stream' }), filename: `${baseName}.dbm`, warnings: [] };
-          } else if (format === 'OKT' as string || layoutFormatId === 'oktalyzer') {
-            const { exportOktalyzer } = await import('./OktalyzerExporter');
-            const buf = exportOktalyzer(song);
-            const baseName = (song.name || 'untitled').replace(/[^a-zA-Z0-9_-]/g, '_');
-            result = { data: new Blob([new Uint8Array(buf)], { type: 'application/octet-stream' }), filename: `${baseName}.okt`, warnings: [] };
-          } else if (format === 'KT' as string || layoutFormatId === 'klystrack') {
-            const { exportAsKlystrack } = await import('./KlysExporter');
-            result = await exportAsKlystrack(song);
-          } else if (layoutFormatId === 'musicLine') {
-            const { exportMusicLineFile } = await import('./MusicLineExporter');
-            const buf = exportMusicLineFile(song);
-            const baseName = (song.name || 'untitled').replace(/[^a-zA-Z0-9_-]/g, '_');
-            result = { data: new Blob([new Uint8Array(buf)], { type: 'application/octet-stream' }), filename: `${baseName}.ml`, warnings: [] };
-          } else if (layoutFormatId === 'musicAssembler') {
-            const { exportAsMusicAssembler } = await import('./MusicAssemblerExporter');
-            result = await exportAsMusicAssembler(song);
-          } else if (layoutFormatId === 'futurePlayer') {
-            const { exportAsFuturePlayer } = await import('./FuturePlayerExporter');
-            result = await exportAsFuturePlayer(song);
-          } else if (layoutFormatId === 'digitalSymphony') {
-            const { exportDigitalSymphony } = await import('./DigitalSymphonyExporter');
-            const buf = exportDigitalSymphony(song);
-            const baseName = (song.name || 'untitled').replace(/[^a-zA-Z0-9_-]/g, '_');
-            result = { data: new Blob([new Uint8Array(buf)], { type: 'application/octet-stream' }), filename: `${baseName}.dsym`, warnings: [] };
-          } else if (layoutFormatId === 'amosMusicBank') {
-            const { exportAMOSMusicBank } = await import('./AMOSMusicBankExporter');
-            const buf = exportAMOSMusicBank(song);
-            const baseName = (song.name || 'untitled').replace(/[^a-zA-Z0-9_-]/g, '_');
-            result = { data: new Blob([new Uint8Array(buf)], { type: 'application/octet-stream' }), filename: `${baseName}.abk`, warnings: [] };
-          } else if (layoutFormatId === 'hippelCoSo') {
-            const { exportAsHippelCoSo } = await import('./HippelCoSoExporter');
-            result = await exportAsHippelCoSo(song);
-          } else if (layoutFormatId === 'symphoniePro' || song.symphonieFileData) {
-            const { exportSymphonieProFile } = await import('./SymphonieProExporter');
-            const buf = exportSymphonieProFile(song);
-            const baseName = (song.name || 'untitled').replace(/[^a-zA-Z0-9_-]/g, '_');
-            result = { data: new Blob([new Uint8Array(buf)], { type: 'application/octet-stream' }), filename: `${baseName}.symmod`, warnings: [] };
-          } else if (format === 'IS10' as string || layoutFormatId === 'inStereo1') {
-            const { exportInStereo1 } = await import('./InStereo1Exporter');
-            result = await exportInStereo1(song);
-          } else if (layoutFormatId === 'inStereo2') {
-            const { exportInStereo2 } = await import('./InStereo2Exporter');
-            result = await exportInStereo2(song);
-          } else if (layoutFormatId === 'deltaMusic1') {
-            const { exportDeltaMusic1 } = await import('./DeltaMusic1Exporter');
-            result = await exportDeltaMusic1(song);
-          } else if (layoutFormatId === 'deltaMusic2') {
-            const { exportDeltaMusic2 } = await import('./DeltaMusic2Exporter');
-            result = await exportDeltaMusic2(song);
-          } else if (layoutFormatId === 'digitalMugician') {
-            const { exportDigitalMugician } = await import('./DigitalMugicianExporter');
-            result = await exportDigitalMugician(song);
-          } else if (layoutFormatId === 'sidmon1') {
-            const { exportSidMon1 } = await import('./SidMon1Exporter');
-            result = await exportSidMon1(song);
-          } else if (layoutFormatId === 'sonicArranger') {
-            const { exportSonicArranger } = await import('./SonicArrangerExporter');
-            result = await exportSonicArranger(song);
-          } else if (layoutFormatId === 'tfmx') {
-            const { exportTFMX } = await import('./TFMXExporter');
-            result = await exportTFMX(song);
-          } else if (layoutFormatId === 'fredEditor') {
-            const { exportFredEditor } = await import('./FredEditorExporter');
-            result = await exportFredEditor(song);
-          } else if (layoutFormatId === 'soundfx') {
-            const { exportSoundFX } = await import('./SoundFXExporter');
-            result = await exportSoundFX(song);
-          } else if (layoutFormatId === 'tcbTracker') {
-            const { exportTCBTracker } = await import('./TCBTrackerExporter');
-            result = await exportTCBTracker(song);
-          } else if (layoutFormatId === 'gameMusicCreator') {
-            const { exportGameMusicCreator } = await import('./GameMusicCreatorExporter');
-            result = await exportGameMusicCreator(song);
-          } else if (layoutFormatId === 'quadraComposer') {
-            const { exportQuadraComposer } = await import('./QuadraComposerExporter');
-            result = await exportQuadraComposer(song);
-          } else if (layoutFormatId === 'activisionPro') {
-            const { exportActivisionPro } = await import('./ActivisionProExporter');
-            result = await exportActivisionPro(song);
-          } else if (layoutFormatId === 'digiBoosterPro') {
-            const { exportDigiBoosterPro } = await import('./DigiBoosterProExporter');
-            result = await exportDigiBoosterPro(song);
-          } else if (layoutFormatId === 'faceTheMusic') {
-            const { exportFaceTheMusic } = await import('./FaceTheMusicExporter');
-            result = await exportFaceTheMusic(song);
-          } else if (layoutFormatId === 'sawteeth') {
-            const { exportSawteeth } = await import('./SawteethExporter');
-            result = await exportSawteeth(song);
-          } else if (layoutFormatId === 'earAche') {
-            const { exportEarAche } = await import('./EarAcheExporter');
-            result = await exportEarAche(song);
-          } else if (layoutFormatId === 'iffSmus') {
-            const { exportIffSmus } = await import('./IffSmusExporter');
-            result = await exportIffSmus(song);
-          } else if (layoutFormatId === 'actionamics') {
-            const { exportActionamics } = await import('./ActionamicsExporter');
-            result = await exportActionamics(song);
-          } else if (layoutFormatId === 'soundFactory') {
-            const { exportSoundFactory } = await import('./SoundFactoryExporter');
-            result = await exportSoundFactory(song);
-          } else if (layoutFormatId === 'synthesis') {
-            const { exportSynthesis } = await import('./SynthesisExporter');
-            result = await exportSynthesis(song);
-          } else if (layoutFormatId === 'soundControl') {
-            const { exportSoundControl } = await import('./SoundControlExporter');
-            result = await exportSoundControl(song);
-          } else if (layoutFormatId === 'c67') {
-            const { exportCDFM67 } = await import('./CDFM67Exporter');
-            result = await exportCDFM67(song);
-          } else if (layoutFormatId === 'zoundMonitor') {
-            const { exportZoundMonitor } = await import('./ZoundMonitorExporter');
-            result = await exportZoundMonitor(song);
-          } else if (layoutFormatId === 'chuckBiscuits') {
-            const { exportChuckBiscuits } = await import('./ChuckBiscuitsExporter');
-            result = await exportChuckBiscuits(song);
-          } else if (layoutFormatId === 'composer667') {
-            const { exportComposer667 } = await import('./Composer667Exporter');
-            result = await exportComposer667(song);
-          } else if (layoutFormatId === 'kris') {
-            const { exportKRIS } = await import('./KRISExporter');
-            result = await exportKRIS(song);
-          } else if (layoutFormatId === 'nru') {
-            const { exportNRU } = await import('./NRUExporter');
-            result = await exportNRU(song);
-          } else if (layoutFormatId === 'ims') {
-            const { exportIMS } = await import('./IMSExporter');
-            result = await exportIMS(song);
-          } else if (layoutFormatId === 'stp') {
-            const { exportSTP } = await import('./STPExporter');
-            result = await exportSTP(song);
-          } else if (layoutFormatId === 'unic') {
-            const { exportUNIC } = await import('./UNICExporter');
-            result = await exportUNIC(song);
-          } else if (layoutFormatId === 'dsm_dyn') {
-            const { exportDSMDyn } = await import('./DSMDynExporter');
-            result = await exportDSMDyn(song);
-          } else if (layoutFormatId === 'scumm') {
-            const { exportSCUMM } = await import('./SCUMMExporter');
-            result = await exportSCUMM(song);
-          } else if (layoutFormatId === 'xmf') {
-            const { exportXMF } = await import('./XMFExporter');
-            result = await exportXMF(song);
-          } else {
-            // Fallback: UADE chip RAM readback (works for any running UADE format)
-            try {
-              const { UADEChipEditor } = await import('@engine/uade/UADEChipEditor');
-              const { UADEEngine } = await import('@engine/uade/UADEEngine');
-              if (UADEEngine.hasInstance()) {
-                const chipEditor = new UADEChipEditor(UADEEngine.getInstance());
-                // Get original file size from first instrument's chipRamInfo
-                const instruments = song.instruments || [];
-                const chipInfo = instruments.find(i => i.uadeChipRam)?.uadeChipRam;
-                const moduleSize = chipInfo?.moduleSize ?? 0;
-                if (moduleSize > 0) {
-                  const bytes = await chipEditor.readEditedModule(moduleSize);
-                  const ext = (song.name || '').split('.').pop() || 'bin';
-                  const baseName = (song.name || 'export').replace(/\.[^/.]+$/, '').replace(/[^a-zA-Z0-9_-]/g, '_');
-                  const filename = `${baseName}.${ext}`;
-                  result = {
-                    data: new Blob([new Uint8Array(bytes.buffer as ArrayBuffer, bytes.byteOffset, bytes.byteLength)], { type: 'application/octet-stream' }),
-                    filename,
-                    warnings: ['Exported via chip RAM readback — edits to pattern data are included']
-                  };
-                }
-              }
-            } catch { /* UADE engine not running */ }
-          }
-
-          if (result) {
-            saveAs(result.data, result.filename);
-            if (result.warnings.length > 0) {
-              notify.warning(`Exported with warnings: ${result.warnings.join('; ')}`);
-            } else {
-              notify.success(`Native format exported: ${result.filename}`);
-            }
-          } else {
-            notify.error(`No native exporter for format "${preset || format}"`);
-          }
-          onClose();
-          break;
-        }
+        case 'native':
+          return ex.handleExportNative((b, n) => saveAs(b, n), onClose);
       }
 
       // Only close if no warnings (warnings will show in dialog)
-      if (exportMode !== 'xm' && exportMode !== 'mod' && exportMode !== 'it' && exportMode !== 's3m') {
+      if (ex.exportMode !== 'xm' && ex.exportMode !== 'mod' && ex.exportMode !== 'it' && ex.exportMode !== 's3m') {
         onClose();
       }
     } catch (error) {
       console.error('Export failed:', error);
-      notify.error('Export failed: ' + (error as Error).message);
     }
   };
 
@@ -477,99 +107,8 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({ isOpen, onClose }) =
   const handleFileSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
-
-    // CRITICAL: Stop playback before loading new song to prevent audio glitches
-    if (isPlaying) {
-      stop();
-      const engine = getToneEngine();
-      engine.releaseAll(); // Release any held notes
-    }
-
-    try {
-      const format = await detectFileFormat(file);
-
-      switch (format) {
-        case 'song': {
-          const data = await importSong(file);
-          if (data) {
-            // Load song metadata
-            setMetadata(data.metadata);
-            setBPM(data.bpm);
-
-            // Load patterns (replaces existing patterns)
-            loadPatterns(data.patterns);
-
-            // Load instruments (replaces existing instruments)
-            loadInstruments(data.instruments);
-
-            // Load automation curves - prefer flat array format, fall back to nested
-            if (data.automationCurves && data.automationCurves.length > 0) {
-              // New flat array format
-              loadCurves(data.automationCurves);
-            } else if (data.automation) {
-              // Legacy nested format - extract curves from automation data structure
-              const allCurves: AutomationCurve[] = [];
-              Object.entries(data.automation).forEach(([, channels]) => {
-                Object.entries(channels as Record<number, Record<string, AutomationCurve>>).forEach(([, params]) => {
-                  Object.values(params).forEach((curve) => {
-                    allCurves.push(curve);
-                  });
-                });
-              });
-              if (allCurves.length > 0) {
-                loadCurves(allCurves);
-              }
-            }
-
-            // Load master effects
-            if (data.masterEffects && data.masterEffects.length > 0) {
-              setMasterEffects(data.masterEffects);
-            }
-
-            notify.success(`Song "${data.metadata.name}" imported successfully!`);
-          }
-          break;
-        }
-
-        case 'sfx': {
-          const data = await importSFX(file);
-          if (data) {
-            // Add the pattern and get its new index
-            const patternIndex = importPattern(data.pattern);
-
-            // Add the instrument
-            addInstrument(data.instrument);
-
-            // Set as current
-            setCurrentPattern(patternIndex);
-            setCurrentInstrument(data.instrument.id);
-
-            notify.success(`SFX "${data.name}" imported successfully!`);
-          }
-          break;
-        }
-
-        case 'instrument': {
-          const data = await importInstrument(file);
-          if (data) {
-            // Add instrument to store
-            addInstrument(data.instrument);
-            setCurrentInstrument(data.instrument.id);
-
-            notify.success(`Instrument "${data.instrument.name}" imported successfully!`);
-          }
-          break;
-        }
-
-        default:
-          notify.error('Unknown or invalid file format');
-      }
-
-      onClose();
-    } catch (error) {
-      console.error('Import failed:', error);
-      notify.error('Import failed: ' + (error as Error).message);
-    }
+    event.target.value = ''; // Reset for re-selection
+    await ex.handleImportFile(file, onClose);
   };
 
   return (
@@ -591,10 +130,10 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({ isOpen, onClose }) =
         {/* Mode Toggle */}
         <div className="bg-dark-bgSecondary border-b border-dark-border flex">
           <button
-            onClick={() => setDialogMode('export')}
+            onClick={() => ex.setDialogMode('export')}
             className={`
               flex-1 px-4 py-3 font-mono text-sm transition-all border-r border-dark-border flex items-center justify-center gap-2
-              ${dialogMode === 'export'
+              ${ex.dialogMode === 'export'
                 ? 'bg-accent-primary text-text-inverse font-bold'
                 : 'text-text-secondary hover:bg-dark-bgHover'
               }
@@ -604,10 +143,10 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({ isOpen, onClose }) =
             Export
           </button>
           <button
-            onClick={() => setDialogMode('import')}
+            onClick={() => ex.setDialogMode('import')}
             className={`
               flex-1 px-4 py-3 font-mono text-sm transition-all flex items-center justify-center gap-2
-              ${dialogMode === 'import'
+              ${ex.dialogMode === 'import'
                 ? 'bg-accent-primary text-text-inverse font-bold'
                 : 'text-text-secondary hover:bg-dark-bgHover'
               }
@@ -620,7 +159,7 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({ isOpen, onClose }) =
 
         {/* Content */}
         <div className="flex-1 overflow-y-auto scrollbar-modern p-5">
-          {dialogMode === 'export' ? (
+          {ex.dialogMode === 'export' ? (
             <>
               {/* Export Mode Selection */}
               <div className="mb-5">
@@ -629,10 +168,10 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({ isOpen, onClose }) =
                 </label>
                 <div className="grid grid-cols-4 gap-3">
                   <button
-                    onClick={() => setExportMode('song')}
+                    onClick={() => ex.setExportMode('song')}
                     className={`
                       p-4 rounded-lg border-2 transition-all text-center
-                      ${exportMode === 'song'
+                      ${ex.exportMode === 'song'
                         ? 'bg-accent-primary text-text-inverse border-accent-primary glow-sm'
                         : 'bg-dark-bgSecondary text-text-primary border-dark-border hover:border-dark-borderLight'
                       }
@@ -642,10 +181,10 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({ isOpen, onClose }) =
                     <div className="font-mono text-sm font-semibold">Song</div>
                   </button>
                   <button
-                    onClick={() => setExportMode('sfx')}
+                    onClick={() => ex.setExportMode('sfx')}
                     className={`
                       p-4 rounded-lg border-2 transition-all text-center
-                      ${exportMode === 'sfx'
+                      ${ex.exportMode === 'sfx'
                         ? 'bg-accent-primary text-text-inverse border-accent-primary glow-sm'
                         : 'bg-dark-bgSecondary text-text-primary border-dark-border hover:border-dark-borderLight'
                       }
@@ -655,10 +194,10 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({ isOpen, onClose }) =
                     <div className="font-mono text-sm font-semibold">SFX</div>
                   </button>
                   <button
-                    onClick={() => setExportMode('instrument')}
+                    onClick={() => ex.setExportMode('instrument')}
                     className={`
                       p-4 rounded-lg border-2 transition-all text-center
-                      ${exportMode === 'instrument'
+                      ${ex.exportMode === 'instrument'
                         ? 'bg-accent-primary text-text-inverse border-accent-primary glow-sm'
                         : 'bg-dark-bgSecondary text-text-primary border-dark-border hover:border-dark-borderLight'
                       }
@@ -668,10 +207,10 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({ isOpen, onClose }) =
                     <div className="font-mono text-sm font-semibold">Instrument</div>
                   </button>
                   <button
-                    onClick={() => setExportMode('audio')}
+                    onClick={() => ex.setExportMode('audio')}
                     className={`
                       p-4 rounded-lg border-2 transition-all text-center
-                      ${exportMode === 'audio'
+                      ${ex.exportMode === 'audio'
                         ? 'bg-accent-primary text-text-inverse border-accent-primary glow-sm'
                         : 'bg-dark-bgSecondary text-text-primary border-dark-border hover:border-dark-borderLight'
                       }
@@ -681,10 +220,10 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({ isOpen, onClose }) =
                     <div className="font-mono text-sm font-semibold">Audio</div>
                   </button>
                   <button
-                    onClick={() => setExportMode('midi')}
+                    onClick={() => ex.setExportMode('midi')}
                     className={`
                       p-4 rounded-lg border-2 transition-all text-center
-                      ${exportMode === 'midi'
+                      ${ex.exportMode === 'midi'
                         ? 'bg-accent-primary text-text-inverse border-accent-primary glow-sm'
                         : 'bg-dark-bgSecondary text-text-primary border-dark-border hover:border-dark-borderLight'
                       }
@@ -694,10 +233,10 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({ isOpen, onClose }) =
                     <div className="font-mono text-sm font-semibold">MIDI</div>
                   </button>
                   <button
-                    onClick={() => setExportMode('xm')}
+                    onClick={() => ex.setExportMode('xm')}
                     className={`
                       p-4 rounded-lg border-2 transition-all text-center
-                      ${exportMode === 'xm'
+                      ${ex.exportMode === 'xm'
                         ? 'bg-accent-primary text-text-inverse border-accent-primary glow-sm'
                         : 'bg-dark-bgSecondary text-text-primary border-dark-border hover:border-dark-borderLight'
                       }
@@ -707,10 +246,10 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({ isOpen, onClose }) =
                     <div className="font-mono text-sm font-semibold">XM</div>
                   </button>
                   <button
-                    onClick={() => setExportMode('mod')}
+                    onClick={() => ex.setExportMode('mod')}
                     className={`
                       p-4 rounded-lg border-2 transition-all text-center
-                      ${exportMode === 'mod'
+                      ${ex.exportMode === 'mod'
                         ? 'bg-accent-primary text-text-inverse border-accent-primary glow-sm'
                         : 'bg-dark-bgSecondary text-text-primary border-dark-border hover:border-dark-borderLight'
                       }
@@ -720,10 +259,10 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({ isOpen, onClose }) =
                     <div className="font-mono text-sm font-semibold">MOD</div>
                   </button>
                   <button
-                    onClick={() => setExportMode('it')}
+                    onClick={() => ex.setExportMode('it')}
                     className={`
                       p-4 rounded-lg border-2 transition-all text-center
-                      ${exportMode === 'it'
+                      ${ex.exportMode === 'it'
                         ? 'bg-accent-primary text-text-inverse border-accent-primary glow-sm'
                         : 'bg-dark-bgSecondary text-text-primary border-dark-border hover:border-dark-borderLight'
                       }
@@ -733,10 +272,10 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({ isOpen, onClose }) =
                     <div className="font-mono text-sm font-semibold">IT</div>
                   </button>
                   <button
-                    onClick={() => setExportMode('s3m')}
+                    onClick={() => ex.setExportMode('s3m')}
                     className={`
                       p-4 rounded-lg border-2 transition-all text-center
-                      ${exportMode === 's3m'
+                      ${ex.exportMode === 's3m'
                         ? 'bg-accent-primary text-text-inverse border-accent-primary glow-sm'
                         : 'bg-dark-bgSecondary text-text-primary border-dark-border hover:border-dark-borderLight'
                       }
@@ -746,10 +285,10 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({ isOpen, onClose }) =
                     <div className="font-mono text-sm font-semibold">S3M</div>
                   </button>
                   <button
-                    onClick={() => setExportMode('chip')}
+                    onClick={() => ex.setExportMode('chip')}
                     className={`
                       p-4 rounded-lg border-2 transition-all text-center
-                      ${exportMode === 'chip'
+                      ${ex.exportMode === 'chip'
                         ? 'bg-accent-primary text-text-inverse border-accent-primary glow-sm'
                         : 'bg-dark-bgSecondary text-text-primary border-dark-border hover:border-dark-borderLight'
                       }
@@ -759,10 +298,10 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({ isOpen, onClose }) =
                     <div className="font-mono text-sm font-semibold">Chip</div>
                   </button>
                   <button
-                    onClick={() => setExportMode('nano')}
+                    onClick={() => ex.setExportMode('nano')}
                     className={`
                       p-4 rounded-lg border-2 transition-all text-center
-                      ${exportMode === 'nano'
+                      ${ex.exportMode === 'nano'
                         ? 'bg-accent-primary text-text-inverse border-accent-primary glow-sm'
                         : 'bg-dark-bgSecondary text-text-primary border-dark-border hover:border-dark-borderLight'
                       }
@@ -771,12 +310,12 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({ isOpen, onClose }) =
                     <Zap size={24} className="mx-auto mb-2" />
                     <div className="font-mono text-sm font-semibold">Nano</div>
                   </button>
-                  {editorMode === 'furnace' && (
+                  {ex.editorMode === 'furnace' && (
                     <button
-                      onClick={() => setExportMode('fur')}
+                      onClick={() => ex.setExportMode('fur')}
                       className={`
                         p-4 rounded-lg border-2 transition-all text-center
-                        ${exportMode === 'fur'
+                        ${ex.exportMode === 'fur'
                           ? 'bg-accent-primary text-text-inverse border-accent-primary glow-sm'
                           : 'bg-dark-bgSecondary text-text-primary border-dark-border hover:border-dark-borderLight'
                         }
@@ -786,12 +325,12 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({ isOpen, onClose }) =
                       <div className="font-mono text-sm font-semibold">Furnace</div>
                     </button>
                   )}
-                  {(editorMode === 'jamcracker' || editorMode === 'classic' || editorMode === 'hively' || editorMode === 'klystrack' || editorMode === 'musicline') && (
+                  {(ex.editorMode === 'jamcracker' || ex.editorMode === 'classic' || ex.editorMode === 'hively' || ex.editorMode === 'klystrack' || ex.editorMode === 'musicline') && (
                     <button
-                      onClick={() => setExportMode('native')}
+                      onClick={() => ex.setExportMode('native')}
                       className={`
                         p-4 rounded-lg border-2 transition-all text-center
-                        ${exportMode === 'native'
+                        ${ex.exportMode === 'native'
                           ? 'bg-accent-primary text-text-inverse border-accent-primary glow-sm'
                           : 'bg-dark-bgSecondary text-text-primary border-dark-border hover:border-dark-borderLight'
                         }
@@ -805,21 +344,21 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({ isOpen, onClose }) =
               </div>
 
               {/* Export Options based on mode */}
-              {exportMode === 'song' && (
+              {ex.exportMode === 'song' && (
                 <div className="bg-dark-bgSecondary border border-dark-border rounded-lg p-4 mb-4">
                   <h3 className="text-sm font-mono font-bold text-accent-primary mb-3">
                     Song Export
                   </h3>
                   <div className="space-y-2 text-sm font-mono text-text-primary">
-                    <div>Project: <span className="text-accent-primary">{metadata.name}</span></div>
-                    <div>Patterns: <span className="text-accent-primary">{patterns.length}</span></div>
-                    <div>Instruments: <span className="text-accent-primary">{instruments.length}</span></div>
-                    <div>BPM: <span className="text-accent-primary">{bpm}</span></div>
+                    <div>Project: <span className="text-accent-primary">{ex.metadata.name}</span></div>
+                    <div>Patterns: <span className="text-accent-primary">{ex.patterns.length}</span></div>
+                    <div>Instruments: <span className="text-accent-primary">{ex.instruments.length}</span></div>
+                    <div>BPM: <span className="text-accent-primary">{ex.bpm}</span></div>
                   </div>
                 </div>
               )}
 
-              {exportMode === 'sfx' && (
+              {ex.exportMode === 'sfx' && (
                 <div className="bg-dark-bgSecondary border border-dark-border rounded-lg p-4 mb-4">
                   <h3 className="text-sm font-mono font-bold text-accent-primary mb-3">
                     SFX Export
@@ -831,8 +370,8 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({ isOpen, onClose }) =
                       </label>
                       <input
                         type="text"
-                        value={sfxName}
-                        onChange={(e) => setSfxName(e.target.value)}
+                        value={ex.sfxName}
+                        onChange={(e) => ex.setSfxName(e.target.value)}
                         className="input w-full"
                       />
                     </div>
@@ -841,11 +380,11 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({ isOpen, onClose }) =
                         Pattern
                       </label>
                       <select
-                        value={selectedPatternIndex}
-                        onChange={(e) => setSelectedPatternIndex(Number(e.target.value))}
+                        value={ex.selectedPatternIndex}
+                        onChange={(e) => ex.setSelectedPatternIndex(Number(e.target.value))}
                         className="input w-full"
                       >
-                        {patterns.map((pattern, index) => (
+                        {ex.patterns.map((pattern, index) => (
                           <option key={pattern.id} value={index}>
                             {index.toString().padStart(2, '0')} - {pattern.name}
                           </option>
@@ -857,11 +396,11 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({ isOpen, onClose }) =
                         Instrument
                       </label>
                       <select
-                        value={selectedInstrumentId}
-                        onChange={(e) => setSelectedInstrumentId(Number(e.target.value))}
+                        value={ex.selectedInstrumentId}
+                        onChange={(e) => ex.setSelectedInstrumentId(Number(e.target.value))}
                         className="input w-full"
                       >
-                        {instruments.map((instrument) => (
+                        {ex.instruments.map((instrument) => (
                           <option key={instrument.id} value={instrument.id}>
                             {instrument.id.toString(16).toUpperCase().padStart(2, '0')} - {instrument.name}
                           </option>
@@ -872,7 +411,7 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({ isOpen, onClose }) =
                 </div>
               )}
 
-              {exportMode === 'instrument' && (
+              {ex.exportMode === 'instrument' && (
                 <div className="bg-dark-bgSecondary border border-dark-border rounded-lg p-4 mb-4">
                   <h3 className="text-sm font-mono font-bold text-accent-primary mb-3">
                     Instrument Export
@@ -882,11 +421,11 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({ isOpen, onClose }) =
                       Select Instrument
                     </label>
                     <select
-                      value={selectedInstrumentId}
-                      onChange={(e) => setSelectedInstrumentId(Number(e.target.value))}
+                      value={ex.selectedInstrumentId}
+                      onChange={(e) => ex.setSelectedInstrumentId(Number(e.target.value))}
                       className="input w-full"
                     >
-                      {instruments.map((instrument) => (
+                      {ex.instruments.map((instrument) => (
                         <option key={instrument.id} value={instrument.id}>
                           {instrument.id.toString(16).toUpperCase().padStart(2, '0')} - {instrument.name}
                         </option>
@@ -896,48 +435,48 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({ isOpen, onClose }) =
                 </div>
               )}
 
-              {exportMode === 'audio' && (
+              {ex.exportMode === 'audio' && (
                 <AudioExportPanel
                   handlerRef={audioHandlerRef}
-                  selectedPatternIndex={selectedPatternIndex}
-                  setSelectedPatternIndex={setSelectedPatternIndex}
-                  isRendering={isRendering}
-                  setIsRendering={setIsRendering}
-                  renderProgress={renderProgress}
-                  setRenderProgress={setRenderProgress}
-                  initialScope={modalData?.audioScope === 'arrangement' ? 'arrangement' : undefined}
+                  selectedPatternIndex={ex.selectedPatternIndex}
+                  setSelectedPatternIndex={ex.setSelectedPatternIndex}
+                  isRendering={ex.isRendering}
+                  setIsRendering={ex.setIsRendering}
+                  renderProgress={ex.renderProgress}
+                  setRenderProgress={ex.setRenderProgress}
+                  initialScope={ex.modalData?.audioScope === 'arrangement' ? 'arrangement' : undefined}
                 />
               )}
 
-              {exportMode === 'midi' && (
+              {ex.exportMode === 'midi' && (
                 <MidiExportPanel
                   handlerRef={midiHandlerRef}
-                  selectedPatternIndex={selectedPatternIndex}
-                  setSelectedPatternIndex={setSelectedPatternIndex}
+                  selectedPatternIndex={ex.selectedPatternIndex}
+                  setSelectedPatternIndex={ex.setSelectedPatternIndex}
                 />
               )}
 
-              {(exportMode === 'xm' || exportMode === 'mod' || exportMode === 'it' || exportMode === 's3m') && (
+              {(ex.exportMode === 'xm' || ex.exportMode === 'mod' || ex.exportMode === 'it' || ex.exportMode === 's3m') && (
                 <ModuleExportPanel
                   handlerRef={moduleHandlerRef}
-                  exportMode={exportMode as 'xm' | 'mod' | 'it' | 's3m'}
+                  exportMode={ex.exportMode as 'xm' | 'mod' | 'it' | 's3m'}
                   onClose={onClose}
                 />
               )}
 
-              {exportMode === 'chip' && (
+              {ex.exportMode === 'chip' && (
                 <ChipExportPanel
                   handlerRef={chipHandlerRef}
-                  isRendering={isRendering}
-                  setIsRendering={setIsRendering}
-                  renderProgress={renderProgress}
-                  setRenderProgress={setRenderProgress}
+                  isRendering={ex.isRendering}
+                  setIsRendering={ex.setIsRendering}
+                  renderProgress={ex.renderProgress}
+                  setRenderProgress={ex.setRenderProgress}
                   onClose={onClose}
                   onFormatChange={setChipExtension}
                 />
               )}
 
-              {exportMode === 'fur' && (
+              {ex.exportMode === 'fur' && (
                 <div className="bg-dark-bgSecondary border border-dark-border rounded-lg p-4 mb-4">
                   <h3 className="text-sm font-mono font-bold text-accent-primary mb-3">
                     Furnace Export (.fur)
@@ -946,14 +485,14 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({ isOpen, onClose }) =
                     <div className="text-sm font-mono text-text-secondary space-y-1">
                       <div>Format: <span className="text-accent-primary">Furnace Tracker Module</span></div>
                       <div>Engine: <span className="text-accent-primary">FurnaceFileOps WASM</span></div>
-                      <div>Patterns: <span className="text-accent-primary">{patterns.length}</span></div>
-                      <div>Instruments: <span className="text-accent-primary">{instruments.length}</span></div>
+                      <div>Patterns: <span className="text-accent-primary">{ex.patterns.length}</span></div>
+                      <div>Instruments: <span className="text-accent-primary">{ex.instruments.length}</span></div>
                     </div>
                   </div>
                 </div>
               )}
 
-              {exportMode === 'native' && (
+              {ex.exportMode === 'native' && (
                 <div className="bg-dark-bgSecondary border border-dark-border rounded-lg p-4 mb-4">
                   <h3 className="text-sm font-mono font-bold text-accent-primary mb-3">
                     Native Amiga Format Export
@@ -961,8 +500,8 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({ isOpen, onClose }) =
                   <div className="space-y-3">
                     <div className="text-sm font-mono text-text-secondary space-y-1">
                       <div>Preset: <span className="text-accent-primary">{useUIStore.getState().activeSystemPreset || 'auto-detect'}</span></div>
-                      <div>Patterns: <span className="text-accent-primary">{patterns.length}</span></div>
-                      <div>Instruments: <span className="text-accent-primary">{instruments.length}</span></div>
+                      <div>Patterns: <span className="text-accent-primary">{ex.patterns.length}</span></div>
+                      <div>Instruments: <span className="text-accent-primary">{ex.instruments.length}</span></div>
                     </div>
                     <div className="bg-dark-bg border border-dark-border rounded-lg p-3">
                       <p className="text-xs font-mono text-text-primary leading-relaxed">
@@ -977,7 +516,7 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({ isOpen, onClose }) =
                 </div>
               )}
 
-              {exportMode === 'nano' && (
+              {ex.exportMode === 'nano' && (
                 <div className="bg-dark-bgSecondary border border-dark-border rounded-lg p-4 mb-4">
                   <h3 className="text-sm font-mono font-bold text-accent-primary mb-3">
                     Nano Binary Export (.dbn)
@@ -996,7 +535,7 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({ isOpen, onClose }) =
                       <div>Used Instruments: <span className="text-accent-primary">
                         {(() => {
                           const used = new Set<number>();
-                          patterns.forEach(pattern => {
+                          ex.patterns.forEach(pattern => {
                             pattern.channels.forEach(ch => {
                               ch.rows.forEach(cell => {
                                 if (cell.instrument > 0) used.add(cell.instrument);
@@ -1012,7 +551,7 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({ isOpen, onClose }) =
               )}
 
               {/* Export Options — only shown when there are relevant options for the current mode */}
-              {exportMode === 'song' && (
+              {ex.exportMode === 'song' && (
                 <div className="bg-dark-bgSecondary border border-dark-border rounded-lg p-4">
                   <h3 className="text-sm font-mono font-bold text-accent-primary mb-3">
                     Options
@@ -1021,8 +560,8 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({ isOpen, onClose }) =
                     <label className="flex items-center gap-3 text-sm font-mono text-text-primary cursor-pointer hover:text-accent-primary transition-colors">
                       <input
                         type="checkbox"
-                        checked={options.includeAutomation}
-                        onChange={(e) => setOptions({ ...options, includeAutomation: e.target.checked })}
+                        checked={ex.options.includeAutomation}
+                        onChange={(e) => ex.setOptions({ ...ex.options, includeAutomation: e.target.checked })}
                         className="w-4 h-4 rounded border-dark-border bg-dark-bg text-accent-primary focus:ring-accent-primary"
                       />
                       Include automation data
@@ -1085,18 +624,18 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({ isOpen, onClose }) =
         {/* Footer */}
         <div className="bg-dark-bgSecondary border-t border-dark-border px-5 py-4 flex items-center justify-between">
           <div className="text-xs font-mono text-text-muted">
-            {dialogMode === 'export'
+            {ex.dialogMode === 'export'
               ? `Format: ${
-                  exportMode === 'audio' ? '.wav'
-                  : exportMode === 'midi' ? '.mid'
-                  : exportMode === 'xm' ? '.xm'
-                  : exportMode === 'mod' ? '.mod'
-                  : exportMode === 'it' ? '.it'
-                  : exportMode === 's3m' ? '.s3m'
-                  : exportMode === 'chip' ? `.${chipExtension}`
-                  : exportMode === 'nano' ? '.dbn'
-                  : exportMode === 'fur' ? '.fur'
-                  : `.${exportMode}.json`
+                  ex.exportMode === 'audio' ? '.wav'
+                  : ex.exportMode === 'midi' ? '.mid'
+                  : ex.exportMode === 'xm' ? '.xm'
+                  : ex.exportMode === 'mod' ? '.mod'
+                  : ex.exportMode === 'it' ? '.it'
+                  : ex.exportMode === 's3m' ? '.s3m'
+                  : ex.exportMode === 'chip' ? `.${chipExtension}`
+                  : ex.exportMode === 'nano' ? '.dbn'
+                  : ex.exportMode === 'fur' ? '.fur'
+                  : `.${ex.exportMode}.json`
                 }`
               : 'Select a file to import'}
           </div>
@@ -1104,18 +643,18 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({ isOpen, onClose }) =
             <button
               onClick={onClose}
               className="btn"
-              disabled={isRendering}
+              disabled={ex.isRendering}
             >
               Cancel
             </button>
-            {dialogMode === 'export' && (
+            {ex.dialogMode === 'export' && (
               <button
                 onClick={handleExport}
                 className="btn-primary flex items-center gap-2"
-                disabled={isRendering}
+                disabled={ex.isRendering}
               >
                 <Download size={16} />
-                {isRendering ? 'Rendering...' : 'Export'}
+                {ex.isRendering ? 'Rendering...' : 'Export'}
               </button>
             )}
           </div>
