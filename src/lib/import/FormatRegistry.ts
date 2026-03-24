@@ -2271,13 +2271,15 @@ export function isSupportedFormat(filename: string): boolean {
 export function detectFormat(filename: string): FormatDefinition | null {
   const lower = filename.toLowerCase();
   const base = getBasename(lower);
+  const ext = lower.slice(lower.lastIndexOf('.') + 1);
 
   for (const fmt of FORMAT_REGISTRY) {
     if (fmt.matchMode === 'extension' || fmt.matchMode === 'both') {
       if (fmt.extRegex?.test(lower)) return fmt;
     }
     if (fmt.matchMode === 'prefix' || fmt.matchMode === 'both') {
-      if (fmt.prefixes?.some(p => base.startsWith(p))) return fmt;
+      // Match both prefix form (prefix.songname) and extension form (songname.prefix)
+      if (fmt.prefixes?.some(p => base.startsWith(p) || p === `${ext}.`)) return fmt;
     }
   }
   return null;
