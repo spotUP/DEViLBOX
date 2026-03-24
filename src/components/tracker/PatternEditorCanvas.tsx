@@ -1492,9 +1492,13 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
     const container = containerRef.current;
     if (!container) return;
 
-    // Feature-detect OffscreenCanvas transfer support
-    if (!('transferControlToOffscreen' in HTMLCanvasElement.prototype)) {
-      console.warn('[PatternEditorCanvas] OffscreenCanvas not supported, skipping worker');
+    // Feature-detect OffscreenCanvas transfer support.
+    // iOS Safari supports OffscreenCanvas but WebGL2 on OffscreenCanvas in a Worker
+    // hangs silently — skip the worker on iOS entirely.
+    const isIOS = /iPhone|iPad|iPod/.test(navigator.userAgent);
+    if (isIOS || !('transferControlToOffscreen' in HTMLCanvasElement.prototype)) {
+      console.warn('[PatternEditorCanvas] OffscreenCanvas worker skipped (iOS or unsupported)');
+      setWebglUnsupported(true);
       return;
     }
 
@@ -2119,10 +2123,33 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
   }, []);
 
   if (webglUnsupported) {
+    // Simple HTML fallback for iOS and browsers without WebGL2 worker support
+    const rows = pattern?.channels?.[0]?.rows ?? [];
+    const numCh = pattern?.channels?.length ?? 0;
     return (
-      <div className="flex-1 flex items-center justify-center flex-col gap-2 text-text-muted">
-        <span className="text-xs font-mono">WebGL2 not supported in this browser.</span>
-        <span className="text-[10px] text-text-muted/60">Pattern editor requires OffscreenCanvas WebGL2.</span>
+      <div className="flex-1 overflow-auto font-mono text-[10px] leading-tight p-1">
+        {rows.length === 0 ? (
+          <div className="flex items-center justify-center h-full text-text-muted text-xs">
+            No pattern data loaded
+          </div>
+        ) : (
+          <table className="w-full border-collapse">
+            <tbody>
+              {rows.map((_, rowIdx) => (
+                <tr key={rowIdx} className={rowIdx % 4 === 0 ? 'bg-dark-bgSecondary/30' : ''}>
+                  <td className="text-text-muted pr-1 text-right w-6">{rowIdx.toString(16).toUpperCase().padStart(2, '0')}</td>
+                  {Array.from({ length: Math.min(numCh, 4) }, (__, chIdx) => {
+                    const cell = pattern!.channels[chIdx]?.rows[rowIdx];
+                    if (!cell || (!cell.note && !cell.instrument)) return <td key={chIdx} className="text-text-muted/30 px-1">--- .. ..</td>;
+                    const note = cell.note ? `${['C-','C#','D-','D#','E-','F-','F#','G-','G#','A-','A#','B-'][(cell.note - 1) % 12]}${Math.floor((cell.note - 1) / 12)}` : '---';
+                    const inst = cell.instrument ? cell.instrument.toString(16).toUpperCase().padStart(2, '0') : '..';
+                    return <td key={chIdx} className="text-text-primary px-1">{note} {inst}</td>;
+                  })}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
       </div>
     );
   }
