@@ -9,19 +9,16 @@
  */
 
 import React, { useState, useCallback, useEffect } from 'react';
-import { useTrackerStore, useTransportStore, useAudioStore, useUIStore, useEditorStore } from '@stores';
-import { useShallow } from 'zustand/react/shallow';
-import { useFPSMonitor } from '@hooks/useFPSMonitor';
-import { GROOVE_TEMPLATES } from '@typedefs/audio';
-import { SYSTEM_PRESETS, getGroupedPresets } from '@/constants/systemPresets';
+import { useUIStore } from '@stores';
+import { useEditorControls } from '@hooks/views/useEditorControls';
+import { getGroupedPresets } from '@/constants/systemPresets';
 import { SubsongSelector } from './SubsongSelector';
 import { SIDSubsongSelector } from './SIDSubsongSelector';
 import { UADESubsongSelector } from './UADESubsongSelector';
 import { ModuleInfoButton } from './ModuleInfoButton';
 import { GenreAnalysisBadge } from './GenreAnalysisBadge';
 import { GrooveSettingsModal } from '@components/dialogs/GrooveSettingsModal';
-import { notify } from '@stores/useNotificationStore';
-import { useTrackerAnalysis } from '@/hooks/useTrackerAnalysis';
+import { GROOVE_TEMPLATES } from '@typedefs/audio';
 import {
   Eye, EyeOff, List, Grid3x3, Piano, Radio,
   Activity, LayoutGrid, Cpu, SlidersHorizontal, Zap,
@@ -53,45 +50,19 @@ export const EditorControlsBar: React.FC<EditorControlsBarProps> = React.memo(({
   onShowAutomation,
   onShowDrumpads: onShowDrumpadsProp,
 }) => {
-  // ── Store state ──────────────────────────────────────────────────────────
-  const {
-    recordMode,
-    showGhostPatterns,
-    channelCount,
-    applySystemPreset,
-  } = {
-    ...useTrackerStore(useShallow(s => ({
-      channelCount: s.patterns[s.currentPatternIndex]?.channels?.length || 4,
-      applySystemPreset: s.applySystemPreset,
-    }))),
-    ...useEditorStore(useShallow(s => ({
-      recordMode: s.recordMode,
-      showGhostPatterns: s.showGhostPatterns,
-    }))),
-  };
-
-  const {
-    grooveTemplateId,
-    swing,
-    jitter,
-    smoothScrolling,
-  } = useTransportStore(useShallow(s => ({
-    grooveTemplateId: s.grooveTemplateId,
-    swing: s.swing,
-    jitter: s.jitter,
-    smoothScrolling: s.smoothScrolling,
-  })));
-
-  const masterMuted = useAudioStore(s => s.masterMuted);
-  const statusMessage = useUIStore(s => s.statusMessage);
-  const setActiveView = useUIStore(s => s.setActiveView);
-  const dialogOpen = useUIStore(s => s.dialogOpen);
-  const closeDialogCommand = useUIStore(s => s.closeDialogCommand);
-
-  const fps = useFPSMonitor();
+  // ── Shared hook ───────────────────────────────────────────────────────────
+  const c = useEditorControls({
+    onShowAutomation,
+    onShowDrumpads: onShowDrumpadsProp,
+  });
 
   // ── Local state ──────────────────────────────────────────────────────────
   const [showGrooveSettings, setShowGrooveSettings] = useState(false);
+
+  // DOM-only: UI store for view-mode switching and groove dialog command
+  const setActiveView = useUIStore(s => s.setActiveView);
+  const dialogOpen = useUIStore(s => s.dialogOpen);
+  const closeDialogCommand = useUIStore(s => s.closeDialogCommand);
 
   // Handle groove-settings dialog command from keyboard shortcuts
   useEffect(() => {
@@ -104,7 +75,7 @@ export const EditorControlsBar: React.FC<EditorControlsBarProps> = React.memo(({
   // ── Grouped hardware presets ─────────────────────────────────────────────
   const groupedPresets = React.useMemo(() => getGroupedPresets(), []);
 
-  // ── Handlers ─────────────────────────────────────────────────────────────
+  // ── DOM-specific handler ──────────────────────────────────────────────────
   const handleViewModeChange = useCallback((e: React.ChangeEvent<HTMLSelectElement>) => {
     const val = e.target.value as TrackerViewMode;
     if (val === 'arrangement' || val === 'dj' || val === 'drumpad' || val === 'pianoroll' || val === 'vj' || val === 'mixer' || val === 'studio' || val === 'split') {
@@ -114,51 +85,8 @@ export const EditorControlsBar: React.FC<EditorControlsBarProps> = React.memo(({
     }
   }, [setActiveView, onViewModeChange]);
 
-  const handleToggleGhosts = useCallback(() => {
-    const s = useEditorStore.getState();
-    s.setShowGhostPatterns(!s.showGhostPatterns);
-  }, []);
-
-  const handleToggleRecord = useCallback(() => {
-    useEditorStore.getState().toggleRecordMode();
-  }, []);
-
-  const handleToggleMute = useCallback(() => {
-    useAudioStore.getState().toggleMasterMute();
-  }, []);
-
-  const handleToggleSmooth = useCallback(() => {
-    const s = useTransportStore.getState();
-    s.setSmoothScrolling(!s.smoothScrolling);
-  }, []);
-
-  const handleShowAutoEditor = useCallback(() => {
-    if (onShowAutomation) onShowAutomation();
-    else useUIStore.getState().openModal('automation');
-  }, [onShowAutomation]);
-
-  const handleShowDrumpads = useCallback(() => {
-    if (onShowDrumpadsProp) onShowDrumpadsProp();
-    else useUIStore.getState().openModal('drumpads');
-  }, [onShowDrumpadsProp]);
-
-  const handleRecSettings = useCallback(() => {
-    useUIStore.getState().openModal('settings');
-  }, []);
-
-  const handleHardwarePresetChange = useCallback((e: React.ChangeEvent<HTMLSelectElement>) => {
-    const presetId = e.target.value;
-    if (presetId === 'none') return;
-    applySystemPreset(presetId);
-    notify.success(`Hardware System: ${SYSTEM_PRESETS.find(p => p.id === presetId)?.name.toUpperCase()}`);
-  }, [applySystemPreset]);
-
-  const grooveActive = (grooveTemplateId !== 'straight' && swing > 0) || jitter > 0;
-
+  const { fps } = c;
   const { quality, averageFps: avgFps } = fps;
-
-  // Initialize tracker audio analysis (capture + analyze during playback)
-  useTrackerAnalysis();
 
   return (
     <div className="flex-shrink flex items-center justify-between px-2 py-1 bg-dark-bgTertiary border-b border-dark-border min-h-[28px]">
@@ -194,7 +122,7 @@ export const EditorControlsBar: React.FC<EditorControlsBarProps> = React.memo(({
           <Cpu size={14} className="shrink-0 text-text-secondary" />
           <select
             className="px-3 py-1.5 rounded-md text-xs font-mono border transition-all cursor-pointer border-dark-borderLight bg-dark-bgTertiary text-text-secondary hover:bg-dark-bgHover hover:text-text-primary"
-            onChange={handleHardwarePresetChange}
+            onChange={(e) => c.handleHardwarePresetChange(e.target.value)}
             defaultValue="none"
             title="Select Hardware System Preset (NES, SMS, Genesis, etc.)"
           >
@@ -224,7 +152,7 @@ export const EditorControlsBar: React.FC<EditorControlsBarProps> = React.memo(({
               onChange={(e) => onGridChannelChange(Number(e.target.value))}
               className="px-3 py-1.5 rounded-md text-xs font-mono border transition-all cursor-pointer border-dark-borderLight bg-dark-bgTertiary text-text-secondary hover:bg-dark-bgHover hover:text-text-primary"
             >
-              {Array.from({ length: channelCount }, (_, idx) => (
+              {Array.from({ length: c.channelCount }, (_, idx) => (
                 <option key={idx} value={idx}>
                   {(idx + 1).toString().padStart(2, '0')}
                 </option>
@@ -236,17 +164,17 @@ export const EditorControlsBar: React.FC<EditorControlsBarProps> = React.memo(({
         {/* Ghost Patterns Toggle (tracker view) */}
         {viewMode === 'tracker' && (
           <button
-            onClick={handleToggleGhosts}
+            onClick={c.handleToggleGhosts}
             className={`
               flex items-center gap-1 px-2 py-1 text-xs rounded transition-colors
-              ${showGhostPatterns
+              ${c.showGhostPatterns
                 ? 'bg-accent-primary/20 text-accent-primary'
                 : 'bg-dark-bgSecondary text-text-secondary hover:text-text-primary'
               }
             `}
-            title={showGhostPatterns ? 'Hide ghost patterns' : 'Show ghost patterns'}
+            title={c.showGhostPatterns ? 'Hide ghost patterns' : 'Show ghost patterns'}
           >
-            {showGhostPatterns ? <Eye size={12} /> : <EyeOff size={12} />}
+            {c.showGhostPatterns ? <Eye size={12} /> : <EyeOff size={12} />}
             <span>Ghosts</span>
           </button>
         )}
@@ -272,7 +200,7 @@ export const EditorControlsBar: React.FC<EditorControlsBarProps> = React.memo(({
         {/* Automation Editor Toggle (tracker view) */}
         {viewMode === 'tracker' && (
           <button
-            onClick={handleShowAutoEditor}
+            onClick={c.handleShowAutoEditor}
             className="flex items-center gap-1 px-2 py-1 text-xs rounded transition-colors bg-dark-bgSecondary text-text-secondary hover:text-text-primary"
             title="Open Automation Editor"
           >
@@ -283,7 +211,7 @@ export const EditorControlsBar: React.FC<EditorControlsBarProps> = React.memo(({
 
         {/* Drumpad Editor Toggle */}
         <button
-          onClick={handleShowDrumpads}
+          onClick={c.handleShowDrumpads}
           className="flex items-center gap-1 px-2 py-1 text-xs rounded transition-colors bg-dark-bgSecondary text-text-secondary hover:text-text-primary"
           title="Open Drumpad Editor"
         >
@@ -294,21 +222,21 @@ export const EditorControlsBar: React.FC<EditorControlsBarProps> = React.memo(({
         {/* Rec Button (with settings access) */}
         <div className="flex items-center gap-1">
           <button
-            onClick={handleToggleRecord}
+            onClick={c.handleToggleRecord}
             className={`
               px-2 py-1 text-xs rounded font-medium transition-colors flex items-center gap-1
-              ${recordMode
+              ${c.recordMode
                 ? 'bg-accent-error text-text-primary animate-pulse'
                 : 'bg-dark-bgSecondary text-text-secondary hover:text-text-primary'
               }
             `}
             title="Toggle Recording Mode (Space)"
           >
-            <div className={`w-2 h-2 rounded-full ${recordMode ? 'bg-white' : 'bg-accent-error'}`} />
+            <div className={`w-2 h-2 rounded-full ${c.recordMode ? 'bg-white' : 'bg-accent-error'}`} />
             REC
           </button>
           <button
-            onClick={handleRecSettings}
+            onClick={c.handleRecSettings}
             className="p-1 rounded bg-dark-bgSecondary text-text-secondary hover:text-text-primary transition-colors"
             title="Recording Settings (Quantize, Edit Step...)"
           >
@@ -321,32 +249,32 @@ export const EditorControlsBar: React.FC<EditorControlsBarProps> = React.memo(({
 
         {/* Mute Button */}
         <button
-          onClick={handleToggleMute}
+          onClick={c.handleToggleMute}
           className={`
             px-2 py-1 text-xs rounded font-medium transition-colors
-            ${masterMuted
+            ${c.masterMuted
               ? 'bg-accent-error/20 text-accent-error'
               : 'bg-dark-bgSecondary text-text-secondary hover:text-text-primary'
             }
           `}
-          title={masterMuted ? 'Unmute master output' : 'Mute master output'}
+          title={c.masterMuted ? 'Unmute master output' : 'Mute master output'}
         >
-          {masterMuted ? 'Unmute' : 'Mute'}
+          {c.masterMuted ? 'Unmute' : 'Mute'}
         </button>
 
         {/* Stepped/Smooth Scrolling Toggle */}
         <button
-          onClick={handleToggleSmooth}
+          onClick={c.handleToggleSmooth}
           className={`
             px-2 py-1 text-xs rounded font-medium transition-colors
-            ${smoothScrolling
+            ${c.smoothScrolling
               ? 'bg-accent-primary/20 text-accent-primary'
               : 'bg-dark-bgSecondary text-text-secondary hover:text-text-primary'
             }
           `}
-          title={smoothScrolling ? 'Switch to stepped scrolling' : 'Switch to smooth scrolling'}
+          title={c.smoothScrolling ? 'Switch to stepped scrolling' : 'Switch to smooth scrolling'}
         >
-          {smoothScrolling ? 'Smooth' : 'Stepped'}
+          {c.smoothScrolling ? 'Smooth' : 'Stepped'}
         </button>
 
         {/* Groove Settings Button */}
@@ -354,11 +282,11 @@ export const EditorControlsBar: React.FC<EditorControlsBarProps> = React.memo(({
           <button
             onClick={() => setShowGrooveSettings(true)}
             className={`px-2 py-1 text-[10px] rounded font-mono font-bold transition-colors ${
-              grooveActive
+              c.grooveActive
                 ? 'bg-accent-primary/20 text-accent-primary border border-accent-primary/50'
                 : 'bg-dark-bgSecondary text-text-secondary border border-dark-border hover:text-text-primary'
             }`}
-            title={`Groove Settings (Current: ${GROOVE_TEMPLATES.find(g => g.id === grooveTemplateId)?.name || 'None'})`}
+            title={`Groove Settings (Current: ${GROOVE_TEMPLATES.find(g => g.id === c.grooveTemplateId)?.name || 'None'})`}
           >
             GROOVE
           </button>
@@ -369,10 +297,10 @@ export const EditorControlsBar: React.FC<EditorControlsBarProps> = React.memo(({
         <GenreAnalysisBadge />
 
         {/* Status Message (ProTracker Style) */}
-        {statusMessage && (
+        {c.statusMessage && (
           <div className="flex items-center px-3 ml-2 pl-3 border-l border-dark-border">
             <span className="text-accent-primary font-bold tracking-[0.3em] text-[11px] animate-pulse font-mono">
-              {statusMessage.toUpperCase()}
+              {c.statusMessage.toUpperCase()}
             </span>
           </div>
         )}
