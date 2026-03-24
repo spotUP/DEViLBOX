@@ -22,6 +22,14 @@ import {
   getFeaturedTunes,
   type HVSCEntry,
 } from '@/lib/hvscApi';
+import {
+  batchGetRatings,
+  setRating,
+  removeRating,
+  type RatingMap,
+} from '@/lib/ratingsApi';
+import { useAuthStore } from '@/stores/useAuthStore';
+import { StarRating } from '@/components/shared/StarRating';
 
 // ── Modland Panel ────────────────────────────────────────────────────────
 
@@ -44,6 +52,8 @@ export const ModlandPanel: React.FC<ModlandPanelProps> = ({ isOpen, onLoadTracke
   const [modlandOffset, setModlandOffset] = useState(0);
   const [modlandHasMore, setModlandHasMore] = useState(false);
   const [modlandDownloading, setModlandDownloading] = useState<Set<string>>(new Set());
+  const [modlandRatings, setModlandRatings] = useState<RatingMap>({});
+  const isLoggedIn = useAuthStore(s => !!s.token);
   const modlandSearchTimer = useRef<ReturnType<typeof setTimeout>>(null);
   const modlandSearchRef = useRef<HTMLInputElement>(null);
 
@@ -77,6 +87,14 @@ export const ModlandPanel: React.FC<ModlandPanelProps> = ({ isOpen, onLoadTracke
         }
         setModlandHasMore(data.results.length === MODLAND_LIMIT);
         setModlandOffset(newOffset);
+
+        // Fetch ratings
+        const keys = data.results.map(r => r.full_path);
+        if (keys.length > 0) {
+          batchGetRatings('modland', keys).then(r => {
+            setModlandRatings(prev => append ? { ...prev, ...r } : r);
+          }).catch(() => {});
+        }
       } catch (err) {
         setModlandError(err instanceof Error ? err.message : 'Search failed');
       } finally {
@@ -133,6 +151,19 @@ export const ModlandPanel: React.FC<ModlandPanelProps> = ({ isOpen, onLoadTracke
     },
     [onLoadTrackerModule, onClose],
   );
+
+  const handleModlandRate = useCallback(async (key: string, star: number) => {
+    if (!isLoggedIn) return;
+    try {
+      if (star === 0) {
+        const res = await removeRating('modland', key);
+        setModlandRatings(prev => ({ ...prev, [key]: { avg: res.avg, count: res.count } }));
+      } else {
+        const res = await setRating('modland', key, star);
+        setModlandRatings(prev => ({ ...prev, [key]: { avg: res.avg, count: res.count, userRating: res.userRating } }));
+      }
+    } catch { /* ignore */ }
+  }, [isLoggedIn]);
 
   return (
     <>
@@ -210,11 +241,26 @@ export const ModlandPanel: React.FC<ModlandPanelProps> = ({ isOpen, onLoadTracke
                     <div className="text-text-primary text-sm font-mono truncate">
                       {file.filename}
                     </div>
-                    <div className="flex gap-3 text-xs text-text-muted">
+                    <div className="flex gap-3 text-xs text-text-muted items-center">
                       <span className="text-green-400/70">{file.format}</span>
                       <span>{file.author}</span>
                     </div>
                   </div>
+
+                  {/* Star rating */}
+                  {(() => {
+                    const r = modlandRatings[file.full_path];
+                    const avg = r?.avg ?? file.avg_rating ?? 0;
+                    const count = r?.count ?? file.vote_count ?? 0;
+                    return (
+                      <StarRating
+                        avg={avg}
+                        count={count}
+                        userRating={r?.userRating}
+                        onRate={isLoggedIn ? (star) => handleModlandRate(file.full_path, star) : undefined}
+                      />
+                    );
+                  })()}
 
                   {modlandDownloading.has(file.full_path) ? (
                     <Loader2 size={14} className="animate-spin text-green-400 flex-shrink-0" />
@@ -280,6 +326,8 @@ export const HVSCPanel: React.FC<HVSCPanelProps> = ({ isOpen, onLoadTrackerModul
   const [hvscQuery, setHvscQuery] = useState('');
   const [hvscSearchResults, setHvscSearchResults] = useState<HVSCEntry[]>([]);
   const [hvscDownloading, setHvscDownloading] = useState<Set<string>>(new Set());
+  const [hvscRatings, setHvscRatings] = useState<RatingMap>({});
+  const isLoggedIn = useAuthStore(s => !!s.token);
   const hvscSearchRef = useRef<HTMLInputElement>(null);
   const hvscSearchTimer = useRef<ReturnType<typeof setTimeout>>(null);
 
@@ -293,6 +341,8 @@ export const HVSCPanel: React.FC<HVSCPanelProps> = ({ isOpen, onLoadTrackerModul
         .then((tunes) => {
           setHvscEntries(tunes);
           setHvscError(null);
+          const keys = tunes.filter(t => !t.isDirectory).map(t => t.path);
+          if (keys.length > 0) batchGetRatings('hvsc', keys).then(r => setHvscRatings(prev => ({ ...prev, ...r }))).catch(() => {});
         })
         .catch((err) => {
           setHvscError(err instanceof Error ? err.message : 'Failed to load featured tunes');
@@ -313,6 +363,8 @@ export const HVSCPanel: React.FC<HVSCPanelProps> = ({ isOpen, onLoadTrackerModul
       setHvscPath(path);
       setHvscQuery('');
       setHvscSearchResults([]);
+      const keys = result.entries.filter((e: HVSCEntry) => !e.isDirectory).map((e: HVSCEntry) => e.path);
+      if (keys.length > 0) batchGetRatings('hvsc', keys).then(r => setHvscRatings(prev => ({ ...prev, ...r }))).catch(() => {});
     } catch (err) {
       setHvscError(err instanceof Error ? err.message : 'Failed to browse directory');
     } finally {
@@ -337,6 +389,12 @@ export const HVSCPanel: React.FC<HVSCPanelProps> = ({ isOpen, onLoadTrackerModul
     try {
       const results = await searchHVSC(query, 100, 0);
       setHvscSearchResults(results);
+
+      // Fetch ratings
+      const keys = results.filter(e => !e.isDirectory).map(e => e.path);
+      if (keys.length > 0) {
+        batchGetRatings('hvsc', keys).then(setHvscRatings).catch(() => {});
+      }
     } catch (err) {
       setHvscError(err instanceof Error ? err.message : 'Search failed');
     } finally {
@@ -363,7 +421,8 @@ export const HVSCPanel: React.FC<HVSCPanelProps> = ({ isOpen, onLoadTrackerModul
       setHvscError(null);
       try {
         const buffer = await downloadHVSCFile(entry.path);
-        await onLoadTrackerModule(buffer, entry.name);
+        const filename = entry.path.split('/').pop() || entry.name;
+        await onLoadTrackerModule(buffer, filename);
         onClose();
       } catch (err) {
         setHvscError(err instanceof Error ? err.message : 'Failed to download');
@@ -386,6 +445,19 @@ export const HVSCPanel: React.FC<HVSCPanelProps> = ({ isOpen, onLoadTrackerModul
       handleHVSCLoad(entry);
     }
   }, [browseHVSCDirectory, handleHVSCLoad]);
+
+  const handleHvscRate = useCallback(async (key: string, star: number) => {
+    if (!isLoggedIn) return;
+    try {
+      if (star === 0) {
+        const res = await removeRating('hvsc', key);
+        setHvscRatings(prev => ({ ...prev, [key]: { avg: res.avg, count: res.count } }));
+      } else {
+        const res = await setRating('hvsc', key, star);
+        setHvscRatings(prev => ({ ...prev, [key]: { avg: res.avg, count: res.count, userRating: res.userRating } }));
+      }
+    } catch { /* ignore */ }
+  }, [isLoggedIn]);
 
   return (
     <>
@@ -451,10 +523,25 @@ export const HVSCPanel: React.FC<HVSCPanelProps> = ({ isOpen, onLoadTrackerModul
                       <div className="text-text-primary text-sm font-mono truncate">
                         {entry.name}
                       </div>
-                      <div className="text-xs text-text-muted truncate">
-                        {entry.author ? `${entry.author} — ` : ''}{entry.path}
+                      <div className="flex text-xs text-text-muted truncate items-center gap-1">
+                        <span>{entry.author ? `${entry.author} — ` : ''}{entry.path}</span>
                       </div>
                     </div>
+
+                    {/* Star rating */}
+                    {!entry.isDirectory && (() => {
+                      const r = hvscRatings[entry.path];
+                      const avg = r?.avg ?? entry.avg_rating ?? 0;
+                      const count = r?.count ?? entry.vote_count ?? 0;
+                      return (
+                        <StarRating
+                          avg={avg}
+                          count={count}
+                          userRating={r?.userRating}
+                          onRate={isLoggedIn ? (star) => handleHvscRate(entry.path, star) : undefined}
+                        />
+                      );
+                    })()}
 
                     {!entry.isDirectory && (
                       hvscDownloading.has(entry.path) ? (
@@ -528,6 +615,21 @@ export const HVSCPanel: React.FC<HVSCPanelProps> = ({ isOpen, onLoadTrackerModul
                         </div>
                       )}
                     </div>
+
+                    {/* Star rating */}
+                    {!entry.isDirectory && (() => {
+                      const r = hvscRatings[entry.path];
+                      const avg = r?.avg ?? entry.avg_rating ?? 0;
+                      const count = r?.count ?? entry.vote_count ?? 0;
+                      return (
+                        <StarRating
+                          avg={avg}
+                          count={count}
+                          userRating={r?.userRating}
+                          onRate={isLoggedIn ? (star) => handleHvscRate(entry.path, star) : undefined}
+                        />
+                      );
+                    })()}
 
                     {!entry.isDirectory && (
                       hvscDownloading.has(entry.path) ? (

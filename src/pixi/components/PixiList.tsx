@@ -1,7 +1,7 @@
 /**
  * PixiList — Virtual scrolling list with object pooling.
  * Only renders visible items + buffer for performance.
- * Supports selection highlighting and keyboard navigation.
+ * Supports selection highlighting, keyboard navigation, and inline star ratings.
  */
 
 import { useRef, useCallback, useState, useMemo } from 'react';
@@ -9,12 +9,37 @@ import type { Graphics as GraphicsType, FederatedWheelEvent, FederatedPointerEve
 import { PIXI_FONTS } from '../fonts';
 import { usePixiTheme } from '../theme';
 
-interface PixiListItem {
+/** Draw a 5-pointed star into a Graphics object */
+function drawStar(g: GraphicsType, cx: number, cy: number, r: number, points: number, innerRatio: number, color: number, alpha = 1) {
+  const inner = r * innerRatio;
+  const step = Math.PI / points;
+  g.moveTo(cx + r * Math.sin(0), cy - r * Math.cos(0));
+  for (let i = 1; i < points * 2; i++) {
+    const radius = i % 2 === 0 ? r : inner;
+    const angle = i * step;
+    g.lineTo(cx + radius * Math.sin(angle), cy - radius * Math.cos(angle));
+  }
+  g.closePath();
+  g.fill({ color, alpha });
+}
+
+export interface PixiListItemRating {
+  /** Community average (0-5) */
+  avg: number;
+  /** Total votes */
+  count: number;
+  /** Current user's rating (1-5), or undefined if not rated */
+  userRating?: number;
+}
+
+export interface PixiListItem {
   id: string;
   label: string;
   sublabel?: string;
   /** Hex color for a small category dot rendered before the label */
   dotColor?: number;
+  /** Star rating data — if present, 5 interactive stars are shown */
+  rating?: PixiListItemRating;
 }
 
 interface PixiListProps {
@@ -25,6 +50,8 @@ interface PixiListProps {
   selectedId?: string | null;
   onSelect?: (id: string) => void;
   onDoubleClick?: (id: string) => void;
+  /** Callback when a star is clicked. rating=1..5. */
+  onRate?: (id: string, rating: number) => void;
   /** Number of buffer items above/below viewport */
   buffer?: number;
   layout?: Record<string, unknown>;
@@ -38,6 +65,7 @@ export const PixiList: React.FC<PixiListProps> = ({
   selectedId,
   onSelect,
   onDoubleClick,
+  onRate,
   buffer = 3,
   layout: layoutProp,
 }) => {
@@ -117,6 +145,22 @@ export const PixiList: React.FC<PixiListProps> = ({
     g.fill({ color: isDraggingRef.current ? theme.accent.color : theme.textMuted.color, alpha: isDraggingRef.current ? 0.6 : 0.4 });
   }, [thumbHeight, maxScroll, theme]);
 
+  // Star rating constants
+  const STAR_SIZE = 16;
+  const STAR_GAP = 2;
+  const STAR_FILLED = 0xf59e0b;   // amber-500
+  const STAR_EMPTY = 0xffffff;    // white (40% alpha applied via container)
+  const STAR_USER = 0xfbbf24;     // amber-400 (brighter for user's own)
+
+  const [hoveredStar, setHoveredStar] = useState<{ itemId: string; star: number } | null>(null);
+
+  const handleStarClick = useCallback((itemId: string, star: number) => {
+    if (!onRate) return;
+    const item = items.find(i => i.id === itemId);
+    // Click same star = remove rating (signal with 0)
+    onRate(itemId, item?.rating?.userRating === star ? 0 : star);
+  }, [onRate, items]);
+
   return (
     <pixiContainer
       eventMode="static"
@@ -195,6 +239,51 @@ export const PixiList: React.FC<PixiListProps> = ({
                 tint={theme.textMuted.color}
                 layout={{ flexShrink: 0, marginRight: 8 }}
               />
+            )}
+
+            {/* Star ratings */}
+            {item.rating != null && onRate && (
+              <pixiContainer
+                eventMode="static"
+                layout={{ flexDirection: 'row', flexShrink: 0, gap: STAR_GAP, marginRight: 6, alignItems: 'center' }}
+              >
+                {[1, 2, 3, 4, 5].map(star => {
+                  const avg = item.rating!.avg;
+                  const userR = item.rating!.userRating;
+                  const isHovered = hoveredStar?.itemId === item.id && hoveredStar.star >= star;
+                  const isFilled = userR ? star <= userR : star <= Math.round(avg);
+                  const color = isHovered ? STAR_USER : (userR && star <= userR) ? STAR_USER : isFilled ? STAR_FILLED : STAR_EMPTY;
+                  const alpha = color === STAR_EMPTY ? 0.4 : 1;
+
+                  return (
+                    <pixiGraphics
+                      key={star}
+                      eventMode="static"
+                      cursor="pointer"
+                      draw={(g) => {
+                        g.clear();
+                        drawStar(g, STAR_SIZE / 2, STAR_SIZE / 2, STAR_SIZE / 2, 5, 0.45, color, alpha);
+                      }}
+                      onPointerEnter={() => setHoveredStar({ itemId: item.id, star })}
+                      onPointerLeave={() => setHoveredStar(null)}
+                      onPointerUp={(e: FederatedPointerEvent) => {
+                        e.stopPropagation();
+                        handleStarClick(item.id, star);
+                      }}
+                      layout={{ width: STAR_SIZE, height: STAR_SIZE }}
+                    />
+                  );
+                })}
+                {item.rating!.count > 0 && (
+                  <pixiBitmapText
+                    eventMode="none"
+                    text={`(${item.rating!.count})`}
+                    style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 9, fill: 0xffffff }}
+                    tint={theme.textMuted.color}
+                    layout={{ marginLeft: 2 }}
+                  />
+                )}
+              </pixiContainer>
             )}
           </pixiContainer>
         );
