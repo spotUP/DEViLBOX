@@ -10,6 +10,7 @@ import { useDJStore } from '@/stores/useDJStore';
 import { registerViewHandler } from '@/engine/keyboard/KeyboardRouter';
 import type { NormalizedKeyEvent } from '@/engine/keyboard/types';
 import { getDJEngine } from '@/engine/dj/DJEngine';
+import { togglePlay } from '@/engine/dj/DJActions';
 import { DJBeatSync } from '@/engine/dj/DJBeatSync';
 import { beatJump, triggerHotCue, activateSeratoLoop } from '@/engine/dj/DJBeatJump';
 import {
@@ -85,14 +86,8 @@ export function useDJKeyboardHandler(): void {
       // ================================================================
       // DECK A (left hand)
       // ================================================================
-      case 'q': // Play/Pause
-        if (engine.deckA.isPlaying()) {
-          engine.deckA.pause();
-          store.setDeckPlaying('A', false);
-        } else {
-          engine.deckA.play();
-          store.setDeckPlaying('A', true);
-        }
+      case 'q': // Play/Pause (with spin-down)
+        togglePlay('A');
         break;
 
       case 'w':
@@ -185,14 +180,8 @@ export function useDJKeyboardHandler(): void {
       // ================================================================
       // DECK B (right hand)
       // ================================================================
-      case 'p': // Play/Pause
-        if (engine.deckB.isPlaying()) {
-          engine.deckB.pause();
-          store.setDeckPlaying('B', false);
-        } else {
-          engine.deckB.play();
-          store.setDeckPlaying('B', true);
-        }
+      case 'p': // Play/Pause (with spin-down)
+        togglePlay('B');
         break;
 
       case 'o':
