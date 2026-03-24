@@ -440,7 +440,6 @@ export function MAMEMacroEditor({
   onChange,
   chipCapabilities = {},
 }: MAMEMacroEditorProps) {
-  const [expandedTypes, setExpandedTypes] = useState<Set<number>>(new Set([MacroType.VOLUME]));
   const [presetMenuOpen, setPresetMenuOpen] = useState<number | null>(null);
 
   const currentThemeId = useThemeStore((s) => s.currentThemeId);
@@ -515,19 +514,6 @@ export function MAMEMacroEditor({
     setPresetMenuOpen(null);
   }, [getMacro, updateMacro]);
 
-  // Toggle expanded state
-  const toggleExpanded = useCallback((type: MacroType) => {
-    setExpandedTypes(prev => {
-      const next = new Set(prev);
-      if (next.has(type)) {
-        next.delete(type);
-      } else {
-        next.add(type);
-      }
-      return next;
-    });
-  }, []);
-
   // Get relevant presets for a macro type
   const getPresetsForType = useCallback((type: MacroType): string[] => {
     const prefix = type === MacroType.VOLUME ? 'vol-' :
@@ -563,97 +549,76 @@ export function MAMEMacroEditor({
         </span>
       </div>
 
-      {/* Macro Editors */}
-      <div className="p-2 space-y-2">
+      {/* Macro Editors — side by side, always visible */}
+      <div className="p-2 grid gap-2" style={{ gridTemplateColumns: `repeat(auto-fill, minmax(180px, 1fr))` }}>
         {availableMacroTypes.map(type => {
           const info = MACRO_TYPE_INFO[type];
           if (!info) return null;
 
           const macro = getMacro(type);
-          const isExpanded = expandedTypes.has(type);
           const isActive = macro.data.length > 1;
           const presets = getPresetsForType(type);
 
           return (
             <div
               key={type}
-              className="rounded border"
+              className="rounded border flex flex-col"
               style={{ borderColor: isActive ? info.color + '40' : borderColor }}
             >
               {/* Macro Header */}
-              <button
-                onClick={() => toggleExpanded(type)}
-                className="w-full px-2 py-1.5 flex items-center justify-between hover:bg-white/5 transition-colors"
-              >
-                <div className="flex items-center gap-2">
+              <div className="px-2 py-1 flex items-center justify-between">
+                <div className="flex items-center gap-1.5">
                   <div
-                    className="w-2 h-2 rounded-full"
+                    className="w-2 h-2 rounded-full flex-shrink-0"
                     style={{ backgroundColor: isActive ? info.color : '#444' }}
                   />
                   <span
-                    className="text-[11px] font-medium"
+                    className="text-[10px] font-medium"
                     style={{ color: isCyanTheme ? '#00ffff' : '#e2e8f0' }}
                   >
                     {info.label}
                   </span>
-                  {isActive && (
-                    <span className="text-[9px] text-slate-500">
-                      ({macro.data.length} steps)
-                    </span>
-                  )}
                 </div>
-                <ChevronDown
-                  size={14}
-                  className={`transform transition-transform ${isExpanded ? 'rotate-180' : ''}`}
-                  style={{ color: isCyanTheme ? '#00ffff' : '#888' }}
+                {/* Preset dropdown */}
+                {presets.length > 0 && (
+                  <div className="relative">
+                    <button
+                      onClick={() => setPresetMenuOpen(presetMenuOpen === type ? null : type)}
+                      className="text-[9px] px-1.5 py-0.5 bg-dark-surface hover:bg-dark-border rounded flex items-center gap-0.5"
+                    >
+                      Presets
+                      <ChevronDown size={8} />
+                    </button>
+                    {presetMenuOpen === type && (
+                      <div className="absolute top-full right-0 mt-1 bg-dark-bg border border-dark-border rounded shadow-lg z-10 min-w-[120px]">
+                        {presets.map(key => (
+                          <button
+                            key={key}
+                            onClick={() => applyPreset(type, key)}
+                            className="block w-full text-left px-3 py-1.5 text-[10px] hover:bg-dark-surface"
+                          >
+                            {MACRO_PRESETS[key].name}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {/* Always-visible macro canvas */}
+              <div className="px-1.5 pb-1.5">
+                <SingleMacroEditor
+                  macro={macro}
+                  onChange={(newMacro) => updateMacro(type, newMacro)}
+                  label={info.label}
+                  min={info.min}
+                  max={info.max}
+                  signed={info.signed}
+                  color={info.color}
+                  height={50}
                 />
-              </button>
-
-              {/* Expanded Editor */}
-              {isExpanded && (
-                <div className="px-2 pb-2 space-y-2">
-                  {/* Preset dropdown */}
-                  {presets.length > 0 && (
-                    <div className="relative">
-                      <button
-                        onClick={() => setPresetMenuOpen(presetMenuOpen === type ? null : type)}
-                        className="text-[10px] px-2 py-1 bg-dark-surface hover:bg-dark-border rounded flex items-center gap-1"
-                      >
-                        Presets
-                        <ChevronDown size={10} />
-                      </button>
-                      {presetMenuOpen === type && (
-                        <div className="absolute top-full left-0 mt-1 bg-dark-bg border border-dark-border rounded shadow-lg z-10">
-                          {presets.map(key => (
-                            <button
-                              key={key}
-                              onClick={() => applyPreset(type, key)}
-                              className="block w-full text-left px-3 py-1.5 text-[10px] hover:bg-dark-surface"
-                            >
-                              {MACRO_PRESETS[key].name}
-                            </button>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  )}
-
-                  {/* Macro canvas editor */}
-                  <SingleMacroEditor
-                    macro={macro}
-                    onChange={(newMacro) => updateMacro(type, newMacro)}
-                    label={info.label}
-                    min={info.min}
-                    max={info.max}
-                    signed={info.signed}
-                    color={info.color}
-                    height={60}
-                  />
-
-                  {/* Description */}
-                  <p className="text-[9px] text-slate-500 px-1">{info.description}</p>
-                </div>
-              )}
+              </div>
             </div>
           );
         })}
