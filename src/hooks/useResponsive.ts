@@ -14,6 +14,10 @@ export interface ResponsiveState {
 export function useResponsive(): ResponsiveState {
   const [state, setState] = useState<ResponsiveState>(() => {
     const width = typeof window !== 'undefined' ? window.innerWidth : 1024;
+    // iOS debug: report detected width
+    if (typeof window !== 'undefined' && /iPhone|iPad/.test(navigator.userAgent)) {
+      alert(`Screen: innerWidth=${window.innerWidth} outerWidth=${window.outerWidth} screen.width=${screen.width} dpr=${devicePixelRatio} → isMobile=${width < 768}`);
+    }
     return {
       width,
       isMobile: width < 768,
