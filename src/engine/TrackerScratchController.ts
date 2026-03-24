@@ -622,10 +622,17 @@ export class TrackerScratchController {
     this.clearScrollReleaseTimer();
     this.stopPhysicsLoop();
 
+    // If playback was already stopped (by exitScratchModeAndStop), don't resume.
+    if (!replayer.isPlaying()) {
+      if (this.scratchBuffer) {
+        this.scratchBuffer.silenceAndStop();
+        this.scratchBuffer.unfreezeCapture();
+      }
+      return;
+    }
+
     const fadeSec = TrackerScratchController.EXIT_CROSSFADE_SEC;
     const fadeMs = fadeSec * 1000;
-
-    console.warn(`[TrackerScratch] Exiting scratch mode, rate=${this.physics.playbackRate.toFixed(3)}`);
 
     // IMPORTANT ORDER: resync BEFORE unsuppressing notes.
     // At 0.001x tempo, nextScheduleTime is far in the future.
@@ -642,7 +649,6 @@ export class TrackerScratchController {
 
     // Resume ALL native WASM engines (were paused when entering scratch mode)
     replayer.resumeNativeEnginesAfterScratch();
-    console.warn(`[TrackerScratch] Gain restored to ${this.originalGainValue}`);
 
     // Crossfade: ramp scratch buffer gain down over the same duration
     if (this.scratchBuffer && this.scratchBufferReady) {
