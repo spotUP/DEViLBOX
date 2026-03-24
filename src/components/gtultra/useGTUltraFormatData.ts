@@ -29,13 +29,14 @@ export function useGTUltraFormatData(): GTUltraFormatData {
   const patternData = useGTUltraStore((s) => s.patternData);
   const playbackPos = useGTUltraStore((s) => s.playbackPos);
   const orderCursor = useGTUltraStore((s) => s.orderCursor);
+  const tableData = useGTUltraStore((s) => s.tableData);
 
   const currentOrderPos = isPlaying ? playbackPos.songPos : orderCursor;
   const displayRow = isPlaying ? playbackPos.row : currentRow;
 
   const channels = useMemo(
-    () => gtUltraToFormatChannels(channelCount, orderData, patternData, currentOrderPos),
-    [channelCount, orderData, patternData, currentOrderPos],
+    () => gtUltraToFormatChannels(channelCount, orderData, patternData, currentOrderPos, tableData),
+    [channelCount, orderData, patternData, currentOrderPos, tableData],
   );
 
   const handleCellChange = useCallback(
@@ -43,13 +44,40 @@ export function useGTUltraFormatData(): GTUltraFormatData {
       const engine = useGTUltraStore.getState().engine;
       if (!engine) return;
       const store = useGTUltraStore.getState();
-      const patIdx = resolveOrderPattern(store.orderData[channelIdx], currentOrderPos);
-      const colMap: Record<string, number> = { note: 0, instrument: 1, command: 2, data: 3 };
-      const col = colMap[columnKey];
-      if (col === undefined) return;
-      engine.setPatternCell(patIdx, rowIdx, col, value);
+
+      // Pattern channels: 0..channelCount-1
+      if (channelIdx < channelCount) {
+        const patIdx = resolveOrderPattern(store.orderData[channelIdx], currentOrderPos);
+        const colMap: Record<string, number> = { note: 0, instrument: 1, command: 2, data: 3 };
+        const col = colMap[columnKey];
+        if (col === undefined) return;
+        engine.setPatternCell(patIdx, rowIdx, col, value);
+        return;
+      }
+
+      // Order channels: channelCount..channelCount*2-1
+      const orderBase = channelCount;
+      if (channelIdx < orderBase + channelCount) {
+        const ch = channelIdx - orderBase;
+        if (columnKey === 'note') {
+          engine.setOrderEntry(ch, rowIdx, value);
+          store.refreshAllOrders();
+        }
+        return;
+      }
+
+      // Table channels: channelCount*2..channelCount*2+3
+      const tableBase = channelCount * 2;
+      const tableIdx = channelIdx - tableBase;
+      if (tableIdx >= 0 && tableIdx < 4) {
+        const side = columnKey === 'note' ? 0 : columnKey === 'instrument' ? 1 : -1;
+        if (side >= 0) {
+          engine.setTableEntry(tableIdx, side, rowIdx, value);
+          store.refreshAllTables();
+        }
+      }
     },
-    [currentOrderPos],
+    [currentOrderPos, channelCount],
   );
 
   return { channels, currentRow: displayRow, isPlaying, channelCount, handleCellChange };
