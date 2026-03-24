@@ -7,16 +7,20 @@
  */
 
 import React, { useRef, useEffect, useCallback, useState } from 'react';
+import { ChevronDown, ChevronRight } from 'lucide-react';
 import type { HivelyNativeData } from '@/types/tracker';
 import { useFormatStore } from '@stores';
 
-const CHAR_W = 8;
+const CHAR_W = 10;
 const CHAR_H = 14;
-const ROW_H = CHAR_H + 2;
-const HEADER_H = ROW_H + 4;
+const ROW_H = 20;
+const HEADER_H = 24;
 const POS_NUM_W = CHAR_W * 4 + 4;
 // Per channel: "XX +XX " = track(2) space sign trans(2) space = 7 chars
 const CH_W = CHAR_W * 7 + 4;
+
+export const HIVELY_MATRIX_HEIGHT = 200;
+export const HIVELY_MATRIX_COLLAPSED_HEIGHT = 28;
 
 const HEX = '0123456789abcdef';
 
@@ -44,15 +48,19 @@ interface Props {
   nativeData: HivelyNativeData;
   currentPosition: number;
   onPositionChange: (pos: number) => void;
+  collapsed?: boolean;
+  onToggleCollapse?: () => void;
 }
 
 export const HivelyPositionEditor: React.FC<Props> = ({
   width, height, nativeData, currentPosition, onPositionChange,
+  collapsed, onToggleCollapse,
 }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const numPos = nativeData.positions.length;
   const numCh = nativeData.channels;
-  const visibleRows = Math.floor((height - HEADER_H) / ROW_H);
+  const canvasH = height - HIVELY_MATRIX_COLLAPSED_HEIGHT;
+  const visibleRows = Math.floor((canvasH - HEADER_H) / ROW_H);
 
   // Cursor: channel + digit column within channel
   const [curCh, setCurCh] = useState(0);
@@ -86,21 +94,21 @@ export const HivelyPositionEditor: React.FC<Props> = ({
 
     const dpr = window.devicePixelRatio || 1;
     canvas.width = width * dpr;
-    canvas.height = height * dpr;
+    canvas.height = canvasH * dpr;
     ctx.scale(dpr, dpr);
 
     ctx.fillStyle = COLORS.bg;
-    ctx.fillRect(0, 0, width, height);
+    ctx.fillRect(0, 0, width, canvasH);
     ctx.font = `${CHAR_H}px "JetBrains Mono", "Fira Code", monospace`;
-    ctx.textBaseline = 'top';
+    ctx.textBaseline = 'middle';
 
     // Header
     ctx.fillStyle = COLORS.headerBg;
     ctx.fillRect(0, 0, width, HEADER_H);
     ctx.fillStyle = COLORS.headerText;
-    ctx.fillText('POS', 2, 4);
+    ctx.fillText('POS', 2, HEADER_H / 2);
     for (let ch = 0; ch < numCh; ch++) {
-      ctx.fillText(`CH${ch + 1}`, POS_NUM_W + ch * CH_W, 4);
+      ctx.fillText(`CH${ch + 1}`, POS_NUM_W + ch * CH_W, HEADER_H / 2);
     }
 
     // Rows
@@ -123,7 +131,7 @@ export const HivelyPositionEditor: React.FC<Props> = ({
 
       // Position number
       ctx.fillStyle = isCurrent ? '#ffff88' : COLORS.posNum;
-      ctx.fillText(pos.toString().padStart(3, '0'), 2, y + 1);
+      ctx.fillText(pos.toString().padStart(3, '0'), 2, y + ROW_H / 2);
 
       // Column separators
       for (let ch = 1; ch < numCh; ch++) {
@@ -142,16 +150,16 @@ export const HivelyPositionEditor: React.FC<Props> = ({
 
         // Track (2 hex digits)
         ctx.fillStyle = COLORS.track;
-        ctx.fillText(trk.toString(16).toUpperCase().padStart(2, '0'), x, y + 1);
+        ctx.fillText(trk.toString(16).toUpperCase().padStart(2, '0'), x, y + ROW_H / 2);
 
         // Space + sign + transpose (2 hex digits)
         const sign = tr >= 0 ? '+' : '-';
         const trAbs = Math.abs(tr).toString(16).toUpperCase().padStart(2, '0');
         ctx.fillStyle = tr === 0 ? COLORS.transDim : (tr > 0 ? COLORS.transPos : COLORS.transNeg);
-        ctx.fillText(` ${sign}${trAbs}`, x + CHAR_W * 2, y + 1);
+        ctx.fillText(` ${sign}${trAbs}`, x + CHAR_W * 2, y + ROW_H / 2);
       }
     }
-  }, [width, height, nativeData, currentPosition, numPos, numCh, scrollPos, visibleRows, curCh, curDigit]);
+  }, [width, canvasH, nativeData, currentPosition, numPos, numCh, scrollPos, visibleRows, curCh, curDigit]);
 
   // Click to select
   const handleClick = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
@@ -283,15 +291,54 @@ export const HivelyPositionEditor: React.FC<Props> = ({
 
   useEffect(() => { canvasRef.current?.focus(); }, []);
 
+  if (collapsed) {
+    return (
+      <div
+        style={{
+          width,
+          height: HIVELY_MATRIX_COLLAPSED_HEIGHT,
+          display: 'flex', alignItems: 'center', gap: 6, padding: '0 8px',
+          background: 'var(--color-tracker-row-highlight)',
+          cursor: 'pointer',
+          borderBottom: '1px solid var(--color-tracker-border, var(--color-border))',
+        }}
+        onClick={onToggleCollapse}
+      >
+        <ChevronRight size={14} style={{ color: 'var(--color-text-muted)', flexShrink: 0 }} />
+        <span style={{
+          fontFamily: '"JetBrains Mono", "Fira Code", monospace',
+          fontSize: 12, fontWeight: 700, color: 'var(--color-accent)',
+        }}>POSITIONS</span>
+      </div>
+    );
+  }
+
   return (
-    <canvas
-      ref={canvasRef}
-      width={width}
-      height={height}
-      style={{ width, height, outline: 'none', cursor: 'pointer' }}
-      tabIndex={0}
-      onClick={handleClick}
-      onKeyDown={handleKeyDown}
-    />
+    <div style={{ width, height, display: 'flex', flexDirection: 'column', background: 'var(--color-tracker-row-even)' }}>
+      <div
+        style={{
+          display: 'flex', alignItems: 'center', gap: 6, padding: '0 8px',
+          height: HIVELY_MATRIX_COLLAPSED_HEIGHT, flexShrink: 0,
+          background: 'var(--color-tracker-row-highlight)', cursor: 'pointer',
+          borderBottom: '1px solid var(--color-tracker-border, var(--color-border))',
+        }}
+        onClick={onToggleCollapse}
+      >
+        <ChevronDown size={14} style={{ color: 'var(--color-text-muted)', flexShrink: 0 }} />
+        <span style={{
+          fontFamily: '"JetBrains Mono", "Fira Code", monospace',
+          fontSize: 12, fontWeight: 700, color: 'var(--color-accent)',
+        }}>POSITIONS</span>
+      </div>
+      <canvas
+        ref={canvasRef}
+        width={width}
+        height={canvasH}
+        style={{ width, height: canvasH, outline: 'none', cursor: 'pointer' }}
+        tabIndex={0}
+        onClick={handleClick}
+        onKeyDown={handleKeyDown}
+      />
+    </div>
   );
 };

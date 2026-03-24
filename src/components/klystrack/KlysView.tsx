@@ -15,14 +15,14 @@ import React, { useRef, useEffect, useState, useCallback, useMemo } from 'react'
 import { useTrackerStore , useFormatStore } from '@stores';
 import { useTransportStore } from '@stores/useTransportStore';
 import { PatternEditorCanvas } from '@/components/tracker/PatternEditorCanvas';
-import { KlysPositionEditor } from './KlysPositionEditor';
+import { KlysPositionEditor, KLYS_MATRIX_HEIGHT, KLYS_MATRIX_COLLAPSED_HEIGHT } from './KlysPositionEditor';
 import { KlysInstrumentEditor } from './KlysInstrumentEditor';
 import { klysToFormatChannels, KLYS_COLUMNS } from './klysAdapter';
 import { KlysEngine } from '@/engine/klystrack/KlysEngine';
 import { getTrackerReplayer } from '@engine/TrackerReplayer';
 import { exportAsKlystrack } from '@lib/export/KlysExporter';
 
-const POSITION_H = 160;
+const POSITION_H = KLYS_MATRIX_HEIGHT;
 
 export const KlysView: React.FC<{ width?: number; height?: number }> = ({ width: propW, height: propH }) => {
   const nativeData = useFormatStore(s => s.klysNative);
@@ -34,6 +34,7 @@ export const KlysView: React.FC<{ width?: number; height?: number }> = ({ width:
   const [editPosition, setEditPosition] = useState(0);
   const [selectedInstrument, setSelectedInstrument] = useState(0);
   const [showInstEditor, setShowInstEditor] = useState(false);
+  const [matrixCollapsed, setMatrixCollapsed] = useState(false);
 
   const containerRef = useRef<HTMLDivElement>(null);
   const [size, setSize] = useState({ w: propW ?? 800, h: propH ?? 600 });
@@ -306,7 +307,7 @@ export const KlysView: React.FC<{ width?: number; height?: number }> = ({ width:
 
       {/* Position Editor */}
       <div style={{
-        height: `${POSITION_H}px`,
+        height: `${matrixCollapsed ? KLYS_MATRIX_COLLAPSED_HEIGHT : POSITION_H}px`,
         borderBottom: '1px solid var(--color-border)',
         overflow: 'auto',
         backgroundColor: 'var(--color-bg-secondary)',
@@ -314,10 +315,12 @@ export const KlysView: React.FC<{ width?: number; height?: number }> = ({ width:
       }}>
         <KlysPositionEditor
           width={width}
-          height={POSITION_H}
+          height={matrixCollapsed ? KLYS_MATRIX_COLLAPSED_HEIGHT : POSITION_H}
           nativeData={nativeData}
           currentPosition={activePosition}
           onPositionChange={handlePositionChange}
+          collapsed={matrixCollapsed}
+          onToggleCollapse={() => setMatrixCollapsed(!matrixCollapsed)}
         />
       </div>
 
