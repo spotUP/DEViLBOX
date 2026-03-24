@@ -5,15 +5,15 @@
  * 3-step wizard: Empty/Preset → Preset browser → Starter instruments.
  * Rendered inside the Pixi scene graph so the CRT shader catches it.
  *
- * DOM reference: src/components/dialogs/NewSongWizard.tsx
+ * DOM reference:    src/components/dialogs/NewSongWizard.tsx
+ * Shared logic:     src/hooks/dialogs/useNewSongWizard.ts
  */
 
 import React, { useState, useCallback, useMemo } from 'react';
 import { useUIStore } from '@stores/useUIStore';
 import { useTrackerStore } from '@stores/useTrackerStore';
-import { useInstrumentStore } from '@stores/useInstrumentStore';
 import { useTabsStore } from '@stores/useTabsStore';
-import { getGroupedPresets, SYSTEM_PRESETS } from '@constants/systemPresets';
+import { SYSTEM_PRESETS } from '@constants/systemPresets';
 import type { SystemPreset } from '@constants/systemPresets';
 import { AMIGA_UADE_PRESET_IDS, getInstrumentPresetsForSystem } from '@constants/uadeInstrumentPresets';
 import { PixiButton, PixiIcon } from '../components';
@@ -25,28 +25,43 @@ import { Div, Txt } from '../layout';
 import type { FederatedPointerEvent, FederatedWheelEvent } from 'pixi.js';
 import { useApplication } from '@pixi/react';
 import type { Graphics as GraphicsType } from 'pixi.js';
+import { useNewSongWizard, GROUPED_PRESETS } from '@hooks/dialogs/useNewSongWizard';
+import type { StartMode } from '@hooks/dialogs/useNewSongWizard';
 
-type WizardStep = 1 | 2 | 3;
-type StartMode = 'empty' | 'preset';
-
-const GROUPED_PRESETS = getGroupedPresets();
 const MODAL_W = 640;
 const MODAL_H = 560;
 
 export const PixiNewSongWizard: React.FC = () => {
-  const isOpen = useUIStore((s) => s.newSongWizardOpen);
-  const close = useUIStore((s) => s.closeNewSongWizard);
   const theme = usePixiTheme();
   const { app } = useApplication();
 
+  const {
+    isOpen,
+    close,
+    step,
+    startMode,
+    setStartMode,
+    selectedPresetId,
+    setSelectedPresetId,
+    withPresetInstruments,
+    setWithPresetInstruments,
+    selectedPreset,
+    hasStarterInstruments,
+    starterInstruments,
+    stepCount,
+    nextLabel,
+    setStep,
+    finishStandard,
+    resetWizardState,
+  } = useNewSongWizard();
+
   useModalClose({ isOpen, onClose: close });
 
-  const [step, setStep] = useState<WizardStep>(1);
-  const [startMode, setStartMode] = useState<StartMode>('empty');
-  const [selectedPresetId, setSelectedPresetId] = useState<string>('amiga_protracker');
-  const [withPresetInstruments, setWithPresetInstruments] = useState(true);
+  // Pixi-specific state: filter and scroll managed at this level (passed as props to GlStep2)
   const [filter, setFilter] = useState('');
   const [scrollY, setScrollY] = useState(0);
+
+  // ── Pixi finish — includes template-file code path ─────────────────────────
 
   const finish = useCallback(
     (mode: StartMode, loadInstruments: boolean) => {
@@ -57,8 +72,9 @@ export const PixiNewSongWizard: React.FC = () => {
       if (mode === 'preset' && preset?.templateFile) {
         const templatePath = preset.templateFile;
         // Close wizard immediately, then load async
-        setStep(1); setStartMode('empty'); setSelectedPresetId('amiga_protracker');
-        setWithPresetInstruments(true); setFilter(''); setScrollY(0);
+        resetWizardState();
+        setFilter('');
+        setScrollY(0);
         close();
 
         // Fetch template and load it through the unified file loader
@@ -92,31 +108,14 @@ export const PixiNewSongWizard: React.FC = () => {
         return;
       }
 
-      // Standard non-template flow
-      useTabsStore.getState().addTab();
-      queueMicrotask(() => {
-        if (mode === 'preset' && presetId) {
-          useTrackerStore.getState().applySystemPreset(presetId);
-          if (AMIGA_UADE_PRESET_IDS.has(presetId)) {
-            useTrackerStore.getState().applyAmigaSongSettings(presetId);
-          }
-        }
-        if (mode === 'preset' && loadInstruments && presetId) {
-          const presets = getInstrumentPresetsForSystem(presetId);
-          presets.forEach((inst) => useInstrumentStore.getState().createInstrument(inst));
-        }
-        useUIStore.getState().setActiveSystemPreset(mode === 'preset' ? presetId : null);
-        useUIStore.getState().setStatusMessage('New project', false, 1500);
-      });
-      setStep(1);
-      setStartMode('empty');
-      setSelectedPresetId('amiga_protracker');
-      setWithPresetInstruments(true);
+      // Standard non-template flow (shared)
+      finishStandard(mode, loadInstruments, presetId);
+      resetWizardState();
       setFilter('');
       setScrollY(0);
       close();
     },
-    [selectedPresetId, close],
+    [selectedPresetId, finishStandard, resetWizardState, close],
   );
 
   // Screen dimensions — safe access for app.screen getter
@@ -130,10 +129,11 @@ export const PixiNewSongWizard: React.FC = () => {
   }, [screenW, screenH]);
 
   const handleOverlayClick = useCallback(() => {
-    // inline cancel logic — can't call handleCancel (defined after early return)
-    setStep(1); setStartMode('empty'); setSelectedPresetId('amiga_protracker');
-    setWithPresetInstruments(true); setFilter(''); setScrollY(0); close();
-  }, [close]);
+    resetWizardState();
+    setFilter('');
+    setScrollY(0);
+    close();
+  }, [resetWizardState, close]);
 
   const handlePanelClick = useCallback((e: FederatedPointerEvent) => {
     e.stopPropagation();
@@ -143,34 +143,31 @@ export const PixiNewSongWizard: React.FC = () => {
     e.stopPropagation();
   }, []);
 
-  if (!isOpen) return null;
-
-  const selectedPreset: SystemPreset | undefined = SYSTEM_PRESETS.find((p) => p.id === selectedPresetId);
-  const hasStarterInstruments = (getInstrumentPresetsForSystem(selectedPresetId).length) > 0;
-  const starterInstruments = getInstrumentPresetsForSystem(selectedPresetId);
-
-  const handleNext = () => {
+  const handleNext = useCallback(() => {
     if (step === 1) {
       if (startMode === 'empty') { finish('empty', false); } else { setStep(2); }
     } else if (step === 2) {
       if (hasStarterInstruments) { setStep(3); } else { finish('preset', false); }
     }
-  };
+  }, [step, startMode, hasStarterInstruments, finish, setStep]);
 
-  const handleBack = () => {
+  const handleBack = useCallback(() => {
     if (step === 2) setStep(1);
     else if (step === 3) setStep(2);
-  };
+  }, [step, setStep]);
 
-  const handleCancel = () => {
-    setStep(1); setStartMode('empty'); setSelectedPresetId('amiga_protracker');
-    setWithPresetInstruments(true); setFilter(''); setScrollY(0); close();
-  };
+  const handleCancel = useCallback(() => {
+    resetWizardState();
+    setFilter('');
+    setScrollY(0);
+    close();
+  }, [resetWizardState, close]);
 
-  const handleFinish = () => { finish('preset', withPresetInstruments); };
+  const handleFinish = useCallback(() => {
+    finish('preset', withPresetInstruments);
+  }, [finish, withPresetInstruments]);
 
-  const stepCount = startMode === 'preset' ? (hasStarterInstruments ? 3 : 2) : 1;
-  const nextLabel = step === 1 ? 'Next' : step === 2 ? (hasStarterInstruments ? 'Next' : 'Finish') : 'Finish';
+  if (!isOpen) return null;
 
   return (
     <pixiContainer layout={{ position: 'absolute', width: '100%', height: '100%' }}>
