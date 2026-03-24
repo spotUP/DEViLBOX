@@ -5,6 +5,7 @@
 
 import React, { useState, useCallback } from 'react';
 import { useGTUltraStore } from '../../stores/useGTUltraStore';
+import { resetFormatPlaybackState, setFormatPlaybackPlaying } from '@engine/FormatPlaybackState';
 import {
   SequenceMatrixEditor, MATRIX_CHAR_W, MATRIX_ROW_H, MATRIX_HEADER_H,
   MATRIX_HEIGHT, MATRIX_COLLAPSED_HEIGHT,
@@ -119,8 +120,10 @@ export const GTOrderMatrix: React.FC<GTOrderMatrixProps> = ({ width, height, col
   const handleDoubleClick = useCallback(() => {
     if (engine) {
       const store = useGTUltraStore.getState();
+      resetFormatPlaybackState();
       engine.play(store.currentSong, orderCursor, 0);
       store.setPlaying(true);
+      setFormatPlaybackPlaying(true);
     }
   }, [engine, orderCursor]);
 
