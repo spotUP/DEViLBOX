@@ -18,8 +18,8 @@ import * as Tone from 'tone';
 import { useTransportStore } from '@stores/useTransportStore';
 import { useGTUltraStore } from '../../stores/useGTUltraStore';
 import { PatternEditorCanvas } from '@/components/tracker/PatternEditorCanvas';
-import type { FormatChannel } from '@/components/shared/format-editor-types';
-import { GTU_COLUMNS, gtuToFormatChannels, parseBinaryPatternData, resolveOrderPattern } from './gtuAdapter';
+import type { FormatCell, FormatChannel } from '@/components/shared/format-editor-types';
+import { GTU_COLUMNS, resolveOrderPattern } from './gtuAdapter';
 import { GTToolbar } from './GTToolbar';
 import { GTInstrumentPanel } from './GTInstrumentPanel';
 import { GTOrderList } from './GTOrderList';
@@ -136,37 +136,48 @@ export const GTUltraView: React.FC<{ width?: number; height?: number }> = ({ wid
   const channels = useMemo(() => {
     const result: FormatChannel[] = [];
 
-    // GT Ultra stores pattern data per-pattern (not per-channel). Each pattern contains
-    // all channels' data in a single binary blob (channelCount * patternLength * 4 bytes).
-    // We use channel 0's order list to determine which pattern to display.
-    // GT Ultra uses shared patterns across all channels at each order position.
-    // All channels share the same pattern index from channel 0's order list.
-    const patIdx = resolveOrderPattern(orderData[0], currentOrderPos);
-    const patEntry = patternData.get(patIdx);
+    // GT patterns are single-channel: each channel has its own order list pointing
+    // to shared pattern numbers.  Resolve each channel's pattern independently.
+    for (let ch = 0; ch < channelCount; ch++) {
+      const patIdx = resolveOrderPattern(orderData[ch], currentOrderPos);
+      const pat = patternData.get(patIdx);
+      const rows: FormatCell[] = [];
+      const patLen = pat?.length ?? 64;
 
-    if (!patEntry) {
-      for (let ch = 0; ch < channelCount; ch++) {
-        result.push({ label: `CH${(ch + 1).toString().padStart(2, '0')}`, patternLength: 64, rows: [] });
+      for (let row = 0; row < patLen; row++) {
+        if (pat && row < pat.length) {
+          const off = row * 4;
+          rows.push({
+            note: pat.data[off] ?? 0,
+            instrument: pat.data[off + 1] ?? 0,
+            command: pat.data[off + 2] ?? 0,
+            data: pat.data[off + 3] ?? 0,
+          });
+        } else {
+          rows.push({ note: 0, instrument: 0, command: 0, data: 0 });
+        }
       }
-      return result;
+
+      result.push({
+        label: `CH${(ch + 1).toString().padStart(2, '0')}`,
+        patternLength: patLen,
+        rows,
+      });
     }
 
-    const structured = parseBinaryPatternData(patEntry.data, channelCount, patEntry.length);
-    const formatted = gtuToFormatChannels(structured, channelCount, patEntry.length);
-    return formatted;
+    return result;
   }, [channelCount, orderData, patternData, currentOrderPos]);
 
-  const handleCellChange = useCallback((_channelIdx: number, rowIdx: number, columnKey: string, value: number) => {
+  const handleCellChange = useCallback((channelIdx: number, rowIdx: number, columnKey: string, value: number) => {
     const engine = useGTUltraStore.getState().engine;
     if (!engine) return;
-    const patIdx = resolveOrderPattern(orderData[0], currentOrderPos);
-    // GT Ultra binary layout: col 0=note, 1=instrument, 2=command, 3=data
+    const store = useGTUltraStore.getState();
+    const patIdx = resolveOrderPattern(store.orderData[channelIdx], currentOrderPos);
     const colMap: Record<string, number> = { note: 0, instrument: 1, command: 2, data: 3 };
     const col = colMap[columnKey];
     if (col === undefined) return;
-    // setPatternCell writes to WASM; the onPatternData callback will refresh store
     engine.setPatternCell(patIdx, rowIdx, col, value);
-  }, [orderData, currentOrderPos]);
+  }, [currentOrderPos]);
 
   const sidebarW = Math.min(SIDEBAR_WIDTH, Math.floor(width * 0.35));
 
