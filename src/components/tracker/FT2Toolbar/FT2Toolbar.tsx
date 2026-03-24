@@ -205,6 +205,8 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = React.memo(({
 
   const editorMode = useFormatStore((s) => s.editorMode);
   const gtPlaying = useGTUltraStore((s) => s.playing);
+  const gtOrderData = useGTUltraStore((s) => s.orderData);
+  const isGT = editorMode === 'goattracker';
 
   const engine = getToneEngine();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -489,7 +491,17 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = React.memo(({
 
   const pattern = patterns[currentPatternIndex];
   const patternLength = pattern?.length || 64;
-  const songLength = patternOrder.length;
+  // GT Ultra: compute song length from order data (entries until 0xFF terminator)
+  let songLength = patternOrder.length;
+  if (isGT && gtOrderData[0]) {
+    const od = gtOrderData[0];
+    let len = 0;
+    for (let i = 0; i < od.length; i++) {
+      if (od[i] === 0xFF) break;
+      len++;
+    }
+    songLength = len || 1;
+  }
 
   const handlePositionChange = (newPos: number) => {
     setCurrentPosition(newPos);
@@ -604,7 +616,6 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = React.memo(({
     await play();
   };
 
-  const isGT = editorMode === 'goattracker';
   const isPlayingSong = isGT ? gtPlaying : (isPlaying && !isLooping);
   const isPlayingPattern = isGT ? false : (isPlaying && isLooping);
 
