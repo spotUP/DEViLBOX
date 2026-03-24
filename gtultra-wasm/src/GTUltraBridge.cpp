@@ -550,6 +550,32 @@ int gt_is_playing(void) {
     return gtObject.songinit || (gtObject.chn[0].gate != 0);
 }
 
+/* Debug: return packed state info for diagnosing silent playback */
+EMSCRIPTEN_KEEPALIVE
+int gt_debug_songinit(void) { return gtObject.songinit; }
+
+EMSCRIPTEN_KEEPALIVE
+int gt_debug_maxchannels(void) { return editorInfo.maxSIDChannels; }
+
+EMSCRIPTEN_KEEPALIVE
+int gt_debug_framerate(void) { return (int)framerate; }
+
+EMSCRIPTEN_KEEPALIVE
+int gt_debug_adparam(void) { return (int)editorInfo.adparam; }
+
+EMSCRIPTEN_KEEPALIVE
+int gt_debug_multiplier(void) { return (int)editorInfo.multiplier; }
+
+EMSCRIPTEN_KEEPALIVE
+int gt_debug_tempo_ch0(void) { return (int)gtObject.chn[0].tempo; }
+
+EMSCRIPTEN_KEEPALIVE
+int gt_debug_sidreg_sum(void) {
+    int sum = 0;
+    for (int i = 0; i < NUMSIDREGS; i++) sum += sidreg[i];
+    return sum;
+}
+
 /* --- Direct memory access (zero-copy reads) --- */
 
 EMSCRIPTEN_KEEPALIVE
