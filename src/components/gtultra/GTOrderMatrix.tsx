@@ -5,17 +5,22 @@
 
 import React, { useRef, useEffect, useState, useCallback } from 'react';
 import { useGTUltraStore } from '../../stores/useGTUltraStore';
+import { ChevronDown, ChevronRight } from 'lucide-react';
 
-export const GT_ORDER_MATRIX_HEIGHT = 160;
+export const GT_ORDER_MATRIX_HEIGHT = 200;
+export const GT_ORDER_MATRIX_COLLAPSED_HEIGHT = 28;
 
-const CHAR_W = 8;
-const ROW_H = 14;
-const LABEL_H = 16;
-const HEADER_H = 16;
+const CHAR_W = 10;
+const ROW_H = 20;
+const HEADER_H = 24;
+const FONT_SIZE = '14px';
+const FONT = `${FONT_SIZE} "JetBrains Mono", "Fira Code", monospace`;
 
 interface GTOrderMatrixProps {
   width: number;
   height: number;
+  collapsed?: boolean;
+  onToggleCollapse?: () => void;
 }
 
 // ─── Order command coloring ──────────────────────────────────────────────────
@@ -58,7 +63,7 @@ const OrdersCanvas: React.FC<{ width: number; height: number }> = ({ width, heig
   const [hexDigit, setHexDigit] = useState<number | null>(null);
 
   const channelCount = sidCount * 3;
-  const contentH = height - LABEL_H - HEADER_H;
+  const contentH = height - HEADER_H;
   const visibleRows = Math.floor(contentH / ROW_H);
   const totalLen = orderData.length > 0 ? orderData[0].length : 0;
 
@@ -80,7 +85,6 @@ const OrdersCanvas: React.FC<{ width: number; height: number }> = ({ width, heig
 
     // Read theme colors from CSS variables (set by useThemeStore)
     const bgEven      = cssVar('--color-tracker-row-even', '#1a1a2e');
-    const bgOdd       = cssVar('--color-tracker-row-odd', '#1e1e34');
     const bgHighlight = cssVar('--color-tracker-row-highlight', '#222244');
     const bgCurrent   = cssVar('--color-tracker-row-current', '#2a2a50');
     const textMuted   = cssVar('--color-text-muted', '#555');
@@ -93,32 +97,24 @@ const OrdersCanvas: React.FC<{ width: number; height: number }> = ({ width, heig
 
     ctx.fillStyle = bgEven;
     ctx.fillRect(0, 0, width, height);
-    ctx.font = `11px "JetBrains Mono", monospace`;
-    ctx.textBaseline = 'top';
-
-    // Section label
-    ctx.fillStyle = bgOdd;
-    ctx.fillRect(0, 0, width, LABEL_H);
-    ctx.fillStyle = accent;
-    ctx.font = `bold 10px "JetBrains Mono", monospace`;
-    ctx.fillText('ORDERS', 4, 2);
-    ctx.font = `11px "JetBrains Mono", monospace`;
+    ctx.font = FONT;
+    ctx.textBaseline = 'middle';
 
     // Column header
-    const posColW = CHAR_W * 3;
-    const chColW = CHAR_W * 3;
-    const hdrY = LABEL_H;
+    const posColW = CHAR_W * 4;
+    const chColW = CHAR_W * 4;
+    const hdrY = 0;
 
     ctx.fillStyle = bgHighlight;
     ctx.fillRect(0, hdrY, width, HEADER_H);
     ctx.fillStyle = textMuted;
-    ctx.fillText('Pos', 2, hdrY + 2);
+    ctx.fillText('Pos', 4, hdrY + HEADER_H / 2);
     for (let ch = 0; ch < channelCount; ch++) {
       ctx.fillStyle = ch === orderChannelCol ? '#ccc' : textMuted;
-      ctx.fillText(`C${ch + 1}`, posColW + ch * chColW, hdrY + 2);
+      ctx.fillText(`C${ch + 1}`, posColW + ch * chColW, hdrY + HEADER_H / 2);
     }
 
-    const dataY0 = LABEL_H + HEADER_H;
+    const dataY0 = HEADER_H;
 
     // Rows
     for (let vi = 0; vi < visibleRows; vi++) {
@@ -142,12 +138,12 @@ const OrdersCanvas: React.FC<{ width: number; height: number }> = ({ width, heig
       }
 
       ctx.fillStyle = isPlay ? accent : textMuted;
-      ctx.fillText(idx.toString(16).toUpperCase().padStart(2, '0'), 4, y + 1);
+      ctx.fillText(idx.toString(16).toUpperCase().padStart(2, '0'), 4, y + ROW_H / 2);
 
       for (let ch = 0; ch < channelCount; ch++) {
         const val = orderData[ch]?.[idx] ?? 0;
         ctx.fillStyle = getOrderColor(val);
-        ctx.fillText(formatOrderVal(val), posColW + ch * chColW, y + 1);
+        ctx.fillText(formatOrderVal(val), posColW + ch * chColW, y + ROW_H / 2);
       }
     }
 
@@ -159,7 +155,7 @@ const OrdersCanvas: React.FC<{ width: number; height: number }> = ({ width, heig
         ctx.fillStyle = 'rgba(255, 102, 102, 0.3)';
         ctx.fillRect(cx - 2, cy, CHAR_W, ROW_H);
         ctx.fillStyle = accent;
-        ctx.fillText(hexDigit.toString(16).toUpperCase(), cx, cy + 1);
+        ctx.fillText(hexDigit.toString(16).toUpperCase(), cx, cy + ROW_H / 2);
       }
     }
   }, [width, height, orderData, playbackPos.position, orderCursor, orderChannelCol,
@@ -175,14 +171,14 @@ const OrdersCanvas: React.FC<{ width: number; height: number }> = ({ width, heig
     const rect = canvasRef.current!.getBoundingClientRect();
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
-    const dataY0 = LABEL_H + HEADER_H;
+    const dataY0 = HEADER_H;
     if (y < dataY0) return;
     const idx = scrollOffset + Math.floor((y - dataY0) / ROW_H);
     if (idx >= totalLen) return;
     setOrderCursor(idx);
 
-    const posColW = CHAR_W * 3;
-    const chColW = CHAR_W * 3;
+    const posColW = CHAR_W * 4;
+    const chColW = CHAR_W * 4;
     const relX = x - posColW;
     if (relX >= 0) {
       const ch = Math.min(channelCount - 1, Math.floor(relX / chColW));
@@ -250,18 +246,74 @@ const OrdersCanvas: React.FC<{ width: number; height: number }> = ({ width, heig
 
 // ─── Main Component ─────────────────────────────────────────────────────────
 
-export const GTOrderMatrix: React.FC<GTOrderMatrixProps> = ({ width, height }) => {
+export const GTOrderMatrix: React.FC<GTOrderMatrixProps> = ({ width, height, collapsed, onToggleCollapse }) => {
+  if (collapsed) {
+    return (
+      <div
+        style={{
+          width,
+          height: GT_ORDER_MATRIX_COLLAPSED_HEIGHT,
+          display: 'flex',
+          alignItems: 'center',
+          gap: 6,
+          padding: '0 8px',
+          background: 'var(--color-tracker-row-highlight)',
+          cursor: 'pointer',
+          borderBottom: '1px solid var(--color-tracker-border, var(--color-border))',
+        }}
+        onClick={onToggleCollapse}
+      >
+        <ChevronRight size={14} style={{ color: 'var(--color-text-muted)', flexShrink: 0 }} />
+        <span style={{
+          fontFamily: '"JetBrains Mono", "Fira Code", monospace',
+          fontSize: 12,
+          fontWeight: 700,
+          color: 'var(--color-accent)',
+        }}>
+          ORDERS
+        </span>
+      </div>
+    );
+  }
+
+  const canvasH = height - GT_ORDER_MATRIX_COLLAPSED_HEIGHT;
+
   return (
     <div
       style={{
         width,
         height,
         display: 'flex',
-        flexDirection: 'row',
+        flexDirection: 'column',
         background: 'var(--color-tracker-row-even)',
       }}
     >
-      <OrdersCanvas width={width} height={height} />
+      {/* Collapse header */}
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 6,
+          padding: '0 8px',
+          height: GT_ORDER_MATRIX_COLLAPSED_HEIGHT,
+          flexShrink: 0,
+          background: 'var(--color-tracker-row-highlight)',
+          cursor: 'pointer',
+          borderBottom: '1px solid var(--color-tracker-border, var(--color-border))',
+        }}
+        onClick={onToggleCollapse}
+      >
+        <ChevronDown size={14} style={{ color: 'var(--color-text-muted)', flexShrink: 0 }} />
+        <span style={{
+          fontFamily: '"JetBrains Mono", "Fira Code", monospace',
+          fontSize: 12,
+          fontWeight: 700,
+          color: 'var(--color-accent)',
+        }}>
+          ORDERS
+        </span>
+      </div>
+      <OrdersCanvas width={width} height={canvasH} />
     </div>
   );
 };
