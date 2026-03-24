@@ -279,6 +279,13 @@ export const usePatternPlayback = () => {
         return;
       }
 
+      // Skip reload if forcePosition was just called — the replayer already seeked
+      if (replayer.skipNextReload && replayer.isPlaying()) {
+        replayer.skipNextReload = false;
+        return;
+      }
+      replayer.skipNextReload = false;
+
       if (!hasStartedRef.current || needsReload) {
         hasStartedRef.current = true;
 
