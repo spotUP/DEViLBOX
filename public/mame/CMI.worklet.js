@@ -79,7 +79,12 @@ class CMIProcessor extends AudioWorkletProcessor {
         await this.initSynth(data);
         break;
       case 'noteOn':
-        if (this.synth) this.synth.noteOn(data.note, data.velocity);
+        if (this.synth) {
+          console.log('[CMI Worklet] noteOn:', data.note, 'vel:', data.velocity);
+          this.synth.noteOn(data.note, data.velocity);
+        } else {
+          console.warn('[CMI Worklet] noteOn ignored — synth not ready');
+        }
         break;
       case 'noteOff':
         if (this.synth) this.synth.noteOff(data.note);
@@ -130,20 +135,27 @@ class CMIProcessor extends AudioWorkletProcessor {
     try {
       this.cleanup();
 
+      console.log('[CMI Worklet] initSynth: loading WASM module...');
       this.module = await globalThis.initMAMEWasmModule(data.wasmBinary, data.jsCode, 'createCMIModule');
+      console.log('[CMI Worklet] Module loaded, has CMISynth:', typeof this.module.CMISynth);
+      console.log('[CMI Worklet] Module wasmMemory:', !!this.module.wasmMemory, 'HEAPF32:', !!this.module.HEAPF32);
 
       this.synth = new this.module.CMISynth();
       this.synth.setSampleRate(data.sampleRate);
+      console.log('[CMI Worklet] Synth created, sample rate:', data.sampleRate);
 
       this.outputPtrL = this.module._malloc(this.bufferSize * 4);
       this.outputPtrR = this.module._malloc(this.bufferSize * 4);
+      console.log('[CMI Worklet] Output buffers allocated:', this.outputPtrL, this.outputPtrR);
 
       this.updateBufferViews();
+      console.log('[CMI Worklet] Buffer views:', !!this.outputBufferL, !!this.outputBufferR);
 
       this.initialized = true;
       this.port.postMessage({ type: 'ready' });
+      console.log('[CMI Worklet] ✓ Initialization complete');
     } catch (error) {
-      console.error('[CMI] init error:', error);
+      console.error('[CMI Worklet] init error:', error);
       this.port.postMessage({ type: 'error', message: error.message });
     }
   }
@@ -198,6 +210,16 @@ class CMIProcessor extends AudioWorkletProcessor {
     }
 
     this.synth.process(this.outputPtrL, this.outputPtrR, numSamples);
+
+    // One-time audio level diagnostic
+    if (!this._audioCheckDone) {
+      let maxL = 0;
+      for (let i = 0; i < numSamples; i++) maxL = Math.max(maxL, Math.abs(this.outputBufferL[i]));
+      if (maxL > 0) {
+        console.log('[CMI Worklet] ✓ Audio output detected! Peak:', maxL.toFixed(4));
+        this._audioCheckDone = true;
+      }
+    }
 
     for (let i = 0; i < numSamples; i++) {
       outputL[i] = this.outputBufferL[i];
