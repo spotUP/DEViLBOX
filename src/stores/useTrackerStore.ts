@@ -552,6 +552,25 @@ export const useTrackerStore = create<TrackerStore>()(
           }
         }
       } catch { /* StarTrekker AM not active */ }
+      // Sync edit to SunVox WASM sequencer if active
+      try {
+        const synthMod = require('../engine/sunvox-modular/SunVoxModularSynth');
+        const handle = synthMod.getSharedSunVoxHandle();
+        if (handle >= 0) {
+          const fullCell = get().patterns[patternIndex]?.channels[channelIndex]?.rows[rowIndex];
+          if (fullCell) {
+            import('@engine/sunvox/SunVoxEngine').then(({ SunVoxEngine }) => {
+              if (!SunVoxEngine.hasInstance()) return;
+              const nn = fullCell.note ?? 0;
+              const vv = fullCell.volume >= 0 ? fullCell.volume : -1;
+              const mm = fullCell.instrument >= 0 ? fullCell.instrument + 1 : 0; // 0-based → 1-based
+              const ccee = fullCell.effTyp > 0 ? (fullCell.effTyp | ((fullCell.eff >> 8) << 8)) : 0;
+              const xxyy = fullCell.eff & 0xFFFF;
+              SunVoxEngine.getInstance().setPatternEvent(handle, patternIndex, channelIndex, rowIndex, nn, vv, mm, ccee, xxyy);
+            });
+          }
+        }
+      } catch { /* SunVox not active */ }
       // Sync edit to MusicLine WASM engine (debounced re-export)
       debouncedWasmEngineReexport();
     },
@@ -599,6 +618,17 @@ export const useTrackerStore = create<TrackerStore>()(
           }
         }
       } catch { /* UADE not active */ }
+      // Sync clear to SunVox WASM sequencer if active
+      try {
+        const synthMod = require('../engine/sunvox-modular/SunVoxModularSynth');
+        const handle = synthMod.getSharedSunVoxHandle();
+        if (handle >= 0) {
+          import('@engine/sunvox/SunVoxEngine').then(({ SunVoxEngine }) => {
+            if (!SunVoxEngine.hasInstance()) return;
+            SunVoxEngine.getInstance().setPatternEvent(handle, patternIndex, channelIndex, rowIndex, 0, 0, 0, 0, 0);
+          });
+        }
+      } catch { /* SunVox not active */ }
       // Sync clear to MusicLine WASM engine (debounced re-export)
       debouncedWasmEngineReexport();
     },
