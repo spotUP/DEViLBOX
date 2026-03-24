@@ -87,6 +87,11 @@ function isHivelyType(synthType: SynthType): boolean {
   return synthType === 'HivelySynth';
 }
 
+/** Check if synth type is GTUltra */
+function isGTUltraType(synthType: SynthType): boolean {
+  return synthType === 'GTUltraSynth';
+}
+
 /** Check if synth type is SoundMon II */
 function isSoundMonType(synthType: SynthType): boolean {
   return synthType === 'SoundMonSynth';
@@ -155,6 +160,7 @@ function getEditorMode(synthType: SynthType): EditorMode {
   if (isDexedType(synthType)) return 'dexed';
   if (isOBXdType(synthType)) return 'obxd';
   if (isHivelyType(synthType)) return 'hively';
+  if (isGTUltraType(synthType)) return 'gtultra';
   if (synthType === 'JamCrackerSynth') return 'jamcracker';
   if (isSoundMonType(synthType)) return 'soundmon';
   if (isSidMonType(synthType)) return 'sidmon';

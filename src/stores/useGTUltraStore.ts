@@ -12,6 +12,7 @@
 
 import { create } from 'zustand';
 import type { GTUltraEngine } from '../engine/gtultra/GTUltraEngine';
+import type { InstrumentConfig } from '../types/instrument/defaults';
 
 // --- GoatTracker data structures ---
 
@@ -181,6 +182,9 @@ export interface GTUltraState {
   refreshAllTables: () => void;
   refreshSidRegisters: () => void;
   refreshSongInfo: () => void;
+
+  // Build InstrumentConfig[] from loaded GT instrument data
+  buildInstrumentConfigs: () => InstrumentConfig[];
 }
 
 // Column navigation order within a channel
@@ -462,5 +466,43 @@ export const useGTUltraStore = create<GTUltraState>()((set, get) => ({
 
   refreshSongInfo: () => {
     get().engine?.requestSongInfo();
+  },
+
+  buildInstrumentConfigs: () => {
+    const { instrumentData } = get();
+    const configs: InstrumentConfig[] = [];
+
+    for (let i = 1; i <= 63; i++) {
+      const inst = instrumentData[i];
+      if (!inst) continue;
+      // Skip empty instruments (all zeros, no name)
+      const isEmpty = inst.ad === 0 && inst.sr === 0 && inst.firstwave === 0
+                      && inst.wavePtr === 0 && (!inst.name || inst.name.trim() === '');
+      if (isEmpty) continue;
+
+      configs.push({
+        id: i,
+        name: inst.name?.trim() || `Instrument ${i.toString(16).toUpperCase().padStart(2, '0')}`,
+        type: 'synth',
+        synthType: 'GTUltraSynth',
+        volume: 0,
+        pan: 0,
+        effects: [],
+        gtUltra: {
+          ad: inst.ad,
+          sr: inst.sr,
+          vibdelay: inst.vibdelay,
+          gatetimer: inst.gatetimer,
+          firstwave: inst.firstwave,
+          name: inst.name || '',
+          wavePtr: inst.wavePtr,
+          pulsePtr: inst.pulsePtr,
+          filterPtr: inst.filterPtr,
+          speedPtr: inst.speedPtr,
+        },
+      });
+    }
+
+    return configs;
   },
 }));

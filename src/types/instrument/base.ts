@@ -203,6 +203,8 @@ export type SynthType =
   | 'D50'            // Roland D-50 (virtual analog)
   // HivelyTracker / AHX synthesis
   | 'HivelySynth'     // HivelyTracker 16-channel chip synth (WASM)
+  // GoatTracker Ultra (C64 SID tracker)
+  | 'GTUltraSynth'    // GoatTracker Ultra SID instrument (shared WASM engine)
   // UADE - Universal Amiga Demod-player (130+ exotic Amiga formats)
   | 'UADESynth'       // UADE catch-all (playback-only via 68k emulation)
   // UADE Format-Specific Synths (native DSP via WASM)
