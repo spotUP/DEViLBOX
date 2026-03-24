@@ -15,9 +15,15 @@ export function playStopToggle(): boolean {
   const { isPlaying, stop, setCurrentRow } = useTransportStore.getState();
   
   if (isPlaying) {
+    // Save playback position — pattern editor reads cursor.rowIndex when stopped
+    const savedRow = useTransportStore.getState().currentRow;
     getTrackerReplayer().stop();
     stop();
     getToneEngine().stop();
+    // Move cursor to where playback was to prevent scroll jump to top
+    import('@/stores/useCursorStore').then(({ useCursorStore }) => {
+      useCursorStore.getState().moveCursorToRow(savedRow);
+    });
   } else {
     // CRITICAL for iOS: Tone.start() MUST be called synchronously within user gesture
     // before engine.init() which does async WASM loading
@@ -39,65 +45,63 @@ export function playStopToggle(): boolean {
 
 /**
  * Play pattern - Always plays from row 0 of current pattern.
- * Stops first if already playing, then starts fresh.
+ * Resets replayer position directly to avoid React state batching issues.
  */
 export function playPattern(): boolean {
-  const store = useTransportStore.getState();
-  const replayer = getTrackerReplayer();
-
   // CRITICAL for iOS: Tone.start() MUST be called synchronously within user gesture
   unlockIOSAudio();
   Tone.start();
 
-  // Always stop first — idempotent, handles any state
-  if (replayer.isPlaying() || store.isPlaying) {
-    replayer.stop();
-    store.stop();
-    getToneEngine().stop();
-  }
+  const replayer = getTrackerReplayer();
+  const store = useTransportStore.getState();
 
   store.setIsLooping(true);
   store.setCurrentRow(0);
 
-  getToneEngine()
-    .init()
-    .then(() => useTransportStore.getState().play())
-    .catch((error) => {
-      console.error('[playPattern] Failed to initialize audio engine:', error);
-    });
+  if (replayer.isPlaying()) {
+    // Reset replayer position directly — no stop/start cycle needed
+    replayer.seekTo(replayer.getSongPos(), 0);
+    replayer.resyncSchedulerToNow();
+  } else {
+    getToneEngine()
+      .init()
+      .then(() => useTransportStore.getState().play())
+      .catch((error) => {
+        console.error('[playPattern] Failed to initialize audio engine:', error);
+      });
+  }
 
   return true;
 }
 
 /**
  * Play song - Always plays from pattern 0 / row 0.
- * Stops first if already playing, then starts fresh.
+ * Resets replayer position directly to avoid React state batching issues.
  */
 export function playSong(): boolean {
-  const store = useTransportStore.getState();
-  const replayer = getTrackerReplayer();
-
   // CRITICAL for iOS: Tone.start() MUST be called synchronously within user gesture
   unlockIOSAudio();
   Tone.start();
 
-  // Always stop first — idempotent, handles any state
-  if (replayer.isPlaying() || store.isPlaying) {
-    replayer.stop();
-    store.stop();
-    getToneEngine().stop();
-  }
+  const replayer = getTrackerReplayer();
+  const store = useTransportStore.getState();
 
   store.setIsLooping(false);
   store.setCurrentPattern(0);
   store.setCurrentRow(0);
 
-  getToneEngine()
-    .init()
-    .then(() => useTransportStore.getState().play())
-    .catch((error) => {
-      console.error('[playSong] Failed to initialize audio engine:', error);
-    });
+  if (replayer.isPlaying()) {
+    // Reset replayer position directly — no stop/start cycle needed
+    replayer.seekTo(0, 0);
+    replayer.resyncSchedulerToNow();
+  } else {
+    getToneEngine()
+      .init()
+      .then(() => useTransportStore.getState().play())
+      .catch((error) => {
+        console.error('[playSong] Failed to initialize audio engine:', error);
+      });
+  }
 
   return true;
 }
