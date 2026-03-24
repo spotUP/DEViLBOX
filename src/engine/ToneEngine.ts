@@ -2231,6 +2231,7 @@ export class ToneEngine {
       // Direct-routing WASM engines with no per-instrument audio
       case 'C64SID':
       case 'Sc68Synth':
+      case 'GTUltraSynth':
         return null;
 
       default: {

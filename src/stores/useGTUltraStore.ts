@@ -192,9 +192,9 @@ const COLUMNS_PER_CHANNEL = 4; // note, instrument, command, data
 const MAX_PATTERN_ROWS = 128;
 
 // Default instrument data
-const defaultInstruments: GTInstrumentView[] = Array.from({ length: 64 }, (_, i) => ({
+const defaultInstruments: GTInstrumentView[] = Array.from({ length: 64 }, () => ({
   ad: 0x00, sr: 0x00, vibdelay: 0, gatetimer: 0, firstwave: 0,
-  name: i === 0 ? '' : `Instr ${i}`,
+  name: '',
   wavePtr: 0, pulsePtr: 0, filterPtr: 0, speedPtr: 0,
 }));
 
