@@ -76,6 +76,7 @@ const DECtalkControls = lazy(() => import('../controls/DECtalkControls').then(m 
 const SynareControls = lazy(() => import('../controls/SynareControls').then(m => ({ default: m.SynareControls })));
 const MAMEControls = lazy(() => import('../controls/MAMEControls').then(m => ({ default: m.MAMEControls })));
 const ChipSynthControls = lazy(() => import('../controls/ChipSynthControls').then(m => ({ default: m.ChipSynthControls })));
+const CMIControls = lazy(() => import('../controls/CMIControls').then(m => ({ default: m.CMIControls })));
 const DexedControls = lazy(() => import('../controls/DexedControls').then(m => ({ default: m.DexedControls })));
 const OBXdControls = lazy(() => import('../controls/OBXdControls').then(m => ({ default: m.OBXdControls })));
 const WAMControls = lazy(() => import('../controls/WAMControls').then(m => ({ default: m.WAMControls })));
@@ -1933,18 +1934,29 @@ export const SynthTypeDispatcher: React.FC<SynthTypeDispatcherProps> = ({
                 />
               </Suspense>
 
-              {/* Chip Parameters */}
+              {/* Chip Parameters — CMI gets dedicated editor, others get generic */}
               <Suspense fallback={<LoadingControls />}>
-                <ChipSynthControls
-                  synthType={instrument.synthType}
-                  parameters={(instrument.parameters || {}) as Record<string, number | string>}
-                  instrumentId={instrument.id}
-                  onParamChange={handleChipParamChange}
-                  onTextChange={handleChipTextChange}
-                  onLoadPreset={handleChipPresetLoad}
-                  onRomUpload={handleChipRomUpload}
-                  onSpeak={handleChipSpeak}
-                />
+                {instrument.synthType === 'MAMECMI' ? (
+                  <CMIControls
+                    synthType={instrument.synthType}
+                    parameters={(instrument.parameters || {}) as Record<string, number | string>}
+                    instrumentId={instrument.id}
+                    onParamChange={handleChipParamChange}
+                    onTextChange={handleChipTextChange}
+                    onLoadPreset={handleChipPresetLoad}
+                  />
+                ) : (
+                  <ChipSynthControls
+                    synthType={instrument.synthType}
+                    parameters={(instrument.parameters || {}) as Record<string, number | string>}
+                    instrumentId={instrument.id}
+                    onParamChange={handleChipParamChange}
+                    onTextChange={handleChipTextChange}
+                    onLoadPreset={handleChipPresetLoad}
+                    onRomUpload={handleChipRomUpload}
+                    onSpeak={handleChipSpeak}
+                  />
+                )}
               </Suspense>
 
               {/* Macro Editor */}
