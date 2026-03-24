@@ -67,7 +67,7 @@ export const usePatternPlayback = () => {
     isLooping: s.isLooping,
     bpm: s.bpm,
     speed: s.speed,
-    setCurrentRow: s.setCurrentRow,
+    // setCurrentRow removed — accessed via getState() where needed
     setCurrentRowThrottled: s.setCurrentRowThrottled,
   })));
   const { instruments } = useInstrumentStore(useShallow((s) => ({ instruments: s.instruments })));
