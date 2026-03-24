@@ -84,45 +84,43 @@ export const GTU_COLUMNS: ColumnDef[] = [
 ];
 
 /**
- * Convert GT Ultra pattern data to FormatChannel[].
+ * Convert GT Ultra store data to FormatChannel[] for the shared pattern editor.
  *
- * GT Ultra stores patterns directly; this maps channels to FormatChannel format.
+ * GT patterns are single-channel: each channel has its own order list pointing
+ * to shared pattern numbers. This resolves each channel's current pattern and
+ * builds the FormatChannel array from the raw Uint8Array pattern data.
  */
-export function gtuToFormatChannels(
-  patternData: Array<Array<{ note: number; instrument: number; command: number; data: number }>>,
+export function gtUltraToFormatChannels(
   channelCount: number,
-  patternLength: number
+  orderData: Record<number, Uint8Array>,
+  patternData: Map<number, { length: number; data: Uint8Array }>,
+  currentOrderPos: number,
 ): FormatChannel[] {
   const result: FormatChannel[] = [];
 
   for (let ch = 0; ch < channelCount; ch++) {
+    const patIdx = resolveOrderPattern(orderData[ch], currentOrderPos);
+    const pat = patternData.get(patIdx);
     const rows: FormatCell[] = [];
+    const patLen = pat?.length ?? 64;
 
-    if (patternData[ch]) {
-      for (let rowIdx = 0; rowIdx < patternLength; rowIdx++) {
-        const cell = patternData[ch][rowIdx];
-        if (cell) {
-          rows.push({
-            note: cell.note,
-            instrument: cell.instrument,
-            command: cell.command,
-            data: cell.data,
-          });
-        } else {
-          rows.push({
-            note: 0,
-            instrument: 0,
-            command: 0,
-            data: 0,
-          });
-        }
+    for (let row = 0; row < patLen; row++) {
+      if (pat && row < pat.length) {
+        const off = row * 4;
+        rows.push({
+          note: pat.data[off] ?? 0,
+          instrument: pat.data[off + 1] ?? 0,
+          command: pat.data[off + 2] ?? 0,
+          data: pat.data[off + 3] ?? 0,
+        });
+      } else {
+        rows.push({ note: 0, instrument: 0, command: 0, data: 0 });
       }
     }
 
-    const label = `CH${(ch + 1).toString().padStart(2, '0')}`;
     result.push({
-      label,
-      patternLength: rows.length || patternLength,
+      label: `CH${(ch + 1).toString().padStart(2, '0')}`,
+      patternLength: patLen,
       rows,
     });
   }
