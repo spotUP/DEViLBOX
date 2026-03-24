@@ -4,6 +4,7 @@
 
 import type { SamplePack, SampleInfo, SampleCategory } from '@typedefs/samplePack';
 import { normalizeUrl } from '@utils/urlUtils';
+import { FAIRLIGHT_CMI_PACK } from './fairlightCMISamples';
 
 /**
  * Helper to create SampleInfo from filename
@@ -538,6 +539,7 @@ export const SAMPLE_PACKS: SamplePack[] = [
   ST01_PACK,
   ST02_PACK,
   SCRATCH_ORIGINALS_PACK,
+  FAIRLIGHT_CMI_PACK,
 ];
 
 export const getSamplePackById = (id: string): SamplePack | undefined => {
