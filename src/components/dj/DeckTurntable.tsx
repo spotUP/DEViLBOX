@@ -9,7 +9,7 @@
 import React, { useRef, useEffect, useCallback, useState } from 'react';
 import { useDJStore } from '@/stores/useDJStore';
 import { useThemeStore } from '@stores';
-import { getDJEngine } from '@/engine/dj/DJEngine';
+import { startScratch, setScratchVelocity, stopScratch } from '@/engine/dj/DJActions';
 import { OffscreenBridge } from '@engine/renderer/OffscreenBridge';
 import TurntableWorkerFactory from '@/workers/dj-turntable.worker.ts?worker';
 
@@ -154,7 +154,7 @@ export const DeckTurntable: React.FC<DeckTurntableProps> = ({ deckId }) => {
       bridgeRef.current?.post({ type: 'velocity', v });
       // Update audio engine velocity during decay (clamp to prevent near-zero stutter)
       const audioV = Math.abs(v) < 0.1 ? 0.1 * Math.sign(v || 1) : v;
-      try { getDJEngine().getDeck(deckId).setScratchVelocity(audioV); } catch { /* Engine not ready */ }
+      setScratchVelocity(deckId, audioV);
 
       if (t < 1) {
         momentumDecayRafRef.current = requestAnimationFrame(animate);
@@ -162,7 +162,7 @@ export const DeckTurntable: React.FC<DeckTurntableProps> = ({ deckId }) => {
         scratchVelocityRef.current = 1;
         momentumDecayRafRef.current = 0;
         // Decay complete - now properly end scratch mode
-        try { getDJEngine().getDeck(deckId).stopScratch(0); } catch { /* ignore */ }
+        stopScratch(deckId, 0);
       }
     };
     momentumDecayRafRef.current = requestAnimationFrame(animate);
@@ -183,10 +183,8 @@ export const DeckTurntable: React.FC<DeckTurntableProps> = ({ deckId }) => {
     useDJStore.getState().setDeckScratchActive(deckId, true);
     bridgeRef.current?.post({ type: 'scratchActive', active: true });
     bridgeRef.current?.post({ type: 'velocity', v: 0 }); // Stop the record immediately
-    try { 
-      getDJEngine().getDeck(deckId).startScratch();
-      getDJEngine().getDeck(deckId).setScratchVelocity(0); // Stop audio too
-    } catch { /* Engine not ready */ }
+    startScratch(deckId);
+    setScratchVelocity(deckId, 0); // Stop audio too
   }, [deckId]);
 
   const handlePointerMove = useCallback((e: React.PointerEvent<HTMLElement>) => {
@@ -198,7 +196,7 @@ export const DeckTurntable: React.FC<DeckTurntableProps> = ({ deckId }) => {
     const v = Math.max(-4, Math.min(4, dy * 0.15));
     scratchVelocityRef.current = v;
     bridgeRef.current?.post({ type: 'velocity', v });
-    try { getDJEngine().getDeck(deckId).setScratchVelocity(v); } catch { /* Engine not ready */ }
+    setScratchVelocity(deckId, v);
 
     lastPointerRef.current = { x: e.clientX, y: e.clientY };
   }, [deckId]);
