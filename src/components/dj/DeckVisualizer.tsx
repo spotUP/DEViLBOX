@@ -13,9 +13,8 @@ import React, { useRef, useEffect, useCallback, useState } from 'react';
 import {
   Maximize2, Minimize2, ChevronLeft, ChevronRight, Shuffle, Play, Pause,
 } from 'lucide-react';
-import { getDJEngine } from '@/engine/dj/DJEngine';
 import { DeckPatternDisplay } from './DeckPatternDisplay';
-import { getBeatPhaseInfo } from '@/engine/dj/DJAutoSync';
+import { useDeckVisualizationData } from '@/hooks/dj/useDeckVisualizationData';
 import {
   VISUALIZER_MODES,
   MODE_LABELS,
@@ -46,6 +45,8 @@ interface DeckVisualizerProps {
 }
 
 export const DeckVisualizer: React.FC<DeckVisualizerProps> = ({ deckId, resetKey = 0 }) => {
+  const viz = useDeckVisualizationData(deckId);
+
   const [vizIndex, setVizIndex] = useState(0); // index into VIZ_MODES
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
@@ -74,7 +75,7 @@ export const DeckVisualizer: React.FC<DeckVisualizerProps> = ({ deckId, resetKey
 
     const tick = () => {
       if (!mounted) return;
-      const phase = getBeatPhaseInfo(deckId);
+      const phase = viz.getBeatPhase();
       if (phase) {
         // Detect beat transition (nearest beat index changed)
         if (phase.nearestBeatIdx !== prevBeatIdxRef.current && prevBeatIdxRef.current >= 0) {
@@ -219,7 +220,7 @@ export const DeckVisualizer: React.FC<DeckVisualizerProps> = ({ deckId, resetKey
           canvas.style.height = `${h}px`;
         }
         gl.viewport(0, 0, drawW, drawH);
-        const audio = getAudioData(deckId);
+        const audio = buildAudioData(viz.getWaveform, viz.getFFT);
         const time = performance.now() / 1000 - startTimeRef.current;
         const renderer = RENDERERS[mode as WebGLVisualizerMode];
         if (renderer) renderer(cache, audio, state, time, drawW, drawH);
@@ -356,46 +357,44 @@ const EMPTY_AUDIO: AudioData = {
   highEnergy: 0,
 };
 
-function getAudioData(deckId: 'A' | 'B' | 'C'): AudioData {
-  try {
-    const engine = getDJEngine();
-    const deck = engine.getDeck(deckId);
-    const waveform = deck.getWaveform();
-    const fft = deck.getFFT();
+function buildAudioData(
+  getWaveform: () => Float32Array | null,
+  getFFT: () => Float32Array | null,
+): AudioData {
+  const waveform = getWaveform();
+  const fft = getFFT();
+  if (!waveform || !fft) return EMPTY_AUDIO;
 
-    // RMS from waveform
-    let sumSq = 0;
-    let peak = 0;
-    for (let i = 0; i < waveform.length; i++) {
-      const v = waveform[i];
-      sumSq += v * v;
-      const abs = Math.abs(v);
-      if (abs > peak) peak = abs;
-    }
-    const rms = Math.sqrt(sumSq / waveform.length);
-
-    // Energy bands from FFT (normalized from dB)
-    const normalize = (db: number) => Math.max(0, (db + 100) / 100);
-    let bassSum = 0, midSum = 0, highSum = 0;
-    const bassEnd = 10;
-    const midEnd = 100;
-    for (let i = 0; i < fft.length; i++) {
-      const v = normalize(fft[i]);
-      if (i < bassEnd) bassSum += v;
-      else if (i < midEnd) midSum += v;
-      else highSum += v;
-    }
-
-    return {
-      waveform,
-      fft,
-      rms,
-      peak,
-      bassEnergy: bassSum / bassEnd,
-      midEnergy: midSum / (midEnd - bassEnd),
-      highEnergy: highSum / (fft.length - midEnd),
-    };
-  } catch {
-    return EMPTY_AUDIO;
+  // RMS from waveform
+  let sumSq = 0;
+  let peak = 0;
+  for (let i = 0; i < waveform.length; i++) {
+    const v = waveform[i];
+    sumSq += v * v;
+    const abs = Math.abs(v);
+    if (abs > peak) peak = abs;
   }
+  const rms = Math.sqrt(sumSq / waveform.length);
+
+  // Energy bands from FFT (normalized from dB)
+  const normalize = (db: number) => Math.max(0, (db + 100) / 100);
+  let bassSum = 0, midSum = 0, highSum = 0;
+  const bassEnd = 10;
+  const midEnd = 100;
+  for (let i = 0; i < fft.length; i++) {
+    const v = normalize(fft[i]);
+    if (i < bassEnd) bassSum += v;
+    else if (i < midEnd) midSum += v;
+    else highSum += v;
+  }
+
+  return {
+    waveform,
+    fft,
+    rms,
+    peak,
+    bassEnergy: bassSum / bassEnd,
+    midEnergy: midSum / (midEnd - bassEnd),
+    highEnergy: highSum / (fft.length - midEnd),
+  };
 }

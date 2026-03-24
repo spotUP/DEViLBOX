@@ -17,6 +17,7 @@ import { PixiDeckScopes } from './PixiDeckScopes';
 import { PixiDeckBeatGrid } from './PixiDeckBeatGrid';
 import { getDJEngine } from '@engine/dj/DJEngine';
 import { TurntablePhysics, OMEGA_NORMAL } from '@/engine/turntable/TurntablePhysics';
+import { useDeckVisualizationData } from '@/hooks/dj/useDeckVisualizationData';
 import * as DJActions from '@/engine/dj/DJActions';
 
 /** Format milliseconds as M:SS */
@@ -53,6 +54,7 @@ const PixiSpectrumDisplay: React.FC<{
   onBeatFlash?: () => void;
 }> = ({ deckId, height, deckColor, vizMode, onBeatFlash }) => {
   const theme = usePixiTheme();
+  const viz = useDeckVisualizationData(deckId);
   const graphicsRef = useRef<GraphicsType | null>(null);
   const rafRef = useRef(0);
   const prevEnergyRef = useRef(0);
@@ -89,11 +91,8 @@ const PixiSpectrumDisplay: React.FC<{
       let fft: Float32Array | null = null;
       let waveform: Float32Array | null = null;
       if (isPlaying) {
-        try {
-          const deck = getDJEngine().getDeck(deckId);
-          fft = deck.getFFT();
-          if (vizMode === 'waveform') waveform = deck.getWaveform();
-        } catch { /* engine not ready */ }
+        fft = viz.getFFT();
+        if (vizMode === 'waveform') waveform = viz.getWaveform();
       }
 
       // Beat detection from FFT energy
