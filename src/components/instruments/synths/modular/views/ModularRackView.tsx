@@ -117,7 +117,7 @@ export const ModularRackView: React.FC<ModularRackViewProps> = ({ config, onChan
         endWiring();
       }
     },
-    [wiringSource, startWiring, endWiring, onChange, config]
+    [wiringSource, startWiring, endWiring, onChange]
   );
 
   // Handle module parameter change
