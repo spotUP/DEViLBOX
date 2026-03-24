@@ -793,7 +793,7 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = React.memo(({
         <Button
           variant={modalOpen === 'findReplace' ? 'primary' : 'ghost'}
           size="sm"
-          onClick={() => { const s = useUIStore.getState(); s.modalOpen === 'findReplace' ? s.closeModal() : s.openModal('findReplace'); }}
+          onClick={() => { const s = useUIStore.getState(); if (s.modalOpen === 'findReplace') { s.closeModal(); } else { s.openModal('findReplace'); } }}
           title="Effect search & replace"
         >FX Search</Button>
         <Button variant="ghost" size="sm" onClick={onShowInstruments} title="Instrument editor">Instruments</Button>
@@ -802,7 +802,7 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = React.memo(({
         <Button
           variant={modalOpen === 'instrumentFx' ? 'primary' : 'ghost'}
           size="sm"
-          onClick={() => { const s = useUIStore.getState(); s.modalOpen === 'instrumentFx' ? s.closeModal() : s.openModal('instrumentFx'); }}
+          onClick={() => { const s = useUIStore.getState(); if (s.modalOpen === 'instrumentFx') { s.closeModal(); } else { s.openModal('instrumentFx'); } }}
           title="Per-instrument effects"
         >Inst FX</Button>
         <Button variant={aiOpen ? 'primary' : 'ghost'} size="sm" onClick={toggleAI} title="AI composition tools">AI</Button>
@@ -1014,9 +1014,12 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = React.memo(({
           notify.success(`Loaded: ${proj.metadata?.name || filename}`);
         } catch { notify.error('Failed to load file'); }
       }} onLoadTrackerModule={async (buffer: ArrayBuffer, filename: string) => {
+        const isIOS = /iPhone|iPad|iPod/.test(navigator.userAgent);
+        if (isIOS) alert(`loadFile: ${buffer.byteLength} bytes, ${filename}`);
         const { loadFile } = await import('@lib/file/UnifiedFileLoader');
         const file = new File([buffer], filename);
         const result = await loadFile(file);
+        if (isIOS) alert(`loadFile result: success=${result.success}, msg=${(result as any).message || (result as any).error || ''}`);
         if (result.success === 'pending-import') {
           setPendingFile(result.file);
           setShowImportDialog(true);
