@@ -415,6 +415,20 @@ export const SynthControlsRouter: React.FC<SynthControlsRouterProps> = ({ instru
       return <VSTBridgePanel instrument={instrument} onChange={onUpdate} />;
     }
 
+    // ── Fairlight CMI IIx (dedicated editor) ──────────────
+    if (synthType === 'MAMECMI') {
+      return (
+        <CMIControls
+          synthType={synthType}
+          parameters={(instrument.parameters || {}) as Record<string, number | string>}
+          instrumentId={instrument.id}
+          onParamChange={handleChipParamChange}
+          onTextChange={handleChipTextChange}
+          onLoadPreset={(program) => onUpdate({ parameters: { ...instrument.parameters, program } })}
+        />
+      );
+    }
+
     // ── MAME Chip synths ────────────────────────────────────
     if (isMAMEChipType(synthType)) {
       return (

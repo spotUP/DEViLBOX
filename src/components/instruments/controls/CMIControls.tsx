@@ -11,7 +11,7 @@ import { ScrollLockContainer } from '@components/ui/ScrollLockContainer';
 import type { SynthType } from '@typedefs/instrument';
 import {
   useCMIPanel,
-  CMI_TAB_DEFS, type CMITab,
+  CMI_TAB_DEFS,
   NUM_HARMONICS, WAVE_SAMPLES, WAVE_NAMES,
   cutoffToHz, filterResponseDb, formatCutoffHz,
   fmtInt, fmtWave, fmtCutoff, fmtTrack,

@@ -83,21 +83,6 @@ export const GTU_COLUMNS: ColumnDef[] = [
   },
 ];
 
-// Order channel columns: single hex value per row
-export const GTU_ORDER_COLUMNS: ColumnDef[] = [
-  {
-    key: 'note',
-    label: 'Val',
-    charWidth: 2,
-    type: 'hex',
-    color: '#ff6666',
-    emptyColor: 'var(--color-border-light)',
-    emptyValue: 0,
-    hexDigits: 2,
-    formatter: gtHex2,
-  },
-];
-
 // Table channel columns: L (left) and R (right) hex values
 export const GTU_TABLE_COLUMNS: ColumnDef[] = [
   {
@@ -131,9 +116,9 @@ export const GTU_TABLE_COLUMNS: ColumnDef[] = [
  * to shared pattern numbers. This resolves each channel's current pattern and
  * builds the FormatChannel array from the raw Uint8Array pattern data.
  *
- * After the pattern channels, appends special channels for:
- *   Orders (per SID-channel), Wave table, Pulse table, Filter table, Speed table
- * These use the same column layout: note=value1, instrument=value2, command/data=0.
+ * After the pattern channels, appends table channels:
+ *   Wave table, Pulse table, Filter table, Speed table
+ * Orders live in the GTOrderMatrix above the pattern editor (not duplicated here).
  */
 export function gtUltraToFormatChannels(
   channelCount: number,
@@ -177,23 +162,6 @@ export function gtUltraToFormatChannels(
       label: `CH${(ch + 1).toString().padStart(2, '0')}`,
       patternLength: patLen,
       rows,
-    });
-  }
-
-  // Order channels — one per SID channel, showing the order list as a vertical column
-  for (let ch = 0; ch < channelCount; ch++) {
-    const order = orderData[ch];
-    const len = order?.length ?? 0;
-    const rows: FormatCell[] = [];
-    for (let i = 0; i < Math.max(len, maxPatLen); i++) {
-      const val = i < len ? (order[i] ?? 0) : 0;
-      rows.push({ note: val, instrument: 0, command: 0, data: 0 });
-    }
-    result.push({
-      label: `ORD${ch + 1}`,
-      patternLength: Math.max(len, maxPatLen),
-      rows,
-      columns: GTU_ORDER_COLUMNS,
     });
   }
 
