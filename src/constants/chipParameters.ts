@@ -958,11 +958,23 @@ export const CHIP_SYNTH_DEFS: Record<string, ChipSynthDef> = {
     synthType: 'MAMECMI',
     name: 'Fairlight CMI IIx',
     subtitle: '8-Voice 8-bit PCM Sampler (1982)',
-    color: '#f59e0b',
+    color: '#22c55e',
     presetCount: 0,
     parameters: [
-      { key: 'volume', label: 'Volume', group: 'Output', type: 'knob', min: 0, max: 1, step: 0.01, default: 0.8, formatValue: 'percent' },
-      { key: 'voice', label: 'Voice', group: 'Voice', type: 'knob', min: 0, max: 7, step: 1, default: 0, formatValue: 'int' },
+      // ── Output ──
+      { key: 'volume', label: 'Volume', group: 'Output', type: 'knob', min: 0, max: 255, step: 1, default: 200, formatValue: 'int' },
+
+      // ── Filter (SSM2045 cascaded lowpass) ──
+      { key: 'filter_cutoff', label: 'Cutoff', group: 'Filter', type: 'knob', min: 0, max: 255, step: 1, default: 200, formatValue: 'int' },
+      { key: 'filter_track', label: 'Key Track', group: 'Filter', type: 'knob', min: 0, max: 255, step: 1, default: 128, formatValue: 'int' },
+
+      // ── Envelope ──
+      { key: 'attack_time', label: 'Attack', group: 'Envelope', type: 'knob', min: 0, max: 255, step: 1, default: 10, formatValue: 'int' },
+      { key: 'release_time', label: 'Release', group: 'Envelope', type: 'knob', min: 0, max: 255, step: 1, default: 80, formatValue: 'int' },
+      { key: 'envelope_rate', label: 'Env Rate', group: 'Envelope', type: 'knob', min: 0, max: 255, step: 1, default: 200, formatValue: 'int' },
+
+      // ── Voice ──
+      { key: 'wave_select', label: 'Wave', group: 'Voice', type: 'knob', min: 0, max: 7, step: 1, default: 0, formatValue: 'int' },
     ],
   },
 

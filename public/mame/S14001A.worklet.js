@@ -64,6 +64,7 @@ class S14001AProcessor extends AudioWorkletProcessor {
     this.bufferSize = 128;
     this.lastHeapBuffer = null;
     this.romPtr = 0;
+    this.frameBufferPtr = 0;
 
     this.port.onmessage = (event) => {
       this.handleMessage(event.data);
@@ -129,10 +130,29 @@ class S14001AProcessor extends AudioWorkletProcessor {
       case 'stopSpeaking':
         if (this.synth) this.synth.stopSpeaking();
         break;
+      // === Frame Buffer Speech Commands ===
+      case 'loadFrameBuffer':
+        this.loadFrameBuffer(data.frameData, data.numFrames);
+        break;
+      case 'speakFrameBuffer':
+        if (this.synth) this.synth.speakFrameBuffer();
+        break;
       case 'dispose':
         this.cleanup();
         break;
     }
+  }
+
+  loadFrameBuffer(frameData, numFrames) {
+    if (!this.module || !this.synth) return;
+    if (this.frameBufferPtr) { this.module._free(this.frameBufferPtr); this.frameBufferPtr = 0; }
+    const size = numFrames * 4; // 4 bytes per frame
+    this.frameBufferPtr = this.module._malloc(size);
+    if (!this.frameBufferPtr) return;
+    const bytes = new Uint8Array(frameData);
+    const heapView = new Uint8Array(this.module.wasmMemory ? this.module.wasmMemory.buffer : this.module.HEAPU8.buffer);
+    heapView.set(bytes, this.frameBufferPtr);
+    this.synth.loadFrameBuffer(this.frameBufferPtr, numFrames);
   }
 
   loadROM(romData) {
@@ -186,6 +206,7 @@ class S14001AProcessor extends AudioWorkletProcessor {
 
   cleanup() {
     if (this.module && this.romPtr) { this.module._free(this.romPtr); this.romPtr = 0; }
+    if (this.module && this.frameBufferPtr) { this.module._free(this.frameBufferPtr); this.frameBufferPtr = 0; }
     if (this.module && this.outputPtrL) {
       this.module._free(this.outputPtrL);
       this.outputPtrL = 0;

@@ -219,20 +219,28 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
 
   // Channel Metrics: calculate numChannels, offsets, and widths once per pattern/theme change
   const { numChannels, channelOffsets, channelWidths, totalChannelsWidth } = useMemo(() => {
-    // FORMAT MODE: compute widths from column definitions
+    // FORMAT MODE: compute widths from column definitions (per-channel columns supported)
     if (isFormatMode && formatColumns && formatChannels) {
       const FORMAT_COL_GAP  = 4;
       const FORMAT_CHAN_GAP = 8;
-      const contentWidth = formatColumns.reduce(
-        (sum, col) => sum + col.charWidth * CHAR_WIDTH + FORMAT_COL_GAP, 0
-      ) - FORMAT_COL_GAP;
-      const chanW = LINE_NUMBER_WIDTH + contentWidth + FORMAT_CHAN_GAP;
-      const n = formatChannels.length;
+      const widths: number[] = [];
+      const offsets: number[] = [];
+      let totalW = 0;
+      for (let i = 0; i < formatChannels.length; i++) {
+        const cols = formatChannels[i].columns ?? formatColumns;
+        const contentWidth = cols.reduce(
+          (sum, col) => sum + col.charWidth * CHAR_WIDTH + FORMAT_COL_GAP, 0
+        ) - FORMAT_COL_GAP;
+        const chanW = LINE_NUMBER_WIDTH + contentWidth + FORMAT_CHAN_GAP;
+        offsets.push(totalW);
+        widths.push(chanW);
+        totalW += chanW;
+      }
       return {
-        numChannels: n,
-        channelOffsets: formatChannels.map((_, i) => i * chanW),
-        channelWidths:  formatChannels.map(() => chanW),
-        totalChannelsWidth: n * chanW,
+        numChannels: formatChannels.length,
+        channelOffsets: offsets,
+        channelWidths: widths,
+        totalChannelsWidth: totalW,
       };
     }
 
@@ -541,14 +549,15 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
 
       // Find column
       const FORMAT_COL_GAP = 4;
+      const chCols = formatChannels[chIdx]?.columns ?? formatColumns;
       const localX = relX - LINE_NUMBER_WIDTH - channelOffsets[chIdx] - 2;
       let colIdx = 0;
       let px = 0;
-      for (let ci = 0; ci < formatColumns.length; ci++) {
-        const colW = formatColumns[ci].charWidth * CHAR_WIDTH + FORMAT_COL_GAP;
+      for (let ci = 0; ci < chCols.length; ci++) {
+        const colW = chCols[ci].charWidth * CHAR_WIDTH + FORMAT_COL_GAP;
         if (localX < px + colW) { colIdx = ci; break; }
         px += colW;
-        if (ci === formatColumns.length - 1) colIdx = ci;
+        if (ci === chCols.length - 1) colIdx = ci;
       }
 
       setFormatCursor({ channelIndex: chIdx, rowIndex: rowIdx, columnIndex: colIdx });
@@ -638,18 +647,19 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
     if (!formatColumns || !formatChannels) return;
     const ch = formatChannels[formatCursor.channelIndex];
     if (!ch) return;
+    const chCols = ch.columns ?? formatColumns;
     const sel = formatSelection;
     const startRow = sel ? sel.startRow : formatCursor.rowIndex;
     const endRow = sel ? sel.endRow : formatCursor.rowIndex;
     const startCol = sel ? sel.startCol : 0;
-    const endCol = sel ? sel.endCol : formatColumns.length - 1;
+    const endCol = sel ? sel.endCol : chCols.length - 1;
     const clipboard: Record<string, number>[] = [];
     for (let r = startRow; r <= endRow; r++) {
       const row = ch.rows[r];
       if (!row) { clipboard.push({}); continue; }
       const entry: Record<string, number> = {};
       for (let c = startCol; c <= endCol; c++) {
-        const colDef = formatColumns[c];
+        const colDef = chCols[c];
         if (colDef) entry[colDef.key] = row[colDef.key] ?? (colDef.emptyValue ?? 0);
       }
       clipboard.push(entry);
@@ -662,15 +672,16 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
   // ── Format mode: clear cells in selection (or current row) ──
   const formatClearSelection = useCallback(() => {
     if (!formatColumns || !formatChannels || !onFormatCellChange) return;
+    const chCols = formatChannels[formatCursor.channelIndex]?.columns ?? formatColumns;
     const sel = formatSelection;
     const startRow = sel ? sel.startRow : formatCursor.rowIndex;
     const endRow = sel ? sel.endRow : formatCursor.rowIndex;
     const startCol = sel ? sel.startCol : 0;
-    const endCol = sel ? sel.endCol : formatColumns.length - 1;
+    const endCol = sel ? sel.endCol : chCols.length - 1;
     const chIdx = formatCursor.channelIndex;
     for (let r = startRow; r <= endRow; r++) {
       for (let c = startCol; c <= endCol; c++) {
-        const colDef = formatColumns[c];
+        const colDef = chCols[c];
         if (colDef) onFormatCellChange(chIdx, r, colDef.key, colDef.emptyValue ?? 0);
       }
     }
@@ -702,20 +713,26 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
 
   const handleFormatKeyDown = useCallback((e: React.KeyboardEvent) => {
     if (!isFormatMode || !formatColumns || !formatChannels) return;
-    const col = formatColumns[formatCursor.columnIndex];
-    const numRows = formatChannels[0]?.patternLength ?? 0;
-    const numCols = formatColumns.length;
+    const chCols = formatChannels[formatCursor.channelIndex]?.columns ?? formatColumns;
+    const col = chCols[formatCursor.columnIndex];
+    const numRows = formatChannels[formatCursor.channelIndex]?.patternLength ?? formatChannels[0]?.patternLength ?? 0;
+    const numCols = chCols.length;
 
     // ── Helper: move cursor and optionally extend/clear selection ──
     const moveCursor = (delta: { channelIndex?: number; rowIndex?: number; columnIndex?: number }, extend?: boolean) => {
       setFormatCursor(prev => {
+        const newChIdx = Math.max(0, Math.min(formatChannels!.length - 1,
+            prev.channelIndex + (delta.channelIndex ?? 0)));
+        const newChCols = formatChannels![newChIdx]?.columns ?? formatColumns!;
+        const newNumCols = newChCols.length;
+        const newNumRows = formatChannels![newChIdx]?.patternLength ?? 0;
         const next = {
-          channelIndex: Math.max(0, Math.min(formatChannels!.length - 1,
-            prev.channelIndex + (delta.channelIndex ?? 0))),
-          rowIndex: Math.max(0, Math.min(numRows - 1,
+          channelIndex: newChIdx,
+          rowIndex: Math.max(0, Math.min(newNumRows - 1,
             prev.rowIndex + (delta.rowIndex ?? 0))),
-          columnIndex: Math.max(0, Math.min(numCols - 1,
-            prev.columnIndex + (delta.columnIndex ?? 0))),
+          columnIndex: Math.max(0, Math.min(newNumCols - 1,
+            delta.channelIndex ? Math.min(prev.columnIndex, newNumCols - 1)
+              : prev.columnIndex + (delta.columnIndex ?? 0))),
         };
         if (extend) {
           // Extend selection from anchor to new cursor position
@@ -2282,7 +2299,8 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
               {/* Row 2: column labels (20px) */}
               <div className="flex h-[20px] border-t border-dark-border">
                 <div className="flex-shrink-0 border-r border-dark-border" style={{ width: LINE_NUMBER_WIDTH }} />
-                {formatChannels.map((_, chIdx) => {
+                {formatChannels.map((ch, chIdx) => {
+                  const chCols = ch.columns ?? formatColumns;
                   const FORMAT_COL_GAP = 4;
                   let px = 2;
                   return (
@@ -2291,7 +2309,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
                       className="flex-shrink-0 relative border-r border-dark-border"
                       style={{ width: channelWidths[chIdx] }}
                     >
-                      {formatColumns.map((col, ci) => {
+                      {chCols.map((col, ci) => {
                         const colLeft = px;
                         const colWidth = col.charWidth * CHAR_WIDTH + FORMAT_COL_GAP;
                         px += colWidth;

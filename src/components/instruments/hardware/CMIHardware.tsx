@@ -1,8 +1,9 @@
 /**
- * CMIHardware — Fairlight CMI IIx hardware UI stub
+ * CMIHardware — Fairlight CMI IIx hardware UI (DOM fallback)
+ * Uses the generic ChipSynthControls which reads from chipParameters.ts
  */
 import React from 'react';
-import { MAMEGenericHardware } from './MAMEGenericHardware';
+import { ChipSynthControls } from '../controls/ChipSynthControls';
 
 interface Props {
   parameters: Record<string, number>;
@@ -10,5 +11,13 @@ interface Props {
 }
 
 export const CMIHardware: React.FC<Props> = ({ parameters, onParamChange }) => {
-  return <MAMEGenericHardware synthType="MAMECMI" parameters={parameters} onParamChange={onParamChange} />;
+  return (
+    <ChipSynthControls
+      synthType="MAMECMI"
+      parameters={parameters}
+      instrumentId={0}
+      onParamChange={onParamChange}
+      onLoadPreset={() => {}}
+    />
+  );
 };

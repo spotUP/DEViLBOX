@@ -36,6 +36,12 @@ class GearmulatorProcessor extends AudioWorkletProcessor {
 
     this.stopped = false;
 
+    // Underrun resilience: hold/fade last good audio instead of hard silence
+    this.lastGoodL = null; // Float32Array(128) — last successfully read left channel
+    this.lastGoodR = null; // Float32Array(128) — last successfully read right channel
+    this.consecutiveUnderruns = 0;
+    this.fadeGain = 1.0;
+
     this.port.onmessage = (event) => {
       const data = event.data;
       if (data.type === 'setSAB') {
@@ -81,10 +87,30 @@ class GearmulatorProcessor extends AudioWorkletProcessor {
     const srcFramesNeeded = Math.ceil(numSamples * this.resampleRatio) + 1;
 
     if (available < srcFramesNeeded) {
-      // Underrun — fill with silence
-      outL.fill(0);
-      outR.fill(0);
+      // Underrun — hold/fade last good audio instead of hard silence
+      this.consecutiveUnderruns++;
       this.underrunCount++;
+
+      if (this.lastGoodL && this.consecutiveUnderruns <= 10) {
+        // Fade the held audio — 0.92 per block gives ~10-block fade to near-silence
+        this.fadeGain *= 0.92;
+        const g = this.fadeGain;
+        const copyLen = Math.min(numSamples, this.lastGoodL.length);
+        for (let i = 0; i < copyLen; i++) {
+          outL[i] = this.lastGoodL[i] * g;
+          outR[i] = this.lastGoodR[i] * g;
+        }
+        // Fill remainder with silence if output is longer than held buffer
+        for (let i = copyLen; i < numSamples; i++) {
+          outL[i] = 0;
+          outR[i] = 0;
+        }
+      } else {
+        // Too many consecutive underruns or no previous audio — output silence
+        outL.fill(0);
+        outR.fill(0);
+      }
+
       if (this.underrunCount % 200 === 1) {
         this.port.postMessage({
           type: 'underrun',
@@ -95,6 +121,10 @@ class GearmulatorProcessor extends AudioWorkletProcessor {
       }
       return true;
     }
+
+    // Successful read — reset underrun tracking
+    this.consecutiveUnderruns = 0;
+    this.fadeGain = 1.0;
 
     const audioOffset = HEADER_INTS;
 
@@ -132,6 +162,14 @@ class GearmulatorProcessor extends AudioWorkletProcessor {
 
     // Advance read position
     Atomics.store(this.sabInt32, 1, readPos);
+
+    // Save last good output for underrun resilience
+    if (!this.lastGoodL || this.lastGoodL.length !== numSamples) {
+      this.lastGoodL = new Float32Array(numSamples);
+      this.lastGoodR = new Float32Array(numSamples);
+    }
+    this.lastGoodL.set(outL);
+    this.lastGoodR.set(outR);
 
     // Track per-channel peaks for VU meters
     for (let i = 0; i < numSamples; i++) {

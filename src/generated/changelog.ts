@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-03-24T09:31:45.950Z
+ * Generated: 2026-03-24T21:06:15.560Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -19,9 +19,9 @@ export interface ChangelogEntry {
 }
 
 // Build info
-export const BUILD_VERSION = '1.0.3448';
-export const BUILD_NUMBER = '3448';
-export const BUILD_HASH = '7921c3eea';
+export const BUILD_VERSION = '1.0.3501';
+export const BUILD_NUMBER = '3501';
+export const BUILD_HASH = '93bd4f65c';
 export const BUILD_DATE = '2026-03-24';
 
 // Full version (patch IS the build number, so no need to append)
@@ -30,208 +30,204 @@ export const FULL_VERSION = BUILD_VERSION;
 // Auto-generated changelog
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: '1.0.3448',
+    version: '1.0.3501',
     date: '2026-03-24',
     changes: [
       {
         type: 'improvement',
-        "description": "Wire both views to usePianoRoll shared hook"
+        "description": "GT Ultra: integrate orders + tables as pattern editor channels"
+      },
+      {
+        type: 'improvement',
+        "description": "GT Ultra: tighten instrument isEmpty filter — require ADSR or waveform"
+      },
+      {
+        type: 'fix',
+        "description": "Fix white borders in format header: border-dark-border/N opacity variants don't resolve"
+      },
+      {
+        type: 'improvement',
+        "description": "GT Ultra: tighten order columns, shrink table widths"
       },
       {
         type: 'feature',
-        "description": "Add usePianoRoll shared logic hook"
+        "description": "GT Ultra: side-by-side Orders+Tables layout, add DOM/Pixi arch rules"
+      },
+      {
+        type: 'fix',
+        "description": "GT Ultra: fix 'Unsupported synth type' error spam and double instrument load"
+      },
+      {
+        type: 'improvement',
+        "description": "GT Ultra: clean up barrel exports, remove unused Pixi component references"
+      },
+      {
+        type: 'improvement',
+        "description": "GT Ultra: AHX layout for Pixi view, bidirectional instrument sync"
+      },
+      {
+        type: 'improvement',
+        "description": "GT Ultra: AHX-style layout, shared format data hook, no code duplication"
+      },
+      {
+        type: 'improvement',
+        "description": "GT Ultra deep integration: types, synth engine, controls, instrument population, order matrix"
+      },
+      {
+        type: 'improvement',
+        "description": "GT Ultra: wire FT2Toolbar play/stop, remove duplicate transport buttons"
+      },
+      {
+        type: 'fix',
+        "description": "Add cache bust to WASM/JS fetches, rebuild with debug diagnostics"
+      },
+      {
+        type: 'fix',
+        "description": "Extend WebGL renderer note table to 189 entries for GT Ultra"
+      },
+      {
+        type: 'improvement',
+        "description": "GT Ultra DOM/Pixi views share single source of truth"
+      },
+      {
+        type: 'fix',
+        "description": "DOM format editors show note/instrument data in pattern grid"
+      },
+      {
+        type: 'fix',
+        "description": "GT Ultra playback silence — call playroutine() from render loop"
+      },
+      {
+        type: 'fix',
+        "description": "DOM GTUltraView reads per-channel patterns correctly"
+      },
+      {
+        type: 'fix',
+        "description": "GT Ultra DOM view uses same resolveOrderPattern as Pixi view"
+      },
+      {
+        type: 'fix',
+        "description": "GT Ultra pattern grid — resolve order list commands before pattern lookup"
       },
       {
         type: 'feature',
-        "description": "Diag: add alert() diagnostics for iOS file loading"
+        "description": "Route regular SID files to classic pattern view (read-only)"
+      },
+      {
+        type: 'fix',
+        "description": "GT Ultra .sng file loading — songs no longer load empty"
       },
       {
         type: 'feature',
-        "description": "Extract usePatternEditor shared hook for both pattern editor views"
+        "description": "5-star rating system for Modland and HVSC browsers"
       },
       {
         type: 'fix',
-        "description": "Auto-discover companion files for multi-file Amiga formats"
+        "description": "Correct ModuleLoader import name"
+      },
+      {
+        type: 'fix',
+        "description": "Handle pending-import in App.tsx mobile file loader"
       },
       {
         type: 'improvement',
-        "description": "Wire ArrangementView pair to useArrangementView hook"
+        "description": "Diag: trace App.tsx loadFile path on iOS"
       },
       {
         type: 'feature',
-        "description": "Add useArrangementView shared hook"
-      },
-      {
-        type: 'improvement',
-        "description": "Extract shared TrackerView logic into useTrackerView hook"
+        "description": "Sync pattern edits to SunVox WASM sequencer"
       },
       {
         type: 'fix',
-        "description": "Guard ALL stop paths in usePatternPlayback with skipNextReload"
+        "description": "Bump ALL dialog z-index to z-[99990]"
+      },
+      {
+        type: 'improvement',
+        "description": "Diag: alert loadFile result on iOS"
       },
       {
         type: 'fix',
-        "description": "Use getSong()!==null to detect playback for Right Shift/Alt seek"
+        "description": "Chore: clean up debug trace in UADEParser NATIVE_ROUTES lookup"
+      },
+      {
+        type: 'fix',
+        "description": "Disable all WebGL worker views on iOS"
+      },
+      {
+        type: 'fix',
+        "description": "Skip WebGL worker on iOS, add HTML pattern fallback"
+      },
+      {
+        type: 'fix',
+        "description": "Correct pattern/macro pointer table offsets + data base offset"
+      },
+      {
+        type: 'fix',
+        "description": "Remove unused setCurrentRow from usePatternPlayback"
       },
       {
         type: 'improvement',
-        "description": "Wire Pixi NavBar to shared hook"
+        "description": "Gate per-note/per-tick console.log in Furnace dispatch and playback"
       },
       {
         type: 'improvement',
-        "description": "Wire Pixi EditorControlsBar to shared hook"
+        "description": "Stabilize playback effect deps and gate transition logging"
       },
       {
         type: 'improvement',
-        "description": "Wire DOM EditorControlsBar to shared hook"
+        "description": "Eliminate dual keyboard handler execution and reduce render overhead"
+      },
+      {
+        type: 'fix',
+        "description": "Correct filterFM → filterFmDepth property name in MIDI actions"
+      },
+      {
+        type: 'improvement',
+        "description": "Replace JSON.parse(JSON.stringify()) with structuredClone"
+      },
+      {
+        type: 'fix',
+        "description": "Remove stale config dep from handlePortClick useCallback"
+      },
+      {
+        type: 'fix',
+        "description": "DetectFormat matches extension-form Amiga files (songname.prefix)"
+      },
+      {
+        type: 'improvement',
+        "description": "Diag: alert import result on iOS"
+      },
+      {
+        type: 'fix',
+        "description": "Tight transport restart — eliminate dual-handler conflicts and async delays"
+      },
+      {
+        type: 'improvement',
+        "description": "Diag: alert screen dimensions on iOS"
+      },
+      {
+        type: 'improvement',
+        "description": "Extract recording start/stop to DJActions"
+      },
+      {
+        type: 'fix',
+        "description": "Instrument tab shows only list, no synth editor"
+      },
+      {
+        type: 'improvement',
+        "description": "Wire all visualization components to shared data hook"
       },
       {
         type: 'feature',
-        "description": "Add useEditorControls shared hook"
+        "description": "Add shared visualization data hook — polls once per frame"
       },
       {
         type: 'improvement',
-        "description": "Wire DOM NavBar to shared hook"
+        "description": "Wire all remaining DJ views to DJActions"
       },
       {
         type: 'feature',
-        "description": "Add useNavBar shared hook"
-      },
-      {
-        type: 'improvement',
-        "description": "Add toggleMic/setMicGain actions, wire PixiDJMixer"
-      },
-      {
-        type: 'fix',
-        "description": "Add ?reset escape hatch for stuck songs + fix FormatFamily type"
-      },
-      {
-        type: 'improvement',
-        "description": "Wire transport views to DJActions"
-      },
-      {
-        type: 'fix',
-        "description": "Right Shift/Alt directly calls forcePosition, bypasses React"
-      },
-      {
-        type: 'fix',
-        "description": "Add 77 missing Amiga extensions to FormatRegistry + fix UADE prefix mapping"
-      },
-      {
-        type: 'fix',
-        "description": "Add missing UADE prefix entries to FormatRegistry"
-      },
-      {
-        type: 'fix',
-        "description": "Check both replayer.isPlaying AND store.isPlaying for seek"
-      },
-      {
-        type: 'fix',
-        "description": "Use DJActions.togglePlay() in keyboard handler"
-      },
-      {
-        type: 'fix',
-        "description": "Add 20+ missing UADE prefix routes, prevent SunVox restore freeze"
-      },
-      {
-        type: 'fix',
-        "description": "Stop position — remove stale playbackRow cursor override"
-      },
-      {
-        type: 'fix',
-        "description": "SkipNextReload flag prevents usePatternPlayback from restarting after forcePosition"
-      },
-      {
-        type: 'improvement',
-        "description": "Wire Pixi PixiNewSongWizard to shared hook"
-      },
-      {
-        type: 'improvement',
-        "description": "Wire Pixi SIDInfoModal to shared hook"
-      },
-      {
-        type: 'improvement',
-        "description": "Wire Pixi GrooveSettingsModal to shared hook"
-      },
-      {
-        type: 'fix',
-        "description": "Skip Tone.start/unlockIOSAudio when seeking during playback"
-      },
-      {
-        type: 'improvement',
-        "description": "Wire DOM NewSongWizard to shared hook"
-      },
-      {
-        type: 'feature',
-        "description": "Add useNewSongWizard shared hook"
-      },
-      {
-        type: 'improvement',
-        "description": "Wire DOM SIDInfoModal to shared hook"
-      },
-      {
-        type: 'feature',
-        "description": "Add useSIDInfoDialog shared hook"
-      },
-      {
-        type: 'improvement',
-        "description": "Wire DOM GrooveSettingsModal to shared hook"
-      },
-      {
-        type: 'feature',
-        "description": "Add useGrooveSettings shared hook"
-      },
-      {
-        type: 'fix',
-        "description": "Don't change store state when seeking during playback"
-      },
-      {
-        type: 'improvement',
-        "description": "Diag: verbose forcePosition logging"
-      },
-      {
-        type: 'fix',
-        "description": "ForcePosition no longer updates transport store"
-      },
-      {
-        type: 'fix',
-        "description": "Sync editing cursor to playback position on stop"
-      },
-      {
-        type: 'fix',
-        "description": "Right Shift = play song, Right Alt = play pattern (ProTracker)"
-      },
-      {
-        type: 'improvement',
-        "description": "Wire DOM HelpModal to shared hook and data constants"
-      },
-      {
-        type: 'fix',
-        "description": "ExitScratchMode bails if replayer already stopped — no restart loop"
-      },
-      {
-        type: 'fix',
-        "description": "Use lastDequeuedState for stop position — matches visual display"
-      },
-      {
-        type: 'feature',
-        "description": "Add shared help content data and useHelpDialog hook"
-      },
-      {
-        type: 'fix',
-        "description": "Sync transport currentRow to replayer pattPos on stop"
-      },
-      {
-        type: 'fix',
-        "description": "Alt/Option+click Play Song/Pattern restarts from row 0"
-      },
-      {
-        type: 'fix',
-        "description": "Preserve lastDequeuedState on stop — pattern editor stays in place"
-      },
-      {
-        type: 'fix',
-        "description": "Add forcePosition() for instant play-from-start"
+        "description": "Add nudge, loop, slip, seek, pitch, scratch pattern actions to DJActions"
       }
     ]
   }

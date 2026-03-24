@@ -83,6 +83,47 @@ export const GTU_COLUMNS: ColumnDef[] = [
   },
 ];
 
+// Order channel columns: single hex value per row
+export const GTU_ORDER_COLUMNS: ColumnDef[] = [
+  {
+    key: 'note',
+    label: 'Val',
+    charWidth: 2,
+    type: 'hex',
+    color: '#ff6666',
+    emptyColor: 'var(--color-border-light)',
+    emptyValue: 0,
+    hexDigits: 2,
+    formatter: gtHex2,
+  },
+];
+
+// Table channel columns: L (left) and R (right) hex values
+export const GTU_TABLE_COLUMNS: ColumnDef[] = [
+  {
+    key: 'note',
+    label: 'L',
+    charWidth: 2,
+    type: 'hex',
+    color: '#60e060',
+    emptyColor: 'var(--color-border-light)',
+    emptyValue: 0,
+    hexDigits: 2,
+    formatter: gtHex2,
+  },
+  {
+    key: 'instrument',
+    label: 'R',
+    charWidth: 2,
+    type: 'hex',
+    color: '#ff8866',
+    emptyColor: 'var(--color-border-light)',
+    emptyValue: 0,
+    hexDigits: 2,
+    formatter: gtHex2,
+  },
+];
+
 /**
  * Convert GT Ultra store data to FormatChannel[] for the shared pattern editor.
  *
@@ -152,6 +193,7 @@ export function gtUltraToFormatChannels(
       label: `ORD${ch + 1}`,
       patternLength: Math.max(len, maxPatLen),
       rows,
+      columns: GTU_ORDER_COLUMNS,
     });
   }
 
@@ -173,6 +215,7 @@ export function gtUltraToFormatChannels(
       label: TABLE_NAMES[t],
       patternLength: 255,
       rows,
+      columns: GTU_TABLE_COLUMNS,
     });
   }
 

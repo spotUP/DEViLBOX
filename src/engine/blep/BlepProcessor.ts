@@ -13,6 +13,7 @@ interface BlepModule {
   _free: (ptr: number) => void;
 }
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 declare function createBlepModule(): Promise<BlepModule>;
 
 // BLEP buffer structure size (matches C struct)

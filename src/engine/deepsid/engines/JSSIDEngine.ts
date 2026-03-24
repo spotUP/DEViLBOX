@@ -131,7 +131,7 @@ export class JSSIDEngine {
       const reg = addr & 0x1F;
       try {
         pico.write(chip, reg, value);
-      } catch (err) {
+      } catch (_err) {
         // write() is synchronous but queues async USB transfers —
         // errors are handled by USBSIDPico's consecutive error counter
       }

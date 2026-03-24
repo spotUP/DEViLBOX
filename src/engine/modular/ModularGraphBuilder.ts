@@ -219,7 +219,7 @@ export class ModularGraphBuilder {
     if (sourcePort.node && targetPort.node) {
       try {
         sourcePort.node.disconnect(targetPort.node);
-      } catch (e) {
+      } catch (_e) {
         // Already disconnected
       }
     }
@@ -227,7 +227,7 @@ export class ModularGraphBuilder {
     if (sourcePort.node && targetPort.scaleNode) {
       try {
         sourcePort.node.disconnect(targetPort.scaleNode);
-      } catch (e) {
+      } catch (_e) {
         // Already disconnected
       }
     }

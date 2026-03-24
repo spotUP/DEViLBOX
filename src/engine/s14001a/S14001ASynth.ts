@@ -131,6 +131,44 @@ export class S14001ASynth extends MAMEBaseSynth {
   }
 
   // ===========================================================================
+  // Frame Buffer Speech (TTS pipeline preset sequencing)
+  // Frame format: 4 bytes per frame [presetIndex, pitchPeriod, voiced, duration10ms]
+  // ===========================================================================
+
+  private _phonemeSpeechActive = false;
+  private _phonemeSpeechTimer: ReturnType<typeof setTimeout> | null = null;
+
+  /**
+   * Send frame buffer to WASM and start speaking.
+   * Each frame is 4 bytes: [presetIndex, pitchPeriod, voiced, duration_10ms_units]
+   */
+  speakFrameBuffer(data: Uint8Array, numFrames: number, onDone?: () => void): void {
+    if (!this._isReady || !this.workletNode || this._disposed) return;
+
+    this.stopSpeaking();
+
+    const buffer = data.buffer.slice(data.byteOffset, data.byteOffset + data.byteLength);
+    this.workletNode.port.postMessage(
+      { type: 'loadFrameBuffer', frameData: buffer, numFrames },
+      [buffer]
+    );
+    this.workletNode.port.postMessage({ type: 'speakFrameBuffer' });
+
+    this._phonemeSpeechActive = true;
+
+    // Estimate duration from frame durations (each unit = 10ms)
+    let totalMs = 100; // buffer
+    for (let i = 0; i < numFrames; i++) {
+      totalMs += data[i * 4 + 3] * 10;
+    }
+    this._phonemeSpeechTimer = setTimeout(() => {
+      this._phonemeSpeechTimer = null;
+      this._phonemeSpeechActive = false;
+      if (onDone) onDone();
+    }, totalMs);
+  }
+
+  // ===========================================================================
   // MAMEBaseSynth Abstract Method Implementations
   // ===========================================================================
 
@@ -280,11 +318,19 @@ export class S14001ASynth extends MAMEBaseSynth {
       this._speechSequencer.stop();
       this._speechSequencer = null;
     }
-    if (this.workletNode && !this._disposed) { this.workletNode.port.postMessage({ type: 'allNotesOff' }); }
+    this._phonemeSpeechActive = false;
+    if (this._phonemeSpeechTimer !== null) {
+      clearTimeout(this._phonemeSpeechTimer);
+      this._phonemeSpeechTimer = null;
+    }
+    if (this.workletNode && !this._disposed) {
+      this.workletNode.port.postMessage({ type: 'stopSpeaking' });
+      this.workletNode.port.postMessage({ type: 'allNotesOff' });
+    }
   }
 
   get isSpeaking(): boolean {
-    return this._speechSequencer?.isSpeaking ?? false;
+    return this._phonemeSpeechActive || (this._speechSequencer?.isSpeaking ?? false);
   }
 
   // ===========================================================================
