@@ -7,8 +7,6 @@ import type { Graphics as GraphicsType } from 'pixi.js';
 import { PIXI_FONTS } from '../../fonts';
 import { usePixiTheme } from '../../theme';
 import { useDJStore } from '@/stores/useDJStore';
-import { getDJEngine } from '@/engine/dj/DJEngine';
-import { DJBeatSync } from '@/engine/dj/DJBeatSync';
 import * as DJActions from '@/engine/dj/DJActions';
 
 interface PixiDeckTransportProps {
@@ -31,36 +29,11 @@ export const PixiDeckTransport: React.FC<PixiDeckTransportProps> = ({ deckId }) 
   }, [deckId]);
 
   const handleCue = useCallback(() => {
-    const engine = getDJEngine();
-    const deck = engine.getDeck(deckId);
-    deck.cue(cuePoint);
+    DJActions.cueDeck(deckId, cuePoint);
   }, [deckId, cuePoint]);
 
   const handleSync = useCallback(() => {
-    try {
-      const engine = getDJEngine();
-      const thisDeck = engine.getDeck(deckId);
-      const otherDeck = engine.getDeck(otherDeckId);
-      const otherState = useDJStore.getState().decks[otherDeckId];
-
-      if (!otherState.fileName) return;
-
-      if (otherDeck.playbackMode === 'audio' || thisDeck.playbackMode === 'audio') {
-        const targetBPM = otherState.detectedBPM;
-        const thisBPMBase = useDJStore.getState().decks[deckId].detectedBPM;
-        if (targetBPM > 0 && thisBPMBase > 0) {
-          const ratio = targetBPM / thisBPMBase;
-          const semitones = 12 * Math.log2(ratio);
-          useDJStore.getState().setDeckPitch(deckId, semitones);
-        }
-      } else {
-        if (!otherDeck.replayer.getSong()) return;
-        const semitones = DJBeatSync.syncBPM(otherDeck, thisDeck);
-        useDJStore.getState().setDeckPitch(deckId, semitones);
-      }
-    } catch {
-      // Engine might not be initialized yet
-    }
+    DJActions.syncDeckBPM(deckId, otherDeckId);
   }, [deckId, otherDeckId]);
 
   return (

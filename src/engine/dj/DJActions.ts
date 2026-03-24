@@ -14,7 +14,8 @@
 import { useDJStore, type CrossfaderCurve } from '@/stores/useDJStore';
 import { getDJEngine } from './DJEngine';
 import { quantizedEQKill, getQuantizeMode, setTrackedFilterPosition } from './DJQuantizedFX';
-import { quantizedPlay } from './DJAutoSync';
+import { quantizedPlay, syncBPMToOther, phaseAlign } from './DJAutoSync';
+import { DJBeatSync } from './DJBeatSync';
 import type { DeckId } from './DeckEngine';
 
 // ============================================================================
@@ -162,6 +163,64 @@ export function cueDeck(deckId: DeckId, position: number, pattPos = 0): void {
   try {
     getDJEngine().getDeck(deckId).cue(position, pattPos);
   } catch { /* engine not ready */ }
+}
+
+/**
+ * Sync this deck's BPM/pitch to the other deck.
+ *
+ * Handles beat grid sync (with phase align), audio-mode BPM matching, and
+ * tracker-mode BPM sync. Also auto-plays this deck if it isn't already playing.
+ *
+ * @param deckId - The deck to sync (the follower)
+ * @param otherDeckId - The deck to sync to (the leader, defaults to the opposite deck)
+ */
+export function syncDeckBPM(deckId: DeckId, otherDeckId?: DeckId): void {
+  const resolvedOther: DeckId = otherDeckId ?? (deckId === 'A' ? 'B' : 'A');
+  try {
+    const engine = getDJEngine();
+    const thisDeck = engine.getDeck(deckId);
+    const otherDeck = engine.getDeck(resolvedOther);
+    const store = useDJStore.getState();
+    const otherState = store.decks[resolvedOther];
+    const thisState = store.decks[deckId];
+
+    if (!otherState.fileName) return;
+
+    // Move crossfader fully to the other (leader) deck
+    const cf = store.crossfaderPosition;
+    if (deckId === 'A' && cf < 1) store.setCrossfader(1);
+    else if (deckId === 'B' && cf > 0) store.setCrossfader(0);
+
+    if (thisState.beatGrid && otherState.beatGrid) {
+      // Precise beat-grid sync + phase align
+      const semitones = syncBPMToOther(deckId, resolvedOther);
+      store.setDeckPitch(deckId, semitones);
+      phaseAlign(deckId, resolvedOther);
+    } else if (otherDeck.playbackMode === 'audio' || thisDeck.playbackMode === 'audio') {
+      // Audio mode — match via detected BPM
+      const targetBPM = otherState.detectedBPM;
+      const thisBPMBase = thisState.detectedBPM;
+      if (targetBPM > 0 && thisBPMBase > 0) {
+        const ratio = targetBPM / thisBPMBase;
+        const semitones = 12 * Math.log2(ratio);
+        store.setDeckPitch(deckId, semitones);
+      }
+    } else {
+      // Tracker mode
+      if (!otherDeck.replayer.getSong()) return;
+      const semitones = DJBeatSync.syncBPM(otherDeck, thisDeck);
+      store.setDeckPitch(deckId, semitones);
+    }
+
+    // Auto-play this deck if it isn't already playing
+    if (!thisState.isPlaying) {
+      thisDeck.play().then(() => {
+        useDJStore.getState().setDeckPlaying(deckId, true);
+      }).catch(() => { /* engine not ready */ });
+    }
+  } catch {
+    // Engine might not be initialized yet
+  }
 }
 
 // ============================================================================
