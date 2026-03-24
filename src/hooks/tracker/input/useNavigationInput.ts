@@ -8,6 +8,7 @@ import { useCallback, useMemo, useRef } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { useTrackerStore, useCursorStore, useTransportStore, useFormatStore } from '@stores';
 import { useEditorStore } from '@stores/useEditorStore';
+import * as Tone from 'tone';
 import { getToneEngine } from '@engine/ToneEngine';
 import { ALT_TRACK_MAP_1, ALT_TRACK_MAP_2, type TrackerInputRefs } from './inputConstants';
 
@@ -68,6 +69,16 @@ export const useNavigationInput = (refs: TrackerInputRefs) => {
       const key = e.key;
       const keyLower = key.toLowerCase();
 
+      // Fast play: skip async ToneEngine.init() when AudioContext is already running
+      const playFast = () => {
+        const ctx = (Tone.getContext() as any).rawContext as AudioContext;
+        if (ctx.state === 'running') {
+          play();
+        } else {
+          getToneEngine().init().then(() => play());
+        }
+      };
+
       // F9-F12: Jump in pattern (FT2-style) — disabled during playback
       if (key === 'F9') {
         if (isPlaying) return false;
@@ -75,11 +86,9 @@ export const useNavigationInput = (refs: TrackerInputRefs) => {
         if (e.shiftKey) {
           setPtnJumpPos(0, cursorRef.current.rowIndex);
         } else if (e.ctrlKey || e.metaKey) {
-          const jumpRow = getPtnJumpPos(0);
-          moveCursorToRow(jumpRow);
-          if (isPlaying) stop();
+          moveCursorToRow(getPtnJumpPos(0));
           setIsLooping(false);
-          getToneEngine().init().then(() => play());
+          playFast();
         } else {
           moveCursorToRow(0);
         }
@@ -91,11 +100,9 @@ export const useNavigationInput = (refs: TrackerInputRefs) => {
         if (e.shiftKey) {
           setPtnJumpPos(1, cursorRef.current.rowIndex);
         } else if (e.ctrlKey || e.metaKey) {
-          const jumpRow = getPtnJumpPos(1);
-          moveCursorToRow(jumpRow);
-          if (isPlaying) stop();
+          moveCursorToRow(getPtnJumpPos(1));
           setIsLooping(false);
-          getToneEngine().init().then(() => play());
+          playFast();
         } else {
           moveCursorToRow(Math.floor(pattern.length * 0.25));
         }
@@ -107,11 +114,9 @@ export const useNavigationInput = (refs: TrackerInputRefs) => {
         if (e.shiftKey) {
           setPtnJumpPos(2, cursorRef.current.rowIndex);
         } else if (e.ctrlKey || e.metaKey) {
-          const jumpRow = getPtnJumpPos(2);
-          moveCursorToRow(jumpRow);
-          if (isPlaying) stop();
+          moveCursorToRow(getPtnJumpPos(2));
           setIsLooping(false);
-          getToneEngine().init().then(() => play());
+          playFast();
         } else {
           moveCursorToRow(Math.floor(pattern.length * 0.5));
         }
@@ -123,11 +128,9 @@ export const useNavigationInput = (refs: TrackerInputRefs) => {
         if (e.shiftKey) {
           setPtnJumpPos(3, cursorRef.current.rowIndex);
         } else if (e.ctrlKey || e.metaKey) {
-          const jumpRow = getPtnJumpPos(3);
-          moveCursorToRow(jumpRow);
-          if (isPlaying) stop();
+          moveCursorToRow(getPtnJumpPos(3));
           setIsLooping(false);
-          getToneEngine().init().then(() => play());
+          playFast();
         } else {
           moveCursorToRow(Math.floor(pattern.length * 0.75));
         }

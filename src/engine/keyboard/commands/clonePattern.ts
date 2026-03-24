@@ -21,7 +21,7 @@ export function clonePattern(): boolean {
   }
 
   // Deep clone the pattern
-  const clonedPattern: Pattern = JSON.parse(JSON.stringify(currentPattern));
+  const clonedPattern: Pattern = structuredClone(currentPattern);
 
   // Generate unique name
   clonedPattern.name = generateCloneName(currentPattern.name, patterns);

@@ -175,7 +175,7 @@ export function useMIDIActions() {
         if (!tb303Instrument.tb303) return;
 
         // Deep copy the tb303 config to avoid mutation
-        const tb303Config = JSON.parse(JSON.stringify(tb303Instrument.tb303));
+        const tb303Config = structuredClone(tb303Instrument.tb303);
 
         switch (paramName) {
           case 'cutoff':

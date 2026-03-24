@@ -301,6 +301,11 @@ export function parseTFMXFile(
   if (patPtrTable === 0)   patPtrTable   = h + TFMX_PATTERN_PTR_UNPACKED;
   if (macroPtrTable === 0) macroPtrTable = h + TFMX_MACRO_PTR_UNPACKED;
 
+  // 3b. Read data base offset at h+0x0C.
+  // In TFMX Professional, pattern/macro data pointers in the pointer tables are
+  // RELATIVE to this base offset, not absolute file positions.
+  const dataBase = u32BE(buf, h + 0x0C);
+
   // 4. Read pattern pointer table (up to 128 u32BE entries)
   // Number of patterns = (macroStart - patternStart) / 4, capped at 128
   const numPatternSlots = Math.min(
@@ -309,7 +314,17 @@ export function parseTFMXFile(
   );
   const patternPointers: number[] = [];
   for (let i = 0; i < numPatternSlots; i++) {
-    patternPointers.push(u32BE(buf, patPtrTable + i * 4));
+    const raw = u32BE(buf, patPtrTable + i * 4);
+    // Apply data base offset for relative pointers. Pointers >= 0xFF000000
+    // are invalid/unused slots. Pointers that already exceed dataBase are
+    // likely already absolute (some TFMX variants use absolute offsets).
+    if (raw === 0 || raw >= 0xFF000000) {
+      patternPointers.push(raw);
+    } else if (dataBase > 0 && raw < dataBase) {
+      patternPointers.push(raw + dataBase);
+    } else {
+      patternPointers.push(raw);
+    }
   }
 
   // 5. Decode all TFMX patterns

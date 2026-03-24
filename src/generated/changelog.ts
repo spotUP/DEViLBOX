@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-03-23T07:35:08.139Z
+ * Generated: 2026-03-24T09:31:45.950Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -19,10 +19,10 @@ export interface ChangelogEntry {
 }
 
 // Build info
-export const BUILD_VERSION = '1.0.3296';
-export const BUILD_NUMBER = '3296';
-export const BUILD_HASH = '192d4a5bc';
-export const BUILD_DATE = '2026-03-23';
+export const BUILD_VERSION = '1.0.3448';
+export const BUILD_NUMBER = '3448';
+export const BUILD_HASH = '7921c3eea';
+export const BUILD_DATE = '2026-03-24';
 
 // Full version (patch IS the build number, so no need to append)
 export const FULL_VERSION = BUILD_VERSION;
@@ -30,214 +30,208 @@ export const FULL_VERSION = BUILD_VERSION;
 // Auto-generated changelog
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: '1.0.3296',
-    date: '2026-03-23',
+    version: '1.0.3448',
+    date: '2026-03-24',
     changes: [
       {
         type: 'improvement',
-        "description": "Chore: server database, DJ engine updates, changelog"
+        "description": "Wire both views to usePianoRoll shared hook"
       },
       {
         type: 'feature',
-        "description": "Per-channel VU meters via module scope RMS polling"
+        "description": "Add usePianoRoll shared logic hook"
+      },
+      {
+        type: 'feature',
+        "description": "Diag: add alert() diagnostics for iOS file loading"
+      },
+      {
+        type: 'feature',
+        "description": "Extract usePatternEditor shared hook for both pattern editor views"
       },
       {
         type: 'fix',
-        "description": "Eagerly init scratch buffer on play for SunVox audio"
+        "description": "Auto-discover companion files for multi-file Amiga formats"
       },
       {
         type: 'improvement',
-        "description": "Chore: update format state and furnace audit tools"
+        "description": "Wire ArrangementView pair to useArrangementView hook"
       },
       {
         type: 'feature',
-        "description": "Add DJ set recording and playback engine"
-      },
-      {
-        type: 'fix',
-        "description": "Suppress font cache warnings by checking Cache.has() before install"
+        "description": "Add useArrangementView shared hook"
       },
       {
         type: 'improvement',
-        "description": "Only poll module scope when canvas is visible"
+        "description": "Extract shared TrackerView logic into useTrackerView hook"
       },
       {
         type: 'fix',
-        "description": "Tighter knob sensitivity, center detent snap, faster tonearm tracking"
+        "description": "Guard ALL stop paths in usePatternPlayback with skipNextReload"
       },
       {
         type: 'fix',
-        "description": "Read computedLayout.width from element itself, not parent"
-      },
-      {
-        type: 'fix',
-        "description": "Smooth slider drag using native DOM coordinates"
-      },
-      {
-        type: 'feature',
-        "description": "Editable Klystrack positions + MusicLine hex nibble entry"
-      },
-      {
-        type: 'fix',
-        "description": "Remove panel stopPropagation blocking slider pointerDown"
-      },
-      {
-        type: 'fix',
-        "description": "Use hitArea on slider container (same pattern as checkbox)"
-      },
-      {
-        type: 'feature',
-        "description": "Insert/delete rows, Pixi block ops, Furnace order editing"
+        "description": "Use getSong()!==null to detect playback for Right Shift/Alt seek"
       },
       {
         type: 'improvement',
-        "description": "Chore: CLAUDE.md update, FurnaceSequencer improvements, changelog, format state"
-      },
-      {
-        type: 'fix',
-        "description": "Default Div eventMode to \"auto\" for event pass-through"
-      },
-      {
-        type: 'fix',
-        "description": "Move onPointerDown to slider graphics element directly"
-      },
-      {
-        type: 'fix',
-        "description": "Filter null-note NOTE_ON from macro volume updates"
-      },
-      {
-        type: 'fix',
-        "description": "Set eventMode=\"static\" on slider graphics for hit testing"
-      },
-      {
-        type: 'fix',
-        "description": "Add hitArea to PixiSlider for reliable drag interaction"
-      },
-      {
-        type: 'fix',
-        "description": "Add hitArea to PixiCheckbox for reliable click detection"
-      },
-      {
-        type: 'fix',
-        "description": "Use onPointerTap for modal overlay close instead of onPointerUp"
+        "description": "Wire Pixi NavBar to shared hook"
       },
       {
         type: 'improvement',
-        "description": "Chore: update format audit state"
-      },
-      {
-        type: 'fix',
-        "description": "Prevent modal close when clicking checkboxes/buttons inside panel"
-      },
-      {
-        type: 'fix',
-        "description": "Route nativeOnly formats through native parser in MCP load"
-      },
-      {
-        type: 'fix',
-        "description": "Cable positioning, matrix params, rack SunVox controls"
+        "description": "Wire Pixi EditorControlsBar to shared hook"
       },
       {
         type: 'improvement',
-        "description": "Frameloop=demand — only render when decks playing or camera moves"
-      },
-      {
-        type: 'fix',
-        "description": "Faders slide on Y axis (vertical), crossfader on X — measured from mesh bounds"
-      }
-    ]
-  },
-  {
-    version: '2026-03-22',
-    date: '2026-03-22',
-    changes: [
-      {
-        type: 'improvement',
-        "description": "Chore(modular): update ModularMatrixView and ModularRackView"
-      },
-      {
-        type: 'fix',
-        "description": "Expand macro filter, add setSkipRegisterWrites to dispatch"
+        "description": "Wire DOM EditorControlsBar to shared hook"
       },
       {
         type: 'feature',
-        "description": "Dynamic keyboard shortcuts from active scheme"
-      },
-      {
-        type: 'fix',
-        "description": "Flip fader Z direction + set default from mesh measurement"
+        "description": "Add useEditorControls shared hook"
       },
       {
         type: 'improvement',
-        "description": "Add comprehensive keyboard shortcuts reference"
-      },
-      {
-        type: 'fix',
-        "description": "Fader default 2.1→2.5 — match left fader position from screenshot"
-      },
-      {
-        type: 'fix',
-        "description": "Fader default 2.2→2.1 — back off slightly"
-      },
-      {
-        type: 'fix',
-        "description": "Fader default 2.0→2.2 (closer), travel 3.5→4.5 (more range)"
-      },
-      {
-        type: 'fix',
-        "description": "Fader defaultValue 1.8→2.0 — nudge forward ~1cm"
-      },
-      {
-        type: 'fix',
-        "description": "Show SunVox module controls in DOM rack view"
-      },
-      {
-        type: 'fix',
-        "description": "Fader defaultValue 1.1→1.8 — much closer to viewer"
+        "description": "Wire DOM NavBar to shared hook"
       },
       {
         type: 'feature',
-        "description": "Register all 327 missing scheme command handlers"
+        "description": "Add useNavBar shared hook"
+      },
+      {
+        type: 'improvement',
+        "description": "Add toggleMic/setMicGain actions, wire PixiDJMixer"
       },
       {
         type: 'fix',
-        "description": "Fader defaultValue 0.75→1.1 — shift toward viewer to align with grooves"
+        "description": "Add ?reset escape hatch for stuck songs + fix FormatFamily type"
+      },
+      {
+        type: 'improvement',
+        "description": "Wire transport views to DJActions"
       },
       {
         type: 'fix',
-        "description": "Vestax fader travel 5.5→3.5, defaultValue 1→0.75 to fit grooves"
+        "description": "Right Shift/Alt directly calls forcePosition, bypasses React"
       },
       {
         type: 'fix',
-        "description": "Turntable spacing 0.38→0.40 — clear mixer edges"
+        "description": "Add 77 missing Amiga extensions to FormatRegistry + fix UADE prefix mapping"
       },
       {
         type: 'fix',
-        "description": "Turntable spacing 0.42→0.38 — slightly closer"
+        "description": "Add missing UADE prefix entries to FormatRegistry"
       },
       {
         type: 'fix',
-        "description": "Spread turntables outward (0.35→0.42) to clear mixer edges"
+        "description": "Check both replayer.isPlaying AND store.isPlaying for seek"
       },
       {
         type: 'fix',
-        "description": "Mixer Y 0.18→0.15 — split the difference"
+        "description": "Use DJActions.togglePlay() in keyboard handler"
       },
       {
         type: 'fix',
-        "description": "Mixer Y 0.12→0.18 — still below turntable surface"
+        "description": "Add 20+ missing UADE prefix routes, prevent SunVox restore freeze"
       },
       {
         type: 'fix',
-        "description": "Raise mixer Y=0.12 to align with turntable surface"
+        "description": "Stop position — remove stale playbackRow cursor override"
+      },
+      {
+        type: 'fix',
+        "description": "SkipNextReload flag prevents usePatternPlayback from restarting after forcePosition"
+      },
+      {
+        type: 'improvement',
+        "description": "Wire Pixi PixiNewSongWizard to shared hook"
+      },
+      {
+        type: 'improvement',
+        "description": "Wire Pixi SIDInfoModal to shared hook"
+      },
+      {
+        type: 'improvement',
+        "description": "Wire Pixi GrooveSettingsModal to shared hook"
+      },
+      {
+        type: 'fix',
+        "description": "Skip Tone.start/unlockIOSAudio when seeking during playback"
+      },
+      {
+        type: 'improvement',
+        "description": "Wire DOM NewSongWizard to shared hook"
       },
       {
         type: 'feature',
-        "description": "Module oscilloscope scope canvas in modular rack view"
+        "description": "Add useNewSongWizard shared hook"
+      },
+      {
+        type: 'improvement',
+        "description": "Wire DOM SIDInfoModal to shared hook"
       },
       {
         type: 'feature',
-        "description": "Chore: add Vestax mixer source assets (OBJ + textures + MTL)"
+        "description": "Add useSIDInfoDialog shared hook"
+      },
+      {
+        type: 'improvement',
+        "description": "Wire DOM GrooveSettingsModal to shared hook"
+      },
+      {
+        type: 'feature',
+        "description": "Add useGrooveSettings shared hook"
+      },
+      {
+        type: 'fix',
+        "description": "Don't change store state when seeking during playback"
+      },
+      {
+        type: 'improvement',
+        "description": "Diag: verbose forcePosition logging"
+      },
+      {
+        type: 'fix',
+        "description": "ForcePosition no longer updates transport store"
+      },
+      {
+        type: 'fix',
+        "description": "Sync editing cursor to playback position on stop"
+      },
+      {
+        type: 'fix',
+        "description": "Right Shift = play song, Right Alt = play pattern (ProTracker)"
+      },
+      {
+        type: 'improvement',
+        "description": "Wire DOM HelpModal to shared hook and data constants"
+      },
+      {
+        type: 'fix',
+        "description": "ExitScratchMode bails if replayer already stopped — no restart loop"
+      },
+      {
+        type: 'fix',
+        "description": "Use lastDequeuedState for stop position — matches visual display"
+      },
+      {
+        type: 'feature',
+        "description": "Add shared help content data and useHelpDialog hook"
+      },
+      {
+        type: 'fix',
+        "description": "Sync transport currentRow to replayer pattPos on stop"
+      },
+      {
+        type: 'fix',
+        "description": "Alt/Option+click Play Song/Pattern restarts from row 0"
+      },
+      {
+        type: 'fix',
+        "description": "Preserve lastDequeuedState on stop — pattern editor stays in place"
+      },
+      {
+        type: 'fix',
+        "description": "Add forcePosition() for instant play-from-start"
       }
     ]
   }

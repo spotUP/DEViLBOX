@@ -93,7 +93,7 @@ export const useNoteInput = (refs: TrackerInputRefs) => {
 
   // Preview note with attack (called on keydown)
   const previewNote = useCallback(
-    async (note: string, octave: number, key: string, shiftKey = false) => {
+    (note: string, octave: number, key: string, shiftKey = false) => {
       if (currentInstrumentId === null) return;
 
       const engine = getToneEngine();
@@ -117,9 +117,10 @@ export const useNoteInput = (refs: TrackerInputRefs) => {
 
       const targetChannel = getTargetChannel();
 
-      await engine.ensureInstrumentReady(instrument);
-
-      // PERFORMANCE: Trigger audio FIRST before any state updates
+      // Trigger audio FIRST — ensureInstrumentReady is fire-and-forget.
+      // The await was deferring audio to the microtask queue, adding latency
+      // to every note. Most instruments are already ready; for WASM synths
+      // that need init, the first note may be silent but all subsequent are instant.
       const { midiPolyphonic } = useSettingsStore.getState();
       if (midiPolyphonic) {
         engine.triggerPolyNoteAttack(currentInstrumentId, fullNote, 1, instrument, accent, slideActive);

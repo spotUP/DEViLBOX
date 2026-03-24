@@ -58,7 +58,7 @@ class CCMapManager {
   private smoothedValues: Map<string, number> = new Map();
 
   // Global sensitivity (0.1 = very slow, 1.0 = direct, default 0.3 for smooth control)
-  private globalSensitivity: number = 0.3;
+  private globalSensitivity: number = 0.8;
 
   // Currently controlled instrument ID (null = control all TB-303 instruments)
   private controlledInstrumentId: number | null = null;
