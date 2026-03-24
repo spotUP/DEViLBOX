@@ -17,6 +17,7 @@
 extern "C" {
 #include "goattrk2.h"
 #include "greloc.h"
+extern unsigned framerate;  /* defined in gsound.c, no header declaration */
 }
 #include "gsid.h"
 
@@ -187,6 +188,7 @@ static int asid_enabled = 0;
 static int gt_sample_rate = 44100;
 static int gt_sid_count = 1;  /* 1 = single SID (3ch), 2 = dual SID (6ch) */
 static int gt_initialized = 0;
+static int gt_playroutine_accumulator = 0; /* sample counter for playroutine tick */
 
 /* ========================================================================
  * Stub functions for UI-only code referenced by engine
@@ -477,6 +479,7 @@ void gt_new_song(void) {
 EMSCRIPTEN_KEEPALIVE
 void gt_play(int songNum, int fromPos, int fromRow) {
     (void)fromRow;
+    gt_playroutine_accumulator = 0;
     gtObject.psnum = songNum;
     gtObject.startpattpos = fromPos;
     gtObject.songinit = 1;
@@ -496,6 +499,19 @@ void gt_render_audio(float* outL, float* outR, int frames) {
     static Sint16 sid3buf[65536];
     int samplesToRender = frames;
     if (samplesToRender > 32768) samplesToRender = 32768;
+
+    /* Tick the playroutine (sequencer) at the correct rate.
+     * Desktop GT calls playroutine() from a timer at `framerate` Hz (50 PAL / 60 NTSC).
+     * In WASM we must interleave it with audio rendering.
+     * samplesPerTick = samplerate / framerate (e.g. 44100/50 = 882). */
+    int samplesPerTick = gt_sample_rate / (framerate > 0 ? framerate : 50);
+    if (samplesPerTick < 1) samplesPerTick = 1;
+
+    gt_playroutine_accumulator += samplesToRender;
+    while (gt_playroutine_accumulator >= samplesPerTick) {
+        gt_playroutine_accumulator -= samplesPerTick;
+        playroutine(&gtObject);
+    }
 
     /* Run play routine + fill SID buffer */
     sid_fillbuffer(sid0buf, sid1buf, sid2buf, sid3buf, samplesToRender, samplesToRender, editorInfo.adparam);
