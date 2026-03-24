@@ -483,16 +483,11 @@ const MixerRecordMic: React.FC = () => {
   }, [isRecording]);
 
   const handleMicToggle = useCallback(async () => {
-    const engine = getDJEngineIfActive();
-    if (!engine) return;
-    const active = await engine.toggleMic();
-    useDJSetStore.getState().setMicEnabled(active);
+    await DJActions.toggleMic();
   }, []);
 
   const handleMicGain = useCallback((v: number) => {
-    useDJSetStore.getState().setMicGain(v);
-    const engine = getDJEngineIfActive();
-    engine?.mic?.setGain(v);
+    DJActions.setMicGain(v);
   }, []);
 
   const handleVideoToggle = useCallback(async () => {

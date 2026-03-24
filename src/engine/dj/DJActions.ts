@@ -12,7 +12,8 @@
  */
 
 import { useDJStore, type CrossfaderCurve } from '@/stores/useDJStore';
-import { getDJEngine } from './DJEngine';
+import { useDJSetStore } from '@/stores/useDJSetStore';
+import { getDJEngine, getDJEngineIfActive } from './DJEngine';
 import { quantizedEQKill, getQuantizeMode, setTrackedFilterPosition } from './DJQuantizedFX';
 import { quantizedPlay, syncBPMToOther, phaseAlign } from './DJAutoSync';
 import { DJBeatSync } from './DJBeatSync';
@@ -423,4 +424,28 @@ export function stopScratch(deckId: DeckId, decayMs = 200): void {
   try {
     getDJEngine().getDeck(deckId).stopScratch(decayMs);
   } catch { /* engine not ready */ }
+}
+
+// ============================================================================
+// MIC
+// ============================================================================
+
+/**
+ * Toggle the microphone on/off. Updates store with the resulting state.
+ */
+export async function toggleMic(): Promise<void> {
+  const engine = getDJEngineIfActive();
+  if (!engine) return;
+  const active = await engine.toggleMic();
+  useDJSetStore.getState().setMicEnabled(active);
+}
+
+/**
+ * Set microphone gain (clamped 0 to 1.5).
+ */
+export function setMicGain(gain: number): void {
+  const clamped = Math.max(0, Math.min(1.5, gain));
+  useDJSetStore.getState().setMicGain(clamped);
+  const engine = getDJEngineIfActive();
+  engine?.mic?.setGain(clamped);
 }
