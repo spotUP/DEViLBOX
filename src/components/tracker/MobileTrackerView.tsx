@@ -8,10 +8,8 @@ import * as Tone from 'tone';
 import { MobileTabBar } from '@components/layout/MobileTabBar';
 import { PatternEditorCanvas } from './PatternEditorCanvas';
 import { InstrumentList } from '@components/instruments/InstrumentList';
-import { TB303KnobPanel } from './TB303KnobPanel';
-import { FT2Toolbar } from './FT2Toolbar';
 import { MobilePatternInput } from './mobile/MobilePatternInput';
-import { Play, Square, ChevronLeft, ChevronRight, Music2, SlidersHorizontal, Cpu } from 'lucide-react';
+import { Play, Square, ChevronLeft, ChevronRight, Music2, Cpu } from 'lucide-react';
 import { useTransportStore, useTrackerStore, useCursorStore, useInstrumentStore, useEditorStore } from '@stores';
 import { useShallow } from 'zustand/react/shallow';
 import { getGroupedPresets } from '@/constants/systemPresets';
@@ -30,13 +28,7 @@ interface MobileTrackerViewProps {
 }
 
 export const MobileTrackerView: React.FC<MobileTrackerViewProps> = ({
-  onShowPatterns,
-  onShowExport,
-  onShowHelp,
-  onShowMasterFX,
   onShowInstruments,
-  showPatterns,
-  showMasterFX,
 }) => {
   const [activeTab, setActiveTab] = useState<'pattern' | 'instruments'>('pattern');
   const [mobileChannel, setMobileChannel] = useState(0); // For portrait mode: which channel to show
