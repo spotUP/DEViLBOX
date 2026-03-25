@@ -57,14 +57,24 @@ export function useGTUltraEngineInit(): void {
           store.refreshAllTables();
           // Don't populate instruments here — wait for onSongLoaded when data is ready
         },
-        onPosition: (pos) => {
-          useGTUltraStore.getState().updatePlaybackPos({
-            row: pos.row,
-            songPos: pos.pos,
-            position: pos.pos,
-          });
-          setFormatPlaybackRow(pos.row);
-        },
+        onPosition: (() => {
+          let lastRow = -1;
+          let lastPos = -1;
+          return (pos: { row: number; pos: number }) => {
+            // Always update the lightweight singleton (no React overhead)
+            setFormatPlaybackRow(pos.row);
+            // Only update Zustand store when values actually change
+            if (pos.row !== lastRow || pos.pos !== lastPos) {
+              lastRow = pos.row;
+              lastPos = pos.pos;
+              useGTUltraStore.getState().updatePlaybackPos({
+                row: pos.row,
+                songPos: pos.pos,
+                position: pos.pos,
+              });
+            }
+          };
+        })(),
         onAsidWrite: (chip, reg, value) => getGTUltraASIDBridge().writeRegister(chip, reg, value),
         onPatternData: (pattern, length, data) => useGTUltraStore.getState().updatePatternData(pattern, length, data),
         onOrderData: (channel, data) => useGTUltraStore.getState().updateOrderData(channel, data),
