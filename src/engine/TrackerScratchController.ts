@@ -560,6 +560,16 @@ export class TrackerScratchController {
 
     // Initialize scratch buffer if needed
     if (!this.scratchBufferReady) {
+      // Mute replayer immediately so normal playback doesn't continue during buffer init.
+      // Without this, the first scratch sounds like normal playback (silent scratch).
+      const now = Tone.getContext().rawContext.currentTime;
+      const gainParam = replayer.getFullOutput().gain;
+      this.originalGainValue = gainParam.value || 1;
+      gainParam.cancelScheduledValues(now);
+      gainParam.setValueAtTime(0, now);
+      replayer.pauseNativeEnginesForScratch();
+      replayer.setSuppressNotes(true);
+
       void this.initScratchBuffer().then(() => {
         // Once buffer is ready and we're still active, engage scratch audio
         if (this._isActive && this.scratchBuffer) {
@@ -568,6 +578,10 @@ export class TrackerScratchController {
         }
       }).catch((err) => {
         console.error('[TrackerScratch] Failed to init scratch buffer:', err);
+        // Restore audio on failure
+        gainParam.setValueAtTime(this.originalGainValue, Tone.getContext().rawContext.currentTime);
+        replayer.resumeNativeEnginesAfterScratch();
+        replayer.setSuppressNotes(false);
       });
     } else {
       this.engageScratchAudio(replayer);
