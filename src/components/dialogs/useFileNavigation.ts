@@ -546,7 +546,6 @@ export function useFileNavigation({
       }
 
       // Check if this is a binary file (tracker module, .sqs/.seq, etc.)
-      console.log('[FileNav] handleLoad:', selectedFile.name, 'source:', selectedFile.source, 'path:', selectedFile.path, 'isBinary:', isBinaryFile(selectedFile.name), 'hasModuleLoader:', !!onLoadTrackerModule);
       if (isBinaryFile(selectedFile.name)) {
         if (!onLoadTrackerModule) {
           throw new Error('Binary file loading not supported');
@@ -561,24 +560,12 @@ export function useFileNavigation({
             // Try static file first (bundled in deploy, works on all platforms including iOS),
             // then fall back to server API for files only available on the backend.
             let loaded = false;
-            console.log('[FileNav] Loading binary:', selectedFile.path, 'manifest:', isManifestAvailable(), 'serverFS:', hasServerFS);
-            // iOS debug: use alert since Safari remote inspector misses console.log
-            if (typeof window !== 'undefined' && /iPhone|iPad/.test(navigator.userAgent)) {
-              alert(`Loading: ${selectedFile.path}\nmanifest: ${isManifestAvailable()}\nserverFS: ${hasServerFS}`);
-            }
             if (isManifestAvailable()) {
               try {
                 buffer = await readStaticFile(selectedFile.path);
                 loaded = true;
-                console.log('[FileNav] Static file loaded:', buffer.byteLength, 'bytes');
-                if (typeof window !== 'undefined' && /iPhone|iPad/.test(navigator.userAgent)) {
-                  alert(`Static OK: ${buffer.byteLength} bytes`);
-                }
-              } catch (e) {
-                console.warn('[FileNav] Static file failed:', e instanceof Error ? e.message : e);
-                if (typeof window !== 'undefined' && /iPhone|iPad/.test(navigator.userAgent)) {
-                  alert(`Static FAILED: ${e instanceof Error ? e.message : e}`);
-                }
+              } catch {
+                /* not in static bundle */
               }
             }
             if (!loaded && hasServerFS) {
@@ -608,20 +595,7 @@ export function useFileNavigation({
           throw new Error('Cannot read tracker module');
         }
 
-        try {
-          if (/iPhone|iPad/.test(navigator.userAgent)) {
-            alert(`Calling onLoadTrackerModule: ${buffer.byteLength} bytes, name=${selectedFile.name}`);
-          }
-          await onLoadTrackerModule(buffer, selectedFile.name);
-          if (/iPhone|iPad/.test(navigator.userAgent)) {
-            alert('Import completed successfully');
-          }
-        } catch (importErr) {
-          if (/iPhone|iPad/.test(navigator.userAgent)) {
-            alert(`Import FAILED: ${importErr instanceof Error ? importErr.message : importErr}`);
-          }
-          throw importErr;
-        }
+        await onLoadTrackerModule(buffer, selectedFile.name);
         onClose();
         return;
       }
