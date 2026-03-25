@@ -516,6 +516,37 @@ export const VJView: React.FC<VJViewProps> = ({ isPopout = false }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
 
+  // Which layers are actively rendering — both on during crossfade, then old one stops.
+  // This avoids running two WebGL pipelines at 60fps permanently.
+  const [renderMilkdrop, setRenderMilkdrop] = useState(true);
+  const [renderProjectm, setRenderProjectm] = useState(false);
+  const crossfadeTimerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
+  const layerSwitchTimerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
+
+  // Prepare a layer switch: wake up the target engine, load a preset, then
+  // after a few frames switch activeLayer so the CSS crossfade begins with
+  // a live rendered frame already in the target canvas.
+  const switchToLayer = useCallback((target: VJLayer, loadPreset: () => void) => {
+    if (layerSwitchTimerRef.current !== undefined) clearTimeout(layerSwitchTimerRef.current);
+    if (crossfadeTimerRef.current !== undefined) clearTimeout(crossfadeTimerRef.current);
+    // 1. Wake up both render loops
+    setRenderMilkdrop(true);
+    setRenderProjectm(true);
+    // 2. Load the new preset into the target engine
+    loadPreset();
+    // 3. After a few frames for the preset to render, trigger the crossfade
+    layerSwitchTimerRef.current = setTimeout(() => {
+      setActiveLayer(target);
+      layerSwitchTimerRef.current = undefined;
+      // 4. After the CSS transition completes, stop the old engine
+      crossfadeTimerRef.current = setTimeout(() => {
+        setRenderMilkdrop(target === 'milkdrop');
+        setRenderProjectm(target === 'projectm');
+        crossfadeTimerRef.current = undefined;
+      }, 900); // 700ms CSS transition + 200ms buffer
+    }, 100); // ~6 frames for new preset to render
+  }, []);
+
   // ── DJ deck scratch via scroll ──────────────────────────────────────────
   const scratchPhysicsRef = useRef<TurntablePhysics | null>(null);
   const scratchActiveRef = useRef(false);
@@ -567,31 +598,28 @@ export const VJView: React.FC<VJViewProps> = ({ isPopout = false }) => {
     setPresetCount(count);
   }, []);
 
-  // Auto-advance timer — picks randomly from BOTH engines
+  // Auto-advance timer — always alternates between milkdrop and projectM
+  // so two projectM presets never play back-to-back (avoids projectM crashes
+  // caused by its native preset transition shader pipeline).
   useEffect(() => {
     if (!autoAdvance) return;
-    const totalMD = presetCount;
-    const totalPM = pmPresetCount;
-    const total = totalMD + totalPM;
-    if (total === 0) return;
+    if (presetCount === 0 && pmPresetCount === 0) return;
 
     const advance = () => {
-      // Weighted random: pick engine proportional to preset count
-      const roll = Math.random() * total;
-      if (roll < totalMD && totalMD > 0) {
-        // Pick a random Milkdrop preset
-        if (activeLayer !== 'milkdrop') setActiveLayer('milkdrop');
-        canvasHandleRef.current?.randomPreset();
-      } else if (totalPM > 0) {
-        // Pick a random projectM preset
-        if (activeLayer !== 'projectm') setActiveLayer('projectm');
-        projectmHandleRef.current?.randomPreset();
+      if (activeLayer === 'projectm' && presetCount > 0) {
+        switchToLayer('milkdrop', () => canvasHandleRef.current?.randomPreset());
+      } else if (activeLayer === 'milkdrop' && pmPresetCount > 0) {
+        switchToLayer('projectm', () => projectmHandleRef.current?.randomPreset());
+      } else {
+        // Only one engine available — stay on it and pick a new preset
+        if (activeLayer === 'milkdrop') canvasHandleRef.current?.randomPreset();
+        else projectmHandleRef.current?.randomPreset();
       }
       autoAdvanceTimerRef.current = setTimeout(advance, 15000 + Math.random() * 15000);
     };
     autoAdvanceTimerRef.current = setTimeout(advance, 15000 + Math.random() * 15000);
     return () => { if (autoAdvanceTimerRef.current) clearTimeout(autoAdvanceTimerRef.current); };
-  }, [autoAdvance, presetCount, pmPresetCount, activeLayer]);
+  }, [autoAdvance, presetCount, pmPresetCount, activeLayer, switchToLayer]);
 
   // Wheel listener — scratch whichever DJ deck is playing
   useEffect(() => {
@@ -699,35 +727,54 @@ export const VJView: React.FC<VJViewProps> = ({ isPopout = false }) => {
     }
   }, []);
 
+  // Next/Random always alternate layers so projectM never loads consecutive presets
   const handleNext = useCallback(() => {
-    if (activeLayer === 'milkdrop') canvasHandleRef.current?.nextPreset();
-    else projectmHandleRef.current?.nextPreset();
-  }, [activeLayer]);
+    if (activeLayer === 'projectm' && presetCount > 0) {
+      switchToLayer('milkdrop', () => canvasHandleRef.current?.nextPreset());
+    } else if (activeLayer === 'milkdrop' && pmPresetCount > 0) {
+      switchToLayer('projectm', () => projectmHandleRef.current?.nextPreset());
+    } else {
+      if (activeLayer === 'milkdrop') canvasHandleRef.current?.nextPreset();
+      else projectmHandleRef.current?.nextPreset();
+    }
+  }, [activeLayer, presetCount, pmPresetCount, switchToLayer]);
 
   const handleRandom = useCallback(() => {
-    if (activeLayer === 'milkdrop') canvasHandleRef.current?.randomPreset();
-    else projectmHandleRef.current?.randomPreset();
-  }, [activeLayer]);
+    if (activeLayer === 'projectm' && presetCount > 0) {
+      switchToLayer('milkdrop', () => canvasHandleRef.current?.randomPreset());
+    } else if (activeLayer === 'milkdrop' && pmPresetCount > 0) {
+      switchToLayer('projectm', () => projectmHandleRef.current?.randomPreset());
+    } else {
+      if (activeLayer === 'milkdrop') canvasHandleRef.current?.randomPreset();
+      else projectmHandleRef.current?.randomPreset();
+    }
+  }, [activeLayer, presetCount, pmPresetCount, switchToLayer]);
 
   return (
     <div ref={containerRef} className="relative w-full h-full bg-black overflow-hidden">
-      {/* Milkdrop layer */}
-      <div className={`absolute inset-0 ${activeLayer === 'milkdrop' ? '' : 'hidden'}`}>
+      {/* Milkdrop layer — crossfade via CSS opacity, render loop paused when fully hidden */}
+      <div
+        className="absolute inset-0 transition-opacity duration-700 ease-in-out"
+        style={{ opacity: activeLayer === 'milkdrop' ? 1 : 0, pointerEvents: activeLayer === 'milkdrop' ? 'auto' : 'none' }}
+      >
         <VJCanvas
           ref={canvasHandleRef}
           onReady={handleReady}
           onPresetChange={handlePresetChange}
-          visible={vjViewActive && activeLayer === 'milkdrop'}
+          visible={vjViewActive && renderMilkdrop}
         />
       </div>
       {/* projectM WASM layer */}
-      <div className={`absolute inset-0 ${activeLayer === 'projectm' ? '' : 'hidden'}`}>
+      <div
+        className="absolute inset-0 transition-opacity duration-700 ease-in-out"
+        style={{ opacity: activeLayer === 'projectm' ? 1 : 0, pointerEvents: activeLayer === 'projectm' ? 'auto' : 'none' }}
+      >
         <React.Suspense fallback={<div className="w-full h-full bg-black flex items-center justify-center"><span className="text-white/50 font-mono text-sm">Loading projectM...</span></div>}>
           <ProjectMCanvas
             ref={projectmHandleRef}
             onReady={handlePMReady}
             onPresetChange={handlePMPresetChange}
-            visible={vjViewActive && activeLayer === 'projectm'}
+            visible={vjViewActive && renderProjectm}
           />
         </React.Suspense>
       </div>
