@@ -161,7 +161,7 @@ export const PixiPitchSlider: React.FC<PixiPitchSliderProps> = ({ width, height 
     // ── Groove — 3px wide, centered in housing ──
     const grooveX = scaleW + housingW / 2 - 1.5;
     g.rect(grooveX, EDGE_PAD, 3, trackH - EDGE_PAD * 2);
-    g.fill({ color: theme.bg.color, alpha: 0.75 });
+    g.fill({ color: 0x000000, alpha: 0.4 });
 
     // ── Handle ──
     const handleX = scaleW + 2;
@@ -244,7 +244,7 @@ export const PixiPitchSlider: React.FC<PixiPitchSliderProps> = ({ width, height 
       cursor="ns-resize"
       onPointerDown={handlePointerDown}
       onRightClick={(e: FederatedPointerEvent) => { e.stopPropagation(); resetPitch(); }}
-      layout={{ width, height }}
+      layout={{ width, height, backgroundColor: theme.bgTertiary.color, borderLeftWidth: 1, borderColor: theme.border.color }}
     >
       {/* PITCH label — pinned to top */}
       <pixiBitmapText
