@@ -442,50 +442,56 @@ export const PixiFT2Toolbar: React.FC = () => {
             }}
           >
 
-            {/* Position */}
-            <FT2Cell label="Position" value={currentPositionIndex} min={0} max={Math.max(0, songLength - 1)} onChange={handlePositionChange} width={44} />
+            {/* Col 1: Position + Tap/Ins/Del (260px matching DOM .ft2-col-1) */}
+            <pixiContainer layout={{ width: 260, flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+              <FT2Cell label="Position" value={currentPositionIndex} min={0} max={Math.max(0, songLength - 1)} onChange={handlePositionChange} width={44} />
+              <PixiButton
+                label={tapActive ? `Tap${tapCount > 0 ? ` (${tapCount})` : ''}` : 'Tap'}
+                variant={tapActive ? 'ft2' : 'ghost'}
+                color={tapActive ? 'green' : 'default'}
+                size="sm"
+                onClick={handleTapTempo}
+              />
+              <PixiButton label="Ins" variant="ghost" size="sm" onClick={handleInsert} />
+              <PixiButton label="Del" variant="ghost" size="sm" onClick={handleDelete} />
+            </pixiContainer>
 
-            {/* Tap | Ins | Del */}
-            <PixiButton
-              label={tapActive ? `Tap${tapCount > 0 ? ` (${tapCount})` : ''}` : 'Tap'}
-              variant={tapActive ? 'ft2' : 'ghost'}
-              color={tapActive ? 'green' : 'default'}
-              size="sm"
-              onClick={handleTapTempo}
-            />
-            <PixiButton label="Ins" variant="ghost" size="sm" onClick={handleInsert} />
-            <PixiButton label="Del" variant="ghost" size="sm" onClick={handleDelete} />
+            {/* Col 2: BPM (220px matching DOM .ft2-col-2) */}
+            <pixiContainer layout={{ width: 220, flexDirection: 'row', alignItems: 'center', paddingLeft: 10 }}>
+              <FT2Cell label="BPM" value={bpm} min={32} max={255} onChange={setBPM} width={48} />
+            </pixiContainer>
 
+            {/* Col 3: Pattern (220px matching DOM .ft2-col-3) */}
+            <pixiContainer layout={{ width: 220, flexDirection: 'row', alignItems: 'center', paddingLeft: 10 }}>
+              <FT2Cell label="Pattern" value={currentPatternInOrder} min={0} max={Math.max(0, patterns.length - 1)} onChange={handlePatternChange} width={48} />
+            </pixiContainer>
 
-            {/* BPM */}
-            <FT2Cell label="BPM" value={bpm} min={32} max={255} onChange={setBPM} width={48} />
+            {/* Col 4: Edit Step (220px matching DOM .ft2-col-4) */}
+            <pixiContainer layout={{ width: 220, flexDirection: 'row', alignItems: 'center', paddingLeft: 10 }}>
+              <FT2Cell label="Edit Step" value={editStep} min={0} max={16} onChange={setEditStep} width={48} />
+            </pixiContainer>
 
-
-            {/* Pattern */}
-            <FT2Cell label="Pattern" value={currentPatternInOrder} min={0} max={Math.max(0, patterns.length - 1)} onChange={handlePatternChange} width={48} />
-
-
-            {/* Edit Step */}
-            <FT2Cell label="Edit Step" value={editStep} min={0} max={16} onChange={setEditStep} width={48} />
-
-
-            {/* Play Song / Play Pattern */}
-            <PixiButton
-              label={isPlayingSong ? 'Stop Song' : 'Play Song'}
-              variant="ft2"
-              color={isPlayingSong ? 'red' : 'green'}
-              size="sm"
-              active={isPlayingSong}
-              onClick={handlePlaySong}
-            />
-            <PixiButton
-              label={isPlayingPattern ? 'Stop Pattern' : 'Play Pattern'}
-              variant="ft2"
-              color={isPlayingPattern ? 'red' : 'default'}
-              size="sm"
-              active={isPlayingPattern}
-              onClick={handlePlayPattern}
-            />
+            {/* Col 5: Play Song / Play Pattern (flex 1 matching DOM .ft2-section-playback) */}
+            <pixiContainer layout={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 6, paddingLeft: 10 }}>
+              <PixiButton
+                label={isPlayingSong ? 'Stop Song' : 'Play Song'}
+                variant="ft2"
+                color={isPlayingSong ? 'red' : 'green'}
+                size="sm"
+                active={isPlayingSong}
+                onClick={handlePlaySong}
+                width={72}
+              />
+              <PixiButton
+                label={isPlayingPattern ? 'Stop Pattern' : 'Play Pattern'}
+                variant="ft2"
+                color={isPlayingPattern ? 'red' : 'default'}
+                size="sm"
+                active={isPlayingPattern}
+                onClick={handlePlayPattern}
+                width={88}
+              />
+            </pixiContainer>
 
             {/* Spacer */}
             <pixiContainer layout={{ flex: 1 }} />
@@ -507,53 +513,44 @@ export const PixiFT2Toolbar: React.FC = () => {
             }}
           >
 
-            {/* Song Length */}
-            <FT2Cell
-              label="Song Len"
-              value={songLength}
-              min={1}
-              max={256}
-              onChange={handleSongLengthChange}
-              width={48}
-            />
+            {/* Col 1: Song Len (260px matching DOM .ft2-col-1) */}
+            <pixiContainer layout={{ width: 260, flexDirection: 'row', alignItems: 'center' }}>
+              <FT2Cell label="Song Len" value={songLength} min={1} max={256} onChange={handleSongLengthChange} width={48} />
+            </pixiContainer>
 
+            {/* Col 2: Speed (220px matching DOM .ft2-col-2) */}
+            <pixiContainer layout={{ width: 220, flexDirection: 'row', alignItems: 'center', paddingLeft: 10 }}>
+              <FT2Cell label="Speed" value={speed} min={1} max={31} onChange={setSpeed} width={44} />
+            </pixiContainer>
 
-            {/* Speed (Groove button is in EditorControlsBar, not here — matching DOM) */}
-            <FT2Cell label="Speed" value={speed} min={1} max={31} onChange={setSpeed} width={44} />
+            {/* Col 3: Length (220px matching DOM .ft2-col-3) */}
+            <pixiContainer layout={{ width: 220, flexDirection: 'row', alignItems: 'center', paddingLeft: 10 }}>
+              <FT2Cell
+                label="Length"
+                value={patternLength}
+                min={1}
+                max={256}
+                onChange={handleLengthChange}
+                width={48}
+                presets={[
+                  { label: '16 rows', value: 16 },
+                  { label: '32 rows', value: 32 },
+                  { label: '48 rows', value: 48 },
+                  { label: '64 rows (default)', value: 64 },
+                  { label: '96 rows', value: 96 },
+                  { label: '128 rows', value: 128 },
+                  { label: '192 rows', value: 192 },
+                  { label: '256 rows (max)', value: 256 },
+                ]}
+              />
+            </pixiContainer>
 
+            {/* Col 4: Song Len duplicate (220px matching DOM .ft2-col-4) */}
+            <pixiContainer layout={{ width: 220, flexDirection: 'row', alignItems: 'center', paddingLeft: 10 }}>
+              <FT2Cell label="Song Len" value={songLength} min={1} max={256} onChange={handleSongLengthChange} width={48} />
+            </pixiContainer>
 
-            {/* Length (pattern rows) */}
-            <FT2Cell
-              label="Length"
-              value={patternLength}
-              min={1}
-              max={256}
-              onChange={handleLengthChange}
-              width={48}
-              presets={[
-                { label: '16 rows', value: 16 },
-                { label: '32 rows', value: 32 },
-                { label: '48 rows', value: 48 },
-                { label: '64 rows (default)', value: 64 },
-                { label: '96 rows', value: 96 },
-                { label: '128 rows', value: 128 },
-                { label: '192 rows', value: 192 },
-                { label: '256 rows (max)', value: 256 },
-              ]}
-            />
-
-
-            {/* Song Len (duplicated to match DOM row 2 layout) */}
-            <FT2Cell
-              label="Song Len"
-              value={songLength}
-              min={1}
-              max={256}
-              onChange={handleSongLengthChange}
-              width={48}
-            />
-
-            {/* Spacer */}
+            {/* Col 5: spacer (flex 1) */}
             <pixiContainer layout={{ flex: 1 }} />
           </layoutContainer>
         </pixiContainer>
