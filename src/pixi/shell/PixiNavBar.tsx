@@ -231,15 +231,18 @@ export const PixiNavBar: React.FC = () => {
           searchable
         />
 
-        {/* Master Volume — horizontal slider matching DOM's <input type="range"> */}
+        {/* Master Volume — horizontal slider matching DOM's <input type="range" class="w-24"> */}
         <PixiSlider
           value={n.masterVolume}
           min={-60}
           max={0}
           onChange={n.setMasterVolume}
-          label=""
+          label="Vol"
           orientation="horizontal"
           length={96}
+          thickness={4}
+          handleWidth={12}
+          handleHeight={18}
           defaultValue={0}
           layout={{}}
         />
