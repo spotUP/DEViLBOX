@@ -492,6 +492,21 @@ export class RdPianoSynth implements DevilboxSynth {
     return this.currentPatch;
   }
 
+  set(param: string, value: number): void {
+    switch (param) {
+      case 'volume':
+        this.output.gain.setValueAtTime(value, this.output.context.currentTime);
+        break;
+    }
+  }
+
+  get(param: string): number | undefined {
+    switch (param) {
+      case 'volume': return this.output.gain.value;
+      default: return undefined;
+    }
+  }
+
   dispose(): void {
     this._worklet?.port.postMessage({ type: 'allNotesOff' });
     this._worklet?.port.postMessage({ type: 'dispose' });

@@ -7,11 +7,44 @@
 import { useCallback, useMemo, useRef, useState } from 'react';
 import type { Graphics as GraphicsType, FederatedPointerEvent } from 'pixi.js';
 import { usePixiTheme } from '../../theme';
-import { useAutomationStore } from '@stores';
+import { useAutomationStore, useInstrumentStore, useTrackerStore } from '@stores';
 import { interpolateAutomationValue } from '@typedefs/automation';
 import type { AutomationCurve } from '@typedefs/automation';
+import { getNKSParametersForSynth } from '@/midi/performance/synthParameterMaps';
+import { NKSSection } from '@/midi/performance/types';
+import type { SynthType } from '@typedefs/instrument';
 
-const LANE_WIDTH = 20;
+const LANE_WIDTH = 24;
+const MULTI_LANE_WIDTH = 20;
+
+/** Map NKS section to a hex color for Pixi rendering */
+function sectionToHex(section: string): number {
+  switch (section) {
+    case NKSSection.FILTER: return 0x4488ff;
+    case NKSSection.ENVELOPE: return 0xff8844;
+    case NKSSection.SYNTHESIS: return 0x44ff88;
+    case NKSSection.LFO:
+    case NKSSection.MODULATION: return 0xaa44ff;
+    case NKSSection.EFFECTS: return 0xff44aa;
+    case NKSSection.OUTPUT:
+    case NKSSection.MIXER: return 0x88ff44;
+    default: return 0x4488ff;
+  }
+}
+
+/** Resolve NKS section color for a parameter on a channel */
+function resolveParamColor(channelIndex: number, paramId: string): number {
+  const { patterns, currentPatternIndex } = useTrackerStore.getState();
+  const pat = patterns[currentPatternIndex];
+  if (!pat) return 0x4488ff;
+  const ch = pat.channels[channelIndex];
+  if (!ch || ch.instrumentId === null) return 0x4488ff;
+  const inst = useInstrumentStore.getState().instruments.find(i => i.id === ch.instrumentId);
+  if (!inst) return 0x4488ff;
+  const nksParams = getNKSParametersForSynth(inst.synthType as SynthType);
+  const nksParam = nksParams.find(p => p.id === paramId);
+  return nksParam ? sectionToHex(nksParam.section) : 0x4488ff;
+}
 
 interface PixiAutomationLanesProps {
   width: number;
@@ -49,28 +82,50 @@ export const PixiAutomationLanes: React.FC<PixiAutomationLanesProps> = ({
   const [dragState, setDragState] = useState<{ curveId: string; channelIndex: number } | null>(null);
   const lastClickRef = useRef<{ time: number; row: number }>({ time: 0, row: -1 });
 
-  // Per-channel active parameter
-  const channelParameters = useMemo(() => {
-    const result: string[] = [];
+  // Per-channel active parameters (multi-lane support)
+  const channelParameterLists = useMemo(() => {
+    const result: string[][] = [];
     for (let i = 0; i < channelCount; i++) {
       const lane = channelLanes.get(i);
-      result.push(lane?.activeParameter || parameter);
+      const params = lane?.activeParameters?.length
+        ? [...lane.activeParameters]
+        : [lane?.activeParameter || parameter];
+      result.push(params);
     }
     return result;
   }, [channelCount, channelLanes, parameter]);
 
-  // Get curves for current pattern
+  const channelParameters = useMemo(
+    () => channelParameterLists.map(pl => pl[0] || parameter),
+    [channelParameterLists, parameter],
+  );
+
+  // Multi-lane curve groups: Map<channelIndex, Array<{curve, param}>>
+  const channelCurveGroups = useMemo(() => {
+    const result = new Map<number, Array<{ curve: AutomationCurve; param: string }>>();
+    for (let i = 0; i < channelCount; i++) {
+      const params = channelParameterLists[i];
+      const group: Array<{ curve: AutomationCurve; param: string }> = [];
+      for (const p of params) {
+        const curve = allCurves.find(
+          c => c.patternId === patternId && c.channelIndex === i && c.parameter === p
+        );
+        if (curve && curve.points.length > 0) group.push({ curve, param: p });
+      }
+      result.set(i, group);
+    }
+    return result;
+  }, [patternId, channelCount, channelParameterLists, allCurves]);
+
+  // Primary curves (first param per channel, backward compat)
   const curves = useMemo(() => {
     const result: (AutomationCurve | null)[] = [];
     for (let i = 0; i < channelCount; i++) {
-      const chParam = channelParameters[i];
-      const curve = allCurves.find(
-        c => c.patternId === patternId && c.channelIndex === i && c.parameter === chParam
-      );
-      result.push(curve && curve.points.length > 0 ? curve : null);
+      const group = channelCurveGroups.get(i);
+      result.push(group && group.length > 0 ? group[0].curve : null);
     }
     return result;
-  }, [patternId, channelCount, channelParameters, allCurves]);
+  }, [channelCount, channelCurveGroups]);
 
   // Ghost curves for prev/next patterns
   const prevCurves = useMemo(() => {
@@ -95,9 +150,11 @@ export const PixiAutomationLanes: React.FC<PixiAutomationLanesProps> = ({
     });
   }, [nextPatternId, channelCount, channelParameters, allCurves]);
 
+  const hasMultiLane = Array.from(channelCurveGroups.values()).some(g => g.length > 1);
   const hasAnyData = curves.some(c => c !== null) ||
     prevCurves.some(c => c !== null) ||
-    nextCurves.some(c => c !== null);
+    nextCurves.some(c => c !== null) ||
+    hasMultiLane;
 
   // Interaction handlers
   const handlePointerDown = useCallback((e: FederatedPointerEvent) => {
@@ -214,11 +271,60 @@ export const PixiAutomationLanes: React.FC<PixiAutomationLanesProps> = ({
     }
   };
 
+  // Draw a single curve with a specific color
+  const drawSingleCurve = (
+    g: GraphicsType,
+    curve: AutomationCurve,
+    pLength: number,
+    laneLeft: number,
+    laneWidth: number,
+    yOffset: number,
+    color: number,
+    alpha: number,
+    showPoints: boolean
+  ) => {
+    const points: { x: number; y: number }[] = [];
+    for (let row = 0; row < pLength; row++) {
+      const val = interpolateAutomationValue(curve.points, row, curve.interpolation, curve.mode);
+      if (val !== null) {
+        const x = laneLeft + val * (laneWidth - 2) + 1;
+        const y = yOffset + row * rowHeight + rowHeight / 2;
+        points.push({ x, y });
+      }
+    }
+    if (points.length < 2) return;
+
+    // Fill
+    const rightX = laneLeft + laneWidth;
+    g.moveTo(rightX, points[0].y);
+    g.lineTo(points[0].x, points[0].y);
+    for (let i = 1; i < points.length; i++) g.lineTo(points[i].x, points[i].y);
+    g.lineTo(rightX, points[points.length - 1].y);
+    g.closePath();
+    g.fill({ color, alpha: 0.08 * alpha });
+
+    // Stroke
+    g.moveTo(points[0].x, points[0].y);
+    for (let i = 1; i < points.length; i++) g.lineTo(points[i].x, points[i].y);
+    g.stroke({ color, alpha: 0.6 * alpha, width: 1.5 });
+
+    // Points
+    if (showPoints) {
+      for (const pt of curve.points) {
+        const x = laneLeft + pt.value * (laneWidth - 2) + 1;
+        const y = yOffset + pt.row * rowHeight + rowHeight / 2;
+        g.circle(x, y, 2);
+        g.fill({ color, alpha: 0.8 });
+      }
+    }
+  };
+
   // Main draw callback
   const draw = useCallback((g: GraphicsType) => {
     g.clear();
     if (!hasAnyData) return;
 
+    const channelWidth = width / channelCount;
     const prevLen = prevPatternId ? (prevPatternLength || patternLength) : 0;
 
     // Ghost: previous pattern curves
@@ -226,15 +332,28 @@ export const PixiAutomationLanes: React.FC<PixiAutomationLanesProps> = ({
       drawCurves(g, prevCurves, prevLen, -(prevLen * rowHeight), 0.5, false);
     }
 
-    // Current pattern curves
+    // Current pattern curves (primary lane)
     drawCurves(g, curves, patternLength, 0, 1, true);
+
+    // Multi-lane: additional curves per channel with section-colored strokes
+    for (const [ch, group] of channelCurveGroups.entries()) {
+      if (group.length <= 1) continue;
+      const baseLaneLeft = (ch + 1) * channelWidth - LANE_WIDTH - 4;
+
+      for (let laneIdx = 1; laneIdx < group.length; laneIdx++) {
+        const { curve, param } = group[laneIdx];
+        const laneLeft = baseLaneLeft - laneIdx * (MULTI_LANE_WIDTH + 2);
+        const paramColor = resolveParamColor(ch, param);
+        drawSingleCurve(g, curve, patternLength, laneLeft, MULTI_LANE_WIDTH, 0, paramColor, 1, true);
+      }
+    }
 
     // Ghost: next pattern curves
     if (nextCurves.length > 0) {
       const nextLen = nextPatternLength || patternLength;
       drawCurves(g, nextCurves, nextLen, patternLength * rowHeight, 0.5, false);
     }
-  }, [hasAnyData, curves, prevCurves, nextCurves, patternLength, prevPatternLength, nextPatternLength, prevPatternId, rowHeight, width, channelCount, theme]);
+  }, [hasAnyData, curves, prevCurves, nextCurves, channelCurveGroups, patternLength, prevPatternLength, nextPatternLength, prevPatternId, rowHeight, width, channelCount, theme]);
 
   if (!hasAnyData) return null;
 

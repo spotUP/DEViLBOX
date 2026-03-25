@@ -493,6 +493,21 @@ export class CZ101Synth implements DevilboxSynth {
     return {};
   }
 
+  set(param: string, value: number): void {
+    switch (param) {
+      case 'volume':
+        this.output.gain.setValueAtTime(value, this.output.context.currentTime);
+        break;
+    }
+  }
+
+  get(param: string): number | undefined {
+    switch (param) {
+      case 'volume': return this.output.gain.value;
+      default: return undefined;
+    }
+  }
+
   dispose(): void {
     if (this.workletNode) {
       this.workletNode.disconnect();
