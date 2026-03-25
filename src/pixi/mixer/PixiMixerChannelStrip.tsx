@@ -28,6 +28,7 @@ import { PIXI_FONTS } from '../fonts';
 import { usePixiTheme } from '../theme';
 import { usePixiDropdownStore } from '../stores/usePixiDropdownStore';
 import type { SelectOption } from '../components/PixiSelect';
+import { VU_GREEN, VU_YELLOW, VU_RED } from '../colors';
 
 // ─── Props ────────────────────────────────────────────────────────────────────
 
@@ -54,9 +55,9 @@ interface PixiMixerChannelStripProps {
 
 const VU_WIDTH = 10;
 const VU_HEIGHT = 120;
-const VU_COLOR_GREEN  = 0x22dd66;
-const VU_COLOR_YELLOW = 0xffcc00;
-const VU_COLOR_RED    = 0xff2222;
+const VU_COLOR_GREEN  = VU_GREEN;
+const VU_COLOR_YELLOW = VU_YELLOW;
+const VU_COLOR_RED    = VU_RED;
 
 const STRIP_WIDTH = 72;
 

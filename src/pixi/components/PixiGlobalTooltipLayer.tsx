@@ -10,11 +10,12 @@ import React, { useCallback } from 'react';
 import type { Graphics as GraphicsType } from 'pixi.js';
 import { usePixiTooltipStore } from '../stores/usePixiTooltipStore';
 import { PIXI_FONTS } from '../fonts';
+import { TOOLTIP_BG } from '../colors';
 
 const TT_PAD_X = 6;
 const TT_PAD_Y = 3;
 const TT_FONT_SIZE = 11;
-const TT_BG = 0x1a1a2e;
+const TT_BG = TOOLTIP_BG;
 const TT_BG_ALPHA = 0.92;
 const TT_BORDER_RADIUS = 4;
 const TT_OFFSET_Y = 10; // pixels above the anchor point

@@ -14,6 +14,14 @@ import {
   getActionTypeName,
   getActionTypeColor,
 } from '@stores/useHistoryStore';
+import {
+  ACTION_NOTE,
+  ACTION_EFFECT,
+  ACTION_INSERT,
+  ACTION_DELETE,
+  ACTION_PATTERN,
+  ACTION_BULK,
+} from '../colors';
 
 interface PixiUndoHistoryPanelProps {
   isOpen: boolean;
@@ -21,12 +29,12 @@ interface PixiUndoHistoryPanelProps {
 }
 
 const COLOR_MAP: Record<string, number> = {
-  'text-blue-400': 0x60A5FA,
-  'text-green-400': 0x4ADE80,
-  'text-yellow-400': 0xFACC15,
-  'text-red-400': 0xF87171,
-  'text-purple-400': 0xC084FC,
-  'text-orange-400': 0xFB923C,
+  'text-blue-400': ACTION_NOTE,
+  'text-green-400': ACTION_EFFECT,
+  'text-yellow-400': ACTION_INSERT,
+  'text-red-400': ACTION_DELETE,
+  'text-purple-400': ACTION_PATTERN,
+  'text-orange-400': ACTION_BULK,
   'text-accent-highlight': 0x22D3EE,
   'text-neutral-400': 0xA3A3A3,
 };
