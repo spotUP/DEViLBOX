@@ -16,6 +16,7 @@ import { getToneEngine } from '@engine/ToneEngine';
 import { setFormatPlaybackRow, setFormatPlaybackPlaying } from '@engine/FormatPlaybackState';
 import { getTrackerReplayer, type TrackerFormat } from '@engine/TrackerReplayer';
 import { resolveArrangement } from '@lib/arrangement/resolveArrangement';
+import { processArrangementAutomation, hasArrangementAutomation } from '@engine/ArrangementAutomationPlayer';
 import type { UADEEngine } from '@engine/uade/UADEEngine';
 
 export const usePatternPlayback = () => {
@@ -542,6 +543,10 @@ export const usePatternPlayback = () => {
               useTransportStore.getState().setCurrentGlobalRow(globalRow);
               if (arrangement.isArrangementMode) {
                 useArrangementStore.getState().setPlaybackRow(globalRow);
+                // Apply arrangement-level timeline automation
+                if (hasArrangementAutomation()) {
+                  processArrangementAutomation(globalRow);
+                }
               }
             }, 0);
           }
