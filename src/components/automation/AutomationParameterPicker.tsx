@@ -6,6 +6,7 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { useAutomationStore } from '@stores';
 import { useChannelAutomationParams, groupParamsBySection } from '@hooks/useChannelAutomationParams';
+import { useResponsiveSafe } from '@/contexts/ResponsiveContext';
 
 interface AutomationParameterPickerProps {
   channelIndex: number;
@@ -20,8 +21,12 @@ export const AutomationParameterPicker: React.FC<AutomationParameterPickerProps>
   width,
   top,
 }) => {
+  const { isMobile } = useResponsiveSafe();
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const pillPadding = isMobile ? 'px-2.5 py-1.5' : 'px-1.5 py-0.5';
+  const pillText = isMobile ? 'text-[11px]' : 'text-[9px]';
+  const dropdownItemPad = isMobile ? 'px-3 py-2.5' : 'px-2 py-1';
 
   const { params } = useChannelAutomationParams(channelIndex);
   const groups = useMemo(() => groupParamsBySection(params), [params]);
@@ -66,7 +71,7 @@ export const AutomationParameterPicker: React.FC<AutomationParameterPickerProps>
             <button
               key={paramKey}
               onClick={() => removeActiveParameter(channelIndex, paramKey)}
-              className="px-1.5 py-0.5 text-[9px] font-mono rounded border transition-colors"
+              className={`${pillPadding} ${pillText} font-mono rounded border transition-colors`}
               style={{
                 backgroundColor: `${param.color}20`,
                 borderColor: param.color,
@@ -83,7 +88,7 @@ export const AutomationParameterPicker: React.FC<AutomationParameterPickerProps>
         {/* Add parameter button */}
         <button
           onClick={() => setIsOpen(!isOpen)}
-          className="px-1 py-0.5 text-[9px] font-mono rounded border border-dark-border text-text-muted hover:text-text-secondary hover:border-dark-borderLight transition-colors"
+          className={`${pillPadding} ${pillText} font-mono rounded border border-dark-border text-text-muted hover:text-text-secondary hover:border-dark-borderLight transition-colors`}
           title="Add automation parameter"
         >
           +
@@ -115,7 +120,7 @@ export const AutomationParameterPicker: React.FC<AutomationParameterPickerProps>
                         setShowLane(channelIndex, true);
                       }
                     }}
-                    className={`w-full text-left px-2 py-1 text-xs flex items-center gap-1.5 transition-colors ${
+                    className={`w-full text-left ${dropdownItemPad} text-xs flex items-center gap-1.5 transition-colors ${
                       isActive
                         ? 'bg-accent-primary/10 text-accent-primary'
                         : 'text-text-secondary hover:bg-dark-bgHover hover:text-text-primary'
