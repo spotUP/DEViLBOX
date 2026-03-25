@@ -365,6 +365,8 @@ interface TrackerStore {
   // Advanced editing
   applyInstrumentToSelection: (instrumentId: number) => void;
   transposeSelection: (semitones: number, currentInstrumentOnly?: boolean) => void;
+  transposeTrack: (channelIndex: number, semitones: number) => void;
+  transposePattern: (semitones: number) => void;
   remapInstrument: (oldId: number, newId: number, scope: 'block' | 'track' | 'pattern' | 'song') => void;
   interpolateSelection: (column: 'volume' | 'cutoff' | 'resonance' | 'envMod' | 'pan' | 'effParam' | 'effParam2', startValue: number, endValue: number, curve?: 'linear' | 'log' | 'exp' | 'scurve') => void;
   humanizeSelection: (volumeVariation: number) => void;
@@ -888,6 +890,50 @@ export const useTrackerStore = create<TrackerStore>()(
       });
       useHistoryStore.getState().pushAction('TRANSPOSE', 'Transpose', patternIndex, beforePattern, get().patterns[patternIndex]);
       syncBulkEdit(patternIndex, get().patterns[patternIndex]);
+      syncBulkEdit(patternIndex, get().patterns[patternIndex]);
+    },
+
+    // Transpose entire track (single channel, all rows) by semitones
+    transposeTrack: (channelIndex, semitones) => {
+      const patternIndex = get().currentPatternIndex;
+      const beforePattern = get().patterns[patternIndex];
+      set((state) => {
+        const pattern = state.patterns[state.currentPatternIndex];
+        const fullTrackSelection = {
+          startChannel: channelIndex,
+          endChannel: channelIndex,
+          startRow: 0,
+          endRow: pattern.length - 1,
+          startColumn: 'note' as const,
+          endColumn: 'note' as const,
+          columnTypes: ['note' as const],
+        };
+        const { cursor } = useCursorStore.getState();
+        transposeSelectionHelper(pattern, fullTrackSelection, cursor, semitones, null);
+      });
+      useHistoryStore.getState().pushAction('TRANSPOSE', 'Transpose Track', patternIndex, beforePattern, get().patterns[patternIndex]);
+      syncBulkEdit(patternIndex, get().patterns[patternIndex]);
+    },
+
+    // Transpose entire pattern (all channels, all rows) by semitones
+    transposePattern: (semitones) => {
+      const patternIndex = get().currentPatternIndex;
+      const beforePattern = get().patterns[patternIndex];
+      set((state) => {
+        const pattern = state.patterns[state.currentPatternIndex];
+        const fullPatternSelection = {
+          startChannel: 0,
+          endChannel: pattern.channels.length - 1,
+          startRow: 0,
+          endRow: pattern.length - 1,
+          startColumn: 'note' as const,
+          endColumn: 'note' as const,
+          columnTypes: ['note' as const],
+        };
+        const { cursor } = useCursorStore.getState();
+        transposeSelectionHelper(pattern, fullPatternSelection, cursor, semitones, null);
+      });
+      useHistoryStore.getState().pushAction('TRANSPOSE', 'Transpose Pattern', patternIndex, beforePattern, get().patterns[patternIndex]);
       syncBulkEdit(patternIndex, get().patterns[patternIndex]);
     },
 
