@@ -48,7 +48,7 @@ interface DJViewProps {
   onShowDrumpads?: () => void;
 }
 
-export const DJView: React.FC<DJViewProps> = ({ onShowDrumpads }) => {
+export const DJView: React.FC<DJViewProps> = ({ onShowDrumpads: _onShowDrumpads }) => {
   const djViewRef = useRef<HTMLDivElement>(null);
   const engineRef = useRef<DJEngine | null>(null);
   const setDJModeActive = useDJStore((s) => s.setDJModeActive);
@@ -332,14 +332,6 @@ export const DJView: React.FC<DJViewProps> = ({ onShowDrumpads }) => {
           >
             FX Editor
           </button>
-          {onShowDrumpads && (
-            <button
-              onClick={onShowDrumpads}
-              className="px-3 py-1.5 rounded-md text-xs font-mono border transition-all border-dark-borderLight bg-dark-bgTertiary text-text-secondary hover:bg-dark-bgHover hover:text-text-primary"
-            >
-              Drumpads
-            </button>
-          )}
           <button
             onClick={() => setShowSampler(!showSampler)}
             className={`px-3 py-1.5 rounded-md text-xs font-mono border transition-all
@@ -347,9 +339,9 @@ export const DJView: React.FC<DJViewProps> = ({ onShowDrumpads }) => {
                 ? 'border-amber-500 bg-amber-900/20 text-amber-400'
                 : 'border-dark-borderLight bg-dark-bgTertiary text-text-secondary hover:bg-dark-bgHover hover:text-text-primary'
               }`}
-            title="Toggle inline sampler pads (routes through DJ mixer)"
+            title="Toggle drum pads / sampler"
           >
-            Sampler
+            Pads
           </button>
           <button
             onClick={() => setShowFileBrowser(!showFileBrowser)}
