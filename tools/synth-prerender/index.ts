@@ -626,6 +626,10 @@ export function bakeSynthInstruments(song: TrackerSong, exportAs: 'mod' | 'xm' =
   const hvlSampleRate = isHVL ? 44100 : 8287;
   const useXMEnvelopes = exportAs === 'xm';
 
+  // For formats that already map arpeggio/vibrato into MOD pattern columns,
+  // skip baking those effects into the sample to avoid doubling up.
+  const skipEffects = ['FC', 'SoundMon', 'HVL', 'AHX', 'DigMug', 'DM1', 'DM2'].includes(song.format ?? '');
+
   for (let instIdx = 0; instIdx < song.instruments.length; instIdx++) {
     const inst = song.instruments[instIdx];
     // Check if instrument has a synth config that XM envelope export can handle
@@ -651,7 +655,7 @@ export function bakeSynthInstruments(song: TrackerSong, exportAs: 'mod' | 'xm' =
     // Try format-specific simulators in priority order
     if (inst.hively) {
       const result = renderSynthInstrument(
-        hivelySim, inst.hively, 24, hvlSampleRate,
+        hivelySim, inst.hively, 24, hvlSampleRate, undefined, skipEffects,
       );
       attachSampleToInstrument(inst, result.pcm, result.loopStart, result.loopEnd, result.sampleRate);
       continue;
@@ -664,7 +668,7 @@ export function bakeSynthInstruments(song: TrackerSong, exportAs: 'mod' | 'xm' =
       } else {
         // MOD: pre-render with ADSR baked into PCM
         const result = renderSynthInstrument(
-          fcSim, inst.fc, 24, DEFAULT_SAMPLE_RATE,
+          fcSim, inst.fc, 24, DEFAULT_SAMPLE_RATE, undefined, skipEffects,
         );
         attachSampleToInstrument(inst, result.pcm, result.loopStart, result.loopEnd, result.sampleRate);
       }
@@ -687,7 +691,7 @@ export function bakeSynthInstruments(song: TrackerSong, exportAs: 'mod' | 'xm' =
         attachSoundMonXM(inst, inst.soundMon);
       } else {
         const result = renderSynthInstrument(
-          soundMonSim, inst.soundMon, 24, DEFAULT_SAMPLE_RATE,
+          soundMonSim, inst.soundMon, 24, DEFAULT_SAMPLE_RATE, undefined, skipEffects,
         );
         attachSampleToInstrument(inst, result.pcm, result.loopStart, result.loopEnd, result.sampleRate);
       }
@@ -700,7 +704,7 @@ export function bakeSynthInstruments(song: TrackerSong, exportAs: 'mod' | 'xm' =
         attachSidMon1XM(inst, inst.sidmon1);
       } else {
         const result = renderSynthInstrument(
-          sidMon1Sim, inst.sidmon1, 24, DEFAULT_SAMPLE_RATE,
+          sidMon1Sim, inst.sidmon1, 24, DEFAULT_SAMPLE_RATE, undefined, skipEffects,
         );
         attachSampleToInstrument(inst, result.pcm, result.loopStart, result.loopEnd, result.sampleRate);
       }
@@ -712,7 +716,7 @@ export function bakeSynthInstruments(song: TrackerSong, exportAs: 'mod' | 'xm' =
         attachDigMugXM(inst, inst.digMug);
       } else {
         const result = renderSynthInstrument(
-          digMugSim, inst.digMug, 24, DEFAULT_SAMPLE_RATE,
+          digMugSim, inst.digMug, 24, DEFAULT_SAMPLE_RATE, undefined, skipEffects,
         );
         attachSampleToInstrument(inst, result.pcm, result.loopStart, result.loopEnd, result.sampleRate);
       }
@@ -724,7 +728,7 @@ export function bakeSynthInstruments(song: TrackerSong, exportAs: 'mod' | 'xm' =
         attachHippelCoSoXM(inst, inst.hippelCoso, instIdx);
       } else {
         const result = renderSynthInstrument(
-          hippelCoSoSim, inst.hippelCoso, 24, DEFAULT_SAMPLE_RATE,
+          hippelCoSoSim, inst.hippelCoso, 24, DEFAULT_SAMPLE_RATE, undefined, skipEffects,
         );
         attachSampleToInstrument(inst, result.pcm, result.loopStart, result.loopEnd, result.sampleRate);
       }
@@ -736,7 +740,7 @@ export function bakeSynthInstruments(song: TrackerSong, exportAs: 'mod' | 'xm' =
         attachDavidWhittakerXM(inst, inst.davidWhittaker);
       } else {
         const result = renderSynthInstrument(
-          davidWhittakerSim, inst.davidWhittaker, 24, DEFAULT_SAMPLE_RATE,
+          davidWhittakerSim, inst.davidWhittaker, 24, DEFAULT_SAMPLE_RATE, undefined, skipEffects,
         );
         attachSampleToInstrument(inst, result.pcm, result.loopStart, result.loopEnd, result.sampleRate);
       }
@@ -748,7 +752,7 @@ export function bakeSynthInstruments(song: TrackerSong, exportAs: 'mod' | 'xm' =
         attachDeltaMusic1XM(inst, inst.deltaMusic1);
       } else {
         const result = renderSynthInstrument(
-          deltaMusic1Sim, inst.deltaMusic1, 24, DEFAULT_SAMPLE_RATE,
+          deltaMusic1Sim, inst.deltaMusic1, 24, DEFAULT_SAMPLE_RATE, undefined, skipEffects,
         );
         attachSampleToInstrument(inst, result.pcm, result.loopStart, result.loopEnd, result.sampleRate);
       }
@@ -760,7 +764,7 @@ export function bakeSynthInstruments(song: TrackerSong, exportAs: 'mod' | 'xm' =
         attachDeltaMusic2XM(inst, inst.deltaMusic2);
       } else {
         const result = renderSynthInstrument(
-          deltaMusic2Sim, inst.deltaMusic2, 24, DEFAULT_SAMPLE_RATE,
+          deltaMusic2Sim, inst.deltaMusic2, 24, DEFAULT_SAMPLE_RATE, undefined, skipEffects,
         );
         attachSampleToInstrument(inst, result.pcm, result.loopStart, result.loopEnd, result.sampleRate);
       }

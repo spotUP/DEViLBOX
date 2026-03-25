@@ -16,6 +16,7 @@ const enum Phase { Attack, Decay, Sustain, Release, Done }
 export class DeltaMusic1SynthSim implements ISynthSimulator {
   private config!: DeltaMusic1Config;
   private basePeriod = 428;
+  private skipPatternEffects = false;
 
   // ADSR
   private phase = Phase.Attack;
@@ -37,9 +38,10 @@ export class DeltaMusic1SynthSim implements ISynthSimulator {
   // Waveform
   private waveform!: Int8Array;
 
-  init(config: unknown, baseNote: number): void {
+  init(config: unknown, baseNote: number, skipPatternEffects = false): void {
     this.config = config as DeltaMusic1Config;
     this.basePeriod = semitoneToAmigaPeriod(baseNote);
+    this.skipPatternEffects = skipPatternEffects;
 
     this.phase = Phase.Attack;
     this.volume = 0;
@@ -65,7 +67,8 @@ export class DeltaMusic1SynthSim implements ISynthSimulator {
     this.processADSR(cfg);
 
     // ── 2. Arpeggio ──────────────────────────────────────────────────
-    if (cfg.arpeggio && cfg.arpeggio.length > 0) {
+    // Skip when skipPatternEffects=true: MOD pattern column 0xy handles arpeggio
+    if (!this.skipPatternEffects && cfg.arpeggio && cfg.arpeggio.length > 0) {
       const tableDelay = cfg.tableDelay || 1;
       this.delayCounter++;
       if (this.delayCounter >= tableDelay) {
@@ -81,6 +84,8 @@ export class DeltaMusic1SynthSim implements ISynthSimulator {
         this.arpIdx++;
         if (this.arpIdx >= cfg.arpeggio.length) this.arpIdx = 0;
       }
+    } else if (this.skipPatternEffects) {
+      this.arpPeriodOffset = 0;
     }
 
     // ── 3. Vibrato ───────────────────────────────────────────────────
@@ -88,6 +93,7 @@ export class DeltaMusic1SynthSim implements ISynthSimulator {
     const vibStep = cfg.vibratoStep ?? 0;
     const vibLen = cfg.vibratoLength ?? 0;
 
+    // DM1 vibrato is synth-internal (not mapped to MOD pattern), so keep it
     if (vibStep > 0 && vibLen > 0) {
       this.vibTick++;
       if (this.vibTick > vibWait) {
