@@ -223,6 +223,25 @@ export class V2Synth implements DevilboxSynth {
     }
   }
 
+  set(param: string, value: number): void {
+    switch (param) {
+      case 'volume':
+        this.output.gain.setValueAtTime(value, this.output.context.currentTime);
+        // Also send MIDI CC7 to the V2 engine for proper internal volume
+        if (this._worklet && this._initialized) {
+          this._worklet.port.postMessage({ type: 'controlChange', channel: 0, cc: 7, value: Math.round(value * 127) });
+        }
+        break;
+    }
+  }
+
+  get(param: string): number | undefined {
+    switch (param) {
+      case 'volume': return this.output.gain.value;
+      default: return undefined;
+    }
+  }
+
   public dispose(): void {
     // Clear all pending release timers to prevent memory leaks
     this._releaseTimers.forEach(timer => clearTimeout(timer));

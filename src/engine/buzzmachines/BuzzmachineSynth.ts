@@ -150,6 +150,21 @@ export class BuzzmachineSynth implements DevilboxSynth {
     }
   }
 
+  set(param: string, value: number): void {
+    switch (param) {
+      case 'volume':
+        this.output.gain.setValueAtTime(value, this.output.context.currentTime);
+        break;
+    }
+  }
+
+  get(param: string): number | undefined {
+    switch (param) {
+      case 'volume': return this.output.gain.value;
+      default: return undefined;
+    }
+  }
+
   /**
    * Dispose of resources
    */

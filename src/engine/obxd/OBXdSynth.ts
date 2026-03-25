@@ -678,6 +678,45 @@ export class OBXdSynth implements DevilboxSynth {
     });
   }
 
+  /** NKS param name → OBXd param ID for automation */
+  private static readonly NKS_TO_PARAM: Record<string, number> = {
+    'osc1Waveform': OBXdParam.OSC1_WAVEFORM, 'osc1Octave': OBXdParam.OSC1_OCTAVE,
+    'osc1PulseWidth': OBXdParam.OSC1_PW, 'osc1Level': OBXdParam.OSC1_LEVEL,
+    'osc2Waveform': OBXdParam.OSC2_WAVEFORM, 'osc2Octave': OBXdParam.OSC2_OCTAVE,
+    'osc2Detune': OBXdParam.OSC2_DETUNE, 'osc2Level': OBXdParam.OSC2_LEVEL,
+    'filterCutoff': OBXdParam.FILTER_CUTOFF, 'filterResonance': OBXdParam.FILTER_RESONANCE,
+    'filterEnvAmount': OBXdParam.FILTER_ENV_AMOUNT, 'filterKeyTrack': OBXdParam.FILTER_KEY_TRACK,
+    'filterAttack': OBXdParam.FILTER_ATTACK, 'filterDecay': OBXdParam.FILTER_DECAY,
+    'filterSustain': OBXdParam.FILTER_SUSTAIN, 'filterRelease': OBXdParam.FILTER_RELEASE,
+    'ampAttack': OBXdParam.AMP_ATTACK, 'ampDecay': OBXdParam.AMP_DECAY,
+    'ampSustain': OBXdParam.AMP_SUSTAIN, 'ampRelease': OBXdParam.AMP_RELEASE,
+    'lfoRate': OBXdParam.LFO_RATE, 'lfoWaveform': OBXdParam.LFO_WAVEFORM,
+    'lfoOscAmount': OBXdParam.LFO_OSC_AMOUNT, 'lfoFilterAmount': OBXdParam.LFO_FILTER_AMOUNT,
+    'lfoAmpAmount': OBXdParam.LFO_AMP_AMOUNT, 'lfoPwAmount': OBXdParam.LFO_PW_AMOUNT,
+    'masterVolume': OBXdParam.MASTER_VOLUME, 'portamento': OBXdParam.PORTAMENTO,
+    'unisonDetune': OBXdParam.UNISON_DETUNE,
+  };
+
+  /**
+   * Set a named parameter (for automation). Maps NKS param names to OBXd parameter IDs.
+   */
+  set(param: string, value: number): void {
+    const paramId = OBXdSynth.NKS_TO_PARAM[param];
+    if (paramId !== undefined) {
+      this.setParameter(paramId, value);
+    } else if (param === 'unison') {
+      this.setParameter(OBXdParam.UNISON, value >= 0.5 ? 1 : 0);
+    } else if (param === 'oscSync') {
+      this.setParameter(OBXdParam.OSC_SYNC, value >= 0.5 ? 1 : 0);
+    }
+  }
+
+  get(param: string): number | undefined {
+    const key = param as keyof OBXdConfig;
+    const val = this.config[key];
+    return typeof val === 'number' ? val : undefined;
+  }
+
   /**
    * Clean up resources
    */
