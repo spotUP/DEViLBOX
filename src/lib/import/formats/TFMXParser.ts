@@ -46,6 +46,7 @@ import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
 import type { Pattern, TrackerCell, InstrumentConfig } from '@/types';
 import type { TFMXConfig, UADEChipRamInfo } from '@/types/instrument';
 import type { UADEPatternLayout } from '@/engine/uade/UADEPatternEncoder';
+import type { TFMXNativeData, TFMXTrackstepEntry, TFMXPatternCommand, TFMXCommandType, TFMXVoiceAssignment } from '@/types/tfmxNative';
 import { encodeTFMXCell } from '@/engine/uade/encoders/TFMXEncoder';
 
 // ── Constants ─────────────────────────────────────────────────────────────────
@@ -271,6 +272,80 @@ function decodeTFMXPattern(buf: Uint8Array, patDataOffset: number): DecodedTFMXC
   return commands;
 }
 
+// ── Native pattern decoder (preserves full TFMX semantics) ───────────────────
+
+function decodeTFMXPatternNative(buf: Uint8Array, patDataOffset: number): TFMXPatternCommand[] {
+  const commands: TFMXPatternCommand[] = [];
+  let pos = patDataOffset;
+
+  for (let i = 0; i < MAX_COMMANDS_PER_PATTERN; i++) {
+    if (pos + 4 > buf.length) break;
+
+    const b0 = buf[pos];
+    const b1 = buf[pos + 1];
+    const b2 = buf[pos + 2];
+    const b3 = buf[pos + 3];
+    const fileOffset = pos;
+    const raw = ((b0 << 24) | (b1 << 16) | (b2 << 8) | b3) >>> 0;
+    pos += 4;
+
+    const base = { raw, fileOffset, byte0: b0, byte1: b1, byte2: b2, byte3: b3 };
+
+    if (b0 >= 0xF0) {
+      const cmdNibble = b0 & 0x0F;
+      const typeMap: Record<number, TFMXCommandType> = {
+        0: 'end', 1: 'loop', 2: 'jump', 3: 'wait', 4: 'stop',
+        5: 'keyup', 6: 'vibrato', 7: 'envelope',
+      };
+      const type: TFMXCommandType = typeMap[cmdNibble] ?? 'command';
+
+      const cmd: TFMXPatternCommand = {
+        ...base, type, commandCode: cmdNibble, commandParam: b1,
+      };
+
+      if (type === 'wait') cmd.wait = b1 + 1;
+      if (type === 'vibrato') { cmd.commandParam = (b1 << 8) | b3; }
+      if (type === 'envelope') { cmd.commandParam = (b1 << 8) | b3; }
+
+      commands.push(cmd);
+      if (type === 'end' || type === 'stop') break;
+      continue;
+    }
+
+    if (b0 < 0xC0) {
+      // Note event
+      const hasWait = (b0 & 0x80) !== 0;
+      const noteIdx = b0 & 0x3F;
+      const macro = b1;
+      const relVol = (b2 >> 4) & 0x0F;
+
+      commands.push({
+        ...base,
+        type: hasWait ? 'noteWait' : 'note',
+        note: noteIdx,
+        macro,
+        relVol,
+        wait: hasWait ? b3 + 1 : undefined,
+        detune: hasWait ? undefined : b3,
+      });
+      continue;
+    }
+
+    // 0xC0-0xEF: Portamento
+    const noteIdx = b0 & 0x3F;
+    commands.push({
+      ...base,
+      type: 'portamento',
+      note: noteIdx,
+      macro: b1 > 0 ? b1 : undefined,
+      relVol: (b2 >> 4) & 0x0F,
+      commandParam: b3,
+    });
+  }
+
+  return commands;
+}
+
 // ── Main parser ───────────────────────────────────────────────────────────────
 
 export function parseTFMXFile(
@@ -319,15 +394,30 @@ export function parseTFMXFile(
     patternPointers.push(raw);
   }
 
-  // 5. Decode all TFMX patterns
+  // 5. Decode all TFMX patterns (both flat for backward compat and native for editor)
   const decodedPatterns: DecodedTFMXCommand[][] = [];
+  const nativePatterns: TFMXPatternCommand[][] = [];
   for (let i = 0; i < patternPointers.length; i++) {
     const ptr = patternPointers[i];
     if (ptr === 0 || ptr >= buf.length) {
       decodedPatterns.push([]);
+      nativePatterns.push([]);
       continue;
     }
     decodedPatterns.push(decodeTFMXPattern(buf, ptr));
+    nativePatterns.push(decodeTFMXPatternNative(buf, ptr));
+  }
+
+  // 5b. Read text area at h+0x10 (240 bytes = 6 lines × 40 chars)
+  const textLines: string[] = [];
+  for (let line = 0; line < 6; line++) {
+    const lineOff = h + 0x10 + line * 40;
+    let text = '';
+    for (let c = 0; c < 40 && lineOff + c < buf.length; c++) {
+      const ch = buf[lineOff + c];
+      text += ch >= 0x20 && ch < 0x7F ? String.fromCharCode(ch) : ' ';
+    }
+    textLines.push(text.trimEnd());
   }
 
   // 6. Select subsong
@@ -339,6 +429,46 @@ export function parseTFMXFile(
   if (firstStep > lastStep || firstStep > 0x3FFF || lastStep > 0x3FFF) {
     firstStep = 0;
     lastStep  = 0;
+  }
+
+  // 6b. Build native trackstep entries for the TFMX editor
+  const nativeTracksteps: TFMXTrackstepEntry[] = [];
+  for (let stepIdx = firstStep; stepIdx <= lastStep; stepIdx++) {
+    const stepOff = trackstepOff + stepIdx * TFMX_TRACKSTEP_ENTRY_SIZE;
+    if (stepOff + TFMX_TRACKSTEP_ENTRY_SIZE > buf.length) break;
+
+    const firstWord = (buf[stepOff] << 8) | buf[stepOff + 1];
+    if (firstWord === 0xEFFE) {
+      const cmd = (buf[stepOff + 2] << 8) | buf[stepOff + 3];
+      const param = (buf[stepOff + 4] << 8) | buf[stepOff + 5];
+      nativeTracksteps.push({
+        stepIndex: stepIdx,
+        voices: [],
+        isEFFE: true,
+        effeCommand: cmd,
+        effeParam: param,
+      });
+      if (cmd === 0x0000) break; // stop
+      continue;
+    }
+
+    const voices: TFMXVoiceAssignment[] = [];
+    for (let ch = 0; ch < NUM_CHANNELS; ch++) {
+      const hi = buf[stepOff + ch * 2];
+      const lo = buf[stepOff + ch * 2 + 1];
+      voices.push({
+        patternNum: (hi === TFMX_TRACK_END || hi >= 0xFE || hi === TFMX_TRACK_HOLD) ? -1 : hi,
+        transpose: lo > 127 ? lo - 256 : lo,  // signed byte
+        isHold: hi === TFMX_TRACK_HOLD,
+        isStop: hi === TFMX_TRACK_END || hi >= 0xFE,
+      });
+    }
+
+    nativeTracksteps.push({
+      stepIndex: stepIdx,
+      voices,
+      isEFFE: false,
+    });
   }
 
   // 7. Build tracker patterns from trackstep entries
@@ -615,16 +745,33 @@ export function parseTFMXFile(
     },
   };
 
+  // 11. Build TFMXNativeData for the native editor
+  const songName = (() => {
+    const base = filename.split('/').pop() ?? filename;
+    const lower = base.toLowerCase();
+    for (const prefix of ['mdat.', 'tfmx.', 'tfx.']) {
+      if (lower.startsWith(prefix)) return base.slice(prefix.length);
+    }
+    return base.replace(/\.[^/.]+$/, '');
+  })();
+
+  const tfmxNative: TFMXNativeData = {
+    songName,
+    textLines,
+    songStarts,
+    songEnds,
+    songTempos,
+    tracksteps: nativeTracksteps,
+    patterns: nativePatterns,
+    patternPointers,
+    numVoices: NUM_CHANNELS,
+    activeSubsong: clampedSong,
+    firstStep,
+    lastStep,
+  };
+
   return {
-    name:            (() => {
-      // For prefix-based names like "mdat.turrican_bonus", extract the song part
-      const base = filename.split('/').pop() ?? filename;
-      const lower = base.toLowerCase();
-      for (const prefix of ['mdat.', 'tfmx.', 'tfx.']) {
-        if (lower.startsWith(prefix)) return base.slice(prefix.length);
-      }
-      return base.replace(/\.[^/.]+$/, '');
-    })(),
+    name:            songName,
     format:          'MOD' as TrackerFormat,
     patterns:        trackerPatterns,
     instruments,
@@ -637,5 +784,6 @@ export function parseTFMXFile(
     linearPeriods:   false,
     uadePatternLayout,
     tfmxTimingTable,
+    tfmxNative,
   };
 }
