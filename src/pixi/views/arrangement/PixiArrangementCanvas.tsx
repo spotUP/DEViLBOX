@@ -12,10 +12,11 @@
  * Split tool:  click clip → split at cursor
  */
 
-import { useCallback, useMemo, useRef } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import type { Graphics as GraphicsType, FederatedPointerEvent } from 'pixi.js';
 import { PIXI_FONTS } from '../../fonts';
 import { usePixiTheme } from '../../theme';
+import { PixiPatternPreviewTooltip } from './PixiPatternPreviewTooltip';
 import { useWorkbenchStore } from '@stores/useWorkbenchStore';
 import { useTrackerStore, usePianoRollStore } from '@stores';
 import { useArrangementStore } from '@stores/useArrangementStore';
@@ -32,6 +33,7 @@ export interface ClipChannelNotes {
 /** Pre-processed clip data ready for rendering */
 export interface ClipRenderData {
   id: string;
+  patternId: string;
   startRow: number;
   lengthRows: number;
   trackIndex: number;
@@ -377,6 +379,27 @@ export const PixiArrangementCanvas: React.FC<PixiArrangementCanvasProps> = ({
       g.stroke({ color: ghostColor, alpha: 0.85, width: 1 });
     }
   }, []);
+
+  // ---------- hover state for tooltip ----------
+  const [hoverState, setHoverState] = useState<{ clipId: string; patternId: string; x: number; y: number } | null>(null);
+
+  const handlePointerMove = useCallback((e: FederatedPointerEvent) => {
+    const local = e.getLocalPosition(e.currentTarget);
+    // Hit test against clips
+    for (const clip of clips) {
+      const cx = (clip.startRow - scrollBeat) * pixelsPerBeat;
+      const cw = clip.lengthRows * pixelsPerBeat;
+      const cy = clip.trackIndex * trackHeight - scrollY + 24; // RULER_HEIGHT = 24
+      const ch = trackHeight;
+      if (local.x >= cx && local.x <= cx + cw && local.y >= cy && local.y <= cy + ch) {
+        if (hoverState?.clipId !== clip.id) {
+          setHoverState({ clipId: clip.id, patternId: clip.patternId, x: local.x, y: local.y });
+        }
+        return;
+      }
+    }
+    if (hoverState) setHoverState(null);
+  }, [clips, scrollBeat, pixelsPerBeat, trackHeight, scrollY, hoverState]);
 
   // ---------- pointer handling ----------
   const handlePointerDown = useCallback((e: FederatedPointerEvent) => {
@@ -935,6 +958,7 @@ export const PixiArrangementCanvas: React.FC<PixiArrangementCanvasProps> = ({
       layout={{ width, height }}
       eventMode="static"
       onPointerDown={handlePointerDown}
+      onPointerMove={handlePointerMove}
     >
       <pixiGraphics draw={drawGrid} layout={{ position: 'absolute', width, height }} />
 
@@ -974,6 +998,14 @@ export const PixiArrangementCanvas: React.FC<PixiArrangementCanvasProps> = ({
           y={y}
         />
       ))}
+
+      {/* Pattern preview tooltip on clip hover */}
+      <PixiPatternPreviewTooltip
+        patternId={hoverState?.patternId ?? null}
+        x={hoverState?.x ?? 0}
+        y={hoverState?.y ?? 0}
+        visible={!!hoverState}
+      />
     </pixiContainer>
   );
 };

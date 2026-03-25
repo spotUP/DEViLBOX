@@ -15,6 +15,7 @@ import { ArrangementGridRenderer } from './engine/ArrangementGridRenderer';
 import { ClipRenderer } from './engine/ClipRenderer';
 import { TimelineRulerRenderer } from './engine/TimelineRulerRenderer';
 import { ArrangementHitTester } from './engine/ArrangementHitTester';
+import { PatternPreviewTooltip } from './PatternPreviewTooltip';
 import { ArrangementInteractionSM } from './engine/ArrangementInteractionSM';
 import { ArrangementEditCommand } from './engine/ArrangementEditCommand';
 import { AutomationLaneRenderer } from './engine/AutomationLaneRenderer';
@@ -820,15 +821,36 @@ export const ArrangementCanvas: React.FC = () => {
     return () => canvas.removeEventListener('wheel', handleWheel);
   }, []);
 
+  // Mouse position tracking for tooltip
+  const [mousePos, setMousePos] = React.useState({ x: 0, y: 0 });
+  const handleTooltipMove = React.useCallback((e: React.PointerEvent) => {
+    setMousePos({ x: e.nativeEvent.offsetX, y: e.nativeEvent.offsetY });
+    (handleMouseMove as React.PointerEventHandler)(e);
+  }, [handleMouseMove]);
+
+  // Resolve hovered clip's pattern ID for tooltip
+  const hoveredClipPatternId = React.useMemo(() => {
+    if (!hoveredClipId) return null;
+    const clip = useArrangementStore.getState().clips.find(c => c.id === hoveredClipId);
+    return clip?.patternId ?? null;
+  }, [hoveredClipId]);
+
   return (
     <div ref={containerRef} className="flex-1 relative overflow-hidden">
       <canvas
         ref={canvasRef}
         className="absolute inset-0 w-full h-full touch-none"
         onPointerDown={handleMouseDown as React.PointerEventHandler}
-        onPointerMove={handleMouseMove as React.PointerEventHandler}
+        onPointerMove={handleTooltipMove}
         onPointerUp={handleMouseUp as React.PointerEventHandler}
         onDoubleClick={handleDoubleClick}
+      />
+      {/* Pattern preview tooltip on clip hover */}
+      <PatternPreviewTooltip
+        patternId={hoveredClipPatternId}
+        x={mousePos.x}
+        y={mousePos.y}
+        visible={!!hoveredClipId}
       />
     </div>
   );
