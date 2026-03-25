@@ -4,11 +4,12 @@
  */
 
 import React, { useState, useRef, useCallback } from 'react';
-import { Menu, X, Settings, Download, HelpCircle, Sliders, Zap, FolderOpen, Save, FilePlus, Trash2, List, Music, Grid3x3, Clock, Smartphone, LogIn, LogOut, User } from 'lucide-react';
+import { Menu, X, Settings, Download, HelpCircle, Sliders, Zap, FolderOpen, Save, FilePlus, Trash2, List, Music, Grid3x3, Clock, Smartphone, LogIn, LogOut, User, LayoutGrid, Piano, Radio, Disc3 } from 'lucide-react';
 import { haptics } from '@/utils/haptics';
 import { MIDIToolbarDropdown } from '@components/midi/MIDIToolbarDropdown';
 import { AddToHomeScreenModal } from '@components/dialogs/AddToHomeScreenModal';
 import { useAuthStore } from '@stores/useAuthStore';
+import { useUIStore } from '@stores/useUIStore';
 
 interface MobileMenuProps {
   onShowSettings?: () => void;
@@ -26,6 +27,51 @@ interface MobileMenuProps {
   onShowGrooveSettings?: () => void;
   onShowAuth?: () => void;
 }
+
+const VIEW_OPTIONS = [
+  { id: 'tracker',     label: 'Tracker',  icon: <LayoutGrid size={18} /> },
+  { id: 'mixer',       label: 'Mixer',    icon: <Sliders size={18} /> },
+  { id: 'arrangement', label: 'Arrange',  icon: <List size={18} /> },
+  { id: 'pianoroll',   label: 'Piano',    icon: <Piano size={18} /> },
+  { id: 'dj',          label: 'DJ',       icon: <Radio size={18} /> },
+  { id: 'drumpad',     label: 'Pads',     icon: <Disc3 size={18} /> },
+] as const;
+
+const ViewSwitcher: React.FC<{ onClose: () => void }> = ({ onClose }) => {
+  const activeView = useUIStore((s) => s.activeView);
+
+  const handleSwitch = useCallback((viewId: string) => {
+    haptics.selection();
+    useUIStore.getState().setActiveView(viewId as typeof activeView);
+    onClose();
+  }, [onClose]);
+
+  return (
+    <>
+      <h3 className="text-xs font-bold text-text-muted uppercase mb-2 px-3">
+        Views
+      </h3>
+      <div className="grid grid-cols-3 gap-2 mb-2">
+        {VIEW_OPTIONS.map(({ id, label, icon }) => (
+          <button
+            key={id}
+            onClick={() => handleSwitch(id)}
+            className={`
+              flex flex-col items-center gap-1 py-2.5 px-1 rounded-lg transition-all active:scale-95
+              ${activeView === id
+                ? 'bg-accent-primary/20 text-accent-primary ring-1 ring-accent-primary/40'
+                : 'bg-dark-bgSecondary text-text-muted hover:bg-dark-bgHover hover:text-text-primary'
+              }
+            `}
+          >
+            {icon}
+            <span className="text-[10px] font-medium">{label}</span>
+          </button>
+        ))}
+      </div>
+    </>
+  );
+};
 
 export const MobileMenu: React.FC<MobileMenuProps> = ({
   onShowSettings,
@@ -112,6 +158,9 @@ export const MobileMenu: React.FC<MobileMenuProps> = ({
 
             {/* Menu Items - Scrollable */}
             <div className="flex-1 overflow-y-auto p-4 space-y-2">
+              {/* View Switcher — always visible so users can never get stuck */}
+              <ViewSwitcher onClose={() => setIsOpen(false)} />
+
               {/* File Operations */}
               <h3 className="text-xs font-bold text-text-muted uppercase mb-2 px-3 mt-6">
                 File

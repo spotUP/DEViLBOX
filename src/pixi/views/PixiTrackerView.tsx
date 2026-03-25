@@ -28,6 +28,7 @@ import { PixiFurnaceView } from './furnace/PixiFurnaceView';
 import { PixiHivelyView } from './hively/PixiHivelyView';
 import { PixiKlysView } from './klystrack/PixiKlysView';
 import { PixiJamCrackerView } from './jamcracker/PixiJamCrackerView';
+import { PixiTFMXView } from './tfmx/PixiTFMXView';
 import { PixiPitchSlider } from './tracker/PixiPitchSlider';
 import { PixiTB303KnobPanel, TB303_PANEL_COLLAPSED_H, TB303_PANEL_EXPANDED_H } from './tracker/PixiTB303KnobPanel';
 import { PixiSCKnobPanel, SC_PANEL_COLLAPSED_H, SC_PANEL_EXPANDED_H } from './tracker/PixiSCKnobPanel';
@@ -206,6 +207,9 @@ export const PixiTrackerView: React.FC = () => {
             )}
             {viewMode === 'tracker' && editorMode === 'hively' && (
               <PixiHivelyView width={Math.max(100, editorWidth)} height={Math.max(100, instrumentPanelHeight)} />
+            )}
+            {viewMode === 'tracker' && editorMode === 'tfmx' && (
+              <PixiTFMXView width={Math.max(100, editorWidth)} height={Math.max(100, instrumentPanelHeight)} />
             )}
             {viewMode === 'tracker' && editorMode === 'musicline' && (
               <pixiContainer layout={{ width: Math.max(100, editorWidth), height: instrumentPanelHeight, flexDirection: 'column' }}>

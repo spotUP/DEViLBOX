@@ -16,6 +16,7 @@ import { haptics } from '@/utils/haptics';
 // Lazy-load format-specific views
 const FurnaceView = lazy(() => import('@/components/furnace/FurnaceView').then(m => ({ default: m.FurnaceView })));
 const HivelyView = lazy(() => import('@/components/hively/HivelyView').then(m => ({ default: m.HivelyView })));
+const TFMXView = lazy(() => import('@/components/tfmx/TFMXView').then(m => ({ default: m.TFMXView })));
 const GTUltraView = lazy(() => import('@/components/gtultra/GTUltraView').then(m => ({ default: m.GTUltraView })));
 const KlysView = lazy(() => import('@/components/klystrack/KlysView').then(m => ({ default: m.KlysView })));
 const JamCrackerView = lazy(() => import('@/components/jamcracker/JamCrackerView').then(m => ({ default: m.JamCrackerView })));
@@ -65,7 +66,7 @@ export const MobileTrackerView: React.FC<MobileTrackerViewProps> = () => {
   const editorMode = useFormatStore((s) => s.editorMode);
   const { isPortrait, isLandscape } = useOrientation();
 
-  const isCustomFormat = ['goattracker', 'hively', 'klystrack', 'jamcracker', 'musicline', 'furnace', 'sc68'].includes(editorMode);
+  const isCustomFormat = ['goattracker', 'hively', 'klystrack', 'jamcracker', 'musicline', 'furnace', 'sc68', 'tfmx'].includes(editorMode);
   const visibleChannels = isLandscape ? 4 : 1;
   const startChannel = isPortrait ? mobileChannel : 0;
 
@@ -180,6 +181,7 @@ export const MobileTrackerView: React.FC<MobileTrackerViewProps> = () => {
                 {editorMode === 'klystrack' && <KlysView />}
                 {editorMode === 'jamcracker' && <JamCrackerView />}
                 {editorMode === 'sc68' && <Sc68Visualizer />}
+                {editorMode === 'tfmx' && <TFMXView />}
                 {editorMode === 'musicline' && (
                   <div className="flex-1 flex flex-col min-h-0">
                     <div className="flex-shrink-0 border-b border-dark-border" style={{ maxHeight: 160, overflowY: 'auto' }}>

@@ -15,6 +15,8 @@
 
 import * as Tone from 'tone';
 import type { Pattern, TrackerCell, FurnaceNativeData, HivelyNativeData, KlysNativeData, FurnaceSubsongPlayback } from '@/types';
+import type { TFMXNativeData } from '@/types/tfmxNative';
+import { setFormatPlaybackRow, setFormatPlaybackPlaying } from './FormatPlaybackState';
 import type { InstrumentConfig, FurnaceMacro } from '@/types/instrument';
 import { FurnaceMacroType } from '@/types/instrument';
 import { PatternAccessor } from './PatternAccessor';
@@ -318,6 +320,8 @@ export interface TrackerSong {
   hivelyNative?: HivelyNativeData;
   /** Native klystrack data for the klystrack pattern editor */
   klysNative?: KlysNativeData;
+  /** Native TFMX data for the TFMX trackstep/pattern editor */
+  tfmxNative?: TFMXNativeData;
   /** Raw klystrack .kt binary for loading into the KlysEngine WASM */
   klysFileData?: ArrayBuffer;
   // Pre-converted subsong data for in-editor subsong switching
@@ -521,6 +525,7 @@ export class TrackerReplayer {
   private hivelyEngine: import('./hively/HivelyEngine').HivelyEngine | null = null;
   private _hvlPositionUnsub: (() => void) | null = null;
   private _uadePositionUnsub: (() => void) | null = null;
+  private _tfmxChannelUnsub: (() => void) | null = null;
 
   /** Get the active C64 SID engine (for subsong switching etc.) */
   public getC64SIDEngine(): C64SIDEngine | null {
@@ -1428,6 +1433,49 @@ export class TrackerReplayer {
         });
         _playLog('UADE position subscription active');
       }
+
+      // TFMX: use timing table + onChannelData for position sync
+      if (result.uadeEngine && this.song.tfmxTimingTable && this.song.tfmxTimingTable.length > 0) {
+        const tt = this.song.tfmxTimingTable;
+        const patternLengths = this.song.patterns.map(p => p.length);
+        let lastRow = -1;
+        let lastPosition = -1;
+        this._tfmxChannelUnsub = result.uadeEngine.onChannelData((_channels, totalFrames) => {
+          if (!this.playing || !this.song) return;
+          // Convert totalFrames to jiffies (PAL VBlank = 50 Hz = 882 samples at 44100)
+          const jiffies = Math.floor(totalFrames / 882);
+
+          // Binary search the timing table
+          let lo = 0, hi = tt.length - 1;
+          while (lo < hi) {
+            const mid = (lo + hi + 1) >> 1;
+            if (tt[mid].cumulativeJiffies <= jiffies) lo = mid;
+            else hi = mid - 1;
+          }
+
+          const entry = tt[lo];
+          const position = entry.patternIndex;
+          const row = entry.row;
+          if (row === lastRow && position === lastPosition) return;
+          lastRow = row;
+          lastPosition = position;
+
+          this.songPos = position;
+          this.pattPos = row;
+          const patternNum = this.song!.songPositions[position] ?? 0;
+          const time = Tone.now();
+          this.queueDisplayState(time, row, patternNum, position, 0, (2.5 / this.bpm) * this.speed);
+
+          // Drive FormatPlaybackState for PatternEditorCanvas RAF loop
+          setFormatPlaybackRow(row);
+          setFormatPlaybackPlaying(true);
+
+          if (this.onRowChange) {
+            this.onRowChange(row, patternNum, position);
+          }
+        });
+        _playLog('TFMX timing-table position subscription active');
+      }
     }
 
     this.playing = true;
@@ -1791,6 +1839,13 @@ export class TrackerReplayer {
     if (this._uadePositionUnsub) {
       this._uadePositionUnsub();
       this._uadePositionUnsub = null;
+    }
+
+    // Clean up TFMX channel subscription
+    if (this._tfmxChannelUnsub) {
+      this._tfmxChannelUnsub();
+      this._tfmxChannelUnsub = null;
+      setFormatPlaybackPlaying(false);
     }
 
     // Stop all channels (release synth notes + stop sample players)

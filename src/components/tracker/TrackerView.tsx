@@ -49,7 +49,9 @@ import { PatternMinimap } from './PatternMinimap';
 import { PianoRoll } from '../pianoroll';
 import { AutomationPanel } from '@components/automation/AutomationPanel';
 import { GTUltraView } from '@components/gtultra/GTUltraView';
+import { useGTUltraStore } from '@/stores/useGTUltraStore';
 import { HivelyView } from '@components/hively/HivelyView';
+import { TFMXView } from '@components/tfmx/TFMXView';
 import { KlysView } from '@components/klystrack/KlysView';
 import { JamCrackerView } from '@components/jamcracker/JamCrackerView';
 import { FurnaceView } from '@components/furnace/FurnaceView';
@@ -455,6 +457,16 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
     );
   }
 
+  // GT Ultra DAW mode: take over the full editor area (no FT2 toolbar, no instrument panel)
+  const gtViewMode = useGTUltraStore((s) => s.viewMode);
+  if (editorMode === 'goattracker' && gtViewMode === 'daw') {
+    return (
+      <div className="flex-1 min-h-0 flex flex-col bg-dark-bg overflow-hidden">
+        <GTUltraView />
+      </div>
+    );
+  }
+
   // Desktop view
   return (
     <div className="flex-1 min-h-0 flex flex-col bg-dark-bg overflow-y-hidden">
@@ -499,10 +511,10 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
           {viewMode === 'tracker' ? (
             (() => {
               // Determine if this is a custom format editor that can be popped out
-              const isCustomFormat = ['goattracker', 'hively', 'klystrack', 'jamcracker', 'musicline', 'furnace'].includes(editorMode);
+              const isCustomFormat = ['goattracker', 'hively', 'klystrack', 'jamcracker', 'musicline', 'furnace', 'tfmx'].includes(editorMode);
               const formatLabels: Record<string, string> = {
                 goattracker: 'GoatTracker', hively: 'AHX / Hively', klystrack: 'Klystrack',
-                jamcracker: 'JamCracker', musicline: 'MusicLine', furnace: 'Furnace',
+                jamcracker: 'JamCracker', musicline: 'MusicLine', furnace: 'Furnace', tfmx: 'TFMX',
               };
 
               // Build the editor content
@@ -516,6 +528,8 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
                 <JamCrackerView />
               ) : editorMode === 'furnace' ? (
                 <FurnaceView />
+              ) : editorMode === 'tfmx' ? (
+                <TFMXView />
               ) : editorMode === 'sc68' ? (
                 <Sc68Visualizer />
               ) : editorMode === 'musicline' ? (

@@ -13,6 +13,7 @@ import { useTrackerStore, useTransportStore, useInstrumentStore, useAudioStore, 
 import { useEditorStore } from '@stores/useEditorStore';
 import { useArrangementStore } from '@stores/useArrangementStore';
 import { getToneEngine } from '@engine/ToneEngine';
+import { setFormatPlaybackRow, setFormatPlaybackPlaying } from '@engine/FormatPlaybackState';
 import { getTrackerReplayer, type TrackerFormat } from '@engine/TrackerReplayer';
 import { resolveArrangement } from '@lib/arrangement/resolveArrangement';
 import type { UADEEngine } from '@engine/uade/UADEEngine';
@@ -106,11 +107,13 @@ export const usePatternPlayback = () => {
   const patternsRef = useRef(patterns);
   const patternOrderRef = useRef(patternOrder);
   const bpmRef = useRef(bpm);
+  const tfmxTimingTableRef = useRef(tfmxTimingTable);
   useEffect(() => {
     patternRef.current = pattern;
     patternsRef.current = patterns;
     patternOrderRef.current = patternOrder;
     bpmRef.current = bpm;
+    tfmxTimingTableRef.current = tfmxTimingTable;
   });
 
   // Ref for instruments — prevents the main playback effect from restarting
@@ -258,19 +261,20 @@ export const usePatternPlayback = () => {
                 const framesPerRow = Math.round(44100 * 2.5 * 6 / 125); // ~5292 at standard Amiga rate
                 uadeChannelUnsubRef.current = uadeEngine.onChannelData((_channels, totalFrames) => {
                   // TFMX: use timing table for position sync instead of fixed framesPerRow
-                  if (tfmxTimingTable && tfmxTimingTable.length > 0) {
+                  const tt = tfmxTimingTableRef.current;
+                  if (tt && tt.length > 0) {
                     // Convert totalFrames to jiffies (PAL Amiga VBlank = 50 Hz = 882 samples at 44100)
                     const jiffies = Math.floor(totalFrames / 882);
 
                     // Binary search the timing table for current position
-                    let lo = 0, hi = tfmxTimingTable.length - 1;
+                    let lo = 0, hi = tt.length - 1;
                     while (lo < hi) {
                       const mid = (lo + hi + 1) >> 1;
-                      if (tfmxTimingTable[mid].cumulativeJiffies <= jiffies) lo = mid;
+                      if (tt[mid].cumulativeJiffies <= jiffies) lo = mid;
                       else hi = mid - 1;
                     }
 
-                    const entry = tfmxTimingTable[lo];
+                    const entry = tt[lo];
                     const patternIdx = entry.patternIndex;
                     const rowInPattern = entry.row;
 
@@ -282,6 +286,9 @@ export const usePatternPlayback = () => {
                       });
                     }
                     setCurrentRowThrottled(rowInPattern, store.patterns[store.patternOrder[patternIdx] ?? patternIdx]?.length ?? 64, true);
+                    // Drive FormatPlaybackState so PatternEditorCanvas RAF loop scrolls in format mode
+                    setFormatPlaybackRow(rowInPattern);
+                    setFormatPlaybackPlaying(true);
                     return; // Skip standard framesPerRow calculation
                   }
 
@@ -565,6 +572,7 @@ export const usePatternPlayback = () => {
       // UADE: stop the song player and clean up channel subscription
       uadeChannelUnsubRef.current?.();
       uadeChannelUnsubRef.current = null;
+      setFormatPlaybackPlaying(false);
       const uadeInst = instrumentsRef.current.find(i => i.synthType === 'UADESynth');
       if (uadeInst) {
         const engine = getToneEngine();
