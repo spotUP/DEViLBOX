@@ -23,8 +23,10 @@ import { TITLE_H } from '../workbench/workbenchLayout';
 import { detectChord } from '@/lib/music/chordDetection';
 import { PixiAcidPatternDialog } from '../dialogs/PixiAcidPatternDialog';
 import { usePianoRoll, QWERTY_NOTE_MAP } from '@/hooks/views/usePianoRoll';
+import { PixiCCLane } from './pianoroll/PixiCCLane';
 
 const VELOCITY_HEIGHT = 80;
+const CC_LANE_HEIGHT = 60;
 const TOOLBAR_HEIGHT = 36;
 const KEYBOARD_WIDTH = 60;
 const SCROLLBAR_SIZE = 8;
@@ -768,6 +770,29 @@ export const PixiPianoRollView: React.FC<{ isActive?: boolean; windowId?: string
           onDragEnd={() => {
             pianoData.endVelocityDrag();
             handleNotesChanged();
+          }}
+        />
+      </pixiContainer>
+
+      {/* CC / Automation Lane — below velocity */}
+      <pixiContainer layout={{ width: '100%', height: CC_LANE_HEIGHT, flexDirection: 'row' }}>
+        <pixiContainer layout={{ width: KEYBOARD_WIDTH, height: CC_LANE_HEIGHT }} />
+        <PixiCCLane
+          width={gridW}
+          height={CC_LANE_HEIGHT}
+          scrollBeat={view.scrollX}
+          pixelsPerBeat={horizontalZoom}
+          totalBeats={patternLength}
+          parameter="pitchBend"
+          points={[]}
+          onPointAdd={(row, value) => {
+            console.log('[PianoRoll CC] Add point:', row, value);
+          }}
+          onPointMove={(index, row, value) => {
+            console.log('[PianoRoll CC] Move point:', index, row, value);
+          }}
+          onPointRemove={(index) => {
+            console.log('[PianoRoll CC] Remove point:', index);
           }}
         />
       </pixiContainer>
