@@ -4,6 +4,7 @@
  */
 
 export * from './tracker';
+export * from './tfmxNative';
 export * from './instrument';
 export * from './audio';
 export * from './automation';

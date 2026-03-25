@@ -125,15 +125,21 @@ export function hivelyToFormatChannels(
 
 function hex1(val: number): string { return (val & 0xF).toString(16).toUpperCase(); }
 
-/** Column definitions for the Hively performance list editor */
+// Waveform names for display (matches HivelyTracker)
+const WAVE_NAMES = ['Tri', 'Saw', 'Sqr', 'Nse', 'FTr', 'FSw', 'FSq', 'FNs'];
+
+/**
+ * Column definitions for the Hively performance list editor.
+ * Colors match the classic HivelyTracker blue/white Amiga palette.
+ */
 export const HIVELY_PERFLIST_COLUMNS: ColumnDef[] = [
   {
     key: 'note',
     label: 'Note',
     charWidth: 3,
     type: 'note',
-    color: 'var(--color-text-secondary)',
-    emptyColor: 'var(--color-border-light)',
+    color: '#ffffff',       // White — primary data
+    emptyColor: '#334455',  // Dark blue-gray — empty
     emptyValue: 0,
     formatter: (val: number) => noteToString(val, 0),
   },
@@ -142,8 +148,8 @@ export const HIVELY_PERFLIST_COLUMNS: ColumnDef[] = [
     label: 'F',
     charWidth: 1,
     type: 'hex',
-    color: '#ffaa00',
-    emptyColor: 'var(--color-border-light)',
+    color: '#ffcc00',       // Bright yellow — fixed/lock flag
+    emptyColor: '#334455',
     emptyValue: 0,
     hexDigits: 1,
     formatter: (val: number) => val ? '*' : '·',
@@ -151,21 +157,21 @@ export const HIVELY_PERFLIST_COLUMNS: ColumnDef[] = [
   {
     key: 'waveform',
     label: 'Wav',
-    charWidth: 1,
+    charWidth: 3,
     type: 'hex',
-    color: '#aaddff',
-    emptyColor: 'var(--color-border-light)',
+    color: '#66ccff',       // Light blue — waveform
+    emptyColor: '#334455',
     emptyValue: 0,
     hexDigits: 1,
-    formatter: hex1,
+    formatter: (val: number) => WAVE_NAMES[val & 7] ?? hex1(val),
   },
   {
     key: 'fx1',
     label: 'Fx1',
     charWidth: 1,
     type: 'hex',
-    color: '#ffcc66',
-    emptyColor: 'var(--color-border-light)',
+    color: '#ffaa44',       // Orange — effect 1
+    emptyColor: '#334455',
     emptyValue: 0,
     hexDigits: 1,
     formatter: hex1,
@@ -175,8 +181,8 @@ export const HIVELY_PERFLIST_COLUMNS: ColumnDef[] = [
     label: 'P1',
     charWidth: 2,
     type: 'hex',
-    color: '#ffcc66',
-    emptyColor: 'var(--color-border-light)',
+    color: '#ffaa44',       // Orange — effect 1 param
+    emptyColor: '#334455',
     emptyValue: 0,
     hexDigits: 2,
     formatter: hex2,
@@ -186,8 +192,8 @@ export const HIVELY_PERFLIST_COLUMNS: ColumnDef[] = [
     label: 'Fx2',
     charWidth: 1,
     type: 'hex',
-    color: '#cc99ff',
-    emptyColor: 'var(--color-border-light)',
+    color: '#bb88ff',       // Purple — effect 2
+    emptyColor: '#334455',
     emptyValue: 0,
     hexDigits: 1,
     formatter: hex1,
@@ -197,8 +203,8 @@ export const HIVELY_PERFLIST_COLUMNS: ColumnDef[] = [
     label: 'P2',
     charWidth: 2,
     type: 'hex',
-    color: '#cc99ff',
-    emptyColor: 'var(--color-border-light)',
+    color: '#bb88ff',       // Purple — effect 2 param
+    emptyColor: '#334455',
     emptyValue: 0,
     hexDigits: 2,
     formatter: hex2,

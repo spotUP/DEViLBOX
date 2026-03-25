@@ -18,6 +18,7 @@ import type {
   KlysNativeData,
   FurnaceSubsongPlayback,
 } from '@typedefs';
+import type { TFMXNativeData } from '@/types/tfmxNative';
 import { useEditorStore } from './useEditorStore';
 import { useUIStore } from './useUIStore';
 
@@ -66,6 +67,8 @@ interface FormatStore {
   uadeEditableFileData: ArrayBuffer | null;
   uadeEditableFileName: string | null;
   tfmxTimingTable: { patternIndex: number; row: number; cumulativeJiffies: number }[] | null;
+  tfmxNative: TFMXNativeData | null;
+  tfmxSelectedPattern: number;
   uadeEditableSubsongs: { count: number; speeds: number[] } | null;
   uadeEditableCurrentSubsong: number;
   libopenmptFileData: ArrayBuffer | null;
@@ -111,6 +114,18 @@ interface FormatStore {
   insertHivelyTrackRow: (trackIndex: number, rowIndex: number) => void;
   /** Delete the row at rowIndex in a Hively track, shifting rows up. An empty row is added at the bottom. */
   deleteHivelyTrackRow: (trackIndex: number, rowIndex: number) => void;
+  /** Set native TFMX data */
+  setTFMXNative: (data: TFMXNativeData | null) => void;
+  /** Set the selected pattern index for the TFMX pattern editor pane */
+  setTFMXSelectedPattern: (idx: number) => void;
+  /** Update a voice assignment in the TFMX trackstep matrix */
+  setTFMXTrackstepVoice: (stepIdx: number, voiceIdx: number, patNum: number, transpose: number) => void;
+  /** Insert a new trackstep (copy of current) at the given index */
+  insertTFMXTrackstep: (idx: number) => void;
+  /** Delete the trackstep at the given index */
+  deleteTFMXTrackstep: (idx: number) => void;
+  /** Update a pattern command in the TFMX pattern pool */
+  setTFMXPatternCommand: (patIdx: number, rowIdx: number, field: 'note' | 'macro' | 'wait' | 'detune', value: number) => void;
   /** Update a Klystrack sequence entry field (pattern or noteOffset) */
   setKlysSequenceEntry: (channel: number, position: number, field: 'pattern' | 'noteOffset', value: number) => void;
   /** Insert a new Klystrack sequence entry (copy of current or blank) at the given position */
@@ -122,7 +137,7 @@ interface FormatStore {
   setSongDBInfo: (info: FormatStore['songDBInfo']) => void;
   setSidMetadata: (info: FormatStore['sidMetadata']) => void;
   setOriginalModuleData: (data: FormatStore['originalModuleData']) => void;
-  applyEditorMode: (song: { linearPeriods?: boolean; furnaceNative?: FurnaceNativeData; hivelyNative?: HivelyNativeData; hivelyFileData?: ArrayBuffer; klysNative?: KlysNativeData; klysFileData?: ArrayBuffer; musiclineFileData?: Uint8Array; c64SidFileData?: Uint8Array; jamCrackerFileData?: ArrayBuffer; futurePlayerFileData?: ArrayBuffer; preTrackerFileData?: ArrayBuffer; maFileData?: ArrayBuffer; hippelFileData?: ArrayBuffer; sonixFileData?: ArrayBuffer; pxtoneFileData?: ArrayBuffer; organyaFileData?: ArrayBuffer; eupFileData?: ArrayBuffer; ixsFileData?: ArrayBuffer; psycleFileData?: ArrayBuffer; sc68FileData?: ArrayBuffer; zxtuneFileData?: ArrayBuffer; pumaTrackerFileData?: ArrayBuffer; steveTurnerFileData?: ArrayBuffer; sidmon1WasmFileData?: ArrayBuffer; artOfNoiseFileData?: ArrayBuffer; bdFileData?: ArrayBuffer; sd2FileData?: ArrayBuffer; symphonieFileData?: ArrayBuffer; uadeEditableFileData?: ArrayBuffer; uadeEditableFileName?: string; libopenmptFileData?: ArrayBuffer; hivelyMeta?: { stereoMode: number; mixGain: number; speedMultiplier: number; version: number }; furnaceSubsongs?: FurnaceSubsongPlayback[]; furnaceActiveSubsong?: number; channelTrackTables?: number[][]; channelSpeeds?: number[]; channelGrooves?: number[]; goatTrackerData?: Uint8Array }) => void;
+  applyEditorMode: (song: { linearPeriods?: boolean; furnaceNative?: FurnaceNativeData; hivelyNative?: HivelyNativeData; hivelyFileData?: ArrayBuffer; klysNative?: KlysNativeData; klysFileData?: ArrayBuffer; musiclineFileData?: Uint8Array; c64SidFileData?: Uint8Array; jamCrackerFileData?: ArrayBuffer; futurePlayerFileData?: ArrayBuffer; preTrackerFileData?: ArrayBuffer; maFileData?: ArrayBuffer; hippelFileData?: ArrayBuffer; sonixFileData?: ArrayBuffer; pxtoneFileData?: ArrayBuffer; organyaFileData?: ArrayBuffer; eupFileData?: ArrayBuffer; ixsFileData?: ArrayBuffer; psycleFileData?: ArrayBuffer; sc68FileData?: ArrayBuffer; zxtuneFileData?: ArrayBuffer; pumaTrackerFileData?: ArrayBuffer; steveTurnerFileData?: ArrayBuffer; sidmon1WasmFileData?: ArrayBuffer; artOfNoiseFileData?: ArrayBuffer; bdFileData?: ArrayBuffer; sd2FileData?: ArrayBuffer; symphonieFileData?: ArrayBuffer; uadeEditableFileData?: ArrayBuffer; uadeEditableFileName?: string; libopenmptFileData?: ArrayBuffer; hivelyMeta?: { stereoMode: number; mixGain: number; speedMultiplier: number; version: number }; furnaceSubsongs?: FurnaceSubsongPlayback[]; furnaceActiveSubsong?: number; channelTrackTables?: number[][]; channelSpeeds?: number[]; channelGrooves?: number[]; goatTrackerData?: Uint8Array; tfmxNative?: TFMXNativeData }) => void;
   setFurnaceActiveSubsong: (index: number) => void;
   reset: () => void;
 }
@@ -140,6 +155,8 @@ const clearNative = (state: any) => {
   state.channelTrackTables = null;
   state.channelSpeeds = null;
   state.channelGrooves = null;
+  state.tfmxNative = null;
+  state.tfmxSelectedPattern = 0;
 };
 
 export const useFormatStore = create<FormatStore>()(
@@ -178,6 +195,8 @@ export const useFormatStore = create<FormatStore>()(
     uadeEditableFileData: null,
     uadeEditableFileName: null,
     tfmxTimingTable: null,
+    tfmxNative: null,
+    tfmxSelectedPattern: 0,
     uadeEditableSubsongs: null,
     uadeEditableCurrentSubsong: 0,
     libopenmptFileData: null,
@@ -464,6 +483,12 @@ export const useFormatStore = create<FormatStore>()(
           clearNative(state);
           state.klysNative = song.klysNative;
           state.klysFileData = song.klysFileData ?? null;
+        } else if (song.tfmxNative) {
+          newEditorMode = 'tfmx';
+          state.editorMode = 'tfmx';
+          clearNative(state);
+          state.tfmxNative = song.tfmxNative;
+          state.tfmxSelectedPattern = 0;
         } else if (song.channelTrackTables) {
           newEditorMode = 'musicline';
           state.editorMode = 'musicline';
@@ -499,6 +524,56 @@ export const useFormatStore = create<FormatStore>()(
 
     setFurnaceActiveSubsong: (index) => set((state) => { state.furnaceActiveSubsong = index; }),
 
+    // TFMX mutations
+    setTFMXNative: (data) => set((state) => { state.tfmxNative = data; }),
+    setTFMXSelectedPattern: (idx) => set((state) => { state.tfmxSelectedPattern = idx; }),
+    setTFMXTrackstepVoice: (stepIdx, voiceIdx, patNum, transpose) => set((state) => {
+      if (!state.tfmxNative) return;
+      const step = state.tfmxNative.tracksteps.find(s => s.stepIndex === stepIdx);
+      if (!step || step.isEFFE || voiceIdx >= step.voices.length) return;
+      const voice = step.voices[voiceIdx];
+      voice.patternNum = patNum;
+      voice.transpose = transpose;
+      voice.isHold = false;
+      voice.isStop = patNum < 0;
+    }),
+    insertTFMXTrackstep: (idx) => set((state) => {
+      if (!state.tfmxNative) return;
+      const steps = state.tfmxNative.tracksteps;
+      if (idx < 0 || idx >= steps.length) return;
+      // Clone the current step
+      const src = steps[idx];
+      const clone: typeof src = {
+        stepIndex: src.stepIndex,
+        voices: src.voices.map(v => ({ ...v })),
+        isEFFE: src.isEFFE,
+        effeCommand: src.effeCommand,
+        effeParam: src.effeParam,
+      };
+      steps.splice(idx + 1, 0, clone);
+      // Renumber step indices
+      for (let i = 0; i < steps.length; i++) steps[i].stepIndex = state.tfmxNative.firstStep + i;
+      state.tfmxNative.lastStep = state.tfmxNative.firstStep + steps.length - 1;
+    }),
+    deleteTFMXTrackstep: (idx) => set((state) => {
+      if (!state.tfmxNative) return;
+      const steps = state.tfmxNative.tracksteps;
+      if (idx < 0 || idx >= steps.length || steps.length <= 1) return;
+      steps.splice(idx, 1);
+      for (let i = 0; i < steps.length; i++) steps[i].stepIndex = state.tfmxNative.firstStep + i;
+      state.tfmxNative.lastStep = state.tfmxNative.firstStep + steps.length - 1;
+    }),
+    setTFMXPatternCommand: (patIdx, rowIdx, field, value) => set((state) => {
+      if (!state.tfmxNative) return;
+      const pat = state.tfmxNative.patterns[patIdx];
+      if (!pat || rowIdx < 0 || rowIdx >= pat.length) return;
+      const cmd = pat[rowIdx];
+      if (field === 'note') cmd.note = value;
+      else if (field === 'macro') cmd.macro = value;
+      else if (field === 'wait') cmd.wait = value;
+      else if (field === 'detune') cmd.detune = value;
+    }),
+
     reset: () => set((state) => {
       state.editorMode = 'classic';
       clearNative(state);
@@ -529,6 +604,8 @@ export const useFormatStore = create<FormatStore>()(
       state.uadeEditableFileData = null;
       state.uadeEditableFileName = null;
       state.tfmxTimingTable = null;
+      state.tfmxNative = null;
+      state.tfmxSelectedPattern = 0;
       state.uadeEditableSubsongs = null;
       state.uadeEditableCurrentSubsong = 0;
       state.libopenmptFileData = null;
