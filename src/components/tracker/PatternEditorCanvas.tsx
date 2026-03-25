@@ -48,6 +48,10 @@ import { TrackerCanvas2DRenderer } from '@engine/renderer/TrackerCanvas2DRendere
 
 const CHAR_WIDTH = 10;
 const LINE_NUMBER_WIDTH = 40;
+// Mobile-scaled layout constants (must match TrackerCanvas2DRenderer MOBILE_SCALE)
+const MOBILE_SCALE = 1.6;
+const M_CHAR_WIDTH = Math.round(CHAR_WIDTH * MOBILE_SCALE);
+const M_LINE_NUMBER_WIDTH = Math.round(LINE_NUMBER_WIDTH * MOBILE_SCALE);
 // Channel width is computed dynamically in render() based on acid/prob columns
 
 const KEY_TO_SEMITONE: Record<string, number> = {
@@ -224,19 +228,24 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
   const showAutomationLanes = useUIStore(s => s.showAutomationLanes);
   const showMacroLanes = useUIStore(s => s.showMacroLanes);
 
+  // Use larger sizes on mobile iOS (Canvas2D main-thread path) for finger-friendly targets
+  const mobileCanvas = webglUnsupported && isMobile;
+  const CW = mobileCanvas ? M_CHAR_WIDTH : CHAR_WIDTH;
+  const LNW = mobileCanvas ? M_LINE_NUMBER_WIDTH : LINE_NUMBER_WIDTH;
+
   // Channel Metrics: calculate numChannels, offsets, and widths once per pattern/theme change
   const { numChannels, channelOffsets, channelWidths, totalChannelsWidth } = useMemo(() => {
     // FORMAT MODE: compute widths from column definitions (per-channel columns supported)
     if (isFormatMode && formatColumns && formatChannels) {
-      const FORMAT_COL_GAP  = 4;
-      const FORMAT_CHAN_PAD = 40;  // Padding inside channel (matches normal mode feel)
+      const FORMAT_COL_GAP  = mobileCanvas ? Math.round(4 * MOBILE_SCALE) : 4;
+      const FORMAT_CHAN_PAD = mobileCanvas ? Math.round(40 * MOBILE_SCALE) : 40;
       const widths: number[] = [];
       const offsets: number[] = [];
-      let currentX = LINE_NUMBER_WIDTH;
+      let currentX = LNW;
       for (let i = 0; i < formatChannels.length; i++) {
         const cols = formatChannels[i].columns ?? formatColumns;
         const contentWidth = cols.reduce(
-          (sum, col) => sum + col.charWidth * CHAR_WIDTH + FORMAT_COL_GAP, 0
+          (sum, col) => sum + col.charWidth * CW + FORMAT_COL_GAP, 0
         ) - FORMAT_COL_GAP;
         const chanW = contentWidth + FORMAT_CHAN_PAD;
         offsets.push(currentX);
@@ -259,7 +268,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
     };
 
     const nc = pattern.channels.length;
-    const noteWidth = CHAR_WIDTH * 3 + 4;
+    const noteWidth = CW * 3 + 4;
     
     // Determine extra column visibility from store settings (stable!)
     const showAcid = columnVisibility.flag1 || columnVisibility.flag2;
@@ -268,29 +277,25 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
     // Calculate per-channel widths based on effectCols
     const offsets: number[] = [];
     const widths: number[] = [];
-    let currentX = LINE_NUMBER_WIDTH;
-    
+    let currentX = LNW;
+
     for (let ch = 0; ch < nc; ch++) {
       const channel = pattern.channels[ch];
       const isCollapsed = channel?.collapsed;
-      
+
       if (isCollapsed) {
-        // Collapsed: show note column + padding for collapse button
-        const collapsedWidth = noteWidth + 40; // Note column + button space
+        const collapsedWidth = noteWidth + (mobileCanvas ? 64 : 40);
         offsets.push(currentX);
         widths.push(collapsedWidth);
         currentX += collapsedWidth;
       } else {
-        // Get effect columns for this channel (default 2 for backward compatibility)
         const effectCols = channel?.channelMeta?.effectCols ?? 2;
-        // inst(2)+4 vol(2)+4 + effectCols*(3+4) - but base layout is CW*4+8 for inst+vol
-        // Each effect column is 3 chars + 4px gap = CHAR_WIDTH*3+4
-        const effectWidth = effectCols * (CHAR_WIDTH * 3 + 4);
-        const paramWidth = CHAR_WIDTH * 4 + 8  // inst(2) + vol(2) + gaps
+        const effectWidth = effectCols * (CW * 3 + 4);
+        const paramWidth = CW * 4 + 8
           + effectWidth
-          + (showAcid ? CHAR_WIDTH * 2 + 8 : 0)
-          + (showProb ? CHAR_WIDTH * 2 + 4 : 0);
-        const chWidth = noteWidth + paramWidth + 60;
+          + (showAcid ? CW * 2 + 8 : 0)
+          + (showProb ? CW * 2 + 4 : 0);
+        const chWidth = noteWidth + paramWidth + (mobileCanvas ? 96 : 60);
         offsets.push(currentX);
         widths.push(chWidth);
         currentX += chWidth;
@@ -301,9 +306,9 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
       numChannels: nc,
       channelOffsets: offsets,
       channelWidths: widths,
-      totalChannelsWidth: currentX - LINE_NUMBER_WIDTH
+      totalChannelsWidth: currentX - LNW
     };
-  }, [pattern, instruments, columnVisibility, isFormatMode, formatColumns, formatChannels]);
+  }, [pattern, instruments, columnVisibility, isFormatMode, formatColumns, formatChannels, mobileCanvas, CW, LNW]);
 
   // Keep channelOffsetsRef/channelWidthsRef in sync for the RAF loop (selection math)
   useEffect(() => {
@@ -314,7 +319,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
   // Calculate if all channels fit in viewport (for disabling horizontal scroll)
   const allChannelsFit = useMemo(() => {
     if (!pattern || numChannels === 0) return true;
-    return (LINE_NUMBER_WIDTH + totalChannelsWidth) <= dimensions.width;
+    return (LNW + totalChannelsWidth) <= dimensions.width;
   }, [totalChannelsWidth, numChannels, dimensions.width, pattern]);
 
   // Mobile gesture handlers
@@ -418,7 +423,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
     }
 
     if (!foundChannel) {
-      if (relativeX < LINE_NUMBER_WIDTH) {
+      if (relativeX < LNW) {
         channelIndex = 0;
         localX = -1;
       } else {
@@ -969,19 +974,21 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
     const rowIndex = Math.floor(relativeY / rowHeightRef.current);
 
     // Calculate channel width - must match render() layout
-    const noteWidth = CHAR_WIDTH * 3 + 4;
+    const cw = mobileCanvas ? M_CHAR_WIDTH : CHAR_WIDTH;
+    const lnw = mobileCanvas ? M_LINE_NUMBER_WIDTH : LINE_NUMBER_WIDTH;
+    const noteWidth = cw * 3 + 4;
     const firstCell = pattern.channels[0]?.rows[0];
     const hasAcid = firstCell?.flag1 !== undefined || firstCell?.flag2 !== undefined;
     const hasProb = firstCell?.probability !== undefined;
-    const paramWidth = CHAR_WIDTH * 10 + 16
-      + (hasAcid ? CHAR_WIDTH * 2 + 8 : 0)
-      + (hasProb ? CHAR_WIDTH * 2 + 4 : 0)
-      + CHAR_WIDTH * 2 + 4; // Automation column
+    const paramWidth = cw * 10 + 16
+      + (hasAcid ? cw * 2 + 8 : 0)
+      + (hasProb ? cw * 2 + 4 : 0)
+      + cw * 2 + 4; // Automation column
     const channelWidth = noteWidth + paramWidth + 20 + 20; // +20 for automation lane visual space
 
     let channelIndex = 0;
-    let localX = relativeX - LINE_NUMBER_WIDTH;
-    if (relativeX > LINE_NUMBER_WIDTH) {
+    let localX = relativeX - lnw;
+    if (relativeX > lnw) {
       channelIndex = Math.floor(localX / channelWidth);
       channelIndex = Math.max(0, Math.min(channelIndex, pattern.channels.length - 1));
       localX = localX % channelWidth;
@@ -1816,7 +1823,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
     canvas.width = Math.round(w * dpr);
     canvas.height = Math.round(h * dpr);
 
-    const renderer = new TrackerCanvas2DRenderer(canvas);
+    const renderer = new TrackerCanvas2DRenderer(canvas, true /* mobile */);
     renderer.resize(w, h, dpr);
     mainThreadRendererRef.current = renderer;
 
@@ -2940,7 +2947,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
         {/* VU Meters overlay — full height, segments extrude from edit row */}
         <div
           className="absolute right-0 pointer-events-none overflow-hidden"
-          style={{ top: 0, left: LINE_NUMBER_WIDTH, bottom: 48, zIndex: 1 }}
+          style={{ top: 0, left: LNW, bottom: 48, zIndex: 1 }}
         >
           <ChannelVUMeters
             channelOffsets={channelOffsets}
