@@ -318,7 +318,7 @@ export const ProjectMCanvas = React.forwardRef<VJCanvasHandle, ProjectMCanvasPro
                 prevHash2 = 0;
                 const names = allPresetNames ?? Object.keys(BUILTIN_PRESETS);
                 if (names.length > 0) {
-                  doLoadPresetRef.current?.(Math.floor(Math.random() * names.length), false);
+                  doLoadPresetRef.current?.(Math.floor(Math.random() * names.length), true);
                 }
               }
             }
@@ -346,14 +346,15 @@ export const ProjectMCanvas = React.forwardRef<VJCanvasHandle, ProjectMCanvasPro
       return () => observer.disconnect();
     }, [ready]);
 
-    // Imperative API
+    // Imperative API — smooth=true enables projectM's native soft cut (crossfade).
+    // Safe because VJView alternates layers so projectM never does back-to-back swaps.
     React.useImperativeHandle(ref, () => ({
-      nextPreset: () => { doLoadPreset(currentIdxRef.current + 1, false); },
+      nextPreset: () => { doLoadPreset(currentIdxRef.current + 1, true); },
       randomPreset: () => {
         const names = allPresetNames ?? Object.keys(BUILTIN_PRESETS);
-        doLoadPreset(Math.floor(Math.random() * names.length), false);
+        doLoadPreset(Math.floor(Math.random() * names.length), true);
       },
-      loadPresetByIndex: (idx: number) => { doLoadPreset(idx, false); },
+      loadPresetByIndex: (idx: number) => { doLoadPreset(idx, true); },
       loadPresetByName: (name: string, blendOrSmooth?: number | boolean) => { doLoadPresetByName(name, blendOrSmooth !== false); },
       getPresetNames: () => allPresetNames ?? Object.keys(BUILTIN_PRESETS),
       getCurrentIndex: () => currentIdxRef.current,
