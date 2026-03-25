@@ -443,6 +443,8 @@ export const usePatternPlayback = () => {
           // Furnace native data (required for WASM sequencer bypass)
           furnaceNative: furnaceNative ?? undefined,
           furnaceActiveSubsong: furnaceActiveSubsong ?? undefined,
+          // TFMX timing table for position sync
+          tfmxTimingTable: tfmxTimingTableRef.current ?? undefined,
         });
 
         // Apply Furnace compat flags, chip flags, and tuning to the dispatch engine

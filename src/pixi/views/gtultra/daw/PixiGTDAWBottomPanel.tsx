@@ -13,6 +13,9 @@ import {
 } from './dawTheme';
 import { PixiGTDAWMixer } from './PixiGTDAWMixer';
 import { PixiGTDAWPresetBrowser } from './PixiGTDAWPresetBrowser';
+import { PixiGTStudioTables } from '../PixiGTStudioTables';
+import { PixiGTSIDMonitor } from '../PixiGTSIDMonitor';
+import { PixiGTOrderList } from '../PixiGTOrderList';
 
 const TAB_H = 28;
 
@@ -73,28 +76,13 @@ export const PixiGTDAWBottomPanel: React.FC<Props> = ({ width, height }) => {
           <PixiGTDAWPresetBrowser width={width} height={contentH} />
         )}
         {dawBottomPanel === 'tables' && (
-          <pixiBitmapText
-            text="Table editor — coming soon"
-            style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 10, fill: 0xffffff }}
-            tint={DAW_TEXT_MUTED}
-            x={16} y={16}
-          />
+          <PixiGTStudioTables width={width} height={contentH} />
         )}
         {dawBottomPanel === 'monitor' && (
-          <pixiBitmapText
-            text="SID Monitor — coming soon"
-            style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 10, fill: 0xffffff }}
-            tint={DAW_TEXT_MUTED}
-            x={16} y={16}
-          />
+          <PixiGTSIDMonitor width={width} height={contentH} />
         )}
         {dawBottomPanel === 'clips' && (
-          <pixiBitmapText
-            text="Clip Grid — coming soon"
-            style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 10, fill: 0xffffff }}
-            tint={DAW_TEXT_MUTED}
-            x={16} y={16}
-          />
+          <PixiGTOrderList width={width} height={contentH} />
         )}
       </pixiContainer>
     </pixiContainer>
