@@ -36,7 +36,7 @@ import * as Tone from 'tone';
 import { exportSong, getOriginalModuleDataForExport } from '@lib/export/exporters';
 import { useShallow } from 'zustand/react/shallow';
 import { useTapTempo } from '@hooks/useTapTempo';
-import { GROOVE_TEMPLATES } from '@typedefs/audio';
+
 import { notify } from '@stores/useNotificationStore';
 import { useHistoryStore } from '@stores/useHistoryStore';
 import { saveProjectToStorage } from '@hooks/useProjectPersistence';
@@ -188,7 +188,6 @@ export const PixiFT2Toolbar: React.FC = () => {
   const currentPatternInOrder = patternOrder[currentPositionIndex] ?? currentPatternIndex;
 
   const grooveActive = (grooveTemplateId !== 'straight' && swing > 0) || jitter > 0;
-  const grooveName = GROOVE_TEMPLATES.find(g => g.id === grooveTemplateId)?.name ?? 'Groove';
 
   const editorMode = useFormatStore((s) => s.editorMode);
   const gtPlaying = useGTUltraStore((s) => s.playing);
@@ -538,7 +537,7 @@ export const PixiFT2Toolbar: React.FC = () => {
             {/* Speed + Groove button */}
             <FT2Cell label="Speed" value={speed} min={1} max={31} onChange={setSpeed} width={44} />
             <PixiButton
-              label={grooveName}
+              label="Groove"
               variant={grooveActive ? 'ft2' : 'ghost'}
               color={grooveActive ? 'blue' : 'default'}
               size="sm"
