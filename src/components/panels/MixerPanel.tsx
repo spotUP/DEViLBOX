@@ -11,6 +11,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useMixerStore } from '../../stores/useMixerStore';
 import { useTrackerStore } from '../../stores/useTrackerStore';
 import { getToneEngine } from '../../engine/ToneEngine';
+import { useResponsiveSafe } from '@/contexts/ResponsiveContext';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -32,9 +33,9 @@ interface DOMStripProps {
   onMuteToggle: () => void;
   onSoloToggle: () => void;
   isMaster?: boolean;
+  /** Mobile compact mode — larger touch targets, simplified layout */
+  compact?: boolean;
 }
-
-const VU_HEIGHT = 80;
 
 function vuColor(level: number): string {
   if (level > 0.9) return '#ff3333';
@@ -55,26 +56,35 @@ const DOMChannelStrip: React.FC<DOMStripProps> = ({
   onMuteToggle,
   onSoloToggle,
   isMaster = false,
+  compact = false,
 }) => {
+  const vuH = compact ? 100 : 80;
+  const stripW = compact ? 72 : 60;
+
   return (
     <div
-      className="flex flex-col items-center gap-1 px-1 py-2 select-none"
-      style={{ width: 60, opacity: dimmed ? 0.35 : 1, transition: 'opacity 0.1s' }}
+      className="flex flex-col items-center gap-1 select-none"
+      style={{
+        width: stripW,
+        padding: compact ? '8px 4px' : '8px 2px',
+        opacity: dimmed ? 0.35 : 1,
+        transition: 'opacity 0.1s',
+      }}
     >
       {/* Channel name */}
-      <div className="text-[9px] font-mono text-white/50 truncate text-center w-full">
+      <div className={`${compact ? 'text-[11px]' : 'text-[9px]'} font-mono text-white/50 truncate text-center w-full`}>
         {name}
       </div>
 
       {/* VU meter */}
       <div
         className="relative rounded-sm bg-white/10"
-        style={{ width: 8, height: VU_HEIGHT }}
+        style={{ width: compact ? 12 : 8, height: vuH }}
       >
         <div
           className="absolute bottom-0 left-0 right-0 rounded-sm"
           style={{
-            height: Math.min(level * VU_HEIGHT, VU_HEIGHT),
+            height: Math.min(level * vuH, vuH),
             backgroundColor: vuColor(level),
             transition: 'height 40ms linear, background-color 40ms linear',
           }}
@@ -90,34 +100,36 @@ const DOMChannelStrip: React.FC<DOMStripProps> = ({
         value={volume}
         title={Math.round(volume * 100) + '%'}
         onChange={(e) => onVolumeChange(parseFloat(e.target.value))}
-        className="h-20 cursor-pointer"
+        className="cursor-pointer touch-none"
         style={{
           writingMode: 'vertical-lr',
           direction: 'rtl',
-          width: 20,
-          height: VU_HEIGHT,
+          width: compact ? 32 : 20,
+          height: vuH,
           accentColor: '#22dd66',
         }}
       />
 
-      {/* Pan slider (horizontal) */}
-      <input
-        type="range"
-        min={-1}
-        max={1}
-        step={0.01}
-        value={pan}
-        title={`Pan: ${pan >= 0 ? '+' : ''}${pan.toFixed(2)}`}
-        onChange={(e) => onPanChange(parseFloat(e.target.value))}
-        className="cursor-pointer"
-        style={{ width: 44, accentColor: '#60a5fa' }}
-      />
+      {/* Pan slider (horizontal) — hidden in compact mode to save space */}
+      {!compact && (
+        <input
+          type="range"
+          min={-1}
+          max={1}
+          step={0.01}
+          value={pan}
+          title={`Pan: ${pan >= 0 ? '+' : ''}${pan.toFixed(2)}`}
+          onChange={(e) => onPanChange(parseFloat(e.target.value))}
+          className="cursor-pointer"
+          style={{ width: 44, accentColor: '#60a5fa' }}
+        />
+      )}
 
       {/* Mute / Solo buttons */}
-      <div className="flex gap-1">
+      <div className={`flex ${compact ? 'flex-col gap-1.5' : 'gap-1'}`}>
         <button
           onClick={onMuteToggle}
-          className="text-[9px] font-mono font-bold rounded px-1 py-0.5 leading-none border transition-colors"
+          className={`${compact ? 'text-[11px] min-w-[44px] min-h-[36px]' : 'text-[9px] px-1 py-0.5'} font-mono font-bold rounded leading-none border transition-colors`}
           style={{
             backgroundColor: muted ? '#dc2626' : 'transparent',
             borderColor: muted ? '#dc2626' : 'rgba(255,255,255,0.2)',
@@ -131,7 +143,7 @@ const DOMChannelStrip: React.FC<DOMStripProps> = ({
         {!isMaster && (
           <button
             onClick={onSoloToggle}
-            className="text-[9px] font-mono font-bold rounded px-1 py-0.5 leading-none border transition-colors"
+            className={`${compact ? 'text-[11px] min-w-[44px] min-h-[36px]' : 'text-[9px] px-1 py-0.5'} font-mono font-bold rounded leading-none border transition-colors`}
             style={{
               backgroundColor: soloed ? '#ca8a04' : 'transparent',
               borderColor: soloed ? '#ca8a04' : 'rgba(255,255,255,0.2)',
@@ -159,15 +171,17 @@ interface MixerContentProps {
   onMuteToggle: (i: number) => void;
   onSoloToggle: (i: number) => void;
   onMasterVolumeChange: (v: number) => void;
+  compact?: boolean;
 }
 
 const MixerContent: React.FC<MixerContentProps> = ({
   channels, master, isSoloing, levels,
   onVolumeChange, onPanChange, onMuteToggle, onSoloToggle, onMasterVolumeChange,
+  compact = false,
 }) => {
   const masterLevel = Math.max(...levels, 0);
   return (
-    <div className="flex flex-row overflow-x-auto items-start pb-2">
+    <div className="flex flex-row overflow-x-auto items-start pb-2 scrollbar-none">
       {channels.map((ch, i) => (
         <DOMChannelStrip
           key={i}
@@ -183,6 +197,7 @@ const MixerContent: React.FC<MixerContentProps> = ({
           onPanChange={(p) => onPanChange(i, p)}
           onMuteToggle={() => onMuteToggle(i)}
           onSoloToggle={() => onSoloToggle(i)}
+          compact={compact}
         />
       ))}
       <div className="self-stretch w-px bg-white/10 mx-1 my-2" />
@@ -200,6 +215,7 @@ const MixerContent: React.FC<MixerContentProps> = ({
         onMuteToggle={() => {}}
         onSoloToggle={() => {}}
         isMaster={true}
+        compact={compact}
       />
     </div>
   );
@@ -215,58 +231,58 @@ function useMixerState() {
   const setChannelMute   = useMixerStore(s => s.setChannelMute);
   const setChannelSolo   = useMixerStore(s => s.setChannelSolo);
 
-  const [levels, setLevels] = useState<number[]>(() => Array(NUM_CHANNELS).fill(0));
-  const rafRef     = useRef<number>(0);
-  const mountedRef = useRef(true);
-  const levelsRef  = useRef(levels);
-  const frameCount = useRef(0);
-
+  // Live VU levels (rAF-driven)
+  const [levels, setLevels] = useState<number[]>(() => new Array(NUM_CHANNELS).fill(0));
+  const prevLevelsRef = useRef(levels);
   useEffect(() => {
-    mountedRef.current = true;
+    let raf = 0;
     const tick = () => {
-      if (!mountedRef.current) return;
-      // Throttle state updates to ~15fps (every 4th frame) to avoid React overload
-      if (++frameCount.current % 4 === 0) {
-        try {
-          const engine = getToneEngine();
-          const chLevels = engine.getChannelLevels(NUM_CHANNELS);
-          const hasSignal = chLevels.some(l => l > 0);
-          if (!hasSignal) {
-            const busLevel = engine.getSynthBusLevel();
-            if (busLevel > 0) {
-              const activeChannels = useTrackerStore.getState().patterns[0]?.channels.length ?? 4;
-              for (let i = 0; i < Math.min(activeChannels, chLevels.length); i++) chLevels[i] = busLevel;
-            }
-          }
-          // Only update state if levels actually changed
-          const prev = levelsRef.current;
-          const changed = chLevels.length !== prev.length || chLevels.some((v, i) => Math.abs(v - prev[i]) > 0.005);
-          if (changed) {
-            levelsRef.current = chLevels;
-            setLevels(chLevels);
-          }
-        } catch { /* not ready */ }
+      const engine = getToneEngine();
+      const patterns = useTrackerStore.getState().patterns;
+      const patternIndex = useTrackerStore.getState().currentPatternIndex;
+      const pattern = patterns[patternIndex];
+      const numCh = pattern?.channels.length ?? NUM_CHANNELS;
+      const allLevels = engine.getChannelLevels?.(numCh) ?? [];
+      const next: number[] = [];
+      for (let i = 0; i < numCh; i++) {
+        const chLevel = allLevels[i] ?? 0;
+        const prev = prevLevelsRef.current[i] ?? 0;
+        // Smooth decay
+        next.push(chLevel > prev ? chLevel : prev * 0.92);
       }
-      rafRef.current = requestAnimationFrame(tick);
+      prevLevelsRef.current = next;
+      setLevels(next);
+      raf = requestAnimationFrame(tick);
     };
-    rafRef.current = requestAnimationFrame(tick);
-    return () => { mountedRef.current = false; cancelAnimationFrame(rafRef.current); };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
   }, []);
 
-  const channelsRef = useRef(channels);
-  useEffect(() => { channelsRef.current = channels; }, [channels]);
+  const handleVolumeChange = useCallback((i: number, v: number) => {
+    setChannelVolume(i, v);
+  }, [setChannelVolume]);
 
-  const handleMuteToggle = useCallback((ch: number) => {
-    setChannelMute(ch, !channelsRef.current[ch].muted);
+  const handlePanChange = useCallback((i: number, p: number) => {
+    setChannelPan(i, p);
+  }, [setChannelPan]);
+
+  const handleMuteToggle = useCallback((i: number) => {
+    const ch = useMixerStore.getState().channels[i];
+    if (ch) setChannelMute(i, !ch.muted);
   }, [setChannelMute]);
-  const handleSoloToggle = useCallback((ch: number) => {
-    setChannelSolo(ch, !channelsRef.current[ch].soloed);
+
+  const handleSoloToggle = useCallback((i: number) => {
+    const ch = useMixerStore.getState().channels[i];
+    if (ch) setChannelSolo(i, !ch.soloed);
   }, [setChannelSolo]);
 
   return {
-    channels, master, isSoloing, levels,
-    onVolumeChange: setChannelVolume,
-    onPanChange: setChannelPan,
+    channels,
+    master,
+    isSoloing,
+    levels,
+    onVolumeChange: handleVolumeChange,
+    onPanChange: handlePanChange,
     onMuteToggle: handleMuteToggle,
     onSoloToggle: handleSoloToggle,
     onMasterVolumeChange: setMasterVolume,
@@ -277,9 +293,10 @@ function useMixerState() {
 
 export const MixerView: React.FC = () => {
   const state = useMixerState();
+  const { isMobile } = useResponsiveSafe();
   return (
     <div className="flex flex-col flex-1 min-h-0 bg-[#0e0e14]">
-      <MixerContent {...state} />
+      <MixerContent {...state} compact={isMobile} />
     </div>
   );
 };

@@ -285,6 +285,54 @@ export const PianoRoll: React.FC<PianoRollProps> = ({ channelIndex }) => {
     return () => resizeObserver.disconnect();
   }, []);
 
+  // ── Pinch-to-zoom (touch devices) ──────────────────────────────────────
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    let lastDist = 0;
+    let lastMidY = 0;
+    const onTouchStart = (e: TouchEvent) => {
+      if (e.touches.length === 2) {
+        const dx = e.touches[0].clientX - e.touches[1].clientX;
+        const dy = e.touches[0].clientY - e.touches[1].clientY;
+        lastDist = Math.hypot(dx, dy);
+        lastMidY = (e.touches[0].clientY + e.touches[1].clientY) / 2;
+      }
+    };
+    const onTouchMove = (e: TouchEvent) => {
+      if (e.touches.length === 2) {
+        e.preventDefault();
+        const dx = e.touches[0].clientX - e.touches[1].clientX;
+        const dy = e.touches[0].clientY - e.touches[1].clientY;
+        const dist = Math.hypot(dx, dy);
+        const midY = (e.touches[0].clientY + e.touches[1].clientY) / 2;
+        if (lastDist > 0) {
+          const scale = dist / lastDist;
+          // Horizontal pinch → horizontal zoom
+          const hZoom = usePianoRollStore.getState().view.horizontalZoom;
+          setHorizontalZoom(Math.max(4, Math.min(64, hZoom * scale)));
+          // Vertical two-finger pan
+          const panDelta = (midY - lastMidY) / view.verticalZoom;
+          if (Math.abs(panDelta) > 0.1) {
+            handleScroll(0, panDelta);
+          }
+        }
+        lastDist = dist;
+        lastMidY = midY;
+      }
+    };
+    const onTouchEnd = () => { lastDist = 0; };
+    el.addEventListener('touchstart', onTouchStart, { passive: false });
+    el.addEventListener('touchmove', onTouchMove, { passive: false });
+    el.addEventListener('touchend', onTouchEnd);
+    return () => {
+      el.removeEventListener('touchstart', onTouchStart);
+      el.removeEventListener('touchmove', onTouchMove);
+      el.removeEventListener('touchend', onTouchEnd);
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // Calculate visible notes range
   const visibleNotes = useMemo(() => {
     return Math.ceil(containerHeight / view.verticalZoom) + 2;
