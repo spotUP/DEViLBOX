@@ -554,7 +554,7 @@ const RenderModeToggle: React.FC = () => {
   const handleSwitch = useCallback((mode: 'dom' | 'webgl') => {
     setRenderMode(mode);
     // Navigate back to the main app in the new mode
-    window.location.hash = '';
+    history.replaceState(null, '', window.location.pathname);
     window.location.reload();
   }, [setRenderMode]);
 
