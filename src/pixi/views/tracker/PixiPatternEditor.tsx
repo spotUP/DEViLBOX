@@ -310,7 +310,7 @@ function renderGrid(g: GraphicsType, p: RenderParams, vStart: number): void {
   }
 
   g.rect(0, 0, LINE_NUMBER_WIDTH, p.gridHeight);
-  g.fill({ color: p.theme.bg.color, alpha: 0.85 });
+  g.fill({ color: p.theme.trackerRowEven.color });
 }
 
 /** Cursor/selection overlay — active channel, caret, selection, peer cursors. */
@@ -589,7 +589,7 @@ export const PixiPatternEditor: React.FC<PixiPatternEditorProps> = ({ width, hei
   const theme = usePixiTheme();
 
   // Update module-level fill styles with current theme colors
-  FILL_BLACK_045 = { color: theme.bg.color, alpha: 0.45 };
+  FILL_BLACK_045 = { color: 0x000000, alpha: 0.45 }; // Black overlay for muted channels, not theme.bg
   FILL_PURPLE_012 = { color: theme.accentSecondary.color, alpha: 0.12 };
   FILL_PURPLE_045 = { color: theme.accentSecondary.color, alpha: 0.45 };
   FILL_PURPLE_055 = { color: theme.accentSecondary.color, alpha: 0.55 };
