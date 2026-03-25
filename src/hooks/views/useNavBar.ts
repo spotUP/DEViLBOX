@@ -25,18 +25,11 @@ export interface NavBarThemeOption {
 
 // ─── Constants (exported for renderers) ──────────────────────────────────────
 
-export const VIEW_TABS = [
-  { id: 'tracker',     label: 'Tracker' },
-  { id: 'arrangement', label: 'Arrange' },
-  { id: 'pianoroll',   label: 'Piano' },
-  { id: 'mixer',       label: 'Mixer' },
-  { id: 'dj',          label: 'DJ'  },
-  { id: 'vj',          label: 'VJ'  },
-  { id: 'studio',      label: 'Studio' },
-  { id: 'split',       label: 'Split' },
-] as const;
+import { NAV_BAR_VIEWS } from '@/constants/viewOptions';
 
-export type ViewTabId = (typeof VIEW_TABS)[number]['id'];
+export const VIEW_TABS = NAV_BAR_VIEWS.map(v => ({ id: v.value, label: v.shortLabel }));
+
+export type ViewTabId = string;
 
 // ─── Hook ────────────────────────────────────────────────────────────────────
 

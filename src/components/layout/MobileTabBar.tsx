@@ -10,6 +10,7 @@ import { useUIStore } from '@stores/useUIStore';
 import { useTrackerStore } from '@stores/useTrackerStore';
 import { useMixerStore } from '@stores/useMixerStore';
 import { haptics } from '@/utils/haptics';
+import { MOBILE_TAB_BAR_VIEWS } from '@/constants/viewOptions';
 
 export type MobileTab = 'tracker' | 'instruments' | 'mixer' | 'arrangement' | 'drumpad';
 
@@ -30,13 +31,25 @@ interface QuickAction {
   destructive?: boolean;
 }
 
-const tabs: TabConfig[] = [
-  { id: 'tracker', label: 'Pattern', icon: <Grid3X3 size={20} /> },
-  { id: 'instruments', label: 'Instr', icon: <Music2 size={20} />, isModal: true },
-  { id: 'mixer', label: 'Mixer', icon: <Sliders size={20} /> },
-  { id: 'arrangement', label: 'Arrange', icon: <LayoutList size={20} /> },
-  { id: 'drumpad', label: 'Pads', icon: <Disc3 size={20} /> },
-];
+// Icons for tab bar views (keyed by view value)
+const TAB_ICONS: Record<string, React.ReactNode> = {
+  tracker: <Grid3X3 size={20} />,
+  mixer: <Sliders size={20} />,
+  arrangement: <LayoutList size={20} />,
+  drumpad: <Disc3 size={20} />,
+};
+
+// Build tabs from single source of truth, insert the special "instruments" modal tab after tracker
+const tabs: TabConfig[] = (() => {
+  const viewTabs: TabConfig[] = MOBILE_TAB_BAR_VIEWS.map(v => ({
+    id: v.value as MobileTab,
+    label: v.shortLabel,
+    icon: TAB_ICONS[v.value] || <Grid3X3 size={20} />,
+  }));
+  // Insert instruments tab after the first tab (tracker)
+  viewTabs.splice(1, 0, { id: 'instruments', label: 'Instr', icon: <Music2 size={20} />, isModal: true });
+  return viewTabs;
+})();
 
 function getQuickActions(tabId: MobileTab): QuickAction[] {
   switch (tabId) {
