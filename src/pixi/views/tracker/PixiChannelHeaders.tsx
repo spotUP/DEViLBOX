@@ -228,7 +228,7 @@ const PixiChannelHeadersInner: React.FC<PixiChannelHeadersProps> = ({
   const drawChannelBackgrounds = useCallback((g: GraphicsType) => {
     g.clear();
     for (let ch = 0; ch < numChannels; ch++) {
-      const colX = channelOffsets[ch] - scrollLeft - LINE_NUMBER_WIDTH;
+      const colX = channelOffsets[ch] - LINE_NUMBER_WIDTH;
       const chW = channelWidths[ch];
       const channel = pattern.channels[ch];
 
@@ -252,7 +252,7 @@ const PixiChannelHeadersInner: React.FC<PixiChannelHeadersProps> = ({
       g.rect(colX + chW - 1, 0, 1, HEADER_HEIGHT);
       g.fill({ color: theme.border.color, alpha: 0.3 });
     }
-  }, [numChannels, channelOffsets, channelWidths, scrollLeft, pattern.channels, theme]);
+  }, [numChannels, channelOffsets, channelWidths, pattern.channels, theme]);
 
   // ── Button draw helpers ────────────────────────────────────────────────────
   const drawMuteBtn = useCallback((g: GraphicsType, muted: boolean) => {
@@ -717,7 +717,7 @@ const PixiChannelHeadersInner: React.FC<PixiChannelHeadersProps> = ({
 
     return headers;
   }, [
-    numChannels, pattern.channels, channelWidths, channelOffsets, scrollLeft,
+    numChannels, pattern.channels, channelWidths, channelOffsets,
     theme, showChannelNames, channelSpeeds, songInitialSpeed, editingChannel, editValue,
     instruments,
     onToggleMute, onToggleSolo, onToggleCollapse, onAddChannel, onUpdateName,
@@ -745,7 +745,7 @@ const PixiChannelHeadersInner: React.FC<PixiChannelHeadersProps> = ({
       >
         <pixiGraphics ref={clipMaskRef} draw={drawClipMask} renderable={false} layout={{ position: 'absolute', width: width - LINE_NUMBER_WIDTH, height: HEADER_HEIGHT }} />
         <pixiContainer
-          x={-scrollLeft + LINE_NUMBER_WIDTH}
+          x={-scrollLeft}
           layout={{ position: 'absolute', top: 0, height: HEADER_HEIGHT }}
           mask={clipMask}
         >

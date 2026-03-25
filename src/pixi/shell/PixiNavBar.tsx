@@ -3,13 +3,13 @@
  *
  * Two rows:
  *   Row 1 (main nav):
- *     Left:   "DEViLBOX" logo + version badge + view selector dropdown
+ *     Left:   "DEViLBOX" logo + version badge
  *     Right:  Sign In, Collab, Desktop App, DOM, Info, Sets, MIDI, Theme, Volume
  *   Row 2 (tab bar):
  *     Project tabs + "+" add button
  */
 
-import React, { useCallback, useMemo, useRef } from 'react';
+import React, { useCallback, useRef } from 'react';
 import type { Container as ContainerType } from 'pixi.js';
 import { PIXI_FONTS } from '../fonts';
 import { usePixiTheme } from '../theme';
@@ -23,7 +23,7 @@ import { MODERN_NAV_H } from '../workbench/workbenchLayout';
 import { BUILD_NUMBER } from '@constants/version';
 import { usePixiDropdownStore } from '../stores/usePixiDropdownStore';
 import { PixiDJSetBrowser } from '../views/dj/PixiDJSetBrowser';
-import { useNavBar, VIEW_TABS, type ViewTabId } from '@hooks/views/useNavBar';
+import { useNavBar } from '@hooks/views/useNavBar';
 import type { FederatedPointerEvent } from 'pixi.js';
 import type { ProjectTab } from '@stores';
 
@@ -40,12 +40,6 @@ export const PixiNavBar: React.FC = () => {
 
   // Theme options for PixiSelect
   const themeOptions = n.themeOptions;
-
-  // View options for PixiSelect dropdown
-  const viewOptions = useMemo(() =>
-    VIEW_TABS.map(({ id, label }) => ({ value: id, label: label.toUpperCase() })),
-    [],
-  );
 
   // MIDI device quick-picker (Pixi-specific dropdown UX)
   const midiContainerRef = useRef<ContainerType>(null);
@@ -112,11 +106,6 @@ export const PixiNavBar: React.FC = () => {
     });
   }, [n.authUser, n.handleOpenAuth, n.logout]);
 
-  // Handle view switch via PixiSelect
-  const handleViewChange = useCallback((id: string) => {
-    n.handleSwitchView(id as ViewTabId);
-  }, [n.handleSwitchView]);
-
   return (
     <layoutContainer
       layout={{
@@ -173,14 +162,7 @@ export const PixiNavBar: React.FC = () => {
           />
         </layoutContainer>
 
-        {/* View selector dropdown — compact, not prominent pills */}
-        <PixiSelect
-          options={viewOptions}
-          value={n.activeView}
-          onChange={handleViewChange}
-          width={90}
-          height={24}
-        />
+        {/* View selector removed — view switching is in the editor controls bar */}
       </pixiContainer>
 
       {/* ═══ Right zone: Actions matching DOM layout ═══ */}
@@ -198,7 +180,7 @@ export const PixiNavBar: React.FC = () => {
         {/* Auth — Sign In / username (matches DOM's Sign In button) */}
         <pixiContainer ref={authContainerRef} layout={{ flexShrink: 0 }}>
           <PixiButton
-            label={n.authUser ? n.authUser.username.slice(0, 8) : 'SIGN IN'}
+            label={n.authUser ? n.authUser.username.slice(0, 8) : 'Sign In'}
             variant="ghost"
             size="sm"
             onClick={handleAuthClick}
@@ -208,7 +190,7 @@ export const PixiNavBar: React.FC = () => {
 
         {/* Collaboration (matches DOM's Collab button) */}
         <PixiButton
-          label="COLLAB"
+          label="Collab"
           variant={n.collabStatus === 'connected' ? 'primary' : 'ghost'}
           size="sm"
           active={n.collabStatus === 'connected'}
@@ -218,18 +200,18 @@ export const PixiNavBar: React.FC = () => {
 
         {/* Desktop App download (matches DOM's Desktop App button) */}
         <PixiButton
-          label="APP"
+          label="Desktop App"
           variant="primary"
           size="sm"
           onClick={n.handleOpenDownload}
-          width={36}
+          width={72}
         />
 
         {/* Switch to DOM mode (matches DOM's DOM button) */}
-        <PixiButton label="DOM" variant="ghost" size="sm" onClick={n.handleSwitchToDom} width={36} />
+        <PixiButton label="Dom" variant="ghost" size="sm" onClick={n.handleSwitchToDom} width={36} />
 
         {/* Song Info (matches DOM's Info button) */}
-        <PixiButton label="INFO" variant="ghost" size="sm" onClick={n.handleOpenModuleInfo} width={40} />
+        <PixiButton label="Info" variant="ghost" size="sm" onClick={n.handleOpenModuleInfo} width={40} />
 
         {/* DJ Sets (matches DOM's Sets dropdown) */}
         <PixiDJSetBrowser />

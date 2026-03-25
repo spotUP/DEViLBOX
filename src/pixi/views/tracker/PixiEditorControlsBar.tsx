@@ -164,9 +164,9 @@ const HardwarePresetSelector: React.FC = () => {
       options={options}
       value="__none__"
       onChange={handleHardwarePresetChange}
-      width={150}
+      width={180}
       height={24}
-      placeholder="SELECT HARDWARE..."
+      placeholder="Select Hardware..."
     />
   );
 };
@@ -489,15 +489,8 @@ export const PixiEditorControlsBar: React.FC<PixiEditorControlsBarProps> = ({
     ? theme.warning.color
     : theme.error.color;
 
-  // Title for the header — based on current local view mode
-  const viewTitle = viewMode === 'tracker' ? 'TRACKER'
-    : viewMode === 'grid' ? 'GRID'
-    : viewMode === 'tb303' ? 'TB-303'
-    : viewMode === 'sunvox' ? 'SUNVOX'
-    : 'TRACKER';
-
   return (
-    <PixiViewHeader activeView={viewMode} title={viewTitle} onViewChange={handleViewModeChange}>
+    <PixiViewHeader activeView={viewMode} title="" onViewChange={handleViewModeChange}>
 
       {/* Channel selector — only in non-tracker modes */}
       <PixiSelect
