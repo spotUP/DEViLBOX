@@ -81,6 +81,21 @@ interface TransportStore extends TransportState {
   seekToGlobalRow: (row: number) => void;
   setCurrentRowPerChannel: (rows: number[]) => void;
   cancelPendingRowUpdate: () => void; // Clear pending throttle timer on seek
+
+  // Timecode
+  getTimecodeString: () => string;
+
+  // Punch in/out
+  punchInRow: number | null;
+  punchOutRow: number | null;
+  setPunchIn: (row: number | null) => void;
+  setPunchOut: (row: number | null) => void;
+  isPunchEnabled: boolean;
+  setPunchEnabled: (enabled: boolean) => void;
+
+  // Count-in (already in state interface above)
+  setCountInEnabled: (enabled: boolean) => void;
+
   reset: () => void;
 }
 
@@ -125,8 +140,11 @@ export const useTransportStore = create<TransportStore>()(
     useMpcScale: false,
     currentGlobalRow: 0,
     currentRowPerChannel: [],
-    globalPitch: 0, // Default to no pitch shift
+    punchInRow: null,
+    punchOutRow: null,
+    isPunchEnabled: false,
     countInEnabled: false,
+    globalPitch: 0, // Default to no pitch shift
 
     // Actions
     setBPM: (bpm) =>
@@ -408,11 +426,32 @@ export const useTransportStore = create<TransportStore>()(
     },
 
     // Reset to initial state (for new project/tab)
+    // Timecode
+    getTimecodeString: () => {
+      const state = _get();
+      const beatsPerRow = 1 / (state.speed || 6); // rows per tick → beats
+      const secondsPerRow = (60 / state.bpm) * beatsPerRow;
+      const totalSeconds = state.currentGlobalRow * secondsPerRow;
+      const hours = Math.floor(totalSeconds / 3600);
+      const minutes = Math.floor((totalSeconds % 3600) / 60);
+      const seconds = Math.floor(totalSeconds % 60);
+      const ms = Math.floor((totalSeconds % 1) * 1000);
+      return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}.${String(ms).padStart(3, '0')}`;
+    },
+
+    // Punch in/out
+    setPunchIn: (row) => set((state) => { state.punchInRow = row; }),
+    setPunchOut: (row) => set((state) => { state.punchOutRow = row; }),
+    setPunchEnabled: (enabled) => set((state) => { state.isPunchEnabled = enabled; }),
+
+    // Count-in
+    setCountInEnabled: (enabled) => set((state) => { state.countInEnabled = enabled; }),
+
     reset: () =>
       set((state) => {
         state.bpm = 125;
         state.timeSignature = [4, 4];
-        state.swing = 0; // 0 = no groove (straight)
+        state.swing = 0;
         state.position = '0:0:0';
         state.isPlaying = false;
         state.isPaused = false;
@@ -428,6 +467,10 @@ export const useTransportStore = create<TransportStore>()(
         state.useMpcScale = false;
         state.currentGlobalRow = 0;
         state.currentRowPerChannel = [];
+        state.punchInRow = null;
+        state.punchOutRow = null;
+        state.isPunchEnabled = false;
+        state.countInEnabled = false;
       }),
   }))
 );
