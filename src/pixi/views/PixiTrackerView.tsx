@@ -17,6 +17,7 @@ import { PixiFT2Toolbar, FT2_TOOLBAR_HEIGHT } from './tracker/PixiFT2Toolbar';
 import { PixiInstrumentPanel } from './tracker/PixiInstrumentPanel';
 import { PixiPatternMinimap } from './tracker/PixiPatternMinimap';
 import { PixiAutomationLanes } from './tracker/PixiAutomationLanes';
+import { PixiAutomationParamPicker } from './tracker/PixiAutomationParamPicker';
 import { PixiMacroLanes } from './tracker/PixiMacroLanes';
 import { PixiMacroSlotsPanel } from './tracker/PixiMacroSlotsPanel';
 import { PixiMIDIKnobBar } from './tracker/PixiMIDIKnobBar';
@@ -289,6 +290,16 @@ export const PixiTrackerView: React.FC = () => {
               </pixiContainer>
             );
           })()}
+          {/* Automation parameter pickers (per-channel) */}
+          <pixiContainer alpha={viewMode === 'tracker' && showAutomation && !!patternId ? 1 : 0} renderable={viewMode === 'tracker' && showAutomation && !!patternId} eventMode={viewMode === 'tracker' && showAutomation && !!patternId ? 'static' : 'none'} layout={{ position: 'absolute', top: 10, left: 0, flexDirection: 'row' }}>
+            {Array.from({ length: channelCount }, (_, i) => (
+              <PixiAutomationParamPicker
+                key={`auto-pick-${i}`}
+                channelIndex={i}
+                channelWidth={Math.floor(Math.max(100, editorWidth) / channelCount)}
+              />
+            ))}
+          </pixiContainer>
           <pixiContainer alpha={viewMode === 'tracker' && showAutomation && !!patternId ? 1 : 0} renderable={viewMode === 'tracker' && showAutomation && !!patternId} eventMode={viewMode === 'tracker' && showAutomation && !!patternId ? 'static' : 'none'} layout={{ position: 'absolute', top: 28 }}>
             <PixiAutomationLanes
               width={Math.max(100, editorWidth)}
