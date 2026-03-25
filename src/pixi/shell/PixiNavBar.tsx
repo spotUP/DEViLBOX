@@ -27,7 +27,7 @@ import { useNavBar } from '@hooks/views/useNavBar';
 import type { FederatedPointerEvent } from 'pixi.js';
 import type { ProjectTab } from '@stores';
 
-const NAV_ROW_H = 40; // Match DOM nav height (py-2 = 8px padding × 2 + content)
+const NAV_ROW_H = 52;
 const TAB_ROW_H = MODERN_NAV_H - NAV_ROW_H; // 24px
 
 // ─── PixiNavBar ──────────────────────────────────────────────────────────────
@@ -172,8 +172,8 @@ export const PixiNavBar: React.FC = () => {
           flexDirection: 'row',
           alignItems: 'center',
           justifyContent: 'flex-end',
-          paddingRight: 16,
-          gap: 16,
+          paddingRight: 12,
+          gap: 8,
           flexShrink: 0,
         }}
       >
