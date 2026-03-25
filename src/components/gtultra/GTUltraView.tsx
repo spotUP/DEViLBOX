@@ -13,7 +13,7 @@
  * special channels on the right side of the pattern editor.
  */
 
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState, lazy, Suspense } from 'react';
 import { PatternEditorCanvas } from '@/components/tracker/PatternEditorCanvas';
 import { GTU_COLUMNS } from './gtuAdapter';
 import { GTToolbar } from './GTToolbar';
@@ -21,10 +21,14 @@ import { GTOrderMatrix, GT_ORDER_MATRIX_HEIGHT, GT_ORDER_MATRIX_COLLAPSED_HEIGHT
 import { useGTKeyboardHandler } from './GTKeyboardHandler';
 import { useGTUltraEngineInit } from '../../engine/gtultra/useGTUltraEngineInit';
 import { useGTUltraFormatData } from './useGTUltraFormatData';
+import { useGTUltraStore } from '../../stores/useGTUltraStore';
+
+const GTDAWView = lazy(() => import('./daw/GTDAWView').then(m => ({ default: m.GTDAWView })));
 
 const TOOLBAR_H = 36;
 
 export const GTUltraView: React.FC<{ width?: number; height?: number }> = () => {
+  const viewMode = useGTUltraStore((s) => s.viewMode);
   const { channels, currentRow, isPlaying, handleCellChange } = useGTUltraFormatData();
 
   const containerRef = useRef<HTMLDivElement>(null);
@@ -47,6 +51,15 @@ export const GTUltraView: React.FC<{ width?: number; height?: number }> = () => 
   useGTUltraEngineInit();
 
   const matrixH = ordersCollapsed ? GT_ORDER_MATRIX_COLLAPSED_HEIGHT : GT_ORDER_MATRIX_HEIGHT;
+
+  // DAW mode renders the modern visual editor
+  if (viewMode === 'daw') {
+    return (
+      <Suspense fallback={<div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '100%', height: '100%', background: '#121218', color: '#6b6b80', fontFamily: 'monospace' }}>Loading DAW mode...</div>}>
+        <GTDAWView />
+      </Suspense>
+    );
+  }
 
   return (
     <div ref={containerRef} style={{

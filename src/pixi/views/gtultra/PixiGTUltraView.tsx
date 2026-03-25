@@ -23,6 +23,7 @@ import { PixiGTOrderList } from './PixiGTOrderList';
 import { useGTUltraStore } from '@/stores/useGTUltraStore';
 import { useGTKeyboardHandler } from '@/components/gtultra/GTKeyboardHandler';
 import { useGTUltraEngineInit } from '@/engine/gtultra/useGTUltraEngineInit';
+import { PixiGTDAWView } from './daw/PixiGTDAWView';
 
 const TOOLBAR_H = 32;
 const ORDER_H = 160;
@@ -41,9 +42,16 @@ interface Props {
 
 export const PixiGTUltraView: React.FC<Props> = ({ width, height }) => {
   const theme = usePixiTheme();
+  const viewMode = useGTUltraStore((s) => s.viewMode);
 
-  useGTKeyboardHandler(true);
+  // Hooks must be called unconditionally (React rules of hooks)
+  useGTKeyboardHandler(viewMode !== 'daw');
   useGTUltraEngineInit();
+
+  // DAW mode renders a completely different layout
+  if (viewMode === 'daw') {
+    return <PixiGTDAWView width={width} height={height} />;
+  }
 
   const songName = useGTUltraStore((s) => s.songName);
   const songAuthor = useGTUltraStore((s) => s.songAuthor);
