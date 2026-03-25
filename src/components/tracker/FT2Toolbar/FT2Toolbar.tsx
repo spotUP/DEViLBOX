@@ -700,9 +700,9 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = React.memo(({
                 size="sm"
                 onClick={handleToggleASID}
                 title={asidEnabled ? `ASID active${asidReady ? '' : ' (no device)'}` : 'Enable ASID hardware SID output'}
-                className={`min-w-[44px] ${asidEnabled ? 'text-green-400 border-green-500/50' : 'text-text-muted'}`}
+                className={`min-w-[72px] ${asidEnabled ? 'text-green-400 border-green-500/50' : 'text-text-muted'}`}
               >
-                {asidEnabled ? '🔊 HW' : '🔇 HW'}
+                Hardware
               </Button>
             </div>
           </div>
