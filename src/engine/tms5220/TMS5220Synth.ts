@@ -118,6 +118,11 @@ export class TMS5220Synth extends MAMEBaseSynth {
     try {
       this._romData = await loadTMS5220ROMs();
 
+      if (!this._romData) {
+        console.warn('[TMS5220] VSM ROMs not found — text-to-speech unavailable until ROM is uploaded');
+        return;
+      }
+
       // Try to build word table from VSM ROM address table
       try {
         const mcuResponse = await fetch(normalizeUrl('/roms/snspell/tmc0271h-n2l'));

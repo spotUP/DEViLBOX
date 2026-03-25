@@ -19,6 +19,7 @@
  */
 
 import { normalizeUrl } from '@/utils/urlUtils';
+import { loadROM as loadROMFromIDB, saveROM } from './MAMEROMStore';
 
 export interface ROMFile {
   name: string;
@@ -339,11 +340,22 @@ async function loadFromZip(zipPath: string, config: ChipROMConfig): Promise<Uint
 }
 
 /**
- * Load ROM files for a specific chip
- * Tries in order: .zip file (MAME standard) -> combined .bin -> individual .bin files
+ * Load ROM files for a specific chip.
+ *
+ * Resolution order:
+ * 1. Disk: .zip file (MAME standard) -> combined .bin -> individual .bin files
+ * 2. IndexedDB: previously user-uploaded ROM (via ROMUploadPrompt)
+ * 3. Returns null if not found anywhere — caller should show ROMUploadPrompt
+ *
+ * On successful disk load, the result is automatically cached to IndexedDB
+ * so future sessions can fall back to it even if the public/ files move.
  */
-export async function loadChipROMs(config: ChipROMConfig): Promise<Uint8Array> {
+export async function loadChipROMs(config: ChipROMConfig): Promise<Uint8Array | null> {
   console.log(`[${config.chipName}] Loading ROMs from ${config.basePath}...`);
+
+  // ── 1. Try disk sources ──────────────────────────────────────────────────
+
+  let diskData: Uint8Array | null = null;
 
   try {
     // Try ZIP file first (MAME standard format)
@@ -352,13 +364,14 @@ export async function loadChipROMs(config: ChipROMConfig): Promise<Uint8Array> {
       const zipData = await loadFromZip(zipPath, config);
       if (zipData) {
         console.log(`✓ Loaded ${config.chipName} from ZIP:`, zipData.length, 'bytes');
-        return zipData;
+        diskData = zipData;
+      } else {
+        console.log(`[${config.chipName}] ZIP not found, trying other formats...`);
       }
-      console.log(`[${config.chipName}] ZIP not found, trying other formats...`);
     }
 
     // Try combined ROM if specified
-    if (config.combinedFile) {
+    if (!diskData && config.combinedFile) {
       try {
         const response = await fetch(normalizeUrl(`${config.basePath}/${config.combinedFile}`));
         const ct = response.headers.get('content-type') || '';
@@ -374,91 +387,108 @@ export async function loadChipROMs(config: ChipROMConfig): Promise<Uint8Array> {
           }
 
           console.log(`✓ Loaded ${config.chipName} combined ROM:`, data.length, 'bytes');
-          return data;
+          diskData = data;
         }
       } catch {
         console.log(`[${config.chipName}] Combined ROM not found, trying individual files...`);
       }
     }
 
-    // Load individual ROM files
-    const maxSize = Math.max(...config.files.map(f => f.offset + (f.size || 0)));
-    const combinedROM = new Uint8Array(maxSize || 1024 * 1024);  // Default 1MB if no sizes specified
+    // Try individual ROM files
+    if (!diskData) {
+      const maxSize = Math.max(...config.files.map(f => f.offset + (f.size || 0)));
+      const combinedROM = new Uint8Array(maxSize || 1024 * 1024);
 
-    let loadedCount = 0;
-    const results = await Promise.allSettled(
-      config.files.map(async (file) => {
-        try {
-          const response = await fetch(normalizeUrl(`${config.basePath}/${file.name}`));
-          const ct = response.headers.get('content-type') || '';
-          if (!response.ok || ct.includes('text/html')) {
-            if (file.required) {
-              throw new Error(`${file.name} not found (HTTP ${response.status}, type: ${ct})`);
+      let loadedCount = 0;
+      const results = await Promise.allSettled(
+        config.files.map(async (file) => {
+          try {
+            const response = await fetch(normalizeUrl(`${config.basePath}/${file.name}`));
+            const ct = response.headers.get('content-type') || '';
+            if (!response.ok || ct.includes('text/html')) {
+              if (file.required) {
+                throw new Error(`${file.name} not found (HTTP ${response.status}, type: ${ct})`);
+              }
+              console.warn(`[${config.chipName}] Optional ROM ${file.name} not found`);
+              return;
             }
-            console.warn(`[${config.chipName}] Optional ROM ${file.name} not found`);
-            return;
-          }
 
-          const buffer = await response.arrayBuffer();
-          const data = new Uint8Array(buffer);
+            const buffer = await response.arrayBuffer();
+            const data = new Uint8Array(buffer);
 
-          if (file.size && data.length !== file.size) {
-            console.warn(
-              `[${config.chipName}] ${file.name} size mismatch: ` +
-              `expected ${file.size}, got ${data.length}`
-            );
-          }
+            if (file.size && data.length !== file.size) {
+              console.warn(
+                `[${config.chipName}] ${file.name} size mismatch: ` +
+                `expected ${file.size}, got ${data.length}`
+              );
+            }
 
-          combinedROM.set(data, file.offset);
-          loadedCount++;
-          console.log(`✓ Loaded ${file.name}:`, data.length, `bytes at offset 0x${file.offset.toString(16)}`);
-        } catch (error) {
-          if (file.required) {
-            throw error;
+            combinedROM.set(data, file.offset);
+            loadedCount++;
+            console.log(`✓ Loaded ${file.name}:`, data.length, `bytes at offset 0x${file.offset.toString(16)}`);
+          } catch (error) {
+            if (file.required) {
+              throw error;
+            }
+            console.warn(`[${config.chipName}] Failed to load ${file.name}:`, error);
           }
-          console.warn(`[${config.chipName}] Failed to load ${file.name}:`, error);
+        })
+      );
+
+      if (loadedCount > 0) {
+        const requiredFailed = results.find((r, i) =>
+          r.status === 'rejected' && config.files[i].required
+        );
+        if (!requiredFailed) {
+          console.log(`✓ ${config.chipName} ROMs loaded: ${loadedCount}/${config.files.length} files`);
+          diskData = combinedROM;
         }
-      })
-    );
-
-    if (loadedCount === 0) {
-      throw new Error(`No ROM files loaded for ${config.chipName}`);
+      }
     }
-
-    // Check if any required files failed
-    const requiredFailed = results.find((r, i) =>
-      r.status === 'rejected' && config.files[i].required
-    );
-    if (requiredFailed) {
-      throw new Error(`Required ROM file failed to load for ${config.chipName}`);
-    }
-
-    console.log(`✓ ${config.chipName} ROMs loaded: ${loadedCount}/${config.files.length} files`);
-    return combinedROM;
-
   } catch (error) {
-    console.error(`[${config.chipName}] ROM loading failed:`, error);
-    throw new Error(
-      `${config.chipName} ROM files not found or invalid.\n` +
-      `Please place ROM files in ${config.basePath}/\n` +
-      `Required files: ${config.files.filter(f => f.required).map(f => f.name).join(', ')}`
-    );
+    console.warn(`[${config.chipName}] Disk ROM load error:`, error);
   }
+
+  // If disk load succeeded, cache to IDB for future sessions and return.
+  if (diskData) {
+    saveROM(config.chipName, diskData).catch((err) => {
+      console.warn(`[${config.chipName}] Failed to cache ROM to IndexedDB:`, err);
+    });
+    return diskData;
+  }
+
+  // ── 2. Try IndexedDB (user-uploaded in a previous session) ───────────────
+
+  try {
+    const idbData = await loadROMFromIDB(config.chipName);
+    if (idbData) {
+      console.log(`✓ ${config.chipName} ROM loaded from IndexedDB:`, idbData.length, 'bytes');
+      return idbData;
+    }
+  } catch (error) {
+    console.warn(`[${config.chipName}] IndexedDB ROM load error:`, error);
+  }
+
+  // ── 3. Not found anywhere — caller should show ROMUploadPrompt ───────────
+
+  console.warn(
+    `[${config.chipName}] ROM not found on disk or in IndexedDB.\n` +
+    `Expected location: ${config.basePath}/\n` +
+    `Required files: ${config.files.filter(f => f.required).map(f => f.name).join(', ')}`
+  );
+  return null;
 }
 
 /**
  * Helper: Load TR-707 ROMs
  * @param useExpansion - If true, attempts to load HKA expansion ROM
  */
-export async function loadTR707ROMs(useExpansion: boolean = false): Promise<Uint8Array> {
+export async function loadTR707ROMs(useExpansion: boolean = false): Promise<Uint8Array | null> {
   if (useExpansion) {
-    try {
-      console.log('[TR707] Attempting to load expansion ROM...');
-      return await loadChipROMs(TR707_EXPANSION_ROM_CONFIG);
-    } catch {
-      console.warn('[TR707] Expansion ROM not found, falling back to standard ROM');
-      // Fall through to standard ROM
-    }
+    console.log('[TR707] Attempting to load expansion ROM...');
+    const expansionData = await loadChipROMs(TR707_EXPANSION_ROM_CONFIG);
+    if (expansionData) return expansionData;
+    console.warn('[TR707] Expansion ROM not found, falling back to standard ROM');
   }
   return loadChipROMs(TR707_ROM_CONFIG);
 }
@@ -466,66 +496,67 @@ export async function loadTR707ROMs(useExpansion: boolean = false): Promise<Uint
 /**
  * Helper: Load SP0250 ROMs
  */
-export async function loadSP0250ROMs(): Promise<Uint8Array> {
+export async function loadSP0250ROMs(): Promise<Uint8Array | null> {
   return loadChipROMs(SP0250_ROM_CONFIG);
 }
 
 /**
  * Helper: Load TMS5220 ROMs
  */
-export async function loadTMS5220ROMs(): Promise<Uint8Array> {
+export async function loadTMS5220ROMs(): Promise<Uint8Array | null> {
   return loadChipROMs(TMS5220_ROM_CONFIG);
 }
 
 /**
  * Helper: Load Votrax ROMs
  */
-export async function loadVotraxROMs(): Promise<Uint8Array> {
+export async function loadVotraxROMs(): Promise<Uint8Array | null> {
   return loadChipROMs(VOTRAX_ROM_CONFIG);
 }
 
 /**
  * Helper: Load C352 ROMs
  */
-export async function loadC352ROMs(): Promise<Uint8Array> {
+export async function loadC352ROMs(): Promise<Uint8Array | null> {
   return loadChipROMs(C352_ROM_CONFIG);
 }
 
 /**
  * Helper: Load K054539 ROMs
  */
-export async function loadK054539ROMs(): Promise<Uint8Array> {
+export async function loadK054539ROMs(): Promise<Uint8Array | null> {
   return loadChipROMs(K054539_ROM_CONFIG);
 }
 
 /**
  * Helper: Load ICS2115 ROMs
  */
-export async function loadICS2115ROMs(): Promise<Uint8Array> {
+export async function loadICS2115ROMs(): Promise<Uint8Array | null> {
   return loadChipROMs(ICS2115_ROM_CONFIG);
 }
 
 /**
  * Helper: Load RF5C400 ROMs
  */
-export async function loadRF5C400ROMs(): Promise<Uint8Array> {
+export async function loadRF5C400ROMs(): Promise<Uint8Array | null> {
   return loadChipROMs(RF5C400_ROM_CONFIG);
 }
 
 /**
  * Helper: Load ES5503 ROMs
  */
-export async function loadES5503ROMs(): Promise<Uint8Array> {
+export async function loadES5503ROMs(): Promise<Uint8Array | null> {
   return loadChipROMs(ES5503_ROM_CONFIG);
 }
 
 
 /**
  * Helper: Load D50 ROMs
- * Returns object with separate ROM buffers for D50's loadROMs() method
+ * Returns object with separate ROM buffers for D50's loadROMs() method, or null if not found.
  */
-export async function loadD50ROMs(): Promise<{ firmware: Uint8Array; ic30: Uint8Array; ic29: Uint8Array }> {
+export async function loadD50ROMs(): Promise<{ firmware: Uint8Array; ic30: Uint8Array; ic29: Uint8Array } | null> {
   const combinedROM = await loadChipROMs(D50_ROM_CONFIG);
+  if (!combinedROM) return null;
 
   // Split the combined ROM into separate buffers
   const firmware = combinedROM.slice(0, 64 * 1024);
@@ -537,10 +568,11 @@ export async function loadD50ROMs(): Promise<{ firmware: Uint8Array; ic30: Uint8
 
 /**
  * Helper: Load VFX ROMs
- * Returns array of sample ROM banks for VFX's loadSampleROM() method
+ * Returns array of sample ROM banks for VFX's loadSampleROM() method, or null if not found.
  */
-export async function loadVFXROMs(): Promise<Uint8Array[]> {
+export async function loadVFXROMs(): Promise<Uint8Array[] | null> {
   const combinedROM = await loadChipROMs(VFX_ROM_CONFIG);
+  if (!combinedROM) return null;
 
   // Split into sample ROM banks (u14, u15, u16)
   const banks = [
@@ -556,7 +588,7 @@ export async function loadVFXROMs(): Promise<Uint8Array[]> {
  * Helper: Load Roland SA ROMs
  * Returns combined 384KB ROM buffer (IC5, IC6, IC7)
  */
-export async function loadRolandSAROMs(): Promise<Uint8Array> {
+export async function loadRolandSAROMs(): Promise<Uint8Array | null> {
   return await loadChipROMs(ROLANDSA_ROM_CONFIG);
 }
 
@@ -645,35 +677,35 @@ export const ROLANDGP_ROM_CONFIG: ChipROMConfig = {
 /**
  * Helper: Load ZSG2 ROMs
  */
-export async function loadZSG2ROMs(): Promise<Uint8Array> {
+export async function loadZSG2ROMs(): Promise<Uint8Array | null> {
   return loadChipROMs(ZSG2_ROM_CONFIG);
 }
 
 /**
  * Helper: Load KS0164 ROMs
  */
-export async function loadKS0164ROMs(): Promise<Uint8Array> {
+export async function loadKS0164ROMs(): Promise<Uint8Array | null> {
   return loadChipROMs(KS0164_ROM_CONFIG);
 }
 
 /**
  * Helper: Load SWP00 ROMs
  */
-export async function loadSWP00ROMs(): Promise<Uint8Array> {
+export async function loadSWP00ROMs(): Promise<Uint8Array | null> {
   return loadChipROMs(SWP00_ROM_CONFIG);
 }
 
 /**
  * Helper: Load SWP20 ROMs
  */
-export async function loadSWP20ROMs(): Promise<Uint8Array> {
+export async function loadSWP20ROMs(): Promise<Uint8Array | null> {
   return loadChipROMs(SWP20_ROM_CONFIG);
 }
 
 /**
  * Helper: Load RolandGP ROMs
  */
-export async function loadRolandGPROMs(): Promise<Uint8Array> {
+export async function loadRolandGPROMs(): Promise<Uint8Array | null> {
   return loadChipROMs(ROLANDGP_ROM_CONFIG);
 }
 
@@ -730,14 +762,14 @@ export const HC55516_ROM_CONFIG: ChipROMConfig = {
   ],
 };
 
-export async function loadS14001AROMs(): Promise<Uint8Array> {
+export async function loadS14001AROMs(): Promise<Uint8Array | null> {
   return loadChipROMs(S14001A_ROM_CONFIG);
 }
 
-export async function loadVLM5030ROMs(): Promise<Uint8Array> {
+export async function loadVLM5030ROMs(): Promise<Uint8Array | null> {
   return loadChipROMs(VLM5030_ROM_CONFIG);
 }
 
-export async function loadHC55516ROMs(): Promise<Uint8Array> {
+export async function loadHC55516ROMs(): Promise<Uint8Array | null> {
   return loadChipROMs(HC55516_ROM_CONFIG);
 }
