@@ -21,6 +21,7 @@ import { InstrumentList } from './InstrumentList';
 import * as LucideIcons from 'lucide-react';
 import { X, Check, Search, Settings, Sparkles, Music2, Save, Keyboard, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, ExternalLink } from 'lucide-react';
 import { useUIStore } from '@stores/useUIStore';
+import { useResponsive } from '@hooks/useResponsive';
 import { focusPopout } from '@components/ui/PopOutWindow';
 import type { InstrumentConfig, SynthType, BuzzmachineType } from '@typedefs/instrument';
 import {
@@ -85,6 +86,7 @@ export const EditInstrumentModal: React.FC<EditInstrumentModalProps> = ({
   onClose,
   createMode = false,
 }) => {
+  const { isMobile } = useResponsive();
   const instruments = useInstrumentStore((state) => state.instruments);
   const currentInstrumentId = useInstrumentStore((state) => state.currentInstrumentId);
   const createInstrument = useInstrumentStore((state) => state.createInstrument);
@@ -419,8 +421,8 @@ export const EditInstrumentModal: React.FC<EditInstrumentModalProps> = ({
     <div className="fixed inset-0 z-[99990] bg-black/90">
       <div className="bg-dark-bg w-full h-full flex flex-col overflow-hidden">
         <div className="flex h-full">
-          {/* Left Sidebar: Instrument List (Collapsible) */}
-          <div className={`border-r border-dark-border flex-shrink-0 bg-dark-bgSecondary transition-all duration-200 ${leftPanelCollapsed ? 'w-8' : 'w-52'}`}>
+          {/* Left Sidebar: Instrument List (Collapsible) — hidden on mobile */}
+          {!isMobile && <div className={`border-r border-dark-border flex-shrink-0 bg-dark-bgSecondary transition-all duration-200 ${leftPanelCollapsed ? 'w-8' : 'w-52'}`}>
             {leftPanelCollapsed ? (
               // Collapsed state - just show expand button
               <button
@@ -452,7 +454,7 @@ export const EditInstrumentModal: React.FC<EditInstrumentModalProps> = ({
                 </div>
               </div>
             )}
-          </div>
+          </div>}
 
           {/* Main Content Area */}
           <div className="flex-1 flex flex-col min-w-0">
