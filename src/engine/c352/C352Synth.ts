@@ -99,6 +99,7 @@ export class C352Synth extends MAMEBaseSynth {
       this.loadROM(0, romData);
 
       this.romLoaded = true;
+      this._updateRomStatus(true);
       console.log('[C352] ROM loaded successfully');
     } catch (error) {
       console.error('[C352] ROM loading failed:', error);

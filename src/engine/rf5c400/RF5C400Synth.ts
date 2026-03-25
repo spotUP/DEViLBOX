@@ -73,6 +73,7 @@ export class RF5C400Synth extends MAMEBaseSynth {
       this.loadROM(0, romData);
 
       this.romLoaded = true;
+      this._updateRomStatus(true);
       console.log('[RF5C400] ROM loaded successfully');
     } catch (error) {
       console.error('[RF5C400] ROM loading failed:', error);

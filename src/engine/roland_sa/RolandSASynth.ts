@@ -92,6 +92,7 @@ export class RolandSASynth extends MAMEBaseSynth {
       this.loadROMs(ic5, ic6, ic7);
 
       this.romLoaded = true;
+      this._updateRomStatus(true);
       console.log('[RolandSA] ROMs loaded successfully');
     } catch (error) {
       console.error('[RolandSA] ROM loading failed:', error);
