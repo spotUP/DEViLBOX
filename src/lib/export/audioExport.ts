@@ -571,3 +571,94 @@ export async function exportSongAsWav(
 
   onProgress?.(100);
 }
+
+/**
+ * Render a single channel/stem to audio buffer.
+ * Creates a pattern copy with all other channels muted, then renders.
+ */
+export async function renderStemToAudio(
+  pattern: Pattern,
+  instruments: InstrumentConfig[],
+  bpm: number,
+  channelIndex: number,
+  options: AudioExportOptions = {}
+): Promise<AudioBuffer> {
+  // Create a pattern with only the target channel active
+  const stemPattern: Pattern = {
+    ...pattern,
+    id: `stem-${channelIndex}-${pattern.id}`,
+    channels: pattern.channels.map((ch, i) => {
+      if (i === channelIndex) return ch;
+      // Mute other channels by zeroing all notes
+      return {
+        ...ch,
+        rows: ch.rows.map(() => ({
+          note: 0,
+          instrument: 0,
+          volume: 0,
+          effTyp: 0,
+          eff: 0,
+          effTyp2: 0,
+          eff2: 0,
+        })),
+      };
+    }),
+  };
+
+  return renderPatternToAudio(stemPattern, instruments, bpm, options);
+}
+
+/**
+ * Export all channels as separate WAV stems.
+ * Returns an array of {channelIndex, channelName, blob} for each stem.
+ */
+export async function exportAllStems(
+  pattern: Pattern,
+  instruments: InstrumentConfig[],
+  bpm: number,
+  onProgress?: (stemIndex: number, totalStems: number, stemProgress: number) => void
+): Promise<Array<{ channelIndex: number; channelName: string; blob: Blob }>> {
+  const results: Array<{ channelIndex: number; channelName: string; blob: Blob }> = [];
+  const numChannels = pattern.channels.length;
+
+  for (let ch = 0; ch < numChannels; ch++) {
+    const stemProgress = (progress: number) => {
+      onProgress?.(ch, numChannels, progress);
+    };
+
+    const buffer = await renderStemToAudio(pattern, instruments, bpm, ch, {
+      sampleRate: 44100,
+      onProgress: stemProgress,
+    });
+
+    const blob = audioBufferToWav(buffer);
+    const channelName = pattern.channels[ch].name || `Channel ${ch + 1}`;
+    results.push({ channelIndex: ch, channelName, blob });
+  }
+
+  return results;
+}
+
+/**
+ * Export all stems and download as individual WAV files.
+ */
+export async function downloadAllStems(
+  pattern: Pattern,
+  instruments: InstrumentConfig[],
+  bpm: number,
+  baseName: string,
+  onProgress?: (stemIndex: number, totalStems: number, stemProgress: number) => void
+): Promise<void> {
+  const stems = await exportAllStems(pattern, instruments, bpm, onProgress);
+
+  for (const stem of stems) {
+    const url = URL.createObjectURL(stem.blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${baseName}_${stem.channelName.replace(/[^a-zA-Z0-9]/g, '_')}.wav`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
+}
