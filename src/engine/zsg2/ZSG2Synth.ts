@@ -1,8 +1,12 @@
 import { MAMEBaseSynth } from '@engine/mame/MAMEBaseSynth';
 
 /**
- * ZSG2Synth - ZOOM ZSG-2 48-Channel ROM Sampler (WASM)
- * Stub — WASM binary not yet compiled.
+ * ZSG2Synth - ZOOM ZSG-2 48-Channel Wavetable Synthesizer (WASM)
+ *
+ * 48-channel wavetable synth with 2:1 compressed samples,
+ * emphasis filter, IIR lowpass with ramping, volume ramping,
+ * 4 output busses (reverb, chorus, left, right).
+ * Extracted from MAME's zsg2 emulator.
  */
 export class ZSG2Synth extends MAMEBaseSynth {
   readonly name = 'ZSG2Synth';
