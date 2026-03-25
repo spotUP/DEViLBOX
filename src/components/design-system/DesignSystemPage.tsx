@@ -7,8 +7,7 @@
  * Shows both DOM and Pixi component variants side by side where applicable.
  */
 
-import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { useSettingsStore } from '@/stores/useSettingsStore';
+import React, { useState, useRef, useEffect } from 'react';
 
 // ── Section wrapper ──
 const Section: React.FC<{ title: string; description?: string; children: React.ReactNode }> = ({ title, description, children }) => (
@@ -546,49 +545,84 @@ const ProViewMock: React.FC = () => (
 );
 
 // ── Main Page ──
-// ── Render Mode Toggle ──
-const RenderModeToggle: React.FC = () => {
-  const renderMode = useSettingsStore((s) => s.renderMode);
-  const setRenderMode = useSettingsStore((s) => s.setRenderMode);
+// ── Split-Screen Live Comparison ──
+const SplitScreenComparison: React.FC = () => {
+  const [showSplit, setShowSplit] = useState(false);
+  const [splitView, setSplitView] = useState<'tracker' | 'dj' | 'mixer' | 'arrangement' | 'pianoroll'>('tracker');
 
-  const handleSwitch = useCallback((mode: 'dom' | 'webgl') => {
-    setRenderMode(mode);
-    // Stay on design system page, just reload with new render mode
-    window.location.hash = '#/design-system';
-    window.location.reload();
-  }, [setRenderMode]);
+  // Build iframe URLs with renderMode overrides via hash params
+  const baseUrl = window.location.origin;
+  const domUrl = `${baseUrl}/?_renderMode=dom#/_view=${splitView}`;
+  const glUrl = `${baseUrl}/?_renderMode=webgl#/_view=${splitView}`;
+
+  if (!showSplit) {
+    return (
+      <button
+        onClick={() => setShowSplit(true)}
+        style={{
+          padding: '8px 20px', fontSize: 12, fontFamily: 'inherit', border: '1px solid #6366f1',
+          borderRadius: 6, cursor: 'pointer', background: '#6366f120', color: '#6366f1', fontWeight: 'bold',
+        }}
+      >
+        Open Side-by-Side Comparison
+      </button>
+    );
+  }
 
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-      <span style={{ fontSize: 11, color: '#6b6b80' }}>Preview in:</span>
-      <div style={{ display: 'flex', borderRadius: 6, overflow: 'hidden', border: '1px solid #2a2a3a' }}>
+    <div style={{ position: 'fixed', inset: 0, zIndex: 99999, background: '#0a0a10', display: 'flex', flexDirection: 'column' }}>
+      {/* Toolbar */}
+      <div style={{ height: 40, flexShrink: 0, display: 'flex', alignItems: 'center', gap: 12, padding: '0 16px', background: '#1a1a24', borderBottom: '1px solid #2a2a3a' }}>
+        <span style={{ fontSize: 13, fontWeight: 'bold', color: '#e2e2e8' }}>DOM vs WebGL Comparison</span>
+        <div style={{ display: 'flex', gap: 4 }}>
+          {(['tracker', 'mixer', 'arrangement', 'pianoroll', 'dj'] as const).map(v => (
+            <button
+              key={v}
+              onClick={() => setSplitView(v)}
+              style={{
+                padding: '3px 10px', fontSize: 10, fontFamily: 'inherit', border: 'none', borderRadius: 3, cursor: 'pointer',
+                background: splitView === v ? '#6366f1' : '#22222e', color: splitView === v ? '#fff' : '#6b6b80',
+              }}
+            >
+              {v.charAt(0).toUpperCase() + v.slice(1)}
+            </button>
+          ))}
+        </div>
+        <span style={{ flex: 1 }} />
         <button
-          onClick={() => handleSwitch('dom')}
-          style={{
-            padding: '6px 16px', fontSize: 11, fontFamily: 'inherit', border: 'none', cursor: 'pointer',
-            background: renderMode === 'dom' ? '#6366f1' : '#1a1a24',
-            color: renderMode === 'dom' ? '#fff' : '#6b6b80',
-            fontWeight: renderMode === 'dom' ? 'bold' : 'normal',
-          }}
+          onClick={() => setShowSplit(false)}
+          style={{ padding: '4px 12px', fontSize: 11, fontFamily: 'inherit', border: '1px solid #2a2a3a', borderRadius: 4, cursor: 'pointer', background: '#22222e', color: '#e2e2e8' }}
         >
-          DOM
-        </button>
-        <button
-          onClick={() => handleSwitch('webgl')}
-          style={{
-            padding: '6px 16px', fontSize: 11, fontFamily: 'inherit', border: 'none', cursor: 'pointer',
-            borderLeft: '1px solid #2a2a3a',
-            background: renderMode === 'webgl' ? '#6366f1' : '#1a1a24',
-            color: renderMode === 'webgl' ? '#fff' : '#6b6b80',
-            fontWeight: renderMode === 'webgl' ? 'bold' : 'normal',
-          }}
-        >
-          WebGL
+          Close
         </button>
       </div>
-      <span style={{ fontSize: 9, color: '#44445a' }}>
-        Current: {renderMode === 'webgl' ? 'Pixi/GL' : 'React/DOM'} — switches mode and opens the app
-      </span>
+
+      {/* Split panes */}
+      <div style={{ flex: 1, display: 'flex', minHeight: 0 }}>
+        {/* DOM side */}
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', borderRight: '2px solid #6366f1' }}>
+          <div style={{ height: 24, flexShrink: 0, background: '#10b98120', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, color: '#10b981', fontWeight: 'bold' }}>
+            DOM (React/HTML) — Source of Truth
+          </div>
+          <iframe
+            src={domUrl}
+            style={{ flex: 1, border: 'none', width: '100%' }}
+            title="DOM View"
+          />
+        </div>
+
+        {/* GL side */}
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+          <div style={{ height: 24, flexShrink: 0, background: '#6366f120', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, color: '#6366f1', fontWeight: 'bold' }}>
+            WebGL (Pixi) — Should Match DOM
+          </div>
+          <iframe
+            src={glUrl}
+            style={{ flex: 1, border: 'none', width: '100%' }}
+            title="WebGL View"
+          />
+        </div>
+      </div>
     </div>
   );
 };
@@ -596,7 +630,7 @@ const RenderModeToggle: React.FC = () => {
 // ── Back to App link ──
 const BackToApp: React.FC = () => (
   <a
-    href="#/"
+    href="/"
     onClick={(e) => { e.preventDefault(); history.replaceState(null, '', window.location.pathname); window.location.reload(); }}
     style={{ fontSize: 11, color: '#6366f1', textDecoration: 'none', cursor: 'pointer' }}
   >
@@ -613,9 +647,9 @@ export const DesignSystemPage: React.FC = () => {
             <h1 style={{ fontSize: 28, fontWeight: 'bold', marginBottom: 4 }}>DEViLBOX Design System</h1>
             <p style={{ fontSize: 12, color: '#6b6b80', marginBottom: 0 }}>Visual catalog of all UI components — DOM and Pixi renderers</p>
           </div>
-          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 8 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <SplitScreenComparison />
             <BackToApp />
-            <RenderModeToggle />
           </div>
         </div>
 
