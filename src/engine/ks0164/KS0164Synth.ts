@@ -2,7 +2,11 @@ import { MAMEBaseSynth } from '@engine/mame/MAMEBaseSynth';
 
 /**
  * KS0164Synth - Samsung KS0164 32-Voice Wavetable ROM (WASM)
- * Stub — WASM binary not yet compiled.
+ *
+ * 32-voice wavetable synth with 16-bit linear + 8-bit compressed sample
+ * playback, pitch interpolation, loop, and volume ramping.
+ * Bypasses the embedded CPU — drives voice registers directly from MIDI.
+ * ROM sample table parsed at load time.
  */
 export class KS0164Synth extends MAMEBaseSynth {
   readonly name = 'KS0164Synth';
@@ -10,9 +14,53 @@ export class KS0164Synth extends MAMEBaseSynth {
   protected readonly workletFile = 'KS0164.worklet.js';
   protected readonly processorName = 'ks0164-processor';
 
+  private _romLoadedResolve: (() => void) | null = null;
+  private _numSamples = 0;
+
   constructor() {
     super();
     this.initSynth();
+  }
+
+  /** Number of samples found in the ROM descriptor table */
+  get numSamples(): number { return this._numSamples; }
+
+  protected handleWorkletMessage(data: Record<string, unknown>): void {
+    if (data.type === 'romLoaded') {
+      this._numSamples = data.numSamples as number;
+      this.romLoaded = true;
+      this._updateRomStatus(true);
+      if (this._romLoadedResolve) {
+        this._romLoadedResolve();
+        this._romLoadedResolve = null;
+      }
+    }
+    super.handleWorkletMessage(data);
+  }
+
+  /**
+   * Load a KS0164 ROM file (e.g. flash.u3, 4MB).
+   * The ROM contains firmware (ignored), sample descriptors at 0x8000,
+   * and audio data from ~0x8220 onward.
+   */
+  async loadROMFile(data: ArrayBuffer): Promise<void> {
+    await this.ensureInitialized();
+    if (!this.workletNode || this._disposed) return;
+
+    return new Promise<void>((resolve) => {
+      this._romLoadedResolve = resolve;
+      this.workletNode!.port.postMessage(
+        { type: 'loadROM', data },
+        [data]
+      );
+      // Timeout fallback
+      setTimeout(() => {
+        if (this._romLoadedResolve) {
+          this._romLoadedResolve();
+          this._romLoadedResolve = null;
+        }
+      }, 5000);
+    });
   }
 
   protected writeKeyOn(note: number, velocity: number): void {
