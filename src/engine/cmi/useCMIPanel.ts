@@ -19,6 +19,7 @@ import { useInstrumentStore, useUIStore } from '@stores';
 import { useMIDIStore } from '@stores/useMIDIStore';
 import { useShallow } from 'zustand/react/shallow';
 import { getToneEngine } from '@engine/ToneEngine';
+import { getDevilboxAudioContext } from '@utils/audio-context';
 import type { CMISynth } from './CMISynth';
 import { CMI_PRESETS, type CMIPreset } from '@/constants/cmiPresets';
 import {
@@ -181,6 +182,11 @@ export interface CMIPanelState {
   // Presets
   presets: CMIPreset[];
   loadPreset: (index: number) => void;
+
+  // Preview/audition
+  previewing: boolean;
+  previewLibrarySample: (sampleIndex?: number) => void;
+  stopPreview: () => void;
 }
 
 // ── Hook ───────────────────────────────────────────────────────────────────
@@ -443,6 +449,55 @@ export function useCMIPanel(props?: UseCMIPanelProps): CMIPanelState {
     loadLibrarySample(idx);
   }, [librarySampleIndex, librarySamples.length, loadLibrarySample]);
 
+  // ── Preview/audition sample (one-shot playback without loading into synth) ─
+
+  const previewSourceRef = useRef<AudioBufferSourceNode | null>(null);
+  const [previewing, setPreviewing] = useState(false);
+
+  const previewLibrarySample = useCallback(async (sampleIndex?: number) => {
+    const idx = sampleIndex ?? librarySampleIndex;
+    if (!manifest) return;
+    const cat = manifest.categories[libraryCategoryIndex];
+    if (!cat) return;
+    const sample = cat.samples[idx];
+    if (!sample) return;
+
+    // Stop any current preview
+    if (previewSourceRef.current) {
+      try { previewSourceRef.current.stop(); } catch { /* already stopped */ }
+      previewSourceRef.current = null;
+    }
+
+    const url = `/${CMI_SAMPLES_BASE}/${cat.name}/${encodeURIComponent(sample.file)}`;
+    setPreviewing(true);
+    try {
+      const resp = await fetch(url);
+      const buf = await resp.arrayBuffer();
+      const ctx = getDevilboxAudioContext();
+      const audioBuffer = await ctx.decodeAudioData(buf.slice(0));
+      const source = ctx.createBufferSource();
+      source.buffer = audioBuffer;
+      source.connect(ctx.destination);
+      source.onended = () => {
+        previewSourceRef.current = null;
+        setPreviewing(false);
+      };
+      source.start(0);
+      previewSourceRef.current = source;
+    } catch (err) {
+      console.error('[CMI] Preview error:', err);
+      setPreviewing(false);
+    }
+  }, [manifest, libraryCategoryIndex, librarySampleIndex]);
+
+  const stopPreview = useCallback(() => {
+    if (previewSourceRef.current) {
+      try { previewSourceRef.current.stop(); } catch { /* ok */ }
+      previewSourceRef.current = null;
+    }
+    setPreviewing(false);
+  }, []);
+
   // ── Harmonic editor (renderer-agnostic: normalized 0..1 coords) ──────────
 
   const updateHarmonicAt = useCallback((normalizedX: number, normalizedY: number) => {
@@ -516,5 +571,9 @@ export function useCMIPanel(props?: UseCMIPanelProps): CMIPanelState {
     voiceStatus,
     presets: CMI_PRESETS,
     loadPreset,
+
+    previewing,
+    previewLibrarySample,
+    stopPreview,
   };
 }

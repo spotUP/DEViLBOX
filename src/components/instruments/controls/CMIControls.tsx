@@ -511,7 +511,7 @@ export const CMIControls: React.FC<CMIControlsProps> = ({
                       <option key={s.file} value={i}>{s.name}</option>
                     ))}
                   </select>
-                  {/* Prev/Next buttons */}
+                  {/* Prev/Next + Preview buttons */}
                   <button onClick={cmi.prevLibrarySample} className="px-2 py-1 text-[10px] font-mono rounded-sm"
                     style={{ color: CMI_GREEN, border: `1px solid ${CMI_GREEN_DIM}`, background: 'transparent' }}>
                     PREV
@@ -519,6 +519,17 @@ export const CMIControls: React.FC<CMIControlsProps> = ({
                   <button onClick={cmi.nextLibrarySample} className="px-2 py-1 text-[10px] font-mono rounded-sm"
                     style={{ color: CMI_GREEN, border: `1px solid ${CMI_GREEN_DIM}`, background: 'transparent' }}>
                     NEXT
+                  </button>
+                  <button
+                    onClick={() => cmi.previewing ? cmi.stopPreview() : cmi.previewLibrarySample()}
+                    className="px-2 py-1 text-[10px] font-mono rounded-sm"
+                    style={{
+                      color: cmi.previewing ? '#000' : CMI_GREEN_BRIGHT,
+                      backgroundColor: cmi.previewing ? CMI_GREEN_BRIGHT : 'transparent',
+                      border: `1px solid ${CMI_GREEN_BRIGHT}`,
+                    }}
+                  >
+                    {cmi.previewing ? 'STOP' : 'PREVIEW'}
                   </button>
                 </div>
                 {cmi.libraryLoading && (
