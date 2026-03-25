@@ -92,8 +92,13 @@ const DAWArrangement: React.FC = () => {
   const playing = useGTUltraStore((s) => s.playing);
   const dawSelectedChannel = useGTUltraStore((s) => s.dawSelectedChannel);
   const dawSelectedPattern = useGTUltraStore((s) => s.dawSelectedPattern);
+  const engine = useGTUltraStore((s) => s.engine);
 
   const channelCount = sidCount * 3;
+
+  // Long-press state for touch context menu on arrangement blocks
+  const arrangeLPRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [arrangeMenu, setArrangeMenu] = useState<{ x: number; y: number; ch: number; orderIdx: number; patNum: number } | null>(null);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -224,9 +229,133 @@ const DAWArrangement: React.FC = () => {
     }
   }, [orderData, patternData, sidCount]);
 
+  /** Hit-test: find block at pixel position */
+  const hitTestBlock = useCallback((x: number, y: number) => {
+    const canvas = canvasRef.current;
+    if (!canvas) return null;
+    const rect = canvas.getBoundingClientRect();
+    const headerW = 50;
+    if (x < headerW) return null;
+    const trackH = Math.max(20, Math.floor(rect.height / channelCount));
+    const ch = Math.min(channelCount - 1, Math.max(0, Math.floor(y / trackH)));
+    const od = orderData[ch];
+    if (!od) return null;
+    let blockX = headerW;
+    for (let oi = 0; oi < od.length; oi++) {
+      const patNum = od[oi];
+      if (patNum === 0xFF) break;
+      if (patNum >= 0xD0) continue;
+      const pd = patternData.get(patNum);
+      const blockW = Math.max(8, (pd ? pd.length : 32) * 2);
+      if (x >= blockX && x < blockX + blockW) {
+        return { ch, orderIdx: oi, patNum };
+      }
+      blockX += blockW;
+    }
+    return null;
+  }, [channelCount, orderData, patternData]);
+
+  // Arrangement touch: long press shows context menu
+  const handleArrangeTouchStart = useCallback((e: React.TouchEvent) => {
+    if (e.touches.length === 1) {
+      const touch = e.touches[0];
+      const canvas = canvasRef.current;
+      if (!canvas) return;
+      const rect = canvas.getBoundingClientRect();
+      const lx = touch.clientX - rect.left;
+      const ly = touch.clientY - rect.top;
+      arrangeLPRef.current = setTimeout(() => {
+        const hit = hitTestBlock(lx, ly);
+        if (hit) {
+          setArrangeMenu({ x: lx, y: ly, ...hit });
+        }
+        arrangeLPRef.current = null;
+      }, 500);
+    }
+  }, [hitTestBlock]);
+
+  const handleArrangeTouchMove = useCallback(() => {
+    if (arrangeLPRef.current) { clearTimeout(arrangeLPRef.current); arrangeLPRef.current = null; }
+  }, []);
+
+  const handleArrangeTouchEnd = useCallback(() => {
+    if (arrangeLPRef.current) { clearTimeout(arrangeLPRef.current); arrangeLPRef.current = null; }
+  }, []);
+
+  // Context menu actions
+  const handleArrangeDuplicate = useCallback(() => {
+    if (!arrangeMenu || !engine) { setArrangeMenu(null); return; }
+    const od = orderData[arrangeMenu.ch];
+    if (!od) { setArrangeMenu(null); return; }
+    let endIdx = 0;
+    for (let i = 0; i < od.length; i++) { if (od[i] === 0xFF) { endIdx = i; break; } }
+    if (endIdx >= 254) { setArrangeMenu(null); return; }
+    for (let i = endIdx; i > arrangeMenu.orderIdx + 1; i--) {
+      engine.setOrderEntry(arrangeMenu.ch, i, od[i - 1]);
+    }
+    engine.setOrderEntry(arrangeMenu.ch, arrangeMenu.orderIdx + 1, arrangeMenu.patNum);
+    engine.setOrderEntry(arrangeMenu.ch, endIdx + 1, 0xFF);
+    useGTUltraStore.getState().refreshAllOrders();
+    setArrangeMenu(null);
+  }, [arrangeMenu, engine, orderData]);
+
+  const handleArrangeClear = useCallback(() => {
+    if (!arrangeMenu || !engine) { setArrangeMenu(null); return; }
+    engine.setOrderEntry(arrangeMenu.ch, arrangeMenu.orderIdx, 0x00);
+    useGTUltraStore.getState().refreshAllOrders();
+    setArrangeMenu(null);
+  }, [arrangeMenu, engine]);
+
   return (
     <div style={{ width: '100%', height: '100%', position: 'relative' }}>
-      <canvas ref={canvasRef} onClick={handleClick} style={{ width: '100%', height: '100%', cursor: 'pointer' }} />
+      <canvas
+        ref={canvasRef}
+        onClick={handleClick}
+        onTouchStart={handleArrangeTouchStart}
+        onTouchMove={handleArrangeTouchMove}
+        onTouchEnd={handleArrangeTouchEnd}
+        style={{ width: '100%', height: '100%', cursor: 'pointer', touchAction: 'pan-x' }}
+      />
+      {/* Arrangement context menu (long press on touch) */}
+      {arrangeMenu && (
+        <div
+          style={{
+            position: 'absolute', left: arrangeMenu.x, top: arrangeMenu.y,
+            background: DAW_CSS.panelBg, border: `1px solid ${DAW_CSS.panelBorder}`,
+            borderRadius: 4, padding: 2, zIndex: 100, minWidth: 100,
+            boxShadow: '0 4px 12px rgba(0,0,0,0.5)',
+          }}
+        >
+          {[
+            { label: 'Duplicate', action: handleArrangeDuplicate },
+            { label: 'Clear', action: handleArrangeClear },
+          ].map(({ label, action }) => (
+            <button
+              key={label}
+              onClick={action}
+              style={{
+                display: 'block', width: '100%', padding: '6px 12px', fontSize: 10,
+                fontFamily: 'inherit', background: 'none', border: 'none', color: DAW_CSS.text,
+                cursor: 'pointer', textAlign: 'left', borderRadius: 2,
+              }}
+              onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = DAW_CSS.surfaceHover; }}
+              onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = 'none'; }}
+            >
+              {label}
+            </button>
+          ))}
+          <button
+            onClick={() => setArrangeMenu(null)}
+            style={{
+              display: 'block', width: '100%', padding: '4px 12px', fontSize: 10,
+              fontFamily: 'inherit', background: 'none', border: 'none', color: DAW_CSS.textMuted,
+              cursor: 'pointer', textAlign: 'left', borderRadius: 2, borderTop: `1px solid ${DAW_CSS.panelBorder}`,
+            }}
+          >
+            Cancel
+          </button>
+        </div>
+      )}
     </div>
   );
 };
@@ -253,6 +382,12 @@ const DAWPianoRoll: React.FC = () => {
   const pd = patternData.get(dawSelectedPattern);
   const maxRows = pd ? pd.length : 32;
   const chColor = DAW_CH_CSS[dawSelectedChannel % DAW_CH_CSS.length];
+
+  // Touch gesture state for pinch-zoom and long press
+  const touchStartDistRef = useRef(0);
+  const touchStartZoomRef = useRef(dawZoomX);
+  const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [longPressMenu, setLongPressMenu] = useState<{ x: number; y: number; row: number; note: number } | null>(null);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -404,11 +539,220 @@ const DAWPianoRoll: React.FC = () => {
     useGTUltraStore.getState().refreshPatternData(dawSelectedPattern);
   }, [engine, pd, maxRows, dawZoomX, dawSelectedPattern, dawSelectedChannel, currentInstrument]);
 
+  // ── Touch: pinch-zoom, long-press context menu ──
+
+  const getTouchDistance = (touches: React.TouchList | TouchList) => {
+    if (touches.length < 2) return 0;
+    const dx = touches[0].clientX - touches[1].clientX;
+    const dy = touches[0].clientY - touches[1].clientY;
+    return Math.sqrt(dx * dx + dy * dy);
+  };
+
+  const handleTouchStart = useCallback((e: React.TouchEvent) => {
+    if (e.touches.length === 2) {
+      touchStartDistRef.current = getTouchDistance(e.touches);
+      touchStartZoomRef.current = useGTUltraStore.getState().dawZoomX;
+      if (longPressTimerRef.current) { clearTimeout(longPressTimerRef.current); longPressTimerRef.current = null; }
+      return;
+    }
+    if (e.touches.length === 1) {
+      const touch = e.touches[0];
+      const canvas = canvasRef.current;
+      if (!canvas) return;
+      const rect = canvas.getBoundingClientRect();
+      const tx = touch.clientX - rect.left;
+      const ty = touch.clientY - rect.top;
+      longPressTimerRef.current = setTimeout(() => {
+        const gridH = rect.height - 40;
+        if (tx < PIANO_W || ty > gridH) return;
+        const noteH = Math.max(2, gridH / VISIBLE_NOTES);
+        const row = Math.max(0, Math.min(maxRows - 1, Math.floor((tx - PIANO_W) / dawZoomX)));
+        const midiNote = Math.max(MIN_NOTE, Math.min(MAX_NOTE - 1, MAX_NOTE - 1 - Math.floor(ty / noteH)));
+        if (pd) {
+          const bpc = 4;
+          const off = row * bpc;
+          if (off < pd.data.length && pd.data[off] > 0 && pd.data[off] < 0xBD) {
+            setLongPressMenu({ x: touch.clientX, y: touch.clientY, row, note: midiNote });
+          }
+        }
+        longPressTimerRef.current = null;
+      }, 500);
+    }
+  }, [maxRows, dawZoomX, pd]);
+
+  const handleTouchMove = useCallback((e: React.TouchEvent) => {
+    if (longPressTimerRef.current) { clearTimeout(longPressTimerRef.current); longPressTimerRef.current = null; }
+    if (e.touches.length === 2) {
+      const dist = getTouchDistance(e.touches);
+      if (touchStartDistRef.current > 0) {
+        const scale = dist / touchStartDistRef.current;
+        const newZoom = Math.max(4, Math.min(64, Math.round(touchStartZoomRef.current * scale)));
+        useGTUltraStore.getState().setDawZoom(newZoom, useGTUltraStore.getState().dawZoomY);
+      }
+    }
+  }, []);
+
+  const handleTouchEnd = useCallback(() => {
+    if (longPressTimerRef.current) { clearTimeout(longPressTimerRef.current); longPressTimerRef.current = null; }
+    touchStartDistRef.current = 0;
+  }, []);
+
+  const handleLongPressDelete = useCallback(() => {
+    if (!longPressMenu || !engine) return;
+    engine.setPatternCell(dawSelectedPattern, longPressMenu.row, 0, 0);
+    engine.setPatternCell(dawSelectedPattern, longPressMenu.row, 1, 0);
+    useGTUltraStore.getState().refreshPatternData(dawSelectedPattern);
+    setLongPressMenu(null);
+  }, [longPressMenu, engine, dawSelectedPattern]);
+
+  const handleLongPressDuplicate = useCallback(() => {
+    if (!longPressMenu || !engine || !pd) return;
+    const bpc = 4;
+    const off = longPressMenu.row * bpc;
+    if (off >= pd.data.length) { setLongPressMenu(null); return; }
+    const noteVal = pd.data[off];
+    const instVal = pd.data[off + 1];
+    for (let r = longPressMenu.row + 1; r < maxRows; r++) {
+      if (r * bpc >= pd.data.length) break;
+      if (pd.data[r * bpc] === 0) {
+        engine.setPatternCell(dawSelectedPattern, r, 0, noteVal);
+        engine.setPatternCell(dawSelectedPattern, r, 1, instVal);
+        break;
+      }
+    }
+    useGTUltraStore.getState().refreshPatternData(dawSelectedPattern);
+    setLongPressMenu(null);
+  }, [longPressMenu, engine, pd, maxRows, dawSelectedPattern]);
+
+  const handleLongPressChangeInst = useCallback(() => {
+    if (!longPressMenu || !engine) return;
+    engine.setPatternCell(dawSelectedPattern, longPressMenu.row, 1, currentInstrument);
+    useGTUltraStore.getState().refreshPatternData(dawSelectedPattern);
+    setLongPressMenu(null);
+  }, [longPressMenu, engine, dawSelectedPattern, currentInstrument]);
+
   return (
-    <div style={{ width: '100%', height: '100%' }}>
-      <canvas ref={canvasRef} onClick={handleClick} onContextMenu={(e) => { e.preventDefault(); handleClick(e); }} style={{ width: '100%', height: '100%', cursor: 'crosshair' }} />
+    <div style={{ width: '100%', height: '100%', position: 'relative' }}>
+      <canvas
+        ref={canvasRef}
+        onClick={handleClick}
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
+        onContextMenu={(e) => { e.preventDefault(); handleClick(e); }}
+        style={{ width: '100%', height: '100%', cursor: 'crosshair', touchAction: 'none' }}
+      />
+      {/* Long-press context menu (touch) */}
+      {longPressMenu && (
+        <div
+          style={{
+            position: 'fixed', left: longPressMenu.x, top: longPressMenu.y,
+            background: DAW_CSS.panelBg, border: `1px solid ${DAW_CSS.panelBorder}`,
+            borderRadius: 4, padding: 2, zIndex: 200, minWidth: 120,
+            boxShadow: '0 4px 12px rgba(0,0,0,0.5)',
+          }}
+          onPointerDown={(e) => e.stopPropagation()}
+        >
+          {[
+            { label: 'Delete Note', action: handleLongPressDelete },
+            { label: 'Duplicate', action: handleLongPressDuplicate },
+            { label: `Set Inst #${currentInstrument.toString(16).toUpperCase().padStart(2, '0')}`, action: handleLongPressChangeInst },
+          ].map(({ label, action }) => (
+            <button
+              key={label}
+              onClick={action}
+              style={{
+                display: 'block', width: '100%', padding: '6px 12px', fontSize: 11,
+                fontFamily: 'inherit', background: 'none', border: 'none', color: DAW_CSS.text,
+                cursor: 'pointer', textAlign: 'left', borderRadius: 2,
+              }}
+              onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = DAW_CSS.surfaceHover; }}
+              onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = 'none'; }}
+            >
+              {label}
+            </button>
+          ))}
+          <button
+            onClick={() => setLongPressMenu(null)}
+            style={{
+              display: 'block', width: '100%', padding: '4px 12px', fontSize: 10,
+              fontFamily: 'inherit', background: 'none', border: 'none', color: DAW_CSS.textMuted,
+              cursor: 'pointer', textAlign: 'left', borderRadius: 2, borderTop: `1px solid ${DAW_CSS.panelBorder}`,
+            }}
+          >
+            Cancel
+          </button>
+        </div>
+      )}
     </div>
   );
+};
+
+// ─── Waveform Mini Canvas (for instrument designer buttons) ───
+
+/** Read pulse width fraction from pulse table. Returns 0-1. */
+function getPulseWidthFrac(pulsePtr: number, tableData: Record<string, { left: Uint8Array; right: Uint8Array }>): number {
+  const pt = tableData['pulse'];
+  if (!pt || pulsePtr === 0 || pulsePtr > pt.left.length) return 0.5;
+  const hi = pt.left[pulsePtr] || 0;
+  const lo = pt.right[pulsePtr] || 0;
+  const pw = ((hi & 0x0F) << 8) | lo;
+  return Math.max(0.05, Math.min(0.95, pw / 4095));
+}
+
+const WaveformMiniCanvas: React.FC<{ bit: number; isOn: boolean; pulseWidthFrac: number }> = ({ bit, isOn, pulseWidthFrac }) => {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    const w = canvas.width;
+    const h = canvas.height;
+    ctx.clearRect(0, 0, w, h);
+
+    const color = isOn ? DAW_CSS.success : DAW_CSS.textMuted;
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 1.5;
+    ctx.globalAlpha = isOn ? 1 : 0.4;
+    ctx.beginPath();
+
+    const mid = h / 2;
+    if (bit === 0x10) {
+      // Triangle
+      ctx.moveTo(0, mid);
+      ctx.lineTo(w * 0.25, 2);
+      ctx.lineTo(w * 0.75, h - 2);
+      ctx.lineTo(w, mid);
+    } else if (bit === 0x20) {
+      // Sawtooth
+      ctx.moveTo(0, mid);
+      ctx.lineTo(w * 0.9, 2);
+      ctx.lineTo(w * 0.9, h - 2);
+      ctx.lineTo(w, mid);
+    } else if (bit === 0x40) {
+      // Pulse — duty cycle from actual pulse width
+      const transX = w * pulseWidthFrac;
+      ctx.moveTo(0, h - 2);
+      ctx.lineTo(0, 2);
+      ctx.lineTo(transX, 2);
+      ctx.lineTo(transX, h - 2);
+      ctx.lineTo(w, h - 2);
+    } else if (bit === 0x80) {
+      // Noise — pseudo-random steps
+      ctx.moveTo(0, mid);
+      for (let i = 1; i <= 10; i++) {
+        const nx = (i / 10) * w;
+        const ny = 2 + ((Math.sin(i * 7.3) * 0.5 + 0.5) * (h - 4));
+        ctx.lineTo(nx, ny);
+      }
+    }
+    ctx.stroke();
+    ctx.globalAlpha = 1;
+  }, [bit, isOn, pulseWidthFrac]);
+
+  return <canvas ref={canvasRef} width={36} height={20} style={{ width: 36, height: 20, flexShrink: 0 }} />;
 };
 
 // ─── Instrument Designer Sidebar ───
@@ -418,6 +762,7 @@ const DAWInstrumentDesigner: React.FC = () => {
   const instrumentData = useGTUltraStore((s) => s.instrumentData);
   const engine = useGTUltraStore((s) => s.engine);
   const dawSelectedChannel = useGTUltraStore((s) => s.dawSelectedChannel);
+  const tableData = useGTUltraStore((s) => s.tableData);
 
   const inst = instrumentData[currentInstrument] || instrumentData[0];
   const chColor = DAW_CH_CSS[dawSelectedChannel % DAW_CH_CSS.length];
@@ -480,11 +825,12 @@ const DAWInstrumentDesigner: React.FC = () => {
         </label>
       </div>
 
-      {/* Waveforms */}
+      {/* Waveforms with mini-canvas visualizations */}
       <div style={{ color: DAW_CSS.textMuted, marginTop: 10, marginBottom: 4 }}>WAVEFORM</div>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 4 }}>
         {WAVEFORMS.map((wf) => {
           const isOn = (waveform & wf.bit) !== 0;
+          const pulseWidthFrac = wf.bit === 0x40 ? getPulseWidthFrac(inst.pulsePtr, tableData) : 0.5;
           return (
             <button
               key={wf.bit}
@@ -499,9 +845,13 @@ const DAWInstrumentDesigner: React.FC = () => {
                 fontSize: 10,
                 fontFamily: 'inherit',
                 textAlign: 'left',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 6,
               }}
             >
-              {wf.shortName} — {wf.description.split(',')[0]}
+              <WaveformMiniCanvas bit={wf.bit} isOn={isOn} pulseWidthFrac={pulseWidthFrac} />
+              <span>{wf.shortName}</span>
             </button>
           );
         })}
@@ -585,9 +935,10 @@ const DAWEnvelopeCanvas: React.FC<{ attack: number; decay: number; sustain: numb
 
 // ─── Bottom Panel ───
 
-type BottomTab = 'mixer' | 'tables' | 'monitor' | 'presets' | 'clips';
+type BottomTab = 'mixer' | 'tables' | 'monitor' | 'presets' | 'clips' | 'steps';
 const BOTTOM_TABS: { id: BottomTab; label: string }[] = [
   { id: 'mixer', label: 'Mixer' },
+  { id: 'steps', label: 'Steps' },
   { id: 'presets', label: 'Presets' },
   { id: 'tables', label: 'Tables' },
   { id: 'monitor', label: 'Monitor' },
@@ -625,10 +976,11 @@ const DAWBottomPanel: React.FC = () => {
       {/* Content */}
       <div style={{ flex: 1, minHeight: 0, overflow: 'auto' }}>
         {dawBottomPanel === 'mixer' && <DAWMixer />}
+        {dawBottomPanel === 'steps' && <DAWStepSequencer />}
         {dawBottomPanel === 'presets' && <DAWPresetBrowser />}
-        {dawBottomPanel === 'tables' && <div style={{ padding: 16, color: DAW_CSS.textMuted }}>Table editor — coming soon</div>}
-        {dawBottomPanel === 'monitor' && <div style={{ padding: 16, color: DAW_CSS.textMuted }}>SID Monitor — coming soon</div>}
-        {dawBottomPanel === 'clips' && <div style={{ padding: 16, color: DAW_CSS.textMuted }}>Clip Grid — coming soon</div>}
+        {dawBottomPanel === 'tables' && <div style={{ padding: 16, color: DAW_CSS.textMuted }}>Table editor -- coming soon</div>}
+        {dawBottomPanel === 'monitor' && <div style={{ padding: 16, color: DAW_CSS.textMuted }}>SID Monitor -- coming soon</div>}
+        {dawBottomPanel === 'clips' && <div style={{ padding: 16, color: DAW_CSS.textMuted }}>Clip Grid -- coming soon</div>}
       </div>
     </div>
   );
@@ -721,6 +1073,106 @@ const DAWPresetBrowser: React.FC = () => {
             </div>
           </button>
         ))}
+      </div>
+    </div>
+  );
+};
+
+// ─── Step Sequencer (simple drum pattern grid) ───
+
+const STEP_COUNT = 16;
+
+const DAWStepSequencer: React.FC = () => {
+  const patternData = useGTUltraStore((s) => s.patternData);
+  const dawSelectedPattern = useGTUltraStore((s) => s.dawSelectedPattern);
+  const sidCount = useGTUltraStore((s) => s.sidCount);
+  const currentInstrument = useGTUltraStore((s) => s.currentInstrument);
+  const engine = useGTUltraStore((s) => s.engine);
+
+  const pd = patternData.get(dawSelectedPattern);
+  const channelCount = sidCount * 3;
+
+  // Build step grid from pattern data: for each channel, check if row has a note
+  const getStepActive = useCallback((_ch: number, step: number): boolean => {
+    if (!pd) return false;
+    // In GoatTracker, pattern data is per-pattern not per-channel — we use the same pattern for all
+    // The step sequencer shows rows 0..15 of the selected pattern
+    const bpc = 4; // bytes per cell
+    const off = step * bpc;
+    if (off >= pd.data.length) return false;
+    // A note exists if noteVal > 0 and < 0xBD
+    const noteVal = pd.data[off];
+    return noteVal > 0 && noteVal < 0xBD;
+  }, [pd]);
+
+  const toggleStep = useCallback((_ch: number, step: number) => {
+    if (!engine || !pd) return;
+    const bpc = 4;
+    const off = step * bpc;
+    if (off >= pd.data.length) return;
+    const noteVal = pd.data[off];
+    const hasNote = noteVal > 0 && noteVal < 0xBD;
+
+    if (hasNote) {
+      // Clear
+      engine.setPatternCell(dawSelectedPattern, step, 0, 0);
+      engine.setPatternCell(dawSelectedPattern, step, 1, 0);
+    } else {
+      // Place note C-3 (middle C area) = GT note 25 using current instrument
+      const defaultNote = 25; // C-3 in GT note numbering
+      engine.setPatternCell(dawSelectedPattern, step, 0, defaultNote);
+      engine.setPatternCell(dawSelectedPattern, step, 1, currentInstrument);
+    }
+    useGTUltraStore.getState().refreshPatternData(dawSelectedPattern);
+  }, [engine, pd, dawSelectedPattern, currentInstrument]);
+
+  return (
+    <div style={{ padding: 8, overflowX: 'auto', height: '100%' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: `60px repeat(${STEP_COUNT}, 1fr)`, gap: 2, fontSize: 9, fontFamily: '"JetBrains Mono", monospace' }}>
+        {/* Header row with step numbers */}
+        <div style={{ color: DAW_CSS.textMuted }} />
+        {Array.from({ length: STEP_COUNT }, (_, s) => (
+          <div key={s} style={{
+            textAlign: 'center', color: s % 4 === 0 ? DAW_CSS.textSec : DAW_CSS.textMuted,
+            fontWeight: s % 4 === 0 ? 'bold' : 'normal', padding: '2px 0',
+          }}>
+            {(s + 1).toString().padStart(2, '0')}
+          </div>
+        ))}
+
+        {/* Channel rows */}
+        {Array.from({ length: channelCount }, (_, ch) => {
+          const color = DAW_CH_CSS[ch % DAW_CH_CSS.length];
+          return (
+            <React.Fragment key={ch}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 4, color: DAW_CSS.textSec }}>
+                <div style={{ width: 3, height: 16, borderRadius: 1, background: color }} />
+                CH{ch + 1}
+              </div>
+              {Array.from({ length: STEP_COUNT }, (_, step) => {
+                const active = getStepActive(ch, step);
+                const isBeat = step % 4 === 0;
+                return (
+                  <div
+                    key={step}
+                    onClick={() => toggleStep(ch, step)}
+                    style={{
+                      width: '100%',
+                      aspectRatio: '1',
+                      maxHeight: 28,
+                      borderRadius: 3,
+                      cursor: 'pointer',
+                      border: `1px solid ${active ? color : isBeat ? DAW_CSS.panelBorder : DAW_CSS.surface}`,
+                      background: active ? `${color}` : isBeat ? DAW_CSS.surface : DAW_CSS.bg,
+                      opacity: active ? 0.85 : 1,
+                      transition: 'background 0.1s, border-color 0.1s',
+                    }}
+                  />
+                );
+              })}
+            </React.Fragment>
+          );
+        })}
       </div>
     </div>
   );
