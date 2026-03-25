@@ -43,6 +43,7 @@ export class FZSynth extends MAMEBaseSynth {
       );
 
       this.romLoaded = true;
+      this._updateRomStatus(true);
       console.log('[FZ] Default sine wave sample loaded:', numSamples, 'samples');
     } catch (error) {
       console.error('[FZ] Failed to load default sample:', error);

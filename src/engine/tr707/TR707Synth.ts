@@ -129,6 +129,7 @@ export class TR707Synth extends MAMEBaseSynth {
       this.setParameterById(TR707Param.DECAY, 0.5);
 
       this.romLoaded = true;
+      this._updateRomStatus(true);
       console.log('[TR707] ROM loaded successfully and parameters initialized');
     } catch (error) {
       console.error('[TR707] ROM loading failed:', error);

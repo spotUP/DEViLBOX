@@ -143,6 +143,7 @@ export class TMS5220Synth extends MAMEBaseSynth {
 
       this._romLoaded = true;
       this.romLoaded = true;
+      this._updateRomStatus(true);
       const sampleNames = this._romWords.slice(0, 10).map(w => w.name);
       console.log(`[TMS5220] Loaded VSM ROMs: ${this._romData.length} bytes, ${this._romWords.length} words, first 10: [${sampleNames.join(', ')}]`);
 
