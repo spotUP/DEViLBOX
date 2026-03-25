@@ -7,7 +7,7 @@
 import React, { useState, useCallback, useMemo } from 'react';
 import { useCursorStore } from '@stores';
 import { useEditorStore } from '@stores/useEditorStore';
-import { Piano, Delete, ChevronLeft, ChevronRight, Copy, Scissors, ChevronDown, ChevronUp, HelpCircle } from 'lucide-react';
+import { Piano, Delete, ChevronLeft, ChevronRight, Copy, Scissors, ChevronDown, ChevronUp } from 'lucide-react';
 import { haptics } from '@/utils/haptics';
 
 interface MobilePatternInputProps {
@@ -18,6 +18,10 @@ interface MobilePatternInputProps {
   onCut?: () => void;
   onPaste?: () => void;
   onCollapseChange?: (isCollapsed: boolean) => void;
+  /** Compact mode: just piano keys, no octave/mode bars. Tap to expand. */
+  compact?: boolean;
+  /** Toggle between compact and full */
+  onExpandToggle?: () => void;
 }
 
 // Note names for the piano keyboard
@@ -31,12 +35,13 @@ export const MobilePatternInput: React.FC<MobilePatternInputProps> = ({
   onCopy,
   onCut,
   onPaste,
-  onCollapseChange,
+  onCollapseChange: _onCollapseChange,
+  compact = false,
+  onExpandToggle,
 }) => {
   const cursor = useCursorStore((s) => s.cursor);
   const { currentOctave, setCurrentOctave } = useEditorStore();
   const [showContextMenu, setShowContextMenu] = useState(false);
-  const [isCollapsed, setIsCollapsed] = useState(false);
 
   // Determine input mode based on cursor column
   const inputMode = useMemo(() => {
@@ -88,13 +93,7 @@ export const MobilePatternInput: React.FC<MobilePatternInputProps> = ({
     onDelete();
   }, [onDelete]);
 
-  // Collapse/expand handler
-  const toggleCollapse = useCallback(() => {
-    haptics.selection();
-    const newCollapsed = !isCollapsed;
-    setIsCollapsed(newCollapsed);
-    onCollapseChange?.(newCollapsed);
-  }, [isCollapsed, onCollapseChange]);
+  // Note: collapse state is now managed by parent via compact/onExpandToggle props
 
   // Long-press context menu handlers
   const handleLongPressStart = useCallback(() => {
@@ -108,56 +107,75 @@ export const MobilePatternInput: React.FC<MobilePatternInputProps> = ({
     setShowContextMenu(false);
   }, []);
 
+  // ── Compact mode: just piano keys with a thin expand handle ──────────────
+  if (compact) {
+    return (
+      <div className="mobile-pattern-input" style={{ paddingBottom: 'calc(56px + env(safe-area-inset-bottom, 0px))' }}>
+        {/* Thin expand handle — tap to go full */}
+        <button
+          onClick={onExpandToggle}
+          className="w-full flex items-center justify-center py-0.5 bg-dark-bgTertiary border-t border-dark-border active:bg-dark-bgHover"
+        >
+          <ChevronUp size={12} className="text-text-muted" />
+        </button>
+        {/* Piano keys only — no octave bar, no mode bar */}
+        <div className="px-1 pb-1 bg-dark-bgSecondary">
+          <PianoKeyboard
+            mode={inputMode}
+            currentOctave={currentOctave}
+            onNotePress={handleNotePress}
+            onHexPress={handleHexPress}
+            onNoteOff={handleNoteOff}
+            onOctaveDown={handleOctaveDown}
+            onOctaveUp={handleOctaveUp}
+            onDelete={handleDeletePress}
+            compactMode
+          />
+        </div>
+        {showContextMenu && (
+          <ContextMenu
+            onCopy={onCopy ? () => handleContextAction(onCopy) : undefined}
+            onCut={onCut ? () => handleContextAction(onCut) : undefined}
+            onPaste={onPaste ? () => handleContextAction(onPaste) : undefined}
+            onClose={() => setShowContextMenu(false)}
+          />
+        )}
+      </div>
+    );
+  }
+
+  // ── Full mode: mode bar + octave controls + piano ──────────────────────
   return (
     <div className="mobile-pattern-input" style={{ paddingBottom: 'calc(56px + env(safe-area-inset-bottom, 0px))' }}>
       {/* Mode indicator bar */}
-      <div className="flex items-center justify-between px-3 py-2 bg-dark-bgTertiary border-t border-dark-border">
+      <div className="flex items-center justify-between px-3 py-1.5 bg-dark-bgTertiary border-t border-dark-border">
         <div className="flex items-center gap-2">
-          <Piano size={16} className="text-accent-primary" />
-          <span className="text-xs font-mono text-text-secondary">
+          <Piano size={14} className="text-accent-primary" />
+          <span className="text-[10px] font-mono text-text-secondary">
             {inputMode === 'piano' ? 'NOTE' : cursor.columnType.toUpperCase()}
           </span>
         </div>
 
         <div className="flex items-center gap-1">
-          {/* Help link */}
-          <button
-            onClick={() => {
-              const event = new KeyboardEvent('keydown', { key: '?' });
-              window.dispatchEvent(event);
-            }}
-            className="p-1.5 rounded bg-dark-bgSecondary hover:bg-dark-bgHover transition-colors"
-            aria-label="Help"
-          >
-            <HelpCircle size={14} className="text-text-muted" />
-          </button>
-
-          {/* Context menu toggle */}
           <button
             onClick={handleLongPressStart}
-            className="p-1.5 rounded bg-dark-bgSecondary hover:bg-dark-bgHover transition-colors"
+            className="p-1.5 rounded bg-dark-bgSecondary hover:bg-dark-bgHover transition-colors active:scale-90"
             aria-label="Show context menu"
           >
             <Copy size={14} className="text-text-muted" />
           </button>
-
-          {/* Collapse toggle */}
           <button
-            onClick={toggleCollapse}
-            className="p-1.5 rounded bg-dark-bgSecondary hover:bg-dark-bgHover transition-colors"
-            aria-label={isCollapsed ? "Expand input" : "Collapse input"}
+            onClick={onExpandToggle}
+            className="p-1.5 rounded bg-dark-bgSecondary hover:bg-dark-bgHover transition-colors active:scale-90"
+            aria-label="Collapse input"
           >
-            {isCollapsed ? (
-              <ChevronUp size={14} className="text-text-muted" />
-            ) : (
-              <ChevronDown size={14} className="text-text-muted" />
-            )}
+            <ChevronDown size={14} className="text-text-muted" />
           </button>
         </div>
       </div>
 
       {/* Input area */}
-      {!isCollapsed && (
+      {(
         <div className="p-2 bg-dark-bgSecondary">
           <PianoKeyboard
             mode={inputMode}
@@ -197,6 +215,8 @@ interface PianoKeyboardProps {
   onNoteOff: () => void;
   onOctaveDown: () => void;
   onOctaveUp: () => void;
+  /** In compact mode, hide octave/hex controls — just show the 12 keys */
+  compactMode?: boolean;
   onDelete: () => void;
 }
 
@@ -219,6 +239,7 @@ const PianoKeyboard: React.FC<PianoKeyboardProps> = ({
   onOctaveDown,
   onOctaveUp,
   onDelete,
+  compactMode = false,
 }) => {
   // Handle touch with pressure sensitivity (iOS 3D Touch / Force Touch)
   const handleKeyTouch = useCallback((semitone: number, _e: React.TouchEvent) => {
@@ -241,9 +262,9 @@ const PianoKeyboard: React.FC<PianoKeyboardProps> = ({
   const semitones = Array.from({ length: 12 }, (_, i) => i);
 
   return (
-    <div className="flex flex-col gap-2">
-      {/* Octave / hex-extra controls and utility buttons */}
-      <div className="flex items-center gap-2 h-[56px]">
+    <div className={`flex flex-col ${compactMode ? 'gap-0' : 'gap-2'}`}>
+      {/* Octave / hex-extra controls and utility buttons — hidden in compact mode */}
+      {!compactMode && <div className="flex items-center gap-2 h-[56px]">
         {mode === 'piano' ? (
           /* Octave controls for note mode */
           <div className="flex items-center gap-1 bg-dark-bgTertiary rounded-lg p-1 h-full">
@@ -303,10 +324,10 @@ const PianoKeyboard: React.FC<PianoKeyboardProps> = ({
           <Delete size={18} />
           <span className="text-[10px] text-text-muted">DEL</span>
         </button>
-      </div>
+      </div>}
 
       {/* Piano keys - always 12 keys in standard piano layout */}
-      <div className="relative h-[120px] bg-dark-bg rounded-lg overflow-hidden">
+      <div className={`relative ${compactMode ? 'h-[72px]' : 'h-[120px]'} bg-dark-bg rounded-lg overflow-hidden`}>
         {/* White keys layer (flex) */}
         <div className="absolute inset-0 flex">
           {semitones.map((semitone) => {
