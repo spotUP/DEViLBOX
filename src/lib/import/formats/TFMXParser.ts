@@ -503,8 +503,13 @@ export function parseTFMXFile(
   );
 
   for (let i = 0; i < numMacroSlots; i++) {
-    const macroAddr = u32BE(buf, macroPtrTable + i * MACRO_ENTRY_SIZE);
-    if (macroAddr === 0 || macroAddr >= buf.length) continue;
+    const rawMacroAddr = u32BE(buf, macroPtrTable + i * MACRO_ENTRY_SIZE);
+    if (rawMacroAddr === 0 || rawMacroAddr >= 0xFF000000) continue;
+    // Apply data base offset for relative pointers (same logic as pattern pointers)
+    const macroAddr = (dataBase > 0 && rawMacroAddr < dataBase)
+      ? rawMacroAddr + dataBase
+      : rawMacroAddr;
+    if (macroAddr >= buf.length) continue;
 
     // Read up to 64 bytes of macro data for display
     const macroDataSize = 64;

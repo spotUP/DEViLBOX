@@ -1311,6 +1311,23 @@ public:
         m_globalWaveSelect = program & 7;
     }
 
+    /**
+     * Get voice status for all 16 voices.
+     * Writes to output buffer: [active(0/1), midiNote, envLevel(0-255), inRelease(0/1)] × 16
+     * Total: 64 values. Caller must provide pointer to 64 ints.
+     */
+    void getVoiceStatus(uintptr_t outPtr, int maxVoices) {
+        int* out = reinterpret_cast<int*>(outPtr);
+        int count = std::min(maxVoices, MAX_POLY);
+        for (int i = 0; i < count; i++) {
+            const CMI01A& v = m_voices[i];
+            out[i * 4 + 0] = v.active ? 1 : 0;
+            out[i * 4 + 1] = v.midi_note;
+            out[i * 4 + 2] = v.env;
+            out[i * 4 + 3] = v.in_release ? 1 : 0;
+        }
+    }
+
 private:
     double    m_sampleRate;
     CMI01A    m_voices[MAX_POLY];
@@ -1352,6 +1369,7 @@ EMSCRIPTEN_BINDINGS(CMISynth) {
         .function("writeRegister", &CMISynth::writeRegister)
         .function("pitchBend", &CMISynth::pitchBend)
         .function("controlChange", &CMISynth::controlChange)
-        .function("programChange", &CMISynth::programChange);
+        .function("programChange", &CMISynth::programChange)
+        .function("getVoiceStatus", &CMISynth::getVoiceStatus);
 }
 #endif

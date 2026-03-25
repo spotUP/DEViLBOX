@@ -36,9 +36,52 @@ export class CMISynth extends MAMEBaseSynth {
   protected readonly workletFile = 'CMI.worklet.js';
   protected readonly processorName = 'cmi-processor';
 
+  /** Last polled voice status: [active, note, env, releasing] × 16 */
+  private _voiceStatus: Int32Array = new Int32Array(64);
+  private _voiceStatusCallbacks: Set<(status: Int32Array) => void> = new Set();
+  private _voicePollTimer: ReturnType<typeof setInterval> | null = null;
+
   constructor() {
     super();
     this.initSynth();
+  }
+
+  /** Subscribe to voice status updates. Returns unsubscribe function. */
+  onVoiceStatus(cb: (status: Int32Array) => void): () => void {
+    this._voiceStatusCallbacks.add(cb);
+    // Start polling when first subscriber
+    if (this._voiceStatusCallbacks.size === 1) this._startVoicePoll();
+    return () => {
+      this._voiceStatusCallbacks.delete(cb);
+      if (this._voiceStatusCallbacks.size === 0) this._stopVoicePoll();
+    };
+  }
+
+  get voiceStatus(): Int32Array { return this._voiceStatus; }
+
+  private _startVoicePoll(): void {
+    if (this._voicePollTimer) return;
+    this._voicePollTimer = setInterval(() => {
+      if (this.workletNode && this._isReady) {
+        this.workletNode.port.postMessage({ type: 'getVoiceStatus' });
+      }
+    }, 50); // 20 fps
+  }
+
+  private _stopVoicePoll(): void {
+    if (this._voicePollTimer) {
+      clearInterval(this._voicePollTimer);
+      this._voicePollTimer = null;
+    }
+  }
+
+  protected override handleWorkletMessage(data: Record<string, unknown>): void {
+    if (data.type === 'voiceStatus' && data.data instanceof ArrayBuffer) {
+      this._voiceStatus = new Int32Array(data.data);
+      for (const cb of this._voiceStatusCallbacks) cb(this._voiceStatus);
+      return;
+    }
+    super.handleWorkletMessage(data);
   }
 
   // ===========================================================================
@@ -148,6 +191,12 @@ export class CMISynth extends MAMEBaseSynth {
 
   setMasterVolume(val: number): void {
     this.setParameterById(CMIParam.VOLUME, Math.round(val * 255));
+  }
+
+  override dispose(): void {
+    this._stopVoicePoll();
+    this._voiceStatusCallbacks.clear();
+    super.dispose();
   }
 }
 
