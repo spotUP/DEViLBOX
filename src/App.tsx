@@ -1211,12 +1211,6 @@ function App() {
               </Suspense>
             )}
 
-            {activeView === 'drumpad' && (
-              <Suspense fallback={<div className="flex-1 flex items-center justify-center text-text-muted">Loading drum pads...</div>}>
-                <DrumPadManager />
-              </Suspense>
-            )}
-
             {activeView === 'pianoroll' && (
               <Suspense fallback={<div className="flex-1 flex items-center justify-center text-text-muted">Loading piano roll...</div>}>
                 <PianoRoll />

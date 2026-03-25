@@ -284,7 +284,6 @@ export const DJView: React.FC<DJViewProps> = ({ onShowDrumpads: _onShowDrumpads 
             <option value="tb303">TB-303</option>
             <option value="arrangement">Arrangement</option>
             <option value="dj">DJ Mixer</option>
-            <option value="drumpad">Drum Pads</option>
             <option value="vj">VJ View</option>
           </select>
           <div className="h-4 w-px bg-dark-border" />
