@@ -1,19 +1,29 @@
 /**
- * MobileTrackerView - Mobile-optimized tracker interface
- * Vivid Tracker-inspired mobile layout with context-aware bottom input
+ * MobileTrackerView - Mobile-optimized tracker/pattern editor interface
+ * Note: MobileTabBar is now in AppLayout (shared across all views).
+ * This component focuses on the pattern editor only.
  */
 
-import React, { useState, useCallback } from 'react';
-import * as Tone from 'tone';
-import { MobileTabBar } from '@components/layout/MobileTabBar';
+import React, { useState, useCallback, Suspense, lazy } from 'react';
 import { PatternEditorCanvas } from './PatternEditorCanvas';
-import { InstrumentList } from '@components/instruments/InstrumentList';
 import { MobilePatternInput } from './mobile/MobilePatternInput';
-import { Play, Square, ChevronLeft, ChevronRight, Music2, Cpu } from 'lucide-react';
-import { useTransportStore, useTrackerStore, useCursorStore, useInstrumentStore, useEditorStore } from '@stores';
+import { MobileTransportBar } from './mobile/MobileTransportBar';
+import { ChevronLeft, ChevronRight, Cpu } from 'lucide-react';
+import { useTrackerStore, useCursorStore, useInstrumentStore, useEditorStore } from '@stores';
+import { useFormatStore } from '@stores/useFormatStore';
 import { useShallow } from 'zustand/react/shallow';
 import { getGroupedPresets } from '@/constants/systemPresets';
 import { useOrientation } from '@/hooks/useOrientation';
+
+// Lazy-load format-specific views
+const FurnaceView = lazy(() => import('@/components/furnace/FurnaceView').then(m => ({ default: m.FurnaceView })));
+const HivelyView = lazy(() => import('@/components/hively/HivelyView').then(m => ({ default: m.HivelyView })));
+const GTUltraView = lazy(() => import('@/components/gtultra/GTUltraView').then(m => ({ default: m.GTUltraView })));
+const KlysView = lazy(() => import('@/components/klystrack/KlysView').then(m => ({ default: m.KlysView })));
+const JamCrackerView = lazy(() => import('@/components/jamcracker/JamCrackerView').then(m => ({ default: m.JamCrackerView })));
+const Sc68Visualizer = lazy(() => import('@/components/tracker/Sc68Visualizer').then(m => ({ default: m.Sc68Visualizer })));
+const MusicLinePatternViewer = lazy(() => import('@/components/tracker/MusicLinePatternViewer').then(m => ({ default: m.MusicLinePatternViewer })));
+const MusicLineTrackTableEditor = lazy(() => import('@/components/tracker/MusicLineTrackTableEditor').then(m => ({ default: m.MusicLineTrackTableEditor })));
 import { haptics } from '@/utils/haptics';
 import { useMobilePatternGestures } from '@/hooks/useMobilePatternGestures';
 
@@ -27,14 +37,9 @@ interface MobileTrackerViewProps {
   showMasterFX?: boolean;
 }
 
-export const MobileTrackerView: React.FC<MobileTrackerViewProps> = ({
-  onShowInstruments,
-}) => {
-  const [activeTab, setActiveTab] = useState<'pattern' | 'instruments'>('pattern');
-  const [mobileChannel, setMobileChannel] = useState(0); // For portrait mode: which channel to show
-  const [isInputCollapsed, setIsInputCollapsed] = useState(false); // Track MobilePatternInput collapse state
-  const isPlaying = useTransportStore((s) => s.isPlaying);
-  const togglePlayPause = useTransportStore((s) => s.togglePlayPause);
+export const MobileTrackerView: React.FC<MobileTrackerViewProps> = () => {
+  const [mobileChannel, setMobileChannel] = useState(0);
+  const [isInputCollapsed, setIsInputCollapsed] = useState(false);
   const cursor = useCursorStore((s) => s.cursor);
   const moveCursor = useCursorStore((s) => s.moveCursor);
   const moveCursorToRow = useCursorStore((s) => s.moveCursorToRow);
@@ -57,13 +62,13 @@ export const MobileTrackerView: React.FC<MobileTrackerViewProps> = ({
     setCurrentInstrument: s.setCurrentInstrument,
   })));
   const pattern = patterns[currentPatternIndex];
+  const editorMode = useFormatStore((s) => s.editorMode);
   const { isPortrait, isLandscape } = useOrientation();
 
-  // Calculate visible channels based on orientation
+  const isCustomFormat = ['goattracker', 'hively', 'klystrack', 'jamcracker', 'musicline', 'furnace', 'sc68'].includes(editorMode);
   const visibleChannels = isLandscape ? 4 : 1;
   const startChannel = isPortrait ? mobileChannel : 0;
 
-  // Handle channel navigation in portrait mode
   const handleChannelPrev = useCallback(() => {
     if (mobileChannel > 0) {
       haptics.selection();
@@ -79,130 +84,61 @@ export const MobileTrackerView: React.FC<MobileTrackerViewProps> = ({
     }
   }, [mobileChannel, pattern]);
 
-  // Handle note input from mobile keyboard
   const handleNoteInput = useCallback((note: number) => {
     setCell(cursor.channelIndex, cursor.rowIndex, {
       note,
       instrument: currentInstrumentId ?? 1,
     });
-    // Advance cursor by editStep rows when in record mode
     if (recordMode && editStep > 0) {
       const patternLength = patterns[currentPatternIndex]?.length ?? 64;
       moveCursorToRow((cursor.rowIndex + editStep) % patternLength);
     }
   }, [cursor, setCell, currentInstrumentId, recordMode, editStep, patterns, currentPatternIndex, moveCursorToRow]);
 
-  // Handle hex input (for effects, volume, instrument)
   const handleHexInput = useCallback((value: number) => {
     const { channelIndex, rowIndex, columnType } = cursor;
-
     switch (columnType) {
-      case 'instrument':
-        setCell(channelIndex, rowIndex, { instrument: value });
-        break;
-      case 'volume':
-        setCell(channelIndex, rowIndex, { volume: value });
-        break;
-      case 'effTyp':
-        setCell(channelIndex, rowIndex, { effTyp: value });
-        break;
-      case 'effParam':
-        setCell(channelIndex, rowIndex, { eff: value });
-        break;
+      case 'instrument': setCell(channelIndex, rowIndex, { instrument: value }); break;
+      case 'volume': setCell(channelIndex, rowIndex, { volume: value }); break;
+      case 'effTyp': setCell(channelIndex, rowIndex, { effTyp: value }); break;
+      case 'effParam': setCell(channelIndex, rowIndex, { eff: value }); break;
     }
-
-    // Move cursor right after input
     moveCursor('right');
   }, [cursor, setCell, moveCursor]);
 
-  // Handle delete
   const handleDelete = useCallback(() => {
     const { channelIndex, rowIndex } = cursor;
-    setCell(channelIndex, rowIndex, {
-      note: 0,
-      instrument: 0,
-      volume: 0,
-      effTyp: 0,
-      eff: 0,
-    });
+    setCell(channelIndex, rowIndex, { note: 0, instrument: 0, volume: 0, effTyp: 0, eff: 0 });
   }, [cursor, setCell]);
 
-  // Gesture handlers for channel header (portrait mode only)
   const channelHeaderGestures = useMobilePatternGestures({
     onSwipeLeft: handleChannelNext,
     onSwipeRight: handleChannelPrev,
     enabled: isPortrait,
   });
 
-  // Clipboard handlers for mobile input context menu
-  const handleCopy = useCallback(() => {
-    haptics.success();
-    copySelection();
-  }, [copySelection]);
+  const handleCopy = useCallback(() => { haptics.success(); copySelection(); }, [copySelection]);
+  const handleCut = useCallback(() => { haptics.success(); cutSelection(); }, [cutSelection]);
+  const handlePaste = useCallback(() => { haptics.success(); paste(); }, [paste]);
 
-  const handleCut = useCallback(() => {
-    haptics.success();
-    cutSelection();
-  }, [cutSelection]);
-
-  const handlePaste = useCallback(() => {
-    haptics.success();
-    paste();
-  }, [paste]);
-
-  // Gesture handlers for pattern editor (cursor movement)
-  // Note: Only horizontal swipes - vertical swipes reserved for scrolling
-  const handlePatternSwipeLeft = useCallback(() => {
-    moveCursor('left');
-  }, [moveCursor]);
-
-  const handlePatternSwipeRight = useCallback(() => {
-    moveCursor('right');
-  }, [moveCursor]);
+  const handlePatternSwipeLeft = useCallback(() => { moveCursor('left'); }, [moveCursor]);
+  const handlePatternSwipeRight = useCallback(() => { moveCursor('right'); }, [moveCursor]);
 
   return (
     <div className="flex flex-col flex-1 min-h-0 bg-dark-bg">
-      {/* Fixed header with pattern info and transport */}
-      <div className="flex-shrink-0 flex items-center justify-between px-3 py-2 bg-dark-bgSecondary border-b border-dark-border safe-area-top">
+      {/* Header with channel nav and instrument selector */}
+      <div className="flex-shrink-0 flex items-center justify-between px-2 py-1.5 bg-dark-bgSecondary border-b border-dark-border safe-area-top">
         <div className="flex items-center gap-2 flex-1 min-w-0">
-          {/* Transport controls - Moved to left to avoid hamburger menu overlap */}
-          <div className="flex items-center gap-1 flex-shrink-0 mr-1">
-            <button
-              onClick={() => { Tone.start(); togglePlayPause().catch(console.error); }}
-              className={`
-                p-2 rounded-lg transition-colors touch-target
-                ${isPlaying
-                  ? 'bg-accent-primary text-text-inverse'
-                  : 'bg-dark-bgTertiary text-text-primary hover:bg-dark-bgHover'
-                }
-              `}
-            >
-              {isPlaying ? <Square size={18} /> : <Play size={18} />}
-            </button>
-          </div>
-
-          <div className="flex items-center gap-1.5 flex-shrink-0">
-            <span className="text-xs text-text-muted font-mono">PAT</span>
-            <span className="text-sm font-bold text-accent-primary font-mono">
-              {(currentPatternIndex + 1).toString().padStart(2, '0')}
-            </span>
-          </div>
-
-          <span className="text-xs text-text-secondary truncate max-w-[40px] hidden sm:inline">
-            {pattern?.name || 'Untitled'}
-          </span>
-
           {/* Portrait mode: Channel selector */}
-          {isPortrait && (
+          {isPortrait && !isCustomFormat && (
             <div
-              className="flex items-center gap-1 ml-1 pl-1 border-l border-dark-border touch-none"
+              className="flex items-center gap-1 touch-none"
               {...channelHeaderGestures}
             >
               <button
                 onClick={handleChannelPrev}
                 disabled={mobileChannel === 0}
                 className="p-1 rounded bg-dark-bgTertiary disabled:opacity-30 touch-target-sm"
-                aria-label="Previous channel"
               >
                 <ChevronLeft size={14} />
               </button>
@@ -213,20 +149,24 @@ export const MobileTrackerView: React.FC<MobileTrackerViewProps> = ({
                 onClick={handleChannelNext}
                 disabled={mobileChannel >= (pattern?.channels.length || 8) - 1}
                 className="p-1 rounded bg-dark-bgTertiary disabled:opacity-30 touch-target-sm"
-                aria-label="Next channel"
               >
                 <ChevronRight size={14} />
               </button>
             </div>
           )}
 
+          {/* Format label for custom formats */}
+          {isCustomFormat && (
+            <span className="text-xs font-bold text-accent-primary uppercase tracking-wide">{editorMode}</span>
+          )}
+
           {/* Instrument selector */}
-          <div className="ml-1 pl-1 border-l border-dark-border flex items-center gap-1 min-w-0">
+          <div className="ml-auto flex items-center gap-1 min-w-0">
             <select
               value={currentInstrumentId ?? 1}
               onChange={(e) => setCurrentInstrument(parseInt(e.target.value, 10))}
               className="text-[10px] bg-dark-bgTertiary border border-dark-border rounded px-1.5 py-1 text-text-primary font-mono truncate"
-              style={{ maxWidth: '80px' }}
+              style={{ maxWidth: '100px' }}
             >
               {instruments.map((inst) => (
                 <option key={inst.id} value={inst.id}>
@@ -234,7 +174,7 @@ export const MobileTrackerView: React.FC<MobileTrackerViewProps> = ({
                 </option>
               ))}
             </select>
-            
+
             <div className="flex items-center ml-1 pl-1 border-l border-dark-border">
               <Cpu size={12} className="text-accent-primary mr-1" />
               <select
@@ -256,69 +196,62 @@ export const MobileTrackerView: React.FC<MobileTrackerViewProps> = ({
         </div>
 
         {/* Right spacer for the fixed hamburger menu button */}
-        <div className="w-12 flex-shrink-0" />
+        <div className="w-10 flex-shrink-0" />
       </div>
 
-      {/* Main content area - Pattern/Instruments/Controls tabs */}
+      {/* Transport bar — BPM, pattern, octave, step, play/record */}
+      <MobileTransportBar />
+
+      {/* Pattern editor — format-aware routing */}
       <div className="flex-1 min-h-0 relative">
-        {activeTab === 'pattern' && (
-          <div 
-            className="h-full flex flex-col"
-            style={{ 
-              paddingBottom: `calc(${isInputCollapsed ? '56px' : '180px'} + env(safe-area-inset-bottom, 0px))` 
-            }}
-          >
-            {/* Pattern editor canvas - scrollable */}
-            <div className="flex-1 overflow-auto">
+        <div
+          className="h-full flex flex-col"
+          style={{
+            paddingBottom: `calc(${isInputCollapsed ? '0px' : '124px'} + env(safe-area-inset-bottom, 0px))`
+          }}
+        >
+          <div className="flex-1 overflow-auto">
+            {isCustomFormat ? (
+              <Suspense fallback={<div className="flex-1 flex items-center justify-center text-text-muted text-xs">Loading format editor...</div>}>
+                {editorMode === 'furnace' && <FurnaceView />}
+                {editorMode === 'hively' && <HivelyView />}
+                {editorMode === 'goattracker' && <GTUltraView />}
+                {editorMode === 'klystrack' && <KlysView />}
+                {editorMode === 'jamcracker' && <JamCrackerView />}
+                {editorMode === 'sc68' && <Sc68Visualizer />}
+                {editorMode === 'musicline' && (
+                  <div className="flex-1 flex flex-col min-h-0">
+                    <div className="flex-shrink-0 border-b border-dark-border" style={{ maxHeight: 160, overflowY: 'auto' }}>
+                      <MusicLineTrackTableEditor />
+                    </div>
+                    <div className="flex-1 min-h-0">
+                      <MusicLinePatternViewer />
+                    </div>
+                  </div>
+                )}
+              </Suspense>
+            ) : (
               <PatternEditorCanvas
                 visibleChannels={visibleChannels}
                 startChannel={startChannel}
                 onSwipeLeft={handlePatternSwipeLeft}
                 onSwipeRight={handlePatternSwipeRight}
               />
-            </div>
+            )}
           </div>
-        )}
-
-        {activeTab === 'instruments' && (
-          <div className="h-full flex flex-col">
-            {/* Instrument list only — synth editor opens via Edit button */}
-            <div
-              className="flex-1 overflow-y-auto p-2"
-              style={{ paddingBottom: 'calc(64px + env(safe-area-inset-bottom, 0px))' }}
-            >
-              <h3 className="text-[10px] font-black text-text-muted uppercase tracking-widest mb-3 px-2 flex items-center gap-1.5">
-                <Music2 size={12} className="text-accent-primary" />
-                Instruments
-              </h3>
-              <InstrumentList
-                variant="ft2"
-                showPreviewOnClick={true}
-                showPresetButton={true}
-                showSamplePackButton={true}
-                showEditButton={true}
-                onEditInstrument={onShowInstruments}
-              />
-            </div>
-          </div>
-        )}
+        </div>
       </div>
 
-      {/* Mobile pattern input - only shown in pattern view */}
-      {activeTab === 'pattern' && (
-        <MobilePatternInput
-          onNoteInput={handleNoteInput}
-          onHexInput={handleHexInput}
-          onDelete={handleDelete}
-          onCopy={handleCopy}
-          onCut={handleCut}
-          onPaste={handlePaste}
-          onCollapseChange={setIsInputCollapsed}
-        />
-      )}
-
-      {/* Bottom tab bar */}
-      <MobileTabBar activeTab={activeTab} onTabChange={setActiveTab} />
+      {/* Mobile pattern input (piano keyboard + hex grid) */}
+      <MobilePatternInput
+        onNoteInput={handleNoteInput}
+        onHexInput={handleHexInput}
+        onDelete={handleDelete}
+        onCopy={handleCopy}
+        onCut={handleCut}
+        onPaste={handlePaste}
+        onCollapseChange={setIsInputCollapsed}
+      />
     </div>
   );
 };

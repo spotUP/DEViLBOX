@@ -19,10 +19,12 @@ import { exportAsHively } from '@lib/export/HivelyExporter';
 import { PatternEditorCanvas } from '@/components/tracker/PatternEditorCanvas';
 import { HIVELY_COLUMNS, hivelyToFormatChannels } from './hivelyAdapter';
 import { HivelyPositionEditor, HIVELY_MATRIX_HEIGHT, HIVELY_MATRIX_COLLAPSED_HEIGHT } from './HivelyPositionEditor';
+import { useResponsiveSafe } from '@/contexts/ResponsiveContext';
 
 const TOOLBAR_H = 36;
 
 export const HivelyView: React.FC<{ width?: number; height?: number }> = () => {
+  const { isMobile } = useResponsiveSafe();
   const nativeData = useFormatStore(s => s.hivelyNative);
   const currentPositionIndex = useTrackerStore(s => s.currentPositionIndex);
   const setCurrentPosition = useTrackerStore(s => s.setCurrentPosition);
@@ -30,7 +32,7 @@ export const HivelyView: React.FC<{ width?: number; height?: number }> = () => {
   const currentRow = useTransportStore(s => s.currentRow);
 
   const [editPosition, setEditPosition] = useState(0);
-  const [matrixCollapsed, setMatrixCollapsed] = useState(false);
+  const [matrixCollapsed, setMatrixCollapsed] = useState(isMobile); // Collapsed by default on mobile
 
   const positionH = matrixCollapsed ? HIVELY_MATRIX_COLLAPSED_HEIGHT : HIVELY_MATRIX_HEIGHT;
 

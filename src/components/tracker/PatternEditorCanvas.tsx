@@ -44,6 +44,7 @@ import type {
 import TrackerWorkerFactory from '@/workers/tracker-render.worker.ts?worker';
 import type { ColumnDef, FormatChannel, OnCellChange } from '@/components/shared/format-editor-types';
 import { toColumnSpec, formatChannelsToSnapshot } from '@/components/shared/format-editor-types';
+import { TrackerCanvas2DRenderer } from '@engine/renderer/TrackerCanvas2DRenderer';
 
 const CHAR_WIDTH = 10;
 const LINE_NUMBER_WIDTH = 40;
@@ -156,8 +157,11 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
   // Accumulator for horizontal scroll resistance
   const scrollAccumulatorRef = useRef(0);
 
-  // Set to true if worker reports WebGL2 is unsupported
+  // Set to true if worker reports WebGL2 is unsupported (iOS Safari)
   const [webglUnsupported, setWebglUnsupported] = useState(false);
+  // Main-thread Canvas2D renderer ref (iOS fallback)
+  const mainThreadRendererRef = useRef<TrackerCanvas2DRenderer | null>(null);
+  const mainThreadRafRef = useRef<number>(0);
 
   const [formatCursor, setFormatCursor] = useState({
     channelIndex: 0, rowIndex: 0, columnIndex: 0,
@@ -1793,6 +1797,224 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // Only on mount
 
+  // ─── iOS/Canvas2D main-thread renderer ────────────────────────────────────
+  // When WebGL2+OffscreenCanvas worker is unavailable, create a Canvas2D renderer
+  // directly on the main thread. Reads stores in a RAF loop (same data as worker).
+  useEffect(() => {
+    if (!webglUnsupported) return;
+    const container = containerRef.current;
+    if (!container) return;
+
+    const canvas = document.createElement('canvas');
+    canvas.style.cssText = 'display:block;width:100%;height:100%;';
+    container.appendChild(canvas);
+    canvasRef.current = canvas;
+
+    const dpr = window.devicePixelRatio || 1;
+    const w = Math.max(1, container.clientWidth);
+    const h = Math.max(1, container.clientHeight);
+    canvas.width = Math.round(w * dpr);
+    canvas.height = Math.round(h * dpr);
+
+    const renderer = new TrackerCanvas2DRenderer(canvas);
+    renderer.resize(w, h, dpr);
+    mainThreadRendererRef.current = renderer;
+
+    // Resize observer
+    const ro = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        const cr = entry.contentRect;
+        const rw = Math.max(1, Math.round(cr.width));
+        const rh = Math.max(1, Math.round(cr.height));
+        const rdpr = window.devicePixelRatio || 1;
+        canvas.style.width = `${rw}px`;
+        canvas.style.height = `${rh}px`;
+        renderer.resize(rw, rh, rdpr);
+        setDimensions({ width: rw, height: rh });
+      }
+    });
+    ro.observe(container);
+
+    // Throttle to ~30fps for battery on iOS
+    const MIN_FRAME_MS = 33;
+    let lastFrame = 0;
+
+    // ── Dirty-flag state — skip rendering when nothing changed ─────
+    let prevPatternsRef: unknown = null;   // tracker store .patterns identity
+    let prevPatIdx = -1;
+    let prevCursorRef: unknown = null;     // cursor store .cursor identity
+    let prevSelectionRef: unknown = null;  // cursor store .selection identity
+    let prevPlayRow = -1;
+    let prevPlaying = false;
+    let prevThemeId: unknown = null;       // theme store identity
+    let prevFormatChannels: unknown = null;
+    let cachedPatterns: PatternSnapshot[] = [];
+    let cachedTheme: ThemeSnapshot | null = null;
+    let cachedUI: UIStateSnapshot | null = null;
+    let prevUIHex: unknown = null;
+    let prevUIZoom: unknown = null;
+    let prevRecordMode: unknown = null;
+    let needsRender = true; // Force first frame
+
+    const tick = (now: number) => {
+      if (now - lastFrame < MIN_FRAME_MS) {
+        mainThreadRafRef.current = requestAnimationFrame(tick);
+        return;
+      }
+      lastFrame = now;
+
+      // ── Read playback state ────────────────────────────────────────
+      let playRow = 0;
+      let smoothOffset = 0;
+      let playPatIdx = 0;
+      let isPlaying = false;
+
+      if (isFormatModeRef.current) {
+        const fps = getFormatPlaybackState();
+        isPlaying = fps.isPlaying;
+        playRow = fps.isPlaying ? fps.row : formatCurrentRowRef.current;
+        if (fps.isPlaying && fps.rowDuration > 0) {
+          const elapsed = performance.now() - fps.rowChangeTime;
+          const progress = Math.min(Math.max(elapsed / fps.rowDuration, 0), 1);
+          const ts = useTransportStore.getState();
+          if (ts.smoothScrolling) smoothOffset = progress * rowHeightRef.current;
+        }
+      } else {
+        const ts = useTransportStore.getState();
+        isPlaying = ts.isPlaying;
+        if (isPlaying) {
+          const scratch = getTrackerScratchController();
+          if (scratch.isActive) {
+            const ss = scratch.getScratchDisplayState(rowHeightRef.current);
+            if (ss) { playRow = ss.row; playPatIdx = ss.pattern; smoothOffset = ss.smoothOffset; }
+          } else {
+            const replayer = getTrackerReplayer();
+            const audioTime = Tone.now() + 0.01;
+            const audioState = replayer.getStateAtTime(audioTime);
+            if (audioState) {
+              playRow = audioState.row;
+              playPatIdx = audioState.pattern;
+              if (ts.smoothScrolling && audioState.duration > 0) {
+                const progress = Math.min(Math.max((audioTime - audioState.time) / audioState.duration, 0), 1);
+                smoothOffset = progress * rowHeightRef.current;
+              }
+            } else {
+              playRow = ts.currentRow;
+            }
+          }
+        }
+      }
+
+      // ── Dirty checks — detect if anything changed since last frame ─
+      const trackerState = useTrackerStore.getState();
+      const cs = useCursorStore.getState();
+      const themeStore = useThemeStore.getState();
+      const uiStore = useUIStore.getState();
+      const editorState = useEditorStore.getState();
+
+      if (trackerState.patterns !== prevPatternsRef ||
+          trackerState.currentPatternIndex !== prevPatIdx ||
+          formatChannelsRef.current !== prevFormatChannels) {
+        prevPatternsRef = trackerState.patterns;
+        prevPatIdx = trackerState.currentPatternIndex;
+        prevFormatChannels = formatChannelsRef.current;
+        // Re-snapshot patterns
+        if (isFormatModeRef.current && formatPatternSnapshotRef.current.length > 0) {
+          cachedPatterns = formatPatternSnapshotRef.current;
+        } else {
+          cachedPatterns = trackerState.patterns.map((p) => ({
+            id: p.id,
+            length: p.length,
+            channels: p.channels.map((ch): ChannelSnapshot => ({
+              id: ch.id, name: ch.name, color: ch.color ?? undefined,
+              muted: ch.muted, solo: ch.solo, collapsed: ch.collapsed,
+              effectCols: ch.channelMeta?.effectCols ?? 2,
+              rows: ch.rows.map((cell): CellSnapshot => ({
+                note: cell.note ?? 0, instrument: cell.instrument ?? 0,
+                volume: cell.volume ?? 0, effTyp: cell.effTyp ?? 0, eff: cell.eff ?? 0,
+                effTyp2: cell.effTyp2 ?? 0, eff2: cell.eff2 ?? 0,
+                effTyp3: cell.effTyp3, eff3: cell.eff3,
+                effTyp4: cell.effTyp4, eff4: cell.eff4,
+                effTyp5: cell.effTyp5, eff5: cell.eff5,
+                flag1: cell.flag1, flag2: cell.flag2, probability: cell.probability,
+              })),
+            })),
+          }));
+        }
+        needsRender = true;
+      }
+
+      if (cs.cursor !== prevCursorRef) { prevCursorRef = cs.cursor; needsRender = true; }
+      if (cs.selection !== prevSelectionRef) { prevSelectionRef = cs.selection; needsRender = true; }
+      if (playRow !== prevPlayRow || isPlaying !== prevPlaying) {
+        prevPlayRow = playRow; prevPlaying = isPlaying; needsRender = true;
+      }
+      if (themeStore !== prevThemeId) { prevThemeId = themeStore; cachedTheme = null; needsRender = true; }
+      if (uiStore.useHexNumbers !== prevUIHex || uiStore.trackerZoom !== prevUIZoom) {
+        prevUIHex = uiStore.useHexNumbers; prevUIZoom = uiStore.trackerZoom;
+        cachedUI = null; needsRender = true;
+      }
+      if (editorState.recordMode !== prevRecordMode) {
+        prevRecordMode = editorState.recordMode; cachedUI = null; needsRender = true;
+      }
+
+      // During playback, always render for smooth scrolling
+      if (isPlaying) needsRender = true;
+
+      if (!needsRender) {
+        mainThreadRafRef.current = requestAnimationFrame(tick);
+        return;
+      }
+      needsRender = false;
+
+      // ── Read cursor/selection ──────────────────────────────────────
+      const cursor = isFormatModeRef.current
+        ? { rowIndex: formatCurrentRowRef.current, channelIndex: 0, columnType: '0', digitIndex: 0 }
+        : { rowIndex: cs.cursor.rowIndex, channelIndex: cs.cursor.channelIndex,
+            columnType: cs.cursor.columnType, digitIndex: cs.cursor.digitIndex };
+
+      const patIdx = isFormatModeRef.current ? 0 : trackerState.currentPatternIndex;
+
+      // Cache theme/ui snapshots
+      if (!cachedTheme) cachedTheme = snapshotTheme();
+      if (!cachedUI) cachedUI = snapshotUI();
+
+      // ── Render ─────────────────────────────────────────────────────
+      renderer.render({
+        patterns: cachedPatterns,
+        currentPatternIndex: patIdx,
+        scrollX: 0,
+        cursor,
+        selection: cs.selection ? {
+          startChannel: cs.selection.startChannel, endChannel: cs.selection.endChannel,
+          startRow: cs.selection.startRow, endRow: cs.selection.endRow,
+          columnTypes: cs.selection.columnTypes,
+        } : null,
+        playback: { row: playRow, smoothOffset, patternIndex: playPatIdx, isPlaying },
+        theme: cachedTheme,
+        ui: cachedUI,
+        layout: { offsets: channelOffsetsRef.current, widths: channelWidthsRef.current, totalWidth: totalChannelsWidth },
+        dragOver: null,
+      });
+
+      mainThreadRafRef.current = requestAnimationFrame(tick);
+    };
+
+    mainThreadRafRef.current = requestAnimationFrame(tick);
+
+    return () => {
+      cancelAnimationFrame(mainThreadRafRef.current);
+      ro.disconnect();
+      renderer.dispose();
+      mainThreadRendererRef.current = null;
+      if (canvasRef.current && container.contains(canvas)) {
+        canvas.remove();
+      }
+      canvasRef.current = null;
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [webglUnsupported]);
+
   // Forward layout changes to worker when channel widths/offsets change
   useEffect(() => {
     bridgeRef.current?.post({ type: 'channelLayout', channelLayout: snapshotLayout() });
@@ -2214,37 +2436,9 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
     if (headerScrollRef.current) headerScrollRef.current.scrollLeft = left;
   }, []);
 
-  if (webglUnsupported) {
-    // Simple HTML fallback for iOS and browsers without WebGL2 worker support
-    const rows = pattern?.channels?.[0]?.rows ?? [];
-    const numCh = pattern?.channels?.length ?? 0;
-    return (
-      <div className="flex-1 overflow-auto font-mono text-[10px] leading-tight p-1">
-        {rows.length === 0 ? (
-          <div className="flex items-center justify-center h-full text-text-muted text-xs">
-            No pattern data loaded
-          </div>
-        ) : (
-          <table className="w-full border-collapse">
-            <tbody>
-              {rows.map((_, rowIdx) => (
-                <tr key={rowIdx} className={rowIdx % 4 === 0 ? 'bg-dark-bgSecondary/30' : ''}>
-                  <td className="text-text-muted pr-1 text-right w-6">{rowIdx.toString(16).toUpperCase().padStart(2, '0')}</td>
-                  {Array.from({ length: Math.min(numCh, 4) }, (__, chIdx) => {
-                    const cell = pattern!.channels[chIdx]?.rows[rowIdx];
-                    if (!cell || (!cell.note && !cell.instrument)) return <td key={chIdx} className="text-text-muted/30 px-1">--- .. ..</td>;
-                    const note = cell.note ? `${['C-','C#','D-','D#','E-','F-','F#','G-','G#','A-','A#','B-'][(cell.note - 1) % 12]}${Math.floor((cell.note - 1) / 12)}` : '---';
-                    const inst = cell.instrument ? cell.instrument.toString(16).toUpperCase().padStart(2, '0') : '..';
-                    return <td key={chIdx} className="text-text-primary px-1">{note} {inst}</td>;
-                  })}
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
-      </div>
-    );
-  }
+  // NOTE: webglUnsupported (iOS) no longer short-circuits here.
+  // The main-thread Canvas2D renderer effect above creates a canvas in containerRef
+  // and runs a RAF loop — the component falls through to the normal render path below.
 
   if (!pattern && !isFormatMode) {
     return (

@@ -30,12 +30,13 @@ const D50Knob: React.FC<{
 
   const rotation = -135 + (value * 270);
 
-  const handleMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
+  const handlePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    (e.target as HTMLElement).setPointerCapture?.(e.pointerId);
     const rect = e.currentTarget.getBoundingClientRect();
     const centerX = rect.left + rect.width / 2;
     const centerY = rect.top + rect.height / 2;
 
-    const handleMouseMove = (moveEvent: MouseEvent) => {
+    const handlePointerMove = (moveEvent: PointerEvent) => {
       const angle = Math.atan2(moveEvent.clientY - centerY, moveEvent.clientX - centerX);
       const degrees = angle * (180 / Math.PI);
       const normalized = (degrees + 135 + 360) % 360;
@@ -43,20 +44,20 @@ const D50Knob: React.FC<{
       onChange(newValue);
     };
 
-    const handleMouseUp = () => {
-      document.removeEventListener('mousemove', handleMouseMove);
-      document.removeEventListener('mouseup', handleMouseUp);
+    const handlePointerUp = () => {
+      document.removeEventListener('pointermove', handlePointerMove);
+      document.removeEventListener('pointerup', handlePointerUp);
     };
 
-    document.addEventListener('mousemove', handleMouseMove);
-    document.addEventListener('mouseup', handleMouseUp);
+    document.addEventListener('pointermove', handlePointerMove);
+    document.addEventListener('pointerup', handlePointerUp);
   };
 
   return (
     <div className="flex flex-col items-center gap-1">
       <div
         className={`${sizeMap[size]} relative cursor-pointer select-none`}
-        onMouseDown={handleMouseDown}
+        onPointerDown={handlePointerDown}
         title={`${label}: ${Math.round(value * 100)}%`}
       >
         {/* Knob body */}
