@@ -7,7 +7,8 @@
  * Shows both DOM and Pixi component variants side by side where applicable.
  */
 
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
+import { useSettingsStore } from '@/stores/useSettingsStore';
 
 // ── Section wrapper ──
 const Section: React.FC<{ title: string; description?: string; children: React.ReactNode }> = ({ title, description, children }) => (
@@ -545,12 +546,78 @@ const ProViewMock: React.FC = () => (
 );
 
 // ── Main Page ──
+// ── Render Mode Toggle ──
+const RenderModeToggle: React.FC = () => {
+  const renderMode = useSettingsStore((s) => s.renderMode);
+  const setRenderMode = useSettingsStore((s) => s.setRenderMode);
+
+  const handleSwitch = useCallback((mode: 'dom' | 'webgl') => {
+    setRenderMode(mode);
+    // Navigate back to the main app in the new mode
+    window.location.hash = '';
+    window.location.reload();
+  }, [setRenderMode]);
+
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+      <span style={{ fontSize: 11, color: '#6b6b80' }}>Preview in:</span>
+      <div style={{ display: 'flex', borderRadius: 6, overflow: 'hidden', border: '1px solid #2a2a3a' }}>
+        <button
+          onClick={() => handleSwitch('dom')}
+          style={{
+            padding: '6px 16px', fontSize: 11, fontFamily: 'inherit', border: 'none', cursor: 'pointer',
+            background: renderMode === 'dom' ? '#6366f1' : '#1a1a24',
+            color: renderMode === 'dom' ? '#fff' : '#6b6b80',
+            fontWeight: renderMode === 'dom' ? 'bold' : 'normal',
+          }}
+        >
+          DOM
+        </button>
+        <button
+          onClick={() => handleSwitch('webgl')}
+          style={{
+            padding: '6px 16px', fontSize: 11, fontFamily: 'inherit', border: 'none', cursor: 'pointer',
+            borderLeft: '1px solid #2a2a3a',
+            background: renderMode === 'webgl' ? '#6366f1' : '#1a1a24',
+            color: renderMode === 'webgl' ? '#fff' : '#6b6b80',
+            fontWeight: renderMode === 'webgl' ? 'bold' : 'normal',
+          }}
+        >
+          WebGL
+        </button>
+      </div>
+      <span style={{ fontSize: 9, color: '#44445a' }}>
+        Current: {renderMode === 'webgl' ? 'Pixi/GL' : 'React/DOM'} — switches mode and opens the app
+      </span>
+    </div>
+  );
+};
+
+// ── Back to App link ──
+const BackToApp: React.FC = () => (
+  <a
+    href="#/"
+    onClick={(e) => { e.preventDefault(); window.location.hash = ''; window.location.reload(); }}
+    style={{ fontSize: 11, color: '#6366f1', textDecoration: 'none', cursor: 'pointer' }}
+  >
+    Back to App
+  </a>
+);
+
 export const DesignSystemPage: React.FC = () => {
   return (
     <div style={{ width: '100vw', height: '100vh', overflow: 'auto', background: '#121218', color: '#e2e2e8', fontFamily: '"JetBrains Mono", "SF Mono", monospace', padding: '24px 32px' }}>
       <div style={{ maxWidth: 1200, margin: '0 auto' }}>
-        <h1 style={{ fontSize: 28, fontWeight: 'bold', marginBottom: 4 }}>DEViLBOX Design System</h1>
-        <p style={{ fontSize: 12, color: '#6b6b80', marginBottom: 32 }}>Visual catalog of all UI components — DOM and Pixi renderers</p>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 24 }}>
+          <div>
+            <h1 style={{ fontSize: 28, fontWeight: 'bold', marginBottom: 4 }}>DEViLBOX Design System</h1>
+            <p style={{ fontSize: 12, color: '#6b6b80', marginBottom: 0 }}>Visual catalog of all UI components — DOM and Pixi renderers</p>
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 8 }}>
+            <BackToApp />
+            <RenderModeToggle />
+          </div>
+        </div>
 
         {/* ─── 1. Colors ─── */}
         <Section title="Colors" description="Core palette used across all components">
