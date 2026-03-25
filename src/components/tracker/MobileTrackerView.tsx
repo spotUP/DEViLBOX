@@ -210,7 +210,7 @@ export const MobileTrackerView: React.FC<MobileTrackerViewProps> = () => {
             paddingBottom: `calc(${isInputCollapsed ? '0px' : '124px'} + env(safe-area-inset-bottom, 0px))`
           }}
         >
-          <div className="flex-1 overflow-auto">
+          <div className="flex-1 overflow-hidden">
             {isCustomFormat ? (
               <Suspense fallback={<div className="flex-1 flex items-center justify-center text-text-muted text-xs">Loading format editor...</div>}>
                 {editorMode === 'furnace' && <FurnaceView />}
