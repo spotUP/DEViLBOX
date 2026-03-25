@@ -73,6 +73,7 @@ export class ICS2115Synth extends MAMEBaseSynth {
       this.loadROM(0, romData);
 
       this.romLoaded = true;
+      this._updateRomStatus(true);
       console.log('[ICS2115] ROM loaded successfully');
     } catch (error) {
       console.error('[ICS2115] ROM loading failed:', error);
