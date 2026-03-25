@@ -1298,7 +1298,26 @@ export async function tryRouteFormat(
     const { parseUADEFile } = await import('@lib/import/formats/UADEParser');
     const dlFile = toUADEPrefixName(originalFileName, ['dl', 'dl_deli']);
     const song = await parseUADEFile(buffer, dlFile, 'enhanced', subsong, preScannedMeta);
-    return injectUADEPlayback(song, { ...ctx, originalFileName: dlFile });
+    // Force UADE playback: enhanced scan gives patterns, UADE handles audio.
+    song.uadeEditableFileData = buffer.slice(0);
+    song.uadeEditableFileName = dlFile;
+    // Extract embedded title from module header (UNCLEART format).
+    // Code section starts at file offset 0x20; ModuleName ptr at code+48 points to title string.
+    const bytes = new Uint8Array(buffer);
+    if (bytes.length > 0x24 && bytes[0x24] === 0x55 /* 'U' */ && bytes[0x28] === 0x45 /* 'E' */) {
+      const dv = new DataView(buffer);
+      const nameOff = 0x20 + dv.getUint32(0x20 + 48, false); // code + ModuleName ptr
+      if (nameOff > 0x20 && nameOff < bytes.length) {
+        let title = '';
+        for (let i = nameOff; i < Math.min(nameOff + 64, bytes.length); i++) {
+          if (bytes[i] === 0) break;
+          if (bytes[i] >= 0x20 && bytes[i] <= 0x7e) title += String.fromCharCode(bytes[i]);
+          else { title = ''; break; }
+        }
+        if (title.trim()) song.name = `${title.trim()} [Dave Lowe]`;
+      }
+    }
+    return song;
   }
 
   // ── Leggless Music Editor (.lme / LME.*) ────────────────────────────────────
