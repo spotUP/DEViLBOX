@@ -294,10 +294,19 @@ export const PixiGTDAWInstrumentDesigner: React.FC<Props> = ({ width, height }) 
           env.lineTo(waveDrawX + waveDrawW * 0.9, waveDrawY + waveDrawH);
           env.lineTo(waveDrawX + waveDrawW, waveDrawY + waveDrawH / 2);
         } else if (wf.bit === 0x40) {
-          // Pulse
+          // Pulse — use actual pulse width from table
+          const pt = tableData['pulse'];
+          let pwFrac = 0.5;
+          if (pt && inst.pulsePtr > 0 && inst.pulsePtr < pt.left.length) {
+            const hi = pt.left[inst.pulsePtr] || 0;
+            const lo = pt.right[inst.pulsePtr] || 0;
+            const pw12 = ((hi & 0x0F) << 8) | lo;
+            pwFrac = Math.max(0.05, Math.min(0.95, pw12 / 4095));
+          }
+          const transX = waveDrawX + waveDrawW * pwFrac;
           env.lineTo(waveDrawX, waveDrawY);
-          env.lineTo(waveDrawX + waveDrawW / 2, waveDrawY);
-          env.lineTo(waveDrawX + waveDrawW / 2, waveDrawY + waveDrawH);
+          env.lineTo(transX, waveDrawY);
+          env.lineTo(transX, waveDrawY + waveDrawH);
           env.lineTo(waveDrawX + waveDrawW, waveDrawY + waveDrawH);
         } else if (wf.bit === 0x80) {
           // Noise

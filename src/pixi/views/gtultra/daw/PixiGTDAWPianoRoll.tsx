@@ -45,6 +45,10 @@ export const PixiGTDAWPianoRoll: React.FC<Props> = ({ width, height }) => {
   const dawZoomX = useGTUltraStore((s) => s.dawZoomX);
   const dawGridSnap = useGTUltraStore((s) => s.dawGridSnap);
   const engine = useGTUltraStore((s) => s.engine);
+  const dawSelection = useGTUltraStore((s) => s.dawSelection);
+
+  // Selection drag tracking
+  const selDragRef = useRef<{ startRow: number; startNote: number } | null>(null);
 
   useEffect(() => {
     const mega = new MegaText();
@@ -186,6 +190,20 @@ export const PixiGTDAWPianoRoll: React.FC<Props> = ({ width, height }) => {
       }
     }
 
+    // Selection rectangle
+    if (dawSelection) {
+      const selMinRow = Math.min(dawSelection.startRow, dawSelection.endRow);
+      const selMaxRow = Math.max(dawSelection.startRow, dawSelection.endRow);
+      const selMinNote = Math.min(dawSelection.startNote, dawSelection.endNote);
+      const selMaxNote = Math.max(dawSelection.startNote, dawSelection.endNote);
+      const sx = keysW + selMinRow * cellW;
+      const sw = (selMaxRow - selMinRow + 1) * cellW;
+      const sy = (MAX_NOTE - 1 - selMaxNote) * noteH;
+      const sh = (selMaxNote - selMinNote + 1) * noteH;
+      overlay.rect(sx, sy, sw, sh).fill({ color: 0x4488ff, alpha: 0.15 });
+      overlay.rect(sx, sy, sw, sh).stroke({ color: 0x4488ff, width: 1 });
+    }
+
     // Cursor
     const cursorX = keysW + cursor.row * cellW;
     overlay.rect(cursorX, 0, cellW, gridH).fill({ color: 0xffffff, alpha: 0.05 });
@@ -197,13 +215,13 @@ export const PixiGTDAWPianoRoll: React.FC<Props> = ({ width, height }) => {
     }
 
     mega.updateLabels(labels, 7);
-  }, [width, height, gridH, gridW, noteH, cellW, maxRows, pd, dawSelectedChannel, cursor, playing, playbackPos, noteToY]);
+  }, [width, height, gridH, gridW, noteH, cellW, maxRows, pd, dawSelectedChannel, cursor, playing, playbackPos, noteToY, dawSelection]);
 
   useEffect(() => {
     redraw();
   }, [redraw]);
 
-  // Click to place/delete notes
+  // Click to place/delete notes, Shift+click to select
   const handlePointerDown = useCallback((e: FederatedPointerEvent) => {
     if (!engine || !pd) return;
     const local = e.getLocalPosition(containerRef.current);
@@ -212,6 +230,18 @@ export const PixiGTDAWPianoRoll: React.FC<Props> = ({ width, height }) => {
     const row = xToRow(local.x);
     const note = yToNote(local.y);
     const gtNote = note - 24 + 1; // Convert back to GT note (1-based)
+
+    // Shift+click: start selection drag
+    if (e.shiftKey && e.button === 0) {
+      selDragRef.current = { startRow: row, startNote: note };
+      useGTUltraStore.getState().setDawSelection({ startRow: row, endRow: row, startNote: note, endNote: note });
+      return;
+    }
+
+    // Clear selection on non-shift click
+    if (dawSelection) {
+      useGTUltraStore.getState().setDawSelection(null);
+    }
 
     const bytesPerCell = 4;
     const offset = row * bytesPerCell;
@@ -233,7 +263,24 @@ export const PixiGTDAWPianoRoll: React.FC<Props> = ({ width, height }) => {
         setTimeout(() => engine.jamNoteOff(dawSelectedChannel), 200);
       }
     }
-  }, [engine, pd, gridH, xToRow, yToNote, dawSelectedPattern, dawSelectedChannel, currentInstrument]);
+  }, [engine, pd, gridH, xToRow, yToNote, dawSelectedPattern, dawSelectedChannel, currentInstrument, dawSelection]);
+
+  const handlePointerMove = useCallback((e: FederatedPointerEvent) => {
+    if (!selDragRef.current) return;
+    const local = e.getLocalPosition(containerRef.current);
+    const endRow = xToRow(local.x);
+    const endNote = yToNote(local.y);
+    useGTUltraStore.getState().setDawSelection({
+      startRow: selDragRef.current.startRow,
+      endRow,
+      startNote: selDragRef.current.startNote,
+      endNote,
+    });
+  }, [xToRow, yToNote]);
+
+  const handlePointerUp = useCallback(() => {
+    selDragRef.current = null;
+  }, []);
 
   return (
     <pixiContainer
@@ -242,6 +289,9 @@ export const PixiGTDAWPianoRoll: React.FC<Props> = ({ width, height }) => {
       eventMode="static"
       onPointerDown={handlePointerDown}
       onRightDown={handlePointerDown}
+      onPointerMove={handlePointerMove}
+      onPointerUp={handlePointerUp}
+      onPointerUpOutside={handlePointerUp}
     >
       <pixiGraphics ref={bgRef} draw={() => {}} />
       <pixiGraphics ref={notesRef} draw={() => {}} />

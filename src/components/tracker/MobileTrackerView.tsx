@@ -9,6 +9,7 @@ import { MobilePatternInput } from './mobile/MobilePatternInput';
 import { MobileTransportBar } from './mobile/MobileTransportBar';
 import { useTransportStore, useTrackerStore, useCursorStore, useInstrumentStore, useEditorStore } from '@stores';
 import { useFormatStore } from '@stores/useFormatStore';
+import { useGTUltraStore } from '@stores/useGTUltraStore';
 import { useShallow } from 'zustand/react/shallow';
 import { useOrientation } from '@/hooks/useOrientation';
 import { haptics } from '@/utils/haptics';
@@ -18,6 +19,7 @@ const FurnaceView = lazy(() => import('@/components/furnace/FurnaceView').then(m
 const HivelyView = lazy(() => import('@/components/hively/HivelyView').then(m => ({ default: m.HivelyView })));
 const TFMXView = lazy(() => import('@/components/tfmx/TFMXView').then(m => ({ default: m.TFMXView })));
 const GTUltraView = lazy(() => import('@/components/gtultra/GTUltraView').then(m => ({ default: m.GTUltraView })));
+const GTDAWView = lazy(() => import('@/components/gtultra/daw/GTDAWView').then(m => ({ default: m.GTDAWView })));
 const KlysView = lazy(() => import('@/components/klystrack/KlysView').then(m => ({ default: m.KlysView })));
 const JamCrackerView = lazy(() => import('@/components/jamcracker/JamCrackerView').then(m => ({ default: m.JamCrackerView })));
 const Sc68Visualizer = lazy(() => import('@/components/tracker/Sc68Visualizer').then(m => ({ default: m.Sc68Visualizer })));
@@ -64,8 +66,11 @@ export const MobileTrackerView: React.FC<MobileTrackerViewProps> = () => {
 
   const pattern = patterns[currentPatternIndex];
   const editorMode = useFormatStore((s) => s.editorMode);
+  const gtViewMode = useGTUltraStore((s) => s.viewMode);
   const { isPortrait, isLandscape } = useOrientation();
 
+  // GoatTracker in DAW mode renders the full DAW view
+  const isGTDAWMode = editorMode === 'goattracker' && gtViewMode === 'daw';
   const isCustomFormat = ['goattracker', 'hively', 'klystrack', 'jamcracker', 'musicline', 'furnace', 'sc68', 'tfmx'].includes(editorMode);
   const visibleChannels = isLandscape ? 4 : 1;
   const startChannel = isPortrait ? mobileChannel : 0;
@@ -177,7 +182,7 @@ export const MobileTrackerView: React.FC<MobileTrackerViewProps> = () => {
               <Suspense fallback={<div className="flex-1 flex items-center justify-center text-text-muted text-xs">Loading format editor...</div>}>
                 {editorMode === 'furnace' && <FurnaceView />}
                 {editorMode === 'hively' && <HivelyView />}
-                {editorMode === 'goattracker' && <GTUltraView />}
+                {editorMode === 'goattracker' && (isGTDAWMode ? <GTDAWView /> : <GTUltraView />)}
                 {editorMode === 'klystrack' && <KlysView />}
                 {editorMode === 'jamcracker' && <JamCrackerView />}
                 {editorMode === 'sc68' && <Sc68Visualizer />}

@@ -24,6 +24,7 @@ import { useGTUltraStore } from '@/stores/useGTUltraStore';
 import { useGTKeyboardHandler } from '@/components/gtultra/GTKeyboardHandler';
 import { useGTUltraEngineInit } from '@/engine/gtultra/useGTUltraEngineInit';
 import { PixiGTDAWView } from './daw/PixiGTDAWView';
+import { useGTDAWKeyboardHandler } from './daw/useGTDAWKeyboardHandler';
 
 const TOOLBAR_H = 32;
 const ORDER_H = 160;
@@ -46,6 +47,7 @@ export const PixiGTUltraView: React.FC<Props> = ({ width, height }) => {
 
   // Hooks must be called unconditionally (React rules of hooks)
   useGTKeyboardHandler(viewMode !== 'daw');
+  useGTDAWKeyboardHandler(viewMode === 'daw');
   useGTUltraEngineInit();
 
   // DAW mode renders a completely different layout

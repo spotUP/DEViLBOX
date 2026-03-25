@@ -139,13 +139,15 @@ export interface GTUltraState {
   tableCursor: number;
 
   // DAW mode state
-  dawBottomPanel: 'mixer' | 'tables' | 'monitor' | 'presets' | 'clips';
+  dawBottomPanel: 'mixer' | 'tables' | 'monitor' | 'presets' | 'clips' | 'steps';
   dawSidebarOpen: boolean;
   dawSelectedChannel: number;
   dawSelectedPattern: number;
   dawZoomX: number;
   dawZoomY: number;
   dawGridSnap: 1 | 2 | 4 | 8 | 16;
+  dawSelection: { startRow: number; endRow: number; startNote: number; endNote: number } | null;
+  dawClipboard: Array<{ relRow: number; note: number; instrument: number }>;
 
   // Actions
   setEngine: (engine: GTUltraEngine | null) => void;
@@ -179,6 +181,8 @@ export interface GTUltraState {
   setDawSelectedPattern: (pat: number) => void;
   setDawZoom: (x: number, y: number) => void;
   setDawGridSnap: (snap: GTUltraState['dawGridSnap']) => void;
+  setDawSelection: (sel: GTUltraState['dawSelection']) => void;
+  setDawClipboard: (data: GTUltraState['dawClipboard']) => void;
   setSongName: (name: string) => void;
   setSongAuthor: (author: string) => void;
   setTempo: (tempo: number) => void;
@@ -287,6 +291,8 @@ export const useGTUltraStore = create<GTUltraState>()((set, get) => ({
   dawZoomX: 16,
   dawZoomY: 8,
   dawGridSnap: 1,
+  dawSelection: null,
+  dawClipboard: [],
 
   // --- Actions ---
 
@@ -393,6 +399,8 @@ export const useGTUltraStore = create<GTUltraState>()((set, get) => ({
   setDawSelectedPattern: (dawSelectedPattern) => set({ dawSelectedPattern }),
   setDawZoom: (dawZoomX, dawZoomY) => set({ dawZoomX, dawZoomY }),
   setDawGridSnap: (dawGridSnap) => set({ dawGridSnap }),
+  setDawSelection: (dawSelection) => set({ dawSelection }),
+  setDawClipboard: (dawClipboard) => set({ dawClipboard }),
 
   setSongName: (songName) => set({ songName }),
   setSongAuthor: (songAuthor) => set({ songAuthor }),
