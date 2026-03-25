@@ -152,9 +152,11 @@ function AppRouter() {
     return <Suspense fallback={<div style={{ background: '#121218', color: '#6b6b80', display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh' }}>Loading design system...</div>}><DesignSystemPage /></Suspense>;
   }
 
-  // Component isolation mode for split-screen comparison
-  const isolate = new URLSearchParams(window.location.search).get('_isolate');
-  if (isolate) {
+  // Component isolation mode for split-screen comparison (DOM only — GL needs full app)
+  const params = new URLSearchParams(window.location.search);
+  const isolate = params.get('_isolate');
+  const forceMode = params.get('_renderMode');
+  if (isolate && forceMode !== 'webgl') {
     return <Suspense fallback={<div style={{ background: '#0d0d0d', color: '#666', display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', fontFamily: 'monospace' }}>Loading {isolate}...</div>}><IsolatedComponent name={isolate} /></Suspense>;
   }
   return <App />;
