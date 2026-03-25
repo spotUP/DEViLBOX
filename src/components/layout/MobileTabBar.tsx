@@ -1,14 +1,15 @@
 /**
  * MobileTabBar - Bottom navigation for mobile devices
- * Integrates with useUIStore.activeView for view switching.
- * Instruments tab opens the modal rather than switching view.
+ * 5 tabs: Pattern, Instruments, Mixer, Arrangement, Pads
+ * Instruments tab opens modal. Haptic feedback on switch.
  */
 
 import React, { useCallback } from 'react';
-import { Grid3X3, Music2, Sliders, LayoutList, Piano, Disc3 } from 'lucide-react';
+import { Grid3X3, Music2, Sliders, LayoutList, Disc3 } from 'lucide-react';
 import { useUIStore } from '@stores/useUIStore';
+import { haptics } from '@/utils/haptics';
 
-export type MobileTab = 'tracker' | 'instruments' | 'mixer' | 'arrangement' | 'pianoroll' | 'drumpad';
+export type MobileTab = 'tracker' | 'instruments' | 'mixer' | 'arrangement' | 'drumpad';
 
 interface MobileTabBarProps {
   onShowInstruments?: () => void;
@@ -18,7 +19,6 @@ interface TabConfig {
   id: MobileTab;
   label: string;
   icon: React.ReactNode;
-  /** If true, opens a modal instead of switching activeView */
   isModal?: boolean;
 }
 
@@ -27,7 +27,6 @@ const tabs: TabConfig[] = [
   { id: 'instruments', label: 'Instr', icon: <Music2 size={20} />, isModal: true },
   { id: 'mixer', label: 'Mixer', icon: <Sliders size={20} /> },
   { id: 'arrangement', label: 'Arrange', icon: <LayoutList size={20} /> },
-  { id: 'pianoroll', label: 'Piano', icon: <Piano size={20} /> },
   { id: 'drumpad', label: 'Pads', icon: <Disc3 size={20} /> },
 ];
 
@@ -37,18 +36,17 @@ export const MobileTabBar: React.FC<MobileTabBarProps> = ({
   const activeView = useUIStore((s) => s.activeView);
 
   const handleTabChange = useCallback((tab: MobileTab) => {
+    haptics.selection();
     if (tab === 'instruments') {
-      // Open instruments modal instead of switching view
       onShowInstruments?.();
       return;
     }
-    // All other tabs map directly to activeView values
     useUIStore.getState().setActiveView(tab as Exclude<MobileTab, 'instruments'>);
   }, [onShowInstruments]);
 
   return (
     <nav className="fixed bottom-0 left-0 right-0 z-[99990] bg-dark-bgSecondary border-t border-dark-border safe-area-bottom">
-      <div className="flex items-stretch overflow-x-auto scrollbar-none">
+      <div className="flex items-stretch">
         {tabs.map((tab) => {
           const isActive = !tab.isModal && activeView === tab.id;
           return (
@@ -57,18 +55,18 @@ export const MobileTabBar: React.FC<MobileTabBarProps> = ({
               onClick={() => handleTabChange(tab.id)}
               className={`
                 flex-1 flex flex-col items-center justify-center gap-0.5
-                py-1.5 min-h-[52px] min-w-[60px] transition-colors
+                py-1.5 min-h-[52px] transition-all active:scale-95
                 ${isActive
                   ? 'text-accent-primary bg-accent-primary/10'
-                  : 'text-text-muted hover:text-text-secondary active:bg-dark-bgTertiary'
+                  : 'text-text-muted active:bg-dark-bgTertiary'
                 }
               `}
               aria-current={isActive ? 'page' : undefined}
             >
-              <span className={isActive ? 'scale-110 transition-transform' : ''}>
+              <span className={`transition-transform ${isActive ? 'scale-110' : ''}`}>
                 {tab.icon}
               </span>
-              <span className="text-[9px] font-medium">{tab.label}</span>
+              <span className="text-[10px] font-medium">{tab.label}</span>
             </button>
           );
         })}
