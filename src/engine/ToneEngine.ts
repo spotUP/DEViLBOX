@@ -1043,7 +1043,6 @@ export class ToneEngine {
        'SonicArrangerSynth', 'InStereo2Synth', 'InStereo1Synth', 'DeltaMusic1Synth', 'DeltaMusic2Synth',
        'StartrekkerAMSynth', 'SunVoxSynth', 'JamCrackerSynth', 'FuturePlayerSynth',
        'KlysSynth', 'WaveSabreSynth', 'OidosSynth', 'TunefishSynth'].includes(c.synthType || '') ||
-      c.synthType?.startsWith('Gearmulator') ||
       c.synthType?.startsWith('Furnace')
     );
     if (wasmConfigs.length === 0) return;
@@ -1478,8 +1477,6 @@ export class ToneEngine {
       'FredSynth', 'HippelCoSoSynth', 'RobHubbardSynth', 'SteveTurnerSynth', 'FredEditorReplayerSynth', 'StartrekkerAMSynth',
       'OctaMEDSynth', 'DavidWhittakerSynth',
       'HivelySynth', 'KlysSynth', 'MAMEVASynth', 'UADESynth',
-      'GearmulatorVirus', 'GearmulatorVirusTI', 'GearmulatorMicroQ',
-      'GearmulatorXT', 'GearmulatorNord', 'GearmulatorJP8000',
       'WaveSabreSynth', 'OidosSynth', 'TunefishSynth', 'SunVoxModular',
     ].includes(config.synthType || '');
     const isVSTBridge = !isWASMSynth && typeof config.synthType === 'string' && SYNTH_REGISTRY.has(config.synthType);
@@ -2220,13 +2217,6 @@ export class ToneEngine {
       // SunVox WASM patch player / modular editor
       case 'SunVoxSynth':
       case 'SunVoxModular':
-      // Gearmulator DSP56300 VA synths
-      case 'GearmulatorVirus':
-      case 'GearmulatorVirusTI':
-      case 'GearmulatorMicroQ':
-      case 'GearmulatorXT':
-      case 'GearmulatorNord':
-      case 'GearmulatorJP8000':
       // Demoscene synths
       case 'WaveSabreSynth':
       case 'OidosSynth':
@@ -3067,9 +3057,6 @@ export class ToneEngine {
     // InstrumentFactory types that use PolySynth internally
     'SuperSaw', 'PolySynth', 'Organ', 'ChipSynth', 'PWMSynth',
     'StringMachine', 'FormantSynth', 'Wavetable', 'WobbleBass',
-    // Gearmulator DSP56300 VA synths — natively polyphonic (firmware handles voices)
-    'GearmulatorVirus', 'GearmulatorVirusTI', 'GearmulatorMicroQ',
-    'GearmulatorXT', 'GearmulatorNord', 'GearmulatorJP8000',
   ]);
 
   /**

@@ -118,7 +118,7 @@ const FRAG = /* glsl */ `#version 300 es
     if (uCurvature > 0.001) {
       uv = curveRemapUV(uv, uCurvature);
       if (uv.x < 0.0 || uv.x > 1.0 || uv.y < 0.0 || uv.y > 1.0) {
-        fragColor = vec4(0.0);
+        fragColor = vec4(0.0, 0.0, 0.0, 1.0);
         return;
       }
     }
@@ -172,56 +172,51 @@ const FRAG = /* glsl */ `#version 300 es
       mask *= vignetteApprox(uv, uVignetteStrength);
     }
 
+    pixel.rgb = max(pixel.rgb, vec3(0.0));
     pixel.rgb *= mask;
-    fragColor = pixel;
+    fragColor = vec4(pixel.rgb, 1.0);
   }
 `;
 
 // ─── CRTRenderer ──────────────────────────────────────────────────────────────
 
-type UniformEntry = { value: number; type: 'f32' };
-
 export class CRTRenderer extends Filter {
-  private readonly _u: Record<string, UniformEntry>;
-
   constructor() {
-    const _u: Record<string, UniformEntry> = {
-      uTime:              { value: 0.0,  type: 'f32' },
-      uScanlineIntensity: { value: 0.15, type: 'f32' },
-      uScanlineCount:     { value: 400,  type: 'f32' },
-      uAdaptiveIntensity: { value: 0.5,  type: 'f32' },
-      uBrightness:        { value: 1.1,  type: 'f32' },
-      uContrast:          { value: 1.05, type: 'f32' },
-      uSaturation:        { value: 1.1,  type: 'f32' },
-      uBloomIntensity:    { value: 0.2,  type: 'f32' },
-      uBloomThreshold:    { value: 0.5,  type: 'f32' },
-      uRgbShift:          { value: 0.0,  type: 'f32' },
-      uVignetteStrength:  { value: 0.3,  type: 'f32' },
-      uCurvature:         { value: 0.15, type: 'f32' },
-      uFlickerStrength:   { value: 0.01, type: 'f32' },
-    };
-
     const glProgram = new GlProgram({ vertex: VERT, fragment: FRAG });
-    super({ glProgram, resources: { uniforms: _u as any } });
-
-    this._u = _u;
+    super({ glProgram, resources: {
+      uniforms: {
+        uTime:              { value: 0.0,  type: 'f32' },
+        uScanlineIntensity: { value: 0.15, type: 'f32' },
+        uScanlineCount:     { value: 400,  type: 'f32' },
+        uAdaptiveIntensity: { value: 0.5,  type: 'f32' },
+        uBrightness:        { value: 1.1,  type: 'f32' },
+        uContrast:          { value: 1.05, type: 'f32' },
+        uSaturation:        { value: 1.1,  type: 'f32' },
+        uBloomIntensity:    { value: 0.2,  type: 'f32' },
+        uBloomThreshold:    { value: 0.5,  type: 'f32' },
+        uRgbShift:          { value: 0.0,  type: 'f32' },
+        uVignetteStrength:  { value: 0.3,  type: 'f32' },
+        uCurvature:         { value: 0.15, type: 'f32' },
+        uFlickerStrength:   { value: 0.01, type: 'f32' },
+      } as any,
+    } });
   }
 
   /** Update all CRT uniforms. Call each tick while enabled. */
   updateParams(time: number, params: CRTParams): void {
-    const u = this._u;
-    u.uTime.value              = time;
-    u.uScanlineIntensity.value = params.scanlineIntensity;
-    u.uScanlineCount.value     = params.scanlineCount;
-    u.uAdaptiveIntensity.value = params.adaptiveIntensity;
-    u.uBrightness.value        = params.brightness;
-    u.uContrast.value          = params.contrast;
-    u.uSaturation.value        = params.saturation;
-    u.uBloomIntensity.value    = params.bloomIntensity;
-    u.uBloomThreshold.value    = params.bloomThreshold;
-    u.uRgbShift.value          = params.rgbShift;
-    u.uVignetteStrength.value  = params.vignetteStrength;
-    u.uCurvature.value         = params.curvature;
-    u.uFlickerStrength.value   = params.flickerStrength;
+    const u = (this.resources as any).uniforms.uniforms;
+    u.uTime              = time;
+    u.uScanlineIntensity = params.scanlineIntensity;
+    u.uScanlineCount     = params.scanlineCount;
+    u.uAdaptiveIntensity = params.adaptiveIntensity;
+    u.uBrightness        = params.brightness;
+    u.uContrast          = params.contrast;
+    u.uSaturation        = params.saturation;
+    u.uBloomIntensity    = params.bloomIntensity;
+    u.uBloomThreshold    = params.bloomThreshold;
+    u.uRgbShift          = params.rgbShift;
+    u.uVignetteStrength  = params.vignetteStrength;
+    u.uCurvature         = params.curvature;
+    u.uFlickerStrength   = params.flickerStrength;
   }
 }

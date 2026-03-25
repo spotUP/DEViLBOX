@@ -247,6 +247,54 @@ export const PixiRoot: React.FC = () => {
     app.stage.filterArea = new Rectangle(0, 0, width, height);
   }, [app, width, height]);
 
+  // Remap pointer coordinates through barrel/curvature distortion so clicks
+  // land where the user visually sees the target (not the undistorted position).
+  useEffect(() => {
+    const events = (app?.renderer as any)?.events;
+    if (!events) return;
+    const original = events.mapPositionToPoint.bind(events);
+    // Store ref so we can read current params in the patched function
+    const getDistortion = () => {
+      const settings = useSettingsStore.getState();
+      return {
+        lensEnabled: settings.lensEnabled,
+        barrel: settings.lensParams.barrel,
+        crtEnabled: settings.crtEnabled,
+        curvature: settings.crtParams.curvature,
+      };
+    };
+    events.mapPositionToPoint = (point: { x: number; y: number }, x: number, y: number) => {
+      original(point, x, y);
+      const d = getDistortion();
+      const hasLens = d.lensEnabled && Math.abs(d.barrel) > 0.001;
+      const hasCRT = d.crtEnabled && d.curvature > 0.001;
+      if (!hasLens && !hasCRT) return;
+      // Normalize to [0,1] UV
+      let ux = point.x / width;
+      let uy = point.y / height;
+      // Filters applied in order: lens first, CRT second.
+      // Screen→scene: apply CRT remap, then lens remap.
+      if (hasCRT) {
+        const cx = ux * 2 - 1, cy = uy * 2 - 1;
+        const dist = cx * cx + cy * cy;
+        const s = 1 + dist * d.curvature * 0.25;
+        ux = (cx * s) * 0.5 + 0.5;
+        uy = (cy * s) * 0.5 + 0.5;
+      }
+      if (hasLens) {
+        const cx = ux * 2 - 1, cy = uy * 2 - 1;
+        const r2 = cx * cx + cy * cy;
+        const s = 1 + d.barrel * r2 + d.barrel * 0.5 * r2 * r2;
+        ux = (cx * s) * 0.5 + 0.5;
+        uy = (cy * s) * 0.5 + 0.5;
+      }
+      point.x = ux * width;
+      point.y = uy * height;
+    };
+    return () => { events.mapPositionToPoint = original; };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [app, width, height]);
+
   // Apply CRT + Lens filters to app.stage.
   useTick(() => {
     if (isRapidScrolling()) return;

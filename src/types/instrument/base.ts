@@ -238,13 +238,6 @@ export type SynthType =
   | 'SunVoxModular'   // SunVox WASM modular synthesizer with visual editor
   // SuperCollider scripted synthesis
   | 'SuperCollider'  // SuperCollider SynthDef (scsynth WASM)
-  // Gearmulator DSP56300 VA synths (Access Virus, Waldorf, Nord, Roland)
-  | 'GearmulatorVirus'   // Access Virus A/B/C
-  | 'GearmulatorVirusTI' // Access Virus TI/TI2/Snow
-  | 'GearmulatorMicroQ'  // Waldorf microQ
-  | 'GearmulatorXT'      // Waldorf Microwave II/XT
-  | 'GearmulatorNord'    // Nord Lead 2x
-  | 'GearmulatorJP8000' // Roland JP-8000
   // SC68/SNDH Atari ST replayer
   | 'Sc68Synth'         // SC68/SNDH (Atari ST YM2149 + 68000 replayer)
   // ZXTune ZX Spectrum replayer

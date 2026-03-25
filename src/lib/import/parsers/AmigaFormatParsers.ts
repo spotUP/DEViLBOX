@@ -1291,18 +1291,14 @@ export async function tryRouteFormat(
   // ── Dave Lowe (.dl / DL.* prefix) ─────────────────────────────────────────
   // Compiled 68k Amiga music format. Two variants: old and new. Both detected
   // by opcode patterns at offsets 0/4/8.
+  // Dave Lowe modules are compiled 68k executables — the native parser only produces
+  // empty stub patterns.  Use UADE enhanced scan to reconstruct patterns from Paula
+  // register captures, then inject UADE playback so audio comes from the real replayer.
   if (matchesExt(filename, ['dl', 'dl_deli'])) {
-    const [{ isDaveLoweFormat, parseDaveLoweFile }, { isDaveLoweNewFormat, parseDaveLoweNewFile }] = await Promise.all([
-      import('@lib/import/formats/DaveLoweParser'),
-      import('@lib/import/formats/DaveLoweNewParser'),
-    ]);
-    return withNativeThenUADE('daveLowe', ctx,
-      async (buf: Uint8Array | ArrayBuffer, name: string) => {
-        if (isDaveLoweFormat(new Uint8Array(buf as ArrayBuffer))) return await parseDaveLoweFile(buf as ArrayBuffer, name);
-        if (isDaveLoweNewFormat(buf as ArrayBuffer)) return parseDaveLoweNewFile(buf as ArrayBuffer, name);
-        return null;
-      },
-      'DaveLoweParser', { injectUADE: true });
+    const { parseUADEFile } = await import('@lib/import/formats/UADEParser');
+    const dlFile = toUADEPrefixName(originalFileName, ['dl', 'dl_deli']);
+    const song = await parseUADEFile(buffer, dlFile, 'enhanced', subsong, preScannedMeta);
+    return injectUADEPlayback(song, { ...ctx, originalFileName: dlFile });
   }
 
   // ── Leggless Music Editor (.lme / LME.*) ────────────────────────────────────

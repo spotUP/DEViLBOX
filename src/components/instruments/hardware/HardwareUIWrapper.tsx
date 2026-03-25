@@ -19,7 +19,6 @@ import { OBXdHardware } from './OBXdHardware';
 import { MAMEGenericHardware } from './MAMEGenericHardware';
 import { BuzzGenericHardware } from './BuzzGenericHardware';
 import { VSTBridgeGenericHardware, isVSTBridgeType } from './VSTBridgeGenericHardware';
-import { GearmulatorHardware } from '../gearmulator/GearmulatorHardware';
 
 import { FZHardware } from './FZHardware';
 import { PS1SPUHardware } from './PS1SPUHardware';
@@ -133,15 +132,6 @@ const BUZZ_GENERIC_TYPES: SynthType[] = [
   'BuzzM4',
 ];
 
-const GEARMULATOR_TYPES: SynthType[] = [
-  'GearmulatorVirus',
-  'GearmulatorVirusTI',
-  'GearmulatorMicroQ',
-  'GearmulatorXT',
-  'GearmulatorNord',
-  'GearmulatorJP8000',
-];
-
 /** Synth types whose dedicated hardware UI includes a built-in keyboard or step sequencer,
  *  meaning the external TestKeyboard is redundant and should be hidden. */
 const SYNTHS_WITH_BUILTIN_INPUT = new Set<string>([
@@ -156,7 +146,6 @@ export function hasHardwareUI(synthType: SynthType): boolean {
   if (synthType in DEDICATED_UI_MAP) return true;
   if (MAME_GENERIC_TYPES.includes(synthType)) return true;
   if (BUZZ_GENERIC_TYPES.includes(synthType)) return true;
-  if (GEARMULATOR_TYPES.includes(synthType)) return true;
   if (isVSTBridgeType(synthType)) return true;
   return false;
 }
@@ -221,19 +210,6 @@ export const HardwareUIWrapper: React.FC<HardwareUIWrapperProps> = ({
         synthType={synthType}
         parameters={parameters}
         onParamChange={onParamChange}
-      />
-    );
-  }
-
-  /* Gearmulator Hardware Skins (Access Virus, Waldorf, Nord, etc.) */
-  if (GEARMULATOR_TYPES.includes(synthType)) {
-    return (
-      <GearmulatorHardware
-        onSendSysex={(data) => {
-          // Route sysex bytes through the param change interface
-          // The synth engine handles sysex→WASM routing
-          onParamChange('_sysex', data[0] ?? 0);
-        }}
       />
     );
   }
