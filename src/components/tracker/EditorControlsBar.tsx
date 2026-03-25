@@ -283,8 +283,8 @@ export const EditorControlsBar: React.FC<EditorControlsBarProps> = React.memo(({
             onClick={() => setShowGrooveSettings(true)}
             className={`px-2 py-1 text-[10px] rounded font-mono font-bold transition-colors ${
               c.grooveActive
-                ? 'bg-accent-primary/20 text-accent-primary border border-accent-primary/50'
-                : 'bg-dark-bgSecondary text-text-secondary border border-dark-border hover:text-text-primary'
+                ? 'bg-accent-primary/20 text-accent-primary'
+                : 'bg-dark-bgSecondary text-text-secondary hover:text-text-primary'
             }`}
             title={`Groove Settings (Current: ${GROOVE_TEMPLATES.find(g => g.id === c.grooveTemplateId)?.name || 'None'})`}
           >
