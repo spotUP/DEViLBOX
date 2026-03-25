@@ -322,6 +322,7 @@ export const PixiCMIKnobPanel: React.FC<PixiCMIKnobPanelProps> = ({ width }) => 
                   style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 9, fill: 0xffffff }} tint={G_DIM} layout={{ width: 80 }}
                 />
                 <PixiButton label="NEXT" variant="ghost" size="sm" onClick={cmi.nextLibrarySample} />
+                <PixiButton label={cmi.previewing ? 'STOP' : 'PREVIEW'} variant={cmi.previewing ? 'ft2' : 'ghost'} size="sm" onClick={() => cmi.previewing ? cmi.stopPreview() : cmi.previewLibrarySample()} />
                 <PixiButton label="LOAD FILE" variant="ft2" size="sm" onClick={triggerFilePicker} />
               </pixiContainer>
               {cmi.libraryLoading && (
