@@ -151,6 +151,9 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
   // Import handlers (extracted to hook)
   const { handleModuleImport, handleSunVoxImport } = useModuleImport();
 
+  // GT Ultra DAW mode — hook must be called before any early returns (rules of hooks)
+  const gtViewMode = useGTUltraStore((s) => s.viewMode);
+
   // Dialog state
   const [showInterpolate, setShowInterpolate] = useState(false);
   const [showHumanize, setShowHumanize] = useState(false);
@@ -457,8 +460,7 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
     );
   }
 
-  // GT Ultra DAW mode flag
-  const gtViewMode = useGTUltraStore((s) => s.viewMode);
+  // GT Ultra DAW mode flag (gtViewMode hook is called above, before mobile early return)
   const isGTDAWMode = editorMode === 'goattracker' && gtViewMode === 'daw';
 
   // Desktop view (GT Ultra DAW mode uses a simplified layout)
