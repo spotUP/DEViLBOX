@@ -50,8 +50,11 @@ export interface ISynthSimulator {
    * Reset state and start a new note.
    * @param config  Format-specific instrument config (FCConfig, SoundMonConfig, etc.)
    * @param baseNote  Base note as semitone index (0 = C-1, 12 = C-2, 24 = C-3)
+   * @param skipPatternEffects  When true, skip arpeggio and vibrato — the MOD
+   *   pattern data already carries these effects so baking them would double up.
+   *   Always keep ADSR, waveform morphing, and phase modulation.
    */
-  init(config: unknown, baseNote: number): void;
+  init(config: unknown, baseNote: number, skipPatternEffects?: boolean): void;
 
   /**
    * Advance one tick and return the new state.
@@ -89,8 +92,9 @@ export function renderSynthInstrument(
   baseNote: number = 24,   // C-3 by default
   sampleRate: number = DEFAULT_SAMPLE_RATE,
   maxTicks: number = MAX_TICKS,
+  skipPatternEffects: boolean = false,
 ): PrerenderedSample {
-  sim.init(config, baseNote);
+  sim.init(config, baseNote, skipPatternEffects);
 
   const samplesPerTick = Math.round(sampleRate / 50); // 50 Hz PAL
   const maxSamples = maxTicks * samplesPerTick;

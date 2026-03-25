@@ -32,7 +32,7 @@ export class HippelCoSoSynthSim implements ISynthSimulator {
   // Default waveform (sawtooth)
   private waveform!: Int8Array;
 
-  init(config: unknown, baseNote: number): void {
+  init(config: unknown, baseNote: number, _skipPatternEffects = false): void {
     this.config = config as HippelCoSoConfig;
     this.basePeriod = semitoneToAmigaPeriod(baseNote);
 

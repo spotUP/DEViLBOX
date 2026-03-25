@@ -51,6 +51,7 @@ const enum Phase { Attack, Decay, Sustain, Release, Done }
 export class HivelySynthSim implements ISynthSimulator {
   private config!: HivelyConfig;
   private basePeriod = 428;
+  private skipPatternEffects = false;
 
   // ADSR (HVL envelope: aFrames/aVolume, dFrames/dVolume, sFrames, rFrames/rVolume)
   private phase = Phase.Attack;
@@ -81,9 +82,10 @@ export class HivelySynthSim implements ISynthSimulator {
   private waveLength = 32;
   private currentWaveform!: Int8Array;
 
-  init(config: unknown, baseNote: number): void {
+  init(config: unknown, baseNote: number, skipPatternEffects = false): void {
     this.config = config as HivelyConfig;
     this.basePeriod = semitoneToAmigaPeriod(baseNote);
+    this.skipPatternEffects = skipPatternEffects;
 
     // Waveform length
     const waveLengths = [4, 8, 16, 32, 64, 128];
@@ -154,7 +156,12 @@ export class HivelySynthSim implements ISynthSimulator {
     }
 
     // ── 5. Vibrato ───────────────────────────────────────────────────
-    this.processVibrato(cfg);
+    // Skip when skipPatternEffects=true: MOD pattern column 4xy handles vibrato
+    if (!this.skipPatternEffects) {
+      this.processVibrato(cfg);
+    } else {
+      this.vibOffset = 0;
+    }
 
     // ── 6. Generate waveform with current state ──────────────────────
     this.regenerateWaveform();

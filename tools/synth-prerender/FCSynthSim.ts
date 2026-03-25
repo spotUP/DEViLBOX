@@ -45,6 +45,7 @@ function generateDefaultWave(waveNum: number): Int8Array {
 export class FCSynthSim implements ISynthSimulator {
   private config!: FCConfig;
   private basePeriod = 428; // C-2 default
+  private skipPatternEffects = false;
 
   // Vol macro state (matches processVolMacro in FCParser.ts)
   private volume = 0;
@@ -72,9 +73,10 @@ export class FCSynthSim implements ISynthSimulator {
   private vibDir = 1;
   private vibOffset = 0;
 
-  init(config: unknown, baseNote: number): void {
+  init(config: unknown, baseNote: number, skipPatternEffects = false): void {
     this.config = config as FCConfig;
     this.basePeriod = semitoneToAmigaPeriod(baseNote);
+    this.skipPatternEffects = skipPatternEffects;
 
     // Vol macro state
     this.volume = 0;
@@ -122,7 +124,12 @@ export class FCSynthSim implements ISynthSimulator {
     this.processArpeggio(cfg);
 
     // ── 4. Vibrato ───────────────────────────────────────────────────
-    this.processVibrato(cfg);
+    // Skip when skipPatternEffects=true: MOD pattern column 4xy handles vibrato
+    if (!this.skipPatternEffects) {
+      this.processVibrato(cfg);
+    } else {
+      this.vibOffset = 0;
+    }
 
     // ── 5. Final period ──────────────────────────────────────────────
     let period = this.basePeriod + this.arpPeriod + this.vibOffset;
