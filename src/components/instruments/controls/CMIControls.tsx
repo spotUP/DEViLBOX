@@ -317,25 +317,66 @@ export const CMIControls: React.FC<CMIControlsProps> = ({
               16-Voice Sampling Synthesizer
             </span>
           </div>
+          {/* Voice status LEDs */}
+          <div className="flex items-center gap-0.5">
+            {Array.from({ length: 16 }, (_, i) => {
+              const active = cmi.voiceStatus[i * 4] === 1;
+              const env = cmi.voiceStatus[i * 4 + 2];
+              const releasing = cmi.voiceStatus[i * 4 + 3] === 1;
+              const brightness = active ? Math.max(0.3, env / 255) : 0;
+              return (
+                <div
+                  key={i}
+                  title={active ? `V${i + 1}: note ${cmi.voiceStatus[i * 4 + 1]} env ${env}${releasing ? ' (rel)' : ''}` : `V${i + 1}: off`}
+                  style={{
+                    width: 6, height: 6, borderRadius: '50%',
+                    backgroundColor: active
+                      ? (releasing ? `rgba(34, 197, 94, ${brightness * 0.6})` : `rgba(34, 197, 94, ${brightness})`)
+                      : '#1a1a1a',
+                    border: `1px solid ${active ? CMI_GREEN_DIM : '#222'}`,
+                    boxShadow: active ? `0 0 ${Math.round(brightness * 4)}px ${CMI_GREEN}` : 'none',
+                  }}
+                />
+              );
+            })}
+          </div>
         </div>
 
-        {/* Tab bar */}
-        <div className="flex gap-1.5 mb-2">
-          {CMI_TAB_DEFS.map((tab) => (
-            <button
-              key={tab.id}
-              onClick={() => cmi.setActiveTab(tab.id)}
-              className="px-3 py-1 text-xs font-mono transition-all rounded-sm"
-              style={{
-                color: cmi.activeTab === tab.id ? '#000' : CMI_GREEN,
-                backgroundColor: cmi.activeTab === tab.id ? CMI_GREEN : 'transparent',
-                border: `1px solid ${cmi.activeTab === tab.id ? CMI_GREEN : CMI_GREEN_DIM}`,
-              }}
-            >
-              <span className="opacity-60 mr-1">{tab.pageNum}</span>
-              {tab.label}
-            </button>
-          ))}
+        {/* Tab bar + Preset selector */}
+        <div className="flex items-center gap-2 mb-2">
+          <div className="flex gap-1.5 flex-1">
+            {CMI_TAB_DEFS.map((tab) => (
+              <button
+                key={tab.id}
+                onClick={() => cmi.setActiveTab(tab.id)}
+                className="px-3 py-1 text-xs font-mono transition-all rounded-sm"
+                style={{
+                  color: cmi.activeTab === tab.id ? '#000' : CMI_GREEN,
+                  backgroundColor: cmi.activeTab === tab.id ? CMI_GREEN : 'transparent',
+                  border: `1px solid ${cmi.activeTab === tab.id ? CMI_GREEN : CMI_GREEN_DIM}`,
+                }}
+              >
+                <span className="opacity-60 mr-1">{tab.pageNum}</span>
+                {tab.label}
+              </button>
+            ))}
+          </div>
+          <select
+            onChange={(e) => cmi.loadPreset(parseInt(e.target.value))}
+            defaultValue=""
+            className="text-[10px] font-mono px-2 py-1 rounded-sm"
+            style={{
+              backgroundColor: '#0a0a0a',
+              color: CMI_GREEN,
+              border: `1px solid ${CMI_GREEN_DIM}`,
+              outline: 'none',
+            }}
+          >
+            <option value="" disabled>PRESET</option>
+            {cmi.presets.map((p, i) => (
+              <option key={i} value={i}>{p.name}</option>
+            ))}
+          </select>
         </div>
 
         {/* ════════════ Page 7: HARMONIC ════════════ */}
