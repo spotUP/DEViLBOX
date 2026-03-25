@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-03-24T23:01:06.611Z
+ * Generated: 2026-03-25T11:37:56.573Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -19,10 +19,10 @@ export interface ChangelogEntry {
 }
 
 // Build info
-export const BUILD_VERSION = '1.0.3518';
-export const BUILD_NUMBER = '3518';
-export const BUILD_HASH = '3682be662';
-export const BUILD_DATE = '2026-03-24';
+export const BUILD_VERSION = '1.0.3549';
+export const BUILD_NUMBER = '3549';
+export const BUILD_HASH = '194daeb98';
+export const BUILD_DATE = '2026-03-25';
 
 // Full version (patch IS the build number, so no need to append)
 export const FULL_VERSION = BUILD_VERSION;
@@ -30,7 +30,137 @@ export const FULL_VERSION = BUILD_VERSION;
 // Auto-generated changelog
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: '1.0.3518',
+    version: '1.0.3549',
+    date: '2026-03-25',
+    changes: [
+      {
+        type: 'feature',
+        "description": "Expand chip parameters and wire setParam for FZ/ZSG2/KS0164/SWP00"
+      },
+      {
+        type: 'fix',
+        "description": "VU meters visible on iOS, scratch drag works on touch"
+      },
+      {
+        type: 'fix',
+        "description": "Use overflow-hidden on pattern editor for centered cursor bar"
+      },
+      {
+        type: 'fix',
+        "description": "Fix MAME CMI boot hang — re-enable keyboard CPUs"
+      },
+      {
+        type: 'feature',
+        "description": "Extract Samsung KS0164 wavetable synth as standalone WASM"
+      },
+      {
+        type: 'feature',
+        "description": "IOS/mobile feature parity — Canvas2D renderer, view switching, format editors, transport bar, touch support"
+      },
+      {
+        type: 'feature',
+        "description": "Extract Yamaha SWP00 rompler/DSP as standalone WASM"
+      },
+      {
+        type: 'improvement',
+        "description": "Extract Zoom ZSG-2 wavetable chip as standalone WASM module"
+      },
+      {
+        type: 'feature',
+        "description": "Extract Casio FZ PCM chip as standalone WASM module"
+      },
+      {
+        type: 'fix',
+        "description": "Add bottom padding to piano keyboard for tab bar"
+      },
+      {
+        type: 'fix',
+        "description": "Hide instrument list sidebar in EditInstrumentModal"
+      },
+      {
+        type: 'improvement',
+        "description": "Cleanup: remove iOS sample rate diagnostic logs"
+      },
+      {
+        type: 'improvement',
+        "description": "Cleanup: remove all iOS diagnostic alerts"
+      },
+      {
+        type: 'feature',
+        "description": "Add MAME CRT hardware UI as lazy-loaded tab"
+      },
+      {
+        type: 'feature',
+        "description": "Add sample preview/audition to CMI library browser"
+      },
+      {
+        type: 'feature',
+        "description": "Add CMI 16-voice status LEDs and factory presets"
+      },
+      {
+        type: 'fix',
+        "description": "Fix 'Maximum update depth exceeded' in MixerPanel, SequenceMatrixEditor, and GT Ultra position updates"
+      },
+      {
+        type: 'improvement',
+        "description": "Use tab bar red for matrix editor header (--color-bg-tertiary)"
+      },
+      {
+        type: 'improvement',
+        "description": "Match matrix editor header to FT2 panel background color"
+      },
+      {
+        type: 'improvement',
+        "description": "Use darker accent red for matrix editor header"
+      },
+      {
+        type: 'improvement',
+        "description": "Style matrix editor header with red accent background"
+      },
+      {
+        type: 'improvement',
+        "description": "Unify Furnace order matrix with shared SequenceMatrixEditor"
+      },
+      {
+        type: 'fix',
+        "description": "Register Fairlight CMI pack + fix FurnaceEditor operator layout"
+      },
+      {
+        type: 'improvement',
+        "description": "Update CMI WASM and sample pack constants"
+      },
+      {
+        type: 'improvement',
+        "description": "Refactor macro editors: simplify MAMEMacroEditor and MacroEditor"
+      },
+      {
+        type: 'fix',
+        "description": "Fix GT Ultra instrument sync, pattern refresh, and order position tracking"
+      },
+      {
+        type: 'fix',
+        "description": "Correct sample playback speed — was 11x too slow (\"whale\")"
+      },
+      {
+        type: 'fix',
+        "description": "Fix Song Len display for GT Ultra: read from order data not tracker store"
+      },
+      {
+        type: 'fix',
+        "description": "Fix pattern length using table channels (255 rows) instead of pattern channels"
+      },
+      {
+        type: 'fix',
+        "description": "Fix GT Ultra row position: divide pattptr by 4 (byte offset → row index)"
+      },
+      {
+        type: 'improvement',
+        "description": "Smooth pattern editor scrolling for GT Ultra playback"
+      }
+    ]
+  },
+  {
+    version: '2026-03-24',
     date: '2026-03-24',
     changes: [
       {
@@ -108,130 +238,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'improvement',
         "description": "GT Ultra: tighten instrument isEmpty filter — require ADSR or waveform"
-      },
-      {
-        type: 'fix',
-        "description": "Fix white borders in format header: border-dark-border/N opacity variants don't resolve"
-      },
-      {
-        type: 'improvement',
-        "description": "GT Ultra: tighten order columns, shrink table widths"
-      },
-      {
-        type: 'feature',
-        "description": "GT Ultra: side-by-side Orders+Tables layout, add DOM/Pixi arch rules"
-      },
-      {
-        type: 'fix',
-        "description": "GT Ultra: fix 'Unsupported synth type' error spam and double instrument load"
-      },
-      {
-        type: 'improvement',
-        "description": "GT Ultra: clean up barrel exports, remove unused Pixi component references"
-      },
-      {
-        type: 'improvement',
-        "description": "GT Ultra: AHX layout for Pixi view, bidirectional instrument sync"
-      },
-      {
-        type: 'improvement',
-        "description": "GT Ultra: AHX-style layout, shared format data hook, no code duplication"
-      },
-      {
-        type: 'improvement',
-        "description": "GT Ultra deep integration: types, synth engine, controls, instrument population, order matrix"
-      },
-      {
-        type: 'improvement',
-        "description": "GT Ultra: wire FT2Toolbar play/stop, remove duplicate transport buttons"
-      },
-      {
-        type: 'fix',
-        "description": "Add cache bust to WASM/JS fetches, rebuild with debug diagnostics"
-      },
-      {
-        type: 'fix',
-        "description": "Extend WebGL renderer note table to 189 entries for GT Ultra"
-      },
-      {
-        type: 'improvement',
-        "description": "GT Ultra DOM/Pixi views share single source of truth"
-      },
-      {
-        type: 'fix',
-        "description": "DOM format editors show note/instrument data in pattern grid"
-      },
-      {
-        type: 'fix',
-        "description": "GT Ultra playback silence — call playroutine() from render loop"
-      },
-      {
-        type: 'fix',
-        "description": "DOM GTUltraView reads per-channel patterns correctly"
-      },
-      {
-        type: 'fix',
-        "description": "GT Ultra DOM view uses same resolveOrderPattern as Pixi view"
-      },
-      {
-        type: 'fix',
-        "description": "GT Ultra pattern grid — resolve order list commands before pattern lookup"
-      },
-      {
-        type: 'feature',
-        "description": "Route regular SID files to classic pattern view (read-only)"
-      },
-      {
-        type: 'fix',
-        "description": "GT Ultra .sng file loading — songs no longer load empty"
-      },
-      {
-        type: 'feature',
-        "description": "5-star rating system for Modland and HVSC browsers"
-      },
-      {
-        type: 'fix',
-        "description": "Correct ModuleLoader import name"
-      },
-      {
-        type: 'fix',
-        "description": "Handle pending-import in App.tsx mobile file loader"
-      },
-      {
-        type: 'improvement',
-        "description": "Diag: trace App.tsx loadFile path on iOS"
-      },
-      {
-        type: 'feature',
-        "description": "Sync pattern edits to SunVox WASM sequencer"
-      },
-      {
-        type: 'fix',
-        "description": "Bump ALL dialog z-index to z-[99990]"
-      },
-      {
-        type: 'improvement',
-        "description": "Diag: alert loadFile result on iOS"
-      },
-      {
-        type: 'fix',
-        "description": "Chore: clean up debug trace in UADEParser NATIVE_ROUTES lookup"
-      },
-      {
-        type: 'fix',
-        "description": "Disable all WebGL worker views on iOS"
-      },
-      {
-        type: 'fix',
-        "description": "Skip WebGL worker on iOS, add HTML pattern fallback"
-      },
-      {
-        type: 'fix',
-        "description": "Correct pattern/macro pointer table offsets + data base offset"
-      },
-      {
-        type: 'fix',
-        "description": "Remove unused setCurrentRow from usePatternPlayback"
       }
     ]
   }
