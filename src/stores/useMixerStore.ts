@@ -11,6 +11,8 @@ import { create } from 'zustand';
 import { immer } from 'zustand/middleware/immer';
 import { getToneEngine } from '../engine/ToneEngine';
 import { useFormatStore } from './useFormatStore';
+import type { EffectConfig } from '@typedefs/instrument';
+import { getChannelEffectsManager } from '../engine/ChannelEffectsManager';
 
 // Forward effective mute state to TrackerReplayer's channelMuteMask.
 // This is essential for WASM synth engines (FC, TFMX, etc.) whose audio
@@ -366,7 +368,9 @@ export interface MixerChannelState {
   muted: boolean;
   soloed: boolean;
   name: string;
-  effects: [string | null, string | null]; // 2 FX slots: effect type name or null
+  effects: [string | null, string | null]; // 2 FX slots: effect type name or null (legacy)
+  insertEffects: EffectConfig[]; // Full insert effect chain (up to 4)
+  sendLevels: number[]; // Send levels per return bus (0-1), indexed by bus number
 }
 
 function defaultChannels(): MixerChannelState[] {
@@ -377,6 +381,8 @@ function defaultChannels(): MixerChannelState[] {
     soloed: false,
     name: `CH ${i + 1}`,
     effects: [null, null],
+    insertEffects: [],
+    sendLevels: [0, 0, 0, 0], // 4 send buses
   }));
 }
 
@@ -410,6 +416,15 @@ interface MixerStoreActions {
   setMasterVolume: (vol: number) => void;
   toggleDomPanel: () => void;
   getInitialState: () => MixerStoreState;
+
+  // Per-channel insert effects
+  addChannelInsertEffect: (ch: number, effect: EffectConfig) => void;
+  removeChannelInsertEffect: (ch: number, effectIndex: number) => void;
+  toggleChannelInsertEffect: (ch: number, effectIndex: number) => void;
+  moveChannelInsertEffect: (ch: number, fromIndex: number, toIndex: number) => void;
+
+  // Send levels
+  setChannelSendLevel: (ch: number, sendIndex: number, level: number) => void;
 }
 
 type MixerStore = MixerStoreState & MixerStoreActions;
@@ -503,6 +518,53 @@ export const useMixerStore = create<MixerStore>()(
     toggleDomPanel(): void {
       set((state) => {
         state.domPanelVisible = !state.domPanelVisible;
+      });
+    },
+
+    // Per-channel insert effects
+    addChannelInsertEffect(ch: number, effect: EffectConfig): void {
+      set((state) => {
+        if (ch < 0 || ch >= state.channels.length) return;
+        if (state.channels[ch].insertEffects.length >= 4) return;
+        state.channels[ch].insertEffects.push(effect);
+      });
+      // Apply to audio engine
+      getChannelEffectsManager().addEffect(ch, effect);
+    },
+
+    removeChannelInsertEffect(ch: number, effectIndex: number): void {
+      set((state) => {
+        if (ch < 0 || ch >= state.channels.length) return;
+        state.channels[ch].insertEffects.splice(effectIndex, 1);
+      });
+      getChannelEffectsManager().removeEffect(ch, effectIndex);
+    },
+
+    toggleChannelInsertEffect(ch: number, effectIndex: number): void {
+      set((state) => {
+        if (ch < 0 || ch >= state.channels.length) return;
+        const fx = state.channels[ch].insertEffects[effectIndex];
+        if (fx) fx.enabled = !fx.enabled;
+      });
+      getChannelEffectsManager().toggleEffect(ch, effectIndex);
+    },
+
+    moveChannelInsertEffect(ch: number, fromIndex: number, toIndex: number): void {
+      set((state) => {
+        if (ch < 0 || ch >= state.channels.length) return;
+        const arr = state.channels[ch].insertEffects;
+        const [item] = arr.splice(fromIndex, 1);
+        if (item) arr.splice(toIndex, 0, item);
+      });
+      getChannelEffectsManager().moveEffect(ch, fromIndex, toIndex);
+    },
+
+    // Send levels
+    setChannelSendLevel(ch: number, sendIndex: number, level: number): void {
+      set((state) => {
+        if (ch < 0 || ch >= state.channels.length) return;
+        if (sendIndex < 0 || sendIndex >= state.channels[ch].sendLevels.length) return;
+        state.channels[ch].sendLevels[sendIndex] = Math.max(0, Math.min(1, level));
       });
     },
   }))
