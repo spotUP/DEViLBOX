@@ -56,6 +56,10 @@ export const PixiAutomationPanel: React.FC<PixiAutomationPanelProps> = ({
 
   const setActiveParameter = useAutomationStore(s => s.setActiveParameter);
   const setShowLane = useAutomationStore(s => s.setShowLane);
+  const recordMode = useAutomationStore(s => s.recordMode);
+  const setRecordMode = useAutomationStore(s => s.setRecordMode);
+  const copyCurve = useAutomationStore(s => s.copyCurve);
+  const pasteCurve = useAutomationStore(s => s.pasteCurve);
 
   const [selectedParameter, setSelectedParameter] = useState<string | null>(null);
   const [selectedChannel, setSelectedChannel] = useState<number>(0);
@@ -194,6 +198,37 @@ export const PixiAutomationPanel: React.FC<PixiAutomationPanelProps> = ({
 
         {/* Spacer */}
         <layoutContainer layout={{ flex: 1 }} />
+
+        {/* Record / Copy / Paste */}
+        <PixiButton
+          label={recordMode ? 'REC' : 'Rec'}
+          variant={recordMode ? 'primary' : 'default'}
+          size="sm"
+          color={recordMode ? 'red' : undefined}
+          onClick={() => setRecordMode(!recordMode)}
+          width={40}
+          height={22}
+        />
+        <PixiButton
+          label="Copy"
+          variant="default"
+          size="sm"
+          onClick={() => {
+            if (automationCurve?.id) copyCurve(automationCurve.id);
+          }}
+          width={42}
+          height={22}
+        />
+        <PixiButton
+          label="Paste"
+          variant="default"
+          size="sm"
+          onClick={() => {
+            if (pattern) pasteCurve(pattern.id, channelIndex, activeParam);
+          }}
+          width={46}
+          height={22}
+        />
 
         {/* Channel selector */}
         <PixiLabel text="Channel:" size="xs" color="textMuted" font="sans" />

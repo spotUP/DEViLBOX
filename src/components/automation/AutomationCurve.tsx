@@ -25,10 +25,17 @@ export const AutomationCurveCanvas: React.FC<AutomationCurveCanvasProps> = ({
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const [drawMode] = useState<DrawMode>('pencil');
+  const [drawMode, setDrawMode] = useState<DrawMode>('pencil');
   const [isDrawing, setIsDrawing] = useState(false);
   const [selectedPoint, setSelectedPoint] = useState<number | null>(null);
+  const [selectedPoints, setSelectedPoints] = useState<Set<number>>(new Set());
   const [canvasWidth, setCanvasWidth] = useState(800);
+  const [snapEnabled, setSnapEnabled] = useState(true);
+  const [snapQuantize] = useState<number>(1); // 1=row, 2=half-row, 4=quarter, 0=free
+  const [valueQuantize, setValueQuantize] = useState<number>(0); // 0=free, 4=quarter, 8=eighth, 16=sixteenth
+  const [lassoStart, setLassoStart] = useState<{ x: number; y: number } | null>(null);
+  const [lassoEnd, setLassoEnd] = useState<{ x: number; y: number } | null>(null);
+  const [groupDragStart, setGroupDragStart] = useState<{ row: number; value: number } | null>(null);
 
   const height = 200;
   const paddingLeft = 35;  // Space for Y-axis labels
@@ -198,16 +205,17 @@ export const AutomationCurveCanvas: React.FC<AutomationCurveCanvasProps> = ({
       sortedPoints.forEach((point, i) => {
         const x = rowToX(point.row);
         const y = valueToY(point.value);
+        const isSelected = i === selectedPoint || selectedPoints.has(i);
 
-        // Point glow
-        if (i === selectedPoint) {
+        // Point glow for selected
+        if (isSelected) {
           ctx.fillStyle = pointGlow;
           ctx.beginPath();
           ctx.arc(x, y, 10, 0, Math.PI * 2);
           ctx.fill();
         }
 
-        ctx.fillStyle = i === selectedPoint ? curveColor1 : curveColor2;
+        ctx.fillStyle = isSelected ? curveColor1 : curveColor2;
         ctx.beginPath();
         ctx.arc(x, y, 5, 0, Math.PI * 2);
         ctx.fill();
@@ -218,8 +226,25 @@ export const AutomationCurveCanvas: React.FC<AutomationCurveCanvasProps> = ({
         ctx.arc(x, y, 2, 0, Math.PI * 2);
         ctx.fill();
       });
+
+      // Draw lasso rectangle
+      if (lassoStart && lassoEnd) {
+        ctx.strokeStyle = curveColor1;
+        ctx.lineWidth = 1;
+        ctx.setLineDash([4, 4]);
+        ctx.strokeRect(
+          lassoStart.x, lassoStart.y,
+          lassoEnd.x - lassoStart.x, lassoEnd.y - lassoStart.y
+        );
+        ctx.fillStyle = `${curveColor1}15`;
+        ctx.fillRect(
+          lassoStart.x, lassoStart.y,
+          lassoEnd.x - lassoStart.x, lassoEnd.y - lassoStart.y
+        );
+        ctx.setLineDash([]);
+      }
     }
-  }, [curve, patternLength, selectedPoint, rowToX, valueToY, curveColor1, curveColor2, pointGlow, canvasWidth, bgColor, gridColor, gridColorMajor, labelColor, drawWidth, drawHeight]);
+  }, [curve, patternLength, selectedPoint, selectedPoints, lassoStart, lassoEnd, rowToX, valueToY, curveColor1, curveColor2, pointGlow, canvasWidth, bgColor, gridColor, gridColorMajor, labelColor, drawWidth, drawHeight]);
 
   useEffect(() => {
     drawCurve();
@@ -250,18 +275,37 @@ export const AutomationCurveCanvas: React.FC<AutomationCurveCanvasProps> = ({
     });
 
     if (nearestIndex >= 0) {
-      // Clicked on existing point - start dragging
-      setSelectedPoint(nearestIndex);
-      setIsDragging(true);
+      if (drawMode === 'select' && selectedPoints.has(nearestIndex)) {
+        // Clicked on an already-selected point in select mode — start group drag
+        setGroupDragStart({ row, value });
+        setIsDragging(true);
+      } else if (drawMode === 'select' && e.shiftKey) {
+        // Shift-click to toggle selection
+        const newSel = new Set(selectedPoints);
+        if (newSel.has(nearestIndex)) newSel.delete(nearestIndex);
+        else newSel.add(nearestIndex);
+        setSelectedPoints(newSel);
+      } else {
+        // Clicked on existing point - start dragging
+        setSelectedPoint(nearestIndex);
+        setSelectedPoints(new Set([nearestIndex]));
+        setIsDragging(true);
+      }
       return;
     }
 
-    // Not clicking on a point - add new point in pencil mode
+    // Not clicking on a point
     if (drawMode === 'pencil') {
       setIsDrawing(true);
       addPoint(row, value);
     } else if (drawMode === 'select') {
-      setSelectedPoint(null);
+      // Start lasso selection
+      setLassoStart({ x, y });
+      setLassoEnd({ x, y });
+      if (!e.shiftKey) {
+        setSelectedPoints(new Set());
+        setSelectedPoint(null);
+      }
     }
   };
 
@@ -279,17 +323,27 @@ export const AutomationCurveCanvas: React.FC<AutomationCurveCanvasProps> = ({
     const row = xToRow(x);
     const value = yToValue(y);
 
-    // Handle dragging (works in any mode)
+    // Group drag in select mode
+    if (isDragging && groupDragStart && selectedPoints.size > 0) {
+      const dRow = row - groupDragStart.row;
+      const dValue = value - groupDragStart.value;
+      moveSelectedGroup(dRow, dValue);
+      setGroupDragStart({ row, value });
+      return;
+    }
+
+    // Handle dragging single point (works in any mode)
     if (isDragging && selectedPoint !== null) {
       const newPoints = [...curve.points];
-      const clampedRow = Math.max(0, Math.min(patternLength, row));
-      newPoints[selectedPoint] = { row: clampedRow, value };
+      const clampedRow = snapRow(Math.max(0, Math.min(patternLength, row)));
+      const clampedValue = snapValue(value);
+      newPoints[selectedPoint] = { ...newPoints[selectedPoint], row: clampedRow, value: clampedValue };
 
       // Sort and update
       const sortedPoints = newPoints.sort((a, b) => a.row - b.row);
 
       // Find the new index of our dragged point
-      const newIndex = sortedPoints.findIndex(p => p.row === clampedRow && Math.abs(p.value - value) < 0.001);
+      const newIndex = sortedPoints.findIndex(p => p.row === clampedRow && Math.abs(p.value - clampedValue) < 0.001);
 
       onChange({
         ...curve,
@@ -301,13 +355,40 @@ export const AutomationCurveCanvas: React.FC<AutomationCurveCanvasProps> = ({
       }
     } else if (drawMode === 'pencil' && isDrawing) {
       addPoint(row, value);
+    } else if (drawMode === 'select' && lassoStart) {
+      // Update lasso rectangle
+      setLassoEnd({ x, y });
     }
   };
 
   // Handle mouse up
   const handleMouseUp = () => {
+    // Finalize lasso selection
+    if (lassoStart && lassoEnd && drawMode === 'select') {
+      const minX = Math.min(lassoStart.x, lassoEnd.x);
+      const maxX = Math.max(lassoStart.x, lassoEnd.x);
+      const minY = Math.min(lassoStart.y, lassoEnd.y);
+      const maxY = Math.max(lassoStart.y, lassoEnd.y);
+
+      // Only select if lasso is at least 5px in size (not just a click)
+      if (maxX - minX > 5 || maxY - minY > 5) {
+        const newSel = new Set(selectedPoints);
+        curve.points.forEach((p, i) => {
+          const px = rowToX(p.row);
+          const py = valueToY(p.value);
+          if (px >= minX && px <= maxX && py >= minY && py <= maxY) {
+            newSel.add(i);
+          }
+        });
+        setSelectedPoints(newSel);
+      }
+    }
+
     setIsDrawing(false);
     setIsDragging(false);
+    setLassoStart(null);
+    setLassoEnd(null);
+    setGroupDragStart(null);
   };
 
   // Handle right-click to delete point
@@ -339,34 +420,30 @@ export const AutomationCurveCanvas: React.FC<AutomationCurveCanvasProps> = ({
     }
   };
 
-  // Handle keyboard for delete
-  const handleKeyDown = useCallback((e: KeyboardEvent) => {
-    if ((e.key === 'Delete' || e.key === 'Backspace') && selectedPoint !== null) {
-      const newPoints = curve.points.filter((_, i) => i !== selectedPoint);
-      onChange({
-        ...curve,
-        points: newPoints,
-      });
-      setSelectedPoint(null);
-    }
-  }, [selectedPoint, curve, onChange]);
+  // Snap helpers
+  const snapRow = (row: number): number => {
+    if (!snapEnabled || snapQuantize === 0) return row;
+    return Math.round(row / snapQuantize) * snapQuantize;
+  };
 
-  useEffect(() => {
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [handleKeyDown]);
+  const snapValue = (value: number): number => {
+    if (valueQuantize === 0) return value;
+    return Math.round(value * valueQuantize) / valueQuantize;
+  };
 
   // Add point to curve
   const addPoint = (row: number, value: number) => {
-    if (row < 0 || row > patternLength) return;
+    const snappedRow = snapRow(row);
+    const snappedValue = snapValue(value);
+    if (snappedRow < 0 || snappedRow > patternLength) return;
 
     const newPoints = [...curve.points];
-    const existingIndex = newPoints.findIndex((p) => p.row === row);
+    const existingIndex = newPoints.findIndex((p) => p.row === snappedRow);
 
     if (existingIndex >= 0) {
-      newPoints[existingIndex].value = value;
+      newPoints[existingIndex] = { ...newPoints[existingIndex], value: snappedValue };
     } else {
-      newPoints.push({ row, value });
+      newPoints.push({ row: snappedRow, value: snappedValue });
     }
 
     onChange({
@@ -374,6 +451,50 @@ export const AutomationCurveCanvas: React.FC<AutomationCurveCanvasProps> = ({
       points: newPoints.sort((a, b) => a.row - b.row),
     });
   };
+
+  // Delete selected points
+  const deleteSelectedPoints = useCallback(() => {
+    if (selectedPoints.size === 0 && selectedPoint === null) return;
+    const toDelete = selectedPoints.size > 0 ? selectedPoints : new Set([selectedPoint!]);
+    const newPoints = curve.points.filter((_, i) => !toDelete.has(i));
+    onChange({ ...curve, points: newPoints });
+    setSelectedPoints(new Set());
+    setSelectedPoint(null);
+  }, [selectedPoints, selectedPoint, curve, onChange]);
+
+  // Move selected points as a group
+  const moveSelectedGroup = useCallback((dRow: number, dValue: number) => {
+    if (selectedPoints.size === 0) return;
+    const newPoints = curve.points.map((p, i) => {
+      if (!selectedPoints.has(i)) return p;
+      return {
+        ...p,
+        row: snapRow(Math.max(0, Math.min(patternLength, p.row + dRow))),
+        value: snapValue(Math.max(0, Math.min(1, p.value + dValue))),
+      };
+    });
+    onChange({ ...curve, points: newPoints.sort((a, b) => a.row - b.row) });
+  }, [selectedPoints, curve, onChange, patternLength, snapRow, snapValue]);
+
+  // Handle keyboard for delete and selection
+  const handleKeyDown = useCallback((e: KeyboardEvent) => {
+    if (e.key === 'Delete' || e.key === 'Backspace') {
+      deleteSelectedPoints();
+    } else if (e.key === 'a' && (e.ctrlKey || e.metaKey)) {
+      e.preventDefault();
+      setSelectedPoints(new Set(curve.points.map((_, i) => i)));
+    } else if (e.key === 'Escape') {
+      setSelectedPoints(new Set());
+      setSelectedPoint(null);
+      setLassoStart(null);
+      setLassoEnd(null);
+    }
+  }, [deleteSelectedPoints, curve.points]);
+
+  useEffect(() => {
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [handleKeyDown]);
 
   // Apply preset shape
   const applyPreset = (shape: PresetShape) => {
@@ -533,6 +654,71 @@ export const AutomationCurveCanvas: React.FC<AutomationCurveCanvasProps> = ({
         >
           Clear
         </button>
+
+        <div className="w-px bg-dark-border mx-1"></div>
+
+        {/* Draw Mode */}
+        <div className="flex gap-1">
+          <button
+            onClick={() => setDrawMode('pencil')}
+            className={`px-2.5 py-1.5 text-xs font-medium rounded-md border transition-colors ${
+              drawMode === 'pencil'
+                ? 'bg-accent-primary text-text-inverse border-accent-primary'
+                : 'bg-dark-bgTertiary text-text-secondary border-dark-border hover:border-dark-borderLight'
+            }`}
+          >
+            Draw
+          </button>
+          <button
+            onClick={() => setDrawMode('select')}
+            className={`px-2.5 py-1.5 text-xs font-medium rounded-md border transition-colors ${
+              drawMode === 'select'
+                ? 'bg-accent-primary text-text-inverse border-accent-primary'
+                : 'bg-dark-bgTertiary text-text-secondary border-dark-border hover:border-dark-borderLight'
+            }`}
+          >
+            Select
+          </button>
+        </div>
+
+        <div className="w-px bg-dark-border mx-1"></div>
+
+        {/* Snap Controls */}
+        <button
+          onClick={() => setSnapEnabled(!snapEnabled)}
+          className={`px-2.5 py-1.5 text-xs font-medium rounded-md border transition-colors ${
+            snapEnabled
+              ? 'bg-accent-primary text-text-inverse border-accent-primary'
+              : 'bg-dark-bgTertiary text-text-secondary border-dark-border hover:border-dark-borderLight'
+          }`}
+          title="Snap to grid"
+        >
+          Snap
+        </button>
+        <select
+          value={valueQuantize}
+          onChange={(e) => setValueQuantize(Number(e.target.value))}
+          className="px-1.5 py-1 text-xs bg-dark-bgTertiary text-text-secondary border border-dark-border rounded-md"
+          title="Value quantization"
+        >
+          <option value={0}>Free</option>
+          <option value={4}>1/4</option>
+          <option value={8}>1/8</option>
+          <option value={16}>1/16</option>
+        </select>
+
+        {selectedPoints.size > 0 && (
+          <>
+            <div className="w-px bg-dark-border mx-1"></div>
+            <span className="text-text-muted text-xs">{selectedPoints.size} sel</span>
+            <button
+              onClick={deleteSelectedPoints}
+              className="px-2.5 py-1.5 text-xs font-medium rounded-md bg-dark-bgTertiary text-accent-error border border-dark-border hover:border-accent-error transition-colors"
+            >
+              Del
+            </button>
+          </>
+        )}
       </div>
 
       {/* Canvas Container - Full Width */}
