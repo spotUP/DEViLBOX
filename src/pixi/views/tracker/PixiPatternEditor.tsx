@@ -38,7 +38,7 @@ const SCROLLBAR_HEIGHT = 12;
 const CHAR_WIDTH = 10;
 const LINE_NUMBER_WIDTH = 40;
 const FONT_SIZE = 11;
-const HEADER_HEIGHT = 28;
+const HEADER_HEIGHT = 48; // 28px channel header + 20px column labels (matches DOM)
 // GL_MUTE_SOLO_H removed — M/S buttons are now in PixiChannelHeaders
 const SCROLL_THRESHOLD = 50; // Horizontal scroll accumulator resistance
 const V_SCROLL_THRESHOLD = 30; // Vertical scroll accumulator — absorbs trackpad momentum
