@@ -7,12 +7,16 @@ import React, { useState, useEffect } from 'react';
 import { useTrackerStore, useAutomationStore, useThemeStore } from '@stores';
 import { AutomationCurveCanvas } from './AutomationCurve';
 import { useChannelAutomationParams } from '@hooks/useChannelAutomationParams';
+import { useAutomationRecording } from '@hooks/useAutomationRecording';
 
 export const AutomationPanel: React.FC = () => {
   const { patterns, currentPatternIndex } = useTrackerStore();
-  const { getAutomation, setAutomation, setActiveParameter, setShowLane } = useAutomationStore();
+  const { getAutomation, setAutomation, setActiveParameter, setShowLane, recordMode, setRecordMode, copyCurve, pasteCurve } = useAutomationStore();
   const [selectedParameter, setSelectedParameter] = useState<string | null>(null);
   const [selectedChannel, setSelectedChannel] = useState<number>(0);
+
+  // Wire up automation recording (captures knob movements during playback)
+  useAutomationRecording();
 
   // Theme-aware colors for "has data" indicator
   const currentThemeId = useThemeStore((state) => state.currentThemeId);
@@ -73,6 +77,39 @@ export const AutomationPanel: React.FC = () => {
             {instrumentName && (
               <span className="text-text-muted text-xs">({instrumentName})</span>
             )}
+          </div>
+
+          {/* Controls: Record, Copy, Paste */}
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setRecordMode(!recordMode)}
+              className={`px-3 py-1.5 text-xs font-medium rounded-md border transition-all ${
+                recordMode
+                  ? 'bg-red-600 text-white border-red-500 shadow-glow-sm'
+                  : 'bg-dark-bgTertiary text-text-secondary border-dark-border hover:border-dark-borderLight'
+              }`}
+              title="Record automation from knob movements during playback"
+            >
+              {recordMode ? 'REC' : 'Rec'}
+            </button>
+            <button
+              onClick={() => {
+                const curve = getAutomation(pattern.id, channelIndex, activeParam);
+                if (curve.id) copyCurve(curve.id);
+              }}
+              className="px-2.5 py-1.5 text-xs font-medium rounded-md bg-dark-bgTertiary text-text-secondary border border-dark-border hover:border-dark-borderLight transition-colors"
+              title="Copy automation curve"
+            >
+              Copy
+            </button>
+            <button
+              onClick={() => pasteCurve(pattern.id, channelIndex, activeParam)}
+              className="px-2.5 py-1.5 text-xs font-medium rounded-md bg-dark-bgTertiary text-text-secondary border border-dark-border hover:border-dark-borderLight transition-colors"
+              title="Paste automation curve"
+            >
+              Paste
+            </button>
+            <div className="w-px h-5 bg-dark-border mx-1" />
           </div>
 
           {/* Channel Selector */}

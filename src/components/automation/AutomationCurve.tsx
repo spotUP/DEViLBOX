@@ -15,7 +15,7 @@ interface AutomationCurveCanvasProps {
 }
 
 type DrawMode = 'pencil' | 'line' | 'select';
-type PresetShape = 'rampUp' | 'rampDown' | 'triangle' | 'sine' | 'saw' | 'square' | 'random';
+type PresetShape = 'rampUp' | 'rampDown' | 'triangle' | 'sine' | 'saw' | 'square' | 'random' | 'sine2x' | 'sine4x' | 'staircase4' | 'staircase8' | 'reverseSaw';
 
 export const AutomationCurveCanvas: React.FC<AutomationCurveCanvasProps> = ({
   curve,
@@ -404,6 +404,25 @@ export const AutomationCurveCanvas: React.FC<AutomationCurveCanvasProps> = ({
         case 'random':
           value = Math.random();
           break;
+        case 'sine2x':
+          value = (Math.sin((row / patternLength) * Math.PI * 4 - Math.PI / 2) + 1) / 2;
+          break;
+        case 'sine4x':
+          value = (Math.sin((row / patternLength) * Math.PI * 8 - Math.PI / 2) + 1) / 2;
+          break;
+        case 'reverseSaw':
+          value = 1 - (row % (patternLength / 4)) / (patternLength / 4);
+          break;
+        case 'staircase4': {
+          const step4 = Math.floor((row / patternLength) * 4);
+          value = step4 / 3;
+          break;
+        }
+        case 'staircase8': {
+          const step8 = Math.floor((row / patternLength) * 8);
+          value = step8 / 7;
+          break;
+        }
       }
 
       newPoints.push({ row, value });
@@ -461,6 +480,48 @@ export const AutomationCurveCanvas: React.FC<AutomationCurveCanvasProps> = ({
             className="px-2.5 py-1.5 text-xs font-medium rounded-md bg-dark-bgTertiary text-text-secondary border border-dark-border hover:border-dark-borderLight transition-colors"
           >
             Random
+          </button>
+          <button
+            onClick={() => applyPreset('saw')}
+            className="px-2.5 py-1.5 text-xs font-medium rounded-md bg-dark-bgTertiary text-text-secondary border border-dark-border hover:border-dark-borderLight transition-colors"
+          >
+            Saw
+          </button>
+          <button
+            onClick={() => applyPreset('reverseSaw')}
+            className="px-2.5 py-1.5 text-xs font-medium rounded-md bg-dark-bgTertiary text-text-secondary border border-dark-border hover:border-dark-borderLight transition-colors"
+          >
+            Rev Saw
+          </button>
+          <button
+            onClick={() => applyPreset('square')}
+            className="px-2.5 py-1.5 text-xs font-medium rounded-md bg-dark-bgTertiary text-text-secondary border border-dark-border hover:border-dark-borderLight transition-colors"
+          >
+            Square
+          </button>
+          <button
+            onClick={() => applyPreset('sine2x')}
+            className="px-2.5 py-1.5 text-xs font-medium rounded-md bg-dark-bgTertiary text-text-secondary border border-dark-border hover:border-dark-borderLight transition-colors"
+          >
+            Sine 2x
+          </button>
+          <button
+            onClick={() => applyPreset('sine4x')}
+            className="px-2.5 py-1.5 text-xs font-medium rounded-md bg-dark-bgTertiary text-text-secondary border border-dark-border hover:border-dark-borderLight transition-colors"
+          >
+            Sine 4x
+          </button>
+          <button
+            onClick={() => applyPreset('staircase4')}
+            className="px-2.5 py-1.5 text-xs font-medium rounded-md bg-dark-bgTertiary text-text-secondary border border-dark-border hover:border-dark-borderLight transition-colors"
+          >
+            Steps 4
+          </button>
+          <button
+            onClick={() => applyPreset('staircase8')}
+            className="px-2.5 py-1.5 text-xs font-medium rounded-md bg-dark-bgTertiary text-text-secondary border border-dark-border hover:border-dark-borderLight transition-colors"
+          >
+            Steps 8
           </button>
         </div>
 

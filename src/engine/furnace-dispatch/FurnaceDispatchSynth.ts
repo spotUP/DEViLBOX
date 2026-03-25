@@ -1295,6 +1295,41 @@ export class FurnaceDispatchSynth implements DevilboxSynth {
     }
   }
 
+  set(param: string, value: number): void {
+    const ch = this.currentChannel;
+    const pt = this.platformType;
+    switch (param) {
+      case 'volume':
+        // Route to both output gain and dispatch engine
+        this.output.gain.setValueAtTime(value, this.output.context.currentTime);
+        this.engine.dispatch(DivCmd.VOLUME, ch, Math.round(value * 127), 0, pt);
+        break;
+      case 'panning':
+        // 0-1 → -127..+127
+        this.engine.dispatch(DivCmd.PANNING, ch, Math.round((value * 2 - 1) * 127), 0, pt);
+        break;
+      case 'cutoff':
+        // C64/SID filter cutoff (0-1 → 0-2047)
+        this.engine.dispatch(DivCmd.C64_CUTOFF, ch, Math.round(value * 2047), 0, pt);
+        break;
+      case 'fmTL':
+        // FM total level for operator 0 (0-1 → 0-127, inverted: 0=max, 127=min)
+        this.engine.dispatch(DivCmd.FM_TL, ch, 0, Math.round((1 - value) * 127), pt);
+        break;
+      case 'duty':
+        // PSG/pulse duty cycle (0-1 → 0-3 or 0-7 depending on chip)
+        this.engine.dispatch(DivCmd.WAVE, ch, Math.round(value * 3), 0, pt);
+        break;
+    }
+  }
+
+  get(param: string): number | undefined {
+    switch (param) {
+      case 'volume': return this.output.gain.value;
+      default: return undefined;
+    }
+  }
+
   dispose(): void {
     this._disposed = true;
     this.activeNotes.clear();

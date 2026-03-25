@@ -51,7 +51,8 @@ function useParameterColor(parameter: string): string {
   }, [parameter, patterns, currentPatternIndex, instruments]);
 }
 
-const LANE_WIDTH = 20;
+const LANE_WIDTH = 24;
+const MULTI_LANE_WIDTH = 20; // Narrower when multiple lanes are stacked
 
 export const AutomationLanes: React.FC<AutomationLanesProps> = ({
   patternId,
@@ -83,34 +84,55 @@ export const AutomationLanes: React.FC<AutomationLanesProps> = ({
   } | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  // Resolve per-channel active parameter: use the store's channelLanes state,
-  // falling back to the prop (which may be a legacy default like "cutoff")
-  const channelParameters = useMemo(() => {
-    const result: string[] = [];
+  // Resolve per-channel active parameters (multi-lane support)
+  // Returns string[][] — each channel can have multiple active parameters
+  const channelParameterLists = useMemo(() => {
+    const result: string[][] = [];
     for (let i = 0; i < channelCount; i++) {
       const lane = channelLanes.get(i);
-      // Use the per-channel active parameter if set, otherwise fall back to prop
-      result.push(lane?.activeParameter || parameter);
+      const params = lane?.activeParameters?.length
+        ? [...lane.activeParameters]
+        : [lane?.activeParameter || parameter];
+      result.push(params);
     }
     return result;
   }, [channelCount, channelLanes, parameter]);
 
-  // Get automation curves for all channels (current pattern)
+  // Legacy single-param alias for backward compatibility
+  const channelParameters = useMemo(
+    () => channelParameterLists.map(pl => pl[0] || parameter),
+    [channelParameterLists, parameter],
+  );
+
+  // Get all automation curves for all channels × all active params (current pattern)
+  // Returns Map<channelIndex, Array<{curve, param}>>
+  const channelCurveGroups = useMemo(() => {
+    const result = new Map<number, Array<{ curve: AutomationCurve; param: string }>>();
+    for (let i = 0; i < channelCount; i++) {
+      const params = channelParameterLists[i];
+      const group: Array<{ curve: AutomationCurve; param: string }> = [];
+      for (const p of params) {
+        const curve = allCurves.find(
+          (c) => c.patternId === patternId && c.channelIndex === i && c.parameter === p
+        );
+        if (curve && curve.points.length > 0) {
+          group.push({ curve, param: p });
+        }
+      }
+      result.set(i, group);
+    }
+    return result;
+  }, [patternId, channelCount, channelParameterLists, allCurves]);
+
+  // Flatten for backward-compat (first param curve per channel)
   const curves = useMemo(() => {
     const result: (AutomationCurve | null)[] = [];
     for (let i = 0; i < channelCount; i++) {
-      const chParam = channelParameters[i];
-      // Find curve matching this pattern, channel, and per-channel parameter
-      const curve = allCurves.find(
-        (c) =>
-          c.patternId === patternId &&
-          c.channelIndex === i &&
-          c.parameter === chParam
-      );
-      result.push(curve && curve.points.length > 0 ? curve : null);
+      const group = channelCurveGroups.get(i);
+      result.push(group && group.length > 0 ? group[0].curve : null);
     }
     return result;
-  }, [patternId, channelCount, channelParameters, allCurves]);
+  }, [channelCount, channelCurveGroups]);
 
   // Get automation curves for previous pattern
   const prevCurves = useMemo(() => {
@@ -237,10 +259,12 @@ export const AutomationLanes: React.FC<AutomationLanesProps> = ({
     }
   }, [patternLength, rowHeight, removePoint]);
 
-  // Check if any channel has automation data (including adjacent patterns)
+  // Check if any channel has automation data (including multi-lane and adjacent patterns)
+  const hasMultiLane = Array.from(channelCurveGroups.values()).some(g => g.length > 1);
   const hasAnyData = curves.some(c => c !== null) ||
                      prevCurves.some(c => c !== null) ||
-                     nextCurves.some(c => c !== null);
+                     nextCurves.some(c => c !== null) ||
+                     hasMultiLane;
 
   if (!hasAnyData) {
     return null; // Don't render anything if no automation data
@@ -374,8 +398,87 @@ export const AutomationLanes: React.FC<AutomationLanesProps> = ({
         false
       )}
 
-      {/* Current pattern curves */}
+      {/* Current pattern curves (primary lane per channel) */}
       {renderPatternCurves(curves, patternLength, prevLen, 1, 'current', true)}
+
+      {/* Multi-lane: additional parameter curves per channel (stacked left of primary) */}
+      {hasMultiLane && Array.from(channelCurveGroups.entries()).map(([channelIndex, group]) => {
+        if (group.length <= 1) return null;
+        const chOffset = channelOffsets[channelIndex] - rowNumWidth;
+        const chWidth = channelWidths[channelIndex];
+        if (chWidth < 40) return null; // Need at least 40px for multi-lane
+
+        return group.slice(1).map((entry, laneIdx) => {
+          const { curve, param } = entry;
+          const laneWidth = MULTI_LANE_WIDTH;
+          const laneLeft = chOffset + chWidth - LANE_WIDTH - 4 - (laneIdx + 1) * (laneWidth + 2);
+          const pHeight = patternLength * rowHeight;
+          const yOffset = prevLen * rowHeight;
+
+          // Resolve color for this parameter
+          const paramColor = (() => {
+            const patterns = useTrackerStore.getState().patterns;
+            const pat = patterns[useTrackerStore.getState().currentPatternIndex];
+            if (!pat) return 'var(--color-synth-pan)';
+            const ch = pat.channels[channelIndex];
+            if (!ch || ch.instrumentId === null) return 'var(--color-synth-pan)';
+            const inst = useInstrumentStore.getState().instruments.find(i => i.id === ch.instrumentId);
+            if (!inst) return 'var(--color-synth-pan)';
+            const nksParams = getNKSParametersForSynth(inst.synthType as SynthType);
+            const nksParam = nksParams.find(p => p.id === param);
+            return nksParam ? getSectionColor(nksParam.section) : 'var(--color-synth-pan)';
+          })();
+
+          // Build SVG path
+          const pathPoints: string[] = [];
+          for (let row = 0; row < patternLength; row++) {
+            const value = interpolateAutomationValue(curve.points, row, curve.interpolation, curve.mode);
+            if (value !== null) {
+              const x = value * (laneWidth - 2) + 1;
+              const y = row * rowHeight + rowHeight / 2;
+              pathPoints.push(`${pathPoints.length === 0 ? 'M' : 'L'} ${x} ${y}`);
+            }
+          }
+
+          return (
+            <div
+              key={`multi-${channelIndex}-${laneIdx}`}
+              style={{
+                position: 'absolute',
+                left: laneLeft,
+                top: yOffset,
+                width: laneWidth,
+                height: pHeight,
+                cursor: 'crosshair',
+              }}
+              onMouseDown={(e) => handleMouseDown(e, curve, channelIndex, laneLeft, yOffset)}
+              onDoubleClick={(e) => handleDoubleClick(e, curve, yOffset)}
+            >
+              <svg width={laneWidth} height={pHeight}>
+                <path
+                  d={pathPoints.join(' ')}
+                  fill="none"
+                  stroke={paramColor}
+                  strokeWidth={1.5}
+                  strokeOpacity={0.7}
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+                {curve.points.map((point, i) => (
+                  <circle
+                    key={i}
+                    cx={point.value * (laneWidth - 2) + 1}
+                    cy={point.row * rowHeight + rowHeight / 2}
+                    r={2}
+                    fill={paramColor}
+                    fillOpacity={0.8}
+                  />
+                ))}
+              </svg>
+            </div>
+          );
+        });
+      })}
 
       {/* Next pattern curves (ghost, below) */}
       {nextCurves.length > 0 && renderPatternCurves(
