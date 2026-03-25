@@ -101,8 +101,12 @@ export class MAMESynth implements DevilboxSynth {
       if (this.config.type === 'doc') {
         try {
           const wavetable = await loadES5503ROMs();
-          this.engine.setRom(0, wavetable);
-          console.log('[MAMESynth] ES5503 wavetable loaded:', wavetable.length, 'bytes');
+          if (!wavetable) {
+            console.warn('[MAMESynth] ES5503 wavetable not found — custom Mirage samples unavailable');
+          } else {
+            this.engine.setRom(0, wavetable);
+            console.log('[MAMESynth] ES5503 wavetable loaded:', wavetable.length, 'bytes');
+          }
           // Enable 1 oscillator (register 0xE1, value = num_oscillators - 1)
           this.engine.write(this.handle, 0xE1, 0);
         } catch (err) {

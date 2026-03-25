@@ -64,6 +64,11 @@ export class RF5C400Synth extends MAMEBaseSynth {
       // Call parent initialize first to set up worklet
       await super.initialize();
 
+      if (!romData) {
+        console.warn('[RF5C400] ROM not found — synth will be silent until ROM is uploaded');
+        return;
+      }
+
       // Load ROMs into the synth
       this.loadROM(0, romData);
 

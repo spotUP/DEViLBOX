@@ -104,6 +104,10 @@ export class ES5503Synth extends MAMEBaseSynth {
     await super.initialize();
 
     loadES5503ROMs().then(romData => {
+      if (!romData) {
+        console.warn('[ES5503] Mirage wavetable ROM not found — using built-in waveforms only');
+        return;
+      }
       this.loadWaveData(romData, 2048);  // Start at page 8 (offset 2048)
       this.romLoaded = true;
       console.log('[ES5503] Mirage wavetable ROM loaded successfully');
