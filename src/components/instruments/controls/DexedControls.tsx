@@ -1,6 +1,6 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { Knob } from '@components/controls/Knob';
-import { Zap, Waves, Settings, Music } from 'lucide-react';
+import { Zap, Waves, Settings, Music, ChevronDown, ChevronRight } from 'lucide-react';
 import { useThemeStore } from '@stores';
 import type { DexedConfig, DexedOperatorConfig } from '@typedefs/instrument';
 import { ScrollLockContainer } from '@components/ui/ScrollLockContainer';
@@ -21,6 +21,8 @@ const DX7_ALGORITHMS = [
 const LFO_WAVES = ['triangle', 'sawDown', 'sawUp', 'square', 'sine', 'sampleHold'] as const;
 const LFO_WAVE_LABELS = ['Triangle', 'Saw Down', 'Saw Up', 'Square', 'Sine', 'S&H'];
 
+const CURVE_OPTIONS = ['-lin', '-exp', '+exp', '+lin'] as const;
+
 interface DexedControlsProps {
   config: Partial<DexedConfig>;
   onChange: (updates: Partial<DexedConfig>) => void;
@@ -33,8 +35,13 @@ export const DexedControls: React.FC<DexedControlsProps> = ({
   onChange,
 }) => {
   const [activeTab, setActiveTab] = useState<DexedTab>('global');
+  const [advancedOpen, setAdvancedOpen] = useState<Record<number, boolean>>({});
   const { isMobile, isTablet } = useBreakpoint();
   const useMobileLayout = isMobile || isTablet;
+
+  const toggleAdvanced = useCallback((opIndex: number) => {
+    setAdvancedOpen((prev) => ({ ...prev, [opIndex]: !prev[opIndex] }));
+  }, []);
 
   // Use ref to prevent stale closures in callbacks
   const configRef = useRef(config);
@@ -311,6 +318,126 @@ export const DexedControls: React.FC<DexedControlsProps> = ({
               />
             ))}
           </div>
+        </div>
+
+        {/* Advanced Section */}
+        <div className={`rounded-xl border ${panelBg} overflow-hidden`}>
+          <button
+            onClick={() => toggleAdvanced(opIndex)}
+            className="w-full flex items-center gap-2 px-4 py-3 text-left hover:bg-white/5 transition-colors"
+          >
+            {advancedOpen[opIndex]
+              ? <ChevronDown size={14} style={{ color: accentColor }} />
+              : <ChevronRight size={14} style={{ color: accentColor }} />
+            }
+            <span className="font-bold uppercase tracking-tight text-sm" style={{ color: accentColor }}>
+              ADVANCED
+            </span>
+          </button>
+
+          {advancedOpen[opIndex] && (
+            <div className="px-4 pb-4 flex flex-col gap-6">
+              {/* Keyboard Level Scaling */}
+              <div>
+                <div className="text-xs text-text-secondary uppercase tracking-wider mb-3">
+                  Keyboard Level Scaling
+                </div>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+                  <Knob
+                    value={op.breakPoint ?? 60}
+                    min={0}
+                    max={99}
+                    onChange={(v) => updateOperator(opIndex, { breakPoint: Math.round(v) })}
+                    label="Break Point"
+                    color={knobColor}
+                    size="sm"
+                  />
+                  <Knob
+                    value={op.leftDepth ?? 0}
+                    min={0}
+                    max={99}
+                    onChange={(v) => updateOperator(opIndex, { leftDepth: Math.round(v) })}
+                    label="Left Depth"
+                    color={knobColor}
+                    size="sm"
+                  />
+                  <Knob
+                    value={op.rightDepth ?? 0}
+                    min={0}
+                    max={99}
+                    onChange={(v) => updateOperator(opIndex, { rightDepth: Math.round(v) })}
+                    label="Right Depth"
+                    color={knobColor}
+                    size="sm"
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-4 mt-4">
+                  <div>
+                    <label className="text-xs text-text-secondary block mb-1">Left Curve</label>
+                    <select
+                      value={op.leftCurve ?? 0}
+                      onChange={(e) => updateOperator(opIndex, { leftCurve: Number(e.target.value) })}
+                      className="bg-dark-bgSecondary border border-dark-borderLight text-xs rounded px-2 py-1 w-full"
+                      style={{ color: accentColor }}
+                    >
+                      {CURVE_OPTIONS.map((label, idx) => (
+                        <option key={idx} value={idx}>{label}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-xs text-text-secondary block mb-1">Right Curve</label>
+                    <select
+                      value={op.rightCurve ?? 0}
+                      onChange={(e) => updateOperator(opIndex, { rightCurve: Number(e.target.value) })}
+                      className="bg-dark-bgSecondary border border-dark-borderLight text-xs rounded px-2 py-1 w-full"
+                      style={{ color: accentColor }}
+                    >
+                      {CURVE_OPTIONS.map((label, idx) => (
+                        <option key={idx} value={idx}>{label}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+              </div>
+
+              {/* Modulation & Sensitivity */}
+              <div>
+                <div className="text-xs text-text-secondary uppercase tracking-wider mb-3">
+                  Modulation &amp; Sensitivity
+                </div>
+                <div className="grid grid-cols-3 gap-6">
+                  <Knob
+                    value={op.rateScaling ?? 0}
+                    min={0}
+                    max={7}
+                    onChange={(v) => updateOperator(opIndex, { rateScaling: Math.round(v) })}
+                    label="Rate Scale"
+                    color={knobColor}
+                    size="sm"
+                  />
+                  <Knob
+                    value={op.ampModSens ?? 0}
+                    min={0}
+                    max={3}
+                    onChange={(v) => updateOperator(opIndex, { ampModSens: Math.round(v) })}
+                    label="Amp Mod Sens"
+                    color={knobColor}
+                    size="sm"
+                  />
+                  <Knob
+                    value={op.velocitySens ?? 0}
+                    min={0}
+                    max={7}
+                    onChange={(v) => updateOperator(opIndex, { velocitySens: Math.round(v) })}
+                    label="Vel Sens"
+                    color={knobColor}
+                    size="sm"
+                  />
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     );
