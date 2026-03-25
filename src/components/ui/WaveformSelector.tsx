@@ -121,7 +121,7 @@ export const WaveformSelector: React.FC<WaveformSelectorProps> = ({
               width={s.width}
               height={s.height}
               className="rounded"
-              style={{ backgroundColor: isSelected ? `${color}15` : '#252525' }}
+              style={{ backgroundColor: isSelected ? `${color}15` : 'var(--color-bg)' }}
             >
               {/* Grid lines */}
               <line

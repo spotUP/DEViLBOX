@@ -42,14 +42,22 @@ const BODY_H = MODAL_H - HEADER_H - FOOTER_H;
 const SUB_HEADER_H = 56;
 const PAD = 8;
 
+import {
+  EFFECT_TYPE_TONEJS,
+  EFFECT_TYPE_NEURAL,
+  EFFECT_TYPE_BUZZMACHINE,
+  EFFECT_TYPE_WASM,
+  EFFECT_TYPE_WAM,
+} from '../colors';
+
 // ── Category accent colors ──────────────────────────────────────────────────
 
 const CATEGORY_ACCENT: Record<string, number> = {
-  tonejs: 0x3b82f6,
-  neural: 0xa855f7,
-  buzzmachine: 0xf97316,
-  wasm: 0x10b981,
-  wam: 0x14b8a6,
+  tonejs: EFFECT_TYPE_TONEJS,
+  neural: EFFECT_TYPE_NEURAL,
+  buzzmachine: EFFECT_TYPE_BUZZMACHINE,
+  wasm: EFFECT_TYPE_WASM,
+  wam: EFFECT_TYPE_WAM,
 };
 
 // ── User preset storage ─────────────────────────────────────────────────────
