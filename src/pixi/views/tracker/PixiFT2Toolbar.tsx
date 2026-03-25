@@ -44,12 +44,15 @@ import { getTrackerScratchController } from '@engine/TrackerScratchController';
 
 // ─── Layout constants ────────────────────────────────────────────────────────
 
-const TRANSPORT_ROW_H = 36; // each transport row (×2)
+const TRANSPORT_ROW_H = 32; // each transport row min-height (matches DOM)
+const TRANSPORT_PAD = 8; // top + bottom padding
+const TRANSPORT_GAP = 4; // gap between rows
+const TRANSPORT_SECTION_H = TRANSPORT_ROW_H * 2 + TRANSPORT_PAD * 2 + TRANSPORT_GAP; // 32+32+16+4 = 84
 const FILE_ROW_H  = 32;
 const VIZ_WIDTH   = 220;
 
-/** Total toolbar height (both transport rows + file row) */
-export const FT2_TOOLBAR_HEIGHT = TRANSPORT_ROW_H * 2 + FILE_ROW_H;
+/** Total toolbar height (transport section + file row) */
+export const FT2_TOOLBAR_HEIGHT = TRANSPORT_SECTION_H + FILE_ROW_H;
 
 // ─── Stable layout objects ───────────────────────────────────────────────────
 
@@ -417,7 +420,7 @@ export const PixiFT2Toolbar: React.FC = () => {
       <pixiContainer
         layout={{
           width: '100%',
-          height: TRANSPORT_ROW_H * 2,
+          height: TRANSPORT_SECTION_H,
           flexDirection: 'row',
         }}
       >
@@ -547,12 +550,12 @@ export const PixiFT2Toolbar: React.FC = () => {
         <pixiContainer
           layout={{
             width: VIZ_WIDTH,
-            height: TRANSPORT_ROW_H * 2,
+            height: TRANSPORT_SECTION_H,
             overflow: 'hidden',
           }}
         >
           {/* Visualizer rendered first — PAT/AUTO buttons go on top in Pixi's compositor */}
-          <PixiVisualizer width={VIZ_WIDTH} height={TRANSPORT_ROW_H * 2} />
+          <PixiVisualizer width={VIZ_WIDTH} height={TRANSPORT_SECTION_H} />
         </pixiContainer>
       </pixiContainer>
 
