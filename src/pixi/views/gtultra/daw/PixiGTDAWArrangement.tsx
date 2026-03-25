@@ -8,11 +8,11 @@
 import React, { useCallback, useEffect, useRef } from 'react';
 import type { Graphics as GraphicsType, FederatedPointerEvent } from 'pixi.js';
 import { PIXI_FONTS } from '@/pixi/fonts';
+import { usePixiTheme } from '@/pixi/theme';
 import { MegaText, type GlyphLabel } from '@/pixi/utils/MegaText';
 import { useGTUltraStore } from '@/stores/useGTUltraStore';
 import {
-  DAW_BG, DAW_PANEL_BG, DAW_PANEL_BORDER, DAW_ACCENT_WARM,
-  DAW_TEXT, DAW_TEXT_SEC, DAW_CH_COLORS, DAW_CHANNEL_HEADER_W,
+  DAW_CH_COLORS, DAW_CHANNEL_HEADER_W,
   DAW_RADIUS,
 } from './dawTheme';
 
@@ -22,6 +22,7 @@ interface Props {
 }
 
 export const PixiGTDAWArrangement: React.FC<Props> = ({ width, height }) => {
+  const theme = usePixiTheme();
   const containerRef = useRef<any>(null);
   const bgRef = useRef<GraphicsType>(null);
   const blocksRef = useRef<GraphicsType>(null);
@@ -66,8 +67,8 @@ export const PixiGTDAWArrangement: React.FC<Props> = ({ width, height }) => {
     const scrollX = scrollRef.current;
 
     // Background
-    bg.rect(0, 0, width, height).fill({ color: DAW_BG });
-    bg.rect(0, 0, width, height).stroke({ color: DAW_PANEL_BORDER, width: 1 });
+    bg.rect(0, 0, width, height).fill({ color: theme.bg.color });
+    bg.rect(0, 0, width, height).stroke({ color: theme.border.color, width: 1 });
 
     // Channel headers + blocks
     for (let ch = 0; ch < channelCount; ch++) {
@@ -75,8 +76,8 @@ export const PixiGTDAWArrangement: React.FC<Props> = ({ width, height }) => {
       const color = DAW_CH_COLORS[ch % DAW_CH_COLORS.length];
 
       // Header background
-      bg.rect(0, y, headerW, trackH).fill({ color: DAW_PANEL_BG });
-      bg.rect(headerW - 1, y, 1, trackH).fill({ color: DAW_PANEL_BORDER });
+      bg.rect(0, y, headerW, trackH).fill({ color: theme.bgSecondary.color });
+      bg.rect(headerW - 1, y, 1, trackH).fill({ color: theme.border.color });
 
       // Color indicator
       bg.rect(0, y, 3, trackH).fill({ color });
@@ -85,12 +86,12 @@ export const PixiGTDAWArrangement: React.FC<Props> = ({ width, height }) => {
       labels.push({
         x: 8, y: y + Math.floor(trackH / 2) - 4,
         text: `CH${ch + 1}`,
-        color: DAW_TEXT_SEC,
+        color: theme.textSecondary.color,
         fontFamily: ff,
       });
 
       // Track separator
-      bg.rect(headerW, y + trackH - 1, gridW, 1).fill({ color: DAW_PANEL_BORDER, alpha: 0.3 });
+      bg.rect(headerW, y + trackH - 1, gridW, 1).fill({ color: theme.border.color, alpha: 0.3 });
 
       // Pattern blocks from order data
       const od = orderData[ch];
@@ -120,7 +121,7 @@ export const PixiGTDAWArrangement: React.FC<Props> = ({ width, height }) => {
           labels.push({
             x: blockX + 4, y: y + Math.floor(trackH / 2) - 4,
             text: patHex,
-            color: isSelected ? DAW_TEXT : color,
+            color: isSelected ? theme.text.color : color,
             fontFamily: ff,
           });
         }
@@ -143,12 +144,12 @@ export const PixiGTDAWArrangement: React.FC<Props> = ({ width, height }) => {
           phX += Math.max(8, (pd ? pd.length : 32) * 2);
         }
         phX += playbackPos.row * 2;
-        overlay.rect(phX, 0, 2, height).fill({ color: DAW_ACCENT_WARM });
+        overlay.rect(phX, 0, 2, height).fill({ color: theme.warning.color });
       }
     }
 
     mega.updateLabels(labels, 8);
-  }, [width, height, orderData, patternData, channelCount, playing, playbackPos, dawSelectedChannel, dawSelectedPattern]);
+  }, [width, height, orderData, patternData, channelCount, playing, playbackPos, dawSelectedChannel, dawSelectedPattern, theme]);
 
   useEffect(() => {
     redraw();

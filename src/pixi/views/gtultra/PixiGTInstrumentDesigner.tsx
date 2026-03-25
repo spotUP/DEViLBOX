@@ -25,16 +25,7 @@ import {
   DAW_CH_COLORS, DAW_RADIUS, DAW_PAD,
 } from './daw/dawTheme';
 
-// ── Studio-mode colors ──
-const C_BG       = 0x0d0d0d;
-const C_BORDER   = 0x222222;
-const C_LABEL    = 0x666666;
-const C_HEADER   = 0x888888;
-const C_ENV_LINE = 0x2a9d8f;
-const C_ENV_FILL = 0x2a9d8f;
-const C_POINT    = 0xffffff;
-const C_POINT_HOVER = 0xffcc00;
-const C_WAVE_ON  = 0x00ff88;
+// Semantic waveform button states (kept as-is — domain-specific)
 const C_WAVE_OFF = 0x333333;
 
 // Studio-mode waveform button layout
@@ -255,16 +246,16 @@ export const PixiGTInstrumentDesigner: React.FC<Props> = ({ width, height, compa
       // ────────────────────────────────────────────
 
       // Background
-      bg.rect(0, 0, width, height).fill({ color: C_BG });
-      bg.rect(0, 0, width, height).stroke({ color: C_BORDER, width: 1 });
+      bg.rect(0, 0, width, height).fill({ color: theme.bg.color });
+      bg.rect(0, 0, width, height).stroke({ color: theme.border.color, width: 1 });
 
       // Header
       const name = inst.name || `Instrument ${currentInstrument}`;
-      labels.push({ x: pad, y: pad, text: `#${currentInstrument.toString(16).padStart(2, '0').toUpperCase()} ${name}`, color: C_HEADER, fontFamily: ff });
+      labels.push({ x: pad, y: pad, text: `#${currentInstrument.toString(16).padStart(2, '0').toUpperCase()} ${name}`, color: theme.textSecondary.color, fontFamily: ff });
 
       // ADSR envelope area
       bg.rect(pad, envY, envW, envH).fill({ color: theme.bg.color });
-      bg.rect(pad, envY, envW, envH).stroke({ color: C_BORDER, width: 1 });
+      bg.rect(pad, envY, envW, envH).stroke({ color: theme.border.color, width: 1 });
 
       const pts = getEnvPoints();
 
@@ -275,7 +266,7 @@ export const PixiGTInstrumentDesigner: React.FC<Props> = ({ width, height, compa
       env.lineTo(pts.x3, pts.ySustain);
       env.lineTo(pts.x4, pts.yBottom);
       env.closePath();
-      env.fill({ color: C_ENV_FILL, alpha: 0.15 });
+      env.fill({ color: theme.accent.color, alpha: 0.15 });
 
       // Line
       env.moveTo(pts.x0, pts.yBottom);
@@ -283,7 +274,7 @@ export const PixiGTInstrumentDesigner: React.FC<Props> = ({ width, height, compa
       env.lineTo(pts.x2, pts.ySustain);
       env.lineTo(pts.x3, pts.ySustain);
       env.lineTo(pts.x4, pts.yBottom);
-      env.stroke({ color: C_ENV_LINE, width: 2 });
+      env.stroke({ color: theme.accent.color, width: 2 });
 
       // Control points
       const points: [number, number, DragTarget][] = [
@@ -293,43 +284,43 @@ export const PixiGTInstrumentDesigner: React.FC<Props> = ({ width, height, compa
         [pts.x4, pts.yBottom, 'release'],
       ];
       for (const [px, py, target] of points) {
-        const color = dragging === target ? C_POINT_HOVER : C_POINT;
+        const color = dragging === target ? theme.warning.color : theme.text.color;
         env.circle(px, py, dragging === target ? 5 : 3).fill({ color });
       }
 
       // ADSR value labels
-      labels.push({ x: pad, y: envY + envH + 4, text: `A:${attack} ${attackLabel(attack)}`, color: C_LABEL, fontFamily: ff });
-      labels.push({ x: pad + 72, y: envY + envH + 4, text: `D:${decay} ${decayLabel(decay)}`, color: C_LABEL, fontFamily: ff });
-      labels.push({ x: pad, y: envY + envH + 16, text: `S:${sustain} ${sustainLabel(sustain)}`, color: C_LABEL, fontFamily: ff });
-      labels.push({ x: pad + 72, y: envY + envH + 16, text: `R:${release} ${decayLabel(release)}`, color: C_LABEL, fontFamily: ff });
+      labels.push({ x: pad, y: envY + envH + 4, text: `A:${attack} ${attackLabel(attack)}`, color: theme.textMuted.color, fontFamily: ff });
+      labels.push({ x: pad + 72, y: envY + envH + 4, text: `D:${decay} ${decayLabel(decay)}`, color: theme.textMuted.color, fontFamily: ff });
+      labels.push({ x: pad, y: envY + envH + 16, text: `S:${sustain} ${sustainLabel(sustain)}`, color: theme.textMuted.color, fontFamily: ff });
+      labels.push({ x: pad + 72, y: envY + envH + 16, text: `R:${release} ${decayLabel(release)}`, color: theme.textMuted.color, fontFamily: ff });
 
       // Waveform buttons
       const waveY = envY + envH + 32;
-      labels.push({ x: pad, y: waveY, text: 'Waveform:', color: C_LABEL, fontFamily: ff });
+      labels.push({ x: pad, y: waveY, text: 'Waveform:', color: theme.textMuted.color, fontFamily: ff });
 
       for (let i = 0; i < WAVEFORMS.length; i++) {
         const wf = WAVEFORMS[i];
         const bx = pad + i * (STUDIO_BTN_W + 6);
         const isOn = (waveform & wf.bit) !== 0;
-        bg.rect(bx, studioBtnY, STUDIO_BTN_W, STUDIO_BTN_H).fill({ color: isOn ? 0x0a2a1a : 0x0d0d0d });
-        bg.rect(bx, studioBtnY, STUDIO_BTN_W, STUDIO_BTN_H).stroke({ color: isOn ? C_WAVE_ON : C_WAVE_OFF, width: 1 });
+        bg.rect(bx, studioBtnY, STUDIO_BTN_W, STUDIO_BTN_H).fill({ color: isOn ? 0x0a2a1a : theme.bg.color });
+        bg.rect(bx, studioBtnY, STUDIO_BTN_W, STUDIO_BTN_H).stroke({ color: isOn ? theme.success.color : C_WAVE_OFF, width: 1 });
         labels.push({
           x: bx + 4, y: studioBtnY + 4,
           text: `${wf.icon} ${wf.shortName}`,
-          color: isOn ? C_WAVE_ON : C_WAVE_OFF,
+          color: isOn ? theme.success.color : C_WAVE_OFF,
           fontFamily: ff,
         });
       }
 
       // Table pointers
       const tblY = studioBtnY + STUDIO_BTN_H + 12;
-      labels.push({ x: pad, y: tblY, text: 'Tables:', color: C_LABEL, fontFamily: ff });
+      labels.push({ x: pad, y: tblY, text: 'Tables:', color: theme.textMuted.color, fontFamily: ff });
       const tblNames = ['Wave', 'Pulse', 'Filter', 'Speed'];
       const tblPtrs = [inst.wavePtr, inst.pulsePtr, inst.filterPtr, inst.speedPtr];
       for (let i = 0; i < 4; i++) {
         const ty = tblY + 14 + i * 14;
         const val = tblPtrs[i].toString(16).toUpperCase().padStart(2, '0');
-        labels.push({ x: pad + 4, y: ty, text: `${tblNames[i]}:`, color: C_LABEL, fontFamily: ff });
+        labels.push({ x: pad + 4, y: ty, text: `${tblNames[i]}:`, color: theme.textMuted.color, fontFamily: ff });
         labels.push({ x: pad + 60, y: ty, text: val, color: tblPtrs[i] ? 0x60e060 : C_WAVE_OFF, fontFamily: ff });
       }
 
@@ -383,7 +374,7 @@ export const PixiGTInstrumentDesigner: React.FC<Props> = ({ width, height, compa
       ];
       for (const [px, py, target] of points) {
         const isDragging = dragging === target;
-        env.circle(px, py, isDragging ? 6 : 4).fill({ color: isDragging ? 0xffcc00 : 0xffffff });
+        env.circle(px, py, isDragging ? 6 : 4).fill({ color: isDragging ? theme.warning.color : theme.text.color });
       }
 
       // ADSR labels

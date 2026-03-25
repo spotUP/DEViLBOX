@@ -16,14 +16,11 @@ import type { Container as ContainerType, Graphics as GraphicsType } from 'pixi.
 import { PIXI_FONTS } from '@/pixi/fonts';
 import { MegaText, type GlyphLabel } from '@/pixi/utils/MegaText';
 import { useGTUltraStore } from '@/stores/useGTUltraStore';
+import { usePixiTheme } from '../../theme';
 
-const C_BG      = 0x080808;
-const C_GRID    = 0x151515;
+// Semantic channel waveform colors (kept as-is)
 const C_WAVE_L  = 0x00ff88;
 const C_WAVE_R  = 0x6699ff;
-const C_CENTER  = 0x222222;
-const C_LABEL   = 0x666666;
-const C_BORDER  = 0x222222;
 
 const FFT_SIZE = 2048;
 
@@ -33,6 +30,7 @@ interface Props {
 }
 
 export const PixiGTOscilloscope: React.FC<Props> = ({ width, height }) => {
+  const theme = usePixiTheme();
   const containerRef = useRef<ContainerType>(null);
   const bgRef = useRef<GraphicsType>(null);
   const waveRef = useRef<GraphicsType>(null);
@@ -94,24 +92,24 @@ export const PixiGTOscilloscope: React.FC<Props> = ({ width, height }) => {
     bg.clear();
 
     // Background
-    bg.rect(0, 0, width, height).fill({ color: C_BG });
-    bg.rect(0, 0, width, height).stroke({ color: C_BORDER, width: 1 });
+    bg.rect(0, 0, width, height).fill({ color: theme.bg.color });
+    bg.rect(0, 0, width, height).stroke({ color: theme.border.color, width: 1 });
 
     // Center line
     const cy = height / 2;
-    bg.moveTo(0, cy).lineTo(width, cy).stroke({ color: C_CENTER, width: 1 });
+    bg.moveTo(0, cy).lineTo(width, cy).stroke({ color: theme.border.color, width: 1 });
 
     // Grid lines (quarter marks)
     for (const frac of [0.25, 0.75]) {
       const y = height * frac;
-      bg.moveTo(0, y).lineTo(width, y).stroke({ color: C_GRID, width: 1, alpha: 0.3 });
+      bg.moveTo(0, y).lineTo(width, y).stroke({ color: theme.border.color, width: 1, alpha: 0.3 });
     }
     // Vertical grid
     for (let i = 1; i < 4; i++) {
       const x = (width / 4) * i;
-      bg.moveTo(x, 0).lineTo(x, height).stroke({ color: C_GRID, width: 1, alpha: 0.3 });
+      bg.moveTo(x, 0).lineTo(x, height).stroke({ color: theme.border.color, width: 1, alpha: 0.3 });
     }
-  }, [width, height]);
+  }, [width, height, theme]);
 
   // Animation loop
   const drawWave = useCallback(() => {
@@ -126,7 +124,7 @@ export const PixiGTOscilloscope: React.FC<Props> = ({ width, height }) => {
     if (!aL || !aR) {
       // No analyser yet — show "NO SIGNAL" label
       mega.updateLabels([
-        { x: width / 2 - 30, y: height / 2 - 5, text: 'NO SIGNAL', color: C_LABEL, fontFamily: PIXI_FONTS.MONO },
+        { x: width / 2 - 30, y: height / 2 - 5, text: 'NO SIGNAL', color: theme.textMuted.color, fontFamily: PIXI_FONTS.MONO },
       ], 10);
       return;
     }
