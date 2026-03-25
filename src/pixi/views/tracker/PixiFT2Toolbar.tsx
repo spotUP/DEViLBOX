@@ -472,19 +472,15 @@ export const PixiFT2Toolbar: React.FC = () => {
             <pixiContainer layout={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 6, paddingLeft: 10 }}>
               <PixiButton
                 label={isPlayingSong ? 'Stop Song' : 'Play Song'}
-                variant="ft2"
-                color={isPlayingSong ? 'red' : 'green'}
+                variant={isPlayingSong ? 'danger' : 'primary'}
                 size="sm"
-                active={isPlayingSong}
                 onClick={handlePlaySong}
                 width={72}
               />
               <PixiButton
                 label={isPlayingPattern ? 'Stop Pattern' : 'Play Pattern'}
-                variant="ft2"
-                color={isPlayingPattern ? 'red' : 'default'}
+                variant={isPlayingPattern ? 'danger' : 'primary'}
                 size="sm"
-                active={isPlayingPattern}
                 onClick={handlePlayPattern}
                 width={88}
               />
