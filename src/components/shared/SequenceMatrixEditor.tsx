@@ -161,9 +161,9 @@ export const SequenceMatrixEditor: React.FC<SequenceMatrixEditorProps> = ({
           alignItems: 'center',
           gap: 6,
           padding: '0 8px',
-          background: 'var(--color-accent-secondary)',
+          background: 'var(--color-bg-secondary)',
           cursor: 'pointer',
-          borderBottom: '1px solid var(--color-accent-secondary)',
+          borderBottom: '1px solid var(--color-border)',
         }}
         onClick={onToggleCollapse}
       >
@@ -201,9 +201,9 @@ export const SequenceMatrixEditor: React.FC<SequenceMatrixEditorProps> = ({
           padding: '0 8px',
           height: MATRIX_COLLAPSED_HEIGHT,
           flexShrink: 0,
-          background: 'var(--color-accent-secondary)',
+          background: 'var(--color-bg-secondary)',
           cursor: 'pointer',
-          borderBottom: '1px solid var(--color-accent-secondary)',
+          borderBottom: '1px solid var(--color-border)',
         }}
         onClick={onToggleCollapse}
       >
