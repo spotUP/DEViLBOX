@@ -70,8 +70,8 @@ function getFT2Colors(
 }
 
 const SIZE_CONFIG: Record<ButtonSize, { height: number; paddingH: number; fontSize: number; minWidth: number }> = {
-  sm:   { height: 24, paddingH: 6, fontSize: 11, minWidth: 0 },
-  md:   { height: 28, paddingH: 8, fontSize: 13, minWidth: 0 },
+  sm:   { height: 24, paddingH: 8, fontSize: 11, minWidth: 0 },
+  md:   { height: 28, paddingH: 10, fontSize: 13, minWidth: 0 },
   lg:   { height: 36, paddingH: 20, fontSize: 16, minWidth: 100 },
   icon: { height: 28, paddingH: 6,  fontSize: 13, minWidth: 28 },
 };
@@ -116,7 +116,7 @@ export const PixiButton: React.FC<PixiButtonProps> = ({
       const ft2 = ft2Colors[color] || ft2Colors.default;
       if (active || pressed) return { bg: ft2.active, border: ft2.active, borderAlpha: 1, text: 0xffffff, showBg: true };
       if (hovered) return { bg: ft2.hover, border: ft2.active, borderAlpha: 0.4, text: ft2.text, showBg: true };
-      return { bg: theme.bgActive.color, border: theme.border.color, borderAlpha: 0.25, text: ft2.text, showBg: true };
+      return { bg: theme.bgTertiary.color, border: theme.border.color, borderAlpha: 0.4, text: ft2.text, showBg: true };
     }
 
     if (variant === 'primary') {
@@ -134,8 +134,8 @@ export const PixiButton: React.FC<PixiButtonProps> = ({
     if (variant === 'ghost') {
       if (pressed) return { bg: theme.bgActive.color, border: 0x000000, borderAlpha: 0, text: theme.text.color, showBg: true };
       if (hovered) return { bg: theme.bgHover.color, border: 0x000000, borderAlpha: 0, text: theme.text.color, showBg: true };
-      // Transparent background — matches DOM btn-ghost (background: transparent, border: none)
-      return { bg: 0x000000, border: 0x000000, borderAlpha: 0, text: theme.textSecondary.color, showBg: false };
+      // Subtle background — visible but not heavy
+      return { bg: theme.bgTertiary.color, border: 0x000000, borderAlpha: 0, text: theme.textSecondary.color, showBg: true };
     }
 
     // default
