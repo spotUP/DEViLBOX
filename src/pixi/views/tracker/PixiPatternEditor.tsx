@@ -257,9 +257,11 @@ function resolveSongRow(
 function renderGrid(g: GraphicsType, p: RenderParams, vStart: number): void {
   g.clear();
 
-  // Always fill the full grid area with tracker row color (not theme.bg which may be red/colored)
+  // Always fill the full grid area with tracker row color at full opacity.
+  // This prevents the red theme.bg from showing through in empty areas.
+  // The visual background (if enabled) shows through the individual row fills, not the base.
   g.rect(0, 0, p.width, p.gridHeight);
-  g.fill({ color: p.theme.trackerRowEven.color, alpha: p.trackerVisualBg ? 0.15 : 1 });
+  g.fill({ color: p.theme.trackerRowEven.color });
 
   for (let i = 0; i < p.visibleLines; i++) {
     const rowNum = vStart + i;
