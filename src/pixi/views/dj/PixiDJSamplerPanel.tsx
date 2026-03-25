@@ -377,6 +377,22 @@ export const PixiDJSamplerPanel: React.FC<PixiDJSamplerPanelProps> = ({ isOpen, 
         ))}
         <PixiLabel text={`${bankLoadedCount}/16`} size="xs" color="textMuted" />
         <PixiButton icon="stop" label="" variant="ghost" color="red" size="sm" onClick={handleStopAll} />
+
+        {/* Program selector */}
+        <PixiSelect
+          options={(() => {
+            const progs = useDrumPadStore.getState().programs;
+            return Array.from(progs.entries()).map(([id, prog]) => ({
+              value: id,
+              label: `${id}: ${prog.name}`,
+            }));
+          })()}
+          value={useDrumPadStore.getState().currentProgramId}
+          onChange={(id) => useDrumPadStore.getState().loadProgram(id)}
+          width={90}
+          height={18}
+        />
+
         <PixiButton icon="close" label="" variant="ghost" size="sm" onClick={onClose} />
       </pixiContainer>
 
