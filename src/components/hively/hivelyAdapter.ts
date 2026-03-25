@@ -2,8 +2,9 @@
  * Hively adapter — Maps HivelyNativeData to format-agnostic FormatChannel[].
  */
 
-import type { ColumnDef, FormatCell, FormatChannel } from '@/components/shared/format-editor-types';
+import type { ColumnDef, FormatCell, FormatChannel, OnCellChange } from '@/components/shared/format-editor-types';
 import type { HivelyNativeData } from '@/types/tracker';
+import type { HivelyConfig } from '@/types/instrument';
 
 const NOTE_NAMES = ['C-', 'C#', 'D-', 'D#', 'E-', 'F-', 'F#', 'G-', 'G#', 'A-', 'A#', 'B-'];
 
@@ -116,4 +117,140 @@ export function hivelyToFormatChannels(
   }
 
   return result;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Performance List Adapter
+// ═══════════════════════════════════════════════════════════════════════════════
+
+function hex1(val: number): string { return (val & 0xF).toString(16).toUpperCase(); }
+
+/** Column definitions for the Hively performance list editor */
+export const HIVELY_PERFLIST_COLUMNS: ColumnDef[] = [
+  {
+    key: 'note',
+    label: 'Note',
+    charWidth: 3,
+    type: 'note',
+    color: 'var(--color-text-secondary)',
+    emptyColor: 'var(--color-border-light)',
+    emptyValue: 0,
+    formatter: (val: number) => noteToString(val, 0),
+  },
+  {
+    key: 'fixed',
+    label: 'F',
+    charWidth: 1,
+    type: 'hex',
+    color: '#ffaa00',
+    emptyColor: 'var(--color-border-light)',
+    emptyValue: 0,
+    hexDigits: 1,
+    formatter: (val: number) => val ? '*' : '·',
+  },
+  {
+    key: 'waveform',
+    label: 'Wav',
+    charWidth: 1,
+    type: 'hex',
+    color: '#aaddff',
+    emptyColor: 'var(--color-border-light)',
+    emptyValue: 0,
+    hexDigits: 1,
+    formatter: hex1,
+  },
+  {
+    key: 'fx1',
+    label: 'Fx1',
+    charWidth: 1,
+    type: 'hex',
+    color: '#ffcc66',
+    emptyColor: 'var(--color-border-light)',
+    emptyValue: 0,
+    hexDigits: 1,
+    formatter: hex1,
+  },
+  {
+    key: 'fxParam1',
+    label: 'P1',
+    charWidth: 2,
+    type: 'hex',
+    color: '#ffcc66',
+    emptyColor: 'var(--color-border-light)',
+    emptyValue: 0,
+    hexDigits: 2,
+    formatter: hex2,
+  },
+  {
+    key: 'fx2',
+    label: 'Fx2',
+    charWidth: 1,
+    type: 'hex',
+    color: '#cc99ff',
+    emptyColor: 'var(--color-border-light)',
+    emptyValue: 0,
+    hexDigits: 1,
+    formatter: hex1,
+  },
+  {
+    key: 'fxParam2',
+    label: 'P2',
+    charWidth: 2,
+    type: 'hex',
+    color: '#cc99ff',
+    emptyColor: 'var(--color-border-light)',
+    emptyValue: 0,
+    hexDigits: 2,
+    formatter: hex2,
+  },
+];
+
+/**
+ * Convert Hively performance list entries to a FormatChannel for PatternEditorCanvas.
+ * Returns a single-channel array (the perf list is one sequence).
+ */
+export function hivelyPerfListToFormatChannel(config: HivelyConfig): FormatChannel[] {
+  const entries = config.performanceList.entries;
+  const rows: FormatCell[] = entries.map((e) => ({
+    note: e.note,
+    fixed: e.fixed ? 1 : 0,
+    waveform: e.waveform,
+    fx1: e.fx[0],
+    fxParam1: e.fxParam[0],
+    fx2: e.fx[1],
+    fxParam2: e.fxParam[1],
+  }));
+
+  return [{
+    label: 'Perf List',
+    patternLength: entries.length,
+    rows,
+    isPatternChannel: false,
+  }];
+}
+
+/**
+ * Create an OnCellChange callback that updates the Hively config's performance list.
+ */
+export function makePerfListCellChange(
+  config: HivelyConfig,
+  onChange: (updates: Partial<HivelyConfig>) => void,
+): OnCellChange {
+  return (_channelIdx: number, rowIdx: number, columnKey: string, value: number) => {
+    const entries = [...config.performanceList.entries];
+    const entry = { ...entries[rowIdx] };
+
+    switch (columnKey) {
+      case 'note': entry.note = value; break;
+      case 'fixed': entry.fixed = value !== 0; break;
+      case 'waveform': entry.waveform = value; break;
+      case 'fx1': entry.fx = [value, entry.fx[1]]; break;
+      case 'fxParam1': entry.fxParam = [value, entry.fxParam[1]]; break;
+      case 'fx2': entry.fx = [entry.fx[0], value]; break;
+      case 'fxParam2': entry.fxParam = [entry.fxParam[0], value]; break;
+    }
+
+    entries[rowIdx] = entry;
+    onChange({ performanceList: { ...config.performanceList, entries } });
+  };
 }
