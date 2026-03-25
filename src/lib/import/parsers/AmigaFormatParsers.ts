@@ -13,7 +13,7 @@
  * All format definitions live in FormatRegistry.ts (single source of truth).
  */
 
-import type { TrackerSong } from '@/engine/TrackerReplayer';
+import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
 import type { UADEMetadata } from '@/engine/uade/UADEEngine';
 import type { FormatEnginePreferences } from '@/stores/useSettingsStore';
 import { withNativeDefault, withNativeThenUADE, callUADE, getBasename, injectUADEPlayback, type FallbackContext } from './withFallback';
@@ -447,13 +447,32 @@ export async function tryRouteFormat(
   // If UADE fails (e.g. missing smpl.* companion), fall back to native parser
   // for pattern display + editing only (no audio).
   if (matchesExt(filename, ['tfmx', 'mdat', 'tfx'])) {
+    // Parse pattern/macro data with the native TFMX parser, then augment with
+    // UADE for audio playback.  This avoids relying on UADE's format detection
+    // (which can report 'Unknown' for some TFMX files) and the enhanced scan
+    // (which produces wrong Sampler instruments + CIA warnings for TFMX).
     try {
+      const { parseTFMXFile } = await import('@lib/import/formats/TFMXParser');
+      const { parseUADEFile } = await import('@lib/import/formats/UADEParser');
+      const nativeSong = parseTFMXFile(buffer, originalFileName, subsong);
+      // Load into UADE for streaming audio (classic mode — no enhanced scan)
+      const uadeSong = await parseUADEFile(buffer, originalFileName, 'classic', subsong, preScannedMeta, companionFiles);
+      // Merge: native patterns + instruments, UADE streaming audio config
+      const uadeInstr = uadeSong.instruments.find(i => i.synthType === 'UADESynth');
+      return {
+        ...nativeSong,
+        format: 'UADE' as TrackerFormat,
+        // uadeEditableFileData triggers UADE streaming playback (suppressNotes=true)
+        uadeEditableFileData: buffer.slice(0),
+        uadeEditableFileName: originalFileName,
+        instruments: uadeInstr
+          ? [uadeInstr, ...nativeSong.instruments]
+          : nativeSong.instruments,
+      };
+    } catch (err) {
+      console.warn(`[TFMX] Native+UADE failed, falling back to pure UADE:`, err);
       const { parseUADEFile } = await import('@lib/import/formats/UADEParser');
       return await parseUADEFile(buffer, originalFileName, prefs.uade ?? 'enhanced', subsong, preScannedMeta, companionFiles);
-    } catch (err) {
-      console.warn(`[TFMX] UADE failed (missing smpl.* companion?), falling back to native parser for display:`, err);
-      const { parseTFMXFile } = await import('@lib/import/formats/TFMXParser');
-      return parseTFMXFile(buffer, originalFileName, subsong);
     }
   }
 

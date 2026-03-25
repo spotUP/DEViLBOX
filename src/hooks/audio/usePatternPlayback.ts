@@ -26,7 +26,7 @@ export const usePatternPlayback = () => {
     currentPositionIndex: s.currentPositionIndex,
     setCurrentPosition: s.setCurrentPosition,
     })));
-  const { channelTrackTables, channelSpeeds, channelGrooves, hivelyNative, hivelyFileData, hivelyMeta, musiclineFileData, c64SidFileData, jamCrackerFileData, futurePlayerFileData, preTrackerFileData, maFileData, hippelFileData, sonixFileData, pxtoneFileData, organyaFileData, eupFileData, ixsFileData, psycleFileData, sc68FileData, zxtuneFileData, pumaTrackerFileData, steveTurnerFileData, sidmon1WasmFileData, fredEditorWasmFileData, artOfNoiseFileData, bdFileData, sd2FileData, symphonieFileData, uadeEditableFileData, libopenmptFileData, furnaceNative, furnaceActiveSubsong } = useFormatStore(useShallow((s) => ({
+  const { channelTrackTables, channelSpeeds, channelGrooves, hivelyNative, hivelyFileData, hivelyMeta, musiclineFileData, c64SidFileData, jamCrackerFileData, futurePlayerFileData, preTrackerFileData, maFileData, hippelFileData, sonixFileData, pxtoneFileData, organyaFileData, eupFileData, ixsFileData, psycleFileData, sc68FileData, zxtuneFileData, pumaTrackerFileData, steveTurnerFileData, sidmon1WasmFileData, fredEditorWasmFileData, artOfNoiseFileData, bdFileData, sd2FileData, symphonieFileData, uadeEditableFileData, libopenmptFileData, furnaceNative, furnaceActiveSubsong, tfmxTimingTable } = useFormatStore(useShallow((s) => ({
     channelTrackTables: s.channelTrackTables,
     channelSpeeds: s.channelSpeeds,
     channelGrooves: s.channelGrooves,
@@ -60,6 +60,7 @@ export const usePatternPlayback = () => {
     libopenmptFileData: s.libopenmptFileData,
     furnaceNative: s.furnaceNative,
     furnaceActiveSubsong: s.furnaceActiveSubsong,
+    tfmxTimingTable: s.tfmxTimingTable,
   })));
   const linearPeriods = useEditorStore((s) => s.linearPeriods);
   const { isPlaying, isLooping, bpm, speed: transportSpeed, setCurrentRowThrottled } = useTransportStore(useShallow((s) => ({
@@ -256,6 +257,34 @@ export const usePatternPlayback = () => {
                 uadeChannelUnsubRef.current?.();
                 const framesPerRow = Math.round(44100 * 2.5 * 6 / 125); // ~5292 at standard Amiga rate
                 uadeChannelUnsubRef.current = uadeEngine.onChannelData((_channels, totalFrames) => {
+                  // TFMX: use timing table for position sync instead of fixed framesPerRow
+                  if (tfmxTimingTable && tfmxTimingTable.length > 0) {
+                    // Convert totalFrames to jiffies (PAL Amiga VBlank = 50 Hz = 882 samples at 44100)
+                    const jiffies = Math.floor(totalFrames / 882);
+
+                    // Binary search the timing table for current position
+                    let lo = 0, hi = tfmxTimingTable.length - 1;
+                    while (lo < hi) {
+                      const mid = (lo + hi + 1) >> 1;
+                      if (tfmxTimingTable[mid].cumulativeJiffies <= jiffies) lo = mid;
+                      else hi = mid - 1;
+                    }
+
+                    const entry = tfmxTimingTable[lo];
+                    const patternIdx = entry.patternIndex;
+                    const rowInPattern = entry.row;
+
+                    const store = useTrackerStore.getState();
+                    if (patternIdx !== store.currentPositionIndex && patternIdx < store.patternOrder.length) {
+                      startTransition(() => {
+                        setCurrentPosition(patternIdx, true);
+                        setCurrentPattern(store.patternOrder[patternIdx] ?? patternIdx, true);
+                      });
+                    }
+                    setCurrentRowThrottled(rowInPattern, store.patterns[store.patternOrder[patternIdx] ?? patternIdx]?.length ?? 64, true);
+                    return; // Skip standard framesPerRow calculation
+                  }
+
                   const globalRow = Math.floor(totalFrames / framesPerRow);
                   const store = useTrackerStore.getState();
                   const pLen = store.patterns[0]?.length ?? 64;

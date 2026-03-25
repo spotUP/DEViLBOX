@@ -130,11 +130,56 @@ function isBinaryFile(filename: string): boolean {
   return !TEXT_EXTENSIONS.includes(ext);
 }
 
+/** Companion file patterns: main prefix → companion prefix */
+const COMPANION_PREFIXES: [string, string][] = [
+  ['mdat.', 'smpl.'],  // TFMX
+  ['smpl.', 'mdat.'],  // TFMX (reverse)
+  ['mfp.',  'smp.'],   // MFP
+  ['midi.', 'smpl.'],  // MIDI-Loriciel
+];
+
+/**
+ * Auto-fetch companion files from the same server/static directory.
+ * Returns a Map of filename → ArrayBuffer for any companions found.
+ */
+async function fetchCompanionFiles(
+  filename: string,
+  filePath: string | undefined,
+): Promise<Map<string, ArrayBuffer>> {
+  const companions = new Map<string, ArrayBuffer>();
+  if (!filePath) return companions;
+
+  const lower = filename.toLowerCase();
+  for (const [mainPrefix, companionPrefix] of COMPANION_PREFIXES) {
+    if (!lower.startsWith(mainPrefix)) continue;
+    const songname = filename.slice(mainPrefix.length);
+    const companionName = companionPrefix + songname;
+    const dir = filePath.slice(0, filePath.lastIndexOf('/') + 1);
+    const companionPath = dir + companionName;
+
+    try {
+      // Try static bundle first, then server API
+      let buf: ArrayBuffer | null = null;
+      if (isManifestAvailable()) {
+        try { buf = await readStaticFile(companionPath); } catch { /* not in bundle */ }
+      }
+      if (!buf) {
+        try { buf = await readServerFile(companionPath); } catch { /* not on server */ }
+      }
+      if (buf) {
+        companions.set(companionName, buf);
+      }
+    } catch { /* companion not found — proceed without it */ }
+    break;
+  }
+  return companions;
+}
+
 interface UseFileNavigationOptions {
   isOpen: boolean;
   fileSource: FileSource;
   onLoad: (data: object, filename: string) => void;
-  onLoadTrackerModule?: (buffer: ArrayBuffer, filename: string) => Promise<void>;
+  onLoadTrackerModule?: (buffer: ArrayBuffer, filename: string, companionFiles?: Map<string, ArrayBuffer>) => Promise<void>;
   onClose: () => void;
   currentProjectData?: () => object;
   mode?: 'load' | 'save';
@@ -595,7 +640,9 @@ export function useFileNavigation({
           throw new Error('Cannot read tracker module');
         }
 
-        await onLoadTrackerModule(buffer, selectedFile.name);
+        // Auto-discover companion files (e.g. mdat.* → smpl.*, mfp.* → smp.*)
+        const companions = await fetchCompanionFiles(selectedFile.name, selectedFile.path);
+        await onLoadTrackerModule(buffer, selectedFile.name, companions.size > 0 ? companions : undefined);
         onClose();
         return;
       }

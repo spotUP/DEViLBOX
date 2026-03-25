@@ -337,6 +337,9 @@ export interface TrackerSong {
    *  During playback, row = floor((tickCount - uadeFirstTick) / initialSpeed). */
   uadeFirstTick?: number;
 
+  /** TFMX timing table: cumulative jiffies at each (patternIndex, row) for position sync */
+  tfmxTimingTable?: { patternIndex: number; row: number; cumulativeJiffies: number }[];
+
   // Per-channel independent sequencing (MusicLine Editor and similar formats)
   // When present, each channel uses its own pattern sequence instead of the global songPositions.
   // channelTrackTables[chIdx][posIdx] = patternIndex  (analogous to Furnace orders matrix)

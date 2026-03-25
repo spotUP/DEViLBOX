@@ -1244,17 +1244,34 @@ function App() {
                 notify.error('Failed to load project');
               }
             }}
-            onLoadTrackerModule={async (buffer: ArrayBuffer, filename: string) => {
+            onLoadTrackerModule={async (buffer: ArrayBuffer, filename: string, companionFiles?: Map<string, ArrayBuffer>) => {
               setShowFileBrowser(false);
               try {
                 const file = new File([buffer], filename);
-                const result = await loadFile(file, { requireConfirmation: false });
+                const result = await loadFile(file, { requireConfirmation: false, companionFiles });
                 if (result.success === 'pending-import') {
-                  // Auto-import without showing dialog (mobile/quick-load path)
-                  const { loadModuleFile } = await import('@lib/import/ModuleLoader');
-                  const moduleInfo = await loadModuleFile(file);
-                  const { importTrackerModule } = await import('@lib/file/UnifiedFileLoader');
-                  await importTrackerModule(moduleInfo, { useLibopenmpt: true });
+                  // Auto-import without showing dialog — use parseModuleToSong
+                  // which correctly routes UADE/TFMX formats with companion files
+                  const { parseModuleToSong } = await import('@lib/import/parseModuleToSong');
+                  const song = await parseModuleToSong(file, 0, undefined, undefined, companionFiles);
+                  const { useTrackerStore: ts } = await import('./stores/useTrackerStore');
+                  const { useInstrumentStore: is } = await import('./stores/useInstrumentStore');
+                  const { useTransportStore: trs } = await import('./stores/useTransportStore');
+                  const { useProjectStore: ps } = await import('./stores/useProjectStore');
+                  const { useFormatStore: fs } = await import('./stores/useFormatStore');
+                  const { getToneEngine } = await import('./engine/ToneEngine');
+                  const engine = getToneEngine();
+                  if (trs.getState().isPlaying) trs.getState().stop();
+                  engine.releaseAll();
+                  trs.getState().reset();
+                  ts.getState().reset();
+                  is.getState().reset();
+                  is.getState().loadInstruments(song.instruments);
+                  ts.getState().loadPatterns(song.patterns);
+                  if (song.songPositions) ts.getState().setPatternOrder(song.songPositions);
+                  trs.getState().setBPM(song.initialBPM ?? 125);
+                  ps.getState().setMetadata({ name: song.name });
+                  fs.getState().applyEditorMode(song);
                 } else if (result.success === true) {
                   notify.success(result.message);
                 } else if (result.success === false) {
