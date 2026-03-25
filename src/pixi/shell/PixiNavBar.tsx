@@ -27,7 +27,7 @@ import { useNavBar } from '@hooks/views/useNavBar';
 import type { FederatedPointerEvent } from 'pixi.js';
 import type { ProjectTab } from '@stores';
 
-const NAV_ROW_H = 52;
+const NAV_ROW_H = 40; // Match DOM nav height (py-2 = 8px padding × 2 + content)
 const TAB_ROW_H = MODERN_NAV_H - NAV_ROW_H; // 24px
 
 // ─── PixiNavBar ──────────────────────────────────────────────────────────────
@@ -112,7 +112,7 @@ export const PixiNavBar: React.FC = () => {
         width,
         height: MODERN_NAV_H,
         flexDirection: 'column',
-        backgroundColor: theme.bgTertiary.color,
+        backgroundColor: theme.bgSecondary.color,
         borderBottomWidth: 1,
         borderColor: theme.border.color,
       }}
@@ -172,8 +172,8 @@ export const PixiNavBar: React.FC = () => {
           flexDirection: 'row',
           alignItems: 'center',
           justifyContent: 'flex-end',
-          paddingRight: 12,
-          gap: 4,
+          paddingRight: 16,
+          gap: 16,
           flexShrink: 0,
         }}
       >
@@ -216,12 +216,10 @@ export const PixiNavBar: React.FC = () => {
         {/* DJ Sets (matches DOM's Sets dropdown) */}
         <PixiDJSetBrowser />
 
-        {/* MIDI — opens device picker dropdown (matches DOM's MIDI dropdown) */}
-        {n.hasMIDI && (
-          <pixiContainer ref={midiContainerRef} layout={{ flexShrink: 0 }}>
-            <PixiButton label="MIDI" variant="ghost" size="sm" onClick={handleMIDIClick} width={40} />
-          </pixiContainer>
-        )}
+        {/* MIDI — always shown matching DOM's MIDIToolbarDropdown */}
+        <pixiContainer ref={midiContainerRef} layout={{ flexShrink: 0 }}>
+          <PixiButton label="MIDI" variant="ghost" size="sm" onClick={handleMIDIClick} width={40} />
+        </pixiContainer>
 
         {/* Theme Switcher (matches DOM's theme dropdown) */}
         <PixiSelect
