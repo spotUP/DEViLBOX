@@ -449,7 +449,10 @@ export function selectInstrument(params: Record<string, unknown>): Record<string
 }
 
 export function createInstrument(params: Record<string, unknown>): Record<string, unknown> {
-  const config = params.config as Record<string, unknown> | undefined;
+  // Support both { config: { name, synthType } } and top-level { name, synthType }
+  const config = (params.config as Record<string, unknown>) ?? {};
+  if (params.name && !config.name) config.name = params.name;
+  if (params.synthType && !config.synthType) config.synthType = params.synthType;
   const id = useInstrumentStore.getState().createInstrument(config);
   return { ok: true, instrumentId: id };
 }
