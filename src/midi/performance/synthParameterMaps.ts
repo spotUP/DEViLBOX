@@ -512,27 +512,69 @@ export const WAVETABLE_NKS_PARAMETERS: NKSParameter[] = [
 // GENERIC FM CHIP PARAMETERS (Furnace OPN/OPL/OPM style)
 // ============================================================================
 export const FURNACE_FM_NKS_PARAMETERS: NKSParameter[] = [
-  { id: 'furnace.algorithm', name: 'Algorithm', section: NKSSection.SYNTHESIS, type: NKSParameterType.INT, min: 0, max: 7, defaultValue: 0, page: 0, index: 0, isAutomatable: true },
-  { id: 'furnace.feedback', name: 'Feedback', section: NKSSection.SYNTHESIS, type: NKSParameterType.INT, min: 0, max: 7, defaultValue: 0, page: 0, index: 1, isAutomatable: true },
-  { id: 'furnace.op1.level', name: 'OP1 Level', section: NKSSection.SYNTHESIS, type: NKSParameterType.INT, min: 0, max: 127, defaultValue: 99, page: 0, index: 2, isAutomatable: true },
-  { id: 'furnace.op1.mult', name: 'OP1 Mult', section: NKSSection.SYNTHESIS, type: NKSParameterType.INT, min: 0, max: 15, defaultValue: 1, page: 0, index: 3, isAutomatable: true },
-  { id: 'furnace.op2.level', name: 'OP2 Level', section: NKSSection.SYNTHESIS, type: NKSParameterType.INT, min: 0, max: 127, defaultValue: 0, page: 0, index: 4, isAutomatable: true },
-  { id: 'furnace.op2.mult', name: 'OP2 Mult', section: NKSSection.SYNTHESIS, type: NKSParameterType.INT, min: 0, max: 15, defaultValue: 1, page: 0, index: 5, isAutomatable: true },
-  { id: 'furnace.lfoRate', name: 'LFO Rate', section: NKSSection.LFO, type: NKSParameterType.INT, min: 0, max: 7, defaultValue: 0, page: 0, index: 6, isAutomatable: true },
-  { id: 'furnace.volume', name: 'Volume', section: NKSSection.OUTPUT, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0.7, unit: '%', formatString: '%.0f%%', page: 0, index: 7, isAutomatable: true },
+  // Page 0: Global FM
+  { id: 'furnace.fmALG', name: 'Algorithm', section: NKSSection.SYNTHESIS, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0, page: 0, index: 0, isAutomatable: true },
+  { id: 'furnace.fmFB', name: 'Feedback', section: NKSSection.SYNTHESIS, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0, page: 0, index: 1, isAutomatable: true },
+  { id: 'furnace.volume', name: 'Volume', section: NKSSection.OUTPUT, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0.7, unit: '%', formatString: '%.0f%%', page: 0, index: 2, isAutomatable: true },
+  { id: 'furnace.panning', name: 'Pan', section: NKSSection.OUTPUT, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0.5, formatString: '%.0f%%', page: 0, index: 3, isAutomatable: true },
+  // Page 1: Operator 1 (carrier)
+  { id: 'furnace.fmOp0TL', name: 'Op1 TL', section: NKSSection.SYNTHESIS, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0.22, page: 1, index: 0, isAutomatable: true },
+  { id: 'furnace.fmOp0AR', name: 'Op1 AR', section: NKSSection.ENVELOPE, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 1, page: 1, index: 1, isAutomatable: true },
+  { id: 'furnace.fmOp0DR', name: 'Op1 DR', section: NKSSection.ENVELOPE, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0.3, page: 1, index: 2, isAutomatable: true },
+  { id: 'furnace.fmOp0SL', name: 'Op1 SL', section: NKSSection.ENVELOPE, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0.5, page: 1, index: 3, isAutomatable: true },
+  { id: 'furnace.fmOp0RR', name: 'Op1 RR', section: NKSSection.ENVELOPE, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0.5, page: 1, index: 4, isAutomatable: true },
+  { id: 'furnace.fmOp0DT', name: 'Op1 DT', section: NKSSection.SYNTHESIS, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0, page: 1, index: 5, isAutomatable: true },
+  { id: 'furnace.fmOp0MULT', name: 'Op1 Mult', section: NKSSection.SYNTHESIS, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0.07, page: 1, index: 6, isAutomatable: true },
+  // Page 2: Operator 2
+  { id: 'furnace.fmOp1TL', name: 'Op2 TL', section: NKSSection.SYNTHESIS, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0.5, page: 2, index: 0, isAutomatable: true },
+  { id: 'furnace.fmOp1AR', name: 'Op2 AR', section: NKSSection.ENVELOPE, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 1, page: 2, index: 1, isAutomatable: true },
+  { id: 'furnace.fmOp1DR', name: 'Op2 DR', section: NKSSection.ENVELOPE, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0.3, page: 2, index: 2, isAutomatable: true },
+  { id: 'furnace.fmOp1SL', name: 'Op2 SL', section: NKSSection.ENVELOPE, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0.5, page: 2, index: 3, isAutomatable: true },
+  { id: 'furnace.fmOp1RR', name: 'Op2 RR', section: NKSSection.ENVELOPE, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0.5, page: 2, index: 4, isAutomatable: true },
+  { id: 'furnace.fmOp1DT', name: 'Op2 DT', section: NKSSection.SYNTHESIS, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0, page: 2, index: 5, isAutomatable: true },
+  { id: 'furnace.fmOp1MULT', name: 'Op2 Mult', section: NKSSection.SYNTHESIS, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0.07, page: 2, index: 6, isAutomatable: true },
+  // Page 3: Operators 3 & 4
+  { id: 'furnace.fmOp2TL', name: 'Op3 TL', section: NKSSection.SYNTHESIS, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0.5, page: 3, index: 0, isAutomatable: true },
+  { id: 'furnace.fmOp2AR', name: 'Op3 AR', section: NKSSection.ENVELOPE, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 1, page: 3, index: 1, isAutomatable: true },
+  { id: 'furnace.fmOp2MULT', name: 'Op3 Mult', section: NKSSection.SYNTHESIS, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0.07, page: 3, index: 2, isAutomatable: true },
+  { id: 'furnace.fmOp3TL', name: 'Op4 TL', section: NKSSection.SYNTHESIS, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0.5, page: 3, index: 3, isAutomatable: true },
+  { id: 'furnace.fmOp3AR', name: 'Op4 AR', section: NKSSection.ENVELOPE, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 1, page: 3, index: 4, isAutomatable: true },
+  { id: 'furnace.fmOp3MULT', name: 'Op4 Mult', section: NKSSection.SYNTHESIS, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0.07, page: 3, index: 5, isAutomatable: true },
 ];
 
 // ============================================================================
 // GENERIC PSG CHIP PARAMETERS (Furnace NES/GB/PSG style)
 // ============================================================================
 export const FURNACE_PSG_NKS_PARAMETERS: NKSParameter[] = [
-  { id: 'furnace.duty', name: 'Duty Cycle', section: NKSSection.SYNTHESIS, type: NKSParameterType.SELECTOR, min: 0, max: 3, defaultValue: 2, valueStrings: ['12.5%', '25%', '50%', '75%'], page: 0, index: 0, isAutomatable: true },
-  { id: 'furnace.volume', name: 'Volume', section: NKSSection.OUTPUT, type: NKSParameterType.INT, min: 0, max: 15, defaultValue: 15, page: 0, index: 1, isAutomatable: true },
-  { id: 'furnace.arpSpeed', name: 'Arp Speed', section: NKSSection.ARP, type: NKSParameterType.INT, min: 0, max: 15, defaultValue: 0, page: 0, index: 2, isAutomatable: true },
-  { id: 'furnace.pitchSlide', name: 'Pitch Slide', section: NKSSection.MODULATION, type: NKSParameterType.INT, min: -127, max: 127, defaultValue: 0, page: 0, index: 3, isAutomatable: true },
-  { id: 'furnace.vibrato', name: 'Vibrato', section: NKSSection.LFO, type: NKSParameterType.INT, min: 0, max: 15, defaultValue: 0, page: 0, index: 4, isAutomatable: true },
-  { id: 'furnace.noise', name: 'Noise', section: NKSSection.SYNTHESIS, type: NKSParameterType.BOOLEAN, min: 0, max: 1, defaultValue: 0, page: 0, index: 5, isAutomatable: true },
-  { id: 'furnace.envelope', name: 'Env Mode', section: NKSSection.ENVELOPE, type: NKSParameterType.INT, min: 0, max: 7, defaultValue: 0, page: 0, index: 6, isAutomatable: true },
+  { id: 'furnace.duty', name: 'Duty Cycle', section: NKSSection.SYNTHESIS, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0.67, page: 0, index: 0, isAutomatable: true },
+  { id: 'furnace.volume', name: 'Volume', section: NKSSection.OUTPUT, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 1, unit: '%', formatString: '%.0f%%', page: 0, index: 1, isAutomatable: true },
+  { id: 'furnace.panning', name: 'Pan', section: NKSSection.OUTPUT, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0.5, page: 0, index: 2, isAutomatable: true },
+  { id: 'furnace.noiseFreq', name: 'Noise Freq', section: NKSSection.SYNTHESIS, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0, page: 0, index: 3, isAutomatable: true },
+];
+
+// ============================================================================
+// FURNACE C64/SID PARAMETERS (deep filter + duty automation)
+// ============================================================================
+export const FURNACE_C64_NKS_PARAMETERS: NKSParameter[] = [
+  // Page 0: Filter
+  { id: 'furnace.cutoff', name: 'Cutoff', section: NKSSection.FILTER, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0.5, unit: '%', formatString: '%.0f%%', page: 0, index: 0, isAutomatable: true },
+  { id: 'furnace.resonance', name: 'Resonance', section: NKSSection.FILTER, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0, unit: '%', formatString: '%.0f%%', page: 0, index: 1, isAutomatable: true },
+  { id: 'furnace.filterMode', name: 'Filter Mode', section: NKSSection.FILTER, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0.14, page: 0, index: 2, isAutomatable: true },
+  { id: 'furnace.fineDuty', name: 'Pulse Width', section: NKSSection.SYNTHESIS, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0.5, unit: '%', formatString: '%.0f%%', page: 0, index: 3, isAutomatable: true },
+  { id: 'furnace.volume', name: 'Volume', section: NKSSection.OUTPUT, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 1, unit: '%', formatString: '%.0f%%', page: 0, index: 4, isAutomatable: true },
+  { id: 'furnace.panning', name: 'Pan', section: NKSSection.OUTPUT, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0.5, page: 0, index: 5, isAutomatable: true },
+  { id: 'furnace.duty', name: 'Waveform', section: NKSSection.SYNTHESIS, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0.67, page: 0, index: 6, isAutomatable: true },
+];
+
+// ============================================================================
+// FURNACE GAME BOY PARAMETERS
+// ============================================================================
+export const FURNACE_GB_NKS_PARAMETERS: NKSParameter[] = [
+  { id: 'furnace.duty', name: 'Duty Cycle', section: NKSSection.SYNTHESIS, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0.67, page: 0, index: 0, isAutomatable: true },
+  { id: 'furnace.volume', name: 'Volume', section: NKSSection.OUTPUT, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 1, unit: '%', formatString: '%.0f%%', page: 0, index: 1, isAutomatable: true },
+  { id: 'furnace.gbSweepTime', name: 'Sweep Time', section: NKSSection.MODULATION, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0, page: 0, index: 2, isAutomatable: true },
+  { id: 'furnace.gbSweepDir', name: 'Sweep Dir', section: NKSSection.MODULATION, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0, page: 0, index: 3, isAutomatable: true },
+  { id: 'furnace.panning', name: 'Pan', section: NKSSection.OUTPUT, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0.5, page: 0, index: 4, isAutomatable: true },
 ];
 
 // ============================================================================
@@ -930,7 +972,7 @@ export const SYNTH_PARAMETER_MAPS: Partial<Record<SynthType, NKSParameter[]>> = 
 
   // Furnace PSG/Console chips - use PSG params
   'FurnaceNES': FURNACE_PSG_NKS_PARAMETERS,
-  'FurnaceGB': FURNACE_PSG_NKS_PARAMETERS,
+  'FurnaceGB': FURNACE_GB_NKS_PARAMETERS,
   'FurnacePSG': FURNACE_PSG_NKS_PARAMETERS,
   'FurnacePCE': FURNACE_PSG_NKS_PARAMETERS,
   'FurnaceSNES': FURNACE_PSG_NKS_PARAMETERS,
@@ -946,9 +988,9 @@ export const SYNTH_PARAMETER_MAPS: Partial<Record<SynthType, NKSParameter[]>> = 
   'FurnaceMMC5': FURNACE_PSG_NKS_PARAMETERS,
 
   // Furnace Computer chips
-  'FurnaceC64': FURNACE_PSG_NKS_PARAMETERS,
-  'FurnaceSID6581': FURNACE_PSG_NKS_PARAMETERS,
-  'FurnaceSID8580': FURNACE_PSG_NKS_PARAMETERS,
+  'FurnaceC64': FURNACE_C64_NKS_PARAMETERS,
+  'FurnaceSID6581': FURNACE_C64_NKS_PARAMETERS,
+  'FurnaceSID8580': FURNACE_C64_NKS_PARAMETERS,
   'FurnaceAY': FURNACE_PSG_NKS_PARAMETERS,
   'FurnaceAY8930': FURNACE_PSG_NKS_PARAMETERS,
   'FurnaceVIC': FURNACE_PSG_NKS_PARAMETERS,

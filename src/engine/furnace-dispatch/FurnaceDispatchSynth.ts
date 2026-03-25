@@ -1298,27 +1298,92 @@ export class FurnaceDispatchSynth implements DevilboxSynth {
   set(param: string, value: number): void {
     const ch = this.currentChannel;
     const pt = this.platformType;
+
+    // FM operator params: fmOp0TL, fmOp1AR, fmOp2DR, etc.
+    const opMatch = param.match(/^fmOp(\d+)(TL|AR|DR|SL|RR|DT|MULT)$/);
+    if (opMatch) {
+      const op = parseInt(opMatch[1]);
+      const opParam = opMatch[2];
+      const cmdMap: Record<string, number> = {
+        'TL': DivCmd.FM_TL, 'AR': DivCmd.FM_AR, 'DR': DivCmd.FM_DR,
+        'SL': DivCmd.FM_SL, 'RR': DivCmd.FM_RR, 'DT': DivCmd.FM_DT,
+        'MULT': DivCmd.FM_MULT,
+      };
+      const cmd = cmdMap[opParam];
+      if (cmd !== undefined) {
+        // TL is inverted (0=max, 127=min), others are direct
+        const maxVal = opParam === 'TL' ? 127 : opParam === 'AR' ? 31 : opParam === 'MULT' ? 15 : 31;
+        const mapped = opParam === 'TL'
+          ? Math.round((1 - value) * maxVal)
+          : Math.round(value * maxVal);
+        this.engine.dispatch(cmd, ch, op, mapped, pt);
+      }
+      return;
+    }
+
     switch (param) {
+      // ── Universal ──
       case 'volume':
-        // Route to both output gain and dispatch engine
         this.output.gain.setValueAtTime(value, this.output.context.currentTime);
         this.engine.dispatch(DivCmd.VOLUME, ch, Math.round(value * 127), 0, pt);
         break;
       case 'panning':
-        // 0-1 → -127..+127
         this.engine.dispatch(DivCmd.PANNING, ch, Math.round((value * 2 - 1) * 127), 0, pt);
         break;
-      case 'cutoff':
-        // C64/SID filter cutoff (0-1 → 0-2047)
-        this.engine.dispatch(DivCmd.C64_CUTOFF, ch, Math.round(value * 2047), 0, pt);
+
+      // ── FM Global ──
+      case 'fmFB':
+        this.engine.dispatch(DivCmd.FM_FB, ch, Math.round(value * 7), 0, pt);
         break;
+      case 'fmALG':
+        this.engine.dispatch(DivCmd.FM_ALG, ch, Math.round(value * 7), 0, pt);
+        break;
+
+      // ── FM Operator shortcuts (op0 = carrier) ──
       case 'fmTL':
-        // FM total level for operator 0 (0-1 → 0-127, inverted: 0=max, 127=min)
         this.engine.dispatch(DivCmd.FM_TL, ch, 0, Math.round((1 - value) * 127), pt);
         break;
+
+      // ── C64/SID ──
+      case 'cutoff':
+        this.engine.dispatch(DivCmd.C64_CUTOFF, ch, Math.round(value * 2047), 0, pt);
+        break;
+      case 'resonance':
+        this.engine.dispatch(DivCmd.C64_RESONANCE, ch, Math.round(value * 15), 0, pt);
+        break;
+      case 'filterMode':
+        // 0=off, 1=LP, 2=BP, 4=HP (bit flags)
+        this.engine.dispatch(DivCmd.C64_FILTER_MODE, ch, Math.round(value * 7), 0, pt);
+        break;
+      case 'fineDuty':
+        this.engine.dispatch(DivCmd.C64_FINE_DUTY, ch, Math.round(value * 4095), 0, pt);
+        break;
+
+      // ── PSG / Waveform ──
       case 'duty':
-        // PSG/pulse duty cycle (0-1 → 0-3 or 0-7 depending on chip)
         this.engine.dispatch(DivCmd.WAVE, ch, Math.round(value * 3), 0, pt);
+        break;
+      case 'noiseFreq':
+        this.engine.dispatch(DivCmd.STD_NOISE_FREQ, ch, Math.round(value * 31), 0, pt);
+        break;
+      case 'noiseMode':
+        this.engine.dispatch(DivCmd.STD_NOISE_MODE, ch, Math.round(value), 0, pt);
+        break;
+
+      // ── Game Boy ──
+      case 'gbSweepTime':
+        this.engine.dispatch(DivCmd.GB_SWEEP_TIME, ch, Math.round(value * 7), 0, pt);
+        break;
+      case 'gbSweepDir':
+        this.engine.dispatch(DivCmd.GB_SWEEP_DIR, ch, value >= 0.5 ? 1 : 0, 0, pt);
+        break;
+
+      // ── AY/YM ──
+      case 'ayNoiseMaskAnd':
+        this.engine.dispatch(DivCmd.AY_NOISE_MASK_AND, ch, Math.round(value * 255), 0, pt);
+        break;
+      case 'ayNoiseMaskOr':
+        this.engine.dispatch(DivCmd.AY_NOISE_MASK_OR, ch, Math.round(value * 255), 0, pt);
         break;
     }
   }

@@ -8,6 +8,7 @@
 import React, { useRef, useEffect, useCallback, useState, useMemo } from 'react';
 import { useTrackerStore, useCursorStore, useTransportStore, useThemeStore, useInstrumentStore, useEditorStore } from '@stores';
 import { AutomationLanes } from './AutomationLanes';
+import { AutomationParameterPicker } from '../automation/AutomationParameterPicker';
 import { MacroLanes } from './MacroLanes';
 import { useUIStore } from '@stores/useUIStore';
 import { useShallow } from 'zustand/react/shallow';
@@ -2957,6 +2958,17 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
         {pattern && (
           <>
             {showAutomationLanes && (
+              <>
+              {/* Per-channel automation parameter pickers */}
+              {pattern.channels.map((_, chIdx) => (
+                <AutomationParameterPicker
+                  key={`auto-picker-${chIdx}`}
+                  channelIndex={chIdx}
+                  left={channelOffsets[chIdx] || 0}
+                  width={channelWidths[chIdx] || 80}
+                  top={-20}
+                />
+              ))}
               <AutomationLanes
                 key={`automation-${pattern.id}`}
                 patternId={pattern.id}
@@ -2974,6 +2986,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
                 nextPatternId={showGhostPatterns ? (currentPatternIndex < patterns.length - 1 ? patterns[currentPatternIndex + 1]?.id : (patterns.length > 1 ? patterns[0]?.id : undefined)) : undefined}
                 nextPatternLength={showGhostPatterns ? (currentPatternIndex < patterns.length - 1 ? patterns[currentPatternIndex + 1]?.length : (patterns.length > 1 ? patterns[0]?.length : undefined)) : undefined}
               />
+              </>
             )}
             {/* Internal Macro Columns Overlay (only when visible) */}
             {showMacroLanes && (
