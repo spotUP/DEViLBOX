@@ -61,6 +61,29 @@ export const VU_RED         = 0xef4444;
 export const MUTE_COLOR     = 0xef4444;
 export const SOLO_COLOR     = 0xfbbf24;
 
+// ─── Effect Type Colors ──────────────────────────────────────────────────────
+
+export const EFFECT_TYPE_TONEJS     = 0x3b82f6; // blue
+export const EFFECT_TYPE_NEURAL     = 0xa855f7; // purple
+export const EFFECT_TYPE_BUZZMACHINE = 0xf97316; // orange
+export const EFFECT_TYPE_WASM       = 0x10b981; // green
+export const EFFECT_TYPE_WAM        = 0x14b8a6; // teal
+
+// ─── UI Element Colors ──────────────────────────────────────────────────────
+
+export const TOOLTIP_BG     = 0x1a1a2e;
+export const TOOLTIP_BORDER = 0x2a2a4e;
+
+// ─── Undo/Action Type Colors ────────────────────────────────────────────────
+
+export const ACTION_NOTE     = 0x60a5fa; // blue
+export const ACTION_EFFECT   = 0x4ade80; // green
+export const ACTION_INSERT   = 0xfbbf24; // yellow
+export const ACTION_DELETE   = 0xf87171; // red
+export const ACTION_PATTERN  = 0xa78bfa; // purple
+export const ACTION_MOVE     = 0x2dd4bf; // teal
+export const ACTION_BULK     = 0xfb923c; // orange
+
 // ─── Misc ───────────────────────────────────────────────────────────────────
 
 export const WHITE          = 0xffffff;
