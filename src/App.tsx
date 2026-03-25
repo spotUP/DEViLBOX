@@ -119,6 +119,7 @@ async function playStartupJingle(): Promise<void> {
 }
 
 const DesignSystemPage = lazy(() => import('./components/design-system/DesignSystemPage').then(m => ({ default: m.DesignSystemPage })));
+const IsolatedComponent = lazy(() => import('./components/design-system/IsolatedComponent').then(m => ({ default: m.IsolatedComponent })));
 
 /** Wrapper that intercepts #/design-system before App mounts its hooks.
  *  Also handles ?_renderMode=dom|webgl for split-screen comparison iframes. */
@@ -149,6 +150,12 @@ function AppRouter() {
 
   if (isDesignSystem) {
     return <Suspense fallback={<div style={{ background: '#121218', color: '#6b6b80', display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh' }}>Loading design system...</div>}><DesignSystemPage /></Suspense>;
+  }
+
+  // Component isolation mode for split-screen comparison
+  const isolate = new URLSearchParams(window.location.search).get('_isolate');
+  if (isolate) {
+    return <Suspense fallback={<div style={{ background: '#0d0d0d', color: '#666', display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', fontFamily: 'monospace' }}>Loading {isolate}...</div>}><IsolatedComponent name={isolate} /></Suspense>;
   }
   return <App />;
 }
