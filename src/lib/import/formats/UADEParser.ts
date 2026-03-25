@@ -1175,10 +1175,17 @@ export async function parseUADEFile(
           }
         });
 
+        // VBlank-timed compiled 68k formats (Dave Lowe etc.) don't use CIA timers,
+        // so the auto-detected speed is unreliable.  Force speed 6 for these.
+        const vblankPrefix = filename.split('.')[0]?.toLowerCase() ?? '';
+        const VBLANK_PREFIXES = new Set(['dl', 'bd', 'fg', 'jb', 'jp', 'mc', 'dh', 'ps', 'sb', 'th', 'wb', 'kc', 'jt']);
+        const speedHint = VBLANK_PREFIXES.has(vblankPrefix) ? 6 : undefined;
+
         const reconstructed = reconstructPatterns(
           tickSnapshots,
           samplePtrToInstrIndex,
           song.numChannels,
+          speedHint,
         );
 
         if (reconstructed.warnings.length > 0) {

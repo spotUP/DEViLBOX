@@ -246,6 +246,7 @@ export function reconstructPatterns(
   snapshots: UADETickSnapshot[],
   samplePtrToInstrIndex: Map<number, number>,
   channelCount = 4,
+  speedHint?: number,
 ): ReconstructedSong {
   const warnings: string[] = [];
 
@@ -256,7 +257,7 @@ export function reconstructPatterns(
   }
 
   // ── Step 1: detect speed ──────────────────────────────────────────────────
-  const speed = detectSpeed(snapshots, channelCount);
+  const speed = speedHint ?? detectSpeed(snapshots, channelCount);
 
   // ── Step 2: group snapshots into rows ─────────────────────────────────────
   // Each row starts at firstTick + rowIndex * speed.
