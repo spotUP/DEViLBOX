@@ -5,7 +5,7 @@
  * Contains all synth-specific change handlers and the editor mode dispatch logic.
  */
 
-import React, { useCallback, useState, lazy, Suspense } from 'react';
+import React, { useCallback, useState, useEffect, lazy, Suspense } from 'react';
 import { useGTUltraStore } from '@stores/useGTUltraStore';
 import type { InstrumentConfig, EffectConfig } from '@typedefs/instrument';
 import type { GTUltraConfig } from '@typedefs/instrument/exotic';
@@ -1888,6 +1888,21 @@ export const SynthTypeDispatcher: React.FC<SynthTypeDispatcherProps> = ({
 
     // Check if hardware UI is available for this synth type
     const hasHardware = hasHardwareUI(instrument.synthType);
+
+    // Pre-initialize MAME/chip synth so ROMs load immediately when the editor opens
+    useEffect(() => {
+      if (!instrument?.id) return;
+      const st = instrument.synthType || '';
+      const isMAMEType = st.startsWith('MAME') || ['CZ101', 'CEM3394', 'SCSP'].includes(st);
+      if (!isMAMEType) return;
+      (async () => {
+        try {
+          const { getToneEngine } = await import('@engine/ToneEngine');
+          const engine = getToneEngine();
+          await engine.ensureInstrumentReady(instrument);
+        } catch { /* engine not ready */ }
+      })();
+    }, [instrument?.id, instrument?.synthType]); // eslint-disable-line react-hooks/exhaustive-deps
 
     return (
       <div className="synth-editor-container bg-gradient-to-b from-[#1e1e1e] to-[#151515]">
