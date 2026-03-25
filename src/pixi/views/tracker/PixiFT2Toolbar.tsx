@@ -74,7 +74,7 @@ const FT2Cell: React.FC<FT2CellProps> = ({ label, value, min, max, onChange, wid
   return (
     <pixiContainer layout={{ flexDirection: 'column', alignItems: 'flex-start', gap: 1 }}>
       <pixiBitmapText
-        text={label.toUpperCase()}
+        text={`${label.toUpperCase()}:`}
         style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 10, fill: 0xffffff }}
         tint={theme.textMuted.color}
         layout={{}}
@@ -111,7 +111,6 @@ export const PixiFT2Toolbar: React.FC = () => {
     speed, setSpeed,
     isPlaying, isLooping,
     play, stop, setIsLooping,
-    grooveTemplateId, swing, jitter,
   } = useTransportStore(useShallow(s => ({
     bpm: s.bpm,
     setBPM: s.setBPM,
@@ -122,9 +121,6 @@ export const PixiFT2Toolbar: React.FC = () => {
     play: s.play,
     stop: s.stop,
     setIsLooping: s.setIsLooping,
-    grooveTemplateId: s.grooveTemplateId,
-    swing: s.swing,
-    jitter: s.jitter,
   })));
 
   // ── Tracker store ─────────────────────────────────────────────────────────
@@ -187,7 +183,7 @@ export const PixiFT2Toolbar: React.FC = () => {
   const songLength = patternOrder.length;
   const currentPatternInOrder = patternOrder[currentPositionIndex] ?? currentPatternIndex;
 
-  const grooveActive = (grooveTemplateId !== 'straight' && swing > 0) || jitter > 0;
+  // Groove button moved to EditorControlsBar (matching DOM)
 
   const editorMode = useFormatStore((s) => s.editorMode);
   const gtPlaying = useGTUltraStore((s) => s.playing);
@@ -246,7 +242,6 @@ export const PixiFT2Toolbar: React.FC = () => {
   const handleShowPatternOrder = useCallback(() => useUIStore.getState().openModal('patternOrder'), []);
   const handleShowDrumpads     = useCallback(() => useUIStore.getState().openModal('drumpads'), []);
   const handleShowSettings     = useCallback(() => useUIStore.getState().openModal('settings'), []);
-  const handleShowGroove       = useCallback(() => useUIStore.getState().openModal('grooveSettings'), []);
 
   // ── File operations ───────────────────────────────────────────────────────
   const handleLoad = useCallback(() => {
@@ -534,16 +529,8 @@ export const PixiFT2Toolbar: React.FC = () => {
 
             <TransportSep />
 
-            {/* Speed + Groove button */}
+            {/* Speed (Groove button is in EditorControlsBar, not here — matching DOM) */}
             <FT2Cell label="Speed" value={speed} min={1} max={31} onChange={setSpeed} width={44} />
-            <PixiButton
-              label="Groove"
-              variant={grooveActive ? 'ft2' : 'ghost'}
-              color={grooveActive ? 'blue' : 'default'}
-              size="sm"
-              active={grooveActive}
-              onClick={handleShowGroove}
-            />
 
             <TransportSep />
 
