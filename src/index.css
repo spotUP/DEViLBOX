@@ -1297,10 +1297,14 @@
       inset 0 1px 2px rgba(0, 0, 0, 0.05);
   }
 
+  .piano-key-white {
+    transition: transform 50ms ease-out, background 50ms ease-out, box-shadow 50ms ease-out;
+  }
+
   .piano-key-white:active {
-    background: linear-gradient(180deg, #dee2e6 0%, #adb5bd 100%);
-    box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.15);
-    transform: translateY(1px);
+    background: linear-gradient(180deg, #ffffff 0%, #e0e4ff 100%);
+    box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.15), 0 0 8px rgba(99, 102, 241, 0.3);
+    transform: translateY(2px) scale(0.98);
   }
 
   .piano-key-black {
@@ -1326,10 +1330,14 @@
     border-radius: 0 0 4px 4px;
   }
 
+  .piano-key-black {
+    transition: transform 50ms ease-out, background 50ms ease-out, box-shadow 50ms ease-out;
+  }
+
   .piano-key-black:active {
-    background: linear-gradient(180deg, #212529 0%, #000000 100%);
-    box-shadow: inset 0 2px 3px rgba(0, 0, 0, 0.5);
-    transform: translateY(1px);
+    background: linear-gradient(180deg, #4a5568 0%, #2d3748 100%);
+    box-shadow: inset 0 2px 3px rgba(0, 0, 0, 0.5), 0 0 6px rgba(99, 102, 241, 0.4);
+    transform: translateY(2px) scale(1.02);
   }
 
   .piano-key-label {
@@ -1751,6 +1759,10 @@
     animation: fadeIn 0.2s ease-out;
   }
 
+  .animate-fade-in-fast {
+    animation: fadeInFast 0.15s ease-out;
+  }
+
   @keyframes fadeIn {
     from {
       opacity: 0;
@@ -1759,6 +1771,17 @@
     to {
       opacity: 1;
       transform: translateY(0);
+    }
+  }
+
+  @keyframes fadeInFast {
+    from {
+      opacity: 0;
+      transform: scale(0.98);
+    }
+    to {
+      opacity: 1;
+      transform: scale(1);
     }
   }
 
