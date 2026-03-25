@@ -247,9 +247,14 @@ export class D50Synth implements DevilboxSynth {
 
     // Auto-load ROMs
     try {
-      const { firmware, ic30, ic29 } = await loadD50ROMs();
-      await this.loadROMs(ic30.buffer as ArrayBuffer, ic29.buffer as ArrayBuffer, firmware.buffer as ArrayBuffer);
-      console.log('[D50Synth] ROMs loaded successfully');
+      const roms = await loadD50ROMs();
+      if (!roms) {
+        console.warn('[D50Synth] ROM not found — synth will be silent until ROM is uploaded');
+      } else {
+        const { firmware, ic30, ic29 } = roms;
+        await this.loadROMs(ic30.buffer as ArrayBuffer, ic29.buffer as ArrayBuffer, firmware.buffer as ArrayBuffer);
+        console.log('[D50Synth] ROMs loaded successfully');
+      }
     } catch (error) {
       console.error('[D50Synth] ROM loading failed:', error);
       console.error('Place ROM files in /public/roms/d50/ - see /public/roms/README.md');

@@ -78,6 +78,11 @@ export class RolandSASynth extends MAMEBaseSynth {
       // Call parent initialize first to set up worklet
       await super.initialize();
 
+      if (!romData) {
+        console.warn('[RolandSA] ROM not found — synth will be silent until ROM is uploaded');
+        return;
+      }
+
       // Split combined ROM into 3 parts (IC5, IC6, IC7)
       const ic5 = romData.slice(0, 128 * 1024);
       const ic6 = romData.slice(128 * 1024, 256 * 1024);

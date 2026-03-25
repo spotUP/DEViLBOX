@@ -231,10 +231,14 @@ export class VFXSynth implements DevilboxSynth {
     // Auto-load sample ROM banks
     try {
       const banks = await loadVFXROMs();
-      for (let i = 0; i < banks.length; i++) {
-        await this.loadSampleROM(i, banks[i].buffer as ArrayBuffer);
+      if (!banks) {
+        console.warn('[VFXSynth] ROM not found — synth will be silent until ROM is uploaded');
+      } else {
+        for (let i = 0; i < banks.length; i++) {
+          await this.loadSampleROM(i, banks[i].buffer as ArrayBuffer);
+        }
+        console.log('[VFXSynth] ROMs loaded successfully');
       }
-      console.log('[VFXSynth] ROMs loaded successfully');
     } catch (error) {
       console.error('[VFXSynth] ROM loading failed:', error);
       console.error('Place ROM files in /public/roms/vfx/ - see /public/roms/README.md');
