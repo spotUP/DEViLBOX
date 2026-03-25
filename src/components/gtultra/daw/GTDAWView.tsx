@@ -25,6 +25,7 @@ import {
   ATTACK_MS, DECAY_MS, WAVEFORMS,
 } from '@/lib/gtultra/GTVisualMapping';
 import { getPresetCategories, getPresetsByCategory, type GTSIDPreset } from '@/constants/gtultraPresets';
+import { Oscilloscope } from '@/components/visualization/Oscilloscope';
 
 const TOOLBAR_H = 36;
 const BOTTOM_H = 220;
@@ -935,7 +936,7 @@ const DAWEnvelopeCanvas: React.FC<{ attack: number; decay: number; sustain: numb
 
 // ─── Bottom Panel ───
 
-type BottomTab = 'mixer' | 'tables' | 'monitor' | 'presets' | 'clips' | 'steps';
+type BottomTab = 'mixer' | 'tables' | 'monitor' | 'presets' | 'clips' | 'steps' | 'scope';
 const BOTTOM_TABS: { id: BottomTab; label: string }[] = [
   { id: 'mixer', label: 'Mixer' },
   { id: 'steps', label: 'Steps' },
@@ -943,6 +944,7 @@ const BOTTOM_TABS: { id: BottomTab; label: string }[] = [
   { id: 'tables', label: 'Tables' },
   { id: 'monitor', label: 'Monitor' },
   { id: 'clips', label: 'Clips' },
+  { id: 'scope', label: 'Scope' },
 ];
 
 const DAWBottomPanel: React.FC = () => {
@@ -981,6 +983,7 @@ const DAWBottomPanel: React.FC = () => {
         {dawBottomPanel === 'tables' && <div style={{ padding: 16, color: DAW_CSS.textMuted }}>Table editor -- coming soon</div>}
         {dawBottomPanel === 'monitor' && <div style={{ padding: 16, color: DAW_CSS.textMuted }}>SID Monitor -- coming soon</div>}
         {dawBottomPanel === 'clips' && <div style={{ padding: 16, color: DAW_CSS.textMuted }}>Clip Grid -- coming soon</div>}
+        {dawBottomPanel === 'scope' && <Oscilloscope width="auto" height={180} />}
       </div>
     </div>
   );

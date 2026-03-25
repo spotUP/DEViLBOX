@@ -815,6 +815,43 @@ export const MELODICA_NKS_PARAMETERS: NKSParameter[] = [
 ];
 
 // ============================================================================
+// HARMONIC SYNTH (Additive)
+// ============================================================================
+export const HARMONICSYNTH_NKS_PARAMETERS: NKSParameter[] = [
+  { id: 'harmonic.spectralTilt', name: 'Tilt', section: NKSSection.SYNTHESIS, type: NKSParameterType.FLOAT, min: -1, max: 1, defaultValue: 0, formatString: '%.2f', page: 0, index: 0, isAutomatable: true },
+  { id: 'harmonic.evenOddBalance', name: 'Even/Odd', section: NKSSection.SYNTHESIS, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0.5, unit: '%', formatString: '%.0f%%', page: 0, index: 1, isAutomatable: true },
+  { id: 'harmonic.filterCutoff', name: 'Cutoff', section: NKSSection.FILTER, type: NKSParameterType.FLOAT, min: 20, max: 20000, defaultValue: 8000, unit: 'Hz', formatString: '%.0f', page: 0, index: 2, isAutomatable: true },
+  { id: 'harmonic.filterResonance', name: 'Resonance', section: NKSSection.FILTER, type: NKSParameterType.FLOAT, min: 0, max: 30, defaultValue: 1, formatString: '%.1f', page: 0, index: 3, isAutomatable: true },
+  { id: 'harmonic.attack', name: 'Attack', section: NKSSection.ENVELOPE, type: NKSParameterType.FLOAT, min: 0, max: 2, defaultValue: 0.01, unit: 's', formatString: '%.3f', page: 0, index: 4, isAutomatable: true },
+  { id: 'harmonic.decay', name: 'Decay', section: NKSSection.ENVELOPE, type: NKSParameterType.FLOAT, min: 0, max: 2, defaultValue: 0.3, unit: 's', formatString: '%.2f', page: 0, index: 5, isAutomatable: true },
+  { id: 'harmonic.sustain', name: 'Sustain', section: NKSSection.ENVELOPE, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0.7, unit: '%', formatString: '%.0f%%', page: 0, index: 6, isAutomatable: true },
+  { id: 'harmonic.release', name: 'Release', section: NKSSection.ENVELOPE, type: NKSParameterType.FLOAT, min: 0, max: 5, defaultValue: 0.5, unit: 's', formatString: '%.2f', page: 0, index: 7, isAutomatable: true },
+];
+
+// ============================================================================
+// PINK TROMBONE (Vocal Synth)
+// ============================================================================
+export const PINKTROMBONE_NKS_PARAMETERS: NKSParameter[] = [
+  { id: 'pinktrombone.frequency', name: 'Frequency', section: NKSSection.SYNTHESIS, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0.5, unit: '%', formatString: '%.0f%%', page: 0, index: 0, isAutomatable: true },
+  { id: 'pinktrombone.intensity', name: 'Intensity', section: NKSSection.SYNTHESIS, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0.5, unit: '%', formatString: '%.0f%%', page: 0, index: 1, isAutomatable: true },
+  { id: 'pinktrombone.velum', name: 'Velum', section: NKSSection.SYNTHESIS, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0.01, unit: '%', formatString: '%.0f%%', page: 0, index: 2, isAutomatable: true },
+  { id: 'pinktrombone.tongueIndex', name: 'Tongue Pos', section: NKSSection.SYNTHESIS, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0.5, unit: '%', formatString: '%.0f%%', page: 0, index: 3, isAutomatable: true },
+  { id: 'pinktrombone.tongueDiameter', name: 'Tongue Dia', section: NKSSection.SYNTHESIS, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0.5, unit: '%', formatString: '%.0f%%', page: 0, index: 4, isAutomatable: true },
+  { id: 'pinktrombone.tipPosition', name: 'Tip Pos', section: NKSSection.SYNTHESIS, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0.5, unit: '%', formatString: '%.0f%%', page: 0, index: 5, isAutomatable: true },
+  { id: 'pinktrombone.tipDiameter', name: 'Tip Dia', section: NKSSection.SYNTHESIS, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0.5, unit: '%', formatString: '%.0f%%', page: 0, index: 6, isAutomatable: true },
+  { id: 'pinktrombone.volume', name: 'Volume', section: NKSSection.OUTPUT, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0.7, unit: '%', formatString: '%.0f%%', page: 0, index: 7, isAutomatable: true },
+];
+
+// ============================================================================
+// DECTALK (Speech Synth)
+// ============================================================================
+export const DECTALK_NKS_PARAMETERS: NKSParameter[] = [
+  { id: 'dectalk.rate', name: 'Rate', section: NKSSection.SYNTHESIS, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0.5, unit: '%', formatString: '%.0f%%', page: 0, index: 0, isAutomatable: true },
+  { id: 'dectalk.pitch', name: 'Pitch', section: NKSSection.SYNTHESIS, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0.5, unit: '%', formatString: '%.0f%%', page: 0, index: 1, isAutomatable: true },
+  { id: 'dectalk.volume', name: 'Volume', section: NKSSection.OUTPUT, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0.7, unit: '%', formatString: '%.0f%%', page: 0, index: 2, isAutomatable: true },
+];
+
+// ============================================================================
 // GENERIC PARAMETERS (for synths without specific mapping)
 // ============================================================================
 export const GENERIC_NKS_PARAMETERS: NKSParameter[] = [
@@ -975,6 +1012,11 @@ export const SYNTH_PARAMETER_MAPS: Partial<Record<SynthType, NKSParameter[]>> = 
 
   // WAM plugin (generic until auto-profiled at runtime)
   'WAM': GENERIC_NKS_PARAMETERS,
+
+  // Additive / Vocal / Speech
+  'HarmonicSynth': HARMONICSYNTH_NKS_PARAMETERS,
+  'PinkTrombone': PINKTROMBONE_NKS_PARAMETERS,
+  'DECtalk': DECTALK_NKS_PARAMETERS,
 
   // Multi-sample / Module playback
   'DrumKit': DRUMMACHINE_NKS_PARAMETERS,

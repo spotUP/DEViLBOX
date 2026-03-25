@@ -22,6 +22,7 @@ const C_BAR_FILTER = 0x2a9d8f;
 const C_BAR_SPEED = 0xffcc00;
 const C_GRID     = 0x151515;
 const C_CURSOR   = 0xffffff;
+const C_PLAYBACK = 0x00ff88;
 
 const TABLE_COLORS = [C_BAR_WAVE, C_BAR_PULSE, C_BAR_FILTER, C_BAR_SPEED];
 const TABLE_NAMES = ['Wave', 'Pulse', 'Filter', 'Speed'];
@@ -37,11 +38,16 @@ export const PixiGTStudioTables: React.FC<Props> = ({ width, height }) => {
   const barsRef = useRef<GraphicsType>(null);
   const megaRef = useRef<MegaText | null>(null);
   const [drawing, setDrawing] = useState(false);
+  const [hoverIndex, setHoverIndex] = useState<number | null>(null);
 
   const activeTable = useGTUltraStore((s) => s.activeTable);
   const tableData = useGTUltraStore((s) => s.tableData);
   const tableCursor = useGTUltraStore((s) => s.tableCursor);
   const engine = useGTUltraStore((s) => s.engine);
+  const playing = useGTUltraStore((s) => s.playing);
+  const playbackPos = useGTUltraStore((s) => s.playbackPos);
+  const instrumentData = useGTUltraStore((s) => s.instrumentData);
+  const currentInstrument = useGTUltraStore((s) => s.currentInstrument);
 
   const tableName = TABLE_NAMES[activeTable] || 'Wave';
   const tableKey = tableName.toLowerCase();
@@ -123,11 +129,15 @@ export const PixiGTStudioTables: React.FC<Props> = ({ width, height }) => {
   }, [width, pointerToCell, applyValue]);
 
   const handlePointerMove = useCallback((e: FederatedPointerEvent) => {
-    if (!drawing) return;
     const cell = pointerToCell(e);
     if (cell) {
-      useGTUltraStore.setState({ tableCursor: cell.index });
-      applyValue(cell.index, cell.value);
+      setHoverIndex(cell.index);
+      if (drawing) {
+        useGTUltraStore.setState({ tableCursor: cell.index });
+        applyValue(cell.index, cell.value);
+      }
+    } else {
+      setHoverIndex(null);
     }
   }, [drawing, pointerToCell, applyValue]);
 
@@ -177,6 +187,12 @@ export const PixiGTStudioTables: React.FC<Props> = ({ width, height }) => {
     const { displayLen, barW } = getBarInfo();
     const barGap = 1;
 
+    // Approximate playback table position from tick count and instrument table pointer
+    const instView = instrumentData[currentInstrument];
+    const tablePtrs = instView ? [instView.wavePtr, instView.pulsePtr, instView.filterPtr, instView.speedPtr] : [0, 0, 0, 0];
+    const tablePtr = tablePtrs[activeTable] || 0;
+    const playbackTablePos = playing && tablePtr > 0 ? tablePtr + (playbackPos.row % Math.max(1, displayLen - tablePtr)) : -1;
+
     // Grid lines
     for (const frac of [0.25, 0.5, 0.75]) {
       const y = chartY + chartH * (1 - frac);
@@ -205,6 +221,27 @@ export const PixiGTStudioTables: React.FC<Props> = ({ width, height }) => {
         bars.rect(x - 1, chartY, barW + 2, chartH).stroke({ color: C_CURSOR, width: 1, alpha: 0.5 });
       }
 
+      // Playback position highlight
+      if (playbackTablePos >= 0 && i === playbackTablePos) {
+        bars.rect(x - 1, chartY, barW + 2, chartH).fill({ color: C_PLAYBACK, alpha: 0.15 });
+        bars.rect(x - 1, chartY, barW + 2, chartH).stroke({ color: C_PLAYBACK, width: 1.5, alpha: 0.8 });
+      }
+
+      // Hover tooltip
+      if (hoverIndex !== null && i === hoverIndex && i !== tableCursor) {
+        bars.rect(x - 1, chartY, barW + 2, chartH).fill({ color: 0xffffff, alpha: 0.05 });
+        const hVal = data.left[i] || 0;
+        const hRVal = data.right[i] || 0;
+        const tooltipText = `#${i.toString(16).padStart(2, '0').toUpperCase()} L:${hVal.toString(16).padStart(2, '0').toUpperCase()} R:${hRVal.toString(16).padStart(2, '0').toUpperCase()}`;
+        const tooltipY = Math.max(chartY - 2, chartY + chartH - (hVal / 255) * chartH - 14);
+        labels.push({
+          x: Math.min(x, width - 100), y: tooltipY,
+          text: tooltipText,
+          color: barColor,
+          fontFamily: ff,
+        });
+      }
+
       // Index labels (every 8 entries)
       if (i % 8 === 0) {
         labels.push({
@@ -227,7 +264,8 @@ export const PixiGTStudioTables: React.FC<Props> = ({ width, height }) => {
     });
 
     mega.updateLabels(labels, 9);
-  }, [width, height, activeTable, data, tableCursor, tableName, barColor, getBarInfo, chartY, chartH, chartW]);
+  }, [width, height, activeTable, data, tableCursor, tableName, barColor, getBarInfo, chartY, chartH, chartW,
+    hoverIndex, playing, playbackPos, instrumentData, currentInstrument]);
 
   useEffect(() => {
     redraw();

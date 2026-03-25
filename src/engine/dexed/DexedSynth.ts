@@ -612,6 +612,50 @@ export class DexedSynth implements DevilboxSynth {
   }
 
   /**
+   * Set a named parameter (for automation). Maps NKS param names to DX7 parameter IDs.
+   */
+  set(param: string, value: number): void {
+    const opMatch = param.match(/^op(\d+)\.(\w+)$/);
+    if (opMatch) {
+      const opIndex = parseInt(opMatch[1]) - 1;
+      if (opIndex < 0 || opIndex >= 6) return;
+      const baseParam = opIndex * 21;
+      const opParam = opMatch[2];
+      switch (opParam) {
+        case 'level': this.setParameter(baseParam + DX7Param.OP_LEVEL, Math.round(value * 99)); break;
+        case 'coarse': this.setParameter(baseParam + DX7Param.OP_COARSE, Math.round(value * 31)); break;
+        case 'fine': this.setParameter(baseParam + DX7Param.OP_FINE, Math.round(value * 99)); break;
+        case 'detune': this.setParameter(baseParam + DX7Param.OP_DETUNE, Math.round(value * 14)); break;
+        case 'egRate1': this.setParameter(baseParam + DX7Param.OP_EG_RATE_1, Math.round(value * 99)); break;
+        case 'egRate2': this.setParameter(baseParam + DX7Param.OP_EG_RATE_2, Math.round(value * 99)); break;
+        case 'egRate3': this.setParameter(baseParam + DX7Param.OP_EG_RATE_3, Math.round(value * 99)); break;
+        case 'egRate4': this.setParameter(baseParam + DX7Param.OP_EG_RATE_4, Math.round(value * 99)); break;
+      }
+      return;
+    }
+    switch (param) {
+      case 'algorithm': this.setAlgorithm(Math.round(value * 31)); break;
+      case 'feedback': this.setFeedback(Math.round(value * 7)); break;
+      case 'lfoSpeed': this.setLfoSpeed(Math.round(value * 99)); break;
+      case 'lfoPitchModDepth': this.setLfoPitchModDepth(Math.round(value * 99)); break;
+      case 'lfoAmpModDepth': this.setLfoAmpModDepth(Math.round(value * 99)); break;
+      case 'lfoWave': this.setLfoWaveform(Math.round(value * 5)); break;
+      case 'transpose': this.setTranspose(Math.round(value * 48)); break;
+      case 'oscSync': this.setParameter(DX7Param.OSC_SYNC, value >= 0.5 ? 1 : 0); break;
+    }
+  }
+
+  get(param: string): number | undefined {
+    switch (param) {
+      case 'algorithm': return (this.config.algorithm ?? 0) / 31;
+      case 'feedback': return (this.config.feedback ?? 0) / 7;
+      case 'lfoSpeed': return (this.config.lfoSpeed ?? 35) / 99;
+      case 'transpose': return (this.config.transpose ?? 24) / 48;
+      default: return undefined;
+    }
+  }
+
+  /**
    * Clean up resources
    */
   dispose(): void {

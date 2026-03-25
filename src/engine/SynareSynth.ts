@@ -203,11 +203,33 @@ export class SynareSynth implements DevilboxSynth {
     this.triggerRelease();
   }
 
-  // Update methods
-  updateParameter(key: string, value: number) {
-    void key; void value;
-    // Basic dynamic update
-    this.applyConfig(this.config);
+  /**
+   * Set a named parameter (for automation). Values are 0-1 normalized.
+   */
+  set(param: string, value: number): void {
+    switch (param) {
+      case 'tune': this.osc1.frequency.rampTo(20 + value * 2000, 0.05); break;
+      case 'cutoff': this.filter.frequency.rampTo(200 * Math.pow(10000 / 200, value), 0.05); break;
+      case 'resonance': this.filter.Q.rampTo(value * 10, 0.05); break;
+      case 'decay': this.ampEnv.decay = 0.01 + value * 2; break;
+      case 'noiseMix': this.noiseGain.gain.rampTo(value, 0.05); break;
+      case 'osc2Mix': this.osc2Gain.gain.rampTo(value, 0.05); break;
+      case 'sweepAmount': this.config.sweep.amount = value * 48 - 24; break;
+      case 'sweepTime': this.config.sweep.time = 10 + value * 990; this.pitchEnv.decay = this.config.sweep.time / 1000; break;
+      case 'lfoRate': this.lfo.frequency.rampTo(0.1 + value * 29.9, 0.05); break;
+      case 'lfoDepth': this.lfoGain.gain.rampTo(value, 0.05); break;
+      case 'volume': this._toneOutput.volume.rampTo(-40 + value * 40, 0.05); break;
+    }
+  }
+
+  get(param: string): number | undefined {
+    switch (param) {
+      case 'cutoff': return Math.log(Number(this.filter.frequency.value) / 200) / Math.log(10000 / 200);
+      case 'resonance': return Number(this.filter.Q.value) / 10;
+      case 'decay': return (Number(this.ampEnv.decay) - 0.01) / 2;
+      case 'volume': return (Number(this._toneOutput.volume.value) + 40) / 40;
+      default: return undefined;
+    }
   }
 
   dispose(): void {

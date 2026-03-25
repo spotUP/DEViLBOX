@@ -139,7 +139,7 @@ export interface GTUltraState {
   tableCursor: number;
 
   // DAW mode state
-  dawBottomPanel: 'mixer' | 'tables' | 'monitor' | 'presets' | 'clips' | 'steps';
+  dawBottomPanel: 'mixer' | 'tables' | 'monitor' | 'presets' | 'clips' | 'steps' | 'scope';
   dawSidebarOpen: boolean;
   dawSelectedChannel: number;
   dawSelectedPattern: number;

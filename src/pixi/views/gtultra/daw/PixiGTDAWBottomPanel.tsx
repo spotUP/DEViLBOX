@@ -12,10 +12,11 @@ import {
   DAW_PANEL_BG, DAW_PANEL_BORDER, DAW_ACCENT, DAW_TEXT_MUTED,
 } from './dawTheme';
 import { PixiGTDAWMixer } from './PixiGTDAWMixer';
-import { PixiGTDAWPresetBrowser } from './PixiGTDAWPresetBrowser';
+import { PixiGTPresetBrowser } from '../PixiGTPresetBrowser';
 import { PixiGTStudioTables } from '../PixiGTStudioTables';
 import { PixiGTSIDMonitor } from '../PixiGTSIDMonitor';
 import { PixiGTOrderList } from '../PixiGTOrderList';
+import { PixiGTOscilloscope } from '../PixiGTOscilloscope';
 
 const TAB_H = 28;
 
@@ -27,6 +28,7 @@ const TABS: { id: BottomPanel; label: string }[] = [
   { id: 'monitor', label: 'MONITOR' },
   { id: 'presets', label: 'PRESETS' },
   { id: 'clips', label: 'CLIPS' },
+  { id: 'scope', label: 'SCOPE' },
 ];
 
 interface Props {
@@ -73,7 +75,7 @@ export const PixiGTDAWBottomPanel: React.FC<Props> = ({ width, height }) => {
           <PixiGTDAWMixer width={width} height={contentH} />
         )}
         {dawBottomPanel === 'presets' && (
-          <PixiGTDAWPresetBrowser width={width} height={contentH} />
+          <PixiGTPresetBrowser width={width} height={contentH} variant="cards" />
         )}
         {dawBottomPanel === 'tables' && (
           <PixiGTStudioTables width={width} height={contentH} />
@@ -83,6 +85,9 @@ export const PixiGTDAWBottomPanel: React.FC<Props> = ({ width, height }) => {
         )}
         {dawBottomPanel === 'clips' && (
           <PixiGTOrderList width={width} height={contentH} />
+        )}
+        {dawBottomPanel === 'scope' && (
+          <PixiGTOscilloscope width={width} height={contentH} />
         )}
       </pixiContainer>
     </pixiContainer>

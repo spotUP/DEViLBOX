@@ -189,6 +189,19 @@ export class VSTBridgeSynth implements DevilboxSynth {
     return this._paramValues.get(paramId);
   }
 
+  /**
+   * Get all automatable parameters from the WASM plugin metadata.
+   */
+  getAutomatableParams(): Array<{ id: string; name: string; min: number; max: number; section?: string }> {
+    return this._params.map((p) => ({
+      id: `${this._descriptor.id}.${p.name}`,
+      name: p.name,
+      min: p.min ?? 0,
+      max: p.max ?? 1,
+      section: undefined,
+    }));
+  }
+
   /** Set a WASM parameter by numeric ID directly */
   setParameter(paramId: number, value: number): void {
     if (!this._worklet) return;

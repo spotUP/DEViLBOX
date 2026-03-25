@@ -105,6 +105,57 @@ export interface TimelineAutomationPoint {
 }
 
 /**
+ * Interpolate a timeline automation lane value at a given row position.
+ * Supports linear, exponential, logarithmic, and s-curve interpolation with per-point tension.
+ */
+export function interpolateTimelineAutomation(
+  points: TimelineAutomationPoint[],
+  row: number,
+): number | null {
+  if (points.length === 0) return null;
+
+  // Find surrounding points
+  let before: TimelineAutomationPoint | null = null;
+  let after: TimelineAutomationPoint | null = null;
+
+  for (let i = 0; i < points.length; i++) {
+    if (points[i].row <= row) before = points[i];
+    if (points[i].row >= row) { after = points[i]; break; }
+  }
+
+  if (before && before.row === row) return before.value;
+  if (after && after.row === row) return after.value;
+  if (!before && after) return after.value;
+  if (before && !after) return before.value;
+
+  if (before && after) {
+    const t = (row - before.row) / (after.row - before.row);
+    const diff = after.value - before.value;
+    const tension = before.tension ?? 0.5;
+
+    switch (before.curve) {
+      case 'linear':
+        return before.value + diff * t;
+      case 'exponential':
+        return before.value + diff * Math.pow(t, 1 + tension * 3);
+      case 'logarithmic':
+        return before.value + diff * (1 - Math.pow(1 - t, 1 + tension * 3));
+      case 's-curve': {
+        // Hermite-style S-curve with tension control
+        const t2 = t * t;
+        const t3 = t2 * t;
+        const s = 2 * t3 - 3 * t2 + 1; // 1→0 ease
+        return before.value + diff * (1 - s);
+      }
+      default:
+        return before.value + diff * t;
+    }
+  }
+
+  return null;
+}
+
+/**
  * An automation lane attached to a track.
  */
 export interface TimelineAutomationLane {

@@ -21,7 +21,10 @@ interface AutomationData {
 
 interface ChannelLaneState {
   activeParameter: AutomationParameter;
+  activeParameters: AutomationParameter[];
   showLane: boolean;
+  laneHeight: number; // 24 = compact, 48 = normal, 72 = expanded
+  collapsed: boolean;
 }
 
 interface AutomationStore {
@@ -74,6 +77,23 @@ interface AutomationStore {
   getActiveParameter: (channelIndex: number) => AutomationParameter;
   setShowLane: (channelIndex: number, show: boolean) => void;
   getShowLane: (channelIndex: number) => boolean;
+
+  // Multi-lane support
+  addActiveParameter: (channelIndex: number, parameter: AutomationParameter) => void;
+  removeActiveParameter: (channelIndex: number, parameter: AutomationParameter) => void;
+  getActiveParameters: (channelIndex: number) => AutomationParameter[];
+  setLaneHeight: (channelIndex: number, height: number) => void;
+  setLaneCollapsed: (channelIndex: number, collapsed: boolean) => void;
+
+  // Copy/paste
+  copiedCurvePoints: AutomationCurve['points'] | null;
+  copyCurve: (curveId: string) => void;
+  pasteCurve: (patternId: string, channelIndex: number, parameter: string) => void;
+
+  // Automation recording
+  recordMode: boolean;
+  setRecordMode: (enabled: boolean) => void;
+  recordPoint: (patternId: string, channelIndex: number, parameter: string, row: number, value: number) => void;
 
   // Reset to initial state
   reset: () => void;
@@ -305,7 +325,7 @@ export const useAutomationStore = create<AutomationStore>()(
     // Channel lane UI state
     setActiveParameter: (channelIndex, parameter) =>
       set((state) => {
-        const existing = state.channelLanes.get(channelIndex) || { activeParameter: '', showLane: false };
+        const existing = state.channelLanes.get(channelIndex) || { activeParameter: '', activeParameters: [], showLane: false, laneHeight: 48, collapsed: false };
         state.channelLanes.set(channelIndex, { ...existing, activeParameter: parameter });
       }),
 
@@ -316,7 +336,7 @@ export const useAutomationStore = create<AutomationStore>()(
 
     setShowLane: (channelIndex, show) =>
       set((state) => {
-        const existing = state.channelLanes.get(channelIndex) || { activeParameter: '', showLane: false };
+        const existing = state.channelLanes.get(channelIndex) || { activeParameter: '', activeParameters: [], showLane: false, laneHeight: 48, collapsed: false };
         state.channelLanes.set(channelIndex, { ...existing, showLane: show });
       }),
 
@@ -324,6 +344,126 @@ export const useAutomationStore = create<AutomationStore>()(
       const state = get();
       return state.channelLanes.get(channelIndex)?.showLane || false;
     },
+
+    // Multi-lane support
+    addActiveParameter: (channelIndex, parameter) =>
+      set((state) => {
+        const existing = state.channelLanes.get(channelIndex) || { activeParameter: '', activeParameters: [], showLane: false, laneHeight: 48, collapsed: false };
+        const params = [...(existing.activeParameters || [])];
+        if (!params.includes(parameter)) params.push(parameter);
+        state.channelLanes.set(channelIndex, { ...existing, activeParameters: params, activeParameter: parameter });
+      }),
+
+    removeActiveParameter: (channelIndex, parameter) =>
+      set((state) => {
+        const existing = state.channelLanes.get(channelIndex);
+        if (!existing) return;
+        const params = (existing.activeParameters || []).filter(p => p !== parameter);
+        const activeParam = params.length > 0 ? params[0] : '';
+        state.channelLanes.set(channelIndex, { ...existing, activeParameters: params, activeParameter: activeParam });
+      }),
+
+    getActiveParameters: (channelIndex) => {
+      const state = get();
+      const lane = state.channelLanes.get(channelIndex);
+      if (!lane) return [];
+      if (lane.activeParameters && lane.activeParameters.length > 0) return lane.activeParameters;
+      return lane.activeParameter ? [lane.activeParameter] : [];
+    },
+
+    setLaneHeight: (channelIndex, height) =>
+      set((state) => {
+        const existing = state.channelLanes.get(channelIndex) || { activeParameter: '', activeParameters: [], showLane: false, laneHeight: 48, collapsed: false };
+        state.channelLanes.set(channelIndex, { ...existing, laneHeight: height });
+      }),
+
+    setLaneCollapsed: (channelIndex, collapsed) =>
+      set((state) => {
+        const existing = state.channelLanes.get(channelIndex) || { activeParameter: '', activeParameters: [], showLane: false, laneHeight: 48, collapsed: false };
+        state.channelLanes.set(channelIndex, { ...existing, collapsed });
+      }),
+
+    // Copy/paste
+    copiedCurvePoints: null,
+
+    copyCurve: (curveId) =>
+      set((state) => {
+        const curve = state.curves.find(c => c.id === curveId);
+        if (curve) {
+          state.copiedCurvePoints = [...curve.points];
+        }
+      }),
+
+    pasteCurve: (patternId, channelIndex, parameter) => {
+      const points = get().copiedCurvePoints;
+      if (!points || points.length === 0) return;
+
+      const existing = get().curves.find(
+        c => c.patternId === patternId && c.channelIndex === channelIndex && c.parameter === parameter
+      );
+
+      if (existing) {
+        set((s) => {
+          const curve = s.curves.find(c => c.id === existing.id);
+          if (curve) curve.points = [...points];
+          rebuildAutomationIndex(s);
+        });
+      } else {
+        set((s) => {
+          s.curves.push({
+            id: crypto.randomUUID(),
+            patternId,
+            channelIndex,
+            parameter,
+            mode: 'curve',
+            interpolation: 'linear',
+            points: [...points],
+            enabled: true,
+          });
+          rebuildAutomationIndex(s);
+        });
+      }
+    },
+
+    // Automation recording
+    recordMode: false,
+
+    setRecordMode: (enabled) =>
+      set((state) => {
+        state.recordMode = enabled;
+      }),
+
+    recordPoint: (patternId, channelIndex, parameter, row, value) =>
+      set((state) => {
+        let curve = state.curves.find(
+          c => c.patternId === patternId && c.channelIndex === channelIndex && c.parameter === parameter
+        );
+
+        if (!curve) {
+          const newCurve: AutomationCurve = {
+            id: crypto.randomUUID(),
+            patternId,
+            channelIndex,
+            parameter,
+            mode: 'curve',
+            interpolation: 'linear',
+            points: [],
+            enabled: true,
+          };
+          state.curves.push(newCurve);
+          curve = state.curves[state.curves.length - 1];
+        }
+
+        const existingIdx = curve.points.findIndex(p => p.row === row);
+        if (existingIdx >= 0) {
+          curve.points[existingIdx].value = value;
+        } else {
+          curve.points.push({ row, value });
+          curve.points.sort((a, b) => a.row - b.row);
+        }
+
+        rebuildAutomationIndex(state);
+      }),
 
     // Reset to initial state (for new project/tab)
     // NOTE: Use direct set({}) rather than Immer producer to avoid Immer proxying
@@ -336,6 +476,8 @@ export const useAutomationStore = create<AutomationStore>()(
         editMode: 'pencil' as const,
         automation: {},
         channelLanes: new Map<number, ChannelLaneState>(),
+        copiedCurvePoints: null,
+        recordMode: false,
       }),
   }))
 );
