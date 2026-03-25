@@ -846,6 +846,47 @@ export interface V2Config {
     rate: number;
     depth: number;
   };
+  voiceDistortion?: {
+    mode: number;    // 0-10: Off, Overdrive, Clip, Bitcrush, Decimate, LPF, BPF, HPF, Notch, Allpass, MoogL
+    inGain: number;  // 0-127
+    param1: number;  // 0-127 mode-specific
+    param2: number;  // 0-127 mode-specific
+  };
+  channelDistortion?: {
+    mode: number;    // 0-10
+    inGain: number;  // 0-127
+    param1: number;  // 0-127
+    param2: number;  // 0-127
+  };
+  chorusFlanger?: {
+    amount: number;    // 0-127 wet/dry
+    feedback: number;  // 0-127
+    delayL: number;    // 1-127
+    delayR: number;    // 1-127
+    modRate: number;   // 0-127
+    modDepth: number;  // 0-127
+    modPhase: number;  // 0-127 stereo phase offset
+  };
+  compressor?: {
+    mode: number;       // 0=Off, 1=Peak, 2=RMS
+    stereoLink: boolean;
+    autoGain: boolean;
+    lookahead: number;  // 0-10
+    threshold: number;  // 0-127
+    ratio: number;      // 0-127
+    attack: number;     // 0-127
+    release: number;    // 0-127
+    outGain: number;    // 0-127
+  };
+  lfo2?: {
+    mode: number;     // 0-4: Saw, Tri, Pulse, Sin, S&H
+    keySync: boolean;
+    envMode: boolean;
+    rate: number;     // 0-127
+    phase: number;    // 0-127
+    polarity: number; // 0-2: Pos, Neg, Bipolar
+    amplify: number;  // 0-127
+  };
 }
 
 /**
