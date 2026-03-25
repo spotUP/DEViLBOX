@@ -74,7 +74,7 @@ export interface GTTableData {
 
 export type GTEditMode = 'pattern' | 'instrument' | 'table' | 'order' | 'songname';
 export type GTSidModel = 0 | 1; // 0=6581, 1=8580
-export type GTViewMode = 'pro' | 'studio'; // Pro = hex editor, Studio = visual
+export type GTViewMode = 'pro' | 'studio' | 'daw'; // Pro = hex editor, Studio = visual, DAW = modern DAW UI
 
 export interface GTUltraState {
   // Engine reference
@@ -138,6 +138,15 @@ export interface GTUltraState {
   // Table cursor
   tableCursor: number;
 
+  // DAW mode state
+  dawBottomPanel: 'mixer' | 'tables' | 'monitor' | 'presets' | 'clips';
+  dawSidebarOpen: boolean;
+  dawSelectedChannel: number;
+  dawSelectedPattern: number;
+  dawZoomX: number;
+  dawZoomY: number;
+  dawGridSnap: 1 | 2 | 4 | 8 | 16;
+
   // Actions
   setEngine: (engine: GTUltraEngine | null) => void;
   setPendingSongData: (data: Uint8Array | null) => void;
@@ -163,6 +172,13 @@ export interface GTUltraState {
   setOrderCursor: (idx: number) => void;
   setOrderChannelCol: (col: number) => void;
   setTableCursor: (idx: number) => void;
+  // DAW mode actions
+  setDawBottomPanel: (panel: GTUltraState['dawBottomPanel']) => void;
+  setDawSidebarOpen: (open: boolean) => void;
+  setDawSelectedChannel: (ch: number) => void;
+  setDawSelectedPattern: (pat: number) => void;
+  setDawZoom: (x: number, y: number) => void;
+  setDawGridSnap: (snap: GTUltraState['dawGridSnap']) => void;
   setSongName: (name: string) => void;
   setSongAuthor: (author: string) => void;
   setTempo: (tempo: number) => void;
@@ -263,6 +279,15 @@ export const useGTUltraStore = create<GTUltraState>()((set, get) => ({
   orderChannelCol: 0,
   tableCursor: 0,
 
+  // DAW mode defaults
+  dawBottomPanel: 'mixer',
+  dawSidebarOpen: true,
+  dawSelectedChannel: 0,
+  dawSelectedPattern: 0,
+  dawZoomX: 16,
+  dawZoomY: 8,
+  dawGridSnap: 1,
+
   // --- Actions ---
 
   setEngine: (engine) => set({ engine }),
@@ -360,6 +385,15 @@ export const useGTUltraStore = create<GTUltraState>()((set, get) => ({
   setOrderCursor: (orderCursor) => set({ orderCursor }),
   setOrderChannelCol: (orderChannelCol: number) => set({ orderChannelCol }),
   setTableCursor: (tableCursor) => set({ tableCursor }),
+
+  // DAW mode actions
+  setDawBottomPanel: (dawBottomPanel) => set({ dawBottomPanel }),
+  setDawSidebarOpen: (dawSidebarOpen) => set({ dawSidebarOpen }),
+  setDawSelectedChannel: (dawSelectedChannel) => set({ dawSelectedChannel }),
+  setDawSelectedPattern: (dawSelectedPattern) => set({ dawSelectedPattern }),
+  setDawZoom: (dawZoomX, dawZoomY) => set({ dawZoomX, dawZoomY }),
+  setDawGridSnap: (dawGridSnap) => set({ dawGridSnap }),
+
   setSongName: (songName) => set({ songName }),
   setSongAuthor: (songAuthor) => set({ songAuthor }),
   setTempo: (tempo) => set({ tempo }),

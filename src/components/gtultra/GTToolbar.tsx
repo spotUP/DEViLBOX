@@ -4,13 +4,46 @@
  */
 
 import React, { useCallback, useState, useEffect } from 'react';
-import { useGTUltraStore, type GTSidModel } from '../../stores/useGTUltraStore';
+import { useGTUltraStore, type GTSidModel, type GTViewMode } from '../../stores/useGTUltraStore';
 import { getGTUltraASIDBridge } from '../../engine/gtultra/GTUltraASIDBridge';
 import { getASIDDeviceManager } from '../../lib/sid/ASIDDeviceManager';
 
 const BTN = 'px-2 py-0.5 text-[10px] font-mono border cursor-pointer transition-colors';
 const BTN_DEFAULT = `${BTN} bg-ft2-header text-ft2-textDim border-ft2-border hover:bg-ft2-border hover:text-ft2-text`;
 const SEL = 'bg-ft2-header text-ft2-text border border-ft2-border font-mono text-[11px] px-1 py-0';
+
+/** View mode toggle (Pro / DAW) — DAW mode auto-switches to WebGL rendering */
+const ViewModeSwitch: React.FC = () => {
+  const viewMode = useGTUltraStore((s) => s.viewMode);
+  const setViewMode = useGTUltraStore((s) => s.setViewMode);
+
+  const handleSwitch = useCallback((mode: GTViewMode) => {
+    setViewMode(mode);
+  }, [setViewMode]);
+
+  const modes: { id: GTViewMode; label: string }[] = [
+    { id: 'pro', label: 'PRO' },
+    { id: 'daw', label: 'DAW' },
+  ];
+
+  return (
+    <div className="flex gap-0.5">
+      {modes.map(({ id, label }) => (
+        <button
+          key={id}
+          onClick={() => handleSwitch(id)}
+          className={`${BTN} ${viewMode === id
+            ? 'bg-indigo-600/30 text-indigo-300 border-indigo-500/50 font-bold'
+            : BTN_DEFAULT
+          }`}
+          title={id === 'daw' ? 'Switch to DAW mode (visual editor)' : 'Switch to Pro mode (hex tracker)'}
+        >
+          {label}
+        </button>
+      ))}
+    </div>
+  );
+};
 
 export const GTToolbar: React.FC<{ width?: number; height?: number }> = () => {
   const songName = useGTUltraStore((s) => s.songName);
@@ -158,6 +191,11 @@ export const GTToolbar: React.FC<{ width?: number; height?: number }> = () => {
       </button>
 
       <ASIDToggle />
+
+      <div className="w-px h-5 bg-ft2-border mx-0.5" />
+
+      {/* View mode switcher */}
+      <ViewModeSwitch />
     </div>
   );
 };
