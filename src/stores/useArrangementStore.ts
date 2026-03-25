@@ -172,6 +172,22 @@ interface ArrangementStore {
   getSnapshot: () => ArrangementSnapshot;
   loadSnapshot: (snapshot: ArrangementSnapshot) => void;
 
+  // === Clone ===
+  /** Clone the clip's pattern as a new independent pattern, update clip reference. */
+  cloneClipAsNewPattern: (clipId: string) => void;
+
+  // === Tracker Integration ===
+  /** Jump to tracker view at the clip's pattern and row. Returns {patternIndex, row} or null. */
+  getClipTrackerPosition: (clipId: string) => { patternIndex: number; row: number } | null;
+
+  /** Auto-create arrangement tracks 1:1 with pattern channels. */
+  syncTracksToChannels: () => void;
+
+  // === View ===
+  /** Ruler display mode: 'bars' (default) or 'rows' */
+  rulerMode: 'bars' | 'rows';
+  setRulerMode: (mode: 'bars' | 'rows') => void;
+
   // === Consolidate ===
   /** Merge all selected clips on the same track into a single new pattern+clip per track. */
   consolidateClips: (clipIds: string[]) => void;
@@ -209,6 +225,7 @@ export const useArrangementStore = create<ArrangementStore>()(
     },
     tool: 'select',
     isArrangementMode: false,
+    rulerMode: 'bars' as const,
 
     selectedClipIds: new Set<string>(),
     selectedTrackId: null,
@@ -919,6 +936,107 @@ export const useArrangementStore = create<ArrangementStore>()(
         state.groups = [];
         state.automationLanes = [];
         state.isArrangementMode = true;
+      }),
+
+    // === Clone ===
+
+    cloneClipAsNewPattern: (clipId) => {
+      const clip = get().clips.find(c => c.id === clipId);
+      if (!clip) return;
+
+      // Use tracker store to clone the underlying pattern
+      const { useTrackerStore } = require('@stores');
+      const trackerState = useTrackerStore.getState();
+      const patternIndex = trackerState.patterns.findIndex((p: { id: string }) => p.id === clip.patternId);
+      if (patternIndex < 0) return;
+
+      // Clone pattern (creates new pattern at patternIndex + 1)
+      trackerState.clonePattern(patternIndex);
+
+      // Get the new pattern's ID
+      const newPatternId = useTrackerStore.getState().patterns[patternIndex + 1]?.id;
+      if (!newPatternId) return;
+
+      // Update clip to reference the new pattern
+      set((state) => {
+        const c = state.clips.find(c2 => c2.id === clipId);
+        if (c) c.patternId = newPatternId;
+      });
+    },
+
+    // === Tracker Integration ===
+
+    getClipTrackerPosition: (clipId) => {
+      const clip = get().clips.find(c => c.id === clipId);
+      if (!clip) return null;
+
+      const { useTrackerStore } = require('@stores');
+      const patterns = useTrackerStore.getState().patterns;
+      const patternIndex = patterns.findIndex((p: { id: string }) => p.id === clip.patternId);
+      if (patternIndex < 0) return null;
+
+      return { patternIndex, row: clip.offsetRows ?? 0 };
+    },
+
+    syncTracksToChannels: () => {
+      const { useTrackerStore } = require('@stores');
+      const trackerState = useTrackerStore.getState();
+      const pattern = trackerState.patterns[trackerState.currentPatternIndex];
+      if (!pattern) return;
+
+      set((state) => {
+        // Remove existing tracks
+        state.tracks = [];
+        state.clips = [];
+
+        // Create one track per channel
+        const channelColors = ['#4a9eff', '#ff6b6b', '#51cf66', '#ffd43b', '#cc5de8', '#ff922b', '#20c997', '#f06595'];
+        pattern.channels.forEach((ch: { name?: string; instrumentId?: number | null }, i: number) => {
+          const trackId = generateId('track');
+          state.tracks.push({
+            id: trackId,
+            name: ch.name || `Channel ${i + 1}`,
+            index: i,
+            volume: 100,
+            pan: 0,
+            muted: false,
+            solo: false,
+            collapsed: false,
+            color: channelColors[i % channelColors.length],
+            height: 60,
+            instrumentId: ch.instrumentId ?? null,
+            groupId: null,
+            automationVisible: false,
+            automationParameter: null,
+            frozen: false,
+            armRecord: false,
+          });
+
+          // Create a clip for each pattern at this channel position
+          trackerState.patternOrder.forEach((patIdx: number, posIdx: number) => {
+            const pat = trackerState.patterns[patIdx];
+            if (!pat) return;
+            state.clips.push({
+              id: generateId('clip'),
+              trackId,
+              patternId: pat.id,
+              startRow: posIdx * pat.length,
+              sourceChannelIndex: i,
+              muted: false,
+              offsetRows: 0,
+              clipLengthRows: null,
+              color: null,
+            });
+          });
+        });
+      });
+    },
+
+    // === View ===
+
+    setRulerMode: (mode) =>
+      set((state) => {
+        state.rulerMode = mode;
       }),
 
     // === Consolidate ===
