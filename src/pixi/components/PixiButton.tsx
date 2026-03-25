@@ -133,9 +133,10 @@ export const PixiButton: React.FC<PixiButtonProps> = ({
     }
 
     if (variant === 'ghost') {
+      // DOM: background transparent, color text-secondary, hover: bg-hover + text-primary
       if (pressed) return { bg: theme.bgActive.color, ...noBorder, text: theme.text.color, showBg: true };
       if (hovered) return { bg: theme.bgHover.color, ...noBorder, text: theme.text.color, showBg: true };
-      return { bg: theme.bgTertiary.color, ...noBorder, text: theme.textSecondary.color, showBg: true };
+      return { bg: 0x000000, ...noBorder, text: theme.textSecondary.color, showBg: false };
     }
 
     // default — matches DOM .btn (no border)

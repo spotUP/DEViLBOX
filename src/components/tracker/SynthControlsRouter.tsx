@@ -159,9 +159,6 @@ const CMIControls = lazy(() =>
 const MAMEControls = lazy(() =>
   import('@components/instruments/controls/MAMEControls').then(m => ({ default: m.MAMEControls }))
 );
-const GearmulatorEditor = lazy(() =>
-  import('@components/instruments/GearmulatorEditor').then(m => ({ default: m.GearmulatorEditor }))
-);
 const FurnaceControls = lazy(() =>
   import('@components/instruments/controls/FurnaceControls').then(m => ({ default: m.FurnaceControls }))
 );
@@ -402,12 +399,6 @@ export const SynthControlsRouter: React.FC<SynthControlsRouterProps> = ({ instru
     // ── Buzzmachines ────────────────────────────────────────
     if (synthType === 'Buzzmachine' || synthType.startsWith('Buzz')) {
       return <BuzzmachineControls config={instrument} onChange={onUpdate} />;
-    }
-
-    // ── Gearmulator ─────────────────────────────────────────
-    if (synthType.startsWith('Gearmulator')) {
-      const cfg = instrument.gearmulator || { synthType: 0, preset: 0, bank: 0 };
-      return <GearmulatorEditor config={cfg} onChange={(u) => onUpdate({ gearmulator: u })} />;
     }
 
     // ── VSTBridge (generic) ─────────────────────────────────

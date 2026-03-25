@@ -49,7 +49,7 @@ describe('InstrumentFactory synth type coverage', () => {
     expect(factoryTs).toContain("default:");
 
     // Collect unhandled types (not in switch and not a known registry-handled prefix)
-    const registryPrefixes = ['Furnace', 'MAME', 'Buzz', 'WAM', 'Gearmulator'];
+    const registryPrefixes = ['Furnace', 'MAME', 'Buzz', 'WAM'];
     const unhandled: string[] = [];
 
     for (const st of synthTypes) {

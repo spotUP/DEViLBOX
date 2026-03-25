@@ -184,12 +184,6 @@ export const VOLUME_NORMALIZATION_OFFSETS: Record<string, number> = {
   'MAMEVLM5030': 8,     // Konami VLM5030 speech — quiet output
   'MAMEHC55516': 6,     // Harris HC55516 CVSD — quiet output
   'MAMEMultiPCM': 0,    // MultiPCM — TBD
-  'GearmulatorVirus': 0,    // Gearmulator — volume managed internally
-  'GearmulatorVirusTI': 0,
-  'GearmulatorMicroQ': 0,
-  'GearmulatorXT': 0,
-  'GearmulatorNord': 0,
-  'GearmulatorJP8000': 0,
 };
 
 /**

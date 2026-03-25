@@ -195,7 +195,6 @@ function getEditorMode(synthType: SynthType): EditorMode {
   if (synthType === 'SunVoxSynth') return 'sunvox-synth';
   if (synthType === 'StartrekkerAMSynth') return 'startrekker-am';
   if (synthType === 'WobbleBass') return 'wobblebass';
-  if (synthType.startsWith('Gearmulator')) return 'gearmulator';
   if (SYNTH_REGISTRY.has(synthType)) return 'vstbridge';
   return 'generic';
 }

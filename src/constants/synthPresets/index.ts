@@ -18,5 +18,4 @@ export { HARMONIC_SYNTH_PRESETS } from './harmonicSynth';
 export { SYNARE_PRESETS } from './synare';
 export { V2_PRESETS } from './v2';
 export { WAVETABLE_PRESETS } from './wavetable';
-export { GEARMULATOR_PRESETS } from './gearmulator';
 export { getPresetsForSynthType, ALL_PRESETS } from './allPresets';

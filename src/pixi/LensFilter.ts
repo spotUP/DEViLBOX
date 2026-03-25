@@ -121,33 +121,28 @@ const FRAG = /* glsl */ `#version 300 es
     }
 
     pixel.rgb *= edgeFade;
-    fragColor = pixel;
+    fragColor = vec4(pixel.rgb, 1.0);
   }
 `;
 
 // ─── LensFilter ───────────────────────────────────────────────────────────────
 
-type UniformEntry = { value: number; type: 'f32' };
-
 export class LensFilter extends Filter {
-  private readonly _u: Record<string, UniformEntry>;
-
   constructor() {
-    const _u: Record<string, UniformEntry> = {
-      uBarrel:    { value: 0, type: 'f32' },
-      uChromatic: { value: 0, type: 'f32' },
-      uVignette:  { value: 0, type: 'f32' },
-    };
-
     const glProgram = new GlProgram({ vertex: VERT, fragment: FRAG });
-    super({ glProgram, resources: { uniforms: _u as any } });
-
-    this._u = _u;
+    super({ glProgram, resources: {
+      uniforms: {
+        uBarrel:    { value: 0, type: 'f32' },
+        uChromatic: { value: 0, type: 'f32' },
+        uVignette:  { value: 0, type: 'f32' },
+      } as any,
+    } });
   }
 
   updateParams(params: LensParams): void {
-    this._u.uBarrel.value    = params.barrel;
-    this._u.uChromatic.value = params.chromatic;
-    this._u.uVignette.value  = params.vignette;
+    const u = (this.resources as any).uniforms.uniforms;
+    u.uBarrel    = params.barrel;
+    u.uChromatic = params.chromatic;
+    u.uVignette  = params.vignette;
   }
 }

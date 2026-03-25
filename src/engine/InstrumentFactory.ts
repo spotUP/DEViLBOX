@@ -40,7 +40,6 @@ import { FurnaceDispatchSynth, FurnaceDispatchPlatform } from './furnace-dispatc
 import { BuzzmachineType } from './buzzmachines/BuzzmachineEngine';
 import { VSTBridgeSynth } from './vstbridge/VSTBridgeSynth';
 import { SYNTH_REGISTRY } from './vstbridge/synth-registry';
-import { GearmulatorSynth } from './gearmulator/GearmulatorSynth';
 import { SynthRegistry } from './registry/SynthRegistry';
 import { WaveSabreSynth } from './wavesabre/WaveSabreSynth';
 import type { WaveSabreSynthType } from '@typedefs/wavesabreInstrument';
@@ -798,32 +797,6 @@ export class InstrumentFactory {
         const scVolDb = (config.volume ?? -12) + scOffset;
         (scSynth.output as GainNode).gain.value = Math.pow(10, scVolDb / 20);
         instrument = scSynth;
-        break;
-      }
-
-      case 'GearmulatorVirus':
-      case 'GearmulatorVirusTI':
-      case 'GearmulatorMicroQ':
-      case 'GearmulatorXT':
-      case 'GearmulatorNord':
-      case 'GearmulatorJP8000': {
-        const GM_TYPE: Record<string, number> = {
-          GearmulatorVirus: 0, GearmulatorVirusTI: 1,
-          GearmulatorMicroQ: 2, GearmulatorXT: 3,
-          GearmulatorNord: 4, GearmulatorJP8000: 5,
-        };
-        const synthTypeNum = GM_TYPE[config.type] ?? 0;
-        const gmConfig = config.gearmulator ?? { synthType: synthTypeNum };
-        // Ensure synthType is always correct for this instrument type
-        if (gmConfig.synthType !== synthTypeNum) gmConfig.synthType = synthTypeNum;
-        const gmVolDb = config.volume ?? -12;
-        const gmSynth = new GearmulatorSynth(gmConfig);
-        gmSynth.output.gain.value = Math.pow(10, gmVolDb / 20);
-        // Fire-and-forget async init — audio starts once WASM is ready
-        gmSynth.ensureInitialized().catch((err: unknown) => {
-          console.error('[InstrumentFactory] Gearmulator init failed:', err);
-        });
-        instrument = gmSynth;
         break;
       }
 

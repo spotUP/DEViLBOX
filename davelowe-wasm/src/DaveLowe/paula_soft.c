@@ -20,6 +20,15 @@ static float        s_output_rate = (float)PAULA_RATE_PAL;
 static float        s_channel_gain[PAULA_CHANNELS] = {1.0f, 1.0f, 1.0f, 1.0f};
 static float        s_channel_peaks[PAULA_CHANNELS] = {0};
 
+// Capture state (forward declarations — used by set_period/set_volume)
+static PaulaNoteEvent s_capture[PAULA_CAPTURE_MAX];
+static int            s_capture_count = 0;
+static int            s_capturing = 0;
+static uint32_t       s_capture_tick = 0;
+static uint16_t       s_prev_period[PAULA_CHANNELS];
+static uint8_t        s_prev_volume[PAULA_CHANNELS];
+static uint8_t        s_dirty[PAULA_CHANNELS];
+
 void paula_reset(void) {
     memset(s_ch, 0, sizeof(s_ch));
     int i;
@@ -66,12 +75,20 @@ void paula_set_length(int ch, uint16_t len_words) {
 void paula_set_period(int ch, uint16_t period) {
     if (ch < 0 || ch >= PAULA_CHANNELS || period == 0) return;
     s_ch[ch].step = s_paula_clock / ((float)period * s_output_rate);
+    if (s_capturing && period != s_prev_period[ch]) {
+        s_prev_period[ch] = period;
+        s_dirty[ch] = 1;
+    }
 }
 
 void paula_set_volume(int ch, uint8_t vol) {
     if (ch < 0 || ch >= PAULA_CHANNELS) return;
     uint8_t v = vol > 64 ? 64 : vol;
     s_ch[ch].volume = (float)v / 64.0f;
+    if (s_capturing && v != s_prev_volume[ch]) {
+        s_prev_volume[ch] = v;
+        s_dirty[ch] = 1;
+    }
 }
 
 void paula_dma_write(uint16_t dmacon) {
@@ -149,4 +166,48 @@ void paula_debug_state(int ch, float* out8) {
     out8[5] = c->sample ? 1.0f : 0.0f;
     out8[6] = c->next_sample ? 1.0f : 0.0f;
     out8[7] = (float)c->next_len;
+}
+
+// ── Note Capture ──────────────────────────────────────────────────────
+
+void paula_capture_start(void) {
+    s_capture_count = 0;
+    s_capture_tick = 0;
+    s_capturing = 1;
+    int i;
+    for (i = 0; i < PAULA_CHANNELS; i++) {
+        s_prev_period[i] = 0;
+        s_prev_volume[i] = 0;
+        s_dirty[i] = 0;
+    }
+}
+
+void paula_capture_stop(void) {
+    s_capturing = 0;
+}
+
+// Called once per Interrupt() tick from the wrapper.
+// Flushes any dirty channels as NoteEvents.
+void paula_capture_tick(void) {
+    if (!s_capturing) return;
+    int i;
+    for (i = 0; i < PAULA_CHANNELS; i++) {
+        if (s_dirty[i] && s_capture_count < PAULA_CAPTURE_MAX) {
+            PaulaNoteEvent* e = &s_capture[s_capture_count++];
+            e->tick    = s_capture_tick;
+            e->channel = (uint8_t)i;
+            e->period  = s_prev_period[i];
+            e->volume  = s_prev_volume[i];
+            s_dirty[i] = 0;
+        }
+    }
+    s_capture_tick++;
+}
+
+int paula_capture_count(void) {
+    return s_capture_count;
+}
+
+const PaulaNoteEvent* paula_capture_buffer(void) {
+    return s_capture;
 }
