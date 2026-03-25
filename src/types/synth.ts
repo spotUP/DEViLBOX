@@ -23,6 +23,8 @@ export interface DevilboxSynth {
   set?(param: string, value: number): void;
   /** Get a named parameter value */
   get?(param: string): number | undefined;
+  /** Get all automatable parameters (for synths with dynamic/runtime params like VST plugins) */
+  getAutomatableParams?(): Array<{ id: string; name: string; min: number; max: number; section?: string }>;
 }
 
 /**

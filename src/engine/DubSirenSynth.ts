@@ -186,6 +186,32 @@ export class DubSirenSynth implements DevilboxSynth {
     this.triggerRelease();
   }
 
+  /**
+   * Set a named parameter (for automation). Values are 0-1 normalized.
+   */
+  set(param: string, value: number): void {
+    switch (param) {
+      case 'frequency': this.setFrequency(100 + value * 900); break;
+      case 'lfoRate': this.setLFORate(0.1 + value * 19.9); break;
+      case 'lfoDepth': this.setLFODepth(value * 500); break;
+      case 'cutoff': this.setFilterFreq(200 * Math.pow(10000 / 200, value)); break;
+      case 'delayTime': this.setDelayTime(value); break;
+      case 'delayFeedback': this.setDelayFeedback(value); break;
+      case 'delayMix': this.setDelayMix(value); break;
+      case 'reverbMix': this.reverb.wet.rampTo(value, 0.1); break;
+      case 'volume': this._toneOutput.volume.rampTo(-40 + value * 40, 0.05); break;
+      case 'distortion': this.distortion.distortion = value; break;
+    }
+  }
+
+  get(param: string): number | undefined {
+    switch (param) {
+      case 'lfoRate': return (Number(this.lfo.frequency.value) - 0.1) / 19.9;
+      case 'volume': return (Number(this._toneOutput.volume.value) + 40) / 40;
+      default: return undefined;
+    }
+  }
+
   // Parameter Setters
   setOscType(type: 'sine' | 'square' | 'sawtooth' | 'triangle') {
     this.osc.type = type;

@@ -154,6 +154,34 @@ export class SpaceLaserSynth implements DevilboxSynth {
     this.triggerRelease();
   }
 
+  /**
+   * Set a named parameter (for automation). Values are 0-1 normalized.
+   */
+  set(param: string, value: number): void {
+    switch (param) {
+      case 'fmRatio': this.synth.harmonicity.rampTo(0.5 + value * 15.5, 0.05); break;
+      case 'fmAmount': this.synth.modulationIndex.rampTo(value * 100, 0.05); break;
+      case 'cutoff': this.filter.frequency.rampTo(200 * Math.pow(10000 / 200, value), 0.05); break;
+      case 'resonance': this.filter.Q.rampTo(value * 10, 0.05); break;
+      case 'noiseAmount': this.noiseGain.gain.rampTo(value, 0.05); break;
+      case 'delayTime': this.delay.delayTime.rampTo(value, 0.1); break;
+      case 'delayFeedback': this.delay.feedback.rampTo(value, 0.1); break;
+      case 'delayMix': this.delay.wet.rampTo(value, 0.1); break;
+      case 'reverbMix': this.reverb.wet.rampTo(value, 0.1); break;
+      case 'volume': this._toneOutput.volume.rampTo(-40 + value * 40, 0.05); break;
+    }
+  }
+
+  get(param: string): number | undefined {
+    switch (param) {
+      case 'fmRatio': return (Number(this.synth.harmonicity.value) - 0.5) / 15.5;
+      case 'fmAmount': return Number(this.synth.modulationIndex.value) / 100;
+      case 'cutoff': return Math.log(Number(this.filter.frequency.value) / 200) / Math.log(10000 / 200);
+      case 'volume': return (Number(this._toneOutput.volume.value) + 40) / 40;
+      default: return undefined;
+    }
+  }
+
   dispose(): void {
     // Stop noise before disposing to ensure clean shutdown
     this.noise.stop();

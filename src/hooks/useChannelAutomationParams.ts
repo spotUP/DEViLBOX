@@ -11,6 +11,7 @@ import { getNKSParametersForSynth } from '@/midi/performance/synthParameterMaps'
 import { NKSSection } from '@/midi/performance/types';
 import type { NKSParameter } from '@/midi/performance/types';
 import type { SynthType } from '@typedefs/instrument';
+import { getToneEngine } from '@/engine/ToneEngine';
 
 export interface AutomatableParamInfo {
   key: string;         // NKS param id — used as automation curve key
@@ -67,6 +68,41 @@ function makeShortLabel(name: string): string {
   if (abbrevs[name]) return abbrevs[name];
   // Fall back to first 3 chars
   return name.replace(/[^A-Za-z0-9]/g, '').slice(0, 3);
+}
+
+/**
+ * Try to get dynamic params from a synth instance (e.g., VSTBridgeSynth with 700+ params).
+ */
+function getDynamicParamsForInstrument(instrumentId: number): AutomatableParamInfo[] | null {
+  try {
+    const engine = getToneEngine();
+    let inst = null;
+    inst = engine.instruments.get((instrumentId << 16) | 0xFFFF);
+    if (!inst) {
+      for (const [key, i] of engine.instruments.entries()) {
+        if ((key >> 16) === instrumentId) { inst = i; break; }
+      }
+    }
+
+    if (!inst || typeof (inst as unknown as Record<string, unknown>).getAutomatableParams !== 'function') {
+      return null;
+    }
+
+    const dynamicParams = (inst as unknown as { getAutomatableParams(): Array<{ id: string; name: string; min: number; max: number; section?: string }> }).getAutomatableParams();
+    if (!dynamicParams || dynamicParams.length === 0) return null;
+
+    return dynamicParams.map((p) => ({
+      key: p.id,
+      name: p.name,
+      shortLabel: p.name.replace(/[^A-Za-z0-9]/g, '').slice(0, 3),
+      section: p.section || NKSSection.SYNTHESIS,
+      color: getSectionColor(p.section || NKSSection.SYNTHESIS),
+      min: p.min,
+      max: p.max,
+    }));
+  } catch {
+    return null;
+  }
 }
 
 /** Convert NKSParameter[] to AutomatableParamInfo[] */
@@ -142,8 +178,23 @@ export function useChannelAutomationParams(channelIndex: number): {
     if (!instrumentInfo)
       return { params: [], groups: [], synthType: null, instrumentName: null };
 
-    const nksParams = getNKSParametersForSynth(instrumentInfo.synthType as SynthType);
-    const params = nksToAutomatable(nksParams);
+    // Try dynamic params first (VST Bridge synths with 700+ params)
+    const dynamicParams = instrumentId !== null
+      ? getDynamicParamsForInstrument(instrumentId)
+      : null;
+
+    let params: AutomatableParamInfo[];
+    if (dynamicParams && dynamicParams.length > 0) {
+      // Merge: static NKS params first (curated), then dynamic ones not already covered
+      const nksParams = nksToAutomatable(getNKSParametersForSynth(instrumentInfo.synthType as SynthType));
+      const nksKeys = new Set(nksParams.map(p => p.key));
+      const extraDynamic = dynamicParams.filter(p => !nksKeys.has(p.key));
+      params = [...nksParams, ...extraDynamic];
+    } else {
+      const nksParams = getNKSParametersForSynth(instrumentInfo.synthType as SynthType);
+      params = nksToAutomatable(nksParams);
+    }
+
     const groups = groupParamsBySection(params);
 
     return {
@@ -152,5 +203,5 @@ export function useChannelAutomationParams(channelIndex: number): {
       synthType: instrumentInfo.synthType,
       instrumentName: instrumentInfo.name,
     };
-  }, [instrumentInfo]);
+  }, [instrumentInfo, instrumentId]);
 }

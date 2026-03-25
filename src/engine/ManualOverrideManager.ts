@@ -4,17 +4,21 @@
  * until a timeout expires (one pattern cycle of inactivity)
  */
 
-type ParameterName = 'cutoff' | 'resonance' | 'envMod' | 'decay' | 'accent' | 'overdrive' | 'tuning' | 'volume' | 'pan' | 'distortion' | 'delay' | 'reverb';
+/** Any automation parameter name (NKS param id suffix) */
+type ParameterName = string;
 
 interface OverrideEntry {
   timestamp: number;
   value: number;
 }
 
+type RecordCallback = (parameter: string, value: number) => void;
+
 class ManualOverrideManager {
-  private overrides: Map<ParameterName, OverrideEntry> = new Map();
+  private overrides: Map<string, OverrideEntry> = new Map();
   private patternLengthMs: number = 4000; // Default 4 seconds (64 rows at 120 BPM)
   private cleanupInterval: ReturnType<typeof setInterval> | null = null;
+  private recordCallback: RecordCallback | null = null;
 
   constructor() {
     // Start cleanup interval
@@ -39,6 +43,18 @@ class ManualOverrideManager {
       timestamp: Date.now(),
       value,
     });
+
+    // Notify recording callback if set (for automation recording)
+    if (this.recordCallback) {
+      this.recordCallback(parameter, value);
+    }
+  }
+
+  /**
+   * Set a callback that fires when a knob override happens (for automation recording)
+   */
+  public setRecordCallback(callback: RecordCallback | null): void {
+    this.recordCallback = callback;
   }
 
   /**
