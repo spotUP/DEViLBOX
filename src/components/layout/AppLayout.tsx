@@ -78,7 +78,10 @@ export const AppLayout: React.FC<AppLayoutProps> = ({
       )}
 
       {/* Main Content Area — add bottom padding on mobile for tab bar */}
-      <main className={`flex-1 flex min-h-0 min-w-0 overflow-hidden ${isMobile ? 'pb-[52px]' : ''}`}>
+      <main
+        key={isMobile ? activeView : 'desktop'}
+        className={`flex-1 flex min-h-0 min-w-0 overflow-hidden ${isMobile ? 'pb-[52px] animate-fade-in-fast' : ''}`}
+      >
         {children}
       </main>
 
