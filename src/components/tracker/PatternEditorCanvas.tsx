@@ -459,21 +459,22 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
   const [, setDragOverCell] = useState<{ channelIndex: number; rowIndex: number } | null>(null);
 
   // Document-level handlers for scratch drag (cursor can leave canvas bounds)
+  // Use pointer events so touch drag works on iOS/mobile
   useEffect(() => {
-    const onDocMouseMove = (e: MouseEvent) => {
+    const onDocPointerMove = (e: PointerEvent) => {
       if (!isScratchDragRef.current) return;
       getTrackerScratchController().onGrabMove(e.clientY, performance.now());
     };
-    const onDocMouseUp = () => {
+    const onDocPointerUp = () => {
       if (!isScratchDragRef.current) return;
       isScratchDragRef.current = false;
       getTrackerScratchController().onGrabEnd(performance.now());
     };
-    document.addEventListener('mousemove', onDocMouseMove);
-    document.addEventListener('mouseup', onDocMouseUp);
+    document.addEventListener('pointermove', onDocPointerMove);
+    document.addEventListener('pointerup', onDocPointerUp);
     return () => {
-      document.removeEventListener('mousemove', onDocMouseMove);
-      document.removeEventListener('mouseup', onDocMouseUp);
+      document.removeEventListener('pointermove', onDocPointerMove);
+      document.removeEventListener('pointerup', onDocPointerUp);
     };
   }, []);
 
@@ -524,10 +525,10 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
   }, [getCellFromCoords]);
 
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
-    if (isMobile || e.button !== 0) return; // Only left click on desktop
+    if (e.button !== 0) return; // Only left click / primary pointer
 
     // FORMAT MODE: own hit-test (pattern may be undefined)
-    if (isFormatMode && formatChannels && formatColumns) {
+    if (!isMobile && isFormatMode && formatChannels && formatColumns) {
       const container = containerRef.current;
       if (!container) return;
       const rect = container.getBoundingClientRect();
@@ -575,7 +576,8 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
     const cell = getCellFromCoords(e.clientX, e.clientY);
     if (!cell) return;
 
-    // During playback, left-click drag = grab scratch (hand on record, vinyl physics)
+    // During playback, pointer drag = grab scratch (hand on record, vinyl physics)
+    // Works on both desktop and mobile/iOS touch
     const isPlaying = useTransportStore.getState().isPlaying;
 
     if (isPlaying && !e.shiftKey && !e.metaKey && !e.ctrlKey) {
@@ -583,26 +585,24 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
       const activated = scratch.onGrabStart(e.clientY, performance.now());
       if (activated) {
         isScratchDragRef.current = true;
-        e.preventDefault(); // Prevent text selection during scratch drag
+        e.preventDefault(); // Prevent text selection / touch gestures during scratch drag
         return;
       }
-      // If scratch didn't activate (e.g., replayer not ready), fall through to normal click
     }
+
+    // Selection and cursor movement — desktop only (mobile uses touch gestures)
+    if (isMobile) return;
 
     const cursorStore = useCursorStore.getState();
 
     if (e.shiftKey) {
-      // Extend selection
       cursorStore.updateSelection(cell.channelIndex, cell.rowIndex);
     } else {
-      // Start new selection or just move cursor
       cursorStore.moveCursorToRow(cell.rowIndex);
       cursorStore.moveCursorToChannelAndColumn(cell.channelIndex, cell.columnType as any);
-
-      // If we move the cursor, start a new selection
       cursorStore.startSelection();
     }
-    
+
     setIsDragging(true);
   }, [isMobile, getCellFromCoords]);
 
@@ -1806,7 +1806,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
     if (!container) return;
 
     const canvas = document.createElement('canvas');
-    canvas.style.cssText = 'display:block;width:100%;height:100%;';
+    canvas.style.cssText = 'display:block;width:100%;height:100%;position:relative;z-index:0;';
     container.appendChild(canvas);
     canvasRef.current = canvas;
 
@@ -2927,20 +2927,20 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
             formatHeldArrowRef.current = null;
           }
         } : undefined}
-        onMouseDown={handleMouseDown}
-        onMouseMove={handleMouseMove}
-        onMouseUp={handleMouseUp}
-        onMouseLeave={() => { if (!isScratchDragRef.current) handleMouseUp(); }}
+        onPointerDown={handleMouseDown as React.PointerEventHandler}
+        onPointerMove={handleMouseMove as React.PointerEventHandler}
+        onPointerUp={handleMouseUp as React.PointerEventHandler}
+        onPointerLeave={() => { if (!isScratchDragRef.current) handleMouseUp(); }}
         onWheel={handleWheel}
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
         onDrop={handleDrop}
         {...patternGestures}
       >
-        {/* VU Meters overlay — full height, segments extrude from edit row (behind everything) */}
+        {/* VU Meters overlay — full height, segments extrude from edit row */}
         <div
           className="absolute right-0 pointer-events-none overflow-hidden"
-          style={{ top: 0, left: LINE_NUMBER_WIDTH, bottom: 48, zIndex: 0 }}
+          style={{ top: 0, left: LINE_NUMBER_WIDTH, bottom: 48, zIndex: 1 }}
         >
           <ChannelVUMeters
             channelOffsets={channelOffsets}
