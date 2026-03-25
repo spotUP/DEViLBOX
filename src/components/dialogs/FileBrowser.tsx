@@ -18,7 +18,7 @@ interface FileBrowserProps {
   isOpen: boolean;
   onClose: () => void;
   onLoad: (data: object, filename: string) => void;
-  onLoadTrackerModule?: (buffer: ArrayBuffer, filename: string) => Promise<void>;
+  onLoadTrackerModule?: (buffer: ArrayBuffer, filename: string, companionFiles?: Map<string, ArrayBuffer>) => Promise<void>;
   onSave?: (getData: () => object) => void;
   mode?: 'load' | 'save';
   currentProjectData?: () => object;

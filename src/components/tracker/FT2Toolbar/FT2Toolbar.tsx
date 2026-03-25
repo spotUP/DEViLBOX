@@ -1073,10 +1073,10 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = React.memo(({
           setGrooveTemplate(proj.grooveTemplateId || 'straight');
           notify.success(`Loaded: ${proj.metadata?.name || filename}`);
         } catch { notify.error('Failed to load file'); }
-      }} onLoadTrackerModule={async (buffer: ArrayBuffer, filename: string) => {
+      }} onLoadTrackerModule={async (buffer: ArrayBuffer, filename: string, companionFiles?: Map<string, ArrayBuffer>) => {
         const { loadFile } = await import('@lib/file/UnifiedFileLoader');
         const file = new File([buffer], filename);
-        const result = await loadFile(file);
+        const result = await loadFile(file, { companionFiles });
         if (result.success === 'pending-import') {
           setPendingFile(result.file);
           setShowImportDialog(true);

@@ -451,11 +451,36 @@ export const ImportModuleDialog: React.FC<ImportModuleDialogProps> = ({
   // Build accept string for the single-file picker inside the dialog
   const ACCEPTED_FORMATS = getSupportedExtensions().join(',');
 
+  // Ref for the hidden companion file input so we can trigger it programmatically
+  const companionInputRef = useRef<HTMLInputElement | null>(null);
+  // Stash the main file while waiting for companion selection
+  const pendingMainFileRef = useRef<File | null>(null);
+
   const handleSingleFileInput = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files ? Array.from(e.target.files) : [];
+    e.target.value = '';
+    if (files.length === 0) return;
+    const mainFile = files.find(f => isSupportedModule(f.name)) ?? files[0];
+    const companions = files.filter(f => f !== mainFile);
+
+    // If this file needs a companion and none were provided, auto-prompt for it
+    const comp = getExpectedCompanion(mainFile.name);
+    if (comp && companions.length === 0 && companionInputRef.current) {
+      pendingMainFileRef.current = mainFile;
+      companionInputRef.current.click();
+      return;
+    }
+
+    handleFileSelect(mainFile, companions);
+  }, [handleFileSelect]);
+
+  const handleCompanionInput = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     e.target.value = '';
-    if (file) {
-      handleFileSelect(file, []);
+    const mainFile = pendingMainFileRef.current;
+    pendingMainFileRef.current = null;
+    if (mainFile) {
+      handleFileSelect(mainFile, file ? [file] : []);
     }
   }, [handleFileSelect]);
 
@@ -486,6 +511,13 @@ export const ImportModuleDialog: React.FC<ImportModuleDialogProps> = ({
 
   return (
     <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-[99990]">
+      {/* Hidden input for companion file (step 2 of two-part loader) */}
+      <input
+        ref={companionInputRef}
+        type="file"
+        className="hidden"
+        onChange={handleCompanionInput}
+      />
       <div className="bg-dark-bgSecondary border border-dark-border rounded-lg shadow-xl w-full max-w-[90vw] md:max-w-[480px] max-h-[80vh] overflow-hidden">
         {/* Header */}
         <div className="flex items-center justify-between px-4 py-3 border-b border-dark-border">
@@ -513,12 +545,13 @@ export const ImportModuleDialog: React.FC<ImportModuleDialogProps> = ({
                 <label className="cursor-pointer">
                   <input
                     type="file"
+                    multiple
                     accept={ACCEPTED_FORMATS}
                     onChange={handleSingleFileInput}
                     className="hidden"
                   />
                   <span className="text-xs px-3 py-1.5 bg-dark-bg border border-dark-border rounded hover:border-dark-borderHover text-text-muted hover:text-text-primary transition-colors cursor-pointer">
-                    Pick File
+                    Pick Files
                   </span>
                 </label>
                 <label className="cursor-pointer">
@@ -765,14 +798,28 @@ export const ImportModuleDialog: React.FC<ImportModuleDialogProps> = ({
               {needsCompanionFiles && (
                 <div className="flex items-start gap-2 p-3 bg-amber-500/10 border border-amber-500/30 rounded text-xs text-amber-400">
                   <AlertCircle size={14} className="shrink-0 mt-0.5" />
-                  <div>
+                  <div className="flex flex-col gap-2">
                     {(() => {
                       const comp = getExpectedCompanion(loadedFileName);
                       if (comp) return (
-                        <span>
-                          <span className="font-semibold">Missing {comp.description}.</span>
-                          {' '}Drop the containing folder or both files together to include samples.
-                        </span>
+                        <>
+                          <span>
+                            <span className="font-semibold">Missing {comp.description}</span>
+                            {' '}({comp.expectedPrefix})
+                          </span>
+                          <button
+                            type="button"
+                            className="text-xs px-2 py-1 bg-amber-500/20 border border-amber-500/40 rounded hover:bg-amber-500/30 transition-colors cursor-pointer"
+                            onClick={() => {
+                              if (moduleInfo?.file && companionInputRef.current) {
+                                pendingMainFileRef.current = moduleInfo.file;
+                                companionInputRef.current.click();
+                              }
+                            }}
+                          >
+                            Select {comp.expectedPrefix.split('.')[0]}.* file
+                          </button>
+                        </>
                       );
                       return (
                         <span>

@@ -162,14 +162,38 @@ export const PixiRoot: React.FC = () => {
   }, [setShowFileBrowser]);
 
   // Handler for FileBrowser tracker module load (binary formats)
-  const handleLoadTrackerModule = useCallback(async (buffer: ArrayBuffer, filename: string) => {
+  const handleLoadTrackerModule = useCallback(async (buffer: ArrayBuffer, filename: string, companionFiles?: Map<string, ArrayBuffer>) => {
     clearExplicitlySaved();
     try {
       const { loadFile } = await import('@lib/file/UnifiedFileLoader');
       const file = new File([buffer], filename);
-      const result = await loadFile(file);
+      const result = await loadFile(file, { companionFiles });
       if (result.success === 'pending-import') {
-        setPendingModuleFile(result.file);
+        if (companionFiles && companionFiles.size > 0) {
+          // Companions already fetched (server path) — import directly, skip dialog
+          const { parseModuleToSong } = await import('@lib/import/parseModuleToSong');
+          const song = await parseModuleToSong(file, 0, undefined, undefined, companionFiles);
+          const { useTrackerStore: ts } = await import('../stores/useTrackerStore');
+          const { useInstrumentStore: is } = await import('../stores/useInstrumentStore');
+          const { useTransportStore: trs } = await import('../stores/useTransportStore');
+          const { useProjectStore: ps } = await import('../stores/useProjectStore');
+          const { useFormatStore: fs } = await import('../stores/useFormatStore');
+          const { getToneEngine } = await import('../engine/ToneEngine');
+          const engine = getToneEngine();
+          if (trs.getState().isPlaying) trs.getState().stop();
+          engine.releaseAll();
+          trs.getState().reset();
+          ts.getState().reset();
+          is.getState().reset();
+          is.getState().loadInstruments(song.instruments);
+          ts.getState().loadPatterns(song.patterns);
+          if (song.songPositions) ts.getState().setPatternOrder(song.songPositions);
+          trs.getState().setBPM(song.initialBPM ?? 125);
+          ps.getState().setMetadata({ name: song.name });
+          fs.getState().applyEditorMode(song);
+        } else {
+          setPendingModuleFile(result.file);
+        }
       } else if (result.success === true) {
         notify.success(result.message);
       } else if (result.success === false) {

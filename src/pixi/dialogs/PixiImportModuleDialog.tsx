@@ -17,7 +17,7 @@ import {
 import { PixiSelect } from '../components/PixiSelect';
 import { PixiNumericInput } from '../components/PixiNumericInput';
 import { usePixiTheme } from '../theme';
-import { pickFile, pickFiles } from '../services/glFilePicker';
+import { pickFiles } from '../services/glFilePicker';
 import {
   loadModuleFile,
   previewModule,
@@ -443,8 +443,20 @@ export const PixiImportModuleDialog: React.FC<PixiImportModuleDialogProps> = ({
   // ── File picker handlers ───────────────────────────────────────────────────
 
   const handlePickFile = useCallback(async () => {
-    const file = await pickFile({ accept: getSupportedExtensions().join(',') });
-    if (file) handleFileSelect(file, []);
+    const files = await pickFiles({ accept: getSupportedExtensions().join(',') });
+    if (files.length === 0) return;
+    const mainFile = files.find(f => isSupportedModule(f.name)) ?? files[0];
+    const companions = files.filter(f => f !== mainFile);
+
+    // Two-part loader: if picked file needs a companion, auto-prompt for it
+    const comp = getExpectedCompanion(mainFile.name);
+    if (comp && companions.length === 0) {
+      const companionFiles = await pickFiles({ accept: '*' });
+      handleFileSelect(mainFile, companionFiles);
+      return;
+    }
+
+    handleFileSelect(mainFile, companions);
   }, [handleFileSelect]);
 
   const handlePickCompanions = useCallback(async () => {
