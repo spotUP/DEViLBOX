@@ -160,8 +160,8 @@ public:
         m_romData = nullptr;
         m_romSize = 0;
         m_globalVolume = 200;
-        m_globalAttack = 0.01f;
-        m_globalRelease = 0.002f;
+        m_globalAttack = 1.0f / (0.01f * 44100.0f);   // 10ms attack
+        m_globalRelease = 1.0f / (0.3f * 44100.0f);   // 300ms release
 
         for (int i = 0; i < MAX_POLY; i++)
             m_voices[i].reset();
@@ -266,12 +266,18 @@ public:
             case PARAM_FILTER_CUTOFF:
                 // Simple lowpass via envelope speed (placeholder — no real filter in FZ hardware)
                 break;
-            case PARAM_ATTACK:
-                m_globalAttack = static_cast<float>(std::max(0.0001, value));
+            case PARAM_ATTACK: {
+                // value is attack time in seconds
+                double attackSec = std::max(0.001, value);
+                m_globalAttack = static_cast<float>(1.0 / (attackSec * m_sampleRate));
                 break;
-            case PARAM_RELEASE:
-                m_globalRelease = static_cast<float>(std::max(0.0001, value));
+            }
+            case PARAM_RELEASE: {
+                // value is release time in seconds
+                double releaseSec = std::max(0.001, value);
+                m_globalRelease = static_cast<float>(1.0 / (releaseSec * m_sampleRate));
                 break;
+            }
             case PARAM_LOOP_MODE:
                 // 0=off, 1=forward loop, 2=reverse
                 for (int i = 0; i < MAX_POLY; i++) {

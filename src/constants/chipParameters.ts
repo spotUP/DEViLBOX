@@ -804,7 +804,7 @@ export const CHIP_SYNTH_DEFS: Record<string, ChipSynthDef> = {
       { key: 'volume', label: 'Volume', group: 'Output', type: 'knob', min: 0, max: 1, step: 0.01, default: 0.8, formatValue: 'percent' },
       { key: 'vco_frequency', label: 'VCO Freq', group: 'VCO', type: 'knob', min: 0, max: 1, step: 0.01, default: 0.5, formatValue: 'percent' },
       { key: 'modulation', label: 'Modulation', group: 'VCO', type: 'knob', min: 0, max: 1, step: 0.01, default: 0, formatValue: 'percent' },
-      { key: 'wave_select', label: 'Wave Select', group: 'VCO', type: 'knob', min: 0, max: 7, step: 1, default: 2, formatValue: 'int' },
+      { key: 'wave_select', label: 'Waveform', group: 'VCO', type: 'select', min: 0, max: 7, step: 1, default: 2, formatValue: 'int', options: [{ value: 0, label: 'Silent' }, { value: 1, label: 'Pulse' }, { value: 2, label: 'Sawtooth' }, { value: 3, label: 'Pulse+Saw' }, { value: 4, label: 'Triangle' }, { value: 5, label: 'Pulse+Tri' }, { value: 6, label: 'Saw+Tri' }, { value: 7, label: 'All' }] },
       { key: 'pulse_width', label: 'Pulse Width', group: 'VCO', type: 'knob', min: 0, max: 1, step: 0.01, default: 0.5, formatValue: 'percent' },
       { key: 'mixer_balance', label: 'Mixer Balance', group: 'Mixer', type: 'knob', min: 0, max: 1, step: 0.01, default: 0.5, formatValue: 'percent' },
       { key: 'resonance', label: 'Resonance', group: 'Filter', type: 'knob', min: 0, max: 1, step: 0.01, default: 0, formatValue: 'percent' },
