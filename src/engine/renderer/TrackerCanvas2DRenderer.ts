@@ -287,9 +287,12 @@ export class TrackerCanvas2DRenderer {
     if (curY >= -rowH && curY < H) {
       const ch = cursor.channelIndex;
       const curX = lnw + (chanOffsets[ch] ?? 0);
+      // Clamp cursor width to canvas bounds (channel may be wider than viewport on mobile)
+      const rawCurW = (chanWidths[ch] ?? cw * 9) - 2;
+      const curW = Math.min(rawCurW, W - curX - 2);
       ctx.strokeStyle = theme.accent;
       ctx.lineWidth   = this.mobile ? 3 : 2;
-      ctx.strokeRect(curX + 1, curY + 1, (chanWidths[ch] ?? cw * 9) - 2, rowH - 2);
+      ctx.strokeRect(curX + 1, curY + 1, curW, rowH - 2);
     }
 
     // ── Center line ─────────────────────────────────────────────────────────
