@@ -1948,7 +1948,7 @@ export const FORMAT_REGISTRY: FormatDefinition[] = [
   },
   // Native-first PC trackers that fall through to libopenmpt (no pref toggle)
   {
-    key: 'unic',      label: 'UNIC Tracker',       description: 'UNIC Tracker',          family: 'pc-tracker', matchMode: 'extension', extRegex: /\.unic$/i, nativeParser: { module: '@lib/import/formats/UNICParser', parseFn: 'parseUNICFile', detectFn: 'isUNICFormat' }, libopenmptFallback: true,
+    key: 'unic',      label: 'UNIC Tracker',       description: 'UNIC Tracker',          family: 'pc-tracker', matchMode: 'both', extRegex: /\.unic$/i, prefixes: ['unic.'], nativeParser: { module: '@lib/import/formats/UNICParser', parseFn: 'parseUNICFile', detectFn: 'isUNICFormat' }, libopenmptFallback: true,
   },
   {
     key: 'mtm',       label: 'MultiTracker',        description: 'MultiTracker',           family: 'pc-tracker', matchMode: 'extension', extRegex: /\.mtm$/i,  nativeParser: { module: '@lib/import/formats/MTMParser', parseFn: 'parseMTMFile', detectFn: 'isMTMFormat' }, libopenmptFallback: true,
@@ -2160,7 +2160,7 @@ export const FORMAT_REGISTRY: FormatDefinition[] = [
     description: 'Amiga music formats handled by AmigaFormatParsers',
     family: 'amiga-native',
     matchMode: 'extension',
-    extRegex: /\.(adpcm|adsc|alp|amc|aps|ash|bds|bye|cin|cm|dat|dln|dm|dm1|doda|dsc|dsr|ex|gray|hip7|hst|jb|jcb|jcbo|jd|jmf|jo|jp|jpn|jpnd|jpo|jpold|js|jt|kh|kim|max|mc|mco|mcr|mdst|mon|mon_old|mosh|mxtx|npp|ntp|one|osp|pap|pat|powt|prt|pt|pvp|qpa|qts|rho|s7g|sb|scr|sg|sjs|sm|sm1|sm2|sm3|smpro|snd|thm|tits|tmk|ts|two|uds|wb)$/i,
+    extRegex: /\.(adpcm|adsc|alp|amc|aps|ash|bds|bye|cin|cm|dat|dln|dm|dm1|doda|dsc|dsr|ex|gray|hip7|hst|ins|jb|jcb|jcbo|jd|jmf|jo|jp|jpn|jpnd|jpo|jpold|js|jt|kh|kim|max|mc|mco|mcr|mdst|mon|mon_old|mosh|mxtx|npp|ntp|one|osp|pap|pat|powt|prt|pt|pvp|qpa|qts|rho|s7g|sb|scr|sg|sjs|sm|sm1|sm2|sm3|smpro|snd|thm|tits|tmk|ts|two|uds|wb)$/i,
     uadeFallback: true,
   },
 
@@ -2202,6 +2202,7 @@ export const FORMAT_REGISTRY: FormatDefinition[] = [
     ['rhst', 'Rob Hubbard ST'], ['rkl', 'Ron Klaren'],
     ['sc2', 'Sean Connolly 2'], ['sil', 'Silmarils v2'],
     ['tomy', 'TomyTracker'], ['st', 'SoundTracker prefix'],
+    ['ins', 'InStereo!'],
   ] as const).map(([prefix, label]): FormatDefinition => ({
     key: `uade_${prefix.replace(/[.-]/g, '_')}`,
     label,

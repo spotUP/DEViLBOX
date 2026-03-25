@@ -79,7 +79,7 @@ export { NUM_HARMONICS, WAVE_SAMPLES, WAVE_NAMES, cutoffToHz, filterResponseDb, 
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
-export type CMITab = 'harmonic' | 'wave' | 'control' | 'filter' | 'envelope';
+export type CMITab = 'harmonic' | 'wave' | 'control' | 'filter' | 'envelope' | 'crt';
 
 export const CMI_TAB_DEFS: { id: CMITab; label: string; pageNum: string }[] = [
   { id: 'harmonic', label: 'HARMONIC', pageNum: '7' },
@@ -87,6 +87,7 @@ export const CMI_TAB_DEFS: { id: CMITab; label: string; pageNum: string }[] = [
   { id: 'control',  label: 'CONTROL',  pageNum: '6' },
   { id: 'filter',   label: 'FILTER',   pageNum: 'F' },
   { id: 'envelope', label: 'ENVELOPE', pageNum: 'E' },
+  { id: 'crt',      label: 'CRT',      pageNum: 'M' },
 ];
 
 // ── Heights (shared between both renderers) ────────────────────────────────

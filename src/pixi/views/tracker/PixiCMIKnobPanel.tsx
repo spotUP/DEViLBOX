@@ -387,6 +387,14 @@ export const PixiCMIKnobPanel: React.FC<PixiCMIKnobPanelProps> = ({ width }) => 
             </pixiContainer>
           </pixiContainer>
         )}
+
+        {cmi.activeTab === 'crt' && (
+          <pixiContainer layout={{ width, height: CMI_CONTENT_H, flexDirection: 'column', paddingLeft: 12, paddingTop: 40, gap: 8, alignItems: 'center' }}>
+            <pixiBitmapText text="MAME CRT DISPLAY" style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 12, fill: 0xffffff }} tint={G} layout={{}} />
+            <pixiBitmapText text="Available in DOM view only" style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 10, fill: 0xffffff }} tint={G_DIM} layout={{}} />
+            <pixiBitmapText text="(full MAME emulation requires iframe)" style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 9, fill: 0xffffff }} tint={G_DIM} layout={{}} />
+          </pixiContainer>
+        )}
       </layoutContainer>
     </layoutContainer>
   );
