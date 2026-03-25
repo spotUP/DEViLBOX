@@ -35,6 +35,12 @@ interface DOMStripProps {
   isMaster?: boolean;
   /** Mobile compact mode — larger touch targets, simplified layout */
   compact?: boolean;
+  // DAW features
+  sendLevels?: number[];
+  onSendLevelChange?: (sendIdx: number, level: number) => void;
+  insertEffectCount?: number;
+  armRecord?: boolean;
+  onArmRecordToggle?: () => void;
 }
 
 function vuColor(level: number): string {
@@ -57,6 +63,11 @@ const DOMChannelStrip: React.FC<DOMStripProps> = ({
   onSoloToggle,
   isMaster = false,
   compact = false,
+  sendLevels,
+  onSendLevelChange,
+  insertEffectCount,
+  armRecord,
+  onArmRecordToggle,
 }) => {
   const vuH = compact ? 100 : 80;
   const stripW = compact ? 72 : 60;
@@ -155,6 +166,47 @@ const DOMChannelStrip: React.FC<DOMStripProps> = ({
           </button>
         )}
       </div>
+
+      {/* Send knobs (compact horizontal row) */}
+      {!isMaster && sendLevels && onSendLevelChange && !compact && (
+        <div className="flex gap-0.5 mt-0.5">
+          {sendLevels.slice(0, 4).map((lvl, i) => (
+            <input
+              key={i}
+              type="range"
+              min={0}
+              max={1}
+              step={0.01}
+              value={lvl}
+              onChange={(e) => onSendLevelChange(i, parseFloat(e.target.value))}
+              className="cursor-pointer"
+              style={{ width: 12, height: 28, writingMode: 'vertical-lr', direction: 'rtl', accentColor: '#14b8a6' }}
+              title={`Send ${i + 1}: ${Math.round(lvl * 100)}%`}
+            />
+          ))}
+        </div>
+      )}
+
+      {/* FX indicator */}
+      {insertEffectCount !== undefined && insertEffectCount > 0 && (
+        <div className="text-[8px] font-mono text-accent-primary mt-0.5">FX:{insertEffectCount}</div>
+      )}
+
+      {/* Record arm button */}
+      {!isMaster && onArmRecordToggle && (
+        <button
+          onClick={onArmRecordToggle}
+          className="text-[9px] font-mono font-bold rounded leading-none border px-1 py-0.5 mt-0.5 transition-colors"
+          style={{
+            backgroundColor: armRecord ? '#dc2626' : 'transparent',
+            borderColor: armRecord ? '#dc2626' : 'rgba(255,255,255,0.2)',
+            color: armRecord ? '#fff' : 'rgba(255,255,255,0.5)',
+          }}
+          title={armRecord ? 'Disarm recording' : 'Arm for recording'}
+        >
+          R
+        </button>
+      )}
     </div>
   );
 };
@@ -198,6 +250,9 @@ const MixerContent: React.FC<MixerContentProps> = ({
           onMuteToggle={() => onMuteToggle(i)}
           onSoloToggle={() => onSoloToggle(i)}
           compact={compact}
+          sendLevels={ch.sendLevels}
+          onSendLevelChange={(sendIdx, level) => useMixerStore.getState().setChannelSendLevel(i, sendIdx, level)}
+          insertEffectCount={ch.insertEffects?.length ?? 0}
         />
       ))}
       <div className="self-stretch w-px bg-white/10 mx-1 my-2" />
