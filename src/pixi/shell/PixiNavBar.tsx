@@ -1,13 +1,15 @@
 /**
- * PixiNavBar — Modern single-row navigation bar.
+ * PixiNavBar — Top navigation bar matching the DOM NavBar layout.
  *
- * Three zones:
- *   Left (460px):  Logo + view selector pills (Tracker, Arrange, Piano, DJ, VJ, Studio)
- *   Center (flex):  PixiTransportBar (play/stop/BPM/position/loop)
- *   Right:  Volume knob, Save, Load, Collab, Auth, MIDI, Theme, Dock, DOM
+ * Two rows:
+ *   Row 1 (main nav):
+ *     Left:   "DEViLBOX" logo + version badge + view selector dropdown
+ *     Right:  Sign In, Collab, Desktop App, DOM, Info, Sets, MIDI, Theme, Volume
+ *   Row 2 (tab bar):
+ *     Project tabs + "+" add button
  */
 
-import React, { useCallback, useRef } from 'react';
+import React, { useCallback, useMemo, useRef } from 'react';
 import type { Container as ContainerType } from 'pixi.js';
 import { PIXI_FONTS } from '../fonts';
 import { usePixiTheme } from '../theme';
@@ -18,8 +20,7 @@ import { usePixiResponsive } from '../hooks/usePixiResponsive';
 import { useUIStore } from '@stores/useUIStore';
 import { useMIDIStore } from '@stores/useMIDIStore';
 import { MODERN_NAV_H } from '../workbench/workbenchLayout';
-import { PixiTransportBar } from './PixiTransportBar';
-import { BUILD_VERSION } from '@constants/version';
+import { BUILD_NUMBER } from '@constants/version';
 import { usePixiDropdownStore } from '../stores/usePixiDropdownStore';
 import { PixiDJSetBrowser } from '../views/dj/PixiDJSetBrowser';
 import { useNavBar, VIEW_TABS, type ViewTabId } from '@hooks/views/useNavBar';
@@ -37,8 +38,14 @@ export const PixiNavBar: React.FC = () => {
 
   const n = useNavBar();
 
-  // Pixi-specific: themeOptions need SelectOption shape (already compatible via NavBarThemeOption)
+  // Theme options for PixiSelect
   const themeOptions = n.themeOptions;
+
+  // View options for PixiSelect dropdown
+  const viewOptions = useMemo(() =>
+    VIEW_TABS.map(({ id, label }) => ({ value: id, label: label.toUpperCase() })),
+    [],
+  );
 
   // MIDI device quick-picker (Pixi-specific dropdown UX)
   const midiContainerRef = useRef<ContainerType>(null);
@@ -105,10 +112,10 @@ export const PixiNavBar: React.FC = () => {
     });
   }, [n.authUser, n.handleOpenAuth, n.logout]);
 
-  // Transport bar width: center zone gets whatever's left after left/right
-  const LEFT_W = 460;
-  const RIGHT_W = 488;
-  const transportW = Math.max(200, width - LEFT_W - RIGHT_W);
+  // Handle view switch via PixiSelect
+  const handleViewChange = useCallback((id: string) => {
+    n.handleSwitchView(id as ViewTabId);
+  }, [n.handleSwitchView]);
 
   return (
     <layoutContainer
@@ -123,17 +130,16 @@ export const PixiNavBar: React.FC = () => {
     >
 
       {/* ── Main nav row ── */}
-      <pixiContainer layout={{ width, height: NAV_ROW_H, flexDirection: 'row', alignItems: 'center', flexShrink: 0 }}>
+      <pixiContainer layout={{ width, height: NAV_ROW_H, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
 
-      {/* ═══ Left zone: Logo + view selector pills ═══ */}
+      {/* ═══ Left zone: Logo + version badge + view dropdown ═══ */}
       <pixiContainer
         layout={{
-          width: LEFT_W,
           height: NAV_ROW_H,
           flexDirection: 'row',
           alignItems: 'center',
           paddingLeft: 16,
-          gap: 6,
+          gap: 8,
           flexShrink: 0,
         }}
       >
@@ -141,33 +147,45 @@ export const PixiNavBar: React.FC = () => {
         <pixiBitmapText
           text="DEViLBOX"
           style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 16, fill: 0xffffff }}
-          tint={theme.accent.color}
-          layout={{ marginRight: 12 }}
+          tint={theme.text.color}
+          layout={{}}
         />
 
-        {/* View selector buttons */}
-        {VIEW_TABS.map(({ id, label }) => {
-          const isActive = n.activeView === id;
-          return (
-            <PixiButton
-              key={id}
-              label={label}
-              variant="ft2"
-              size="sm"
-              active={isActive}
-              onClick={() => n.handleSwitchView(id as ViewTabId)}
-            />
-          );
-        })}
+        {/* Version badge — matches DOM's accent-colored badge */}
+        <layoutContainer
+          layout={{
+            paddingLeft: 6,
+            paddingRight: 6,
+            paddingTop: 2,
+            paddingBottom: 2,
+            backgroundColor: theme.accent.color,
+            borderRadius: 3,
+          }}
+          eventMode="static"
+          cursor="help"
+        >
+          <pixiBitmapText
+            text={`1.0.${BUILD_NUMBER}`}
+            style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 10, fill: 0xffffff }}
+            tint={0x000000}
+            layout={{}}
+            eventMode="none"
+          />
+        </layoutContainer>
+
+        {/* View selector dropdown — compact, not prominent pills */}
+        <PixiSelect
+          options={viewOptions}
+          value={n.activeView}
+          onChange={handleViewChange}
+          width={90}
+          height={24}
+        />
       </pixiContainer>
 
-      {/* ═══ Center zone: Transport ═══ */}
-      <PixiTransportBar width={transportW} height={NAV_ROW_H} />
-
-      {/* ═══ Right zone: Volume, Actions, Status ═══ */}
+      {/* ═══ Right zone: Actions matching DOM layout ═══ */}
       <pixiContainer
         layout={{
-          width: RIGHT_W,
           height: NAV_ROW_H,
           flexDirection: 'row',
           alignItems: 'center',
@@ -177,7 +195,63 @@ export const PixiNavBar: React.FC = () => {
           flexShrink: 0,
         }}
       >
-        {/* Master Volume */}
+        {/* Auth — Sign In / username (matches DOM's Sign In button) */}
+        <pixiContainer ref={authContainerRef} layout={{ flexShrink: 0 }}>
+          <PixiButton
+            label={n.authUser ? n.authUser.username.slice(0, 8) : 'SIGN IN'}
+            variant="ghost"
+            size="sm"
+            onClick={handleAuthClick}
+            width={n.authUser ? 56 : 56}
+          />
+        </pixiContainer>
+
+        {/* Collaboration (matches DOM's Collab button) */}
+        <PixiButton
+          label="COLLAB"
+          variant={n.collabStatus === 'connected' ? 'primary' : 'ghost'}
+          size="sm"
+          active={n.collabStatus === 'connected'}
+          onClick={n.handleOpenCollab}
+          width={52}
+        />
+
+        {/* Desktop App download (matches DOM's Desktop App button) */}
+        <PixiButton
+          label="APP"
+          variant="primary"
+          size="sm"
+          onClick={n.handleOpenDownload}
+          width={36}
+        />
+
+        {/* Switch to DOM mode (matches DOM's DOM button) */}
+        <PixiButton label="DOM" variant="ghost" size="sm" onClick={n.handleSwitchToDom} width={36} />
+
+        {/* Song Info (matches DOM's Info button) */}
+        <PixiButton label="INFO" variant="ghost" size="sm" onClick={n.handleOpenModuleInfo} width={40} />
+
+        {/* DJ Sets (matches DOM's Sets dropdown) */}
+        <PixiDJSetBrowser />
+
+        {/* MIDI — opens device picker dropdown (matches DOM's MIDI dropdown) */}
+        {n.hasMIDI && (
+          <pixiContainer ref={midiContainerRef} layout={{ flexShrink: 0 }}>
+            <PixiButton label="MIDI" variant="ghost" size="sm" onClick={handleMIDIClick} width={40} />
+          </pixiContainer>
+        )}
+
+        {/* Theme Switcher (matches DOM's theme dropdown) */}
+        <PixiSelect
+          options={themeOptions}
+          value={n.currentThemeId}
+          onChange={n.setTheme}
+          width={80}
+          height={24}
+          searchable
+        />
+
+        {/* Master Volume (matches DOM's volume slider) */}
         <PixiKnob
           value={n.masterVolume}
           min={-60}
@@ -188,82 +262,7 @@ export const PixiNavBar: React.FC = () => {
           size="sm"
           defaultValue={0}
           formatValue={(v) => `${v.toFixed(0)}`}
-          layout={{ marginRight: 4 }}
-        />
-
-        <PixiButton label="SAVE" variant="ghost" size="sm" onClick={n.handleSaveFile} width={44} />
-        <PixiButton label="LOAD" variant="ghost" size="sm" onClick={n.handleLoadFile} width={44} />
-        <PixiButton label="INFO" variant="ghost" size="sm" onClick={n.handleOpenModuleInfo} width={40} />
-
-        {/* Collaboration */}
-        <PixiButton
-          label={n.collabStatus === 'connected' ? 'LIVE' : 'COLLAB'}
-          variant={n.collabStatus === 'connected' ? 'ft2' : 'ghost'}
-          color={n.collabStatus === 'connected' ? 'green' : 'default'}
-          size="sm"
-          active={n.collabStatus === 'connected'}
-          onClick={n.handleOpenCollab}
-          width={48}
-        />
-
-        {/* DJ Sets */}
-        <PixiDJSetBrowser />
-
-        {/* Auth — shows sign-out dropdown when logged in */}
-        <pixiContainer ref={authContainerRef} layout={{ flexShrink: 0 }}>
-          <PixiButton
-            label={n.authUser ? n.authUser.username.slice(0, 6) : 'LOGIN'}
-            variant="ghost"
-            size="sm"
-            onClick={handleAuthClick}
-            width={44}
-          />
-        </pixiContainer>
-
-        {/* MIDI — opens device picker dropdown */}
-        {n.hasMIDI && (
-          <pixiContainer ref={midiContainerRef} layout={{ flexShrink: 0 }}>
-            <PixiButton label="MIDI" variant="ghost" size="sm" onClick={handleMIDIClick} width={40} />
-          </pixiContainer>
-        )}
-
-        {/* Exposé — shows in all views */}
-        <PixiButton
-          label="EXPOSÉ"
-          variant={n.exposeActive ? 'ft2' : 'ghost'}
-          size="sm"
-          active={n.exposeActive}
-          onClick={n.handleExpose}
-          width={56}
-        />
-
-        {/* AI Assistant */}
-        <PixiButton
-          label="AI"
-          variant={n.aiPanelOpen ? 'ft2' : 'ghost'}
-          size="sm"
-          active={n.aiPanelOpen}
-          onClick={n.toggleAI}
-          width={28}
-        />
-
-        <PixiSelect
-          options={themeOptions}
-          value={n.currentThemeId}
-          onChange={n.setTheme}
-          width={80}
-          height={24}
-          searchable
-        />
-        <PixiButton label="APP" variant="ghost" size="sm" onClick={n.handleOpenDownload} width={36} />
-        <PixiButton label="DOM" variant="ghost" size="sm" onClick={n.handleSwitchToDom} width={36} />
-
-        {/* Build version badge */}
-        <pixiBitmapText
-          text={BUILD_VERSION}
-          style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 9, fill: 0xffffff }}
-          tint={theme.textMuted.color}
-          layout={{ marginLeft: 4 }}
+          layout={{}}
         />
       </pixiContainer>
 

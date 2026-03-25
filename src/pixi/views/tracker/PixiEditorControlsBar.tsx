@@ -166,7 +166,7 @@ const HardwarePresetSelector: React.FC = () => {
       onChange={handleHardwarePresetChange}
       width={150}
       height={24}
-      placeholder="HW SYSTEM..."
+      placeholder="SELECT HARDWARE..."
     />
   );
 };
@@ -531,7 +531,7 @@ export const PixiEditorControlsBar: React.FC<PixiEditorControlsBarProps> = ({
       {/* Ghost Patterns — only in tracker view */}
       <PixiButton
         label="Ghosts"
-        variant={c.showGhostPatterns ? 'ft2' : 'ghost'}
+        variant="ghost"
         color={c.showGhostPatterns ? 'blue' : undefined}
         size="sm"
         active={c.showGhostPatterns}
@@ -565,9 +565,9 @@ export const PixiEditorControlsBar: React.FC<PixiEditorControlsBarProps> = ({
         onClick={c.handleShowDrumpads}
       />
 
-      {/* REC button */}
+      {/* REC button with dot indicator (matches DOM) */}
       <PixiButton
-        label="REC"
+        label={'\u25CF REC'}
         variant={c.recordMode ? 'ft2' : 'ghost'}
         color={c.recordMode ? 'red' : undefined}
         size="sm"
@@ -575,9 +575,10 @@ export const PixiEditorControlsBar: React.FC<PixiEditorControlsBarProps> = ({
         onClick={c.handleToggleRecord}
       />
 
-      {/* Settings */}
+      {/* Recording Settings (matches DOM slider icon next to REC) */}
       <PixiButton
-        label="Settings"
+        icon="preset-a"
+        label=""
         variant="ghost"
         size="sm"
         onClick={c.handleRecSettings}
@@ -631,7 +632,7 @@ export const PixiEditorControlsBar: React.FC<PixiEditorControlsBarProps> = ({
 
       {/* FPS pill */}
       <pixiBitmapText
-        text={`${c.fps.averageFps}FPS`}
+        text={`${c.fps.averageFps} FPS`}
         style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 11, fill: 0xffffff }}
         tint={fpsTint}
         layout={{}}
