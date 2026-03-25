@@ -928,6 +928,16 @@ export const CHIP_SYNTH_DEFS: Record<string, ChipSynthDef> = {
     presetNames: ['Brass 1', 'E.Piano', 'Synth Bass', 'Pad'],
     parameters: [
       { key: 'volume', label: 'Volume', group: 'Output', type: 'knob', min: 0, max: 1, step: 0.01, default: 0.8, formatValue: 'percent' },
+      { key: 'waveform1', label: 'Waveform 1', group: 'Oscillator', type: 'select', min: 0, max: 7, step: 1, default: 0, formatValue: 'int', options: [{ value: 0, label: 'Sawtooth' }, { value: 1, label: 'Square' }, { value: 2, label: 'Pulse' }, { value: 3, label: 'Silent' }, { value: 4, label: 'Double Sine' }, { value: 5, label: 'Saw Pulse' }, { value: 6, label: 'Resonance' }, { value: 7, label: 'Dbl Pulse' }] },
+      { key: 'waveform2', label: 'Waveform 2', group: 'Oscillator', type: 'select', min: 0, max: 7, step: 1, default: 0, formatValue: 'int', options: [{ value: 0, label: 'Sawtooth' }, { value: 1, label: 'Square' }, { value: 2, label: 'Pulse' }, { value: 3, label: 'Silent' }, { value: 4, label: 'Double Sine' }, { value: 5, label: 'Saw Pulse' }, { value: 6, label: 'Resonance' }, { value: 7, label: 'Dbl Pulse' }] },
+      { key: 'window', label: 'Window', group: 'Oscillator', type: 'select', min: 0, max: 5, step: 1, default: 0, formatValue: 'int', options: [{ value: 0, label: 'None' }, { value: 1, label: 'Saw' }, { value: 2, label: 'Triangle' }, { value: 3, label: 'Trapezoid' }, { value: 4, label: 'Pulse' }, { value: 5, label: 'Double Saw' }] },
+      { key: 'dcw_depth', label: 'DCW Depth', group: 'Waveform', type: 'knob', min: 0, max: 127, step: 1, default: 64, formatValue: 'int' },
+      { key: 'dca_rate', label: 'DCA Rate', group: 'Envelope', type: 'knob', min: 0, max: 127, step: 1, default: 80, formatValue: 'int' },
+      { key: 'dcw_rate', label: 'DCW Rate', group: 'Envelope', type: 'knob', min: 0, max: 127, step: 1, default: 60, formatValue: 'int' },
+      { key: 'dco_rate', label: 'DCO Rate', group: 'Pitch Env', type: 'knob', min: 0, max: 127, step: 1, default: 0, formatValue: 'int' },
+      { key: 'dco_depth', label: 'DCO Depth', group: 'Pitch Env', type: 'knob', min: 0, max: 63, step: 1, default: 0, formatValue: 'int' },
+      { key: 'ring_mod', label: 'Ring Mod', group: 'Oscillator', type: 'toggle', min: 0, max: 1, default: 0 },
+      { key: 'stereo_width', label: 'Stereo Width', group: 'Output', type: 'knob', min: 0, max: 1, step: 0.01, default: 0.3, formatValue: 'percent' },
     ],
   },
 

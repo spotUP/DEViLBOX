@@ -413,8 +413,77 @@ export class CZ101Synth implements DevilboxSynth {
    * Set a parameter value
    */
   setParameter(param: string, value: number): void {
-    // Parameter mapping to be implemented
-    console.log(`[CZ101Synth] setParameter: ${param} = ${value}`);
+    if (!this.workletNode) return;
+
+    switch (param) {
+      case 'volume':
+        this.output.gain.value = Math.max(0, Math.min(1, value));
+        break;
+      case 'waveform1':
+        // Set waveform for all voices (3-bit PD waveform index)
+        for (let v = 0; v < 8; v++) {
+          this.writeReg(UPD933_REG.WAVEFORM + v, Math.round(value) & 0x0F);
+        }
+        if (this.currentPatch) this.currentPatch.line1.waveform1 = Math.round(value) as CZWaveform;
+        break;
+      case 'waveform2':
+        // Set second waveform (upper nibble of waveform register)
+        for (let v = 0; v < 8; v++) {
+          const current = this.currentPatch?.line1.waveform1 ?? 0;
+          this.writeReg(UPD933_REG.WAVEFORM + v, (current & 0x0F) | ((Math.round(value) & 0x0F) << 4));
+        }
+        if (this.currentPatch?.line2) this.currentPatch.line2.waveform1 = Math.round(value) as CZWaveform;
+        break;
+      case 'window':
+        // Window function — stored in patch but applied on next note trigger
+        break;
+      case 'dcw_depth':
+        if (this.currentPatch) {
+          const depth = Math.round(value);
+          for (const stage of this.currentPatch.line1.dcwEnvelope) {
+            stage.level = depth;
+          }
+        }
+        break;
+      case 'dca_rate':
+        if (this.currentPatch) {
+          const rate = Math.round(value);
+          for (const stage of this.currentPatch.line1.dcaEnvelope) {
+            stage.rate = rate;
+          }
+        }
+        break;
+      case 'dcw_rate':
+        if (this.currentPatch) {
+          const rate = Math.round(value);
+          for (const stage of this.currentPatch.line1.dcwEnvelope) {
+            stage.rate = rate;
+          }
+        }
+        break;
+      case 'dco_rate':
+        if (this.currentPatch?.line1.dcoEnvelope) {
+          const rate = Math.round(value);
+          for (const stage of this.currentPatch.line1.dcoEnvelope) {
+            stage.rate = rate;
+          }
+        }
+        break;
+      case 'dco_depth':
+        if (this.currentPatch?.line1.dcoEnvelope) {
+          const depth = Math.round(value);
+          for (const stage of this.currentPatch.line1.dcoEnvelope) {
+            stage.level = depth;
+          }
+        }
+        break;
+      case 'ring_mod':
+        if (this.currentPatch) this.currentPatch.ringMod = value > 0.5;
+        break;
+      case 'stereo_width':
+        // No direct register — would need pan per voice
+        break;
+    }
   }
 
   /**
