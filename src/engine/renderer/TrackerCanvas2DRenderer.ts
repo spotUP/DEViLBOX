@@ -56,15 +56,15 @@ const COL_GAP = 4;
 // ─────────────────────────────────────────────────────────────────────────────
 
 export class TrackerCanvas2DRenderer {
-  private readonly ctx: OffscreenCanvasRenderingContext2D;
+  private readonly ctx: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D;
   width  = 800;
   height = 600;
   private dpr = 1;
 
-  constructor(canvas: OffscreenCanvas) {
+  constructor(canvas: OffscreenCanvas | HTMLCanvasElement) {
     const ctx = canvas.getContext('2d');
     if (!ctx) throw new Error('[TrackerCanvas2DRenderer] Canvas2D not supported');
-    this.ctx = ctx;
+    this.ctx = ctx as CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D;
     this.width  = canvas.width;
     this.height = canvas.height;
   }

@@ -222,28 +222,28 @@ const Knob: React.FC<{
   const rootRef = React.useRef<HTMLDivElement>(null);
 
   // Drag interaction
-  const handleMouseDown = useCallback((e: React.MouseEvent) => {
+  const handlePointerDown = useCallback((e: React.PointerEvent) => {
     e.preventDefault();
+    (e.target as HTMLElement).setPointerCapture?.(e.pointerId);
     const startY = e.clientY;
     const startVal = value;
     const range = max - min;
 
-    const handleMouseMove = (moveEvent: MouseEvent) => {
+    const handlePointerMove = (moveEvent: PointerEvent) => {
       const delta = (startY - moveEvent.clientY) / 200;
       let newValue = startVal + delta * range;
-      // Snap to step
       newValue = Math.round(newValue / step) * step + min;
       newValue = Math.max(min, Math.min(max, newValue));
       onChange(newValue);
     };
 
-    const handleMouseUp = () => {
-      document.removeEventListener('mousemove', handleMouseMove);
-      document.removeEventListener('mouseup', handleMouseUp);
+    const handlePointerUp = () => {
+      document.removeEventListener('pointermove', handlePointerMove);
+      document.removeEventListener('pointerup', handlePointerUp);
     };
 
-    document.addEventListener('mousemove', handleMouseMove);
-    document.addEventListener('mouseup', handleMouseUp);
+    document.addEventListener('pointermove', handlePointerMove);
+    document.addEventListener('pointerup', handlePointerUp);
   }, [value, onChange, min, max, step]);
 
   // io-808: rotationAmount = getNormalizedValue(value, min, max) * bufferSize - bufferSize / 2
@@ -260,7 +260,7 @@ const Knob: React.FC<{
         width: size,
         cursor: 'grab',
       }}
-      onMouseDown={handleMouseDown}
+      onPointerDown={handlePointerDown}
     >
       <div style={{
         position: 'relative',

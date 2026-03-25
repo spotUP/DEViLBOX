@@ -35,10 +35,11 @@ export const HWKnob: React.FC<HWKnobProps> = ({
   const knobSize = size === 'sm' ? 24 : size === 'lg' ? 40 : 32;
   const containerWidth = size === 'sm' ? 48 : size === 'lg' ? 64 : 56;
 
-  const handleMouseDown = useCallback((e: React.MouseEvent) => {
+  const handlePointerDown = useCallback((e: React.PointerEvent) => {
     e.preventDefault();
+    (e.target as HTMLElement).setPointerCapture?.(e.pointerId);
     dragRef.current = { startY: e.clientY, startVal: value };
-    const handleMouseMove = (ev: MouseEvent) => {
+    const handlePointerMove = (ev: PointerEvent) => {
       if (!dragRef.current) return;
       const dy = dragRef.current.startY - ev.clientY;
       const range = max - min;
@@ -47,13 +48,13 @@ export const HWKnob: React.FC<HWKnobProps> = ({
       newVal = Math.max(min, Math.min(max, newVal));
       onChange(newVal);
     };
-    const handleMouseUp = () => {
+    const handlePointerUp = () => {
       dragRef.current = null;
-      document.removeEventListener('mousemove', handleMouseMove);
-      document.removeEventListener('mouseup', handleMouseUp);
+      document.removeEventListener('pointermove', handlePointerMove);
+      document.removeEventListener('pointerup', handlePointerUp);
     };
-    document.addEventListener('mousemove', handleMouseMove);
-    document.addEventListener('mouseup', handleMouseUp);
+    document.addEventListener('pointermove', handlePointerMove);
+    document.addEventListener('pointerup', handlePointerUp);
   }, [value, min, max, step, onChange]);
 
   const displayVal = formatDisplay ? formatDisplay(value) : value.toFixed(2);
@@ -62,7 +63,7 @@ export const HWKnob: React.FC<HWKnobProps> = ({
     <div
       className="flex flex-col items-center gap-0.5 select-none cursor-ns-resize"
       style={{ width: containerWidth }}
-      onMouseDown={handleMouseDown}
+      onPointerDown={handlePointerDown}
     >
       <div
         className="rounded-full border-2 flex items-center justify-center text-[9px]"

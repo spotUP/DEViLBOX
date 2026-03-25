@@ -47,34 +47,34 @@ const TR707Slider: React.FC<{
   const currentThemeId = useThemeStore((state) => state.currentThemeId);
   const isDark = currentThemeId !== 'cyan-lineart';
 
-  const handleMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
+  const handlePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
     e.preventDefault();
+    (e.target as HTMLElement).setPointerCapture?.(e.pointerId);
     const track = e.currentTarget;
     const rect = track.getBoundingClientRect();
 
     const computeValue = (clientY: number) => {
       const y = clientY - rect.top;
-      // Invert: top = 1, bottom = 0
       const raw = 1 - Math.max(0, Math.min(1, y / rect.height));
       onChange(Math.round(raw * 100) / 100);
     };
     computeValue(e.clientY);
 
-    const handleMouseMove = (moveEvent: MouseEvent) => computeValue(moveEvent.clientY);
-    const handleMouseUp = () => {
-      document.removeEventListener('mousemove', handleMouseMove);
-      document.removeEventListener('mouseup', handleMouseUp);
+    const handlePointerMove = (moveEvent: PointerEvent) => computeValue(moveEvent.clientY);
+    const handlePointerUp = () => {
+      document.removeEventListener('pointermove', handlePointerMove);
+      document.removeEventListener('pointerup', handlePointerUp);
     };
-    document.addEventListener('mousemove', handleMouseMove);
-    document.addEventListener('mouseup', handleMouseUp);
+    document.addEventListener('pointermove', handlePointerMove);
+    document.addEventListener('pointerup', handlePointerUp);
   };
 
   return (
     <div className="flex flex-col items-center gap-2 flex-1">
       {/* Slider track — handles mouse input directly */}
       <div
-        className="relative h-32 w-8 cursor-pointer select-none"
-        onMouseDown={handleMouseDown}
+        className="relative h-32 w-8 cursor-pointer select-none touch-none"
+        onPointerDown={handlePointerDown}
       >
         <div className={`absolute inset-0 rounded-full ${isDark ? 'bg-dark-bgTertiary' : 'bg-dark-bgHover'} border ${isDark ? 'border-dark-borderLight' : 'border-dark-borderLight'}`}>
           <div className="absolute left-1/2 top-2 bottom-2 w-1 -translate-x-1/2 bg-dark-bgSecondary rounded-full" />
@@ -123,12 +123,13 @@ const TR707Knob: React.FC<{
 
   const rotation = -135 + (value * 270); // -135deg to +135deg (270 deg total)
 
-  const handleMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
+  const handlePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    (e.target as HTMLElement).setPointerCapture?.(e.pointerId);
     const rect = e.currentTarget.getBoundingClientRect();
     const centerX = rect.left + rect.width / 2;
     const centerY = rect.top + rect.height / 2;
 
-    const handleMouseMove = (moveEvent: MouseEvent) => {
+    const handlePointerMove = (moveEvent: PointerEvent) => {
       const angle = Math.atan2(moveEvent.clientY - centerY, moveEvent.clientX - centerX);
       const degrees = angle * (180 / Math.PI);
       const normalized = (degrees + 135 + 360) % 360;
@@ -136,20 +137,20 @@ const TR707Knob: React.FC<{
       onChange(newValue);
     };
 
-    const handleMouseUp = () => {
-      document.removeEventListener('mousemove', handleMouseMove);
-      document.removeEventListener('mouseup', handleMouseUp);
+    const handlePointerUp = () => {
+      document.removeEventListener('pointermove', handlePointerMove);
+      document.removeEventListener('pointerup', handlePointerUp);
     };
 
-    document.addEventListener('mousemove', handleMouseMove);
-    document.addEventListener('mouseup', handleMouseUp);
+    document.addEventListener('pointermove', handlePointerMove);
+    document.addEventListener('pointerup', handlePointerUp);
   };
 
   return (
     <div className="flex flex-col items-center gap-2">
       <div
         className={`${sizeMap[size]} relative cursor-pointer select-none`}
-        onMouseDown={handleMouseDown}
+        onPointerDown={handlePointerDown}
         title={`${label}: ${Math.round(value * 100)}%`}
       >
         {/* Knob body */}

@@ -579,6 +579,11 @@ export const FT2Hardware: React.FC<FT2HardwareProps> = ({ instrument, onChange }
         canvas.addEventListener('mousedown', onMouseDown);
         document.addEventListener('mouseup', onMouseUp);
         document.addEventListener('mousemove', onMouseMove);
+        // Pointer events for touch support
+        canvas.addEventListener('pointerdown', onMouseDown as EventListener);
+        document.addEventListener('pointerup', onMouseUp as EventListener);
+        document.addEventListener('pointermove', onMouseMove as EventListener);
+        canvas.style.touchAction = 'none';
         canvas.addEventListener('wheel', onWheel, { passive: false });
         canvas.addEventListener('keydown', onKeyDown);
 
@@ -586,6 +591,9 @@ export const FT2Hardware: React.FC<FT2HardwareProps> = ({ instrument, onChange }
           () => canvas.removeEventListener('mousedown', onMouseDown),
           () => document.removeEventListener('mouseup', onMouseUp),
           () => document.removeEventListener('mousemove', onMouseMove),
+          () => canvas.removeEventListener('pointerdown', onMouseDown as EventListener),
+          () => document.removeEventListener('pointerup', onMouseUp as EventListener),
+          () => document.removeEventListener('pointermove', onMouseMove as EventListener),
           () => canvas.removeEventListener('wheel', onWheel),
           () => canvas.removeEventListener('keydown', onKeyDown),
         );

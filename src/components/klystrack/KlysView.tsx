@@ -21,10 +21,12 @@ import { klysToFormatChannels, KLYS_COLUMNS } from './klysAdapter';
 import { KlysEngine } from '@/engine/klystrack/KlysEngine';
 import { getTrackerReplayer } from '@engine/TrackerReplayer';
 import { exportAsKlystrack } from '@lib/export/KlysExporter';
+import { useResponsiveSafe } from '@/contexts/ResponsiveContext';
 
 const POSITION_H = KLYS_MATRIX_HEIGHT;
 
 export const KlysView: React.FC<{ width?: number; height?: number }> = ({ width: propW, height: propH }) => {
+  const { isMobile } = useResponsiveSafe();
   const nativeData = useFormatStore(s => s.klysNative);
   const currentPositionIndex = useTrackerStore(s => s.currentPositionIndex);
   const setCurrentPosition = useTrackerStore(s => s.setCurrentPosition);
@@ -34,7 +36,7 @@ export const KlysView: React.FC<{ width?: number; height?: number }> = ({ width:
   const [editPosition, setEditPosition] = useState(0);
   const [selectedInstrument, setSelectedInstrument] = useState(0);
   const [showInstEditor, setShowInstEditor] = useState(false);
-  const [matrixCollapsed, setMatrixCollapsed] = useState(false);
+  const [matrixCollapsed, setMatrixCollapsed] = useState(isMobile); // Collapsed by default on mobile
 
   const containerRef = useRef<HTMLDivElement>(null);
   const [size, setSize] = useState({ w: propW ?? 800, h: propH ?? 600 });
