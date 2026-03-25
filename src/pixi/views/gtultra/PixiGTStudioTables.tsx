@@ -11,18 +11,13 @@ import type { Graphics as GraphicsType, FederatedPointerEvent } from 'pixi.js';
 import { PIXI_FONTS } from '@/pixi/fonts';
 import { MegaText, type GlyphLabel } from '@/pixi/utils/MegaText';
 import { useGTUltraStore } from '@/stores/useGTUltraStore';
+import { usePixiTheme } from '../../theme';
 
-const C_BG       = 0x0d0d0d;
-const C_BORDER   = 0x222222;
-const C_LABEL    = 0x666666;
-const C_HEADER   = 0x888888;
+// Semantic table-type colors (kept as-is)
 const C_BAR_WAVE = 0x6699ff;
 const C_BAR_PULSE = 0xff8866;
 const C_BAR_FILTER = 0x2a9d8f;
 const C_BAR_SPEED = 0xffcc00;
-const C_GRID     = 0x151515;
-const C_CURSOR   = 0xffffff;
-const C_PLAYBACK = 0x00ff88;
 
 const TABLE_COLORS = [C_BAR_WAVE, C_BAR_PULSE, C_BAR_FILTER, C_BAR_SPEED];
 const TABLE_NAMES = ['Wave', 'Pulse', 'Filter', 'Speed'];
@@ -33,6 +28,7 @@ interface Props {
 }
 
 export const PixiGTStudioTables: React.FC<Props> = ({ width, height }) => {
+  const theme = usePixiTheme();
   const containerRef = useRef<any>(null);
   const bgRef = useRef<GraphicsType>(null);
   const barsRef = useRef<GraphicsType>(null);
@@ -158,22 +154,22 @@ export const PixiGTStudioTables: React.FC<Props> = ({ width, height }) => {
     const ff = PIXI_FONTS.MONO;
 
     // Background
-    bg.rect(0, 0, width, height).fill({ color: C_BG });
-    bg.rect(0, 0, width, height).stroke({ color: C_BORDER, width: 1 });
+    bg.rect(0, 0, width, height).fill({ color: theme.bg.color });
+    bg.rect(0, 0, width, height).stroke({ color: theme.border.color, width: 1 });
 
     // Header with tab buttons
-    labels.push({ x: pad, y: pad, text: `${tableName} Table`, color: C_HEADER, fontFamily: ff });
+    labels.push({ x: pad, y: pad, text: `${tableName} Table`, color: theme.textSecondary.color, fontFamily: ff });
 
     // Tab buttons
     for (let i = 0; i < 4; i++) {
       const tx = width - 4 * 40 + i * 40;
       const isActive = i === activeTable;
       bg.rect(tx, 2, 36, 18).fill({ color: isActive ? 0x1a3a2a : 0x0a0a1a });
-      bg.rect(tx, 2, 36, 18).stroke({ color: isActive ? TABLE_COLORS[i] : C_BORDER, width: 1 });
+      bg.rect(tx, 2, 36, 18).stroke({ color: isActive ? TABLE_COLORS[i] : theme.border.color, width: 1 });
       labels.push({
         x: tx + 4, y: 5,
         text: TABLE_NAMES[i].slice(0, 3).toUpperCase(),
-        color: isActive ? TABLE_COLORS[i] : C_LABEL,
+        color: isActive ? TABLE_COLORS[i] : theme.textMuted.color,
         fontFamily: ff,
       });
     }
@@ -196,7 +192,7 @@ export const PixiGTStudioTables: React.FC<Props> = ({ width, height }) => {
     // Grid lines
     for (const frac of [0.25, 0.5, 0.75]) {
       const y = chartY + chartH * (1 - frac);
-      bg.moveTo(pad, y).lineTo(pad + chartW, y).stroke({ color: C_GRID, width: 1, alpha: 0.3 });
+      bg.moveTo(pad, y).lineTo(pad + chartW, y).stroke({ color: theme.bgSecondary.color, width: 1, alpha: 0.3 });
     }
 
     // Draw bars (left column values)
@@ -218,13 +214,13 @@ export const PixiGTStudioTables: React.FC<Props> = ({ width, height }) => {
 
       // Cursor highlight
       if (i === tableCursor) {
-        bars.rect(x - 1, chartY, barW + 2, chartH).stroke({ color: C_CURSOR, width: 1, alpha: 0.5 });
+        bars.rect(x - 1, chartY, barW + 2, chartH).stroke({ color: theme.text.color, width: 1, alpha: 0.5 });
       }
 
       // Playback position highlight
       if (playbackTablePos >= 0 && i === playbackTablePos) {
-        bars.rect(x - 1, chartY, barW + 2, chartH).fill({ color: C_PLAYBACK, alpha: 0.15 });
-        bars.rect(x - 1, chartY, barW + 2, chartH).stroke({ color: C_PLAYBACK, width: 1.5, alpha: 0.8 });
+        bars.rect(x - 1, chartY, barW + 2, chartH).fill({ color: theme.success.color, alpha: 0.15 });
+        bars.rect(x - 1, chartY, barW + 2, chartH).stroke({ color: theme.success.color, width: 1.5, alpha: 0.8 });
       }
 
       // Hover tooltip
@@ -247,7 +243,7 @@ export const PixiGTStudioTables: React.FC<Props> = ({ width, height }) => {
         labels.push({
           x, y: chartY + chartH + 4,
           text: i.toString(16).toUpperCase().padStart(2, '0'),
-          color: C_LABEL,
+          color: theme.textMuted.color,
           fontFamily: ff,
         });
       }
@@ -265,7 +261,7 @@ export const PixiGTStudioTables: React.FC<Props> = ({ width, height }) => {
 
     mega.updateLabels(labels, 9);
   }, [width, height, activeTable, data, tableCursor, tableName, barColor, getBarInfo, chartY, chartH, chartW,
-    hoverIndex, playing, playbackPos, instrumentData, currentInstrument]);
+    hoverIndex, playing, playbackPos, instrumentData, currentInstrument, theme]);
 
   useEffect(() => {
     redraw();

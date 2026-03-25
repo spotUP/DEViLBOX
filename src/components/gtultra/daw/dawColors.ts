@@ -1,23 +1,23 @@
 /**
- * DAW Mode Colors — shared between DOM and Pixi DAW views.
- * CSS color strings for DOM usage.
+ * DAW Mode Colors — CSS variable references for DOM DAW views.
+ * These respond to theme changes automatically.
  */
 
 export const DAW_CSS = {
-  bg:          '#121218',
-  panelBg:     '#1a1a24',
-  panelBorder: '#2a2a3a',
-  surface:     '#22222e',
-  surfaceHover:'#2a2a38',
+  bg:          'var(--color-bg)',
+  panelBg:     'var(--color-bg-secondary)',
+  panelBorder: 'var(--color-border)',
+  surface:     'var(--color-bg-tertiary)',
+  surfaceHover:'var(--color-bg-hover)',
 
-  accent:      '#6366f1',
-  accentWarm:  '#f59e0b',
-  success:     '#10b981',
-  error:       '#ef4444',
+  accent:      'var(--color-accent)',
+  accentWarm:  'var(--color-warning)',
+  success:     'var(--color-success)',
+  error:       'var(--color-error)',
 
-  text:        '#e2e2e8',
-  textSec:     '#6b6b80',
-  textMuted:   '#44445a',
+  text:        'var(--color-text)',
+  textSec:     'var(--color-text-secondary)',
+  textMuted:   'var(--color-text-muted)',
 } as const;
 
 export const DAW_CH_CSS = [

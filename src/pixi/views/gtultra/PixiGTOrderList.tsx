@@ -14,16 +14,11 @@ const ROW_H = 14;
 const HEADER_H = 18;
 const FONT_SIZE = 10;
 
-const C_BG       = 0x0d0d0d;
-const C_HEADER   = 0x1a1a1a;
-const C_ACCENT   = 0x888888;
+// ── Semantic order colors (domain-specific, not theme-derived) ──
 const C_ORDER    = 0x60e060;
 const C_END      = 0xe94560;
 const C_REPEAT   = 0xffcc00;
 const C_TRANS    = 0xff8866;
-const C_DIM      = 0x555555;
-const C_CURSOR   = 0xffffff;
-const C_SEP      = 0x222222;
 
 interface Props { width: number; height: number }
 
@@ -57,16 +52,16 @@ export const PixiGTOrderList: React.FC<Props> = ({ width, height }) => {
     if (!g || !mega) return;
 
     g.clear();
-    g.rect(0, 0, width, height).fill({ color: C_BG });
-    g.rect(0, height - 1, width, 1).fill({ color: C_SEP });
+    g.rect(0, 0, width, height).fill({ color: theme.bg.color });
+    g.rect(0, height - 1, width, 1).fill({ color: theme.border.color });
 
     // Header
-    g.rect(0, 0, width, HEADER_H).fill({ color: C_HEADER });
+    g.rect(0, 0, width, HEADER_H).fill({ color: theme.bgTertiary.color });
 
     const labels: GlyphLabel[] = [];
     const ff = PIXI_FONTS.MONO;
 
-    labels.push({ x: 4, y: 3, text: 'ORDER LIST', color: C_ACCENT, fontFamily: ff });
+    labels.push({ x: 4, y: 3, text: 'ORDER LIST', color: theme.textSecondary.color, fontFamily: ff });
 
     const scrollTop = Math.max(0, orderCursor - Math.floor(visibleRows / 2));
 
@@ -79,12 +74,12 @@ export const PixiGTOrderList: React.FC<Props> = ({ width, height }) => {
 
       if (isPlay) g.rect(0, y, width, ROW_H).fill({ color: theme.error.color });
       if (isCursor) {
-        g.rect(0, y, width, 1).fill({ color: C_CURSOR });
-        g.rect(0, y + ROW_H - 1, width, 1).fill({ color: C_CURSOR });
+        g.rect(0, y, width, 1).fill({ color: theme.text.color });
+        g.rect(0, y + ROW_H - 1, width, 1).fill({ color: theme.text.color });
       }
 
       // Index
-      labels.push({ x: 4, y: y + 1, text: idx.toString(16).toUpperCase().padStart(2, '0'), color: C_DIM, fontFamily: ff });
+      labels.push({ x: 4, y: y + 1, text: idx.toString(16).toUpperCase().padStart(2, '0'), color: theme.textMuted.color, fontFamily: ff });
 
       // Pattern per channel
       const colW = Math.floor((width - 28) / channelCount);
@@ -116,7 +111,7 @@ export const PixiGTOrderList: React.FC<Props> = ({ width, height }) => {
     }
 
     mega.updateLabels(labels, FONT_SIZE);
-  }, [width, height, orderData, orderCursor, orderChannelCol, playbackPos.position, channelCount, visibleRows, totalLen]);
+  }, [width, height, orderData, orderCursor, orderChannelCol, playbackPos.position, channelCount, visibleRows, totalLen, theme]);
 
   useEffect(() => { redraw(); }, [redraw]);
 

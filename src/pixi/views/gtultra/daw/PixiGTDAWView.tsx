@@ -12,10 +12,10 @@
 import React, { useCallback } from 'react';
 import type { Graphics as GraphicsType } from 'pixi.js';
 import { PIXI_FONTS } from '@/pixi/fonts';
+import { usePixiTheme } from '@/pixi/theme';
 import { useGTUltraStore } from '@/stores/useGTUltraStore';
 // Engine init and keyboard handler are managed by the parent PixiGTUltraView
 import {
-  DAW_BG, DAW_TEXT_MUTED,
   DAW_TOOLBAR_H, DAW_BOTTOM_H, DAW_SIDEBAR_W, DAW_ARRANGEMENT_H,
 } from './dawTheme';
 import { PixiGTDAWToolbar } from './PixiGTDAWToolbar';
@@ -30,6 +30,7 @@ interface Props {
 }
 
 export const PixiGTDAWView: React.FC<Props> = ({ width, height }) => {
+  const theme = usePixiTheme();
   // Engine init and keyboard handler are managed by parent PixiGTUltraView
   const engine = useGTUltraStore((s) => s.engine);
   const dawSidebarOpen = useGTUltraStore((s) => s.dawSidebarOpen);
@@ -45,8 +46,8 @@ export const PixiGTDAWView: React.FC<Props> = ({ width, height }) => {
 
   const drawBg = useCallback((g: GraphicsType) => {
     g.clear();
-    g.rect(0, 0, width, height).fill({ color: DAW_BG });
-  }, [width, height]);
+    g.rect(0, 0, width, height).fill({ color: theme.bg.color });
+  }, [width, height, theme.bg.color]);
 
   return (
     <pixiContainer layout={{ width, height, flexDirection: 'column' }}>
@@ -58,7 +59,7 @@ export const PixiGTDAWView: React.FC<Props> = ({ width, height }) => {
           <pixiBitmapText
             text="GoatTracker Ultra DAW — initializing..."
             style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 13, fill: 0xffffff }}
-            tint={DAW_TEXT_MUTED}
+            tint={theme.textMuted.color}
           />
         </pixiContainer>
       )}
