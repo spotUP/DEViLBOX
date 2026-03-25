@@ -32,7 +32,6 @@ import { FORMANT_SYNTH_LAYOUT } from './formantSynth';
 import { DRUM_MACHINE_LAYOUT } from './drumMachine';
 import { DRUM_KIT_LAYOUT } from './drumKit';
 import { POLY_SYNTH_LAYOUT } from './polySynth';
-import { GEARMULATOR_VIRUS_LAYOUT } from './gearmulatorVirus';
 
 /** Map from SynthType string to layout descriptor */
 export const SYNTH_LAYOUTS: Record<string, SynthPanelLayout> = {
@@ -156,13 +155,6 @@ export const SYNTH_LAYOUTS: Record<string, SynthPanelLayout> = {
   FurnaceUPD1771: FURNACE_LAYOUT,
   FurnaceSCVTONE: FURNACE_LAYOUT,
 
-  // Gearmulator DSP56300 synths
-  GearmulatorVirus: GEARMULATOR_VIRUS_LAYOUT,
-  GearmulatorVirusTI: GEARMULATOR_VIRUS_LAYOUT,
-  GearmulatorMicroQ: GEARMULATOR_VIRUS_LAYOUT,  // Uses Virus layout (same parameter structure)
-  GearmulatorXT: GEARMULATOR_VIRUS_LAYOUT,
-  GearmulatorNord: GEARMULATOR_VIRUS_LAYOUT,
-  GearmulatorJP8000: GEARMULATOR_VIRUS_LAYOUT,
 };
 
 /**

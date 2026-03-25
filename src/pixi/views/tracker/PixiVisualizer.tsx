@@ -121,7 +121,6 @@ const PEAK_DECAY = 0.02;
 
 // Stable module-level layout objects — inline literals create new references every render,
 // which causes Yoga WASM "Expected null or instance of Node" BindingErrors.
-const LAYOUT_MODE_LABEL: Record<string, unknown> = {};
 const LAYOUT_MODE_LABEL_COLLAPSED: Record<string, unknown> = { width: 0, height: 0 };
 const LAYOUT_MODE_INDICATOR: Record<string, unknown> = { position: 'absolute', right: 4, bottom: 2 };
 const LAYOUT_MODE_INDICATOR_COLLAPSED: Record<string, unknown> = { position: 'absolute', width: 0, height: 0 };
