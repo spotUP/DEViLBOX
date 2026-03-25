@@ -93,10 +93,10 @@ export const PixiDJSetBrowser: React.FC = () => {
   }, [isRecording]);
 
   const label = isPlayingSet
-    ? 'SETS >>'
+    ? 'Sets >>'
     : total > 0
-      ? `SETS (${total})`
-      : 'SETS';
+      ? `Sets (${total})`
+      : 'Sets';
 
   return (
     <pixiContainer ref={containerRef} layout={{ flexShrink: 0 }}>

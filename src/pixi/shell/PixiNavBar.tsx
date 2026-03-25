@@ -288,7 +288,7 @@ export const PixiNavBar: React.FC = () => {
               }}
             >
               <pixiBitmapText
-                text={(tab.name || 'Untitled').toUpperCase() + (tab.isDirty ? ' *' : '')}
+                text={(tab.name || 'Untitled') + (tab.isDirty ? ' *' : '')}
                 style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 10, fill: 0xffffff }}
                 tint={isActive ? theme.text.color : theme.textMuted.color}
                 layout={{}}

@@ -301,13 +301,13 @@ export const PixiVisualizer: React.FC<PixiVisualizerProps> = ({
         layout={layoutFill}
       />
 
-      {/* Centered mode label — visible when stopped and not in jingle mode */}
+      {/* Centered mode label — hidden to match DOM visualizer (no mode label when stopped) */}
       <pixiBitmapText
         text={VIZ_MODE_LABELS[mode] ?? ''}
         style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 10, fill: 0xffffff }}
         tint={theme.textMuted.color}
-        layout={isPlaying || jingleActive ? LAYOUT_MODE_LABEL_COLLAPSED : LAYOUT_MODE_LABEL}
-        alpha={!isPlaying && !jingleActive ? 1 : 0}
+        layout={LAYOUT_MODE_LABEL_COLLAPSED}
+        alpha={0}
       />
 
       {/* Bottom-right mode indicator — visible when playing, hidden during jingle */}

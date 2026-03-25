@@ -25,12 +25,15 @@ import type { ContextMenuItem } from '../../input/PixiContextMenu';
 import { PixiPureTextInput } from '../../input/PixiPureTextInput';
 
 // ─── Layout constants ────────────────────────────────────────────────────────
-const HEADER_HEIGHT = 28;
+const HEADER_ROW_HEIGHT = 28;
+const COLUMN_LABELS_HEIGHT = 20;
+const HEADER_HEIGHT = HEADER_ROW_HEIGHT + COLUMN_LABELS_HEIGHT; // 48 total — matches DOM (28 + 20)
 const LINE_NUMBER_WIDTH = 40;
 const BTN_W = 16;
 const BTN_H = 14;
 const BTN_GAP = 2;
 const BTN_R = 3;
+const CHAR_WIDTH = 10; // must match PixiPatternEditor CHAR_WIDTH
 
 // Pre-allocated layout objects to avoid GC pressure and Yoga recalculation
 const LAYOUT_BTN = { width: BTN_W, height: BTN_H, justifyContent: 'center' as const, alignItems: 'center' as const };
@@ -85,7 +88,7 @@ const AddChannelBtn: React.FC<{
       layout={{
         position: 'absolute',
         left,
-        top: (HEADER_HEIGHT - BTN_H) / 2,
+        top: (HEADER_ROW_HEIGHT - BTN_H) / 2,
         width: 32,
         height: BTN_H,
         justifyContent: 'center',
@@ -201,7 +204,7 @@ const PixiChannelHeadersInner: React.FC<PixiChannelHeadersProps> = ({
   const numChannels = pattern.channels.length;
 
   // ── Clip mask for scrollable area ──────────────────────────────────────────
-  const drawClipMask = useCallback((g: GraphicsType) => {
+  const drawClipMaskFull = useCallback((g: GraphicsType) => {
     g.clear();
     g.rect(0, 0, width - LINE_NUMBER_WIDTH, HEADER_HEIGHT);
     g.fill({ color: 0xffffff });
@@ -213,7 +216,10 @@ const PixiChannelHeadersInner: React.FC<PixiChannelHeadersProps> = ({
     // Full background — fully opaque so pattern data doesn't bleed through
     g.rect(0, 0, width, HEADER_HEIGHT);
     g.fill({ color: theme.bgTertiary.color, alpha: 1 });
-    // Bottom border
+    // Row 1 bottom border (between channel names and column labels)
+    g.rect(0, HEADER_ROW_HEIGHT - 1, width, 1);
+    g.fill({ color: theme.border.color, alpha: 0.2 });
+    // Row 2 bottom border
     g.rect(0, HEADER_HEIGHT - 1, width, 1);
     g.fill({ color: theme.border.color, alpha: 0.3 });
     // ROW column background
@@ -235,20 +241,20 @@ const PixiChannelHeadersInner: React.FC<PixiChannelHeadersProps> = ({
       // Color tint
       if (channel.color) {
         const colorNum = parseInt(channel.color.replace('#', ''), 16);
-        g.rect(colX, 0, chW, HEADER_HEIGHT);
+        g.rect(colX, 0, chW, HEADER_ROW_HEIGHT);
         g.fill({ color: colorNum, alpha: 0.08 });
         // Left color indicator
-        g.rect(colX, 0, 2, HEADER_HEIGHT);
+        g.rect(colX, 0, 2, HEADER_ROW_HEIGHT);
         g.fill({ color: colorNum, alpha: 0.5 });
       }
 
       // Solo highlight
       if (channel.solo) {
-        g.rect(colX, 0, chW, HEADER_HEIGHT);
+        g.rect(colX, 0, chW, HEADER_ROW_HEIGHT);
         g.fill({ color: theme.accent.color, alpha: 0.1 });
       }
 
-      // Right separator
+      // Right separator (full height)
       g.rect(colX + chW - 1, 0, 1, HEADER_HEIGHT);
       g.fill({ color: theme.border.color, alpha: 0.3 });
     }
@@ -484,7 +490,7 @@ const PixiChannelHeadersInner: React.FC<PixiChannelHeadersProps> = ({
               left: colX,
               top: 0,
               width: chW,
-              height: HEADER_HEIGHT,
+              height: HEADER_ROW_HEIGHT,
               flexDirection: 'row',
               alignItems: 'center',
               justifyContent: 'space-between',
@@ -527,7 +533,7 @@ const PixiChannelHeadersInner: React.FC<PixiChannelHeadersProps> = ({
             left: colX,
             top: 0,
             width: chW,
-            height: HEADER_HEIGHT,
+            height: HEADER_ROW_HEIGHT,
             flexDirection: 'row',
             alignItems: 'center',
             paddingLeft: 6,
@@ -555,7 +561,7 @@ const PixiChannelHeadersInner: React.FC<PixiChannelHeadersProps> = ({
           }}
         >
           {/* Text area: channel number + speed badge + name */}
-          <pixiContainer layout={{ width: textAreaW, height: HEADER_HEIGHT, flexDirection: 'row', alignItems: 'center', gap: 4, overflow: 'hidden' }}>
+          <pixiContainer layout={{ width: textAreaW, height: HEADER_ROW_HEIGHT, flexDirection: 'row', alignItems: 'center', gap: 4, overflow: 'hidden' }}>
             <pixiBitmapText
               text={chNum}
               style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 11, fill: 0xffffff }}
@@ -725,34 +731,66 @@ const PixiChannelHeadersInner: React.FC<PixiChannelHeadersProps> = ({
     drawMuteBtn, drawSoloBtn, drawCollapseBtn, drawContextBtn, drawColorBtn, drawAddBtn, drawHoverBtn,
   ]);
 
+  // ── Column labels row (row 2) — "Note Ins Vol Eff" per channel ────────────
+  const columnLabels = useMemo(() => {
+    const labels: React.ReactNode[] = [];
+    const noteWidth = CHAR_WIDTH * 3 + 4;
+    for (let ch = 0; ch < numChannels; ch++) {
+      const channel = pattern.channels[ch];
+      if (channel.collapsed) continue;
+      const colX = channelOffsets[ch] - LINE_NUMBER_WIDTH;
+      const colLabels = [
+        { text: 'Note', x: colX + 8 },
+        { text: 'Ins', x: colX + 8 + noteWidth + 4 },
+        { text: 'Vol', x: colX + 8 + noteWidth + 4 + CHAR_WIDTH * 2 + 4 },
+        { text: 'Eff', x: colX + 8 + noteWidth + CHAR_WIDTH * 4 + 12 },
+      ];
+      for (const lbl of colLabels) {
+        labels.push(
+          <pixiBitmapText
+            key={`col-${ch}-${lbl.text}`}
+            text={lbl.text}
+            style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 9, fill: 0xffffff }}
+            tint={theme.textMuted.color}
+            alpha={0.55}
+            layout={{ position: 'absolute', left: lbl.x, top: HEADER_ROW_HEIGHT + (COLUMN_LABELS_HEIGHT - 9) / 2 }}
+          />
+        );
+      }
+    }
+    return labels;
+  }, [numChannels, channelOffsets, pattern.channels, theme]);
+
 
   return (
     <pixiContainer layout={{ width, height: HEADER_HEIGHT }}>
       {/* Background layer */}
       <pixiGraphics draw={drawBackground} layout={{ position: 'absolute', width, height: HEADER_HEIGHT }} />
 
-      {/* ROW label */}
+      {/* ROW label (vertically centered in row 1) */}
       <pixiBitmapText
         text="ROW"
         style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 9, fill: 0xffffff }}
         tint={theme.textMuted.color}
-        layout={{ position: 'absolute', left: 8, top: (HEADER_HEIGHT - 9) / 2 }}
+        layout={{ position: 'absolute', left: 8, top: (HEADER_ROW_HEIGHT - 9) / 2 }}
       />
 
-      {/* Scrollable channel area — masked to viewport */}
+      {/* Scrollable channel area — masked to viewport (full height for both rows) */}
       <pixiContainer
         layout={{ position: 'absolute', left: LINE_NUMBER_WIDTH, top: 0, width: width - LINE_NUMBER_WIDTH, height: HEADER_HEIGHT }}
       >
-        <pixiGraphics ref={clipMaskRef} draw={drawClipMask} renderable={false} layout={{ position: 'absolute', width: width - LINE_NUMBER_WIDTH, height: HEADER_HEIGHT }} />
+        <pixiGraphics ref={clipMaskRef} draw={drawClipMaskFull} renderable={false} layout={{ position: 'absolute', width: width - LINE_NUMBER_WIDTH, height: HEADER_HEIGHT }} />
         <pixiContainer
           x={-scrollLeft}
           layout={{ position: 'absolute', top: 0, height: HEADER_HEIGHT }}
           mask={clipMask}
         >
-          {/* Channel backgrounds */}
+          {/* Channel backgrounds (row 1 only) */}
           <pixiGraphics draw={drawChannelBackgrounds} layout={{ position: 'absolute', width: totalChannelsWidth, height: HEADER_HEIGHT }} />
-          {/* Per-channel headers */}
+          {/* Per-channel headers (row 1) */}
           {channelHeaders}
+          {/* Column labels (row 2) */}
+          {columnLabels}
         </pixiContainer>
       </pixiContainer>
 
