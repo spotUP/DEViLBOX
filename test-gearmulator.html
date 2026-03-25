@@ -72,7 +72,7 @@
 
   <script>
     const SAB_HEADER = 16;
-    const RING_FRAMES = 8192;
+    const RING_FRAMES = 32768; // Must match worker's RING_FRAMES
     const SAB_SIZE = SAB_HEADER + RING_FRAMES * 2 * 4;
 
     const logEl = document.getElementById('log');
@@ -197,7 +197,7 @@
         await loadRom();
 
         log('Creating AudioContext...');
-        audioCtx = new AudioContext({ sampleRate: 44100 });
+        audioCtx = new AudioContext({ sampleRate: 48000 }); // Closer to DSP's 46875Hz = less resampling
         if (audioCtx.state === 'suspended') await audioCtx.resume();
 
         // Create SharedArrayBuffer for audio ring buffer
@@ -286,8 +286,10 @@
         btnStop.disabled = false;
         btnScan.disabled = false;
         btnCC.disabled = false;
+        btnRecord.disabled = false;
+        btnRenderPlay.disabled = false;
         startMeter();
-        startSABMonitor();
+        // startSABMonitor(); // Disabled — buffer is healthy (overflowing with LTO+SIMD)
 
       } catch (err) {
         log(`✗ Init failed: ${err}`, 'error');
@@ -354,6 +356,84 @@
         sendMidi('noteOn', { note: 60, velocity: 127, channel: ch });
       }
       log('All 16 channels triggered — watch peak level');
+    });
+
+    // Render & Play: bypass SAB/worklet/resampler — render directly in worker, play as AudioBuffer
+    const btnRenderPlay = document.createElement('button');
+    btnRenderPlay.textContent = 'Render & Play';
+    btnRenderPlay.title = 'Render 2s offline in worker, then play as AudioBuffer (bypasses SAB/worklet/resampler)';
+    btnRenderPlay.disabled = true;
+    document.querySelector('.controls:nth-child(2)').appendChild(btnRenderPlay);
+    btnRenderPlay.addEventListener('click', async () => {
+      if (!dspWorker || !audioCtx) return;
+      log('Rendering 2s offline in worker...', 'ok');
+      btnRenderPlay.disabled = true;
+
+      // Ask the worker to render offline
+      dspWorker.postMessage({ type: 'renderOffline', durationMs: 2000, note: 60, velocity: 127 });
+
+      // Wait for the rendered audio
+      const handler = (e) => {
+        if (e.data.type !== 'offlineRendered') return;
+        dspWorker.removeEventListener('message', handler);
+
+        const { left, right, sampleRate: sr, frames } = e.data;
+        log(`Got ${frames} frames at ${sr} Hz. Playing...`, 'ok');
+
+        // Create AudioBuffer and play it directly (no resampling — browser handles it)
+        const buf = audioCtx.createBuffer(2, frames, sr);
+        buf.getChannelData(0).set(new Float32Array(left));
+        buf.getChannelData(1).set(new Float32Array(right));
+
+        const src = audioCtx.createBufferSource();
+        src.buffer = buf;
+        src.connect(audioCtx.destination);
+        src.start();
+        log('Playing offline render — compare with native reference', 'ok');
+
+        // Also save as WAV for waveform comparison
+        const wavData = encodeWav(new Float32Array(left), new Float32Array(right), sr);
+        const blob = new Blob([wavData], { type: 'audio/wav' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url; a.download = 'virus-wasm-offline.wav'; a.click();
+        log('WAV saved as virus-wasm-offline.wav', 'ok');
+
+        btnRenderPlay.disabled = false;
+      };
+      dspWorker.addEventListener('message', handler);
+    });
+
+    // Record 2s of audio from the worklet output for analysis
+    const btnRecord = document.createElement('button');
+    btnRecord.textContent = 'Record 2s';
+    btnRecord.title = 'Record 2 seconds of audio output as WAV for comparison with native';
+    btnRecord.disabled = true;
+    document.querySelector('.controls:nth-child(2)').appendChild(btnRecord);
+    btnRecord.addEventListener('click', async () => {
+      if (!audioCtx) return;
+      log('Recording 2s of audio...', 'ok');
+      const dest = audioCtx.createMediaStreamDestination();
+      gainNode.connect(dest);
+      const recorder = new MediaRecorder(dest.stream, { mimeType: 'audio/webm' });
+      const chunks = [];
+      recorder.ondataavailable = e => chunks.push(e.data);
+      recorder.onstop = () => {
+        gainNode.disconnect(dest);
+        const blob = new Blob(chunks, { type: 'audio/webm' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url; a.download = 'gearmulator-wasm-output.webm'; a.click();
+        log('Audio saved as gearmulator-wasm-output.webm', 'ok');
+      };
+      // Send note and start recording
+      sendMidi('noteOn', { note: 60, velocity: 127, channel: 0 });
+      recorder.start();
+      setTimeout(() => {
+        recorder.stop();
+        sendMidi('noteOff', { note: 60, channel: 0 });
+        log('Recording complete');
+      }, 2000);
     });
 
     // Note: btnScan.disabled is cleared below when ready=true
@@ -546,6 +626,25 @@
         monitorCount++;
         if (monitorCount > 30) clearInterval(monitor); // stop after ~30s
       }, 1000);
+    }
+
+    function encodeWav(left, right, sampleRate) {
+      const frames = left.length;
+      const buffer = new ArrayBuffer(44 + frames * 4); // 16-bit stereo
+      const view = new DataView(buffer);
+      const writeStr = (o, s) => { for (let i = 0; i < s.length; i++) view.setUint8(o + i, s.charCodeAt(i)); };
+      writeStr(0, 'RIFF'); view.setUint32(4, 36 + frames * 4, true); writeStr(8, 'WAVE');
+      writeStr(12, 'fmt '); view.setUint32(16, 16, true); view.setUint16(20, 1, true);
+      view.setUint16(22, 2, true); view.setUint32(24, sampleRate, true);
+      view.setUint32(28, sampleRate * 4, true); view.setUint16(32, 4, true); view.setUint16(34, 16, true);
+      writeStr(36, 'data'); view.setUint32(40, frames * 4, true);
+      let o = 44;
+      for (let i = 0; i < frames; i++) {
+        const clamp = v => Math.max(-32768, Math.min(32767, Math.round(v * 32767)));
+        view.setInt16(o, clamp(left[i]), true); o += 2;
+        view.setInt16(o, clamp(right[i]), true); o += 2;
+      }
+      return buffer;
     }
 
     function startMeter() {

@@ -24,6 +24,10 @@
 #include "dsp56kEmu/dsp.h"
 #include "dsp56kEmu/memory.h"
 #include "dsp56kEmu/peripherals.h"
+#include "dsp56kEmu/esai.h"
+#include "dsp56kEmu/hdi08.h"
+#include "dsp56kEmu/esaiclock.h"
+#include "dsp56kEmu/timers.h"
 
 // RLE block extraction — skip runs of zero
 struct MemBlock
@@ -175,7 +179,134 @@ int main(int argc, char** argv)
         device->process(inputs, outputs, blockSize, midiIn, midiOut);
     }
 
-    // Verify MIDI works before dumping
+    // === DUMP SNAPSHOT FROM CLEAN IDLE STATE ===
+    // Capture BEFORE any MIDI — notes would contaminate DSP memory
+    fprintf(stderr, "Dumping snapshot from clean idle state...\n");
+
+    // Access DSP internals for snapshot dump
+    auto* dspSingle = device->getDSP();
+    auto& dsp = dspSingle->getDSP();
+    auto& mem = dsp.memory();
+    const uint32_t pSize = 0x40000;   // Virus B P memory: 256K words (see device.cpp line 543)
+    const uint32_t xySize = 0x40000;  // Virus B X/Y memory: 256K words each
+
+    std::ofstream out(argv[2]);
+    if (!out.is_open())
+    {
+        fprintf(stderr, "Failed to open output: %s\n", argv[2]);
+        return 1;
+    }
+
+    out << "// Auto-generated Virus B snapshot — do not edit\n";
+    out << "// Created by virus_snapshot_dumper from fully-booted device state\n";
+    out << "// Boot time: " << bootMs << "ms\n";
+    out << "// ROM size: " << romSize << " bytes\n";
+    out << "// Captured from clean idle state (JIT boot, 2s stabilization, no MIDI sent)\n";
+    out << "#pragma once\n";
+    out << "#include <cstdint>\n\n";
+    out << "struct MemBlock { uint32_t startAddr; uint32_t count; const uint32_t* data; };\n\n";
+
+    // Use RLE blocks — skip runs of zeros to reduce binary size (~80% is zero)
+    auto dumpMemAreaRLE = [&](const char* prefix, dsp56k::EMemArea area, uint32_t size) {
+        fprintf(stderr, "Extracting %s memory (%u words, RLE)...\n", prefix, size);
+        auto blocks = extractBlocks(mem, area, size);
+
+        uint32_t totalWords = 0;
+        for (size_t i = 0; i < blocks.size(); ++i)
+        {
+            totalWords += blocks[i].data.size();
+            out << "static const uint32_t virusb_" << prefix << "data_" << i << "[] = {\n    ";
+            for (size_t j = 0; j < blocks[i].data.size(); ++j)
+            {
+                out << "0x" << std::hex << std::uppercase
+                    << std::setw(6) << std::setfill('0')
+                    << blocks[i].data[j];
+                if (j + 1 < blocks[i].data.size()) out << ", ";
+                if ((j + 1) % 8 == 0 && j + 1 < blocks[i].data.size()) out << "\n    ";
+            }
+            out << std::dec << "\n};\n\n";
+        }
+
+        out << "static const MemBlock virusb_" << prefix << "blocks[] = {\n";
+        for (size_t i = 0; i < blocks.size(); ++i)
+        {
+            out << "    { " << blocks[i].startAddr << ", "
+                << blocks[i].data.size() << ", virusb_"
+                << prefix << "data_" << i << " },\n";
+        }
+        out << "};\n";
+        out << "static const uint32_t virusb_" << prefix << "block_count = " << blocks.size() << ";\n\n";
+        fprintf(stderr, "  %u non-zero words in %zu blocks / %u total\n", totalWords, blocks.size(), size);
+    };
+
+    dumpMemAreaRLE("p", dsp56k::MemArea_P, pSize);
+    dumpMemAreaRLE("x", dsp56k::MemArea_X, xySize);
+    dumpMemAreaRLE("y", dsp56k::MemArea_Y, xySize);
+
+    fprintf(stderr, "Dumping registers...\n");
+    writeRegisters(out, "virusb_", dsp);
+
+    // === DUMP PERIPHERAL REGISTER VALUES ===
+    // These are the ACTUAL values set by the JIT boot — use these in loadMemorySnapshot()
+    {
+        auto& periphX = dspSingle->getPeriphX();
+        auto& esai = periphX.getEsai();
+        auto& hdi08 = periphX.getHDI08();
+        auto& timers = periphX.getTimers();
+        auto& clock = periphX.getEsaiClock();
+
+        fprintf(stderr, "\n=== PERIPHERAL REGISTERS (use these in loadMemorySnapshot) ===\n");
+        fprintf(stderr, "ESAI TCCR = 0x%06X\n", esai.readTransmitClockControlRegister());
+        fprintf(stderr, "ESAI RCCR = 0x%06X\n", esai.readReceiveClockControlRegister());
+        fprintf(stderr, "ESAI TCR  = 0x%06X\n", esai.readTransmitControlRegister());
+        fprintf(stderr, "ESAI RCR  = 0x%06X\n", esai.readReceiveControlRegister());
+        fprintf(stderr, "HDI08 HCR  = 0x%06X\n", hdi08.readControlRegister());
+        fprintf(stderr, "HDI08 HPCR = 0x%06X\n", hdi08.readPortControlRegister());
+        fprintf(stderr, "PLL PCTL   = 0x%06X\n", clock.getPCTL());
+        for (int t = 0; t < 3; ++t)
+        {
+            fprintf(stderr, "Timer%d TCSR=0x%06X TLR=0x%06X TCPR=0x%06X\n",
+                    t, timers.readTCSR(t), timers.readTLR(t), timers.readTCPR(t));
+        }
+        fprintf(stderr, "=== END PERIPHERAL REGISTERS ===\n\n");
+
+        // Write peripheral values into the snapshot header for loadMemorySnapshot() to use
+        out << "\n// Peripheral register values captured from JIT boot\n";
+        out << "static const uint32_t virusb_esai_tccr = 0x" << std::hex << std::uppercase
+            << std::setw(6) << std::setfill('0') << esai.readTransmitClockControlRegister() << ";\n";
+        out << "static const uint32_t virusb_esai_rccr = 0x"
+            << std::setw(6) << std::setfill('0') << esai.readReceiveClockControlRegister() << ";\n";
+        out << "static const uint32_t virusb_esai_tcr = 0x"
+            << std::setw(6) << std::setfill('0') << esai.readTransmitControlRegister() << ";\n";
+        out << "static const uint32_t virusb_esai_rcr = 0x"
+            << std::setw(6) << std::setfill('0') << esai.readReceiveControlRegister() << ";\n";
+        out << "static const uint32_t virusb_hdi08_hcr = 0x"
+            << std::setw(6) << std::setfill('0') << hdi08.readControlRegister() << ";\n";
+        out << "static const uint32_t virusb_hdi08_hpcr = 0x"
+            << std::setw(6) << std::setfill('0') << hdi08.readPortControlRegister() << ";\n";
+        out << "static const uint32_t virusb_pctl = 0x"
+            << std::setw(6) << std::setfill('0') << clock.getPCTL() << ";\n";
+        for (int t = 0; t < 3; ++t)
+        {
+            out << "static const uint32_t virusb_timer" << std::dec << t << "_tcsr = 0x" << std::hex
+                << std::setw(6) << std::setfill('0') << timers.readTCSR(t) << ";\n";
+            out << "static const uint32_t virusb_timer" << std::dec << t << "_tlr = 0x" << std::hex
+                << std::setw(6) << std::setfill('0') << timers.readTLR(t) << ";\n";
+            out << "static const uint32_t virusb_timer" << std::dec << t << "_tcpr = 0x" << std::hex
+                << std::setw(6) << std::setfill('0') << timers.readTCPR(t) << ";\n";
+        }
+        out << std::dec;
+    }
+
+    out.close();
+
+    // Report file size
+    std::ifstream check(argv[2], std::ios::ate);
+    auto fileSize = check.tellg();
+    fprintf(stderr, "Snapshot written to: %s (%lld KB)\n", argv[2], static_cast<long long>(fileSize / 1024));
+
+    // === VERIFY MIDI AFTER SNAPSHOT ===
+    // The snapshot is already saved; this test just confirms the device works
     fprintf(stderr, "Verifying MIDI Note On produces audio...\n");
     midiIn.clear();
     synthLib::SMidiEvent noteOn(synthLib::MidiEventSource::Host, 0x90, 60, 127);
@@ -194,77 +325,6 @@ int main(int argc, char** argv)
         }
     }
     fprintf(stderr, "MIDI note peak: %f %s\n", peakNote, peakNote > 0.01f ? "✓ OK" : "✗ SILENT!");
-
-    // Send note off
-    midiIn.clear();
-    synthLib::SMidiEvent noteOff(synthLib::MidiEventSource::Host, 0x80, 60, 0);
-    midiIn.push_back(noteOff);
-
-    // Let the note release and DSP settle
-    for (int i = 0; i < 172; i++)
-    {
-        midiOut.clear();
-        device->process(inputs, outputs, blockSize, midiIn, midiOut);
-        midiIn.clear();
-    }
-
-    fprintf(stderr, "DSP is settled and MIDI-ready. Dumping snapshot...\n");
-
-    // Access DSP internals for snapshot dump
-    auto* dspSingle = device->getDSP();
-    auto& dsp = dspSingle->getDSP();
-    auto& mem = dsp.memory();
-    const uint32_t pSize = 0x10000;   // Virus B P memory: 64K words
-    const uint32_t xySize = 0x10000;  // Virus B X/Y memory: 64K words each
-
-    std::ofstream out(argv[2]);
-    if (!out.is_open())
-    {
-        fprintf(stderr, "Failed to open output: %s\n", argv[2]);
-        return 1;
-    }
-
-    out << "// Auto-generated Virus B snapshot — do not edit\n";
-    out << "// Created by virus_snapshot_dumper from fully-booted device state\n";
-    out << "// Boot time: " << bootMs << "ms\n";
-    out << "// ROM size: " << romSize << " bytes\n";
-    out << "// MIDI test peak: " << peakNote << "\n";
-    out << "// The DSP was fully booted, stabilized, and MIDI-verified before capture\n";
-    out << "#pragma once\n";
-    out << "#include <cstdint>\n\n";
-    out << "struct SnapshotMemBlock { uint32_t startAddr; uint32_t count; const uint32_t* data; };\n\n";
-
-    fprintf(stderr, "Extracting P memory (%u words)...\n", pSize);
-    auto pBlocks = extractBlocks(mem, dsp56k::MemArea_P, pSize);
-    fprintf(stderr, "  %zu non-zero blocks\n", pBlocks.size());
-
-    fprintf(stderr, "Extracting X memory (%u words)...\n", xySize);
-    auto xBlocks = extractBlocks(mem, dsp56k::MemArea_X, xySize);
-    fprintf(stderr, "  %zu non-zero blocks\n", xBlocks.size());
-
-    fprintf(stderr, "Extracting Y memory (%u words)...\n", xySize);
-    auto yBlocks = extractBlocks(mem, dsp56k::MemArea_Y, xySize);
-    fprintf(stderr, "  %zu non-zero blocks\n", yBlocks.size());
-
-    size_t totalWords = 0;
-    for (auto& b : pBlocks) totalWords += b.data.size();
-    for (auto& b : xBlocks) totalWords += b.data.size();
-    for (auto& b : yBlocks) totalWords += b.data.size();
-    fprintf(stderr, "Total non-zero words: %zu (%zu KB)\n", totalWords, totalWords * 4 / 1024);
-
-    writeBlocks(out, "vb_p", pBlocks);
-    writeBlocks(out, "vb_x", xBlocks);
-    writeBlocks(out, "vb_y", yBlocks);
-
-    fprintf(stderr, "Dumping registers...\n");
-    writeRegisters(out, "vb_", dsp);
-
-    out.close();
-
-    // Report file size
-    std::ifstream check(argv[2], std::ios::ate);
-    auto fileSize = check.tellg();
-    fprintf(stderr, "Snapshot written to: %s (%lld KB)\n", argv[2], static_cast<long long>(fileSize / 1024));
 
     return 0;
 }

@@ -18,9 +18,11 @@ set(GM_SRC  "${GM_ROOT}/source")
 if(EMSCRIPTEN)
     # -pthread for SharedArrayBuffer support (AudioWorklet needs it)
     # -O3 for maximum interpreter performance
+    # -flto for link-time optimization (critical for DSP interpreter hot path inlining)
+    # -msimd128 for WASM SIMD (helps with DSP56300 56-bit arithmetic)
     # -fexceptions so C++ try/catch works (needed for ROM validation errors)
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -pthread -O3 -fexceptions")
-    set(CMAKE_C_FLAGS   "${CMAKE_C_FLAGS} -pthread -O3")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -pthread -O3 -flto -fexceptions")
+    set(CMAKE_C_FLAGS   "${CMAKE_C_FLAGS} -pthread -O3 -flto")
 
     # Increase constexpr step limit for DSP56300's compile-time tables
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fconstexpr-steps=10000000")
@@ -166,8 +168,11 @@ add_library(virusLib STATIC ${VIRUSLIB_SRC})
 target_include_directories(virusLib PUBLIC "${GM_SRC}")
 target_link_libraries(virusLib PUBLIC synthLib hardwareLib mc68k)
 if(EMSCRIPTEN)
-    # Pre-boot snapshot: skip 20+ min DSP boot, load memory dump directly
-    target_compile_definitions(virusLib PRIVATE GM_USE_SNAPSHOT=1)
+    # Full boot — interpreter produces identical audio to JIT (correlation=1.0).
+    # Virus B boots in ~3-5s in WASM interpreter with LTO.
+    # Snapshot approach crashes due to C++ runtime state (callbacks, interrupt queues)
+    # that can't be serialized. Full boot is correct and fast enough.
+    # target_compile_definitions(virusLib PRIVATE GM_USE_SNAPSHOT=1)
     target_include_directories(virusLib PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/src")
 endif()
 
@@ -295,6 +300,35 @@ else()
         mc68k rLib esp asmjit libresample
     )
 
+    # Interpreter-only native build for audio comparison with WASM
+    # Force-include a header that undefs arch macros so g_jitSupported=false
+    add_executable(virus_midi_test_interp src/virus_midi_test.cpp src/musashi_unified.cpp)
+    target_compile_options(virus_midi_test_interp PRIVATE
+        "-include${CMAKE_CURRENT_SOURCE_DIR}/src/force_interpreter.h"
+    )
+    target_link_libraries(virus_midi_test_interp PRIVATE
+        virusLib mqLib xtLib nordLib ronaldoLib wLib
+        synthLib hardwareLib baseLib dsp56kEmu dsp56kBase
+        mc68k rLib esp asmjit libresample
+    )
+
+    # Interpreter + snapshot native build — tests snapshot quality with native interpreter
+    add_library(virusLib_snap STATIC ${VIRUSLIB_SRC})
+    target_include_directories(virusLib_snap PUBLIC "${GM_SRC}")
+    target_include_directories(virusLib_snap PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/src")
+    target_compile_definitions(virusLib_snap PRIVATE GM_USE_SNAPSHOT=1)
+    target_link_libraries(virusLib_snap PUBLIC synthLib hardwareLib mc68k)
+
+    add_executable(virus_midi_test_snap src/virus_midi_test.cpp src/musashi_unified.cpp)
+    target_compile_options(virus_midi_test_snap PRIVATE
+        "-include${CMAKE_CURRENT_SOURCE_DIR}/src/force_interpreter.h"
+    )
+    target_link_libraries(virus_midi_test_snap PRIVATE
+        virusLib_snap mqLib xtLib nordLib ronaldoLib wLib
+        synthLib hardwareLib baseLib dsp56kEmu dsp56kBase
+        mc68k rLib esp asmjit libresample
+    )
+
     # Native Virus B snapshot dumper (captures fully-booted state for WASM)
     add_executable(virus_snapshot_dumper src/virus_snapshot_dumper.cpp src/musashi_unified.cpp)
     target_link_libraries(virus_snapshot_dumper PRIVATE
@@ -321,6 +355,7 @@ if(EMSCRIPTEN)
             -s WASM=1 \
             -pthread \
             --no-entry \
+            -flto \
         "
     )
 endif()

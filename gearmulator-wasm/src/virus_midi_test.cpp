@@ -117,5 +117,79 @@ int main(int argc, char** argv)
     else
         printf("VERDICT: NO AUDIO FROM NOTE — MIDI or patch issue ✗\n");
 
+    // Write a WAV file for comparison with WASM output
+    if (argc >= 3)
+    {
+        const char* wavPath = argv[2];
+        printf("Rendering 2s of note to WAV: %s\n", wavPath);
+
+        // Send note on
+        midiIn.clear();
+        synthLib::SMidiEvent noteOn2(synthLib::MidiEventSource::Host, 0x90, 60, 127);
+        midiIn.push_back(noteOn2);
+
+        const uint32_t totalFrames = 46875 * 2; // 2 seconds at 46875Hz
+        std::vector<float> wavL(totalFrames), wavR(totalFrames);
+        uint32_t offset = 0;
+
+        while (offset < totalFrames)
+        {
+            uint32_t n = std::min(blockSize, totalFrames - offset);
+            midiOut.clear();
+            device->process(inputs, outputs, n, midiIn, midiOut);
+            midiIn.clear();
+            memcpy(&wavL[offset], outL.data(), n * sizeof(float));
+            memcpy(&wavR[offset], outR.data(), n * sizeof(float));
+            offset += n;
+        }
+
+        // Write 16-bit stereo WAV
+        FILE* wav = fopen(wavPath, "wb");
+        if (wav)
+        {
+            uint32_t sampleRate = 46875;
+            uint16_t channels = 2;
+            uint16_t bitsPerSample = 16;
+            uint32_t dataSize = totalFrames * channels * (bitsPerSample / 8);
+            uint32_t fileSize = 36 + dataSize;
+
+            // RIFF header
+            fwrite("RIFF", 1, 4, wav);
+            fwrite(&fileSize, 4, 1, wav);
+            fwrite("WAVE", 1, 4, wav);
+            // fmt chunk
+            fwrite("fmt ", 1, 4, wav);
+            uint32_t fmtSize = 16;
+            fwrite(&fmtSize, 4, 1, wav);
+            uint16_t audioFormat = 1; // PCM
+            fwrite(&audioFormat, 2, 1, wav);
+            fwrite(&channels, 2, 1, wav);
+            fwrite(&sampleRate, 4, 1, wav);
+            uint32_t byteRate = sampleRate * channels * (bitsPerSample / 8);
+            fwrite(&byteRate, 4, 1, wav);
+            uint16_t blockAlign = channels * (bitsPerSample / 8);
+            fwrite(&blockAlign, 2, 1, wav);
+            fwrite(&bitsPerSample, 2, 1, wav);
+            // data chunk
+            fwrite("data", 1, 4, wav);
+            fwrite(&dataSize, 4, 1, wav);
+            for (uint32_t i = 0; i < totalFrames; i++)
+            {
+                auto toS16 = [](float f) -> int16_t {
+                    int32_t s = (int32_t)(f * 32767.0f);
+                    if (s > 32767) s = 32767;
+                    if (s < -32768) s = -32768;
+                    return (int16_t)s;
+                };
+                int16_t sL = toS16(wavL[i]);
+                int16_t sR = toS16(wavR[i]);
+                fwrite(&sL, 2, 1, wav);
+                fwrite(&sR, 2, 1, wav);
+            }
+            fclose(wav);
+            printf("WAV written: %u frames at %u Hz\n", totalFrames, sampleRate);
+        }
+    }
+
     return 0;
 }
