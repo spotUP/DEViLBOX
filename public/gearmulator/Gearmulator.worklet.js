@@ -139,8 +139,8 @@ class GearmulatorProcessor extends AudioWorkletProcessor {
       readPos = (readPos + numSamples) % bufSize;
     } else {
       // Linear interpolation resampling
+      const sabF = this.sabFloat32;
       let srcPos = this.fracPos;
-      let intPos = 0;
       for (let i = 0; i < numSamples; i++) {
         const srcIdx = Math.floor(srcPos);
         const frac = srcPos - srcIdx;
@@ -149,13 +149,12 @@ class GearmulatorProcessor extends AudioWorkletProcessor {
         const idx0 = audioOffset + pos0 * 2;
         const idx1 = audioOffset + pos1 * 2;
 
-        outL[i] = this.sabFloat32[idx0] * (1 - frac) + this.sabFloat32[idx1] * frac;
-        outR[i] = this.sabFloat32[idx0 + 1] * (1 - frac) + this.sabFloat32[idx1 + 1] * frac;
+        outL[i] = sabF[idx0] * (1 - frac) + sabF[idx1] * frac;
+        outR[i] = sabF[idx0 + 1] * (1 - frac) + sabF[idx1 + 1] * frac;
 
         srcPos += this.resampleRatio;
       }
-      // Advance read position by integer part consumed
-      intPos = Math.floor(srcPos);
+      const intPos = Math.floor(srcPos);
       this.fracPos = srcPos - intPos;
       readPos = (readPos + intPos) % bufSize;
     }

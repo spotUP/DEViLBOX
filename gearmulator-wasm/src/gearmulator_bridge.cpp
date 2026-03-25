@@ -274,12 +274,15 @@ EXPORT int32_t gm_create(const uint8_t* romData, uint32_t romSize, int32_t synth
         };
 
         std::vector<synthLib::SMidiEvent> noMidi;
-        for (int i = 0; i < 32; ++i)
+        // Extended warm-up: 256 blocks × 64 samples = 16384 frames (~350ms at 46875Hz)
+        // The snapshot DSP firmware may need time to finish boot and install MIDI handlers.
+        for (int i = 0; i < 256; ++i)
         {
             dev.midiOut.clear();
             dev.device->process(inputs, outputs, warmupSamples, noMidi, dev.midiOut);
         }
-        printf("[EM] gm_create: warm-up complete (32 x %u samples)\n", warmupSamples);
+        printf("[EM] gm_create: warm-up complete (256 x %u samples = %u frames)\n",
+               warmupSamples, 256 * warmupSamples);
     }
 
     return handle;
@@ -344,13 +347,8 @@ EXPORT void gm_process(int32_t handle, float* outputL, float* outputR, uint32_t 
         dummy, dummy
     };
 
-    const auto midiInSize = gm.midiIn.size();
     gm.midiOut.clear();
     gm.device->process(inputs, outputs, numSamples, gm.midiIn, gm.midiOut);
-    const auto midiOutSize = gm.midiOut.size();
-    if (midiInSize > 0 || midiOutSize > 0)
-        printf("[EM] gm_process: midiIn=%d midiOut=%d numSamples=%u\n",
-               static_cast<int>(midiInSize), static_cast<int>(midiOutSize), numSamples);
     gm.midiIn.clear();
 }
 

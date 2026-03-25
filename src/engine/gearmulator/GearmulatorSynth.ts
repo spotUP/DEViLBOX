@@ -78,7 +78,7 @@ const STORE_NAME = 'roms';
 
 /** SAB ring buffer layout constants — must match Gearmulator.worker.js and worklet */
 const HEADER_BYTES = 16;
-const RING_FRAMES = 8192;
+const RING_FRAMES = 32768;
 
 export class GearmulatorSynth implements DevilboxSynth {
   readonly name = 'GearmulatorSynth';

@@ -26,7 +26,7 @@
 
 const HEADER_BYTES = 16; // 4 Int32s (writePos, readPos, bufferSize, peakx1000)
 const HEADER_INTS = HEADER_BYTES / 4;
-const RING_FRAMES = 8192; // ~186ms at 44100Hz — enough to absorb jitter
+const RING_FRAMES = 32768; // ~700ms at 46875Hz — larger buffer for non-real-time DSP
 
 let module = null;
 let handle = -1;
@@ -149,6 +149,12 @@ self.onmessage = async function (e) {
       }
       break;
 
+    case 'renderOffline':
+      if (handle >= 0 && module) {
+        renderOffline(data);
+      }
+      break;
+
     case 'dispose':
       dispose();
       break;
@@ -190,7 +196,7 @@ async function initSynth(data) {
     },
     // Suppress Emscripten's verbose stdout/stderr but show important messages
     print: (text) => {
-      if (text.includes('[EM]') || text.includes('Factory reset') || text.includes('boot') || text.includes('ERROR') || text.includes('error') || text.includes('snapshot') || text.includes('ESAI') || text.includes('MIPS'))
+      if (text.includes('ERROR') || text.includes('error') || text.includes('snapshot') || text.includes('boot') || text.includes('Factory reset') || text.includes('OOB') || text.includes('DSP'))
         console.log('[EM]', text);
     },
     printErr: (text) => {
@@ -293,7 +299,7 @@ async function initSynth(data) {
     calibrationDone = true; // No calibration for JP-8000
   } else {
     currentClockPercent = 100;
-    calibrationDone = true; // Start at 100% so MIDI works — user can lower via slider
+    calibrationDone = true; // Must be 100% for correct synthesis — slower than real-time but sounds right
   }
   module._gm_setDspClockPercent(handle, currentClockPercent);
   console.log(`[Gearmulator Worker] Initial clock: ${currentClockPercent}%`);
@@ -410,14 +416,16 @@ function startRenderLoop(sampleRate) {
     // possible per yield to keep the buffer from draining completely.
     const bufSize = Atomics.load(sabInt32, 2);
     let fills = 0;
-    const maxFillTime = 200; // Don't block event loop for more than 200ms
-    while (fills < 4) {
+    const maxFillTime = 200;
+    const targetFill = Math.floor(bufSize * 0.6); // Don't fill past 60% — leave headroom
+    while (fills < 16) {
       const wp = Atomics.load(sabInt32, 0);
       const rp = Atomics.load(sabInt32, 1);
       let used = wp - rp;
       if (used < 0) used += bufSize;
+      if (used >= targetFill) break; // Buffer sufficiently full
       const free = bufSize - used - 1;
-      if (free < RENDER_BLOCK) break; // Buffer full
+      if (free < RENDER_BLOCK) break;
       fillRingBuffer();
       fills++;
       if (performance.now() - t0 > maxFillTime) break;
@@ -448,8 +456,8 @@ function startRenderLoop(sampleRate) {
       autoCalibrateClock();
     }
 
-    if (renderCount <= 5 || (renderCount % 1000 === 0)) {
-      console.log(`[Gearmulator Worker] tick #${renderCount}: render=${renderMs.toFixed(1)}ms total=${totalMs.toFixed(1)}ms frames=${totalFramesRendered} peak=${peakSeen.toFixed(6)} clock=${currentClockPercent}% fills=${fills}`);
+    if (renderCount <= 3 || (renderCount % 5000 === 0)) {
+      console.log(`[Gearmulator Worker] tick #${renderCount}: render=${renderMs.toFixed(1)}ms frames=${totalFramesRendered} peak=${peakSeen.toFixed(6)} clock=${currentClockPercent}% fills=${fills}`);
     }
 
     // Use setTimeout(0) to yield to the event loop for MIDI messages
@@ -476,11 +484,14 @@ function autoCalibrateClock() {
   // So the relationship is INVERSE: to increase ratio, we must DECREASE clock%.
   // ratio = audioMs/wallMs. If ratio < target, we're too slow → decrease clock.
   // newClock = currentClock * (ratio / targetRatio)
-  const targetRatio = 0.9;
+  // Target 0.5 (50% real-time) — leaves enough DSP cycles for MIDI processing.
+  // At 100% clock the interpreter is ~5.5% real-time. We want to lower the clock
+  // enough for usable (if choppy) playback while keeping MIDI responsive.
+  const targetRatio = 0.5;
   let newClock = Math.round(currentClockPercent * (ratio / targetRatio));
 
   // Clamp to reasonable range
-  newClock = Math.max(2, Math.min(100, newClock));
+  newClock = Math.max(8, Math.min(100, newClock));
 
   // Only change if difference is significant (> 1%)
   if (Math.abs(newClock - currentClockPercent) > 1) {
@@ -563,6 +574,71 @@ function fillRingBuffer() {
   if (peakSeen > 0) {
     Atomics.store(sabInt32, 3, Math.round(peakSeen * 1000));
   }
+}
+
+/**
+ * Render audio offline (not real-time) — bypasses SAB/worklet entirely.
+ * Sends a note, renders the requested duration, returns raw float buffers.
+ */
+function renderOffline(data) {
+  const { durationMs, note, velocity } = data;
+  const sr = module._gm_getSamplerate(handle);
+  const totalFrames = Math.ceil(sr * (durationMs / 1000));
+  const blockSize = 256;
+
+  // Set 100% clock for full-quality offline render
+  const savedClock = currentClockPercent;
+  module._gm_setDspClockPercent(handle, 100);
+  console.log(`[Gearmulator Worker] Offline render: ${totalFrames} frames at ${sr} Hz (clock=100%)`);
+
+
+  // Allocate output buffers
+  const ptrL = module._malloc(blockSize * 4);
+  const ptrR = module._malloc(blockSize * 4);
+  const allL = new Float32Array(totalFrames);
+  const allR = new Float32Array(totalFrames);
+
+  // Send note on
+  if (note !== undefined) {
+    module._gm_sendMidi(handle, 0x90, note & 0x7f, (velocity || 127) & 0x7f);
+  }
+
+  // Render all frames
+  let offset = 0;
+  while (offset < totalFrames) {
+    const n = Math.min(blockSize, totalFrames - offset);
+    module._gm_process(handle, ptrL, ptrR, n);
+
+    const heapF32 = module.HEAPF32;
+    const offL = ptrL >> 2;
+    const offR = ptrR >> 2;
+    for (let i = 0; i < n; i++) {
+      allL[offset + i] = heapF32[offL + i];
+      allR[offset + i] = heapF32[offR + i];
+    }
+    offset += n;
+  }
+
+  // Send note off
+  if (note !== undefined) {
+    module._gm_sendMidi(handle, 0x80, note & 0x7f, 0);
+  }
+
+  module._free(ptrL);
+  module._free(ptrR);
+
+  // Restore original clock
+  module._gm_setDspClockPercent(handle, savedClock);
+  console.log(`[Gearmulator Worker] Offline render complete: ${totalFrames} frames (clock restored to ${savedClock}%)`);
+
+  // Transfer buffers to main thread
+  self.postMessage({
+    type: 'offlineRendered',
+    left: allL.buffer,
+    right: allR.buffer,
+    sampleRate: sr,
+    frames: totalFrames,
+  }, [allL.buffer, allR.buffer]);
 }
 
 function dispose() {
