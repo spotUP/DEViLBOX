@@ -120,7 +120,8 @@ async function playStartupJingle(): Promise<void> {
 
 const DesignSystemPage = lazy(() => import('./components/design-system/DesignSystemPage').then(m => ({ default: m.DesignSystemPage })));
 
-/** Wrapper that intercepts #/design-system before App mounts its hooks */
+/** Wrapper that intercepts #/design-system before App mounts its hooks.
+ *  Also handles ?_renderMode=dom|webgl for split-screen comparison iframes. */
 function AppRouter() {
   const [isDesignSystem, setIsDesignSystem] = useState(window.location.hash === '#/design-system');
   useEffect(() => {
@@ -128,6 +129,24 @@ function AppRouter() {
     window.addEventListener('hashchange', handler);
     return () => window.removeEventListener('hashchange', handler);
   }, []);
+
+  // Handle ?_renderMode=dom|webgl from split-screen comparison iframes
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const forceMode = params.get('_renderMode');
+    if (forceMode === 'dom' || forceMode === 'webgl') {
+      useSettingsStore.getState().setRenderMode(forceMode);
+    }
+    // Handle #/_view=xxx to switch to a specific view
+    const hashMatch = window.location.hash.match(/_view=(\w+)/);
+    if (hashMatch) {
+      const view = hashMatch[1];
+      setTimeout(() => {
+        useUIStore.getState().setActiveView(view as never);
+      }, 500); // delay to let app initialize
+    }
+  }, []);
+
   if (isDesignSystem) {
     return <Suspense fallback={<div style={{ background: '#121218', color: '#6b6b80', display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh' }}>Loading design system...</div>}><DesignSystemPage /></Suspense>;
   }
