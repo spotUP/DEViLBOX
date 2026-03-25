@@ -49,6 +49,13 @@ interface PixiMixerChannelStripProps {
   isMaster?: boolean;   // if true, hides the solo button
   effects?: [string | null, string | null];
   onEffectChange?: (slot: 0 | 1, type: string | null) => void;
+
+  // DAW features
+  sendLevels?: number[];       // 0-1 per send bus
+  onSendLevelChange?: (sendIndex: number, level: number) => void;
+  insertEffectCount?: number;  // Number of active insert effects
+  armRecord?: boolean;
+  onArmRecordToggle?: () => void;
 }
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -178,6 +185,11 @@ export const PixiMixerChannelStrip: React.FC<PixiMixerChannelStripProps> = ({
   isMaster = false,
   effects,
   onEffectChange,
+  sendLevels,
+  onSendLevelChange,
+  insertEffectCount,
+  armRecord,
+  onArmRecordToggle,
 }) => {
   const theme = usePixiTheme();
 
@@ -393,6 +405,47 @@ export const PixiMixerChannelStrip: React.FC<PixiMixerChannelStripProps> = ({
           color={soloed ? 'yellow' : 'default'}
           active={soloed}
           onClick={handleSoloClick}
+          width={STRIP_WIDTH - 8}
+        />
+      )}
+
+      {/* 10. Send knobs (compact, hidden for master) */}
+      {!isMaster && sendLevels && onSendLevelChange && (
+        <layoutContainer layout={{ flexDirection: 'row', gap: 2, width: STRIP_WIDTH, justifyContent: 'center', marginTop: 2 }}>
+          {sendLevels.slice(0, 4).map((level, i) => (
+            <PixiKnob
+              key={`send-${i}`}
+              value={level}
+              min={0}
+              max={1}
+              onChange={(v) => onSendLevelChange(i, v)}
+              size="sm"
+              label={`S${i + 1}`}
+              color={0x14b8a6}
+            />
+          ))}
+        </layoutContainer>
+      )}
+
+      {/* 11. Insert FX indicator */}
+      {insertEffectCount !== undefined && insertEffectCount > 0 && (
+        <pixiBitmapText
+          text={`FX:${insertEffectCount}`}
+          style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 9, fill: 0xffffff }}
+          tint={theme.accent.color}
+          layout={{ width: STRIP_WIDTH, marginTop: 2 }}
+        />
+      )}
+
+      {/* 12. Record arm button (hidden for master) */}
+      {!isMaster && onArmRecordToggle && (
+        <PixiButton
+          label="R"
+          variant="ft2"
+          size="sm"
+          color={armRecord ? 'red' : 'default'}
+          active={armRecord ?? false}
+          onClick={onArmRecordToggle}
           width={STRIP_WIDTH - 8}
         />
       )}
