@@ -87,12 +87,12 @@ export const SequenceMatrixEditor: React.FC<SequenceMatrixEditorProps> = ({
 
   // Auto-scroll to keep active row visible
   useEffect(() => {
-    if (activeRow < scrollOffset) {
-      setScrollOffset(activeRow);
-    } else if (activeRow >= scrollOffset + visibleRows) {
-      setScrollOffset(activeRow - visibleRows + 1);
-    }
-  }, [activeRow, scrollOffset, visibleRows]);
+    setScrollOffset(prev => {
+      if (activeRow < prev) return activeRow;
+      if (activeRow >= prev + visibleRows) return activeRow - visibleRows + 1;
+      return prev;
+    });
+  }, [activeRow, visibleRows]);
 
   // Render
   useEffect(() => {
