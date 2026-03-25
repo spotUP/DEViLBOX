@@ -480,7 +480,7 @@ export const PixiFT2Toolbar: React.FC = () => {
           >
 
             {/* Position */}
-            <FT2Cell label="Pos" value={currentPositionIndex} min={0} max={Math.max(0, songLength - 1)} onChange={handlePositionChange} width={44} />
+            <FT2Cell label="Position" value={currentPositionIndex} min={0} max={Math.max(0, songLength - 1)} onChange={handlePositionChange} width={44} />
 
             {/* Tap | Ins | Del */}
             <PixiButton
@@ -525,7 +525,7 @@ export const PixiFT2Toolbar: React.FC = () => {
               onClick={handlePlaySong}
             />
             <PixiButton
-              label={isPlayingPattern ? 'Stop Pat.' : 'Play Pat.'}
+              label={isPlayingPattern ? 'Stop Pattern' : 'Play Pattern'}
               variant="ft2"
               color={isPlayingPattern ? 'red' : 'default'}
               size="sm"

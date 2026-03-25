@@ -257,9 +257,9 @@ function resolveSongRow(
 function renderGrid(g: GraphicsType, p: RenderParams, vStart: number): void {
   g.clear();
 
-  // Always fill the full grid area to prevent black gaps at edges
+  // Always fill the full grid area with tracker row color (not theme.bg which may be red/colored)
   g.rect(0, 0, p.width, p.gridHeight);
-  g.fill({ color: p.theme.bg.color, alpha: p.trackerVisualBg ? 0.15 : 1 });
+  g.fill({ color: p.theme.trackerRowEven.color, alpha: p.trackerVisualBg ? 0.15 : 1 });
 
   for (let i = 0; i < p.visibleLines; i++) {
     const rowNum = vStart + i;
