@@ -1890,11 +1890,14 @@ export const SynthTypeDispatcher: React.FC<SynthTypeDispatcherProps> = ({
     const hasHardware = hasHardwareUI(instrument.synthType);
 
     // Pre-initialize MAME/chip synth so ROMs load immediately when the editor opens
+    // Pre-initialize synths that need WASM/ROM loading when editor opens
     useEffect(() => {
       if (!instrument?.id) return;
       const st = instrument.synthType || '';
-      const isMAMEType = st.startsWith('MAME') || ['CZ101', 'CEM3394', 'SCSP'].includes(st);
-      if (!isMAMEType) return;
+      // All synths that use AudioWorklet + WASM and may need ROM auto-loading
+      const needsPreInit = st.startsWith('MAME') || st.startsWith('Gearmulator') ||
+        ['CZ101', 'CEM3394', 'SCSP', 'D50', 'Dexed', 'OBXd', 'V2', 'TB303'].includes(st);
+      if (!needsPreInit) return;
       (async () => {
         try {
           const { getToneEngine } = await import('@engine/ToneEngine');
