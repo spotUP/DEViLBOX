@@ -1,4 +1,5 @@
 import { MAMEBaseSynth } from '@engine/mame/MAMEBaseSynth';
+import { loadZSG2ROMs } from '@engine/mame/MAMEROMLoader';
 
 /**
  * ZSG2Synth - ZOOM ZSG-2 48-Channel Wavetable Synthesizer (WASM)
@@ -17,6 +18,36 @@ export class ZSG2Synth extends MAMEBaseSynth {
   constructor() {
     super();
     this.initSynth();
+  }
+
+  /**
+   * Override initialize to auto-load ZSG-2 ROM before worklet initialization
+   */
+  protected async initialize(): Promise<void> {
+    try {
+      const romData = await loadZSG2ROMs();
+
+      await super.initialize();
+
+      if (!romData) {
+        console.warn('[ZSG2] ROM not found — synth will be silent until ROM is uploaded');
+        return;
+      }
+
+      // Transfer ROM buffer to worklet
+      const romBuffer = romData.buffer.slice(romData.byteOffset, romData.byteOffset + romData.byteLength);
+      this.workletNode!.port.postMessage(
+        { type: 'loadROM', data: romBuffer },
+        [romBuffer]
+      );
+
+      this.romLoaded = true;
+      this._updateRomStatus(true);
+      console.log('[ZSG2] ROM loaded successfully:', romData.length, 'bytes');
+    } catch (error) {
+      console.error('[ZSG2] ROM loading failed:', error);
+      console.error('Place ROM files in /public/roms/zsg2/ — see /public/roms/README.md');
+    }
   }
 
   protected writeKeyOn(note: number, velocity: number): void {
