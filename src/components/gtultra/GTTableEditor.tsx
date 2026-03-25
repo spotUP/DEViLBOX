@@ -37,6 +37,8 @@ export const GTTableEditor: React.FC<{ width: number; height: number }> = ({ wid
   const [activeTable, setActiveTable] = useState<TableType>('wave');
   const [activeCol, setActiveCol] = useState<0 | 1>(0); // 0=left, 1=right
   const [hexDigit, setHexDigit] = useState<number | null>(null);
+  const [drawing, setDrawing] = useState(false);
+  const [hoverInfo, setHoverInfo] = useState<{ idx: number; x: number; y: number } | null>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const tableData = useGTUltraStore((s) => s.tableData);
   const tableCursor = useGTUltraStore((s) => s.tableCursor);
@@ -134,6 +136,35 @@ export const GTTableEditor: React.FC<{ width: number; height: number }> = ({ wid
     }
   }, [width, contentHeight, activeTable, table, tableCursor, visibleRows, headerHeight, activeCol]);
 
+  // Convert pointer position to table index
+  const pointerToIdx = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
+    const rect = canvasRef.current!.getBoundingClientRect();
+    const y = e.clientY - rect.top;
+    if (y < headerHeight) return -1;
+    const scrollTop = Math.max(0, tableCursor - Math.floor(visibleRows / 2));
+    return Math.min(254, Math.max(0, scrollTop + Math.floor((y - headerHeight) / ROW_H)));
+  }, [tableCursor, visibleRows, headerHeight]);
+
+  // Draw mode: paint value based on X position within the bar area
+  const applyDrawValue = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
+    if (!engine) return;
+    const rect = canvasRef.current!.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const idx = pointerToIdx(e);
+    if (idx < 0) return;
+
+    // If clicking in the bar area (right side), use X position to set value
+    const barAreaStart = 130;
+    const barAreaEnd = width - 10;
+    if (x >= barAreaStart && (activeTable === 'pulse' || activeTable === 'filter' || activeTable === 'speed')) {
+      const frac = Math.max(0, Math.min(1, (x - barAreaStart) / (barAreaEnd - barAreaStart)));
+      const value = Math.round(frac * 255);
+      const typeIdx = TABLE_TYPE_INDEX[activeTable];
+      engine.setTableEntry(typeIdx, 1, idx, value); // write to right column
+      useGTUltraStore.getState().refreshAllTables();
+    }
+  }, [engine, activeTable, width, pointerToIdx]);
+
   const handleCanvasClick = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
     const rect = canvasRef.current!.getBoundingClientRect();
     const x = e.clientX - rect.left;
@@ -147,6 +178,31 @@ export const GTTableEditor: React.FC<{ width: number; height: number }> = ({ wid
     setHexDigit(null);
     canvasRef.current?.focus();
   }, [tableCursor, visibleRows, headerHeight, setTableCursor]);
+
+  const handlePointerDown = useCallback((e: React.PointerEvent<HTMLCanvasElement>) => {
+    setDrawing(true);
+    applyDrawValue(e as unknown as React.MouseEvent<HTMLCanvasElement>);
+  }, [applyDrawValue]);
+
+  const handlePointerMove = useCallback((e: React.PointerEvent<HTMLCanvasElement>) => {
+    // Hover tooltip
+    const idx = pointerToIdx(e as unknown as React.MouseEvent<HTMLCanvasElement>);
+    if (idx >= 0) {
+      const rect = canvasRef.current!.getBoundingClientRect();
+      setHoverInfo({ idx, x: e.clientX - rect.left, y: e.clientY - rect.top });
+    } else {
+      setHoverInfo(null);
+    }
+
+    // Draw mode
+    if (drawing) {
+      applyDrawValue(e as unknown as React.MouseEvent<HTMLCanvasElement>);
+    }
+  }, [drawing, pointerToIdx, applyDrawValue]);
+
+  const handlePointerUp = useCallback(() => {
+    setDrawing(false);
+  }, []);
 
   const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
     const { key } = e;
@@ -241,13 +297,40 @@ export const GTTableEditor: React.FC<{ width: number; height: number }> = ({ wid
       </div>
 
       {/* Table content */}
-      <canvas
-        ref={canvasRef}
-        style={{ width, height: contentHeight, outline: 'none' }}
-        tabIndex={0}
-        onClick={handleCanvasClick}
-        onKeyDown={handleKeyDown}
-      />
+      <div style={{ position: 'relative', width, height: contentHeight }}>
+        <canvas
+          ref={canvasRef}
+          style={{ width, height: contentHeight, outline: 'none', cursor: drawing ? 'crosshair' : 'default' }}
+          tabIndex={0}
+          onClick={handleCanvasClick}
+          onKeyDown={handleKeyDown}
+          onPointerDown={handlePointerDown}
+          onPointerMove={handlePointerMove}
+          onPointerUp={handlePointerUp}
+          onPointerLeave={() => { setDrawing(false); setHoverInfo(null); }}
+        />
+        {/* Hover tooltip */}
+        {hoverInfo && hoverInfo.idx >= 0 && (
+          <div style={{
+            position: 'absolute',
+            left: Math.min(hoverInfo.x + 12, width - 90),
+            top: Math.max(0, hoverInfo.y - 24),
+            background: '#1a1a1a',
+            border: '1px solid #333',
+            borderRadius: 3,
+            padding: '2px 6px',
+            fontSize: 9,
+            fontFamily: '"JetBrains Mono", monospace',
+            color: TABLE_COLORS[activeTable],
+            pointerEvents: 'none',
+            zIndex: 10,
+            whiteSpace: 'nowrap',
+          }}>
+            [{hoverInfo.idx.toString(16).toUpperCase().padStart(2, '0')}] L:{table.left[hoverInfo.idx].toString(16).toUpperCase().padStart(2, '0')} R:{table.right[hoverInfo.idx].toString(16).toUpperCase().padStart(2, '0')}
+            {activeTable === 'wave' && WAVE_LEFT_ANNOTATIONS[table.left[hoverInfo.idx]] ? ` (${WAVE_LEFT_ANNOTATIONS[table.left[hoverInfo.idx]]})` : ''}
+          </div>
+        )}
+      </div>
     </div>
   );
 };
