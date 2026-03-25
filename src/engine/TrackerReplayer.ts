@@ -1437,7 +1437,6 @@ export class TrackerReplayer {
       // TFMX: use timing table + onChannelData for position sync
       if (result.uadeEngine && this.song.tfmxTimingTable && this.song.tfmxTimingTable.length > 0) {
         const tt = this.song.tfmxTimingTable;
-        const patternLengths = this.song.patterns.map(p => p.length);
         let lastRow = -1;
         let lastPosition = -1;
         this._tfmxChannelUnsub = result.uadeEngine.onChannelData((_channels, totalFrames) => {
