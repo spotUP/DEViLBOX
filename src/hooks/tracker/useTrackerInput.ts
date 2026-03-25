@@ -66,6 +66,8 @@ export const useTrackerInput = () => {
   const cutPattern = useTrackerStore((state) => state.cutPattern);
   const pastePattern = useTrackerStore((state) => state.pastePattern);
   const transposeSelection = useTrackerStore((state) => state.transposeSelection);
+  const transposeTrack = useTrackerStore((state) => state.transposeTrack);
+  const transposePattern = useTrackerStore((state) => state.transposePattern);
   const toggleRecordMode = useEditorStore((state) => state.toggleRecordMode);
   const writeMacroSlot = useTrackerStore((state) => state.writeMacroSlot);
   const readMacroSlot = useTrackerStore((state) => state.readMacroSlot);
@@ -402,18 +404,45 @@ export const useTrackerInput = () => {
 
       // F7/F8: Transpose with FT2 scoping
       // Shift = Track, Ctrl = Pattern, Alt = Block; F7 = up, F8 = down
+      // Shift+Ctrl = 12 semitones (octave) instead of 1
       if (key === 'F7' && (e.shiftKey || e.ctrlKey || e.metaKey || e.altKey)) {
         e.preventDefault();
-        const semitones = e.shiftKey && (e.ctrlKey || e.metaKey) ? 12 : 1;
-        transposeSelection(semitones);
-        useUIStore.getState().setStatusMessage(`TRANSPOSE +${semitones}`);
+        const octaveJump = e.shiftKey && (e.ctrlKey || e.metaKey);
+        const semitones = octaveJump ? 12 : 1;
+        if (e.shiftKey && !(e.ctrlKey || e.metaKey)) {
+          transposeTrack(cursorRef.current.channelIndex, semitones);
+          useUIStore.getState().setStatusMessage(`TRANSPOSE TRACK +${semitones}`);
+        } else if ((e.ctrlKey || e.metaKey) && !e.shiftKey) {
+          transposePattern(semitones);
+          useUIStore.getState().setStatusMessage(`TRANSPOSE PATTERN +${semitones}`);
+        } else if (e.altKey) {
+          transposeSelection(semitones);
+          useUIStore.getState().setStatusMessage(`TRANSPOSE BLOCK +${semitones}`);
+        } else {
+          // Shift+Ctrl = octave transpose on pattern
+          transposePattern(semitones);
+          useUIStore.getState().setStatusMessage(`TRANSPOSE PATTERN +${semitones}`);
+        }
         return;
       }
       if (key === 'F8' && (e.shiftKey || e.ctrlKey || e.metaKey || e.altKey)) {
         e.preventDefault();
-        const semitones = e.shiftKey && (e.ctrlKey || e.metaKey) ? 12 : 1;
-        transposeSelection(-semitones);
-        useUIStore.getState().setStatusMessage(`TRANSPOSE -${semitones}`);
+        const octaveJump = e.shiftKey && (e.ctrlKey || e.metaKey);
+        const semitones = octaveJump ? 12 : 1;
+        if (e.shiftKey && !(e.ctrlKey || e.metaKey)) {
+          transposeTrack(cursorRef.current.channelIndex, -semitones);
+          useUIStore.getState().setStatusMessage(`TRANSPOSE TRACK -${semitones}`);
+        } else if ((e.ctrlKey || e.metaKey) && !e.shiftKey) {
+          transposePattern(-semitones);
+          useUIStore.getState().setStatusMessage(`TRANSPOSE PATTERN -${semitones}`);
+        } else if (e.altKey) {
+          transposeSelection(-semitones);
+          useUIStore.getState().setStatusMessage(`TRANSPOSE BLOCK -${semitones}`);
+        } else {
+          // Shift+Ctrl = octave transpose on pattern
+          transposePattern(-semitones);
+          useUIStore.getState().setStatusMessage(`TRANSPOSE PATTERN -${semitones}`);
+        }
         return;
       }
 
@@ -632,6 +661,7 @@ export const useTrackerInput = () => {
       cutSelection,
       copyTrack, cutTrack, pasteTrack,
       copyPattern, cutPattern, pastePattern,
+      transposeTrack, transposePattern,
       paste,
       pasteMix,
       pasteFlood,
