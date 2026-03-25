@@ -143,22 +143,71 @@ export function resolveArrangement(
           const pattern = patternById.get(clip.patternId);
           if (pattern) {
             const rowInClip = globalRow - clip.startRow;
-            // Determine the effective pattern row, accounting for loopClip
+            // Determine the effective pattern row, accounting for loopClip and reverse
             let patternRow: number;
+            const effectiveLength = pattern.length - clip.offsetRows;
             if (clip.loopClip && pattern.length > 0) {
               // Cyclic: repeat pattern rows to fill the clip region
-              patternRow = clip.offsetRows + (rowInClip % pattern.length);
+              const cycleRow = rowInClip % pattern.length;
+              patternRow = clip.reversed
+                ? clip.offsetRows + (pattern.length - 1 - cycleRow)
+                : clip.offsetRows + cycleRow;
             } else {
-              patternRow = clip.offsetRows + rowInClip;
+              patternRow = clip.reversed
+                ? clip.offsetRows + Math.max(0, effectiveLength - 1 - rowInClip)
+                : clip.offsetRows + rowInClip;
             }
             const channel = pattern.channels[clip.sourceChannelIndex];
             if (channel && patternRow >= 0 && patternRow < channel.rows.length) {
               const cell = { ...channel.rows[patternRow] };
+
+              // --- Clip Transpose ---
               const semitones = clip.transpose ?? 0;
               if (semitones !== 0 && cell.note > 0 && cell.note < 97) {
-                // XM note range: 1–96 (1=C-0, 96=B-7), 0=empty, 97=note off
                 cell.note = Math.max(1, Math.min(96, cell.note + semitones));
               }
+
+              // --- Clip Gain + Fade ---
+              const clipGain = clip.gain ?? 1.0;
+              const clipLen = clip.clipLength ?? clip.clipLengthRows ?? (pattern.length - clip.offsetRows);
+              let fadeMultiplier = 1.0;
+
+              // Fade in
+              const fadeIn = clip.fadeInRows ?? 0;
+              if (fadeIn > 0 && rowInClip < fadeIn) {
+                const t = rowInClip / fadeIn;
+                const curve = clip.fadeInCurve ?? 'linear';
+                fadeMultiplier *= curve === 'exponential' ? t * t
+                  : curve === 'logarithmic' ? Math.sqrt(t)
+                  : t;
+              }
+
+              // Fade out
+              const fadeOut = clip.fadeOutRows ?? 0;
+              if (fadeOut > 0 && rowInClip >= clipLen - fadeOut) {
+                const remaining = clipLen - rowInClip;
+                const t = remaining / fadeOut;
+                const curve = clip.fadeOutCurve ?? 'linear';
+                fadeMultiplier *= curve === 'exponential' ? t * t
+                  : curve === 'logarithmic' ? Math.sqrt(t)
+                  : t;
+              }
+
+              // Apply gain + fade to volume column
+              const totalGain = clipGain * fadeMultiplier;
+              if (totalGain !== 1.0 && cell.volume > 0 && cell.volume <= 0x50) {
+                // Volume column: 0x10-0x50 = volume 0-64
+                const vol = cell.volume - 0x10;
+                cell.volume = Math.max(0x10, Math.min(0x50, 0x10 + Math.round(vol * totalGain)));
+              } else if (totalGain !== 1.0 && cell.note > 0 && cell.note < 97) {
+                // No volume column set — inject one based on gain
+                cell.volume = Math.max(0x10, Math.min(0x50, 0x10 + Math.round(64 * totalGain)));
+              }
+
+              // --- Clip Reverse ---
+              // (reversed is handled structurally — reverse the row index)
+              // Already handled above via patternRow calculation
+
               rows.push(cell);
             } else {
               rows.push({ ...EMPTY });
