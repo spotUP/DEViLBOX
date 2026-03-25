@@ -9,14 +9,17 @@
 import React from 'react';
 import { usePatternMatrix } from '@/hooks/arrangement/usePatternMatrix';
 import { useTrackerStore } from '@stores';
+import { useResponsiveSafe } from '@/contexts/ResponsiveContext';
 
 interface PatternMatrixProps {
   width?: number;
   height?: number;
 }
 
-const CELL_W = 40;
-const CELL_H = 20;
+const CELL_W_DESKTOP = 40;
+const CELL_H_DESKTOP = 20;
+const CELL_W_MOBILE = 48;
+const CELL_H_MOBILE = 36; // 36px for touch-friendly targets
 const HEADER_H = 22;
 const ROW_LABEL_W = 32;
 
@@ -26,6 +29,10 @@ export const PatternMatrix: React.FC<PatternMatrixProps> = ({
   width,
   height,
 }) => {
+  const { isMobile } = useResponsiveSafe();
+  const CELL_W = isMobile ? CELL_W_MOBILE : CELL_W_DESKTOP;
+  const CELL_H = isMobile ? CELL_H_MOBILE : CELL_H_DESKTOP;
+
   const matrix = usePatternMatrix();
   const setCurrentPosition = useTrackerStore(s => s.setCurrentPosition);
   const setCurrentPattern = useTrackerStore(s => s.setCurrentPattern);
