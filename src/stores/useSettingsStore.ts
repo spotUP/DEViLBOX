@@ -481,7 +481,7 @@ export const useSettingsStore = create<SettingsStore>()(
       midiPolyphonic: true,  // Default: polyphonic enabled for better jamming
       trackerVisualBg: false,  // Default: off
       trackerVisualMode: 0,    // Default: spectrum bars
-      vjPatternOverlay: false, // Default: off
+      vjPatternOverlay: true, // Default: on — pattern data visible in VJ view
       vuMeterMode: 'trigger' as const,  // Default: trigger-based VU (note-on)
       vuMeterStyle: 'segments' as const,  // Default: LED segment style
       vuMeterSwing: true,  // Default: sine wave swing enabled
