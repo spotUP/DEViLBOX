@@ -14,7 +14,7 @@ import type { Container as ContainerType } from 'pixi.js';
 import { PIXI_FONTS } from '../fonts';
 import { usePixiTheme } from '../theme';
 import { PixiButton } from '../components/PixiButton';
-import { PixiKnob } from '../components/PixiKnob';
+import { PixiSlider } from '../components/PixiSlider';
 import { PixiSelect } from '../components/PixiSelect';
 import { usePixiResponsive } from '../hooks/usePixiResponsive';
 import { useUIStore } from '@stores/useUIStore';
@@ -233,17 +233,16 @@ export const PixiNavBar: React.FC = () => {
           searchable
         />
 
-        {/* Master Volume (matches DOM's volume slider) */}
-        <PixiKnob
+        {/* Master Volume — horizontal slider matching DOM's <input type="range"> */}
+        <PixiSlider
           value={n.masterVolume}
           min={-60}
           max={0}
           onChange={n.setMasterVolume}
-          label="VOL"
-          unit="dB"
-          size="sm"
+          label=""
+          orientation="horizontal"
+          length={96}
           defaultValue={0}
-          formatValue={(v) => `${v.toFixed(0)}`}
           layout={{}}
         />
       </pixiContainer>
