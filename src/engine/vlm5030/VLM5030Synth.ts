@@ -157,8 +157,15 @@ export class VLM5030Synth extends MAMEBaseSynth {
         } else {
           this._startSpeechAtNote(this._speechText, note, velocity);
         }
-      } else {
+      } else if (this._speechText && this._speechText.trim().length > 0) {
         this._startSpeechAtNote(this._speechText, 60, velocity);
+      } else {
+        // No speech text set — fall through to direct WASM noteOn (uses default vowel preset)
+        this.workletNode.port.postMessage({
+          type: 'noteOn',
+          note,
+          velocity: Math.floor(velocity * 127),
+        });
       }
     } else {
       this.workletNode.port.postMessage({

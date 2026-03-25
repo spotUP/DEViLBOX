@@ -199,7 +199,7 @@ export class CZ101Synth implements DevilboxSynth {
       const timeout = setTimeout(() => reject(new Error('CZ101 init timeout')), 5000);
 
       const handler = (event: MessageEvent) => {
-        if (event.data.type === 'initialized') {
+        if (event.data.type === 'initialized' || event.data.type === 'ready') {
           clearTimeout(timeout);
           this.workletNode?.port.removeEventListener('message', handler);
           resolve();
