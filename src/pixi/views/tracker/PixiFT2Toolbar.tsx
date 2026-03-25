@@ -93,12 +93,6 @@ const FT2Cell: React.FC<FT2CellProps> = ({ label, value, min, max, onChange, wid
   );
 };
 
-// ─── Vertical separator ──────────────────────────────────────────────────────
-
-const TransportSep: React.FC<{ height?: number }> = ({ height = 26 }) => {
-  const theme = usePixiTheme();
-  return <layoutContainer alpha={0.4} layout={{ width: 1, height, alignSelf: 'center', marginLeft: 2, marginRight: 2, backgroundColor: theme.border.color }} />;
-};
 
 // ─── PixiFT2Toolbar ──────────────────────────────────────────────────────────
 
@@ -462,22 +456,18 @@ export const PixiFT2Toolbar: React.FC = () => {
             <PixiButton label="Ins" variant="ghost" size="sm" onClick={handleInsert} />
             <PixiButton label="Del" variant="ghost" size="sm" onClick={handleDelete} />
 
-            <TransportSep />
 
             {/* BPM */}
             <FT2Cell label="BPM" value={bpm} min={32} max={255} onChange={setBPM} width={48} />
 
-            <TransportSep />
 
             {/* Pattern */}
             <FT2Cell label="Pattern" value={currentPatternInOrder} min={0} max={Math.max(0, patterns.length - 1)} onChange={handlePatternChange} width={48} />
 
-            <TransportSep />
 
             {/* Edit Step */}
             <FT2Cell label="Edit Step" value={editStep} min={0} max={16} onChange={setEditStep} width={48} />
 
-            <TransportSep />
 
             {/* Play Song / Play Pattern */}
             <PixiButton
@@ -527,12 +517,10 @@ export const PixiFT2Toolbar: React.FC = () => {
               width={48}
             />
 
-            <TransportSep />
 
             {/* Speed (Groove button is in EditorControlsBar, not here — matching DOM) */}
             <FT2Cell label="Speed" value={speed} min={1} max={31} onChange={setSpeed} width={44} />
 
-            <TransportSep />
 
             {/* Length (pattern rows) */}
             <FT2Cell
@@ -554,7 +542,6 @@ export const PixiFT2Toolbar: React.FC = () => {
               ]}
             />
 
-            <TransportSep />
 
             {/* Song Len (duplicated to match DOM row 2 layout) */}
             <FT2Cell
