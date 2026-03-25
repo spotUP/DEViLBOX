@@ -8,11 +8,10 @@
 import React, { useCallback, useEffect, useRef } from 'react';
 import type { Graphics as GraphicsType } from 'pixi.js';
 import { PIXI_FONTS } from '@/pixi/fonts';
+import { usePixiTheme } from '@/pixi/theme';
 import { MegaText, type GlyphLabel } from '@/pixi/utils/MegaText';
 import { useGTUltraStore } from '@/stores/useGTUltraStore';
 import {
-  DAW_BG, DAW_PANEL_BG, DAW_PANEL_BORDER, DAW_SURFACE,
-  DAW_ACCENT, DAW_SUCCESS, DAW_ERROR, DAW_TEXT, DAW_TEXT_MUTED,
   DAW_CH_COLORS, DAW_RADIUS, DAW_PAD,
 } from './dawTheme';
 
@@ -22,6 +21,7 @@ interface Props {
 }
 
 export const PixiGTDAWMixer: React.FC<Props> = ({ width, height }) => {
+  const theme = usePixiTheme();
   const containerRef = useRef<any>(null);
   const bgRef = useRef<GraphicsType>(null);
   const megaRef = useRef<MegaText | null>(null);
@@ -51,7 +51,7 @@ export const PixiGTDAWMixer: React.FC<Props> = ({ width, height }) => {
     const stripW = Math.min(100, Math.floor((width - pad * 2) / channelCount) - 4);
     const stripH = height - pad * 2;
 
-    bg.rect(0, 0, width, height).fill({ color: DAW_BG });
+    bg.rect(0, 0, width, height).fill({ color: theme.bg.color });
 
     for (let ch = 0; ch < channelCount; ch++) {
       const x = pad + ch * (stripW + 4);
@@ -59,9 +59,9 @@ export const PixiGTDAWMixer: React.FC<Props> = ({ width, height }) => {
 
       // Strip background
       bg.roundRect(x, pad, stripW, stripH, DAW_RADIUS)
-        .fill({ color: DAW_PANEL_BG });
+        .fill({ color: theme.bgSecondary.color });
       bg.roundRect(x, pad, stripW, stripH, DAW_RADIUS)
-        .stroke({ color: DAW_PANEL_BORDER, width: 1 });
+        .stroke({ color: theme.border.color, width: 1 });
 
       // Color indicator bar at top
       bg.roundRect(x + 2, pad + 2, stripW - 4, 4, 2)
@@ -71,7 +71,7 @@ export const PixiGTDAWMixer: React.FC<Props> = ({ width, height }) => {
       labels.push({
         x: x + stripW / 2 - 10, y: pad + 10,
         text: `CH ${ch + 1}`,
-        color: DAW_TEXT,
+        color: theme.text.color,
         fontFamily: ff,
       });
 
@@ -81,7 +81,7 @@ export const PixiGTDAWMixer: React.FC<Props> = ({ width, height }) => {
       const vuW = 12;
       const vuX = x + stripW / 2 - vuW / 2;
 
-      bg.roundRect(vuX, vuY, vuW, vuH, 2).fill({ color: DAW_SURFACE });
+      bg.roundRect(vuX, vuY, vuW, vuH, 2).fill({ color: theme.bgTertiary.color });
 
       // Read SID register activity for VU
       const regs = useGTUltraStore.getState().sidRegisters;
@@ -101,7 +101,7 @@ export const PixiGTDAWMixer: React.FC<Props> = ({ width, height }) => {
 
       const fillH = level * vuH;
       if (fillH > 0) {
-        const vuColor = level > 0.85 ? DAW_ERROR : level > 0.6 ? DAW_ACCENT : DAW_SUCCESS;
+        const vuColor = level > 0.85 ? theme.error.color : level > 0.6 ? theme.accent.color : theme.success.color;
         bg.roundRect(vuX, vuY + vuH - fillH, vuW, fillH, 2).fill({ color: vuColor, alpha: 0.8 });
       }
 
@@ -110,18 +110,18 @@ export const PixiGTDAWMixer: React.FC<Props> = ({ width, height }) => {
       labels.push({
         x: x + stripW / 2 - 12, y: faderY,
         text: 'VOL',
-        color: DAW_TEXT_MUTED,
+        color: theme.textMuted.color,
         fontFamily: ff,
       });
 
       // Mute / Solo
       const btnY = faderY + 16;
-      labels.push({ x: x + 8, y: btnY, text: 'M', color: DAW_TEXT_MUTED, fontFamily: ff });
-      labels.push({ x: x + stripW - 18, y: btnY, text: 'S', color: DAW_TEXT_MUTED, fontFamily: ff });
+      labels.push({ x: x + 8, y: btnY, text: 'M', color: theme.textMuted.color, fontFamily: ff });
+      labels.push({ x: x + stripW - 18, y: btnY, text: 'S', color: theme.textMuted.color, fontFamily: ff });
     }
 
     mega.updateLabels(labels, 8);
-  }, [width, height, channelCount]);
+  }, [width, height, channelCount, theme]);
 
   // Animation loop for VU meters
   useEffect(() => {

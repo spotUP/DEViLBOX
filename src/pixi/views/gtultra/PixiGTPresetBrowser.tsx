@@ -11,16 +11,7 @@ import { PIXI_FONTS } from '@/pixi/fonts';
 import { MegaText, type GlyphLabel } from '@/pixi/utils/MegaText';
 import { getPresetCategories, getPresetsByCategory, type GTSIDPreset } from '@/constants/gtultraPresets';
 import { useGTUltraStore } from '@/stores/useGTUltraStore';
-
-const C_BG       = 0x0d0d0d;
-const C_BORDER   = 0x222222;
-const C_LABEL    = 0x666666;
-const C_HEADER   = 0x888888;
-const C_CAT_BG   = 0x141414;
-const C_CAT_SEL  = 0x1a2a3a;
-const C_PRESET   = 0xcccccc;
-const C_PRESET_SEL = 0x66aaff;
-const C_HOVER    = 0x1a1a1a;
+import { usePixiTheme } from '../../theme';
 
 interface Props {
   width: number;
@@ -30,6 +21,7 @@ interface Props {
 }
 
 export const PixiGTPresetBrowser: React.FC<Props> = ({ width, height, variant = 'list', onApplyPreset }) => {
+  const theme = usePixiTheme();
   const containerRef = useRef<any>(null);
   const bgRef = useRef<GraphicsType>(null);
   const megaRef = useRef<MegaText | null>(null);
@@ -67,15 +59,15 @@ export const PixiGTPresetBrowser: React.FC<Props> = ({ width, height, variant = 
     const presetH = isCards ? 60 : 14;
 
     // Background
-    bg.rect(0, 0, width, height).fill({ color: C_BG });
-    bg.rect(0, 0, width, height).stroke({ color: C_BORDER, width: 1 });
+    bg.rect(0, 0, width, height).fill({ color: theme.bg.color });
+    bg.rect(0, 0, width, height).stroke({ color: theme.border.color, width: 1 });
 
     // Header
-    labels.push({ x: pad, y: 4, text: 'PRESETS', color: C_HEADER, fontFamily: ff });
+    labels.push({ x: pad, y: 4, text: 'PRESETS', color: theme.textSecondary.color, fontFamily: ff });
     labels.push({
       x: width - 100, y: 4,
       text: `Inst ${(currentInstrument + 1).toString(16).toUpperCase().padStart(2, '0')}`,
-      color: C_LABEL, fontFamily: ff,
+      color: theme.textMuted.color, fontFamily: ff,
     });
 
     let y = headerH;
@@ -85,11 +77,11 @@ export const PixiGTPresetBrowser: React.FC<Props> = ({ width, height, variant = 
     for (let i = 0; i < categories.length; i++) {
       const cx = pad + i * catW;
       const isSel = i === selectedCat;
-      bg.rect(cx, y, catW - 1, catH).fill({ color: isSel ? C_CAT_SEL : C_CAT_BG });
+      bg.rect(cx, y, catW - 1, catH).fill({ color: isSel ? theme.bgHover.color : theme.bgSecondary.color });
       labels.push({
         x: cx + 3, y: y + 2,
         text: categories[i].slice(0, 5).toUpperCase(),
-        color: isSel ? C_PRESET_SEL : C_LABEL,
+        color: isSel ? theme.accent.color : theme.textMuted.color,
         fontFamily: ff,
       });
     }
@@ -107,13 +99,13 @@ export const PixiGTPresetBrowser: React.FC<Props> = ({ width, height, variant = 
       const isSel = pi === selectedPreset;
 
       if (isSel) {
-        bg.rect(pad, py, width - pad * 2, presetH - 1).fill({ color: C_HOVER });
+        bg.rect(pad, py, width - pad * 2, presetH - 1).fill({ color: theme.bgHover.color });
       }
 
       labels.push({
         x: pad + 4, y: py + 1,
         text: preset.name,
-        color: isSel ? C_PRESET_SEL : C_PRESET,
+        color: isSel ? theme.accent.color : theme.text.color,
         fontFamily: ff,
       });
 
@@ -121,7 +113,7 @@ export const PixiGTPresetBrowser: React.FC<Props> = ({ width, height, variant = 
       labels.push({
         x: width - 90, y: py + 1,
         text: `${preset.ad.toString(16).toUpperCase().padStart(2, '0')} ${preset.sr.toString(16).toUpperCase().padStart(2, '0')}`,
-        color: C_LABEL,
+        color: theme.textMuted.color,
         fontFamily: ff,
       });
     }
@@ -131,12 +123,12 @@ export const PixiGTPresetBrowser: React.FC<Props> = ({ width, height, variant = 
       const sbH = height - y - 4;
       const thumbH = Math.max(10, (maxVisible / presets.length) * sbH);
       const thumbY = y + (visStart / presets.length) * sbH;
-      bg.rect(width - 4, y, 2, sbH).fill({ color: C_CAT_BG });
-      bg.rect(width - 4, thumbY, 2, thumbH).fill({ color: C_LABEL });
+      bg.rect(width - 4, y, 2, sbH).fill({ color: theme.bgSecondary.color });
+      bg.rect(width - 4, thumbY, 2, thumbH).fill({ color: theme.textMuted.color });
     }
 
     mega.updateLabels(labels, 8);
-  }, [width, height, selectedCat, selectedPreset, scroll, categories, catName, presets, currentInstrument]);
+  }, [width, height, selectedCat, selectedPreset, scroll, categories, catName, presets, currentInstrument, theme]);
 
   useEffect(() => {
     redraw();

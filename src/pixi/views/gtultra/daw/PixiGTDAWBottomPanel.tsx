@@ -7,10 +7,8 @@
 import React, { useCallback } from 'react';
 import type { Graphics as GraphicsType } from 'pixi.js';
 import { PIXI_FONTS } from '@/pixi/fonts';
+import { usePixiTheme } from '@/pixi/theme';
 import { useGTUltraStore, type GTUltraState } from '@/stores/useGTUltraStore';
-import {
-  DAW_PANEL_BG, DAW_PANEL_BORDER, DAW_ACCENT, DAW_TEXT_MUTED,
-} from './dawTheme';
 import { PixiGTDAWMixer } from './PixiGTDAWMixer';
 import { PixiGTPresetBrowser } from '../PixiGTPresetBrowser';
 import { PixiGTStudioTables } from '../PixiGTStudioTables';
@@ -37,6 +35,7 @@ interface Props {
 }
 
 export const PixiGTDAWBottomPanel: React.FC<Props> = ({ width, height }) => {
+  const theme = usePixiTheme();
   const dawBottomPanel = useGTUltraStore((s) => s.dawBottomPanel);
 
   const handleTab = useCallback((panel: BottomPanel) => {
@@ -45,9 +44,9 @@ export const PixiGTDAWBottomPanel: React.FC<Props> = ({ width, height }) => {
 
   const drawBg = useCallback((g: GraphicsType) => {
     g.clear();
-    g.rect(0, 0, width, height).fill({ color: DAW_PANEL_BG });
-    g.rect(0, 0, width, 1).fill({ color: DAW_PANEL_BORDER });
-  }, [width, height]);
+    g.rect(0, 0, width, height).fill({ color: theme.bgSecondary.color });
+    g.rect(0, 0, width, 1).fill({ color: theme.border.color });
+  }, [width, height, theme.bgSecondary.color, theme.border.color]);
 
   const contentH = height - TAB_H;
 
@@ -63,7 +62,7 @@ export const PixiGTDAWBottomPanel: React.FC<Props> = ({ width, height }) => {
               eventMode="none"
               text={label}
               style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 9, fill: 0xffffff }}
-              tint={dawBottomPanel === id ? DAW_ACCENT : DAW_TEXT_MUTED}
+              tint={dawBottomPanel === id ? theme.accent.color : theme.textMuted.color}
             />
           </pixiContainer>
         ))}

@@ -7,17 +7,16 @@
 import React, { useCallback, useMemo } from 'react';
 import type { Graphics as GraphicsType } from 'pixi.js';
 import { PIXI_FONTS } from '@/pixi/fonts';
+import { usePixiTheme } from '@/pixi/theme';
 import { useGTUltraStore, type GTViewMode } from '@/stores/useGTUltraStore';
-import {
-  DAW_PANEL_BG, DAW_PANEL_BORDER, DAW_ACCENT, DAW_ACCENT_WARM,
-  DAW_SUCCESS, DAW_ERROR, DAW_TEXT, DAW_TEXT_SEC, DAW_TEXT_MUTED, DAW_TOOLBAR_H,
-} from './dawTheme';
+import { DAW_TOOLBAR_H } from './dawTheme';
 
 interface Props {
   width: number;
 }
 
 export const PixiGTDAWToolbar: React.FC<Props> = ({ width }) => {
+  const theme = usePixiTheme();
   const playing = useGTUltraStore((s) => s.playing);
   const recordMode = useGTUltraStore((s) => s.recordMode);
   const tempo = useGTUltraStore((s) => s.tempo);
@@ -64,9 +63,9 @@ export const PixiGTDAWToolbar: React.FC<Props> = ({ width }) => {
 
   const drawBg = useCallback((g: GraphicsType) => {
     g.clear();
-    g.rect(0, 0, width, DAW_TOOLBAR_H).fill({ color: DAW_PANEL_BG });
-    g.rect(0, DAW_TOOLBAR_H - 1, width, 1).fill({ color: DAW_PANEL_BORDER });
-  }, [width]);
+    g.rect(0, 0, width, DAW_TOOLBAR_H).fill({ color: theme.bgTertiary.color });
+    g.rect(0, DAW_TOOLBAR_H - 1, width, 1).fill({ color: theme.border.color });
+  }, [width, theme.bgTertiary.color, theme.border.color]);
 
   const gridLabel = `1/${dawGridSnap === 1 ? '1' : dawGridSnap.toString()}`;
 
@@ -82,46 +81,46 @@ export const PixiGTDAWToolbar: React.FC<Props> = ({ width }) => {
 
       {/* Transport */}
       <pixiContainer eventMode="static" cursor="pointer" onPointerUp={handlePlay}>
-        <pixiBitmapText eventMode="none" text={playing ? '[PLAY]' : '[play]'} style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 10, fill: 0xffffff }} tint={playing ? DAW_SUCCESS : DAW_TEXT_MUTED} />
+        <pixiBitmapText eventMode="none" text={playing ? '[PLAY]' : '[play]'} style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 10, fill: 0xffffff }} tint={playing ? theme.success.color : theme.textMuted.color} />
       </pixiContainer>
 
       <pixiContainer eventMode="static" cursor="pointer" onPointerUp={handleStop}>
-        <pixiBitmapText eventMode="none" text="[stop]" style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 10, fill: 0xffffff }} tint={DAW_TEXT_SEC} />
+        <pixiBitmapText eventMode="none" text="[stop]" style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 10, fill: 0xffffff }} tint={theme.textSecondary.color} />
       </pixiContainer>
 
       <pixiContainer eventMode="static" cursor="pointer" onPointerUp={handleRecord}>
-        <pixiBitmapText eventMode="none" text={recordMode ? '[REC]' : '[rec]'} style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 10, fill: 0xffffff }} tint={recordMode ? DAW_ERROR : DAW_TEXT_MUTED} />
+        <pixiBitmapText eventMode="none" text={recordMode ? '[REC]' : '[rec]'} style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 10, fill: 0xffffff }} tint={recordMode ? theme.error.color : theme.textMuted.color} />
       </pixiContainer>
 
       {/* Separator */}
-      <pixiBitmapText text="|" style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 10, fill: 0xffffff }} tint={DAW_PANEL_BORDER} />
+      <pixiBitmapText text="|" style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 10, fill: 0xffffff }} tint={theme.border.color} />
 
       {/* BPM */}
-      <pixiBitmapText text={`BPM:${tempo}`} style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 10, fill: 0xffffff }} tint={DAW_TEXT_SEC} />
+      <pixiBitmapText text={`BPM:${tempo}`} style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 10, fill: 0xffffff }} tint={theme.textSecondary.color} />
 
       {/* Position */}
-      <pixiBitmapText text={posText} style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 11, fill: 0xffffff }} tint={DAW_ACCENT_WARM} />
+      <pixiBitmapText text={posText} style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 11, fill: 0xffffff }} tint={theme.warning.color} />
 
       {/* Song name */}
-      <pixiBitmapText text={songName || 'Untitled'} style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 11, fill: 0xffffff }} tint={DAW_TEXT} />
+      <pixiBitmapText text={songName || 'Untitled'} style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 11, fill: 0xffffff }} tint={theme.text.color} />
 
       {/* Flex spacer */}
       <pixiContainer layout={{ flex: 1 }} />
 
       {/* Grid snap */}
       <pixiContainer eventMode="static" cursor="pointer" onPointerUp={handleGridSnap}>
-        <pixiBitmapText eventMode="none" text={`Grid:${gridLabel}`} style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 10, fill: 0xffffff }} tint={DAW_TEXT_SEC} />
+        <pixiBitmapText eventMode="none" text={`Grid:${gridLabel}`} style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 10, fill: 0xffffff }} tint={theme.textSecondary.color} />
       </pixiContainer>
 
       {/* Sidebar toggle */}
       <pixiContainer eventMode="static" cursor="pointer" onPointerUp={handleSidebar}>
-        <pixiBitmapText eventMode="none" text={dawSidebarOpen ? '[SIDE]' : '[side]'} style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 10, fill: 0xffffff }} tint={dawSidebarOpen ? DAW_ACCENT : DAW_TEXT_MUTED} />
+        <pixiBitmapText eventMode="none" text={dawSidebarOpen ? '[SIDE]' : '[side]'} style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 10, fill: 0xffffff }} tint={dawSidebarOpen ? theme.accent.color : theme.textMuted.color} />
       </pixiContainer>
 
       {/* View mode switches */}
       {viewModes.map(({ mode, label }) => (
         <pixiContainer key={mode} eventMode="static" cursor="pointer" onPointerUp={() => handleViewMode(mode)}>
-          <pixiBitmapText eventMode="none" text={`[${label}]`} style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 10, fill: 0xffffff }} tint={viewMode === mode ? DAW_ACCENT : DAW_TEXT_MUTED} />
+          <pixiBitmapText eventMode="none" text={`[${label}]`} style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 10, fill: 0xffffff }} tint={viewMode === mode ? theme.accent.color : theme.textMuted.color} />
         </pixiContainer>
       ))}
     </pixiContainer>

@@ -14,22 +14,19 @@ import type { Graphics as GraphicsType } from 'pixi.js';
 import { PIXI_FONTS } from '@/pixi/fonts';
 import { MegaText, type GlyphLabel } from '@/pixi/utils/MegaText';
 import { useGTUltraStore } from '@/stores/useGTUltraStore';
+import { usePixiTheme } from '../../theme';
 
 const FONT_SIZE = 10;
 const LINE_H = 13;
 const HEADER_H = 16;
 
-// SID register colors by function
+// Semantic SID register colors by function (kept as-is)
 const C_FREQ    = 0x6699ff;  // Frequency
 const C_PW      = 0xff8866;  // Pulse width
 const C_CTRL    = 0xffcc00;  // Control (waveform/gate/sync/ring)
 const C_ADSR    = 0x60e060;  // ADSR
 const C_FILTER  = 0xe94560;  // Filter
 const C_VOL     = 0xffffff;  // Volume
-const C_LABEL   = 0x666666;
-const C_DIM     = 0x333333;
-const C_BG      = 0x0d0d0d;
-const C_HEADER  = 0x1a1a1a;
 
 // SID register layout (offset → name, color)
 const VOICE_REGS = [
@@ -57,6 +54,7 @@ interface Props {
 }
 
 export const PixiGTSIDMonitor: React.FC<Props> = ({ width, height, sidIndex = 0 }) => {
+  const theme = usePixiTheme();
   const gridRef = useRef<GraphicsType>(null);
   const megaRef = useRef<MegaText | null>(null);
   const containerRef = useRef<any>(null);
@@ -80,8 +78,8 @@ export const PixiGTSIDMonitor: React.FC<Props> = ({ width, height, sidIndex = 0 
     const ff = PIXI_FONTS.MONO;
 
     g.clear();
-    g.rect(0, 0, width, height).fill({ color: C_BG });
-    g.rect(0, 0, width, HEADER_H).fill({ color: C_HEADER });
+    g.rect(0, 0, width, height).fill({ color: theme.bg.color });
+    g.rect(0, 0, width, HEADER_H).fill({ color: theme.bgTertiary.color });
 
     const sidLabel = sidIndex === 0 ? 'SID #1' : 'SID #2';
     labels.push({ x: 4, y: 2, text: `${sidLabel} REGISTERS`, color: C_FILTER, fontFamily: ff });
@@ -91,7 +89,7 @@ export const PixiGTSIDMonitor: React.FC<Props> = ({ width, height, sidIndex = 0 
     // Voice registers (3 voices)
     for (let voice = 0; voice < 3; voice++) {
       const baseOff = voice * 7;
-      labels.push({ x: 4, y, text: `Voice ${voice + 1}`, color: C_LABEL, fontFamily: ff });
+      labels.push({ x: 4, y, text: `Voice ${voice + 1}`, color: theme.textMuted.color, fontFamily: ff });
       y += LINE_H;
 
       for (const reg of VOICE_REGS) {
@@ -100,9 +98,9 @@ export const PixiGTSIDMonitor: React.FC<Props> = ({ width, height, sidIndex = 0 
         const hex = val.toString(16).toUpperCase().padStart(2, '0');
         const addrHex = `$D4${addr.toString(16).toUpperCase().padStart(2, '0')}`;
 
-        labels.push({ x: 8, y, text: reg.name, color: C_DIM, fontFamily: ff });
-        labels.push({ x: 80, y, text: addrHex, color: C_DIM, fontFamily: ff });
-        labels.push({ x: 120, y, text: hex, color: val > 0 ? reg.color : C_DIM, fontFamily: ff });
+        labels.push({ x: 8, y, text: reg.name, color: theme.textMuted.color, fontFamily: ff });
+        labels.push({ x: 80, y, text: addrHex, color: theme.textMuted.color, fontFamily: ff });
+        labels.push({ x: 120, y, text: hex, color: val > 0 ? reg.color : theme.textMuted.color, fontFamily: ff });
 
         // Visual bar for frequency/PW
         if (reg.off <= 1 && val > 0) {
@@ -127,7 +125,7 @@ export const PixiGTSIDMonitor: React.FC<Props> = ({ width, height, sidIndex = 0 
     }
 
     // Global registers
-    labels.push({ x: 4, y, text: 'Filter / Vol', color: C_LABEL, fontFamily: ff });
+    labels.push({ x: 4, y, text: 'Filter / Vol', color: theme.textMuted.color, fontFamily: ff });
     y += LINE_H;
 
     for (const reg of GLOBAL_REGS) {
@@ -135,14 +133,14 @@ export const PixiGTSIDMonitor: React.FC<Props> = ({ width, height, sidIndex = 0 
       const hex = val.toString(16).toUpperCase().padStart(2, '0');
       const addrHex = `$D4${reg.off.toString(16).toUpperCase().padStart(2, '0')}`;
 
-      labels.push({ x: 8, y, text: reg.name, color: C_DIM, fontFamily: ff });
-      labels.push({ x: 80, y, text: addrHex, color: C_DIM, fontFamily: ff });
-      labels.push({ x: 120, y, text: hex, color: val > 0 ? reg.color : C_DIM, fontFamily: ff });
+      labels.push({ x: 8, y, text: reg.name, color: theme.textMuted.color, fontFamily: ff });
+      labels.push({ x: 80, y, text: addrHex, color: theme.textMuted.color, fontFamily: ff });
+      labels.push({ x: 120, y, text: hex, color: val > 0 ? reg.color : theme.textMuted.color, fontFamily: ff });
       y += LINE_H;
     }
 
     mega.updateLabels(labels, FONT_SIZE);
-  }, [width, height, sidIndex]);
+  }, [width, height, sidIndex, theme]);
 
   // Animation loop: poll SID registers from engine and update display
   useEffect(() => {

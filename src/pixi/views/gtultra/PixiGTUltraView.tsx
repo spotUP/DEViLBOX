@@ -29,12 +29,6 @@ import { useGTDAWKeyboardHandler } from './daw/useGTDAWKeyboardHandler';
 const TOOLBAR_H = 32;
 const ORDER_H = 160;
 
-const GT_BG        = 0x0d0d0d;
-const GT_TOOLBAR   = 0x1a1a1a;
-const GT_ACCENT    = 0xe94560;
-const GT_GREEN     = 0x2a9d8f;
-const GT_SEP       = 0x222222;
-const GT_TEXT_DIM  = 0x555555;
 
 interface Props {
   width: number;
@@ -102,14 +96,14 @@ export const PixiGTUltraView: React.FC<Props> = ({ width, height }) => {
 
   const drawBg = useCallback((g: GraphicsType) => {
     g.clear();
-    g.rect(0, 0, width, height).fill({ color: GT_BG });
-  }, [width, height]);
+    g.rect(0, 0, width, height).fill({ color: theme.bg.color });
+  }, [width, height, theme]);
 
   const drawToolbar = useCallback((g: GraphicsType) => {
     g.clear();
-    g.rect(0, 0, width, TOOLBAR_H).fill({ color: GT_TOOLBAR });
-    g.rect(0, TOOLBAR_H - 1, width, 1).fill({ color: GT_SEP });
-  }, [width]);
+    g.rect(0, 0, width, TOOLBAR_H).fill({ color: theme.bgTertiary.color });
+    g.rect(0, TOOLBAR_H - 1, width, 1).fill({ color: theme.border.color });
+  }, [width, theme]);
 
   const ready = !!engine;
 
@@ -126,7 +120,7 @@ export const PixiGTUltraView: React.FC<Props> = ({ width, height }) => {
         <pixiBitmapText
           text="GoatTracker Ultra — initializing..."
           style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 13, fill: 0xffffff }}
-          tint={GT_TEXT_DIM}
+          tint={theme.textMuted.color}
         />
       </pixiContainer>
 
@@ -149,40 +143,40 @@ export const PixiGTUltraView: React.FC<Props> = ({ width, height }) => {
         <pixiBitmapText
           text={songName || 'Untitled'}
           style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 11, fill: 0xffffff }}
-          tint={GT_ACCENT}
+          tint={theme.accent.color}
         />
 
         <pixiBitmapText
           text={songAuthor ? `by ${songAuthor}` : ''}
           alpha={songAuthor ? 1 : 0}
           style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 10, fill: 0xffffff }}
-          tint={GT_TEXT_DIM}
+          tint={theme.textMuted.color}
         />
 
         {/* Octave +/- */}
         <pixiContainer eventMode="static" cursor="pointer" onPointerUp={() => cycleOctave(-1)}>
-          <pixiBitmapText eventMode="none" text="-" style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 10, fill: 0xffffff }} tint={GT_TEXT_DIM} />
+          <pixiBitmapText eventMode="none" text="-" style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 10, fill: 0xffffff }} tint={theme.textMuted.color} />
         </pixiContainer>
         <pixiBitmapText text={`Oct:${currentOctave}`} style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 10, fill: 0xffffff }} tint={theme.textSecondary.color} />
         <pixiContainer eventMode="static" cursor="pointer" onPointerUp={() => cycleOctave(1)}>
-          <pixiBitmapText eventMode="none" text="+" style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 10, fill: 0xffffff }} tint={GT_TEXT_DIM} />
+          <pixiBitmapText eventMode="none" text="+" style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 10, fill: 0xffffff }} tint={theme.textMuted.color} />
         </pixiContainer>
 
         {/* Edit step +/- */}
         <pixiContainer eventMode="static" cursor="pointer" onPointerUp={() => cycleStep(-1)}>
-          <pixiBitmapText eventMode="none" text="-" style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 10, fill: 0xffffff }} tint={GT_TEXT_DIM} />
+          <pixiBitmapText eventMode="none" text="-" style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 10, fill: 0xffffff }} tint={theme.textMuted.color} />
         </pixiContainer>
         <pixiBitmapText text={`Stp:${editStep}`} style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 10, fill: 0xffffff }} tint={theme.textSecondary.color} />
         <pixiContainer eventMode="static" cursor="pointer" onPointerUp={() => cycleStep(1)}>
-          <pixiBitmapText eventMode="none" text="+" style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 10, fill: 0xffffff }} tint={GT_TEXT_DIM} />
+          <pixiBitmapText eventMode="none" text="+" style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 10, fill: 0xffffff }} tint={theme.textMuted.color} />
         </pixiContainer>
 
         {/* Record / Jam */}
         <pixiContainer eventMode="static" cursor="pointer" onPointerUp={toggleRecord}>
-          <pixiBitmapText eventMode="none" text={recordMode ? '[REC]' : '[rec]'} style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 10, fill: 0xffffff }} tint={recordMode ? 0xef4444 : GT_TEXT_DIM} />
+          <pixiBitmapText eventMode="none" text={recordMode ? '[REC]' : '[rec]'} style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 10, fill: 0xffffff }} tint={recordMode ? 0xef4444 : theme.textMuted.color} />
         </pixiContainer>
         <pixiContainer eventMode="static" cursor="pointer" onPointerUp={toggleJam}>
-          <pixiBitmapText eventMode="none" text={jamMode ? '[JAM]' : '[jam]'} style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 10, fill: 0xffffff }} tint={jamMode ? GT_GREEN : GT_TEXT_DIM} />
+          <pixiBitmapText eventMode="none" text={jamMode ? '[JAM]' : '[jam]'} style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 10, fill: 0xffffff }} tint={jamMode ? theme.success.color : theme.textMuted.color} />
         </pixiContainer>
 
         <pixiContainer layout={{ flex: 1 }} />
@@ -193,11 +187,11 @@ export const PixiGTUltraView: React.FC<Props> = ({ width, height }) => {
             eventMode="none"
             text={followPlay ? '[FOLLOW]' : '[follow]'}
             style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 10, fill: 0xffffff }}
-            tint={followPlay ? GT_GREEN : GT_TEXT_DIM}
+            tint={followPlay ? theme.success.color : theme.textMuted.color}
           />
         </pixiContainer>
 
-        <pixiBitmapText text={infoText} style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 10, fill: 0xffffff }} tint={GT_TEXT_DIM} />
+        <pixiBitmapText text={infoText} style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 10, fill: 0xffffff }} tint={theme.textMuted.color} />
       </pixiContainer>
 
       {/* ─── Order List (AHX-style position editor) ─── */}

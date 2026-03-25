@@ -31,22 +31,12 @@ const CHAN_GAP = 10;
 const HEADER_H = 20;
 const CHANNEL_W = NOTE_W + COL_GAP + HEX_W + COL_GAP + HEX_W + COL_GAP + HEX_W;
 
-// ── Colors (FT2 neutral dark theme) ──
-const C_BG         = 0x0d0d0d;
-const C_BG_ALT     = 0x141414;
-const C_HEADER     = 0x1a1a1a;
-const C_HEADER_TXT = 0x888888;
-const C_ROW_NUM    = 0x555555;
+// ── Semantic cell colors (domain-specific, not theme-derived) ──
 const C_NOTE       = 0xe0e0e0;
 const C_INSTR      = 0x60e060;
 const C_CMD        = 0xffcc00;
 const C_DATA       = 0xff8866;
-const C_EMPTY      = 0x333333;
-const C_CURSOR     = 0xffffff;
-const C_CURSOR_BG  = 0x333333;
-const C_PLAY_ROW   = 0x2a1520;
 const C_SEL        = 0x3355aa;
-const C_CHAN_SEP    = 0x222222;
 
 // ── Helpers ──
 
@@ -122,19 +112,19 @@ export const PixiGTPatternGrid: React.FC<Props> = ({ width, height }) => {
     grid.clear();
 
     // Background
-    grid.rect(0, 0, width, height).fill({ color: C_BG });
+    grid.rect(0, 0, width, height).fill({ color: theme.bg.color });
 
     // Header bar
-    grid.rect(0, 0, width, HEADER_H).fill({ color: C_HEADER });
+    grid.rect(0, 0, width, HEADER_H).fill({ color: theme.bgTertiary.color });
 
     // Header channel labels with pattern numbers
-    labels.push({ x: 2, y: 3, text: 'ROW', color: C_HEADER_TXT, fontFamily });
+    labels.push({ x: 2, y: 3, text: 'ROW', color: theme.textSecondary.color, fontFamily });
     const orderData = orderDataRef.current;
     for (let ch = 0; ch < channelCount; ch++) {
       const patNum = resolveOrderPattern(orderData[ch], orderCursor);
       const label = `CH${ch + 1}:${patNum.toString(16).toUpperCase().padStart(2, '0')}`;
       const x = ROW_NUM_W + ch * (CHANNEL_W + CHAN_GAP) + CHANNEL_W / 2 - CHAR_W * label.length / 2;
-      labels.push({ x, y: 3, text: label, color: C_HEADER_TXT, fontFamily });
+      labels.push({ x, y: 3, text: label, color: theme.textSecondary.color, fontFamily });
     }
 
     // Record mode border
@@ -150,9 +140,9 @@ export const PixiGTPatternGrid: React.FC<Props> = ({ width, height }) => {
 
       // Play row highlight
       if (playing && row === playbackPos.row) {
-        grid.rect(0, y, width, ROW_H).fill({ color: C_PLAY_ROW });
+        grid.rect(0, y, width, ROW_H).fill({ color: theme.trackerRowCurrent.color });
       } else if (row % 8 === 0) {
-        grid.rect(0, y, width, ROW_H).fill({ color: C_BG_ALT });
+        grid.rect(0, y, width, ROW_H).fill({ color: theme.trackerRowHighlight.color });
       }
 
       // Selection highlight
@@ -172,7 +162,7 @@ export const PixiGTPatternGrid: React.FC<Props> = ({ width, height }) => {
       // Channel separator lines
       for (let ch = 1; ch < channelCount; ch++) {
         const sx = ROW_NUM_W + ch * (CHANNEL_W + CHAN_GAP) - CHAN_GAP / 2;
-        grid.rect(sx, y, 1, ROW_H).fill({ color: C_CHAN_SEP });
+        grid.rect(sx, y, 1, ROW_H).fill({ color: theme.border.color });
       }
 
       // Row number
@@ -180,7 +170,7 @@ export const PixiGTPatternGrid: React.FC<Props> = ({ width, height }) => {
         x: 2,
         y: y + 2,
         text: row.toString(16).toUpperCase().padStart(2, '0'),
-        color: C_ROW_NUM,
+        color: theme.textMuted.color,
         fontFamily,
       });
 
@@ -205,19 +195,19 @@ export const PixiGTPatternGrid: React.FC<Props> = ({ width, height }) => {
         let colX = baseX;
 
         // Note
-        labels.push({ x: colX, y: y + 2, text: gtNoteToString(note), color: (note === 0 || note >= 0xBD) ? C_EMPTY : C_NOTE, fontFamily });
+        labels.push({ x: colX, y: y + 2, text: gtNoteToString(note), color: (note === 0 || note >= 0xBD) ? theme.cellEmpty.color : C_NOTE, fontFamily });
         colX += NOTE_W + COL_GAP;
 
         // Instrument
-        labels.push({ x: colX, y: y + 2, text: gtHex2(instr), color: instr === 0 ? C_EMPTY : C_INSTR, fontFamily });
+        labels.push({ x: colX, y: y + 2, text: gtHex2(instr), color: instr === 0 ? theme.cellEmpty.color : C_INSTR, fontFamily });
         colX += HEX_W + COL_GAP;
 
         // Command
-        labels.push({ x: colX, y: y + 2, text: gtHex2(cmd), color: cmd === 0 ? C_EMPTY : C_CMD, fontFamily });
+        labels.push({ x: colX, y: y + 2, text: gtHex2(cmd), color: cmd === 0 ? theme.cellEmpty.color : C_CMD, fontFamily });
         colX += HEX_W + COL_GAP;
 
         // Data
-        labels.push({ x: colX, y: y + 2, text: gtHex2(param), color: (param === 0 && cmd === 0) ? C_EMPTY : C_DATA, fontFamily });
+        labels.push({ x: colX, y: y + 2, text: gtHex2(param), color: (param === 0 && cmd === 0) ? theme.cellEmpty.color : C_DATA, fontFamily });
       }
     }
 
@@ -239,18 +229,18 @@ export const PixiGTPatternGrid: React.FC<Props> = ({ width, height }) => {
       }
 
       // Cursor background
-      overlay.rect(cx + colOff, cy, colW, ROW_H).fill({ color: C_CURSOR_BG, alpha: 0.5 });
+      overlay.rect(cx + colOff, cy, colW, ROW_H).fill({ color: theme.trackerRowCursor.color, alpha: 0.5 });
       // Cursor border
-      overlay.rect(cx + colOff, cy, colW, 1).fill({ color: C_CURSOR });
-      overlay.rect(cx + colOff, cy + ROW_H - 1, colW, 1).fill({ color: C_CURSOR });
-      overlay.rect(cx + colOff, cy, 1, ROW_H).fill({ color: C_CURSOR });
-      overlay.rect(cx + colOff + colW - 1, cy, 1, ROW_H).fill({ color: C_CURSOR });
+      overlay.rect(cx + colOff, cy, colW, 1).fill({ color: theme.text.color });
+      overlay.rect(cx + colOff, cy + ROW_H - 1, colW, 1).fill({ color: theme.text.color });
+      overlay.rect(cx + colOff, cy, 1, ROW_H).fill({ color: theme.text.color });
+      overlay.rect(cx + colOff + colW - 1, cy, 1, ROW_H).fill({ color: theme.text.color });
     }
 
     // Update MegaText
     mega.updateLabels(labels, FONT_SIZE);
   }, [width, height, scrollRow, visibleRows, patternLength, playbackPos, playing,
-      followPlay, selection, channelCount, recordMode, orderCursor, orderPos]);
+      followPlay, selection, channelCount, recordMode, orderCursor, orderPos, theme]);
 
   // Subscribe to pattern/order data changes for redraw
   useEffect(() => {
