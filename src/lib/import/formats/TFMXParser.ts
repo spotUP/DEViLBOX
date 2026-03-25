@@ -52,9 +52,13 @@ import { encodeTFMXCell } from '@/engine/uade/encoders/TFMXEncoder';
 
 const TFMX_MIN_SIZE = 0x200;
 const TFMX_SONG_SLOTS = 32;
-const TFMX_TRACKSTEP_UNPACKED = 0x600;
-const TFMX_PATTERN_PTR_UNPACKED = 0x800;
-const TFMX_MACRO_PTR_UNPACKED = 0xA00;
+// Unpacked module default offsets (file-space, verified against NostalgicPlayer).
+// NostalgicPlayer loads file data from offset 0x200 into musicData[],
+// using musicData-relative defaults of 0x600/0x200/0x400.
+// In file-space these correspond to 0x800/0x400/0x600.
+const TFMX_TRACKSTEP_UNPACKED = 0x800;
+const TFMX_PATTERN_PTR_UNPACKED = 0x400;
+const TFMX_MACRO_PTR_UNPACKED = 0x600;
 const TFMX_TRACKSTEP_ENTRY_SIZE = 16;
 const TFMX_TRACK_END = 0xFF;
 const TFMX_TRACK_HOLD = 0x80;
@@ -301,12 +305,9 @@ export function parseTFMXFile(
   if (patPtrTable === 0)   patPtrTable   = h + TFMX_PATTERN_PTR_UNPACKED;
   if (macroPtrTable === 0) macroPtrTable = h + TFMX_MACRO_PTR_UNPACKED;
 
-  // 3b. Read data base offset at h+0x0C.
-  // In TFMX Professional, pattern/macro data pointers in the pointer tables are
-  // RELATIVE to this base offset, not absolute file positions.
-  const dataBase = u32BE(buf, h + 0x0C);
-
   // 4. Read pattern pointer table (up to 128 u32BE entries)
+  // Pointer values are file-absolute (verified against NostalgicPlayer, which
+  // subtracts 0x200 to convert from file-space to its musicData buffer space).
   // Number of patterns = (macroStart - patternStart) / 4, capped at 128
   const numPatternSlots = Math.min(
     Math.floor((macroPtrTable - patPtrTable) / 4),
@@ -315,16 +316,7 @@ export function parseTFMXFile(
   const patternPointers: number[] = [];
   for (let i = 0; i < numPatternSlots; i++) {
     const raw = u32BE(buf, patPtrTable + i * 4);
-    // Apply data base offset for relative pointers. Pointers >= 0xFF000000
-    // are invalid/unused slots. Pointers that already exceed dataBase are
-    // likely already absolute (some TFMX variants use absolute offsets).
-    if (raw === 0 || raw >= 0xFF000000) {
-      patternPointers.push(raw);
-    } else if (dataBase > 0 && raw < dataBase) {
-      patternPointers.push(raw + dataBase);
-    } else {
-      patternPointers.push(raw);
-    }
+    patternPointers.push(raw);
   }
 
   // 5. Decode all TFMX patterns
@@ -362,15 +354,23 @@ export function parseTFMXFile(
     const stepOff = trackstepOff + stepIdx * TFMX_TRACKSTEP_ENTRY_SIZE;
     if (stepOff + TFMX_TRACKSTEP_ENTRY_SIZE > buf.length) break;
 
+    // Check for $EFFE command line (no track data — the entire line is a command)
+    const firstWord = (buf[stepOff] << 8) | buf[stepOff + 1];
+    if (firstWord === 0xEFFE) {
+      const cmd = (buf[stepOff + 2] << 8) | buf[stepOff + 3];
+      if (cmd === 0x0000) break; // EFFE0000 = stop player
+      // EFFE0001 = loop section, EFFE0002 = set tempo, EFFE0003/0004 = volume fade
+      // Skip command lines — they don't produce pattern rows
+      continue;
+    }
+
     // Read voice assignments for this step
     const voicePatNums: number[] = [];
-    let isEnd = false;
 
     for (let ch = 0; ch < NUM_CHANNELS; ch++) {
       const hi = buf[stepOff + ch * 2];
-      if (hi === TFMX_TRACK_END) { isEnd = true; break; }
-      if (hi >= 0xFE) {
-        // 0xFE = stop voice, treat as no pattern
+      if (hi === TFMX_TRACK_END || hi >= 0xFE) {
+        // 0xFF = stop voice, 0xFE = stop voice indicated in low byte — no pattern
         voicePatNums.push(-1);
       } else if (hi === TFMX_TRACK_HOLD) {
         // Hold previous pattern (no new assignment)
@@ -380,7 +380,8 @@ export function parseTFMXFile(
       }
     }
 
-    if (isEnd) break;
+    // If ALL voices are stopped (-1), skip this step
+    if (voicePatNums.every(v => v === -1)) continue;
 
     // Get decoded commands for each channel
     const channelCommands: DecodedTFMXCommand[][] = [];
@@ -481,14 +482,55 @@ export function parseTFMXFile(
     });
   }
 
+  // Build TFMX timing table: cumulative jiffies → (patternIndex, row)
+  const tfmxTimingTable: { patternIndex: number; row: number; cumulativeJiffies: number }[] = [];
+  let cumulativeJiffies = 0;
+
+  for (let patIdx = 0; patIdx < trackerPatterns.length; patIdx++) {
+    const pat = trackerPatterns[patIdx];
+    const numRows = pat.channels[0]?.rows.length ?? 0;
+
+    for (let row = 0; row < numRows; row++) {
+      tfmxTimingTable.push({ patternIndex: patIdx, row, cumulativeJiffies });
+      // Get the wait time from the raw TFMX command at this row
+      const offsetMap = channelOffsetMaps[patIdx]?.[0]; // use channel 0 as timing reference
+      if (offsetMap && row < offsetMap.length && offsetMap[row] >= 0) {
+        const cmdOff = offsetMap[row];
+        if (cmdOff >= 0 && cmdOff + 3 < buf.length) {
+          const b0 = buf[cmdOff];
+          const b1 = buf[cmdOff + 1];
+          const b3 = buf[cmdOff + 3];
+          if (b0 >= 0xF0 && (b0 & 0x0F) === 3) {
+            // F3: wait (b1 + 1) jiffies
+            cumulativeJiffies += b1 + 1;
+          } else if (b0 >= 0x80 && b0 < 0xC0) {
+            // Note with wait: b3 + 1 jiffies
+            cumulativeJiffies += b3 + 1;
+          } else {
+            // Immediate command (no wait) — 1 jiffy minimum for display
+            cumulativeJiffies += 1;
+          }
+        } else {
+          cumulativeJiffies += 1;
+        }
+      } else {
+        cumulativeJiffies += 1;
+      }
+    }
+  }
+
   // 8. Determine initial BPM/speed from tempo value
+  // TFMX timing doesn't map directly to tracker BPM (commands have per-note waits).
+  // Use 125 BPM / speed 6 as defaults for reasonable pattern scrolling.
+  // CIA mode (tempo >= 16) uses tempo as BPM-like value × 2.5/24.
   let initialBPM   = 125;
   let initialSpeed = 6;
   if (tempo > 15) {
-    initialBPM = tempo;
+    initialBPM = Math.round(tempo * 2.5 / 24) || 125;
   } else if (tempo > 0) {
-    initialBPM   = Math.round(50 / (tempo + 1) * 2.5);
-    initialSpeed = tempo + 1;
+    // VBlank mode: keep standard 125 BPM, adjust speed for approximate pace
+    initialBPM = 125;
+    initialSpeed = Math.max(3, Math.min(8, tempo + 1));
   }
 
   // 9. Extract instrument data from the macro table
@@ -496,20 +538,15 @@ export function parseTFMXFile(
   const MAX_INSTRUMENTS = 128;
   const MACRO_ENTRY_SIZE = 4; // macro pointer table has u32BE entries
 
-  // Count macros from the pointer table
-  const numMacroSlots = Math.min(
-    Math.floor((trackstepOff - macroPtrTable) / MACRO_ENTRY_SIZE),
-    MAX_INSTRUMENTS,
-  );
-
-  for (let i = 0; i < numMacroSlots; i++) {
-    const rawMacroAddr = u32BE(buf, macroPtrTable + i * MACRO_ENTRY_SIZE);
-    if (rawMacroAddr === 0 || rawMacroAddr >= 0xFF000000) continue;
-    // Apply data base offset for relative pointers (same logic as pattern pointers)
-    const macroAddr = (dataBase > 0 && rawMacroAddr < dataBase)
-      ? rawMacroAddr + dataBase
-      : rawMacroAddr;
-    if (macroAddr >= buf.length) continue;
+  // Count macros by iterating the pointer table and stopping at invalid entries
+  // (matches NostalgicPlayer approach — packed modules can have trackstep before macros)
+  for (let i = 0; i < MAX_INSTRUMENTS; i++) {
+    const ptrOff = macroPtrTable + i * MACRO_ENTRY_SIZE;
+    if (ptrOff + MACRO_ENTRY_SIZE > buf.length) break;
+    const macroAddr = u32BE(buf, ptrOff);
+    if (macroAddr === 0 || macroAddr >= buf.length) continue;
+    if (macroAddr >= 0xFF000000) break; // end of table marker
+    if ((macroAddr & 3) !== 0) break; // misaligned = end of valid entries
 
     // Read up to 64 bytes of macro data for display
     const macroDataSize = 64;
@@ -549,7 +586,7 @@ export function parseTFMXFile(
       id: i + 1,
       name: `Macro ${i + 1}`,
       type: 'synth' as const,
-      synthType: 'Synth' as const,
+      synthType: 'Sampler' as const,
       tfmx: tfmxConfig,
       uadeChipRam,
       effects: [],
@@ -579,7 +616,15 @@ export function parseTFMXFile(
   };
 
   return {
-    name:            filename.replace(/\.[^/.]+$/, ''),
+    name:            (() => {
+      // For prefix-based names like "mdat.turrican_bonus", extract the song part
+      const base = filename.split('/').pop() ?? filename;
+      const lower = base.toLowerCase();
+      for (const prefix of ['mdat.', 'tfmx.', 'tfx.']) {
+        if (lower.startsWith(prefix)) return base.slice(prefix.length);
+      }
+      return base.replace(/\.[^/.]+$/, '');
+    })(),
     format:          'MOD' as TrackerFormat,
     patterns:        trackerPatterns,
     instruments,
@@ -591,5 +636,6 @@ export function parseTFMXFile(
     initialBPM,
     linearPeriods:   false,
     uadePatternLayout,
+    tfmxTimingTable,
   };
 }

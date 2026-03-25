@@ -40,7 +40,7 @@ interface PixiFileBrowserProps {
   onClose: () => void;
   mode: 'load' | 'save';
   onLoad?: (data: any, filename: string) => void;
-  onLoadTrackerModule?: (buffer: ArrayBuffer, filename: string) => void;
+  onLoadTrackerModule?: (buffer: ArrayBuffer, filename: string, companionFiles?: Map<string, ArrayBuffer>) => void;
 }
 
 // Adapt PixiList item interface locally
@@ -95,7 +95,7 @@ export const PixiFileBrowser: React.FC<PixiFileBrowserProps> = ({
     fileSource,
     onLoad: onLoad ?? (() => {}),
     onLoadTrackerModule: onLoadTrackerModule
-      ? async (buf: ArrayBuffer, fn: string) => { onLoadTrackerModule(buf, fn); }
+      ? async (buf: ArrayBuffer, fn: string, companions?: Map<string, ArrayBuffer>) => { onLoadTrackerModule(buf, fn, companions); }
       : undefined,
     onClose,
     mode,

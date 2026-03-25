@@ -929,7 +929,13 @@ export async function parseUADEFile(
         return parseQuartetFile(buffer, filename);
       },
     };
-    const route = NATIVE_ROUTES[fmt] || NATIVE_ROUTES[fmt?.trim()];
+    let route = NATIVE_ROUTES[fmt] || NATIVE_ROUTES[fmt?.trim()];
+    // Prefix fallback: UADE may report variants like "TFMX Professional", "TFMX 1.5", etc.
+    if (!route && fmt) {
+      const fmtLower = fmt.toLowerCase().trim();
+      if (fmtLower.startsWith('tfmx')) route = NATIVE_ROUTES['TFMX'];
+    }
+    console.log(`[UADEParser] formatName='${fmt}', route=${route != null ? 'found' : 'NOT FOUND'}`);
     if (route) {
       try {
         const nativeSong = await route();
