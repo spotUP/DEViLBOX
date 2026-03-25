@@ -112,37 +112,36 @@ export const PixiButton: React.FC<PixiButtonProps> = ({
       };
     }
 
+    // All variants: no visible borders (matching DOM border: none)
+    const noBorder = { border: 0x000000, borderAlpha: 0 };
+
     if (variant === 'ft2') {
       const ft2 = ft2Colors[color] || ft2Colors.default;
-      if (active || pressed) return { bg: ft2.active, border: ft2.active, borderAlpha: 1, text: 0xffffff, showBg: true };
-      if (hovered) return { bg: ft2.hover, border: ft2.active, borderAlpha: 0.4, text: ft2.text, showBg: true };
-      return { bg: theme.bgTertiary.color, border: theme.border.color, borderAlpha: 0.4, text: ft2.text, showBg: true };
+      if (active || pressed) return { bg: ft2.active, ...noBorder, text: 0xffffff, showBg: true };
+      if (hovered) return { bg: ft2.hover, ...noBorder, text: ft2.text, showBg: true };
+      return { bg: theme.bgTertiary.color, ...noBorder, text: ft2.text, showBg: true };
     }
 
     if (variant === 'primary') {
-      if (pressed) return { bg: theme.accent.color, border: theme.accent.color, borderAlpha: 1, text: theme.textInverse.color, showBg: true };
-      if (hovered) return { bg: theme.accent.color, border: theme.accent.color, borderAlpha: 1, text: theme.textInverse.color, showBg: true };
-      return { bg: theme.accent.color, border: theme.accent.color, borderAlpha: 1, text: theme.textInverse.color, showBg: true };
+      if (pressed || hovered) return { bg: theme.accentSecondary.color, ...noBorder, text: theme.textInverse.color, showBg: true };
+      return { bg: theme.accent.color, ...noBorder, text: theme.textInverse.color, showBg: true };
     }
 
     if (variant === 'danger') {
-      // DOM: bg #dc2626, border #b91c1c, color white, hover bg #b91c1c
-      if (pressed) return { bg: 0xb91c1c, border: 0x991b1b, borderAlpha: 1, text: 0xffffff, showBg: true };
-      if (hovered) return { bg: 0xb91c1c, border: 0x991b1b, borderAlpha: 1, text: 0xffffff, showBg: true };
-      return { bg: 0xdc2626, border: 0xb91c1c, borderAlpha: 1, text: 0xffffff, showBg: true };
+      if (pressed || hovered) return { bg: 0xb91c1c, ...noBorder, text: 0xffffff, showBg: true };
+      return { bg: 0xdc2626, ...noBorder, text: 0xffffff, showBg: true };
     }
 
     if (variant === 'ghost') {
-      if (pressed) return { bg: theme.bgActive.color, border: 0x000000, borderAlpha: 0, text: theme.text.color, showBg: true };
-      if (hovered) return { bg: theme.bgHover.color, border: 0x000000, borderAlpha: 0, text: theme.text.color, showBg: true };
-      // Subtle background — visible but not heavy
-      return { bg: theme.bgTertiary.color, border: 0x000000, borderAlpha: 0, text: theme.textSecondary.color, showBg: true };
+      if (pressed) return { bg: theme.bgActive.color, ...noBorder, text: theme.text.color, showBg: true };
+      if (hovered) return { bg: theme.bgHover.color, ...noBorder, text: theme.text.color, showBg: true };
+      return { bg: theme.bgTertiary.color, ...noBorder, text: theme.textSecondary.color, showBg: true };
     }
 
-    // default
-    if (pressed) return { bg: theme.bgActive.color, border: theme.accent.color, borderAlpha: 0.8, text: theme.text.color, showBg: true };
-    if (hovered) return { bg: theme.bgHover.color, border: theme.borderLight.color, borderAlpha: 0.8, text: theme.text.color, showBg: true };
-    return { bg: theme.bgTertiary.color, border: theme.border.color, borderAlpha: 0.6, text: theme.textSecondary.color, showBg: true };
+    // default — matches DOM .btn (no border)
+    if (pressed) return { bg: theme.bgActive.color, ...noBorder, text: theme.text.color, showBg: true };
+    if (hovered) return { bg: theme.bgHover.color, ...noBorder, text: theme.text.color, showBg: true };
+    return { bg: theme.bgTertiary.color, ...noBorder, text: theme.textSecondary.color, showBg: true };
   }, [theme, ft2Colors, variant, color, disabled, loading, active, hovered, pressed]);
 
   const colors = getColors();
