@@ -31,12 +31,8 @@ const CHAN_GAP = 10;
 const HEADER_H = 20;
 const CHANNEL_W = NOTE_W + COL_GAP + HEX_W + COL_GAP + HEX_W + COL_GAP + HEX_W;
 
-// ── Semantic cell colors (domain-specific, not theme-derived) ──
-const C_NOTE       = 0xe0e0e0;
-const C_INSTR      = 0x60e060;
-const C_CMD        = 0xffcc00;
-const C_DATA       = 0xff8866;
-const C_SEL        = 0x3355aa;
+// Selection color — not theme-derived (fixed blue for cross-theme clarity)
+const C_SEL = 0x3355aa;
 
 // ── Helpers ──
 
@@ -195,19 +191,19 @@ export const PixiGTPatternGrid: React.FC<Props> = ({ width, height }) => {
         let colX = baseX;
 
         // Note
-        labels.push({ x: colX, y: y + 2, text: gtNoteToString(note), color: (note === 0 || note >= 0xBD) ? theme.cellEmpty.color : C_NOTE, fontFamily });
+        labels.push({ x: colX, y: y + 2, text: gtNoteToString(note), color: (note === 0 || note >= 0xBD) ? theme.cellEmpty.color : theme.cellNote.color, fontFamily });
         colX += NOTE_W + COL_GAP;
 
         // Instrument
-        labels.push({ x: colX, y: y + 2, text: gtHex2(instr), color: instr === 0 ? theme.cellEmpty.color : C_INSTR, fontFamily });
+        labels.push({ x: colX, y: y + 2, text: gtHex2(instr), color: instr === 0 ? theme.cellEmpty.color : theme.cellInstrument.color, fontFamily });
         colX += HEX_W + COL_GAP;
 
         // Command
-        labels.push({ x: colX, y: y + 2, text: gtHex2(cmd), color: cmd === 0 ? theme.cellEmpty.color : C_CMD, fontFamily });
+        labels.push({ x: colX, y: y + 2, text: gtHex2(cmd), color: cmd === 0 ? theme.cellEmpty.color : theme.cellEffect.color, fontFamily });
         colX += HEX_W + COL_GAP;
 
         // Data
-        labels.push({ x: colX, y: y + 2, text: gtHex2(param), color: (param === 0 && cmd === 0) ? theme.cellEmpty.color : C_DATA, fontFamily });
+        labels.push({ x: colX, y: y + 2, text: gtHex2(param), color: (param === 0 && cmd === 0) ? theme.cellEmpty.color : theme.cellAccent.color, fontFamily });
       }
     }
 

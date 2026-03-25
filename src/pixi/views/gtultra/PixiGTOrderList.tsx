@@ -14,11 +14,6 @@ const ROW_H = 14;
 const HEADER_H = 18;
 const FONT_SIZE = 10;
 
-// ── Semantic order colors (domain-specific, not theme-derived) ──
-const C_ORDER    = 0x60e060;
-const C_END      = 0xe94560;
-const C_REPEAT   = 0xffcc00;
-const C_TRANS    = 0xff8866;
 
 interface Props { width: number; height: number }
 
@@ -90,15 +85,15 @@ export const PixiGTOrderList: React.FC<Props> = ({ width, height }) => {
         let color: number;
 
         if (val === 0xFF) {
-          text = 'EN'; color = C_END;
+          text = 'EN'; color = theme.error.color;
         } else if (val >= 0xF0 && val <= 0xFE) {
-          text = `+${(val & 0x0F).toString(16).toUpperCase()}`; color = C_TRANS;
+          text = `+${(val & 0x0F).toString(16).toUpperCase()}`; color = theme.cellAccent.color;
         } else if (val >= 0xE0 && val <= 0xEF) {
-          text = `-${(val & 0x0F).toString(16).toUpperCase()}`; color = C_TRANS;
+          text = `-${(val & 0x0F).toString(16).toUpperCase()}`; color = theme.cellAccent.color;
         } else if (val >= 0xD0 && val <= 0xDF) {
-          text = `R${(val & 0x0F).toString(16).toUpperCase()}`; color = C_REPEAT;
+          text = `R${(val & 0x0F).toString(16).toUpperCase()}`; color = theme.warning.color;
         } else {
-          text = val.toString(16).toUpperCase().padStart(2, '0'); color = C_ORDER;
+          text = val.toString(16).toUpperCase().padStart(2, '0'); color = theme.cellInstrument.color;
         }
 
         // Channel column highlight
