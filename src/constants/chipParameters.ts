@@ -80,7 +80,7 @@ export const CHIP_SYNTH_DEFS: Record<string, ChipSynthDef> = {
       { key: 'noise_am', label: 'Noise AM', group: 'Noise', type: 'toggle', min: 0, max: 1, default: 0 },
       { key: 'noise_mod', label: 'Noise Mod', group: 'Noise', type: 'toggle', min: 0, max: 1, default: 0 },
       { key: 'noise_vol', label: 'Noise Volume', group: 'Noise', type: 'knob', min: 0, max: 255, step: 1, default: 0, formatValue: 'int' },
-      { key: 'master_freq', label: 'Master Freq', group: 'Oscillator', type: 'knob', min: 0, max: 1, step: 0.01, default: 0.5, formatValue: 'percent' },
+      { key: 'master_freq', label: 'Master Freq', group: 'Oscillator', type: 'knob', min: 0, max: 255, step: 1, default: 128, formatValue: 'int' },
       { key: 'stereo_width', label: 'Stereo Width', group: 'Output', type: 'knob', min: 0, max: 1, step: 0.01, default: 0.5, formatValue: 'percent' },
     ],
   },
@@ -991,6 +991,8 @@ export const CHIP_SYNTH_DEFS: Record<string, ChipSynthDef> = {
       { key: 'attack_time', label: 'Attack', group: 'Envelope', type: 'knob', min: 0, max: 255, step: 1, default: 10, formatValue: 'int' },
       { key: 'release_time', label: 'Release', group: 'Envelope', type: 'knob', min: 0, max: 255, step: 1, default: 80, formatValue: 'int' },
       { key: 'envelope_rate', label: 'Env Rate', group: 'Envelope', type: 'knob', min: 0, max: 255, step: 1, default: 200, formatValue: 'int' },
+
+      { key: 'env_mode', label: 'Env Mode', group: 'Envelope', type: 'select', min: 0, max: 2, step: 1, default: 0, formatValue: 'int', options: [{ value: 0, label: 'Gate' }, { value: 1, label: 'Trigger' }, { value: 2, label: 'Loop' }] },
 
       // ── Voice ──
       { key: 'wave_select', label: 'Wave', group: 'Voice', type: 'knob', min: 0, max: 7, step: 1, default: 0, formatValue: 'int' },

@@ -595,6 +595,8 @@ struct CMI01A {
     double attack_time;
     double release_time;
     double filter_track;
+    double env_rate_mul;  // envelope speed multiplier (default 1.0)
+    int    env_mode;      // 0=gate, 1=trigger, 2=loop
 
     void init(double masterOsc) {
         mosc = masterOsc;
@@ -701,6 +703,8 @@ struct CMI01A {
         attack_time = 0.01;
         release_time = 0.3;
         filter_track = 0.5;
+        env_rate_mul = 1.0;
+        env_mode = 0;
 
         pia[0].reset();
         pia[1].reset();
@@ -1220,6 +1224,22 @@ public:
             case PARAM_FILTER_TRACK:
                 m_globalFilterTrack = std::min(1.0, std::max(0.0, value));
                 break;
+            case PARAM_ENVELOPE_RATE: {
+                // Envelope speed multiplier (0-1 → 0.1x to 10x speed)
+                double rate = 0.1 + std::min(1.0, std::max(0.0, value)) * 9.9;
+                for (int i = 0; i < MAX_POLY; i++) {
+                    m_voices[i].env_rate_mul = rate;
+                }
+                break;
+            }
+            case PARAM_ENV_MODE: {
+                // 0=gate (sustain while held), 1=trigger (one-shot), 2=loop
+                int mode = (int)std::min(2.0, std::max(0.0, value));
+                for (int i = 0; i < MAX_POLY; i++) {
+                    m_voices[i].env_mode = mode;
+                }
+                break;
+            }
         }
     }
 
