@@ -276,7 +276,7 @@ function renderGrid(g: GraphicsType, p: RenderParams, vStart: number): void {
     if (isInPattern || isGhost || songRow) {
       const actualRow = songRow ? songRow.row : rowNum;
       const isHighlight = actualRow >= 0 && actualRow % p.rowHighlightInterval === 0;
-      g.rect(LINE_NUMBER_WIDTH, y, p.width - LINE_NUMBER_WIDTH, p.rowHeight);
+      g.rect(0, y, p.width, p.rowHeight);
       g.fill({
         color: isHighlight ? p.theme.trackerRowHighlight.color : p.theme.trackerRowOdd.color,
         alpha: (isHighlight ? p.theme.trackerRowHighlight.alpha : p.theme.trackerRowOdd.alpha) * ghostAlpha,
@@ -309,8 +309,8 @@ function renderGrid(g: GraphicsType, p: RenderParams, vStart: number): void {
     g.fill({ color: p.theme.border.color, alpha: p.theme.border.alpha });
   }
 
-  g.rect(0, 0, LINE_NUMBER_WIDTH, p.gridHeight);
-  g.fill({ color: p.theme.trackerRowEven.color });
+  // No separate line number column background — the grid base fill (trackerRowEven)
+  // already covers it, and ghost rows need to show through at reduced alpha.
 }
 
 /** Cursor/selection overlay — active channel, caret, selection, peer cursors. */
