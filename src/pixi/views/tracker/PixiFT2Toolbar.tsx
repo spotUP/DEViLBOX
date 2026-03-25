@@ -421,8 +421,8 @@ export const PixiFT2Toolbar: React.FC = () => {
           flexDirection: 'row',
         }}
       >
-        {/* Left: two transport rows stacked */}
-        <pixiContainer layout={{ flex: 1, flexDirection: 'column' }}>
+        {/* Left: two transport rows stacked — DOM: padding 8px 14px, gap 4px */}
+        <pixiContainer layout={{ flex: 1, flexDirection: 'column', padding: 8, paddingLeft: 14, paddingRight: 14, gap: 4, backgroundColor: theme.bgSecondary.color, borderBottomWidth: 1, borderColor: theme.border.color }}>
 
           {/* Transport Row 1: Position | BPM | Pattern | EditStep | PlaySong PlayPattern */}
           <layoutContainer
@@ -430,15 +430,9 @@ export const PixiFT2Toolbar: React.FC = () => {
             onPointerDown={handleTransportPointerDown}
             layout={{
               width: '100%',
-              height: TRANSPORT_ROW_H,
+              minHeight: 32,
               flexDirection: 'row',
               alignItems: 'center',
-              paddingLeft: 8,
-              paddingRight: 8,
-              gap: 6,
-              backgroundColor: theme.bgSecondary.color,
-              borderBottomWidth: 1,
-              borderColor: theme.border.color,
             }}
           >
 
@@ -501,15 +495,9 @@ export const PixiFT2Toolbar: React.FC = () => {
           <layoutContainer
             layout={{
               width: '100%',
-              height: TRANSPORT_ROW_H,
+              minHeight: 32,
               flexDirection: 'row',
               alignItems: 'center',
-              paddingLeft: 8,
-              paddingRight: 8,
-              gap: 6,
-              backgroundColor: theme.bgSecondary.color,
-              borderBottomWidth: 1,
-              borderColor: theme.border.color,
             }}
           >
 
