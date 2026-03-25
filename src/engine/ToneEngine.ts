@@ -2155,6 +2155,18 @@ export class ToneEngine {
       case 'MAMEYMF271':
       case 'MAMEYMOPQ':
       case 'MAMEVASynth':
+      case 'MAMECMI':
+      case 'MAMEFZPCM':
+      case 'MAMEPS1SPU':
+      case 'MAMEMultiPCM':
+      case 'MAMEZSG2':
+      case 'MAMEKS0164':
+      case 'MAMESWP00':
+      case 'MAMESWP20':
+      case 'MAMERolandGP':
+      case 'MAMES14001A':
+      case 'MAMEVLM5030':
+      case 'MAMEHC55516':
       // Buzzmachine Generators (WASM-emulated Buzz synths) -- falls through
       case 'BuzzDTMF':
       case 'BuzzFreqBomb':
