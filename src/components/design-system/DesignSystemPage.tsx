@@ -546,14 +546,53 @@ const ProViewMock: React.FC = () => (
 
 // ── Main Page ──
 // ── Split-Screen Live Comparison ──
+type CompareMode = 'components' | 'views';
+type ComponentId = 'toolbar' | 'pattern-grid' | 'order-list' | 'table-editor' | 'instrument-panel' | 'sid-monitor' | 'preset-browser' | 'piano-roll' | 'mixer' | 'arrangement';
+type ViewId = 'tracker' | 'dj' | 'mixer' | 'arrangement' | 'pianoroll';
+
+const COMPONENT_LIST: { id: ComponentId; label: string }[] = [
+  { id: 'toolbar', label: 'Toolbar' },
+  { id: 'pattern-grid', label: 'Pattern Grid' },
+  { id: 'order-list', label: 'Order List' },
+  { id: 'table-editor', label: 'Table Editor' },
+  { id: 'instrument-panel', label: 'Instrument Panel' },
+  { id: 'sid-monitor', label: 'SID Monitor' },
+  { id: 'preset-browser', label: 'Preset Browser' },
+  { id: 'piano-roll', label: 'Piano Roll' },
+  { id: 'mixer', label: 'Mixer' },
+  { id: 'arrangement', label: 'Arrangement' },
+];
+
+const VIEW_LIST: { id: ViewId; label: string }[] = [
+  { id: 'tracker', label: 'Tracker' },
+  { id: 'mixer', label: 'Mixer' },
+  { id: 'arrangement', label: 'Arrangement' },
+  { id: 'pianoroll', label: 'Piano Roll' },
+  { id: 'dj', label: 'DJ' },
+];
+
 const SplitScreenComparison: React.FC = () => {
   const [showSplit, setShowSplit] = useState(false);
-  const [splitView, setSplitView] = useState<'tracker' | 'dj' | 'mixer' | 'arrangement' | 'pianoroll'>('tracker');
+  const [mode, setMode] = useState<CompareMode>('components');
+  const [selectedComponent, setSelectedComponent] = useState<ComponentId>('toolbar');
+  const [selectedView, setSelectedView] = useState<ViewId>('tracker');
 
-  // Build iframe URLs with renderMode overrides via hash params
   const baseUrl = window.location.origin;
-  const domUrl = `${baseUrl}/?_renderMode=dom#/_view=${splitView}`;
-  const glUrl = `${baseUrl}/?_renderMode=webgl#/_view=${splitView}`;
+
+  // Component isolation: load app with ?_isolate=<component>&_renderMode=dom|webgl
+  // View comparison: load app with ?_renderMode=dom|webgl#/_view=<view>
+  const domUrl = mode === 'components'
+    ? `${baseUrl}/?_renderMode=dom&_isolate=${selectedComponent}`
+    : `${baseUrl}/?_renderMode=dom#/_view=${selectedView}`;
+  const glUrl = mode === 'components'
+    ? `${baseUrl}/?_renderMode=webgl&_isolate=${selectedComponent}`
+    : `${baseUrl}/?_renderMode=webgl#/_view=${selectedView}`;
+
+  const items = mode === 'components' ? COMPONENT_LIST : VIEW_LIST;
+  const selected = mode === 'components' ? selectedComponent : selectedView;
+  const setSelected = mode === 'components'
+    ? (id: string) => setSelectedComponent(id as ComponentId)
+    : (id: string) => setSelectedView(id as ViewId);
 
   if (!showSplit) {
     return (
@@ -572,55 +611,51 @@ const SplitScreenComparison: React.FC = () => {
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 99999, background: '#0a0a10', display: 'flex', flexDirection: 'column' }}>
       {/* Toolbar */}
-      <div style={{ height: 40, flexShrink: 0, display: 'flex', alignItems: 'center', gap: 12, padding: '0 16px', background: '#1a1a24', borderBottom: '1px solid #2a2a3a' }}>
-        <span style={{ fontSize: 13, fontWeight: 'bold', color: '#e2e2e8' }}>DOM vs WebGL Comparison</span>
-        <div style={{ display: 'flex', gap: 4 }}>
-          {(['tracker', 'mixer', 'arrangement', 'pianoroll', 'dj'] as const).map(v => (
-            <button
-              key={v}
-              onClick={() => setSplitView(v)}
-              style={{
-                padding: '3px 10px', fontSize: 10, fontFamily: 'inherit', border: 'none', borderRadius: 3, cursor: 'pointer',
-                background: splitView === v ? '#6366f1' : '#22222e', color: splitView === v ? '#fff' : '#6b6b80',
-              }}
-            >
-              {v.charAt(0).toUpperCase() + v.slice(1)}
-            </button>
+      <div style={{ height: 44, flexShrink: 0, display: 'flex', alignItems: 'center', gap: 8, padding: '0 12px', background: '#1a1a24', borderBottom: '1px solid #2a2a3a' }}>
+        <span style={{ fontSize: 13, fontWeight: 'bold', color: '#e2e2e8', marginRight: 8 }}>DOM vs GL</span>
+
+        {/* Mode toggle */}
+        <div style={{ display: 'flex', borderRadius: 4, overflow: 'hidden', border: '1px solid #2a2a3a' }}>
+          {(['components', 'views'] as const).map(m => (
+            <button key={m} onClick={() => setMode(m)} style={{
+              padding: '3px 10px', fontSize: 10, fontFamily: 'inherit', border: 'none', cursor: 'pointer',
+              background: mode === m ? '#6366f1' : '#22222e', color: mode === m ? '#fff' : '#6b6b80',
+            }}>{m === 'components' ? 'Components' : 'Full Views'}</button>
           ))}
         </div>
+
+        <div style={{ width: 1, height: 20, background: '#2a2a3a' }} />
+
+        {/* Item selector */}
+        <div style={{ display: 'flex', gap: 3, flexWrap: 'wrap' }}>
+          {items.map(({ id, label }) => (
+            <button key={id} onClick={() => setSelected(id)} style={{
+              padding: '2px 8px', fontSize: 9, fontFamily: 'inherit', border: 'none', borderRadius: 3, cursor: 'pointer',
+              background: selected === id ? '#6366f1' : '#22222e', color: selected === id ? '#fff' : '#6b6b80',
+            }}>{label}</button>
+          ))}
+        </div>
+
         <span style={{ flex: 1 }} />
-        <button
-          onClick={() => setShowSplit(false)}
-          style={{ padding: '4px 12px', fontSize: 11, fontFamily: 'inherit', border: '1px solid #2a2a3a', borderRadius: 4, cursor: 'pointer', background: '#22222e', color: '#e2e2e8' }}
-        >
-          Close
-        </button>
+        <button onClick={() => setShowSplit(false)} style={{
+          padding: '4px 12px', fontSize: 11, fontFamily: 'inherit', border: '1px solid #2a2a3a',
+          borderRadius: 4, cursor: 'pointer', background: '#22222e', color: '#e2e2e8',
+        }}>Close</button>
       </div>
 
       {/* Split panes */}
       <div style={{ flex: 1, display: 'flex', minHeight: 0 }}>
-        {/* DOM side */}
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', borderRight: '2px solid #6366f1' }}>
-          <div style={{ height: 24, flexShrink: 0, background: '#10b98120', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, color: '#10b981', fontWeight: 'bold' }}>
-            DOM (React/HTML) — Source of Truth
+          <div style={{ height: 22, flexShrink: 0, background: '#10b98120', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 9, color: '#10b981', fontWeight: 'bold' }}>
+            DOM — Source of Truth
           </div>
-          <iframe
-            src={domUrl}
-            style={{ flex: 1, border: 'none', width: '100%' }}
-            title="DOM View"
-          />
+          <iframe key={`dom-${domUrl}`} src={domUrl} style={{ flex: 1, border: 'none', width: '100%' }} title="DOM" />
         </div>
-
-        {/* GL side */}
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
-          <div style={{ height: 24, flexShrink: 0, background: '#6366f120', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, color: '#6366f1', fontWeight: 'bold' }}>
-            WebGL (Pixi) — Should Match DOM
+          <div style={{ height: 22, flexShrink: 0, background: '#6366f120', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 9, color: '#6366f1', fontWeight: 'bold' }}>
+            WebGL — Should Match DOM
           </div>
-          <iframe
-            src={glUrl}
-            style={{ flex: 1, border: 'none', width: '100%' }}
-            title="WebGL View"
-          />
+          <iframe key={`gl-${glUrl}`} src={glUrl} style={{ flex: 1, border: 'none', width: '100%' }} title="WebGL" />
         </div>
       </div>
     </div>
