@@ -348,12 +348,12 @@ export const ProjectMCanvas = React.forwardRef<VJCanvasHandle, ProjectMCanvasPro
 
     // Imperative API
     React.useImperativeHandle(ref, () => ({
-      nextPreset: () => { doLoadPreset(currentIdxRef.current + 1); },
+      nextPreset: () => { doLoadPreset(currentIdxRef.current + 1, false); },
       randomPreset: () => {
         const names = allPresetNames ?? Object.keys(BUILTIN_PRESETS);
-        doLoadPreset(Math.floor(Math.random() * names.length));
+        doLoadPreset(Math.floor(Math.random() * names.length), false);
       },
-      loadPresetByIndex: (idx: number) => { doLoadPreset(idx); },
+      loadPresetByIndex: (idx: number) => { doLoadPreset(idx, false); },
       loadPresetByName: (name: string, blendOrSmooth?: number | boolean) => { doLoadPresetByName(name, blendOrSmooth !== false); },
       getPresetNames: () => allPresetNames ?? Object.keys(BUILTIN_PRESETS),
       getCurrentIndex: () => currentIdxRef.current,
