@@ -263,11 +263,27 @@ public:
             case PARAM_VOLUME:
                 m_globalVolume = static_cast<uint8_t>(std::max(0.0, std::min(255.0, value)));
                 break;
+            case PARAM_FILTER_CUTOFF:
+                // Simple lowpass via envelope speed (placeholder — no real filter in FZ hardware)
+                break;
             case PARAM_ATTACK:
                 m_globalAttack = static_cast<float>(std::max(0.0001, value));
                 break;
             case PARAM_RELEASE:
                 m_globalRelease = static_cast<float>(std::max(0.0001, value));
+                break;
+            case PARAM_LOOP_MODE:
+                // 0=off, 1=forward loop, 2=reverse
+                for (int i = 0; i < MAX_POLY; i++) {
+                    if (static_cast<int>(value) == 0)
+                        m_voices[i].flags &= ~((1 << FLAG_LOOP) | (1 << FLAG_REVERSE));
+                    else if (static_cast<int>(value) == 1) {
+                        m_voices[i].flags |= (1 << FLAG_LOOP);
+                        m_voices[i].flags &= ~(1 << FLAG_REVERSE);
+                    } else {
+                        m_voices[i].flags |= (1 << FLAG_LOOP) | (1 << FLAG_REVERSE);
+                    }
+                }
                 break;
         }
     }
