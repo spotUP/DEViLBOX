@@ -29,7 +29,7 @@ export const VIEW_OPTIONS: ViewOption[] = [
   { value: 'pianoroll',   label: 'Piano Roll',   shortLabel: 'Piano',    showInNavBar: true,  showInMobileMenu: true,  showInMobileTabBar: true },
   { value: 'mixer',       label: 'Mixer',        shortLabel: 'Mixer',    showInNavBar: true,  showInMobileMenu: true,  showInMobileTabBar: true },
   { value: 'dj',          label: 'DJ Mixer',     shortLabel: 'DJ',       showInNavBar: true,  showInMobileMenu: true,  showInMobileTabBar: false },
-  { value: 'drumpad',     label: 'Drum Pads',    shortLabel: 'Pads',     showInNavBar: true,  showInMobileMenu: true,  showInMobileTabBar: true },
+  // Drum pads accessible via DJ view's Pads button (not a standalone view)
   { value: 'vj',          label: 'VJ View',      shortLabel: 'VJ',       showInNavBar: true,  showInMobileMenu: true,  showInMobileTabBar: false },
   { value: 'studio',      label: 'Studio',       shortLabel: 'Studio',   showInNavBar: true,  showInMobileMenu: true,  showInMobileTabBar: false },
   { value: 'split',       label: 'Split View',   shortLabel: 'Split',    showInNavBar: true,  showInMobileMenu: true,  showInMobileTabBar: false },
