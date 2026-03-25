@@ -190,6 +190,8 @@ export interface ArrangementViewState {
   followPlayback: boolean;
   loopStart: number | null;     // Loop region start row (null = no loop)
   loopEnd: number | null;       // Loop region end row (null = no loop)
+  showPatternMatrix: boolean;   // Show pattern matrix sidebar (default false)
+  showPatternOrder: boolean;    // Show pattern order sidebar (default true)
 }
 
 /**

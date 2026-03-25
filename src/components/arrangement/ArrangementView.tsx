@@ -13,6 +13,8 @@ import { ArrangementToolbar } from './ArrangementToolbar';
 import { TrackHeaderPanel } from './TrackHeaderPanel';
 import { ArrangementCanvas } from './ArrangementCanvas';
 import { ArrangementContextMenu } from './ArrangementContextMenu';
+import { PatternOrderSidebar } from './PatternOrderSidebar';
+import { PatternMatrix } from './PatternMatrix';
 
 export const ArrangementView: React.FC = () => {
   // Shared logic: arrangement mode lifecycle, auto-import, playback rAF loop
@@ -166,8 +168,11 @@ export const ArrangementView: React.FC = () => {
       {/* Toolbar */}
       <ArrangementToolbar />
 
-      {/* Body: Track headers + Canvas */}
+      {/* Body: Pattern Order Sidebar + Track headers + Canvas + Pattern Matrix */}
       <div className="flex flex-1 overflow-hidden">
+        {/* Pattern order sidebar (vertical order list) */}
+        <PatternOrderSidebar />
+
         {/* Track header panel (DOM, syncs vertical scroll with canvas) */}
         <TrackHeaderPanel
           tracks={tracks}
@@ -178,6 +183,11 @@ export const ArrangementView: React.FC = () => {
 
         {/* Main canvas area */}
         <ArrangementCanvas />
+
+        {/* Pattern matrix (Renoise-style, toggleable) */}
+        {view.showPatternMatrix && (
+          <PatternMatrix width={240} />
+        )}
       </div>
 
       {/* Context menu — reads position/clipId from store */}

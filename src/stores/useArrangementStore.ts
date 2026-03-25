@@ -222,6 +222,8 @@ export const useArrangementStore = create<ArrangementStore>()(
       followPlayback: true,
       loopStart: null,
       loopEnd: null,
+      showPatternMatrix: false,
+      showPatternOrder: true,
     },
     tool: 'select',
     isArrangementMode: false,

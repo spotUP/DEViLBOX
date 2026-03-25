@@ -166,6 +166,9 @@ export const PixiMixerView: React.FC = () => {
                 onSoloToggle={handleSoloToggle}
                 effects={ch.effects ?? [null, null]}
                 onEffectChange={(slot, type) => useMixerStore.getState().setChannelEffect(i, slot, type)}
+                sendLevels={ch.sendLevels}
+                onSendLevelChange={(sendIdx, level) => useMixerStore.getState().setChannelSendLevel(i, sendIdx, level)}
+                insertEffectCount={ch.insertEffects?.length ?? 0}
               />
             ))}
           </pixiContainer>

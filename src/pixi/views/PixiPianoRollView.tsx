@@ -24,6 +24,7 @@ import { detectChord } from '@/lib/music/chordDetection';
 import { PixiAcidPatternDialog } from '../dialogs/PixiAcidPatternDialog';
 import { usePianoRoll, QWERTY_NOTE_MAP } from '@/hooks/views/usePianoRoll';
 import { PixiCCLane } from './pianoroll/PixiCCLane';
+import { PixiStepSequencer, type StepPad, type StepData } from './pianoroll/PixiStepSequencer';
 
 const VELOCITY_HEIGHT = 80;
 const CC_LANE_HEIGHT = 60;
@@ -67,6 +68,7 @@ export const PixiPianoRollView: React.FC<{ isActive?: boolean; windowId?: string
   const tool = usePianoRollStore(s => s.tool);
   const setTool = usePianoRollStore(s => s.setTool);
   const view = usePianoRollStore(s => s.view);
+  const viewMode = usePianoRollStore(s => s.viewMode);
   const noteLengthPreset = view.noteLengthPreset;
   const selectedNotes = usePianoRollStore(s => s.selection.notes);
   const chordBuffer = usePianoRollStore(s => s.chordBuffer);
@@ -552,6 +554,19 @@ export const PixiPianoRollView: React.FC<{ isActive?: boolean; windowId?: string
           onClick={() => usePianoRollStore.getState().setMultiChannel(!view.multiChannel)}
         />
 
+        {/* Step sequencer toggle */}
+        <PixiButton
+          label="STEPS"
+          variant={viewMode === 'stepsequencer' ? 'ft2' : 'ghost'}
+          color={viewMode === 'stepsequencer' ? 'green' : undefined}
+          size="sm"
+          active={viewMode === 'stepsequencer'}
+          onClick={() => {
+            const pr = usePianoRollStore.getState();
+            pr.setViewMode(pr.viewMode === 'stepsequencer' ? 'pianoroll' : 'stepsequencer');
+          }}
+        />
+
         {/* Acid pattern generator */}
         <PixiButton
           label="Acid"
@@ -796,6 +811,59 @@ export const PixiPianoRollView: React.FC<{ isActive?: boolean; windowId?: string
           }}
         />
       </pixiContainer>
+
+      {/* Step Sequencer Mode — shown instead of piano roll grid */}
+      {viewMode === 'stepsequencer' && (
+        <PixiStepSequencer
+          width={gridW + KEYBOARD_WIDTH}
+          height={Math.max(200, gridH)}
+          steps={patternLength}
+          pads={(() => {
+            // Generate pads from current channel's instrument notes
+            const defaultPads: StepPad[] = [
+              { note: 36, label: 'Kick', color: 0xff6b6b },
+              { note: 38, label: 'Snare', color: 0x4a9eff },
+              { note: 42, label: 'HiHat', color: 0xffd43b },
+              { note: 46, label: 'Open HH', color: 0xfbbf24 },
+              { note: 49, label: 'Crash', color: 0xcc5de8 },
+              { note: 45, label: 'Tom Hi', color: 0x51cf66 },
+              { note: 43, label: 'Tom Mid', color: 0x20c997 },
+              { note: 41, label: 'Tom Lo', color: 0xff922b },
+            ];
+            return defaultPads;
+          })()}
+          data={(() => {
+            // Build step data from pattern channel
+            const result: StepData[][] = [];
+            const pattern = useTrackerStore.getState().patterns[useTrackerStore.getState().currentPatternIndex];
+            if (!pattern) return result;
+            const channel = pattern.channels[view.channelIndex];
+            if (!channel) return result;
+            const padNotes = [36, 38, 42, 46, 49, 45, 43, 41];
+            for (let p = 0; p < padNotes.length; p++) {
+              const padRow: StepData[] = [];
+              for (let s = 0; s < patternLength; s++) {
+                const cell = channel.rows[s];
+                const xmNote = cell?.note ?? 0;
+                // Convert XM note to MIDI: XM 1=C-0 → MIDI 12
+                const midiNote = xmNote > 0 && xmNote <= 96 ? xmNote + 11 : 0;
+                padRow.push({
+                  active: midiNote === padNotes[p],
+                  velocity: cell?.volume > 0 ? Math.min(127, (cell.volume - 0x10) * 2) : 100,
+                });
+              }
+              result.push(padRow);
+            }
+            return result;
+          })()}
+          onToggle={(padIndex, stepIndex) => {
+            console.log('[StepSeq] Toggle:', padIndex, stepIndex);
+          }}
+          onVelocityChange={(padIndex, stepIndex, velocity) => {
+            console.log('[StepSeq] Velocity:', padIndex, stepIndex, velocity);
+          }}
+        />
+      )}
 
       {/* Acid Pattern Generator Dialog */}
       <PixiAcidPatternDialog
