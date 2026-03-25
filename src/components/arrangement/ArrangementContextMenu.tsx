@@ -145,6 +145,11 @@ export const ArrangementContextMenu: React.FC = () => {
       <MenuItem label="Rename" onClick={handleRename} />
       <MenuItem label={clip.muted ? 'Unmute' : 'Mute'} onClick={handleMute} />
       <MenuItem label="Duplicate" onClick={handleDuplicate} />
+      <MenuItem label="Clone as new pattern" onClick={() => {
+        close();
+        arr.pushUndo();
+        arr.cloneClipAsNewPattern(clipId);
+      }} />
       <Separator />
       {/* Set color menu item with color dot indicator */}
       <button

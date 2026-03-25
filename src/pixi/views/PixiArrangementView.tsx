@@ -221,6 +221,7 @@ export const PixiArrangementView: React.FC = () => {
 
         return {
           id: clip.id,
+          patternId: clip.patternId,
           startRow: clip.startRow,
           lengthRows,
           trackIndex: trackIdx,
