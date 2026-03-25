@@ -480,7 +480,7 @@ export async function parseUADEFile(
     'sun',   // SunTronic/TSM — compiled 68k synth, enhanced scan corrupts engine
     'tsm',   // SunTronic/TSM — suffix-form variant
   ]);
-  const SKIP_SCAN_PREFIXES = new Set(['dl', 'dl_deli', 'dln', 'rh',
+  const SKIP_SCAN_PREFIXES = new Set(['dl_deli', 'dln', 'rh',
     'sas',   // SonicArranger prefix-form — enhanced scan crashes browser
     'spl',   // SoundProgrammingLanguage — compiled replayer
     'riff',  // RiffRaff — compiled replayer

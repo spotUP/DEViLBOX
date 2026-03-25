@@ -967,7 +967,7 @@ export function getSynthConfig(params: Record<string, unknown>): Record<string, 
     'chiptuneModule', 'hively', 'jamCracker', 'uade', 'soundMon', 'sidMon',
     'digMug', 'fc', 'deltaMusic1', 'deltaMusic2', 'sonicArranger', 'fred',
     'tfmx', 'hippelCoso', 'robHubbard', 'sidmon1', 'octamed', 'davidWhittaker',
-    'sunvox', 'superCollider', 'gearmulator', 'wam', 'drumKit',
+    'sunvox', 'superCollider', 'wam', 'drumKit',
   ] as const;
 
   for (const key of configKeys) {

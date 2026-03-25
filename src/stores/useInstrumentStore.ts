@@ -279,7 +279,6 @@ export const useInstrumentStore = create<InstrumentStore>()(
         updates.symphonie ||
         updates.sunvox ||
         updates.modularSynth ||
-        updates.gearmulator ||
         updates.parameters ||
         updates.sample ||
         updates.superCollider ||

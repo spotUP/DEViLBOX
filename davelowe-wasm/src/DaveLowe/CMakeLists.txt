@@ -21,6 +21,8 @@ if(EMSCRIPTEN)
         "_player_init" "_player_load" "_player_render" "_player_stop"
         "_player_is_finished" "_player_get_subsong_count" "_player_set_subsong"
         "_player_get_title" "_player_detect_duration"
+        "_player_capture_start" "_player_capture_stop"
+        "_player_capture_count" "_player_capture_buffer"
     )
     string(JOIN "," EXPORT_STR ${EXPORTED_FUNCTIONS})
     target_link_options(${OUTPUT_NAME} PRIVATE

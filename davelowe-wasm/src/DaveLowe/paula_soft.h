@@ -38,3 +38,22 @@ void paula_get_channel_levels(float* out4);
 
 // Debug: dump channel state [dma, vol, step, pos, slen, hasPtr, hasNext, nextLen]
 void paula_debug_state(int ch, float* out8);
+
+// ── Note Capture ──────────────────────────────────────────────────────
+// Records period+volume changes per channel per tick for pattern import.
+// Each entry: 8 bytes = [tick:u32, period:u16, volume:u8, channel:u8]
+
+#define PAULA_CAPTURE_MAX 16384
+
+typedef struct {
+    uint32_t tick;
+    uint16_t period;
+    uint8_t  volume;
+    uint8_t  channel;
+} PaulaNoteEvent;
+
+void paula_capture_start(void);
+void paula_capture_stop(void);
+void paula_capture_tick(void);  // call once per Interrupt tick
+int  paula_capture_count(void);
+const PaulaNoteEvent* paula_capture_buffer(void);

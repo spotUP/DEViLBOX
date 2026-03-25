@@ -19,7 +19,6 @@ import { HARMONIC_SYNTH_PRESETS } from './harmonicSynth';
 import { SYNARE_PRESETS } from './synare';
 import { V2_PRESETS } from './v2';
 import { WAVETABLE_PRESETS } from './wavetable';
-import { GEARMULATOR_PRESETS } from './gearmulator';
 
 export function getPresetsForSynthType(synthType: SynthType): SynthPreset[] {
   switch (synthType) {
@@ -61,13 +60,6 @@ export function getPresetsForSynthType(synthType: SynthType): SynthPreset[] {
       return V2_PRESETS;
     case 'Wavetable':
       return WAVETABLE_PRESETS;
-    case 'GearmulatorVirus':
-    case 'GearmulatorVirusTI':
-    case 'GearmulatorMicroQ':
-    case 'GearmulatorXT':
-    case 'GearmulatorNord':
-    case 'GearmulatorJP8000':
-      return GEARMULATOR_PRESETS;
     default:
       return [];
   }
@@ -93,10 +85,4 @@ export const ALL_PRESETS: Record<string, SynthPreset[]> = {
   Synare: SYNARE_PRESETS,
   V2: V2_PRESETS,
   Wavetable: WAVETABLE_PRESETS,
-  GearmulatorVirus: GEARMULATOR_PRESETS,
-  GearmulatorVirusTI: GEARMULATOR_PRESETS,
-  GearmulatorMicroQ: GEARMULATOR_PRESETS,
-  GearmulatorXT: GEARMULATOR_PRESETS,
-  GearmulatorNord: GEARMULATOR_PRESETS,
-  GearmulatorJP8000: GEARMULATOR_PRESETS,
 };
