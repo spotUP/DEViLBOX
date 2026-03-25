@@ -77,22 +77,32 @@ export abstract class MAMEBaseSynth implements DevilboxSynth, MAMEEffectTarget {
   protected _updateRomStatus(loaded: boolean): void {
     if (this._romStatusUpdated) return; // Prevent render loop
     this._romStatusUpdated = true;
-    // Defer to next microtask to avoid synchronous re-render cascade
-    queueMicrotask(() => {
+
+    const chipName = this.chipName;
+    const synthType = `MAME${chipName}`;
+    // Also match non-MAME prefixed types (CZ101, CEM3394, SCSP)
+    const altTypes = [synthType, chipName];
+
+    const tryUpdate = (retries: number) => {
       import('../../stores/useInstrumentStore').then(({ useInstrumentStore }) => {
         const store = useInstrumentStore.getState();
         const inst = store.instruments.find((i: { synthType?: string }) =>
-          i.synthType === `MAME${this.chipName}`
+          altTypes.includes(i.synthType ?? '')
         );
         if (inst) {
           const params = (inst as { parameters?: Record<string, unknown> }).parameters;
-          if (params?._romsLoaded === (loaded ? 1 : 0)) return; // Already set
+          if (params?._romsLoaded === (loaded ? 1 : 0)) return;
           store.updateInstrument(inst.id, {
             parameters: { ...params, _romsLoaded: loaded ? 1 : 0 },
           });
+        } else if (retries > 0) {
+          // Instrument may not be in store yet — retry after a delay
+          setTimeout(() => tryUpdate(retries - 1), 500);
         }
       }).catch(() => {});
-    });
+    };
+
+    queueMicrotask(() => tryUpdate(5)); // Retry up to 5 times over 2.5s
   }
   private _romStatusUpdated = false;
 
