@@ -14,6 +14,7 @@ export class DigMugSynthSim implements ISynthSimulator {
   private config!: DigMugConfig;
   private basePeriod = 428;
   private volume = 64;
+  private skipPatternEffects = false;
 
   // Wavetable
   private waveIdx = 0;
@@ -31,10 +32,11 @@ export class DigMugSynthSim implements ISynthSimulator {
   private vibPhase = 0;
   private vibOffset = 0;
 
-  init(config: unknown, baseNote: number): void {
+  init(config: unknown, baseNote: number, skipPatternEffects = false): void {
     this.config = config as DigMugConfig;
     this.basePeriod = semitoneToAmigaPeriod(baseNote);
     this.volume = this.config.volume ?? 64;
+    this.skipPatternEffects = skipPatternEffects;
 
     // Build waveform table from available data
     this.waveforms = [];
@@ -81,10 +83,20 @@ export class DigMugSynthSim implements ISynthSimulator {
     this.processWavetable(cfg);
 
     // ── 2. Arpeggio ──────────────────────────────────────────────────
-    this.processArpeggio(cfg);
+    // Skip when skipPatternEffects=true: MOD pattern column 0xy handles arpeggio
+    if (!this.skipPatternEffects) {
+      this.processArpeggio(cfg);
+    } else {
+      this.arpPeriodOffset = 0;
+    }
 
     // ── 3. Vibrato ───────────────────────────────────────────────────
-    this.processVibrato(cfg);
+    // Skip when skipPatternEffects=true: MOD pattern column 4xy handles vibrato
+    if (!this.skipPatternEffects) {
+      this.processVibrato(cfg);
+    } else {
+      this.vibOffset = 0;
+    }
 
     // ── 4. Final period ──────────────────────────────────────────────
     let period = this.basePeriod + this.arpPeriodOffset + this.vibOffset;

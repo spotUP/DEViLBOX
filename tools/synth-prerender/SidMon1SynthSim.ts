@@ -42,7 +42,7 @@ export class SidMon1SynthSim implements ISynthSimulator {
   // Tick counter
   private tickCount = 0;
 
-  init(config: unknown, baseNote: number): void {
+  init(config: unknown, baseNote: number, _skipPatternEffects = false): void {
     this.config = config as SidMon1Config;
     this.basePeriod = semitoneToAmigaPeriod(baseNote);
 

@@ -13,6 +13,7 @@ import { semitoneToAmigaPeriod } from './SynthSimulator';
 export class DeltaMusic2SynthSim implements ISynthSimulator {
   private config!: DeltaMusic2Config;
   private basePeriod = 428;
+  private skipPatternEffects = false;
 
   // Volume table
   private volPhaseIdx = 0;
@@ -33,9 +34,10 @@ export class DeltaMusic2SynthSim implements ISynthSimulator {
   // Waveform
   private waveform!: Int8Array;
 
-  init(config: unknown, baseNote: number): void {
+  init(config: unknown, baseNote: number, skipPatternEffects = false): void {
     this.config = config as DeltaMusic2Config;
     this.basePeriod = semitoneToAmigaPeriod(baseNote);
+    this.skipPatternEffects = skipPatternEffects;
 
     this.volPhaseIdx = 0;
     this.volCounter = 0;

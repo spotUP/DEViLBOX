@@ -23,6 +23,7 @@ const enum Phase { Attack, Decay, Sustain, Release, Done }
 export class SoundMonSynthSim implements ISynthSimulator {
   private config!: SoundMonConfig;
   private basePeriod = 428;
+  private skipPatternEffects = false;
 
   // ADSR
   private phase = Phase.Attack;
@@ -46,9 +47,10 @@ export class SoundMonSynthSim implements ISynthSimulator {
   // Waveform morph
   private waveCounter = 0;
 
-  init(config: unknown, baseNote: number): void {
+  init(config: unknown, baseNote: number, skipPatternEffects = false): void {
     this.config = config as SoundMonConfig;
     this.basePeriod = semitoneToAmigaPeriod(baseNote);
+    this.skipPatternEffects = skipPatternEffects;
 
     // ADSR
     this.phase = Phase.Attack;
@@ -88,10 +90,20 @@ export class SoundMonSynthSim implements ISynthSimulator {
     this.processADSR(cfg);
 
     // ── 2. Arpeggio ──────────────────────────────────────────────────
-    this.processArpeggio(cfg);
+    // Skip when skipPatternEffects=true: MOD pattern column 0xy handles arpeggio
+    if (!this.skipPatternEffects) {
+      this.processArpeggio(cfg);
+    } else {
+      this.arpPeriodOffset = 0;
+    }
 
     // ── 3. Vibrato ───────────────────────────────────────────────────
-    this.processVibrato(cfg);
+    // Skip when skipPatternEffects=true: MOD pattern column 4xy handles vibrato
+    if (!this.skipPatternEffects) {
+      this.processVibrato(cfg);
+    } else {
+      this.vibOffset = 0;
+    }
 
     // ── 4. Waveform morph (simplified EG/FX) ─────────────────────────
     this.processWaveformMorph(cfg);
