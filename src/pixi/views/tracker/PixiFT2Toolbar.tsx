@@ -194,7 +194,7 @@ export const PixiFT2Toolbar: React.FC = () => {
 
   // ── ASID hardware toggle ───────────────────────────────────────────────────
   const asidEnabled = useSettingsStore(s => s.asidEnabled);
-  const [asidReady, setAsidReady] = useState(false);
+  const [, setAsidReady] = useState(false);
 
   const handleToggleASID = useCallback(async () => {
     const settings = useSettingsStore.getState();
@@ -484,6 +484,14 @@ export const PixiFT2Toolbar: React.FC = () => {
                 onClick={handlePlayPattern}
                 width={88}
               />
+              <PixiButton
+                label="Hardware"
+                variant={asidEnabled ? 'primary' : 'default'}
+                size="sm"
+                active={asidEnabled}
+                onClick={handleToggleASID}
+                width={72}
+              />
             </pixiContainer>
 
             {/* Spacer */}
@@ -614,14 +622,6 @@ export const PixiFT2Toolbar: React.FC = () => {
           size="sm"
           active={aiOpen}
           onClick={toggleAI}
-        />
-        <PixiButton
-          label={asidEnabled ? (asidReady ? 'HW ON' : 'HW...') : 'HW'}
-          variant={asidEnabled ? 'ft2' : 'ghost'}
-          color={asidEnabled ? 'green' : 'default'}
-          size="sm"
-          active={asidEnabled}
-          onClick={handleToggleASID}
         />
         <PixiButton label="Reference" variant="ghost" size="sm" onClick={() => handleShowHelp('chip-effects')} />
         <PixiButton label="Help"      variant="ghost" size="sm" onClick={() => handleShowHelp('shortcuts')} />
