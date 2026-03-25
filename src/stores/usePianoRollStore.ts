@@ -27,6 +27,10 @@ interface PianoRollStore {
   // Tool mode
   tool: 'select' | 'draw' | 'erase';
 
+  // View mode: 'pianoroll' (default) or 'stepsequencer'
+  viewMode: 'pianoroll' | 'stepsequencer';
+  setViewMode: (mode: 'pianoroll' | 'stepsequencer') => void;
+
   // Clipboard
   clipboard: PianoRollClipboard | null;
 
@@ -117,6 +121,7 @@ export const usePianoRollStore = create<PianoRollStore>()(
       originalNotes: [],
     },
     tool: 'select',
+    viewMode: 'pianoroll' as const,
     clipboard: null,
     chordBuffer: [],
     contextMenu: {
@@ -270,6 +275,11 @@ export const usePianoRollStore = create<PianoRollStore>()(
     setTool: (tool) =>
       set((state) => {
         state.tool = tool;
+      }),
+
+    setViewMode: (mode) =>
+      set((state) => {
+        state.viewMode = mode;
       }),
 
     // Clipboard actions
