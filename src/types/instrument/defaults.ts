@@ -1527,6 +1527,11 @@ export const DEFAULT_V2: V2Config = {
   envelope: { attack: 0, decay: 64, sustain: 127, release: 32 },
   envelope2: { attack: 0, decay: 64, sustain: 127, release: 32 },
   lfo1: { rate: 64, depth: 0 },
+  voiceDistortion: { mode: 0, inGain: 32, param1: 0, param2: 64 },
+  channelDistortion: { mode: 0, inGain: 32, param1: 100, param2: 64 },
+  chorusFlanger: { amount: 64, feedback: 64, delayL: 32, delayR: 32, modRate: 0, modDepth: 0, modPhase: 64 },
+  compressor: { mode: 0, stereoLink: false, autoGain: true, lookahead: 2, threshold: 90, ratio: 32, attack: 20, release: 64, outGain: 64 },
+  lfo2: { mode: 1, keySync: true, envMode: false, rate: 64, phase: 2, polarity: 0, amplify: 127 },
 };
 
 export const DEFAULT_TB303: TB303Config = {
