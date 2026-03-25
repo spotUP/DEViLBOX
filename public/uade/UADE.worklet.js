@@ -563,8 +563,6 @@ class UADEProcessor extends AudioWorkletProcessor {
       this._ptrR = this._wasm._malloc(frameBytes);
 
       // Initialize UADE engine
-      console.log('[UADE.worklet] WorkletGlobalScope sampleRate:', sampleRate, 'type:', typeof sampleRate,
-        'using:', (sampleRate || 44100));
       const ret = this._wasm._uade_wasm_init(sampleRate || 44100);
       if (ret !== 0) {
         throw new Error('uade_wasm_init failed with code ' + ret);
