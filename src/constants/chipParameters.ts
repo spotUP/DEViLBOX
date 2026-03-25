@@ -382,6 +382,8 @@ export const CHIP_SYNTH_DEFS: Record<string, ChipSynthDef> = {
       { key: 'lfo_am_sens', label: 'LFO AM Sens', group: 'LFO', type: 'knob', min: 0, max: 3, step: 1, default: 0, formatValue: 'int' },
       { key: 'reverb', label: 'Reverb', group: 'Output', type: 'knob', min: 0, max: 1, step: 0.01, default: 0, formatValue: 'percent' },
       { key: 'volume', label: 'Volume', group: 'Output', type: 'knob', min: 0, max: 1, step: 0.01, default: 0.8, formatValue: 'percent' },
+      { key: 'mod_wheel', label: 'Mod Wheel', group: 'Modulation', type: 'knob', min: 0, max: 127, step: 1, default: 0, formatValue: 'int' },
+      { key: 'pan', label: 'Pan', group: 'Output', type: 'knob', min: 0, max: 127, step: 1, default: 64, formatValue: 'int' },
     ],
     operatorParams: [
       { key: 'total_level', label: 'Total Level', group: 'Operator', type: 'knob', min: 0, max: 127, step: 1, default: 0, formatValue: 'int' },
@@ -807,6 +809,7 @@ export const CHIP_SYNTH_DEFS: Record<string, ChipSynthDef> = {
       { key: 'mixer_balance', label: 'Mixer Balance', group: 'Mixer', type: 'knob', min: 0, max: 1, step: 0.01, default: 0.5, formatValue: 'percent' },
       { key: 'resonance', label: 'Resonance', group: 'Filter', type: 'knob', min: 0, max: 1, step: 0.01, default: 0, formatValue: 'percent' },
       { key: 'cutoff', label: 'Cutoff', group: 'Filter', type: 'knob', min: 0, max: 1, step: 0.01, default: 0.8, formatValue: 'percent' },
+      { key: 'final_gain', label: 'Final Gain', group: 'Output', type: 'knob', min: 0, max: 1, step: 0.01, default: 0.8, formatValue: 'percent' },
     ],
   },
 
@@ -818,6 +821,20 @@ export const CHIP_SYNTH_DEFS: Record<string, ChipSynthDef> = {
     name: 'SCSP',
     subtitle: 'Sega Saturn YMF292-F Sound Processor',
     color: '#475569',
+    presetCount: 0,
+    parameters: [
+      { key: 'volume', label: 'Volume', group: 'Output', type: 'knob', min: 0, max: 1, step: 0.01, default: 0.8, formatValue: 'percent' },
+    ],
+  },
+
+  // =========================================================================
+  // MAMEAICA - Sega Dreamcast AICA (ARM7+64-voice PCM)
+  // =========================================================================
+  MAMEAICA: {
+    synthType: 'MAMEAICA',
+    name: 'AICA',
+    subtitle: 'Sega Dreamcast AICA 64-Voice PCM/ADPCM',
+    color: '#0ea5e9',
     presetCount: 0,
     parameters: [
       { key: 'volume', label: 'Volume', group: 'Output', type: 'knob', min: 0, max: 1, step: 0.01, default: 0.8, formatValue: 'percent' },
@@ -895,6 +912,7 @@ export const CHIP_SYNTH_DEFS: Record<string, ChipSynthDef> = {
     },
     parameters: [
       { key: 'volume', label: 'Volume', group: 'Output', type: 'knob', min: 0, max: 1, step: 0.01, default: 0.8, formatValue: 'percent' },
+      { key: 'clock', label: 'Clock Rate', group: 'Output', type: 'knob', min: 0, max: 1, step: 0.01, default: 0.5, formatValue: 'percent' },
     ],
   },
 
@@ -927,6 +945,7 @@ export const CHIP_SYNTH_DEFS: Record<string, ChipSynthDef> = {
     presetCount: 0,
     parameters: [
       { key: 'volume', label: 'Volume', group: 'Output', type: 'knob', min: 0, max: 1, step: 0.01, default: 0.8, formatValue: 'percent' },
+      { key: 'preset', label: 'Preset', group: 'Voice', type: 'knob', min: 0, max: 127, step: 1, default: 0, formatValue: 'int' },
     ],
     romConfig: {
       requiredZip: 'mks20.zip (Roland D-50 / MKS-20 ROMs: IC5, IC6, IC7)',
