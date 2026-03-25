@@ -412,10 +412,11 @@ const PianoRollCanvasComponent: React.FC<PianoRollCanvasProps> = ({
     >
       <canvas
         ref={canvasRef}
-        onMouseDown={handleMouseDown}
-        onMouseMove={handleMouseMove}
-        onMouseUp={handleMouseUp}
-        onMouseLeave={handleMouseLeave}
+        className="touch-none"
+        onPointerDown={handleMouseDown as React.PointerEventHandler}
+        onPointerMove={handleMouseMove as React.PointerEventHandler}
+        onPointerUp={handleMouseUp as React.PointerEventHandler}
+        onPointerLeave={handleMouseLeave as React.PointerEventHandler}
         onContextMenu={handleContextMenu}
         role="grid"
         aria-label="Piano roll note grid"

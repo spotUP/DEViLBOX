@@ -5,6 +5,7 @@
 import React from 'react';
 import { NavBar } from './NavBar';
 import { MobileMenu } from './MobileMenu';
+import { MobileTabBar } from './MobileTabBar';
 import { useResponsive } from '@/hooks/useResponsive';
 import { useUIStore } from '@/stores';
 
@@ -76,10 +77,15 @@ export const AppLayout: React.FC<AppLayoutProps> = ({
         />
       )}
 
-      {/* Main Content Area */}
-      <main className="flex-1 flex min-h-0 min-w-0 overflow-hidden">
+      {/* Main Content Area — add bottom padding on mobile for tab bar */}
+      <main className={`flex-1 flex min-h-0 min-w-0 overflow-hidden ${isMobile ? 'pb-[52px]' : ''}`}>
         {children}
       </main>
+
+      {/* Mobile Bottom Tab Bar */}
+      {isMobile && (
+        <MobileTabBar onShowInstruments={onShowInstruments} />
+      )}
     </div>
   );
 };

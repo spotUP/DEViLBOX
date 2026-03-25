@@ -172,12 +172,12 @@ const PianoKeyboardCanvasComponent: React.FC<PianoKeyboardCanvasProps> = ({
   return (
     <div
       ref={containerRef}
-      className="shrink-0"
+      className="shrink-0 touch-none"
       style={{ width: KEYBOARD_WIDTH, height: containerHeight }}
-      onMouseDown={handleMouseDown}
-      onMouseUp={handleMouseUp}
-      onMouseMove={handleMouseMove}
-      onMouseLeave={handleMouseLeave}
+      onPointerDown={handleMouseDown as React.PointerEventHandler}
+      onPointerUp={handleMouseUp as React.PointerEventHandler}
+      onPointerMove={handleMouseMove as React.PointerEventHandler}
+      onPointerLeave={handleMouseLeave as React.PointerEventHandler}
       role="group"
       aria-label="Piano keyboard"
     />

@@ -824,10 +824,10 @@ export const ArrangementCanvas: React.FC = () => {
     <div ref={containerRef} className="flex-1 relative overflow-hidden">
       <canvas
         ref={canvasRef}
-        className="absolute inset-0 w-full h-full"
-        onMouseDown={handleMouseDown}
-        onMouseMove={handleMouseMove}
-        onMouseUp={handleMouseUp}
+        className="absolute inset-0 w-full h-full touch-none"
+        onPointerDown={handleMouseDown as React.PointerEventHandler}
+        onPointerMove={handleMouseMove as React.PointerEventHandler}
+        onPointerUp={handleMouseUp as React.PointerEventHandler}
         onDoubleClick={handleDoubleClick}
       />
     </div>

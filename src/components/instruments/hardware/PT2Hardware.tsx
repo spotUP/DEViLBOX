@@ -378,6 +378,11 @@ export const PT2Hardware: React.FC<PT2HardwareProps> = ({ instrument, onChange }
         canvas.addEventListener('mousedown', onMouseDown);
         document.addEventListener('mouseup', onMouseUp);
         document.addEventListener('mousemove', onMouseMove);
+        // Pointer events for touch support (PointerEvent extends MouseEvent — same clientX/clientY)
+        canvas.addEventListener('pointerdown', onMouseDown as EventListener);
+        document.addEventListener('pointerup', onMouseUp as EventListener);
+        document.addEventListener('pointermove', onMouseMove as EventListener);
+        canvas.style.touchAction = 'none';
         canvas.addEventListener('wheel', onWheel, { passive: false });
         canvas.addEventListener('keydown', onKeyDown);
         canvas.addEventListener('keyup', onKeyUp);
@@ -386,6 +391,9 @@ export const PT2Hardware: React.FC<PT2HardwareProps> = ({ instrument, onChange }
           () => canvas.removeEventListener('mousedown', onMouseDown),
           () => document.removeEventListener('mouseup', onMouseUp),
           () => document.removeEventListener('mousemove', onMouseMove),
+          () => canvas.removeEventListener('pointerdown', onMouseDown as EventListener),
+          () => document.removeEventListener('pointerup', onMouseUp as EventListener),
+          () => document.removeEventListener('pointermove', onMouseMove as EventListener),
           () => canvas.removeEventListener('wheel', onWheel),
           () => canvas.removeEventListener('keydown', onKeyDown),
           () => canvas.removeEventListener('keyup', onKeyUp),

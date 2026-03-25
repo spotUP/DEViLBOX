@@ -227,13 +227,13 @@ const VelocityLaneCanvasComponent: React.FC<VelocityLaneCanvasProps> = ({
   return (
     <div
       ref={containerRef}
-      className="relative flex-1 shrink-0 border-t border-dark-border overflow-hidden"
+      className="relative flex-1 shrink-0 border-t border-dark-border overflow-hidden touch-none"
       style={{ height: LANE_HEIGHT }}
       title="Velocity Editor: Click or drag velocity bars to adjust. Scroll wheel for fine adjustment."
-      onMouseDown={handleMouseDown}
-      onMouseMove={handleMouseMove}
-      onMouseUp={handleMouseUp}
-      onMouseLeave={handleMouseUp}
+      onPointerDown={handleMouseDown as React.PointerEventHandler}
+      onPointerMove={handleMouseMove as React.PointerEventHandler}
+      onPointerUp={handleMouseUp as React.PointerEventHandler}
+      onPointerLeave={handleMouseUp as React.PointerEventHandler}
     />
   );
 };

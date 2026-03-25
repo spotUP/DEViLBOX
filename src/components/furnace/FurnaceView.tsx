@@ -16,10 +16,12 @@ import { useTrackerStore, useFormatStore } from '@stores';
 import { useTransportStore } from '@stores/useTransportStore';
 import { PatternEditorCanvas } from '@/components/tracker/PatternEditorCanvas';
 import { FurnaceOrderEditor, FURNACE_ORDER_MATRIX_HEIGHT, FURNACE_ORDER_MATRIX_COLLAPSED_HEIGHT } from './FurnaceOrderEditor';
+import { useResponsiveSafe } from '@/contexts/ResponsiveContext';
 
 const TOOLBAR_H = 36;
 
 export const FurnaceView: React.FC<{ width?: number; height?: number }> = () => {
+  const { isMobile } = useResponsiveSafe();
   const nativeData = useFormatStore(s => s.furnaceNative);
   const currentPositionIndex = useTrackerStore(s => s.currentPositionIndex);
   const setCurrentPosition = useTrackerStore(s => s.setCurrentPosition);
@@ -28,7 +30,7 @@ export const FurnaceView: React.FC<{ width?: number; height?: number }> = () => 
   const currentRow = useTransportStore(s => s.currentRow);
 
   const [editPosition, setEditPosition] = useState(0);
-  const [orderCollapsed, setOrderCollapsed] = useState(false);
+  const [orderCollapsed, setOrderCollapsed] = useState(isMobile); // Collapsed by default on mobile
 
   const orderH = orderCollapsed ? FURNACE_ORDER_MATRIX_COLLAPSED_HEIGHT : FURNACE_ORDER_MATRIX_HEIGHT;
 
