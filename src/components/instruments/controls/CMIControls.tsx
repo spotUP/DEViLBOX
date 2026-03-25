@@ -5,7 +5,7 @@
  * The Pixi version (PixiCMIKnobPanel.tsx) uses the same hook — zero duplication.
  */
 
-import React, { useCallback, useRef, useEffect, useState } from 'react';
+import React, { useCallback, useRef, useEffect } from 'react';
 import { Knob } from '@components/controls/Knob';
 import { ScrollLockContainer } from '@components/ui/ScrollLockContainer';
 import type { SynthType } from '@typedefs/instrument';
@@ -264,72 +264,6 @@ const EnvelopeCanvas: React.FC<{
   }, [curve, width, height]);
 
   return <canvas ref={canvasRef} width={width} height={height} style={{ width, height, borderRadius: 4 }} />;
-};
-
-// ── Main Component ───────────────────────────────────────────────────────────
-
-export // ── CRT Embed (lazy-loaded MAME iframe) ─────────────────────────────────────
-
-const CMICrtEmbed: React.FC = () => {
-  const [loaded, setLoaded] = useState(false);
-  const iframeRef = useRef<HTMLIFrameElement>(null);
-
-  useEffect(() => {
-    const handler = (e: MessageEvent) => {
-      if (e.data?.type === 'cmi-ready') setLoaded(true);
-    };
-    window.addEventListener('message', handler);
-    return () => window.removeEventListener('message', handler);
-  }, []);
-
-  return (
-    <div className="flex flex-col gap-2">
-      <div
-        style={{
-          position: 'relative',
-          width: '100%',
-          paddingBottom: '50%', // 2:1 aspect ratio (512×256)
-          backgroundColor: '#0a0a0a',
-          border: `1px solid ${CMI_GREEN_DIM}`,
-          borderRadius: 4,
-          overflow: 'hidden',
-        }}
-      >
-        <iframe
-          ref={iframeRef}
-          src="/mame-cmi/embed.html"
-          style={{
-            position: 'absolute',
-            top: 0, left: 0,
-            width: '100%',
-            height: '100%',
-            border: 'none',
-          }}
-          title="Fairlight CMI IIx — MAME CRT"
-          allow="autoplay"
-        />
-      </div>
-      <div className="flex items-center justify-between">
-        <div className="text-[9px] font-mono" style={{ color: loaded ? CMI_GREEN : CMI_GREEN_DIM }}>
-          {loaded ? 'MAME CMI IIx — RUNNING' : 'BOOTING FIRMWARE...'}
-        </div>
-        <button
-          onClick={() => {
-            iframeRef.current?.contentWindow?.postMessage({ type: 'cmi-reset' }, '*');
-          }}
-          className="text-[9px] font-mono px-2 py-0.5 rounded-sm"
-          style={{
-            color: CMI_GREEN,
-            backgroundColor: 'transparent',
-            border: `1px solid ${CMI_GREEN_DIM}`,
-            cursor: 'pointer',
-          }}
-        >
-          RESET
-        </button>
-      </div>
-    </div>
-  );
 };
 
 // ── Main Component ──────────────────────────────────────────────────────────
@@ -668,11 +602,6 @@ const CMIControls: React.FC<CMIControlsProps> = ({
               </div>
             </div>
           </div>
-        )}
-
-        {/* ════════════ Page M: CRT (MAME Hardware UI) ════════════ */}
-        {cmi.activeTab === 'crt' && (
-          <CMICrtEmbed />
         )}
       </div>
     </ScrollLockContainer>
