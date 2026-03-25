@@ -2475,30 +2475,19 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
               <ChevronLeft size={20} />
             </button>
 
-            <div className="flex flex-col items-center">
-              <div className="flex items-center gap-3">
-                <span
-                  className="font-bold font-mono text-lg"
-                  style={{ color: mobileChannel?.color || 'var(--color-accent)' }}
-                >
-                  CH {(mobileChannelIndex + 1).toString().padStart(2, '0')}
-                </span>
-                <span className="text-xs text-text-muted">
-                  / {(pattern?.channels.length ?? 0).toString().padStart(2, '0')}
-                </span>
-                <ChannelVUMeter level={mobileTrigger.level} isActive={mobileTrigger.triggered} />
-              </div>
+            <div className="flex items-center gap-2">
               <input
                 type="text"
-                className="bg-dark-bgPrimary/50 border border-dark-border rounded px-2 py-0.5 mt-1 font-mono text-[10px] text-accent-primary text-center uppercase focus:border-accent-primary outline-none min-w-[120px]"
+                className="bg-dark-bgPrimary/50 border border-dark-border rounded px-3 py-1 font-mono text-xs text-center uppercase focus:border-accent-primary outline-none min-w-[140px]"
+                style={{ color: mobileChannel?.color || 'var(--color-accent)' }}
                 value={mobileChannel?.name || `Channel ${mobileChannelIndex + 1}`}
                 onChange={(e) => updateChannelName(mobileChannelIndex, e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
-                    (e.target as HTMLInputElement).blur();
-                  }
-                }}
+                onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); }}
               />
+              <span className="text-[10px] text-text-muted font-mono">
+                {mobileChannelIndex + 1}/{pattern?.channels.length ?? 0}
+              </span>
+              <ChannelVUMeter level={mobileTrigger.level} isActive={mobileTrigger.triggered} />
             </div>
 
             <button
