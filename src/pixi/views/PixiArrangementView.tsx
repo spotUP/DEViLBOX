@@ -9,6 +9,8 @@ import { PixiArrangementCanvas } from './arrangement/PixiArrangementCanvas';
 import type { ClipRenderData, ClipChannelNotes } from './arrangement/PixiArrangementCanvas';
 import { PixiTrackHeaders } from './arrangement/PixiTrackHeaders';
 import { PixiArrangementAutomationLane } from './arrangement/PixiArrangementAutomationLane';
+import { PixiPatternOrderSidebar } from './arrangement/PixiPatternOrderSidebar';
+import { PixiPatternMatrix } from './arrangement/PixiPatternMatrix';
 import { PixiScrollbar } from './pianoroll/PixiScrollbar';
 import { useTransportStore, useTrackerStore, useUIStore } from '@stores';
 import { usePianoRollStore } from '@/stores/usePianoRollStore';
@@ -429,6 +431,11 @@ export const PixiArrangementView: React.FC = () => {
         onPointerOver={() => { isHoveredRef.current = true; }}
         onPointerOut={() => { isHoveredRef.current = false; }}
       >
+        {/* Pattern order sidebar */}
+        {view.showPatternOrder !== false && (
+          <PixiPatternOrderSidebar height={canvasH} />
+        )}
+
         {/* Track headers + blank corner for scrollbar alignment */}
         <pixiContainer layout={{ width: TRACK_HEADERS_W, flexDirection: 'column' }}>
           <PixiTrackHeaders
@@ -512,6 +519,15 @@ export const PixiArrangementView: React.FC = () => {
                       const newIds = arr.duplicateClips([clipId]);
                       arr.clearSelection();
                       arr.selectClips(newIds);
+                    },
+                  },
+                  {
+                    type: 'action',
+                    label: 'Clone as new pattern',
+                    onClick: () => {
+                      close();
+                      arr.pushUndo();
+                      arr.cloneClipAsNewPattern(clipId);
                     },
                   },
                   { type: 'separator' },
@@ -675,6 +691,11 @@ export const PixiArrangementView: React.FC = () => {
             useArrangementStore.getState().setScrollY(v * Math.max(0, totalH - visibleH));
           }}
         />
+
+        {/* Pattern matrix sidebar (Renoise-style) */}
+        {view.showPatternMatrix && (
+          <PixiPatternMatrix width={240} height={canvasH + SCROLLBAR_SIZE} />
+        )}
       </pixiContainer>
 
       {/* Marker rename input — DOM overlay rendered via portal */}
