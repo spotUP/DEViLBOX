@@ -70,7 +70,7 @@ export const PixiViewHeader: React.FC<PixiViewHeaderProps> = ({
         height={24}
       />
 
-      <PixiLabel text={title} size="sm" weight="bold" color="accent" />
+      {title ? <PixiLabel text={title} size="sm" weight="bold" color="accent" /> : null}
       {subtitle && <PixiLabel text={subtitle} size="sm" color="textMuted" />}
 
       {children}

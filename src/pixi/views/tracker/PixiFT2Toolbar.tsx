@@ -25,7 +25,6 @@ import type { FederatedPointerEvent } from 'pixi.js';
 import { usePixiTheme } from '../../theme';
 import { PIXI_FONTS } from '../../fonts';
 import { PixiButton, PixiNumericInput } from '../../components';
-import { PixiPureTextInput } from '../../input/PixiPureTextInput';
 import { PixiFXSearchReplace } from '../../components/PixiFXSearchReplace';
 import { PixiVisualizer } from './PixiVisualizer';
 import { useTransportStore, useTrackerStore, useUIStore, useInstrumentStore, useProjectStore, useAudioStore, useAutomationStore, useEditorStore } from '@stores';
@@ -64,9 +63,13 @@ interface FT2CellProps {
   onChange: (v: number) => void;
   width?: number;
   presets?: Array<{ label: string; value: number }>;
+  formatValue?: (v: number) => string;
 }
 
-const FT2Cell: React.FC<FT2CellProps> = ({ label, value, min, max, onChange, width = 52, presets }) => {
+/** Default FT2-style zero-padded 3-digit display (matches DOM toolbar) */
+const ft2Pad3 = (v: number) => v.toString().padStart(3, '0');
+
+const FT2Cell: React.FC<FT2CellProps> = ({ label, value, min, max, onChange, width = 52, presets, formatValue }) => {
   const theme = usePixiTheme();
   return (
     <pixiContainer layout={{ flexDirection: 'column', alignItems: 'flex-start', gap: 1 }}>
@@ -84,6 +87,7 @@ const FT2Cell: React.FC<FT2CellProps> = ({ label, value, min, max, onChange, wid
         onChange={onChange}
         width={width}
         presets={presets}
+        formatValue={formatValue ?? ft2Pad3}
       />
     </pixiContainer>
   );
@@ -130,7 +134,7 @@ export const PixiFT2Toolbar: React.FC = () => {
     patternOrder, setPatternOrder,
     currentPositionIndex, setCurrentPosition,
     duplicatePosition, removeFromOrder,
-    resizePattern, updatePatternName, replacePattern,
+    resizePattern, replacePattern,
   } = useTrackerStore(useShallow(s => ({
     patterns: s.patterns,
     currentPatternIndex: s.currentPatternIndex,
@@ -142,7 +146,6 @@ export const PixiFT2Toolbar: React.FC = () => {
     duplicatePosition: s.duplicatePosition,
     removeFromOrder: s.removeFromOrder,
     resizePattern: s.resizePattern,
-    updatePatternName: s.updatePatternName,
     replacePattern: s.replacePattern,
   })));
 
@@ -165,16 +168,11 @@ export const PixiFT2Toolbar: React.FC = () => {
 
   const editStep = useEditorStore(s => s.editStep);
   const setEditStep = useEditorStore(s => s.setEditStep);
-  const currentOctave = useEditorStore(s => s.currentOctave);
-  const setCurrentOctave = useEditorStore(s => s.setCurrentOctave);
-  const toggleRecordMode = useEditorStore(s => s.toggleRecordMode);
-  const recordMode = useEditorStore(s => s.recordMode);
 
 
 
   // ── UI store ─────────────────────────────────────────────────────────────
   const modalOpen = useUIStore(s => s.modalOpen);
-  const showAutomation = useUIStore(s => s.showAutomationLanes);
 
   // ── AI store ─────────────────────────────────────────────────────────────
   const aiOpen = useAIStore(s => s.isOpen);
@@ -185,7 +183,6 @@ export const PixiFT2Toolbar: React.FC = () => {
 
   // ── Derived values ────────────────────────────────────────────────────────
   const currentPattern = patterns[currentPatternIndex];
-  const patternName = currentPattern?.name ?? '';
   const patternLength = currentPattern?.length ?? 64;
   const songLength = patternOrder.length;
   const currentPatternInOrder = patternOrder[currentPositionIndex] ?? currentPatternIndex;
@@ -199,13 +196,6 @@ export const PixiFT2Toolbar: React.FC = () => {
   const isPlayingSong    = (isGT ? gtPlaying : isPlaying && !isLooping);
   const isPlayingPattern = (isGT ? gtPlaying : isPlaying && isLooping);
 
-  // ── Pattern name local state ──────────────────────────────────────────────
-  const [localName, setLocalName] = useState(patternName);
-  const nameRef = useRef(patternName);
-  useEffect(() => {
-    nameRef.current = patternName;
-    setLocalName(patternName);
-  }, [patternName]);
 
   // ── Tap Tempo ─────────────────────────────────────────────────────────────
   const { tap: handleTapTempo, tapCount, isActive: tapActive } = useTapTempo(setBPM);
@@ -386,15 +376,6 @@ export const PixiFT2Toolbar: React.FC = () => {
     await play().catch(() => {});
   }, [isGT, isPlayingPattern, isPlaying, stop, setIsLooping, play]);
 
-  const handleStop = useCallback(() => {
-    if (isGT) {
-      const gtStore = useGTUltraStore.getState();
-      gtStore.engine?.stop();
-      gtStore.setPlaying(false);
-      return;
-    }
-    stop();
-  }, [isGT, stop]);
 
   // ── Pattern position / order handlers ─────────────────────────────────────
   const handlePositionChange = useCallback((v: number) => setCurrentPosition(v), [setCurrentPosition]);
@@ -416,13 +397,7 @@ export const PixiFT2Toolbar: React.FC = () => {
   }, [patternOrder, currentPositionIndex, setPatternOrder, setCurrentPosition]);
   const handleLengthChange = useCallback((v: number) => { if (v >= 1 && v <= 256) resizePattern(currentPatternIndex, v); }, [resizePattern, currentPatternIndex]);
 
-  // ── Pattern name handlers ─────────────────────────────────────────────────
-  const handleNameChange = useCallback((v: string) => setLocalName(v), []);
-  const handleNameSubmit = useCallback((v: string) => updatePatternName(currentPatternIndex, v), [updatePatternName, currentPatternIndex]);
-  const handleNameCancel = useCallback(() => setLocalName(nameRef.current), []);
 
-  // ── Toggle handlers ───────────────────────────────────────────────────────
-  const handleToggleAutomation= useCallback(() => useUIStore.getState().toggleAutomationLanes(), []);
 
   // ── FX Search & Replace panel ─────────────────────────────────────────────
   const [showFXSearchReplace, setShowFXSearchReplace] = useState(false);
@@ -507,11 +482,6 @@ export const PixiFT2Toolbar: React.FC = () => {
 
             {/* Edit Step */}
             <FT2Cell label="Edit Step" value={editStep} min={0} max={16} onChange={setEditStep} width={48} />
-
-            <TransportSep />
-
-            {/* Octave */}
-            <FT2Cell label="Oct" value={currentOctave} min={1} max={7} onChange={setCurrentOctave} width={40} />
 
             <TransportSep />
 
@@ -600,42 +570,18 @@ export const PixiFT2Toolbar: React.FC = () => {
 
             <TransportSep />
 
-            {/* Pattern name */}
-            <pixiBitmapText
-              text="PAT"
-              style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 10, fill: 0xffffff }}
-              tint={theme.textMuted.color}
-              layout={{ alignSelf: 'center' }}
-            />
-            <PixiPureTextInput
-              value={localName}
-              onChange={handleNameChange}
-              onSubmit={handleNameSubmit}
-              onCancel={handleNameCancel}
-              placeholder="Pattern name..."
-              width={110}
-              height={22}
-              fontSize={10}
-              font="mono"
+            {/* Song Len (duplicated to match DOM row 2 layout) */}
+            <FT2Cell
+              label="Song Len"
+              value={songLength}
+              min={1}
+              max={256}
+              onChange={handleSongLengthChange}
+              width={48}
             />
 
-            {/* REC + Stop */}
+            {/* Spacer */}
             <pixiContainer layout={{ flex: 1 }} />
-            <PixiButton
-              label="REC"
-              variant={recordMode ? 'ft2' : 'ghost'}
-              color={recordMode ? 'red' : 'default'}
-              size="sm"
-              active={recordMode}
-              onClick={toggleRecordMode}
-            />
-            <PixiButton
-              label="Stop"
-              variant="ft2"
-              color="default"
-              size="sm"
-              onClick={handleStop}
-            />
           </layoutContainer>
         </pixiContainer>
 
@@ -649,25 +595,6 @@ export const PixiFT2Toolbar: React.FC = () => {
         >
           {/* Visualizer rendered first — PAT/AUTO buttons go on top in Pixi's compositor */}
           <PixiVisualizer width={VIZ_WIDTH} height={TRANSPORT_ROW_H * 2} />
-          {/* PAT/AUTO toggles overlay — must come after PixiVisualizer in tree so they render on top */}
-          <pixiContainer
-            layout={{
-              position: 'absolute',
-              top: 4,
-              right: 4,
-              flexDirection: 'row',
-              gap: 4,
-            }}
-          >
-            <PixiButton
-              label="AUTO"
-              variant={showAutomation ? 'ft2' : 'ghost'}
-              color={showAutomation ? 'blue' : 'default'}
-              size="sm"
-              active={showAutomation}
-              onClick={handleToggleAutomation}
-            />
-          </pixiContainer>
         </pixiContainer>
       </pixiContainer>
 
