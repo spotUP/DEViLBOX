@@ -3,8 +3,9 @@
  * Provides access to MIDI, settings, export, and other features
  */
 
-import React, { useState } from 'react';
+import React, { useState, useRef, useCallback } from 'react';
 import { Menu, X, Settings, Download, HelpCircle, Sliders, Zap, FolderOpen, Save, FilePlus, Trash2, List, Music, Grid3x3, Clock, Smartphone, LogIn, LogOut, User } from 'lucide-react';
+import { haptics } from '@/utils/haptics';
 import { MIDIToolbarDropdown } from '@components/midi/MIDIToolbarDropdown';
 import { AddToHomeScreenModal } from '@components/dialogs/AddToHomeScreenModal';
 import { useAuthStore } from '@stores/useAuthStore';
@@ -46,7 +47,22 @@ export const MobileMenu: React.FC<MobileMenuProps> = ({
   const [showInstallModal, setShowInstallModal] = useState(false);
   const { user, logout, isServerAvailable } = useAuthStore();
 
+  // Swipe-to-dismiss: track touch start X, close on rightward swipe
+  const touchStartX = useRef(0);
+  const panelRef = useRef<HTMLDivElement>(null);
+  const handleTouchStart = useCallback((e: React.TouchEvent) => {
+    touchStartX.current = e.touches[0].clientX;
+  }, []);
+  const handleTouchEnd = useCallback((e: React.TouchEvent) => {
+    const deltaX = e.changedTouches[0].clientX - touchStartX.current;
+    if (deltaX > 60) { // Swipe right > 60px to dismiss
+      haptics.selection();
+      setIsOpen(false);
+    }
+  }, []);
+
   const handleMenuClick = (action?: () => void) => {
+    haptics.light();
     if (action) action();
     setIsOpen(false);
   };
@@ -75,8 +91,13 @@ export const MobileMenu: React.FC<MobileMenuProps> = ({
             onClick={() => setIsOpen(false)}
           />
 
-          {/* Menu Panel */}
-          <div className="fixed top-0 right-0 bottom-0 w-80 max-w-[85vw] bg-dark-bgTertiary border-l border-dark-border z-[99998] flex flex-col">
+          {/* Menu Panel — swipe right to dismiss */}
+          <div
+            ref={panelRef}
+            onTouchStart={handleTouchStart}
+            onTouchEnd={handleTouchEnd}
+            className="fixed top-0 right-0 bottom-0 w-64 max-w-[75vw] bg-dark-bgTertiary border-l border-dark-border z-[99998] flex flex-col animate-slide-in-right"
+          >
             {/* Header */}
             <div className="flex-shrink-0 bg-dark-bgSecondary border-b border-dark-border p-4 flex items-center justify-between">
               <h2 className="font-bold text-lg text-text-primary">Menu</h2>

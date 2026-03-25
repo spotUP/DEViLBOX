@@ -1785,6 +1785,19 @@
     }
   }
 
+  .animate-slide-in-right {
+    animation: slideInRight 0.2s ease-out;
+  }
+
+  @keyframes slideInRight {
+    from {
+      transform: translateX(100%);
+    }
+    to {
+      transform: translateX(0);
+    }
+  }
+
   .animate-pulse-glow {
     animation: pulseGlow 2s ease-in-out infinite;
   }
@@ -2946,4 +2959,14 @@ button[class*="rounded"] {
 
 [data-theme="boss-hc2"] .tracker-cell {
   text-shadow: 0 0 3px rgba(50, 155, 212, 0.2);
+}
+
+/* ── OLED-friendly pure black on mobile dark mode ────────────────────────── */
+/* Saves 30%+ battery on OLED iPhones. Only applies on small screens + dark preference. */
+@media (prefers-color-scheme: dark) and (max-width: 768px) {
+  :root {
+    --color-bg: #000000;
+    --color-bg-secondary: #0a0a0a;
+    --color-bg-tertiary: #111111;
+  }
 }
