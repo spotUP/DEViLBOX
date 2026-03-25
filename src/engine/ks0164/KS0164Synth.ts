@@ -1,4 +1,5 @@
 import { MAMEBaseSynth } from '@engine/mame/MAMEBaseSynth';
+import { loadKS0164ROMs } from '@engine/mame/MAMEROMLoader';
 
 /**
  * KS0164Synth - Samsung KS0164 32-Voice Wavetable ROM (WASM)
@@ -20,6 +21,31 @@ export class KS0164Synth extends MAMEBaseSynth {
   constructor() {
     super();
     this.initSynth();
+  }
+
+  /**
+   * Override initialize to auto-load KS0164 ROM
+   */
+  protected async initialize(): Promise<void> {
+    try {
+      const romData = await loadKS0164ROMs();
+
+      await super.initialize();
+
+      if (!romData) {
+        console.warn('[KS0164] ROM not found — synth will be silent until ROM is uploaded');
+        return;
+      }
+
+      // loadROMFile sends the ROM and awaits the worklet's romLoaded response
+      // Use slice() on the Uint8Array to get a plain ArrayBuffer copy
+      const romBuffer: ArrayBuffer = romData.slice(0).buffer;
+      await this.loadROMFile(romBuffer);
+      console.log('[KS0164] ROM auto-loaded successfully');
+    } catch (error) {
+      console.error('[KS0164] ROM loading failed:', error);
+      console.error('Place ROM files in /public/roms/ks0164/ — see /public/roms/README.md');
+    }
   }
 
   /** Number of samples found in the ROM descriptor table */

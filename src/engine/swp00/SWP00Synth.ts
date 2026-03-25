@@ -1,4 +1,5 @@
 import { MAMEBaseSynth } from '@engine/mame/MAMEBaseSynth';
+import { loadSWP00ROMs } from '@engine/mame/MAMEROMLoader';
 
 /**
  * SWP00Synth - Yamaha SWP00 AWM2 MU50 (WASM)
@@ -16,6 +17,36 @@ export class SWP00Synth extends MAMEBaseSynth {
   constructor() {
     super();
     this.initSynth();
+  }
+
+  /**
+   * Override initialize to auto-load SWP00 (Yamaha MU50) ROM
+   */
+  protected async initialize(): Promise<void> {
+    try {
+      const romData = await loadSWP00ROMs();
+
+      await super.initialize();
+
+      if (!romData) {
+        console.warn('[SWP00] ROM not found — synth will be silent until ROM is uploaded');
+        return;
+      }
+
+      // Transfer ROM buffer to worklet
+      const romBuffer = romData.buffer.slice(romData.byteOffset, romData.byteOffset + romData.byteLength);
+      this.workletNode!.port.postMessage(
+        { type: 'loadROM', data: romBuffer },
+        [romBuffer]
+      );
+
+      this.romLoaded = true;
+      this._updateRomStatus(true);
+      console.log('[SWP00] ROM loaded successfully:', romData.length, 'bytes');
+    } catch (error) {
+      console.error('[SWP00] ROM loading failed:', error);
+      console.error('Place ROM files in /public/roms/swp00/ — see /public/roms/README.md');
+    }
   }
 
   protected writeKeyOn(note: number, velocity: number): void {
