@@ -188,11 +188,11 @@
     color: var(--color-text-muted);
   }
 
-  /* Modern button styles */
+  /* Modern button styles — no visible borders for consistency */
   .btn {
     padding: 0.5rem 1rem;
     border-radius: 0.375rem;
-    border: 1px solid var(--color-border);
+    border: none;
     background-color: var(--color-bg-tertiary);
     color: var(--color-text);
     font-size: 0.875rem;
@@ -203,7 +203,6 @@
 
   .btn:hover {
     background-color: var(--color-bg-hover);
-    border-color: var(--color-border-light);
   }
 
   .btn:active {
@@ -213,7 +212,7 @@
   .btn-primary {
     padding: 0.5rem 1rem;
     border-radius: 0.375rem;
-    border: 1px solid var(--color-accent);
+    border: none;
     background-color: var(--color-accent);
     color: var(--color-text-inverse);
     font-size: 0.875rem;
@@ -224,7 +223,6 @@
 
   .btn-primary:hover {
     background-color: var(--color-accent-secondary);
-    border-color: var(--color-accent-secondary);
   }
 
   .btn-ghost {
@@ -262,7 +260,7 @@
   .btn-danger {
     padding: 0.5rem 1rem;
     border-radius: 0.375rem;
-    border: 1px solid #b91c1c;
+    border: none;
     background-color: #dc2626;
     color: white;
     font-size: 0.875rem;
@@ -273,7 +271,6 @@
 
   .btn-danger:hover {
     background-color: #b91c1c;
-    border-color: #991b1b;
   }
 
   /* Button size modifiers */
