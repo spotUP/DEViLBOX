@@ -109,7 +109,7 @@ export const MobilePatternInput: React.FC<MobilePatternInputProps> = ({
   }, []);
 
   return (
-    <div className="mobile-pattern-input safe-area-bottom">
+    <div className="mobile-pattern-input" style={{ paddingBottom: 'calc(56px + env(safe-area-inset-bottom, 0px))' }}>
       {/* Mode indicator bar */}
       <div className="flex items-center justify-between px-3 py-2 bg-dark-bgTertiary border-t border-dark-border">
         <div className="flex items-center gap-2">
