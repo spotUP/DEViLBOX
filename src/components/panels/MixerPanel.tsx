@@ -218,26 +218,35 @@ function useMixerState() {
   const [levels, setLevels] = useState<number[]>(() => Array(NUM_CHANNELS).fill(0));
   const rafRef     = useRef<number>(0);
   const mountedRef = useRef(true);
+  const levelsRef  = useRef(levels);
+  const frameCount = useRef(0);
 
   useEffect(() => {
     mountedRef.current = true;
     const tick = () => {
       if (!mountedRef.current) return;
-      try {
-        const engine = getToneEngine();
-        const chLevels = engine.getChannelLevels(NUM_CHANNELS);
-        // If all per-channel levels are 0 (WASM engines bypass channel routing),
-        // fall back to synthBus level on active channels only
-        const hasSignal = chLevels.some(l => l > 0);
-        if (!hasSignal) {
-          const busLevel = engine.getSynthBusLevel();
-          if (busLevel > 0) {
-            const activeChannels = useTrackerStore.getState().patterns[0]?.channels.length ?? 4;
-            for (let i = 0; i < Math.min(activeChannels, chLevels.length); i++) chLevels[i] = busLevel;
+      // Throttle state updates to ~15fps (every 4th frame) to avoid React overload
+      if (++frameCount.current % 4 === 0) {
+        try {
+          const engine = getToneEngine();
+          const chLevels = engine.getChannelLevels(NUM_CHANNELS);
+          const hasSignal = chLevels.some(l => l > 0);
+          if (!hasSignal) {
+            const busLevel = engine.getSynthBusLevel();
+            if (busLevel > 0) {
+              const activeChannels = useTrackerStore.getState().patterns[0]?.channels.length ?? 4;
+              for (let i = 0; i < Math.min(activeChannels, chLevels.length); i++) chLevels[i] = busLevel;
+            }
           }
-        }
-        setLevels(chLevels);
-      } catch { /* not ready */ }
+          // Only update state if levels actually changed
+          const prev = levelsRef.current;
+          const changed = chLevels.length !== prev.length || chLevels.some((v, i) => Math.abs(v - prev[i]) > 0.005);
+          if (changed) {
+            levelsRef.current = chLevels;
+            setLevels(chLevels);
+          }
+        } catch { /* not ready */ }
+      }
       rafRef.current = requestAnimationFrame(tick);
     };
     rafRef.current = requestAnimationFrame(tick);
