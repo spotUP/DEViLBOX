@@ -20,7 +20,7 @@ import { MAMEGenericHardware } from './MAMEGenericHardware';
 import { BuzzGenericHardware } from './BuzzGenericHardware';
 import { VSTBridgeGenericHardware, isVSTBridgeType } from './VSTBridgeGenericHardware';
 import { GearmulatorHardware } from '../gearmulator/GearmulatorHardware';
-import { CMIHardware } from './CMIHardware';
+
 import { FZHardware } from './FZHardware';
 import { PS1SPUHardware } from './PS1SPUHardware';
 import { ZSG2Hardware } from './ZSG2Hardware';
@@ -61,7 +61,7 @@ const DEDICATED_UI_MAP: Partial<Record<SynthType, React.ComponentType<HWComponen
   MAMEVFX: VFXHardware,         // Ensoniq VFX Wavetable (1989)
 
   // MAME PCM / Samplers (dedicated hardware UIs)
-  MAMECMI: CMIHardware,         // Fairlight CMI IIx 8-Voice PCM (1982)
+
   MAMEFZPCM: FZHardware,        // Casio FZ-1 16-bit PCM Sampler (1987)
   MAMEPS1SPU: PS1SPUHardware,   // Sony PlayStation SPU ADPCM (1994)
   MAMEZSG2: ZSG2Hardware,       // ZOOM ZSG-2 48-Channel ADPCM

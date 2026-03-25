@@ -1,4 +1,5 @@
 import { MAMEBaseSynth } from '@engine/mame/MAMEBaseSynth';
+import { getBuiltinWaveform, floatToUint8PCM } from './cmi-dsp-utils';
 
 /**
  * CMI Parameter IDs — must match C++ enum in mame-wasm/cmi/CMISynth.cpp
@@ -80,6 +81,10 @@ export class CMISynth extends MAMEBaseSynth {
       this._voiceStatus = new Int32Array(data.data);
       for (const cb of this._voiceStatusCallbacks) cb(this._voiceStatus);
       return;
+    }
+    if (data.type === 'ready') {
+      // Load default sawtooth waveform so the synth is playable immediately
+      queueMicrotask(() => this.loadSampleAll(floatToUint8PCM(getBuiltinWaveform(1))));
     }
     super.handleWorkletMessage(data);
   }
