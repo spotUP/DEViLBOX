@@ -988,8 +988,9 @@ export const CHIP_SYNTH_DEFS: Record<string, ChipSynthDef> = {
     color: '#06b6d4',
     presetCount: 0,
     parameters: [
-      { key: 'volume', label: 'Volume', group: 'Output', type: 'knob', min: 0, max: 1, step: 0.01, default: 0.8, formatValue: 'percent' },
-      { key: 'voice', label: 'Voice', group: 'Voice', type: 'knob', min: 0, max: 7, step: 1, default: 0, formatValue: 'int' },
+      { key: 'volume', label: 'Volume', group: 'Output', type: 'knob', min: 0, max: 255, step: 1, default: 200, formatValue: 'int' },
+      { key: 'attack', label: 'Attack', group: 'Envelope', type: 'knob', min: 0.0001, max: 0.1, step: 0.001, default: 0.01, formatValue: 'seconds' },
+      { key: 'release', label: 'Release', group: 'Envelope', type: 'knob', min: 0.0001, max: 0.05, step: 0.001, default: 0.002, formatValue: 'seconds' },
     ],
   },
 
@@ -1038,8 +1039,9 @@ export const CHIP_SYNTH_DEFS: Record<string, ChipSynthDef> = {
     color: '#22c55e',
     presetCount: 0,
     parameters: [
-      { key: 'volume', label: 'Volume', group: 'Output', type: 'knob', min: 0, max: 1, step: 0.01, default: 0.8, formatValue: 'percent' },
-      { key: 'voice', label: 'Channel', group: 'Playback', type: 'knob', min: 0, max: 47, step: 1, default: 0, formatValue: 'int' },
+      { key: 'volume', label: 'Volume', group: 'Output', type: 'knob', min: 0, max: 255, step: 1, default: 200, formatValue: 'int' },
+      { key: 'attack', label: 'Attack', group: 'Envelope', type: 'knob', min: 0.0001, max: 0.1, step: 0.001, default: 0.01, formatValue: 'seconds' },
+      { key: 'release', label: 'Release', group: 'Envelope', type: 'knob', min: 0.0001, max: 0.05, step: 0.001, default: 0.002, formatValue: 'seconds' },
     ],
     romConfig: {
       requiredZip: 'zsg2.zip (ZOOM ZSG-2 wave ROM)',
@@ -1059,7 +1061,8 @@ export const CHIP_SYNTH_DEFS: Record<string, ChipSynthDef> = {
     presetCount: 0,
     parameters: [
       { key: 'volume', label: 'Volume', group: 'Output', type: 'knob', min: 0, max: 1, step: 0.01, default: 0.8, formatValue: 'percent' },
-      { key: 'voice', label: 'Voice', group: 'Playback', type: 'knob', min: 0, max: 31, step: 1, default: 0, formatValue: 'int' },
+      { key: 'attack', label: 'Attack', group: 'Envelope', type: 'knob', min: 0.0001, max: 0.1, step: 0.001, default: 0.01, formatValue: 'seconds' },
+      { key: 'release', label: 'Release', group: 'Envelope', type: 'knob', min: 0.0001, max: 0.05, step: 0.001, default: 0.002, formatValue: 'seconds' },
     ],
     romConfig: {
       requiredZip: 'ks0164.zip (Samsung KS0164 wave ROM)',
@@ -1074,14 +1077,14 @@ export const CHIP_SYNTH_DEFS: Record<string, ChipSynthDef> = {
   MAMESWP00: {
     synthType: 'MAMESWP00',
     name: 'Yamaha SWP00',
-    subtitle: 'AWM2 32-Voice ROMpler — MU50 (requires ROM)',
+    subtitle: 'AWM2 64-Voice ROMpler/DSP — MU50 (requires ROM)',
     color: '#a855f7',
     presetCount: 0,
     parameters: [
-      { key: 'volume', label: 'Volume', group: 'Output', type: 'knob', min: 0, max: 1, step: 0.01, default: 0.8, formatValue: 'percent' },
-      { key: 'voice', label: 'Voice', group: 'Playback', type: 'knob', min: 0, max: 31, step: 1, default: 0, formatValue: 'int' },
+      { key: 'volume', label: 'Volume', group: 'Output', type: 'knob', min: 0, max: 255, step: 1, default: 200, formatValue: 'int' },
       { key: 'filter_cutoff', label: 'Cutoff', group: 'Filter', type: 'knob', min: 0, max: 1, step: 0.01, default: 1.0, formatValue: 'percent' },
-      { key: 'filter_resonance', label: 'Resonance', group: 'Filter', type: 'knob', min: 0, max: 1, step: 0.01, default: 0.0, formatValue: 'percent' },
+      { key: 'attack', label: 'Attack', group: 'Envelope', type: 'knob', min: 0, max: 1, step: 0.01, default: 0.5, formatValue: 'percent' },
+      { key: 'release', label: 'Release', group: 'Envelope', type: 'knob', min: 0, max: 1, step: 0.01, default: 0.3, formatValue: 'percent' },
     ],
     romConfig: {
       requiredZip: 'mu50.zip (Yamaha MU50 / SWP00 wave ROM)',

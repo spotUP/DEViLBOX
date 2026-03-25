@@ -41,12 +41,19 @@ export class FZSynth extends MAMEBaseSynth {
     this.workletNode.port.postMessage({ type: 'setPanning', pan });
   }
 
+  private static readonly PARAM_IDS: Record<string, number> = {
+    volume: 0, attack: 2, release: 3,
+  };
+
   setParam(param: string, value: number): void {
     if (!this._isReady) {
       this._pendingCalls.push({ method: 'setParam', args: [param, value] });
       return;
     }
     if (!this.workletNode || this._disposed) return;
-    this.workletNode.port.postMessage({ type: 'setParameter', param, value });
+    const paramId = FZSynth.PARAM_IDS[param];
+    if (paramId !== undefined) {
+      this.workletNode.port.postMessage({ type: 'setParameter', paramId, value });
+    }
   }
 }
