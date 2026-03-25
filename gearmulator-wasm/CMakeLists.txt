@@ -294,6 +294,14 @@ else()
         synthLib hardwareLib baseLib dsp56kEmu dsp56kBase
         mc68k rLib esp asmjit libresample
     )
+
+    # Native Virus B snapshot dumper (captures fully-booted state for WASM)
+    add_executable(virus_snapshot_dumper src/virus_snapshot_dumper.cpp src/musashi_unified.cpp)
+    target_link_libraries(virus_snapshot_dumper PRIVATE
+        virusLib mqLib xtLib nordLib ronaldoLib wLib
+        synthLib hardwareLib baseLib dsp56kEmu dsp56kBase
+        mc68k rLib esp asmjit libresample
+    )
 endif()
 
 if(EMSCRIPTEN)

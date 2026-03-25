@@ -108,6 +108,7 @@ const EXT_TO_UADE_PREFIX: Record<string, string> = {
   'tomy':     'sg',        // TomyTracker → "sg"
   'tme':      'tme',       // TheMusicalEnlightenment → "tme"
   'unic':     'unic',      // UNIC Tracker → "unic" (in PTK-Prowiz list)
+  'ins':      'ins',       // InStereo! → "ins"
 };
 
 /**
