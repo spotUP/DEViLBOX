@@ -457,18 +457,16 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
     );
   }
 
-  // GT Ultra DAW mode: take over the full editor area (no FT2 toolbar, no instrument panel)
+  // GT Ultra DAW mode flag
   const gtViewMode = useGTUltraStore((s) => s.viewMode);
-  if (editorMode === 'goattracker' && gtViewMode === 'daw') {
-    return (
-      <div className="flex-1 min-h-0 flex flex-col bg-dark-bg overflow-hidden">
-        <GTUltraView />
-      </div>
-    );
-  }
+  const isGTDAWMode = editorMode === 'goattracker' && gtViewMode === 'daw';
 
-  // Desktop view
-  return (
+  // Desktop view (GT Ultra DAW mode uses a simplified layout)
+  return isGTDAWMode ? (
+    <div className="flex-1 min-h-0 flex flex-col bg-dark-bg overflow-hidden">
+      <GTUltraView />
+    </div>
+  ) : (
     <div className="flex-1 min-h-0 flex flex-col bg-dark-bg overflow-y-hidden">
       {/* FT2 Style Toolbar (shrinkable when space is limited) */}
       <div className="flex-shrink min-h-[80px]">
