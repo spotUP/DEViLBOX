@@ -207,7 +207,7 @@ export const MobileTrackerView: React.FC<MobileTrackerViewProps> = () => {
         <div
           className="h-full flex flex-col"
           style={{
-            paddingBottom: `calc(${isInputCollapsed ? '0px' : '124px'} + env(safe-area-inset-bottom, 0px))`
+            paddingBottom: `calc(${isInputCollapsed ? '44px' : '240px'} + env(safe-area-inset-bottom, 0px))`
           }}
         >
           <div className="flex-1 overflow-hidden">
