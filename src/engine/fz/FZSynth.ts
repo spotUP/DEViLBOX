@@ -2,7 +2,8 @@ import { MAMEBaseSynth } from '@engine/mame/MAMEBaseSynth';
 
 /**
  * FZSynth - Casio FZ-1 16-bit PCM Sampler (WASM)
- * Stub — WASM binary not yet compiled.
+ * 8-voice sample playback with fractional pitch, loop modes, reverse playback.
+ * Extracted from MAME's fz_pcm emulator by Devin Acker.
  */
 export class FZSynth extends MAMEBaseSynth {
   readonly name = 'FZSynth';
