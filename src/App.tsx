@@ -118,7 +118,20 @@ async function playStartupJingle(): Promise<void> {
   }
 }
 
+const DesignSystemPage = lazy(() => import('./components/design-system/DesignSystemPage').then(m => ({ default: m.DesignSystemPage })));
+
 function App() {
+  // Design system page — accessible via #/design-system
+  const [isDesignSystem, setIsDesignSystem] = useState(window.location.hash === '#/design-system');
+  useEffect(() => {
+    const handler = () => setIsDesignSystem(window.location.hash === '#/design-system');
+    window.addEventListener('hashchange', handler);
+    return () => window.removeEventListener('hashchange', handler);
+  }, []);
+  if (isDesignSystem) {
+    return <Suspense fallback={<div style={{ background: '#121218', color: '#6b6b80', display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh' }}>Loading design system...</div>}><DesignSystemPage /></Suspense>;
+  }
+
   // Check for application updates
   const { updateAvailable, latestVersion, currentVersion, refresh } = useVersionCheck();
   const [updateDismissed, setUpdateDismissed] = useState(false);
