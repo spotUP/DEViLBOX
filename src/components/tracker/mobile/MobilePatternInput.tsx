@@ -374,7 +374,12 @@ const PianoKeyboard: React.FC<PianoKeyboardProps> = ({
                 onTouchStart={(e) => handleKeyTouch(semitone, e)}
                 onClick={() => handleKeyClick(semitone)}
                 className="piano-key-black pointer-events-auto"
-                style={{ left: `${leftPos}%`, width: `${whiteKeyWidth * 0.6}%` }}
+                style={{
+                  left: `${leftPos - whiteKeyWidth * 0.1}%`,
+                  width: `${whiteKeyWidth * 0.8}%`,
+                  padding: '0 8%', // Extend invisible hit zone beyond visual bounds
+                  backgroundClip: 'content-box',
+                }}
                 aria-label={mode === 'hex' ? `Hex ${label}` : `${label}${octave}`}
               >
                 <span className="piano-key-label">
