@@ -10,6 +10,7 @@ import { MIDIToolbarDropdown } from '@components/midi/MIDIToolbarDropdown';
 import { AddToHomeScreenModal } from '@components/dialogs/AddToHomeScreenModal';
 import { useAuthStore } from '@stores/useAuthStore';
 import { useUIStore } from '@stores/useUIStore';
+import { MOBILE_MENU_VIEWS } from '@/constants/viewOptions';
 
 interface MobileMenuProps {
   onShowSettings?: () => void;
@@ -28,14 +29,22 @@ interface MobileMenuProps {
   onShowAuth?: () => void;
 }
 
-const VIEW_OPTIONS = [
-  { id: 'tracker',     label: 'Tracker',  icon: <LayoutGrid size={18} /> },
-  { id: 'mixer',       label: 'Mixer',    icon: <Sliders size={18} /> },
-  { id: 'arrangement', label: 'Arrange',  icon: <List size={18} /> },
-  { id: 'pianoroll',   label: 'Piano',    icon: <Piano size={18} /> },
-  { id: 'dj',          label: 'DJ',       icon: <Radio size={18} /> },
-  { id: 'drumpad',     label: 'Pads',     icon: <Disc3 size={18} /> },
-] as const;
+// Icons for mobile menu views (keyed by view value)
+const VIEW_ICONS: Record<string, React.ReactNode> = {
+  tracker: <LayoutGrid size={18} />,
+  mixer: <Sliders size={18} />,
+  arrangement: <List size={18} />,
+  pianoroll: <Piano size={18} />,
+  dj: <Radio size={18} />,
+  drumpad: <Disc3 size={18} />,
+};
+
+// Derived from single source of truth + local icons
+const MENU_VIEW_OPTIONS = MOBILE_MENU_VIEWS.map(v => ({
+  id: v.value,
+  label: v.shortLabel,
+  icon: VIEW_ICONS[v.value] || <LayoutGrid size={18} />,
+}));
 
 const ViewSwitcher: React.FC<{ onClose: () => void }> = ({ onClose }) => {
   const activeView = useUIStore((s) => s.activeView);
@@ -52,7 +61,7 @@ const ViewSwitcher: React.FC<{ onClose: () => void }> = ({ onClose }) => {
         Views
       </h3>
       <div className="grid grid-cols-3 gap-2 mb-2">
-        {VIEW_OPTIONS.map(({ id, label, icon }) => (
+        {MENU_VIEW_OPTIONS.map(({ id, label, icon }) => (
           <button
             key={id}
             onClick={() => handleSwitch(id)}
