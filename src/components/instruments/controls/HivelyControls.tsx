@@ -24,7 +24,13 @@ type HivelyTab = 'main' | 'perflist';
 
 const WAVE_LENGTH_LABELS = ['4', '8', '16', '32', '64', '128'];
 
-// Note: NOTE_NAMES and PL_FX_NAMES moved to hivelyAdapter.ts (shared with canvas renderer)
+// Performance list effect names (reference grid)
+const PL_FX_NAMES: Record<number, string> = {
+  0x0: 'Filter', 0x1: 'Slide Up', 0x2: 'Slide Dn', 0x3: 'Square',
+  0x4: 'Flt Mod', 0x5: 'Jump', 0x6: 'Raw Tri', 0x7: 'Raw Saw',
+  0x8: 'Raw Sqr', 0x9: 'Raw Nse', 0xA: '--', 0xB: '--',
+  0xC: 'Volume', 0xD: '--', 0xE: '--', 0xF: 'Speed',
+};
 
 export const HivelyControls: React.FC<HivelyControlsProps> = ({
   config,
@@ -325,7 +331,7 @@ export const HivelyControls: React.FC<HivelyControlsProps> = ({
         </div>
 
         {/* Canvas-rendered performance list — shares renderer with main pattern editor */}
-        <div className="flex-1 min-h-0">
+        <div className="flex-1 min-h-0" tabIndex={0} onKeyDown={handlePerfKeyDown}>
           <PatternEditorCanvas
             formatColumns={HIVELY_PERFLIST_COLUMNS}
             formatChannels={perfFormatChannels}
@@ -335,11 +341,49 @@ export const HivelyControls: React.FC<HivelyControlsProps> = ({
             hideVUMeters
           />
         </div>
+
+        {/* Effect reference */}
+        <div className="flex-shrink-0 p-2 rounded border text-[9px] font-mono grid grid-cols-4 gap-x-3 gap-y-0.5"
+          style={{ borderColor: dimColor, color: 'var(--color-text-muted)' }}>
+          {Object.entries(PL_FX_NAMES).map(([code, name]) => (
+            <span key={code}>
+              <span style={{ color: accentColor }}>{parseInt(code).toString(16).toUpperCase()}</span>
+              ={name}
+            </span>
+          ))}
+        </div>
       </div>
     );
   };
 
-  // Note: keyboard navigation now handled by PatternEditorCanvas in format mode
+  // Performance list keyboard navigation (insert/delete rows, cursor movement)
+  const handlePerfKeyDown = useCallback((e: React.KeyboardEvent) => {
+    const entries = configRef.current.performanceList.entries;
+    switch (e.key) {
+      case 'ArrowUp':
+        e.preventDefault();
+        setPerfCursorY((y) => Math.max(0, y - 1));
+        break;
+      case 'ArrowDown':
+        e.preventDefault();
+        setPerfCursorY((y) => Math.min(entries.length - 1, y + 1));
+        break;
+      case 'PageUp':
+        e.preventDefault();
+        setPerfCursorY((y) => Math.max(0, y - 16));
+        break;
+      case 'PageDown':
+        e.preventDefault();
+        setPerfCursorY((y) => Math.min(entries.length - 1, y + 16));
+        break;
+      case 'Enter':
+        if (e.shiftKey) { e.preventDefault(); insertPerfRow(perfCursorY); }
+        break;
+      case 'Backspace':
+        if (e.shiftKey) { e.preventDefault(); deletePerfRow(perfCursorY); }
+        break;
+    }
+  }, [perfCursorY, insertPerfRow, deletePerfRow]);
 
   return (
     <div className="flex flex-col h-full">
