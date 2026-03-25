@@ -553,8 +553,8 @@ const RenderModeToggle: React.FC = () => {
 
   const handleSwitch = useCallback((mode: 'dom' | 'webgl') => {
     setRenderMode(mode);
-    // Navigate back to the main app in the new mode
-    history.replaceState(null, '', window.location.pathname);
+    // Stay on design system page, just reload with new render mode
+    window.location.hash = '#/design-system';
     window.location.reload();
   }, [setRenderMode]);
 
@@ -597,7 +597,7 @@ const RenderModeToggle: React.FC = () => {
 const BackToApp: React.FC = () => (
   <a
     href="#/"
-    onClick={(e) => { e.preventDefault(); window.location.hash = ''; window.location.reload(); }}
+    onClick={(e) => { e.preventDefault(); history.replaceState(null, '', window.location.pathname); window.location.reload(); }}
     style={{ fontSize: 11, color: '#6366f1', textDecoration: 'none', cursor: 'pointer' }}
   >
     Back to App
