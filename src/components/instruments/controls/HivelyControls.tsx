@@ -332,6 +332,7 @@ export const HivelyControls: React.FC<HivelyControlsProps> = ({
             formatCurrentRow={perfCursorY}
             formatIsPlaying={false}
             onFormatCellChange={perfCellChange}
+            hideVUMeters
           />
         </div>
       </div>

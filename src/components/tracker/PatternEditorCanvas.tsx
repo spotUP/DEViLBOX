@@ -84,6 +84,8 @@ interface PatternEditorCanvasProps {
   formatCurrentRow?: number;
   formatIsPlaying?: boolean;
   onFormatCellChange?: OnCellChange;
+  /** Hide VU meters (for sub-editors like perf list that aren't main song views) */
+  hideVUMeters?: boolean;
 }
 
 // PERFORMANCE: Memoize to prevent re-renders on every scroll step
@@ -101,6 +103,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
   formatCurrentRow,
   formatIsPlaying,
   onFormatCellChange,
+  hideVUMeters = false,
 }) => {
   const { isMobile } = useResponsiveSafe();
 
@@ -2933,7 +2936,8 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
         onDrop={handleDrop}
         {...patternGestures}
       >
-        {/* VU Meters overlay — full height, segments extrude from edit row */}
+        {/* VU Meters overlay — hidden when explicitly disabled (e.g. perf list sub-editor) */}
+        {!hideVUMeters && (
         <div
           className="absolute right-0 pointer-events-none overflow-hidden"
           style={{ top: 0, left: LNW, bottom: 48, zIndex: 1 }}
@@ -2945,6 +2949,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
             editRowY={dimensions.height / 2}
           />
         </div>
+        )}
 
         {/* Canvas is created imperatively in useEffect to support OffscreenCanvas transfer */}
 
