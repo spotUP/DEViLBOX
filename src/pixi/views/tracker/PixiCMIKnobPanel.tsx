@@ -5,7 +5,7 @@
  * The DOM version (CMIControls.tsx) uses the same hook — zero duplication.
  */
 
-import React, { useCallback } from 'react';
+import React, { useCallback, useRef } from 'react';
 import type { Graphics as GraphicsType, FederatedPointerEvent } from 'pixi.js';
 import { usePixiTheme } from '../../theme';
 import { PIXI_FONTS } from '../../fonts';
@@ -47,6 +47,7 @@ interface PixiCMIKnobPanelProps {
 export const PixiCMIKnobPanel: React.FC<PixiCMIKnobPanelProps> = ({ width }) => {
   const theme = usePixiTheme();
   const cmi = useCMIPanel();
+  const presetIdxRef = useRef(0);
 
   // ── Pixi-specific pointer adapters (convert pixel coords → normalized) ───
 
@@ -222,10 +223,27 @@ export const PixiCMIKnobPanel: React.FC<PixiCMIKnobPanelProps> = ({ width }) => 
       <layoutContainer layout={{ width, height: CMI_HEADER_H, flexDirection: 'column', backgroundColor: 0x141414, borderBottomWidth: 1, borderColor: theme.border.color }}>
         <pixiContainer layout={{ width, height: CMI_HEADER_H, flexDirection: 'row', alignItems: 'center', paddingLeft: 10, paddingRight: 6, gap: 8 }}>
           <pixiBitmapText text="FAIRLIGHT CMI IIx" style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 14, fill: 0xffffff }} tint={G} layout={{}} />
-          <pixiBitmapText text="16-VOICE SAMPLING SYNTH" style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 11, fill: 0xffffff }} tint={theme.textMuted.color} layout={{}} />
           <pixiBitmapText text={cmi.chLabel} style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 11, fill: 0xffffff }} tint={theme.textMuted.color} layout={{}} />
-          <pixiBitmapText text={cmi.instrumentName} style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 11, fill: 0xffffff }} tint={theme.textSecondary.color} layout={{}} />
           <pixiContainer layout={{ flex: 1 }} />
+          {/* Voice status LEDs */}
+          <pixiContainer layout={{ flexDirection: 'row', alignItems: 'center', gap: 2 }}>
+            {Array.from({ length: 16 }, (_, i) => {
+              const active = cmi.voiceStatus[i * 4] === 1;
+              const env = cmi.voiceStatus[i * 4 + 2];
+              const brightness = active ? Math.max(0.3, env / 255) : 0;
+              return (
+                <pixiGraphics key={i} layout={{ width: 6, height: 6 }}
+                  draw={(g: GraphicsType) => {
+                    g.clear();
+                    g.circle(3, 3, 3);
+                    g.fill({ color: active ? G : 0x1a1a1a, alpha: active ? brightness : 1 });
+                    g.circle(3, 3, 3);
+                    g.stroke({ color: active ? G_DIM : 0x222222, width: 0.5 });
+                  }}
+                />
+              );
+            })}
+          </pixiContainer>
           <PixiButton label="COLLAPSE" variant="ghost" size="sm" onClick={cmi.toggleCollapsed} />
         </pixiContainer>
       </layoutContainer>
@@ -236,6 +254,11 @@ export const PixiCMIKnobPanel: React.FC<PixiCMIKnobPanelProps> = ({ width }) => 
           {CMI_TAB_DEFS.map((tab) => (
             <PixiButton key={tab.id} label={`${tab.pageNum} ${tab.label}`} variant={cmi.activeTab === tab.id ? 'ft2' : 'ghost'} size="sm" active={cmi.activeTab === tab.id} onClick={() => cmi.setActiveTab(tab.id)} />
           ))}
+          <pixiContainer layout={{ flex: 1 }} />
+          <pixiBitmapText text="PRESET:" style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 9, fill: 0xffffff }} tint={G_DIM} layout={{}} />
+          <PixiButton label="<" variant="ghost" size="sm" onClick={() => { const cur = presetIdxRef.current; presetIdxRef.current = (cur - 1 + cmi.presets.length) % cmi.presets.length; cmi.loadPreset(presetIdxRef.current); }} />
+          <pixiBitmapText text={cmi.presets[presetIdxRef.current]?.name ?? '---'} style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 10, fill: 0xffffff }} tint={G} layout={{ minWidth: 80 }} />
+          <PixiButton label=">" variant="ghost" size="sm" onClick={() => { const cur = presetIdxRef.current; presetIdxRef.current = (cur + 1) % cmi.presets.length; cmi.loadPreset(presetIdxRef.current); }} />
         </pixiContainer>
       </layoutContainer>
 

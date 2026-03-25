@@ -128,6 +128,16 @@ class CMIProcessor extends AudioWorkletProcessor {
       case 'dispose':
         this.cleanup();
         break;
+      case 'getVoiceStatus':
+        if (this.synth && this.module) {
+          const statusPtr = this.module._malloc(16 * 4 * 4); // 16 voices × 4 ints × 4 bytes
+          this.synth.getVoiceStatus(statusPtr, 16);
+          const heap = new Int32Array(this.module.wasmMemory.buffer, statusPtr, 64);
+          const status = new Int32Array(heap); // copy before free
+          this.module._free(statusPtr);
+          this.port.postMessage({ type: 'voiceStatus', data: status.buffer }, [status.buffer]);
+        }
+        break;
     }
   }
 

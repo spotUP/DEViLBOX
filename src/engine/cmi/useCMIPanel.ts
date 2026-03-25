@@ -19,6 +19,8 @@ import { useInstrumentStore, useUIStore } from '@stores';
 import { useMIDIStore } from '@stores/useMIDIStore';
 import { useShallow } from 'zustand/react/shallow';
 import { getToneEngine } from '@engine/ToneEngine';
+import type { CMISynth } from './CMISynth';
+import { CMI_PRESETS, type CMIPreset } from '@/constants/cmiPresets';
 import {
   NUM_HARMONICS, WAVE_SAMPLES, WAVE_NAMES,
   generateFromHarmonics, getBuiltinHarmonics, getBuiltinWaveform,
@@ -172,6 +174,13 @@ export interface CMIPanelState {
   updateHarmonicAt: (normalizedX: number, normalizedY: number) => void;
   startHarmonicDrag: (normalizedX: number, normalizedY: number) => void;
   endHarmonicDrag: () => void;
+
+  // Voice status (16 voices: [active, note, env, releasing] × 16)
+  voiceStatus: Int32Array;
+
+  // Presets
+  presets: CMIPreset[];
+  loadPreset: (index: number) => void;
 }
 
 // ── Hook ───────────────────────────────────────────────────────────────────
@@ -456,6 +465,29 @@ export function useCMIPanel(props?: UseCMIPanelProps): CMIPanelState {
     harmonicDragActive.current = false;
   }, []);
 
+  // ── Voice status polling ────────────────────────────────────────────────
+
+  const [voiceStatus, setVoiceStatus] = useState<Int32Array>(() => new Int32Array(64));
+
+  useEffect(() => {
+    const instId = targetInstrument?.id;
+    if (instId == null) return;
+    const synth = getCMISynthInstance(instId) as CMISynth | null;
+    if (!synth || typeof synth.onVoiceStatus !== 'function') return;
+    const unsub = synth.onVoiceStatus((status) => setVoiceStatus(new Int32Array(status)));
+    return unsub;
+  }, [targetInstrument?.id]);
+
+  // ── Preset loading ──────────────────────────────────────────────────────
+
+  const loadPreset = useCallback((index: number) => {
+    const preset = CMI_PRESETS[index];
+    if (!preset) return;
+    for (const [key, value] of Object.entries(preset.params)) {
+      handleParamChange(key, value);
+    }
+  }, [handleParamChange]);
+
   // ── Return ───────────────────────────────────────────────────────────────
 
   return {
@@ -480,5 +512,9 @@ export function useCMIPanel(props?: UseCMIPanelProps): CMIPanelState {
 
     handleParamChange, selectWavePreset, loadSampleFromFile, syncHarmonicsToEngine,
     harmonicDragActive, updateHarmonicAt, startHarmonicDrag, endHarmonicDrag,
+
+    voiceStatus,
+    presets: CMI_PRESETS,
+    loadPreset,
   };
 }
