@@ -1,19 +1,17 @@
 /**
  * MobileTrackerView - Mobile-optimized tracker/pattern editor interface
- * Note: MobileTabBar is now in AppLayout (shared across all views).
- * This component focuses on the pattern editor only.
+ * Single combined header+transport bar, format-aware editor, 3-state piano input.
  */
 
-import React, { useState, useCallback, Suspense, lazy } from 'react';
+import React, { useState, useCallback, useEffect, useRef, Suspense, lazy } from 'react';
 import { PatternEditorCanvas } from './PatternEditorCanvas';
 import { MobilePatternInput } from './mobile/MobilePatternInput';
 import { MobileTransportBar } from './mobile/MobileTransportBar';
-import { ChevronLeft, ChevronRight, Cpu } from 'lucide-react';
-import { useTrackerStore, useCursorStore, useInstrumentStore, useEditorStore } from '@stores';
+import { useTransportStore, useTrackerStore, useCursorStore, useInstrumentStore, useEditorStore } from '@stores';
 import { useFormatStore } from '@stores/useFormatStore';
 import { useShallow } from 'zustand/react/shallow';
-import { getGroupedPresets } from '@/constants/systemPresets';
 import { useOrientation } from '@/hooks/useOrientation';
+import { haptics } from '@/utils/haptics';
 
 // Lazy-load format-specific views
 const FurnaceView = lazy(() => import('@/components/furnace/FurnaceView').then(m => ({ default: m.FurnaceView })));
@@ -24,8 +22,11 @@ const JamCrackerView = lazy(() => import('@/components/jamcracker/JamCrackerView
 const Sc68Visualizer = lazy(() => import('@/components/tracker/Sc68Visualizer').then(m => ({ default: m.Sc68Visualizer })));
 const MusicLinePatternViewer = lazy(() => import('@/components/tracker/MusicLinePatternViewer').then(m => ({ default: m.MusicLinePatternViewer })));
 const MusicLineTrackTableEditor = lazy(() => import('@/components/tracker/MusicLineTrackTableEditor').then(m => ({ default: m.MusicLineTrackTableEditor })));
-import { haptics } from '@/utils/haptics';
-import { useMobilePatternGestures } from '@/hooks/useMobilePatternGestures';
+
+// Piano input collapse states
+type PianoState = 'full' | 'compact' | 'hidden';
+const PIANO_HEIGHTS: Record<PianoState, number> = { full: 240, compact: 80, hidden: 0 };
+const AUTO_COMPACT_MS = 4000; // Auto-collapse to compact after 4s idle
 
 interface MobileTrackerViewProps {
   onShowPatterns?: () => void;
@@ -39,28 +40,27 @@ interface MobileTrackerViewProps {
 
 export const MobileTrackerView: React.FC<MobileTrackerViewProps> = () => {
   const [mobileChannel, setMobileChannel] = useState(0);
-  const [isInputCollapsed, setIsInputCollapsed] = useState(false);
+  const [pianoState, setPianoState] = useState<PianoState>('compact');
+  const autoCollapseTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const isPlaying = useTransportStore((s) => s.isPlaying);
   const cursor = useCursorStore((s) => s.cursor);
   const moveCursor = useCursorStore((s) => s.moveCursor);
   const moveCursorToRow = useCursorStore((s) => s.moveCursorToRow);
-  const { patterns, currentPatternIndex, setCell, copySelection, cutSelection, paste, applySystemPreset } = useTrackerStore(useShallow((s) => ({
+  const { patterns, currentPatternIndex, setCell, copySelection, cutSelection, paste } = useTrackerStore(useShallow((s) => ({
     patterns: s.patterns,
     currentPatternIndex: s.currentPatternIndex,
     setCell: s.setCell,
     copySelection: s.copySelection,
     cutSelection: s.cutSelection,
     paste: s.paste,
-    applySystemPreset: s.applySystemPreset,
   })));
   const { recordMode, editStep } = useEditorStore(useShallow((s) => ({
     recordMode: s.recordMode,
     editStep: s.editStep,
   })));
-  const { instruments, currentInstrumentId, setCurrentInstrument } = useInstrumentStore(useShallow((s) => ({
-    instruments: s.instruments,
-    currentInstrumentId: s.currentInstrumentId,
-    setCurrentInstrument: s.setCurrentInstrument,
-  })));
+  const currentInstrumentId = useInstrumentStore((s) => s.currentInstrumentId);
+
   const pattern = patterns[currentPatternIndex];
   const editorMode = useFormatStore((s) => s.editorMode);
   const { isPortrait, isLandscape } = useOrientation();
@@ -69,33 +69,46 @@ export const MobileTrackerView: React.FC<MobileTrackerViewProps> = () => {
   const visibleChannels = isLandscape ? 4 : 1;
   const startChannel = isPortrait ? mobileChannel : 0;
 
-  const handleChannelPrev = useCallback(() => {
-    if (mobileChannel > 0) {
-      haptics.selection();
-      setMobileChannel(mobileChannel - 1);
+  // Auto-hide piano during playback (when not in record mode)
+  useEffect(() => {
+    if (isPlaying && !recordMode) {
+      setPianoState('hidden');
+    } else if (!isPlaying && pianoState === 'hidden') {
+      setPianoState('compact');
     }
+  }, [isPlaying, recordMode]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Auto-collapse from full → compact after idle
+  const resetAutoCollapse = useCallback(() => {
+    if (autoCollapseTimer.current) clearTimeout(autoCollapseTimer.current);
+    autoCollapseTimer.current = setTimeout(() => {
+      setPianoState(prev => prev === 'full' ? 'compact' : prev);
+    }, AUTO_COMPACT_MS);
+  }, []);
+
+  // Channel navigation
+  const handleChannelPrev = useCallback(() => {
+    if (mobileChannel > 0) { haptics.selection(); setMobileChannel(mobileChannel - 1); }
   }, [mobileChannel]);
 
   const handleChannelNext = useCallback(() => {
     const maxChannels = pattern?.channels.length || 8;
-    if (mobileChannel < maxChannels - 1) {
-      haptics.selection();
-      setMobileChannel(mobileChannel + 1);
-    }
+    if (mobileChannel < maxChannels - 1) { haptics.selection(); setMobileChannel(mobileChannel + 1); }
   }, [mobileChannel, pattern]);
 
+  // Note input — expand piano on use, auto-collapse after idle
   const handleNoteInput = useCallback((note: number) => {
-    setCell(cursor.channelIndex, cursor.rowIndex, {
-      note,
-      instrument: currentInstrumentId ?? 1,
-    });
+    haptics.medium();
+    setCell(cursor.channelIndex, cursor.rowIndex, { note, instrument: currentInstrumentId ?? 1 });
     if (recordMode && editStep > 0) {
       const patternLength = patterns[currentPatternIndex]?.length ?? 64;
       moveCursorToRow((cursor.rowIndex + editStep) % patternLength);
     }
-  }, [cursor, setCell, currentInstrumentId, recordMode, editStep, patterns, currentPatternIndex, moveCursorToRow]);
+    resetAutoCollapse();
+  }, [cursor, setCell, currentInstrumentId, recordMode, editStep, patterns, currentPatternIndex, moveCursorToRow, resetAutoCollapse]);
 
   const handleHexInput = useCallback((value: number) => {
+    haptics.medium();
     const { channelIndex, rowIndex, columnType } = cursor;
     switch (columnType) {
       case 'instrument': setCell(channelIndex, rowIndex, { instrument: value }); break;
@@ -104,18 +117,14 @@ export const MobileTrackerView: React.FC<MobileTrackerViewProps> = () => {
       case 'effParam': setCell(channelIndex, rowIndex, { eff: value }); break;
     }
     moveCursor('right');
-  }, [cursor, setCell, moveCursor]);
+    resetAutoCollapse();
+  }, [cursor, setCell, moveCursor, resetAutoCollapse]);
 
   const handleDelete = useCallback(() => {
+    haptics.rigid();
     const { channelIndex, rowIndex } = cursor;
     setCell(channelIndex, rowIndex, { note: 0, instrument: 0, volume: 0, effTyp: 0, eff: 0 });
   }, [cursor, setCell]);
-
-  const channelHeaderGestures = useMobilePatternGestures({
-    onSwipeLeft: handleChannelNext,
-    onSwipeRight: handleChannelPrev,
-    enabled: isPortrait,
-  });
 
   const handleCopy = useCallback(() => { haptics.success(); copySelection(); }, [copySelection]);
   const handleCut = useCallback(() => { haptics.success(); cutSelection(); }, [cutSelection]);
@@ -124,90 +133,42 @@ export const MobileTrackerView: React.FC<MobileTrackerViewProps> = () => {
   const handlePatternSwipeLeft = useCallback(() => { moveCursor('left'); }, [moveCursor]);
   const handlePatternSwipeRight = useCallback(() => { moveCursor('right'); }, [moveCursor]);
 
+  // Tap piano area to expand from compact → full
+  const handlePianoExpand = useCallback(() => {
+    if (pianoState === 'compact') {
+      setPianoState('full');
+      resetAutoCollapse();
+    } else if (pianoState === 'full') {
+      setPianoState('compact');
+    }
+  }, [pianoState, resetAutoCollapse]);
+
+  // Collapse callback for MobilePatternInput
+  const handleCollapseChange = useCallback((collapsed: boolean) => {
+    setPianoState(collapsed ? 'compact' : 'full');
+    if (!collapsed) resetAutoCollapse();
+  }, [resetAutoCollapse]);
+
+  const pianoHeight = PIANO_HEIGHTS[pianoState];
+
   return (
     <div className="flex flex-col flex-1 min-h-0 bg-dark-bg">
-      {/* Header with channel nav and instrument selector */}
-      <div className="flex-shrink-0 flex items-center justify-between px-2 py-1.5 bg-dark-bgSecondary border-b border-dark-border safe-area-top">
-        <div className="flex items-center gap-2 flex-1 min-w-0">
-          {/* Portrait mode: Channel selector */}
-          {isPortrait && !isCustomFormat && (
-            <div
-              className="flex items-center gap-1 touch-none"
-              {...channelHeaderGestures}
-            >
-              <button
-                onClick={handleChannelPrev}
-                disabled={mobileChannel === 0}
-                className="p-1 rounded bg-dark-bgTertiary disabled:opacity-30 touch-target-sm"
-              >
-                <ChevronLeft size={14} />
-              </button>
-              <span className="text-xs font-mono text-accent-primary min-w-[28px] text-center">
-                CH {(mobileChannel + 1).toString().padStart(2, '0')}
-              </span>
-              <button
-                onClick={handleChannelNext}
-                disabled={mobileChannel >= (pattern?.channels.length || 8) - 1}
-                className="p-1 rounded bg-dark-bgTertiary disabled:opacity-30 touch-target-sm"
-              >
-                <ChevronRight size={14} />
-              </button>
-            </div>
-          )}
-
-          {/* Format label for custom formats */}
-          {isCustomFormat && (
-            <span className="text-xs font-bold text-accent-primary uppercase tracking-wide">{editorMode}</span>
-          )}
-
-          {/* Instrument selector */}
-          <div className="ml-auto flex items-center gap-1 min-w-0">
-            <select
-              value={currentInstrumentId ?? 1}
-              onChange={(e) => setCurrentInstrument(parseInt(e.target.value, 10))}
-              className="text-[10px] bg-dark-bgTertiary border border-dark-border rounded px-1.5 py-1 text-text-primary font-mono truncate"
-              style={{ maxWidth: '100px' }}
-            >
-              {instruments.map((inst) => (
-                <option key={inst.id} value={inst.id}>
-                  {inst.name.substring(0, 15)}
-                </option>
-              ))}
-            </select>
-
-            <div className="flex items-center ml-1 pl-1 border-l border-dark-border">
-              <Cpu size={12} className="text-accent-primary mr-1" />
-              <select
-                className="bg-dark-bgTertiary text-text-primary text-[10px] h-6 border border-dark-border rounded px-1 hover:border-accent-primary outline-none max-w-[70px]"
-                onChange={(e) => applySystemPreset(e.target.value)}
-                defaultValue="none"
-              >
-                <option value="none" disabled>HW...</option>
-                {getGroupedPresets().map(group => (
-                  <optgroup key={group.label} label={group.label}>
-                    {group.presets.map(preset => (
-                      <option key={preset.id} value={preset.id}>{preset.name.split(' ')[0].toUpperCase()}</option>
-                    ))}
-                  </optgroup>
-                ))}
-              </select>
-            </div>
-          </div>
-        </div>
-
-        {/* Right spacer for the fixed hamburger menu button */}
-        <div className="w-10 flex-shrink-0" />
-      </div>
-
-      {/* Transport bar — BPM, pattern, octave, step, play/record */}
-      <MobileTransportBar />
+      {/* Combined header + transport bar (single 40px bar) */}
+      <MobileTransportBar
+        mobileChannel={mobileChannel}
+        onChannelPrev={handleChannelPrev}
+        onChannelNext={handleChannelNext}
+        maxChannels={pattern?.channels.length || 8}
+        showChannelNav={isPortrait && !isCustomFormat}
+        formatLabel={isCustomFormat ? editorMode : undefined}
+      />
 
       {/* Pattern editor — format-aware routing */}
       <div className="flex-1 min-h-0 relative">
         <div
           className="h-full flex flex-col"
           style={{
-            paddingBottom: `calc(${isInputCollapsed ? '44px' : '240px'} + env(safe-area-inset-bottom, 0px))`
+            paddingBottom: `calc(${pianoHeight + 44}px + env(safe-area-inset-bottom, 0px))`
           }}
         >
           <div className="flex-1 overflow-hidden">
@@ -242,16 +203,20 @@ export const MobileTrackerView: React.FC<MobileTrackerViewProps> = () => {
         </div>
       </div>
 
-      {/* Mobile pattern input (piano keyboard + hex grid) */}
-      <MobilePatternInput
-        onNoteInput={handleNoteInput}
-        onHexInput={handleHexInput}
-        onDelete={handleDelete}
-        onCopy={handleCopy}
-        onCut={handleCut}
-        onPaste={handlePaste}
-        onCollapseChange={setIsInputCollapsed}
-      />
+      {/* Piano input — 3 states: full / compact / hidden */}
+      {pianoState !== 'hidden' && (
+        <MobilePatternInput
+          onNoteInput={handleNoteInput}
+          onHexInput={handleHexInput}
+          onDelete={handleDelete}
+          onCopy={handleCopy}
+          onCut={handleCut}
+          onPaste={handlePaste}
+          onCollapseChange={handleCollapseChange}
+          compact={pianoState === 'compact'}
+          onExpandToggle={handlePianoExpand}
+        />
+      )}
     </div>
   );
 };

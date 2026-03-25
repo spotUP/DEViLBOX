@@ -1,49 +1,64 @@
 /**
- * MobileTransportBar — Compact transport and editor controls for mobile.
- * BPM, pattern selector, record, octave, edit step in a single row.
+ * MobileTransportBar — Combined header + transport for mobile.
+ * Single 40px bar with: [Rec][Play] [CH◄►] [BPM±] [PAT±] [Instrument▼]
+ * Octave and edit step are now in the piano input area (contextual to note entry).
  */
 
 import React, { useCallback } from 'react';
-import { Circle, Play, Square } from 'lucide-react';
+import { Circle, Play, Square, ChevronLeft, ChevronRight } from 'lucide-react';
 import * as Tone from 'tone';
-import { useTransportStore, useTrackerStore, useEditorStore } from '@stores';
+import { useTransportStore, useTrackerStore, useEditorStore, useInstrumentStore } from '@stores';
 import { haptics } from '@/utils/haptics';
+import { useShallow } from 'zustand/react/shallow';
 
-/** Touch-friendly stepper: label + value + ±buttons */
-const Stepper: React.FC<{
-  label: string;
+interface MobileTransportBarProps {
+  /** Channel index for portrait mode navigation */
+  mobileChannel: number;
+  onChannelPrev: () => void;
+  onChannelNext: () => void;
+  maxChannels: number;
+  /** Show channel nav (portrait + non-format mode) */
+  showChannelNav?: boolean;
+  /** Format label (e.g. "furnace") when in custom format mode */
+  formatLabel?: string;
+}
+
+/** Compact stepper: [−] value [+] */
+const MiniStepper: React.FC<{
   value: string | number;
   onIncrement: () => void;
   onDecrement: () => void;
-  min?: number;
-  max?: number;
-  currentValue?: number;
-}> = ({ label, value, onIncrement, onDecrement, min, max, currentValue }) => {
-  const atMin = min !== undefined && currentValue !== undefined && currentValue <= min;
-  const atMax = max !== undefined && currentValue !== undefined && currentValue >= max;
-  return (
-    <div className="flex items-center gap-0.5">
-      <span className="text-[9px] text-text-muted font-mono uppercase w-[22px] text-right mr-0.5">{label}</span>
-      <button
-        onClick={() => { haptics.selection(); onDecrement(); }}
-        disabled={atMin}
-        className="w-6 h-6 flex items-center justify-center rounded bg-dark-bgTertiary text-text-secondary disabled:opacity-30 active:bg-dark-bgHover text-xs font-bold"
-      >
-        −
-      </button>
-      <span className="text-[11px] font-mono font-bold text-accent-primary min-w-[24px] text-center">{value}</span>
-      <button
-        onClick={() => { haptics.selection(); onIncrement(); }}
-        disabled={atMax}
-        className="w-6 h-6 flex items-center justify-center rounded bg-dark-bgTertiary text-text-secondary disabled:opacity-30 active:bg-dark-bgHover text-xs font-bold"
-      >
-        +
-      </button>
-    </div>
-  );
-};
+  disabled?: { min?: boolean; max?: boolean };
+}> = ({ value, onIncrement, onDecrement, disabled }) => (
+  <div className="flex items-center">
+    <button
+      onClick={() => { haptics.selection(); onDecrement(); }}
+      disabled={disabled?.min}
+      className="w-7 h-7 flex items-center justify-center rounded-l bg-dark-bgTertiary text-text-secondary disabled:opacity-30 active:bg-dark-bgHover active:scale-95 text-sm font-bold transition-transform"
+    >
+      −
+    </button>
+    <span className="text-[11px] font-mono font-bold text-accent-primary min-w-[28px] text-center bg-dark-bg/50 h-7 flex items-center justify-center">
+      {value}
+    </span>
+    <button
+      onClick={() => { haptics.selection(); onIncrement(); }}
+      disabled={disabled?.max}
+      className="w-7 h-7 flex items-center justify-center rounded-r bg-dark-bgTertiary text-text-secondary disabled:opacity-30 active:bg-dark-bgHover active:scale-95 text-sm font-bold transition-transform"
+    >
+      +
+    </button>
+  </div>
+);
 
-export const MobileTransportBar: React.FC = () => {
+export const MobileTransportBar: React.FC<MobileTransportBarProps> = ({
+  mobileChannel,
+  onChannelPrev,
+  onChannelNext,
+  maxChannels,
+  showChannelNav = true,
+  formatLabel,
+}) => {
   const isPlaying = useTransportStore((s) => s.isPlaying);
   const bpm = useTransportStore((s) => s.bpm);
   const togglePlayPause = useTransportStore((s) => s.togglePlayPause);
@@ -55,10 +70,12 @@ export const MobileTransportBar: React.FC = () => {
 
   const recordMode = useEditorStore((s) => s.recordMode);
   const toggleRecordMode = useEditorStore((s) => s.toggleRecordMode);
-  const octave = useEditorStore((s) => s.currentOctave);
-  const setOctave = useEditorStore((s) => s.setCurrentOctave);
-  const editStep = useEditorStore((s) => s.editStep);
-  const setEditStep = useEditorStore((s) => s.setEditStep);
+
+  const { instruments, currentInstrumentId, setCurrentInstrument } = useInstrumentStore(useShallow((s) => ({
+    instruments: s.instruments,
+    currentInstrumentId: s.currentInstrumentId,
+    setCurrentInstrument: s.setCurrentInstrument,
+  })));
 
   const handlePlay = useCallback(() => {
     Tone.start();
@@ -66,89 +83,104 @@ export const MobileTransportBar: React.FC = () => {
   }, [togglePlayPause]);
 
   const handleRecord = useCallback(() => {
-    haptics.medium();
+    haptics.heavy();
     toggleRecordMode();
   }, [toggleRecordMode]);
 
   return (
-    <div className={`flex-shrink-0 flex items-center gap-1.5 px-2 py-1.5 border-b overflow-x-auto scrollbar-none ${
+    <div className={`flex-shrink-0 flex items-center gap-1 px-1.5 h-10 border-b safe-area-top ${
       recordMode ? 'bg-accent-error/10 border-accent-error/30' : 'bg-dark-bgSecondary border-dark-border'
     }`}>
       {/* Record */}
       <button
         onClick={handleRecord}
-        className={`w-7 h-7 flex items-center justify-center rounded-full flex-shrink-0 transition-colors ${
-          recordMode
-            ? 'bg-accent-error text-white'
-            : 'bg-dark-bgTertiary text-text-muted'
+        className={`w-8 h-8 flex items-center justify-center rounded-full flex-shrink-0 transition-all active:scale-90 ${
+          recordMode ? 'bg-accent-error text-white shadow-lg shadow-accent-error/30' : 'bg-dark-bgTertiary text-text-muted'
         }`}
-        aria-label="Toggle record mode"
       >
-        <Circle size={12} fill={recordMode ? 'currentColor' : 'none'} />
+        <Circle size={14} fill={recordMode ? 'currentColor' : 'none'} />
       </button>
 
       {/* Play/Stop */}
       <button
         onClick={handlePlay}
-        className={`w-7 h-7 flex items-center justify-center rounded flex-shrink-0 transition-colors ${
+        className={`w-8 h-8 flex items-center justify-center rounded flex-shrink-0 transition-all active:scale-90 ${
           isPlaying ? 'bg-accent-primary text-text-inverse' : 'bg-dark-bgTertiary text-text-primary'
         }`}
-        aria-label={isPlaying ? 'Stop' : 'Play'}
       >
-        {isPlaying ? <Square size={12} /> : <Play size={12} />}
+        {isPlaying ? <Square size={14} /> : <Play size={14} />}
       </button>
+
+      {/* Channel nav (portrait, non-format) */}
+      {showChannelNav && (
+        <div className="flex items-center flex-shrink-0">
+          <button
+            onClick={onChannelPrev}
+            disabled={mobileChannel === 0}
+            className="w-6 h-8 flex items-center justify-center text-text-secondary disabled:opacity-30 active:scale-90 transition-transform"
+          >
+            <ChevronLeft size={16} />
+          </button>
+          <span className="text-[10px] font-mono text-accent-primary min-w-[20px] text-center font-bold">
+            {mobileChannel + 1}
+          </span>
+          <button
+            onClick={onChannelNext}
+            disabled={mobileChannel >= maxChannels - 1}
+            className="w-6 h-8 flex items-center justify-center text-text-secondary disabled:opacity-30 active:scale-90 transition-transform"
+          >
+            <ChevronRight size={16} />
+          </button>
+        </div>
+      )}
+
+      {/* Format label */}
+      {formatLabel && (
+        <span className="text-[10px] font-bold text-accent-primary uppercase tracking-wide flex-shrink-0">{formatLabel}</span>
+      )}
 
       <div className="w-px h-5 bg-dark-border flex-shrink-0" />
 
       {/* BPM */}
-      <Stepper
-        label="BPM"
-        value={bpm}
-        currentValue={bpm}
-        min={20}
-        max={999}
-        onIncrement={() => setBPM(Math.min(999, bpm + 1))}
-        onDecrement={() => setBPM(Math.max(20, bpm - 1))}
-      />
-
-      <div className="w-px h-5 bg-dark-border flex-shrink-0" />
+      <div className="flex items-center gap-0.5 flex-shrink-0">
+        <span className="text-[8px] text-text-muted font-mono">BPM</span>
+        <MiniStepper
+          value={bpm}
+          onIncrement={() => setBPM(Math.min(999, bpm + 1))}
+          onDecrement={() => setBPM(Math.max(20, bpm - 1))}
+          disabled={{ min: bpm <= 20, max: bpm >= 999 }}
+        />
+      </div>
 
       {/* Pattern */}
-      <Stepper
-        label="PAT"
-        value={currentPatternIndex.toString().padStart(2, '0')}
-        currentValue={currentPatternIndex}
-        min={0}
-        max={patternCount - 1}
-        onIncrement={() => setCurrentPattern(Math.min(patternCount - 1, currentPatternIndex + 1))}
-        onDecrement={() => setCurrentPattern(Math.max(0, currentPatternIndex - 1))}
-      />
+      <div className="flex items-center gap-0.5 flex-shrink-0">
+        <span className="text-[8px] text-text-muted font-mono">PAT</span>
+        <MiniStepper
+          value={currentPatternIndex.toString().padStart(2, '0')}
+          onIncrement={() => setCurrentPattern(Math.min(patternCount - 1, currentPatternIndex + 1))}
+          onDecrement={() => setCurrentPattern(Math.max(0, currentPatternIndex - 1))}
+          disabled={{ min: currentPatternIndex <= 0, max: currentPatternIndex >= patternCount - 1 }}
+        />
+      </div>
 
-      <div className="w-px h-5 bg-dark-border flex-shrink-0" />
+      {/* Spacer */}
+      <div className="flex-1 min-w-0" />
 
-      {/* Octave */}
-      <Stepper
-        label="OCT"
-        value={octave}
-        currentValue={octave}
-        min={0}
-        max={8}
-        onIncrement={() => setOctave(Math.min(8, octave + 1))}
-        onDecrement={() => setOctave(Math.max(0, octave - 1))}
-      />
+      {/* Instrument selector */}
+      <select
+        value={currentInstrumentId ?? 1}
+        onChange={(e) => { haptics.selection(); setCurrentInstrument(parseInt(e.target.value, 10)); }}
+        className="text-[10px] bg-dark-bgTertiary border border-dark-border rounded h-8 px-1.5 text-text-primary font-mono truncate flex-shrink min-w-0 max-w-[90px]"
+      >
+        {instruments.map((inst) => (
+          <option key={inst.id} value={inst.id}>
+            {inst.name.substring(0, 12)}
+          </option>
+        ))}
+      </select>
 
-      <div className="w-px h-5 bg-dark-border flex-shrink-0" />
-
-      {/* Edit Step */}
-      <Stepper
-        label="STP"
-        value={editStep}
-        currentValue={editStep}
-        min={0}
-        max={16}
-        onIncrement={() => setEditStep(Math.min(16, editStep + 1))}
-        onDecrement={() => setEditStep(Math.max(0, editStep - 1))}
-      />
+      {/* Spacer for hamburger menu */}
+      <div className="w-8 flex-shrink-0" />
     </div>
   );
 };
