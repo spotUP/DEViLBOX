@@ -134,10 +134,9 @@ export const PixiButton: React.FC<PixiButtonProps> = ({
 
     if (variant === 'ghost') {
       // DOM: background transparent, color text-secondary, hover: bg-hover + text-primary
-      // Use bgSecondary as "transparent" since layoutContainer can't clear backgroundColor
       if (pressed) return { bg: theme.bgActive.color, ...noBorder, text: theme.text.color, showBg: true };
       if (hovered) return { bg: theme.bgHover.color, ...noBorder, text: theme.text.color, showBg: true };
-      return { bg: theme.bgSecondary.color, ...noBorder, text: theme.textSecondary.color, showBg: true };
+      return { bg: 0x000000, ...noBorder, text: theme.textSecondary.color, showBg: false };
     }
 
     // default — matches DOM .btn (no border)
@@ -159,6 +158,14 @@ export const PixiButton: React.FC<PixiButtonProps> = ({
   const isVertical = iconPosition === 'top';
   const iconFontSize = isVertical ? config.fontSize + 4 : config.fontSize + 2;
 
+  const drawBg = useCallback((g: import('pixi.js').Graphics) => {
+    g.clear();
+    if (!colors.showBg) return;
+    const w = g.parent?.width || 100;
+    const h = g.parent?.height || btnHeight;
+    g.roundRect(0, 0, w, h, 4).fill({ color: colors.bg });
+  }, [colors.showBg, colors.bg, btnHeight]);
+
   return (
     <layoutContainer
       eventMode={disabled ? 'none' : 'static'}
@@ -176,13 +183,11 @@ export const PixiButton: React.FC<PixiButtonProps> = ({
         justifyContent: 'center',
         alignItems: 'center',
         gap: isVertical ? 1 : 0,
-        backgroundColor: colors.bg,
-        borderColor: colors.border,
-        borderWidth: colors.borderAlpha > 0 ? 1 : 0,
         borderRadius: 4,
         ...layout,
       }}
     >
+      <pixiGraphics draw={drawBg} layout={{ position: 'absolute', width: '100%', height: '100%' }} />
       {/* Icon (fontaudio) */}
       {icon && FAD_ICONS[icon] && (
         <pixiBitmapText
