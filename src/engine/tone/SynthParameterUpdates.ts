@@ -417,10 +417,61 @@ export function updateV2Parameters(ctx: SynthUpdateContext, instrumentId: number
           v2.setParameter(42, config.envelope2.release);
         }
 
+        // Voice distortion (indices 28-31: Mode, InGain, Param1, Param2)
+        if (config.voiceDistortion) {
+          v2.setParameter(28, config.voiceDistortion.mode);
+          v2.setParameter(29, config.voiceDistortion.inGain);
+          v2.setParameter(30, config.voiceDistortion.param1);
+          v2.setParameter(31, config.voiceDistortion.param2);
+        }
+
         // LFO 1 (indices 44-50: Mode, KeySync, EnvMode, Rate, Phase, Polarity, Amplify)
         if (config.lfo1) {
           v2.setParameter(47, config.lfo1.rate);
           v2.setParameter(50, config.lfo1.depth);
+        }
+
+        // LFO 2 (indices 51-57: Mode, KeySync, EnvMode, Rate, Phase, Polarity, Amplify)
+        if (config.lfo2) {
+          v2.setParameter(51, config.lfo2.mode);
+          v2.setParameter(52, config.lfo2.keySync ? 1 : 0);
+          v2.setParameter(53, config.lfo2.envMode ? 1 : 0);
+          v2.setParameter(54, config.lfo2.rate);
+          v2.setParameter(55, config.lfo2.phase);
+          v2.setParameter(56, config.lfo2.polarity);
+          v2.setParameter(57, config.lfo2.amplify);
+        }
+
+        // Channel distortion (indices 68-71: Mode, InGain, Param1, Param2)
+        if (config.channelDistortion) {
+          v2.setParameter(68, config.channelDistortion.mode);
+          v2.setParameter(69, config.channelDistortion.inGain);
+          v2.setParameter(70, config.channelDistortion.param1);
+          v2.setParameter(71, config.channelDistortion.param2);
+        }
+
+        // Chorus/Flanger (indices 72-78: Amount, Feedback, DelayL, DelayR, ModRate, ModDepth, ModPhase)
+        if (config.chorusFlanger) {
+          v2.setParameter(72, config.chorusFlanger.amount);
+          v2.setParameter(73, config.chorusFlanger.feedback);
+          v2.setParameter(74, config.chorusFlanger.delayL);
+          v2.setParameter(75, config.chorusFlanger.delayR);
+          v2.setParameter(76, config.chorusFlanger.modRate);
+          v2.setParameter(77, config.chorusFlanger.modDepth);
+          v2.setParameter(78, config.chorusFlanger.modPhase);
+        }
+
+        // Compressor (indices 79-87: Mode, StereoLink, AutoGain, Lookahead, Threshold, Ratio, Attack, Release, OutGain)
+        if (config.compressor) {
+          v2.setParameter(79, config.compressor.mode);
+          v2.setParameter(80, config.compressor.stereoLink ? 1 : 0);
+          v2.setParameter(81, config.compressor.autoGain ? 1 : 0);
+          v2.setParameter(82, config.compressor.lookahead);
+          v2.setParameter(83, config.compressor.threshold);
+          v2.setParameter(84, config.compressor.ratio);
+          v2.setParameter(85, config.compressor.attack);
+          v2.setParameter(86, config.compressor.release);
+          v2.setParameter(87, config.compressor.outGain);
         }
       }
     }
