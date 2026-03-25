@@ -27,8 +27,8 @@ import { useNavBar } from '@hooks/views/useNavBar';
 import type { FederatedPointerEvent } from 'pixi.js';
 import type { ProjectTab } from '@stores';
 
-const NAV_ROW_H = 52;
-const TAB_ROW_H = MODERN_NAV_H - NAV_ROW_H; // 24px
+const NAV_ROW_H = 42;
+const TAB_ROW_H = MODERN_NAV_H - NAV_ROW_H; // 34px — matches DOM's ~32px tab bar
 
 // ─── PixiNavBar ──────────────────────────────────────────────────────────────
 
@@ -288,15 +288,15 @@ export const PixiNavBar: React.FC = () => {
                 borderRightWidth: 1,
                 borderBottomWidth: isActive ? 0 : 1,
                 borderColor: theme.border.color,
-                borderTopLeftRadius: 4,
-                borderTopRightRadius: 4,
+                borderTopLeftRadius: 6,
+                borderTopRightRadius: 6,
                 borderBottomLeftRadius: 0,
                 borderBottomRightRadius: 0,
               }}
             >
               <pixiBitmapText
                 text={tab.name || 'Untitled'}
-                style={{ fontFamily: PIXI_FONTS.SANS_MEDIUM, fontSize: 13, fill: 0xffffff }}
+                style={{ fontFamily: PIXI_FONTS.SANS_MEDIUM, fontSize: 14, fill: 0xffffff }}
                 tint={isActive ? theme.text.color : theme.textSecondary.color}
                 layout={{}}
                 eventMode="none"
@@ -330,23 +330,23 @@ export const PixiNavBar: React.FC = () => {
           );
         })}
 
-        {/* Add tab button — matching DOM: p-1.5 ml-1 rounded */}
+        {/* Add tab button — DOM: p-1.5 ml-1 rounded, Plus icon 16px */}
         <layoutContainer
           eventMode="static"
           cursor="pointer"
           onPointerUp={() => n.addTab()}
           layout={{
-            width: 24,
-            height: 24,
+            width: 28,
+            height: 28,
             justifyContent: 'center',
             alignItems: 'center',
             marginLeft: 4,
-            borderRadius: 3,
+            borderRadius: 4,
           }}
         >
           <pixiBitmapText
             text="+"
-            style={{ fontFamily: PIXI_FONTS.SANS_MEDIUM, fontSize: 14, fill: 0xffffff }}
+            style={{ fontFamily: PIXI_FONTS.SANS_MEDIUM, fontSize: 16, fill: 0xffffff }}
             tint={theme.textMuted.color}
             layout={{}}
             eventMode="none"
