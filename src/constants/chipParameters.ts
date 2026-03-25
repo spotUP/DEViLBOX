@@ -1010,6 +1010,7 @@ export const CHIP_SYNTH_DEFS: Record<string, ChipSynthDef> = {
       { key: 'volume', label: 'Volume', group: 'Output', type: 'knob', min: 0, max: 255, step: 1, default: 200, formatValue: 'int' },
       { key: 'attack', label: 'Attack', group: 'Envelope', type: 'knob', min: 0.0001, max: 0.1, step: 0.001, default: 0.01, formatValue: 'seconds' },
       { key: 'release', label: 'Release', group: 'Envelope', type: 'knob', min: 0.0001, max: 0.05, step: 0.001, default: 0.002, formatValue: 'seconds' },
+      { key: 'loop_mode', label: 'Loop', group: 'Playback', type: 'select', min: 0, max: 2, step: 1, default: 1, formatValue: 'int', options: [{ value: 0, label: 'Off' }, { value: 1, label: 'Forward' }, { value: 2, label: 'Reverse' }] },
     ],
   },
 
