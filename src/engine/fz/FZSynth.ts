@@ -42,7 +42,7 @@ export class FZSynth extends MAMEBaseSynth {
   }
 
   private static readonly PARAM_IDS: Record<string, number> = {
-    volume: 0, attack: 2, release: 3,
+    volume: 0, filter_cutoff: 1, attack: 2, release: 3, loop_mode: 4,
   };
 
   setParam(param: string, value: number): void {
