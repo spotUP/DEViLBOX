@@ -173,22 +173,9 @@ const PixiDJTopBar: React.FC<DJTopBarProps> = ({ browserPanel, onBrowserPanelCha
         onClick={handleFX}
       />
 
-      {/* Drumpads */}
+      {/* Sampler / Drum Pads (unified) */}
       <PixiButton
-        label="Drumpads"
-        variant="ghost"
-        size="sm"
-        onClick={() => {
-          const s = useUIStore.getState();
-          if (s.modalOpen === 'drumpad') { s.closeModal(); } else { s.openModal('drumpad'); }
-        }}
-        active={modalOpen === 'drumpad'}
-        color={modalOpen === 'drumpad' ? 'yellow' : undefined}
-      />
-
-      {/* Sampler */}
-      <PixiButton
-        label="Sampler"
+        label="Pads"
         variant={samplerOpen ? 'ft2' : 'ghost'}
         color={samplerOpen ? 'yellow' : undefined}
         size="sm"
