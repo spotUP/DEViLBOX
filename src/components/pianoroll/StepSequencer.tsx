@@ -7,6 +7,7 @@
  */
 
 import React, { useState, useCallback } from 'react';
+import { useResponsiveSafe } from '@/contexts/ResponsiveContext';
 
 export interface StepPad {
   note: number;
@@ -28,7 +29,7 @@ interface StepSequencerProps {
   onVelocityChange?: (padIndex: number, stepIndex: number, velocity: number) => void;
 }
 
-const LABEL_W = 60;
+// Label width now dynamic via labelWidth
 
 export const StepSequencer: React.FC<StepSequencerProps> = ({
   steps,
@@ -38,6 +39,9 @@ export const StepSequencer: React.FC<StepSequencerProps> = ({
   onToggle,
   onVelocityChange,
 }) => {
+  const { isMobile } = useResponsiveSafe();
+  const cellHeight = isMobile ? 44 : 32; // 44px minimum touch target on mobile
+  const labelWidth = isMobile ? 48 : 60;
   const [dragPad, setDragPad] = useState<{ pad: number; step: number } | null>(null);
 
   const handleMouseDown = useCallback((pad: number, step: number) => {
@@ -59,11 +63,11 @@ export const StepSequencer: React.FC<StepSequencerProps> = ({
   return (
     <div className="flex flex-col bg-dark-bg select-none" onMouseUp={handleMouseUp} onMouseLeave={handleMouseUp}>
       {pads.map((pad, padIdx) => (
-        <div key={padIdx} className="flex items-stretch" style={{ height: 32 }}>
+        <div key={padIdx} className="flex items-stretch" style={{ height: cellHeight }}>
           {/* Pad label */}
           <div
             className="flex-shrink-0 flex items-center px-2 text-[10px] font-mono border-r border-dark-border bg-dark-bgSecondary"
-            style={{ width: LABEL_W, color: pad.color ?? 'var(--color-text-secondary)' }}
+            style={{ width: labelWidth, color: pad.color ?? 'var(--color-text-secondary)' }}
           >
             {pad.label}
           </div>
@@ -89,6 +93,8 @@ export const StepSequencer: React.FC<StepSequencerProps> = ({
                 } : undefined}
                 onMouseDown={() => handleMouseDown(padIdx, stepIdx)}
                 onMouseMove={(e) => handleMouseMove(e, padIdx, stepIdx)}
+                onTouchStart={() => handleMouseDown(padIdx, stepIdx)}
+                onTouchEnd={handleMouseUp}
               >
                 {/* Velocity bar */}
                 {isActive && (
