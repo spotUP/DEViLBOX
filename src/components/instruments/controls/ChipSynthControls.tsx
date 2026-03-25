@@ -28,6 +28,7 @@ interface ChipSynthControlsProps {
 export const ChipSynthControls: React.FC<ChipSynthControlsProps> = ({
   synthType,
   parameters,
+  instrumentId,
   onParamChange,
   onTextChange,
   onLoadPreset,
@@ -43,6 +44,20 @@ export const ChipSynthControls: React.FC<ChipSynthControlsProps> = ({
   // Use ref to prevent stale closures in callbacks
   const parametersRef = useRef(parameters);
   useEffect(() => { parametersRef.current = parameters; }, [parameters]);
+
+  // Pre-initialize the MAME synth on mount so ROMs load immediately
+  useEffect(() => {
+    if (!instrumentId) return;
+    (async () => {
+      try {
+        const { getToneEngine } = await import('@engine/ToneEngine');
+        const { useInstrumentStore } = await import('@stores/useInstrumentStore');
+        const engine = getToneEngine();
+        const inst = useInstrumentStore.getState().instruments.find((i: { id: number }) => i.id === instrumentId);
+        if (inst) await engine.ensureInstrumentReady(inst);
+      } catch { /* engine not ready */ }
+    })();
+  }, [instrumentId]);
 
   // Phoneme toggle state for text params (must be top-level, not inside renderParam)
   const [phonemeMode, setPhonemeMode] = useState<Record<string, boolean>>({});
