@@ -250,7 +250,7 @@ export const PixiNavBar: React.FC = () => {
 
       </pixiContainer>{/* end main nav row */}
 
-      {/* ── Project tab bar row ── */}
+      {/* ── Project tab bar row ── matching DOM: bg-dark-bgTertiary, px-2 py-1, border-b */}
       <layoutContainer
         layout={{
           width,
@@ -259,9 +259,10 @@ export const PixiNavBar: React.FC = () => {
           alignItems: 'center',
           paddingLeft: 8,
           paddingRight: 8,
-          gap: 2,
-          backgroundColor: theme.bgSecondary.color,
+          gap: 4,
+          backgroundColor: theme.bgTertiary.color,
           borderTopWidth: 1,
+          borderBottomWidth: 1,
           borderColor: theme.border.color,
           flexShrink: 0,
         }}
@@ -278,32 +279,47 @@ export const PixiNavBar: React.FC = () => {
                 height: TAB_ROW_H - 4,
                 flexDirection: 'row',
                 alignItems: 'center',
-                gap: 4,
-                paddingLeft: 8,
-                paddingRight: n.tabs.length > 1 ? 4 : 8,
-                backgroundColor: isActive ? theme.bg.color : theme.bgTertiary.color,
-                borderWidth: 1,
-                borderColor: isActive ? theme.accent.color : theme.border.color,
-                borderRadius: 3,
+                gap: 8,
+                paddingLeft: 12,
+                paddingRight: n.tabs.length > 1 ? 4 : 12,
+                backgroundColor: isActive ? theme.bg.color : theme.bgSecondary.color,
+                borderTopWidth: 1,
+                borderLeftWidth: 1,
+                borderRightWidth: 1,
+                borderBottomWidth: isActive ? 0 : 1,
+                borderColor: theme.border.color,
+                borderTopLeftRadius: 4,
+                borderTopRightRadius: 4,
+                borderBottomLeftRadius: 0,
+                borderBottomRightRadius: 0,
               }}
             >
               <pixiBitmapText
-                text={(tab.name || 'Untitled') + (tab.isDirty ? ' *' : '')}
-                style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 10, fill: 0xffffff }}
-                tint={isActive ? theme.text.color : theme.textMuted.color}
+                text={tab.name || 'Untitled'}
+                style={{ fontFamily: PIXI_FONTS.SANS_MEDIUM, fontSize: 13, fill: 0xffffff }}
+                tint={isActive ? theme.text.color : theme.textSecondary.color}
                 layout={{}}
                 eventMode="none"
               />
+              {tab.isDirty && (
+                <pixiBitmapText
+                  text="*"
+                  style={{ fontFamily: PIXI_FONTS.SANS_BOLD, fontSize: 13, fill: 0xffffff }}
+                  tint={theme.accent.color}
+                  layout={{}}
+                  eventMode="none"
+                />
+              )}
               {n.tabs.length > 1 && (
                 <layoutContainer
                   eventMode="static"
                   cursor="pointer"
                   onPointerUp={(e: FederatedPointerEvent) => { e.stopPropagation(); n.closeTab(tab.id); }}
-                  layout={{ width: 12, height: 12, justifyContent: 'center', alignItems: 'center' }}
+                  layout={{ width: 14, height: 14, justifyContent: 'center', alignItems: 'center' }}
                 >
                   <pixiBitmapText
                     text="x"
-                    style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 9, fill: 0xffffff }}
+                    style={{ fontFamily: PIXI_FONTS.SANS_BOLD, fontSize: 10, fill: 0xffffff }}
                     tint={theme.textMuted.color}
                     layout={{}}
                     eventMode="none"
@@ -314,25 +330,23 @@ export const PixiNavBar: React.FC = () => {
           );
         })}
 
-        {/* Add tab button */}
+        {/* Add tab button — matching DOM: p-1.5 ml-1 rounded */}
         <layoutContainer
           eventMode="static"
           cursor="pointer"
           onPointerUp={() => n.addTab()}
           layout={{
-            width: TAB_ROW_H - 4,
-            height: TAB_ROW_H - 4,
+            width: 24,
+            height: 24,
             justifyContent: 'center',
             alignItems: 'center',
-            backgroundColor: theme.bgTertiary.color,
-            borderWidth: 1,
-            borderColor: theme.border.color,
+            marginLeft: 4,
             borderRadius: 3,
           }}
         >
           <pixiBitmapText
             text="+"
-            style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 12, fill: 0xffffff }}
+            style={{ fontFamily: PIXI_FONTS.SANS_MEDIUM, fontSize: 14, fill: 0xffffff }}
             tint={theme.textMuted.color}
             layout={{}}
             eventMode="none"
