@@ -11,7 +11,7 @@
 import React, { useState, useCallback, useMemo, useRef, useEffect } from 'react';
 import type { FurnaceConfig, FurnaceOperatorConfig, FurnaceMacro } from '@typedefs/instrument';
 import { Knob } from '@components/controls/Knob';
-import { Cpu, Activity, Zap, Waves, Volume2, Music, Settings, ChevronDown, ChevronRight, FileUp } from 'lucide-react';
+import { Cpu, Activity, Zap, Waves, Volume2, Music, Settings, FileUp } from 'lucide-react';
 import { InstrumentOscilloscope } from '@components/visualization';
 import { VisualizerFrame } from '@components/visualization/VisualizerFrame';
 import { MacroListEditor } from './MacroEditor';
@@ -184,7 +184,6 @@ interface FurnaceEditorProps {
 
 export const FurnaceEditor: React.FC<FurnaceEditorProps> = ({ config, instrumentId, onChange }) => {
   const [activeTab, setActiveTab] = useState<'fm' | 'macros' | 'chip'>('fm');
-  const [expandedOps, setExpandedOps] = useState<Set<number>>(new Set([0, 1, 2, 3]));
   // selectedOp: 1-indexed op number matching FMAlgorithmDiagram convention (null = none)
   const [selectedOp, setSelectedOp] = useState<number | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -208,14 +207,9 @@ export const FurnaceEditor: React.FC<FurnaceEditorProps> = ({ config, instrument
     } catch { /* engine not ready */ }
   }, [onChange, instrumentId]);
 
-  // Click an operator in the diagram → highlight its card and ensure it's expanded
+  // Click an operator in the diagram → highlight its card
   const handleDiagramSelect = useCallback((opNum: number) => {
     setSelectedOp(prev => prev === opNum ? null : opNum);
-    setExpandedOps(prev => {
-      const next = new Set(prev);
-      next.add(opNum - 1); // opNum is 1-indexed; array is 0-indexed
-      return next;
-    });
   }, []);
 
   const handleImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -279,15 +273,6 @@ export const FurnaceEditor: React.FC<FurnaceEditorProps> = ({ config, instrument
     newOps[idx] = { ...newOps[idx], ...updates };
     pushLiveUpdate({ operators: newOps });
   }, [config.operators, pushLiveUpdate]);
-
-  const toggleOpExpanded = useCallback((idx: number) => {
-    setExpandedOps(prev => {
-      const next = new Set(prev);
-      if (next.has(idx)) next.delete(idx);
-      else next.add(idx);
-      return next;
-    });
-  }, []);
 
   const chipName = getChipName(config.chipType);
   const category = getChipCategory(config.chipType);
@@ -434,8 +419,6 @@ export const FurnaceEditor: React.FC<FurnaceEditorProps> = ({ config, instrument
                 op={op}
                 onUpdate={(u) => updateOperator(opIdx, u)}
                 ranges={paramRanges}
-                isExpanded={expandedOps.has(opIdx)}
-                onToggleExpand={() => toggleOpExpanded(opIdx)}
                 isCarrier={isOperatorCarrier(config.algorithm, opIdx)}
                 isSelected={selectedOp === opIdx + 1}
               />
@@ -594,15 +577,13 @@ interface OperatorCardProps {
   op: FurnaceOperatorConfig;
   onUpdate: (u: Partial<FurnaceOperatorConfig>) => void;
   ranges: ChipParameterRanges;
-  isExpanded: boolean;
-  onToggleExpand: () => void;
   isCarrier: boolean;
   /** Highlighted by clicking in the FMAlgorithmDiagram */
   isSelected?: boolean;
 }
 
 const OperatorCard: React.FC<OperatorCardProps> = ({
-  index, op, onUpdate, ranges, isExpanded, onToggleExpand, isCarrier, isSelected
+  index, op, onUpdate, ranges, isCarrier, isSelected
 }) => {
   const borderColor = isSelected
     ? 'border-emerald-500/60'
@@ -619,12 +600,6 @@ const OperatorCard: React.FC<OperatorCardProps> = ({
       {/* Header */}
       <div className="flex items-center justify-between mb-2">
         <div className="flex items-center gap-2">
-          <button
-            onClick={onToggleExpand}
-            className="text-text-muted hover:text-text-primary transition-colors"
-          >
-            {isExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
-          </button>
           <div
             className="w-6 h-6 rounded flex items-center justify-center font-mono text-xs font-bold border"
             style={{
@@ -705,11 +680,10 @@ const OperatorCard: React.FC<OperatorCardProps> = ({
           formatValue={(v) => String(Math.round(v))} />
       </div>
 
-      {/* Row 3: D2R, RS + flags (expanded or show if has params) */}
-      {isExpanded && (
-        <div className="pt-2 border-t border-dark-border mt-1 animate-in slide-in-from-top-2 duration-200">
-          {/* Row 3: D2R, RS, DT2, KSL, WS - all in one horizontal row */}
-          <div className="flex justify-center items-center gap-3 mb-2">
+      {/* Row 3: D2R, RS + flags (always visible) */}
+      <div className="pt-2 border-t border-dark-border mt-1">
+        {/* Row 3: D2R, RS, DT2, KSL, WS - all in one horizontal row */}
+        <div className="flex justify-center items-center gap-3 mb-2">
             {ranges.hasD2R && (
               <Knob label="D2R" value={op.d2r ?? 0} min={ranges.d2r.min} max={ranges.d2r.max}
                 onChange={(v) => onUpdate({ d2r: Math.round(v) })} size="sm" color="#fb923c"
@@ -752,7 +726,6 @@ const OperatorCard: React.FC<OperatorCardProps> = ({
             )}
           </div>
         </div>
-      )}
     </div>
   );
 };
