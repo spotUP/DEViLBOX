@@ -223,6 +223,32 @@ export class WavetableSynth implements DevilboxSynth {
   }
 
   /**
+   * Set a named parameter (for automation). Values are 0-1 normalized.
+   */
+  set(param: string, value: number): void {
+    switch (param) {
+      case 'morphPosition': this.setMorphPosition(value); break;
+      case 'cutoff': this.setFilterCutoff(200 * Math.pow(8000 / 200, value)); break;
+      case 'resonance': this.setFilterResonance(value * 100); break;
+      case 'attack': this.config.envelope.attack = value * 2000; break;
+      case 'decay': this.config.envelope.decay = value * 2000; break;
+      case 'sustain': this.config.envelope.sustain = value * 100; break;
+      case 'release': this.config.envelope.release = value * 2000; break;
+      case 'volume': this.outputGain.gain.setValueAtTime(value * 2, this.audioContext.currentTime); break;
+    }
+  }
+
+  get(param: string): number | undefined {
+    switch (param) {
+      case 'morphPosition': return this.baseMorphPosition;
+      case 'cutoff': return Math.log(this.filter.frequency.value / 200) / Math.log(8000 / 200);
+      case 'resonance': return this.config.filter.resonance / 100;
+      case 'volume': return this.outputGain.gain.value / 2;
+      default: return undefined;
+    }
+  }
+
+  /**
    * Update configuration
    */
   updateConfig(updates: Partial<WavetableConfig>): void {

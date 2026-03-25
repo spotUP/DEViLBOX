@@ -146,7 +146,7 @@ export class AutomationPlayer {
     // Override manager stores short names ('cutoff'), so extract from NKS id ('tb303.cutoff')
     const shortName = parameter.includes('.') ? parameter.split('.').pop()! : parameter;
     const overrideManager = getManualOverrideManager();
-    if (overrideManager.isOverridden(shortName as 'cutoff' | 'resonance' | 'envMod' | 'decay' | 'accent' | 'overdrive' | 'tuning' | 'volume' | 'pan' | 'distortion' | 'delay' | 'reverb')) {
+    if (overrideManager.isOverridden(shortName)) {
       return; // Manual control takes precedence
     }
 
@@ -186,42 +186,98 @@ export class AutomationPlayer {
         return;
       }
 
+      // Also check if instrument has set() via duck-typing (covers non-DevilboxSynth wrappers)
+      if (typeof (instrument as unknown as Record<string, unknown>).set === 'function') {
+        (instrument as unknown as { set: (p: string, v: number) => void }).set(shortName, value);
+        return;
+      }
+
       // Generic Tone.js fallback for common params
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const inst = instrument as any;
+      const now = Tone.now();
       switch (shortName) {
+        // Filter
         case 'cutoff':
           if (inst.filter?.frequency) {
-            inst.filter.frequency.setValueAtTime(200 * Math.pow(5000 / 200, value), Tone.now());
+            inst.filter.frequency.setValueAtTime(200 * Math.pow(5000 / 200, value), now);
           }
           break;
         case 'resonance':
           if (inst.filter?.Q) {
-            inst.filter.Q.setValueAtTime(value * 30, Tone.now());
+            inst.filter.Q.setValueAtTime(value * 30, now);
           }
           break;
+
+        // Amp envelope
+        case 'attack':
+          if (inst.envelope) inst.envelope.attack = value * 2;
+          break;
+        case 'decay':
+          if (inst.envelope) inst.envelope.decay = value * 2;
+          break;
+        case 'sustain':
+          if (inst.envelope) inst.envelope.sustain = value;
+          break;
+        case 'release':
+          if (inst.envelope) inst.envelope.release = value * 5;
+          break;
+
+        // Filter envelope
+        case 'filterAttack':
+          if (inst.filterEnvelope) inst.filterEnvelope.attack = value * 2;
+          break;
+        case 'filterDecay':
+          if (inst.filterEnvelope) inst.filterEnvelope.decay = value * 2;
+          break;
+        case 'filterSustain':
+          if (inst.filterEnvelope) inst.filterEnvelope.sustain = value;
+          break;
+        case 'filterRelease':
+          if (inst.filterEnvelope) inst.filterEnvelope.release = value * 5;
+          break;
+
+        // Oscillator
+        case 'detune':
+          if (inst.detune) inst.detune.setValueAtTime((value * 2 - 1) * 100, now);
+          break;
+        case 'portamento':
+          if (inst.portamento !== undefined) inst.portamento = value * 0.5;
+          break;
+
+        // FM synth params
+        case 'modulationIndex':
+          if (inst.modulationIndex) inst.modulationIndex.setValueAtTime(value * 100, now);
+          break;
+        case 'harmonicity':
+          if (inst.harmonicity) inst.harmonicity.setValueAtTime(0.5 + value * 15.5, now);
+          break;
+
+        // Volume & pan
         case 'volume': {
           const volumeDb = -40 + value * 40;
           if (inst.volume) {
-            inst.volume.setValueAtTime(volumeDb, Tone.now());
+            inst.volume.setValueAtTime(volumeDb, now);
           }
           break;
         }
         case 'pan': {
           const panValue = value * 2 - 1;
           if (inst.pan) {
-            inst.pan.setValueAtTime(panValue, Tone.now());
+            inst.pan.setValueAtTime(panValue, now);
           }
           break;
         }
+
+        // Effects
         case 'distortion':
-          if (inst.distortion) inst.distortion.setValueAtTime(value, Tone.now());
+          if (inst.distortion) inst.distortion.setValueAtTime(value, now);
           break;
         case 'delay':
-          if (inst.delayWet) inst.delayWet.setValueAtTime(value, Tone.now());
+          if (inst.delayWet) inst.delayWet.setValueAtTime(value, now);
           break;
         case 'reverb':
-          if (inst.reverbWet) inst.reverbWet.setValueAtTime(value, Tone.now());
+          if (inst.reverbWet) inst.reverbWet.setValueAtTime(value, now);
           break;
       }
     } catch (error) {
@@ -263,17 +319,40 @@ export class AutomationPlayer {
   }
 
   /**
-   * Apply automation values for all channels at a specific row
+   * Apply automation values for all channels at a specific row.
+   * Accepts fractional rows for sub-row (tick-level) automation resolution.
+   * Column values are read from the integer row; curve interpolation uses the exact fractional position.
    */
   public processPatternRow(row: number): void {
     if (!this.currentPattern) return;
 
+    const intRow = Math.floor(row);
+
     this.currentPattern.channels.forEach((channel, channelIndex) => {
-      const cell = channel.rows[row];
+      if (intRow < 0 || intRow >= channel.rows.length) return;
+      const cell = channel.rows[intRow];
       const instrumentId = cell.instrument !== null ? cell.instrument : channel.instrumentId;
 
-      if (instrumentId !== null) {
-        this.processRow(this.currentPattern!.id, channelIndex, row, cell, instrumentId);
+      if (instrumentId === null) return;
+
+      // Column-based params (always checked at integer row)
+      const columnParams = ['cutoff', 'resonance', 'envMod', 'pan', 'volume'];
+      for (const param of columnParams) {
+        const colValue = this.getColumnValue(cell, param);
+        if (colValue !== null) {
+          this.applyParameter(instrumentId, param, colValue, channelIndex);
+        }
+      }
+
+      // Curve-based params — interpolate at the exact fractional row position
+      const channelCurves = this.automationData[this.currentPattern!.id]?.[channelIndex];
+      if (channelCurves) {
+        for (const parameter of Object.keys(channelCurves)) {
+          const curveValue = this.getCurveValue(this.currentPattern!.id, channelIndex, parameter, row);
+          if (curveValue !== null) {
+            this.applyParameter(instrumentId, parameter, curveValue, channelIndex);
+          }
+        }
       }
     });
   }

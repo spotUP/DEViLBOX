@@ -306,6 +306,24 @@ export class MAMESynth implements DevilboxSynth {
     }
   }
 
+  /**
+   * Set a named parameter (for automation). Values are 0-1 normalized.
+   */
+  set(param: string, value: number): void {
+    switch (param) {
+      case 'volume':
+        this.output.gain.setValueAtTime(value, getDevilboxAudioContext().currentTime);
+        break;
+    }
+  }
+
+  get(param: string): number | undefined {
+    switch (param) {
+      case 'volume': return this.output.gain.value;
+      default: return undefined;
+    }
+  }
+
   public dispose(): void {
     if (this.handle !== 0) {
       this.engine.deleteInstance(this.handle);

@@ -25,13 +25,15 @@ const C_HOVER    = 0x1a1a1a;
 interface Props {
   width: number;
   height: number;
+  variant?: 'list' | 'cards';
   onApplyPreset?: (preset: GTSIDPreset) => void;
 }
 
-export const PixiGTPresetBrowser: React.FC<Props> = ({ width, height, onApplyPreset }) => {
+export const PixiGTPresetBrowser: React.FC<Props> = ({ width, height, variant = 'list', onApplyPreset }) => {
   const containerRef = useRef<any>(null);
   const bgRef = useRef<GraphicsType>(null);
   const megaRef = useRef<MegaText | null>(null);
+  const isCards = variant === 'cards';
 
   const [selectedCat, setSelectedCat] = useState(0);
   const [selectedPreset, setSelectedPreset] = useState(0);
@@ -62,7 +64,7 @@ export const PixiGTPresetBrowser: React.FC<Props> = ({ width, height, onApplyPre
     const pad = 6;
     const headerH = 22;
     const catH = 16;
-    const presetH = 14;
+    const presetH = isCards ? 60 : 14;
 
     // Background
     bg.rect(0, 0, width, height).fill({ color: C_BG });

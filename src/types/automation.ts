@@ -12,6 +12,8 @@ export type AutomationParameter = string;
 export interface AutomationPoint {
   row: number;
   value: number; // 0-1 normalized
+  tension?: number; // 0-1, per-point curve tension (optional override)
+  curveType?: InterpolationType; // per-segment interpolation override
 }
 
 export interface AutomationCurve {
@@ -146,6 +148,94 @@ export const AUTOMATION_PRESETS: AutomationPreset[] = [
     points: Array.from({ length: 64 }, (_, i) => ({
       row: i,
       value: (Math.sin((i / 64) * Math.PI * 2) + 1) / 2,
+    })),
+  },
+  {
+    id: 'saw',
+    name: 'Sawtooth',
+    shape: 'saw',
+    points: [
+      { row: 0, value: 0 },
+      { row: 31, value: 1 },
+      { row: 32, value: 0 },
+      { row: 63, value: 1 },
+    ],
+  },
+  {
+    id: 'reverse-saw',
+    name: 'Reverse Saw',
+    shape: 'reverseSaw',
+    points: [
+      { row: 0, value: 1 },
+      { row: 31, value: 0 },
+      { row: 32, value: 1 },
+      { row: 63, value: 0 },
+    ],
+  },
+  {
+    id: 'square',
+    name: 'Square',
+    shape: 'square',
+    points: [
+      { row: 0, value: 1 },
+      { row: 15, value: 1 },
+      { row: 16, value: 0 },
+      { row: 31, value: 0 },
+      { row: 32, value: 1 },
+      { row: 47, value: 1 },
+      { row: 48, value: 0 },
+      { row: 63, value: 0 },
+    ],
+  },
+  {
+    id: 'random',
+    name: 'Random',
+    shape: 'random',
+    points: Array.from({ length: 16 }, (_, i) => ({
+      row: i * 4,
+      value: Math.random(),
+    })),
+  },
+  {
+    id: 'sine-2x',
+    name: 'Sine 2x',
+    shape: 'sine',
+    points: Array.from({ length: 64 }, (_, i) => ({
+      row: i,
+      value: (Math.sin((i / 64) * Math.PI * 4) + 1) / 2,
+    })),
+  },
+  {
+    id: 'sine-4x',
+    name: 'Sine 4x',
+    shape: 'sine',
+    points: Array.from({ length: 64 }, (_, i) => ({
+      row: i,
+      value: (Math.sin((i / 64) * Math.PI * 8) + 1) / 2,
+    })),
+  },
+  {
+    id: 'staircase-4',
+    name: 'Staircase 4',
+    shape: 'rampUp',
+    points: [
+      { row: 0, value: 0 },
+      { row: 15, value: 0 },
+      { row: 16, value: 0.33 },
+      { row: 31, value: 0.33 },
+      { row: 32, value: 0.66 },
+      { row: 47, value: 0.66 },
+      { row: 48, value: 1 },
+      { row: 63, value: 1 },
+    ],
+  },
+  {
+    id: 'staircase-8',
+    name: 'Staircase 8',
+    shape: 'rampUp',
+    points: Array.from({ length: 16 }, (_, i) => ({
+      row: i * 4,
+      value: Math.floor(i / 2) / 7,
     })),
   },
 ];

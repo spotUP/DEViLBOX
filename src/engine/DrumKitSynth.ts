@@ -322,6 +322,24 @@ export class DrumKitSynth implements DevilboxSynth {
   }
 
   /**
+   * Set a named parameter (for automation). Values are 0-1 normalized.
+   */
+  set(param: string, value: number): void {
+    switch (param) {
+      case 'volume':
+        this.outputGain.gain.setValueAtTime(value, this.audioContext.currentTime);
+        break;
+    }
+  }
+
+  get(param: string): number | undefined {
+    switch (param) {
+      case 'volume': return this.outputGain.gain.value;
+      default: return undefined;
+    }
+  }
+
+  /**
    * Dispose
    */
   dispose(): void {

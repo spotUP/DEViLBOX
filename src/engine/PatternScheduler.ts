@@ -661,6 +661,9 @@ export class PatternScheduler {
               this.applyTickEffects(channelIndex, effectResult, localHandler);
             });
 
+            // Apply automation curves for this row
+            this.automationPlayer.processPatternRow(row);
+
             // Deferred control
             if (this.pendingPositionJump !== null) {
               if (this.onPositionJump) this.onPositionJump(this.pendingPositionJump);
@@ -692,12 +695,16 @@ export class PatternScheduler {
             callback: () => {
               // Process instrument macros and state
               engine.processInstrumentTicks(tickTime);
-              
+
               pattern.channels.forEach((_, channelIndex) => {
                 engine.updateChannelEnvelopes(channelIndex);
                 const tickResult = localHandler.processTick(channelIndex, tick, localHandler.getChannelState(channelIndex));
                 this.applyTickEffects(channelIndex, tickResult, localHandler);
               });
+
+              // Sub-row automation: process at fractional row position
+              const fractionalRow = row + tick / rowTiming.speed;
+              this.automationPlayer.processPatternRow(fractionalRow);
             },
           });
         }

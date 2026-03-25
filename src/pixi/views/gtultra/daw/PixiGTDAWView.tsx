@@ -20,8 +20,8 @@ import {
 } from './dawTheme';
 import { PixiGTDAWToolbar } from './PixiGTDAWToolbar';
 import { PixiGTDAWArrangement } from './PixiGTDAWArrangement';
-import { PixiGTDAWPianoRoll } from './PixiGTDAWPianoRoll';
-import { PixiGTDAWInstrumentDesigner } from './PixiGTDAWInstrumentDesigner';
+import { PixiGTPianoRoll } from '../PixiGTPianoRoll';
+import { PixiGTInstrumentDesigner } from '../PixiGTInstrumentDesigner';
 import { PixiGTDAWBottomPanel } from './PixiGTDAWBottomPanel';
 
 interface Props {
@@ -79,7 +79,7 @@ export const PixiGTDAWView: React.FC<Props> = ({ width, height }) => {
             />
           </pixiContainer>
           <pixiContainer layout={{ width: centerW, height: pianoRollH }}>
-            <PixiGTDAWPianoRoll
+            <PixiGTPianoRoll
               width={Math.max(100, centerW)}
               height={Math.max(50, pianoRollH)}
             />
@@ -89,7 +89,7 @@ export const PixiGTDAWView: React.FC<Props> = ({ width, height }) => {
         {/* Right: Instrument Designer sidebar */}
         {dawSidebarOpen && (
           <pixiContainer layout={{ width: DAW_SIDEBAR_W, height: centerH }}>
-            <PixiGTDAWInstrumentDesigner
+            <PixiGTInstrumentDesigner
               width={DAW_SIDEBAR_W}
               height={Math.max(100, centerH)}
             />

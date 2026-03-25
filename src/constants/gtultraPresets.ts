@@ -14,7 +14,7 @@
 
 export interface GTSIDPreset {
   name: string;
-  category: 'bass' | 'lead' | 'pad' | 'arp' | 'drum' | 'fx' | 'classic';
+  category: 'bass' | 'lead' | 'pad' | 'arp' | 'drum' | 'fx' | 'classic' | 'template';
   description: string;
   ad: number;     // Attack/Decay byte (high nibble = A, low nibble = D)
   sr: number;     // Sustain/Release byte (high nibble = S, low nibble = R)
@@ -251,6 +251,61 @@ export const SID_PRESETS: GTSIDPreset[] = [
     waveform: 0x41,
     pulseWidth: 2560,
   },
+
+  // ── Template (with table programs) ──
+  {
+    name: 'PWM Bass',
+    category: 'template',
+    description: 'Pulse width modulation bass with smooth PWM sweep',
+    ad: 0x09, sr: 0xA0,
+    waveform: 0x41,
+    pulseWidth: 2048,
+    suggestedPulseTable: [0x08, 0x40, 0x08, 0xC0],
+  },
+  {
+    name: 'Filter Sweep Lead',
+    category: 'template',
+    description: 'Sawtooth lead with automated filter sweep',
+    ad: 0x0A, sr: 0x9A,
+    waveform: 0x21,
+    suggestedFilterTable: [0x01, 0xFF, 0x01, 0xE0, 0x01, 0xC0, 0x01, 0xA0, 0x01, 0x80],
+  },
+  {
+    name: 'Arpeggio Pad',
+    category: 'template',
+    description: 'Triangle pad with 3-note arpeggio via wavetable',
+    ad: 0x2A, sr: 0x8A,
+    waveform: 0x11,
+    gatetimer: 2,
+    suggestedWaveTable: [0x11, 0x11, 0x11],
+  },
+  {
+    name: 'Drum Kit Kick',
+    category: 'template',
+    description: 'Pitch-sweep kick drum with noise transient',
+    ad: 0x00, sr: 0x00,
+    waveform: 0x81,
+    suggestedWaveTable: [0x81, 0x11, 0x11],
+  },
+  {
+    name: 'Wobble Bass',
+    category: 'template',
+    description: 'Sawtooth bass with rhythmic filter wobble',
+    ad: 0x09, sr: 0x00,
+    waveform: 0x21,
+    suggestedFilterTable: [0x01, 0xFF, 0x01, 0x40, 0x01, 0xFF, 0x01, 0x40],
+  },
+  {
+    name: 'Chip Chord',
+    category: 'template',
+    description: 'Fast arp pulse chord with PWM animation',
+    ad: 0x08, sr: 0x80,
+    waveform: 0x41,
+    pulseWidth: 2048,
+    gatetimer: 2,
+    suggestedWaveTable: [0x41, 0x41, 0x41],
+    suggestedPulseTable: [0x08, 0x60, 0x08, 0xA0, 0x08, 0x60],
+  },
 ];
 
 /**
@@ -268,13 +323,81 @@ export function getPresetCategories(): GTSIDPreset['category'][] {
 }
 
 /**
- * Apply a preset to the current instrument via engine
+ * Engine interface for preset application (subset of GTUltraEngine)
+ */
+interface PresetEngine {
+  setPatternCell: (p: number, r: number, c: number, v: number) => void;
+  setTableEntry: (tableType: number, side: number, index: number, value: number) => void;
+  setInstrumentTablePtr: (instrument: number, tableType: number, value: number) => void;
+}
+
+/**
+ * Find the first unused run of `length` entries in a table's left column.
+ * Returns the start index, or -1 if no space found.
+ */
+function findFreeTableSlot(tableLeft: Uint8Array, length: number): number {
+  for (let start = 1; start <= tableLeft.length - length; start++) {
+    let free = true;
+    for (let j = 0; j < length; j++) {
+      if (tableLeft[start + j] !== 0) { free = false; break; }
+    }
+    if (free) return start;
+  }
+  return -1;
+}
+
+/**
+ * Apply a preset to the current instrument via engine.
+ * When the preset includes suggestedWaveTable/suggestedPulseTable/suggestedFilterTable,
+ * writes the table data into the first free slot and sets the instrument's table pointer.
  */
 export function applyPresetToInstrument(
   preset: GTSIDPreset,
-  _instrumentIndex: number,
-  _engine: { setPatternCell: (p: number, r: number, c: number, v: number) => void } | null
+  instrumentIndex: number,
+  engine: PresetEngine | null,
+  tableData?: Record<string, { left: Uint8Array; right: Uint8Array }>,
 ): { ad: number; sr: number; firstwave: number; name: string } {
+  if (engine && tableData) {
+    // Write suggested wave table
+    if (preset.suggestedWaveTable && preset.suggestedWaveTable.length > 0) {
+      const slot = findFreeTableSlot(tableData['wave']?.left ?? new Uint8Array(255), preset.suggestedWaveTable.length);
+      if (slot >= 0) {
+        for (let i = 0; i < preset.suggestedWaveTable.length; i++) {
+          engine.setTableEntry(0, 0, slot + i, preset.suggestedWaveTable[i]);
+        }
+        engine.setInstrumentTablePtr(instrumentIndex, 0, slot);
+      }
+    }
+
+    // Write suggested pulse table (pairs: left/right alternating)
+    if (preset.suggestedPulseTable && preset.suggestedPulseTable.length > 0) {
+      const pairCount = Math.ceil(preset.suggestedPulseTable.length / 2);
+      const slot = findFreeTableSlot(tableData['pulse']?.left ?? new Uint8Array(255), pairCount);
+      if (slot >= 0) {
+        for (let i = 0; i < preset.suggestedPulseTable.length; i++) {
+          const side = i % 2 === 0 ? 0 : 1;
+          const entryIdx = slot + Math.floor(i / 2);
+          engine.setTableEntry(1, side, entryIdx, preset.suggestedPulseTable[i]);
+        }
+        engine.setInstrumentTablePtr(instrumentIndex, 1, slot);
+      }
+    }
+
+    // Write suggested filter table (pairs: left/right alternating)
+    if (preset.suggestedFilterTable && preset.suggestedFilterTable.length > 0) {
+      const pairCount = Math.ceil(preset.suggestedFilterTable.length / 2);
+      const slot = findFreeTableSlot(tableData['filter']?.left ?? new Uint8Array(255), pairCount);
+      if (slot >= 0) {
+        for (let i = 0; i < preset.suggestedFilterTable.length; i++) {
+          const side = i % 2 === 0 ? 0 : 1;
+          const entryIdx = slot + Math.floor(i / 2);
+          engine.setTableEntry(2, side, entryIdx, preset.suggestedFilterTable[i]);
+        }
+        engine.setInstrumentTablePtr(instrumentIndex, 2, slot);
+      }
+    }
+  }
+
   return {
     ad: preset.ad,
     sr: preset.sr,
