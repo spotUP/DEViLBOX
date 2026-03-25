@@ -161,18 +161,18 @@ export const SequenceMatrixEditor: React.FC<SequenceMatrixEditorProps> = ({
           alignItems: 'center',
           gap: 6,
           padding: '0 8px',
-          background: 'var(--color-tracker-row-highlight)',
+          background: 'var(--color-accent)',
           cursor: 'pointer',
-          borderBottom: '1px solid var(--color-tracker-border, var(--color-border))',
+          borderBottom: '1px solid var(--color-accent-secondary)',
         }}
         onClick={onToggleCollapse}
       >
-        <ChevronRight size={14} style={{ color: 'var(--color-text-muted)', flexShrink: 0 }} />
+        <ChevronRight size={14} style={{ color: 'rgba(0,0,0,0.5)', flexShrink: 0 }} />
         <span style={{
           fontFamily: '"JetBrains Mono", "Fira Code", monospace',
           fontSize: 12,
           fontWeight: 700,
-          color: 'var(--color-accent)',
+          color: '#fff',
         }}>
           {label}
         </span>
@@ -201,18 +201,18 @@ export const SequenceMatrixEditor: React.FC<SequenceMatrixEditorProps> = ({
           padding: '0 8px',
           height: MATRIX_COLLAPSED_HEIGHT,
           flexShrink: 0,
-          background: 'var(--color-tracker-row-highlight)',
+          background: 'var(--color-accent)',
           cursor: 'pointer',
-          borderBottom: '1px solid var(--color-tracker-border, var(--color-border))',
+          borderBottom: '1px solid var(--color-accent-secondary)',
         }}
         onClick={onToggleCollapse}
       >
-        <ChevronDown size={14} style={{ color: 'var(--color-text-muted)', flexShrink: 0 }} />
+        <ChevronDown size={14} style={{ color: 'rgba(0,0,0,0.5)', flexShrink: 0 }} />
         <span style={{
           fontFamily: '"JetBrains Mono", "Fira Code", monospace',
           fontSize: 12,
           fontWeight: 700,
-          color: 'var(--color-accent)',
+          color: '#fff',
         }}>
           {label}
         </span>
