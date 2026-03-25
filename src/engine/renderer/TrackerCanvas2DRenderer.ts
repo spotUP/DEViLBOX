@@ -21,6 +21,15 @@ const CHAR_WIDTH   = 10;
 const LINE_NUMBER_WIDTH = 40;
 const FONT_SIZE_PX = 13;
 const FONT = `${FONT_SIZE_PX}px "JetBrains Mono", "Fira Code", monospace`;
+const COL_GAP = 4;
+
+// Mobile-scaled constants (1.6x for finger-friendly targets)
+const MOBILE_SCALE     = 1.6;
+const M_CHAR_WIDTH     = Math.round(CHAR_WIDTH * MOBILE_SCALE);
+const M_LINE_NUM_W     = Math.round(LINE_NUMBER_WIDTH * MOBILE_SCALE);
+const M_FONT_SIZE_PX   = Math.round(FONT_SIZE_PX * MOBILE_SCALE);
+const M_FONT           = `${M_FONT_SIZE_PX}px "JetBrains Mono", "Fira Code", monospace`;
+const M_COL_GAP        = Math.round(COL_GAP * MOBILE_SCALE);
 
 // ── Note name lookup ─────────────────────────────────────────────────────────
 
@@ -51,8 +60,6 @@ const HEX1: string[] = Array.from({ length: 16 }, (_, i) => i.toString(16).toUpp
 
 function hex2(v: number): string { return HEX[v & 0xff] ?? '00'; }
 
-const COL_GAP = 4;
-
 // ─────────────────────────────────────────────────────────────────────────────
 
 export class TrackerCanvas2DRenderer {
@@ -60,13 +67,24 @@ export class TrackerCanvas2DRenderer {
   width  = 800;
   height = 600;
   private dpr = 1;
+  private readonly mobile: boolean;
+  // Resolved constants based on mobile flag
+  private readonly cw: number;
+  private readonly lnw: number;
+  private readonly font: string;
+  private readonly colGap: number;
 
-  constructor(canvas: OffscreenCanvas | HTMLCanvasElement) {
+  constructor(canvas: OffscreenCanvas | HTMLCanvasElement, mobile = false) {
     const ctx = canvas.getContext('2d');
     if (!ctx) throw new Error('[TrackerCanvas2DRenderer] Canvas2D not supported');
     this.ctx = ctx as CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D;
     this.width  = canvas.width;
     this.height = canvas.height;
+    this.mobile = mobile;
+    this.cw     = mobile ? M_CHAR_WIDTH : CHAR_WIDTH;
+    this.lnw    = mobile ? M_LINE_NUM_W : LINE_NUMBER_WIDTH;
+    this.font   = mobile ? M_FONT : FONT;
+    this.colGap = mobile ? M_COL_GAP : COL_GAP;
   }
 
   resize(w: number, h: number, dpr: number): void {
@@ -98,10 +116,12 @@ export class TrackerCanvas2DRenderer {
     const activePatIdx = isPlaying ? playPatIdx : currentPatternIndex;
     const pattern = patterns[activePatIdx];
 
-    const { ctx, dpr } = this;
+    const { ctx, dpr, cw, lnw, font, colGap } = this;
     const W = this.width;
     const H = this.height;
-    const rowH = ui.rowHeight ?? ROW_HEIGHT;
+    // On mobile, enforce a larger minimum row height for finger-friendly targets
+    const baseRowH = ui.rowHeight ?? ROW_HEIGHT;
+    const rowH = this.mobile ? Math.max(Math.round(ROW_HEIGHT * MOBILE_SCALE), baseRowH) : baseRowH;
     const hiInterval = ui.rowHighlightInterval || 4;
     const displayOffset = ui.noteDisplayOffset ?? 0;
 
@@ -154,7 +174,7 @@ export class TrackerCanvas2DRenderer {
     }
 
     // ── Line number gutter ──────────────────────────────────────────────────
-    ctx.font = FONT;
+    ctx.font = font;
     for (let r = startRow; r < endRow; r++) {
       const y = (r - scrollRow) * rowH;
       const isHi = r % hiInterval === 0;
@@ -162,14 +182,14 @@ export class TrackerCanvas2DRenderer {
       const label = ui.useHex
         ? r.toString(16).toUpperCase().padStart(3, '0')
         : r.toString().padStart(3, ' ');
-      ctx.fillText(label, 2, y + rowH - 6);
+      ctx.fillText(label, 2, y + rowH - Math.round(6 * (this.mobile ? MOBILE_SCALE : 1)));
     }
 
     // ── Channel separator lines ─────────────────────────────────────────────
     ctx.strokeStyle = theme.trackerBorder || theme.border;
     ctx.lineWidth   = 1;
     for (let ch = 0; ch < numChan; ch++) {
-      const x = LINE_NUMBER_WIDTH + (chanOffsets[ch] ?? 0);
+      const x = lnw + (chanOffsets[ch] ?? 0);
       ctx.beginPath();
       ctx.moveTo(x - 0.5, 0);
       ctx.lineTo(x - 0.5, H);
@@ -177,18 +197,18 @@ export class TrackerCanvas2DRenderer {
     }
 
     // ── Cell text ───────────────────────────────────────────────────────────
-    ctx.font = FONT;
+    ctx.font = font;
     ctx.textBaseline = 'middle';
 
     for (let ch = 0; ch < numChan; ch++) {
-      const chanX  = LINE_NUMBER_WIDTH + (chanOffsets[ch] ?? 0);
+      const chanX  = lnw + (chanOffsets[ch] ?? 0);
       const chan   = pattern.channels[ch];
       if (!chan) continue;
 
       // Muted / non-solo darkening overlay
       const isDimmed = chan.muted || (anySolo && !chan.solo);
       if (isDimmed) {
-        const chW = chanWidths[ch] ?? CHAR_WIDTH * 9;
+        const chW = chanWidths[ch] ?? cw * 9;
         ctx.fillStyle = 'rgba(0,0,0,0.45)';
         ctx.fillRect(chanX, 0, chW, H);
       }
@@ -231,7 +251,7 @@ export class TrackerCanvas2DRenderer {
               ctx.fillStyle = `rgba(${Math.round(r*255)},${Math.round(g*255)},${Math.round(b*255)},${a})`;
             }
             ctx.fillText(str, px, y);
-            px += col.charWidth * CHAR_WIDTH + COL_GAP;
+            px += col.charWidth * cw + colGap;
           }
         } else {
           // FIXED-COLUMN PATH (Note / Inst / Vol / Eff)
@@ -244,17 +264,17 @@ export class TrackerCanvas2DRenderer {
 
           const inst = cell?.instrument ?? 0;
           ctx.fillStyle = isPlayRow ? '#ffffff' : inst === 0 ? theme.textMuted : theme.textInstrument;
-          ctx.fillText(inst === 0 ? '··' : hex2(inst), chanX + 2 + CHAR_WIDTH * 3 + 2, y);
+          ctx.fillText(inst === 0 ? '··' : hex2(inst), chanX + 2 + cw * 3 + 2, y);
 
           const vol = cell?.volume ?? 0;
           ctx.fillStyle = isPlayRow ? '#ffffff' : vol === 0 ? theme.textMuted : theme.textVolume;
-          ctx.fillText(vol === 0 ? '··' : hex2(vol), chanX + 2 + CHAR_WIDTH * 5 + 4, y);
+          ctx.fillText(vol === 0 ? '··' : hex2(vol), chanX + 2 + cw * 5 + 4, y);
 
           const eff  = cell?.effTyp ?? 0;
           const effp = cell?.eff    ?? 0;
           ctx.fillStyle = isPlayRow ? '#ffffff' : eff === 0 && effp === 0 ? theme.textMuted : theme.textEffect;
           const effStr = eff === 0 && effp === 0 ? '···' : `${hex2(eff)[1]}${hex2(effp)}`;
-          ctx.fillText(effStr, chanX + 2 + CHAR_WIDTH * 7 + 6, y);
+          ctx.fillText(effStr, chanX + 2 + cw * 7 + 6, y);
         }
       }
 
@@ -266,10 +286,10 @@ export class TrackerCanvas2DRenderer {
     const curY = (cursor.rowIndex - scrollRow) * rowH;
     if (curY >= -rowH && curY < H) {
       const ch = cursor.channelIndex;
-      const curX = LINE_NUMBER_WIDTH + (chanOffsets[ch] ?? 0);
+      const curX = lnw + (chanOffsets[ch] ?? 0);
       ctx.strokeStyle = theme.accent;
-      ctx.lineWidth   = 2;
-      ctx.strokeRect(curX + 1, curY + 1, (chanWidths[ch] ?? CHAR_WIDTH * 9) - 2, rowH - 2);
+      ctx.lineWidth   = this.mobile ? 3 : 2;
+      ctx.strokeRect(curX + 1, curY + 1, (chanWidths[ch] ?? cw * 9) - 2, rowH - 2);
     }
 
     // ── Center line ─────────────────────────────────────────────────────────
