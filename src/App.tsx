@@ -1206,7 +1206,7 @@ function App() {
             {(activeView === 'dj' || (activeView === 'vj' && djModeActive)) && (
               <Suspense fallback={<div className="flex-1 flex items-center justify-center text-text-muted">Loading DJ mode...</div>}>
                 <div style={{ display: activeView === 'dj' ? 'contents' : 'none' }}>
-                  <DJView onShowDrumpads={() => openModal('drumpads')} />
+                  <DJView />
                 </div>
               </Suspense>
             )}
