@@ -15,10 +15,9 @@ import React, { useRef, useEffect, useState, useCallback } from 'react';
 import { useTrackerStore, useFormatStore } from '@stores';
 import { useTransportStore } from '@stores/useTransportStore';
 import { PatternEditorCanvas } from '@/components/tracker/PatternEditorCanvas';
-import { FurnaceOrderEditor } from './FurnaceOrderEditor';
+import { FurnaceOrderEditor, FURNACE_ORDER_MATRIX_HEIGHT, FURNACE_ORDER_MATRIX_COLLAPSED_HEIGHT } from './FurnaceOrderEditor';
 
 const TOOLBAR_H = 36;
-const ORDER_H = 160;
 
 export const FurnaceView: React.FC<{ width?: number; height?: number }> = () => {
   const nativeData = useFormatStore(s => s.furnaceNative);
@@ -29,6 +28,9 @@ export const FurnaceView: React.FC<{ width?: number; height?: number }> = () => 
   const currentRow = useTransportStore(s => s.currentRow);
 
   const [editPosition, setEditPosition] = useState(0);
+  const [orderCollapsed, setOrderCollapsed] = useState(false);
+
+  const orderH = orderCollapsed ? FURNACE_ORDER_MATRIX_COLLAPSED_HEIGHT : FURNACE_ORDER_MATRIX_HEIGHT;
 
   // Measure container width for FurnaceOrderEditor (canvas-based, needs numeric width)
   const containerRef = useRef<HTMLDivElement>(null);
@@ -101,13 +103,15 @@ export const FurnaceView: React.FC<{ width?: number; height?: number }> = () => 
 
       {/* Order Editor */}
       <div style={{
-        height: `${ORDER_H}px`,
+        height: `${orderH}px`,
         borderBottom: '1px solid var(--color-border)',
         flexShrink: 0,
       }}>
         <FurnaceOrderEditor
           width={containerWidth}
-          height={ORDER_H}
+          height={orderH}
+          collapsed={orderCollapsed}
+          onToggleCollapse={() => setOrderCollapsed(c => !c)}
           nativeData={nativeData}
           currentPosition={activePosition}
           onPositionChange={handlePositionChange}
