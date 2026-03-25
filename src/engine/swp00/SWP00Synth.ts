@@ -2,7 +2,10 @@ import { MAMEBaseSynth } from '@engine/mame/MAMEBaseSynth';
 
 /**
  * SWP00Synth - Yamaha SWP00 AWM2 MU50 (WASM)
- * Stub — WASM binary not yet compiled.
+ *
+ * 32-voice rompler with multi-format sample decoding (16/12/8-bit + DPCM),
+ * LFO, Chamberlin LPF, envelope, and volume/pan ramping.
+ * Extracted from MAME's swp00 emulator by Olivier Galibert.
  */
 export class SWP00Synth extends MAMEBaseSynth {
   readonly name = 'SWP00Synth';
