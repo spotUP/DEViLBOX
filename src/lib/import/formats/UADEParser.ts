@@ -1175,17 +1175,33 @@ export async function parseUADEFile(
           }
         });
 
-        // VBlank-timed compiled 68k formats (Dave Lowe etc.) don't use CIA timers,
-        // so the auto-detected speed is unreliable.  Force speed 6 for these.
+        // For VBlank-timed compiled 68k formats (Dave Lowe etc.), each VBlank
+        // interrupt = 1 tick = 1 row.  The CIA timer is not used for row timing.
+        // Speed must be 1 so that the pattern row counter stays in lockstep with
+        // UADE's tick counter during playback (TrackerReplayer uses the formula
+        // absoluteRow = (tickCount - firstTick) / speed).
+        //
+        // Detect whether this file uses a VBlank-based prefix.
         const vblankPrefix = filename.split('.')[0]?.toLowerCase() ?? '';
-        const VBLANK_PREFIXES = new Set(['dl', 'bd', 'fg', 'jb', 'jp', 'mc', 'dh', 'ps', 'sb', 'th', 'wb', 'kc', 'jt']);
-        const speedHint = VBLANK_PREFIXES.has(vblankPrefix) ? 6 : undefined;
+        const VBLANK_FORMATS = new Set([
+          'dl',     // Dave Lowe
+          'bd',     // Ben Daglish
+          'fg',     // Fred Gray
+          'jb',     // Jason Brooke
+          'jp',     // Jason Page
+          'mc',     // Mark Cooksey
+          'dh',     // David Hanney
+          'sb',     // Steve Barrett
+          'th',     // Thomas Hermann
+          'wb',     // Wally Beben
+        ]);
+        const isVBlankFormat = VBLANK_FORMATS.has(vblankPrefix);
 
         const reconstructed = reconstructPatterns(
           tickSnapshots,
           samplePtrToInstrIndex,
           song.numChannels,
-          speedHint,
+          isVBlankFormat ? 1 : undefined,
         );
 
         if (reconstructed.warnings.length > 0) {

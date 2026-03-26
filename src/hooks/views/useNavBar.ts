@@ -25,7 +25,7 @@ export interface NavBarThemeOption {
 
 // ─── Constants (exported for renderers) ──────────────────────────────────────
 
-import { NAV_BAR_VIEWS } from '@/constants/viewOptions';
+import { NAV_BAR_VIEWS, switchView } from '@/constants/viewOptions';
 
 export const VIEW_TABS = NAV_BAR_VIEWS.map(v => ({ id: v.value, label: v.shortLabel }));
 
@@ -184,8 +184,8 @@ export function useNavBar() {
   const handleSwitchView = useCallback((id: ViewTabId) => {
     if (workbenchExposeActive) useWorkbenchStore.getState().setExposeActive(false);
     if (viewExposeActive) useUIStore.getState().setViewExposeActive(false);
-    setActiveView(id as any);
-  }, [workbenchExposeActive, viewExposeActive, setActiveView]);
+    switchView(id, activeView);
+  }, [workbenchExposeActive, viewExposeActive, activeView]);
 
   // ── Return ────────────────────────────────────────────────────────────────
 

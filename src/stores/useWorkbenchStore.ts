@@ -194,7 +194,7 @@ interface WorkbenchStore {
 export const useWorkbenchStore = create<WorkbenchStore>()(
   persist(
     immer((set, get) => ({
-      camera: { x: 0, y: 0, scale: 1 },
+      camera: { x: 0, y: 0, scale: 0.55 },
       windows: computeDefaultWindows() as Record<string, WindowState>,
       maxZIndex: 10,
       workspaces: {},
@@ -425,7 +425,7 @@ export const useWorkbenchStore = create<WorkbenchStore>()(
           state.windows = Object.fromEntries(
             Object.entries(defaults).map(([id, w]) => [id, { ...w }])
           ) as Record<string, WindowState>;
-          state.camera = { x: 0, y: 0, scale: 1 };
+          state.camera = { x: 0, y: 0, scale: 0.55 };
           state.maxZIndex = 10;
         }),
     })),
@@ -439,7 +439,7 @@ export const useWorkbenchStore = create<WorkbenchStore>()(
           return {
             ...(_persisted as Record<string, unknown>),
             windows: computeDefaultWindows(),
-            camera: { x: 0, y: 0, scale: 1 },
+            camera: { x: 0, y: 0, scale: 0.55 },
           };
         }
         return _persisted as Record<string, unknown>;

@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-03-25T11:37:56.573Z
+ * Generated: 2026-03-26T09:36:22.042Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -19,10 +19,10 @@ export interface ChangelogEntry {
 }
 
 // Build info
-export const BUILD_VERSION = '1.0.3549';
-export const BUILD_NUMBER = '3549';
-export const BUILD_HASH = '194daeb98';
-export const BUILD_DATE = '2026-03-25';
+export const BUILD_VERSION = '1.0.3666';
+export const BUILD_NUMBER = '3666';
+export const BUILD_HASH = '49422b21f';
+export const BUILD_DATE = '2026-03-26';
 
 // Full version (patch IS the build number, so no need to append)
 export const FULL_VERSION = BUILD_VERSION;
@@ -30,214 +30,214 @@ export const FULL_VERSION = BUILD_VERSION;
 // Auto-generated changelog
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: '1.0.3549',
-    date: '2026-03-25',
+    version: '1.0.3666',
+    date: '2026-03-26',
     changes: [
       {
         type: 'feature',
-        "description": "Expand chip parameters and wire setParam for FZ/ZSG2/KS0164/SWP00"
-      },
-      {
-        type: 'fix',
-        "description": "VU meters visible on iOS, scratch drag works on touch"
-      },
-      {
-        type: 'fix',
-        "description": "Use overflow-hidden on pattern editor for centered cursor bar"
-      },
-      {
-        type: 'fix',
-        "description": "Fix MAME CMI boot hang — re-enable keyboard CPUs"
+        "description": "Replace FontAudio icons with Lucide SVG textures"
       },
       {
         type: 'feature',
-        "description": "Extract Samsung KS0164 wavetable synth as standalone WASM"
-      },
-      {
-        type: 'feature',
-        "description": "IOS/mobile feature parity — Canvas2D renderer, view switching, format editors, transport bar, touch support"
-      },
-      {
-        type: 'feature',
-        "description": "Extract Yamaha SWP00 rompler/DSP as standalone WASM"
-      },
-      {
-        type: 'improvement',
-        "description": "Extract Zoom ZSG-2 wavetable chip as standalone WASM module"
-      },
-      {
-        type: 'feature',
-        "description": "Extract Casio FZ PCM chip as standalone WASM module"
+        "description": "Lucide SVG → Pixi Texture converter + icon library"
       },
       {
         type: 'fix',
-        "description": "Add bottom padding to piano keyboard for tab bar"
+        "description": "Channel headers — enable pointer events on all containers"
       },
       {
         type: 'fix',
-        "description": "Hide instrument list sidebar in EditInstrumentModal"
-      },
-      {
-        type: 'improvement',
-        "description": "Cleanup: remove iOS sample rate diagnostic logs"
-      },
-      {
-        type: 'improvement',
-        "description": "Cleanup: remove all iOS diagnostic alerts"
-      },
-      {
-        type: 'feature',
-        "description": "Add MAME CRT hardware UI as lazy-loaded tab"
-      },
-      {
-        type: 'feature',
-        "description": "Add sample preview/audition to CMI library browser"
-      },
-      {
-        type: 'feature',
-        "description": "Add CMI 16-voice status LEDs and factory presets"
+        "description": "Channel headers — remove stencil mask, use overflow hidden"
       },
       {
         type: 'fix',
-        "description": "Fix 'Maximum update depth exceeded' in MixerPanel, SequenceMatrixEditor, and GT Ultra position updates"
-      },
-      {
-        type: 'improvement',
-        "description": "Use tab bar red for matrix editor header (--color-bg-tertiary)"
-      },
-      {
-        type: 'improvement',
-        "description": "Match matrix editor header to FT2 panel background color"
-      },
-      {
-        type: 'improvement',
-        "description": "Use darker accent red for matrix editor header"
-      },
-      {
-        type: 'improvement',
-        "description": "Style matrix editor header with red accent background"
-      },
-      {
-        type: 'improvement',
-        "description": "Unify Furnace order matrix with shared SequenceMatrixEditor"
+        "description": "Channel headers use layoutContainer + flexShrink: 0"
       },
       {
         type: 'fix',
-        "description": "Register Fairlight CMI pack + fix FurnaceEditor operator layout"
-      },
-      {
-        type: 'improvement',
-        "description": "Update CMI WASM and sample pack constants"
-      },
-      {
-        type: 'improvement',
-        "description": "Refactor macro editors: simplify MAMEMacroEditor and MacroEditor"
+        "description": "Channel header ROW column uses bgTertiary not theme.bg (red)"
       },
       {
         type: 'fix',
-        "description": "Fix GT Ultra instrument sync, pattern refresh, and order position tracking"
+        "description": "Pitch slider width 52px matching DOM's DJPitchSlider"
       },
       {
         type: 'fix',
-        "description": "Correct sample playback speed — was 11x too slow (\"whale\")"
+        "description": "Pitch slider — use layoutContainer for backgroundColor support"
       },
       {
         type: 'fix',
-        "description": "Fix Song Len display for GT Ultra: read from order data not tracker store"
+        "description": "Pitch slider — solid background + fix groove color"
       },
       {
         type: 'fix',
-        "description": "Fix pattern length using table channels (255 rows) instead of pattern channels"
+        "description": "VBlank speed hint for compiled 68k formats, fix dl prefix skip"
       },
       {
         type: 'fix',
-        "description": "Fix GT Ultra row position: divide pattptr by 4 (byte offset → row index)"
+        "description": "Grid base fill always opaque — no red bleed through"
       },
       {
-        type: 'improvement',
-        "description": "Smooth pattern editor scrolling for GT Ultra playback"
+        type: 'fix',
+        "description": "Dave Lowe format uses UADE playback with title extraction"
+      },
+      {
+        type: 'fix',
+        "description": "Alternate milkdrop/projectM layers to prevent projectM crashes"
+      },
+      {
+        type: 'fix',
+        "description": "Remove DrumPadManager as standalone view, unify into DJ Pads"
+      },
+      {
+        type: 'fix',
+        "description": "Remove row number column background, extend rows full width"
+      },
+      {
+        type: 'fix',
+        "description": "Remove unused onShowDrumpads prop from DJView in App.tsx"
+      },
+      {
+        type: 'fix',
+        "description": "Row number column and mute overlay use correct colors"
+      },
+      {
+        type: 'fix',
+        "description": "Merge Drumpads + Sampler into single Pads button"
+      },
+      {
+        type: 'fix',
+        "description": "Ghost buttons truly transparent — use Graphics draw for bg"
+      },
+      {
+        type: 'fix',
+        "description": "Enable pattern overlay by default in VJ view"
+      },
+      {
+        type: 'fix',
+        "description": "Ghost button hover state clears properly"
       }
     ]
   },
   {
-    version: '2026-03-24',
-    date: '2026-03-24',
+    version: '2026-03-25',
+    date: '2026-03-25',
     changes: [
       {
         type: 'fix',
-        "description": "Fix GT Ultra pattern editor not following playback"
+        "description": "Chore: stage pending changes (DaveLowe WASM, synth categories, CRT fixes)"
+      },
+      {
+        type: 'fix',
+        "description": "Remove border from GROOVE button — consistent borderless"
+      },
+      {
+        type: 'fix',
+        "description": "Remove all button borders — consistent borderless style"
+      },
+      {
+        type: 'fix',
+        "description": "Hardware button — no emoji, renamed, moved to playback section"
+      },
+      {
+        type: 'fix',
+        "description": "Play/Stop buttons use primary/danger variants matching DOM"
+      },
+      {
+        type: 'fix',
+        "description": "FT2 toolbar height accounts for padding + gap"
+      },
+      {
+        type: 'fix',
+        "description": "FT2 toolbar padding/gap matches DOM exactly"
       },
       {
         type: 'feature',
-        "description": "Add CMI WASM build dir to gitignore"
-      },
-      {
-        type: 'improvement',
-        "description": "CMI synth: smooth envelope accumulator, UI layout improvements"
+        "description": "WAM plugin browser (DOM+Pixi) + mobile touch fixes"
       },
       {
         type: 'fix',
-        "description": "Fix PatternEditorCanvas cleanup for iOS fallback and safe canvas removal"
+        "description": "FT2 toolbar uses grid-like fixed column widths matching DOM"
       },
       {
         type: 'fix',
-        "description": "Fix GT Ultra silent playback: initialize editorInfo in gt_play()"
+        "description": "Remove vertical dividers from FT2 toolbar"
       },
       {
         type: 'fix',
-        "description": "Fix format editors rendering zeros instead of dots for empty cells"
+        "description": "Tab bar — exact DOM values for font, radius, height, + button"
       },
       {
-        type: 'improvement',
-        "description": "Wire format context menu + shared SequenceMatrixEditor"
+        type: 'fix',
+        "description": "Tab bar matches DOM — top-rounded tabs, proper colors/fonts"
+      },
+      {
+        type: 'fix',
+        "description": "Volume slider — add label, taller handle for visibility"
+      },
+      {
+        type: 'fix',
+        "description": "Restore nav bar and button readability"
+      },
+      {
+        type: 'fix',
+        "description": "Nav bar height, gap, bg, MIDI — match DOM exactly"
+      },
+      {
+        type: 'fix',
+        "description": "Hide WAVE mode label in visualizer, cleanup layout index"
+      },
+      {
+        type: 'fix',
+        "description": "Remove Groove button from toolbar, add colons to FT2 labels"
+      },
+      {
+        type: 'fix',
+        "description": "DOM/GL parity — mixer sends/FX/record, clip clone, hover tooltip"
+      },
+      {
+        type: 'fix',
+        "description": "Replace volume knob with horizontal slider matching DOM"
+      },
+      {
+        type: 'fix',
+        "description": "Visual parity — flatten buttons, fix labels, channel headers"
       },
       {
         type: 'feature',
-        "description": "Unify format editor sizing and add collapsible matrix editors"
-      },
-      {
-        type: 'improvement',
-        "description": "Unify format/normal pattern editor headers with full channel controls"
-      },
-      {
-        type: 'improvement',
-        "description": "Update DEViLBOX theme tracker rows to navy background"
-      },
-      {
-        type: 'fix',
-        "description": "Fix format mode channel header alignment with pattern content"
-      },
-      {
-        type: 'improvement',
-        "description": "Use theme CSS variables in GTOrderMatrix and GTUltraView"
-      },
-      {
-        type: 'improvement',
-        "description": "Remove table sections from GTOrderMatrix — tables live in pattern editor now"
-      },
-      {
-        type: 'improvement',
-        "description": "Update default dark theme tracker rows to navy color scheme"
-      },
-      {
-        type: 'improvement',
-        "description": "Match pattern editor colors to GTOrderMatrix color scheme"
-      },
-      {
-        type: 'improvement',
-        "description": "Remove order channels from pattern editor — orders live only in GTOrderMatrix"
+        "description": "Wire all new components into views"
       },
       {
         type: 'feature',
-        "description": "Add per-channel column support to pattern editor"
+        "description": "Pattern preview tooltip, order sidebar, step sequencer (DOM+Pixi)"
       },
       {
-        type: 'improvement',
-        "description": "GT Ultra: integrate orders + tables as pattern editor channels"
+        type: 'fix',
+        "description": "Visual parity pass — match GL chrome to DOM layout"
       },
       {
-        type: 'improvement',
-        "description": "GT Ultra: tighten instrument isEmpty filter — require ADSR or waveform"
+        type: 'feature',
+        "description": "Pattern matrix (DOM+Pixi), pattern preview hook, mixer send/record UI"
+      },
+      {
+        type: 'fix',
+        "description": "Move useGTUltraStore hook before mobile early return"
+      },
+      {
+        type: 'feature',
+        "description": "Store actions for pattern clone, tracker jump, ruler mode, channel sync"
+      },
+      {
+        type: 'fix',
+        "description": "Match nav bar and editor controls to DOM layout"
+      },
+      {
+        type: 'fix',
+        "description": "Pattern grid background uses trackerRowEven instead of theme.bg"
+      },
+      {
+        type: 'feature',
+        "description": "CC automation lane, step sequencer, multi-channel already wired"
       }
     ]
   }

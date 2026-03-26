@@ -11,9 +11,14 @@ import { EffectComposer, Bloom, ChromaticAberration } from '@react-three/postpro
 import { BlendFunction } from 'postprocessing';
 import * as THREE from 'three';
 import { useVJAudio, type VJScenePreset } from './scenes/types';
+
+// Memoized constants — avoid per-render allocations
+const CHROMA_OFFSET = new THREE.Vector2(0.001, 0.001);
+
 import { ReactiveParticles } from './scenes/ReactiveParticles';
 import { AudioTerrain } from './scenes/AudioTerrain';
 import { WireframeSphere } from './scenes/WireframeSphere';
+import { KraftwerkHead } from './scenes/KraftwerkHead';
 
 // ─── Scene registry ────────────────────────────────────────────────────────────
 
@@ -21,6 +26,7 @@ const SCENES: VJScenePreset[] = [
   { name: 'Reactive Particles', component: ReactiveParticles, category: 'Particles', description: 'Audio-reactive particle cloud' },
   { name: 'Audio Terrain', component: AudioTerrain, category: 'Landscape', description: 'Frequency-driven terrain mesh' },
   { name: 'Wireframe Sphere', component: WireframeSphere, category: 'Geometry', description: 'Pulsing wireframe icosphere' },
+  { name: 'Kraftwerk Head', component: KraftwerkHead, category: 'Character', description: 'Speech-reactive wireframe head' },
 ];
 
 export { SCENES as THREE_SCENES };
@@ -60,7 +66,7 @@ const PostEffects: React.FC = () => (
     />
     <ChromaticAberration
       blendFunction={BlendFunction.NORMAL}
-      offset={new THREE.Vector2(0.001, 0.001)}
+      offset={CHROMA_OFFSET}
     />
   </EffectComposer>
 );

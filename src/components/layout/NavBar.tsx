@@ -3,9 +3,9 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { useThemeStore, themes, useUIStore } from '@stores';
+import { useThemeStore, themes } from '@stores';
 import { BUILD_HASH, BUILD_DATE, BUILD_NUMBER } from '@constants/version';
-import { Plus, X, Palette, Download, LogIn, LogOut, Cloud, Users, Monitor, Info } from 'lucide-react';
+import { Plus, X, Palette, Download, LogIn, LogOut, Cloud, Users, Monitor } from 'lucide-react';
 import { MIDIToolbarDropdown } from '@components/midi/MIDIToolbarDropdown';
 import { DJSetBrowser } from '@components/dj/DJSetBrowser';
 import { DownloadModal } from '@components/dialogs/DownloadModal';
@@ -13,7 +13,7 @@ import { AuthModal } from '@components/dialogs/AuthModal';
 import { CollaborationModal } from '@components/collaboration/CollaborationModal';
 import { Button } from '@components/ui/Button';
 import { isElectron } from '@utils/electron';
-import { useNavBar } from '@hooks/views/useNavBar';
+import { useNavBar, VIEW_TABS } from '@hooks/views/useNavBar';
 
 const NavBarComponent: React.FC = () => {
   const n = useNavBar();
@@ -99,6 +99,18 @@ const NavBarComponent: React.FC = () => {
             1.0.{BUILD_NUMBER}
           </span>
         </div>
+
+        {/* Center: View Switcher dropdown — always visible in all views */}
+        <select
+          value={n.activeView}
+          onChange={(e) => n.handleSwitchView(e.target.value)}
+          className="px-3 py-1.5 rounded-md text-xs font-mono border transition-all cursor-pointer border-dark-borderLight bg-dark-bgTertiary text-text-secondary hover:bg-dark-bgHover hover:text-text-primary"
+          title="Select view"
+        >
+          {VIEW_TABS.map((tab) => (
+            <option key={tab.id} value={tab.id}>{tab.label}</option>
+          ))}
+        </select>
 
         {/* Right: MIDI, Theme Switcher and Master Volume */}
         <div className="flex items-center gap-4">
@@ -196,20 +208,10 @@ const NavBarComponent: React.FC = () => {
             </Button>
           )}
 
-          {/* Song Info */}
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => useUIStore.getState().openModal('moduleInfo')}
-            icon={<Info size={14} />}
-            iconPosition="left"
-            title="Song / module info"
-          >
-            <span className="hidden sm:inline">Info</span>
-          </Button>
+          {/* Song Info button moved to EditorControlsBar (FT2 toolbar row) */}
 
-          {/* DJ Sets */}
-          <DJSetBrowser />
+          {/* DJ Sets — only visible in DJ view */}
+          {n.activeView === 'dj' && <DJSetBrowser />}
 
           {/* MIDI Settings */}
           <MIDIToolbarDropdown />

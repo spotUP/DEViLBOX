@@ -1,5 +1,6 @@
 import type { DevilboxSynth } from '@/types/synth';
 import { getDevilboxAudioContext, noteToMidi } from '@/utils/audio-context';
+import { useSpeechActivityStore } from '@/stores/useSpeechActivityStore';
 
 export interface DECtalkConfig {
   text: string;
@@ -100,6 +101,7 @@ export class DECtalkSynth implements DevilboxSynth {
       this._sourceNode.disconnect();
       this._sourceNode = null;
     }
+    if (this._isPlaying) useSpeechActivityStore.getState().speechStop();
     this._isPlaying = false;
   }
 
@@ -113,6 +115,7 @@ export class DECtalkSynth implements DevilboxSynth {
     source.connect(this._playerGain);
     source.onended = () => {
       if (this._sourceNode === source) {
+        if (this._isPlaying) useSpeechActivityStore.getState().speechStop();
         this._isPlaying = false;
         this._sourceNode = null;
       }
@@ -120,6 +123,7 @@ export class DECtalkSynth implements DevilboxSynth {
     this._sourceNode = source;
     source.start(time ?? 0);
     this._isPlaying = true;
+    useSpeechActivityStore.getState().speechStart();
   }
 
   private async _render(): Promise<void> {
@@ -228,6 +232,7 @@ export class DECtalkSynth implements DevilboxSynth {
     source.connect(this._playerGain);
     source.onended = () => {
       if (this._sourceNode === source) {
+        if (this._isPlaying) useSpeechActivityStore.getState().speechStop();
         this._isPlaying = false;
         this._sourceNode = null;
       }
@@ -235,6 +240,7 @@ export class DECtalkSynth implements DevilboxSynth {
     this._sourceNode = source;
     source.start(time ?? 0);
     this._isPlaying = true;
+    useSpeechActivityStore.getState().speechStart();
   }
 
   public triggerRelease(_note?: string | number, _time?: number): void {

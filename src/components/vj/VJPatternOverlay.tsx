@@ -205,8 +205,7 @@ export const VJPatternOverlay: React.FC<VJPatternOverlayProps> = React.memo(({ s
     if (!canvas || !wrap) return;
     const ctx = canvas.getContext('2d')!;
 
-    const bus = new AudioDataBus();
-    bus.enable();
+    const bus = AudioDataBus.getShared();
     busRef.current = bus;
 
     // Reusable per-frame arrays to reduce GC pressure
@@ -627,7 +626,6 @@ export const VJPatternOverlay: React.FC<VJPatternOverlayProps> = React.memo(({ s
     rafRef.current = requestAnimationFrame(render);
     return () => {
       cancelAnimationFrame(rafRef.current);
-      bus.disable();
     };
   }, []);
 

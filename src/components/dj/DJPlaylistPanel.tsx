@@ -1,40 +1,35 @@
 /**
- * DJPlaylistPanel - Playlist manager for the DJ view.
+ * DJPlaylistPanel - Playlist browser for the DJ view.
  *
- * Create, rename, delete playlists. Add tracks from loaded files.
- * Click a track to load it to a deck. Reorder via drag handles.
+ * Two-pane layout matching the Modland browser style:
+ *   Top: playlist selector dropdown + search filter + sort controls
+ *   Bottom: scrollable track list with deck load buttons (1/2/3)
  */
 
-import React, { useState, useCallback, useRef } from 'react';
+import React, { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import {
   ListMusic,
   Plus,
   Trash2,
-  Edit3,
-  Check,
+  Search,
   X,
-  GripVertical,
   Music,
+  Loader2,
 } from 'lucide-react';
 import {
   useDJPlaylistStore,
   type PlaylistTrack,
+  type PlaylistSortField,
+  type PlaylistSortOrder,
+  loadBundledPlaylists,
 } from '@/stores/useDJPlaylistStore';
-import { useDJStore } from '@/stores/useDJStore';
+import { useDJStore, useThirdDeckActive } from '@/stores/useDJStore';
 import { getDJEngine } from '@/engine/dj/DJEngine';
 import { parseModuleToSong } from '@/lib/import/parseModuleToSong';
 import { detectBPM, estimateSongDuration } from '@/engine/dj/DJBeatDetector';
 import { cacheSong } from '@/engine/dj/DJSongCache';
 import { getDJPipeline } from '@/engine/dj/DJPipeline';
 import { isAudioFile } from '@/lib/audioFileUtils';
-
-// ── Helpers ──────────────────────────────────────────────────────────────────
-
-function formatDuration(seconds: number): string {
-  const m = Math.floor(seconds / 60);
-  const s = Math.floor(seconds % 60);
-  return `${m}:${s.toString().padStart(2, '0')}`;
-}
 
 // ── Component ────────────────────────────────────────────────────────────────
 
@@ -43,481 +38,456 @@ interface DJPlaylistPanelProps {
 }
 
 export const DJPlaylistPanel: React.FC<DJPlaylistPanelProps> = ({ onClose }) => {
+  useEffect(() => { loadBundledPlaylists(); }, []);
+
   const playlists = useDJPlaylistStore((s) => s.playlists);
   const activePlaylistId = useDJPlaylistStore((s) => s.activePlaylistId);
   const createPlaylist = useDJPlaylistStore((s) => s.createPlaylist);
   const deletePlaylist = useDJPlaylistStore((s) => s.deletePlaylist);
-  const renamePlaylist = useDJPlaylistStore((s) => s.renamePlaylist);
   const setActivePlaylist = useDJPlaylistStore((s) => s.setActivePlaylist);
   const addTrack = useDJPlaylistStore((s) => s.addTrack);
   const removeTrack = useDJPlaylistStore((s) => s.removeTrack);
-  const reorderTrack = useDJPlaylistStore((s) => s.reorderTrack);
+  const sortPlaylist = useDJPlaylistStore((s) => s.sortPlaylist);
+  const thirdDeckActive = useThirdDeckActive();
 
-  const [isCreating, setIsCreating] = useState(false);
-  const [newName, setNewName] = useState('');
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [editName, setEditName] = useState('');
-  const [dragIndex, setDragIndex] = useState<number | null>(null);
-  const [isLoadingFile, setIsLoadingFile] = useState(false);
+  const [filter, setFilter] = useState('');
+  const [sortFields, setSortFields] = useState<PlaylistSortField[]>([]);
+  const [sortOrder, setSortOrder] = useState<PlaylistSortOrder>('asc');
+  const [selectedIndex, setSelectedIndex] = useState(-1);
+  const [loadingTracks, setLoadingTracks] = useState<Set<number>>(new Set());
+
+  const inputRef = useRef<HTMLInputElement>(null);
+  const listRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const activePlaylist = playlists.find((p) => p.id === activePlaylistId) ?? null;
 
-  // ── Playlist CRUD ────────────────────────────────────────────────────────
+  // Filter tracks by search query
+  const filteredTracks = useMemo(() => {
+    if (!activePlaylist) return [];
+    if (!filter.trim()) return activePlaylist.tracks;
+    const q = filter.toLowerCase();
+    return activePlaylist.tracks.filter(t =>
+      t.trackName.toLowerCase().includes(q) ||
+      t.fileName.toLowerCase().includes(q) ||
+      t.format.toLowerCase().includes(q)
+    );
+  }, [activePlaylist, filter]);
 
-  const handleCreate = useCallback(() => {
-    if (!newName.trim()) return;
-    createPlaylist(newName.trim());
-    setNewName('');
-    setIsCreating(false);
-  }, [newName, createPlaylist]);
+  // ── Load track to deck ──────────────────────────────────────────────────
 
-  const handleRename = useCallback(
-    (id: string) => {
-      if (!editName.trim()) return;
-      renamePlaylist(id, editName.trim());
-      setEditingId(null);
-    },
-    [editName, renamePlaylist],
-  );
+  const loadToDeck = useCallback(
+    async (track: PlaylistTrack, trackIndex: number, deckId: 'A' | 'B' | 'C') => {
+      setLoadingTracks(prev => new Set(prev).add(trackIndex));
+      try {
+        const engine = getDJEngine();
 
-  // ── Add files to playlist ────────────────────────────────────────────────
+        // Tracks with sourceUrl: download from remote
+        if (track.sourceUrl) {
+          const { downloadModlandFile } = await import('@/lib/modlandApi');
+          const buffer = await downloadModlandFile(track.sourceUrl.replace('http://ftp.modland.com/', 'pub/'));
+          const filename = track.sourceUrl.split('/').pop() || track.fileName;
 
-  const handleAddFiles = useCallback(
-    async (e: React.ChangeEvent<HTMLInputElement>) => {
-      if (!activePlaylistId || !e.target.files) return;
-      setIsLoadingFile(true);
+          if (isAudioFile(filename)) {
+            await engine.loadAudioToDeck(deckId, buffer, track.fileName);
+          } else {
+            const blob = new File([buffer], filename, { type: 'application/octet-stream' });
+            const song = await parseModuleToSong(blob);
+            cacheSong(track.fileName, song);
+            const bpmResult = detectBPM(song);
+            useDJStore.getState().setDeckState(deckId, {
+              fileName: track.fileName,
+              trackName: song.name || track.trackName,
+              detectedBPM: bpmResult.bpm,
+              effectiveBPM: bpmResult.bpm,
+              analysisState: 'rendering',
+              isPlaying: false,
+            });
+            const result = await getDJPipeline().loadOrEnqueue(buffer, filename, deckId, 'high');
+            await engine.loadAudioToDeck(deckId, result.wavData, filename, song.name || track.trackName, result.analysis?.bpm || bpmResult.bpm, song);
+          }
+          useDJStore.getState().setDeckViewMode('visualizer');
+          return;
+        }
 
-      for (const file of Array.from(e.target.files)) {
-        try {
-          const isAudio = isAudioFile(file.name);
-          const fileExt = file.name.split('.').pop()?.toUpperCase() ?? 'MOD';
+        // Modland-cached tracks
+        if (track.fileName.startsWith('modland:')) {
+          const modlandPath = track.fileName.slice('modland:'.length);
+          const { downloadModlandFile } = await import('@/lib/modlandApi');
+          const buffer = await downloadModlandFile(modlandPath);
+          const filename = modlandPath.split('/').pop() || 'download.mod';
+          if (isAudioFile(filename)) {
+            await engine.loadAudioToDeck(deckId, buffer, track.fileName);
+          } else {
+            const blob = new File([buffer], filename, { type: 'application/octet-stream' });
+            const song = await parseModuleToSong(blob);
+            cacheSong(track.fileName, song);
+            const bpmResult = detectBPM(song);
+            useDJStore.getState().setDeckState(deckId, {
+              fileName: track.fileName,
+              trackName: song.name || track.trackName,
+              detectedBPM: bpmResult.bpm,
+              effectiveBPM: bpmResult.bpm,
+              analysisState: 'rendering',
+              isPlaying: false,
+            });
+            const result = await getDJPipeline().loadOrEnqueue(buffer, filename, deckId, 'high');
+            await engine.loadAudioToDeck(deckId, result.wavData, filename, song.name || track.trackName, result.analysis?.bpm || bpmResult.bpm, song);
+          }
+          useDJStore.getState().setDeckViewMode('visualizer');
+          return;
+        }
 
-          if (isAudio) {
-            const track: PlaylistTrack = {
-              fileName: file.name,
-              trackName: file.name.replace(/\.[^.]+$/, ''),
-              format: fileExt,
-              bpm: 0,
-              duration: 0,
-              addedAt: Date.now(),
-            };
-            addTrack(activePlaylistId, track);
+        // Local file: prompt user
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.accept = '*/*';
+        input.onchange = async () => {
+          const file = input.files?.[0];
+          if (!file) return;
+          const rawBuffer = await file.arrayBuffer();
+          if (isAudioFile(file.name)) {
+            await engine.loadAudioToDeck(deckId, rawBuffer, file.name);
           } else {
             const song = await parseModuleToSong(file);
             cacheSong(file.name, song);
             const bpmResult = detectBPM(song);
-            const duration = estimateSongDuration(song);
-
-            const track: PlaylistTrack = {
+            useDJStore.getState().setDeckState(deckId, {
               fileName: file.name,
               trackName: song.name || file.name,
-              format: fileExt,
-              bpm: bpmResult.bpm,
-              duration,
-              addedAt: Date.now(),
-            };
-
-            addTrack(activePlaylistId, track);
+              detectedBPM: bpmResult.bpm,
+              effectiveBPM: bpmResult.bpm,
+              analysisState: 'rendering',
+              isPlaying: false,
+            });
+            const result = await getDJPipeline().loadOrEnqueue(rawBuffer, file.name, deckId, 'high');
+            await engine.loadAudioToDeck(deckId, result.wavData, file.name, song.name || file.name, result.analysis?.bpm || bpmResult.bpm, song);
           }
-        } catch (err) {
-          console.error(`[DJPlaylistPanel] Failed to process ${file.name}:`, err);
-        }
-      }
-
-      setIsLoadingFile(false);
-      if (fileInputRef.current) fileInputRef.current.value = '';
-    },
-    [activePlaylistId, addTrack],
-  );
-
-  // ── Load track to deck (uses song cache, falls back to file picker) ─────
-
-  const loadSongToDeck = useCallback(
-    async (song: import('@/engine/TrackerReplayer').TrackerSong, fileName: string, deckId: 'A' | 'B' | 'C', rawBuffer?: ArrayBuffer) => {
-      const engine = getDJEngine();
-      const bpmResult = detectBPM(song);
-
-      // We MUST have the raw buffer to render
-      if (rawBuffer) {
-        useDJStore.getState().setDeckState(deckId, {
-          fileName,
-          trackName: song.name || fileName,
-          detectedBPM: bpmResult.bpm,
-          effectiveBPM: bpmResult.bpm,
-          analysisState: 'rendering',
-          isPlaying: false,
-        });
-
-        try {
-          const result = await getDJPipeline().loadOrEnqueue(rawBuffer, fileName, deckId, 'high');
-          await engine.loadAudioToDeck(deckId, result.wavData, fileName, song.name || fileName, result.analysis?.bpm || bpmResult.bpm, song);
           useDJStore.getState().setDeckViewMode('visualizer');
-        } catch (err) {
-          console.error(`[DJPlaylistPanel] Pipeline failed for ${fileName}:`, err);
-        }
-      } else {
-        console.warn(`[DJPlaylistPanel] Cannot load ${fileName}: missing raw buffer for rendering`);
+        };
+        input.click();
+      } catch (err) {
+        console.error(`[DJPlaylist] Failed to load track:`, err);
+      } finally {
+        setLoadingTracks(prev => { const n = new Set(prev); n.delete(trackIndex); return n; });
       }
     },
     [],
   );
 
-  const loadTrackToDeck = useCallback(
-    async (track: PlaylistTrack, deckId: 'A' | 'B' | 'C') => {
-      const engine = getDJEngine();
+  // ── Add files ───────────────────────────────────────────────────────────
 
-      // Modland tracks: auto re-download from server to get the raw buffer
-      if (track.fileName.startsWith('modland:')) {
-        const modlandPath = track.fileName.slice('modland:'.length);
+  const handleAddFiles = useCallback(
+    async (e: React.ChangeEvent<HTMLInputElement>) => {
+      if (!activePlaylistId || !e.target.files) return;
+      for (const file of Array.from(e.target.files)) {
         try {
-          const { downloadModlandFile } = await import('@/lib/modlandApi');
-          const buffer = await downloadModlandFile(modlandPath);
-          const filename = modlandPath.split('/').pop() || 'download.mod';
-          
-          if (isAudioFile(filename)) {
-            await engine.loadAudioToDeck(deckId, buffer, track.fileName);
-            useDJStore.getState().setDeckViewMode('vinyl');
-          } else {
-            const blob = new File([buffer], filename, { type: 'application/octet-stream' });
-            const song = await parseModuleToSong(blob);
-            cacheSong(track.fileName, song);
-            await loadSongToDeck(song, track.fileName, deckId, buffer);
-          }
-          return;
-        } catch (err) {
-          console.error(`[DJPlaylistPanel] Modland re-download failed:`, err);
-        }
-      }
-
-      // Prompt user to select the file to get the raw buffer
-      const input = document.createElement('input');
-      input.type = 'file';
-      input.accept = '*/*';
-      input.onchange = async () => {
-        const file = input.files?.[0];
-        if (!file) return;
-        try {
-          const rawBuffer = await file.arrayBuffer();
-          if (isAudioFile(file.name)) {
-            await engine.loadAudioToDeck(deckId, rawBuffer, file.name);
-            useDJStore.getState().setDeckViewMode('vinyl');
-          } else {
-            const song = await parseModuleToSong(file);
-            cacheSong(file.name, song);
-            await loadSongToDeck(song, file.name, deckId, rawBuffer);
-            // loadSongToDeck already sets 'visualizer'
-          }
-        } catch (err) {
-          console.error(`[DJPlaylistPanel] Failed to load track:`, err);
-        }
-      };
-      input.click();
-    },
-    [loadSongToDeck],
-  );
-
-  // ── Drag reorder ─────────────────────────────────────────────────────────
-
-  const handleDragStart = useCallback((index: number) => {
-    setDragIndex(index);
-  }, []);
-
-  const handleDragOver = useCallback(
-    (e: React.DragEvent, index: number) => {
-      e.preventDefault();
-      if (dragIndex === null || dragIndex === index || !activePlaylistId) return;
-      reorderTrack(activePlaylistId, dragIndex, index);
-      setDragIndex(index);
-    },
-    [dragIndex, activePlaylistId, reorderTrack],
-  );
-
-  const handleDragEnd = useCallback(() => {
-    setDragIndex(null);
-  }, []);
-
-  // ── Drop files from file browser onto playlist ───────────────────────────
-
-  const handleDropOnPlaylist = useCallback(
-    async (e: React.DragEvent) => {
-      e.preventDefault();
-      e.stopPropagation();
-      if (!activePlaylistId) return;
-
-      const droppedFiles = Array.from(e.dataTransfer.files);
-      if (droppedFiles.length === 0) return;
-
-      setIsLoadingFile(true);
-      for (const file of droppedFiles) {
-        try {
-          const isAudio = isAudioFile(file.name);
           const fileExt = file.name.split('.').pop()?.toUpperCase() ?? 'MOD';
-
-          if (isAudio) {
-            addTrack(activePlaylistId, {
-              fileName: file.name,
-              trackName: file.name.replace(/\.[^.]+$/, ''),
-              format: fileExt,
-              bpm: 0,
-              duration: 0,
-              addedAt: Date.now(),
-            });
+          if (isAudioFile(file.name)) {
+            addTrack(activePlaylistId, { fileName: file.name, trackName: file.name.replace(/\.[^.]+$/, ''), format: fileExt, bpm: 0, duration: 0, addedAt: Date.now() });
           } else {
             const song = await parseModuleToSong(file);
             cacheSong(file.name, song);
             const bpmResult = detectBPM(song);
-            const duration = estimateSongDuration(song);
-
-            addTrack(activePlaylistId, {
-              fileName: file.name,
-              trackName: song.name || file.name,
-              format: fileExt,
-              bpm: bpmResult.bpm,
-              duration,
-              addedAt: Date.now(),
-            });
+            addTrack(activePlaylistId, { fileName: file.name, trackName: song.name || file.name, format: fileExt, bpm: bpmResult.bpm, duration: estimateSongDuration(song), addedAt: Date.now() });
           }
-        } catch (err) {
-          console.error(`[DJPlaylistPanel] Drop process error:`, err);
-        }
+        } catch { /* skip */ }
       }
-      setIsLoadingFile(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
     },
     [activePlaylistId, addTrack],
   );
 
-  // ── Render ───────────────────────────────────────────────────────────────
+  // ── Keyboard navigation ─────────────────────────────────────────────────
+
+  const handleKeyDown = useCallback(
+    (e: React.KeyboardEvent) => {
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        setSelectedIndex(i => Math.min(i + 1, filteredTracks.length - 1));
+      } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        setSelectedIndex(i => Math.max(i - 1, 0));
+      } else if (e.key === 'Enter' && selectedIndex >= 0 && selectedIndex < filteredTracks.length) {
+        e.preventDefault();
+        loadToDeck(filteredTracks[selectedIndex], selectedIndex, e.shiftKey ? 'B' : 'A');
+      } else if ((e.key === '1' || e.key === '2' || e.key === '3') && selectedIndex >= 0) {
+        const target = e.target as HTMLElement;
+        if (target.tagName === 'INPUT' || target.tagName === 'SELECT') return;
+        e.preventDefault();
+        const deckMap = { '1': 'A', '2': 'B', '3': 'C' } as const;
+        const deckId = deckMap[e.key as '1' | '2' | '3'];
+        if (deckId === 'C' && !thirdDeckActive) useDJStore.getState().setThirdDeckActive(true);
+        loadToDeck(filteredTracks[selectedIndex], selectedIndex, deckId);
+      }
+    },
+    [filteredTracks, selectedIndex, thirdDeckActive, loadToDeck],
+  );
+
+  // ── Sort handler ────────────────────────────────────────────────────────
+  // Click a field to add it to the sort chain. Click again to toggle order.
+  // Click an active field a third time to remove it from the chain.
+
+  const handleSort = useCallback((field: PlaylistSortField) => {
+    setSortFields(prev => {
+      const idx = prev.indexOf(field);
+      let next: PlaylistSortField[];
+      let order = sortOrder;
+
+      if (idx === -1) {
+        // Field not active — add it to the chain
+        next = [...prev, field];
+      } else if (idx === prev.length - 1) {
+        // Last field clicked again — toggle order
+        order = sortOrder === 'asc' ? 'desc' : 'asc';
+        setSortOrder(order);
+        next = prev;
+      } else {
+        // Already in chain but not last — move to end
+        next = [...prev.filter(f => f !== field), field];
+      }
+
+      if (activePlaylistId && next.length > 0) {
+        sortPlaylist(activePlaylistId, next, order);
+      }
+      return next;
+    });
+  }, [sortOrder, activePlaylistId, sortPlaylist]);
+
+  // ── Render ──────────────────────────────────────────────────────────────
 
   return (
-    <div className="bg-dark-bgSecondary border border-dark-border rounded-lg p-3 flex flex-col gap-2 max-h-[400px]">
+    <div
+      className="bg-dark-bgSecondary border border-dark-border rounded-lg p-3 flex flex-col gap-2 max-h-[400px] relative z-[99990]"
+      onKeyDown={handleKeyDown}
+      tabIndex={-1}
+    >
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex-shrink-0 flex items-center justify-between">
         <div className="flex items-center gap-2">
           <ListMusic size={14} className="text-accent-primary" />
           <h3 className="text-text-primary text-sm font-mono font-bold tracking-wider uppercase">
             Playlists
           </h3>
+          <span className="text-[10px] font-mono text-text-muted">
+            {playlists.length} lists
+          </span>
         </div>
-        <div className="flex items-center gap-1.5">
-          {!isCreating ? (
-            <button
-              onClick={() => setIsCreating(true)}
-              className="flex items-center gap-1 px-2 py-1 text-[10px] font-mono text-text-secondary
-                         bg-dark-bgTertiary border border-dark-borderLight rounded
-                         hover:bg-dark-bgHover hover:text-text-primary transition-colors"
-            >
-              <Plus size={10} />
-              New
-            </button>
-          ) : (
-            <div className="flex items-center gap-1">
-              <input
-                autoFocus
-                value={newName}
-                onChange={(e) => setNewName(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') handleCreate();
-                  if (e.key === 'Escape') setIsCreating(false);
-                }}
-                placeholder="Playlist name..."
-                className="w-32 px-2 py-0.5 text-[10px] font-mono bg-dark-bg border border-dark-borderLight
-                           rounded text-text-primary placeholder:text-text-muted/40"
-              />
-              <button onClick={handleCreate} className="p-0.5 text-green-400 hover:text-green-300">
-                <Check size={12} />
-              </button>
-              <button onClick={() => setIsCreating(false)} className="p-0.5 text-text-muted hover:text-text-primary">
-                <X size={12} />
-              </button>
-            </div>
-          )}
-          {onClose && (
-            <button onClick={onClose} className="text-text-muted hover:text-text-primary p-1">
-              <X size={14} />
-            </button>
-          )}
-        </div>
+        {onClose && (
+          <button onClick={onClose} className="text-text-muted hover:text-text-primary p-1">
+            <X size={14} />
+          </button>
+        )}
       </div>
 
-      {/* Playlist selector */}
-      {playlists.length > 0 && (
-        <div className="flex gap-1 flex-wrap">
-          {playlists.map((pl) => (
-            <div
-              key={pl.id}
-              className={`group flex items-center gap-1 px-2 py-1 rounded text-[10px] font-mono cursor-pointer transition-colors ${
-                activePlaylistId === pl.id
-                  ? 'bg-accent-primary/15 text-accent-primary border border-accent-primary/30'
-                  : 'bg-dark-bgTertiary text-text-muted border border-dark-borderLight hover:text-text-secondary'
-              }`}
-              onClick={() => setActivePlaylist(pl.id)}
-            >
-              {editingId === pl.id ? (
-                <input
-                  autoFocus
-                  value={editName}
-                  onChange={(e) => setEditName(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') handleRename(pl.id);
-                    if (e.key === 'Escape') setEditingId(null);
-                  }}
-                  onBlur={() => handleRename(pl.id)}
-                  onClick={(e) => e.stopPropagation()}
-                  className="w-20 px-1 bg-dark-bg border border-dark-borderLight rounded text-[10px] text-text-primary"
-                />
-              ) : (
-                <>
-                  <span className="truncate max-w-[80px]">{pl.name}</span>
-                  <span className="text-text-muted/40">{pl.tracks.length}</span>
-                  <Edit3
-                    size={9}
-                    className="opacity-0 group-hover:opacity-60 hover:!opacity-100 shrink-0"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setEditingId(pl.id);
-                      setEditName(pl.name);
-                    }}
-                  />
-                  <Trash2
-                    size={9}
-                    className="opacity-0 group-hover:opacity-60 hover:!opacity-100 text-red-400 shrink-0"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      deletePlaylist(pl.id);
-                    }}
-                  />
-                </>
-              )}
-            </div>
+      {/* Playlist selector + search + sort */}
+      <div className="flex-shrink-0 flex gap-2">
+        <select
+          value={activePlaylistId ?? ''}
+          onChange={(e) => { setActivePlaylist(e.target.value || null); setSelectedIndex(-1); setFilter(''); }}
+          className="w-48 px-2 py-1.5 text-xs font-mono bg-dark-bg border border-dark-borderLight rounded
+                     text-text-primary focus:border-accent-primary focus:outline-none transition-colors"
+        >
+          <option value="">Select playlist...</option>
+          {playlists.map(pl => (
+            <option key={pl.id} value={pl.id}>
+              {pl.name} ({pl.tracks.length})
+            </option>
           ))}
+        </select>
+
+        <div className="flex-1 relative">
+          <Search size={12} className="absolute left-2 top-1/2 -translate-y-1/2 text-text-muted" />
+          <input
+            ref={inputRef}
+            value={filter}
+            onChange={(e) => { setFilter(e.target.value); setSelectedIndex(-1); }}
+            placeholder="Filter tracks..."
+            className="w-full pl-7 pr-2 py-1.5 text-xs font-mono bg-dark-bg border border-dark-borderLight
+                       rounded text-text-primary placeholder:text-text-muted/40
+                       focus:border-accent-primary focus:outline-none transition-colors"
+          />
+        </div>
+
+        <button
+          onClick={() => fileInputRef.current?.click()}
+          className="px-2 py-1 text-[10px] font-mono text-text-secondary bg-dark-bgTertiary border
+                     border-dark-borderLight rounded hover:bg-dark-bgHover hover:text-text-primary
+                     transition-colors shrink-0"
+          title="Add files to active playlist"
+        >
+          <Plus size={12} />
+        </button>
+        <input ref={fileInputRef} type="file" multiple accept="*/*" onChange={handleAddFiles} className="hidden" />
+
+        <button
+          onClick={() => { const name = prompt('Playlist name:'); if (name?.trim()) createPlaylist(name.trim()); }}
+          className="px-2 py-1 text-[10px] font-mono text-text-secondary bg-dark-bgTertiary border
+                     border-dark-borderLight rounded hover:bg-dark-bgHover hover:text-text-primary
+                     transition-colors shrink-0"
+          title="New playlist"
+        >
+          New
+        </button>
+
+        {activePlaylistId && (
+          <button
+            onClick={() => { if (confirm('Delete this playlist?')) deletePlaylist(activePlaylistId); }}
+            className="px-1 py-1 text-text-muted hover:text-red-400 transition-colors shrink-0"
+            title="Delete playlist"
+          >
+            <Trash2 size={12} />
+          </button>
+        )}
+      </div>
+
+      {/* Sort row */}
+      {activePlaylist && activePlaylist.tracks.length > 1 && (
+        <div className="flex-shrink-0 flex items-center gap-1 px-1">
+          <span className="text-[9px] text-text-muted mr-1">Sort:</span>
+          {([
+            ['trackName', 'Name'],
+            ['bpm', 'BPM'],
+            ['key', 'Key'],
+            ['duration', 'Dur'],
+            ['format', 'Fmt'],
+          ] as const).map(([field, label]) => {
+            const sortIdx = sortFields.indexOf(field);
+            const isActive = sortIdx !== -1;
+            const isLast = sortIdx === sortFields.length - 1;
+            return (
+              <button
+                key={field}
+                onClick={() => handleSort(field)}
+                onContextMenu={(e) => {
+                  e.preventDefault();
+                  // Right-click removes from sort chain
+                  if (isActive) {
+                    const next = sortFields.filter(f => f !== field);
+                    setSortFields(next);
+                    if (activePlaylistId && next.length > 0) sortPlaylist(activePlaylistId, next, sortOrder);
+                  }
+                }}
+                className={`px-1.5 py-0.5 text-[9px] font-mono rounded transition-colors ${
+                  isActive
+                    ? 'bg-accent-primary/20 text-accent-primary'
+                    : 'text-text-muted hover:text-text-primary hover:bg-dark-bgHover'
+                }`}
+                title={isActive ? `Sort priority ${sortIdx + 1}. Right-click to remove.` : `Click to sort by ${label}`}
+              >
+                {label}
+                {isActive && sortFields.length > 1 && <sup className="ml-0.5 text-[7px]">{sortIdx + 1}</sup>}
+                {isActive && isLast ? (sortOrder === 'asc' ? ' \u2191' : ' \u2193') : ''}
+              </button>
+            );
+          })}
+          <span className="flex-1" />
+          <span className="text-[9px] font-mono text-text-muted/40">
+            {filteredTracks.length}{filter ? `/${activePlaylist.tracks.length}` : ''} tracks
+          </span>
         </div>
       )}
 
-      {/* Active playlist tracks */}
-      {activePlaylist ? (
-        <div
-          className="flex-1 overflow-y-auto min-h-0"
-          onDragOver={(e) => e.preventDefault()}
-          onDrop={handleDropOnPlaylist}
-        >
-          {/* Add to playlist button */}
-          <div className="flex items-center gap-2 mb-2">
-            <button
-              onClick={() => fileInputRef.current?.click()}
-              disabled={isLoadingFile}
-              className="flex items-center gap-1 px-2 py-1 text-[10px] font-mono text-text-secondary
-                         bg-dark-bgTertiary border border-dark-borderLight rounded
-                         hover:bg-dark-bgHover hover:text-text-primary transition-colors disabled:opacity-50"
-            >
-              <Plus size={10} />
-              {isLoadingFile ? 'Loading...' : 'Add Tracks'}
-            </button>
-            <span className="text-[9px] font-mono text-text-muted/40">
-              or drop files here
-            </span>
-            <input
-              ref={fileInputRef}
-              type="file"
-              multiple
-              accept="*/*"
-              onChange={handleAddFiles}
-              className="hidden"
-            />
+      {/* Track list — matches Modland browser row style */}
+      <div ref={listRef} className="flex-1 overflow-y-auto min-h-0">
+        {!activePlaylist ? (
+          <div className="flex flex-col items-center justify-center py-8 text-text-muted">
+            <ListMusic size={24} className="mb-2 opacity-40" />
+            <p className="text-xs font-mono">Select a playlist</p>
           </div>
-
-          {activePlaylist.tracks.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-6 text-text-muted">
-              <Music size={20} className="mb-1.5 opacity-30" />
-              <p className="text-[10px] font-mono">Empty playlist</p>
-            </div>
-          ) : (
-            <div className="flex flex-col gap-0.5">
-              {activePlaylist.tracks.map((track, i) => (
-                <div
-                  key={`${track.fileName}-${i}`}
-                  draggable
-                  onDragStart={() => handleDragStart(i)}
-                  onDragOver={(e) => handleDragOver(e, i)}
-                  onDragEnd={handleDragEnd}
-                  className={`flex items-center gap-1.5 px-2 py-1.5 rounded border transition-colors group ${
-                    dragIndex === i
-                      ? 'bg-accent-primary/10 border-accent-primary/30'
-                      : 'bg-dark-bg border-dark-borderLight hover:border-dark-border'
-                  }`}
-                >
-                  {/* Drag handle */}
-                  <GripVertical
-                    size={10}
-                    className="text-text-muted/30 group-hover:text-text-muted/60 shrink-0 cursor-grab"
-                  />
-
-                  {/* Track number */}
-                  <span className="text-[9px] font-mono text-text-muted/40 w-4 text-right shrink-0">
-                    {i + 1}
-                  </span>
-
-                  {/* Track info */}
-                  <div className="flex-1 min-w-0">
-                    <div className="text-text-primary text-[11px] font-mono truncate">
-                      {track.trackName}
-                    </div>
-                    <div className="flex gap-2 text-[9px] text-text-muted/50 font-mono">
-                      <span>{track.format}</span>
-                      {track.bpm > 0 && <span>{track.bpm} BPM</span>}
-                      {track.duration > 0 && <span>{formatDuration(track.duration)}</span>}
-                    </div>
+        ) : filteredTracks.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-8 text-text-muted">
+            <Music size={24} className="mb-2 opacity-40" />
+            <p className="text-xs font-mono">{filter ? 'No matches' : 'Empty playlist'}</p>
+          </div>
+        ) : (
+          <div className="flex flex-col gap-0.5">
+            {filteredTracks.map((track, idx) => (
+              <div
+                key={`${track.fileName}-${idx}`}
+                onClick={() => setSelectedIndex(idx)}
+                className={`flex items-center gap-2 px-2 py-1.5 rounded border transition-colors group cursor-pointer ${
+                  idx === selectedIndex
+                    ? 'bg-accent-primary/10 border-accent-primary/30'
+                    : 'bg-dark-bg border-dark-borderLight hover:border-dark-border'
+                }`}
+              >
+                {/* Track info */}
+                <div className="flex-1 min-w-0">
+                  <div className="text-text-primary text-xs font-mono truncate">
+                    {track.trackName}
                   </div>
+                  <div className="flex gap-3 text-[10px] text-text-muted font-mono">
+                    <span>{track.format}</span>
+                    {track.bpm > 0 && <span>{track.bpm} BPM</span>}
+                    {track.key && <span>{track.key}</span>}
+                  </div>
+                </div>
 
-                  {/* Deck load buttons */}
-                  <button
-                    onClick={() => loadTrackToDeck(track, 'A')}
-                    className="px-1.5 py-0.5 text-[9px] font-mono font-bold rounded
-                               bg-blue-900/30 text-blue-400 border border-blue-800/50
-                               hover:bg-blue-800/40 hover:text-blue-300 transition-colors
-                               opacity-0 group-hover:opacity-100"
-                    title="Load to Deck 1"
-                  >
-                    1
-                  </button>
-                  <button
-                    onClick={() => loadTrackToDeck(track, 'B')}
-                    className="px-1.5 py-0.5 text-[9px] font-mono font-bold rounded
-                               bg-red-900/30 text-red-400 border border-red-800/50
-                               hover:bg-red-800/40 hover:text-red-300 transition-colors
-                               opacity-0 group-hover:opacity-100"
-                    title="Load to Deck 2"
-                  >
-                    2
-                  </button>
-                  {useDJStore.getState().thirdDeckActive && (
+                {/* Actions */}
+                {loadingTracks.has(idx) ? (
+                  <Loader2 size={12} className="animate-spin text-accent-primary" />
+                ) : (
+                  <>
                     <button
-                      onClick={() => loadTrackToDeck(track, 'C')}
-                      className="px-1.5 py-0.5 text-[9px] font-mono font-bold rounded
+                      onClick={(e) => { e.stopPropagation(); loadToDeck(track, idx, 'A'); }}
+                      className="px-2 py-1 text-[10px] font-mono font-bold rounded
+                                 bg-blue-900/30 text-blue-400 border border-blue-800/50
+                                 hover:bg-blue-800/40 hover:text-blue-300 transition-colors
+                                 opacity-0 group-hover:opacity-100"
+                    >
+                      1
+                    </button>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); loadToDeck(track, idx, 'B'); }}
+                      className="px-2 py-1 text-[10px] font-mono font-bold rounded
+                                 bg-red-900/30 text-red-400 border border-red-800/50
+                                 hover:bg-red-800/40 hover:text-red-300 transition-colors
+                                 opacity-0 group-hover:opacity-100"
+                    >
+                      2
+                    </button>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (!thirdDeckActive) useDJStore.getState().setThirdDeckActive(true);
+                        loadToDeck(track, idx, 'C');
+                      }}
+                      className={`px-2 py-1 text-[10px] font-mono font-bold rounded
                                  bg-emerald-900/30 text-emerald-400 border border-emerald-800/50
                                  hover:bg-emerald-800/40 hover:text-emerald-300 transition-colors
-                                 opacity-0 group-hover:opacity-100"
-                      title="Load to Deck 3"
+                                 opacity-0 group-hover:opacity-100 ${!thirdDeckActive ? 'opacity-0 group-hover:opacity-50' : ''}`}
                     >
                       3
                     </button>
-                  )}
-                  <button
-                    onClick={() => removeTrack(activePlaylist.id, i)}
-                    className="p-0.5 text-text-muted hover:text-accent-error transition-colors
-                               opacity-0 group-hover:opacity-100"
-                  >
-                    <X size={9} />
-                  </button>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      ) : (
-        <div className="flex-1 flex flex-col items-center justify-center py-8 text-text-muted">
-          <ListMusic size={24} className="mb-2 opacity-30" />
-          <p className="text-[10px] font-mono">Create a playlist to get started</p>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (activePlaylistId) {
+                          const realIdx = activePlaylist!.tracks.indexOf(track);
+                          if (realIdx >= 0) removeTrack(activePlaylistId, realIdx);
+                        }
+                      }}
+                      className="p-1 text-text-muted hover:text-red-400 transition-colors
+                                 opacity-0 group-hover:opacity-100"
+                    >
+                      <X size={10} />
+                    </button>
+                  </>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Keyboard hints */}
+      {filteredTracks.length > 0 && (
+        <div className="text-[9px] font-mono text-text-muted/50 flex gap-3 px-1">
+          <span>↑↓ navigate</span>
+          <span>⏎ deck 1</span>
+          <span>⇧⏎ deck 2</span>
+          <span>1/2/3 load deck</span>
         </div>
       )}
     </div>

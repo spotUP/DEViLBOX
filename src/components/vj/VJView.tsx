@@ -33,6 +33,12 @@ import { registerCaptureCanvas } from '@/engine/dj/streaming/DJVideoCapture';
 // Lazy-load ProjectMCanvas (heavy WASM dependency)
 const ProjectMCanvas = React.lazy(() => import('./ProjectMCanvas').then(m => ({ default: m.ProjectMCanvas })));
 
+// Lazy-load ThreeCanvas (Three.js 3D scenes)
+const LazyThreeCanvas = React.lazy(() => import('./ThreeCanvas').then(m => ({ default: m.ThreeCanvas })));
+
+// Lazy-load KraftwerkHeadOverlay (transparent 3D head on top of visualizers)
+const LazyHeadOverlay = React.lazy(() => import('./KraftwerkHeadOverlay').then(m => ({ default: m.KraftwerkHeadOverlay })));
+
 // ─── Lazy-loaded butterchurn (large dependency) ────────────────────────────────
 
 let butterchurnModule: any = null;
@@ -740,7 +746,9 @@ export const VJView: React.FC<VJViewProps> = ({ isPopout = false }) => {
   }, [activeLayer, presetCount, pmPresetCount, switchToLayer]);
 
   const handleRandom = useCallback(() => {
-    if (activeLayer === 'projectm' && presetCount > 0) {
+    if (activeLayer === 'three') {
+      threeHandleRef.current?.randomScene();
+    } else if (activeLayer === 'projectm' && presetCount > 0) {
       switchToLayer('milkdrop', () => canvasHandleRef.current?.randomPreset());
     } else if (activeLayer === 'milkdrop' && pmPresetCount > 0) {
       switchToLayer('projectm', () => projectmHandleRef.current?.randomPreset());
@@ -778,6 +786,21 @@ export const VJView: React.FC<VJViewProps> = ({ isPopout = false }) => {
           />
         </React.Suspense>
       </div>
+      {/* Three.js 3D scenes layer */}
+      <div
+        className="absolute inset-0 transition-opacity duration-700 ease-in-out"
+        style={{ opacity: activeLayer === 'three' ? 1 : 0, pointerEvents: activeLayer === 'three' ? 'auto' : 'none' }}
+      >
+        {renderThree && (
+          <React.Suspense fallback={<div className="w-full h-full bg-black flex items-center justify-center"><span className="text-white/50 font-mono text-sm">Loading 3D...</span></div>}>
+            <LazyThreeCanvas
+              ref={threeHandleRef}
+              onReady={handleThreeReady}
+              onSceneChange={handleThreeSceneChange}
+            />
+          </React.Suspense>
+        )}
+      </div>
       <VJPatternOverlayWrapper />
       <VJControls
         currentName={currentName}
@@ -791,7 +814,12 @@ export const VJView: React.FC<VJViewProps> = ({ isPopout = false }) => {
         onToggleAutoAdvance={() => setAutoAdvance(v => !v)}
         onPopOut={handlePopOut}
         onToggleBrowser={() => setBrowserOpen(v => !v)}
-        onSwitchLayer={setActiveLayer}
+        onSwitchLayer={(layer) => {
+          setActiveLayer(layer);
+          setRenderMilkdrop(layer === 'milkdrop');
+          setRenderProjectm(layer === 'projectm');
+          setRenderThree(layer === 'three');
+        }}
         onFullscreen={handleFullscreen}
         isFullscreen={isFullscreen}
         browserOpen={browserOpen}
