@@ -1,0 +1,3 @@
+/Users/spot/Code/DEViLBOX/mame-wasm/ks0164/build/CMakeFiles/KS0164_WASM.dir
+/Users/spot/Code/DEViLBOX/mame-wasm/ks0164/build/CMakeFiles/edit_cache.dir
+/Users/spot/Code/DEViLBOX/mame-wasm/ks0164/build/CMakeFiles/rebuild_cache.dir
