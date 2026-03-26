@@ -33,8 +33,8 @@ const HEADER_ROW_HEIGHT = 28;
 const COLUMN_LABELS_HEIGHT = 20;
 const HEADER_HEIGHT = HEADER_ROW_HEIGHT + COLUMN_LABELS_HEIGHT; // 48 total — matches DOM (28 + 20)
 const LINE_NUMBER_WIDTH = 40;
-const BTN_W = 16;
-const BTN_H = 14;
+const BTN_W = 18;
+const BTN_H = 16;
 const BTN_GAP = 2;
 const BTN_R = 3;
 const CHAR_WIDTH = 10; // must match PixiPatternEditor CHAR_WIDTH
@@ -205,7 +205,7 @@ const PixiChannelHeadersInner: React.FC<PixiChannelHeadersProps> = ({
   const numChannels = pattern.channels.length;
 
   // ── Lucide icon textures (preloaded for async rendering) ────────────────
-  const ICON_SIZE = 12;
+  const ICON_SIZE = 14; // DOM uses size={12} but Pixi textures need slightly larger for visual match
   const [iconsReady, setIconsReady] = useState(false);
   useEffect(() => {
     setIconsReady(false); // Reset so stale textures aren't used during preload
@@ -526,7 +526,7 @@ const PixiChannelHeadersInner: React.FC<PixiChannelHeadersProps> = ({
           >
             <pixiBitmapText
               text={chNum}
-              style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 9, fill: 0xffffff }}
+              style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 11, fill: 0xffffff }}
               tint={chColor}
               layout={LAYOUT_EMPTY}
             />
@@ -557,8 +557,8 @@ const PixiChannelHeadersInner: React.FC<PixiChannelHeadersProps> = ({
             height: HEADER_ROW_HEIGHT,
             flexDirection: 'row',
             alignItems: 'center',
-            paddingLeft: 6,
-            paddingRight: 4,
+            paddingLeft: 8,
+            paddingRight: 8,
           }}
           alpha={mutedAlpha}
           eventMode="static"
