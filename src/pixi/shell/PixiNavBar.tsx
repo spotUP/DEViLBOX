@@ -9,7 +9,7 @@
  *     Project tabs + "+" add button
  */
 
-import React, { useCallback, useRef } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { Container as ContainerType } from 'pixi.js';
 import { PIXI_FONTS } from '../fonts';
 import { usePixiTheme } from '../theme';
@@ -23,9 +23,14 @@ import { MODERN_NAV_H } from '../workbench/workbenchLayout';
 import { BUILD_NUMBER } from '@constants/version';
 import { usePixiDropdownStore } from '../stores/usePixiDropdownStore';
 import { PixiDJSetBrowser } from '../views/dj/PixiDJSetBrowser';
-import { useNavBar } from '@hooks/views/useNavBar';
+import { useNavBar, VIEW_TABS } from '@hooks/views/useNavBar';
 import type { FederatedPointerEvent } from 'pixi.js';
 import type { ProjectTab } from '@stores';
+import { getLucideTexture, preloadLucideIcons } from '../utils/lucideToTexture';
+import {
+  ICON_LOG_IN, ICON_USERS, ICON_DOWNLOAD, ICON_MONITOR,
+  ICON_INFO, ICON_MUSIC, ICON_X, ICON_PLUS,
+} from '../utils/lucideIcons';
 
 const NAV_ROW_H = 42;
 const TAB_ROW_H = MODERN_NAV_H - NAV_ROW_H; // 34px — matches DOM's ~32px tab bar
@@ -37,6 +42,40 @@ export const PixiNavBar: React.FC = () => {
   const { width } = usePixiResponsive();
 
   const n = useNavBar();
+
+  // ── Lucide icon textures for nav buttons ──────────────────────────────────
+  const NAV_ICON = 14;
+  const [navIconsReady, setNavIconsReady] = useState(false);
+  useEffect(() => {
+    const textColor = theme.text.color;
+    const mutedColor = theme.textMuted.color;
+    preloadLucideIcons([
+      { name: 'log-in', iconNode: ICON_LOG_IN, size: NAV_ICON, color: mutedColor },
+      { name: 'users', iconNode: ICON_USERS, size: NAV_ICON, color: mutedColor },
+      { name: 'download', iconNode: ICON_DOWNLOAD, size: NAV_ICON, color: textColor },
+      { name: 'monitor', iconNode: ICON_MONITOR, size: NAV_ICON, color: mutedColor },
+      { name: 'info', iconNode: ICON_INFO, size: NAV_ICON, color: mutedColor },
+      { name: 'music', iconNode: ICON_MUSIC, size: NAV_ICON, color: mutedColor },
+      { name: 'x-close', iconNode: ICON_X, size: 12, color: mutedColor },
+      { name: 'plus-add', iconNode: ICON_PLUS, size: NAV_ICON, color: mutedColor },
+    ]).then(() => setNavIconsReady(true));
+  }, [theme]);
+
+  const navIcons = useMemo(() => {
+    if (!navIconsReady) return null;
+    const textColor = theme.text.color;
+    const mutedColor = theme.textMuted.color;
+    return {
+      logIn: getLucideTexture('log-in', ICON_LOG_IN, NAV_ICON, mutedColor),
+      users: getLucideTexture('users', ICON_USERS, NAV_ICON, mutedColor),
+      download: getLucideTexture('download', ICON_DOWNLOAD, NAV_ICON, textColor),
+      monitor: getLucideTexture('monitor', ICON_MONITOR, NAV_ICON, mutedColor),
+      info: getLucideTexture('info', ICON_INFO, NAV_ICON, mutedColor),
+      music: getLucideTexture('music', ICON_MUSIC, NAV_ICON, mutedColor),
+      xClose: getLucideTexture('x-close', ICON_X, 12, mutedColor),
+      plus: getLucideTexture('plus-add', ICON_PLUS, NAV_ICON, mutedColor),
+    };
+  }, [navIconsReady, theme]);
 
   // Theme options for PixiSelect
   const themeOptions = n.themeOptions;
@@ -162,7 +201,16 @@ export const PixiNavBar: React.FC = () => {
           />
         </layoutContainer>
 
-        {/* View selector removed — view switching is in the editor controls bar */}
+        {/* View switcher dropdown — always visible in all views */}
+        <pixiContainer layout={{ marginLeft: 12, flexShrink: 0 }}>
+          <PixiSelect
+            options={VIEW_TABS.map(t => ({ value: t.id, label: t.label }))}
+            value={n.activeView}
+            onChange={(val) => n.handleSwitchView(val)}
+            width={110}
+            height={24}
+          />
+        </pixiContainer>
       </pixiContainer>
 
       {/* ═══ Right zone: Actions matching DOM layout ═══ */}
@@ -177,8 +225,11 @@ export const PixiNavBar: React.FC = () => {
           flexShrink: 0,
         }}
       >
-        {/* Auth — Sign In / username (matches DOM's Sign In button) */}
-        <pixiContainer ref={authContainerRef} layout={{ flexShrink: 0 }}>
+        {/* Auth — Sign In / username (matches DOM's LogIn icon + text) */}
+        <pixiContainer ref={authContainerRef} layout={{ flexShrink: 0, flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+          {!n.authUser && navIcons?.logIn && (
+            <pixiSprite texture={navIcons.logIn} width={NAV_ICON} height={NAV_ICON} eventMode="none" />
+          )}
           <PixiButton
             label={n.authUser ? n.authUser.username.slice(0, 8) : 'Sign In'}
             variant="ghost"
@@ -188,36 +239,59 @@ export const PixiNavBar: React.FC = () => {
           />
         </pixiContainer>
 
-        {/* Collaboration (matches DOM's Collab button) */}
-        <PixiButton
-          label="Collab"
-          variant={n.collabStatus === 'connected' ? 'primary' : 'ghost'}
-          size="sm"
-          active={n.collabStatus === 'connected'}
-          onClick={n.handleOpenCollab}
-          width={52}
-        />
+        {/* Collaboration (matches DOM's Users icon + Collab text) */}
+        <pixiContainer layout={{ flexShrink: 0, flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+          {navIcons?.users && (
+            <pixiSprite texture={navIcons.users} width={NAV_ICON} height={NAV_ICON} eventMode="none" />
+          )}
+          <PixiButton
+            label="Collab"
+            variant={n.collabStatus === 'connected' ? 'primary' : 'ghost'}
+            size="sm"
+            active={n.collabStatus === 'connected'}
+            onClick={n.handleOpenCollab}
+            width={52}
+          />
+        </pixiContainer>
 
-        {/* Desktop App download (matches DOM's Desktop App button) */}
-        <PixiButton
-          label="Desktop App"
-          variant="primary"
-          size="sm"
-          onClick={n.handleOpenDownload}
-          width={72}
-        />
+        {/* Desktop App download (matches DOM's Download icon + text) */}
+        <pixiContainer layout={{ flexShrink: 0, flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+          {navIcons?.download && (
+            <pixiSprite texture={navIcons.download} width={NAV_ICON} height={NAV_ICON} eventMode="none" />
+          )}
+          <PixiButton
+            label="Desktop App"
+            variant="primary"
+            size="sm"
+            onClick={n.handleOpenDownload}
+            width={72}
+          />
+        </pixiContainer>
 
-        {/* Switch to DOM mode (matches DOM's DOM button) */}
-        <PixiButton label="Dom" variant="ghost" size="sm" onClick={n.handleSwitchToDom} width={36} />
+        {/* Switch to DOM mode (matches DOM's Monitor icon + DOM text) */}
+        <pixiContainer layout={{ flexShrink: 0, flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+          {navIcons?.monitor && (
+            <pixiSprite texture={navIcons.monitor} width={NAV_ICON} height={NAV_ICON} eventMode="none" />
+          )}
+          <PixiButton label="Dom" variant="ghost" size="sm" onClick={n.handleSwitchToDom} width={36} />
+        </pixiContainer>
 
-        {/* Song Info (matches DOM's Info button) */}
-        <PixiButton label="Info" variant="ghost" size="sm" onClick={n.handleOpenModuleInfo} width={40} />
+        {/* Song Info (matches DOM's Info icon + text) */}
+        <pixiContainer layout={{ flexShrink: 0, flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+          {navIcons?.info && (
+            <pixiSprite texture={navIcons.info} width={NAV_ICON} height={NAV_ICON} eventMode="none" />
+          )}
+          <PixiButton label="Info" variant="ghost" size="sm" onClick={n.handleOpenModuleInfo} width={40} />
+        </pixiContainer>
 
         {/* DJ Sets (matches DOM's Sets dropdown) */}
         <PixiDJSetBrowser />
 
-        {/* MIDI — always shown matching DOM's MIDIToolbarDropdown */}
-        <pixiContainer ref={midiContainerRef} layout={{ flexShrink: 0 }}>
+        {/* MIDI — matches DOM's Music icon + MIDI text */}
+        <pixiContainer ref={midiContainerRef} layout={{ flexShrink: 0, flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+          {navIcons?.music && (
+            <pixiSprite texture={navIcons.music} width={NAV_ICON} height={NAV_ICON} eventMode="none" />
+          )}
           <PixiButton label="MIDI" variant="ghost" size="sm" onClick={handleMIDIClick} width={40} />
         </pixiContainer>
 
@@ -317,13 +391,17 @@ export const PixiNavBar: React.FC = () => {
                   onPointerUp={(e: FederatedPointerEvent) => { e.stopPropagation(); n.closeTab(tab.id); }}
                   layout={{ width: 14, height: 14, justifyContent: 'center', alignItems: 'center' }}
                 >
-                  <pixiBitmapText
-                    text="x"
-                    style={{ fontFamily: PIXI_FONTS.SANS_BOLD, fontSize: 10, fill: 0xffffff }}
-                    tint={theme.textMuted.color}
-                    layout={{}}
-                    eventMode="none"
-                  />
+                  {navIcons?.xClose ? (
+                    <pixiSprite texture={navIcons.xClose} width={12} height={12} eventMode="none" />
+                  ) : (
+                    <pixiBitmapText
+                      text="x"
+                      style={{ fontFamily: PIXI_FONTS.SANS_BOLD, fontSize: 10, fill: 0xffffff }}
+                      tint={theme.textMuted.color}
+                      layout={{}}
+                      eventMode="none"
+                    />
+                  )}
                 </layoutContainer>
               )}
             </layoutContainer>
@@ -344,13 +422,17 @@ export const PixiNavBar: React.FC = () => {
             borderRadius: 4,
           }}
         >
-          <pixiBitmapText
-            text="+"
-            style={{ fontFamily: PIXI_FONTS.SANS_MEDIUM, fontSize: 16, fill: 0xffffff }}
-            tint={theme.textMuted.color}
-            layout={{}}
-            eventMode="none"
-          />
+          {navIcons?.plus ? (
+            <pixiSprite texture={navIcons.plus} width={NAV_ICON} height={NAV_ICON} eventMode="none" />
+          ) : (
+            <pixiBitmapText
+              text="+"
+              style={{ fontFamily: PIXI_FONTS.SANS_MEDIUM, fontSize: 16, fill: 0xffffff }}
+              tint={theme.textMuted.color}
+              layout={{}}
+              eventMode="none"
+            />
+          )}
         </layoutContainer>
       </layoutContainer>
 
