@@ -238,7 +238,7 @@ export const PixiPitchSlider: React.FC<PixiPitchSliderProps> = ({ width, height 
   // ─── Render ────────────────────────────────────────────────────────────
 
   return (
-    <pixiContainer
+    <layoutContainer
       ref={containerRef}
       eventMode="static"
       cursor="ns-resize"
@@ -268,6 +268,6 @@ export const PixiPitchSlider: React.FC<PixiPitchSliderProps> = ({ width, height 
         draw={drawTrack}
         layout={{ position: 'absolute', top: HEADER_H, left: 0, width, height: trackH }}
       />
-    </pixiContainer>
+    </layoutContainer>
   );
 };
