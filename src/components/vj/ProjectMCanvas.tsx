@@ -173,6 +173,25 @@ export const ProjectMCanvas = React.forwardRef<VJCanvasHandle, ProjectMCanvasPro
         }
       };
 
+      // WebGL context loss recovery
+      const handleContextLost = (e: Event) => {
+        e.preventDefault(); // Signal browser we want context restore
+        console.warn('[ProjectM] WebGL context lost — waiting for restore');
+        audioBusRef.current?.disable();
+        audioBusRef.current = null;
+        engineRef.current?.destroy();
+        engineRef.current = null;
+        setReady(false);
+      };
+
+      const handleContextRestored = () => {
+        console.warn('[ProjectM] WebGL context restored — re-initializing');
+        doInit();
+      };
+
+      canvas.addEventListener('webglcontextlost', handleContextLost);
+      canvas.addEventListener('webglcontextrestored', handleContextRestored);
+
       // Wait for next frame so canvas has layout dimensions
       const raf = requestAnimationFrame(() => {
         if (!cancelled) doInit();
@@ -183,6 +202,8 @@ export const ProjectMCanvas = React.forwardRef<VJCanvasHandle, ProjectMCanvasPro
         cancelAnimationFrame(raf);
         cancelAnimationFrame(rafRef.current);
         if (fadeTimerRef.current !== undefined) clearTimeout(fadeTimerRef.current);
+        canvas.removeEventListener('webglcontextlost', handleContextLost);
+        canvas.removeEventListener('webglcontextrestored', handleContextRestored);
         audioBusRef.current?.disable();
         audioBusRef.current = null;
         engineRef.current?.destroy();
