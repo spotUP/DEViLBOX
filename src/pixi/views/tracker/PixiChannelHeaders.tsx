@@ -10,7 +10,7 @@
  * A DOM portal is used only for the channel name editing input (keyboard/IME).
  */
 
-import React, { useCallback, useMemo, useRef, useState, type RefCallback } from 'react';
+import React, { useCallback, useMemo, useRef, useState } from 'react';
 import type { Graphics as GraphicsType, FederatedPointerEvent } from 'pixi.js';
 import { usePixiTheme } from '../../theme';
 import { PIXI_FONTS } from '../../fonts';
@@ -191,10 +191,7 @@ const PixiChannelHeadersInner: React.FC<PixiChannelHeadersProps> = ({
   const showChannelNames = useUIStore(s => s.showChannelNames);
   const [editingChannel, setEditingChannel] = useState<number | null>(null);
   const [editValue, setEditValue] = useState('');
-  const [clipMask, setClipMask] = useState<GraphicsType | null>(null);
-  const clipMaskRef: RefCallback<GraphicsType> = useCallback((g) => {
-    if (g && g !== clipMask) setClipMask(g);
-  }, [clipMask]);
+  // Mask removed — using overflow: hidden on the container instead
   // For double-click detection on channel name
   const lastClickRef = useRef<{ time: number; ch: number }>({ time: 0, ch: -1 });
 
@@ -203,12 +200,6 @@ const PixiChannelHeadersInner: React.FC<PixiChannelHeadersProps> = ({
 
   const numChannels = pattern.channels.length;
 
-  // ── Clip mask for scrollable area ──────────────────────────────────────────
-  const drawClipMaskFull = useCallback((g: GraphicsType) => {
-    g.clear();
-    g.rect(0, 0, width - LINE_NUMBER_WIDTH, HEADER_HEIGHT);
-    g.fill({ color: 0xffffff });
-  }, [width]);
 
   // ── Background drawing ─────────────────────────────────────────────────────
   const drawBackground = useCallback((g: GraphicsType) => {
@@ -775,15 +766,13 @@ const PixiChannelHeadersInner: React.FC<PixiChannelHeadersProps> = ({
         layout={{ position: 'absolute', left: 8, top: (HEADER_ROW_HEIGHT - 9) / 2 }}
       />
 
-      {/* Scrollable channel area — masked to viewport (full height for both rows) */}
+      {/* Scrollable channel area — clipped via overflow hidden */}
       <pixiContainer
-        layout={{ position: 'absolute', left: LINE_NUMBER_WIDTH, top: 0, width: width - LINE_NUMBER_WIDTH, height: HEADER_HEIGHT }}
+        layout={{ position: 'absolute', left: LINE_NUMBER_WIDTH, top: 0, width: width - LINE_NUMBER_WIDTH, height: HEADER_HEIGHT, overflow: 'hidden' }}
       >
-        <pixiGraphics ref={clipMaskRef} draw={drawClipMaskFull} renderable={false} layout={{ position: 'absolute', width: width - LINE_NUMBER_WIDTH, height: HEADER_HEIGHT }} />
         <pixiContainer
           x={-scrollLeft}
           layout={{ position: 'absolute', top: 0, height: HEADER_HEIGHT }}
-          mask={clipMask}
         >
           {/* Channel backgrounds (row 1 only) */}
           <pixiGraphics draw={drawChannelBackgrounds} layout={{ position: 'absolute', width: totalChannelsWidth, height: HEADER_HEIGHT }} />
