@@ -1,13 +1,31 @@
 /**
  * PixiButton — Button component with 6 variants matching DOM Button.
  * Uses layoutContainer native bg/border + MSDF BitmapText labels.
+ * Icons rendered as Lucide SVG textures (pixiSprite) instead of FontAudio bitmap text.
  * Reference: src/components/ui/Button.tsx
  */
 
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Texture } from 'pixi.js';
 import { PIXI_FONTS } from '../fonts';
-import { FAD_ICONS } from '../fontaudioIcons';
+import { FONTAUDIO_TO_LUCIDE } from '../utils/lucideIcons';
+import { getLucideTexture, preloadLucideIcons } from '../utils/lucideToTexture';
 import { usePixiTheme, usePixiThemeId, type PixiTheme } from '../theme';
+
+// Preload all mapped Lucide icons once (white, at common sizes)
+let _iconsPreloaded = false;
+function ensureIconsPreloaded(): void {
+  if (_iconsPreloaded) return;
+  _iconsPreloaded = true;
+  const entries = Object.entries(FONTAUDIO_TO_LUCIDE);
+  const toPreload: { name: string; iconNode: [string, Record<string, string>][]; size: number; color: number }[] = [];
+  for (const [name, node] of entries) {
+    for (const sz of [13, 15, 17, 20]) {
+      toPreload.push({ name, iconNode: node, size: sz, color: 0xffffff });
+    }
+  }
+  preloadLucideIcons(toPreload);
+}
 
 export type ButtonVariant = 'primary' | 'default' | 'ghost' | 'icon' | 'ft2' | 'danger';
 export type ButtonSize = 'sm' | 'md' | 'lg' | 'icon';
@@ -15,7 +33,7 @@ export type ButtonColor = 'default' | 'red' | 'green' | 'yellow' | 'blue' | 'pur
 
 interface PixiButtonProps {
   label: string;
-  /** FontAudio icon name (e.g. 'play', 'stop', 'mute'). Rendered before label. */
+  /** Icon name (e.g. 'play', 'stop', 'close'). Maps to Lucide SVG texture via FONTAUDIO_TO_LUCIDE. */
   icon?: string;
   /** 'left' = icon before label (default), 'top' = icon above label (vertical layout) */
   iconPosition?: 'left' | 'top';
@@ -158,6 +176,17 @@ export const PixiButton: React.FC<PixiButtonProps> = ({
   const isVertical = iconPosition === 'top';
   const iconFontSize = isVertical ? config.fontSize + 4 : config.fontSize + 2;
 
+  // Trigger preload on first mount
+  useEffect(() => { ensureIconsPreloaded(); }, []);
+
+  // Resolve Lucide icon texture (rendered white, tinted via sprite)
+  const iconTexture: Texture | null = useMemo(() => {
+    if (!icon) return null;
+    const lucideNode = FONTAUDIO_TO_LUCIDE[icon];
+    if (!lucideNode) return null;
+    return getLucideTexture(icon, lucideNode, iconFontSize, 0xffffff);
+  }, [icon, iconFontSize]);
+
   const drawBg = useCallback((g: import('pixi.js').Graphics) => {
     g.clear();
     if (!colors.showBg) return;
@@ -188,18 +217,15 @@ export const PixiButton: React.FC<PixiButtonProps> = ({
       }}
     >
       <pixiGraphics draw={drawBg} layout={{ position: 'absolute', width: '100%', height: '100%' }} />
-      {/* Icon (fontaudio) */}
-      {icon && FAD_ICONS[icon] && (
-        <pixiBitmapText
-          eventMode="none"
-          text={FAD_ICONS[icon]}
-          style={{
-            fontFamily: PIXI_FONTS.ICONS,
-            fontSize: iconFontSize,
-            fill: 0xffffff,
-          }}
+      {/* Icon (Lucide SVG texture) */}
+      {icon && iconTexture && (
+        <pixiSprite
+          texture={iconTexture}
+          width={iconFontSize}
+          height={iconFontSize}
           tint={colors.text}
           alpha={disabled ? 0.5 : 1}
+          eventMode="none"
           layout={{ marginRight: !isVertical && label ? 4 : 0 }}
         />
       )}
