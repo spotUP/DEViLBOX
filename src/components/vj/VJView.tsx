@@ -515,6 +515,7 @@ export const VJView: React.FC<VJViewProps> = ({ isPopout = false }) => {
   const autoAdvanceTimerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
   const containerRef = useRef<HTMLDivElement>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const prevLayerRef = useRef<VJLayer>('milkdrop');
 
   // Which layers are actively rendering — both on during crossfade, then old one stops.
   // This avoids running two WebGL pipelines at 60fps permanently.
@@ -527,21 +528,30 @@ export const VJView: React.FC<VJViewProps> = ({ isPopout = false }) => {
   // after a few frames switch activeLayer so the CSS crossfade begins with
   // a live rendered frame already in the target canvas.
   const switchToLayer = useCallback((target: VJLayer, loadPreset: () => void) => {
+    // HARD GUARD: never allow projectM → projectM (crashes native shader pipeline)
+    let effectiveTarget = target;
+    let effectiveLoadPreset = loadPreset;
+    if (target === 'projectm' && prevLayerRef.current === 'projectm') {
+      effectiveTarget = 'milkdrop';
+      effectiveLoadPreset = () => canvasHandleRef.current?.nextPreset();
+    }
+    prevLayerRef.current = effectiveTarget;
+
     if (layerSwitchTimerRef.current !== undefined) clearTimeout(layerSwitchTimerRef.current);
     if (crossfadeTimerRef.current !== undefined) clearTimeout(crossfadeTimerRef.current);
     // 1. Wake up both render loops
     setRenderMilkdrop(true);
     setRenderProjectm(true);
     // 2. Load the new preset into the target engine
-    loadPreset();
+    effectiveLoadPreset();
     // 3. After a few frames for the preset to render, trigger the crossfade
     layerSwitchTimerRef.current = setTimeout(() => {
-      setActiveLayer(target);
+      setActiveLayer(effectiveTarget);
       layerSwitchTimerRef.current = undefined;
       // 4. After the CSS transition completes, stop the old engine
       crossfadeTimerRef.current = setTimeout(() => {
-        setRenderMilkdrop(target === 'milkdrop');
-        setRenderProjectm(target === 'projectm');
+        setRenderMilkdrop(effectiveTarget === 'milkdrop');
+        setRenderProjectm(effectiveTarget === 'projectm');
         crossfadeTimerRef.current = undefined;
       }, 900); // 700ms CSS transition + 200ms buffer
     }, 100); // ~6 frames for new preset to render
@@ -712,20 +722,19 @@ export const VJView: React.FC<VJViewProps> = ({ isPopout = false }) => {
   }, []);
 
   const handleBrowserSelect = useCallback((name: string, _idx: number) => {
-    canvasHandleRef.current?.loadPresetByName(name, 1.5);
-    setActiveLayer('milkdrop');
-  }, []);
+    switchToLayer('milkdrop', () => canvasHandleRef.current?.loadPresetByName(name, 1.5));
+  }, [switchToLayer]);
 
   const handlePMBrowserSelect = useCallback((name: string, _idx: number) => {
     // Instant switch (no blend) for manual browser picks + reset auto-advance timer
-    projectmHandleRef.current?.loadPresetByName(name, false);
+    switchToLayer('projectm', () => projectmHandleRef.current?.loadPresetByName(name, false));
     // Close browser so user can see the preset change (80% black overlay hides it)
     setBrowserOpen(false);
     if (autoAdvanceTimerRef.current) {
       clearTimeout(autoAdvanceTimerRef.current);
       autoAdvanceTimerRef.current = undefined;
     }
-  }, []);
+  }, [switchToLayer]);
 
   // Next/Random always alternate layers so projectM never loads consecutive presets
   const handleNext = useCallback(() => {
@@ -791,7 +800,13 @@ export const VJView: React.FC<VJViewProps> = ({ isPopout = false }) => {
         onToggleAutoAdvance={() => setAutoAdvance(v => !v)}
         onPopOut={handlePopOut}
         onToggleBrowser={() => setBrowserOpen(v => !v)}
-        onSwitchLayer={setActiveLayer}
+        onSwitchLayer={(layer) => {
+          if (layer === 'milkdrop') {
+            switchToLayer('milkdrop', () => canvasHandleRef.current?.nextPreset());
+          } else {
+            switchToLayer('projectm', () => projectmHandleRef.current?.nextPreset());
+          }
+        }}
         onFullscreen={handleFullscreen}
         isFullscreen={isFullscreen}
         browserOpen={browserOpen}
