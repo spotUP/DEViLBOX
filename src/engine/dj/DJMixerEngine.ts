@@ -231,21 +231,23 @@ export class DJMixerEngine {
   async rebuildMasterEffects(effects: EffectConfig[]): Promise<void> {
     const myVersion = ++this.masterEffectsRebuildVersion;
 
-    // Disconnect masterGain's output (preserves upstream from deck inputs)
-    this.masterGain.disconnect();
-
-    // Dispose old effect nodes
-    for (const node of this.masterEffectsNodes) {
-      try { node.disconnect(); node.dispose(); } catch { /* already disposed */ }
-    }
-    this.masterEffectsNodes = [];
+    // Capture current first node so we can disconnect it AFTER connecting the new path
+    const oldFirstNode = this.masterEffectsNodes[0] ?? this.limiter;
+    const oldNodes = [...this.masterEffectsNodes];
 
     // Filter to enabled effects only
     const enabled = effects.filter((fx) => fx.enabled);
 
     if (enabled.length === 0) {
-      // No effects — direct path
+      // No effects — ZERO-GAP SWAP: connect direct to limiter FIRST, then disconnect old
       this.masterGain.connect(this.limiter);
+      try { this.masterGain.disconnect(oldFirstNode); } catch { /* already disconnected */ }
+
+      // Dispose old effect nodes
+      for (const node of oldNodes) {
+        try { node.disconnect(); node.dispose(); } catch { /* already disposed */ }
+      }
+      this.masterEffectsNodes = [];
       return;
     }
 
@@ -277,18 +279,34 @@ export class DJMixerEngine {
     }
 
     if (nodes.length === 0) {
+      // All effects failed — ZERO-GAP SWAP: connect direct to limiter FIRST
       this.masterGain.connect(this.limiter);
+      try { this.masterGain.disconnect(oldFirstNode); } catch { /* already disconnected */ }
+
+      for (const node of oldNodes) {
+        try { node.disconnect(); node.dispose(); } catch { /* already disposed */ }
+      }
+      this.masterEffectsNodes = [];
       return;
     }
 
-    this.masterEffectsNodes = nodes;
-
-    // Chain: masterGain → fx[0] → fx[1] → ... → limiter
-    this.masterGain.connect(nodes[0]);
+    // Wire new chain internally first (not yet connected to masterGain)
     for (let i = 0; i < nodes.length - 1; i++) {
       nodes[i].connect(nodes[i + 1]);
     }
     nodes[nodes.length - 1].connect(this.limiter);
+
+    // ZERO-GAP SWAP: connect new chain FIRST, then disconnect old
+    // Web Audio allows multiple connections — for one sample frame both paths carry audio
+    this.masterGain.connect(nodes[0]);
+    try { this.masterGain.disconnect(oldFirstNode); } catch { /* already disconnected */ }
+
+    // Dispose old effect nodes (already disconnected from masterGain)
+    for (const node of oldNodes) {
+      try { node.disconnect(); node.dispose(); } catch { /* already disposed */ }
+    }
+
+    this.masterEffectsNodes = nodes;
 
     console.log(`[DJMixer] Master FX chain: ${enabled.map(e => e.type).join(' → ')}`);
   }
