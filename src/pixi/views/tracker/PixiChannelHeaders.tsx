@@ -763,7 +763,7 @@ const PixiChannelHeadersInner: React.FC<PixiChannelHeadersProps> = ({
 
 
   return (
-    <pixiContainer layout={{ width, height: HEADER_HEIGHT }}>
+    <layoutContainer layout={{ width, height: HEADER_HEIGHT, flexShrink: 0 }}>
       {/* Background layer */}
       <pixiGraphics draw={drawBackground} layout={{ position: 'absolute', width, height: HEADER_HEIGHT }} />
 
@@ -794,7 +794,7 @@ const PixiChannelHeadersInner: React.FC<PixiChannelHeadersProps> = ({
         </pixiContainer>
       </pixiContainer>
 
-    </pixiContainer>
+    </layoutContainer>
   );
 };
 
