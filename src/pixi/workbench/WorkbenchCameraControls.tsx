@@ -7,10 +7,11 @@
  * leaves the pad bounds.
  */
 
-import React, { useCallback, useRef } from 'react';
+import React, { useCallback, useMemo, useRef } from 'react';
 import type { FederatedPointerEvent } from 'pixi.js';
 import { PIXI_FONTS } from '../fonts';
-import { FAD_ICONS } from '../fontaudioIcons';
+import { FONTAUDIO_TO_LUCIDE } from '../utils/lucideIcons';
+import { getLucideTexture } from '../utils/lucideToTexture';
 import { usePixiTheme } from '../theme';
 
 interface WorkbenchCameraControlsProps {
@@ -61,8 +62,13 @@ const DragPad: React.FC<{
     document.addEventListener('pointerup', onUp);
   }, [onDrag]);
 
-  const iconChar = FAD_ICONS[icon] ?? '?';
   const textColor = theme.text?.color ?? 0xcccccc;
+  const lucideNode = FONTAUDIO_TO_LUCIDE[icon];
+  // eslint-disable-next-line react-hooks/rules-of-hooks
+  const iconTexture = useMemo(() => {
+    if (!lucideNode) return null;
+    return getLucideTexture(icon, lucideNode, ICON_SIZE, 0xffffff);
+  }, [icon, lucideNode]);
 
   return (
     <layoutContainer
@@ -84,13 +90,16 @@ const DragPad: React.FC<{
         borderColor: 0x555555,
       }}
     >
-      <pixiBitmapText
-        text={iconChar}
-        style={{ fontFamily: PIXI_FONTS.ICONS, fontSize: ICON_SIZE }}
-        tint={textColor}
-        anchor={{ x: 0.5, y: 0.5 }}
-        layout={{ alignSelf: 'center' }}
-      />
+      {iconTexture && (
+        <pixiSprite
+          texture={iconTexture}
+          width={ICON_SIZE}
+          height={ICON_SIZE}
+          tint={textColor}
+          eventMode="none"
+          layout={{ alignSelf: 'center' }}
+        />
+      )}
       <pixiBitmapText
         text={label}
         style={{ fontFamily: PIXI_FONTS.MONO, fontSize: LABEL_SIZE }}
