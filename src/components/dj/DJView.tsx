@@ -28,6 +28,7 @@ import { useDJKeyboardHandler } from './DJKeyboardHandler';
 import type { SeratoTrack } from '@/lib/serato';
 import { getDJPipeline } from '@/engine/dj/DJPipeline';
 import { useDeckStateSync } from '@/hooks/dj/useDeckStateSync';
+import { useDJHealth } from '@/hooks/dj/useDJHealth';
 import type { DeckId } from '@/engine/dj/DeckEngine';
 
 /** Headless bridge — polls engine state and updates the store for one deck. */
@@ -61,6 +62,7 @@ export const DJView: React.FC<DJViewProps> = ({ onShowDrumpads: _onShowDrumpads 
   const [showSerato, setShowSerato] = useState(false);
   const [showMasterFX, setShowMasterFX] = useState(false);
   const [showSampler, setShowSampler] = useState(false);
+  const health = useDJHealth();
 
   // Initialize DJEngine on mount, silence tracker + dispose on unmount
   useEffect(() => {
@@ -247,6 +249,17 @@ export const DJView: React.FC<DJViewProps> = ({ onShowDrumpads: _onShowDrumpads 
 
   return (
     <div ref={djViewRef} className="relative flex flex-col h-full w-full overflow-hidden select-none bg-dark-bg font-mono">
+      {/* Audio health indicator — only visible when AudioContext is not running */}
+      {health && health.audioContext !== 'running' && (
+        <div style={{
+          position: 'absolute', top: 4, right: 4, zIndex: 9999,
+          padding: '4px 8px', borderRadius: 4, fontSize: 11, fontFamily: 'monospace',
+          background: health.audioContext === 'suspended' ? '#a80' : '#a00',
+          color: '#fff', pointerEvents: 'none',
+        }}>
+          Audio: {health.audioContext}
+        </div>
+      )}
       {/* Headless state sync — runs in ALL view modes (DOM, Vinyl, 3D) */}
       <DeckStateSyncBridge deckId="A" />
       <DeckStateSyncBridge deckId="B" />
