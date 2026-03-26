@@ -23,7 +23,7 @@ import { MODERN_NAV_H } from '../workbench/workbenchLayout';
 import { BUILD_NUMBER } from '@constants/version';
 import { usePixiDropdownStore } from '../stores/usePixiDropdownStore';
 import { PixiDJSetBrowser } from '../views/dj/PixiDJSetBrowser';
-import { useNavBar, VIEW_TABS } from '@hooks/views/useNavBar';
+import { useNavBar } from '@hooks/views/useNavBar';
 import type { FederatedPointerEvent } from 'pixi.js';
 import type { ProjectTab } from '@stores';
 import { getLucideTexture, preloadLucideIcons } from '../utils/lucideToTexture';
@@ -201,16 +201,6 @@ export const PixiNavBar: React.FC = () => {
           />
         </layoutContainer>
 
-        {/* View switcher dropdown — always visible in all views */}
-        <pixiContainer layout={{ marginLeft: 12, flexShrink: 0 }}>
-          <PixiSelect
-            options={VIEW_TABS.map(t => ({ value: t.id, label: t.label }))}
-            value={n.activeView}
-            onChange={(val) => n.handleSwitchView(val)}
-            width={110}
-            height={24}
-          />
-        </pixiContainer>
       </pixiContainer>
 
       {/* ═══ Right zone: Actions matching DOM layout ═══ */}
