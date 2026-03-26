@@ -754,7 +754,7 @@ const PixiChannelHeadersInner: React.FC<PixiChannelHeadersProps> = ({
 
 
   return (
-    <layoutContainer layout={{ width, height: HEADER_HEIGHT, flexShrink: 0 }}>
+    <layoutContainer eventMode="static" layout={{ width, height: HEADER_HEIGHT, flexShrink: 0 }}>
       {/* Background layer */}
       <pixiGraphics draw={drawBackground} layout={{ position: 'absolute', width, height: HEADER_HEIGHT }} />
 
@@ -768,9 +768,11 @@ const PixiChannelHeadersInner: React.FC<PixiChannelHeadersProps> = ({
 
       {/* Scrollable channel area — clipped via overflow hidden */}
       <pixiContainer
+        eventMode="static"
         layout={{ position: 'absolute', left: LINE_NUMBER_WIDTH, top: 0, width: width - LINE_NUMBER_WIDTH, height: HEADER_HEIGHT, overflow: 'hidden' }}
       >
         <pixiContainer
+          eventMode="static"
           x={-scrollLeft}
           layout={{ position: 'absolute', top: 0, height: HEADER_HEIGHT }}
         >
