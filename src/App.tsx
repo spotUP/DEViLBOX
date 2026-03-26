@@ -59,6 +59,7 @@ import { useCollaborationStore } from '@stores/useCollaborationStore';
 import { PeerMouseCursor } from '@components/collaboration/PeerMouseCursor';
 import { PeerVideoWindow } from '@components/collaboration/PeerVideoWindow';
 import { ExposeOverlay } from '@components/ui/ExposeOverlay';
+import { DJErrorBoundary } from './components/dj/DJErrorBoundary';
 
 // Lazy-loaded components for better startup performance
 const HelpModal = lazy(() => import('./components/help/HelpModal').then(m => ({ default: m.HelpModal })));
@@ -984,9 +985,11 @@ function App() {
                 width={1280}
                 height={720}
               >
-                <div className="h-screen w-screen bg-black">
-                  <VJView isPopout />
-                </div>
+                <DJErrorBoundary viewName="VJ">
+                  <div className="h-screen w-screen bg-black">
+                    <VJView isPopout />
+                  </div>
+                </DJErrorBoundary>
               </PopOutWindow>
             </Suspense>
           )}
@@ -1204,11 +1207,13 @@ function App() {
             )}
 
             {(activeView === 'dj' || (activeView === 'vj' && djModeActive)) && (
-              <Suspense fallback={<div className="flex-1 flex items-center justify-center text-text-muted">Loading DJ mode...</div>}>
-                <div style={{ display: activeView === 'dj' ? 'contents' : 'none' }}>
-                  <DJView />
-                </div>
-              </Suspense>
+              <DJErrorBoundary viewName="DJ">
+                <Suspense fallback={<div className="flex-1 flex items-center justify-center text-text-muted">Loading DJ mode...</div>}>
+                  <div style={{ display: activeView === 'dj' ? 'contents' : 'none' }}>
+                    <DJView />
+                  </div>
+                </Suspense>
+              </DJErrorBoundary>
             )}
 
             {activeView === 'pianoroll' && (
@@ -1218,9 +1223,11 @@ function App() {
             )}
 
             {activeView === 'vj' && (
-              <Suspense fallback={<div className="flex-1 flex items-center justify-center text-text-muted bg-black">Loading VJ...</div>}>
-                <VJView />
-              </Suspense>
+              <DJErrorBoundary viewName="VJ">
+                <Suspense fallback={<div className="flex-1 flex items-center justify-center text-text-muted bg-black">Loading VJ...</div>}>
+                  <VJView />
+                </Suspense>
+              </DJErrorBoundary>
             )}
 
             {activeView === 'mixer' && (
