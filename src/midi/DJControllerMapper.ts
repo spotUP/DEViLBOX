@@ -39,6 +39,10 @@ class DJControllerMapper {
     timeoutId?: NodeJS.Timeout;
   }>();
 
+  // Auto-reconnect state: remember the bound device name so we can re-bind on replug
+  private boundDeviceName: string | null = null;
+  private boundDeviceConnected = false;
+
   private constructor() {}
 
   static getInstance(): DJControllerMapper {
@@ -93,6 +97,7 @@ class DJControllerMapper {
   /**
    * Register our MIDI message handler with MIDIManager.
    * Called once — persists across preset changes.
+   * Also subscribes to device change events for auto-reconnect.
    */
   private ensureHandlerRegistered(): void {
     if (this.handlerRegistered) return;
@@ -105,6 +110,67 @@ class DJControllerMapper {
       // Individual handlers check isDJContext() when needed
       this.handleMessage(msg);
     });
+
+    // Snapshot the currently selected device for auto-reconnect
+    this.snapshotBoundDevice();
+
+    // Subscribe to device change events for auto-reconnect on USB replug
+    // (singleton lives for app lifetime — no need to unsubscribe)
+    manager.onDeviceChange(() => {
+      this.handleDeviceChange();
+    });
+  }
+
+  /**
+   * Snapshot the currently selected MIDI input device name.
+   * Called when the handler is first registered so we know what to reconnect to.
+   */
+  private snapshotBoundDevice(): void {
+    const manager = getMIDIManager();
+    const selected = manager.getSelectedInput();
+    if (selected) {
+      this.boundDeviceName = selected.name;
+      this.boundDeviceConnected = true;
+    }
+  }
+
+  /**
+   * Handle MIDI device state changes (connect/disconnect).
+   * On disconnect: log warning, keep mapping, mark as disconnected.
+   * On reconnect of matching device name: automatically re-bind.
+   */
+  private handleDeviceChange(): void {
+    const manager = getMIDIManager();
+    const selected = manager.getSelectedInput();
+
+    // Update bound device name from current selection if we don't have one yet
+    if (!this.boundDeviceName && selected) {
+      this.boundDeviceName = selected.name;
+      this.boundDeviceConnected = true;
+      return;
+    }
+
+    if (!this.boundDeviceName) return;
+
+    // Check if the currently selected device is still connected
+    if (this.boundDeviceConnected && !selected) {
+      // Device disconnected — keep the mapping and preset, just mark disconnected
+      console.warn(`[MIDI] DJ controller disconnected: ${this.boundDeviceName}`);
+      this.boundDeviceConnected = false;
+      return;
+    }
+
+    // Check if a disconnected device has come back (match by name)
+    if (!this.boundDeviceConnected) {
+      const inputs = manager.getInputDevices();
+      const match = inputs.find(d => d.name === this.boundDeviceName && d.isConnected);
+      if (match) {
+        console.log(`[MIDI] DJ controller reconnected: ${match.name} — re-binding`);
+        this.boundDeviceConnected = true;
+        // Re-select the input by its (possibly new) ID
+        manager.selectInput(match.id);
+      }
+    }
   }
 
   /**
