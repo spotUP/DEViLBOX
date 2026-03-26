@@ -330,8 +330,8 @@ export const PixiTrackerView: React.FC = () => {
           <PixiPatternMinimap height={Math.max(100, instrumentPanelHeight)} />
         </pixiContainer>
 
-        {/* Pitch slider — pure Pixi */}
-        <PixiPitchSlider width={32} height={Math.max(100, instrumentPanelHeight)} />
+        {/* Pitch slider — 52px wide matching DOM's DJPitchSlider (style={{ width: 52 }}) */}
+        <PixiPitchSlider width={52} height={Math.max(100, instrumentPanelHeight)} />
 
         {/* Instrument panel toggle button — always mounted, zero-width when hidden */}
         <PixiInstrumentToggle
