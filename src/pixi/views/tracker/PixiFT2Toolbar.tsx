@@ -44,10 +44,10 @@ import { getTrackerScratchController } from '@engine/TrackerScratchController';
 
 // ─── Layout constants ────────────────────────────────────────────────────────
 
-const TRANSPORT_ROW_H = 32; // each transport row min-height (matches DOM)
-const TRANSPORT_PAD = 8; // top + bottom padding
+const TRANSPORT_ROW_H = 36; // each transport row min-height (matches DOM — needs room for FT2Cell label+input)
+const TRANSPORT_PAD = 6; // top + bottom padding
 const TRANSPORT_GAP = 4; // gap between rows
-const TRANSPORT_SECTION_H = TRANSPORT_ROW_H * 2 + TRANSPORT_PAD * 2 + TRANSPORT_GAP; // 32+32+16+4 = 84
+const TRANSPORT_SECTION_H = TRANSPORT_ROW_H * 2 + TRANSPORT_PAD * 2 + TRANSPORT_GAP; // 36+36+12+4 = 88
 const FILE_ROW_H  = 32;
 const VIZ_WIDTH   = 220;
 

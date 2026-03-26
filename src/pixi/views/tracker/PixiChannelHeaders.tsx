@@ -208,6 +208,7 @@ const PixiChannelHeadersInner: React.FC<PixiChannelHeadersProps> = ({
   const ICON_SIZE = 12;
   const [iconsReady, setIconsReady] = useState(false);
   useEffect(() => {
+    setIconsReady(false); // Reset so stale textures aren't used during preload
     preloadLucideIcons([
       { name: 'volume-2', iconNode: ICON_VOLUME_2, size: ICON_SIZE, color: theme.textMuted.color },
       { name: 'volume-x', iconNode: ICON_VOLUME_X, size: ICON_SIZE, color: theme.error.color },

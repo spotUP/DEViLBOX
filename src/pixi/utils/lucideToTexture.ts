@@ -39,6 +39,8 @@ function buildSVG(iconNode: IconNode, size: number, color: string): string {
 
 /**
  * Convert an SVG string to a PixiJS Texture via canvas.
+ * Falls back to a 1-tick deferred draw if the image isn't immediately complete,
+ * then updates the texture source so existing sprites refresh.
  */
 function svgToTexture(svg: string, size: number): Texture {
   const dpr = window.devicePixelRatio || 1;
@@ -48,16 +50,22 @@ function svgToTexture(svg: string, size: number): Texture {
 
   const ctx = canvas.getContext('2d')!;
   const img = new Image();
-  // Synchronous draw via data URL
   const dataUrl = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
   img.src = dataUrl;
 
   // Draw synchronously if image is cached (common for data URLs)
-  if (img.complete) {
+  if (img.complete && img.naturalWidth > 0) {
     ctx.drawImage(img, 0, 0, size * dpr, size * dpr);
+  } else {
+    // Async fallback — draw once the image loads, then update the texture source
+    img.onload = () => {
+      ctx.drawImage(img, 0, 0, size * dpr, size * dpr);
+      // Force Pixi to re-upload the canvas texture to GPU
+      texture.source.update();
+    };
   }
 
-  const texture = Texture.from(canvas);
+  const texture = Texture.from({ resource: canvas, alphaMode: 'premultiply-alpha-on-upload' });
   return texture;
 }
 
@@ -111,7 +119,7 @@ export function preloadLucideIcons(
         const img = new Image();
         img.onload = () => {
           ctx.drawImage(img, 0, 0, size * dpr, size * dpr);
-          const tex = Texture.from(canvas);
+          const tex = Texture.from({ resource: canvas, alphaMode: 'premultiply-alpha-on-upload' });
           textureCache.set(key, tex);
           resolve();
         };
