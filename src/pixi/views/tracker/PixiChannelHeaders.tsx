@@ -222,9 +222,9 @@ const PixiChannelHeadersInner: React.FC<PixiChannelHeadersProps> = ({
     // Row 2 bottom border
     g.rect(0, HEADER_HEIGHT - 1, width, 1);
     g.fill({ color: theme.border.color, alpha: 0.3 });
-    // ROW column background
+    // ROW column background — use bgTertiary (same as header), not theme.bg (may be red)
     g.rect(0, 0, LINE_NUMBER_WIDTH, HEADER_HEIGHT);
-    g.fill({ color: theme.bg.color, alpha: 1 });
+    g.fill({ color: theme.bgTertiary.color, alpha: 1 });
     // ROW column right border
     g.rect(LINE_NUMBER_WIDTH - 1, 0, 1, HEADER_HEIGHT);
     g.fill({ color: theme.border.color, alpha: 0.3 });
