@@ -6,18 +6,11 @@
  * Standard height 36px, bgSecondary background, bottom border.
  */
 
-import React, { useCallback } from 'react';
+import React from 'react';
 import { usePixiTheme } from '../theme';
-import { PixiSelect, type SelectOption } from './PixiSelect';
 import { PixiLabel } from './PixiLabel';
-import { VIEW_OPTIONS, switchView } from '@/constants/viewOptions';
 
 export const VIEW_HEADER_HEIGHT = 36;
-
-const VIEW_MODE_OPTIONS: SelectOption[] = VIEW_OPTIONS.map(({ value, label }) => ({
-  value,
-  label,
-}));
 
 export interface PixiViewHeaderProps {
   /** Current view value for the selector dropdown */
@@ -33,19 +26,11 @@ export interface PixiViewHeaderProps {
 }
 
 export const PixiViewHeader: React.FC<PixiViewHeaderProps> = ({
-  activeView,
   title,
   subtitle,
   children,
-  onViewChange,
 }) => {
   const theme = usePixiTheme();
-
-  const defaultViewChange = useCallback((val: string) => {
-    switchView(val, activeView);
-  }, [activeView]);
-
-  const handleChange = onViewChange ?? defaultViewChange;
 
   return (
     <layoutContainer
@@ -62,13 +47,7 @@ export const PixiViewHeader: React.FC<PixiViewHeaderProps> = ({
         borderColor: theme.border.color,
       }}
     >
-      <PixiSelect
-        options={VIEW_MODE_OPTIONS}
-        value={activeView}
-        onChange={handleChange}
-        width={110}
-        height={24}
-      />
+      {/* View switcher moved to NavBar — always visible in all views */}
 
       {title ? <PixiLabel text={title} size="sm" weight="bold" color="accent" /> : null}
       {subtitle && <PixiLabel text={subtitle} size="sm" color="textMuted" />}

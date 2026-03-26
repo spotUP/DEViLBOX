@@ -10,12 +10,16 @@
  * A DOM portal is used only for the channel name editing input (keyboard/IME).
  */
 
-import React, { useCallback, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { Graphics as GraphicsType, FederatedPointerEvent } from 'pixi.js';
 import { usePixiTheme } from '../../theme';
 import { PIXI_FONTS } from '../../fonts';
-import { FAD_ICONS } from '../../fontaudioIcons';
 import { usePixiDropdownStore } from '../../stores/usePixiDropdownStore';
+import { getLucideTexture, preloadLucideIcons } from '../../utils/lucideToTexture';
+import {
+  ICON_VOLUME_2, ICON_VOLUME_X, ICON_HEADPHONES,
+  ICON_CHEVRON_LEFT, ICON_CHEVRON_RIGHT, ICON_ELLIPSIS_V, ICON_PALETTE,
+} from '../../utils/lucideIcons';
 import { useUIStore, useInstrumentStore } from '@stores';
 import { useLiveModeStore } from '@stores/useLiveModeStore';
 import { useTrackerStore } from '@stores/useTrackerStore';
@@ -200,6 +204,35 @@ const PixiChannelHeadersInner: React.FC<PixiChannelHeadersProps> = ({
 
   const numChannels = pattern.channels.length;
 
+  // ── Lucide icon textures (preloaded for async rendering) ────────────────
+  const ICON_SIZE = 12;
+  const [iconsReady, setIconsReady] = useState(false);
+  useEffect(() => {
+    preloadLucideIcons([
+      { name: 'volume-2', iconNode: ICON_VOLUME_2, size: ICON_SIZE, color: theme.textMuted.color },
+      { name: 'volume-x', iconNode: ICON_VOLUME_X, size: ICON_SIZE, color: theme.error.color },
+      { name: 'headphones', iconNode: ICON_HEADPHONES, size: ICON_SIZE, color: theme.textMuted.color },
+      { name: 'headphones-active', iconNode: ICON_HEADPHONES, size: ICON_SIZE, color: theme.accent.color },
+      { name: 'chevron-left', iconNode: ICON_CHEVRON_LEFT, size: ICON_SIZE, color: theme.textMuted.color },
+      { name: 'chevron-right', iconNode: ICON_CHEVRON_RIGHT, size: ICON_SIZE, color: theme.textMuted.color },
+      { name: 'ellipsis-v', iconNode: ICON_ELLIPSIS_V, size: ICON_SIZE, color: theme.textMuted.color },
+      { name: 'palette', iconNode: ICON_PALETTE, size: ICON_SIZE, color: theme.textMuted.color },
+    ]).then(() => setIconsReady(true));
+  }, [theme]);
+
+  // Memoized texture getters (cache-backed, safe to call per-render after preload)
+  const iconTextures = useMemo(() => {
+    if (!iconsReady) return null;
+    return {
+      volumeOn: getLucideTexture('volume-2', ICON_VOLUME_2, ICON_SIZE, theme.textMuted.color),
+      volumeOff: getLucideTexture('volume-x', ICON_VOLUME_X, ICON_SIZE, theme.error.color),
+      headphones: getLucideTexture('headphones', ICON_HEADPHONES, ICON_SIZE, theme.textMuted.color),
+      headphonesActive: getLucideTexture('headphones-active', ICON_HEADPHONES, ICON_SIZE, theme.accent.color),
+      chevronLeft: getLucideTexture('chevron-left', ICON_CHEVRON_LEFT, ICON_SIZE, theme.textMuted.color),
+      chevronRight: getLucideTexture('chevron-right', ICON_CHEVRON_RIGHT, ICON_SIZE, theme.textMuted.color),
+      ellipsisV: getLucideTexture('ellipsis-v', ICON_ELLIPSIS_V, ICON_SIZE, theme.textMuted.color),
+    };
+  }, [iconsReady, theme]);
 
   // ── Background drawing ─────────────────────────────────────────────────────
   const drawBackground = useCallback((g: GraphicsType) => {
@@ -498,13 +531,9 @@ const PixiChannelHeadersInner: React.FC<PixiChannelHeadersProps> = ({
             />
             {/* Expand button */}
             <HoverableHeaderBtn drawBg={drawCollapseBtn} drawHoverBg={drawHoverBtn} onPress={() => onToggleCollapse(ch)}>
-              <pixiBitmapText
-                text={FAD_ICONS['caret-right']}
-                style={{ fontFamily: PIXI_FONTS.ICONS, fontSize: 10, fill: 0xffffff }}
-                tint={theme.textMuted.color}
-                eventMode="none"
-                layout={LAYOUT_EMPTY}
-              />
+              {iconTextures?.chevronRight ? (
+                <pixiSprite texture={iconTextures.chevronRight} width={ICON_SIZE} height={ICON_SIZE} eventMode="none" layout={LAYOUT_EMPTY} />
+              ) : null}
             </HoverableHeaderBtn>
           </pixiContainer>
         );
@@ -629,13 +658,9 @@ const PixiChannelHeadersInner: React.FC<PixiChannelHeadersProps> = ({
           <pixiContainer layout={LAYOUT_BTNS_ROW}>
             {/* Context menu button (three dots) */}
             <HoverableHeaderBtn drawBg={drawContextBtn} drawHoverBg={drawHoverBtn} onPress={(e) => openContextMenu(ch, e)}>
-              <pixiBitmapText
-                text={'\u2026'}
-                style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 10, fill: 0xffffff }}
-                tint={theme.textMuted.color}
-                eventMode="none"
-                layout={LAYOUT_EMPTY}
-              />
+              {iconTextures?.ellipsisV ? (
+                <pixiSprite texture={iconTextures.ellipsisV} width={ICON_SIZE} height={ICON_SIZE} eventMode="none" layout={LAYOUT_EMPTY} />
+              ) : null}
             </HoverableHeaderBtn>
 
             {/* Color picker button */}
@@ -653,35 +678,29 @@ const PixiChannelHeadersInner: React.FC<PixiChannelHeadersProps> = ({
 
             {/* Mute button — speaker/mute icon matching DOM VolumeX/Volume2 */}
             <HoverableHeaderBtn drawBg={(g: GraphicsType) => drawMuteBtn(g, channel.muted)} drawHoverBg={drawHoverBtn} onPress={() => onToggleMute(ch)}>
-              <pixiBitmapText
-                text={channel.muted ? FAD_ICONS['mute'] : FAD_ICONS['speaker']}
-                style={{ fontFamily: PIXI_FONTS.ICONS, fontSize: 10, fill: 0xffffff }}
-                tint={channel.muted ? theme.error.color : theme.textMuted.color}
-                eventMode="none"
-                layout={LAYOUT_EMPTY}
-              />
+              {iconTextures ? (
+                <pixiSprite
+                  texture={channel.muted ? iconTextures.volumeOff : iconTextures.volumeOn}
+                  width={ICON_SIZE} height={ICON_SIZE} eventMode="none" layout={LAYOUT_EMPTY}
+                />
+              ) : null}
             </HoverableHeaderBtn>
 
             {/* Solo button — headphones icon matching DOM Headphones */}
             <HoverableHeaderBtn drawBg={(g: GraphicsType) => drawSoloBtn(g, channel.solo)} drawHoverBg={drawHoverBtn} onPress={() => onToggleSolo(ch)}>
-              <pixiBitmapText
-                text={FAD_ICONS['headphones']}
-                style={{ fontFamily: PIXI_FONTS.ICONS, fontSize: 10, fill: 0xffffff }}
-                tint={channel.solo ? theme.accent.color : theme.textMuted.color}
-                eventMode="none"
-                layout={LAYOUT_EMPTY}
-              />
+              {iconTextures ? (
+                <pixiSprite
+                  texture={channel.solo ? iconTextures.headphonesActive : iconTextures.headphones}
+                  width={ICON_SIZE} height={ICON_SIZE} eventMode="none" layout={LAYOUT_EMPTY}
+                />
+              ) : null}
             </HoverableHeaderBtn>
 
-            {/* Collapse button — caret-left matching DOM ChevronLeft */}
+            {/* Collapse button — chevron-left matching DOM ChevronLeft */}
             <HoverableHeaderBtn drawBg={drawCollapseBtn} drawHoverBg={drawHoverBtn} onPress={() => onToggleCollapse(ch)}>
-              <pixiBitmapText
-                text={FAD_ICONS['caret-left']}
-                style={{ fontFamily: PIXI_FONTS.ICONS, fontSize: 10, fill: 0xffffff }}
-                tint={theme.textMuted.color}
-                eventMode="none"
-                layout={LAYOUT_EMPTY}
-              />
+              {iconTextures?.chevronLeft ? (
+                <pixiSprite texture={iconTextures.chevronLeft} width={ICON_SIZE} height={ICON_SIZE} eventMode="none" layout={LAYOUT_EMPTY} />
+              ) : null}
             </HoverableHeaderBtn>
           </pixiContainer>
         </pixiContainer>
@@ -720,6 +739,7 @@ const PixiChannelHeadersInner: React.FC<PixiChannelHeadersProps> = ({
     onToggleMute, onToggleSolo, onToggleCollapse, onAddChannel, onUpdateName,
     openContextMenu, openColorPicker, startEditing,
     drawMuteBtn, drawSoloBtn, drawCollapseBtn, drawContextBtn, drawColorBtn, drawAddBtn, drawHoverBtn,
+    iconTextures,
   ]);
 
   // ── Column labels row (row 2) — "Note Ins Vol Eff" per channel ────────────
