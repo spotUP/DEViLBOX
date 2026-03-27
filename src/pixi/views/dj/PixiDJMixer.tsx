@@ -59,8 +59,6 @@ export const PixiDJMixer: React.FC = () => {
     >
       <pixiGraphics draw={drawBg} layout={{ position: 'absolute', width: MIXER_WIDTH, height: '100%' }} />
 
-      <PixiLabel text="MIXER" size="md" weight="bold" color="accent" />
-
       {/* Row 1: Filters (matches DOM) */}
       <MixerFilterSection />
 
@@ -69,9 +67,6 @@ export const PixiDJMixer: React.FC = () => {
 
       {/* Row 3: Channel strips (matches DOM) */}
       <MixerChannelStrips />
-
-      {/* Spacer */}
-      <pixiContainer layout={{ flex: 1 }} />
 
       {/* Row 4: Crossfader (matches DOM) */}
       <MixerCrossfader />
@@ -114,20 +109,20 @@ const MixerFilterSection: React.FC = () => {
         {/* Deck A Filter: -1 (HPF) to 0 (off) to +1 (LPF) */}
         <pixiContainer layout={{ flexDirection: 'column', gap: 4, alignItems: 'center' }}>
           <PixiLabel text="A" size="xs" color="textMuted" />
-          <PixiKnob value={filterA} min={-1} max={1} defaultValue={0} size="sm" label="FLT" bipolar onChange={(v) => DJActions.setDeckFilter('A', v)} />
+          <PixiKnob value={filterA} min={-1} max={1} defaultValue={0} size="sm" label="FLT" color={0xaa44ff} bipolar onChange={(v) => DJActions.setDeckFilter('A', v)} />
         </pixiContainer>
 
         {/* Deck B Filter */}
         <pixiContainer layout={{ flexDirection: 'column', gap: 4, alignItems: 'center' }}>
           <PixiLabel text="B" size="xs" color="textMuted" />
-          <PixiKnob value={filterB} min={-1} max={1} defaultValue={0} size="sm" label="FLT" bipolar onChange={(v) => DJActions.setDeckFilter('B', v)} />
+          <PixiKnob value={filterB} min={-1} max={1} defaultValue={0} size="sm" label="FLT" color={0xaa44ff} bipolar onChange={(v) => DJActions.setDeckFilter('B', v)} />
         </pixiContainer>
 
         {/* Deck C Filter */}
         {thirdDeck && (
           <pixiContainer layout={{ flexDirection: 'column', gap: 4, alignItems: 'center' }}>
             <PixiLabel text="C" size="xs" color="textMuted" />
-            <PixiKnob value={filterC} min={-1} max={1} defaultValue={0} size="sm" label="FLT" bipolar onChange={(v) => DJActions.setDeckFilter('C', v)} />
+            <PixiKnob value={filterC} min={-1} max={1} defaultValue={0} size="sm" label="FLT" color={0xaa44ff} bipolar onChange={(v) => DJActions.setDeckFilter('C', v)} />
           </pixiContainer>
         )}
       </pixiContainer>
@@ -516,6 +511,7 @@ const MixerTransitionSection: React.FC = () => {
   return (
     <pixiContainer layout={{ flexDirection: 'column', gap: 4, alignItems: 'center' }}>
       <pixiGraphics draw={drawBorder} layout={{ width: MIXER_WIDTH - 16, height: 1 }} />
+      {/* Button order matches DOM: A->B, quickA, cancel/spacer, quickB, B->A */}
       <pixiContainer layout={{ flexDirection: 'row', gap: 4, alignItems: 'center' }}>
         <PixiButton
           label={automating && direction === 'A>B' ? 'A>>B' : 'A>B'}
@@ -525,6 +521,13 @@ const MixerTransitionSection: React.FC = () => {
           active={automating && direction === 'A>B'}
           onClick={() => handleTransition('A', 'B')}
         />
+        <PixiButton label="A" variant="ghost" size="sm" onClick={() => handleQuickCut('A')} />
+        {automating ? (
+          <PixiButton label="X" variant="ft2" color="red" size="sm" onClick={cancelCurrent} />
+        ) : (
+          <pixiContainer layout={{ width: 28 }} />
+        )}
+        <PixiButton label="B" variant="ghost" size="sm" onClick={() => handleQuickCut('B')} />
         <PixiButton
           label={automating && direction === 'B>A' ? 'B>>A' : 'B>A'}
           variant={automating && direction === 'B>A' ? 'ft2' : 'ghost'}
@@ -533,11 +536,6 @@ const MixerTransitionSection: React.FC = () => {
           active={automating && direction === 'B>A'}
           onClick={() => handleTransition('B', 'A')}
         />
-        <PixiButton label="CUT>A" variant="ghost" size="sm" onClick={() => handleQuickCut('A')} />
-        <PixiButton label="CUT>B" variant="ghost" size="sm" onClick={() => handleQuickCut('B')} />
-        {automating && (
-          <PixiButton label="X" variant="ft2" color="red" size="sm" onClick={cancelCurrent} />
-        )}
       </pixiContainer>
     </pixiContainer>
   );
@@ -569,6 +567,7 @@ const MixerMaster: React.FC = () => {
   const masterVolume = useDJStore(s => s.masterVolume);
   const masterVURef = useRef<GraphicsType | null>(null);
   const masterLevelsRef = useRef({ l: 0, r: 0 });
+  const [limiterActive, setLimiterActive] = useState(false);
 
   const handleVolumeChange = useCallback((value: number) => {
     DJActions.setMasterVolume(value);
@@ -592,11 +591,13 @@ const MixerMaster: React.FC = () => {
         if (Array.isArray(raw) && raw.length >= 2) {
           masterLevelsRef.current.l = masterDbToSegments(raw[0]);
           masterLevelsRef.current.r = masterDbToSegments(raw[1]);
+          setLimiterActive(raw[0] > -1 || raw[1] > -1);
         } else {
           const mono = typeof raw === 'number' ? raw : -Infinity;
           const segs = masterDbToSegments(mono);
           masterLevelsRef.current.l = segs;
           masterLevelsRef.current.r = segs;
+          setLimiterActive(mono > -1);
         }
       } catch {
         masterLevelsRef.current.l = Math.max(0, masterLevelsRef.current.l - 1);
@@ -641,7 +642,9 @@ const MixerMaster: React.FC = () => {
         min={0}
         max={1.5}
         size="sm"
-        label="MASTER"
+        label="MST"
+        color={0xffffff}
+        defaultValue={1}
         onChange={handleVolumeChange}
       />
 
@@ -658,6 +661,19 @@ const MixerMaster: React.FC = () => {
             layout={{ position: 'absolute', width: vuTotalW, height: vuTotalH }}
           />
         </pixiContainer>
+      </pixiContainer>
+
+      {/* Limiter indicator (matches DOM) */}
+      <pixiContainer layout={{ flexDirection: 'row', gap: 3, alignItems: 'center' }}>
+        <pixiGraphics
+          draw={(g: GraphicsType) => {
+            g.clear();
+            g.circle(2.5, 2.5, 2.5);
+            g.fill({ color: limiterActive ? COLOR_RED : (theme.bgTertiary?.color ?? 0x313244), alpha: limiterActive ? 1 : 0.5 });
+          }}
+          layout={{ width: 5, height: 5 }}
+        />
+        <PixiLabel text="LIM" size="xs" color="textMuted" />
       </pixiContainer>
     </pixiContainer>
   );
@@ -694,10 +710,13 @@ const MixerCueSection: React.FC = () => {
         max={1.5}
         size="sm"
         label="CUE"
+        color={0xffcc00}
+        defaultValue={1}
         onChange={handleCueVolumeChange}
       />
-      {/* PFL buttons */}
-      <pixiContainer layout={{ flexDirection: 'row', gap: 2, alignItems: 'center' }}>
+      {/* PFL buttons with headphone label (matches DOM) */}
+      <pixiContainer layout={{ flexDirection: 'row', gap: 3, alignItems: 'center' }}>
+        <PixiLabel text="PFL" size="xs" color="textMuted" />
         <PixiButton
           label="1"
           variant={pflA ? 'ft2' : 'ghost'}
@@ -727,6 +746,7 @@ const MixerRecordMic: React.FC = () => {
   const micGain = useDJSetStore(s => s.micGain);
   const [showBroadcast, setShowBroadcast] = useState(false);
   const [videoRecording, setVideoRecording] = useState(false);
+  const [isLive, setIsLive] = useState(false);
   const videoCaptureRef = useRef<DJVideoCapture | null>(null);
   const videoRecorderRef = useRef<DJVideoRecorder | null>(null);
 
@@ -811,6 +831,13 @@ const MixerRecordMic: React.FC = () => {
             color={videoRecording ? 'purple' : undefined}
             active={videoRecording}
             onClick={handleVideoToggle}
+          />
+          <PixiButton
+            label={isLive ? 'STOP' : 'LIVE'}
+            size="sm"
+            color={isLive ? 'red' : undefined}
+            active={isLive}
+            onClick={() => setIsLive(v => !v)}
           />
           <PixiButton
             label="MIC"

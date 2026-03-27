@@ -1201,6 +1201,102 @@ const PixiTurntable2D: React.FC<{
   );
 };
 
+/* ─── Loop button (LOOP / SLIP) — matches DOM DeckLoopControls ──────── */
+
+const LOOP_BTN_SIZE = 40;
+
+const PixiLoopButton: React.FC<{
+  label: string;
+  active: boolean;
+  color: number;
+  onClick: () => void;
+}> = ({ label, active, color, onClick }) => {
+  const theme = usePixiTheme();
+
+  const drawBg = useCallback((g: GraphicsType) => {
+    g.clear();
+    g.roundRect(0, 0, LOOP_BTN_SIZE, LOOP_BTN_SIZE, 4);
+    if (active) {
+      g.fill({ color, alpha: 0.4 });
+      g.roundRect(0, 0, LOOP_BTN_SIZE, LOOP_BTN_SIZE, 4);
+      g.stroke({ color, alpha: 0.6, width: 1 });
+    } else {
+      g.fill({ color: theme.bgTertiary.color });
+      g.roundRect(0, 0, LOOP_BTN_SIZE, LOOP_BTN_SIZE, 4);
+      g.stroke({ color: theme.border.color, alpha: 0.4, width: 1 });
+    }
+    // Status LED dot (top-right)
+    g.circle(LOOP_BTN_SIZE - 5, 5, 2).fill({ color: active ? color : theme.border.color });
+  }, [active, color, theme]);
+
+  return (
+    <pixiContainer
+      eventMode="static"
+      cursor="pointer"
+      onPointerUp={onClick}
+      layout={{ width: LOOP_BTN_SIZE, height: LOOP_BTN_SIZE, justifyContent: 'center', alignItems: 'center' }}
+    >
+      <pixiGraphics draw={drawBg} layout={{ position: 'absolute', width: LOOP_BTN_SIZE, height: LOOP_BTN_SIZE }} />
+      <pixiBitmapText
+        text={label}
+        style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 10, fill: 0xffffff }}
+        tint={active ? theme.text.color : theme.textSecondary.color}
+        eventMode="none"
+      />
+    </pixiContainer>
+  );
+};
+
+/* ─── Loop size button (1, 2, 4, 8, 16, 32) ─────────────────────────── */
+
+const LOOP_SIZE_BTN_W = 28;
+const LOOP_SIZE_BTN_H = 40;
+
+const PixiLoopSizeButton: React.FC<{
+  size: number;
+  active: boolean;
+  selected: boolean;
+  color: number;
+  onClick: () => void;
+}> = ({ size, active, selected, color, onClick }) => {
+  const theme = usePixiTheme();
+
+  const drawBg = useCallback((g: GraphicsType) => {
+    g.clear();
+    g.roundRect(0, 0, LOOP_SIZE_BTN_W, LOOP_SIZE_BTN_H, 2);
+    if (active) {
+      g.fill({ color, alpha: 0.5 });
+      g.roundRect(0, 0, LOOP_SIZE_BTN_W, LOOP_SIZE_BTN_H, 2);
+      g.stroke({ color, alpha: 0.6, width: 1 });
+    } else if (selected) {
+      g.fill({ color: theme.bgTertiary.color, alpha: 0.8 });
+      g.roundRect(0, 0, LOOP_SIZE_BTN_W, LOOP_SIZE_BTN_H, 2);
+      g.stroke({ color: theme.border.color, alpha: 0.6, width: 1 });
+    } else {
+      g.fill({ color: theme.bgTertiary.color });
+      g.roundRect(0, 0, LOOP_SIZE_BTN_W, LOOP_SIZE_BTN_H, 2);
+      g.stroke({ color: theme.border.color, alpha: 0.2, width: 1 });
+    }
+  }, [active, selected, color, theme]);
+
+  return (
+    <pixiContainer
+      eventMode="static"
+      cursor="pointer"
+      onPointerUp={onClick}
+      layout={{ width: LOOP_SIZE_BTN_W, height: LOOP_SIZE_BTN_H, justifyContent: 'center', alignItems: 'center' }}
+    >
+      <pixiGraphics draw={drawBg} layout={{ position: 'absolute', width: LOOP_SIZE_BTN_W, height: LOOP_SIZE_BTN_H }} />
+      <pixiBitmapText
+        text={String(size)}
+        style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: size >= 10 ? 9 : 11, fill: 0xffffff }}
+        tint={active ? color : selected ? theme.text.color : theme.textMuted.color}
+        eventMode="none"
+      />
+    </pixiContainer>
+  );
+};
+
 interface PixiDJDeckProps {
   deckId: 'A' | 'B' | 'C';
 }
@@ -1208,13 +1304,44 @@ interface PixiDJDeckProps {
 export const PixiDJDeck: React.FC<PixiDJDeckProps> = ({ deckId }) => {
   const theme = usePixiTheme();
   const bpm = useDJStore(s => s.decks[deckId].effectiveBPM);
+  const detectedBPM = useDJStore(s => s.decks[deckId].detectedBPM);
   const trackName = useDJStore(s => s.decks[deckId].trackName);
   const pitchOffset = useDJStore(s => s.decks[deckId].pitchOffset);
   const setDeckPitch = useDJStore(s => s.setDeckPitch);
   const loopActive = useDJStore(s => s.decks[deckId].loopActive);
-  const loopMode = useDJStore(s => s.decks[deckId].loopMode);
+  const lineLoopSize = useDJStore(s => s.decks[deckId].lineLoopSize);
+  const slipEnabled = useDJStore(s => s.decks[deckId].slipEnabled);
+  const playbackMode = useDJStore(s => s.decks[deckId].playbackMode);
   const audioPosition = useDJStore(s => s.decks[deckId].audioPosition);
+  const elapsedMs = useDJStore(s => s.decks[deckId].elapsedMs);
   const durationMs = useDJStore(s => s.decks[deckId].durationMs);
+  const musicalKey = useDJStore(s => s.decks[deckId].musicalKey);
+  const seratoKey = useDJStore(s => s.decks[deckId].seratoKey);
+  const analysisBPM = useDJStore(s => s.decks[deckId].beatGrid?.bpm ?? 0);
+  const otherDeckId = deckId === 'A' ? 'B' : 'A';
+  const otherBPM = useDJStore(s => s.decks[otherDeckId].effectiveBPM);
+
+  // Computed display values matching DOM DeckTrackInfo
+  const displayBPM = analysisBPM > 0 ? analysisBPM : (playbackMode === 'audio' ? detectedBPM : bpm);
+  const isBPMMatched = Math.abs(displayBPM - otherBPM) < 0.5;
+  const displayKey = musicalKey ?? seratoKey ?? null;
+  const pitchPercent = pitchOffset !== 0
+    ? `${(Math.pow(2, pitchOffset / 12) - 1) * 100 > 0 ? '+' : ''}${((Math.pow(2, pitchOffset / 12) - 1) * 100).toFixed(1)}%`
+    : null;
+  const formattedTime = (() => {
+    const totalSeconds = Math.floor(elapsedMs / 1000);
+    const minutes = Math.floor(totalSeconds / 60);
+    const seconds = totalSeconds % 60;
+    return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+  })();
+  const formattedRemaining = (() => {
+    if (playbackMode !== 'audio' || durationMs <= 0) return null;
+    const remainMs = Math.max(0, durationMs - elapsedMs);
+    const totalSeconds = Math.floor(remainMs / 1000);
+    const minutes = Math.floor(totalSeconds / 60);
+    const seconds = totalSeconds % 60;
+    return `-${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+  })();
 
   // Visualizer mode cycling
   const [vizMode, setVizMode] = useState<VizMode>('spectrum');
@@ -1237,7 +1364,7 @@ export const PixiDJDeck: React.FC<PixiDJDeckProps> = ({ deckId }) => {
   // View mode from global store (synced with DOM version)
   const viewMode = useDJStore(s => s.deckViewMode);
 
-  // Nudge BPM
+  // Nudge BPM (matches DOM DeckNudge: soft +-2 BPM for 8 ticks)
   const handleNudge = useCallback((direction: 1 | -1) => {
     try {
       const engine = getDJEngine();
@@ -1245,21 +1372,41 @@ export const PixiDJDeck: React.FC<PixiDJDeckProps> = ({ deckId }) => {
     } catch { /* engine not ready */ }
   }, [deckId]);
 
-  const handleLoopLine = useCallback(() => {
+  // Loop controls matching DOM DeckLoopControls
+  const handleLoopToggle = useCallback(() => {
+    const engine = getDJEngine();
+    const deck = engine.getDeck(deckId);
     const s = useDJStore.getState();
-    const active = s.decks[deckId].loopMode === 'line' && s.decks[deckId].loopActive;
-    s.setDeckLoop(deckId, 'line', !active);
-  }, [deckId]);
+    if (loopActive) {
+      deck.clearLineLoop();
+      s.setDeckLoop(deckId, 'off', false);
+    } else {
+      deck.setLineLoop(lineLoopSize);
+      s.setDeckLoop(deckId, 'line', true);
+    }
+  }, [deckId, loopActive, lineLoopSize]);
 
-  const handleLoopPattern = useCallback(() => {
+  const handleLoopSizeChange = useCallback((size: 1 | 2 | 4 | 8 | 16 | 32) => {
     const s = useDJStore.getState();
-    const active = s.decks[deckId].loopMode === 'pattern' && s.decks[deckId].loopActive;
-    s.setDeckLoop(deckId, 'pattern', !active);
-  }, [deckId]);
+    s.setDeckLoopSize(deckId, size);
+    const engine = getDJEngine();
+    const deck = engine.getDeck(deckId);
+    deck.setLineLoop(size);
+    if (!loopActive) {
+      s.setDeckLoop(deckId, 'line', true);
+    }
+  }, [deckId, loopActive]);
 
-  const handleLoopOff = useCallback(() => {
-    useDJStore.getState().setDeckLoop(deckId, 'off', false);
-  }, [deckId]);
+  const handleSlipToggle = useCallback(() => {
+    const engine = getDJEngine();
+    const deck = engine.getDeck(deckId);
+    const newSlip = !slipEnabled;
+    deck.setSlipEnabled(newSlip);
+    useDJStore.getState().setDeckSlip(deckId, newSlip);
+  }, [deckId, slipEnabled]);
+
+  // Loop sizes matching DOM DeckLoopControls
+  const LOOP_SIZES = [1, 2, 4, 8, 16, 32] as const;
 
   const themeId = usePixiThemeId();
   const { deckA, deckB, deckC } = getDeckColors(themeId, theme.accent, theme.accentSecondary);
@@ -1279,35 +1426,73 @@ export const PixiDJDeck: React.FC<PixiDJDeckProps> = ({ deckId }) => {
         overflow: 'hidden',
       }}
     >
-      {/* ── Track info + scopes (matches DOM header row) ── */}
-      <pixiContainer layout={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-        <pixiBitmapText
-          text={`Deck ${deckNum}`}
-          style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 12, fill: 0xffffff }}
-          tint={DECK_COLOR}
-          alpha={0.6}
-          layout={{}}
-        />
+      {/* ── Track info + scopes (matches DOM DeckTrackInfo + DeckScopes) ── */}
+      <pixiContainer layout={{ flexDirection: 'row', alignItems: 'flex-start', gap: 8 }}>
         <pixiContainer layout={{ flex: 1, flexDirection: 'column', gap: 2, overflow: 'hidden' }}>
+          {/* Deck label */}
+          <pixiBitmapText
+            text={`Deck ${deckNum}`}
+            style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 10, fill: 0xffffff }}
+            tint={DECK_COLOR}
+            alpha={0.6}
+            layout={{}}
+          />
+          {/* Track name */}
           <pixiBitmapText
             text={trackName || 'No track loaded'}
             style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 13, fill: 0xffffff }}
             tint={trackName ? theme.text.color : theme.textMuted.color}
             layout={{}}
           />
-          <pixiContainer layout={{ flexDirection: 'row', gap: 8 }}>
+          {/* BPM + Key + Pitch% + Time row (matches DOM DeckTrackInfo) */}
+          <pixiContainer layout={{ flexDirection: 'row', gap: 8, alignItems: 'center' }}>
+            {/* BPM - large LED style */}
             <pixiBitmapText
-              text={`${bpm.toFixed(1)} BPM`}
-              style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 11, fill: 0xffffff }}
-              tint={DECK_COLOR}
+              text={displayBPM > 0 ? displayBPM.toFixed(1) : '---.-'}
+              style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 18, fill: 0xffffff }}
+              tint={isBPMMatched ? theme.success.color : theme.text.color}
               layout={{}}
             />
             <pixiBitmapText
-              text={durationMs > 0 ? formatTime(audioPosition) : '--:--'}
-              style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 11, fill: 0xffffff }}
+              text="BPM"
+              style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 9, fill: 0xffffff }}
               tint={theme.textMuted.color}
               layout={{}}
             />
+            {/* Pitch percentage */}
+            {pitchPercent !== null && (
+              <pixiBitmapText
+                text={pitchPercent}
+                style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 10, fill: 0xffffff }}
+                tint={theme.textSecondary.color}
+                layout={{}}
+              />
+            )}
+            {/* Musical key */}
+            {displayKey !== null && (
+              <pixiBitmapText
+                text={displayKey}
+                style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 12, fill: 0xffffff }}
+                tint={DECK_COLOR}
+                layout={{}}
+              />
+            )}
+            {/* Elapsed time */}
+            <pixiBitmapText
+              text={formattedTime}
+              style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 12, fill: 0xffffff }}
+              tint={theme.textSecondary.color}
+              layout={{}}
+            />
+            {/* Remaining time (audio mode only) */}
+            {formattedRemaining !== null && (
+              <pixiBitmapText
+                text={formattedRemaining}
+                style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 12, fill: 0xffffff }}
+                tint={theme.textMuted.color}
+                layout={{}}
+              />
+            )}
           </pixiContainer>
         </pixiContainer>
         <PixiDeckScopes deckId={deckId} size={48} layout={{ width: 64, height: 48, flexDirection: 'row', gap: 2 }} />
@@ -1437,32 +1622,30 @@ export const PixiDJDeck: React.FC<PixiDJDeckProps> = ({ deckId }) => {
       {/* ── Cue points (matches DOM placement before transport) ── */}
       <PixiDeckCuePoints deckId={deckId} layout={{ width: '100%', height: 36 }} />
 
-      {/* ── Transport + Nudge + Loop (matches DOM: all on one row) ── */}
+      {/* ── Transport + Nudge + Loop (matches DOM: DeckTransport + DeckNudge + DeckLoopControls) ── */}
       <pixiContainer layout={{ flexDirection: 'row', gap: 4, alignItems: 'center' }}>
         <PixiDeckTransport deckId={deckId} />
-        {/* Nudge */}
-        <PixiButton label="<<" variant="ghost" size="sm" onClick={() => handleNudge(-1)} />
-        <PixiButton label=">>" variant="ghost" size="sm" onClick={() => handleNudge(1)} />
-        {/* Loop */}
-        <PixiButton
-          label="Line"
-          variant={loopActive && loopMode === 'line' ? 'ft2' : 'ghost'}
-          color={loopActive && loopMode === 'line' ? 'green' : undefined}
-          size="sm"
-          active={loopActive && loopMode === 'line'}
-          onClick={handleLoopLine}
-        />
-        <PixiButton
-          label="Patt"
-          variant={loopActive && loopMode === 'pattern' ? 'ft2' : 'ghost'}
-          color={loopActive && loopMode === 'pattern' ? 'blue' : undefined}
-          size="sm"
-          active={loopActive && loopMode === 'pattern'}
-          onClick={handleLoopPattern}
-        />
-        {loopActive && (
-          <PixiButton label="Off" variant="ghost" size="sm" onClick={handleLoopOff} />
-        )}
+        {/* Nudge (matches DOM DeckNudge: chevron left/right) */}
+        <PixiButton icon="prev" label="" variant="ghost" width={40} onClick={() => handleNudge(-1)} />
+        <PixiButton icon="next" label="" variant="ghost" width={40} onClick={() => handleNudge(1)} />
+      </pixiContainer>
+      {/* ── Loop controls (matches DOM DeckLoopControls: LOOP + sizes + SLIP) ── */}
+      <pixiContainer layout={{ flexDirection: 'row', gap: 2, alignItems: 'center' }}>
+        {/* LOOP toggle button */}
+        <PixiLoopButton label="LOOP" active={loopActive} color={DECK_COLOR} onClick={handleLoopToggle} />
+        {/* Loop size buttons: 1, 2, 4, 8, 16, 32 */}
+        {LOOP_SIZES.map((size) => (
+          <PixiLoopSizeButton
+            key={size}
+            size={size}
+            active={lineLoopSize === size && loopActive}
+            selected={lineLoopSize === size}
+            color={DECK_COLOR}
+            onClick={() => handleLoopSizeChange(size)}
+          />
+        ))}
+        {/* SLIP toggle button */}
+        <PixiLoopButton label="SLIP" active={slipEnabled} color={0xd97706} onClick={handleSlipToggle} />
       </pixiContainer>
 
       {/* ── FX Pads + Beat Jump (matches DOM placement after transport) ── */}
