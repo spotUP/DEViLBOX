@@ -266,6 +266,26 @@ export const ICON_ARROW_LEFT_RIGHT: IconNode = [
   ["path", { d: "M20 17H4" }],
 ];
 
+/** Pause */
+export const ICON_PAUSE: IconNode = [
+  ["rect", { x: "14", y: "4", width: "4", height: "16", rx: "1" }],
+  ["rect", { x: "6", y: "4", width: "4", height: "16", rx: "1" }],
+];
+
+/** Disc3 (turntable/cue) */
+export const ICON_DISC_3: IconNode = [
+  ["circle", { cx: "12", cy: "12", r: "10" }],
+  ["path", { d: "M6 12c0-1.7.7-3.2 1.8-4.2" }],
+  ["circle", { cx: "12", cy: "12", r: "2" }],
+  ["path", { d: "M18 12c0 1.7-.7 3.2-1.8 4.2" }],
+];
+
+/** Link (sync) */
+export const ICON_LINK: IconNode = [
+  ["path", { d: "M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" }],
+  ["path", { d: "M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" }],
+];
+
 /** Timer */
 export const ICON_TIMER: IconNode = [
   ["line", { x1: "10", x2: "14", y1: "2", y2: "2" }],
@@ -312,4 +332,7 @@ export const FONTAUDIO_TO_LUCIDE: Record<string, IconNode> = {
   'caret-left':   ICON_CHEVRON_LEFT,
   'caret-right':  ICON_CHEVRON_RIGHT,
   'arrows-horz':  ICON_ARROW_LEFT_RIGHT,
+  'pause':        ICON_PAUSE,
+  'disc-3':       ICON_DISC_3,
+  'link':         ICON_LINK,
 };
