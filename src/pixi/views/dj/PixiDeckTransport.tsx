@@ -1,19 +1,36 @@
 /**
  * PixiDeckTransport — Play/Cue/Sync buttons for a DJ deck.
+ * Uses Lucide icon textures matching the DOM version's Lucide icons.
  */
 
-import { useCallback } from 'react';
+import { useCallback, useEffect, useMemo } from 'react';
+import { Texture } from 'pixi.js';
 import type { Graphics as GraphicsType } from 'pixi.js';
-import { PIXI_FONTS } from '../../fonts';
 import { usePixiTheme } from '../../theme';
 import { useDJStore } from '@/stores/useDJStore';
+import { ICON_PLAY, ICON_PAUSE, ICON_DISC_3, ICON_LINK } from '../../utils/lucideIcons';
+import { getLucideTexture, preloadLucideIcons } from '../../utils/lucideToTexture';
 import * as DJActions from '@/engine/dj/DJActions';
 
 interface PixiDeckTransportProps {
   deckId: 'A' | 'B' | 'C';
 }
 
-const BTN_SIZE = 36;
+const BTN_SIZE = 40;
+const ICON_SIZE = 20;
+
+// Preload transport icons once
+let _transportIconsPreloaded = false;
+function ensureTransportIconsPreloaded(): void {
+  if (_transportIconsPreloaded) return;
+  _transportIconsPreloaded = true;
+  preloadLucideIcons([
+    { name: 'transport-play', iconNode: ICON_PLAY, size: ICON_SIZE, color: 0xffffff },
+    { name: 'transport-pause', iconNode: ICON_PAUSE, size: ICON_SIZE, color: 0xffffff },
+    { name: 'transport-disc3', iconNode: ICON_DISC_3, size: ICON_SIZE, color: 0xffffff },
+    { name: 'transport-link', iconNode: ICON_LINK, size: ICON_SIZE, color: 0xffffff },
+  ]);
+}
 
 export const PixiDeckTransport: React.FC<PixiDeckTransportProps> = ({ deckId }) => {
   const theme = usePixiTheme();
@@ -23,6 +40,8 @@ export const PixiDeckTransport: React.FC<PixiDeckTransportProps> = ({ deckId }) 
   const thisBPM = useDJStore(s => s.decks[deckId].effectiveBPM);
   const otherBPM = useDJStore(s => s.decks[otherDeckId].effectiveBPM);
   const isSynced = Math.abs(thisBPM - otherBPM) < 0.5;
+
+  useEffect(() => { ensureTransportIconsPreloaded(); }, []);
 
   const handlePlayPause = useCallback(async () => {
     await DJActions.togglePlay(deckId);
@@ -36,11 +55,20 @@ export const PixiDeckTransport: React.FC<PixiDeckTransportProps> = ({ deckId }) 
     DJActions.syncDeckBPM(deckId, otherDeckId);
   }, [deckId, otherDeckId]);
 
+  const playTex = useMemo(() => getLucideTexture(
+    isPlaying ? 'transport-pause' : 'transport-play',
+    isPlaying ? ICON_PAUSE : ICON_PLAY,
+    ICON_SIZE, 0xffffff,
+  ), [isPlaying]);
+
+  const cueTex = useMemo(() => getLucideTexture('transport-disc3', ICON_DISC_3, ICON_SIZE, 0xffffff), []);
+  const syncTex = useMemo(() => getLucideTexture('transport-link', ICON_LINK, ICON_SIZE, 0xffffff), []);
+
   return (
     <pixiContainer layout={{ flexDirection: 'row', gap: 6, alignItems: 'center' }}>
       {/* Play/Pause */}
       <PixiTransportButton
-        label={isPlaying ? 'PAUSE' : 'PLAY'}
+        iconTexture={playTex}
         color={isPlaying ? theme.success.color : theme.textMuted.color}
         isActive={isPlaying}
         onClick={handlePlayPause}
@@ -48,14 +76,14 @@ export const PixiDeckTransport: React.FC<PixiDeckTransportProps> = ({ deckId }) 
 
       {/* Cue */}
       <PixiTransportButton
-        label="CUE"
+        iconTexture={cueTex}
         color={theme.warning.color}
         onClick={handleCue}
       />
 
       {/* Sync */}
       <PixiTransportButton
-        label={isSynced ? 'SYNC' : 'SYNC'}
+        iconTexture={syncTex}
         color={isSynced ? theme.success.color : theme.accent.color}
         isActive={isSynced}
         onClick={handleSync}
@@ -64,16 +92,16 @@ export const PixiDeckTransport: React.FC<PixiDeckTransportProps> = ({ deckId }) 
   );
 };
 
-// ─── Transport Button ───────────────────────────────────────────────────────
+// --- Transport Button ---
 
 interface TransportBtnProps {
-  label: string;
+  iconTexture: Texture;
   color: number;
   isActive?: boolean;
   onClick: () => void;
 }
 
-const PixiTransportButton: React.FC<TransportBtnProps> = ({ label, color, isActive, onClick }) => {
+const PixiTransportButton: React.FC<TransportBtnProps> = ({ iconTexture, color, isActive, onClick }) => {
   const theme = usePixiTheme();
 
   const drawBg = useCallback((g: GraphicsType) => {
@@ -103,10 +131,12 @@ const PixiTransportButton: React.FC<TransportBtnProps> = ({ label, color, isActi
       }}
     >
       <pixiGraphics draw={drawBg} layout={{ position: 'absolute', width: BTN_SIZE, height: BTN_SIZE }} />
-      <pixiBitmapText
-        text={label}
-        style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 10, fill: 0xffffff }}
+      <pixiSprite
+        texture={iconTexture}
+        width={ICON_SIZE}
+        height={ICON_SIZE}
         tint={isActive ? color : theme.textMuted.color}
+        eventMode="none"
         layout={{}}
       />
     </pixiContainer>
