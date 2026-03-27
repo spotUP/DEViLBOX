@@ -14,7 +14,7 @@ import { DJVideoCapture, getCaptureCanvas } from '@/engine/dj/streaming/DJVideoC
 import { DJVideoRecorder } from '@/engine/dj/streaming/DJVideoRecorder';
 import * as DJActions from '@/engine/dj/DJActions';
 
-const MIXER_WIDTH = 220;
+const MIXER_WIDTH = 400;
 
 export const PixiDJMixer: React.FC = () => {
   const theme = usePixiTheme();
@@ -116,6 +116,37 @@ const MixerFilterSection: React.FC = () => {
 
 // ─── EQ Section ─────────────────────────────────────────────────────────────
 
+/** EQ knob + kill button row for one band */
+const EQBandRow: React.FC<{
+  deckId: 'A' | 'B';
+  band: 'high' | 'mid' | 'low';
+  label: string;
+  value: number;
+  isKilled: boolean;
+}> = ({ deckId, band, label, value, isKilled }) => {
+  const handleKillToggle = useCallback(() => {
+    const killKey = `eq${band.charAt(0).toUpperCase() + band.slice(1)}Kill` as 'eqLowKill' | 'eqMidKill' | 'eqHighKill';
+    const current = useDJStore.getState().decks[deckId][killKey];
+    DJActions.setDeckEQKill(deckId, band, !current);
+  }, [deckId, band]);
+
+  return (
+    <pixiContainer layout={{ flexDirection: 'row', gap: 2, alignItems: 'center' }}>
+      <PixiKnob value={value} min={-24} max={6} defaultValue={0} size="sm" label={label} bipolar onChange={(v) => DJActions.setDeckEQ(deckId, band, v)} />
+      <PixiButton
+        label="K"
+        variant={isKilled ? 'ft2' : 'ghost'}
+        color={isKilled ? 'red' : undefined}
+        size="sm"
+        active={isKilled}
+        width={20}
+        height={20}
+        onClick={handleKillToggle}
+      />
+    </pixiContainer>
+  );
+};
+
 const MixerEQSection: React.FC = () => {
   const theme = usePixiTheme();
   const eqHighA = useDJStore(s => s.decks.A.eqHigh);
@@ -124,6 +155,12 @@ const MixerEQSection: React.FC = () => {
   const eqHighB = useDJStore(s => s.decks.B.eqHigh);
   const eqMidB = useDJStore(s => s.decks.B.eqMid);
   const eqLowB = useDJStore(s => s.decks.B.eqLow);
+  const killHighA = useDJStore(s => s.decks.A.eqHighKill);
+  const killMidA = useDJStore(s => s.decks.A.eqMidKill);
+  const killLowA = useDJStore(s => s.decks.A.eqLowKill);
+  const killHighB = useDJStore(s => s.decks.B.eqHighKill);
+  const killMidB = useDJStore(s => s.decks.B.eqMidKill);
+  const killLowB = useDJStore(s => s.decks.B.eqLowKill);
 
   const drawBorder = useCallback((g: GraphicsType) => {
     g.clear();
@@ -139,17 +176,17 @@ const MixerEQSection: React.FC = () => {
         {/* Deck A EQ — dB range: -24 to +6 */}
         <pixiContainer layout={{ flexDirection: 'column', gap: 4, alignItems: 'center' }}>
           <PixiLabel text="A" size="xs" color="textMuted" />
-          <PixiKnob value={eqHighA} min={-24} max={6} defaultValue={0} size="sm" label="HI" bipolar onChange={(v) => DJActions.setDeckEQ('A', 'high', v)} />
-          <PixiKnob value={eqMidA} min={-24} max={6} defaultValue={0} size="sm" label="MID" bipolar onChange={(v) => DJActions.setDeckEQ('A', 'mid', v)} />
-          <PixiKnob value={eqLowA} min={-24} max={6} defaultValue={0} size="sm" label="LO" bipolar onChange={(v) => DJActions.setDeckEQ('A', 'low', v)} />
+          <EQBandRow deckId="A" band="high" label="HI" value={eqHighA} isKilled={killHighA} />
+          <EQBandRow deckId="A" band="mid" label="MID" value={eqMidA} isKilled={killMidA} />
+          <EQBandRow deckId="A" band="low" label="LO" value={eqLowA} isKilled={killLowA} />
         </pixiContainer>
 
         {/* Deck B EQ */}
         <pixiContainer layout={{ flexDirection: 'column', gap: 4, alignItems: 'center' }}>
           <PixiLabel text="B" size="xs" color="textMuted" />
-          <PixiKnob value={eqHighB} min={-24} max={6} defaultValue={0} size="sm" label="HI" bipolar onChange={(v) => DJActions.setDeckEQ('B', 'high', v)} />
-          <PixiKnob value={eqMidB} min={-24} max={6} defaultValue={0} size="sm" label="MID" bipolar onChange={(v) => DJActions.setDeckEQ('B', 'mid', v)} />
-          <PixiKnob value={eqLowB} min={-24} max={6} defaultValue={0} size="sm" label="LO" bipolar onChange={(v) => DJActions.setDeckEQ('B', 'low', v)} />
+          <EQBandRow deckId="B" band="high" label="HI" value={eqHighB} isKilled={killHighB} />
+          <EQBandRow deckId="B" band="mid" label="MID" value={eqMidB} isKilled={killMidB} />
+          <EQBandRow deckId="B" band="low" label="LO" value={eqLowB} isKilled={killLowB} />
         </pixiContainer>
       </pixiContainer>
 
@@ -162,7 +199,7 @@ const MixerEQSection: React.FC = () => {
 
 const VU_SEGMENTS = 20;
 const VU_WIDTH = 12;
-const VU_HEIGHT = 80;
+const VU_HEIGHT = 102;
 const VU_SEG_HEIGHT = (VU_HEIGHT - 2) / VU_SEGMENTS;
 
 const COLOR_GREEN = 0x22c55e;
@@ -322,7 +359,7 @@ const MixerCrossfader: React.FC = () => {
       {/* Crossfader curve selector */}
       <pixiContainer layout={{ flexDirection: 'row', gap: 2, alignItems: 'center' }}>
         <PixiButton
-          label="Lin"
+          label="Linear"
           variant={crossfaderCurve === 'linear' ? 'ft2' : 'ghost'}
           color={crossfaderCurve === 'linear' ? 'blue' : undefined}
           size="sm"
@@ -338,7 +375,7 @@ const MixerCrossfader: React.FC = () => {
           onClick={() => handleCurveChange('cut')}
         />
         <PixiButton
-          label="Smo"
+          label="Smooth"
           variant={crossfaderCurve === 'smooth' ? 'ft2' : 'ghost'}
           color={crossfaderCurve === 'smooth' ? 'green' : undefined}
           size="sm"
@@ -352,9 +389,30 @@ const MixerCrossfader: React.FC = () => {
 
 // ─── Master ─────────────────────────────────────────────────────────────────
 
+// ─── Master Stereo VU ──────────────────────────────────────────────────────
+
+const MASTER_VU_SEGMENTS = 8;
+const MASTER_VU_SEG_W = 5;
+const MASTER_VU_SEG_H = 4;
+
+function masterSegmentColor(index: number): number {
+  // 8 segments: 0-4 green, 5-6 yellow, 7 red (matching DOM's 8-segment scheme)
+  if (index >= 7) return COLOR_RED;
+  if (index >= 5) return COLOR_YELLOW;
+  return COLOR_GREEN;
+}
+
+function masterDbToSegments(dB: number): number {
+  if (dB <= -60) return 0;
+  if (dB >= 0) return MASTER_VU_SEGMENTS;
+  return Math.round(((dB + 60) / 60) * MASTER_VU_SEGMENTS);
+}
+
 const MixerMaster: React.FC = () => {
   const theme = usePixiTheme();
   const masterVolume = useDJStore(s => s.masterVolume);
+  const masterVURef = useRef<GraphicsType | null>(null);
+  const masterLevelsRef = useRef({ l: 0, r: 0 });
 
   const handleVolumeChange = useCallback((value: number) => {
     DJActions.setMasterVolume(value);
@@ -365,6 +423,59 @@ const MixerMaster: React.FC = () => {
     g.rect(0, 0, MIXER_WIDTH - 16, 1);
     g.fill({ color: theme.border.color, alpha: 0.2 });
   }, [theme]);
+
+  // Animate master stereo VU via rAF
+  useEffect(() => {
+    let rafId: number;
+    const tick = () => {
+      const g = masterVURef.current;
+      if (!g) { rafId = requestAnimationFrame(tick); return; }
+
+      try {
+        const raw = getDJEngine().mixer.getMasterLevel();
+        if (Array.isArray(raw) && raw.length >= 2) {
+          masterLevelsRef.current.l = masterDbToSegments(raw[0]);
+          masterLevelsRef.current.r = masterDbToSegments(raw[1]);
+        } else {
+          const mono = typeof raw === 'number' ? raw : -Infinity;
+          const segs = masterDbToSegments(mono);
+          masterLevelsRef.current.l = segs;
+          masterLevelsRef.current.r = segs;
+        }
+      } catch {
+        masterLevelsRef.current.l = Math.max(0, masterLevelsRef.current.l - 1);
+        masterLevelsRef.current.r = Math.max(0, masterLevelsRef.current.r - 1);
+      }
+
+      g.clear();
+      const { l, r } = masterLevelsRef.current;
+      const bgColor = theme.bgTertiary?.color ?? 0x313244;
+
+      // Draw L channel
+      for (let i = 0; i < MASTER_VU_SEGMENTS; i++) {
+        const y = (MASTER_VU_SEGMENTS - 1 - i) * (MASTER_VU_SEG_H + 1);
+        const lit = i < l;
+        g.rect(0, y, MASTER_VU_SEG_W, MASTER_VU_SEG_H);
+        g.fill({ color: lit ? masterSegmentColor(i) : bgColor, alpha: lit ? 0.9 : 0.3 });
+      }
+
+      // Draw R channel (offset by width + gap)
+      const rX = MASTER_VU_SEG_W + 2;
+      for (let i = 0; i < MASTER_VU_SEGMENTS; i++) {
+        const y = (MASTER_VU_SEGMENTS - 1 - i) * (MASTER_VU_SEG_H + 1);
+        const lit = i < r;
+        g.rect(rX, y, MASTER_VU_SEG_W, MASTER_VU_SEG_H);
+        g.fill({ color: lit ? masterSegmentColor(i) : bgColor, alpha: lit ? 0.9 : 0.3 });
+      }
+
+      rafId = requestAnimationFrame(tick);
+    };
+    rafId = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(rafId);
+  }, [theme]);
+
+  const vuTotalW = MASTER_VU_SEG_W * 2 + 2;
+  const vuTotalH = MASTER_VU_SEGMENTS * (MASTER_VU_SEG_H + 1) - 1;
 
   return (
     <pixiContainer layout={{ flexDirection: 'column', gap: 4, alignItems: 'center', marginBottom: 4 }}>
@@ -377,6 +488,21 @@ const MixerMaster: React.FC = () => {
         label="MASTER"
         onChange={handleVolumeChange}
       />
+
+      {/* Stereo VU meter (L/R) */}
+      <pixiContainer layout={{ flexDirection: 'column', gap: 1, alignItems: 'center' }}>
+        <pixiContainer layout={{ flexDirection: 'row', justifyContent: 'space-between', width: vuTotalW }}>
+          <PixiLabel text="L" size="xs" color="textMuted" />
+          <PixiLabel text="R" size="xs" color="textMuted" />
+        </pixiContainer>
+        <pixiContainer layout={{ width: vuTotalW, height: vuTotalH }}>
+          <pixiGraphics
+            ref={masterVURef}
+            draw={() => {}}
+            layout={{ position: 'absolute', width: vuTotalW, height: vuTotalH }}
+          />
+        </pixiContainer>
+      </pixiContainer>
     </pixiContainer>
   );
 };
