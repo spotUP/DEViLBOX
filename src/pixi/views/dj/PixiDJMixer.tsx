@@ -1,5 +1,12 @@
 /**
- * PixiDJMixer — Center mixer panel: Filter | EQ | Channel strips | Crossfader | Master
+ * PixiDJMixer — Center mixer panel matching DOM DJMixer layout:
+ *   1. Filters (with bottom border)
+ *   2. EQ + VU meters (with bottom border)
+ *   3. Channel strips (with bottom border)
+ *   4. Crossfader (with bottom border)
+ *   5. Transition controls (with bottom border)
+ *   6. Master + Cue
+ *   7. Broadcast
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -12,6 +19,12 @@ import { getDJEngine } from '@/engine/dj/DJEngine';
 import type { CrossfaderCurve } from '@/engine/dj/DJMixerEngine';
 import { DJVideoCapture, getCaptureCanvas } from '@/engine/dj/streaming/DJVideoCapture';
 import { DJVideoRecorder } from '@/engine/dj/streaming/DJVideoRecorder';
+import {
+  beatMatchedTransition,
+  cancelAllAutomation,
+} from '@/engine/dj/DJQuantizedFX';
+import { onNextDownbeat } from '@/engine/dj/DJAutoSync';
+import type { DeckId } from '@/engine/dj/DeckEngine';
 import * as DJActions from '@/engine/dj/DJActions';
 
 const MIXER_WIDTH = 400;
@@ -48,31 +61,31 @@ export const PixiDJMixer: React.FC = () => {
 
       <PixiLabel text="MIXER" size="md" weight="bold" color="accent" />
 
-      {/* Filter Section */}
+      {/* Row 1: Filters (matches DOM) */}
       <MixerFilterSection />
 
-      {/* EQ Section */}
+      {/* Row 2: EQ + VU meters (matches DOM) */}
       <MixerEQSection />
 
-      {/* VU Meters */}
-      <MixerVUMeters />
-
-      {/* Channel strips */}
+      {/* Row 3: Channel strips (matches DOM) */}
       <MixerChannelStrips />
 
       {/* Spacer */}
       <pixiContainer layout={{ flex: 1 }} />
 
-      {/* Crossfader */}
+      {/* Row 4: Crossfader (matches DOM) */}
       <MixerCrossfader />
 
-      {/* Master volume + Cue */}
+      {/* Row 5: Transition controls (matches DOM) */}
+      <MixerTransitionSection />
+
+      {/* Row 6: Master + Cue (matches DOM) */}
       <pixiContainer layout={{ flexDirection: 'row', gap: 12, alignItems: 'center' }}>
         <MixerMaster />
         <MixerCueSection />
       </pixiContainer>
 
-      {/* Record + Mic */}
+      {/* Row 7: Broadcast (matches DOM) */}
       <MixerRecordMic />
     </pixiContainer>
   );
@@ -84,6 +97,8 @@ const MixerFilterSection: React.FC = () => {
   const theme = usePixiTheme();
   const filterA = useDJStore(s => s.decks.A.filterPosition);
   const filterB = useDJStore(s => s.decks.B.filterPosition);
+  const filterC = useDJStore(s => s.decks.C.filterPosition);
+  const thirdDeck = useDJStore(s => s.thirdDeckActive);
 
   const drawBorder = useCallback((g: GraphicsType) => {
     g.clear();
@@ -107,6 +122,14 @@ const MixerFilterSection: React.FC = () => {
           <PixiLabel text="B" size="xs" color="textMuted" />
           <PixiKnob value={filterB} min={-1} max={1} defaultValue={0} size="sm" label="FLT" bipolar onChange={(v) => DJActions.setDeckFilter('B', v)} />
         </pixiContainer>
+
+        {/* Deck C Filter */}
+        {thirdDeck && (
+          <pixiContainer layout={{ flexDirection: 'column', gap: 4, alignItems: 'center' }}>
+            <PixiLabel text="C" size="xs" color="textMuted" />
+            <PixiKnob value={filterC} min={-1} max={1} defaultValue={0} size="sm" label="FLT" bipolar onChange={(v) => DJActions.setDeckFilter('C', v)} />
+          </pixiContainer>
+        )}
       </pixiContainer>
 
       <pixiGraphics draw={drawBorder} layout={{ width: MIXER_WIDTH - 16, height: 1 }} />
@@ -118,7 +141,7 @@ const MixerFilterSection: React.FC = () => {
 
 /** EQ knob + kill button row for one band */
 const EQBandRow: React.FC<{
-  deckId: 'A' | 'B';
+  deckId: 'A' | 'B' | 'C';
   band: 'high' | 'mid' | 'low';
   label: string;
   value: number;
@@ -155,12 +178,19 @@ const MixerEQSection: React.FC = () => {
   const eqHighB = useDJStore(s => s.decks.B.eqHigh);
   const eqMidB = useDJStore(s => s.decks.B.eqMid);
   const eqLowB = useDJStore(s => s.decks.B.eqLow);
+  const eqHighC = useDJStore(s => s.decks.C.eqHigh);
+  const eqMidC = useDJStore(s => s.decks.C.eqMid);
+  const eqLowC = useDJStore(s => s.decks.C.eqLow);
   const killHighA = useDJStore(s => s.decks.A.eqHighKill);
   const killMidA = useDJStore(s => s.decks.A.eqMidKill);
   const killLowA = useDJStore(s => s.decks.A.eqLowKill);
   const killHighB = useDJStore(s => s.decks.B.eqHighKill);
   const killMidB = useDJStore(s => s.decks.B.eqMidKill);
   const killLowB = useDJStore(s => s.decks.B.eqLowKill);
+  const killHighC = useDJStore(s => s.decks.C.eqHighKill);
+  const killMidC = useDJStore(s => s.decks.C.eqMidKill);
+  const killLowC = useDJStore(s => s.decks.C.eqLowKill);
+  const thirdDeck = useDJStore(s => s.thirdDeckActive);
 
   const drawBorder = useCallback((g: GraphicsType) => {
     g.clear();
@@ -181,6 +211,9 @@ const MixerEQSection: React.FC = () => {
           <EQBandRow deckId="A" band="low" label="LO" value={eqLowA} isKilled={killLowA} />
         </pixiContainer>
 
+        {/* VU Meters in center (matching DOM layout: EQ | VU | EQ) */}
+        <MixerVUMeters />
+
         {/* Deck B EQ */}
         <pixiContainer layout={{ flexDirection: 'column', gap: 4, alignItems: 'center' }}>
           <PixiLabel text="B" size="xs" color="textMuted" />
@@ -188,6 +221,16 @@ const MixerEQSection: React.FC = () => {
           <EQBandRow deckId="B" band="mid" label="MID" value={eqMidB} isKilled={killMidB} />
           <EQBandRow deckId="B" band="low" label="LO" value={eqLowB} isKilled={killLowB} />
         </pixiContainer>
+
+        {/* Deck C EQ */}
+        {thirdDeck && (
+          <pixiContainer layout={{ flexDirection: 'column', gap: 4, alignItems: 'center' }}>
+            <PixiLabel text="C" size="xs" color="textMuted" />
+            <EQBandRow deckId="C" band="high" label="HI" value={eqHighC} isKilled={killHighC} />
+            <EQBandRow deckId="C" band="mid" label="MID" value={eqMidC} isKilled={killMidC} />
+            <EQBandRow deckId="C" band="low" label="LO" value={eqLowC} isKilled={killLowC} />
+          </pixiContainer>
+        )}
       </pixiContainer>
 
       <pixiGraphics draw={drawBorder} layout={{ width: MIXER_WIDTH - 16, height: 1 }} />
@@ -221,7 +264,10 @@ function dbToSegments(dB: number): number {
 const MixerVUMeters: React.FC = () => {
   const theme = usePixiTheme();
   const graphicsRef = useRef<GraphicsType | null>(null);
-  const levelsRef = useRef({ a: 0, b: 0 });
+  const thirdDeck = useDJStore(s => s.thirdDeckActive);
+  const levelsRef = useRef({ a: 0, b: 0, c: 0 });
+  const thirdDeckRef = useRef(thirdDeck);
+  thirdDeckRef.current = thirdDeck;
 
   useEffect(() => {
     let rafId: number;
@@ -232,22 +278,23 @@ const MixerVUMeters: React.FC = () => {
       // Read levels from DJ engine
       try {
         const engine = getDJEngine();
-        const dbA = engine.getDeck('A').getLevel() as number;
-        const dbB = engine.getDeck('B').getLevel() as number;
-        levelsRef.current.a = dbToSegments(dbA);
-        levelsRef.current.b = dbToSegments(dbB);
+        levelsRef.current.a = dbToSegments(engine.getDeck('A').getLevel() as number);
+        levelsRef.current.b = dbToSegments(engine.getDeck('B').getLevel() as number);
+        if (thirdDeckRef.current) {
+          levelsRef.current.c = dbToSegments(engine.getDeck('C').getLevel() as number);
+        }
       } catch {
-        // Decay toward 0 when engine not ready
         levelsRef.current.a = Math.max(0, levelsRef.current.a - 1);
         levelsRef.current.b = Math.max(0, levelsRef.current.b - 1);
+        levelsRef.current.c = Math.max(0, levelsRef.current.c - 1);
       }
 
       g.clear();
-      const { a, b } = levelsRef.current;
+      const { a, b, c } = levelsRef.current;
+      const meterCount = thirdDeckRef.current ? 3 : 2;
 
-      // Draw two VU meters side by side
-      for (let deckIdx = 0; deckIdx < 2; deckIdx++) {
-        const segs = deckIdx === 0 ? a : b;
+      for (let deckIdx = 0; deckIdx < meterCount; deckIdx++) {
+        const segs = deckIdx === 0 ? a : deckIdx === 1 ? b : c;
         const xOff = deckIdx * (VU_WIDTH + 4);
 
         for (let i = 0; i < VU_SEGMENTS; i++) {
@@ -267,19 +314,22 @@ const MixerVUMeters: React.FC = () => {
     return () => cancelAnimationFrame(rafId);
   }, [theme]);
 
+  const meterCount = thirdDeck ? 3 : 2;
+  const totalW = VU_WIDTH * meterCount + 4 * (meterCount - 1);
+
   return (
     <pixiContainer layout={{ flexDirection: 'column', gap: 2, alignItems: 'center' }}>
-      <PixiLabel text="LEVEL" size="xs" color="textMuted" />
-      <pixiContainer layout={{ flexDirection: 'row', gap: 4, width: VU_WIDTH * 2 + 4, height: VU_HEIGHT }}>
+      <pixiContainer layout={{ flexDirection: 'row', gap: 4, width: totalW, height: VU_HEIGHT }}>
         <pixiGraphics
           ref={graphicsRef}
           draw={() => {}}
-          layout={{ position: 'absolute', width: VU_WIDTH * 2 + 4, height: VU_HEIGHT }}
+          layout={{ position: 'absolute', width: totalW, height: VU_HEIGHT }}
         />
       </pixiContainer>
-      <pixiContainer layout={{ flexDirection: 'row', justifyContent: 'space-between', width: VU_WIDTH * 2 + 4 }}>
+      <pixiContainer layout={{ flexDirection: 'row', justifyContent: 'space-between', width: totalW }}>
         <PixiLabel text="A" size="xs" color="textMuted" />
         <PixiLabel text="B" size="xs" color="textMuted" />
+        {thirdDeck && <PixiLabel text="C" size="xs" color="textMuted" />}
       </pixiContainer>
     </pixiContainer>
   );
@@ -288,36 +338,64 @@ const MixerVUMeters: React.FC = () => {
 // ─── Channel Strips ─────────────────────────────────────────────────────────
 
 const MixerChannelStrips: React.FC = () => {
+  const theme = usePixiTheme();
   const volumeA = useDJStore(s => s.decks.A.volume);
   const volumeB = useDJStore(s => s.decks.B.volume);
+  const volumeC = useDJStore(s => s.decks.C.volume);
+  const thirdDeck = useDJStore(s => s.thirdDeckActive);
+
+  const drawBorder = useCallback((g: GraphicsType) => {
+    g.clear();
+    g.rect(0, 0, MIXER_WIDTH - 16, 1);
+    g.fill({ color: theme.border.color, alpha: 0.2 });
+  }, [theme]);
 
   return (
-    <pixiContainer layout={{ flexDirection: 'row', gap: 24, alignItems: 'center' }}>
-      {/* Channel A fader */}
-      <pixiContainer layout={{ flexDirection: 'column', gap: 4, alignItems: 'center' }}>
-        <PixiLabel text="CH A" size="xs" color="textMuted" />
-        <PixiSlider
-          value={volumeA ?? 0.8}
-          min={0}
-          max={1}
-          orientation="vertical"
-          length={100}
-          onChange={(v) => DJActions.setDeckVolume('A', v)}
-        />
+    <pixiContainer layout={{ flexDirection: 'column', gap: 4, alignItems: 'center' }}>
+      <pixiContainer layout={{ flexDirection: 'row', gap: 24, alignItems: 'center' }}>
+        {/* Channel A fader */}
+        <pixiContainer layout={{ flexDirection: 'column', gap: 4, alignItems: 'center' }}>
+          <PixiLabel text="1" size="xs" color="textMuted" />
+          <PixiSlider
+            value={volumeA ?? 0.8}
+            min={0}
+            max={1}
+            orientation="vertical"
+            length={100}
+            onChange={(v) => DJActions.setDeckVolume('A', v)}
+          />
+        </pixiContainer>
+
+        {/* Channel B fader */}
+        <pixiContainer layout={{ flexDirection: 'column', gap: 4, alignItems: 'center' }}>
+          <PixiLabel text="2" size="xs" color="textMuted" />
+          <PixiSlider
+            value={volumeB ?? 0.8}
+            min={0}
+            max={1}
+            orientation="vertical"
+            length={100}
+            onChange={(v) => DJActions.setDeckVolume('B', v)}
+          />
+        </pixiContainer>
+
+        {/* Channel C fader */}
+        {thirdDeck && (
+          <pixiContainer layout={{ flexDirection: 'column', gap: 4, alignItems: 'center' }}>
+            <PixiLabel text="3" size="xs" color="textMuted" />
+            <PixiSlider
+              value={volumeC ?? 0.8}
+              min={0}
+              max={1}
+              orientation="vertical"
+              length={100}
+              onChange={(v) => DJActions.setDeckVolume('C', v)}
+            />
+          </pixiContainer>
+        )}
       </pixiContainer>
 
-      {/* Channel B fader */}
-      <pixiContainer layout={{ flexDirection: 'column', gap: 4, alignItems: 'center' }}>
-        <PixiLabel text="CH B" size="xs" color="textMuted" />
-        <PixiSlider
-          value={volumeB ?? 0.8}
-          min={0}
-          max={1}
-          orientation="vertical"
-          length={100}
-          onChange={(v) => DJActions.setDeckVolume('B', v)}
-        />
-      </pixiContainer>
+      <pixiGraphics draw={drawBorder} layout={{ width: MIXER_WIDTH - 16, height: 1 }} />
     </pixiContainer>
   );
 };
@@ -353,8 +431,8 @@ const MixerCrossfader: React.FC = () => {
         onChange={(v) => DJActions.setCrossfader(v)}
       />
       <pixiContainer layout={{ flexDirection: 'row', justifyContent: 'space-between', width: MIXER_WIDTH - 40 }}>
-        <PixiLabel text="A" size="xs" color="textMuted" />
-        <PixiLabel text="B" size="xs" color="textMuted" />
+        <PixiLabel text="1" size="xs" color="textMuted" />
+        <PixiLabel text="2" size="xs" color="textMuted" />
       </pixiContainer>
       {/* Crossfader curve selector */}
       <pixiContainer layout={{ flexDirection: 'row', gap: 2, alignItems: 'center' }}>
@@ -382,6 +460,84 @@ const MixerCrossfader: React.FC = () => {
           active={crossfaderCurve === 'smooth'}
           onClick={() => handleCurveChange('smooth')}
         />
+      </pixiContainer>
+    </pixiContainer>
+  );
+};
+
+// ─── Transition ──────────────────────────────────────────────────────────────
+
+const MixerTransitionSection: React.FC = () => {
+  const theme = usePixiTheme();
+  const [automating, setAutomating] = useState(false);
+  const [direction, setDirection] = useState<'A>B' | 'B>A' | null>(null);
+  const cancelRef = useRef<(() => void) | null>(null);
+
+  const drawBorder = useCallback((g: GraphicsType) => {
+    g.clear();
+    g.rect(0, 0, MIXER_WIDTH - 16, 1);
+    g.fill({ color: theme.border.color, alpha: 0.2 });
+  }, [theme]);
+
+  const cancelCurrent = useCallback(() => {
+    if (cancelRef.current) {
+      cancelRef.current();
+      cancelRef.current = null;
+    }
+    cancelAllAutomation();
+    setAutomating(false);
+    setDirection(null);
+  }, []);
+
+  const handleTransition = useCallback((from: DeckId, to: DeckId) => {
+    cancelCurrent();
+    setAutomating(true);
+    setDirection(from === 'A' ? 'A>B' : 'B>A');
+    cancelRef.current = beatMatchedTransition(from, to, 8, true);
+    const timeout = setTimeout(() => {
+      setAutomating(false);
+      setDirection(null);
+      cancelRef.current = null;
+    }, 30000);
+    const originalCancel = cancelRef.current;
+    cancelRef.current = () => {
+      clearTimeout(timeout);
+      originalCancel();
+    };
+  }, [cancelCurrent]);
+
+  const handleQuickCut = useCallback((to: DeckId) => {
+    cancelCurrent();
+    const target = to === 'A' ? 0 : 1;
+    const refDeck: DeckId = to === 'A' ? 'B' : 'A'; // reference the outgoing deck
+    onNextDownbeat(refDeck, () => DJActions.setCrossfader(target));
+  }, [cancelCurrent]);
+
+  return (
+    <pixiContainer layout={{ flexDirection: 'column', gap: 4, alignItems: 'center' }}>
+      <pixiGraphics draw={drawBorder} layout={{ width: MIXER_WIDTH - 16, height: 1 }} />
+      <pixiContainer layout={{ flexDirection: 'row', gap: 4, alignItems: 'center' }}>
+        <PixiButton
+          label={automating && direction === 'A>B' ? 'A>>B' : 'A>B'}
+          variant={automating && direction === 'A>B' ? 'ft2' : 'ghost'}
+          color={automating && direction === 'A>B' ? 'blue' : undefined}
+          size="sm"
+          active={automating && direction === 'A>B'}
+          onClick={() => handleTransition('A', 'B')}
+        />
+        <PixiButton
+          label={automating && direction === 'B>A' ? 'B>>A' : 'B>A'}
+          variant={automating && direction === 'B>A' ? 'ft2' : 'ghost'}
+          color={automating && direction === 'B>A' ? 'blue' : undefined}
+          size="sm"
+          active={automating && direction === 'B>A'}
+          onClick={() => handleTransition('B', 'A')}
+        />
+        <PixiButton label="CUT>A" variant="ghost" size="sm" onClick={() => handleQuickCut('A')} />
+        <PixiButton label="CUT>B" variant="ghost" size="sm" onClick={() => handleQuickCut('B')} />
+        {automating && (
+          <PixiButton label="X" variant="ft2" color="red" size="sm" onClick={cancelCurrent} />
+        )}
       </pixiContainer>
     </pixiContainer>
   );
