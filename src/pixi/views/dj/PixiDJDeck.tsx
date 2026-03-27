@@ -15,6 +15,7 @@ import { PixiDeckScratch } from './PixiDeckScratch';
 import { PixiDeckCuePoints } from './PixiDeckCuePoints';
 import { PixiDeckScopes } from './PixiDeckScopes';
 import { PixiDeckBeatGrid } from './PixiDeckBeatGrid';
+import { PixiDeckFXPads } from './PixiDeckFXPads';
 import { getDJEngine } from '@engine/dj/DJEngine';
 import { TurntablePhysics, OMEGA_NORMAL } from '@/engine/turntable/TurntablePhysics';
 import { useDeckVisualizationData } from '@/hooks/dj/useDeckVisualizationData';
@@ -1206,7 +1207,6 @@ interface PixiDJDeckProps {
 
 export const PixiDJDeck: React.FC<PixiDJDeckProps> = ({ deckId }) => {
   const theme = usePixiTheme();
-  const isPlaying = useDJStore(s => s.decks[deckId].isPlaying);
   const bpm = useDJStore(s => s.decks[deckId].effectiveBPM);
   const trackName = useDJStore(s => s.decks[deckId].trackName);
   const pitchOffset = useDJStore(s => s.decks[deckId].pitchOffset);
@@ -1215,8 +1215,6 @@ export const PixiDJDeck: React.FC<PixiDJDeckProps> = ({ deckId }) => {
   const loopMode = useDJStore(s => s.decks[deckId].loopMode);
   const audioPosition = useDJStore(s => s.decks[deckId].audioPosition);
   const durationMs = useDJStore(s => s.decks[deckId].durationMs);
-
-  const cuePoint = useDJStore(s => s.decks[deckId].cuePoint);
 
   // Visualizer mode cycling
   const [vizMode, setVizMode] = useState<VizMode>('spectrum');
@@ -1238,24 +1236,6 @@ export const PixiDJDeck: React.FC<PixiDJDeckProps> = ({ deckId }) => {
 
   // View mode from global store (synced with DOM version)
   const viewMode = useDJStore(s => s.deckViewMode);
-  const cycleDeckViewMode = useDJStore(s => s.cycleDeckViewMode);
-  const VIEW_LABELS: Record<string, string> = { visualizer: 'WAV', vinyl: 'VIN', '3d': 'TBL' };
-
-  // Set cue point at current position
-  const handleSetCue = useCallback(() => {
-    const pos = useDJStore.getState().decks[deckId].audioPosition;
-    useDJStore.getState().setDeckCuePoint(deckId, pos);
-  }, [deckId]);
-
-  // Jump to cue point
-  const handleGoToCue = useCallback(() => {
-    try {
-      const engine = getDJEngine();
-      const deck = engine.getDeck(deckId);
-      const cp = useDJStore.getState().decks[deckId].cuePoint;
-      deck.cue(cp / 1000);
-    } catch { /* engine not ready */ }
-  }, [deckId]);
 
   // Nudge BPM
   const handleNudge = useCallback((direction: 1 | -1) => {
@@ -1285,6 +1265,8 @@ export const PixiDJDeck: React.FC<PixiDJDeckProps> = ({ deckId }) => {
   const { deckA, deckB, deckC } = getDeckColors(themeId, theme.accent, theme.accentSecondary);
   const DECK_COLOR = deckId === 'A' ? deckA : deckId === 'B' ? deckB : deckC;
 
+  const deckNum = deckId === 'A' ? '1' : deckId === 'B' ? '2' : '3';
+
   return (
     <pixiContainer
       layout={{
@@ -1297,166 +1279,66 @@ export const PixiDJDeck: React.FC<PixiDJDeckProps> = ({ deckId }) => {
         overflow: 'hidden',
       }}
     >
-      {/* Deck header + track info */}
+      {/* ── Track info + scopes (matches DOM header row) ── */}
       <pixiContainer layout={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
         <pixiBitmapText
-          text={`DECK ${deckId}`}
-          style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 15, fill: 0xffffff }}
+          text={`Deck ${deckNum}`}
+          style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 12, fill: 0xffffff }}
           tint={DECK_COLOR}
+          alpha={0.6}
           layout={{}}
         />
-        <pixiBitmapText
-          text={isPlaying ? 'PLAYING' : 'STOPPED'}
-          style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 11, fill: 0xffffff }}
-          tint={isPlaying ? theme.success.color : theme.textMuted.color}
-          layout={{}}
-        />
-        <pixiContainer layout={{ flex: 1 }} />
-        <PixiButton
-          label={VIEW_LABELS[viewMode] ?? 'WAV'}
-          variant="ghost"
-          size="sm"
-          onClick={cycleDeckViewMode}
-        />
-        <pixiBitmapText
-          text={`${bpm.toFixed(1)} BPM`}
-          style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 13, fill: 0xffffff }}
-          tint={DECK_COLOR}
-          layout={{}}
-        />
+        <pixiContainer layout={{ flex: 1, flexDirection: 'column', gap: 2, overflow: 'hidden' }}>
+          <pixiBitmapText
+            text={trackName || 'No track loaded'}
+            style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 13, fill: 0xffffff }}
+            tint={trackName ? theme.text.color : theme.textMuted.color}
+            layout={{}}
+          />
+          <pixiContainer layout={{ flexDirection: 'row', gap: 8 }}>
+            <pixiBitmapText
+              text={`${bpm.toFixed(1)} BPM`}
+              style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 11, fill: 0xffffff }}
+              tint={DECK_COLOR}
+              layout={{}}
+            />
+            <pixiBitmapText
+              text={durationMs > 0 ? formatTime(audioPosition) : '--:--'}
+              style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 11, fill: 0xffffff }}
+              tint={theme.textMuted.color}
+              layout={{}}
+            />
+          </pixiContainer>
+        </pixiContainer>
+        <PixiDeckScopes deckId={deckId} size={48} layout={{ width: 64, height: 48, flexDirection: 'row', gap: 2 }} />
+        {viewMode === 'visualizer' && <PixiDeckTurntable deckId={deckId} size={64} />}
       </pixiContainer>
 
-      {/* Track name */}
-      <pixiBitmapText
-        text={trackName || 'No track loaded'}
-        style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 13, fill: 0xffffff }}
-        tint={trackName ? theme.text.color : theme.textMuted.color}
-        layout={{}}
-      />
-
-      {/* Deck content — switches based on view mode */}
-      {viewMode === 'visualizer' && (
-        <>
-          {/* Spectrum visualizer with beat flash border */}
-          <pixiContainer layout={{ width: '100%', height: 80 }}>
-            <PixiSpectrumDisplay deckId={deckId} height={80} deckColor={DECK_COLOR} vizMode={vizMode} onBeatFlash={handleBeatFlash} />
-            {beatFlash > 0 && (
-              <pixiGraphics
-                draw={(g: GraphicsType) => {
-                  g.clear();
-                  const bw = (g as any).layout?.computedLayout?.width ?? 280;
-                  g.roundRect(0, 0, bw, 80, 4).stroke({ color: DECK_COLOR, width: 3, alpha: beatFlash });
-                }}
-                layout={{ position: 'absolute', top: 0, left: 0, width: '100%', height: 80 }}
-                eventMode="none"
-              />
-            )}
-          </pixiContainer>
-
-          {/* Visualizer mode nav */}
-          <pixiContainer layout={{ flexDirection: 'row', gap: 4, justifyContent: 'center', alignItems: 'center' }}>
-            <PixiButton icon="prev" label="" variant="ghost" width={28} onClick={cycleVizPrev} />
-            <PixiLabel text={VIZ_LABELS[vizMode]} size="xs" color="textMuted" />
-            <PixiButton icon="next" label="" variant="ghost" width={28} onClick={cycleVizNext} />
-          </pixiContainer>
-
-          {/* Turntable + Pitch slider row */}
-          <pixiContainer layout={{ flexDirection: 'row', gap: 8, alignItems: 'center' }}>
-            <PixiDeckTurntable deckId={deckId} size={90} />
-
-            {/* Pitch slider */}
-            <pixiContainer layout={{ flexDirection: 'column', gap: 2, alignItems: 'center' }}>
-              <PixiLabel text="PITCH" size="xs" color="textMuted" />
-              <PixiSlider
-                value={pitchOffset ?? 0}
-                min={-0.08}
-                max={0.08}
-                orientation="vertical"
-                length={80}
-                detent={0}
-                onChange={(v) => setDeckPitch?.(deckId, v)}
-              />
-              <pixiBitmapText
-                text={`${((pitchOffset ?? 0) * 100).toFixed(1)}%`}
-                style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 11, fill: 0xffffff }}
-                tint={theme.textMuted.color}
-                layout={{}}
-              />
-            </pixiContainer>
-          </pixiContainer>
-
-          {/* Waveform */}
-          <PixiDeckWaveform deckId={deckId} height={60} />
-        </>
-      )}
-
-      {viewMode === 'vinyl' && (
-        <>
-          {/* Vinyl record + Pitch slider */}
-          <pixiContainer layout={{ flexDirection: 'row', gap: 8, alignItems: 'center' }}>
-            <PixiVinylDisplay deckId={deckId} size={250} deckColor={DECK_COLOR} />
-
-            {/* Pitch slider */}
-            <pixiContainer layout={{ flexDirection: 'column', gap: 2, alignItems: 'center' }}>
-              <PixiLabel text="PITCH" size="xs" color="textMuted" />
-              <PixiSlider
-                value={pitchOffset ?? 0}
-                min={-0.08}
-                max={0.08}
-                orientation="vertical"
-                length={140}
-                detent={0}
-                onChange={(v) => setDeckPitch?.(deckId, v)}
-              />
-              <pixiBitmapText
-                text={`${((pitchOffset ?? 0) * 100).toFixed(1)}%`}
-                style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 11, fill: 0xffffff }}
-                tint={theme.textMuted.color}
-                layout={{}}
-              />
-            </pixiContainer>
-          </pixiContainer>
-        </>
-      )}
-
-      {viewMode === '3d' && (
-        <PixiTurntable2D
-          deckId={deckId}
-          deckColor={DECK_COLOR}
-          height={260}
-        />
-      )}
-
-      {/* Track overview / progress bar */}
+      {/* ── Track overview / progress bar ── */}
       <pixiContainer layout={{ height: 16, width: '100%' }}>
         <pixiGraphics
           draw={(g: GraphicsType) => {
             g.clear();
             const barW = (g as any).layout?.computedLayout?.width ?? 280;
             const barH = 16;
-            // Background
             g.roundRect(0, 0, barW, barH, 2);
             g.fill({ color: theme.bg.color });
-            // Progress fill
             const progress = durationMs > 0 ? Math.min(1, audioPosition / durationMs) : 0;
             if (progress > 0) {
               const fillW = Math.max(2, progress * (barW - 2));
               g.roundRect(1, 1, fillW, barH - 2, 2);
               g.fill({ color: DECK_COLOR, alpha: 0.3 });
             }
-            // Playhead
             if (progress > 0) {
               const px = Math.floor(progress * (barW - 2)) + 1;
               g.rect(px, 0, 1, barH);
               g.fill({ color: DECK_COLOR, alpha: 0.9 });
             }
-            // Border
             g.roundRect(0, 0, barW, barH, 2);
             g.stroke({ color: theme.border.color, alpha: 0.2, width: 1 });
           }}
           layout={{ width: '100%', height: 16 }}
         />
-        {/* Time display */}
         <pixiBitmapText
           text={durationMs > 0
             ? `${formatTime(audioPosition)} / ${formatTime(durationMs)}`
@@ -1468,9 +1350,100 @@ export const PixiDJDeck: React.FC<PixiDJDeckProps> = ({ deckId }) => {
         />
       </pixiContainer>
 
-      {/* Loop controls */}
+      {/* ── Waveform (audio mode) ── */}
+      <PixiDeckWaveform deckId={deckId} height={60} />
+
+      {/* ── Main controls area: visualizer/vinyl + pitch slider (matches DOM) ── */}
+      {viewMode === 'visualizer' && (
+        <pixiContainer layout={{ flexDirection: 'row', gap: 8, flex: 1, minHeight: 0 }}>
+          <pixiContainer layout={{ flex: 1, minWidth: 0, minHeight: 0, flexDirection: 'column', gap: 4 }}>
+            {/* Spectrum visualizer with beat flash border */}
+            <pixiContainer layout={{ width: '100%', height: 80 }}>
+              <PixiSpectrumDisplay deckId={deckId} height={80} deckColor={DECK_COLOR} vizMode={vizMode} onBeatFlash={handleBeatFlash} />
+              {beatFlash > 0 && (
+                <pixiGraphics
+                  draw={(g: GraphicsType) => {
+                    g.clear();
+                    const bw = (g as any).layout?.computedLayout?.width ?? 280;
+                    g.roundRect(0, 0, bw, 80, 4).stroke({ color: DECK_COLOR, width: 3, alpha: beatFlash });
+                  }}
+                  layout={{ position: 'absolute', top: 0, left: 0, width: '100%', height: 80 }}
+                  eventMode="none"
+                />
+              )}
+            </pixiContainer>
+            {/* Visualizer mode nav */}
+            <pixiContainer layout={{ flexDirection: 'row', gap: 4, justifyContent: 'center', alignItems: 'center' }}>
+              <PixiButton icon="prev" label="" variant="ghost" width={28} onClick={cycleVizPrev} />
+              <PixiLabel text={VIZ_LABELS[vizMode]} size="xs" color="textMuted" />
+              <PixiButton icon="next" label="" variant="ghost" width={28} onClick={cycleVizNext} />
+            </pixiContainer>
+          </pixiContainer>
+          {/* Pitch slider */}
+          <pixiContainer layout={{ flexDirection: 'column', gap: 2, alignItems: 'center', flexShrink: 0 }}>
+            <PixiLabel text="PITCH" size="xs" color="textMuted" />
+            <PixiSlider
+              value={pitchOffset ?? 0}
+              min={-0.08}
+              max={0.08}
+              orientation="vertical"
+              length={80}
+              detent={0}
+              onChange={(v) => setDeckPitch?.(deckId, v)}
+            />
+            <pixiBitmapText
+              text={`${((pitchOffset ?? 0) * 100).toFixed(1)}%`}
+              style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 11, fill: 0xffffff }}
+              tint={theme.textMuted.color}
+              layout={{}}
+            />
+          </pixiContainer>
+        </pixiContainer>
+      )}
+
+      {viewMode === 'vinyl' && (
+        <pixiContainer layout={{ flexDirection: 'row', gap: 8, flex: 1, minHeight: 0, alignItems: 'center' }}>
+          <PixiVinylDisplay deckId={deckId} size={250} deckColor={DECK_COLOR} />
+          {/* Pitch slider */}
+          <pixiContainer layout={{ flexDirection: 'column', gap: 2, alignItems: 'center', flexShrink: 0 }}>
+            <PixiLabel text="PITCH" size="xs" color="textMuted" />
+            <PixiSlider
+              value={pitchOffset ?? 0}
+              min={-0.08}
+              max={0.08}
+              orientation="vertical"
+              length={140}
+              detent={0}
+              onChange={(v) => setDeckPitch?.(deckId, v)}
+            />
+            <pixiBitmapText
+              text={`${((pitchOffset ?? 0) * 100).toFixed(1)}%`}
+              style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 11, fill: 0xffffff }}
+              tint={theme.textMuted.color}
+              layout={{}}
+            />
+          </pixiContainer>
+        </pixiContainer>
+      )}
+
+      {viewMode === '3d' && (
+        <PixiTurntable2D
+          deckId={deckId}
+          deckColor={DECK_COLOR}
+          height={260}
+        />
+      )}
+
+      {/* ── Cue points (matches DOM placement before transport) ── */}
+      <PixiDeckCuePoints deckId={deckId} layout={{ width: '100%', height: 36 }} />
+
+      {/* ── Transport + Nudge + Loop (matches DOM: all on one row) ── */}
       <pixiContainer layout={{ flexDirection: 'row', gap: 4, alignItems: 'center' }}>
-        <PixiLabel text="LOOP" size="xs" color="textMuted" />
+        <PixiDeckTransport deckId={deckId} />
+        {/* Nudge */}
+        <PixiButton label="<<" variant="ghost" size="sm" onClick={() => handleNudge(-1)} />
+        <PixiButton label=">>" variant="ghost" size="sm" onClick={() => handleNudge(1)} />
+        {/* Loop */}
         <PixiButton
           label="Line"
           variant={loopActive && loopMode === 'line' ? 'ft2' : 'ghost'}
@@ -1480,7 +1453,7 @@ export const PixiDJDeck: React.FC<PixiDJDeckProps> = ({ deckId }) => {
           onClick={handleLoopLine}
         />
         <PixiButton
-          label="Pattern"
+          label="Patt"
           variant={loopActive && loopMode === 'pattern' ? 'ft2' : 'ghost'}
           color={loopActive && loopMode === 'pattern' ? 'blue' : undefined}
           size="sm"
@@ -1492,51 +1465,14 @@ export const PixiDJDeck: React.FC<PixiDJDeckProps> = ({ deckId }) => {
         )}
       </pixiContainer>
 
-      {/* Cue point */}
-      <pixiContainer layout={{ flexDirection: 'row', gap: 4, alignItems: 'center' }}>
-        <PixiLabel text="CUE" size="xs" color="textMuted" />
-        <PixiButton label="SET" variant="ghost" size="sm" onClick={handleSetCue} />
-        <PixiButton
-          label="GO"
-          variant={cuePoint > 0 ? 'ft2' : 'ghost'}
-          color={cuePoint > 0 ? 'yellow' : undefined}
-          size="sm"
-          onClick={handleGoToCue}
-        />
-        {cuePoint > 0 && (
-          <pixiBitmapText
-            text={formatTime(cuePoint)}
-            style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 10, fill: 0xffffff }}
-            tint={theme.textMuted.color}
-            layout={{}}
-          />
-        )}
-      </pixiContainer>
+      {/* ── FX Pads + Beat Jump (matches DOM placement after transport) ── */}
+      <PixiDeckFXPads deckId={deckId} />
 
-      {/* Nudge controls */}
-      <pixiContainer layout={{ flexDirection: 'row', gap: 4, alignItems: 'center' }}>
-        <PixiLabel text="NUDGE" size="xs" color="textMuted" />
-        <PixiButton label="<< -" variant="ghost" size="sm" onClick={() => handleNudge(-1)} />
-        <PixiButton label="+ >>" variant="ghost" size="sm" onClick={() => handleNudge(1)} />
-      </pixiContainer>
-
-      {/* Scratch presets + Fader LFO */}
+      {/* ── Scratch presets + Fader LFO (matches DOM: last section) ── */}
       <PixiDeckScratch deckId={deckId} layout={{ width: '100%', height: 56 }} />
-
-      {/* Cue points */}
-      <PixiDeckCuePoints deckId={deckId} layout={{ width: '100%', height: 36 }} />
 
       {/* Beat grid */}
       <PixiDeckBeatGrid deckId={deckId} />
-
-      {/* Oscilloscope / spectrum scopes */}
-      <PixiDeckScopes deckId={deckId} size={48} layout={{ width: '100%', height: 64, paddingLeft: 2, paddingTop: 4, flexDirection: 'row', gap: 2 }} />
-
-      {/* Spacer */}
-      <pixiContainer layout={{ flex: 1 }} />
-
-      {/* Transport controls */}
-      <PixiDeckTransport deckId={deckId} />
     </pixiContainer>
   );
 };
