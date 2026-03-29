@@ -36,6 +36,19 @@ import { BuzzmachineGenerator } from '../buzzmachines/BuzzmachineGenerator';
 import { BuzzmachineType } from '../buzzmachines/BuzzmachineEngine';
 import { DexedSynth } from '../dexed/DexedSynth';
 import { OBXdSynth } from '../obxd/OBXdSynth';
+import { MdaEPianoSynth } from '../mda-epiano/MdaEPianoSynth';
+import { MdaJX10Synth } from '../mda-jx10/MdaJX10Synth';
+import { MdaDX10Synth } from '../mda-dx10/MdaDX10Synth';
+import { AMSynthSynth } from '../amsynth/AMSynthSynth';
+import { RaffoSynthEngine } from '../raffo/RaffoSynth';
+import { CalfMonoSynthImpl } from '../calf-mono/CalfMonoSynth';
+import { SetBfreeSynthImpl } from '../setbfree/SetBfreeSynth';
+import { SynthV1SynthImpl } from '../synthv1/SynthV1Synth';
+import { TalNoizeMakerSynthImpl } from '../tal-noizemaker/TalNoizeMakerSynth';
+import { AeolusSynthImpl } from '../aeolus/AeolusSynth';
+import { FluidSynthSynthImpl } from '../fluidsynth/FluidSynthSynth';
+import { SfizzEngine } from '../sfizz/SfizzSynth';
+import { ZynAddSubFXSynthImpl } from '../zynaddsubfx/ZynAddSubFXSynth';
 import { CZ101Synth } from '../cz101/CZ101Synth';
 import { CEM3394Synth } from '../cem3394/CEM3394Synth';
 import { SCSPSynth } from '../scsp/SCSPSynth';
@@ -892,6 +905,138 @@ export function createOBXd(config: InstrumentConfig): Tone.ToneAudioNode {
 
   synth.output.gain.value = Tone.dbToGain(getNormalizedVolume('OBXd', config.volume));
 
+  return synth as unknown as Tone.ToneAudioNode;
+}
+
+/**
+ * Create MDA ePiano (Fender Rhodes)
+ * 32-voice sample-based Rhodes piano with tremolo, autopan, overdrive
+ */
+export function createMdaEPiano(config: InstrumentConfig): Tone.ToneAudioNode {
+  const epianoConfig = config.mdaEPiano || {};
+  const synth = new MdaEPianoSynth(epianoConfig);
+
+  synth.output.gain.value = Tone.dbToGain(getNormalizedVolume('MdaEPiano', config.volume));
+
+  return synth as unknown as Tone.ToneAudioNode;
+}
+
+/**
+ * Create MDA JX-10 Polysynth (Roland JX-8P inspired)
+ * 8-voice dual-oscillator subtractive synth with state-variable filter
+ */
+export function createMdaJX10(config: InstrumentConfig): Tone.ToneAudioNode {
+  const jx10Config = config.mdaJX10 || {};
+  const synth = new MdaJX10Synth(jx10Config);
+
+  synth.output.gain.value = Tone.dbToGain(getNormalizedVolume('MdaJX10', config.volume));
+
+  return synth as unknown as Tone.ToneAudioNode;
+}
+
+/**
+ * Create MDA DX10 FM Synth (2-operator FM)
+ * 8-voice polyphonic FM synth with carrier/modulator envelopes
+ */
+export function createMdaDX10(config: InstrumentConfig): Tone.ToneAudioNode {
+  const dx10Config = config.mdaDX10 || {};
+  const synth = new MdaDX10Synth(dx10Config);
+
+  synth.output.gain.value = Tone.dbToGain(getNormalizedVolume('MdaDX10', config.volume));
+
+  return synth as unknown as Tone.ToneAudioNode;
+}
+
+/**
+ * Create AMSynth (Analog Modelling Synthesizer)
+ * Dual-oscillator subtractive with multi-mode filter, reverb, distortion
+ */
+export function createAMSynth(config: InstrumentConfig): Tone.ToneAudioNode {
+  const amsynthConfig = config.amsynth || {};
+  const synth = new AMSynthSynth(amsynthConfig);
+
+  synth.output.gain.value = Tone.dbToGain(getNormalizedVolume('AMSynth', config.volume));
+
+  return synth as unknown as Tone.ToneAudioNode;
+}
+
+/**
+ * Create Raffo Synth (Minimoog clone)
+ * Monophonic 4-oscillator subtractive with glide
+ */
+export function createRaffoSynth(config: InstrumentConfig): Tone.ToneAudioNode {
+  const raffoConfig = config.raffo || {};
+  const synth = new RaffoSynthEngine(raffoConfig);
+
+  synth.output.gain.value = Tone.dbToGain(getNormalizedVolume('RaffoSynth', config.volume));
+
+  return synth as unknown as Tone.ToneAudioNode;
+}
+
+export function createCalfMono(config: InstrumentConfig): Tone.ToneAudioNode {
+  const calfConfig = config.calfMono || {};
+  const synth = new CalfMonoSynthImpl();
+  void synth.init();
+  synth.applyConfig(calfConfig);
+
+  return synth as unknown as Tone.ToneAudioNode;
+}
+
+export function createSetBfree(config: InstrumentConfig): Tone.ToneAudioNode {
+  const bfreeConfig = config.setbfree || {};
+  const synth = new SetBfreeSynthImpl();
+  void synth.init();
+  synth.applyConfig(bfreeConfig);
+
+  return synth as unknown as Tone.ToneAudioNode;
+}
+
+export function createSynthV1(config: InstrumentConfig): Tone.ToneAudioNode {
+  const sv1Config = config.synthv1 || {};
+  const synth = new SynthV1SynthImpl();
+  void synth.init();
+  synth.applyConfig(sv1Config);
+
+  return synth as unknown as Tone.ToneAudioNode;
+}
+
+export function createTalNoizeMaker(config: InstrumentConfig): Tone.ToneAudioNode {
+  const talConfig = config.talNoizeMaker || {};
+  const synth = new TalNoizeMakerSynthImpl();
+  void synth.init();
+  synth.applyConfig(talConfig);
+  return synth as unknown as Tone.ToneAudioNode;
+}
+
+export function createAeolus(config: InstrumentConfig): Tone.ToneAudioNode {
+  const aeolusConfig = config.aeolus || {};
+  const synth = new AeolusSynthImpl();
+  void synth.init();
+  synth.applyConfig(aeolusConfig);
+  return synth as unknown as Tone.ToneAudioNode;
+}
+
+export function createFluidSynth(config: InstrumentConfig): Tone.ToneAudioNode {
+  const fsConfig = config.fluidsynth || {};
+  const synth = new FluidSynthSynthImpl();
+  void synth.init();
+  synth.applyConfig(fsConfig);
+  return synth as unknown as Tone.ToneAudioNode;
+}
+
+export function createSfizz(config: InstrumentConfig): Tone.ToneAudioNode {
+  const sfizzConfig = config.sfizz || {};
+  const synth = new SfizzEngine();
+  void synth.init();
+  synth.applyConfig(sfizzConfig);
+  return synth as unknown as Tone.ToneAudioNode;
+}
+
+export function createZynAddSubFX(config: InstrumentConfig): Tone.ToneAudioNode {
+  const zasfxConfig = config.zynaddsubfx || {};
+  const synth = new ZynAddSubFXSynthImpl();
+  void synth.init();
+  synth.applyConfig(zasfxConfig);
   return synth as unknown as Tone.ToneAudioNode;
 }
 
