@@ -46,6 +46,8 @@ import type { WaveSabreSynthType } from '@typedefs/wavesabreInstrument';
 import { OidosSynth } from './oidos/OidosSynth';
 import { TunefishSynth } from './tunefish/TunefishSynth';
 import { SunVoxModularSynth } from './sunvox-modular/SunVoxModularSynth';
+import { createIO808Instrument } from './io808/createIO808Instrument';
+import { createTR909Instrument } from './tr909/createTR909Instrument';
 
 // Sub-factory imports
 import { VOLUME_NORMALIZATION_OFFSETS } from './factories/volumeNormalization';
@@ -74,6 +76,19 @@ import {
   createSynare,
   createDexed,
   createOBXd,
+  createMdaEPiano,
+  createMdaJX10,
+  createMdaDX10,
+  createAMSynth,
+  createRaffoSynth,
+  createCalfMono,
+  createSetBfree,
+  createSynthV1,
+  createTalNoizeMaker,
+  createAeolus,
+  createFluidSynth,
+  createSfizz,
+  createZynAddSubFX,
   createCZ101,
   createCEM3394,
   createSCSP,
@@ -294,6 +309,14 @@ export class InstrumentFactory {
         instrument = createToneJSSynth({ ...config, synthType: "DrumMachine" })!;
         break;
 
+      case 'TR808':
+        instrument = createIO808Instrument(config);
+        break;
+
+      case 'TR909':
+        instrument = createTR909Instrument(config);
+        break;
+
       case 'ChipSynth':
         instrument = createToneJSSynth({ ...config, synthType: "ChipSynth" })!;
         break;
@@ -365,6 +388,47 @@ export class InstrumentFactory {
 
       case 'OBXd':
         instrument = createOBXd(config);
+        break;
+
+      // MDA Instrument Plugins
+      case 'MdaEPiano':
+        instrument = createMdaEPiano(config);
+        break;
+      case 'MdaJX10':
+        instrument = createMdaJX10(config);
+        break;
+      case 'MdaDX10':
+        instrument = createMdaDX10(config);
+        break;
+      case 'AMSynth':
+        instrument = createAMSynth(config);
+        break;
+      case 'RaffoSynth':
+        instrument = createRaffoSynth(config);
+        break;
+      case 'CalfMono':
+        instrument = createCalfMono(config);
+        break;
+      case 'SetBfree':
+        instrument = createSetBfree(config);
+        break;
+      case 'SynthV1':
+        instrument = createSynthV1(config);
+        break;
+      case 'TalNoizeMaker':
+        instrument = createTalNoizeMaker(config);
+        break;
+      case 'Aeolus':
+        instrument = createAeolus(config);
+        break;
+      case 'FluidSynth':
+        instrument = createFluidSynth(config);
+        break;
+      case 'Sfizz':
+        instrument = createSfizz(config);
+        break;
+      case 'ZynAddSubFX':
+        instrument = createZynAddSubFX(config);
         break;
 
       case 'MAMEVFX':

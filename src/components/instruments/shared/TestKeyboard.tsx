@@ -223,13 +223,18 @@ export const TestKeyboard: React.FC<TestKeyboardProps> = ({ instrument }) => {
       }
     };
 
-    // Audio context must be running before triggering notes.
-    // ensureContextRunning() calls engine.init() which calls Tone.start() —
-    // resuming a suspended AudioContext is only allowed within a user gesture,
-    // which is exactly where attackNote is called (mousedown / keydown).
-    void ensureContextRunning()
-      .then(() => engine.ensureInstrumentReady(inst))
-      .then(doAttack);
+    // Fast path: if context is already running, trigger synchronously to avoid
+    // microtask delays that cause audible latency (sound on mouse-up instead of down).
+    if (engine.isContextActuallyRunning()) {
+      // Ensure instrument exists (synchronous — getInstrument creates on demand)
+      engine.getInstrument(inst.id, inst);
+      doAttack();
+    } else {
+      // Slow path: need to resume context first (only on first interaction)
+      void ensureContextRunning()
+        .then(() => engine.ensureInstrumentReady(inst))
+        .then(doAttack);
+    }
   }, [instrument, ensureContextRunning]);
 
   // Release note - stops the sustained note
@@ -370,12 +375,10 @@ export const TestKeyboard: React.FC<TestKeyboardProps> = ({ instrument }) => {
                     onMouseLeave={() => {
                       if (activeNotes.has(key.note)) releaseNote(key.note);
                     }}
-                    onTouchStart={(e) => {
-                      e.preventDefault();
+                    onTouchStart={() => {
                       attackNote(key.note);
                     }}
-                    onTouchEnd={(e) => {
-                      e.preventDefault();
+                    onTouchEnd={() => {
                       releaseNote(key.note);
                     }}
                     className={`
@@ -442,12 +445,10 @@ export const TestKeyboard: React.FC<TestKeyboardProps> = ({ instrument }) => {
                     onMouseLeave={() => {
                       if (activeNotes.has(key.note)) releaseNote(key.note);
                     }}
-                    onTouchStart={(e) => {
-                      e.preventDefault();
+                    onTouchStart={() => {
                       attackNote(key.note);
                     }}
-                    onTouchEnd={(e) => {
-                      e.preventDefault();
+                    onTouchEnd={() => {
                       releaseNote(key.note);
                     }}
                     className="absolute border border-ft2-border rounded-b pointer-events-auto

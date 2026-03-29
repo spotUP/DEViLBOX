@@ -2,6 +2,10 @@
  * Drum Pad Types - MPC-inspired drum pad system
  */
 
+import type { InstrumentConfig } from './instrument/defaults';
+import type { SynthType, EnvelopeConfig } from './instrument/base';
+import type { DrumType, DrumMachineType } from './instrument/drums';
+
 export type OutputBus = 'stereo' | 'out1' | 'out2' | 'out3' | 'out4';
 export type FilterType = 'lpf' | 'hpf' | 'bpf' | 'off';
 export type PlayMode = 'oneshot' | 'sustain';
@@ -39,16 +43,25 @@ export type ScratchActionId =
   | 'scratch_stop'
   | 'lfo_off' | 'lfo_14' | 'lfo_18' | 'lfo_116' | 'lfo_132';
 
+export type VelocityCurve = 'linear' | 'exponential' | 'logarithmic' | 'scurve' | 'fixed';
+
 export interface DrumPad {
   id: number;              // 1-64
   sample: SampleData | null;
   name: string;
+  color?: string;          // Custom pad color (CSS hex, e.g. '#ff6b35')
+
+  // Instrument / synth assignment (optional — triggers via ToneEngine)
+  instrumentId?: number;   // Legacy: reference to song instrument in useInstrumentStore
+  instrumentNote?: string; // Fixed note to trigger (e.g. 'C3', 'D#2')
+  synthConfig?: InstrumentConfig; // Pad-owned synth config (independent from song instruments)
 
   // Basic parameters
   level: number;           // 0-127
   tune: number;            // -120 to +120 (10 units = 1 semitone, ±1 octave fine precision)
   pan: number;             // -64 to +63 (0 = center)
   output: OutputBus;       // Output routing
+  velocityCurve?: VelocityCurve; // Velocity response curve (default: 'linear')
 
   // Amplitude Envelope
   attack: number;          // 0-100ms
@@ -164,6 +177,9 @@ export function createEmptyProgram(id: string, name: string): DrumProgram {
   };
 }
 
+/** Base ID for pad-owned instruments in ToneEngine (50000 + padId) */
+export const PAD_INSTRUMENT_BASE = 50000;
+
 /** Get the bank letter for a pad ID (1-64) */
 export function getPadBank(padId: number): PadBank {
   if (padId <= 16) return 'A';
@@ -172,61 +188,174 @@ export function getPadBank(padId: number): PadBank {
   return 'D';
 }
 
+/** Apply velocity curve transformation (input: 0-127, output: 0-127) */
+export function applyVelocityCurve(velocity: number, curve: VelocityCurve = 'linear'): number {
+  const normalized = velocity / 127; // 0-1
+  let result: number;
+  switch (curve) {
+    case 'exponential':
+      result = normalized * normalized;
+      break;
+    case 'logarithmic':
+      result = Math.sqrt(normalized);
+      break;
+    case 'scurve':
+      // S-curve: soft at extremes, steep in middle
+      result = normalized < 0.5
+        ? 2 * normalized * normalized
+        : 1 - 2 * (1 - normalized) * (1 - normalized);
+      break;
+    case 'fixed':
+      result = 1; // Always max velocity
+      break;
+    default: // 'linear'
+      result = normalized;
+  }
+  return Math.max(1, Math.min(127, Math.round(result * 127)));
+}
+
 /** Get the 16 pads for a given bank */
 export function getBankPads(pads: DrumPad[], bank: PadBank): DrumPad[] {
   const bankIndex = { A: 0, B: 1, C: 2, D: 3 }[bank];
   return pads.slice(bankIndex * 16, (bankIndex + 1) * 16);
 }
 
+/** Create a pad-owned synth-based InstrumentConfig (used when user picks a synth type in PadEditor) */
+export function makeDrumConfig(
+  padId: number, name: string, synthType: SynthType, note: string = 'C3',
+  envelope?: Partial<EnvelopeConfig>,
+  parameters?: Record<string, unknown>,
+): { synthConfig: InstrumentConfig; instrumentNote: string } {
+  const fullEnvelope: EnvelopeConfig | undefined = envelope ? {
+    attack: envelope.attack ?? 1,
+    decay: envelope.decay ?? 200,
+    sustain: envelope.sustain ?? 0,
+    release: envelope.release ?? 100,
+  } : undefined;
+  return {
+    synthConfig: {
+      id: PAD_INSTRUMENT_BASE + padId,
+      name,
+      type: 'synth',
+      synthType,
+      effects: [],
+      volume: 0,
+      pan: 0,
+      ...(fullEnvelope ? { envelope: fullEnvelope } : {}),
+      ...(parameters ? { parameters } : {}),
+    },
+    instrumentNote: note,
+  };
+}
+
+/** Create a pad-owned sample-based InstrumentConfig */
+export function makeSampleConfig(padId: number, name: string, url: string): { synthConfig: InstrumentConfig; instrumentNote: string } {
+  return {
+    synthConfig: {
+      id: PAD_INSTRUMENT_BASE + padId,
+      name,
+      type: 'sample',
+      synthType: 'Sampler',
+      sample: { url, baseNote: 'C4', detune: 0, loop: false, loopStart: 0, loopEnd: 0, reverse: false, playbackRate: 1 },
+      effects: [],
+      volume: -6,
+      pan: 0,
+    },
+    instrumentNote: 'C4',
+  };
+}
+
+/** Create a pad-owned DrumMachine config (circuit-modeled 808/909 synthesis) */
+function makeDrumMachineConfig(
+  padId: number, name: string, drumType: DrumType, machineType: DrumMachineType,
+  note: string = 'C3', drumSubType?: string
+): { synthConfig: InstrumentConfig; instrumentNote: string } {
+  const synthType = machineType === '808' ? 'TR808' : 'TR909';
+  const paramKey = machineType === '808' ? 'io808Type' : 'tr909Type';
+  return {
+    synthConfig: {
+      id: PAD_INSTRUMENT_BASE + padId,
+      name,
+      type: 'synth',
+      synthType,
+      drumMachine: { drumType, machineType },
+      effects: [],
+      volume: 0,
+      pan: 0,
+      ...(drumSubType ? { parameters: { [paramKey]: drumSubType } } : {}),
+    },
+    instrumentNote: note,
+  };
+}
+
 /**
- * Factory preset: TR-808 Kit
+ * Factory preset: TR-808 Kit — io-808 circuit-modeled synthesis
  */
 export function create808Program(): DrumProgram {
-  const program = createEmptyProgram('A-01', '808 Kit');
+  const program = createEmptyProgram('A-01', 'TR-808');
+  const M: DrumMachineType = '808';
 
-  // Set pad names (samples will be loaded later)
-  program.pads[0].name = 'Kick';
-  program.pads[1].name = 'Snare';
-  program.pads[2].name = 'Clap';
-  program.pads[3].name = 'Rim';
-  program.pads[4].name = 'Cl Hat';
-  program.pads[5].name = 'Op Hat';
-  program.pads[6].name = 'Lo Tom';
-  program.pads[7].name = 'Mid Tom';
-  program.pads[8].name = 'Hi Tom';
-  program.pads[9].name = 'Crash';
-  program.pads[10].name = 'Ride';
-  program.pads[11].name = 'Clave';
-  program.pads[12].name = 'Cowbell';
-  program.pads[13].name = 'Maracas';
-  program.pads[14].name = 'Conga';
-  program.pads[15].name = 'Cymbal';
+  // [name, drumType, note, io808Type]
+  const kit: [string, DrumType, string, string][] = [
+    ['BD',       'kick',     'C2',   'kick'],
+    ['SD',       'snare',    'D2',   'snare'],
+    ['CP',       'clap',     'D#2',  'clap'],
+    ['RS',       'rimshot',  'C#2',  'rimshot'],
+    ['CH',       'hihat',    'F#2',  'closedHat'],
+    ['OH',       'hihat',    'A#2',  'openHat'],
+    ['LT',       'tom',      'F2',   'tomLow'],
+    ['MT',       'tom',      'B2',   'tomMid'],
+    ['HT',       'tom',      'D3',   'tomHigh'],
+    ['CY',       'cymbal',   'C#3',  'cymbal'],
+    ['CL',       'clave',    'D#2',  'clave'],
+    ['CB',       'cowbell',  'G#2',  'cowbell'],
+    ['MA',       'maracas',  'D3',   'maracas'],
+    ['Conga Lo', 'conga',    'D#3',  'congaLow'],
+    ['Conga Hi', 'conga',    'A3',   'congaHigh'],
+    ['Cymbal 2', 'cymbal',   'A4',   'cymbal'],
+  ];
+
+  kit.forEach(([name, drumType, note, subType], i) => {
+    const pad = program.pads[i];
+    pad.name = name;
+    const cfg = makeDrumMachineConfig(pad.id, name, drumType, M, note, subType);
+    pad.synthConfig = cfg.synthConfig;
+    pad.instrumentNote = cfg.instrumentNote;
+  });
 
   return program;
 }
 
 /**
- * Factory preset: TR-909 Kit
+ * Factory preset: TR-909 Kit — sample-based synthesis (André Michelle port)
+ * The real 909 has 11 voices: BD, SD, LT, MT, HT, RS, CP, CH, OH, Crash, Ride
  */
 export function create909Program(): DrumProgram {
-  const program = createEmptyProgram('B-01', '909 Kit');
+  const program = createEmptyProgram('B-01', 'TR-909');
+  const M: DrumMachineType = '909';
 
-  program.pads[0].name = 'Kick';
-  program.pads[1].name = 'Snare';
-  program.pads[2].name = 'Clap';
-  program.pads[3].name = 'Rim';
-  program.pads[4].name = 'Cl Hat';
-  program.pads[5].name = 'Op Hat';
-  program.pads[6].name = 'Lo Tom';
-  program.pads[7].name = 'Mid Tom';
-  program.pads[8].name = 'Hi Tom';
-  program.pads[9].name = 'Crash';
-  program.pads[10].name = 'Ride';
-  program.pads[11].name = 'Shaker';
-  program.pads[12].name = 'Tambourine';
-  program.pads[13].name = 'Splash';
-  program.pads[14].name = 'China';
-  program.pads[15].name = 'Reverse Cymbal';
+  // [name, drumType, note, tr909Type]
+  const kit: [string, DrumType, string, string][] = [
+    ['BD',    'kick',     'C2',   'kick'],
+    ['SD',    'snare',    'D2',   'snare'],
+    ['CP',    'clap',     'D#2',  'clap'],
+    ['RS',    'rimshot',  'C#2',  'rimshot'],
+    ['CH',    'hihat',    'F#2',  'closedHat'],
+    ['OH',    'hihat',    'A#2',  'openHat'],
+    ['LT',    'tom',      'F2',   'tomLow'],
+    ['MT',    'tom',      'B2',   'tomMid'],
+    ['HT',    'tom',      'D3',   'tomHigh'],
+    ['Crash', 'cymbal',   'C#3',  'crash'],
+    ['Ride',  'cymbal',   'D#3',  'ride'],
+  ];
+
+  kit.forEach(([name, drumType, note, subType], i) => {
+    const pad = program.pads[i];
+    pad.name = name;
+    const cfg = makeDrumMachineConfig(pad.id, name, drumType, M, note, subType);
+    pad.synthConfig = cfg.synthConfig;
+    pad.instrumentNote = cfg.instrumentNote;
+  });
 
   return program;
 }

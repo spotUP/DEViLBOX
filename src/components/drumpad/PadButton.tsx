@@ -14,6 +14,7 @@ interface PadButtonProps {
   onTrigger: (padId: number, velocity: number) => void;
   onRelease?: (padId: number) => void;  // For sustain mode
   onSelect: (padId: number) => void;
+  onEmptyPadClick?: (padId: number) => void;  // Opens sample browser for empty pads
   onFocus?: () => void;  // Focus callback
   className?: string;
 }
@@ -26,6 +27,7 @@ export const PadButton: React.FC<PadButtonProps> = ({
   onTrigger,
   onRelease,
   onSelect,
+  onEmptyPadClick,
   onFocus,
   className = '',
 }) => {
@@ -33,6 +35,7 @@ export const PadButton: React.FC<PadButtonProps> = ({
   const [isPressed, setIsPressed] = useState(false);
   const [triggerIntensity, setTriggerIntensity] = useState(0); // 0-1 animated flash
   const decayTimerRef = useRef<number | null>(null);
+  const buttonRef = useRef<HTMLButtonElement>(null);
 
   // Animate velocity flash decay
   useEffect(() => {
@@ -78,11 +81,14 @@ export const PadButton: React.FC<PadButtonProps> = ({
     return Math.max(1, Math.min(127, baseVelocity));
   }, []);
 
+  // A pad is "loaded" if it has a sample, synth config, or legacy instrument assigned
+  const isLoaded = !!(pad.sample || pad.synthConfig || pad.instrumentId != null);
+
   const handleMouseDown = useCallback((event: React.MouseEvent) => {
     event.preventDefault();
     
-    // Empty pads can be clicked for selection but don't trigger sound
-    if (!pad.sample) {
+    // Empty pads: just select (don't auto-open editor)
+    if (!isLoaded) {
       onSelect(pad.id);
       return;
     }
@@ -91,7 +97,7 @@ export const PadButton: React.FC<PadButtonProps> = ({
     const vel = calculateVelocity(event.clientY, event.currentTarget);
     flashTrigger(vel);
     onTrigger(pad.id, vel);
-  }, [pad.id, pad.sample, onTrigger, onSelect, calculateVelocity, flashTrigger]);
+  }, [pad.id, isLoaded, onTrigger, onSelect, calculateVelocity, flashTrigger]);
 
   const handleMouseUp = useCallback(() => {
     setIsPressed(false);
@@ -105,59 +111,85 @@ export const PadButton: React.FC<PadButtonProps> = ({
     }
   }, [pad.id, onSelect]);
 
-  // Touch support for mobile devices
-  const handleTouchStart = useCallback((event: React.TouchEvent) => {
-    event.preventDefault();
-    
-    // Empty pads can be tapped for selection but don't trigger sound
-    if (!pad.sample) {
-      onSelect(pad.id);
-      return;
-    }
-    
-    setIsPressed(true);
-    const touch = event.touches[0];
-    const vel = calculateVelocity(touch.clientY, event.currentTarget);
-    flashTrigger(vel);
-    onTrigger(pad.id, vel);
-  }, [pad.id, pad.sample, onTrigger, onSelect, calculateVelocity, flashTrigger]);
+  // Touch support — use ref-based listeners with { passive: false } to allow preventDefault
+  const touchHandlersRef = useRef({
+    onTrigger, onRelease, onSelect, onEmptyPadClick, pad, calculateVelocity, flashTrigger,
+  });
+  touchHandlersRef.current = { onTrigger, onRelease, onSelect, onEmptyPadClick, pad, calculateVelocity, flashTrigger };
 
-  const handleTouchEnd = useCallback((event: React.TouchEvent) => {
-    event.preventDefault();
-    setIsPressed(false);
-    onRelease?.(pad.id);
+  useEffect(() => {
+    const el = buttonRef.current;
+    if (!el) return;
 
-    // Check for selection gesture (long press could be added later)
-    if (event.changedTouches.length > 1) {
-      // Multi-touch = select
-      onSelect(pad.id);
-    }
-  }, [pad.id, onSelect, onRelease]);
+    const handleTouchStart = (event: TouchEvent) => {
+      event.preventDefault(); // safe: non-passive listener
+      const { pad, onSelect, onTrigger, calculateVelocity, flashTrigger } = touchHandlersRef.current;
+
+      if (!pad.sample && !pad.synthConfig && pad.instrumentId == null) {
+        onSelect(pad.id);
+        return;
+      }
+
+      setIsPressed(true);
+      const touch = event.touches[0];
+      const vel = calculateVelocity(touch.clientY, el);
+      flashTrigger(vel);
+      onTrigger(pad.id, vel);
+    };
+
+    const handleTouchEnd = (event: TouchEvent) => {
+      event.preventDefault();
+      setIsPressed(false);
+      const { pad, onRelease, onSelect } = touchHandlersRef.current;
+      onRelease?.(pad.id);
+
+      if (event.changedTouches.length > 1) {
+        onSelect(pad.id);
+      }
+    };
+
+    el.addEventListener('touchstart', handleTouchStart, { passive: false });
+    el.addEventListener('touchend', handleTouchEnd, { passive: false });
+    el.addEventListener('touchcancel', handleTouchEnd, { passive: false });
+
+    return () => {
+      el.removeEventListener('touchstart', handleTouchStart);
+      el.removeEventListener('touchend', handleTouchEnd);
+      el.removeEventListener('touchcancel', handleTouchEnd);
+    };
+  }, []); // stable — handlers accessed through ref
 
   // Determine pad style based on state
   const padStyle = useMemo(() => {
-    if (!pad.sample) {
-      return { className: 'bg-dark-border', overlay: undefined };
+    // Custom color takes priority
+    if (pad.color && isLoaded) {
+      return { className: '', bgColor: pad.color };
     }
 
-    if (isSelected) {
-      return { className: 'bg-emerald-800', overlay: undefined };
+    if (!isLoaded) {
+      return { className: 'bg-dark-border', bgColor: undefined };
     }
 
-    return { className: 'bg-emerald-800', overlay: undefined };
-  }, [pad.sample, isSelected]);
+    // Synth-only pads get a different color accent
+    if (!pad.sample && (pad.synthConfig || pad.instrumentId != null)) {
+      return { className: isSelected ? 'bg-blue-800' : 'bg-blue-900', bgColor: undefined };
+    }
+
+    return { className: 'bg-emerald-800', bgColor: undefined };
+  }, [isLoaded, pad.sample, pad.instrumentId, pad.color, isSelected]);
 
   // Flash overlay opacity driven by triggerIntensity (animated)
   const flashOpacity = triggerIntensity > 0.01 ? triggerIntensity : 0;
 
   return (
     <button
+      ref={buttonRef}
       data-pad-id={pad.id}
       className={`
         relative rounded-lg select-none overflow-hidden cursor-pointer
         ${padStyle.className}
-        ${!pad.sample ? 'opacity-40' : ''}
-        ${isPressed && pad.sample ? 'scale-95' : 'scale-100'}
+        ${!isLoaded ? 'opacity-40' : ''}
+        ${isPressed && isLoaded ? 'scale-95' : 'scale-100'}
         ${isSelected ? 'ring-2 ring-accent-primary ring-offset-2 ring-offset-dark-bg' : ''}
         ${isFocused && !isSelected ? 'ring-2 ring-blue-400 ring-offset-2 ring-offset-dark-bg' : ''}
         transform-gpu will-change-transform
@@ -166,15 +198,13 @@ export const PadButton: React.FC<PadButtonProps> = ({
       style={{
         aspectRatio: '1',
         transition: isPressed ? 'transform 50ms' : 'transform 120ms',
+        ...(padStyle.bgColor ? { backgroundColor: padStyle.bgColor } : {}),
       }}
       onMouseDown={handleMouseDown}
       onMouseUp={handleMouseUp}
       onMouseLeave={handleMouseUp}
       onClick={handleClick}
       onFocus={onFocus}
-      onTouchStart={handleTouchStart}
-      onTouchEnd={handleTouchEnd}
-      onTouchCancel={handleTouchEnd}
       tabIndex={0}
       aria-label={`Drum pad ${pad.id}: ${pad.name}${pad.sample ? '' : ' (empty - click to assign)'}`}
       aria-pressed={isPressed}
@@ -216,7 +246,7 @@ export const PadButton: React.FC<PadButtonProps> = ({
       </div>
 
       {/* Velocity dot */}
-      {velocity > 0 && pad.sample && (
+      {velocity > 0 && isLoaded && (
         <div className="absolute bottom-1 right-1">
           <div
             className="w-1.5 h-1.5 rounded-full bg-emerald-400"
@@ -226,7 +256,7 @@ export const PadButton: React.FC<PadButtonProps> = ({
       )}
 
       {/* Empty state icon */}
-      {!pad.sample && (
+      {!isLoaded && (
         <div className="absolute inset-0 flex items-center justify-center">
           <div className="text-2xl text-white/20">+</div>
         </div>
