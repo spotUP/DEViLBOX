@@ -1481,6 +1481,7 @@ export class ToneEngine {
       // AudioWorklet WASM synths — use shared instances (one per instrument ID)
       // to avoid exhausting fixed player-handle pools across channels.
       'TB303', 'Buzz3o3', 'V2', 'V2Speech', 'Sam', 'DECtalk', 'PinkTrombone', 'DubSiren', 'SpaceLaser', 'Synare', 'Dexed', 'OBXd', 'WAM',
+      'TR808', 'TR909',
       'SonicArrangerSynth', 'InStereo2Synth', 'InStereo1Synth', 'JamCrackerSynth', 'FuturePlayerSynth',
       'SoundMonSynth', 'SidMonSynth', 'SidMon1Synth',
       'DigMugSynth', 'DeltaMusic1Synth', 'DeltaMusic2Synth',
