@@ -5,14 +5,16 @@
 import React, { useCallback, useState, useEffect, useRef, useMemo } from 'react';
 import { PadButton } from './PadButton';
 import { useDrumPadStore } from '../../stores/useDrumPadStore';
+import { useInstrumentStore } from '../../stores/useInstrumentStore';
 import { DrumPadEngine } from '../../engine/drumpad/DrumPadEngine';
 import { NoteRepeatEngine } from '../../engine/drumpad/NoteRepeatEngine';
 import type { NoteRepeatRate } from '../../engine/drumpad/NoteRepeatEngine';
 import { getAudioContext, resumeAudioContext } from '../../audio/AudioContextSingleton';
+import { getToneEngine } from '../../engine/ToneEngine';
 import { useTransportStore } from '../../stores/useTransportStore';
 import { useOrientation } from '@hooks/useOrientation';
 import type { ScratchActionId, PadBank } from '../../types/drumpad';
-import { getBankPads } from '../../types/drumpad';
+import { getBankPads, applyVelocityCurve, PAD_INSTRUMENT_BASE } from '../../types/drumpad';
 import {
   djScratchBaby, djScratchTrans, djScratchFlare, djScratchHydro, djScratchCrab, djScratchOrbit,
   djScratchChirp, djScratchStab, djScratchScrbl, djScratchTear,
@@ -55,11 +57,13 @@ const SCRATCH_ACTION_HANDLERS: Record<ScratchActionId, () => boolean> = {
 
 interface PadGridProps {
   onPadSelect: (padId: number) => void;
+  onEmptyPadClick?: (padId: number) => void;
   selectedPadId: number | null;
 }
 
 export const PadGrid: React.FC<PadGridProps> = ({
   onPadSelect,
+  onEmptyPadClick,
   selectedPadId,
 }) => {
   // Track velocity for each pad (for visual feedback)
@@ -162,13 +166,58 @@ export const PadGrid: React.FC<PadGridProps> = ({
     if (currentProgram && engineRef.current) {
       const pad = currentProgram.pads.find(p => p.id === padId);
       if (pad) {
+        // Apply per-pad velocity curve
+        const curvedVelocity = applyVelocityCurve(velocity, pad.velocityCurve);
+
         // Fire DJ scratch action if assigned (in addition to any sample)
         if (pad.scratchAction) {
           SCRATCH_ACTION_HANDLERS[pad.scratchAction]?.();
         }
-        // Trigger audio playback if sample is loaded
+        // Trigger sample playback if sample is loaded
         if (pad.sample) {
-          engineRef.current.triggerPad(pad, velocity);
+          engineRef.current.triggerPad(pad, curvedVelocity);
+        }
+        // Trigger pad-owned synth if assigned
+        if (pad.synthConfig) {
+          try {
+            const engine = getToneEngine();
+            const note = pad.instrumentNote || 'C3';
+            const normalizedVel = curvedVelocity / 127;
+            const padInstId = PAD_INSTRUMENT_BASE + pad.id;
+            const config = { ...pad.synthConfig, id: padInstId };
+            engine.triggerNoteAttack(padInstId, note, 0, normalizedVel, config);
+            if (pad.playMode === 'oneshot') {
+              const releaseDelay = Math.max(pad.decay, 100) / 1000;
+              setTimeout(() => {
+                try { engine.triggerNoteRelease(padInstId, note, 0, config); } catch { /* ignore */ }
+              }, releaseDelay * 1000);
+            }
+          } catch (err) {
+            console.warn('[PadGrid] Pad synth trigger failed:', err);
+          }
+        }
+        // Legacy: trigger song instrument if assigned (backward compat)
+        else if (pad.instrumentId != null) {
+          try {
+            const config = useInstrumentStore.getState().getInstrument(pad.instrumentId);
+            if (config) {
+              const engine = getToneEngine();
+              const note = pad.instrumentNote || 'C3';
+              const normalizedVel = curvedVelocity / 127;
+              engine.triggerNoteAttack(pad.instrumentId, note, 0, normalizedVel, config);
+              // Auto-release after decay time for oneshot pads
+              if (pad.playMode === 'oneshot') {
+                const releaseDelay = Math.max(pad.decay, 100) / 1000;
+                setTimeout(() => {
+                  try {
+                    engine.triggerNoteRelease(pad.instrumentId!, note, 0, config);
+                  } catch { /* ignore release errors */ }
+                }, releaseDelay * 1000);
+              }
+            }
+          } catch (err) {
+            console.warn('[PadGrid] Synth trigger failed:', err);
+          }
         }
         // Track held pads for sustain mode
         if (pad.playMode === 'sustain') {
@@ -199,7 +248,25 @@ export const PadGrid: React.FC<PadGridProps> = ({
     if (currentProgram && engineRef.current) {
       const pad = currentProgram.pads.find(p => p.id === padId);
       if (pad && pad.playMode === 'sustain') {
+        // Release sample voice
         engineRef.current.stopPad(padId, pad.release / 1000);
+        // Release synth voice
+        if (pad.synthConfig) {
+          try {
+            const padInstId = PAD_INSTRUMENT_BASE + pad.id;
+            const config = { ...pad.synthConfig, id: padInstId };
+            const note = pad.instrumentNote || 'C3';
+            getToneEngine().triggerNoteRelease(padInstId, note, 0, config);
+          } catch { /* ignore release errors */ }
+        } else if (pad.instrumentId != null) {
+          try {
+            const config = useInstrumentStore.getState().getInstrument(pad.instrumentId);
+            if (config) {
+              const note = pad.instrumentNote || 'C3';
+              getToneEngine().triggerNoteRelease(pad.instrumentId, note, 0, config);
+            }
+          } catch { /* ignore release errors */ }
+        }
       }
     }
   }, [currentProgram]);
@@ -309,8 +376,8 @@ export const PadGrid: React.FC<PadGridProps> = ({
   }
 
   const bankButtons: PadBank[] = ['A', 'B', 'C', 'D'];
-  const bankLoadedCount = bankPads.filter(p => p.sample !== null).length;
-  const totalLoadedCount = currentProgram.pads.filter(p => p.sample !== null).length;
+  const bankLoadedCount = bankPads.filter(p => p.sample !== null || p.synthConfig || p.instrumentId != null).length;
+  const totalLoadedCount = currentProgram.pads.filter(p => p.sample !== null || p.synthConfig || p.instrumentId != null).length;
 
   return (
     <div className="flex flex-col gap-2 p-4">
@@ -406,6 +473,7 @@ export const PadGrid: React.FC<PadGridProps> = ({
             onTrigger={handlePadTrigger}
             onRelease={handlePadRelease}
             onSelect={onPadSelect}
+            onEmptyPadClick={onEmptyPadClick}
             onFocus={() => setFocusedPadId(pad.id)}
           />
         ))}

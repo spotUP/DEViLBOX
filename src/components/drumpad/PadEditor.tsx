@@ -3,11 +3,113 @@
  */
 
 import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react';
-import type { DrumPad, FilterType, OutputBus, ScratchActionId, PlayMode } from '../../types/drumpad';
+import type { DrumPad, FilterType, OutputBus, ScratchActionId, PlayMode, VelocityCurve } from '../../types/drumpad';
+import { PAD_INSTRUMENT_BASE } from '../../types/drumpad';
+import type { InstrumentConfig } from '../../types/instrument/defaults';
+import type { SynthType } from '../../types/instrument/base';
 import { useDrumPadStore } from '../../stores/useDrumPadStore';
+import { getToneEngine } from '../../engine/ToneEngine';
 import { SamplePackBrowser } from '../instruments/SamplePackBrowser';
 import { getMIDIManager } from '../../midi/MIDIManager';
 import type { MIDIMessage } from '../../midi/types';
+
+const SPEECH_SYNTH_TYPES = new Set(['Sam', 'DECtalk', 'PinkTrombone']);
+
+/** Grouped synth types for the pad synth picker */
+const SYNTH_TYPE_GROUPS: { label: string; types: { value: SynthType; label: string }[] }[] = [
+  { label: 'Basic Synths', types: [
+    { value: 'Synth', label: 'Synth' },
+    { value: 'MonoSynth', label: 'Mono Synth' },
+    { value: 'FMSynth', label: 'FM Synth' },
+    { value: 'AMSynth', label: 'AM Synth' },
+    { value: 'DuoSynth', label: 'Duo Synth' },
+    { value: 'NoiseSynth', label: 'Noise' },
+  ]},
+  { label: 'Drums & Percussion', types: [
+    { value: 'TR808', label: 'TR-808' },
+    { value: 'TR909', label: 'TR-909' },
+    { value: 'MembraneSynth', label: 'Membrane (Kick/Tom)' },
+    { value: 'MetalSynth', label: 'Metal (HiHat/Cymbal)' },
+    { value: 'PluckSynth', label: 'Pluck' },
+    { value: 'Synare', label: 'Synare Drum' },
+  ]},
+  { label: 'Modern Synths', types: [
+    { value: 'SuperSaw', label: 'Super Saw' },
+    { value: 'Wavetable', label: 'Wavetable' },
+    { value: 'PolySynth', label: 'Poly Synth' },
+    { value: 'ChipSynth', label: 'Chip Synth' },
+    { value: 'PWMSynth', label: 'PWM Synth' },
+    { value: 'WobbleBass', label: 'Wobble Bass' },
+    { value: 'FormantSynth', label: 'Formant' },
+    { value: 'StringMachine', label: 'String Machine' },
+    { value: 'Organ', label: 'Organ' },
+  ]},
+  { label: 'Bass & Lead', types: [
+    { value: 'TB303', label: 'TB-303' },
+    { value: 'DubSiren', label: 'Dub Siren' },
+    { value: 'SpaceLaser', label: 'Space Laser' },
+  ]},
+  { label: 'Speech', types: [
+    { value: 'Sam', label: 'SAM (Robot Voice)' },
+    { value: 'DECtalk', label: 'DECtalk (Hawking)' },
+    { value: 'PinkTrombone', label: 'Pink Trombone' },
+  ]},
+  { label: 'WASM Synths', types: [
+    { value: 'Dexed', label: 'Dexed (DX7)' },
+    { value: 'OBXd', label: 'OB-Xd' },
+    { value: 'AMSynth' as SynthType, label: 'amsynth' },
+    { value: 'SynthV1', label: 'SynthV1' },
+    { value: 'TalNoizeMaker', label: 'TAL NoiseMaker' },
+    { value: 'MdaEPiano', label: 'MDA EPiano' },
+    { value: 'MdaJX10', label: 'MDA JX10' },
+    { value: 'SetBfree', label: 'setBfree (B3 Organ)' },
+    { value: 'ZynAddSubFX', label: 'ZynAddSubFX' },
+  ]},
+  { label: 'Chip / Retro', types: [
+    { value: 'C64SID', label: 'C64 SID' },
+    { value: 'HarmonicSynth', label: 'Harmonic' },
+    { value: 'FurnaceGB', label: 'Game Boy' },
+    { value: 'FurnaceNES', label: 'NES' },
+    { value: 'FurnacePSG', label: 'PSG (Master System)' },
+    { value: 'FurnaceC64', label: 'C64 (Furnace)' },
+    { value: 'FurnaceAY', label: 'AY-3-8910' },
+    { value: 'FurnacePCE', label: 'PC Engine' },
+    { value: 'FurnaceSNES', label: 'SNES' },
+  ]},
+  { label: 'V2 / Demoscene', types: [
+    { value: 'V2', label: 'V2 Synth' },
+    { value: 'V2Speech', label: 'V2 Speech' },
+    { value: 'Oidos', label: 'Oidos' },
+  ]},
+];
+
+const VELOCITY_CURVE_OPTIONS: { value: VelocityCurve; label: string; desc: string }[] = [
+  { value: 'linear',      label: 'Linear',      desc: 'Default — velocity maps directly' },
+  { value: 'exponential',  label: 'Exponential',  desc: 'Soft touch, hard hits for max' },
+  { value: 'logarithmic',  label: 'Logarithmic',  desc: 'Reaches loud quickly' },
+  { value: 'scurve',       label: 'S-Curve',       desc: 'Subtle extremes, steep middle' },
+  { value: 'fixed',        label: 'Fixed (Max)',   desc: 'Always max velocity' },
+];
+
+const PAD_COLOR_PRESETS = [
+  '#10b981', '#3b82f6', '#ef4444', '#f59e0b', '#8b5cf6',
+  '#ec4899', '#06b6d4', '#84cc16', '#f97316', '#6366f1',
+];
+
+/** Get speech text from a synth config */
+function getSpeechText(config: InstrumentConfig): string | undefined {
+  if (config.synthType === 'Sam') return (config as any).sam?.text;
+  if (config.synthType === 'DECtalk') return (config as any).dectalk?.text;
+  if (config.synthType === 'PinkTrombone') return (config as any).pinkTrombone?.text;
+  return undefined;
+}
+
+/** Set speech text on a synth config (mutates) */
+function setSpeechTextField(config: InstrumentConfig, synthType: string, text: string): void {
+  if (synthType === 'Sam') (config as any).sam = { ...(config as any).sam, text };
+  else if (synthType === 'DECtalk') (config as any).dectalk = { ...(config as any).dectalk, text };
+  else if (synthType === 'PinkTrombone') (config as any).pinkTrombone = { ...(config as any).pinkTrombone, text };
+}
 
 interface PadEditorProps {
   padId: number;
@@ -161,13 +263,19 @@ export const PadEditor: React.FC<PadEditorProps> = ({ padId, onClose }) => {
   ];
 
   return (
-    <div className="bg-dark-bg border border-dark-border rounded-lg overflow-hidden">
+    <div className="bg-dark-bg border border-dark-border rounded-lg overflow-hidden flex flex-col max-h-[85vh]">
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-3 border-b border-dark-border">
         <div>
           <div className="text-sm font-bold text-text-primary">Pad {pad.id}: {pad.name}</div>
           <div className="text-xs text-text-muted">
-            {pad.sample ? 'Sample loaded' : 'No sample'}
+            {pad.sample && pad.instrumentId != null
+              ? 'Sample + Instrument'
+              : pad.sample
+                ? 'Sample loaded'
+                : pad.instrumentId != null
+                  ? `Instrument #${pad.instrumentId}`
+                  : 'Empty — assign sample or instrument'}
           </div>
         </div>
         <div className="flex items-center gap-2">
@@ -222,7 +330,7 @@ export const PadEditor: React.FC<PadEditorProps> = ({ padId, onClose }) => {
       </div>
 
       {/* Tab Content */}
-      <div className="p-4 animate-in fade-in-0 slide-in-from-bottom-2 duration-200">
+      <div className="p-4 animate-in fade-in-0 slide-in-from-bottom-2 duration-200 overflow-y-auto flex-1 min-h-0">
         {activeTab === 'main' && (
           <div className="space-y-4">
             <div>
@@ -233,6 +341,208 @@ export const PadEditor: React.FC<PadEditorProps> = ({ padId, onClose }) => {
                 onChange={(e) => handleUpdate({ name: e.target.value })}
                 className="w-full bg-dark-surface border border-dark-border rounded px-3 py-2 text-sm text-text-primary focus:outline-none focus:ring-2 focus:ring-accent-primary"
               />
+            </div>
+
+            {/* Synth Assignment — pad-owned, independent from song */}
+            <div className="border border-dark-border rounded-lg p-3 space-y-3">
+              <div className="text-[10px] font-mono text-text-muted uppercase tracking-wider">Sound Source</div>
+
+              {/* Synth Type Picker */}
+              <div>
+                <label className="block text-xs text-text-muted mb-1">Synth Type</label>
+                <select
+                  value={pad.synthConfig?.synthType ?? ''}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    if (val === '') {
+                      handleUpdate({ synthConfig: undefined, instrumentId: undefined, instrumentNote: undefined });
+                    } else {
+                      const synthType = val as SynthType;
+                      const padInstId = PAD_INSTRUMENT_BASE + pad.id;
+                      const newConfig: InstrumentConfig = {
+                        id: padInstId,
+                        name: pad.name === `Pad ${pad.id}` ? val : pad.name,
+                        type: 'synth',
+                        synthType,
+                        effects: [],
+                        volume: 0,
+                        pan: 0,
+                      };
+                      // Carry over speech text if switching between speech synths
+                      if (SPEECH_SYNTH_TYPES.has(synthType) && pad.synthConfig) {
+                        const oldText = getSpeechText(pad.synthConfig);
+                        if (oldText) setSpeechTextField(newConfig, synthType, oldText);
+                      }
+                      handleUpdate({
+                        synthConfig: newConfig,
+                        instrumentId: undefined,
+                        instrumentNote: pad.instrumentNote || 'C3',
+                        name: pad.name === `Pad ${pad.id}` ? val : pad.name,
+                      });
+                    }
+                  }}
+                  className="w-full bg-dark-surface border border-dark-border rounded px-3 py-2 text-sm text-text-primary focus:outline-none focus:ring-2 focus:ring-accent-primary font-mono"
+                >
+                  <option value="">None</option>
+                  {SYNTH_TYPE_GROUPS.map(group => (
+                    <optgroup key={group.label} label={group.label}>
+                      {group.types.map(t => (
+                        <option key={t.value} value={t.value}>{t.label}</option>
+                      ))}
+                    </optgroup>
+                  ))}
+                </select>
+              </div>
+
+              {/* Trigger Note */}
+              {(pad.synthConfig || pad.instrumentId != null) && (
+                <div>
+                  <label className="block text-xs text-text-muted mb-1">Trigger Note</label>
+                  <select
+                    value={pad.instrumentNote || 'C3'}
+                    onChange={(e) => handleUpdate({ instrumentNote: e.target.value })}
+                    className="w-full bg-dark-surface border border-dark-border rounded px-3 py-2 text-sm text-text-primary focus:outline-none focus:ring-2 focus:ring-accent-primary font-mono"
+                  >
+                    {(() => {
+                      const notes: string[] = [];
+                      const noteNames = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+                      for (let oct = 1; oct <= 7; oct++) {
+                        for (const n of noteNames) {
+                          notes.push(`${n}${oct}`);
+                        }
+                      }
+                      return notes.map(n => <option key={n} value={n}>{n}</option>);
+                    })()}
+                  </select>
+                </div>
+              )}
+
+              {/* Status indicators */}
+              {pad.sample && (
+                <div className="flex items-center gap-2 text-xs text-emerald-400 font-mono">
+                  <span className="w-2 h-2 rounded-full bg-emerald-400 inline-block" />
+                  Sample: {pad.sample.name}
+                </div>
+              )}
+              {pad.synthConfig && (
+                <div className="flex items-center gap-2 text-xs text-blue-400 font-mono">
+                  <span className="w-2 h-2 rounded-full bg-blue-400 inline-block" />
+                  Synth: {pad.synthConfig.synthType}
+                </div>
+              )}
+
+              {/* Preview / Audition */}
+              {(pad.sample || pad.synthConfig) && (
+                <button
+                  onMouseDown={() => {
+                    if (pad.synthConfig) {
+                      try {
+                        const padInstId = PAD_INSTRUMENT_BASE + pad.id;
+                        const config = { ...pad.synthConfig, id: padInstId };
+                        const note = pad.instrumentNote || 'C3';
+                        getToneEngine().triggerNoteAttack(padInstId, note, 0, 0.8, config);
+                        setTimeout(() => {
+                          try { getToneEngine().triggerNoteRelease(padInstId, note, 0, config); } catch {}
+                        }, 500);
+                      } catch {}
+                    }
+                  }}
+                  className="w-full px-3 py-1.5 bg-dark-surface border border-dark-border rounded text-xs text-text-muted hover:text-text-primary hover:bg-dark-bgTertiary transition-colors font-mono"
+                >
+                  Preview Sound
+                </button>
+              )}
+
+              {/* Inline speech text config */}
+              {pad.synthConfig && SPEECH_SYNTH_TYPES.has(pad.synthConfig.synthType) && (() => {
+                const currentText = getSpeechText(pad.synthConfig) || '';
+                return (
+                  <div>
+                    <label className="block text-xs text-text-muted mb-1">
+                      Speech Text ({pad.synthConfig.synthType})
+                    </label>
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        value={currentText}
+                        onChange={(e) => {
+                          const updated = { ...pad.synthConfig! };
+                          setSpeechTextField(updated, pad.synthConfig!.synthType, e.target.value);
+                          handleUpdate({ synthConfig: updated });
+                        }}
+                        placeholder="Type what to say..."
+                        className="flex-1 bg-dark-surface border border-dark-border rounded px-3 py-1.5 text-sm text-text-primary focus:outline-none focus:ring-2 focus:ring-accent-primary"
+                      />
+                      <button
+                        onClick={() => {
+                          try {
+                            const padInstId = PAD_INSTRUMENT_BASE + pad.id;
+                            const config = { ...pad.synthConfig!, id: padInstId };
+                            const note = pad.instrumentNote || 'C3';
+                            getToneEngine().triggerNoteAttack(padInstId, note, 0, 0.8, config);
+                            setTimeout(() => {
+                              try { getToneEngine().triggerNoteRelease(padInstId, note, 0, config); } catch {}
+                            }, 2000);
+                          } catch {}
+                        }}
+                        className="px-3 py-1.5 bg-accent-primary hover:bg-accent-primary/80 text-text-primary text-xs font-bold rounded transition-colors"
+                      >
+                        Speak
+                      </button>
+                    </div>
+                  </div>
+                );
+              })()}
+            </div>
+
+            {/* Pad Color */}
+            <div>
+              <label className="block text-xs text-text-muted mb-1">Pad Color</label>
+              <div className="flex items-center gap-2 flex-wrap">
+                <button
+                  onClick={() => handleUpdate({ color: undefined })}
+                  className={`w-6 h-6 rounded border-2 transition-all ${
+                    !pad.color ? 'border-white ring-1 ring-white/50' : 'border-dark-border'
+                  }`}
+                  style={{ background: 'linear-gradient(135deg, #10b981 50%, #3b82f6 50%)' }}
+                  title="Default (auto)"
+                />
+                {PAD_COLOR_PRESETS.map(color => (
+                  <button
+                    key={color}
+                    onClick={() => handleUpdate({ color })}
+                    className={`w-6 h-6 rounded border-2 transition-all ${
+                      pad.color === color ? 'border-white ring-1 ring-white/50 scale-110' : 'border-dark-border'
+                    }`}
+                    style={{ backgroundColor: color }}
+                  />
+                ))}
+                <input
+                  type="color"
+                  value={pad.color || '#10b981'}
+                  onChange={(e) => handleUpdate({ color: e.target.value })}
+                  className="w-6 h-6 rounded border border-dark-border cursor-pointer"
+                  title="Custom color"
+                />
+              </div>
+            </div>
+
+            {/* Velocity Curve */}
+            <div>
+              <label className="block text-xs text-text-muted mb-1">
+                Velocity Curve: {VELOCITY_CURVE_OPTIONS.find(v => v.value === (pad.velocityCurve || 'linear'))?.label || 'Linear'}
+              </label>
+              <select
+                value={pad.velocityCurve || 'linear'}
+                onChange={(e) => handleUpdate({ velocityCurve: e.target.value as VelocityCurve })}
+                className="w-full bg-dark-surface border border-dark-border rounded px-3 py-2 text-sm text-text-primary focus:outline-none focus:ring-2 focus:ring-accent-primary font-mono"
+              >
+                {VELOCITY_CURVE_OPTIONS.map(opt => (
+                  <option key={opt.value} value={opt.value}>
+                    {opt.label} — {opt.desc}
+                  </option>
+                ))}
+              </select>
             </div>
 
             <div>
