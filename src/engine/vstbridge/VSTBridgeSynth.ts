@@ -25,10 +25,11 @@ export class VSTBridgeSynth implements DevilboxSynth {
   private _params: VSTBridgeParam[] = [];
   private _paramValues = new Map<number, number>();
   private _pendingNotes: Array<{ note: number; velocity: number }> = [];
+  private _initialConfig: InstrumentConfig | undefined;
 
   constructor(descriptor: VSTBridgeDescriptor, config?: InstrumentConfig) {
-    void config;
     this._descriptor = descriptor;
+    this._initialConfig = config;
     this.name = `VSTBridge:${descriptor.id}`;
 
     const ctx = getDevilboxAudioContext();
@@ -102,6 +103,14 @@ export class VSTBridgeSynth implements DevilboxSynth {
       // Query parameter metadata from WASM, then wait for the response
       this._worklet.port.postMessage({ type: 'getParams' });
       await Promise.race([paramsReceived, new Promise<void>((r) => setTimeout(r, 3000))]);
+
+      // Apply stored initial config if available
+      if (this._initialConfig && this._descriptor.configKey) {
+        const synthConfig = (this._initialConfig as unknown as Record<string, unknown>)[this._descriptor.configKey];
+        if (synthConfig && typeof synthConfig === 'object') {
+          this.applyConfig(synthConfig as Record<string, number>);
+        }
+      }
 
       // Process any pending notes
       for (const { note, velocity } of this._pendingNotes) {
@@ -207,6 +216,40 @@ export class VSTBridgeSynth implements DevilboxSynth {
     if (!this._worklet) return;
     this._paramValues.set(paramId, value);
     this._worklet.port.postMessage({ type: 'parameter', paramId, value });
+  }
+
+  /**
+   * Apply a config object to the WASM synth.
+   * Uses the descriptor's paramMapping (explicit config-key → WASM-param-ID table)
+   * to translate UI config into setParameter() calls.
+   * Falls back to WASM name matching when no mapping is available.
+   */
+  applyConfig(config: Record<string, unknown>): void {
+    if (!this._worklet || !this._isReady) return;
+
+    const mapping = this._descriptor.paramMapping;
+
+    for (const [key, value] of Object.entries(config)) {
+      if (typeof value !== 'number') continue;
+
+      // Try explicit mapping first (fast, exact)
+      if (mapping && key in mapping) {
+        this.setParameter(mapping[key], value);
+        continue;
+      }
+
+      // Fallback: try to match against WASM parameter metadata by name
+      if (this._params.length > 0) {
+        const normalizedKey = key.toLowerCase().replace(/[^a-z0-9]/g, '');
+        const found = this._params.find((p) => {
+          const normalizedName = p.name.toLowerCase().replace(/[^a-z0-9]/g, '');
+          return normalizedName === normalizedKey;
+        });
+        if (found) {
+          this.setParameter(found.id, value);
+        }
+      }
+    }
   }
 
   /** Get a WASM parameter by numeric ID */

@@ -32,6 +32,15 @@ export interface VSTBridgeDescriptor {
   panelComponent?: string;
   /** Supported extension command types, e.g. ['loadSysEx', 'loadPatch'] */
   commands?: string[];
+  /**
+   * Explicit mapping from InstrumentConfig sub-object keys to WASM parameter IDs.
+   * Used by VSTBridgeSynth.applyConfig() to translate UI config changes into
+   * setParameter() calls. Required when config key names don't match WASM
+   * parameter names (e.g. 'osc1Wave' → WASM param 5 "Osc1:Wave").
+   */
+  paramMapping?: Record<string, number>;
+  /** Config key on InstrumentConfig that holds this synth's config, e.g. 'monique' */
+  configKey?: string;
 }
 
 /** Global registry of VSTBridge synth descriptors */
@@ -146,6 +155,52 @@ registerVSTBridge({
   synthClassName: 'MoniqueSynth',
   moduleFactoryName: 'createMoniqueModule',
   volumeOffsetDb: 0,
+  configKey: 'monique',
+  // Maps MoniqueConfig keys → WASM param IDs (C++ MoniqueParams enum, 0-119)
+  paramMapping: {
+    // Oscillators
+    osc1Wave: 5, osc1FmPower: 7, osc1Octave: 6, osc1Sync: 8,
+    osc2Wave: 9, osc2FmPower: 11, osc2Octave: 10, osc2Sync: 12,
+    osc3Wave: 13, osc3FmPower: 15, osc3Octave: 14, osc3Sync: 16,
+    fmMulti: 17, fmSwing: 19, fmPhase: 18, masterShift: 20,
+    // Filter 1 (21-27) + routing (87-89)
+    filter1Type: 21, filter1Cutoff: 22, filter1Resonance: 23,
+    filter1Distortion: 24, filter1Output: 25, filter1Pan: 26,
+    filter1ModMix: 27, filter1Input0: 87, filter1Input1: 88, filter1Input2: 89,
+    // Filter 2 (28-34) + routing (90-92)
+    filter2Type: 28, filter2Cutoff: 29, filter2Resonance: 30,
+    filter2Distortion: 31, filter2Output: 32, filter2Pan: 33,
+    filter2ModMix: 34, filter2Input0: 90, filter2Input1: 91, filter2Input2: 92,
+    // Filter 3 (35-41) + routing (93-95)
+    filter3Type: 35, filter3Cutoff: 36, filter3Resonance: 37,
+    filter3Distortion: 38, filter3Output: 39, filter3Pan: 40,
+    filter3ModMix: 41, filter3Input0: 93, filter3Input1: 94, filter3Input2: 95,
+    // Envelope 1 — Filter 1 (42-47)
+    env1Attack: 42, env1Decay: 43, env1Sustain: 44,
+    env1Retrigger: 45, env1Release: 46, env1Shape: 47,
+    // Envelope 2 — Filter 2 (48-53)
+    env2Attack: 48, env2Decay: 49, env2Sustain: 50,
+    env2Retrigger: 51, env2Release: 52, env2Shape: 53,
+    // Envelope 3 — Filter 3 (54-59)
+    env3Attack: 54, env3Decay: 55, env3Sustain: 56,
+    env3Retrigger: 57, env3Release: 58, env3Shape: 59,
+    // Envelope 4 — Main (60-65)
+    env4Attack: 60, env4Decay: 61, env4Sustain: 62,
+    env4Retrigger: 63, env4Release: 64, env4Shape: 65,
+    // LFOs (66-74)
+    lfo1Speed: 66, lfo1Wave: 67, lfo1Phase: 68,
+    lfo2Speed: 69, lfo2Wave: 70, lfo2Phase: 71,
+    lfo3Speed: 72, lfo3Wave: 73, lfo3Phase: 74,
+    // Effects (96-103)
+    reverbRoom: 100, reverbMix: 101,
+    chorusMod: 102,
+    delay: 98, delayPan: 99,
+    eqBypass: 119,
+    // Master (0-4) + FX shape/dist (96-97)
+    volume: 0, shape: 97, distortion: 96,
+    glide: 1, octaveOffset: 2, noteOffset: 3,
+    effectBypass: 103,
+  },
 });
 
 // ---------------------------------------------------------------------------
