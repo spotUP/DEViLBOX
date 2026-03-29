@@ -18,6 +18,7 @@ import {
   loadAllPrograms,
   exportConfig,
   importConfig,
+  clearDatabase,
 } from '../lib/drumpad/drumpadDB';
 import { mpcResample, MODEL_CONFIGS } from '../engine/mpc-resampler/MpcResamplerDSP';
 import type { MpcResampleOptions } from '../engine/mpc-resampler/MpcResamplerDSP';
@@ -87,6 +88,13 @@ const DEFAULT_PREFERENCES: DrumPadState['preferences'] = {
   velocitySensitivity: 1.0,
   padColors: {},
 };
+
+// Bump this when factory presets or stored schema changes — discards stale data
+const DRUMPAD_SCHEMA_VERSION = 13;
+const DRUMPAD_SCHEMA_KEY = 'devilbox_drumpad_schema';
+
+// Set when schema migration clears old data — prevents IndexedDB from overwriting factory presets
+let _schemaResetPending = false;
 
 export const useDrumPadStore = create<DrumPadStore>((set, get) => ({
   // Initial state
@@ -301,6 +309,11 @@ export const useDrumPadStore = create<DrumPadStore>((set, get) => ({
   clearPad: (padId: number) => {
     get().updatePad(padId, {
       sample: null,
+      instrumentId: undefined,
+      instrumentNote: undefined,
+      synthConfig: undefined,
+      color: undefined,
+      velocityCurve: undefined,
       name: `Pad ${padId}`,
     });
   },
@@ -345,6 +358,7 @@ export const useDrumPadStore = create<DrumPadStore>((set, get) => ({
     set((state) => ({
       busLevels: { ...state.busLevels, [bus]: level },
     }));
+    get().saveToStorage();
   },
 
   // MIDI mapping
@@ -391,17 +405,19 @@ export const useDrumPadStore = create<DrumPadStore>((set, get) => ({
       });
 
       const state = {
-        version: 1,
+        version: DRUMPAD_SCHEMA_VERSION,
         programs: programsObj,
         currentProgramId,
         midiMappings,
         preferences,
+        busLevels: get().busLevels,
       };
 
       // NOTE: AudioBuffer is not JSON-serializable — audio data is NOT stored here.
       // Full audio persistence (including samples) is handled by saveToIndexedDB().
       // This localStorage entry only persists pad parameters, names, and MIDI mappings.
       localStorage.setItem('devilbox_drumpad', JSON.stringify(state));
+      localStorage.setItem(DRUMPAD_SCHEMA_KEY, String(DRUMPAD_SCHEMA_VERSION));
     } catch (error) {
       console.error('[DrumPadStore] Failed to save to storage:', error);
       // Handle quota exceeded errors
@@ -413,6 +429,17 @@ export const useDrumPadStore = create<DrumPadStore>((set, get) => ({
 
   loadFromStorage: () => {
     try {
+      // Check schema version from separate key (immune to stale data baked-in version)
+      const storedVersion = Number(localStorage.getItem(DRUMPAD_SCHEMA_KEY) || '0');
+      if (storedVersion < DRUMPAD_SCHEMA_VERSION) {
+        console.log('[DrumPadStore] Schema upgraded v' + storedVersion + ' → v' + DRUMPAD_SCHEMA_VERSION + ', resetting to factory presets');
+        localStorage.removeItem('devilbox_drumpad');
+        localStorage.setItem(DRUMPAD_SCHEMA_KEY, String(DRUMPAD_SCHEMA_VERSION));
+        _schemaResetPending = true;
+        clearDatabase().catch(() => {}).finally(() => { _schemaResetPending = false; });
+        return;
+      }
+
       const stored = localStorage.getItem('devilbox_drumpad');
 
       if (stored) {
@@ -452,6 +479,7 @@ export const useDrumPadStore = create<DrumPadStore>((set, get) => ({
           currentProgramId: state.currentProgramId || 'A-01',
           midiMappings: state.midiMappings || {},
           preferences: { ...DEFAULT_PREFERENCES, ...state.preferences },
+          busLevels: state.busLevels || {},
         });
 
         if (process.env.NODE_ENV === 'development') {
@@ -477,6 +505,11 @@ export const useDrumPadStore = create<DrumPadStore>((set, get) => ({
   },
 
   loadFromIndexedDB: async (audioContext: BaseAudioContext) => {
+    // Skip if schema was just reset — factory presets are already correct
+    if (_schemaResetPending) {
+      console.log('[DrumPadStore] Skipping IndexedDB load (schema reset pending)');
+      return;
+    }
     try {
       const programs = await loadAllPrograms(audioContext);
       if (programs && programs.size > 0) {
@@ -528,7 +561,12 @@ export const useDrumPadStore = create<DrumPadStore>((set, get) => ({
   },
 }));
 
-// Auto-load on store creation
+// Auto-load on store creation (dev: rate-limit to avoid HMR spam)
 if (typeof window !== 'undefined') {
-  useDrumPadStore.getState().loadFromStorage();
+  const now = Date.now();
+  const lastLoad = Number(sessionStorage.getItem('_dpstore_t') || '0');
+  if (now - lastLoad > 500) {
+    sessionStorage.setItem('_dpstore_t', String(now));
+    useDrumPadStore.getState().loadFromStorage();
+  }
 }

@@ -11,7 +11,7 @@ import { DB303Synth, DB303Synth as JC303Synth } from './db303';
 // MAMESynth imported via MAMEBaseSynth
 import { MAMEBaseSynth } from './mame/MAMEBaseSynth';
 import { InstrumentFactory } from './InstrumentFactory';
-import { periodToNoteIndex, getPeriodExtended } from './effects/PeriodTables';
+import { periodToNoteIndex, getPeriodExtended, _registerToneEngineRef } from './effects/PeriodTables';
 import { AmigaFilter } from './effects/AmigaFilter';
 import { TrackerEnvelope } from './TrackerEnvelope';
 import { InstrumentAnalyser } from './InstrumentAnalyser';
@@ -30,6 +30,7 @@ import { WAMSynth } from './wam/WAMSynth';
 import { CHIP_SYNTH_DEFS } from '../constants/chipParameters';
 import { useRomDialogStore } from '../stores/useRomDialogStore';
 import { BlepManager } from './blep/BlepManager';
+import { preloadTR909Resources } from './tr909/TR909Synth';
 import { SynthRegistry } from './registry/SynthRegistry';
 import { VoiceAllocator } from './audio/VoiceAllocator';
 
@@ -177,6 +178,7 @@ export class ToneEngine {
   private autoGainSynthCorr: number = 0;
   private _manualSampleGainDb: number = 0; // tracks last setSampleBusGain arg
   private _manualSynthGainDb: number = 0;
+  private _masterVolumeDb: number = -6;   // tracks intended master volume (avoids race in stop())
 
   // Native AudioContext — owned by DEViLBOX, shared with Tone.js via Tone.setContext()
   // This allows WASM/WAM synths to use the real BaseAudioContext directly.
@@ -777,6 +779,11 @@ export class ToneEngine {
       console.warn('[ToneEngine] BLEP init failed (continuing without BLEP):', error);
     });
 
+    // Preload TR909 samples in background (shared singleton — fast for all pads)
+    preloadTR909Resources(nativeCtx).catch(e => {
+      console.warn('[ToneEngine] TR909 sample preload failed:', e);
+    });
+
     // Load AmigaFilter worklet handled by its class
   }
 
@@ -1088,6 +1095,7 @@ export class ToneEngine {
    * Set master volume
    */
   public setMasterVolume(volumeDb: number): void {
+    this._masterVolumeDb = volumeDb;
     this.masterChannel.volume.value = volumeDb;
   }
 
@@ -1330,13 +1338,16 @@ export class ToneEngine {
     this.clearChannelTriggerLevels();
 
     // Kill master effects tails (delay, reverb) by temporarily muting output
-    // then restoring after the effect buffers have cleared
-    const currentVolume = this.masterChannel.volume.value;
+    // then restoring after the effect buffers have cleared.
+    // Use _masterVolumeDb (not .volume.value) to avoid race condition:
+    // if stop() is called twice within 50ms, reading .volume.value captures
+    // -Infinity from the first call, permanently silencing the master channel.
+    const restoreVolume = this._masterVolumeDb;
     this.masterChannel.volume.value = -Infinity;
 
     // Restore volume after effects have flushed (delay/reverb tails)
     setTimeout(() => {
-      this.masterChannel.volume.value = currentVolume;
+      this.masterChannel.volume.value = restoreVolume;
     }, 50);
 
     Tone.getTransport().stop();
@@ -1686,82 +1697,11 @@ export class ToneEngine {
       }
 
       case 'MetalSynth':
-        // Use NoiseSynth as fast alternative for hi-hats/cymbals
-        instrument = new Tone.NoiseSynth({
-          noise: { type: 'white' },
-          envelope: {
-            attack: (config.envelope?.attack ?? 1) / 1000,
-            decay: (config.envelope?.decay ?? 100) / 1000,
-            sustain: 0,
-            release: (config.envelope?.release ?? 100) / 1000,
-          },
-          volume: config.volume || -12,
-        });
-        break;
-
       case 'MembraneSynth':
-        // PERFORMANCE FIX: MembraneSynth takes 117-122ms per note
-        // Use a simpler Synth with pitch envelope for kick drums
-        instrument = new Tone.Synth({
-          oscillator: { type: 'sine' },
-          envelope: {
-            attack: (config.envelope?.attack ?? 1) / 1000,
-            decay: (config.envelope?.decay ?? 400) / 1000,
-            sustain: 0.01,
-            release: (config.envelope?.release ?? 100) / 1000,
-          },
-          volume: config.volume || -12,
-        });
+      case 'NoiseSynth':
+        // Use SynthRegistry (proper Tone.MetalSynth/MembraneSynth/NoiseSynth)
+        instrument = InstrumentFactory.createInstrument(config);
         break;
-
-      case 'NoiseSynth': {
-        // NoiseSynth doesn't have built-in filter, so we create a wrapper
-        const noiseSynth = new Tone.NoiseSynth({
-          noise: {
-            type: 'white',
-          },
-          envelope: {
-            attack: (config.envelope?.attack ?? 10) / 1000,
-            decay: (config.envelope?.decay ?? 200) / 1000,
-            sustain: (config.envelope?.sustain ?? 50) / 100,
-            release: (config.envelope?.release ?? 1000) / 1000,
-          },
-          volume: config.volume ?? -12,
-        });
-
-        // If filter is specified, route through filter
-        if (config.filter && config.filter.type !== 'lowpass') {
-          const filter = new Tone.Filter({
-            type: config.filter.type,
-            frequency: config.filter.frequency,
-            Q: config.filter.Q || 1,
-            rolloff: config.filter.rolloff || -12,
-          });
-          noiseSynth.connect(filter);
-          // Create a wrapper object with filter output
-          instrument = {
-            triggerAttackRelease: (duration: number, time?: number, velocity?: number) => {
-              noiseSynth.triggerAttackRelease(duration, time, velocity);
-            },
-            triggerAttack: ((_note: string | number, time?: number, velocity?: number) => {
-              noiseSynth.triggerAttack(time, velocity);
-            }) as any,
-            triggerRelease: (time?: number) => {
-              noiseSynth.triggerRelease(time);
-            },
-            connect: (dest: Tone.InputNode) => filter.connect(dest),
-            disconnect: () => filter.disconnect(),
-            dispose: () => {
-              noiseSynth.dispose();
-              filter.dispose();
-            },
-            volume: noiseSynth.volume,
-          } as unknown as Tone.ToneAudioNode;
-        } else {
-          instrument = noiseSynth;
-        }
-        break;
-      }
 
       case 'TB303':
         // Always use InstrumentFactory which now uses JC303 WASM engine
@@ -2030,6 +1970,8 @@ export class ToneEngine {
       case 'PolySynth':
       case 'Organ':
       case 'DrumMachine':
+      case 'TR808':
+      case 'TR909':
       case 'ChipSynth':
       case 'PWMSynth':
       case 'StringMachine':
@@ -2222,6 +2164,31 @@ export class ToneEngine {
       case 'OidosSynth':
       case 'TunefishSynth': {
         instrument = InstrumentFactory.createInstrument(config);
+        break;
+      }
+
+      // Zynthian community synth ports
+      case 'MdaEPiano':
+      case 'MdaJX10':
+      case 'MdaDX10':
+      case 'AMSynth':
+      case 'RaffoSynth':
+      case 'CalfMono':
+      case 'SetBfree':
+      case 'SynthV1':
+      case 'TalNoizeMaker':
+      case 'Aeolus':
+      case 'FluidSynth':
+      case 'Sfizz':
+      case 'ZynAddSubFX':
+      case 'Monique': {
+        instrument = InstrumentFactory.createInstrument(config);
+        if (instrument) {
+          console.log('[ToneEngine] Zynthian synth created:', config.synthType,
+            'isDevilbox:', isDevilboxSynth(instrument),
+            'output:', (instrument as any).output?.constructor?.name,
+            'toDestination:', typeof (instrument as any).toDestination);
+        }
         break;
       }
 
@@ -3008,6 +2975,8 @@ export class ToneEngine {
         config.synthType === 'MetalSynth' ||
         config.synthType === 'MembraneSynth' ||
         config.synthType === 'DrumMachine' ||
+        config.synthType === 'TR808' ||
+        config.synthType === 'TR909' ||
         config.synthType === 'TB303' ||
         config.synthType === 'DubSiren' ||
         config.synthType === 'Synare' ||
@@ -3057,6 +3026,11 @@ export class ToneEngine {
     // InstrumentFactory types that use PolySynth internally
     'SuperSaw', 'PolySynth', 'Organ', 'ChipSynth', 'PWMSynth',
     'StringMachine', 'FormantSynth', 'Wavetable', 'WobbleBass',
+    // Zynthian WASM synths (polyphony handled internally by WASM)
+    'MdaEPiano', 'MdaJX10', 'MdaDX10', 'AMSynth',
+    'RaffoSynth', 'CalfMono', 'SetBfree', 'SynthV1',
+    'TalNoizeMaker', 'Aeolus', 'FluidSynth', 'Sfizz',
+    'ZynAddSubFX', 'Monique',
   ]);
 
   /**
@@ -3086,6 +3060,8 @@ export class ToneEngine {
       'MAMECM3394', 'MAMETMS36XX', 'MAMESN76477', 'MAMEUPD931', 'MAMEUPD933',
       // Monophonic synths
       'MonoSynth', 'DuoSynth', 'TB303', 'Buzz3o3', 'DB303', 'DubSiren', 'SpaceLaser', 'Synare',
+      // Zynthian mono synths (single-voice WASM engines)
+      'RaffoSynth', 'CalfMono', 'Monique',
     ]);
     const isMonoSynth = config.synthType ? monoSynthTypes.has(config.synthType) : false;
 
@@ -3764,7 +3740,7 @@ export class ToneEngine {
         }
       } else if (instrument instanceof WAMSynth) {
         (instrument as any).triggerAttackRelease(note, duration, safeTime, velocity);
-      } else if (config.synthType === 'DrumMachine') {
+      } else if (config.synthType === 'DrumMachine' || config.synthType === 'TR808' || config.synthType === 'TR909') {
         // DrumMachine - some drum types don't take note parameter
         // Apply accent (velocity boost) but not slide (drums don't pitch slide)
         if ((instrument as any).triggerAttackRelease) {
@@ -4823,3 +4799,6 @@ export class ToneEngine {
 
 // Export singleton instance getter
 export const getToneEngine = () => ToneEngine.getInstance();
+
+// Register engine ref for PeriodTables (breaks circular dependency)
+_registerToneEngineRef(getToneEngine);
