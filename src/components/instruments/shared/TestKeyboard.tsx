@@ -198,6 +198,10 @@ export const TestKeyboard: React.FC<TestKeyboardProps> = ({ instrument }) => {
     // Don't retrigger if already playing
     if (activeNotesRef.current.has(note)) return;
 
+    // Mark as active SYNCHRONOUSLY so rapid duplicate calls (touch + synthetic mouse,
+    // or fast key repeat) are blocked before the async useEffect ref-sync runs.
+    activeNotesRef.current = new Set(activeNotesRef.current).add(note);
+
     const engine = engineRef.current;
     const inst = instrument;
     const { midiPolyphonic } = useSettingsStore.getState();
@@ -217,7 +221,9 @@ export const TestKeyboard: React.FC<TestKeyboardProps> = ({ instrument }) => {
       } else {
         // Monophonic: release all other notes first
         for (const activeNote of activeNotesRef.current) {
-          engine.triggerPolyNoteRelease(inst.id, activeNote, inst);
+          if (activeNote !== note) {
+            engine.triggerPolyNoteRelease(inst.id, activeNote, inst);
+          }
         }
         engine.triggerPolyNoteAttack(inst.id, note, 0.8, inst);
       }
@@ -239,14 +245,19 @@ export const TestKeyboard: React.FC<TestKeyboardProps> = ({ instrument }) => {
 
   // Release note - stops the sustained note
   const releaseNote = useCallback((note: string) => {
+    // Mark as inactive SYNCHRONOUSLY (mirrors the sync add in attackNote)
+    const next = new Set(activeNotesRef.current);
+    next.delete(note);
+    activeNotesRef.current = next;
+
     const engine = engineRef.current;
     const inst = instrument;
 
     engine.triggerPolyNoteRelease(inst.id, note, inst);
     setActiveNotes((prev) => {
-      const next = new Set(prev);
-      next.delete(note);
-      return next;
+      const s = new Set(prev);
+      s.delete(note);
+      return s;
     });
   }, [instrument]);
 
