@@ -96,6 +96,36 @@ export const FLUIDSYNTH_PRESETS: Record<string, FluidSynthConfig> = {
     reverbRoomSize: 0.7, reverbLevel: 0.5,
     chorusVoices: 4, chorusSpeed: 0.5,
   },
+  'Acoustic Guitar': {
+    ...DEFAULT_FLUIDSYNTH,
+    program: 25, bank: 0,
+    reverbRoomSize: 0.4, reverbLevel: 0.5, reverbDamping: 0.4,
+    chorusVoices: 2, chorusLevel: 1.5, chorusDepth: 4,
+  },
+  'Brass Ensemble': {
+    ...DEFAULT_FLUIDSYNTH,
+    program: 61, bank: 0,
+    reverbRoomSize: 0.7, reverbLevel: 0.6,
+    chorusVoices: 3, chorusLevel: 2.0, chorusDepth: 6,
+  },
+  'Alto Sax': {
+    ...DEFAULT_FLUIDSYNTH,
+    program: 65, bank: 0,
+    reverbRoomSize: 0.5, reverbLevel: 0.55, reverbDamping: 0.3,
+    chorusVoices: 2, chorusLevel: 1.0, chorusDepth: 3,
+  },
+  'Acoustic Bass': {
+    ...DEFAULT_FLUIDSYNTH,
+    program: 32, bank: 0,
+    reverbRoomSize: 0.3, reverbLevel: 0.35,
+    chorusVoices: 0, chorusLevel: 0,
+  },
+  'Flute': {
+    ...DEFAULT_FLUIDSYNTH,
+    program: 73, bank: 0,
+    reverbRoomSize: 0.55, reverbLevel: 0.6, reverbDamping: 0.25,
+    chorusVoices: 3, chorusLevel: 2.0, chorusDepth: 5, chorusSpeed: 0.4,
+  },
 };
 
 const CONFIG_KEYS: (keyof FluidSynthConfig)[] = [

@@ -1,247 +1,211 @@
 /**
- * AeolusSynth.ts — Aeolus pipe organ WASM engine for DEViLBOX
+ * AeolusSynth.ts - Aeolus pipe organ WASM engine for DEViLBOX
  *
  * Features:
- * - 3 divisions: Great (7 stops), Swell (4 stops), Pedal (3 stops)
- * - 14 organ stops with authentic additive synthesis
+ * - 3 divisions: Great (8 stops), Swell (8 stops), Pedal (5 stops)
  * - Tremulant (speed, depth, on/off)
- * - Reverb (amount, delay, decay times for bass/mid/treble)
- * - 11 historical temperaments (Pythagorean through Equal)
- * - Ambisonic spatial processing (azimuth, width, direct/reflect)
- * - 32 parameters total
- *
- * Based on Aeolus by Fons Adriaensen (GPL v3)
+ * - Reverb (amount, size)
+ * - Wind pressure, tuning, expression pedals
+ * - 4 couplers (swell-great, great-pedal, swell-pedal, swell-octave)
+ * - ~35 parameters
  */
 
 import type { DevilboxSynth } from '@/types/synth';
 import { getDevilboxAudioContext, noteToMidi } from '@/utils/audio-context';
 
-// Parameter indices matching the C bridge (aeolus_bridge.cpp)
 export const AeolusParam = {
-  // Stops (0-13)
-  STOP_GREAT_PRINCIPAL_8: 0,
-  STOP_GREAT_OCTAVE_4: 1,
-  STOP_GREAT_FIFTEENTH_2: 2,
-  STOP_GREAT_MIXTURE: 3,
-  STOP_GREAT_FLUTE_8: 4,
-  STOP_GREAT_BOURDON_16: 5,
-  STOP_GREAT_TRUMPET_8: 6,
-  STOP_SWELL_GEDACKT_8: 7,
-  STOP_SWELL_SALICIONAL_8: 8,
-  STOP_SWELL_VOIX_CELESTE: 9,
-  STOP_SWELL_OBOE_8: 10,
-  STOP_PEDAL_SUBBASS_16: 11,
-  STOP_PEDAL_PRINCIPAL_8: 12,
-  STOP_PEDAL_TROMPETE_8: 13,
-  // Division expression (14-16)
-  GREAT_EXPRESSION: 14,
-  SWELL_EXPRESSION: 15,
-  PEDAL_EXPRESSION: 16,
-  // Tremulant (17-19)
-  TREM_SPEED: 17,
-  TREM_DEPTH: 18,
-  TREM_ENABLE: 19,
-  // Reverb (20-24)
-  REVERB_AMOUNT: 20,
-  REVERB_DELAY: 21,
-  REVERB_TIME: 22,
-  REVERB_BASS_TIME: 23,
-  REVERB_TREBLE_TIME: 24,
-  // Global (25-31)
-  MASTER_VOLUME: 25,
-  TUNING: 26,
-  TEMPERAMENT: 27,
-  AZIMUTH: 28,
-  STEREO_WIDTH: 29,
-  DIRECT_LEVEL: 30,
-  REFLECT_LEVEL: 31,
+  GREAT_STOP_0: 0, GREAT_STOP_1: 1, GREAT_STOP_2: 2, GREAT_STOP_3: 3,
+  GREAT_STOP_4: 4, GREAT_STOP_5: 5, GREAT_STOP_6: 6, GREAT_STOP_7: 7,
+  SWELL_STOP_0: 8, SWELL_STOP_1: 9, SWELL_STOP_2: 10, SWELL_STOP_3: 11,
+  SWELL_STOP_4: 12, SWELL_STOP_5: 13, SWELL_STOP_6: 14, SWELL_STOP_7: 15,
+  PEDAL_STOP_0: 16, PEDAL_STOP_1: 17, PEDAL_STOP_2: 18, PEDAL_STOP_3: 19, PEDAL_STOP_4: 20,
+  TREMULANT_SPEED: 21, TREMULANT_DEPTH: 22, TREMULANT_ON: 23,
+  REVERB_AMOUNT: 24, REVERB_SIZE: 25,
+  VOLUME: 26, TUNING: 27, WIND_PRESSURE: 28,
+  SWELL_EXPRESSION: 29, GREAT_EXPRESSION: 30,
+  COUPLER_SWELL_GREAT: 31, COUPLER_GREAT_PEDAL: 32,
+  COUPLER_SWELL_PEDAL: 33, COUPLER_SWELL_OCTAVE: 34,
 } as const;
 
 export const AEOLUS_PARAM_NAMES: Record<number, string> = {
-  0: "Great: Principal 8'",
-  1: "Great: Octave 4'",
-  2: "Great: Fifteenth 2'",
-  3: 'Great: Mixture III',
-  4: "Great: Flute 8'",
-  5: "Great: Bourdon 16'",
-  6: "Great: Trumpet 8'",
-  7: "Swell: Gedackt 8'",
-  8: "Swell: Salicional 8'",
-  9: "Swell: Voix Celeste 8'",
-  10: "Swell: Oboe 8'",
-  11: "Pedal: Subbass 16'",
-  12: "Pedal: Principalbass 8'",
-  13: "Pedal: Trompete 8'",
-  14: 'Great Expression',
-  15: 'Swell Expression',
-  16: 'Pedal Expression',
-  17: 'Tremulant Speed',
-  18: 'Tremulant Depth',
-  19: 'Tremulant On/Off',
-  20: 'Reverb Amount',
-  21: 'Reverb Delay',
-  22: 'Reverb Time',
-  23: 'Reverb Bass Time',
-  24: 'Reverb Treble Time',
-  25: 'Master Volume',
-  26: 'Tuning (A4 Hz)',
-  27: 'Temperament',
-  28: 'Azimuth',
-  29: 'Stereo Width',
-  30: 'Direct Level',
-  31: 'Reflection Level',
+  0: 'Great Principal 8', 1: 'Great Principal 4', 2: 'Great Octave 2', 3: 'Great Mixture IV',
+  4: 'Great Flute 8', 5: 'Great Flute 4', 6: 'Great Trumpet 8', 7: 'Great Cornet V',
+  8: 'Swell Gedeckt 8', 9: 'Swell Salicional 8', 10: 'Swell Voix Celeste 8', 11: 'Swell Principal 4',
+  12: 'Swell Flute 4', 13: 'Swell Nazard 2 2/3', 14: 'Swell Oboe 8', 15: 'Swell Tremulant',
+  16: 'Pedal Bourdon 16', 17: 'Pedal Principal 8', 18: 'Pedal Flute 8', 19: 'Pedal Octave 4', 20: 'Pedal Trombone 16',
+  21: 'Tremulant Speed', 22: 'Tremulant Depth', 23: 'Tremulant On',
+  24: 'Reverb Amount', 25: 'Reverb Size',
+  26: 'Volume', 27: 'Tuning', 28: 'Wind Pressure',
+  29: 'Swell Expression', 30: 'Great Expression',
+  31: 'Swell to Great', 32: 'Great to Pedal', 33: 'Swell to Pedal', 34: 'Swell 4 to Great',
 };
 
 export interface AeolusConfig {
-  // Stop on/off (0 or 1)
-  greatPrincipal8?: number;
-  greatOctave4?: number;
-  greatFifteenth2?: number;
-  greatMixture?: number;
-  greatFlute8?: number;
-  greatBourdon16?: number;
-  greatTrumpet8?: number;
-  swellGedackt8?: number;
-  swellSalicional8?: number;
-  swellVoixCeleste?: number;
-  swellOboe8?: number;
-  pedalSubbass16?: number;
-  pedalPrincipal8?: number;
-  pedalTrompete8?: number;
-  // Division expression (0-1)
-  greatExpression?: number;
-  swellExpression?: number;
-  pedalExpression?: number;
-  // Tremulant
-  tremSpeed?: number;   // 0-1 (2-8 Hz)
-  tremDepth?: number;   // 0-1 (0-0.6)
-  tremEnable?: number;  // 0/1
-  // Reverb (0-1)
+  greatStop0?: number; greatStop1?: number; greatStop2?: number; greatStop3?: number;
+  greatStop4?: number; greatStop5?: number; greatStop6?: number; greatStop7?: number;
+  swellStop0?: number; swellStop1?: number; swellStop2?: number; swellStop3?: number;
+  swellStop4?: number; swellStop5?: number; swellStop6?: number; swellStop7?: number;
+  pedalStop0?: number; pedalStop1?: number; pedalStop2?: number; pedalStop3?: number; pedalStop4?: number;
+  tremulantSpeed?: number;
+  tremulantDepth?: number;
+  tremulantOn?: number;
   reverbAmount?: number;
-  reverbDelay?: number;
-  reverbTime?: number;
-  reverbBassTime?: number;
-  reverbTrebleTime?: number;
-  // Global
-  volume?: number;       // 0-1
-  tuning?: number;       // 0-1 (392-494 Hz)
-  temperament?: number;  // 0-1 (11 scales)
-  azimuth?: number;      // 0-1
-  stereoWidth?: number;  // 0-1
-  directLevel?: number;  // 0-1
-  reflectLevel?: number; // 0-1
+  reverbSize?: number;
+  volume?: number;
+  tuning?: number;
+  windPressure?: number;
+  swellExpression?: number;
+  greatExpression?: number;
+  couplerSwellGreat?: number;
+  couplerGreatPedal?: number;
+  couplerSwellPedal?: number;
+  couplerSwellOctave?: number;
 }
 
 export const DEFAULT_AEOLUS: AeolusConfig = {
-  // Default stops: Principal 8' + Subbass 16'
-  greatPrincipal8: 1,
-  greatOctave4: 0,
-  greatFifteenth2: 0,
-  greatMixture: 0,
-  greatFlute8: 0,
-  greatBourdon16: 0,
-  greatTrumpet8: 0,
-  swellGedackt8: 0,
-  swellSalicional8: 0,
-  swellVoixCeleste: 0,
-  swellOboe8: 0,
-  pedalSubbass16: 1,
-  pedalPrincipal8: 0,
-  pedalTrompete8: 0,
-  greatExpression: 1,
-  swellExpression: 1,
-  pedalExpression: 1,
-  tremSpeed: 0.33,
-  tremDepth: 0.5,
-  tremEnable: 0,
-  reverbAmount: 0.32,
-  reverbDelay: 0.29,
-  reverbTime: 0.33,
-  reverbBassTime: 0.29,
-  reverbTrebleTime: 0.33,
-  volume: 0.35,
-  tuning: 0.47,      // ~440 Hz
-  temperament: 0.5,   // Equal temperament
-  azimuth: 0.5,
-  stereoWidth: 0.8,
-  directLevel: 0.56,
-  reflectLevel: 0.25,
+  greatStop0: 1, greatStop1: 0, greatStop2: 0, greatStop3: 0,
+  greatStop4: 1, greatStop5: 0, greatStop6: 0, greatStop7: 0,
+  swellStop0: 1, swellStop1: 1, swellStop2: 0, swellStop3: 0,
+  swellStop4: 0, swellStop5: 0, swellStop6: 0, swellStop7: 0,
+  pedalStop0: 1, pedalStop1: 0, pedalStop2: 0, pedalStop3: 0, pedalStop4: 0,
+  tremulantSpeed: 0.5, tremulantDepth: 0.5, tremulantOn: 0,
+  reverbAmount: 0.3, reverbSize: 0.5,
+  volume: 0.8, tuning: 440, windPressure: 0.5,
+  swellExpression: 0.7, greatExpression: 1.0,
+  couplerSwellGreat: 0, couplerGreatPedal: 0, couplerSwellPedal: 0, couplerSwellOctave: 0,
 };
 
 export const AEOLUS_PRESETS: Record<string, AeolusConfig> = {
   'Full Organ': {
     ...DEFAULT_AEOLUS,
-    greatPrincipal8: 1, greatOctave4: 1, greatFifteenth2: 1, greatMixture: 1,
-    greatFlute8: 1, greatBourdon16: 1, greatTrumpet8: 1,
-    swellGedackt8: 1, swellSalicional8: 1, swellVoixCeleste: 1, swellOboe8: 1,
-    pedalSubbass16: 1, pedalPrincipal8: 1, pedalTrompete8: 1,
-    tremEnable: 0,
+    greatStop0: 1, greatStop1: 1, greatStop2: 1, greatStop3: 1,
+    greatStop4: 1, greatStop5: 1, greatStop6: 1, greatStop7: 1,
+    swellStop0: 1, swellStop1: 1, swellStop2: 1, swellStop3: 1,
+    swellStop4: 1, swellStop5: 1, swellStop6: 1, swellStop7: 1,
+    pedalStop0: 1, pedalStop1: 1, pedalStop2: 1, pedalStop3: 1, pedalStop4: 1,
+    tremulantOn: 0, couplerSwellGreat: 1, couplerGreatPedal: 1,
+    swellExpression: 1.0, greatExpression: 1.0,
   },
   'Soft Registration': {
     ...DEFAULT_AEOLUS,
-    greatPrincipal8: 1, greatFlute8: 1,
-    swellGedackt8: 1,
-    pedalSubbass16: 1,
-    greatExpression: 0.5, swellExpression: 0.3,
+    greatStop0: 1, greatStop1: 0, greatStop2: 0, greatStop3: 0,
+    greatStop4: 1, greatStop5: 0, greatStop6: 0, greatStop7: 0,
+    swellStop0: 1, swellStop1: 0, swellStop2: 0, swellStop3: 0,
+    swellStop4: 0, swellStop5: 0, swellStop6: 0, swellStop7: 0,
+    pedalStop0: 1, pedalStop1: 0, pedalStop2: 0, pedalStop3: 0, pedalStop4: 0,
+    swellExpression: 0.3, greatExpression: 0.5,
   },
   'Baroque': {
     ...DEFAULT_AEOLUS,
-    greatPrincipal8: 1, greatOctave4: 1, greatFifteenth2: 1, greatMixture: 1,
-    pedalSubbass16: 1, pedalPrincipal8: 1,
-    tremEnable: 0,
-    temperament: 0.1,  // Pythagorean
+    greatStop0: 1, greatStop1: 1, greatStop2: 1, greatStop3: 1,
+    greatStop4: 0, greatStop5: 0, greatStop6: 0, greatStop7: 0,
+    swellStop0: 0, swellStop1: 0, swellStop2: 0, swellStop3: 1,
+    swellStop4: 1, swellStop5: 1, swellStop6: 0, swellStop7: 0,
+    pedalStop0: 1, pedalStop1: 1, pedalStop2: 0, pedalStop3: 1, pedalStop4: 0,
+    tremulantOn: 0, couplerSwellGreat: 1,
   },
   'Romantic': {
     ...DEFAULT_AEOLUS,
-    greatPrincipal8: 1, greatFlute8: 1, greatBourdon16: 1,
-    swellSalicional8: 1, swellVoixCeleste: 1, swellOboe8: 1,
-    pedalSubbass16: 1,
-    tremEnable: 1, tremSpeed: 0.5, tremDepth: 0.4,
-    reverbAmount: 0.5, reverbTime: 0.6,
+    greatStop0: 1, greatStop1: 0, greatStop2: 0, greatStop3: 0,
+    greatStop4: 1, greatStop5: 1, greatStop6: 0, greatStop7: 0,
+    swellStop0: 1, swellStop1: 1, swellStop2: 1, swellStop3: 0,
+    swellStop4: 0, swellStop5: 0, swellStop6: 1, swellStop7: 0,
+    tremulantOn: 1, tremulantSpeed: 0.6, tremulantDepth: 0.4,
+    reverbAmount: 0.5, reverbSize: 0.7,
+    couplerSwellGreat: 1,
   },
-  'Reed Chorus': {
+  'Pedal Solo': {
     ...DEFAULT_AEOLUS,
-    greatTrumpet8: 1, greatPrincipal8: 1, greatOctave4: 1,
-    swellOboe8: 1,
-    pedalTrompete8: 1, pedalPrincipal8: 1,
+    greatStop0: 0, greatStop1: 0, greatStop2: 0, greatStop3: 0,
+    greatStop4: 0, greatStop5: 0, greatStop6: 0, greatStop7: 0,
+    swellStop0: 0, swellStop1: 0, swellStop2: 0, swellStop3: 0,
+    swellStop4: 0, swellStop5: 0, swellStop6: 0, swellStop7: 0,
+    pedalStop0: 1, pedalStop1: 1, pedalStop2: 1, pedalStop3: 0, pedalStop4: 1,
+    volume: 0.9, reverbAmount: 0.4,
+  },
+  'Flute Choir': {
+    ...DEFAULT_AEOLUS,
+    // Great: Flute 8' + Flute 4'
+    greatStop0: 0, greatStop1: 0, greatStop2: 0, greatStop3: 0,
+    greatStop4: 1, greatStop5: 1, greatStop6: 0, greatStop7: 0,
+    // Swell: Gedeckt 8' + Flute 4' + Nazard 2⅔' + tremulant
+    swellStop0: 1, swellStop1: 0, swellStop2: 0, swellStop3: 0,
+    swellStop4: 1, swellStop5: 1, swellStop6: 0, swellStop7: 1,
+    pedalStop0: 1, pedalStop1: 0, pedalStop2: 1, pedalStop3: 0, pedalStop4: 0,
+    tremulantOn: 1, tremulantSpeed: 0.5, tremulantDepth: 0.35,
+    couplerSwellGreat: 1, couplerGreatPedal: 1,
+    reverbAmount: 0.4, reverbSize: 0.55,
+    swellExpression: 0.7, greatExpression: 0.7,
+  },
+  'Reed Ensemble': {
+    ...DEFAULT_AEOLUS,
+    // Great: Principal 8' + Trumpet 8'
+    greatStop0: 1, greatStop1: 0, greatStop2: 0, greatStop3: 0,
+    greatStop4: 0, greatStop5: 0, greatStop6: 1, greatStop7: 0,
+    // Swell: Salicional 8' + Oboe 8'
+    swellStop0: 0, swellStop1: 1, swellStop2: 0, swellStop3: 0,
+    swellStop4: 0, swellStop5: 0, swellStop6: 1, swellStop7: 0,
+    // Pedal: Bourdon 16' + Principal 8' + Trombone 16'
+    pedalStop0: 1, pedalStop1: 1, pedalStop2: 0, pedalStop3: 0, pedalStop4: 1,
+    couplerSwellGreat: 1, couplerGreatPedal: 1,
+    swellExpression: 0.85, greatExpression: 0.9,
+    reverbAmount: 0.35, reverbSize: 0.5,
+  },
+  'Principal Chorus': {
+    ...DEFAULT_AEOLUS,
+    // Great: Principal 8' + 4' + Octave 2' + Mixture IV
+    greatStop0: 1, greatStop1: 1, greatStop2: 1, greatStop3: 1,
+    greatStop4: 0, greatStop5: 0, greatStop6: 0, greatStop7: 0,
+    // Swell: Principal 4' only (light support)
+    swellStop0: 0, swellStop1: 0, swellStop2: 0, swellStop3: 1,
+    swellStop4: 0, swellStop5: 0, swellStop6: 0, swellStop7: 0,
+    // Pedal: Bourdon 16' + Principal 8' + Octave 4'
+    pedalStop0: 1, pedalStop1: 1, pedalStop2: 0, pedalStop3: 1, pedalStop4: 0,
+    tremulantOn: 0, couplerSwellGreat: 1, couplerGreatPedal: 1,
+    swellExpression: 0.8, greatExpression: 0.9,
+  },
+  'Swell Solo': {
+    ...DEFAULT_AEOLUS,
+    // Great off — Swell plays solo through coupler
+    greatStop0: 0, greatStop1: 0, greatStop2: 0, greatStop3: 0,
+    greatStop4: 0, greatStop5: 0, greatStop6: 0, greatStop7: 0,
+    // Swell: Salicional 8' + Voix Celeste 8' + Oboe 8' + tremulant
+    swellStop0: 0, swellStop1: 1, swellStop2: 1, swellStop3: 0,
+    swellStop4: 0, swellStop5: 0, swellStop6: 1, swellStop7: 1,
+    pedalStop0: 1, pedalStop1: 0, pedalStop2: 1, pedalStop3: 0, pedalStop4: 0,
+    tremulantOn: 1, tremulantSpeed: 0.55, tremulantDepth: 0.4,
+    couplerSwellGreat: 1, couplerGreatPedal: 1,
+    swellExpression: 0.6, greatExpression: 0.5,
+    reverbAmount: 0.45, reverbSize: 0.65,
+  },
+  'Meditation': {
+    ...DEFAULT_AEOLUS,
+    // Great: Flute 8' only — very quiet
+    greatStop0: 0, greatStop1: 0, greatStop2: 0, greatStop3: 0,
+    greatStop4: 1, greatStop5: 0, greatStop6: 0, greatStop7: 0,
+    // Swell: Gedeckt 8' + Voix Celeste 8' + tremulant
+    swellStop0: 1, swellStop1: 0, swellStop2: 1, swellStop3: 0,
+    swellStop4: 0, swellStop5: 0, swellStop6: 0, swellStop7: 1,
+    pedalStop0: 1, pedalStop1: 0, pedalStop2: 0, pedalStop3: 0, pedalStop4: 0,
+    tremulantOn: 1, tremulantSpeed: 0.4, tremulantDepth: 0.3,
+    couplerSwellGreat: 1, couplerGreatPedal: 1,
+    swellExpression: 0.35, greatExpression: 0.4,
+    volume: 0.6, reverbAmount: 0.6, reverbSize: 0.8,
   },
 };
 
-// Maps config key names to WASM parameter indices
-const CONFIG_KEY_TO_PARAM: Record<string, number> = {
-  greatPrincipal8: 0,
-  greatOctave4: 1,
-  greatFifteenth2: 2,
-  greatMixture: 3,
-  greatFlute8: 4,
-  greatBourdon16: 5,
-  greatTrumpet8: 6,
-  swellGedackt8: 7,
-  swellSalicional8: 8,
-  swellVoixCeleste: 9,
-  swellOboe8: 10,
-  pedalSubbass16: 11,
-  pedalPrincipal8: 12,
-  pedalTrompete8: 13,
-  greatExpression: 14,
-  swellExpression: 15,
-  pedalExpression: 16,
-  tremSpeed: 17,
-  tremDepth: 18,
-  tremEnable: 19,
-  reverbAmount: 20,
-  reverbDelay: 21,
-  reverbTime: 22,
-  reverbBassTime: 23,
-  reverbTrebleTime: 24,
-  volume: 25,
-  tuning: 26,
-  temperament: 27,
-  azimuth: 28,
-  stereoWidth: 29,
-  directLevel: 30,
-  reflectLevel: 31,
-};
+const CONFIG_KEYS: (keyof AeolusConfig)[] = [
+  'greatStop0', 'greatStop1', 'greatStop2', 'greatStop3',
+  'greatStop4', 'greatStop5', 'greatStop6', 'greatStop7',
+  'swellStop0', 'swellStop1', 'swellStop2', 'swellStop3',
+  'swellStop4', 'swellStop5', 'swellStop6', 'swellStop7',
+  'pedalStop0', 'pedalStop1', 'pedalStop2', 'pedalStop3', 'pedalStop4',
+  'tremulantSpeed', 'tremulantDepth', 'tremulantOn',
+  'reverbAmount', 'reverbSize',
+  'volume', 'tuning', 'windPressure',
+  'swellExpression', 'greatExpression',
+  'couplerSwellGreat', 'couplerGreatPedal', 'couplerSwellPedal', 'couplerSwellOctave',
+];
 
 export class AeolusSynthEngine implements DevilboxSynth {
   readonly name = 'AeolusSynthEngine';
@@ -250,7 +214,7 @@ export class AeolusSynthEngine implements DevilboxSynth {
   private _worklet: AudioWorkletNode | null = null;
   private config: AeolusConfig;
   private isInitialized = false;
-  private pendingMessages: Array<Record<string, unknown>> = [];
+  private pendingNotes: Array<{ note: number; velocity: number }> = [];
 
   private static isWorkletLoaded = false;
   private static workletLoadPromise: Promise<void> | null = null;
@@ -310,12 +274,12 @@ export class AeolusSynthEngine implements DevilboxSynth {
         if (event.data.type === 'ready') {
           this.isInitialized = true;
           this.sendConfig(this.config);
-          for (const msg of this.pendingMessages) {
-            this._worklet!.port.postMessage(msg);
+          for (const { note, velocity } of this.pendingNotes) {
+            this._worklet!.port.postMessage({ type: 'noteOn', note, velocity });
           }
-          this.pendingMessages = [];
+          this.pendingNotes = [];
         } else if (event.data.type === 'error') {
-          console.error('Aeolus worklet error:', event.data.message);
+          console.error('Aeolus error:', event.data.error);
         }
       };
 
@@ -339,70 +303,49 @@ export class AeolusSynthEngine implements DevilboxSynth {
   }
 
   private sendConfig(config: AeolusConfig): void {
-    for (const [key, value] of Object.entries(config)) {
-      const param = CONFIG_KEY_TO_PARAM[key];
-      if (param !== undefined && typeof value === 'number') {
-        this.postMsg({ type: 'setParam', param, value });
+    if (!this._worklet || !this.isInitialized) return;
+    for (let i = 0; i < CONFIG_KEYS.length; i++) {
+      const value = config[CONFIG_KEYS[i]];
+      if (value !== undefined) {
+        this._worklet.port.postMessage({ type: 'setParam', index: i, value });
       }
     }
   }
 
-  private postMsg(msg: Record<string, unknown>): void {
-    if (this._worklet && this.isInitialized) {
-      this._worklet.port.postMessage(msg);
-    } else {
-      this.pendingMessages.push(msg);
-    }
-  }
-
   triggerAttack(frequency: number | string, _time?: number, velocity?: number): this {
-    const note = typeof frequency === 'string'
-      ? noteToMidi(frequency)
-      : (frequency < 128 ? frequency : Math.round(12 * Math.log2(frequency / 440) + 69));
+    const note = typeof frequency === 'string' ? noteToMidi(frequency) : Math.round(12 * Math.log2(frequency / 440) + 69);
     const vel = Math.round((velocity ?? 0.8) * 127);
-    this.postMsg({ type: 'noteOn', note, velocity: vel });
+    if (!this.isInitialized || !this._worklet) {
+      this.pendingNotes.push({ note, velocity: vel });
+      return this;
+    }
+    this._worklet.port.postMessage({ type: 'noteOn', note, velocity: vel });
     return this;
   }
 
   triggerRelease(frequency?: number | string, _time?: number): this {
+    if (!this._worklet || !this.isInitialized) return this;
     if (frequency !== undefined) {
-      const note = typeof frequency === 'string'
-        ? noteToMidi(frequency)
-        : (frequency < 128 ? frequency : Math.round(12 * Math.log2(frequency / 440) + 69));
-      this.postMsg({ type: 'noteOff', note });
+      const note = typeof frequency === 'string' ? noteToMidi(frequency) : Math.round(12 * Math.log2(frequency / 440) + 69);
+      this._worklet.port.postMessage({ type: 'noteOff', note });
     } else {
-      this.postMsg({ type: 'allNotesOff' });
+      this._worklet.port.postMessage({ type: 'allNotesOff' });
     }
     return this;
   }
 
   set(param: string, value: number): void {
-    const idx = CONFIG_KEY_TO_PARAM[param];
-    if (idx !== undefined) {
+    const index = CONFIG_KEYS.indexOf(param as keyof AeolusConfig);
+    if (index >= 0) {
       (this.config as Record<string, number>)[param] = value;
-      this.postMsg({ type: 'setParam', param: idx, value });
+      if (this._worklet && this.isInitialized) {
+        this._worklet.port.postMessage({ type: 'setParam', index, value });
+      }
     }
   }
 
   get(param: string): number | undefined {
     return (this.config as Record<string, number | undefined>)[param];
-  }
-
-  getAutomatableParams(): Array<{ id: string; name: string; min: number; max: number; section?: string }> {
-    const params: Array<{ id: string; name: string; min: number; max: number; section?: string }> = [];
-    for (const [key, paramIdx] of Object.entries(CONFIG_KEY_TO_PARAM)) {
-      const name = AEOLUS_PARAM_NAMES[paramIdx] || key;
-      let section: string | undefined;
-      if (paramIdx <= 6) section = 'Great Stops';
-      else if (paramIdx <= 10) section = 'Swell Stops';
-      else if (paramIdx <= 13) section = 'Pedal Stops';
-      else if (paramIdx <= 16) section = 'Expression';
-      else if (paramIdx <= 19) section = 'Tremulant';
-      else if (paramIdx <= 24) section = 'Reverb';
-      else section = 'Global';
-      params.push({ id: key, name, min: 0, max: 1, section });
-    }
-    return params;
   }
 
   setPreset(name: string): void {
@@ -419,7 +362,6 @@ export class AeolusSynthEngine implements DevilboxSynth {
       this._worklet.disconnect();
       this._worklet = null;
     }
-    this.output.disconnect();
     this.isInitialized = false;
   }
 }

@@ -7,7 +7,7 @@
 import React, { useRef, useEffect, useCallback } from 'react';
 import { Knob } from '@components/controls/Knob';
 import type { TalNoizeMakerConfig } from '@/engine/tal-noizemaker/TalNoizeMakerSynth';
-import { DEFAULT_TAL_NOIZEMAKER, TAL_NOIZEMAKER_PRESETS } from '@/engine/tal-noizemaker/TalNoizeMakerSynth';
+import { DEFAULT_TAL_NOIZEMAKER } from '@/engine/tal-noizemaker/TalNoizeMakerSynth';
 
 interface TalNoizeMakerControlsProps {
   config: Partial<TalNoizeMakerConfig>;
@@ -57,27 +57,10 @@ export const TalNoizeMakerControls: React.FC<TalNoizeMakerControlsProps> = ({ co
     onChange({ ...configRef.current, [key]: value });
   }, [onChange]);
 
-  const handlePreset = useCallback((name: string) => {
-    const preset = TAL_NOIZEMAKER_PRESETS[name];
-    if (preset) onChange(preset);
-  }, [onChange]);
-
   const m = { ...DEFAULT_TAL_NOIZEMAKER, ...config } as Required<TalNoizeMakerConfig>;
 
   return (
     <div className="p-4 space-y-4 text-xs">
-      {/* Preset selector */}
-      <div className="flex items-center gap-2">
-        <label className="text-gray-400 font-medium">Preset:</label>
-        <select
-          className="bg-[#2a2a2a] text-gray-200 border border-gray-600 rounded px-2 py-1 text-xs"
-          onChange={(e) => handlePreset(e.target.value)} defaultValue=""
-        >
-          <option value="" disabled>Select preset...</option>
-          {Object.keys(TAL_NOIZEMAKER_PRESETS).map((n) => <option key={n} value={n}>{n}</option>)}
-        </select>
-      </div>
-
       {/* ── Oscillators ── */}
       <div>
         <SectionHeader title="Oscillators" />

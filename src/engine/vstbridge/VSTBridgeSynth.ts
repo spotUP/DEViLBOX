@@ -62,9 +62,11 @@ export class VSTBridgeSynth implements DevilboxSynth {
   private async _initialize(): Promise<void> {
     try {
       const rawContext = getDevilboxAudioContext();
+      console.log(`[VSTBridgeSynth] Initializing ${this._descriptor.id}...`);
 
       // Load worklet + fetch WASM
       const { wasmBinary, jsCode } = await ensureVSTBridgeLoaded(rawContext, this._descriptor);
+      console.log(`[VSTBridgeSynth] ${this._descriptor.id}: WASM loaded (${wasmBinary.byteLength} bytes, JS ${jsCode.length} chars)`);
 
       // Create worklet node
       const { workletNode, readyPromise } = createVSTBridgeNode(
@@ -99,10 +101,12 @@ export class VSTBridgeSynth implements DevilboxSynth {
       // Wait for WASM ready
       await readyPromise;
       this._isReady = true;
+      console.log(`[VSTBridgeSynth] ${this._descriptor.id}: WASM ready, querying params...`);
 
       // Query parameter metadata from WASM, then wait for the response
       this._worklet.port.postMessage({ type: 'getParams' });
       await Promise.race([paramsReceived, new Promise<void>((r) => setTimeout(r, 3000))]);
+      console.log(`[VSTBridgeSynth] ${this._descriptor.id}: Init complete, ${this._params.length} params, ${this._pendingNotes.length} pending notes`);
 
       // Apply stored initial config if available
       if (this._initialConfig && this._descriptor.configKey) {

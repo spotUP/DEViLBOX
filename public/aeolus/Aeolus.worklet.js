@@ -166,7 +166,9 @@ class AeolusProcessor extends AudioWorkletProcessor {
     this.Module._aeolus_process(this.synth, this.outputPtrL, this.outputPtrR, frames);
 
     // Copy from WASM heap to output arrays
-    const heapF32 = this.Module.HEAPF32;
+    const heapF32 = this.Module.HEAPF32 ||
+      (this.Module.wasmMemory && new Float32Array(this.Module.wasmMemory.buffer));
+    if (!heapF32) return true;
     const offsetL = this.outputPtrL >> 2;
     const offsetR = this.outputPtrR >> 2;
     for (let i = 0; i < frames; i++) {

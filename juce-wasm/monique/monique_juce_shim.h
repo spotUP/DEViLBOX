@@ -717,6 +717,7 @@ public:
     void clearCurrentNote() { currentNote_ = -1; voiceActive_ = false; }
 
 protected:
+    friend class Synthesiser;
     bool voiceActive_ = false;
     bool keyIsDown_ = false;
     int currentNote_ = -1;
@@ -746,6 +747,9 @@ public:
         for (auto* v : voices_) {
             if (!v->isVoiceActive() || v->getCurrentlyPlayingNote() == midiNoteNumber) {
                 auto* sound = sounds_.empty() ? nullptr : sounds_[0].get();
+                v->currentNote_ = midiNoteNumber;
+                v->voiceActive_ = true;
+                v->keyIsDown_ = true;
                 v->startNote(midiNoteNumber, velocity, sound, lastPitchWheel_);
                 return;
             }
@@ -753,6 +757,9 @@ public:
         // Steal oldest if all busy
         if (!voices_.empty()) {
             auto* sound = sounds_.empty() ? nullptr : sounds_[0].get();
+            voices_[0]->currentNote_ = midiNoteNumber;
+            voices_[0]->voiceActive_ = true;
+            voices_[0]->keyIsDown_ = true;
             voices_[0]->startNote(midiNoteNumber, velocity, sound, lastPitchWheel_);
         }
     }
@@ -761,6 +768,7 @@ public:
         (void)midiChannel;
         for (auto* v : voices_) {
             if (v->getCurrentlyPlayingNote() == midiNoteNumber) {
+                v->keyIsDown_ = false;
                 v->stopNote(velocity, allowTailOff);
             }
         }

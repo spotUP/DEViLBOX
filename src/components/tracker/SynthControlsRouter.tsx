@@ -20,6 +20,20 @@ import {
   DEFAULT_FUTUREPLAYER,
   DEFAULT_FURNACE, DEFAULT_MAME_VFX, DEFAULT_MAME_DOC,
 } from '@typedefs/instrument';
+import { DEFAULT_MDA_EPIANO } from '@engine/mda-epiano/MdaEPianoSynth';
+import { DEFAULT_MDA_JX10 } from '@engine/mda-jx10/MdaJX10Synth';
+import { DEFAULT_MDA_DX10 } from '@engine/mda-dx10/MdaDX10Synth';
+import { DEFAULT_AMSYNTH } from '@engine/amsynth/AMSynthSynth';
+import { DEFAULT_RAFFO } from '@engine/raffo/RaffoSynth';
+import { DEFAULT_CALF_MONO } from '@engine/calf-mono/CalfMonoSynth';
+import { DEFAULT_SETBFREE } from '@engine/setbfree/SetBfreeSynth';
+import { DEFAULT_SYNTHV1 } from '@engine/synthv1/SynthV1Synth';
+import { DEFAULT_MONIQUE } from '@engine/monique/MoniqueSynth';
+import { DEFAULT_TAL_NOIZEMAKER } from '@engine/tal-noizemaker/TalNoizeMakerSynth';
+import { DEFAULT_AEOLUS } from '@engine/aeolus/AeolusSynth';
+import { DEFAULT_FLUIDSYNTH } from '@engine/fluidsynth/FluidSynthSynth';
+import { DEFAULT_SFIZZ } from '@engine/sfizz/SfizzSynth';
+import { DEFAULT_ZYNADDSUBFX } from '@engine/zynaddsubfx/ZynAddSubFXSynth';
 import { deepMerge } from '@lib/migration';
 import { isMAMEChipType } from '@constants/chipParameters';
 import { SYNTH_REGISTRY } from '@engine/vstbridge/synth-registry';
@@ -58,6 +72,46 @@ const DexedControls = lazy(() =>
 );
 const OBXdControls = lazy(() =>
   import('@components/instruments/controls/OBXdControls').then(m => ({ default: m.OBXdControls }))
+);
+const MdaEPianoControls = lazy(() =>
+  import('@components/instruments/controls/MdaEPianoControls').then(m => ({ default: m.MdaEPianoControls }))
+);
+const MdaJX10Controls = lazy(() =>
+  import('@components/instruments/controls/MdaJX10Controls').then(m => ({ default: m.MdaJX10Controls }))
+);
+const MdaDX10Controls = lazy(() =>
+  import('@components/instruments/controls/MdaDX10Controls').then(m => ({ default: m.MdaDX10Controls }))
+);
+const AMSynthControls = lazy(() =>
+  import('@components/instruments/controls/AMSynthControls').then(m => ({ default: m.AMSynthControls }))
+);
+const RaffoSynthControls = lazy(() =>
+  import('@components/instruments/controls/RaffoSynthControls').then(m => ({ default: m.RaffoSynthControls }))
+);
+const CalfMonoControls = lazy(() =>
+  import('@components/instruments/controls/CalfMonoControls').then(m => ({ default: m.CalfMonoControls }))
+);
+const SetBfreeControls = lazy(() =>
+  import('@components/instruments/controls/SetBfreeControls').then(m => ({ default: m.SetBfreeControls }))
+);
+const SynthV1Controls = lazy(() =>
+  import('@components/instruments/controls/SynthV1Controls').then(m => ({ default: m.SynthV1Controls }))
+);
+import { MoniqueControls } from '@components/instruments/controls/MoniqueControls';
+const TalNoizeMakerControls = lazy(() =>
+  import('@components/instruments/controls/TalNoizeMakerControls').then(m => ({ default: m.TalNoizeMakerControls }))
+);
+const AeolusControls = lazy(() =>
+  import('@components/instruments/controls/AeolusControls').then(m => ({ default: m.AeolusControls }))
+);
+const FluidSynthControls = lazy(() =>
+  import('@components/instruments/controls/FluidSynthControls').then(m => ({ default: m.FluidSynthControls }))
+);
+const SfizzControls = lazy(() =>
+  import('@components/instruments/controls/SfizzControls').then(m => ({ default: m.SfizzControls }))
+);
+const ZynAddSubFXControls = lazy(() =>
+  import('@components/instruments/controls/ZynAddSubFXControls').then(m => ({ default: m.ZynAddSubFXControls }))
 );
 const HivelyControls = lazy(() =>
   import('@components/instruments/controls/HivelyControls').then(m => ({ default: m.HivelyControls }))
@@ -266,6 +320,90 @@ export const SynthControlsRouter: React.FC<SynthControlsRouterProps> = ({ instru
     if (synthType === 'OBXd') {
       const cfg = deepMerge(DEFAULT_OBXD, instrument.obxd || {});
       return <OBXdControls config={cfg} onChange={(u) => onUpdate({ obxd: { ...cfg, ...u } })} />;
+    }
+
+    // ── MDA ePiano (Fender Rhodes) ──────────────────────────
+    if (synthType === 'MdaEPiano') {
+      const cfg = { ...DEFAULT_MDA_EPIANO, ...(instrument.mdaEPiano || {}) };
+      return <MdaEPianoControls config={cfg} onChange={(u) => onUpdate({ mdaEPiano: { ...cfg, ...u } })} />;
+    }
+
+    // ── MDA JX-10 (Roland-inspired poly) ────────────────────
+    if (synthType === 'MdaJX10') {
+      const cfg = { ...DEFAULT_MDA_JX10, ...(instrument.mdaJX10 || {}) };
+      return <MdaJX10Controls config={cfg} onChange={(u) => onUpdate({ mdaJX10: { ...cfg, ...u } })} />;
+    }
+
+    // ── MDA DX10 (2-operator FM) ────────────────────────────
+    if (synthType === 'MdaDX10') {
+      const cfg = { ...DEFAULT_MDA_DX10, ...(instrument.mdaDX10 || {}) };
+      return <MdaDX10Controls config={cfg} onChange={(u) => onUpdate({ mdaDX10: { ...cfg, ...u } })} />;
+    }
+
+    // ── AMSynth (Analog Modelling) ─────────────────────────
+    if (synthType === 'AMSynth') {
+      const cfg = { ...DEFAULT_AMSYNTH, ...(instrument.amsynth || {}) };
+      return <AMSynthControls config={cfg} onChange={(u) => onUpdate({ amsynth: { ...cfg, ...u } })} />;
+    }
+
+    // ── Raffo (Minimoog clone) ─────────────────────────────
+    if (synthType === 'RaffoSynth') {
+      const cfg = { ...DEFAULT_RAFFO, ...(instrument.raffo || {}) };
+      return <RaffoSynthControls config={cfg} onChange={(u) => onUpdate({ raffo: { ...cfg, ...u } })} />;
+    }
+
+    // ── Calf Monosynth ─────────────────────────────────────
+    if (synthType === 'CalfMono') {
+      const cfg = { ...DEFAULT_CALF_MONO, ...(instrument.calfMono || {}) };
+      return <CalfMonoControls config={cfg} onChange={(u) => onUpdate({ calfMono: { ...cfg, ...u } })} />;
+    }
+
+    // ── setBfree Hammond B3 ────────────────────────────────
+    if (synthType === 'SetBfree') {
+      const cfg = { ...DEFAULT_SETBFREE, ...(instrument.setbfree || {}) };
+      return <SetBfreeControls config={cfg} onChange={(u) => onUpdate({ setbfree: { ...cfg, ...u } })} />;
+    }
+
+    // ── SynthV1 (4-osc poly) ───────────────────────────────
+    if (synthType === 'SynthV1') {
+      const cfg = { ...DEFAULT_SYNTHV1, ...(instrument.synthv1 || {}) };
+      return <SynthV1Controls config={cfg} onChange={(u) => onUpdate({ synthv1: { ...cfg, ...u } })} />;
+    }
+
+    // ── Monique (Morphing Mono) ────────────────────────────
+    if (synthType === 'Monique') {
+      const cfg = { ...DEFAULT_MONIQUE, ...(instrument.monique || {}) };
+      return <MoniqueControls config={cfg} onChange={(u) => onUpdate({ monique: { ...cfg, ...u } })} />;
+    }
+
+    // ── TAL-NoiseMaker ─────────────────────────────────────
+    if (synthType === 'TalNoizeMaker') {
+      const cfg = { ...DEFAULT_TAL_NOIZEMAKER, ...(instrument.talNoizeMaker || {}) };
+      return <TalNoizeMakerControls config={cfg} onChange={(u) => onUpdate({ talNoizeMaker: { ...cfg, ...u } })} />;
+    }
+
+    // ── Aeolus (Pipe Organ) ────────────────────────────────
+    if (synthType === 'Aeolus') {
+      const cfg = { ...DEFAULT_AEOLUS, ...(instrument.aeolus || {}) };
+      return <AeolusControls config={cfg} onChange={(u) => onUpdate({ aeolus: { ...cfg, ...u } })} />;
+    }
+
+    // ── FluidSynth (SF2) ───────────────────────────────────
+    if (synthType === 'FluidSynth') {
+      const cfg = { ...DEFAULT_FLUIDSYNTH, ...(instrument.fluidsynth || {}) };
+      return <FluidSynthControls config={cfg} onChange={(u) => onUpdate({ fluidsynth: { ...cfg, ...u } })} />;
+    }
+
+    // ── Sfizz (SFZ) ────────────────────────────────────────
+    if (synthType === 'Sfizz') {
+      const cfg = { ...DEFAULT_SFIZZ, ...(instrument.sfizz || {}) };
+      return <SfizzControls config={cfg} onChange={(u) => onUpdate({ sfizz: { ...cfg, ...u } })} />;
+    }
+
+    // ── ZynAddSubFX ────────────────────────────────────────
+    if (synthType === 'ZynAddSubFX') {
+      const cfg = { ...DEFAULT_ZYNADDSUBFX, ...(instrument.zynaddsubfx || {}) };
+      return <ZynAddSubFXControls config={cfg} onChange={(u) => onUpdate({ zynaddsubfx: { ...cfg, ...u } })} />;
     }
 
     // ── HivelyTracker ───────────────────────────────────────

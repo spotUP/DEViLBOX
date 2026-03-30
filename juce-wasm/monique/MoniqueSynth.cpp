@@ -25,9 +25,11 @@
 // Note: private/protected->public hack is in monique_juce_shim.h (force-included)
 #include "monique_core_Synth.h"
 #include "monique_core_Datastructures.h"
+#include "monique_core_Processor.h"
 
 #include <cstring>
 #include <cmath>
+#include <cstdio>
 #include <vector>
 #include <string>
 
@@ -411,10 +413,16 @@ public:
         runtimeInfo_ = nullptr;
         delete runtimeNotifyer_;
         runtimeNotifyer_ = nullptr;
+        delete audioProcessor_;
+        audioProcessor_ = nullptr;
     }
 
     void initialize(int sampleRate) override {
         WASMSynthBase::initialize(sampleRate);
+
+        // Create a minimal MoniqueAudioProcessor stub — the voice dereferences
+        // this pointer for get_current_pos_info(), amp_painter, peak_meter.
+        audioProcessor_ = new MoniqueAudioProcessor();
 
         // Create runtime infrastructure
         runtimeNotifyer_ = new RuntimeNotifyer();
@@ -433,7 +441,7 @@ public:
         synthData_ = new MoniqueSynthData(
             MASTER,             // data type
             nullptr,            // no look and feel (WASM)
-            nullptr,            // no audio processor (WASM wrapper replaces it)
+            audioProcessor_,    // stub processor for voice field access
             runtimeNotifyer_,
             runtimeInfo_,
             dataBuffer_,
@@ -442,9 +450,12 @@ public:
         );
         smoothManager_ = synthData_->smooth_manager;
 
+        // Load factory default preset (sets filter routing, env params, etc.)
+        synthData_->load_default();
+
         // Create the voice
         voice_ = new MoniqueSynthesiserVoice(
-            nullptr,            // no audio processor
+            audioProcessor_,    // stub processor (voice reads pos info from this)
             synthData_,
             runtimeNotifyer_,
             runtimeInfo_,
@@ -480,8 +491,14 @@ public:
         juce::MidiBuffer midiBuf;
         midiBuf.addEvent(juce::MidiMessage::noteOn(1, midiNote, vel), 0);
 
+        printf("[MoniqueSynth C++] noteOn: note=%d vel=%d voiceActive=%d currentNote=%d\n",
+               midiNote, velocity, voice_->isVoiceActive(), voice_->getCurrentlyPlayingNote());
+
         // Route through synthesizer's MIDI handling
         synth_->render_next_block(outputBuffer_, midiBuf, 0, 0);
+
+        printf("[MoniqueSynth C++] after noteOn: voiceActive=%d currentNote=%d voice_current_note=%d\n",
+               voice_->isVoiceActive(), voice_->getCurrentlyPlayingNote(), voice_->current_note);
     }
 
     void noteOff(int midiNote) override {
@@ -502,6 +519,14 @@ public:
             std::memset(outputL, 0, numSamples * sizeof(float));
             std::memset(outputR, 0, numSamples * sizeof(float));
             return;
+        }
+
+        // Debug: periodically log voice state
+        static int dbgCount = 0;
+        if (++dbgCount % 500 == 1) {
+            printf("[MoniqueSynth C++] process #%d: voiceActive=%d currentNote=%d voice_current_note=%d numVoices=%d\n",
+                   dbgCount, voice_->isVoiceActive(), voice_->getCurrentlyPlayingNote(),
+                   voice_->current_note, synth_->getNumVoices());
         }
 
         // Process in blocks of DEFAULT_BLOCK_SIZE
@@ -526,7 +551,14 @@ public:
                 runtimeInfo_->steps_per_sample = (bpm / 60.0) * 4.0 / (double)sampleRate_;
             }
 
-            // Render through synthesizer
+            // Keep the stub AudioProcessor's position info in sync —
+            // the voice's renderNextBlock reads from audio_processor->get_current_pos_info()
+            // and OVERWRITES runtimeInfo_->samples_since_start with its timeInSamples.
+            audioProcessor_->current_pos_info.timeInSamples = runtimeInfo_->samples_since_start;
+            audioProcessor_->current_pos_info.bpm = bpm;
+
+            // Render: call voice directly (bypasses synth_->render_next_block dispatch)
+                        // Render through synthesizer
             juce::MidiBuffer emptyMidi;
             synth_->render_next_block(outputBuffer_, emptyMidi, 0, blockSize);
 
@@ -535,6 +567,16 @@ public:
             const float* bufR = outputBuffer_.getNumChannels() > 1
                 ? outputBuffer_.getReadPointer(1)
                 : bufL;
+
+            // Debug: check for non-zero output
+            if (dbgCount % 500 == 2) {
+                float maxVal = 0;
+                for (int i = 0; i < blockSize; i++) {
+                    float v = std::fabs(bufL[i]);
+                    if (v > maxVal) maxVal = v;
+                }
+                printf("[MoniqueSynth C++] output maxL=%.6f blockSize=%d\n", maxVal, blockSize);
+            }
 
             std::memcpy(outputL + offset, bufL, blockSize * sizeof(float));
             std::memcpy(outputR + offset, bufR, blockSize * sizeof(float));
@@ -882,6 +924,7 @@ private:
     }
 
     // Monique core objects (raw pointers -- private ctors/dtors opened via #define)
+    MoniqueAudioProcessor* audioProcessor_ = nullptr;
     RuntimeNotifyer* runtimeNotifyer_ = nullptr;
     RuntimeInfo* runtimeInfo_ = nullptr;
     DataBuffer* dataBuffer_ = nullptr;
