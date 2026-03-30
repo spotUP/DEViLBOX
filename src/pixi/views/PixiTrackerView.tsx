@@ -167,19 +167,23 @@ export const PixiTrackerView: React.FC = () => {
 
   // Adjacent pattern IDs for ghost automation curves
   const prevPatternId = useTrackerStore(s => {
-    const prev = s.currentPositionIndex > 0 ? s.currentPositionIndex - 1 : -1;
+    const orderLen = s.patternOrder.length;
+    const prev = s.currentPositionIndex > 0 ? s.currentPositionIndex - 1 : (orderLen >= 1 ? orderLen - 1 : -1);
     return prev >= 0 ? (s.patterns[s.patternOrder[prev]]?.id ?? undefined) : undefined;
   });
   const prevPatternLength = useTrackerStore(s => {
-    const prev = s.currentPositionIndex > 0 ? s.currentPositionIndex - 1 : -1;
+    const orderLen = s.patternOrder.length;
+    const prev = s.currentPositionIndex > 0 ? s.currentPositionIndex - 1 : (orderLen >= 1 ? orderLen - 1 : -1);
     return prev >= 0 ? (s.patterns[s.patternOrder[prev]]?.length ?? undefined) : undefined;
   });
   const nextPatternId = useTrackerStore(s => {
-    const next = s.currentPositionIndex < s.patternOrder.length - 1 ? s.currentPositionIndex + 1 : -1;
+    const orderLen = s.patternOrder.length;
+    const next = s.currentPositionIndex < orderLen - 1 ? s.currentPositionIndex + 1 : (orderLen >= 1 ? 0 : -1);
     return next >= 0 ? (s.patterns[s.patternOrder[next]]?.id ?? undefined) : undefined;
   });
   const nextPatternLength = useTrackerStore(s => {
-    const next = s.currentPositionIndex < s.patternOrder.length - 1 ? s.currentPositionIndex + 1 : -1;
+    const orderLen = s.patternOrder.length;
+    const next = s.currentPositionIndex < orderLen - 1 ? s.currentPositionIndex + 1 : (orderLen >= 1 ? 0 : -1);
     return next >= 0 ? (s.patterns[s.patternOrder[next]]?.length ?? undefined) : undefined;
   });
 
