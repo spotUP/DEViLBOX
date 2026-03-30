@@ -603,7 +603,7 @@ async function loadSongFile(file: File, options: FileLoadOptions, preReadBuffer?
   clearExplicitlySaved();
 
   const { loadPatterns, setPatternOrder, setCurrentPattern, reset: resetTracker } = useTrackerStore.getState();
-  const { applyEditorMode } = useFormatStore.getState();
+  const { applyEditorMode, setOriginalModuleData } = useFormatStore.getState();
   const { loadInstruments, addInstrument, reset: resetInstruments } = useInstrumentStore.getState();
   const { setBPM, setSpeed, setGrooveTemplate, reset: resetTransport, isPlaying, stop: stopTransport } = useTransportStore.getState();
   const { setMetadata } = useProjectStore.getState();
@@ -877,9 +877,18 @@ async function loadSongFile(file: File, options: FileLoadOptions, preReadBuffer?
     if (result.instruments.length > 0) {
       loadInstruments(result.instruments);
     }
-    setPatternOrder(result.patterns.map((_: unknown, i: number) => i));
+    const songPositions = result.patterns.map((_: unknown, i: number) => i);
+    setPatternOrder(songPositions);
     setCurrentPattern(0);
     setBPM(result.bpm);
+    setSpeed(6);
+    setOriginalModuleData({
+      base64: '',
+      format: 'XM' as 'MOD' | 'XM' | 'IT' | 'S3M' | 'UNKNOWN',
+      initialBPM: result.bpm,
+      initialSpeed: 6,
+      songLength: songPositions.length,
+    } as any);
     setMetadata({
       name: result.metadata.name,
       author: '',
