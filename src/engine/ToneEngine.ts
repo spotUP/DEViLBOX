@@ -3361,12 +3361,17 @@ export class ToneEngine {
         voices[existingVoiceIndex].note = note;
       } else {
         // Create new voice entry
-        const voice = this.createVoice(channelIndex, voiceNode, note, config);
-        if (!isDevilboxSynth(voiceNode)) {
-          voiceNode.connect(voice.nodes.gain);
+        try {
+          const voice = this.createVoice(channelIndex, voiceNode, note, config);
+          if (!isDevilboxSynth(voiceNode)) {
+            voiceNode.connect(voice.nodes.gain);
+          }
+          // DevilboxSynths: audio flows via buildInstrumentEffectChain → masterInput
+          voices.push(voice);
+        } catch (voiceErr) {
+          console.error(`[ToneEngine] createVoice failed for ch=${channelIndex} type=${config.synthType}:`, voiceErr);
+          // Still try to trigger the sound even without voice routing
         }
-        // DevilboxSynths: audio flows via buildInstrumentEffectChain → masterInput
-        voices.push(voice);
       }
       this.activeVoices.set(channelIndex, voices);
 

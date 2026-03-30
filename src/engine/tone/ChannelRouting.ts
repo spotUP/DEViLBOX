@@ -184,8 +184,10 @@ export function getChannelOutput(ctx: ChannelRoutingContext, channelIndex: numbe
  * Create a new voice chain for a note
  */
 export function createVoice(ctx: ChannelRoutingContext, channelIndex: number, instrument: Tone.ToneAudioNode | DevilboxSynth, note: string, config: InstrumentConfig): VoiceState {
-  const channelOutput = ctx.channelOutputs.get(channelIndex);
-  if (!channelOutput) throw new Error(`Channel ${channelIndex} not initialized`);
+  // Lazily create the channel output if it doesn't exist yet.
+  // This handles channels added while the replayer is already playing.
+  getChannelOutput(ctx, channelIndex);
+  const channelOutput = ctx.channelOutputs.get(channelIndex)!;
 
   const gain = new Tone.Gain(1);
   
