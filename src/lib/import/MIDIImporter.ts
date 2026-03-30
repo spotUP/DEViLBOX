@@ -87,10 +87,9 @@ export async function importMIDIFile(
       if (endTick > maxTick) maxTick = endTick;
     }
   }
-  const totalRows = Math.max(
-    opts.defaultPatternLength,
-    Math.ceil((maxTick / ppq) * rowsPerBeat),
-  );
+  // Fit total rows to content, rounded up to nearest 16 (1 bar at 4 rows/beat)
+  const contentRows = Math.ceil((maxTick / ppq) * rowsPerBeat);
+  const totalRows = Math.max(16, Math.ceil(contentRows / 16) * 16);
 
   // Non-percussion tracks — one channel each
   for (let ti = 0; ti < midi.tracks.length; ti++) {
