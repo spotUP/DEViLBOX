@@ -7,6 +7,7 @@ import { IO808Synth, type IO808DrumType, type IO808Params } from './IO808Synth';
 import type { InstrumentConfig } from '../../types/instrument';
 import { getNormalizedVolume } from '../factories/volumeNormalization';
 import type { DrumType } from '../../types/instrument/drums';
+import { resolveIO808Note } from '../drumNoteMap';
 
 /**
  * Map DrumType + optional io808Type override → IO808DrumType
@@ -102,20 +103,34 @@ export function createIO808Instrument(config: InstrumentConfig): Tone.ToneAudioN
   // Create IO808 synth targeting the raw GainNode inside the Tone.Gain bridge
   const io808 = new IO808Synth(audioCtx, bridgeGain.input);
 
-  // Resolve which IO808 drum type this instrument plays
-  const io808Type = resolveIO808Type(config);
+  // Resolve the configured drum type (used as fallback and for pitch mode)
+  const defaultDrumType = resolveIO808Type(config);
+
+  // Note mode: 'kit' = note name picks drum, 'pitch' = note controls tuning
+  const noteMode = config.drumMachine?.noteMode ?? 'kit';
 
   // Extract default params from config (level comes from velocity at trigger time)
   const baseParams = extractIO808Params(config);
 
+  /** Trigger helper — resolves note to drum type + tune offset */
+  const triggerDrum = (note: string, time: number, velocity: number) => {
+    const { drumType, tuneOffset } = resolveIO808Note(note, noteMode, defaultDrumType);
+    const level = velocity * 100;
+    const params: IO808Params = { level, ...baseParams };
+    if (tuneOffset !== 0) {
+      // Apply tune offset — clamp to 0-100 range
+      const baseTune = params.tuning ?? 50;
+      params.tuning = Math.max(0, Math.min(100, baseTune + tuneOffset));
+    }
+    io808.trigger(drumType, time, params);
+  };
+
   return {
-    triggerAttackRelease: (_note: string, _duration: number, time?: number, velocity?: number) => {
-      const level = (velocity ?? 1) * 100;
-      io808.trigger(io808Type, time ?? Tone.now(), { level, ...baseParams });
+    triggerAttackRelease: (note: string, _duration: number, time?: number, velocity?: number) => {
+      triggerDrum(note, time ?? Tone.now(), velocity ?? 1);
     },
-    triggerAttack: (_note: string, time?: number, velocity?: number) => {
-      const level = (velocity ?? 1) * 100;
-      io808.trigger(io808Type, time ?? Tone.now(), { level, ...baseParams });
+    triggerAttack: (note: string, time?: number, velocity?: number) => {
+      triggerDrum(note, time ?? Tone.now(), velocity ?? 1);
     },
     triggerRelease: () => { /* drums are fire-and-forget */ },
     releaseAll: () => { /* nothing to release */ },
