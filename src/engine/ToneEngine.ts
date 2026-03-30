@@ -3298,7 +3298,6 @@ export class ToneEngine {
   ): void {
     const safeTime = this.getSafeTime(time);
     if (safeTime === null) {
-      console.warn(`[ToneEngine] triggerNote: safeTime is null for id=${instrumentId}`);
       return;
     }
 

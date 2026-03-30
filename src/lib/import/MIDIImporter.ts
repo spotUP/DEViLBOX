@@ -132,7 +132,7 @@ export async function importMIDIFile(
       for (const hit of hits) {
         const row = tickToRow(hit.ticks, ppq, rowsPerBeat, opts.quantize);
         if (row < 0 || row >= totalRows) continue;
-        rows[row].note = 1; // trigger (drum machines ignore pitch)
+        rows[row].note = 61; // C-5 — standard drum trigger note
         rows[row].instrument = instId;
         if (opts.velocityToVolume) {
           rows[row].volume = 0x10 + Math.round(velocityToVolume(hit.velocity * 127));
