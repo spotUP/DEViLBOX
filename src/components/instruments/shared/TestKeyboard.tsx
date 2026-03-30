@@ -103,6 +103,9 @@ export const TestKeyboard: React.FC<TestKeyboardProps> = ({ instrument }) => {
   const activeNotesRef = useRef<Set<string>>(new Set());
   // Single shared init promise — prevents concurrent init() calls from rapid key presses.
   const initPromiseRef = useRef<Promise<void> | null>(null);
+  // Timestamp of last touch event — used to suppress synthetic mouse events
+  // that browsers fire after touchend (causes double-trigger on touch devices).
+  const lastTouchTimeRef = useRef(0);
 
   // Get per-note theme colors
   const pianoKeyColors = useThemeStore(s => {
@@ -268,10 +271,13 @@ export const TestKeyboard: React.FC<TestKeyboardProps> = ({ instrument }) => {
         return;
       }
       if (e.repeat) return;
+      // Skip if already handled by another capture-phase listener (e.g., pattern editor noteInput)
+      if ((e as any)._handledByPianoKeys) return;
 
       const keyLower = e.key.toLowerCase();
 
       if (ALL_PIANO_KEYS.has(keyLower)) {
+        (e as any)._handledByPianoKeys = true;
         e.preventDefault();
         e.stopPropagation();
 
@@ -283,9 +289,11 @@ export const TestKeyboard: React.FC<TestKeyboardProps> = ({ instrument }) => {
     };
 
     const handleKeyUp = (e: KeyboardEvent) => {
+      if ((e as any)._handledByPianoKeys) return;
       const keyLower = e.key.toLowerCase();
 
       if (ALL_PIANO_KEYS.has(keyLower)) {
+        (e as any)._handledByPianoKeys = true;
         e.preventDefault();
         e.stopPropagation();
 
@@ -377,16 +385,19 @@ export const TestKeyboard: React.FC<TestKeyboardProps> = ({ instrument }) => {
                     key={key.note}
                     onMouseDown={(e) => {
                       e.preventDefault();
+                      if (Date.now() - lastTouchTimeRef.current < 500) return;
                       attackNote(key.note);
                     }}
                     onMouseUp={(e) => {
                       e.preventDefault();
+                      if (Date.now() - lastTouchTimeRef.current < 500) return;
                       releaseNote(key.note);
                     }}
                     onMouseLeave={() => {
                       if (activeNotes.has(key.note)) releaseNote(key.note);
                     }}
                     onTouchStart={() => {
+                      lastTouchTimeRef.current = Date.now();
                       attackNote(key.note);
                     }}
                     onTouchEnd={() => {
@@ -447,16 +458,19 @@ export const TestKeyboard: React.FC<TestKeyboardProps> = ({ instrument }) => {
                     key={key.note}
                     onMouseDown={(e) => {
                       e.preventDefault();
+                      if (Date.now() - lastTouchTimeRef.current < 500) return;
                       attackNote(key.note);
                     }}
                     onMouseUp={(e) => {
                       e.preventDefault();
+                      if (Date.now() - lastTouchTimeRef.current < 500) return;
                       releaseNote(key.note);
                     }}
                     onMouseLeave={() => {
                       if (activeNotes.has(key.note)) releaseNote(key.note);
                     }}
                     onTouchStart={() => {
+                      lastTouchTimeRef.current = Date.now();
                       attackNote(key.note);
                     }}
                     onTouchEnd={() => {
