@@ -2581,6 +2581,16 @@ export class TrackerReplayer {
         // Same-pitch slide detection for 303 synths
         // XM uses note numbers directly; MOD uses Amiga periods
         const newNoteName = (this.useXMPeriods || is303Synth) ? xmNoteToNoteName(noteValue ?? 0) : periodToNoteName(usePeriod);
+
+        // Release previous synth note before triggering new one.
+        // Native poly types (Organ, SuperSaw, etc.) use a shared PolySynth instance,
+        // so the voice system's NNA CUT won't release them (same instrument check).
+        // Without this, notes pile up and never release.
+        if (!slideActive && ch.lastPlayedNoteName && ch.instrument?.synthType && ch.instrument.synthType !== 'Sampler') {
+          try {
+            getToneEngine().triggerNoteRelease(ch.instrument.id, ch.lastPlayedNoteName, time, ch.instrument, chIndex);
+          } catch { /* ignored */ }
+        }
         ch.lastPlayedNoteName = newNoteName;
 
         // Trigger note
@@ -2668,6 +2678,13 @@ export class TrackerReplayer {
 
         // XM uses note numbers directly; MOD uses Amiga periods
         const newNoteName = (this.useXMPeriods || is303Synth) ? xmNoteToNoteName(noteValue ?? 0) : periodToNoteName(usePeriod);
+
+        // Release previous synth note (same fix as above — native poly types need explicit release)
+        if (!slideActive && ch.lastPlayedNoteName && ch.instrument?.synthType && ch.instrument.synthType !== 'Sampler') {
+          try {
+            getToneEngine().triggerNoteRelease(ch.instrument.id, ch.lastPlayedNoteName, time, ch.instrument, chIndex);
+          } catch { /* ignored */ }
+        }
         ch.lastPlayedNoteName = newNoteName;
 
         this.triggerNote(ch, time, offset, chIndex, accent, slideActive, effectiveSlide, hammer);
