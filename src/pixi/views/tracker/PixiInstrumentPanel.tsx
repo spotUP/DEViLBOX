@@ -13,7 +13,6 @@ import * as Tone from 'tone';
 import { useInstrumentStore } from '@stores/useInstrumentStore';
 import { useUIStore } from '@stores/useUIStore';
 import { getSynthInfo } from '@constants/synthCategories';
-import { BASS_PRESETS } from '@constants/factoryPresets';
 import { getToneEngine } from '@engine/ToneEngine';
 import { PIXI_FONTS } from '../../fonts';
 import { FAD_ICONS } from '../../fontaudioIcons';
@@ -120,7 +119,6 @@ export const PixiInstrumentPanel: React.FC<PixiInstrumentPanelProps> = ({ width,
   const instruments = useInstrumentStore((s) => s.instruments);
   const currentId   = useInstrumentStore((s) => s.currentInstrumentId);
   const select      = useInstrumentStore((s) => s.setCurrentInstrument);
-  const createInstrument = useInstrumentStore((s) => s.createInstrument);
   const deleteInstrument = useInstrumentStore((s) => s.deleteInstrument);
   const cloneInstrument  = useInstrumentStore((s) => s.cloneInstrument);
   const useHexNumbers    = useUIStore((s) => s.useHexNumbers);
@@ -225,8 +223,8 @@ export const PixiInstrumentPanel: React.FC<PixiInstrumentPanelProps> = ({ width,
   // ─── Action bar handlers ────────────────────────────────────────────────────
 
   const handleAdd = useCallback(() => {
-    createInstrument(BASS_PRESETS[0]);
-  }, [createInstrument]);
+    useUIStore.getState().setShowNewInstrumentBrowser(true);
+  }, []);
 
   const handlePreset = useCallback(() => {
     useUIStore.getState().openModal('instruments');
