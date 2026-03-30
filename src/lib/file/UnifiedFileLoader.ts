@@ -813,6 +813,12 @@ async function loadSongFile(file: File, options: FileLoadOptions, preReadBuffer?
       instruments = migrated.instruments;
     }
 
+    // Load instruments BEFORE patterns to avoid timing race.
+    // loadInstruments defers set() via queueMicrotask; if patterns load first,
+    // the playback effect fires before instruments are in the store → silence.
+    if (instruments) loadInstruments(instruments);
+    if (songData.masterEffects) useAudioStore.getState().setMasterEffects(songData.masterEffects);
+
     loadPatterns(patterns);
 
     // Restore pattern order: prefer numeric patternOrder, fall back to sequence (pattern IDs)
@@ -826,8 +832,6 @@ async function loadSongFile(file: File, options: FileLoadOptions, preReadBuffer?
       if (order.length > 0) setPatternOrder(order);
     }
 
-    if (instruments) loadInstruments(instruments);
-    if (songData.masterEffects) useAudioStore.getState().setMasterEffects(songData.masterEffects);
     setBPM(songData.bpm);
     if (songData.speed) setSpeed(songData.speed);
     setMetadata(songData.metadata);
