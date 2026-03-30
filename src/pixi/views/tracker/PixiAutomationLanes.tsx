@@ -347,6 +347,21 @@ export const PixiAutomationLanes: React.FC<PixiAutomationLanesProps> = ({
     g.clear();
     if (!hasAnyData) return;
 
+    // Pattern extent in scroll-adjusted coordinates
+    const patTop = -scrollOffset;
+    const patBot = patternLength * rowHeight - scrollOffset;
+
+    // Draw lane background strips spanning the full pattern height
+    for (let ch = 0; ch < channelCount; ch++) {
+      const laneLeft = getLaneLeft(ch);
+      if (laneLeft + LANE_WIDTH < 0 || laneLeft > width) continue;
+      g.rect(laneLeft, patTop, LANE_WIDTH, patBot - patTop);
+      g.fill({ color: theme.accent.color, alpha: 0.04 });
+      g.moveTo(laneLeft, patTop);
+      g.lineTo(laneLeft, patBot);
+      g.stroke({ color: theme.accent.color, alpha: 0.12, width: 1 });
+    }
+
     const prevLen = prevPatternId ? (prevPatternLength || patternLength) : 0;
 
     // Ghost: previous pattern curves
@@ -375,7 +390,7 @@ export const PixiAutomationLanes: React.FC<PixiAutomationLanesProps> = ({
       const nextLen = nextPatternLength || patternLength;
       drawCurves(g, nextCurves, nextLen, patternLength * rowHeight - scrollOffset, 0.5, false);
     }
-  }, [hasAnyData, curves, prevCurves, nextCurves, channelCurveGroups, patternLength, prevPatternLength, nextPatternLength, prevPatternId, rowHeight, channelOffsets, channelWidths, scrollLeft, channelCount, theme, scrollOffset]);
+  }, [hasAnyData, curves, prevCurves, nextCurves, channelCurveGroups, patternLength, prevPatternLength, nextPatternLength, prevPatternId, rowHeight, channelOffsets, channelWidths, scrollLeft, channelCount, width, height, theme, scrollOffset]);
 
   if (!hasAnyData) return null;
 

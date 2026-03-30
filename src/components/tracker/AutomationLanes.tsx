@@ -5,6 +5,8 @@
 
 import React, { useMemo, useState, useRef, useCallback } from 'react';
 import { useAutomationStore, useInstrumentStore, useTrackerStore } from '@stores';
+import { useTransportStore } from '@stores/useTransportStore';
+import { useCursorStore } from '@stores/useCursorStore';
 import { interpolateAutomationValue } from '@typedefs/automation';
 import type { AutomationCurve } from '@typedefs/automation';
 import { getSectionColor } from '@hooks/useChannelAutomationParams';
@@ -21,6 +23,7 @@ interface AutomationLanesProps {
   rowNumWidth: number;
   scrollOffset: number;
   visibleStart: number;
+  containerHeight: number;
   parameter?: string;
   // For showing ghost curves from adjacent patterns
   prevPatternId?: string;
@@ -63,7 +66,8 @@ export const AutomationLanes: React.FC<AutomationLanesProps> = ({
   channelWidths,
   rowNumWidth,
   scrollOffset: _scrollOffset,
-  visibleStart,
+  visibleStart: _visibleStart,
+  containerHeight,
   parameter = 'cutoff',
   prevPatternId,
   prevPatternLength,
@@ -75,6 +79,12 @@ export const AutomationLanes: React.FC<AutomationLanesProps> = ({
   const addPoint = useAutomationStore((state) => state.addPoint);
   const removePoint = useAutomationStore((state) => state.removePoint);
   const channelLanes = useAutomationStore((state) => state.channelLanes);
+
+  // Live scroll sync — subscribe to transport/cursor for reactive updates
+  const isPlaying = useTransportStore(s => s.isPlaying);
+  const playbackRow = useTransportStore(s => s.currentRow);
+  const cursorRow = useCursorStore(s => s.cursor.rowIndex);
+  const currentRow = isPlaying ? playbackRow : cursorRow;
 
   // Drag state
   const [dragState, setDragState] = useState<{
@@ -370,15 +380,23 @@ export const AutomationLanes: React.FC<AutomationLanesProps> = ({
   // Current pattern: virtualIndex from 0 to patternLength-1
   // Next pattern: virtualIndex from patternLength to patternLength+nextLen-1
 
+  // Compute baseY matching PatternEditorCanvas scroll model
+  const visibleLines = Math.ceil(containerHeight / rowHeight) + 2;
+  const topLines = Math.floor(visibleLines / 2);
+  const centerLineTop = Math.floor(containerHeight / 2) - rowHeight / 2;
+  const baseY = centerLineTop - topLines * rowHeight;
+  // vStart = currentRow - topLines; baseY positions row vStart at top.
+  // We want row 0 of current pattern at baseY + (0 - vStart)*rowHeight = baseY + topLines*rowHeight - currentRow*rowHeight
+  // But the container holds prev+current+next, so shift up by prevLen rows.
+  const containerTop = baseY - currentRow * rowHeight - prevLen * rowHeight;
+
   return (
     <div
       ref={containerRef}
       className="automation-lanes"
       style={{
         position: 'absolute',
-        // Container includes prev+current+next patterns
-        // Position so current pattern (at yOffset=prevLen*rowHeight within container) aligns with screen row 0
-        top: _scrollOffset - (visibleStart * rowHeight) - (prevLen * rowHeight),
+        top: containerTop,
         left: rowNumWidth,
         right: 0,
         height: totalVirtualHeight,
