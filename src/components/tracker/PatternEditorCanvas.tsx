@@ -2991,6 +2991,14 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
                   top={-20}
                 />
               ))}
+              {(() => {
+                const prevLen = showGhostPatterns
+                  ? (currentPatternIndex > 0 ? patterns[currentPatternIndex - 1]?.length : (patterns.length > 1 ? patterns[patterns.length - 1]?.length : 0)) || 0
+                  : 0;
+                const nextLen = showGhostPatterns
+                  ? (currentPatternIndex < patterns.length - 1 ? patterns[currentPatternIndex + 1]?.length : (patterns.length > 1 ? patterns[0]?.length : 0)) || 0
+                  : 0;
+                return (
               <div
                 ref={automationOverlayRef}
                 style={{
@@ -2998,7 +3006,8 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
                   top: scrollYRef.current,
                   left: 0,
                   right: 0,
-                  height: pattern.length * rowHeight,
+                  height: (prevLen + pattern.length + nextLen) * rowHeight,
+                  marginTop: -prevLen * rowHeight,
                   pointerEvents: 'auto',
                   zIndex: 5,
                 }}
@@ -3022,6 +3031,8 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
                 nextPatternLength={showGhostPatterns ? (currentPatternIndex < patterns.length - 1 ? patterns[currentPatternIndex + 1]?.length : (patterns.length > 1 ? patterns[0]?.length : undefined)) : undefined}
               />
               </div>
+                );
+              })()}
               </>
             )}
             {/* Internal Macro Columns Overlay (only when visible) */}
