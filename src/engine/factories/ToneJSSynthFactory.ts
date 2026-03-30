@@ -1002,7 +1002,7 @@ export function createDrumMachine(config: InstrumentConfig): Tone.ToneAudioNode 
         modulationIndex: 32 + hhConfig.metallic / 3,
         resonance: 4000 + hhConfig.tone * 40,
         octaves: 1.5,
-        volume: config.volume || -12,
+        volume: getNormalizedVolume('DrumMachine', config.volume),
       });
       metalSynth.frequency.value = is808 ? 180 + hhConfig.tone * 1.5 : 200 + hhConfig.tone * 2;
       return metalSynth;
@@ -1045,7 +1045,7 @@ export function createDrumMachine(config: InstrumentConfig): Tone.ToneAudioNode 
           sustain: 0,
           release: 0.05,
         },
-        volume: config.volume ?? -10,
+        volume: getNormalizedVolume('DrumMachine', config.volume),
       });
 
       // Serial bandpass filters (909: highpass 900Hz -> bandpass 1200Hz)
@@ -1085,7 +1085,7 @@ export function createDrumMachine(config: InstrumentConfig): Tone.ToneAudioNode 
             sustain: 0,
             release: 0.02,
           },
-          volume: (config.volume ?? -10) - (i * 3), // Each burst quieter
+          volume: getNormalizedVolume('DrumMachine', config.volume) - (i * 3), // Each burst quieter
         });
         burstNoise.connect(toneFilter);
         burstNoises.push(burstNoise);
@@ -1292,7 +1292,7 @@ export function createDrumMachine(config: InstrumentConfig): Tone.ToneAudioNode 
           sustain: 0,
           release: 0.01,
         },
-        volume: config.volume ?? -10,
+        volume: getNormalizedVolume('DrumMachine', config.volume),
       });
 
       // Three parallel resonant bandpass filters (909 characteristic)
@@ -1407,7 +1407,7 @@ export function createDrumMachine(config: InstrumentConfig): Tone.ToneAudioNode 
           sustain: 0,
           release: 0.1,
         },
-        volume: config.volume ?? -8,
+        volume: getNormalizedVolume('DrumMachine', config.volume),
       });
 
       // Lowpass filter for warmth
@@ -1496,8 +1496,9 @@ export function createDrumMachine(config: InstrumentConfig): Tone.ToneAudioNode 
       oscMix.connect(shortVCA);
       oscMix.connect(longVCA);
 
-      // Output mix
-      const output = new Tone.Gain(1);
+      // Output mix — apply volume normalization (dB → linear)
+      const normDb = getNormalizedVolume('DrumMachine', config.volume);
+      const output = new Tone.Gain(Math.pow(10, normDb / 20));
       shortVCA.connect(filter);
       longVCA.connect(filter);
       filter.connect(output);
@@ -1605,7 +1606,9 @@ export function createDrumMachine(config: InstrumentConfig): Tone.ToneAudioNode 
         wet: 1,
       });
 
-      const output = new Tone.Gain(1);
+      // Output — apply volume normalization (dB → linear)
+      const normDb = getNormalizedVolume('DrumMachine', config.volume);
+      const output = new Tone.Gain(Math.pow(10, normDb / 20));
 
       osc1.connect(vca1);
       osc2.connect(vca2);
@@ -1773,7 +1776,9 @@ export function createDrumMachine(config: InstrumentConfig): Tone.ToneAudioNode 
       midFilter.connect(midVCA);
       highFilter.connect(highVCA);
 
-      const output = new Tone.Gain(1);
+      // Output — apply volume normalization (dB → linear)
+      const normDb = getNormalizedVolume('DrumMachine', config.volume);
+      const output = new Tone.Gain(Math.pow(10, normDb / 20));
       lowVCA.connect(output);
       midVCA.connect(output);
       highVCA.connect(output);
@@ -1857,7 +1862,7 @@ export function createDrumMachine(config: InstrumentConfig): Tone.ToneAudioNode 
           sustain: 0,
           release: 0.1,
         },
-        volume: config.volume || -12,
+        volume: getNormalizedVolume('DrumMachine', config.volume),
       });
   }
 }
