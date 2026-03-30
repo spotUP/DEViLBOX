@@ -57,6 +57,7 @@ interface UIStore {
   oscilloscopeVisible: boolean;
   autoCompactApplied: boolean; // Track if we've already auto-compacted this session
   showSamplePackModal: boolean;
+  showNewInstrumentBrowser: boolean;
   uiVersion: number; // Track UI migrations
 
   // Performance settings
@@ -131,6 +132,7 @@ interface UIStore {
   setOscilloscopeVisible: (visible: boolean) => void;
   applyAutoCompact: () => void; // Auto-collapse panels on small screens
   setShowSamplePackModal: (show: boolean) => void;
+  setShowNewInstrumentBrowser: (show: boolean) => void;
 
   // Performance actions
   setPerformanceQuality: (quality: PerformanceQuality) => void;
@@ -230,6 +232,7 @@ export const useUIStore = create<UIStore>()(
       oscilloscopeVisible: true,
       autoCompactApplied: false,
       showSamplePackModal: false,
+      showNewInstrumentBrowser: false,
       uiVersion: 8, // Start at v8 to ensure migration runs
 
       // Performance settings (default to high quality)
@@ -473,6 +476,11 @@ export const useUIStore = create<UIStore>()(
       setShowSamplePackModal: (show) =>
         set((state) => {
           state.showSamplePackModal = show;
+        }),
+
+      setShowNewInstrumentBrowser: (show) =>
+        set((state) => {
+          state.showNewInstrumentBrowser = show;
         }),
 
       // Performance actions

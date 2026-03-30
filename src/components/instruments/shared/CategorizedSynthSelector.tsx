@@ -38,11 +38,14 @@ interface CategorizedSynthSelectorProps {
   onSelect?: (synthType: SynthType) => void;
   /** Show compact grid instead of full list */
   compact?: boolean;
+  /** Create mode: just fire onSelect without updating existing instrument */
+  createMode?: boolean;
 }
 
 export const CategorizedSynthSelector: React.FC<CategorizedSynthSelectorProps> = ({
   onSelect,
   compact = false,
+  createMode = false,
 }) => {
   // Use selectors for proper reactivity - don't use the getter!
   const currentInstrumentId = useInstrumentStore(state => state.currentInstrumentId);
@@ -195,6 +198,12 @@ export const CategorizedSynthSelector: React.FC<CategorizedSynthSelectorProps> =
 
   // Handle synth selection
   const handleSelectSynth = (synthType: SynthType) => {
+    // In create mode, just fire callback — caller handles instrument creation
+    if (createMode) {
+      onSelect?.(synthType);
+      return;
+    }
+
     if (!currentInstrument) return;
 
     // Invalidate cached instrument so ToneEngine recreates it
