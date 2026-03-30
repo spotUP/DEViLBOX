@@ -5165,6 +5165,20 @@ export class TrackerReplayer {
     }
   }
 
+  /**
+   * Hot-swap instrument list without stopping playback.
+   * When the user adds, removes, or updates instruments while playing,
+   * the replayer's instrumentMap must stay in sync so processRow()
+   * can resolve instrument numbers from pattern cells.
+   */
+  updateInstruments(instruments: InstrumentConfig[]): void {
+    if (this.song) {
+      this.song.instruments = instruments;
+      this.instrumentMap = new Map(instruments.map(i => [i.id, i]));
+      this._warnedMissingInstruments = undefined;
+    }
+  }
+
   // ==========================================================================
   // CLEANUP
   // ==========================================================================
