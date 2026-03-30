@@ -112,15 +112,13 @@ export function createIO808Instrument(config: InstrumentConfig): Tone.ToneAudioN
   // Extract default params from config (level comes from velocity at trigger time)
   const baseParams = extractIO808Params(config);
 
-  /** Trigger helper — resolves note to drum type + tune offset */
+  /** Trigger helper — resolves note to drum type + pitch multiplier */
   const triggerDrum = (note: string, time: number, velocity: number) => {
-    const { drumType, tuneOffset } = resolveIO808Note(note, noteMode, defaultDrumType);
+    const { drumType, pitchMultiplier } = resolveIO808Note(note, noteMode, defaultDrumType);
     const level = velocity * 100;
     const params: IO808Params = { level, ...baseParams };
-    if (tuneOffset !== 0) {
-      // Apply tune offset — clamp to 0-100 range
-      const baseTune = params.tuning ?? 50;
-      params.tuning = Math.max(0, Math.min(100, baseTune + tuneOffset));
+    if (pitchMultiplier !== 1) {
+      params.pitchMultiplier = pitchMultiplier;
     }
     io808.trigger(drumType, time, params);
   };

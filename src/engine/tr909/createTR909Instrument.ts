@@ -108,14 +108,13 @@ export function createTR909Instrument(config: InstrumentConfig): Tone.ToneAudioN
 
   // TR909Synth constructor auto-starts shared resource loading
 
-  /** Trigger helper — resolves note to drum type + tune offset */
+  /** Trigger helper — resolves note to drum type + pitch multiplier */
   const triggerDrum = (note: string, time: number, velocity: number) => {
-    const { drumType, tuneOffset } = resolveTR909Note(note, noteMode, defaultDrumType);
+    const { drumType, pitchMultiplier } = resolveTR909Note(note, noteMode, defaultDrumType);
     const level = velocity * 100;
     const params: TR909Params = { level, ...baseParams };
-    if (tuneOffset !== 0) {
-      const baseTune = params.tune ?? 50;
-      params.tune = Math.max(0, Math.min(100, baseTune + tuneOffset));
+    if (pitchMultiplier !== 1) {
+      params.pitchMultiplier = pitchMultiplier;
     }
     tr909.trigger(drumType, time, params);
   };
