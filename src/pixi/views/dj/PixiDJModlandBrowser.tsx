@@ -1,9 +1,8 @@
 /**
- * PixiDJModlandBrowser — GL-native Modland browser for the DJ view.
+ * PixiDJModlandBrowser — GL-native unified online music browser for the DJ view.
  *
- * Renders entirely in Pixi (no DOM). Provides search with debounce,
- * format dropdown filter, paginated results, keyboard navigation,
- * deck load buttons on hover, and "add to playlist" support.
+ * Searches Modland (190K+ tracker modules) and HVSC (80K+ C64 SID tunes)
+ * from a single search bar. Source selector lets you filter or search all.
  *
  * DOM reference: src/components/dj/DJModlandBrowser.tsx
  */
@@ -20,6 +19,11 @@ import {
   type ModlandFormat,
   type ModlandStatus,
 } from '@/lib/modlandApi';
+import {
+  searchHVSC,
+  downloadHVSCFile,
+  type HVSCEntry,
+} from '@/lib/hvscApi';
 import { useDJStore, useThirdDeckActive } from '@/stores/useDJStore';
 import { getDJEngine } from '@/engine/dj/DJEngine';
 import { detectBPM, estimateSongDuration } from '@/engine/dj/DJBeatDetector';
@@ -44,7 +48,7 @@ import { PIXI_FONTS } from '../../fonts';
 
 // ── Layout constants ─────────────────────────────────────────────────────────
 
-const PANEL_W = 600;
+const PANEL_W = 700;
 const PANEL_H = 280;
 const HEADER_H = 24;
 const SEARCH_ROW_H = 28;
@@ -53,6 +57,34 @@ const FOOTER_H = 28;
 const HINT_H = 14;
 const LIST_H = PANEL_H - HEADER_H - SEARCH_ROW_H - FOOTER_H - HINT_H - 16;
 const LIMIT = 50;
+
+// ── Unified result type ──────────────────────────────────────────────────────
+
+type SearchSource = 'all' | 'modland' | 'hvsc';
+
+interface OnlineResult {
+  source: 'modland' | 'hvsc';
+  key: string;          // unique key for cache/download: modland full_path or hvsc path
+  filename: string;
+  format: string;
+  author: string;
+  avg_rating?: number;
+  vote_count?: number;
+}
+
+function modlandToResult(f: ModlandFile): OnlineResult {
+  return { source: 'modland', key: f.full_path, filename: f.filename, format: f.format, author: f.author, avg_rating: f.avg_rating, vote_count: f.vote_count };
+}
+
+function hvscToResult(e: HVSCEntry): OnlineResult {
+  return { source: 'hvsc', key: e.path, filename: e.name, format: 'SID', author: e.author || '', avg_rating: e.avg_rating, vote_count: e.vote_count };
+}
+
+const SOURCE_OPTIONS: SelectOption[] = [
+  { value: 'all', label: 'All sources' },
+  { value: 'modland', label: 'Modland (190K+)' },
+  { value: 'hvsc', label: 'HVSC / SID (80K+)' },
+];
 
 // ── Star rating helpers ──────────────────────────────────────────────────────
 
@@ -80,20 +112,23 @@ function drawStar(g: GraphicsType, cx: number, cy: number, r: number, color: num
 
 interface PixiDJModlandBrowserProps {
   visible?: boolean;
+  onClose?: () => void;
 }
 
 // ── Component ────────────────────────────────────────────────────────────────
 
 export const PixiDJModlandBrowser: React.FC<PixiDJModlandBrowserProps> = ({
   visible = true,
+  onClose,
 }) => {
   const theme = usePixiTheme();
   const thirdDeckActive = useThirdDeckActive();
 
   // ── State ────────────────────────────────────────────────────────────────
   const [query, setQuery] = useState('');
+  const [source, setSource] = useState<SearchSource>('all');
   const [format, setFormat] = useState('');
-  const [results, setResults] = useState<ModlandFile[]>([]);
+  const [results, setResults] = useState<OnlineResult[]>([]);
   const [formats, setFormats] = useState<ModlandFormat[]>([]);
   const [status, setStatus] = useState<ModlandStatus | null>(null);
   const [loading, setLoading] = useState(false);
@@ -106,10 +141,12 @@ export const PixiDJModlandBrowser: React.FC<PixiDJModlandBrowserProps> = ({
   const [scrollY, setScrollY] = useState(0);
   const [ratings, setRatings] = useState<RatingMap>({});
   const [hoveredStar, setHoveredStar] = useState<{ path: string; star: number } | null>(null);
+  const [, setLoadedDecks] = useState<Set<string>>(new Set());
 
   const isLoggedIn = useAuthStore(s => !!s.token);
 
   const searchTimerRef = useRef<ReturnType<typeof setTimeout>>(null);
+  const abortRef = useRef<AbortController | null>(null);
   const resultsRef = useRef(results);
   const selectedIndexRef = useRef(selectedIndex);
   const downloadingRef = useRef(downloadingPaths);
@@ -136,7 +173,7 @@ export const PixiDJModlandBrowser: React.FC<PixiDJModlandBrowserProps> = ({
 
   // ── Debounced search ─────────────────────────────────────────────────────
   const doSearch = useCallback(
-    async (q: string, fmt: string, newOffset: number, append: boolean) => {
+    async (q: string, fmt: string, src: SearchSource, newOffset: number, append: boolean) => {
       if (!q && !fmt) {
         if (!append) setResults([]);
         return;
@@ -144,26 +181,56 @@ export const PixiDJModlandBrowser: React.FC<PixiDJModlandBrowserProps> = ({
       setLoading(true);
       setError(null);
       try {
-        const data = await searchModland({
-          q: q || undefined,
-          format: fmt || undefined,
-          limit: LIMIT,
-          offset: newOffset,
-        });
+        let combined: OnlineResult[] = [];
+        let moreResults = false;
+
+        // Search Modland
+        if (src === 'all' || src === 'modland') {
+          const data = await searchModland({
+            q: q || undefined,
+            format: fmt || undefined,
+            limit: LIMIT,
+            offset: newOffset,
+          });
+          combined.push(...data.results.map(modlandToResult));
+          if (data.results.length === LIMIT) moreResults = true;
+        }
+
+        // Search HVSC (no format filter — always SID)
+        if ((src === 'all' || src === 'hvsc') && q && !fmt) {
+          try {
+            const hvscResults = await searchHVSC(q, LIMIT, newOffset);
+            combined.push(...hvscResults.filter(e => !e.isDirectory).map(hvscToResult));
+            if (hvscResults.length === LIMIT) moreResults = true;
+          } catch {
+            // HVSC search may fail if server not running — continue with Modland results
+          }
+        }
+
+        // Sort: interleave sources for variety when searching "all"
+        if (src === 'all') {
+          combined.sort((a, b) => a.filename.localeCompare(b.filename));
+        }
+
         if (append) {
-          setResults((prev) => [...prev, ...data.results]);
+          setResults((prev) => [...prev, ...combined]);
         } else {
-          setResults(data.results);
+          setResults(combined);
           setScrollY(0);
         }
-        setHasMore(data.results.length === LIMIT);
+        setHasMore(moreResults);
         setOffset(newOffset);
 
         // Fetch ratings for results
-        const keys = data.results.map((f: ModlandFile) => f.full_path);
-        if (keys.length > 0) {
-          batchGetRatings('modland', keys).then(rm => {
-            setRatings(prev => append ? { ...prev, ...rm } : rm);
+        const modlandKeys = combined.filter(r => r.source === 'modland').map(r => r.key);
+        const hvscKeys = combined.filter(r => r.source === 'hvsc').map(r => r.key);
+        const ratingPromises: Promise<RatingMap>[] = [];
+        if (modlandKeys.length > 0) ratingPromises.push(batchGetRatings('modland', modlandKeys));
+        if (hvscKeys.length > 0) ratingPromises.push(batchGetRatings('hvsc', hvscKeys));
+        if (ratingPromises.length > 0) {
+          Promise.all(ratingPromises).then(maps => {
+            const merged = Object.assign({}, ...maps);
+            setRatings(prev => append ? { ...prev, ...merged } : merged);
           }).catch(() => {});
         } else if (!append) {
           setRatings({});
@@ -180,21 +247,25 @@ export const PixiDJModlandBrowser: React.FC<PixiDJModlandBrowserProps> = ({
   useEffect(() => {
     if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
     searchTimerRef.current = setTimeout(() => {
-      doSearch(query, format, 0, false);
+      // Cancel any in-flight search
+      if (abortRef.current) abortRef.current.abort();
+      doSearch(query, format, source, 0, false);
       setSelectedIndex(0);
-    }, 300);
+    }, 500);
     return () => {
       if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
     };
-  }, [query, format, doSearch]);
+  }, [query, format, source, doSearch]);
 
   const loadMore = useCallback(() => {
-    doSearch(query, format, offset + LIMIT, true);
-  }, [query, format, offset, doSearch]);
+    doSearch(query, format, source, offset + LIMIT, true);
+  }, [query, format, source, offset, doSearch]);
 
   // ── Rate handler ──────────────────────────────────────────────────────────
-  const handleRate = useCallback(async (itemKey: string, star: number) => {
+  const handleRate = useCallback(async (item: OnlineResult, star: number) => {
     if (!isLoggedIn) return;
+    const itemKey = item.key;
+    const ratingSource = item.source;
     setRatings(prev => {
       const existing = prev[itemKey];
       if (star === 0) {
@@ -216,12 +287,12 @@ export const PixiDJModlandBrowser: React.FC<PixiDJModlandBrowserProps> = ({
     });
     try {
       if (star === 0) {
-        await removeRating('modland', itemKey);
+        await removeRating(ratingSource, itemKey);
       } else {
-        await setRating('modland', itemKey, star);
+        await setRating(ratingSource, itemKey, star);
       }
     } catch {
-      batchGetRatings('modland', [itemKey]).then(rm => {
+      batchGetRatings(ratingSource, [itemKey]).then(rm => {
         setRatings(prev => ({ ...prev, ...rm }));
       }).catch(() => {});
     }
@@ -229,22 +300,28 @@ export const PixiDJModlandBrowser: React.FC<PixiDJModlandBrowserProps> = ({
 
   // ── Download → Parse → Load to Deck ──────────────────────────────────────
   const loadToDeck = useCallback(
-    async (file: ModlandFile, deckId: 'A' | 'B' | 'C') => {
-      setDownloadingPaths((prev) => new Set(prev).add(file.full_path));
+    async (file: OnlineResult, deckId: 'A' | 'B' | 'C') => {
+      setDownloadingPaths((prev) => new Set(prev).add(file.key));
       setError(null);
       try {
-        const [buffer, companion] = await Promise.all([
-          downloadModlandFile(file.full_path),
-          downloadTFMXCompanion(file.full_path),
-        ]);
-        if (companion) {
-          const { UADEEngine } = await import('@engine/uade/UADEEngine');
-          await UADEEngine.getInstance().addCompanionFile(companion.filename, companion.buffer);
+        let buffer: ArrayBuffer;
+        if (file.source === 'hvsc') {
+          buffer = await downloadHVSCFile(file.key);
+        } else {
+          const [modBuffer, companion] = await Promise.all([
+            downloadModlandFile(file.key),
+            downloadTFMXCompanion(file.key),
+          ]);
+          buffer = modBuffer;
+          if (companion) {
+            const { UADEEngine } = await import('@engine/uade/UADEEngine');
+            await UADEEngine.getInstance().addCompanionFile(companion.filename, companion.buffer);
+          }
         }
         const blob = new File([buffer], file.filename, { type: 'application/octet-stream' });
         const song = await parseModuleToSong(blob);
         const bpmResult = detectBPM(song);
-        const cacheKey = `modland:${file.full_path}`;
+        const cacheKey = `${file.source}:${file.key}`;
         cacheSong(cacheKey, song);
         const engine = getDJEngine();
         useDJStore.getState().setDeckState(deckId, {
@@ -258,44 +335,60 @@ export const PixiDJModlandBrowser: React.FC<PixiDJModlandBrowserProps> = ({
         const result = await getDJPipeline().loadOrEnqueue(buffer, file.filename, deckId, 'high');
         await engine.loadAudioToDeck(deckId, result.wavData, cacheKey, song.name || file.filename, result.analysis?.bpm || bpmResult.bpm, song);
         useDJStore.getState().setDeckViewMode('visualizer');
+
+        // Auto-close when all active decks are filled
+        setLoadedDecks((prev) => {
+          const next = new Set(prev).add(deckId);
+          const requiredDecks = thirdDeckActive ? 3 : 2;
+          if (next.size >= requiredDecks && onClose) {
+            setTimeout(onClose, 300);
+          }
+          return next;
+        });
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to load');
       } finally {
         setDownloadingPaths((prev) => {
           const next = new Set(prev);
-          next.delete(file.full_path);
+          next.delete(file.key);
           return next;
         });
       }
     },
-    [],
+    [thirdDeckActive, onClose],
   );
 
   // ── Add to playlist ──────────────────────────────────────────────────────
-  const addToPlaylist = useCallback(async (file: ModlandFile) => {
+  const addToPlaylist = useCallback(async (file: OnlineResult) => {
     const playlistId = useDJPlaylistStore.getState().activePlaylistId;
     if (!playlistId) return;
-    setDownloadingPaths((prev) => new Set(prev).add(file.full_path));
+    setDownloadingPaths((prev) => new Set(prev).add(file.key));
     setError(null);
     try {
-      const [buffer, companion] = await Promise.all([
-        downloadModlandFile(file.full_path),
-        downloadTFMXCompanion(file.full_path),
-      ]);
-      if (companion) {
-        const { UADEEngine } = await import('@engine/uade/UADEEngine');
-        await UADEEngine.getInstance().addCompanionFile(companion.filename, companion.buffer);
+      let buffer: ArrayBuffer;
+      if (file.source === 'hvsc') {
+        buffer = await downloadHVSCFile(file.key);
+      } else {
+        const [modBuffer, companion] = await Promise.all([
+          downloadModlandFile(file.key),
+          downloadTFMXCompanion(file.key),
+        ]);
+        buffer = modBuffer;
+        if (companion) {
+          const { UADEEngine } = await import('@engine/uade/UADEEngine');
+          await UADEEngine.getInstance().addCompanionFile(companion.filename, companion.buffer);
+        }
       }
       const blob = new File([buffer], file.filename, { type: 'application/octet-stream' });
       const song = await parseModuleToSong(blob);
       const bpmResult = detectBPM(song);
       const duration = estimateSongDuration(song);
-      const cacheKey = `modland:${file.full_path}`;
+      const cacheKey = `${file.source}:${file.key}`;
       cacheSong(cacheKey, song);
       useDJPlaylistStore.getState().addTrack(playlistId, {
         fileName: cacheKey,
         trackName: song.name || file.filename,
-        format: file.extension.toUpperCase(),
+        format: file.format,
         bpm: bpmResult.bpm,
         duration,
         addedAt: Date.now(),
@@ -305,7 +398,7 @@ export const PixiDJModlandBrowser: React.FC<PixiDJModlandBrowserProps> = ({
     } finally {
       setDownloadingPaths((prev) => {
         const next = new Set(prev);
-        next.delete(file.full_path);
+        next.delete(file.key);
         return next;
       });
     }
@@ -330,7 +423,7 @@ export const PixiDJModlandBrowser: React.FC<PixiDJModlandBrowserProps> = ({
       } else if (e.key === 'Enter' && idx >= 0 && idx < res.length) {
         e.preventDefault();
         const file = res[idx];
-        if (!downloadingRef.current.has(file.full_path)) {
+        if (!downloadingRef.current.has(file.key)) {
           loadToDeck(file, e.shiftKey ? 'B' : 'A');
         }
       }
@@ -391,7 +484,7 @@ export const PixiDJModlandBrowser: React.FC<PixiDJModlandBrowserProps> = ({
 
   if (!visible) return null;
 
-  const isDownloading = (path: string) => downloadingPaths.has(path);
+  const isDownloading = (key: string) => downloadingPaths.has(key);
   const contentW = PANEL_W - 12;
 
   return (
@@ -410,11 +503,15 @@ export const PixiDJModlandBrowser: React.FC<PixiDJModlandBrowserProps> = ({
     >
       {/* ── Header ──────────────────────────────────────────────────────── */}
       <layoutContainer layout={{ flexDirection: 'row', alignItems: 'center', gap: 6, height: HEADER_H }}>
-        <PixiLabel text="🌐" size="sm" color="success" />
-        <PixiLabel text="MODLAND" size="sm" weight="bold" font="mono" color="text" />
+        <PixiLabel text="ONLINE" size="sm" weight="bold" font="mono" color="text" />
         {statusText ? (
           <PixiLabel text={statusText} size="xs" font="mono" color="textMuted" />
         ) : null}
+        {onClose && (
+          <layoutContainer layout={{ marginLeft: 'auto' }}>
+            <PixiButton icon="close" label="" variant="ghost" size="sm" width={24} height={24} onClick={onClose} />
+          </layoutContainer>
+        )}
       </layoutContainer>
 
       {/* ── Search row ──────────────────────────────────────────────────── */}
@@ -422,10 +519,17 @@ export const PixiDJModlandBrowser: React.FC<PixiDJModlandBrowserProps> = ({
         <PixiPureTextInput
           value={query}
           onChange={setQuery}
-          placeholder="Search modules..."
-          width={contentW - 160}
+          placeholder="Search online archives..."
+          width={contentW - 310}
           height={SEARCH_ROW_H}
           fontSize={11}
+        />
+        <PixiSelect
+          options={SOURCE_OPTIONS}
+          value={source}
+          onChange={v => setSource(v as SearchSource)}
+          width={150}
+          height={SEARCH_ROW_H}
         />
         <PixiSelect
           options={formatOptions}
@@ -434,6 +538,7 @@ export const PixiDJModlandBrowser: React.FC<PixiDJModlandBrowserProps> = ({
           width={200}
           height={SEARCH_ROW_H}
           searchable
+          disabled={source === 'hvsc'}
         />
       </layoutContainer>
 
@@ -475,7 +580,7 @@ export const PixiDJModlandBrowser: React.FC<PixiDJModlandBrowserProps> = ({
         {results.length === 0 && !loading && (
           <layoutContainer layout={{ alignItems: 'center', justifyContent: 'center', width: contentW, height: LIST_H }}>
             <PixiLabel
-              text={query || format ? 'No results found' : 'Search the modland archive'}
+              text={query || format ? 'No results found' : 'Search 270K+ tracker modules & SID tunes'}
               size="xs"
               font="mono"
               color="textMuted"
@@ -496,11 +601,12 @@ export const PixiDJModlandBrowser: React.FC<PixiDJModlandBrowserProps> = ({
           const y = actualIdx * ROW_H - scrollY;
           const isSelected = actualIdx === selectedIndex;
           const isHovered = actualIdx === hoveredIndex;
-          const downloading = isDownloading(file.full_path);
+          const downloading = isDownloading(file.key);
+          const sourceTag = file.source === 'hvsc' ? 'SID' : '';
 
           return (
             <pixiContainer
-              key={file.full_path}
+              key={file.key}
               eventMode="static"
               cursor="pointer"
               onPointerUp={() => setSelectedIndex(actualIdx)}
@@ -546,9 +652,17 @@ export const PixiDJModlandBrowser: React.FC<PixiDJModlandBrowserProps> = ({
                   <pixiBitmapText
                     text={file.format}
                     style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 11, fill: 0xffffff }}
-                    tint={theme.textMuted.color}
+                    tint={file.source === 'hvsc' ? 0x60a5fa : theme.textMuted.color}
                     layout={{}}
                   />
+                  {sourceTag ? (
+                    <pixiBitmapText
+                      text="HVSC"
+                      style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 9, fill: 0xffffff }}
+                      tint={0x60a5fa}
+                      layout={{}}
+                    />
+                  ) : null}
                   <pixiBitmapText
                     text={file.author}
                     style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 11, fill: 0xffffff }}
@@ -559,11 +673,11 @@ export const PixiDJModlandBrowser: React.FC<PixiDJModlandBrowserProps> = ({
                   {/* Star ratings */}
                   <layoutContainer layout={{ flexDirection: 'row', gap: STAR_GAP, marginLeft: 4 }}>
                     {[1, 2, 3, 4, 5].map(star => {
-                      const r = ratings[file.full_path];
+                      const r = ratings[file.key];
                       const avg = r?.avg ?? file.avg_rating ?? 0;
                       const userR = r?.userRating;
-                      const isStarHovered = hoveredStar?.path === file.full_path && hoveredStar.star >= star;
-                      const isFilled = star <= (hoveredStar?.path === file.full_path ? hoveredStar.star : (userR || Math.round(avg)));
+                      const isStarHovered = hoveredStar?.path === file.key && hoveredStar.star >= star;
+                      const isFilled = star <= (hoveredStar?.path === file.key ? hoveredStar.star : (userR || Math.round(avg)));
                       const color = isStarHovered ? STAR_HOVER : (userR && star <= userR) ? STAR_USER : isFilled ? STAR_FILLED : STAR_EMPTY;
                       const starAlpha = color === STAR_EMPTY ? 0.4 : 1;
                       return (
@@ -571,11 +685,11 @@ export const PixiDJModlandBrowser: React.FC<PixiDJModlandBrowserProps> = ({
                           key={star}
                           eventMode={isLoggedIn ? 'static' : 'none'}
                           cursor={isLoggedIn ? 'pointer' : undefined}
-                          onPointerOver={() => isLoggedIn && setHoveredStar({ path: file.full_path, star })}
+                          onPointerOver={() => isLoggedIn && setHoveredStar({ path: file.key, star })}
                           onPointerOut={() => setHoveredStar(null)}
                           onPointerUp={() => {
                             if (!isLoggedIn) return;
-                            handleRate(file.full_path, userR === star ? 0 : star);
+                            handleRate(file, userR === star ? 0 : star);
                           }}
                           draw={(g: GraphicsType) => {
                             g.clear();
@@ -585,9 +699,9 @@ export const PixiDJModlandBrowser: React.FC<PixiDJModlandBrowserProps> = ({
                         />
                       );
                     })}
-                    {(ratings[file.full_path]?.count ?? file.vote_count ?? 0) > 0 && (
+                    {(ratings[file.key]?.count ?? file.vote_count ?? 0) > 0 && (
                       <pixiBitmapText
-                        text={`(${ratings[file.full_path]?.count ?? file.vote_count ?? 0})`}
+                        text={`(${ratings[file.key]?.count ?? file.vote_count ?? 0})`}
                         style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 9, fill: 0xffffff }}
                         tint={theme.textMuted.color}
                         alpha={0.4}

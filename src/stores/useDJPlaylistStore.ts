@@ -26,6 +26,8 @@ export interface PlaylistTrack {
   duration: number;
   /** When this track was added */
   addedAt: number;
+  /** Optional download URL (e.g. Modland HTTP URL) */
+  sourceUrl?: string;
 }
 
 export interface DJPlaylist {
@@ -154,10 +156,48 @@ export const useDJPlaylistStore = create<DJPlaylistState>()(
     })),
     {
       name: 'devilbox-dj-playlists',
-      version: 1,
+      version: 2,
+      migrate: (persisted: unknown) => {
+        // Wipe playlists on upgrade so bundled import re-runs with modland: prefixes
+        const state = persisted as Record<string, unknown>;
+        state.playlists = [];
+        state.activePlaylistId = null;
+        return state;
+      },
     },
   ),
 );
+
+// ── Auto-import bundled playlists on first launch ────────────────────────────
+
+let bundledImportAttempted = false;
+
+async function importBundledIfEmpty(): Promise<void> {
+  if (bundledImportAttempted) return;
+  bundledImportAttempted = true;
+
+  const { playlists } = useDJPlaylistStore.getState();
+  if (playlists.length > 0) return; // Already have playlists
+
+  try {
+    const resp = await fetch('/data/playlists/imported-prg.json');
+    if (!resp.ok) return;
+    const data: DJPlaylist[] = await resp.json();
+    if (Array.isArray(data) && data.length > 0) {
+      useDJPlaylistStore.getState().importPlaylists(data);
+      // Set the first playlist as active
+      const first = useDJPlaylistStore.getState().playlists[0];
+      if (first) useDJPlaylistStore.getState().setActivePlaylist(first.id);
+      console.log(`[DJPlaylistStore] Imported ${data.length} bundled playlists`);
+    }
+  } catch {
+    // Bundled file not available — no problem
+  }
+}
+
+// Trigger on store hydration (persist middleware fires synchronously,
+// so by the time this runs the localStorage data is already loaded)
+setTimeout(importBundledIfEmpty, 100);
 
 // ── Debounced server sync ────────────────────────────────────────────────────
 

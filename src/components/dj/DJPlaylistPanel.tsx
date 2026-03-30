@@ -5,16 +5,14 @@
  * Click a track to load it to a deck. Reorder via drag handles.
  */
 
-import React, { useState, useCallback, useRef } from 'react';
+import React, { useState, useCallback, useRef, useEffect } from 'react';
 import {
-  ListMusic,
   Plus,
   Trash2,
   Edit3,
   Check,
   X,
   GripVertical,
-  Music,
 } from 'lucide-react';
 import {
   useDJPlaylistStore,
@@ -53,6 +51,10 @@ export const DJPlaylistPanel: React.FC<DJPlaylistPanelProps> = ({ onClose }) => 
   const removeTrack = useDJPlaylistStore((s) => s.removeTrack);
   const reorderTrack = useDJPlaylistStore((s) => s.reorderTrack);
 
+  const autoDJEnabled = useDJStore((s) => s.autoDJEnabled);
+  const autoDJCurrentIdx = useDJStore((s) => s.autoDJCurrentTrackIndex);
+  const autoDJNextIdx = useDJStore((s) => s.autoDJNextTrackIndex);
+
   const [isCreating, setIsCreating] = useState(false);
   const [newName, setNewName] = useState('');
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -60,6 +62,19 @@ export const DJPlaylistPanel: React.FC<DJPlaylistPanelProps> = ({ onClose }) => 
   const [dragIndex, setDragIndex] = useState<number | null>(null);
   const [isLoadingFile, setIsLoadingFile] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
+
+  // Click-outside to close
+  useEffect(() => {
+    if (!onClose) return;
+    const handlePointerDown = (e: PointerEvent) => {
+      if (panelRef.current && !panelRef.current.contains(e.target as Node)) {
+        onClose();
+      }
+    };
+    document.addEventListener('pointerdown', handlePointerDown);
+    return () => document.removeEventListener('pointerdown', handlePointerDown);
+  }, [onClose]);
 
   const activePlaylist = playlists.find((p) => p.id === activePlaylistId) ?? null;
 
@@ -290,149 +305,131 @@ export const DJPlaylistPanel: React.FC<DJPlaylistPanelProps> = ({ onClose }) => 
   // ── Render ───────────────────────────────────────────────────────────────
 
   return (
-    <div className="bg-dark-bgSecondary border border-dark-border rounded-lg p-3 flex flex-col gap-2 max-h-[400px]">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <ListMusic size={14} className="text-accent-primary" />
-          <h3 className="text-text-primary text-sm font-mono font-bold tracking-wider uppercase">
-            Playlists
-          </h3>
-        </div>
-        <div className="flex items-center gap-1.5">
-          {!isCreating ? (
+    <div ref={panelRef} className="bg-dark-bgSecondary border border-dark-border rounded-lg p-2 flex flex-col gap-1 max-h-[400px]">
+      {/* Header: dropdown + actions in one row */}
+      <div className="flex items-center gap-1.5">
+        {playlists.length > 0 ? (
+          <select
+            value={activePlaylistId ?? ''}
+            onChange={(e) => setActivePlaylist(e.target.value)}
+            className="flex-1 px-2 py-1 text-[10px] font-mono bg-dark-bg border border-dark-borderLight
+                       rounded text-text-primary cursor-pointer min-w-0"
+          >
+            {playlists.map((pl) => (
+              <option key={pl.id} value={pl.id}>
+                {pl.name} ({pl.tracks.length})
+              </option>
+            ))}
+          </select>
+        ) : (
+          <span className="flex-1 text-[10px] font-mono text-text-muted">No playlists</span>
+        )}
+
+        {activePlaylist && !isCreating && (
+          <>
             <button
-              onClick={() => setIsCreating(true)}
-              className="flex items-center gap-1 px-2 py-1 text-[10px] font-mono text-text-secondary
-                         bg-dark-bgTertiary border border-dark-borderLight rounded
-                         hover:bg-dark-bgHover hover:text-text-primary transition-colors"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={isLoadingFile}
+              className="p-1 text-text-muted hover:text-text-primary transition-colors disabled:opacity-50"
+              title={isLoadingFile ? 'Loading...' : 'Add tracks'}
             >
-              <Plus size={10} />
-              New
+              <Plus size={12} />
             </button>
-          ) : (
-            <div className="flex items-center gap-1">
-              <input
-                autoFocus
-                value={newName}
-                onChange={(e) => setNewName(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') handleCreate();
-                  if (e.key === 'Escape') setIsCreating(false);
-                }}
-                placeholder="Playlist name..."
-                className="w-32 px-2 py-0.5 text-[10px] font-mono bg-dark-bg border border-dark-borderLight
-                           rounded text-text-primary placeholder:text-text-muted/40"
-              />
-              <button onClick={handleCreate} className="p-0.5 text-green-400 hover:text-green-300">
-                <Check size={12} />
-              </button>
-              <button onClick={() => setIsCreating(false)} className="p-0.5 text-text-muted hover:text-text-primary">
-                <X size={12} />
-              </button>
-            </div>
-          )}
-          {onClose && (
-            <button onClick={onClose} className="text-text-muted hover:text-text-primary p-1">
-              <X size={14} />
+            <button
+              onClick={() => { setEditingId(activePlaylist.id); setEditName(activePlaylist.name); }}
+              className="p-1 text-text-muted hover:text-text-primary transition-colors"
+              title="Rename playlist"
+            >
+              <Edit3 size={10} />
             </button>
-          )}
-        </div>
+            <button
+              onClick={() => deletePlaylist(activePlaylist.id)}
+              className="p-1 text-text-muted hover:text-accent-error transition-colors"
+              title="Delete playlist"
+            >
+              <Trash2 size={10} />
+            </button>
+          </>
+        )}
+
+        {!isCreating ? (
+          <button
+            onClick={() => setIsCreating(true)}
+            className="px-2 py-1 text-[10px] font-mono text-text-secondary
+                       bg-dark-bgTertiary border border-dark-borderLight rounded
+                       hover:bg-dark-bgHover hover:text-text-primary transition-colors"
+          >
+            New
+          </button>
+        ) : (
+          <div className="flex items-center gap-1">
+            <input
+              autoFocus
+              value={newName}
+              onChange={(e) => setNewName(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') handleCreate();
+                if (e.key === 'Escape') setIsCreating(false);
+              }}
+              placeholder="Name..."
+              className="w-24 px-2 py-0.5 text-[10px] font-mono bg-dark-bg border border-dark-borderLight
+                         rounded text-text-primary placeholder:text-text-muted/40"
+            />
+            <button onClick={handleCreate} className="p-0.5 text-green-400 hover:text-green-300">
+              <Check size={12} />
+            </button>
+            <button onClick={() => setIsCreating(false)} className="p-0.5 text-text-muted hover:text-text-primary">
+              <X size={12} />
+            </button>
+          </div>
+        )}
+
+        {onClose && (
+          <button onClick={onClose} className="text-text-muted hover:text-text-primary p-1">
+            <X size={12} />
+          </button>
+        )}
       </div>
 
-      {/* Playlist selector */}
-      {playlists.length > 0 && (
-        <div className="flex gap-1 flex-wrap">
-          {playlists.map((pl) => (
-            <div
-              key={pl.id}
-              className={`group flex items-center gap-1 px-2 py-1 rounded text-[10px] font-mono cursor-pointer transition-colors ${
-                activePlaylistId === pl.id
-                  ? 'bg-accent-primary/15 text-accent-primary border border-accent-primary/30'
-                  : 'bg-dark-bgTertiary text-text-muted border border-dark-borderLight hover:text-text-secondary'
-              }`}
-              onClick={() => setActivePlaylist(pl.id)}
-            >
-              {editingId === pl.id ? (
-                <input
-                  autoFocus
-                  value={editName}
-                  onChange={(e) => setEditName(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') handleRename(pl.id);
-                    if (e.key === 'Escape') setEditingId(null);
-                  }}
-                  onBlur={() => handleRename(pl.id)}
-                  onClick={(e) => e.stopPropagation()}
-                  className="w-20 px-1 bg-dark-bg border border-dark-borderLight rounded text-[10px] text-text-primary"
-                />
-              ) : (
-                <>
-                  <span className="truncate max-w-[80px]">{pl.name}</span>
-                  <span className="text-text-muted/40">{pl.tracks.length}</span>
-                  <Edit3
-                    size={9}
-                    className="opacity-0 group-hover:opacity-60 hover:!opacity-100 shrink-0"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setEditingId(pl.id);
-                      setEditName(pl.name);
-                    }}
-                  />
-                  <Trash2
-                    size={9}
-                    className="opacity-0 group-hover:opacity-60 hover:!opacity-100 text-red-400 shrink-0"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      deletePlaylist(pl.id);
-                    }}
-                  />
-                </>
-              )}
-            </div>
-          ))}
+      {/* Inline rename */}
+      {editingId && (
+        <div className="flex items-center gap-1">
+          <input
+            autoFocus
+            value={editName}
+            onChange={(e) => setEditName(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') handleRename(editingId);
+              if (e.key === 'Escape') setEditingId(null);
+            }}
+            onBlur={() => handleRename(editingId)}
+            className="flex-1 px-2 py-0.5 text-[10px] font-mono bg-dark-bg border border-dark-borderLight
+                       rounded text-text-primary"
+          />
+          <button onClick={() => handleRename(editingId)} className="p-0.5 text-green-400 hover:text-green-300">
+            <Check size={12} />
+          </button>
+          <button onClick={() => setEditingId(null)} className="p-0.5 text-text-muted hover:text-text-primary">
+            <X size={12} />
+          </button>
         </div>
       )}
 
-      {/* Active playlist tracks */}
+      <input ref={fileInputRef} type="file" multiple accept="*/*" onChange={handleAddFiles} className="hidden" />
+
+      {/* Track list */}
       {activePlaylist ? (
         <div
           className="flex-1 overflow-y-auto min-h-0"
           onDragOver={(e) => e.preventDefault()}
           onDrop={handleDropOnPlaylist}
         >
-          {/* Add to playlist button */}
-          <div className="flex items-center gap-2 mb-2">
-            <button
-              onClick={() => fileInputRef.current?.click()}
-              disabled={isLoadingFile}
-              className="flex items-center gap-1 px-2 py-1 text-[10px] font-mono text-text-secondary
-                         bg-dark-bgTertiary border border-dark-borderLight rounded
-                         hover:bg-dark-bgHover hover:text-text-primary transition-colors disabled:opacity-50"
-            >
-              <Plus size={10} />
-              {isLoadingFile ? 'Loading...' : 'Add Tracks'}
-            </button>
-            <span className="text-[9px] font-mono text-text-muted/40">
-              or drop files here
-            </span>
-            <input
-              ref={fileInputRef}
-              type="file"
-              multiple
-              accept="*/*"
-              onChange={handleAddFiles}
-              className="hidden"
-            />
-          </div>
-
           {activePlaylist.tracks.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-6 text-text-muted">
-              <Music size={20} className="mb-1.5 opacity-30" />
-              <p className="text-[10px] font-mono">Empty playlist</p>
+            <div className="flex items-center justify-center py-4 text-text-muted">
+              <p className="text-[10px] font-mono">Drop files or click + to add tracks</p>
             </div>
           ) : (
-            <div className="flex flex-col gap-0.5">
+            <div className="flex flex-col">
               {activePlaylist.tracks.map((track, i) => (
                 <div
                   key={`${track.fileName}-${i}`}
@@ -440,74 +437,64 @@ export const DJPlaylistPanel: React.FC<DJPlaylistPanelProps> = ({ onClose }) => 
                   onDragStart={() => handleDragStart(i)}
                   onDragOver={(e) => handleDragOver(e, i)}
                   onDragEnd={handleDragEnd}
-                  className={`flex items-center gap-1.5 px-2 py-1.5 rounded border transition-colors group ${
+                  className={`flex items-center gap-1.5 px-1.5 py-1 border-b border-dark-borderLight/50 transition-colors group ${
                     dragIndex === i
-                      ? 'bg-accent-primary/10 border-accent-primary/30'
-                      : 'bg-dark-bg border-dark-borderLight hover:border-dark-border'
+                      ? 'bg-accent-primary/10'
+                      : autoDJEnabled && i === autoDJCurrentIdx
+                        ? 'bg-green-900/20'
+                        : autoDJEnabled && i === autoDJNextIdx
+                          ? 'bg-blue-900/15'
+                          : 'hover:bg-dark-bg/50'
                   }`}
                 >
-                  {/* Drag handle */}
                   <GripVertical
-                    size={10}
-                    className="text-text-muted/30 group-hover:text-text-muted/60 shrink-0 cursor-grab"
+                    size={8}
+                    className="text-text-muted/20 group-hover:text-text-muted/50 shrink-0 cursor-grab"
                   />
-
-                  {/* Track number */}
-                  <span className="text-[9px] font-mono text-text-muted/40 w-4 text-right shrink-0">
+                  <span className="text-[9px] font-mono text-text-muted/30 w-3 text-right shrink-0">
                     {i + 1}
                   </span>
-
-                  {/* Track info */}
-                  <div className="flex-1 min-w-0">
-                    <div className="text-text-primary text-[11px] font-mono truncate">
-                      {track.trackName}
-                    </div>
-                    <div className="flex gap-2 text-[9px] text-text-muted/50 font-mono">
-                      <span>{track.format}</span>
-                      {track.bpm > 0 && <span>{track.bpm} BPM</span>}
-                      {track.duration > 0 && <span>{formatDuration(track.duration)}</span>}
-                    </div>
-                  </div>
-
-                  {/* Deck load buttons */}
+                  <span className="flex-1 text-text-primary text-[10px] font-mono truncate min-w-0">
+                    {track.trackName}
+                  </span>
+                  {track.bpm > 0 && (
+                    <span className="text-[9px] font-mono text-text-muted/40 shrink-0">{track.bpm}</span>
+                  )}
+                  {track.duration > 0 && (
+                    <span className="text-[9px] font-mono text-text-muted/30 shrink-0">{formatDuration(track.duration)}</span>
+                  )}
                   <button
                     onClick={() => loadTrackToDeck(track, 'A')}
-                    className="px-1.5 py-0.5 text-[9px] font-mono font-bold rounded
-                               bg-blue-900/30 text-blue-400 border border-blue-800/50
-                               hover:bg-blue-800/40 hover:text-blue-300 transition-colors
-                               opacity-0 group-hover:opacity-100"
-                    title="Load to Deck 1"
+                    className="px-1 text-[9px] font-mono font-bold text-blue-400/70 hover:text-blue-300
+                               opacity-0 group-hover:opacity-100 transition-opacity"
+                    title="Deck 1"
                   >
                     1
                   </button>
                   <button
                     onClick={() => loadTrackToDeck(track, 'B')}
-                    className="px-1.5 py-0.5 text-[9px] font-mono font-bold rounded
-                               bg-red-900/30 text-red-400 border border-red-800/50
-                               hover:bg-red-800/40 hover:text-red-300 transition-colors
-                               opacity-0 group-hover:opacity-100"
-                    title="Load to Deck 2"
+                    className="px-1 text-[9px] font-mono font-bold text-red-400/70 hover:text-red-300
+                               opacity-0 group-hover:opacity-100 transition-opacity"
+                    title="Deck 2"
                   >
                     2
                   </button>
                   {useDJStore.getState().thirdDeckActive && (
                     <button
                       onClick={() => loadTrackToDeck(track, 'C')}
-                      className="px-1.5 py-0.5 text-[9px] font-mono font-bold rounded
-                                 bg-emerald-900/30 text-emerald-400 border border-emerald-800/50
-                                 hover:bg-emerald-800/40 hover:text-emerald-300 transition-colors
-                                 opacity-0 group-hover:opacity-100"
-                      title="Load to Deck 3"
+                      className="px-1 text-[9px] font-mono font-bold text-emerald-400/70 hover:text-emerald-300
+                                 opacity-0 group-hover:opacity-100 transition-opacity"
+                      title="Deck 3"
                     >
                       3
                     </button>
                   )}
                   <button
                     onClick={() => removeTrack(activePlaylist.id, i)}
-                    className="p-0.5 text-text-muted hover:text-accent-error transition-colors
+                    className="p-0.5 text-text-muted/30 hover:text-accent-error transition-colors
                                opacity-0 group-hover:opacity-100"
                   >
-                    <X size={9} />
+                    <X size={8} />
                   </button>
                 </div>
               ))}
@@ -515,8 +502,7 @@ export const DJPlaylistPanel: React.FC<DJPlaylistPanelProps> = ({ onClose }) => 
           )}
         </div>
       ) : (
-        <div className="flex-1 flex flex-col items-center justify-center py-8 text-text-muted">
-          <ListMusic size={24} className="mb-2 opacity-30" />
+        <div className="flex-1 flex items-center justify-center py-4 text-text-muted">
           <p className="text-[10px] font-mono">Create a playlist to get started</p>
         </div>
       )}

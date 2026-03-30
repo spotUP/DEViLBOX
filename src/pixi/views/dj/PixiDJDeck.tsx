@@ -1612,25 +1612,48 @@ export const PixiDJDeck: React.FC<PixiDJDeckProps> = ({ deckId }) => {
       )}
 
       {viewMode === '3d' && (
-        <PixiTurntable2D
-          deckId={deckId}
-          deckColor={DECK_COLOR}
-          height={260}
-        />
+        <pixiContainer layout={{ flexDirection: 'row', gap: 8, flex: 1, minHeight: 0, alignItems: 'center' }}>
+          <pixiContainer layout={{ flex: 1, minWidth: 0, minHeight: 0 }}>
+            <PixiTurntable2D
+              deckId={deckId}
+              deckColor={DECK_COLOR}
+              height={260}
+            />
+          </pixiContainer>
+          {/* Pitch slider */}
+          <pixiContainer layout={{ flexDirection: 'column', gap: 2, alignItems: 'center', flexShrink: 0 }}>
+            <PixiLabel text="PITCH" size="xs" color="textMuted" />
+            <PixiSlider
+              value={pitchOffset ?? 0}
+              min={-0.08}
+              max={0.08}
+              orientation="vertical"
+              length={140}
+              detent={0}
+              onChange={(v) => setDeckPitch?.(deckId, v)}
+            />
+            <pixiBitmapText
+              text={`${((pitchOffset ?? 0) * 100).toFixed(1)}%`}
+              style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 11, fill: 0xffffff }}
+              tint={theme.textMuted.color}
+              layout={{}}
+            />
+          </pixiContainer>
+        </pixiContainer>
       )}
 
       {/* ── Cue points (matches DOM placement before transport) ── */}
-      <PixiDeckCuePoints deckId={deckId} layout={{ width: '100%', height: 36 }} />
+      <PixiDeckCuePoints deckId={deckId} layout={{ width: '100%', height: 36, flexShrink: 0 }} />
 
       {/* ── Transport + Nudge + Loop (matches DOM: DeckTransport + DeckNudge + DeckLoopControls) ── */}
-      <pixiContainer layout={{ flexDirection: 'row', gap: 4, alignItems: 'center' }}>
+      <pixiContainer layout={{ flexDirection: 'row', gap: 4, alignItems: 'center', height: 40, flexShrink: 0 }}>
         <PixiDeckTransport deckId={deckId} />
         {/* Nudge (matches DOM DeckNudge: chevron left/right) */}
         <PixiButton icon="prev" label="" variant="ghost" width={40} onClick={() => handleNudge(-1)} />
         <PixiButton icon="next" label="" variant="ghost" width={40} onClick={() => handleNudge(1)} />
       </pixiContainer>
       {/* ── Loop controls (matches DOM DeckLoopControls: LOOP + sizes + SLIP) ── */}
-      <pixiContainer layout={{ flexDirection: 'row', gap: 2, alignItems: 'center' }}>
+      <pixiContainer layout={{ flexDirection: 'row', gap: 2, alignItems: 'center', height: 40, flexShrink: 0 }}>
         {/* LOOP toggle button */}
         <PixiLoopButton label="LOOP" active={loopActive} color={DECK_COLOR} onClick={handleLoopToggle} />
         {/* Loop size buttons: 1, 2, 4, 8, 16, 32 */}
@@ -1649,10 +1672,12 @@ export const PixiDJDeck: React.FC<PixiDJDeckProps> = ({ deckId }) => {
       </pixiContainer>
 
       {/* ── FX Pads + Beat Jump (matches DOM placement after transport) ── */}
-      <PixiDeckFXPads deckId={deckId} />
+      <pixiContainer layout={{ flexShrink: 0 }}>
+        <PixiDeckFXPads deckId={deckId} />
+      </pixiContainer>
 
       {/* ── Scratch presets + Fader LFO (matches DOM: last section) ── */}
-      <PixiDeckScratch deckId={deckId} layout={{ width: '100%', height: 56 }} />
+      <PixiDeckScratch deckId={deckId} layout={{ width: '100%', height: 56, flexShrink: 0 }} />
 
       {/* Beat grid */}
       <PixiDeckBeatGrid deckId={deckId} />

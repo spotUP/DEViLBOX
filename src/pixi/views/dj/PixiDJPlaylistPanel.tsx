@@ -52,10 +52,12 @@ function trackSublabel(t: PlaylistTrack): string {
 
 interface PixiDJPlaylistPanelProps {
   visible?: boolean;
+  onClose?: () => void;
 }
 
 export const PixiDJPlaylistPanel: React.FC<PixiDJPlaylistPanelProps> = ({
   visible = true,
+  onClose,
 }) => {
   const theme = usePixiTheme();
 
@@ -317,6 +319,9 @@ export const PixiDJPlaylistPanel: React.FC<PixiDJPlaylistPanelProps> = ({
               color="red"
               onClick={handleDeletePlaylist}
             />
+          )}
+          {onClose && (
+            <PixiButton icon="close" label="" variant="ghost" size="sm" width={24} height={22} onClick={onClose} />
           )}
         </layoutContainer>
       </layoutContainer>
