@@ -5164,6 +5164,18 @@ export class TrackerReplayer {
       this.song.patterns = patterns;
       // Keep the accessor in sync so getClassicRow reads current data
       this.accessor.updatePatterns(patterns);
+
+      // Grow channel array if the pattern has more channels than the replayer.
+      // This happens when the user adds a channel while playing — the pattern
+      // data gets the new channel immediately but the replayer's ChannelState
+      // array stays at its original size, causing the tick loop to skip it.
+      const maxPatCh = Math.max(...patterns.map(p => p.channels.length));
+      if (maxPatCh > this.channels.length) {
+        this.song.numChannels = maxPatCh;
+        for (let i = this.channels.length; i < maxPatCh; i++) {
+          this.channels.push(this.createChannel(i, maxPatCh));
+        }
+      }
     }
   }
 
