@@ -99,15 +99,27 @@ export function usePatternEditor() {
   const rowHeight = Math.round(24 * (trackerZoom / 100));
 
   // Per-channel automation lane count (for multi-lane width allocation)
+  // Counts both explicitly active params AND params with existing curve data
   const channelLaneCounts = useAutomationStore(useShallow((s) => {
     if (!showAutomationLanes) return [] as number[];
     const nc = pattern?.channels.length ?? 0;
+    const patId = pattern?.id ?? '';
     const counts: number[] = [];
     for (let ch = 0; ch < nc; ch++) {
       const lane = s.channelLanes.get(ch);
-      if (!lane) { counts.push(1); continue; }
-      const n = lane.activeParameters?.length || (lane.activeParameter ? 1 : 0);
-      counts.push(Math.max(1, n));
+      const explicit = new Set<string>();
+      if (lane?.activeParameters?.length) {
+        lane.activeParameters.forEach(p => explicit.add(p));
+      } else if (lane?.activeParameter) {
+        explicit.add(lane.activeParameter);
+      }
+      // Also count params that have curves with data
+      for (const c of s.curves) {
+        if (c.patternId === patId && c.channelIndex === ch && c.points.length > 0) {
+          explicit.add(c.parameter);
+        }
+      }
+      counts.push(Math.max(1, explicit.size));
     }
     return counts;
   }));
