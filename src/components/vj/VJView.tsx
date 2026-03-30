@@ -33,6 +33,9 @@ import { registerCaptureCanvas } from '@/engine/dj/streaming/DJVideoCapture';
 // Lazy-load ProjectMCanvas (heavy WASM dependency)
 const ProjectMCanvas = React.lazy(() => import('./ProjectMCanvas').then(m => ({ default: m.ProjectMCanvas })));
 
+// Lazy-load KraftwerkHeadOverlay (transparent 3D head on top of visualizers)
+const LazyHeadOverlay = React.lazy(() => import('./KraftwerkHeadOverlay').then(m => ({ default: m.KraftwerkHeadOverlay })));
+
 // ─── Lazy-loaded butterchurn (large dependency) ────────────────────────────────
 
 let butterchurnModule: any = null;
@@ -316,7 +319,7 @@ const VJPatternOverlayWrapper: React.FC = () => {
 
 // ─── VJControls — DOM overlay controls (used by both DOM view + PixiDOMOverlay) ─
 
-export type VJLayer = 'milkdrop' | 'projectm';
+type VJLayer = 'milkdrop' | 'projectm';
 
 interface VJControlsProps {
   currentName: string;
@@ -324,13 +327,11 @@ interface VJControlsProps {
   totalPresets: number;
   autoAdvance: boolean;
   isPopout?: boolean;
-  activeLayer: VJLayer;
   onNext: () => void;
   onRandom: () => void;
   onToggleAutoAdvance: () => void;
   onPopOut?: () => void;
   onToggleBrowser?: () => void;
-  onSwitchLayer?: (layer: VJLayer) => void;
   onFullscreen?: () => void;
   isFullscreen?: boolean;
   browserOpen?: boolean;
@@ -342,13 +343,11 @@ export const VJControls: React.FC<VJControlsProps> = ({
   totalPresets,
   autoAdvance,
   isPopout,
-  activeLayer,
   onNext,
   onRandom,
   onToggleAutoAdvance,
   onPopOut,
   onToggleBrowser,
-  onSwitchLayer,
   onFullscreen,
   isFullscreen,
   browserOpen,
@@ -395,26 +394,6 @@ export const VJControls: React.FC<VJControlsProps> = ({
                   <option key={value} value={value}>{label}</option>
                 ))}
               </select>
-              {onSwitchLayer && (
-                <div className="flex items-center gap-1 flex-shrink-0">
-                  <button
-                    onClick={() => onSwitchLayer('milkdrop')}
-                    className={`px-2 py-0.5 text-[10px] rounded transition-colors ${
-                      activeLayer === 'milkdrop' ? 'bg-accent/60 text-text-primary' : 'bg-white/10 text-white/50 hover:text-text-primary/80'
-                    }`}
-                  >
-                    Milkdrop
-                  </button>
-                  <button
-                    onClick={() => onSwitchLayer('projectm')}
-                    className={`px-2 py-0.5 text-[10px] rounded transition-colors ${
-                      activeLayer === 'projectm' ? 'bg-accent/60 text-text-primary' : 'bg-white/10 text-white/50 hover:text-text-primary/80'
-                    }`}
-                  >
-                    projectM
-                  </button>
-                </div>
-              )}
               <div className="text-white/90 text-sm font-mono truncate">
                 {currentName}
               </div>
@@ -595,9 +574,10 @@ export const VJView: React.FC<VJViewProps> = ({ isPopout = false }) => {
     setPmPresetName(name);
   }, []);
 
+  // Show whichever engine is currently active — user doesn't see the distinction
   const currentName = activeLayer === 'milkdrop' ? presetName : pmPresetName;
-  const currentIdx = activeLayer === 'milkdrop' ? presetIdx : pmPresetIdx;
-  const currentCount = activeLayer === 'milkdrop' ? presetCount : pmPresetCount;
+  const combinedCount = presetCount + pmPresetCount;
+  const currentIdx = activeLayer === 'milkdrop' ? presetIdx : (presetCount + pmPresetIdx);
 
   const handlePresetChange = useCallback((idx: number, name: string) => {
     setPresetIdx(idx);
@@ -787,26 +767,22 @@ export const VJView: React.FC<VJViewProps> = ({ isPopout = false }) => {
           />
         </React.Suspense>
       </div>
+      {/* 3D wireframe head overlay — transparent, on top of visualizers */}
+      <React.Suspense fallback={null}>
+        <LazyHeadOverlay />
+      </React.Suspense>
       <VJPatternOverlayWrapper />
       <VJControls
         currentName={currentName}
         currentIdx={currentIdx}
-        totalPresets={currentCount}
+        totalPresets={combinedCount}
         autoAdvance={autoAdvance}
         isPopout={isPopout}
-        activeLayer={activeLayer}
         onNext={handleNext}
         onRandom={handleRandom}
         onToggleAutoAdvance={() => setAutoAdvance(v => !v)}
         onPopOut={handlePopOut}
         onToggleBrowser={() => setBrowserOpen(v => !v)}
-        onSwitchLayer={(layer) => {
-          if (layer === 'milkdrop') {
-            switchToLayer('milkdrop', () => canvasHandleRef.current?.nextPreset());
-          } else {
-            switchToLayer('projectm', () => projectmHandleRef.current?.nextPreset());
-          }
-        }}
         onFullscreen={handleFullscreen}
         isFullscreen={isFullscreen}
         browserOpen={browserOpen}
