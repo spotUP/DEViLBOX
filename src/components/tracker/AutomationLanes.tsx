@@ -143,39 +143,74 @@ export const AutomationLanes: React.FC<AutomationLanesProps> = ({
     return result;
   }, [channelCount, channelCurveGroups]);
 
-  // Get automation curves for previous pattern
+  // Get ALL automation curves for previous pattern (all params, not just primary)
+  const prevCurveGroups = useMemo(() => {
+    if (!prevPatternId) return new Map<number, Array<{ curve: AutomationCurve; param: string }>>();
+    const result = new Map<number, Array<{ curve: AutomationCurve; param: string }>>();
+    for (let i = 0; i < channelCount; i++) {
+      const params = channelParameterLists[i];
+      const group: Array<{ curve: AutomationCurve; param: string }> = [];
+      for (const p of params) {
+        const curve = allCurves.find(
+          (c) => c.patternId === prevPatternId && c.channelIndex === i && c.parameter === p
+        );
+        if (curve && curve.points.length > 0) group.push({ curve, param: p });
+      }
+      // Also include curves not in explicit params
+      for (const c of allCurves) {
+        if (c.patternId === prevPatternId && c.channelIndex === i && c.points.length > 0
+            && !group.some(g => g.param === c.parameter)) {
+          group.push({ curve: c, param: c.parameter });
+        }
+      }
+      result.set(i, group);
+    }
+    return result;
+  }, [prevPatternId, channelCount, channelParameterLists, allCurves]);
+
   const prevCurves = useMemo(() => {
     if (!prevPatternId) return [];
     const result: (AutomationCurve | null)[] = [];
     for (let i = 0; i < channelCount; i++) {
-      const chParam = channelParameters[i];
-      const curve = allCurves.find(
-        (c) =>
-          c.patternId === prevPatternId &&
-          c.channelIndex === i &&
-          c.parameter === chParam
-      );
-      result.push(curve && curve.points.length > 0 ? curve : null);
+      const group = prevCurveGroups.get(i);
+      result.push(group && group.length > 0 ? group[0].curve : null);
     }
     return result;
-  }, [prevPatternId, channelCount, channelParameters, allCurves]);
+  }, [prevPatternId, channelCount, prevCurveGroups]);
 
-  // Get automation curves for next pattern
+  // Get ALL automation curves for next pattern (all params, not just primary)
+  const nextCurveGroups = useMemo(() => {
+    if (!nextPatternId) return new Map<number, Array<{ curve: AutomationCurve; param: string }>>();
+    const result = new Map<number, Array<{ curve: AutomationCurve; param: string }>>();
+    for (let i = 0; i < channelCount; i++) {
+      const params = channelParameterLists[i];
+      const group: Array<{ curve: AutomationCurve; param: string }> = [];
+      for (const p of params) {
+        const curve = allCurves.find(
+          (c) => c.patternId === nextPatternId && c.channelIndex === i && c.parameter === p
+        );
+        if (curve && curve.points.length > 0) group.push({ curve, param: p });
+      }
+      for (const c of allCurves) {
+        if (c.patternId === nextPatternId && c.channelIndex === i && c.points.length > 0
+            && !group.some(g => g.param === c.parameter)) {
+          group.push({ curve: c, param: c.parameter });
+        }
+      }
+      result.set(i, group);
+    }
+    return result;
+  }, [nextPatternId, channelCount, channelParameterLists, allCurves]);
+
   const nextCurves = useMemo(() => {
     if (!nextPatternId) return [];
     const result: (AutomationCurve | null)[] = [];
     for (let i = 0; i < channelCount; i++) {
-      const chParam = channelParameters[i];
-      const curve = allCurves.find(
-        (c) =>
-          c.patternId === nextPatternId &&
-          c.channelIndex === i &&
-          c.parameter === chParam
-      );
-      result.push(curve && curve.points.length > 0 ? curve : null);
+      const group = nextCurveGroups.get(i);
+      result.push(group && group.length > 0 ? group[0].curve : null);
     }
     return result;
-  }, [nextPatternId, channelCount, channelParameters, allCurves]);
+  }, [nextPatternId, channelCount, nextCurveGroups]);
 
   // Use the first channel's active parameter for color (cosmetic — each channel
   // could theoretically have its own parameter but one color is sufficient for overlay)
@@ -270,14 +305,110 @@ export const AutomationLanes: React.FC<AutomationLanesProps> = ({
 
   // Check if any channel has automation data (including multi-lane and adjacent patterns)
   const hasMultiLane = Array.from(channelCurveGroups.values()).some(g => g.length > 1);
+  const hasPrevMultiLane = Array.from(prevCurveGroups.values()).some(g => g.length > 1);
+  const hasNextMultiLane = Array.from(nextCurveGroups.values()).some(g => g.length > 1);
   const hasAnyData = curves.some(c => c !== null) ||
                      prevCurves.some(c => c !== null) ||
                      nextCurves.some(c => c !== null) ||
-                     hasMultiLane;
+                     hasMultiLane || hasPrevMultiLane || hasNextMultiLane;
 
   if (!hasAnyData) {
     return null; // Don't render anything if no automation data
   }
+
+  // Helper: render additional (non-primary) curves for a curve group
+  const renderMultiLaneCurves = (
+    groups: Map<number, Array<{ curve: AutomationCurve; param: string }>>,
+    pLength: number,
+    startVirtualRow: number,
+    opacity: number,
+    keyPrefix: string,
+    isInteractive: boolean,
+  ) => {
+    return Array.from(groups.entries()).map(([channelIndex, group]) => {
+      if (group.length <= 1) return null;
+      const chOffset = channelOffsets[channelIndex] - rowNumWidth;
+      const chWidth = channelWidths[channelIndex];
+      if (chWidth < 40) return null;
+
+      const laneCount = group.length;
+      const autoArea = Math.max(AUTOMATION_LANE_WIDTH, laneCount * AUTOMATION_LANE_MIN + 4);
+      const areaLeft = chOffset + chWidth - autoArea;
+      const perLane = Math.floor(autoArea / laneCount);
+
+      return group.slice(1).map((entry, laneIdx) => {
+        const { curve, param } = entry;
+        const laneWidth = Math.max(4, perLane - 2);
+        const laneLeft = areaLeft + (laneIdx + 1) * perLane + 1;
+        const pHeight = pLength * rowHeight;
+        const yOffset = startVirtualRow * rowHeight;
+
+        const paramColor = (() => {
+          const patterns = useTrackerStore.getState().patterns;
+          const pat = patterns[useTrackerStore.getState().currentPatternIndex];
+          if (!pat) return 'var(--color-synth-pan)';
+          const ch = pat.channels[channelIndex];
+          if (!ch || ch.instrumentId === null) return 'var(--color-synth-pan)';
+          const inst = useInstrumentStore.getState().instruments.find(i => i.id === ch.instrumentId);
+          if (!inst) return 'var(--color-synth-pan)';
+          const nksParams = getNKSParametersForSynth(inst.synthType as SynthType);
+          const nksParam = nksParams.find(p => p.id === param);
+          return nksParam ? getSectionColor(nksParam.section) : 'var(--color-synth-pan)';
+        })();
+
+        const pathPoints: string[] = [];
+        for (let row = 0; row < pLength; row++) {
+          const value = interpolateAutomationValue(curve.points, row, curve.interpolation, curve.mode);
+          if (value !== null) {
+            const x = value * (laneWidth - 2) + 1;
+            const y = row * rowHeight + rowHeight / 2;
+            pathPoints.push(`${pathPoints.length === 0 ? 'M' : 'L'} ${x} ${y}`);
+          }
+        }
+
+        return (
+          <div
+            key={`${keyPrefix}-multi-${channelIndex}-${laneIdx}`}
+            style={{
+              position: 'absolute',
+              left: laneLeft,
+              top: yOffset,
+              width: laneWidth,
+              height: pHeight,
+              cursor: isInteractive ? 'crosshair' : 'default',
+              pointerEvents: isInteractive ? 'auto' : 'none',
+            }}
+            onMouseDown={isInteractive ? (e) => handleMouseDown(e, curve, channelIndex, laneLeft, yOffset) : undefined}
+            onMouseMove={isInteractive ? handleMouseMove : undefined}
+            onMouseUp={isInteractive ? handleMouseUp : undefined}
+            onDoubleClick={isInteractive ? (e) => handleDoubleClick(e, curve, yOffset) : undefined}
+          >
+            <svg width={laneWidth} height={pHeight}>
+              <path
+                d={pathPoints.join(' ')}
+                fill="none"
+                stroke={paramColor}
+                strokeWidth={1.5}
+                strokeOpacity={0.6 * opacity}
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+              {opacity === 1 && curve.points.map((point, i) => (
+                <circle
+                  key={i}
+                  cx={point.value * (laneWidth - 2) + 1}
+                  cy={point.row * rowHeight + rowHeight / 2}
+                  r={2}
+                  fill={paramColor}
+                  fillOpacity={0.8}
+                />
+              ))}
+            </svg>
+          </div>
+        );
+      });
+    });
+  };
 
   // Helper to render curves for a single pattern at a virtual y position
   const renderPatternCurves = (
@@ -445,99 +576,13 @@ export const AutomationLanes: React.FC<AutomationLanesProps> = ({
         'prev',
         false
       )}
+      {hasPrevMultiLane && renderMultiLaneCurves(prevCurveGroups, prevLen, 0, 0.5, 'prev', false)}
 
       {/* Current pattern curves (primary lane per channel) */}
       {renderPatternCurves(curves, patternLength, prevLen, 1, 'current', true)}
 
       {/* Multi-lane: additional parameter curves per channel (side by side in automation area) */}
-      {hasMultiLane && Array.from(channelCurveGroups.entries()).map(([channelIndex, group]) => {
-        if (group.length <= 1) return null;
-        const chOffset = channelOffsets[channelIndex] - rowNumWidth;
-        const chWidth = channelWidths[channelIndex];
-        if (chWidth < 40) return null;
-
-        // Match usePatternEditor layout formula
-        const laneCount = group.length;
-        const autoArea = Math.max(AUTOMATION_LANE_WIDTH, laneCount * AUTOMATION_LANE_MIN + 4);
-        const areaLeft = chOffset + chWidth - autoArea;
-        const perLane = Math.floor(autoArea / laneCount);
-
-        return group.slice(1).map((entry, laneIdx) => {
-          const { curve, param } = entry;
-          const laneWidth = Math.max(4, perLane - 2);
-          // Additional lanes at slot 1, 2, ... (primary is slot 0)
-          const laneLeft = areaLeft + (laneIdx + 1) * perLane + 1;
-          const pHeight = patternLength * rowHeight;
-          const yOffset = prevLen * rowHeight;
-
-          // Resolve color for this parameter
-          const paramColor = (() => {
-            const patterns = useTrackerStore.getState().patterns;
-            const pat = patterns[useTrackerStore.getState().currentPatternIndex];
-            if (!pat) return 'var(--color-synth-pan)';
-            const ch = pat.channels[channelIndex];
-            if (!ch || ch.instrumentId === null) return 'var(--color-synth-pan)';
-            const inst = useInstrumentStore.getState().instruments.find(i => i.id === ch.instrumentId);
-            if (!inst) return 'var(--color-synth-pan)';
-            const nksParams = getNKSParametersForSynth(inst.synthType as SynthType);
-            const nksParam = nksParams.find(p => p.id === param);
-            return nksParam ? getSectionColor(nksParam.section) : 'var(--color-synth-pan)';
-          })();
-
-          // Build SVG path
-          const pathPoints: string[] = [];
-          for (let row = 0; row < patternLength; row++) {
-            const value = interpolateAutomationValue(curve.points, row, curve.interpolation, curve.mode);
-            if (value !== null) {
-              const x = value * (laneWidth - 2) + 1;
-              const y = row * rowHeight + rowHeight / 2;
-              pathPoints.push(`${pathPoints.length === 0 ? 'M' : 'L'} ${x} ${y}`);
-            }
-          }
-
-          return (
-            <div
-              key={`multi-${channelIndex}-${laneIdx}`}
-              style={{
-                position: 'absolute',
-                left: laneLeft,
-                top: yOffset,
-                width: laneWidth,
-                height: pHeight,
-                cursor: 'crosshair',
-                pointerEvents: 'auto',
-              }}
-              onMouseDown={(e) => handleMouseDown(e, curve, channelIndex, laneLeft, yOffset)}
-              onMouseMove={handleMouseMove}
-              onMouseUp={handleMouseUp}
-              onMouseLeave={handleMouseUp}
-              onDoubleClick={(e) => handleDoubleClick(e, curve, yOffset)}
-            >
-              <svg width={laneWidth} height={pHeight}>
-                <path
-                  d={pathPoints.join(' ')}
-                  fill="none"
-                  stroke={paramColor}
-                  strokeWidth={1.5}
-                  strokeOpacity={0.7}
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-                {curve.points.map((point, i) => (
-                  <circle
-                    key={i}
-                    cx={point.value * (laneWidth - 2) + 1}
-                    cy={point.row * rowHeight + rowHeight / 2}
-                    r={2}
-                    fill={paramColor}
-                    fillOpacity={0.8}
-                  />
-                ))}
-              </svg>
-            </div>
-          );
-        });
-      })}
+      {hasMultiLane && renderMultiLaneCurves(channelCurveGroups, patternLength, prevLen, 1, 'current', true)}
 
       {/* Next pattern curves (ghost, below) */}
       {nextCurves.length > 0 && renderPatternCurves(
@@ -548,6 +593,7 @@ export const AutomationLanes: React.FC<AutomationLanesProps> = ({
         'next',
         false
       )}
+      {hasNextMultiLane && renderMultiLaneCurves(nextCurveGroups, nextLen, prevLen + patternLength, 0.5, 'next', false)}
     </div>
   );
 };
