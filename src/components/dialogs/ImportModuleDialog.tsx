@@ -33,7 +33,6 @@ export interface ImportOptions {
   companionFiles?: Map<string, ArrayBuffer>; // Companion files for multi-file formats (name → buffer)
   midiOptions?: {             // MIDI-specific import settings
     quantize?: number;
-    mergeChannels?: boolean;
     velocityToVolume?: boolean;
     defaultPatternLength?: number;
   };

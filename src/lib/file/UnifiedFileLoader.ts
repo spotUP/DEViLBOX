@@ -40,10 +40,9 @@ export interface FileLoadOptions {
   subsong?: number;
   /** Pre-scanned UADE metadata — avoids a redundant scan when the dialog already ran one */
   uadeMetadata?: UADEMetadata;
-  /** MIDI-specific import settings (quantize, mergeChannels, etc.) */
+  /** MIDI-specific import settings */
   midiOptions?: {
     quantize?: number;
-    mergeChannels?: boolean;
     velocityToVolume?: boolean;
     defaultPatternLength?: number;
   };
@@ -866,7 +865,6 @@ async function loadSongFile(file: File, options: FileLoadOptions, preReadBuffer?
     const { importMIDIFile } = await import('@lib/import/MIDIImporter');
     const result = await importMIDIFile(file, {
       quantize: options.midiOptions?.quantize ?? 1,
-      mergeChannels: options.midiOptions?.mergeChannels ?? false,
       velocityToVolume: options.midiOptions?.velocityToVolume ?? true,
       defaultPatternLength: options.midiOptions?.defaultPatternLength ?? 64,
     });
