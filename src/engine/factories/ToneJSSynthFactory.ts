@@ -1888,7 +1888,7 @@ export function createChipSynth(config: InstrumentConfig): Tone.ToneAudioNode {
         sustain: (chipConfig.envelope?.sustain ?? 0) / 100,
         release: (chipConfig.envelope?.release || 50) / 1000,
       },
-      volume: config.volume || -12,
+      volume: getNormalizedVolume('ChipSynth', config.volume),
     });
 
     // Add bit crusher for 8-bit sound

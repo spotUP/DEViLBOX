@@ -1198,6 +1198,10 @@ export const useInstrumentStore = create<InstrumentStore>()(
 
     // Import instruments from song file
     loadInstruments: (newInstruments) => {
+      // DIAGNOSTIC: trace who's calling loadInstruments (debug MIDI silence on loop)
+      console.warn('[InstrumentStore] loadInstruments called with', newInstruments.length, 'instruments');
+      console.trace('[InstrumentStore] loadInstruments caller');
+
       // Revoke blob URLs from old instruments to prevent memory leaks
       get().instruments.forEach((inst) => {
         revokeInstrumentSampleUrls(inst.sample);

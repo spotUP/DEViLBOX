@@ -33,6 +33,7 @@ import { BlepManager } from './blep/BlepManager';
 import { preloadTR909Resources } from './tr909/TR909Synth';
 import { SynthRegistry } from './registry/SynthRegistry';
 import { VoiceAllocator } from './audio/VoiceAllocator';
+import { getNormalizedVolume } from './factories/volumeNormalization';
 
 // Extracted modules
 import { applyEffectParametersDiff as _applyEffectParamsDiff, applyBpmSyncedParam as _applyBpmSyncedParam } from './tone/EffectParameterEngine';
@@ -1592,7 +1593,7 @@ export class ToneEngine {
               release: (config.envelope?.release ?? 1000) / 1000,
             },
           },
-          volume: config.volume || -12,
+          volume: getNormalizedVolume('Synth', config.volume),
         } as any);
         break;
       }
@@ -1608,7 +1609,7 @@ export class ToneEngine {
             sustain: (config.envelope?.sustain ?? 50) / 100,
             release: (config.envelope?.release ?? 1000) / 1000,
           },
-          volume: config.volume || -12,
+          volume: getNormalizedVolume('MonoSynth', config.volume),
         });
         break;
 
@@ -1634,7 +1635,7 @@ export class ToneEngine {
           },
           vibratoAmount: config.oscillator?.detune ? config.oscillator.detune / 100 : 0.5,
           vibratoRate: 5,
-          volume: config.volume || -12,
+          volume: getNormalizedVolume('DuoSynth', config.volume),
         });
         break;
 
@@ -1655,7 +1656,7 @@ export class ToneEngine {
             },
             modulationIndex: 10,
           },
-          volume: config.volume || -12,
+          volume: getNormalizedVolume('FMSynth', config.volume),
         } as any);
         break;
       }
@@ -1676,7 +1677,7 @@ export class ToneEngine {
               release: (config.envelope?.release ?? 1000) / 1000,
             },
           },
-          volume: config.volume || -12,
+          volume: getNormalizedVolume('AMSynth', config.volume),
         } as any);
         break;
       }
@@ -1692,7 +1693,7 @@ export class ToneEngine {
             dampening: config.filter?.frequency || 4000,
             resonance: 0.7,
           },
-          volume: config.volume || -12,
+          volume: getNormalizedVolume('PluckSynth', config.volume),
         });
         break;
       }
@@ -1767,7 +1768,7 @@ export class ToneEngine {
             if (usePeriodPlayback || hasLoop) {
               instrument = new Tone.Player({
                 loop: hasLoop,
-                volume: config.volume || 0,
+                volume: getNormalizedVolume('Player', config.volume),
               });
               this.instrumentSynthTypes.set(key, 'Player');
 
@@ -1804,7 +1805,7 @@ export class ToneEngine {
             } else {
               // Standard style: Use Tone.Sampler for polyphonic keyboard/MIDI play
               instrument = new Tone.Sampler({
-                volume: config.volume || -12,
+                volume: getNormalizedVolume('Sampler', config.volume),
               });
               this.instrumentSynthTypes.set(key, 'Sampler');
 
@@ -1838,7 +1839,7 @@ export class ToneEngine {
             const playerRef = new Tone.Player({
               url: sampleUrl,
               loop: hasLoop,
-              volume: config.volume || 0,
+              volume: getNormalizedVolume('Player', config.volume),
               onload: () => {
                 if (hasLoop) {
                   const originalSampleRate = config.sample?.sampleRate || 8363;
@@ -1875,7 +1876,7 @@ export class ToneEngine {
 
             instrument = new Tone.Sampler({
               urls,
-              volume: config.volume || -12,
+              volume: getNormalizedVolume('Sampler', config.volume),
               onerror: (err: Error) => {
                 console.error(`[ToneEngine] Sampler ${instrumentId} failed to load sample:`, err);
               },
@@ -1905,7 +1906,7 @@ export class ToneEngine {
         if (!instrument) {
           console.debug(`[ToneEngine] Sampler ${instrumentId} has no valid sample source`);
           instrument = new Tone.Sampler({
-            volume: config.volume || -12,
+            volume: getNormalizedVolume('Sampler', config.volume),
           });
           this.instrumentSynthTypes.set(key, 'EmptySampler');
         }
@@ -1919,7 +1920,7 @@ export class ToneEngine {
         if (playerUrl) {
           instrument = new Tone.Player({
             url: playerUrl,
-            volume: config.volume || -12,
+            volume: getNormalizedVolume('Player', config.volume),
             onload: () => {
             },
             onerror: (err: Error) => {
@@ -1928,7 +1929,7 @@ export class ToneEngine {
           });
         } else {
           instrument = new Tone.Player({
-            volume: config.volume || -12,
+            volume: getNormalizedVolume('Player', config.volume),
           });
         }
         break;
@@ -1948,7 +1949,7 @@ export class ToneEngine {
             detune: granularConfig?.detune || 0,
             reverse: granularConfig?.reverse || false,
             loop: true,
-            volume: config.volume || -12,
+            volume: getNormalizedVolume('GranularSynth', config.volume),
             onload: () => {
             },
             onerror: (err: Error) => {
@@ -1960,7 +1961,7 @@ export class ToneEngine {
             grainSize: 0.1,
             overlap: 0.5,
             loop: true,
-            volume: config.volume || -12,
+            volume: getNormalizedVolume('GranularSynth', config.volume),
           });
         }
         break;
@@ -2758,7 +2759,7 @@ export class ToneEngine {
                 // Create a one-shot Player for this slice (no duration, plays until release)
                 const slicePlayer = new Tone.Player({
                   url: buffer,
-                  volume: Tone.gainToDb(velocity) + (config.volume || -12),
+                  volume: Tone.gainToDb(velocity) + getNormalizedVolume('Sampler', config.volume),
                 });
                 slicePlayer.connect(this.getInstrumentOutputDestination(instrumentId, false));
 
@@ -3646,7 +3647,7 @@ export class ToneEngine {
                 // Create a one-shot Player for this slice
                 const slicePlayer = new Tone.Player({
                   url: buffer,
-                  volume: Tone.gainToDb(velocity) + (config.volume || -12),
+                  volume: Tone.gainToDb(velocity) + getNormalizedVolume('Sampler', config.volume),
                 });
                 slicePlayer.connect(this.getInstrumentOutputDestination(instrumentId, false));
 
@@ -3697,7 +3698,7 @@ export class ToneEngine {
               try {
                 const offsetPlayer = new Tone.Player({
                   url: buffer,
-                  volume: Tone.gainToDb(velocity) + (config.volume || -12),
+                  volume: Tone.gainToDb(velocity) + getNormalizedVolume('Sampler', config.volume),
                 });
                 offsetPlayer.connect(this.getInstrumentOutputDestination(instrumentId, false));
 
@@ -4045,6 +4046,10 @@ export class ToneEngine {
    * Removes all audio nodes, effect chains, analysers, and type mappings.
    */
   public disposeAllInstruments(): void {
+    // DIAGNOSTIC: trace who's calling disposeAllInstruments (debug MIDI silence on loop)
+    console.warn(`[ToneEngine] disposeAllInstruments called, ${this.instruments.size} instruments`);
+    console.trace('[ToneEngine] disposeAllInstruments caller');
+
     // Cancel all pending release-restore timeouts to prevent them from
     // firing on new instruments and restoring wrong volume values
     this.releaseRestoreTimeouts.forEach((timeout) => clearTimeout(timeout));
