@@ -648,28 +648,25 @@ export function createOrgan(config: InstrumentConfig): Tone.ToneAudioNode {
   const drawbars = orgConfig.drawbars || DEFAULT_ORGAN.drawbars;
   const output = new Tone.Gain(1);
 
+  // Build partials from drawbars, normalized so they don't sum above 1.0
+  // Without normalization, Rock Organ [8,8,8,0,0,0,0,0,0] peaks at 3.0 = +9.5dB → clipping
+  const rawPartials = drawbars.map((d: number) => d / 8);
+  const partialSum = rawPartials.reduce((a: number, b: number) => a + b, 0);
+  const scale = partialSum > 1 ? 1.0 / partialSum : 1.0;
+  const partials = rawPartials.map((p: number) => p * scale);
+
   // Create polyphonic sine synth for organ tone
   const synth = new Tone.PolySynth(Tone.Synth, {
 
     oscillator: {
       type: 'custom',
-      partials: [
-        drawbars[0] / 8, // sub
-        drawbars[1] / 8, // fundamental
-        drawbars[2] / 8, // 3rd
-        drawbars[3] / 8, // 4th
-        drawbars[4] / 8, // 5th
-        drawbars[5] / 8, // 6th
-        drawbars[6] / 8, // 7th
-        drawbars[7] / 8, // 8th
-        drawbars[8] / 8, // 9th
-      ]
+      partials,
     } as any,
     envelope: {
       attack: 0.005, // Fast attack for organ click
       decay: 0.1,
       sustain: 1.0,  // Organ sustains fully
-      release: 0.1,
+      release: 0.3,  // Longer release so note-off is audible
     },
     volume: getNormalizedVolume('Organ', config.volume),
   });
@@ -715,19 +712,12 @@ export function createOrgan(config: InstrumentConfig): Tone.ToneAudioNode {
     applyConfig: (newConfig: Record<string, unknown>) => {
       const oc = newConfig || DEFAULT_ORGAN;
       const db = oc.drawbars as number[];
+      const rp = db.map((d: number) => (d || 0) / 8);
+      const ps = rp.reduce((a: number, b: number) => a + b, 0);
+      const sc = ps > 1 ? 1.0 / ps : 1.0;
       synth.set({
         oscillator: {
-          partials: [
-            (db[0] || 0) / 8,
-            (db[1] || 0) / 8,
-            (db[2] || 0) / 8,
-            (db[3] || 0) / 8,
-            (db[4] || 0) / 8,
-            (db[5] || 0) / 8,
-            (db[6] || 0) / 8,
-            (db[7] || 0) / 8,
-            (db[8] || 0) / 8,
-          ]
+          partials: rp.map((p: number) => p * sc),
         }
       });
       if (rotary) {
