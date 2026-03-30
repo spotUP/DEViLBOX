@@ -123,7 +123,7 @@ export const FORMAT_REGISTRY: FormatDefinition[] = [
     extRegex: /\.(mid|midi)$/i,
     nativeOnly: true,
     nativeParser: { module: '@lib/import/MIDIImporter', parseFn: 'importMIDIFile' },
-    customDispatch: true, // MIDI has special options (quantize, mergeChannels, etc.)
+    customDispatch: true, // MIDI has special options (quantize, pattern length, etc.)
   },
 
   // ═══════════════════════════════════════════════════════════════════════════
