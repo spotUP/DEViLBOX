@@ -83,18 +83,28 @@ export const AutomationLanes: React.FC<AutomationLanesProps> = ({
   const containerRef = useRef<HTMLDivElement>(null);
 
   // Resolve per-channel active parameters (multi-lane support)
-  // Returns string[][] — each channel can have multiple active parameters
+  // Combines explicitly active params with any params that already have curve data
   const channelParameterLists = useMemo(() => {
     const result: string[][] = [];
     for (let i = 0; i < channelCount; i++) {
       const lane = channelLanes.get(i);
-      const params = lane?.activeParameters?.length
+      const explicit = lane?.activeParameters?.length
         ? [...lane.activeParameters]
-        : [lane?.activeParameter || parameter];
-      result.push(params);
+        : lane?.activeParameter ? [lane.activeParameter] : [];
+      // Also include any params that have curves with data (even if not explicitly active)
+      const curvesForCh = allCurves.filter(
+        (c) => c.patternId === patternId && c.channelIndex === i && c.points.length > 0
+      );
+      const fromCurves = curvesForCh.map(c => c.parameter);
+      // Merge: explicit first, then any from curves not already in the list
+      const merged = [...explicit];
+      for (const p of fromCurves) {
+        if (!merged.includes(p)) merged.push(p);
+      }
+      result.push(merged.length > 0 ? merged : [parameter]);
     }
     return result;
-  }, [channelCount, channelLanes, parameter]);
+  }, [channelCount, channelLanes, parameter, allCurves, patternId]);
 
   // Legacy single-param alias for backward compatibility
   const channelParameters = useMemo(
@@ -102,7 +112,7 @@ export const AutomationLanes: React.FC<AutomationLanesProps> = ({
     [channelParameterLists, parameter],
   );
 
-  // Get all automation curves for all channels × all active params (current pattern)
+  // Get all automation curves for all channels × all params (current pattern)
   // Returns Map<channelIndex, Array<{curve, param}>>
   const channelCurveGroups = useMemo(() => {
     const result = new Map<number, Array<{ curve: AutomationCurve; param: string }>>();
@@ -280,7 +290,7 @@ export const AutomationLanes: React.FC<AutomationLanesProps> = ({
     return patternCurves.map((curve, channelIndex) => {
       if (!curve) return null;
 
-      const chOffset = channelOffsets[channelIndex] - rowNumWidth;
+      const chOffset = channelOffsets[channelIndex];
       const chWidth = channelWidths[channelIndex];
       
       // Skip if channel is too narrow (collapsed)
@@ -411,7 +421,7 @@ export const AutomationLanes: React.FC<AutomationLanesProps> = ({
       {/* Multi-lane: additional parameter curves per channel (side by side in automation area) */}
       {hasMultiLane && Array.from(channelCurveGroups.entries()).map(([channelIndex, group]) => {
         if (group.length <= 1) return null;
-        const chOffset = channelOffsets[channelIndex] - rowNumWidth;
+        const chOffset = channelOffsets[channelIndex];
         const chWidth = channelWidths[channelIndex];
         if (chWidth < 40) return null;
 
