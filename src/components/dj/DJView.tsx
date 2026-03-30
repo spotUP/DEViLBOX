@@ -6,6 +6,7 @@
  */
 
 import React, { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import * as Tone from 'tone';
 import { useDJStore } from '@/stores/useDJStore';
 import { getDJEngine, disposeDJEngine } from '@/engine/dj/DJEngine';
 import { clearSongCache } from '@/engine/dj/DJSongCache';
@@ -23,7 +24,7 @@ import { DJCachePanel } from './DJCachePanel';
 import { MasterEffectsModal } from '@/components/effects';
 import { DJFxQuickPresets } from './DJFxQuickPresets';
 import { DJControllerSelector } from './DJControllerSelector';
-import { DJSamplerPanel } from './DJSamplerPanel';
+import { DJAutoDJPanel } from './DJAutoDJPanel';
 import { useDJKeyboardHandler } from './DJKeyboardHandler';
 import type { SeratoTrack } from '@/lib/serato';
 import { getDJPipeline } from '@/engine/dj/DJPipeline';
@@ -61,7 +62,8 @@ export const DJView: React.FC<DJViewProps> = ({ onShowDrumpads: _onShowDrumpads 
   const [showModland, setShowModland] = useState(false);
   const [showSerato, setShowSerato] = useState(false);
   const [showMasterFX, setShowMasterFX] = useState(false);
-  const [showSampler, setShowSampler] = useState(false);
+  const [showAutoDJ, setShowAutoDJ] = useState(false);
+  const autoDJEnabled = useDJStore((s) => s.autoDJEnabled);
   const health = useDJHealth();
 
   // Initialize DJEngine on mount, silence tracker + dispose on unmount
@@ -70,6 +72,9 @@ export const DJView: React.FC<DJViewProps> = ({ onShowDrumpads: _onShowDrumpads 
     const { isPlaying, stop } = useTransportStore.getState();
     if (isPlaying) stop();
     getToneEngine().releaseAll();
+
+    // Ensure AudioContext is running (browser may have suspended it)
+    void Tone.start().catch(() => { /* needs user gesture — togglePlay will retry */ });
 
     engineRef.current = getDJEngine();
     setDJModeActive(true);
@@ -308,7 +313,7 @@ export const DJView: React.FC<DJViewProps> = ({ onShowDrumpads: _onShowDrumpads 
           </span>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           <DJControllerSelector />
           <DJFxQuickPresets />
           <select
@@ -345,15 +350,15 @@ export const DJView: React.FC<DJViewProps> = ({ onShowDrumpads: _onShowDrumpads 
             FX Editor
           </button>
           <button
-            onClick={() => setShowSampler(!showSampler)}
+            onClick={() => setShowAutoDJ(!showAutoDJ)}
             className={`px-3 py-1.5 rounded-md text-xs font-mono border transition-all
-              ${showSampler
-                ? 'border-amber-500 bg-amber-900/20 text-amber-400'
+              ${showAutoDJ || autoDJEnabled
+                ? 'border-green-500 bg-green-900/20 text-green-400'
                 : 'border-dark-borderLight bg-dark-bgTertiary text-text-secondary hover:bg-dark-bgHover hover:text-text-primary'
               }`}
-            title="Toggle drum pads / sampler"
+            title="Auto DJ — automatic beatmixed playlist playback"
           >
-            Pads
+            Auto DJ{autoDJEnabled ? ' ON' : ''}
           </button>
           <button
             onClick={() => setShowFileBrowser(!showFileBrowser)}
@@ -383,7 +388,7 @@ export const DJView: React.FC<DJViewProps> = ({ onShowDrumpads: _onShowDrumpads 
                 : 'border-dark-borderLight bg-dark-bgTertiary text-text-secondary hover:bg-dark-bgHover hover:text-text-primary'
               }`}
           >
-            Modland
+            Online
           </button>
           <button
             onClick={() => setShowSerato(!showSerato)}
@@ -399,17 +404,17 @@ export const DJView: React.FC<DJViewProps> = ({ onShowDrumpads: _onShowDrumpads 
       </div>
 
       {/* ================================================================== */}
-      {/* FILE BROWSER / PLAYLISTS / MODLAND (collapsible)                  */}
+      {/* FILE BROWSER / PLAYLISTS / ONLINE (collapsible)                   */}
       {/* ================================================================== */}
       {(showFileBrowser || showPlaylists || showModland || showSerato) && (() => {
         const panelCount = [showFileBrowser, showPlaylists, showModland, showSerato].filter(Boolean).length;
         const gridClass = panelCount >= 4
-          ? 'grid grid-cols-4 gap-2'
-          : panelCount === 3
-            ? 'grid grid-cols-3 gap-2'
-            : panelCount === 2
-              ? 'grid grid-cols-2 gap-2'
-              : '';
+            ? 'grid grid-cols-4 gap-2'
+            : panelCount === 3
+              ? 'grid grid-cols-3 gap-2'
+              : panelCount === 2
+                ? 'grid grid-cols-2 gap-2'
+                : '';
         return (
           <div className="absolute inset-x-0 top-12 bottom-0 z-[99990] pointer-events-none px-2 pt-2 flex flex-col gap-2">
             <div className="pointer-events-auto max-h-[50vh] overflow-y-auto flex flex-col gap-2">
@@ -440,11 +445,11 @@ export const DJView: React.FC<DJViewProps> = ({ onShowDrumpads: _onShowDrumpads 
       })()}
 
       {/* ================================================================== */}
-      {/* INLINE SAMPLER (routes through DJ mixer)                          */}
+      {/* AUTO DJ PANEL                                                     */}
       {/* ================================================================== */}
-      {showSampler && (
+      {showAutoDJ && (
         <div className="shrink-0 px-2 pt-2">
-          <DJSamplerPanel onClose={() => setShowSampler(false)} />
+          <DJAutoDJPanel onClose={() => setShowAutoDJ(false)} />
         </div>
       )}
 

@@ -163,6 +163,7 @@ export function filterSweep(
         getDJEngine().getDeck(deckId).setFilterPosition(current);
         setTrackedFilterPosition(deckId, current);
       } catch { /* engine not ready */ }
+      useDJStore.getState().setDeckFilter(deckId, current);
 
       if (progress < 1) {
         sweep.id = requestAnimationFrame(animate);
@@ -244,6 +245,7 @@ export function crossfaderSweep(
       try {
         getDJEngine().setCrossfader(current);
       } catch { /* engine not ready */ }
+      useDJStore.getState().setCrossfader(current);
 
       if (progress < 1) {
         sweep.id = requestAnimationFrame(animate);
@@ -312,7 +314,15 @@ export function beatMatchedTransition(
     // Crossfade: move from current position toward toDeck
     const crossfadeTarget = toDeck === 'A' ? 0 : toDeck === 'B' ? 1 : 0.5;
     cancellers.push(
-      crossfaderSweep(crossfadeTarget, totalBeats, fromDeck)
+      crossfaderSweep(crossfadeTarget, totalBeats, fromDeck, () => {
+        // Crossfade complete — stop the outgoing deck so Auto DJ can advance
+        if (!cancelled) {
+          try {
+            getDJEngine().getDeck(fromDeck).stop();
+          } catch { /* engine not ready */ }
+          useDJStore.getState().setDeckPlaying(fromDeck, false);
+        }
+      })
     );
 
     // Optional: HPF sweep on outgoing deck (sweep to mid HPF over first half)
@@ -384,6 +394,7 @@ export function echoOut(
       try {
         getDJEngine().getDeck(deckId).setVolume(volume);
       } catch { /* engine not ready */ }
+      useDJStore.getState().setDeckVolume(deckId, volume);
 
       if (progress < 1) {
         sweep.id = requestAnimationFrame(animate);

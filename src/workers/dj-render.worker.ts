@@ -388,6 +388,11 @@ async function initHively(): Promise<void> {
   jsCode = jsCode.replace(/export\s*\{[^}]*\}/g, '');
   jsCode = jsCode.replace(/ENVIRONMENT_IS_WEB\s*=\s*!0/g, 'ENVIRONMENT_IS_WEB=false');
   jsCode = jsCode.replace(/ENVIRONMENT_IS_WORKER\s*=\s*!1/g, 'ENVIRONMENT_IS_WORKER=true');
+  // Export HEAPU8/HEAPF32 on Module (modern Emscripten keeps them closure-local)
+  jsCode = jsCode.replace(
+    'moduleRtn=Module',
+    'Module.HEAPU8=HEAPU8;Module.HEAPF32=HEAPF32;moduleRtn=Module',
+  );
   jsCode = 'var document = { currentScript: { src: "' + baseUrl + '/hively/Hively.js" }, title: "" };\n' + jsCode;
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any

@@ -216,6 +216,8 @@ const defaultDeckState: DeckState = {
 
 export type DeckViewMode = 'visualizer' | 'vinyl' | '3d';
 
+export type AutoDJStatus = 'idle' | 'playing' | 'preloading' | 'preload-failed' | 'transition-pending' | 'transitioning';
+
 interface DJState {
   // Global
   djModeActive: boolean;
@@ -242,6 +244,15 @@ interface DJState {
   pipelineActive: boolean;
   pipelineQueue: number;           // Number of pending tasks
   pipelineCurrentTask: string | null; // e.g. "Rendering mod.symphony..." or "Analyzing..."
+
+  // Auto DJ
+  autoDJEnabled: boolean;
+  autoDJStatus: AutoDJStatus;
+  autoDJCurrentTrackIndex: number;
+  autoDJNextTrackIndex: number;
+  autoDJTransitionBars: number;
+  autoDJShuffle: boolean;
+  autoDJWithFilter: boolean;
 }
 
 interface DJActions {
@@ -304,6 +315,12 @@ interface DJActions {
   setCueMode: (mode: CueMode) => void;
   setCueDevice: (deviceId: string | null) => void;
   setCueVolume: (volume: number) => void;
+
+  // Auto DJ
+  setAutoDJEnabled: (enabled: boolean) => void;
+  setAutoDJStatus: (status: AutoDJStatus) => void;
+  setAutoDJTrackIndices: (current: number, next: number) => void;
+  setAutoDJConfig: (config: Partial<{ transitionBars: number; shuffle: boolean; withFilter: boolean }>) => void;
 }
 
 type DJStore = DJState & DJActions;
@@ -337,6 +354,15 @@ export const useDJStore = create<DJStore>()(
     pipelineActive: false,
     pipelineQueue: 0,
     pipelineCurrentTask: null as string | null,
+
+    // Auto DJ
+    autoDJEnabled: false,
+    autoDJStatus: 'idle' as AutoDJStatus,
+    autoDJCurrentTrackIndex: 0,
+    autoDJNextTrackIndex: 1,
+    autoDJTransitionBars: 16,
+    autoDJShuffle: false,
+    autoDJWithFilter: true,
 
     // ========================================================================
     // ACTIONS
@@ -590,6 +616,31 @@ export const useDJStore = create<DJStore>()(
     setDeckAnalysisProgress: (deck, progress) =>
       set((state) => {
         state.decks[deck].analysisProgress = progress;
+      }),
+
+    // Auto DJ
+    setAutoDJEnabled: (enabled) =>
+      set((state) => {
+        state.autoDJEnabled = enabled;
+        if (!enabled) state.autoDJStatus = 'idle';
+      }),
+
+    setAutoDJStatus: (status) =>
+      set((state) => {
+        state.autoDJStatus = status;
+      }),
+
+    setAutoDJTrackIndices: (current, next) =>
+      set((state) => {
+        state.autoDJCurrentTrackIndex = current;
+        state.autoDJNextTrackIndex = next;
+      }),
+
+    setAutoDJConfig: (config) =>
+      set((state) => {
+        if (config.transitionBars !== undefined) state.autoDJTransitionBars = config.transitionBars;
+        if (config.shuffle !== undefined) state.autoDJShuffle = config.shuffle;
+        if (config.withFilter !== undefined) state.autoDJWithFilter = config.withFilter;
       }),
   })))
 );
