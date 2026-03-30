@@ -3027,8 +3027,6 @@ export class ToneEngine {
     // InstrumentFactory types that use PolySynth internally
     'SuperSaw', 'PolySynth', 'Organ', 'ChipSynth', 'PWMSynth',
     'StringMachine', 'FormantSynth', 'Wavetable', 'WobbleBass',
-    // Drum machines — fire-and-forget, no voice allocation needed
-    'DrumMachine', 'TR808', 'TR909',
     // Zynthian WASM synths (polyphony handled internally by WASM)
     'MdaEPiano', 'MdaJX10', 'MdaDX10', 'AMSynth',
     'RaffoSynth', 'CalfMono', 'SetBfree', 'SynthV1',
@@ -3054,6 +3052,15 @@ export class ToneEngine {
     if (config.synthType === 'SuperCollider') {
       console.log('[SC:ToneEngine] triggerPolyNoteAttack called — id:', instrumentId, 'note:', note, 'synthType:', config.synthType, 'binary:', config.superCollider?.binary ? `${config.superCollider.binary.length}b` : 'EMPTY');
     }
+
+    // Fire-and-forget drum machines: trigger immediately, no voice tracking or release.
+    // Drums create independent Web Audio nodes per hit — no gate/release cycle needed.
+    if (config.synthType === 'TR808' || config.synthType === 'TR909' || config.synthType === 'DrumMachine') {
+      const triggerTime = config.isLive ? this.getImmediateTime() : this.getImmediateTime();
+      this.triggerNoteAttack(instrumentId, note, triggerTime, velocity, config, undefined, accent);
+      return;
+    }
+
     // Monophonic synths (enforced at runtime for safety, even if config.monophonic isn't set)
     // These synths are architecturally monophonic and will break with polyphonic note allocation
     const monoSynthTypes = new Set([
