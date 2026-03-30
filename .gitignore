@@ -187,3 +187,62 @@ mame-wasm/cmi/build/
 
 # Fairlight CMI sample library (65MB, deployed separately)
 public/data/samples/packs/fairlight-cmi/
+
+# New WASM synth build artifacts
+amsynth-wasm/build/
+calf-mono-wasm/build/
+davelowe-wasm/build/
+fluidsynth-wasm/build/
+mda-dx10-wasm/build/
+mda-epiano-wasm/build/
+mda-jx10-wasm/build/
+raffo-wasm/build/
+setbfree-wasm/build/
+sfizz-wasm/build/
+synthv1-wasm/build/
+zynaddsubfx-wasm/build/
+
+# Screenshot files (design reference, not source)
+*.png
+
+# Claude agent worktrees
+.claude/worktrees/
+
+# Third-party new (large, downloaded separately)
+third-party/tunefish/
+davelowe-wasm/src/DaveLowe/build/
+mame-wasm/fz/build/
+mame-wasm/ks0164/build/
+mame-wasm/swp00/build/
+mame-wasm/zsg2/build/
+
+# Third-party synth source trees (large, downloaded separately)
+third-party/calf-studio-gear/
+third-party/distrho-ports/
+third-party/fftw-3.3.10/
+third-party/fluidsynth/
+third-party/mda-lv2/
+third-party/mxml/
+third-party/RaffoSynth/
+third-party/rtosc-build-wasm/
+third-party/setBfree/
+third-party/sfizz/
+third-party/synthv1/
+
+# WASM build source directories (contain extracted/built C++ sources)
+amsynth-wasm/
+davelowe-wasm/
+fluidsynth-wasm/
+mame-wasm/fz/
+mame-wasm/ks0164/
+mame-wasm/swp00/
+mame-wasm/zsg2/
+setbfree-wasm/
+sfizz-wasm/
+zynaddsubfx-wasm/
+
+# 3D models (large binary, deployed separately)
+public/models/
+
+# Basis texture transcoder
+public/basis/
