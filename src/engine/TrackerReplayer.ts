@@ -4199,10 +4199,12 @@ export class TrackerReplayer {
       console.log(`[Groove] row=${String(this.pattPos).padStart(2)} ch=${channelIndex} velOffset=${velocityOffset >= 0 ? '+' : ''}${velocityOffset.toFixed(3)} velocity=${velocity.toFixed(3)}`);
     }
 
-    // Schedule VU meter trigger at exact audio playback time for tight sync.
+    // Schedule VU meter trigger at audio playback time.
     // Uses Tone.Draw.schedule to defer the visual trigger to the nearest
     // animation frame matching the audio time. Pre-allocated per-channel
     // callbacks avoid closure allocation per note.
+    // Add a small offset (+30ms) so the VU flash lands ON or just AFTER the
+    // audible note rather than one rAF ahead of it.
     if (channelIndex !== undefined) {
       if (!this.meterCallbacks) {
         this.meterCallbacks = [];
@@ -4215,7 +4217,7 @@ export class TrackerReplayer {
         }
       }
       this.meterStaging[channelIndex] = velocity;
-      Tone.Draw.schedule(this.meterCallbacks[channelIndex], safeTime);
+      Tone.Draw.schedule(this.meterCallbacks[channelIndex], safeTime + 0.03);
     }
 
     // Check if this is a synth instrument (has synthType) or sample-based
