@@ -235,6 +235,14 @@ export const usePatternPlayback = () => {
                                    wasReplayerAdvanced;
 
       const needsReload = hasStartedRef.current && !isNaturalAdvancement;
+
+      // DIAGNOSTIC: log when effect re-fires during active playback (debug MIDI silence on loop)
+      if (hasStartedRef.current) {
+        console.warn(`[Playback] Effect re-fired during playback: needsReload=${needsReload} wasReplayerAdvanced=${wasReplayerAdvanced} isNaturalAdvancement=${isNaturalAdvancement} key=${patternStructureKey}`);
+        if (needsReload) {
+          console.trace('[Playback] needsReload=true caller');
+        }
+      }
       // Per-channel formats (MusicLine etc.) have no importMetadata.sourceFormat on their
       // single-voice PART patterns. Fall back to 'MOD' (Amiga period math) not 'XM'.
       const format = (pattern.importMetadata?.sourceFormat as TrackerFormat)
