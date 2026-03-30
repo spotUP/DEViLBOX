@@ -9,16 +9,33 @@ import { useInstrumentStore } from '@stores/useInstrumentStore';
 import { useUIStore } from '@stores/useUIStore';
 import { useShallow } from 'zustand/react/shallow';
 import { getSynthInfo } from '@constants/synthCategories';
-import { Plus, Trash2, Copy, Repeat, Repeat1, FolderOpen, Pencil, Package, ExternalLink, Download, Upload, Cpu } from 'lucide-react';
+import { Plus, Trash2, Copy, Repeat, Repeat1, FolderOpen, Pencil, Package, ExternalLink, Download, Upload, Cpu, X, Music2 } from 'lucide-react';
 import * as LucideIcons from 'lucide-react';
 
 import { InstrumentContextMenu } from './InstrumentContextMenu';
 import { LoadPresetModal } from './presets';
+import { CategorizedSynthSelector } from './shared/CategorizedSynthSelector';
 import { focusPopout } from '@components/ui/PopOutWindow';
-import { BASS_PRESETS } from '@constants/factoryPresets';
 import { getToneEngine } from '@engine/ToneEngine';
 import * as Tone from 'tone';
-import type { InstrumentConfig, HivelyConfig, SunVoxConfig } from '@typedefs/instrument';
+import type { InstrumentConfig, HivelyConfig, SunVoxConfig, SynthType } from '@typedefs/instrument';
+import {
+  DEFAULT_TB303,
+  DEFAULT_DRUM_MACHINE,
+  DEFAULT_CHIP_SYNTH,
+  DEFAULT_PWM_SYNTH,
+  DEFAULT_WAVETABLE,
+  DEFAULT_GRANULAR,
+  DEFAULT_SUPERSAW,
+  DEFAULT_POLYSYNTH,
+  DEFAULT_ORGAN,
+  DEFAULT_STRING_MACHINE,
+  DEFAULT_FORMANT_SYNTH,
+  DEFAULT_FURNACE,
+  DEFAULT_CHIPTUNE_MODULE,
+  DEFAULT_WOBBLE_BASS,
+  DEFAULT_DRUMKIT,
+} from '@typedefs/instrument';
 import { exportAsAhi } from '@lib/export/HivelyExporter';
 import { parseAhiFile } from '@lib/import/formats/HivelyParser';
 import { exportMusicLineInstrument } from '@lib/export/MusicLineExporter';
@@ -93,12 +110,14 @@ export const InstrumentList: React.FC<InstrumentListProps> = memo(({
     updateInstrument: state.updateInstrument,
   })));
 
-  const { useHexNumbers, setShowSamplePackModal, setInstrumentEditorPoppedOut, instrumentEditorPoppedOut, activeSystemPreset } = useUIStore(useShallow(s => ({
+  const { useHexNumbers, setShowSamplePackModal, setInstrumentEditorPoppedOut, instrumentEditorPoppedOut, activeSystemPreset, showNewInstrumentBrowser, setShowNewInstrumentBrowser } = useUIStore(useShallow(s => ({
     useHexNumbers: s.useHexNumbers,
     setShowSamplePackModal: s.setShowSamplePackModal,
     setInstrumentEditorPoppedOut: s.setInstrumentEditorPoppedOut,
     instrumentEditorPoppedOut: s.instrumentEditorPoppedOut,
     activeSystemPreset: s.activeSystemPreset,
+    showNewInstrumentBrowser: s.showNewInstrumentBrowser,
+    setShowNewInstrumentBrowser: s.setShowNewInstrumentBrowser,
   })));
   const listRef = useRef<HTMLDivElement>(null);
   const selectedRef = useRef<HTMLDivElement>(null);
@@ -224,13 +243,35 @@ export const InstrumentList: React.FC<InstrumentListProps> = memo(({
   };
 
   const handleAdd = () => {
-    if (isFT2) {
-      // Use '303 Classic' as the starting point for FT2 variant
-      const startingPreset = BASS_PRESETS[0];
-      createInstrument(startingPreset);
-    } else {
-      createInstrument();
+    setShowNewInstrumentBrowser(true);
+  };
+
+  const handleCreateWithSynthType = (synthType: SynthType) => {
+    const synthInfo = getSynthInfo(synthType);
+    const config: Partial<InstrumentConfig> = {
+      synthType,
+      name: synthInfo.name,
+    };
+    // Initialize synth-specific sub-configs
+    switch (synthType) {
+      case 'TB303': config.tb303 = { ...DEFAULT_TB303 }; break;
+      case 'DrumMachine': config.drumMachine = { ...DEFAULT_DRUM_MACHINE }; break;
+      case 'ChipSynth': config.chipSynth = { ...DEFAULT_CHIP_SYNTH }; break;
+      case 'PWMSynth': config.pwmSynth = { ...DEFAULT_PWM_SYNTH }; break;
+      case 'Wavetable': config.wavetable = { ...DEFAULT_WAVETABLE }; break;
+      case 'GranularSynth': config.granular = { ...DEFAULT_GRANULAR }; break;
+      case 'SuperSaw': config.superSaw = { ...DEFAULT_SUPERSAW }; break;
+      case 'PolySynth': config.polySynth = { ...DEFAULT_POLYSYNTH }; break;
+      case 'Organ': config.organ = { ...DEFAULT_ORGAN }; break;
+      case 'StringMachine': config.stringMachine = { ...DEFAULT_STRING_MACHINE }; break;
+      case 'FormantSynth': config.formantSynth = { ...DEFAULT_FORMANT_SYNTH }; break;
+      case 'Furnace': config.furnace = { ...DEFAULT_FURNACE }; break;
+      case 'ChiptuneModule': config.chiptuneModule = { ...DEFAULT_CHIPTUNE_MODULE }; break;
+      case 'WobbleBass': config.wobbleBass = { ...DEFAULT_WOBBLE_BASS }; break;
+      case 'DrumKit': config.drumKit = { ...DEFAULT_DRUMKIT }; break;
     }
+    createInstrument(config as any);
+    setShowNewInstrumentBrowser(false);
   };
 
   const handleDelete = (e: React.MouseEvent, id: number) => {
@@ -419,7 +460,7 @@ export const InstrumentList: React.FC<InstrumentListProps> = memo(({
             <button
               onClick={handleAdd}
               className="flex flex-col items-center gap-0.5 px-1 py-1.5 bg-ft2-bg border border-ft2-border hover:border-ft2-highlight hover:text-ft2-highlight transition-colors text-ft2-text"
-              title="Add new instrument (303 Classic)"
+              title="Add new instrument"
             >
               <Plus size={14} />
               <span className="text-[8px] font-bold">ADD</span>
@@ -788,6 +829,30 @@ export const InstrumentList: React.FC<InstrumentListProps> = memo(({
       )}
       {showFurnaceBrowserDialog && (
         <FurnacePresetBrowser onClose={() => setShowFurnaceBrowserDialog(false)} />
+      )}
+      {showNewInstrumentBrowser && (
+        <div className="fixed inset-0 z-[99990] bg-black/80 flex items-center justify-center" onClick={() => setShowNewInstrumentBrowser(false)}>
+          <div className="bg-dark-bg border border-dark-border rounded-lg shadow-2xl w-[90%] max-w-4xl max-h-[85vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between px-4 py-3 border-b border-dark-border">
+              <h3 className="text-lg font-semibold text-text-primary flex items-center gap-2">
+                <Music2 size={20} className="text-accent-primary" />
+                Add New Instrument
+              </h3>
+              <button
+                onClick={() => setShowNewInstrumentBrowser(false)}
+                className="p-1.5 rounded hover:bg-dark-bgHover text-text-muted hover:text-text-primary transition-colors"
+              >
+                <X size={18} />
+              </button>
+            </div>
+            <div className="flex-1 overflow-y-auto p-4">
+              <CategorizedSynthSelector
+                onSelect={(type) => handleCreateWithSynthType(type)}
+                createMode
+              />
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
