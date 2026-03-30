@@ -4,8 +4,8 @@
  * Reference: src/components/automation/AutomationPanel.tsx
  */
 
-import { useState, useEffect, useCallback, useMemo } from 'react';
-import type { Graphics as GraphicsType } from 'pixi.js';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import type { Graphics as GraphicsType, FederatedPointerEvent } from 'pixi.js';
 import { PixiLabel, PixiButton, PixiScrollView } from '../components';
 import { PixiSelect, type SelectOption } from '../components/PixiSelect';
 import { usePixiTheme, usePixiThemeId } from '../theme';
@@ -13,6 +13,7 @@ import { PIXI_FONTS } from '../fonts';
 import { useModalClose } from '@hooks/useDialogKeyboard';
 import { useTrackerStore, useAutomationStore } from '@stores';
 import { useChannelAutomationParams } from '@hooks/useChannelAutomationParams';
+import { interpolateAutomationValue } from '@typedefs/automation';
 
 interface PixiAutomationPanelProps {
   isOpen: boolean;
@@ -48,11 +49,29 @@ export const PixiAutomationPanel: React.FC<PixiAutomationPanelProps> = ({
   const themeId = usePixiThemeId();
   const isCyan = themeId === 'cyan-lineart';
 
-  useModalClose({ isOpen, onClose });
+  // Snapshot of curves at dialog open for cancel support
+  const snapshotRef = useRef<string | null>(null);
+
+  // Escape key restores snapshot (cancel behavior)
+  const handleEscapeClose = useCallback(() => {
+    if (snapshotRef.current) {
+      try {
+        const restored = JSON.parse(snapshotRef.current);
+        useAutomationStore.getState().loadCurves(restored);
+      } catch { /* ignore */ }
+    }
+    onClose();
+  }, [onClose]);
+
+  useModalClose({ isOpen, onClose: handleEscapeClose });
 
   const patterns = useTrackerStore(s => s.patterns);
   const currentPatternIndex = useTrackerStore(s => s.currentPatternIndex);
   const getAutomation = useAutomationStore(s => s.getAutomation);
+  const addCurve = useAutomationStore(s => s.addCurve);
+  const addPoint = useAutomationStore(s => s.addPoint);
+  const removePoint = useAutomationStore(s => s.removePoint);
+  const allCurves = useAutomationStore(s => s.curves);
 
   const setActiveParameter = useAutomationStore(s => s.setActiveParameter);
   const setShowLane = useAutomationStore(s => s.setShowLane);
@@ -70,6 +89,13 @@ export const PixiAutomationPanel: React.FC<PixiAutomationPanelProps> = ({
 
   const { groups, instrumentName } = useChannelAutomationParams(channelIndex);
 
+  // Snapshot curves on open for cancel
+  useEffect(() => {
+    if (isOpen) {
+      snapshotRef.current = JSON.stringify(useAutomationStore.getState().curves);
+    }
+  }, [isOpen]);
+
   // Auto-select first param when instrument changes
   useEffect(() => {
     if (groups.length === 0) return;
@@ -78,6 +104,18 @@ export const PixiAutomationPanel: React.FC<PixiAutomationPanelProps> = ({
       requestAnimationFrame(() => setSelectedParameter(allKeys[0]));
     }
   }, [groups, selectedParameter]);
+
+  // Ensure a real curve exists in the store for the active parameter
+  const ensureCurve = useCallback(
+    (patId: string, chIdx: number, param: string): string => {
+      const existing = useAutomationStore.getState().curves.find(
+        c => c.patternId === patId && c.channelIndex === chIdx && c.parameter === param,
+      );
+      if (existing) return existing.id;
+      return addCurve(patId, chIdx, param);
+    },
+    [addCurve],
+  );
 
   // Channel selector options
   const channelOptions: SelectOption[] = useMemo(
@@ -97,14 +135,24 @@ export const PixiAutomationPanel: React.FC<PixiAutomationPanelProps> = ({
   // Active param resolution
   const activeParam = selectedParameter ?? groups[0]?.params[0]?.key ?? 'tb303.cutoff';
   const automationCurve = pattern ? getAutomation(pattern.id, channelIndex, activeParam) : null;
+  // Resolve real curve id (may be temp if not yet in store)
+  const realCurveId = useMemo(() => {
+    if (!pattern) return null;
+    const found = allCurves.find(
+      c => c.patternId === pattern.id && c.channelIndex === channelIndex && c.parameter === activeParam,
+    );
+    return found?.id ?? null;
+  }, [allCurves, pattern, channelIndex, activeParam]);
 
   const handleParamClick = useCallback(
     (key: string) => {
       setSelectedParameter(key);
       setActiveParameter(channelIndex, key);
       setShowLane(channelIndex, true);
+      // Ensure a real curve exists so the user can immediately draw points
+      if (pattern) ensureCurve(pattern.id, channelIndex, key);
     },
-    [channelIndex, setActiveParameter, setShowLane],
+    [channelIndex, setActiveParameter, setShowLane, pattern, ensureCurve],
   );
 
   // "Has data" indicator color
@@ -121,20 +169,119 @@ export const PixiAutomationPanel: React.FC<PixiAutomationPanelProps> = ({
   }, [groups]);
 
   const HEADER_H = 36;
+  const FOOTER_H = 40;
   const PARAM_AREA_H = Math.min(180, paramContentHeight + 8);
-  const EDITOR_H = height - HEADER_H - PARAM_AREA_H;
+  const EDITOR_H = height - HEADER_H - PARAM_AREA_H - FOOTER_H;
+  const editorW = width - 24;
+  const editorH = Math.max(40, EDITOR_H - 12);
+  const patternLength = pattern?.channels[0]?.rows.length ?? 64;
 
-  // Placeholder for the curve editor
-  const drawEditorPlaceholder = useCallback(
+  // Draw the curve editor background + grid + curve + control points
+  const drawCurveEditor = useCallback(
     (g: GraphicsType) => {
       g.clear();
-      g.rect(0, 0, width - 24, EDITOR_H - 12);
+      // Background
+      g.rect(0, 0, editorW, editorH);
       g.fill({ color: theme.bgTertiary.color, alpha: 0.5 });
-      g.rect(0, 0, width - 24, EDITOR_H - 12);
+      g.rect(0, 0, editorW, editorH);
       g.stroke({ color: theme.border.color, width: 1, alpha: 0.5 });
+      // Horizontal grid at 25/50/75%
+      for (const frac of [0.25, 0.5, 0.75]) {
+        const y = editorH * (1 - frac);
+        g.moveTo(0, y); g.lineTo(editorW, y);
+        g.stroke({ color: theme.border.color, width: 1, alpha: 0.2 });
+      }
+      // Vertical grid every 4 rows, major every 16
+      for (let r = 0; r <= patternLength; r += 4) {
+        const x = (r / patternLength) * editorW;
+        const isMajor = r % 16 === 0;
+        g.moveTo(x, 0); g.lineTo(x, editorH);
+        g.stroke({ color: theme.border.color, width: 1, alpha: isMajor ? 0.4 : 0.15 });
+      }
+      // Draw curve
+      const points = automationCurve?.points;
+      if (points && points.length > 0) {
+        const curveColor = isCyan ? 0x22D3EE : 0x7C3AED;
+        // Filled area under curve
+        g.moveTo((points[0].row / patternLength) * editorW, editorH);
+        for (let r = 0; r <= patternLength; r++) {
+          const v = interpolateAutomationValue(points, r, automationCurve!.interpolation, automationCurve!.mode);
+          const x = (r / patternLength) * editorW;
+          const y = editorH * (1 - (v ?? 0));
+          g.lineTo(x, y);
+        }
+        g.lineTo(editorW, editorH);
+        g.closePath();
+        g.fill({ color: curveColor, alpha: 0.12 });
+        // Stroke line
+        let first = true;
+        for (let r = 0; r <= patternLength; r++) {
+          const v = interpolateAutomationValue(points, r, automationCurve!.interpolation, automationCurve!.mode);
+          const x = (r / patternLength) * editorW;
+          const y = editorH * (1 - (v ?? 0));
+          if (first) { g.moveTo(x, y); first = false; } else g.lineTo(x, y);
+        }
+        g.stroke({ color: curveColor, width: 2, alpha: 0.8 });
+        // Control points
+        for (const pt of points) {
+          const x = (pt.row / patternLength) * editorW;
+          const y = editorH * (1 - pt.value);
+          g.circle(x, y, 4);
+          g.fill({ color: curveColor, alpha: 1 });
+          g.circle(x, y, 4);
+          g.stroke({ color: 0xffffff, width: 1, alpha: 0.6 });
+        }
+      }
     },
-    [width, EDITOR_H, theme],
+    [editorW, editorH, patternLength, automationCurve, theme, isCyan],
   );
+
+  // Click / drag in the editor area to add/move points
+  const lastClickRef = useRef<{ time: number; row: number }>({ time: 0, row: -1 });
+  const isDragging = useRef(false);
+
+  const editorPointerDown = useCallback((e: FederatedPointerEvent) => {
+    if (!pattern) return;
+    const local = e.getLocalPosition(e.currentTarget);
+    const row = Math.round((local.x / editorW) * patternLength);
+    const value = 1 - (local.y / editorH);
+    const clampedRow = Math.max(0, Math.min(patternLength - 1, row));
+    const clampedValue = Math.max(0, Math.min(1, value));
+
+    // Double-click to remove
+    const now = Date.now();
+    if (lastClickRef.current.row === clampedRow && now - lastClickRef.current.time < 300) {
+      if (realCurveId) removePoint(realCurveId, clampedRow);
+      lastClickRef.current = { time: 0, row: -1 };
+      return;
+    }
+    lastClickRef.current = { time: now, row: clampedRow };
+
+    const curveId = ensureCurve(pattern.id, channelIndex, activeParam);
+    addPoint(curveId, clampedRow, clampedValue);
+    isDragging.current = true;
+  }, [pattern, editorW, editorH, patternLength, channelIndex, activeParam, ensureCurve, addPoint, removePoint, realCurveId]);
+
+  const editorPointerMove = useCallback((e: FederatedPointerEvent) => {
+    if (!isDragging.current || !pattern) return;
+    const local = e.getLocalPosition(e.currentTarget);
+    const row = Math.round((local.x / editorW) * patternLength);
+    const value = 1 - (local.y / editorH);
+    const clampedRow = Math.max(0, Math.min(patternLength - 1, row));
+    const clampedValue = Math.max(0, Math.min(1, value));
+    const curveId = ensureCurve(pattern.id, channelIndex, activeParam);
+    addPoint(curveId, clampedRow, clampedValue);
+  }, [pattern, editorW, editorH, patternLength, channelIndex, activeParam, ensureCurve, addPoint]);
+
+  const editorPointerUp = useCallback(() => { isDragging.current = false; }, []);
+
+  // Cancel = handleEscapeClose (restore snapshot + close)
+  const handleCancel = handleEscapeClose;
+
+  // OK: just close (data is already live in the store)
+  const handleOk = useCallback(() => {
+    onClose();
+  }, [onClose]);
 
   if (!isOpen) return null;
 
@@ -241,7 +388,7 @@ export const PixiAutomationPanel: React.FC<PixiAutomationPanelProps> = ({
         />
 
         {/* Close button */}
-        <PixiButton label="x" variant="ghost" size="sm" onClick={onClose} width={24} height={22} />
+        <PixiButton label="x" variant="ghost" size="sm" onClick={handleCancel} width={24} height={22} />
       </layoutContainer>
 
       {/* Parameter selector — grouped by NKS section */}
@@ -318,30 +465,56 @@ export const PixiAutomationPanel: React.FC<PixiAutomationPanelProps> = ({
         )}
       </layoutContainer>
 
-      {/* Automation Curve Editor — placeholder */}
+      {/* Automation Curve Editor — interactive click/drag to add points */}
       <layoutContainer
         layout={{
-          flex: 1,
           width,
+          height: EDITOR_H,
           padding: 12,
-          justifyContent: 'center',
-          alignItems: 'center',
         }}
       >
-        <pixiGraphics
-          draw={drawEditorPlaceholder}
-          layout={{ position: 'absolute', left: 12, top: 6, width: width - 24, height: EDITOR_H - 12 }}
-        />
-        <PixiLabel text="Automation Curve Editor" size="sm" color="textMuted" font="sans" />
+        <pixiContainer
+          eventMode="static"
+          cursor="crosshair"
+          onPointerDown={editorPointerDown}
+          onPointerMove={editorPointerMove}
+          onPointerUp={editorPointerUp}
+          onPointerUpOutside={editorPointerUp}
+          layout={{ width: editorW, height: editorH }}
+        >
+          <pixiGraphics
+            draw={drawCurveEditor}
+            layout={{ width: editorW, height: editorH }}
+          />
+        </pixiContainer>
+      </layoutContainer>
+
+      {/* Footer — Cancel / OK */}
+      <layoutContainer
+        layout={{
+          width,
+          height: FOOTER_H,
+          flexDirection: 'row',
+          justifyContent: 'flex-end',
+          alignItems: 'center',
+          paddingRight: 12,
+          gap: 8,
+          backgroundColor: theme.bgSecondary.color,
+          borderTopWidth: 1,
+          borderColor: theme.border.color,
+        }}
+      >
         {automationCurve && automationCurve.points.length > 0 && (
           <PixiLabel
             text={`${automationCurve.points.length} point${automationCurve.points.length !== 1 ? 's' : ''}`}
             size="xs"
             color="textMuted"
             font="mono"
-            layout={{ marginTop: 4 }}
+            layout={{ marginRight: 'auto', marginLeft: 12 }}
           />
         )}
+        <PixiButton label="Cancel" variant="default" size="sm" onClick={handleCancel} width={60} height={26} />
+        <PixiButton label="OK" variant="primary" size="sm" onClick={handleOk} width={50} height={26} />
       </layoutContainer>
     </layoutContainer>
   );
