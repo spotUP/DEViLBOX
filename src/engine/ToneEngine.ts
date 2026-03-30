@@ -3027,6 +3027,8 @@ export class ToneEngine {
     // InstrumentFactory types that use PolySynth internally
     'SuperSaw', 'PolySynth', 'Organ', 'ChipSynth', 'PWMSynth',
     'StringMachine', 'FormantSynth', 'Wavetable', 'WobbleBass',
+    // Drum machines — fire-and-forget, no voice allocation needed
+    'DrumMachine', 'TR808', 'TR909',
     // Zynthian WASM synths (polyphony handled internally by WASM)
     'MdaEPiano', 'MdaJX10', 'MdaDX10', 'AMSynth',
     'RaffoSynth', 'CalfMono', 'SetBfree', 'SynthV1',

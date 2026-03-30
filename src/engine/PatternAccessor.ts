@@ -45,6 +45,14 @@ export class PatternAccessor {
   }
 
   /**
+   * Hot-swap pattern data without changing mode or song positions.
+   * Used for live edits during playback.
+   */
+  updatePatterns(patterns: Pattern[]): void {
+    this.patterns = patterns;
+  }
+
+  /**
    * Configure for Furnace native pattern access.
    * Classic data is still kept for fallback (grid/pianoroll views).
    */
