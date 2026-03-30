@@ -10,7 +10,7 @@
  * are hooked here — they only attach window event listeners, no DOM rendering.
  */
 
-import React from 'react';
+import React, { useMemo } from 'react';
 import { usePixiTheme } from '../theme';
 import { PIXI_FONTS } from '../fonts';
 import { PixiFT2Toolbar, FT2_TOOLBAR_HEIGHT } from './tracker/PixiFT2Toolbar';
@@ -45,7 +45,8 @@ import { PixiPianoRollView } from './PixiPianoRollView';
 import { PixiGTUltraView } from './gtultra/PixiGTUltraView';
 import { PixiSc68View } from './sc68/PixiSc68View';
 import { useTrackerView } from '@/hooks/views/useTrackerView';
-import { useTrackerStore, useUIStore, useInstrumentStore } from '@stores';
+import { AUTOMATION_LANE_WIDTH } from '@/hooks/views/usePatternEditor';
+import { useTrackerStore, useUIStore, useInstrumentStore, useEditorStore } from '@stores';
 import { useWorkbenchStore } from '@stores/useWorkbenchStore';
 import { useMIDIStore } from '@stores/useMIDIStore';
 import { TITLE_H } from '../workbench/workbenchLayout';
@@ -92,9 +93,9 @@ export const PixiTrackerView: React.FC = () => {
   // Pattern data for automation/macro lanes overlay.
   // Use stable primitive selectors — avoids re-rendering the whole tracker view on every cell edit.
   // Cell edits change s.patterns reference but never change id/length/channelCount/patternOrder.
-  // currentPositionIndex reserved for future automation lane scroll sync
   const showAutomation = useUIStore(s => s.showAutomationLanes);
   const showMacroLanes = useUIStore(s => s.showMacroLanes);
+  const patternEditorScrollLeft = useUIStore(s => s.patternEditorScrollLeft);
   const tb303Collapsed = useUIStore(s => s.tb303Collapsed);
   const scCollapsed = useUIStore(s => s.scCollapsed ?? true);
   const cmiCollapsed = useUIStore(s => s.cmiCollapsed ?? true);
@@ -105,6 +106,36 @@ export const PixiTrackerView: React.FC = () => {
   const patternLength = useTrackerStore(s => s.patterns[s.currentPatternIndex]?.length ?? 64);
   const channelCount  = useTrackerStore(s => s.patterns[s.currentPatternIndex]?.channels?.length ?? 4);
   const ROW_HEIGHT = 18; // matches PatternEditorCanvas default row height
+
+  // Channel layout for automation lane positioning — mirrors usePatternEditor layout.
+  // Only the offsets/widths matter here; we read the current pattern's channel metadata.
+  const currentPattern = useTrackerStore(s => s.patterns[s.currentPatternIndex]);
+  const columnVisibility = useEditorStore(s => s.columnVisibility);
+  const { channelOffsets, channelWidths } = useMemo(() => {
+    if (!currentPattern) return { channelOffsets: [] as number[], channelWidths: [] as number[] };
+    const CHAR_W = 10, LINE_NUM_W = 40;
+    const noteW = CHAR_W * 3 + 4;
+    const showAcid = columnVisibility.flag1 || columnVisibility.flag2;
+    const showProb = columnVisibility.probability;
+    const autoExtra = showAutomation ? AUTOMATION_LANE_WIDTH : 0;
+    const offsets: number[] = [];
+    const widths: number[] = [];
+    let x = LINE_NUM_W;
+    for (let ch = 0; ch < currentPattern.channels.length; ch++) {
+      const channel = currentPattern.channels[ch];
+      if (channel?.collapsed) {
+        const cw = noteW + 40 + autoExtra;
+        offsets.push(x); widths.push(cw); x += cw;
+      } else {
+        const effectCols = channel?.channelMeta?.effectCols ?? 2;
+        const effectW = effectCols * (CHAR_W * 3 + 4);
+        const paramW = CHAR_W * 4 + 8 + effectW + (showAcid ? CHAR_W * 2 + 8 : 0) + (showProb ? CHAR_W * 2 + 4 : 0);
+        const cw = noteW + paramW + 60 + autoExtra;
+        offsets.push(x); widths.push(cw); x += cw;
+      }
+    }
+    return { channelOffsets: offsets, channelWidths: widths };
+  }, [currentPattern, columnVisibility, showAutomation]);
 
   // Adjacent pattern IDs for ghost automation curves
   const prevPatternId = useTrackerStore(s => {
@@ -313,6 +344,9 @@ export const PixiTrackerView: React.FC = () => {
               patternLength={patternLength}
               rowHeight={ROW_HEIGHT}
               channelCount={channelCount}
+              channelOffsets={channelOffsets}
+              channelWidths={channelWidths}
+              scrollLeft={patternEditorScrollLeft}
               prevPatternId={prevPatternId}
               prevPatternLength={prevPatternLength}
               nextPatternId={nextPatternId}

@@ -918,10 +918,17 @@ export const PixiPatternEditor: React.FC<PixiPatternEditorProps> = ({ width, hei
   }, []);
 
   // ── Scroll state ──────────────────────────────────────────────────────────
-  const [scrollLeft, setScrollLeft] = useState(0);
+  const [scrollLeft, setScrollLeftRaw] = useState(0);
   const scrollLeftRef = useRef(0);
   const scrollAccumulatorRef = useRef(0);
   const vScrollAccRef = useRef(0);
+
+  // Sync horizontal scroll to UIStore so automation lanes can follow
+  const setScrollLeft = useCallback((v: number) => {
+    setScrollLeftRaw(v);
+    useUIStore.getState().patternEditorScrollLeft !== v &&
+      useUIStore.setState({ patternEditorScrollLeft: v });
+  }, []);
 
   // Playback row tracking — smooth offset is imperative (no React state)
   const playbackRowRef = useRef(0);
