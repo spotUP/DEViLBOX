@@ -986,9 +986,11 @@ export class TrackerReplayer {
     this._warnedMissingInstruments = undefined;
     this.instrumentMap = new Map(song.instruments.map(i => [i.id, i]));
 
-    // Dispose all ToneEngine instrument instances — this frees WASM handles
-    // (e.g. DigMug player slots) that would otherwise leak across song changes.
-    getToneEngine().disposeAllInstruments();
+    // NOTE: We do NOT call disposeAllInstruments() here.
+    // Instrument disposal is handled by loadInstruments() in useInstrumentStore
+    // which runs BEFORE the playback effect calls loadSong().
+    // Disposing here would kill freshly-created instruments, causing silence
+    // when loading a second song while the first was playing.
 
     // Pre-load any embedded-buffer Sampler instruments so ToneEngine begins decoding
     // immediately on song load rather than lazily on first note trigger.
