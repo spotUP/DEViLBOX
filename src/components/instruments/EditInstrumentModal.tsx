@@ -19,7 +19,7 @@ import { hasBuiltInInput } from './hardware/HardwareUIWrapper';
 import { SavePresetDialog } from './presets';
 import { InstrumentList } from './InstrumentList';
 import * as LucideIcons from 'lucide-react';
-import { X, Check, Search, Settings, Sparkles, Music2, Save, Keyboard, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, ExternalLink } from 'lucide-react';
+import { X, Check, Search, Settings, Sparkles, Music2, Save, Keyboard, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, ExternalLink, Plus } from 'lucide-react';
 import { useUIStore } from '@stores/useUIStore';
 import { useResponsive } from '@hooks/useResponsive';
 import { focusPopout } from '@components/ui/PopOutWindow';
@@ -510,6 +510,14 @@ export const EditInstrumentModal: React.FC<EditInstrumentModalProps> = ({
                     >
                       <Music2 size={14} />
                       Browse Synths
+                    </button>
+                    <button
+                      onClick={() => useUIStore.getState().setShowNewInstrumentBrowser(true)}
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded bg-dark-bg hover:bg-dark-bgTertiary text-green-400 transition-colors text-sm border border-green-800 hover:border-green-600"
+                      title="Add new instrument"
+                    >
+                      <Plus size={14} />
+                      Add Instrument
                     </button>
                     <button
                       onClick={() => setShowSaveDialog(true)}
