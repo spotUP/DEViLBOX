@@ -73,34 +73,35 @@ const TONEJSDRUM_KIT: DrumType[] = [
 // ─── Base octave for "normal" pitch (no tune offset) ─────────────────────────
 const BASE_OCTAVE = 4;
 
-// ─── Pitch offset per octave step (applied to tune 0-100 param) ──────────────
-// Each octave = ±15 tune units.  Two octaves either side keeps 0-100 in range.
-const TUNE_PER_OCTAVE = 15;
-
 // ─── Public API ──────────────────────────────────────────────────────────────
 
 export interface DrumNoteResult<T extends string> {
   /** Which drum sound to trigger */
   drumType: T;
-  /** Tune offset to add to the drum's base tune (0 = normal, negative = lower) */
-  tuneOffset: number;
+  /**
+   * Frequency multiplier for pitch shifting.
+   * 1.0 = normal pitch (base octave 4),
+   * 2.0 = one octave up, 0.5 = one octave down.
+   */
+  pitchMultiplier: number;
 }
 
 /**
  * Convert a note (name or MIDI number) to semitone class (0-11) and octave.
  */
-function parseNote(note: string | number): { semitone: number; octave: number } {
+function parseNote(note: string | number): { semitone: number; octave: number; midi: number } {
   const midi = typeof note === 'string' ? noteToMidi(note) : (
     note > 127 ? 60 : note  // Frequency → default to C4
   );
   return {
     semitone: midi % 12,
     octave: Math.floor(midi / 12) - 1,  // MIDI 60 = C4 → octave 4
+    midi,
   };
 }
 
 /**
- * Resolve IO808 drum type and tune offset from a tracker note.
+ * Resolve IO808 drum type and pitch multiplier from a tracker note.
  *
  * Kit mode:  note name → drum,  octave → pitch
  * Pitch mode: always uses `fallback` drum, note distance from C4 → pitch
@@ -110,65 +111,59 @@ export function resolveIO808Note(
   mode: 'kit' | 'pitch',
   fallback: IO808DrumType,
 ): DrumNoteResult<IO808DrumType> {
-  const { semitone, octave } = parseNote(note);
+  const { semitone, octave, midi } = parseNote(note);
 
   if (mode === 'pitch') {
-    const midi = typeof note === 'string' ? noteToMidi(note) : note;
-    // Distance from C4 (60) mapped to tune range
-    const tuneOffset = (midi - 60) * (TUNE_PER_OCTAVE / 12);
-    return { drumType: fallback, tuneOffset };
+    // Each semitone = 2^(1/12) frequency ratio
+    return { drumType: fallback, pitchMultiplier: Math.pow(2, (midi - 60) / 12) };
   }
 
-  // Kit mode
+  // Kit mode: note name → drum, octave offset → pitch
   return {
     drumType: IO808_KIT[semitone] ?? fallback,
-    tuneOffset: (octave - BASE_OCTAVE) * TUNE_PER_OCTAVE,
+    pitchMultiplier: Math.pow(2, octave - BASE_OCTAVE),
   };
 }
 
 /**
- * Resolve TR909 drum type and tune offset from a tracker note.
+ * Resolve TR909 drum type and pitch multiplier from a tracker note.
  */
 export function resolveTR909Note(
   note: string | number,
   mode: 'kit' | 'pitch',
   fallback: TR909DrumType,
 ): DrumNoteResult<TR909DrumType> {
-  const { semitone, octave } = parseNote(note);
+  const { semitone, octave, midi } = parseNote(note);
 
   if (mode === 'pitch') {
-    const midi = typeof note === 'string' ? noteToMidi(note) : note;
-    const tuneOffset = (midi - 60) * (TUNE_PER_OCTAVE / 12);
-    return { drumType: fallback, tuneOffset };
+    return { drumType: fallback, pitchMultiplier: Math.pow(2, (midi - 60) / 12) };
   }
 
   return {
     drumType: TR909_KIT[semitone] ?? fallback,
-    tuneOffset: (octave - BASE_OCTAVE) * TUNE_PER_OCTAVE,
+    pitchMultiplier: Math.pow(2, octave - BASE_OCTAVE),
   };
 }
 
 /**
- * Resolve ToneJS DrumMachine drum type and tune offset from a tracker note.
+ * Resolve ToneJS DrumMachine drum type and pitch multiplier from a tracker note.
  */
 export function resolveToneJSDrumNote(
   note: string | number,
   mode: 'kit' | 'pitch',
   fallback: DrumType,
 ): DrumNoteResult<DrumType> {
-  const { semitone, octave } = parseNote(note);
+  const { semitone, octave, midi } = parseNote(note);
 
   if (mode === 'pitch') {
-    const midi = typeof note === 'string' ? noteToMidi(note) : note;
-    const tuneOffset = (midi - 60) * (TUNE_PER_OCTAVE / 12);
-    return { drumType: fallback, tuneOffset };
+    return { drumType: fallback, pitchMultiplier: Math.pow(2, (midi - 60) / 12) };
   }
 
   return {
     drumType: TONEJSDRUM_KIT[semitone] ?? fallback,
-    tuneOffset: (octave - BASE_OCTAVE) * TUNE_PER_OCTAVE,
+    pitchMultiplier: Math.pow(2, octave - BASE_OCTAVE),
   };
 }
 
 // ─── Exported maps for UI display (e.g. note labels in pattern editor) ───────
-export { IO808_KIT, TR909_KIT, TONEJSDRUM_KIT, BASE_OCTAVE, TUNE_PER_OCTAVE };
+export { IO808_KIT, TR909_KIT, TONEJSDRUM_KIT, BASE_OCTAVE };

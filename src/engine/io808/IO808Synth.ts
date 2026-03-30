@@ -34,6 +34,8 @@ export interface IO808Params {
   decay?: number;   // 0-100
   snappy?: number;  // 0-100
   tuning?: number;  // 0-100
+  /** Frequency multiplier for pitch shifting (1.0 = normal, 2.0 = octave up) */
+  pitchMultiplier?: number;
 }
 
 // ─── Helper ──────────────────────────────────────────────────────────────────
@@ -381,14 +383,15 @@ class SwingVCA {
 
 function bassDrum(
   audioCtx: AudioContext, destination: AudioNode,
-  time: number, params: { level: number; tone: number; decay: number }
+  time: number, params: { level: number; tone: number; decay: number; pm: number }
 ): VCA {
   const outputLevel = equalPower(params.level);
   const vcfFreq = 200 + params.tone * 20;
   const decayTime = params.decay * 5 + 50;
+  const pm = params.pm;
 
-  const START_FREQ = 48;
-  const FREQ_AMT = 50;
+  const START_FREQ = 48 * pm;
+  const FREQ_AMT = 50 * pm;
 
   const vco = new VCO('sine', audioCtx);
   vco.frequency.value = START_FREQ;
@@ -426,16 +429,17 @@ function bassDrum(
 
 function snareDrum(
   audioCtx: AudioContext, destination: AudioNode,
-  time: number, params: { level: number; tone: number; snappy: number }
+  time: number, params: { level: number; tone: number; snappy: number; pm: number }
 ): VCA {
   const outputLevel = equalPower(params.level);
   const noiseVCFFreq = params.tone * 100 + 800;
   const snappyEnvAmt = params.snappy / 200;
+  const pm = params.pm;
 
   const highOsc = new VCO('sine', audioCtx);
-  highOsc.frequency.value = 476;
+  highOsc.frequency.value = 476 * pm;
   const lowOsc = new VCO('sine', audioCtx);
-  lowOsc.frequency.value = 238;
+  lowOsc.frequency.value = 238 * pm;
   const noiseOsc = new VCO('whitenoise', audioCtx);
   const noiseVCF = new VCF('highpass', audioCtx);
   noiseVCF.frequency.value = noiseVCFFreq;
@@ -471,14 +475,15 @@ function snareDrum(
 
 function cowbell(
   audioCtx: AudioContext, destination: AudioNode,
-  time: number, params: { level: number }
+  time: number, params: { level: number; pm: number }
 ): VCA {
   const outputLevel = equalPower(params.level);
+  const pm = params.pm;
 
   const highOsc = new VCO('square', audioCtx);
-  highOsc.frequency.value = 800;
+  highOsc.frequency.value = 800 * pm;
   const lowOsc = new VCO('square', audioCtx);
-  lowOsc.frequency.value = 540;
+  lowOsc.frequency.value = 540 * pm;
   const bandFilter = new VCF('bandpass', audioCtx);
   bandFilter.frequency.value = 2640;
   bandFilter.Q.value = 1;
@@ -514,13 +519,13 @@ function cowbell(
 
 function hiHat(
   audioCtx: AudioContext, destination: AudioNode,
-  time: number, outputLevel: number, decay: number
+  time: number, outputLevel: number, decay: number, pm: number
 ): VCA {
   const oscBank = new SquareOscBank(audioCtx);
   const midFilter = new VCF('bandpass', audioCtx);
-  midFilter.frequency.value = 10000;
+  midFilter.frequency.value = 10000 * pm;
   const highFilter = new VCF('highpass', audioCtx);
-  highFilter.frequency.value = 8000;
+  highFilter.frequency.value = 8000 * pm;
   const outputVCA = new VCA(audioCtx);
   outputVCA.amplitude.value = outputLevel;
   const modVCA = new VCA(audioCtx);
@@ -544,28 +549,29 @@ function hiHat(
 
 function closedHat(
   audioCtx: AudioContext, destination: AudioNode,
-  time: number, params: { level: number }
+  time: number, params: { level: number; pm: number }
 ): VCA {
-  return hiHat(audioCtx, destination, time, equalPower(params.level), 50);
+  return hiHat(audioCtx, destination, time, equalPower(params.level), 50, params.pm);
 }
 
 function openHat(
   audioCtx: AudioContext, destination: AudioNode,
-  time: number, params: { level: number; decay: number }
+  time: number, params: { level: number; decay: number; pm: number }
 ): VCA {
-  return hiHat(audioCtx, destination, time, equalPower(params.level), params.decay * 3.6 + 90);
+  return hiHat(audioCtx, destination, time, equalPower(params.level), params.decay * 3.6 + 90, params.pm);
 }
 
 function claveRimshot(
   audioCtx: AudioContext, destination: AudioNode,
-  time: number, params: { level: number; selector: number }
+  time: number, params: { level: number; selector: number; pm: number }
 ): VCA {
   const outputLevel = equalPower(params.level);
   const selector = params.selector;
+  const pm = params.pm;
 
-  const RIM_CLAVE_FREQ = 1750;
-  const CLAVE_FREQ = 2450;
-  const RIM_FREQ = 480;
+  const RIM_CLAVE_FREQ = 1750 * pm;
+  const CLAVE_FREQ = 2450 * pm;
+  const RIM_FREQ = 480 * pm;
 
   const outputVCA = new VCA(audioCtx);
   outputVCA.amplitude.value = outputLevel;
@@ -632,14 +638,15 @@ function claveRimshot(
 
 function cymbal(
   audioCtx: AudioContext, destination: AudioNode,
-  time: number, params: { level: number; tone: number; decay: number }
+  time: number, params: { level: number; tone: number; decay: number; pm: number }
 ): VCA {
   const outputLevel = equalPower(params.level);
   const lowDecay = params.decay * 8.5 + 700;
+  const pm = params.pm;
 
-  const LOW_FILTER_FREQ = 5000;
-  const MID_HIGH_FILTER_FREQ = 10000;
-  const HIGH_FILTER_FREQ = 8000;
+  const LOW_FILTER_FREQ = 5000 * pm;
+  const MID_HIGH_FILTER_FREQ = 10000 * pm;
+  const HIGH_FILTER_FREQ = 8000 * pm;
   const HIGH_DECAY = 150;
   const MID_DECAY = 400;
 
@@ -797,13 +804,14 @@ const tomCongaParameterMap: Record<string, [TomCongaRange, TomCongaRange]> = {
 function tomConga(
   pitchRange: 'low' | 'mid' | 'high',
   audioCtx: AudioContext, destination: AudioNode,
-  time: number, params: { level: number; tuning: number; selector: number }
+  time: number, params: { level: number; tuning: number; selector: number; pm: number }
 ): VCA {
   const selector = params.selector;
+  const pm = params.pm;
   const rangeData = tomCongaParameterMap[pitchRange][selector];
   const [highFreq, lowFreq] = rangeData.frequencies;
   const [oscDecay, noiseDecay] = rangeData.decay;
-  const oscFreq = (params.tuning / 100) * (highFreq - lowFreq) + lowFreq;
+  const oscFreq = ((params.tuning / 100) * (highFreq - lowFreq) + lowFreq) * pm;
   const outputLevel = equalPower(params.level / 4);
 
   const osc = new VCO('sine', audioCtx);
@@ -866,57 +874,58 @@ export class IO808Synth {
     const decay = params.decay ?? 50;
     const snappy = params.snappy ?? 50;
     const tuning = params.tuning ?? 50;
+    const pm = params.pitchMultiplier ?? 1;
     const ctx = this.audioCtx;
     const dest = this.destination;
 
     switch (drumType) {
       case 'kick':
-        bassDrum(ctx, dest, time, { level, tone, decay });
+        bassDrum(ctx, dest, time, { level, tone, decay, pm });
         break;
       case 'snare':
-        snareDrum(ctx, dest, time, { level, tone, snappy });
+        snareDrum(ctx, dest, time, { level, tone, snappy, pm });
         break;
       case 'closedHat':
-        closedHat(ctx, dest, time, { level });
+        closedHat(ctx, dest, time, { level, pm });
         break;
       case 'openHat':
-        openHat(ctx, dest, time, { level, decay });
+        openHat(ctx, dest, time, { level, decay, pm });
         break;
       case 'clap':
         maracasHandclap(ctx, dest, time, { level, selector: 1 });
         break;
       case 'rimshot':
-        claveRimshot(ctx, dest, time, { level, selector: 1 });
+        claveRimshot(ctx, dest, time, { level, selector: 1, pm });
         break;
       case 'clave':
-        claveRimshot(ctx, dest, time, { level, selector: 0 });
+        claveRimshot(ctx, dest, time, { level, selector: 0, pm });
         break;
       case 'cowbell':
-        cowbell(ctx, dest, time, { level });
+        cowbell(ctx, dest, time, { level, pm });
         break;
       case 'cymbal':
-        cymbal(ctx, dest, time, { level, tone, decay });
+        cymbal(ctx, dest, time, { level, tone, decay, pm });
         break;
       case 'maracas':
         maracasHandclap(ctx, dest, time, { level, selector: 0 });
         break;
       case 'tomLow':
-        tomConga('low', ctx, dest, time, { level, tuning, selector: 1 });
+        tomConga('low', ctx, dest, time, { level, tuning, selector: 1, pm });
         break;
       case 'tomMid':
-        tomConga('mid', ctx, dest, time, { level, tuning, selector: 1 });
+        tomConga('mid', ctx, dest, time, { level, tuning, selector: 1, pm });
         break;
       case 'tomHigh':
-        tomConga('high', ctx, dest, time, { level, tuning, selector: 1 });
+        tomConga('high', ctx, dest, time, { level, tuning, selector: 1, pm });
         break;
       case 'congaLow':
-        tomConga('low', ctx, dest, time, { level, tuning, selector: 0 });
+        tomConga('low', ctx, dest, time, { level, tuning, selector: 0, pm });
         break;
       case 'congaMid':
-        tomConga('mid', ctx, dest, time, { level, tuning, selector: 0 });
+        tomConga('mid', ctx, dest, time, { level, tuning, selector: 0, pm });
         break;
       case 'congaHigh':
-        tomConga('high', ctx, dest, time, { level, tuning, selector: 0 });
+        tomConga('high', ctx, dest, time, { level, tuning, selector: 0, pm });
         break;
     }
   }
