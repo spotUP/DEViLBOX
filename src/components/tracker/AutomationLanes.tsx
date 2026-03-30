@@ -346,8 +346,12 @@ export const AutomationLanes: React.FC<AutomationLanesProps> = ({
             width: lw,
             height: pHeight,
             cursor: isCurrentPattern ? 'crosshair' : 'default',
+            pointerEvents: 'auto',
           }}
           onMouseDown={isCurrentPattern ? (e) => handleMouseDown(e, curve, channelIndex, laneLeft, yOffset) : undefined}
+          onMouseMove={isCurrentPattern ? handleMouseMove : undefined}
+          onMouseUp={isCurrentPattern ? handleMouseUp : undefined}
+          onMouseLeave={isCurrentPattern ? handleMouseUp : undefined}
           onDoubleClick={isCurrentPattern ? (e) => handleDoubleClick(e, curve, yOffset) : undefined}
         >
           <svg width={lw} height={pHeight}>
@@ -401,10 +405,8 @@ export const AutomationLanes: React.FC<AutomationLanesProps> = ({
         left: rowNumWidth,
         width: `calc(100% - ${rowNumWidth}px)`,
         height: totalVirtualHeight,
+        pointerEvents: 'none',
       }}
-      onMouseMove={handleMouseMove}
-      onMouseUp={handleMouseUp}
-      onMouseLeave={handleMouseUp}
     >
       {/* Automation lane backgrounds with active channel highlight */}
       {Array.from({ length: channelCount }, (_, ch) => {
@@ -503,8 +505,12 @@ export const AutomationLanes: React.FC<AutomationLanesProps> = ({
                 width: laneWidth,
                 height: pHeight,
                 cursor: 'crosshair',
+                pointerEvents: 'auto',
               }}
               onMouseDown={(e) => handleMouseDown(e, curve, channelIndex, laneLeft, yOffset)}
+              onMouseMove={handleMouseMove}
+              onMouseUp={handleMouseUp}
+              onMouseLeave={handleMouseUp}
               onDoubleClick={(e) => handleDoubleClick(e, curve, yOffset)}
             >
               <svg width={laneWidth} height={pHeight}>
