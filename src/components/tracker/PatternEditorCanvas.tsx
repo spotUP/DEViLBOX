@@ -3037,7 +3037,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
                   right: 0,
                   height: (prevLen + pattern.length + nextLen) * rowHeight,
                   marginTop: -prevLen * rowHeight,
-                  pointerEvents: 'auto',
+                  pointerEvents: 'none',
                   zIndex: 5,
                 }}
               >
