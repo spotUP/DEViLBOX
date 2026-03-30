@@ -4,7 +4,7 @@
  */
 
 import React, { useMemo, useState, useRef, useCallback } from 'react';
-import { useAutomationStore, useInstrumentStore, useTrackerStore } from '@stores';
+import { useAutomationStore, useInstrumentStore, useTrackerStore, useCursorStore } from '@stores';
 import { interpolateAutomationValue } from '@typedefs/automation';
 import type { AutomationCurve } from '@typedefs/automation';
 import { getSectionColor } from '@hooks/useChannelAutomationParams';
@@ -73,6 +73,7 @@ export const AutomationLanes: React.FC<AutomationLanesProps> = ({
   const addPoint = useAutomationStore((state) => state.addPoint);
   const removePoint = useAutomationStore((state) => state.removePoint);
   const channelLanes = useAutomationStore((state) => state.channelLanes);
+  const activeChannelIndex = useCursorStore((s) => s.cursor.channelIndex);
 
   // Drag state
   const [dragState, setDragState] = useState<{
@@ -290,7 +291,7 @@ export const AutomationLanes: React.FC<AutomationLanesProps> = ({
     return patternCurves.map((curve, channelIndex) => {
       if (!curve) return null;
 
-      const chOffset = channelOffsets[channelIndex];
+      const chOffset = channelOffsets[channelIndex] - rowNumWidth;
       const chWidth = channelWidths[channelIndex];
       
       // Skip if channel is too narrow (collapsed)
@@ -405,6 +406,34 @@ export const AutomationLanes: React.FC<AutomationLanesProps> = ({
       onMouseUp={handleMouseUp}
       onMouseLeave={handleMouseUp}
     >
+      {/* Automation lane backgrounds with active channel highlight */}
+      {Array.from({ length: channelCount }, (_, ch) => {
+        const chOffset = channelOffsets[ch] - rowNumWidth;
+        const chWidth = channelWidths[ch];
+        if (chWidth < 20) return null;
+        const group = channelCurveGroups.get(ch);
+        const laneCount = group ? Math.max(1, group.length) : 1;
+        const autoArea = laneCount <= 1 ? AUTOMATION_LANE_WIDTH
+          : Math.max(AUTOMATION_LANE_WIDTH, laneCount * AUTOMATION_LANE_MIN + 4);
+        const areaLeft = chOffset + chWidth - autoArea;
+        const isActive = ch === activeChannelIndex;
+        return (
+          <div
+            key={`bg-${ch}`}
+            style={{
+              position: 'absolute',
+              left: areaLeft,
+              top: 0,
+              width: autoArea,
+              height: totalVirtualHeight,
+              backgroundColor: isActive ? 'rgba(255,255,255,0.03)' : 'rgba(255,255,255,0.01)',
+              borderLeft: '1px solid rgba(255,255,255,0.06)',
+              pointerEvents: 'none',
+            }}
+          />
+        );
+      })}
+
       {/* Previous pattern curves (ghost, above) */}
       {prevCurves.length > 0 && renderPatternCurves(
         prevCurves,
@@ -421,7 +450,7 @@ export const AutomationLanes: React.FC<AutomationLanesProps> = ({
       {/* Multi-lane: additional parameter curves per channel (side by side in automation area) */}
       {hasMultiLane && Array.from(channelCurveGroups.entries()).map(([channelIndex, group]) => {
         if (group.length <= 1) return null;
-        const chOffset = channelOffsets[channelIndex];
+        const chOffset = channelOffsets[channelIndex] - rowNumWidth;
         const chWidth = channelWidths[channelIndex];
         if (chWidth < 40) return null;
 

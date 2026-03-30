@@ -3054,10 +3054,10 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
                 visibleStart={0}
                 containerHeight={dimensions.height}
                 /* parameter is resolved per-channel from useAutomationStore.channelLanes */
-                prevPatternId={showGhostPatterns ? (currentPatternIndex > 0 ? patterns[currentPatternIndex - 1]?.id : (patterns.length > 1 ? patterns[patterns.length - 1]?.id : undefined)) : undefined}
-                prevPatternLength={showGhostPatterns ? (currentPatternIndex > 0 ? patterns[currentPatternIndex - 1]?.length : (patterns.length > 1 ? patterns[patterns.length - 1]?.length : undefined)) : undefined}
-                nextPatternId={showGhostPatterns ? (currentPatternIndex < patterns.length - 1 ? patterns[currentPatternIndex + 1]?.id : (patterns.length > 1 ? patterns[0]?.id : undefined)) : undefined}
-                nextPatternLength={showGhostPatterns ? (currentPatternIndex < patterns.length - 1 ? patterns[currentPatternIndex + 1]?.length : (patterns.length > 1 ? patterns[0]?.length : undefined)) : undefined}
+                prevPatternId={showGhostPatterns ? (currentPatternIndex > 0 ? patterns[currentPatternIndex - 1]?.id : (patterns.length >= 1 ? patterns[patterns.length - 1]?.id : undefined)) : undefined}
+                prevPatternLength={showGhostPatterns ? (currentPatternIndex > 0 ? patterns[currentPatternIndex - 1]?.length : (patterns.length >= 1 ? patterns[patterns.length - 1]?.length : undefined)) : undefined}
+                nextPatternId={showGhostPatterns ? (currentPatternIndex < patterns.length - 1 ? patterns[currentPatternIndex + 1]?.id : (patterns.length >= 1 ? patterns[0]?.id : undefined)) : undefined}
+                nextPatternLength={showGhostPatterns ? (currentPatternIndex < patterns.length - 1 ? patterns[currentPatternIndex + 1]?.length : (patterns.length >= 1 ? patterns[0]?.length : undefined)) : undefined}
               />
               </div>
                 );
