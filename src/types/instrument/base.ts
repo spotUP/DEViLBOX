@@ -23,6 +23,8 @@ export type SynthType =
   | 'PolySynth'
   | 'Organ'
   | 'DrumMachine'
+  | 'TR808'
+  | 'TR909'
   | 'ChipSynth'
   | 'PWMSynth'
   | 'StringMachine'
@@ -183,6 +185,21 @@ export type SynthType =
   | 'WAMSynth101'       // Synth-101 WAM synth
   | 'WAMTinySynth'      // TinySynth WAM synth
   | 'WAMFaustFlute'     // Faust Flute WAM synth
+  // MDA Instrument Plugins
+  | 'MdaEPiano'        // MDA ePiano - Fender Rhodes electric piano (sample-based, 32-voice)
+  | 'MdaJX10'          // MDA JX-10 - Roland-inspired 8-voice polyphonic subtractive
+  | 'MdaDX10'          // MDA DX10 - 2-operator FM synthesizer
+  // Ported Zynthian Synths
+  | 'AMSynth'          // AMSynth - Dual-oscillator analog modelling (41 params)
+  | 'RaffoSynth'       // Raffo - Minimoog clone (4-osc mono, 32 params)
+  | 'CalfMono'         // Calf Monosynth - 2-osc mono subtractive (55 params)
+  | 'SetBfree'         // setBfree - Hammond B3 tonewheel organ + Leslie (60 params)
+  | 'SynthV1'          // SynthV1 - Dual-page 4-osc poly subtractive (100 params)
+  | 'TalNoizeMaker'    // TAL-NoiseMaker - Virtual analog (80 params)
+  | 'Aeolus'           // Aeolus - Pipe organ emulator (35 params)
+  | 'FluidSynth'       // FluidSynth - SF2 SoundFont player (15 params)
+  | 'Sfizz'            // Sfizz - SFZ sample player (12 params)
+  | 'ZynAddSubFX'      // ZynAddSubFX - ADD/SUB/PAD mega-synth (70 params)
   // JUCE WASM Synths
   | 'Dexed'            // Yamaha DX7 FM Synthesizer (6-op FM)
   | 'OBXd'             // Oberheim OB-X Analog Synthesizer

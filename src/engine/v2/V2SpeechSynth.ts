@@ -2,6 +2,7 @@ import type { DevilboxSynth } from '@/types/synth';
 import { getDevilboxAudioContext, noteToMidi } from '@/utils/audio-context';
 // @ts-expect-error -- SamJs is a JavaScript library without types
 import SamJs from '../sam/samjs';
+import { useSpeechActivityStore } from '@/stores/useSpeechActivityStore';
 
 export interface V2SpeechConfig {
   text: string;
@@ -81,6 +82,7 @@ export class V2SpeechSynth implements DevilboxSynth {
       this._sourceNode.disconnect();
       this._sourceNode = null;
     }
+    if (this._isPlaying) useSpeechActivityStore.getState().speechStop();
     this._isPlaying = false;
   }
 
@@ -94,6 +96,7 @@ export class V2SpeechSynth implements DevilboxSynth {
     source.connect(this._playerGain);
     source.onended = () => {
       if (this._sourceNode === source) {
+        if (this._isPlaying) useSpeechActivityStore.getState().speechStop();
         this._isPlaying = false;
         this._sourceNode = null;
       }
@@ -101,6 +104,7 @@ export class V2SpeechSynth implements DevilboxSynth {
     this._sourceNode = source;
     source.start(time, offset ?? 0);
     this._isPlaying = true;
+    useSpeechActivityStore.getState().speechStart();
   }
 
   private async _render() {
@@ -229,6 +233,7 @@ export class V2SpeechSynth implements DevilboxSynth {
       source.connect(this._playerGain);
       source.onended = () => {
         if (this._sourceNode === source) {
+          if (this._isPlaying) useSpeechActivityStore.getState().speechStop();
           this._isPlaying = false;
           this._sourceNode = null;
         }
@@ -237,6 +242,7 @@ export class V2SpeechSynth implements DevilboxSynth {
       source.playbackRate.value = ratio;
       source.start(time, 0);
       this._isPlaying = true;
+      useSpeechActivityStore.getState().speechStart();
       return;
     }
 

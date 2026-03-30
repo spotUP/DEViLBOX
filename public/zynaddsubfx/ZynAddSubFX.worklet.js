@@ -122,15 +122,52 @@ class ZynAddSubFXProcessor extends AudioWorkletProcessor {
     switch (data.type) {
       case 'init': {
         try {
-          if (data.jsCode) {
-            // Inline JS code approach (from TypeScript)
-            const blob = new Blob([data.jsCode], { type: 'application/javascript' });
-            const url = URL.createObjectURL(blob);
-            importScripts(url);
-            URL.revokeObjectURL(url);
-          } else {
-            // URL-based approach
-            importScripts(data.wasmJsUrl || '/zynaddsubfx/ZynAddSubFX.js');
+          // Polyfills for DOM objects that Emscripten expects
+          if (typeof globalThis.document === 'undefined') {
+            globalThis.document = {
+              createElement: () => ({
+                relList: { supports: () => false },
+                tagName: 'DIV', rel: '',
+                addEventListener: () => {}, removeEventListener: () => {}
+              }),
+              getElementById: () => null,
+              querySelector: () => null,
+              querySelectorAll: () => [],
+              getElementsByTagName: () => [],
+              head: { appendChild: () => {} },
+              addEventListener: () => {}, removeEventListener: () => {}
+            };
+          }
+          if (typeof globalThis.window === 'undefined') {
+            globalThis.window = {
+              addEventListener: () => {}, removeEventListener: () => {},
+              dispatchEvent: () => {},
+              customElements: { whenDefined: () => Promise.resolve() },
+              location: { href: '', pathname: '' }
+            };
+          }
+          if (typeof globalThis.MutationObserver === 'undefined') {
+            globalThis.MutationObserver = class { constructor() {} observe() {} disconnect() {} };
+          }
+          if (typeof globalThis.DOMParser === 'undefined') {
+            globalThis.DOMParser = class { parseFromString() { return { querySelector: () => null, querySelectorAll: () => [] }; } };
+          }
+
+          if (data.jsCode && !globalThis.ZynAddSubFXFactory) {
+            const wrappedCode = data.jsCode + '\nreturn createZynAddSubFX;';
+            const factory = new Function(wrappedCode);
+            const result = factory();
+            if (typeof result === 'function') {
+              globalThis.ZynAddSubFXFactory = result;
+            } else {
+              this.port.postMessage({ type: 'error', error: 'Failed to load ZynAddSubFX JS module' });
+              return;
+            }
+          }
+
+          if (typeof globalThis.ZynAddSubFXFactory !== 'function') {
+            this.port.postMessage({ type: 'error', error: 'ZynAddSubFX factory not available' });
+            return;
           }
 
           const moduleOpts = {};
@@ -143,7 +180,7 @@ class ZynAddSubFXProcessor extends AudioWorkletProcessor {
             };
           }
 
-          this.module = await createZynAddSubFX(moduleOpts);
+          this.module = await globalThis.ZynAddSubFXFactory(moduleOpts);
 
           const sr = data.sampleRate || sampleRate;
           this.instance = this.module._zasfx_create(sr);

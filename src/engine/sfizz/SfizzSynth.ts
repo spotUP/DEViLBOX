@@ -1,104 +1,98 @@
 /**
- * SfizzSynth.ts — Sfizz SFZ sample player engine for DEViLBOX
+ * SfizzSynth.ts - Sfizz SFZ player WASM engine for DEViLBOX
  *
- * Loads SFZ instrument definitions and WAV/FLAC/OGG samples into a WASM-based
- * sfizz engine running in an AudioWorklet. Supports the SFZ v1/v2 format.
- *
- * CC Mappings (standard MIDI CCs used by SFZ instruments):
- *   CC 1   - Modulation Wheel
- *   CC 7   - Volume
- *   CC 10  - Pan
- *   CC 11  - Expression
- *   CC 64  - Sustain Pedal (hold)
- *   CC 66  - Sostenuto
- *   CC 67  - Soft Pedal
- *   CC 71  - Filter Resonance (Timbre)
- *   CC 72  - Release Time
- *   CC 73  - Attack Time
- *   CC 74  - Filter Cutoff (Brightness)
- *   CC 91  - Reverb Send
- *   CC 93  - Chorus Send
- *   CC 120 - All Sound Off
- *   CC 123 - All Notes Off
- *   (SFZ instruments can map any CC 0-511 via the sfizz HD CC system)
+ * Features:
+ * - SFZ file loading with sample data
+ * - Volume, pan, polyphony control
+ * - Oversampling quality
+ * - Performance controllers (sustain, mod wheel, expression, pitch bend)
+ * - Reverb/chorus sends
+ * - ~12 parameters
  */
 
 import type { DevilboxSynth } from '@/types/synth';
 import { getDevilboxAudioContext, noteToMidi } from '@/utils/audio-context';
 
-/** Standard MIDI CC numbers commonly used in SFZ instruments */
-export const SFIZZ_CC = {
-  MODULATION: 1,
-  VOLUME: 7,
-  PAN: 10,
-  EXPRESSION: 11,
-  SUSTAIN: 64,
-  SOSTENUTO: 66,
-  SOFT_PEDAL: 67,
-  FILTER_RESONANCE: 71,
-  RELEASE_TIME: 72,
-  ATTACK_TIME: 73,
-  FILTER_CUTOFF: 74,
-  REVERB_SEND: 91,
-  CHORUS_SEND: 93,
-  ALL_SOUND_OFF: 120,
-  ALL_NOTES_OFF: 123,
+export const SfizzParam = {
+  VOLUME: 0, PAN: 1, POLYPHONY: 2,
+  OVERSAMPLING: 3, PRELOAD_SIZE: 4,
+  SUSTAIN_PEDAL: 5, MOD_WHEEL: 6,
+  EXPRESSION: 7, PITCH_BEND: 8,
+  REVERB_SEND: 9, CHORUS_SEND: 10,
+  TRANSPOSE: 11,
 } as const;
 
-/** Sfizz engine configuration */
+export const SFIZZ_PARAM_NAMES: Record<number, string> = {
+  0: 'Volume', 1: 'Pan', 2: 'Polyphony',
+  3: 'Oversampling', 4: 'Preload Size',
+  5: 'Sustain Pedal', 6: 'Mod Wheel',
+  7: 'Expression', 8: 'Pitch Bend',
+  9: 'Reverb Send', 10: 'Chorus Send',
+  11: 'Transpose',
+};
+
 export interface SfizzConfig {
-  volume: number;              // dB (-60 to +6)
-  numVoices: number;           // 1-256
-  oversampling: number;        // 1, 2, 4, or 8
-  preloadSize: number;         // bytes, sample preload buffer size
-  sampleQuality: number;       // 0-10
-  oscillatorQuality: number;   // 0-3
+  volume?: number;         // 0-1
+  pan?: number;            // -1 to 1
+  polyphony?: number;      // 1-256
+  oversampling?: number;   // 0-3 (1x/2x/4x/8x)
+  preloadSize?: number;    // 1024-65536
+  sustainPedal?: number;   // 0/1
+  modWheel?: number;       // 0-1
+  expression?: number;     // 0-1
+  pitchBend?: number;      // -1 to 1
+  reverbSend?: number;     // 0-1
+  chorusSend?: number;     // 0-1
+  transpose?: number;      // -24 to 24
 }
 
 export const DEFAULT_SFIZZ: SfizzConfig = {
-  volume: 0,
-  numVoices: 64,
-  oversampling: 1,
-  preloadSize: 8192,
-  sampleQuality: 2,
-  oscillatorQuality: 1,
+  volume: 0.8, pan: 0, polyphony: 64,
+  oversampling: 0, preloadSize: 8192,
+  sustainPedal: 0, modWheel: 0,
+  expression: 1.0, pitchBend: 0,
+  reverbSend: 0.2, chorusSend: 0,
+  transpose: 0,
 };
 
-export const SFIZZ_PRESETS: Record<string, Partial<SfizzConfig>> = {
-  'Default': { ...DEFAULT_SFIZZ },
-  'High Quality': { ...DEFAULT_SFIZZ, oversampling: 2, sampleQuality: 5, oscillatorQuality: 2 },
-  'Low CPU': { ...DEFAULT_SFIZZ, numVoices: 32, oversampling: 1, sampleQuality: 1, oscillatorQuality: 0 },
-  'Maximum': { ...DEFAULT_SFIZZ, numVoices: 128, oversampling: 4, sampleQuality: 8, oscillatorQuality: 3 },
+export const SFIZZ_PRESETS: Record<string, SfizzConfig> = {
+  'Natural': { ...DEFAULT_SFIZZ },
+  'Expressive': { ...DEFAULT_SFIZZ, expression: 0.8, modWheel: 0.5, reverbSend: 0.3 },
+  'Staccato': { ...DEFAULT_SFIZZ, sustainPedal: 0, expression: 1.0, reverbSend: 0.1, chorusSend: 0 },
+  'Legato': { ...DEFAULT_SFIZZ, sustainPedal: 1, expression: 0.7, reverbSend: 0.3, chorusSend: 0.1 },
+  'Ambient': { ...DEFAULT_SFIZZ, reverbSend: 0.7, chorusSend: 0.5, expression: 0.6, modWheel: 0.3 },
+  'Orchestral': { ...DEFAULT_SFIZZ, expression: 0.9, modWheel: 0.6, reverbSend: 0.5, chorusSend: 0.2, polyphony: 64 },
+  'Chamber': { ...DEFAULT_SFIZZ, expression: 0.75, reverbSend: 0.35, chorusSend: 0.1, polyphony: 32 },
+  'Solo Bright': { ...DEFAULT_SFIZZ, expression: 1.0, modWheel: 0.7, reverbSend: 0.2, chorusSend: 0, volume: 0.85 },
 };
 
-export class SfizzEngine implements DevilboxSynth {
-  readonly name = 'SfizzEngine';
+const CONFIG_KEYS: (keyof SfizzConfig)[] = [
+  'volume', 'pan', 'polyphony', 'oversampling', 'preloadSize',
+  'sustainPedal', 'modWheel', 'expression', 'pitchBend',
+  'reverbSend', 'chorusSend', 'transpose',
+];
+
+export class SfizzSynthEngine implements DevilboxSynth {
+  readonly name = 'SfizzSynthEngine';
   readonly output: GainNode;
 
   private _worklet: AudioWorkletNode | null = null;
   private config: SfizzConfig;
   private isInitialized = false;
   private pendingNotes: Array<{ note: number; velocity: number }> = [];
-  private _initPromise: Promise<void> | null = null;
-  private sfzLoaded = false;
 
   private static isWorkletLoaded = false;
   private static workletLoadPromise: Promise<void> | null = null;
+  private _initPromise: Promise<void>;
 
   constructor(config: Partial<SfizzConfig> = {}) {
     this.output = getDevilboxAudioContext().createGain();
     this.config = { ...DEFAULT_SFIZZ, ...config };
+    this._initPromise = this.initialize();
   }
 
-  async init(): Promise<void> {
-    if (!this._initPromise) {
-      this._initPromise = this.initialize();
-    }
+  public async ensureInitialized(): Promise<void> {
     return this._initPromise;
-  }
-
-  async ensureInitialized(): Promise<void> {
-    return this.init();
   }
 
   private async initialize(): Promise<void> {
@@ -106,14 +100,14 @@ export class SfizzEngine implements DevilboxSynth {
       const rawContext = getDevilboxAudioContext();
       const baseUrl = import.meta.env.BASE_URL || '/';
 
-      if (!SfizzEngine.isWorkletLoaded) {
-        if (!SfizzEngine.workletLoadPromise) {
-          SfizzEngine.workletLoadPromise = rawContext.audioWorklet.addModule(
+      if (!SfizzSynthEngine.isWorkletLoaded) {
+        if (!SfizzSynthEngine.workletLoadPromise) {
+          SfizzSynthEngine.workletLoadPromise = rawContext.audioWorklet.addModule(
             `${baseUrl}sfizz/Sfizz.worklet.js`
           );
         }
-        await SfizzEngine.workletLoadPromise;
-        SfizzEngine.isWorkletLoaded = true;
+        await SfizzSynthEngine.workletLoadPromise;
+        SfizzSynthEngine.isWorkletLoaded = true;
       }
 
       const [wasmResponse, jsResponse] = await Promise.all([
@@ -141,28 +135,18 @@ export class SfizzEngine implements DevilboxSynth {
         numberOfOutputs: 1,
       });
 
-      const readyPromise = new Promise<void>((resolve, reject) => {
-        const timeout = setTimeout(() => reject(new Error('Sfizz init timeout')), 15000);
-        this._worklet!.port.onmessage = (event) => {
-          const msg = event.data;
-          if (msg.type === 'ready') {
-            clearTimeout(timeout);
-            this.isInitialized = true;
-            this.applyConfig(this.config);
-            for (const { note, velocity } of this.pendingNotes) {
-              this._worklet!.port.postMessage({ type: 'noteOn', note, velocity: velocity / 127 });
-            }
-            this.pendingNotes = [];
-            resolve();
-          } else if (msg.type === 'error') {
-            clearTimeout(timeout);
-            console.error('Sfizz error:', msg.message);
-            reject(new Error(msg.message));
-          } else if (msg.type === 'sfzLoaded') {
-            this.sfzLoaded = msg.success;
+      this._worklet.port.onmessage = (event) => {
+        if (event.data.type === 'ready') {
+          this.isInitialized = true;
+          this.sendConfig(this.config);
+          for (const { note, velocity } of this.pendingNotes) {
+            this._worklet!.port.postMessage({ type: 'noteOn', note, velocity });
           }
-        };
-      });
+          this.pendingNotes = [];
+        } else if (event.data.type === 'error') {
+          console.error('Sfizz error:', event.data.error);
+        }
+      };
 
       this._worklet.port.postMessage({
         type: 'init', wasmBinary, jsCode, sampleRate: rawContext.sampleRate,
@@ -177,209 +161,78 @@ export class SfizzEngine implements DevilboxSynth {
         keepalive.connect(rawContext.destination);
       } catch { /* keepalive failed */ }
 
-      await readyPromise;
     } catch (error) {
       console.error('Failed to initialize Sfizz:', error);
       throw error;
     }
   }
 
-  applyConfig(config: Partial<SfizzConfig>): void {
-    Object.assign(this.config, config);
+  private sendConfig(config: SfizzConfig): void {
     if (!this._worklet || !this.isInitialized) return;
-
-    if (config.volume !== undefined) {
-      this._worklet.port.postMessage({ type: 'setVolume', value: config.volume });
-    }
-    if (config.numVoices !== undefined) {
-      this._worklet.port.postMessage({ type: 'setNumVoices', value: config.numVoices });
-    }
-    if (config.oversampling !== undefined) {
-      this._worklet.port.postMessage({ type: 'setOversampling', value: config.oversampling });
-    }
-    if (config.preloadSize !== undefined) {
-      this._worklet.port.postMessage({ type: 'setPreloadSize', value: config.preloadSize });
-    }
-    if (config.sampleQuality !== undefined) {
-      this._worklet.port.postMessage({ type: 'setSampleQuality', value: config.sampleQuality });
-    }
-    if (config.oscillatorQuality !== undefined) {
-      this._worklet.port.postMessage({ type: 'setOscillatorQuality', value: config.oscillatorQuality });
+    for (let i = 0; i < CONFIG_KEYS.length; i++) {
+      const value = config[CONFIG_KEYS[i]];
+      if (value !== undefined) {
+        this._worklet.port.postMessage({ type: 'setParam', index: i, value });
+      }
     }
   }
 
-  /** Load an SFZ definition from a text string */
-  async loadSfzString(sfzText: string, virtualPath?: string): Promise<boolean> {
-    await this.ensureInitialized();
-    if (!this._worklet) return false;
-
-    return new Promise((resolve) => {
-      const handler = (event: MessageEvent) => {
-        if (event.data.type === 'sfzLoaded') {
-          this._worklet!.port.removeEventListener('message', handler);
-          this.sfzLoaded = event.data.success;
-          resolve(event.data.success);
-        }
-      };
-      this._worklet!.port.addEventListener('message', handler);
-      this._worklet!.port.postMessage({ type: 'loadSfzString', sfzText, virtualPath });
-    });
-  }
-
-  /** Load an SFZ file already written to MEMFS */
-  async loadSfzFile(path: string): Promise<boolean> {
-    await this.ensureInitialized();
-    if (!this._worklet) return false;
-
-    return new Promise((resolve) => {
-      const handler = (event: MessageEvent) => {
-        if (event.data.type === 'sfzLoaded') {
-          this._worklet!.port.removeEventListener('message', handler);
-          this.sfzLoaded = event.data.success;
-          resolve(event.data.success);
-        }
-      };
-      this._worklet!.port.addEventListener('message', handler);
-      this._worklet!.port.postMessage({ type: 'loadSfzFile', path });
-    });
-  }
-
-  /** Write a sample file to the WASM virtual filesystem */
-  async writeSample(path: string, data: ArrayBuffer): Promise<void> {
-    await this.ensureInitialized();
-    if (!this._worklet) return;
-    this._worklet.port.postMessage({ type: 'writeSample', path, data }, [data]);
-  }
-
-  /** Write multiple files at once (SFZ + samples) */
-  async writeFiles(files: Array<{ path: string; data: ArrayBuffer }>): Promise<void> {
-    await this.ensureInitialized();
-    if (!this._worklet) return;
-    const transferables = files.map(f => f.data);
-    return new Promise((resolve) => {
-      const handler = (event: MessageEvent) => {
-        if (event.data.type === 'filesWritten') {
-          this._worklet!.port.removeEventListener('message', handler);
-          resolve();
-        }
-      };
-      this._worklet!.port.addEventListener('message', handler);
-      this._worklet!.port.postMessage({ type: 'writeFiles', files }, transferables);
-    });
-  }
-
-  /** Create directory tree in MEMFS */
-  async mkdirp(path: string): Promise<void> {
-    await this.ensureInitialized();
-    if (!this._worklet) return;
-    this._worklet.port.postMessage({ type: 'mkdirp', path });
-  }
-
-  /**
-   * Load a complete SFZ instrument with all referenced samples.
-   * @param sfzPath Virtual path for the SFZ file (e.g., "/instruments/piano.sfz")
-   * @param sfzContent The SFZ file text content
-   * @param samples Array of {path, data} for each referenced sample
-   */
-  async loadInstrument(
-    sfzPath: string,
-    sfzContent: string,
-    samples: Array<{ path: string; data: ArrayBuffer }>
-  ): Promise<boolean> {
-    await this.ensureInitialized();
-    if (!this._worklet) return false;
-
-    if (samples.length > 0) {
-      await this.writeFiles(samples);
-    }
-
-    const encoder = new TextEncoder();
-    const sfzData = encoder.encode(sfzContent);
-    const sfzBuf = sfzData.buffer.slice(sfzData.byteOffset, sfzData.byteOffset + sfzData.byteLength);
-    await this.writeSample(sfzPath, sfzBuf);
-
-    return this.loadSfzFile(sfzPath);
-  }
-
-  noteOn(noteOrName: number | string, velocity = 100): void {
-    const note = typeof noteOrName === 'string' ? noteToMidi(noteOrName) : noteOrName;
-    const vel = Math.max(0, Math.min(1, velocity / 127));
-
-    if (!this._worklet || !this.isInitialized) {
-      this.pendingNotes.push({ note, velocity });
+  loadSFZ(sfzContent: string, samples: Map<string, ArrayBuffer>): void {
+    if (!this._worklet) {
+      console.warn('Sfizz: worklet not ready, cannot load SFZ');
       return;
     }
+    const samplesObj: Record<string, ArrayBuffer> = {};
+    const transferables: ArrayBuffer[] = [];
+    for (const [name, data] of samples) {
+      samplesObj[name] = data;
+      transferables.push(data);
+    }
+    this._worklet.port.postMessage({ type: 'loadSFZ', sfzContent, samples: samplesObj }, transferables);
+  }
+
+  triggerAttack(frequency: number | string, _time?: number, velocity?: number): this {
+    const note = typeof frequency === 'string' ? noteToMidi(frequency) : Math.round(12 * Math.log2(frequency / 440) + 69);
+    const vel = Math.round((velocity ?? 0.8) * 127);
+    if (!this.isInitialized || !this._worklet) {
+      this.pendingNotes.push({ note, velocity: vel });
+      return this;
+    }
     this._worklet.port.postMessage({ type: 'noteOn', note, velocity: vel });
+    return this;
   }
 
-  noteOff(noteOrName: number | string): void {
-    const note = typeof noteOrName === 'string' ? noteToMidi(noteOrName) : noteOrName;
-    if (!this._worklet || !this.isInitialized) return;
-    this._worklet.port.postMessage({ type: 'noteOff', note, velocity: 0 });
+  triggerRelease(frequency?: number | string, _time?: number): this {
+    if (!this._worklet || !this.isInitialized) return this;
+    if (frequency !== undefined) {
+      const note = typeof frequency === 'string' ? noteToMidi(frequency) : Math.round(12 * Math.log2(frequency / 440) + 69);
+      this._worklet.port.postMessage({ type: 'noteOff', note });
+    } else {
+      this._worklet.port.postMessage({ type: 'allNotesOff' });
+    }
+    return this;
   }
 
-  allNotesOff(): void {
-    if (!this._worklet || !this.isInitialized) return;
-    this._worklet.port.postMessage({ type: 'allSoundOff' });
-    this.pendingNotes = [];
+  set(param: string, value: number): void {
+    const index = CONFIG_KEYS.indexOf(param as keyof SfizzConfig);
+    if (index >= 0) {
+      (this.config as Record<string, number>)[param] = value;
+      if (this._worklet && this.isInitialized) {
+        this._worklet.port.postMessage({ type: 'setParam', index, value });
+      }
+    }
   }
 
-  /** Send a MIDI CC (value 0-1 normalized, HD precision) */
-  sendCC(cc: number, value: number): void {
-    if (!this._worklet || !this.isInitialized) return;
-    this._worklet.port.postMessage({ type: 'cc', cc, value: Math.max(0, Math.min(1, value)) });
+  get(param: string): number | undefined {
+    return (this.config as Record<string, number | undefined>)[param];
   }
 
-  /** Send pitch wheel (-8192 to +8191) */
-  sendPitchWheel(value: number): void {
-    if (!this._worklet || !this.isInitialized) return;
-    this._worklet.port.postMessage({ type: 'pitchWheel', value: Math.max(-8192, Math.min(8191, value | 0)) });
-  }
-
-  /** Send channel aftertouch (0-127) */
-  sendAftertouch(value: number): void {
-    if (!this._worklet || !this.isInitialized) return;
-    this._worklet.port.postMessage({ type: 'aftertouch', value: Math.max(0, Math.min(127, value | 0)) });
-  }
-
-  /** Send MIDI program change (0-127) */
-  sendProgramChange(program: number): void {
-    if (!this._worklet || !this.isInitialized) return;
-    this._worklet.port.postMessage({ type: 'programChange', program: Math.max(0, Math.min(127, program | 0)) });
-  }
-
-  /** Set transport tempo (BPM) — used by SFZ instruments with tempo-synced LFOs */
-  setTempo(bpm: number): void {
-    if (!this._worklet || !this.isInitialized) return;
-    this._worklet.port.postMessage({ type: 'setTempo', bpm });
-  }
-
-  /** Query engine info (async round-trip to worklet) */
-  async getInfo(): Promise<{
-    numRegions: number;
-    numGroups: number;
-    numVoices: number;
-    activeVoices: number;
-    preloadedSamples: number;
-    volume: number;
-    oversampling: number;
-    sfzLoaded: boolean;
-  } | null> {
-    if (!this._worklet || !this.isInitialized) return null;
-    return new Promise((resolve) => {
-      const handler = (event: MessageEvent) => {
-        if (event.data.type === 'info') {
-          this._worklet!.port.removeEventListener('message', handler);
-          resolve(event.data);
-        }
-      };
-      this._worklet!.port.addEventListener('message', handler);
-      this._worklet!.port.postMessage({ type: 'getInfo' });
-    });
-  }
-
-  get isSfzLoaded(): boolean {
-    return this.sfzLoaded;
+  setPreset(name: string): void {
+    const preset = SFIZZ_PRESETS[name];
+    if (preset) {
+      this.config = { ...preset };
+      this.sendConfig(this.config);
+    }
   }
 
   dispose(): void {
@@ -389,8 +242,19 @@ export class SfizzEngine implements DevilboxSynth {
       this._worklet = null;
     }
     this.isInitialized = false;
-    this.sfzLoaded = false;
-    this.pendingNotes = [];
-    this._initPromise = null;
+  }
+}
+
+export class SfizzSynthImpl extends SfizzSynthEngine {
+  async init(): Promise<void> {
+    return this.ensureInitialized();
+  }
+
+  applyConfig(config: Partial<SfizzConfig>): void {
+    for (const [key, value] of Object.entries(config)) {
+      if (typeof value === 'number') {
+        this.set(key, value);
+      }
+    }
   }
 }

@@ -36,6 +36,20 @@ const VSTBRIDGE_TYPES: SynthType[] = [
   'amsynth' as SynthType,
   'OBXf' as SynthType,
   'Open303' as SynthType,
+  // Zynthian ports
+  'MdaEPiano' as SynthType,
+  'MdaJX10' as SynthType,
+  'MdaDX10' as SynthType,
+  'AMSynth' as SynthType,
+  'RaffoSynth' as SynthType,
+  'CalfMono' as SynthType,
+  'SetBfree' as SynthType,
+  'SynthV1' as SynthType,
+  'TalNoizeMaker' as SynthType,
+  'Aeolus' as SynthType,
+  'FluidSynth' as SynthType,
+  'Sfizz' as SynthType,
+  'ZynAddSubFX' as SynthType,
 ];
 
 /** Check if a synth type is a VSTBridge type */
@@ -57,6 +71,20 @@ const SYNTH_INFO: Record<string, { name: string; color: [number, number, number]
   amsynth: { name: 'amsynth', color: [100, 100, 255] },
   OBXf: { name: 'OB-Xf', color: [255, 200, 50] },
   Open303: { name: 'Open303', color: [255, 80, 0] },
+  // Zynthian ports
+  MdaEPiano: { name: 'MDA ePiano', color: [200, 160, 120] },
+  MdaJX10: { name: 'MDA JX-10', color: [80, 140, 220] },
+  MdaDX10: { name: 'MDA DX-10', color: [220, 120, 60] },
+  AMSynth: { name: 'AMSynth', color: [100, 100, 255] },
+  RaffoSynth: { name: 'Raffo Minimoog', color: [160, 100, 50] },
+  CalfMono: { name: 'Calf Mono', color: [60, 180, 120] },
+  SetBfree: { name: 'setBfree B3', color: [180, 120, 60] },
+  SynthV1: { name: 'SynthV1', color: [140, 100, 200] },
+  TalNoizeMaker: { name: 'TAL NoizeMaker', color: [40, 180, 200] },
+  Aeolus: { name: 'Aeolus Organ', color: [200, 170, 80] },
+  FluidSynth: { name: 'FluidSynth', color: [80, 160, 200] },
+  Sfizz: { name: 'Sfizz', color: [120, 80, 200] },
+  ZynAddSubFX: { name: 'ZynAddSubFX', color: [220, 60, 60] },
 };
 
 /* ── Buffer Builders ───────────────────────────────────────────────────── */

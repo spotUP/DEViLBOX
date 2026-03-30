@@ -40,6 +40,20 @@ import { HardwareUIWrapper, hasHardwareUI } from '../hardware/HardwareUIWrapper'
 import type { MacroData } from './MAMEMacroEditor';
 import type { WavetableData } from './WavetableEditor';
 import { isFurnaceFMType } from '../hardware/FurnaceFMHardware';
+import { DEFAULT_MDA_EPIANO, type MdaEPianoConfig } from '@engine/mda-epiano/MdaEPianoSynth';
+import { DEFAULT_MDA_JX10, type MdaJX10Config } from '@engine/mda-jx10/MdaJX10Synth';
+import { DEFAULT_MDA_DX10, type MdaDX10Config } from '@engine/mda-dx10/MdaDX10Synth';
+import { DEFAULT_AMSYNTH, type AMSynthConfig } from '@engine/amsynth/AMSynthSynth';
+import { DEFAULT_RAFFO, type RaffoSynthConfig } from '@engine/raffo/RaffoSynth';
+import { DEFAULT_CALF_MONO, type CalfMonoConfig } from '@engine/calf-mono/CalfMonoSynth';
+import { DEFAULT_SETBFREE, type SetBfreeConfig } from '@engine/setbfree/SetBfreeSynth';
+import { DEFAULT_SYNTHV1, type SynthV1Config } from '@engine/synthv1/SynthV1Synth';
+import { DEFAULT_MONIQUE, type MoniqueConfig } from '@engine/monique/MoniqueSynth';
+import { DEFAULT_TAL_NOIZEMAKER, type TalNoizeMakerConfig } from '@engine/tal-noizemaker/TalNoizeMakerSynth';
+import { DEFAULT_AEOLUS, type AeolusConfig } from '@engine/aeolus/AeolusSynth';
+import { DEFAULT_FLUIDSYNTH, type FluidSynthConfig } from '@engine/fluidsynth/FluidSynthSynth';
+import { DEFAULT_SFIZZ, type SfizzConfig } from '@engine/sfizz/SfizzSynth';
+import { DEFAULT_ZYNADDSUBFX, type ZynAddSubFXConfig } from '@engine/zynaddsubfx/ZynAddSubFXSynth';
 import { isFurnacePSGType } from '../hardware/FurnacePSGHardware';
 import { isFurnaceWaveType } from '../hardware/FurnaceWaveHardware';
 import { isFurnacePCMType } from '../hardware/FurnacePCMHardware';
@@ -78,6 +92,20 @@ const ChipSynthControls = lazy(() => import('../controls/ChipSynthControls').the
 const CMIControls = lazy(() => import('../controls/CMIControls').then(m => ({ default: m.CMIControls })));
 const DexedControls = lazy(() => import('../controls/DexedControls').then(m => ({ default: m.DexedControls })));
 const OBXdControls = lazy(() => import('../controls/OBXdControls').then(m => ({ default: m.OBXdControls })));
+const MdaEPianoControls = lazy(() => import('../controls/MdaEPianoControls').then(m => ({ default: m.MdaEPianoControls })));
+const MdaJX10Controls = lazy(() => import('../controls/MdaJX10Controls').then(m => ({ default: m.MdaJX10Controls })));
+const MdaDX10Controls = lazy(() => import('../controls/MdaDX10Controls').then(m => ({ default: m.MdaDX10Controls })));
+const AMSynthControls = lazy(() => import('../controls/AMSynthControls').then(m => ({ default: m.AMSynthControls })));
+const RaffoSynthControls = lazy(() => import('../controls/RaffoSynthControls').then(m => ({ default: m.RaffoSynthControls })));
+const CalfMonoControls = lazy(() => import('../controls/CalfMonoControls').then(m => ({ default: m.CalfMonoControls })));
+const SetBfreeControls = lazy(() => import('../controls/SetBfreeControls').then(m => ({ default: m.SetBfreeControls })));
+const SynthV1Controls = lazy(() => import('../controls/SynthV1Controls').then(m => ({ default: m.SynthV1Controls })));
+const MoniqueControls = lazy(() => import('../controls/MoniqueControls').then(m => ({ default: m.MoniqueControls })));
+const TalNoizeMakerControls = lazy(() => import('../controls/TalNoizeMakerControls').then(m => ({ default: m.TalNoizeMakerControls })));
+const AeolusControls = lazy(() => import('../controls/AeolusControls').then(m => ({ default: m.AeolusControls })));
+const FluidSynthControls = lazy(() => import('../controls/FluidSynthControls').then(m => ({ default: m.FluidSynthControls })));
+const SfizzControls = lazy(() => import('../controls/SfizzControls').then(m => ({ default: m.SfizzControls })));
+const ZynAddSubFXControls = lazy(() => import('../controls/ZynAddSubFXControls').then(m => ({ default: m.ZynAddSubFXControls })));
 const WAMControls = lazy(() => import('../controls/WAMControls').then(m => ({ default: m.WAMControls })));
 const VSTBridgePanel = lazy(() => import('../controls/VSTBridgePanel').then(m => ({ default: m.VSTBridgePanel })));
 const HarmonicSynthControls = lazy(() => import('../controls/HarmonicSynthControls').then(m => ({ default: m.HarmonicSynthControls })));
@@ -137,7 +165,7 @@ const WavetableListEditor = lazy(() => import('./WavetableEditor').then(m => ({ 
 
 
 // Types
-export type EditorMode = 'generic' | 'tb303' | 'furnace' | 'buzzmachine' | 'sample' | 'dubsiren' | 'spacelaser' | 'v2' | 'sam' | 'pinktrombone' | 'dectalk' | 'synare' | 'mame' | 'mamechip' | 'dexed' | 'obxd' | 'wam' | 'tonewheelOrgan' | 'melodica' | 'vital' | 'odin2' | 'surge' | 'vstbridge' | 'harmonicsynth' | 'modular' | 'sunvox-modular' | 'hively' | 'gtultra' | 'jamcracker' | 'soundmon' | 'sidmon' | 'digmug' | 'fc' | 'deltamusic1' | 'deltamusic2' | 'fred' | 'tfmx' | 'octamed' | 'sidmon1' | 'hippelcoso' | 'robhubbard' | 'steveturner' | 'davidwhittaker' | 'sonic-arranger' | 'instereo2' | 'musicline' | 'supercollider' | 'wobblebass' | 'startrekker-am' | 'futureplayer' | 'symphonie' | 'xrns-synth' | 'sunvox-synth';
+export type EditorMode = 'generic' | 'tb303' | 'furnace' | 'buzzmachine' | 'sample' | 'dubsiren' | 'spacelaser' | 'v2' | 'sam' | 'pinktrombone' | 'dectalk' | 'synare' | 'mame' | 'mamechip' | 'dexed' | 'obxd' | 'mdaEPiano' | 'mdaJX10' | 'mdaDX10' | 'amsynth' | 'raffo' | 'calfMono' | 'setbfree' | 'synthv1' | 'moniqueSynth' | 'talNoizeMaker' | 'aeolus' | 'fluidsynth' | 'sfizz' | 'zynaddsubfx' | 'wam' | 'tonewheelOrgan' | 'melodica' | 'vital' | 'odin2' | 'surge' | 'vstbridge' | 'harmonicsynth' | 'modular' | 'sunvox-modular' | 'hively' | 'gtultra' | 'jamcracker' | 'soundmon' | 'sidmon' | 'digmug' | 'fc' | 'deltamusic1' | 'deltamusic2' | 'fred' | 'tfmx' | 'octamed' | 'sidmon1' | 'hippelcoso' | 'robhubbard' | 'steveturner' | 'davidwhittaker' | 'sonic-arranger' | 'instereo2' | 'musicline' | 'supercollider' | 'wobblebass' | 'startrekker-am' | 'futureplayer' | 'symphonie' | 'xrns-synth' | 'sunvox-synth';
 
 export interface SynthTypeDispatcherProps {
   editorMode: EditorMode;
@@ -469,6 +497,121 @@ export const SynthTypeDispatcher: React.FC<SynthTypeDispatcherProps> = ({
       // Ignored
     }
   }, [instrument.obxd, instrument.id, handleChange]);
+
+  // Handle MDA ePiano config updates
+  const handleMdaEPianoChange = useCallback((updates: Partial<MdaEPianoConfig>) => {
+    const currentConfig = instrument.mdaEPiano || DEFAULT_MDA_EPIANO;
+    const newConfig = { ...currentConfig, ...updates };
+    handleChange({ mdaEPiano: newConfig });
+  }, [instrument.mdaEPiano, handleChange]);
+
+  // Handle MDA JX-10 config updates
+  const handleMdaJX10Change = useCallback((updates: Partial<MdaJX10Config>) => {
+    const currentConfig = instrument.mdaJX10 || DEFAULT_MDA_JX10;
+    const newConfig = { ...currentConfig, ...updates };
+    handleChange({ mdaJX10: newConfig });
+  }, [instrument.mdaJX10, handleChange]);
+
+  // Handle MDA DX10 config updates
+  const handleMdaDX10Change = useCallback((updates: Partial<MdaDX10Config>) => {
+    const currentConfig = instrument.mdaDX10 || DEFAULT_MDA_DX10;
+    const newConfig = { ...currentConfig, ...updates };
+    handleChange({ mdaDX10: newConfig });
+  }, [instrument.mdaDX10, handleChange]);
+
+  // Handle AMSynth config updates
+  const handleAMSynthChange = useCallback((updates: Partial<AMSynthConfig>) => {
+    const currentConfig = instrument.amsynth || DEFAULT_AMSYNTH;
+    const newConfig = { ...currentConfig, ...updates };
+    handleChange({ amsynth: newConfig });
+  }, [instrument.amsynth, handleChange]);
+
+  // Handle Raffo Synth config updates
+  const handleRaffoChange = useCallback((updates: Partial<RaffoSynthConfig>) => {
+    const currentConfig = instrument.raffo || DEFAULT_RAFFO;
+    const newConfig = { ...currentConfig, ...updates };
+    handleChange({ raffo: newConfig });
+  }, [instrument.raffo, handleChange]);
+
+  // Handle Calf Monosynth config updates
+  const handleCalfMonoChange = useCallback((updates: Partial<CalfMonoConfig>) => {
+    const currentConfig = instrument.calfMono || DEFAULT_CALF_MONO;
+    const newConfig = { ...currentConfig, ...updates };
+    handleChange({ calfMono: newConfig });
+  }, [instrument.calfMono, handleChange]);
+
+  // Handle setBfree Hammond B3 config updates
+  const handleSetBfreeChange = useCallback((updates: Partial<SetBfreeConfig>) => {
+    const currentConfig = instrument.setbfree || DEFAULT_SETBFREE;
+    const newConfig = { ...currentConfig, ...updates };
+    handleChange({ setbfree: newConfig });
+  }, [instrument.setbfree, handleChange]);
+
+  // Handle SynthV1 config updates
+  const handleSynthV1Change = useCallback((updates: Partial<SynthV1Config>) => {
+    const currentConfig = instrument.synthv1 || DEFAULT_SYNTHV1;
+    const newConfig = { ...currentConfig, ...updates };
+    handleChange({ synthv1: newConfig });
+  }, [instrument.synthv1, handleChange]);
+
+  // Handle Monique config updates
+  const handleMoniqueChange = useCallback((updates: Partial<MoniqueConfig>) => {
+    const currentConfig = instrument.monique || DEFAULT_MONIQUE;
+    const newConfig = { ...currentConfig, ...updates };
+    handleChange({ monique: newConfig });
+  }, [instrument.monique, handleChange]);
+
+  // Handle TAL-NoiseMaker config updates
+  const handleTalNoizeMakerChange = useCallback((updates: Partial<TalNoizeMakerConfig>) => {
+    const currentConfig = instrument.talNoizeMaker || DEFAULT_TAL_NOIZEMAKER;
+    const newConfig = { ...currentConfig, ...updates };
+    handleChange({ talNoizeMaker: newConfig });
+  }, [instrument.talNoizeMaker, handleChange]);
+
+  // Handle Aeolus config updates
+  const handleAeolusChange = useCallback((updates: Partial<AeolusConfig>) => {
+    const currentConfig = instrument.aeolus || DEFAULT_AEOLUS;
+    const newConfig = { ...currentConfig, ...updates };
+    handleChange({ aeolus: newConfig });
+  }, [instrument.aeolus, handleChange]);
+
+  // Handle FluidSynth config updates
+  const handleFluidSynthChange = useCallback((updates: Partial<FluidSynthConfig>) => {
+    const currentConfig = instrument.fluidsynth || DEFAULT_FLUIDSYNTH;
+    const newConfig = { ...currentConfig, ...updates };
+    handleChange({ fluidsynth: newConfig });
+  }, [instrument.fluidsynth, handleChange]);
+
+  // Handle Sfizz config updates
+  const handleSfizzChange = useCallback((updates: Partial<SfizzConfig>) => {
+    const currentConfig = instrument.sfizz || DEFAULT_SFIZZ;
+    const newConfig = { ...currentConfig, ...updates };
+    handleChange({ sfizz: newConfig });
+  }, [instrument.sfizz, handleChange]);
+
+  // Handle ZynAddSubFX config updates
+  const handleZynAddSubFXChange = useCallback((updates: Partial<ZynAddSubFXConfig>) => {
+    const currentConfig = instrument.zynaddsubfx || DEFAULT_ZYNADDSUBFX;
+    const newConfig = { ...currentConfig, ...updates };
+    handleChange({ zynaddsubfx: newConfig });
+  }, [instrument.zynaddsubfx, handleChange]);
+
+  // Pre-initialize synths that need WASM/ROM loading when editor opens
+  // (must be above all conditional returns to satisfy React hooks rules)
+  useEffect(() => {
+    if (!instrument?.id) return;
+    const st = instrument.synthType || '';
+    const needsPreInit = st.startsWith('MAME') ||
+      ['CZ101', 'CEM3394', 'SCSP', 'D50', 'Dexed', 'OBXd', 'MdaEPiano', 'MdaJX10', 'MdaDX10', 'AMSynth', 'RaffoSynth', 'CalfMono', 'SetBfree', 'SynthV1', 'TalNoizeMaker', 'Aeolus', 'FluidSynth', 'Sfizz', 'ZynAddSubFX', 'V2', 'TB303'].includes(st);
+    if (!needsPreInit) return;
+    (async () => {
+      try {
+        const { getToneEngine } = await import('@engine/ToneEngine');
+        const engine = getToneEngine();
+        await engine.ensureInstrumentReady(instrument);
+      } catch { /* engine not ready */ }
+    })();
+  }, [instrument?.id, instrument?.synthType]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ============================================================================
   // TB-303 EDITOR
@@ -1758,24 +1901,6 @@ export const SynthTypeDispatcher: React.FC<SynthTypeDispatcherProps> = ({
     // Check if hardware UI is available for this synth type
     const hasHardware = hasHardwareUI(instrument.synthType);
 
-    // Pre-initialize MAME/chip synth so ROMs load immediately when the editor opens
-    // Pre-initialize synths that need WASM/ROM loading when editor opens
-    useEffect(() => {
-      if (!instrument?.id) return;
-      const st = instrument.synthType || '';
-      // All synths that use AudioWorklet + WASM and may need ROM auto-loading
-      const needsPreInit = st.startsWith('MAME') ||
-        ['CZ101', 'CEM3394', 'SCSP', 'D50', 'Dexed', 'OBXd', 'V2', 'TB303'].includes(st);
-      if (!needsPreInit) return;
-      (async () => {
-        try {
-          const { getToneEngine } = await import('@engine/ToneEngine');
-          const engine = getToneEngine();
-          await engine.ensureInstrumentReady(instrument);
-        } catch { /* engine not ready */ }
-      })();
-    }, [instrument?.id, instrument?.synthType]); // eslint-disable-line react-hooks/exhaustive-deps
-
     return (
       <div className="synth-editor-container bg-gradient-to-b from-[#1e1e1e] to-[#151515]">
         <EditorHeader
@@ -1985,6 +2110,306 @@ export const SynthTypeDispatcher: React.FC<SynthTypeDispatcherProps> = ({
               config={obxdConfig}
               onChange={handleOBXdChange}
             />
+          </Suspense>
+        </div>
+      </div>
+    );
+  }
+
+  // ============================================================================
+  // MDA ePIANO EDITOR (Fender Rhodes)
+  // ============================================================================
+  if (editorMode === 'mdaEPiano' || instrument.synthType === 'MdaEPiano') {
+    const epianoConfig = { ...DEFAULT_MDA_EPIANO, ...(instrument.mdaEPiano || {}) };
+
+    return (
+      <div className="synth-editor-container bg-gradient-to-b from-[#1e1e1e] to-[#151515]">
+        <EditorHeader
+          instrument={instrument}
+          onChange={handleChange}
+          vizMode={vizMode}
+          onVizModeChange={setVizMode}
+          showHelpButton={false}
+          onBake={handleBake}
+          onBakePro={handleBakePro}
+          onUnbake={handleUnbake}
+          isBaked={isBaked}
+          isBaking={isBaking}
+        />
+
+        <div className="synth-editor-content overflow-y-auto">
+          <Suspense fallback={<LoadingControls />}>
+            <MdaEPianoControls
+              config={epianoConfig}
+              onChange={handleMdaEPianoChange}
+            />
+          </Suspense>
+        </div>
+      </div>
+    );
+  }
+
+  // ============================================================================
+  // MDA JX-10 EDITOR (Roland-inspired poly synth)
+  // ============================================================================
+  if (editorMode === 'mdaJX10' || instrument.synthType === 'MdaJX10') {
+    const jx10Config = { ...DEFAULT_MDA_JX10, ...(instrument.mdaJX10 || {}) };
+
+    return (
+      <div className="synth-editor-container bg-gradient-to-b from-[#1e1e1e] to-[#151515]">
+        <EditorHeader
+          instrument={instrument}
+          onChange={handleChange}
+          vizMode={vizMode}
+          onVizModeChange={setVizMode}
+          showHelpButton={false}
+          onBake={handleBake}
+          onBakePro={handleBakePro}
+          onUnbake={handleUnbake}
+          isBaked={isBaked}
+          isBaking={isBaking}
+        />
+
+        <div className="synth-editor-content overflow-y-auto">
+          <Suspense fallback={<LoadingControls />}>
+            <MdaJX10Controls
+              config={jx10Config}
+              onChange={handleMdaJX10Change}
+            />
+          </Suspense>
+        </div>
+      </div>
+    );
+  }
+
+  // ============================================================================
+  // MDA DX10 EDITOR (2-operator FM synth)
+  // ============================================================================
+  if (editorMode === 'mdaDX10' || instrument.synthType === 'MdaDX10') {
+    const dx10Config = { ...DEFAULT_MDA_DX10, ...(instrument.mdaDX10 || {}) };
+
+    return (
+      <div className="synth-editor-container bg-gradient-to-b from-[#1e1e1e] to-[#151515]">
+        <EditorHeader
+          instrument={instrument}
+          onChange={handleChange}
+          vizMode={vizMode}
+          onVizModeChange={setVizMode}
+          showHelpButton={false}
+          onBake={handleBake}
+          onBakePro={handleBakePro}
+          onUnbake={handleUnbake}
+          isBaked={isBaked}
+          isBaking={isBaking}
+        />
+
+        <div className="synth-editor-content overflow-y-auto">
+          <Suspense fallback={<LoadingControls />}>
+            <MdaDX10Controls
+              config={dx10Config}
+              onChange={handleMdaDX10Change}
+            />
+          </Suspense>
+        </div>
+      </div>
+    );
+  }
+
+  // ============================================================================
+  // AMSYNTH EDITOR (Analog Modelling Synthesizer)
+  // ============================================================================
+  if (editorMode === 'amsynth' || instrument.synthType === 'AMSynth') {
+    const amsynthConfig = { ...DEFAULT_AMSYNTH, ...(instrument.amsynth || {}) };
+
+    return (
+      <div className="synth-editor-container bg-gradient-to-b from-[#1e1e1e] to-[#151515]">
+        <EditorHeader
+          instrument={instrument}
+          onChange={handleChange}
+          vizMode={vizMode}
+          onVizModeChange={setVizMode}
+          showHelpButton={false}
+          onBake={handleBake}
+          onBakePro={handleBakePro}
+          onUnbake={handleUnbake}
+          isBaked={isBaked}
+          isBaking={isBaking}
+        />
+
+        <div className="synth-editor-content overflow-y-auto">
+          <Suspense fallback={<LoadingControls />}>
+            <AMSynthControls
+              config={amsynthConfig}
+              onChange={handleAMSynthChange}
+            />
+          </Suspense>
+        </div>
+      </div>
+    );
+  }
+
+  // ============================================================================
+  // RAFFO SYNTH EDITOR (Minimoog clone)
+  // ============================================================================
+  if (editorMode === 'raffo' || instrument.synthType === 'RaffoSynth') {
+    const raffoConfig = { ...DEFAULT_RAFFO, ...(instrument.raffo || {}) };
+
+    return (
+      <div className="synth-editor-container bg-gradient-to-b from-[#1e1e1e] to-[#151515]">
+        <EditorHeader
+          instrument={instrument}
+          onChange={handleChange}
+          vizMode={vizMode}
+          onVizModeChange={setVizMode}
+          showHelpButton={false}
+          onBake={handleBake}
+          onBakePro={handleBakePro}
+          onUnbake={handleUnbake}
+          isBaked={isBaked}
+          isBaking={isBaking}
+        />
+
+        <div className="synth-editor-content overflow-y-auto">
+          <Suspense fallback={<LoadingControls />}>
+            <RaffoSynthControls
+              config={raffoConfig}
+              onChange={handleRaffoChange}
+            />
+          </Suspense>
+        </div>
+      </div>
+    );
+  }
+
+  // ── Calf Monosynth ───────────────────────────────────────
+  if (editorMode === 'calfMono' || instrument.synthType === 'CalfMono') {
+    const calfConfig = { ...DEFAULT_CALF_MONO, ...(instrument.calfMono || {}) };
+    return (
+      <div className="synth-editor-container bg-gradient-to-b from-[#1e1e1e] to-[#151515]">
+        <EditorHeader instrument={instrument} onChange={handleChange} vizMode={vizMode} onVizModeChange={setVizMode} showHelpButton={false} onBake={handleBake} onBakePro={handleBakePro} onUnbake={handleUnbake} isBaked={isBaked} isBaking={isBaking} />
+        <div className="synth-editor-content overflow-y-auto">
+          <Suspense fallback={<LoadingControls />}>
+            <CalfMonoControls config={calfConfig} onChange={handleCalfMonoChange} />
+          </Suspense>
+        </div>
+      </div>
+    );
+  }
+
+  // ── setBfree Hammond B3 ──────────────────────────────────
+  if (editorMode === 'setbfree' || instrument.synthType === 'SetBfree') {
+    const bfreeConfig = { ...DEFAULT_SETBFREE, ...(instrument.setbfree || {}) };
+    return (
+      <div className="synth-editor-container bg-gradient-to-b from-[#1e1e1e] to-[#151515]">
+        <EditorHeader instrument={instrument} onChange={handleChange} vizMode={vizMode} onVizModeChange={setVizMode} showHelpButton={false} onBake={handleBake} onBakePro={handleBakePro} onUnbake={handleUnbake} isBaked={isBaked} isBaking={isBaking} />
+        <div className="synth-editor-content overflow-y-auto">
+          <Suspense fallback={<LoadingControls />}>
+            <SetBfreeControls config={bfreeConfig} onChange={handleSetBfreeChange} />
+          </Suspense>
+        </div>
+      </div>
+    );
+  }
+
+  // ── SynthV1 (4-osc poly) ─────────────────────────────────
+  if (editorMode === 'synthv1' || instrument.synthType === 'SynthV1') {
+    const sv1Config = { ...DEFAULT_SYNTHV1, ...(instrument.synthv1 || {}) };
+    return (
+      <div className="synth-editor-container bg-gradient-to-b from-[#1e1e1e] to-[#151515]">
+        <EditorHeader instrument={instrument} onChange={handleChange} vizMode={vizMode} onVizModeChange={setVizMode} showHelpButton={false} onBake={handleBake} onBakePro={handleBakePro} onUnbake={handleUnbake} isBaked={isBaked} isBaking={isBaking} />
+        <div className="synth-editor-content overflow-y-auto">
+          <Suspense fallback={<LoadingControls />}>
+            <SynthV1Controls config={sv1Config} onChange={handleSynthV1Change} />
+          </Suspense>
+        </div>
+      </div>
+    );
+  }
+
+  // ── Monique (Morphing Mono) ──────────────────────────────
+  if (editorMode === 'moniqueSynth' || instrument.synthType === 'Monique') {
+    const moniqueConfig = { ...DEFAULT_MONIQUE, ...(instrument.monique || {}) };
+    return (
+      <div className="synth-editor-container bg-gradient-to-b from-[#1e1e1e] to-[#151515]">
+        <EditorHeader instrument={instrument} onChange={handleChange} vizMode={vizMode} onVizModeChange={setVizMode} showHelpButton={false} onBake={handleBake} onBakePro={handleBakePro} onUnbake={handleUnbake} isBaked={isBaked} isBaking={isBaking} />
+        <div className="synth-editor-content overflow-y-auto">
+          <Suspense fallback={<LoadingControls />}>
+            <MoniqueControls config={moniqueConfig} onChange={handleMoniqueChange} />
+          </Suspense>
+        </div>
+      </div>
+    );
+  }
+
+  // ── TAL-NoiseMaker ───────────────────────────────────────
+  if (editorMode === 'talNoizeMaker' || instrument.synthType === 'TalNoizeMaker') {
+    const talConfig = { ...DEFAULT_TAL_NOIZEMAKER, ...(instrument.talNoizeMaker || {}) };
+    return (
+      <div className="synth-editor-container bg-gradient-to-b from-[#1e1e1e] to-[#151515]">
+        <EditorHeader instrument={instrument} onChange={handleChange} vizMode={vizMode} onVizModeChange={setVizMode} showHelpButton={false} onBake={handleBake} onBakePro={handleBakePro} onUnbake={handleUnbake} isBaked={isBaked} isBaking={isBaking} />
+        <div className="synth-editor-content overflow-y-auto">
+          <Suspense fallback={<LoadingControls />}>
+            <TalNoizeMakerControls config={talConfig} onChange={handleTalNoizeMakerChange} />
+          </Suspense>
+        </div>
+      </div>
+    );
+  }
+
+  // ── Aeolus (Pipe Organ) ──────────────────────────────────
+  if (editorMode === 'aeolus' || instrument.synthType === 'Aeolus') {
+    const aeolusConfig = { ...DEFAULT_AEOLUS, ...(instrument.aeolus || {}) };
+    return (
+      <div className="synth-editor-container bg-gradient-to-b from-[#1e1e1e] to-[#151515]">
+        <EditorHeader instrument={instrument} onChange={handleChange} vizMode={vizMode} onVizModeChange={setVizMode} showHelpButton={false} onBake={handleBake} onBakePro={handleBakePro} onUnbake={handleUnbake} isBaked={isBaked} isBaking={isBaking} />
+        <div className="synth-editor-content overflow-y-auto">
+          <Suspense fallback={<LoadingControls />}>
+            <AeolusControls config={aeolusConfig} onChange={handleAeolusChange} />
+          </Suspense>
+        </div>
+      </div>
+    );
+  }
+
+  // ── FluidSynth (SF2) ─────────────────────────────────────
+  if (editorMode === 'fluidsynth' || instrument.synthType === 'FluidSynth') {
+    const fsConfig = { ...DEFAULT_FLUIDSYNTH, ...(instrument.fluidsynth || {}) };
+    return (
+      <div className="synth-editor-container bg-gradient-to-b from-[#1e1e1e] to-[#151515]">
+        <EditorHeader instrument={instrument} onChange={handleChange} vizMode={vizMode} onVizModeChange={setVizMode} showHelpButton={false} onBake={handleBake} onBakePro={handleBakePro} onUnbake={handleUnbake} isBaked={isBaked} isBaking={isBaking} />
+        <div className="synth-editor-content overflow-y-auto">
+          <Suspense fallback={<LoadingControls />}>
+            <FluidSynthControls config={fsConfig} onChange={handleFluidSynthChange} />
+          </Suspense>
+        </div>
+      </div>
+    );
+  }
+
+  // ── Sfizz (SFZ) ──────────────────────────────────────────
+  if (editorMode === 'sfizz' || instrument.synthType === 'Sfizz') {
+    const sfizzConfig = { ...DEFAULT_SFIZZ, ...(instrument.sfizz || {}) };
+    return (
+      <div className="synth-editor-container bg-gradient-to-b from-[#1e1e1e] to-[#151515]">
+        <EditorHeader instrument={instrument} onChange={handleChange} vizMode={vizMode} onVizModeChange={setVizMode} showHelpButton={false} onBake={handleBake} onBakePro={handleBakePro} onUnbake={handleUnbake} isBaked={isBaked} isBaking={isBaking} />
+        <div className="synth-editor-content overflow-y-auto">
+          <Suspense fallback={<LoadingControls />}>
+            <SfizzControls config={sfizzConfig} onChange={handleSfizzChange} />
+          </Suspense>
+        </div>
+      </div>
+    );
+  }
+
+  // ── ZynAddSubFX ──────────────────────────────────────────
+  if (editorMode === 'zynaddsubfx' || instrument.synthType === 'ZynAddSubFX') {
+    const zasfxConfig = { ...DEFAULT_ZYNADDSUBFX, ...(instrument.zynaddsubfx || {}) };
+    return (
+      <div className="synth-editor-container bg-gradient-to-b from-[#1e1e1e] to-[#151515]">
+        <EditorHeader instrument={instrument} onChange={handleChange} vizMode={vizMode} onVizModeChange={setVizMode} showHelpButton={false} onBake={handleBake} onBakePro={handleBakePro} onUnbake={handleUnbake} isBaked={isBaked} isBaking={isBaking} />
+        <div className="synth-editor-content overflow-y-auto">
+          <Suspense fallback={<LoadingControls />}>
+            <ZynAddSubFXControls config={zasfxConfig} onChange={handleZynAddSubFXChange} />
           </Suspense>
         </div>
       </div>
