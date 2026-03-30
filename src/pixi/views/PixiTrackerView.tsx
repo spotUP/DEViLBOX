@@ -45,10 +45,11 @@ import { PixiPianoRollView } from './PixiPianoRollView';
 import { PixiGTUltraView } from './gtultra/PixiGTUltraView';
 import { PixiSc68View } from './sc68/PixiSc68View';
 import { useTrackerView } from '@/hooks/views/useTrackerView';
-import { AUTOMATION_LANE_WIDTH } from '@/hooks/views/usePatternEditor';
-import { useTrackerStore, useUIStore, useInstrumentStore, useEditorStore } from '@stores';
+import { AUTOMATION_LANE_WIDTH, AUTOMATION_LANE_MIN } from '@/hooks/views/usePatternEditor';
+import { useTrackerStore, useUIStore, useInstrumentStore, useEditorStore, useAutomationStore } from '@stores';
 import { useWorkbenchStore } from '@stores/useWorkbenchStore';
 import { useMIDIStore } from '@stores/useMIDIStore';
+import { useShallow } from 'zustand/react/shallow';
 import { TITLE_H } from '../workbench/workbenchLayout';
 import { getTrackerReplayer } from '@engine/TrackerReplayer';
 import { PixiButton } from '../components/PixiButton';
@@ -111,18 +112,35 @@ export const PixiTrackerView: React.FC = () => {
   // Only the offsets/widths matter here; we read the current pattern's channel metadata.
   const currentPattern = useTrackerStore(s => s.patterns[s.currentPatternIndex]);
   const columnVisibility = useEditorStore(s => s.columnVisibility);
+  // Per-channel automation lane count (for multi-lane width allocation)
+  const channelLaneCounts = useAutomationStore(useShallow((s) => {
+    if (!showAutomation || !currentPattern) return [] as number[];
+    const nc = currentPattern.channels.length;
+    const counts: number[] = [];
+    for (let ch = 0; ch < nc; ch++) {
+      const lane = s.channelLanes.get(ch);
+      if (!lane) { counts.push(1); continue; }
+      const n = lane.activeParameters?.length || (lane.activeParameter ? 1 : 0);
+      counts.push(Math.max(1, n));
+    }
+    return counts;
+  }));
+
   const { channelOffsets, channelWidths } = useMemo(() => {
     if (!currentPattern) return { channelOffsets: [] as number[], channelWidths: [] as number[] };
     const CHAR_W = 10, LINE_NUM_W = 40;
     const noteW = CHAR_W * 3 + 4;
     const showAcid = columnVisibility.flag1 || columnVisibility.flag2;
     const showProb = columnVisibility.probability;
-    const autoExtra = showAutomation ? AUTOMATION_LANE_WIDTH : 0;
     const offsets: number[] = [];
     const widths: number[] = [];
     let x = LINE_NUM_W;
     for (let ch = 0; ch < currentPattern.channels.length; ch++) {
       const channel = currentPattern.channels[ch];
+      const lc = showAutomation ? (channelLaneCounts[ch] ?? 1) : 0;
+      const autoExtra = lc <= 0 ? 0
+        : lc === 1 ? AUTOMATION_LANE_WIDTH
+        : Math.max(AUTOMATION_LANE_WIDTH, lc * AUTOMATION_LANE_MIN + 4);
       if (channel?.collapsed) {
         const cw = noteW + 40 + autoExtra;
         offsets.push(x); widths.push(cw); x += cw;
@@ -135,7 +153,7 @@ export const PixiTrackerView: React.FC = () => {
       }
     }
     return { channelOffsets: offsets, channelWidths: widths };
-  }, [currentPattern, columnVisibility, showAutomation]);
+  }, [currentPattern, columnVisibility, showAutomation, channelLaneCounts]);
 
   // Adjacent pattern IDs for ghost automation curves
   const prevPatternId = useTrackerStore(s => {

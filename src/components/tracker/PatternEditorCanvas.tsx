@@ -6,13 +6,13 @@
  */
 
 import React, { useRef, useEffect, useCallback, useState, useMemo } from 'react';
-import { useTrackerStore, useCursorStore, useTransportStore, useThemeStore, useInstrumentStore, useEditorStore } from '@stores';
+import { useTrackerStore, useCursorStore, useTransportStore, useThemeStore, useInstrumentStore, useEditorStore, useAutomationStore } from '@stores';
 import { AutomationLanes } from './AutomationLanes';
 import { AutomationParameterPicker } from '../automation/AutomationParameterPicker';
 import { MacroLanes } from './MacroLanes';
 import { useUIStore } from '@stores/useUIStore';
 import { useShallow } from 'zustand/react/shallow';
-import { usePatternEditor, AUTOMATION_LANE_WIDTH } from '@hooks/views/usePatternEditor';
+import { usePatternEditor, AUTOMATION_LANE_WIDTH, AUTOMATION_LANE_MIN } from '@hooks/views/usePatternEditor';
 import { ChannelVUMeter } from './ChannelVUMeter';
 import { ChannelVUMeters } from './ChannelVUMeters';
 import { ChannelColorPicker } from './ChannelColorPicker';
@@ -234,6 +234,20 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
   const showAutomationLanes = useUIStore(s => s.showAutomationLanes);
   const showMacroLanes = useUIStore(s => s.showMacroLanes);
 
+  // Per-channel automation lane count (for multi-lane width allocation)
+  const channelLaneCounts = useAutomationStore(useShallow((s) => {
+    if (!showAutomationLanes || !pattern) return [] as number[];
+    const nc = pattern.channels.length;
+    const counts: number[] = [];
+    for (let ch = 0; ch < nc; ch++) {
+      const lane = s.channelLanes.get(ch);
+      if (!lane) { counts.push(1); continue; }
+      const n = lane.activeParameters?.length || (lane.activeParameter ? 1 : 0);
+      counts.push(Math.max(1, n));
+    }
+    return counts;
+  }));
+
   // Use larger sizes on mobile iOS (Canvas2D main-thread path) for finger-friendly targets
   const mobileCanvas = webglUnsupported && isMobile;
   const CW = mobileCanvas ? M_CHAR_WIDTH : CHAR_WIDTH;
@@ -279,7 +293,12 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
     // Determine extra column visibility from store settings (stable!)
     const showAcid = columnVisibility.flag1 || columnVisibility.flag2;
     const showProb = columnVisibility.probability;
-    const autoLaneExtra = showAutomationLanes ? AUTOMATION_LANE_W : 0;
+    const autoLaneExtra = (ch: number) => {
+      if (!showAutomationLanes) return 0;
+      const lc = channelLaneCounts[ch] ?? 1;
+      return lc <= 1 ? AUTOMATION_LANE_W
+        : Math.max(AUTOMATION_LANE_W, lc * AUTOMATION_LANE_MIN + 4);
+    };
 
     // Calculate per-channel widths based on effectCols
     const offsets: number[] = [];
@@ -291,7 +310,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
       const isCollapsed = channel?.collapsed;
 
       if (isCollapsed) {
-        const collapsedWidth = noteWidth + (mobileCanvas ? 64 : 40) + autoLaneExtra;
+        const collapsedWidth = noteWidth + (mobileCanvas ? 64 : 40) + autoLaneExtra(ch);
         offsets.push(currentX);
         widths.push(collapsedWidth);
         currentX += collapsedWidth;
@@ -302,7 +321,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
           + effectWidth
           + (showAcid ? CW * 2 + 8 : 0)
           + (showProb ? CW * 2 + 4 : 0);
-        const chWidth = noteWidth + paramWidth + (mobileCanvas ? 96 : 60) + autoLaneExtra;
+        const chWidth = noteWidth + paramWidth + (mobileCanvas ? 96 : 60) + autoLaneExtra(ch);
         offsets.push(currentX);
         widths.push(chWidth);
         currentX += chWidth;
@@ -315,7 +334,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
       channelWidths: widths,
       totalChannelsWidth: currentX - LNW
     };
-  }, [pattern, instruments, columnVisibility, isFormatMode, formatColumns, formatChannels, mobileCanvas, CW, LNW, showAutomationLanes]);
+  }, [pattern, instruments, columnVisibility, isFormatMode, formatColumns, formatChannels, mobileCanvas, CW, LNW, showAutomationLanes, channelLaneCounts]);
 
   // Keep channelOffsetsRef/channelWidthsRef in sync for the RAF loop (selection math)
   useEffect(() => {

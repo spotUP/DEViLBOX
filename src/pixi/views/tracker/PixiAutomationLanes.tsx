@@ -14,8 +14,9 @@ import { getNKSParametersForSynth } from '@/midi/performance/synthParameterMaps'
 import { NKSSection } from '@/midi/performance/types';
 import type { SynthType } from '@typedefs/instrument';
 
+import { AUTOMATION_LANE_WIDTH, AUTOMATION_LANE_MIN } from '@hooks/views/usePatternEditor';
+
 const LANE_WIDTH = 24;
-const MULTI_LANE_WIDTH = 20;
 
 /** Map NKS section to a hex color for Pixi rendering */
 function sectionToHex(section: string): number {
@@ -178,9 +179,29 @@ export const PixiAutomationLanes: React.FC<PixiAutomationLanesProps> = ({
     nextCurves.some(c => c !== null) ||
     hasMultiLane;
 
-  // Lane X position: right edge of channel, accounting for horizontal scroll
-  const getLaneLeft = (ch: number) =>
-    (channelOffsets[ch] ?? 0) + (channelWidths[ch] ?? 0) - LANE_WIDTH - scrollLeft;
+  // Lane X position: in the dedicated automation area at the right edge of channel
+  const getAutoArea = (ch: number) => {
+    const group = channelCurveGroups.get(ch);
+    const laneCount = group ? Math.max(1, group.length) : 1;
+    return laneCount <= 1 ? AUTOMATION_LANE_WIDTH
+      : Math.max(AUTOMATION_LANE_WIDTH, laneCount * AUTOMATION_LANE_MIN + 4);
+  };
+  const getLaneLeft = (ch: number) => {
+    const autoArea = getAutoArea(ch);
+    const group = channelCurveGroups.get(ch);
+    const laneCount = group ? Math.max(1, group.length) : 1;
+    const areaLeft = (channelOffsets[ch] ?? 0) + (channelWidths[ch] ?? 0) - autoArea - scrollLeft;
+    if (laneCount > 1) {
+      return areaLeft + 1; // primary at slot 0
+    }
+    return areaLeft + (autoArea - LANE_WIDTH) / 2;
+  };
+  const getLaneWidth = (ch: number) => {
+    const autoArea = getAutoArea(ch);
+    const group = channelCurveGroups.get(ch);
+    const laneCount = group ? Math.max(1, group.length) : 1;
+    return laneCount > 1 ? Math.max(4, Math.floor(autoArea / laneCount) - 2) : LANE_WIDTH;
+  };
 
   // Interaction handlers
   const handlePointerDown = useCallback((e: FederatedPointerEvent) => {
@@ -188,14 +209,15 @@ export const PixiAutomationLanes: React.FC<PixiAutomationLanesProps> = ({
 
     for (let ch = 0; ch < channelCount; ch++) {
       const laneLeft = getLaneLeft(ch);
-      if (local.x >= laneLeft && local.x <= laneLeft + LANE_WIDTH) {
+      const lw = getLaneWidth(ch);
+      if (local.x >= laneLeft && local.x <= laneLeft + lw) {
         const curve = curves[ch];
         if (!curve) continue;
 
         const row = Math.floor((local.y + scrollOffset) / rowHeight);
         if (row < 0 || row >= patternLength) continue;
 
-        const value = Math.max(0, Math.min(1, (local.x - laneLeft - 1) / (LANE_WIDTH - 2)));
+        const value = Math.max(0, Math.min(1, (local.x - laneLeft - 1) / (lw - 2)));
 
         // Double-click detection
         const now = Date.now();
@@ -214,7 +236,7 @@ export const PixiAutomationLanes: React.FC<PixiAutomationLanesProps> = ({
         return;
       }
     }
-  }, [channelOffsets, channelWidths, scrollLeft, channelCount, curves, rowHeight, patternLength, addPoint, removePoint, scrollOffset]);
+  }, [channelOffsets, channelWidths, scrollLeft, channelCount, curves, channelCurveGroups, rowHeight, patternLength, addPoint, removePoint, scrollOffset]);
 
   const handlePointerMove = useCallback((e: FederatedPointerEvent) => {
     if (!dragState) return;
@@ -223,12 +245,13 @@ export const PixiAutomationLanes: React.FC<PixiAutomationLanesProps> = ({
     if (!curve) return;
 
     const laneLeft = getLaneLeft(dragState.channelIndex);
+    const lw = getLaneWidth(dragState.channelIndex);
     const row = Math.floor((local.y + scrollOffset) / rowHeight);
     if (row < 0 || row >= patternLength) return;
 
-    const value = Math.max(0, Math.min(1, (local.x - laneLeft - 1) / (LANE_WIDTH - 2)));
+    const value = Math.max(0, Math.min(1, (local.x - laneLeft - 1) / (lw - 2)));
     addPoint(curve.id, row, value);
-  }, [dragState, curves, channelOffsets, channelWidths, scrollLeft, rowHeight, patternLength, addPoint, scrollOffset]);
+  }, [dragState, curves, channelOffsets, channelWidths, channelCurveGroups, scrollLeft, rowHeight, patternLength, addPoint, scrollOffset]);
 
   const handlePointerUp = useCallback(() => {
     setDragState(null);
@@ -250,13 +273,14 @@ export const PixiAutomationLanes: React.FC<PixiAutomationLanesProps> = ({
       if (!curve) continue;
 
       const laneLeft = getLaneLeft(ch);
+      const lw = getLaneWidth(ch);
 
       // Build path points
       const points: { x: number; y: number }[] = [];
       for (let row = 0; row < pLength; row++) {
         const val = interpolateAutomationValue(curve.points, row, curve.interpolation, curve.mode);
         if (val !== null) {
-          const x = laneLeft + val * (LANE_WIDTH - 2) + 1;
+          const x = laneLeft + val * (lw - 2) + 1;
           const y = yOffset + row * rowHeight + rowHeight / 2;
           points.push({ x, y });
         }
@@ -265,7 +289,7 @@ export const PixiAutomationLanes: React.FC<PixiAutomationLanesProps> = ({
       if (points.length < 2) continue;
 
       // Fill area between curve and right edge of lane
-      const rightX = laneLeft + LANE_WIDTH;
+      const rightX = laneLeft + lw;
       g.moveTo(rightX, points[0].y);
       g.lineTo(points[0].x, points[0].y);
       for (let i = 1; i < points.length; i++) {
@@ -285,7 +309,7 @@ export const PixiAutomationLanes: React.FC<PixiAutomationLanesProps> = ({
       // Control points
       if (showPoints) {
         for (const pt of curve.points) {
-          const x = laneLeft + pt.value * (LANE_WIDTH - 2) + 1;
+          const x = laneLeft + pt.value * (lw - 2) + 1;
           const y = yOffset + pt.row * rowHeight + rowHeight / 2;
           g.circle(x, y, 2);
           g.fill({ color: accentColor, alpha: 0.8 });
@@ -353,12 +377,13 @@ export const PixiAutomationLanes: React.FC<PixiAutomationLanesProps> = ({
 
     // Draw lane background strips spanning the full pattern height
     for (let ch = 0; ch < channelCount; ch++) {
-      const laneLeft = getLaneLeft(ch);
-      if (laneLeft + LANE_WIDTH < 0 || laneLeft > width) continue;
-      g.rect(laneLeft, patTop, LANE_WIDTH, patBot - patTop);
+      const autoArea = getAutoArea(ch);
+      const areaLeft = (channelOffsets[ch] ?? 0) + (channelWidths[ch] ?? 0) - autoArea - scrollLeft;
+      if (areaLeft + autoArea < 0 || areaLeft > width) continue;
+      g.rect(areaLeft, patTop, autoArea, patBot - patTop);
       g.fill({ color: theme.accent.color, alpha: 0.04 });
-      g.moveTo(laneLeft, patTop);
-      g.lineTo(laneLeft, patBot);
+      g.moveTo(areaLeft, patTop);
+      g.lineTo(areaLeft, patBot);
       g.stroke({ color: theme.accent.color, alpha: 0.12, width: 1 });
     }
 
@@ -375,13 +400,16 @@ export const PixiAutomationLanes: React.FC<PixiAutomationLanesProps> = ({
     // Multi-lane: additional curves per channel with section-colored strokes
     for (const [ch, group] of channelCurveGroups.entries()) {
       if (group.length <= 1) continue;
-      const baseLaneLeft = getLaneLeft(ch);
+      const autoArea = getAutoArea(ch);
+      const areaLeft = (channelOffsets[ch] ?? 0) + (channelWidths[ch] ?? 0) - autoArea - scrollLeft;
+      const perLane = Math.floor(autoArea / group.length);
 
       for (let laneIdx = 1; laneIdx < group.length; laneIdx++) {
         const { curve, param } = group[laneIdx];
-        const laneLeft = baseLaneLeft - laneIdx * (MULTI_LANE_WIDTH + 2);
+        const laneLeft = areaLeft + laneIdx * perLane + 1;
+        const laneWidth = Math.max(4, perLane - 2);
         const paramColor = resolveParamColor(ch, param);
-        drawSingleCurve(g, curve, patternLength, laneLeft, MULTI_LANE_WIDTH, -scrollOffset, paramColor, 1, true);
+        drawSingleCurve(g, curve, patternLength, laneLeft, laneWidth, -scrollOffset, paramColor, 1, true);
       }
     }
 
