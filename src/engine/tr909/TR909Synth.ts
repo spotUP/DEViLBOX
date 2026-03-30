@@ -49,6 +49,8 @@ export interface TR909Params {
   snappy?: number;  // 0-100 (snare only: noise level in dB)
   tone?: number;    // 0-100 (snare only: noise decay rate)
   attack?: number;  // 0-100 (bassdrum only: click attack level in dB)
+  /** Frequency multiplier for pitch shifting (1.0 = normal, 2.0 = octave up) */
+  pitchMultiplier?: number;
 }
 
 export interface TR909Resources {
@@ -223,6 +225,9 @@ function triggerBassdrum(
   const FREQ_END = 53.0;
   const cycleBaseFreq = RESOURCE_SAMPLE_RATE / resources.cycle.length; // ≈43.07Hz
 
+  // Pitch multiplier from note mapping (1.0 = normal)
+  const pm = params.pitchMultiplier ?? 1.0;
+
   // --- Cycle source (looping single-cycle waveform) ---
   const cycleSource = audioCtx.createBufferSource();
   cycleSource.buffer = resources.cycle;
@@ -230,8 +235,8 @@ function triggerBassdrum(
   cycleSource.loopEnd = resources.cycle.duration;
 
   // Pitch sweep via playbackRate: FreqStart/baseFreq → FreqEnd/baseFreq
-  const startRate = FREQ_START / cycleBaseFreq;
-  const endRate = FREQ_END / cycleBaseFreq;
+  const startRate = (FREQ_START / cycleBaseFreq) * pm;
+  const endRate = (FREQ_END / cycleBaseFreq) * pm;
   // The exponential sweep converges in ~5 time constants
   const sweepDuration = Math.max(sweepTimeConst * 5, 0.001);
 
@@ -300,9 +305,10 @@ function triggerSnaredrum(
   const levelDb = volumeDefault.y(levelUnipolar);
   const levelGain = levelDb === Number.NEGATIVE_INFINITY ? 0 : dbToGain(levelDb);
 
-  // Tune → playback rate modifier
+  // Tune → playback rate modifier (includes external pitch multiplier)
+  const pm = params.pitchMultiplier ?? 1.0;
   const tuneValue = tuneMapping.y(tuneUnipolar); // -0.5..0.5
-  const toneRate = Math.pow(2.0, tuneValue);
+  const toneRate = Math.pow(2.0, tuneValue) * pm;
 
   // Noise decay time constant
   const noiseDecayTimeConst = snaredrumDecayMapping.y(toneUnipolar);
@@ -372,11 +378,11 @@ function triggerBasicVoice(
   const levelDb = volumeDefault.y(levelUnipolar);
   const levelGain = levelDb === Number.NEGATIVE_INFINITY ? 0 : dbToGain(levelDb);
 
-  // Tune → playback rate
-  let rate = 1.0;
+  // Tune → playback rate (includes external pitch multiplier)
+  let rate = params.pitchMultiplier ?? 1.0;
   if (hasTune) {
     const tuneValue = tuneMapping.y(tuneUnipolar);
-    rate = Math.pow(2.0, tuneValue);
+    rate *= Math.pow(2.0, tuneValue);
   }
 
   // Decay time constant
