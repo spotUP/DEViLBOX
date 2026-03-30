@@ -43,6 +43,7 @@ interface UIStore {
   showAutomationLanes: boolean;
   showMacroLanes: boolean;
   showMacroSlots: boolean;
+  patternEditorScrollLeft: number; // Horizontal scroll offset shared with automation lanes
   sidebarCollapsed: boolean;
   useHexNumbers: boolean; // Display numbers in hex (true) or decimal (false)
   rowHighlightInterval: number; // Every N rows gets highlight (default 4, FT2 style)
@@ -218,6 +219,7 @@ export const useUIStore = create<UIStore>()(
       showAutomationLanes: false,
       showMacroLanes: false,
       showMacroSlots: false,
+      patternEditorScrollLeft: 0,
       sidebarCollapsed: false,
       useHexNumbers: true, // Default to hex numbers (FT2 style)
       rowHighlightInterval: 4, // Highlight every 4th row (FT2 default)

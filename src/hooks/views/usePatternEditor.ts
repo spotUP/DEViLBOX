@@ -39,6 +39,7 @@ import type { CursorPosition, BlockSelection } from '@typedefs';
 // ─── Layout constants (must match PatternEditorCanvas + PixiPatternEditor) ───
 const CHAR_WIDTH = 10;
 const LINE_NUMBER_WIDTH = 40;
+export const AUTOMATION_LANE_WIDTH = 28; // 24px lane + 4px gap
 
 // ─── Hook ─────────────────────────────────────────────────────────────────────
 
@@ -92,6 +93,7 @@ export function usePatternEditor() {
 
   // ── UI / display settings ─────────────────────────────────────────────────
   const trackerZoom = useUIStore((s) => s.trackerZoom);
+  const showAutomationLanes = useUIStore((s) => s.showAutomationLanes);
   const rowHeight = Math.round(24 * (trackerZoom / 100));
 
   // Ref-tracked row height for hot loops (avoids restarting effects on zoom change)
@@ -179,6 +181,7 @@ export function usePatternEditor() {
     const noteWidth = CHAR_WIDTH * 3 + 4;
     const showAcid = columnVisibility.flag1 || columnVisibility.flag2;
     const showProb = columnVisibility.probability;
+    const autoLaneExtra = showAutomationLanes ? AUTOMATION_LANE_WIDTH : 0;
 
     const offsets: number[] = [];
     const widths: number[] = [];
@@ -188,7 +191,7 @@ export function usePatternEditor() {
       const channel = pattern.channels[ch];
       const isCollapsed = channel?.collapsed;
       if (isCollapsed) {
-        const cw = noteWidth + 40;
+        const cw = noteWidth + 40 + autoLaneExtra;
         offsets.push(currentX);
         widths.push(cw);
         currentX += cw;
@@ -199,7 +202,7 @@ export function usePatternEditor() {
           + effectWidth
           + (showAcid ? CHAR_WIDTH * 2 + 8 : 0)
           + (showProb ? CHAR_WIDTH * 2 + 4 : 0);
-        const chWidth = noteWidth + paramWidth + 60;
+        const chWidth = noteWidth + paramWidth + 60 + autoLaneExtra;
         offsets.push(currentX);
         widths.push(chWidth);
         currentX += chWidth;
@@ -212,7 +215,7 @@ export function usePatternEditor() {
       channelWidths: widths,
       totalChannelsWidth: currentX - LINE_NUMBER_WIDTH,
     };
-  }, [pattern, columnVisibility]);
+  }, [pattern, columnVisibility, showAutomationLanes]);
 
   // ─────────────────────────────────────────────────────────────────────────
 

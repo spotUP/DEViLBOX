@@ -7,7 +7,7 @@
 import { useCallback, useMemo, useRef, useState } from 'react';
 import type { Graphics as GraphicsType, FederatedPointerEvent } from 'pixi.js';
 import { usePixiTheme } from '../../theme';
-import { useAutomationStore, useInstrumentStore, useTrackerStore } from '@stores';
+import { useAutomationStore, useInstrumentStore, useTrackerStore, useTransportStore, useCursorStore } from '@stores';
 import { interpolateAutomationValue } from '@typedefs/automation';
 import type { AutomationCurve } from '@typedefs/automation';
 import { getNKSParametersForSynth } from '@/midi/performance/synthParameterMaps';
@@ -53,6 +53,9 @@ interface PixiAutomationLanesProps {
   patternLength: number;
   rowHeight: number;
   channelCount: number;
+  channelOffsets: number[];
+  channelWidths: number[];
+  scrollLeft: number;
   parameter?: string;
   prevPatternId?: string;
   prevPatternLength?: number;
@@ -67,6 +70,9 @@ export const PixiAutomationLanes: React.FC<PixiAutomationLanesProps> = ({
   patternLength,
   rowHeight,
   channelCount,
+  channelOffsets,
+  channelWidths,
+  scrollLeft,
   parameter = 'cutoff',
   prevPatternId,
   prevPatternLength,
@@ -78,6 +84,22 @@ export const PixiAutomationLanes: React.FC<PixiAutomationLanesProps> = ({
   const addPoint = useAutomationStore(s => s.addPoint);
   const removePoint = useAutomationStore(s => s.removePoint);
   const channelLanes = useAutomationStore(s => s.channelLanes);
+
+  // Scroll sync — align with PixiPatternEditor's center-cursor scroll model.
+  // The pattern editor draws row r at: gridTop + centerLineTop + (r - currentRow) * rowHeight
+  // where gridTop=48 from editor top. Lanes container is at parent top=28, so grid
+  // starts 20px below lanes' y=0. We compute scrollOffset so that
+  // drawCurves(yOffset = -scrollOffset) positions row r at the same screen y.
+  const isPlaying = useTransportStore(s => s.isPlaying);
+  const playbackRow = useTransportStore(s => s.currentRow);
+  const cursorRow = useCursorStore(s => s.cursor.rowIndex);
+  const currentRow = isPlaying ? playbackRow : cursorRow;
+  const GRID_OFFSET = 20; // lanes at top:28, grid at editor's HEADER_HEIGHT=48 → 20px gap
+  const gridHeight = height - GRID_OFFSET; // approximate grid area (ignoring h-scrollbar)
+  const centerLineTop = Math.floor(gridHeight / 2) - rowHeight / 2;
+  // Row r is drawn at y = r*rowH - scrollOffset. We want that = GRID_OFFSET + centerLineTop + (r-currentRow)*rowH
+  // So: scrollOffset = r*rowH - GRID_OFFSET - centerLineTop - (r-currentRow)*rowH = currentRow*rowH - GRID_OFFSET - centerLineTop
+  const scrollOffset = currentRow * rowHeight - GRID_OFFSET - centerLineTop;
 
   const [dragState, setDragState] = useState<{ curveId: string; channelIndex: number } | null>(null);
   const lastClickRef = useRef<{ time: number; row: number }>({ time: 0, row: -1 });
@@ -156,18 +178,21 @@ export const PixiAutomationLanes: React.FC<PixiAutomationLanesProps> = ({
     nextCurves.some(c => c !== null) ||
     hasMultiLane;
 
+  // Lane X position: right edge of channel, accounting for horizontal scroll
+  const getLaneLeft = (ch: number) =>
+    (channelOffsets[ch] ?? 0) + (channelWidths[ch] ?? 0) - LANE_WIDTH - scrollLeft;
+
   // Interaction handlers
   const handlePointerDown = useCallback((e: FederatedPointerEvent) => {
     const local = e.getLocalPosition(e.currentTarget);
-    const channelWidth = width / channelCount;
 
     for (let ch = 0; ch < channelCount; ch++) {
-      const laneLeft = (ch + 1) * channelWidth - LANE_WIDTH - 4;
+      const laneLeft = getLaneLeft(ch);
       if (local.x >= laneLeft && local.x <= laneLeft + LANE_WIDTH) {
         const curve = curves[ch];
         if (!curve) continue;
 
-        const row = Math.floor(local.y / rowHeight);
+        const row = Math.floor((local.y + scrollOffset) / rowHeight);
         if (row < 0 || row >= patternLength) continue;
 
         const value = Math.max(0, Math.min(1, (local.x - laneLeft - 1) / (LANE_WIDTH - 2)));
@@ -189,7 +214,7 @@ export const PixiAutomationLanes: React.FC<PixiAutomationLanesProps> = ({
         return;
       }
     }
-  }, [width, channelCount, curves, rowHeight, patternLength, addPoint, removePoint]);
+  }, [channelOffsets, channelWidths, scrollLeft, channelCount, curves, rowHeight, patternLength, addPoint, removePoint, scrollOffset]);
 
   const handlePointerMove = useCallback((e: FederatedPointerEvent) => {
     if (!dragState) return;
@@ -197,14 +222,13 @@ export const PixiAutomationLanes: React.FC<PixiAutomationLanesProps> = ({
     const curve = curves[dragState.channelIndex];
     if (!curve) return;
 
-    const channelWidth = width / channelCount;
-    const laneLeft = (dragState.channelIndex + 1) * channelWidth - LANE_WIDTH - 4;
-    const row = Math.floor(local.y / rowHeight);
+    const laneLeft = getLaneLeft(dragState.channelIndex);
+    const row = Math.floor((local.y + scrollOffset) / rowHeight);
     if (row < 0 || row >= patternLength) return;
 
     const value = Math.max(0, Math.min(1, (local.x - laneLeft - 1) / (LANE_WIDTH - 2)));
     addPoint(curve.id, row, value);
-  }, [dragState, curves, width, channelCount, rowHeight, patternLength, addPoint]);
+  }, [dragState, curves, channelOffsets, channelWidths, scrollLeft, rowHeight, patternLength, addPoint, scrollOffset]);
 
   const handlePointerUp = useCallback(() => {
     setDragState(null);
@@ -219,14 +243,13 @@ export const PixiAutomationLanes: React.FC<PixiAutomationLanesProps> = ({
     alpha: number,
     showPoints: boolean
   ) => {
-    const channelWidth = width / channelCount;
     const accentColor = theme.accent.color;
 
     for (let ch = 0; ch < curvesArray.length; ch++) {
       const curve = curvesArray[ch];
       if (!curve) continue;
 
-      const laneLeft = (ch + 1) * channelWidth - LANE_WIDTH - 4;
+      const laneLeft = getLaneLeft(ch);
 
       // Build path points
       const points: { x: number; y: number }[] = [];
@@ -324,36 +347,35 @@ export const PixiAutomationLanes: React.FC<PixiAutomationLanesProps> = ({
     g.clear();
     if (!hasAnyData) return;
 
-    const channelWidth = width / channelCount;
     const prevLen = prevPatternId ? (prevPatternLength || patternLength) : 0;
 
     // Ghost: previous pattern curves
     if (prevCurves.length > 0 && prevLen > 0) {
-      drawCurves(g, prevCurves, prevLen, -(prevLen * rowHeight), 0.5, false);
+      drawCurves(g, prevCurves, prevLen, -(prevLen * rowHeight) - scrollOffset, 0.5, false);
     }
 
     // Current pattern curves (primary lane)
-    drawCurves(g, curves, patternLength, 0, 1, true);
+    drawCurves(g, curves, patternLength, -scrollOffset, 1, true);
 
     // Multi-lane: additional curves per channel with section-colored strokes
     for (const [ch, group] of channelCurveGroups.entries()) {
       if (group.length <= 1) continue;
-      const baseLaneLeft = (ch + 1) * channelWidth - LANE_WIDTH - 4;
+      const baseLaneLeft = getLaneLeft(ch);
 
       for (let laneIdx = 1; laneIdx < group.length; laneIdx++) {
         const { curve, param } = group[laneIdx];
         const laneLeft = baseLaneLeft - laneIdx * (MULTI_LANE_WIDTH + 2);
         const paramColor = resolveParamColor(ch, param);
-        drawSingleCurve(g, curve, patternLength, laneLeft, MULTI_LANE_WIDTH, 0, paramColor, 1, true);
+        drawSingleCurve(g, curve, patternLength, laneLeft, MULTI_LANE_WIDTH, -scrollOffset, paramColor, 1, true);
       }
     }
 
     // Ghost: next pattern curves
     if (nextCurves.length > 0) {
       const nextLen = nextPatternLength || patternLength;
-      drawCurves(g, nextCurves, nextLen, patternLength * rowHeight, 0.5, false);
+      drawCurves(g, nextCurves, nextLen, patternLength * rowHeight - scrollOffset, 0.5, false);
     }
-  }, [hasAnyData, curves, prevCurves, nextCurves, channelCurveGroups, patternLength, prevPatternLength, nextPatternLength, prevPatternId, rowHeight, width, channelCount, theme]);
+  }, [hasAnyData, curves, prevCurves, nextCurves, channelCurveGroups, patternLength, prevPatternLength, nextPatternLength, prevPatternId, rowHeight, channelOffsets, channelWidths, scrollLeft, channelCount, theme, scrollOffset]);
 
   if (!hasAnyData) return null;
 
