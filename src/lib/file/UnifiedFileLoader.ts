@@ -873,10 +873,17 @@ async function loadSongFile(file: File, options: FileLoadOptions, preReadBuffer?
       return { success: false, error: 'No patterns found in MIDI file' };
     }
 
-    loadPatterns(result.patterns);
+    // Load instruments FIRST, then wait for the microtask to complete.
+    // loadInstruments defers set() via queueMicrotask (to avoid pixi-react crash).
+    // If we load patterns immediately, the playback effect fires before instruments
+    // are in the store → replayer gets empty instrument list → silence.
     if (result.instruments.length > 0) {
       loadInstruments(result.instruments);
     }
+    // Wait for the queueMicrotask inside loadInstruments to flush
+    await new Promise(resolve => setTimeout(resolve, 0));
+
+    loadPatterns(result.patterns);
     const songPositions = result.patterns.map((_: unknown, i: number) => i);
     setPatternOrder(songPositions);
     setCurrentPattern(0);

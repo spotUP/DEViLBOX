@@ -73,7 +73,7 @@ export const usePatternPlayback = () => {
     // setCurrentRow removed — accessed via getState() where needed
     setCurrentRowThrottled: s.setCurrentRowThrottled,
   })));
-  const { instruments } = useInstrumentStore(useShallow((s) => ({ instruments: s.instruments })));
+  const { instruments, instrumentLoadVersion } = useInstrumentStore(useShallow((s) => ({ instruments: s.instruments, instrumentLoadVersion: s.instrumentLoadVersion })));
   const { masterEffects } = useAudioStore(useShallow((s) => ({ masterEffects: s.masterEffects })));
   const isArrangementMode = useArrangementStore((state) => state.isArrangementMode);
   const loopStart = useArrangementStore((state) => state.view.loopStart);
@@ -137,8 +137,8 @@ export const usePatternPlayback = () => {
     const loopBoundsKey = (isArrangementMode && isLooping && loopStart != null && loopEnd != null)
       ? `:loop:${loopStart}-${loopEnd}`
       : '';
-    return `${patterns.length}:${pattern.channels.length}:${pattern.length}:${pattern.importMetadata?.sourceFormat ?? ''}:${patternOrderKey}${loopBoundsKey}`;
-  }, [patterns.length, pattern?.channels.length, pattern?.length, pattern?.importMetadata?.sourceFormat, patternOrderKey, isArrangementMode, isLooping, loopStart, loopEnd]);
+    return `${patterns.length}:${pattern.channels.length}:${pattern.length}:${pattern.importMetadata?.sourceFormat ?? ''}:${patternOrderKey}${loopBoundsKey}:v${instrumentLoadVersion}`;
+  }, [patterns.length, pattern?.channels.length, pattern?.length, pattern?.importMetadata?.sourceFormat, patternOrderKey, isArrangementMode, isLooping, loopStart, loopEnd, instrumentLoadVersion]);
 
   // Track if we've started playback
   const hasStartedRef = useRef(false);
@@ -215,6 +215,7 @@ export const usePatternPlayback = () => {
     const replayer = replayerRef.current;
     const pattern = patternRef.current;
     const patterns = patternsRef.current;
+
 
     // IF we are playing and the song structure changed, we need to RELOAD the song in the replayer
     // otherwise it won't know about the new patterns (like B/D animation helpers)
@@ -332,10 +333,15 @@ export const usePatternPlayback = () => {
       }
 
       // Skip reload if forcePosition was just called — the replayer already seeked.
-      // Check skipNextReload regardless of isPlaying — the cleanup may have briefly stopped it.
+      // But only skip if we've already loaded a song (hasStartedRef.current).
+      // If the replayer hasn't started yet, we MUST proceed to loadSong even if
+      // forcePosition was called (e.g. play button calls forcePosition before the
+      // effect fires for a newly loaded song).
       if (replayer.skipNextReload) {
         replayer.skipNextReload = false;
-        return;
+        if (hasStartedRef.current) {
+          return;
+        }
       }
 
       if (!hasStartedRef.current || needsReload) {
