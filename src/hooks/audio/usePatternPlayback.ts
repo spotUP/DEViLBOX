@@ -194,6 +194,15 @@ export const usePatternPlayback = () => {
     }
   }, [patterns]);
 
+  // Hot-swap instrument list into the replayer when instruments change.
+  // Without this, instruments added/modified after loadSong are invisible to
+  // the replayer's instrumentMap, causing notes on those instruments to be silent.
+  // Works both during playback AND while stopped (so the next play() is current).
+  useEffect(() => {
+    const replayer = replayerRef.current;
+    replayer.updateInstruments(instruments);
+  }, [instruments]);
+
   // When in loop mode, track which pattern is being looped so that position
   // changes (clicking position buttons) trigger a reload with the new pattern.
   // In song mode this is -1 so it doesn't interfere with patternStructureKey.
