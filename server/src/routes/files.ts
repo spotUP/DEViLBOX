@@ -172,16 +172,33 @@ function reconstructRevision(fileId: string, targetRevision: number, currentData
 
 /**
  * GET /api/files
- * List user's files
+ * List user's files from the database (returns id, filename, createdAt, updatedAt)
  */
 router.get('/', authenticateToken, (req: AuthRequest, res: Response) => {
   try {
     const userId = req.userId!;
     const type = req.query.type as string || 'songs';
 
-    const dirPath = getTypedDirectory(userId, type);
+    const rows = db.prepare(`
+      SELECT id, filename, created_at, updated_at FROM files
+      WHERE user_id = ? AND type = ?
+      ORDER BY updated_at DESC
+    `).all(userId, type) as { id: string; filename: string; created_at: number; updated_at: number }[];
 
-    const files = listDirectory(dirPath);
+    // Deduplicate by filename — keep only the most recently updated entry per filename
+    const seen = new Map<string, typeof rows[0]>();
+    for (const row of rows) {
+      if (!seen.has(row.filename)) {
+        seen.set(row.filename, row);
+      }
+    }
+
+    const files = Array.from(seen.values()).map(row => ({
+      id: row.id,
+      filename: row.filename,
+      createdAt: row.created_at,
+      updatedAt: row.updated_at,
+    }));
 
     res.json({ files });
   } catch (error) {
@@ -220,7 +237,7 @@ router.get('/:id', authenticateToken, (req: AuthRequest, res: Response) => {
 
 /**
  * POST /api/files
- * Save file
+ * Save file (upserts: if a file with the same name+type already exists for this user, update it)
  */
 router.post('/', authenticateToken, (req: AuthRequest, res: Response) => {
   try {
@@ -231,19 +248,37 @@ router.post('/', authenticateToken, (req: AuthRequest, res: Response) => {
       return res.status(400).json({ error: 'Filename and data required' });
     }
 
-    // Generate file ID
-    const fileId = randomBytes(16).toString('hex');
     const now = Date.now();
-
-    // Save to database
     const fileType = type || 'songs';
-    db.prepare(`
-      INSERT INTO files (id, user_id, filename, data, type, created_at, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?)
-    `).run(fileId, userId, filename, JSON.stringify(data), fileType, now, now);
+
+    // Check if a file with the same name+type already exists for this user
+    const existing = db.prepare(`
+      SELECT id, data FROM files
+      WHERE user_id = ? AND filename = ? AND type = ?
+      ORDER BY updated_at DESC LIMIT 1
+    `).get(userId, filename, fileType) as { id: string; data: string } | undefined;
+
+    let fileId: string;
+
+    if (existing) {
+      // Update existing file instead of creating a duplicate
+      const oldDataStr = existing.data;
+      createRevision(existing.id, oldDataStr, JSON.stringify(data));
+      db.prepare(`
+        UPDATE files SET data = ?, updated_at = ? WHERE id = ?
+      `).run(JSON.stringify(data), now, existing.id);
+      fileId = existing.id;
+    } else {
+      // Create new file
+      fileId = randomBytes(16).toString('hex');
+      db.prepare(`
+        INSERT INTO files (id, user_id, filename, data, type, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+      `).run(fileId, userId, filename, JSON.stringify(data), fileType, now, now);
+    }
 
     // Also save to filesystem
-    const dirPath = getTypedDirectory(userId, type || 'songs');
+    const dirPath = getTypedDirectory(userId, fileType);
 
     const filePath = path.join(dirPath, filename);
 
@@ -254,7 +289,7 @@ router.post('/', authenticateToken, (req: AuthRequest, res: Response) => {
 
     fsWriteFile(filePath, JSON.stringify(data, null, 2));
 
-    res.status(201).json({
+    res.status(existing ? 200 : 201).json({
       id: fileId,
       filename,
       createdAt: now,

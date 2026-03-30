@@ -9,7 +9,8 @@
  *   - "samples":  Raw PCM channel data keyed by sampleId
  */
 
-import type { DrumProgram, DrumPad, SampleData, MpcResampleConfig } from '../../types/drumpad';
+import type { DrumProgram, DrumPad, SampleData, SampleLayer, MpcResampleConfig } from '../../types/drumpad';
+import type { InstrumentConfig } from '../../types/instrument/defaults';
 import { createEmptyPad } from '../../types/drumpad';
 
 const DB_NAME = 'devilbox-drumpad';
@@ -66,6 +67,19 @@ function txStore(
   mode: IDBTransactionMode,
 ): IDBObjectStore {
   return db.transaction(storeName, mode).objectStore(storeName);
+}
+
+/** Delete the entire drumpad IndexedDB (for schema migration) */
+export async function clearDatabase(): Promise<void> {
+  if (dbInstance) {
+    dbInstance.close();
+    dbInstance = null;
+  }
+  return new Promise((resolve, reject) => {
+    const request = indexedDB.deleteDatabase(DB_NAME);
+    request.onsuccess = () => { console.log('[drumpadDB] Database cleared'); resolve(); };
+    request.onerror = () => reject(request.error);
+  });
 }
 
 function idbRequest<T>(req: IDBRequest<T>): Promise<T> {
@@ -178,14 +192,24 @@ interface StoredProgram {
   mpcResample?: MpcResampleConfig;
 }
 
+interface StoredLayer {
+  sampleId: string;
+  velocityRange: [number, number];
+  levelOffset: number;
+}
+
 interface StoredPad {
   id: number;
   name: string;
+  color?: string;
   sampleId: string | null;    // Reference to sample in STORE_SAMPLES
+  instrumentId?: number;       // Reference to instrument in useInstrumentStore
+  instrumentNote?: string;     // Fixed note for synth trigger
   level: number;
   tune: number;
   pan: number;
   output: string;
+  velocityCurve?: string;
   attack: number;
   decay: number;
   decayMode?: string;
@@ -209,6 +233,10 @@ interface StoredPad {
   sampleStart?: number;
   sampleEnd?: number;
   reverse?: boolean;
+  // Velocity-switched layers
+  layers?: StoredLayer[];
+  // Pad-owned synth config (JSON-safe, no AudioBuffer)
+  synthConfig?: InstrumentConfig;
 }
 
 function programToStored(program: DrumProgram): StoredProgram {
@@ -221,11 +249,15 @@ function programToStored(program: DrumProgram): StoredProgram {
     pads: program.pads.map(pad => ({
       id: pad.id,
       name: pad.name,
+      color: pad.color,
       sampleId: pad.sample?.id ?? null,
+      instrumentId: pad.instrumentId,
+      instrumentNote: pad.instrumentNote,
       level: pad.level,
       tune: pad.tune,
       pan: pad.pan,
       output: pad.output,
+      velocityCurve: pad.velocityCurve,
       attack: pad.attack,
       decay: pad.decay,
       decayMode: pad.decayMode,
@@ -248,6 +280,14 @@ function programToStored(program: DrumProgram): StoredProgram {
       sampleStart: pad.sampleStart,
       sampleEnd: pad.sampleEnd,
       reverse: pad.reverse,
+      layers: pad.layers.length > 0
+        ? pad.layers.map(l => ({
+            sampleId: l.sample.id,
+            velocityRange: l.velocityRange,
+            levelOffset: l.levelOffset,
+          }))
+        : undefined,
+      synthConfig: pad.synthConfig,
     })),
   };
 }
@@ -256,40 +296,58 @@ function storedToProgram(
   stored: StoredProgram,
   sampleMap: Map<string, SampleData>,
 ): DrumProgram {
-  const pads: DrumPad[] = stored.pads.map(sp => ({
-    id: sp.id,
-    name: sp.name,
-    sample: sp.sampleId ? (sampleMap.get(sp.sampleId) ?? null) : null,
-    level: sp.level,
-    tune: sp.tune,
-    pan: sp.pan,
-    output: sp.output as DrumPad['output'],
-    attack: sp.attack,
-    decay: sp.decay,
-    sustain: sp.sustain,
-    release: sp.release,
-    filterType: sp.filterType as DrumPad['filterType'],
-    cutoff: sp.cutoff,
-    resonance: sp.resonance,
-    layers: [],
-    scratchAction: sp.scratchAction as DrumPad['scratchAction'],
-    // MPC fields with backward-compatible defaults
-    muteGroup: sp.muteGroup ?? 0,
-    playMode: (sp.playMode as DrumPad['playMode']) ?? 'oneshot',
-    sampleStart: sp.sampleStart ?? 0,
-    sampleEnd: sp.sampleEnd ?? 1,
-    reverse: sp.reverse ?? false,
-    // VMPC fields with backward-compatible defaults
-    decayMode: (sp.decayMode as DrumPad['decayMode']) ?? 'start',
-    filterAttack: sp.filterAttack ?? 0,
-    filterDecay: sp.filterDecay ?? 50,
-    filterEnvAmount: sp.filterEnvAmount ?? 0,
-    veloToLevel: sp.veloToLevel ?? 100,
-    veloToAttack: sp.veloToAttack ?? 0,
-    veloToStart: sp.veloToStart ?? 0,
-    veloToFilter: sp.veloToFilter ?? 0,
-    veloToPitch: sp.veloToPitch ?? 0,
-  }));
+  const pads: DrumPad[] = stored.pads.map(sp => {
+    // Reconstruct velocity-switched layers from stored references
+    const layers: SampleLayer[] = (sp.layers ?? [])
+      .map(sl => {
+        const sample = sampleMap.get(sl.sampleId);
+        if (!sample) return null;
+        return {
+          sample,
+          velocityRange: sl.velocityRange,
+          levelOffset: sl.levelOffset,
+        };
+      })
+      .filter((l): l is SampleLayer => l !== null);
+
+    return {
+      id: sp.id,
+      name: sp.name,
+      color: sp.color,
+      sample: sp.sampleId ? (sampleMap.get(sp.sampleId) ?? null) : null,
+      instrumentId: sp.instrumentId,
+      instrumentNote: sp.instrumentNote,
+      synthConfig: sp.synthConfig,
+      level: sp.level,
+      tune: sp.tune,
+      pan: sp.pan,
+      output: sp.output as DrumPad['output'],
+      velocityCurve: (sp.velocityCurve as DrumPad['velocityCurve']) ?? undefined,
+      attack: sp.attack,
+      decay: sp.decay,
+      sustain: sp.sustain,
+      release: sp.release,
+      filterType: sp.filterType as DrumPad['filterType'],
+      cutoff: sp.cutoff,
+      resonance: sp.resonance,
+      layers,
+      scratchAction: sp.scratchAction as DrumPad['scratchAction'],
+      muteGroup: sp.muteGroup ?? 0,
+      playMode: (sp.playMode as DrumPad['playMode']) ?? 'oneshot',
+      sampleStart: sp.sampleStart ?? 0,
+      sampleEnd: sp.sampleEnd ?? 1,
+      reverse: sp.reverse ?? false,
+      decayMode: (sp.decayMode as DrumPad['decayMode']) ?? 'start',
+      filterAttack: sp.filterAttack ?? 0,
+      filterDecay: sp.filterDecay ?? 50,
+      filterEnvAmount: sp.filterEnvAmount ?? 0,
+      veloToLevel: sp.veloToLevel ?? 100,
+      veloToAttack: sp.veloToAttack ?? 0,
+      veloToStart: sp.veloToStart ?? 0,
+      veloToFilter: sp.veloToFilter ?? 0,
+      veloToPitch: sp.veloToPitch ?? 0,
+    };
+  });
 
   // Migration: expand 16-pad programs to 64 pads
   while (pads.length < 64) {
@@ -313,12 +371,15 @@ export async function saveAllPrograms(
 ): Promise<void> {
   const db = await openDB();
 
-  // Collect all unique samples across all programs
+  // Collect all unique samples across all programs (including layers)
   const sampleSet = new Map<string, SampleData>();
   for (const program of programs.values()) {
     for (const pad of program.pads) {
       if (pad.sample) {
         sampleSet.set(pad.sample.id, pad.sample);
+      }
+      for (const layer of pad.layers) {
+        sampleSet.set(layer.sample.id, layer.sample);
       }
     }
   }
@@ -415,11 +476,14 @@ function base64ToFloat32(b64: string): Float32Array {
 export async function exportConfig(
   programs: Map<string, DrumProgram>,
 ): Promise<Blob> {
-  // Collect unique samples
+  // Collect unique samples (including layers)
   const sampleSet = new Map<string, SampleData>();
   for (const program of programs.values()) {
     for (const pad of program.pads) {
       if (pad.sample) sampleSet.set(pad.sample.id, pad.sample);
+      for (const layer of pad.layers) {
+        sampleSet.set(layer.sample.id, layer.sample);
+      }
     }
   }
 

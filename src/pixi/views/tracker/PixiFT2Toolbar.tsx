@@ -413,6 +413,7 @@ export const PixiFT2Toolbar: React.FC = () => {
       layout={{
         width: '100%',
         height: FT2_TOOLBAR_HEIGHT,
+        flexShrink: 0,
         flexDirection: 'column',
       }}
     >
@@ -626,6 +627,14 @@ export const PixiFT2Toolbar: React.FC = () => {
         <PixiButton label="Reference" variant="ghost" size="sm" onClick={() => handleShowHelp('chip-effects')} />
         <PixiButton label="Help"      variant="ghost" size="sm" onClick={() => handleShowHelp('shortcuts')} />
         <PixiButton label="Settings"  variant="ghost" size="sm" onClick={handleShowSettings} />
+        <PixiButton
+          label="Info"
+          variant={modalOpen === 'moduleInfo' ? 'ft2' : 'ghost'}
+          color={modalOpen === 'moduleInfo' ? 'blue' : 'default'}
+          size="sm"
+          active={modalOpen === 'moduleInfo'}
+          onClick={() => { const s = useUIStore.getState(); if (s.modalOpen === 'moduleInfo') { s.closeModal(); } else { requestAnimationFrame(() => s.openModal('moduleInfo')); } }}
+        />
         <PixiButton
           label=""
           icon={isFullscreen ? 'zoomout' : 'zoomin'}

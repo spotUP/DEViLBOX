@@ -870,6 +870,12 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = React.memo(({
         <Button variant="ghost" size="sm" onClick={() => onShowHelp?.('shortcuts')} title="Help & keyboard shortcuts (?)">Help</Button>
         <Button variant="ghost" size="sm" onClick={() => setShowSettings(true)} title="Settings (Ctrl+,)">Settings</Button>
         <Button
+          variant={useUIStore.getState().modalOpen === 'moduleInfo' ? 'primary' : 'ghost'}
+          size="sm"
+          onClick={() => { const s = useUIStore.getState(); if (s.modalOpen === 'moduleInfo') { s.closeModal(); } else { s.openModal('moduleInfo'); } }}
+          title="Song / module info"
+        >Info</Button>
+        <Button
           variant={isFullscreen ? 'primary' : 'ghost'}
           size="sm"
           onClick={toggleFullscreen}

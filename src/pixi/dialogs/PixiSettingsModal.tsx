@@ -257,6 +257,15 @@ export const PixiSettingsModal: React.FC<PixiSettingsModalProps> = ({ isOpen, on
           {/* ═══════ DISPLAY ═══════ */}
           <SectionHeader text="DISPLAY" />
 
+          <SettingRow label="UI Render Mode:" description="Switch between DOM and WebGL rendering">
+            <PixiSelect
+              options={RENDER_MODE_OPTIONS}
+              value={s.renderMode}
+              onChange={(v) => s.setRenderMode(v as 'dom' | 'webgl')}
+              width={200}
+            />
+          </SettingRow>
+
           <SettingRow label="Theme:">
             <PixiSelect
               options={getThemeOptions()}
@@ -309,15 +318,6 @@ export const PixiSettingsModal: React.FC<PixiSettingsModalProps> = ({ isOpen, on
                 />
               )}
             </Div>
-          </SettingRow>
-
-          <SettingRow label="UI Render Mode:" description="Switch between DOM and WebGL rendering">
-            <PixiSelect
-              options={RENDER_MODE_OPTIONS}
-              value={s.renderMode}
-              onChange={(v) => s.setRenderMode(v as 'dom' | 'webgl')}
-              width={200}
-            />
           </SettingRow>
 
           <SettingRow label="Number Format:">

@@ -8,7 +8,6 @@ import { X, Maximize2, Keyboard, Usb } from 'lucide-react';
 import { useUIStore } from '@stores/useUIStore';
 import { themes, THEME_TOKEN_GROUPS } from '@stores/useThemeStore';
 import { type SIDEngineType } from '@stores/useSettingsStore';
-import { LENS_PRESETS, LENS_PRESET_ORDER } from '@/pixi/LensFilter';
 import { SID_ENGINES } from '@engine/deepsid/DeepSIDEngineManager';
 import { useModlandContributionModal } from '@stores/useModlandContributionModal';
 import { Toggle } from '@components/controls/Toggle';
@@ -38,33 +37,6 @@ function normalizeToHex6(color: string | undefined): string {
   if (s.startsWith('#')) return s.slice(0, 7);
   return '#000000';
 }
-
-interface CRTSliderProps {
-  label: string;
-  value: number;
-  min: number;
-  max: number;
-  step: number;
-  onChange: (v: number) => void;
-}
-
-const CRTSlider: React.FC<CRTSliderProps> = ({ label, value, min, max, step, onChange }) => (
-  <div className="flex items-center justify-between gap-2">
-    <label className="text-ft2-text text-[10px] font-mono w-28 shrink-0">{label}</label>
-    <input
-      type="range"
-      min={min}
-      max={max}
-      step={step}
-      value={value}
-      onChange={(e) => onChange(parseFloat(e.target.value))}
-      className="flex-1 h-1 accent-ft2-highlight cursor-pointer"
-    />
-    <span className="text-ft2-textDim text-[10px] font-mono w-10 text-right tabular-nums">
-      {value.toFixed(step < 0.01 ? 3 : step < 0.1 ? 2 : 1)}
-    </span>
-  </div>
-);
 
 interface SettingsModalProps {
   onClose: () => void;
@@ -466,73 +438,12 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
                 </div>
               </section>
 
-              {/* CRT Shader */}
+              {/* GL-only settings note */}
               <section>
-                <h3 className="text-ft2-highlight text-xs font-bold mb-3 tracking-wide">CRT SHADER</h3>
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between">
-                    <div className="flex flex-col">
-                      <label className="text-ft2-text text-xs font-mono">Enable:</label>
-                      <span className="text-[9px] text-ft2-textDim font-mono">Scanlines, curvature, bloom</span>
-                    </div>
-                    <Toggle label="" value={s.crtEnabled} onChange={s.setCrtEnabled} size="sm" />
-                  </div>
-                  {s.crtEnabled && (
-                    <div className="space-y-2 border-t border-ft2-border pt-3">
-                      <div className="text-[9px] text-ft2-highlight font-mono font-bold">SCANLINES</div>
-                      <CRTSlider label="Intensity" value={s.crtParams.scanlineIntensity} min={0} max={1} step={0.01} onChange={(v) => s.setCrtParam('scanlineIntensity', v)} />
-                      <CRTSlider label="Count" value={s.crtParams.scanlineCount} min={50} max={1200} step={1} onChange={(v) => s.setCrtParam('scanlineCount', v)} />
-                      <div className="text-[9px] text-ft2-highlight font-mono font-bold pt-1">COLOR</div>
-                      <CRTSlider label="Brightness" value={s.crtParams.brightness} min={0.6} max={1.8} step={0.01} onChange={(v) => s.setCrtParam('brightness', v)} />
-                      <CRTSlider label="Contrast" value={s.crtParams.contrast} min={0.6} max={1.8} step={0.01} onChange={(v) => s.setCrtParam('contrast', v)} />
-                      <div className="text-[9px] text-ft2-highlight font-mono font-bold pt-1">EFFECTS</div>
-                      <CRTSlider label="Bloom" value={s.crtParams.bloomIntensity} min={0} max={1.5} step={0.01} onChange={(v) => s.setCrtParam('bloomIntensity', v)} />
-                      <CRTSlider label="RGB Shift" value={s.crtParams.rgbShift} min={0} max={1} step={0.01} onChange={(v) => s.setCrtParam('rgbShift', v)} />
-                      <CRTSlider label="Vignette" value={s.crtParams.vignetteStrength} min={0} max={2} step={0.01} onChange={(v) => s.setCrtParam('vignetteStrength', v)} />
-                      <CRTSlider label="Curvature" value={s.crtParams.curvature} min={0} max={0.5} step={0.005} onChange={(v) => s.setCrtParam('curvature', v)} />
-                      <button onClick={s.resetCrtParams}
-                        className="w-full text-[10px] font-mono text-ft2-textDim border border-ft2-border hover:border-ft2-highlight hover:text-ft2-highlight px-2 py-1 transition-colors mt-1">
-                        Reset to defaults
-                      </button>
-                    </div>
-                  )}
-                </div>
-              </section>
-
-              {/* Lens Distortion */}
-              <section>
-                <h3 className="text-ft2-highlight text-xs font-bold mb-3 tracking-wide">LENS DISTORTION</h3>
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between">
-                    <div className="flex flex-col">
-                      <label className="text-ft2-text text-xs font-mono">Enable:</label>
-                      <span className="text-[9px] text-ft2-textDim font-mono">Fish-eye, barrel, chromatic</span>
-                    </div>
-                    <Toggle label="" value={s.lensEnabled} onChange={s.setLensEnabled} size="sm" />
-                  </div>
-                  {s.lensEnabled && (
-                    <div className="space-y-2">
-                      <div className="flex flex-wrap gap-1">
-                        {LENS_PRESET_ORDER.filter((p) => p !== 'off').map((presetKey) => {
-                          const preset = LENS_PRESETS[presetKey];
-                          return (
-                            <button key={presetKey}
-                              onClick={() => { s.setLensPreset(presetKey); s.setLensParam('barrel', preset.params.barrel); s.setLensParam('chromatic', preset.params.chromatic); s.setLensParam('vignette', preset.params.vignette); }}
-                              className={`text-[10px] font-mono px-2 py-0.5 border transition-colors ${
-                                s.lensPreset === presetKey ? 'border-ft2-highlight text-ft2-highlight bg-ft2-highlight/10' : 'border-ft2-border text-ft2-textDim hover:border-ft2-highlight'
-                              }`}>{preset.label}</button>
-                          );
-                        })}
-                      </div>
-                      <CRTSlider label="Barrel" value={s.lensParams.barrel} min={-0.5} max={1} step={0.01} onChange={(v) => { s.setLensParam('barrel', v); s.setLensPreset('custom'); }} />
-                      <CRTSlider label="Chromatic" value={s.lensParams.chromatic} min={0} max={1} step={0.01} onChange={(v) => { s.setLensParam('chromatic', v); s.setLensPreset('custom'); }} />
-                      <CRTSlider label="Vignette" value={s.lensParams.vignette} min={0} max={1} step={0.01} onChange={(v) => { s.setLensParam('vignette', v); s.setLensPreset('custom'); }} />
-                      <button onClick={s.resetLensParams}
-                        className="w-full text-[10px] font-mono text-ft2-textDim border border-ft2-border hover:border-ft2-highlight hover:text-ft2-highlight px-2 py-1 transition-colors mt-1">
-                        Reset to defaults
-                      </button>
-                    </div>
-                  )}
+                <h3 className="text-ft2-highlight text-xs font-bold mb-3 tracking-wide">SHADER EFFECTS</h3>
+                <div className="text-[10px] text-ft2-textDim font-mono leading-relaxed">
+                  CRT Shader, Lens Distortion, and Wobble Windows are available in the WebGL UI.
+                  Switch to WebGL mode in General &gt; Display to access these settings.
                 </div>
               </section>
 
@@ -540,13 +451,6 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
               <section>
                 <h3 className="text-ft2-highlight text-xs font-bold mb-3 tracking-wide">OTHER</h3>
                 <div className="space-y-3">
-                  <div className="flex items-center justify-between">
-                    <div className="flex flex-col">
-                      <label className="text-ft2-text text-xs font-mono">Wobble Windows:</label>
-                      <span className="text-[9px] text-ft2-textDim font-mono">Compiz-style (GL UI only)</span>
-                    </div>
-                    <Toggle label="" value={s.wobbleWindows} onChange={s.setWobbleWindows} size="sm" />
-                  </div>
                   <div className="flex flex-col gap-2">
                     <div className="flex items-center justify-between">
                       <div className="flex flex-col">

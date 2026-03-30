@@ -27,6 +27,13 @@ import { PixiViewHeader } from '../../components/PixiViewHeader';
 
 const BAR_H = 36;
 
+const TRACKER_SUB_MODES = [
+  { value: 'tracker', label: 'Tracker' },
+  { value: 'grid', label: 'Grid' },
+  { value: 'tb303', label: 'TB-303' },
+  { value: 'sunvox', label: 'SunVox' },
+];
+
 // ─── Genre Analysis Badge ─────────────────────────────────────────────────────
 
 const PixiGenreAnalysisBadge: React.FC = () => {
@@ -490,7 +497,16 @@ export const PixiEditorControlsBar: React.FC<PixiEditorControlsBarProps> = ({
     : theme.error.color;
 
   return (
-    <PixiViewHeader activeView={viewMode} title="" onViewChange={handleViewModeChange}>
+    <PixiViewHeader activeView={viewMode} title="">
+
+      {/* Tracker sub-mode selector (tracker/grid/tb303/sunvox) */}
+      <PixiSelect
+        options={TRACKER_SUB_MODES}
+        value={viewMode}
+        onChange={handleViewModeChange}
+        width={90}
+        height={24}
+      />
 
       {/* Channel selector — only in non-tracker modes */}
       <PixiSelect

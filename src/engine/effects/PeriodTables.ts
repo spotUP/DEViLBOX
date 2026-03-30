@@ -5,7 +5,24 @@
  * Supports standard Amiga periods (logarithmic frequency) and XM linear periods.
  */
 
-import { getToneEngine } from '../ToneEngine';
+// Break circular dependency: ToneEngine imports us, we need ToneEngine at runtime.
+// Store a lazy reference that resolves after all modules finish loading.
+type ToneEngineRef = { getWasmInstance(): any };
+let _cachedGetEngine: (() => ToneEngineRef) | null = null;
+function lazyGetToneEngine(): ToneEngineRef {
+  if (!_cachedGetEngine) {
+    // At runtime, the circular dependency is fully resolved.
+    // Access via the module namespace which has live bindings.
+    const mod = (globalThis as any).__periodTablesEngineRef;
+    if (mod) return mod();
+    throw new Error('ToneEngine not available');
+  }
+  return _cachedGetEngine();
+}
+/** Called by ToneEngine after it finishes loading to register itself */
+export function _registerToneEngineRef(fn: () => ToneEngineRef): void {
+  _cachedGetEngine = fn;
+}
 
 // ProTracker note range limits
 export const PT_MIN_PERIOD = 54;   // Amiga C-5 (approx)
@@ -22,7 +39,7 @@ export function periodToFrequency(period: number, ntsc: boolean = false): number
 
   // Try WASM for higher accuracy, but gracefully fall back if ToneEngine unavailable (e.g., in tests)
   try {
-    const wasm = getToneEngine().getWasmInstance();
+    const wasm = lazyGetToneEngine().getWasmInstance();
     if (wasm && !ntsc && typeof wasm.periodToHz === 'function') {
       return wasm.periodToHz(period);
     }
@@ -41,7 +58,7 @@ export function frequencyToPeriod(hz: number, ntsc: boolean = false): number {
 
   // Try WASM for higher accuracy, but gracefully fall back if ToneEngine unavailable (e.g., in tests)
   try {
-    const wasm = getToneEngine().getWasmInstance();
+    const wasm = lazyGetToneEngine().getWasmInstance();
     if (wasm && !ntsc && typeof wasm.hzToPeriod === 'function') {
       return wasm.hzToPeriod(hz);
     }
