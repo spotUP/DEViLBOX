@@ -12,7 +12,7 @@ import { AutomationParameterPicker } from '../automation/AutomationParameterPick
 import { MacroLanes } from './MacroLanes';
 import { useUIStore } from '@stores/useUIStore';
 import { useShallow } from 'zustand/react/shallow';
-import { usePatternEditor } from '@hooks/views/usePatternEditor';
+import { usePatternEditor, AUTOMATION_LANE_WIDTH } from '@hooks/views/usePatternEditor';
 import { ChannelVUMeter } from './ChannelVUMeter';
 import { ChannelVUMeters } from './ChannelVUMeters';
 import { ChannelColorPicker } from './ChannelColorPicker';
@@ -49,6 +49,7 @@ import { TrackerCanvas2DRenderer } from '@engine/renderer/TrackerCanvas2DRendere
 
 const CHAR_WIDTH = 10;
 const LINE_NUMBER_WIDTH = 40;
+const AUTOMATION_LANE_W = AUTOMATION_LANE_WIDTH; // Re-export alias for readability
 // Mobile-scaled layout constants (must match TrackerCanvas2DRenderer MOBILE_SCALE)
 const MOBILE_SCALE = 1.6;
 const M_CHAR_WIDTH = Math.round(CHAR_WIDTH * MOBILE_SCALE);
@@ -277,6 +278,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
     // Determine extra column visibility from store settings (stable!)
     const showAcid = columnVisibility.flag1 || columnVisibility.flag2;
     const showProb = columnVisibility.probability;
+    const autoLaneExtra = showAutomationLanes ? AUTOMATION_LANE_W : 0;
 
     // Calculate per-channel widths based on effectCols
     const offsets: number[] = [];
@@ -288,7 +290,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
       const isCollapsed = channel?.collapsed;
 
       if (isCollapsed) {
-        const collapsedWidth = noteWidth + (mobileCanvas ? 64 : 40);
+        const collapsedWidth = noteWidth + (mobileCanvas ? 64 : 40) + autoLaneExtra;
         offsets.push(currentX);
         widths.push(collapsedWidth);
         currentX += collapsedWidth;
@@ -299,7 +301,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
           + effectWidth
           + (showAcid ? CW * 2 + 8 : 0)
           + (showProb ? CW * 2 + 4 : 0);
-        const chWidth = noteWidth + paramWidth + (mobileCanvas ? 96 : 60);
+        const chWidth = noteWidth + paramWidth + (mobileCanvas ? 96 : 60) + autoLaneExtra;
         offsets.push(currentX);
         widths.push(chWidth);
         currentX += chWidth;
@@ -312,7 +314,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
       channelWidths: widths,
       totalChannelsWidth: currentX - LNW
     };
-  }, [pattern, instruments, columnVisibility, isFormatMode, formatColumns, formatChannels, mobileCanvas, CW, LNW]);
+  }, [pattern, instruments, columnVisibility, isFormatMode, formatColumns, formatChannels, mobileCanvas, CW, LNW, showAutomationLanes]);
 
   // Keep channelOffsetsRef/channelWidthsRef in sync for the RAF loop (selection math)
   useEffect(() => {
@@ -2980,6 +2982,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
                 rowNumWidth={LINE_NUMBER_WIDTH}
                 scrollOffset={scrollYRef.current}
                 visibleStart={visibleStartRef.current}
+                containerHeight={dimensions.height}
                 /* parameter is resolved per-channel from useAutomationStore.channelLanes */
                 prevPatternId={showGhostPatterns ? (currentPatternIndex > 0 ? patterns[currentPatternIndex - 1]?.id : (patterns.length > 1 ? patterns[patterns.length - 1]?.id : undefined)) : undefined}
                 prevPatternLength={showGhostPatterns ? (currentPatternIndex > 0 ? patterns[currentPatternIndex - 1]?.length : (patterns.length > 1 ? patterns[patterns.length - 1]?.length : undefined)) : undefined}
