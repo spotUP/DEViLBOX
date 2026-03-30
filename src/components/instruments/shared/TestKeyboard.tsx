@@ -87,9 +87,6 @@ function generateKeys(startOctave: number, numOctaves: number): Key[] {
   return keys;
 }
 
-// Set of keyboard keys used for piano
-const ALL_PIANO_KEYS = new Set(Object.keys(FT2_KEYBOARD_MAP));
-
 // Minimum white key width in pixels
 const MIN_WHITE_KEY_WIDTH = 24;
 const MAX_WHITE_KEY_WIDTH = 40;
@@ -264,54 +261,9 @@ export const TestKeyboard: React.FC<TestKeyboardProps> = ({ instrument }) => {
     });
   }, [instrument]);
 
-  // Keyboard event handlers
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
-        return;
-      }
-      if (e.repeat) return;
-      // Skip if already handled by another capture-phase listener (e.g., pattern editor noteInput)
-      if ((e as any)._handledByPianoKeys) return;
-
-      const keyLower = e.key.toLowerCase();
-
-      if (ALL_PIANO_KEYS.has(keyLower)) {
-        (e as any)._handledByPianoKeys = true;
-        e.preventDefault();
-        e.stopPropagation();
-
-        const key = keys.find((k) => k.keyboardKey === keyLower);
-        if (key) {
-          attackNote(key.note);
-        }
-      }
-    };
-
-    const handleKeyUp = (e: KeyboardEvent) => {
-      if ((e as any)._handledByPianoKeys) return;
-      const keyLower = e.key.toLowerCase();
-
-      if (ALL_PIANO_KEYS.has(keyLower)) {
-        (e as any)._handledByPianoKeys = true;
-        e.preventDefault();
-        e.stopPropagation();
-
-        const key = keys.find((k) => k.keyboardKey === keyLower);
-        if (key) {
-          releaseNote(key.note);
-        }
-      }
-    };
-
-    window.addEventListener('keydown', handleKeyDown, true);
-    window.addEventListener('keyup', handleKeyUp, true);
-
-    return () => {
-      window.removeEventListener('keydown', handleKeyDown, true);
-      window.removeEventListener('keyup', handleKeyUp, true);
-    };
-  }, [attackNote, releaseNote, keys]);
+  // Keyboard note input is handled by useNoteInput (pattern editor) which
+  // auditions notes for the selected instrument. TestKeyboard only handles
+  // mouse/touch on the visual piano keys — no duplicate keyboard handler.
 
   // Separate white and black keys
   const whiteKeys = keys.filter((k) => !k.isBlack);
