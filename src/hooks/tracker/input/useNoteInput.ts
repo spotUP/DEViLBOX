@@ -296,7 +296,8 @@ export const useNoteInput = (refs: TrackerInputRefs) => {
 
       // Note Entry (Piano Keys)
       // Only on NOTE column; otherwise let effect/volume entry handle it
-      if (NOTE_MAP[keyLower] && !e.altKey && !e.ctrlKey && !e.metaKey && !e.repeat && cursorRef.current.columnType === 'note') {
+      // Skip if already handled by TestKeyboard (both are capture-phase on window)
+      if (NOTE_MAP[keyLower] && !e.altKey && !e.ctrlKey && !e.metaKey && !e.repeat && cursorRef.current.columnType === 'note' && !(e as any)._handledByPianoKeys) {
         e.preventDefault();
         const { note, octaveOffset } = NOTE_MAP[keyLower];
         const octave = currentOctave + octaveOffset;
