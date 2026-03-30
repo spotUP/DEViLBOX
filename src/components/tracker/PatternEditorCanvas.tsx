@@ -150,6 +150,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
   const scrollYRef = useRef(0);
   const visibleStartRef = useRef(0);
   const macroOverlayRef = useRef<HTMLDivElement>(null);
+  const automationOverlayRef = useRef<HTMLDivElement>(null);
   const peerCursorDivRef = useRef<HTMLDivElement>(null);
   // Peer selection overlay (DOM overlay div — kept local)
   const peerSelectionDivRef = useRef<HTMLDivElement>(null);
@@ -2233,6 +2234,9 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
       if (macroOverlayRef.current) {
         macroOverlayRef.current.style.top = `${baseY}px`;
       }
+      if (automationOverlayRef.current) {
+        automationOverlayRef.current.style.top = `${baseY}px`;
+      }
 
       // Peer cursor overlay — thin caret at peer's channel + row
       if (peerCursorDivRef.current) {
@@ -2956,7 +2960,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
 
         {/* Canvas is created imperatively in useEffect to support OffscreenCanvas transfer */}
 
-        {/* Automation Lanes Overlay */}
+        {/* Automation Lanes Overlay — positioned imperatively by RAF loop */}
         {pattern && (
           <>
             {showAutomationLanes && (
@@ -2971,6 +2975,18 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
                   top={-20}
                 />
               ))}
+              <div
+                ref={automationOverlayRef}
+                style={{
+                  position: 'absolute',
+                  top: scrollYRef.current,
+                  left: 0,
+                  right: 0,
+                  height: pattern.length * rowHeight,
+                  pointerEvents: 'auto',
+                  zIndex: 5,
+                }}
+              >
               <AutomationLanes
                 key={`automation-${pattern.id}`}
                 patternId={pattern.id}
@@ -2980,8 +2996,8 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
                 channelOffsets={channelOffsets}
                 channelWidths={channelWidths}
                 rowNumWidth={LINE_NUMBER_WIDTH}
-                scrollOffset={scrollYRef.current}
-                visibleStart={visibleStartRef.current}
+                scrollOffset={0}
+                visibleStart={0}
                 containerHeight={dimensions.height}
                 /* parameter is resolved per-channel from useAutomationStore.channelLanes */
                 prevPatternId={showGhostPatterns ? (currentPatternIndex > 0 ? patterns[currentPatternIndex - 1]?.id : (patterns.length > 1 ? patterns[patterns.length - 1]?.id : undefined)) : undefined}
@@ -2989,6 +3005,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
                 nextPatternId={showGhostPatterns ? (currentPatternIndex < patterns.length - 1 ? patterns[currentPatternIndex + 1]?.id : (patterns.length > 1 ? patterns[0]?.id : undefined)) : undefined}
                 nextPatternLength={showGhostPatterns ? (currentPatternIndex < patterns.length - 1 ? patterns[currentPatternIndex + 1]?.length : (patterns.length > 1 ? patterns[0]?.length : undefined)) : undefined}
               />
+              </div>
               </>
             )}
             {/* Internal Macro Columns Overlay (only when visible) */}
