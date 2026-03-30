@@ -2153,8 +2153,20 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
       const transportState = useTransportStore.getState();
       const isPlaying      = transportState.isPlaying;
 
-      // PERF: When idle, skip expensive store reads and DOM updates
+      // PERF: When idle, still update overlay positions for cursor movement
+      // but skip expensive playback state reads.
       if (!isPlaying && !prevPlaying) {
+        const cursorRow = useCursorStore.getState().cursor.rowIndex;
+        const h = dimensions.height;
+        const rh = rowHeightRef.current;
+        const centerLineTop = Math.floor(h / 2) - rh / 2;
+        const overlayTop = centerLineTop - cursorRow * rh;
+        if (macroOverlayRef.current) {
+          macroOverlayRef.current.style.top = `${overlayTop}px`;
+        }
+        if (automationOverlayRef.current) {
+          automationOverlayRef.current.style.top = `${overlayTop}px`;
+        }
         rafId = requestAnimationFrame(tick);
         return;
       }
@@ -2219,7 +2231,10 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
         } as any);
       }
 
-      // Update overlay positions (macroLanes) — uses same smoothOffset as worker
+      // Update overlay positions — row 0 must align with where the canvas draws row 0.
+      // Canvas draws row r at: baseY + (r - vStart) * rh.
+      // Row 0 on canvas: baseY - vStart * rh = centerLineTop - currentRow * rh - smoothOffset.
+      // Overlay has row r at internal y = r * rh, so overlay.top must equal that.
 
       const h = dimensions.height;
       const rh = rowHeightRef.current;
@@ -2228,14 +2243,15 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
       const vStart       = currentRow - topLines;
       const centerLineTop = Math.floor(h / 2) - rh / 2;
       const baseY        = centerLineTop - topLines * rh - smoothOffset;
+      const overlayTop   = centerLineTop - currentRow * rh - smoothOffset;
 
       scrollYRef.current       = baseY;
       visibleStartRef.current  = vStart;
       if (macroOverlayRef.current) {
-        macroOverlayRef.current.style.top = `${baseY}px`;
+        macroOverlayRef.current.style.top = `${overlayTop}px`;
       }
       if (automationOverlayRef.current) {
-        automationOverlayRef.current.style.top = `${baseY}px`;
+        automationOverlayRef.current.style.top = `${overlayTop}px`;
       }
 
       // Peer cursor overlay — thin caret at peer's channel + row
