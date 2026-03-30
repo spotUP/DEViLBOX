@@ -65,35 +65,37 @@ class ViewErrorBoundary extends Component<ViewErrorBoundaryProps, ViewErrorBound
   }
 
   handleReset = () => {
-    // Reset to tracker view and clear error state
+    // Reset to tracker view and clear error state for ALL view error boundaries
     useUIStore.getState().setActiveView('tracker');
     this.setState({ hasError: false, error: null });
   };
 
   render() {
     if (this.state.hasError) {
-      // Render a simple error message using PixiJS primitives
+      const { viewId, theme } = this.props;
+      // Render a visible error message — use explicit pixel sizes (not %)
+      // to guarantee it's visible even if parent layout is broken
       return (
-        <layoutContainer layout={{ width: '100%' as any, height: '100%' as any, justifyContent: 'center', alignItems: 'center', flexDirection: 'column', gap: 12 }}>
+        <pixiContainer layout={{ width: 600, height: 200, justifyContent: 'center', alignItems: 'center', flexDirection: 'column', gap: 12 }}>
           <pixiBitmapText
-            text={`View "${this.props.viewId}" failed to render`}
+            text={`View "${viewId}" failed to render`}
             style={{ fontFamily: PIXI_FONTS.SANS_SEMIBOLD, fontSize: 16, fill: 0xffffff }}
-            tint={this.props.theme.accent.color}
+            tint={theme.accent.color}
           />
           <pixiBitmapText
             text={this.state.error?.message?.slice(0, 120) || 'Unknown error'}
             style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 11, fill: 0xffffff }}
-            tint={this.props.theme.textMuted.color}
+            tint={theme.textMuted.color}
           />
           <pixiBitmapText
             text="Click here to reset to Tracker view"
             style={{ fontFamily: PIXI_FONTS.SANS_SEMIBOLD, fontSize: 13, fill: 0xffffff }}
-            tint={this.props.theme.accentHighlight.color}
+            tint={theme.accentHighlight.color}
             eventMode="static"
             cursor="pointer"
             onPointerUp={this.handleReset}
           />
-        </layoutContainer>
+        </pixiContainer>
       );
     }
     return this.props.children;

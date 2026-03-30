@@ -37,13 +37,39 @@ let cachedFileList: ServerFileRef[] | null = null;
 let cacheTimestamp = 0;
 const CACHE_TTL = 30_000; // 30 seconds
 
+// Track consecutive failures — stop spamming after too many
+let consecutiveFailures = 0;
+const MAX_FAILURES = 3;
+let backoffUntil = 0;
+
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
 function syncFilename(key: string): string {
   return `__sync_${key}.json`;
 }
 
+function isBackedOff(): boolean {
+  if (consecutiveFailures >= MAX_FAILURES && Date.now() < backoffUntil) {
+    return true;
+  }
+  return false;
+}
+
+function recordFailure() {
+  consecutiveFailures++;
+  if (consecutiveFailures >= MAX_FAILURES) {
+    // Back off for 5 minutes after 3 consecutive failures
+    backoffUntil = Date.now() + 5 * 60_000;
+  }
+}
+
+function recordSuccess() {
+  consecutiveFailures = 0;
+  backoffUntil = 0;
+}
+
 async function getFileList(): Promise<ServerFileRef[]> {
+  if (isBackedOff()) return cachedFileList || [];
   const now = Date.now();
   if (cachedFileList && now - cacheTimestamp < CACHE_TTL) {
     return cachedFileList;
@@ -52,8 +78,10 @@ async function getFileList(): Promise<ServerFileRef[]> {
     const files = await listUserFiles('presets');
     cachedFileList = files.map((f) => ({ id: f.id, filename: f.filename }));
     cacheTimestamp = now;
+    recordSuccess();
     return cachedFileList;
   } catch {
+    recordFailure();
     return cachedFileList || [];
   }
 }
@@ -71,7 +99,7 @@ function invalidateCache() {
  * Fire-and-forget — never throws.
  */
 export async function pushToCloud<T>(key: string, data: T, version = 1): Promise<void> {
-  if (!isAuthenticated()) return;
+  if (!isAuthenticated() || isBackedOff()) return;
 
   const filename = syncFilename(key);
   const envelope: SyncEnvelope<T> = { version, data, updatedAt: Date.now() };
@@ -86,8 +114,13 @@ export async function pushToCloud<T>(key: string, data: T, version = 1): Promise
       await saveFile(filename, envelope as unknown as object, 'presets');
       invalidateCache(); // new file created
     }
+    recordSuccess();
   } catch (err) {
-    console.warn(`[CloudSync] Push failed for "${key}":`, err);
+    recordFailure();
+    if (consecutiveFailures <= 1) {
+      // Only warn on first failure per backoff cycle
+      console.warn(`[CloudSync] Push failed for "${key}":`, err);
+    }
   }
 }
 
@@ -96,7 +129,7 @@ export async function pushToCloud<T>(key: string, data: T, version = 1): Promise
  * Returns null if not found or not authenticated.
  */
 export async function pullFromCloud<T>(key: string): Promise<{ data: T; updatedAt: number } | null> {
-  if (!isAuthenticated()) return null;
+  if (!isAuthenticated() || isBackedOff()) return null;
 
   const filename = syncFilename(key);
 
