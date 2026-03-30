@@ -3,6 +3,7 @@ import { getDevilboxAudioContext, noteToMidi } from '@/utils/audio-context';
 // @ts-expect-error -- SamJs is a JavaScript library without types
 import SamJs from './samjs';
 import type { SamConfig } from '@/types/instrument';
+import { useSpeechActivityStore } from '@/stores/useSpeechActivityStore';
 
 export class SAMSynth implements DevilboxSynth {
   public readonly name: string = 'SAMSynth';
@@ -63,6 +64,7 @@ export class SAMSynth implements DevilboxSynth {
       this._sourceNode.disconnect();
       this._sourceNode = null;
     }
+    if (this._isPlaying) useSpeechActivityStore.getState().speechStop();
     this._isPlaying = false;
   }
 
@@ -76,6 +78,7 @@ export class SAMSynth implements DevilboxSynth {
     source.connect(this._playerGain);
     source.onended = () => {
       if (this._sourceNode === source) {
+        if (this._isPlaying) useSpeechActivityStore.getState().speechStop();
         this._isPlaying = false;
         this._sourceNode = null;
       }
@@ -83,6 +86,7 @@ export class SAMSynth implements DevilboxSynth {
     this._sourceNode = source;
     source.start(time, offset ?? 0);
     this._isPlaying = true;
+    useSpeechActivityStore.getState().speechStart();
   }
 
   private async _render() {

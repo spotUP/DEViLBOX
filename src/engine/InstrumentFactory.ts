@@ -86,6 +86,7 @@ import {
   createSynthV1,
   createTalNoizeMaker,
   createAeolus,
+  createMonique,
   createFluidSynth,
   createSfizz,
   createZynAddSubFX,
@@ -420,6 +421,9 @@ export class InstrumentFactory {
         break;
       case 'Aeolus':
         instrument = createAeolus(config);
+        break;
+      case 'Monique':
+        instrument = createMonique(config);
         break;
       case 'FluidSynth':
         instrument = createFluidSynth(config);

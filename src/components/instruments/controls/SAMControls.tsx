@@ -141,14 +141,14 @@ export const SAMControls: React.FC<SAMControlsProps> = ({
                 const rect = e.currentTarget.getBoundingClientRect();
                 const x = Math.max(0, Math.min(255, ((e.clientX - rect.left) / rect.width) * 255));
                 const y = Math.max(0, Math.min(255, (1 - (e.clientY - rect.top) / rect.height) * 255));
-                onChange({ mouth: Math.round(x), throat: Math.round(y) });
+                onChange({ ...configRef.current, mouth: Math.round(x), throat: Math.round(y) });
               }
             }}
             onClick={(e) => {
               const rect = e.currentTarget.getBoundingClientRect();
               const x = Math.max(0, Math.min(255, ((e.clientX - rect.left) / rect.width) * 255));
               const y = Math.max(0, Math.min(255, (1 - (e.clientY - rect.top) / rect.height) * 255));
-              onChange({ mouth: Math.round(x), throat: Math.round(y) });
+              onChange({ ...configRef.current, mouth: Math.round(x), throat: Math.round(y) });
             }}
             onTouchMove={(e) => {
               if (e.touches.length === 1) {
@@ -156,7 +156,7 @@ export const SAMControls: React.FC<SAMControlsProps> = ({
                 const rect = e.currentTarget.getBoundingClientRect();
                 const x = Math.max(0, Math.min(255, ((touch.clientX - rect.left) / rect.width) * 255));
                 const y = Math.max(0, Math.min(255, (1 - (touch.clientY - rect.top) / rect.height) * 255));
-                onChange({ mouth: Math.round(x), throat: Math.round(y) });
+                onChange({ ...configRef.current, mouth: Math.round(x), throat: Math.round(y) });
               }
             }}
             onTouchStart={(e) => {
@@ -165,7 +165,7 @@ export const SAMControls: React.FC<SAMControlsProps> = ({
                 const rect = e.currentTarget.getBoundingClientRect();
                 const x = Math.max(0, Math.min(255, ((touch.clientX - rect.left) / rect.width) * 255));
                 const y = Math.max(0, Math.min(255, (1 - (touch.clientY - rect.top) / rect.height) * 255));
-                onChange({ mouth: Math.round(x), throat: Math.round(y) });
+                onChange({ ...configRef.current, mouth: Math.round(x), throat: Math.round(y) });
               }
             }}
           >
@@ -212,7 +212,7 @@ export const SAMControls: React.FC<SAMControlsProps> = ({
               value={config.pitch}
               min={0}
               max={255}
-              onChange={(v) => onChange({ pitch: v })}
+              onChange={(v) => onChange({ ...configRef.current, pitch: v })}
               label="Pitch"
               color={knobColor}
             />
@@ -220,7 +220,7 @@ export const SAMControls: React.FC<SAMControlsProps> = ({
               value={config.speed}
               min={0}
               max={255}
-              onChange={(v) => onChange({ speed: v })}
+              onChange={(v) => onChange({ ...configRef.current, speed: v })}
               label="Speed"
               color={knobColor}
             />

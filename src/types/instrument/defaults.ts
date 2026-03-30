@@ -253,6 +253,21 @@ export interface InstrumentConfig {
   dexed?: DexedConfig;
   obxd?: OBXdConfig;
   rdpiano?: RdPianoConfig;
+  // MDA Instrument Plugins
+  mdaEPiano?: import('../../engine/mda-epiano/MdaEPianoSynth').MdaEPianoConfig;
+  mdaJX10?: import('../../engine/mda-jx10/MdaJX10Synth').MdaJX10Config;
+  mdaDX10?: import('../../engine/mda-dx10/MdaDX10Synth').MdaDX10Config;
+  amsynth?: import('../../engine/amsynth/AMSynthSynth').AMSynthConfig;
+  raffo?: import('../../engine/raffo/RaffoSynth').RaffoSynthConfig;
+  calfMono?: import('../../engine/calf-mono/CalfMonoSynth').CalfMonoConfig;
+  setbfree?: import('../../engine/setbfree/SetBfreeSynth').SetBfreeConfig;
+  synthv1?: import('../../engine/synthv1/SynthV1Synth').SynthV1Config;
+  monique?: import('../../engine/monique/MoniqueSynth').MoniqueConfig;
+  talNoizeMaker?: import('../../engine/tal-noizemaker/TalNoizeMakerSynth').TalNoizeMakerConfig;
+  aeolus?: import('../../engine/aeolus/AeolusSynth').AeolusConfig;
+  fluidsynth?: import('../../engine/fluidsynth/FluidSynthSynth').FluidSynthConfig;
+  sfizz?: import('../../engine/sfizz/SfizzSynth').SfizzConfig;
+  zynaddsubfx?: import('../../engine/zynaddsubfx/ZynAddSubFXSynth').ZynAddSubFXConfig;
   // Drumkit/Keymap (multi-sample)
   drumKit?: DrumKitConfig;
   // Module playback (libopenmpt)

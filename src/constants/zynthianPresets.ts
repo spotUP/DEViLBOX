@@ -1,0 +1,75 @@
+/**
+ * Zynthian WASM Synth Factory Presets
+ * Wraps the inline preset maps from 14 Zynthian synth engines into
+ * the InstrumentPreset['config'] format used by the PresetDropdown system.
+ */
+
+import type { InstrumentPreset } from '../types/instrument';
+
+import { DX10_PRESETS, DEFAULT_MDA_DX10 } from '../engine/mda-dx10/MdaDX10Synth';
+import { JX10_PRESETS, DEFAULT_MDA_JX10 } from '../engine/mda-jx10/MdaJX10Synth';
+import { EPIANO_PRESETS, DEFAULT_MDA_EPIANO } from '../engine/mda-epiano/MdaEPianoSynth';
+import { AMSYNTH_PRESETS, DEFAULT_AMSYNTH } from '../engine/amsynth/AMSynthSynth';
+import { RAFFO_PRESETS, DEFAULT_RAFFO } from '../engine/raffo/RaffoSynth';
+import { MONIQUE_PRESETS, DEFAULT_MONIQUE } from '../engine/monique/MoniqueSynth';
+import { CALF_MONO_PRESETS, DEFAULT_CALF_MONO } from '../engine/calf-mono/CalfMonoSynth';
+import { SETBFREE_PRESETS, DEFAULT_SETBFREE } from '../engine/setbfree/SetBfreeSynth';
+import { SYNTHV1_PRESETS, DEFAULT_SYNTHV1 } from '../engine/synthv1/SynthV1Synth';
+import { TAL_NOIZEMAKER_PRESETS, DEFAULT_TAL_NOIZEMAKER } from '../engine/tal-noizemaker/TalNoizeMakerSynth';
+import { AEOLUS_PRESETS, DEFAULT_AEOLUS } from '../engine/aeolus/AeolusSynth';
+import { FLUIDSYNTH_PRESETS, DEFAULT_FLUIDSYNTH } from '../engine/fluidsynth/FluidSynthSynth';
+import { SFIZZ_PRESETS, DEFAULT_SFIZZ } from '../engine/sfizz/SfizzSynth';
+import { ZYNADDSUBFX_PRESETS, DEFAULT_ZYNADDSUBFX } from '../engine/zynaddsubfx/ZynAddSubFXSynth';
+
+/** Convert a synth engine's preset map into InstrumentPreset['config'][] */
+function makePresets<D, P>(
+  presetMap: Record<string, P>,
+  synthType: string,
+  configKey: string,
+  defaultConfig: D,
+): InstrumentPreset['config'][] {
+  return Object.entries(presetMap).map(([name, config]) => {
+    const preset: Record<string, unknown> = {
+      type: 'synth',
+      name,
+      synthType,
+      effects: [],
+      volume: -8,
+      pan: 0,
+    };
+    preset[configKey] = { ...(defaultConfig as any), ...(config as any) };
+    return preset as InstrumentPreset['config'];
+  });
+}
+
+export const MDA_DX10_FACTORY_PRESETS = makePresets(DX10_PRESETS, 'MdaDX10', 'mdaDX10', DEFAULT_MDA_DX10);
+export const MDA_JX10_FACTORY_PRESETS = makePresets(JX10_PRESETS, 'MdaJX10', 'mdaJX10', DEFAULT_MDA_JX10);
+export const MDA_EPIANO_FACTORY_PRESETS = makePresets(EPIANO_PRESETS, 'MdaEPiano', 'mdaEPiano', DEFAULT_MDA_EPIANO);
+export const AMSYNTH_FACTORY_PRESETS = makePresets(AMSYNTH_PRESETS, 'AMSynth', 'amsynth', DEFAULT_AMSYNTH);
+export const RAFFO_FACTORY_PRESETS = makePresets(RAFFO_PRESETS, 'RaffoSynth', 'raffo', DEFAULT_RAFFO);
+export const MONIQUE_FACTORY_PRESETS = makePresets(MONIQUE_PRESETS, 'Monique', 'monique', DEFAULT_MONIQUE);
+export const CALF_MONO_FACTORY_PRESETS = makePresets(CALF_MONO_PRESETS, 'CalfMono', 'calfMono', DEFAULT_CALF_MONO);
+export const SETBFREE_FACTORY_PRESETS = makePresets(SETBFREE_PRESETS, 'SetBfree', 'setbfree', DEFAULT_SETBFREE);
+export const SYNTHV1_FACTORY_PRESETS = makePresets(SYNTHV1_PRESETS, 'SynthV1', 'synthv1', DEFAULT_SYNTHV1);
+export const TAL_NOIZEMAKER_FACTORY_PRESETS = makePresets(TAL_NOIZEMAKER_PRESETS, 'TalNoizeMaker', 'talNoizeMaker', DEFAULT_TAL_NOIZEMAKER);
+export const AEOLUS_FACTORY_PRESETS = makePresets(AEOLUS_PRESETS, 'Aeolus', 'aeolus', DEFAULT_AEOLUS);
+export const FLUIDSYNTH_FACTORY_PRESETS = makePresets(FLUIDSYNTH_PRESETS, 'FluidSynth', 'fluidsynth', DEFAULT_FLUIDSYNTH);
+export const SFIZZ_FACTORY_PRESETS = makePresets(SFIZZ_PRESETS, 'Sfizz', 'sfizz', DEFAULT_SFIZZ);
+export const ZYNADDSUBFX_FACTORY_PRESETS = makePresets(ZYNADDSUBFX_PRESETS, 'ZynAddSubFX', 'zynaddsubfx', DEFAULT_ZYNADDSUBFX);
+
+export const ZYNTHIAN_PRESETS: InstrumentPreset['config'][] = [
+  ...MDA_DX10_FACTORY_PRESETS,
+  ...MDA_JX10_FACTORY_PRESETS,
+  ...MDA_EPIANO_FACTORY_PRESETS,
+  ...AMSYNTH_FACTORY_PRESETS,
+  ...RAFFO_FACTORY_PRESETS,
+  ...MONIQUE_FACTORY_PRESETS,
+  ...CALF_MONO_FACTORY_PRESETS,
+  ...SETBFREE_FACTORY_PRESETS,
+  ...SYNTHV1_FACTORY_PRESETS,
+  ...TAL_NOIZEMAKER_FACTORY_PRESETS,
+  ...AEOLUS_FACTORY_PRESETS,
+  ...FLUIDSYNTH_FACTORY_PRESETS,
+  ...SFIZZ_FACTORY_PRESETS,
+  ...ZYNADDSUBFX_FACTORY_PRESETS,
+];

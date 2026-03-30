@@ -282,7 +282,21 @@ export const useInstrumentStore = create<InstrumentStore>()(
         updates.parameters ||
         updates.sample ||
         updates.superCollider ||
-        updates.gtUltra
+        updates.gtUltra ||
+        updates.mdaEPiano ||
+        updates.mdaJX10 ||
+        updates.mdaDX10 ||
+        updates.amsynth ||
+        updates.raffo ||
+        updates.calfMono ||
+        updates.setbfree ||
+        updates.synthv1 ||
+        updates.monique ||
+        updates.talNoizeMaker ||
+        updates.aeolus ||
+        updates.fluidsynth ||
+        updates.sfizz ||
+        updates.zynaddsubfx
       );
 
       set((state) => {
@@ -502,6 +516,23 @@ export const useInstrumentStore = create<InstrumentStore>()(
             if (updatedInstrument.synthType === 'WAM' && updatedInstrument.wam && updates.wam) {
               engine.updateWAMParameters(id, updatedInstrument.wam);
               return; // Handled
+            }
+
+            // Zynthian WASM synths — all use DevilboxSynth.applyConfig() pattern
+            const zynthianConfigMap: Record<string, string> = {
+              MdaEPiano: 'mdaEPiano', MdaJX10: 'mdaJX10', MdaDX10: 'mdaDX10',
+              AMSynth: 'amsynth', RaffoSynth: 'raffo', CalfMono: 'calfMono',
+              SetBfree: 'setbfree', SynthV1: 'synthv1', Monique: 'monique',
+              TalNoizeMaker: 'talNoizeMaker', Aeolus: 'aeolus', FluidSynth: 'fluidsynth',
+              Sfizz: 'sfizz', ZynAddSubFX: 'zynaddsubfx',
+            };
+            const zynthConfigKey = zynthianConfigMap[updatedInstrument.synthType];
+            if (zynthConfigKey) {
+              const synthConfig = (updatedInstrument as any)[zynthConfigKey];
+              if (synthConfig && (updates as any)[zynthConfigKey]) {
+                engine.updateComplexSynthParameters(id, synthConfig);
+                return; // Handled
+              }
             }
 
             // WASM singleton engines (Hively, JamCracker, FC, etc.) run autonomously

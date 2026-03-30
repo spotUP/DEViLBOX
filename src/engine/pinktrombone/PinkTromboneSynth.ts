@@ -5,6 +5,7 @@ import type { SpeechFrame } from '@/engine/speech/SpeechSequencer';
 import { getTractShape, type TractShape } from './PhonemeMap';
 import { textToPhonemes as simpleTextToPhonemes } from './SimpleReciter';
 import { espeakTextToIPA, parseEspeakIPA, isEspeakAvailable, preloadEspeak } from '@engine/speech/EspeakNG';
+import { useSpeechActivityStore } from '@/stores/useSpeechActivityStore';
 
 export interface PinkTromboneConfig {
   tenseness: number;       // 0-1: breathy (0) → harsh (1)
@@ -121,6 +122,7 @@ export class PinkTromboneSynth implements DevilboxSynth {
       (shape) => this._applyTractShape(shape),
       () => {
         this._isSpeaking = false;
+        useSpeechActivityStore.getState().speechStop();
         // Release the note when speech ends
         if (this._workletNode) {
           this._workletNode.port.postMessage({ type: 'allNotesOff' });
@@ -294,6 +296,7 @@ export class PinkTromboneSynth implements DevilboxSynth {
 
     // Start a sustained note
     this._isSpeaking = true;
+    useSpeechActivityStore.getState().speechStart();
     if (this._workletNode) {
       // Map speechPitch 0-1 to MIDI 30-72 (deep bass to soprano)
       const midiNote = Math.round(30 + this._config.speechPitch * 42);
@@ -307,6 +310,9 @@ export class PinkTromboneSynth implements DevilboxSynth {
   /** Stop speech playback */
   public stopSpeech(): void {
     this._speechSequencer.stop();
+    if (this._isSpeaking) {
+      useSpeechActivityStore.getState().speechStop();
+    }
     this._isSpeaking = false;
     this._currentShape = null;
     this._targetShape = null;
@@ -394,6 +400,10 @@ export class PinkTromboneSynth implements DevilboxSynth {
   public dispose(): void {
     if (PinkTromboneSynth._activeInstance === this) PinkTromboneSynth._activeInstance = null;
     if (this._rafId) { cancelAnimationFrame(this._rafId); this._rafId = null; }
+    if (this._isSpeaking) {
+      useSpeechActivityStore.getState().speechStop();
+      this._isSpeaking = false;
+    }
     this._speechSequencer.dispose();
     if (this._workletNode) {
       this._workletNode.port.postMessage({ type: 'allNotesOff' });

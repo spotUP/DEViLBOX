@@ -46,8 +46,9 @@ import { SetBfreeSynthImpl } from '../setbfree/SetBfreeSynth';
 import { SynthV1SynthImpl } from '../synthv1/SynthV1Synth';
 import { TalNoizeMakerSynthImpl } from '../tal-noizemaker/TalNoizeMakerSynth';
 import { AeolusSynthImpl } from '../aeolus/AeolusSynth';
+import { MoniqueSynthEngine } from '../monique/MoniqueSynth';
 import { FluidSynthSynthImpl } from '../fluidsynth/FluidSynthSynth';
-import { SfizzEngine } from '../sfizz/SfizzSynth';
+import { SfizzSynthImpl as SfizzEngine } from '../sfizz/SfizzSynth';
 import { ZynAddSubFXSynthImpl } from '../zynaddsubfx/ZynAddSubFXSynth';
 import { CZ101Synth } from '../cz101/CZ101Synth';
 import { CEM3394Synth } from '../cem3394/CEM3394Synth';
@@ -1013,6 +1014,12 @@ export function createAeolus(config: InstrumentConfig): Tone.ToneAudioNode {
   const synth = new AeolusSynthImpl();
   void synth.init();
   synth.applyConfig(aeolusConfig);
+  return synth as unknown as Tone.ToneAudioNode;
+}
+
+export function createMonique(config: InstrumentConfig): Tone.ToneAudioNode {
+  const moniqueConfig = config.monique || {};
+  const synth = new MoniqueSynthEngine(moniqueConfig);
   return synth as unknown as Tone.ToneAudioNode;
 }
 

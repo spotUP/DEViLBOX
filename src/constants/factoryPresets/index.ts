@@ -25,6 +25,7 @@ import { BUZZMACHINE_FACTORY_PRESETS } from '../buzzmachineFactoryPresets';
 import { MAKK_FACTORY_PRESETS } from '../makkPresets';
 import { HARMONIC_PRESETS } from '../harmonicPresets';
 import { DJ_ONE_SHOT_PRESETS } from '../djOneShotPresets';
+import { ZYNTHIAN_PRESETS } from '../zynthianPresets';
 
 // Re-export all per-category preset arrays
 export { BASS_PRESETS } from './bass';
@@ -98,6 +99,7 @@ export const FACTORY_PRESETS: InstrumentPreset['config'][] = [
   ...BUZZMACHINE_FACTORY_PRESETS,
   ...MAKK_FACTORY_PRESETS,
   ...DJ_ONE_SHOT_PRESETS,
+  ...ZYNTHIAN_PRESETS,
   // Player Init
   {
     type: 'synth' as const,

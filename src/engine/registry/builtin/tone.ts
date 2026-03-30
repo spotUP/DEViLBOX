@@ -210,6 +210,10 @@ const toneSynths: SynthDescriptor[] = [
     volumeOffsetDb: 23,
     create: (config) => {
       const synth = new Tone.MetalSynth({
+        harmonicity: (config.parameters?.harmonicity as number) ?? 5.1,
+        modulationIndex: (config.parameters?.modulationIndex as number) ?? 32,
+        resonance: (config.parameters?.resonance as number) ?? 4000,
+        octaves: (config.parameters?.octaves as number) ?? 1.5,
         envelope: {
           attack: (config.envelope?.attack ?? 1) / 1000,
           decay: (config.envelope?.decay ?? 100) / 1000,
@@ -217,12 +221,8 @@ const toneSynths: SynthDescriptor[] = [
         },
         volume: getNormalizedVolume('MetalSynth', config.volume),
       });
-      // Wrap to translate (time, velocity) calling convention used by synthTester/NoiseSynth
-      // path into MetalSynth's actual (note, time, velocity) signature. Also hides .output
-      // so synthTester uses path B (Tone.Analyser) — scheduleTime = Tone.now() — ensuring
-      // events are not scheduled hundreds of seconds in the past.
       return {
-        triggerAttack: (time: number, velocity?: number) => synth.triggerAttack('C3', time, velocity),
+        triggerAttack: (note: string | number, time: number, velocity?: number) => synth.triggerAttack(note, time, velocity),
         triggerRelease: (time?: number) => synth.triggerRelease(time),
         triggerAttackRelease: (duration: string | number, time?: number, velocity?: number) =>
           synth.triggerAttackRelease(duration, time ?? Tone.now(), velocity),
@@ -233,9 +233,9 @@ const toneSynths: SynthDescriptor[] = [
         volume: synth.volume,
       } as unknown as Tone.ToneAudioNode;
     },
-    onTriggerAttack: (synth, _note, time, velocity, opts) => {
+    onTriggerAttack: (synth, note, time, velocity, opts) => {
       const finalVelocity = opts.accent ? Math.min(1, velocity * ACCENT_BOOST) : velocity;
-      (synth as unknown as { triggerAttack: (t: number, v: number) => void }).triggerAttack(time, finalVelocity);
+      (synth as unknown as { triggerAttack: (n: string | number, t: number, v: number) => void }).triggerAttack(note, time, finalVelocity);
       return true;
     },
     onTriggerRelease: (synth, _note, time) => {

@@ -26,6 +26,7 @@ set(MONIQUE_CORE_SOURCES
 # WASM Wrapper (replaces MoniqueAudioProcessor)
 set(WRAPPER_SOURCES
     "${CMAKE_SOURCE_DIR}/MoniqueSynth.cpp"
+    "${CMAKE_SOURCE_DIR}/MoniqueProcessorStub.cpp"
 )
 
 add_executable(MoniqueWASMBuild

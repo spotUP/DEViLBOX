@@ -131,6 +131,19 @@ export const VOLUME_NORMALIZATION_OFFSETS: Record<string, number> = {
   'CZ101': 0,            // Reset to 0 - was unmeasured guess of 10
   'Dexed': 41,           // VERIFIED: measured -9.9dB with this offset (correct!)
   'OBXd': 9,             // VERIFIED: measured -10.0dB with this offset (correct!)
+  'MdaEPiano': 6,        // Initial estimate — Rhodes is naturally quiet
+  'MdaJX10': 4,          // Initial estimate
+  'MdaDX10': 4,          // Initial estimate
+  'RaffoSynth': 4,       // Minimoog clone
+  'CalfMono': 4,         // Calf Monosynth — initial estimate
+  'SetBfree': 6,         // setBfree Hammond B3 — organ can be loud
+  'SynthV1': 4,          // SynthV1 4-osc poly — initial estimate
+  'Monique': 5,          // Monique morphing mono — initial estimate
+  'TalNoizeMaker': 4,   // TAL-NoiseMaker VA — initial estimate
+  'Aeolus': 6,           // Pipe organ — can be loud
+  'FluidSynth': 4,       // SF2 player — depends on soundfont
+  'Sfizz': 4,            // SFZ player — depends on samples
+  'ZynAddSubFX': 5,      // Mega-synth — can be loud
   'SuperCollider': 2,   // Measured: -22.3dB @ offset -10 → adjusted to target -10dB
   'CEM3394': 14,         // Recalibrated 2026-02-28
   'SCSP': 1,             // Recalibrated 2026-02-28

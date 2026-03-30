@@ -1,5 +1,6 @@
 /**
  * AeolusControls.tsx - Aeolus pipe organ controls
+ * Matches AeolusConfig which uses greatStop0-7, swellStop0-7, pedalStop0-4
  */
 
 import React, { useRef, useEffect, useCallback } from 'react';
@@ -15,26 +16,33 @@ interface AeolusControlsProps {
 type StopDef = { key: keyof AeolusConfig; label: string };
 
 const GREAT_STOPS: StopDef[] = [
-  { key: 'greatPrincipal8', label: "Principal 8'" },
-  { key: 'greatOctave4', label: "Octave 4'" },
-  { key: 'greatFifteenth2', label: "Fifteenth 2'" },
-  { key: 'greatMixture', label: 'Mixture' },
-  { key: 'greatFlute8', label: "Flute 8'" },
-  { key: 'greatBourdon16', label: "Bourdon 16'" },
-  { key: 'greatTrumpet8', label: "Trumpet 8'" },
+  { key: 'greatStop0', label: "Principal 8'" },
+  { key: 'greatStop1', label: "Octave 4'" },
+  { key: 'greatStop2', label: "Fifteenth 2'" },
+  { key: 'greatStop3', label: 'Mixture' },
+  { key: 'greatStop4', label: "Flute 8'" },
+  { key: 'greatStop5', label: "Bourdon 16'" },
+  { key: 'greatStop6', label: "Trumpet 8'" },
+  { key: 'greatStop7', label: "Clarion 4'" },
 ];
 
 const SWELL_STOPS: StopDef[] = [
-  { key: 'swellGedackt8', label: "Gedackt 8'" },
-  { key: 'swellSalicional8', label: "Salicional 8'" },
-  { key: 'swellVoixCeleste', label: 'Voix Celeste' },
-  { key: 'swellOboe8', label: "Oboe 8'" },
+  { key: 'swellStop0', label: "Gedackt 8'" },
+  { key: 'swellStop1', label: "Salicional 8'" },
+  { key: 'swellStop2', label: 'Voix Celeste' },
+  { key: 'swellStop3', label: "Oboe 8'" },
+  { key: 'swellStop4', label: "Gemshorn 4'" },
+  { key: 'swellStop5', label: "Rohrflöte 4'" },
+  { key: 'swellStop6', label: "Trompette 8'" },
+  { key: 'swellStop7', label: "Clairon 4'" },
 ];
 
 const PEDAL_STOPS: StopDef[] = [
-  { key: 'pedalSubbass16', label: "Subbass 16'" },
-  { key: 'pedalPrincipal8', label: "Principal 8'" },
-  { key: 'pedalTrompete8', label: "Trompete 8'" },
+  { key: 'pedalStop0', label: "Subbass 16'" },
+  { key: 'pedalStop1', label: "Principal 8'" },
+  { key: 'pedalStop2', label: "Trompete 8'" },
+  { key: 'pedalStop3', label: "Octave 4'" },
+  { key: 'pedalStop4', label: "Bourdon 8'" },
 ];
 
 const StopToggle: React.FC<{ label: string; active: boolean; onChange: (on: boolean) => void }> = ({ label, active, onChange }) => (
@@ -80,16 +88,31 @@ export const AeolusControls: React.FC<AeolusControlsProps> = ({ config, onChange
       <StopBank title="Swell" stops={SWELL_STOPS} config={merged} onUpdate={updateParam} />
       <StopBank title="Pedal" stops={PEDAL_STOPS} config={merged} onUpdate={updateParam} />
 
+      {/* Couplers */}
+      <div className="p-3 rounded-xl border bg-[#1a1a1a] border-amber-900/30">
+        <h3 className="font-bold uppercase tracking-tight text-sm mb-2 text-amber-500">Couplers</h3>
+        <div className="flex flex-wrap gap-2">
+          <StopToggle label="Swell→Great" active={merged.couplerSwellGreat === 1}
+            onChange={(on) => updateParam('couplerSwellGreat', on ? 1 : 0)} />
+          <StopToggle label="Great→Pedal" active={merged.couplerGreatPedal === 1}
+            onChange={(on) => updateParam('couplerGreatPedal', on ? 1 : 0)} />
+          <StopToggle label="Swell→Pedal" active={merged.couplerSwellPedal === 1}
+            onChange={(on) => updateParam('couplerSwellPedal', on ? 1 : 0)} />
+          <StopToggle label="Swell 16'" active={merged.couplerSwellOctave === 1}
+            onChange={(on) => updateParam('couplerSwellOctave', on ? 1 : 0)} />
+        </div>
+      </div>
+
       {/* Tremulant */}
       <div className="p-3 rounded-xl border bg-[#1a1a1a] border-amber-900/30">
         <h3 className="font-bold uppercase tracking-tight text-sm mb-2 text-amber-500">Tremulant</h3>
         <div className="flex flex-wrap gap-4 items-center justify-center">
-          <StopToggle label="Enable" active={merged.tremEnable === 1}
-            onChange={(on) => updateParam('tremEnable', on ? 1 : 0)} />
-          <Knob label="Speed" value={merged.tremSpeed} min={0} max={1} defaultValue={0.33}
-            onChange={(v) => updateParam('tremSpeed', v)} size="sm" color="#d4a017" />
-          <Knob label="Depth" value={merged.tremDepth} min={0} max={1} defaultValue={0.5}
-            onChange={(v) => updateParam('tremDepth', v)} size="sm" color="#d4a017" />
+          <StopToggle label="Enable" active={merged.tremulantOn === 1}
+            onChange={(on) => updateParam('tremulantOn', on ? 1 : 0)} />
+          <Knob label="Speed" value={merged.tremulantSpeed ?? 0.5} min={0} max={1} defaultValue={0.5}
+            onChange={(v) => updateParam('tremulantSpeed', v)} size="sm" color="#d4a017" />
+          <Knob label="Depth" value={merged.tremulantDepth ?? 0.5} min={0} max={1} defaultValue={0.5}
+            onChange={(v) => updateParam('tremulantDepth', v)} size="sm" color="#d4a017" />
         </div>
       </div>
 
@@ -97,10 +120,10 @@ export const AeolusControls: React.FC<AeolusControlsProps> = ({ config, onChange
       <div className="p-3 rounded-xl border bg-[#1a1a1a] border-amber-900/30">
         <h3 className="font-bold uppercase tracking-tight text-sm mb-2 text-amber-500">Reverb</h3>
         <div className="flex flex-wrap gap-4 justify-center">
-          <Knob label="Amount" value={merged.reverbAmount} min={0} max={1} defaultValue={0.3}
+          <Knob label="Amount" value={merged.reverbAmount ?? 0.3} min={0} max={1} defaultValue={0.3}
             onChange={(v) => updateParam('reverbAmount', v)} size="sm" color="#d4a017" />
-          <Knob label="Time" value={merged.reverbTime} min={0} max={1} defaultValue={0.5}
-            onChange={(v) => updateParam('reverbTime', v)} size="sm" color="#d4a017" />
+          <Knob label="Size" value={merged.reverbSize ?? 0.5} min={0} max={1} defaultValue={0.5}
+            onChange={(v) => updateParam('reverbSize', v)} size="sm" color="#d4a017" />
         </div>
       </div>
 
@@ -108,15 +131,15 @@ export const AeolusControls: React.FC<AeolusControlsProps> = ({ config, onChange
       <div className="p-3 rounded-xl border bg-[#1a1a1a] border-amber-900/30">
         <h3 className="font-bold uppercase tracking-tight text-sm mb-2 text-amber-500">Master</h3>
         <div className="flex flex-wrap gap-4 justify-center">
-          <Knob label="Volume" value={merged.volume} min={0} max={1} defaultValue={0.8}
+          <Knob label="Volume" value={merged.volume ?? 0.8} min={0} max={1} defaultValue={0.8}
             onChange={(v) => updateParam('volume', v)} size="sm" color="#d4a017" />
-          <Knob label="Tuning" value={merged.tuning} min={0} max={1} defaultValue={0.5}
+          <Knob label="Tuning" value={merged.tuning ?? 440} min={415} max={466} defaultValue={440}
             onChange={(v) => updateParam('tuning', v)} size="sm" color="#d4a017" />
-          <Knob label="Width" value={merged.stereoWidth} min={0} max={1} defaultValue={0.5}
-            onChange={(v) => updateParam('stereoWidth', v)} size="sm" color="#d4a017" />
-          <Knob label="Swell" value={merged.swellExpression} min={0} max={1} defaultValue={1}
+          <Knob label="Wind" value={merged.windPressure ?? 0.5} min={0} max={1} defaultValue={0.5}
+            onChange={(v) => updateParam('windPressure', v)} size="sm" color="#d4a017" />
+          <Knob label="Swell Expr" value={merged.swellExpression ?? 0.7} min={0} max={1} defaultValue={0.7}
             onChange={(v) => updateParam('swellExpression', v)} size="sm" color="#d4a017" />
-          <Knob label="Great" value={merged.greatExpression} min={0} max={1} defaultValue={1}
+          <Knob label="Great Expr" value={merged.greatExpression ?? 1} min={0} max={1} defaultValue={1}
             onChange={(v) => updateParam('greatExpression', v)} size="sm" color="#d4a017" />
         </div>
       </div>
