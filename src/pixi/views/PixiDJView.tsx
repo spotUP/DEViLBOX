@@ -21,6 +21,7 @@ import { useDJKeyboardHandler } from '@components/dj/DJKeyboardHandler';
 import { PixiDJControllerSelect } from './dj/PixiDJControllerSelect';
 import { PixiDJFxPresets } from './dj/PixiDJFxPresets';
 import { PixiDJSamplerPanel } from './dj/PixiDJSamplerPanel';
+import { PixiDJAutoDJPanel } from './dj/PixiDJAutoDJPanel';
 
 type DJBrowserPanel = 'none' | 'playlists' | 'modland' | 'serato';
 
@@ -57,6 +58,8 @@ export const PixiDJView: React.FC = () => {
 
   const [browserPanel, setBrowserPanel] = useState<DJBrowserPanel>('none');
   const [samplerOpen, setSamplerOpen] = useState(false);
+  const [autoDJOpen, setAutoDJOpen] = useState(false);
+  const autoDJEnabled = useDJStore(s => s.autoDJEnabled);
 
   return (
     <pixiContainer
@@ -72,17 +75,21 @@ export const PixiDJView: React.FC = () => {
         onBrowserPanelChange={setBrowserPanel}
         samplerOpen={samplerOpen}
         onSamplerToggle={() => setSamplerOpen(p => !p)}
+        autoDJOpen={autoDJOpen || autoDJEnabled}
+        onAutoDJToggle={() => setAutoDJOpen(p => !p)}
       />
 
       {/* Browser panel — GL-native, collapses to 0 height when hidden */}
-      <pixiContainer layout={{ width: '100%', height: browserPanel !== 'none' ? 280 : 0 }}>
-        {browserPanel === 'playlists' && <PixiDJPlaylistPanel />}
-        {browserPanel === 'modland' && <PixiDJModlandBrowser />}
+      <pixiContainer layout={{ width: '100%', height: browserPanel !== 'none' ? 280 : 0, flexShrink: 0 }}>
+        {browserPanel === 'playlists' && <PixiDJPlaylistPanel onClose={() => setBrowserPanel('none')} />}
+        {browserPanel === 'modland' && <PixiDJModlandBrowser onClose={() => setBrowserPanel('none')} />}
         {browserPanel === 'serato' && <PixiDJSeratoBrowser />}
       </pixiContainer>
 
       {/* Main deck area: Deck A | Mixer | Deck B [| Deck C] */}
       <pixiContainer
+        eventMode={browserPanel !== 'none' ? 'static' : 'auto'}
+        onPointerDown={browserPanel !== 'none' ? () => setBrowserPanel('none') : undefined}
         layout={{
           flex: 1,
           width: '100%',
@@ -100,6 +107,13 @@ export const PixiDJView: React.FC = () => {
         >
           <PixiDJDeck deckId="C" />
         </pixiContainer>
+
+        {/* Auto DJ panel overlay */}
+        {(autoDJOpen || autoDJEnabled) && (
+          <pixiContainer layout={{ position: 'absolute', left: 8, top: 8 }}>
+            <PixiDJAutoDJPanel isOpen={autoDJOpen || autoDJEnabled} onClose={() => setAutoDJOpen(false)} />
+          </pixiContainer>
+        )}
 
         {/* Sampler panel overlay */}
         {samplerOpen && (
@@ -120,9 +134,11 @@ interface DJTopBarProps {
   onBrowserPanelChange: (panel: DJBrowserPanel) => void;
   samplerOpen: boolean;
   onSamplerToggle: () => void;
+  autoDJOpen: boolean;
+  onAutoDJToggle: () => void;
 }
 
-const PixiDJTopBar: React.FC<DJTopBarProps> = ({ browserPanel, onBrowserPanelChange, samplerOpen, onSamplerToggle }) => {
+const PixiDJTopBar: React.FC<DJTopBarProps> = ({ browserPanel, onBrowserPanelChange, samplerOpen, onSamplerToggle, autoDJOpen, onAutoDJToggle }) => {
   const modalOpen = useUIStore(s => s.modalOpen);
   const deckViewMode = useDJStore(s => s.deckViewMode);
   const thirdDeckActive = useDJStore(s => s.thirdDeckActive);
@@ -183,6 +199,16 @@ const PixiDJTopBar: React.FC<DJTopBarProps> = ({ browserPanel, onBrowserPanelCha
         onClick={onSamplerToggle}
       />
 
+      {/* Auto DJ */}
+      <PixiButton
+        label={autoDJOpen ? 'Auto DJ ON' : 'Auto DJ'}
+        variant={autoDJOpen ? 'ft2' : 'ghost'}
+        color={autoDJOpen ? 'green' : undefined}
+        size="sm"
+        active={autoDJOpen}
+        onClick={onAutoDJToggle}
+      />
+
       {/* Browser */}
       <PixiButton
         label="Browser"
@@ -206,9 +232,9 @@ const PixiDJTopBar: React.FC<DJTopBarProps> = ({ browserPanel, onBrowserPanelCha
         onClick={() => togglePanel('playlists')}
       />
 
-      {/* Modland */}
+      {/* Online Music Search (Modland + HVSC) */}
       <PixiButton
-        label="Modland"
+        label="Online"
         variant={browserPanel === 'modland' ? 'ft2' : 'ghost'}
         color={browserPanel === 'modland' ? 'green' : undefined}
         size="sm"

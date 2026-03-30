@@ -1,8 +1,8 @@
 /**
- * DJModlandBrowser - Browse and load tracker modules from ftp.modland.com
+ * DJModlandBrowser - Unified online music browser for the DJ view
  *
- * Search 150K+ playable modules by title, author, or format.
- * Downloads are proxied through the DEViLBOX server (CORS + caching).
+ * Search 190K+ Modland tracker modules and 80K+ HVSC C64 SID tunes
+ * from a single search bar. Downloads are proxied through the DEViLBOX server.
  */
 
 import React, { useState, useCallback, useEffect, useRef } from 'react';
@@ -17,6 +17,11 @@ import {
   type ModlandFormat,
   type ModlandStatus,
 } from '@/lib/modlandApi';
+import {
+  searchHVSC,
+  downloadHVSCFile,
+  type HVSCEntry,
+} from '@/lib/hvscApi';
 import { useDJStore, useThirdDeckActive } from '@/stores/useDJStore';
 import { getDJEngine } from '@/engine/dj/DJEngine';
 import { detectBPM, estimateSongDuration } from '@/engine/dj/DJBeatDetector';
@@ -33,6 +38,28 @@ import {
 import { useAuthStore } from '@/stores/useAuthStore';
 import { StarRating } from '@/components/shared/StarRating';
 
+// ── Unified result type ──────────────────────────────────────────────────────
+
+type SearchSource = 'all' | 'modland' | 'hvsc';
+
+interface OnlineResult {
+  source: 'modland' | 'hvsc';
+  key: string;
+  filename: string;
+  format: string;
+  author: string;
+  avg_rating?: number;
+  vote_count?: number;
+}
+
+function modlandToResult(f: ModlandFile): OnlineResult {
+  return { source: 'modland', key: f.full_path, filename: f.filename, format: f.format, author: f.author, avg_rating: f.avg_rating, vote_count: f.vote_count };
+}
+
+function hvscToResult(e: HVSCEntry): OnlineResult {
+  return { source: 'hvsc', key: e.path, filename: e.name, format: 'SID', author: e.author || '', avg_rating: e.avg_rating, vote_count: e.vote_count };
+}
+
 // ── Component ────────────────────────────────────────────────────────────────
 
 interface DJModlandBrowserProps {
@@ -41,8 +68,9 @@ interface DJModlandBrowserProps {
 
 export const DJModlandBrowser: React.FC<DJModlandBrowserProps> = ({ onClose }) => {
   const [query, setQuery] = useState('');
+  const [source, setSource] = useState<SearchSource>('all');
   const [format, setFormat] = useState('');
-  const [results, setResults] = useState<ModlandFile[]>([]);
+  const [results, setResults] = useState<OnlineResult[]>([]);
   const [formats, setFormats] = useState<ModlandFormat[]>([]);
   const [status, setStatus] = useState<ModlandStatus | null>(null);
   const [loading, setLoading] = useState(false);
@@ -57,6 +85,7 @@ export const DJModlandBrowser: React.FC<DJModlandBrowserProps> = ({ onClose }) =
   const isLoggedIn = useAuthStore(s => !!s.token);
 
   const searchTimerRef = useRef<ReturnType<typeof setTimeout>>(null);
+  const abortRef = useRef<AbortController | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
@@ -88,7 +117,7 @@ export const DJModlandBrowser: React.FC<DJModlandBrowserProps> = ({ onClose }) =
   // ── Debounced search ────────────────────────────────────────────────────
 
   const doSearch = useCallback(
-    async (q: string, fmt: string, newOffset: number, append: boolean) => {
+    async (q: string, fmt: string, src: SearchSource, newOffset: number, append: boolean) => {
       if (!q && !fmt) {
         if (!append) setResults([]);
         return;
@@ -98,26 +127,51 @@ export const DJModlandBrowser: React.FC<DJModlandBrowserProps> = ({ onClose }) =
       setError(null);
 
       try {
-        const data = await searchModland({
-          q: q || undefined,
-          format: fmt || undefined,
-          limit: LIMIT,
-          offset: newOffset,
-        });
+        let combined: OnlineResult[] = [];
+        let moreResults = false;
+
+        if (src === 'all' || src === 'modland') {
+          const data = await searchModland({
+            q: q || undefined,
+            format: fmt || undefined,
+            limit: LIMIT,
+            offset: newOffset,
+          });
+          combined.push(...data.results.map(modlandToResult));
+          if (data.results.length === LIMIT) moreResults = true;
+        }
+
+        if ((src === 'all' || src === 'hvsc') && q && !fmt) {
+          try {
+            const hvscResults = await searchHVSC(q, LIMIT, newOffset);
+            combined.push(...hvscResults.filter(e => !e.isDirectory).map(hvscToResult));
+            if (hvscResults.length === LIMIT) moreResults = true;
+          } catch {
+            // HVSC may fail if server not running
+          }
+        }
+
+        if (src === 'all') {
+          combined.sort((a, b) => a.filename.localeCompare(b.filename));
+        }
 
         if (append) {
-          setResults((prev) => [...prev, ...data.results]);
+          setResults((prev) => [...prev, ...combined]);
         } else {
-          setResults(data.results);
+          setResults(combined);
         }
-        setHasMore(data.results.length === LIMIT);
+        setHasMore(moreResults);
         setOffset(newOffset);
 
-        // Fetch ratings for results
-        const keys = data.results.map((f: ModlandFile) => f.full_path);
-        if (keys.length > 0) {
-          batchGetRatings('modland', keys).then(rm => {
-            setRatings(prev => append ? { ...prev, ...rm } : rm);
+        const modlandKeys = combined.filter(r => r.source === 'modland').map(r => r.key);
+        const hvscKeys = combined.filter(r => r.source === 'hvsc').map(r => r.key);
+        const ratingPromises: Promise<RatingMap>[] = [];
+        if (modlandKeys.length > 0) ratingPromises.push(batchGetRatings('modland', modlandKeys));
+        if (hvscKeys.length > 0) ratingPromises.push(batchGetRatings('hvsc', hvscKeys));
+        if (ratingPromises.length > 0) {
+          Promise.all(ratingPromises).then(maps => {
+            const merged = Object.assign({}, ...maps);
+            setRatings(prev => append ? { ...prev, ...merged } : merged);
           }).catch(() => {});
         } else if (!append) {
           setRatings({});
@@ -135,23 +189,27 @@ export const DJModlandBrowser: React.FC<DJModlandBrowserProps> = ({ onClose }) =
   useEffect(() => {
     if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
     searchTimerRef.current = setTimeout(() => {
-      doSearch(query, format, 0, false);
+      // Cancel any in-flight search
+      if (abortRef.current) abortRef.current.abort();
+      doSearch(query, format, source, 0, false);
       setSelectedIndex(0);
-    }, 300);
+    }, 500);
     return () => {
       if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
     };
-  }, [query, format, doSearch]);
+  }, [query, format, source, doSearch]);
 
   const loadMore = useCallback(() => {
     const newOffset = offset + LIMIT;
-    doSearch(query, format, newOffset, true);
-  }, [query, format, offset, doSearch]);
+    doSearch(query, format, source, newOffset, true);
+  }, [query, format, source, offset, doSearch]);
 
   // ── Rate handler ──────────────────────────────────────────────────────
 
-  const handleRate = useCallback(async (itemKey: string, star: number) => {
+  const handleRate = useCallback(async (item: OnlineResult, star: number) => {
     if (!isLoggedIn) return;
+    const itemKey = item.key;
+    const ratingSource = item.source;
     // Optimistic update
     setRatings(prev => {
       const existing = prev[itemKey];
@@ -174,13 +232,12 @@ export const DJModlandBrowser: React.FC<DJModlandBrowserProps> = ({ onClose }) =
     });
     try {
       if (star === 0) {
-        await removeRating('modland', itemKey);
+        await removeRating(ratingSource, itemKey);
       } else {
-        await setRating('modland', itemKey, star);
+        await setRating(ratingSource, itemKey, star);
       }
     } catch {
-      // Re-fetch on error
-      batchGetRatings('modland', [itemKey]).then(rm => {
+      batchGetRatings(ratingSource, [itemKey]).then(rm => {
         setRatings(prev => ({ ...prev, ...rm }));
       }).catch(() => {});
     }
@@ -196,32 +253,35 @@ export const DJModlandBrowser: React.FC<DJModlandBrowserProps> = ({ onClose }) =
   // ── Download → Parse → Load to Deck ─────────────────────────────────────
 
   const loadToDeck = useCallback(
-    async (file: ModlandFile, deckId: 'A' | 'B' | 'C') => {
-      setDownloadingPaths((prev) => new Set(prev).add(file.full_path));
+    async (file: OnlineResult, deckId: 'A' | 'B' | 'C') => {
+      setDownloadingPaths((prev) => new Set(prev).add(file.key));
       setError(null);
 
       try {
-        const [buffer, companion] = await Promise.all([
-          downloadModlandFile(file.full_path),
-          downloadTFMXCompanion(file.full_path),
-        ]);
-
-        if (companion) {
-          const { UADEEngine } = await import('@engine/uade/UADEEngine');
-          await UADEEngine.getInstance().addCompanionFile(companion.filename, companion.buffer);
+        let buffer: ArrayBuffer;
+        if (file.source === 'hvsc') {
+          buffer = await downloadHVSCFile(file.key);
+        } else {
+          const [modBuffer, companion] = await Promise.all([
+            downloadModlandFile(file.key),
+            downloadTFMXCompanion(file.key),
+          ]);
+          buffer = modBuffer;
+          if (companion) {
+            const { UADEEngine } = await import('@engine/uade/UADEEngine');
+            await UADEEngine.getInstance().addCompanionFile(companion.filename, companion.buffer);
+          }
         }
 
         const blob = new File([buffer], file.filename, { type: 'application/octet-stream' });
         const song = await parseModuleToSong(blob);
         const bpmResult = detectBPM(song);
 
-        // Cache with modland: prefix for playlist re-download support
-        const cacheKey = `modland:${file.full_path}`;
+        const cacheKey = `${file.source}:${file.key}`;
         cacheSong(cacheKey, song);
 
         const engine = getDJEngine();
 
-        // Set loading state immediately
         useDJStore.getState().setDeckState(deckId, {
           fileName: cacheKey,
           trackName: song.name || file.filename,
@@ -231,26 +291,18 @@ export const DJModlandBrowser: React.FC<DJModlandBrowserProps> = ({ onClose }) =
           isPlaying: false,
         });
 
-        // Render + analyze FIRST, then load audio directly (skip tracker mode)
-        // This eliminates the "tracker bug window" — user hears perfect audio immediately
         const result = await getDJPipeline().loadOrEnqueue(buffer, file.filename, deckId, 'high');
-
-        // Load the pre-rendered WAV directly in audio mode
         await engine.loadAudioToDeck(deckId, result.wavData, cacheKey, song.name || file.filename, result.analysis?.bpm || bpmResult.bpm, song);
 
-        // Switch to visualizer view for modules (only if not in 3D mode)
         if (useDJStore.getState().deckViewMode !== '3d') {
           useDJStore.getState().setDeckViewMode('visualizer');
         }
 
-        console.log(`[DJModlandBrowser] Loaded ${file.filename} in audio mode (skipped tracker bugs)`);
-
-        // Track loaded decks and auto-close when all active decks are filled
         setLoadedDecks((prev) => {
           const next = new Set(prev).add(deckId);
           const requiredDecks = thirdDeckActive ? 3 : 2;
           if (next.size >= requiredDecks && onClose) {
-            setTimeout(onClose, 300); // brief delay so user sees the load complete
+            setTimeout(onClose, 300);
           }
           return next;
         });
@@ -259,7 +311,7 @@ export const DJModlandBrowser: React.FC<DJModlandBrowserProps> = ({ onClose }) =
       } finally {
         setDownloadingPaths((prev) => {
           const next = new Set(prev);
-          next.delete(file.full_path);
+          next.delete(file.key);
           return next;
         });
       }
@@ -270,22 +322,27 @@ export const DJModlandBrowser: React.FC<DJModlandBrowserProps> = ({ onClose }) =
   // ── Add to playlist ─────────────────────────────────────────────────────
 
   const addToPlaylist = useCallback(
-    async (file: ModlandFile) => {
+    async (file: OnlineResult) => {
       const playlistId = useDJPlaylistStore.getState().activePlaylistId;
       if (!playlistId) return;
 
-      setDownloadingPaths((prev) => new Set(prev).add(file.full_path));
+      setDownloadingPaths((prev) => new Set(prev).add(file.key));
       setError(null);
 
       try {
-        const [buffer, companion] = await Promise.all([
-          downloadModlandFile(file.full_path),
-          downloadTFMXCompanion(file.full_path),
-        ]);
-
-        if (companion) {
-          const { UADEEngine } = await import('@engine/uade/UADEEngine');
-          await UADEEngine.getInstance().addCompanionFile(companion.filename, companion.buffer);
+        let buffer: ArrayBuffer;
+        if (file.source === 'hvsc') {
+          buffer = await downloadHVSCFile(file.key);
+        } else {
+          const [modBuffer, companion] = await Promise.all([
+            downloadModlandFile(file.key),
+            downloadTFMXCompanion(file.key),
+          ]);
+          buffer = modBuffer;
+          if (companion) {
+            const { UADEEngine } = await import('@engine/uade/UADEEngine');
+            await UADEEngine.getInstance().addCompanionFile(companion.filename, companion.buffer);
+          }
         }
 
         const blob = new File([buffer], file.filename, { type: 'application/octet-stream' });
@@ -293,13 +350,13 @@ export const DJModlandBrowser: React.FC<DJModlandBrowserProps> = ({ onClose }) =
         const bpmResult = detectBPM(song);
         const duration = estimateSongDuration(song);
 
-        const cacheKey = `modland:${file.full_path}`;
+        const cacheKey = `${file.source}:${file.key}`;
         cacheSong(cacheKey, song);
 
         useDJPlaylistStore.getState().addTrack(playlistId, {
           fileName: cacheKey,
           trackName: song.name || file.filename,
-          format: file.extension.toUpperCase(),
+          format: file.format,
           bpm: bpmResult.bpm,
           duration,
           addedAt: Date.now(),
@@ -309,7 +366,7 @@ export const DJModlandBrowser: React.FC<DJModlandBrowserProps> = ({ onClose }) =
       } finally {
         setDownloadingPaths((prev) => {
           const next = new Set(prev);
-          next.delete(file.full_path);
+          next.delete(file.key);
           return next;
         });
       }
@@ -329,7 +386,7 @@ export const DJModlandBrowser: React.FC<DJModlandBrowserProps> = ({ onClose }) =
       } else if (e.key === 'Enter' && selectedIndex >= 0 && selectedIndex < results.length) {
         e.preventDefault();
         const file = results[selectedIndex];
-        if (!downloadingPaths.has(file.full_path)) {
+        if (!downloadingPaths.has(file.key)) {
           loadToDeck(file, e.shiftKey ? 'B' : 'A');
         }
       } else if ((e.key === '1' || e.key === '2' || e.key === '3') && selectedIndex >= 0 && selectedIndex < results.length) {
@@ -337,7 +394,7 @@ export const DJModlandBrowser: React.FC<DJModlandBrowserProps> = ({ onClose }) =
         if (target.tagName === 'INPUT') return; // Don't intercept number keys while typing
         e.preventDefault();
         const file = results[selectedIndex];
-        if (downloadingPaths.has(file.full_path)) return;
+        if (downloadingPaths.has(file.key)) return;
         const deckMap = { '1': 'A', '2': 'B', '3': 'C' } as const;
         const deckId = deckMap[e.key as '1' | '2' | '3'];
         if (deckId === 'C' && !thirdDeckActive) {
@@ -351,7 +408,7 @@ export const DJModlandBrowser: React.FC<DJModlandBrowserProps> = ({ onClose }) =
 
   // ── Render ──────────────────────────────────────────────────────────────
 
-  const isDownloading = (path: string) => downloadingPaths.has(path);
+  const isDownloading = (key: string) => downloadingPaths.has(key);
 
   return (
     <div
@@ -365,7 +422,7 @@ export const DJModlandBrowser: React.FC<DJModlandBrowserProps> = ({ onClose }) =
         <div className="flex items-center gap-2">
           <Globe size={14} className="text-green-400" />
           <h3 className="text-text-primary text-sm font-mono font-bold tracking-wider uppercase">
-            Modland
+            Online
           </h3>
           {status && status.status === 'ready' && (
             <span className="text-[10px] font-mono text-text-muted">
@@ -393,17 +450,29 @@ export const DJModlandBrowser: React.FC<DJModlandBrowserProps> = ({ onClose }) =
             ref={inputRef}
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search modules..."
+            placeholder="Search online archives..."
             className="w-full pl-7 pr-2 py-1.5 text-xs font-mono bg-dark-bg border border-dark-borderLight
                        rounded text-text-primary placeholder:text-text-muted/40
                        focus:border-green-600 focus:outline-none transition-colors"
           />
         </div>
         <select
-          value={format}
-          onChange={(e) => setFormat(e.target.value)}
+          value={source}
+          onChange={(e) => setSource(e.target.value as SearchSource)}
           className="px-2 py-1.5 text-[10px] font-mono bg-dark-bg border border-dark-borderLight
                      rounded text-text-secondary cursor-pointer hover:bg-dark-bgHover transition-colors"
+        >
+          <option value="all">All sources</option>
+          <option value="modland">Modland (190K+)</option>
+          <option value="hvsc">HVSC / SID (80K+)</option>
+        </select>
+        <select
+          value={format}
+          onChange={(e) => setFormat(e.target.value)}
+          disabled={source === 'hvsc'}
+          className="px-2 py-1.5 text-[10px] font-mono bg-dark-bg border border-dark-borderLight
+                     rounded text-text-secondary cursor-pointer hover:bg-dark-bgHover transition-colors
+                     disabled:opacity-50"
         >
           <option value="">All formats</option>
           {formats.map((f) => (
@@ -428,14 +497,14 @@ export const DJModlandBrowser: React.FC<DJModlandBrowserProps> = ({ onClose }) =
           <div className="flex flex-col items-center justify-center py-8 text-text-muted">
             <Globe size={24} className="mb-2 opacity-40" />
             <p className="text-xs font-mono">
-              {query || format ? 'No results found' : 'Search the modland archive'}
+              {query || format ? 'No results found' : 'Search 270K+ tracker modules & SID tunes'}
             </p>
           </div>
         ) : (
           <div className="flex flex-col gap-0.5">
             {results.map((file, idx) => (
               <div
-                key={file.full_path}
+                key={file.key}
                 data-result-item
                 onClick={() => setSelectedIndex(idx)}
                 className={`flex items-center gap-2 px-2 py-1.5 rounded border transition-colors group cursor-pointer ${
@@ -450,19 +519,20 @@ export const DJModlandBrowser: React.FC<DJModlandBrowserProps> = ({ onClose }) =
                     {file.filename}
                   </div>
                   <div className="flex gap-3 text-[10px] text-text-muted font-mono items-center">
-                    <span>{file.format}</span>
+                    <span className={file.source === 'hvsc' ? 'text-blue-400' : ''}>{file.format}</span>
+                    {file.source === 'hvsc' && <span className="text-blue-400/60 text-[9px]">HVSC</span>}
                     <span className="text-text-muted/60">{file.author}</span>
                     <StarRating
-                      avg={ratings[file.full_path]?.avg ?? file.avg_rating ?? 0}
-                      count={ratings[file.full_path]?.count ?? file.vote_count ?? 0}
-                      userRating={ratings[file.full_path]?.userRating}
-                      onRate={isLoggedIn ? (star) => handleRate(file.full_path, star) : undefined}
+                      avg={ratings[file.key]?.avg ?? file.avg_rating ?? 0}
+                      count={ratings[file.key]?.count ?? file.vote_count ?? 0}
+                      userRating={ratings[file.key]?.userRating}
+                      onRate={isLoggedIn ? (star) => handleRate(file, star) : undefined}
                     />
                   </div>
                 </div>
 
                 {/* Actions */}
-                {isDownloading(file.full_path) ? (
+                {isDownloading(file.key) ? (
                   <Loader2 size={12} className="animate-spin text-green-400" />
                 ) : (
                   <>

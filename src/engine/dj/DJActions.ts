@@ -11,6 +11,7 @@
  * some only the engine, and some both — with no consistency.
  */
 
+import * as Tone from 'tone';
 import { useDJStore, type CrossfaderCurve } from '@/stores/useDJStore';
 import { useDJSetStore } from '@/stores/useDJSetStore';
 import { getDJEngine, getDJEngineIfActive } from './DJEngine';
@@ -18,6 +19,7 @@ import type { DJSet } from './recording/DJSetFormat';
 import { quantizedEQKill, getQuantizeMode, setTrackedFilterPosition } from './DJQuantizedFX';
 import { quantizedPlay, syncBPMToOther, phaseAlign } from './DJAutoSync';
 import { DJBeatSync } from './DJBeatSync';
+import { getAutoDJ } from './DJAutoDJ';
 import type { DeckId, FaderLFODivision } from './DeckEngine';
 
 // ============================================================================
@@ -52,6 +54,11 @@ export async function togglePlay(
     spinDownMs = 800,
     spinDownCurve = 'exponential',
   } = options;
+
+  // Ensure AudioContext is running (browser suspends until user gesture)
+  if (Tone.getContext().state !== 'running') {
+    await Tone.start();
+  }
 
   const store = useDJStore.getState();
   const isPlaying = store.decks[deckId].isPlaying;
@@ -654,4 +661,23 @@ export async function stopRecording(
   useDJSetStore.getState().setRecording(false);
   useDJSetStore.getState().setRecordingDuration(0);
   return set;
+}
+
+// ============================================================================
+// AUTO DJ
+// ============================================================================
+
+/** Enable Auto DJ — plays through the active playlist with beatmatched transitions. */
+export async function enableAutoDJ(startIndex?: number): Promise<void> {
+  await getAutoDJ().enable(startIndex);
+}
+
+/** Disable Auto DJ — current track keeps playing. */
+export function disableAutoDJ(): void {
+  getAutoDJ().disable();
+}
+
+/** Skip to the next Auto DJ track with a short transition. */
+export async function skipAutoDJ(): Promise<void> {
+  await getAutoDJ().skip();
 }
