@@ -419,7 +419,7 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = React.memo(({
 
       if (isMIDIFile(file.name)) {
         const midiResult = await importMIDIFile(file, {
-          quantize: 1, mergeChannels: false, velocityToVolume: true, defaultPatternLength: 64,
+          quantize: 1, velocityToVolume: true, defaultPatternLength: 64,
         });
         resetAutomation();
         resetTransport();
@@ -1015,7 +1015,6 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = React.memo(({
 
               const result = await importMIDIFile(file, {
                 quantize: 1,
-                mergeChannels: false,
                 velocityToVolume: true,
                 defaultPatternLength: 64
               });

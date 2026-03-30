@@ -32,7 +32,6 @@ interface ParseOptions {
   preScannedMeta?: UADEMetadata;
   midiOptions?: {
     quantize?: number;
-    mergeChannels?: boolean;
     velocityToVolume?: boolean;
     defaultPatternLength?: number;
   };

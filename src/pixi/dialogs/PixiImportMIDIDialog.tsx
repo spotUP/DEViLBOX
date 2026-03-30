@@ -84,7 +84,6 @@ export const PixiImportMIDIDialog: React.FC<PixiImportMIDIDialogProps> = ({
 
   // MIDI import options
   const [quantize, setQuantize] = useState(1);
-  const [mergeChannels, setMergeChannels] = useState(false);
   const [velocityToVolume, setVelocityToVolume] = useState(true);
   const [patternLength, setPatternLength] = useState(64);
 
@@ -142,7 +141,6 @@ export const PixiImportMIDIDialog: React.FC<PixiImportMIDIDialogProps> = ({
 
     const midiOptions: MIDIImportOptions = {
       quantize,
-      mergeChannels,
       velocityToVolume,
       defaultPatternLength: patternLength,
     };
@@ -164,7 +162,7 @@ export const PixiImportMIDIDialog: React.FC<PixiImportMIDIDialogProps> = ({
 
     onImport(info, { useLibopenmpt: false, midiOptions });
     onClose();
-  }, [moduleFile, preview, quantize, mergeChannels, velocityToVolume, patternLength, onImport, onClose]);
+  }, [moduleFile, preview, quantize, velocityToVolume, patternLength, onImport, onClose]);
 
   const handleClose = useCallback(() => {
     setPreview(null);
@@ -315,14 +313,7 @@ export const PixiImportMIDIDialog: React.FC<PixiImportMIDIDialogProps> = ({
             <PixiCheckbox checked={velocityToVolume} onChange={setVelocityToVolume} />
           </layoutContainer>
 
-          {/* Merge Channels */}
-          <layoutContainer layout={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', width: CONTENT_W - 32 }}>
-            <layoutContainer layout={{ flexDirection: 'column', gap: 2 }}>
-              <PixiLabel text="Merge Channels" size="md" color="text" />
-              <PixiLabel text="Combine MIDI channels into fewer tracker channels" size="sm" color="textMuted" />
-            </layoutContainer>
-            <PixiCheckbox checked={mergeChannels} onChange={setMergeChannels} />
-          </layoutContainer>
+          {/* Merge Channels option removed — tracks always become channels */}
         </layoutContainer>
       </layoutContainer>
 

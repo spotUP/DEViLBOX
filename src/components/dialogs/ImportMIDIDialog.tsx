@@ -55,7 +55,6 @@ export const ImportMIDIDialog: React.FC<ImportMIDIDialogProps> = ({
 
   // MIDI import options
   const [quantize, setQuantize]                   = useState(1);
-  const [mergeChannels, setMergeChannels]         = useState(false);
   const [velocityToVolume, setVelocityToVolume]   = useState(true);
   const [patternLength, setPatternLength]         = useState(64);
 
@@ -125,7 +124,6 @@ export const ImportMIDIDialog: React.FC<ImportMIDIDialogProps> = ({
 
     const midiOptions: MIDIImportOptions = {
       quantize,
-      mergeChannels,
       velocityToVolume,
       defaultPatternLength: patternLength,
     };
@@ -147,7 +145,7 @@ export const ImportMIDIDialog: React.FC<ImportMIDIDialogProps> = ({
 
     onImport(info, { useLibopenmpt: false, midiOptions });
     onClose();
-  }, [moduleFile, preview, quantize, mergeChannels, velocityToVolume, patternLength, onImport, onClose]);
+  }, [moduleFile, preview, quantize, velocityToVolume, patternLength, onImport, onClose]);
 
   const handleClose = useCallback(() => {
     setPreview(null);
@@ -309,19 +307,7 @@ export const ImportMIDIDialog: React.FC<ImportMIDIDialogProps> = ({
               />
             </label>
 
-            {/* Merge Channels */}
-            <label className="flex items-center justify-between cursor-pointer">
-              <div>
-                <p className="text-sm text-text-primary">Merge Channels</p>
-                <p className="text-xs text-text-muted">Combine all MIDI channels into fewer tracker channels</p>
-              </div>
-              <input
-                type="checkbox"
-                checked={mergeChannels}
-                onChange={(e) => setMergeChannels(e.target.checked)}
-                className="w-4 h-4 accent-accent-primary"
-              />
-            </label>
+            {/* Merge Channels option removed — tracks always become channels */}
           </div>
         </div>
 
