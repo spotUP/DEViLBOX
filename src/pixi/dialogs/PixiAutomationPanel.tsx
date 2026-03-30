@@ -12,6 +12,7 @@ import { usePixiTheme, usePixiThemeId } from '../theme';
 import { PIXI_FONTS } from '../fonts';
 import { useModalClose } from '@hooks/useDialogKeyboard';
 import { useTrackerStore, useAutomationStore } from '@stores';
+import { useUIStore } from '@stores/useUIStore';
 import { useChannelAutomationParams } from '@hooks/useChannelAutomationParams';
 import { interpolateAutomationValue } from '@typedefs/automation';
 
@@ -278,8 +279,13 @@ export const PixiAutomationPanel: React.FC<PixiAutomationPanelProps> = ({
   // Cancel = handleEscapeClose (restore snapshot + close)
   const handleCancel = handleEscapeClose;
 
-  // OK: just close (data is already live in the store)
+  // OK: enable automation lanes if there's data, then close
   const handleOk = useCallback(() => {
+    const hasCurves = useAutomationStore.getState().curves.some(c => c.points.length > 0);
+    if (hasCurves) {
+      const uiState = useUIStore.getState();
+      if (!uiState.showAutomationLanes) uiState.toggleAutomationLanes();
+    }
     onClose();
   }, [onClose]);
 

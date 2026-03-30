@@ -48,6 +48,7 @@ import { DJPitchSlider } from '@components/transport/DJPitchSlider';
 import { PatternMinimap } from './PatternMinimap';
 import { PianoRoll } from '../pianoroll';
 import { AutomationPanel } from '@components/automation/AutomationPanel';
+import { useAutomationStore } from '@stores/useAutomationStore';
 import { GTUltraView } from '@components/gtultra/GTUltraView';
 import { useGTUltraStore } from '@/stores/useGTUltraStore';
 import { HivelyView } from '@components/hively/HivelyView';
@@ -861,6 +862,28 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
             {/* Content */}
             <div className="flex-1 overflow-y-auto scrollbar-modern">
               <AutomationPanel />
+            </div>
+            {/* Footer — Cancel / OK */}
+            <div className="flex items-center justify-end gap-2 px-6 py-3 border-t border-dark-border bg-dark-bgSecondary">
+              <button
+                onClick={() => setShowAutomation(false)}
+                className="px-4 py-1.5 text-xs font-medium rounded-md bg-dark-bgTertiary text-text-secondary border border-dark-border hover:border-dark-borderLight transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => {
+                  const hasCurves = useAutomationStore.getState().curves.some(c => c.points.length > 0);
+                  if (hasCurves) {
+                    const uiState = useUIStore.getState();
+                    if (!uiState.showAutomationLanes) uiState.toggleAutomationLanes();
+                  }
+                  setShowAutomation(false);
+                }}
+                className="px-4 py-1.5 text-xs font-medium rounded-md bg-accent-primary text-text-inverse border border-accent-primary hover:bg-accent-primaryHover transition-colors"
+              >
+                OK
+              </button>
             </div>
           </div>
         </div>
