@@ -110,13 +110,22 @@ export const PixiAutomationLanes: React.FC<PixiAutomationLanesProps> = ({
     const result: string[][] = [];
     for (let i = 0; i < channelCount; i++) {
       const lane = channelLanes.get(i);
-      const params = lane?.activeParameters?.length
+      const explicit = lane?.activeParameters?.length
         ? [...lane.activeParameters]
-        : [lane?.activeParameter || parameter];
-      result.push(params);
+        : lane?.activeParameter ? [lane.activeParameter] : [];
+      // Also include any params that have curves with data
+      const curvesForCh = allCurves.filter(
+        (c) => c.patternId === patternId && c.channelIndex === i && c.points.length > 0
+      );
+      const fromCurves = curvesForCh.map(c => c.parameter);
+      const merged = [...explicit];
+      for (const p of fromCurves) {
+        if (!merged.includes(p)) merged.push(p);
+      }
+      result.push(merged.length > 0 ? merged : [parameter]);
     }
     return result;
-  }, [channelCount, channelLanes, parameter]);
+  }, [channelCount, channelLanes, parameter, allCurves, patternId]);
 
   const channelParameters = useMemo(
     () => channelParameterLists.map(pl => pl[0] || parameter),
