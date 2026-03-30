@@ -24,7 +24,9 @@ import { getToneEngine } from './ToneEngine';
 import { StereoSeparationNode } from './StereoSeparationNode';
 // getNativeAudioNode used in audio-context utilities
 import { getPatternScheduler } from './PatternScheduler';
+import { getAutomationPlayer } from './AutomationPlayer';
 import { useTransportStore, cancelPendingRowUpdate } from '@/stores/useTransportStore';
+import { useAutomationStore } from '@/stores/useAutomationStore';
 import { useCursorStore } from '@/stores/useCursorStore';
 import { unlockIOSAudio } from '@utils/ios-audio-unlock';
 import { ft2NoteToPeriod, ft2Period2Hz, ft2GetSampleC4Rate } from './effects/FT2Tables';
@@ -2125,6 +2127,28 @@ export class TrackerReplayer {
 
       // Process global pitch shift slide (Wxx effect) - once per tick
       this.doGlobalPitchSlide(safeTime);
+
+      // Apply curve-based automation (reads from useAutomationStore)
+      if (readNewNote && this.song) {
+        const ap = getAutomationPlayer();
+        const curPattern = this.song.patterns[this.song.songPositions[this.songPos]];
+        if (curPattern) {
+          ap.setPattern(curPattern);
+          ap.setAutomationData(useAutomationStore.getState().buildAutomationData());
+          const fractionalRow = this.pattPos + (this.currentTick / this.speed);
+          ap.processPatternRow(fractionalRow);
+        }
+      } else if (this.currentTick !== 0 && this.song) {
+        // Sub-row automation for smooth interpolation on non-zero ticks
+        const ap = getAutomationPlayer();
+        const curPattern = this.song.patterns[this.song.songPositions[this.songPos]];
+        if (curPattern) {
+          ap.setPattern(curPattern);
+          ap.setAutomationData(useAutomationStore.getState().buildAutomationData());
+          const fractionalRow = this.pattPos + (this.currentTick / this.speed);
+          ap.processPatternRow(fractionalRow);
+        }
+      }
     }
 
     // VU meters for native-engine formats (SID, HVL, MusicLine, JamCracker):
