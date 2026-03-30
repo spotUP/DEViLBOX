@@ -28,6 +28,7 @@ import {
   useTrackerStore,
   useCursorStore,
   useEditorStore,
+  useAutomationStore,
 } from '@stores';
 import { useUIStore } from '@stores/useUIStore';
 import { useSettingsStore } from '@stores/useSettingsStore';
@@ -39,7 +40,8 @@ import type { CursorPosition, BlockSelection } from '@typedefs';
 // ─── Layout constants (must match PatternEditorCanvas + PixiPatternEditor) ───
 const CHAR_WIDTH = 10;
 const LINE_NUMBER_WIDTH = 40;
-export const AUTOMATION_LANE_WIDTH = 28; // 24px lane + 4px gap
+export const AUTOMATION_LANE_WIDTH = 28; // base width for a single automation lane
+export const AUTOMATION_LANE_MIN = 12; // minimum per-lane width when multiple lanes share space
 
 // ─── Hook ─────────────────────────────────────────────────────────────────────
 
@@ -95,6 +97,20 @@ export function usePatternEditor() {
   const trackerZoom = useUIStore((s) => s.trackerZoom);
   const showAutomationLanes = useUIStore((s) => s.showAutomationLanes);
   const rowHeight = Math.round(24 * (trackerZoom / 100));
+
+  // Per-channel automation lane count (for multi-lane width allocation)
+  const channelLaneCounts = useAutomationStore(useShallow((s) => {
+    if (!showAutomationLanes) return [] as number[];
+    const nc = pattern?.channels.length ?? 0;
+    const counts: number[] = [];
+    for (let ch = 0; ch < nc; ch++) {
+      const lane = s.channelLanes.get(ch);
+      if (!lane) { counts.push(1); continue; }
+      const n = lane.activeParameters?.length || (lane.activeParameter ? 1 : 0);
+      counts.push(Math.max(1, n));
+    }
+    return counts;
+  }));
 
   // Ref-tracked row height for hot loops (avoids restarting effects on zoom change)
   const rowHeightRef = useRef(rowHeight);
@@ -181,7 +197,6 @@ export function usePatternEditor() {
     const noteWidth = CHAR_WIDTH * 3 + 4;
     const showAcid = columnVisibility.flag1 || columnVisibility.flag2;
     const showProb = columnVisibility.probability;
-    const autoLaneExtra = showAutomationLanes ? AUTOMATION_LANE_WIDTH : 0;
 
     const offsets: number[] = [];
     const widths: number[] = [];
@@ -190,6 +205,12 @@ export function usePatternEditor() {
     for (let ch = 0; ch < nc; ch++) {
       const channel = pattern.channels[ch];
       const isCollapsed = channel?.collapsed;
+      // Per-channel automation area: scale with lane count
+      const laneCount = showAutomationLanes ? (channelLaneCounts[ch] ?? 1) : 0;
+      const autoLaneExtra = laneCount <= 0 ? 0
+        : laneCount === 1 ? AUTOMATION_LANE_WIDTH
+        : Math.max(AUTOMATION_LANE_WIDTH, laneCount * AUTOMATION_LANE_MIN + 4);
+
       if (isCollapsed) {
         const cw = noteWidth + 40 + autoLaneExtra;
         offsets.push(currentX);
@@ -215,7 +236,7 @@ export function usePatternEditor() {
       channelWidths: widths,
       totalChannelsWidth: currentX - LINE_NUMBER_WIDTH,
     };
-  }, [pattern, columnVisibility, showAutomationLanes]);
+  }, [pattern, columnVisibility, showAutomationLanes, channelLaneCounts]);
 
   // ─────────────────────────────────────────────────────────────────────────
 

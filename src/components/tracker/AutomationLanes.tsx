@@ -9,6 +9,7 @@ import { interpolateAutomationValue } from '@typedefs/automation';
 import type { AutomationCurve } from '@typedefs/automation';
 import { getSectionColor } from '@hooks/useChannelAutomationParams';
 import { getNKSParametersForSynth } from '@/midi/performance/synthParameterMaps';
+import { AUTOMATION_LANE_WIDTH, AUTOMATION_LANE_MIN } from '@hooks/views/usePatternEditor';
 import type { SynthType } from '@typedefs/instrument';
 
 interface AutomationLanesProps {
@@ -52,7 +53,6 @@ function useParameterColor(parameter: string): string {
 }
 
 const LANE_WIDTH = 24;
-const MULTI_LANE_WIDTH = 20; // Narrower when multiple lanes are stacked
 
 export const AutomationLanes: React.FC<AutomationLanesProps> = ({
   patternId,
@@ -286,19 +286,29 @@ export const AutomationLanes: React.FC<AutomationLanesProps> = ({
       // Skip if channel is too narrow (collapsed)
       if (chWidth < 20) return null;
 
-      // Position this lane at the right edge of the channel
-      const laneLeft = chOffset + chWidth - LANE_WIDTH - 4;
+      // Position in the dedicated automation area at the right edge
+      const group = channelCurveGroups.get(channelIndex);
+      const laneCount = group ? Math.max(1, group.length) : 1;
+      // Match usePatternEditor layout formula
+      const autoArea = laneCount <= 1 ? AUTOMATION_LANE_WIDTH
+        : Math.max(AUTOMATION_LANE_WIDTH, laneCount * AUTOMATION_LANE_MIN + 4);
+      const areaLeft = chOffset + chWidth - autoArea;
+      const perLane = Math.floor(autoArea / laneCount);
+      const effectiveLaneWidth = laneCount > 1 ? Math.max(4, perLane - 2) : LANE_WIDTH;
+      // Primary lane is always at slot 0 (leftmost in the automation area)
+      const laneLeft = laneCount > 1 ? areaLeft + 1 : areaLeft + (autoArea - LANE_WIDTH) / 2;
       const pHeight = pLength * rowHeight;
       const yOffset = startVirtualRow * rowHeight;
 
       // Build SVG path
+      const lw = effectiveLaneWidth;
       const pathPoints: string[] = [];
-      const fillPoints: string[] = [`M ${LANE_WIDTH} ${pHeight}`];
+      const fillPoints: string[] = [`M ${lw} ${pHeight}`];
 
       for (let row = 0; row < pLength; row++) {
         const value = interpolateAutomationValue(curve.points, row, curve.interpolation, curve.mode);
         if (value !== null) {
-          const x = value * (LANE_WIDTH - 2) + 1;
+          const x = value * (lw - 2) + 1;
           const y = row * rowHeight + rowHeight / 2;
           pathPoints.push(`${pathPoints.length === 0 ? 'M' : 'L'} ${x} ${y}`);
         }
@@ -308,12 +318,12 @@ export const AutomationLanes: React.FC<AutomationLanesProps> = ({
       for (let row = pLength - 1; row >= 0; row--) {
         const value = interpolateAutomationValue(curve.points, row, curve.interpolation, curve.mode);
         if (value !== null) {
-          const x = value * (LANE_WIDTH - 2) + 1;
+          const x = value * (lw - 2) + 1;
           const y = row * rowHeight + rowHeight / 2;
           fillPoints.push(`L ${x} ${y}`);
         }
       }
-      fillPoints.push(`L ${LANE_WIDTH} 0 Z`);
+      fillPoints.push(`L ${lw} 0 Z`);
 
       return (
         <div
@@ -322,14 +332,14 @@ export const AutomationLanes: React.FC<AutomationLanesProps> = ({
             position: 'absolute',
             left: laneLeft,
             top: yOffset,
-            width: LANE_WIDTH,
+            width: lw,
             height: pHeight,
             cursor: isCurrentPattern ? 'crosshair' : 'default',
           }}
           onMouseDown={isCurrentPattern ? (e) => handleMouseDown(e, curve, channelIndex, laneLeft, yOffset) : undefined}
           onDoubleClick={isCurrentPattern ? (e) => handleDoubleClick(e, curve, yOffset) : undefined}
         >
-          <svg width={LANE_WIDTH} height={pHeight}>
+          <svg width={lw} height={pHeight}>
             {/* Fill */}
             <path
               d={fillPoints.join(' ')}
@@ -350,7 +360,7 @@ export const AutomationLanes: React.FC<AutomationLanesProps> = ({
             {opacity === 1 && curve.points.map((point, i) => (
               <circle
                 key={i}
-                cx={point.value * (LANE_WIDTH - 2) + 1}
+                cx={point.value * (lw - 2) + 1}
                 cy={point.row * rowHeight + rowHeight / 2}
                 r={2}
                 fill={color}
@@ -398,17 +408,24 @@ export const AutomationLanes: React.FC<AutomationLanesProps> = ({
       {/* Current pattern curves (primary lane per channel) */}
       {renderPatternCurves(curves, patternLength, prevLen, 1, 'current', true)}
 
-      {/* Multi-lane: additional parameter curves per channel (stacked left of primary) */}
+      {/* Multi-lane: additional parameter curves per channel (side by side in automation area) */}
       {hasMultiLane && Array.from(channelCurveGroups.entries()).map(([channelIndex, group]) => {
         if (group.length <= 1) return null;
         const chOffset = channelOffsets[channelIndex] - rowNumWidth;
         const chWidth = channelWidths[channelIndex];
-        if (chWidth < 40) return null; // Need at least 40px for multi-lane
+        if (chWidth < 40) return null;
+
+        // Match usePatternEditor layout formula
+        const laneCount = group.length;
+        const autoArea = Math.max(AUTOMATION_LANE_WIDTH, laneCount * AUTOMATION_LANE_MIN + 4);
+        const areaLeft = chOffset + chWidth - autoArea;
+        const perLane = Math.floor(autoArea / laneCount);
 
         return group.slice(1).map((entry, laneIdx) => {
           const { curve, param } = entry;
-          const laneWidth = MULTI_LANE_WIDTH;
-          const laneLeft = chOffset + chWidth - LANE_WIDTH - 4 - (laneIdx + 1) * (laneWidth + 2);
+          const laneWidth = Math.max(4, perLane - 2);
+          // Additional lanes at slot 1, 2, ... (primary is slot 0)
+          const laneLeft = areaLeft + (laneIdx + 1) * perLane + 1;
           const pHeight = patternLength * rowHeight;
           const yOffset = prevLen * rowHeight;
 
