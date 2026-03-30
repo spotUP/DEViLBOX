@@ -205,7 +205,7 @@ export const EditorControlsBar: React.FC<EditorControlsBarProps> = React.memo(({
             title="Open Automation Editor"
           >
             <Activity size={12} />
-            <span>Auto</span>
+            <span>Automation</span>
           </button>
         )}
 
@@ -288,7 +288,7 @@ export const EditorControlsBar: React.FC<EditorControlsBarProps> = React.memo(({
             }`}
             title={`Groove Settings (Current: ${GROOVE_TEMPLATES.find(g => g.id === c.grooveTemplateId)?.name || 'None'})`}
           >
-            GROOVE
+            Groove
           </button>
           {showGrooveSettings && <GrooveSettingsModal onClose={() => setShowGrooveSettings(false)} />}
         </div>
