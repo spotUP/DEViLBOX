@@ -5160,6 +5160,8 @@ export class TrackerReplayer {
   updatePatterns(patterns: Pattern[]): void {
     if (this.song) {
       this.song.patterns = patterns;
+      // Keep the accessor in sync so getClassicRow reads current data
+      this.accessor.updatePatterns(patterns);
     }
   }
 
