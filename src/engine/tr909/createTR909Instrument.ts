@@ -9,6 +9,7 @@ import { TR909Synth, type TR909DrumType, type TR909Params } from './TR909Synth';
 import type { InstrumentConfig } from '../../types/instrument';
 import { getNormalizedVolume } from '../factories/volumeNormalization';
 import type { DrumType } from '../../types/instrument/drums';
+import { resolveTR909Note } from '../drumNoteMap';
 
 /**
  * Map DrumType + optional tr909Type override → TR909DrumType
@@ -96,22 +97,35 @@ export function createTR909Instrument(config: InstrumentConfig): Tone.ToneAudioN
   // Create TR909 synth targeting the raw GainNode inside the Tone.Gain bridge
   const tr909 = new TR909Synth(audioCtx, bridgeGain.input);
 
-  // Resolve which TR909 drum type this instrument plays
-  const tr909Type = resolveTR909Type(config);
+  // Resolve the configured drum type (used as fallback and for pitch mode)
+  const defaultDrumType = resolveTR909Type(config);
+
+  // Note mode: 'kit' = note name picks drum, 'pitch' = note controls tuning
+  const noteMode = config.drumMachine?.noteMode ?? 'kit';
 
   // Extract default params from config
   const baseParams = extractTR909Params(config);
 
   // TR909Synth constructor auto-starts shared resource loading
 
+  /** Trigger helper — resolves note to drum type + tune offset */
+  const triggerDrum = (note: string, time: number, velocity: number) => {
+    const { drumType, tuneOffset } = resolveTR909Note(note, noteMode, defaultDrumType);
+    const level = velocity * 100;
+    const params: TR909Params = { level, ...baseParams };
+    if (tuneOffset !== 0) {
+      const baseTune = params.tune ?? 50;
+      params.tune = Math.max(0, Math.min(100, baseTune + tuneOffset));
+    }
+    tr909.trigger(drumType, time, params);
+  };
+
   return {
-    triggerAttackRelease: (_note: string, _duration: number, time?: number, velocity?: number) => {
-      const level = (velocity ?? 1) * 100;
-      tr909.trigger(tr909Type, time ?? Tone.now(), { level, ...baseParams });
+    triggerAttackRelease: (note: string, _duration: number, time?: number, velocity?: number) => {
+      triggerDrum(note, time ?? Tone.now(), velocity ?? 1);
     },
-    triggerAttack: (_note: string, time?: number, velocity?: number) => {
-      const level = (velocity ?? 1) * 100;
-      tr909.trigger(tr909Type, time ?? Tone.now(), { level, ...baseParams });
+    triggerAttack: (note: string, time?: number, velocity?: number) => {
+      triggerDrum(note, time ?? Tone.now(), velocity ?? 1);
     },
     triggerRelease: () => { /* drums are fire-and-forget */ },
     releaseAll: () => { /* nothing to release */ },

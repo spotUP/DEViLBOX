@@ -10,6 +10,14 @@ export type DrumMachineType = '808' | '909';
 export interface DrumMachineConfig {
   drumType: DrumType;
   machineType?: DrumMachineType; // '808' or '909' - affects synthesis character
+  /**
+   * How tracker notes map to this drum instrument:
+   * - 'kit'   (default) — note NAME picks the drum, octave shifts pitch
+   *           C=kick C#=snare D=closedHat … (see drumNoteMap.ts)
+   * - 'pitch' — all notes play the configured drumType,
+   *           note value shifts the tune parameter
+   */
+  noteMode?: 'kit' | 'pitch';
   kick?: {
     pitch: number;              // 30-100 Hz base frequency (808: 48Hz, 909: 80Hz)
     pitchDecay: number;         // 0-500ms pitch envelope duration
