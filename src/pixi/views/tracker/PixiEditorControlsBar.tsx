@@ -559,7 +559,7 @@ export const PixiEditorControlsBar: React.FC<PixiEditorControlsBarProps> = ({
 
       {/* Auto — opens automation editor (tracker view only) */}
       <PixiButton
-        label="Auto"
+        label="Automation"
         variant="ghost"
         size="sm"
         onClick={c.handleShowAutoEditor}
@@ -617,7 +617,7 @@ export const PixiEditorControlsBar: React.FC<PixiEditorControlsBarProps> = ({
 
       {/* Groove — single button matching DOM EditorControlsBar */}
       <PixiButton
-        label="GROOVE"
+        label="Groove"
         variant={c.grooveActive ? 'ft2' : 'ghost'}
         color={c.grooveActive ? 'blue' : undefined}
         size="sm"
