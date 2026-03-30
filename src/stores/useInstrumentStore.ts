@@ -84,6 +84,10 @@ interface InstrumentStore {
   currentInstrument: InstrumentConfig | null;
   previewInstrument: InstrumentConfig | null; // For modal previews (EditInstrumentModal)
   presets: InstrumentPreset[];
+  /** Monotonically increasing counter — bumps on every loadInstruments() call.
+   *  Used by usePatternPlayback to re-fire when a full instrument reload arrives
+   *  (deferred via queueMicrotask) without re-firing on individual edits. */
+  instrumentLoadVersion: number;
 
   // Actions
   setCurrentInstrument: (id: number) => void;
@@ -183,6 +187,7 @@ export const useInstrumentStore = create<InstrumentStore>()(
     // Initial state - Start empty, user creates instruments as needed
     instruments: [],
     currentInstrumentId: 0,  // 0 = no instrument selected
+    instrumentLoadVersion: 0,
     get currentInstrument() {
       const state = get();
       return state.instruments.find((inst) => inst.id === state.currentInstrumentId) || null;
@@ -1252,6 +1257,7 @@ export const useInstrumentStore = create<InstrumentStore>()(
         set((state) => {
           state.instruments = migratedInstruments;
           state.currentInstrumentId = migratedInstruments.length > 0 ? migratedInstruments[0].id : null;
+          state.instrumentLoadVersion = (state.instrumentLoadVersion ?? 0) + 1;
         });
 
         // Preload instruments so WASM synths (TB303, Furnace, etc.) are initialized
