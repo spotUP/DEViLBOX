@@ -3,17 +3,19 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { useThemeStore, themes, useUIStore } from '@stores';
+import { useThemeStore, themes } from '@stores';
 import { BUILD_HASH, BUILD_DATE, BUILD_NUMBER } from '@constants/version';
-import { Plus, X, Palette, Download, LogIn, LogOut, Cloud, Users, Monitor, Info } from 'lucide-react';
+import { Plus, X, Palette, Download, LogIn, LogOut, Cloud, Users, Monitor, Settings } from 'lucide-react';
 import { MIDIToolbarDropdown } from '@components/midi/MIDIToolbarDropdown';
 import { DJSetBrowser } from '@components/dj/DJSetBrowser';
 import { DownloadModal } from '@components/dialogs/DownloadModal';
+import { SettingsModal } from '@components/dialogs/SettingsModal';
 import { AuthModal } from '@components/dialogs/AuthModal';
 import { CollaborationModal } from '@components/collaboration/CollaborationModal';
 import { Button } from '@components/ui/Button';
 import { isElectron } from '@utils/electron';
 import { useNavBar } from '@hooks/views/useNavBar';
+import { NAV_BAR_VIEWS, switchView } from '@/constants/viewOptions';
 
 const NavBarComponent: React.FC = () => {
   const n = useNavBar();
@@ -25,6 +27,7 @@ const NavBarComponent: React.FC = () => {
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [showCollabModal, setShowCollabModal] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
 
   // Auto-close collab modal when connection succeeds (DOM-local modal state)
   useEffect(() => {
@@ -168,6 +171,30 @@ const NavBarComponent: React.FC = () => {
             )}
           </Button>
 
+          {/* View Switcher */}
+          <select
+            value={n.activeView}
+            onChange={(e) => switchView(e.target.value, n.activeView)}
+            className="bg-dark-bgTertiary text-text-primary text-sm border border-dark-border rounded px-2 py-1 outline-none focus:border-accent-primary"
+            title="Switch view"
+          >
+            {NAV_BAR_VIEWS.map((v) => (
+              <option key={v.value} value={v.value}>{v.shortLabel}</option>
+            ))}
+          </select>
+
+          {/* Settings */}
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setShowSettings(true)}
+            icon={<Settings size={14} />}
+            iconPosition="left"
+            title="Settings (Ctrl+,)"
+          >
+            <span className="hidden sm:inline">Settings</span>
+          </Button>
+
           {/* Download Button (Web only) */}
           {!isElectron() && (
             <Button
@@ -196,20 +223,10 @@ const NavBarComponent: React.FC = () => {
             </Button>
           )}
 
-          {/* Song Info */}
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => useUIStore.getState().openModal('moduleInfo')}
-            icon={<Info size={14} />}
-            iconPosition="left"
-            title="Song / module info"
-          >
-            <span className="hidden sm:inline">Info</span>
-          </Button>
+          {/* Info button moved to FT2 toolbar */}
 
-          {/* DJ Sets */}
-          <DJSetBrowser />
+          {/* DJ Sets — only shown in DJ and VJ views */}
+          {(n.activeView === 'dj' || n.activeView === 'vj') && <DJSetBrowser />}
 
           {/* MIDI Settings */}
           <MIDIToolbarDropdown />
@@ -331,6 +348,9 @@ const NavBarComponent: React.FC = () => {
           onClose={() => setShowCollabModal(false)}
         />
       )}
+
+      {/* Settings Modal */}
+      {showSettings && <SettingsModal onClose={() => setShowSettings(false)} />}
     </div>
   );
 };

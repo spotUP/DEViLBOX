@@ -280,6 +280,12 @@ export const ICON_DISC_3: IconNode = [
   ["path", { d: "M18 12c0 1.7-.7 3.2-1.8 4.2" }],
 ];
 
+/** Lock (key lock / master tempo) */
+export const ICON_LOCK: IconNode = [
+  ["rect", { width: "18", height: "11", x: "3", y: "11", rx: "2", ry: "2" }],
+  ["path", { d: "M7 11V7a5 5 0 0 1 10 0v4" }],
+];
+
 /** Link (sync) */
 export const ICON_LINK: IconNode = [
   ["path", { d: "M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" }],
@@ -335,4 +341,5 @@ export const FONTAUDIO_TO_LUCIDE: Record<string, IconNode> = {
   'pause':        ICON_PAUSE,
   'disc-3':       ICON_DISC_3,
   'link':         ICON_LINK,
+  'lock':         ICON_LOCK,
 };

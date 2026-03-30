@@ -109,6 +109,7 @@ export const EditorControlsBar: React.FC<EditorControlsBarProps> = React.memo(({
             <option value="tb303">TB-303</option>
             <option value="arrangement">Arrangement</option>
             <option value="dj">DJ Mixer</option>
+            <option value="drumpad">Drum Pads</option>
             <option value="vj">VJ View</option>
             <option value="mixer">Mixer</option>
             <option value="studio">Studio</option>

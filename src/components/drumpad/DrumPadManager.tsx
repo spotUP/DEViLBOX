@@ -16,7 +16,7 @@ import {
   loadKitSource,
 } from '../../lib/drumpad/defaultKitLoader';
 import { useInstrumentStore, useAllSamplePacks } from '../../stores';
-import { X, Download, Piano } from 'lucide-react';
+import { X, Download, Piano, Maximize2, Minimize2 } from 'lucide-react';
 import { useUIStore } from '../../stores/useUIStore';
 
 interface DrumPadManagerProps {
@@ -41,6 +41,9 @@ export const DrumPadManager: React.FC<DrumPadManagerProps> = ({ onClose }) => {
     message: '',
     onConfirm: () => {},
   });
+
+  // Performance mode: fullscreen pads with minimal UI
+  const [performanceMode, setPerformanceMode] = useState(false);
 
   // Local state for immediate UI updates (debounced save)
   const [localMasterLevel, setLocalMasterLevel] = useState<number | null>(null);
@@ -142,6 +145,11 @@ export const DrumPadManager: React.FC<DrumPadManagerProps> = ({ onClose }) => {
       },
     });
   }, [programs.size, currentProgramId, deleteProgram]);
+
+  const handleEmptyPadClick = useCallback((padId: number) => {
+    setSelectedPadId(padId);
+    setShowPadEditor(true);
+  }, []);
 
   const handleLoadSample = useCallback((sample: SampleData) => {
     if (selectedPadId !== null) {
@@ -272,7 +280,7 @@ export const DrumPadManager: React.FC<DrumPadManagerProps> = ({ onClose }) => {
           if (program) {
             event.preventDefault();
             const pad = program.pads.find((p) => p.id === padId);
-            if (pad?.sample) {
+            if (pad?.sample || pad?.instrumentId != null || pad?.synthConfig) {
               // Trigger via mousedown event on the pad button for proper audio triggering
               const padButton = document.querySelector(`[data-pad-id="${padId}"]`) as HTMLElement;
               if (padButton) {
@@ -290,14 +298,18 @@ export const DrumPadManager: React.FC<DrumPadManagerProps> = ({ onClose }) => {
       }
 
       // Escape to close (always works, even in inputs)
-      if (event.key === 'Escape' && onClose) {
-        onClose();
+      if (event.key === 'Escape') {
+        if (performanceMode) {
+          setPerformanceMode(false);
+        } else if (onClose) {
+          onClose();
+        }
       }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [programs, currentProgramId, currentBank, onClose]);
+  }, [programs, currentProgramId, currentBank, onClose, performanceMode]);
 
   // Determine if we're rendered as a full view (no onClose) or as a modal
   const isViewMode = !onClose;
@@ -314,9 +326,11 @@ export const DrumPadManager: React.FC<DrumPadManagerProps> = ({ onClose }) => {
           : 'bg-dark-surface border border-dark-border rounded-lg shadow-2xl max-w-6xl w-full max-h-[90vh] overflow-hidden flex flex-col animate-in fade-in-0 zoom-in-95 slide-in-from-bottom-8 duration-400'
       }>
         {/* Header / Top Bar */}
-        <div className="flex items-center justify-between px-4 py-2 shrink-0 bg-dark-bgSecondary border-b border-dark-border">
+        <div className={`flex items-center justify-between px-4 py-2 shrink-0 border-b border-dark-border ${
+          performanceMode ? 'bg-dark-bg' : 'bg-dark-bgSecondary'
+        }`}>
           <div className="flex items-center gap-3">
-            {isViewMode && (
+            {isViewMode && !performanceMode && (
               <>
                 <select
                   value="drumpad"
@@ -342,22 +356,38 @@ export const DrumPadManager: React.FC<DrumPadManagerProps> = ({ onClose }) => {
               </>
             )}
             <span className="font-mono text-sm font-bold tracking-widest uppercase text-accent-primary">
-              DRUM PADS
+              {performanceMode ? 'LIVE' : 'DRUM PADS'}
             </span>
-            <span className="font-mono text-[10px] text-text-muted uppercase tracking-wider">
-              MPC-style 64-pad drum machine
-            </span>
+            {!performanceMode && (
+              <span className="font-mono text-[10px] text-text-muted uppercase tracking-wider">
+                MPC-style 64-pad drum machine
+              </span>
+            )}
           </div>
           <div className="flex items-center gap-2">
             <button
-              onClick={() => useUIStore.getState().openModal('midi-pads')}
-              className="px-3 py-1.5 text-xs font-mono text-text-muted hover:text-text-primary bg-dark-bgTertiary border border-dark-border rounded transition-colors flex items-center gap-1.5"
-              title="Open MIDI Pad Mapper"
+              onClick={() => setPerformanceMode(!performanceMode)}
+              className={`px-3 py-1.5 text-xs font-mono border rounded transition-colors flex items-center gap-1.5 ${
+                performanceMode
+                  ? 'bg-accent-primary text-text-primary border-accent-primary'
+                  : 'text-text-muted hover:text-text-primary bg-dark-bgTertiary border-dark-border'
+              }`}
+              title={performanceMode ? 'Exit performance mode (Esc)' : 'Performance mode — fullscreen pads'}
             >
-              <Piano className="w-3.5 h-3.5" />
-              MIDI Map
+              {performanceMode ? <Minimize2 className="w-3.5 h-3.5" /> : <Maximize2 className="w-3.5 h-3.5" />}
+              {performanceMode ? 'EXIT' : 'PERFORM'}
             </button>
-            {onClose && (
+            {!performanceMode && (
+              <button
+                onClick={() => useUIStore.getState().openModal('midi-pads')}
+                className="px-3 py-1.5 text-xs font-mono text-text-muted hover:text-text-primary bg-dark-bgTertiary border border-dark-border rounded transition-colors flex items-center gap-1.5"
+                title="Open MIDI Pad Mapper"
+              >
+                <Piano className="w-3.5 h-3.5" />
+                MIDI Map
+              </button>
+            )}
+            {onClose && !performanceMode && (
               <button
                 onClick={onClose}
                 className="p-2 hover:bg-dark-border rounded-lg transition-colors"
@@ -370,6 +400,16 @@ export const DrumPadManager: React.FC<DrumPadManagerProps> = ({ onClose }) => {
 
         {/* Main content area */}
         <ErrorBoundary fallbackMessage="An error occurred in the drum pad interface.">
+          {performanceMode ? (
+            /* Performance Mode: fullscreen pads with minimal controls */
+            <div className="flex-1 flex flex-col overflow-hidden">
+              <PadGrid
+                onPadSelect={setSelectedPadId}
+                onEmptyPadClick={handleEmptyPadClick}
+                selectedPadId={selectedPadId}
+              />
+            </div>
+          ) : (
           <div className="flex-1 overflow-auto">
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 p-4">
             {/* Left: Pad Grid (takes 2 columns on large screens) */}
@@ -377,6 +417,7 @@ export const DrumPadManager: React.FC<DrumPadManagerProps> = ({ onClose }) => {
               <div className="bg-dark-bg border border-dark-border rounded-lg">
                 <PadGrid
                   onPadSelect={setSelectedPadId}
+                  onEmptyPadClick={handleEmptyPadClick}
                   selectedPadId={selectedPadId}
                 />
               </div>
@@ -618,30 +659,48 @@ export const DrumPadManager: React.FC<DrumPadManagerProps> = ({ onClose }) => {
               </div>
 
               {/* Selected Pad Info */}
-              {selectedPadId !== null && (
-                <div className="bg-dark-bg border border-dark-border rounded-lg p-4">
-                  <div className="text-xs font-mono text-text-muted mb-2">
-                    PAD {selectedPadId}
+              {selectedPadId !== null && (() => {
+                const selectedPad = programs.get(currentProgramId)?.pads.find(p => p.id === selectedPadId);
+                return (
+                  <div className="bg-dark-bg border border-dark-border rounded-lg p-4">
+                    <div className="text-xs font-mono text-text-muted mb-2">
+                      PAD {selectedPadId}
+                    </div>
+                    <div className="text-sm text-text-primary mb-1">
+                      {selectedPad?.name || 'Empty'}
+                    </div>
+                    {selectedPad?.sample && (
+                      <div className="text-[10px] text-emerald-400 font-mono mb-1">
+                        Sample: {selectedPad.sample.name}
+                      </div>
+                    )}
+                    {selectedPad?.instrumentId != null && (
+                      <div className="text-[10px] text-blue-400 font-mono mb-1">
+                        Inst #{selectedPad.instrumentId}
+                      </div>
+                    )}
+                    {selectedPad?.synthConfig && (
+                      <div className="text-[10px] text-blue-400 font-mono mb-1">
+                        Synth: {selectedPad.synthConfig.synthType}
+                      </div>
+                    )}
+                    <div className="space-y-2 mt-3">
+                      <button
+                        onClick={() => setShowSampleBrowser(true)}
+                        className="w-full px-3 py-2 bg-accent-primary hover:bg-accent-primary/80 text-text-primary text-xs font-bold rounded transition-colors"
+                      >
+                        Load Sample
+                      </button>
+                      <button
+                        onClick={() => setShowPadEditor(true)}
+                        className="w-full px-3 py-2 bg-blue-600 hover:bg-blue-700 text-text-primary text-xs font-bold rounded transition-colors"
+                      >
+                        Assign Instrument / Edit
+                      </button>
+                    </div>
                   </div>
-                  <div className="text-sm text-text-primary mb-3">
-                    {programs.get(currentProgramId)?.pads[selectedPadId - 1]?.name || 'Empty'}
-                  </div>
-                  <div className="space-y-2">
-                    <button
-                      onClick={() => setShowSampleBrowser(true)}
-                      className="w-full px-3 py-2 bg-accent-primary hover:bg-accent-primary/80 text-text-primary text-xs font-bold rounded transition-colors"
-                    >
-                      Load Sample
-                    </button>
-                    <button
-                      onClick={() => setShowPadEditor(true)}
-                      className="w-full px-3 py-2 bg-dark-border hover:bg-dark-border/80 text-text-primary text-xs font-bold rounded transition-colors"
-                    >
-                      Edit Parameters
-                    </button>
-                  </div>
-                </div>
-              )}
+                );
+              })()}
 
               {/* Quick Info */}
               <div className="bg-dark-bg border border-dark-border rounded-lg p-4">
@@ -653,8 +712,9 @@ export const DrumPadManager: React.FC<DrumPadManagerProps> = ({ onClose }) => {
                 </div>
               </div>
             </div>
+            </div>
           </div>
-          </div>
+          )}
         </ErrorBoundary>
 
         {/* Sample Browser Modal */}
@@ -670,8 +730,11 @@ export const DrumPadManager: React.FC<DrumPadManagerProps> = ({ onClose }) => {
 
         {/* Pad Editor Modal */}
         {showPadEditor && selectedPadId !== null && (
-          <div className="fixed inset-0 z-[99990] bg-dark-bg/95 backdrop-blur-sm flex items-center justify-center animate-in fade-in-0 duration-200">
-            <div className="max-w-2xl w-full mx-4 animate-in fade-in-0 zoom-in-95 slide-in-from-bottom-4 duration-300">
+          <div
+            className="fixed inset-0 z-[99990] bg-dark-bg/95 backdrop-blur-sm flex items-center justify-center animate-in fade-in-0 duration-200"
+            onMouseDown={(e) => { if (e.target === e.currentTarget) setShowPadEditor(false); }}
+          >
+            <div className="max-w-2xl w-full mx-4 max-h-[85vh] animate-in fade-in-0 zoom-in-95 slide-in-from-bottom-4 duration-300">
               <PadEditor
                 padId={selectedPadId}
                 onClose={() => setShowPadEditor(false)}

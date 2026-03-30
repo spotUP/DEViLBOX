@@ -37,6 +37,7 @@ import { PixiCMIKnobPanel, CMI_PANEL_COLLAPSED_H, CMI_PANEL_EXPANDED_H } from '.
 import { PixiMusicLineTrackTable } from './tracker/PixiMusicLineTrackTable';
 import { PixiMusicLinePatternViewer } from './tracker/PixiMusicLinePatternViewer';
 import { PixiPatternEditor } from './tracker/PixiPatternEditor';
+import { PixiTrackerVisualBg } from './tracker/PixiTrackerVisualBg';
 import { PixiGridSequencer } from './tracker/PixiGridSequencer';
 import { PixiTB303View } from './tracker/PixiTB303View';
 import { PixiSunVoxChannelView } from './sunvox/PixiSunVoxChannelView';
@@ -154,17 +155,17 @@ export const PixiTrackerView: React.FC = () => {
       <PixiFT2Toolbar />
 
       {/* TB-303 Knob Panel — shown when a TB-303 instrument is active and not in TB-303/SunVox view */}
-      <pixiContainer layout={{ width: '100%', height: tb303PanelH }} alpha={tb303PanelH > 0 ? 1 : 0} renderable={tb303PanelH > 0}>
+      <pixiContainer layout={{ width: '100%', height: tb303PanelH, flexShrink: 0 }} alpha={tb303PanelH > 0 ? 1 : 0} renderable={tb303PanelH > 0}>
         <PixiTB303KnobPanel width={windowWidth} />
       </pixiContainer>
 
       {/* SuperCollider Knob Panel — shown when an SC instrument with compiled binary is active */}
-      <pixiContainer layout={{ width: '100%', height: scPanelH }} alpha={scPanelH > 0 ? 1 : 0} renderable={scPanelH > 0}>
+      <pixiContainer layout={{ width: '100%', height: scPanelH, flexShrink: 0 }} alpha={scPanelH > 0 ? 1 : 0} renderable={scPanelH > 0}>
         <PixiSCKnobPanel width={windowWidth} />
       </pixiContainer>
 
       {/* Fairlight CMI Knob Panel — shown when a MAMECMI instrument is active */}
-      <pixiContainer layout={{ width: '100%', height: cmiPanelH }} alpha={cmiPanelH > 0 ? 1 : 0} renderable={cmiPanelH > 0}>
+      <pixiContainer layout={{ width: '100%', height: cmiPanelH, flexShrink: 0 }} alpha={cmiPanelH > 0 ? 1 : 0} renderable={cmiPanelH > 0}>
         <PixiCMIKnobPanel width={windowWidth} />
       </pixiContainer>
 
@@ -273,6 +274,10 @@ export const PixiTrackerView: React.FC = () => {
           {/* Overlays — ALWAYS mounted to avoid @pixi/layout Yoga BindingErrors.
               Use alpha/renderable (NOT visible) — @pixi/layout calls _onChildRemoved()
               on visible=false, detaching Yoga nodes and causing BindingErrors. */}
+          {/* Audio-reactive visual background — renders behind everything else */}
+          <pixiContainer alpha={viewMode === 'tracker' && editorMode === 'classic' ? 1 : 0} renderable={viewMode === 'tracker' && editorMode === 'classic'} eventMode="none" layout={{ position: 'absolute', top: 0, width: Math.max(100, editorWidth), height: Math.max(100, instrumentPanelHeight) }}>
+            <PixiTrackerVisualBg width={Math.max(100, editorWidth)} height={Math.max(100, instrumentPanelHeight)} />
+          </pixiContainer>
           {/* VU meters overlay — covers top half of editor down to the edit bar.
               VU segments draw upward from the bottom of this area, so they
               appear to shoot out from the edit cursor row.

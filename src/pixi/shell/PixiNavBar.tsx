@@ -24,6 +24,8 @@ import { BUILD_NUMBER } from '@constants/version';
 import { usePixiDropdownStore } from '../stores/usePixiDropdownStore';
 import { PixiDJSetBrowser } from '../views/dj/PixiDJSetBrowser';
 import { useNavBar } from '@hooks/views/useNavBar';
+import { NAV_BAR_VIEWS } from '@/constants/viewOptions';
+import { switchView } from '@/constants/viewOptions';
 import type { FederatedPointerEvent } from 'pixi.js';
 import type { ProjectTab } from '@stores';
 import { getLucideTexture, preloadLucideIcons } from '../utils/lucideToTexture';
@@ -34,6 +36,8 @@ import {
 
 const NAV_ROW_H = 42;
 const TAB_ROW_H = MODERN_NAV_H - NAV_ROW_H; // 34px — matches DOM's ~32px tab bar
+
+const VIEW_SELECT_OPTIONS = NAV_BAR_VIEWS.map(v => ({ value: v.value, label: v.shortLabel }));
 
 // ─── PixiNavBar ──────────────────────────────────────────────────────────────
 
@@ -244,6 +248,24 @@ export const PixiNavBar: React.FC = () => {
           />
         </pixiContainer>
 
+        {/* View switcher dropdown */}
+        <PixiSelect
+          options={VIEW_SELECT_OPTIONS}
+          value={n.activeView}
+          onChange={(v) => switchView(v, n.activeView)}
+          width={90}
+          height={24}
+        />
+
+        {/* Settings button */}
+        <PixiButton
+          label="Settings"
+          variant="ghost"
+          size="sm"
+          onClick={() => useUIStore.getState().openModal('settings')}
+          width={56}
+        />
+
         {/* Desktop App download (matches DOM's Download icon + text) */}
         <pixiContainer layout={{ flexShrink: 0, flexDirection: 'row', alignItems: 'center', gap: 4 }}>
           {navIcons?.download && (
@@ -266,16 +288,10 @@ export const PixiNavBar: React.FC = () => {
           <PixiButton label="Dom" variant="ghost" size="sm" onClick={n.handleSwitchToDom} width={36} />
         </pixiContainer>
 
-        {/* Song Info (matches DOM's Info icon + text) */}
-        <pixiContainer layout={{ flexShrink: 0, flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-          {navIcons?.info && (
-            <pixiSprite texture={navIcons.info} width={NAV_ICON} height={NAV_ICON} eventMode="none" />
-          )}
-          <PixiButton label="Info" variant="ghost" size="sm" onClick={n.handleOpenModuleInfo} width={40} />
-        </pixiContainer>
+        {/* Info button moved to FT2 toolbar Row 4 */}
 
-        {/* DJ Sets (matches DOM's Sets dropdown) */}
-        <PixiDJSetBrowser />
+        {/* DJ Sets — only shown in DJ and VJ views */}
+        {(n.activeView === 'dj' || n.activeView === 'vj') && <PixiDJSetBrowser />}
 
         {/* MIDI — matches DOM's Music icon + MIDI text */}
         <pixiContainer ref={midiContainerRef} layout={{ flexShrink: 0, flexDirection: 'row', alignItems: 'center', gap: 4 }}>

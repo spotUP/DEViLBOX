@@ -378,6 +378,13 @@ function App() {
         setAnalyserNode(engine.analyser);
         setFFTNode(engine.fft);
 
+        // Sync store volume/gain values to engine (store defaults may differ from engine constructor)
+        const audioState = useAudioStore.getState();
+        engine.setMasterVolume(audioState.masterVolume);
+        engine.setSampleBusGain(audioState.sampleBusGain);
+        engine.setSynthBusGain(audioState.synthBusGain);
+        engine.setMasterMute(audioState.masterMuted);
+
         // Set initial context state
         setContextState(engine.getContextState() as 'suspended' | 'running' | 'closed');
         setInitialized(true);
@@ -1233,6 +1240,12 @@ function App() {
             {activeView === 'mixer' && (
               <Suspense fallback={<div className="flex-1 flex items-center justify-center text-text-muted">Loading mixer...</div>}>
                 <MixerView />
+              </Suspense>
+            )}
+
+            {activeView === 'drumpad' && (
+              <Suspense fallback={<div className="flex-1 flex items-center justify-center text-text-muted">Loading drum pads...</div>}>
+                <DrumPadManager />
               </Suspense>
             )}
 

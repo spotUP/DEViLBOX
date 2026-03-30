@@ -18,6 +18,8 @@ import { useMixerStore } from '../../stores/useMixerStore';
 import { useHistoryStore } from '../../stores/useHistoryStore';
 import { useProjectStore } from '../../stores/useProjectStore';
 import { useOscilloscopeStore } from '../../stores/useOscilloscopeStore';
+import { useDJStore } from '../../stores/useDJStore';
+import { getDJEngineIfActive } from '../../engine/dj/DJEngine';
 import { useSynthErrorStore } from '../../stores/useSynthErrorStore';
 import { useMIDIStore } from '../../stores/useMIDIStore';
 import { useArrangementStore } from '../../stores/useArrangementStore';
@@ -558,6 +560,36 @@ export function diffPatterns(params: Record<string, unknown>): Record<string, un
 
 export function getAudioState(): Record<string, unknown> {
   const audio = useAudioStore.getState();
+  const dj = useDJStore.getState();
+
+  // DJ mixer diagnostics (when DJ mode is active)
+  let djDiag: Record<string, unknown> | undefined;
+  if (dj.djModeActive) {
+    try {
+      const engine = getDJEngineIfActive();
+      if (engine) {
+        const mixer = engine.mixer;
+        djDiag = {
+          mixerMasterGain: mixer.getMasterVolume(),
+          mixerMasterLevel: mixer.getMasterLevel(),
+          crossfader: mixer.getCrossfader(),
+          deckA: {
+            isPlaying: dj.decks.A.isPlaying,
+            isLoaded: dj.decks.A.fileName !== null,
+            volume: dj.decks.A.volume,
+            meterLevel: engine.deckA.meter.getValue(),
+          },
+          deckB: {
+            isPlaying: dj.decks.B.isPlaying,
+            isLoaded: dj.decks.B.fileName !== null,
+            volume: dj.decks.B.volume,
+            meterLevel: engine.deckB.meter.getValue(),
+          },
+        };
+      }
+    } catch { /* DJ engine not available */ }
+  }
+
   return {
     initialized: audio.initialized,
     contextState: audio.contextState,
@@ -574,6 +606,7 @@ export function getAudioState(): Record<string, unknown> {
       wet: fx.wet,
       parameters: fx.parameters,
     })),
+    ...(djDiag ? { dj: djDiag } : {}),
   };
 }
 
