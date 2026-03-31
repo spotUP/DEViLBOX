@@ -86,6 +86,28 @@ export const SynareControls: React.FC<SynareControlsProps> = ({
         </div>
         
         <div className="flex flex-wrap gap-6 items-end">
+          {/* Oscillator Type */}
+          <div className="flex flex-col items-center gap-2">
+            <span className="text-[10px] font-bold text-text-muted uppercase">Wave</span>
+            <div className="flex gap-1">
+              {['square', 'pulse'].map((type) => (
+                <button
+                  key={type}
+                  onClick={() => updateOsc({ type: type as 'square' | 'pulse' })}
+                  className={`
+                    px-2 py-1 text-[10px] font-bold rounded border uppercase
+                    ${config.oscillator.type === type
+                      ? `bg-[#2a2a2a]`
+                      : 'bg-[#1a1a1a] border-dark-borderLight text-text-muted hover:border-dark-borderLight'
+                    }
+                  `}
+                  style={config.oscillator.type === type ? { borderColor: accentColor, color: accentColor } : undefined}
+                >
+                  {type}
+                </button>
+              ))}
+            </div>
+          </div>
           <Knob
             value={config.oscillator.tune}
             min={40}
@@ -94,6 +116,17 @@ export const SynareControls: React.FC<SynareControlsProps> = ({
             label="Tune"
             color={knobColor}
             formatValue={(v) => `${Math.round(v)}Hz`}
+          />
+          <Knob
+            value={config.oscillator.fine}
+            min={-100}
+            max={100}
+            onChange={(v) => updateOsc({ fine: v })}
+            label="Fine"
+            color={knobColor}
+            bipolar
+            defaultValue={0}
+            formatValue={(v) => `${Math.round(v)}c`}
           />
           <Knob
             value={config.oscillator2.enabled ? config.oscillator2.mix : 0}
@@ -105,13 +138,15 @@ export const SynareControls: React.FC<SynareControlsProps> = ({
             formatValue={(v) => `${Math.round(v * 100)}%`}
           />
           <Knob
-            value={config.noise.mix}
-            min={0}
-            max={1}
-            onChange={(v) => updateNoise({ mix: v })}
-            label="Noise"
+            value={config.oscillator2.detune}
+            min={-24}
+            max={24}
+            onChange={(v) => updateOsc2({ detune: v })}
+            label="Detune"
             color={knobColor}
-            formatValue={(v) => `${Math.round(v * 100)}%`}
+            bipolar
+            defaultValue={0}
+            formatValue={(v) => `${Math.round(v)}st`}
           />
           <Knob
             value={config.envelope.decay}
@@ -121,6 +156,77 @@ export const SynareControls: React.FC<SynareControlsProps> = ({
             label="Decay"
             color={knobColor}
             formatValue={(v) => `${Math.round(v)}ms`}
+          />
+          <Knob
+            value={config.envelope.sustain}
+            min={0}
+            max={1}
+            onChange={(v) => updateEnv({ sustain: v })}
+            label="Sustain"
+            color={knobColor}
+            formatValue={(v) => `${Math.round(v * 100)}%`}
+          />
+        </div>
+      </div>
+
+      {/* Noise Section */}
+      <div className={`p-4 rounded-xl border ${panelBg}`}>
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-2">
+            <Wind size={16} className={isCyanTheme ? 'text-accent-highlight' : 'text-yellow-500'} />
+            <h3 className={`font-bold ${isCyanTheme ? 'text-accent-highlight' : 'text-yellow-400'}`}>NOISE</h3>
+          </div>
+          <label className="flex items-center gap-2 cursor-pointer">
+            <span className="text-xs text-text-muted">Enable</span>
+            <input
+              type="checkbox"
+              checked={config.noise.enabled}
+              onChange={(e) => updateNoise({ enabled: e.target.checked })}
+              className={`w-4 h-4 rounded border-2 bg-transparent cursor-pointer ${isCyanTheme ? 'border-accent-highlight checked:bg-accent-highlight' : 'border-yellow-500 checked:bg-yellow-500'}`}
+            />
+          </label>
+        </div>
+
+        <div className={`flex flex-wrap gap-6 items-end transition-opacity ${config.noise.enabled ? 'opacity-100' : 'opacity-40 pointer-events-none'}`}>
+          {/* Noise Type */}
+          <div className="flex flex-col items-center gap-2">
+            <span className="text-[10px] font-bold text-text-muted uppercase">Type</span>
+            <div className="flex gap-1">
+              {['white', 'pink'].map((type) => (
+                <button
+                  key={type}
+                  onClick={() => updateNoise({ type: type as 'white' | 'pink' })}
+                  className={`
+                    px-2 py-1 text-[10px] font-bold rounded border uppercase
+                    ${config.noise.type === type
+                      ? `bg-[#2a2a2a]`
+                      : 'bg-[#1a1a1a] border-dark-borderLight text-text-muted hover:border-dark-borderLight'
+                    }
+                  `}
+                  style={config.noise.type === type ? { borderColor: accentColor, color: accentColor } : undefined}
+                >
+                  {type}
+                </button>
+              ))}
+            </div>
+          </div>
+          <Knob
+            value={config.noise.mix}
+            min={0}
+            max={1}
+            onChange={(v) => updateNoise({ mix: v })}
+            label="Mix"
+            color={knobColor}
+            formatValue={(v) => `${Math.round(v * 100)}%`}
+          />
+          <Knob
+            value={config.noise.color}
+            min={0}
+            max={100}
+            onChange={(v) => updateNoise({ color: v })}
+            label="Color"
+            color={knobColor}
+            formatValue={(v) => `${Math.round(v)}`}
           />
         </div>
       </div>

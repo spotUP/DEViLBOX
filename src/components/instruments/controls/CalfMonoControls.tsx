@@ -25,6 +25,7 @@ const FILTER_NAMES = [
 
 const PHASE_NAMES = ['Free', 'On Note', 'Random', 'Sync', 'Phase 4', 'Phase 5'];
 const LEGATO_NAMES = ['Off', 'On', 'Retrig', 'Fing'];
+const MIDI_CH_NAMES = ['All', '1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12', '13', '14', '15', '16'];
 const TRIG_NAMES = ['Free', 'Retrigger'];
 
 /* --- Reusable sub-components -------------------------------------------- */
@@ -199,9 +200,10 @@ export const CalfMonoControls: React.FC<CalfMonoControlsProps> = ({ config, onCh
 
       {/* Master */}
       <Section title="Master">
-        <div className="grid grid-cols-2 gap-2">
+        <div className="grid grid-cols-3 gap-2">
           {sl('master', 'Volume', 0, 100, 0.1, 'accent-emerald-500')}
           {sl('pbendRange', 'PBend Range', 0, 2400, 1, 'accent-emerald-500', v => `${Math.round(v)} ct`)}
+          <Sel label="MIDI Ch" value={m.midi} options={MIDI_CH_NAMES} onChange={(v) => update('midi', v)} />
         </div>
       </Section>
     </div>

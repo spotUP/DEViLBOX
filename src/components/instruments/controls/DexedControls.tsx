@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { Knob } from '@components/controls/Knob';
-import { Zap, Waves, Settings, Music, ChevronDown, ChevronRight } from 'lucide-react';
+import { Zap, Waves, Settings, Music, ChevronDown, ChevronRight, ToggleLeft, ToggleRight } from 'lucide-react';
 import { useThemeStore } from '@stores';
 import type { DexedConfig, DexedOperatorConfig } from '@typedefs/instrument';
 import { ScrollLockContainer } from '@components/ui/ScrollLockContainer';
@@ -83,128 +83,257 @@ export const DexedControls: React.FC<DexedControlsProps> = ({
     onChange({ operators });
   };
 
-  const renderGlobalTab = () => (
-    <div className="flex flex-col gap-4 p-4">
-      {/* Algorithm Section */}
-      <div className={`p-4 rounded-xl border ${panelBg}`}>
-        <div className="flex items-center gap-2 mb-4">
-          <Settings size={16} style={{ color: accentColor }} />
-          <h3 className="font-bold uppercase tracking-tight" style={{ color: accentColor }}>
-            ALGORITHM
-          </h3>
-        </div>
+  const renderGlobalTab = () => {
+    const pitchEgRates = config.pitchEgRates || [99, 99, 99, 99];
+    const pitchEgLevels = config.pitchEgLevels || [50, 50, 50, 50];
 
-        <div className="flex flex-wrap gap-2 mb-4">
-          {Array.from({ length: 32 }, (_, i) => (
-            <button
-              key={i}
-              onClick={() => onChange({ algorithm: i })}
-              className={`w-8 h-8 text-xs rounded border transition-all ${
-                config.algorithm === i
-                  ? 'border-blue-400 bg-blue-500/30 text-blue-300'
-                  : 'border-dark-borderLight bg-dark-bgTertiary text-text-secondary hover:border-dark-borderLight'
-              }`}
-            >
-              {i + 1}
-            </button>
-          ))}
-        </div>
+    return (
+      <div className="flex flex-col gap-4 p-4">
+        {/* Algorithm Section */}
+        <div className={`p-4 rounded-xl border ${panelBg}`}>
+          <div className="flex items-center gap-2 mb-4">
+            <Settings size={16} style={{ color: accentColor }} />
+            <h3 className="font-bold uppercase tracking-tight" style={{ color: accentColor }}>
+              ALGORITHM
+            </h3>
+          </div>
 
-        <div className="text-xs text-text-secondary text-center font-mono">
-          {DX7_ALGORITHMS[config.algorithm || 0]}
-        </div>
-      </div>
-
-      {/* Feedback & Global */}
-      <div className={`p-4 rounded-xl border ${panelBg}`}>
-        <div className="flex items-center gap-2 mb-4">
-          <Zap size={16} style={{ color: accentColor }} />
-          <h3 className="font-bold uppercase tracking-tight" style={{ color: accentColor }}>
-            FEEDBACK & LFO
-          </h3>
-        </div>
-
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
-          <Knob
-            value={config.feedback || 0}
-            min={0}
-            max={7}
-            onChange={(v) => onChange({ feedback: Math.round(v) })}
-            label="Feedback"
-            color={knobColor}
-            size="sm"
-          />
-          <Knob
-            value={config.lfoSpeed || 35}
-            min={0}
-            max={99}
-            onChange={(v) => onChange({ lfoSpeed: Math.round(v) })}
-            label="LFO Speed"
-            color={knobColor}
-            size="sm"
-          />
-          <Knob
-            value={config.lfoPitchModDepth || 0}
-            min={0}
-            max={99}
-            onChange={(v) => onChange({ lfoPitchModDepth: Math.round(v) })}
-            label="Pitch Mod"
-            color={knobColor}
-            size="sm"
-          />
-          <Knob
-            value={config.lfoAmpModDepth || 0}
-            min={0}
-            max={99}
-            onChange={(v) => onChange({ lfoAmpModDepth: Math.round(v) })}
-            label="Amp Mod"
-            color={knobColor}
-            size="sm"
-          />
-        </div>
-
-        <div className="mt-4">
-          <label className="text-xs text-text-secondary block mb-2">LFO Waveform</label>
-          <select
-            value={config.lfoWave || 'triangle'}
-            onChange={(e) => onChange({ lfoWave: e.target.value as DexedConfig['lfoWave'] })}
-            className="bg-dark-bgSecondary border border-dark-borderLight text-xs rounded px-2 py-1 w-full"
-            style={{ color: accentColor }}
-          >
-            {LFO_WAVES.map((wave, i) => (
-              <option key={wave} value={wave}>{LFO_WAVE_LABELS[i]}</option>
+          <div className="flex flex-wrap gap-2 mb-4">
+            {Array.from({ length: 32 }, (_, i) => (
+              <button
+                key={i}
+                onClick={() => onChange({ algorithm: i })}
+                className={`w-8 h-8 text-xs rounded border transition-all ${
+                  config.algorithm === i
+                    ? 'border-blue-400 bg-blue-500/30 text-blue-300'
+                    : 'border-dark-borderLight bg-dark-bgTertiary text-text-secondary hover:border-dark-borderLight'
+                }`}
+              >
+                {i + 1}
+              </button>
             ))}
-          </select>
-        </div>
-      </div>
+          </div>
 
-      {/* Operator Levels Overview */}
-      <div className={`p-4 rounded-xl border ${panelBg}`}>
-        <div className="flex items-center gap-2 mb-4">
-          <Waves size={16} style={{ color: accentColor }} />
-          <h3 className="font-bold uppercase tracking-tight" style={{ color: accentColor }}>
-            OPERATOR LEVELS
-          </h3>
+          <div className="text-xs text-text-secondary text-center font-mono">
+            {DX7_ALGORITHMS[config.algorithm || 0]}
+          </div>
         </div>
 
-        <div className="grid grid-cols-6 gap-4">
-          {[0, 1, 2, 3, 4, 5].map((i) => (
-            <div key={i} className="text-center">
+        {/* Global Controls */}
+        <div className={`p-4 rounded-xl border ${panelBg}`}>
+          <div className="flex items-center gap-2 mb-4">
+            <Settings size={16} style={{ color: accentColor }} />
+            <h3 className="font-bold uppercase tracking-tight" style={{ color: accentColor }}>
+              GLOBAL
+            </h3>
+          </div>
+
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+            <Knob
+              value={config.feedback || 0}
+              min={0}
+              max={7}
+              onChange={(v) => onChange({ feedback: Math.round(v) })}
+              label="Feedback"
+              color={knobColor}
+              size="sm"
+            />
+            <Knob
+              value={config.transpose ?? 0}
+              min={-24}
+              max={24}
+              onChange={(v) => onChange({ transpose: Math.round(v) })}
+              label="Transpose"
+              color={knobColor}
+              size="sm"
+            />
+          </div>
+
+          {/* Osc Key Sync toggle */}
+          <div className="mt-4 flex items-center gap-3">
+            <button
+              onClick={() => onChange({ oscSync: !config.oscSync })}
+              className="flex items-center gap-2 text-xs"
+            >
+              {config.oscSync
+                ? <ToggleRight size={20} style={{ color: accentColor }} />
+                : <ToggleLeft size={20} className="text-text-muted" />
+              }
+              <span className={config.oscSync ? '' : 'text-text-muted'} style={config.oscSync ? { color: accentColor } : {}}>
+                OSC Key Sync
+              </span>
+            </button>
+          </div>
+        </div>
+
+        {/* LFO Section */}
+        <div className={`p-4 rounded-xl border ${panelBg}`}>
+          <div className="flex items-center gap-2 mb-4">
+            <Zap size={16} style={{ color: accentColor }} />
+            <h3 className="font-bold uppercase tracking-tight" style={{ color: accentColor }}>
+              LFO
+            </h3>
+          </div>
+
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+            <Knob
+              value={config.lfoSpeed || 35}
+              min={0}
+              max={99}
+              onChange={(v) => onChange({ lfoSpeed: Math.round(v) })}
+              label="Speed"
+              color={knobColor}
+              size="sm"
+            />
+            <Knob
+              value={config.lfoDelay ?? 0}
+              min={0}
+              max={99}
+              onChange={(v) => onChange({ lfoDelay: Math.round(v) })}
+              label="Delay"
+              color={knobColor}
+              size="sm"
+            />
+            <Knob
+              value={config.lfoPitchModDepth || 0}
+              min={0}
+              max={99}
+              onChange={(v) => onChange({ lfoPitchModDepth: Math.round(v) })}
+              label="Pitch Mod"
+              color={knobColor}
+              size="sm"
+            />
+            <Knob
+              value={config.lfoAmpModDepth || 0}
+              min={0}
+              max={99}
+              onChange={(v) => onChange({ lfoAmpModDepth: Math.round(v) })}
+              label="Amp Mod"
+              color={knobColor}
+              size="sm"
+            />
+          </div>
+
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mt-4">
+            <Knob
+              value={config.lfoPitchModSens ?? 0}
+              min={0}
+              max={7}
+              onChange={(v) => onChange({ lfoPitchModSens: Math.round(v) })}
+              label="P Mod Sens"
+              color={knobColor}
+              size="sm"
+            />
+            <div>
+              <label className="text-xs text-text-secondary block mb-2">Waveform</label>
+              <select
+                value={config.lfoWave || 'triangle'}
+                onChange={(e) => onChange({ lfoWave: e.target.value as DexedConfig['lfoWave'] })}
+                className="bg-dark-bgSecondary border border-dark-borderLight text-xs rounded px-2 py-1 w-full"
+                style={{ color: accentColor }}
+              >
+                {LFO_WAVES.map((wave, i) => (
+                  <option key={wave} value={wave}>{LFO_WAVE_LABELS[i]}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          {/* LFO Key Sync toggle */}
+          <div className="mt-4 flex items-center gap-3">
+            <button
+              onClick={() => onChange({ lfoSync: !config.lfoSync })}
+              className="flex items-center gap-2 text-xs"
+            >
+              {config.lfoSync
+                ? <ToggleRight size={20} style={{ color: accentColor }} />
+                : <ToggleLeft size={20} className="text-text-muted" />
+              }
+              <span className={config.lfoSync ? '' : 'text-text-muted'} style={config.lfoSync ? { color: accentColor } : {}}>
+                LFO Key Sync
+              </span>
+            </button>
+          </div>
+        </div>
+
+        {/* Pitch Envelope */}
+        <div className={`p-4 rounded-xl border ${panelBg}`}>
+          <div className="flex items-center gap-2 mb-4">
+            <Music size={16} style={{ color: accentColor }} />
+            <h3 className="font-bold uppercase tracking-tight" style={{ color: accentColor }}>
+              PITCH ENVELOPE
+            </h3>
+          </div>
+
+          <div className="text-xs text-text-secondary uppercase tracking-wider mb-3">Rates</div>
+          <div className="grid grid-cols-4 gap-6">
+            {['R1', 'R2', 'R3', 'R4'].map((label, i) => (
               <Knob
-                value={config.operators?.[i]?.level ?? 99}
+                key={label}
+                value={pitchEgRates[i]}
                 min={0}
                 max={99}
-                onChange={(v) => updateOperator(i, { level: Math.round(v) })}
-                label={`OP${i + 1}`}
+                onChange={(v) => {
+                  const newRates = [...pitchEgRates] as [number, number, number, number];
+                  newRates[i] = Math.round(v);
+                  onChange({ pitchEgRates: newRates });
+                }}
+                label={label}
                 color={knobColor}
                 size="sm"
               />
-            </div>
-          ))}
+            ))}
+          </div>
+
+          <div className="text-xs text-text-secondary uppercase tracking-wider mb-3 mt-4">Levels</div>
+          <div className="grid grid-cols-4 gap-6">
+            {['L1', 'L2', 'L3', 'L4'].map((label, i) => (
+              <Knob
+                key={label}
+                value={pitchEgLevels[i]}
+                min={0}
+                max={99}
+                onChange={(v) => {
+                  const newLevels = [...pitchEgLevels] as [number, number, number, number];
+                  newLevels[i] = Math.round(v);
+                  onChange({ pitchEgLevels: newLevels });
+                }}
+                label={label}
+                color={knobColor}
+                size="sm"
+              />
+            ))}
+          </div>
+        </div>
+
+        {/* Operator Levels Overview */}
+        <div className={`p-4 rounded-xl border ${panelBg}`}>
+          <div className="flex items-center gap-2 mb-4">
+            <Waves size={16} style={{ color: accentColor }} />
+            <h3 className="font-bold uppercase tracking-tight" style={{ color: accentColor }}>
+              OPERATOR LEVELS
+            </h3>
+          </div>
+
+          <div className="grid grid-cols-6 gap-4">
+            {[0, 1, 2, 3, 4, 5].map((i) => (
+              <div key={i} className="text-center">
+                <Knob
+                  value={config.operators?.[i]?.level ?? 99}
+                  min={0}
+                  max={99}
+                  onChange={(v) => updateOperator(i, { level: Math.round(v) })}
+                  label={`OP${i + 1}`}
+                  color={knobColor}
+                  size="sm"
+                />
+              </div>
+            ))}
+          </div>
         </div>
       </div>
-    </div>
-  );
+    );
+  };
 
   const renderOperatorTab = (opIndex: number) => {
     const op = config.operators?.[opIndex] || {
@@ -267,6 +396,29 @@ export const DexedControls: React.FC<DexedControlsProps> = ({
               color={knobColor}
               size="sm"
             />
+          </div>
+
+          {/* Frequency Mode */}
+          <div className="mt-4 flex items-center gap-3">
+            <button
+              onClick={() => {
+                const currentMode = op.mode ?? 'ratio';
+                const newMode = currentMode === 'ratio' ? 'fixed' : 'ratio';
+                updateOperator(opIndex, { mode: newMode });
+              }}
+              className="flex items-center gap-2 text-xs"
+            >
+              {(op.mode ?? 'ratio') === 'fixed'
+                ? <ToggleRight size={20} style={{ color: accentColor }} />
+                : <ToggleLeft size={20} className="text-text-muted" />
+              }
+              <span
+                className={(op.mode ?? 'ratio') === 'fixed' ? '' : 'text-text-muted'}
+                style={(op.mode ?? 'ratio') === 'fixed' ? { color: accentColor } : {}}
+              >
+                {(op.mode ?? 'ratio') === 'fixed' ? 'FIXED Frequency' : 'RATIO Mode'}
+              </span>
+            </button>
           </div>
         </div>
 

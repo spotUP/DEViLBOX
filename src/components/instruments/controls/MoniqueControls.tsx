@@ -89,6 +89,14 @@ const FilterPanel: React.FC<{
           onChange={(v) => update(k('Pan'), v)} label="Pan" size="sm" color="#6366f1" />
         <Knob value={(merged[k('Output')] as number) ?? 0} min={0} max={1}
           onChange={(v) => update(k('Output'), v)} label="Out" size="sm" color="#22c55e" />
+        <Knob value={(merged[k('ModMix')] as number) ?? 0} min={-1} max={1}
+          onChange={(v) => update(k('ModMix'), v)} label="ModMix" size="sm" color="#e879f9" />
+        <Knob value={(merged[k('Input0')] as number) ?? 0} min={0} max={1}
+          onChange={(v) => update(k('Input0'), v)} label="In 1" size="sm" color="#64748b" />
+        <Knob value={(merged[k('Input1')] as number) ?? 0} min={0} max={1}
+          onChange={(v) => update(k('Input1'), v)} label="In 2" size="sm" color="#64748b" />
+        <Knob value={(merged[k('Input2')] as number) ?? 0} min={0} max={1}
+          onChange={(v) => update(k('Input2'), v)} label="In 3" size="sm" color="#64748b" />
       </div>
     </div>
   );
@@ -119,6 +127,8 @@ const EnvPanel: React.FC<{
           onChange={(v) => update(k('Shape'), v)} label="Shp" size="sm" color="#8b5cf6" />
         <Knob value={(merged[k('Velocity')] as number) ?? 0.5} min={0} max={1}
           onChange={(v) => update(k('Velocity'), v)} label="Vel" size="sm" color="#06b6d4" />
+        <Knob value={(merged[k('Retrigger')] as number) ?? 0.004} min={0.004} max={1}
+          onChange={(v) => update(k('Retrigger'), v)} label="Retrig" size="sm" color="#f472b6" />
       </div>
     </div>
   );
@@ -224,6 +234,14 @@ export const MoniqueControls: React.FC<MoniqueControlsProps> = ({ config, onChan
             onChange={(v) => updateParam('delay', v)} label="Delay" size="sm" color="#0891b2" />
           <Knob value={merged.delayPan ?? 0.5} min={0} max={1}
             onChange={(v) => updateParam('delayPan', v)} label="Dly Pan" size="sm" color="#0891b2" />
+          <button
+            className={`px-2 py-1 rounded text-[10px] ${(merged.eqBypass ?? 0) > 0.5 ? 'bg-red-700 text-white' : 'bg-gray-700 text-gray-400'}`}
+            onClick={() => updateParam('eqBypass', (merged.eqBypass ?? 0) > 0.5 ? 0 : 1)}
+          >{(merged.eqBypass ?? 0) > 0.5 ? 'EQ OFF' : 'EQ ON'}</button>
+          <button
+            className={`px-2 py-1 rounded text-[10px] ${(merged.effectBypass ?? 0) > 0.5 ? 'bg-red-700 text-white' : 'bg-gray-700 text-gray-400'}`}
+            onClick={() => updateParam('effectBypass', (merged.effectBypass ?? 0) > 0.5 ? 0 : 1)}
+          >{(merged.effectBypass ?? 0) > 0.5 ? 'FX OFF' : 'FX ON'}</button>
         </div>
       </div>
 
@@ -239,6 +257,12 @@ export const MoniqueControls: React.FC<MoniqueControlsProps> = ({ config, onChan
             onChange={(v) => updateParam('distortion', v)} label="Dist" size="sm" color="#ef4444" />
           <Knob value={merged.glide ?? 0} min={0} max={1}
             onChange={(v) => updateParam('glide', v)} label="Glide" size="sm" color="#3b82f6" />
+          <Knob value={merged.glideTime ?? 0} min={0} max={127}
+            onChange={(v) => updateParam('glideTime', Math.round(v))} label="Glide T" size="sm" color="#3b82f6" />
+          <Knob value={merged.octaveOffset ?? 0} min={-4} max={4}
+            onChange={(v) => updateParam('octaveOffset', Math.round(v))} label="Oct" size="sm" color="#a78bfa" />
+          <Knob value={merged.noteOffset ?? 0} min={-12} max={12}
+            onChange={(v) => updateParam('noteOffset', Math.round(v))} label="Note" size="sm" color="#a78bfa" />
           <Knob value={merged.speed ?? 120} min={20} max={1000}
             onChange={(v) => updateParam('speed', Math.round(v))} label="BPM" size="sm" color="#f97316" />
         </div>
