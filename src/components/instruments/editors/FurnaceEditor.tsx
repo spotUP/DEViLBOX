@@ -9,7 +9,7 @@
  */
 
 import React, { useState, useCallback, useMemo, useRef, useEffect } from 'react';
-import type { FurnaceConfig, FurnaceOperatorConfig, FurnaceMacro } from '@typedefs/instrument';
+import type { FurnaceConfig, FurnaceOperatorConfig, FurnaceMacro, FurnaceAmigaConfig, FurnaceN163Config, FurnaceFDSConfig, FurnaceESFMConfig, FurnaceESFMOperatorConfig, FurnaceMultiPCMConfig, FurnaceSoundUnitConfig, FurnaceSID2Config, FurnaceES5506Config } from '@typedefs/instrument';
 import { Knob } from '@components/controls/Knob';
 import { Cpu, Activity, Zap, Waves, Volume2, Music, Settings, FileUp } from 'lucide-react';
 import { InstrumentOscilloscope } from '@components/visualization';
@@ -40,6 +40,7 @@ interface ChipParameterRanges {
   hasSSG: boolean;
   hasWS: boolean;
   hasDT2: boolean;
+  isOPZ: boolean;
   opCount: number;
 }
 
@@ -60,6 +61,7 @@ function getChipParameterRanges(chipType: number): ChipParameterRanges {
       hasSSG: true,
       hasWS: false,
       hasDT2: false,
+      isOPZ: false,
       opCount: 4,
     };
   }
@@ -81,6 +83,7 @@ function getChipParameterRanges(chipType: number): ChipParameterRanges {
       hasSSG: false,
       hasWS: false,
       hasDT2: true,
+      isOPZ: false,
       opCount: 4,
     };
   }
@@ -103,6 +106,7 @@ function getChipParameterRanges(chipType: number): ChipParameterRanges {
       hasSSG: false,
       hasWS: true,
       hasDT2: false,
+      isOPZ: false,
       opCount: 4,
     };
   }
@@ -124,6 +128,7 @@ function getChipParameterRanges(chipType: number): ChipParameterRanges {
       hasSSG: false,
       hasWS: false,
       hasDT2: false,
+      isOPZ: false,
       opCount: 2,
     };
   }
@@ -145,6 +150,7 @@ function getChipParameterRanges(chipType: number): ChipParameterRanges {
       hasSSG: false,
       hasWS: false,
       hasDT2: true,
+      isOPZ: true,
       opCount: 4,
     };
   }
@@ -164,6 +170,7 @@ function getChipParameterRanges(chipType: number): ChipParameterRanges {
     hasSSG: true,
     hasWS: false,
     hasDT2: false,
+    isOPZ: false,
     opCount: 4,
   };
 }
@@ -503,6 +510,46 @@ export const FurnaceEditor: React.FC<FurnaceEditorProps> = ({ config, instrument
         <SNESPanel config={config} onChange={pushLiveUpdate} />
       )}
 
+      {/* Amiga Panel (when amiga config present) */}
+      {config.amiga && (
+        <AmigaPanel config={config} onChange={pushLiveUpdate} />
+      )}
+
+      {/* N163 Panel (chipType 8 or n163 config present) */}
+      {(config.chipType === 8 || config.n163) && (
+        <N163Panel config={config} onChange={pushLiveUpdate} />
+      )}
+
+      {/* FDS Panel (chipType 16 or fds config present) */}
+      {(config.chipType === 16 || config.fds) && (
+        <FDSPanel config={config} onChange={pushLiveUpdate} />
+      )}
+
+      {/* ESFM Panel (when esfm config present) */}
+      {config.esfm && (
+        <ESFMPanel config={config} onChange={pushLiveUpdate} />
+      )}
+
+      {/* MultiPCM Panel (when multipcm config present) */}
+      {config.multipcm && (
+        <MultiPCMPanel config={config} onChange={pushLiveUpdate} />
+      )}
+
+      {/* Sound Unit Panel (when soundUnit config present) */}
+      {config.soundUnit && (
+        <SoundUnitPanel config={config} onChange={pushLiveUpdate} />
+      )}
+
+      {/* ES5506 Panel (chipType 21 or es5506 config present) */}
+      {(config.chipType === 21 || config.es5506) && (
+        <ES5506Panel config={config} onChange={pushLiveUpdate} />
+      )}
+
+      {/* SID2 Panel (when sid2 config present) */}
+      {config.sid2 && (
+        <SID2Panel config={config} onChange={pushLiveUpdate} />
+      )}
+
       {/* PSG / PULSE PANEL (for other PSG chips) */}
       {category === "PSG" && ![5, 10, 24].includes(config.chipType) && (
         <PSGPanel config={config} onChange={pushLiveUpdate} />
@@ -709,6 +756,19 @@ const OperatorCard: React.FC<OperatorCardProps> = ({
                 onChange={(v) => onUpdate({ ws: Math.round(v) })} size="sm" color="#34d399"
                 formatValue={(v) => String(Math.round(v))} />
             )}
+            {ranges.isOPZ && (
+              <>
+                <Knob label="DAM" value={op.dam ?? 0} min={0} max={7}
+                  onChange={(v) => onUpdate({ dam: Math.round(v) })} size="sm" color="#f472b6"
+                  formatValue={(v) => String(Math.round(v))} />
+                <Knob label="DVB" value={op.dvb ?? 0} min={0} max={7}
+                  onChange={(v) => onUpdate({ dvb: Math.round(v) })} size="sm" color="#e879f9"
+                  formatValue={(v) => String(Math.round(v))} />
+                <Knob label="KVS" value={op.kvs ?? 0} min={0} max={3}
+                  onChange={(v) => onUpdate({ kvs: Math.round(v) })} size="sm" color="#c084fc"
+                  formatValue={(v) => String(Math.round(v))} />
+              </>
+            )}
           </div>
 
           {/* Boolean Flags - horizontal row */}
@@ -723,6 +783,9 @@ const OperatorCard: React.FC<OperatorCardProps> = ({
                 <ToggleButton label="SUS" value={op.sus ?? false} onChange={(v) => onUpdate({ sus: v })} />
                 <ToggleButton label="KSR" value={op.ksr ?? false} onChange={(v) => onUpdate({ ksr: v })} />
               </>
+            )}
+            {ranges.isOPZ && (
+              <ToggleButton label="EGT" value={op.egt ?? false} onChange={(v) => onUpdate({ egt: v })} />
             )}
           </div>
         </div>
@@ -849,6 +912,38 @@ const GBPanel: React.FC<{ config: FurnaceConfig; onChange: (u: Partial<FurnaceCo
             >
               Always Init
             </button>
+            <button
+              onClick={() => updateGB({ hwSeqEnabled: !gb.hwSeqEnabled })}
+              className={`px-2 py-1 text-[9px] font-mono rounded border transition-colors ${
+                gb.hwSeqEnabled
+                  ? 'bg-emerald-600/20 border-emerald-500/50 text-emerald-400'
+                  : 'bg-dark-bg border-dark-border text-text-muted'
+              }`}
+            >
+              HW Sequence
+            </button>
+          </div>
+
+          {/* Duty Cycle */}
+          <div className="flex items-center gap-4 pt-2 border-t border-dark-border">
+            <Knob
+              label="DUTY"
+              value={gb.duty ?? 2}
+              min={0} max={3}
+              onChange={(v) => updateGB({ duty: Math.round(v) })}
+              size="sm" color="#6ee7b7"
+              formatValue={(v) => ['12.5%', '25%', '50%', '75%'][Math.round(v)] ?? String(Math.round(v))}
+            />
+            {gb.hwSeqEnabled && (
+              <Knob
+                label="SEQ LEN"
+                value={gb.hwSeqLen ?? 0}
+                min={0} max={64}
+                onChange={(v) => updateGB({ hwSeqLen: Math.round(v) })}
+                size="sm" color="#34d399"
+                formatValue={(v) => String(Math.round(v))}
+              />
+            )}
           </div>
         </div>
       </div>
@@ -1149,9 +1244,79 @@ const C64Panel: React.FC<{ config: FurnaceConfig; onChange: (u: Partial<FurnaceC
                 >
                   HP
                 </button>
+                <button
+                  onClick={() => updateC64({ filterCh3Off: !c64.filterCh3Off })}
+                  className={`px-2 py-1 text-[9px] font-mono rounded border transition-colors ${
+                    c64.filterCh3Off
+                      ? 'bg-purple-600/20 border-purple-500/50 text-purple-400'
+                      : 'bg-dark-bg border-dark-border text-text-muted'
+                  }`}
+                >
+                  CH3 OFF
+                </button>
               </div>
             </>
           )}
+        </div>
+      </div>
+
+      {/* Advanced Options */}
+      <div className="bg-dark-bgSecondary p-4 rounded-lg border border-dark-border">
+        <div className="flex items-center gap-2 mb-4">
+          <Settings size={16} className="text-gray-400" />
+          <h3 className="font-mono text-xs font-bold text-text-primary uppercase">Options</h3>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <button
+            onClick={() => updateC64({ dutyIsAbs: !c64.dutyIsAbs })}
+            className={`px-2 py-1 text-[9px] font-mono rounded border transition-colors ${
+              c64.dutyIsAbs
+                ? 'bg-accent-highlight/20 border-accent-highlight/50 text-accent-highlight'
+                : 'bg-dark-bg border-dark-border text-text-muted'
+            }`}
+          >
+            Absolute Duty
+          </button>
+          <button
+            onClick={() => updateC64({ filterIsAbs: !c64.filterIsAbs })}
+            className={`px-2 py-1 text-[9px] font-mono rounded border transition-colors ${
+              c64.filterIsAbs
+                ? 'bg-accent-highlight/20 border-accent-highlight/50 text-accent-highlight'
+                : 'bg-dark-bg border-dark-border text-text-muted'
+            }`}
+          >
+            Absolute Filter
+          </button>
+          <button
+            onClick={() => updateC64({ noTest: !c64.noTest })}
+            className={`px-2 py-1 text-[9px] font-mono rounded border transition-colors ${
+              c64.noTest
+                ? 'bg-accent-highlight/20 border-accent-highlight/50 text-accent-highlight'
+                : 'bg-dark-bg border-dark-border text-text-muted'
+            }`}
+          >
+            No Test Bit
+          </button>
+          <button
+            onClick={() => updateC64({ resetDuty: !c64.resetDuty })}
+            className={`px-2 py-1 text-[9px] font-mono rounded border transition-colors ${
+              c64.resetDuty
+                ? 'bg-accent-highlight/20 border-accent-highlight/50 text-accent-highlight'
+                : 'bg-dark-bg border-dark-border text-text-muted'
+            }`}
+          >
+            Reset Duty
+          </button>
+          <button
+            onClick={() => updateC64({ initFilter: !c64.initFilter })}
+            className={`px-2 py-1 text-[9px] font-mono rounded border transition-colors ${
+              c64.initFilter
+                ? 'bg-accent-highlight/20 border-accent-highlight/50 text-accent-highlight'
+                : 'bg-dark-bg border-dark-border text-text-muted'
+            }`}
+          >
+            Init Filter
+          </button>
         </div>
       </div>
     </div>
@@ -1190,19 +1355,36 @@ const SNESPanel: React.FC<{ config: FurnaceConfig; onChange: (u: Partial<Furnace
         </div>
 
         {snes.useEnv ? (
-          <div className="flex justify-between gap-4">
-            <Knob label="A" value={snes.a} min={0} max={15}
-              onChange={(v) => updateSNES({ a: Math.round(v) })}
-              size="md" color="#06b6d4" formatValue={(v) => String(Math.round(v))} />
-            <Knob label="D" value={snes.d} min={0} max={7}
-              onChange={(v) => updateSNES({ d: Math.round(v) })}
-              size="md" color="#22d3ee" formatValue={(v) => String(Math.round(v))} />
-            <Knob label="S" value={snes.s} min={0} max={7}
-              onChange={(v) => updateSNES({ s: Math.round(v) })}
-              size="md" color="#67e8f9" formatValue={(v) => String(Math.round(v))} />
-            <Knob label="R" value={snes.r} min={0} max={31}
-              onChange={(v) => updateSNES({ r: Math.round(v) })}
-              size="md" color="#a5f3fc" formatValue={(v) => String(Math.round(v))} />
+          <div className="space-y-3">
+            <div className="flex justify-between gap-4">
+              <Knob label="A" value={snes.a} min={0} max={15}
+                onChange={(v) => updateSNES({ a: Math.round(v) })}
+                size="md" color="#06b6d4" formatValue={(v) => String(Math.round(v))} />
+              <Knob label="D" value={snes.d} min={0} max={7}
+                onChange={(v) => updateSNES({ d: Math.round(v) })}
+                size="md" color="#22d3ee" formatValue={(v) => String(Math.round(v))} />
+              <Knob label="S" value={snes.s} min={0} max={7}
+                onChange={(v) => updateSNES({ s: Math.round(v) })}
+                size="md" color="#67e8f9" formatValue={(v) => String(Math.round(v))} />
+              <Knob label="R" value={snes.r} min={0} max={31}
+                onChange={(v) => updateSNES({ r: Math.round(v) })}
+                size="md" color="#a5f3fc" formatValue={(v) => String(Math.round(v))} />
+            </div>
+            <div className="flex items-center gap-4 pt-2 border-t border-dark-border">
+              <Knob label="D2" value={snes.d2 ?? 0} min={0} max={31}
+                onChange={(v) => updateSNES({ d2: Math.round(v) })}
+                size="sm" color="#0891b2" formatValue={(v) => String(Math.round(v))} />
+              <button
+                onClick={() => updateSNES({ sus: (snes.sus ?? 0) ? 0 : 1 })}
+                className={`px-2 py-1 text-[9px] font-mono rounded border transition-colors ${
+                  (snes.sus ?? 0)
+                    ? 'bg-accent-highlight/20 border-accent-highlight/50 text-accent-highlight'
+                    : 'bg-dark-bg border-dark-border text-text-muted'
+                }`}
+              >
+                Sustain Mode
+              </button>
+            </div>
           </div>
         ) : (
           <div className="flex items-center gap-4">
@@ -1364,6 +1546,645 @@ const PCMPanel: React.FC<{ config: FurnaceConfig; onChange: (u: Partial<FurnaceC
         >
           {pcm.loopEnabled ? '🔁 Loop Enabled' : 'Loop Disabled'}
         </button>
+      </div>
+    </div>
+  );
+};
+
+// ============================================================================
+// AMIGA PANEL
+// ============================================================================
+
+const AMIGA_DEFAULTS: FurnaceAmigaConfig = { initSample: -1, useNoteMap: false, useSample: true, useWave: false, waveLen: 32, noteMap: [] };
+
+const AmigaPanel: React.FC<{ config: FurnaceConfig; onChange: (u: Partial<FurnaceConfig>) => void }> = ({ config, onChange }) => {
+  const amiga = useMemo(() => ({ ...AMIGA_DEFAULTS, ...config.amiga }), [config.amiga]);
+
+  const updateAmiga = useCallback((updates: Partial<FurnaceAmigaConfig>) => {
+    onChange({ amiga: { ...config.amiga, ...AMIGA_DEFAULTS, ...updates } });
+  }, [config.amiga, onChange]);
+
+  return (
+    <div className="space-y-4 animate-in fade-in slide-in-from-top-2">
+      <div className="bg-dark-bgSecondary p-4 rounded-lg border border-amber-500/30">
+        <div className="flex items-center gap-2 mb-4">
+          <Music size={16} className="text-amber-400" />
+          <h3 className="font-mono text-xs font-bold text-text-primary uppercase">Amiga / Sample</h3>
+        </div>
+
+        <div className="space-y-4">
+          <div className="flex items-center gap-4">
+            <Knob label="SAMPLE" value={amiga.initSample} min={-1} max={255}
+              onChange={(v) => updateAmiga({ initSample: Math.round(v) })}
+              size="md" color="#f59e0b"
+              formatValue={(v) => Math.round(v) === -1 ? 'OFF' : String(Math.round(v))} />
+            <Knob label="WAVE LEN" value={amiga.waveLen} min={1} max={256}
+              onChange={(v) => updateAmiga({ waveLen: Math.round(v) })}
+              size="md" color="#fbbf24"
+              formatValue={(v) => String(Math.round(v))} />
+          </div>
+
+          <div className="flex flex-wrap gap-2 pt-2 border-t border-dark-border">
+            <button
+              onClick={() => updateAmiga({ useSample: !amiga.useSample })}
+              className={`px-2 py-1 text-[9px] font-mono rounded border transition-colors ${
+                amiga.useSample
+                  ? 'bg-amber-600/20 border-amber-500/50 text-amber-400'
+                  : 'bg-dark-bg border-dark-border text-text-muted'
+              }`}
+            >
+              Use Sample
+            </button>
+            <button
+              onClick={() => updateAmiga({ useWave: !amiga.useWave })}
+              className={`px-2 py-1 text-[9px] font-mono rounded border transition-colors ${
+                amiga.useWave
+                  ? 'bg-amber-600/20 border-amber-500/50 text-amber-400'
+                  : 'bg-dark-bg border-dark-border text-text-muted'
+              }`}
+            >
+              Use Wavetable
+            </button>
+            <button
+              onClick={() => updateAmiga({ useNoteMap: !amiga.useNoteMap })}
+              className={`px-2 py-1 text-[9px] font-mono rounded border transition-colors ${
+                amiga.useNoteMap
+                  ? 'bg-amber-600/20 border-amber-500/50 text-amber-400'
+                  : 'bg-dark-bg border-dark-border text-text-muted'
+              }`}
+            >
+              Note Map
+            </button>
+          </div>
+
+          {amiga.useNoteMap && amiga.noteMap.length > 0 && (
+            <div className="pt-2 border-t border-dark-border">
+              <span className="text-[9px] text-text-muted font-mono">
+                {amiga.noteMap.length} note mapping(s) configured
+              </span>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// ============================================================================
+// N163 PANEL (Namco 163 Wavetable)
+// ============================================================================
+
+const N163_DEFAULTS: FurnaceN163Config = { wave: 0, wavePos: 0, waveLen: 32, waveMode: 0, perChPos: false };
+
+const N163Panel: React.FC<{ config: FurnaceConfig; onChange: (u: Partial<FurnaceConfig>) => void }> = ({ config, onChange }) => {
+  const n163 = useMemo(() => ({ ...N163_DEFAULTS, ...config.n163 }), [config.n163]);
+
+  const updateN163 = useCallback((updates: Partial<FurnaceN163Config>) => {
+    onChange({ n163: { ...config.n163, ...N163_DEFAULTS, ...updates } });
+  }, [config.n163, onChange]);
+
+  const waveModes = ['Load on playback', 'Load when changed', 'Load on note-on', 'Manual write'];
+
+  return (
+    <div className="space-y-4 animate-in fade-in slide-in-from-top-2">
+      <div className="bg-dark-bgSecondary p-4 rounded-lg border border-teal-500/30">
+        <div className="flex items-center gap-2 mb-4">
+          <Waves size={16} className="text-teal-400" />
+          <h3 className="font-mono text-xs font-bold text-text-primary uppercase">N163 Wavetable</h3>
+        </div>
+
+        <div className="space-y-4">
+          <div className="flex justify-between gap-4">
+            <Knob label="WAVE" value={n163.wave} min={0} max={255}
+              onChange={(v) => updateN163({ wave: Math.round(v) })}
+              size="md" color="#14b8a6"
+              formatValue={(v) => String(Math.round(v))} />
+            <Knob label="POS" value={n163.wavePos} min={0} max={255}
+              onChange={(v) => updateN163({ wavePos: Math.round(v) })}
+              size="md" color="#2dd4bf"
+              formatValue={(v) => String(Math.round(v))} />
+            <Knob label="LEN" value={n163.waveLen} min={0} max={252}
+              onChange={(v) => updateN163({ waveLen: Math.round(v) & ~3 })}
+              size="md" color="#5eead4"
+              formatValue={(v) => String(Math.round(v) & ~3)} />
+          </div>
+
+          <div className="flex items-center gap-4 pt-2 border-t border-dark-border">
+            <div>
+              <label className="text-[10px] text-text-muted font-mono block mb-1">Wave Mode</label>
+              <select
+                value={n163.waveMode}
+                onChange={(e) => updateN163({ waveMode: parseInt(e.target.value) })}
+                className="bg-dark-bg border border-dark-border rounded px-2 py-1 text-xs text-text-primary"
+              >
+                {waveModes.map((mode, i) => (
+                  <option key={i} value={i}>{mode}</option>
+                ))}
+              </select>
+            </div>
+            <button
+              onClick={() => updateN163({ perChPos: !n163.perChPos })}
+              className={`px-2 py-1 text-[9px] font-mono rounded border transition-colors ${
+                n163.perChPos
+                  ? 'bg-teal-600/20 border-teal-500/50 text-teal-400'
+                  : 'bg-dark-bg border-dark-border text-text-muted'
+              }`}
+            >
+              Per-Channel Position
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// ============================================================================
+// FDS PANEL (Famicom Disk System Modulation)
+// ============================================================================
+
+const FDS_DEFAULTS: FurnaceFDSConfig = { modSpeed: 0, modDepth: 0, modTable: new Array(32).fill(0), initModTableWithFirstWave: false };
+
+const FDSPanel: React.FC<{ config: FurnaceConfig; onChange: (u: Partial<FurnaceConfig>) => void }> = ({ config, onChange }) => {
+  const fds = useMemo(() => ({ ...FDS_DEFAULTS, ...config.fds }), [config.fds]);
+
+  const updateFDS = useCallback((updates: Partial<FurnaceFDSConfig>) => {
+    onChange({ fds: { ...config.fds, ...FDS_DEFAULTS, ...updates } });
+  }, [config.fds, onChange]);
+
+  return (
+    <div className="space-y-4 animate-in fade-in slide-in-from-top-2">
+      <div className="bg-dark-bgSecondary p-4 rounded-lg border border-red-500/30">
+        <div className="flex items-center gap-2 mb-4">
+          <Activity size={16} className="text-red-400" />
+          <h3 className="font-mono text-xs font-bold text-text-primary uppercase">FDS Modulation</h3>
+        </div>
+
+        <div className="space-y-4">
+          <div className="flex justify-between gap-4">
+            <Knob label="SPEED" value={fds.modSpeed} min={0} max={4095}
+              onChange={(v) => updateFDS({ modSpeed: Math.round(v) })}
+              size="md" color="#ef4444"
+              formatValue={(v) => String(Math.round(v))} />
+            <Knob label="DEPTH" value={fds.modDepth} min={0} max={63}
+              onChange={(v) => updateFDS({ modDepth: Math.round(v) })}
+              size="md" color="#f87171"
+              formatValue={(v) => String(Math.round(v))} />
+          </div>
+
+          <div className="pt-2 border-t border-dark-border">
+            <button
+              onClick={() => updateFDS({ initModTableWithFirstWave: !fds.initModTableWithFirstWave })}
+              className={`px-2 py-1 text-[9px] font-mono rounded border transition-colors ${
+                fds.initModTableWithFirstWave
+                  ? 'bg-red-600/20 border-red-500/50 text-red-400'
+                  : 'bg-dark-bg border-dark-border text-text-muted'
+              }`}
+            >
+              Init Mod Table from Wave
+            </button>
+          </div>
+
+          {/* Mod Table Visualization */}
+          <div className="pt-2 border-t border-dark-border">
+            <span className="text-[9px] text-text-muted font-mono block mb-2">Modulation Table (32 steps, -4 to +3)</span>
+            <div className="flex gap-px h-12 bg-dark-bg rounded border border-dark-border p-1">
+              {(fds.modTable || []).slice(0, 32).map((val, i) => {
+                const normalized = (val + 4) / 7;
+                return (
+                  <div
+                    key={i}
+                    className="flex-1 flex flex-col-reverse"
+                  >
+                    <div
+                      className="bg-red-500/60 rounded-sm"
+                      style={{ height: `${normalized * 100}%` }}
+                    />
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// ============================================================================
+// ESFM PANEL (Enhanced FM)
+// ============================================================================
+
+const ESFM_OP_DEFAULTS = {
+  delay: 0, outLvl: 0, modIn: 0, left: true, right: true, ct: 0, fixed: false, fixedFreq: 0,
+};
+
+const ESFMPanel: React.FC<{ config: FurnaceConfig; onChange: (u: Partial<FurnaceConfig>) => void }> = ({ config, onChange }) => {
+  const esfm = useMemo(() => ({
+    operators: config.esfm?.operators ?? [],
+    noise: config.esfm?.noise ?? 0,
+  }), [config.esfm]);
+
+  const updateESFM = useCallback((updates: Partial<FurnaceESFMConfig>) => {
+    onChange({ esfm: { ...config.esfm, operators: config.esfm?.operators ?? [], noise: config.esfm?.noise ?? 0, ...updates } });
+  }, [config.esfm, onChange]);
+
+  const updateESFMOp = useCallback((idx: number, updates: Partial<FurnaceESFMOperatorConfig>) => {
+    const ops = [...(config.esfm?.operators ?? [])];
+    ops[idx] = { ...ESFM_OP_DEFAULTS, ...ops[idx], ...updates } as FurnaceESFMOperatorConfig;
+    updateESFM({ operators: ops });
+  }, [config.esfm, updateESFM]);
+
+  return (
+    <div className="space-y-4 animate-in fade-in slide-in-from-top-2">
+      <div className="bg-dark-bgSecondary p-4 rounded-lg border border-orange-500/30">
+        <div className="flex items-center gap-2 mb-4">
+          <Zap size={16} className="text-orange-400" />
+          <h3 className="font-mono text-xs font-bold text-text-primary uppercase">ESFM Extensions</h3>
+        </div>
+
+        <div className="space-y-4">
+          <Knob label="NOISE" value={esfm.noise} min={0} max={7}
+            onChange={(v) => updateESFM({ noise: Math.round(v) })}
+            size="sm" color="#f97316"
+            formatValue={(v) => String(Math.round(v))} />
+
+          {esfm.operators.map((op, idx) => {
+            const opData = { ...ESFM_OP_DEFAULTS, ...op };
+            return (
+              <div key={idx} className="p-3 rounded border border-orange-500/20 bg-dark-bg/50">
+                <div className="font-mono text-[10px] font-bold text-orange-400 mb-2">OP{idx + 1} ESFM</div>
+                <div className="flex flex-wrap gap-3 mb-2">
+                  <Knob label="DELAY" value={opData.delay} min={0} max={7}
+                    onChange={(v) => updateESFMOp(idx, { delay: Math.round(v) })}
+                    size="sm" color="#fb923c" formatValue={(v) => String(Math.round(v))} />
+                  <Knob label="OUT" value={opData.outLvl} min={0} max={7}
+                    onChange={(v) => updateESFMOp(idx, { outLvl: Math.round(v) })}
+                    size="sm" color="#f97316" formatValue={(v) => String(Math.round(v))} />
+                  <Knob label="MOD IN" value={opData.modIn} min={0} max={7}
+                    onChange={(v) => updateESFMOp(idx, { modIn: Math.round(v) })}
+                    size="sm" color="#ea580c" formatValue={(v) => String(Math.round(v))} />
+                  <Knob label="CT" value={opData.ct} min={-128} max={127}
+                    onChange={(v) => updateESFMOp(idx, { ct: Math.round(v) })}
+                    size="sm" color="#c2410c" formatValue={(v) => String(Math.round(v))} />
+                  <Knob label="DT" value={opData.dt} min={-128} max={127}
+                    onChange={(v) => updateESFMOp(idx, { dt: Math.round(v) })}
+                    size="sm" color="#9a3412" formatValue={(v) => String(Math.round(v))} />
+                </div>
+                {opData.fixed && (
+                  <Knob label="FREQ" value={opData.fixedFreq} min={0} max={1023}
+                    onChange={(v) => updateESFMOp(idx, { fixedFreq: Math.round(v) })}
+                    size="sm" color="#fdba74" formatValue={(v) => String(Math.round(v))} />
+                )}
+                <div className="flex flex-wrap gap-2 mt-2">
+                  <ToggleButton label="LEFT" value={opData.left} onChange={(v) => updateESFMOp(idx, { left: v })} />
+                  <ToggleButton label="RIGHT" value={opData.right} onChange={(v) => updateESFMOp(idx, { right: v })} />
+                  <ToggleButton label="FIXED" value={opData.fixed} onChange={(v) => updateESFMOp(idx, { fixed: v })} />
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// ============================================================================
+// MULTIPCM PANEL
+// ============================================================================
+
+const MULTIPCM_DEFAULTS: FurnaceMultiPCMConfig = {
+  ar: 15, d1r: 0, dl: 0, d2r: 0, rr: 15, rc: 0, lfo: 0, vib: 0, am: 0,
+  damp: false, pseudoReverb: false, lfoReset: false, levelDirect: false,
+};
+
+const MultiPCMPanel: React.FC<{ config: FurnaceConfig; onChange: (u: Partial<FurnaceConfig>) => void }> = ({ config, onChange }) => {
+  const mpcm = useMemo(() => ({ ...MULTIPCM_DEFAULTS, ...config.multipcm }), [config.multipcm]);
+
+  const updateMultiPCM = useCallback((updates: Partial<FurnaceMultiPCMConfig>) => {
+    onChange({ multipcm: { ...config.multipcm, ...MULTIPCM_DEFAULTS, ...updates } });
+  }, [config.multipcm, onChange]);
+
+  return (
+    <div className="space-y-4 animate-in fade-in slide-in-from-top-2">
+      <div className="bg-dark-bgSecondary p-4 rounded-lg border border-pink-500/30">
+        <div className="flex items-center gap-2 mb-4">
+          <Activity size={16} className="text-pink-400" />
+          <h3 className="font-mono text-xs font-bold text-text-primary uppercase">MultiPCM Envelope</h3>
+        </div>
+
+        <div className="space-y-4">
+          <div className="flex flex-wrap justify-between gap-3">
+            <Knob label="AR" value={mpcm.ar} min={0} max={15}
+              onChange={(v) => updateMultiPCM({ ar: Math.round(v) })}
+              size="sm" color="#ec4899" formatValue={(v) => String(Math.round(v))} />
+            <Knob label="D1R" value={mpcm.d1r} min={0} max={15}
+              onChange={(v) => updateMultiPCM({ d1r: Math.round(v) })}
+              size="sm" color="#f472b6" formatValue={(v) => String(Math.round(v))} />
+            <Knob label="DL" value={mpcm.dl} min={0} max={15}
+              onChange={(v) => updateMultiPCM({ dl: Math.round(v) })}
+              size="sm" color="#f9a8d4" formatValue={(v) => String(Math.round(v))} />
+            <Knob label="D2R" value={mpcm.d2r} min={0} max={15}
+              onChange={(v) => updateMultiPCM({ d2r: Math.round(v) })}
+              size="sm" color="#db2777" formatValue={(v) => String(Math.round(v))} />
+            <Knob label="RR" value={mpcm.rr} min={0} max={15}
+              onChange={(v) => updateMultiPCM({ rr: Math.round(v) })}
+              size="sm" color="#be185d" formatValue={(v) => String(Math.round(v))} />
+            <Knob label="RC" value={mpcm.rc} min={0} max={15}
+              onChange={(v) => updateMultiPCM({ rc: Math.round(v) })}
+              size="sm" color="#9d174d" formatValue={(v) => String(Math.round(v))} />
+          </div>
+
+          <div className="flex flex-wrap gap-3 pt-2 border-t border-dark-border">
+            <Knob label="LFO" value={mpcm.lfo} min={0} max={7}
+              onChange={(v) => updateMultiPCM({ lfo: Math.round(v) })}
+              size="sm" color="#d946ef" formatValue={(v) => String(Math.round(v))} />
+            <Knob label="VIB" value={mpcm.vib} min={0} max={7}
+              onChange={(v) => updateMultiPCM({ vib: Math.round(v) })}
+              size="sm" color="#c026d3" formatValue={(v) => String(Math.round(v))} />
+            <Knob label="AM" value={mpcm.am} min={0} max={7}
+              onChange={(v) => updateMultiPCM({ am: Math.round(v) })}
+              size="sm" color="#a21caf" formatValue={(v) => String(Math.round(v))} />
+          </div>
+
+          <div className="flex flex-wrap gap-2 pt-2 border-t border-dark-border">
+            <button
+              onClick={() => updateMultiPCM({ damp: !mpcm.damp })}
+              className={`px-2 py-1 text-[9px] font-mono rounded border transition-colors ${
+                mpcm.damp
+                  ? 'bg-pink-600/20 border-pink-500/50 text-pink-400'
+                  : 'bg-dark-bg border-dark-border text-text-muted'
+              }`}
+            >
+              Damp
+            </button>
+            <button
+              onClick={() => updateMultiPCM({ pseudoReverb: !mpcm.pseudoReverb })}
+              className={`px-2 py-1 text-[9px] font-mono rounded border transition-colors ${
+                mpcm.pseudoReverb
+                  ? 'bg-pink-600/20 border-pink-500/50 text-pink-400'
+                  : 'bg-dark-bg border-dark-border text-text-muted'
+              }`}
+            >
+              Pseudo Reverb
+            </button>
+            <button
+              onClick={() => updateMultiPCM({ lfoReset: !mpcm.lfoReset })}
+              className={`px-2 py-1 text-[9px] font-mono rounded border transition-colors ${
+                mpcm.lfoReset
+                  ? 'bg-pink-600/20 border-pink-500/50 text-pink-400'
+                  : 'bg-dark-bg border-dark-border text-text-muted'
+              }`}
+            >
+              LFO Reset
+            </button>
+            <button
+              onClick={() => updateMultiPCM({ levelDirect: !mpcm.levelDirect })}
+              className={`px-2 py-1 text-[9px] font-mono rounded border transition-colors ${
+                mpcm.levelDirect
+                  ? 'bg-pink-600/20 border-pink-500/50 text-pink-400'
+                  : 'bg-dark-bg border-dark-border text-text-muted'
+              }`}
+            >
+              Level Direct
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// ============================================================================
+// SOUND UNIT PANEL
+// ============================================================================
+
+const SU_DEFAULTS: FurnaceSoundUnitConfig = { switchRoles: false, hwSeqLen: 0, hwSeq: [] };
+
+const SoundUnitPanel: React.FC<{ config: FurnaceConfig; onChange: (u: Partial<FurnaceConfig>) => void }> = ({ config, onChange }) => {
+  const su = useMemo(() => ({ ...SU_DEFAULTS, ...config.soundUnit }), [config.soundUnit]);
+
+  const updateSU = useCallback((updates: Partial<FurnaceSoundUnitConfig>) => {
+    onChange({ soundUnit: { ...config.soundUnit, ...SU_DEFAULTS, ...updates } });
+  }, [config.soundUnit, onChange]);
+
+  return (
+    <div className="space-y-4 animate-in fade-in slide-in-from-top-2">
+      <div className="bg-dark-bgSecondary p-4 rounded-lg border border-lime-500/30">
+        <div className="flex items-center gap-2 mb-4">
+          <Cpu size={16} className="text-lime-400" />
+          <h3 className="font-mono text-xs font-bold text-text-primary uppercase">Sound Unit</h3>
+        </div>
+
+        <div className="space-y-4">
+          <div className="flex items-center gap-4">
+            <Knob label="SEQ LEN" value={su.hwSeqLen} min={0} max={255}
+              onChange={(v) => updateSU({ hwSeqLen: Math.round(v) })}
+              size="md" color="#84cc16"
+              formatValue={(v) => String(Math.round(v))} />
+            <button
+              onClick={() => updateSU({ switchRoles: !su.switchRoles })}
+              className={`px-2 py-1 text-[9px] font-mono rounded border transition-colors ${
+                su.switchRoles
+                  ? 'bg-lime-600/20 border-lime-500/50 text-lime-400'
+                  : 'bg-dark-bg border-dark-border text-text-muted'
+              }`}
+            >
+              Switch Roles
+            </button>
+          </div>
+
+          {su.hwSeq.length > 0 && (
+            <div className="pt-2 border-t border-dark-border">
+              <span className="text-[9px] text-text-muted font-mono block mb-1">
+                Hardware Sequence ({su.hwSeq.length} step{su.hwSeq.length !== 1 ? 's' : ''})
+              </span>
+              <div className="max-h-32 overflow-y-auto">
+                {su.hwSeq.map((step, i) => (
+                  <div key={i} className="flex gap-2 text-[9px] font-mono text-text-muted py-0.5">
+                    <span className="text-lime-400 w-6">{i}</span>
+                    <span>cmd={step.cmd}</span>
+                    <span>val={step.val}</span>
+                    <span>bound={step.bound}</span>
+                    <span>spd={step.speed}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// ============================================================================
+// ES5506 PANEL (Ensoniq)
+// ============================================================================
+
+const ES5506_DEFAULTS: FurnaceES5506Config = {
+  filter: { mode: 0, k1: 0xFFFF, k2: 0xFFFF },
+  envelope: { ecount: 0, lVRamp: 0, rVRamp: 0, k1Ramp: 0, k2Ramp: 0, k1Slow: false, k2Slow: false },
+};
+
+const ES5506Panel: React.FC<{ config: FurnaceConfig; onChange: (u: Partial<FurnaceConfig>) => void }> = ({ config, onChange }) => {
+  const es = useMemo(() => ({
+    filter: { ...ES5506_DEFAULTS.filter, ...config.es5506?.filter },
+    envelope: { ...ES5506_DEFAULTS.envelope, ...config.es5506?.envelope },
+  }), [config.es5506]);
+
+  const updateFilter = useCallback((updates: Partial<FurnaceES5506Config['filter']>) => {
+    const cur = { ...ES5506_DEFAULTS.filter, ...config.es5506?.filter, ...updates };
+    onChange({ es5506: { filter: cur, envelope: config.es5506?.envelope ?? ES5506_DEFAULTS.envelope } });
+  }, [config.es5506, onChange]);
+
+  const updateEnvelope = useCallback((updates: Partial<FurnaceES5506Config['envelope']>) => {
+    const cur = { ...ES5506_DEFAULTS.envelope, ...config.es5506?.envelope, ...updates };
+    onChange({ es5506: { filter: config.es5506?.filter ?? ES5506_DEFAULTS.filter, envelope: cur } });
+  }, [config.es5506, onChange]);
+
+  const filterModes = ['Off', 'LP', 'K2', 'HP', 'BP'];
+
+  return (
+    <div className="space-y-4 animate-in fade-in slide-in-from-top-2">
+      {/* Filter */}
+      <div className="bg-dark-bgSecondary p-4 rounded-lg border border-indigo-500/30">
+        <div className="flex items-center gap-2 mb-4">
+          <Volume2 size={16} className="text-indigo-400" />
+          <h3 className="font-mono text-xs font-bold text-text-primary uppercase">ES5506 Filter</h3>
+        </div>
+
+        <div className="flex items-center gap-4">
+          <div>
+            <label className="text-[10px] text-text-muted font-mono block mb-1">Mode</label>
+            <select
+              value={es.filter.mode}
+              onChange={(e) => updateFilter({ mode: parseInt(e.target.value) })}
+              className="bg-dark-bg border border-dark-border rounded px-2 py-1 text-xs text-text-primary"
+            >
+              {filterModes.map((mode, i) => (
+                <option key={i} value={i}>{mode}</option>
+              ))}
+            </select>
+          </div>
+          <Knob label="K1" value={es.filter.k1} min={0} max={0xFFFF}
+            onChange={(v) => updateFilter({ k1: Math.round(v) })}
+            size="sm" color="#818cf8" formatValue={(v) => Math.round(v).toString(16).toUpperCase()} />
+          <Knob label="K2" value={es.filter.k2} min={0} max={0xFFFF}
+            onChange={(v) => updateFilter({ k2: Math.round(v) })}
+            size="sm" color="#6366f1" formatValue={(v) => Math.round(v).toString(16).toUpperCase()} />
+        </div>
+      </div>
+
+      {/* Envelope */}
+      <div className="bg-dark-bgSecondary p-4 rounded-lg border border-indigo-500/30">
+        <div className="flex items-center gap-2 mb-4">
+          <Activity size={16} className="text-indigo-400" />
+          <h3 className="font-mono text-xs font-bold text-text-primary uppercase">ES5506 Envelope</h3>
+        </div>
+
+        <div className="space-y-3">
+          <div className="flex flex-wrap gap-3">
+            <Knob label="ECOUNT" value={es.envelope.ecount} min={0} max={511}
+              onChange={(v) => updateEnvelope({ ecount: Math.round(v) })}
+              size="sm" color="#a5b4fc" formatValue={(v) => String(Math.round(v))} />
+            <Knob label="L RAMP" value={es.envelope.lVRamp} min={-128} max={127}
+              onChange={(v) => updateEnvelope({ lVRamp: Math.round(v) })}
+              size="sm" color="#818cf8" formatValue={(v) => String(Math.round(v))} />
+            <Knob label="R RAMP" value={es.envelope.rVRamp} min={-128} max={127}
+              onChange={(v) => updateEnvelope({ rVRamp: Math.round(v) })}
+              size="sm" color="#6366f1" formatValue={(v) => String(Math.round(v))} />
+            <Knob label="K1 RAMP" value={es.envelope.k1Ramp} min={-128} max={127}
+              onChange={(v) => updateEnvelope({ k1Ramp: Math.round(v) })}
+              size="sm" color="#4f46e5" formatValue={(v) => String(Math.round(v))} />
+            <Knob label="K2 RAMP" value={es.envelope.k2Ramp} min={-128} max={127}
+              onChange={(v) => updateEnvelope({ k2Ramp: Math.round(v) })}
+              size="sm" color="#4338ca" formatValue={(v) => String(Math.round(v))} />
+          </div>
+
+          <div className="flex gap-2 pt-2 border-t border-dark-border">
+            <button
+              onClick={() => updateEnvelope({ k1Slow: !es.envelope.k1Slow })}
+              className={`px-2 py-1 text-[9px] font-mono rounded border transition-colors ${
+                es.envelope.k1Slow
+                  ? 'bg-indigo-600/20 border-indigo-500/50 text-indigo-400'
+                  : 'bg-dark-bg border-dark-border text-text-muted'
+              }`}
+            >
+              K1 Slow
+            </button>
+            <button
+              onClick={() => updateEnvelope({ k2Slow: !es.envelope.k2Slow })}
+              className={`px-2 py-1 text-[9px] font-mono rounded border transition-colors ${
+                es.envelope.k2Slow
+                  ? 'bg-indigo-600/20 border-indigo-500/50 text-indigo-400'
+                  : 'bg-dark-bg border-dark-border text-text-muted'
+              }`}
+            >
+              K2 Slow
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// ============================================================================
+// SID2 PANEL
+// ============================================================================
+
+const SID2_DEFAULTS: FurnaceSID2Config = { volume: 15, mixMode: 0, noiseMode: 0 };
+
+const SID2Panel: React.FC<{ config: FurnaceConfig; onChange: (u: Partial<FurnaceConfig>) => void }> = ({ config, onChange }) => {
+  const sid2 = useMemo(() => ({ ...SID2_DEFAULTS, ...config.sid2 }), [config.sid2]);
+
+  const updateSID2 = useCallback((updates: Partial<FurnaceSID2Config>) => {
+    onChange({ sid2: { ...config.sid2, ...SID2_DEFAULTS, ...updates } });
+  }, [config.sid2, onChange]);
+
+  const mixModes = ['Normal', 'Mode 1', 'Mode 2', 'Mode 3'];
+  const noiseModes = ['Normal', 'Mode 1', 'Mode 2', 'Mode 3'];
+
+  return (
+    <div className="space-y-4 animate-in fade-in slide-in-from-top-2">
+      <div className="bg-dark-bgSecondary p-4 rounded-lg border border-fuchsia-500/30">
+        <div className="flex items-center gap-2 mb-4">
+          <Music size={16} className="text-fuchsia-400" />
+          <h3 className="font-mono text-xs font-bold text-text-primary uppercase">SID2</h3>
+        </div>
+
+        <div className="flex items-center gap-4">
+          <Knob label="VOL" value={sid2.volume} min={0} max={15}
+            onChange={(v) => updateSID2({ volume: Math.round(v) })}
+            size="md" color="#d946ef"
+            formatValue={(v) => String(Math.round(v))} />
+          <div>
+            <label className="text-[10px] text-text-muted font-mono block mb-1">Mix Mode</label>
+            <select
+              value={sid2.mixMode}
+              onChange={(e) => updateSID2({ mixMode: parseInt(e.target.value) })}
+              className="bg-dark-bg border border-dark-border rounded px-2 py-1 text-xs text-text-primary"
+            >
+              {mixModes.map((mode, i) => (
+                <option key={i} value={i}>{mode}</option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="text-[10px] text-text-muted font-mono block mb-1">Noise Mode</label>
+            <select
+              value={sid2.noiseMode}
+              onChange={(e) => updateSID2({ noiseMode: parseInt(e.target.value) })}
+              className="bg-dark-bg border border-dark-border rounded px-2 py-1 text-xs text-text-primary"
+            >
+              {noiseModes.map((mode, i) => (
+                <option key={i} value={i}>{mode}</option>
+              ))}
+            </select>
+          </div>
+        </div>
       </div>
     </div>
   );

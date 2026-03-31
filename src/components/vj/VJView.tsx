@@ -697,7 +697,14 @@ export const VJView: React.FC<VJViewProps> = ({ isPopout = false }) => {
     if (s.vjPoppedOut) {
       focusPopout('DEViLBOX — VJ');
     } else {
-      s.setVJPoppedOut(true);
+      // Exit fullscreen first — browsers block window.open() in fullscreen mode
+      if (document.fullscreenElement) {
+        document.exitFullscreen().then(() => {
+          useUIStore.getState().setVJPoppedOut(true);
+        });
+      } else {
+        s.setVJPoppedOut(true);
+      }
     }
   }, []);
 
