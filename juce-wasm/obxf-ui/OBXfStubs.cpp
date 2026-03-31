@@ -90,6 +90,8 @@ Utils::Utils() : configLock("__OBXf_WASMConfigLock__")
 {
     // Set theme to embedded mode (no filesystem)
     currentTheme = {EMBEDDED, "Default Vector", embeddedThemeSentinel};
+    // Populate themeLocations so loadThemeFilesAndCheck() doesn't show AlertWindow (which deadlocks WASM)
+    themeLocations.push_back(currentTheme);
 }
 
 Utils::~Utils() {}
