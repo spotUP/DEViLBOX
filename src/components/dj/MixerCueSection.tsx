@@ -82,12 +82,12 @@ export const MixerCueSection: React.FC = () => {
         title="Cue volume — headphone pre-fader listen level"
       />
 
-      {/* PFL buttons */}
+      {/* PFL buttons — headphone pre-listen per deck */}
       <div className="flex gap-1 items-center">
         <Headphones size={10} className="text-text-muted flex-shrink-0" />
         <button
           onClick={() => handlePFLToggle('A')}
-          title={`PFL Deck 1 — ${pflA ? 'disable' : 'enable'} headphone monitoring`}
+          title={`Headphone cue Deck A — ${pflA ? 'disable' : 'enable'} pre-fader listen`}
           className={`
             px-1.5 py-0.5 text-[9px] font-mono font-bold rounded transition-colors
             ${
@@ -97,11 +97,11 @@ export const MixerCueSection: React.FC = () => {
             }
           `}
         >
-          1
+          A
         </button>
         <button
           onClick={() => handlePFLToggle('B')}
-          title={`PFL Deck 2 — ${pflB ? 'disable' : 'enable'} headphone monitoring`}
+          title={`Headphone cue Deck B — ${pflB ? 'disable' : 'enable'} pre-fader listen`}
           className={`
             px-1.5 py-0.5 text-[9px] font-mono font-bold rounded transition-colors
             ${
@@ -111,17 +111,18 @@ export const MixerCueSection: React.FC = () => {
             }
           `}
         >
-          2
+          B
         </button>
       </div>
 
-      {/* Output device selector */}
+      {/* Headphone output device selector */}
       <div className="flex flex-col items-center w-full gap-0.5">
+        <label className="text-[7px] font-mono text-text-muted uppercase tracking-wider">Phones</label>
         <select
           value={cueDeviceId || ''}
           onChange={handleDeviceChange}
           className="w-full px-1 py-0.5 text-[8px] font-mono bg-dark-bgTertiary text-text-secondary border border-dark-borderLight rounded hover:bg-dark-bgHover transition-colors cursor-pointer"
-          title="Select headphone output device"
+          title="Headphone output device — only affects cue/PFL monitoring, not main speakers"
         >
           <option value="">System Default</option>
           {devices.map(d => (
