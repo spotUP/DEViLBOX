@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useRef, useEffect } from 'react';
 import { Knob } from '@components/controls/Knob';
 import { Waves, Filter, Zap, Activity, Volume2 } from 'lucide-react';
 import { useThemeStore } from '@stores';
@@ -23,14 +23,10 @@ interface OBXdControlsProps {
   onChange: (updates: Partial<OBXdConfig>) => void;
 }
 
-type OBXdTab = 'osc' | 'filter' | 'env' | 'mod';
-
 export const OBXdControls: React.FC<OBXdControlsProps> = ({
   config,
   onChange,
 }) => {
-  const [activeTab, setActiveTab] = useState<OBXdTab>('osc');
-  
   // Use ref to prevent stale closures in callbacks
   const configRef = useRef(config);
   useEffect(() => { configRef.current = config; }, [config]);
@@ -642,39 +638,19 @@ export const OBXdControls: React.FC<OBXdControlsProps> = ({
     </div>
   );
 
-  const tabs: { id: OBXdTab; label: string }[] = [
-    { id: 'osc', label: 'Oscillators' },
-    { id: 'filter', label: 'Filter' },
-    { id: 'env', label: 'Envelope' },
-    { id: 'mod', label: 'Modulation' },
-  ];
-
   return (
-    <div className="flex flex-col h-full">
-      {/* Tab Bar */}
-      <div className="flex border-b border-dark-border bg-dark-bgSecondary/50">
-        {tabs.map((tab) => (
-          <button
-            key={tab.id}
-            onClick={() => setActiveTab(tab.id)}
-            className={`px-4 py-2 text-xs font-bold uppercase tracking-wider transition-all ${
-              activeTab === tab.id
-                ? 'border-b-2 text-amber-400'
-                : 'text-text-muted hover:text-text-secondary'
-            }`}
-            style={activeTab === tab.id ? { borderColor: accentColor, color: accentColor } : {}}
-          >
-            {tab.label}
-          </button>
-        ))}
-      </div>
-
-      {/* Tab Content */}
-      <div className="synth-controls-flow flex-1 overflow-y-auto">
-        {activeTab === 'osc' && renderOscillatorTab()}
-        {activeTab === 'filter' && renderFilterTab()}
-        {activeTab === 'env' && renderEnvelopeTab()}
-        {activeTab === 'mod' && renderModulationTab()}
+    <div className="flex flex-col h-full overflow-y-auto">
+      <div className="grid grid-cols-2 gap-2 p-2">
+        {/* Left column: Oscillators + Envelopes */}
+        <div className="flex flex-col gap-2">
+          {renderOscillatorTab()}
+          {renderEnvelopeTab()}
+        </div>
+        {/* Right column: Filter + Modulation */}
+        <div className="flex flex-col gap-2">
+          {renderFilterTab()}
+          {renderModulationTab()}
+        </div>
       </div>
     </div>
   );
