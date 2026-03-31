@@ -44,44 +44,13 @@ app.use(cors({
 app.use(express.json({ limit: '10mb' }));
 
 // Rate limiting
-const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100, // Limit each IP to 100 requests per windowMs
-  message: 'Too many requests from this IP'
-});
-app.use('/api/', limiter as unknown as express.RequestHandler);
-
-// Stricter rate limit for auth endpoints
+// Rate limiting only for auth endpoints (brute-force protection)
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 10,
   message: 'Too many auth attempts, please try again later'
 });
 app.use('/api/auth/', authLimiter as unknown as express.RequestHandler);
-
-// Higher rate limit for modland browsing (public catalog search)
-const modlandLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 500,
-  message: 'Too many requests from this IP'
-});
-app.use('/api/modland/', modlandLimiter as unknown as express.RequestHandler);
-
-// SongDB rate limiter (same as modland — 500/15min, public catalog)
-const songdbLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 500,
-  message: 'Too many requests from this IP'
-});
-app.use('/api/songdb/', songdbLimiter as unknown as express.RequestHandler);
-
-// HVSC rate limiter (same as modland — 500/15min, public catalog)
-const hvscLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 500,
-  message: 'Too many requests from this IP'
-});
-app.use('/api/hvsc/', hvscLimiter as unknown as express.RequestHandler);
 
 // Routes
 app.use('/api/auth', authRoutes);
