@@ -20,6 +20,7 @@ interface KnobProps {
   color?: string;
   title?: string; // Tooltip text on hover
   disabled?: boolean; // Disable interaction and dim appearance
+  hideValue?: boolean; // Hide the static value label below the knob
 
   // From controls/Knob (TB303 automation)
   logarithmic?: boolean;
@@ -66,6 +67,7 @@ export const Knob: React.FC<KnobProps> = React.memo(({
   formatValue: customFormatValue,
   step,
   disabled = false,
+  hideValue = false,
 }) => {
   // Guard against undefined/NaN value prop (can happen if synth params aren't loaded yet)
   const safeValue = (value == null || isNaN(value)) ? (min ?? 0) : value;
@@ -555,16 +557,18 @@ export const Knob: React.FC<KnobProps> = React.memo(({
       </div>
 
       {/* Value display */}
-      <div
-        className="knob-value"
-        style={{
-          fontSize,
-          color: isActive ? color : undefined,
-          textShadow: isActive ? `0 0 4px ${color}80` : 'none',
-        }}
-      >
-        {formatValueDisplay(displayValue !== undefined ? displayValue : value)}{unit}
-      </div>
+      {!hideValue && (
+        <div
+          className="knob-value"
+          style={{
+            fontSize,
+            color: isActive ? color : undefined,
+            textShadow: isActive ? `0 0 4px ${color}80` : 'none',
+          }}
+        >
+          {formatValueDisplay(displayValue !== undefined ? displayValue : value)}{unit}
+        </div>
+      )}
     </div>
 
     {/* Floating tooltip during drag */}
@@ -675,7 +679,8 @@ export const Knob: React.FC<KnobProps> = React.memo(({
     prevProps.label === nextProps.label &&
     prevProps.color === nextProps.color &&
     prevProps.size === nextProps.size &&
-    prevProps.disabled === nextProps.disabled
+    prevProps.disabled === nextProps.disabled &&
+    prevProps.hideValue === nextProps.hideValue
   );
 });
 
