@@ -407,7 +407,6 @@ export const useNoteInput = (refs: TrackerInputRefs) => {
         // PT numpad sample bank selection:
         // KP_Enter toggles hi/lo bank (0-15 vs 16-31)
         // KP_0-9 select sample within current bank (3×3 grid + 0)
-        const { useInstrumentStore } = require('@stores/useInstrumentStore');
         const ptBank = useEditorStore.getState().ptSampleBank ?? 0; // 0 = low (0-15), 16 = high (16-31)
         const PT_NUMPAD_MAP: Record<string, number> = {
           'Numpad1': 12, 'Numpad2': 13, 'Numpad3': 14,
@@ -428,7 +427,7 @@ export const useNoteInput = (refs: TrackerInputRefs) => {
           const sampleIndex = ptBank + sampleOffset;
           const instruments = useInstrumentStore.getState().instruments;
           if (sampleIndex < instruments.length) {
-            useInstrumentStore.getState().setCurrentInstrumentId(instruments[sampleIndex].id);
+            useInstrumentStore.getState().setCurrentInstrument(instruments[sampleIndex].id);
             useUIStore.getState().setStatusMessage(`SAMPLE ${sampleIndex + 1}`);
           }
           return true;
