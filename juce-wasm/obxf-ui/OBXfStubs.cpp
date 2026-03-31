@@ -49,10 +49,37 @@ bool ObxfAudioProcessor::producesMidi() const { return false; }
 bool ObxfAudioProcessor::isMidiEffect() const { return false; }
 double ObxfAudioProcessor::getTailLengthSeconds() const { return 0.0; }
 
-int ObxfAudioProcessor::getNumPrograms() { return 1; }
-int ObxfAudioProcessor::getCurrentProgram() { return 0; }
-void ObxfAudioProcessor::setCurrentProgram(int) {}
-const juce::String ObxfAudioProcessor::getProgramName(int) { return "Init"; }
+int ObxfAudioProcessor::getNumPrograms()
+{
+    return (int)utils->patchesAsLinearList.size() + 1; // +1 for Init
+}
+
+int ObxfAudioProcessor::getCurrentProgram() { return currentDawProgram; }
+
+void ObxfAudioProcessor::setCurrentProgram(int index)
+{
+    if (index < 0 || index > (int)utils->patchesAsLinearList.size())
+        return;
+    currentDawProgram = index;
+    if (index == 0)
+    {
+        utils->initializePatch();
+        processActiveProgramChanged();
+    }
+    else
+    {
+        utils->loadPatch(utils->patchesAsLinearList[index - 1]);
+    }
+}
+
+const juce::String ObxfAudioProcessor::getProgramName(int index)
+{
+    if (index == 0) return "Init";
+    int i = index - 1;
+    if (i >= 0 && i < (int)utils->patchesAsLinearList.size())
+        return utils->patchesAsLinearList[i]->displayName;
+    return "ERR";
+}
 
 void ObxfAudioProcessor::getStateInformation(juce::MemoryBlock&) {}
 void ObxfAudioProcessor::setStateInformation(const void*, int) {}
@@ -69,7 +96,14 @@ void ObxfAudioProcessor::handleMIDIProgramChange(int) {}
 void ObxfAudioProcessor::updateUIState() {}
 void ObxfAudioProcessor::randomizeToAlgo(RandomAlgos) {}
 void ObxfAudioProcessor::panSetter(PanAlgos) {}
-void ObxfAudioProcessor::resetLastLoadedProgramTo(int) {}
+void ObxfAudioProcessor::resetLastLoadedProgramTo(int idx)
+{
+    lastLoadedProgram = idx;
+    if (idx >= 0 && idx < (int)utils->patchesAsLinearList.size())
+        lastLoadedPatchNode = utils->patchesAsLinearList[idx];
+    else
+        lastLoadedPatchNode.reset();
+}
 int ObxfAudioProcessor::resetLastLoadedProgramByName(const std::string&, bool) { return -1; }
 
 void ObxfAudioProcessor::setEngineParameterValue(const juce::String&, float, bool) {}
@@ -141,10 +175,27 @@ float Utils::getDefaultZoomFactor() const { return 1.0f; }
 void Utils::setUseSoftwareRenderer(bool) {}
 bool Utils::getUseSoftwareRenderer() const { return false; }
 
-bool Utils::loadPatch(const PatchTreeNode::ptr_t&) { return false; }
+bool Utils::loadPatch(const PatchTreeNode::ptr_t& node)
+{
+    if (!node) return false;
+    // Notify JS to load this preset in the OBXd audio worklet
+    EM_ASM({
+        if (typeof window !== 'undefined' && window._obxfUIProgramCallback)
+            window._obxfUIProgramCallback($0);
+    }, node->index);
+    if (hostUpdateCallback) hostUpdateCallback(node->index);
+    return true;
+}
 bool Utils::loadPatch(const juce::File&) { return false; }
 bool Utils::savePatch(const juce::File&) { return false; }
-void Utils::initializePatch() const {}
+void Utils::initializePatch() const
+{
+    // Notify JS to load Init preset (index -1)
+    EM_ASM({
+        if (typeof window !== 'undefined' && window._obxfUIProgramCallback)
+            window._obxfUIProgramCallback(-1);
+    });
+}
 
 void Utils::copyPatch() {}
 void Utils::pastePatch() {}

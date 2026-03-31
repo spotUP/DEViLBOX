@@ -38,6 +38,7 @@ class ParamForwarder : public juce::AudioProcessorParameter::Listener
 public:
     void parameterValueChanged(int parameterIndex, float newValue) override
     {
+        // _obxfUIParamCallback(index, value) — JS side maps index→OBXd param via _obxfParamIds
         EM_ASM({
             if (typeof window !== 'undefined' && window._obxfUIParamCallback)
                 window._obxfUIParamCallback($0, $1);
@@ -94,6 +95,22 @@ static void obxf_ui_init_common(float scale)
     auto& params = g_processor->getParameters();
     for (auto* p : params)
         p->addListener(g_paramForwarder);
+
+    // Emit parameter ID array to JS for OBXf→OBXd index mapping
+    EM_ASM({ window._obxfParamIds = []; });
+    for (int i = 0; i < params.size(); i++)
+    {
+        // Cast to AudioProcessorParameterWithID to get the string paramID
+        if (auto* pwid = dynamic_cast<juce::AudioProcessorParameterWithID*>(params[i]))
+        {
+            EM_ASM({ window._obxfParamIds.push(UTF8ToString($0)); },
+                   pwid->paramID.toRawUTF8());
+        }
+        else
+        {
+            EM_ASM({ window._obxfParamIds.push(""); });
+        }
+    }
 
     g_editor = g_processor->createEditor();
     juce_wasm_dispatch_messages();
@@ -265,6 +282,67 @@ void obxf_ui_set_program(int p) { if (g_processor) g_processor->setCurrentProgra
 
 EMSCRIPTEN_KEEPALIVE
 int obxf_ui_get_program_count() { return g_processor ? g_processor->getNumPrograms() : 0; }
+
+// Populate the OBXf patch browser from JS preset names
+// Call after init — reads window._obxdPresetNames array
+EMSCRIPTEN_KEEPALIVE
+void obxf_ui_populate_presets()
+{
+    if (!g_processor) return;
+    auto& utils = *g_processor->utils;
+
+    int count = EM_ASM_INT({
+        return (window._obxdPresetNames && window._obxdPresetNames.length) || 0;
+    });
+    if (count == 0) return;
+
+    // Build the patch tree root
+    utils.patchRoot = std::make_shared<Utils::PatchTreeNode>();
+    utils.patchRoot->isFolder = true;
+    utils.patchRoot->displayName = "Patches";
+    utils.patchRoot->locationType = Utils::EMBEDDED;
+
+    auto factoryFolder = std::make_shared<Utils::PatchTreeNode>();
+    factoryFolder->isFolder = true;
+    factoryFolder->displayName = "Factory";
+    factoryFolder->locationType = Utils::EMBEDDED;
+    factoryFolder->parent = utils.patchRoot;
+    utils.patchRoot->children.push_back(factoryFolder);
+
+    utils.patchesAsLinearList.clear();
+
+    for (int i = 0; i < count; i++)
+    {
+        char nameBuf[256] = {0};
+        EM_ASM({
+            var name = window._obxdPresetNames[$0] || ("Preset " + $0);
+            stringToUTF8(name, $1, 256);
+        }, i, nameBuf);
+
+        auto node = std::make_shared<Utils::PatchTreeNode>();
+        node->isFolder = false;
+        node->displayName = juce::String(nameBuf);
+        node->locationType = Utils::EMBEDDED;
+        node->index = i;
+        node->indexInParent = i;
+        node->parent = factoryFolder;
+
+        factoryFolder->children.push_back(node);
+        factoryFolder->nonFolderChildIndices.push_back(i);
+        utils.patchesAsLinearList.push_back(node);
+    }
+
+    factoryFolder->childRange = {0, count - 1};
+    utils.patchRoot->childRange = {0, count - 1};
+    utils.lastFactoryPatch = count - 1;
+
+    // Wire the hostUpdateCallback so loadPatch() updates processor state
+    utils.hostUpdateCallback = [](int idx) {
+        if (g_processor) g_processor->resetLastLoadedProgramTo(idx);
+    };
+
+    EM_ASM({ console.log("[OBXfUI WASM] Populated " + $0 + " presets"); }, count);
+}
 
 // ── Cleanup ──
 
