@@ -29,8 +29,8 @@ const dx7Desc: SynthDescriptor = {
 
   parameters: [
     { key: 'volume', label: 'Volume', type: 'knob', min: 0, max: 2, default: 1 },
-    { key: 'bank', label: 'Bank', type: 'knob', min: 0, max: 7, default: 0 },
-    { key: 'program', label: 'Program', type: 'knob', min: 0, max: 31, default: 0 },
+    { key: 'bank', label: 'Bank', type: 'knob', min: 0, max: 34, default: 0 },
+    { key: 'program', label: 'Voice', type: 'knob', min: 0, max: 31, default: 0 },
   ],
 };
 

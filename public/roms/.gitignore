@@ -3,6 +3,8 @@
 *.BIN
 *.OBJ
 *.obj
+*.syx
+*.SYX
 *.zip
 *.ZIP
 *.vsm
@@ -11,3 +13,4 @@
 # But keep .gitkeep files and README
 !.gitkeep
 !README.md
+!**/manifest.json

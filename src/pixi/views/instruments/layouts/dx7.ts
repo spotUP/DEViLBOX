@@ -7,14 +7,14 @@ export const DX7_LAYOUT: SynthPanelLayout = {
   configKey: 'dx7',
   sections: [
     {
-      label: 'VOICE',
+      label: 'PATCH',
       controls: [
-        { type: 'knob', key: 'bank', label: 'BANK', color: '#33ccff', min: 0, max: 7, defaultValue: 0, formatValue: (v) => `${Math.round(v) + 1}` },
-        { type: 'knob', key: 'program', label: 'PROGRAM', color: '#33ccff', min: 0, max: 31, defaultValue: 0, formatValue: (v) => `${Math.round(v) + 1}` },
+        { type: 'knob', key: 'bank', label: 'BANK', color: '#33ccff', min: 0, max: 34, defaultValue: 0, formatValue: (v) => `${Math.round(v) + 1}` },
+        { type: 'knob', key: 'program', label: 'VOICE', color: '#ff9933', min: 0, max: 31, defaultValue: 0, formatValue: (v) => `${Math.round(v) + 1}` },
       ],
     },
     {
-      label: 'PERFORMANCE',
+      label: 'OUTPUT',
       controls: [
         { type: 'knob', key: 'volume', label: 'VOLUME', color: '#66ff99', min: 0, max: 2, defaultValue: 1, formatValue: fmtPct },
       ],
