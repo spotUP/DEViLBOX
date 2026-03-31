@@ -48,7 +48,7 @@ interface CursorStore {
   moveCursorToRow: (row: number) => void;
   moveCursorToChannel: (channel: number) => void;
   moveCursorToColumn: (columnType: CursorPosition['columnType']) => void;
-  moveCursorToChannelAndColumn: (channel: number, columnType: CursorPosition['columnType']) => void;
+  moveCursorToChannelAndColumn: (channel: number, columnType: CursorPosition['columnType'], noteColumnIndex?: number) => void;
 
   startSelection: () => void;
   updateSelection: (channelIndex: number, rowIndex: number, columnType?: CursorPosition['columnType']) => void;
@@ -68,7 +68,7 @@ function getEditorState() {
 }
 
 export const useCursorStore = create<CursorStore>()((set, get) => ({
-  cursor: { channelIndex: 0, rowIndex: 0, columnType: 'note', digitIndex: 0 },
+  cursor: { channelIndex: 0, rowIndex: 0, noteColumnIndex: 0, columnType: 'note', digitIndex: 0 },
   selection: null,
 
   moveCursor: (direction) => {
@@ -79,7 +79,15 @@ export const useCursorStore = create<CursorStore>()((set, get) => ({
     const numRows = pattern.length;
 
     let { channelIndex, rowIndex, columnType, digitIndex } = cur;
+    let noteColumnIndex = cur.noteColumnIndex ?? 0;
     const currentDigits = DIGIT_COUNTS[columnType] || 0;
+
+    // Get total note columns for the current channel
+    const getNoteCols = (ch: number) => pattern.channels[ch]?.channelMeta?.noteCols ?? 1;
+
+    // Clamp noteColumnIndex to valid range — prevents stale values after note column changes
+    const maxNci = getNoteCols(channelIndex) - 1;
+    if (noteColumnIndex > maxNci) noteColumnIndex = maxNci;
 
     switch (direction) {
       case 'up':
@@ -92,31 +100,55 @@ export const useCursorStore = create<CursorStore>()((set, get) => ({
         if (currentDigits > 0 && digitIndex > 0) { digitIndex--; break; }
 
         const vis = getEditorState().columnVisibility;
-        const cols: CursorPosition['columnType'][] = ['note'];
-        if (vis.instrument) cols.push('instrument');
-        if (vis.volume) cols.push('volume');
-        if (vis.effect) { cols.push('effTyp'); cols.push('effParam'); }
-        if (vis.effect2) { cols.push('effTyp2'); cols.push('effParam2'); }
-        if (vis.cutoff) cols.push('cutoff');
-        if (vis.resonance) cols.push('resonance');
-        if (vis.envMod) cols.push('envMod');
-        if (vis.pan) cols.push('pan');
-        if (vis.flag1) cols.push('flag1');
-        if (vis.flag2) cols.push('flag2');
-        if (vis.probability) cols.push('probability');
+        // Build column order for a single note column group
+        const noteGroupCols: CursorPosition['columnType'][] = ['note'];
+        if (vis.instrument) noteGroupCols.push('instrument');
+        if (vis.volume) noteGroupCols.push('volume');
 
-        let ci = cols.indexOf(columnType);
-        if (ci === -1) {
-          // Cursor on a hidden/unknown column — find nearest visible column to the left
-          ci = 0; // fall back to first column (note)
+        // Build full column list: [noteGroup * noteCols] + effects + flags
+        const totalNoteCols = getNoteCols(channelIndex);
+        const cols: Array<{ type: CursorPosition['columnType']; nci: number }> = [];
+        for (let nc = 0; nc < totalNoteCols; nc++) {
+          for (const t of noteGroupCols) cols.push({ type: t, nci: nc });
         }
+        if (vis.effect) { cols.push({ type: 'effTyp', nci: 0 }); cols.push({ type: 'effParam', nci: 0 }); }
+        if (vis.effect2) { cols.push({ type: 'effTyp2', nci: 0 }); cols.push({ type: 'effParam2', nci: 0 }); }
+        if (vis.cutoff) cols.push({ type: 'cutoff', nci: 0 });
+        if (vis.resonance) cols.push({ type: 'resonance', nci: 0 });
+        if (vis.envMod) cols.push({ type: 'envMod', nci: 0 });
+        if (vis.pan) cols.push({ type: 'pan', nci: 0 });
+        if (vis.flag1) cols.push({ type: 'flag1', nci: 0 });
+        if (vis.flag2) cols.push({ type: 'flag2', nci: 0 });
+        if (vis.probability) cols.push({ type: 'probability', nci: 0 });
+
+        let ci = cols.findIndex(c => c.type === columnType && c.nci === noteColumnIndex);
+        if (ci === -1) ci = 0;
         if (ci > 0) {
-          columnType = cols[ci - 1];
+          columnType = cols[ci - 1].type;
+          noteColumnIndex = cols[ci - 1].nci;
           const nd = DIGIT_COUNTS[columnType] || 0;
           digitIndex = nd > 0 ? nd - 1 : 0;
         } else {
+          // Wrap to previous channel
           channelIndex = channelIndex > 0 ? channelIndex - 1 : numChannels - 1;
-          columnType = cols[cols.length - 1];
+          // Build cols for new channel's last column
+          const prevNoteCols = getNoteCols(channelIndex);
+          const prevCols: Array<{ type: CursorPosition['columnType']; nci: number }> = [];
+          for (let nc = 0; nc < prevNoteCols; nc++) {
+            for (const t of noteGroupCols) prevCols.push({ type: t, nci: nc });
+          }
+          if (vis.effect) { prevCols.push({ type: 'effTyp', nci: 0 }); prevCols.push({ type: 'effParam', nci: 0 }); }
+          if (vis.effect2) { prevCols.push({ type: 'effTyp2', nci: 0 }); prevCols.push({ type: 'effParam2', nci: 0 }); }
+          if (vis.cutoff) prevCols.push({ type: 'cutoff', nci: 0 });
+          if (vis.resonance) prevCols.push({ type: 'resonance', nci: 0 });
+          if (vis.envMod) prevCols.push({ type: 'envMod', nci: 0 });
+          if (vis.pan) prevCols.push({ type: 'pan', nci: 0 });
+          if (vis.flag1) prevCols.push({ type: 'flag1', nci: 0 });
+          if (vis.flag2) prevCols.push({ type: 'flag2', nci: 0 });
+          if (vis.probability) prevCols.push({ type: 'probability', nci: 0 });
+          const last = prevCols[prevCols.length - 1];
+          columnType = last.type;
+          noteColumnIndex = last.nci;
           const nd = DIGIT_COUNTS[columnType] || 0;
           digitIndex = nd > 0 ? nd - 1 : 0;
         }
@@ -126,33 +158,41 @@ export const useCursorStore = create<CursorStore>()((set, get) => ({
         if (currentDigits > 0 && digitIndex < currentDigits - 1) { digitIndex++; break; }
 
         const vis = getEditorState().columnVisibility;
-        const cols: CursorPosition['columnType'][] = ['note'];
-        if (vis.instrument) cols.push('instrument');
-        if (vis.volume) cols.push('volume');
-        if (vis.effect) { cols.push('effTyp'); cols.push('effParam'); }
-        if (vis.effect2) { cols.push('effTyp2'); cols.push('effParam2'); }
-        if (vis.cutoff) cols.push('cutoff');
-        if (vis.resonance) cols.push('resonance');
-        if (vis.envMod) cols.push('envMod');
-        if (vis.pan) cols.push('pan');
-        if (vis.flag1) cols.push('flag1');
-        if (vis.flag2) cols.push('flag2');
-        if (vis.probability) cols.push('probability');
+        const noteGroupCols: CursorPosition['columnType'][] = ['note'];
+        if (vis.instrument) noteGroupCols.push('instrument');
+        if (vis.volume) noteGroupCols.push('volume');
 
-        let ci = cols.indexOf(columnType);
+        const totalNoteCols = getNoteCols(channelIndex);
+        const cols: Array<{ type: CursorPosition['columnType']; nci: number }> = [];
+        for (let nc = 0; nc < totalNoteCols; nc++) {
+          for (const t of noteGroupCols) cols.push({ type: t, nci: nc });
+        }
+        if (vis.effect) { cols.push({ type: 'effTyp', nci: 0 }); cols.push({ type: 'effParam', nci: 0 }); }
+        if (vis.effect2) { cols.push({ type: 'effTyp2', nci: 0 }); cols.push({ type: 'effParam2', nci: 0 }); }
+        if (vis.cutoff) cols.push({ type: 'cutoff', nci: 0 });
+        if (vis.resonance) cols.push({ type: 'resonance', nci: 0 });
+        if (vis.envMod) cols.push({ type: 'envMod', nci: 0 });
+        if (vis.pan) cols.push({ type: 'pan', nci: 0 });
+        if (vis.flag1) cols.push({ type: 'flag1', nci: 0 });
+        if (vis.flag2) cols.push({ type: 'flag2', nci: 0 });
+        if (vis.probability) cols.push({ type: 'probability', nci: 0 });
+
+        let ci = cols.findIndex(c => c.type === columnType && c.nci === noteColumnIndex);
         if (ci === -1) {
-          // Cursor on a hidden/unknown column — advance to next channel
-          channelIndex = channelIndex < numChannels - 1 ? channelIndex + 1 : 0;
-          columnType = 'note';
+          // Stale cursor position — snap to first column of current channel
+          columnType = cols[0]?.type ?? 'note';
+          noteColumnIndex = 0;
           digitIndex = 0;
           break;
         }
         if (ci < cols.length - 1) {
-          columnType = cols[ci + 1];
+          columnType = cols[ci + 1].type;
+          noteColumnIndex = cols[ci + 1].nci;
           digitIndex = 0;
         } else {
           channelIndex = channelIndex < numChannels - 1 ? channelIndex + 1 : 0;
           columnType = 'note';
+          noteColumnIndex = 0;
           digitIndex = 0;
         }
         break;
@@ -164,13 +204,14 @@ export const useCursorStore = create<CursorStore>()((set, get) => ({
       rowIndex === cur.rowIndex &&
       channelIndex === cur.channelIndex &&
       columnType === cur.columnType &&
-      digitIndex === cur.digitIndex
+      digitIndex === cur.digitIndex &&
+      noteColumnIndex === (cur.noteColumnIndex ?? 0)
     ) return;
 
     // PERF: Notify scroll perf manager for vertical movement (suppresses Yoga layout)
     if (direction === 'up' || direction === 'down') notifyScrollEvent();
 
-    set({ cursor: { channelIndex, rowIndex, columnType, digitIndex } });
+    set({ cursor: { channelIndex, rowIndex, noteColumnIndex, columnType, digitIndex } });
   },
 
   moveCursorToRow: (row) => {
@@ -190,7 +231,10 @@ export const useCursorStore = create<CursorStore>()((set, get) => ({
     const ts = getTrackerState();
     const pattern = ts.patterns[ts.currentPatternIndex];
     if (channel >= 0 && channel < pattern.channels.length) {
-      set({ cursor: { ...get().cursor, channelIndex: channel } });
+      const cur = get().cursor;
+      const maxNci = (pattern.channels[channel]?.channelMeta?.noteCols ?? 1) - 1;
+      const nci = Math.min(cur.noteColumnIndex ?? 0, maxNci);
+      set({ cursor: { ...cur, channelIndex: channel, noteColumnIndex: nci } });
     }
   },
 
@@ -198,11 +242,13 @@ export const useCursorStore = create<CursorStore>()((set, get) => ({
     set({ cursor: { ...get().cursor, columnType, digitIndex: 0 } });
   },
 
-  moveCursorToChannelAndColumn: (channel, columnType) => {
+  moveCursorToChannelAndColumn: (channel, columnType, noteColumnIndex) => {
     const ts = getTrackerState();
     const pattern = ts.patterns[ts.currentPatternIndex];
     if (channel >= 0 && channel < pattern.channels.length) {
-      set({ cursor: { ...get().cursor, channelIndex: channel, columnType, digitIndex: 0 } });
+      const maxNci = (pattern.channels[channel]?.channelMeta?.noteCols ?? 1) - 1;
+      const nci = Math.min(noteColumnIndex ?? 0, maxNci);
+      set({ cursor: { ...get().cursor, channelIndex: channel, columnType, digitIndex: 0, noteColumnIndex: nci } });
     }
   },
 
