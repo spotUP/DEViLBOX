@@ -27,6 +27,7 @@
 #include "Misc/Allocator.h"
 #include "Misc/Util.h"
 #include "Misc/Config.h"
+#include "Misc/XMLwrapper.h"
 #include "Params/ADnoteParameters.h"
 #include "Params/SUBnoteParameters.h"
 #include "Params/PADnoteParameters.h"
@@ -55,6 +56,7 @@ enum ZasfxParam {
     P_ADD_STEREO = 16, P_ADD_PUNCH_STRENGTH = 17,
     P_ADD_PUNCH_TIME = 18, P_ADD_PUNCH_STRETCH = 19,
 
+    // Voice 0: 30-49
     P_ADDV0_ENABLE = 30, P_ADDV0_VOLUME = 31,
     P_ADDV0_PANNING = 32, P_ADDV0_DETUNE = 33,
     P_ADDV0_COARSE_DETUNE = 34, P_ADDV0_OSCIL_SHAPE = 35,
@@ -111,6 +113,26 @@ enum ZasfxParam {
     P_EFX2_TYPE = 122, P_EFX2_PRESET = 123,
     P_EFX3_TYPE = 124, P_EFX3_PRESET = 125,
     P_REVERB_MIX = 126, P_ECHO_MIX = 127,
+
+    // Voice 1: 130-135 (essential params only)
+    P_ADDV1_ENABLE = 130, P_ADDV1_VOLUME = 131,
+    P_ADDV1_DETUNE = 132, P_ADDV1_COARSE_DETUNE = 133,
+    P_ADDV1_OSCIL_SHAPE = 134,
+    // Voice 2: 140-144
+    P_ADDV2_ENABLE = 140, P_ADDV2_VOLUME = 141,
+    P_ADDV2_DETUNE = 142, P_ADDV2_COARSE_DETUNE = 143,
+    P_ADDV2_OSCIL_SHAPE = 144,
+    // Voice 3: 150-154
+    P_ADDV3_ENABLE = 150, P_ADDV3_VOLUME = 151,
+    P_ADDV3_DETUNE = 152, P_ADDV3_COARSE_DETUNE = 153,
+    P_ADDV3_OSCIL_SHAPE = 154,
+
+    // SUBsynth harmonics: 160-175
+    P_SUB_HMAG0 = 160, P_SUB_HMAG1 = 161, P_SUB_HMAG2 = 162,
+    P_SUB_HMAG3 = 163, P_SUB_HMAG4 = 164, P_SUB_HMAG5 = 165,
+
+    // Apply parameters trigger
+    P_APPLY_PARAMS = 200,
 };
 
 struct ZasfxInstance {
@@ -161,8 +183,15 @@ void* zasfx_create(int sampleRate) {
     inst->master->partonoff(0, 1);
     Part* part = getPart(inst);
     part->kit[0].Padenabled = 1;
+    // Allocate SUBsynth and PADsynth params (Part constructor only creates ADDsynth)
+    if (!part->kit[0].subpars)
+        part->kit[0].subpars = new SUBnoteParameters(&inst->master->time);
+    if (!part->kit[0].padpars)
+        part->kit[0].padpars = new PADnoteParameters(inst->synth, inst->master->fft, &inst->master->time);
     inst->master->applyparameters();
     inst->master->initialize_rt();
+    // Boost master volume from default -6.67dB to 0dB
+    inst->master->Volume = 0.0f;
     inst->tmpL = new float[inst->bufferSize];
     inst->tmpR = new float[inst->bufferSize];
     return (void*)inst;
@@ -297,7 +326,7 @@ void zasfx_set_param(void* ptr, int index, float value) {
     case P_SUB_START: if (sub) sub->Pstart = v; break;
 
     // === PADsynth (60-69) ===
-    case P_PAD_ENABLE: part->kit[0].Ppadenabled = (v > 0) ? 1 : 0; break;
+    case P_PAD_ENABLE: if (pad) part->kit[0].Ppadenabled = (v > 0) ? 1 : 0; break;
     case P_PAD_VOLUME: if (pad) pad->PVolume = v; break;
     case P_PAD_PANNING: if (pad) pad->PPanning = v; break;
     case P_PAD_DETUNE: if (pad) pad->PDetune = (unsigned short)value; break;
@@ -407,6 +436,44 @@ void zasfx_set_param(void* ptr, int index, float value) {
     case P_EFX3_PRESET: if (part->partefx[2]) part->partefx[2]->changepreset((int)value); break;
     case P_REVERB_MIX: inst->master->setPsysefxvol(0, 0, (char)v); break;
     case P_ECHO_MIX: inst->master->setPsysefxvol(0, 1, (char)v); break;
+
+    // === ADDsynth Voice 1 (130-134) ===
+    case P_ADDV1_ENABLE: if (ad) ad->VoicePar[1].Enabled = (v > 0) ? 1 : 0; break;
+    case P_ADDV1_VOLUME: if (ad) ad->VoicePar[1].volume = norm127(value); break;
+    case P_ADDV1_DETUNE: if (ad) ad->VoicePar[1].PDetune = (unsigned short)value; break;
+    case P_ADDV1_COARSE_DETUNE: if (ad) ad->VoicePar[1].PCoarseDetune = (unsigned short)value; break;
+    case P_ADDV1_OSCIL_SHAPE:
+        if (ad && ad->VoicePar[1].OscilGn) ad->VoicePar[1].OscilGn->Pcurrentbasefunc = v;
+        break;
+    // === ADDsynth Voice 2 (140-144) ===
+    case P_ADDV2_ENABLE: if (ad) ad->VoicePar[2].Enabled = (v > 0) ? 1 : 0; break;
+    case P_ADDV2_VOLUME: if (ad) ad->VoicePar[2].volume = norm127(value); break;
+    case P_ADDV2_DETUNE: if (ad) ad->VoicePar[2].PDetune = (unsigned short)value; break;
+    case P_ADDV2_COARSE_DETUNE: if (ad) ad->VoicePar[2].PCoarseDetune = (unsigned short)value; break;
+    case P_ADDV2_OSCIL_SHAPE:
+        if (ad && ad->VoicePar[2].OscilGn) ad->VoicePar[2].OscilGn->Pcurrentbasefunc = v;
+        break;
+    // === ADDsynth Voice 3 (150-154) ===
+    case P_ADDV3_ENABLE: if (ad) ad->VoicePar[3].Enabled = (v > 0) ? 1 : 0; break;
+    case P_ADDV3_VOLUME: if (ad) ad->VoicePar[3].volume = norm127(value); break;
+    case P_ADDV3_DETUNE: if (ad) ad->VoicePar[3].PDetune = (unsigned short)value; break;
+    case P_ADDV3_COARSE_DETUNE: if (ad) ad->VoicePar[3].PCoarseDetune = (unsigned short)value; break;
+    case P_ADDV3_OSCIL_SHAPE:
+        if (ad && ad->VoicePar[3].OscilGn) ad->VoicePar[3].OscilGn->Pcurrentbasefunc = v;
+        break;
+
+    // === SUBsynth harmonics (160-165) ===
+    case P_SUB_HMAG0: if (sub) sub->Phmag[0] = v; break;
+    case P_SUB_HMAG1: if (sub) sub->Phmag[1] = v; break;
+    case P_SUB_HMAG2: if (sub) sub->Phmag[2] = v; break;
+    case P_SUB_HMAG3: if (sub) sub->Phmag[3] = v; break;
+    case P_SUB_HMAG4: if (sub) sub->Phmag[4] = v; break;
+    case P_SUB_HMAG5: if (sub) sub->Phmag[5] = v; break;
+
+    // === Apply parameters (for PADsynth wavetable rebuild) ===
+    case P_APPLY_PARAMS:
+        inst->master->applyparameters();
+        break;
     }
 }
 
@@ -449,6 +516,39 @@ float zasfx_get_param(void* ptr, int index) {
         return (ad && ad->GlobalPar.GlobalFilter) ? ad->GlobalPar.GlobalFilter->baseq / 10.0f * 127.0f : 0;
     default: return 0.0f;
     }
+}
+
+// Load a complete instrument preset from XML string.
+// Returns 0 on success, negative on error.
+int zasfx_load_preset_xml(void* ptr, const char* xml_data, int len) {
+    if (!ptr || !xml_data || len <= 0) return -1;
+
+    auto* inst = (ZasfxInstance*)ptr;
+    Part* part = getPart(inst);
+
+    // Stop all notes before changing instrument
+    part->AllNotesOff();
+    part->defaultsinstrument();
+
+    // Parse XML
+    XMLwrapper xml;
+    std::string xmlStr(xml_data, len);
+    if (!xml.putXMLdata(xmlStr.c_str())) {
+        return -2;
+    }
+
+    // Navigate to INSTRUMENT branch and load
+    if (xml.enterbranch("INSTRUMENT") == 0) {
+        return -3;
+    }
+
+    part->getfromXMLinstrument(xml);
+    xml.exitbranch();
+
+    // Apply non-realtime parameters (PADsynth wavetable generation etc.)
+    part->applyparameters();
+
+    return 0;
 }
 
 } // extern "C"

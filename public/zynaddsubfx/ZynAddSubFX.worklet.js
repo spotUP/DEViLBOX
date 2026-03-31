@@ -11,31 +11,36 @@
  *   100-109: Freq envelope    120-127: Effects
  */
 
-// Map TypeScript param index (0-69) to [WASM index, valueTransform]
-// valueTransform: 'bool01'=0/1->0/127, 'uni'=0-1->0-127, 'bi'=-1..1->0-127, 'oct'=-4..4->0-127,
-//                 'wave'=waveform, 'raw'=pass value*127, 'sub_harm'=0-1->0-127, 'quality'=0-3
+// Map TypeScript param index (0-69) to [WASM bridge index, valueTransform]
+// valueTransform: 'bool01'=0/1->0/127, 'uni'=0-1->0-127, 'bi'=-1..1->0-127,
+//                 'oct'=octave->PCoarseDetune, 'detune'=-1..1->0..16383,
+//                 'wave'=waveform, 'raw'=pass value*127, 'sub_harm'=0-1->0-127
 const PARAM_MAP = [
-  // ADDsynth (TS 0-19)
+  // ADDsynth global (TS 0-4)
   [10, 'bool01'],  // 0:  ADD_ENABLE -> P_ADD_ENABLE
   [11, 'uni'],     // 1:  ADD_VOLUME -> P_ADD_VOLUME
   [12, 'bi'],      // 2:  ADD_PANNING -> P_ADD_PANNING
   [13, 'detune'],  // 3:  ADD_DETUNE -> P_ADD_DETUNE
-  [14, 'oct'],     // 4:  ADD_OCTAVE -> P_ADD_COARSE_DETUNE (octave in coarse)
+  [14, 'oct'],     // 4:  ADD_OCTAVE -> P_ADD_COARSE_DETUNE
+  // ADDsynth Voice 0 (TS 5-7)
   [35, 'wave'],    // 5:  ADD_V1_WAVE -> P_ADDV0_OSCIL_SHAPE
   [31, 'uni'],     // 6:  ADD_V1_VOLUME -> P_ADDV0_VOLUME
   [33, 'detune'],  // 7:  ADD_V1_DETUNE -> P_ADDV0_DETUNE
-  [35, 'wave'],    // 8:  ADD_V2_WAVE (voice 0 only in bridge - mapped same)
-  [31, 'uni'],     // 9:  ADD_V2_VOLUME
-  [33, 'detune'],  // 10: ADD_V2_DETUNE
-  [34, 'oct'],     // 11: ADD_V2_OCTAVE
-  [35, 'wave'],    // 12: ADD_V3_WAVE
-  [31, 'uni'],     // 13: ADD_V3_VOLUME
-  [33, 'detune'],  // 14: ADD_V3_DETUNE
-  [34, 'oct'],     // 15: ADD_V3_OCTAVE
-  [35, 'wave'],    // 16: ADD_V4_WAVE
-  [31, 'uni'],     // 17: ADD_V4_VOLUME
-  [33, 'detune'],  // 18: ADD_V4_DETUNE
-  [34, 'oct'],     // 19: ADD_V4_OCTAVE
+  // ADDsynth Voice 1 (TS 8-11)
+  [134, 'wave'],   // 8:  ADD_V2_WAVE -> P_ADDV1_OSCIL_SHAPE
+  [131, 'uni'],    // 9:  ADD_V2_VOLUME -> P_ADDV1_VOLUME
+  [132, 'detune'], // 10: ADD_V2_DETUNE -> P_ADDV1_DETUNE
+  [133, 'oct'],    // 11: ADD_V2_OCTAVE -> P_ADDV1_COARSE_DETUNE
+  // ADDsynth Voice 2 (TS 12-15)
+  [144, 'wave'],   // 12: ADD_V3_WAVE -> P_ADDV2_OSCIL_SHAPE
+  [141, 'uni'],    // 13: ADD_V3_VOLUME -> P_ADDV2_VOLUME
+  [142, 'detune'], // 14: ADD_V3_DETUNE -> P_ADDV2_DETUNE
+  [143, 'oct'],    // 15: ADD_V3_OCTAVE -> P_ADDV2_COARSE_DETUNE
+  // ADDsynth Voice 3 (TS 16-19)
+  [154, 'wave'],   // 16: ADD_V4_WAVE -> P_ADDV3_OSCIL_SHAPE
+  [151, 'uni'],    // 17: ADD_V4_VOLUME -> P_ADDV3_VOLUME
+  [152, 'detune'], // 18: ADD_V4_DETUNE -> P_ADDV3_DETUNE
+  [153, 'oct'],    // 19: ADD_V4_OCTAVE -> P_ADDV3_COARSE_DETUNE
   // SUBsynth (TS 20-34)
   [50, 'bool01'],  // 20: SUB_ENABLE
   [51, 'uni'],     // 21: SUB_VOLUME
@@ -46,12 +51,12 @@ const PARAM_MAP = [
   [54, 'uni'],     // 26: SUB_BANDWIDTH_SCALE
   [57, 'raw8'],    // 27: SUB_NUM_HARMONICS -> P_SUB_NUM_STAGES
   [58, 'raw4'],    // 28: SUB_MAG_TYPE
-  [59, 'uni'],     // 29: SUB_HARM_1 -> P_SUB_START (mapped to start for now)
-  [59, 'uni'],     // 30-34: SUB_HARM_2-6 (limited mapping)
-  [59, 'uni'],
-  [59, 'uni'],
-  [59, 'uni'],
-  [59, 'uni'],
+  [160, 'uni'],    // 29: SUB_HARM_1 -> P_SUB_HMAG0
+  [161, 'uni'],    // 30: SUB_HARM_2 -> P_SUB_HMAG1
+  [162, 'uni'],    // 31: SUB_HARM_3 -> P_SUB_HMAG2
+  [163, 'uni'],    // 32: SUB_HARM_4 -> P_SUB_HMAG3
+  [164, 'uni'],    // 33: SUB_HARM_5 -> P_SUB_HMAG4
+  [165, 'uni'],    // 34: SUB_HARM_6 -> P_SUB_HMAG5
   // PADsynth (TS 35-44)
   [60, 'bool01'],  // 35: PAD_ENABLE
   [61, 'uni'],     // 36: PAD_VOLUME
@@ -69,16 +74,16 @@ const PARAM_MAP = [
   [73, 'uni'],     // 47: FILTER_RESONANCE
   [94, 'uni'],     // 48: FILTER_ENV_AMOUNT -> P_FILTENV_DEPTH
   [78, 'uni'],     // 49: FILTER_VELOCITY -> P_FILTER_VELSCALE
-  [90, 'uni'],     // 50: FILTER_ATTACK -> P_FILTENV_ATTACK
-  [91, 'uni'],     // 51: FILTER_DECAY -> P_FILTENV_DECAY
-  [92, 'uni'],     // 52: FILTER_SUSTAIN -> P_FILTENV_SUSTAIN
-  [93, 'uni'],     // 53: FILTER_RELEASE -> P_FILTENV_RELEASE
+  null,            // 50: FILTER_ATTACK (use WASM defaults)
+  null,            // 51: FILTER_DECAY
+  null,            // 52: FILTER_SUSTAIN
+  null,            // 53: FILTER_RELEASE
   [76, 'uni'],     // 54: FILTER_KEY_TRACK -> P_FILTER_TRACKING
-  // Amp envelope (TS 55-58)
-  [80, 'uni'],     // 55: AMP_ATTACK -> P_AMPENV_ATTACK
-  [81, 'uni'],     // 56: AMP_DECAY -> P_AMPENV_DECAY
-  [82, 'uni'],     // 57: AMP_SUSTAIN -> P_AMPENV_SUSTAIN
-  [83, 'uni'],     // 58: AMP_RELEASE -> P_AMPENV_RELEASE
+  // Amp envelope (TS 55-58) — SKIP: setting raw ints into float fields corrupts state
+  null,              // 55: AMP_ATTACK (use WASM defaults)
+  null,              // 56: AMP_DECAY
+  null,              // 57: AMP_SUSTAIN
+  null,              // 58: AMP_RELEASE
   // Effects (TS 59-69)
   [126, 'uni'],    // 59: REVERB_WET -> P_REVERB_MIX
   [121, 'uni'],    // 60: REVERB_SIZE -> P_EFX1_PRESET (mapped as preset)
@@ -98,7 +103,12 @@ function transformValue(value, type) {
     case 'bool01': return value > 0.5 ? 127 : 0;
     case 'uni': return value * 127;                    // 0..1 -> 0..127
     case 'bi': return (value + 1) * 63.5;             // -1..1 -> 0..127
-    case 'oct': return (value + 4) * (127 / 8);       // -4..4 -> 0..127
+    case 'oct': {                                      // -4..4 octave -> PCoarseDetune encoding
+      // PCoarseDetune: octave = value/1024, cdetune = value%1024
+      // octave * 1024 encodes the octave shift; negative uses 16-octave wrap
+      const oct = Math.round(value);
+      return oct >= 0 ? oct * 1024 : (oct + 16) * 1024;
+    }
     case 'detune': return 8192 + value * 8191;        // -1..1 -> 0..16383 (fine detune)
     case 'wave': return Math.round(value);             // waveform index
     case 'raw4': return Math.round(value * 3);         // 0..3 range
@@ -184,6 +194,10 @@ class ZynAddSubFXProcessor extends AudioWorkletProcessor {
 
           const sr = data.sampleRate || sampleRate;
           this.instance = this.module._zasfx_create(sr);
+          if (!this.instance) {
+            this.port.postMessage({ type: 'error', error: 'zasfx_create returned null' });
+            return;
+          }
           this.leftPtr = this.module._malloc(128 * 4);
           this.rightPtr = this.module._malloc(128 * 4);
           this.ready = true;
@@ -209,6 +223,31 @@ class ZynAddSubFXProcessor extends AudioWorkletProcessor {
           const wasmIdx = mapping[0];
           const wasmVal = transformValue(data.value, mapping[1]);
           this.module._zasfx_set_param(this.instance, wasmIdx, wasmVal);
+        }
+        break;
+      }
+      case 'setParamRaw': {
+        if (!this.ready) break;
+        this.module._zasfx_set_param(this.instance, data.index, data.value);
+        break;
+      }
+      case 'loadPresetXML': {
+        if (!this.ready || !data.xmlBytes) {
+          console.warn('[ZASFX Worklet] loadPresetXML: not ready or no xmlBytes', this.ready, !!data.xmlBytes);
+          break;
+        }
+        try {
+          const xmlBytes = data.xmlBytes;
+          const xmlLen = xmlBytes.length;
+          const xmlPtr = this.module._malloc(xmlLen + 1);
+          const heap = new Uint8Array(this.module.wasmMemory.buffer);
+          heap.set(xmlBytes, xmlPtr);
+          heap[xmlPtr + xmlLen] = 0; // null-terminate
+          const result = this.module._zasfx_load_preset_xml(this.instance, xmlPtr, xmlLen);
+          this.module._free(xmlPtr);
+          this.port.postMessage({ type: 'presetLoaded', result, name: data.name || '' });
+        } catch (err) {
+          this.port.postMessage({ type: 'presetError', error: String(err.message || err) });
         }
         break;
       }
@@ -245,12 +284,16 @@ class ZynAddSubFXProcessor extends AudioWorkletProcessor {
 
     this.module._zasfx_process(this.instance, this.leftPtr, this.rightPtr, n);
 
-    const heap = this.module.HEAPF32;
+    const heap = this.module.HEAPF32 ||
+      (this.module.wasmMemory && new Float32Array(this.module.wasmMemory.buffer));
+    if (!heap || heap.length === 0) return true;
+
     const lo = this.leftPtr >> 2;
     const ro = this.rightPtr >> 2;
+    const gain = 5.0;
     for (let i = 0; i < n; i++) {
-      left[i] = heap[lo + i];
-      right[i] = heap[ro + i];
+      left[i] = heap[lo + i] * gain;
+      right[i] = heap[ro + i] * gain;
     }
     return true;
   }

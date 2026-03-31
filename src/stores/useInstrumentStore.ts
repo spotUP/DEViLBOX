@@ -297,6 +297,7 @@ export const useInstrumentStore = create<InstrumentStore>()(
         updates.setbfree ||
         updates.synthv1 ||
         updates.monique ||
+        updates.vl1 ||
         updates.talNoizeMaker ||
         updates.aeolus ||
         updates.fluidsynth ||
@@ -527,12 +528,17 @@ export const useInstrumentStore = create<InstrumentStore>()(
             const zynthianConfigMap: Record<string, string> = {
               MdaEPiano: 'mdaEPiano', MdaJX10: 'mdaJX10', MdaDX10: 'mdaDX10',
               AMSynth: 'amsynth', RaffoSynth: 'raffo', CalfMono: 'calfMono',
-              SetBfree: 'setbfree', SynthV1: 'synthv1', Monique: 'monique',
+              SetBfree: 'setbfree', SynthV1: 'synthv1', Monique: 'monique', VL1: 'vl1',
               TalNoizeMaker: 'talNoizeMaker', Aeolus: 'aeolus', FluidSynth: 'fluidsynth',
               Sfizz: 'sfizz', ZynAddSubFX: 'zynaddsubfx',
             };
             const zynthConfigKey = zynthianConfigMap[updatedInstrument.synthType];
             if (zynthConfigKey) {
+              // ZynAddSubFX XML presets require synth recreation (native XML loading)
+              if (zynthConfigKey === 'zynaddsubfx' && (updates as any).zynaddsubfxXmlPreset) {
+                engine.invalidateInstrument(id);
+                return;
+              }
               const synthConfig = (updatedInstrument as any)[zynthConfigKey];
               if (synthConfig && (updates as any)[zynthConfigKey]) {
                 engine.updateComplexSynthParameters(id, synthConfig);
@@ -577,7 +583,7 @@ export const useInstrumentStore = create<InstrumentStore>()(
             }
 
             // Standard Tone.js synths: update in-place instead of recreating
-            const toneJsSynthTypes = ['Synth', 'FMSynth', 'AMSynth', 'MonoSynth', 'DuoSynth', 'PluckSynth',
+            const toneJsSynthTypes = ['Synth', 'FMSynth', 'ToneAM', 'MonoSynth', 'DuoSynth', 'PluckSynth',
               'MembraneSynth', 'MetalSynth', 'NoiseSynth'];
             if (toneJsSynthTypes.includes(updatedInstrument.synthType) &&
                 (updates.oscillator || updates.envelope || updates.filter || updates.filterEnvelope || updates.volume !== undefined)) {
