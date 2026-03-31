@@ -28,7 +28,7 @@ export function createToneJSSynth(config: InstrumentConfig): Tone.ToneAudioNode 
     case 'MonoSynth': return createMonoSynth(config);
     case 'DuoSynth': return createDuoSynth(config);
     case 'FMSynth': return createFMSynth(config);
-    case 'AMSynth': return createAMSynth(config);
+    case 'ToneAM': return createAMSynth(config);
     case 'PluckSynth': return createPluckSynth(config);
     case 'MetalSynth': return createMetalSynth(config);
     case 'MembraneSynth': return createMembraneSynth(config);
@@ -268,7 +268,7 @@ export function createAMSynth(config: InstrumentConfig): Tone.ToneAudioNode {
       sustain: (config.envelope?.sustain ?? 50) / 100,
       release: (config.envelope?.release ?? 1000) / 1000,
     },
-    volume: getNormalizedVolume('AMSynth', config.volume),
+    volume: getNormalizedVolume('ToneAM', config.volume),
   });
   // Wrap to prevent voice leak on rapid retrigger
   return {
@@ -573,7 +573,7 @@ export function createPolySynth(config: InstrumentConfig): Tone.ToneAudioNode {
   // Select voice type
   let VoiceClass: typeof Tone.Synth | typeof Tone.FMSynth | typeof Tone.AMSynth = Tone.Synth;
   if (psConfig.voiceType === 'FMSynth') VoiceClass = Tone.FMSynth;
-  else if (psConfig.voiceType === 'AMSynth') VoiceClass = Tone.AMSynth;
+  else if (psConfig.voiceType === 'ToneAM') VoiceClass = Tone.AMSynth;
 
   const synth = new Tone.PolySynth(VoiceClass as any, {
     oscillator: {

@@ -79,7 +79,7 @@ import {
   createMdaEPiano,
   createMdaJX10,
   createMdaDX10,
-  createAMSynth,
+  createAmsynth,
   createRaffoSynth,
   createCalfMono,
   createSetBfree,
@@ -87,6 +87,7 @@ import {
   createTalNoizeMaker,
   createAeolus,
   createMonique,
+  createVL1,
   createFluidSynth,
   createSfizz,
   createZynAddSubFX,
@@ -182,8 +183,8 @@ export class InstrumentFactory {
         instrument = createToneJSSynth({ ...config, synthType: "FMSynth" })!;
         break;
 
-      case 'AMSynth':
-        instrument = createToneJSSynth({ ...config, synthType: "AMSynth" })!;
+      case 'ToneAM':
+        instrument = createToneJSSynth({ ...config, synthType: "ToneAM" })!;
         break;
 
       case 'PluckSynth':
@@ -401,8 +402,8 @@ export class InstrumentFactory {
       case 'MdaDX10':
         instrument = createMdaDX10(config);
         break;
-      case 'AMSynth':
-        instrument = createAMSynth(config);
+      case 'Amsynth':
+        instrument = createAmsynth(config);
         break;
       case 'RaffoSynth':
         instrument = createRaffoSynth(config);
@@ -424,6 +425,9 @@ export class InstrumentFactory {
         break;
       case 'Monique':
         instrument = createMonique(config);
+        break;
+      case 'VL1':
+        instrument = createVL1(config);
         break;
       case 'FluidSynth':
         instrument = createFluidSynth(config);

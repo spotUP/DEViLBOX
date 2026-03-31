@@ -29,7 +29,9 @@ class AMSynthProcessor extends AudioWorkletProcessor {
         break;
       case 'noteOn':
         if (this.engine) {
+          console.log('[AMSynth Worklet] noteOn:', data.note, 'vel:', data.velocity);
           this.module._amsynth_note_on(this.engine, data.note, data.velocity);
+          this._audioDetected = false;
         }
         break;
       case 'noteOff':
@@ -260,6 +262,18 @@ class AMSynthProcessor extends AudioWorkletProcessor {
 
     outputL.set(this.outputBufferL.subarray(0, numSamples));
     outputR.set(this.outputBufferR.subarray(0, numSamples));
+
+    // Audio level monitoring
+    if (!this._audioDetected) this._audioDetected = false;
+    let peak = 0;
+    for (let i = 0; i < numSamples; i++) {
+      const v = Math.abs(outputL[i]);
+      if (v > peak) peak = v;
+    }
+    if (peak > 0.0001 && !this._audioDetected) {
+      this._audioDetected = true;
+      this.port.postMessage({ type: 'audioLevel', peak, status: 'producing audio' });
+    }
 
     return true;
   }

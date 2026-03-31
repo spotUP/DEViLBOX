@@ -38,7 +38,7 @@ const CORE_SYNTH_TYPES: SynthType[] = [
   'MonoSynth',
   'DuoSynth',
   'FMSynth',
-  'AMSynth',
+  'ToneAM',
   'PluckSynth',
   'MetalSynth',
   'MembraneSynth',
@@ -822,7 +822,7 @@ describe('Parameter Validation Tests', () => {
 // ============================================
 
 describe('TriggerAttack/Release Tests', () => {
-  const testableCoreSynths: SynthType[] = ['Synth', 'MonoSynth', 'FMSynth', 'AMSynth'];
+  const testableCoreSynths: SynthType[] = ['Synth', 'MonoSynth', 'FMSynth', 'ToneAM'];
 
   it.each(testableCoreSynths)('%s should not throw when triggering attack', (synthType) => {
     testSynthCreation(synthType, (synth) => {
@@ -1587,7 +1587,7 @@ describe('Byte Order and Data Format Tests', () => {
 describe('Synth Type Completeness Audit', () => {
   // All synth types from SynthType definition
   const ALL_SYNTH_TYPES: SynthType[] = [
-    'Synth', 'MonoSynth', 'DuoSynth', 'FMSynth', 'AMSynth',
+    'Synth', 'MonoSynth', 'DuoSynth', 'FMSynth', 'ToneAM',
     'PluckSynth', 'MetalSynth', 'MembraneSynth', 'NoiseSynth',
     'TB303', 'Sampler', 'Player', 'Wavetable', 'GranularSynth',
     'SuperSaw', 'PolySynth', 'Organ', 'DrumMachine', 'ChipSynth',
@@ -2098,7 +2098,7 @@ describe('State Consistency Tests', () => {
 
 describe('Default Value Validation', () => {
   const synthsWithDefaults: SynthType[] = [
-    'Synth', 'MonoSynth', 'FMSynth', 'AMSynth',
+    'Synth', 'MonoSynth', 'FMSynth', 'ToneAM',
     'Synare', 'Sam', 'DubSiren', 'SpaceLaser', 'V2',
   ];
 
@@ -2409,7 +2409,7 @@ describe('Fallback Detection Tests', () => {
     'Synth': ['Synth'],
     'MonoSynth': ['MonoSynth'],
     'FMSynth': ['PolySynth', 'FMSynth'], // Can be wrapped in PolySynth
-    'AMSynth': ['PolySynth', 'AMSynth'],
+    'ToneAM': ['PolySynth', 'ToneAM'],
     'TB303': ['DB303Synth', 'Object'],
     'Furnace': ['FurnaceSynth', 'Object'],
     'FurnaceGB': ['FurnaceSynth', 'Object'],
@@ -2471,7 +2471,7 @@ describe('Fallback Detection Tests', () => {
 
   describe('Constructor Type Verification', () => {
     const synthTypesToCheck: SynthType[] = [
-      'Synth', 'MonoSynth', 'FMSynth', 'AMSynth', 'TB303',
+      'Synth', 'MonoSynth', 'FMSynth', 'ToneAM', 'TB303',
       'Furnace', 'Synare', 'DubSiren', 'SpaceLaser', 'V2', 'Sam',
     ];
 

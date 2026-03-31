@@ -158,23 +158,22 @@ registerVSTBridge({
   configKey: 'monique',
   // Maps MoniqueConfig keys → WASM param IDs (C++ MoniqueParams enum, 0-119)
   paramMapping: {
-    // Oscillators
-    osc1Wave: 5, osc1FmPower: 7, osc1Octave: 6, osc1Sync: 8,
-    osc2Wave: 9, osc2FmPower: 11, osc2Octave: 10, osc2Sync: 12,
-    osc3Wave: 13, osc3FmPower: 15, osc3Octave: 14, osc3Sync: 16,
-    fmMulti: 17, fmSwing: 19, fmPhase: 18, masterShift: 20,
-    // Filter 1 (21-27) + routing (87-89)
+    // Master (0-4)
+    volume: 0, glide: 1, octaveOffset: 2, noteOffset: 3, sync: 4,
+    // Oscillators (5-20)
+    osc1Wave: 5, osc1Octave: 6, osc1FmPower: 7, osc1Sync: 8,
+    osc2Wave: 9, osc2Octave: 10, osc2FmPower: 11, osc2Sync: 12,
+    osc3Wave: 13, osc3Octave: 14, osc3FmPower: 15, osc3Sync: 16,
+    fmMulti: 17, fmPhase: 18, fmSwing: 19, masterShift: 20,
+    // Filter 1 (21-27)
     filter1Type: 21, filter1Cutoff: 22, filter1Resonance: 23,
-    filter1Distortion: 24, filter1Output: 25, filter1Pan: 26,
-    filter1ModMix: 27, filter1Input0: 87, filter1Input1: 88, filter1Input2: 89,
-    // Filter 2 (28-34) + routing (90-92)
+    filter1Distortion: 24, filter1Output: 25, filter1Pan: 26, filter1ModMix: 27,
+    // Filter 2 (28-34)
     filter2Type: 28, filter2Cutoff: 29, filter2Resonance: 30,
-    filter2Distortion: 31, filter2Output: 32, filter2Pan: 33,
-    filter2ModMix: 34, filter2Input0: 90, filter2Input1: 91, filter2Input2: 92,
-    // Filter 3 (35-41) + routing (93-95)
+    filter2Distortion: 31, filter2Output: 32, filter2Pan: 33, filter2ModMix: 34,
+    // Filter 3 (35-41)
     filter3Type: 35, filter3Cutoff: 36, filter3Resonance: 37,
-    filter3Distortion: 38, filter3Output: 39, filter3Pan: 40,
-    filter3ModMix: 41, filter3Input0: 93, filter3Input1: 94, filter3Input2: 95,
+    filter3Distortion: 38, filter3Output: 39, filter3Pan: 40, filter3ModMix: 41,
     // Envelope 1 — Filter 1 (42-47)
     env1Attack: 42, env1Decay: 43, env1Sustain: 44,
     env1Retrigger: 45, env1Release: 46, env1Shape: 47,
@@ -191,15 +190,25 @@ registerVSTBridge({
     lfo1Speed: 66, lfo1Wave: 67, lfo1Phase: 68,
     lfo2Speed: 69, lfo2Wave: 70, lfo2Phase: 71,
     lfo3Speed: 72, lfo3Wave: 73, lfo3Phase: 74,
+    // MFOs — Morphing Oscillators (75-86)
+    mfo1Speed: 75, mfo1Wave: 76, mfo1Phase: 77,
+    mfo2Speed: 78, mfo2Wave: 79, mfo2Phase: 80,
+    mfo3Speed: 81, mfo3Wave: 82, mfo3Phase: 83,
+    mfo4Speed: 84, mfo4Wave: 85, mfo4Phase: 86,
+    // Routing — filter input levels (87-95)
+    filter1Input0: 87, filter1Input1: 88, filter1Input2: 89,
+    filter2Input0: 90, filter2Input1: 91, filter2Input2: 92,
+    filter3Input0: 93, filter3Input1: 94, filter3Input2: 95,
     // Effects (96-103)
-    reverbRoom: 100, reverbMix: 101,
-    chorusMod: 102,
-    delay: 98, delayPan: 99,
-    eqBypass: 119,
-    // Master (0-4) + FX shape/dist (96-97)
-    volume: 0, shape: 97, distortion: 96,
-    glide: 1, octaveOffset: 2, noteOffset: 3,
-    effectBypass: 103,
+    distortion: 96, shape: 97, delay: 98, delayPan: 99,
+    reverbRoom: 100, reverbMix: 101, chorusMod: 102, effectBypass: 103,
+    // Morph groups (104-107)
+    morph1: 104, morph2: 105, morph3: 106, morph4: 107,
+    // Arpeggiator (108-111)
+    arpOn: 108, arpSequencer: 109, arpSpeed: 110, arpShuffle: 111,
+    // EQ (112-119)
+    eqBand1: 112, eqBand2: 113, eqBand3: 114, eqBand4: 115,
+    eqBand5: 116, eqBand6: 117, eqBand7: 118, eqBypass: 119,
   },
 });
 
@@ -234,19 +243,9 @@ registerVSTBridge({
 });
 
 // ---------------------------------------------------------------------------
-// amsynth — Classic Analog Modeling Synthesizer by Nick Dowell (GPL2)
-// 2 oscillators, filter, 2 envelopes, LFO, Freeverb reverb, distortion
-// 41 parameters across 11 groups
+// amsynth — handled by dedicated AMSynthSynth class (not VSTBridge)
+// See src/engine/amsynth/AMSynthSynth.ts
 // ---------------------------------------------------------------------------
-registerVSTBridge({
-  id: 'Amsynth',
-  name: 'amsynth (Analog)',
-  wasmDir: 'amsynth',
-  wasmFile: 'Amsynth',
-  synthClassName: 'AmsynthSynth',
-  moduleFactoryName: 'createAmsynthModule',
-  volumeOffsetDb: 0,
-});
 
 // ---------------------------------------------------------------------------
 // OB-Xf — Oberheim OB-X/OB-Xa Modeling by Surge Synth Team (GPL3)
