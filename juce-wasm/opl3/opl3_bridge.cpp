@@ -156,6 +156,9 @@ static uint8_t allocVoice() {
 // ── Exported C API ──────────────────────────────────────────────────────
 extern "C" {
 
+// Forward declarations
+EMSCRIPTEN_KEEPALIVE void oplNoteOff(uint8_t note);
+
 EMSCRIPTEN_KEEPALIVE
 int oplInit(float sampleRate) {
     if (g_opl) delete g_opl;
@@ -313,8 +316,5 @@ int oplGetActiveVoiceCount() {
         if (g_opl->voices[i].active) count++;
     return count;
 }
-
-// Forward declaration needed for oplNoteOn's velocity==0 path
-EMSCRIPTEN_KEEPALIVE void oplNoteOff(uint8_t note);
 
 } // extern "C"
