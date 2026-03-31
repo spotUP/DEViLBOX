@@ -14,6 +14,7 @@ export interface ThemeSnapshot {
   bg: string;
   rowNormal: string;
   rowHighlight: string;
+  rowSecondaryHighlight: string;
   border: string;
   trackerBorder: string;
   textNote: string;
@@ -43,6 +44,9 @@ export interface CellSnapshot {
   effTyp6?: number;  eff6?: number;
   effTyp7?: number;  eff7?: number;
   effTyp8?: number;  eff8?: number;
+  note2?: number; instrument2?: number; volume2?: number;
+  note3?: number; instrument3?: number; volume3?: number;
+  note4?: number; instrument4?: number; volume4?: number;
   flag1?: number;
   flag2?: number;
   probability?: number;
@@ -57,6 +61,7 @@ export interface ChannelSnapshot {
   solo?: boolean;
   collapsed?: boolean;
   effectCols: number; // from channelMeta.effectCols, default 2
+  noteCols?: number;  // from channelMeta.noteCols, default 1
   rows: CellSnapshot[];
   /** Per-channel column specs — overrides global ui.columns when present */
   columnSpecs?: ColumnSpec[];
@@ -102,6 +107,7 @@ export interface UIStateSnapshot {
   recordMode: boolean;
   rowHeight: number;           // Derived from trackerZoom (80-200%)
   rowHighlightInterval: number; // Every N rows gets a highlight color
+  rowSecondaryHighlightInterval: number; // Every M rows gets a stronger highlight (bar lines)
   showBeatLabels: boolean;     // Show beat.tick format in line number gutter
   noteDisplayOffset: number;   // Semitones to add to note for display (e.g. -12 for MOD)
   columns?: ColumnSpec[];      // When present, renderer uses column-driven path instead of fixed Note/Inst/Vol/Eff

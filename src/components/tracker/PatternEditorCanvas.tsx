@@ -1313,6 +1313,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
       bg:                  theme.colors.trackerRowEven,
       rowNormal:           theme.colors.trackerRowOdd,
       rowHighlight:        theme.colors.trackerRowHighlight,
+      rowSecondaryHighlight: theme.colors.accent + '33',
       border:              theme.colors.border,
       trackerBorder:       theme.colors.trackerBorder,
       textNote:            theme.colors.textSecondary,
@@ -1340,6 +1341,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
       recordMode:         editor.recordMode,
       rowHeight:          Math.round(24 * (ui.trackerZoom / 100)),
       rowHighlightInterval: ui.rowHighlightInterval,
+      rowSecondaryHighlightInterval: ui.rowSecondaryHighlightInterval,
       showBeatLabels:     ui.showBeatLabels,
       noteDisplayOffset:  getTrackerReplayer().getSong()?.noteDisplayOffset ?? 0,
     };

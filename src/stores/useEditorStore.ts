@@ -66,6 +66,10 @@ interface EditorStore {
   // PT-style effect macro slots (10 slots for storing effect commands)
   effectMacros: Array<{ effTyp: number; eff: number } | null>;
 
+  // PT-style sample bank (0 = low bank 0-15, 16 = high bank 16-31)
+  ptSampleBank: number;
+  setPtSampleBank: (bank: number) => void;
+
   // Jump positions
   ptnJumpPos: number[];
 
@@ -160,6 +164,7 @@ export const useEditorStore = create<EditorStore>()(
 
     ptnJumpPos: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
     effectMacros: Array(10).fill(null) as Array<{ effTyp: number; eff: number } | null>,
+    ptSampleBank: 0,
     activeBehavior: DEFAULT_BEHAVIOR,
 
     // ── Editor behavior ──────────────────────────────────────────────────
@@ -167,6 +172,9 @@ export const useEditorStore = create<EditorStore>()(
       set((state) => {
         state.activeBehavior = getBehaviorForScheme(schemeName) as any;
       }),
+
+    setPtSampleBank: (bank) =>
+      set((state) => { state.ptSampleBank = bank; }),
 
     // ── Editor settings ──────────────────────────────────────────────────
 

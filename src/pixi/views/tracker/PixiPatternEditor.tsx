@@ -210,6 +210,7 @@ interface RenderParams {
   scrollLeft: number;
   rowHeight: number;
   rowHighlightInterval: number;
+  rowSecondaryHighlightInterval: number;
   channelMuted: boolean[];
   channelSolo: boolean[];
   useHex: boolean;
@@ -290,12 +291,20 @@ function renderGrid(g: GraphicsType, p: RenderParams, vStart: number): void {
 
     if (isInPattern || isGhost || songRow) {
       const actualRow = songRow ? songRow.row : rowNum;
+      const isSecondaryHighlight = p.rowSecondaryHighlightInterval > 0 && actualRow >= 0 && actualRow % p.rowSecondaryHighlightInterval === 0;
       const isHighlight = actualRow >= 0 && actualRow % p.rowHighlightInterval === 0;
       g.rect(0, y, p.width, p.rowHeight);
-      g.fill({
-        color: isHighlight ? p.theme.trackerRowHighlight.color : p.theme.trackerRowOdd.color,
-        alpha: (isHighlight ? p.theme.trackerRowHighlight.alpha : p.theme.trackerRowOdd.alpha) * ghostAlpha,
-      });
+      if (isSecondaryHighlight) {
+        g.fill({
+          color: p.theme.accent.color,
+          alpha: 0.2 * ghostAlpha,
+        });
+      } else {
+        g.fill({
+          color: isHighlight ? p.theme.trackerRowHighlight.color : p.theme.trackerRowOdd.color,
+          alpha: (isHighlight ? p.theme.trackerRowHighlight.alpha : p.theme.trackerRowOdd.alpha) * ghostAlpha,
+        });
+      }
     }
 
     // Center-line highlight moved to renderOverlay to avoid grid redraw during scrolling
@@ -482,7 +491,8 @@ function generateLabels(p: RenderParams, vStart: number, activeRow = -1): LabelD
       }
     }
 
-    const isHighlightRow = actualRow % p.rowHighlightInterval === 0;
+    const isSecondaryHL = p.rowSecondaryHighlightInterval > 0 && actualRow % p.rowSecondaryHighlightInterval === 0;
+    const isHighlightRow = isSecondaryHL || actualRow % p.rowHighlightInterval === 0;
     // Glow trail: rows near the active row lerp toward white, fading over TRAIL_ROWS
     const TRAIL_ROWS = 3;
     // Glow trails BEHIND the playhead: active row = full white, rows already
@@ -664,6 +674,7 @@ export const PixiPatternEditor: React.FC<PixiPatternEditorProps> = ({ width, hei
   const useHex = useUIStore(s => s.useHexNumbers);
   const blankEmpty = useUIStore(s => s.blankEmptyCells);
   const rowHighlightInterval = useUIStore(s => s.rowHighlightInterval);
+  const rowSecondaryHighlightInterval = useUIStore(s => s.rowSecondaryHighlightInterval);
   const showBeatLabels = useUIStore(s => s.showBeatLabels);
 
   // ── Cell context menu (GL-native via PixiContextMenu) ─────────────────────
@@ -1345,7 +1356,7 @@ export const PixiPatternEditor: React.FC<PixiPatternEditorProps> = ({ width, hei
     width, gridHeight, theme, visibleLines, topLines, baseY, patternLength,
     showGhostPatterns, trackerVisualBg, numChannels, channelOffsets, channelWidths,
     displayPattern, displayPatternIndex, patterns, isPlaying, recordMode,
-    scrollLeft: scrollLeftRef.current, rowHeight, rowHighlightInterval,
+    scrollLeft: scrollLeftRef.current, rowHeight, rowHighlightInterval, rowSecondaryHighlightInterval,
     channelMuted, channelSolo, useHex, blankEmpty, showBeatLabels, columnVisibility,
     currentPatternIndex, playbackRow: playbackRowRef.current, playbackPatternIdx,
     noteDisplayOffset: _song?.noteDisplayOffset ?? 0,
@@ -1460,7 +1471,7 @@ export const PixiPatternEditor: React.FC<PixiPatternEditorProps> = ({ width, hei
   }, [width, gridHeight, theme, visibleLines, baseY, patternLength,
       showGhostPatterns, trackerVisualBg, numChannels, channelOffsets, channelWidths,
       displayPattern, displayPatternIndex, patterns, isPlaying, recordMode, scrollLeft,
-      rowHeight, rowHighlightInterval, channelMuted, channelSolo, useHex, blankEmpty,
+      rowHeight, rowHighlightInterval, rowSecondaryHighlightInterval, channelMuted, channelSolo, useHex, blankEmpty,
       showBeatLabels, columnVisibility, currentPatternIndex, playbackPatternIdx,
       imperativeRedraw]);
 

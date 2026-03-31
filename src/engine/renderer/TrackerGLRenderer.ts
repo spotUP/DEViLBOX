@@ -222,6 +222,7 @@ export class TrackerGLRenderer {
     bg:                  [0,0,0,1] as [number,number,number,number],
     rowNormal:           [0,0,0,1] as [number,number,number,number],
     rowHighlight:        [0,0,0,1] as [number,number,number,number],
+    rowSecondaryHighlight: [0,0,0,1] as [number,number,number,number],
     centerLine:          [0,0,0,1] as [number,number,number,number],
     rowCurrent:          [0,0,0,1] as [number,number,number,number],
     cursor:              [0,0,0,1] as [number,number,number,number],
@@ -414,6 +415,7 @@ export class TrackerGLRenderer {
       this.colors.bg                  = parseColor(theme.bg);
       this.colors.rowNormal           = parseColor(theme.rowNormal);
       this.colors.rowHighlight        = parseColor(theme.rowHighlight);
+      this.colors.rowSecondaryHighlight = parseColor(theme.rowSecondaryHighlight);
       this.colors.centerLine          = parseRgba(theme.accentGlow);
       this.colors.rowCurrent          = parseColor(theme.rowCurrent);
       this.colors.cursor              = parseColor(theme.accent);
@@ -454,6 +456,7 @@ export class TrackerGLRenderer {
     const centerLineTop = Math.floor(height / 2) - rowH / 2;
     const baseY = centerLineTop - topLines * rowH - smoothOffset;
     const hlInterval = ui.rowHighlightInterval ?? 4;
+    const hl2Interval = ui.rowSecondaryHighlightInterval ?? 0;
 
     // ── Clear ─────────────────────────────────────────────────────────────────
     if (ui.trackerVisualBg) {
@@ -540,8 +543,9 @@ export class TrackerGLRenderer {
       if (y + rowH < 0 || y > height) continue;
 
       if (!ui.trackerVisualBg) {
+        const isHL2 = hl2Interval > 0 && rowIndex % hl2Interval === 0;
         const isHL = rowIndex % hlInterval === 0;
-        const bgColor = isHL ? colors.rowHighlight : colors.rowNormal;
+        const bgColor = isHL2 ? colors.rowSecondaryHighlight : isHL ? colors.rowHighlight : colors.rowNormal;
         const alpha = isGhostRow ? bgColor[3] * 0.35 : bgColor[3];
         this.addRect(0, y, width, rowH, [bgColor[0], bgColor[1], bgColor[2], alpha]);
       }
@@ -665,7 +669,8 @@ export class TrackerGLRenderer {
 
       const ghostAlpha = isGhostRow ? 0.35 : 1.0;
       // Per-row alpha for ghost; per-channel mute alpha computed in channel loop below
-      const isHL = rowIndex % hlInterval === 0;
+      const isHL2b = hl2Interval > 0 && rowIndex % hl2Interval === 0;
+      const isHL = rowIndex % hlInterval === 0 || isHL2b;
 
       // Line number — use pre-computed hex/dec tables
       // Glow trails behind the playhead: active row = white, rows above fade out
