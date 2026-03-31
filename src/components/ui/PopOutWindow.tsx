@@ -114,6 +114,16 @@ export const PopOutWindow: React.FC<PopOutWindowProps> = ({
     // Also set document.title directly for browsers that need it
     popup.document.title = title;
 
+    // Replace about:blank URL with a meaningful path so the address bar
+    // doesn't show "about:blank". Works because about:blank inherits the
+    // opener's origin, making replaceState with a same-origin URL valid.
+    try {
+      const slug = title.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+      popup.history.replaceState({}, title, `/popout/${slug}`);
+    } catch {
+      // Some browsers may not allow replaceState on about:blank — that's OK
+    }
+
     const mount = popup.document.getElementById('popout-root') as HTMLDivElement;
     if (!mount) {
       console.error('[PopOutWindow] Failed to find popout-root element');
