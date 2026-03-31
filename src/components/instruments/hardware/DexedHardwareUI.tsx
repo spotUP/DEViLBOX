@@ -245,9 +245,31 @@ export const DexedHardwareUI: React.FC<DexedHardwareUIProps> = ({
           } catch { /* engine not ready */ }
         };
 
+        // MIDI callback: JUCE on-screen keyboard → JS → audio worklet
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (window as any)._dexedUIMidiCallback = (type: string, note: number, vel: number) => {
+          if (!instrumentId) return;
+          try {
+            const engine = getToneEngine();
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const instruments = (engine as any).instruments as Map<number, any>;
+            const key = (instrumentId << 16) | 0xFFFF;
+            const synth = instruments?.get(key);
+            if (!synth?._worklet) return;
+
+            if (type === 'noteOn') {
+              synth._worklet.port.postMessage({ type: 'noteOn', note, velocity: vel });
+            } else if (type === 'noteOff') {
+              synth._worklet.port.postMessage({ type: 'noteOff', note });
+            }
+          } catch { /* engine not ready */ }
+        };
+
         eventCleanups.push(() => {
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           delete (window as any)._dexedUIParamCallback;
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          delete (window as any)._dexedUIMidiCallback;
         });
 
         setLoaded(true);
@@ -274,6 +296,20 @@ export const DexedHardwareUI: React.FC<DexedHardwareUIProps> = ({
       cancelled = true;
       if (rafId) cancelAnimationFrame(rafId);
       eventCleanups.forEach((fn) => fn());
+
+      // Prevent stuck notes when switching away from hardware UI
+      if (instrumentId) {
+        try {
+          const engine = getToneEngine();
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const instruments = (engine as any).instruments as Map<number, any>;
+          const key = (instrumentId << 16) | 0xFFFF;
+          const synth = instruments?.get(key);
+          if (synth?._worklet) {
+            synth._worklet.port.postMessage({ type: 'allNotesOff' });
+          }
+        } catch { /* engine not ready */ }
+      }
 
       if (moduleRef.current) {
         moduleRef.current._dexed_ui_shutdown();

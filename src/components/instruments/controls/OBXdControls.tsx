@@ -293,6 +293,15 @@ export const OBXdControls: React.FC<OBXdControlsProps> = ({
             color={knobColor}
             size="md"
           />
+          <Knob
+            value={config.filterVelocity ?? 0.3}
+            min={0}
+            max={1}
+            onChange={(v) => onChange({ filterVelocity: v })}
+            label="Velocity"
+            color={knobColor}
+            size="md"
+          />
         </div>
 
         <div className="mt-4">
@@ -481,6 +490,15 @@ export const OBXdControls: React.FC<OBXdControlsProps> = ({
             color={knobColor}
             size="md"
           />
+          <Knob
+            value={config.voices ?? 8}
+            min={1}
+            max={8}
+            onChange={(v) => onChange({ voices: Math.round(v) })}
+            label="Voices"
+            color={knobColor}
+            size="md"
+          />
         </div>
       </div>
     </div>
@@ -607,6 +625,15 @@ export const OBXdControls: React.FC<OBXdControlsProps> = ({
             max={1}
             onChange={(v) => onChange({ drift: v })}
             label="Drift"
+            color={knobColor}
+            size="sm"
+          />
+          <Knob
+            value={config.subOscOctave ?? -1}
+            min={-2}
+            max={-1}
+            onChange={(v) => onChange({ subOscOctave: Math.round(v) as -1 | -2 })}
+            label="Sub Oct"
             color={knobColor}
             size="sm"
           />

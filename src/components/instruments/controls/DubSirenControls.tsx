@@ -284,6 +284,26 @@ export const DubSirenControls: React.FC<DubSirenControlsProps> = ({
             ))}
           </div>
 
+          {/* Filter Rolloff */}
+          <div className="flex gap-2">
+            {([-12, -24, -48, -96] as const).map((roll) => (
+              <button
+                key={roll}
+                onClick={() => updateFilter({ rolloff: roll })}
+                className={`
+                  px-3 py-1 text-xs font-bold rounded border
+                  ${config.filter.rolloff === roll
+                    ? `bg-[#2a2a2a]`
+                    : 'bg-[#1a1a1a] border-dark-borderLight text-text-muted hover:border-dark-borderLight'
+                  }
+                `}
+                style={config.filter.rolloff === roll ? { borderColor: accentColor, color: accentColor } : undefined}
+              >
+                {roll}dB
+              </button>
+            ))}
+          </div>
+
           <FilterFrequencyResponse
             filterType={config.filter.type as FilterType}
             cutoff={Math.log10(Math.max(config.filter.frequency, 20) / 20) / 3}
