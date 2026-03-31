@@ -123,6 +123,7 @@ export class TrackerCanvas2DRenderer {
     const baseRowH = ui.rowHeight ?? ROW_HEIGHT;
     const rowH = this.mobile ? Math.max(Math.round(ROW_HEIGHT * MOBILE_SCALE), baseRowH) : baseRowH;
     const hiInterval = ui.rowHighlightInterval || 4;
+    const hi2Interval = ui.rowSecondaryHighlightInterval || 0;
     const displayOffset = ui.noteDisplayOffset ?? 0;
 
     if (H < 48 || W < 48) return;
@@ -165,6 +166,8 @@ export class TrackerCanvas2DRenderer {
       } else if (selection &&
         r >= selection.startRow && r <= selection.endRow) {
         ctx.fillStyle = theme.selection;
+      } else if (hi2Interval > 0 && r % hi2Interval === 0) {
+        ctx.fillStyle = theme.rowSecondaryHighlight;
       } else if (r % hiInterval === 0) {
         ctx.fillStyle = theme.rowHighlight;
       } else {
@@ -177,8 +180,9 @@ export class TrackerCanvas2DRenderer {
     ctx.font = font;
     for (let r = startRow; r < endRow; r++) {
       const y = (r - scrollRow) * rowH;
+      const isHi2 = hi2Interval > 0 && r % hi2Interval === 0;
       const isHi = r % hiInterval === 0;
-      ctx.fillStyle = isHi ? theme.lineNumberHighlight : theme.lineNumber;
+      ctx.fillStyle = (isHi2 || isHi) ? theme.lineNumberHighlight : theme.lineNumber;
       const label = ui.useHex
         ? r.toString(16).toUpperCase().padStart(3, '0')
         : r.toString().padStart(3, ' ');
@@ -255,26 +259,39 @@ export class TrackerCanvas2DRenderer {
           }
         } else {
           // FIXED-COLUMN PATH (Note / Inst / Vol / Eff)
-          const noteVal = cell?.note ?? 0;
-          const noteText = noteStr(noteVal, displayOffset);
-          ctx.fillStyle = isPlayRow ? theme.textNoteActive
-            : noteVal === 0         ? theme.textMuted
-            :                         theme.textNote;
-          ctx.fillText(noteText, chanX + 2, y);
+          // Render all note column groups
+          const totalNoteCols = chan.noteCols ?? 1;
+          const NOTE_COL_GROUP_W = cw * 3 + 4 + 4 + cw * 2 + 4 + cw * 2 + 4; // note+inst+vol+gaps
+          for (let nc = 0; nc < totalNoteCols; nc++) {
+            const ncX = chanX + 2 + nc * NOTE_COL_GROUP_W;
+            const noteVal = nc === 0 ? (cell?.note ?? 0)
+              : nc === 1 ? (cell?.note2 ?? 0)
+              : nc === 2 ? (cell?.note3 ?? 0) : (cell?.note4 ?? 0);
+            const noteText = noteStr(noteVal, displayOffset);
+            ctx.fillStyle = isPlayRow ? theme.textNoteActive
+              : noteVal === 0 ? theme.textMuted : theme.textNote;
+            ctx.fillText(noteText, ncX, y);
 
-          const inst = cell?.instrument ?? 0;
-          ctx.fillStyle = isPlayRow ? '#ffffff' : inst === 0 ? theme.textMuted : theme.textInstrument;
-          ctx.fillText(inst === 0 ? '··' : hex2(inst), chanX + 2 + cw * 3 + 2, y);
+            const inst = nc === 0 ? (cell?.instrument ?? 0)
+              : nc === 1 ? (cell?.instrument2 ?? 0)
+              : nc === 2 ? (cell?.instrument3 ?? 0) : (cell?.instrument4 ?? 0);
+            ctx.fillStyle = isPlayRow ? '#ffffff' : inst === 0 ? theme.textMuted : theme.textInstrument;
+            ctx.fillText(inst === 0 ? '··' : hex2(inst), ncX + cw * 3 + 2, y);
 
-          const vol = cell?.volume ?? 0;
-          ctx.fillStyle = isPlayRow ? '#ffffff' : vol === 0 ? theme.textMuted : theme.textVolume;
-          ctx.fillText(vol === 0 ? '··' : hex2(vol), chanX + 2 + cw * 5 + 4, y);
+            const vol = nc === 0 ? (cell?.volume ?? 0)
+              : nc === 1 ? (cell?.volume2 ?? 0)
+              : nc === 2 ? (cell?.volume3 ?? 0) : (cell?.volume4 ?? 0);
+            ctx.fillStyle = isPlayRow ? '#ffffff' : vol === 0 ? theme.textMuted : theme.textVolume;
+            ctx.fillText(vol === 0 ? '··' : hex2(vol), ncX + cw * 5 + 4, y);
+          }
 
+          // Effects start after all note column groups
+          const effBaseX = chanX + 2 + totalNoteCols * NOTE_COL_GROUP_W;
           const eff  = cell?.effTyp ?? 0;
           const effp = cell?.eff    ?? 0;
           ctx.fillStyle = isPlayRow ? '#ffffff' : eff === 0 && effp === 0 ? theme.textMuted : theme.textEffect;
           const effStr = eff === 0 && effp === 0 ? '···' : `${hex2(eff)[1]}${hex2(effp)}`;
-          ctx.fillText(effStr, chanX + 2 + cw * 7 + 6, y);
+          ctx.fillText(effStr, effBaseX, y);
         }
       }
 

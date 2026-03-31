@@ -52,6 +52,7 @@ let ui: UIStateSnapshot = {
   recordMode: false,
   rowHeight: 24,
   rowHighlightInterval: 4,
+  rowSecondaryHighlightInterval: 16,
   showBeatLabels: false,
   noteDisplayOffset: 0,
 };

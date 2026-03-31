@@ -415,6 +415,7 @@ interface TrackerStore {
   applyAmigaSongSettings: (presetId: string) => void;
   setChannelRecordGroup: (channelIndex: number, group: 0 | 1 | 2) => void;
   getChannelsInRecordGroup: (group: 1 | 2) => number[];
+  setChannelMeta: (channelIndex: number, meta: Partial<NonNullable<import('@typedefs').ChannelData['channelMeta']>>) => void;
 
   // Clipboard
   setClipboard: (data: ClipboardData) => void;
@@ -1345,11 +1346,25 @@ export const useTrackerStore = create<TrackerStore>()(
     // Channel management
     addChannel: () =>
       set((state) => {
-        const maxChannels = MAX_CHANNELS;
+        // Use the scheme-specific maxChannels, falling back to global MAX_CHANNELS
+        const { useEditorStore: getEditorStore } = require('@stores/useEditorStore');
+        const behaviorMax = getEditorStore.getState().activeBehavior.maxChannels;
+        const maxChannels = Math.min(behaviorMax, MAX_CHANNELS);
         // Get available colors (excluding null)
         const availableColors = CHANNEL_COLORS.filter((c) => c !== null) as string[];
         // Pick a random color for the new channel
         const randomColor = availableColors[Math.floor(Math.random() * availableColors.length)];
+
+        const firstPattern = state.patterns[0];
+        if (firstPattern && firstPattern.channels.length >= maxChannels) {
+          // At limit — show message but don't add
+          if (typeof window !== 'undefined') {
+            import('@stores/useUIStore').then(({ useUIStore }) => {
+              useUIStore.getState().setStatusMessage(`MAX ${maxChannels} CHANNELS (${getEditorStore.getState().activeBehavior.name})`);
+            });
+          }
+          return;
+        }
 
         state.patterns.forEach((pattern) => {
           if (pattern.channels.length < maxChannels) {
@@ -1494,6 +1509,20 @@ export const useTrackerStore = create<TrackerStore>()(
         state.patterns.forEach((pattern) => {
           if (channelIndex >= 0 && channelIndex < pattern.channels.length) {
             pattern.channels[channelIndex].color = color;
+          }
+        });
+      }),
+
+    setChannelMeta: (channelIndex, meta) =>
+      set((state) => {
+        state.patterns.forEach((pattern) => {
+          if (channelIndex >= 0 && channelIndex < pattern.channels.length) {
+            const ch = pattern.channels[channelIndex];
+            ch.channelMeta = {
+              importedFromMOD: false,
+              ...ch.channelMeta,
+              ...meta,
+            };
           }
         });
       }),
@@ -1715,7 +1744,7 @@ export const useTrackerStore = create<TrackerStore>()(
           state.patterns = normalizedPatterns;
           state.currentPatternIndex = 0;
           useCursorStore.setState({
-            cursor: { channelIndex: 0, rowIndex: 0, columnType: 'note', digitIndex: 0 },
+            cursor: { channelIndex: 0, rowIndex: 0, noteColumnIndex: 0, columnType: 'note', digitIndex: 0 },
             selection: null,
           });
           state.clipboard = null;
@@ -1880,7 +1909,7 @@ export const useTrackerStore = create<TrackerStore>()(
     // Reset to initial state (for new project/tab)
     reset: () => {
       useCursorStore.setState({
-        cursor: { channelIndex: 0, rowIndex: 0, columnType: 'note', digitIndex: 0 },
+        cursor: { channelIndex: 0, rowIndex: 0, noteColumnIndex: 0, columnType: 'note', digitIndex: 0 },
         selection: null,
       });
       useEditorStore.getState().reset();

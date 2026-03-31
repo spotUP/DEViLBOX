@@ -694,8 +694,25 @@ export const useTrackerInput = () => {
               useUIStore.getState().setStatusMessage(isRec ? 'RECORD ON' : 'RECORD OFF');
             }
             break;
-          case 'toggle-edit':
-            // IT: Always toggle edit mode regardless of play state.
+          case 'toggle-edit': {
+            // IT: In edit mode, Space on an empty cell pastes current instrument from mask
+            if (behavior.itSpaceCopyMask && recordMode) {
+              const ch = cursorRef.current.channelIndex;
+              const row = cursorRef.current.rowIndex;
+              const cell = pattern.channels[ch]?.rows[row];
+              if (cell && cell.note === 0) {
+                const { currentInstrumentId, instruments } = (require('@stores/useInstrumentStore') as any).useInstrumentStore.getState();
+                const idx = instruments.findIndex((i: any) => i.id === currentInstrumentId);
+                if (idx >= 0) {
+                  setCell(ch, row, { instrument: idx + 1 });
+                }
+                if (editStep > 0 && !isPlaying) {
+                  moveCursorToRow((cursorRef.current.rowIndex + editStep) % pattern.length);
+                }
+                return;
+              }
+            }
+            // Always toggle edit mode regardless of play state.
             if (!recordMode && !isPatternEditable) {
               useUIStore.getState().openNonEditableDialog();
               return;
@@ -704,6 +721,7 @@ export const useTrackerInput = () => {
             const isRec = useEditorStore.getState().recordMode;
             useUIStore.getState().setStatusMessage(isRec ? 'RECORD ON' : 'RECORD OFF');
             break;
+          }
           case 'play-stop':
             // Renoise: Always play/stop, never toggles edit.
             if (isPlaying) {

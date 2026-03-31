@@ -187,7 +187,20 @@ export const useNoteInput = (refs: TrackerInputRefs) => {
         ? targetChannelOverride
         : getTargetChannel();
 
-      const targetRow = (recordMode && isPlaying) ? playbackRow : cursorRef.current.rowIndex;
+      let targetRow = (recordMode && isPlaying) ? playbackRow : cursorRef.current.rowIndex;
+
+      // Record quantization: snap to nearest boundary when recording during playback
+      if (recordMode && isPlaying && pattern) {
+        const editor = useEditorStore.getState();
+        if (editor.recQuantEnabled && editor.recQuantRes > 0) {
+          const res = editor.recQuantRes;
+          const remainder = targetRow % res;
+          targetRow = remainder >= res / 2
+            ? Math.min(targetRow + (res - remainder), pattern.length - 1)
+            : targetRow - remainder;
+        }
+      }
+
       const nci = cursorRef.current.noteColumnIndex ?? 0;
 
       if (insertMode && !isPlaying) {
@@ -387,6 +400,36 @@ export const useNoteInput = (refs: TrackerInputRefs) => {
           e.preventDefault();
           if (currentOctave > behavior.octaveRange[0]) {
             setCurrentOctave(currentOctave - 1);
+          }
+          return true;
+        }
+      } else {
+        // PT numpad sample bank selection:
+        // KP_Enter toggles hi/lo bank (0-15 vs 16-31)
+        // KP_0-9 select sample within current bank (3×3 grid + 0)
+        const { useInstrumentStore } = require('@stores/useInstrumentStore');
+        const ptBank = useEditorStore.getState().ptSampleBank ?? 0; // 0 = low (0-15), 16 = high (16-31)
+        const PT_NUMPAD_MAP: Record<string, number> = {
+          'Numpad1': 12, 'Numpad2': 13, 'Numpad3': 14,
+          'Numpad4': 8,  'Numpad5': 9,  'Numpad6': 10,
+          'Numpad7': 4,  'Numpad8': 5,  'Numpad9': 6,
+          'Numpad0': 0,
+        };
+        if (e.code === 'NumpadEnter') {
+          e.preventDefault();
+          const newBank = ptBank === 0 ? 16 : 0;
+          useEditorStore.getState().setPtSampleBank(newBank);
+          useUIStore.getState().setStatusMessage(`SAMPLE BANK ${newBank === 0 ? '01-16' : '17-32'}`);
+          return true;
+        }
+        const sampleOffset = PT_NUMPAD_MAP[e.code];
+        if (sampleOffset !== undefined) {
+          e.preventDefault();
+          const sampleIndex = ptBank + sampleOffset;
+          const instruments = useInstrumentStore.getState().instruments;
+          if (sampleIndex < instruments.length) {
+            useInstrumentStore.getState().setCurrentInstrumentId(instruments[sampleIndex].id);
+            useUIStore.getState().setStatusMessage(`SAMPLE ${sampleIndex + 1}`);
           }
           return true;
         }

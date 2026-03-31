@@ -8,8 +8,10 @@ import { useCallback, useMemo, useRef } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { useTrackerStore, useCursorStore, useTransportStore, useFormatStore } from '@stores';
 import { useEditorStore } from '@stores/useEditorStore';
+import { useInstrumentStore } from '@stores/useInstrumentStore';
 import * as Tone from 'tone';
 import { getToneEngine } from '@engine/ToneEngine';
+import { xmNoteToString } from '@lib/xmConversions';
 import { ALT_TRACK_MAP_1, ALT_TRACK_MAP_2, type TrackerInputRefs } from './inputConstants';
 
 export const useNavigationInput = (refs: TrackerInputRefs) => {
@@ -47,6 +49,26 @@ export const useNavigationInput = (refs: TrackerInputRefs) => {
   })));
 
   const pattern = patterns[currentPatternIndex];
+
+  // Preview the note at the current cursor position (for previewNoteOnNavigate)
+  const previewNoteAtCursor = useCallback(() => {
+    const behavior = useEditorStore.getState().activeBehavior;
+    if (!behavior.previewNoteOnNavigate) return;
+    if (!pattern) return;
+    const cur = cursorRef.current;
+    const cell = pattern.channels[cur.channelIndex]?.rows[cur.rowIndex];
+    if (!cell || !cell.note || cell.note < 1 || cell.note > 96) return;
+    const noteStr = xmNoteToString(cell.note);
+    if (!noteStr || noteStr === '---') return;
+    const { currentInstrumentId, instruments } = useInstrumentStore.getState();
+    if (!currentInstrumentId) return;
+    const instrument = instruments.find((i: any) => i.id === currentInstrumentId);
+    if (!instrument) return;
+    const engine = getToneEngine();
+    const noteForEngine = noteStr.replace('-', '');
+    engine.triggerNoteAttack(currentInstrumentId, noteForEngine, 0, 0.5, instrument);
+    setTimeout(() => engine.triggerNoteRelease(currentInstrumentId, noteForEngine, 0, instrument), 150);
+  }, [pattern, cursorRef]);
 
   // ── RAF-driven arrow key scrolling ──────────────────────────────────────────
   const heldArrowRef = useRef<{ dir: 'up' | 'down' | 'left' | 'right'; selecting: boolean } | null>(null);
@@ -294,6 +316,7 @@ export const useNavigationInput = (refs: TrackerInputRefs) => {
           : e.shiftKey;                // IT/Renoise: Shift+arrows select
         if (selecting && !selectionRef.current) startSelection();
         moveCursor(dir);
+        previewNoteAtCursor();
         if (selecting) endSelection();
         // Start RAF-driven scroll (time-based throttle — refresh-rate independent)
         heldArrowRef.current = { dir, selecting };
