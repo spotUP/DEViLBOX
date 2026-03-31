@@ -168,6 +168,7 @@ export type SynthType =
   | 'SCSP'             // Sega Saturn SCSP (YMF292-F) 32-voice sound processor
   | 'DubSiren'         // Dub Siren (Osc + LFO + Delay)
   | 'SpaceLaser'       // Space Laser (FM + Pitch Sweep)
+  | 'OpenWurli'        // Wurlitzer 200A Electric Piano (Physical Model)
   | 'V2'               // Farbrausch V2 Synth
   | 'V2Speech'         // Farbrausch V2 Speech Synth
   | 'Sam'              // Commodore SAM Speech Synth

@@ -796,7 +796,7 @@ export const PixiImportModuleDialog: React.FC<PixiImportModuleDialogProps> = ({
       {/* Footer */}
       <PixiModalFooter width={MODAL_W}>
         <PixiButton label="Cancel" variant="ghost" onClick={handleClose} disabled={isImporting} />
-        <PixiButton label={isImporting ? 'Importing…' : 'Import Module'} variant="primary" onClick={handleImport} disabled={!moduleInfo || isImporting} />
+        <PixiButton label={isImporting ? 'Importing…' : isLoading ? 'Loading…' : 'Import Module'} variant="primary" onClick={handleImport} disabled={!moduleInfo || isLoading || isImporting} />
       </PixiModalFooter>
     </PixiModal>
   );

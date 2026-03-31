@@ -925,8 +925,8 @@ export const ImportModuleDialog: React.FC<ImportModuleDialogProps> = ({
         {/* Footer */}
         <div className="flex justify-end gap-2 px-4 py-3 border-t border-dark-border">
           <Button variant="ghost" size="sm" onClick={handleClose} disabled={isImporting}>Cancel</Button>
-          <Button variant="primary" size="sm" onClick={handleImport} disabled={!moduleInfo || isImporting}>
-            {isImporting ? 'Importing…' : 'Import Module'}
+          <Button variant="primary" size="sm" onClick={handleImport} disabled={!moduleInfo || isLoading || isImporting}>
+            {isImporting ? 'Importing…' : isLoading ? 'Loading…' : 'Import Module'}
           </Button>
         </div>
       </div>

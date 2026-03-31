@@ -52,6 +52,7 @@ import type {
   RdPianoConfig,
   MAMEConfig,
   SuperColliderConfig,
+  OpenWurliConfig,
 } from './tonejs';
 import { VOWEL_FORMANTS } from './tonejs';
 import type {
@@ -321,6 +322,7 @@ export interface InstrumentConfig {
   sunvoxModular?: import('../modular').ModularPatchConfig;
   // SuperCollider scripted synthesis
   superCollider?: SuperColliderConfig;
+  openWurli?: OpenWurliConfig;
   // Sampler config
   sample?: SampleConfig;
   effects: EffectConfig[];
@@ -1648,4 +1650,12 @@ export const DEFAULT_SUPERCOLLIDER: SuperColliderConfig = {
 })`,
   binary: 'U0NnZgAAAAIAAQdteVN5bnRoAAAACwAAAAA/gAAAQAAAAEBAAADCxgAAPCPXCkCgAADAgAAAPzMzMz3MzM0/AAAAAAAAA0PcAAA/AAAAP4AAAAAAAAMEZnJlcQAAAAADYW1wAAAAAQRnYXRlAAAAAgAAAAYHQ29udHJvbAEAAAAAAAAAAwAAAQEBBlNpbk9zYwIAAAACAAAAAQAAAAAAAAAAAAD/////AAAAAAIMQmluYXJ5T3BVR2VuAgAAAAIAAAABAAIAAAABAAAAAAAAAAAAAAABAgZFbnZHZW4BAAAAFQAAAAEAAAAAAAAAAAAC/////wAAAAH/////AAAAAP////8AAAAB/////wAAAAL/////AAAAAP////8AAAAD/////wAAAAL/////AAAABP////8AAAAB/////wAAAAX/////AAAABv////8AAAAH/////wAAAAj/////AAAACf////8AAAAG/////wAAAAf/////AAAAAP////8AAAAK/////wAAAAb/////AAAABwEMQmluYXJ5T3BVR2VuAgAAAAIAAAABAAIAAAACAAAAAAAAAAMAAAAAAgNPdXQCAAAAAwAAAAAAAP////8AAAAAAAAABAAAAAAAAAAEAAAAAAAA',
   params: [],
+};
+
+export const DEFAULT_OPENWURLI: OpenWurliConfig = {
+  volume: 0.8,
+  tremoloDepth: 0.5,
+  speakerCharacter: 0.5,
+  mlpEnabled: true,
+  velocityCurve: 2,
 };
