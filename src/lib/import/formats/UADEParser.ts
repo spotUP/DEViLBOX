@@ -1012,6 +1012,12 @@ export async function parseUADEFile(
     'dns',   // DynamicSynthesizer — compiled 68k replayer
     'vss',   // VoodooSupremeSynthesizer — synthesis-based
     'synmod', // SynTracker — synthesis-based
+    'cus',    // CustomMade — compiled 68k replayer
+    'cust',   // CustomMade variant
+    'custom', // CustomMade variant
+    'cm',     // CustomMade variant
+    'rk',     // CustomMade (Richard Karsmakers) variant
+    'rkb',    // CustomMade variant
   ]);
   if (mode === 'enhanced' && FORCE_CLASSIC_FORMATS.has(ext)) {
     console.log(`[UADEParser] ${ext.toUpperCase()} uses compiled replayer; forcing classic UADESynth streaming`);
@@ -1050,6 +1056,12 @@ export async function parseUADEFile(
     'dns',   // DynamicSynthesizer
     'vss',   // VoodooSupremeSynthesizer
     'synmod', // SynTracker
+    'cus',    // CustomMade — compiled 68k replayer
+    'cust',   // CustomMade variant
+    'custom', // CustomMade variant
+    'cm',     // CustomMade variant
+    'rk',     // CustomMade (Richard Karsmakers) variant
+    'rkb',    // CustomMade variant
   ]);
   if (mode === 'enhanced' && FORCE_CLASSIC_PREFIXES.has(prefix)) {
     console.log(`[UADEParser] ${prefix.toUpperCase()} uses prefix form; forcing classic UADESynth streaming`);
