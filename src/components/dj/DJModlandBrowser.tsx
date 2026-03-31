@@ -26,6 +26,8 @@ import { useDJStore, useThirdDeckActive } from '@/stores/useDJStore';
 import { getDJEngine } from '@/engine/dj/DJEngine';
 import { detectBPM, estimateSongDuration } from '@/engine/dj/DJBeatDetector';
 import { parseModuleToSong } from '@/lib/import/parseModuleToSong';
+import { isUADEFormat } from '@/lib/import/formats/UADEParser';
+import { loadUADEToDeck } from '@/engine/dj/DJUADEPrerender';
 import { cacheSong } from '@/engine/dj/DJSongCache';
 import { getDJPipeline } from '@/engine/dj/DJPipeline';
 import { useDJPlaylistStore } from '@/stores/useDJPlaylistStore';
@@ -281,29 +283,41 @@ export const DJModlandBrowser: React.FC<DJModlandBrowserProps> = ({ onClose }) =
           }
         }
 
-        const blob = new File([buffer], file.filename, { type: 'application/octet-stream' });
-        const song = await parseModuleToSong(blob);
-        const bpmResult = detectBPM(song);
-
         const cacheKey = `${file.source}:${file.key}`;
-        cacheSong(cacheKey, song);
-
         const engine = getDJEngine();
 
-        useDJStore.getState().setDeckState(deckId, {
-          fileName: cacheKey,
-          trackName: song.name || file.filename,
-          detectedBPM: bpmResult.bpm,
-          effectiveBPM: bpmResult.bpm,
-          analysisState: 'rendering',
-          isPlaying: false,
-        });
+        // UADE/SID formats: use the dedicated pre-render path which handles
+        // the UADE render worker correctly (avoids main-thread UADE engine)
+        if (isUADEFormat(file.filename) || file.source === 'hvsc') {
+          await loadUADEToDeck(
+            engine, deckId, buffer, file.filename, true, undefined, file.filename
+          );
+          if (useDJStore.getState().deckViewMode !== '3d') {
+            useDJStore.getState().setDeckViewMode('visualizer');
+          }
+        } else {
+          // Non-UADE tracker (XM/IT/S3M/etc.) — parse + pipeline render
+          const blob = new File([buffer], file.filename, { type: 'application/octet-stream' });
+          const song = await parseModuleToSong(blob);
+          const bpmResult = detectBPM(song);
 
-        const result = await getDJPipeline().loadOrEnqueue(buffer, file.filename, deckId, 'high');
-        await engine.loadAudioToDeck(deckId, result.wavData, cacheKey, song.name || file.filename, result.analysis?.bpm || bpmResult.bpm, song);
+          cacheSong(cacheKey, song);
 
-        if (useDJStore.getState().deckViewMode !== '3d') {
-          useDJStore.getState().setDeckViewMode('visualizer');
+          useDJStore.getState().setDeckState(deckId, {
+            fileName: cacheKey,
+            trackName: song.name || file.filename,
+            detectedBPM: bpmResult.bpm,
+            effectiveBPM: bpmResult.bpm,
+            analysisState: 'rendering',
+            isPlaying: false,
+          });
+
+          const result = await getDJPipeline().loadOrEnqueue(buffer, file.filename, deckId, 'high');
+          await engine.loadAudioToDeck(deckId, result.wavData, cacheKey, song.name || file.filename, result.analysis?.bpm || bpmResult.bpm, song);
+
+          if (useDJStore.getState().deckViewMode !== '3d') {
+            useDJStore.getState().setDeckViewMode('visualizer');
+          }
         }
 
         setLoadedDecks((prev) => {
