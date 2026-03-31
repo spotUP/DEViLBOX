@@ -1,0 +1,11 @@
+// Default SFZ instrument for DEViLBOX
+<global>
+loop_mode=no_loop
+amp_veltrack=100
+
+<group>
+<region>
+sample=default_sample.wav
+pitch_keycenter=60
+lokey=0
+hikey=127
