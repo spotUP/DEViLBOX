@@ -405,6 +405,16 @@ export const JC303StyledKnobPanel: React.FC<JC303StyledKnobPanelProps> = memo(({
     onChange({ delay: { ...currentDelay, enabled: true, [key]: value } as TB303Config['delay'] });
   };
 
+  const updatePhaser = (key: string, value: number | boolean) => {
+    const currentPhaser = configRef.current.phaser || { enabled: false, rate: 0.5, depth: 0.7, feedback: 0, mix: 0 };
+    onChange({ phaser: { ...currentPhaser, [key]: value } as TB303Config['phaser'] });
+  };
+
+  const updateOverdrive = (key: string, value: number) => {
+    const currentOD = configRef.current.overdrive || { amount: 0 };
+    onChange({ overdrive: { ...currentOD, [key]: value } as TB303Config['overdrive'] });
+  };
+
   // Absolute positioning helpers for Row 1
   const style = (x: number, y: number, width: number, height: number) => ({
     left: `${x}px`, top: `${y}px`, width: `${width}px`, height: `${height}px`,
@@ -522,6 +532,7 @@ export const JC303StyledKnobPanel: React.FC<JC303StyledKnobPanelProps> = memo(({
             <div className="flex items-center gap-3 h-full px-6">
               <div style={{ width: '65px' }}><Knob value={config.oscillator.waveformBlend ?? (config.oscillator.type === 'square' ? 1 : 0)} min={0} max={1} defaultValue={0} onChange={(v) => updateOscillatorParam('waveformBlend', v)} label="Waveform" size="md" color="#06b6d4" formatValue={v => v < 0.05 ? 'SAW' : v > 0.95 ? 'SQR' : Math.round(v * 100) + '%'} /></div>
               <div style={{ width: '65px' }}><Knob value={config.oscillator.pulseWidth ?? 0} min={0} max={1} defaultValue={0} onChange={(v) => updateOscillatorParam('pulseWidth', v)} label="Pulse W" size="md" color="#06b6d4" formatValue={v => Math.round(50 + v * 49) + '%'} /></div>
+              <div style={{ width: '65px' }}><Knob value={config.oscillator.pitchToPw ?? 0} min={0} max={1} defaultValue={0} onChange={(v) => updateOscillatorParam('pitchToPw', v)} label="P→PW" size="md" color="#06b6d4" formatValue={v => Math.round(v * 100) + '%'} /></div>
               <div style={{ width: '65px' }}><Knob value={config.oscillator.subOscGain ?? 0} min={0} max={1} defaultValue={0} onChange={(v) => updateOscillatorParam('subOscGain', v)} label="Sub Osc" size="md" color="#06b6d4" formatValue={v => Math.round(v * 100) + '%'} /></div>
               <div style={{ width: '65px' }}><Knob value={config.oscillator.subOscBlend ?? 1} min={0} max={1} defaultValue={1} onChange={(v) => updateOscillatorParam('subOscBlend', v)} label="Sub Wave" size="md" color="#06b6d4" formatValue={v => v < 0.5 ? '-2 Oct' : '-1 Oct'} /></div>
             </div>
@@ -529,27 +540,53 @@ export const JC303StyledKnobPanel: React.FC<JC303StyledKnobPanelProps> = memo(({
 
           {/* MOJO Tab — Filter character shaping */}
           {effectiveTab === 'mojo' && (
-            <div className="flex items-center gap-3 h-full px-6">
-              <div style={{ width: '65px' }}><Knob value={config.devilFish?.passbandCompensation ?? 0.9} min={0} max={1} defaultValue={0.9} onChange={(v) => updateDevilFish('passbandCompensation', v)} label="Bass" size="md" color="#ff9900" formatValue={v => Math.round(v * 100) + '%'} /></div>
-              <div style={{ width: '65px' }}><Knob value={config.devilFish?.resTracking ?? 0.7} min={0} max={1} defaultValue={0.7} onChange={(v) => updateDevilFish('resTracking', v)} label="Rez" size="md" color="#ff9900" formatValue={v => Math.round(v * 100) + '%'} /></div>
-              <div style={{ width: '65px' }}><Knob value={config.devilFish?.filterInputDrive ?? 0} min={0} max={1} defaultValue={0} onChange={(v) => updateDevilFish('filterInputDrive', v)} label="Satur" size="md" color="#ff9900" formatValue={v => (v * 10).toFixed(1)} /></div>
-              <div className="w-px h-14 bg-white/5 flex-shrink-0" />
-              <div style={{ width: '65px' }}><Knob value={config.devilFish?.diodeCharacter ?? 0} min={0} max={1} defaultValue={0} onChange={(v) => updateDevilFish('diodeCharacter', v)} label="Bite" size="md" color="#ff9900" formatValue={v => Math.round(v * 100) + '%'} /></div>
-              <div style={{ width: '65px' }}><Knob value={config.devilFish?.duffingAmount ?? 0} min={-1} max={1} defaultValue={0} bipolar onChange={(v) => updateDevilFish('duffingAmount', v)} label="Tension" size="md" color="#ff9900" formatValue={v => Math.round(v * 100) + '%'} /></div>
-              <div style={{ width: '65px' }}><Knob value={config.devilFish?.lpBpMix ?? 0} min={0} max={1} defaultValue={0} onChange={(v) => updateDevilFish('lpBpMix', v)} label="LP/BP" size="md" color="#ff9900" formatValue={v => v < 0.05 ? 'LP' : v > 0.95 ? 'BP' : 'Mix'} /></div>
-              <div className="w-px h-14 bg-white/5 flex-shrink-0" />
-              <div className="flex flex-col gap-1">
-                <label className="text-[8px] font-bold text-orange-500/70">FILTER</label>
-                <select value={config.devilFish?.filterSelect ?? 1} onChange={(e) => updateDevilFish('filterSelect', parseInt(e.target.value))} className="bg-[#111] text-[10px] text-orange-400 border border-orange-900/30 rounded px-1 py-1 outline-none focus:border-orange-500">
-                  <option value={0}>DiodeLadder</option><option value={5}>MissThang-20</option>
-                </select>
+            <div className="flex flex-col gap-2 h-full overflow-y-auto px-6 py-2">
+              <div className="flex items-center gap-3">
+                <div style={{ width: '65px' }}><Knob value={config.devilFish?.passbandCompensation ?? 0.9} min={0} max={1} defaultValue={0.9} onChange={(v) => updateDevilFish('passbandCompensation', v)} label="Bass" size="md" color="#ff9900" formatValue={v => Math.round(v * 100) + '%'} /></div>
+                <div style={{ width: '65px' }}><Knob value={config.devilFish?.resTracking ?? 0.7} min={0} max={1} defaultValue={0.7} onChange={(v) => updateDevilFish('resTracking', v)} label="Rez" size="md" color="#ff9900" formatValue={v => Math.round(v * 100) + '%'} /></div>
+                <div style={{ width: '65px' }}><Knob value={config.devilFish?.filterInputDrive ?? 0} min={0} max={1} defaultValue={0} onChange={(v) => updateDevilFish('filterInputDrive', v)} label="Satur" size="md" color="#ff9900" formatValue={v => (v * 10).toFixed(1)} /></div>
+                <div className="w-px h-14 bg-white/5 flex-shrink-0" />
+                <div style={{ width: '65px' }}><Knob value={config.devilFish?.diodeCharacter ?? 0} min={0} max={1} defaultValue={0} onChange={(v) => updateDevilFish('diodeCharacter', v)} label="Bite" size="md" color="#ff9900" formatValue={v => Math.round(v * 100) + '%'} /></div>
+                <div style={{ width: '65px' }}><Knob value={config.devilFish?.duffingAmount ?? 0} min={-1} max={1} defaultValue={0} bipolar onChange={(v) => updateDevilFish('duffingAmount', v)} label="Tension" size="md" color="#ff9900" formatValue={v => Math.round(v * 100) + '%'} /></div>
+                <div style={{ width: '65px' }}><Knob value={config.devilFish?.lpBpMix ?? 0} min={0} max={1} defaultValue={0} onChange={(v) => updateDevilFish('lpBpMix', v)} label="LP/BP" size="md" color="#ff9900" formatValue={v => v < 0.05 ? 'LP' : v > 0.95 ? 'BP' : 'Mix'} /></div>
+                <div style={{ width: '65px' }}><Knob value={config.devilFish?.stageNLAmount ?? 0} min={0} max={1} defaultValue={0} onChange={(v) => updateDevilFish('stageNLAmount', v)} label="StgNL" size="md" color="#ff9900" formatValue={v => Math.round(v * 100) + '%'} /></div>
+                <div className="w-px h-14 bg-white/5 flex-shrink-0" />
+                <div className="flex flex-col gap-1">
+                  <label className="text-[8px] font-bold text-orange-500/70">FILTER</label>
+                  <select value={config.devilFish?.filterSelect ?? 1} onChange={(e) => updateDevilFish('filterSelect', parseInt(e.target.value))} className="bg-[#111] text-[10px] text-orange-400 border border-orange-900/30 rounded px-1 py-1 outline-none focus:border-orange-500">
+                    <option value={0}>DiodeLadder</option><option value={5}>MissThang-20</option>
+                  </select>
+                </div>
+                <label className="flex items-center gap-1 cursor-pointer flex-shrink-0">
+                  <input type="checkbox" checked={config.devilFish?.korgEnabled ?? false} onChange={(e) => updateDevilFish('korgEnabled', e.target.checked)} className="w-3 h-3 accent-orange-500 rounded" />
+                  <span className="text-[8px] text-orange-400/70 font-bold">KORG</span>
+                </label>
               </div>
+              {config.devilFish?.korgEnabled && (
+                <div className="flex items-center gap-3">
+                  <span className="text-[8px] font-bold text-orange-400/40 tracking-wider flex-shrink-0">KORG</span>
+                  <div style={{ width: '60px' }}><Knob value={config.devilFish?.korgBite ?? 0} min={0} max={1} defaultValue={0} onChange={(v) => updateDevilFish('korgBite', v)} label="Bite" size="sm" color="#ff9900" formatValue={v => Math.round(v * 100) + '%'} /></div>
+                  <div style={{ width: '60px' }}><Knob value={config.devilFish?.korgClip ?? 0} min={0} max={1} defaultValue={0} onChange={(v) => updateDevilFish('korgClip', v)} label="Clip" size="sm" color="#ff9900" formatValue={v => Math.round(v * 100) + '%'} /></div>
+                  <div style={{ width: '60px' }}><Knob value={config.devilFish?.korgCrossmod ?? 0} min={0} max={1} defaultValue={0} onChange={(v) => updateDevilFish('korgCrossmod', v)} label="Xmod" size="sm" color="#ff9900" formatValue={v => Math.round(v * 100) + '%'} /></div>
+                  <div style={{ width: '60px' }}><Knob value={config.devilFish?.korgQSag ?? 0} min={0} max={1} defaultValue={0} onChange={(v) => updateDevilFish('korgQSag', v)} label="Q-Sag" size="sm" color="#ff9900" formatValue={v => Math.round(v * 100) + '%'} /></div>
+                  <div style={{ width: '60px' }}><Knob value={config.devilFish?.korgSharpness ?? 0} min={0} max={1} defaultValue={0} onChange={(v) => updateDevilFish('korgSharpness', v)} label="Sharp" size="sm" color="#ff9900" formatValue={v => Math.round(v * 100) + '%'} /></div>
+                  <div style={{ width: '60px' }}><Knob value={config.devilFish?.korgStiffness ?? 0} min={0} max={1} defaultValue={0} onChange={(v) => updateDevilFish('korgStiffness', v)} label="Stiff" size="sm" color="#ff9900" formatValue={v => Math.round(v * 100) + '%'} /></div>
+                  <div style={{ width: '60px' }}><Knob value={config.devilFish?.korgWarmth ?? 0} min={0} max={1} defaultValue={0} onChange={(v) => updateDevilFish('korgWarmth', v)} label="Warm" size="sm" color="#ff9900" formatValue={v => Math.round(v * 100) + '%'} /></div>
+                  <div style={{ width: '60px' }}><Knob value={config.devilFish?.korgFilterFm ?? 0} min={0} max={1} defaultValue={0} onChange={(v) => updateDevilFish('korgFilterFm', v)} label="FiltFM" size="sm" color="#ff9900" formatValue={v => Math.round(v * 100) + '%'} /></div>
+                </div>
+              )}
             </div>
           )}
 
           {/* LFO Tab — Modulation */}
           {effectiveTab === 'lfo' && !isBuzz3o3 && (
             <div className="flex items-center gap-3 h-full px-6">
+              {/* Enable toggle */}
+              <label className="flex flex-col items-center gap-1 cursor-pointer flex-shrink-0">
+                <span className="text-[9px] font-bold text-purple-400/60 tracking-wider">ON</span>
+                <input type="checkbox" checked={config.lfo?.enabled ?? false} onChange={(e) => updateLfo({ enabled: e.target.checked })} className="w-4 h-4 accent-purple-500 rounded" />
+              </label>
+              <div className="w-px h-14 bg-white/5 flex-shrink-0" />
               {/* Waveform buttons */}
               <div className="flex flex-col items-center gap-1.5 flex-shrink-0">
                 <span className="text-[9px] font-bold text-purple-400/60 tracking-wider">WAVE</span>
@@ -573,70 +610,183 @@ export const JC303StyledKnobPanel: React.FC<JC303StyledKnobPanelProps> = memo(({
 
           {/* DEVILFISH Tab — Circuit modification params */}
           {effectiveTab === 'devilfish' && (
-            <div className="flex items-center gap-3 h-full px-6">
-              <div style={{ width: '65px' }}><Knob value={config.devilFish?.filterFmDepth ?? 0} min={0} max={1} defaultValue={0} onChange={(v) => updateDevilFish('filterFmDepth', v)} label="Filt FM" size="md" color="#ff3333" formatValue={v => Math.round(v * 100) + '%'} /></div>
-              <div style={{ width: '65px' }}><Knob value={config.devilFish?.filterTracking ?? 0} min={0} max={1} defaultValue={0} onChange={(v) => updateDevilFish('filterTracking', v)} label="Filt Trk" size="md" color="#ff3333" formatValue={v => Math.round(v * 100) + '%'} /></div>
-              <div style={{ width: '65px' }}><Knob value={config.slide?.time ?? 0.17} min={0} max={1} defaultValue={0.17} onChange={updateSlide} label="Slide" size="md" color="#ff3333" formatValue={v => Math.round(SLIDE_MIN * Math.pow(SLIDE_MAX / SLIDE_MIN, v)) + ' ms'} /></div>
-              <div className="w-px h-14 bg-white/5 flex-shrink-0" />
-              <div style={{ width: '65px' }}><Knob value={config.devilFish?.softAttack ?? 0} min={0} max={1} defaultValue={0} onChange={(v) => updateDevilFish('softAttack', v)} label="S.Atk" size="md" color="#ff3333" formatValue={v => (0.3 * Math.pow(100, v)).toFixed(1) + ' ms'} /></div>
-              <div style={{ width: '65px' }}><Knob value={config.devilFish?.normalDecay ?? 0.5} min={0} max={1} defaultValue={0.5} onChange={(v) => updateDevilFish('normalDecay', v)} label="N.Dec" size="md" color="#ff3333" formatValue={v => Math.round(DECAY_MIN * Math.pow(DECAY_MAX / DECAY_MIN, v)) + ' ms'} /></div>
-              <div style={{ width: '65px' }}><Knob value={config.devilFish?.accentDecay ?? 0.5} min={0} max={1} defaultValue={0.5} onChange={(v) => updateDevilFish('accentDecay', v)} label="Acc Dec" size="md" color="#ff3333" formatValue={v => Math.round(DECAY_MIN * Math.pow(DECAY_MAX / DECAY_MIN, v)) + ' ms'} /></div>
-              <div style={{ width: '65px' }}><Knob value={config.devilFish?.accentSoftAttack ?? 0.5} min={0} max={1} defaultValue={0.5} onChange={(v) => updateDevilFish('accentSoftAttack', v)} label="Acc Soft" size="md" color="#ff3333" formatValue={v => Math.round(v * 100) + '%'} /></div>
+            <div className="flex flex-col gap-1.5 h-full overflow-y-auto px-6 py-2">
+              {/* Row 1: Envelope & Filter mods */}
+              <div className="flex items-center gap-3 flex-shrink-0">
+                <label className="flex flex-col items-center gap-1 cursor-pointer flex-shrink-0">
+                  <span className="text-[9px] font-bold text-red-400/60 tracking-wider">DF</span>
+                  <input type="checkbox" checked={config.devilFish?.enabled ?? true} onChange={(e) => updateDevilFish('enabled', e.target.checked)} className="w-4 h-4 accent-red-500 rounded" />
+                </label>
+                <div className="w-px h-14 bg-white/5 flex-shrink-0" />
+                <div style={{ width: '65px' }}><Knob value={config.devilFish?.filterFmDepth ?? 0} min={0} max={1} defaultValue={0} onChange={(v) => updateDevilFish('filterFmDepth', v)} label="Filt FM" size="md" color="#ff3333" formatValue={v => Math.round(v * 100) + '%'} /></div>
+                <div style={{ width: '65px' }}><Knob value={config.devilFish?.filterTracking ?? 0} min={0} max={1} defaultValue={0} onChange={(v) => updateDevilFish('filterTracking', v)} label="Filt Trk" size="md" color="#ff3333" formatValue={v => Math.round(v * 100) + '%'} /></div>
+                <div style={{ width: '65px' }}><Knob value={config.slide?.time ?? 0.17} min={0} max={1} defaultValue={0.17} onChange={updateSlide} label="Slide" size="md" color="#ff3333" formatValue={v => Math.round(SLIDE_MIN * Math.pow(SLIDE_MAX / SLIDE_MIN, v)) + ' ms'} /></div>
+                <div className="flex flex-col items-center gap-1 flex-shrink-0">
+                  <span className="text-[8px] font-bold text-red-400/60">SLIDE</span>
+                  <div className="flex gap-1">
+                    {(['linear', 'exponential'] as const).map(m => (
+                      <button key={m} onClick={() => onChange({ slide: { ...configRef.current.slide, mode: m } })}
+                        className={clsx("px-1.5 py-0.5 text-[9px] font-bold rounded border transition-all",
+                          config.slide?.mode === m ? "bg-red-500 text-text-primary border-red-400" : "bg-black/50 text-red-400/50 border-red-900/40 hover:border-red-500/50"
+                        )}>
+                        {m === 'linear' ? 'LIN' : 'EXP'}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <div className="w-px h-14 bg-white/5 flex-shrink-0" />
+                <div style={{ width: '65px' }}><Knob value={config.devilFish?.softAttack ?? 0} min={0} max={1} defaultValue={0} onChange={(v) => updateDevilFish('softAttack', v)} label="S.Atk" size="md" color="#ff3333" formatValue={v => (0.3 * Math.pow(100, v)).toFixed(1) + ' ms'} /></div>
+                <div style={{ width: '65px' }}><Knob value={config.devilFish?.accentAttack ?? 0} min={0} max={1} defaultValue={0} onChange={(v) => updateDevilFish('accentAttack', v)} label="Acc Atk" size="md" color="#ff3333" formatValue={v => (0.3 * Math.pow(100, v)).toFixed(1) + ' ms'} /></div>
+                <div style={{ width: '65px' }}><Knob value={config.devilFish?.normalDecay ?? 0.5} min={0} max={1} defaultValue={0.5} onChange={(v) => updateDevilFish('normalDecay', v)} label="N.Dec" size="md" color="#ff3333" formatValue={v => Math.round(DECAY_MIN * Math.pow(DECAY_MAX / DECAY_MIN, v)) + ' ms'} /></div>
+                <div style={{ width: '65px' }}><Knob value={config.devilFish?.accentDecay ?? 0.5} min={0} max={1} defaultValue={0.5} onChange={(v) => updateDevilFish('accentDecay', v)} label="Acc Dec" size="md" color="#ff3333" formatValue={v => Math.round(DECAY_MIN * Math.pow(DECAY_MAX / DECAY_MIN, v)) + ' ms'} /></div>
+                <div style={{ width: '65px' }}><Knob value={config.devilFish?.accentSoftAttack ?? 0.5} min={0} max={1} defaultValue={0.5} onChange={(v) => updateDevilFish('accentSoftAttack', v)} label="Acc Soft" size="md" color="#ff3333" formatValue={v => Math.round(v * 100) + '%'} /></div>
+              </div>
+              {/* Row 2: VEG, Ensemble, Controls */}
+              <div className="flex items-center gap-3 flex-shrink-0">
+                <div style={{ width: '65px' }}><Knob value={config.devilFish?.vegDecay ?? 0.5} min={0} max={1} defaultValue={0.5} onChange={(v) => updateDevilFish('vegDecay', v)} label="VEG Dec" size="md" color="#ff3333" formatValue={v => Math.round(16 + v * 2984) + ' ms'} /></div>
+                <div style={{ width: '65px' }}><Knob value={config.devilFish?.vegSustain ?? 0} min={0} max={1} defaultValue={0} onChange={(v) => updateDevilFish('vegSustain', v)} label="VEG Sus" size="md" color="#ff3333" formatValue={v => Math.round(v * 100) + '%'} /></div>
+                <div style={{ width: '65px' }}><Knob value={config.devilFish?.ensembleAmount ?? 0} min={0} max={1} defaultValue={0} onChange={(v) => updateDevilFish('ensembleAmount', v)} label="Ensem" size="md" color="#ff3333" formatValue={v => Math.round(v * 100) + '%'} /></div>
+                <div className="w-px h-14 bg-white/5 flex-shrink-0" />
+                {/* Compact toggles/selects */}
+                <div className="flex flex-col gap-1.5 flex-shrink-0">
+                  <label className="flex items-center gap-1 cursor-pointer">
+                    <input type="checkbox" checked={config.devilFish?.accentSweepEnabled ?? true} onChange={(e) => updateDevilFish('accentSweepEnabled', e.target.checked)} className="w-3 h-3 accent-red-500 rounded" />
+                    <span className="text-[8px] text-red-400/80 font-bold">Acc Sweep</span>
+                  </label>
+                  <label className="flex items-center gap-1 cursor-pointer">
+                    <input type="checkbox" checked={config.devilFish?.highResonance ?? false} onChange={(e) => updateDevilFish('highResonance', e.target.checked)} className="w-3 h-3 accent-red-500 rounded" />
+                    <span className="text-[8px] text-red-400/80 font-bold">Hi Reso</span>
+                  </label>
+                  <label className="flex items-center gap-1 cursor-pointer">
+                    <input type="checkbox" checked={config.tempoRelative ?? false} onChange={(e) => onChange({ tempoRelative: e.target.checked })} className="w-3 h-3 accent-red-500 rounded" />
+                    <span className="text-[8px] text-red-400/80 font-bold">Tempo Rel</span>
+                  </label>
+                </div>
+                <div className="flex flex-col gap-1.5 flex-shrink-0">
+                  <div className="flex items-center gap-1">
+                    <span className="text-[8px] text-red-400/60 font-bold w-10">Speed</span>
+                    <select value={config.devilFish?.sweepSpeed ?? 'normal'} onChange={(e) => updateDevilFish('sweepSpeed', e.target.value)} className="bg-[#111] text-[9px] text-red-400 border border-red-900/30 rounded px-1 py-0.5 outline-none">
+                      <option value="fast">Fast</option><option value="normal">Normal</option><option value="slow">Slow</option>
+                    </select>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <span className="text-[8px] text-red-400/60 font-bold w-10">Muffler</span>
+                    <select value={config.devilFish?.muffler ?? 'off'} onChange={(e) => updateDevilFish('muffler', e.target.value)} className="bg-[#111] text-[9px] text-red-400 border border-red-900/30 rounded px-1 py-0.5 outline-none">
+                      <option value="off">Off</option><option value="soft">Soft</option><option value="hard">Hard</option><option value="dark">Dark</option><option value="mid">Mid</option><option value="bright">Bright</option>
+                    </select>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <span className="text-[8px] text-red-400/60 font-bold w-10">OS</span>
+                    <select value={config.devilFish?.oversamplingOrder ?? 2} onChange={(e) => updateDevilFish('oversamplingOrder', parseInt(e.target.value))} className="bg-[#111] text-[9px] text-red-400 border border-red-900/30 rounded px-1 py-0.5 outline-none">
+                      <option value={0}>None</option><option value={1}>2x</option><option value={2}>4x</option><option value={3}>8x</option><option value={4}>16x</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
             </div>
           )}
 
-          {/* FX Tab — Dimension + Delay (matching reference) */}
+          {/* FX Tab — Dimension + Phaser + Delay + Overdrive */}
           {effectiveTab === 'fx' && !isBuzz3o3 && (
-            <div className="flex items-start gap-5 h-full px-6 py-3">
-              {/* Dimension (Chorus) */}
-              <div className="flex flex-col gap-2">
-                <span className="text-[9px] font-bold text-green-400/60 tracking-wider">DIMENSION</span>
-                <div className="flex items-center gap-2">
-                  <span className="text-[9px] text-text-secondary flex-shrink-0">Mode</span>
-                  <div className="flex gap-1">
-                    {[0, 1, 2, 3, 4].map(m => {
-                      const activeMode = (config.chorus?.enabled && (config.chorus?.mode ?? 0) > 0) ? (config.chorus?.mode ?? 0) : 0;
-                      return (
-                        <button key={m} onClick={() => updateChorus({ mode: m, enabled: m > 0 })}
-                          className={clsx("px-2.5 py-1 text-[10px] font-bold rounded border transition-all",
-                            activeMode === m ? "bg-green-500 text-text-primary border-green-400" : "bg-black/50 text-green-400/50 border-green-900/40 hover:border-green-500/50"
-                          )}>
-                          {m === 0 ? 'Off' : m}
-                        </button>
-                      );
-                    })}
+            <div className="flex flex-col gap-2 h-full overflow-y-auto px-6 py-2">
+              {/* Row 1: Chorus + Phaser */}
+              <div className="flex items-start gap-5 flex-shrink-0">
+                {/* Dimension (Chorus) */}
+                <div className="flex flex-col gap-1.5">
+                  <span className="text-[9px] font-bold text-green-400/60 tracking-wider">DIMENSION</span>
+                  <div className="flex items-center gap-2">
+                    <span className="text-[9px] text-text-secondary flex-shrink-0">Mode</span>
+                    <div className="flex gap-1">
+                      {[0, 1, 2, 3, 4].map(m => {
+                        const activeMode = (config.chorus?.enabled && (config.chorus?.mode ?? 0) > 0) ? (config.chorus?.mode ?? 0) : 0;
+                        return (
+                          <button key={m} onClick={() => updateChorus({ mode: m, enabled: m > 0 })}
+                            className={clsx("px-2.5 py-1 text-[10px] font-bold rounded border transition-all",
+                              activeMode === m ? "bg-green-500 text-text-primary border-green-400" : "bg-black/50 text-green-400/50 border-green-900/40 hover:border-green-500/50"
+                            )}>
+                            {m === 0 ? 'Off' : m}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-[9px] text-text-secondary flex-shrink-0 w-8">Mix</span>
+                    <input type="range" min={0} max={1} step={0.01} value={config.chorus?.mix ?? 0.5}
+                      onChange={(e) => updateChorus({ mix: parseFloat(e.target.value) })}
+                      className="flex-1 h-1.5 accent-green-500 cursor-pointer" style={{ minWidth: '80px' }} />
+                    <span className="text-[10px] text-text-secondary w-8 text-right tabular-nums">{Math.round((config.chorus?.mix ?? 0.5) * 100)}%</span>
                   </div>
                 </div>
-                <div className="flex items-center gap-2">
-                  <span className="text-[9px] text-text-secondary flex-shrink-0 w-8">Mix</span>
-                  <input type="range" min={0} max={1} step={0.01} value={config.chorus?.mix ?? 0.5}
-                    onChange={(e) => updateChorus({ mix: parseFloat(e.target.value) })}
-                    className="flex-1 h-1.5 accent-green-500 cursor-pointer" style={{ minWidth: '80px' }} />
-                  <span className="text-[10px] text-text-secondary w-8 text-right tabular-nums">{Math.round((config.chorus?.mix ?? 0.5) * 100)}%</span>
+                <div className="w-px self-stretch bg-white/5 flex-shrink-0" />
+                {/* Phaser */}
+                <div className="flex flex-col gap-1.5 flex-1">
+                  <div className="flex items-center gap-2">
+                    <span className="text-[9px] font-bold text-green-400/60 tracking-wider">PHASER</span>
+                    <label className="flex items-center gap-1 cursor-pointer ml-auto">
+                      <input type="checkbox" checked={config.phaser?.enabled ?? false} onChange={(e) => updatePhaser('enabled', e.target.checked)} className="w-3 h-3 accent-green-500 rounded" />
+                      <span className="text-[8px] text-text-secondary">On</span>
+                    </label>
+                  </div>
+                  {([
+                    { label: 'Rate', key: 'rate', min: 0, max: 100, step: 1, value: config.phaser?.rate ?? 50, fmt: (v: number) => `${Math.round(v)}` },
+                    { label: 'Depth', key: 'depth', min: 0, max: 100, step: 1, value: config.phaser?.depth ?? 70, fmt: (v: number) => `${Math.round(v)}%` },
+                    { label: 'Feedback', key: 'feedback', min: 0, max: 100, step: 1, value: config.phaser?.feedback ?? 0, fmt: (v: number) => `${Math.round(v)}%` },
+                    { label: 'Mix', key: 'mix', min: 0, max: 100, step: 1, value: config.phaser?.mix ?? 0, fmt: (v: number) => `${Math.round(v)}%` },
+                  ] as const).map(s => (
+                    <div key={s.key} className="flex items-center gap-2">
+                      <span className="text-[9px] text-text-secondary w-14 flex-shrink-0">{s.label}</span>
+                      <input type="range" min={s.min} max={s.max} step={s.step} value={s.value}
+                        onChange={(e) => updatePhaser(s.key as string, parseFloat(e.target.value))}
+                        className="flex-1 h-1.5 accent-green-500 cursor-pointer" />
+                      <span className="text-[10px] text-text-secondary w-10 text-right tabular-nums">{s.fmt(s.value)}</span>
+                    </div>
+                  ))}
                 </div>
               </div>
-              <div className="w-px self-stretch bg-white/5 flex-shrink-0" />
-              {/* Delay */}
-              <div className="flex flex-col gap-1.5 flex-1">
-                <span className="text-[9px] font-bold text-green-400/60 tracking-wider">DELAY</span>
-                {([
-                  { label: 'Time', key: 'time', min: 0, max: 16, step: 1, value: config.delay?.time ?? 3, fmt: (v: number) => `${v} 16ths` },
-                  { label: 'Feedback', key: 'feedback', min: 0, max: 1, step: 0.01, value: config.delay?.feedback ?? 0.3, fmt: (v: number) => `${Math.round(v * 100)}%` },
-                  { label: 'Tone', key: 'tone', min: 0, max: 1, step: 0.01, value: config.delay?.tone ?? 0.5, fmt: (v: number) => v < 0.4 ? 'LP' : v > 0.6 ? 'HP' : 'Bypass' },
-                  { label: 'Mix', key: 'mix', min: 0, max: 1, step: 0.01, value: config.delay?.mix ?? 0, fmt: (v: number) => `${Math.round(v * 100)}%` },
-                  { label: 'Spread', key: 'stereo', min: 0, max: 1, step: 0.01, value: config.delay?.stereo ?? 0.75, fmt: (v: number) => `${Math.round(v * 100)}%` },
-                ] as const).map(s => (
-                  <div key={s.key} className="flex items-center gap-2">
-                    <span className="text-[9px] text-text-secondary w-14 flex-shrink-0">{s.label}</span>
-                    <input type="range" min={s.min} max={s.max} step={s.step} value={s.value}
-                      onChange={(e) => {
-                        const raw = parseFloat(e.target.value);
-                        updateDelay(s.key as string, 'convert' in s ? (s as { convert: (v: number) => number }).convert(raw) : raw);
-                      }}
-                      className="flex-1 h-1.5 accent-green-500 cursor-pointer" />
-                    <span className="text-[10px] text-text-secondary w-14 text-right tabular-nums">{s.fmt(s.value)}</span>
-                  </div>
-                ))}
+              {/* Row 2: Delay + Overdrive */}
+              <div className="flex items-start gap-5 flex-shrink-0">
+                {/* Delay */}
+                <div className="flex flex-col gap-1.5 flex-1">
+                  <span className="text-[9px] font-bold text-green-400/60 tracking-wider">DELAY</span>
+                  {([
+                    { label: 'Time', key: 'time', min: 0, max: 16, step: 1, value: config.delay?.time ?? 3, fmt: (v: number) => `${v} 16ths` },
+                    { label: 'Feedback', key: 'feedback', min: 0, max: 1, step: 0.01, value: config.delay?.feedback ?? 0.3, fmt: (v: number) => `${Math.round(v * 100)}%` },
+                    { label: 'Tone', key: 'tone', min: 0, max: 1, step: 0.01, value: config.delay?.tone ?? 0.5, fmt: (v: number) => v < 0.4 ? 'LP' : v > 0.6 ? 'HP' : 'Bypass' },
+                    { label: 'Mix', key: 'mix', min: 0, max: 1, step: 0.01, value: config.delay?.mix ?? 0, fmt: (v: number) => `${Math.round(v * 100)}%` },
+                    { label: 'Spread', key: 'stereo', min: 0, max: 1, step: 0.01, value: config.delay?.stereo ?? 0.75, fmt: (v: number) => `${Math.round(v * 100)}%` },
+                  ] as const).map(s => (
+                    <div key={s.key} className="flex items-center gap-2">
+                      <span className="text-[9px] text-text-secondary w-14 flex-shrink-0">{s.label}</span>
+                      <input type="range" min={s.min} max={s.max} step={s.step} value={s.value}
+                        onChange={(e) => {
+                          const raw = parseFloat(e.target.value);
+                          updateDelay(s.key as string, 'convert' in s ? (s as { convert: (v: number) => number }).convert(raw) : raw);
+                        }}
+                        className="flex-1 h-1.5 accent-green-500 cursor-pointer" />
+                      <span className="text-[10px] text-text-secondary w-14 text-right tabular-nums">{s.fmt(s.value)}</span>
+                    </div>
+                  ))}
+                </div>
+                <div className="w-px self-stretch bg-white/5 flex-shrink-0" />
+                {/* Overdrive */}
+                <div className="flex flex-col gap-1.5 flex-1">
+                  <span className="text-[9px] font-bold text-green-400/60 tracking-wider">OVERDRIVE</span>
+                  {([
+                    { label: 'Amount', key: 'amount', min: 0, max: 100, step: 1, value: config.overdrive?.amount ?? 0, fmt: (v: number) => `${Math.round(v)}%` },
+                    { label: 'Drive', key: 'drive', min: 0, max: 100, step: 1, value: config.overdrive?.drive ?? 0, fmt: (v: number) => `${Math.round(v)}%` },
+                    { label: 'Dry/Wet', key: 'dryWet', min: 0, max: 100, step: 1, value: config.overdrive?.dryWet ?? 0, fmt: (v: number) => `${Math.round(v)}%` },
+                    { label: 'Model', key: 'modelIndex', min: 0, max: 10, step: 1, value: config.overdrive?.modelIndex ?? 0, fmt: (v: number) => `${Math.round(v)}` },
+                  ] as const).map(s => (
+                    <div key={s.key} className="flex items-center gap-2">
+                      <span className="text-[9px] text-text-secondary w-14 flex-shrink-0">{s.label}</span>
+                      <input type="range" min={s.min} max={s.max} step={s.step} value={s.value}
+                        onChange={(e) => updateOverdrive(s.key as string, parseFloat(e.target.value))}
+                        className="flex-1 h-1.5 accent-green-500 cursor-pointer" />
+                      <span className="text-[10px] text-text-secondary w-10 text-right tabular-nums">{s.fmt(s.value)}</span>
+                    </div>
+                  ))}
+                </div>
               </div>
             </div>
           )}
@@ -652,6 +802,12 @@ export const JC303StyledKnobPanel: React.FC<JC303StyledKnobPanelProps> = memo(({
             </div>
           </div>
           <div className="h-8 w-px bg-white/5"></div>
+          <div className="flex flex-col">
+            <label className="text-[8px] font-bold text-text-muted mb-1">ENGINE</label>
+            <select value={config.engineType ?? 'db303'} onChange={(e) => onChange({ engineType: e.target.value as 'jc303' | 'db303' })} className="bg-[#111] text-[10px] text-accent-primary border border-white/5 rounded px-2 py-1 outline-none focus:border-accent-primary transition-colors">
+              <option value="db303">DB-303</option><option value="jc303">JC-303</option>
+            </select>
+          </div>
           <div className="flex flex-col">
             <label className="text-[8px] font-bold text-text-muted mb-1">PRESET</label>
             <select value="" onChange={(e) => { const p = TB303_PRESETS.find(pr => pr.name === e.target.value); if (p) { if (onPresetLoad) { onPresetLoad(p); } else if (p.tb303) { onChange(p.tb303 as Partial<TB303Config>); } } }} className="bg-[#111] text-[10px] text-accent-primary border border-white/5 rounded px-2 py-1 outline-none focus:border-accent-primary transition-colors max-w-[160px]">
