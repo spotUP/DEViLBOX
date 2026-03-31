@@ -13,8 +13,13 @@ import * as Tone from 'tone';
 export type CueMode = 'multi-output' | 'split-stereo' | 'none';
 
 export class DJCueEngine {
-  private cueGain: Tone.Gain;
+  private cueGain: Tone.Gain;       // PFL input from decks
+  private masterTap: Tone.Gain;     // Tap of master output
+  private cueMixer: Tone.Gain;      // Final cue output (blend of PFL + master)
+  private pflGain: Tone.Gain;       // PFL level in cue mix
+  private masterMixGain: Tone.Gain; // Master level in cue mix
   private cueMode: CueMode = 'none';
+  private cueMix = 0.5;             // 0 = PFL only, 1 = master only
 
   // Multi-output mode
   private mediaStreamDest: MediaStreamAudioDestinationNode | null = null;
@@ -29,12 +34,28 @@ export class DJCueEngine {
   private pflB = false;
 
   constructor() {
-    this.cueGain = new Tone.Gain(1);
+    this.cueGain = new Tone.Gain(1);      // PFL decks feed in here
+    this.masterTap = new Tone.Gain(1);     // master output taps here
+    this.cueMixer = new Tone.Gain(1);      // final headphone output
+    this.pflGain = new Tone.Gain(0.5);     // PFL contribution
+    this.masterMixGain = new Tone.Gain(0.5); // master contribution
+
+    // Wire: cueGain → pflGain → cueMixer
+    //       masterTap → masterMixGain → cueMixer
+    this.cueGain.connect(this.pflGain);
+    this.masterTap.connect(this.masterMixGain);
+    this.pflGain.connect(this.cueMixer);
+    this.masterMixGain.connect(this.cueMixer);
   }
 
   /** Get the cue mix input node — deck channel gains connect to this when PFL is enabled */
   getCueInput(): Tone.Gain {
     return this.cueGain;
+  }
+
+  /** Get the master tap node — connect master output to this for cue mix monitoring */
+  getMasterTap(): Tone.Gain {
+    return this.masterTap;
   }
 
   // ==========================================================================
@@ -85,9 +106,9 @@ export class DJCueEngine {
   private async initMultiOutput(): Promise<void> {
     const ctx = Tone.getContext().rawContext;
 
-    // Create MediaStreamDestination from the cue mix
+    // Create MediaStreamDestination from the final cue mix output
     this.mediaStreamDest = (ctx as AudioContext).createMediaStreamDestination();
-    this.cueGain.connect(this.mediaStreamDest as unknown as AudioNode);
+    this.cueMixer.connect(this.mediaStreamDest as unknown as AudioNode);
 
     // Create an <audio> element to play the stream
     this.audioElement = new Audio();
@@ -124,7 +145,7 @@ export class DJCueEngine {
     this.mainSplitGain.connect(this.merger, 0, 0);
 
     // Cue → right channel (input 1)
-    this.cueGain.connect(this.cueSplitGain as unknown as AudioNode);
+    this.cueMixer.connect(this.cueSplitGain as unknown as AudioNode);
     this.cueSplitGain.connect(this.merger, 0, 1);
 
     // Merger → destination
@@ -148,9 +169,21 @@ export class DJCueEngine {
     return deck === 'A' ? this.pflA : this.pflB;
   }
 
-  /** Set cue volume */
+  /** Set cue volume (overall headphone level) */
   setCueVolume(volume: number): void {
-    this.cueGain.gain.rampTo(Math.max(0, Math.min(1.5, volume)), 0.02);
+    this.cueMixer.gain.rampTo(Math.max(0, Math.min(1.5, volume)), 0.02);
+  }
+
+  /** Set cue mix balance: 0 = PFL only, 0.5 = blend, 1 = master only */
+  setCueMix(mix: number): void {
+    this.cueMix = Math.max(0, Math.min(1, mix));
+    // Equal-power-ish crossfade
+    this.pflGain.gain.rampTo(1 - this.cueMix, 0.02);
+    this.masterMixGain.gain.rampTo(this.cueMix, 0.02);
+  }
+
+  getCueMix(): number {
+    return this.cueMix;
   }
 
   // ==========================================================================
@@ -179,5 +212,9 @@ export class DJCueEngine {
       this.cueSplitGain = null;
     }
     this.cueGain.dispose();
+    this.masterTap.dispose();
+    this.pflGain.dispose();
+    this.masterMixGain.dispose();
+    this.cueMixer.dispose();
   }
 }
