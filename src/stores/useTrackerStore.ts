@@ -302,6 +302,9 @@ import {
   copySelectionHelper, cutSelectionHelper,
   pasteHelper, pasteMixHelper, pasteFloodHelper, pastePushForwardHelper,
   copyTrackHelper, cutTrackHelper, pasteTrackHelper,
+  copyCommandsHelper, cutCommandsHelper, pasteCommandsHelper,
+  killToEndHelper, killToStartHelper,
+  reverseBlockHelper, doubleBlockHelper, halveBlockHelper,
 } from './tracker/clipboardActions';
 import {
   type MacroSlot, createEmptyMacroSlot,
@@ -313,8 +316,9 @@ interface TrackerStore {
   patterns: Pattern[];
   currentPatternIndex: number;
   clipboard: ClipboardData | null;
-  trackClipboard: TrackerCell[] | null; // FT2: Single-channel clipboard
-  patternClipboard: (TrackerCell[] | null)[] | null; // FT2: All-channel clipboard
+  trackClipboard: TrackerCell[] | null;
+  patternClipboard: (TrackerCell[] | null)[] | null;
+  cmdsClipboard: TrackerCell[] | null; // PT: Commands-only clipboard
   macroSlots: MacroSlot[]; // FT2: 8 quick-entry slots
   // FT2: Pattern Order List (Song Position List)
   patternOrder: number[]; // Array of pattern indices for song arrangement
@@ -335,7 +339,6 @@ interface TrackerStore {
   amplifySelection: (factor: number) => void;
   growSelection: () => void;
   shrinkSelection: () => void;
-  swapChannels: (aIdx: number, bIdx: number) => void;
   splitPatternAtCursor: () => void;
   joinPatterns: () => void;
 
@@ -352,6 +355,19 @@ interface TrackerStore {
   copyTrack: (channelIndex: number) => void;
   cutTrack: (channelIndex: number) => void;
   pasteTrack: (channelIndex: number) => void;
+
+  // PT: Commands-only buffer
+  copyCommands: (channelIndex: number) => void;
+  cutCommands: (channelIndex: number) => void;
+  pasteCommands: (channelIndex: number) => void;
+
+  // PT/IT: Block operations
+  killToEnd: (channelIndex: number, fromRow: number) => void;
+  killToStart: (channelIndex: number, toRow: number) => void;
+  swapChannels: (ch1: number, ch2: number) => void;
+  reverseBlock: (channelIndex: number, startRow: number, endRow: number) => void;
+  doubleBlock: (channelIndex: number, startRow: number, endRow: number) => void;
+  halveBlock: (channelIndex: number, startRow: number, endRow: number) => void;
 
   // FT2: Pattern operations (all channels)
   copyPattern: () => void;
@@ -461,6 +477,7 @@ export const useTrackerStore = create<TrackerStore>()(
     clipboard: null,
     trackClipboard: null, // FT2: Single-channel clipboard
     patternClipboard: null, // FT2: All-channel clipboard
+    cmdsClipboard: null, // PT: Commands-only clipboard
     macroSlots: Array.from({ length: 8 }, () => createEmptyMacroSlot()), // FT2: 8 macro slots
     // FT2: Pattern Order List (Song Position List)
     patternOrder: [0], // Start with first pattern in order
@@ -802,6 +819,93 @@ export const useTrackerStore = create<TrackerStore>()(
       syncBulkEdit(patternIndex, get().patterns[patternIndex]);
     },
 
+    // PT: Commands-only clipboard operations
+    copyCommands: (channelIndex) =>
+      set((state) => {
+        const pattern = state.patterns[state.currentPatternIndex];
+        const result = copyCommandsHelper(pattern, channelIndex);
+        if (result) state.cmdsClipboard = result;
+      }),
+    cutCommands: (channelIndex) => {
+      const patternIndex = get().currentPatternIndex;
+      const beforePattern = get().patterns[patternIndex];
+      set((state) => {
+        const p = state.patterns[state.currentPatternIndex];
+        const result = cutCommandsHelper(p, channelIndex);
+        if (result) state.cmdsClipboard = result;
+      });
+      useHistoryStore.getState().pushAction('CUT_COMMANDS', 'Cut commands', patternIndex, beforePattern, get().patterns[patternIndex]);
+      syncBulkEdit(patternIndex, get().patterns[patternIndex]);
+    },
+    pasteCommands: (channelIndex) => {
+      if (!get().cmdsClipboard) return;
+      const patternIndex = get().currentPatternIndex;
+      const beforePattern = get().patterns[patternIndex];
+      set((state) => {
+        if (!state.cmdsClipboard) return;
+        const p = state.patterns[state.currentPatternIndex];
+        pasteCommandsHelper(p, channelIndex, state.cmdsClipboard);
+      });
+      useHistoryStore.getState().pushAction('PASTE_COMMANDS', 'Paste commands', patternIndex, beforePattern, get().patterns[patternIndex]);
+      syncBulkEdit(patternIndex, get().patterns[patternIndex]);
+    },
+
+    // PT/IT: Block operations
+    killToEnd: (channelIndex, fromRow) => {
+      const patternIndex = get().currentPatternIndex;
+      const beforePattern = get().patterns[patternIndex];
+      set((state) => {
+        killToEndHelper(state.patterns[state.currentPatternIndex], channelIndex, fromRow);
+      });
+      useHistoryStore.getState().pushAction('KILL_TO_END', 'Kill to end', patternIndex, beforePattern, get().patterns[patternIndex]);
+      syncBulkEdit(patternIndex, get().patterns[patternIndex]);
+    },
+    killToStart: (channelIndex, toRow) => {
+      const patternIndex = get().currentPatternIndex;
+      const beforePattern = get().patterns[patternIndex];
+      set((state) => {
+        killToStartHelper(state.patterns[state.currentPatternIndex], channelIndex, toRow);
+      });
+      useHistoryStore.getState().pushAction('KILL_TO_START', 'Kill to start', patternIndex, beforePattern, get().patterns[patternIndex]);
+      syncBulkEdit(patternIndex, get().patterns[patternIndex]);
+    },
+    swapChannels: (ch1, ch2) => {
+      const patternIndex = get().currentPatternIndex;
+      const beforePattern = get().patterns[patternIndex];
+      set((state) => {
+        swapChannelsHelper(state.patterns[state.currentPatternIndex], ch1, ch2);
+      });
+      useHistoryStore.getState().pushAction('SWAP_CHANNELS', `Swap ch ${ch1+1}↔${ch2+1}`, patternIndex, beforePattern, get().patterns[patternIndex]);
+      syncBulkEdit(patternIndex, get().patterns[patternIndex]);
+    },
+    reverseBlock: (channelIndex, startRow, endRow) => {
+      const patternIndex = get().currentPatternIndex;
+      const beforePattern = get().patterns[patternIndex];
+      set((state) => {
+        reverseBlockHelper(state.patterns[state.currentPatternIndex], channelIndex, startRow, endRow);
+      });
+      useHistoryStore.getState().pushAction('REVERSE_BLOCK', 'Reverse block', patternIndex, beforePattern, get().patterns[patternIndex]);
+      syncBulkEdit(patternIndex, get().patterns[patternIndex]);
+    },
+    doubleBlock: (channelIndex, startRow, endRow) => {
+      const patternIndex = get().currentPatternIndex;
+      const beforePattern = get().patterns[patternIndex];
+      set((state) => {
+        doubleBlockHelper(state.patterns[state.currentPatternIndex], channelIndex, startRow, endRow);
+      });
+      useHistoryStore.getState().pushAction('DOUBLE_BLOCK', 'Double block', patternIndex, beforePattern, get().patterns[patternIndex]);
+      syncBulkEdit(patternIndex, get().patterns[patternIndex]);
+    },
+    halveBlock: (channelIndex, startRow, endRow) => {
+      const patternIndex = get().currentPatternIndex;
+      const beforePattern = get().patterns[patternIndex];
+      set((state) => {
+        halveBlockHelper(state.patterns[state.currentPatternIndex], channelIndex, startRow, endRow);
+      });
+      useHistoryStore.getState().pushAction('HALVE_BLOCK', 'Halve block', patternIndex, beforePattern, get().patterns[patternIndex]);
+      syncBulkEdit(patternIndex, get().patterns[patternIndex]);
+    },
+
     // FT2: Pattern operations (all channels — copies each track)
     copyPattern: () =>
       set((state) => {
@@ -1077,18 +1181,6 @@ export const useTrackerStore = create<TrackerStore>()(
           endChannel: Math.max(sel.endChannel - 1, midCh),
         },
       });
-    },
-
-    swapChannels: (aIdx, bIdx) => {
-      const { patterns, currentPatternIndex } = get();
-      const pattern = patterns[currentPatternIndex];
-      if (aIdx < 0 || bIdx < 0 || aIdx >= pattern.channels.length || bIdx >= pattern.channels.length) return;
-      const beforePattern = pattern;
-      set((state) => {
-        swapChannelsHelper(state.patterns[state.currentPatternIndex], aIdx, bIdx);
-      });
-      useHistoryStore.getState().pushAction('SWAP_CHANNELS', 'Swap channels', currentPatternIndex, beforePattern, get().patterns[currentPatternIndex]);
-      syncBulkEdit(currentPatternIndex, get().patterns[currentPatternIndex]);
     },
 
     splitPatternAtCursor: () => {
