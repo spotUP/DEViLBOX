@@ -166,7 +166,8 @@
       "Shift+Space": "power_cut_stop",
       "Ctrl+=": "zoom_in",
       "Ctrl+-": "zoom_out",
-      "Ctrl+0": "fit_to_window"
+      "Ctrl+0": "fit_to_window",
+      ",": "toggle_mask_at_cursor"
     },
     "mac": {
       "Cmd+N": "new_file",
@@ -329,7 +330,8 @@
       "Cmd+=": "zoom_in",
       "Cmd+-": "zoom_out",
       "Cmd+0": "fit_to_window",
-      "Ctrl+1": "reset_zoom"
+      "Ctrl+1": "reset_zoom",
+      ",": "toggle_mask_at_cursor"
     }
   },
   "Ctrl+Enter": "preview_note_at_cursor",

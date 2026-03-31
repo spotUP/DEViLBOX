@@ -49,6 +49,7 @@ interface CursorStore {
   moveCursorToChannel: (channel: number) => void;
   moveCursorToColumn: (columnType: CursorPosition['columnType']) => void;
   moveCursorToChannelAndColumn: (channel: number, columnType: CursorPosition['columnType'], noteColumnIndex?: number) => void;
+  getColumnsForChannel: (channelIndex: number) => Array<{ type: CursorPosition['columnType']; nci: number }> | null;
 
   startSelection: () => void;
   updateSelection: (channelIndex: number, rowIndex: number, columnType?: CursorPosition['columnType']) => void;
@@ -81,6 +82,7 @@ export const useCursorStore = create<CursorStore>()((set, get) => ({
     let { channelIndex, rowIndex, columnType, digitIndex } = cur;
     let noteColumnIndex = cur.noteColumnIndex ?? 0;
     const currentDigits = DIGIT_COUNTS[columnType] || 0;
+    const behavior = getEditorState().activeBehavior;
 
     // Get total note columns for the current channel
     const getNoteCols = (ch: number) => pattern.channels[ch]?.channelMeta?.noteCols ?? 1;
@@ -91,10 +93,18 @@ export const useCursorStore = create<CursorStore>()((set, get) => ({
 
     switch (direction) {
       case 'up':
-        rowIndex = rowIndex > 0 ? rowIndex - 1 : numRows - 1;
+        if (rowIndex > 0) {
+          rowIndex--;
+        } else if (behavior.cursorWrapVertical) {
+          rowIndex = numRows - 1;
+        }
         break;
       case 'down':
-        rowIndex = rowIndex < numRows - 1 ? rowIndex + 1 : 0;
+        if (rowIndex < numRows - 1) {
+          rowIndex++;
+        } else if (behavior.cursorWrapVertical) {
+          rowIndex = 0;
+        }
         break;
       case 'left': {
         if (currentDigits > 0 && digitIndex > 0) { digitIndex--; break; }
@@ -250,6 +260,32 @@ export const useCursorStore = create<CursorStore>()((set, get) => ({
       const nci = Math.min(noteColumnIndex ?? 0, maxNci);
       set({ cursor: { ...get().cursor, channelIndex: channel, columnType, digitIndex: 0, noteColumnIndex: nci } });
     }
+  },
+
+  // Get the visible column list for a channel (used by IT Home/End double-press)
+  getColumnsForChannel: (channelIndex) => {
+    const ts = getTrackerState();
+    const pattern = ts.patterns[ts.currentPatternIndex];
+    if (!pattern || channelIndex < 0 || channelIndex >= pattern.channels.length) return null;
+    const vis = getEditorState().columnVisibility;
+    const noteGroupCols: CursorPosition['columnType'][] = ['note'];
+    if (vis.instrument) noteGroupCols.push('instrument');
+    if (vis.volume) noteGroupCols.push('volume');
+    const totalNoteCols = pattern.channels[channelIndex]?.channelMeta?.noteCols ?? 1;
+    const cols: Array<{ type: CursorPosition['columnType']; nci: number }> = [];
+    for (let nc = 0; nc < totalNoteCols; nc++) {
+      for (const t of noteGroupCols) cols.push({ type: t, nci: nc });
+    }
+    if (vis.effect) { cols.push({ type: 'effTyp', nci: 0 }); cols.push({ type: 'effParam', nci: 0 }); }
+    if (vis.effect2) { cols.push({ type: 'effTyp2', nci: 0 }); cols.push({ type: 'effParam2', nci: 0 }); }
+    if (vis.cutoff) cols.push({ type: 'cutoff', nci: 0 });
+    if (vis.resonance) cols.push({ type: 'resonance', nci: 0 });
+    if (vis.envMod) cols.push({ type: 'envMod', nci: 0 });
+    if (vis.pan) cols.push({ type: 'pan', nci: 0 });
+    if (vis.flag1) cols.push({ type: 'flag1', nci: 0 });
+    if (vis.flag2) cols.push({ type: 'flag2', nci: 0 });
+    if (vis.probability) cols.push({ type: 'probability', nci: 0 });
+    return cols;
   },
 
   // --- Selection actions ---

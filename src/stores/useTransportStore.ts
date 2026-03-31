@@ -282,6 +282,20 @@ export const useTransportStore = create<TransportStore>()(
         const prevRow = state.currentRow;
         state.currentRow = row;
 
+        // Follow playback: sync cursor to playback row
+        if (state.isPlaying) {
+          try {
+            const { useEditorStore } = require('./useEditorStore');
+            const { useCursorStore } = require('./useCursorStore');
+            if (useEditorStore.getState().followPlayback) {
+              const cursor = useCursorStore.getState().cursor;
+              if (cursor.rowIndex !== row) {
+                useCursorStore.setState({ cursor: { ...cursor, rowIndex: row } });
+              }
+            }
+          } catch { /* avoid circular import issues at startup */ }
+        }
+
         // Track continuous row for smooth scrolling
         if (row > prevRow) {
           // Normal forward movement
