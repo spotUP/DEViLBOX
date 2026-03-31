@@ -92,10 +92,21 @@ export const PopOutWindow: React.FC<PopOutWindowProps> = ({
       'status=no',
     ].join(',');
 
-    // Open popup with empty URL (about:blank is unavoidable, but we immediately write content)
-    const popup = window.open('', '', features);
+    // Build the popout HTML document
+    const popoutHTML = `<!DOCTYPE html><html><head><title>${title}</title><style>
+      html, body { margin: 0; padding: 0; background: var(--color-bg, #0b0909); color: var(--color-text, #f2f0f0); overflow: auto; height: 100%; }
+      #popout-root { display: inline-block; min-width: 100%; }
+    </style></head><body><div id="popout-root"></div></body></html>`;
+
+    // Use a blob URL so the window title bar shows the page title instead of "about:blank".
+    // Blob URLs inherit the creating origin, so createPortal and shared stores still work.
+    const blob = new Blob([popoutHTML], { type: 'text/html' });
+    const blobUrl = URL.createObjectURL(blob);
+
+    const popup = window.open(blobUrl, '', features);
 
     if (!popup) {
+      URL.revokeObjectURL(blobUrl);
       notify.warning('Popup blocked — please allow popups for this site');
       onClose();
       return;
@@ -104,123 +115,121 @@ export const PopOutWindow: React.FC<PopOutWindowProps> = ({
     popupRef.current = popup;
     openPopouts.set(title, popup);
 
-    // Immediately write document content to replace about:blank display
-    // The title in <title> tag will show in the window title bar
-    popup.document.write(`<!DOCTYPE html><html><head><title>${title}</title><style>
-      html, body { margin: 0; padding: 0; background: var(--color-bg, #0b0909); color: var(--color-text, #f2f0f0); overflow: auto; height: 100%; }
-      #popout-root { display: inline-block; min-width: 100%; }
-    </style></head><body><div id="popout-root"></div></body></html>`);
-    popup.document.close();
-    // Also set document.title directly for browsers that need it
-    popup.document.title = title;
+    // Wait for the blob document to load, then set up the portal mount
+    const setupPopup = () => {
+      URL.revokeObjectURL(blobUrl);
 
-    // Replace about:blank URL with a meaningful path so the address bar
-    // doesn't show "about:blank". Works because about:blank inherits the
-    // opener's origin, making replaceState with a same-origin URL valid.
-    try {
-      const slug = title.toLowerCase().replace(/[^a-z0-9]+/g, '-');
-      popup.history.replaceState({}, title, `/popout/${slug}`);
-    } catch {
-      // Some browsers may not allow replaceState on about:blank — that's OK
-    }
+      popup.document.title = title;
 
-    const mount = popup.document.getElementById('popout-root') as HTMLDivElement;
-    if (!mount) {
-      console.error('[PopOutWindow] Failed to find popout-root element');
-      popup.close();
-      onClose();
-      return;
-    }
-
-    // Clone all stylesheets from parent window
-    const popupHead = popup.document.head;
-
-    // Clone <style> tags (Vite-injected Tailwind, CSS modules, etc.)
-    document.head.querySelectorAll('style').forEach((style) => {
-      const clone = popup.document.createElement('style');
-      clone.textContent = style.textContent;
-      clone.dataset.cloned = 'true';
-      popupHead.appendChild(clone);
-    });
-
-    // Clone <link rel="stylesheet"> tags
-    document.head.querySelectorAll('link[rel="stylesheet"]').forEach((link) => {
-      const clone = popup.document.createElement('link');
-      clone.rel = 'stylesheet';
-      clone.href = (link as HTMLLinkElement).href;
-      clone.dataset.cloned = 'true';
-      popupHead.appendChild(clone);
-    });
-
-    // Defer state updates to next frame to avoid synchronous setState in effect
-    requestAnimationFrame(() => {
-      setMountEl(mount);
-      setReady(true);
-    });
-
-    // MutationObserver: mirror Vite HMR style injections during dev
-    const observer = new MutationObserver((mutations) => {
-      if (popup.closed) return;
-      for (const mutation of mutations) {
-        for (const node of mutation.addedNodes) {
-          if (node instanceof HTMLStyleElement) {
-            const clone = popup.document.createElement('style');
-            clone.textContent = node.textContent;
-            clone.dataset.cloned = 'true';
-            popup.document.head.appendChild(clone);
-          }
-          if (node instanceof HTMLLinkElement && node.rel === 'stylesheet') {
-            const clone = popup.document.createElement('link');
-            clone.rel = 'stylesheet';
-            clone.href = node.href;
-            clone.dataset.cloned = 'true';
-            popup.document.head.appendChild(clone);
-          }
-        }
-        for (const node of mutation.removedNodes) {
-          if (popup.closed) return;
-          if (node instanceof HTMLStyleElement || node instanceof HTMLLinkElement) {
-            const clones = popup.document.head.querySelectorAll('[data-cloned="true"]');
-            clones.forEach((clone) => {
-              if (
-                (clone instanceof HTMLStyleElement && node instanceof HTMLStyleElement &&
-                  clone.textContent === node.textContent) ||
-                (clone instanceof HTMLLinkElement && node instanceof HTMLLinkElement &&
-                  clone.href === node.href)
-              ) {
-                clone.remove();
-              }
-            });
-          }
-        }
+      const mount = popup.document.getElementById('popout-root') as HTMLDivElement;
+      if (!mount) {
+        console.error('[PopOutWindow] Failed to find popout-root element');
+        popup.close();
+        onClose();
+        return;
       }
-    });
-    observer.observe(document.head, { childList: true });
 
-    // Handle popup close (user clicks X on popup window).
-    // Defer onClose so React doesn't try to unmount the portal while
-    // the popup DOM is mid-teardown (which causes a null error).
-    closingRef.current = false;
-    const handlePopupClose = () => {
-      if (closingRef.current) return;
-      closingRef.current = true;
-      // Detach mount point immediately so React stops touching popup DOM
-      setMountEl(null);
-      setReady(false);
-      // Defer the state update to next microtask
-      setTimeout(() => onCloseRef.current(), 0);
+      // Clone all stylesheets from parent window
+      const popupHead = popup.document.head;
+
+      // Clone <style> tags (Vite-injected Tailwind, CSS modules, etc.)
+      document.head.querySelectorAll('style').forEach((style) => {
+        const clone = popup.document.createElement('style');
+        clone.textContent = style.textContent;
+        clone.dataset.cloned = 'true';
+        popupHead.appendChild(clone);
+      });
+
+      // Clone <link rel="stylesheet"> tags
+      document.head.querySelectorAll('link[rel="stylesheet"]').forEach((link) => {
+        const clone = popup.document.createElement('link');
+        clone.rel = 'stylesheet';
+        clone.href = (link as HTMLLinkElement).href;
+        clone.dataset.cloned = 'true';
+        popupHead.appendChild(clone);
+      });
+
+      // Defer state updates to next frame to avoid synchronous setState in effect
+      requestAnimationFrame(() => {
+        setMountEl(mount);
+        setReady(true);
+      });
+
+      // MutationObserver: mirror Vite HMR style injections during dev
+      const observer = new MutationObserver((mutations) => {
+        if (popup.closed) return;
+        for (const mutation of mutations) {
+          for (const node of mutation.addedNodes) {
+            if (node instanceof HTMLStyleElement) {
+              const clone = popup.document.createElement('style');
+              clone.textContent = node.textContent;
+              clone.dataset.cloned = 'true';
+              popup.document.head.appendChild(clone);
+            }
+            if (node instanceof HTMLLinkElement && node.rel === 'stylesheet') {
+              const clone = popup.document.createElement('link');
+              clone.rel = 'stylesheet';
+              clone.href = node.href;
+              clone.dataset.cloned = 'true';
+              popup.document.head.appendChild(clone);
+            }
+          }
+          for (const node of mutation.removedNodes) {
+            if (popup.closed) return;
+            if (node instanceof HTMLStyleElement || node instanceof HTMLLinkElement) {
+              const clones = popup.document.head.querySelectorAll('[data-cloned="true"]');
+              clones.forEach((clone) => {
+                if (
+                  (clone instanceof HTMLStyleElement && node instanceof HTMLStyleElement &&
+                    clone.textContent === node.textContent) ||
+                  (clone instanceof HTMLLinkElement && node instanceof HTMLLinkElement &&
+                    clone.href === node.href)
+                ) {
+                  clone.remove();
+                }
+              });
+            }
+          }
+        }
+      });
+      observer.observe(document.head, { childList: true });
+
+      // Handle popup close
+      closingRef.current = false;
+      const handlePopupClose = () => {
+        if (closingRef.current) return;
+        closingRef.current = true;
+        setMountEl(null);
+        setReady(false);
+        setTimeout(() => onCloseRef.current(), 0);
+      };
+      popup.addEventListener('pagehide', handlePopupClose);
+      popup.onbeforeunload = handlePopupClose;
+
+      // Store cleanup references for the effect cleanup
+      (popup as any).__observer = observer;
+      (popup as any).__handleClose = handlePopupClose;
     };
-    popup.addEventListener('pagehide', handlePopupClose);
-    popup.onbeforeunload = handlePopupClose;
 
-    // Cleanup on unmount (e.g. parent sets isOpen=false)
+    // Blob URLs load asynchronously — wait for DOMContentLoaded
+    if (popup.document.readyState === 'complete' || popup.document.readyState === 'interactive') {
+      setupPopup();
+    } else {
+      popup.addEventListener('DOMContentLoaded', setupPopup);
+    }
+
+    // Cleanup on unmount
     return () => {
-      observer.disconnect();
+      const obs = (popup as any).__observer as MutationObserver | undefined;
+      const handleClose = (popup as any).__handleClose as (() => void) | undefined;
       closingRef.current = true;
       openPopouts.delete(title);
+      obs?.disconnect();
       if (popup && !popup.closed) {
-        popup.removeEventListener('pagehide', handlePopupClose);
-        popup.onbeforeunload = null;
+        if (handleClose) {
+          popup.removeEventListener('pagehide', handleClose);
+          popup.onbeforeunload = null;
+        }
         popup.close();
       }
       popupRef.current = null;
