@@ -604,61 +604,54 @@ export const MONIQUE_PRESETS: Record<string, MoniqueConfig> = {
   },
 };
 
-const CONFIG_KEYS: (keyof MoniqueConfig)[] = [
-  // Oscillators (0-15)
-  'osc1Wave', 'osc1FmPower', 'osc1Octave',
-  'osc2Wave', 'osc2FmPower', 'osc2Octave',
-  'osc3Wave', 'osc3FmPower', 'osc3Octave',
-  'fmMulti', 'fmSwing', 'fmPhase',
-  'masterShift', 'osc1Sync', 'osc2Sync', 'osc3Sync',
-
-  // Filter 1 (16-25)
-  'filter1Type', 'filter1Cutoff', 'filter1Resonance',
-  'filter1Distortion', 'filter1Pan', 'filter1Output',
-  'filter1ModMix', 'filter1Input0', 'filter1Input1', 'filter1Input2',
-
-  // Filter 2 (26-35)
-  'filter2Type', 'filter2Cutoff', 'filter2Resonance',
-  'filter2Distortion', 'filter2Pan', 'filter2Output',
-  'filter2ModMix', 'filter2Input0', 'filter2Input1', 'filter2Input2',
-
-  // Filter 3 (36-45)
-  'filter3Type', 'filter3Cutoff', 'filter3Resonance',
-  'filter3Distortion', 'filter3Pan', 'filter3Output',
-  'filter3ModMix', 'filter3Input0', 'filter3Input1', 'filter3Input2',
-
-  // Envelope 1 (46-52)
-  'env1Attack', 'env1Decay', 'env1Sustain',
-  'env1Retrigger', 'env1Release', 'env1Shape', 'env1Velocity',
-
-  // Envelope 2 (53-59)
-  'env2Attack', 'env2Decay', 'env2Sustain',
-  'env2Retrigger', 'env2Release', 'env2Shape', 'env2Velocity',
-
-  // Envelope 3 (60-66)
-  'env3Attack', 'env3Decay', 'env3Sustain',
-  'env3Retrigger', 'env3Release', 'env3Shape', 'env3Velocity',
-
-  // Envelope 4 (67-73)
-  'env4Attack', 'env4Decay', 'env4Sustain',
-  'env4Retrigger', 'env4Release', 'env4Shape', 'env4Velocity',
-
-  // LFOs (74-82)
-  'lfo1Speed', 'lfo1Wave', 'lfo1Phase',
-  'lfo2Speed', 'lfo2Wave', 'lfo2Phase',
-  'lfo3Speed', 'lfo3Wave', 'lfo3Phase',
-
-  // Effects (83-90)
-  'reverbRoom', 'reverbMix', 'reverbWidth',
-  'chorusMod', 'chorusPan',
-  'delay', 'delayPan',
-  'eqBypass',
-
-  // Master (91-99)
-  'volume', 'shape', 'distortion',
-  'glide', 'glideTime', 'octaveOffset', 'noteOffset',
-  'speed', 'effectBypass',
-];
+// Map from MoniqueConfig key → C++ MoniqueParams enum index.
+// Must match the enum in MoniqueSynth.cpp exactly.
+const PARAM_INDEX: Record<string, number> = {
+  // Master (0-4)
+  volume: 0, glide: 1, octaveOffset: 2, noteOffset: 3, speed: 4,
+  // Osc1 (5-8)
+  osc1Wave: 5, osc1Octave: 6, osc1FmPower: 7, osc1Sync: 8,
+  // Osc2 (9-12)
+  osc2Wave: 9, osc2Octave: 10, osc2FmPower: 11, osc2Sync: 12,
+  // Osc3 (13-16)
+  osc3Wave: 13, osc3Octave: 14, osc3FmPower: 15, osc3Sync: 16,
+  // FM Osc (17-20)
+  fmMulti: 17, fmPhase: 18, fmSwing: 19, masterShift: 20,
+  // Filter1 (21-27)
+  filter1Type: 21, filter1Cutoff: 22, filter1Resonance: 23,
+  filter1Distortion: 24, filter1Output: 25, filter1Pan: 26, filter1ModMix: 27,
+  // Filter2 (28-34)
+  filter2Type: 28, filter2Cutoff: 29, filter2Resonance: 30,
+  filter2Distortion: 31, filter2Output: 32, filter2Pan: 33, filter2ModMix: 34,
+  // Filter3 (35-41)
+  filter3Type: 35, filter3Cutoff: 36, filter3Resonance: 37,
+  filter3Distortion: 38, filter3Output: 39, filter3Pan: 40, filter3ModMix: 41,
+  // FiltEnv1 (42-47)
+  env1Attack: 42, env1Decay: 43, env1Sustain: 44,
+  env1Retrigger: 45, env1Release: 46, env1Shape: 47,
+  // FiltEnv2 (48-53)
+  env2Attack: 48, env2Decay: 49, env2Sustain: 50,
+  env2Retrigger: 51, env2Release: 52, env2Shape: 53,
+  // FiltEnv3 (54-59)
+  env3Attack: 54, env3Decay: 55, env3Sustain: 56,
+  env3Retrigger: 57, env3Release: 58, env3Shape: 59,
+  // Env — main output (60-65)
+  env4Attack: 60, env4Decay: 61, env4Sustain: 62,
+  env4Retrigger: 63, env4Release: 64, env4Shape: 65,
+  // LFOs (66-74)
+  lfo1Speed: 66, lfo1Wave: 67, lfo1Phase: 68,
+  lfo2Speed: 69, lfo2Wave: 70, lfo2Phase: 71,
+  lfo3Speed: 72, lfo3Wave: 73, lfo3Phase: 74,
+  // Routing — filter inputs (87-95)
+  filter1Input0: 87, filter1Input1: 88, filter1Input2: 89,
+  filter2Input0: 90, filter2Input1: 91, filter2Input2: 92,
+  filter3Input0: 93, filter3Input1: 94, filter3Input2: 95,
+  // FX (96-103)
+  distortion: 96, shape: 97, delay: 98, delayPan: 99,
+  reverbRoom: 100, reverbMix: 101, chorusMod: 102, effectBypass: 103,
+  // EQ (119)
+  eqBypass: 119,
+};
 
 export class MoniqueSynthEngine implements DevilboxSynth {
   readonly name = 'MoniqueSynthEngine';
@@ -668,6 +661,7 @@ export class MoniqueSynthEngine implements DevilboxSynth {
   private config: MoniqueConfig;
   private isInitialized = false;
   private pendingNotes: Array<{ note: number; velocity: number }> = [];
+  private _currentNote = -1;
 
   private static isWorkletLoaded = false;
   private static workletLoadPromise: Promise<void> | null = null;
@@ -716,7 +710,7 @@ export class MoniqueSynthEngine implements DevilboxSynth {
         .replace(/import\.meta\.url/g, `"${baseUrl}monique/"`)
         .replace(/export\s+default\s+\w+;?\s*$/, '')
         .replace(/if\s*\(ENVIRONMENT_IS_NODE\)\s*\{[^}]*await\s+import\([^)]*\)[^}]*\}/g, '')
-        .replace(/(wasmMemory=wasmExports\["\w+"\])/, '$1;Module["wasmMemory"]=wasmMemory')
+        .replace(/(wasmMemory\s*=\s*wasmExports\[['"][\w]+['"]\])/, '$1;Module["wasmMemory"]=wasmMemory')
         .replace(/new\s+URL\(([^,]+),\s*([^)]+)\)\.href/g, '($2 + $1)');
 
       this._worklet = new AudioWorkletNode(rawContext, 'monique-processor', {
@@ -726,13 +720,16 @@ export class MoniqueSynthEngine implements DevilboxSynth {
 
       this._worklet.port.onmessage = (event) => {
         if (event.data.type === 'ready') {
-          console.log('[MoniqueSynth] Worklet ready, applying config');
+          console.log('[MoniqueSynth] Worklet ready, factory default loaded');
           this.isInitialized = true;
+          // Apply TS config on top of factory defaults (PARAM_INDEX matches C++ enum)
           this.applyConfig(this.config);
           for (const { note, velocity } of this.pendingNotes) {
             this._worklet!.port.postMessage({ type: 'noteOn', note, velocity });
           }
           this.pendingNotes = [];
+        } else if (event.data.type === 'audioLevel') {
+          console.log('[MoniqueSynth] 🔊 WASM producing audio! peak:', event.data.peak);
         } else if (event.data.type === 'error') {
           console.error('[MoniqueSynth] Worklet error:', event.data.error);
         } else {
@@ -762,10 +759,10 @@ export class MoniqueSynthEngine implements DevilboxSynth {
 
   private applyConfig(config: MoniqueConfig): void {
     if (!this._worklet || !this.isInitialized) return;
-    for (let i = 0; i < CONFIG_KEYS.length; i++) {
-      const value = config[CONFIG_KEYS[i]];
+    for (const [key, index] of Object.entries(PARAM_INDEX)) {
+      const value = (config as Record<string, number | undefined>)[key];
       if (value !== undefined) {
-        this._worklet.port.postMessage({ type: 'setParam', index: i, value });
+        this._worklet.port.postMessage({ type: 'setParam', index, value });
       }
     }
   }
@@ -773,6 +770,7 @@ export class MoniqueSynthEngine implements DevilboxSynth {
   triggerAttack(frequency: number | string, _time?: number, velocity?: number): this {
     const note = typeof frequency === 'string' ? noteToMidi(frequency) : Math.round(12 * Math.log2(frequency / 440) + 69);
     const vel = Math.round((velocity ?? 0.8) * 127);
+    this._currentNote = note;
     if (!this.isInitialized || !this._worklet) {
       this.pendingNotes.push({ note, velocity: vel });
       return this;
@@ -781,20 +779,20 @@ export class MoniqueSynthEngine implements DevilboxSynth {
     return this;
   }
 
-  triggerRelease(frequency?: number | string, _time?: number): this {
+  // Monique is monophonic — always release the current note to ensure
+  // the JUCE shim's noteOff matches the voice's currentNote
+  triggerRelease(_time?: number): this {
     if (!this._worklet || !this.isInitialized) return this;
-    if (frequency !== undefined) {
-      const note = typeof frequency === 'string' ? noteToMidi(frequency) : Math.round(12 * Math.log2(frequency / 440) + 69);
-      this._worklet.port.postMessage({ type: 'noteOff', note });
-    } else {
-      this._worklet.port.postMessage({ type: 'allNotesOff' });
+    if (this._currentNote >= 0) {
+      this._worklet.port.postMessage({ type: 'noteOff', note: this._currentNote });
+      this._currentNote = -1;
     }
     return this;
   }
 
   set(param: string, value: number): void {
-    const index = CONFIG_KEYS.indexOf(param as keyof MoniqueConfig);
-    if (index >= 0) {
+    const index = PARAM_INDEX[param];
+    if (index !== undefined) {
       (this.config as Record<string, number>)[param] = value;
       if (this._worklet && this.isInitialized) {
         this._worklet.port.postMessage({ type: 'setParam', index, value });
