@@ -170,6 +170,7 @@ export type SynthType =
   | 'SpaceLaser'       // Space Laser (FM + Pitch Sweep)
   | 'OpenWurli'        // Wurlitzer 200A Electric Piano (Physical Model)
   | 'OPL3'             // Nuked OPL3 (YMF262) 18-channel FM
+  | 'DX7'              // VDX7 Yamaha DX7 (cycle-accurate)
   | 'V2'               // Farbrausch V2 Synth
   | 'V2Speech'         // Farbrausch V2 Speech Synth
   | 'Sam'              // Commodore SAM Speech Synth
