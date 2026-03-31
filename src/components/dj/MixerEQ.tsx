@@ -1,9 +1,8 @@
 /**
  * MixerEQ - Filter + 3-band EQ with kill switches for one DJ deck
  *
- * Vertical stack: Filter, High, Mid, Low knobs (top to bottom, like a real mixer).
+ * Horizontal layout: knobs laid out in rows across both decks.
  * Each EQ band has a kill switch button that mutes the frequency range.
- * Kill switches snap to beat/bar boundaries when quantize is enabled.
  */
 
 import React, { useCallback } from 'react';
@@ -16,42 +15,13 @@ interface MixerEQProps {
   deckId: 'A' | 'B' | 'C';
 }
 
-const BANDS = [
-  { key: 'high' as const, label: 'HI', color: '#00d4ff', killKey: 'eqHighKill' as const },
-  { key: 'mid' as const, label: 'MID', color: '#cccccc', killKey: 'eqMidKill' as const },
-  { key: 'low' as const, label: 'LO', color: '#ff8800', killKey: 'eqLowKill' as const },
-] as const;
-
-export const MixerEQ: React.FC<MixerEQProps> = ({ deckId }) => {
+/** Single filter knob for one deck */
+export const MixerFilterKnob: React.FC<MixerEQProps> = ({ deckId }) => {
   const filterPosition = useDJStore((s) => s.decks[deckId].filterPosition);
-  const eqHigh = useDJStore((s) => s.decks[deckId].eqHigh);
-  const eqMid = useDJStore((s) => s.decks[deckId].eqMid);
-  const eqLow = useDJStore((s) => s.decks[deckId].eqLow);
-  const killHigh = useDJStore((s) => s.decks[deckId].eqHighKill);
-  const killMid = useDJStore((s) => s.decks[deckId].eqMidKill);
-  const killLow = useDJStore((s) => s.decks[deckId].eqLowKill);
 
-  const eqValues = { high: eqHigh, mid: eqMid, low: eqLow };
-  const killValues = { high: killHigh, mid: killMid, low: killLow };
-
-  const handleFilterChange = useCallback((value: number) => {
+  const handleChange = useCallback((value: number) => {
     DJActions.setDeckFilter(deckId, value);
   }, [deckId]);
-
-  const handleEQChange = useCallback((band: 'low' | 'mid' | 'high', dB: number) => {
-    DJActions.setDeckEQ(deckId, band, dB);
-  }, [deckId]);
-
-  const handleKillToggle = useCallback((band: 'low' | 'mid' | 'high') => {
-    const killKey = `eq${band.charAt(0).toUpperCase() + band.slice(1)}Kill` as 'eqLowKill' | 'eqMidKill' | 'eqHighKill';
-    const current = useDJStore.getState().decks[deckId][killKey];
-    DJActions.setDeckEQKill(deckId, band, !current);
-  }, [deckId]);
-
-  const formatEQ = useCallback((val: number) => {
-    if (val === 0) return '0';
-    return `${val > 0 ? '+' : ''}${val.toFixed(0)}`;
-  }, []);
 
   const formatFilter = useCallback((val: number) => {
     if (Math.abs(val) < 0.01) return 'OFF';
@@ -60,61 +30,101 @@ export const MixerEQ: React.FC<MixerEQProps> = ({ deckId }) => {
   }, []);
 
   const deckNum = deckId === 'A' ? '1' : '2';
-  const bandDescriptions = {
-    high: 'High frequencies (treble)',
-    mid: 'Mid frequencies',
-    low: 'Low frequencies (bass)',
-  };
 
   return (
-    <div className="flex flex-col items-center gap-0.5" title={`Deck ${deckNum} Filter + EQ`}>
-      {/* Filter knob — above EQ */}
+    <Knob
+      value={filterPosition}
+      min={-1}
+      max={1}
+      onChange={handleChange}
+      label="FLT"
+      size="sm"
+      color="#aa44ff"
+      bipolar
+      defaultValue={0}
+      formatValue={formatFilter}
+      title={`Deck ${deckNum} Filter — left: high-pass, center: off, right: low-pass`}
+    />
+  );
+};
+
+/** Single EQ band knob + kill switch for one deck */
+export const MixerEQBandKnob: React.FC<{
+  deckId: 'A' | 'B' | 'C';
+  band: 'high' | 'mid' | 'low';
+  label: string;
+  color: string;
+  side: 'left' | 'right';
+}> = ({ deckId, band, label, color, side }) => {
+  const eqValue = useDJStore((s) => s.decks[deckId][`eq${band.charAt(0).toUpperCase() + band.slice(1)}` as 'eqHigh' | 'eqMid' | 'eqLow']);
+  const killKey = `eq${band.charAt(0).toUpperCase() + band.slice(1)}Kill` as 'eqHighKill' | 'eqMidKill' | 'eqLowKill';
+  const killActive = useDJStore((s) => s.decks[deckId][killKey]);
+
+  const handleChange = useCallback((dB: number) => {
+    DJActions.setDeckEQ(deckId, band, dB);
+  }, [deckId, band]);
+
+  const handleKillToggle = useCallback(() => {
+    const current = useDJStore.getState().decks[deckId][killKey];
+    DJActions.setDeckEQKill(deckId, band, !current);
+  }, [deckId, band, killKey]);
+
+  const formatEQ = useCallback((val: number) => {
+    if (val === 0) return '0';
+    return `${val > 0 ? '+' : ''}${val.toFixed(0)}`;
+  }, []);
+
+  const deckNum = deckId === 'A' ? '1' : '2';
+  const bandDesc = band === 'high' ? 'treble' : band === 'low' ? 'bass' : 'mid';
+
+  const killButton = (
+    <button
+      onClick={handleKillToggle}
+      className={`
+        w-4 h-4 rounded-sm text-[7px] font-black leading-none
+        flex items-center justify-center flex-shrink-0
+        transition-all duration-75
+        ${
+          killActive
+            ? 'bg-red-600 text-text-primary shadow-[0_0_6px_rgba(220,38,38,0.5)]'
+            : 'bg-dark-bgTertiary text-text-muted hover:bg-dark-bgHover border border-dark-border'
+        }
+      `}
+      title={`${killActive ? 'Unmute' : 'Kill'} ${label} (${getQuantizeMode() !== 'off' ? 'quantized' : 'instant'})`}
+    >
+      K
+    </button>
+  );
+
+  return (
+    <div className="flex items-center gap-0.5">
+      {side === 'left' && killButton}
       <Knob
-        value={filterPosition}
-        min={-1}
-        max={1}
-        onChange={handleFilterChange}
-        label="FLT"
+        value={eqValue}
+        min={-24}
+        max={6}
+        onChange={handleChange}
+        label={label}
         size="sm"
-        color="#aa44ff"
+        color={color}
         bipolar
         defaultValue={0}
-        formatValue={formatFilter}
-        title={`Deck ${deckNum} Filter — left: high-pass, center: off, right: low-pass`}
+        formatValue={formatEQ}
+        title={`Deck ${deckNum} EQ ${label} — ${bandDesc} (-24 to +6 dB)`}
       />
-      {BANDS.map(({ key, label, color }) => (
-        <div key={key} className="flex items-center gap-0.5">
-          <Knob
-            value={eqValues[key]}
-            min={-24}
-            max={6}
-            onChange={(v) => handleEQChange(key, v)}
-            label={label}
-            size="sm"
-            color={color}
-            bipolar
-            defaultValue={0}
-            formatValue={formatEQ}
-            title={`Deck ${deckNum} EQ ${label} — ${bandDescriptions[key]} (-24 to +6 dB)`}
-          />
-          <button
-            onClick={() => handleKillToggle(key)}
-            className={`
-              w-4 h-4 rounded-sm text-[7px] font-black leading-none
-              flex items-center justify-center
-              transition-all duration-75
-              ${
-                killValues[key]
-                  ? 'bg-red-600 text-text-primary shadow-[0_0_6px_rgba(220,38,38,0.5)]'
-                  : 'bg-dark-bgTertiary text-text-muted hover:bg-dark-bgHover border border-dark-border'
-              }
-            `}
-            title={`${killValues[key] ? 'Unmute' : 'Kill'} ${label} (${getQuantizeMode() !== 'off' ? 'quantized' : 'instant'})`}
-          >
-            K
-          </button>
-        </div>
-      ))}
+      {side === 'right' && killButton}
+    </div>
+  );
+};
+
+/** Full EQ column (legacy — kept for backward compat if needed) */
+export const MixerEQ: React.FC<MixerEQProps> = ({ deckId }) => {
+  return (
+    <div className="flex flex-col items-center gap-0.5">
+      <MixerFilterKnob deckId={deckId} />
+      <MixerEQBandKnob deckId={deckId} band="high" label="HI" color="#00d4ff" side={deckId === 'A' ? 'left' : 'right'} />
+      <MixerEQBandKnob deckId={deckId} band="mid" label="MID" color="#cccccc" side={deckId === 'A' ? 'left' : 'right'} />
+      <MixerEQBandKnob deckId={deckId} band="low" label="LO" color="#ff8800" side={deckId === 'A' ? 'left' : 'right'} />
     </div>
   );
 };
