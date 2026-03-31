@@ -39,7 +39,7 @@ SynthRegistry.registerLazy(
 SynthRegistry.registerLazy(
   [
     'DexedBridge', 'Vital', 'Odin2', 'Surge', 'TonewheelOrgan',
-    'Melodica', 'Monique', 'Helm', 'Sorcer', 'Amsynth', 'OBXf', 'Open303',
+    'Melodica', 'Monique', 'Helm', 'Sorcer', 'OBXf', 'Open303',
   ],
   () => import('./vstbridge').then(() => {}),
 );

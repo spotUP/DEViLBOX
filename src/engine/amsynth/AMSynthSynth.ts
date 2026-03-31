@@ -338,6 +338,7 @@ export class AMSynthSynth implements DevilboxSynth {
   private config: AMSynthConfig;
   private isInitialized = false;
   private pendingNotes: Array<{ note: number; velocity: number }> = [];
+  private _currentNote = -1;
 
   private static isWorkletLoaded = false;
   private static workletLoadPromise: Promise<void> | null = null;
@@ -387,7 +388,8 @@ export class AMSynthSynth implements DevilboxSynth {
         .replace(/import\.meta\.url/g, `"${baseUrl}amsynth/"`)
         .replace(/export\s+default\s+\w+;?\s*$/, '')
         .replace(/if\s*\(ENVIRONMENT_IS_NODE\)\s*\{[^}]*await\s+import\([^)]*\)[^}]*\}/g, '')
-        .replace(/(wasmMemory=wasmExports\["\w+"\])/, '$1;Module["wasmMemory"]=wasmMemory');
+        .replace(/(wasmMemory\s*=\s*wasmExports\[['"][\w]+['"]\])/, '$1;Module["wasmMemory"]=wasmMemory')
+        .replace(/new\s+URL\(([^,]+),\s*([^)]+)\)\.href/g, '($2 + $1)');
 
       this._worklet = new AudioWorkletNode(rawContext, 'amsynth-processor', {
         outputChannelCount: [2],
@@ -396,14 +398,17 @@ export class AMSynthSynth implements DevilboxSynth {
 
       this._worklet.port.onmessage = (event) => {
         if (event.data.type === 'ready') {
+          console.log('[AMSynth] Worklet ready');
           this.isInitialized = true;
           this.applyConfig(this.config);
           for (const { note, velocity } of this.pendingNotes) {
             this._worklet!.port.postMessage({ type: 'noteOn', note, velocity });
           }
           this.pendingNotes = [];
+        } else if (event.data.type === 'audioLevel') {
+          console.log('[AMSynth] 🔊 WASM producing audio! peak:', event.data.peak);
         } else if (event.data.type === 'error') {
-          console.error('AMSynth error:', event.data.error);
+          console.error('[AMSynth] Worklet error:', event.data.error);
         }
       };
 
@@ -442,6 +447,7 @@ export class AMSynthSynth implements DevilboxSynth {
   triggerAttack(frequency: number | string, _time?: number, velocity?: number): this {
     const note = typeof frequency === 'string' ? noteToMidi(frequency) : Math.round(12 * Math.log2(frequency / 440) + 69);
     const vel = Math.round((velocity ?? 0.8) * 127);
+    this._currentNote = note;
 
     if (!this.isInitialized || !this._worklet) {
       this.pendingNotes.push({ note, velocity: vel });
@@ -452,14 +458,12 @@ export class AMSynthSynth implements DevilboxSynth {
     return this;
   }
 
-  triggerRelease(frequency?: number | string, _time?: number): this {
+  // AMSynth is monophonic — always release the current note
+  triggerRelease(_time?: number): this {
     if (!this._worklet || !this.isInitialized) return this;
-
-    if (frequency !== undefined) {
-      const note = typeof frequency === 'string' ? noteToMidi(frequency) : Math.round(12 * Math.log2(frequency / 440) + 69);
-      this._worklet.port.postMessage({ type: 'noteOff', note });
-    } else {
-      this._worklet.port.postMessage({ type: 'allNotesOff' });
+    if (this._currentNote >= 0) {
+      this._worklet.port.postMessage({ type: 'noteOff', note: this._currentNote });
+      this._currentNote = -1;
     }
     return this;
   }

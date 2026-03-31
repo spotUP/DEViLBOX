@@ -16,7 +16,7 @@ const TONE_VOLUME_OFFSETS: Record<string, number> = {
   MonoSynth: 14,
   DuoSynth: 5,
   FMSynth: 16,
-  AMSynth: 22,
+  ToneAM: 22,
   PluckSynth: 32,
   MetalSynth: 23,
   MembraneSynth: 10,
@@ -153,7 +153,7 @@ const toneSynths: SynthDescriptor[] = [
     },
   },
   {
-    id: 'AMSynth',
+    id: 'ToneAM',
     name: 'AM Synth',
     category: 'tone',
     loadMode: 'eager',
@@ -164,7 +164,7 @@ const toneSynths: SynthDescriptor[] = [
           type: config.oscillator?.type || 'sine',
         } as Partial<Tone.OmniOscillatorOptions>,
         envelope: getEnvelope(config),
-        volume: getNormalizedVolume('AMSynth', config.volume),
+        volume: getNormalizedVolume('ToneAM', config.volume),
       });
     },
   },

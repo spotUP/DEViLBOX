@@ -9,7 +9,7 @@ export const VOLUME_NORMALIZATION_OFFSETS: Record<string, number> = {
   'MonoSynth': 2,        // Measured: 1.6dB → target -10dB
   'DuoSynth': 6,         // Measured: -10.8dB → on target
   'FMSynth': 16,         // Measured: -9.9dB → on target
-  'AMSynth': 22,         // Measured: -9.8dB → on target
+  'ToneAM': 22,         // Measured: -9.8dB → on target
   'PluckSynth': 19,      // Measured: 3.4dB → target -10dB
   'MetalSynth': 17,      // Measured: -3.8dB → target -10dB
   'MembraneSynth': 3,    // Measured: -3.2dB → target -10dB
@@ -139,6 +139,8 @@ export const VOLUME_NORMALIZATION_OFFSETS: Record<string, number> = {
   'SetBfree': 6,         // setBfree Hammond B3 — organ can be loud
   'SynthV1': 4,          // SynthV1 4-osc poly — initial estimate
   'Monique': 5,          // Monique morphing mono — initial estimate
+  'Amsynth': 3,          // AMSynth analog modelling — moderate output
+  'VL1': 3,              // Casio VL-Tone — low output wavetable synth
   'TalNoizeMaker': 4,   // TAL-NoiseMaker VA — initial estimate
   'Aeolus': 6,           // Pipe organ — can be loud
   'FluidSynth': 4,       // SF2 player — depends on soundfont

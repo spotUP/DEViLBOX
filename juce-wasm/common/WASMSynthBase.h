@@ -82,6 +82,27 @@ public:
         return false;
     }
 
+    // --- Atomic state load/save (works for any synth with getParameter/setParameter) ---
+
+    /** Get complete engine state as a float array. */
+    virtual std::vector<float> getFullState() const {
+        int count = getParameterCount();
+        std::vector<float> state(count);
+        for (int i = 0; i < count; i++) {
+            state[i] = getParameter(i);
+        }
+        return state;
+    }
+
+    /** Load complete engine state from a float array. */
+    virtual void loadFullState(const float* data, int count) {
+        int paramCount = getParameterCount();
+        int toSet = count < paramCount ? count : paramCount;
+        for (int i = 0; i < toSet; i++) {
+            setParameter(i, data[i]);
+        }
+    }
+
 #ifdef __EMSCRIPTEN__
     // JS-callable wrapper for handleCommand (accepts emscripten::val)
     bool handleCommandJS(const std::string& commandType, emscripten::val jsData) {
@@ -91,6 +112,26 @@ public:
             buf[i] = jsData[i].as<uint8_t>();
         }
         return handleCommand(commandType.c_str(), buf.data(), length);
+    }
+
+    // JS-callable: get complete state as Float32Array
+    emscripten::val getFullStateJS() const {
+        auto state = getFullState();
+        auto arr = emscripten::val::global("Float32Array").new_(static_cast<unsigned>(state.size()));
+        for (size_t i = 0; i < state.size(); i++) {
+            arr.set(i, state[i]);
+        }
+        return arr;
+    }
+
+    // JS-callable: load complete state from Float32Array
+    void loadFullStateJS(emscripten::val jsArray) {
+        auto len = jsArray["length"].as<int>();
+        std::vector<float> data(len);
+        for (int i = 0; i < len; i++) {
+            data[i] = jsArray[i].as<float>();
+        }
+        loadFullState(data.data(), len);
     }
 
     // JS-callable wrapper for getParameterName (returns std::string)
