@@ -35,8 +35,11 @@
 #ifndef JUCE_WINDOWS
 #define JUCE_WINDOWS 0
 #endif
-#ifndef JUCE_IOS
-#define JUCE_IOS 0
+#ifdef JUCE_IOS
+#undef JUCE_IOS
+#endif
+#ifdef JUCE_ANDROID
+#undef JUCE_ANDROID
 #endif
 #ifndef JUCE_ANDROID
 #define JUCE_ANDROID 0
@@ -74,6 +77,7 @@
 #include <cstring>
 #include <string>
 #include <vector>
+#include <map>
 #include <algorithm>
 #include <memory>
 #include <functional>
@@ -141,6 +145,11 @@ public:
     String(const char* s) : str_(s ? s : "") {}
     String(const std::string& s) : str_(s) {}
     String(int v) : str_(std::to_string(v)) {}
+    String(unsigned int v) : str_(std::to_string(v)) {}
+    String(long v) : str_(std::to_string(v)) {}
+    String(unsigned long v) : str_(std::to_string(v)) {}
+    String(long long v) : str_(std::to_string(v)) {}
+    String(unsigned long long v) : str_(std::to_string(v)) {}
     String(float v) : str_(std::to_string(v)) {}
     String(double v) : str_(std::to_string(v)) {}
 
@@ -155,6 +164,7 @@ public:
     String operator+(const char* s) const { return String(str_ + (s ? s : "")); }
     bool operator==(const String& o) const { return str_ == o.str_; }
     bool operator!=(const String& o) const { return str_ != o.str_; }
+    bool operator<(const String& o) const { return str_ < o.str_; }
     operator std::string() const { return str_; }
 
     int getIntValue() const {
@@ -214,6 +224,22 @@ public:
         return String(std::string(a ? a : "") + b.str_);
     }
 
+    String trim() const {
+        auto s = str_;
+        auto start = s.find_first_not_of(" \t\r\n");
+        if (start == std::string::npos) return String("");
+        auto end = s.find_last_not_of(" \t\r\n");
+        return String(s.substr(start, end - start + 1));
+    }
+    String fromFirstOccurrenceOf(const String& sub, bool includeSubstring, bool ignoreCase) const {
+        (void)ignoreCase;
+        auto pos = str_.find(sub.str_);
+        if (pos == std::string::npos) return String("");
+        if (includeSubstring) return String(str_.substr(pos));
+        return String(str_.substr(pos + sub.str_.length()));
+    }
+    void append(const char* s, int) { if (s) str_ += s; }
+
 private:
     std::string str_;
 };
@@ -234,8 +260,16 @@ public:
     StringArray() {}
     void add(const String& s) { items_.push_back(s); }
     int size() const { return (int)items_.size(); }
-    const String& operator[](int i) const { return items_[i]; }
-    String& getReference(int i) { return items_[i]; }
+    const String& operator[](int i) const {
+        static String empty;
+        if (i < 0 || i >= (int)items_.size()) return empty;
+        return items_[i];
+    }
+    String& getReference(int i) {
+        static String empty;
+        if (i < 0 || i >= (int)items_.size()) return empty;
+        return items_[i];
+    }
     void clear() { items_.clear(); }
     void clearQuick() { items_.clear(); }
     int indexOf(const String& s) const {
@@ -498,6 +532,7 @@ public:
     bool isMidiClock() const { return type_ == Type::Clock; }
     bool isMidiStart() const { return type_ == Type::Start; }
     bool isMidiStop() const { return type_ == Type::Stop; }
+    bool isMidiContinue() const { return false; }
     bool isAllNotesOff() const { return isController() && getControllerNumber() == 123; }
     bool isSustainPedalOn() const { return isController() && getControllerNumber() == 64 && getControllerValue() >= 64; }
     bool isSustainPedalOff() const { return isController() && getControllerNumber() == 64 && getControllerValue() < 64; }
@@ -666,6 +701,7 @@ class MidiKeyboardState {
 public:
     virtual ~MidiKeyboardState() {}
     void processNextMidiEvent(const MidiMessage&) {}
+    void processNextMidiBuffer(MidiBuffer&, int, int, bool) {}
     void allNotesOff(int) {}
     void reset() {}
 };
@@ -691,7 +727,18 @@ using ScopedLock = CriticalSection::ScopedLockType;
 // ============================================================================
 class SynthesiserSound {
 public:
-    using Ptr = std::shared_ptr<SynthesiserSound>;
+    // Custom Ptr that allows implicit construction from raw pointer
+    // (JUCE's ReferenceCountedObjectPtr supports this)
+    struct Ptr {
+        std::shared_ptr<SynthesiserSound> ptr_;
+        Ptr() {}
+        Ptr(SynthesiserSound* raw) : ptr_(raw) {}
+        Ptr(std::shared_ptr<SynthesiserSound> sp) : ptr_(std::move(sp)) {}
+        SynthesiserSound* get() const { return ptr_.get(); }
+        SynthesiserSound& operator*() const { return *ptr_; }
+        SynthesiserSound* operator->() const { return ptr_.get(); }
+        operator bool() const { return ptr_ != nullptr; }
+    };
     virtual ~SynthesiserSound() {}
     virtual bool appliesToNote(int) = 0;
     virtual bool appliesToChannel(int) = 0;
@@ -801,6 +848,10 @@ public:
 
     int getNumVoices() const { return (int)voices_.size(); }
     SynthesiserVoice* getVoice(int index) { return voices_[index]; }
+    void removeVoice(int index) {
+        if (index >= 0 && index < (int)voices_.size())
+            voices_.erase(voices_.begin() + index);
+    }
 
 protected:
     virtual void renderVoices(AudioBuffer<float>& outputAudio,
@@ -876,6 +927,12 @@ struct AudioPlayHead {
         double editOriginTime = 0.0;
         int64_t timeInSamples = 0;
         double timeInSeconds = 0.0;
+        void resetToDefault() {
+            bpm = 120.0; ppqPosition = 0; ppqPositionOfLastBarStart = 0;
+            timeSigNumerator = 4; timeSigDenominator = 4;
+            isPlaying = false; isRecording = false; isLooping = false;
+            editOriginTime = 0; timeInSamples = 0; timeInSeconds = 0;
+        }
     };
     virtual ~AudioPlayHead() {}
     virtual bool getCurrentPosition(CurrentPositionInfo&) { return false; }
@@ -885,6 +942,16 @@ class AudioProcessorEditor {
 public:
     virtual ~AudioProcessorEditor() {}
 };
+
+// Forward declarations needed by AudioProcessor
+struct AudioChannelSet {
+    int channels_ = 2;
+    static AudioChannelSet mono() { AudioChannelSet a; a.channels_ = 1; return a; }
+    static AudioChannelSet stereo() { AudioChannelSet a; a.channels_ = 2; return a; }
+    bool operator!=(const AudioChannelSet& o) const { return channels_ != o.channels_; }
+    bool operator==(const AudioChannelSet& o) const { return channels_ == o.channels_; }
+};
+class XmlElement;  // full definition below
 
 class AudioProcessor {
 public:
@@ -898,8 +965,18 @@ public:
         wrapperType_Standalone
     };
 
-    struct BusesLayout {};
+    struct BusesLayout {
+        AudioChannelSet getMainOutputChannelSet() const { return AudioChannelSet::stereo(); }
+        AudioChannelSet getMainInputChannelSet() const { return AudioChannelSet::stereo(); }
+    };
 
+    struct BusesProperties {
+        BusesProperties& withOutput(const char*, AudioChannelSet, bool = true) { return *this; }
+        BusesProperties& withInput(const char*, AudioChannelSet, bool = true) { return *this; }
+    };
+
+    AudioProcessor() {}
+    AudioProcessor(BusesProperties) {}
     virtual ~AudioProcessor() {}
 
     // Pure virtuals that MoniqueAudioProcessor overrides
@@ -941,6 +1018,13 @@ public:
     double getSampleRate() const { return sampleRate_; }
     int getBlockSize() const { return blockSize_; }
 
+    void setPlayConfigDetails(int numIns, int numOuts, double sr, int bs) {
+        sampleRate_ = sr; blockSize_ = bs;
+    }
+    void sendParamChangeMessageToListeners(int, float) {}
+    void copyXmlToBinary(const XmlElement&, MemoryBlock&) {}
+    std::unique_ptr<XmlElement> getXmlFromBinary(const void*, int) { return nullptr; }
+
 protected:
     double sampleRate_ = 44100.0;
     int blockSize_ = 512;
@@ -969,14 +1053,6 @@ public:
 class AudioDeviceManager {
 public:
     virtual ~AudioDeviceManager() {}
-};
-
-// ============================================================================
-// AudioChannelSet
-// ============================================================================
-struct AudioChannelSet {
-    static AudioChannelSet mono() { return AudioChannelSet(); }
-    static AudioChannelSet stereo() { return AudioChannelSet(); }
 };
 
 // ============================================================================
@@ -1022,6 +1098,11 @@ public:
     void remove(int index) {
         if (index >= 0 && index < (int)items_.size())
             items_.erase(items_.begin() + index);
+    }
+    T removeAndReturn(int index) {
+        T val = std::move(items_[index]);
+        items_.erase(items_.begin() + index);
+        return val;
     }
     void removeFirstMatchingValue(const T& val) {
         for (auto it = items_.begin(); it != items_.end(); ++it) {
@@ -1099,8 +1180,14 @@ public:
     }
     void clearQuick(bool deleteObjects = true) { clear(deleteObjects); }
 
-    T* operator[](int index) const { return items_[index]; }
-    T* getUnchecked(int index) const { return items_[index]; }
+    T* operator[](int index) const {
+        if (index < 0 || index >= (int)items_.size()) return nullptr;
+        return items_[index];
+    }
+    T* getUnchecked(int index) const {
+        if (index < 0 || index >= (int)items_.size()) return nullptr;
+        return items_[index];
+    }
     T* getLast() const { return items_.empty() ? nullptr : items_.back(); }
     T* getFirst() const { return items_.empty() ? nullptr : items_.front(); }
 
@@ -1274,38 +1361,81 @@ private:
 class XmlElement {
 public:
     XmlElement(const String& tagName) : tagName_(tagName) {}
-    ~XmlElement() {}
+    ~XmlElement() {
+        for (auto* child : children_) delete child;
+    }
 
     bool hasTagName(const String& name) const { return tagName_ == name; }
     String getTagName() const { return tagName_; }
 
-    void setAttribute(const String&, const String&) {}
-    void setAttribute(const String&, int) {}
-    void setAttribute(const String&, double) {}
-    void setAttribute(const String&, float) {}
-
-    String getStringAttribute(const String&, const String& defaultValue = "") const { return defaultValue; }
-    int getIntAttribute(const String&, int defaultValue = 0) const { return defaultValue; }
-    double getDoubleAttribute(const String&, double defaultValue = 0) const { return defaultValue; }
-    bool getBoolAttribute(const String&, bool defaultValue = false) const { return defaultValue; }
-
-    XmlElement* getChildByName(const String&) const { return nullptr; }
-    XmlElement* getFirstChildElement() const { return nullptr; }
-    XmlElement* getNextElement() const { return nullptr; }
-    int getNumChildElements() const { return 0; }
-    void addChildElement(XmlElement*) {}
-    XmlElement* createNewChildElement(const String& tagName) {
-        return new XmlElement(tagName);
+    void setAttribute(const String& name, const String& value) { attributes_[name] = value; }
+    void setAttribute(const String& name, int value) { attributes_[name] = std::to_string(value); }
+    void setAttribute(const String& name, double value) {
+        char buf[64]; snprintf(buf, sizeof(buf), "%.20g", value);
+        attributes_[name] = buf;
     }
-    void removeAllAttributes() {}
-    void deleteAllChildElements() {}
+    void setAttribute(const String& name, float value) { setAttribute(name, (double)value); }
+
+    String getStringAttribute(const String& name, const String& defaultValue = "") const {
+        auto it = attributes_.find(name);
+        return it != attributes_.end() ? it->second : defaultValue;
+    }
+    int getIntAttribute(const String& name, int defaultValue = 0) const {
+        auto it = attributes_.find(name);
+        if (it == attributes_.end()) return defaultValue;
+        const char* s = it->second.toRawUTF8();
+        if (!s || !*s) return defaultValue;
+        return std::atoi(s);
+    }
+    double getDoubleAttribute(const String& name, double defaultValue = 0) const {
+        auto it = attributes_.find(name);
+        if (it == attributes_.end()) return defaultValue;
+        const char* s = it->second.toRawUTF8();
+        if (!s || !*s) return defaultValue;
+        return std::atof(s);
+    }
+    bool getBoolAttribute(const String& name, bool defaultValue = false) const {
+        auto it = attributes_.find(name);
+        if (it == attributes_.end()) return defaultValue;
+        return it->second == "1" || it->second == "true";
+    }
+
+    XmlElement* getChildByName(const String& name) const {
+        for (auto* child : children_)
+            if (child->tagName_ == name) return child;
+        return nullptr;
+    }
+    XmlElement* getFirstChildElement() const {
+        return children_.empty() ? nullptr : children_[0];
+    }
+    XmlElement* getNextElement() const { return nextSibling_; }
+    int getNumChildElements() const { return (int)children_.size(); }
+    void addChildElement(XmlElement* child) {
+        if (!child) return;
+        if (!children_.empty()) children_.back()->nextSibling_ = child;
+        children_.push_back(child);
+    }
+    XmlElement* createNewChildElement(const String& tagName) {
+        auto* child = new XmlElement(tagName);
+        addChildElement(child);
+        return child;
+    }
+    void removeAllAttributes() { attributes_.clear(); }
+    void deleteAllChildElements() {
+        for (auto* child : children_) delete child;
+        children_.clear();
+    }
 
     struct XmlElement_OutputOptions {};
     bool writeTo(const File&, const XmlElement_OutputOptions& = {}) const { return false; }
     String toString() const { return ""; }
 
 private:
+    friend class XmlDocument;
     String tagName_;
+    std::map<String, String> attributes_;
+    std::vector<XmlElement*> children_;
+    XmlElement* nextSibling_ = nullptr;
 };
 
 class XmlDocument {
@@ -1314,8 +1444,85 @@ public:
     XmlDocument(const File&) {}
     std::unique_ptr<XmlElement> getDocumentElement() { return nullptr; }
     String getLastParseError() const { return ""; }
-    static std::unique_ptr<XmlElement> parse(const String&) { return nullptr; }
-    static std::unique_ptr<XmlElement> parse(const char*) { return nullptr; }
+
+    static std::unique_ptr<XmlElement> parse(const String& text) {
+        return parse(text.toRawUTF8());
+    }
+    static std::unique_ptr<XmlElement> parse(const char* text) {
+        if (!text || !*text) return nullptr;
+        const char* p = text;
+        // Skip XML declaration <?xml ... ?>
+        while (*p) {
+            while (*p && (*p == ' ' || *p == '\t' || *p == '\n' || *p == '\r')) p++;
+            if (p[0] == '<' && p[1] == '?') {
+                while (*p && !(p[0] == '?' && p[1] == '>')) p++;
+                if (*p) p += 2;
+            } else break;
+        }
+        return parseElement(p);
+    }
+
+private:
+    static void skipWS(const char*& p) {
+        while (*p && (*p == ' ' || *p == '\t' || *p == '\n' || *p == '\r')) p++;
+    }
+    static String parseQuotedString(const char*& p) {
+        if (*p != '"') return "";
+        p++; // skip opening quote
+        std::string result;
+        while (*p && *p != '"') { result += *p; p++; }
+        if (*p == '"') p++; // skip closing quote
+        return result;
+    }
+    static String parseName(const char*& p) {
+        std::string name;
+        while (*p && *p != '=' && *p != ' ' && *p != '\t' && *p != '\n' && *p != '\r'
+               && *p != '>' && *p != '/' && *p != '<') {
+            name += *p; p++;
+        }
+        return name;
+    }
+    static std::unique_ptr<XmlElement> parseElement(const char*& p) {
+        skipWS(p);
+        if (*p != '<' || p[1] == '/') return nullptr;
+        p++; // skip '<'
+        String tagName = parseName(p);
+        if (tagName.isEmpty()) return nullptr;
+        auto elem = std::make_unique<XmlElement>(tagName);
+        // Parse attributes
+        while (*p) {
+            skipWS(p);
+            if (*p == '/' && p[1] == '>') { p += 2; return elem; } // self-closing
+            if (*p == '>') { p++; break; } // end of opening tag
+            String attrName = parseName(p);
+            if (attrName.isEmpty()) { p++; continue; }
+            skipWS(p);
+            if (*p == '=') {
+                p++;
+                skipWS(p);
+                String attrValue = parseQuotedString(p);
+                elem->attributes_[attrName] = attrValue;
+            }
+        }
+        // Parse children and closing tag
+        while (*p) {
+            skipWS(p);
+            if (*p == '<' && p[1] == '/') {
+                // Closing tag — skip past '>'
+                while (*p && *p != '>') p++;
+                if (*p == '>') p++;
+                return elem;
+            }
+            if (*p == '<') {
+                auto child = parseElement(p);
+                if (child) elem->addChildElement(child.release());
+                else { p++; } // skip malformed
+            } else {
+                p++; // skip text content
+            }
+        }
+        return elem;
+    }
 };
 
 // ============================================================================
@@ -1371,6 +1578,7 @@ public:
 class LookAndFeel {
 public:
     virtual ~LookAndFeel() {}
+    static void setDefaultLookAndFeel(LookAndFeel*) {}
 };
 
 // ============================================================================
@@ -1406,6 +1614,16 @@ public:
 };
 
 } // namespace juce
+
+// ============================================================================
+// JUCE Plugin Macros (needed by monique_core_Processor.cpp)
+// ============================================================================
+#ifndef JucePlugin_Name
+#define JucePlugin_Name "Monique"
+#endif
+#ifndef JucePlugin_IsSynth
+#define JucePlugin_IsSynth 1
+#endif
 
 // ============================================================================
 // JUCE_CALLTYPE for createPluginFilter (global scope)

@@ -3,6 +3,11 @@
  * Uses WASMSynthBase Embind API (class-based: MoniqueSynth)
  */
 
+// AudioWorkletGlobalScope has no `performance` — polyfill for Emscripten's emscripten_get_now()
+if (typeof performance === 'undefined') {
+  globalThis.performance = { now: () => currentTime * 1000 };
+}
+
 class MoniqueProcessor extends AudioWorkletProcessor {
   constructor() {
     super();
@@ -15,6 +20,7 @@ class MoniqueProcessor extends AudioWorkletProcessor {
     this.outputBufferL = null;
     this.outputBufferR = null;
     this._wasmMemory = null;
+    this._bufferSize = 128;
 
     this.port.onmessage = this.handleMessage.bind(this);
   }
@@ -29,8 +35,9 @@ class MoniqueProcessor extends AudioWorkletProcessor {
 
       case 'noteOn':
         if (this.synth && this.isInitialized) {
-          console.log(`[Monique Worklet] noteOn: note=${data.note} vel=${data.velocity || 100}`);
+          console.log('[Monique Worklet] noteOn:', data.note, 'vel:', data.velocity || 100);
           this.synth.noteOn(data.note, data.velocity || 100);
+          this._audioDetected = false; // Reset to detect audio from this note
         } else {
           this.pendingMessages.push(event.data);
         }
@@ -38,6 +45,7 @@ class MoniqueProcessor extends AudioWorkletProcessor {
 
       case 'noteOff':
         if (this.synth && this.isInitialized) {
+          console.log('[Monique Worklet] noteOff:', data.note);
           this.synth.noteOff(data.note);
         }
         break;
@@ -80,7 +88,6 @@ class MoniqueProcessor extends AudioWorkletProcessor {
   async initialize(data) {
     try {
       const { wasmBinary, jsCode } = data;
-      console.log('[Monique Worklet] Init called, wasmBinary:', wasmBinary?.byteLength, 'jsCode length:', jsCode?.length);
       if (!wasmBinary || !jsCode) {
         throw new Error('Missing wasmBinary or jsCode in init message');
       }
@@ -90,7 +97,6 @@ class MoniqueProcessor extends AudioWorkletProcessor {
       try {
         const wrappedCode = `${jsCode}; return typeof createMoniqueModule !== 'undefined' ? createMoniqueModule : null;`;
         createModule = new Function(wrappedCode)();
-        console.log('[Monique Worklet] Factory eval result:', typeof createModule);
       } catch (evalErr) {
         console.error('[Monique Worklet] Failed to evaluate JS:', evalErr);
         throw new Error('Could not evaluate Monique module factory');
@@ -120,7 +126,6 @@ class MoniqueProcessor extends AudioWorkletProcessor {
       let Module;
       try {
         Module = await createModule({ wasmBinary });
-        console.log('[Monique Worklet] Module created, keys:', Object.keys(Module).slice(0, 20));
       } finally {
         WebAssembly.instantiate = origInstantiate;
       }
@@ -129,24 +134,20 @@ class MoniqueProcessor extends AudioWorkletProcessor {
 
       // Create synth instance via Embind class
       const SynthClass = Module.MoniqueSynth;
-      console.log('[Monique Worklet] SynthClass:', typeof SynthClass, SynthClass ? 'found' : 'MISSING');
       if (!SynthClass) {
         throw new Error('WASM module does not export MoniqueSynth class');
       }
       this.synth = new SynthClass();
-      console.log('[Monique Worklet] Synth instance created, calling initialize with sampleRate:', data.sampleRate || sampleRate);
       this.synth.initialize(data.sampleRate || sampleRate);
-      console.log('[Monique Worklet] Synth initialized');
 
-      // Allocate output buffers
-      this.outputPtrL = Module._malloc(128 * 4);
-      this.outputPtrR = Module._malloc(128 * 4);
-      console.log('[Monique Worklet] Buffers allocated:', this.outputPtrL, this.outputPtrR);
+      // Allocate output buffers (128 = Web Audio standard quantum size)
+      this._bufferSize = 128;
+      this.outputPtrL = Module._malloc(this._bufferSize * 4);
+      this.outputPtrR = Module._malloc(this._bufferSize * 4);
 
       // Get WASM memory
       const wasmMem = Module.wasmMemory || capturedMemory;
       this._wasmMemory = wasmMem;
-      console.log('[Monique Worklet] wasmMemory:', wasmMem ? 'found' : 'MISSING', 'capturedMemory:', capturedMemory ? 'found' : 'MISSING');
 
       const heapBuffer = Module.HEAPF32
         ? Module.HEAPF32.buffer
@@ -156,8 +157,8 @@ class MoniqueProcessor extends AudioWorkletProcessor {
         throw new Error('Cannot access WASM memory buffer');
       }
 
-      this.outputBufferL = new Float32Array(heapBuffer, this.outputPtrL, 128);
-      this.outputBufferR = new Float32Array(heapBuffer, this.outputPtrR, 128);
+      this.outputBufferL = new Float32Array(heapBuffer, this.outputPtrL, this._bufferSize);
+      this.outputBufferR = new Float32Array(heapBuffer, this.outputPtrR, this._bufferSize);
 
       this.isInitialized = true;
 
@@ -193,24 +194,25 @@ class MoniqueProcessor extends AudioWorkletProcessor {
         ? this._wasmMemory.buffer
         : this.Module.HEAPF32 ? this.Module.HEAPF32.buffer : null;
       if (currentBuffer && this.outputBufferL.buffer !== currentBuffer) {
-        this.outputBufferL = new Float32Array(currentBuffer, this.outputPtrL, 128);
-        this.outputBufferR = new Float32Array(currentBuffer, this.outputPtrR, 128);
-      }
-
-      // Debug: check for non-zero samples periodically
-      if (!this._dbgCount) this._dbgCount = 0;
-      if (++this._dbgCount % 500 === 1) {
-        let maxL = 0;
-        for (let i = 0; i < numSamples; i++) {
-          const v = Math.abs(this.outputBufferL[i]);
-          if (v > maxL) maxL = v;
-        }
-        console.log(`[Monique Worklet] process #${this._dbgCount} maxL=${maxL.toFixed(6)} samples=${numSamples}`);
+        this.outputBufferL = new Float32Array(currentBuffer, this.outputPtrL, this._bufferSize);
+        this.outputBufferR = new Float32Array(currentBuffer, this.outputPtrR, this._bufferSize);
       }
 
       outputL.set(this.outputBufferL.subarray(0, numSamples));
       if (outputR !== outputL) {
         outputR.set(this.outputBufferR.subarray(0, numSamples));
+      }
+
+      // Audio level monitoring — log once when audio starts/stops
+      if (!this._audioDetected) this._audioDetected = false;
+      let peak = 0;
+      for (let i = 0; i < numSamples; i++) {
+        const v = Math.abs(outputL[i]);
+        if (v > peak) peak = v;
+      }
+      if (peak > 0.0001 && !this._audioDetected) {
+        this._audioDetected = true;
+        this.port.postMessage({ type: 'audioLevel', peak, status: 'producing audio' });
       }
     } catch (error) {
       console.error('[Monique Worklet] process error:', error);

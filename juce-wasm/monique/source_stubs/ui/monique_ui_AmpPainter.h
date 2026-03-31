@@ -16,4 +16,5 @@ public:
     void calc_new_cycle() {}
     void add_master_osc(const float*, const float*, int) {}
     void add_osc(int, const float*, int) {}
+    void clear_and_keep_minimum() {}
 };

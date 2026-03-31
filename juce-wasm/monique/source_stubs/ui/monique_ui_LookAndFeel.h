@@ -12,7 +12,7 @@ struct ComponentColours {
     void save_to(juce::XmlElement*) const {}
 };
 
-class UiLookAndFeel {
+class UiLookAndFeel : public juce::LookAndFeel {
 public:
     UiLookAndFeel()
         : show_values_always(false, "ShowVals", "SV")
@@ -48,4 +48,7 @@ public:
     int is_global_factory_return = 0;
     int is_global_program_return = 0;
     int is_global_undo = 0;
+
+    void set_synth_data(void*) {}
+    void clear_synth_data() {}
 };

@@ -21,11 +21,14 @@
 #include "../common/WASMSynthBase.h"
 #include "../common/WASMExports.h"
 
-// Monique core headers (uses our JUCE shim via include paths)
-// Note: private/protected->public hack is in monique_juce_shim.h (force-included)
+// Monique core headers (uses real JUCE + stub headers via include paths)
+// Access hack opens private/protected for WASM wrapper to access internals
+#include "monique_access_hack.h"
 #include "monique_core_Synth.h"
 #include "monique_core_Datastructures.h"
 #include "monique_core_Processor.h"
+#undef private
+#undef protected
 
 #include <cstring>
 #include <cmath>
@@ -450,8 +453,43 @@ public:
         );
         smoothManager_ = synthData_->smooth_manager;
 
-        // Load factory default preset (sets filter routing, env params, etc.)
+        // Load factory default preset (real XML parsing now implemented in shim)
         synthData_->load_default();
+
+#ifndef NDEBUG
+        printf("[MoniqueSynth C++] Factory default loaded via XML\n");
+        
+        // Diagnostic: verify key parameters loaded from XML
+        printf("[MoniqueSynth C++] input_sustain[0][0]=%f input_sustain[0][1]=%f input_sustain[0][2]=%f\n",
+            synthData_->filter_datas[0]->input_sustains[0].get_value(),
+            synthData_->filter_datas[0]->input_sustains[1].get_value(),
+            synthData_->filter_datas[0]->input_sustains[2].get_value());
+        printf("[MoniqueSynth C++] filter_type[0]=%f cutoff[0]=%f resonance[0]=%f\n",
+            synthData_->filter_datas[0]->filter_type.get_value(),
+            synthData_->filter_datas[0]->cutoff.get_value(),
+            synthData_->filter_datas[0]->resonance.get_value());
+        printf("[MoniqueSynth C++] osc_wave[0]=%f\n",
+            synthData_->osc_datas[0]->wave.get_value());
+        printf("[MoniqueSynth C++] output[0]=%f output[1]=%f output[2]=%f\n",
+            synthData_->filter_datas[0]->output.get_value(),
+            synthData_->filter_datas[1]->output.get_value(),
+            synthData_->filter_datas[2]->output.get_value());
+        printf("[MoniqueSynth C++] volume=%f glide=%d\n",
+            synthData_->volume.get_value(),
+            (int)synthData_->glide_motor_time);
+        
+        // Diagnostic: morph source values for input_sustain
+        printf("[MoniqueSynth C++] morph_state[1]=%f\n",
+            synthData_->morhp_states[1].get_value());
+        if (synthData_->left_morph_sources.size() > 1) {
+            printf("[MoniqueSynth C++] left_morph[1] input_sustain[0][0]=%f\n",
+                synthData_->left_morph_sources[1]->filter_datas[0]->input_sustains[0].get_value());
+        }
+        if (synthData_->right_morph_sources.size() > 1) {
+            printf("[MoniqueSynth C++] right_morph[1] input_sustain[0][0]=%f\n",
+                synthData_->right_morph_sources[1]->filter_datas[0]->input_sustains[0].get_value());
+        }
+#endif
 
         // Create the voice
         voice_ = new MoniqueSynthesiserVoice(
@@ -463,17 +501,20 @@ public:
         );
 
         // Create synthesizer sound
-        auto sound = std::make_shared<MoniqueSynthesiserSound>();
-
         // Create synthesizer and connect voice
         synth_ = new MoniqueSynthesizer(
             synthData_,
             voice_,
-            sound,
+            new MoniqueSynthesiserSound(),
             nullptr             // no MIDI control handler
         );
 
         synth_->setCurrentPlaybackSampleRate((double)sampleRate);
+
+        // Un-bypass the voice (bypass_smoother is init'd to 0 = muted;
+        // the real MoniqueAudioProcessor sets it to 1 in prepareToPlay)
+        voice_->bypass_smoother.reset_coefficients(sampleRate, 30);
+        voice_->bypass_smoother.set_value(1.0f);
 
         // Allocate output buffer
         outputBuffer_.setSize(2, DEFAULT_BLOCK_SIZE);
@@ -491,14 +532,8 @@ public:
         juce::MidiBuffer midiBuf;
         midiBuf.addEvent(juce::MidiMessage::noteOn(1, midiNote, vel), 0);
 
-        printf("[MoniqueSynth C++] noteOn: note=%d vel=%d voiceActive=%d currentNote=%d\n",
-               midiNote, velocity, voice_->isVoiceActive(), voice_->getCurrentlyPlayingNote());
-
         // Route through synthesizer's MIDI handling
         synth_->render_next_block(outputBuffer_, midiBuf, 0, 0);
-
-        printf("[MoniqueSynth C++] after noteOn: voiceActive=%d currentNote=%d voice_current_note=%d\n",
-               voice_->isVoiceActive(), voice_->getCurrentlyPlayingNote(), voice_->current_note);
     }
 
     void noteOff(int midiNote) override {
@@ -519,14 +554,6 @@ public:
             std::memset(outputL, 0, numSamples * sizeof(float));
             std::memset(outputR, 0, numSamples * sizeof(float));
             return;
-        }
-
-        // Debug: periodically log voice state
-        static int dbgCount = 0;
-        if (++dbgCount % 500 == 1) {
-            printf("[MoniqueSynth C++] process #%d: voiceActive=%d currentNote=%d voice_current_note=%d numVoices=%d\n",
-                   dbgCount, voice_->isVoiceActive(), voice_->getCurrentlyPlayingNote(),
-                   voice_->current_note, synth_->getNumVoices());
         }
 
         // Process in blocks of DEFAULT_BLOCK_SIZE
@@ -567,16 +594,6 @@ public:
             const float* bufR = outputBuffer_.getNumChannels() > 1
                 ? outputBuffer_.getReadPointer(1)
                 : bufL;
-
-            // Debug: check for non-zero output
-            if (dbgCount % 500 == 2) {
-                float maxVal = 0;
-                for (int i = 0; i < blockSize; i++) {
-                    float v = std::fabs(bufL[i]);
-                    if (v > maxVal) maxVal = v;
-                }
-                printf("[MoniqueSynth C++] output maxL=%.6f blockSize=%d\n", maxVal, blockSize);
-            }
 
             std::memcpy(outputL + offset, bufL, blockSize * sizeof(float));
             std::memcpy(outputR + offset, bufR, blockSize * sizeof(float));
