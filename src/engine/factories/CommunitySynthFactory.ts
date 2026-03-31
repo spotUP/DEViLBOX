@@ -47,6 +47,7 @@ import { SynthV1SynthImpl } from '../synthv1/SynthV1Synth';
 import { TalNoizeMakerSynthImpl } from '../tal-noizemaker/TalNoizeMakerSynth';
 import { AeolusSynthImpl } from '../aeolus/AeolusSynth';
 import { MoniqueSynthEngine } from '../monique/MoniqueSynth';
+import { VL1SynthEngine } from '../vl1/VL1Synth';
 import { FluidSynthSynthImpl } from '../fluidsynth/FluidSynthSynth';
 import { SfizzSynthImpl as SfizzEngine } from '../sfizz/SfizzSynth';
 import { ZynAddSubFXSynthImpl } from '../zynaddsubfx/ZynAddSubFXSynth';
@@ -949,14 +950,14 @@ export function createMdaDX10(config: InstrumentConfig): Tone.ToneAudioNode {
 }
 
 /**
- * Create AMSynth (Analog Modelling Synthesizer)
+ * Create Amsynth (Analog Modelling Synthesizer, real WASM engine)
  * Dual-oscillator subtractive with multi-mode filter, reverb, distortion
  */
-export function createAMSynth(config: InstrumentConfig): Tone.ToneAudioNode {
+export function createAmsynth(config: InstrumentConfig): Tone.ToneAudioNode {
   const amsynthConfig = config.amsynth || {};
   const synth = new AMSynthSynth(amsynthConfig);
 
-  synth.output.gain.value = Tone.dbToGain(getNormalizedVolume('AMSynth', config.volume));
+  synth.output.gain.value = Tone.dbToGain(getNormalizedVolume('Amsynth', config.volume));
 
   return synth as unknown as Tone.ToneAudioNode;
 }
@@ -979,7 +980,7 @@ export function createCalfMono(config: InstrumentConfig): Tone.ToneAudioNode {
   const synth = new CalfMonoSynthImpl();
   void synth.init();
   synth.applyConfig(calfConfig);
-
+  synth.output.gain.value = Tone.dbToGain(getNormalizedVolume('CalfMono', config.volume));
   return synth as unknown as Tone.ToneAudioNode;
 }
 
@@ -988,7 +989,7 @@ export function createSetBfree(config: InstrumentConfig): Tone.ToneAudioNode {
   const synth = new SetBfreeSynthImpl();
   void synth.init();
   synth.applyConfig(bfreeConfig);
-
+  synth.output.gain.value = Tone.dbToGain(getNormalizedVolume('SetBfree', config.volume));
   return synth as unknown as Tone.ToneAudioNode;
 }
 
@@ -997,7 +998,7 @@ export function createSynthV1(config: InstrumentConfig): Tone.ToneAudioNode {
   const synth = new SynthV1SynthImpl();
   void synth.init();
   synth.applyConfig(sv1Config);
-
+  synth.output.gain.value = Tone.dbToGain(getNormalizedVolume('SynthV1', config.volume));
   return synth as unknown as Tone.ToneAudioNode;
 }
 
@@ -1006,6 +1007,7 @@ export function createTalNoizeMaker(config: InstrumentConfig): Tone.ToneAudioNod
   const synth = new TalNoizeMakerSynthImpl();
   void synth.init();
   synth.applyConfig(talConfig);
+  synth.output.gain.value = Tone.dbToGain(getNormalizedVolume('TalNoizeMaker', config.volume));
   return synth as unknown as Tone.ToneAudioNode;
 }
 
@@ -1014,12 +1016,21 @@ export function createAeolus(config: InstrumentConfig): Tone.ToneAudioNode {
   const synth = new AeolusSynthImpl();
   void synth.init();
   synth.applyConfig(aeolusConfig);
+  synth.output.gain.value = Tone.dbToGain(getNormalizedVolume('Aeolus', config.volume));
   return synth as unknown as Tone.ToneAudioNode;
 }
 
 export function createMonique(config: InstrumentConfig): Tone.ToneAudioNode {
   const moniqueConfig = config.monique || {};
   const synth = new MoniqueSynthEngine(moniqueConfig);
+  synth.output.gain.value = Tone.dbToGain(getNormalizedVolume('Monique', config.volume));
+  return synth as unknown as Tone.ToneAudioNode;
+}
+
+export function createVL1(config: InstrumentConfig): Tone.ToneAudioNode {
+  const vl1Config = config.vl1 || {};
+  const synth = new VL1SynthEngine(vl1Config);
+  synth.output.gain.value = Tone.dbToGain(getNormalizedVolume('VL1', config.volume));
   return synth as unknown as Tone.ToneAudioNode;
 }
 
@@ -1028,6 +1039,7 @@ export function createFluidSynth(config: InstrumentConfig): Tone.ToneAudioNode {
   const synth = new FluidSynthSynthImpl();
   void synth.init();
   synth.applyConfig(fsConfig);
+  synth.output.gain.value = Tone.dbToGain(getNormalizedVolume('FluidSynth', config.volume));
   return synth as unknown as Tone.ToneAudioNode;
 }
 
@@ -1036,6 +1048,7 @@ export function createSfizz(config: InstrumentConfig): Tone.ToneAudioNode {
   const synth = new SfizzEngine();
   void synth.init();
   synth.applyConfig(sfizzConfig);
+  synth.output.gain.value = Tone.dbToGain(getNormalizedVolume('Sfizz', config.volume));
   return synth as unknown as Tone.ToneAudioNode;
 }
 
@@ -1043,7 +1056,14 @@ export function createZynAddSubFX(config: InstrumentConfig): Tone.ToneAudioNode 
   const zasfxConfig = config.zynaddsubfx || {};
   const synth = new ZynAddSubFXSynthImpl();
   void synth.init();
-  synth.applyConfig(zasfxConfig);
+  // Check for native XML preset (loaded by ZynAddSubFX's own XML parser)
+  const xmlPresetName = (config as unknown as Record<string, unknown>).zynaddsubfxXmlPreset;
+  if (typeof xmlPresetName === 'string') {
+    synth.setPreset(xmlPresetName);
+  } else {
+    synth.applyConfig(zasfxConfig);
+  }
+  synth.output.gain.value = Tone.dbToGain(getNormalizedVolume('ZynAddSubFX', config.volume));
   return synth as unknown as Tone.ToneAudioNode;
 }
 

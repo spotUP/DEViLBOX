@@ -43,6 +43,7 @@ add_definitions(
     -DOUT_DEFAULT="null"
     -DIN_DEFAULT="null"
     -DMXML_MAJOR_VERSION=4
+    -DNDEBUG
 )
 
 # ZynAddSubFX DSP source files
@@ -206,6 +207,7 @@ set(EXPORTED_FUNCTIONS
     "_zasfx_get_param"
     "_zasfx_get_num_params"
     "_zasfx_all_notes_off"
+    "_zasfx_load_preset_xml"
     "_malloc"
     "_free"
 )
@@ -222,7 +224,7 @@ target_link_options(ZynAddSubFX PRIVATE
     "SHELL:-s MODULARIZE=1"
     "SHELL:-s EXPORT_NAME=createZynAddSubFX"
     "SHELL:-s EXPORTED_FUNCTIONS=[${EXPORTED_FUNCTIONS_STR}]"
-    "SHELL:-s EXPORTED_RUNTIME_METHODS=[ccall,cwrap,getValue,setValue]"
+    "SHELL:-s EXPORTED_RUNTIME_METHODS=[ccall,cwrap,getValue,setValue,wasmMemory,HEAPF32]"
     "SHELL:-s ALLOW_MEMORY_GROWTH=1"
     "SHELL:-s INITIAL_MEMORY=33554432"
     "SHELL:-s STACK_SIZE=1048576"
@@ -234,4 +236,5 @@ target_link_options(ZynAddSubFX PRIVATE
     "SHELL:-s USE_ZLIB=1"
     "SHELL:-s USE_PTHREADS=0"
     "SHELL:-s ERROR_ON_UNDEFINED_SYMBOLS=0"
+    "--js-library ${CMAKE_SOURCE_DIR}/fs_stubs.js"
 )
