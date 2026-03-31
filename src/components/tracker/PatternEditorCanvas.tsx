@@ -451,7 +451,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
     let foundChannel = false;
 
     for (let ch = 0; ch < numChannels; ch++) {
-      const off = channelOffsets[ch] - scrollLeft;
+      const off = channelOffsets[ch];
       const w = channelWidths[ch];
       if (relativeX >= off && relativeX < off + w) {
         channelIndex = ch;
