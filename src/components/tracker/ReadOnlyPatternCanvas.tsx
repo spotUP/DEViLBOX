@@ -105,6 +105,7 @@ export const ReadOnlyPatternCanvas: React.FC<ReadOnlyPatternCanvasProps> = React
       bg:                  t.colors.trackerRowEven,
       rowNormal:           t.colors.trackerRowOdd,
       rowHighlight:        t.colors.trackerRowHighlight,
+      rowSecondaryHighlight: t.colors.accent + '33',
       border:              t.colors.border,
       trackerBorder:       t.colors.trackerBorder,
       textNote:            t.colors.textSecondary,

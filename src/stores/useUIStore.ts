@@ -48,6 +48,7 @@ interface UIStore {
   sidebarCollapsed: boolean;
   useHexNumbers: boolean; // Display numbers in hex (true) or decimal (false)
   rowHighlightInterval: number; // Every N rows gets highlight (default 4, FT2 style)
+  rowSecondaryHighlightInterval: number; // Every M rows gets stronger highlight (bar, default 16)
   showBeatLabels: boolean; // Show beat.tick labels alongside row numbers
   chordEntryMode: boolean; // Chord entry: spread notes across channels
   blankEmptyCells: boolean; // Hide ---, .., ... etc. for clean pattern view
@@ -224,6 +225,7 @@ export const useUIStore = create<UIStore>()(
       sidebarCollapsed: false,
       useHexNumbers: true, // Default to hex numbers (FT2 style)
       rowHighlightInterval: 4, // Highlight every 4th row (FT2 default)
+      rowSecondaryHighlightInterval: 16, // Stronger highlight every 16th row (bar lines)
       showBeatLabels: false, // Beat labels off by default
       chordEntryMode: false, // Chord entry off by default
       blankEmptyCells: false, // Show ---, .., ... by default
