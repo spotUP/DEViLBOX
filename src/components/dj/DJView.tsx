@@ -395,7 +395,10 @@ export const DJView: React.FC<DJViewProps> = ({ onShowDrumpads: _onShowDrumpads 
       {/* AUTO DJ PANEL                                                     */}
       {/* ================================================================== */}
       {showAutoDJ && (
-        <div className="shrink-0 px-2 pt-2">
+        <div
+          className="absolute inset-x-0 top-12 bottom-0 z-[99989] px-2 pt-2"
+          onClick={(e) => { if (e.target === e.currentTarget) setShowAutoDJ(false); }}
+        >
           <DJAutoDJPanel onClose={() => setShowAutoDJ(false)} />
         </div>
       )}
