@@ -15,6 +15,7 @@ import * as Tone from 'tone';
 import { getToneEngine } from '@engine/ToneEngine';
 import { getTrackerReplayer } from '@engine/TrackerReplayer';
 import { parseMPTClipboard } from '@lib/import/MPTClipboardParser';
+import { xmNoteToString } from '@lib/xmConversions';
 import { useNoteInput, useEffectInput, useNavigationInput } from './input';
 import type { EditorBehavior } from '@engine/keyboard/EditorBehavior';
 
@@ -690,11 +691,61 @@ export const useTrackerInput = () => {
         return;
       }
 
-      // Standard Ctrl+C/X/V shortcuts
-      if ((e.ctrlKey || e.metaKey) && keyLower === 'c' && !e.altKey) {
+      // OpenMPT: Ctrl+Shift+C = copy selection as text to system clipboard
+      if ((e.ctrlKey || e.metaKey) && keyLower === 'c' && e.shiftKey && !e.altKey) {
         e.preventDefault();
-        copySelection();
-        useUIStore.getState().setStatusMessage('COPY');
+        const sel = selectionRef.current;
+        if (sel) {
+          const lines: string[] = [];
+          const startRow = Math.min(sel.startRow, sel.endRow);
+          const endRow = Math.max(sel.startRow, sel.endRow);
+          const startCh = Math.min(sel.startChannel, sel.endChannel);
+          const endCh = Math.max(sel.startChannel, sel.endChannel);
+          for (let r = startRow; r <= endRow; r++) {
+            const parts: string[] = [];
+            for (let ch = startCh; ch <= endCh; ch++) {
+              const cell = pattern.channels[ch].rows[r];
+              const note = cell.note > 0 && cell.note < 97
+                ? xmNoteToString(cell.note)
+                : (cell.note === 97 ? '===' : '...');
+              const inst = cell.instrument
+                ? cell.instrument.toString(16).toUpperCase().padStart(2, '0')
+                : '..';
+              const vol = cell.volume
+                ? cell.volume.toString(16).toUpperCase().padStart(2, '0')
+                : '..';
+              const eff = cell.effTyp
+                ? cell.effTyp.toString(16).toUpperCase()
+                : '.';
+              const param = cell.eff
+                ? cell.eff.toString(16).toUpperCase().padStart(2, '0')
+                : '..';
+              parts.push(`${note} ${inst} ${vol} ${eff}${param}`);
+            }
+            lines.push(parts.join(' | '));
+          }
+          navigator.clipboard.writeText(lines.join('\n')).catch(() => {
+            // clipboard API denied — ignore silently
+          });
+          useUIStore.getState().setStatusMessage('COPY AS TEXT');
+        } else {
+          useUIStore.getState().setStatusMessage('SELECT RANGE FIRST');
+        }
+        return;
+      }
+
+      // Standard Ctrl+C/X/V shortcuts — IT: Ctrl+C = centralize cursor
+      if ((e.ctrlKey || e.metaKey) && keyLower === 'c' && !e.altKey && !e.shiftKey) {
+        e.preventDefault();
+        const beh = useEditorStore.getState().activeBehavior;
+        if (beh.itMaskVariables) {
+          // IT: Ctrl+C = centralize cursor (scroll view to center on cursor row)
+          window.dispatchEvent(new CustomEvent('tracker:center-cursor'));
+          useUIStore.getState().setStatusMessage('CENTRALIZE');
+        } else {
+          copySelection();
+          useUIStore.getState().setStatusMessage('COPY');
+        }
         return;
       }
       if ((e.ctrlKey || e.metaKey) && keyLower === 'x' && !e.altKey) {
@@ -753,6 +804,22 @@ export const useTrackerInput = () => {
       if ((e.ctrlKey || e.metaKey) && e.shiftKey && keyLower === 'i') {
         e.preventDefault();
         pastePushForward();
+        return;
+      }
+
+      // Renoise: Ctrl+P = continuous paste (paste and advance cursor by clipboard height)
+      if ((e.ctrlKey || e.metaKey) && keyLower === 'p' && !e.altKey && !e.shiftKey && recordMode) {
+        e.preventDefault();
+        const clipData = useTrackerStore.getState().clipboard;
+        if (clipData) {
+          paste();
+          const clipHeight = clipData.rows || 1;
+          const newRow = Math.min(cursorRef.current.rowIndex + clipHeight, pattern.length - 1);
+          moveCursorToRow(newRow);
+          useUIStore.getState().setStatusMessage('CONTINUOUS PASTE');
+        } else {
+          useUIStore.getState().setStatusMessage('CLIPBOARD EMPTY');
+        }
         return;
       }
 
@@ -1127,6 +1194,20 @@ export const useTrackerInput = () => {
           useUIStore.getState().setStatusMessage('REVERSE BLOCK');
           return;
         }
+
+        // IT: Alt+I = template mode toggle (placeholder — full 5-mode cycling not yet implemented)
+        if (isIT && keyLower === 'i' && !e.shiftKey) {
+          e.preventDefault();
+          useUIStore.getState().setStatusMessage('TEMPLATE MODE: NOT YET IMPLEMENTED');
+          return;
+        }
+
+        // IT: Alt+N = multichannel mode toggle (placeholder)
+        if (isIT && keyLower === 'n' && !e.shiftKey) {
+          e.preventDefault();
+          useUIStore.getState().setStatusMessage('MULTICHANNEL: NOT YET IMPLEMENTED');
+          return;
+        }
       }
 
       // IT: Ctrl+Insert = roll selection down, Ctrl+Delete = roll selection up
@@ -1249,11 +1330,20 @@ export const useTrackerInput = () => {
         return;
       }
 
-      // Ctrl+H: FT2 = chord tool, PT = transpose block +1 semitone
+      // Ctrl+H: IT = toggle row highlight, FT2 = chord tool, PT = transpose block +1 semitone
       if ((e.ctrlKey || e.metaKey) && keyLower === 'h' && !e.altKey) {
         e.preventDefault();
         const beh = useEditorStore.getState().activeBehavior;
-        if (beh.ptEffectMacros && recordMode) {
+        if (beh.itMaskVariables) {
+          // IT: Ctrl+H = toggle row highlight on/off
+          const currentHighlight = beh.primaryHighlight;
+          const newHighlight = currentHighlight === 0 ? 4 : 0;
+          // Dispatch event so the pattern editor can pick up the highlight change
+          window.dispatchEvent(new CustomEvent('tracker:toggle-row-highlight', {
+            detail: { primaryHighlight: newHighlight }
+          }));
+          useUIStore.getState().setStatusMessage(`ROW HIGHLIGHT: ${newHighlight > 0 ? 'ON' : 'OFF'}`);
+        } else if (beh.ptEffectMacros && recordMode) {
           // PT: Ctrl+H = transpose selection +1 semitone
           transposeSelection(1);
           useUIStore.getState().setStatusMessage('TRANSPOSE +1');
