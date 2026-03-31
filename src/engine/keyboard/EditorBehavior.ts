@@ -236,7 +236,7 @@ const protrackerBehavior: EditorBehavior = {
   spaceBehavior: 'play-stop-or-edit',
   recordQuantization: false,
   volumeColumnEnabled: false,
-  fKeyCutCopyPaste: false,
+  fKeyCutCopyPaste: true,
   fKeyTranspose: false,
   primaryHighlight: 4,
   secondaryHighlight: 16,

@@ -85,6 +85,8 @@ export const useTrackerInput = () => {
   const deleteRow = useTrackerStore((state) => state.deleteRow);
   const interpolateSelection = useTrackerStore((state) => state.interpolateSelection);
   const replacePattern = useTrackerStore((state) => state.replacePattern);
+  const expandPattern = useTrackerStore((state) => state.expandPattern);
+  const shrinkPattern = useTrackerStore((state) => state.shrinkPattern);
 
   const {
     isPlaying,
@@ -279,18 +281,125 @@ export const useTrackerInput = () => {
       }
 
       // ============================================
-      // FT2: Macro Slots (Ctrl+1-8)
+      // Macro Slots (FT2: Ctrl+1-8, PT: Shift+0-9 store / Alt+1-0 recall)
+      // PT: Ctrl+0-9 sets edit step directly
       // ============================================
 
-      if ((e.ctrlKey || e.metaKey) && key >= '1' && key <= '8' && !e.altKey) {
-        e.preventDefault();
-        const slotIndex = parseInt(key) - 1;
-        if (e.shiftKey) {
-          writeMacroSlot(slotIndex);
-        } else {
-          readMacroSlot(slotIndex);
+      if ((e.ctrlKey || e.metaKey) && key >= '0' && key <= '9' && !e.altKey && !e.shiftKey) {
+        const behavior = useEditorStore.getState().activeBehavior;
+        if (behavior.ptEffectMacros) {
+          // PT: Ctrl+0-9 = set edit step
+          e.preventDefault();
+          const step = parseInt(key);
+          useEditorStore.getState().setEditStep(step);
+          useUIStore.getState().setStatusMessage(`EDITSKIP = ${step}`);
+          return;
+        } else if (key >= '1' && key <= '8') {
+          // FT2: Ctrl+1-8 = recall macro slot
+          e.preventDefault();
+          readMacroSlot(parseInt(key) - 1);
+          return;
         }
-        return;
+      }
+      if ((e.ctrlKey || e.metaKey) && e.shiftKey && key >= '1' && key <= '8' && !e.altKey) {
+        const behavior = useEditorStore.getState().activeBehavior;
+        if (!behavior.ptEffectMacros) {
+          // FT2: Ctrl+Shift+1-8 = store macro slot
+          e.preventDefault();
+          writeMacroSlot(parseInt(key) - 1);
+          return;
+        }
+      }
+
+      // PT-style effect macros: Shift+0-9 stores effect, Alt+1-0 recalls
+      if (useEditorStore.getState().activeBehavior.ptEffectMacros) {
+        // Shift+0-9: Store current cell's effect into macro slot
+        if (e.shiftKey && !e.altKey && !e.ctrlKey && !e.metaKey && key >= '0' && key <= '9') {
+          e.preventDefault();
+          const slotIndex = key === '0' ? 9 : parseInt(key) - 1;
+          writeMacroSlot(slotIndex);
+          return;
+        }
+        // Alt+1-0: Recall effect macro into current cell
+        if (e.altKey && !e.shiftKey && !e.ctrlKey && !e.metaKey && key >= '0' && key <= '9' && recordMode) {
+          e.preventDefault();
+          const slotIndex = key === '0' ? 9 : parseInt(key) - 1;
+          readMacroSlot(slotIndex);
+          return;
+        }
+      }
+
+      // ============================================
+      // IT/OpenMPT: Comma toggles copy mask per column
+      // ============================================
+
+      if (key === ',' && !e.ctrlKey && !e.metaKey && !e.altKey && !e.shiftKey) {
+        const behavior = useEditorStore.getState().activeBehavior;
+        if (behavior.itMaskVariables) {
+          e.preventDefault();
+          const colType = cursorRef.current.columnType;
+          const MASK_INSTRUMENT = 1 << 1;
+          const MASK_VOLUME = 1 << 2;
+          const MASK_EFFECT = 1 << 3;
+          const edStore = useEditorStore.getState();
+          let bit = 0;
+          if (colType === 'instrument') bit = MASK_INSTRUMENT;
+          else if (colType === 'volume') bit = MASK_VOLUME;
+          else if (colType === 'effTyp' || colType === 'effParam' || colType === 'effTyp2' || colType === 'effParam2') bit = MASK_EFFECT;
+          if (bit) {
+            edStore.toggleMaskBit('copy', bit);
+            const newMask = useEditorStore.getState().copyMask;
+            const maskNames = [];
+            if (newMask & 1) maskNames.push('NOTE');
+            if (newMask & MASK_INSTRUMENT) maskNames.push('INST');
+            if (newMask & MASK_VOLUME) maskNames.push('VOL');
+            if (newMask & MASK_EFFECT) maskNames.push('EFX');
+            useUIStore.getState().setStatusMessage(`MASK: ${maskNames.join('+') || 'NONE'}`);
+          }
+          return;
+        }
+      }
+
+      // ============================================
+      // PT: F6-F10 position markers (Shift+Fn = store, bare Fn = jump)
+      // ============================================
+
+      if (['F6', 'F7', 'F8', 'F9', 'F10'].includes(key)) {
+        const behavior = useEditorStore.getState().activeBehavior;
+        if (behavior.ptEffectMacros && !e.ctrlKey && !e.metaKey && !e.altKey) {
+          const posIndex = parseInt(key.slice(1)) - 6; // F6=0, F7=1, F8=2, F9=3, F10=4
+          if (e.shiftKey) {
+            // Store position
+            e.preventDefault();
+            useEditorStore.getState().setPtnJumpPos(posIndex, cursorRef.current.rowIndex);
+            useUIStore.getState().setStatusMessage(`POSITION ${posIndex + 1} SET (ROW ${cursorRef.current.rowIndex})`);
+            return;
+          } else if (!isPlaying) {
+            // Jump to stored position
+            e.preventDefault();
+            const jumpRow = useEditorStore.getState().getPtnJumpPos(posIndex);
+            moveCursorToRow(jumpRow);
+            useUIStore.getState().setStatusMessage(`JUMP TO ROW ${jumpRow}`);
+            return;
+          }
+        }
+      }
+
+      // PT: Alt+Backslash = copy effect from row above
+      if (key === '\\' && e.altKey && !e.ctrlKey && !e.metaKey && recordMode) {
+        const behavior = useEditorStore.getState().activeBehavior;
+        if (behavior.ptEffectMacros) {
+          e.preventDefault();
+          const ch = cursorRef.current.channelIndex;
+          const row = cursorRef.current.rowIndex;
+          const prevRow = (row - 1 + pattern.length) % pattern.length;
+          const prevCell = pattern.channels[ch]?.rows[prevRow];
+          if (prevCell) {
+            setCell(ch, row, { effTyp: prevCell.effTyp || 0, eff: prevCell.eff || 0 });
+            useUIStore.getState().setStatusMessage('COPY EFFECT FROM ABOVE');
+          }
+          return;
+        }
       }
 
       // ============================================
@@ -585,6 +694,19 @@ export const useTrackerInput = () => {
         return;
       }
 
+      // Expand/Shrink pattern (FT2: Alt+E = expand, Alt+Shift+E = shrink, or Ctrl+F9/F10)
+      if (e.altKey && keyLower === 'e' && !e.ctrlKey && !e.metaKey) {
+        e.preventDefault();
+        if (e.shiftKey) {
+          shrinkPattern(currentPatternIndex);
+          useUIStore.getState().setStatusMessage('SHRINK PATTERN');
+        } else {
+          expandPattern(currentPatternIndex);
+          useUIStore.getState().setStatusMessage('EXPAND PATTERN');
+        }
+        return;
+      }
+
       // I key (no modifiers): Interpolate values in selection (only on volume column)
       if (keyLower === 'i' && !e.ctrlKey && !e.metaKey && !e.altKey && !e.shiftKey && cursorRef.current.columnType === 'volume') {
         e.preventDefault();
@@ -636,7 +758,8 @@ export const useTrackerInput = () => {
         return;
       }
 
-      // Escape: Clear selection, or double-Esc to kill all notes (panic)
+      // Escape: Behavior-aware
+      // Renoise: Escape stops playback. All schemes: clear selection, double-Esc = panic
       if (key === 'Escape') {
         e.preventDefault();
 
@@ -648,7 +771,16 @@ export const useTrackerInput = () => {
           useUIStore.getState().setStatusMessage('PANIC - ALL NOTES OFF');
           lastEscPressRef.current = 0;
         } else {
-          clearSelection();
+          // Renoise: Escape stops playback if playing
+          const behavior = useEditorStore.getState().activeBehavior;
+          if (behavior.spaceBehavior === 'play-stop' && isPlaying) {
+            getTrackerReplayer().stop();
+            stop();
+            getToneEngine().releaseAll();
+            useUIStore.getState().setStatusMessage('STOPPED');
+          } else {
+            clearSelection();
+          }
           lastEscPressRef.current = now;
         }
         return;
@@ -695,16 +827,28 @@ export const useTrackerInput = () => {
             }
             break;
           case 'toggle-edit': {
-            // IT: In edit mode, Space on an empty cell pastes current instrument from mask
+            // IT: In edit mode, Space on an empty cell pastes data from mask
             if (behavior.itSpaceCopyMask && recordMode) {
               const ch = cursorRef.current.channelIndex;
               const row = cursorRef.current.rowIndex;
               const cell = pattern.channels[ch]?.rows[row];
               if (cell && cell.note === 0) {
                 const { currentInstrumentId, instruments } = (require('@stores/useInstrumentStore') as any).useInstrumentStore.getState();
-                const idx = instruments.findIndex((i: any) => i.id === currentInstrumentId);
-                if (idx >= 0) {
-                  setCell(ch, row, { instrument: idx + 1 });
+                const copyMask = useEditorStore.getState().copyMask;
+                const updates: Record<string, any> = {};
+                // Paste instrument if mask bit set
+                if (copyMask & 0b00010) { // MASK_INSTRUMENT
+                  const idx = instruments.findIndex((i: any) => i.id === currentInstrumentId);
+                  if (idx >= 0) updates.instrument = idx + 1;
+                }
+                // Paste last volume if mask bit set
+                if (copyMask & 0b00100) { // MASK_VOLUME
+                  // IT copies the last-entered volume value; use current cell's volume or default 64
+                  if (cell.volume) updates.volume = cell.volume;
+                  else updates.volume = 64;
+                }
+                if (Object.keys(updates).length > 0) {
+                  setCell(ch, row, updates);
                 }
                 if (editStep > 0 && !isPlaying) {
                   moveCursorToRow((cursorRef.current.rowIndex + editStep) % pattern.length);
@@ -799,6 +943,8 @@ export const useTrackerInput = () => {
       toggleInsertMode,
       replacePattern,
       interpolateSelection,
+      expandPattern,
+      shrinkPattern,
       insertRow,
       setIsLooping,
       isPatternEditable,

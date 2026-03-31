@@ -11,6 +11,7 @@ import { useEditorStore } from '@stores/useEditorStore';
 import {
   HEX_DIGITS_ALL,
   VOL1_KEY_MAP,
+  IT_VOL1_KEY_MAP,
   EFFECT_TYPE_KEY_MAP,
   type TrackerInputRefs,
 } from './inputConstants';
@@ -84,12 +85,15 @@ export const useEffectInput = (refs: TrackerInputRefs) => {
         return true;
       }
 
-      // ---------- VOLUME COLUMN (FT2 VOL1 special keys + VOL2 hex) ----------
+      // ---------- VOLUME COLUMN (scheme-aware VOL1 keys + VOL2 hex) ----------
       if (cursorRef.current.columnType === 'volume') {
         const currentValue = currentCell.volume || 0;
+        // Select volume key map based on scheme (IT/OpenMPT use different keys)
+        const behavior = useEditorStore.getState().activeBehavior;
+        const volKeyMap = (behavior.itMaskVariables || behavior.itThreeNoteTypes) ? IT_VOL1_KEY_MAP : VOL1_KEY_MAP;
 
         if (cursorRef.current.digitIndex === 0) {
-          const vol1Key = VOL1_KEY_MAP[keyLower];
+          const vol1Key = volKeyMap[keyLower];
           if (vol1Key !== undefined) {
             e.preventDefault();
             let newValue = (vol1Key << 4) | (currentValue & 0x0F);
