@@ -11,6 +11,8 @@
 
 import type { DevilboxSynth } from '@/types/synth';
 import { getDevilboxAudioContext, noteToMidi } from '@/utils/audio-context';
+import { parseDX7Cartridge, configToVCED, type DX7Patch } from './dx7sysex';
+import { DX7_VCED_PRESETS } from './dx7presets';
 
 /**
  * DX7 Algorithm definitions
@@ -167,6 +169,7 @@ export class DexedSynth implements DevilboxSynth {
   private config: DexedConfig;
   private isInitialized = false;
   private pendingNotes: Array<{ note: number; velocity: number }> = [];
+  private pendingVCED: Uint8Array | null = null;
 
   // Static initialization tracking
   private static isWorkletLoaded = false;
@@ -239,7 +242,8 @@ export class DexedSynth implements DevilboxSynth {
         .replace(/import\.meta\.url/g, `"${baseUrl}dexed/"`)
         .replace(/export\s+default\s+\w+;?\s*$/, '')
         .replace(/if\s*\(ENVIRONMENT_IS_NODE\)\s*\{[^}]*await\s+import\([^)]*\)[^}]*\}/g, '')
-        .replace(/(wasmMemory=wasmExports\["\w+"\])/, '$1;Module["wasmMemory"]=wasmMemory');
+        .replace(/(wasmMemory\s*=\s*wasmExports\[['"][\w]+['"]\])/, '$1;Module["wasmMemory"]=wasmMemory')
+        .replace(/new\s+URL\(([^,]+),\s*([^)]+)\)\.href/g, '($2 + $1)');
 
       // Create worklet node using native AudioWorkletNode constructor
       this._worklet = new AudioWorkletNode(rawContext, 'dexed-processor');
@@ -249,8 +253,14 @@ export class DexedSynth implements DevilboxSynth {
         if (event.data.type === 'ready') {
           this.isInitialized = true;
 
-          // Apply initial config
-          this.applyConfig(this.config);
+          // If a VCED preset was queued before init, load it natively
+          if (this.pendingVCED) {
+            this.loadVCED(this.pendingVCED);
+            this.pendingVCED = null;
+          } else {
+            // Apply initial config via individual parameters
+            this.applyConfig(this.config);
+          }
 
           // Process pending notes
           for (const { note, velocity } of this.pendingNotes) {
@@ -423,7 +433,23 @@ export class DexedSynth implements DevilboxSynth {
   }
 
   /**
-   * Load a DX7 SysEx patch
+   * Load a VCED factory preset by name. Sets pendingVCED if not yet initialized.
+   */
+  loadVCEDPreset(name: string): void {
+    const preset = DX7_VCED_PRESETS.find(p => p.name === name);
+    if (!preset) {
+      console.warn(`[Dexed] VCED preset not found: ${name}`);
+      return;
+    }
+    if (this.isInitialized) {
+      this.loadVCED(preset.data);
+    } else {
+      this.pendingVCED = preset.data;
+    }
+  }
+
+  /**
+   * Load a DX7 SysEx patch (raw 156-byte VCED or array)
    */
   loadSysEx(data: Uint8Array): void {
     this._worklet?.port.postMessage({
@@ -433,13 +459,36 @@ export class DexedSynth implements DevilboxSynth {
   }
 
   /**
-   * Load a preset by name
+   * Load a 156-byte VCED patch directly (preferred method for factory presets)
+   */
+  loadVCED(vced: Uint8Array): void {
+    if (vced.length >= 156) {
+      this.loadSysEx(vced);
+    }
+  }
+
+  /**
+   * Load a DX7 .syx cartridge file and return the 32 patches.
+   * Optionally loads a specific patch index immediately.
+   */
+  loadCartridge(syxData: Uint8Array, patchIndex?: number): DX7Patch[] {
+    const patches = parseDX7Cartridge(syxData);
+    if (patches.length > 0 && patchIndex !== undefined) {
+      const idx = Math.max(0, Math.min(patches.length - 1, patchIndex));
+      this.loadVCED(patches[idx].data);
+    }
+    return patches;
+  }
+
+  /**
+   * Load a preset by name (flat config presets)
    */
   loadPreset(name: keyof typeof DEXED_PRESETS): void {
     const preset = DEXED_PRESETS[name];
     if (preset) {
-      this.config = { ...this.config, ...preset };
-      this.applyConfig(this.config);
+      // Convert flat config to VCED and load natively
+      const vced = configToVCED(preset);
+      this.loadVCED(vced);
     }
   }
 
