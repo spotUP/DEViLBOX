@@ -67,6 +67,9 @@ export class DJEngine {
     // Wire cue engine to mixer
     this.mixer.setCueEngine(this.cueEngine);
 
+    // Tap master output into cue engine for cue mix (PFL ↔ master blend)
+    this.mixer.getMasterGain().connect(this.cueEngine.getMasterTap());
+
     // Create decks connected to mixer inputs
     this.deckA = new DeckEngine({ id: 'A', outputNode: this.mixer.inputA });
     this.deckB = new DeckEngine({ id: 'B', outputNode: this.mixer.inputB });

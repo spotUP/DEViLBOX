@@ -84,7 +84,7 @@ export const MixerMaster: React.FC = () => {
   }, []);
 
   return (
-    <div className="flex flex-col items-center gap-1" title="Master output">
+    <div className="flex flex-col items-center gap-0.5" title="Master output">
       <Knob
         value={masterVolume}
         min={0}

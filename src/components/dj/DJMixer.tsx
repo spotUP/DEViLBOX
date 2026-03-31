@@ -2,16 +2,16 @@
  * DJMixer - Center mixer panel composing all mixer sub-components
  *
  * Layout (top to bottom):
- *   1. EQ(A) | VU(A) | Filter(A) | Filter(B) | VU(B) | EQ(B)
- *   2. ChannelStrip(A) | gap | ChannelStrip(B)
- *   3. Crossfader
+ *   1. Filter+EQ(A) | Fader(A) | VU(A) VU(B) | Fader(B) | Filter+EQ(B)
+ *   2. Crossfader
+ *   3. Transition controls
  *   4. Master | CueSection
+ *   5. Broadcast (collapsed)
  */
 
 import React, { useState } from 'react';
 import { useDJStore } from '@/stores/useDJStore';
 import { MixerEQ } from '@/components/dj/MixerEQ';
-import { MixerFilter } from '@/components/dj/MixerFilter';
 import { MixerVUMeter } from '@/components/dj/MixerVUMeter';
 import { MixerChannelStrip } from '@/components/dj/MixerChannelStrip';
 import { MixerCrossfader } from '@/components/dj/MixerCrossfader';
@@ -30,52 +30,39 @@ export const DJMixer: React.FC = () => {
   return (
     <div
       className="
-        flex flex-col items-center gap-2 p-2
+        flex flex-col items-center gap-1 p-1.5
         bg-dark-bg border border-dark-border rounded-lg h-full
       "
     >
-      {/* Row 1: Filters */}
-      <div className="flex items-center justify-center gap-4 w-full border-b border-dark-border pb-2">
-        <MixerFilter deckId="A" />
-        <MixerFilter deckId="B" />
-        {thirdDeck && <MixerFilter deckId="C" />}
-      </div>
-
-      {/* Row 2: EQ + VU meters */}
-      <div className="flex items-end justify-center gap-1 w-full border-b border-dark-border pb-2">
+      {/* Row 1: Filter+EQ | Fader | VUs | Fader | Filter+EQ — all stretch to same height */}
+      <div className="flex items-stretch justify-center gap-1 w-full border-b border-dark-border pb-1">
         <MixerEQ deckId="A" />
+        <MixerChannelStrip deckId="A" stretch />
 
-        {/* Center VU meters — aligned to bottom, tall */}
-        <div className="flex gap-1 items-end mx-0.5">
-          <MixerVUMeter deckId="A" />
-          <MixerVUMeter deckId="B" />
-          {thirdDeck && <MixerVUMeter deckId="C" />}
+        {/* Center VU meters — stretch full height */}
+        <div className="flex gap-1 items-stretch mx-0.5">
+          <MixerVUMeter deckId="A" stretch />
+          <MixerVUMeter deckId="B" stretch />
+          {thirdDeck && <MixerVUMeter deckId="C" stretch />}
         </div>
 
+        <MixerChannelStrip deckId="B" stretch />
         <MixerEQ deckId="B" />
-        {thirdDeck && <MixerEQ deckId="C" />}
-      </div>
-
-      {/* Row 2: Channel strips */}
-      <div className="flex items-start justify-center gap-4 w-full border-b border-dark-border pb-2">
-        <MixerChannelStrip deckId="A" />
-        <div className="w-px bg-dark-borderLight self-stretch" />
-        <MixerChannelStrip deckId="B" />
         {thirdDeck && (
           <>
-            <div className="w-px bg-dark-borderLight self-stretch" />
-            <MixerChannelStrip deckId="C" />
+            <MixerChannelStrip deckId="C" stretch />
+            <MixerEQ deckId="C" />
           </>
         )}
       </div>
 
-      {/* Row 3: Crossfader (A↔B only; Deck C is thru) */}
-      <div className="w-full border-b border-dark-border pb-2">
+      {/* Row 2: Crossfader (A↔B only; Deck C is thru) */}
+      <div className="w-full border-b border-dark-border pb-1">
         <MixerCrossfader />
       </div>
 
-      {/* Row 3.5: Transition controls */}
-      <div className="w-full border-b border-dark-border pb-2">
+      {/* Row 3: Transition controls */}
+      <div className="w-full border-b border-dark-border pb-1">
         <MixerTransition />
       </div>
 
@@ -86,8 +73,8 @@ export const DJMixer: React.FC = () => {
         <MixerCueSection />
       </div>
 
-      {/* Row 5: Broadcast toggle — collapsed by default, expands to show REC/VIDEO/LIVE/MIC */}
-      <div className="flex items-center justify-center gap-2 w-full pt-2 border-t border-dark-border flex-wrap">
+      {/* Row 5: Broadcast toggle — collapsed by default */}
+      <div className="flex items-center justify-center gap-2 w-full pt-1 border-t border-dark-border flex-wrap">
         <button
           onClick={() => setShowBroadcast(v => !v)}
           className={`px-2 py-0.5 text-xs font-mono rounded border transition-colors ${

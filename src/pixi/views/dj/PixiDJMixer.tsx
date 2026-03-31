@@ -686,6 +686,7 @@ const MixerCueSection: React.FC = () => {
   const pflA = useDJStore(s => s.decks.A.pflEnabled);
   const pflB = useDJStore(s => s.decks.B.pflEnabled);
   const cueVolume = useDJStore(s => s.cueVolume);
+  const cueMix = useDJStore(s => s.cueMix);
 
   const handlePFLToggle = useCallback((deck: 'A' | 'B' | 'C') => {
     DJActions.togglePFL(deck);
@@ -693,6 +694,10 @@ const MixerCueSection: React.FC = () => {
 
   const handleCueVolumeChange = useCallback((value: number) => {
     useDJStore.getState().setCueVolume(value);
+  }, []);
+
+  const handleCueMixChange = useCallback((value: number) => {
+    useDJStore.getState().setCueMix(value);
   }, []);
 
   const drawBorder = useCallback((g: GraphicsType) => {
@@ -713,6 +718,16 @@ const MixerCueSection: React.FC = () => {
         color={0xffcc00}
         defaultValue={1}
         onChange={handleCueVolumeChange}
+      />
+      <PixiKnob
+        value={cueMix}
+        min={0}
+        max={1}
+        size="sm"
+        label="MIX"
+        color={0x66ccff}
+        defaultValue={0.5}
+        onChange={handleCueMixChange}
       />
       {/* PFL buttons with headphone label (matches DOM) */}
       <pixiContainer layout={{ flexDirection: 'row', gap: 3, alignItems: 'center' }}>
