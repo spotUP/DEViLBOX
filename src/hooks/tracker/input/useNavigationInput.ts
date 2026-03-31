@@ -105,61 +105,67 @@ export const useNavigationInput = (refs: TrackerInputRefs) => {
       };
 
       // F9-F12: Jump in pattern (FT2-style) — disabled during playback
-      if (key === 'F9') {
-        if (isPlaying) return false;
-        e.preventDefault();
-        if (e.shiftKey) {
-          setPtnJumpPos(0, cursorRef.current.rowIndex);
-        } else if (e.ctrlKey || e.metaKey) {
-          moveCursorToRow(getPtnJumpPos(0));
-          setIsLooping(false);
-          playFast();
-        } else {
-          moveCursorToRow(0);
+      // Skip in ProTracker mode — PT uses F6-F10 for position markers (handled in useTrackerInput)
+      {
+        const behavior = useEditorStore.getState().activeBehavior;
+        if (!behavior.ptEffectMacros) {
+          if (key === 'F9') {
+            if (isPlaying) return false;
+            e.preventDefault();
+            if (e.shiftKey) {
+              setPtnJumpPos(0, cursorRef.current.rowIndex);
+            } else if (e.ctrlKey || e.metaKey) {
+              moveCursorToRow(getPtnJumpPos(0));
+              setIsLooping(false);
+              playFast();
+            } else {
+              moveCursorToRow(0);
+            }
+            return true;
+          }
+          if (key === 'F10') {
+            if (isPlaying) return false;
+            e.preventDefault();
+            if (e.shiftKey) {
+              setPtnJumpPos(1, cursorRef.current.rowIndex);
+            } else if (e.ctrlKey || e.metaKey) {
+              moveCursorToRow(getPtnJumpPos(1));
+              setIsLooping(false);
+              playFast();
+            } else {
+              moveCursorToRow(Math.floor(pattern.length * 0.25));
+            }
+            return true;
+          }
+          if (key === 'F11') {
+            if (isPlaying) return false;
+            e.preventDefault();
+            if (e.shiftKey) {
+              setPtnJumpPos(2, cursorRef.current.rowIndex);
+            } else if (e.ctrlKey || e.metaKey) {
+              moveCursorToRow(getPtnJumpPos(2));
+              setIsLooping(false);
+              playFast();
+            } else {
+              moveCursorToRow(Math.floor(pattern.length * 0.5));
+            }
+            return true;
+          }
+          if (key === 'F12') {
+            if (isPlaying) return false;
+            e.preventDefault();
+            if (e.shiftKey) {
+              setPtnJumpPos(3, cursorRef.current.rowIndex);
+            } else if (e.ctrlKey || e.metaKey) {
+              moveCursorToRow(getPtnJumpPos(3));
+              setIsLooping(false);
+              playFast();
+            } else {
+              moveCursorToRow(Math.floor(pattern.length * 0.75));
+            }
+            return true;
+          }
         }
-        return true;
-      }
-      if (key === 'F10') {
-        if (isPlaying) return false;
-        e.preventDefault();
-        if (e.shiftKey) {
-          setPtnJumpPos(1, cursorRef.current.rowIndex);
-        } else if (e.ctrlKey || e.metaKey) {
-          moveCursorToRow(getPtnJumpPos(1));
-          setIsLooping(false);
-          playFast();
-        } else {
-          moveCursorToRow(Math.floor(pattern.length * 0.25));
-        }
-        return true;
-      }
-      if (key === 'F11') {
-        if (isPlaying) return false;
-        e.preventDefault();
-        if (e.shiftKey) {
-          setPtnJumpPos(2, cursorRef.current.rowIndex);
-        } else if (e.ctrlKey || e.metaKey) {
-          moveCursorToRow(getPtnJumpPos(2));
-          setIsLooping(false);
-          playFast();
-        } else {
-          moveCursorToRow(Math.floor(pattern.length * 0.5));
-        }
-        return true;
-      }
-      if (key === 'F12') {
-        if (isPlaying) return false;
-        e.preventDefault();
-        if (e.shiftKey) {
-          setPtnJumpPos(3, cursorRef.current.rowIndex);
-        } else if (e.ctrlKey || e.metaKey) {
-          moveCursorToRow(getPtnJumpPos(3));
-          setIsLooping(false);
-          playFast();
-        } else {
-          moveCursorToRow(Math.floor(pattern.length * 0.75));
-        }
-        return true;
       }
 
       // PageUp: Jump N lines up (N = behavior.pageJumpSize) — disabled during playback
@@ -355,6 +361,13 @@ export const useNavigationInput = (refs: TrackerInputRefs) => {
           return true;
         }
         const behavior = useEditorStore.getState().activeBehavior;
+        // Ctrl+Left = jump to previous channel
+        if ((e.ctrlKey || e.metaKey) && !e.altKey) {
+          e.preventDefault();
+          const ch = cursorRef.current.channelIndex;
+          if (ch > 0) moveCursorToChannel(ch - 1);
+          return true;
+        }
         const selecting = behavior.selectionModifier === 'alt' ? e.altKey : e.shiftKey;
         if (selecting && !selectionRef.current) startSelection();
         moveCursor('left');
@@ -395,6 +408,13 @@ export const useNavigationInput = (refs: TrackerInputRefs) => {
           return true;
         }
         const behavior = useEditorStore.getState().activeBehavior;
+        // Ctrl+Right = jump to next channel
+        if ((e.ctrlKey || e.metaKey) && !e.altKey) {
+          e.preventDefault();
+          const ch = cursorRef.current.channelIndex;
+          if (pattern && ch < pattern.channels.length - 1) moveCursorToChannel(ch + 1);
+          return true;
+        }
         const selecting = behavior.selectionModifier === 'alt' ? e.altKey : e.shiftKey;
         if (selecting && !selectionRef.current) startSelection();
         moveCursor('right');

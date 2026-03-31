@@ -6,7 +6,7 @@
 
 import { useEffect, useCallback, useRef } from 'react';
 import { useShallow } from 'zustand/react/shallow';
-import { useTrackerStore, useCursorStore, useTransportStore } from '@stores';
+import { useTrackerStore, useCursorStore, useTransportStore, useInstrumentStore } from '@stores';
 import { useEditorStore } from '@stores/useEditorStore';
 import { useUIStore } from '@stores/useUIStore';
 import { useFormatStore } from '@stores/useFormatStore';
@@ -299,8 +299,8 @@ export const useTrackerInput = () => {
 
       if ((e.ctrlKey || e.metaKey) && key >= '0' && key <= '9' && !e.altKey && !e.shiftKey) {
         const behavior = useEditorStore.getState().activeBehavior;
-        if (behavior.ptEffectMacros) {
-          // PT: Ctrl+0-9 = set edit step
+        if (behavior.ptEffectMacros || behavior.itMaskVariables) {
+          // PT/IT/OpenMPT: Ctrl+0-9 = set edit step
           e.preventDefault();
           const step = parseInt(key);
           useEditorStore.getState().setEditStep(step);
@@ -378,15 +378,23 @@ export const useTrackerInput = () => {
 
       if (['F6', 'F7', 'F8', 'F9', 'F10'].includes(key)) {
         const behavior = useEditorStore.getState().activeBehavior;
-        if (behavior.ptEffectMacros && !e.ctrlKey && !e.metaKey && !e.altKey) {
+        if (behavior.ptEffectMacros && !e.ctrlKey && !e.metaKey) {
           const posIndex = parseInt(key.slice(1)) - 6; // F6=0, F7=1, F8=2, F9=3, F10=4
-          if (e.shiftKey) {
+          if (e.shiftKey && !e.altKey) {
             // Store position
             e.preventDefault();
             useEditorStore.getState().setPtnJumpPos(posIndex, cursorRef.current.rowIndex);
             useUIStore.getState().setStatusMessage(`POSITION ${posIndex + 1} SET (ROW ${cursorRef.current.rowIndex})`);
             return;
-          } else if (!isPlaying) {
+          } else if (e.altKey && !e.shiftKey) {
+            // Play from position marker
+            e.preventDefault();
+            const jumpRow = useEditorStore.getState().getPtnJumpPos(posIndex);
+            moveCursorToRow(jumpRow);
+            play();
+            useUIStore.getState().setStatusMessage(`PLAY FROM ROW ${jumpRow}`);
+            return;
+          } else if (!e.shiftKey && !e.altKey && !isPlaying) {
             // Jump to stored position
             e.preventDefault();
             const jumpRow = useEditorStore.getState().getPtnJumpPos(posIndex);
@@ -626,6 +634,62 @@ export const useTrackerInput = () => {
         return;
       }
 
+      // Ctrl+Shift+A = deselect (Renoise-style, universal)
+      if ((e.ctrlKey || e.metaKey) && keyLower === 'a' && e.shiftKey && !e.altKey) {
+        e.preventDefault();
+        useCursorStore.getState().clearSelection();
+        useUIStore.getState().setStatusMessage('DESELECT');
+        return;
+      }
+
+      // Ctrl+A = select all pattern (universal)
+      if ((e.ctrlKey || e.metaKey) && keyLower === 'a' && !e.altKey && !e.shiftKey) {
+        e.preventDefault();
+        useCursorStore.getState().selectPattern();
+        useUIStore.getState().setStatusMessage('SELECT ALL');
+        return;
+      }
+
+      // Ctrl+L: PT = transpose -1, Renoise/FT2/IT = select column
+      if ((e.ctrlKey || e.metaKey) && keyLower === 'l' && !e.altKey && !e.shiftKey) {
+        e.preventDefault();
+        const beh = useEditorStore.getState().activeBehavior;
+        if (beh.ptEffectMacros && recordMode) {
+          transposeSelection(-1);
+          useUIStore.getState().setStatusMessage('TRANSPOSE -1');
+        } else {
+          useCursorStore.getState().selectChannel(cursorRef.current.channelIndex);
+          useUIStore.getState().setStatusMessage('SELECT COLUMN');
+        }
+        return;
+      }
+
+      // Ctrl+I = interpolate selection (Renoise-style, universal)
+      if ((e.ctrlKey || e.metaKey) && keyLower === 'i' && !e.altKey && !e.shiftKey) {
+        e.preventDefault();
+        const sel = selectionRef.current;
+        if (sel) {
+          const startRow = Math.min(sel.startRow, sel.endRow);
+          const endRow = Math.max(sel.startRow, sel.endRow);
+          const ch = cursorRef.current.channelIndex;
+          const colType = cursorRef.current.columnType;
+          if (colType === 'volume' || colType === 'effParam' || colType === 'effParam2') {
+            const col = colType as 'volume' | 'effParam' | 'effParam2';
+            const fieldMap: Record<string, keyof typeof pattern.channels[0]['rows'][0]> = {
+              volume: 'volume',
+              effParam: 'eff',
+              effParam2: 'eff2',
+            };
+            const field = fieldMap[col];
+            const startVal = (pattern.channels[ch].rows[startRow][field] as number) || 0;
+            const endVal = (pattern.channels[ch].rows[endRow][field] as number) || 0;
+            interpolateSelection(col, startVal, endVal, 'linear');
+            useUIStore.getState().setStatusMessage(`INTERPOLATE: ${startVal} → ${endVal}`);
+          }
+        }
+        return;
+      }
+
       // Standard Ctrl+C/X/V shortcuts
       if ((e.ctrlKey || e.metaKey) && keyLower === 'c' && !e.altKey) {
         e.preventDefault();
@@ -773,13 +837,6 @@ export const useTrackerInput = () => {
           return;
         }
 
-        // PT: Ctrl+L = transpose selection -1 semitone
-        if (isPT && keyLower === 'l' && !e.shiftKey && recordMode) {
-          e.preventDefault();
-          transposeSelection(-1);
-          useUIStore.getState().setStatusMessage('TRANSPOSE -1');
-          return;
-        }
       }
 
       // PT: Swap channel target (1-4 key after Ctrl+T)
@@ -804,6 +861,15 @@ export const useTrackerInput = () => {
         const beh = useEditorStore.getState().activeBehavior;
         const isIT = beh.itMaskVariables;
         const ALL_COLS: Array<'note'|'instrument'|'volume'|'effTyp'|'effParam'|'effTyp2'|'effParam2'|'flag1'|'flag2'|'probability'> = ['note', 'instrument', 'volume', 'effTyp', 'effParam', 'effTyp2', 'effParam2', 'flag1', 'flag2', 'probability'];
+
+        // IT/OpenMPT: Alt+0-9 = quick set edit step
+        if (isIT && /^[0-9]$/.test(key) && !e.shiftKey) {
+          e.preventDefault();
+          const step = key === '0' ? 0 : parseInt(key);
+          useEditorStore.getState().setEditStep(step);
+          useUIStore.getState().setStatusMessage(`EDIT STEP: ${step}`);
+          return;
+        }
 
         // IT: Alt+B = mark block start
         if (isIT && keyLower === 'b' && !e.shiftKey) {
@@ -874,6 +940,14 @@ export const useTrackerInput = () => {
           return;
         }
 
+        // IT: Alt+M = mix paste (blend clipboard with pattern)
+        if (isIT && keyLower === 'm' && !e.shiftKey && recordMode) {
+          e.preventDefault();
+          pasteMix();
+          useUIStore.getState().setStatusMessage('MIX PASTE');
+          return;
+        }
+
         // IT: Alt+Q = transpose +1 (Shift = +12 octave)
         if (isIT && keyLower === 'q' && recordMode) {
           e.preventDefault();
@@ -934,6 +1008,123 @@ export const useTrackerInput = () => {
             useCursorStore.setState({ selection: { ...sel, endRow: newEnd } });
             useUIStore.getState().setStatusMessage('DOUBLE SELECTION');
           }
+          return;
+        }
+
+        // IT: Alt+U = unmark/clear selection
+        if (isIT && keyLower === 'u' && !e.shiftKey) {
+          e.preventDefault();
+          useCursorStore.getState().clearSelection();
+          useUIStore.getState().setStatusMessage('UNMARK BLOCK');
+          return;
+        }
+
+        // IT: Alt+S = set instrument in block (uses current instrument)
+        if (isIT && keyLower === 's' && !e.shiftKey && recordMode) {
+          e.preventDefault();
+          const sel = selectionRef.current;
+          if (sel) {
+            const { currentInstrumentId, instruments } = useInstrumentStore.getState();
+            const instIdx = instruments.findIndex((i) => i.id === currentInstrumentId);
+            const inst = instIdx >= 0 ? instIdx + 1 : 1;
+            const startRow = Math.min(sel.startRow, sel.endRow);
+            const endRow = Math.max(sel.startRow, sel.endRow);
+            const startCh = Math.min(sel.startChannel, sel.endChannel);
+            const endCh = Math.max(sel.startChannel, sel.endChannel);
+            for (let ch = startCh; ch <= endCh; ch++) {
+              for (let r = startRow; r <= endRow; r++) {
+                if (pattern.channels[ch].rows[r].note > 0) {
+                  setCell(ch, r, { instrument: inst });
+                }
+              }
+            }
+            useUIStore.getState().setStatusMessage(`SET INST ${inst} IN BLOCK`);
+          }
+          return;
+        }
+
+        // IT: Alt+V = set volume in block (default volume = 64)
+        if (isIT && keyLower === 'v' && !e.shiftKey && recordMode) {
+          e.preventDefault();
+          const sel = selectionRef.current;
+          if (sel) {
+            const startRow = Math.min(sel.startRow, sel.endRow);
+            const endRow = Math.max(sel.startRow, sel.endRow);
+            const startCh = Math.min(sel.startChannel, sel.endChannel);
+            const endCh = Math.max(sel.startChannel, sel.endChannel);
+            const vol = 64;
+            for (let ch = startCh; ch <= endCh; ch++) {
+              for (let r = startRow; r <= endRow; r++) {
+                if (pattern.channels[ch].rows[r].note > 0) {
+                  setCell(ch, r, { volume: vol });
+                }
+              }
+            }
+            useUIStore.getState().setStatusMessage('SET VOLUME IN BLOCK');
+          }
+          return;
+        }
+
+        // IT: Alt+W = wipe volume in block (clear volume column)
+        if (isIT && keyLower === 'w' && !e.shiftKey && recordMode) {
+          e.preventDefault();
+          const sel = selectionRef.current;
+          if (sel) {
+            const startRow = Math.min(sel.startRow, sel.endRow);
+            const endRow = Math.max(sel.startRow, sel.endRow);
+            const startCh = Math.min(sel.startChannel, sel.endChannel);
+            const endCh = Math.max(sel.startChannel, sel.endChannel);
+            for (let ch = startCh; ch <= endCh; ch++) {
+              for (let r = startRow; r <= endRow; r++) {
+                setCell(ch, r, { volume: 0 });
+              }
+            }
+            useUIStore.getState().setStatusMessage('WIPE VOLUME');
+          }
+          return;
+        }
+
+        // IT: Alt+K = interpolate volume in block
+        if (isIT && keyLower === 'k' && !e.shiftKey && recordMode) {
+          e.preventDefault();
+          const sel = selectionRef.current;
+          if (sel) {
+            const startRow = Math.min(sel.startRow, sel.endRow);
+            const endRow = Math.max(sel.startRow, sel.endRow);
+            const channel = cursorRef.current.channelIndex;
+            const startVol = pattern.channels[channel].rows[startRow].volume || 0;
+            const endVol = pattern.channels[channel].rows[endRow].volume || 64;
+            interpolateSelection('volume', startVol, endVol, 'linear');
+            useUIStore.getState().setStatusMessage(`INTERPOLATE VOL: ${startVol} → ${endVol}`);
+          }
+          return;
+        }
+
+        // IT: Alt+X = interpolate effect in block
+        if (isIT && keyLower === 'x' && !e.shiftKey && recordMode) {
+          e.preventDefault();
+          const sel = selectionRef.current;
+          if (sel) {
+            const startRow = Math.min(sel.startRow, sel.endRow);
+            const endRow = Math.max(sel.startRow, sel.endRow);
+            const channel = cursorRef.current.channelIndex;
+            const startVal = pattern.channels[channel].rows[startRow].eff || 0;
+            const endVal = pattern.channels[channel].rows[endRow].eff || 0;
+            interpolateSelection('effParam', startVal, endVal, 'linear');
+            useUIStore.getState().setStatusMessage(`INTERPOLATE EFF: ${startVal} → ${endVal}`);
+          }
+          return;
+        }
+
+        // IT: Alt+Y = reverse block
+        if (isIT && keyLower === 'y' && !e.shiftKey && recordMode) {
+          e.preventDefault();
+          const sel = selectionRef.current;
+          const ch = sel ? Math.min(sel.startChannel, sel.endChannel) : cursorRef.current.channelIndex;
+          const sr = sel ? Math.min(sel.startRow, sel.endRow) : 0;
+          const er = sel ? Math.max(sel.startRow, sel.endRow) : pattern.length - 1;
+          reverseBlock(ch, sr, er);
+          useUIStore.getState().setStatusMessage('REVERSE BLOCK');
           return;
         }
       }
