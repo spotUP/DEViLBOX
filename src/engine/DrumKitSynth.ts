@@ -34,6 +34,9 @@ export class DrumKitSynth implements DevilboxSynth {
   // Active voices
   private activeVoices: ActiveVoice[] = [];
 
+  // Round-robin state: mapping.id → last used index in velocityLayers
+  private roundRobinIndex: Map<string, number> = new Map();
+
   // Native Web Audio context
   private audioContext: AudioContext;
 
@@ -71,14 +74,30 @@ export class DrumKitSynth implements DevilboxSynth {
   async preloadSamples(): Promise<void> {
     if (!this.onSampleNeeded) return;
 
-    const promises = this.config.keymap.map(async (mapping) => {
+    const promises: Promise<void>[] = [];
+
+    for (const mapping of this.config.keymap) {
+      // Preload primary sample
       if (!this.sampleBuffers.has(mapping.id)) {
-        const buffer = await this.onSampleNeeded!(mapping.sampleId, mapping.sampleUrl);
-        if (buffer) {
-          this.sampleBuffers.set(mapping.id, buffer);
+        promises.push(
+          this.onSampleNeeded(mapping.sampleId, mapping.sampleUrl).then(buffer => {
+            if (buffer) this.sampleBuffers.set(mapping.id, buffer);
+          })
+        );
+      }
+      // Preload velocity layer samples
+      if (mapping.velocityLayers) {
+        for (const layer of mapping.velocityLayers) {
+          if (!this.sampleBuffers.has(layer.sampleId)) {
+            promises.push(
+              this.onSampleNeeded!(layer.sampleId, layer.sampleUrl).then(buffer => {
+                if (buffer) this.sampleBuffers.set(layer.sampleId, buffer);
+              })
+            );
+          }
         }
       }
-    });
+    }
 
     await Promise.all(promises);
   }
@@ -100,6 +119,34 @@ export class DrumKitSynth implements DevilboxSynth {
       }
     }
     return null;
+  }
+
+  /**
+   * Resolve which sample ID to use based on velocity layers and round-robin.
+   * Falls back to the mapping's primary sampleId if no layers match.
+   */
+  private resolveSampleId(mapping: DrumKitKeyMapping, velocity: number): string {
+    const layers = mapping.velocityLayers;
+    if (!layers || layers.length === 0) return mapping.sampleId;
+
+    // Convert 0-1 velocity to 0-127 range for layer matching
+    const vel127 = Math.round(velocity * 127);
+
+    // Find matching velocity layers
+    const matching = layers.filter(l => vel127 >= l.velocityMin && vel127 <= l.velocityMax);
+    if (matching.length === 0) return mapping.sampleId;
+
+    // If round-robin group is set, cycle through matching layers
+    if (mapping.roundRobinGroup && mapping.roundRobinGroup > 0 && matching.length > 1) {
+      const rrKey = `${mapping.id}-rr${mapping.roundRobinGroup}`;
+      const lastIdx = this.roundRobinIndex.get(rrKey) ?? -1;
+      const nextIdx = (lastIdx + 1) % matching.length;
+      this.roundRobinIndex.set(rrKey, nextIdx);
+      return matching[nextIdx].sampleId;
+    }
+
+    // No round-robin: return first matching layer
+    return matching[0].sampleId;
   }
 
   /**
@@ -125,10 +172,13 @@ export class DrumKitSynth implements DevilboxSynth {
       return;
     }
 
+    // Resolve which sample to play — velocity layers + round-robin
+    const sampleId = this.resolveSampleId(mapping, velocity);
+
     // Get sample buffer
-    const buffer = this.sampleBuffers.get(mapping.id);
+    const buffer = this.sampleBuffers.get(sampleId);
     if (!buffer) {
-      console.warn(`[DrumKitSynth] No buffer loaded for mapping ${mapping.id}`);
+      console.warn(`[DrumKitSynth] No buffer loaded for sample ${sampleId}`);
       return;
     }
 

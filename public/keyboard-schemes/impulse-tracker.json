@@ -306,5 +306,7 @@
       "Ctrl+1": "reset_zoom",
       "Ctrl+L": "show_command_palette"
     }
-  }
+  },
+  "Ctrl+Enter": "preview_note_at_cursor",
+  "Ctrl+Shift+L": "pattern_length_dialog"
 }

@@ -43,6 +43,14 @@ const HEADER_HEIGHT = 48; // 28px channel header + 20px column labels (matches D
 const SCROLL_THRESHOLD = 50; // Horizontal scroll accumulator resistance
 const V_SCROLL_THRESHOLD = 30; // Vertical scroll accumulator — absorbs trackpad momentum
 
+// Width of one note column group: note(34) + gap(4) + instrument(20) + gap(4) + volume(20) + gap(4) = 86
+const NOTE_COL_GROUP_WIDTH = (CHAR_WIDTH * 3 + 4) + 4 + (CHAR_WIDTH * 2) + 4 + (CHAR_WIDTH * 2) + 4;
+
+/** Get pixel offset for note column N within a channel (0-based). Column 0 returns 0. */
+function noteColOffset(colIdx: number): number {
+  return colIdx * NOTE_COL_GROUP_WIDTH;
+}
+
 // ─── Pre-computed lookup tables (zero allocations in hot render loop) ────────
 const NOTE_NAMES = ['C-', 'C#', 'D-', 'D#', 'E-', 'F-', 'F#', 'G-', 'G#', 'A-', 'A#', 'B-'];
 
@@ -408,13 +416,20 @@ function renderCursorCaret(
     let cursorW = CHAR_WIDTH * 3 + 4;
     let cursorX = colX + 8;
     const noteWidth = CHAR_WIDTH * 3 + 4;
-    if (cursor.columnType === 'instrument') { cursorX = colX + 8 + noteWidth + 4; cursorW = CHAR_WIDTH * 2; }
-    else if (cursor.columnType === 'volume') { cursorX = colX + 8 + noteWidth + 4 + CHAR_WIDTH * 2 + 4; cursorW = CHAR_WIDTH * 2; }
-    else if (cursor.columnType === 'effTyp' || cursor.columnType === 'effParam') { cursorX = colX + 8 + noteWidth + CHAR_WIDTH * 4 + 12; cursorW = CHAR_WIDTH * 3; }
-    else if (cursor.columnType === 'effTyp2' || cursor.columnType === 'effParam2') { cursorX = colX + 8 + noteWidth + CHAR_WIDTH * 7 + 16; cursorW = CHAR_WIDTH * 3; }
-    else if (cursor.columnType === 'flag1') { cursorX = colX + 8 + noteWidth + CHAR_WIDTH * 10 + 20; cursorW = CHAR_WIDTH; }
-    else if (cursor.columnType === 'flag2') { cursorX = colX + 8 + noteWidth + CHAR_WIDTH * 11 + 24; cursorW = CHAR_WIDTH; }
-    else if (cursor.columnType === 'probability') { cursorX = colX + 8 + noteWidth + CHAR_WIDTH * 12 + 28; cursorW = CHAR_WIDTH * 2; }
+    const nci = cursor.noteColumnIndex ?? 0;
+    const channel = p.displayPattern?.channels[cursorCh];
+    const totalNoteCols = channel?.channelMeta?.noteCols ?? 1;
+    // Base X after all note column groups (where inst/vol of last col ends, effects start)
+    const afterAllNoteCols = colX + 8 + noteColOffset(totalNoteCols);
+
+    if (cursor.columnType === 'note') { cursorX = colX + 8 + noteColOffset(nci); }
+    else if (cursor.columnType === 'instrument') { cursorX = colX + 8 + noteColOffset(nci) + noteWidth + 4; cursorW = CHAR_WIDTH * 2; }
+    else if (cursor.columnType === 'volume') { cursorX = colX + 8 + noteColOffset(nci) + noteWidth + CHAR_WIDTH * 2 + 8; cursorW = CHAR_WIDTH * 2; }
+    else if (cursor.columnType === 'effTyp' || cursor.columnType === 'effParam') { cursorX = afterAllNoteCols; cursorW = CHAR_WIDTH * 3; }
+    else if (cursor.columnType === 'effTyp2' || cursor.columnType === 'effParam2') { cursorX = afterAllNoteCols + CHAR_WIDTH * 3 + 4; cursorW = CHAR_WIDTH * 3; }
+    else if (cursor.columnType === 'flag1') { const effectCols = channel?.channelMeta?.effectCols ?? 2; cursorX = afterAllNoteCols + effectCols * (CHAR_WIDTH * 3 + 4); cursorW = CHAR_WIDTH; }
+    else if (cursor.columnType === 'flag2') { const effectCols = channel?.channelMeta?.effectCols ?? 2; cursorX = afterAllNoteCols + effectCols * (CHAR_WIDTH * 3 + 4) + CHAR_WIDTH + 4; cursorW = CHAR_WIDTH; }
+    else if (cursor.columnType === 'probability') { const effectCols = channel?.channelMeta?.effectCols ?? 2; cursorX = afterAllNoteCols + effectCols * (CHAR_WIDTH * 3 + 4) + (p.columnVisibility.flag1 ? CHAR_WIDTH + 4 : 0) + (p.columnVisibility.flag2 ? CHAR_WIDTH + 4 : 0); cursorW = CHAR_WIDTH * 2; }
 
     g.rect(cursorX, y, cursorW, p.rowHeight);
     g.fill({ color: p.recordMode ? p.theme.error.color : p.theme.accent.color, alpha: 1 });
@@ -500,34 +515,44 @@ function generateLabels(p: RenderParams, vStart: number, activeRow = -1): LabelD
       const cell = channel.rows[actualRow];
       if (!cell) continue;
       const baseX = colX + 8;
+      const totalNoteCols = channel.channelMeta?.noteCols ?? 1;
 
-      const noteText = noteToString(cell.note ?? 0, p.noteDisplayOffset);
-      const noteHasContent = cell.note > 0;
-      const noteColor = lerpWhite(
-        cell.note === 97 ? p.theme.cellEffect.color
-        : (cell.note > 0 && cell.note < 97) ? p.theme.cellNote.color
-        : p.theme.cellEmpty.color, glowFor(noteHasContent));
-      if (noteText !== '---' || !p.blankEmpty) {
-        labels.push({ x: baseX, y, text: noteText, color: noteColor, fontFamily: fontFor(noteHasContent), alpha: isGhost ? 0.35 : undefined });
+      // Render all note column groups (note + instrument + volume per column)
+      for (let nc = 0; nc < totalNoteCols; nc++) {
+        const ncX = baseX + noteColOffset(nc);
+        const n = nc === 0 ? (cell.note ?? 0) : nc === 1 ? (cell.note2 ?? 0) : nc === 2 ? (cell.note3 ?? 0) : (cell.note4 ?? 0);
+        const noteText = noteToString(n, p.noteDisplayOffset);
+        const noteHasContent = n > 0;
+        const noteColor = lerpWhite(
+          n === 97 ? p.theme.cellEffect.color
+          : (n > 0 && n < 97) ? p.theme.cellNote.color
+          : p.theme.cellEmpty.color, glowFor(noteHasContent));
+        if (noteText !== '---' || !p.blankEmpty) {
+          labels.push({ x: ncX, y, text: noteText, color: noteColor, fontFamily: fontFor(noteHasContent), alpha: isGhost ? 0.35 : undefined });
+        }
+
+        if (!isCollapsed) {
+          const noteWidth = CHAR_WIDTH * 3 + 4;
+          let px = ncX + noteWidth + 4;
+          const ins = nc === 0 ? (cell.instrument ?? 0) : nc === 1 ? (cell.instrument2 ?? 0) : nc === 2 ? (cell.instrument3 ?? 0) : (cell.instrument4 ?? 0);
+          const insText = ins > 0 ? hexByte(ins) : (p.blankEmpty ? '' : '..');
+          if (insText) {
+            labels.push({ x: px, y, text: insText, color: lerpWhite(ins > 0 ? p.theme.cellInstrument.color : p.theme.cellEmpty.color, glowFor(ins > 0)), fontFamily: fontFor(ins > 0), alpha: isGhost ? 0.35 : undefined });
+          }
+          px += CHAR_WIDTH * 2 + 4;
+          const vol = nc === 0 ? (cell.volume ?? 0) : nc === 1 ? (cell.volume2 ?? 0) : nc === 2 ? (cell.volume3 ?? 0) : (cell.volume4 ?? 0);
+          const volValid = vol >= 0x10 && vol <= 0x50;
+          const volText = volValid ? hexByte(vol) : (p.blankEmpty ? '' : '..');
+          if (volText) {
+            labels.push({ x: px, y, text: volText, color: lerpWhite(volValid ? p.theme.cellVolume.color : p.theme.cellEmpty.color, glowFor(volValid)), fontFamily: fontFor(volValid), alpha: isGhost ? 0.35 : undefined });
+          }
+        }
       }
 
       if (isCollapsed) continue;
 
-      const noteWidth = CHAR_WIDTH * 3 + 4;
-      let px = baseX + noteWidth + 4;
-
-      const insText = cell.instrument > 0 ? hexByte(cell.instrument) : (p.blankEmpty ? '' : '..');
-      if (insText) {
-        labels.push({ x: px, y, text: insText, color: lerpWhite(cell.instrument > 0 ? p.theme.cellInstrument.color : p.theme.cellEmpty.color, glowFor(cell.instrument > 0)), fontFamily: fontFor(cell.instrument > 0), alpha: isGhost ? 0.35 : undefined });
-      }
-      px += CHAR_WIDTH * 2 + 4;
-
-      const volValid = cell.volume >= 0x10 && cell.volume <= 0x50;
-      const volText = volValid ? hexByte(cell.volume) : (p.blankEmpty ? '' : '..');
-      if (volText) {
-        labels.push({ x: px, y, text: volText, color: lerpWhite(volValid ? p.theme.cellVolume.color : p.theme.cellEmpty.color, glowFor(volValid)), fontFamily: fontFor(volValid), alpha: isGhost ? 0.35 : undefined });
-      }
-      px += CHAR_WIDTH * 2 + 4;
+      // Effects start after all note column groups
+      let px = baseX + noteColOffset(totalNoteCols);
 
       const effectCols = channel.channelMeta?.effectCols ?? 2;
       for (let e = 0; e < effectCols; e++) {
@@ -665,6 +690,33 @@ export const PixiPatternEditor: React.FC<PixiPatternEditorProps> = ({ width, hei
     closeCellContextMenu();
   }, [ctxMenuState, pattern, openModal, closeCellContextMenu]);
 
+  // ── Preview note at cell ──────────────────────────────────────────────────
+  const handlePreviewCell = useCallback((ch: number, row: number) => {
+    if (!pattern) return;
+    const cell = pattern.channels[ch]?.rows[row];
+    if (!cell || !cell.note || cell.note === 97 || cell.note < 1 || cell.note > 96) return;
+    import('@engine/ToneEngine').then(({ getToneEngine: engine }) => {
+      import('@stores/useInstrumentStore').then(({ useInstrumentStore }) => {
+        import('@/lib/xmConversions').then(({ xmNoteToToneJS }) => {
+          const instrumentId = cell.instrument || useInstrumentStore.getState().currentInstrumentId || 1;
+          const toneEng = engine();
+          const inst = useInstrumentStore.getState().getInstrument(instrumentId);
+          if (!inst) return;
+          const toneNote = xmNoteToToneJS(cell.note);
+          if (!toneNote) return;
+          const velocity = cell.volume ? Math.min(cell.volume / 64, 1) : 0.8;
+          toneEng.ensureInstrumentReady(inst).then(() => {
+            toneEng.triggerNoteAttack(inst.id, toneNote, 0, velocity, inst);
+            setTimeout(() => {
+              toneEng.triggerNoteRelease(inst.id, toneNote, 0, inst);
+            }, 500);
+          });
+        });
+      });
+    });
+    closeCellContextMenu();
+  }, [pattern, closeCellContextMenu]);
+
   // ── B/D Animation handlers ────────────────────────────────────────────────
   const getBDAnimationOptions = useCallback((channelIndex: number) => {
     const sel = selectionRef.current;
@@ -744,6 +796,16 @@ export const PixiPatternEditor: React.FC<PixiPatternEditorProps> = ({ width, hei
       items.push({ separator: true, label: '' });
     }
 
+    // Preview
+    const cellForPreview = pat?.channels[ch]?.rows[row];
+    const hasNote = cellForPreview && cellForPreview.note >= 1 && cellForPreview.note <= 96;
+    items.push({
+      label: 'Preview Note',
+      action: () => handlePreviewCell(ch, row),
+      disabled: !hasNote,
+    });
+    items.push({ separator: true, label: '' });
+
     // Single cell operations
     items.push({ label: 'CELL OPERATIONS', disabled: true });
     items.push({
@@ -816,7 +878,7 @@ export const PixiPatternEditor: React.FC<PixiPatternEditorProps> = ({ width, hei
 
     return items;
   }, [ctxMenuState.channelIndex, ctxMenuState.rowIndex, ctxMenuState.position,
-      handleOpenParameterEditor, handleReverseVisual, handlePolyrhythm, handleFibonacci,
+      handleOpenParameterEditor, handlePreviewCell, handleReverseVisual, handlePolyrhythm, handleFibonacci,
       handleEuclidean, handlePingPong, handleGlitch, handleStrobe, handleVisualEcho,
       handleConverge, handleSpiral, handleBounce, handleChaos]);
 
@@ -1290,7 +1352,7 @@ export const PixiPatternEditor: React.FC<PixiPatternEditorProps> = ({ width, hei
       imperativeRedraw]);
 
   // ── Click → cell mapping ──────────────────────────────────────────────────
-  const getCellFromLocal = useCallback((localX: number, localY: number): { rowIndex: number; channelIndex: number; columnType: CursorPosition['columnType'] } | null => {
+  const getCellFromLocal = useCallback((localX: number, localY: number): { rowIndex: number; channelIndex: number; noteColumnIndex: number; columnType: CursorPosition['columnType'] } | null => {
     if (!pattern) return null;
     const currentRowLocal = isPlaying ? playbackRowRef.current : cursorRef.current.rowIndex;
     const rowOffset = Math.floor((localY - centerLineTop) / rowHeight);
@@ -1310,28 +1372,37 @@ export const PixiPatternEditor: React.FC<PixiPatternEditorProps> = ({ width, hei
     if (!foundChannel) return null;
 
     const isCollapsed = pattern.channels[channelIndex]?.collapsed;
-    if (isCollapsed) return { rowIndex: Math.max(0, Math.min(rowIndex, patternLength - 1)), channelIndex, columnType: 'note' };
+    if (isCollapsed) return { rowIndex: Math.max(0, Math.min(rowIndex, patternLength - 1)), channelIndex, noteColumnIndex: 0, columnType: 'note' };
 
     const noteWidth = CHAR_WIDTH * 3 + 4;
+    const channel = pattern.channels[channelIndex];
+    const totalNoteCols = channel?.channelMeta?.noteCols ?? 1;
     const chLocalX = localX - (channelOffsets[channelIndex] - scrollLeftRef.current) - 8;
     let columnType: CursorPosition['columnType'] = 'note';
-    if (chLocalX >= noteWidth + 4) {
-      const xInParams = chLocalX - (noteWidth + 8);
+    let noteColumnIndex = 0;
+
+    // Check which note column group the click is in
+    const allNoteColsEnd = noteColOffset(totalNoteCols);
+    if (chLocalX < allNoteColsEnd) {
+      // Inside a note column group
+      noteColumnIndex = Math.min(totalNoteCols - 1, Math.floor(chLocalX / NOTE_COL_GROUP_WIDTH));
+      const xInGroup = chLocalX - noteColOffset(noteColumnIndex);
+      if (xInGroup < noteWidth) columnType = 'note';
+      else if (xInGroup < noteWidth + 4 + CHAR_WIDTH * 2) columnType = 'instrument';
+      else columnType = 'volume';
+    } else {
+      // After all note columns — effects, flags, probability
+      const xInParams = chLocalX - allNoteColsEnd;
       const showAcid = columnVisibility.flag1 || columnVisibility.flag2;
       const showProb = columnVisibility.probability;
-      const effectCols = pattern.channels[channelIndex]?.channelMeta?.effectCols ?? 2;
+      const effectCols = channel?.channelMeta?.effectCols ?? 2;
       const effectWidth = effectCols * (CHAR_WIDTH * 3 + 4);
 
-      if (xInParams < CHAR_WIDTH * 2 + 4) columnType = 'instrument';
-      else if (xInParams < CHAR_WIDTH * 4 + 8) columnType = 'volume';
-      else if (xInParams < CHAR_WIDTH * 4 + 8 + effectWidth) {
-        // Determine which effect column
-        const effX = xInParams - (CHAR_WIDTH * 4 + 8);
-        const effCol = Math.floor(effX / (CHAR_WIDTH * 3 + 4));
+      if (xInParams < effectWidth) {
+        const effCol = Math.floor(xInParams / (CHAR_WIDTH * 3 + 4));
         columnType = effCol === 0 ? 'effTyp' : 'effTyp2';
-      }
-      else {
-        const afterEffects = CHAR_WIDTH * 4 + 8 + effectWidth;
+      } else {
+        const afterEffects = effectWidth;
         const flagX = xInParams - afterEffects;
         if (showAcid && columnVisibility.flag1 && flagX < CHAR_WIDTH + 4) columnType = 'flag1';
         else if (showAcid && columnVisibility.flag2 && flagX < (CHAR_WIDTH + 4) * 2) columnType = 'flag2';
@@ -1340,7 +1411,7 @@ export const PixiPatternEditor: React.FC<PixiPatternEditorProps> = ({ width, hei
       }
     }
 
-    return { rowIndex: Math.max(0, Math.min(rowIndex, patternLength - 1)), channelIndex, columnType };
+    return { rowIndex: Math.max(0, Math.min(rowIndex, patternLength - 1)), channelIndex, noteColumnIndex, columnType };
   }, [pattern, numChannels, channelOffsets, channelWidths, centerLineTop, isPlaying, patternLength, columnVisibility, rowHeight]);
 
   // ── Instrument drag-and-drop handlers (native canvas events) ────────────
@@ -1443,7 +1514,7 @@ export const PixiPatternEditor: React.FC<PixiPatternEditorProps> = ({ width, hei
       cursorStore.updateSelection(cell.channelIndex, cell.rowIndex);
     } else {
       cursorStore.moveCursorToRow(cell.rowIndex);
-      cursorStore.moveCursorToChannelAndColumn(cell.channelIndex, cell.columnType as any);
+      cursorStore.moveCursorToChannelAndColumn(cell.channelIndex, cell.columnType as any, cell.noteColumnIndex);
       cursorStore.startSelection();
     }
     isDraggingRef.current = true;

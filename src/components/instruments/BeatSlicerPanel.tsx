@@ -19,8 +19,10 @@ import { useTransportStore } from '../../stores/useTransportStore';
 import type { InstrumentConfig } from '../../types/instrument';
 import type { BeatSlice, BeatSliceConfig, SliceMode } from '../../types/beatSlicer';
 import { DEFAULT_BEAT_SLICE_CONFIG } from '../../types/beatSlicer';
-import { BeatSliceAnalyzer, removeSlice } from '../../lib/audio/BeatSliceAnalyzer';
+import { BeatSliceAnalyzer, removeSlice, extractSliceAudio } from '../../lib/audio/BeatSliceAnalyzer';
 import { getToneEngine } from '../../engine/ToneEngine';
+import { useDrumPadStore } from '../../stores/useDrumPadStore';
+import type { SampleData } from '../../types/drumpad';
 
 interface BeatSlicerPanelProps {
   instrument: InstrumentConfig;
@@ -47,6 +49,7 @@ export const BeatSlicerPanel: React.FC<BeatSlicerPanelProps> = ({
   const [isExpanded, setIsExpanded] = useState(true);
   const [isExporting, setIsExporting] = useState(false);
   const [isExportingKit, setIsExportingKit] = useState(false);
+  const [isExportingPads, setIsExportingPads] = useState(false);
 
   // Get slices and config from instrument or use defaults
   const slices = instrument.sample?.slices || [];
@@ -171,6 +174,50 @@ export const BeatSlicerPanel: React.FC<BeatSlicerPanelProps> = ({
       setIsExportingKit(false);
     }
   }, [slices, instrument.id, createDrumKitFromSlices]);
+
+  // Export slices to Drum Pads
+  const handleExportToDrumPads = useCallback(async () => {
+    if (slices.length === 0 || !audioBuffer) {
+      notify.error('No slices to export');
+      return;
+    }
+
+    const maxPads = 64;
+    const slicesToExport = slices.slice(0, maxPads);
+    if (slices.length > maxPads) {
+      notify.warning(`Only first ${maxPads} slices exported (${slices.length} total)`);
+    }
+
+    setIsExportingPads(true);
+    try {
+      const padStore = useDrumPadStore.getState();
+      // Create a new program for the slices
+      const programId = `SLICE-${Date.now().toString(36).toUpperCase()}`;
+      const programName = instrument.name ? `${instrument.name} Slices` : 'Sliced Pads';
+      padStore.createProgram(programId, programName);
+
+      // Extract audio and load each slice into a pad
+      for (let i = 0; i < slicesToExport.length; i++) {
+        const slice = slicesToExport[i];
+        const sliceBuffer = extractSliceAudio(audioBuffer, slice, { fadeInMs: 1, fadeOutMs: 5 });
+        const sampleData: SampleData = {
+          id: `slice-${i}-${slice.id}`,
+          name: slice.label || `Slice ${i + 1}`,
+          audioBuffer: sliceBuffer,
+          duration: sliceBuffer.duration,
+          sampleRate: sliceBuffer.sampleRate,
+        };
+        await padStore.loadSampleToPad(i + 1, sampleData);
+      }
+
+      notify.success(`Loaded ${slicesToExport.length} slices to Drum Pads (${programName})`);
+    } catch (error) {
+      console.error('[BeatSlicerPanel] Drum Pad export failed:', error);
+      notify.error('Drum Pad export failed');
+    } finally {
+      setIsExportingPads(false);
+    }
+  }, [slices, audioBuffer, instrument.name]);
 
   // Format time display
   const formatTime = (seconds: number): string => {
@@ -416,6 +463,23 @@ export const BeatSlicerPanel: React.FC<BeatSlicerPanelProps> = ({
                   {isExportingKit
                     ? 'Creating DrumKit...'
                     : `Slice to DrumKit (MIDI 36+)`}
+                </span>
+              </button>
+
+              <button
+                onClick={handleExportToDrumPads}
+                disabled={isExporting || isExportingKit || isExportingPads}
+                className="w-full flex items-center justify-center gap-1.5 px-3 py-2 bg-ft2-border text-ft2-text rounded text-xs font-medium hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isExportingPads ? (
+                  <RefreshCw size={12} className="animate-spin" />
+                ) : (
+                  <Grid3X3 size={12} />
+                )}
+                <span>
+                  {isExportingPads
+                    ? 'Loading Pads...'
+                    : `Slice to Drum Pads (${Math.min(slices.length, 64)} pads)`}
                 </span>
               </button>
             </div>

@@ -73,6 +73,9 @@ export const WebGLModalBridge: React.FC = () => {
       case 'acid-pattern':
         openModal('acidPattern');
         break;
+      case 'pattern-length':
+        openModal('patternLength');
+        break;
       case 'tempo-tap':
         // Tap tempo is handled inline, no modal needed
         break;

@@ -12,6 +12,8 @@ import { getToneEngine } from '@engine/ToneEngine';
 import { getTrackerReplayer } from '@engine/TrackerReplayer';
 import { saveProjectToStorage } from '@hooks/useProjectPersistence';
 import { useAIStore } from '@stores/useAIStore';
+import { useInstrumentStore } from '@stores/useInstrumentStore';
+import { xmNoteToToneJS } from '@/lib/xmConversions';
 
 // ====== REAL IMPLEMENTATIONS (kept from original) ======
 
@@ -263,6 +265,33 @@ export function quickSave(): boolean {
 }
 
 // ====== PREVIEW ======
+
+export function previewNoteAtCursor(): boolean {
+  const ts = useTrackerStore.getState();
+  const { cursor } = useCursorStore.getState();
+  const pat = ts.patterns[ts.currentPatternIndex];
+  if (!pat) return true;
+  const cell = pat.channels[cursor.channelIndex]?.rows[cursor.rowIndex];
+  if (!cell || !cell.note || cell.note === 97 || cell.note < 1 || cell.note > 96) {
+    useUIStore.getState().setStatusMessage('No note at cursor', false, 600);
+    return true;
+  }
+  const instrumentId = cell.instrument || useInstrumentStore.getState().currentInstrumentId || 1;
+  const inst = useInstrumentStore.getState().getInstrument(instrumentId);
+  if (!inst) return true;
+  const toneNote = xmNoteToToneJS(cell.note);
+  if (!toneNote) return true;
+  const velocity = cell.volume ? Math.min(cell.volume / 64, 1) : 0.8;
+  const toneEng = getToneEngine();
+  toneEng.ensureInstrumentReady(inst).then(() => {
+    toneEng.triggerNoteAttack(inst.id, toneNote, 0, velocity, inst);
+    setTimeout(() => {
+      toneEng.triggerNoteRelease(inst.id, toneNote, 0, inst);
+    }, 500);
+  });
+  useUIStore.getState().setStatusMessage('Preview', false, 600);
+  return true;
+}
 
 export function previewInstrument(): boolean {
   import('@engine/ToneEngine').then(({ getToneEngine: engine }) => {
