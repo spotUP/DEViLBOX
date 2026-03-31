@@ -162,7 +162,7 @@ export const useEditorStore = create<EditorStore>()(
     keyOffTime: Array(MAX_CHANNELS).fill(0),
     keyOffCounter: 0,
 
-    ptnJumpPos: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+    ptnJumpPos: [-1, -1, -1, -1, -1, -1, -1, -1, -1, -1],
     effectMacros: Array(10).fill(null) as Array<{ effTyp: number; eff: number } | null>,
     ptSampleBank: 0,
     activeBehavior: DEFAULT_BEHAVIOR,
@@ -337,7 +337,7 @@ export const useEditorStore = create<EditorStore>()(
 
     getPtnJumpPos: (index) => {
       const { ptnJumpPos } = get();
-      return (index >= 0 && index < 10) ? ptnJumpPos[index] : 0;
+      return (index >= 0 && index < 10) ? ptnJumpPos[index] : -1;
     },
 
     // ── Effect macros ────────────────────────────────────────────────────

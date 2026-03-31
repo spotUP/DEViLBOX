@@ -115,7 +115,8 @@ export const useNavigationInput = (refs: TrackerInputRefs) => {
             if (e.shiftKey) {
               setPtnJumpPos(0, cursorRef.current.rowIndex);
             } else if (e.ctrlKey || e.metaKey) {
-              moveCursorToRow(getPtnJumpPos(0));
+              const pos = getPtnJumpPos(0);
+              moveCursorToRow(pos >= 0 ? pos : 0);
               setIsLooping(false);
               playFast();
             } else {
@@ -129,7 +130,8 @@ export const useNavigationInput = (refs: TrackerInputRefs) => {
             if (e.shiftKey) {
               setPtnJumpPos(1, cursorRef.current.rowIndex);
             } else if (e.ctrlKey || e.metaKey) {
-              moveCursorToRow(getPtnJumpPos(1));
+              const pos = getPtnJumpPos(1);
+              moveCursorToRow(pos >= 0 ? pos : Math.floor(pattern.length * 0.25));
               setIsLooping(false);
               playFast();
             } else {
@@ -143,7 +145,8 @@ export const useNavigationInput = (refs: TrackerInputRefs) => {
             if (e.shiftKey) {
               setPtnJumpPos(2, cursorRef.current.rowIndex);
             } else if (e.ctrlKey || e.metaKey) {
-              moveCursorToRow(getPtnJumpPos(2));
+              const pos = getPtnJumpPos(2);
+              moveCursorToRow(pos >= 0 ? pos : Math.floor(pattern.length * 0.5));
               setIsLooping(false);
               playFast();
             } else {
@@ -157,7 +160,8 @@ export const useNavigationInput = (refs: TrackerInputRefs) => {
             if (e.shiftKey) {
               setPtnJumpPos(3, cursorRef.current.rowIndex);
             } else if (e.ctrlKey || e.metaKey) {
-              moveCursorToRow(getPtnJumpPos(3));
+              const pos = getPtnJumpPos(3);
+              moveCursorToRow(pos >= 0 ? pos : Math.floor(pattern.length * 0.75));
               setIsLooping(false);
               playFast();
             } else {
@@ -289,22 +293,28 @@ export const useNavigationInput = (refs: TrackerInputRefs) => {
         return true;
       }
 
-      // Alt+Q..I: Jump to track 0-7
+      // Alt+Q..I: Jump to track 0-7 (FT2/PT — disabled in IT/OpenMPT where Alt+letter = block ops)
       if (e.altKey && ALT_TRACK_MAP_1[keyLower] !== undefined) {
-        e.preventDefault();
-        const track = ALT_TRACK_MAP_1[keyLower] % pattern.channels.length;
-        moveCursorToChannel(track);
-        moveCursorToColumn('note');
-        return true;
+        const behavior = useEditorStore.getState().activeBehavior;
+        if (!behavior.itMaskVariables) {
+          e.preventDefault();
+          const track = ALT_TRACK_MAP_1[keyLower] % pattern.channels.length;
+          moveCursorToChannel(track);
+          moveCursorToColumn('note');
+          return true;
+        }
       }
 
-      // Alt+A..K: Jump to track 8-15
+      // Alt+A..K: Jump to track 8-15 (FT2/PT — disabled in IT/OpenMPT where Alt+letter = block ops)
       if (e.altKey && ALT_TRACK_MAP_2[keyLower] !== undefined) {
-        e.preventDefault();
-        const track = ALT_TRACK_MAP_2[keyLower] % pattern.channels.length;
-        moveCursorToChannel(track);
-        moveCursorToColumn('note');
-        return true;
+        const behavior = useEditorStore.getState().activeBehavior;
+        if (!behavior.itMaskVariables) {
+          e.preventDefault();
+          const track = ALT_TRACK_MAP_2[keyLower] % pattern.channels.length;
+          moveCursorToChannel(track);
+          moveCursorToColumn('note');
+          return true;
+        }
       }
 
       // Arrow keys (up/down) — disabled during playback and in format modes

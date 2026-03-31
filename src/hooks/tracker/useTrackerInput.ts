@@ -27,6 +27,25 @@ function noteColFields(nci: number): { note: string; instrument: string; volume:
   return { note: 'note', instrument: 'instrument', volume: 'volume' };
 }
 
+/** PT default jump rows for F6-F10 (0=0%, 1=25%, 2=50%, 3=75%, 4=last row) */
+function ptDefaultJumpRow(posIndex: number, patternLength: number): number {
+  const last = patternLength - 1;
+  switch (posIndex) {
+    case 0: return 0;
+    case 1: return Math.floor(last * 0.25);
+    case 2: return Math.floor(last * 0.5);
+    case 3: return Math.floor(last * 0.75);
+    case 4: return last;
+    default: return 0;
+  }
+}
+
+/** Get stored jump position, or PT default if not explicitly set (-1 = unset) */
+function getJumpRow(posIndex: number, patternLength: number): number {
+  const stored = useEditorStore.getState().getPtnJumpPos(posIndex);
+  return stored >= 0 ? stored : ptDefaultJumpRow(posIndex, patternLength);
+}
+
 export const useTrackerInput = () => {
   // PERFORMANCE: cursor and selection are refs — updated via subscription, not React state.
   const cursorRef = useRef(useCursorStore.getState().cursor);
@@ -390,15 +409,15 @@ export const useTrackerInput = () => {
           } else if (e.altKey && !e.shiftKey) {
             // Play from position marker
             e.preventDefault();
-            const jumpRow = useEditorStore.getState().getPtnJumpPos(posIndex);
+            const jumpRow = getJumpRow(posIndex, pattern.length);
             moveCursorToRow(jumpRow);
             play();
             useUIStore.getState().setStatusMessage(`PLAY FROM ROW ${jumpRow}`);
             return;
           } else if (!e.shiftKey && !e.altKey && !isPlaying) {
-            // Jump to stored position
+            // Jump to stored position (or PT default: F6=0, F7=25%, F8=50%, F9=75%, F10=last)
             e.preventDefault();
-            const jumpRow = useEditorStore.getState().getPtnJumpPos(posIndex);
+            const jumpRow = getJumpRow(posIndex, pattern.length);
             moveCursorToRow(jumpRow);
             useUIStore.getState().setStatusMessage(`JUMP TO ROW ${jumpRow}`);
             return;
@@ -429,19 +448,24 @@ export const useTrackerInput = () => {
 
       if (key === 'Insert') {
         const behavior = useEditorStore.getState().activeBehavior;
-        e.preventDefault();
-        if (recordMode) {
-          if (e.shiftKey && behavior.insertShiftAllChannels) {
-            for (let ch = 0; ch < pattern.channels.length; ch++) {
-              insertRow(ch, cursorRef.current.rowIndex);
+        // IT: Ctrl+Insert = roll selection down — handled below, don't consume here
+        if ((e.ctrlKey || e.metaKey) && behavior.itMaskVariables) {
+          // fall through to IT Ctrl+Insert roll handler
+        } else {
+          e.preventDefault();
+          if (recordMode) {
+            if (e.shiftKey && behavior.insertShiftAllChannels) {
+              for (let ch = 0; ch < pattern.channels.length; ch++) {
+                insertRow(ch, cursorRef.current.rowIndex);
+              }
+            } else {
+              handleInsertRow();
             }
-          } else {
-            handleInsertRow();
+          } else if (behavior.insertTogglesMode) {
+            toggleInsertMode();
           }
-        } else if (behavior.insertTogglesMode) {
-          toggleInsertMode();
+          return;
         }
-        return;
       }
 
       // ============================================
@@ -475,35 +499,40 @@ export const useTrackerInput = () => {
       // Delete: Behavior-aware clearing (requires edit mode)
       if (key === 'Delete' && recordMode) {
         const behavior = useEditorStore.getState().activeBehavior;
-        e.preventDefault();
+        // IT: Ctrl+Delete = roll selection up — handled below, don't consume here
+        if ((e.ctrlKey || e.metaKey) && behavior.itMaskVariables) {
+          // fall through to IT Ctrl+Delete roll handler
+        } else {
+          e.preventDefault();
 
-        // FT2 modifier variants: Shift=clear all, Ctrl=clear vol+eff, Alt=clear eff
-        if (behavior.deleteModifierVariants) {
-          if (e.shiftKey) {
-            setCell(cursorRef.current.channelIndex, cursorRef.current.rowIndex, {
-              note: 0, instrument: 0, volume: 0, effTyp: 0, eff: 0,
-            });
-          } else if (e.ctrlKey || e.metaKey) {
-            setCell(cursorRef.current.channelIndex, cursorRef.current.rowIndex, {
-              volume: 0, effTyp: 0, eff: 0,
-            });
-          } else if (e.altKey) {
-            setCell(cursorRef.current.channelIndex, cursorRef.current.rowIndex, {
-              effTyp: 0, eff: 0,
-            });
+          // FT2 modifier variants: Shift=clear all, Ctrl=clear vol+eff, Alt=clear eff
+          if (behavior.deleteModifierVariants) {
+            if (e.shiftKey) {
+              setCell(cursorRef.current.channelIndex, cursorRef.current.rowIndex, {
+                note: 0, instrument: 0, volume: 0, effTyp: 0, eff: 0,
+              });
+            } else if (e.ctrlKey || e.metaKey) {
+              setCell(cursorRef.current.channelIndex, cursorRef.current.rowIndex, {
+                volume: 0, effTyp: 0, eff: 0,
+              });
+            } else if (e.altKey) {
+              setCell(cursorRef.current.channelIndex, cursorRef.current.rowIndex, {
+                effTyp: 0, eff: 0,
+              });
+            } else {
+              // Bare Delete: behavior-determined
+              deleteByCursorField(behavior);
+            }
           } else {
-            // Bare Delete: behavior-determined
+            // Non-FT2 schemes: bare Delete only, behavior-determined
             deleteByCursorField(behavior);
           }
-        } else {
-          // Non-FT2 schemes: bare Delete only, behavior-determined
-          deleteByCursorField(behavior);
-        }
 
-        if (behavior.advanceOnDelete && editStep > 0 && !isPlaying) {
-          moveCursorToRow((cursorRef.current.rowIndex + editStep) % pattern.length);
+          if (behavior.advanceOnDelete && editStep > 0 && !isPlaying) {
+            moveCursorToRow((cursorRef.current.rowIndex + editStep) % pattern.length);
+          }
+          return;
         }
-        return;
       }
 
       // Backspace: Delete previous note/line (requires edit mode)
@@ -707,7 +736,10 @@ export const useTrackerInput = () => {
               const cell = pattern.channels[ch].rows[r];
               const note = cell.note > 0 && cell.note < 97
                 ? xmNoteToString(cell.note)
-                : (cell.note === 97 ? '===' : '...');
+                : cell.note === 97 ? '==='
+                : cell.note === 254 ? '^^^'
+                : cell.note === 255 ? '~~~'
+                : '...';
               const inst = cell.instrument
                 ? cell.instrument.toString(16).toUpperCase().padStart(2, '0')
                 : '..';
