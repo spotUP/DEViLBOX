@@ -140,10 +140,10 @@ export const pluginSynthEntries: Record<string, SynthInfo> = {
     icon: 'Zap',
     color: 'text-yellow-400',
   },
-  AMSynth: {
-    type: 'AMSynth',
-    name: 'AMSynth (Analog Modelling)',
-    shortName: 'AMSynth',
+  ToneAM: {
+    type: 'ToneAM',
+    name: 'Tone AM Synth',
+    shortName: 'ToneAM',
     description: 'Dual-oscillator subtractive synth — multi-mode filter, dual ADSR, LFO, distortion, reverb, 41 params',
     bestFor: ['Bass', 'Leads', 'Pads', 'Analog', 'Subtractive'],
     icon: 'Waves',
@@ -292,6 +292,15 @@ export const pluginSynthEntries: Record<string, SynthInfo> = {
     bestFor: ['Mono bass', 'Acid', 'Leads', 'Sound design', 'Morphing'],
     icon: 'Sparkles',
     color: 'text-fuchsia-400',
+  },
+  VL1: {
+    type: 'VL1',
+    name: 'Casio VL-Tone',
+    shortName: 'VL-1',
+    description: 'Casio VL-1 emulation - 10 wavetable sounds, authentic ADSR envelopes, vibrato/tremolo, 10 built-in rhythm patterns',
+    bestFor: ['Lo-fi', 'Retro', 'Chiptune', 'Novelty', 'Rhythm'],
+    icon: 'Music',
+    color: 'text-amber-400',
   },
   Helm: {
     type: 'Helm',

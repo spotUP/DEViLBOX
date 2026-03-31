@@ -53,7 +53,7 @@ export const PAD_PRESETS: InstrumentPreset['config'][] = [
   {
     type: 'synth' as const,
     name: 'AM Atmospheric',
-    synthType: 'AMSynth',
+    synthType: 'ToneAM',
     oscillator: { type: 'sine', detune: 5, octave: 0 },
     envelope: { attack: 1500, decay: 3000, sustain: 0.8, release: 2000 },
     effects: [],

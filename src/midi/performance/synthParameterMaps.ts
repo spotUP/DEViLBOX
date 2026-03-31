@@ -921,7 +921,7 @@ export const SYNTH_PARAMETER_MAPS: Partial<Record<SynthType, NKSParameter[]>> = 
   'PolySynth': POLYSYNTH_NKS_PARAMETERS,
   'Synth': POLYSYNTH_NKS_PARAMETERS,
   'FMSynth': FMSYNTH_NKS_PARAMETERS,
-  'AMSynth': AMSYNTH_NKS_PARAMETERS,
+  'ToneAM': AMSYNTH_NKS_PARAMETERS,
   'MembraneSynth': MEMBRANESYNTH_NKS_PARAMETERS,
   'MetalSynth': METALSYNTH_NKS_PARAMETERS,
   'NoiseSynth': NOISESYNTH_NKS_PARAMETERS,
@@ -1051,6 +1051,7 @@ export const SYNTH_PARAMETER_MAPS: Partial<Record<SynthType, NKSParameter[]>> = 
   'Odin2': ODIN2_NKS_PARAMETERS,
   'Surge': SURGE_NKS_PARAMETERS,
   'Monique': MONIQUE_NKS_PARAMETERS,
+  'VL1': GENERIC_NKS_PARAMETERS,
 
   // WAM plugin (generic until auto-profiled at runtime)
   'WAM': GENERIC_NKS_PARAMETERS,
@@ -1131,7 +1132,7 @@ export const SYNTH_VISUAL_IDENTITY: Partial<Record<SynthType, SynthVisualIdentit
   'DuoSynth':     { color: '#009999', controlColor: 0x009999, shortName: 'DuoSynth' },
   'PolySynth':    { color: '#6633CC', controlColor: 0x6633CC, shortName: 'PolySynth' },
   'FMSynth':      { color: '#CC6600', controlColor: 0xCC6600, shortName: 'FM Synth' },
-  'AMSynth':      { color: '#CC9900', controlColor: 0xCC9900, shortName: 'AM Synth' },
+  'ToneAM':      { color: '#CC9900', controlColor: 0xCC9900, shortName: 'AM Synth' },
   'SuperSaw':     { color: '#FF3366', controlColor: 0xFF3366, shortName: 'SuperSaw' },
   'Organ':        { color: '#996633', controlColor: 0x996633, shortName: 'Organ' },
   'DrumMachine':  { color: '#CC0033', controlColor: 0xCC0033, shortName: 'DrumMachine' },
@@ -1147,6 +1148,7 @@ export const SYNTH_VISUAL_IDENTITY: Partial<Record<SynthType, SynthVisualIdentit
   'Odin2':        { color: '#6600CC', controlColor: 0x6600CC, shortName: 'Odin2' },
   'Surge':        { color: '#0066CC', controlColor: 0x0066CC, shortName: 'Surge' },
   'Monique':      { color: '#CC0066', controlColor: 0xCC0066, shortName: 'Monique' },
+  'VL1':          { color: '#CC9900', controlColor: 0xCC9900, shortName: 'VL-1' },
   'Sam':          { color: '#66CC00', controlColor: 0x66CC00, shortName: 'Sam' },
 };
 

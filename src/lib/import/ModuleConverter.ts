@@ -368,6 +368,17 @@ export function convertXMModule(
           if (cell.instrument !== null) {
             lastInstrument = cell.instrument;
           }
+          // Preserve extra note columns from XRNS import
+          const raw = xmNote as unknown as Record<string, number>;
+          if (raw.note2) cell.note2 = raw.note2;
+          if (raw.instrument2) cell.instrument2 = raw.instrument2;
+          if (raw.volume2) cell.volume2 = raw.volume2;
+          if (raw.note3) cell.note3 = raw.note3;
+          if (raw.instrument3) cell.instrument3 = raw.instrument3;
+          if (raw.volume3) cell.volume3 = raw.volume3;
+          if (raw.note4) cell.note4 = raw.note4;
+          if (raw.instrument4) cell.instrument4 = raw.instrument4;
+          if (raw.volume4) cell.volume4 = raw.volume4;
           rows.push(cell);
         } else {
           rows.push({
@@ -385,6 +396,10 @@ export function convertXMModule(
       // Default to first instrument (ID 0) if none was used in this channel
       const defaultInstrument = lastInstrument !== null ? lastInstrument : 0;
 
+      // Check if XRNS import attached max note column info
+      const maxNoteCols = (xmPattern as unknown as { __maxNoteCols?: number[] }).__maxNoteCols;
+      const noteCols = maxNoteCols?.[chIdx] ?? 1;
+
       channels.push({
         id: `xm-ch-${patIdx}-${chIdx}-${Date.now()}`,
         name: metadata.modData?.channelNames[chIdx] || `Channel ${chIdx + 1}`,
@@ -400,6 +415,7 @@ export function convertXMModule(
           importedFromMOD: true,
           originalIndex: chIdx,
           channelType: 'sample',
+          ...(noteCols > 1 ? { noteCols } : {}),
         },
       });
     }

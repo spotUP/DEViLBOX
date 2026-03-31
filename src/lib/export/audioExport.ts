@@ -102,7 +102,7 @@ export async function renderPatternToAudio(
         case 'FMSynth':
           synth = new Tone.PolySynth(Tone.FMSynth).toDestination();
           break;
-        case 'AMSynth':
+        case 'ToneAM':
           synth = new Tone.PolySynth(Tone.AMSynth).toDestination();
           break;
         case 'DuoSynth':

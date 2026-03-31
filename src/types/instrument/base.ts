@@ -8,7 +8,7 @@ export type SynthType =
   | 'MonoSynth'
   | 'DuoSynth'
   | 'FMSynth'
-  | 'AMSynth'
+  | 'ToneAM'
   | 'PluckSynth'
   | 'MetalSynth'
   | 'MembraneSynth'
@@ -190,7 +190,7 @@ export type SynthType =
   | 'MdaJX10'          // MDA JX-10 - Roland-inspired 8-voice polyphonic subtractive
   | 'MdaDX10'          // MDA DX10 - 2-operator FM synthesizer
   // Ported Zynthian Synths
-  | 'AMSynth'          // AMSynth - Dual-oscillator analog modelling (41 params)
+  | 'ToneAM'          // Tone.js AM Synth - Dual-oscillator amplitude modulation
   | 'RaffoSynth'       // Raffo - Minimoog clone (4-osc mono, 32 params)
   | 'CalfMono'         // Calf Monosynth - 2-osc mono subtractive (55 params)
   | 'SetBfree'         // setBfree - Hammond B3 tonewheel organ + Leslie (60 params)
@@ -215,6 +215,7 @@ export type SynthType =
   | 'TonewheelOrgan'   // Hammond-style Tonewheel Organ (VSTBridge)
   | 'Melodica'         // Melodica Reed Instrument (VSTBridge)
   | 'Monique'          // Monique Morphing Monosynth (VSTBridge)
+  | 'VL1'              // Casio VL-Tone (pure TS worklet)
   // Virtual instruments (aliased MAME)
   | 'VFX'             // Ensoniq VFX (alias for MAMEVFX)
   | 'D50'            // Roland D-50 (virtual analog)

@@ -171,7 +171,7 @@ const SYNTH_CONFIGS: Record<string, Record<string, unknown>> = {
   'MonoSynth':     { synthType: 'MonoSynth', volume: -12 },
   'DuoSynth':      { synthType: 'DuoSynth', volume: -12 },
   'FMSynth':       { synthType: 'FMSynth', volume: -12 },
-  'AMSynth':       { synthType: 'AMSynth', volume: -12 },
+  'ToneAM':       { synthType: 'ToneAM', volume: -12 },
   'PluckSynth':    { synthType: 'PluckSynth', volume: -12 },
   'MetalSynth':    { synthType: 'MetalSynth', volume: -12 },
   'MembraneSynth': { synthType: 'MembraneSynth', volume: -12 },
@@ -478,7 +478,7 @@ const SYNTH_CONFIGS_FULL: Record<string, any> = {
   'Synth': { synthType: 'Synth', volume: -12 },
   'DuoSynth': { synthType: 'DuoSynth', volume: -12 },
   'FMSynth': { synthType: 'FMSynth', volume: -12 },
-  'AMSynth': { synthType: 'AMSynth', volume: -12 },
+  'ToneAM': { synthType: 'ToneAM', volume: -12 },
   'PluckSynth': { synthType: 'PluckSynth', volume: -12 },
   'MetalSynth': { synthType: 'MetalSynth', volume: -12 },
   'MembraneSynth': { synthType: 'MembraneSynth', volume: -12 },
@@ -1003,6 +1003,8 @@ function getRequiredEngine(synthName: string): string | null {
   if (['Dexed', 'OBXd', 'D50', 'VFX'].includes(synthName)) return 'standalone-wasm';
   // SuperCollider uses scsynth WASM
   if (synthName === 'SuperCollider') return 'standalone-wasm';
+  // VL1 uses pure JS AudioWorklet
+  if (synthName === 'VL1') return 'standalone-wasm';
   // VSTBridge synths use WASM plugins
   if (['Helm', 'Vital', 'Surge', 'Amsynth', 'Monique', 'Odin2', 'OBXf', 'Sorcer',
        'DexedBridge', 'TonewheelOrgan', 'Melodica'].includes(synthName)) return 'standalone-wasm';
@@ -2635,7 +2637,7 @@ async function testSustainReleaseBehavior() {
   meter.toDestination();
 
   // Synths to test (exclude noise/percussion which behave differently)
-  const synthsToTest = ['Synth', 'MonoSynth', 'FMSynth', 'AMSynth', 'TB303', 'Buzz3o3',
+  const synthsToTest = ['Synth', 'MonoSynth', 'FMSynth', 'ToneAM', 'TB303', 'Buzz3o3',
     'SuperSaw', 'WobbleBass', 'FormantSynth', 'V2', 'Furnace', 'PolySynth', 'Organ'];
 
   interface BehaviorResult {

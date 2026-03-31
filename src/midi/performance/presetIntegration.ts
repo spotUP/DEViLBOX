@@ -337,7 +337,7 @@ function inferSynthTypeFromMetadata(metadata: NKSPresetMetadata): SynthType | nu
   if (combined.includes('pluck')) return 'PluckSynth';
   if (combined.includes('noise')) return 'NoiseSynth';
   if (combined.includes('duo')) return 'DuoSynth';
-  if (combined.includes('am synth') || combined.includes('amsyn')) return 'AMSynth';
+  if (combined.includes('am synth') || combined.includes('amsyn')) return 'ToneAM';
   if (types.includes('synth lead') && combined.includes('mono')) return 'MonoSynth';
   if (types.includes('synth lead')) return 'PolySynth';
   if (types.includes('synth pad')) return 'PolySynth';
