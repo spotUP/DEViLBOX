@@ -28,6 +28,10 @@ export interface PlaylistTrack {
   addedAt: number;
   /** Optional download URL (e.g. Modland HTTP URL) */
   sourceUrl?: string;
+  /** Musical key from analysis (e.g. "C minor", "8B") */
+  musicalKey?: string;
+  /** Energy level 0-1 from analysis */
+  energy?: number;
 }
 
 export interface DJPlaylist {
@@ -50,6 +54,8 @@ interface DJPlaylistState {
   addTrack: (playlistId: string, track: PlaylistTrack) => void;
   removeTrack: (playlistId: string, index: number) => void;
   reorderTrack: (playlistId: string, fromIndex: number, toIndex: number) => void;
+  sortTracks: (playlistId: string, sortedTracks: PlaylistTrack[]) => void;
+  updateTrackMeta: (playlistId: string, index: number, meta: Partial<Pick<PlaylistTrack, 'musicalKey' | 'energy' | 'bpm'>>) => void;
   importPlaylists: (playlists: DJPlaylist[]) => void;
 }
 
@@ -138,6 +144,26 @@ export const useDJPlaylistStore = create<DJPlaylistState>()(
           }
         });
         syncPlaylists();
+      },
+
+      sortTracks: (playlistId: string, sortedTracks: PlaylistTrack[]) => {
+        set((state) => {
+          const p = state.playlists.find((pl) => pl.id === playlistId);
+          if (p) {
+            p.tracks = sortedTracks;
+            p.updatedAt = Date.now();
+          }
+        });
+        syncPlaylists();
+      },
+
+      updateTrackMeta: (playlistId: string, index: number, meta: Partial<Pick<PlaylistTrack, 'musicalKey' | 'energy' | 'bpm'>>) => {
+        set((state) => {
+          const p = state.playlists.find((pl) => pl.id === playlistId);
+          if (p && index >= 0 && index < p.tracks.length) {
+            Object.assign(p.tracks[index], meta);
+          }
+        });
       },
 
       importPlaylists: (playlists: DJPlaylist[]) => {

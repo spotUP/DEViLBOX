@@ -13,6 +13,7 @@ import {
   Check,
   X,
   GripVertical,
+  ArrowUpDown,
 } from 'lucide-react';
 import {
   useDJPlaylistStore,
@@ -23,6 +24,8 @@ import { getDJEngine } from '@/engine/dj/DJEngine';
 import { parseModuleToSong } from '@/lib/import/parseModuleToSong';
 import { detectBPM, estimateSongDuration } from '@/engine/dj/DJBeatDetector';
 import { cacheSong } from '@/engine/dj/DJSongCache';
+import { smartSort, sortByBPM, sortByKey, sortByEnergy, sortByName } from '@/engine/dj/DJPlaylistSort';
+import { camelotDisplay, camelotColor } from '@/engine/dj/DJKeyUtils';
 import { getDJPipeline } from '@/engine/dj/DJPipeline';
 import { isAudioFile } from '@/lib/audioFileUtils';
 
@@ -50,6 +53,7 @@ export const DJPlaylistPanel: React.FC<DJPlaylistPanelProps> = ({ onClose }) => 
   const addTrack = useDJPlaylistStore((s) => s.addTrack);
   const removeTrack = useDJPlaylistStore((s) => s.removeTrack);
   const reorderTrack = useDJPlaylistStore((s) => s.reorderTrack);
+  const sortTracksAction = useDJPlaylistStore((s) => s.sortTracks);
 
   const autoDJEnabled = useDJStore((s) => s.autoDJEnabled);
   const autoDJCurrentIdx = useDJStore((s) => s.autoDJCurrentTrackIndex);
@@ -61,6 +65,7 @@ export const DJPlaylistPanel: React.FC<DJPlaylistPanelProps> = ({ onClose }) => 
   const [editName, setEditName] = useState('');
   const [dragIndex, setDragIndex] = useState<number | null>(null);
   const [isLoadingFile, setIsLoadingFile] = useState(false);
+  const [showSortMenu, setShowSortMenu] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
 
@@ -302,6 +307,25 @@ export const DJPlaylistPanel: React.FC<DJPlaylistPanelProps> = ({ onClose }) => 
     [activePlaylistId, addTrack],
   );
 
+  // ── Sort handlers ─────────────────────────────────────────────────────────
+
+  const handleSort = useCallback((mode: 'smart' | 'bpm' | 'bpm-desc' | 'key' | 'energy' | 'name') => {
+    if (!activePlaylist) return;
+    const tracks = [...activePlaylist.tracks];
+    let sorted: PlaylistTrack[];
+    switch (mode) {
+      case 'smart': sorted = smartSort(tracks); break;
+      case 'bpm': sorted = sortByBPM(tracks); break;
+      case 'bpm-desc': sorted = sortByBPM(tracks, true); break;
+      case 'key': sorted = sortByKey(tracks); break;
+      case 'energy': sorted = sortByEnergy(tracks); break;
+      case 'name': sorted = sortByName(tracks); break;
+      default: sorted = tracks;
+    }
+    sortTracksAction(activePlaylist.id, sorted);
+    setShowSortMenu(false);
+  }, [activePlaylist, sortTracksAction]);
+
   // ── Render ───────────────────────────────────────────────────────────────
 
   return (
@@ -349,6 +373,47 @@ export const DJPlaylistPanel: React.FC<DJPlaylistPanelProps> = ({ onClose }) => 
             >
               <Trash2 size={10} />
             </button>
+            {/* Sort dropdown */}
+            <div className="relative">
+              <button
+                onClick={() => setShowSortMenu(v => !v)}
+                className={`p-1 transition-colors ${showSortMenu ? 'text-accent-primary' : 'text-text-muted hover:text-text-primary'}`}
+                title="Sort playlist"
+              >
+                <ArrowUpDown size={12} />
+              </button>
+              {showSortMenu && (
+                <div className="absolute top-full right-0 mt-1 z-50 bg-dark-bg border border-dark-border rounded shadow-xl min-w-[140px]">
+                  <button onClick={() => handleSort('smart')}
+                    className="w-full text-left px-3 py-1.5 text-xs font-mono text-accent-primary hover:bg-dark-bgTertiary transition-colors"
+                    title="AI-optimized order: BPM flow + harmonic keys + energy arc"
+                  >
+                    Smart Mix
+                  </button>
+                  <div className="border-t border-dark-border/30" />
+                  <button onClick={() => handleSort('bpm')}
+                    className="w-full text-left px-3 py-1.5 text-xs font-mono text-text-secondary hover:bg-dark-bgTertiary transition-colors">
+                    BPM (low → high)
+                  </button>
+                  <button onClick={() => handleSort('bpm-desc')}
+                    className="w-full text-left px-3 py-1.5 text-xs font-mono text-text-secondary hover:bg-dark-bgTertiary transition-colors">
+                    BPM (high → low)
+                  </button>
+                  <button onClick={() => handleSort('key')}
+                    className="w-full text-left px-3 py-1.5 text-xs font-mono text-text-secondary hover:bg-dark-bgTertiary transition-colors">
+                    Key (Camelot)
+                  </button>
+                  <button onClick={() => handleSort('energy')}
+                    className="w-full text-left px-3 py-1.5 text-xs font-mono text-text-secondary hover:bg-dark-bgTertiary transition-colors">
+                    Energy
+                  </button>
+                  <button onClick={() => handleSort('name')}
+                    className="w-full text-left px-3 py-1.5 text-xs font-mono text-text-secondary hover:bg-dark-bgTertiary transition-colors">
+                    Name (A→Z)
+                  </button>
+                </div>
+              )}
+            </div>
           </>
         )}
 
@@ -459,6 +524,14 @@ export const DJPlaylistPanel: React.FC<DJPlaylistPanelProps> = ({ onClose }) => 
                   </span>
                   {track.bpm > 0 && (
                     <span className="text-xs font-mono text-text-muted/40 shrink-0">{track.bpm}</span>
+                  )}
+                  {track.musicalKey && (
+                    <span
+                      className="text-[10px] font-mono font-bold shrink-0 px-1 rounded"
+                      style={{ color: camelotColor(track.musicalKey), backgroundColor: `${camelotColor(track.musicalKey)}15` }}
+                    >
+                      {camelotDisplay(track.musicalKey)}
+                    </span>
                   )}
                   {track.duration > 0 && (
                     <span className="text-xs font-mono text-text-muted/30 shrink-0">{formatDuration(track.duration)}</span>
