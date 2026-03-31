@@ -128,8 +128,51 @@ export class OPL3Synth implements DevilboxSynth {
     this.send({ type: 'pitchBend', semitones });
   }
 
-  set(_param: string, _value: number) { /* patch registers set via setPatchRegisters */ }
-  get(_param: string): number | undefined { return undefined; }
+  /**
+   * Current patch state (individual parameters).
+   * Packed into OPL3 registers when sending to worklet.
+   */
+  private patchState = {
+    // Operator 1 (modulator)
+    op1Attack: 1, op1Decay: 4, op1Sustain: 2, op1Release: 5,
+    op1Level: 32, op1Multi: 1,
+    // Operator 2 (carrier)
+    op2Attack: 1, op2Decay: 4, op2Sustain: 2, op2Release: 5,
+    op2Level: 0, op2Multi: 1,
+    // Global
+    feedback: 0, connection: 0,
+  };
+
+  /** Pack current patch state into 11 OPL3 registers */
+  private packRegisters(): number[] {
+    const s = this.patchState;
+    return [
+      (s.op1Multi & 0xF),                                      // 0x20 mod: TVSK(4) | MULTI(4) — tremolo/vibrato/sustain/ksr bits zeroed
+      (s.op2Multi & 0xF),                                      // 0x20 car
+      ((63 - (s.op1Level & 0x3F)) & 0x3F),                    // 0x40 mod: KSL(2) | TL(6) — level is inverted (63=quiet, 0=loud)
+      ((63 - (s.op2Level & 0x3F)) & 0x3F),                    // 0x40 car
+      (((s.op1Attack & 0xF) << 4) | (s.op1Decay & 0xF)),     // 0x60 mod: AR(4) | DR(4)
+      (((s.op2Attack & 0xF) << 4) | (s.op2Decay & 0xF)),     // 0x60 car
+      (((s.op1Sustain & 0xF) << 4) | (s.op1Release & 0xF)),  // 0x80 mod: SL(4) | RR(4) — sustain is inverted (15=quiet, 0=loud)
+      (((s.op2Sustain & 0xF) << 4) | (s.op2Release & 0xF)),  // 0x80 car
+      0,                                                        // 0xE0 mod: waveform (0=sine)
+      0,                                                        // 0xE0 car: waveform (0=sine)
+      (((s.feedback & 0x7) << 1) | (s.connection & 0x1) | 0x30), // 0xC0: L+R(2) | FB(3) | CNT(1)
+    ];
+  }
+
+  set(param: string, value: number) {
+    if (param in this.patchState) {
+      (this.patchState as Record<string, number>)[param] = Math.round(value);
+      this.send({ type: 'setPatch', regs: this.packRegisters() });
+    }
+  }
+
+  get(param: string): number | undefined {
+    if (param in this.patchState)
+      return (this.patchState as Record<string, number>)[param];
+    return undefined;
+  }
 
   dispose() {
     if (this._disposed) return;
