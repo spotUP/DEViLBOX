@@ -221,6 +221,11 @@ export const HarmonicSynthControls: React.FC<HarmonicSynthControlsProps> = ({
               value={config.evenOddBalance} min={-100} max={100} onChange={(v) => onChange({ evenOddBalance: v })}
               label="E/O" size="sm" color={knobColor} bipolar defaultValue={0}
             />
+            <Knob
+              value={config.maxVoices} min={4} max={8} onChange={(v) => onChange({ maxVoices: Math.round(v) })}
+              label="Voices" size="sm" color={knobColor}
+              formatValue={v => `${Math.round(v)}`}
+            />
           </div>
         </div>
 

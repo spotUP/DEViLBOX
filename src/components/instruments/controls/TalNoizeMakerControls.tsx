@@ -18,6 +18,7 @@ const OSC_WAVE_NAMES = ['Saw', 'Pulse', 'Noise', 'Triangle', 'Sine'];
 const FILTER_TYPE_NAMES = ['LP24', 'LP12', 'HP', 'BP'];
 const LFO_WAVE_NAMES = ['Tri', 'Saw', 'Square', 'S&H', 'Sine'];
 const LFO_DEST_NAMES = ['Filter', 'Osc', 'PW', 'Pan'];
+const FREE_AD_DEST_NAMES = ['Filter', 'Osc', 'PW', 'Pan'];
 
 const SectionHeader: React.FC<{ title: string }> = ({ title }) => (
   <h3 className="text-gray-400 font-semibold mb-2 border-b border-gray-700 pb-1">{title}</h3>
@@ -96,6 +97,7 @@ export const TalNoizeMakerControls: React.FC<TalNoizeMakerControlsProps> = ({ co
         {/* Sub / Ring / Misc */}
         <div className="flex flex-wrap gap-3 mt-2 items-end">
           <Knob label="Osc 3 Vol" value={m.osc3Volume} min={0} max={1} size="sm" color="#4ade80" onChange={(v) => update('osc3Volume', v)} />
+          <Knob label="Master Tune" value={m.masterTune} min={0} max={1} size="sm" color="#facc15" bipolar onChange={(v) => update('masterTune', v)} />
           <Knob label="Ring Mod" value={m.ringModulation} min={0} max={1} size="sm" color="#f97316" onChange={(v) => update('ringModulation', v)} />
           <Knob label="Transpose" value={m.transpose} min={0} max={1} size="sm" color="#facc15" bipolar onChange={(v) => update('transpose', v)} />
           <Knob label="Vintage Noise" value={m.vintageNoise} min={0} max={1} size="sm" color="#94a3b8" onChange={(v) => update('vintageNoise', v)} />
@@ -141,7 +143,19 @@ export const TalNoizeMakerControls: React.FC<TalNoizeMakerControlsProps> = ({ co
               <Knob label="D" value={m.filterDecay} min={0} max={1} size="sm" color="#a855f7" onChange={(v) => update('filterDecay', v)} />
               <Knob label="S" value={m.filterSustain} min={0} max={1} size="sm" color="#a855f7" onChange={(v) => update('filterSustain', v)} />
               <Knob label="R" value={m.filterRelease} min={0} max={1} size="sm" color="#a855f7" onChange={(v) => update('filterRelease', v)} />
+              <Knob label="Vel Cont" value={m.velocityContour} min={0} max={1} size="sm" color="#c084fc" onChange={(v) => update('velocityContour', v)} />
             </div>
+          </div>
+        </div>
+
+        {/* Free AD Envelope */}
+        <div className="p-2 rounded bg-[#2a1a1a] mt-3">
+          <span className="text-gray-400 font-semibold text-[11px]">FREE AD</span>
+          <div className="flex flex-wrap gap-2 mt-1 items-end">
+            <Knob label="A" value={m.freeAdAttack} min={0} max={1} size="sm" color="#f97316" onChange={(v) => update('freeAdAttack', v)} />
+            <Knob label="D" value={m.freeAdDecay} min={0} max={1} size="sm" color="#f97316" onChange={(v) => update('freeAdDecay', v)} />
+            <Knob label="Amount" value={m.freeAdAmount} min={0} max={1} size="sm" color="#f97316" onChange={(v) => update('freeAdAmount', v)} />
+            <SelectControl label="Dest" value={m.freeAdDestination} options={FREE_AD_DEST_NAMES} onChange={(v) => update('freeAdDestination', v)} />
           </div>
         </div>
       </div>
@@ -160,6 +174,7 @@ export const TalNoizeMakerControls: React.FC<TalNoizeMakerControlsProps> = ({ co
               <SelectControl label="Dest" value={m.lfo1Destination} options={LFO_DEST_NAMES} onChange={(v) => update('lfo1Destination', v)} />
               <Knob label="Phase" value={m.lfo1Phase} min={0} max={1} size="sm" color="#67e8f9" onChange={(v) => update('lfo1Phase', v)} />
               <ToggleButton label="Sync" value={m.lfo1Sync} onChange={(v) => update('lfo1Sync', v)} />
+              <ToggleButton label="Key Trig" value={m.lfo1KeyTrigger} onChange={(v) => update('lfo1KeyTrigger', v)} />
             </div>
           </div>
 
@@ -173,6 +188,7 @@ export const TalNoizeMakerControls: React.FC<TalNoizeMakerControlsProps> = ({ co
               <SelectControl label="Dest" value={m.lfo2Destination} options={LFO_DEST_NAMES} onChange={(v) => update('lfo2Destination', v)} />
               <Knob label="Phase" value={m.lfo2Phase} min={0} max={1} size="sm" color="#5eead4" onChange={(v) => update('lfo2Phase', v)} />
               <ToggleButton label="Sync" value={m.lfo2Sync} onChange={(v) => update('lfo2Sync', v)} />
+              <ToggleButton label="Key Trig" value={m.lfo2KeyTrigger} onChange={(v) => update('lfo2KeyTrigger', v)} />
             </div>
           </div>
         </div>
@@ -211,6 +227,8 @@ export const TalNoizeMakerControls: React.FC<TalNoizeMakerControlsProps> = ({ co
               <Knob label="Time" value={m.delayTime} min={0} max={1} size="sm" color="#fb923c" onChange={(v) => update('delayTime', v)} />
               <Knob label="Feedback" value={m.delayFeedback} min={0} max={1} size="sm" color="#fb923c" onChange={(v) => update('delayFeedback', v)} />
               <ToggleButton label="Sync" value={m.delaySync} onChange={(v) => update('delaySync', v)} />
+              <Knob label="Factor L" value={m.delayFactorL} min={0} max={1} size="sm" color="#fb923c" onChange={(v) => update('delayFactorL', v)} />
+              <Knob label="Factor R" value={m.delayFactorR} min={0} max={1} size="sm" color="#fb923c" onChange={(v) => update('delayFactorR', v)} />
               <Knob label="Hi Shelf" value={m.delayHighShelf} min={0} max={1} size="sm" color="#fb923c" onChange={(v) => update('delayHighShelf', v)} />
               <Knob label="Lo Shelf" value={m.delayLowShelf} min={0} max={1} size="sm" color="#fb923c" onChange={(v) => update('delayLowShelf', v)} />
             </div>
@@ -231,6 +249,7 @@ export const TalNoizeMakerControls: React.FC<TalNoizeMakerControlsProps> = ({ co
           <Knob label="PB Pitch" value={m.pitchwheelPitch} min={0} max={1} size="sm" color="#facc15"
             formatValue={(v) => String(Math.round(v * 24))}
             onChange={(v) => update('pitchwheelPitch', v)} />
+          <Knob label="PB Cutoff" value={m.pitchwheelCutoff} min={0} max={1} size="sm" color="#facc15" onChange={(v) => update('pitchwheelCutoff', v)} />
           <Knob label="Detune" value={m.detune} min={0} max={1} size="sm" color="#f472b6" onChange={(v) => update('detune', v)} />
           <Knob label="Bitcrusher" value={m.oscBitcrusher} min={0} max={1} size="sm" color="#f97316" onChange={(v) => update('oscBitcrusher', v)} />
         </div>
