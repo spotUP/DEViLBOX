@@ -25,6 +25,10 @@ import {
 import { ContextMenu, type MenuItemType } from '@components/common/ContextMenu';
 import { useTrackerStore } from '@stores/useTrackerStore';
 import { useCursorStore } from '@stores/useCursorStore';
+import {
+  CHORD_TYPES, ARP_PRESETS_UNIQUE,
+  chordNotes, invertChord, chordLabel, arpLabel,
+} from '@/lib/chordDefinitions';
 
 interface CellContextMenuProps {
   isOpen?: boolean;
@@ -90,6 +94,7 @@ export const CellContextMenu: React.FC<CellContextMenuProps> = ({
     transposeSelection,
     interpolateSelection,
     removeChannel,
+    setChannelMeta,
   } = useTrackerStore(useShallow((s) => ({
     patterns: s.patterns,
     currentPatternIndex: s.currentPatternIndex,
@@ -100,6 +105,7 @@ export const CellContextMenu: React.FC<CellContextMenuProps> = ({
     transposeSelection: s.transposeSelection,
     interpolateSelection: s.interpolateSelection,
     removeChannel: s.removeChannel,
+    setChannelMeta: s.setChannelMeta,
   })));
 
   const pattern = patterns[currentPatternIndex];
@@ -434,6 +440,96 @@ export const CellContextMenu: React.FC<CellContextMenuProps> = ({
       onClick: onLegato,
     },
     { type: 'divider' },
+    // ── Insert Chord / Arpeggio helpers ──
+    ...(() => {
+      const cell = pattern?.channels[channelIndex]?.rows[rowIndex];
+      const hasNote = cell && cell.note >= 1 && cell.note <= 96;
+      if (!hasNote || !cell) return [
+        { id: 'insert-chord', label: 'Insert Chord', icon: <Music size={14} />, disabled: true },
+        { id: 'insert-arp', label: 'Insert Arpeggio', icon: <Zap size={14} />, disabled: true },
+      ] as MenuItemType[];
+
+      const rootNote = cell.note;
+      const rootInst = cell.instrument || 1;
+
+      const makeChordAction = (intervals: readonly number[], inversion: number) => () => {
+        let notes = chordNotes(rootNote, intervals);
+        if (inversion > 0) notes = invertChord(notes, inversion);
+        const neededCols = Math.min(4, notes.length);
+        const currentCols = pattern?.channels[channelIndex]?.channelMeta?.noteCols ?? 1;
+        if (neededCols > currentCols) setChannelMeta(channelIndex, { noteCols: neededCols });
+        const update: Record<string, number> = {};
+        if (notes.length >= 2) { update.note2 = notes[1]; update.instrument2 = rootInst; }
+        if (notes.length >= 3) { update.note3 = notes[2]; update.instrument3 = rootInst; }
+        if (notes.length >= 4) { update.note4 = notes[3]; update.instrument4 = rootInst; }
+        setCell(channelIndex, rowIndex, update);
+        onClose();
+      };
+
+      const triadItems: MenuItemType[] = CHORD_TYPES
+        .filter(c => c.category === 'triad')
+        .map(chord => ({ id: `chord-${chord.short || 'maj'}`, label: chordLabel(chord, rootNote), onClick: makeChordAction(chord.intervals, 0) }));
+      const seventhItems: MenuItemType[] = CHORD_TYPES
+        .filter(c => c.category === 'seventh')
+        .map(chord => ({ id: `chord-${chord.short}`, label: chordLabel(chord, rootNote), onClick: makeChordAction(chord.intervals, 0) }));
+      const inversionItems: MenuItemType[] = [
+        { id: 'inv-1st', label: '1st Inversion', submenu: CHORD_TYPES.filter(c => c.category === 'triad').map(chord => ({
+          id: `inv1-${chord.short || 'maj'}`, label: chordLabel(chord, rootNote), onClick: makeChordAction(chord.intervals, 1),
+        })) },
+        { id: 'inv-2nd', label: '2nd Inversion', submenu: CHORD_TYPES.filter(c => c.category === 'triad').map(chord => ({
+          id: `inv2-${chord.short || 'maj'}`, label: chordLabel(chord, rootNote), onClick: makeChordAction(chord.intervals, 2),
+        })) },
+      ];
+
+      const makeArpAction = (param: number) => () => {
+        if (selection) {
+          const startRow = Math.min(selection.startRow, selection.endRow);
+          const endRow = Math.max(selection.startRow, selection.endRow);
+          const startCh = Math.min(selection.startChannel, selection.endChannel);
+          const endCh = Math.max(selection.startChannel, selection.endChannel);
+          for (let c = startCh; c <= endCh; c++) {
+            for (let r = startRow; r <= endRow; r++) {
+              const rc = pattern?.channels[c]?.rows[r];
+              if (!rc) continue;
+              if (!rc.effTyp && !rc.eff) setCell(c, r, { effTyp: 0, eff: param });
+              else if (!rc.effTyp2 && !rc.eff2) setCell(c, r, { effTyp2: 0, eff2: param });
+              else setCell(c, r, { effTyp: 0, eff: param });
+            }
+          }
+        } else {
+          if (!cell.effTyp && !cell.eff) setCell(channelIndex, rowIndex, { effTyp: 0, eff: param });
+          else if (!cell.effTyp2 && !cell.eff2) setCell(channelIndex, rowIndex, { effTyp2: 0, eff2: param });
+          else setCell(channelIndex, rowIndex, { effTyp: 0, eff: param });
+        }
+        onClose();
+      };
+
+      return [
+        {
+          id: 'insert-chord',
+          label: 'Insert Chord',
+          icon: <Music size={14} />,
+          submenu: [
+            ...triadItems,
+            { type: 'divider' as const },
+            ...seventhItems,
+            { type: 'divider' as const },
+            ...inversionItems,
+          ],
+        },
+        {
+          id: 'insert-arp',
+          label: selection ? 'Insert Arpeggio (selection)' : 'Insert Arpeggio',
+          icon: <Zap size={14} />,
+          submenu: ARP_PRESETS_UNIQUE.map(arp => ({
+            id: `arp-${arp.label}`,
+            label: arpLabel(arp, rootNote),
+            onClick: makeArpAction(arp.param),
+          })),
+        },
+      ] as MenuItemType[];
+    })(),
+    { type: 'divider' },
     // Visual Parameter Editor
     {
       id: 'param-editor',
@@ -474,6 +570,17 @@ export const CellContextMenu: React.FC<CellContextMenuProps> = ({
     ...(pattern && pattern.channels.length > 1 ? [
       { type: 'divider' as const },
       {
+        id: 'note-columns',
+        label: 'Note Columns',
+        icon: <Columns size={14} />,
+        submenu: [
+          { id: 'notecols-1', label: '1 Column', onClick: () => { setChannelMeta(channelIndex, { noteCols: 1 }); onClose(); } },
+          { id: 'notecols-2', label: '2 Columns', onClick: () => { setChannelMeta(channelIndex, { noteCols: 2 }); onClose(); } },
+          { id: 'notecols-3', label: '3 Columns', onClick: () => { setChannelMeta(channelIndex, { noteCols: 3 }); onClose(); } },
+          { id: 'notecols-4', label: '4 Columns', onClick: () => { setChannelMeta(channelIndex, { noteCols: 4 }); onClose(); } },
+        ],
+      },
+      {
         id: 'remove-channel',
         label: 'Remove Channel',
         icon: <Minus size={14} />,
@@ -495,6 +602,7 @@ export const CellContextMenu: React.FC<CellContextMenuProps> = ({
     handleSelectColumn,
     handleSelectChannel,
     handleRemoveChannel,
+    setChannelMeta,
     pattern,
     hasSelection,
     handleCopyBlock,
@@ -515,6 +623,11 @@ export const CellContextMenu: React.FC<CellContextMenuProps> = ({
     onSpiral,
     onBounce,
     onChaos,
+    channelIndex,
+    rowIndex,
+    onClose,
+    selection,
+    setCell,
   ]);
 
   if (!position) return null;
