@@ -37,7 +37,7 @@ export function preprocessEmscriptenJS(jsCode: string, baseUrl: string): string 
     .replace(/import\.meta\.url/g, `"${baseUrl}"`)
     .replace(/export\s+default\s+\w+;?\s*$/, '')
     .replace(/if\s*\(ENVIRONMENT_IS_NODE\)\s*\{[^}]*await\s+import\([^)]*\)[^}]*\}/g, '')
-    .replace(/(wasmMemory=wasmExports\["\w+"\])/, '$1;Module["wasmMemory"]=wasmMemory')
+    .replace(/(wasmMemory\s*=\s*wasmExports\[['"][\w]+['"]\])/, '$1;Module["wasmMemory"]=wasmMemory')
     // Replace new URL(file, base).href with string concatenation.
     // AudioWorklet scope does not have the URL constructor. After the
     // import.meta.url replacement above, these become

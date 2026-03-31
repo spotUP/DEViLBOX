@@ -192,7 +192,8 @@ export class FluidSynthSynthEngine implements DevilboxSynth {
         .replace(/import\.meta\.url/g, `"${baseUrl}fluidsynth/"`)
         .replace(/export\s+default\s+\w+;?\s*$/, '')
         .replace(/if\s*\(ENVIRONMENT_IS_NODE\)\s*\{[^}]*await\s+import\([^)]*\)[^}]*\}/g, '')
-        .replace(/(wasmMemory=wasmExports\["\w+"\])/, '$1;Module["wasmMemory"]=wasmMemory');
+        .replace(/(wasmMemory\s*=\s*wasmExports\[['"][\w]+['"]\])/, '$1;Module["wasmMemory"]=wasmMemory')
+        .replace(/new\s+URL\(([^,]+),\s*([^)]+)\)\.href/g, '($2 + $1)');
 
       this._worklet = new AudioWorkletNode(rawContext, 'fluidsynth-processor', {
         outputChannelCount: [2],
@@ -203,6 +204,8 @@ export class FluidSynthSynthEngine implements DevilboxSynth {
         if (event.data.type === 'ready') {
           this.isInitialized = true;
           this.sendConfig(this.config);
+          // Auto-load default SF2 so the synth produces sound immediately
+          this.loadDefaultSF2(baseUrl);
           for (const { note, velocity } of this.pendingNotes) {
             this._worklet!.port.postMessage({ type: 'noteOn', channel: 0, key: note, velocity });
           }
@@ -240,6 +243,17 @@ export class FluidSynthSynthEngine implements DevilboxSynth {
       if (value !== undefined) {
         this._worklet.port.postMessage({ type: 'setParam', index: i, value });
       }
+    }
+  }
+
+  private async loadDefaultSF2(baseUrl: string): Promise<void> {
+    try {
+      const res = await fetch(`${baseUrl}fluidsynth/default.sf2`);
+      if (!res.ok) return;
+      const data = await res.arrayBuffer();
+      this.loadSF2(data, 'default.sf2');
+    } catch {
+      // No default SF2 available — user must load one manually
     }
   }
 

@@ -78,7 +78,7 @@ export class V2Synth implements DevilboxSynth {
       .replace(/import\.meta\.url/g, `"${baseUrl}"`)
       .replace(/export\s+default\s+\w+;?\s*$/, '')
       .replace(/if\s*\(ENVIRONMENT_IS_NODE\)\s*\{[^}]*await\s+import\([^)]*\)[^}]*\}/g, '')
-      .replace(/(wasmMemory=wasmExports\["\w+"\])/, '$1;Module["wasmMemory"]=wasmMemory')
+      .replace(/(wasmMemory\s*=\s*wasmExports\[['"][\w]+['"]\])/, '$1;Module["wasmMemory"]=wasmMemory')
       .replace(/(_malloc=wasmExports\["\w+"\])/, '$1;Module["_malloc"]=_malloc')
       .replace(/(_free=wasmExports\["\w+"\])/, '$1;Module["_free"]=_free');
 

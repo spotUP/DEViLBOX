@@ -71,6 +71,8 @@
             .function("getParameterMax", &ClassName::getParameterMax) \
             .function("getParameterDefault", &ClassName::getParameterDefault) \
             .function("handleCommand", &ClassName::handleCommandJS) \
+            .function("getFullState", &ClassName::getFullStateJS) \
+            .function("loadFullState", &ClassName::loadFullStateJS) \
             .function("process", &ClassName::processJS); \
     }
 

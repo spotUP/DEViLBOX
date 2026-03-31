@@ -14,6 +14,11 @@
  * dynamic import which is not allowed in WorkletGlobalScope.
  */
 
+// AudioWorkletGlobalScope has no `performance` — polyfill for Emscripten's emscripten_get_now()
+if (typeof performance === 'undefined') {
+  globalThis.performance = { now: () => currentTime * 1000 };
+}
+
 // Track processor registration
 let processorRegistered = false;
 

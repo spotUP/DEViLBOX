@@ -190,7 +190,8 @@ export class DB303Synth implements DevilboxSynth {
             .replace(/export\s+default\s+\w+;?/g, '')
             .replace(/if\s*\(ENVIRONMENT_IS_NODE\)\s*\{[^}]*await\s+import\([^)]*\)[^}]*\}/g, '')
             .replace(/var\s+wasmBinary;/, 'var wasmBinary = Module["wasmBinary"];')
-            .replace(/(wasmMemory=wasmExports\["\w+"\])/, '$1;Module["wasmMemory"]=wasmMemory');
+            .replace(/(wasmMemory\s*=\s*wasmExports\[['"][\w]+['"]\])/, '$1;Module["wasmMemory"]=wasmMemory')
+            .replace(/new\s+URL\(([^,]+),\s*([^)]+)\)\.href/g, '($2 + $1)');
           code += '\nvar DB303 = createDB303Module;';
           this.jsCode = code;
         }

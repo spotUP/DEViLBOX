@@ -170,7 +170,8 @@ export class RdPianoSynth implements DevilboxSynth {
           .replace(/import\.meta\.url/g, `"${baseUrl}rdpiano/"`)
           .replace(/export\s+default\s+\w+;?\s*$/, '')
           .replace(/if\s*\(ENVIRONMENT_IS_NODE\)\s*\{[^}]*await\s+import\([^)]*\)[^}]*\}/g, '')
-          .replace(/(wasmMemory=wasmExports\["\w+"\])/, '$1;Module["wasmMemory"]=wasmMemory');
+          .replace(/(wasmMemory\s*=\s*wasmExports\[['"][\w]+['"]\])/, '$1;Module["wasmMemory"]=wasmMemory')
+          .replace(/new\s+URL\(([^,]+),\s*([^)]+)\)\.href/g, '($2 + $1)');
         RdPianoSynth.wasmBinary = wasmBinary;
       }
 
