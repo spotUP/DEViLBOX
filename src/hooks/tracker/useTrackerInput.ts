@@ -87,6 +87,15 @@ export const useTrackerInput = () => {
   const replacePattern = useTrackerStore((state) => state.replacePattern);
   const expandPattern = useTrackerStore((state) => state.expandPattern);
   const shrinkPattern = useTrackerStore((state) => state.shrinkPattern);
+  const copyCommands = useTrackerStore((state) => state.copyCommands);
+  const cutCommands = useTrackerStore((state) => state.cutCommands);
+  const pasteCommands = useTrackerStore((state) => state.pasteCommands);
+  const killToEnd = useTrackerStore((state) => state.killToEnd);
+  const killToStart = useTrackerStore((state) => state.killToStart);
+  const swapChannels = useTrackerStore((state) => state.swapChannels);
+  const reverseBlock = useTrackerStore((state) => state.reverseBlock);
+  const doubleBlock = useTrackerStore((state) => state.doubleBlock);
+  const halveBlock = useTrackerStore((state) => state.halveBlock);
 
   const {
     isPlaying,
@@ -112,6 +121,9 @@ export const useTrackerInput = () => {
 
   // Track last Esc press for double-Esc panic (kill all notes)
   const lastEscPressRef = useRef<number>(0);
+
+  // PT: Swap channel mode (Ctrl+T awaits channel number 1-4)
+  const swapChannelPendingRef = useRef<boolean>(false);
 
   // FT2: Insert empty row at cursor, shift rows down (local wrapper)
   const handleInsertRow = useCallback(() => {
@@ -535,49 +547,35 @@ export const useTrackerInput = () => {
         return;
       }
 
-      // F3/F4/F5: Cut/Copy/Paste with FT2 scoping (only if behavior enables it)
-      // Shift = Track (single channel), Ctrl = Pattern (all channels), Alt = Block (selection)
-      if (key === 'F3' && useEditorStore.getState().activeBehavior.fKeyCutCopyPaste) {
+      // F3/F4/F5: Cut/Copy/Paste — scheme-aware modifier mapping
+      // FT2/Renoise/OpenMPT/OctaMED: Shift=track, Ctrl=pattern, Alt=block
+      // PT: Shift=track, Alt=pattern, Ctrl=commands-only
+      if ((key === 'F3' || key === 'F4' || key === 'F5')
+          && useEditorStore.getState().activeBehavior.fKeyCutCopyPaste
+          && (e.shiftKey || e.ctrlKey || e.metaKey || e.altKey)) {
         e.preventDefault();
-        if (e.shiftKey) {
-          cutTrack(cursorRef.current.channelIndex);
-          useUIStore.getState().setStatusMessage('CUT TRACK');
-        } else if (e.ctrlKey || e.metaKey) {
-          cutPattern();
-          useUIStore.getState().setStatusMessage('CUT PATTERN');
-        } else if (e.altKey) {
-          cutSelection();
-          useUIStore.getState().setStatusMessage('CUT BLOCK');
-        }
-        return;
-      }
+        const beh = useEditorStore.getState().activeBehavior;
+        const isPT = beh.ptEffectMacros; // PT scheme flag
+        const isTrack = e.shiftKey;
+        const isPattern = isPT ? e.altKey : (e.ctrlKey || e.metaKey);
+        const isCommands = isPT ? (e.ctrlKey || e.metaKey) : false;
+        const isBlock = isPT ? false : e.altKey;
 
-      if (key === 'F4' && useEditorStore.getState().activeBehavior.fKeyCutCopyPaste) {
-        e.preventDefault();
-        if (e.shiftKey) {
-          copyTrack(cursorRef.current.channelIndex);
-          useUIStore.getState().setStatusMessage('COPY TRACK');
-        } else if (e.ctrlKey || e.metaKey) {
-          copyPattern();
-          useUIStore.getState().setStatusMessage('COPY PATTERN');
-        } else if (e.altKey) {
-          copySelection();
-          useUIStore.getState().setStatusMessage('COPY BLOCK');
-        }
-        return;
-      }
-
-      if (key === 'F5' && useEditorStore.getState().activeBehavior.fKeyCutCopyPaste) {
-        e.preventDefault();
-        if (e.shiftKey) {
-          pasteTrack(cursorRef.current.channelIndex);
-          useUIStore.getState().setStatusMessage('PASTE TRACK');
-        } else if (e.ctrlKey || e.metaKey) {
-          pastePattern();
-          useUIStore.getState().setStatusMessage('PASTE PATTERN');
-        } else if (e.altKey) {
-          paste();
-          useUIStore.getState().setStatusMessage('PASTE BLOCK');
+        if (key === 'F3') {
+          if (isTrack) { cutTrack(cursorRef.current.channelIndex); useUIStore.getState().setStatusMessage('CUT TRACK'); }
+          else if (isPattern) { cutPattern(); useUIStore.getState().setStatusMessage('CUT PATTERN'); }
+          else if (isCommands) { cutCommands(cursorRef.current.channelIndex); useUIStore.getState().setStatusMessage('CUT COMMANDS'); }
+          else if (isBlock) { cutSelection(); useUIStore.getState().setStatusMessage('CUT BLOCK'); }
+        } else if (key === 'F4') {
+          if (isTrack) { copyTrack(cursorRef.current.channelIndex); useUIStore.getState().setStatusMessage('COPY TRACK'); }
+          else if (isPattern) { copyPattern(); useUIStore.getState().setStatusMessage('COPY PATTERN'); }
+          else if (isCommands) { copyCommands(cursorRef.current.channelIndex); useUIStore.getState().setStatusMessage('COPY COMMANDS'); }
+          else if (isBlock) { copySelection(); useUIStore.getState().setStatusMessage('COPY BLOCK'); }
+        } else {
+          if (isTrack) { pasteTrack(cursorRef.current.channelIndex); useUIStore.getState().setStatusMessage('PASTE TRACK'); }
+          else if (isPattern) { pastePattern(); useUIStore.getState().setStatusMessage('PASTE PATTERN'); }
+          else if (isCommands) { pasteCommands(cursorRef.current.channelIndex); useUIStore.getState().setStatusMessage('PASTE COMMANDS'); }
+          else if (isBlock) { paste(); useUIStore.getState().setStatusMessage('PASTE BLOCK'); }
         }
         return;
       }
@@ -694,7 +692,339 @@ export const useTrackerInput = () => {
         return;
       }
 
+      // ============================================
+      // PT Ctrl+letter Block Operations
+      // ============================================
+
+      if ((e.ctrlKey || e.metaKey) && !e.altKey) {
+        const beh = useEditorStore.getState().activeBehavior;
+        const isPT = beh.ptEffectMacros;
+        const ALL_COLS: Array<'note'|'instrument'|'volume'|'effTyp'|'effParam'|'effTyp2'|'effParam2'|'flag1'|'flag2'|'probability'> = ['note', 'instrument', 'volume', 'effTyp', 'effParam', 'effTyp2', 'effParam2', 'flag1', 'flag2', 'probability'];
+
+        // PT: Ctrl+B = toggle block mark (first press = start, second = end)
+        if (isPT && keyLower === 'b' && !e.shiftKey && recordMode) {
+          e.preventDefault();
+          const sel = selectionRef.current;
+          const cursor = cursorRef.current;
+          if (!sel) {
+            useCursorStore.setState({
+              selection: {
+                startRow: cursor.rowIndex, endRow: cursor.rowIndex,
+                startChannel: cursor.channelIndex, endChannel: cursor.channelIndex,
+                startColumn: 'note', endColumn: 'probability', columnTypes: ALL_COLS,
+              },
+            });
+            useUIStore.getState().setStatusMessage('BLOCK MARK START');
+          } else {
+            useCursorStore.setState({
+              selection: { ...sel, endRow: cursor.rowIndex, endChannel: cursor.channelIndex },
+            });
+            useUIStore.getState().setStatusMessage('BLOCK MARK END');
+          }
+          return;
+        }
+
+        // PT: Ctrl+K = kill to end (bare) / kill to start (Shift)
+        if (isPT && keyLower === 'k' && recordMode) {
+          e.preventDefault();
+          if (e.shiftKey) {
+            killToStart(cursorRef.current.channelIndex, cursorRef.current.rowIndex);
+            useUIStore.getState().setStatusMessage('KILL TO START');
+          } else {
+            killToEnd(cursorRef.current.channelIndex, cursorRef.current.rowIndex);
+            useUIStore.getState().setStatusMessage('KILL TO END');
+          }
+          return;
+        }
+
+        // PT: Ctrl+E = expand block (insert blank rows between existing rows)
+        if (isPT && keyLower === 'e' && !e.shiftKey && recordMode) {
+          e.preventDefault();
+          expandPattern(currentPatternIndex);
+          useUIStore.getState().setStatusMessage('EXPAND PATTERN');
+          return;
+        }
+
+        // PT: Ctrl+O = compress/shrink (remove every other row)
+        if (isPT && keyLower === 'o' && !e.shiftKey && recordMode) {
+          e.preventDefault();
+          shrinkPattern(currentPatternIndex);
+          useUIStore.getState().setStatusMessage('SHRINK PATTERN');
+          return;
+        }
+
+        // PT: Ctrl+T = swap channel (waits for digit key to select target)
+        if (isPT && keyLower === 't' && !e.shiftKey) {
+          e.preventDefault();
+          swapChannelPendingRef.current = true;
+          useUIStore.getState().setStatusMessage('SWAP: PRESS 1-4 FOR TARGET CHANNEL');
+          return;
+        }
+
+        // PT: Ctrl+Y = reverse block
+        if (isPT && keyLower === 'y' && !e.shiftKey && recordMode) {
+          e.preventDefault();
+          const sel = selectionRef.current;
+          const ch = sel ? Math.min(sel.startChannel, sel.endChannel) : cursorRef.current.channelIndex;
+          const sr = sel ? Math.min(sel.startRow, sel.endRow) : 0;
+          const er = sel ? Math.max(sel.startRow, sel.endRow) : pattern.length - 1;
+          reverseBlock(ch, sr, er);
+          useUIStore.getState().setStatusMessage('REVERSE BLOCK');
+          return;
+        }
+
+        // PT: Ctrl+L = transpose selection -1 semitone
+        if (isPT && keyLower === 'l' && !e.shiftKey && recordMode) {
+          e.preventDefault();
+          transposeSelection(-1);
+          useUIStore.getState().setStatusMessage('TRANSPOSE -1');
+          return;
+        }
+      }
+
+      // PT: Swap channel target (1-4 key after Ctrl+T)
+      if (swapChannelPendingRef.current && key >= '1' && key <= '9') {
+        e.preventDefault();
+        swapChannelPendingRef.current = false;
+        const targetCh = parseInt(key) - 1;
+        if (targetCh < pattern.channels.length && targetCh !== cursorRef.current.channelIndex) {
+          swapChannels(cursorRef.current.channelIndex, targetCh);
+          useUIStore.getState().setStatusMessage(`SWAPPED CH ${cursorRef.current.channelIndex + 1} ↔ CH ${targetCh + 1}`);
+        } else {
+          useUIStore.getState().setStatusMessage('SWAP CANCELLED');
+        }
+        return;
+      }
+
+      // ============================================
+      // IT/Schism Alt+letter Block Operations
+      // ============================================
+
+      if (e.altKey && !e.ctrlKey && !e.metaKey) {
+        const beh = useEditorStore.getState().activeBehavior;
+        const isIT = beh.itMaskVariables;
+        const ALL_COLS: Array<'note'|'instrument'|'volume'|'effTyp'|'effParam'|'effTyp2'|'effParam2'|'flag1'|'flag2'|'probability'> = ['note', 'instrument', 'volume', 'effTyp', 'effParam', 'effTyp2', 'effParam2', 'flag1', 'flag2', 'probability'];
+
+        // IT: Alt+B = mark block start
+        if (isIT && keyLower === 'b' && !e.shiftKey) {
+          e.preventDefault();
+          const cursor = cursorRef.current;
+          const sel = selectionRef.current;
+          useCursorStore.setState({
+            selection: {
+              startRow: cursor.rowIndex, startChannel: cursor.channelIndex,
+              endRow: sel?.endRow ?? cursor.rowIndex,
+              endChannel: sel?.endChannel ?? cursor.channelIndex,
+              startColumn: sel?.startColumn ?? 'note', endColumn: sel?.endColumn ?? 'probability',
+              columnTypes: sel?.columnTypes ?? ALL_COLS,
+            },
+          });
+          useUIStore.getState().setStatusMessage('BLOCK START');
+          return;
+        }
+
+        // IT: Alt+E = mark block end (note: Alt+E is also expand in FT2 — handled by isIT check)
+        if (isIT && keyLower === 'e' && !e.shiftKey) {
+          e.preventDefault();
+          const cursor = cursorRef.current;
+          const sel = selectionRef.current;
+          useCursorStore.setState({
+            selection: {
+              startRow: sel?.startRow ?? cursor.rowIndex,
+              startChannel: sel?.startChannel ?? cursor.channelIndex,
+              endRow: cursor.rowIndex,
+              endChannel: cursor.channelIndex,
+              startColumn: sel?.startColumn ?? 'note', endColumn: sel?.endColumn ?? 'probability',
+              columnTypes: sel?.columnTypes ?? ALL_COLS,
+            },
+          });
+          useUIStore.getState().setStatusMessage('BLOCK END');
+          return;
+        }
+
+        // IT: Alt+C = copy block
+        if (isIT && keyLower === 'c' && !e.shiftKey) {
+          e.preventDefault();
+          copySelection();
+          useUIStore.getState().setStatusMessage('COPY BLOCK');
+          return;
+        }
+
+        // IT: Alt+Z = cut block
+        if (isIT && keyLower === 'z' && !e.shiftKey && recordMode) {
+          e.preventDefault();
+          cutSelection();
+          useUIStore.getState().setStatusMessage('CUT BLOCK');
+          return;
+        }
+
+        // IT: Alt+O = paste overwrite
+        if (isIT && keyLower === 'o' && !e.shiftKey && recordMode) {
+          e.preventDefault();
+          paste();
+          useUIStore.getState().setStatusMessage('PASTE OVERWRITE');
+          return;
+        }
+
+        // IT: Alt+P = paste insert (push forward)
+        if (isIT && keyLower === 'p' && !e.shiftKey && recordMode) {
+          e.preventDefault();
+          pastePushForward();
+          useUIStore.getState().setStatusMessage('PASTE INSERT');
+          return;
+        }
+
+        // IT: Alt+Q = transpose +1 (Shift = +12 octave)
+        if (isIT && keyLower === 'q' && recordMode) {
+          e.preventDefault();
+          const semitones = e.shiftKey ? 12 : 1;
+          transposeSelection(semitones);
+          useUIStore.getState().setStatusMessage(`TRANSPOSE +${semitones}`);
+          return;
+        }
+
+        // IT: Alt+A = transpose -1 (Shift = -12 octave)
+        if (isIT && keyLower === 'a' && recordMode) {
+          e.preventDefault();
+          const semitones = e.shiftKey ? -12 : -1;
+          transposeSelection(semitones);
+          useUIStore.getState().setStatusMessage(`TRANSPOSE ${semitones}`);
+          return;
+        }
+
+        // IT: Alt+F = double block length
+        if (isIT && keyLower === 'f' && !e.shiftKey && recordMode) {
+          e.preventDefault();
+          const sel = selectionRef.current;
+          const ch = sel ? Math.min(sel.startChannel, sel.endChannel) : cursorRef.current.channelIndex;
+          const sr = sel ? Math.min(sel.startRow, sel.endRow) : 0;
+          const er = sel ? Math.max(sel.startRow, sel.endRow) : pattern.length - 1;
+          doubleBlock(ch, sr, er);
+          useUIStore.getState().setStatusMessage('DOUBLE BLOCK');
+          return;
+        }
+
+        // IT: Alt+G = halve block length
+        if (isIT && keyLower === 'g' && !e.shiftKey && recordMode) {
+          e.preventDefault();
+          const sel = selectionRef.current;
+          const ch = sel ? Math.min(sel.startChannel, sel.endChannel) : cursorRef.current.channelIndex;
+          const sr = sel ? Math.min(sel.startRow, sel.endRow) : 0;
+          const er = sel ? Math.max(sel.startRow, sel.endRow) : pattern.length - 1;
+          halveBlock(ch, sr, er);
+          useUIStore.getState().setStatusMessage('HALVE BLOCK');
+          return;
+        }
+
+        // IT: Alt+L = select entire channel
+        if (isIT && keyLower === 'l' && !e.shiftKey) {
+          e.preventDefault();
+          useCursorStore.getState().selectChannel(cursorRef.current.channelIndex);
+          useUIStore.getState().setStatusMessage('SELECT CHANNEL');
+          return;
+        }
+
+        // IT: Alt+D = double selection size (extend end row)
+        if (isIT && keyLower === 'd' && !e.shiftKey) {
+          e.preventDefault();
+          const sel = selectionRef.current;
+          if (sel) {
+            const selLen = Math.abs(sel.endRow - sel.startRow) + 1;
+            const newEnd = Math.min(sel.endRow + selLen, pattern.length - 1);
+            useCursorStore.setState({ selection: { ...sel, endRow: newEnd } });
+            useUIStore.getState().setStatusMessage('DOUBLE SELECTION');
+          }
+          return;
+        }
+      }
+
+      // IT: Ctrl+Insert = roll selection down, Ctrl+Delete = roll selection up
+      if ((e.ctrlKey || e.metaKey) && key === 'Insert' && !e.altKey) {
+        const beh = useEditorStore.getState().activeBehavior;
+        if (beh.itMaskVariables && recordMode) {
+          e.preventDefault();
+          // Roll down: last row wraps to first
+          const sel = selectionRef.current;
+          if (sel) {
+            const startRow = Math.min(sel.startRow, sel.endRow);
+            const endRow = Math.max(sel.startRow, sel.endRow);
+            const startCh = Math.min(sel.startChannel, sel.endChannel);
+            const endCh = Math.max(sel.startChannel, sel.endChannel);
+            // Save last row, shift everything down, put last at first
+            for (let ch = startCh; ch <= endCh; ch++) {
+              const lastCell = { ...pattern.channels[ch].rows[endRow] };
+              for (let r = endRow; r > startRow; r--) {
+                setCell(ch, r, { ...pattern.channels[ch].rows[r - 1] });
+              }
+              setCell(ch, startRow, lastCell);
+            }
+            useUIStore.getState().setStatusMessage('ROLL DOWN');
+          }
+          return;
+        }
+      }
+      if ((e.ctrlKey || e.metaKey) && key === 'Delete' && !e.altKey) {
+        const beh = useEditorStore.getState().activeBehavior;
+        if (beh.itMaskVariables && recordMode) {
+          e.preventDefault();
+          const sel = selectionRef.current;
+          if (sel) {
+            const startRow = Math.min(sel.startRow, sel.endRow);
+            const endRow = Math.max(sel.startRow, sel.endRow);
+            const startCh = Math.min(sel.startChannel, sel.endChannel);
+            const endCh = Math.max(sel.startChannel, sel.endChannel);
+            // Roll up: first row wraps to last
+            for (let ch = startCh; ch <= endCh; ch++) {
+              const firstCell = { ...pattern.channels[ch].rows[startRow] };
+              for (let r = startRow; r < endRow; r++) {
+                setCell(ch, r, { ...pattern.channels[ch].rows[r + 1] });
+              }
+              setCell(ch, endRow, firstCell);
+            }
+            useUIStore.getState().setStatusMessage('ROLL UP');
+          }
+          return;
+        }
+      }
+
+      // ============================================
+      // PT: Enter variants
+      // ============================================
+      if (key === 'Enter' && !e.ctrlKey && !e.metaKey && !e.altKey && !e.shiftKey) {
+        const beh = useEditorStore.getState().activeBehavior;
+        if (beh.ptEffectMacros && !isPlaying) {
+          // PT: bare Enter = step play (advance cursor by editstep, preview note if present)
+          e.preventDefault();
+          const step = useEditorStore.getState().editStep || 1;
+          const newRow = Math.min(cursorRef.current.rowIndex + step, pattern.length - 1);
+          moveCursorToRow(newRow);
+          return;
+        }
+      }
+
+      // PT: Shift+Enter = insert row, Alt+Enter = insert row all channels
+      if (key === 'Enter' && recordMode) {
+        const beh = useEditorStore.getState().activeBehavior;
+        if (beh.ptEffectMacros) {
+          if (e.shiftKey && !e.altKey) {
+            e.preventDefault();
+            insertRow(cursorRef.current.channelIndex, cursorRef.current.rowIndex);
+            useUIStore.getState().setStatusMessage('INSERT ROW');
+            return;
+          }
+          if (e.altKey && !e.shiftKey) {
+            e.preventDefault();
+            for (let ch = 0; ch < pattern.channels.length; ch++) {
+              insertRow(ch, cursorRef.current.rowIndex);
+            }
+            useUIStore.getState().setStatusMessage('INSERT ROW ALL CH');
+            return;
+          }
+        }
+      }
+
       // Expand/Shrink pattern (FT2: Alt+E = expand, Alt+Shift+E = shrink, or Ctrl+F9/F10)
+      // Note: IT Alt+E is block-end (handled above), so this only fires for non-IT schemes
       if (e.altKey && keyLower === 'e' && !e.ctrlKey && !e.metaKey) {
         e.preventDefault();
         if (e.shiftKey) {
@@ -728,10 +1058,15 @@ export const useTrackerInput = () => {
         return;
       }
 
-      // Ctrl+H: Chord tool (expand note into chord)
+      // Ctrl+H: FT2 = chord tool, PT = transpose block +1 semitone
       if ((e.ctrlKey || e.metaKey) && keyLower === 'h' && !e.altKey) {
         e.preventDefault();
-        if (cursorRef.current.columnType === 'note') {
+        const beh = useEditorStore.getState().activeBehavior;
+        if (beh.ptEffectMacros && recordMode) {
+          // PT: Ctrl+H = transpose selection +1 semitone
+          transposeSelection(1);
+          useUIStore.getState().setStatusMessage('TRANSPOSE +1');
+        } else if (cursorRef.current.columnType === 'note') {
           const currentCell = pattern.channels[cursorRef.current.channelIndex].rows[cursorRef.current.rowIndex];
           if (currentCell.note && currentCell.note > 0 && currentCell.note < 97) {
             const rootNote = currentCell.note;

@@ -72,9 +72,22 @@ export function copySelectionHelper(
         if (columnTypes.includes('note')) {
           sparseCell.note = sourceCell.note;
           sparseCell.instrument = sourceCell.instrument;
+          sparseCell.note2 = sourceCell.note2; sparseCell.instrument2 = sourceCell.instrument2;
+          sparseCell.note3 = sourceCell.note3; sparseCell.instrument3 = sourceCell.instrument3;
+          sparseCell.note4 = sourceCell.note4; sparseCell.instrument4 = sourceCell.instrument4;
         }
-        if (columnTypes.includes('instrument')) sparseCell.instrument = sourceCell.instrument;
-        if (columnTypes.includes('volume')) sparseCell.volume = sourceCell.volume;
+        if (columnTypes.includes('instrument')) {
+          sparseCell.instrument = sourceCell.instrument;
+          sparseCell.instrument2 = sourceCell.instrument2;
+          sparseCell.instrument3 = sourceCell.instrument3;
+          sparseCell.instrument4 = sourceCell.instrument4;
+        }
+        if (columnTypes.includes('volume')) {
+          sparseCell.volume = sourceCell.volume;
+          sparseCell.volume2 = sourceCell.volume2;
+          sparseCell.volume3 = sourceCell.volume3;
+          sparseCell.volume4 = sourceCell.volume4;
+        }
         if (columnTypes.includes('effTyp') || columnTypes.includes('effParam')) {
           sparseCell.effTyp = sourceCell.effTyp;
           sparseCell.eff = sourceCell.eff;
@@ -130,18 +143,34 @@ export function cutSelectionHelper(
       } else {
         const sparseCell: TrackerCell = { ...EMPTY_CELL };
         if (columnTypes.includes('note')) {
-          sparseCell.note = cell.note;
-          sparseCell.instrument = cell.instrument;
-          cell.note = 0;
-          cell.instrument = 0;
+          sparseCell.note = cell.note; sparseCell.instrument = cell.instrument;
+          sparseCell.note2 = cell.note2; sparseCell.instrument2 = cell.instrument2;
+          sparseCell.note3 = cell.note3; sparseCell.instrument3 = cell.instrument3;
+          sparseCell.note4 = cell.note4; sparseCell.instrument4 = cell.instrument4;
+          cell.note = 0; cell.instrument = 0;
+          cell.note2 = undefined; cell.instrument2 = undefined;
+          cell.note3 = undefined; cell.instrument3 = undefined;
+          cell.note4 = undefined; cell.instrument4 = undefined;
         }
         if (columnTypes.includes('instrument')) {
           sparseCell.instrument = cell.instrument;
+          sparseCell.instrument2 = cell.instrument2;
+          sparseCell.instrument3 = cell.instrument3;
+          sparseCell.instrument4 = cell.instrument4;
           cell.instrument = 0;
+          cell.instrument2 = undefined;
+          cell.instrument3 = undefined;
+          cell.instrument4 = undefined;
         }
         if (columnTypes.includes('volume')) {
           sparseCell.volume = cell.volume;
+          sparseCell.volume2 = cell.volume2;
+          sparseCell.volume3 = cell.volume3;
+          sparseCell.volume4 = cell.volume4;
           cell.volume = 0;
+          cell.volume2 = undefined;
+          cell.volume3 = undefined;
+          cell.volume4 = undefined;
         }
         if (columnTypes.includes('effTyp') || columnTypes.includes('effParam')) {
           sparseCell.effTyp = cell.effTyp;
@@ -211,12 +240,21 @@ export function pasteHelper(
         if (sourceCell.instrument !== 0) {
           targetCell.instrument = sourceCell.instrument;
         }
+        targetCell.note2 = sourceCell.note2; targetCell.instrument2 = sourceCell.instrument2;
+        targetCell.note3 = sourceCell.note3; targetCell.instrument3 = sourceCell.instrument3;
+        targetCell.note4 = sourceCell.note4; targetCell.instrument4 = sourceCell.instrument4;
       }
       if (hasMaskBit(pasteMask, MASK_INSTRUMENT) && (!isSparse || columnTypes!.includes('instrument'))) {
         targetCell.instrument = sourceCell.instrument;
+        targetCell.instrument2 = sourceCell.instrument2;
+        targetCell.instrument3 = sourceCell.instrument3;
+        targetCell.instrument4 = sourceCell.instrument4;
       }
       if (hasMaskBit(pasteMask, MASK_VOLUME) && (!isSparse || columnTypes!.includes('volume'))) {
         targetCell.volume = sourceCell.volume;
+        targetCell.volume2 = sourceCell.volume2;
+        targetCell.volume3 = sourceCell.volume3;
+        targetCell.volume4 = sourceCell.volume4;
       }
       if (hasMaskBit(pasteMask, MASK_EFFECT) && (!isSparse || columnTypes!.includes('effTyp') || columnTypes!.includes('effParam'))) {
         targetCell.effTyp = sourceCell.effTyp;
@@ -267,12 +305,21 @@ export function pasteMixHelper(
 
       if (hasMaskBit(pasteMask, MASK_NOTE) && sourceCell.note !== 0 && targetCell.note === 0) {
         targetCell.note = sourceCell.note;
+        if (sourceCell.note2 && !targetCell.note2) targetCell.note2 = sourceCell.note2;
+        if (sourceCell.note3 && !targetCell.note3) targetCell.note3 = sourceCell.note3;
+        if (sourceCell.note4 && !targetCell.note4) targetCell.note4 = sourceCell.note4;
       }
       if (hasMaskBit(pasteMask, MASK_INSTRUMENT) && sourceCell.instrument !== 0 && targetCell.instrument === 0) {
         targetCell.instrument = sourceCell.instrument;
+        if (sourceCell.instrument2 && !targetCell.instrument2) targetCell.instrument2 = sourceCell.instrument2;
+        if (sourceCell.instrument3 && !targetCell.instrument3) targetCell.instrument3 = sourceCell.instrument3;
+        if (sourceCell.instrument4 && !targetCell.instrument4) targetCell.instrument4 = sourceCell.instrument4;
       }
       if (hasMaskBit(pasteMask, MASK_VOLUME) && sourceCell.volume !== 0 && targetCell.volume === 0) {
         targetCell.volume = sourceCell.volume;
+        if (sourceCell.volume2 && !targetCell.volume2) targetCell.volume2 = sourceCell.volume2;
+        if (sourceCell.volume3 && !targetCell.volume3) targetCell.volume3 = sourceCell.volume3;
+        if (sourceCell.volume4 && !targetCell.volume4) targetCell.volume4 = sourceCell.volume4;
       }
       if (hasMaskBit(pasteMask, MASK_EFFECT) && (sourceCell.effTyp !== 0 || sourceCell.eff !== 0) && targetCell.effTyp === 0 && targetCell.eff === 0) {
         targetCell.effTyp = sourceCell.effTyp;
@@ -314,9 +361,18 @@ export function pasteFloodHelper(
         const sourceCell = data[ch][row];
         const targetCell = pattern.channels[targetChannel].rows[targetRow];
 
-        if (hasMaskBit(pasteMask, MASK_NOTE)) targetCell.note = sourceCell.note;
-        if (hasMaskBit(pasteMask, MASK_INSTRUMENT)) targetCell.instrument = sourceCell.instrument;
-        if (hasMaskBit(pasteMask, MASK_VOLUME)) targetCell.volume = sourceCell.volume;
+        if (hasMaskBit(pasteMask, MASK_NOTE)) {
+          targetCell.note = sourceCell.note;
+          targetCell.note2 = sourceCell.note2; targetCell.note3 = sourceCell.note3; targetCell.note4 = sourceCell.note4;
+        }
+        if (hasMaskBit(pasteMask, MASK_INSTRUMENT)) {
+          targetCell.instrument = sourceCell.instrument;
+          targetCell.instrument2 = sourceCell.instrument2; targetCell.instrument3 = sourceCell.instrument3; targetCell.instrument4 = sourceCell.instrument4;
+        }
+        if (hasMaskBit(pasteMask, MASK_VOLUME)) {
+          targetCell.volume = sourceCell.volume;
+          targetCell.volume2 = sourceCell.volume2; targetCell.volume3 = sourceCell.volume3; targetCell.volume4 = sourceCell.volume4;
+        }
         if (hasMaskBit(pasteMask, MASK_EFFECT)) {
           targetCell.effTyp = sourceCell.effTyp;
           targetCell.eff = sourceCell.eff;
@@ -368,10 +424,13 @@ export function pastePushForwardHelper(
       const sourceCell = data[ch][row];
       const targetCell = channel.rows[targetRow];
 
-      // Clear first
+      // Clear first (including extra columns)
       targetCell.note = 0;
       targetCell.instrument = 0;
       targetCell.volume = 0;
+      targetCell.note2 = undefined; targetCell.instrument2 = undefined; targetCell.volume2 = undefined;
+      targetCell.note3 = undefined; targetCell.instrument3 = undefined; targetCell.volume3 = undefined;
+      targetCell.note4 = undefined; targetCell.instrument4 = undefined; targetCell.volume4 = undefined;
       targetCell.effTyp = 0;
       targetCell.eff = 0;
       targetCell.effTyp2 = 0;
@@ -382,12 +441,19 @@ export function pastePushForwardHelper(
 
       if (hasMaskBit(pasteMask, MASK_NOTE)) {
         targetCell.note = sourceCell.note;
+        targetCell.note2 = sourceCell.note2; targetCell.note3 = sourceCell.note3; targetCell.note4 = sourceCell.note4;
         targetCell.flag1 = sourceCell.flag1 ?? 0;
         targetCell.flag2 = sourceCell.flag2 ?? 0;
         targetCell.probability = sourceCell.probability ?? 0;
       }
-      if (hasMaskBit(pasteMask, MASK_INSTRUMENT)) targetCell.instrument = sourceCell.instrument;
-      if (hasMaskBit(pasteMask, MASK_VOLUME)) targetCell.volume = sourceCell.volume;
+      if (hasMaskBit(pasteMask, MASK_INSTRUMENT)) {
+        targetCell.instrument = sourceCell.instrument;
+        targetCell.instrument2 = sourceCell.instrument2; targetCell.instrument3 = sourceCell.instrument3; targetCell.instrument4 = sourceCell.instrument4;
+      }
+      if (hasMaskBit(pasteMask, MASK_VOLUME)) {
+        targetCell.volume = sourceCell.volume;
+        targetCell.volume2 = sourceCell.volume2; targetCell.volume3 = sourceCell.volume3; targetCell.volume4 = sourceCell.volume4;
+      }
       if (hasMaskBit(pasteMask, MASK_EFFECT)) {
         targetCell.effTyp = sourceCell.effTyp;
         targetCell.eff = sourceCell.eff;
@@ -442,5 +508,144 @@ export function pasteTrackHelper(
       targetCell.effTyp2 = sourceCell.effTyp2;
       targetCell.eff2 = sourceCell.eff2;
     }
+  }
+}
+
+// ---------------------------------------------------------------------------
+// PT Commands-only buffer (copies/pastes only effect columns)
+// ---------------------------------------------------------------------------
+
+export function copyCommandsHelper(pattern: Pattern, channelIndex: number): TrackerCell[] | null {
+  if (channelIndex < 0 || channelIndex >= pattern.channels.length) return null;
+  return pattern.channels[channelIndex].rows.map((row) => ({
+    ...EMPTY_CELL,
+    effTyp: row.effTyp ?? 0,
+    eff: row.eff ?? 0,
+    effTyp2: row.effTyp2 ?? 0,
+    eff2: row.eff2 ?? 0,
+  }));
+}
+
+export function cutCommandsHelper(pattern: Pattern, channelIndex: number): TrackerCell[] | null {
+  if (channelIndex < 0 || channelIndex >= pattern.channels.length) return null;
+  const channel = pattern.channels[channelIndex];
+  const copied = channel.rows.map((row) => ({
+    ...EMPTY_CELL,
+    effTyp: row.effTyp ?? 0,
+    eff: row.eff ?? 0,
+    effTyp2: row.effTyp2 ?? 0,
+    eff2: row.eff2 ?? 0,
+  }));
+  for (const row of channel.rows) {
+    row.effTyp = 0;
+    row.eff = 0;
+    row.effTyp2 = 0;
+    row.eff2 = 0;
+  }
+  return copied;
+}
+
+export function pasteCommandsHelper(
+  pattern: Pattern,
+  channelIndex: number,
+  cmdsClipboard: TrackerCell[],
+): void {
+  if (channelIndex < 0 || channelIndex >= pattern.channels.length) return;
+  const channel = pattern.channels[channelIndex];
+  const maxRows = Math.min(cmdsClipboard.length, pattern.length);
+  for (let row = 0; row < maxRows; row++) {
+    channel.rows[row].effTyp = cmdsClipboard[row].effTyp;
+    channel.rows[row].eff = cmdsClipboard[row].eff;
+    channel.rows[row].effTyp2 = cmdsClipboard[row].effTyp2;
+    channel.rows[row].eff2 = cmdsClipboard[row].eff2;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Kill to end / Kill to start
+// ---------------------------------------------------------------------------
+
+export function killToEndHelper(pattern: Pattern, channelIndex: number, fromRow: number): void {
+  if (channelIndex < 0 || channelIndex >= pattern.channels.length) return;
+  const channel = pattern.channels[channelIndex];
+  for (let r = fromRow; r < pattern.length; r++) {
+    channel.rows[r] = { ...EMPTY_CELL };
+  }
+}
+
+export function killToStartHelper(pattern: Pattern, channelIndex: number, toRow: number): void {
+  if (channelIndex < 0 || channelIndex >= pattern.channels.length) return;
+  const channel = pattern.channels[channelIndex];
+  for (let r = 0; r <= toRow; r++) {
+    channel.rows[r] = { ...EMPTY_CELL };
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Reverse rows in a channel (within range)
+// ---------------------------------------------------------------------------
+
+export function reverseBlockHelper(
+  pattern: Pattern,
+  channelIndex: number,
+  startRow: number,
+  endRow: number,
+): void {
+  if (channelIndex < 0 || channelIndex >= pattern.channels.length) return;
+  const channel = pattern.channels[channelIndex];
+  let lo = Math.max(0, startRow);
+  let hi = Math.min(pattern.length - 1, endRow);
+  while (lo < hi) {
+    const tmp = channel.rows[lo];
+    channel.rows[lo] = channel.rows[hi];
+    channel.rows[hi] = tmp;
+    lo++;
+    hi--;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Double / Halve block rows (IT Alt+F / Alt+G)
+// ---------------------------------------------------------------------------
+
+export function doubleBlockHelper(
+  pattern: Pattern,
+  channelIndex: number,
+  startRow: number,
+  endRow: number,
+): void {
+  if (channelIndex < 0 || channelIndex >= pattern.channels.length) return;
+  const channel = pattern.channels[channelIndex];
+  // Double: insert empty rows between each existing row
+  const expanded: TrackerCell[] = [];
+  for (let r = startRow; r <= endRow && r < pattern.length; r++) {
+    expanded.push({ ...channel.rows[r] });
+    expanded.push({ ...EMPTY_CELL });
+  }
+  // Write back, capped to pattern length
+  for (let i = 0; i < expanded.length && startRow + i < pattern.length; i++) {
+    channel.rows[startRow + i] = expanded[i];
+  }
+}
+
+export function halveBlockHelper(
+  pattern: Pattern,
+  channelIndex: number,
+  startRow: number,
+  endRow: number,
+): void {
+  if (channelIndex < 0 || channelIndex >= pattern.channels.length) return;
+  const channel = pattern.channels[channelIndex];
+  // Halve: keep every other row, shift remaining up
+  const kept: TrackerCell[] = [];
+  for (let r = startRow; r <= endRow && r < pattern.length; r += 2) {
+    kept.push({ ...channel.rows[r] });
+  }
+  // Write back kept rows, fill remainder with empty
+  for (let i = 0; i < kept.length; i++) {
+    channel.rows[startRow + i] = kept[i];
+  }
+  for (let r = startRow + kept.length; r <= endRow && r < pattern.length; r++) {
+    channel.rows[r] = { ...EMPTY_CELL };
   }
 }
