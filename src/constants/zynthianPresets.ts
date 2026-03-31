@@ -14,6 +14,7 @@ import { RAFFO_PRESETS, DEFAULT_RAFFO } from '../engine/raffo/RaffoSynth';
 import { MONIQUE_PRESETS, DEFAULT_MONIQUE } from '../engine/monique/MoniqueSynth';
 import { VL1_PRESETS, DEFAULT_VL1 } from '../engine/vl1/VL1Synth';
 import { CALF_MONO_PRESETS, DEFAULT_CALF_MONO } from '../engine/calf-mono/CalfMonoSynth';
+import { CALFMONO_NATIVE_FACTORY_PRESETS } from '../engine/calf-mono/CalfMonoSynth';
 import { SYNTHV1_PRESETS, DEFAULT_SYNTHV1 } from '../engine/synthv1/SynthV1Synth';
 import { AEOLUS_PRESETS, DEFAULT_AEOLUS } from '../engine/aeolus/AeolusSynth';
 import { FLUIDSYNTH_PRESETS, DEFAULT_FLUIDSYNTH } from '../engine/fluidsynth/FluidSynthSynth';
@@ -50,7 +51,21 @@ export const AMSYNTH_FACTORY_PRESETS = makePresets(AMSYNTH_PRESETS, 'Amsynth', '
 export const RAFFO_FACTORY_PRESETS = makePresets(RAFFO_PRESETS, 'RaffoSynth', 'raffo', DEFAULT_RAFFO);
 export const MONIQUE_FACTORY_PRESETS = makePresets(MONIQUE_PRESETS, 'Monique', 'monique', DEFAULT_MONIQUE);
 export const VL1_FACTORY_PRESETS = makePresets(VL1_PRESETS, 'VL1', 'vl1', DEFAULT_VL1);
-export const CALF_MONO_FACTORY_PRESETS = makePresets(CALF_MONO_PRESETS, 'CalfMono', 'calfMono', DEFAULT_CALF_MONO);
+export const CALF_MONO_FACTORY_PRESETS: InstrumentPreset['config'][] = [
+  // Legacy flat config presets
+  ...makePresets(CALF_MONO_PRESETS, 'CalfMono', 'calfMono', DEFAULT_CALF_MONO),
+  // Native factory presets from upstream presets.xml
+  ...CALFMONO_NATIVE_FACTORY_PRESETS.map(p => ({
+    type: 'synth' as const,
+    name: p.name,
+    synthType: 'CalfMono',
+    effects: [],
+    volume: -8,
+    pan: 0,
+    calfMono: { ...DEFAULT_CALF_MONO },
+    calfMonoNativePatch: p.name,
+  } as InstrumentPreset['config'])),
+];
 export const SETBFREE_FACTORY_PRESETS: InstrumentPreset['config'][] =
   SETBFREE_NATIVE_FACTORY_PRESETS.map(p => ({
     type: 'synth' as const,
