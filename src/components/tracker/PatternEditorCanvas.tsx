@@ -709,6 +709,10 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
     e.preventDefault();
     const cell = getCellFromCoords(e.clientX, e.clientY);
     if (cell) {
+      // Move cursor to the right-clicked cell so context menu actions target the visible cell
+      const cursorStore = useCursorStore.getState();
+      cursorStore.moveCursorToRow(cell.rowIndex);
+      cursorStore.moveCursorToChannelAndColumn(cell.channelIndex, cell.columnType as any, cell.noteColumnIndex);
       cellContextMenu.openMenu(e, cell.rowIndex, cell.channelIndex);
     }
   }, [getCellFromCoords, cellContextMenu]);

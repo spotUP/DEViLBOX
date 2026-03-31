@@ -1619,8 +1619,10 @@ export const PixiPatternEditor: React.FC<PixiPatternEditorProps> = ({ width, hei
 
     const cursorStore = useCursorStore.getState();
 
-    // Right-click → context menu
+    // Right-click → move cursor to clicked cell, then open context menu
     if (nativeEvent.button === 2) {
+      cursorStore.moveCursorToRow(cell.rowIndex);
+      cursorStore.moveCursorToChannelAndColumn(cell.channelIndex, cell.columnType as any, cell.noteColumnIndex);
       openCellContextMenu(nativeEvent.clientX, nativeEvent.clientY, cell.rowIndex, cell.channelIndex);
       return;
     }
