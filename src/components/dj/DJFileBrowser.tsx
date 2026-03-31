@@ -103,6 +103,14 @@ export const DJFileBrowser: React.FC<DJFileBrowserProps> = ({ onClose }) => {
     }
   }, []);
 
+  /** Pick the deck that isn't currently playing (fallback: A) */
+  const pickFreeDeck = useCallback((): 'A' | 'B' => {
+    const decks = useDJStore.getState().decks;
+    if (!decks.A.isPlaying) return 'A';
+    if (!decks.B.isPlaying) return 'B';
+    return 'A';
+  }, []);
+
   const loadToDeck = useCallback(async (file: LoadedFile, deckId: 'A' | 'B' | 'C') => {
     const engine = getDJEngine();
 
@@ -239,8 +247,9 @@ export const DJFileBrowser: React.FC<DJFileBrowserProps> = ({ onClose }) => {
             {sortedFiles.map((file, i) => (
               <div
                 key={`${file.name}-${i}`}
+                onDoubleClick={() => loadToDeck(file, pickFreeDeck())}
                 className="flex items-center gap-2 px-2 py-1.5 bg-dark-bg rounded border border-dark-borderLight
-                           hover:border-dark-border transition-colors group"
+                           hover:border-dark-border transition-colors group cursor-pointer"
               >
                 {/* File info */}
                 <div className="flex-1 min-w-0">
