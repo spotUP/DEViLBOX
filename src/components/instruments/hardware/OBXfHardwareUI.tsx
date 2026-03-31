@@ -112,7 +112,6 @@ export const OBXfHardwareUI: React.FC<OBXfHardwareUIProps> = ({
 
     const init = async () => {
       try {
-        console.log('[OBXfHardwareUI] Loading factory script...');
         // Load factory via script tag (Emscripten MODULARIZE pattern)
         const factory = await new Promise<
           (opts: Record<string, unknown>) => Promise<OBXfUIModule>
@@ -141,9 +140,7 @@ export const OBXfHardwareUI: React.FC<OBXfHardwareUIProps> = ({
 
         if (cancelled) return;
 
-        console.log('[OBXfHardwareUI] Factory loaded, instantiating WASM module...');
         const m = await factory({
-          // Catch Emscripten abort
           onAbort: (what: string) => {
             console.error('[OBXfHardwareUI] WASM abort:', what);
           },
@@ -154,7 +151,6 @@ export const OBXfHardwareUI: React.FC<OBXfHardwareUIProps> = ({
         }
 
         moduleRef.current = m;
-        console.log('[OBXfHardwareUI] WASM module ready, initializing UI...');
 
         // Yield to browser before heavy WASM init (OB-Xf parses 12MB of SVG assets)
         await new Promise(resolve => setTimeout(resolve, 50));
@@ -163,10 +159,7 @@ export const OBXfHardwareUI: React.FC<OBXfHardwareUIProps> = ({
           return;
         }
 
-        // Initialize at 1x scale — OB-Xf's SVG asset parsing is very heavy,
-        // DPR scaling would create a 2880×900 framebuffer and double the work.
         m._obxf_ui_init();
-        console.log('[OBXfHardwareUI] UI initialized, fb:', m._obxf_ui_get_width(), 'x', m._obxf_ui_get_height());
 
         const w = m._obxf_ui_get_width();
         const h = m._obxf_ui_get_height();
