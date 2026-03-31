@@ -154,7 +154,14 @@ export const ImportModuleDialog: React.FC<ImportModuleDialogProps> = ({
     const nativeFmtForFile = detectNativeFormat(fname);
     const isFurnace = isFurnaceFormat(fname);
     const isChipDumpFile = isChipDumpFormat(fname);
-    const isUADEExclusive = !nativeFmtForFile && !isFurnace && !isChipDumpFile && isUADEFormat(fname);
+    // isUADEFormat only checks file extensions — prefix-named formats like
+    // cust.songname / custom.songname are missed.  Also check the FormatRegistry
+    // which understands prefix matching (family 'uade-only' or uadeFallback
+    // without a native parser).
+    const fmtForFile = detectFormat(fname);
+    const isUADEByRegistry = !!fmtForFile && !fmtForFile.nativeParser &&
+      (fmtForFile.family === 'uade-only' || (fmtForFile.uadeFallback && !fmtForFile.nativeOnly));
+    const isUADEExclusive = !nativeFmtForFile && !isFurnace && !isChipDumpFile && (isUADEFormat(fname) || isUADEByRegistry);
 
     setIsLoading(true);
     setError(null);
