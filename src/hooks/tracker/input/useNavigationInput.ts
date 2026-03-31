@@ -49,7 +49,7 @@ export const useNavigationInput = (refs: TrackerInputRefs) => {
   const pattern = patterns[currentPatternIndex];
 
   // ── RAF-driven arrow key scrolling ──────────────────────────────────────────
-  const heldArrowRef = useRef<{ dir: 'up' | 'down'; selecting: boolean } | null>(null);
+  const heldArrowRef = useRef<{ dir: 'up' | 'down' | 'left' | 'right'; selecting: boolean } | null>(null);
   const arrowRafRef = useRef(0);
   const moveCursorRef = useRef(moveCursor);
   moveCursorRef.current = moveCursor;
@@ -229,12 +229,22 @@ export const useNavigationInput = (refs: TrackerInputRefs) => {
         // Start RAF-driven scroll (time-based throttle — refresh-rate independent)
         heldArrowRef.current = { dir, selecting };
         if (!arrowRafRef.current) {
-          let lastMoveTime = performance.now(); // seed with current time to prevent immediate double-move
-          const MOVE_INTERVAL = 50; // ~20 moves/sec regardless of refresh rate
+          const keyDownTime = performance.now();
+          let initialDelayPassed = false;
+          let lastMoveTime = keyDownTime;
+          const INITIAL_DELAY = 250; // ms before first repeat (matches typical OS key repeat delay)
+          const MOVE_INTERVAL = 50; // ~20 moves/sec after initial delay
           const tick = (now: number) => {
             const held = heldArrowRef.current;
             if (!held) { arrowRafRef.current = 0; return; }
-            if (now - lastMoveTime >= MOVE_INTERVAL) {
+            if (!initialDelayPassed) {
+              if (now - keyDownTime >= INITIAL_DELAY) {
+                initialDelayPassed = true;
+                lastMoveTime = now;
+                moveCursorRef.current(held.dir);
+                if (held.selecting) endSelectionRef.current();
+              }
+            } else if (now - lastMoveTime >= MOVE_INTERVAL) {
               lastMoveTime = now;
               moveCursorRef.current(held.dir);
               if (held.selecting) endSelectionRef.current();
@@ -248,32 +258,86 @@ export const useNavigationInput = (refs: TrackerInputRefs) => {
 
       if (key === 'ArrowLeft') {
         e.preventDefault();
-        if (isPlaying) {
-          moveCursor('left');
-        } else if (e.shiftKey && !e.altKey) {
+        if (e.shiftKey && !e.altKey && !isPlaying) {
           if (currentPatternIndex > 0) setCurrentPattern(currentPatternIndex - 1);
-        } else if (e.altKey) {
-          if (!selectionRef.current) startSelection();
-          moveCursor('left');
-          endSelection();
-        } else {
-          moveCursor('left');
+          return true;
+        }
+        if (e.repeat) {
+          e.stopImmediatePropagation();
+          return true;
+        }
+        const selecting = e.altKey;
+        if (selecting && !selectionRef.current) startSelection();
+        moveCursor('left');
+        if (selecting) endSelection();
+        heldArrowRef.current = { dir: 'left', selecting };
+        if (!arrowRafRef.current) {
+          const keyDownTime = performance.now();
+          let initialDelayPassed = false;
+          let lastMoveTime = keyDownTime;
+          const INITIAL_DELAY = 250;
+          const MOVE_INTERVAL = 50;
+          const tick = (now: number) => {
+            const held = heldArrowRef.current;
+            if (!held) { arrowRafRef.current = 0; return; }
+            if (!initialDelayPassed) {
+              if (now - keyDownTime >= INITIAL_DELAY) {
+                initialDelayPassed = true;
+                lastMoveTime = now;
+                moveCursorRef.current(held.dir);
+                if (held.selecting) endSelectionRef.current();
+              }
+            } else if (now - lastMoveTime >= MOVE_INTERVAL) {
+              lastMoveTime = now;
+              moveCursorRef.current(held.dir);
+              if (held.selecting) endSelectionRef.current();
+            }
+            arrowRafRef.current = requestAnimationFrame(tick);
+          };
+          arrowRafRef.current = requestAnimationFrame(tick);
         }
         return true;
       }
 
       if (key === 'ArrowRight') {
         e.preventDefault();
-        if (isPlaying) {
-          moveCursor('right');
-        } else if (e.shiftKey && !e.altKey) {
+        if (e.shiftKey && !e.altKey && !isPlaying) {
           if (currentPatternIndex < patterns.length - 1) setCurrentPattern(currentPatternIndex + 1);
-        } else if (e.altKey) {
-          if (!selectionRef.current) startSelection();
-          moveCursor('right');
-          endSelection();
-        } else {
-          moveCursor('right');
+          return true;
+        }
+        if (e.repeat) {
+          e.stopImmediatePropagation();
+          return true;
+        }
+        const selecting = e.altKey;
+        if (selecting && !selectionRef.current) startSelection();
+        moveCursor('right');
+        if (selecting) endSelection();
+        heldArrowRef.current = { dir: 'right', selecting };
+        if (!arrowRafRef.current) {
+          const keyDownTime = performance.now();
+          let initialDelayPassed = false;
+          let lastMoveTime = keyDownTime;
+          const INITIAL_DELAY = 250;
+          const MOVE_INTERVAL = 50;
+          const tick = (now: number) => {
+            const held = heldArrowRef.current;
+            if (!held) { arrowRafRef.current = 0; return; }
+            if (!initialDelayPassed) {
+              if (now - keyDownTime >= INITIAL_DELAY) {
+                initialDelayPassed = true;
+                lastMoveTime = now;
+                moveCursorRef.current(held.dir);
+                if (held.selecting) endSelectionRef.current();
+              }
+            } else if (now - lastMoveTime >= MOVE_INTERVAL) {
+              lastMoveTime = now;
+              moveCursorRef.current(held.dir);
+              if (held.selecting) endSelectionRef.current();
+            }
+            arrowRafRef.current = requestAnimationFrame(tick);
+          };
+          arrowRafRef.current = requestAnimationFrame(tick);
         }
         return true;
       }
@@ -292,7 +356,7 @@ export const useNavigationInput = (refs: TrackerInputRefs) => {
   // Handle navigation keyup events. Returns true if handled.
   const handleKeyUp = useCallback(
     (e: KeyboardEvent): boolean => {
-      if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+      if (e.key === 'ArrowUp' || e.key === 'ArrowDown' || e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
         heldArrowRef.current = null;
         return true;
       }
