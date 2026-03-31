@@ -1045,3 +1045,41 @@ export interface OpenWurliConfig {
   mlpEnabled?: boolean;       // MLP neural correction for mode frequencies/decays
   velocityCurve?: number;     // 0=Linear, 1=Soft, 2=Medium, 3=Hard, 4=Fixed
 }
+
+export interface OPL3Config {
+  // Operator 1 (modulator)
+  op1Attack?: number;         // 0-15
+  op1Decay?: number;          // 0-15
+  op1Sustain?: number;        // 0-15
+  op1Release?: number;        // 0-15
+  op1Level?: number;          // 0-63
+  op1Multi?: number;          // 0-15 (frequency multiplier)
+  op1Waveform?: number;       // 0-7 (sine, half-sine, abs-sine, pulse, sine2x, abs2x, square, dsaw)
+  op1Tremolo?: number;        // 0-1
+  op1Vibrato?: number;        // 0-1
+  op1SustainHold?: number;    // 0-1
+  op1KSR?: number;            // 0-1 (key scale rate)
+  op1KSL?: number;            // 0-3 (key scale level)
+  // Operator 2 (carrier)
+  op2Attack?: number;
+  op2Decay?: number;
+  op2Sustain?: number;
+  op2Release?: number;
+  op2Level?: number;
+  op2Multi?: number;
+  op2Waveform?: number;
+  op2Tremolo?: number;
+  op2Vibrato?: number;
+  op2SustainHold?: number;
+  op2KSR?: number;
+  op2KSL?: number;
+  // Global
+  feedback?: number;          // 0-7
+  connection?: number;        // 0=FM, 1=Additive
+}
+
+export interface DX7Config {
+  volume?: number;            // 0-2 (1=unity)
+  bank?: number;              // 0-7 (cartridge bank)
+  program?: number;           // 0-31 (voice within bank)
+}

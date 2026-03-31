@@ -133,12 +133,14 @@ export class OPL3Synth implements DevilboxSynth {
    * Packed into OPL3 registers when sending to worklet.
    */
   private patchState = {
-    // Operator 1 (modulator)
+    // Operator 1 (modulator) — ADSR, level, multiplier, waveform, flags
     op1Attack: 1, op1Decay: 4, op1Sustain: 2, op1Release: 5,
-    op1Level: 32, op1Multi: 1,
+    op1Level: 32, op1Multi: 1, op1Waveform: 0,
+    op1Tremolo: 0, op1Vibrato: 0, op1SustainHold: 0, op1KSR: 0, op1KSL: 0,
     // Operator 2 (carrier)
     op2Attack: 1, op2Decay: 4, op2Sustain: 2, op2Release: 5,
-    op2Level: 0, op2Multi: 1,
+    op2Level: 0, op2Multi: 1, op2Waveform: 0,
+    op2Tremolo: 0, op2Vibrato: 0, op2SustainHold: 0, op2KSR: 0, op2KSL: 0,
     // Global
     feedback: 0, connection: 0,
   };
@@ -147,17 +149,28 @@ export class OPL3Synth implements DevilboxSynth {
   private packRegisters(): number[] {
     const s = this.patchState;
     return [
-      (s.op1Multi & 0xF),                                      // 0x20 mod: TVSK(4) | MULTI(4) — tremolo/vibrato/sustain/ksr bits zeroed
-      (s.op2Multi & 0xF),                                      // 0x20 car
-      ((63 - (s.op1Level & 0x3F)) & 0x3F),                    // 0x40 mod: KSL(2) | TL(6) — level is inverted (63=quiet, 0=loud)
-      ((63 - (s.op2Level & 0x3F)) & 0x3F),                    // 0x40 car
-      (((s.op1Attack & 0xF) << 4) | (s.op1Decay & 0xF)),     // 0x60 mod: AR(4) | DR(4)
-      (((s.op2Attack & 0xF) << 4) | (s.op2Decay & 0xF)),     // 0x60 car
-      (((s.op1Sustain & 0xF) << 4) | (s.op1Release & 0xF)),  // 0x80 mod: SL(4) | RR(4) — sustain is inverted (15=quiet, 0=loud)
-      (((s.op2Sustain & 0xF) << 4) | (s.op2Release & 0xF)),  // 0x80 car
-      0,                                                        // 0xE0 mod: waveform (0=sine)
-      0,                                                        // 0xE0 car: waveform (0=sine)
-      (((s.feedback & 0x7) << 1) | (s.connection & 0x1) | 0x30), // 0xC0: L+R(2) | FB(3) | CNT(1)
+      // 0x20 mod: Tremolo(1) | Vibrato(1) | SustainHold(1) | KSR(1) | Multi(4)
+      ((s.op1Tremolo & 1) << 7) | ((s.op1Vibrato & 1) << 6) | ((s.op1SustainHold & 1) << 5) | ((s.op1KSR & 1) << 4) | (s.op1Multi & 0xF),
+      // 0x20 car
+      ((s.op2Tremolo & 1) << 7) | ((s.op2Vibrato & 1) << 6) | ((s.op2SustainHold & 1) << 5) | ((s.op2KSR & 1) << 4) | (s.op2Multi & 0xF),
+      // 0x40 mod: KSL(2) | TL(6) — level is inverted (63=quiet, 0=loud)
+      ((s.op1KSL & 3) << 6) | ((63 - (s.op1Level & 0x3F)) & 0x3F),
+      // 0x40 car
+      ((s.op2KSL & 3) << 6) | ((63 - (s.op2Level & 0x3F)) & 0x3F),
+      // 0x60 mod: AR(4) | DR(4)
+      ((s.op1Attack & 0xF) << 4) | (s.op1Decay & 0xF),
+      // 0x60 car
+      ((s.op2Attack & 0xF) << 4) | (s.op2Decay & 0xF),
+      // 0x80 mod: SL(4) | RR(4)
+      ((s.op1Sustain & 0xF) << 4) | (s.op1Release & 0xF),
+      // 0x80 car
+      ((s.op2Sustain & 0xF) << 4) | (s.op2Release & 0xF),
+      // 0xE0 mod: waveform (0-7)
+      s.op1Waveform & 0x7,
+      // 0xE0 car: waveform (0-7)
+      s.op2Waveform & 0x7,
+      // 0xC0: L+R(2) | FB(3) | CNT(1)
+      0x30 | ((s.feedback & 0x7) << 1) | (s.connection & 0x1),
     ];
   }
 
