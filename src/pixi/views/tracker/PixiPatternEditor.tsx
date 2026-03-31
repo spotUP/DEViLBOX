@@ -32,6 +32,11 @@ import { haptics } from '@/utils/haptics';
 import * as Tone from 'tone';
 import type { CursorPosition, BlockSelection } from '@typedefs';
 import { usePatternEditor } from '@hooks/views/usePatternEditor';
+import {
+  CHORD_TYPES, ARP_PRESETS_UNIQUE,
+  chordNotes, invertChord, chordLabel, arpLabel,
+  type ChordDefinition, type ArpDefinition,
+} from '@/lib/chordDefinitions';
 const SCROLLBAR_HEIGHT = 12;
 
 // ─── Layout constants (must match worker-types / TrackerGLRenderer) ──────────
@@ -804,6 +809,114 @@ export const PixiPatternEditor: React.FC<PixiPatternEditorProps> = ({ width, hei
       action: () => handlePreviewCell(ch, row),
       disabled: !hasNote,
     });
+
+    // ── Insert Chord submenu ──
+    if (hasNote && cellForPreview) {
+      const rootNote = cellForPreview.note;
+      const rootInst = cellForPreview.instrument || 1;
+      const insertChord = (chord: ChordDefinition, inversion: number) => {
+        let notes = chordNotes(rootNote, chord.intervals);
+        if (inversion > 0) notes = invertChord(notes, inversion);
+        // Auto-expand note columns: triads need 2 cols (root + 2), 7ths need 3 cols (root + 3)
+        const neededCols = Math.min(4, notes.length);
+        const currentCols = pat?.channels[ch]?.channelMeta?.noteCols ?? 1;
+        if (neededCols > currentCols) {
+          useTrackerStore.getState().setChannelMeta(ch, { noteCols: neededCols });
+        }
+        // Build cell update: root stays, additional notes go to note2/note3/note4
+        const update: Record<string, number> = {};
+        if (notes.length >= 2) { update.note2 = notes[1]; update.instrument2 = rootInst; }
+        if (notes.length >= 3) { update.note3 = notes[2]; update.instrument3 = rootInst; }
+        if (notes.length >= 4) { update.note4 = notes[3]; update.instrument4 = rootInst; }
+        ts.setCell(ch, row, update);
+      };
+
+      const triadItems: ContextMenuItem[] = CHORD_TYPES
+        .filter(c => c.category === 'triad')
+        .map(chord => ({
+          label: chordLabel(chord, rootNote),
+          action: () => insertChord(chord, 0),
+        }));
+
+      const seventhItems: ContextMenuItem[] = CHORD_TYPES
+        .filter(c => c.category === 'seventh')
+        .map(chord => ({
+          label: chordLabel(chord, rootNote),
+          action: () => insertChord(chord, 0),
+        }));
+
+      const inversionItems: ContextMenuItem[] = [
+        { label: '1st Inversion', submenu: CHORD_TYPES.filter(c => c.category === 'triad').map(chord => ({
+          label: chordLabel(chord, rootNote),
+          action: () => insertChord(chord, 1),
+        }))},
+        { label: '2nd Inversion', submenu: CHORD_TYPES.filter(c => c.category === 'triad').map(chord => ({
+          label: chordLabel(chord, rootNote),
+          action: () => insertChord(chord, 2),
+        }))},
+      ];
+
+      items.push({
+        label: 'Insert Chord',
+        submenu: [
+          ...triadItems,
+          { separator: true, label: '' },
+          ...seventhItems,
+          { separator: true, label: '' },
+          ...inversionItems,
+        ],
+      });
+    } else {
+      items.push({ label: 'Insert Chord', disabled: true });
+    }
+
+    // ── Insert Arpeggio submenu ──
+    if (hasNote && cellForPreview) {
+      const rootNote = cellForPreview.note;
+      const insertArp = (arp: ArpDefinition) => {
+        if (sel) {
+          // Apply to all rows in selection
+          const startRow = Math.min(sel.startRow, sel.endRow);
+          const endRow = Math.max(sel.startRow, sel.endRow);
+          const startCh = Math.min(sel.startChannel, sel.endChannel);
+          const endCh = Math.max(sel.startChannel, sel.endChannel);
+          for (let c = startCh; c <= endCh; c++) {
+            for (let r = startRow; r <= endRow; r++) {
+              const cell = pat?.channels[c]?.rows[r];
+              if (!cell) continue;
+              if (!cell.effTyp && !cell.eff) {
+                ts.setCell(c, r, { effTyp: 0, eff: arp.param });
+              } else if (!cell.effTyp2 && !cell.eff2) {
+                ts.setCell(c, r, { effTyp2: 0, eff2: arp.param });
+              } else {
+                ts.setCell(c, r, { effTyp: 0, eff: arp.param });
+              }
+            }
+          }
+        } else {
+          // Single cell
+          const cell = cellForPreview;
+          if (!cell.effTyp && !cell.eff) {
+            ts.setCell(ch, row, { effTyp: 0, eff: arp.param });
+          } else if (!cell.effTyp2 && !cell.eff2) {
+            ts.setCell(ch, row, { effTyp2: 0, eff2: arp.param });
+          } else {
+            ts.setCell(ch, row, { effTyp: 0, eff: arp.param });
+          }
+        }
+      };
+
+      items.push({
+        label: sel ? 'Insert Arpeggio (selection)' : 'Insert Arpeggio',
+        submenu: ARP_PRESETS_UNIQUE.map(arp => ({
+          label: arpLabel(arp, rootNote),
+          action: () => insertArp(arp),
+        })),
+      });
+    } else {
+      items.push({ label: 'Insert Arpeggio', disabled: true });
+    }
+
     items.push({ separator: true, label: '' });
 
     // Single cell operations
