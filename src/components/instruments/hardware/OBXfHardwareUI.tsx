@@ -148,18 +148,21 @@ export const OBXfHardwareUI: React.FC<OBXfHardwareUIProps> = ({
 
         moduleRef.current = m;
 
-        // Initialize WASM at DPR scale for Retina-crisp rendering
-        const dpr = window.devicePixelRatio || 1;
-        if (m._obxf_ui_init_scaled) {
-          m._obxf_ui_init_scaled(dpr);
-        } else {
-          m._obxf_ui_init();
+        // Yield to browser before heavy WASM init (OB-Xf parses 12MB of SVG assets)
+        await new Promise(resolve => setTimeout(resolve, 50));
+        if (cancelled) {
+          m._obxf_ui_shutdown();
+          return;
         }
+
+        // Initialize at 1x scale — OB-Xf's SVG asset parsing is very heavy,
+        // DPR scaling would create a 2880×900 framebuffer and double the work.
+        m._obxf_ui_init();
 
         const w = m._obxf_ui_get_width();
         const h = m._obxf_ui_get_height();
-        fbWidthRef.current = Math.round(w / dpr);
-        fbHeightRef.current = Math.round(h / dpr);
+        fbWidthRef.current = w;
+        fbHeightRef.current = h;
 
         const canvas = canvasRef.current;
         if (!canvas) return;
@@ -273,12 +276,16 @@ export const OBXfHardwareUI: React.FC<OBXfHardwareUIProps> = ({
 
         setLoaded(true);
 
-        // rAF render loop
-        const renderLoop = () => {
+        // rAF render loop — throttled to 30fps (OB-Xf SVG rendering is heavy)
+        let lastFrameTime = 0;
+        const FRAME_INTERVAL = 1000 / 30;
+        const renderLoop = (now: number) => {
           if (cancelled) return;
+          rafId = requestAnimationFrame(renderLoop);
+          if (now - lastFrameTime < FRAME_INTERVAL) return;
+          lastFrameTime = now;
           if (m._obxf_ui_tick) m._obxf_ui_tick();
           blitFramebuffer(m, ctx, imgData, w, h);
-          rafId = requestAnimationFrame(renderLoop);
         };
         rafId = requestAnimationFrame(renderLoop);
       } catch (err) {
