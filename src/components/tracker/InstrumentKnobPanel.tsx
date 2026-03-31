@@ -315,7 +315,7 @@ function getSynthColor(synthType: SynthType | undefined): string {
   // Tone.js synths
   switch (synthType) {
     case 'FMSynth': return '#22d3ee';
-    case 'AMSynth': return '#14b8a6';
+    case 'ToneAM': return '#14b8a6';
     case 'MonoSynth': return '#a78bfa';
     case 'DuoSynth': return '#f472b6';
     case 'PluckSynth': return '#f59e0b';

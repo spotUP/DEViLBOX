@@ -27,7 +27,7 @@ const SYNTH_LABELS: Record<string, string> = {
   MonoSynth:      'Mono Synth',
   DuoSynth:       'Duo Synth',
   FMSynth:        'FM Synth',
-  AMSynth:        'AM Synth',
+  ToneAM:        'AM Synth',
   PluckSynth:     'Pluck Synth',
   MetalSynth:     'Metal Synth',
   MembraneSynth:  'Membrane Synth',

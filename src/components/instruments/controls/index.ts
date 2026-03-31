@@ -24,6 +24,7 @@ export { CalfMonoControls } from './CalfMonoControls';
 export { SetBfreeControls } from './SetBfreeControls';
 export { SynthV1Controls } from './SynthV1Controls';
 export { MoniqueControls } from './MoniqueControls';
+export { VL1Controls } from './VL1Controls';
 export { TalNoizeMakerControls } from './TalNoizeMakerControls';
 export { AeolusControls } from './AeolusControls';
 export { FluidSynthControls } from './FluidSynthControls';

@@ -460,8 +460,8 @@ export const EditInstrumentModal: React.FC<EditInstrumentModalProps> = ({
           <div className="flex-1 flex flex-col min-w-0">
             {currentInstrument ? (
               <>
-                {/* Header */}
-                <div className="flex items-center justify-between px-4 py-3 border-b border-dark-border bg-dark-bgSecondary">
+                {/* Header with integrated Sound/Effects tabs */}
+                <div className="flex items-center justify-between px-4 py-2 border-b border-dark-border bg-dark-bgSecondary shrink-0">
                   <div className="flex items-center gap-2">
                     {/* Previous Instrument Button */}
                     <button
@@ -500,6 +500,31 @@ export const EditInstrumentModal: React.FC<EditInstrumentModalProps> = ({
                     >
                       <ChevronRight size={20} />
                     </button>
+
+                    {/* Sound / Effects tabs — integrated into header */}
+                    <div className="flex items-center gap-1 ml-4 pl-4 border-l border-dark-border">
+                      {tabs.map((tab) => {
+                        const TabIcon = tab.icon;
+                        const isActive = activeTab === tab.id;
+
+                        return (
+                          <button
+                            key={tab.id}
+                            onClick={() => setActiveTab(tab.id)}
+                            className={`
+                              flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-all border
+                              ${isActive
+                                ? 'bg-dark-bg text-accent-primary border-accent-primary'
+                                : 'text-text-muted hover:text-text-primary hover:bg-dark-bg border-transparent'
+                              }
+                            `}
+                          >
+                            <TabIcon size={14} />
+                            {tab.label}
+                          </button>
+                        );
+                      })}
+                    </div>
                   </div>
 
                   <div className="flex items-center gap-2">
@@ -537,38 +562,13 @@ export const EditInstrumentModal: React.FC<EditInstrumentModalProps> = ({
                     </button>
                     <button
                       onClick={handleClose}
-                      className="flex items-center gap-2 px-3 py-2 rounded-lg bg-dark-bg hover:bg-dark-bgHover transition-colors text-text-muted hover:text-text-primary border border-dark-border"
+                      className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-dark-bg hover:bg-dark-bgHover transition-colors text-text-muted hover:text-text-primary border border-dark-border"
                       title="Close (Escape)"
                     >
                       <X size={18} />
                       <span className="text-sm font-medium">Close</span>
                     </button>
                   </div>
-                </div>
-
-                {/* Tab Bar */}
-                <div className="flex items-center gap-1 px-4 py-2 border-b border-dark-border bg-dark-bg">
-                  {tabs.map((tab) => {
-                    const TabIcon = tab.icon;
-                    const isActive = activeTab === tab.id;
-
-                    return (
-                      <button
-                        key={tab.id}
-                        onClick={() => setActiveTab(tab.id)}
-                        className={`
-                          flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all border
-                          ${isActive
-                            ? 'bg-dark-bgSecondary text-accent-primary border-accent-primary'
-                            : 'text-text-muted hover:text-text-primary hover:bg-dark-bgSecondary border-transparent'
-                          }
-                        `}
-                      >
-                        <TabIcon size={16} />
-                        {tab.label}
-                      </button>
-                    );
-                  })}
                 </div>
 
                 {/* Tab Content */}

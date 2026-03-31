@@ -1,11 +1,13 @@
 /**
  * AMSynthControls.tsx - Visual UI for AMSynth (Analog Modelling Synthesizer)
- * 41 parameters organized into logical groups.
+ * 41 parameters organized into logical groups, rendered with rotary Knob controls.
  */
 
 import React, { useRef, useEffect, useCallback } from 'react';
 import type { AMSynthConfig } from '@/engine/amsynth/AMSynthSynth';
 import { DEFAULT_AMSYNTH, AMSYNTH_PARAM_NAMES } from '@/engine/amsynth/AMSynthSynth';
+import { Knob } from '@components/controls/Knob';
+import { useThemeStore } from '@stores';
 
 interface AMSynthControlsProps {
   config: Partial<AMSynthConfig>;
@@ -13,7 +15,7 @@ interface AMSynthControlsProps {
 }
 
 const WAVEFORM_NAMES = ['Sine', 'Pulse', 'Saw', 'Noise', 'Random'];
-const LFO_WAVEFORM_NAMES = ['Sine', 'Square', 'Saw Up', 'Saw Down', 'Noise', 'Random', 'Sample&Hold'];
+const LFO_WAVEFORM_NAMES = ['Sine', 'Square', 'Saw Up', 'Saw Down', 'Noise', 'Random', 'S&H'];
 const FILTER_TYPES = ['Low Pass', 'High Pass', 'Band Pass', 'Band Stop', 'Bypass'];
 const KBD_MODES = ['Poly', 'Mono', 'Legato'];
 
@@ -30,27 +32,20 @@ const CONFIG_KEYS: (keyof AMSynthConfig)[] = [
   'filterKbdTrack', 'filterVelSens', 'ampVelSens', 'portamentoMode',
 ];
 
-interface ParamSliderProps {
+const BIPOLAR_PARAMS = new Set<keyof AMSynthConfig>([
+  'osc2Detune', 'oscMix', 'filterEnvAmount', 'filterModAmount', 'ampModAmount',
+]);
+
+const GROUPS: Array<{
   label: string;
-  value: number;
-  min: number;
-  max: number;
-  step?: number;
-  onChange: (v: number) => void;
-  format?: (v: number) => string;
-}
-
-const ParamSlider: React.FC<ParamSliderProps> = ({ label, value, min, max, step = 0.001, onChange, format }) => (
-  <div className="flex flex-col gap-1">
-    <label className="text-gray-500 truncate text-[10px]" title={label}>{label}</label>
-    <input type="range" min={min} max={max} step={step} value={value}
-      onChange={(e) => onChange(parseFloat(e.target.value))}
-      className="w-full accent-green-500 h-2" />
-    <span className="text-gray-600 text-[10px]">{format ? format(value) : `${value.toFixed(2)}`}</span>
-  </div>
-);
-
-const GROUPS: Array<{ label: string; params: Array<{ key: keyof AMSynthConfig; min: number; max: number; step?: number; format?: (v: number) => string }> }> = [
+  params: Array<{
+    key: keyof AMSynthConfig;
+    min: number;
+    max: number;
+    step?: number;
+    format?: (v: number) => string;
+  }>;
+}> = [
   {
     label: 'Oscillator 1', params: [
       { key: 'osc1Waveform', min: 0, max: 4, step: 1, format: (v) => WAVEFORM_NAMES[Math.round(v)] || '?' },
@@ -138,18 +133,25 @@ export const AMSynthControls: React.FC<AMSynthControlsProps> = ({ config, onChan
     onChange({ ...configRef.current, [key]: value });
   }, [onChange]);
 
+  const currentThemeId = useThemeStore((state) => state.currentThemeId);
+  const isCyanTheme = currentThemeId === 'cyan-lineart';
+  const knobColor = isCyanTheme ? '#00ffff' : '#88ff88';
+  const headerColor = isCyanTheme ? 'text-cyan-400' : 'text-green-400';
+
   const merged = { ...DEFAULT_AMSYNTH, ...config };
 
   return (
-    <div className="p-4 space-y-4 text-xs">
+    <div className="p-4 space-y-3 text-xs">
       {GROUPS.map((group) => (
-        <div key={group.label}>
-          <h3 className="text-gray-400 font-semibold mb-2 border-b border-gray-700 pb-1">{group.label}</h3>
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
+        <div key={group.label} className="bg-[#1a1a1a] border border-dark-border rounded-xl p-4">
+          <h3 className={`font-bold ${headerColor} mb-4 text-[11px] uppercase tracking-wide`}>
+            {group.label}
+          </h3>
+          <div className="grid grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
             {group.params.map((p) => {
               const idx = CONFIG_KEYS.indexOf(p.key);
               return (
-                <ParamSlider
+                <Knob
                   key={p.key}
                   label={AMSYNTH_PARAM_NAMES[idx] || p.key}
                   value={merged[p.key] ?? 0}
@@ -157,7 +159,10 @@ export const AMSynthControls: React.FC<AMSynthControlsProps> = ({ config, onChan
                   max={p.max}
                   step={p.step}
                   onChange={(v) => updateParam(p.key, v)}
-                  format={p.format}
+                  formatValue={p.format}
+                  bipolar={BIPOLAR_PARAMS.has(p.key)}
+                  size="sm"
+                  color={knobColor}
                 />
               );
             })}

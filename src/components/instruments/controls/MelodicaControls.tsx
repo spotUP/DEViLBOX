@@ -68,7 +68,9 @@ export const MelodicaControls: React.FC<MelodicaControlsProps> = ({
         synthRef.current = synth;
         if ('getParams' in synth) {
           const wasmParams = synth.getParams();
-          const vals = wasmParams.map(p => p.defaultValue);
+          const vals = DEFAULTS.map((def, i) =>
+            i < wasmParams.length ? (wasmParams[i].defaultValue ?? def) : def
+          );
           if (!cancelled) {
             setParams(vals);
             setSynthReady(true);

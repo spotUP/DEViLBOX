@@ -21,7 +21,7 @@ const SYNTH_TYPE_GROUPS: { label: string; types: { value: SynthType; label: stri
     { value: 'Synth', label: 'Synth' },
     { value: 'MonoSynth', label: 'Mono Synth' },
     { value: 'FMSynth', label: 'FM Synth' },
-    { value: 'AMSynth', label: 'AM Synth' },
+    { value: 'ToneAM', label: 'AM Synth' },
     { value: 'DuoSynth', label: 'Duo Synth' },
     { value: 'NoiseSynth', label: 'Noise' },
   ]},
@@ -57,7 +57,7 @@ const SYNTH_TYPE_GROUPS: { label: string; types: { value: SynthType; label: stri
   { label: 'WASM Synths', types: [
     { value: 'Dexed', label: 'Dexed (DX7)' },
     { value: 'OBXd', label: 'OB-Xd' },
-    { value: 'AMSynth' as SynthType, label: 'amsynth' },
+    { value: 'ToneAM' as SynthType, label: 'amsynth' },
     { value: 'SynthV1', label: 'SynthV1' },
     { value: 'TalNoizeMaker', label: 'TAL NoiseMaker' },
     { value: 'MdaEPiano', label: 'MDA EPiano' },

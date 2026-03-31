@@ -9,7 +9,7 @@
  * - High-DPI (Retina) support
  */
 
-import React, { useRef, useCallback, useLayoutEffect } from 'react';
+import React, { useRef, useCallback, useLayoutEffect, useState, useEffect } from 'react';
 import { useVisualizationAnimation } from '@hooks/useVisualizationAnimation';
 import { getVisualizationData } from '@stores/useVisualizationStore';
 
@@ -19,7 +19,7 @@ interface LiveADSRVisualizerProps {
   decay: number;   // 0-1
   sustain: number; // 0-1
   release: number; // 0-1
-  width?: number;
+  width?: number | 'auto';
   height?: number;
   color?: string;
   activeColor?: string;
@@ -40,8 +40,28 @@ export const LiveADSRVisualizer: React.FC<LiveADSRVisualizerProps> = ({
   backgroundColor = 'var(--color-bg-tertiary)',
   className = '',
 }) => {
+  const containerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const contextRef = useRef<CanvasRenderingContext2D | null>(null);
+  const [logicalWidth, setLogicalWidth] = useState(width === 'auto' ? 200 : width);
+
+  // Handle responsive width
+  useEffect(() => {
+    if (width !== 'auto') {
+      requestAnimationFrame(() => setLogicalWidth(width));
+      return;
+    }
+    const container = containerRef.current;
+    if (!container) return;
+    const updateWidth = () => {
+      const rect = container.getBoundingClientRect();
+      if (rect.width > 0) setLogicalWidth(Math.floor(rect.width));
+    };
+    updateWidth();
+    const resizeObserver = new ResizeObserver(updateWidth);
+    resizeObserver.observe(container);
+    return () => resizeObserver.disconnect();
+  }, [width]);
 
   // Read visualization data directly (no Zustand subscription for high-frequency data)
   const vizData = getVisualizationData();
@@ -56,14 +76,14 @@ export const LiveADSRVisualizer: React.FC<LiveADSRVisualizerProps> = ({
     if (!ctx) return;
 
     const dpr = window.devicePixelRatio || 1;
-    canvas.width = width * dpr;
+    canvas.width = logicalWidth * dpr;
     canvas.height = height * dpr;
     
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.scale(dpr, dpr);
     
     contextRef.current = ctx;
-  }, [width, height]);
+  }, [logicalWidth, height]);
 
   // Animation frame callback
   const onFrame = useCallback((): boolean => {
@@ -72,11 +92,11 @@ export const LiveADSRVisualizer: React.FC<LiveADSRVisualizerProps> = ({
 
     // Clear canvas using logical units
     ctx.fillStyle = backgroundColor;
-    ctx.fillRect(0, 0, width, height);
+    ctx.fillRect(0, 0, logicalWidth, height);
 
     // Padding and dimensions
     const padding = { top: 10, right: 10, bottom: 10, left: 10 };
-    const innerWidth = width - padding.left - padding.right;
+    const innerWidth = logicalWidth - padding.left - padding.right;
     const innerHeight = height - padding.top - padding.bottom;
 
     // Calculate segments (fixed ratios for visual balance)
@@ -163,7 +183,7 @@ export const LiveADSRVisualizer: React.FC<LiveADSRVisualizerProps> = ({
     decay,
     sustain,
     release,
-    width,
+    logicalWidth,
     height,
     color,
     activeColor,
@@ -177,16 +197,25 @@ export const LiveADSRVisualizer: React.FC<LiveADSRVisualizerProps> = ({
     fps: 60,
   });
 
-  return (
+  const canvas = (
     <canvas
       ref={canvasRef}
       className={`rounded ${className}`}
       style={{ 
         backgroundColor,
-        width: `${width}px`,
+        width: width === 'auto' ? '100%' : `${width}px`,
         height: `${height}px`,
         display: 'block'
       }}
     />
   );
+
+  if (width === 'auto') {
+    return (
+      <div ref={containerRef} className="w-full h-full">
+        {canvas}
+      </div>
+    );
+  }
+  return canvas;
 };

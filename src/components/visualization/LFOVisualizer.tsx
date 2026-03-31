@@ -5,10 +5,12 @@
  * - Displays LFO waveform shape (sine/tri/saw/square)
  * - Animated phase indicator (cycling dot)
  * - Rate display with optional BPM sync
+ * - Auto-width support
+ * - High-DPI (Retina) support
  * - 30fps animation
  */
 
-import React, { useRef, useCallback, useEffect } from 'react';
+import React, { useRef, useCallback, useEffect, useState, useLayoutEffect } from 'react';
 import { useVisualizationAnimation } from '@hooks/useVisualizationAnimation';
 import { useVisualizationStore } from '@stores/useVisualizationStore';
 
@@ -16,61 +18,18 @@ type LFOWaveform = 'sine' | 'triangle' | 'sawtooth' | 'square';
 
 interface LFOVisualizerProps {
   instrumentId: number;
-  rate: number; // Hz or BPM sync value
+  rate: number;
   depth: number; // 0-100
   waveform: LFOWaveform;
   syncToBPM?: boolean;
   bpm?: number;
-  width?: number;
+  width?: number | 'auto';
   height?: number;
   color?: string;
   dotColor?: string;
   backgroundColor?: string;
   className?: string;
   label?: string;
-}
-
-// Generate waveform path
-function generateWaveformPath(
-  waveform: LFOWaveform,
-  width: number,
-  height: number,
-  padding: { top: number; bottom: number; left: number; right: number },
-  depth: number
-): string {
-  const graphWidth = width - padding.left - padding.right;
-  const graphHeight = height - padding.top - padding.bottom;
-  const centerY = padding.top + graphHeight / 2;
-  const amplitude = (graphHeight / 2) * (depth / 100);
-
-  const points: string[] = [];
-  const numPoints = 100;
-
-  for (let i = 0; i <= numPoints; i++) {
-    const phase = i / numPoints; // 0 to 1
-    const x = padding.left + phase * graphWidth;
-
-    let value = 0;
-    switch (waveform) {
-      case 'sine':
-        value = Math.sin(phase * Math.PI * 2);
-        break;
-      case 'triangle':
-        value = 1 - 4 * Math.abs(Math.round(phase) - phase);
-        break;
-      case 'sawtooth':
-        value = 2 * (phase - Math.floor(phase + 0.5));
-        break;
-      case 'square':
-        value = phase < 0.5 ? 1 : -1;
-        break;
-    }
-
-    const y = centerY - value * amplitude;
-    points.push(i === 0 ? `M ${x} ${y}` : `L ${x} ${y}`);
-  }
-
-  return points.join(' ');
 }
 
 // Get waveform value at phase
@@ -104,89 +63,111 @@ export const LFOVisualizer: React.FC<LFOVisualizerProps> = ({
   className = '',
   label = 'LFO',
 }) => {
+  const containerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const contextRef = useRef<CanvasRenderingContext2D | null>(null);
   const phaseRef = useRef(0);
   const lastTimeRef = useRef(0);
+  const [logicalWidth, setLogicalWidth] = useState(width === 'auto' ? 200 : width);
 
-  // Read visualization data directly (no Zustand subscription for high-frequency data)
   const setLFOPhase = useVisualizationStore.getState().setLFOPhase;
 
-  // Padding and dimensions
-  const padding = { top: 4, right: 4, bottom: 16, left: 4 };
-  const graphWidth = width - padding.left - padding.right;
-  const graphHeight = height - padding.top - padding.bottom;
-  const centerY = padding.top + graphHeight / 2;
-  const amplitude = (graphHeight / 2) * (depth / 100);
-
-  // Calculate actual rate in Hz
-  const actualRate = syncToBPM ? (bpm / 60) * rate : rate;
-
-  // Initialize canvas
+  // Handle responsive width
   useEffect(() => {
+    if (width !== 'auto') {
+      requestAnimationFrame(() => setLogicalWidth(width));
+      return;
+    }
+    const container = containerRef.current;
+    if (!container) return;
+    const updateWidth = () => {
+      const rect = container.getBoundingClientRect();
+      if (rect.width > 0) setLogicalWidth(Math.floor(rect.width));
+    };
+    updateWidth();
+    const resizeObserver = new ResizeObserver(updateWidth);
+    resizeObserver.observe(container);
+    return () => resizeObserver.disconnect();
+  }, [width]);
+
+  // Setup High-DPI canvas
+  useLayoutEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
-
     const ctx = canvas.getContext('2d', { alpha: false });
     if (!ctx) return;
 
-    contextRef.current = ctx;
-  }, []);
+    const dpr = window.devicePixelRatio || 1;
+    canvas.width = logicalWidth * dpr;
+    canvas.height = height * dpr;
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.scale(dpr, dpr);
 
-  // Animation frame callback
+    contextRef.current = ctx;
+  }, [logicalWidth, height]);
+
+  // Dimensions
+  const padding = { top: 4, right: 4, bottom: 16, left: 4 };
+  const graphWidth = logicalWidth - padding.left - padding.right;
+  const graphHeight = height - padding.top - padding.bottom;
+  const centerY = padding.top + graphHeight / 2;
+  const amplitude = (graphHeight / 2) * (depth / 100);
+  const actualRate = syncToBPM ? (bpm / 60) * rate : rate;
+
   const onFrame = useCallback(
     (timestamp: number): boolean => {
-      const canvas = canvasRef.current;
       const ctx = contextRef.current;
-      if (!canvas || !ctx) return false;
+      if (!ctx) return false;
 
-      // Update phase based on time
       const deltaTime = lastTimeRef.current ? (timestamp - lastTimeRef.current) / 1000 : 0;
       lastTimeRef.current = timestamp;
-
       phaseRef.current = (phaseRef.current + actualRate * deltaTime) % 1;
 
-      // Update visualization store
       setLFOPhase(instrumentId, {
         filter: phaseRef.current,
         pitch: phaseRef.current,
         rate: actualRate,
       });
 
-      // Clear canvas
+      // Clear
       ctx.fillStyle = backgroundColor;
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.fillRect(0, 0, logicalWidth, height);
 
-      // Draw center line
-      ctx.strokeStyle = 'var(--color-border-light)';
+      // Center line
+      ctx.strokeStyle = 'rgba(255,255,255,0.08)';
       ctx.lineWidth = 1;
       ctx.beginPath();
       ctx.moveTo(padding.left, centerY);
       ctx.lineTo(padding.left + graphWidth, centerY);
       ctx.stroke();
 
-      // Generate and draw waveform path
-      const waveformPath = generateWaveformPath(waveform, width, height, padding, depth);
-      const path = new Path2D(waveformPath);
-
+      // Draw waveform
       ctx.strokeStyle = color;
       ctx.lineWidth = 2;
       ctx.lineCap = 'round';
       ctx.lineJoin = 'round';
-      ctx.stroke(path);
+      ctx.beginPath();
+      const numPoints = 100;
+      for (let i = 0; i <= numPoints; i++) {
+        const phase = i / numPoints;
+        const x = padding.left + phase * graphWidth;
+        const value = getWaveformValue(waveform, phase);
+        const y = centerY - value * amplitude;
+        if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+      }
+      ctx.stroke();
 
-      // Glow effect
+      // Glow
       ctx.shadowColor = color;
       ctx.shadowBlur = 4;
-      ctx.stroke(path);
+      ctx.stroke();
       ctx.shadowBlur = 0;
 
-      // Draw phase indicator dot
+      // Phase dot
       const dotX = padding.left + phaseRef.current * graphWidth;
       const value = getWaveformValue(waveform, phaseRef.current);
       const dotY = centerY - value * amplitude;
 
-      // Dot glow
       ctx.fillStyle = dotColor;
       ctx.shadowColor = dotColor;
       ctx.shadowBlur = 8;
@@ -195,58 +176,46 @@ export const LFOVisualizer: React.FC<LFOVisualizerProps> = ({
       ctx.fill();
       ctx.shadowBlur = 0;
 
-      // Dot outline
       ctx.strokeStyle = color;
       ctx.lineWidth = 1;
       ctx.stroke();
 
-      // Draw label and rate
+      // Labels
       ctx.fillStyle = '#666';
       ctx.font = '9px monospace';
       ctx.textAlign = 'left';
-      ctx.fillText(label, padding.left, canvas.height - 2);
-
+      ctx.fillText(label, padding.left, height - 2);
       ctx.textAlign = 'right';
-      const rateText = syncToBPM ? `${rate}x` : `${rate.toFixed(1)}Hz`;
-      ctx.fillText(rateText, canvas.width - padding.right, canvas.height - 2);
+      ctx.fillText(syncToBPM ? `${rate}x` : `${rate.toFixed(1)}Hz`, logicalWidth - padding.right, height - 2);
 
-      return true; // LFO always animates
+      return true;
     },
-    [
-      instrumentId,
-      waveform,
-      depth,
-      actualRate,
-      syncToBPM,
-      rate,
-      color,
-      dotColor,
-      backgroundColor,
-      label,
-      width,
-      height,
-      padding,
-      graphWidth,
-      centerY,
-      amplitude,
-      setLFOPhase,
-    ]
+    [instrumentId, waveform, depth, actualRate, syncToBPM, rate, color, dotColor,
+     backgroundColor, label, logicalWidth, height, graphWidth, centerY, amplitude,
+     padding, setLFOPhase]
   );
 
-  // Start animation
-  useVisualizationAnimation({
-    onFrame,
-    enabled: depth > 0,
-    fps: 60,
-  });
+  useVisualizationAnimation({ onFrame, enabled: depth > 0, fps: 60 });
 
-  return (
+  const canvas = (
     <canvas
       ref={canvasRef}
-      width={width}
-      height={height}
       className={`rounded ${className}`}
-      style={{ backgroundColor }}
+      style={{
+        backgroundColor,
+        width: width === 'auto' ? '100%' : `${width}px`,
+        height: `${height}px`,
+        display: 'block',
+      }}
     />
   );
+
+  if (width === 'auto') {
+    return (
+      <div ref={containerRef} className="w-full h-full">
+        {canvas}
+      </div>
+    );
+  }
+  return canvas;
 };
