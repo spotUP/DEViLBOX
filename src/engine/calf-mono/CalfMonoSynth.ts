@@ -13,7 +13,9 @@
 
 import type { DevilboxSynth } from '@/types/synth';
 import { getDevilboxAudioContext, noteToMidi } from '@/utils/audio-context';
-import { loadNativePatch, captureNativeState, type NativePatch } from '@/engine/common/NativePatchLoader';
+import { loadNativePatch, captureNativeState } from '@/engine/common/NativePatchLoader';
+import { CALFMONO_NATIVE_FACTORY_PRESETS } from './calfMonoNativePresets';
+export { CALFMONO_NATIVE_FACTORY_PRESETS };
 
 export const CalfMonoParam = {
   O1_WAVE: 0, O2_WAVE: 1, O1_PW: 2, O2_PW: 3,
@@ -240,7 +242,7 @@ export const CALF_MONO_PRESETS: Record<string, Partial<CalfMonoConfig>> = {
   },
 };
 
-export const CALF_MONO_NATIVE_PRESETS: NativePatch[] = [];
+// Native factory presets re-exported above from calfMonoNativePresets.ts
 
 export class CalfMonoSynthImpl implements DevilboxSynth {
   readonly name = 'CalfMonoSynth';
@@ -373,10 +375,10 @@ export class CalfMonoSynthImpl implements DevilboxSynth {
   }
 
   /**
-   * Load a native preset by name from the CALF_MONO_NATIVE_PRESETS map.
+   * Load a native preset by name from the CALFMONO_NATIVE_FACTORY_PRESETS map.
    */
   loadNativePreset(name: string): void {
-    const preset = CALF_MONO_NATIVE_PRESETS.find(p => p.name === name);
+    const preset = CALFMONO_NATIVE_FACTORY_PRESETS.find(p => p.name === name);
     if (preset) {
       this.loadPatch(preset.values);
     } else {
