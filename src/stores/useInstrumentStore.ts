@@ -526,6 +526,7 @@ export const useInstrumentStore = create<InstrumentStore>()(
 
             // Zynthian WASM synths — all use DevilboxSynth.applyConfig() pattern
             const zynthianConfigMap: Record<string, string> = {
+              Dexed: 'dexed', OBXd: 'obxd',
               MdaEPiano: 'mdaEPiano', MdaJX10: 'mdaJX10', MdaDX10: 'mdaDX10',
               AMSynth: 'amsynth', RaffoSynth: 'raffo', CalfMono: 'calfMono',
               SetBfree: 'setbfree', SynthV1: 'synthv1', Monique: 'monique', VL1: 'vl1',
@@ -536,6 +537,11 @@ export const useInstrumentStore = create<InstrumentStore>()(
             if (zynthConfigKey) {
               // ZynAddSubFX XML presets require synth recreation (native XML loading)
               if (zynthConfigKey === 'zynaddsubfx' && (updates as any).zynaddsubfxXmlPreset) {
+                engine.invalidateInstrument(id);
+                return;
+              }
+              // Dexed VCED presets require synth recreation (native SysEx loading)
+              if (zynthConfigKey === 'dexed' && (updates as any).dexedVcedPreset) {
                 engine.invalidateInstrument(id);
                 return;
               }
