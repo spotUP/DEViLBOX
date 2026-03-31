@@ -200,9 +200,15 @@ export const PopOutWindow: React.FC<PopOutWindowProps> = ({
 
     // Wait for the static HTML to finish loading before setting up
     popup.addEventListener('load', setupPopup);
+    // Fallback: if popout.html loads from cache before the listener is attached,
+    // the load event is missed. Poll briefly to catch this race condition.
+    const fallbackTimer = setTimeout(() => {
+      if (!popup.closed) setupPopup();
+    }, 100);
 
     // Cleanup on unmount
     return () => {
+      clearTimeout(fallbackTimer);
       const obs = (popup as any).__observer as MutationObserver | undefined;
       const handleClose = (popup as any).__handleClose as (() => void) | undefined;
       closingRef.current = true;

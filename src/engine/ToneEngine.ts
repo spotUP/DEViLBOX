@@ -3041,6 +3041,8 @@ export class ToneEngine {
     'RaffoSynth', 'CalfMono', 'SetBfree', 'SynthV1',
     'TalNoizeMaker', 'Aeolus', 'FluidSynth', 'Sfizz',
     'ZynAddSubFX', 'Monique', 'VL1',
+    // JUCE WASM synths (polyphony handled internally by WASM)
+    'Dexed', 'OBXd',
   ]);
 
   /**

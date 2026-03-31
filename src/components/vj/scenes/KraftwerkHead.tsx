@@ -5,6 +5,7 @@
  * jawOpen, mouthSmile, eyeBlink, browInnerUp, etc.
  * Falls back to LeePerrySmith.glb (static, jaw-split) if facecap fails.
  * Rendered as cyan wireframe with bloom glow for Kraftwerk aesthetic.
+ * Also activates when the vocoder is running (DJ robot voice mode).
  */
 
 import React, { useRef, useEffect, useState } from 'react';
@@ -15,6 +16,7 @@ import { KTX2Loader } from 'three/examples/jsm/loaders/KTX2Loader.js';
 import { MeshoptDecoder } from 'meshoptimizer';
 import type { VJSceneProps } from './types';
 import { useSpeechActivityStore } from '@/stores/useSpeechActivityStore';
+import { useVocoderStore } from '@/stores/useVocoderStore';
 
 // Morph target indices (from facecap.glb extras.targetNames)
 const MORPH = {
@@ -89,6 +91,15 @@ const flatShadeMat = new THREE.MeshPhongMaterial({
   transparent: true,
   opacity: 0.6,
   side: THREE.FrontSide,
+});
+
+// Spike hair material — bright cyan lines with additive glow
+const spikeMat = new THREE.LineBasicMaterial({
+  color: 0x00eeff,
+  transparent: true,
+  opacity: 0.9,
+  blending: THREE.AdditiveBlending,
+  depthWrite: false,
 });
 
 // ─── Model loading with KTX2 + Meshopt ───────────────────────────────────────
@@ -175,6 +186,16 @@ export const KraftwerkHead: React.FC<VJSceneProps> = ({ audioRef }) => {
   // Visibility — fade in when speech is active, fade out when idle
   const smoothVisibility = useRef(0);
 
+  // Spike hair system
+  const spikeMeshRef = useRef<THREE.LineSegments | null>(null);
+  const spikeDataRef = useRef<{
+    origins: Float32Array;     // base positions (scalp vertices)
+    normals: Float32Array;     // outward direction per spike
+    phases: Float32Array;      // per-spike random phase offset for wave motion
+    basePositions: Float32Array; // attribute buffer (interleaved: origin, tip, origin, tip...)
+    count: number;
+  } | null>(null);
+
   // Head look-at targets — pick a random point, turn toward it, hold, pick another
   const headTargetY = useRef(0);       // target Y rotation (left/right)
   const headTargetX = useRef(0);       // target X rotation (up/down)
@@ -217,6 +238,84 @@ export const KraftwerkHead: React.FC<VJSceneProps> = ({ audioRef }) => {
         parent.add(flat);
       }
       headMeshRef.current = morphMesh;
+
+      // ── Create spike hair from scalp vertices ──
+      if (morphMesh) {
+        const headGeo = (morphMesh as THREE.Mesh).geometry;
+        const posAttr = headGeo.getAttribute('position');
+        const normAttr = headGeo.getAttribute('normal');
+        if (posAttr && normAttr) {
+          // Collect scalp vertices (top of head)
+          const scalpVerts: { x: number; y: number; z: number; nx: number; ny: number; nz: number }[] = [];
+          const seen = new Set<string>();
+          for (let i = 0; i < posAttr.count; i++) {
+            const x = posAttr.getX(i);
+            const y = posAttr.getY(i);
+            const z = posAttr.getZ(i);
+            const nx = normAttr.getX(i);
+            const ny = normAttr.getY(i);
+            const nz = normAttr.getZ(i);
+            // Scalp region: above eyes, normals pointing up/outward
+            if (ny > 0.3 && y > 0.02) {
+              // Deduplicate nearby vertices (round to 3 decimals)
+              const key = `${(x * 100) | 0},${(y * 100) | 0},${(z * 100) | 0}`;
+              if (!seen.has(key)) {
+                seen.add(key);
+                scalpVerts.push({ x, y, z, nx, ny, nz });
+              }
+            }
+          }
+
+          // Subsample if too many (aim for ~120 spikes)
+          const maxSpikes = 120;
+          let spikes = scalpVerts;
+          if (spikes.length > maxSpikes) {
+            const step = spikes.length / maxSpikes;
+            const sampled = [];
+            for (let i = 0; i < maxSpikes; i++) {
+              sampled.push(spikes[Math.floor(i * step)]);
+            }
+            spikes = sampled;
+          }
+
+          const count = spikes.length;
+          const origins = new Float32Array(count * 3);
+          const normals = new Float32Array(count * 3);
+          const phases = new Float32Array(count);
+          // Line segments: 2 vertices per spike (base + tip)
+          const positions = new Float32Array(count * 2 * 3);
+
+          for (let i = 0; i < count; i++) {
+            const s = spikes[i];
+            origins[i * 3] = s.x;
+            origins[i * 3 + 1] = s.y;
+            origins[i * 3 + 2] = s.z;
+            normals[i * 3] = s.nx;
+            normals[i * 3 + 1] = s.ny;
+            normals[i * 3 + 2] = s.nz;
+            phases[i] = Math.random() * Math.PI * 2;
+            // Initial positions (base = tip, zero length)
+            positions[i * 6] = s.x;
+            positions[i * 6 + 1] = s.y;
+            positions[i * 6 + 2] = s.z;
+            positions[i * 6 + 3] = s.x;
+            positions[i * 6 + 4] = s.y;
+            positions[i * 6 + 5] = s.z;
+          }
+
+          const spikeGeo = new THREE.BufferGeometry();
+          spikeGeo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+
+          const spikeMesh = new THREE.LineSegments(spikeGeo, spikeMat);
+          spikeMesh.renderOrder = 2;
+          spikeMesh.frustumCulled = false;
+          result.scene.add(spikeMesh);
+          spikeMeshRef.current = spikeMesh;
+
+          spikeDataRef.current = { origins, normals, phases, basePositions: positions, count };
+        }
+      }
+
       setSceneObj(result.scene);
     }).catch((err) => {
       console.error('[KraftwerkHead] Failed to load facecap.glb:', err);
@@ -232,10 +331,14 @@ export const KraftwerkHead: React.FC<VJSceneProps> = ({ audioRef }) => {
 
     const t = state.clock.elapsedTime;
     const speechActive = useSpeechActivityStore.getState().activeSpeechCount > 0;
+    const vocoderState = useVocoderStore.getState();
+    const vocoderActive = vocoderState.isActive;
+    const vocoderAmplitude = vocoderState.amplitude;
+    const isActive = speechActive || vocoderActive;
 
-    // Fade in/out based on speech activity
-    const visTarget = speechActive ? 1 : 0;
-    smoothVisibility.current += (visTarget - smoothVisibility.current) * (speechActive ? 0.08 : 0.03);
+    // Fade in/out based on speech or vocoder activity
+    const visTarget = isActive ? 1 : 0;
+    smoothVisibility.current += (visTarget - smoothVisibility.current) * (isActive ? 0.08 : 0.03);
     const vis = smoothVisibility.current;
     group.visible = vis > 0.01;
     wireframeMat.opacity = 0.85 * vis;
@@ -260,12 +363,18 @@ export const KraftwerkHead: React.FC<VJSceneProps> = ({ audioRef }) => {
       // Phase oscillator — creates natural mouth cycling during sustained speech
       mouthPhase.current += (mid + high) * 0.3;
 
-      if (speechActive) {
+      if (speechActive || vocoderActive) {
+        // When vocoder is active, use its dedicated amplitude for tighter lip-sync
+        const vocAmp = vocoderActive ? Math.min(1, vocoderAmplitude * 4) : 0;
+
         // Jaw: combine absolute energy (baseline open) with delta (syllable pops)
         // and a phase oscillator for natural cycling
         const syllablePop = Math.min(1, midDelta * 8 + highDelta * 6);
         const phaseModulation = Math.sin(mouthPhase.current) * 0.3 + 0.3;
-        const jawTarget = Math.min(0.35, mid * 0.15 + syllablePop * 0.2 + phaseModulation * 0.12);
+        const speechJaw = Math.min(0.35, mid * 0.15 + syllablePop * 0.2 + phaseModulation * 0.12);
+        // Vocoder jaw driven directly by amplitude — more responsive than frequency analysis
+        const vocoderJaw = Math.min(0.45, vocAmp * 0.35 + Math.sin(mouthPhase.current) * vocAmp * 0.1);
+        const jawTarget = vocoderActive ? Math.max(speechJaw, vocoderJaw) : speechJaw;
         smoothJaw.current += (jawTarget - smoothJaw.current) * 0.5; // fast tracking
         m[MORPH.jawOpen] = smoothJaw.current;
         m[MORPH.mouthLowerDown_L] = smoothJaw.current * 0.4;
@@ -370,6 +479,55 @@ export const KraftwerkHead: React.FC<VJSceneProps> = ({ audioRef }) => {
         m[MORPH.mouthPress_L] *= 0.9;
         m[MORPH.mouthPress_R] *= 0.9;
       }
+    }
+
+    // ── Animate hair spikes — music-reactive extrusion ──
+    const spikeData = spikeDataRef.current;
+    const spikeMesh = spikeMeshRef.current;
+    if (spikeData && spikeMesh) {
+      const { origins, normals, phases, basePositions, count } = spikeData;
+      const posAttr = spikeMesh.geometry.getAttribute('position') as THREE.BufferAttribute;
+
+      for (let i = 0; i < count; i++) {
+        const phase = phases[i];
+        // Each spike responds to a mix of bass, mid, high with its own phase
+        // Creates a wave-like ripple across the scalp
+        const wave = Math.sin(t * 4.0 + phase * 3.0) * 0.5 + 0.5;
+        const bassWave = Math.sin(t * 2.0 + phase) * bass;
+        const midPulse = mid * Math.sin(t * 6.0 + phase * 2.0);
+        const highSparkle = high * (Math.sin(t * 12.0 + phase * 5.0) > 0.3 ? 1.0 : 0.0);
+        const beatPop = beat ? 0.5 : 0;
+
+        // Combine into spike length (0 to ~0.25 units)
+        let length = 0.02 + wave * 0.03 // idle gentle wave
+          + bassWave * 0.12             // bass pumps
+          + midPulse * 0.08             // mid ripples
+          + highSparkle * 0.06          // high frequency sparkle
+          + beatPop * 0.1;             // beat pop
+        length = Math.max(0.01, Math.min(0.3, length));
+
+        // Scale opacity with visibility
+        length *= vis;
+
+        const ox = origins[i * 3];
+        const oy = origins[i * 3 + 1];
+        const oz = origins[i * 3 + 2];
+        const nx = normals[i * 3];
+        const ny = normals[i * 3 + 1];
+        const nz = normals[i * 3 + 2];
+
+        // Base vertex stays at origin
+        basePositions[i * 6] = ox;
+        basePositions[i * 6 + 1] = oy;
+        basePositions[i * 6 + 2] = oz;
+        // Tip vertex extends along normal
+        basePositions[i * 6 + 3] = ox + nx * length;
+        basePositions[i * 6 + 4] = oy + ny * length;
+        basePositions[i * 6 + 5] = oz + nz * length;
+      }
+
+      posAttr.needsUpdate = true;
+      spikeMat.opacity = 0.9 * vis;
     }
 
     // ── Natural head movement — look at random targets ──

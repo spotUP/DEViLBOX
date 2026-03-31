@@ -35,3 +35,4 @@ export { MelodicaControls } from './MelodicaControls';
 export { VitalControls } from './VitalControls';
 export { Odin2Controls } from './Odin2Controls';
 export { SurgeControls } from './SurgeControls';
+export { GranularControls } from './GranularControls';
