@@ -128,7 +128,8 @@ export class SfizzSynthEngine implements DevilboxSynth {
         .replace(/import\.meta\.url/g, `"${baseUrl}sfizz/"`)
         .replace(/export\s+default\s+\w+;?\s*$/, '')
         .replace(/if\s*\(ENVIRONMENT_IS_NODE\)\s*\{[^}]*await\s+import\([^)]*\)[^}]*\}/g, '')
-        .replace(/(wasmMemory=wasmExports\["\w+"\])/, '$1;Module["wasmMemory"]=wasmMemory');
+        .replace(/(wasmMemory\s*=\s*wasmExports\[['"][\w]+['"]\])/, '$1;Module["wasmMemory"]=wasmMemory')
+        .replace(/new\s+URL\(([^,]+),\s*([^)]+)\)\.href/g, '($2 + $1)');
 
       this._worklet = new AudioWorkletNode(rawContext, 'sfizz-processor', {
         outputChannelCount: [2],
@@ -139,6 +140,8 @@ export class SfizzSynthEngine implements DevilboxSynth {
         if (event.data.type === 'ready') {
           this.isInitialized = true;
           this.sendConfig(this.config);
+          // Auto-load default SFZ so the synth produces sound immediately
+          this.loadDefaultSFZ(baseUrl);
           for (const { note, velocity } of this.pendingNotes) {
             this._worklet!.port.postMessage({ type: 'noteOn', note, velocity });
           }
@@ -174,6 +177,25 @@ export class SfizzSynthEngine implements DevilboxSynth {
       if (value !== undefined) {
         this._worklet.port.postMessage({ type: 'setParam', index: i, value });
       }
+    }
+  }
+
+  private async loadDefaultSFZ(baseUrl: string): Promise<void> {
+    try {
+      const [sfzRes, wavRes] = await Promise.all([
+        fetch(`${baseUrl}sfizz/default.sfz`),
+        fetch(`${baseUrl}sfizz/default_sample.wav`),
+      ]);
+      if (!sfzRes.ok || !wavRes.ok) return;
+      const [sfzContent, wavData] = await Promise.all([
+        sfzRes.text(),
+        wavRes.arrayBuffer(),
+      ]);
+      const samples = new Map<string, ArrayBuffer>();
+      samples.set('default_sample.wav', wavData);
+      this.loadSFZ(sfzContent, samples);
+    } catch {
+      // No default SFZ available — user must load one manually
     }
   }
 
