@@ -41,7 +41,7 @@ export interface ImportOptions {
 interface ImportModuleDialogProps {
   isOpen: boolean;
   onClose: () => void;
-  onImport: (info: ModuleInfo, options: ImportOptions) => void;
+  onImport: (info: ModuleInfo, options: ImportOptions) => void | Promise<void>;
   initialFile?: File | null; // Pre-loaded file (from drag-drop)
   companionFiles?: File[];    // Additional files for multi-file formats (e.g. SMUS instruments)
 }
@@ -94,10 +94,12 @@ export const ImportModuleDialog: React.FC<ImportModuleDialogProps> = ({
   initialFile,
   companionFiles,
 }) => {
-  useModalClose({ isOpen, onClose });
   const [moduleInfo, setModuleInfo]     = useState<ModuleInfo | null>(null);
   const [loadedFileName, setLoadedFileName] = useState('');
   const [isLoading, setIsLoading]       = useState(false);
+  const [isImporting, setIsImporting]   = useState(false);
+  const safeClose = useCallback(() => { if (!isImporting) onClose(); }, [isImporting, onClose]);
+  useModalClose({ isOpen, onClose: safeClose });
   const [uadeInitProgress, setUadeInitProgress] = useState(0);
   const [uadeInitPhase, setUadeInitPhase] = useState('');
   const [error, setError]               = useState<string | null>(null);
@@ -428,7 +430,13 @@ export const ImportModuleDialog: React.FC<ImportModuleDialogProps> = ({
         companionMap.set(f.name, await f.arrayBuffer());
       }
     }
-    onImport(moduleInfo, { useLibopenmpt: true, subsong: selectedSubsong, uadeMetadata: uadeMetadata ?? undefined, companionFiles: companionMap });
+    // Block the dialog until import completes so UADE engine is fully ready
+    setIsImporting(true);
+    try {
+      await onImport(moduleInfo, { useLibopenmpt: true, subsong: selectedSubsong, uadeMetadata: uadeMetadata ?? undefined, companionFiles: companionMap });
+    } finally {
+      setIsImporting(false);
+    }
     onClose();
   }, [moduleInfo, isPlaying, isMusicLine, isHively, stopEnginePreview, nativeFmt, isNativeOnly, setFormatEngine, onImport, onClose, selectedSubsong, activeCompanions]);
 
@@ -916,9 +924,9 @@ export const ImportModuleDialog: React.FC<ImportModuleDialogProps> = ({
 
         {/* Footer */}
         <div className="flex justify-end gap-2 px-4 py-3 border-t border-dark-border">
-          <Button variant="ghost" size="sm" onClick={handleClose}>Cancel</Button>
-          <Button variant="primary" size="sm" onClick={handleImport} disabled={!moduleInfo}>
-            Import Module
+          <Button variant="ghost" size="sm" onClick={handleClose} disabled={isImporting}>Cancel</Button>
+          <Button variant="primary" size="sm" onClick={handleImport} disabled={!moduleInfo || isImporting}>
+            {isImporting ? 'Importing…' : 'Import Module'}
           </Button>
         </div>
       </div>
