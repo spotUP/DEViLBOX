@@ -33,6 +33,7 @@ import {
 import {
   deleteNote, deleteAndPull, insertRow, toggleEditMode,
   clearPattern, clearChannel, toggleInsertMode, advanceToNextRow,
+  toggleMaskAtCursor, storeEffectMacro, recallEffectMacro,
   setOctave0, setOctave1, setOctave2, setOctave3, setOctave4, setOctave5, setOctave6, setOctave7,
   setStep0, setStep1, setStep2, setStep3, setStep4, setStep5, setStep6, setStep7, setStep8, setStep9
 } from '@engine/keyboard/commands/edit';
@@ -230,6 +231,27 @@ function initializeRegistry() {
     { name: 'clear_pattern', contexts: ['pattern'], handler: clearPattern, description: 'Clear entire pattern' },
     { name: 'clear_channel', contexts: ['pattern'], handler: clearChannel, description: 'Clear current channel' },
     { name: 'advance_to_next_row', contexts: ['pattern'], handler: advanceToNextRow, description: 'Advance to next row' },
+    { name: 'toggle_mask_at_cursor', contexts: ['pattern'], handler: toggleMaskAtCursor, description: 'Toggle copy/paste mask for current column (IT)' },
+    { name: 'store_effect_macro_0', contexts: ['pattern'], handler: () => storeEffectMacro(0), description: 'Store effect to macro slot 0' },
+    { name: 'store_effect_macro_1', contexts: ['pattern'], handler: () => storeEffectMacro(1), description: 'Store effect to macro slot 1' },
+    { name: 'store_effect_macro_2', contexts: ['pattern'], handler: () => storeEffectMacro(2), description: 'Store effect to macro slot 2' },
+    { name: 'store_effect_macro_3', contexts: ['pattern'], handler: () => storeEffectMacro(3), description: 'Store effect to macro slot 3' },
+    { name: 'store_effect_macro_4', contexts: ['pattern'], handler: () => storeEffectMacro(4), description: 'Store effect to macro slot 4' },
+    { name: 'store_effect_macro_5', contexts: ['pattern'], handler: () => storeEffectMacro(5), description: 'Store effect to macro slot 5' },
+    { name: 'store_effect_macro_6', contexts: ['pattern'], handler: () => storeEffectMacro(6), description: 'Store effect to macro slot 6' },
+    { name: 'store_effect_macro_7', contexts: ['pattern'], handler: () => storeEffectMacro(7), description: 'Store effect to macro slot 7' },
+    { name: 'store_effect_macro_8', contexts: ['pattern'], handler: () => storeEffectMacro(8), description: 'Store effect to macro slot 8' },
+    { name: 'store_effect_macro_9', contexts: ['pattern'], handler: () => storeEffectMacro(9), description: 'Store effect to macro slot 9' },
+    { name: 'recall_effect_macro_0', contexts: ['pattern'], handler: () => recallEffectMacro(0), description: 'Recall effect macro slot 0' },
+    { name: 'recall_effect_macro_1', contexts: ['pattern'], handler: () => recallEffectMacro(1), description: 'Recall effect macro slot 1' },
+    { name: 'recall_effect_macro_2', contexts: ['pattern'], handler: () => recallEffectMacro(2), description: 'Recall effect macro slot 2' },
+    { name: 'recall_effect_macro_3', contexts: ['pattern'], handler: () => recallEffectMacro(3), description: 'Recall effect macro slot 3' },
+    { name: 'recall_effect_macro_4', contexts: ['pattern'], handler: () => recallEffectMacro(4), description: 'Recall effect macro slot 4' },
+    { name: 'recall_effect_macro_5', contexts: ['pattern'], handler: () => recallEffectMacro(5), description: 'Recall effect macro slot 5' },
+    { name: 'recall_effect_macro_6', contexts: ['pattern'], handler: () => recallEffectMacro(6), description: 'Recall effect macro slot 6' },
+    { name: 'recall_effect_macro_7', contexts: ['pattern'], handler: () => recallEffectMacro(7), description: 'Recall effect macro slot 7' },
+    { name: 'recall_effect_macro_8', contexts: ['pattern'], handler: () => recallEffectMacro(8), description: 'Recall effect macro slot 8' },
+    { name: 'recall_effect_macro_9', contexts: ['pattern'], handler: () => recallEffectMacro(9), description: 'Recall effect macro slot 9' },
     
     // === PATTERN NAVIGATION ===
     { name: 'next_pattern', contexts: ['pattern', 'global'], handler: nextPattern, description: 'Go to next pattern' },
@@ -1805,6 +1827,8 @@ export function useGlobalKeyboardHandler(options: UseGlobalKeyboardHandlerOption
       try {
         await schemeLoaderRef.current.loadScheme(activeScheme);
         schemeLoadedRef.current = activeScheme;
+        // Update editor behavior profile to match the new scheme
+        useEditorStore.getState().setActiveBehavior(activeScheme);
         console.log(`[Keyboard] Loaded scheme: ${activeScheme}`);
       } catch (error) {
         console.error(`[Keyboard] Failed to load scheme '${activeScheme}':`, error);
@@ -1813,6 +1837,7 @@ export function useGlobalKeyboardHandler(options: UseGlobalKeyboardHandlerOption
           try {
             await schemeLoaderRef.current.loadScheme('fasttracker2');
             schemeLoadedRef.current = 'fasttracker2';
+            useEditorStore.getState().setActiveBehavior('fasttracker2');
             console.log('[Keyboard] Fell back to fasttracker2 scheme');
           } catch {
             console.error('[Keyboard] Failed to load fallback scheme');

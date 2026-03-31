@@ -136,7 +136,8 @@
       "Ctrl+-": "zoom_out",
       "Ctrl+0": "fit_to_window",
       "Ctrl+1": "reset_zoom",
-      "Ctrl+L": "show_command_palette"
+      "Ctrl+L": "show_command_palette",
+      "Ctrl+K": "toggle_bookmark"
     },
     "mac": {
       "Up": "cursor_up",
@@ -272,7 +273,8 @@
       "Cmd+0": "fit_to_window",
       "Cmd+1": "reset_zoom",
       "Ctrl+1": "reset_zoom",
-      "Ctrl+L": "show_command_palette"
+      "Ctrl+L": "show_command_palette",
+      "Cmd+K": "toggle_bookmark"
     }
   },
   "Ctrl+Enter": "preview_note_at_cursor",

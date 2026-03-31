@@ -36,9 +36,17 @@ export const useEffectInput = (refs: TrackerInputRefs) => {
 
   const pattern = patterns[currentPatternIndex];
 
-  // Advance cursor by editStep (shared helper)
-  const advanceByEditStep = useCallback(() => {
-    if (editStep > 0 && !isPlaying) {
+  // Advance cursor by editStep — only if the behavior says so for this column type
+  const advanceIfAllowed = useCallback((columnType: 'instrument' | 'volume' | 'effTyp' | 'effParam' | 'effTyp2' | 'effParam2' | 'flag1' | 'flag2' | 'probability') => {
+    if (editStep <= 0 || isPlaying) return;
+    const behavior = useEditorStore.getState().activeBehavior;
+    // Determine whether this column type should trigger advancement
+    let shouldAdvance = true;
+    if (columnType === 'instrument') shouldAdvance = behavior.advanceOnInstrument;
+    else if (columnType === 'volume') shouldAdvance = behavior.advanceOnVolume;
+    else if (columnType.startsWith('eff')) shouldAdvance = behavior.advanceOnEffect;
+    // flag/probability always advance (DEViLBOX-specific columns)
+    if (shouldAdvance) {
       moveCursorToRow((cursorRef.current.rowIndex + editStep) % pattern.length);
     }
   }, [editStep, isPlaying, moveCursorToRow, cursorRef, pattern]);
@@ -70,7 +78,7 @@ export const useEffectInput = (refs: TrackerInputRefs) => {
 
         if (newValue > 128) newValue = 128;
         setCell(cursorRef.current.channelIndex, cursorRef.current.rowIndex, { instrument: newValue });
-        advanceByEditStep();
+        advanceIfAllowed("instrument");
         return true;
       }
 
@@ -85,7 +93,7 @@ export const useEffectInput = (refs: TrackerInputRefs) => {
             let newValue = (vol1Key << 4) | (currentValue & 0x0F);
             if (newValue >= 0x51 && newValue <= 0x5F) newValue = 0x50;
             setCell(cursorRef.current.channelIndex, cursorRef.current.rowIndex, { volume: newValue });
-            advanceByEditStep();
+            advanceIfAllowed("volume");
             return true;
           }
         } else {
@@ -102,7 +110,7 @@ export const useEffectInput = (refs: TrackerInputRefs) => {
 
             if (newValue >= 0x51 && newValue <= 0x5F) newValue = 0x50;
             setCell(cursorRef.current.channelIndex, cursorRef.current.rowIndex, { volume: newValue });
-            advanceByEditStep();
+            advanceIfAllowed("volume");
             return true;
           }
         }
@@ -120,7 +128,7 @@ export const useEffectInput = (refs: TrackerInputRefs) => {
             effTyp: effKey,
             effect: effectString
           });
-          advanceByEditStep();
+          advanceIfAllowed("effTyp");
           return true;
         }
       }
@@ -146,7 +154,7 @@ export const useEffectInput = (refs: TrackerInputRefs) => {
           eff: newValue,
           effect: effectString
         });
-        advanceByEditStep();
+        advanceIfAllowed("effParam");
         return true;
       }
 
@@ -162,7 +170,7 @@ export const useEffectInput = (refs: TrackerInputRefs) => {
             effTyp2: effKey,
             effect2: effectString
           });
-          advanceByEditStep();
+          advanceIfAllowed("effTyp2");
           return true;
         }
       }
@@ -174,31 +182,31 @@ export const useEffectInput = (refs: TrackerInputRefs) => {
         if (keyLower === 'a') {
           e.preventDefault();
           setCell(cursorRef.current.channelIndex, cursorRef.current.rowIndex, { [flagField]: 1 });
-          advanceByEditStep();
+          advanceIfAllowed("flag1");
           return true;
         }
         if (keyLower === 's') {
           e.preventDefault();
           setCell(cursorRef.current.channelIndex, cursorRef.current.rowIndex, { [flagField]: 2 });
-          advanceByEditStep();
+          advanceIfAllowed("flag1");
           return true;
         }
         if (keyLower === 'm') {
           e.preventDefault();
           setCell(cursorRef.current.channelIndex, cursorRef.current.rowIndex, { [flagField]: 3 });
-          advanceByEditStep();
+          advanceIfAllowed("flag1");
           return true;
         }
         if (keyLower === 'h') {
           e.preventDefault();
           setCell(cursorRef.current.channelIndex, cursorRef.current.rowIndex, { [flagField]: 4 });
-          advanceByEditStep();
+          advanceIfAllowed("flag1");
           return true;
         }
         if (key === '0' || key === '.') {
           e.preventDefault();
           setCell(cursorRef.current.channelIndex, cursorRef.current.rowIndex, { [flagField]: 0 });
-          advanceByEditStep();
+          advanceIfAllowed("flag1");
           return true;
         }
       }
@@ -224,7 +232,7 @@ export const useEffectInput = (refs: TrackerInputRefs) => {
           eff2: newValue,
           effect2: effectString
         });
-        advanceByEditStep();
+        advanceIfAllowed("effParam2");
         return true;
       }
 
@@ -244,13 +252,13 @@ export const useEffectInput = (refs: TrackerInputRefs) => {
         newValue = Math.min(99, Math.max(0, newValue));
 
         setCell(cursorRef.current.channelIndex, cursorRef.current.rowIndex, { probability: newValue });
-        advanceByEditStep();
+        advanceIfAllowed("probability");
         return true;
       }
 
       return false;
     },
-    [recordMode, pattern, setCell, advanceByEditStep, cursorRef]
+    [recordMode, pattern, setCell, advanceIfAllowed, cursorRef]
   );
 
   return useMemo(() => ({ handleKeyDown }), [handleKeyDown]);

@@ -1,7 +1,7 @@
 /**
  * useNoteInput - QWERTY piano note entry, octave changes, held note tracking.
- * Handles piano key mapping, note preview/release, CapsLock note-off,
- * F1-F7 octave selection, numpad octave changes, and edit step cycling.
+ * Handles piano key mapping, note preview/release, note-off entry,
+ * octave selection, and edit step cycling — all behavior-aware per scheme.
  */
 
 import { useCallback, useMemo, useRef } from 'react';
@@ -16,6 +16,11 @@ import { NOTE_MAP, type HeldNote, type TrackerInputRefs } from './inputConstants
 import { validateEdit } from '@/lib/import/formatConstraints';
 import { notify } from '@/stores/useNotificationStore';
 import type { TrackerFormat } from '@/engine/TrackerReplayer';
+
+// XM note values for IT-style note types
+const XM_NOTE_OFF = 97;
+const XM_NOTE_CUT = 254;   // ^^^ (IT note cut)
+const XM_NOTE_FADE = 255;  // ~~~ (IT note fade)
 
 export const useNoteInput = (refs: TrackerInputRefs) => {
   const { cursorRef } = refs;
@@ -167,7 +172,7 @@ export const useNoteInput = (refs: TrackerInputRefs) => {
     [instruments, setKeyOff, recReleaseEnabled, recordMode, isPlaying, setCell, playbackRow]
   );
 
-  // Enter note into cell
+  // Enter note into cell (respects noteColumnIndex for chord columns)
   const enterNote = useCallback(
     (note: string, octave: number, targetChannelOverride?: number) => {
       const noteStr = `${note}-${octave}`;
@@ -183,15 +188,29 @@ export const useNoteInput = (refs: TrackerInputRefs) => {
         : getTargetChannel();
 
       const targetRow = (recordMode && isPlaying) ? playbackRow : cursorRef.current.rowIndex;
+      const nci = cursorRef.current.noteColumnIndex ?? 0;
 
       if (insertMode && !isPlaying) {
         insertRow(targetChannel, targetRow);
       }
 
-      setCell(targetChannel, targetRow, {
-        note: xmNote,
-        instrument: currentInstrumentId !== null ? currentInstrumentId : undefined,
-      });
+      // Write to the correct note column field based on noteColumnIndex
+      const cellUpdate: Partial<import('@typedefs').TrackerCell> = {};
+      if (nci === 0) {
+        cellUpdate.note = xmNote;
+        cellUpdate.instrument = currentInstrumentId !== null ? currentInstrumentId : undefined;
+      } else if (nci === 1) {
+        cellUpdate.note2 = xmNote;
+        cellUpdate.instrument2 = currentInstrumentId !== null ? currentInstrumentId : undefined;
+      } else if (nci === 2) {
+        cellUpdate.note3 = xmNote;
+        cellUpdate.instrument3 = currentInstrumentId !== null ? currentInstrumentId : undefined;
+      } else {
+        cellUpdate.note4 = xmNote;
+        cellUpdate.instrument4 = currentInstrumentId !== null ? currentInstrumentId : undefined;
+      }
+
+      setCell(targetChannel, targetRow, cellUpdate);
 
       // Format constraint validation — warn if edit exceeds source format limits
       const fmt = pattern.importMetadata?.sourceFormat as TrackerFormat | undefined;
@@ -217,9 +236,20 @@ export const useNoteInput = (refs: TrackerInputRefs) => {
         }
       }
 
-      // Chord entry mode: advance to next channel instead of next row
+      // Chord entry mode: advance to next note column, then next channel
       const chordEntry = useUIStore.getState().chordEntryMode;
       if (chordEntry && !isPlaying && targetChannelOverride === undefined) {
+        const ch = pattern.channels[cursorRef.current.channelIndex];
+        const totalNoteCols = ch?.channelMeta?.noteCols ?? 1;
+        const nextNci = nci + 1;
+        if (nextNci < totalNoteCols) {
+          // Advance to next note column within the same track
+          useCursorStore.getState().moveCursorToChannelAndColumn(
+            cursorRef.current.channelIndex, 'note', nextNci
+          );
+          return;
+        }
+        // All note columns used — fall through to next channel
         const channelCount = pattern.channels.length;
         const nextChannel = cursorRef.current.channelIndex + 1;
         if (nextChannel < channelCount) {
@@ -241,57 +271,125 @@ export const useNoteInput = (refs: TrackerInputRefs) => {
       if ((e as any).__handled) return false;
       const key = e.key;
       const keyLower = key.toLowerCase();
+      const behavior = useEditorStore.getState().activeBehavior;
 
-      // CapsLock: Enter note-off (XM note 97)
-      if (key === 'CapsLock') {
-        e.preventDefault();
-        if (cursorRef.current.columnType === 'note') {
+      // ── Note-off entry (behavior-aware) ──────────────────────────────────
+      // FT2: CapsLock = note off.  IT: ` = note off, Shift+` = note fade, 1 = note cut
+      if (cursorRef.current.columnType === 'note') {
+        // Note Off (===)
+        if (
+          (behavior.noteOff.noteOffKey === 'CapsLock' && key === 'CapsLock') ||
+          (behavior.noteOff.noteOffKey === '`' && key === '`' && !e.shiftKey)
+        ) {
+          e.preventDefault();
           const targetRow = (recordMode && isPlaying) ? playbackRow : cursorRef.current.rowIndex;
-          setCell(cursorRef.current.channelIndex, targetRow, { note: 97 });
-          if (editStep > 0 && !isPlaying) {
-            moveCursorToRow((cursorRef.current.rowIndex + editStep) % pattern.length);
+          const nci = cursorRef.current.noteColumnIndex ?? 0;
+          const noteField = nci === 0 ? 'note' : nci === 1 ? 'note2' : nci === 2 ? 'note3' : 'note4';
+          if (recordMode) {
+            setCell(cursorRef.current.channelIndex, targetRow, { [noteField]: XM_NOTE_OFF });
+            if (editStep > 0 && !isPlaying) {
+              moveCursorToRow((cursorRef.current.rowIndex + editStep) % pattern.length);
+            }
           }
+          return true;
         }
-        return true;
+
+        // Note Cut (^^^ — IT/OpenMPT)
+        if (behavior.noteOff.noteCutKey === '1' && key === '1' && !e.ctrlKey && !e.altKey && !e.metaKey) {
+          e.preventDefault();
+          const targetRow = (recordMode && isPlaying) ? playbackRow : cursorRef.current.rowIndex;
+          const nci = cursorRef.current.noteColumnIndex ?? 0;
+          const noteField = nci === 0 ? 'note' : nci === 1 ? 'note2' : nci === 2 ? 'note3' : 'note4';
+          if (recordMode) {
+            setCell(cursorRef.current.channelIndex, targetRow, { [noteField]: XM_NOTE_CUT });
+            if (editStep > 0 && !isPlaying) {
+              moveCursorToRow((cursorRef.current.rowIndex + editStep) % pattern.length);
+            }
+          }
+          return true;
+        }
+
+        // Note Fade (~~~ — IT)
+        if (behavior.noteOff.noteFadeKey === 'Shift+`' && key === '~' && e.shiftKey) {
+          e.preventDefault();
+          const targetRow = (recordMode && isPlaying) ? playbackRow : cursorRef.current.rowIndex;
+          const nci = cursorRef.current.noteColumnIndex ?? 0;
+          const noteField = nci === 0 ? 'note' : nci === 1 ? 'note2' : nci === 2 ? 'note3' : 'note4';
+          if (recordMode) {
+            setCell(cursorRef.current.channelIndex, targetRow, { [noteField]: XM_NOTE_FADE });
+            if (editStep > 0 && !isPlaying) {
+              moveCursorToRow((cursorRef.current.rowIndex + editStep) % pattern.length);
+            }
+          }
+          return true;
+        }
       }
 
-      // F1-F7: Select octave 1-7
-      if (key >= 'F1' && key <= 'F7') {
-        e.preventDefault();
-        const octave = parseInt(key.substring(1));
-        setCurrentOctave(octave);
-        useUIStore.getState().setStatusMessage(`OCTAVE ${octave}`);
-        return true;
+      // ── Octave selection (behavior-aware) ────────────────────────────────
+      if (behavior.octaveSelectMode === 'fkeys-direct') {
+        // FT2/OpenMPT: F1-F7 set octave directly
+        if (key >= 'F1' && key <= 'F7' && !e.shiftKey && !e.ctrlKey && !e.altKey) {
+          e.preventDefault();
+          const octave = parseInt(key.substring(1));
+          if (octave >= behavior.octaveRange[0] && octave <= behavior.octaveRange[1]) {
+            setCurrentOctave(octave);
+            useUIStore.getState().setStatusMessage(`OCTAVE ${octave}`);
+          }
+          return true;
+        }
+      } else if (behavior.octaveSelectMode === 'fkeys-lohi') {
+        // ProTracker: F1 = low octave, F2 = high octave
+        if (key === 'F1' && !e.shiftKey && !e.ctrlKey && !e.altKey) {
+          e.preventDefault();
+          setCurrentOctave(behavior.octaveRange[0]);
+          useUIStore.getState().setStatusMessage(`LOW OCTAVE (${behavior.octaveRange[0]})`);
+          return true;
+        }
+        if (key === 'F2' && !e.shiftKey && !e.ctrlKey && !e.altKey) {
+          e.preventDefault();
+          setCurrentOctave(behavior.octaveRange[1]);
+          useUIStore.getState().setStatusMessage(`HIGH OCTAVE (${behavior.octaveRange[1]})`);
+          return true;
+        }
       }
+      // 'numpad-only': no F-key octave selection — numpad +/- handled below
 
-      // FT2: Grave key (`) - Cycle edit step (0-16)
-      if (key === '`' || key === '~') {
-        e.preventDefault();
-        let newStep: number;
-        if (e.shiftKey) {
-          newStep = editStep === 0 ? 16 : editStep - 1;
+      // ── Edit step cycling (behavior-aware) ───────────────────────────────
+      if (behavior.editStepCycleKey === '`' && (key === '`' || key === '~')) {
+        // Skip if this was consumed as IT note-off above
+        if (behavior.noteOff.noteOffKey === '`') {
+          // Already handled above — don't also cycle edit step
         } else {
-          newStep = editStep === 16 ? 0 : editStep + 1;
+          e.preventDefault();
+          const [minStep, maxStep] = behavior.editStepRange;
+          let newStep: number;
+          if (e.shiftKey) {
+            newStep = editStep <= minStep ? maxStep : editStep - 1;
+          } else {
+            newStep = editStep >= maxStep ? minStep : editStep + 1;
+          }
+          setEditStep(newStep);
+          useUIStore.getState().setStatusMessage(`EDIT STEP ${newStep}`);
+          return true;
         }
-        setEditStep(newStep);
-        useUIStore.getState().setStatusMessage(`EDIT STEP ${newStep}`);
-        return true;
       }
 
-      // FT2: Numpad +/- to change octave
-      if (e.code === 'NumpadAdd' || (key === '+' && !e.shiftKey && e.location === 3)) {
-        e.preventDefault();
-        if (currentOctave < 7) {
-          setCurrentOctave(currentOctave + 1);
+      // Numpad +/- for octave (all schemes except PT where numpad selects samples)
+      if (!behavior.ptNumpadSampleSelect) {
+        if (e.code === 'NumpadAdd' || (key === '+' && !e.shiftKey && e.location === 3)) {
+          e.preventDefault();
+          if (currentOctave < behavior.octaveRange[1]) {
+            setCurrentOctave(currentOctave + 1);
+          }
+          return true;
         }
-        return true;
-      }
-      if (e.code === 'NumpadSubtract' || (key === '-' && e.location === 3)) {
-        e.preventDefault();
-        if (currentOctave > 1) {
-          setCurrentOctave(currentOctave - 1);
+        if (e.code === 'NumpadSubtract' || (key === '-' && e.location === 3)) {
+          e.preventDefault();
+          if (currentOctave > behavior.octaveRange[0]) {
+            setCurrentOctave(currentOctave - 1);
+          }
+          return true;
         }
-        return true;
       }
 
       // Note Entry (Piano Keys)
@@ -307,6 +405,23 @@ export const useNoteInput = (refs: TrackerInputRefs) => {
           const heldNote = heldNotesRef.current.get(keyLower);
           const targetChannel = heldNote?.channelIndex;
           enterNote(note, octave, targetChannel);
+
+          // Shift+Note: auto-advance to next note column for chord entry
+          if (e.shiftKey && !isPlaying && targetChannel === undefined) {
+            const chIdx = cursorRef.current.channelIndex;
+            const ch = pattern.channels[chIdx];
+            const nci = cursorRef.current.noteColumnIndex ?? 0;
+            const totalNoteCols = ch?.channelMeta?.noteCols ?? 1;
+            if (nci + 1 < totalNoteCols) {
+              // Move to next existing note column
+              useCursorStore.getState().moveCursorToChannelAndColumn(chIdx, 'note', nci + 1);
+            } else if (totalNoteCols < 4) {
+              // Auto-expand: add a new note column
+              const newNoteCols = totalNoteCols + 1;
+              useTrackerStore.getState().setChannelMeta(chIdx, { noteCols: newNoteCols });
+              useCursorStore.getState().moveCursorToChannelAndColumn(chIdx, 'note', nci + 1);
+            }
+          }
         }
         return true;
       }

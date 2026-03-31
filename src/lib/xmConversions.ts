@@ -59,10 +59,12 @@ export function stringNoteToXM(note: string | null): number {
 }
 
 // Pre-computed XM note → display string lookup (avoids template literal per call)
-// Index 0 = '...', 1-96 = note strings, 97 = '==='
-const XM_NOTE_STRING_LOOKUP: string[] = new Array(98);
+// Index 0 = '...', 1-96 = note strings, 97 = '===', 254 = '^^^', 255 = '~~~'
+const XM_NOTE_STRING_LOOKUP: string[] = new Array(256);
 XM_NOTE_STRING_LOOKUP[0] = '...';
 XM_NOTE_STRING_LOOKUP[97] = '===';
+XM_NOTE_STRING_LOOKUP[254] = '^^^';  // IT note cut
+XM_NOTE_STRING_LOOKUP[255] = '~~~';  // IT note fade
 for (let i = 1; i <= 96; i++) {
   const noteIndex = i - 1;
   const octave = Math.floor(noteIndex / 12);
