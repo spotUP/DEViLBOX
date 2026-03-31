@@ -263,6 +263,7 @@ export interface InstrumentConfig {
   setbfree?: import('../../engine/setbfree/SetBfreeSynth').SetBfreeConfig;
   synthv1?: import('../../engine/synthv1/SynthV1Synth').SynthV1Config;
   monique?: import('../../engine/monique/MoniqueSynth').MoniqueConfig;
+  vl1?: import('../../engine/vl1/VL1Synth').VL1Config;
   talNoizeMaker?: import('../../engine/tal-noizemaker/TalNoizeMakerSynth').TalNoizeMakerConfig;
   aeolus?: import('../../engine/aeolus/AeolusSynth').AeolusConfig;
   fluidsynth?: import('../../engine/fluidsynth/FluidSynthSynth').FluidSynthConfig;

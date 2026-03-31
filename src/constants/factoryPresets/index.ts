@@ -129,6 +129,7 @@ export const FACTORY_PRESETS: InstrumentPreset['config'][] = [
   { type: 'synth' as const, name: 'Odin2 Init', synthType: 'Odin2' as const, volume: -8, pan: 0, effects: [] },
   { type: 'synth' as const, name: 'Amsynth Init', synthType: 'Amsynth' as const, volume: -8, pan: 0, effects: [] },
   { type: 'synth' as const, name: 'Monique Init', synthType: 'Monique' as const, volume: -8, pan: 0, effects: [] },
+  { type: 'synth' as const, name: 'VL-1 Piano', synthType: 'VL1' as const, volume: -6, pan: 0, effects: [] },
   { type: 'synth' as const, name: 'Sorcer Init', synthType: 'Sorcer' as const, volume: -8, pan: 0, effects: [] },
   { type: 'synth' as const, name: 'SuperCollider Init', synthType: 'SuperCollider' as const, volume: -8, pan: 0, effects: [] },
   { type: 'synth' as const, name: 'VFX Init', synthType: 'VFX' as const, volume: -8, pan: 0, effects: [] },

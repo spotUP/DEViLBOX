@@ -93,7 +93,7 @@ export const POLYSYNTH_PRESETS: SynthPreset[] = [
     category: 'lead',
     config: {
       voiceCount: 6,
-      voiceType: 'AMSynth',
+      voiceType: 'ToneAM',
       stealMode: 'oldest',
       oscillator: { type: 'sawtooth', detune: 5, octave: 0 },
       envelope: { attack: 20, decay: 600, sustain: 0, release: 200 },

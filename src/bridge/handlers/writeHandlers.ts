@@ -1766,7 +1766,7 @@ export async function exportWav(params: Record<string, unknown>): Promise<Record
     // Sampler/Player are excluded: Tone.Offline never loads their sample URLs,
     // so they produce silence. Songs using these must use live capture instead.
     const OFFLINE_SYNTH_TYPES = new Set([
-      'MonoSynth', 'PolySynth', 'DuoSynth', 'FMSynth', 'AMSynth',
+      'MonoSynth', 'PolySynth', 'DuoSynth', 'FMSynth', 'ToneAM',
       'MembraneSynth', 'MetalSynth', 'NoiseSynth', 'PluckSynth',
     ]);
     // Check format store for native engines that bypass Tone.js entirely

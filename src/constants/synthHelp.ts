@@ -103,7 +103,7 @@ to modulate another (carrier). Famous for electric pianos, bells, and metallic s
     trackerUsage: 'Modulation index can be automated with effect commands for evolving timbres.',
   },
 
-  AMSynth: {
+  ToneAM: {
     overview: `Amplitude Modulation synthesis creates tremolo and ring modulation effects.
 One oscillator modulates the volume of another, creating characteristic sidebands.`,
     keyParameters: [

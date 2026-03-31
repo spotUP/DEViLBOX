@@ -346,24 +346,45 @@ async function loadWithNativeParser(
       const convertedPatterns: unknown[][] = xrns.patterns.map((p, patIdx) => {
         const rows: unknown[] = [];
         let notesInPattern = 0;
+        // Track max note columns per channel across all rows
+        const maxNoteColsPerChannel: number[] = new Array(p.tracks.length).fill(1);
         for (let row = 0; row < p.lines; row++) {
           const rowData: unknown[] = [];
           for (let ch = 0; ch < p.tracks.length; ch++) {
             const line = p.tracks[ch].lines.get(row);
-            const noteCol = line?.noteColumns[0];
+            const noteColumns = line?.noteColumns ?? [];
+            const noteCol = noteColumns[0];
             const note = noteCol?.note ? xrnsNoteToMidi(noteCol.note) : 0;
             if (note > 0) notesInPattern++;
-            rowData.push({
+
+            const cellData: Record<string, number> = {
               note,
-              // XRNS uses 0-based instrument indices, DEViLBOX uses 1-based
               instrument: noteCol?.instrument !== undefined ? noteCol.instrument + 1 : 0,
               volume: noteCol?.volume ?? 0,
               effTyp: 0,
               eff: 0,
-            });
+            };
+
+            // Map extra note columns (up to 4 total)
+            for (let nc = 1; nc < Math.min(noteColumns.length, 4); nc++) {
+              const col = noteColumns[nc];
+              if (!col) continue;
+              const extraNote = col.note ? xrnsNoteToMidi(col.note) : 0;
+              if (extraNote > 0 || col.instrument !== undefined) {
+                const suffix = nc + 1; // note2, note3, note4
+                cellData[`note${suffix}`] = extraNote;
+                if (col.instrument !== undefined) cellData[`instrument${suffix}`] = col.instrument + 1;
+                if (col.volume !== undefined) cellData[`volume${suffix}`] = col.volume;
+                if (nc + 1 > maxNoteColsPerChannel[ch]) maxNoteColsPerChannel[ch] = nc + 1;
+              }
+            }
+
+            rowData.push(cellData);
           }
           rows.push(rowData);
         }
+        // Store maxNoteCols info for channel metadata (attach to first row for later use)
+        (rows as any).__maxNoteCols = maxNoteColsPerChannel;
         if (patIdx < 5 || notesInPattern > 0) {
           console.log(`[ModuleLoader] Pattern ${patIdx}: ${p.lines} lines, ${p.tracks.length} tracks, ${notesInPattern} notes`);
         }

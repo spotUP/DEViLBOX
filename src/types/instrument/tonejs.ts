@@ -306,7 +306,7 @@ export interface SuperSawConfig {
  */
 export interface PolySynthConfig {
   voiceCount: number;           // 1-16 max simultaneous voices
-  voiceType: 'Synth' | 'FMSynth' | 'AMSynth';
+  voiceType: 'Synth' | 'FMSynth' | 'ToneAM';
   stealMode: 'oldest' | 'lowest' | 'highest';
   oscillator: OscillatorConfig;
   envelope: EnvelopeConfig;

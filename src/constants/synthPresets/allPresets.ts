@@ -48,7 +48,7 @@ export function getPresetsForSynthType(synthType: SynthType): SynthPreset[] {
       return MONO_SYNTH_PRESETS;
     case 'FMSynth':
       return FM_SYNTH_PRESETS;
-    case 'AMSynth':
+    case 'ToneAM':
       return AM_SYNTH_PRESETS;
     case 'WobbleBass':
       return WOBBLE_BASS_PRESETS;
@@ -79,7 +79,7 @@ export const ALL_PRESETS: Record<string, SynthPreset[]> = {
   SpaceLaser: SPACE_LASER_PRESETS,
   MonoSynth: MONO_SYNTH_PRESETS,
   FMSynth: FM_SYNTH_PRESETS,
-  AMSynth: AM_SYNTH_PRESETS,
+  ToneAM: AM_SYNTH_PRESETS,
   WobbleBass: WOBBLE_BASS_PRESETS,
   HarmonicSynth: HARMONIC_SYNTH_PRESETS,
   Synare: SYNARE_PRESETS,

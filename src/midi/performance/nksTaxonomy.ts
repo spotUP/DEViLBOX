@@ -207,7 +207,7 @@ export const SYNTH_TYPE_TO_NKS: Partial<Record<SynthType, NKSTypeMapping>> = {
   // Classic synths
   MonoSynth:      { type: 'Synth Lead', subType: 'Classic Mono', characters: ['Analog', 'Monophonic'] },
   PolySynth:      { type: 'Synth Lead', subType: 'Classic Poly', characters: ['Analog'] },
-  AMSynth:        { type: 'Synth Lead', subType: 'Classic Poly', characters: ['Analog'] },
+  ToneAM:        { type: 'Synth Lead', subType: 'Classic Poly', characters: ['Analog'] },
   DuoSynth:       { type: 'Synth Lead', subType: 'Classic Poly', characters: ['Analog', 'Layered'] },
   Synth:          { type: 'Synth Lead', subType: 'Classic Poly', characters: ['Digital'] },
 

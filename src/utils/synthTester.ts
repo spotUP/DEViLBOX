@@ -389,7 +389,7 @@ export async function testToneSynths(): Promise<SynthTestSummary> {
     'MonoSynth',
     'DuoSynth',
     'FMSynth',
-    'AMSynth',
+    'ToneAM',
     'PluckSynth',
     'MetalSynth',
     'MembraneSynth',

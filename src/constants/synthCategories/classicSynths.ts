@@ -46,8 +46,8 @@ export const classicSynthEntries: Record<string, SynthInfo> = {
     icon: 'Radio',
     color: 'text-accent-highlight',
   },
-  AMSynth: {
-    type: 'AMSynth',
+  ToneAM: {
+    type: 'ToneAM',
     name: 'AM Synth',
     shortName: 'AM',
     description: 'Amplitude modulation synth with ring modulation character',

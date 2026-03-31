@@ -95,12 +95,12 @@ function pianoPreset(program: number, id: number): InstrumentConfig {
   };
 }
 
-/** Chromatic percussion (8–15): AMSynth — bell/mallet character */
+/** Chromatic percussion (8–15): ToneAM — bell/mallet character */
 function chromaticPercPreset(program: number, id: number): InstrumentConfig {
   return {
     ...BASE, id,
     name: GM2_NAMES[program],
-    synthType: 'AMSynth',
+    synthType: 'ToneAM',
     oscillator: osc('sine'),
     envelope: env(1, 400, 0, 200),
   };
