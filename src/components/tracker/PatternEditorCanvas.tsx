@@ -327,8 +327,11 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
       } else {
         const effectCols = channel?.channelMeta?.effectCols ?? 2;
         const effectWidth = effectCols * (CW * 3 + 4);
+        const noteCols = channel?.channelMeta?.noteCols ?? 1;
+        const extraNoteColWidth = (noteCols - 1) * (noteWidth + CW * 4 + 12);
         const paramWidth = CW * 4 + 8
           + effectWidth
+          + extraNoteColWidth
           + (showAcid ? CW * 2 + 8 : 0)
           + (showProb ? CW * 2 + 4 : 0);
         const chWidth = noteWidth + paramWidth + (mobileCanvas ? 96 : 60) + autoLaneExtra(ch);
@@ -472,25 +475,45 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
     if (isCollapsed) return { rowIndex: Math.max(0, Math.min(rowIndex, pattern.length - 1)), channelIndex, columnType: 'note' };
 
     let columnType: CursorPosition['columnType'] = 'note';
+    let noteColumnIndex = 0;
     // Calculate widths for the current channel's schema (same as getParamCanvas)
     const noteWidth = CHAR_WIDTH * 3 + 4;
     const cell = pattern.channels[channelIndex]?.rows[0];
+    const channel = pattern.channels[channelIndex];
     const hasAcid = cell?.flag1 !== undefined || cell?.flag2 !== undefined;
     const hasProb = cell?.probability !== undefined;
+    const totalNoteCols = channel?.channelMeta?.noteCols ?? 1;
+    const NOTE_COL_GROUP_W = noteWidth + 4 + CHAR_WIDTH * 2 + 4 + CHAR_WIDTH * 2 + 4; // note+inst+vol+gaps
+    const allNoteColsEnd = NOTE_COL_GROUP_W * totalNoteCols;
 
-    if (localX >= noteWidth + 4) {
-      const xInParams = localX - (noteWidth + 8);
-      if (xInParams < CHAR_WIDTH * 2 + 4) columnType = 'instrument';
-      else if (xInParams < CHAR_WIDTH * 4 + 8) columnType = 'volume';
-      else if (xInParams < CHAR_WIDTH * 7 + 12) columnType = 'effTyp';
-      else if (xInParams < CHAR_WIDTH * 10 + 16) columnType = 'effTyp2';
-      else if (hasAcid && xInParams < CHAR_WIDTH * 12 + 24) columnType = xInParams < CHAR_WIDTH * 11 + 20 ? 'flag1' : 'flag2';
-      else if (hasProb) columnType = 'probability';
+    if (localX < allNoteColsEnd) {
+      // Inside a note column group
+      noteColumnIndex = Math.min(totalNoteCols - 1, Math.floor(localX / NOTE_COL_GROUP_W));
+      const xInGroup = localX - noteColumnIndex * NOTE_COL_GROUP_W;
+      if (xInGroup < noteWidth) columnType = 'note';
+      else if (xInGroup < noteWidth + 4 + CHAR_WIDTH * 2) columnType = 'instrument';
+      else columnType = 'volume';
+    } else {
+      // After all note columns — effects, flags, probability
+      const xInParams = localX - allNoteColsEnd;
+      const effectCols = channel?.channelMeta?.effectCols ?? 2;
+      const effectWidth = effectCols * (CHAR_WIDTH * 3 + 4);
+      if (xInParams < effectWidth) {
+        const effCol = Math.floor(xInParams / (CHAR_WIDTH * 3 + 4));
+        columnType = effCol === 0 ? 'effTyp' : 'effTyp2';
+      } else if (hasAcid && xInParams < effectWidth + CHAR_WIDTH * 2 + 8) {
+        columnType = xInParams < effectWidth + CHAR_WIDTH + 4 ? 'flag1' : 'flag2';
+      } else if (hasProb) {
+        columnType = 'probability';
+      } else {
+        columnType = 'effTyp';
+      }
     }
 
     return {
       rowIndex: Math.max(0, Math.min(rowIndex, pattern.length - 1)),
       channelIndex,
+      noteColumnIndex,
       columnType
     };
   }, [pattern, dimensions.height, scrollLeft, channelOffsets, channelWidths, numChannels]);
@@ -640,7 +663,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
       cursorStore.updateSelection(cell.channelIndex, cell.rowIndex);
     } else {
       cursorStore.moveCursorToRow(cell.rowIndex);
-      cursorStore.moveCursorToChannelAndColumn(cell.channelIndex, cell.columnType as any);
+      cursorStore.moveCursorToChannelAndColumn(cell.channelIndex, cell.columnType as any, cell.noteColumnIndex);
       cursorStore.startSelection();
     }
 
@@ -675,7 +698,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
 
     const cursorStore = useCursorStore.getState();
     cursorStore.moveCursorToRow(cell.rowIndex);
-    cursorStore.moveCursorToChannelAndColumn(cell.channelIndex, cell.columnType as any);
+    cursorStore.moveCursorToChannelAndColumn(cell.channelIndex, cell.columnType as any, cell.noteColumnIndex);
     cursorStore.startSelection();
     
     haptics.heavy();
@@ -1326,39 +1349,61 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
     return base;
   }, [isFormatMode, formatColumns]);
 
+  // Per-pattern snapshot cache for worker bridge path
+  const workerPatternCacheRef = useRef(new Map<unknown, PatternSnapshot>());
+
   const snapshotPatterns = useCallback((): PatternSnapshot[] => {
     const state = useTrackerStore.getState();
-    return state.patterns.map((p) => ({
-      id: p.id,
-      length: p.length,
-      channels: p.channels.map((ch): ChannelSnapshot => ({
-        id: ch.id,
-        name: ch.name,
-        color: ch.color ?? undefined,
-        muted: ch.muted,
-        solo: ch.solo,
-        collapsed: ch.collapsed,
-        effectCols: ch.channelMeta?.effectCols ?? 2,
-        rows: ch.rows.map((cell): CellSnapshot => ({
-          note: cell.note ?? 0,
-          instrument: cell.instrument ?? 0,
-          volume: cell.volume ?? 0,
-          effTyp: cell.effTyp ?? 0,
-          eff: cell.eff ?? 0,
-          effTyp2: cell.effTyp2 ?? 0,
-          eff2: cell.eff2 ?? 0,
-          effTyp3: cell.effTyp3,
-          eff3: cell.eff3,
-          effTyp4: cell.effTyp4,
-          eff4: cell.eff4,
-          effTyp5: cell.effTyp5,
-          eff5: cell.eff5,
-          flag1: cell.flag1,
-          flag2: cell.flag2,
-          probability: cell.probability,
+    const cache = workerPatternCacheRef.current;
+    const result = state.patterns.map((p) => {
+      const cached = cache.get(p);
+      if (cached) return cached;
+      const snap: PatternSnapshot = {
+        id: p.id,
+        length: p.length,
+        channels: p.channels.map((ch): ChannelSnapshot => ({
+          id: ch.id,
+          name: ch.name,
+          color: ch.color ?? undefined,
+          muted: ch.muted,
+          solo: ch.solo,
+          collapsed: ch.collapsed,
+          effectCols: ch.channelMeta?.effectCols ?? 2,
+          noteCols: ch.channelMeta?.noteCols,
+          rows: ch.rows.map((cell): CellSnapshot => ({
+            note: cell.note ?? 0,
+            instrument: cell.instrument ?? 0,
+            volume: cell.volume ?? 0,
+            effTyp: cell.effTyp ?? 0,
+            eff: cell.eff ?? 0,
+            effTyp2: cell.effTyp2 ?? 0,
+            eff2: cell.eff2 ?? 0,
+            effTyp3: cell.effTyp3,
+            eff3: cell.eff3,
+            effTyp4: cell.effTyp4,
+            eff4: cell.eff4,
+            effTyp5: cell.effTyp5,
+            eff5: cell.eff5,
+            note2: cell.note2, instrument2: cell.instrument2, volume2: cell.volume2,
+            note3: cell.note3, instrument3: cell.instrument3, volume3: cell.volume3,
+            note4: cell.note4, instrument4: cell.instrument4, volume4: cell.volume4,
+            flag1: cell.flag1,
+            flag2: cell.flag2,
+            probability: cell.probability,
+          })),
         })),
-      })),
-    }));
+      };
+      cache.set(p, snap);
+      return snap;
+    });
+    // Evict stale entries
+    const livePatterns = new Set(state.patterns);
+    for (const key of cache.keys()) {
+      if (!livePatterns.has(key as typeof state.patterns[0])) {
+        cache.delete(key);
+      }
+    }
+    return result;
   }, []);
 
   const snapshotFormatPatterns = useCallback((): PatternSnapshot[] => {
@@ -1892,6 +1937,8 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
     let prevThemeId: unknown = null;       // theme store identity
     let prevFormatChannels: unknown = null;
     let cachedPatterns: PatternSnapshot[] = [];
+    // Per-pattern snapshot cache — only re-snapshot patterns whose identity changed
+    const patternSnapshotCache = new Map<unknown, PatternSnapshot>();
     let cachedTheme: ThemeSnapshot | null = null;
     let cachedUI: UIStateSnapshot | null = null;
     let prevUIHex: unknown = null;
@@ -1961,28 +2008,46 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
         prevPatternsRef = trackerState.patterns;
         prevPatIdx = trackerState.currentPatternIndex;
         prevFormatChannels = formatChannelsRef.current;
-        // Re-snapshot patterns
+        // Re-snapshot patterns — use per-pattern identity cache to avoid
+        // re-copying unchanged patterns (biggest perf win for large songs)
         if (isFormatModeRef.current && formatPatternSnapshotRef.current.length > 0) {
           cachedPatterns = formatPatternSnapshotRef.current;
         } else {
-          cachedPatterns = trackerState.patterns.map((p) => ({
-            id: p.id,
-            length: p.length,
-            channels: p.channels.map((ch): ChannelSnapshot => ({
-              id: ch.id, name: ch.name, color: ch.color ?? undefined,
-              muted: ch.muted, solo: ch.solo, collapsed: ch.collapsed,
-              effectCols: ch.channelMeta?.effectCols ?? 2,
-              rows: ch.rows.map((cell): CellSnapshot => ({
-                note: cell.note ?? 0, instrument: cell.instrument ?? 0,
-                volume: cell.volume ?? 0, effTyp: cell.effTyp ?? 0, eff: cell.eff ?? 0,
-                effTyp2: cell.effTyp2 ?? 0, eff2: cell.eff2 ?? 0,
-                effTyp3: cell.effTyp3, eff3: cell.eff3,
-                effTyp4: cell.effTyp4, eff4: cell.eff4,
-                effTyp5: cell.effTyp5, eff5: cell.eff5,
-                flag1: cell.flag1, flag2: cell.flag2, probability: cell.probability,
+          cachedPatterns = trackerState.patterns.map((p) => {
+            const cached = patternSnapshotCache.get(p);
+            if (cached) return cached;
+            const snap: PatternSnapshot = {
+              id: p.id,
+              length: p.length,
+              channels: p.channels.map((ch): ChannelSnapshot => ({
+                id: ch.id, name: ch.name, color: ch.color ?? undefined,
+                muted: ch.muted, solo: ch.solo, collapsed: ch.collapsed,
+                effectCols: ch.channelMeta?.effectCols ?? 2,
+                noteCols: ch.channelMeta?.noteCols,
+                rows: ch.rows.map((cell): CellSnapshot => ({
+                  note: cell.note ?? 0, instrument: cell.instrument ?? 0,
+                  volume: cell.volume ?? 0, effTyp: cell.effTyp ?? 0, eff: cell.eff ?? 0,
+                  effTyp2: cell.effTyp2 ?? 0, eff2: cell.eff2 ?? 0,
+                  effTyp3: cell.effTyp3, eff3: cell.eff3,
+                  effTyp4: cell.effTyp4, eff4: cell.eff4,
+                  effTyp5: cell.effTyp5, eff5: cell.eff5,
+                  note2: cell.note2, instrument2: cell.instrument2, volume2: cell.volume2,
+                  note3: cell.note3, instrument3: cell.instrument3, volume3: cell.volume3,
+                  note4: cell.note4, instrument4: cell.instrument4, volume4: cell.volume4,
+                  flag1: cell.flag1, flag2: cell.flag2, probability: cell.probability,
+                })),
               })),
-            })),
-          }));
+            };
+            patternSnapshotCache.set(p, snap);
+            return snap;
+          });
+          // Evict stale entries from cache
+          const livePatterns = new Set(trackerState.patterns);
+          for (const key of patternSnapshotCache.keys()) {
+            if (!livePatterns.has(key as typeof trackerState.patterns[0])) {
+              patternSnapshotCache.delete(key);
+            }
+          }
         }
         needsRender = true;
       }

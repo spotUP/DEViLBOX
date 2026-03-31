@@ -467,6 +467,13 @@ export class PatternScheduler {
     
     const localHandler = this.activeHandler;
     const engine = getToneEngine();
+
+    // Sync per-channel voice limits from channel metadata
+    for (let ch = 0; ch < pattern.channels.length; ch++) {
+      const maxV = pattern.channels[ch].channelMeta?.maxVoices || 0;
+      engine.setChannelMaxVoices(ch, maxV);
+    }
+
     // Set pattern in automation player
     this.automationPlayer.setPattern(pattern);
     this.automationPlayer.setAutomationData(this.automation);
@@ -666,6 +673,49 @@ export class PatternScheduler {
 
               // Apply results to engine (if we triggered a note, this re-applies any Tick 0 changes)
               this.applyTickEffects(channelIndex, effectResult, localHandler);
+
+              // ── Extra note columns (chord support) ─────────────────────
+              // Process note columns 2-4 for multi-note chord playback
+              const totalNoteCols = channel.channelMeta?.noteCols ?? 1;
+              if (totalNoteCols > 1 && !engine.isChannelMuted(channelIndex)) {
+                for (let nc = 1; nc < totalNoteCols; nc++) {
+                  const extraNote = nc === 1 ? (cell.note2 ?? 0) : nc === 2 ? (cell.note3 ?? 0) : (cell.note4 ?? 0);
+                  const extraInst = nc === 1 ? (cell.instrument2 ?? 0) : nc === 2 ? (cell.instrument3 ?? 0) : (cell.instrument4 ?? 0);
+                  const extraVol = nc === 1 ? (cell.volume2 ?? 0) : nc === 2 ? (cell.volume3 ?? 0) : (cell.volume4 ?? 0);
+
+                  if (extraNote === 97) {
+                    // Note-off for this column — release the channel's poly voice
+                    // (simplified: triggers general note-off for the channel)
+                    const activeNotes = this.channelNotes.get(channelIndex);
+                    if (activeNotes) {
+                      activeNotes.forEach((an) => {
+                        engine.releaseNote(instrumentId, an, time, channelIndex);
+                      });
+                    }
+                  } else if (extraNote > 0 && extraNote <= 96) {
+                    const extraInstId = extraInst > 0 ? extraInst : instrumentId;
+                    const extraInstrument = instrumentMap.get(extraInstId);
+                    if (extraInstrument) {
+                      const toneNote = xmNoteToToneJS(extraNote);
+                      if (toneNote) {
+                        if (!this.channelNotes.has(channelIndex)) {
+                          this.channelNotes.set(channelIndex, new Set());
+                        }
+                        this.channelNotes.get(channelIndex)!.add(toneNote);
+                        const vel = extraVol > 0 && extraVol <= 64 ? extraVol / 64 : 0.8;
+                        try {
+                          engine.triggerNote(
+                            extraInstId, toneNote, 999, time, vel, extraInstrument,
+                            false, false, channelIndex, 0, undefined, undefined
+                          );
+                        } catch (error) {
+                          this.trackPlaybackError(toneNote, error as Error);
+                        }
+                      }
+                    }
+                  }
+                }
+              }
             });
 
             // Apply automation curves for this row

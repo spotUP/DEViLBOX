@@ -74,7 +74,7 @@ import {
   expandPattern, shrinkPattern, growSelection, shrinkSelection, duplicatePattern,
   doubleBlockLength, halveBlockLength, doubleBlock, halveBlock,
   scaleVolumeTrack, scaleVolumePattern, scaleVolumeBlock, swapChannels, splitPattern,
-  joinBlocks, setPatternLength, setBpm, setSpeed, setTempo, appendBlock, insertBlock,
+  joinBlocks, setPatternLength, patternLengthDialog, setBpm, setSpeed, setTempo, appendBlock, insertBlock,
   splitBlock, gotoBlock, findSample, findReplace, findNext, gotoDialog, quantizeSettings
 } from '@engine/keyboard/commands/advanced';
 import {
@@ -110,7 +110,7 @@ import {
   quickSave, revertToSaved, resetView, increasePatternSize, decreasePatternSize,
   toggleHexMode, toggleRowHighlight, toggleChannelNames, zoomIn, zoomOut, resetZoom, fitToWindow,
   clonePattern as clonePatternCmd, createPattern, deletePattern, importMidi, exportMidi, importSample, exportSample,
-  patternProperties, songProperties, cleanupUnused, toggleRecording, previewInstrument, previewSample, stopPreview,
+  patternProperties, songProperties, cleanupUnused, toggleRecording, previewInstrument, previewSample, previewNoteAtCursor, stopPreview,
   tempoTap, showQuantizeDialog, showHumanizeDialog, showGrooveSettings, applySwing, runScript, recordMacro,
   escapeCommand, confirmCommand, showContextMenu, showCommandPalette
 } from '@engine/keyboard/commands/misc';
@@ -435,6 +435,7 @@ function initializeRegistry() {
     { name: 'split_pattern', contexts: ['pattern'], handler: splitPattern, description: 'Split pattern' },
     { name: 'join_blocks', contexts: ['pattern'], handler: joinBlocks, description: 'Join blocks' },
     { name: 'set_pattern_length', contexts: ['pattern'], handler: setPatternLength, description: 'Set pattern length' },
+    { name: 'pattern_length_dialog', contexts: ['pattern', 'global'], handler: patternLengthDialog, description: 'Pattern length dialog' },
     { name: 'set_bpm', contexts: ['global'], handler: setBpm, description: 'Set BPM' },
     { name: 'set_speed', contexts: ['global'], handler: setSpeed, description: 'Set speed' },
     { name: 'set_tempo', contexts: ['global'], handler: setTempo, description: 'Set tempo' },
@@ -598,6 +599,7 @@ function initializeRegistry() {
     { name: 'toggle_recording', contexts: ['global'], handler: toggleRecording, description: 'Toggle recording' },
     { name: 'preview_instrument', contexts: ['global'], handler: previewInstrument, description: 'Preview instrument' },
     { name: 'preview_sample', contexts: ['global'], handler: previewSample, description: 'Preview sample' },
+    { name: 'preview_note_at_cursor', contexts: ['pattern'], handler: previewNoteAtCursor, description: 'Preview note at cursor' },
     { name: 'stop_preview', contexts: ['global'], handler: stopPreview, description: 'Stop preview' },
     { name: 'tempo_tap', contexts: ['global'], handler: tempoTap, description: 'Tempo tap' },
     { name: 'show_quantize_dialog', contexts: ['global'], handler: showQuantizeDialog, description: 'Show quantize dialog' },

@@ -115,7 +115,12 @@ export function joinBlocks(): boolean {
 }
 
 export function setPatternLength(): boolean {
-  useUIStore.getState().setStatusMessage('Pattern length: resize in pattern list', false, 1500);
+  useUIStore.getState().openDialogCommand('pattern-length');
+  return true;
+}
+
+export function patternLengthDialog(): boolean {
+  useUIStore.getState().openDialogCommand('pattern-length');
   return true;
 }
 

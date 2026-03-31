@@ -217,6 +217,8 @@ export class ToneEngine {
 
   // Active voices per channel (for IT NNA support)
   private activeVoices: Map<number, VoiceState[]> = new Map();
+  // Per-channel voice limit (0 = unlimited)
+  private channelMaxVoices: Map<number, number> = new Map();
 
   // Master effects chain
   private masterEffectsNodes: Tone.ToneAudioNode[] = [];
@@ -1661,7 +1663,7 @@ export class ToneEngine {
         break;
       }
 
-      case 'AMSynth': {
+      case 'ToneAM': {
         // AMSynth has dual oscillators, reduce polyphony on lower quality
         const amPolyphony = this.currentPerformanceQuality === 'high' ? 16 :
                             this.currentPerformanceQuality === 'medium' ? 8 : 4;
@@ -1677,7 +1679,7 @@ export class ToneEngine {
               release: (config.envelope?.release ?? 1000) / 1000,
             },
           },
-          volume: getNormalizedVolume('AMSynth', config.volume),
+          volume: getNormalizedVolume('ToneAM', config.volume),
         } as any);
         break;
       }
@@ -2173,7 +2175,8 @@ export class ToneEngine {
       case 'MdaEPiano':
       case 'MdaJX10':
       case 'MdaDX10':
-      case 'AMSynth':
+      case 'ToneAM':
+      case 'Amsynth':
       case 'RaffoSynth':
       case 'CalfMono':
       case 'SetBfree':
@@ -2183,7 +2186,8 @@ export class ToneEngine {
       case 'FluidSynth':
       case 'Sfizz':
       case 'ZynAddSubFX':
-      case 'Monique': {
+      case 'Monique':
+      case 'VL1': {
         instrument = InstrumentFactory.createInstrument(config);
         if (instrument) {
           console.log('[ToneEngine] Zynthian synth created:', config.synthType,
@@ -3008,7 +3012,11 @@ export class ToneEngine {
         config.synthType === 'SCSP' ||
         // MAME worklet synths (all use triggerRelease with no note)
         config.synthType.startsWith('MAME') ||
-        config.synthType === 'SunVoxSynth'
+        config.synthType === 'SunVoxSynth' ||
+        // WASM monosynths track current note internally
+        config.synthType === 'Monique' ||
+        config.synthType === 'Amsynth' ||
+        config.synthType === 'RaffoSynth'
       ) {
         // These synths use triggerRelease(time) - no note parameter
         (instrument as any).triggerRelease(safeTime);
@@ -3024,15 +3032,15 @@ export class ToneEngine {
   // Synth types that are natively polyphonic (PolySynth-based) and don't need voice allocation
   // These either ARE PolySynths or wrap a PolySynth internally
   private static readonly NATIVE_POLY_TYPES = new Set([
-    'Synth', 'FMSynth', 'AMSynth', 'PluckSynth', 'Sampler',
+    'Synth', 'FMSynth', 'ToneAM', 'PluckSynth', 'Sampler',
     // InstrumentFactory types that use PolySynth internally
     'SuperSaw', 'PolySynth', 'Organ', 'ChipSynth', 'PWMSynth',
     'StringMachine', 'FormantSynth', 'Wavetable', 'WobbleBass',
     // Zynthian WASM synths (polyphony handled internally by WASM)
-    'MdaEPiano', 'MdaJX10', 'MdaDX10', 'AMSynth',
+    'MdaEPiano', 'MdaJX10', 'MdaDX10', 'ToneAM',
     'RaffoSynth', 'CalfMono', 'SetBfree', 'SynthV1',
     'TalNoizeMaker', 'Aeolus', 'FluidSynth', 'Sfizz',
-    'ZynAddSubFX', 'Monique',
+    'ZynAddSubFX', 'Monique', 'VL1',
   ]);
 
   /**
@@ -3072,7 +3080,7 @@ export class ToneEngine {
       // Monophonic synths
       'MonoSynth', 'DuoSynth', 'TB303', 'Buzz3o3', 'DB303', 'DubSiren', 'SpaceLaser', 'Synare',
       // Zynthian mono synths (single-voice WASM engines)
-      'RaffoSynth', 'CalfMono', 'Monique',
+      'RaffoSynth', 'CalfMono', 'Monique', 'VL1',
     ]);
     const isMonoSynth = config.synthType ? monoSynthTypes.has(config.synthType) : false;
 
@@ -3354,6 +3362,15 @@ export class ToneEngine {
       }
 
       // 3. Create new voice state and routing chain
+      // Enforce per-channel voice limit (stop oldest voices if over limit)
+      const maxV = this.channelMaxVoices.get(channelIndex) || 0;
+      if (maxV > 0) {
+        while (voices.length >= maxV) {
+          const oldest = voices.shift();
+          if (oldest) this.stopVoice(oldest, safeTime);
+        }
+      }
+
       // For mono synths where voiceNode === instrument, check if voice already exists
       const existingVoiceIndex = voices.findIndex(v => v.instrument === voiceNode);
       if (existingVoiceIndex >= 0) {
@@ -4627,6 +4644,8 @@ export class ToneEngine {
   public setMixerChannelPan(channelIndex: number, pan: number): void { _setMixerChannelPan(this._channelCtx, channelIndex, pan); }
   public updateMuteStates(channels: { muted: boolean; solo: boolean }[]): void { _updateMuteStates(this._channelCtx, channels); }
   public isChannelMuted(channelIndex: number): boolean { return _isChannelMuted(this._channelCtx, channelIndex); }
+  public setChannelMaxVoices(channelIndex: number, maxVoices: number): void { this.channelMaxVoices.set(channelIndex, maxVoices); }
+  public getChannelMaxVoices(channelIndex: number): number { return this.channelMaxVoices.get(channelIndex) || 0; }
   private disposeChannelOutputs(): void { _disposeChannelOutputs(this._channelCtx); }
   public getChannelLevels(numChannels: number): number[] {
     // Per-channel meter data from TypeScript synths (each channel has its own Tone.Meter)
@@ -4760,7 +4779,7 @@ export class ToneEngine {
         // Get synth type from instrumentSynthTypes map
         const synthType = this.instrumentSynthTypes.get(key);
 
-        if (synthType && ['Synth', 'FMSynth', 'AMSynth', 'PluckSynth'].includes(synthType)) {
+        if (synthType && ['Synth', 'FMSynth', 'ToneAM', 'PluckSynth'].includes(synthType)) {
           polySynthsToRecreate.push({
             key,
             instrumentId,
