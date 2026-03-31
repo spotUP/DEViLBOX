@@ -26,6 +26,7 @@ import {
   DEFAULT_WOBBLE_BASS,
   DEFAULT_PINK_TROMBONE,
   DEFAULT_DECTALK,
+  DEFAULT_GRANULAR,
 } from '@typedefs/instrument';
 import { deepMerge } from '../../../lib/migration';
 import { Knob } from '@components/controls/Knob';
@@ -83,6 +84,7 @@ const SampleControls = lazy(() => import('../controls/SampleControls').then(m =>
 const DrumKitEditor = lazy(() => import('./DrumKitEditor').then(m => ({ default: m.DrumKitEditor })));
 const DubSirenControls = lazy(() => import('../controls/DubSirenControls').then(m => ({ default: m.DubSirenControls })));
 const SpaceLaserControls = lazy(() => import('../controls/SpaceLaserControls').then(m => ({ default: m.SpaceLaserControls })));
+const GranularControls = lazy(() => import('../controls/GranularControls').then(m => ({ default: m.GranularControls })));
 const V2Controls = lazy(() => import('../controls/V2Controls').then(m => ({ default: m.V2Controls })));
 const V2SpeechControls = lazy(() => import('../controls/V2SpeechControls').then(m => ({ default: m.V2SpeechControls })));
 const SAMControls = lazy(() => import('../controls/SAMControls').then(m => ({ default: m.SAMControls })));
@@ -170,7 +172,7 @@ const WavetableListEditor = lazy(() => import('./WavetableEditor').then(m => ({ 
 
 
 // Types
-export type EditorMode = 'generic' | 'tb303' | 'furnace' | 'buzzmachine' | 'sample' | 'dubsiren' | 'spacelaser' | 'v2' | 'sam' | 'pinktrombone' | 'dectalk' | 'synare' | 'mame' | 'mamechip' | 'dexed' | 'obxd' | 'mdaEPiano' | 'mdaJX10' | 'mdaDX10' | 'toneAM' | 'raffo' | 'calfMono' | 'setbfree' | 'synthv1' | 'moniqueSynth' | 'vl1Synth' | 'talNoizeMaker' | 'aeolus' | 'fluidsynth' | 'sfizz' | 'zynaddsubfx' | 'wam' | 'tonewheelOrgan' | 'melodica' | 'vital' | 'odin2' | 'surge' | 'vstbridge' | 'harmonicsynth' | 'modular' | 'sunvox-modular' | 'hively' | 'gtultra' | 'jamcracker' | 'soundmon' | 'sidmon' | 'digmug' | 'fc' | 'deltamusic1' | 'deltamusic2' | 'fred' | 'tfmx' | 'octamed' | 'sidmon1' | 'hippelcoso' | 'robhubbard' | 'steveturner' | 'davidwhittaker' | 'sonic-arranger' | 'instereo2' | 'musicline' | 'supercollider' | 'wobblebass' | 'startrekker-am' | 'futureplayer' | 'symphonie' | 'xrns-synth' | 'sunvox-synth';
+export type EditorMode = 'generic' | 'tb303' | 'furnace' | 'buzzmachine' | 'sample' | 'dubsiren' | 'spacelaser' | 'granular' | 'v2' | 'sam' | 'pinktrombone' | 'dectalk' | 'synare' | 'mame' | 'mamechip' | 'dexed' | 'obxd' | 'mdaEPiano' | 'mdaJX10' | 'mdaDX10' | 'toneAM' | 'raffo' | 'calfMono' | 'setbfree' | 'synthv1' | 'moniqueSynth' | 'vl1Synth' | 'talNoizeMaker' | 'aeolus' | 'fluidsynth' | 'sfizz' | 'zynaddsubfx' | 'wam' | 'tonewheelOrgan' | 'melodica' | 'vital' | 'odin2' | 'surge' | 'vstbridge' | 'harmonicsynth' | 'modular' | 'sunvox-modular' | 'hively' | 'gtultra' | 'jamcracker' | 'soundmon' | 'sidmon' | 'digmug' | 'fc' | 'deltamusic1' | 'deltamusic2' | 'fred' | 'tfmx' | 'octamed' | 'sidmon1' | 'hippelcoso' | 'robhubbard' | 'steveturner' | 'davidwhittaker' | 'sonic-arranger' | 'instereo2' | 'musicline' | 'supercollider' | 'wobblebass' | 'startrekker-am' | 'futureplayer' | 'symphonie' | 'xrns-synth' | 'sunvox-synth';
 
 export interface SynthTypeDispatcherProps {
   editorMode: EditorMode;
@@ -368,6 +370,14 @@ export const SynthTypeDispatcher: React.FC<SynthTypeDispatcherProps> = ({
       spaceLaser: { ...currentSpaceLaser, ...updates },
     });
   }, [instrument.spaceLaser, handleChange]);
+
+  // Handle Granular config updates
+  const handleGranularChange = useCallback((updates: Partial<typeof instrument.granular>) => {
+    const currentGranular = instrument.granular || DEFAULT_GRANULAR;
+    handleChange({
+      granular: { ...currentGranular, ...updates },
+    });
+  }, [instrument.granular, handleChange]);
 
   // Handle V2 config updates
   const handleV2Change = useCallback((updates: Partial<typeof instrument.v2>) => {
@@ -1565,6 +1575,32 @@ export const SynthTypeDispatcher: React.FC<SynthTypeDispatcherProps> = ({
   }
 
   // ============================================================================
+  // GRANULAR SYNTH EDITOR
+  // ============================================================================
+  if (editorMode === 'granular') {
+    const granularConfig = deepMerge(DEFAULT_GRANULAR, instrument.granular || {});
+
+    return (
+      <div className="synth-editor-container bg-gradient-to-b from-[#1e1e1e] to-[#151515]">
+        <EditorHeader
+          instrument={instrument}
+          onChange={handleChange}
+          vizMode={vizMode}
+          onVizModeChange={setVizMode}
+          hideVisualization={true}
+          showHelpButton={false}
+        />
+        <Suspense fallback={<LoadingControls />}>
+          <GranularControls
+            config={granularConfig}
+            onChange={handleGranularChange}
+          />
+        </Suspense>
+      </div>
+    );
+  }
+
+  // ============================================================================
   // V2 SYNTH EDITOR
   // ============================================================================
   if (editorMode === 'v2') {
@@ -2103,6 +2139,7 @@ export const SynthTypeDispatcher: React.FC<SynthTypeDispatcherProps> = ({
             <HardwareUIWrapper
               synthType={instrument.synthType}
               parameters={(instrument.parameters || {}) as Record<string, number>}
+              instrumentId={instrument.id}
               onParamChange={handleChipParamChange}
             />
           ) : (
@@ -2123,6 +2160,7 @@ export const SynthTypeDispatcher: React.FC<SynthTypeDispatcherProps> = ({
   // ============================================================================
   if (editorMode === 'obxd') {
     const obxdConfig = deepMerge(DEFAULT_OBXD, instrument.obxd || {});
+    const hasHardware = hasHardwareUI(instrument.synthType);
 
     return (
       <div className="synth-editor-container bg-gradient-to-b from-[#1e1e1e] to-[#151515]">
@@ -2138,16 +2176,42 @@ export const SynthTypeDispatcher: React.FC<SynthTypeDispatcherProps> = ({
           onUnbake={handleUnbake}
           isBaked={isBaked}
           isBaking={isBaking}
+          customHeaderControls={
+            hasHardware ? (
+              <button
+                onClick={() => setUIMode(uiMode === 'simple' ? 'hardware' : 'simple')}
+                className={`p-1.5 rounded transition-all flex items-center gap-1.5 px-2 ${
+                  uiMode === 'hardware'
+                    ? 'bg-accent-primary/20 text-accent-primary ring-1 ring-accent-primary/50'
+                    : 'bg-dark-bgTertiary text-text-muted hover:text-text-secondary border border-dark-borderLight'
+                }`}
+                title={uiMode === 'hardware' ? 'Switch to Simple Controls' : 'Switch to Hardware UI'}
+              >
+                {uiMode === 'hardware' ? <Cpu size={14} /> : <Monitor size={14} />}
+                <span className="text-[10px] font-bold uppercase">
+                  {uiMode === 'hardware' ? 'Hardware UI' : 'Simple UI'}
+                </span>
+              </button>
+            ) : undefined
+          }
         />
 
-        {/* OBXd Controls */}
         <div className="synth-editor-content overflow-y-auto">
-          <Suspense fallback={<LoadingControls />}>
-            <OBXdControls
-              config={obxdConfig}
-              onChange={handleOBXdChange}
+          {uiMode === 'hardware' && hasHardware ? (
+            <HardwareUIWrapper
+              synthType={instrument.synthType}
+              parameters={(instrument.parameters || {}) as Record<string, number>}
+              instrumentId={instrument.id}
+              onParamChange={handleChipParamChange}
             />
-          </Suspense>
+          ) : (
+            <Suspense fallback={<LoadingControls />}>
+              <OBXdControls
+                config={obxdConfig}
+                onChange={handleOBXdChange}
+              />
+            </Suspense>
+          )}
         </div>
       </div>
     );

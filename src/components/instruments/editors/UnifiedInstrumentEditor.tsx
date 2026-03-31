@@ -48,7 +48,7 @@ function isBuzzmachineType(synthType: SynthType): boolean {
 
 /** Check if synth type uses Sample editor */
 function isSampleType(synthType: SynthType): boolean {
-  return ['Sampler', 'Player', 'GranularSynth', 'DrumKit', 'ChiptuneModule'].includes(synthType);
+  return ['Sampler', 'Player', 'DrumKit', 'ChiptuneModule'].includes(synthType);
 }
 
 /** Check if synth type is Dub Siren */
@@ -149,6 +149,7 @@ function getEditorMode(synthType: SynthType): EditorMode {
   if (isSampleType(synthType)) return 'sample';
   if (isDubSirenType(synthType)) return 'dubsiren';
   if (isSpaceLaserType(synthType)) return 'spacelaser';
+  if (synthType === 'GranularSynth') return 'granular';
   if (isV2Type(synthType)) return 'v2';
   if (synthType === 'Sam') return 'sam';
   if (synthType === 'PinkTrombone') return 'pinktrombone';
@@ -353,6 +354,7 @@ export const UnifiedInstrumentEditor: React.FC<UnifiedInstrumentEditorProps> = (
           <HardwareUIWrapper
             synthType={instrument.synthType}
             parameters={(instrument.parameters || {}) as Record<string, number>}
+            instrumentId={instrument.id}
             onParamChange={(key, value) => {
               handleChange({
                 parameters: {

@@ -14,7 +14,6 @@ import { TB303Hardware } from './TB303Hardware';
 import { D50Hardware } from './D50Hardware';
 import { CZ101Hardware } from './CZ101Hardware';
 import { VFXHardware } from './VFXHardware';
-import { OBXdHardware } from './OBXdHardware';
 import { MAMEGenericHardware } from './MAMEGenericHardware';
 import { BuzzGenericHardware } from './BuzzGenericHardware';
 import { VSTBridgeGenericHardware, isVSTBridgeType } from './VSTBridgeGenericHardware';
@@ -29,18 +28,21 @@ import { RolandGPHardware } from './RolandGPHardware';
 import { MoniqueHardwareUI } from './MoniqueHardwareUI';
 import { AmsynthHardwareUI } from './AmsynthHardwareUI';
 import { DexedHardwareUI } from './DexedHardwareUI';
+import { OBXfHardwareUI } from './OBXfHardwareUI';
 import VL1Hardware from './VL1Hardware';
 
 interface HardwareUIWrapperProps {
   synthType: SynthType;
   parameters: Record<string, number>;
   onParamChange: (key: string, value: number) => void;
+  instrumentId?: number;
 }
 
 type HWComponentProps = {
   parameters: Record<string, number>;
   onParamChange: (key: string, value: number) => void;
   synthType?: SynthType;
+  instrumentId?: number;
 };
 
 /**
@@ -56,7 +58,7 @@ const DEDICATED_UI_MAP: Partial<Record<SynthType, React.ComponentType<HWComponen
   TB303: TB303Hardware,         // Roland TB-303 Bass Line (1981)
   CZ101: CZ101Hardware,         // Casio CZ-101 Phase Distortion (1984)
   Dexed: DexedHardwareUI as unknown as React.ComponentType<HWComponentProps>,  // Yamaha DX7 FM Synthesis (1983)
-  OBXd: OBXdHardware,           // Oberheim OB-X Analog (1979)
+  OBXd: OBXfHardwareUI as unknown as React.ComponentType<HWComponentProps>,   // Oberheim OB-X Analog (1979) — JUCE OB-Xf UI
 
   // Synthesizers - MAME (dedicated)
   MAMERSA: D50Hardware,         // Roland D-50 LA Synthesis (1987)
@@ -184,6 +186,7 @@ export const HardwareUIWrapper: React.FC<HardwareUIWrapperProps> = ({
   synthType,
   parameters,
   onParamChange,
+  instrumentId,
 }) => {
   /* Check dedicated UIs first */
   const DedicatedComponent = DEDICATED_UI_MAP[synthType];
@@ -192,6 +195,7 @@ export const HardwareUIWrapper: React.FC<HardwareUIWrapperProps> = ({
       <DedicatedComponent
         parameters={parameters}
         onParamChange={onParamChange}
+        instrumentId={instrumentId}
       />
     );
   }

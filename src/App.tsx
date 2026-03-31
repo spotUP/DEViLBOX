@@ -1264,8 +1264,10 @@ function App() {
 
         </div>
 
-        {/* Global Status Bar (includes MIDI Knob Bar) */}
-        <StatusBar onShowTips={() => openModal('tips', { initialTab: 'tips' })} />
+        {/* Global Status Bar (includes MIDI Knob Bar) — hidden in VJ view */}
+        {activeView !== 'vj' && (
+          <StatusBar onShowTips={() => openModal('tips', { initialTab: 'tips' })} />
+        )}
       </div>
 
       {/* Modals */}
