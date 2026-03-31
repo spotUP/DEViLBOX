@@ -378,8 +378,11 @@ export const DJView: React.FC<DJViewProps> = ({ onShowDrumpads: _onShowDrumpads 
       {/* CRATE PANEL (tabbed: Browser / Playlists / Online / Serato)      */}
       {/* ================================================================== */}
       {showCrate && (
-        <div className="absolute inset-x-0 top-12 bottom-0 z-[99990] pointer-events-none px-2 pt-2">
-          <div className="pointer-events-auto max-h-[50vh]">
+        <div
+          className="absolute inset-x-0 top-12 bottom-0 z-[99990] px-2 pt-2"
+          onClick={(e) => { if (e.target === e.currentTarget) setShowCrate(false); }}
+        >
+          <div className="max-h-[50vh]">
             <DJCratePanel
               onClose={() => setShowCrate(false)}
               onLoadSeratoTrack={handleSeratoTrackLoad}
