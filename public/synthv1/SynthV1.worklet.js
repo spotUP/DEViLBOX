@@ -54,6 +54,26 @@ class SynthV1Processor extends AudioWorkletProcessor {
           this.port.postMessage({ type: 'paramValue', index: data.index, value });
         }
         break;
+      case 'loadPatch':
+        if (this.engine && data.values) {
+          const numParams = this.module._synthv1_get_num_params(this.engine);
+          const count = Math.min(data.values.length, numParams);
+          for (let i = 0; i < count; i++) {
+            this.module._synthv1_set_param(this.engine, i, data.values[i]);
+          }
+          this.port.postMessage({ type: 'patchLoaded', paramCount: count });
+        }
+        break;
+      case 'getState':
+        if (this.engine) {
+          const numParams = this.module._synthv1_get_num_params(this.engine);
+          const state = new Float32Array(numParams);
+          for (let i = 0; i < numParams; i++) {
+            state[i] = this.module._synthv1_get_param(this.engine, i);
+          }
+          this.port.postMessage({ type: 'state', values: Array.from(state), numParams });
+        }
+        break;
       case 'getInfo':
         if (this.engine) {
           this.port.postMessage({

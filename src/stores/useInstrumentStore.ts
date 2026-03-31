@@ -545,6 +545,15 @@ export const useInstrumentStore = create<InstrumentStore>()(
                 engine.invalidateInstrument(id);
                 return;
               }
+              // Native patch presets (OBXd, SynthV1, etc.) require synth recreation
+              const nativePatchKeys = [
+                'obxdNativePatch', 'synthv1NativePatch', 'calfMonoNativePatch',
+                'talNativePatch', 'raffoNativePatch', 'setbfreeNativePatch',
+              ];
+              if (nativePatchKeys.some(k => (updates as any)[k])) {
+                engine.invalidateInstrument(id);
+                return;
+              }
               const synthConfig = (updatedInstrument as any)[zynthConfigKey];
               if (synthConfig && (updates as any)[zynthConfigKey]) {
                 engine.updateComplexSynthParameters(id, synthConfig);

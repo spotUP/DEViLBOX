@@ -13,6 +13,9 @@
 
 import type { DevilboxSynth } from '@/types/synth';
 import { getDevilboxAudioContext, noteToMidi } from '@/utils/audio-context';
+import { loadNativePatch, captureNativeState } from '@/engine/common/NativePatchLoader';
+import { SETBFREE_NATIVE_FACTORY_PRESETS, SETBFREE_ALL_FACTORY_PRESETS } from './setbfreeNativePresets';
+export { SETBFREE_NATIVE_FACTORY_PRESETS, SETBFREE_ALL_FACTORY_PRESETS };
 
 export const SetBfreeParam = {
   // Upper manual drawbars (0-8)
@@ -246,6 +249,8 @@ export const SETBFREE_PRESETS: Record<string, SetBfreeConfig> = {
   },
 };
 
+// Native factory presets re-exported above from setbfreeNativePresets.ts
+
 const CONFIG_KEYS: (keyof SetBfreeConfig)[] = [
   // Upper drawbars (0-8)
   'upper16', 'upper513', 'upper8', 'upper4', 'upper223',
@@ -278,6 +283,7 @@ export class SetBfreeSynthEngine implements DevilboxSynth {
   private config: SetBfreeConfig;
   private isInitialized = false;
   private pendingNotes: Array<{ note: number; velocity: number }> = [];
+  private pendingPatch: number[] | null = null;
 
   private static isWorkletLoaded = false;
   private static workletLoadPromise: Promise<void> | null = null;
@@ -326,7 +332,8 @@ export class SetBfreeSynthEngine implements DevilboxSynth {
         .replace(/import\.meta\.url/g, `"${baseUrl}setbfree/"`)
         .replace(/export\s+default\s+\w+;?\s*$/, '')
         .replace(/if\s*\(ENVIRONMENT_IS_NODE\)\s*\{[^}]*await\s+import\([^)]*\)[^}]*\}/g, '')
-        .replace(/(wasmMemory=wasmExports\["\w+"\])/, '$1;Module["wasmMemory"]=wasmMemory');
+        .replace(/(wasmMemory\s*=\s*wasmExports\[['"][\w]+['"]\])/, '$1;Module["wasmMemory"]=wasmMemory')
+        .replace(/new\s+URL\(([^,]+),\s*([^)]+)\)\.href/g, '($2 + $1)');
 
       this._worklet = new AudioWorkletNode(rawContext, 'setbfree-processor', {
         outputChannelCount: [2],
@@ -336,7 +343,12 @@ export class SetBfreeSynthEngine implements DevilboxSynth {
       this._worklet.port.onmessage = (event) => {
         if (event.data.type === 'ready') {
           this.isInitialized = true;
-          this.sendConfig(this.config);
+          if (this.pendingPatch) {
+            void loadNativePatch(this._worklet!, this.pendingPatch).catch(() => {});
+            this.pendingPatch = null;
+          } else {
+            this.sendConfig(this.config);
+          }
           for (const { note, velocity } of this.pendingNotes) {
             this._worklet!.port.postMessage({ type: 'noteOn', note, velocity });
           }
@@ -416,6 +428,43 @@ export class SetBfreeSynthEngine implements DevilboxSynth {
     if (preset) {
       this.config = { ...preset };
       this.sendConfig(this.config);
+    }
+  }
+
+  /**
+   * Load a native patch (complete engine state snapshot).
+   * If not yet initialized, queues the patch for loading on ready.
+   */
+  loadPatch(values: number[]): void {
+    if (this.isInitialized && this._worklet) {
+      void loadNativePatch(this._worklet, values).catch(() => {});
+    } else {
+      this.pendingPatch = values;
+    }
+  }
+
+  /**
+   * Load a native preset by name from the SETBFREE_NATIVE_FACTORY_PRESETS map.
+   */
+  loadNativePreset(name: string): void {
+    const preset = SETBFREE_NATIVE_FACTORY_PRESETS.find(p => p.name === name);
+    if (preset) {
+      this.loadPatch(preset.values);
+    } else {
+      console.warn(`[SetBfree] Native preset not found: ${name}`);
+    }
+  }
+
+  /**
+   * Capture the current complete engine state (for preset creation).
+   */
+  async getState(): Promise<number[] | null> {
+    if (!this.isInitialized || !this._worklet) return null;
+    try {
+      const result = await captureNativeState(this._worklet);
+      return result.values;
+    } catch {
+      return null;
     }
   }
 
