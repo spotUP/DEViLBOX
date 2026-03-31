@@ -90,7 +90,8 @@ target_link_options(SfizzWASM PRIVATE
     "SHELL:-s MAXIMUM_MEMORY=268435456"
     "SHELL:-s FILESYSTEM=1"
     "SHELL:-s FORCE_FILESYSTEM=1"
-    "SHELL:-s ENVIRONMENT='web'"
+    "SHELL:-s ENVIRONMENT='web,worker'"
     "SHELL:-s SINGLE_FILE=0"
     "SHELL:-s NO_EXIT_RUNTIME=1"
+    "SHELL:-s ASSERTIONS=1"
 )
