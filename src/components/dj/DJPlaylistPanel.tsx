@@ -502,7 +502,7 @@ export const DJPlaylistPanel: React.FC<DJPlaylistPanelProps> = ({ onClose }) => 
                   onDragStart={() => handleDragStart(i)}
                   onDragOver={(e) => handleDragOver(e, i)}
                   onDragEnd={handleDragEnd}
-                  className={`flex items-center gap-1.5 px-1.5 py-1 border-b border-dark-border/30 transition-colors group ${
+                  className={`flex items-center gap-1.5 px-1.5 py-1 border-b border-dark-border/10 transition-colors group ${
                     dragIndex === i
                       ? 'bg-accent-primary/10'
                       : autoDJEnabled && i === autoDJCurrentIdx
@@ -519,7 +519,7 @@ export const DJPlaylistPanel: React.FC<DJPlaylistPanelProps> = ({ onClose }) => 
                   <span className="text-xs font-mono text-text-muted/30 w-4 text-right shrink-0">
                     {i + 1}
                   </span>
-                  <span className="flex-1 text-text-primary text-sm font-mono truncate min-w-0">
+                  <span className="flex-1 text-text-secondary text-sm font-mono truncate min-w-0">
                     {track.trackName}
                   </span>
                   {track.bpm > 0 && (
