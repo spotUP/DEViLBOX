@@ -32,6 +32,9 @@ import { FORMANT_SYNTH_LAYOUT } from './formantSynth';
 import { DRUM_MACHINE_LAYOUT } from './drumMachine';
 import { DRUM_KIT_LAYOUT } from './drumKit';
 import { POLY_SYNTH_LAYOUT } from './polySynth';
+import { OPENWURLI_LAYOUT } from './openwurli';
+import { OPL3_LAYOUT } from './opl3';
+import { DX7_LAYOUT } from './dx7';
 
 /** Map from SynthType string to layout descriptor */
 export const SYNTH_LAYOUTS: Record<string, SynthPanelLayout> = {
@@ -45,6 +48,11 @@ export const SYNTH_LAYOUTS: Record<string, SynthPanelLayout> = {
   Odin2: ODIN2_LAYOUT,
   Surge: SURGE_LAYOUT,
   Vital: VITAL_LAYOUT,
+
+  // Retromulator WASM synths
+  OpenWurli: OPENWURLI_LAYOUT,
+  OPL3: OPL3_LAYOUT,
+  DX7: DX7_LAYOUT,
 
   // Custom Tone.js synths
   DubSiren: DUB_SIREN_LAYOUT,
