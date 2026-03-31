@@ -439,8 +439,12 @@ export async function parseUADEFile(
   const { UADEEngine } = await import('@engine/uade/UADEEngine');
   const { periodToNoteIndex } = await import('@engine/effects/PeriodTables');
 
-  const name = filename.replace(/\.[^/.]+$/, '');
-  const ext = filename.split('.').pop()?.toLowerCase() ?? '';
+  // Strip directory components — Modland paths like "paranoimia/cust.paranoimia"
+  // break ext/prefix extraction if the slash isn't removed.
+  const basename = filename.includes('/') ? filename.split('/').pop()! : filename;
+
+  const name = basename.replace(/\.[^/.]+$/, '');
+  const ext = basename.split('.').pop()?.toLowerCase() ?? '';
 
   // Initialize UADE engine; reuse pre-scanned metadata from the dialog when available
   // (avoids a second full scan which can take several seconds per file)
@@ -465,7 +469,7 @@ export async function parseUADEFile(
   // Compiled 68k replayer formats loop indefinitely without an end signal.
   // Skip the worklet's built-in scan for these to avoid a 600-second hang.
   // Prefix-based formats (dl.*, dln.*, rh.*) are matched by the leading component.
-  const prefix = filename.split('.')[0]?.toLowerCase() ?? '';
+  const prefix = basename.split('.')[0]?.toLowerCase() ?? '';
   const SKIP_SCAN_EXTS = new Set(['jpo', 'jpold', 'rh', 'rhp',
     'mon',   // ManiacsOfNoise — enhanced scan crashes browser
     'sa',    // SonicArranger compiled binary variant — JSR prolog, enhanced scan hangs
@@ -1194,7 +1198,7 @@ export async function parseUADEFile(
 
         // VBlank-timed compiled 68k formats (Dave Lowe etc.) don't use CIA timers,
         // so the auto-detected speed is unreliable.  Force speed 6 for these.
-        const vblankPrefix = filename.split('.')[0]?.toLowerCase() ?? '';
+        const vblankPrefix = basename.split('.')[0]?.toLowerCase() ?? '';
         const VBLANK_PREFIXES = new Set(['dl', 'bd', 'fg', 'jb', 'jp', 'mc', 'dh', 'ps', 'sb', 'th', 'wb', 'kc', 'jt']);
         const speedHint = VBLANK_PREFIXES.has(vblankPrefix) ? 6 : undefined;
 
@@ -2193,6 +2197,11 @@ function buildClassicSong(
       rows: Array.from({ length: rowEnd - rowStart }, (_, rowIdx) => {
         const scanIdx = rowStart + rowIdx;
         if (scanIdx >= scanRows.length) {
+          // When scanRows is empty (compiled 68k), place a trigger note on
+          // row 0 / channel 0 so UADESynth playback starts and user sees it.
+          if (scanIdx === 0 && chIdx === 0) {
+            return { note: 49, instrument: 1, volume: 0x40, effTyp: 0, eff: 0, effTyp2: 0, eff2: 0 };
+          }
           return { note: 0, instrument: 0, volume: 0, effTyp: 0, eff: 0, effTyp2: 0, eff2: 0 };
         }
 
