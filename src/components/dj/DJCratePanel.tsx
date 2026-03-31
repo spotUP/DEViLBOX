@@ -35,7 +35,7 @@ export const DJCratePanel: React.FC<DJCratePanelProps> = ({ onClose, onLoadSerat
   }, []);
 
   return (
-    <div className="bg-dark-bgSecondary border border-dark-border rounded-lg flex flex-col max-h-[50vh] overflow-hidden">
+    <div className="bg-dark-bgSecondary border border-dark-border rounded-lg flex flex-col max-h-[50vh]">
       {/* Tab bar */}
       <div className="flex items-center border-b border-dark-border shrink-0">
         {TABS.map(({ id, label, icon: Icon }) => (
@@ -63,7 +63,7 @@ export const DJCratePanel: React.FC<DJCratePanelProps> = ({ onClose, onLoadSerat
       </div>
 
       {/* Tab content */}
-      <div className="flex-1 overflow-y-auto">
+      <div className="flex-1 min-h-0">
         {activeTab === 'browser' && <DJFileBrowser />}
         {activeTab === 'playlists' && <DJPlaylistPanel />}
         {activeTab === 'online' && <DJModlandBrowser />}
