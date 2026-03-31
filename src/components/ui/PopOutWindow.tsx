@@ -92,21 +92,13 @@ export const PopOutWindow: React.FC<PopOutWindowProps> = ({
       'status=no',
     ].join(',');
 
-    // Build the popout HTML document
-    const popoutHTML = `<!DOCTYPE html><html><head><title>${title}</title><style>
-      html, body { margin: 0; padding: 0; background: var(--color-bg, #0b0909); color: var(--color-text, #f2f0f0); overflow: auto; height: 100%; }
-      #popout-root { display: inline-block; min-width: 100%; }
-    </style></head><body><div id="popout-root"></div></body></html>`;
-
-    // Use a blob URL so the window title bar shows the page title instead of "about:blank".
-    // Blob URLs inherit the creating origin, so createPortal and shared stores still work.
-    const blob = new Blob([popoutHTML], { type: 'text/html' });
-    const blobUrl = URL.createObjectURL(blob);
-
-    const popup = window.open(blobUrl, '', features);
+    // Open a real same-origin URL so the title bar shows the page title, not "about:blank".
+    // The static HTML at /popout.html reads the title from the query param.
+    // Because it's same-origin, createPortal and shared Zustand stores still work.
+    const popoutUrl = `/popout.html?t=${encodeURIComponent(title)}`;
+    const popup = window.open(popoutUrl, '', features);
 
     if (!popup) {
-      URL.revokeObjectURL(blobUrl);
       notify.warning('Popup blocked — please allow popups for this site');
       onClose();
       return;
@@ -115,17 +107,12 @@ export const PopOutWindow: React.FC<PopOutWindowProps> = ({
     popupRef.current = popup;
     openPopouts.set(title, popup);
 
-    // Wait for the blob document to load, then set up the portal mount
+    // Wait for the static HTML document to finish loading, then set up the portal mount
     const setupPopup = () => {
-      URL.revokeObjectURL(blobUrl);
-
-      popup.document.title = title;
-
       const mount = popup.document.getElementById('popout-root') as HTMLDivElement;
       if (!mount) {
-        console.error('[PopOutWindow] Failed to find popout-root element');
-        popup.close();
-        onClose();
+        // Document not ready yet (still on about:blank during navigation) — retry
+        setTimeout(setupPopup, 30);
         return;
       }
 
@@ -211,12 +198,8 @@ export const PopOutWindow: React.FC<PopOutWindowProps> = ({
       (popup as any).__handleClose = handlePopupClose;
     };
 
-    // Blob URLs load asynchronously — wait for DOMContentLoaded
-    if (popup.document.readyState === 'complete' || popup.document.readyState === 'interactive') {
-      setupPopup();
-    } else {
-      popup.addEventListener('DOMContentLoaded', setupPopup);
-    }
+    // Wait for the static HTML to finish loading before setting up
+    popup.addEventListener('load', setupPopup);
 
     // Cleanup on unmount
     return () => {
