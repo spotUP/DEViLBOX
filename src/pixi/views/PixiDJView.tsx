@@ -7,9 +7,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { PixiButton, PixiViewHeader } from '../components';
 import { PixiDJDeck } from './dj/PixiDJDeck';
 import { PixiDJMixer } from './dj/PixiDJMixer';
-import { PixiDJPlaylistPanel } from './dj/PixiDJPlaylistPanel';
-import { PixiDJModlandBrowser } from './dj/PixiDJModlandBrowser';
-import { PixiDJSeratoBrowser } from './dj/PixiDJSeratoBrowser';
+import { PixiDJCratePanel } from './dj/PixiDJCratePanel';
 import { useUIStore } from '@stores';
 import { useDJStore } from '@stores/useDJStore';
 import { useTransportStore } from '@stores/useTransportStore';
@@ -23,7 +21,7 @@ import { PixiDJFxPresets } from './dj/PixiDJFxPresets';
 import { PixiDJSamplerPanel } from './dj/PixiDJSamplerPanel';
 import { PixiDJAutoDJPanel } from './dj/PixiDJAutoDJPanel';
 
-type DJBrowserPanel = 'none' | 'playlists' | 'modland' | 'serato';
+type DJBrowserPanel = 'none' | 'crate';
 
 export const PixiDJView: React.FC = () => {
   const engineRef = useRef<DJEngine | null>(null);
@@ -79,11 +77,9 @@ export const PixiDJView: React.FC = () => {
         onAutoDJToggle={() => setAutoDJOpen(p => !p)}
       />
 
-      {/* Browser panel — GL-native, collapses to 0 height when hidden */}
-      <pixiContainer layout={{ width: '100%', height: browserPanel !== 'none' ? 280 : 0, flexShrink: 0 }}>
-        {browserPanel === 'playlists' && <PixiDJPlaylistPanel onClose={() => setBrowserPanel('none')} />}
-        {browserPanel === 'modland' && <PixiDJModlandBrowser onClose={() => setBrowserPanel('none')} />}
-        {browserPanel === 'serato' && <PixiDJSeratoBrowser />}
+      {/* Crate panel — GL-native tabbed browser, collapses to 0 height when hidden */}
+      <pixiContainer layout={{ width: '100%', height: browserPanel === 'crate' ? 280 : 0, flexShrink: 0 }}>
+        {browserPanel === 'crate' && <PixiDJCratePanel onClose={() => setBrowserPanel('none')} />}
       </pixiContainer>
 
       {/* Main deck area: Deck A | Mixer | Deck B [| Deck C] */}
@@ -209,47 +205,14 @@ const PixiDJTopBar: React.FC<DJTopBarProps> = ({ browserPanel, onBrowserPanelCha
         onClick={onAutoDJToggle}
       />
 
-      {/* Browser */}
+      {/* Crate */}
       <PixiButton
-        label="Browser"
-        variant={modalOpen === 'fileBrowser' ? 'ft2' : 'ghost'}
-        color={modalOpen === 'fileBrowser' ? 'blue' : undefined}
+        label="Crate"
+        variant={browserPanel === 'crate' ? 'ft2' : 'ghost'}
+        color={browserPanel === 'crate' ? 'blue' : undefined}
         size="sm"
-        active={modalOpen === 'fileBrowser'}
-        onClick={() => {
-          const s = useUIStore.getState();
-          if (s.modalOpen === 'fileBrowser') { s.closeModal(); } else { s.openModal('fileBrowser'); }
-        }}
-      />
-
-      {/* Playlists */}
-      <PixiButton
-        label="Playlists"
-        variant={browserPanel === 'playlists' ? 'ft2' : 'ghost'}
-        color={browserPanel === 'playlists' ? 'blue' : undefined}
-        size="sm"
-        active={browserPanel === 'playlists'}
-        onClick={() => togglePanel('playlists')}
-      />
-
-      {/* Online Music Search (Modland + HVSC) */}
-      <PixiButton
-        label="Online"
-        variant={browserPanel === 'modland' ? 'ft2' : 'ghost'}
-        color={browserPanel === 'modland' ? 'green' : undefined}
-        size="sm"
-        active={browserPanel === 'modland'}
-        onClick={() => togglePanel('modland')}
-      />
-
-      {/* Serato */}
-      <PixiButton
-        label="Serato"
-        variant={browserPanel === 'serato' ? 'ft2' : 'ghost'}
-        color={browserPanel === 'serato' ? 'purple' : undefined}
-        size="sm"
-        active={browserPanel === 'serato'}
-        onClick={() => togglePanel('serato')}
+        active={browserPanel === 'crate'}
+        onClick={() => togglePanel('crate')}
       />
     </PixiViewHeader>
   );
