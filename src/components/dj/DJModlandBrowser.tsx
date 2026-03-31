@@ -252,6 +252,14 @@ export const DJModlandBrowser: React.FC<DJModlandBrowserProps> = ({ onClose }) =
 
   // ── Download → Parse → Load to Deck ─────────────────────────────────────
 
+  /** Pick the deck that isn't currently playing (fallback: A) */
+  const pickFreeDeck = useCallback((): 'A' | 'B' => {
+    const decks = useDJStore.getState().decks;
+    if (!decks.A.isPlaying) return 'A';
+    if (!decks.B.isPlaying) return 'B';
+    return 'A';
+  }, []);
+
   const loadToDeck = useCallback(
     async (file: OnlineResult, deckId: 'A' | 'B' | 'C') => {
       setDownloadingPaths((prev) => new Set(prev).add(file.key));
@@ -507,6 +515,7 @@ export const DJModlandBrowser: React.FC<DJModlandBrowserProps> = ({ onClose }) =
                 key={file.key}
                 data-result-item
                 onClick={() => setSelectedIndex(idx)}
+                onDoubleClick={() => loadToDeck(file, pickFreeDeck())}
                 className={`flex items-center gap-2 px-2 py-1.5 rounded border transition-colors group cursor-pointer ${
                   idx === selectedIndex
                     ? 'bg-green-900/20 border-green-700/50'

@@ -153,6 +153,14 @@ export const DJPlaylistPanel: React.FC<DJPlaylistPanelProps> = ({ onClose }) => 
 
   // ── Load track to deck (uses song cache, falls back to file picker) ─────
 
+  /** Pick the deck that isn't currently playing (fallback: A) */
+  const pickFreeDeck = useCallback((): 'A' | 'B' => {
+    const decks = useDJStore.getState().decks;
+    if (!decks.A.isPlaying) return 'A';
+    if (!decks.B.isPlaying) return 'B';
+    return 'A';
+  }, []);
+
   const loadSongToDeck = useCallback(
     async (song: import('@/engine/TrackerReplayer').TrackerSong, fileName: string, deckId: 'A' | 'B' | 'C', rawBuffer?: ArrayBuffer) => {
       const engine = getDJEngine();
@@ -502,7 +510,8 @@ export const DJPlaylistPanel: React.FC<DJPlaylistPanelProps> = ({ onClose }) => 
                   onDragStart={() => handleDragStart(i)}
                   onDragOver={(e) => handleDragOver(e, i)}
                   onDragEnd={handleDragEnd}
-                  className={`flex items-center gap-1.5 px-1.5 py-1 border-b border-white/[0.04] transition-colors group ${
+                  onDoubleClick={() => loadTrackToDeck(track, pickFreeDeck())}
+                  className={`flex items-center gap-1.5 px-1.5 py-1 border-b border-white/[0.04] transition-colors group cursor-pointer ${
                     dragIndex === i
                       ? 'bg-accent-primary/10'
                       : autoDJEnabled && i === autoDJCurrentIdx
