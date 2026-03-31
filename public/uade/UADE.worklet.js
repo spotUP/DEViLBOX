@@ -624,14 +624,18 @@ class UADEProcessor extends AudioWorkletProcessor {
   }
 
   _loadIntoWasm(data, filenameHint) {
+    // Strip directory components — UADE MEMFS only has /uade/ flat dir;
+    // paths like "paranoimia/cust.paranoimia" cause "Cannot write to MEMFS".
+    const basename = filenameHint.includes('/') ? filenameHint.split('/').pop() : filenameHint;
+
     const ptr = this._wasm._malloc(data.byteLength);
     if (!ptr) throw new Error('malloc failed for file data (' + data.byteLength + ' bytes)');
     this._wasm.HEAPU8.set(data, ptr);
 
-    const hintLen = filenameHint.length * 3 + 1;
+    const hintLen = basename.length * 3 + 1;
     const hintPtr = this._wasm._malloc(hintLen);
     if (!hintPtr) throw new Error('malloc failed for filename hint');
-    this._wasm.stringToUTF8(filenameHint, hintPtr, hintLen);
+    this._wasm.stringToUTF8(basename, hintPtr, hintLen);
 
     this._lastAbortReason = null;
     const ret = this._wasm._uade_wasm_load(ptr, data.byteLength, hintPtr);
