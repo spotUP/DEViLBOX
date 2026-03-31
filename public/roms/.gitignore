@@ -1,6 +1,8 @@
 # Ignore all ROM files (copyrighted material)
 *.bin
 *.BIN
+*.OBJ
+*.obj
 *.zip
 *.ZIP
 *.vsm
