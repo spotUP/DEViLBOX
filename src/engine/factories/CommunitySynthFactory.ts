@@ -896,6 +896,12 @@ export function createDexed(config: InstrumentConfig): Tone.ToneAudioNode {
   const dexedConfig = config.dexed || {};
   const synth = new DexedSynth(dexedConfig);
 
+  // Check for native VCED preset (loaded via loadSysEx)
+  const vcedPresetName = (config as unknown as Record<string, unknown>).dexedVcedPreset;
+  if (typeof vcedPresetName === 'string') {
+    synth.loadVCEDPreset(vcedPresetName);
+  }
+
   synth.output.gain.value = Tone.dbToGain(getNormalizedVolume('Dexed', config.volume));
 
   return synth as unknown as Tone.ToneAudioNode;

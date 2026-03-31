@@ -4,196 +4,23 @@
  */
 
 import type { InstrumentPreset } from '@typedefs/instrument';
-import { DEXED_PRESETS } from '../engine/dexed/DexedSynth';
 import { OBXD_PRESETS } from '../engine/obxd/OBXdSynth';
+import { DX7_VCED_PRESETS } from '../engine/dexed/dx7presets';
 
-// Helper to create basic DX7 operator
-const dxOp = (level: number, coarse: number, fine: number = 0, detune: number = 7) => ({
-  level, coarse, fine, detune,
-  egRates: [99, 99, 99, 99] as [number, number, number, number], 
-  egLevels: [99, 99, 99, 0] as [number, number, number, number]
-});
-
-export const DEXED_FACTORY_PRESETS: InstrumentPreset['config'][] = [
-  // --- KEYS & PIANOS ---
-  {
-    name: 'DX7 E.Piano 1',
-    type: 'synth',
-    synthType: 'Dexed',
-    volume: -10,
-    pan: 0,
-    effects: [],
-    dexed: DEXED_PRESETS['E.PIANO 1'],
-  },
-  {
-    name: 'DX7 E.Piano Bright',
-    type: 'synth',
-    synthType: 'Dexed',
-    volume: -10,
-    pan: 0,
-    effects: [],
-    dexed: {
-      ...DEXED_PRESETS['E.PIANO 1'],
-      feedback: 7, // More harmonics
-    },
-  },
-  {
-    name: 'DX7 Clavinet',
-    type: 'synth',
-    synthType: 'Dexed',
-    volume: -10,
-    pan: 0,
-    effects: [],
-    dexed: {
-      algorithm: 4,
-      feedback: 0,
-      operators: [
-        { level: 99, coarse: 1, egRates: [99, 60, 30, 60] as [number, number, number, number], egLevels: [99, 0, 0, 0] as [number, number, number, number] },
-        { level: 80, coarse: 2, egRates: [99, 50, 20, 50] as [number, number, number, number], egLevels: [99, 0, 0, 0] as [number, number, number, number] },
-        dxOp(0, 1), dxOp(0, 1), dxOp(0, 1), dxOp(0, 1)
-      ]
-    },
-  },
-  {
-    name: 'DX7 Organ',
-    type: 'synth',
-    synthType: 'Dexed',
-    volume: -12,
-    pan: 0,
-    effects: [],
-    dexed: {
-      algorithm: 3, // Stacked modulators
-      feedback: 0,
-      operators: [
-        { level: 99, coarse: 1 }, // Fundamental
-        { level: 90, coarse: 2 }, // Octave
-        { level: 85, coarse: 3 }, // Fifth
-        { level: 80, coarse: 4 }, // 2 Octaves
-        dxOp(0, 1), dxOp(0, 1)
-      ]
-    },
-  },
-
-  // --- BASS ---
-  {
-    name: 'DX7 Bass 1',
-    type: 'synth',
-    synthType: 'Dexed',
-    volume: -8,
-    pan: 0,
-    effects: [],
-    dexed: {
-      algorithm: 5,
-      feedback: 7,
-      operators: [
-        { level: 99, coarse: 1, fine: 0, detune: 7, egRates: [99, 75, 40, 60] as [number, number, number, number], egLevels: [99, 90, 0, 0] as [number, number, number, number] },
-        { level: 75, coarse: 1, fine: 0, detune: 7, egRates: [99, 75, 40, 60] as [number, number, number, number], egLevels: [99, 90, 0, 0] as [number, number, number, number] },
-        { level: 50, coarse: 2, fine: 0, detune: 7, egRates: [99, 75, 40, 60] as [number, number, number, number], egLevels: [99, 90, 0, 0] as [number, number, number, number] },
-        dxOp(0, 1), dxOp(0, 1), dxOp(0, 1)
-      ]
-    },
-  },
-  {
-    name: 'DX7 Slap Bass',
-    type: 'synth',
-    synthType: 'Dexed',
-    volume: -8,
-    pan: 0,
-    effects: [],
-    dexed: {
-      algorithm: 16, // 1 carrier, 1 modulator stack
-      feedback: 6,
-      operators: [
-        { level: 99, coarse: 1, egRates: [99, 60, 40, 60] as [number, number, number, number], egLevels: [99, 95, 0, 0] as [number, number, number, number] },
-        { level: 88, coarse: 4, egRates: [99, 80, 60, 80] as [number, number, number, number], egLevels: [99, 0, 0, 0] as [number, number, number, number] }, // Snap
-        dxOp(0, 1), dxOp(0, 1), dxOp(0, 1), dxOp(0, 1)
-      ]
-    },
-  },
-  {
-    name: 'DX7 Solid Bass',
-    type: 'synth',
-    synthType: 'Dexed',
-    volume: -8,
-    pan: 0,
-    effects: [],
-    dexed: {
-      algorithm: 18,
-      feedback: 4,
-      operators: [
-        { level: 99, coarse: 0, fine: 50 }, // Sub
-        { level: 80, coarse: 1 },
-        { level: 70, coarse: 1 },
-        dxOp(0, 1), dxOp(0, 1), dxOp(0, 1)
-      ]
-    },
-  },
-
-  // --- BELLS & MALLETS ---
-  {
-    name: 'DX7 Tubular Bells',
-    type: 'synth',
-    synthType: 'Dexed',
-    volume: -12,
-    pan: 0,
-    effects: [],
-    dexed: {
-      algorithm: 1,
-      feedback: 5,
-      operators: [
-        { level: 99, coarse: 1, fine: 0, detune: 7, egRates: [99, 40, 20, 50] as [number, number, number, number], egLevels: [99, 0, 0, 0] as [number, number, number, number] },
-        { level: 85, coarse: 3, fine: 50, detune: 7, egRates: [99, 60, 30, 50] as [number, number, number, number], egLevels: [99, 0, 0, 0] as [number, number, number, number] }, // Non-integer ratio
-        dxOp(0, 1), dxOp(0, 1), dxOp(0, 1), dxOp(0, 1)
-      ]
-    },
-  },
-  {
-    name: 'DX7 Marimba',
-    type: 'synth',
-    synthType: 'Dexed',
-    volume: -10,
-    pan: 0,
-    effects: [],
-    dexed: {
-      algorithm: 4,
-      feedback: 0,
-      operators: [
-        { level: 99, coarse: 1, egRates: [99, 70, 30, 60] as [number, number, number, number], egLevels: [99, 0, 0, 0] as [number, number, number, number] },
-        { level: 80, coarse: 4, egRates: [99, 60, 20, 50] as [number, number, number, number], egLevels: [99, 0, 0, 0] as [number, number, number, number] },
-        dxOp(0, 1), dxOp(0, 1), dxOp(0, 1), dxOp(0, 1)
-      ]
-    },
-  },
-
-  // --- BRASS & STRINGS ---
-  {
-    name: 'DX7 Brass 1',
-    type: 'synth',
-    synthType: 'Dexed',
-    volume: -10,
-    pan: 0,
-    effects: [],
-    dexed: DEXED_PRESETS['BRASS 1'],
-  },
-  {
-    name: 'DX7 Strings 1',
-    type: 'synth',
-    synthType: 'Dexed',
-    volume: -10,
-    pan: 0,
-    effects: [],
-    dexed: DEXED_PRESETS['STRINGS 1'],
-  },
-  {
-    name: 'DX7 Init Voice',
-    type: 'synth',
-    synthType: 'Dexed',
-    volume: -10,
-    pan: 0,
-    effects: [],
-    dexed: DEXED_PRESETS['INIT VOICE'],
-  },
-];
+/**
+ * Dexed (DX7) factory presets — all use native VCED patch loading
+ * Each preset loads a 156-byte VCED patch directly into the engine via loadSysEx
+ */
+export const DEXED_FACTORY_PRESETS: InstrumentPreset['config'][] = DX7_VCED_PRESETS.map(preset => ({
+  name: `DX7 ${preset.name}`,
+  type: 'synth' as const,
+  synthType: 'Dexed',
+  volume: -10,
+  pan: 0,
+  effects: [],
+  dexed: {},
+  dexedVcedPreset: preset.name,
+}));
 
 export const OBXD_FACTORY_PRESETS: InstrumentPreset['config'][] = [
   // --- BRASS ---
