@@ -11,7 +11,7 @@
 
 import React, { useState } from 'react';
 import { useDJStore } from '@/stores/useDJStore';
-import { MixerEQ } from '@/components/dj/MixerEQ';
+import { MixerFilterKnob, MixerEQBandKnob } from '@/components/dj/MixerEQ';
 import { MixerVUMeter } from '@/components/dj/MixerVUMeter';
 import { MixerChannelStrip } from '@/components/dj/MixerChannelStrip';
 import { MixerCrossfader } from '@/components/dj/MixerCrossfader';
@@ -34,24 +34,46 @@ export const DJMixer: React.FC = () => {
         bg-dark-bg border border-dark-border rounded-lg h-full
       "
     >
-      {/* Row 1: Filter+EQ | Fader | VUs | Fader | Filter+EQ — all stretch to same height */}
-      <div className="flex items-stretch justify-center gap-1 w-full border-b border-dark-border pb-2">
-        <MixerEQ deckId="A" />
+      {/* Row 1: Knob columns | Faders | VUs — knobs horizontal, faders/VUs full height */}
+      <div className="flex items-stretch justify-center gap-1.5 w-full border-b border-dark-border pb-2">
+        {/* Deck A knobs — stacked vertically, kill buttons on outside (left) */}
+        <div className="flex flex-col items-center gap-0.5">
+          <MixerFilterKnob deckId="A" />
+          <MixerEQBandKnob deckId="A" band="high" label="HI" color="#00d4ff" side="left" />
+          <MixerEQBandKnob deckId="A" band="mid" label="MID" color="#cccccc" side="left" />
+          <MixerEQBandKnob deckId="A" band="low" label="LO" color="#ff8800" side="left" />
+        </div>
+
+        {/* Deck A fader — stretches full height */}
         <MixerChannelStrip deckId="A" stretch />
 
         {/* Center VU meters — stretch full height */}
-        <div className="flex gap-1 items-stretch mx-0.5">
+        <div className="flex gap-1 items-stretch">
           <MixerVUMeter deckId="A" stretch />
           <MixerVUMeter deckId="B" stretch />
           {thirdDeck && <MixerVUMeter deckId="C" stretch />}
         </div>
 
+        {/* Deck B fader — stretches full height */}
         <MixerChannelStrip deckId="B" stretch />
-        <MixerEQ deckId="B" />
+
+        {/* Deck B knobs — stacked vertically, kill buttons on outside (right) */}
+        <div className="flex flex-col items-center gap-0.5">
+          <MixerFilterKnob deckId="B" />
+          <MixerEQBandKnob deckId="B" band="high" label="HI" color="#00d4ff" side="right" />
+          <MixerEQBandKnob deckId="B" band="mid" label="MID" color="#cccccc" side="right" />
+          <MixerEQBandKnob deckId="B" band="low" label="LO" color="#ff8800" side="right" />
+        </div>
+
         {thirdDeck && (
           <>
             <MixerChannelStrip deckId="C" stretch />
-            <MixerEQ deckId="C" />
+            <div className="flex flex-col items-center gap-0.5">
+              <MixerFilterKnob deckId="C" />
+              <MixerEQBandKnob deckId="C" band="high" label="HI" color="#00d4ff" side="right" />
+              <MixerEQBandKnob deckId="C" band="mid" label="MID" color="#cccccc" side="right" />
+              <MixerEQBandKnob deckId="C" band="low" label="LO" color="#ff8800" side="right" />
+            </div>
           </>
         )}
       </div>
