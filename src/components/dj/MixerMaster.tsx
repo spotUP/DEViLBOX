@@ -95,6 +95,7 @@ export const MixerMaster: React.FC = () => {
         color="#ffffff"
         defaultValue={1}
         formatValue={formatMaster}
+        hideValue
         title="Master volume — controls overall output level"
       />
 
