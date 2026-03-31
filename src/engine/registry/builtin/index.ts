@@ -10,3 +10,4 @@ import './tb303';
 import './furnace';
 import './supercollider';
 import './openwurli';
+import './opl3';

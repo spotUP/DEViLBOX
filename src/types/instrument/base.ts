@@ -169,6 +169,7 @@ export type SynthType =
   | 'DubSiren'         // Dub Siren (Osc + LFO + Delay)
   | 'SpaceLaser'       // Space Laser (FM + Pitch Sweep)
   | 'OpenWurli'        // Wurlitzer 200A Electric Piano (Physical Model)
+  | 'OPL3'             // Nuked OPL3 (YMF262) 18-channel FM
   | 'V2'               // Farbrausch V2 Synth
   | 'V2Speech'         // Farbrausch V2 Speech Synth
   | 'Sam'              // Commodore SAM Speech Synth
