@@ -41,7 +41,14 @@ export type ActionType =
   | 'FADE_VOLUME'
   | 'AMPLIFY'
   | 'SWAP_CHANNELS'
-  | 'JOIN_PATTERNS';
+  | 'JOIN_PATTERNS'
+  | 'CUT_COMMANDS'
+  | 'PASTE_COMMANDS'
+  | 'KILL_TO_END'
+  | 'KILL_TO_START'
+  | 'REVERSE_BLOCK'
+  | 'DOUBLE_BLOCK'
+  | 'HALVE_BLOCK';
 
 export interface HistoryAction {
   id: string;
@@ -363,6 +370,13 @@ export const getActionTypeName = (type: ActionType): string => {
     AMPLIFY: 'Amplify Selection',
     SWAP_CHANNELS: 'Swap Channels',
     JOIN_PATTERNS: 'Join Patterns',
+    CUT_COMMANDS: 'Cut Commands',
+    PASTE_COMMANDS: 'Paste Commands',
+    KILL_TO_END: 'Kill to End',
+    KILL_TO_START: 'Kill to Start',
+    REVERSE_BLOCK: 'Reverse Block',
+    DOUBLE_BLOCK: 'Double Block',
+    HALVE_BLOCK: 'Halve Block',
   };
   return names[type] || type;
 };
