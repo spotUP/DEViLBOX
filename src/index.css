@@ -1905,7 +1905,7 @@
 }
 
 /* Column Classes for Strict Alignment */
-.ft2-col-1 { width: 260px; }
+.ft2-col-1 { width: 260px; border-right: none; }
 .ft2-col-2 { width: 220px; }
 .ft2-col-3 { width: 220px; }
 .ft2-col-4 { width: 220px; }
