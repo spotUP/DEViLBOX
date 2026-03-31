@@ -94,6 +94,17 @@ export interface DrumMachineConfig {
 }
 
 /**
+ * Velocity Layer - Maps a velocity range to a specific sample within a key mapping
+ */
+export interface VelocityLayer {
+  sampleId: string;
+  sampleUrl?: string;
+  sampleName?: string;
+  velocityMin: number;   // 0-127
+  velocityMax: number;   // 0-127
+}
+
+/**
  * Drumkit Key Mapping - Maps a note range to a sample
  */
 export interface DrumKitKeyMapping {
@@ -108,6 +119,8 @@ export interface DrumKitKeyMapping {
   volumeOffset: number;
   panOffset: number;
   baseNote?: string;
+  velocityLayers?: VelocityLayer[];        // Velocity-switched sample layers
+  roundRobinGroup?: number;                 // Group ID for round-robin cycling (0 = off)
 }
 
 /**

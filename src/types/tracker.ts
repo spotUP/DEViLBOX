@@ -112,6 +112,25 @@ export interface TrackerCell {
   // Effects 1,2,4,7,8,A are handled by WASM synth, not XM replayer
   saEffect?: number;
   saEffectArg?: number;
+
+  // ── Renoise-style multi-note columns (up to 4 notes per cell) ──
+  // Extra note columns for chord support. Column 1 uses the primary
+  // note/instrument/volume fields above. Columns 2-4 are optional.
+  // Each column has independent note-off, instrument, volume, and delay.
+  note2?: NoteValue;              // 0 = empty, 1-96 = notes, 97 = note off
+  instrument2?: InstrumentValue;
+  volume2?: VolumeValue;
+  delay2?: number;                // 0-255 sub-row delay (for strum effects)
+
+  note3?: NoteValue;
+  instrument3?: InstrumentValue;
+  volume3?: VolumeValue;
+  delay3?: number;
+
+  note4?: NoteValue;
+  instrument4?: InstrumentValue;
+  volume4?: VolumeValue;
+  delay4?: number;
 }
 
 export interface TrackerRow {
@@ -140,6 +159,8 @@ export interface ChannelData {
     hardwareName?: string; // Hardware-specific channel name
     shortName?: string; // Short display name for channel headers
     effectCols?: number; // Number of effect columns (default 2)
+    noteCols?: number;   // Number of note columns per track (default 1, max 4) — Renoise-style chords
+    maxVoices?: number;  // Max simultaneous voices per channel (default unlimited; 1-16)
     systemId?: number | string; // System preset identifier (number for Furnace fileID)
     sunvoxModuleId?: number; // SunVox module ID for SunVox channels
   };
@@ -419,6 +440,7 @@ export interface PatternSequence {
 export interface CursorPosition {
   channelIndex: number;
   rowIndex: number;
+  noteColumnIndex: number; // 0-3: which note column the cursor is in (0 = primary)
   columnType: 'note' | 'instrument' | 'volume' | 'effTyp' | 'effParam' | 'effTyp2' | 'effParam2' | 'flag1' | 'flag2' | 'cutoff' | 'resonance' | 'envMod' | 'pan' | 'probability' | 'automation';
   digitIndex: number; // For hex input (0-2 depending on column)
 }

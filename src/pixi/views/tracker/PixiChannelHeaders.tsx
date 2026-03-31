@@ -450,6 +450,20 @@ const PixiChannelHeadersInner: React.FC<PixiChannelHeadersProps> = ({
         { label: channel.muted ? 'Unmute' : 'Mute', action: () => toggleChannelMute(ch) },
         { label: channel.solo ? 'Unsolo' : 'Solo', action: () => toggleChannelSolo(ch) },
         { label: '', separator: true },
+        { label: 'Max Voices', submenu: (() => {
+          const currentMax = channel.channelMeta?.maxVoices || 0;
+          const options = [0, 1, 2, 4, 8, 16];
+          return options.map(n => ({
+            label: n === 0 ? `Unlimited${currentMax === 0 ? ' ✓' : ''}` : `${n}${currentMax === n ? ' ✓' : ''}`,
+            action: () => {
+              const { setChannelMeta } = useTrackerStore.getState();
+              setChannelMeta(ch, { maxVoices: n });
+              import('@engine/ToneEngine').then(({ getToneEngine }) => {
+                getToneEngine().setChannelMaxVoices(ch, n);
+              });
+            },
+          }));
+        })()},
         { label: 'Delete Channel', action: () => removeChannel(ch), disabled: patterns[0]?.channels.length <= 1 },
       ];
     }

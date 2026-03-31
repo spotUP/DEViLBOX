@@ -30,7 +30,8 @@ export type DialogCommand =
   | 'automation'
   | 'collaboration'
   | 'randomize'
-  | 'acid-pattern';
+  | 'acid-pattern'
+  | 'pattern-length';
 
 interface UIStore {
   // State

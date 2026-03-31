@@ -37,6 +37,7 @@ import { PixiScaleVolumeDialog } from './dialogs/PixiScaleVolumeDialog';
 import { PixiFadeVolumeDialog } from './dialogs/PixiFadeVolumeDialog';
 import { PixiStrumDialog } from './dialogs/PixiStrumDialog';
 import { PixiAcidPatternDialog } from './dialogs/PixiAcidPatternDialog';
+import { PixiPatternLengthDialog } from './dialogs/PixiPatternLengthDialog';
 import { PixiRandomizeDialog } from './dialogs/PixiRandomizeDialog';
 import { PixiClipRenameDialog } from './dialogs/PixiClipRenameDialog';
 import { PixiTrackRenameDialog } from './dialogs/PixiTrackRenameDialog';
@@ -358,6 +359,7 @@ export const PixiRoot: React.FC = () => {
         />
         <PixiStrumDialog isOpen={modalOpen === 'strum'} onClose={closeModal} />
         <PixiAcidPatternDialog isOpen={modalOpen === 'acidPattern'} onClose={closeModal} />
+        <PixiPatternLengthDialog isOpen={modalOpen === 'patternLength'} onClose={closeModal} />
         <PixiRandomizeDialog isOpen={modalOpen === 'randomize'} onClose={closeModal} />
         <PixiDownloadModal isOpen={modalOpen === 'download'} onClose={closeModal} />
         <PixiUndoHistoryPanel isOpen={modalOpen === 'undoHistory'} onClose={closeModal} />
