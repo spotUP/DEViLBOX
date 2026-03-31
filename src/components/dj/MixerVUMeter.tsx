@@ -11,9 +11,10 @@ import { useDeckVisualizationData } from '@/hooks/dj/useDeckVisualizationData';
 
 interface MixerVUMeterProps {
   deckId: 'A' | 'B' | 'C';
+  stretch?: boolean;
 }
 
-const VU_SEGMENTS = 20;
+const VU_SEGMENTS = 14;
 const PEAK_HOLD_MS = 1500;
 const PEAK_DECAY_SEGMENTS_PER_SEC = 12;
 
@@ -32,12 +33,12 @@ const COLORS = {
 };
 
 function getSegmentColor(index: number): string {
-  if (index >= 17) return COLORS.red;
-  if (index >= 12) return COLORS.yellow;
+  if (index >= 12) return COLORS.red;
+  if (index >= 8) return COLORS.yellow;
   return COLORS.green;
 }
 
-export const MixerVUMeter: React.FC<MixerVUMeterProps> = ({ deckId }) => {
+export const MixerVUMeter: React.FC<MixerVUMeterProps> = ({ deckId, stretch }) => {
   const viz = useDeckVisualizationData(deckId);
   const containerRef = useRef<HTMLDivElement>(null);
   const rafRef = useRef<number>(0);
@@ -111,17 +112,17 @@ export const MixerVUMeter: React.FC<MixerVUMeterProps> = ({ deckId }) => {
   return (
     <div
       ref={containerRef}
-      className="flex flex-col-reverse gap-[1px] justify-center"
+      className={`flex flex-col-reverse gap-[1px] justify-center${stretch ? ' self-stretch flex-1' : ''}`}
       style={{ width: 12 }}
       title={`Deck ${deckId === 'A' ? '1' : '2'} level meter`}
     >
       {Array.from({ length: VU_SEGMENTS }, (_, i) => (
         <div
           key={i}
-          className="rounded-[1px]"
+          className={`rounded-[1px]${stretch ? ' flex-1' : ''}`}
           style={{
             width: 12,
-            height: 5,
+            ...(!stretch ? { height: 5 } : { minHeight: 3 }),
             backgroundColor: COLORS.off,
           }}
         />

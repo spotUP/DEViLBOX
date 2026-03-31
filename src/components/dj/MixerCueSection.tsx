@@ -15,12 +15,14 @@ interface CueState {
   pflA: boolean;
   pflB: boolean;
   cueVolume: number;
+  cueMix: number;
 }
 
 export const MixerCueSection: React.FC = () => {
   const pflA = useDJStore((s) => s.decks.A.pflEnabled);
   const pflB = useDJStore((s) => s.decks.B.pflEnabled);
   const cueVolume = useDJStore((s) => s.cueVolume);
+  const cueMix = useDJStore((s) => s.cueMix);
   const cueDeviceId = useDJStore((s) => s.cueDeviceId);
   const setCueDevice = useDJStore((s) => s.setCueDevice);
 
@@ -28,10 +30,10 @@ export const MixerCueSection: React.FC = () => {
   const [supportsMultiOutput, setSupportsMultiOutput] = useState(false);
 
   // Ref pattern for toggle callbacks
-  const stateRef = useRef<CueState>({ pflA, pflB, cueVolume });
+  const stateRef = useRef<CueState>({ pflA, pflB, cueVolume, cueMix });
   useEffect(() => {
-    stateRef.current = { pflA, pflB, cueVolume };
-  }, [pflA, pflB, cueVolume]);
+    stateRef.current = { pflA, pflB, cueVolume, cueMix };
+  }, [pflA, pflB, cueVolume, cueMix]);
 
   // Enumerate audio output devices on mount
   useEffect(() => {
@@ -62,25 +64,42 @@ export const MixerCueSection: React.FC = () => {
     useDJStore.getState().setCueVolume(value);
   }, []);
 
+  const handleCueMixChange = useCallback((value: number) => {
+    useDJStore.getState().setCueMix(value);
+  }, []);
+
   const handleDeviceChange = useCallback((e: React.ChangeEvent<HTMLSelectElement>) => {
     const deviceId = e.target.value || null;
     setCueDevice(deviceId);
   }, [setCueDevice]);
 
   return (
-    <div className="flex flex-col items-center gap-1.5" title="Headphone cue section">
-      {/* Cue volume knob */}
-      <Knob
-        value={cueVolume}
-        min={0}
-        max={1.5}
-        onChange={handleCueVolumeChange}
-        label="CUE"
-        size="sm"
-        color="#ffcc00"
-        defaultValue={1}
-        title="Cue volume — headphone pre-fader listen level"
-      />
+    <div className="flex flex-col items-center gap-1" title="Headphone cue section">
+      {/* CUE + MIX knobs side by side */}
+      <div className="flex gap-1 items-start">
+        <Knob
+          value={cueVolume}
+          min={0}
+          max={1.5}
+          onChange={handleCueVolumeChange}
+          label="CUE"
+          size="sm"
+          color="#ffcc00"
+          defaultValue={1}
+          title="Cue volume — headphone pre-fader listen level"
+        />
+        <Knob
+          value={cueMix}
+          min={0}
+          max={1}
+          onChange={handleCueMixChange}
+          label="MIX"
+          size="sm"
+          color="#66ccff"
+          defaultValue={0.5}
+          title="Cue mix — 0 = PFL only, center = blend, 1 = master only"
+        />
+      </div>
 
       {/* PFL buttons — headphone pre-listen per deck */}
       <div className="flex gap-1 items-center">

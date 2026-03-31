@@ -1,8 +1,8 @@
 /**
- * MixerEQ - 3-band EQ with kill switches for one DJ deck
+ * MixerEQ - Filter + 3-band EQ with kill switches for one DJ deck
  *
- * Vertical stack: High, Mid, Low knobs (top to bottom, like a real mixer).
- * Each band has a kill switch button that mutes the frequency range.
+ * Vertical stack: Filter, High, Mid, Low knobs (top to bottom, like a real mixer).
+ * Each EQ band has a kill switch button that mutes the frequency range.
  * Kill switches snap to beat/bar boundaries when quantize is enabled.
  */
 
@@ -23,6 +23,7 @@ const BANDS = [
 ] as const;
 
 export const MixerEQ: React.FC<MixerEQProps> = ({ deckId }) => {
+  const filterPosition = useDJStore((s) => s.decks[deckId].filterPosition);
   const eqHigh = useDJStore((s) => s.decks[deckId].eqHigh);
   const eqMid = useDJStore((s) => s.decks[deckId].eqMid);
   const eqLow = useDJStore((s) => s.decks[deckId].eqLow);
@@ -32,6 +33,10 @@ export const MixerEQ: React.FC<MixerEQProps> = ({ deckId }) => {
 
   const eqValues = { high: eqHigh, mid: eqMid, low: eqLow };
   const killValues = { high: killHigh, mid: killMid, low: killLow };
+
+  const handleFilterChange = useCallback((value: number) => {
+    DJActions.setDeckFilter(deckId, value);
+  }, [deckId]);
 
   const handleEQChange = useCallback((band: 'low' | 'mid' | 'high', dB: number) => {
     DJActions.setDeckEQ(deckId, band, dB);
@@ -48,6 +53,12 @@ export const MixerEQ: React.FC<MixerEQProps> = ({ deckId }) => {
     return `${val > 0 ? '+' : ''}${val.toFixed(0)}`;
   }, []);
 
+  const formatFilter = useCallback((val: number) => {
+    if (Math.abs(val) < 0.01) return 'OFF';
+    if (val < 0) return 'HPF';
+    return 'LPF';
+  }, []);
+
   const deckNum = deckId === 'A' ? '1' : '2';
   const bandDescriptions = {
     high: 'High frequencies (treble)',
@@ -56,7 +67,21 @@ export const MixerEQ: React.FC<MixerEQProps> = ({ deckId }) => {
   };
 
   return (
-    <div className="flex flex-col items-center gap-0.5" title={`Deck ${deckNum} EQ`}>
+    <div className="flex flex-col items-center gap-0.5" title={`Deck ${deckNum} Filter + EQ`}>
+      {/* Filter knob — above EQ */}
+      <Knob
+        value={filterPosition}
+        min={-1}
+        max={1}
+        onChange={handleFilterChange}
+        label="FLT"
+        size="sm"
+        color="#aa44ff"
+        bipolar
+        defaultValue={0}
+        formatValue={formatFilter}
+        title={`Deck ${deckNum} Filter — left: high-pass, center: off, right: low-pass`}
+      />
       {BANDS.map(({ key, label, color }) => (
         <div key={key} className="flex items-center gap-0.5">
           <Knob

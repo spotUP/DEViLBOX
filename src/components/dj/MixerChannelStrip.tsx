@@ -15,9 +15,10 @@ import * as DJActions from '@/engine/dj/DJActions';
 
 interface MixerChannelStripProps {
   deckId: 'A' | 'B' | 'C';
+  stretch?: boolean;
 }
 
-const TRACK_HEIGHT = 100;
+const TRACK_HEIGHT = 80;
 const THUMB_HEIGHT = 12;
 const THUMB_WIDTH = 24;
 
@@ -30,7 +31,7 @@ function volumeToDb(volume: number): string {
   return `${dB.toFixed(0)}dB`;
 }
 
-export const MixerChannelStrip: React.FC<MixerChannelStripProps> = ({ deckId }) => {
+export const MixerChannelStrip: React.FC<MixerChannelStripProps> = ({ deckId, stretch }) => {
   const volume = useDJStore((s) => s.decks[deckId].volume);
   const trimGain = useDJStore((s) => s.decks[deckId].trimGain);
   const scratchFaderGain = useDJStore((s) => s.decks[deckId].scratchFaderGain);
@@ -86,7 +87,7 @@ export const MixerChannelStrip: React.FC<MixerChannelStripProps> = ({ deckId }) 
   const cutColor = isB ? 'rgba(248, 113, 113, 0.6)' : 'rgba(96, 165, 250, 0.6)';
 
   return (
-    <div className="flex flex-col items-center gap-1" title={`Deck ${deckNum} channel fader`}>
+    <div className={`flex flex-col items-center gap-1${stretch ? ' self-stretch' : ''}`} title={`Deck ${deckNum} channel fader`}>
       {/* Deck label */}
       <div className="text-text-muted text-[10px] font-mono tracking-wider">
         {deckNum}
@@ -95,8 +96,8 @@ export const MixerChannelStrip: React.FC<MixerChannelStripProps> = ({ deckId }) 
       {/* Fader track */}
       <div
         ref={trackRef}
-        className="relative cursor-pointer select-none"
-        style={{ width: THUMB_WIDTH + 4, height: TRACK_HEIGHT }}
+        className={`relative cursor-pointer select-none${stretch ? ' flex-1' : ''}`}
+        style={{ width: THUMB_WIDTH + 4, ...(!stretch ? { height: TRACK_HEIGHT } : { minHeight: TRACK_HEIGHT }) }}
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}

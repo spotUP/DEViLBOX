@@ -124,6 +124,11 @@ export const DJView: React.FC<DJViewProps> = ({ onShowDrumpads: _onShowDrumpads 
       (volume) => engine.cueEngine.setCueVolume(volume)
     );
 
+    const unsubscribeCueMix = useDJStore.subscribe(
+      (s) => s.cueMix,
+      (mix) => engine.cueEngine.setCueMix(mix)
+    );
+
     const unsubscribeCueDevice = useDJStore.subscribe(
       (s) => s.cueDeviceId,
       (deviceId) => {
@@ -138,6 +143,7 @@ export const DJView: React.FC<DJViewProps> = ({ onShowDrumpads: _onShowDrumpads 
       unsubscribePFLB();
       unsubscribePFLC();
       unsubscribeCueVolume();
+      unsubscribeCueMix();
       unsubscribeCueDevice();
     };
   }, []);
