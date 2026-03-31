@@ -43,6 +43,7 @@ export const MixerFilterKnob: React.FC<MixerEQProps> = ({ deckId }) => {
       bipolar
       defaultValue={0}
       formatValue={formatFilter}
+      hideValue
       title={`Deck ${deckNum} Filter — left: high-pass, center: off, right: low-pass`}
     />
   );
@@ -110,6 +111,7 @@ export const MixerEQBandKnob: React.FC<{
         bipolar
         defaultValue={0}
         formatValue={formatEQ}
+        hideValue
         title={`Deck ${deckNum} EQ ${label} — ${bandDesc} (-24 to +6 dB)`}
       />
       {side === 'right' && killButton}

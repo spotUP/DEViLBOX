@@ -437,7 +437,7 @@ export const DJPlaylistPanel: React.FC<DJPlaylistPanelProps> = ({ onClose }) => 
                   onDragStart={() => handleDragStart(i)}
                   onDragOver={(e) => handleDragOver(e, i)}
                   onDragEnd={handleDragEnd}
-                  className={`flex items-center gap-1.5 px-1.5 py-1 border-b border-dark-borderLight/50 transition-colors group ${
+                  className={`flex items-center gap-1.5 px-1.5 py-1 border-b border-dark-border/30 transition-colors group ${
                     dragIndex === i
                       ? 'bg-accent-primary/10'
                       : autoDJEnabled && i === autoDJCurrentIdx
@@ -451,21 +451,21 @@ export const DJPlaylistPanel: React.FC<DJPlaylistPanelProps> = ({ onClose }) => 
                     size={8}
                     className="text-text-muted/20 group-hover:text-text-muted/50 shrink-0 cursor-grab"
                   />
-                  <span className="text-[9px] font-mono text-text-muted/30 w-3 text-right shrink-0">
+                  <span className="text-xs font-mono text-text-muted/30 w-4 text-right shrink-0">
                     {i + 1}
                   </span>
-                  <span className="flex-1 text-text-primary text-[10px] font-mono truncate min-w-0">
+                  <span className="flex-1 text-text-primary text-sm font-mono truncate min-w-0">
                     {track.trackName}
                   </span>
                   {track.bpm > 0 && (
-                    <span className="text-[9px] font-mono text-text-muted/40 shrink-0">{track.bpm}</span>
+                    <span className="text-xs font-mono text-text-muted/40 shrink-0">{track.bpm}</span>
                   )}
                   {track.duration > 0 && (
-                    <span className="text-[9px] font-mono text-text-muted/30 shrink-0">{formatDuration(track.duration)}</span>
+                    <span className="text-xs font-mono text-text-muted/30 shrink-0">{formatDuration(track.duration)}</span>
                   )}
                   <button
                     onClick={() => loadTrackToDeck(track, 'A')}
-                    className="px-1 text-[9px] font-mono font-bold text-blue-400/70 hover:text-blue-300
+                    className="px-1 text-xs font-mono font-bold text-blue-400/70 hover:text-blue-300
                                opacity-0 group-hover:opacity-100 transition-opacity"
                     title="Deck 1"
                   >
@@ -473,7 +473,7 @@ export const DJPlaylistPanel: React.FC<DJPlaylistPanelProps> = ({ onClose }) => 
                   </button>
                   <button
                     onClick={() => loadTrackToDeck(track, 'B')}
-                    className="px-1 text-[9px] font-mono font-bold text-red-400/70 hover:text-red-300
+                    className="px-1 text-xs font-mono font-bold text-red-400/70 hover:text-red-300
                                opacity-0 group-hover:opacity-100 transition-opacity"
                     title="Deck 2"
                   >
@@ -482,7 +482,7 @@ export const DJPlaylistPanel: React.FC<DJPlaylistPanelProps> = ({ onClose }) => 
                   {useDJStore.getState().thirdDeckActive && (
                     <button
                       onClick={() => loadTrackToDeck(track, 'C')}
-                      className="px-1 text-[9px] font-mono font-bold text-emerald-400/70 hover:text-emerald-300
+                      className="px-1 text-xs font-mono font-bold text-emerald-400/70 hover:text-emerald-300
                                  opacity-0 group-hover:opacity-100 transition-opacity"
                       title="Deck 3"
                     >

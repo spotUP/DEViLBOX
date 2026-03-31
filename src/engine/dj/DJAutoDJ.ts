@@ -198,11 +198,11 @@ class DJAutoDJ {
 
     switch (status) {
       case 'playing': {
-        // Check if it's time to preload
-        if (timeRemaining < PRELOAD_LEAD_TIME_SEC && !this.preloading && !this.preloadedDeck) {
+        // Check if it's time to preload (or always preload if duration unknown)
+        const shouldPreload = timeRemaining < PRELOAD_LEAD_TIME_SEC || timeRemaining === Infinity;
+        if (shouldPreload && !this.preloading && !this.preloadedDeck) {
           this.preloadNextTrack();
         }
-        // If already preloaded and approaching end, wait for transition-pending
         break;
       }
 
@@ -233,8 +233,14 @@ class DJAutoDJ {
       }
 
       case 'preloading':
-      case 'preload-failed':
         // Waiting for preload — handled by preloadNextTrack callback
+        break;
+
+      case 'preload-failed':
+        // Retry preload — previous attempt failed, try again
+        this.preloading = false;
+        this.preloadedDeck = null;
+        store.setAutoDJStatus('playing');
         break;
 
       case 'idle':

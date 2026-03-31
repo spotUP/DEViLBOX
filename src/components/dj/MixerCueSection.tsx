@@ -86,6 +86,7 @@ export const MixerCueSection: React.FC = () => {
           size="sm"
           color="#ffcc00"
           defaultValue={1}
+          hideValue
           title="Cue volume — headphone pre-fader listen level"
         />
         <Knob
@@ -97,6 +98,7 @@ export const MixerCueSection: React.FC = () => {
           size="sm"
           color="#66ccff"
           defaultValue={0.5}
+          hideValue
           title="Cue mix — 0 = PFL only, center = blend, 1 = master only"
         />
       </div>
