@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-03-29T12:00:53.355Z
+ * Generated: 2026-03-31T05:22:40.263Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -19,10 +19,10 @@ export interface ChangelogEntry {
 }
 
 // Build info
-export const BUILD_VERSION = '1.0.3679';
-export const BUILD_NUMBER = '3679';
-export const BUILD_HASH = '9a82a9f62';
-export const BUILD_DATE = '2026-03-29';
+export const BUILD_VERSION = '1.0.3729';
+export const BUILD_NUMBER = '3729';
+export const BUILD_HASH = 'c8d7a0157';
+export const BUILD_DATE = '2026-03-31';
 
 // Full version (patch IS the build number, so no need to append)
 export const FULL_VERSION = BUILD_VERSION;
@@ -30,220 +30,220 @@ export const FULL_VERSION = BUILD_VERSION;
 // Auto-generated changelog
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: '1.0.3679',
-    date: '2026-03-27',
+    version: '1.0.3729',
+    date: '2026-03-31',
     changes: [
       {
         type: 'fix',
-        "description": "DJ deck + mixer — comprehensive DOM parity"
+        "description": "Ghost automation shows all lanes, not just primary"
       },
       {
         type: 'fix',
-        "description": "DJ view comprehensive DOM parity pass"
+        "description": "Automation overlay no longer blocks pattern editor interaction"
       },
       {
         type: 'fix',
-        "description": "DJ view parity with DOM — mixer width, features, icons"
+        "description": "Ghost automation for single-pattern songs + active channel highlight"
+      },
+      {
+        type: 'fix',
+        "description": "Automation lanes positioning and multi-lane visibility"
       }
     ]
   },
   {
-    version: '2026-03-26',
-    date: '2026-03-26',
+    version: '2026-03-30',
+    date: '2026-03-30',
     changes: [
       {
         type: 'fix',
-        "description": "Channel headers — larger text, icons, proper padding"
+        "description": "Automation lanes use dedicated column space, multiple lanes side by side"
       },
       {
         type: 'fix',
-        "description": "Toolbar row 2, icon textures, nav dropdown, view selector"
+        "description": "Automation ghost patterns no longer clipped"
       },
       {
-        type: 'feature',
-        "description": "PixiButton renders Lucide SVG icons — all 53 buttons converted"
+        type: 'fix',
+        "description": "DOM overlay scroll uses currentRow, not constant baseY"
+      },
+      {
+        type: 'fix',
+        "description": "DOM automation lanes scroll via imperative RAF positioning"
+      },
+      {
+        type: 'fix',
+        "description": "DOM automation lanes scroll sync + full pattern height"
+      },
+      {
+        type: 'fix',
+        "description": "Automation lanes get own column space and scroll with pattern"
+      },
+      {
+        type: 'fix',
+        "description": "Show automation lanes on OK + add DOM dialog footer buttons"
       },
       {
         type: 'improvement',
-        "description": "Add live gig preparation and emergency recovery checklist"
+        "description": "Rename Auto→Automation and GROOVE→Groove toolbar buttons"
       },
       {
         type: 'feature',
-        "description": "Add AudioContext health monitor with auto-resume and status indicator"
+        "description": "Wire automation playback + interactive curve editor + dialog buttons"
+      },
+      {
+        type: 'fix',
+        "description": "Organ distortion and stuck notes"
+      },
+      {
+        type: 'fix',
+        "description": "Stop loadSong from killing freshly-created instruments"
+      },
+      {
+        type: 'fix',
+        "description": "Normalize volume for all legacy synth creation paths"
+      },
+      {
+        type: 'fix',
+        "description": "Normalize volume for all DrumMachine drum types"
+      },
+      {
+        type: 'fix',
+        "description": "Playback silence bugs — instrument timing race + skipNextReload gate"
       },
       {
         type: 'feature',
-        "description": "Add error boundary with retry/reload for DOM view crash recovery"
+        "description": "Full MIDI CC/pitchbend → tracker effect mapping"
+      },
+      {
+        type: 'fix',
+        "description": "MIDI import pattern length and loadSongFile scope"
+      },
+      {
+        type: 'fix',
+        "description": "MIDI import now imports all tracks as channels"
       },
       {
         type: 'feature',
-        "description": "Auto-reconnect DJ controller on USB replug"
-      },
-      {
-        type: 'fix',
-        "description": "Glitch-free master FX hot-swap during live playback"
-      },
-      {
-        type: 'fix',
-        "description": "Recover from WebGL context loss in projectM"
-      },
-      {
-        type: 'fix',
-        "description": "Hard guard against consecutive projectM presets (crash prevention)"
+        "description": "PitchMultiplier for IO808/TR909 drum synths"
       },
       {
         type: 'feature',
-        "description": "Replace FontAudio icons with Lucide SVG textures"
+        "description": "Note-to-drum mapping for IO808 and TR909"
+      },
+      {
+        type: 'fix',
+        "description": "Fix circular dep crash and harden voice routing"
+      },
+      {
+        type: 'fix',
+        "description": "Fix new channels silent: grow replayer channel array on hot-swap"
+      },
+      {
+        type: 'fix',
+        "description": "Fix VU meters firing before audio, remove diagnostic logs"
       },
       {
         type: 'feature',
-        "description": "Lucide SVG → Pixi Texture converter + icon library"
+        "description": "Add 'Add Instrument' button to synth editor header"
       },
       {
         type: 'fix',
-        "description": "Channel headers — enable pointer events on all containers"
+        "description": "Instruments added after song load are now playable"
+      },
+      {
+        type: 'feature',
+        "description": "Open synth browser when adding new instrument"
+      },
+      {
+        type: 'improvement',
+        "description": "Update Monique WASM binary"
+      },
+      {
+        type: 'improvement',
+        "description": "Update generated changelog and file manifest"
+      },
+      {
+        type: 'improvement',
+        "description": "App shell, settings, toolbar, Pixi views, and misc updates"
+      },
+      {
+        type: 'improvement',
+        "description": "VJ view: Kraftwerk head scene and overlay"
+      },
+      {
+        type: 'improvement',
+        "description": "DJ view updates: AutoDJ, playlist, quantized FX, modland browser"
+      },
+      {
+        type: 'feature',
+        "description": "Add new WASM synth engines: Monique, Calf Mono, MDA (DX10/EPiano/JX10), Raffo, SynthV1, AMSynth, SetBfree, ZynAddSubFX"
+      },
+      {
+        type: 'feature',
+        "description": "Update .gitignore for new WASM synth builds and third-party trees"
       },
       {
         type: 'fix',
-        "description": "Channel headers — remove stencil mask, use overflow hidden"
+        "description": "Fix keyboard double-trigger: remove duplicate handler from TestKeyboard"
       },
       {
         type: 'fix',
-        "description": "Channel headers use layoutContainer + flexShrink: 0"
+        "description": "Keyboard double-trigger from competing capture-phase handlers"
       },
       {
         type: 'fix',
-        "description": "Channel header ROW column uses bgTertiary not theme.bg (red)"
+        "description": "Drum machines double-triggering on keyboard and mouse"
       },
       {
         type: 'fix',
-        "description": "Pitch slider width 52px matching DOM's DJPitchSlider"
+        "description": "Drum machine double-trigger and stale pattern playback"
       },
       {
         type: 'fix',
-        "description": "Pitch slider — use layoutContainer for backgroundColor support"
+        "description": "Share TR808/TR909 instances per instrument ID (not per-channel)"
+      },
+      {
+        type: 'feature',
+        "description": "IO808 + TR909 drum machine engines with presets and synth browser"
       },
       {
         type: 'fix',
-        "description": "Pitch slider — solid background + fix groove color"
-      },
-      {
-        type: 'fix',
-        "description": "VBlank speed hint for compiled 68k formats, fix dl prefix skip"
-      },
-      {
-        type: 'fix',
-        "description": "Grid base fill always opaque — no red bleed through"
-      },
-      {
-        type: 'fix',
-        "description": "Dave Lowe format uses UADE playback with title extraction"
-      },
-      {
-        type: 'fix',
-        "description": "Alternate milkdrop/projectM layers to prevent projectM crashes"
-      },
-      {
-        type: 'fix',
-        "description": "Remove DrumPadManager as standalone view, unify into DJ Pads"
-      },
-      {
-        type: 'fix',
-        "description": "Remove row number column background, extend rows full width"
-      },
-      {
-        type: 'fix',
-        "description": "Remove unused onShowDrumpads prop from DJView in App.tsx"
-      },
-      {
-        type: 'fix',
-        "description": "Row number column and mute overlay use correct colors"
-      },
-      {
-        type: 'fix',
-        "description": "Merge Drumpads + Sampler into single Pads button"
-      },
-      {
-        type: 'fix',
-        "description": "Ghost buttons truly transparent — use Graphics draw for bg"
-      },
-      {
-        type: 'fix',
-        "description": "Enable pattern overlay by default in VJ view"
-      },
-      {
-        type: 'fix',
-        "description": "Ghost button hover state clears properly"
+        "description": "Add applyConfig to VSTBridgeSynth + param mapping"
       }
     ]
   },
   {
-    version: '2026-03-25',
-    date: '2026-03-25',
+    version: '2026-03-29',
+    date: '2026-03-29',
     changes: [
       {
-        type: 'fix',
-        "description": "Chore: stage pending changes (DaveLowe WASM, synth categories, CRT fixes)"
+        type: 'feature',
+        "description": "Port ZynAddSubFX to WASM with full ADDsynth/SUBsynth/PADsynth engines"
       },
       {
-        type: 'fix',
-        "description": "Remove border from GROOVE button — consistent borderless"
+        type: 'improvement',
+        "description": "Port Sfizz SFZ sample player to WASM"
       },
       {
-        type: 'fix',
-        "description": "Remove all button borders — consistent borderless style"
-      },
-      {
-        type: 'fix',
-        "description": "Hardware button — no emoji, renamed, moved to playback section"
-      },
-      {
-        type: 'fix',
-        "description": "Play/Stop buttons use primary/danger variants matching DOM"
-      },
-      {
-        type: 'fix',
-        "description": "FT2 toolbar height accounts for padding + gap"
-      },
-      {
-        type: 'fix',
-        "description": "FT2 toolbar padding/gap matches DOM exactly"
+        type: 'improvement',
+        "description": "Port TAL-NoiseMaker to WASM"
       },
       {
         type: 'feature',
-        "description": "WAM plugin browser (DOM+Pixi) + mobile touch fixes"
+        "description": "Port Aeolus pipe organ emulator to WASM"
       },
       {
-        type: 'fix',
-        "description": "FT2 toolbar uses grid-like fixed column widths matching DOM"
+        type: 'improvement',
+        "description": "Port FluidSynth (SF2 SoundFont player) to WASM"
       },
       {
-        type: 'fix',
-        "description": "Remove vertical dividers from FT2 toolbar"
+        type: 'feature',
+        "description": "Add setBfree Hammond B3 organ + Leslie speaker WASM module"
       },
       {
-        type: 'fix',
-        "description": "Tab bar — exact DOM values for font, radius, height, + button"
-      },
-      {
-        type: 'fix',
-        "description": "Tab bar matches DOM — top-rounded tabs, proper colors/fonts"
-      },
-      {
-        type: 'fix',
-        "description": "Volume slider — add label, taller handle for visibility"
-      },
-      {
-        type: 'fix',
-        "description": "Restore nav bar and button readability"
-      },
-      {
-        type: 'fix',
-        "description": "Nav bar height, gap, bg, MIDI — match DOM exactly"
-      },
-      {
-        type: 'fix',
-        "description": "Hide WAVE mode label in visualizer, cleanup layout index"
+        type: 'feature',
+        "description": "Add AMSynth (Analog Modelling Synthesizer) WASM module"
       }
     ]
   }

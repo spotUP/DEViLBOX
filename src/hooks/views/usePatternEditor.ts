@@ -217,6 +217,7 @@ export function usePatternEditor() {
     for (let ch = 0; ch < nc; ch++) {
       const channel = pattern.channels[ch];
       const isCollapsed = channel?.collapsed;
+      const noteCols = channel?.channelMeta?.noteCols ?? 1;
       // Per-channel automation area: scale with lane count
       const laneCount = showAutomationLanes ? (channelLaneCounts[ch] ?? 1) : 0;
       const autoLaneExtra = laneCount <= 0 ? 0
@@ -231,11 +232,13 @@ export function usePatternEditor() {
       } else {
         const effectCols = channel?.channelMeta?.effectCols ?? 2;
         const effectWidth = effectCols * (CHAR_WIDTH * 3 + 4);
+        // Extra note columns: each adds note(34) + inst(20) + vol(20) + gaps(12) = 86px
+        const extraNoteColWidth = (noteCols - 1) * (noteWidth + CHAR_WIDTH * 4 + 12);
         const paramWidth = CHAR_WIDTH * 4 + 8
           + effectWidth
           + (showAcid ? CHAR_WIDTH * 2 + 8 : 0)
           + (showProb ? CHAR_WIDTH * 2 + 4 : 0);
-        const chWidth = noteWidth + paramWidth + 60 + autoLaneExtra;
+        const chWidth = noteWidth + extraNoteColWidth + paramWidth + 60 + autoLaneExtra;
         offsets.push(currentX);
         widths.push(chWidth);
         currentX += chWidth;

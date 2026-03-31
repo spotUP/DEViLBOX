@@ -365,21 +365,39 @@ export const useMIDIStore = create<MIDIStore>()(
                   if (trackerStore.recordMode && !transportStore.isPlaying) {
                     const xmNote = midiToXMNote(transposedNote);
                     if (xmNote >= 1 && xmNote <= 96) {
-                      const { cursor, setCell, moveCursor, editStep } = trackerStore;
+                      const { setCell, editStep } = trackerStore;
+                      const cursorStore = require('./useCursorStore').useCursorStore.getState();
+                      const cursor = cursorStore.cursor;
+                      const nci = cursor.noteColumnIndex ?? 0;
                       const instrumentId = targetInstrument?.id ?? instrumentStore.currentInstrumentId ?? 0;
                       // Map velocity to volume column (0-64 in XM convention, stored as 0x10-0x50)
                       const vol = Math.round((message.velocity / 127) * 64);
                       const volumeCol = vol > 0 ? 0x10 + Math.min(vol, 64) : 0;
 
-                      setCell(cursor.channelIndex, cursor.rowIndex, {
-                        note: xmNote,
-                        instrument: instrumentId,
-                        volume: volumeCol,
-                      });
+                      const cellUpdate: Record<string, number> = {};
+                      if (nci === 0) {
+                        cellUpdate.note = xmNote;
+                        cellUpdate.instrument = instrumentId;
+                        cellUpdate.volume = volumeCol;
+                      } else if (nci === 1) {
+                        cellUpdate.note2 = xmNote;
+                        cellUpdate.instrument2 = instrumentId;
+                        cellUpdate.volume2 = volumeCol;
+                      } else if (nci === 2) {
+                        cellUpdate.note3 = xmNote;
+                        cellUpdate.instrument3 = instrumentId;
+                        cellUpdate.volume3 = volumeCol;
+                      } else {
+                        cellUpdate.note4 = xmNote;
+                        cellUpdate.instrument4 = instrumentId;
+                        cellUpdate.volume4 = volumeCol;
+                      }
+
+                      setCell(cursor.channelIndex, cursor.rowIndex, cellUpdate);
 
                       // Advance cursor by edit step
                       for (let i = 0; i < editStep; i++) {
-                        moveCursor('down');
+                        cursorStore.moveCursor('down');
                       }
                     }
                   }

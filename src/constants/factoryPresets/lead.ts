@@ -44,7 +44,7 @@ export const LEAD_PRESETS: InstrumentPreset['config'][] = [
   {
     type: 'synth' as const,
     name: 'AM Bell',
-    synthType: 'AMSynth',
+    synthType: 'ToneAM',
     oscillator: { type: 'sine', detune: 0, octave: 0 },
     envelope: { attack: 1, decay: 300, sustain: 0, release: 500 },
     effects: [],
@@ -54,7 +54,7 @@ export const LEAD_PRESETS: InstrumentPreset['config'][] = [
   {
     type: 'synth' as const,
     name: 'AM Sci-Fi',
-    synthType: 'AMSynth',
+    synthType: 'ToneAM',
     oscillator: { type: 'square', detune: 0, octave: 0 },
     envelope: { attack: 50, decay: 500, sustain: 0.5, release: 1000 },
     effects: [],
@@ -185,7 +185,7 @@ export const LEAD_PRESETS: InstrumentPreset['config'][] = [
   {
     type: 'synth' as const,
     name: 'AM Tremolo Lead',
-    synthType: 'AMSynth',
+    synthType: 'ToneAM',
     oscillator: { type: 'sine', detune: 0, octave: 0 },
     envelope: { attack: 10, decay: 300, sustain: 0.5, release: 200 },
     effects: [],
