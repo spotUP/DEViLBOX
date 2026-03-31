@@ -21,6 +21,7 @@ export class UADESynth implements DevilboxSynth {
   private audioContext: AudioContext;
   private _disposed = false;
   private _currentConfig: UADEConfig | null = null;
+  private _initPromise: Promise<void> | null = null;
 
   constructor() {
     this.audioContext = getDevilboxAudioContext();
@@ -37,13 +38,25 @@ export class UADESynth implements DevilboxSynth {
   async setInstrument(config: UADEConfig): Promise<void> {
     this._currentConfig = config;
 
-    await this.engine.ready();
-    const ext = config.filename.split('.').pop()?.toLowerCase() ?? '';
-    const prefix = config.filename.split('.')[0]?.toLowerCase() ?? '';
-    const SKIP_SCAN_EXTS = new Set(['jpo', 'jpold', 'rh', 'rhp']);
-    const SKIP_SCAN_PREFIXES = new Set(['dl', 'dl_deli', 'dln', 'rh']);
-    const skipScan = SKIP_SCAN_EXTS.has(ext) || SKIP_SCAN_PREFIXES.has(prefix);
-    await this.engine.load(config.fileData, config.filename, skipScan, config.currentSubsong ?? 0);
+    const p = (async () => {
+      await this.engine.ready();
+      const ext = config.filename.split('.').pop()?.toLowerCase() ?? '';
+      const prefix = config.filename.split('.')[0]?.toLowerCase() ?? '';
+      const SKIP_SCAN_EXTS = new Set(['jpo', 'jpold', 'rh', 'rhp']);
+      const SKIP_SCAN_PREFIXES = new Set(['dl', 'dl_deli', 'dln', 'rh']);
+      const skipScan = SKIP_SCAN_EXTS.has(ext) || SKIP_SCAN_PREFIXES.has(prefix);
+      await this.engine.load(config.fileData, config.filename, skipScan, config.currentSubsong ?? 0);
+    })();
+    this._initPromise = p;
+    await p;
+  }
+
+  /**
+   * Wait for the WASM engine + song data to be fully loaded.
+   * Called by preloadInstruments/ensureWASMSynthsReady.
+   */
+  async ensureInitialized(): Promise<void> {
+    if (this._initPromise) await this._initPromise;
   }
 
   triggerAttack(_note?: string | number, _time?: number, _velocity?: number): void {
