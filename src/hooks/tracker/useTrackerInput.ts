@@ -17,6 +17,7 @@ import { getTrackerReplayer } from '@engine/TrackerReplayer';
 import { parseMPTClipboard } from '@lib/import/MPTClipboardParser';
 import { xmNoteToString } from '@lib/xmConversions';
 import { useNoteInput, useEffectInput, useNavigationInput } from './input';
+import { amplifySelectionHelper } from '@stores/tracker/patternEditActions';
 import type { EditorBehavior } from '@engine/keyboard/EditorBehavior';
 
 /** Get the cell field names for a given note column index (0-3) */
@@ -1227,10 +1228,42 @@ export const useTrackerInput = () => {
           return;
         }
 
-        // IT: Alt+I = template mode toggle (placeholder — full 5-mode cycling not yet implemented)
+        // IT: Alt+J = amplify volume in selection (prompt for percentage)
+        if (isIT && keyLower === 'j' && !e.shiftKey) {
+          e.preventDefault();
+          const sel = selectionRef.current;
+          if (!sel) {
+            useUIStore.getState().setStatusMessage('NO BLOCK SELECTED');
+            return;
+          }
+          const input = window.prompt('Amplify volume by percentage (e.g. 150 = 150%, 50 = half):', '100');
+          if (input === null) return;
+          const pct = parseInt(input, 10);
+          if (isNaN(pct) || pct < 0) {
+            useUIStore.getState().setStatusMessage('INVALID PERCENTAGE');
+            return;
+          }
+          const factor = pct / 100;
+          const store = useTrackerStore.getState();
+          const patIdx = store.currentPatternIndex;
+          const pat = store.patterns[patIdx];
+          if (pat) {
+            useTrackerStore.setState((state) => {
+              amplifySelectionHelper(state.patterns[state.currentPatternIndex], sel, factor);
+            });
+            useUIStore.getState().setStatusMessage(`AMPLIFIED ${pct}%`);
+          }
+          return;
+        }
+
+        // IT: Alt+I = cycle template mode (off → note → inst → vol → effect → all → off)
         if (isIT && keyLower === 'i' && !e.shiftKey) {
           e.preventDefault();
-          useUIStore.getState().setStatusMessage('TEMPLATE MODE: NOT YET IMPLEMENTED');
+          const edStore = useEditorStore.getState();
+          edStore.cycleTemplateMode();
+          const mode = useEditorStore.getState().templateMode;
+          const names = ['OFF', 'NOTE ONLY', 'INST ONLY', 'VOL ONLY', 'EFFECT ONLY', 'ALL FIELDS'];
+          useUIStore.getState().setStatusMessage(`TEMPLATE: ${names[mode]}`);
           return;
         }
 
@@ -1238,6 +1271,26 @@ export const useTrackerInput = () => {
         if (isIT && keyLower === 'n' && !e.shiftKey) {
           e.preventDefault();
           useUIStore.getState().setStatusMessage('MULTICHANNEL: NOT YET IMPLEMENTED');
+          return;
+        }
+      }
+
+      // IT: Ctrl+Shift+Plus/Minus = track width zoom
+      if ((e.ctrlKey || e.metaKey) && e.shiftKey && (key === '+' || key === '=' || key === 'Equal')) {
+        const beh = useEditorStore.getState().activeBehavior;
+        if (beh.itMaskVariables) {
+          e.preventDefault();
+          useUIStore.getState().increaseTrackZoom();
+          useUIStore.getState().setStatusMessage(`TRACK ZOOM: ${useUIStore.getState().trackWidthZoom + 1}/7`);
+          return;
+        }
+      }
+      if ((e.ctrlKey || e.metaKey) && e.shiftKey && (key === '-' || key === '_' || key === 'Minus')) {
+        const beh = useEditorStore.getState().activeBehavior;
+        if (beh.itMaskVariables) {
+          e.preventDefault();
+          useUIStore.getState().decreaseTrackZoom();
+          useUIStore.getState().setStatusMessage(`TRACK ZOOM: ${useUIStore.getState().trackWidthZoom + 1}/7`);
           return;
         }
       }

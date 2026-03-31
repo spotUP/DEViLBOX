@@ -95,6 +95,7 @@ export function usePatternEditor() {
 
   // ── UI / display settings ─────────────────────────────────────────────────
   const trackerZoom = useUIStore((s) => s.trackerZoom);
+  const trackWidthZoom = useUIStore((s) => s.trackWidthZoom);
   const showAutomationLanes = useUIStore((s) => s.showAutomationLanes);
   const rowHeight = Math.round(24 * (trackerZoom / 100));
 
@@ -206,7 +207,9 @@ export function usePatternEditor() {
     }
 
     const nc = pattern.channels.length;
-    const noteWidth = CHAR_WIDTH * 3 + 4;
+    const zoomMultipliers = [0.6, 0.7, 0.85, 1.0, 1.2, 1.5, 1.8];
+    const zoomFactor = zoomMultipliers[trackWidthZoom ?? 3] ?? 1.0;
+    const noteWidth = Math.round((CHAR_WIDTH * 3 + 4) * zoomFactor);
     const showAcid = columnVisibility.flag1 || columnVisibility.flag2;
     const showProb = columnVisibility.probability;
 
@@ -225,20 +228,20 @@ export function usePatternEditor() {
         : Math.max(AUTOMATION_LANE_WIDTH, laneCount * AUTOMATION_LANE_MIN + 4);
 
       if (isCollapsed) {
-        const cw = noteWidth + 40 + autoLaneExtra;
+        const cw = noteWidth + Math.round(40 * zoomFactor) + autoLaneExtra;
         offsets.push(currentX);
         widths.push(cw);
         currentX += cw;
       } else {
         const effectCols = channel?.channelMeta?.effectCols ?? 2;
-        const effectWidth = effectCols * (CHAR_WIDTH * 3 + 4);
+        const effectWidth = Math.round(effectCols * (CHAR_WIDTH * 3 + 4) * zoomFactor);
         // Extra note columns: each adds note(34) + inst(20) + vol(20) + gaps(12) = 86px
-        const extraNoteColWidth = (noteCols - 1) * (noteWidth + CHAR_WIDTH * 4 + 12);
-        const paramWidth = CHAR_WIDTH * 4 + 8
+        const extraNoteColWidth = Math.round((noteCols - 1) * (noteWidth + CHAR_WIDTH * 4 + 12));
+        const paramWidth = Math.round((CHAR_WIDTH * 4 + 8) * zoomFactor)
           + effectWidth
-          + (showAcid ? CHAR_WIDTH * 2 + 8 : 0)
-          + (showProb ? CHAR_WIDTH * 2 + 4 : 0);
-        const chWidth = noteWidth + extraNoteColWidth + paramWidth + 60 + autoLaneExtra;
+          + (showAcid ? Math.round((CHAR_WIDTH * 2 + 8) * zoomFactor) : 0)
+          + (showProb ? Math.round((CHAR_WIDTH * 2 + 4) * zoomFactor) : 0);
+        const chWidth = noteWidth + extraNoteColWidth + paramWidth + Math.round(60 * zoomFactor) + autoLaneExtra;
         offsets.push(currentX);
         widths.push(chWidth);
         currentX += chWidth;
@@ -251,7 +254,7 @@ export function usePatternEditor() {
       channelWidths: widths,
       totalChannelsWidth: currentX - LINE_NUMBER_WIDTH,
     };
-  }, [pattern, columnVisibility, showAutomationLanes, channelLaneCounts]);
+  }, [pattern, columnVisibility, showAutomationLanes, channelLaneCounts, trackWidthZoom]);
 
   // ─────────────────────────────────────────────────────────────────────────
 

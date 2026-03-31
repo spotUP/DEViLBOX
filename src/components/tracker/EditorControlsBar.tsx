@@ -304,6 +304,15 @@ export const EditorControlsBar: React.FC<EditorControlsBarProps> = React.memo(({
             </span>
           </div>
         )}
+
+        {/* IT Mask Indicator (persistent when itMaskVariables behavior is active) */}
+        {c.maskDisplay && (
+          <div className="flex items-center px-2 ml-1 pl-2 border-l border-dark-border">
+            <span className="text-cyan-400 font-bold text-[10px] font-mono tracking-wider">
+              [MASK: {c.maskDisplay}]
+            </span>
+          </div>
+        )}
       </div>
 
       {/* FPS / Quality Indicator - Compact */}
