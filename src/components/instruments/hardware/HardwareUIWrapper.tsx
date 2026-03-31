@@ -14,7 +14,6 @@ import { TB303Hardware } from './TB303Hardware';
 import { D50Hardware } from './D50Hardware';
 import { CZ101Hardware } from './CZ101Hardware';
 import { VFXHardware } from './VFXHardware';
-import { DX7Hardware } from './DX7Hardware';
 import { OBXdHardware } from './OBXdHardware';
 import { MAMEGenericHardware } from './MAMEGenericHardware';
 import { BuzzGenericHardware } from './BuzzGenericHardware';
@@ -27,6 +26,10 @@ import { KS0164Hardware } from './KS0164Hardware';
 import { SWP00Hardware } from './SWP00Hardware';
 import { SWP20Hardware } from './SWP20Hardware';
 import { RolandGPHardware } from './RolandGPHardware';
+import { MoniqueHardwareUI } from './MoniqueHardwareUI';
+import { AmsynthHardwareUI } from './AmsynthHardwareUI';
+import { DexedHardwareUI } from './DexedHardwareUI';
+import VL1Hardware from './VL1Hardware';
 
 interface HardwareUIWrapperProps {
   synthType: SynthType;
@@ -52,7 +55,7 @@ const DEDICATED_UI_MAP: Partial<Record<SynthType, React.ComponentType<HWComponen
   // Synthesizers - Classic
   TB303: TB303Hardware,         // Roland TB-303 Bass Line (1981)
   CZ101: CZ101Hardware,         // Casio CZ-101 Phase Distortion (1984)
-  Dexed: DX7Hardware,           // Yamaha DX7 FM Synthesis (1983)
+  Dexed: DexedHardwareUI as unknown as React.ComponentType<HWComponentProps>,  // Yamaha DX7 FM Synthesis (1983)
   OBXd: OBXdHardware,           // Oberheim OB-X Analog (1979)
 
   // Synthesizers - MAME (dedicated)
@@ -68,6 +71,15 @@ const DEDICATED_UI_MAP: Partial<Record<SynthType, React.ComponentType<HWComponen
   MAMESWP00: SWP00Hardware,     // Yamaha SWP00 AWM2 MU50 (1994)
   MAMESWP20: SWP20Hardware,     // Yamaha SWP20 AWM2 MU80 (1994)
   MAMERolandGP: RolandGPHardware, // Roland TC6116 SC-88 PCM (1994)
+
+  // Monique Monosynth — full JUCE UI via software renderer
+  Monique: MoniqueHardwareUI as unknown as React.ComponentType<HWComponentProps>,
+
+  // amsynth — bitmap skin-based JUCE UI via software renderer
+  Amsynth: AmsynthHardwareUI as unknown as React.ComponentType<HWComponentProps>,
+
+  // Casio VL-Tone — retro calculator-style HTML UI
+  VL1: VL1Hardware as unknown as React.ComponentType<HWComponentProps>,
 };
 
 /**
@@ -138,6 +150,9 @@ const SYNTHS_WITH_BUILTIN_INPUT = new Set<string>([
   'DrumMachine',  // TR-808/909 has a 16-step sequencer
   'MAMETR707',    // TR-707 has a 16-step sequencer
   'TB303',        // TB-303 has its own note input
+  // Note: Monique has a built-in keyboard only in hardware UI mode,
+  // not in simple controls mode. The keyboard visibility for Monique
+  // is handled by MoniqueHardwareUI rendering its own piano.
 ]);
 
 /** Check if a synth type has any hardware UI (dedicated or generic) */

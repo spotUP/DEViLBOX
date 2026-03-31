@@ -75,7 +75,7 @@ export const SYNTH_LAYOUTS: Record<string, SynthPanelLayout> = {
   MonoSynth: MONO_SYNTH_LAYOUT,
   DuoSynth: DUO_SYNTH_LAYOUT,
   FMSynth: FM_SYNTH_LAYOUT,
-  AMSynth: AM_SYNTH_LAYOUT,
+  ToneAM: AM_SYNTH_LAYOUT,
   PluckSynth: PLUCK_SYNTH_LAYOUT,
   MetalSynth: METAL_SYNTH_LAYOUT,
   MembraneSynth: MEMBRANE_SYNTH_LAYOUT,

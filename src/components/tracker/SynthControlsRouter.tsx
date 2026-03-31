@@ -29,6 +29,7 @@ import { DEFAULT_CALF_MONO } from '@engine/calf-mono/CalfMonoSynth';
 import { DEFAULT_SETBFREE } from '@engine/setbfree/SetBfreeSynth';
 import { DEFAULT_SYNTHV1 } from '@engine/synthv1/SynthV1Synth';
 import { DEFAULT_MONIQUE } from '@engine/monique/MoniqueSynth';
+import { DEFAULT_VL1 } from '@engine/vl1/VL1Synth';
 import { DEFAULT_TAL_NOIZEMAKER } from '@engine/tal-noizemaker/TalNoizeMakerSynth';
 import { DEFAULT_AEOLUS } from '@engine/aeolus/AeolusSynth';
 import { DEFAULT_FLUIDSYNTH } from '@engine/fluidsynth/FluidSynthSynth';
@@ -98,6 +99,7 @@ const SynthV1Controls = lazy(() =>
   import('@components/instruments/controls/SynthV1Controls').then(m => ({ default: m.SynthV1Controls }))
 );
 import { MoniqueControls } from '@components/instruments/controls/MoniqueControls';
+import { VL1Controls } from '@components/instruments/controls/VL1Controls';
 const TalNoizeMakerControls = lazy(() =>
   import('@components/instruments/controls/TalNoizeMakerControls').then(m => ({ default: m.TalNoizeMakerControls }))
 );
@@ -340,8 +342,13 @@ export const SynthControlsRouter: React.FC<SynthControlsRouterProps> = ({ instru
       return <MdaDX10Controls config={cfg} onChange={(u) => onUpdate({ mdaDX10: { ...cfg, ...u } })} />;
     }
 
-    // ── AMSynth (Analog Modelling) ─────────────────────────
-    if (synthType === 'AMSynth') {
+    // ── ToneAM (Tone.js AM Synth) — uses generic controls ──
+    if (synthType === 'ToneAM') {
+      return fallback;
+    }
+
+    // ── Amsynth (real amsynth WASM) ──────────────────────────
+    if (synthType === 'Amsynth') {
       const cfg = { ...DEFAULT_AMSYNTH, ...(instrument.amsynth || {}) };
       return <AMSynthControls config={cfg} onChange={(u) => onUpdate({ amsynth: { ...cfg, ...u } })} />;
     }
@@ -374,6 +381,12 @@ export const SynthControlsRouter: React.FC<SynthControlsRouterProps> = ({ instru
     if (synthType === 'Monique') {
       const cfg = { ...DEFAULT_MONIQUE, ...(instrument.monique || {}) };
       return <MoniqueControls config={cfg} onChange={(u) => onUpdate({ monique: { ...cfg, ...u } })} />;
+    }
+
+    // ── VL1 (Casio VL-Tone) ─────────────────────────────────
+    if (synthType === 'VL1') {
+      const cfg = { ...DEFAULT_VL1, ...(instrument.vl1 || {}) };
+      return <VL1Controls config={cfg} onChange={(u) => onUpdate({ vl1: { ...cfg, ...u } })} />;
     }
 
     // ── TAL-NoiseMaker ─────────────────────────────────────

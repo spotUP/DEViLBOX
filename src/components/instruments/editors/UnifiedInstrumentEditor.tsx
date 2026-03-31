@@ -10,17 +10,16 @@
  * that imports specialized controls as needed.
  */
 
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback } from 'react';
 import type { InstrumentConfig, SynthType } from '@typedefs/instrument';
 import { EditorHeader, type VizMode } from '../shared/EditorHeader';
-import { SynthEditorTabs, type SynthEditorTab } from '../shared/SynthEditorTabs';
 import { SYNTH_REGISTRY } from '@engine/vstbridge/synth-registry';
 import { useThemeStore, useInstrumentStore } from '@stores';
 import { isMAMEChipType } from '@constants/chipParameters';
 import { Monitor, Cpu } from 'lucide-react';
 
 // Import the tab content renderers from VisualSynthEditor
-import { renderSpecialParameters, renderGenericTabContent } from './VisualSynthEditorContent';
+import { renderAllSections } from './VisualSynthEditorContent';
 
 // Import hardware UI components (lightweight, always needed for detection)
 import { HardwareUIWrapper, hasHardwareUI } from '../hardware/HardwareUIWrapper';
@@ -162,12 +161,13 @@ function getEditorMode(synthType: SynthType): EditorMode {
   if (synthType === 'MdaEPiano') return 'mdaEPiano';
   if (synthType === 'MdaJX10') return 'mdaJX10';
   if (synthType === 'MdaDX10') return 'mdaDX10';
-  if (synthType === 'AMSynth') return 'amsynth';
+  if (synthType === 'ToneAM') return 'toneAM';
   if (synthType === 'RaffoSynth') return 'raffo';
   if (synthType === 'CalfMono') return 'calfMono';
   if (synthType === 'SetBfree') return 'setbfree';
   if (synthType === 'SynthV1') return 'synthv1';
   if (synthType === 'Monique') return 'moniqueSynth';
+  if (synthType === 'VL1') return 'vl1Synth';
   if (synthType === 'TalNoizeMaker') return 'talNoizeMaker';
   if (synthType === 'Aeolus') return 'aeolus';
   if (synthType === 'FluidSynth') return 'fluidsynth';
@@ -228,7 +228,6 @@ export const UnifiedInstrumentEditor: React.FC<UnifiedInstrumentEditorProps> = (
 }) => {
   const [vizMode, setVizMode] = useState<VizMode>('oscilloscope');
   const [showHelp, setShowHelp] = useState(false);
-  const [genericTab, setGenericTab] = useState<SynthEditorTab>('oscillator');
   const [isBaking, setIsBaking] = useState(false);
   // Default to hardware UI if available, otherwise simple UI
   const [uiMode, setUIMode] = useState<'simple' | 'hardware'>(() =>
@@ -278,47 +277,9 @@ export const UnifiedInstrumentEditor: React.FC<UnifiedInstrumentEditorProps> = (
         ? 'sample'
         : synthEditorMode;
 
-  // Auto-switch tabs when synth type changes
-  useEffect(() => {
-    if (instrument.synthType === 'DrumMachine') {
-      setGenericTab('special');
-    } else if (isSampleType(instrument.synthType)) {
-      setGenericTab('envelope');
-    } else if (genericTab === 'special' && !renderSpecialParameters(instrument, handleChange)) {
-      setGenericTab('oscillator');
-    }
-  }, [instrument.synthType]);
-
   const currentThemeId = useThemeStore((state) => state.currentThemeId);
   const isCyanTheme = currentThemeId === 'cyan-lineart';
 
-
-  const getHiddenTabs = (): SynthEditorTab[] => {
-    const hidden: SynthEditorTab[] = [];
-    
-    // DrumMachine hides standard tabs as it uses per-voice controls in Special tab
-    if (instrument.synthType === 'DrumMachine') {
-      hidden.push('oscillator');
-      hidden.push('envelope');
-      hidden.push('filter');
-      hidden.push('modulation');
-      // Keep 'output' and 'special'
-    } else {
-      if (isSampleType(instrument.synthType)) {
-        hidden.push('oscillator');
-      }
-      if (!instrument.oscillator && !isSampleType(instrument.synthType)) {
-        hidden.push('oscillator');
-      }
-    }
-
-    // Hide special tab if no special parameters for this synth type
-    const hasSpecialParams = renderSpecialParameters(instrument, handleChange) !== null;
-    if (!hasSpecialParams) {
-      hidden.push('special');
-    }
-    return hidden;
-  };
   // ============================================================================
   // DISPATCH TO SYNTH-SPECIFIC EDITORS
   // ============================================================================
@@ -403,22 +364,10 @@ export const UnifiedInstrumentEditor: React.FC<UnifiedInstrumentEditorProps> = (
           />
         </div>
       ) : (
-        /* Simple Controls Mode */
+        /* All-sections layout — compact two-column flow, no tabs */
         <>
-          {/* Tab Bar */}
-          <SynthEditorTabs
-            activeTab={genericTab}
-            onTabChange={setGenericTab}
-            hiddenTabs={getHiddenTabs()}
-          />
-
-          {/* Tab Content */}
-          <div className="synth-editor-content">
-            <GenericTabContent
-              instrument={instrument}
-              onChange={handleChange}
-              activeTab={genericTab}
-            />
+          <div className="synth-editor-content overflow-y-auto">
+            {renderAllSections(instrument, handleChange)}
           </div>
         </>
       )}
@@ -429,28 +378,6 @@ export const UnifiedInstrumentEditor: React.FC<UnifiedInstrumentEditorProps> = (
 // ============================================================================
 // GENERIC TAB CONTENT (imported from VisualSynthEditor logic)
 // ============================================================================
-
-interface GenericTabContentProps {
-  instrument: InstrumentConfig;
-  onChange: (updates: Partial<InstrumentConfig>) => void;
-  activeTab: SynthEditorTab;
-}
-
-/**
- * GenericTabContent - Renders the content for generic synth editor tabs
- *
- * This component contains the tab content that was previously in VisualSynthEditor.
- * It's been extracted to keep the UnifiedInstrumentEditor clean.
- */
-const GenericTabContent: React.FC<GenericTabContentProps> = ({
-  instrument,
-  onChange,
-  activeTab,
-}) => {
-  // We import the tab content rendering from a separate module
-  // to avoid duplicating ~700 lines of tab content code
-  return renderGenericTabContent(instrument, onChange, activeTab);
-};
 
 export default UnifiedInstrumentEditor;
 

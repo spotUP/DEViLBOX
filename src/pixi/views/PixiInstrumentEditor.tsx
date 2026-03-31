@@ -9,6 +9,7 @@ import { usePixiTheme } from '../theme';
 import { PixiLabel } from '../components';
 import { PixiSynthPanel } from './instruments/PixiSynthPanel';
 import { PixiEnvelopeEditor } from './instruments/PixiEnvelopeEditor';
+import { PixiInstrumentVisualizer } from './instruments/PixiInstrumentVisualizer';
 import { getSynthLayout } from './instruments/layouts';
 import type { InstrumentConfig, EnvelopeConfig } from '@/types/instrument';
 import { PixiUADELiveParams } from './instruments/PixiUADELiveParams';
@@ -147,6 +148,14 @@ export const PixiInstrumentEditor: React.FC<PixiInstrumentEditorProps> = ({
 
         <PixiLabel text={synthType} size="xs" color="textMuted" />
       </layoutContainer>
+
+      {/* Visualizer */}
+      <pixiContainer layout={{ width: '100%', paddingLeft: 8, paddingRight: 8, paddingTop: 4 }}>
+        <PixiInstrumentVisualizer
+          instrumentId={instrConfig.id ?? 0}
+          height={60}
+        />
+      </pixiContainer>
 
       {/* Content area */}
       <pixiContainer

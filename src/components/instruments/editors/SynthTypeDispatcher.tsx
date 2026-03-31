@@ -28,6 +28,7 @@ import {
   DEFAULT_DECTALK,
 } from '@typedefs/instrument';
 import { deepMerge } from '../../../lib/migration';
+import { Knob } from '@components/controls/Knob';
 import { EditorHeader, type VizMode } from '../shared/EditorHeader';
 import { VisualizerFrame } from '@components/visualization/VisualizerFrame';
 import { PresetDropdown } from '../presets/PresetDropdown';
@@ -49,6 +50,7 @@ import { DEFAULT_CALF_MONO, type CalfMonoConfig } from '@engine/calf-mono/CalfMo
 import { DEFAULT_SETBFREE, type SetBfreeConfig } from '@engine/setbfree/SetBfreeSynth';
 import { DEFAULT_SYNTHV1, type SynthV1Config } from '@engine/synthv1/SynthV1Synth';
 import { DEFAULT_MONIQUE, type MoniqueConfig } from '@engine/monique/MoniqueSynth';
+import { DEFAULT_VL1, type VL1Config } from '@engine/vl1/VL1Synth';
 import { DEFAULT_TAL_NOIZEMAKER, type TalNoizeMakerConfig } from '@engine/tal-noizemaker/TalNoizeMakerSynth';
 import { DEFAULT_AEOLUS, type AeolusConfig } from '@engine/aeolus/AeolusSynth';
 import { DEFAULT_FLUIDSYNTH, type FluidSynthConfig } from '@engine/fluidsynth/FluidSynthSynth';
@@ -101,6 +103,9 @@ const CalfMonoControls = lazy(() => import('../controls/CalfMonoControls').then(
 const SetBfreeControls = lazy(() => import('../controls/SetBfreeControls').then(m => ({ default: m.SetBfreeControls })));
 const SynthV1Controls = lazy(() => import('../controls/SynthV1Controls').then(m => ({ default: m.SynthV1Controls })));
 const MoniqueControls = lazy(() => import('../controls/MoniqueControls').then(m => ({ default: m.MoniqueControls })));
+const VL1Controls = lazy(() => import('../controls/VL1Controls').then(m => ({ default: m.VL1Controls })));
+const MoniqueHardwareUI = lazy(() => import('../hardware/MoniqueHardwareUI'));
+const AmsynthHardwareUI = lazy(() => import('../hardware/AmsynthHardwareUI'));
 const TalNoizeMakerControls = lazy(() => import('../controls/TalNoizeMakerControls').then(m => ({ default: m.TalNoizeMakerControls })));
 const AeolusControls = lazy(() => import('../controls/AeolusControls').then(m => ({ default: m.AeolusControls })));
 const FluidSynthControls = lazy(() => import('../controls/FluidSynthControls').then(m => ({ default: m.FluidSynthControls })));
@@ -165,7 +170,7 @@ const WavetableListEditor = lazy(() => import('./WavetableEditor').then(m => ({ 
 
 
 // Types
-export type EditorMode = 'generic' | 'tb303' | 'furnace' | 'buzzmachine' | 'sample' | 'dubsiren' | 'spacelaser' | 'v2' | 'sam' | 'pinktrombone' | 'dectalk' | 'synare' | 'mame' | 'mamechip' | 'dexed' | 'obxd' | 'mdaEPiano' | 'mdaJX10' | 'mdaDX10' | 'amsynth' | 'raffo' | 'calfMono' | 'setbfree' | 'synthv1' | 'moniqueSynth' | 'talNoizeMaker' | 'aeolus' | 'fluidsynth' | 'sfizz' | 'zynaddsubfx' | 'wam' | 'tonewheelOrgan' | 'melodica' | 'vital' | 'odin2' | 'surge' | 'vstbridge' | 'harmonicsynth' | 'modular' | 'sunvox-modular' | 'hively' | 'gtultra' | 'jamcracker' | 'soundmon' | 'sidmon' | 'digmug' | 'fc' | 'deltamusic1' | 'deltamusic2' | 'fred' | 'tfmx' | 'octamed' | 'sidmon1' | 'hippelcoso' | 'robhubbard' | 'steveturner' | 'davidwhittaker' | 'sonic-arranger' | 'instereo2' | 'musicline' | 'supercollider' | 'wobblebass' | 'startrekker-am' | 'futureplayer' | 'symphonie' | 'xrns-synth' | 'sunvox-synth';
+export type EditorMode = 'generic' | 'tb303' | 'furnace' | 'buzzmachine' | 'sample' | 'dubsiren' | 'spacelaser' | 'v2' | 'sam' | 'pinktrombone' | 'dectalk' | 'synare' | 'mame' | 'mamechip' | 'dexed' | 'obxd' | 'mdaEPiano' | 'mdaJX10' | 'mdaDX10' | 'toneAM' | 'raffo' | 'calfMono' | 'setbfree' | 'synthv1' | 'moniqueSynth' | 'vl1Synth' | 'talNoizeMaker' | 'aeolus' | 'fluidsynth' | 'sfizz' | 'zynaddsubfx' | 'wam' | 'tonewheelOrgan' | 'melodica' | 'vital' | 'odin2' | 'surge' | 'vstbridge' | 'harmonicsynth' | 'modular' | 'sunvox-modular' | 'hively' | 'gtultra' | 'jamcracker' | 'soundmon' | 'sidmon' | 'digmug' | 'fc' | 'deltamusic1' | 'deltamusic2' | 'fred' | 'tfmx' | 'octamed' | 'sidmon1' | 'hippelcoso' | 'robhubbard' | 'steveturner' | 'davidwhittaker' | 'sonic-arranger' | 'instereo2' | 'musicline' | 'supercollider' | 'wobblebass' | 'startrekker-am' | 'futureplayer' | 'symphonie' | 'xrns-synth' | 'sunvox-synth';
 
 export interface SynthTypeDispatcherProps {
   editorMode: EditorMode;
@@ -519,7 +524,7 @@ export const SynthTypeDispatcher: React.FC<SynthTypeDispatcherProps> = ({
     handleChange({ mdaDX10: newConfig });
   }, [instrument.mdaDX10, handleChange]);
 
-  // Handle AMSynth config updates
+  // Handle ToneAM config updates
   const handleAMSynthChange = useCallback((updates: Partial<AMSynthConfig>) => {
     const currentConfig = instrument.amsynth || DEFAULT_AMSYNTH;
     const newConfig = { ...currentConfig, ...updates };
@@ -560,6 +565,13 @@ export const SynthTypeDispatcher: React.FC<SynthTypeDispatcherProps> = ({
     const newConfig = { ...currentConfig, ...updates };
     handleChange({ monique: newConfig });
   }, [instrument.monique, handleChange]);
+
+  // Handle VL1 config updates
+  const handleVL1Change = useCallback((updates: Partial<VL1Config>) => {
+    const currentConfig = instrument.vl1 || DEFAULT_VL1;
+    const newConfig = { ...currentConfig, ...updates };
+    handleChange({ vl1: newConfig });
+  }, [instrument.vl1, handleChange]);
 
   // Handle TAL-NoiseMaker config updates
   const handleTalNoizeMakerChange = useCallback((updates: Partial<TalNoizeMakerConfig>) => {
@@ -602,7 +614,7 @@ export const SynthTypeDispatcher: React.FC<SynthTypeDispatcherProps> = ({
     if (!instrument?.id) return;
     const st = instrument.synthType || '';
     const needsPreInit = st.startsWith('MAME') ||
-      ['CZ101', 'CEM3394', 'SCSP', 'D50', 'Dexed', 'OBXd', 'MdaEPiano', 'MdaJX10', 'MdaDX10', 'AMSynth', 'RaffoSynth', 'CalfMono', 'SetBfree', 'SynthV1', 'TalNoizeMaker', 'Aeolus', 'FluidSynth', 'Sfizz', 'ZynAddSubFX', 'V2', 'TB303'].includes(st);
+      ['CZ101', 'CEM3394', 'SCSP', 'D50', 'Dexed', 'OBXd', 'MdaEPiano', 'MdaJX10', 'MdaDX10', 'ToneAM', 'RaffoSynth', 'CalfMono', 'SetBfree', 'SynthV1', 'TalNoizeMaker', 'Aeolus', 'FluidSynth', 'Sfizz', 'ZynAddSubFX', 'V2', 'TB303'].includes(st);
     if (!needsPreInit) return;
     (async () => {
       try {
@@ -2051,10 +2063,10 @@ export const SynthTypeDispatcher: React.FC<SynthTypeDispatcherProps> = ({
   // ============================================================================
   if (editorMode === 'dexed') {
     const dexedConfig = deepMerge(DEFAULT_DEXED, instrument.dexed || {});
+    const hasHardware = hasHardwareUI(instrument.synthType);
 
     return (
       <div className="synth-editor-container bg-gradient-to-b from-[#1e1e1e] to-[#151515]">
-        {/* Use common header with visualization */}
         <EditorHeader
           instrument={instrument}
           onChange={handleChange}
@@ -2066,16 +2078,41 @@ export const SynthTypeDispatcher: React.FC<SynthTypeDispatcherProps> = ({
           onUnbake={handleUnbake}
           isBaked={isBaked}
           isBaking={isBaking}
+          customHeaderControls={
+            hasHardware ? (
+              <button
+                onClick={() => setUIMode(uiMode === 'simple' ? 'hardware' : 'simple')}
+                className={`p-1.5 rounded transition-all flex items-center gap-1.5 px-2 ${
+                  uiMode === 'hardware'
+                    ? 'bg-accent-primary/20 text-accent-primary ring-1 ring-accent-primary/50'
+                    : 'bg-dark-bgTertiary text-text-muted hover:text-text-secondary border border-dark-borderLight'
+                }`}
+                title={uiMode === 'hardware' ? 'Switch to Simple Controls' : 'Switch to Hardware UI'}
+              >
+                {uiMode === 'hardware' ? <Cpu size={14} /> : <Monitor size={14} />}
+                <span className="text-[10px] font-bold uppercase">
+                  {uiMode === 'hardware' ? 'Hardware UI' : 'Simple UI'}
+                </span>
+              </button>
+            ) : undefined
+          }
         />
 
-        {/* Dexed Controls */}
         <div className="synth-editor-content overflow-y-auto">
-          <Suspense fallback={<LoadingControls />}>
-            <DexedControls
-              config={dexedConfig}
-              onChange={handleDexedChange}
+          {uiMode === 'hardware' && hasHardware ? (
+            <HardwareUIWrapper
+              synthType={instrument.synthType}
+              parameters={(instrument.parameters || {}) as Record<string, number>}
+              onParamChange={handleChipParamChange}
             />
-          </Suspense>
+          ) : (
+            <Suspense fallback={<LoadingControls />}>
+              <DexedControls
+                config={dexedConfig}
+                onChange={handleDexedChange}
+              />
+            </Suspense>
+          )}
         </div>
       </div>
     );
@@ -2216,10 +2253,25 @@ export const SynthTypeDispatcher: React.FC<SynthTypeDispatcherProps> = ({
   }
 
   // ============================================================================
-  // AMSYNTH EDITOR (Analog Modelling Synthesizer)
+  // TONE AM SYNTH (Tone.js Amplitude Modulation)
   // ============================================================================
-  if (editorMode === 'amsynth' || instrument.synthType === 'AMSynth') {
-    const amsynthConfig = { ...DEFAULT_AMSYNTH, ...(instrument.amsynth || {}) };
+  if (editorMode === 'toneAM' || instrument.synthType === 'ToneAM') {
+    const toneAMKnobColor = isCyanTheme ? '#00ffff' : '#e879f9';
+    const toneAMPanelBg = isCyanTheme
+      ? 'bg-[#051515] border-accent-highlight/20'
+      : 'bg-[#1a1a1a] border-dark-border';
+    const toneAMAccentText = isCyanTheme ? 'text-cyan-400' : 'text-purple-400';
+
+    const toneAMDefaultEnv = { attack: 10, decay: 200, sustain: 50, release: 1000 };
+    const toneAMEnv = {
+      attack: instrument.envelope?.attack ?? toneAMDefaultEnv.attack,
+      decay: instrument.envelope?.decay ?? toneAMDefaultEnv.decay,
+      sustain: instrument.envelope?.sustain ?? toneAMDefaultEnv.sustain,
+      release: instrument.envelope?.release ?? toneAMDefaultEnv.release,
+    };
+    const toneAMDefaultOsc = { type: 'sine' as const, detune: 0, octave: 0 };
+    const toneAMOsc = { ...toneAMDefaultOsc, ...instrument.oscillator };
+    const toneAMVolume = instrument.volume ?? 80;
 
     return (
       <div className="synth-editor-container bg-gradient-to-b from-[#1e1e1e] to-[#151515]">
@@ -2235,14 +2287,68 @@ export const SynthTypeDispatcher: React.FC<SynthTypeDispatcherProps> = ({
           isBaked={isBaked}
           isBaking={isBaking}
         />
+        <div className="synth-editor-content overflow-y-auto p-4 space-y-4">
+          {/* Oscillator */}
+          <div className={`p-4 rounded-xl border ${toneAMPanelBg}`}>
+            <h3 className={`font-bold ${toneAMAccentText} mb-4 text-xs uppercase tracking-widest`}>OSCILLATOR</h3>
+            <div className="flex items-center gap-3">
+              <label className="text-xs text-text-muted uppercase tracking-wide">Waveform</label>
+              <select
+                className="bg-dark-bg border border-dark-border rounded px-2 py-1 text-sm text-text-primary focus:outline-none focus:border-accent-highlight"
+                value={toneAMOsc.type}
+                onChange={(e) => handleChange({ oscillator: { ...toneAMOsc, type: e.target.value as 'sine' | 'square' | 'sawtooth' | 'triangle' } })}
+              >
+                <option value="sine">Sine</option>
+                <option value="square">Square</option>
+                <option value="sawtooth">Sawtooth</option>
+                <option value="triangle">Triangle</option>
+              </select>
+            </div>
+          </div>
 
-        <div className="synth-editor-content overflow-y-auto">
-          <Suspense fallback={<LoadingControls />}>
-            <AMSynthControls
-              config={amsynthConfig}
-              onChange={handleAMSynthChange}
-            />
-          </Suspense>
+          {/* Envelope */}
+          <div className={`p-4 rounded-xl border ${toneAMPanelBg}`}>
+            <h3 className={`font-bold ${toneAMAccentText} mb-4 text-xs uppercase tracking-widest`}>ENVELOPE</h3>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+              <Knob
+                value={toneAMEnv.attack} min={0} max={2000}
+                onChange={(v) => handleChange({ envelope: { ...toneAMEnv, attack: v } })}
+                label="Attack" color={toneAMKnobColor}
+                formatValue={(v) => v < 1000 ? `${Math.round(v)}ms` : `${(v / 1000).toFixed(1)}s`}
+              />
+              <Knob
+                value={toneAMEnv.decay} min={0} max={5000}
+                onChange={(v) => handleChange({ envelope: { ...toneAMEnv, decay: v } })}
+                label="Decay" color={toneAMKnobColor}
+                formatValue={(v) => v < 1000 ? `${Math.round(v)}ms` : `${(v / 1000).toFixed(1)}s`}
+              />
+              <Knob
+                value={toneAMEnv.sustain} min={0} max={100}
+                onChange={(v) => handleChange({ envelope: { ...toneAMEnv, sustain: v } })}
+                label="Sustain" color={toneAMKnobColor}
+                formatValue={(v) => `${Math.round(v)}%`}
+              />
+              <Knob
+                value={toneAMEnv.release} min={0} max={5000}
+                onChange={(v) => handleChange({ envelope: { ...toneAMEnv, release: v } })}
+                label="Release" color={toneAMKnobColor}
+                formatValue={(v) => v < 1000 ? `${Math.round(v)}ms` : `${(v / 1000).toFixed(1)}s`}
+              />
+            </div>
+          </div>
+
+          {/* Volume */}
+          <div className={`p-4 rounded-xl border ${toneAMPanelBg}`}>
+            <h3 className={`font-bold ${toneAMAccentText} mb-4 text-xs uppercase tracking-widest`}>OUTPUT</h3>
+            <div className="flex justify-center">
+              <Knob
+                value={toneAMVolume} min={0} max={100}
+                onChange={(v) => handleChange({ volume: v })}
+                label="Volume" color={toneAMKnobColor}
+                formatValue={(v) => `${Math.round(v)}%`}
+              />
+            </div>
+          </div>
         </div>
       </div>
     );
@@ -2331,12 +2437,123 @@ export const SynthTypeDispatcher: React.FC<SynthTypeDispatcherProps> = ({
     const moniqueConfig = { ...DEFAULT_MONIQUE, ...(instrument.monique || {}) };
     return (
       <div className="synth-editor-container bg-gradient-to-b from-[#1e1e1e] to-[#151515]">
-        <EditorHeader instrument={instrument} onChange={handleChange} vizMode={vizMode} onVizModeChange={setVizMode} showHelpButton={false} onBake={handleBake} onBakePro={handleBakePro} onUnbake={handleUnbake} isBaked={isBaked} isBaking={isBaking} />
+        <EditorHeader
+          instrument={instrument}
+          onChange={handleChange}
+          vizMode={vizMode}
+          onVizModeChange={setVizMode}
+          showHelpButton={false}
+          hideVisualization={uiMode === 'hardware'}
+          onBake={handleBake}
+          onBakePro={handleBakePro}
+          onUnbake={handleUnbake}
+          isBaked={isBaked}
+          isBaking={isBaking}
+          customHeaderControls={
+            <button
+              className={`px-2 py-1 text-xs rounded flex items-center gap-1 ${
+                uiMode === 'hardware'
+                  ? 'bg-blue-600 text-text-primary'
+                  : 'bg-dark-bgHover text-text-secondary hover:bg-dark-bgHover'
+              }`}
+              onClick={() => setUIMode(uiMode === 'simple' ? 'hardware' : 'simple')}
+              title={uiMode === 'hardware' ? 'Switch to Simple Controls' : 'Switch to Hardware UI'}
+            >
+              {uiMode === 'hardware' ? <Cpu size={14} /> : <Monitor size={14} />}
+              <span className="hidden sm:inline">
+                {uiMode === 'hardware' ? 'Hardware UI' : 'Simple UI'}
+              </span>
+            </button>
+          }
+        />
+        {uiMode === 'hardware' ? (
+          <Suspense fallback={<LoadingControls />}>
+            <MoniqueHardwareUI instrumentId={instrument.id} />
+          </Suspense>
+        ) : (
+          <div className="synth-editor-content overflow-y-auto">
+            <Suspense fallback={<LoadingControls />}>
+              <MoniqueControls config={moniqueConfig} onChange={handleMoniqueChange} />
+            </Suspense>
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  // ── VL1 (Casio VL-Tone) ──────────────────────────────────
+  if (editorMode === 'vl1Synth' || instrument.synthType === 'VL1') {
+    const vl1Config = { ...DEFAULT_VL1, ...(instrument.vl1 || {}) };
+    return (
+      <div className="synth-editor-container bg-gradient-to-b from-[#1e1e1e] to-[#151515]">
+        <EditorHeader
+          instrument={instrument}
+          onChange={handleChange}
+          vizMode={vizMode}
+          onVizModeChange={setVizMode}
+          showHelpButton={false}
+          onBake={handleBake}
+          onBakePro={handleBakePro}
+          onUnbake={handleUnbake}
+          isBaked={isBaked}
+          isBaking={isBaking}
+        />
         <div className="synth-editor-content overflow-y-auto">
           <Suspense fallback={<LoadingControls />}>
-            <MoniqueControls config={moniqueConfig} onChange={handleMoniqueChange} />
+            <VL1Controls config={vl1Config} onChange={handleVL1Change} />
           </Suspense>
         </div>
+      </div>
+    );
+  }
+
+  // ── amsynth (Classic Analog Modeling) ──────────────────────
+  if (instrument.synthType === 'Amsynth') {
+    return (
+      <div className="synth-editor-container bg-gradient-to-b from-[#1e1e1e] to-[#151515]">
+        <EditorHeader
+          instrument={instrument}
+          onChange={handleChange}
+          vizMode={vizMode}
+          onVizModeChange={setVizMode}
+          showHelpButton={false}
+          hideVisualization={uiMode === 'hardware'}
+          onBake={handleBake}
+          onBakePro={handleBakePro}
+          onUnbake={handleUnbake}
+          isBaked={isBaked}
+          isBaking={isBaking}
+          customHeaderControls={
+            <button
+              className={`px-2 py-1 text-xs rounded flex items-center gap-1 ${
+                uiMode === 'hardware'
+                  ? 'bg-blue-600 text-text-primary'
+                  : 'bg-dark-bgHover text-text-secondary hover:bg-dark-bgHover'
+              }`}
+              onClick={() => setUIMode(uiMode === 'simple' ? 'hardware' : 'simple')}
+              title={uiMode === 'hardware' ? 'Switch to Simple Controls' : 'Switch to Hardware UI'}
+            >
+              {uiMode === 'hardware' ? <Cpu size={14} /> : <Monitor size={14} />}
+              <span className="hidden sm:inline">
+                {uiMode === 'hardware' ? 'Hardware UI' : 'Simple UI'}
+              </span>
+            </button>
+          }
+        />
+        {uiMode === 'hardware' ? (
+          <Suspense fallback={<LoadingControls />}>
+            <AmsynthHardwareUI instrumentId={instrument.id} />
+          </Suspense>
+        ) : (
+          <div className="synth-editor-content overflow-y-auto">
+            <Suspense fallback={<LoadingControls />}>
+              <AMSynthControls
+                config={{ ...DEFAULT_AMSYNTH, ...(instrument.amsynth || {}) }}
+                onChange={handleAMSynthChange}
+              />
+            </Suspense>
+          </div>
+        )}
       </div>
     );
   }
@@ -2872,6 +3089,7 @@ export const SynthTypeDispatcher: React.FC<SynthTypeDispatcherProps> = ({
   // VST BRIDGE EDITOR (auto-generated parameter knobs from WASM metadata)
   // ============================================================================
   if (editorMode === 'vstbridge') {
+    const hasHW = hasHardwareUI(instrument.synthType);
     return (
       <div className="synth-editor-container bg-gradient-to-b from-[#1e1e1e] to-[#151515]">
         <EditorHeader
@@ -2885,15 +3103,45 @@ export const SynthTypeDispatcher: React.FC<SynthTypeDispatcherProps> = ({
           onUnbake={handleUnbake}
           isBaked={isBaked}
           isBaking={isBaking}
+          customHeaderControls={
+            hasHW ? (
+              <button
+                className={`flex items-center gap-1 px-2 py-1 rounded text-xs font-bold uppercase transition-colors ${
+                  uiMode === 'hardware'
+                    ? 'bg-blue-600 text-text-primary'
+                    : 'bg-dark-bgHover text-text-secondary hover:bg-dark-bgHover'
+                }`}
+                onClick={() => setUIMode(uiMode === 'simple' ? 'hardware' : 'simple')}
+                title={uiMode === 'hardware' ? 'Switch to Simple Controls' : 'Switch to Hardware UI'}
+              >
+                {uiMode === 'hardware' ? <Cpu size={14} /> : <Monitor size={14} />}
+                <span className="hidden sm:inline">
+                  {uiMode === 'hardware' ? 'Hardware UI' : 'Simple UI'}
+                </span>
+              </button>
+            ) : undefined
+          }
         />
-        <div className="synth-editor-content overflow-y-auto">
+        {uiMode === 'hardware' && hasHW ? (
           <Suspense fallback={<LoadingControls />}>
-            <VSTBridgePanel
-              instrument={instrument}
-              onChange={handleChange}
+            <HardwareUIWrapper
+              synthType={instrument.synthType}
+              parameters={(instrument.parameters || {}) as Record<string, number>}
+              onParamChange={(key, value) => {
+                handleChange({ parameters: { ...instrument.parameters, [key]: value } });
+              }}
             />
           </Suspense>
-        </div>
+        ) : (
+          <div className="synth-editor-content overflow-y-auto">
+            <Suspense fallback={<LoadingControls />}>
+              <VSTBridgePanel
+                instrument={instrument}
+                onChange={handleChange}
+              />
+            </Suspense>
+          </div>
+        )}
       </div>
     );
   }
