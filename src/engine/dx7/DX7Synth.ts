@@ -7,6 +7,15 @@
 import type { DevilboxSynth } from '@/types/synth';
 import { getDevilboxAudioContext, noteToMidi } from '@/utils/audio-context';
 
+export interface DX7PatchBank {
+  file: string;
+  voices: string[];
+}
+
+export interface DX7PatchManifest {
+  banks: DX7PatchBank[];
+}
+
 export class DX7Synth implements DevilboxSynth {
   readonly name = 'DX7Synth';
   readonly output: GainNode;
@@ -16,6 +25,8 @@ export class DX7Synth implements DevilboxSynth {
   private static initPromises = new WeakMap<AudioContext, Promise<void>>();
   private static wasmCache: { wasmBinary: ArrayBuffer; jsCode: string } | null = null;
   private static wasmFetchPromise: Promise<{ wasmBinary: ArrayBuffer; jsCode: string }> | null = null;
+  private static patchManifest: DX7PatchManifest | null = null;
+  private static manifestPromise: Promise<DX7PatchManifest | null> | null = null;
 
   private audioContext: AudioContext;
   private _disposed = false;
@@ -23,6 +34,9 @@ export class DX7Synth implements DevilboxSynth {
   private _wasmLoaded = false;
   private _pendingMessages: Array<Record<string, unknown>> = [];
   private _romLoaded = false;
+  private _currentBankFile = '';
+  private _currentVoice = 0;
+  private _onPatchChange: ((bankFile: string, voiceIndex: number, voiceName: string) => void) | null = null;
 
   constructor() {
     this.audioContext = getDevilboxAudioContext();
@@ -36,6 +50,7 @@ export class DX7Synth implements DevilboxSynth {
       const [, assets] = await Promise.all([
         DX7Synth.ensureModuleLoaded(this.audioContext),
         DX7Synth.fetchWasmAssets(),
+        DX7Synth.fetchPatchManifest(),
       ]);
 
       this.workletNode = new AudioWorkletNode(this.audioContext, 'dx7-processor', {
@@ -50,6 +65,7 @@ export class DX7Synth implements DevilboxSynth {
           for (const msg of this._pendingMessages) this.workletNode?.port.postMessage(msg);
           this._pendingMessages = [];
           this.tryAutoLoadVoices();
+          this.tryAutoLoadFirstPatchBank();
         } else if (data.type === 'wasmLoaded') {
           this._wasmLoaded = true;
           this.tryAutoLoadRom();
@@ -119,6 +135,81 @@ export class DX7Synth implements DevilboxSynth {
       } catch { /* try next */ }
     }
   }
+
+  /** Auto-load the first patch bank from manifest */
+  private async tryAutoLoadFirstPatchBank() {
+    const manifest = await DX7Synth.fetchPatchManifest();
+    if (manifest && manifest.banks.length > 0) {
+      // Load rom1a.syx first if available, otherwise first bank
+      const preferred = manifest.banks.find(b => b.file === 'rom1a.syx') ?? manifest.banks[0];
+      await this.loadPatchBank(preferred.file, 0);
+    }
+  }
+
+  /** Fetch patch manifest (cached, shared across instances) */
+  static async fetchPatchManifest(): Promise<DX7PatchManifest | null> {
+    if (DX7Synth.patchManifest) return DX7Synth.patchManifest;
+    if (DX7Synth.manifestPromise) return DX7Synth.manifestPromise;
+    DX7Synth.manifestPromise = (async () => {
+      try {
+        const baseUrl = import.meta.env.BASE_URL || '/';
+        const resp = await fetch(`${baseUrl}roms/dx7/Patches/manifest.json`);
+        if (!resp.ok) return null;
+        const data = await resp.json() as DX7PatchManifest;
+        DX7Synth.patchManifest = data;
+        console.log(`[DX7] Loaded patch manifest: ${data.banks.length} banks, ${data.banks.length * 32} voices`);
+        return data;
+      } catch {
+        return null;
+      }
+    })();
+    return DX7Synth.manifestPromise;
+  }
+
+  /** Get available patch banks (from manifest) */
+  static getPatchManifest(): DX7PatchManifest | null {
+    return DX7Synth.patchManifest;
+  }
+
+  /** Load a sysex patch bank by filename and optionally select a voice */
+  async loadPatchBank(bankFile: string, voiceIndex = 0) {
+    const baseUrl = import.meta.env.BASE_URL || '/';
+    try {
+      const resp = await fetch(`${baseUrl}roms/dx7/Patches/${bankFile}`);
+      if (!resp.ok) throw new Error(`Failed to fetch ${bankFile}`);
+      const data = await resp.arrayBuffer();
+      this.loadSysex(data);
+      this._currentBankFile = bankFile;
+      // Select the voice after a short delay to let the firmware process the sysex
+      setTimeout(() => {
+        this.selectVoice(voiceIndex);
+      }, 100);
+    } catch (err) {
+      console.error(`[DX7] Failed to load patch bank ${bankFile}:`, err);
+    }
+  }
+
+  /** Select a voice within the currently loaded bank (0-31) */
+  selectVoice(index: number) {
+    const voiceIndex = Math.max(0, Math.min(31, Math.round(index)));
+    this._currentVoice = voiceIndex;
+    this.send({ type: 'programChange', program: voiceIndex });
+    // Notify listener
+    if (this._onPatchChange) {
+      const manifest = DX7Synth.patchManifest;
+      const bank = manifest?.banks.find(b => b.file === this._currentBankFile);
+      const voiceName = bank?.voices[voiceIndex] ?? `Voice ${voiceIndex + 1}`;
+      this._onPatchChange(this._currentBankFile, voiceIndex, voiceName);
+    }
+  }
+
+  /** Register callback for patch changes */
+  onPatchChange(cb: (bankFile: string, voiceIndex: number, voiceName: string) => void) {
+    this._onPatchChange = cb;
+  }
+
+  get currentBankFile(): string { return this._currentBankFile; }
+  get currentVoice(): number { return this._currentVoice; }
 
   /** Load 16KB firmware ROM */
   loadFirmware(data: ArrayBuffer) {
@@ -215,12 +306,38 @@ export class DX7Synth implements DevilboxSynth {
   set(param: string, value: number) {
     switch (param) {
       case 'volume': this.send({ type: 'setVolume', volume: value }); break;
-      case 'bank': this.setBank(value); break;
-      case 'program': this.programChange(value); break;
+      case 'bank': {
+        // Bank index maps to sysex files from the manifest
+        const manifest = DX7Synth.patchManifest;
+        if (manifest && manifest.banks.length > 0) {
+          const idx = Math.max(0, Math.min(manifest.banks.length - 1, Math.round(value)));
+          const bank = manifest.banks[idx];
+          if (bank.file !== this._currentBankFile) {
+            this.loadPatchBank(bank.file, 0);
+          }
+        } else {
+          this.setBank(value);
+        }
+        break;
+      }
+      case 'program': this.selectVoice(value); break;
     }
   }
 
-  get(_param: string): number | undefined { return undefined; }
+  get(param: string): number | undefined {
+    switch (param) {
+      case 'bank': {
+        const manifest = DX7Synth.patchManifest;
+        if (manifest) {
+          const idx = manifest.banks.findIndex(b => b.file === this._currentBankFile);
+          return idx >= 0 ? idx : 0;
+        }
+        return 0;
+      }
+      case 'program': return this._currentVoice;
+      default: return undefined;
+    }
+  }
 
   get isReady(): boolean { return this._ready; }
   get hasRom(): boolean { return this._romLoaded; }
