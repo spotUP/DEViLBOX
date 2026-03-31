@@ -86,6 +86,24 @@ export const VOL1_KEY_MAP: Record<string, number> = {
   'm': 0xF,  // 0xF0-0xFF - tone portamento
 };
 
+// IT/Schism Volume Column Effect Keys (VOL1 position)
+// IT uses letter prefixes instead of FT2's numeric volume prefix
+export const IT_VOL1_KEY_MAP: Record<string, number> = {
+  'v': 0x1,  // volume set (maps to 0x10-0x4F range)
+  'p': 0x5,  // panning (0x50-0x5F in storage, displayed as pXX)
+  'c': 0x7,  // volume slide up
+  'd': 0x6,  // volume slide down
+  'a': 0x9,  // fine volume up
+  'b': 0x8,  // fine volume down
+  'u': 0xA,  // vibrato speed
+  'h': 0xB,  // vibrato depth
+  'l': 0xD,  // pan slide left
+  'r': 0xE,  // pan slide right
+  'g': 0xF,  // tone portamento
+  'f': 0x10, // portamento up (IT-specific, stored as extended)
+  'e': 0x11, // portamento down (IT-specific, stored as extended)
+};
+
 // FT2 Effect Type Keys (EFX0 position) - 36 effect commands
 export const EFFECT_TYPE_KEY_MAP: Record<string, number> = {
   '0': 0x00, '1': 0x01, '2': 0x02, '3': 0x03, '4': 0x04,
