@@ -4,7 +4,7 @@
  * Uses the configRef pattern for stale-state prevention (CLAUDE.md: Knob/Control Handling Pattern).
  */
 
-import { useCallback, useRef, useEffect, useState } from 'react';
+import { useCallback, useRef, useEffect } from 'react';
 import type { Graphics as GraphicsType } from 'pixi.js';
 import { PIXI_FONTS } from '../../fonts';
 import { usePixiTheme } from '../../theme';
@@ -19,15 +19,9 @@ interface PixiSynthPanelProps {
 }
 
 export const PixiSynthPanel: React.FC<PixiSynthPanelProps> = ({ layout: panelLayout, config, onChange, synthType }) => {
-  const theme = usePixiTheme();
-
   // Stale-ref pattern per CLAUDE.md
   const configRef = useRef(config);
   useEffect(() => { configRef.current = config; });
-
-  const [activeTab, setActiveTab] = useState<string | null>(
-    panelLayout.tabs?.[0]?.id ?? null,
-  );
 
   // Resolve a layout key to a full config path.
   // Keys starting with '~' are absolute (root-level, ignores configKey).
@@ -77,9 +71,9 @@ export const PixiSynthPanel: React.FC<PixiSynthPanelProps> = ({ layout: panelLay
     return current;
   };
 
-  // Determine which sections to show
-  const activeSections = panelLayout.tabs
-    ? panelLayout.tabs.find(t => t.id === activeTab)?.sections ?? []
+  // Flatten all sections (tabs are removed — show everything at once like DOM)
+  const allSections: SectionDescriptor[] = panelLayout.tabs
+    ? panelLayout.tabs.flatMap(t => t.sections)
     : panelLayout.sections ?? [];
 
   return (
@@ -95,59 +89,18 @@ export const PixiSynthPanel: React.FC<PixiSynthPanelProps> = ({ layout: panelLay
       {/* Synth name */}
       <PixiLabel text={panelLayout.name} size="md" weight="bold" color="accent" />
 
-      {/* Tab bar */}
-      {panelLayout.tabs && (
-        <pixiContainer layout={{ flexDirection: 'row', gap: 4, marginBottom: 4 }}>
-          {panelLayout.tabs.map(tab => (
-            <pixiContainer
-              key={tab.id}
-              eventMode="static"
-              cursor="pointer"
-              onPointerUp={() => setActiveTab(tab.id)}
-              layout={{
-                height: 24,
-                paddingLeft: 8,
-                paddingRight: 8,
-                justifyContent: 'center',
-                alignItems: 'center',
-              }}
-            >
-              <pixiGraphics
-                draw={(g: GraphicsType) => {
-                  g.clear();
-                  g.roundRect(0, 0, 60, 22, 4);
-                  if (activeTab === tab.id) {
-                    g.fill({ color: theme.accent.color, alpha: 0.15 });
-                    g.roundRect(0, 0, 60, 22, 4);
-                    g.stroke({ color: theme.accent.color, alpha: 0.5, width: 1 });
-                  } else {
-                    g.fill({ color: theme.bgTertiary.color });
-                    g.roundRect(0, 0, 60, 22, 4);
-                    g.stroke({ color: theme.border.color, alpha: 0.3, width: 1 });
-                  }
-                }}
-                layout={{ position: 'absolute', width: 60, height: 22 }}
-              />
-              <pixiBitmapText
-                text={tab.label}
-                style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 11, fill: 0xffffff }}
-                tint={activeTab === tab.id ? theme.accent.color : theme.textMuted.color}
-                layout={{}}
-              />
-            </pixiContainer>
-          ))}
-        </pixiContainer>
-      )}
-
-      {/* Sections */}
-      {activeSections.map((section, sIdx) => (
-        <PixiSynthSection
-          key={`${activeTab}-${sIdx}`}
-          section={section}
-          getValue={getValue}
-          updateParam={updateParam}
-        />
-      ))}
+      {/* Two-column grid of all sections */}
+      <pixiContainer layout={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'stretch', gap: 6, width: '100%' }}>
+        {allSections.map((section, sIdx) => (
+          <pixiContainer key={sIdx} layout={{ width: '48%', flexShrink: 0, flexGrow: 1 }}>
+            <PixiSynthSection
+              section={section}
+              getValue={getValue}
+              updateParam={updateParam}
+            />
+          </pixiContainer>
+        ))}
+      </pixiContainer>
 
       {/* Sampler waveform preview */}
       {(synthType === 'Sampler' || synthType === 'Player') && (
@@ -220,7 +173,7 @@ const PixiSynthControl: React.FC<SynthControlProps> = ({ descriptor, value, onCh
           max={descriptor.max ?? 1}
           defaultValue={descriptor.defaultValue ?? 0.5}
           label={descriptor.label}
-          size={descriptor.size ?? 'sm'}
+          size={descriptor.size ?? 'md'}
           bipolar={descriptor.bipolar}
           formatValue={descriptor.formatValue}
           onChange={(v) => onChange(v)}

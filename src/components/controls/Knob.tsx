@@ -67,6 +67,10 @@ export const Knob: React.FC<KnobProps> = React.memo(({
   step,
   disabled = false,
 }) => {
+  // Guard against undefined/NaN value prop (can happen if synth params aren't loaded yet)
+  const safeValue = (value == null || isNaN(value)) ? (min ?? 0) : value;
+  value = safeValue;
+
   const knobRef = useRef<HTMLDivElement>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [showNumericInput, setShowNumericInput] = useState(false);

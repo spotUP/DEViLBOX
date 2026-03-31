@@ -20,8 +20,8 @@ import { PresetDropdown } from '../presets/PresetDropdown';
 import {
   InstrumentOscilloscope,
   InstrumentSpectrum,
-  InstrumentLevelMeter,
-  NoteActivityDisplay,
+  InstrumentSpectrogram,
+  InstrumentLissajous,
 } from '@components/visualization';
 import type { InstrumentConfig, SynthType } from '@typedefs/instrument';
 import {
@@ -45,7 +45,7 @@ import {
   DEFAULT_SYNARE,
 } from '@/types/instrument';
 
-export type VizMode = 'oscilloscope' | 'spectrum';
+export type VizMode = 'oscilloscope' | 'spectrum' | 'spectrogram' | 'lissajous';
 
 export interface EditorHeaderProps {
   instrument: InstrumentConfig;
@@ -438,7 +438,7 @@ export const VisualizationRow: React.FC<VisualizationRowProps> = ({
 
   return (
     <div className="synth-editor-viz-header">
-      {/* Oscilloscope / Spectrum Toggle */}
+      {/* Visualization Mode Toggle */}
       <div className="flex bg-dark-bgSecondary rounded p-0.5">
         <button
           onClick={() => onVizModeChange('oscilloscope')}
@@ -447,6 +447,7 @@ export const VisualizationRow: React.FC<VisualizationRowProps> = ({
               ? 'bg-dark-bgHover text-text-primary'
               : 'text-text-muted hover:text-text-secondary'
           }`}
+          title="Oscilloscope"
         >
           <Activity size={12} className="inline mr-1" />
           Scope
@@ -458,9 +459,34 @@ export const VisualizationRow: React.FC<VisualizationRowProps> = ({
               ? 'bg-dark-bgHover text-text-primary'
               : 'text-text-muted hover:text-text-secondary'
           }`}
+          title="Frequency Spectrum"
         >
           <BarChart2 size={12} className="inline mr-1" />
           FFT
+        </button>
+        <button
+          onClick={() => onVizModeChange('spectrogram')}
+          className={`px-2 py-1 text-xs font-medium rounded transition-all ${
+            vizMode === 'spectrogram'
+              ? 'bg-dark-bgHover text-text-primary'
+              : 'text-text-muted hover:text-text-secondary'
+          }`}
+          title="Spectrogram (time-frequency heatmap)"
+        >
+          <Layers size={12} className="inline mr-1" />
+          Gram
+        </button>
+        <button
+          onClick={() => onVizModeChange('lissajous')}
+          className={`px-2 py-1 text-xs font-medium rounded transition-all ${
+            vizMode === 'lissajous'
+              ? 'bg-dark-bgHover text-text-primary'
+              : 'text-text-muted hover:text-text-secondary'
+          }`}
+          title="Lissajous / Phase Scope"
+        >
+          <Radio size={12} className="inline mr-1" />
+          X/Y
         </button>
       </div>
 
@@ -474,7 +500,7 @@ export const VisualizationRow: React.FC<VisualizationRowProps> = ({
             color="#4ade80"
             backgroundColor="#000000"
           />
-        ) : (
+        ) : vizMode === 'spectrum' ? (
           <InstrumentSpectrum
             instrumentId={instrument.id}
             width="auto"
@@ -484,27 +510,23 @@ export const VisualizationRow: React.FC<VisualizationRowProps> = ({
             colorEnd="#ef4444"
             backgroundColor="#000000"
           />
+        ) : vizMode === 'spectrogram' ? (
+          <InstrumentSpectrogram
+            instrumentId={instrument.id}
+            width="auto"
+            height={vizHeight}
+            backgroundColor="#000000"
+          />
+        ) : (
+          <InstrumentLissajous
+            instrumentId={instrument.id}
+            width="auto"
+            height={vizHeight}
+            color="#4ade80"
+            backgroundColor="#000000"
+          />
         )}
       </VisualizerFrame>
-
-      {/* Level Meter */}
-      <InstrumentLevelMeter
-        instrumentId={instrument.id}
-        orientation="vertical"
-        width={16}
-        height={vizHeight - 10}
-      />
-
-      {/* Note Activity Mini Display (only in non-compact mode) */}
-      {!compact && (
-        <NoteActivityDisplay
-          width={80}
-          height={24}
-          octaveStart={3}
-          octaveEnd={5}
-          activeColor="#4ade80"
-        />
-      )}
     </div>
   );
 };

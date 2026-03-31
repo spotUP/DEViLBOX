@@ -147,14 +147,14 @@ export const LFOControls: React.FC<LFOControlsProps> = ({
       </div>
 
       {/* LFO Visualizer */}
-      <div className="mb-4 bg-dark-bg rounded-lg p-2 border border-dark-border">
+      <div className="mb-3 bg-dark-bg rounded-lg border border-dark-border overflow-hidden">
         <LFOVisualizer
           instrumentId={instrument.id}
           rate={lfo.rate}
           depth={Math.max(lfo.filterAmount, lfo.pitchAmount, lfo.volumeAmount)}
           waveform={lfo.waveform}
-          width={200}
-          height={50}
+          width="auto"
+          height={60}
         />
       </div>
 
@@ -179,119 +179,70 @@ export const LFOControls: React.FC<LFOControlsProps> = ({
         </div>
       </div>
 
-      {/* Rate Control */}
-      <div className="mb-4">
-        <div className="flex items-center justify-between mb-1">
-          <label className="text-xs text-text-muted">Rate</label>
-          <span className="text-xs text-text-secondary">{lfo.rate.toFixed(1)} Hz</span>
-        </div>
-        <div className="flex items-center gap-2">
-          <Knob
-            value={lfo.rate}
-            min={0.1}
-            max={20}
-            step={0.1}
-            onChange={(v) => updateLFO({ rate: v })}
-            size="md"
-            color="#a855f7"
-          />
-          <input
-            type="range"
-            min={0.1}
-            max={20}
-            step={0.1}
-            value={lfo.rate}
-            onChange={(e) => updateLFO({ rate: parseFloat(e.target.value) })}
-            className="flex-1 h-2 accent-purple-500 rounded-lg"
-          />
-        </div>
-      </div>
-
-      {/* Modulation Targets */}
-      <div className="grid grid-cols-3 gap-4">
-        {/* Filter */}
-        <div className="text-center">
-          <div className="flex items-center justify-center gap-1 mb-2">
-            <Filter size={14} className="text-accent-highlight" />
-            <span className="text-xs text-text-muted">Filter</span>
-          </div>
-          <Knob
-            value={lfo.filterAmount}
-            min={0}
-            max={100}
-            onChange={(v) => updateLFO({ filterAmount: v })}
-            size="lg"
-            color="#22d3ee"
-          />
-          <div className="text-[10px] text-text-secondary mt-1">{lfo.filterAmount}%</div>
-        </div>
-
-        {/* Pitch */}
-        <div className="text-center">
-          <div className="flex items-center justify-center gap-1 mb-2">
-            <Music size={14} className="text-yellow-400" />
-            <span className="text-xs text-text-muted">Pitch</span>
-          </div>
-          <Knob
-            value={lfo.pitchAmount}
-            min={0}
-            max={100}
-            onChange={(v) => updateLFO({ pitchAmount: v })}
-            size="lg"
-            color="#facc15"
-          />
-          <div className="text-[10px] text-text-secondary mt-1">{lfo.pitchAmount} cents</div>
-        </div>
-
-        {/* Volume */}
-        <div className="text-center">
-          <div className="flex items-center justify-center gap-1 mb-2">
-            <Volume2 size={14} className="text-green-400" />
-            <span className="text-xs text-text-muted">Volume</span>
-          </div>
-          <Knob
-            value={lfo.volumeAmount}
-            min={0}
-            max={100}
-            onChange={(v) => updateLFO({ volumeAmount: v })}
-            size="lg"
-            color="#22c55e"
-          />
-          <div className="text-[10px] text-text-secondary mt-1">{lfo.volumeAmount}%</div>
-        </div>
+      {/* All controls in one row */}
+      <div className="flex flex-wrap gap-4 items-end justify-center">
+        <Knob
+          value={lfo.rate}
+          min={0.1}
+          max={20}
+          step={0.1}
+          onChange={(v) => updateLFO({ rate: v })}
+          label="Rate"
+          color="#a855f7"
+          formatValue={(v) => `${v.toFixed(1)}Hz`}
+        />
+        <Knob
+          value={lfo.filterAmount}
+          min={0}
+          max={100}
+          onChange={(v) => updateLFO({ filterAmount: v })}
+          label="Filter"
+          color="#22d3ee"
+          formatValue={(v) => `${Math.round(v)}%`}
+        />
+        <Knob
+          value={lfo.pitchAmount}
+          min={0}
+          max={100}
+          onChange={(v) => updateLFO({ pitchAmount: v })}
+          label="Pitch"
+          color="#facc15"
+          formatValue={(v) => `${Math.round(v)}¢`}
+        />
+        <Knob
+          value={lfo.volumeAmount}
+          min={0}
+          max={100}
+          onChange={(v) => updateLFO({ volumeAmount: v })}
+          label="Volume"
+          color="#22c55e"
+          formatValue={(v) => `${Math.round(v)}%`}
+        />
       </div>
 
       {/* Advanced Options */}
-      <div className="mt-4 pt-4 border-t border-dark-border">
-        <div className="grid grid-cols-2 gap-4">
-          {/* Phase */}
-          <div>
-            <label className="block text-xs text-text-muted mb-1">Start Phase</label>
-            <input
-              type="range"
-              min={0}
-              max={360}
-              value={lfo.phase}
-              onChange={(e) => updateLFO({ phase: parseInt(e.target.value) })}
-              className="w-full h-1 accent-accent-primary"
-            />
-            <div className="text-[10px] text-text-secondary text-center">{lfo.phase}°</div>
-          </div>
-
-          {/* Retrigger */}
-          <div>
-            <label className="block text-xs text-text-muted mb-1">Note Retrigger</label>
-            <button
-              onClick={() => updateLFO({ retrigger: !lfo.retrigger })}
-              className={`w-full px-3 py-1.5 rounded text-xs transition-colors ${
-                lfo.retrigger
-                  ? 'bg-accent-primary text-dark-bg'
-                  : 'bg-dark-bgTertiary text-text-muted'
-              }`}
-            >
-              {lfo.retrigger ? 'ON' : 'OFF'}
-            </button>
-          </div>
+      <div className="mt-3 pt-3 border-t border-dark-border flex gap-4 items-end justify-center">
+        <Knob
+          value={lfo.phase}
+          min={0}
+          max={360}
+          onChange={(v) => updateLFO({ phase: v })}
+          label="Phase"
+          color="#a855f7"
+          formatValue={(v) => `${Math.round(v)}°`}
+        />
+        <div className="text-center">
+          <label className="block text-[10px] text-text-muted mb-1">Retrigger</label>
+          <button
+            onClick={() => updateLFO({ retrigger: !lfo.retrigger })}
+            className={`px-3 py-1.5 rounded text-xs transition-colors ${
+              lfo.retrigger
+                ? 'bg-accent-primary text-dark-bg'
+                : 'bg-dark-bgTertiary text-text-muted'
+            }`}
+          >
+            {lfo.retrigger ? 'ON' : 'OFF'}
+          </button>
         </div>
       </div>
     </div>

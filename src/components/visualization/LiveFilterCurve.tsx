@@ -9,7 +9,7 @@
  * - High-DPI (Retina) support
  */
 
-import React, { useRef, useCallback, useLayoutEffect } from 'react';
+import React, { useRef, useCallback, useLayoutEffect, useState, useEffect } from 'react';
 import { useVisualizationAnimation } from '@hooks/useVisualizationAnimation';
 import { getVisualizationData } from '@stores/useVisualizationStore';
 
@@ -22,7 +22,7 @@ interface LiveFilterCurveProps {
   type: FilterType;
   envelopeAmount?: number; // -100 to 100
   lfoAmount?: number; // 0-100
-  width?: number;
+  width?: number | 'auto';
   height?: number;
   color?: string;
   modulatedColor?: string;
@@ -44,9 +44,29 @@ export const LiveFilterCurve: React.FC<LiveFilterCurveProps> = ({
   backgroundColor = 'var(--color-bg-tertiary)',
   className = '',
 }) => {
+  const containerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const contextRef = useRef<CanvasRenderingContext2D | null>(null);
   const modulatedCutoffRef = useRef(cutoff);
+  const [logicalWidth, setLogicalWidth] = useState(width === 'auto' ? 200 : width);
+
+  // Handle responsive width
+  useEffect(() => {
+    if (width !== 'auto') {
+      requestAnimationFrame(() => setLogicalWidth(width));
+      return;
+    }
+    const container = containerRef.current;
+    if (!container) return;
+    const updateWidth = () => {
+      const rect = container.getBoundingClientRect();
+      if (rect.width > 0) setLogicalWidth(Math.floor(rect.width));
+    };
+    updateWidth();
+    const resizeObserver = new ResizeObserver(updateWidth);
+    resizeObserver.observe(container);
+    return () => resizeObserver.disconnect();
+  }, [width]);
 
   // Read visualization data directly (no Zustand subscription for high-frequency data)
   const vizData = getVisualizationData();
@@ -56,7 +76,7 @@ export const LiveFilterCurve: React.FC<LiveFilterCurveProps> = ({
 
   // Padding and dimensions
   const padding = { top: 8, right: 8, bottom: 20, left: 32 };
-  const graphWidth = width - padding.left - padding.right;
+  const graphWidth = logicalWidth - padding.left - padding.right;
   const graphHeight = height - padding.top - padding.bottom;
 
   // Frequency scale (logarithmic)
@@ -156,14 +176,14 @@ export const LiveFilterCurve: React.FC<LiveFilterCurveProps> = ({
     if (!ctx) return;
 
     const dpr = window.devicePixelRatio || 1;
-    canvas.width = width * dpr;
+    canvas.width = logicalWidth * dpr;
     canvas.height = height * dpr;
     
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.scale(dpr, dpr);
     
     contextRef.current = ctx;
-  }, [width, height]);
+  }, [logicalWidth, height]);
 
   // Animation frame callback
   const onFrame = useCallback((): boolean => {
@@ -208,7 +228,7 @@ export const LiveFilterCurve: React.FC<LiveFilterCurveProps> = ({
 
     // Clear canvas
     ctx.fillStyle = backgroundColor;
-    ctx.fillRect(0, 0, width, height);
+    ctx.fillRect(0, 0, logicalWidth, height);
 
     // Draw grid
     ctx.strokeStyle = 'var(--color-border-light)';
@@ -330,7 +350,7 @@ export const LiveFilterCurve: React.FC<LiveFilterCurveProps> = ({
     graphWidth,
     graphHeight,
     padding,
-    width,
+    logicalWidth,
     height
   ]);
 
@@ -341,16 +361,25 @@ export const LiveFilterCurve: React.FC<LiveFilterCurveProps> = ({
     fps: 60,
   });
 
-  return (
+  const canvas = (
     <canvas
       ref={canvasRef}
       className={`rounded ${className}`}
       style={{ 
         backgroundColor,
-        width: `${width}px`,
+        width: width === 'auto' ? '100%' : `${width}px`,
         height: `${height}px`,
         display: 'block'
       }}
     />
   );
+
+  if (width === 'auto') {
+    return (
+      <div ref={containerRef} className="w-full h-full">
+        {canvas}
+      </div>
+    );
+  }
+  return canvas;
 };
