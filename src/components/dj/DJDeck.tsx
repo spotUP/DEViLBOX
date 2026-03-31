@@ -13,6 +13,8 @@ import { parseModuleToSong } from '@/lib/import/parseModuleToSong';
 import { detectBPM } from '@/engine/dj/DJBeatDetector';
 import { cacheSong } from '@/engine/dj/DJSongCache';
 import { isAudioFile } from '@/lib/audioFileUtils';
+import { isUADEFormat } from '@/lib/import/formats/UADEParser';
+import { loadUADEToDeck } from '@/engine/dj/DJUADEPrerender';
 import { getDJPipeline } from '@/engine/dj/DJPipeline';
 import { DeckTransport } from './DeckTransport';
 import { DeckPitchSlider } from './DeckPitchSlider';
@@ -179,14 +181,18 @@ export const DJDeck: React.FC<DJDeckProps> = ({ deckId }) => {
           seratoBeatGrid: seratoBeatGrid,
           seratoKey: seratoKey,
         });
+      } else if (isUADEFormat(file.name)) {
+        // UADE format — use dedicated pre-render path
+        const moduleBuffer = await file.arrayBuffer();
+        await loadUADEToDeck(engine, deckId, moduleBuffer, file.name, true);
+        useDJStore.getState().setDeckViewMode('visualizer');
       } else {
-        // Tracker module mode (MOD, XM, IT, S3M, etc.)
+        // Non-UADE tracker module (XM/IT/S3M/etc.)
         const song = await parseModuleToSong(file);
         cacheSong(file.name, song);
         const bpmResult = detectBPM(song);
         const moduleBuffer = await file.arrayBuffer();
 
-        // Set loading state
         useDJStore.getState().setDeckState(deckId, {
           fileName: file.name,
           trackName: song.name || file.name,
@@ -196,14 +202,10 @@ export const DJDeck: React.FC<DJDeckProps> = ({ deckId }) => {
           isPlaying: false,
         });
 
-        // Render FIRST, then load audio directly (eliminates tracker bugs)
         try {
           const result = await getDJPipeline().loadOrEnqueue(moduleBuffer, file.name, deckId, 'high');
           await engine.loadAudioToDeck(deckId, result.wavData, file.name, song.name || file.name, result.analysis?.bpm || bpmResult.bpm, song);
-          
-          // Switch to visualizer view for modules
           useDJStore.getState().setDeckViewMode('visualizer');
-          
         } catch (err) {
           console.error(`[DJDeck] Pipeline failed:`, err);
         }

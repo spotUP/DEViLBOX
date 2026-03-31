@@ -205,45 +205,37 @@ export const DJView: React.FC<DJViewProps> = ({ onShowDrumpads: _onShowDrumpads 
         });
       } else {
         // Tracker module mode (MOD, XM, IT, S3M, etc.)
-        const { parseModuleToSong } = await import('@/lib/import/parseModuleToSong');
-        const { detectBPM } = await import('@/engine/dj/DJBeatDetector');
-        const { cacheSong } = await import('@/engine/dj/DJSongCache');
+        const { isUADEFormat: checkUADE } = await import('@/lib/import/formats/UADEParser');
+        
+        if (checkUADE(filename)) {
+          // UADE format — use dedicated pre-render path
+          const { loadUADEToDeck: loadUADE } = await import('@/engine/dj/DJUADEPrerender');
+          await loadUADE(engine, deckId, buffer.slice(0), filename, true, track.bpm > 0 ? track.bpm : undefined, track.title);
+          useDJStore.getState().setDeckViewMode('visualizer');
+        } else {
+          const { parseModuleToSong } = await import('@/lib/import/parseModuleToSong');
+          const { detectBPM } = await import('@/engine/dj/DJBeatDetector');
+          const { cacheSong } = await import('@/engine/dj/DJSongCache');
 
-        const blob = new File([buffer], filename, { type: 'application/octet-stream' });
-        const song = await parseModuleToSong(blob);
-        const bpmResult = detectBPM(song);
+          const blob = new File([buffer], filename, { type: 'application/octet-stream' });
+          const song = await parseModuleToSong(blob);
+          const bpmResult = detectBPM(song);
 
-        cacheSong(cacheKey, song);
-        await engine.loadToDeck(deckId, song, filename, bpmResult.bpm);
+          cacheSong(cacheKey, song);
 
-        // Fire background pipeline for render + analysis
-        void getDJPipeline().loadOrEnqueue(buffer.slice(0), filename, deckId, 'high').catch((err) => {
-          console.warn(`[DJView] Pipeline for Serato tracker ${filename}:`, err);
-        });
+          useDJStore.getState().setDeckState(deckId, {
+            fileName: cacheKey,
+            trackName: song.name || track.title || filename,
+            detectedBPM: track.bpm > 0 ? track.bpm : bpmResult.bpm,
+            effectiveBPM: track.bpm > 0 ? track.bpm : bpmResult.bpm,
+            analysisState: 'rendering',
+            isPlaying: false,
+          });
 
-        // Compute note density peaks for overview waveform
-        const { computeTrackerPeaks } = await import('@/engine/dj/computeTrackerPeaks');
-        const trackerPeaks = computeTrackerPeaks(song, 800);
-
-        useDJStore.getState().setDeckState(deckId, {
-          fileName: cacheKey,
-          trackName: song.name || track.title || filename,
-          detectedBPM: track.bpm > 0 ? track.bpm : bpmResult.bpm,
-          effectiveBPM: track.bpm > 0 ? track.bpm : bpmResult.bpm,
-          totalPositions: song.songLength,
-          songPos: 0,
-          pattPos: 0,
-          elapsedMs: 0,
-          isPlaying: false,
-          playbackMode: 'tracker',
-          durationMs: 0,
-          audioPosition: 0,
-          waveformPeaks: trackerPeaks,
-          seratoCuePoints: [],
-          seratoLoops: [],
-          seratoBeatGrid: [],
-          seratoKey: null,
-        });
+          const result = await getDJPipeline().loadOrEnqueue(buffer.slice(0), filename, deckId, 'high');
+          await engine.loadAudioToDeck(deckId, result.wavData, cacheKey, song.name || filename, result.analysis?.bpm || bpmResult.bpm, song);
+          useDJStore.getState().setDeckViewMode('visualizer');
+        }
       }
     } catch (err) {
       console.error(`[DJView] Failed to load Serato track ${track.title}:`, err);

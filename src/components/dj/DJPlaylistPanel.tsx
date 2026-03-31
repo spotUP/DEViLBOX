@@ -28,6 +28,8 @@ import { smartSort, sortByBPM, sortByKey, sortByEnergy, sortByName } from '@/eng
 import { camelotDisplay, camelotColor } from '@/engine/dj/DJKeyUtils';
 import { getDJPipeline } from '@/engine/dj/DJPipeline';
 import { isAudioFile } from '@/lib/audioFileUtils';
+import { isUADEFormat } from '@/lib/import/formats/UADEParser';
+import { loadUADEToDeck } from '@/engine/dj/DJUADEPrerender';
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -206,6 +208,9 @@ export const DJPlaylistPanel: React.FC<DJPlaylistPanelProps> = ({ onClose }) => 
           if (isAudioFile(filename)) {
             await engine.loadAudioToDeck(deckId, buffer, track.fileName);
             useDJStore.getState().setDeckViewMode('vinyl');
+          } else if (isUADEFormat(filename)) {
+            await loadUADEToDeck(engine, deckId, buffer, filename, true, undefined, track.trackName);
+            useDJStore.getState().setDeckViewMode('visualizer');
           } else {
             const blob = new File([buffer], filename, { type: 'application/octet-stream' });
             const song = await parseModuleToSong(blob);
