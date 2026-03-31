@@ -1036,3 +1036,12 @@ export interface MAMEConfig {
   romsLoaded: boolean;
   registers: Record<number, number>;
 }
+
+// ─── OpenWurli (Wurlitzer 200A Physical Model) ─────────────────────────────
+export interface OpenWurliConfig {
+  volume?: number;            // 0-1 (audio taper in DSP: vol²)
+  tremoloDepth?: number;      // 0-1 (Twin-T circuit oscillator modulation depth)
+  speakerCharacter?: number;  // 0-1 (0=clean, 1=full cabinet coloration)
+  mlpEnabled?: boolean;       // MLP neural correction for mode frequencies/decays
+  velocityCurve?: number;     // 0=Linear, 1=Soft, 2=Medium, 3=Hard, 4=Fixed
+}
