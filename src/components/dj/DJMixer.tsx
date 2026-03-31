@@ -30,12 +30,12 @@ export const DJMixer: React.FC = () => {
   return (
     <div
       className="
-        flex flex-col items-center gap-1 p-1.5
+        flex flex-col items-center gap-2 p-2
         bg-dark-bg border border-dark-border rounded-lg h-full
       "
     >
       {/* Row 1: Filter+EQ | Fader | VUs | Fader | Filter+EQ — all stretch to same height */}
-      <div className="flex items-stretch justify-center gap-1 w-full border-b border-dark-border pb-1">
+      <div className="flex items-stretch justify-center gap-1 w-full border-b border-dark-border pb-2">
         <MixerEQ deckId="A" />
         <MixerChannelStrip deckId="A" stretch />
 
@@ -57,12 +57,12 @@ export const DJMixer: React.FC = () => {
       </div>
 
       {/* Row 2: Crossfader (A↔B only; Deck C is thru) */}
-      <div className="w-full border-b border-dark-border pb-1">
+      <div className="w-full border-b border-dark-border pb-2">
         <MixerCrossfader />
       </div>
 
       {/* Row 3: Transition controls */}
-      <div className="w-full border-b border-dark-border pb-1">
+      <div className="w-full border-b border-dark-border pb-2">
         <MixerTransition />
       </div>
 
@@ -74,7 +74,7 @@ export const DJMixer: React.FC = () => {
       </div>
 
       {/* Row 5: Broadcast toggle — collapsed by default */}
-      <div className="flex items-center justify-center gap-2 w-full pt-1 border-t border-dark-border flex-wrap">
+      <div className="flex items-center justify-center gap-2 w-full pt-2 border-t border-dark-border flex-wrap">
         <button
           onClick={() => setShowBroadcast(v => !v)}
           className={`px-2 py-0.5 text-xs font-mono rounded border transition-colors ${
