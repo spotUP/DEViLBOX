@@ -13,6 +13,7 @@
 
 import type { DevilboxSynth } from '@/types/synth';
 import { getDevilboxAudioContext, noteToMidi } from '@/utils/audio-context';
+import { loadNativePatch, captureNativeState, type NativePatch } from '@/engine/common/NativePatchLoader';
 
 export const CalfMonoParam = {
   O1_WAVE: 0, O2_WAVE: 1, O1_PW: 2, O2_PW: 3,
@@ -239,12 +240,15 @@ export const CALF_MONO_PRESETS: Record<string, Partial<CalfMonoConfig>> = {
   },
 };
 
+export const CALF_MONO_NATIVE_PRESETS: NativePatch[] = [];
+
 export class CalfMonoSynthImpl implements DevilboxSynth {
   readonly name = 'CalfMonoSynth';
   readonly output: GainNode;
   private node: AudioWorkletNode | null = null;
   private ready = false;
   private config: CalfMonoConfig;
+  private pendingPatch: number[] | null = null;
 
   constructor() {
     this.config = { ...DEFAULT_CALF_MONO };
@@ -272,11 +276,12 @@ export class CalfMonoSynthImpl implements DevilboxSynth {
     ]);
 
     // Patch JS for worklet environment
-    const jsCode = jsCodeRaw
+    const urlPolyfill = 'if(typeof URL==="undefined"){globalThis.URL=class{constructor(p,b){this.href=(b||"")+p;this.pathname=p;}};}\n';
+    const jsCode = urlPolyfill + jsCodeRaw
       .replace(/import\.meta\.url/g, `'${baseUrl}CalfMonoSynth.js'`)
       .replace(/export\s+default\s+\w+;?\s*$/, '')
       .replace(/if\s*\(ENVIRONMENT_IS_NODE\)\s*\{[^}]*await\s+import\([^)]*\)[^}]*\}/g, '')
-      .replace(/(wasmMemory=wasmExports\["\w+"\])/, '$1;Module["wasmMemory"]=wasmMemory')
+      .replace(/(wasmMemory\s*=\s*wasmExports\[['"][\w]+['"]\])/, '$1;Module["wasmMemory"]=wasmMemory')
       .replace(/new\s+URL\(([^,]+),\s*([^)]+)\)\.href/g, '($2 + $1)');
 
     // Load worklet
@@ -309,7 +314,12 @@ export class CalfMonoSynthImpl implements DevilboxSynth {
       );
     });
 
-    this.applyConfig(this.config);
+    if (this.pendingPatch) {
+      void loadNativePatch(this.node!, this.pendingPatch).catch(() => {});
+      this.pendingPatch = null;
+    } else {
+      this.applyConfig(this.config);
+    }
   }
 
   getNode(): AudioNode | null { return this.node; }
@@ -348,6 +358,43 @@ export class CalfMonoSynthImpl implements DevilboxSynth {
 
   getPresets(): Record<string, Partial<CalfMonoConfig>> {
     return CALF_MONO_PRESETS;
+  }
+
+  /**
+   * Load a native patch (complete engine state snapshot).
+   * If not yet initialized, queues the patch for loading on ready.
+   */
+  loadPatch(values: number[]): void {
+    if (this.ready && this.node) {
+      void loadNativePatch(this.node, values).catch(() => {});
+    } else {
+      this.pendingPatch = values;
+    }
+  }
+
+  /**
+   * Load a native preset by name from the CALF_MONO_NATIVE_PRESETS map.
+   */
+  loadNativePreset(name: string): void {
+    const preset = CALF_MONO_NATIVE_PRESETS.find(p => p.name === name);
+    if (preset) {
+      this.loadPatch(preset.values);
+    } else {
+      console.warn(`[CalfMono] Native preset not found: ${name}`);
+    }
+  }
+
+  /**
+   * Capture the current complete engine state (for preset creation).
+   */
+  async getState(): Promise<number[] | null> {
+    if (!this.ready || !this.node) return null;
+    try {
+      const result = await captureNativeState(this.node);
+      return result.values;
+    } catch {
+      return null;
+    }
   }
 
   dispose(): void {

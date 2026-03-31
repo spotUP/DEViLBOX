@@ -911,6 +911,12 @@ export function createOBXd(config: InstrumentConfig): Tone.ToneAudioNode {
   const obxdConfig = config.obxd || {};
   const synth = new OBXdSynth(obxdConfig);
 
+  // Check for native patch preset (complete engine state snapshot)
+  const nativePresetName = (config as unknown as Record<string, unknown>).obxdNativePatch;
+  if (typeof nativePresetName === 'string') {
+    synth.loadNativePreset(nativePresetName);
+  }
+
   synth.output.gain.value = Tone.dbToGain(getNormalizedVolume('OBXd', config.volume));
 
   return synth as unknown as Tone.ToneAudioNode;
@@ -976,6 +982,11 @@ export function createRaffoSynth(config: InstrumentConfig): Tone.ToneAudioNode {
   const raffoConfig = config.raffo || {};
   const synth = new RaffoSynthEngine(raffoConfig);
 
+  const nativePatch = (config as unknown as Record<string, unknown>).raffoNativePatch;
+  if (typeof nativePatch === 'string') {
+    synth.loadNativePreset(nativePatch);
+  }
+
   synth.output.gain.value = Tone.dbToGain(getNormalizedVolume('RaffoSynth', config.volume));
 
   return synth as unknown as Tone.ToneAudioNode;
@@ -986,6 +997,10 @@ export function createCalfMono(config: InstrumentConfig): Tone.ToneAudioNode {
   const synth = new CalfMonoSynthImpl();
   void synth.init();
   synth.applyConfig(calfConfig);
+  const nativePatch = (config as unknown as Record<string, unknown>).calfMonoNativePatch;
+  if (typeof nativePatch === 'string') {
+    synth.loadNativePreset(nativePatch);
+  }
   synth.output.gain.value = Tone.dbToGain(getNormalizedVolume('CalfMono', config.volume));
   return synth as unknown as Tone.ToneAudioNode;
 }
@@ -995,6 +1010,13 @@ export function createSetBfree(config: InstrumentConfig): Tone.ToneAudioNode {
   const synth = new SetBfreeSynthImpl();
   void synth.init();
   synth.applyConfig(bfreeConfig);
+
+  // Check for native patch preset (complete organ registration from upstream default.pgm)
+  const nativePresetName = (config as unknown as Record<string, unknown>).setbfreeNativePatch;
+  if (typeof nativePresetName === 'string') {
+    synth.loadNativePreset(nativePresetName);
+  }
+
   synth.output.gain.value = Tone.dbToGain(getNormalizedVolume('SetBfree', config.volume));
   return synth as unknown as Tone.ToneAudioNode;
 }
@@ -1004,6 +1026,10 @@ export function createSynthV1(config: InstrumentConfig): Tone.ToneAudioNode {
   const synth = new SynthV1SynthImpl();
   void synth.init();
   synth.applyConfig(sv1Config);
+  const nativePatch = (config as unknown as Record<string, unknown>).synthv1NativePatch;
+  if (typeof nativePatch === 'string') {
+    synth.loadNativePreset(nativePatch);
+  }
   synth.output.gain.value = Tone.dbToGain(getNormalizedVolume('SynthV1', config.volume));
   return synth as unknown as Tone.ToneAudioNode;
 }
@@ -1013,6 +1039,13 @@ export function createTalNoizeMaker(config: InstrumentConfig): Tone.ToneAudioNod
   const synth = new TalNoizeMakerSynthImpl();
   void synth.init();
   synth.applyConfig(talConfig);
+
+  // Check for native patch preset (complete engine state from upstream ProgramChunk.h)
+  const nativePresetName = (config as unknown as Record<string, unknown>).talNativePatch;
+  if (typeof nativePresetName === 'string') {
+    synth.loadNativePreset(nativePresetName);
+  }
+
   synth.output.gain.value = Tone.dbToGain(getNormalizedVolume('TalNoizeMaker', config.volume));
   return synth as unknown as Tone.ToneAudioNode;
 }

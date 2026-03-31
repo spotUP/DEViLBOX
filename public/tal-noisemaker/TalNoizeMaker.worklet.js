@@ -57,6 +57,26 @@ class TalNoizeMakerProcessor extends AudioWorkletProcessor {
           this.module._tal_nm_set_bpm(this.engine, data.bpm);
         }
         break;
+      case 'loadPatch':
+        if (this.engine && data.values) {
+          const numParams = this.module._tal_nm_get_num_params(this.engine);
+          const count = Math.min(data.values.length, numParams);
+          for (let i = 0; i < count; i++) {
+            this.module._tal_nm_set_param(this.engine, i, data.values[i]);
+          }
+          this.port.postMessage({ type: 'patchLoaded', paramCount: count });
+        }
+        break;
+      case 'getState':
+        if (this.engine) {
+          const numParams = this.module._tal_nm_get_num_params(this.engine);
+          const state = new Float32Array(numParams);
+          for (let i = 0; i < numParams; i++) {
+            state[i] = this.module._tal_nm_get_param(this.engine, i);
+          }
+          this.port.postMessage({ type: 'state', values: Array.from(state), numParams });
+        }
+        break;
       case 'getInfo':
         if (this.engine) {
           this.port.postMessage({
@@ -82,7 +102,9 @@ class TalNoizeMakerProcessor extends AudioWorkletProcessor {
             createElement: () => ({
               relList: { supports: () => false },
               tagName: 'DIV', rel: '',
-              addEventListener: () => {}, removeEventListener: () => {}
+              setAttribute: () => {}, getAttribute: () => null,
+              addEventListener: () => {}, removeEventListener: () => {},
+              style: {}
             }),
             getElementById: () => null,
             querySelector: () => null,

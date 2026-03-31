@@ -8,6 +8,7 @@
 
 import type { DevilboxSynth } from '@/types/synth';
 import { getDevilboxAudioContext, noteToMidi } from '@/utils/audio-context';
+import { loadNativePatch, captureNativeState, type NativePatch } from '@/engine/common/NativePatchLoader';
 
 // Parameter index map — per-page offsets (add page*40 for page 2)
 export const SV1 = {
@@ -368,6 +369,8 @@ export const DCO_SHAPE_NAMES = ['Pulse', 'Saw', 'Sine', 'Noise'];
 export const DCF_TYPE_NAMES = ['LPF', 'BPF', 'HPF', 'BRF'];
 export const LFO_SHAPE_NAMES = ['Tri', 'Sine', 'Saw', 'Square', 'S&H'];
 
+export const SYNTHV1_NATIVE_PRESETS: NativePatch[] = [];
+
 export class SynthV1Engine implements DevilboxSynth {
   readonly name = 'SynthV1Engine';
   readonly output: GainNode;
@@ -376,6 +379,7 @@ export class SynthV1Engine implements DevilboxSynth {
   private config: SynthV1Config;
   private isInitialized = false;
   private pendingNotes: Array<{ note: number; velocity: number }> = [];
+  private pendingPatch: number[] | null = null;
 
   private static isWorkletLoaded = false;
   private static workletLoadPromise: Promise<void> | null = null;
@@ -431,7 +435,8 @@ export class SynthV1Engine implements DevilboxSynth {
         .replace(/import\.meta\.url/g, `"${baseUrl}synthv1/"`)
         .replace(/export\s+default\s+\w+;?\s*$/, '')
         .replace(/if\s*\(ENVIRONMENT_IS_NODE\)\s*\{[^}]*await\s+import\([^)]*\)[^}]*\}/g, '')
-        .replace(/(wasmMemory=wasmExports\["\w+"\])/, '$1;Module["wasmMemory"]=wasmMemory');
+        .replace(/(wasmMemory\s*=\s*wasmExports\[['"][\w]+['"]\])/, '$1;Module["wasmMemory"]=wasmMemory')
+        .replace(/new\s+URL\(([^,]+),\s*([^)]+)\)\.href/g, '($2 + $1)');
 
       this._worklet = new AudioWorkletNode(rawContext, 'synthv1-processor', {
         outputChannelCount: [2],
@@ -441,7 +446,12 @@ export class SynthV1Engine implements DevilboxSynth {
       this._worklet.port.onmessage = (event) => {
         if (event.data.type === 'ready') {
           this.isInitialized = true;
-          this.applyConfig(this.config);
+          if (this.pendingPatch) {
+            void loadNativePatch(this._worklet!, this.pendingPatch).catch(() => {});
+            this.pendingPatch = null;
+          } else {
+            this.applyConfig(this.config);
+          }
           for (const { note, velocity } of this.pendingNotes) {
             this._worklet!.port.postMessage({ type: 'noteOn', note, velocity });
           }
@@ -526,6 +536,43 @@ export class SynthV1Engine implements DevilboxSynth {
     if (preset) {
       this.config = { ...DEFAULT_SYNTHV1, ...preset };
       this.applyConfig(this.config);
+    }
+  }
+
+  /**
+   * Load a native patch (complete engine state snapshot).
+   * If not yet initialized, queues the patch for loading on ready.
+   */
+  loadPatch(values: number[]): void {
+    if (this.isInitialized && this._worklet) {
+      void loadNativePatch(this._worklet, values).catch(() => {});
+    } else {
+      this.pendingPatch = values;
+    }
+  }
+
+  /**
+   * Load a native preset by name from the SYNTHV1_NATIVE_PRESETS map.
+   */
+  loadNativePreset(name: string): void {
+    const preset = SYNTHV1_NATIVE_PRESETS.find(p => p.name === name);
+    if (preset) {
+      this.loadPatch(preset.values);
+    } else {
+      console.warn(`[SynthV1] Native preset not found: ${name}`);
+    }
+  }
+
+  /**
+   * Capture the current complete engine state (for preset creation).
+   */
+  async getState(): Promise<number[] | null> {
+    if (!this.isInitialized || !this._worklet) return null;
+    try {
+      const result = await captureNativeState(this._worklet);
+      return result.values;
+    } catch {
+      return null;
     }
   }
 

@@ -77,6 +77,28 @@ class OBXdProcessor extends AudioWorkletProcessor {
         }
         break;
 
+      case 'loadPatch':
+        if (this.synth && this.isInitialized && data.values) {
+          const numParams = this.synth.getParameterCount();
+          const count = Math.min(data.values.length, numParams);
+          for (let i = 0; i < count; i++) {
+            this.synth.setParameter(i, data.values[i]);
+          }
+          this.port.postMessage({ type: 'patchLoaded', paramCount: count });
+        }
+        break;
+
+      case 'getState':
+        if (this.synth && this.isInitialized) {
+          const numParams = this.synth.getParameterCount();
+          const state = new Float32Array(numParams);
+          for (let i = 0; i < numParams; i++) {
+            state[i] = this.synth.getParameter(i);
+          }
+          this.port.postMessage({ type: 'state', values: Array.from(state), numParams });
+        }
+        break;
+
       case 'dispose':
         this.cleanup();
         break;

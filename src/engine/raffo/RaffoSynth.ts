@@ -12,6 +12,7 @@
 
 import type { DevilboxSynth } from '@/types/synth';
 import { getDevilboxAudioContext, noteToMidi } from '@/utils/audio-context';
+import { loadNativePatch, captureNativeState, type NativePatch } from '@/engine/common/NativePatchLoader';
 
 export const RaffoParam = {
   VOLUME: 0, WAVE0: 1, WAVE1: 2, WAVE2: 3, WAVE3: 4,
@@ -193,6 +194,8 @@ export const RAFFO_PRESETS: Record<string, RaffoSynthConfig> = {
   },
 };
 
+export const RAFFO_NATIVE_PRESETS: NativePatch[] = [];
+
 const CONFIG_KEYS: (keyof RaffoSynthConfig)[] = [
   'volume', 'wave0', 'wave1', 'wave2', 'wave3',
   'range0', 'range1', 'range2', 'range3',
@@ -212,6 +215,8 @@ export class RaffoSynthEngine implements DevilboxSynth {
   private config: RaffoSynthConfig;
   private isInitialized = false;
   private pendingNotes: Array<{ note: number; velocity: number }> = [];
+  private pendingPatch: number[] | null = null;
+  private _currentNote = -1;
 
   private static isWorkletLoaded = false;
   private static workletLoadPromise: Promise<void> | null = null;
@@ -260,7 +265,8 @@ export class RaffoSynthEngine implements DevilboxSynth {
         .replace(/import\.meta\.url/g, `"${baseUrl}raffo/"`)
         .replace(/export\s+default\s+\w+;?\s*$/, '')
         .replace(/if\s*\(ENVIRONMENT_IS_NODE\)\s*\{[^}]*await\s+import\([^)]*\)[^}]*\}/g, '')
-        .replace(/(wasmMemory=wasmExports\["\w+"\])/, '$1;Module["wasmMemory"]=wasmMemory');
+        .replace(/(wasmMemory\s*=\s*wasmExports\[['"][\w]+['"]\])/, '$1;Module["wasmMemory"]=wasmMemory')
+        .replace(/new\s+URL\(([^,]+),\s*([^)]+)\)\.href/g, '($2 + $1)');
 
       this._worklet = new AudioWorkletNode(rawContext, 'raffo-processor', {
         outputChannelCount: [2],
@@ -270,7 +276,12 @@ export class RaffoSynthEngine implements DevilboxSynth {
       this._worklet.port.onmessage = (event) => {
         if (event.data.type === 'ready') {
           this.isInitialized = true;
-          this.applyConfig(this.config);
+          if (this.pendingPatch) {
+            void loadNativePatch(this._worklet!, this.pendingPatch).catch(() => {});
+            this.pendingPatch = null;
+          } else {
+            this.applyConfig(this.config);
+          }
           for (const { note, velocity } of this.pendingNotes) {
             this._worklet!.port.postMessage({ type: 'noteOn', note, velocity });
           }
@@ -312,6 +323,7 @@ export class RaffoSynthEngine implements DevilboxSynth {
   triggerAttack(frequency: number | string, _time?: number, velocity?: number): this {
     const note = typeof frequency === 'string' ? noteToMidi(frequency) : Math.round(12 * Math.log2(frequency / 440) + 69);
     const vel = Math.round((velocity ?? 0.8) * 127);
+    this._currentNote = note;
     if (!this.isInitialized || !this._worklet) {
       this.pendingNotes.push({ note, velocity: vel });
       return this;
@@ -320,13 +332,12 @@ export class RaffoSynthEngine implements DevilboxSynth {
     return this;
   }
 
-  triggerRelease(frequency?: number | string, _time?: number): this {
+  // RaffoSynth is monophonic (Minimoog clone) — always release current note
+  triggerRelease(_time?: number): this {
     if (!this._worklet || !this.isInitialized) return this;
-    if (frequency !== undefined) {
-      const note = typeof frequency === 'string' ? noteToMidi(frequency) : Math.round(12 * Math.log2(frequency / 440) + 69);
-      this._worklet.port.postMessage({ type: 'noteOff', note });
-    } else {
-      this._worklet.port.postMessage({ type: 'allNotesOff' });
+    if (this._currentNote >= 0) {
+      this._worklet.port.postMessage({ type: 'noteOff', note: this._currentNote });
+      this._currentNote = -1;
     }
     return this;
   }
@@ -350,6 +361,43 @@ export class RaffoSynthEngine implements DevilboxSynth {
     if (preset) {
       this.config = { ...preset };
       this.applyConfig(this.config);
+    }
+  }
+
+  /**
+   * Load a native patch (complete engine state snapshot).
+   * If not yet initialized, queues the patch for loading on ready.
+   */
+  loadPatch(values: number[]): void {
+    if (this.isInitialized && this._worklet) {
+      void loadNativePatch(this._worklet, values).catch(() => {});
+    } else {
+      this.pendingPatch = values;
+    }
+  }
+
+  /**
+   * Load a native preset by name from the RAFFO_NATIVE_PRESETS map.
+   */
+  loadNativePreset(name: string): void {
+    const preset = RAFFO_NATIVE_PRESETS.find(p => p.name === name);
+    if (preset) {
+      this.loadPatch(preset.values);
+    } else {
+      console.warn(`[RaffoSynth] Native preset not found: ${name}`);
+    }
+  }
+
+  /**
+   * Capture the current complete engine state (for preset creation).
+   */
+  async getState(): Promise<number[] | null> {
+    if (!this.isInitialized || !this._worklet) return null;
+    try {
+      const result = await captureNativeState(this._worklet);
+      return result.values;
+    } catch {
+      return null;
     }
   }
 
