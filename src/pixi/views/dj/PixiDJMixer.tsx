@@ -718,7 +718,7 @@ const MixerCueSection: React.FC = () => {
       <pixiContainer layout={{ flexDirection: 'row', gap: 3, alignItems: 'center' }}>
         <PixiLabel text="PFL" size="xs" color="textMuted" />
         <PixiButton
-          label="1"
+          label="A"
           variant={pflA ? 'ft2' : 'ghost'}
           color={pflA ? 'yellow' : undefined}
           size="sm"
@@ -726,7 +726,7 @@ const MixerCueSection: React.FC = () => {
           onClick={() => handlePFLToggle('A')}
         />
         <PixiButton
-          label="2"
+          label="B"
           variant={pflB ? 'ft2' : 'ghost'}
           color={pflB ? 'yellow' : undefined}
           size="sm"
