@@ -399,7 +399,8 @@ export async function importTrackerModule(
     setMetadata({ name: song.name, author: '', description: `Imported from ${info.file?.name || 'module'}` });
     applyEditorMode(song);
     const samplerCount = song.instruments.filter(i => i.synthType === 'Sampler').length;
-    if (samplerCount > 0) await engine.preloadInstruments(song.instruments);
+    const hasWasmSynths = song.instruments.some(i => i.synthType && i.synthType !== 'Sampler' && i.synthType !== 'Synth');
+    if (samplerCount > 0 || hasWasmSynths) await engine.preloadInstruments(song.instruments);
     notify.success(`Imported "${song.name}" — ${song.patterns.length} patterns, ${song.instruments.length} instruments`);
     if (info.file) checkModlandFileWithPatternHash(info.file, null);
     return;
@@ -428,7 +429,8 @@ export async function importTrackerModule(
       setMetadata({ name: song.name, author: '', description: `Imported from ${info.file?.name || 'module'}` });
       applyEditorMode(song);
       const samplerCount = song.instruments.filter(i => i.synthType === 'Sampler').length;
-      if (samplerCount > 0) await engine.preloadInstruments(song.instruments);
+      const hasWasmSynths2 = song.instruments.some(i => i.synthType && i.synthType !== 'Sampler' && i.synthType !== 'Synth');
+      if (samplerCount > 0 || hasWasmSynths2) await engine.preloadInstruments(song.instruments);
       notify.success(`Imported "${song.name}" — ${song.patterns.length} patterns, ${song.instruments.length} instruments`);
       if (info.file) checkModlandFileWithPatternHash(info.file, null);
       return;
