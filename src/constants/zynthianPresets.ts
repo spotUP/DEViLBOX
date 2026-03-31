@@ -12,6 +12,7 @@ import { EPIANO_PRESETS, DEFAULT_MDA_EPIANO } from '../engine/mda-epiano/MdaEPia
 import { AMSYNTH_PRESETS, DEFAULT_AMSYNTH } from '../engine/amsynth/AMSynthSynth';
 import { RAFFO_PRESETS, DEFAULT_RAFFO } from '../engine/raffo/RaffoSynth';
 import { MONIQUE_PRESETS, DEFAULT_MONIQUE } from '../engine/monique/MoniqueSynth';
+import { VL1_PRESETS, DEFAULT_VL1 } from '../engine/vl1/VL1Synth';
 import { CALF_MONO_PRESETS, DEFAULT_CALF_MONO } from '../engine/calf-mono/CalfMonoSynth';
 import { SETBFREE_PRESETS, DEFAULT_SETBFREE } from '../engine/setbfree/SetBfreeSynth';
 import { SYNTHV1_PRESETS, DEFAULT_SYNTHV1 } from '../engine/synthv1/SynthV1Synth';
@@ -19,7 +20,7 @@ import { TAL_NOIZEMAKER_PRESETS, DEFAULT_TAL_NOIZEMAKER } from '../engine/tal-no
 import { AEOLUS_PRESETS, DEFAULT_AEOLUS } from '../engine/aeolus/AeolusSynth';
 import { FLUIDSYNTH_PRESETS, DEFAULT_FLUIDSYNTH } from '../engine/fluidsynth/FluidSynthSynth';
 import { SFIZZ_PRESETS, DEFAULT_SFIZZ } from '../engine/sfizz/SfizzSynth';
-import { ZYNADDSUBFX_PRESETS, DEFAULT_ZYNADDSUBFX } from '../engine/zynaddsubfx/ZynAddSubFXSynth';
+import { ZYNADDSUBFX_PRESETS, ZYNADDSUBFX_XML_PRESETS, DEFAULT_ZYNADDSUBFX } from '../engine/zynaddsubfx/ZynAddSubFXSynth';
 
 /** Convert a synth engine's preset map into InstrumentPreset['config'][] */
 function makePresets<D, P>(
@@ -45,9 +46,10 @@ function makePresets<D, P>(
 export const MDA_DX10_FACTORY_PRESETS = makePresets(DX10_PRESETS, 'MdaDX10', 'mdaDX10', DEFAULT_MDA_DX10);
 export const MDA_JX10_FACTORY_PRESETS = makePresets(JX10_PRESETS, 'MdaJX10', 'mdaJX10', DEFAULT_MDA_JX10);
 export const MDA_EPIANO_FACTORY_PRESETS = makePresets(EPIANO_PRESETS, 'MdaEPiano', 'mdaEPiano', DEFAULT_MDA_EPIANO);
-export const AMSYNTH_FACTORY_PRESETS = makePresets(AMSYNTH_PRESETS, 'AMSynth', 'amsynth', DEFAULT_AMSYNTH);
+export const AMSYNTH_FACTORY_PRESETS = makePresets(AMSYNTH_PRESETS, 'Amsynth', 'amsynth', DEFAULT_AMSYNTH);
 export const RAFFO_FACTORY_PRESETS = makePresets(RAFFO_PRESETS, 'RaffoSynth', 'raffo', DEFAULT_RAFFO);
 export const MONIQUE_FACTORY_PRESETS = makePresets(MONIQUE_PRESETS, 'Monique', 'monique', DEFAULT_MONIQUE);
+export const VL1_FACTORY_PRESETS = makePresets(VL1_PRESETS, 'VL1', 'vl1', DEFAULT_VL1);
 export const CALF_MONO_FACTORY_PRESETS = makePresets(CALF_MONO_PRESETS, 'CalfMono', 'calfMono', DEFAULT_CALF_MONO);
 export const SETBFREE_FACTORY_PRESETS = makePresets(SETBFREE_PRESETS, 'SetBfree', 'setbfree', DEFAULT_SETBFREE);
 export const SYNTHV1_FACTORY_PRESETS = makePresets(SYNTHV1_PRESETS, 'SynthV1', 'synthv1', DEFAULT_SYNTHV1);
@@ -55,7 +57,21 @@ export const TAL_NOIZEMAKER_FACTORY_PRESETS = makePresets(TAL_NOIZEMAKER_PRESETS
 export const AEOLUS_FACTORY_PRESETS = makePresets(AEOLUS_PRESETS, 'Aeolus', 'aeolus', DEFAULT_AEOLUS);
 export const FLUIDSYNTH_FACTORY_PRESETS = makePresets(FLUIDSYNTH_PRESETS, 'FluidSynth', 'fluidsynth', DEFAULT_FLUIDSYNTH);
 export const SFIZZ_FACTORY_PRESETS = makePresets(SFIZZ_PRESETS, 'Sfizz', 'sfizz', DEFAULT_SFIZZ);
-export const ZYNADDSUBFX_FACTORY_PRESETS = makePresets(ZYNADDSUBFX_PRESETS, 'ZynAddSubFX', 'zynaddsubfx', DEFAULT_ZYNADDSUBFX);
+export const ZYNADDSUBFX_FACTORY_PRESETS = [
+  // Legacy flat config preset
+  ...makePresets(ZYNADDSUBFX_PRESETS, 'ZynAddSubFX', 'zynaddsubfx', DEFAULT_ZYNADDSUBFX),
+  // XML presets loaded natively by ZynAddSubFX's own XML parser
+  ...Object.keys(ZYNADDSUBFX_XML_PRESETS).map(name => ({
+    type: 'synth' as const,
+    name,
+    synthType: 'ZynAddSubFX',
+    effects: [],
+    volume: -8,
+    pan: 0,
+    zynaddsubfx: { ...DEFAULT_ZYNADDSUBFX },
+    zynaddsubfxXmlPreset: name,
+  } as InstrumentPreset['config'])),
+];
 
 export const ZYNTHIAN_PRESETS: InstrumentPreset['config'][] = [
   ...MDA_DX10_FACTORY_PRESETS,
@@ -64,6 +80,7 @@ export const ZYNTHIAN_PRESETS: InstrumentPreset['config'][] = [
   ...AMSYNTH_FACTORY_PRESETS,
   ...RAFFO_FACTORY_PRESETS,
   ...MONIQUE_FACTORY_PRESETS,
+  ...VL1_FACTORY_PRESETS,
   ...CALF_MONO_FACTORY_PRESETS,
   ...SETBFREE_FACTORY_PRESETS,
   ...SYNTHV1_FACTORY_PRESETS,

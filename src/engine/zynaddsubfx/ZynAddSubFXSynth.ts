@@ -180,245 +180,44 @@ export const DEFAULT_ZYNADDSUBFX: ZynAddSubFXConfig = {
   eqLow: 0.5, eqHigh: 0.5,
 };
 
+/**
+ * XML preset files extracted from ZynAddSubFX instrument banks.
+ * These are loaded natively by ZynAddSubFX's own XML parser — no parameter mapping needed.
+ * Maps display name → filename in public/zynaddsubfx/presets/
+ */
+export const ZYNADDSUBFX_XML_PRESETS: Record<string, string> = {
+  // ADDsynth
+  'Saw Lead': 'saw-lead.xml',
+  'Bass 1': 'bass-1.xml',
+  'Analog Bass': 'bass-analog.xml',
+  'Organ': 'organ-1.xml',
+  'FM Trumpet': 'brass-fm.xml',
+  'Plucked': 'plucked-1.xml',
+  'Strings': 'strings-saw.xml',
+  'Flute': 'flute.xml',
+  'Choir': 'choir.xml',
+  'Arpeggio': 'arpeggio.xml',
+  'Space Synth': 'space-synth.xml',
+  'Analog Pad': 'analog-pad.xml',
+  // SUBsynth
+  'Sine Pad': 'sine-pad.xml',
+  'Wind': 'wind.xml',
+  'Sub Noise': 'sub-noise.xml',
+  // ADD+SUB combos
+  'Voiced Saw': 'voiced-saw.xml',
+  'Extreme': 'extreme.xml',
+  // PADsynth
+  'PAD Ronzio': 'pad-ronzio.xml',
+  'PAD Asteroide': 'pad-asteroide.xml',
+  'PAD Beep': 'pad-beep.xml',
+};
+
+/**
+ * Legacy flat presets kept for backward compatibility and as the "Init" default.
+ * New presets should use XML (ZYNADDSUBFX_XML_PRESETS).
+ */
 export const ZYNADDSUBFX_PRESETS: Record<string, ZynAddSubFXConfig> = {
-  'Additive Pad': {
-    ...DEFAULT_ZYNADDSUBFX,
-    addEnable: 1, addVolume: 0.7,
-    addVoice1Wave: 0, addVoice1Volume: 1.0, addVoice1Detune: 0,
-    addVoice2Wave: 0, addVoice2Volume: 0.8, addVoice2Detune: 0.1, addVoice2Octave: 0,
-    addVoice3Wave: 0, addVoice3Volume: 0.6, addVoice3Detune: -0.1, addVoice3Octave: 0,
-    addVoice4Wave: 0, addVoice4Volume: 0.4, addVoice4Detune: 0.05, addVoice4Octave: 1,
-    subEnable: 0, padEnable: 0,
-    ampAttack: 0.4, ampDecay: 0.2, ampSustain: 0.8, ampRelease: 0.6,
-    filterCutoff: 0.6, filterResonance: 0.1, filterEnvAmount: 0.2,
-    chorusWet: 0.3, chorusRate: 0.2, chorusDepth: 0.4,
-    reverbWet: 0.2,
-  },
-  'Sub Bass': {
-    ...DEFAULT_ZYNADDSUBFX,
-    addEnable: 0, subEnable: 1, padEnable: 0,
-    subVolume: 0.9, subOctave: -1,
-    subBandwidth: 0.3, subNumHarmonics: 4, subMagType: 0,
-    subHarmonic1: 1.0, subHarmonic2: 0.7, subHarmonic3: 0.3, subHarmonic4: 0.1, subHarmonic5: 0, subHarmonic6: 0,
-    filterCutoff: 0.4, filterResonance: 0.3,
-    ampAttack: 0.01, ampDecay: 0.2, ampSustain: 0.9, ampRelease: 0.15,
-  },
-  'PAD Atmosphere': {
-    ...DEFAULT_ZYNADDSUBFX,
-    addEnable: 0, subEnable: 0, padEnable: 1,
-    padVolume: 0.7, padBandwidth: 0.8, padBandwidthScale: 0.6,
-    padProfileWidth: 0.7, padProfileStretch: 0.4, padQuality: 2,
-    ampAttack: 0.6, ampDecay: 0.3, ampSustain: 0.7, ampRelease: 1.0,
-    filterCutoff: 0.5, filterResonance: 0.15, filterEnvAmount: 0.1,
-    reverbWet: 0.6, reverbSize: 0.8, reverbDamp: 0.3,
-  },
-  'FM Lead': {
-    ...DEFAULT_ZYNADDSUBFX,
-    addEnable: 1, subEnable: 0, padEnable: 0,
-    addVolume: 0.8,
-    addVoice1Wave: 0, addVoice1Volume: 1.0, addVoice1Detune: 0,
-    addVoice2Wave: 2, addVoice2Volume: 0.6, addVoice2Detune: 0, addVoice2Octave: 1,
-    ampAttack: 0.01, ampDecay: 0.15, ampSustain: 0.7, ampRelease: 0.2,
-    filterCutoff: 0.7, filterResonance: 0.4, filterEnvAmount: 0.5,
-    filterAttack: 0.01, filterDecay: 0.4, filterSustain: 0.3, filterRelease: 0.2,
-    distortionWet: 0.15, distortionDrive: 0.4,
-  },
-  'Full Stack': {
-    ...DEFAULT_ZYNADDSUBFX,
-    addEnable: 1, subEnable: 1, padEnable: 1,
-    addVolume: 0.5, subVolume: 0.4, padVolume: 0.3,
-    addVoice1Wave: 2, addVoice1Volume: 0.8, addVoice1Detune: 0.05,
-    addVoice2Wave: 0, addVoice2Volume: 0.6, addVoice2Detune: -0.05, addVoice2Octave: 0,
-    subBandwidth: 0.6, subNumHarmonics: 12,
-    padBandwidth: 0.7, padQuality: 2,
-    ampAttack: 0.1, ampSustain: 0.8, ampRelease: 0.5,
-    filterCutoff: 0.65, filterResonance: 0.25,
-    reverbWet: 0.25, chorusWet: 0.15,
-  },
-  'Warm Strings': {
-    ...DEFAULT_ZYNADDSUBFX,
-    addEnable: 1, subEnable: 0, padEnable: 1,
-    addVolume: 0.5, padVolume: 0.5,
-    addVoice1Wave: 2, addVoice1Volume: 0.7, addVoice1Detune: 0.03,
-    addVoice2Wave: 2, addVoice2Volume: 0.7, addVoice2Detune: -0.03,
-    padBandwidth: 0.6, padQuality: 2,
-    ampAttack: 0.35, ampDecay: 0.2, ampSustain: 0.85, ampRelease: 0.5,
-    filterCutoff: 0.55, filterResonance: 0.1, filterEnvAmount: 0.15,
-    chorusWet: 0.25, chorusRate: 0.15, chorusDepth: 0.35,
-    reverbWet: 0.3, reverbSize: 0.7,
-  },
-  'Crystal Bell': {
-    ...DEFAULT_ZYNADDSUBFX,
-    addEnable: 1, subEnable: 0, padEnable: 0,
-    addVolume: 0.75,
-    addVoice1Wave: 0, addVoice1Volume: 1.0, addVoice1Detune: 0,
-    addVoice2Wave: 0, addVoice2Volume: 0.5, addVoice2Detune: 0, addVoice2Octave: 2,
-    addVoice3Wave: 0, addVoice3Volume: 0.3, addVoice3Detune: 0.02, addVoice3Octave: 3,
-    addVoice4Wave: 0, addVoice4Volume: 0.15, addVoice4Detune: -0.01, addVoice4Octave: 4,
-    ampAttack: 0.005, ampDecay: 0.6, ampSustain: 0.1, ampRelease: 0.8,
-    filterCutoff: 0.85, filterResonance: 0.05,
-    reverbWet: 0.45, reverbSize: 0.75, reverbDamp: 0.4,
-  },
-  'Dark Ambient': {
-    ...DEFAULT_ZYNADDSUBFX,
-    addEnable: 0, subEnable: 1, padEnable: 1,
-    subVolume: 0.6, subOctave: -1, subBandwidth: 0.7, subNumHarmonics: 16, subMagType: 1,
-    subHarmonic1: 1.0, subHarmonic2: 0.5, subHarmonic3: 0.3, subHarmonic4: 0.6,
-    subHarmonic5: 0.1, subHarmonic6: 0.4,
-    padVolume: 0.5, padBandwidth: 0.9, padBandwidthScale: 0.7, padQuality: 3,
-    ampAttack: 0.8, ampDecay: 0.4, ampSustain: 0.6, ampRelease: 1.0,
-    filterCutoff: 0.35, filterResonance: 0.2, filterEnvAmount: 0.1,
-    reverbWet: 0.7, reverbSize: 0.9, reverbDamp: 0.2,
-  },
-  'Analog Bass': {
-    ...DEFAULT_ZYNADDSUBFX,
-    addEnable: 1, subEnable: 1, padEnable: 0,
-    addVolume: 0.7, addVoice1Wave: 2, addVoice1Volume: 0.9,
-    addVoice2Wave: 3, addVoice2Volume: 0.4, addVoice2Octave: -1,
-    subVolume: 0.5, subOctave: -1, subBandwidth: 0.2, subNumHarmonics: 6,
-    subHarmonic1: 1.0, subHarmonic2: 0.8, subHarmonic3: 0.4, subHarmonic4: 0.2,
-    subHarmonic5: 0.1, subHarmonic6: 0.05,
-    ampAttack: 0.005, ampDecay: 0.3, ampSustain: 0.7, ampRelease: 0.12,
-    filterCutoff: 0.45, filterResonance: 0.45, filterEnvAmount: 0.4,
-    filterAttack: 0.005, filterDecay: 0.35, filterSustain: 0.2, filterRelease: 0.15,
-    distortionWet: 0.1, distortionDrive: 0.25,
-  },
-  'Choir Pad': {
-    ...DEFAULT_ZYNADDSUBFX,
-    addEnable: 1, subEnable: 0, padEnable: 1,
-    addVolume: 0.55,
-    addVoice1Wave: 0, addVoice1Volume: 0.8, addVoice1Detune: 0.04,
-    addVoice2Wave: 0, addVoice2Volume: 0.8, addVoice2Detune: -0.04,
-    addVoice3Wave: 0, addVoice3Volume: 0.5, addVoice3Detune: 0.08, addVoice3Octave: 1,
-    padVolume: 0.45, padBandwidth: 0.75, padProfileWidth: 0.6, padQuality: 2,
-    ampAttack: 0.5, ampDecay: 0.25, ampSustain: 0.8, ampRelease: 0.7,
-    filterCutoff: 0.5, filterResonance: 0.1, filterEnvAmount: 0.15,
-    chorusWet: 0.35, chorusRate: 0.18, chorusDepth: 0.45,
-    reverbWet: 0.4, reverbSize: 0.8, reverbDamp: 0.35,
-  },
-  'Pluck Synth': {
-    ...DEFAULT_ZYNADDSUBFX,
-    addEnable: 1, subEnable: 0, padEnable: 0,
-    addVolume: 0.8,
-    addVoice1Wave: 2, addVoice1Volume: 1.0,
-    addVoice2Wave: 3, addVoice2Volume: 0.4, addVoice2Octave: 1,
-    ampAttack: 0.002, ampDecay: 0.4, ampSustain: 0.05, ampRelease: 0.3,
-    filterCutoff: 0.75, filterResonance: 0.3, filterEnvAmount: 0.6,
-    filterAttack: 0.002, filterDecay: 0.35, filterSustain: 0.1, filterRelease: 0.25,
-    reverbWet: 0.15,
-  },
-  'Organ Tone': {
-    ...DEFAULT_ZYNADDSUBFX,
-    addEnable: 1, subEnable: 0, padEnable: 0,
-    addVolume: 0.7,
-    addVoice1Wave: 0, addVoice1Volume: 1.0, addVoice1Detune: 0,
-    addVoice2Wave: 0, addVoice2Volume: 0.7, addVoice2Detune: 0, addVoice2Octave: 1,
-    addVoice3Wave: 0, addVoice3Volume: 0.5, addVoice3Detune: 0, addVoice3Octave: 2,
-    addVoice4Wave: 0, addVoice4Volume: 0.3, addVoice4Detune: 0, addVoice4Octave: -1,
-    ampAttack: 0.01, ampDecay: 0.05, ampSustain: 0.95, ampRelease: 0.08,
-    filterCutoff: 0.7, filterResonance: 0.05,
-    chorusWet: 0.2, chorusRate: 0.3, chorusDepth: 0.25,
-    reverbWet: 0.15, reverbSize: 0.5,
-  },
-  'Brass Section': {
-    ...DEFAULT_ZYNADDSUBFX,
-    addEnable: 1, subEnable: 1, padEnable: 0,
-    addVolume: 0.65,
-    addVoice1Wave: 2, addVoice1Volume: 0.9, addVoice1Detune: 0.02,
-    addVoice2Wave: 2, addVoice2Volume: 0.8, addVoice2Detune: -0.02,
-    subVolume: 0.35, subBandwidth: 0.4, subNumHarmonics: 8,
-    subHarmonic1: 1.0, subHarmonic2: 0.6, subHarmonic3: 0.8, subHarmonic4: 0.3,
-    subHarmonic5: 0.5, subHarmonic6: 0.2,
-    ampAttack: 0.08, ampDecay: 0.15, ampSustain: 0.85, ampRelease: 0.2,
-    filterCutoff: 0.6, filterResonance: 0.2, filterEnvAmount: 0.35,
-    filterAttack: 0.05, filterDecay: 0.3, filterSustain: 0.5, filterRelease: 0.15,
-    reverbWet: 0.2, reverbSize: 0.6,
-  },
-  'Metallic Hit': {
-    ...DEFAULT_ZYNADDSUBFX,
-    addEnable: 1, subEnable: 0, padEnable: 0,
-    addVolume: 0.85,
-    addVoice1Wave: 0, addVoice1Volume: 1.0, addVoice1Detune: 0,
-    addVoice2Wave: 0, addVoice2Volume: 0.7, addVoice2Detune: 0.15, addVoice2Octave: 2,
-    addVoice3Wave: 0, addVoice3Volume: 0.5, addVoice3Detune: -0.12, addVoice3Octave: 3,
-    addVoice4Wave: 0, addVoice4Volume: 0.35, addVoice4Detune: 0.22, addVoice4Octave: 4,
-    ampAttack: 0.001, ampDecay: 0.5, ampSustain: 0.0, ampRelease: 0.6,
-    filterCutoff: 0.9, filterResonance: 0.15,
-    reverbWet: 0.35, reverbSize: 0.65, reverbDamp: 0.5,
-  },
-  'Saw Lead': {
-    ...DEFAULT_ZYNADDSUBFX,
-    addEnable: 1, subEnable: 0, padEnable: 0,
-    addVolume: 0.8,
-    addVoice1Wave: 2, addVoice1Volume: 1.0, addVoice1Detune: 0.06,
-    addVoice2Wave: 2, addVoice2Volume: 0.9, addVoice2Detune: -0.06,
-    ampAttack: 0.01, ampDecay: 0.1, ampSustain: 0.8, ampRelease: 0.15,
-    filterCutoff: 0.65, filterResonance: 0.35, filterEnvAmount: 0.3,
-    filterAttack: 0.01, filterDecay: 0.25, filterSustain: 0.4, filterRelease: 0.15,
-    distortionWet: 0.08, distortionDrive: 0.2,
-  },
-  'Sub Drone': {
-    ...DEFAULT_ZYNADDSUBFX,
-    addEnable: 0, subEnable: 1, padEnable: 0,
-    subVolume: 0.85, subOctave: -2,
-    subBandwidth: 0.15, subNumHarmonics: 3, subMagType: 0,
-    subHarmonic1: 1.0, subHarmonic2: 0.5, subHarmonic3: 0.2,
-    subHarmonic4: 0, subHarmonic5: 0, subHarmonic6: 0,
-    ampAttack: 0.5, ampDecay: 0.1, ampSustain: 1.0, ampRelease: 0.8,
-    filterCutoff: 0.3, filterResonance: 0.15,
-    reverbWet: 0.4, reverbSize: 0.85,
-  },
-  'Ice Pad': {
-    ...DEFAULT_ZYNADDSUBFX,
-    addEnable: 0, subEnable: 0, padEnable: 1,
-    padVolume: 0.7, padBandwidth: 0.4, padBandwidthScale: 0.3,
-    padProfileWidth: 0.5, padProfileStretch: 0.6, padQuality: 3,
-    ampAttack: 0.7, ampDecay: 0.3, ampSustain: 0.65, ampRelease: 0.9,
-    filterCutoff: 0.7, filterResonance: 0.25, filterEnvAmount: 0.2,
-    filterAttack: 0.5, filterDecay: 0.4, filterSustain: 0.6, filterRelease: 0.5,
-    chorusWet: 0.4, chorusRate: 0.1, chorusDepth: 0.5,
-    reverbWet: 0.55, reverbSize: 0.85, reverbDamp: 0.15,
-  },
-  'Detuned Poly': {
-    ...DEFAULT_ZYNADDSUBFX,
-    addEnable: 1, subEnable: 0, padEnable: 0,
-    addVolume: 0.7,
-    addVoice1Wave: 2, addVoice1Volume: 0.9, addVoice1Detune: 0.08,
-    addVoice2Wave: 2, addVoice2Volume: 0.9, addVoice2Detune: -0.08,
-    addVoice3Wave: 3, addVoice3Volume: 0.5, addVoice3Detune: 0.12, addVoice3Octave: 1,
-    addVoice4Wave: 3, addVoice4Volume: 0.5, addVoice4Detune: -0.12, addVoice4Octave: 1,
-    ampAttack: 0.05, ampDecay: 0.2, ampSustain: 0.75, ampRelease: 0.35,
-    filterCutoff: 0.6, filterResonance: 0.15, filterEnvAmount: 0.2,
-    filterAttack: 0.03, filterDecay: 0.3, filterSustain: 0.4, filterRelease: 0.2,
-    chorusWet: 0.2, chorusRate: 0.25, chorusDepth: 0.3,
-    reverbWet: 0.2,
-  },
-  'Noise Texture': {
-    ...DEFAULT_ZYNADDSUBFX,
-    addEnable: 1, subEnable: 0, padEnable: 0,
-    addVolume: 0.6,
-    addVoice1Wave: 4, addVoice1Volume: 0.7,
-    addVoice2Wave: 0, addVoice2Volume: 0.4, addVoice2Detune: 0,
-    ampAttack: 0.3, ampDecay: 0.5, ampSustain: 0.4, ampRelease: 0.7,
-    filterCutoff: 0.45, filterResonance: 0.35, filterEnvAmount: 0.3,
-    filterAttack: 0.2, filterDecay: 0.6, filterSustain: 0.25, filterRelease: 0.4,
-    reverbWet: 0.5, reverbSize: 0.7, reverbDamp: 0.4,
-  },
-  'Hybrid Stack': {
-    ...DEFAULT_ZYNADDSUBFX,
-    addEnable: 1, subEnable: 1, padEnable: 1,
-    addVolume: 0.45, subVolume: 0.35, padVolume: 0.35,
-    addVoice1Wave: 2, addVoice1Volume: 0.8, addVoice1Detune: 0.04,
-    addVoice2Wave: 3, addVoice2Volume: 0.5, addVoice2Detune: -0.04, addVoice2Octave: 1,
-    subBandwidth: 0.5, subNumHarmonics: 10, subOctave: -1,
-    subHarmonic1: 1.0, subHarmonic2: 0.6, subHarmonic3: 0.4, subHarmonic4: 0.3,
-    subHarmonic5: 0.2, subHarmonic6: 0.1,
-    padBandwidth: 0.65, padQuality: 2,
-    ampAttack: 0.15, ampDecay: 0.2, ampSustain: 0.8, ampRelease: 0.45,
-    filterCutoff: 0.6, filterResonance: 0.2, filterEnvAmount: 0.25,
-    chorusWet: 0.2, chorusRate: 0.2, chorusDepth: 0.3,
-    reverbWet: 0.3, reverbSize: 0.65,
-  },
+  'Init': { ...DEFAULT_ZYNADDSUBFX },
 };
 
 const CONFIG_KEYS: (keyof ZynAddSubFXConfig)[] = [
@@ -508,7 +307,16 @@ export class ZynAddSubFXSynthEngine implements DevilboxSynth {
         .replace(/import\.meta\.url/g, `"${baseUrl}zynaddsubfx/"`)
         .replace(/export\s+default\s+\w+;?\s*$/, '')
         .replace(/if\s*\(ENVIRONMENT_IS_NODE\)\s*\{[^}]*await\s+import\([^)]*\)[^}]*\}/g, '')
-        .replace(/(wasmMemory=wasmExports\["\w+"\])/, '$1;Module["wasmMemory"]=wasmMemory');
+        .replace(/(wasmMemory\s*=\s*wasmExports\[['"][\w]+['"]\])/, '$1;Module["wasmMemory"]=wasmMemory')
+        .replace(/new\s+URL\(([^,]+),\s*([^)]+)\)\.href/g, '($2 + $1)')
+        // Stub filesystem syscalls to return errors instead of aborting (FILESYSTEM=0)
+        .replace(/function ___syscall_openat\([^)]*\)\s*\{[\s\S]*?abort\([\s\S]*?\);\s*\}/,
+          'function ___syscall_openat(dirfd, path, flags, varargs) { return -44; }')
+        // Stub _fd_write (printf/fprintf): HEAPU8 is null in worklet context.
+        // Must return non-zero (WASI errno) so musl's stdio gives up instead of looping.
+        // Returning 8 = WASI_ERRNO_BADF makes writev return -1, breaking the loop.
+        .replace(/_fd_write\s*=\s*\(fd,iov,iovcnt,pnum\)\s*=>\s*\{[\s\S]*?HEAPU32\[pnum>>\d+\]\s*=\s*num;return\s+0\s*\}/,
+          '_fd_write=(fd,iov,iovcnt,pnum)=>{return 8}');
 
       this._worklet = new AudioWorkletNode(rawContext, 'zynaddsubfx-processor', {
         outputChannelCount: [2],
@@ -518,13 +326,21 @@ export class ZynAddSubFXSynthEngine implements DevilboxSynth {
       this._worklet.port.onmessage = (event) => {
         if (event.data.type === 'ready') {
           this.isInitialized = true;
-          this.sendConfig(this.config);
+          if (this.pendingXmlPreset) {
+            const presetName = this.pendingXmlPreset;
+            this.pendingXmlPreset = null;
+            this.loadPresetXML(presetName);
+          } else {
+            this.sendConfig(this.config);
+          }
           for (const { note, velocity } of this.pendingNotes) {
             this._worklet!.port.postMessage({ type: 'noteOn', note, velocity });
           }
           this.pendingNotes = [];
+        } else if (event.data.type === 'presetError') {
+          console.error('[ZynAddSubFX] Preset load error:', event.data.error);
         } else if (event.data.type === 'error') {
-          console.error('ZynAddSubFX error:', event.data.error);
+          console.error('[ZynAddSubFX] error:', event.data.error);
         }
       };
 
@@ -549,11 +365,28 @@ export class ZynAddSubFXSynthEngine implements DevilboxSynth {
 
   private sendConfig(config: ZynAddSubFXConfig): void {
     if (!this._worklet || !this.isInitialized) return;
+    // Auto-enable voices 1-3 when their volume > 0
+    // Voice 0 is always enabled by default in zasfx_create
+    const voiceEnables = [
+      { vol: config.addVoice2Volume, bridgeIdx: 130 }, // P_ADDV1_ENABLE
+      { vol: config.addVoice3Volume, bridgeIdx: 140 }, // P_ADDV2_ENABLE
+      { vol: config.addVoice4Volume, bridgeIdx: 150 }, // P_ADDV3_ENABLE
+    ];
+    for (const ve of voiceEnables) {
+      this._worklet.port.postMessage({
+        type: 'setParamRaw', index: ve.bridgeIdx, value: ((ve.vol ?? 0) > 0) ? 127 : 0
+      });
+    }
+    // Send all config params
     for (let i = 0; i < CONFIG_KEYS.length; i++) {
       const value = config[CONFIG_KEYS[i]];
       if (value !== undefined) {
         this._worklet.port.postMessage({ type: 'setParam', index: i, value });
       }
+    }
+    // Trigger applyparameters if PADsynth is enabled (rebuilds wavetables)
+    if (config.padEnable) {
+      this._worklet.port.postMessage({ type: 'setParamRaw', index: 200, value: 0 });
     }
   }
 
@@ -593,7 +426,44 @@ export class ZynAddSubFXSynthEngine implements DevilboxSynth {
     return (this.config as Record<string, number | undefined>)[param];
   }
 
+  // Cache of fetched XML preset data
+  private static xmlCache: Map<string, string> = new Map();
+  private pendingXmlPreset: string | null = null;
+
+  private async loadPresetXML(name: string): Promise<void> {
+    const filename = ZYNADDSUBFX_XML_PRESETS[name];
+    if (!filename) return;
+
+    let xml = ZynAddSubFXSynthEngine.xmlCache.get(filename);
+    if (!xml) {
+      const baseUrl = import.meta.env.BASE_URL || '/';
+      const resp = await fetch(`${baseUrl}zynaddsubfx/presets/${filename}`);
+      if (!resp.ok) {
+        console.error(`[ZynAddSubFX] Failed to fetch preset ${filename}: ${resp.status}`);
+        return;
+      }
+      xml = await resp.text();
+      ZynAddSubFXSynthEngine.xmlCache.set(filename, xml);
+    }
+
+    if (this._worklet && this.isInitialized) {
+      // Encode XML to UTF-8 in main thread (TextEncoder not available in AudioWorklet)
+      const xmlBytes = new TextEncoder().encode(xml);
+      this._worklet.port.postMessage({ type: 'loadPresetXML', xmlBytes, name }, [xmlBytes.buffer]);
+      this.pendingXmlPreset = null;
+    } else {
+      // pendingXmlPreset already set in setPreset()
+    }
+  }
+
   setPreset(name: string): void {
+    // Try XML preset first (native ZynAddSubFX format)
+    if (ZYNADDSUBFX_XML_PRESETS[name]) {
+      this.pendingXmlPreset = name;
+      this.loadPresetXML(name);
+      return;
+    }
+    // Fall back to flat config preset
     const preset = ZYNADDSUBFX_PRESETS[name];
     if (preset) {
       this.config = { ...preset };
