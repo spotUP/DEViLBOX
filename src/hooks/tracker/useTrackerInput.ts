@@ -16,6 +16,15 @@ import { getToneEngine } from '@engine/ToneEngine';
 import { getTrackerReplayer } from '@engine/TrackerReplayer';
 import { parseMPTClipboard } from '@lib/import/MPTClipboardParser';
 import { useNoteInput, useEffectInput, useNavigationInput } from './input';
+import type { EditorBehavior } from '@engine/keyboard/EditorBehavior';
+
+/** Get the cell field names for a given note column index (0-3) */
+function noteColFields(nci: number): { note: string; instrument: string; volume: string } {
+  if (nci === 1) return { note: 'note2', instrument: 'instrument2', volume: 'volume2' };
+  if (nci === 2) return { note: 'note3', instrument: 'instrument3', volume: 'volume3' };
+  if (nci === 3) return { note: 'note4', instrument: 'instrument4', volume: 'volume4' };
+  return { note: 'note', instrument: 'instrument', volume: 'volume' };
+}
 
 export const useTrackerInput = () => {
   // PERFORMANCE: cursor and selection are refs — updated via subscription, not React state.
@@ -111,6 +120,66 @@ export const useTrackerInput = () => {
   const handleDeleteRow = useCallback(() => {
     deleteRow(cursorRef.current.channelIndex, cursorRef.current.rowIndex);
   }, [deleteRow]);
+
+  // Behavior-aware delete: what to clear depends on scheme + cursor position
+  const deleteByCursorField = useCallback((behavior: EditorBehavior) => {
+    const ch = cursorRef.current.channelIndex;
+    const row = cursorRef.current.rowIndex;
+    const colType = cursorRef.current.columnType;
+
+    switch (behavior.deleteClearsWhat) {
+      case 'note-inst-vol': {
+        // FT2: Delete clears note+instrument+volume on note column, or cursor field
+        if (colType === 'note') {
+          const f = noteColFields(cursorRef.current.noteColumnIndex ?? 0);
+          setCell(ch, row, { [f.note]: 0, [f.instrument]: 0, [f.volume]: 0 });
+        } else if (colType === 'instrument') {
+          const f = noteColFields(cursorRef.current.noteColumnIndex ?? 0);
+          setCell(ch, row, { [f.instrument]: 0 });
+        } else if (colType === 'volume') {
+          const f = noteColFields(cursorRef.current.noteColumnIndex ?? 0);
+          setCell(ch, row, { [f.volume]: 0 });
+        } else if (colType === 'effTyp' || colType === 'effParam') {
+          setCell(ch, row, { effTyp: 0, eff: 0 });
+        } else if (colType === 'effTyp2' || colType === 'effParam2') {
+          setCell(ch, row, { effTyp2: 0, eff2: 0 });
+        } else if (colType === 'probability') {
+          setCell(ch, row, { probability: undefined });
+        } else {
+          clearCell(ch, row);
+        }
+        break;
+      }
+      case 'cursor-field': {
+        // IT/Renoise: Delete clears only the field at cursor position
+        if (colType === 'note') {
+          const f = noteColFields(cursorRef.current.noteColumnIndex ?? 0);
+          setCell(ch, row, { [f.note]: 0 });
+        } else if (colType === 'instrument') {
+          const f = noteColFields(cursorRef.current.noteColumnIndex ?? 0);
+          setCell(ch, row, { [f.instrument]: 0 });
+        } else if (colType === 'volume') {
+          const f = noteColFields(cursorRef.current.noteColumnIndex ?? 0);
+          setCell(ch, row, { [f.volume]: 0 });
+        } else if (colType === 'effTyp' || colType === 'effParam') {
+          setCell(ch, row, { effTyp: 0, eff: 0 });
+        } else if (colType === 'effTyp2' || colType === 'effParam2') {
+          setCell(ch, row, { effTyp2: 0, eff2: 0 });
+        } else if (colType === 'probability') {
+          setCell(ch, row, { probability: undefined });
+        } else {
+          clearCell(ch, row);
+        }
+        break;
+      }
+      case 'note-sample': {
+        // PT: Delete clears note + sample number
+        const f = noteColFields(cursorRef.current.noteColumnIndex ?? 0);
+        setCell(ch, row, { [f.note]: 0, [f.instrument]: 0 });
+        break;
+      }
+    }
+  }, [setCell, clearCell]);
 
   // Handle keyboard input — edit operations that remain in the composition hook
   const handleKeyDown = useCallback(
@@ -225,20 +294,21 @@ export const useTrackerInput = () => {
       }
 
       // ============================================
-      // FT2: Insert/Delete Row Operations
+      // Insert/Delete Row Operations (behavior-aware)
       // ============================================
 
       if (key === 'Insert') {
+        const behavior = useEditorStore.getState().activeBehavior;
         e.preventDefault();
         if (recordMode) {
-          if (e.shiftKey) {
+          if (e.shiftKey && behavior.insertShiftAllChannels) {
             for (let ch = 0; ch < pattern.channels.length; ch++) {
               insertRow(ch, cursorRef.current.rowIndex);
             }
           } else {
             handleInsertRow();
           }
-        } else {
+        } else if (behavior.insertTogglesMode) {
           toggleInsertMode();
         }
         return;
@@ -272,92 +342,93 @@ export const useTrackerInput = () => {
       // Cut/Copy/Paste
       // ============================================
 
-      // Delete: Different behaviors based on modifiers (requires edit mode)
+      // Delete: Behavior-aware clearing (requires edit mode)
       if (key === 'Delete' && recordMode) {
+        const behavior = useEditorStore.getState().activeBehavior;
         e.preventDefault();
-        if (e.shiftKey) {
-          setCell(cursorRef.current.channelIndex, cursorRef.current.rowIndex, {
-            note: 0,
-            instrument: 0,
-            volume: 0,
-            effTyp: 0,
-            eff: 0,
-          });
-        } else if (e.ctrlKey || e.metaKey) {
-          setCell(cursorRef.current.channelIndex, cursorRef.current.rowIndex, {
-            volume: 0,
-            effTyp: 0,
-            eff: 0,
-          });
-        } else if (e.altKey) {
-          setCell(cursorRef.current.channelIndex, cursorRef.current.rowIndex, {
-            effTyp: 0,
-            eff: 0,
-          });
-        } else {
-          if (cursorRef.current.columnType === 'note') {
-            setCell(cursorRef.current.channelIndex, cursorRef.current.rowIndex, { note: 0, instrument: 0 });
-          } else if (cursorRef.current.columnType === 'instrument') {
-            setCell(cursorRef.current.channelIndex, cursorRef.current.rowIndex, { instrument: 0 });
-          } else if (cursorRef.current.columnType === 'volume') {
-            setCell(cursorRef.current.channelIndex, cursorRef.current.rowIndex, { volume: 0 });
-          } else if (cursorRef.current.columnType === 'effTyp' || cursorRef.current.columnType === 'effParam') {
-            setCell(cursorRef.current.channelIndex, cursorRef.current.rowIndex, { effTyp: 0, eff: 0 });
-          } else if (cursorRef.current.columnType === 'effTyp2' || cursorRef.current.columnType === 'effParam2') {
-            setCell(cursorRef.current.channelIndex, cursorRef.current.rowIndex, { effTyp2: 0, eff2: 0 });
-          } else if (cursorRef.current.columnType === 'probability') {
-            setCell(cursorRef.current.channelIndex, cursorRef.current.rowIndex, { probability: undefined });
+
+        // FT2 modifier variants: Shift=clear all, Ctrl=clear vol+eff, Alt=clear eff
+        if (behavior.deleteModifierVariants) {
+          if (e.shiftKey) {
+            setCell(cursorRef.current.channelIndex, cursorRef.current.rowIndex, {
+              note: 0, instrument: 0, volume: 0, effTyp: 0, eff: 0,
+            });
+          } else if (e.ctrlKey || e.metaKey) {
+            setCell(cursorRef.current.channelIndex, cursorRef.current.rowIndex, {
+              volume: 0, effTyp: 0, eff: 0,
+            });
+          } else if (e.altKey) {
+            setCell(cursorRef.current.channelIndex, cursorRef.current.rowIndex, {
+              effTyp: 0, eff: 0,
+            });
           } else {
-            clearCell(cursorRef.current.channelIndex, cursorRef.current.rowIndex);
+            // Bare Delete: behavior-determined
+            deleteByCursorField(behavior);
           }
+        } else {
+          // Non-FT2 schemes: bare Delete only, behavior-determined
+          deleteByCursorField(behavior);
         }
-        if (editStep > 0 && !isPlaying) {
+
+        if (behavior.advanceOnDelete && editStep > 0 && !isPlaying) {
           moveCursorToRow((cursorRef.current.rowIndex + editStep) % pattern.length);
         }
         return;
       }
 
       // Backspace: Delete previous note/line (requires edit mode)
+      // Backspace: Behavior-aware (requires edit mode)
       if (key === 'Backspace' && recordMode) {
+        const behavior = useEditorStore.getState().activeBehavior;
         e.preventDefault();
         if (e.metaKey) {
-          if (cursorRef.current.columnType === 'note') {
-            setCell(cursorRef.current.channelIndex, cursorRef.current.rowIndex, { note: 0, instrument: 0 });
-          } else if (cursorRef.current.columnType === 'instrument') {
-            setCell(cursorRef.current.channelIndex, cursorRef.current.rowIndex, { instrument: 0 });
-          } else if (cursorRef.current.columnType === 'volume') {
-            setCell(cursorRef.current.channelIndex, cursorRef.current.rowIndex, { volume: 0 });
-          } else if (cursorRef.current.columnType === 'effTyp' || cursorRef.current.columnType === 'effParam') {
-            setCell(cursorRef.current.channelIndex, cursorRef.current.rowIndex, { effTyp: 0, eff: 0 });
-          } else if (cursorRef.current.columnType === 'effTyp2' || cursorRef.current.columnType === 'effParam2') {
-            setCell(cursorRef.current.channelIndex, cursorRef.current.rowIndex, { effTyp2: 0, eff2: 0 });
-          } else if (cursorRef.current.columnType === 'probability') {
-            setCell(cursorRef.current.channelIndex, cursorRef.current.rowIndex, { probability: undefined });
-          } else {
-            clearCell(cursorRef.current.channelIndex, cursorRef.current.rowIndex);
-          }
+          // Cmd+Backspace: clear current field and advance (same for all schemes)
+          deleteByCursorField(behavior);
           if (editStep > 0 && !isPlaying) {
             moveCursorToRow((cursorRef.current.rowIndex + editStep) % pattern.length);
           }
         } else if (e.shiftKey) {
+          // Shift+Backspace: move up + delete row (pull up)
           if (cursorRef.current.rowIndex > 0) {
             moveCursor('up');
             handleDeleteRow();
           }
         } else {
-          if (cursorRef.current.rowIndex > 0) {
-            moveCursor('up');
-            clearCell(cursorRef.current.channelIndex, cursorRef.current.rowIndex);
-          } else {
-            clearCell(cursorRef.current.channelIndex, 0);
+          // Plain Backspace: behavior-dependent
+          switch (behavior.backspaceBehavior) {
+            case 'pull-delete':
+              // FT2: move up, then clear cell (like FT2's backspace)
+              if (cursorRef.current.rowIndex > 0) {
+                moveCursor('up');
+                clearCell(cursorRef.current.channelIndex, cursorRef.current.rowIndex);
+              } else {
+                clearCell(cursorRef.current.channelIndex, 0);
+              }
+              break;
+            case 'clear-prev':
+              // PT: move up, clear cell
+              if (cursorRef.current.rowIndex > 0) {
+                moveCursor('up');
+                clearCell(cursorRef.current.channelIndex, cursorRef.current.rowIndex);
+              } else {
+                clearCell(cursorRef.current.channelIndex, 0);
+              }
+              break;
+            case 'pull-channel':
+              // IT: pull rows up in current channel only
+              if (cursorRef.current.rowIndex > 0) {
+                moveCursor('up');
+                handleDeleteRow();
+              }
+              break;
           }
         }
         return;
       }
 
-      // F3/F4/F5: Cut/Copy/Paste with FT2 scoping
+      // F3/F4/F5: Cut/Copy/Paste with FT2 scoping (only if behavior enables it)
       // Shift = Track (single channel), Ctrl = Pattern (all channels), Alt = Block (selection)
-      if (key === 'F3') {
+      if (key === 'F3' && useEditorStore.getState().activeBehavior.fKeyCutCopyPaste) {
         e.preventDefault();
         if (e.shiftKey) {
           cutTrack(cursorRef.current.channelIndex);
@@ -372,7 +443,7 @@ export const useTrackerInput = () => {
         return;
       }
 
-      if (key === 'F4') {
+      if (key === 'F4' && useEditorStore.getState().activeBehavior.fKeyCutCopyPaste) {
         e.preventDefault();
         if (e.shiftKey) {
           copyTrack(cursorRef.current.channelIndex);
@@ -387,7 +458,7 @@ export const useTrackerInput = () => {
         return;
       }
 
-      if (key === 'F5') {
+      if (key === 'F5' && useEditorStore.getState().activeBehavior.fKeyCutCopyPaste) {
         e.preventDefault();
         if (e.shiftKey) {
           pasteTrack(cursorRef.current.channelIndex);
@@ -402,10 +473,11 @@ export const useTrackerInput = () => {
         return;
       }
 
-      // F7/F8: Transpose with FT2 scoping
+      // F7/F8: Transpose with FT2 scoping (only if behavior enables it)
       // Shift = Track, Ctrl = Pattern, Alt = Block; F7 = up, F8 = down
       // Shift+Ctrl = 12 semitones (octave) instead of 1
-      if (key === 'F7' && (e.shiftKey || e.ctrlKey || e.metaKey || e.altKey)) {
+      if (key === 'F7' && (e.shiftKey || e.ctrlKey || e.metaKey || e.altKey)
+          && useEditorStore.getState().activeBehavior.fKeyTranspose) {
         e.preventDefault();
         const octaveJump = e.shiftKey && (e.ctrlKey || e.metaKey);
         const semitones = octaveJump ? 12 : 1;
@@ -425,7 +497,8 @@ export const useTrackerInput = () => {
         }
         return;
       }
-      if (key === 'F8' && (e.shiftKey || e.ctrlKey || e.metaKey || e.altKey)) {
+      if (key === 'F8' && (e.shiftKey || e.ctrlKey || e.metaKey || e.altKey)
+          && useEditorStore.getState().activeBehavior.fKeyTranspose) {
         e.preventDefault();
         const octaveJump = e.shiftKey && (e.ctrlKey || e.metaKey);
         const semitones = octaveJump ? 12 : 1;
@@ -598,23 +671,56 @@ export const useTrackerInput = () => {
       // Handled by global keyboard handler via forcePosition() for tight restart.
       if (e.key === 'Alt' && e.location === 2) return;
 
-      // Space: Toggle edit mode or stop (FT2 style)
+      // Space: Behavior-aware (FT2: play/stop or edit toggle, IT: always toggle edit, Renoise: play/stop)
       if (key === ' ') {
+        const behavior = useEditorStore.getState().activeBehavior;
         e.preventDefault();
 
-        if (isPlaying) {
-          getTrackerReplayer().stop();  // syncs cursor to accurate stop position
-          stop();
-          getToneEngine().releaseAll();
-          useUIStore.getState().setStatusMessage('STOPPED');
-        } else {
-          if (!recordMode && !isPatternEditable) {
-            useUIStore.getState().openNonEditableDialog();
-            return;
-          }
-          toggleRecordMode();
-          const isRec = useEditorStore.getState().recordMode;
-          useUIStore.getState().setStatusMessage(isRec ? 'RECORD ON' : 'RECORD OFF');
+        switch (behavior.spaceBehavior) {
+          case 'play-stop-or-edit':
+            // FT2: If playing → stop. If stopped → toggle edit mode.
+            if (isPlaying) {
+              getTrackerReplayer().stop();
+              stop();
+              getToneEngine().releaseAll();
+              useUIStore.getState().setStatusMessage('STOPPED');
+            } else {
+              if (!recordMode && !isPatternEditable) {
+                useUIStore.getState().openNonEditableDialog();
+                return;
+              }
+              toggleRecordMode();
+              const isRec = useEditorStore.getState().recordMode;
+              useUIStore.getState().setStatusMessage(isRec ? 'RECORD ON' : 'RECORD OFF');
+            }
+            break;
+          case 'toggle-edit':
+            // IT: Always toggle edit mode regardless of play state.
+            if (!recordMode && !isPatternEditable) {
+              useUIStore.getState().openNonEditableDialog();
+              return;
+            }
+            toggleRecordMode();
+            const isRec = useEditorStore.getState().recordMode;
+            useUIStore.getState().setStatusMessage(isRec ? 'RECORD ON' : 'RECORD OFF');
+            break;
+          case 'play-stop':
+            // Renoise: Always play/stop, never toggles edit.
+            if (isPlaying) {
+              getTrackerReplayer().stop();
+              stop();
+              getToneEngine().releaseAll();
+              useUIStore.getState().setStatusMessage('STOPPED');
+            } else {
+              const ctx = (Tone.getContext() as any).rawContext as AudioContext;
+              if (ctx.state === 'running') {
+                play();
+              } else {
+                getToneEngine().init().then(() => play());
+              }
+              useUIStore.getState().setStatusMessage('PLAYING');
+            }
+            break;
         }
         return;
       }
@@ -668,6 +774,7 @@ export const useTrackerInput = () => {
       pastePushForward,
       handleInsertRow,
       handleDeleteRow,
+      deleteByCursorField,
       transposeSelection,
       readMacroSlot,
       writeMacroSlot,

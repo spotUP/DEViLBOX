@@ -56,6 +56,8 @@ export const useEffectInput = (refs: TrackerInputRefs) => {
     (e: KeyboardEvent): boolean => {
       if ((e as any).__handled) return false;
       if (!recordMode) return false;
+      // Suppress key repeat on all data entry columns (matches note input behavior)
+      if (e.repeat) return false;
 
       const key = e.key;
       const keyLower = key.toLowerCase();
