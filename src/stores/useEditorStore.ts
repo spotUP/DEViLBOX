@@ -66,6 +66,9 @@ interface EditorStore {
   // PT-style effect macro slots (10 slots for storing effect commands)
   effectMacros: Array<{ effTyp: number; eff: number } | null>;
 
+  // IT template mode (0=off, 1=note, 2=instrument, 3=volume, 4=effect, 5=all)
+  templateMode: number;
+
   // PT-style sample bank (0 = low bank 0-15, 16 = high bank 16-31)
   ptSampleBank: number;
   setPtSampleBank: (bank: number) => void;
@@ -120,6 +123,9 @@ interface EditorStore {
   setPtnJumpPos: (index: number, row: number) => void;
   getPtnJumpPos: (index: number) => number;
 
+  // Actions — template mode
+  cycleTemplateMode: () => void;
+
   // Actions — effect macros (PT-style)
   setEffectMacro: (slot: number, effTyp: number, eff: number) => void;
   getEffectMacro: (slot: number) => { effTyp: number; eff: number } | null;
@@ -165,6 +171,7 @@ export const useEditorStore = create<EditorStore>()(
     ptnJumpPos: [-1, -1, -1, -1, -1, -1, -1, -1, -1, -1],
     effectMacros: Array(10).fill(null) as Array<{ effTyp: number; eff: number } | null>,
     ptSampleBank: 0,
+    templateMode: 0,
     activeBehavior: DEFAULT_BEHAVIOR,
 
     // ── Editor behavior ──────────────────────────────────────────────────
@@ -340,6 +347,11 @@ export const useEditorStore = create<EditorStore>()(
       return (index >= 0 && index < 10) ? ptnJumpPos[index] : -1;
     },
 
+    // ── Template mode ────────────────────────────────────────────────────
+
+    cycleTemplateMode: () =>
+      set((state) => { state.templateMode = (state.templateMode + 1) % 6; }),
+
     // ── Effect macros ────────────────────────────────────────────────────
 
     setEffectMacro: (slot, effTyp, eff) =>
@@ -366,6 +378,7 @@ export const useEditorStore = create<EditorStore>()(
         state.copyMask = MASK_ALL;
         state.pasteMask = MASK_ALL;
         state.transposeMask = MASK_NOTE;
+        state.templateMode = 0;
         state.linearPeriods = false;
       }),
   }))
@@ -374,3 +387,13 @@ export const useEditorStore = create<EditorStore>()(
 // Re-export mask constants for use in other modules
 export { MASK_NOTE, MASK_INSTRUMENT, MASK_VOLUME, MASK_EFFECT, MASK_EFFECT2, MASK_ALL };
 export { _toggleMaskBit as toggleMaskBitFn, type EditorStore };
+
+/** Format the copy mask bits for display (e.g. "N+I+V+E") */
+export function formatMaskDisplay(mask: number): string {
+  const parts: string[] = [];
+  if (mask & MASK_NOTE) parts.push('N');
+  if (mask & MASK_INSTRUMENT) parts.push('I');
+  if (mask & MASK_VOLUME) parts.push('V');
+  if (mask & MASK_EFFECT) parts.push('E');
+  return parts.join('+') || 'NONE';
+}

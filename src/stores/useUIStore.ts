@@ -37,6 +37,7 @@ interface UIStore {
   // State
   visiblePanels: PanelType[];
   trackerZoom: number; // 80-200%
+  trackWidthZoom: number; // 0=narrowest (more channels), 6=widest (fewer channels)
   activePanel: PanelType;
   modalOpen: string | null;
   modalData: Record<string, unknown> | null;
@@ -109,6 +110,8 @@ interface UIStore {
   togglePanel: (panel: PanelType) => void;
   setActivePanel: (panel: PanelType) => void;
   setTrackerZoom: (zoom: number) => void;
+  increaseTrackZoom: () => void;
+  decreaseTrackZoom: () => void;
   openModal: (modalId: string, data?: Record<string, unknown>) => void;
   closeModal: () => void;
   togglePatterns: () => void;
@@ -214,6 +217,7 @@ export const useUIStore = create<UIStore>()(
       // Initial state
       visiblePanels: ['tracker', 'oscilloscope', 'pattern-list'],
       trackerZoom: 100,
+      trackWidthZoom: 3,
       activePanel: 'tracker',
       modalOpen: null,
       modalData: null,
@@ -320,6 +324,12 @@ export const useUIStore = create<UIStore>()(
           // Clamp between 80-200%
           state.trackerZoom = Math.max(80, Math.min(200, zoom));
         }),
+
+      increaseTrackZoom: () =>
+        set((state) => { state.trackWidthZoom = Math.min(6, state.trackWidthZoom + 1); }),
+
+      decreaseTrackZoom: () =>
+        set((state) => { state.trackWidthZoom = Math.max(0, state.trackWidthZoom - 1); }),
 
       openModal: (modalId, data) =>
         set((state) => {
@@ -682,6 +692,7 @@ export const useUIStore = create<UIStore>()(
         oscilloscopeVisible: state.oscilloscopeVisible,
         sidebarCollapsed: state.sidebarCollapsed,
         trackerZoom: state.trackerZoom,
+        trackWidthZoom: state.trackWidthZoom,
         useHexNumbers: state.useHexNumbers,
         rowHighlightInterval: state.rowHighlightInterval,
         showBeatLabels: state.showBeatLabels,

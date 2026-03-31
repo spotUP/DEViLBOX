@@ -9,6 +9,7 @@
 
 import { useCallback } from 'react';
 import { useTrackerStore, useTransportStore, useAudioStore, useUIStore, useEditorStore } from '@stores';
+import { formatMaskDisplay } from '@stores/useEditorStore';
 import { useShallow } from 'zustand/react/shallow';
 import { useFPSMonitor } from '@hooks/useFPSMonitor';
 import { SYSTEM_PRESETS } from '@/constants/systemPresets';
@@ -25,10 +26,12 @@ export function useEditorControls(opts?: {
 }) {
   // ── Store state ───────────────────────────────────────────────────────────
 
-  const { recordMode, showGhostPatterns } = useEditorStore(
+  const { recordMode, showGhostPatterns, activeBehavior, copyMask } = useEditorStore(
     useShallow((s) => ({
       recordMode: s.recordMode,
       showGhostPatterns: s.showGhostPatterns,
+      activeBehavior: s.activeBehavior,
+      copyMask: s.copyMask,
     })),
   );
 
@@ -58,6 +61,9 @@ export function useEditorControls(opts?: {
   // ── Derived state ─────────────────────────────────────────────────────────
 
   const grooveActive = (grooveTemplateId !== 'straight' && swing > 0) || jitter > 0;
+
+  // IT mask display string (only relevant when itMaskVariables behavior is active)
+  const maskDisplay = activeBehavior.itMaskVariables ? formatMaskDisplay(copyMask) : null;
 
   // ── Tracker audio analysis (capture + analyze during playback) ────────────
   // Called here so exactly one component in the tree runs the effect regardless
@@ -130,6 +136,7 @@ export function useEditorControls(opts?: {
     statusMessage,
     // Derived
     grooveActive,
+    maskDisplay,
     // FPS
     fps,
     // Handlers
