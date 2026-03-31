@@ -15,6 +15,9 @@
 
 import type { DevilboxSynth } from '@/types/synth';
 import { getDevilboxAudioContext, noteToMidi } from '@/utils/audio-context';
+import { loadNativePatch, captureNativeState } from '@/engine/common/NativePatchLoader';
+import { TAL_NATIVE_FACTORY_PRESETS, TAL_ALL_FACTORY_PRESETS } from './talNativePresets';
+export { TAL_NATIVE_FACTORY_PRESETS, TAL_ALL_FACTORY_PRESETS };
 
 /**
  * Parameter indices matching the C++ SYNTHPARAMETERS enum in Params.h.
@@ -569,6 +572,8 @@ export const TAL_NOIZEMAKER_PRESETS: Record<string, Partial<TalNoizeMakerConfig>
   },
 };
 
+// Native factory presets re-exported above from talNativePresets.ts
+
 export class TalNoizeMakerEngine implements DevilboxSynth {
   readonly name = 'TalNoizeMakerEngine';
   readonly output: GainNode;
@@ -577,6 +582,7 @@ export class TalNoizeMakerEngine implements DevilboxSynth {
   private params: Record<number, number> = {};
   private isInitialized = false;
   private pendingNotes: Array<{ note: number; velocity: number }> = [];
+  private pendingPatch: number[] | null = null;
 
   private static isWorkletLoaded = false;
   private static workletLoadPromise: Promise<void> | null = null;
@@ -631,7 +637,8 @@ export class TalNoizeMakerEngine implements DevilboxSynth {
         .replace(/import\.meta\.url/g, `"${baseUrl}tal-noisemaker/"`)
         .replace(/export\s+default\s+\w+;?\s*$/, '')
         .replace(/if\s*\(ENVIRONMENT_IS_NODE\)\s*\{[^}]*await\s+import\([^)]*\)[^}]*\}/g, '')
-        .replace(/(wasmMemory=wasmExports\["\w+"\])/, '$1;Module["wasmMemory"]=wasmMemory');
+        .replace(/(wasmMemory\s*=\s*wasmExports\[['"][\w]+['"]\])/, '$1;Module["wasmMemory"]=wasmMemory')
+        .replace(/new\s+URL\(([^,]+),\s*([^)]+)\)\.href/g, '($2 + $1)');
 
       this._worklet = new AudioWorkletNode(rawContext, 'tal-noizemaker-processor', {
         outputChannelCount: [2],
@@ -641,7 +648,12 @@ export class TalNoizeMakerEngine implements DevilboxSynth {
       this._worklet.port.onmessage = (event) => {
         if (event.data.type === 'ready') {
           this.isInitialized = true;
-          this.sendAllParams();
+          if (this.pendingPatch) {
+            void loadNativePatch(this._worklet!, this.pendingPatch).catch(() => {});
+            this.pendingPatch = null;
+          } else {
+            this.sendAllParams();
+          }
           for (const { note, velocity } of this.pendingNotes) {
             this._worklet!.port.postMessage({ type: 'noteOn', note, velocity });
           }
@@ -734,6 +746,43 @@ export class TalNoizeMakerEngine implements DevilboxSynth {
       }
     }
     this.sendAllParams();
+  }
+
+  /**
+   * Load a native patch (complete engine state snapshot).
+   * If not yet initialized, queues the patch for loading on ready.
+   */
+  loadPatch(values: number[]): void {
+    if (this.isInitialized && this._worklet) {
+      void loadNativePatch(this._worklet, values).catch(() => {});
+    } else {
+      this.pendingPatch = values;
+    }
+  }
+
+  /**
+   * Load a native preset by name from the TAL_NATIVE_FACTORY_PRESETS map.
+   */
+  loadNativePreset(name: string): void {
+    const preset = TAL_NATIVE_FACTORY_PRESETS.find(p => p.name === name);
+    if (preset) {
+      this.loadPatch(preset.values);
+    } else {
+      console.warn(`[TalNoizeMaker] Native preset not found: ${name}`);
+    }
+  }
+
+  /**
+   * Capture the current complete engine state (for preset creation).
+   */
+  async getState(): Promise<number[] | null> {
+    if (!this.isInitialized || !this._worklet) return null;
+    try {
+      const result = await captureNativeState(this._worklet);
+      return result.values;
+    } catch {
+      return null;
+    }
   }
 
   dispose(): void {
