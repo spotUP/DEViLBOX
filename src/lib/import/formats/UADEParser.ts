@@ -352,8 +352,13 @@ const UADE_EXTENSIONS: Set<string> = new Set([
  * Returns true if the extension matches a known UADE format.
  */
 export function isUADEFormat(filename: string): boolean {
-  const ext = filename.split('.').pop()?.toLowerCase() ?? '';
-  return UADE_EXTENSIONS.has(ext);
+  const lower = filename.toLowerCase();
+  const ext = lower.split('.').pop() ?? '';
+  if (UADE_EXTENSIONS.has(ext)) return true;
+  // Also match prefix-named files (e.g. cust.songname, custom.Theme)
+  const base = lower.split('/').pop() ?? lower;
+  const prefix = base.split('.')[0];
+  return UADE_EXTENSIONS.has(prefix);
 }
 
 /**
