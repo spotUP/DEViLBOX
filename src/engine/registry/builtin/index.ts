@@ -11,3 +11,4 @@ import './furnace';
 import './supercollider';
 import './openwurli';
 import './opl3';
+import './dx7';
