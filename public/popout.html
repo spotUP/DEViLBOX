@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>DEViLBOX</title>
+  <style>
+    html, body {
+      margin: 0;
+      padding: 0;
+      background: var(--color-bg, #0b0909);
+      color: var(--color-text, #f2f0f0);
+      overflow: auto;
+      height: 100%;
+    }
+    #popout-root {
+      display: inline-block;
+      min-width: 100%;
+    }
+  </style>
+  <script>
+    var params = new URLSearchParams(window.location.search);
+    var t = params.get('t');
+    if (t) document.title = t;
+  </script>
+</head>
+<body>
+  <div id="popout-root"></div>
+</body>
+</html>
