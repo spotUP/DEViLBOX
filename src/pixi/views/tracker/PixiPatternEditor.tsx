@@ -1618,7 +1618,13 @@ export const PixiPatternEditor: React.FC<PixiPatternEditorProps> = ({ width, hei
     };
 
     canvas.addEventListener('wheel', onWheel, { passive: false });
-    return () => canvas.removeEventListener('wheel', onWheel);
+    // Prevent browser context menu on canvas — the app handles right-click itself
+    const onContextMenu = (e: MouseEvent) => e.preventDefault();
+    canvas.addEventListener('contextmenu', onContextMenu);
+    return () => {
+      canvas.removeEventListener('wheel', onWheel);
+      canvas.removeEventListener('contextmenu', onContextMenu);
+    };
   }, []);
 
   // ── Touch scratch — native touch listener for touchscreen scratch during playback ──
