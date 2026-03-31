@@ -17,7 +17,6 @@ import { getToneEngine } from '@/engine/ToneEngine';
 import { DJDeck } from './DJDeck';
 import { DJMixer } from './DJMixer';
 import { DJCratePanel } from './DJCratePanel';
-import { MasterEffectsModal } from '@/components/effects';
 import { DJFxQuickPresets } from './DJFxQuickPresets';
 import { DJControllerSelector } from './DJControllerSelector';
 import { DJAutoDJPanel } from './DJAutoDJPanel';
@@ -55,7 +54,6 @@ export const DJView: React.FC<DJViewProps> = ({ onShowDrumpads: _onShowDrumpads 
   const thirdDeckActive = useDJStore((s) => s.thirdDeckActive);
   const setThirdDeckActive = useDJStore((s) => s.setThirdDeckActive);
   const [showCrate, setShowCrate] = useState(false);
-  const [showMasterFX, setShowMasterFX] = useState(false);
   const [showAutoDJ, setShowAutoDJ] = useState(false);
   const autoDJEnabled = useDJStore((s) => s.autoDJEnabled);
   const health = useDJHealth();
@@ -339,17 +337,6 @@ export const DJView: React.FC<DJViewProps> = ({ onShowDrumpads: _onShowDrumpads 
             Deck C
           </button>
           <button
-            onClick={() => setShowMasterFX(!showMasterFX)}
-            className={`px-3 py-1.5 rounded-md text-xs font-mono border transition-all
-              ${showMasterFX
-                ? 'border-accent-primary bg-dark-bgActive text-text-primary'
-                : 'border-dark-borderLight bg-dark-bgTertiary text-text-secondary hover:bg-dark-bgHover hover:text-text-primary'
-              }`}
-            title="Open Master FX editor"
-          >
-            FX Editor
-          </button>
-          <button
             onClick={() => setShowAutoDJ(!showAutoDJ)}
             className={`px-3 py-1.5 rounded-md text-xs font-mono border transition-all
               ${showAutoDJ || autoDJEnabled
@@ -449,9 +436,6 @@ export const DJView: React.FC<DJViewProps> = ({ onShowDrumpads: _onShowDrumpads 
           </>
         )}
       </div>
-
-      {/* Master Effects Modal */}
-      <MasterEffectsModal isOpen={showMasterFX} onClose={() => setShowMasterFX(false)} />
     </div>
   );
 };

@@ -8,7 +8,6 @@ import { PixiButton, PixiViewHeader } from '../components';
 import { PixiDJDeck } from './dj/PixiDJDeck';
 import { PixiDJMixer } from './dj/PixiDJMixer';
 import { PixiDJCratePanel } from './dj/PixiDJCratePanel';
-import { useUIStore } from '@stores';
 import { useDJStore } from '@stores/useDJStore';
 import { useTransportStore } from '@stores/useTransportStore';
 import { getDJEngine, disposeDJEngine } from '@engine/dj/DJEngine';
@@ -135,18 +134,12 @@ interface DJTopBarProps {
 }
 
 const PixiDJTopBar: React.FC<DJTopBarProps> = ({ browserPanel, onBrowserPanelChange, samplerOpen, onSamplerToggle, autoDJOpen, onAutoDJToggle }) => {
-  const modalOpen = useUIStore(s => s.modalOpen);
   const deckViewMode = useDJStore(s => s.deckViewMode);
   const thirdDeckActive = useDJStore(s => s.thirdDeckActive);
 
   const togglePanel = useCallback((panel: DJBrowserPanel) => {
     onBrowserPanelChange(browserPanel === panel ? 'none' : panel);
   }, [browserPanel, onBrowserPanelChange]);
-
-  const handleFX = useCallback(() => {
-    const s = useUIStore.getState();
-    if (s.modalOpen === 'masterFx') { s.closeModal(); } else { s.openModal('masterFx'); }
-  }, []);
 
   return (
     <PixiViewHeader activeView="dj" title="DEVILBOX DJ" subtitle="DUAL DECK MIXER">
@@ -173,16 +166,6 @@ const PixiDJTopBar: React.FC<DJTopBarProps> = ({ browserPanel, onBrowserPanelCha
         size="sm"
         active={thirdDeckActive}
         onClick={() => useDJStore.getState().setThirdDeckActive(!thirdDeckActive)}
-      />
-
-      {/* FX Editor */}
-      <PixiButton
-        label="FX Editor"
-        variant={modalOpen === 'masterFx' ? 'ft2' : 'ghost'}
-        color={modalOpen === 'masterFx' ? 'green' : undefined}
-        size="sm"
-        active={modalOpen === 'masterFx'}
-        onClick={handleFX}
       />
 
       {/* Sampler / Drum Pads (unified) */}
