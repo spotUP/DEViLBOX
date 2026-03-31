@@ -16,11 +16,7 @@ import { useAudioStore } from '@/stores/useAudioStore';
 import { getToneEngine } from '@/engine/ToneEngine';
 import { DJDeck } from './DJDeck';
 import { DJMixer } from './DJMixer';
-import { DJFileBrowser } from './DJFileBrowser';
-import { DJPlaylistPanel } from './DJPlaylistPanel';
-import { DJModlandBrowser } from './DJModlandBrowser';
-import { DJSeratoBrowser } from './DJSeratoBrowser';
-import { DJCachePanel } from './DJCachePanel';
+import { DJCratePanel } from './DJCratePanel';
 import { MasterEffectsModal } from '@/components/effects';
 import { DJFxQuickPresets } from './DJFxQuickPresets';
 import { DJControllerSelector } from './DJControllerSelector';
@@ -58,10 +54,7 @@ export const DJView: React.FC<DJViewProps> = ({ onShowDrumpads: _onShowDrumpads 
   const deckViewMode = useDJStore((s) => s.deckViewMode);
   const thirdDeckActive = useDJStore((s) => s.thirdDeckActive);
   const setThirdDeckActive = useDJStore((s) => s.setThirdDeckActive);
-  const [showFileBrowser, setShowFileBrowser] = useState(false);
-  const [showPlaylists, setShowPlaylists] = useState(false);
-  const [showModland, setShowModland] = useState(false);
-  const [showSerato, setShowSerato] = useState(false);
+  const [showCrate, setShowCrate] = useState(false);
   const [showMasterFX, setShowMasterFX] = useState(false);
   const [showAutoDJ, setShowAutoDJ] = useState(false);
   const autoDJEnabled = useDJStore((s) => s.autoDJEnabled);
@@ -369,88 +362,31 @@ export const DJView: React.FC<DJViewProps> = ({ onShowDrumpads: _onShowDrumpads 
           </button>
           <DJVocoderControl />
           <button
-            onClick={() => setShowFileBrowser(!showFileBrowser)}
+            onClick={() => setShowCrate(!showCrate)}
             className={`px-3 py-1.5 rounded-md text-xs font-mono border transition-all
-              ${showFileBrowser
+              ${showCrate
                 ? 'border-accent-primary bg-dark-bgActive text-text-primary'
                 : 'border-dark-borderLight bg-dark-bgTertiary text-text-secondary hover:bg-dark-bgHover hover:text-text-primary'
               }`}
           >
-            Browser
-          </button>
-          <button
-            onClick={() => setShowPlaylists(!showPlaylists)}
-            className={`px-3 py-1.5 rounded-md text-xs font-mono border transition-all
-              ${showPlaylists
-                ? 'border-accent-primary bg-dark-bgActive text-text-primary'
-                : 'border-dark-borderLight bg-dark-bgTertiary text-text-secondary hover:bg-dark-bgHover hover:text-text-primary'
-              }`}
-          >
-            Playlists
-          </button>
-          <button
-            onClick={() => setShowModland(!showModland)}
-            className={`px-3 py-1.5 rounded-md text-xs font-mono border transition-all
-              ${showModland
-                ? 'border-green-500 bg-green-900/20 text-green-400'
-                : 'border-dark-borderLight bg-dark-bgTertiary text-text-secondary hover:bg-dark-bgHover hover:text-text-primary'
-              }`}
-          >
-            Online
-          </button>
-          <button
-            onClick={() => setShowSerato(!showSerato)}
-            className={`px-3 py-1.5 rounded-md text-xs font-mono border transition-all
-              ${showSerato
-                ? 'border-purple-500 bg-purple-900/20 text-purple-400'
-                : 'border-dark-borderLight bg-dark-bgTertiary text-text-secondary hover:bg-dark-bgHover hover:text-text-primary'
-              }`}
-          >
-            Serato
+            Crate
           </button>
         </div>
       </div>
 
       {/* ================================================================== */}
-      {/* FILE BROWSER / PLAYLISTS / ONLINE (collapsible)                   */}
+      {/* CRATE PANEL (tabbed: Browser / Playlists / Online / Serato)      */}
       {/* ================================================================== */}
-      {(showFileBrowser || showPlaylists || showModland || showSerato) && (() => {
-        const panelCount = [showFileBrowser, showPlaylists, showModland, showSerato].filter(Boolean).length;
-        const gridClass = panelCount >= 4
-            ? 'grid grid-cols-4 gap-2'
-            : panelCount === 3
-              ? 'grid grid-cols-3 gap-2'
-              : panelCount === 2
-                ? 'grid grid-cols-2 gap-2'
-                : '';
-        return (
-          <div className="absolute inset-x-0 top-12 bottom-0 z-[99990] pointer-events-none px-2 pt-2 flex flex-col gap-2">
-            <div className="pointer-events-auto max-h-[50vh] overflow-y-auto flex flex-col gap-2">
-              {/* Cache status panel */}
-              <DJCachePanel />
-              
-              {/* Browser panels */}
-              <div className={gridClass}>
-                {showFileBrowser && (
-                  <DJFileBrowser onClose={() => setShowFileBrowser(false)} />
-                )}
-                {showPlaylists && (
-                  <DJPlaylistPanel onClose={() => setShowPlaylists(false)} />
-                )}
-                {showModland && (
-                  <DJModlandBrowser onClose={() => setShowModland(false)} />
-                )}
-                {showSerato && (
-                  <DJSeratoBrowser
-                    onClose={() => setShowSerato(false)}
-                    onLoadTrackToDevice={handleSeratoTrackLoad}
-                  />
-                )}
-              </div>
-            </div>
+      {showCrate && (
+        <div className="absolute inset-x-0 top-12 bottom-0 z-[99990] pointer-events-none px-2 pt-2">
+          <div className="pointer-events-auto max-h-[50vh]">
+            <DJCratePanel
+              onClose={() => setShowCrate(false)}
+              onLoadSeratoTrack={handleSeratoTrackLoad}
+            />
           </div>
-        );
-      })()}
+        </div>
+      )}
 
       {/* ================================================================== */}
       {/* AUTO DJ PANEL                                                     */}
