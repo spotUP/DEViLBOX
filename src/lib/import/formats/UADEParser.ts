@@ -1025,7 +1025,8 @@ export async function parseUADEFile(
   ]);
   if (mode === 'enhanced' && FORCE_CLASSIC_FORMATS.has(ext)) {
     console.log(`[UADEParser] ${ext.toUpperCase()} uses compiled replayer; forcing classic UADESynth streaming`);
-    return buildClassicSong(songName, ext, filename, buffer, metadata, activeScanRows, periodToNoteIndex);
+    const classicSong = buildClassicSong(songName, ext, filename, buffer, metadata, activeScanRows, periodToNoteIndex);
+    return await reconstructClassicPatterns(classicSong, engine, basename);
   }
 
   const FORCE_CLASSIC_PREFIXES = new Set<string>([
@@ -1069,7 +1070,8 @@ export async function parseUADEFile(
   ]);
   if (mode === 'enhanced' && FORCE_CLASSIC_PREFIXES.has(prefix)) {
     console.log(`[UADEParser] ${prefix.toUpperCase()} uses prefix form; forcing classic UADESynth streaming`);
-    return buildClassicSong(songName, prefix, filename, buffer, metadata, activeScanRows, periodToNoteIndex);
+    const classicSong = buildClassicSong(songName, prefix, filename, buffer, metadata, activeScanRows, periodToNoteIndex);
+    return await reconstructClassicPatterns(classicSong, engine, basename);
   }
 
   // Synthesis-based formats use short macro-driven waveforms (16-32 bytes) that the
@@ -2099,6 +2101,66 @@ function augmentWithUADEAudio(
     format: 'UADE' as TrackerFormat,
     instruments: [uadeInstr, ...nativeSong.instruments],
   };
+}
+
+/**
+ * Try to reconstruct display patterns from CIA tick snapshots for a classic-mode song.
+ * Compiled 68k replayers can't have samples extracted, but their Paula DMA triggers
+ * can still be captured to approximate note/instrument display in the tracker grid.
+ */
+async function reconstructClassicPatterns(
+  song: TrackerSong,
+  engine: { getTickSnapshots(): Promise<any[]>; enableTickSnapshots(on: boolean): void },
+  basename: string,
+): Promise<TrackerSong> {
+  try {
+    const tickSnapshots = await engine.getTickSnapshots();
+    engine.enableTickSnapshots(false);
+
+    if (tickSnapshots.length < 2) return song;
+
+    const { reconstructPatterns } = await import('@engine/uade/UADEPatternReconstructor');
+
+    // Build samplePtr → instrument index from the classic song's instruments.
+    // Classic songs have UADESynth at index 0 and display-only Sampler stubs after.
+    const samplePtrToInstrIndex = new Map<number, number>();
+    song.instruments.forEach((inst, idx) => {
+      const ptr = (inst as any).sample?.uadeSamplePtr;
+      if (ptr != null) samplePtrToInstrIndex.set(ptr, idx + 1);
+    });
+
+    // VBlank-timed formats: force speed 6
+    const vblankPrefix = basename.split('.')[0]?.toLowerCase() ?? '';
+    const VBLANK_PREFIXES = new Set(['dl', 'bd', 'fg', 'jb', 'jp', 'mc', 'dh', 'ps', 'sb', 'th', 'wb', 'kc', 'jt',
+      'cus', 'cust', 'custom', 'cm', 'rk', 'rkb']);
+    const speedHint = VBLANK_PREFIXES.has(vblankPrefix) ? 6 : undefined;
+
+    const reconstructed = reconstructPatterns(
+      tickSnapshots,
+      samplePtrToInstrIndex,
+      song.numChannels,
+      speedHint,
+    );
+
+    if (reconstructed.warnings.length > 0) {
+      console.warn('[UADEParser] Classic reconstruct warnings:', reconstructed.warnings);
+    }
+
+    if (reconstructed.patterns.length > 0) {
+      song.patterns = reconstructed.patterns;
+      song.songPositions = reconstructed.patterns.map((_: any, i: number) => i);
+      song.songLength = reconstructed.patterns.length;
+      song.initialSpeed = reconstructed.speed;
+      song.uadeFirstTick = reconstructed.firstTick;
+      console.log(
+        `[UADEParser] Classic tick reconstructor: ${reconstructed.patterns.length} patterns, speed=${reconstructed.speed}`,
+      );
+    }
+  } catch (e) {
+    console.warn('[UADEParser] Classic pattern reconstruction failed (non-critical):', e);
+    engine.enableTickSnapshots(false);
+  }
+  return song;
 }
 
 /**
