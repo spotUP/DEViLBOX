@@ -140,19 +140,21 @@ export const useNavigationInput = (refs: TrackerInputRefs) => {
         return true;
       }
 
-      // PageUp: Jump 16 lines up — disabled during playback
+      // PageUp: Jump N lines up (N = behavior.pageJumpSize) — disabled during playback
       if (key === 'PageUp') {
         if (isPlaying) return false;
         e.preventDefault();
-        moveCursorToRow(Math.max(0, cursorRef.current.rowIndex - 16));
+        const jump = useEditorStore.getState().activeBehavior.pageJumpSize;
+        moveCursorToRow(Math.max(0, cursorRef.current.rowIndex - jump));
         return true;
       }
 
-      // PageDown: Jump 16 lines down — disabled during playback
+      // PageDown: Jump N lines down (N = behavior.pageJumpSize) — disabled during playback
       if (key === 'PageDown') {
         if (isPlaying) return false;
         e.preventDefault();
-        moveCursorToRow(Math.min(pattern.length - 1, cursorRef.current.rowIndex + 16));
+        const jump = useEditorStore.getState().activeBehavior.pageJumpSize;
+        moveCursorToRow(Math.min(pattern.length - 1, cursorRef.current.rowIndex + jump));
         return true;
       }
 
