@@ -14,6 +14,51 @@
 
 import React, { useRef, useEffect, useState, useCallback } from 'react';
 import { getToneEngine } from '../../../engine/ToneEngine';
+import { OBXD_NATIVE_PRESETS } from '../../../engine/obxd/OBXdSynth';
+
+// OBXf UI param string ID → OBXd audio worklet param index mapping
+// OBXf (OB-Xf fork) has ~80+ params with string IDs; OBXd audio WASM has 45 integer-indexed params
+const OBXF_ID_TO_OBXD: Record<string, number> = {
+  // Master
+  Volume: 34,        // MASTER_VOLUME
+  // Global
+  Polyphony: 35,     // VOICES
+  Portamento: 38,    // PORTAMENTO
+  Unison: 36,        // UNISON
+  UnisonDetune: 37,  // UNISON_DETUNE
+  // Oscillators
+  Osc1Pitch: 1,      // OSC1_OCTAVE (semitone → octave, both 0-1 normalized)
+  Osc2Detune: 7,     // OSC2_DETUNE
+  Osc2Pitch: 6,      // OSC2_OCTAVE
+  OscPW: 3,          // OSC1_PW
+  Osc2PWOffset: 8,   // OSC2_PW
+  OscSync: 11,       // OSC_SYNC
+  // Mixer
+  Osc1Mix: 4,        // OSC1_LEVEL
+  Osc2Mix: 9,        // OSC2_LEVEL
+  NoiseMix: 41,      // NOISE_LEVEL
+  // Filter
+  FilterCutoff: 13,  // FILTER_CUTOFF
+  FilterResonance: 14, // FILTER_RESONANCE
+  FilterEnvAmount: 16, // FILTER_ENV_AMOUNT
+  FilterKeyFollow: 17, // FILTER_KEY_TRACK
+  Filter4PoleMode: 15, // FILTER_TYPE
+  // Filter Envelope
+  FilterEnvAttack: 19,  // FILTER_ATTACK
+  FilterEnvDecay: 20,   // FILTER_DECAY
+  FilterEnvSustain: 21, // FILTER_SUSTAIN
+  FilterEnvRelease: 22, // FILTER_RELEASE
+  VelToFilterEnv: 18,   // FILTER_VELOCITY
+  // Amp Envelope
+  AmpEnvAttack: 23,  // AMP_ATTACK
+  AmpEnvDecay: 24,   // AMP_DECAY
+  AmpEnvSustain: 25, // AMP_SUSTAIN
+  AmpEnvRelease: 26, // AMP_RELEASE
+  // LFO (map LFO1 → OBXd's single LFO)
+  LFO1Rate: 27,        // LFO_RATE
+  LFO1ModAmount1: 30,  // LFO_OSC_AMOUNT
+  LFO1ModAmount2: 31,  // LFO_FILTER_AMOUNT
+};
 
 interface OBXfUIModule {
   _obxf_ui_init: () => void;
@@ -32,6 +77,7 @@ interface OBXfUIModule {
   _obxf_ui_set_program: (program: number) => void;
   _obxf_ui_get_program: () => number;
   _obxf_ui_get_program_count: () => number;
+  _obxf_ui_populate_presets: () => void;
   _obxf_ui_shutdown: () => void;
   _malloc: (size: number) => number;
   _free: (ptr: number) => void;
@@ -161,6 +207,11 @@ export const OBXfHardwareUI: React.FC<OBXfHardwareUIProps> = ({
 
         m._obxf_ui_init();
 
+        // Populate patch browser with OBXd native presets
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (window as any)._obxdPresetNames = OBXD_NATIVE_PRESETS.map(p => p.name);
+        if (m._obxf_ui_populate_presets) m._obxf_ui_populate_presets();
+
         const w = m._obxf_ui_get_width();
         const h = m._obxf_ui_get_height();
         fbWidthRef.current = w;
@@ -229,10 +280,18 @@ export const OBXfHardwareUI: React.FC<OBXfHardwareUIProps> = ({
           () => canvas.removeEventListener('wheel', onWheel)
         );
 
-        // Parameter callback: WASM UI knob → JS → audio worklet
+        // Parameter callback: WASM UI knob → name lookup → OBXd audio worklet
+        // OBXf init emits window._obxfParamIds (string ID per JUCE param index)
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (window as any)._obxfUIParamCallback = (paramId: number, normalizedValue: number) => {
+        (window as any)._obxfUIParamCallback = (paramIndex: number, normalizedValue: number) => {
           if (!instrumentId) return;
+          // Look up the OBXf string ID from the array built during C++ init
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const paramIds = (window as any)._obxfParamIds as string[] | undefined;
+          if (!paramIds || paramIndex < 0 || paramIndex >= paramIds.length) return;
+          const obxfId = paramIds[paramIndex];
+          const obxdParamId = OBXF_ID_TO_OBXD[obxfId];
+          if (obxdParamId === undefined) return; // no mapping for this OBXf param
           try {
             const engine = getToneEngine();
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -241,8 +300,8 @@ export const OBXfHardwareUI: React.FC<OBXfHardwareUIProps> = ({
             const synth = instruments?.get(key);
             if (synth?._worklet) {
               synth._worklet.port.postMessage({
-                type: 'setParameter',
-                index: paramId,
+                type: 'parameter',
+                paramId: obxdParamId,
                 value: normalizedValue,
               });
             }
@@ -269,11 +328,41 @@ export const OBXfHardwareUI: React.FC<OBXfHardwareUIProps> = ({
           } catch { /* engine not ready */ }
         };
 
+        // Program/preset change callback: OBXf patch browser → OBXd audio worklet
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (window as any)._obxfUIProgramCallback = (presetIndex: number) => {
+          if (!instrumentId) return;
+          try {
+            const engine = getToneEngine();
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const instruments = (engine as any).instruments as Map<number, any>;
+            const key = (instrumentId << 16) | 0xFFFF;
+            const synth = instruments?.get(key);
+            if (!synth?._worklet) return;
+
+            // Index -1 = Init patch (first preset), 0+ = preset index
+            const idx = presetIndex < 0 ? 0 : presetIndex;
+            const preset = OBXD_NATIVE_PRESETS[idx];
+            if (preset) {
+              synth._worklet.port.postMessage({
+                type: 'loadPatch',
+                values: preset.values,
+              });
+            }
+          } catch { /* engine not ready */ }
+        };
+
         eventCleanups.push(() => {
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           delete (window as any)._obxfUIParamCallback;
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           delete (window as any)._obxfUIMidiCallback;
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          delete (window as any)._obxfUIProgramCallback;
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          delete (window as any)._obxfParamIds;
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          delete (window as any)._obxdPresetNames;
         });
 
         setLoaded(true);
