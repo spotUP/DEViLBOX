@@ -11,6 +11,7 @@ import type { ColumnVisibility } from '@typedefs';
 import { DEFAULT_COLUMN_VISIBILITY } from '@typedefs';
 import { MAX_CHANNELS } from '../constants/trackerConstants';
 import { useCursorStore } from './useCursorStore';
+import { getBehaviorForScheme, DEFAULT_BEHAVIOR, type EditorBehavior } from '../engine/keyboard/EditorBehavior';
 
 // FT2-style bitwise mask system for copy/paste/transpose operations
 const MASK_NOTE = 1 << 0;      // 0b00001
@@ -59,8 +60,17 @@ interface EditorStore {
   keyOffTime: number[];
   keyOffCounter: number;
 
+  // Active editor behavior profile (per-scheme)
+  activeBehavior: EditorBehavior;
+
+  // PT-style effect macro slots (10 slots for storing effect commands)
+  effectMacros: Array<{ effTyp: number; eff: number } | null>;
+
   // Jump positions
   ptnJumpPos: number[];
+
+  // Actions — editor behavior
+  setActiveBehavior: (schemeName: string) => void;
 
   // Actions — editor settings
   setCurrentOctave: (octave: number) => void;
@@ -106,6 +116,10 @@ interface EditorStore {
   setPtnJumpPos: (index: number, row: number) => void;
   getPtnJumpPos: (index: number) => number;
 
+  // Actions — effect macros (PT-style)
+  setEffectMacro: (slot: number, effTyp: number, eff: number) => void;
+  getEffectMacro: (slot: number) => { effTyp: number; eff: number } | null;
+
   // Reset editor state (called by useTrackerStore.reset)
   reset: () => void;
 }
@@ -145,6 +159,14 @@ export const useEditorStore = create<EditorStore>()(
     keyOffCounter: 0,
 
     ptnJumpPos: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+    effectMacros: Array(10).fill(null) as Array<{ effTyp: number; eff: number } | null>,
+    activeBehavior: DEFAULT_BEHAVIOR,
+
+    // ── Editor behavior ──────────────────────────────────────────────────
+    setActiveBehavior: (schemeName) =>
+      set((state) => {
+        state.activeBehavior = getBehaviorForScheme(schemeName) as any;
+      }),
 
     // ── Editor settings ──────────────────────────────────────────────────
 
@@ -308,6 +330,20 @@ export const useEditorStore = create<EditorStore>()(
     getPtnJumpPos: (index) => {
       const { ptnJumpPos } = get();
       return (index >= 0 && index < 10) ? ptnJumpPos[index] : 0;
+    },
+
+    // ── Effect macros ────────────────────────────────────────────────────
+
+    setEffectMacro: (slot, effTyp, eff) =>
+      set((state) => {
+        if (slot >= 0 && slot < 10) {
+          state.effectMacros[slot] = { effTyp, eff };
+        }
+      }),
+
+    getEffectMacro: (slot) => {
+      const { effectMacros } = get();
+      return (slot >= 0 && slot < 10) ? effectMacros[slot] : null;
     },
 
     // ── Reset ────────────────────────────────────────────────────────────

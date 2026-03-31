@@ -156,41 +156,106 @@ export const useNavigationInput = (refs: TrackerInputRefs) => {
         return true;
       }
 
-      // Home: Jump to line 0 — disabled during playback
+      // Home: behavior-aware (row-jump vs double-press)
       if (key === 'Home') {
         if (isPlaying) return false;
         e.preventDefault();
-        moveCursorToRow(0);
+        const behavior = useEditorStore.getState().activeBehavior;
+        if (behavior.homeEndBehavior === 'double-press') {
+          // IT: first press = move to note column, second press = row 0
+          if (cursorRef.current.columnType !== 'note') {
+            moveCursorToColumn('note');
+          } else {
+            moveCursorToRow(0);
+          }
+        } else {
+          moveCursorToRow(0);
+        }
         return true;
       }
 
-      // End: Jump to last line — disabled during playback
+      // End: behavior-aware (row-jump vs double-press)
       if (key === 'End') {
         if (isPlaying) return false;
         e.preventDefault();
-        moveCursorToRow(pattern.length - 1);
+        const behavior = useEditorStore.getState().activeBehavior;
+        if (behavior.homeEndBehavior === 'double-press') {
+          // IT: first press = move to last column, second press = last row
+          const cols = useCursorStore.getState().getColumnsForChannel(cursorRef.current.channelIndex);
+          const lastColType = cols && cols.length > 0 ? cols[cols.length - 1].type : 'effParam';
+          if (cursorRef.current.columnType !== lastColType) {
+            moveCursorToColumn(lastColType);
+          } else {
+            moveCursorToRow(pattern.length - 1);
+          }
+        } else {
+          moveCursorToRow(pattern.length - 1);
+        }
         return true;
       }
 
-      // Tab/Shift+Tab: Jump to next/previous track (with wrapping)
+      // Tab/Shift+Tab: behavior-aware channel/column navigation
       if (key === 'Tab') {
         e.preventDefault();
-        if (e.shiftKey) {
-          if (cursorRef.current.columnType === 'note') {
-            if (cursorRef.current.channelIndex > 0) {
-              moveCursorToChannel(cursorRef.current.channelIndex - 1);
+        const behavior = useEditorStore.getState().activeBehavior;
+
+        if (behavior.tabBehavior === 'cycle-columns') {
+          // IT/Renoise/OpenMPT: Tab cycles columns within channel, then next channel
+          const cols = useCursorStore.getState().getColumnsForChannel(cursorRef.current.channelIndex);
+          if (e.shiftKey) {
+            // Check if we're at the first column
+            const isFirstCol = cols && cols.length > 0 &&
+              cursorRef.current.columnType === cols[0].type &&
+              (cursorRef.current.noteColumnIndex ?? 0) === cols[0].nci &&
+              (cursorRef.current.digitIndex ?? 0) === 0;
+            if (isFirstCol) {
+              // At first column — move to previous channel's last column
+              const prevCh = cursorRef.current.channelIndex > 0
+                ? cursorRef.current.channelIndex - 1
+                : pattern.channels.length - 1;
+              moveCursorToChannel(prevCh);
+              const prevCols = useCursorStore.getState().getColumnsForChannel(prevCh);
+              if (prevCols && prevCols.length > 0) {
+                moveCursorToColumn(prevCols[prevCols.length - 1].type);
+              }
             } else {
-              moveCursorToChannel(pattern.channels.length - 1);
+              moveCursor('left');
+            }
+          } else {
+            // Check if we're at the last column
+            const isLastCol = cols && cols.length > 0 &&
+              cursorRef.current.columnType === cols[cols.length - 1].type &&
+              (cursorRef.current.noteColumnIndex ?? 0) === cols[cols.length - 1].nci;
+            if (isLastCol) {
+              // At last column — move to next channel's first column
+              const nextCh = cursorRef.current.channelIndex < pattern.channels.length - 1
+                ? cursorRef.current.channelIndex + 1
+                : 0;
+              moveCursorToChannel(nextCh);
+              moveCursorToColumn('note');
+            } else {
+              moveCursor('right');
             }
           }
         } else {
-          if (cursorRef.current.channelIndex < pattern.channels.length - 1) {
-            moveCursorToChannel(cursorRef.current.channelIndex + 1);
+          // FT2/PT: Tab jumps to next/prev channel note column
+          if (e.shiftKey) {
+            if (cursorRef.current.columnType === 'note') {
+              if (cursorRef.current.channelIndex > 0) {
+                moveCursorToChannel(cursorRef.current.channelIndex - 1);
+              } else {
+                moveCursorToChannel(pattern.channels.length - 1);
+              }
+            }
           } else {
-            moveCursorToChannel(0);
+            if (cursorRef.current.channelIndex < pattern.channels.length - 1) {
+              moveCursorToChannel(cursorRef.current.channelIndex + 1);
+            } else {
+              moveCursorToChannel(0);
+            }
           }
+          moveCursorToColumn('note');
         }
-        moveCursorToColumn('note');
         return true;
       }
 
@@ -213,7 +278,6 @@ export const useNavigationInput = (refs: TrackerInputRefs) => {
       }
 
       // Arrow keys (up/down) — disabled during playback and in format modes
-      // (format modes handle arrows in PatternEditorCanvas.handleFormatKeyDown)
       if (key === 'ArrowUp' || key === 'ArrowDown') {
         if (isPlaying) return false;
         e.preventDefault();
@@ -222,7 +286,10 @@ export const useNavigationInput = (refs: TrackerInputRefs) => {
           e.stopImmediatePropagation();
           return true;
         }
-        const selecting = e.altKey || e.shiftKey;
+        const behavior = useEditorStore.getState().activeBehavior;
+        const selecting = behavior.selectionModifier === 'alt'
+          ? (e.altKey || e.shiftKey)   // FT2: Alt+arrows select (also allow Shift for convenience)
+          : e.shiftKey;                // IT/Renoise: Shift+arrows select
         if (selecting && !selectionRef.current) startSelection();
         moveCursor(dir);
         if (selecting) endSelection();
@@ -258,15 +325,12 @@ export const useNavigationInput = (refs: TrackerInputRefs) => {
 
       if (key === 'ArrowLeft') {
         e.preventDefault();
-        if (e.shiftKey && !e.altKey && !isPlaying) {
-          if (currentPatternIndex > 0) setCurrentPattern(currentPatternIndex - 1);
-          return true;
-        }
         if (e.repeat) {
           e.stopImmediatePropagation();
           return true;
         }
-        const selecting = e.altKey;
+        const behavior = useEditorStore.getState().activeBehavior;
+        const selecting = behavior.selectionModifier === 'alt' ? e.altKey : e.shiftKey;
         if (selecting && !selectionRef.current) startSelection();
         moveCursor('left');
         if (selecting) endSelection();
@@ -301,15 +365,12 @@ export const useNavigationInput = (refs: TrackerInputRefs) => {
 
       if (key === 'ArrowRight') {
         e.preventDefault();
-        if (e.shiftKey && !e.altKey && !isPlaying) {
-          if (currentPatternIndex < patterns.length - 1) setCurrentPattern(currentPatternIndex + 1);
-          return true;
-        }
         if (e.repeat) {
           e.stopImmediatePropagation();
           return true;
         }
-        const selecting = e.altKey;
+        const behavior = useEditorStore.getState().activeBehavior;
+        const selecting = behavior.selectionModifier === 'alt' ? e.altKey : e.shiftKey;
         if (selecting && !selectionRef.current) startSelection();
         moveCursor('right');
         if (selecting) endSelection();

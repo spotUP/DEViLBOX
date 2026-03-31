@@ -163,7 +163,10 @@
       "Ctrl+=": "zoom_in",
       "Ctrl+-": "zoom_out",
       "Ctrl+0": "fit_to_window",
-      "Ctrl+L": "show_command_palette"
+      "Ctrl+L": "show_command_palette",
+      "Ctrl+K": "toggle_bookmark",
+      "Ctrl+Shift+J": "jump_to_next_bookmark",
+      "Ctrl+Shift+K": "jump_to_prev_bookmark"
     },
     "mac": {
       "Space": "play_stop_toggle",
@@ -328,7 +331,10 @@
       "Cmd+-": "zoom_out",
       "Cmd+0": "fit_to_window",
       "Cmd+1": "reset_zoom",
-      "Ctrl+L": "show_command_palette"
+      "Ctrl+L": "show_command_palette",
+      "Cmd+K": "toggle_bookmark",
+      "Cmd+Shift+J": "jump_to_next_bookmark",
+      "Cmd+Shift+K": "jump_to_prev_bookmark"
     }
   },
   "Ctrl+Enter": "preview_note_at_cursor",
