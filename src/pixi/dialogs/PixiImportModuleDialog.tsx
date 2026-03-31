@@ -63,7 +63,7 @@ const isChipDumpFormat = (filename: string): boolean => {
 interface PixiImportModuleDialogProps {
   isOpen: boolean;
   onClose: () => void;
-  onImport: (info: ModuleInfo, options: ImportOptions) => void;
+  onImport: (info: ModuleInfo, options: ImportOptions) => void | Promise<void>;
   initialFile?: File | null;
   companionFiles?: File[];
 }
@@ -130,6 +130,7 @@ export const PixiImportModuleDialog: React.FC<PixiImportModuleDialogProps> = ({
   const [moduleInfo, setModuleInfo] = useState<ModuleInfo | null>(null);
   const [loadedFileName, setLoadedFileName] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [isImporting, setIsImporting] = useState(false);
   const [uadeInitProgress, setUadeInitProgress] = useState(0);
   const [uadeInitPhase, setUadeInitPhase] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -400,20 +401,24 @@ export const PixiImportModuleDialog: React.FC<PixiImportModuleDialogProps> = ({
     }
     setFormatEngine('uade', 'enhanced');
     let companionMap: Map<string, ArrayBuffer> | undefined;
-    console.log('[PixiImportModuleDialog] activeCompanions:', activeCompanions.length, activeCompanions.map(f => f.name));
     if (activeCompanions.length > 0) {
       companionMap = new Map();
       for (const f of activeCompanions) {
         companionMap.set(f.name, await f.arrayBuffer());
       }
     }
-    console.log('[PixiImportModuleDialog] companionMap:', companionMap ? [...companionMap.keys()] : 'undefined');
-    onImport(moduleInfo, {
-      useLibopenmpt: true,
-      subsong: selectedSubsong,
-      uadeMetadata: uadeMetadata ?? undefined,
-      companionFiles: companionMap,
-    });
+    // Block dialog until import completes so UADE engine is fully ready
+    setIsImporting(true);
+    try {
+      await onImport(moduleInfo, {
+        useLibopenmpt: true,
+        subsong: selectedSubsong,
+        uadeMetadata: uadeMetadata ?? undefined,
+        companionFiles: companionMap,
+      });
+    } finally {
+      setIsImporting(false);
+    }
     onClose();
   }, [moduleInfo, isPlaying, isMusicLine, isHively, stopEnginePreview, nativeFmt, isNativeOnly, setFormatEngine, onImport, onClose, selectedSubsong, activeCompanions, uadeMetadata]);
 
@@ -790,8 +795,8 @@ export const PixiImportModuleDialog: React.FC<PixiImportModuleDialogProps> = ({
 
       {/* Footer */}
       <PixiModalFooter width={MODAL_W}>
-        <PixiButton label="Cancel" variant="ghost" onClick={handleClose} />
-        <PixiButton label="Import Module" variant="primary" onClick={handleImport} disabled={!moduleInfo} />
+        <PixiButton label="Cancel" variant="ghost" onClick={handleClose} disabled={isImporting} />
+        <PixiButton label={isImporting ? 'Importing…' : 'Import Module'} variant="primary" onClick={handleImport} disabled={!moduleInfo || isImporting} />
       </PixiModalFooter>
     </PixiModal>
   );
