@@ -3,19 +3,60 @@
  *
  * Appears in the DJ toolbar as a performance tool.
  * When active, routes mic through the WASM vocoder and shows the Kraftwerk head.
+ * Includes a mic device selector so users can pick their real hardware mic.
  */
 
 import React, { useState, useCallback, useRef, useEffect } from 'react';
-import { useVocoderStore, type CarrierType } from '@/stores/useVocoderStore';
+import { useVocoderStore, VOCODER_PRESETS } from '@/stores/useVocoderStore';
 import { VocoderEngine } from '@/engine/vocoder/VocoderEngine';
+
+interface AudioInputDevice {
+  deviceId: string;
+  label: string;
+}
 
 export const DJVocoderControl: React.FC = () => {
   const isActive = useVocoderStore(s => s.isActive);
   const amplitude = useVocoderStore(s => s.amplitude);
   const params = useVocoderStore(s => s.params);
+  const presetName = useVocoderStore(s => s.presetName);
   const [error, setError] = useState<string | null>(null);
   const [muted, setMuted] = useState(false);
+  const [devices, setDevices] = useState<AudioInputDevice[]>([]);
+  const [selectedDeviceId, setSelectedDeviceId] = useState<string>('');
   const engineRef = useRef<VocoderEngine | null>(null);
+
+  // Enumerate audio input devices on mount and when devices change
+  useEffect(() => {
+    const enumerate = async () => {
+      try {
+        const allDevices = await navigator.mediaDevices.enumerateDevices();
+        const inputs = allDevices
+          .filter(d => d.kind === 'audioinput')
+          .map(d => ({
+            deviceId: d.deviceId,
+            label: d.label || `Mic ${d.deviceId.slice(0, 8)}`,
+          }));
+        setDevices(inputs);
+        // Auto-select first real mic (skip virtual devices like BlackHole)
+        if (!selectedDeviceId && inputs.length > 0) {
+          const real = inputs.find(d =>
+            !d.label.toLowerCase().includes('blackhole') &&
+            !d.label.toLowerCase().includes('virtual') &&
+            !d.label.toLowerCase().includes('loopback')
+          );
+          setSelectedDeviceId((real || inputs[0]).deviceId);
+        }
+      } catch {
+        // Permission not yet granted — labels will be empty
+      }
+    };
+    enumerate();
+    navigator.mediaDevices?.addEventListener('devicechange', enumerate);
+    return () => {
+      navigator.mediaDevices?.removeEventListener('devicechange', enumerate);
+    };
+  }, [selectedDeviceId]);
 
   // Cleanup on unmount
   useEffect(() => {
@@ -35,9 +76,19 @@ export const DJVocoderControl: React.FC = () => {
         const djEngine = getDJEngineIfActive();
         const destination = djEngine?.mixer.samplerInput;
         const engine = new VocoderEngine(destination);
-        await engine.start();
+        await engine.start(selectedDeviceId || undefined);
         engineRef.current = engine;
         setMuted(false);
+
+        // Re-enumerate after permission grant (labels become available)
+        const allDevices = await navigator.mediaDevices.enumerateDevices();
+        const inputs = allDevices
+          .filter(d => d.kind === 'audioinput')
+          .map(d => ({
+            deviceId: d.deviceId,
+            label: d.label || `Mic ${d.deviceId.slice(0, 8)}`,
+          }));
+        setDevices(inputs);
       } else {
         engineRef.current?.stop();
         engineRef.current = null;
@@ -52,18 +103,33 @@ export const DJVocoderControl: React.FC = () => {
       }
       console.error('[DJVocoderControl]', err);
     }
-  }, [isActive]);
+  }, [isActive, selectedDeviceId]);
+
+  const handleDeviceChange = useCallback(async (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const deviceId = e.target.value;
+    setSelectedDeviceId(deviceId);
+    // If already active, restart with new device
+    if (engineRef.current?.isActive) {
+      engineRef.current.stop();
+      try {
+        const { getDJEngineIfActive } = await import('@/engine/dj/DJEngine');
+        const djEngine = getDJEngineIfActive();
+        const destination = djEngine?.mixer.samplerInput;
+        const engine = new VocoderEngine(destination);
+        await engine.start(deviceId || undefined);
+        engineRef.current = engine;
+      } catch (err) {
+        console.error('[DJVocoderControl] Device switch failed:', err);
+        setError('Switch failed');
+      }
+    }
+  }, []);
 
   const handleMute = useCallback(() => {
     const next = !muted;
     setMuted(next);
     engineRef.current?.setMuted(next);
   }, [muted]);
-
-  const handleCarrierType = useCallback((e: React.ChangeEvent<HTMLSelectElement>) => {
-    const type = e.target.value as CarrierType;
-    engineRef.current?.setCarrierType(type);
-  }, []);
 
   const handleFormantShift = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const shift = parseFloat(e.target.value);
@@ -75,8 +141,29 @@ export const DJVocoderControl: React.FC = () => {
     engineRef.current?.setWet(wet);
   }, []);
 
+  const handlePresetChange = useCallback((e: React.ChangeEvent<HTMLSelectElement>) => {
+    const name = e.target.value;
+    engineRef.current?.loadPreset(name);
+  }, []);
+
   return (
     <div className="flex items-center gap-1.5">
+      {/* Mic device selector (always visible so user can pick before activating) */}
+      {devices.length > 1 && (
+        <select
+          value={selectedDeviceId}
+          onChange={handleDeviceChange}
+          className="px-1 py-0.5 text-[10px] rounded border border-dark-border bg-dark-bgTertiary text-dark-textSecondary max-w-[120px] truncate"
+          title="Select microphone input"
+        >
+          {devices.map(d => (
+            <option key={d.deviceId} value={d.deviceId}>
+              {d.label}
+            </option>
+          ))}
+        </select>
+      )}
+
       <button
         onClick={handleToggle}
         className={`
@@ -114,17 +201,17 @@ export const DJVocoderControl: React.FC = () => {
             {muted ? 'MUTED' : 'MIC'}
           </button>
 
-          {/* Carrier type selector */}
+          {/* Preset selector */}
           <select
-            value={params.carrierType}
-            onChange={handleCarrierType}
+            value={presetName || ''}
+            onChange={handlePresetChange}
             className="px-1 py-0.5 text-[10px] rounded border border-dark-border bg-dark-bgTertiary text-dark-textSecondary"
-            title="Carrier waveform"
+            title="Vocoder preset"
           >
-            <option value="chord">Chord</option>
-            <option value="saw">Saw</option>
-            <option value="square">Square</option>
-            <option value="noise">Noise</option>
+            {!presetName && <option value="">Custom</option>}
+            {VOCODER_PRESETS.map(p => (
+              <option key={p.name} value={p.name}>{p.name}</option>
+            ))}
           </select>
 
           {/* Formant shift slider */}
