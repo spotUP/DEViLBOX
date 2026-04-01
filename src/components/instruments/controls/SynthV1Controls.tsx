@@ -95,27 +95,36 @@ export const SynthV1Controls: React.FC<SynthV1ControlsProps> = ({ config, onChan
           {/* Oscillator 1 */}
           <div className="flex flex-col gap-2">
             <span className="text-gray-500 text-[10px] font-semibold">Osc A</span>
+            <Knob value={merged[dcoK('Width1', page)] as number} min={0} max={1}
+              onChange={(v) => update(dcoK('Width1', page), v)}
+              label="Width" color="#22c55e" />
             <ParamSelect
               label="Shape" value={merged[dcoK('Shape1', page)] as number}
               options={DCO_SHAPE_NAMES} onChange={(v) => update(dcoK('Shape1', page), v)}
             />
-            <Knob value={merged[dcoK('Width1', page)] as number} min={0} max={1}
-              onChange={(v) => update(dcoK('Width1', page), v)}
-              label="Width" color="#22c55e" />
           </div>
           {/* Oscillator 2 */}
           <div className="flex flex-col gap-2">
             <span className="text-gray-500 text-[10px] font-semibold">Osc B</span>
+            <Knob value={merged[dcoK('Width2', page)] as number} min={0} max={1}
+              onChange={(v) => update(dcoK('Width2', page), v)}
+              label="Width" color="#22c55e" />
             <ParamSelect
               label="Shape" value={merged[dcoK('Shape2', page)] as number}
               options={DCO_SHAPE_NAMES} onChange={(v) => update(dcoK('Shape2', page), v)}
             />
-            <Knob value={merged[dcoK('Width2', page)] as number} min={0} max={1}
-              onChange={(v) => update(dcoK('Width2', page), v)}
-              label="Width" color="#22c55e" />
           </div>
         </div>
         <div className="grid grid-cols-4 gap-3 mb-3">
+          <Knob value={merged[dcoK('Tuning', page)] as number} min={-1} max={1}
+            onChange={(v) => update(dcoK('Tuning', page), v)}
+            label="Tune" color="#eab308" bipolar />
+          <Knob value={merged[dcoK('Glide', page)] as number} min={0} max={1}
+            onChange={(v) => update(dcoK('Glide', page), v)}
+            label="Glide" color="#3b82f6" />
+          <Knob value={merged[dcoK('Detune', page)] as number} min={0} max={1}
+            onChange={(v) => update(dcoK('Detune', page), v)}
+            label="Detune" color="#eab308" />
           <div className="flex flex-col gap-1">
             <label className="text-gray-500 text-[10px]">Octave</label>
             <select
@@ -126,15 +135,6 @@ export const SynthV1Controls: React.FC<SynthV1ControlsProps> = ({ config, onChan
               {OCTAVE_OPTIONS.map(o => <option key={o} value={o}>{o > 0 ? `+${o}` : o}</option>)}
             </select>
           </div>
-          <Knob value={merged[dcoK('Tuning', page)] as number} min={-1} max={1}
-            onChange={(v) => update(dcoK('Tuning', page), v)}
-            label="Tune" color="#eab308" bipolar />
-          <Knob value={merged[dcoK('Glide', page)] as number} min={0} max={1}
-            onChange={(v) => update(dcoK('Glide', page), v)}
-            label="Glide" color="#3b82f6" />
-          <Knob value={merged[dcoK('Detune', page)] as number} min={0} max={1}
-            onChange={(v) => update(dcoK('Detune', page), v)}
-            label="Detune" color="#eab308" />
         </div>
         <div className="grid grid-cols-4 gap-3">
           <Knob value={merged[dcoK('Balance', page)] as number} min={-1} max={1}
@@ -174,6 +174,9 @@ export const SynthV1Controls: React.FC<SynthV1ControlsProps> = ({ config, onChan
           <Knob value={merged[dcfK('Envelope', page)] as number} min={0} max={1}
             onChange={(v) => update(dcfK('Envelope', page), v)}
             label="Env Amt" color="#a855f7" />
+          <Knob value={merged[dcfK('KeyFollow', page)] as number} min={0} max={1}
+            onChange={(v) => update(dcfK('KeyFollow', page), v)}
+            label="Key Follow" color="#a855f7" />
         </div>
         <div className="grid grid-cols-4 gap-3 mb-3">
           <ParamSelect
@@ -191,9 +194,6 @@ export const SynthV1Controls: React.FC<SynthV1ControlsProps> = ({ config, onChan
               <option value={1}>24 dB</option>
             </select>
           </div>
-          <Knob value={merged[dcfK('KeyFollow', page)] as number} min={0} max={1}
-            onChange={(v) => update(dcfK('KeyFollow', page), v)}
-            label="Key Follow" color="#a855f7" />
         </div>
         <ADSRRow
           a={merged[dcfK('Attack', page)] as number} d={merged[dcfK('Decay', page)] as number}
@@ -231,16 +231,16 @@ export const SynthV1Controls: React.FC<SynthV1ControlsProps> = ({ config, onChan
       <div className="p-3 rounded bg-[#1a1a1a]">
         <SectionHeader title={`LFO ${page}`} />
         <div className="grid grid-cols-4 gap-3 mb-3">
-          <ParamSelect
-            label="Shape" value={merged[lfoK('Shape', page)] as number}
-            options={LFO_SHAPE_NAMES} onChange={(v) => update(lfoK('Shape', page), v)}
-          />
           <Knob value={merged[lfoK('Bpm', page)] as number} min={0} max={1}
             onChange={(v) => update(lfoK('Bpm', page), v)}
             label="Rate" color="#f59e0b" />
           <Knob value={merged[lfoK('Width', page)] as number} min={0} max={1}
             onChange={(v) => update(lfoK('Width', page), v)}
             label="Width" color="#f59e0b" />
+          <ParamSelect
+            label="Shape" value={merged[lfoK('Shape', page)] as number}
+            options={LFO_SHAPE_NAMES} onChange={(v) => update(lfoK('Shape', page), v)}
+          />
         </div>
         <div className="grid grid-cols-5 gap-3">
           <Knob value={merged[lfoK('Pitch', page)] as number} min={0} max={1}

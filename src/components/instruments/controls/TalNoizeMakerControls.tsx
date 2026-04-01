@@ -70,12 +70,12 @@ export const TalNoizeMakerControls: React.FC<TalNoizeMakerControlsProps> = ({ co
           <div className="p-2 rounded bg-[#1a2a1a]">
             <span className="text-gray-400 font-semibold text-[11px]">OSC 1</span>
             <div className="flex flex-wrap gap-2 mt-1 items-end">
-              <SelectControl label="Wave" value={m.osc1Waveform} options={OSC_WAVE_NAMES} onChange={(v) => update('osc1Waveform', v)} />
               <Knob label="Volume" value={m.osc1Volume} min={0} max={1} color="#4ade80" onChange={(v) => update('osc1Volume', v)} />
               <Knob label="Tune" value={m.osc1Tune} min={0} max={1} color="#facc15" bipolar onChange={(v) => update('osc1Tune', v)} />
               <Knob label="Fine" value={m.osc1FineTune} min={0} max={1} color="#facc15" bipolar onChange={(v) => update('osc1FineTune', v)} />
               <Knob label="PW" value={m.osc1PW} min={0} max={1} color="#60a5fa" onChange={(v) => update('osc1PW', v)} />
               <Knob label="Phase" value={m.osc1Phase} min={0} max={1} color="#818cf8" onChange={(v) => update('osc1Phase', v)} />
+              <SelectControl label="Wave" value={m.osc1Waveform} options={OSC_WAVE_NAMES} onChange={(v) => update('osc1Waveform', v)} />
               <ToggleButton label="Sync" value={m.oscSync} onChange={(v) => update('oscSync', v)} />
             </div>
           </div>
@@ -84,12 +84,12 @@ export const TalNoizeMakerControls: React.FC<TalNoizeMakerControlsProps> = ({ co
           <div className="p-2 rounded bg-[#1a2a1a]">
             <span className="text-gray-400 font-semibold text-[11px]">OSC 2</span>
             <div className="flex flex-wrap gap-2 mt-1 items-end">
-              <SelectControl label="Wave" value={m.osc2Waveform} options={OSC_WAVE_NAMES} onChange={(v) => update('osc2Waveform', v)} />
               <Knob label="Volume" value={m.osc2Volume} min={0} max={1} color="#4ade80" onChange={(v) => update('osc2Volume', v)} />
               <Knob label="Tune" value={m.osc2Tune} min={0} max={1} color="#facc15" bipolar onChange={(v) => update('osc2Tune', v)} />
               <Knob label="Fine" value={m.osc2FineTune} min={0} max={1} color="#facc15" bipolar onChange={(v) => update('osc2FineTune', v)} />
               <Knob label="Phase" value={m.osc2Phase} min={0} max={1} color="#818cf8" onChange={(v) => update('osc2Phase', v)} />
               <Knob label="FM" value={m.osc2FM} min={0} max={1} color="#f472b6" onChange={(v) => update('osc2FM', v)} />
+              <SelectControl label="Wave" value={m.osc2Waveform} options={OSC_WAVE_NAMES} onChange={(v) => update('osc2Waveform', v)} />
             </div>
           </div>
         </div>
@@ -108,7 +108,6 @@ export const TalNoizeMakerControls: React.FC<TalNoizeMakerControlsProps> = ({ co
       <div>
         <SectionHeader title="Filter" />
         <div className="flex flex-wrap gap-3 items-end">
-          <SelectControl label="Type" value={m.filterType} options={FILTER_TYPE_NAMES} onChange={(v) => update('filterType', v)} />
           <Knob label="Cutoff" value={m.cutoff} min={0} max={1} color="#a855f7" onChange={(v) => update('cutoff', v)} />
           <Knob label="Reso" value={m.resonance} min={0} max={1} color="#a855f7" onChange={(v) => update('resonance', v)} />
           <Knob label="Drive" value={m.filterDrive} min={0} max={1} color="#ef4444" onChange={(v) => update('filterDrive', v)} />
@@ -116,6 +115,7 @@ export const TalNoizeMakerControls: React.FC<TalNoizeMakerControlsProps> = ({ co
           <Knob label="Contour" value={m.filterContour} min={0} max={1} color="#c084fc" onChange={(v) => update('filterContour', v)} />
           <Knob label="Vel Cutoff" value={m.velocityCutoff} min={0} max={1} color="#c084fc" onChange={(v) => update('velocityCutoff', v)} />
           <Knob label="High Pass" value={m.highPass} min={0} max={1} color="#a855f7" onChange={(v) => update('highPass', v)} />
+          <SelectControl label="Type" value={m.filterType} options={FILTER_TYPE_NAMES} onChange={(v) => update('filterType', v)} />
         </div>
       </div>
 

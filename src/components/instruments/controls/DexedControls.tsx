@@ -217,6 +217,10 @@ export const DexedControls: React.FC<DexedControlsProps> = ({
               label="P Mod Sens"
               color={knobColor}
             />
+          </div>
+
+          {/* LFO Waveform + Key Sync */}
+          <div className="mt-3 flex items-center gap-4">
             <div>
               <label className="text-xs text-text-secondary block mb-2">Waveform</label>
               <select
@@ -230,10 +234,6 @@ export const DexedControls: React.FC<DexedControlsProps> = ({
                 ))}
               </select>
             </div>
-          </div>
-
-          {/* LFO Key Sync toggle */}
-          <div className="mt-4 flex items-center gap-3">
             <button
               onClick={() => onChange({ lfoSync: !config.lfoSync })}
               className="flex items-center gap-2 text-xs"

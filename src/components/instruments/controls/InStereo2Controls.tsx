@@ -261,13 +261,7 @@ export const InStereo2Controls: React.FC<InStereo2ControlsProps> = ({
       {/* ADSR Section */}
       <div className={`rounded-lg border p-3 ${panelBg}`}>
         <SectionLabel label="ADSR Envelope" />
-        <BarChart
-          data={config.adsrTable}
-          width={320} height={56}
-          color={accent}
-          markers={adsrMarkers}
-        />
-        <div className="flex gap-3 flex-wrap mt-3">
+        <div className="flex gap-3 flex-wrap">
           <Knob value={config.adsrLength} min={0} max={127} step={1}
             onChange={(v) => updateParam('adsrLength', Math.round(v))}
             label="Length" color={knob}
@@ -284,6 +278,14 @@ export const InStereo2Controls: React.FC<InStereo2ControlsProps> = ({
             onChange={(v) => updateParam('sustainSpeed', Math.round(v))}
             label="Sus Speed" color={knob}
             formatValue={(v) => Math.round(v).toString()} />
+        </div>
+        <div className="mt-2">
+          <BarChart
+            data={config.adsrTable}
+            width={320} height={56}
+            color={accent}
+            markers={adsrMarkers}
+          />
         </div>
       </div>
 
@@ -305,14 +307,8 @@ export const InStereo2Controls: React.FC<InStereo2ControlsProps> = ({
 
         {config.egMode !== 0 && (
           <>
-            <BarChart
-              data={config.egTable}
-              width={320} height={48}
-              color={isCyan ? '#00cc99' : '#cc6633'}
-              markers={egMarkers}
-            />
             {config.egMode === 1 && (
-              <div className="flex gap-3 flex-wrap mt-3">
+              <div className="flex gap-3 flex-wrap">
                 <Knob value={config.egStartLen} min={0} max={255} step={1}
                   onChange={(v) => updateParam('egStartLen', Math.round(v))}
                   label="Start/Len" color={knob}
@@ -332,7 +328,7 @@ export const InStereo2Controls: React.FC<InStereo2ControlsProps> = ({
               </div>
             )}
             {config.egMode === 2 && (
-              <div className="flex gap-3 flex-wrap mt-3">
+              <div className="flex gap-3 flex-wrap">
                 <Knob value={config.egStartLen} min={0} max={255} step={1}
                   onChange={(v) => updateParam('egStartLen', Math.round(v))}
                   label="Start Len" color={knob}
@@ -343,6 +339,14 @@ export const InStereo2Controls: React.FC<InStereo2ControlsProps> = ({
                   formatValue={(v) => Math.round(v).toString()} />
               </div>
             )}
+            <div className="mt-2">
+              <BarChart
+                data={config.egTable}
+                width={320} height={48}
+                color={isCyan ? '#00cc99' : '#cc6633'}
+                markers={egMarkers}
+              />
+            </div>
           </>
         )}
       </div>
@@ -388,13 +392,7 @@ export const InStereo2Controls: React.FC<InStereo2ControlsProps> = ({
       {/* LFO Table */}
       <div className={`rounded-lg border p-3 ${panelBg}`}>
         <SectionLabel label="LFO (Pitch Modulation)" />
-        <BarChart
-          data={config.lfoTable}
-          width={320} height={56}
-          color={accent}
-          signed
-        />
-        <div className="flex gap-3 mt-3">
+        <div className="flex gap-3">
           <Knob value={config.amfLength} min={0} max={127} step={1}
             onChange={(v) => updateParam('amfLength', Math.round(v))}
             label="Length" color={knob}
@@ -403,6 +401,14 @@ export const InStereo2Controls: React.FC<InStereo2ControlsProps> = ({
             onChange={(v) => updateParam('amfRepeat', Math.round(v))}
             label="Repeat" color={knob}
             formatValue={(v) => Math.round(v).toString()} />
+        </div>
+        <div className="mt-2">
+          <BarChart
+            data={config.lfoTable}
+            width={320} height={56}
+            color={accent}
+            signed
+          />
         </div>
       </div>
     </div>

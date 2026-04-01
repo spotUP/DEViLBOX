@@ -81,6 +81,14 @@ export const VL1Controls: React.FC<VL1ControlsProps> = ({ config, onChange }) =>
       <div>
         <h3 className="text-gray-400 font-semibold mb-2 border-b border-gray-700 pb-1">Master</h3>
         <div className="flex gap-3 flex-wrap items-end">
+          <Knob value={merged.tune ?? 1} min={0.5} max={1.5}
+            onChange={(v) => updateParam('tune', v)} label="Tune" color="#64748b" />
+          <Knob value={merged.volume ?? 0.7} min={0} max={1}
+            onChange={(v) => updateParam('volume', v)} label="Volume" color="#22c55e" />
+          <Knob value={merged.balance ?? 0.5} min={0} max={1}
+            onChange={(v) => updateParam('balance', v)} label="Balance" color="#06b6d4" />
+        </div>
+        <div className="flex gap-3 flex-wrap items-end mt-2">
           <div className="flex flex-col gap-1">
             <label className="text-gray-500 text-[10px]">Octave</label>
             <div className="flex gap-1">
@@ -99,12 +107,6 @@ export const VL1Controls: React.FC<VL1ControlsProps> = ({ config, onChange }) =>
               ))}
             </div>
           </div>
-          <Knob value={merged.tune ?? 1} min={0.5} max={1.5}
-            onChange={(v) => updateParam('tune', v)} label="Tune" color="#64748b" />
-          <Knob value={merged.volume ?? 0.7} min={0} max={1}
-            onChange={(v) => updateParam('volume', v)} label="Volume" color="#22c55e" />
-          <Knob value={merged.balance ?? 0.5} min={0} max={1}
-            onChange={(v) => updateParam('balance', v)} label="Balance" color="#06b6d4" />
         </div>
       </div>
 
@@ -112,6 +114,8 @@ export const VL1Controls: React.FC<VL1ControlsProps> = ({ config, onChange }) =>
       <div>
         <h3 className="text-gray-400 font-semibold mb-2 border-b border-gray-700 pb-1">Rhythm</h3>
         <div className="flex items-center gap-3 mb-2">
+          <Knob value={merged.tempo ?? 0.5} min={0} max={1}
+            onChange={(v) => updateParam('tempo', v)} label="Tempo" color="#f97316" />
           <button
             className={`px-3 py-1 rounded text-[11px] font-semibold ${
               (merged.rhythmOn ?? 0) > 0.5
@@ -122,8 +126,6 @@ export const VL1Controls: React.FC<VL1ControlsProps> = ({ config, onChange }) =>
           >
             {(merged.rhythmOn ?? 0) > 0.5 ? 'RHYTHM ON' : 'RHYTHM OFF'}
           </button>
-          <Knob value={merged.tempo ?? 0.5} min={0} max={1}
-            onChange={(v) => updateParam('tempo', v)} label="Tempo" color="#f97316" />
         </div>
         <div className="flex flex-wrap gap-1">
           {VL1_RHYTHM_NAMES.map((name, i) => (
