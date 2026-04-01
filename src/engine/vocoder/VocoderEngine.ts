@@ -95,9 +95,9 @@ export class VocoderEngine {
     // Get microphone
     const constraints: MediaStreamConstraints = {
       audio: {
-        echoCancellation: false,  // We want raw signal for vocoding
-        noiseSuppression: false,
-        autoGainControl: false,
+        echoCancellation: true,   // Prevents feedback loop with speakers
+        noiseSuppression: false,  // We want raw vocal timbre for vocoding
+        autoGainControl: false,   // Noise gate handles levels
         ...(deviceId ? { deviceId: { exact: deviceId } } : {}),
       },
     };
