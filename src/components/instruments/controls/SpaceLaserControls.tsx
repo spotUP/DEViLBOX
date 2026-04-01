@@ -69,7 +69,7 @@ export const SpaceLaserControls: React.FC<SpaceLaserControlsProps> = ({
           <h3 className={`font-bold ${isCyanTheme ? 'text-accent-highlight' : 'text-green-400'}`}>LASER SWEEP</h3>
         </div>
         
-        <div className="grid grid-cols-4 gap-3 items-center gap-3">
+        <div className="grid grid-cols-3 gap-3">
           <Knob
             value={config.laser.startFreq}
             min={100}
@@ -97,27 +97,27 @@ export const SpaceLaserControls: React.FC<SpaceLaserControlsProps> = ({
             color={knobColor}
             formatValue={(v) => `${Math.round(v)}ms`}
           />
+        </div>
           
-          <div className="flex flex-col items-center gap-2">
-            <span className="text-[10px] font-bold text-text-muted uppercase">Curve</span>
-            <div className="flex gap-1">
-              {['exponential', 'linear'].map((curve) => (
-                <button
-                  key={curve}
-                  onClick={() => updateLaser({ sweepCurve: curve as 'exponential' | 'linear' })}
-                  className={`
-                    px-2 py-1 text-[10px] font-bold rounded border uppercase
-                    ${config.laser.sweepCurve === curve
-                      ? `bg-[#2a2a2a]`
-                      : 'bg-[#1a1a1a] border-dark-borderLight text-text-muted hover:border-dark-borderLight'
-                    }
-                  `}
-                  style={config.laser.sweepCurve === curve ? { borderColor: accentColor, color: accentColor } : undefined}
-                >
-                  {curve.slice(0, 3)}
-                </button>
-              ))}
-            </div>
+        <div className="flex flex-col items-center gap-2 mt-2">
+          <span className="text-[10px] font-bold text-text-muted uppercase">Curve</span>
+          <div className="flex gap-1">
+            {['exponential', 'linear'].map((curve) => (
+              <button
+                key={curve}
+                onClick={() => updateLaser({ sweepCurve: curve as 'exponential' | 'linear' })}
+                className={`
+                  px-2 py-1 text-[10px] font-bold rounded border uppercase
+                  ${config.laser.sweepCurve === curve
+                    ? `bg-[#2a2a2a]`
+                    : 'bg-[#1a1a1a] border-dark-borderLight text-text-muted hover:border-dark-borderLight'
+                  }
+                `}
+                style={config.laser.sweepCurve === curve ? { borderColor: accentColor, color: accentColor } : undefined}
+              >
+                {curve.slice(0, 3)}
+              </button>
+            ))}
           </div>
         </div>
       </div>
@@ -129,7 +129,7 @@ export const SpaceLaserControls: React.FC<SpaceLaserControlsProps> = ({
           <h3 className={`font-bold ${isCyanTheme ? 'text-accent-highlight' : 'text-green-400'}`}>NOISE GRIT</h3>
         </div>
         
-        <div className="flex gap-3 items-center">
+        <div className="flex gap-3">
           <Knob
             value={config.noise.amount}
             min={0}
@@ -139,27 +139,27 @@ export const SpaceLaserControls: React.FC<SpaceLaserControlsProps> = ({
             color={knobColor}
             formatValue={(v) => `${Math.round(v)}%`}
           />
+        </div>
           
-          <div className="flex flex-col items-center gap-2">
-            <span className="text-[10px] font-bold text-text-muted uppercase">Type</span>
-            <div className="flex gap-1">
-              {['white', 'pink', 'brown'].map((type) => (
-                <button
-                  key={type}
-                  onClick={() => updateNoise({ type: type as 'white' | 'pink' | 'brown' })}
-                  className={`
-                    px-2 py-1 text-[10px] font-bold rounded border uppercase
-                    ${config.noise.type === type
-                      ? `bg-[#2a2a2a]`
-                      : 'bg-[#1a1a1a] border-dark-borderLight text-text-muted hover:border-dark-borderLight'
-                    }
-                  `}
-                  style={config.noise.type === type ? { borderColor: accentColor, color: accentColor } : undefined}
-                >
-                  {type[0]}
-                </button>
-              ))}
-            </div>
+        <div className="flex flex-col items-center gap-2 mt-2">
+          <span className="text-[10px] font-bold text-text-muted uppercase">Type</span>
+          <div className="flex gap-1">
+            {['white', 'pink', 'brown'].map((type) => (
+              <button
+                key={type}
+                onClick={() => updateNoise({ type: type as 'white' | 'pink' | 'brown' })}
+                className={`
+                  px-2 py-1 text-[10px] font-bold rounded border uppercase
+                  ${config.noise.type === type
+                    ? `bg-[#2a2a2a]`
+                    : 'bg-[#1a1a1a] border-dark-borderLight text-text-muted hover:border-dark-borderLight'
+                  }
+                `}
+                style={config.noise.type === type ? { borderColor: accentColor, color: accentColor } : undefined}
+              >
+                {type[0]}
+              </button>
+            ))}
           </div>
         </div>
       </div>
