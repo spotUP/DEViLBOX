@@ -87,7 +87,7 @@ export const SynthV1Controls: React.FC<SynthV1ControlsProps> = ({ config, onChan
   const lfoK = (name: string, p: 1 | 2) => `lfo${p}${name}` as keyof SynthV1Config;
 
   const renderSynthPage = (page: 1 | 2) => (
-    <div className="grid grid-cols-3 gap-2 p-2">
+    <div className="grid grid-cols-4 gap-2 p-2">
       {/* DCO — Oscillators */}
       <div className="p-3 rounded bg-[#1a2a1a]">
         <SectionHeader title={`DCO ${page} — Oscillators`} />
@@ -280,7 +280,7 @@ export const SynthV1Controls: React.FC<SynthV1ControlsProps> = ({ config, onChan
   );
 
   const renderEffects = () => (
-    <div className="grid grid-cols-3 gap-2 p-2">
+    <div className="grid grid-cols-4 gap-2 p-2">
       {/* Chorus */}
       <div className="p-3 rounded bg-[#1a1a2a]">
         <SectionHeader title="Chorus" />

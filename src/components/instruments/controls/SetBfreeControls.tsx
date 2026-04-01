@@ -192,7 +192,7 @@ export const SetBfreeControls: React.FC<SetBfreeControlsProps> = ({ config, onCh
   const merged = { ...DEFAULT_SETBFREE, ...config } as Required<SetBfreeConfig>;
 
   return (
-    <div className="synth-controls-flow grid grid-cols-3 gap-2 p-2 overflow-y-auto text-xs">
+    <div className="synth-controls-flow grid grid-cols-4 gap-2 p-2 overflow-y-auto text-xs">
       {/* ═══ UPPER MANUAL ═══ */}
       <DrawbarBank title="Upper Manual" keys={UPPER_KEYS} merged={merged} update={updateParam} />
 
