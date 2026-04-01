@@ -361,11 +361,14 @@ export const KraftwerkHead: React.FC<VJSceneProps> = ({ audioRef }) => {
       prevHigh.current = high;
 
       // Phase oscillator — creates natural mouth cycling during sustained speech
-      mouthPhase.current += (mid + high) * 0.3;
+      // When vocoder is active, also drive from mic amplitude for mouth variety
+      const vocoderDrive = vocoderActive ? vocoderAmplitude * 8 : 0;
+      mouthPhase.current += (mid + high + vocoderDrive) * 0.3;
 
       if (speechActive || vocoderActive) {
         // When vocoder is active, use its dedicated amplitude for tighter lip-sync
-        const vocAmp = vocoderActive ? Math.min(1, vocoderAmplitude * 4) : 0;
+        // micPeak values are typically 0.01-0.1 for speech → scale up aggressively
+        const vocAmp = vocoderActive ? Math.min(1, vocoderAmplitude * 15) : 0;
 
         // Jaw: combine absolute energy (baseline open) with delta (syllable pops)
         // and a phase oscillator for natural cycling

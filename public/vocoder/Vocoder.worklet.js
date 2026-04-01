@@ -24,6 +24,12 @@ class VocoderProcessor extends AudioWorkletProcessor {
     this.rmsCounter = 0;
     this.rmsInterval = 17; // ~50ms at 44100/128
 
+    // Noise gate — smooth open/close to avoid clicks
+    this.gateOpen = 0;          // 0 = closed, 1 = open
+    this.gateThreshold = 0.06;  // mic peak must exceed this to open (above keyboard/ambient)
+    this.gateAttack = 0.05;     // how fast it opens (per block, 0-1)
+    this.gateRelease = 0.008;   // how fast it closes (per block, 0-1)
+
     this.port.onmessage = (e) => this.handleMessage(e.data);
     console.log('[Vocoder Worklet] Processor constructed');
   }
@@ -32,6 +38,9 @@ class VocoderProcessor extends AudioWorkletProcessor {
     switch (data.type) {
       case 'init':
         await this.initWasm(data);
+        break;
+      case 'reinit':
+        this.reinitVocoder(data);
         break;
       case 'setCarrierType':
         if (this.ready) this.exports.i(this.vocoderPtr, data.value);
@@ -55,6 +64,24 @@ class VocoderProcessor extends AudioWorkletProcessor {
         this.dispose();
         break;
     }
+  }
+
+  /** Recreate the vocoder with new bands/filtersPerBand (e.g. on preset change) */
+  reinitVocoder(data) {
+    if (!this.ready || !this.exports || !this.vocoderPtr) return;
+    const ex = this.exports;
+    const { sampleRate: sr, bands, filtersPerBand } = data;
+
+    // Destroy old instance + buffers
+    ex.f(this.vocoderPtr);
+    if (this.modulatorBuf) ex.q(this.modulatorBuf);
+    if (this.outputBuf) ex.q(this.outputBuf);
+
+    // Create new
+    this.vocoderPtr = ex.d(sr || sampleRate, bands || 32, filtersPerBand || 6);
+    this.modulatorBuf = ex.o(128);
+    this.outputBuf = ex.o(128);
+    console.log('[Vocoder Worklet] Reinit: bands=' + bands + ' filters=' + filtersPerBand + ' ptr=' + this.vocoderPtr);
   }
 
   updateHeapViews() {
@@ -179,38 +206,56 @@ class VocoderProcessor extends AudioWorkletProcessor {
     // Refresh HEAPF32 in case memory grew
     const HEAPF32 = new Float32Array(this.memory.buffer);
 
-    // Copy modulator (mic) into WASM heap
-    const modOffset = this.modulatorBuf >> 2;
-    HEAPF32.set(inputChannel.subarray(0, frames), modOffset);
-
-    // Process vocoder
-    const rms = ex.g(this.vocoderPtr, this.modulatorBuf, this.outputBuf, frames);
-
-    // Copy output from WASM heap with gain boost
-    // Vocoder filter banks distribute energy across bands → output is naturally quiet.
-    // Apply makeup gain with soft clipping (tanh) to avoid harsh digital clipping.
-    const MAKEUP_GAIN = 10.0;
-    const outOffset = this.outputBuf >> 2;
+    // Compute mic peak for noise gate + diagnostics
+    let micMax = 0;
     for (let i = 0; i < frames; i++) {
-      const raw = HEAPF32[outOffset + i] * MAKEUP_GAIN;
-      // tanh soft-clip: stays linear near 0, smoothly limits at ±1
-      outputChannel[i] = Math.tanh(raw);
+      const v = Math.abs(inputChannel[i]);
+      if (v > micMax) micMax = v;
     }
 
-    // Report RMS periodically + one-time mic diagnostics
+    // Noise gate — smoothly open/close based on mic level to kill ambient noise
+    if (micMax > this.gateThreshold) {
+      this.gateOpen = Math.min(1, this.gateOpen + this.gateAttack);
+    } else {
+      this.gateOpen = Math.max(0, this.gateOpen - this.gateRelease);
+    }
+
+    let rms = 0;
+    const outOffset = this.outputBuf >> 2;
+
+    // If gate is fully closed, skip processing and output silence
+    if (this.gateOpen < 0.001) {
+      outputChannel.fill(0);
+    } else {
+      // Copy modulator (mic) into WASM heap
+      const modOffset = this.modulatorBuf >> 2;
+      HEAPF32.set(inputChannel.subarray(0, frames), modOffset);
+
+      // Process vocoder
+      rms = ex.g(this.vocoderPtr, this.modulatorBuf, this.outputBuf, frames);
+
+      // Copy output with gain boost + gate envelope
+      // Vocoder filter banks distribute energy across bands → output is naturally very quiet.
+      // tanh prevents harsh clipping regardless of gain amount.
+      const MAKEUP_GAIN = 50.0;
+      const gate = this.gateOpen;
+      for (let i = 0; i < frames; i++) {
+        const raw = HEAPF32[outOffset + i] * MAKEUP_GAIN * gate;
+        outputChannel[i] = Math.tanh(raw);
+      }
+    }
+
+    // Report RMS + mic peak continuously
     this.rmsCounter++;
     if (this.rmsCounter >= this.rmsInterval) {
       this.rmsCounter = 0;
-      this.port.postMessage({ type: 'rms', value: rms });
 
-      // Log mic input level for first few seconds to diagnose silent mic
-      if (!this._diagDone) {
-        this._diagCount = (this._diagCount || 0) + 1;
-        let micMax = 0;
-        for (let i = 0; i < frames; i++) {
-          const v = Math.abs(inputChannel[i]);
-          if (v > micMax) micMax = v;
-        }
+      // Send both vocoder RMS and mic peak to main thread
+      this.port.postMessage({ type: 'rms', value: rms, micPeak: micMax });
+
+      // Log to console for first 20 reports + whenever mic peak exceeds threshold
+      this._diagCount = (this._diagCount || 0) + 1;
+      if (this._diagCount <= 20 || micMax > 0.05) {
         let outMax = 0;
         const outHeap = new Float32Array(this.memory.buffer);
         for (let i = 0; i < frames; i++) {
@@ -219,11 +264,8 @@ class VocoderProcessor extends AudioWorkletProcessor {
         }
         console.log('[Vocoder Worklet] mic peak=' + micMax.toFixed(6) +
           ' vocoderOut peak=' + outMax.toFixed(6) +
-          ' rms=' + rms.toFixed(6));
-        if (this._diagCount >= 20) {
-          this._diagDone = true;
-          console.log('[Vocoder Worklet] Diagnostics complete (20 samples logged)');
-        }
+          ' rms=' + rms.toFixed(6) +
+          (this._diagCount === 20 ? ' (continuous logging for loud signals)' : ''));
       }
     }
 
