@@ -707,3 +707,160 @@ function modSourceToNumber(source: V2ModSource): number {
   ];
   return sources.indexOf(source);
 }
+
+// Import types from tonejs — we can't import directly due to circular deps,
+// so we use a structural type for the input
+type V2ConfigInput = {
+  osc1?: { mode?: number; transpose?: number; detune?: number; color?: number; level?: number };
+  osc2?: { mode?: number; ringMod?: boolean; transpose?: number; detune?: number; color?: number; level?: number };
+  osc3?: { mode?: number; ringMod?: boolean; transpose?: number; detune?: number; color?: number; level?: number };
+  filter1?: { mode?: number; cutoff?: number; resonance?: number };
+  filter2?: { mode?: number; cutoff?: number; resonance?: number };
+  routing?: { mode?: number; balance?: number };
+  envelope?: { attack?: number; decay?: number; sustain?: number; release?: number };
+  envelope2?: { attack?: number; decay?: number; sustain?: number; release?: number };
+  lfo1?: { rate?: number; depth?: number; mode?: number; keySync?: boolean; envMode?: boolean; phase?: number; polarity?: number; amplify?: number };
+  lfo2?: { mode?: number; keySync?: boolean; envMode?: boolean; rate?: number; phase?: number; polarity?: number; amplify?: number };
+  voiceDistortion?: { mode?: number; inGain?: number; param1?: number; param2?: number };
+  channelDistortion?: { mode?: number; inGain?: number; param1?: number; param2?: number };
+  chorusFlanger?: { amount?: number; feedback?: number; delayL?: number; delayR?: number; modRate?: number; modDepth?: number; modPhase?: number };
+  compressor?: { mode?: number; stereoLink?: boolean; autoGain?: boolean; lookahead?: number; threshold?: number; ratio?: number; attack?: number; release?: number; outGain?: number };
+};
+
+const OSC_MODES: V2OscMode[] = ['off', 'saw', 'pulse', 'sin', 'noise', 'fm', 'auxA', 'auxB'];
+const FILTER_MODES: V2FilterMode[] = ['off', 'low', 'band', 'high', 'notch', 'all', 'moogL', 'moogH'];
+const FILTER_ROUTINGS: V2FilterRouting[] = ['single', 'serial', 'parallel'];
+const DIST_MODES: V2DistMode[] = ['off', 'overdrive', 'clip', 'bitcrush', 'decimate', 'lpf', 'bpf', 'hpf', 'notch', 'allpass', 'moogL'];
+const LFO_MODES: V2LFOMode[] = ['saw', 'tri', 'pulse', 'sin', 'sampleHold'];
+const LFO_POLARITIES: V2LFOPolarity[] = ['positive', 'negative', 'bipolar'];
+const COMP_MODES: Array<'off' | 'peak' | 'rms'> = ['off', 'peak', 'rms'];
+
+/**
+ * Convert V2Config (UI/preset numeric format) to V2InstrumentConfig (full typed format).
+ * V2Config uses numeric mode indices and `level` for volumes; V2InstrumentConfig uses
+ * string enums and `volume`. Missing fields are filled from DEFAULT_V2_INSTRUMENT.
+ */
+export function v2ConfigToInstrument(cfg: V2ConfigInput): V2InstrumentConfig {
+  const d = DEFAULT_V2_INSTRUMENT;
+
+  // Helper to clamp transpose/detune from signed (-64..+63) to unsigned (0..127)
+  const toUnsigned = (v: number | undefined, def: number): number => {
+    if (v === undefined) return def;
+    // If already 0-127 range (unsigned), use directly
+    if (v >= 0 && v <= 127) return v;
+    // If signed (-64 to +63), convert to unsigned
+    return Math.max(0, Math.min(127, v + 64));
+  };
+
+  return {
+    voice: {
+      ...d.voice,
+      channelVolume: 127,
+    },
+    osc1: {
+      mode: OSC_MODES[cfg.osc1?.mode ?? 1] ?? d.osc1.mode,
+      ringmod: false,
+      transpose: toUnsigned(cfg.osc1?.transpose, d.osc1.transpose),
+      detune: toUnsigned(cfg.osc1?.detune, d.osc1.detune),
+      color: cfg.osc1?.color ?? d.osc1.color,
+      volume: cfg.osc1?.level ?? d.osc1.volume,
+    },
+    osc2: {
+      mode: OSC_MODES[cfg.osc2?.mode ?? 0] ?? d.osc2.mode,
+      ringmod: cfg.osc2?.ringMod ?? false,
+      transpose: toUnsigned(cfg.osc2?.transpose, d.osc2.transpose),
+      detune: toUnsigned(cfg.osc2?.detune, d.osc2.detune),
+      color: cfg.osc2?.color ?? d.osc2.color,
+      volume: cfg.osc2?.level ?? d.osc2.volume,
+    },
+    osc3: {
+      mode: OSC_MODES[cfg.osc3?.mode ?? 0] ?? d.osc3.mode,
+      ringmod: cfg.osc3?.ringMod ?? false,
+      transpose: toUnsigned(cfg.osc3?.transpose, d.osc3.transpose),
+      detune: toUnsigned(cfg.osc3?.detune, d.osc3.detune),
+      color: cfg.osc3?.color ?? d.osc3.color,
+      volume: cfg.osc3?.level ?? d.osc3.volume,
+    },
+    filter1: {
+      mode: FILTER_MODES[cfg.filter1?.mode ?? 1] ?? d.filter1.mode,
+      cutoff: cfg.filter1?.cutoff ?? d.filter1.cutoff,
+      resonance: cfg.filter1?.resonance ?? d.filter1.resonance,
+    },
+    filter2: {
+      mode: FILTER_MODES[cfg.filter2?.mode ?? 0] ?? d.filter2.mode,
+      cutoff: cfg.filter2?.cutoff ?? d.filter2.cutoff,
+      resonance: cfg.filter2?.resonance ?? d.filter2.resonance,
+    },
+    filterRouting: FILTER_ROUTINGS[cfg.routing?.mode ?? 0] ?? d.filterRouting,
+    filterBalance: cfg.routing?.balance ?? d.filterBalance,
+    voiceDistortion: {
+      mode: DIST_MODES[cfg.voiceDistortion?.mode ?? 0] ?? d.voiceDistortion.mode,
+      inGain: cfg.voiceDistortion?.inGain ?? d.voiceDistortion.inGain,
+      param1: cfg.voiceDistortion?.param1 ?? d.voiceDistortion.param1,
+      param2: cfg.voiceDistortion?.param2 ?? d.voiceDistortion.param2,
+    },
+    ampEnvelope: {
+      attack: cfg.envelope?.attack ?? d.ampEnvelope.attack,
+      decay: cfg.envelope?.decay ?? d.ampEnvelope.decay,
+      sustain: cfg.envelope?.sustain ?? d.ampEnvelope.sustain,
+      sustainTime: 64, // infinite
+      release: cfg.envelope?.release ?? d.ampEnvelope.release,
+      amplify: 0,
+    },
+    modEnvelope: {
+      attack: cfg.envelope2?.attack ?? d.modEnvelope.attack,
+      decay: cfg.envelope2?.decay ?? d.modEnvelope.decay,
+      sustain: cfg.envelope2?.sustain ?? d.modEnvelope.sustain,
+      sustainTime: 64,
+      release: cfg.envelope2?.release ?? d.modEnvelope.release,
+      amplify: 64,
+    },
+    lfo1: {
+      mode: LFO_MODES[cfg.lfo1?.mode ?? 1] ?? d.lfo1.mode,
+      keySync: cfg.lfo1?.keySync ?? d.lfo1.keySync,
+      envMode: cfg.lfo1?.envMode ?? d.lfo1.envMode,
+      rate: cfg.lfo1?.rate ?? d.lfo1.rate,
+      phase: cfg.lfo1?.phase ?? d.lfo1.phase,
+      polarity: LFO_POLARITIES[cfg.lfo1?.polarity ?? 0] ?? d.lfo1.polarity,
+      amplify: cfg.lfo1?.depth ?? cfg.lfo1?.amplify ?? d.lfo1.amplify,
+    },
+    lfo2: {
+      mode: LFO_MODES[cfg.lfo2?.mode ?? 1] ?? d.lfo2.mode,
+      keySync: cfg.lfo2?.keySync ?? d.lfo2.keySync,
+      envMode: cfg.lfo2?.envMode ?? d.lfo2.envMode,
+      rate: cfg.lfo2?.rate ?? d.lfo2.rate,
+      phase: cfg.lfo2?.phase ?? d.lfo2.phase,
+      polarity: LFO_POLARITIES[cfg.lfo2?.polarity ?? 0] ?? d.lfo2.polarity,
+      amplify: cfg.lfo2?.amplify ?? d.lfo2.amplify,
+    },
+    channelDistortion: {
+      mode: DIST_MODES[cfg.channelDistortion?.mode ?? 0] ?? d.channelDistortion.mode,
+      inGain: cfg.channelDistortion?.inGain ?? d.channelDistortion.inGain,
+      param1: cfg.channelDistortion?.param1 ?? d.channelDistortion.param1,
+      param2: cfg.channelDistortion?.param2 ?? d.channelDistortion.param2,
+    },
+    chorusFlanger: {
+      amount: cfg.chorusFlanger?.amount ?? d.chorusFlanger.amount,
+      feedback: cfg.chorusFlanger?.feedback ?? d.chorusFlanger.feedback,
+      delayL: cfg.chorusFlanger?.delayL ?? d.chorusFlanger.delayL,
+      delayR: cfg.chorusFlanger?.delayR ?? d.chorusFlanger.delayR,
+      modRate: cfg.chorusFlanger?.modRate ?? d.chorusFlanger.modRate,
+      modDepth: cfg.chorusFlanger?.modDepth ?? d.chorusFlanger.modDepth,
+      modPhase: cfg.chorusFlanger?.modPhase ?? d.chorusFlanger.modPhase,
+    },
+    compressor: {
+      mode: COMP_MODES[cfg.compressor?.mode ?? 0] ?? d.compressor.mode,
+      stereoLink: cfg.compressor?.stereoLink ?? d.compressor.stereoLink,
+      autoGain: cfg.compressor?.autoGain ?? d.compressor.autoGain,
+      lookahead: cfg.compressor?.lookahead ?? d.compressor.lookahead,
+      threshold: cfg.compressor?.threshold ?? d.compressor.threshold,
+      ratio: cfg.compressor?.ratio ?? d.compressor.ratio,
+      attack: cfg.compressor?.attack ?? d.compressor.attack,
+      release: cfg.compressor?.release ?? d.compressor.release,
+      outGain: cfg.compressor?.outGain ?? d.compressor.outGain,
+    },
+    modMatrix: [
+      ...d.modMatrix, // Keep default velocity/modwheel/volume routing
+    ],
+  };
+}

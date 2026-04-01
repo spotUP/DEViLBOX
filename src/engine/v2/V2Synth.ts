@@ -1,7 +1,8 @@
 import type { V2Config } from '@/types/instrument';
+import { DEFAULT_V2 } from '@/types/instrument';
 import type { DevilboxSynth } from '@/types/synth';
 import { getDevilboxAudioContext, noteToMidi } from '@/utils/audio-context';
-import { v2ConfigToBytes, DEFAULT_V2_INSTRUMENT } from '@/types/v2Instrument';
+import { v2ConfigToBytes, v2ConfigToInstrument, DEFAULT_V2_INSTRUMENT } from '@/types/v2Instrument';
 
 export class V2Synth implements DevilboxSynth {
   public readonly name: string = 'V2Synth';
@@ -12,8 +13,10 @@ export class V2Synth implements DevilboxSynth {
   private _initPromise: Promise<void>;
   private _pendingNotes: Array<{note: number, vel: number}> = [];
   private _releaseTimers: Set<ReturnType<typeof setTimeout>> = new Set();
+  private _config: V2Config;
 
-  constructor(_config?: V2Config) {
+  constructor(config?: V2Config) {
+    this._config = config ? structuredClone(config) : structuredClone(DEFAULT_V2);
     this.output = getDevilboxAudioContext().createGain();
     this._initPromise = this._initialize();
   }
@@ -197,17 +200,17 @@ export class V2Synth implements DevilboxSynth {
 
   /** Apply a V2Config, mapping config fields to WASM parameter indices */
   public applyConfig(config: V2Config) {
+    this._config = structuredClone(config);
     if (this._initialized) {
       this._applyV2Config(config);
     }
   }
 
-  private _applyV2Config(_config: V2Config) {
-    // V2 uses binary patch data — load DEFAULT_V2_INSTRUMENT as the default patch.
-    // The V2Config → V2InstrumentConfig mapping is not yet implemented; for now we load
-    // the standard default so the synth produces sound on note trigger.
+  private _applyV2Config(config: V2Config) {
     if (!this._worklet) return;
-    const patchData = v2ConfigToBytes(DEFAULT_V2_INSTRUMENT);
+    // Convert V2Config (UI/preset format) to V2InstrumentConfig (binary format)
+    const inst = v2ConfigToInstrument(config);
+    const patchData = v2ConfigToBytes(inst);
     this._worklet.port.postMessage({ type: 'loadPatch', channel: 0, patchData });
   }
 
@@ -227,11 +230,24 @@ export class V2Synth implements DevilboxSynth {
     switch (param) {
       case 'volume':
         this.output.gain.setValueAtTime(value, this.output.context.currentTime);
-        // Also send MIDI CC7 to the V2 engine for proper internal volume
         if (this._worklet && this._initialized) {
           this._worklet.port.postMessage({ type: 'controlChange', channel: 0, cc: 7, value: Math.round(value * 127) });
         }
         break;
+      default: {
+        // Support dot-notation: e.g. 'osc1.mode', 'filter1.cutoff'
+        const parts = param.split('.');
+        if (parts.length === 2) {
+          const [section, key] = parts;
+          const obj = (this._config as unknown as Record<string, unknown>)[section];
+          if (obj && typeof obj === 'object') {
+            (obj as Record<string, unknown>)[key] = value;
+            // Re-send full patch to WASM
+            this._applyV2Config(this._config);
+          }
+        }
+        break;
+      }
     }
   }
 

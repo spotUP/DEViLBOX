@@ -36,6 +36,10 @@ import { OPENWURLI_LAYOUT } from './openwurli';
 import { OPL3_LAYOUT } from './opl3';
 import { DX7_LAYOUT } from './dx7';
 import { OIDOS_LAYOUT } from './oidos';
+import { TUNEFISH_LAYOUT } from './tunefish';
+import { SLAUGHTER_LAYOUT } from './wavesabreSlaughter';
+import { FALCON_LAYOUT } from './wavesabreFalcon';
+import { V2_LAYOUT } from './v2';
 
 /** Map from SynthType string to layout descriptor */
 export const SYNTH_LAYOUTS: Record<string, SynthPanelLayout> = {
@@ -55,6 +59,13 @@ export const SYNTH_LAYOUTS: Record<string, SynthPanelLayout> = {
   OPL3: OPL3_LAYOUT,
   DX7: DX7_LAYOUT,
   OidosSynth: OIDOS_LAYOUT,
+
+  // Demoscene WASM synths
+  V2: V2_LAYOUT,
+  TunefishSynth: TUNEFISH_LAYOUT,
+  WaveSabreSlaughter: SLAUGHTER_LAYOUT,
+  WaveSabreFalcon: FALCON_LAYOUT,
+  WaveSabreSynth: FALCON_LAYOUT, // Default for generic WaveSabre
 
   // Custom Tone.js synths
   DubSiren: DUB_SIREN_LAYOUT,
