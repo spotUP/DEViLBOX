@@ -28,6 +28,7 @@ export class VocoderEngine {
   private audioContext: AudioContext;
   private stream: MediaStream | null = null;
   private sourceNode: MediaStreamAudioSourceNode | null = null;
+  private micPreamp: GainNode;
   private workletNode: AudioWorkletNode | null = null;
   private outputGain: GainNode;
   private ready = false;
@@ -35,6 +36,11 @@ export class VocoderEngine {
 
   constructor(destination?: AudioNode) {
     this.audioContext = Tone.getContext().rawContext as AudioContext;
+
+    // Mic preamp — built-in laptop mics are often very quiet
+    this.micPreamp = this.audioContext.createGain();
+    this.micPreamp.gain.value = 2.0;
+
     this.outputGain = this.audioContext.createGain();
     this.outputGain.gain.value = 1.0;
 
@@ -118,16 +124,18 @@ export class VocoderEngine {
         this.ready = true;
         this.applyCurrentParams();
       } else if (data.type === 'rms') {
-        useVocoderStore.getState().setAmplitude(data.value);
+        // Use mic peak for the level meter (vocoder RMS is too quiet to see)
+        useVocoderStore.getState().setAmplitude(data.micPeak ?? data.value);
       } else if (data.type === 'error') {
         console.error('[VocoderEngine] Worklet error:', data.message);
       }
     };
 
-    // Connect: mic → worklet → output gain
-    this.sourceNode.connect(this.workletNode);
+    // Connect: mic → preamp(2x) → worklet → output gain
+    this.sourceNode.connect(this.micPreamp);
+    this.micPreamp.connect(this.workletNode);
     this.workletNode.connect(this.outputGain);
-    console.log('[VocoderEngine] Audio chain connected: mic → worklet → gain → dest',
+    console.log('[VocoderEngine] Audio chain connected: mic → preamp(2x) → worklet → gain → dest',
       'contextState:', this.audioContext.state);
 
     // Initialize WASM in worklet
@@ -152,6 +160,7 @@ export class VocoderEngine {
 
     // Disconnect audio graph
     this.sourceNode?.disconnect();
+    this.micPreamp.disconnect();
     this.workletNode?.disconnect();
 
     // Tell worklet to dispose WASM
@@ -213,6 +222,30 @@ export class VocoderEngine {
     this.workletNode?.port.postMessage({ type: 'setFormantShift', value: shift });
   }
 
+  /** Load a preset — reinitializes the WASM vocoder if bands/filtersPerBand changed */
+  loadPreset(presetName: string): void {
+    useVocoderStore.getState().loadPreset(presetName);
+    if (!this.workletNode || !this.ready) return;
+
+    const p = useVocoderStore.getState().params;
+    const port = this.workletNode.port;
+
+    // Reinit WASM with new bands/filtersPerBand, then apply all params
+    port.postMessage({
+      type: 'reinit',
+      sampleRate: this.audioContext.sampleRate,
+      bands: p.bands,
+      filtersPerBand: p.filtersPerBand,
+    });
+
+    // Apply runtime params (worklet applies these after reinit completes)
+    port.postMessage({ type: 'setCarrierType', value: CARRIER_TYPE_MAP[p.carrierType] });
+    port.postMessage({ type: 'setCarrierFreq', value: p.carrierFreq });
+    port.postMessage({ type: 'setWet', value: p.wet });
+    port.postMessage({ type: 'setReactionTime', value: p.reactionTime });
+    port.postMessage({ type: 'setFormantShift', value: p.formantShift });
+  }
+
   setOutputGain(gain: number): void {
     this.outputGain.gain.value = Math.max(0, Math.min(2, gain));
   }
@@ -239,6 +272,7 @@ export class VocoderEngine {
   /** Full cleanup */
   dispose(): void {
     this.stop();
+    this.micPreamp.disconnect();
     this.outputGain.disconnect();
   }
 }
