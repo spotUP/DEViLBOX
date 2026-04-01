@@ -85,7 +85,7 @@ const PAD_GAP = 6;
 const GRID_COLS = 4;
 const GRID_ROWS = 4;
 const MIN_PAD_SIZE = 48;
-const MAX_PAD_SIZE = 160;
+const MAX_PAD_SIZE = 90;
 const RIGHT_W = 240;
 const EDITOR_W = 320;
 const HEADER_H = 36;
@@ -175,8 +175,7 @@ const PadCell: React.FC<PadCellProps> = React.memo(({ pad, selected, focused, ve
     onRelease(pad.id);
   }, [pad.id, onRelease]);
 
-  const maxNameLen = size >= 100 ? 14 : 8;
-  const truncatedName = pad.name.length > maxNameLen ? pad.name.slice(0, maxNameLen - 2) + '..' : pad.name;
+  const truncatedName = pad.name;
 
   return (
     <Div
