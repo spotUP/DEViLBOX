@@ -19,4 +19,6 @@ export { SYNARE_PRESETS } from './synare';
 export { V2_PRESETS } from './v2';
 export { WAVETABLE_PRESETS } from './wavetable';
 export { OIDOS_PRESETS } from './oidos';
+export { TUNEFISH_PRESETS } from './tunefish';
+export { WAVESABRE_SLAUGHTER_PRESETS, WAVESABRE_FALCON_PRESETS } from './wavesabre';
 export { getPresetsForSynthType, ALL_PRESETS } from './allPresets';
