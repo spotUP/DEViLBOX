@@ -13,7 +13,7 @@ import { SamplePackBrowser } from '../instruments/SamplePackBrowser';
 import { getMIDIManager } from '../../midi/MIDIManager';
 import type { MIDIMessage } from '../../midi/types';
 
-const SPEECH_SYNTH_TYPES = new Set(['Sam', 'DECtalk', 'PinkTrombone']);
+const SPEECH_SYNTH_TYPES = new Set(['Sam', 'DECtalk', 'PinkTrombone', 'V2Speech']);
 
 /** Grouped synth types for the pad synth picker */
 const SYNTH_TYPE_GROUPS: { label: string; types: { value: SynthType; label: string }[] }[] = [
@@ -101,6 +101,7 @@ function getSpeechText(config: InstrumentConfig): string | undefined {
   if (config.synthType === 'Sam') return (config as any).sam?.text;
   if (config.synthType === 'DECtalk') return (config as any).dectalk?.text;
   if (config.synthType === 'PinkTrombone') return (config as any).pinkTrombone?.text;
+  if (config.synthType === 'V2Speech') return (config as any).v2Speech?.text;
   return undefined;
 }
 
@@ -109,6 +110,7 @@ function setSpeechTextField(config: InstrumentConfig, synthType: string, text: s
   if (synthType === 'Sam') (config as any).sam = { ...(config as any).sam, text };
   else if (synthType === 'DECtalk') (config as any).dectalk = { ...(config as any).dectalk, text };
   else if (synthType === 'PinkTrombone') (config as any).pinkTrombone = { ...(config as any).pinkTrombone, text };
+  else if (synthType === 'V2Speech') (config as any).v2Speech = { ...(config as any).v2Speech, text };
 }
 
 interface PadEditorProps {
