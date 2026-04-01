@@ -278,7 +278,7 @@ function makeDrumMachineConfig(
       name,
       type: 'synth',
       synthType,
-      drumMachine: { drumType, machineType },
+      drumMachine: { drumType, machineType, noteMode: 'pitch' },
       effects: [],
       volume: 0,
       pan: 0,
