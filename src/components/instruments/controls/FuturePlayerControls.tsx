@@ -89,24 +89,6 @@ export const FuturePlayerControls: React.FC<FuturePlayerControlsProps> = ({
       {/* ═══════════ ENVELOPE TAB ═══════════ */}
       {activeTab === 'envelope' && (
         <div className="space-y-3">
-          {/* Envelope visualization */}
-          <div className={`rounded border p-2 ${panelBg}`} style={{ height: 96 }}>
-            <EnvelopeVisualization
-              mode="steps"
-              attackVol={config.attackPeak}
-              attackSpeed={config.attackRate || 1}
-              decayVol={config.sustainLevel}
-              decaySpeed={config.decayRate || 1}
-              sustainVol={config.sustainTarget}
-              sustainLen={16}
-              releaseVol={0}
-              releaseSpeed={config.releaseRate || 1}
-              maxVol={255}
-              color={knob}
-              height={72}
-            />
-          </div>
-
           {/* Volume */}
           <div className={`rounded border p-3 ${panelBg}`}>
             <div className="text-xs font-semibold text-text-secondary mb-2">Volume</div>
@@ -156,6 +138,24 @@ export const FuturePlayerControls: React.FC<FuturePlayerControlsProps> = ({
                 </button>
               </div>
             </div>
+          </div>
+
+          {/* Envelope visualization */}
+          <div className={`rounded border p-2 ${panelBg}`} style={{ height: 96 }}>
+            <EnvelopeVisualization
+              mode="steps"
+              attackVol={config.attackPeak}
+              attackSpeed={config.attackRate || 1}
+              decayVol={config.sustainLevel}
+              decaySpeed={config.decayRate || 1}
+              sustainVol={config.sustainTarget}
+              sustainLen={16}
+              releaseVol={0}
+              releaseSpeed={config.releaseRate || 1}
+              maxVol={255}
+              color={knob}
+              height={72}
+            />
           </div>
         </div>
       )}

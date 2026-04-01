@@ -189,22 +189,6 @@ export const SidMonControls: React.FC<SidMonControlsProps> = ({
       <div className={`rounded-lg border p-3 ${panelBg}`}>
         <SectionLabel label="ADSR (SID format, 0–15)" />
 
-        {/* Envelope visualization */}
-        <div className="mb-3">
-          <EnvelopeVisualization
-            mode="adsr"
-            ar={config.attack}
-            dr={config.decay}
-            rr={config.release}
-            sl={config.sustain}
-            tl={0}
-            maxRate={15}
-            maxTl={1}
-            width={320} height={64}
-            color={accent}
-          />
-        </div>
-
         <div className="flex gap-4">
           <Knob value={config.attack} min={0} max={15} step={1}
             onChange={(v) => {
@@ -246,6 +230,20 @@ export const SidMonControls: React.FC<SidMonControlsProps> = ({
             }}
             label="Release" color={knob}
             formatValue={(v) => Math.round(v).toString()} />
+        </div>
+        <div className="mt-2">
+          <EnvelopeVisualization
+            mode="adsr"
+            ar={config.attack}
+            dr={config.decay}
+            rr={config.release}
+            sl={config.sustain}
+            tl={0}
+            maxRate={15}
+            maxTl={1}
+            width={320} height={64}
+            color={accent}
+          />
         </div>
       </div>
 
@@ -295,16 +293,6 @@ export const SidMonControls: React.FC<SidMonControlsProps> = ({
             </button>
           ))}
         </div>
-        <div className="mb-3">
-          <FilterFrequencyResponse
-            filterType={FILTER_MODE_TYPES[config.filterMode] ?? 'lowpass'}
-            cutoff={config.filterCutoff / 255}
-            resonance={config.filterResonance / 15}
-            poles={2}
-            color={accent}
-            width={320} height={64}
-          />
-        </div>
         <div className="flex gap-4">
           <Knob value={config.filterCutoff} min={0} max={255} step={1}
             onChange={(v) => upd('filterCutoff', Math.round(v))}
@@ -314,6 +302,16 @@ export const SidMonControls: React.FC<SidMonControlsProps> = ({
             onChange={(v) => upd('filterResonance', Math.round(v))}
             label="Resonance" color={knob} size="md"
             formatValue={(v) => Math.round(v).toString()} />
+        </div>
+        <div className="mt-2">
+          <FilterFrequencyResponse
+            filterType={FILTER_MODE_TYPES[config.filterMode] ?? 'lowpass'}
+            cutoff={config.filterCutoff / 255}
+            resonance={config.filterResonance / 15}
+            poles={2}
+            color={accent}
+            width={320} height={64}
+          />
         </div>
       </div>
     </div>

@@ -304,15 +304,6 @@ export const DubSirenControls: React.FC<DubSirenControlsProps> = ({
             ))}
           </div>
 
-          <FilterFrequencyResponse
-            filterType={config.filter.type as FilterType}
-            cutoff={Math.log10(Math.max(config.filter.frequency, 20) / 20) / 3}
-            resonance={0}
-            poles={2}
-            color={knobColor}
-            width={300} height={56}
-          />
-
           <Knob
             value={config.filter.frequency}
             min={20}
@@ -321,6 +312,15 @@ export const DubSirenControls: React.FC<DubSirenControlsProps> = ({
             label="Cutoff"
             color={knobColor}
             formatValue={(v) => `${Math.round(v)}Hz`}
+          />
+
+          <FilterFrequencyResponse
+            filterType={config.filter.type as FilterType}
+            cutoff={Math.log10(Math.max(config.filter.frequency, 20) / 20) / 3}
+            resonance={0}
+            poles={2}
+            color={knobColor}
+            width={300} height={56}
           />
         </div>
       </div>
