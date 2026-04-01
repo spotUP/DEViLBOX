@@ -110,7 +110,7 @@ export const ZynAddSubFXControls: React.FC<ZynAddSubFXControlsProps> = ({ config
   const merged = { ...DEFAULT_ZYNADDSUBFX, ...config } as Required<ZynAddSubFXConfig>;
 
   return (
-    <div className="synth-controls-flow grid grid-cols-2 gap-2 p-2 overflow-y-auto text-xs">
+    <div className="synth-controls-flow grid grid-cols-3 gap-2 p-2 overflow-y-auto text-xs">
       {/* Tab Bar */}
       <div className="flex gap-1 border-b border-dark-borderLight pb-1">
         {TAB_NAMES.map((name, i) => (

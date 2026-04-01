@@ -147,7 +147,7 @@ export const VSTBridgePanel: React.FC<VSTBridgePanelProps> = ({
   const groups = groupParams(params);
 
   return (
-    <div className="synth-controls-flow grid grid-cols-2 gap-2 p-2 overflow-y-auto">
+    <div className="synth-controls-flow grid grid-cols-3 gap-2 p-2 overflow-y-auto">
       {groups.map((group) => (
         <div key={group.name} className={`p-2 rounded-lg border ${panelBg}`}>
           <div className="flex items-center gap-2 mb-2">

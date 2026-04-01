@@ -244,7 +244,7 @@ export const Odin2Controls: React.FC<Odin2ControlsProps> = ({
 
   if (!synthReady) {
     return (
-      <div className="grid grid-cols-2 gap-2 p-2">
+      <div className="grid grid-cols-3 gap-2 p-2">
         <div className="flex items-center justify-center gap-2 p-4 text-text-secondary">
           <Loader size={16} className="animate-spin" />
           <span className="text-sm">Loading Odin2...</span>
@@ -269,7 +269,7 @@ export const Odin2Controls: React.FC<Odin2ControlsProps> = ({
   ];
 
   return (
-    <div className="synth-controls-flow grid grid-cols-2 gap-2 p-2 overflow-y-auto">
+    <div className="synth-controls-flow grid grid-cols-3 gap-2 p-2 overflow-y-auto">
       {/* ═══ MASTER ═══ */}
       <Section title="Master" panelBg={panelBg} accentColor={accentColor}>
         <div className="flex gap-4 justify-center flex-wrap">
