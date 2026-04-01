@@ -16,9 +16,10 @@ import { NoteRepeatEngine } from '@/engine/drumpad/NoteRepeatEngine';
 import type { NoteRepeatRate } from '@/engine/drumpad/NoteRepeatEngine';
 import { getAudioContext, resumeAudioContext } from '@/audio/AudioContextSingleton';
 import { getDJEngineIfActive } from '@/engine/dj/DJEngine';
+import { getToneEngine } from '@/engine/ToneEngine';
 import { useTransportStore } from '@/stores/useTransportStore';
 import type { PadBank, DrumPad, ScratchActionId } from '@/types/drumpad';
-import { getBankPads } from '@/types/drumpad';
+import { getBankPads, PAD_INSTRUMENT_BASE } from '@/types/drumpad';
 import {
   djScratchBaby, djScratchTrans, djScratchFlare, djScratchHydro, djScratchCrab, djScratchOrbit,
   djScratchChirp, djScratchStab, djScratchScrbl, djScratchTear,
@@ -296,6 +297,26 @@ export const PixiDJSamplerPanel: React.FC<PixiDJSamplerPanelProps> = ({ isOpen, 
       if (pad.sample) {
         engineRef.current.triggerPad(pad, velocity);
       }
+      if (pad.synthConfig) {
+        try {
+          const engine = getToneEngine();
+          const note = pad.instrumentNote || 'C3';
+          const normalizedVel = velocity / 127;
+          const padInstId = PAD_INSTRUMENT_BASE + pad.id;
+          const config = { ...pad.synthConfig, id: padInstId };
+          engine.triggerNoteAttack(padInstId, note, 0, normalizedVel, config);
+          if (pad.playMode === 'oneshot') {
+            const releaseDelay = Math.max(pad.decay, 100) / 1000;
+            setTimeout(() => {
+              try { engine.triggerNoteRelease(padInstId, note, 0, config); } catch { /* ignore */ }
+            }, releaseDelay * 1000);
+          } else {
+            heldPadsRef.current.add(pad.id);
+          }
+        } catch (err) {
+          console.warn('[PixiDJSamplerPanel] Pad synth trigger failed:', err);
+        }
+      }
       if (pad.playMode === 'sustain') {
         heldPadsRef.current.add(pad.id);
       }
@@ -319,6 +340,15 @@ export const PixiDJSamplerPanel: React.FC<PixiDJSamplerPanelProps> = ({ isOpen, 
 
     if (engineRef.current && currentProgram && pad.playMode === 'sustain') {
       engineRef.current.stopPad(pad.id, pad.release / 1000);
+    }
+
+    if (pad.playMode === 'sustain' && pad.synthConfig) {
+      try {
+        const padInstId = PAD_INSTRUMENT_BASE + pad.id;
+        const config = { ...pad.synthConfig, id: padInstId };
+        const note = pad.instrumentNote || 'C3';
+        getToneEngine().triggerNoteRelease(padInstId, note, 0, config);
+      } catch { /* ignore */ }
     }
   }, [currentProgram]);
 
