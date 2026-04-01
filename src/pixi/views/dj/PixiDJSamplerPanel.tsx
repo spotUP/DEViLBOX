@@ -88,6 +88,26 @@ function blendColor(base: number, target: number, t: number): number {
   );
 }
 
+// ─── Synth badge helpers ────────────────────────────────────────────────────
+
+/** Short 3-char badge for a synth type shown in pad cell top-right */
+function getSynthBadge(synthType: string): string {
+  const badges: Record<string, string> = {
+    TR808: '808', TR909: '909',
+    Sam: 'SAM', DECtalk: 'DEC', V2Speech: 'V2S', PinkTrombone: 'PKT',
+    TB303: '303', Dexed: 'DX7', OBXd: 'OBX',
+  };
+  return badges[synthType] ?? 'SYN';
+}
+
+/** Accent color for a synth type badge */
+function getSynthColor(synthType: string): number {
+  if (synthType === 'TR808' || synthType === 'TR909') return 0xf97316; // orange
+  if (synthType === 'Sam' || synthType === 'DECtalk' || synthType === 'V2Speech' || synthType === 'PinkTrombone') return 0xf59e0b; // amber
+  if (synthType === 'TB303') return 0x22c55e; // green
+  return 0x60a5fa; // blue default
+}
+
 // ─── Individual Pad ─────────────────────────────────────────────────────────
 
 interface PadCellProps {
@@ -111,7 +131,8 @@ const PadCell: React.FC<PadCellProps> = ({
   const isPressed = velocity > 0;
   const hasSample = pad.sample !== null;
   const hasScratch = !!pad.scratchAction;
-  const hasContent = hasSample || hasScratch;
+  const hasSynth = !!pad.synthConfig;
+  const hasContent = hasSample || hasScratch || hasSynth;
   const brightness = isPressed ? 0.3 + (velocity / 127) * 0.7 : 0;
   const fillColor = isPressed ? blendColor(bgColor, 0xffffff, brightness) : bgColor;
   const fillAlpha = isPressed ? 0.9 : hasContent ? 1 : 0.5;
@@ -151,6 +172,14 @@ const PadCell: React.FC<PadCellProps> = ({
           text="SCR"
           style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 8, fill: 0xffffff }}
           tint={theme.warning.color}
+          layout={{ position: 'absolute', right: 4, top: 3 }}
+        />
+      )}
+      {hasSynth && !hasScratch && (
+        <pixiBitmapText
+          text={getSynthBadge(pad.synthConfig!.synthType)}
+          style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 8, fill: 0xffffff }}
+          tint={getSynthColor(pad.synthConfig!.synthType)}
           layout={{ position: 'absolute', right: 4, top: 3 }}
         />
       )}
