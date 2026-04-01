@@ -20,6 +20,8 @@ import { SYNARE_PRESETS } from './synare';
 import { V2_PRESETS } from './v2';
 import { WAVETABLE_PRESETS } from './wavetable';
 import { OIDOS_PRESETS } from './oidos';
+import { TUNEFISH_PRESETS } from './tunefish';
+import { WAVESABRE_SLAUGHTER_PRESETS, WAVESABRE_FALCON_PRESETS } from './wavesabre';
 
 export function getPresetsForSynthType(synthType: SynthType): SynthPreset[] {
   switch (synthType) {
@@ -63,6 +65,10 @@ export function getPresetsForSynthType(synthType: SynthType): SynthPreset[] {
       return WAVETABLE_PRESETS;
     case 'OidosSynth':
       return OIDOS_PRESETS;
+    case 'TunefishSynth':
+      return TUNEFISH_PRESETS;
+    case 'WaveSabreSynth':
+      return [...WAVESABRE_SLAUGHTER_PRESETS, ...WAVESABRE_FALCON_PRESETS];
     default:
       return [];
   }
@@ -89,4 +95,7 @@ export const ALL_PRESETS: Record<string, SynthPreset[]> = {
   V2: V2_PRESETS,
   Wavetable: WAVETABLE_PRESETS,
   OidosSynth: OIDOS_PRESETS,
+  TunefishSynth: TUNEFISH_PRESETS,
+  WaveSabreSlaughter: WAVESABRE_SLAUGHTER_PRESETS,
+  WaveSabreFalcon: WAVESABRE_FALCON_PRESETS,
 };
