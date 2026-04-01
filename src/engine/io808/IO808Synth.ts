@@ -584,7 +584,7 @@ function claveRimshot(
   const rimHighFilter = new VCF('highpass', audioCtx);
   rimHighFilter.frequency.value = RIM_FREQ;
   const swingVCA = new SwingVCA(audioCtx);
-  const swingEnv = new ADGenerator('linear', 0.11, 10, 0, 1.7);
+  const swingEnv = new ADGenerator('linear', 0.11, 50, 0, 1.7);
 
   // clave modules
   const claveOsc = new VCO('triangle', audioCtx);
