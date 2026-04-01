@@ -58,11 +58,11 @@ const SCRATCH_ACTION_HANDLERS: Record<ScratchActionId, () => boolean> = {
 
 // ─── Constants ──────────────────────────────────────────────────────────────
 
-const PAD_SIZE = 60;
-const PAD_GAP = 4;
-const PANEL_PAD = 6;
-const HEADER_H = 22;
-const TOOLBAR_H = 22;
+const PAD_SIZE = 44;
+const PAD_GAP = 3;
+const PANEL_PAD = 5;
+const HEADER_H = 20;
+const TOOLBAR_H = 20;
 const GRID_SIZE = PAD_SIZE * 4 + PAD_GAP * 3;
 const PANEL_W = GRID_SIZE + PANEL_PAD * 2;
 const PANEL_H = HEADER_H + TOOLBAR_H + PAD_GAP * 3 + GRID_SIZE + PANEL_PAD * 2;
