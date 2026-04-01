@@ -171,7 +171,7 @@ export const VitalControls: React.FC<VitalControlsProps> = ({
 
   if (!synthReady) {
     return (
-      <div className="grid grid-cols-3 gap-2 p-2">
+      <div className="grid grid-cols-4 gap-2 p-2">
         <div className="flex items-center justify-center gap-2 p-4 text-text-secondary">
           <Loader size={16} className="animate-spin" />
           <span className="text-sm">Loading Vital...</span>

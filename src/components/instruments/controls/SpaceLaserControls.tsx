@@ -61,7 +61,7 @@ export const SpaceLaserControls: React.FC<SpaceLaserControlsProps> = ({
   };
 
   const renderLaserTab = () => (
-    <div className="grid grid-cols-3 gap-2 p-2">
+    <div className="grid grid-cols-4 gap-2 p-2">
       {/* Laser Sweep Section */}
       <div className={`p-2 rounded-lg border ${panelBg}`}>
         <div className="flex items-center gap-2 mb-2">
@@ -167,7 +167,7 @@ export const SpaceLaserControls: React.FC<SpaceLaserControlsProps> = ({
   );
 
   const renderFMTab = () => (
-    <div className="grid grid-cols-3 gap-2 p-2">
+    <div className="grid grid-cols-4 gap-2 p-2">
       {/* FM Section */}
       <div className={`p-2 rounded-lg border ${panelBg}`}>
         <div className="flex items-center gap-2 mb-2">
@@ -257,7 +257,7 @@ export const SpaceLaserControls: React.FC<SpaceLaserControlsProps> = ({
   );
 
   const renderFXTab = () => (
-    <div className="grid grid-cols-3 gap-2 p-2">
+    <div className="grid grid-cols-4 gap-2 p-2">
       {/* Delay Section */}
       <div className={`p-2 rounded-lg border ${panelBg}`}>
         <div className="flex items-center justify-between mb-2">

@@ -57,7 +57,7 @@ export const V2SpeechControls: React.FC<V2SpeechControlsProps> = ({
 
   return (
     <ScrollLockContainer>
-      <div className="synth-controls-flow grid grid-cols-3 gap-2 p-2 h-full overflow-y-auto scrollbar-modern">
+      <div className="synth-controls-flow grid grid-cols-4 gap-2 p-2 h-full overflow-y-auto scrollbar-modern">
       {/* Speech Text Section */}
       <div className={`p-2 rounded-lg border ${panelBg}`}>
         <div className="flex items-center justify-between mb-2">

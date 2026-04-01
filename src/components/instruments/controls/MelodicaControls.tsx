@@ -100,7 +100,7 @@ export const MelodicaControls: React.FC<MelodicaControlsProps> = ({
 
   if (!synthReady) {
     return (
-      <div className="grid grid-cols-3 gap-2 p-2">
+      <div className="grid grid-cols-4 gap-2 p-2">
         <div className="flex items-center justify-center gap-2 p-4 text-text-secondary">
           <Loader size={16} className="animate-spin" />
           <span className="text-sm">Loading Melodica...</span>
@@ -115,7 +115,7 @@ export const MelodicaControls: React.FC<MelodicaControlsProps> = ({
     : 'bg-[#1a1a1a] border-teal-900/30';
 
   return (
-    <div className="synth-controls-flow grid grid-cols-3 gap-2 p-2 overflow-y-auto">
+    <div className="synth-controls-flow grid grid-cols-4 gap-2 p-2 overflow-y-auto">
       {/* ═══ BREATH & DYNAMICS ═══ */}
       <div className={`p-2 rounded-lg border ${panelBg}`}>
         <h3
