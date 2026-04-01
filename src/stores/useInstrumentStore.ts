@@ -25,7 +25,13 @@ import {
   DEFAULT_V2_SPEECH,
   DEFAULT_SYNARE,
   DEFAULT_BUZZMACHINE,
+  DEFAULT_OPENWURLI,
+  DEFAULT_OPL3,
+  DEFAULT_DX7,
 } from '@typedefs/instrument';
+import { DEFAULT_TUNEFISH } from '@typedefs/tunefishInstrument';
+import { DEFAULT_OIDOS_INSTRUMENT } from '@typedefs/oidosInstrument';
+import { DEFAULT_WAVESABRE_INSTRUMENT } from '@typedefs/wavesabreInstrument';
 
 import { getFirstPresetForSynthType } from '@constants/factoryPresets';
 import { getDefaultFurnaceConfig } from '@engine/InstrumentFactory';
@@ -302,7 +308,13 @@ export const useInstrumentStore = create<InstrumentStore>()(
         updates.aeolus ||
         updates.fluidsynth ||
         updates.sfizz ||
-        updates.zynaddsubfx
+        updates.zynaddsubfx ||
+        updates.tunefish ||
+        updates.wavesabre ||
+        updates.oidos ||
+        updates.openWurli ||
+        updates.opl3 ||
+        updates.dx7
       );
 
       set((state) => {
@@ -378,6 +390,32 @@ export const useInstrumentStore = create<InstrumentStore>()(
           // Auto-initialize V2Speech config when synthType changes to 'V2Speech'
           if (synthTypeChanging && updates.synthType === 'V2Speech' && !instrument.v2Speech) {
             instrument.v2Speech = { ...DEFAULT_V2_SPEECH };
+          }
+
+          // Auto-initialize Tunefish config
+          if (synthTypeChanging && updates.synthType === 'TunefishSynth' && !instrument.tunefish) {
+            instrument.tunefish = { ...DEFAULT_TUNEFISH };
+          }
+
+          // Auto-initialize Oidos config
+          if (synthTypeChanging && updates.synthType === 'OidosSynth' && !instrument.oidos) {
+            instrument.oidos = { ...DEFAULT_OIDOS_INSTRUMENT };
+          }
+
+          // Auto-initialize WaveSabre config (Slaughter/Falcon variants)
+          if (synthTypeChanging && updates.synthType === 'WaveSabreSynth' && !instrument.wavesabre) {
+            instrument.wavesabre = { ...DEFAULT_WAVESABRE_INSTRUMENT };
+          }
+
+          // Auto-initialize Retromulator synth configs
+          if (synthTypeChanging && updates.synthType === 'OpenWurli' && !instrument.openWurli) {
+            instrument.openWurli = { ...DEFAULT_OPENWURLI };
+          }
+          if (synthTypeChanging && updates.synthType === 'OPL3' && !instrument.opl3) {
+            instrument.opl3 = { ...DEFAULT_OPL3 };
+          }
+          if (synthTypeChanging && updates.synthType === 'DX7' && !instrument.dx7) {
+            instrument.dx7 = { ...DEFAULT_DX7 };
           }
 
           // Auto-apply first factory preset when synthType changes (unless this IS a preset load).
@@ -521,6 +559,43 @@ export const useInstrumentStore = create<InstrumentStore>()(
 
             if (updatedInstrument.synthType === 'WAM' && updatedInstrument.wam && updates.wam) {
               engine.updateWAMParameters(id, updatedInstrument.wam);
+              return; // Handled
+            }
+
+            // Demoscene WASM synths — use applyConfig pattern
+            if (updatedInstrument.synthType === 'TunefishSynth' && updatedInstrument.tunefish && updates.tunefish) {
+              engine.updateComplexSynthParameters(id, updatedInstrument.tunefish);
+              return; // Handled
+            }
+
+            if (updatedInstrument.synthType === 'OidosSynth' && updatedInstrument.oidos && updates.oidos) {
+              engine.updateComplexSynthParameters(id, updatedInstrument.oidos);
+              return; // Handled
+            }
+
+            if (updatedInstrument.wavesabre && updates.wavesabre) {
+              // WaveSabre variants — extract the sub-config for the active variant
+              const variant = updatedInstrument.wavesabre.slaughter ? updatedInstrument.wavesabre.slaughter
+                : updatedInstrument.wavesabre.falcon ? updatedInstrument.wavesabre.falcon : null;
+              if (variant) {
+                engine.updateComplexSynthParameters(id, variant);
+                return; // Handled
+              }
+            }
+
+            // Retromulator WASM synths
+            if (updatedInstrument.synthType === 'OpenWurli' && updatedInstrument.openWurli && updates.openWurli) {
+              engine.updateComplexSynthParameters(id, updatedInstrument.openWurli);
+              return; // Handled
+            }
+
+            if (updatedInstrument.synthType === 'OPL3' && updatedInstrument.opl3 && updates.opl3) {
+              engine.updateComplexSynthParameters(id, updatedInstrument.opl3);
+              return; // Handled
+            }
+
+            if (updatedInstrument.synthType === 'DX7' && updatedInstrument.dx7 && updates.dx7) {
+              engine.updateComplexSynthParameters(id, updatedInstrument.dx7);
               return; // Handled
             }
 
