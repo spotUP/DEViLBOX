@@ -124,7 +124,7 @@ export const TonewheelOrganControls: React.FC<TonewheelOrganControlsProps> = ({
   // Fallback to VSTBridgePanel if synth not ready after a reasonable wait
   if (!synthReady) {
     return (
-      <div className="grid grid-cols-3 gap-2 p-2">
+      <div className="grid grid-cols-4 gap-2 p-2">
         <div className="flex items-center justify-center gap-2 p-4 text-text-secondary">
           <Loader size={16} className="animate-spin" />
           <span className="text-sm">Loading Tonewheel Organ...</span>
@@ -139,7 +139,7 @@ export const TonewheelOrganControls: React.FC<TonewheelOrganControlsProps> = ({
     : 'bg-[#1a1a1a] border-amber-900/30';
 
   return (
-    <div className="synth-controls-flow grid grid-cols-3 gap-2 p-2 overflow-y-auto">
+    <div className="synth-controls-flow grid grid-cols-4 gap-2 p-2 overflow-y-auto">
       {/* ═══ DRAWBARS ═══ */}
       <div className={`p-2 rounded-lg border ${panelBg}`}>
         <h3

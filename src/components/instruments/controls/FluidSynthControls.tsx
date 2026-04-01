@@ -57,7 +57,7 @@ export const FluidSynthControls: React.FC<FluidSynthControlsProps> = ({ config, 
   const merged = { ...DEFAULT_FLUIDSYNTH, ...config } as Required<FluidSynthConfig>;
 
   return (
-    <div className="synth-controls-flow grid grid-cols-3 gap-2 p-2 overflow-y-auto text-xs">
+    <div className="synth-controls-flow grid grid-cols-4 gap-2 p-2 overflow-y-auto text-xs">
       {/* Program / Bank */}
       <div className="p-2 rounded-lg border bg-[#1a1a1a] border-amber-900/30">
         <h3 className="font-bold uppercase tracking-tight text-sm mb-3 text-amber-500">Program</h3>

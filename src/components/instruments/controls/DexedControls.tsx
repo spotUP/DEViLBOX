@@ -88,7 +88,7 @@ export const DexedControls: React.FC<DexedControlsProps> = ({
     const pitchEgLevels = config.pitchEgLevels || [50, 50, 50, 50];
 
     return (
-      <div className="grid grid-cols-3 gap-2 p-2">
+      <div className="grid grid-cols-4 gap-2 p-2">
         {/* Algorithm Section */}
         <div className={`p-2 rounded-lg border ${panelBg}`}>
           <div className="flex items-center gap-2 mb-2">
@@ -349,7 +349,7 @@ export const DexedControls: React.FC<DexedControlsProps> = ({
     const egLevels = op.egLevels || [99, 99, 99, 0];
 
     return (
-      <div className="grid grid-cols-3 gap-2 p-2">
+      <div className="grid grid-cols-4 gap-2 p-2">
         {/* Frequency Section */}
         <div className={`p-2 rounded-lg border ${panelBg}`}>
           <div className="flex items-center gap-2 mb-2">
