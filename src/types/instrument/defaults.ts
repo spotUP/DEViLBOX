@@ -309,6 +309,7 @@ export interface InstrumentConfig {
   // StarTrekker AM synthesis (from NT companion file)
   startrekkerAM?: import('./exotic').StartrekkerAMConfig;
   // Demoscene 4k/64k intro synths
+  tunefish?: import('../tunefishInstrument').TunefishInstrumentConfig;
   oidos?: import('../oidosInstrument').OidosInstrumentConfig;
   wavesabre?: import('../wavesabreInstrument').WaveSabreInstrumentConfig;
   // XRNS imported synth data (raw parameters from Renoise)

@@ -30,6 +30,20 @@ import { AmsynthHardwareUI } from './AmsynthHardwareUI';
 import { DexedHardwareUI } from './DexedHardwareUI';
 import { OBXfHardwareUI } from './OBXfHardwareUI';
 import VL1Hardware from './VL1Hardware';
+import { V2Hardware } from './V2Hardware';
+import { TunefishHardware } from './TunefishHardware';
+import { SlaughterHardware } from './SlaughterHardware';
+import { FalconHardware } from './FalconHardware';
+import { OidosHardware } from './OidosHardware';
+
+// WaveSabre variant router — picks Falcon vs Slaughter based on instrument config
+const WaveSabreHardwareRouter: React.FC<HWComponentProps> = ({ parameters, onParamChange }) => {
+  // Check if falcon-specific params are present to choose the right UI
+  if (parameters['osc1Waveform'] !== undefined || parameters['fmAmount'] !== undefined) {
+    return <FalconHardware parameters={parameters} onParamChange={onParamChange} />;
+  }
+  return <SlaughterHardware parameters={parameters} onParamChange={onParamChange} />;
+};
 
 interface HardwareUIWrapperProps {
   synthType: SynthType;
@@ -82,6 +96,12 @@ const DEDICATED_UI_MAP: Partial<Record<SynthType, React.ComponentType<HWComponen
 
   // Casio VL-Tone — retro calculator-style HTML UI
   VL1: VL1Hardware as unknown as React.ComponentType<HWComponentProps>,
+
+  // Demoscene synths — custom panel UIs
+  V2: V2Hardware,
+  TunefishSynth: TunefishHardware,
+  WaveSabreSynth: WaveSabreHardwareRouter,
+  OidosSynth: OidosHardware,
 };
 
 /**
