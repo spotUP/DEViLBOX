@@ -140,8 +140,6 @@ const PadCell: React.FC<PadCellProps> = ({
   const strokeWidth = isSelected ? 2 : 1;
   const strokeAlpha = isSelected ? 1 : isPressed ? 1 : 0.4;
   const padNum = ((pad.id - 1) % 16) + 1;
-  const displayName = pad.name.length > 8 ? pad.name.slice(0, 7) + '\u2026' : pad.name;
-
   return (
     <pixiContainer
       layout={{ width: PAD_SIZE, height: PAD_SIZE }}
@@ -184,7 +182,7 @@ const PadCell: React.FC<PadCellProps> = ({
         />
       )}
       <pixiBitmapText
-        text={hasContent ? displayName : '\u2014'}
+        text={hasContent ? pad.name : '\u2014'}
         style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 9, fill: 0xffffff }}
         tint={isPressed ? 0xffffff : hasContent ? textColor : textMutedColor}
         layout={{ position: 'absolute', left: 4, bottom: 4 }}
