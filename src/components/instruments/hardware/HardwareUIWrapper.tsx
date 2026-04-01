@@ -29,6 +29,7 @@ import { MoniqueHardwareUI } from './MoniqueHardwareUI';
 import { AmsynthHardwareUI } from './AmsynthHardwareUI';
 import { DexedHardwareUI } from './DexedHardwareUI';
 import { OBXfHardwareUI } from './OBXfHardwareUI';
+import { Odin2HardwareUI } from './Odin2HardwareUI';
 import VL1Hardware from './VL1Hardware';
 import { V2Hardware } from './V2Hardware';
 import { TunefishHardware } from './TunefishHardware';
@@ -67,12 +68,14 @@ const DEDICATED_UI_MAP: Partial<Record<SynthType, React.ComponentType<HWComponen
   // Drum Machines
   MAMETR707: TR707Hardware,
   DrumMachine: TR808Hardware,   // Roland TR-808/909 Rhythm Composers (1980/1983)
+  TR808: TR808Hardware,         // Roland TR-808 (io-808 synth engine)
 
   // Synthesizers - Classic
   TB303: TB303Hardware,         // Roland TB-303 Bass Line (1981)
   CZ101: CZ101Hardware,         // Casio CZ-101 Phase Distortion (1984)
   Dexed: DexedHardwareUI as unknown as React.ComponentType<HWComponentProps>,  // Yamaha DX7 FM Synthesis (1983)
   OBXd: OBXfHardwareUI as unknown as React.ComponentType<HWComponentProps>,   // Oberheim OB-X Analog (1979) — JUCE OB-Xf UI
+  Odin2: Odin2HardwareUI as unknown as React.ComponentType<HWComponentProps>, // Odin2 Semi-Modular Synth — JUCE Odin2 UI
 
   // Synthesizers - MAME (dedicated)
   MAMERSA: D50Hardware,         // Roland D-50 LA Synthesis (1987)
@@ -170,6 +173,7 @@ const BUZZ_GENERIC_TYPES: SynthType[] = [
  *  meaning the external TestKeyboard is redundant and should be hidden. */
 const SYNTHS_WITH_BUILTIN_INPUT = new Set<string>([
   'DrumMachine',  // TR-808/909 has a 16-step sequencer
+  'TR808',        // TR-808 (io-808 engine) has a 16-step sequencer
   'MAMETR707',    // TR-707 has a 16-step sequencer
   'TB303',        // TB-303 has its own note input
   // Note: Monique has a built-in keyboard only in hardware UI mode,

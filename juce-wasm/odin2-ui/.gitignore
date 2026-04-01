@@ -1,0 +1,6 @@
+# Generated BinaryData (73MB+ hex source from PNGs) — regenerate with:
+#   python3 generate_binary_data.py
+stubs/BinaryData_*.cpp
+
+# Build output
+build/
