@@ -214,18 +214,6 @@ export const SonicArrangerControls: React.FC<SonicArrangerControlsProps> = ({
       {/* Effect Mode selector */}
       <div className={`rounded-lg border p-3 ${panelBg}`}>
         <SectionLabel label="Synthesis Effect" />
-        <select
-          value={config.effect}
-          onChange={(e) => updateParam('effect', parseInt(e.target.value))}
-          className="w-full text-xs font-mono border rounded px-2 py-1.5 mb-3"
-          style={{ background: '#0a0a0a', borderColor: dim, color: accent }}
-        >
-          {EFFECT_MODES.map((m) => (
-            <option key={m.value} value={m.value} style={{ background: 'var(--color-bg-secondary)', color: 'var(--color-text-secondary)' }}>
-              {m.value}: {m.name}
-            </option>
-          ))}
-        </select>
 
         {/* Effect argument knobs */}
         <div className="flex gap-3 flex-wrap">
@@ -246,6 +234,19 @@ export const SonicArrangerControls: React.FC<SonicArrangerControlsProps> = ({
             label="Effect Speed" color={knob}
             formatValue={(v) => Math.round(v).toString()} />
         </div>
+
+        <select
+          value={config.effect}
+          onChange={(e) => updateParam('effect', parseInt(e.target.value))}
+          className="w-full text-xs font-mono border rounded px-2 py-1.5 mt-3"
+          style={{ background: '#0a0a0a', borderColor: dim, color: accent }}
+        >
+          {EFFECT_MODES.map((m) => (
+            <option key={m.value} value={m.value} style={{ background: 'var(--color-bg-secondary)', color: 'var(--color-text-secondary)' }}>
+              {m.value}: {m.name}
+            </option>
+          ))}
+        </select>
       </div>
 
       {/* Waveform display */}

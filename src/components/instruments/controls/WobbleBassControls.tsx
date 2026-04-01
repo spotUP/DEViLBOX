@@ -75,8 +75,8 @@ const BtnGroup: React.FC<{ items: readonly string[]; labels?: Record<string, str
 const Section: React.FC<{ label: string; controls?: React.ReactNode; children: React.ReactNode; className?: string }> = ({ label, controls, children, className }) => (
   <div className={`rounded-lg p-2.5 ${className ?? ''}`} style={{ background: SECTION_BG }}>
     <SectionLabel>{label}</SectionLabel>
-    {controls && <div className="flex flex-wrap items-center gap-2 mb-2">{controls}</div>}
     <div className="flex flex-wrap items-start gap-2">{children}</div>
+    {controls && <div className="flex flex-wrap items-center gap-2 mt-2">{controls}</div>}
   </div>
 );
 

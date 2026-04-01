@@ -244,7 +244,16 @@ export const SoundMonControls: React.FC<SoundMonControlsProps> = ({
       {/* Waveform selector — 4×4 grid with mini waveform thumbnails */}
       <div className={`rounded-lg border p-3 ${panelBg}`}>
         <SectionLabel label="Waveform" />
-        <div className="grid grid-cols-4 gap-1 mb-2">
+        {/* waveSpeed has no direct byte in the SoundMon instrument header. */}
+        <div className="flex items-center gap-4 mb-3">
+          <Knob value={config.waveSpeed} min={0} max={15} step={1}
+            onChange={(v) => upd('waveSpeed', Math.round(v))}
+            label="Morph Rate" color={knob}
+            formatValue={(v) => Math.round(v).toString()} />
+        </div>
+        {/* waveType (+1) is a table index pointer into the synth table region;
+            overwriting it alone would corrupt the waveform table reference. */}
+        <div className="grid grid-cols-4 gap-1 mt-2">
           {WAVE_DEFS.map((def, i) => {
             const active = config.waveType === i;
             return (
@@ -269,34 +278,11 @@ export const SoundMonControls: React.FC<SoundMonControlsProps> = ({
             );
           })}
         </div>
-        {/* waveType (+1) is a table index pointer into the synth table region;
-            overwriting it alone would corrupt the waveform table reference. */}
-        <div className="flex items-center gap-4 mt-2">
-          <Knob value={config.waveSpeed} min={0} max={15} step={1}
-            onChange={(v) => upd('waveSpeed', Math.round(v))}
-            label="Morph Rate" color={knob}
-            formatValue={(v) => Math.round(v).toString()} />
-          {/* waveSpeed has no direct byte in the SoundMon instrument header. */}
-        </div>
       </div>
 
       {/* Volume Envelope — knobs + visual curve */}
       <div className={`rounded-lg border p-3 ${panelBg}`}>
         <SectionLabel label="Volume Envelope" />
-
-        {/* Envelope visualization */}
-        <div className="mb-3">
-          <EnvelopeVisualization
-            mode="steps"
-            attackVol={config.attackVolume}   attackSpeed={config.attackSpeed}
-            decayVol={config.decayVolume}     decaySpeed={config.decaySpeed}
-            sustainVol={config.sustainVolume} sustainLen={config.sustainLength}
-            releaseVol={config.releaseVolume} releaseSpeed={config.releaseSpeed}
-            maxVol={64}
-            width={320} height={72}
-            color={accent}
-          />
-        </div>
 
         {/* ADSR Knobs — 4 columns (A / D / S / R) */}
         <div className="grid grid-cols-4 gap-3">
@@ -350,6 +336,20 @@ export const SoundMonControls: React.FC<SoundMonControlsProps> = ({
               label="Speed" color={knob}
               formatValue={(v) => Math.round(v).toString()} />
           </div>
+        </div>
+
+        {/* Envelope visualization */}
+        <div className="mt-2">
+          <EnvelopeVisualization
+            mode="steps"
+            attackVol={config.attackVolume}   attackSpeed={config.attackSpeed}
+            decayVol={config.decayVolume}     decaySpeed={config.decaySpeed}
+            sustainVol={config.sustainVolume} sustainLen={config.sustainLength}
+            releaseVol={config.releaseVolume} releaseSpeed={config.releaseSpeed}
+            maxVol={64}
+            width={320} height={72}
+            color={accent}
+          />
         </div>
       </div>
 

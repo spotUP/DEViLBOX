@@ -336,21 +336,6 @@ export const Odin2Controls: React.FC<Odin2ControlsProps> = ({
           <div className="flex flex-col gap-3">
             <span className="text-xs font-bold" style={{ color: accentColor }}>FILTER 1</span>
             <TypeSelect id={P.FIL1_TYPE} labels={FILTER_TYPE_LABELS} params={params} accentColor={accentColor} setParam={setParam} />
-            {(() => {
-              const entry = ODIN2_FILTER_MAP[Math.round(params[P.FIL1_TYPE])];
-              if (!entry) return null;
-              // FIL1_FREQ is raw Hz (20–20000); normalise to 0–1 on log scale
-              const norm = Math.log10(Math.max(params[P.FIL1_FREQ], 20) / 20) / 3;
-              return (
-                <div className="my-1">
-                  <FilterFrequencyResponse
-                    filterType={entry.type} cutoff={norm}
-                    resonance={params[P.FIL1_RES]} poles={entry.poles}
-                    color={accentColor} width={280} height={56}
-                  />
-                </div>
-              );
-            })()}
             <div className="flex gap-2 justify-center flex-wrap">
               <Knob label="Freq" value={params[P.FIL1_FREQ]} min={20} max={20000} defaultValue={10000}
                 onChange={(v) => setParam(P.FIL1_FREQ, v)} color={knobColor} logarithmic
@@ -368,6 +353,20 @@ export const Odin2Controls: React.FC<Odin2ControlsProps> = ({
               <Knob label="Kbd" value={params[P.FIL1_KBD]} min={0} max={1} defaultValue={0}
                 onChange={(v) => setParam(P.FIL1_KBD, v)} color={knobColor} />
             </div>
+            {(() => {
+              const entry = ODIN2_FILTER_MAP[Math.round(params[P.FIL1_TYPE])];
+              if (!entry) return null;
+              const norm = Math.log10(Math.max(params[P.FIL1_FREQ], 20) / 20) / 3;
+              return (
+                <div className="my-1">
+                  <FilterFrequencyResponse
+                    filterType={entry.type} cutoff={norm}
+                    resonance={params[P.FIL1_RES]} poles={entry.poles}
+                    color={accentColor} width={280} height={56}
+                  />
+                </div>
+              );
+            })()}
             <div className="flex gap-1 justify-center">
               <Toggle id={P.FIL1_OSC1} label="Osc1" params={params} accentColor={accentColor} setParam={setParam} />
               <Toggle id={P.FIL1_OSC2} label="Osc2" params={params} accentColor={accentColor} setParam={setParam} />
@@ -379,20 +378,6 @@ export const Odin2Controls: React.FC<Odin2ControlsProps> = ({
           <div className="flex flex-col gap-3">
             <span className="text-xs font-bold" style={{ color: accentColor }}>FILTER 2</span>
             <TypeSelect id={P.FIL2_TYPE} labels={FILTER_TYPE_LABELS} params={params} accentColor={accentColor} setParam={setParam} />
-            {(() => {
-              const entry = ODIN2_FILTER_MAP[Math.round(params[P.FIL2_TYPE])];
-              if (!entry) return null;
-              const norm = Math.log10(Math.max(params[P.FIL2_FREQ], 20) / 20) / 3;
-              return (
-                <div className="my-1">
-                  <FilterFrequencyResponse
-                    filterType={entry.type} cutoff={norm}
-                    resonance={params[P.FIL2_RES]} poles={entry.poles}
-                    color={accentColor} width={280} height={56}
-                  />
-                </div>
-              );
-            })()}
             <div className="flex gap-2 justify-center flex-wrap">
               <Knob label="Freq" value={params[P.FIL2_FREQ]} min={20} max={20000} defaultValue={10000}
                 onChange={(v) => setParam(P.FIL2_FREQ, v)} color={knobColor} logarithmic
@@ -410,6 +395,20 @@ export const Odin2Controls: React.FC<Odin2ControlsProps> = ({
               <Knob label="Kbd" value={params[P.FIL2_KBD]} min={0} max={1} defaultValue={0}
                 onChange={(v) => setParam(P.FIL2_KBD, v)} color={knobColor} />
             </div>
+            {(() => {
+              const entry = ODIN2_FILTER_MAP[Math.round(params[P.FIL2_TYPE])];
+              if (!entry) return null;
+              const norm = Math.log10(Math.max(params[P.FIL2_FREQ], 20) / 20) / 3;
+              return (
+                <div className="my-1">
+                  <FilterFrequencyResponse
+                    filterType={entry.type} cutoff={norm}
+                    resonance={params[P.FIL2_RES]} poles={entry.poles}
+                    color={accentColor} width={280} height={56}
+                  />
+                </div>
+              );
+            })()}
             <div className="flex gap-1 justify-center">
               <Toggle id={P.FIL2_OSC1} label="Osc1" params={params} accentColor={accentColor} setParam={setParam} />
               <Toggle id={P.FIL2_OSC2} label="Osc2" params={params} accentColor={accentColor} setParam={setParam} />
