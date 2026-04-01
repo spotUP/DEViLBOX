@@ -310,8 +310,6 @@ export const PixiDJSamplerPanel: React.FC<PixiDJSamplerPanelProps> = ({ isOpen, 
             setTimeout(() => {
               try { engine.triggerNoteRelease(padInstId, note, 0, config); } catch { /* ignore */ }
             }, releaseDelay * 1000);
-          } else {
-            heldPadsRef.current.add(pad.id);
           }
         } catch (err) {
           console.warn('[PixiDJSamplerPanel] Pad synth trigger failed:', err);
@@ -342,7 +340,7 @@ export const PixiDJSamplerPanel: React.FC<PixiDJSamplerPanelProps> = ({ isOpen, 
       engineRef.current.stopPad(pad.id, pad.release / 1000);
     }
 
-    if (pad.playMode === 'sustain' && pad.synthConfig) {
+    if (pad.playMode === 'sustain' && pad.synthConfig && heldPadsRef.current.has(pad.id)) {
       try {
         const padInstId = PAD_INSTRUMENT_BASE + pad.id;
         const config = { ...pad.synthConfig, id: padInstId };
