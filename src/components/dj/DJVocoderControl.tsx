@@ -30,7 +30,11 @@ export const DJVocoderControl: React.FC = () => {
       setError(null);
 
       if (!isActive) {
-        const engine = new VocoderEngine();
+        // Route through DJ mixer so vocoder goes through limiter + master FX
+        const { getDJEngineIfActive } = await import('@/engine/dj/DJEngine');
+        const djEngine = getDJEngineIfActive();
+        const destination = djEngine?.mixer.samplerInput;
+        const engine = new VocoderEngine(destination);
         await engine.start();
         engineRef.current = engine;
         setMuted(false);

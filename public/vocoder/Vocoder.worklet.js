@@ -119,6 +119,14 @@ class VocoderProcessor extends AudioWorkletProcessor {
         return;
       }
 
+      // Set sane carrier defaults immediately so process() works before
+      // the main thread round-trips with applyCurrentParams().
+      ex.i(this.vocoderPtr, 3);      // chord carrier
+      ex.j(this.vocoderPtr, 130.81); // C3 frequency
+      ex.k(this.vocoderPtr, 1.0);    // 100% wet
+      ex.l(this.vocoderPtr, 0.03);   // 30ms reaction time
+      ex.m(this.vocoderPtr, 1.0);    // no formant shift
+
       this.modulatorBuf = ex.o(128);
       this.outputBuf = ex.o(128);
       console.log('[Vocoder Worklet] Buffers allocated: mod=' + this.modulatorBuf + ' out=' + this.outputBuf);
@@ -158,6 +166,11 @@ class VocoderProcessor extends AudioWorkletProcessor {
 
     if (!inputChannel || inputChannel.length === 0) {
       outputChannel.fill(0);
+      // Log once when we have no input
+      if (!this._warnedNoInput) {
+        console.warn('[Vocoder Worklet] No input channel — mic may not be connected');
+        this._warnedNoInput = true;
+      }
       return true;
     }
 
@@ -184,11 +197,34 @@ class VocoderProcessor extends AudioWorkletProcessor {
       outputChannel[i] = Math.tanh(raw);
     }
 
-    // Report RMS periodically
+    // Report RMS periodically + one-time mic diagnostics
     this.rmsCounter++;
     if (this.rmsCounter >= this.rmsInterval) {
       this.rmsCounter = 0;
       this.port.postMessage({ type: 'rms', value: rms });
+
+      // Log mic input level for first few seconds to diagnose silent mic
+      if (!this._diagDone) {
+        this._diagCount = (this._diagCount || 0) + 1;
+        let micMax = 0;
+        for (let i = 0; i < frames; i++) {
+          const v = Math.abs(inputChannel[i]);
+          if (v > micMax) micMax = v;
+        }
+        let outMax = 0;
+        const outHeap = new Float32Array(this.memory.buffer);
+        for (let i = 0; i < frames; i++) {
+          const v = Math.abs(outHeap[outOffset + i]);
+          if (v > outMax) outMax = v;
+        }
+        console.log('[Vocoder Worklet] mic peak=' + micMax.toFixed(6) +
+          ' vocoderOut peak=' + outMax.toFixed(6) +
+          ' rms=' + rms.toFixed(6));
+        if (this._diagCount >= 20) {
+          this._diagDone = true;
+          console.log('[Vocoder Worklet] Diagnostics complete (20 samples logged)');
+        }
+      }
     }
 
     return true;

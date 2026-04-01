@@ -39,8 +39,10 @@ export class VocoderEngine {
     this.outputGain.gain.value = 1.0;
 
     if (destination) {
+      console.log('[VocoderEngine] Routing through provided destination (DJ mixer)');
       this.outputGain.connect(destination);
     } else {
+      console.log('[VocoderEngine] Routing directly to audioContext.destination');
       this.outputGain.connect(this.audioContext.destination);
     }
   }
@@ -94,6 +96,10 @@ export class VocoderEngine {
       },
     };
     this.stream = await navigator.mediaDevices.getUserMedia(constraints);
+    const tracks = this.stream.getAudioTracks();
+    console.log('[VocoderEngine] Mic acquired:', tracks.length, 'tracks,',
+      tracks[0]?.label || 'unknown', 'enabled:', tracks[0]?.enabled,
+      'muted:', tracks[0]?.muted);
     this.sourceNode = this.audioContext.createMediaStreamSource(this.stream);
 
     // Create worklet node
@@ -121,6 +127,8 @@ export class VocoderEngine {
     // Connect: mic → worklet → output gain
     this.sourceNode.connect(this.workletNode);
     this.workletNode.connect(this.outputGain);
+    console.log('[VocoderEngine] Audio chain connected: mic → worklet → gain → dest',
+      'contextState:', this.audioContext.state);
 
     // Initialize WASM in worklet
     const params = useVocoderStore.getState().params;
