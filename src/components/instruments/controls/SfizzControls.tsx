@@ -33,7 +33,7 @@ export const SfizzControls: React.FC<SfizzControlsProps> = ({ config, onChange }
   const merged = { ...DEFAULT_SFIZZ, ...config } as Required<SfizzConfig>;
 
   return (
-    <div className="synth-controls-flow grid grid-cols-2 gap-2 p-2 overflow-y-auto text-xs">
+    <div className="synth-controls-flow grid grid-cols-3 gap-2 p-2 overflow-y-auto text-xs">
       <div className="p-2 rounded-lg border bg-[#1a1a1a] border-amber-900/30">
         <h3 className="font-bold uppercase tracking-tight text-sm mb-3 text-amber-500">Output</h3>
         <div className="flex flex-wrap gap-4 justify-center">

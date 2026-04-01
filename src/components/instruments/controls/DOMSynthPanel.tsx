@@ -86,8 +86,8 @@ export const DOMSynthPanel: React.FC<DOMSynthPanelProps> = ({ layout, config, on
         </div>
       )}
 
-      {/* 2-column section grid */}
-      <div className="grid grid-cols-2 gap-2">
+      {/* 3-column section grid */}
+      <div className="grid grid-cols-3 gap-2">
         {sections.map((section, sIdx) => (
           <DOMSynthSection
             key={`${activeTab}-${sIdx}`}

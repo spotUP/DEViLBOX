@@ -176,7 +176,7 @@ export const SurgeControls: React.FC<SurgeControlsProps> = ({
 
   if (!synthReady) {
     return (
-      <div className="grid grid-cols-2 gap-2 p-2">
+      <div className="grid grid-cols-3 gap-2 p-2">
         <div className="flex items-center justify-center gap-2 p-4 text-text-secondary">
           <Loader size={16} className="animate-spin" />
           <span className="text-sm">Loading Surge XT...</span>
