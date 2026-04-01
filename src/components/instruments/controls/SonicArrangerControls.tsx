@@ -231,19 +231,19 @@ export const SonicArrangerControls: React.FC<SonicArrangerControlsProps> = ({
         <div className="flex gap-3 flex-wrap">
           <Knob value={config.effectArg1} min={0} max={127} step={1}
             onChange={(v) => updateParam('effectArg1', Math.round(v))}
-            label={arg1Label(config.effect)} color={knob} size="sm"
+            label={arg1Label(config.effect)} color={knob}
             formatValue={(v) => Math.round(v).toString()} />
           <Knob value={config.effectArg2} min={0} max={127} step={1}
             onChange={(v) => updateParam('effectArg2', Math.round(v))}
-            label={arg2Label(config.effect)} color={knob} size="sm"
+            label={arg2Label(config.effect)} color={knob}
             formatValue={(v) => Math.round(v).toString()} />
           <Knob value={config.effectArg3} min={0} max={127} step={1}
             onChange={(v) => updateParam('effectArg3', Math.round(v))}
-            label={arg3Label(config.effect)} color={knob} size="sm"
+            label={arg3Label(config.effect)} color={knob}
             formatValue={(v) => Math.round(v).toString()} />
           <Knob value={config.effectDelay} min={1} max={255} step={1}
             onChange={(v) => updateParam('effectDelay', Math.round(v))}
-            label="Effect Speed" color={knob} size="sm"
+            label="Effect Speed" color={knob}
             formatValue={(v) => Math.round(v).toString()} />
         </div>
       </div>
@@ -279,7 +279,7 @@ export const SonicArrangerControls: React.FC<SonicArrangerControlsProps> = ({
             formatValue={(v) => Math.round(v).toString()} />
           <Knob value={config.fineTuning} min={-128} max={127} step={1}
             onChange={(v) => updateParam('fineTuning', Math.round(v))}
-            label="Fine Tune" color={knob} size="sm"
+            label="Fine Tune" color={knob}
             formatValue={(v) => Math.round(v).toString()} />
         </div>
       </div>
@@ -295,23 +295,23 @@ export const SonicArrangerControls: React.FC<SonicArrangerControlsProps> = ({
         <div className="flex gap-3 flex-wrap mt-3">
           <Knob value={config.adsrDelay} min={0} max={255} step={1}
             onChange={(v) => updateParam('adsrDelay', Math.round(v))}
-            label="Delay" color={knob} size="sm"
+            label="Delay" color={knob}
             formatValue={(v) => Math.round(v).toString()} />
           <Knob value={config.adsrLength} min={0} max={127} step={1}
             onChange={(v) => updateParam('adsrLength', Math.round(v))}
-            label="Length" color={knob} size="sm"
+            label="Length" color={knob}
             formatValue={(v) => Math.round(v).toString()} />
           <Knob value={config.adsrRepeat} min={0} max={127} step={1}
             onChange={(v) => updateParam('adsrRepeat', Math.round(v))}
-            label="Repeat" color={knob} size="sm"
+            label="Repeat" color={knob}
             formatValue={(v) => Math.round(v).toString()} />
           <Knob value={config.sustainPoint} min={0} max={127} step={1}
             onChange={(v) => updateParam('sustainPoint', Math.round(v))}
-            label="Sus Point" color={knob} size="sm"
+            label="Sus Point" color={knob}
             formatValue={(v) => Math.round(v).toString()} />
           <Knob value={config.sustainDelay} min={0} max={255} step={1}
             onChange={(v) => updateParam('sustainDelay', Math.round(v))}
-            label="Sus Delay" color={knob} size="sm"
+            label="Sus Delay" color={knob}
             formatValue={(v) => Math.round(v).toString()} />
         </div>
       </div>
@@ -328,15 +328,15 @@ export const SonicArrangerControls: React.FC<SonicArrangerControlsProps> = ({
         <div className="flex gap-3 mt-3">
           <Knob value={config.amfDelay} min={0} max={255} step={1}
             onChange={(v) => updateParam('amfDelay', Math.round(v))}
-            label="Delay" color={knob} size="sm"
+            label="Delay" color={knob}
             formatValue={(v) => Math.round(v).toString()} />
           <Knob value={config.amfLength} min={0} max={127} step={1}
             onChange={(v) => updateParam('amfLength', Math.round(v))}
-            label="Length" color={knob} size="sm"
+            label="Length" color={knob}
             formatValue={(v) => Math.round(v).toString()} />
           <Knob value={config.amfRepeat} min={0} max={127} step={1}
             onChange={(v) => updateParam('amfRepeat', Math.round(v))}
-            label="Repeat" color={knob} size="sm"
+            label="Repeat" color={knob}
             formatValue={(v) => Math.round(v).toString()} />
         </div>
       </div>
@@ -379,15 +379,15 @@ export const SonicArrangerControls: React.FC<SonicArrangerControlsProps> = ({
         <div className="flex gap-3">
           <Knob value={config.vibratoDelay} min={0} max={255} step={1}
             onChange={(v) => updateParam('vibratoDelay', Math.round(v))}
-            label="Delay" color={knob} size="sm"
+            label="Delay" color={knob}
             formatValue={(v) => Math.round(v).toString()} />
           <Knob value={config.vibratoSpeed} min={0} max={65535} step={1}
             onChange={(v) => updateParam('vibratoSpeed', Math.round(v))}
-            label="Speed" color={knob} size="sm"
+            label="Speed" color={knob}
             formatValue={(v) => Math.round(v).toString()} />
           <Knob value={config.vibratoLevel} min={0} max={65535} step={1}
             onChange={(v) => updateParam('vibratoLevel', Math.round(v))}
-            label="Level" color={knob} size="sm"
+            label="Level" color={knob}
             formatValue={(v) => Math.round(v).toString()} />
         </div>
       </div>

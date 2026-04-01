@@ -75,7 +75,7 @@ export const FluidSynthControls: React.FC<FluidSynthControlsProps> = ({ config, 
             </select>
           </div>
           <Knob label="Bank" value={merged.bank} min={0} max={128} defaultValue={0}
-            onChange={(v) => updateParam('bank', Math.round(v))} size="sm" color="#38bdf8" />
+            onChange={(v) => updateParam('bank', Math.round(v))} color="#38bdf8" />
         </div>
       </div>
 
@@ -84,13 +84,13 @@ export const FluidSynthControls: React.FC<FluidSynthControlsProps> = ({ config, 
         <h3 className="font-bold uppercase tracking-tight text-sm mb-3 text-amber-500">Reverb</h3>
         <div className="flex flex-wrap gap-4 justify-center">
           <Knob label="Room" value={merged.reverbRoomSize} min={0} max={1.2} defaultValue={0.2}
-            onChange={(v) => updateParam('reverbRoomSize', v)} size="sm" color="#38bdf8" />
+            onChange={(v) => updateParam('reverbRoomSize', v)} color="#38bdf8" />
           <Knob label="Damp" value={merged.reverbDamping} min={0} max={1} defaultValue={0}
-            onChange={(v) => updateParam('reverbDamping', v)} size="sm" color="#38bdf8" />
+            onChange={(v) => updateParam('reverbDamping', v)} color="#38bdf8" />
           <Knob label="Width" value={merged.reverbWidth} min={0} max={100} defaultValue={0.5}
-            onChange={(v) => updateParam('reverbWidth', v)} size="sm" color="#38bdf8" />
+            onChange={(v) => updateParam('reverbWidth', v)} color="#38bdf8" />
           <Knob label="Level" value={merged.reverbLevel} min={0} max={1} defaultValue={0.9}
-            onChange={(v) => updateParam('reverbLevel', v)} size="sm" color="#38bdf8" />
+            onChange={(v) => updateParam('reverbLevel', v)} color="#38bdf8" />
         </div>
       </div>
 
@@ -99,13 +99,13 @@ export const FluidSynthControls: React.FC<FluidSynthControlsProps> = ({ config, 
         <h3 className="font-bold uppercase tracking-tight text-sm mb-3 text-amber-500">Chorus</h3>
         <div className="flex flex-wrap gap-4 justify-center">
           <Knob label="Voices" value={merged.chorusVoices} min={0} max={99} defaultValue={3}
-            onChange={(v) => updateParam('chorusVoices', Math.round(v))} size="sm" color="#38bdf8" />
+            onChange={(v) => updateParam('chorusVoices', Math.round(v))} color="#38bdf8" />
           <Knob label="Level" value={merged.chorusLevel} min={0} max={10} defaultValue={2}
-            onChange={(v) => updateParam('chorusLevel', v)} size="sm" color="#38bdf8" />
+            onChange={(v) => updateParam('chorusLevel', v)} color="#38bdf8" />
           <Knob label="Speed" value={merged.chorusSpeed} min={0.1} max={5} defaultValue={0.3}
-            onChange={(v) => updateParam('chorusSpeed', v)} size="sm" color="#38bdf8" unit="Hz" />
+            onChange={(v) => updateParam('chorusSpeed', v)} color="#38bdf8" unit="Hz" />
           <Knob label="Depth" value={merged.chorusDepth} min={0} max={21} defaultValue={8}
-            onChange={(v) => updateParam('chorusDepth', v)} size="sm" color="#38bdf8" />
+            onChange={(v) => updateParam('chorusDepth', v)} color="#38bdf8" />
           <div className="flex flex-col items-center gap-1">
             <span className="text-[10px] text-text-muted">Type</span>
             <div className="flex gap-1">
@@ -132,13 +132,13 @@ export const FluidSynthControls: React.FC<FluidSynthControlsProps> = ({ config, 
         <h3 className="font-bold uppercase tracking-tight text-sm mb-3 text-amber-500">Master</h3>
         <div className="flex flex-wrap gap-4 justify-center">
           <Knob label="Gain" value={merged.gain} min={0} max={10} defaultValue={0.4}
-            onChange={(v) => updateParam('gain', v)} size="sm" color="#38bdf8" />
+            onChange={(v) => updateParam('gain', v)} color="#38bdf8" />
           <Knob label="Polyphony" value={merged.polyphony} min={1} max={256} defaultValue={64}
-            onChange={(v) => updateParam('polyphony', Math.round(v))} size="sm" color="#38bdf8" />
+            onChange={(v) => updateParam('polyphony', Math.round(v))} color="#38bdf8" />
           <Knob label="Tuning" value={merged.tuning} min={430} max={450} defaultValue={440}
-            onChange={(v) => updateParam('tuning', v)} size="sm" color="#38bdf8" unit="Hz" />
+            onChange={(v) => updateParam('tuning', v)} color="#38bdf8" unit="Hz" />
           <Knob label="Transpose" value={merged.transpose} min={-24} max={24} defaultValue={0}
-            onChange={(v) => updateParam('transpose', Math.round(v))} size="sm" color="#38bdf8" unit="st" />
+            onChange={(v) => updateParam('transpose', Math.round(v))} color="#38bdf8" unit="st" />
         </div>
       </div>
     </div>

@@ -276,17 +276,17 @@ export const Odin2Controls: React.FC<Odin2ControlsProps> = ({
           <Knob label="Volume" value={params[P.MASTER_VOL]} min={0} max={1} defaultValue={0.7}
             onChange={(v) => setParam(P.MASTER_VOL, v)} size="md" color={knobColor} />
           <Knob label="Gain" value={params[P.MASTER_GAIN]} min={-24} max={12} defaultValue={0}
-            onChange={(v) => setParam(P.MASTER_GAIN, v)} size="sm" color={knobColor} bipolar
+            onChange={(v) => setParam(P.MASTER_GAIN, v)} color={knobColor} bipolar
             formatValue={(v) => `${v > 0 ? '+' : ''}${v.toFixed(1)}dB`} />
           <Knob label="Pan" value={params[P.MASTER_PAN]} min={-1} max={1} defaultValue={0}
-            onChange={(v) => setParam(P.MASTER_PAN, v)} size="sm" color={knobColor} bipolar />
+            onChange={(v) => setParam(P.MASTER_PAN, v)} color={knobColor} bipolar />
           <Knob label="Glide" value={params[P.MASTER_GLIDE]} min={0} max={1} defaultValue={0}
-            onChange={(v) => setParam(P.MASTER_GLIDE, v)} size="sm" color={knobColor}
+            onChange={(v) => setParam(P.MASTER_GLIDE, v)} color={knobColor}
             formatValue={(v) => `${Math.round(v * 1000)}ms`} />
           <Knob label="Velocity" value={params[P.MASTER_VELOCITY]} min={0} max={1} defaultValue={1}
-            onChange={(v) => setParam(P.MASTER_VELOCITY, v)} size="sm" color={knobColor} />
+            onChange={(v) => setParam(P.MASTER_VELOCITY, v)} color={knobColor} />
           <Knob label="Uni Det" value={params[P.MASTER_UNISON_DETUNE]} min={0} max={1} defaultValue={0}
-            onChange={(v) => setParam(P.MASTER_UNISON_DETUNE, v)} size="sm" color={knobColor} />
+            onChange={(v) => setParam(P.MASTER_UNISON_DETUNE, v)} color={knobColor} />
         </div>
       </Section>
 
@@ -303,24 +303,24 @@ export const Odin2Controls: React.FC<Odin2ControlsProps> = ({
               </div>
               <div className="flex gap-2 flex-wrap justify-center">
                 <Knob label="Vol" value={params[osc.volId]} min={0} max={1} defaultValue={0.7}
-                  onChange={(v) => setParam(osc.volId, v)} size="sm" color={knobColor} />
+                  onChange={(v) => setParam(osc.volId, v)} color={knobColor} />
                 <Knob label="Oct" value={params[osc.octId]} min={-4} max={4} defaultValue={0} step={1}
-                  onChange={(v) => setParam(osc.octId, Math.round(v))} size="sm" color={knobColor}
+                  onChange={(v) => setParam(osc.octId, Math.round(v))} color={knobColor}
                   formatValue={(v) => `${v > 0 ? '+' : ''}${Math.round(v)}`} />
                 <Knob label="Semi" value={params[osc.semiId]} min={-12} max={12} defaultValue={0} step={1}
-                  onChange={(v) => setParam(osc.semiId, Math.round(v))} size="sm" color={knobColor} bipolar
+                  onChange={(v) => setParam(osc.semiId, Math.round(v))} color={knobColor} bipolar
                   formatValue={(v) => `${v > 0 ? '+' : ''}${Math.round(v)}`} />
                 <Knob label="Fine" value={params[osc.fineId]} min={-100} max={100} defaultValue={0}
-                  onChange={(v) => setParam(osc.fineId, v)} size="sm" color={knobColor} bipolar
+                  onChange={(v) => setParam(osc.fineId, v)} color={knobColor} bipolar
                   formatValue={(v) => `${v.toFixed(0)}ct`} />
                 <Knob label="PW" value={params[osc.pwId]} min={0.02} max={0.98} defaultValue={0.5}
-                  onChange={(v) => setParam(osc.pwId, v)} size="sm" color={knobColor} />
+                  onChange={(v) => setParam(osc.pwId, v)} color={knobColor} />
                 <Knob label="Pos" value={params[osc.posId]} min={0} max={1} defaultValue={0}
-                  onChange={(v) => setParam(osc.posId, v)} size="sm" color={knobColor} />
+                  onChange={(v) => setParam(osc.posId, v)} color={knobColor} />
                 <Knob label="FM" value={params[osc.fmId]} min={0} max={1} defaultValue={0}
-                  onChange={(v) => setParam(osc.fmId, v)} size="sm" color={knobColor} />
+                  onChange={(v) => setParam(osc.fmId, v)} color={knobColor} />
                 <Knob label="Drift" value={params[osc.driftId]} min={0} max={1} defaultValue={0}
-                  onChange={(v) => setParam(osc.driftId, v)} size="sm" color={knobColor} />
+                  onChange={(v) => setParam(osc.driftId, v)} color={knobColor} />
                 <Toggle id={osc.resetId} label="Reset" params={params} accentColor={accentColor} setParam={setParam} />
                 {osc.syncId >= 0 && <Toggle id={osc.syncId} label="Sync" params={params} accentColor={accentColor} setParam={setParam} />}
               </div>
@@ -353,20 +353,20 @@ export const Odin2Controls: React.FC<Odin2ControlsProps> = ({
             })()}
             <div className="flex gap-2 justify-center flex-wrap">
               <Knob label="Freq" value={params[P.FIL1_FREQ]} min={20} max={20000} defaultValue={10000}
-                onChange={(v) => setParam(P.FIL1_FREQ, v)} size="sm" color={knobColor} logarithmic
+                onChange={(v) => setParam(P.FIL1_FREQ, v)} color={knobColor} logarithmic
                 formatValue={(v) => v >= 1000 ? `${(v/1000).toFixed(1)}k` : `${Math.round(v)}`} />
               <Knob label="Res" value={params[P.FIL1_RES]} min={0} max={1} defaultValue={0.2}
-                onChange={(v) => setParam(P.FIL1_RES, v)} size="sm" color={knobColor} />
+                onChange={(v) => setParam(P.FIL1_RES, v)} color={knobColor} />
               <Knob label="Gain" value={params[P.FIL1_GAIN]} min={0} max={2} defaultValue={1}
-                onChange={(v) => setParam(P.FIL1_GAIN, v)} size="sm" color={knobColor} />
+                onChange={(v) => setParam(P.FIL1_GAIN, v)} color={knobColor} />
               <Knob label="Env" value={params[P.FIL1_ENV]} min={-1} max={1} defaultValue={0.5}
-                onChange={(v) => setParam(P.FIL1_ENV, v)} size="sm" color={knobColor} bipolar />
+                onChange={(v) => setParam(P.FIL1_ENV, v)} color={knobColor} bipolar />
               <Knob label="Sat" value={params[P.FIL1_SAT]} min={0} max={1} defaultValue={0}
-                onChange={(v) => setParam(P.FIL1_SAT, v)} size="sm" color={knobColor} />
+                onChange={(v) => setParam(P.FIL1_SAT, v)} color={knobColor} />
               <Knob label="Vel" value={params[P.FIL1_VEL]} min={0} max={1} defaultValue={0}
-                onChange={(v) => setParam(P.FIL1_VEL, v)} size="sm" color={knobColor} />
+                onChange={(v) => setParam(P.FIL1_VEL, v)} color={knobColor} />
               <Knob label="Kbd" value={params[P.FIL1_KBD]} min={0} max={1} defaultValue={0}
-                onChange={(v) => setParam(P.FIL1_KBD, v)} size="sm" color={knobColor} />
+                onChange={(v) => setParam(P.FIL1_KBD, v)} color={knobColor} />
             </div>
             <div className="flex gap-1 justify-center">
               <Toggle id={P.FIL1_OSC1} label="Osc1" params={params} accentColor={accentColor} setParam={setParam} />
@@ -395,20 +395,20 @@ export const Odin2Controls: React.FC<Odin2ControlsProps> = ({
             })()}
             <div className="flex gap-2 justify-center flex-wrap">
               <Knob label="Freq" value={params[P.FIL2_FREQ]} min={20} max={20000} defaultValue={10000}
-                onChange={(v) => setParam(P.FIL2_FREQ, v)} size="sm" color={knobColor} logarithmic
+                onChange={(v) => setParam(P.FIL2_FREQ, v)} color={knobColor} logarithmic
                 formatValue={(v) => v >= 1000 ? `${(v/1000).toFixed(1)}k` : `${Math.round(v)}`} />
               <Knob label="Res" value={params[P.FIL2_RES]} min={0} max={1} defaultValue={0}
-                onChange={(v) => setParam(P.FIL2_RES, v)} size="sm" color={knobColor} />
+                onChange={(v) => setParam(P.FIL2_RES, v)} color={knobColor} />
               <Knob label="Gain" value={params[P.FIL2_GAIN]} min={0} max={2} defaultValue={1}
-                onChange={(v) => setParam(P.FIL2_GAIN, v)} size="sm" color={knobColor} />
+                onChange={(v) => setParam(P.FIL2_GAIN, v)} color={knobColor} />
               <Knob label="Env" value={params[P.FIL2_ENV]} min={-1} max={1} defaultValue={0}
-                onChange={(v) => setParam(P.FIL2_ENV, v)} size="sm" color={knobColor} bipolar />
+                onChange={(v) => setParam(P.FIL2_ENV, v)} color={knobColor} bipolar />
               <Knob label="Sat" value={params[P.FIL2_SAT]} min={0} max={1} defaultValue={0}
-                onChange={(v) => setParam(P.FIL2_SAT, v)} size="sm" color={knobColor} />
+                onChange={(v) => setParam(P.FIL2_SAT, v)} color={knobColor} />
               <Knob label="Vel" value={params[P.FIL2_VEL]} min={0} max={1} defaultValue={0}
-                onChange={(v) => setParam(P.FIL2_VEL, v)} size="sm" color={knobColor} />
+                onChange={(v) => setParam(P.FIL2_VEL, v)} color={knobColor} />
               <Knob label="Kbd" value={params[P.FIL2_KBD]} min={0} max={1} defaultValue={0}
-                onChange={(v) => setParam(P.FIL2_KBD, v)} size="sm" color={knobColor} />
+                onChange={(v) => setParam(P.FIL2_KBD, v)} color={knobColor} />
             </div>
             <div className="flex gap-1 justify-center">
               <Toggle id={P.FIL2_OSC1} label="Osc1" params={params} accentColor={accentColor} setParam={setParam} />
@@ -442,16 +442,16 @@ export const Odin2Controls: React.FC<Odin2ControlsProps> = ({
               </span>
               <div className="flex gap-2 justify-center flex-wrap">
                 <Knob label="A" value={params[env.a]} min={0.001} max={5} defaultValue={0.01}
-                  onChange={(v) => setParam(env.a, v)} size="sm" color={knobColor}
+                  onChange={(v) => setParam(env.a, v)} color={knobColor}
                   formatValue={(v) => v < 0.1 ? `${(v * 1000).toFixed(0)}ms` : `${v.toFixed(2)}s`} />
                 <Knob label="D" value={params[env.d]} min={0.001} max={5} defaultValue={0.3}
-                  onChange={(v) => setParam(env.d, v)} size="sm" color={knobColor}
+                  onChange={(v) => setParam(env.d, v)} color={knobColor}
                   formatValue={(v) => v < 0.1 ? `${(v * 1000).toFixed(0)}ms` : `${v.toFixed(2)}s`} />
                 <Knob label="S" value={params[env.s]} min={0} max={1} defaultValue={0.7}
-                  onChange={(v) => setParam(env.s, v)} size="sm" color={knobColor}
+                  onChange={(v) => setParam(env.s, v)} color={knobColor}
                   formatValue={(v) => `${Math.round(v * 100)}%`} />
                 <Knob label="R" value={params[env.r]} min={0.001} max={5} defaultValue={0.3}
-                  onChange={(v) => setParam(env.r, v)} size="sm" color={knobColor}
+                  onChange={(v) => setParam(env.r, v)} color={knobColor}
                   formatValue={(v) => v < 0.1 ? `${(v * 1000).toFixed(0)}ms` : `${v.toFixed(2)}s`} />
                 <Toggle id={env.loop} label="Loop" params={params} accentColor={accentColor} setParam={setParam} />
               </div>
@@ -474,10 +474,10 @@ export const Odin2Controls: React.FC<Odin2ControlsProps> = ({
               </span>
               <div className="flex gap-2 justify-center">
                 <Knob label="Freq" value={params[lfo.freq]} min={0.01} max={20} defaultValue={2}
-                  onChange={(v) => setParam(lfo.freq, v)} size="sm" color={knobColor}
+                  onChange={(v) => setParam(lfo.freq, v)} color={knobColor}
                   formatValue={(v) => `${v.toFixed(1)}Hz`} />
                 <Knob label="Depth" value={params[lfo.depth]} min={0} max={1} defaultValue={0}
-                  onChange={(v) => setParam(lfo.depth, v)} size="sm" color={knobColor}
+                  onChange={(v) => setParam(lfo.depth, v)} color={knobColor}
                   formatValue={(v) => `${Math.round(v * 100)}%`} />
               </div>
             </div>
@@ -490,9 +490,9 @@ export const Odin2Controls: React.FC<Odin2ControlsProps> = ({
         <div className="flex gap-3 items-center justify-center flex-wrap">
           <FxToggle id={P.DIST_ON} label="ON" params={params} fxAccent={fxAccent} setParam={setParam} />
           <Knob label="Boost" value={params[P.DIST_BOOST]} min={0} max={1} defaultValue={0.5}
-            onChange={(v) => setParam(P.DIST_BOOST, v)} size="sm" color={fxAccent} />
+            onChange={(v) => setParam(P.DIST_BOOST, v)} color={fxAccent} />
           <Knob label="Dry/Wet" value={params[P.DIST_DRYWET]} min={0} max={1} defaultValue={1}
-            onChange={(v) => setParam(P.DIST_DRYWET, v)} size="sm" color={fxAccent} />
+            onChange={(v) => setParam(P.DIST_DRYWET, v)} color={fxAccent} />
         </div>
       </Section>
 
@@ -506,16 +506,16 @@ export const Odin2Controls: React.FC<Odin2ControlsProps> = ({
             </div>
             <div className="flex gap-2 flex-wrap justify-center">
               <Knob label="Time" value={params[P.DELAY_TIME]} min={0.01} max={2} defaultValue={0.3}
-                onChange={(v) => setParam(P.DELAY_TIME, v)} size="sm" color={fxAccent}
+                onChange={(v) => setParam(P.DELAY_TIME, v)} color={fxAccent}
                 formatValue={(v) => `${(v * 1000).toFixed(0)}ms`} />
               <Knob label="Feedback" value={params[P.DELAY_FB]} min={0} max={1} defaultValue={0.4}
-                onChange={(v) => setParam(P.DELAY_FB, v)} size="sm" color={fxAccent} />
+                onChange={(v) => setParam(P.DELAY_FB, v)} color={fxAccent} />
               <Knob label="HP" value={params[P.DELAY_HP]} min={20} max={2000} defaultValue={80}
-                onChange={(v) => setParam(P.DELAY_HP, v)} size="sm" color={fxAccent} logarithmic />
+                onChange={(v) => setParam(P.DELAY_HP, v)} color={fxAccent} logarithmic />
               <Knob label="Dry" value={params[P.DELAY_DRY]} min={0} max={1} defaultValue={1}
-                onChange={(v) => setParam(P.DELAY_DRY, v)} size="sm" color={fxAccent} />
+                onChange={(v) => setParam(P.DELAY_DRY, v)} color={fxAccent} />
               <Knob label="Wet" value={params[P.DELAY_WET]} min={0} max={1} defaultValue={0.3}
-                onChange={(v) => setParam(P.DELAY_WET, v)} size="sm" color={fxAccent} />
+                onChange={(v) => setParam(P.DELAY_WET, v)} color={fxAccent} />
             </div>
           </div>
 
@@ -526,13 +526,13 @@ export const Odin2Controls: React.FC<Odin2ControlsProps> = ({
             </div>
             <div className="flex gap-2 flex-wrap justify-center">
               <Knob label="Rate" value={params[P.CHORUS_RATE]} min={0.01} max={10} defaultValue={0.3}
-                onChange={(v) => setParam(P.CHORUS_RATE, v)} size="sm" color={fxAccent} />
+                onChange={(v) => setParam(P.CHORUS_RATE, v)} color={fxAccent} />
               <Knob label="Amount" value={params[P.CHORUS_AMT]} min={0} max={1} defaultValue={0.5}
-                onChange={(v) => setParam(P.CHORUS_AMT, v)} size="sm" color={fxAccent} />
+                onChange={(v) => setParam(P.CHORUS_AMT, v)} color={fxAccent} />
               <Knob label="FB" value={params[P.CHORUS_FB]} min={-0.98} max={0.98} defaultValue={0}
-                onChange={(v) => setParam(P.CHORUS_FB, v)} size="sm" color={fxAccent} bipolar />
+                onChange={(v) => setParam(P.CHORUS_FB, v)} color={fxAccent} bipolar />
               <Knob label="D/W" value={params[P.CHORUS_DW]} min={0} max={1} defaultValue={0.5}
-                onChange={(v) => setParam(P.CHORUS_DW, v)} size="sm" color={fxAccent} />
+                onChange={(v) => setParam(P.CHORUS_DW, v)} color={fxAccent} />
             </div>
           </div>
 
@@ -543,13 +543,13 @@ export const Odin2Controls: React.FC<Odin2ControlsProps> = ({
             </div>
             <div className="flex gap-2 flex-wrap justify-center">
               <Knob label="Rate" value={params[P.PHASER_RATE]} min={0.01} max={10} defaultValue={0.5}
-                onChange={(v) => setParam(P.PHASER_RATE, v)} size="sm" color={fxAccent} />
+                onChange={(v) => setParam(P.PHASER_RATE, v)} color={fxAccent} />
               <Knob label="Mod" value={params[P.PHASER_MOD]} min={0} max={1.5} defaultValue={0.5}
-                onChange={(v) => setParam(P.PHASER_MOD, v)} size="sm" color={fxAccent} />
+                onChange={(v) => setParam(P.PHASER_MOD, v)} color={fxAccent} />
               <Knob label="FB" value={params[P.PHASER_FB]} min={0} max={0.97} defaultValue={0.3}
-                onChange={(v) => setParam(P.PHASER_FB, v)} size="sm" color={fxAccent} />
+                onChange={(v) => setParam(P.PHASER_FB, v)} color={fxAccent} />
               <Knob label="D/W" value={params[P.PHASER_DW]} min={0} max={1} defaultValue={0.5}
-                onChange={(v) => setParam(P.PHASER_DW, v)} size="sm" color={fxAccent} />
+                onChange={(v) => setParam(P.PHASER_DW, v)} color={fxAccent} />
             </div>
           </div>
 
@@ -560,13 +560,13 @@ export const Odin2Controls: React.FC<Odin2ControlsProps> = ({
             </div>
             <div className="flex gap-2 flex-wrap justify-center">
               <Knob label="Rate" value={params[P.FLANGER_RATE]} min={0.01} max={10} defaultValue={0.3}
-                onChange={(v) => setParam(P.FLANGER_RATE, v)} size="sm" color={fxAccent} />
+                onChange={(v) => setParam(P.FLANGER_RATE, v)} color={fxAccent} />
               <Knob label="Amount" value={params[P.FLANGER_AMT]} min={0} max={1} defaultValue={0.5}
-                onChange={(v) => setParam(P.FLANGER_AMT, v)} size="sm" color={fxAccent} />
+                onChange={(v) => setParam(P.FLANGER_AMT, v)} color={fxAccent} />
               <Knob label="FB" value={params[P.FLANGER_FB]} min={-0.98} max={0.98} defaultValue={0.3}
-                onChange={(v) => setParam(P.FLANGER_FB, v)} size="sm" color={fxAccent} bipolar />
+                onChange={(v) => setParam(P.FLANGER_FB, v)} color={fxAccent} bipolar />
               <Knob label="D/W" value={params[P.FLANGER_DW]} min={0} max={1} defaultValue={0.5}
-                onChange={(v) => setParam(P.FLANGER_DW, v)} size="sm" color={fxAccent} />
+                onChange={(v) => setParam(P.FLANGER_DW, v)} color={fxAccent} />
             </div>
           </div>
 
@@ -577,16 +577,16 @@ export const Odin2Controls: React.FC<Odin2ControlsProps> = ({
             </div>
             <div className="flex gap-2 flex-wrap justify-center">
               <Knob label="Hall" value={params[P.REVERB_HALL]} min={0.2} max={10} defaultValue={2}
-                onChange={(v) => setParam(P.REVERB_HALL, v)} size="sm" color={fxAccent}
+                onChange={(v) => setParam(P.REVERB_HALL, v)} color={fxAccent}
                 formatValue={(v) => `${v.toFixed(1)}s`} />
               <Knob label="Damp" value={params[P.REVERB_DAMP]} min={500} max={20000} defaultValue={6000}
-                onChange={(v) => setParam(P.REVERB_DAMP, v)} size="sm" color={fxAccent} logarithmic
+                onChange={(v) => setParam(P.REVERB_DAMP, v)} color={fxAccent} logarithmic
                 formatValue={(v) => v >= 1000 ? `${(v/1000).toFixed(1)}k` : `${Math.round(v)}`} />
               <Knob label="Pre-D" value={params[P.REVERB_PRE]} min={0.001} max={0.5} defaultValue={0.04}
-                onChange={(v) => setParam(P.REVERB_PRE, v)} size="sm" color={fxAccent}
+                onChange={(v) => setParam(P.REVERB_PRE, v)} color={fxAccent}
                 formatValue={(v) => `${(v * 1000).toFixed(0)}ms`} />
               <Knob label="D/W" value={params[P.REVERB_DW]} min={0} max={1} defaultValue={0.3}
-                onChange={(v) => setParam(P.REVERB_DW, v)} size="sm" color={fxAccent} />
+                onChange={(v) => setParam(P.REVERB_DW, v)} color={fxAccent} />
             </div>
           </div>
         </div>

@@ -74,7 +74,6 @@ export const OBXdControls: React.FC<OBXdControlsProps> = ({
             onChange={(v) => onChange({ osc1Octave: Math.round(v) })}
             label="Octave"
             color={knobColor}
-            size="sm"
           />
           <Knob
             value={config.osc1Detune ?? 0}
@@ -83,7 +82,6 @@ export const OBXdControls: React.FC<OBXdControlsProps> = ({
             onChange={(v) => onChange({ osc1Detune: v })}
             label="Detune"
             color={knobColor}
-            size="sm"
           />
           <Knob
             value={config.osc1Level ?? 1}
@@ -92,7 +90,6 @@ export const OBXdControls: React.FC<OBXdControlsProps> = ({
             onChange={(v) => onChange({ osc1Level: v })}
             label="Level"
             color={knobColor}
-            size="sm"
           />
         </div>
 
@@ -104,7 +101,6 @@ export const OBXdControls: React.FC<OBXdControlsProps> = ({
             onChange={(v) => onChange({ osc1PulseWidth: v })}
             label="Pulse Width"
             color={knobColor}
-            size="sm"
           />
         </div>
       </div>
@@ -139,7 +135,6 @@ export const OBXdControls: React.FC<OBXdControlsProps> = ({
             onChange={(v) => onChange({ osc2Octave: Math.round(v) })}
             label="Octave"
             color={knobColor}
-            size="sm"
           />
           <Knob
             value={config.osc2Detune ?? 0}
@@ -148,7 +143,6 @@ export const OBXdControls: React.FC<OBXdControlsProps> = ({
             onChange={(v) => onChange({ osc2Detune: v })}
             label="Detune"
             color={knobColor}
-            size="sm"
           />
           <Knob
             value={config.osc2Level ?? 0.7}
@@ -157,7 +151,6 @@ export const OBXdControls: React.FC<OBXdControlsProps> = ({
             onChange={(v) => onChange({ osc2Level: v })}
             label="Level"
             color={knobColor}
-            size="sm"
           />
         </div>
 
@@ -169,7 +162,6 @@ export const OBXdControls: React.FC<OBXdControlsProps> = ({
             onChange={(v) => onChange({ osc2PulseWidth: v })}
             label="Pulse Width"
             color={knobColor}
-            size="sm"
           />
         </div>
       </div>
@@ -217,7 +209,6 @@ export const OBXdControls: React.FC<OBXdControlsProps> = ({
               onChange={(v) => onChange({ unisonDetune: v })}
               label="Unison Detune"
               color={knobColor}
-              size="sm"
             />
           </div>
         )}
@@ -252,7 +243,7 @@ export const OBXdControls: React.FC<OBXdControlsProps> = ({
           })()}
         </div>
 
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <div className="grid grid-cols-4 gap-3">
           <Knob
             value={config.filterCutoff ?? 0.7}
             min={0}
@@ -343,7 +334,6 @@ export const OBXdControls: React.FC<OBXdControlsProps> = ({
             onChange={(v) => onChange({ filterAttack: v })}
             label="Attack"
             color={knobColor}
-            size="sm"
           />
           <Knob
             value={config.filterDecay ?? 0.3}
@@ -352,7 +342,6 @@ export const OBXdControls: React.FC<OBXdControlsProps> = ({
             onChange={(v) => onChange({ filterDecay: v })}
             label="Decay"
             color={knobColor}
-            size="sm"
           />
           <Knob
             value={config.filterSustain ?? 0.3}
@@ -361,7 +350,6 @@ export const OBXdControls: React.FC<OBXdControlsProps> = ({
             onChange={(v) => onChange({ filterSustain: v })}
             label="Sustain"
             color={knobColor}
-            size="sm"
           />
           <Knob
             value={config.filterRelease ?? 0.3}
@@ -370,7 +358,6 @@ export const OBXdControls: React.FC<OBXdControlsProps> = ({
             onChange={(v) => onChange({ filterRelease: v })}
             label="Release"
             color={knobColor}
-            size="sm"
           />
         </div>
       </div>
@@ -449,7 +436,7 @@ export const OBXdControls: React.FC<OBXdControlsProps> = ({
           </h3>
         </div>
 
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <div className="grid grid-cols-4 gap-3">
           <Knob
             value={config.masterVolume ?? 0.7}
             min={0}
@@ -511,7 +498,7 @@ export const OBXdControls: React.FC<OBXdControlsProps> = ({
           </h3>
         </div>
 
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <div className="grid grid-cols-4 gap-3">
           <Knob
             value={config.lfoRate ?? 0.2}
             min={0}
@@ -549,7 +536,7 @@ export const OBXdControls: React.FC<OBXdControlsProps> = ({
 
         <div className="mt-4">
           <h4 className="text-xs text-text-secondary mb-2">LFO ROUTING</h4>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          <div className="grid grid-cols-4 gap-3">
             <Knob
               value={config.lfoOscAmount ?? 0}
               min={0}
@@ -557,7 +544,6 @@ export const OBXdControls: React.FC<OBXdControlsProps> = ({
               onChange={(v) => onChange({ lfoOscAmount: v })}
               label="→ Pitch"
               color={knobColor}
-              size="sm"
             />
             <Knob
               value={config.lfoFilterAmount ?? 0}
@@ -566,7 +552,6 @@ export const OBXdControls: React.FC<OBXdControlsProps> = ({
               onChange={(v) => onChange({ lfoFilterAmount: v })}
               label="→ Filter"
               color={knobColor}
-              size="sm"
             />
             <Knob
               value={config.lfoAmpAmount ?? 0}
@@ -575,7 +560,6 @@ export const OBXdControls: React.FC<OBXdControlsProps> = ({
               onChange={(v) => onChange({ lfoAmpAmount: v })}
               label="→ Amp"
               color={knobColor}
-              size="sm"
             />
             <Knob
               value={config.lfoPwAmount ?? 0}
@@ -584,7 +568,6 @@ export const OBXdControls: React.FC<OBXdControlsProps> = ({
               onChange={(v) => onChange({ lfoPwAmount: v })}
               label="→ PW"
               color={knobColor}
-              size="sm"
             />
           </div>
         </div>
@@ -596,7 +579,7 @@ export const OBXdControls: React.FC<OBXdControlsProps> = ({
           ADDITIONAL
         </h3>
 
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <div className="grid grid-cols-4 gap-3">
           <Knob
             value={config.noiseLevel ?? 0}
             min={0}
@@ -604,7 +587,6 @@ export const OBXdControls: React.FC<OBXdControlsProps> = ({
             onChange={(v) => onChange({ noiseLevel: v })}
             label="Noise"
             color={knobColor}
-            size="sm"
           />
           <Knob
             value={config.subOscLevel ?? 0}
@@ -613,7 +595,6 @@ export const OBXdControls: React.FC<OBXdControlsProps> = ({
             onChange={(v) => onChange({ subOscLevel: v })}
             label="Sub Osc"
             color={knobColor}
-            size="sm"
           />
           <Knob
             value={config.drift ?? 0}
@@ -622,7 +603,6 @@ export const OBXdControls: React.FC<OBXdControlsProps> = ({
             onChange={(v) => onChange({ drift: v })}
             label="Drift"
             color={knobColor}
-            size="sm"
           />
           <Knob
             value={config.subOscOctave ?? -1}
@@ -631,7 +611,6 @@ export const OBXdControls: React.FC<OBXdControlsProps> = ({
             onChange={(v) => onChange({ subOscOctave: Math.round(v) as -1 | -2 })}
             label="Sub Oct"
             color={knobColor}
-            size="sm"
           />
         </div>
       </div>

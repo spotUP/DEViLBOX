@@ -128,7 +128,7 @@ export const DexedControls: React.FC<DexedControlsProps> = ({
             </h3>
           </div>
 
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          <div className="grid grid-cols-4 gap-3">
             <Knob
               value={config.feedback || 0}
               min={0}
@@ -136,7 +136,6 @@ export const DexedControls: React.FC<DexedControlsProps> = ({
               onChange={(v) => onChange({ feedback: Math.round(v) })}
               label="Feedback"
               color={knobColor}
-              size="sm"
             />
             <Knob
               value={config.transpose ?? 0}
@@ -145,7 +144,6 @@ export const DexedControls: React.FC<DexedControlsProps> = ({
               onChange={(v) => onChange({ transpose: Math.round(v) })}
               label="Transpose"
               color={knobColor}
-              size="sm"
             />
           </div>
 
@@ -175,7 +173,7 @@ export const DexedControls: React.FC<DexedControlsProps> = ({
             </h3>
           </div>
 
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          <div className="grid grid-cols-4 gap-3">
             <Knob
               value={config.lfoSpeed || 35}
               min={0}
@@ -183,7 +181,6 @@ export const DexedControls: React.FC<DexedControlsProps> = ({
               onChange={(v) => onChange({ lfoSpeed: Math.round(v) })}
               label="Speed"
               color={knobColor}
-              size="sm"
             />
             <Knob
               value={config.lfoDelay ?? 0}
@@ -192,7 +189,6 @@ export const DexedControls: React.FC<DexedControlsProps> = ({
               onChange={(v) => onChange({ lfoDelay: Math.round(v) })}
               label="Delay"
               color={knobColor}
-              size="sm"
             />
             <Knob
               value={config.lfoPitchModDepth || 0}
@@ -201,7 +197,6 @@ export const DexedControls: React.FC<DexedControlsProps> = ({
               onChange={(v) => onChange({ lfoPitchModDepth: Math.round(v) })}
               label="Pitch Mod"
               color={knobColor}
-              size="sm"
             />
             <Knob
               value={config.lfoAmpModDepth || 0}
@@ -210,11 +205,10 @@ export const DexedControls: React.FC<DexedControlsProps> = ({
               onChange={(v) => onChange({ lfoAmpModDepth: Math.round(v) })}
               label="Amp Mod"
               color={knobColor}
-              size="sm"
             />
           </div>
 
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mt-4">
+          <div className="grid grid-cols-4 gap-4 mt-4">
             <Knob
               value={config.lfoPitchModSens ?? 0}
               min={0}
@@ -222,7 +216,6 @@ export const DexedControls: React.FC<DexedControlsProps> = ({
               onChange={(v) => onChange({ lfoPitchModSens: Math.round(v) })}
               label="P Mod Sens"
               color={knobColor}
-              size="sm"
             />
             <div>
               <label className="text-xs text-text-secondary block mb-2">Waveform</label>
@@ -280,7 +273,6 @@ export const DexedControls: React.FC<DexedControlsProps> = ({
                 }}
                 label={label}
                 color={knobColor}
-                size="sm"
               />
             ))}
           </div>
@@ -300,7 +292,6 @@ export const DexedControls: React.FC<DexedControlsProps> = ({
                 }}
                 label={label}
                 color={knobColor}
-                size="sm"
               />
             ))}
           </div>
@@ -325,7 +316,6 @@ export const DexedControls: React.FC<DexedControlsProps> = ({
                   onChange={(v) => updateOperator(i, { level: Math.round(v) })}
                   label={`OP${i + 1}`}
                   color={knobColor}
-                  size="sm"
                 />
               </div>
             ))}
@@ -359,7 +349,7 @@ export const DexedControls: React.FC<DexedControlsProps> = ({
             </h3>
           </div>
 
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          <div className="grid grid-cols-4 gap-3">
             <Knob
               value={op.level ?? 99}
               min={0}
@@ -367,7 +357,6 @@ export const DexedControls: React.FC<DexedControlsProps> = ({
               onChange={(v) => updateOperator(opIndex, { level: Math.round(v) })}
               label="Level"
               color={knobColor}
-              size="sm"
             />
             <Knob
               value={op.coarse ?? 1}
@@ -376,7 +365,6 @@ export const DexedControls: React.FC<DexedControlsProps> = ({
               onChange={(v) => updateOperator(opIndex, { coarse: Math.round(v) })}
               label="Coarse"
               color={knobColor}
-              size="sm"
             />
             <Knob
               value={op.fine ?? 0}
@@ -385,7 +373,6 @@ export const DexedControls: React.FC<DexedControlsProps> = ({
               onChange={(v) => updateOperator(opIndex, { fine: Math.round(v) })}
               label="Fine"
               color={knobColor}
-              size="sm"
             />
             <Knob
               value={op.detune ?? 7}
@@ -394,7 +381,6 @@ export const DexedControls: React.FC<DexedControlsProps> = ({
               onChange={(v) => updateOperator(opIndex, { detune: Math.round(v) })}
               label="Detune"
               color={knobColor}
-              size="sm"
             />
           </div>
 
@@ -441,7 +427,6 @@ export const DexedControls: React.FC<DexedControlsProps> = ({
                 }}
                 label={label}
                 color={knobColor}
-                size="sm"
               />
             ))}
           </div>
@@ -466,7 +451,6 @@ export const DexedControls: React.FC<DexedControlsProps> = ({
                 }}
                 label={label}
                 color={knobColor}
-                size="sm"
               />
             ))}
           </div>
@@ -494,7 +478,7 @@ export const DexedControls: React.FC<DexedControlsProps> = ({
                 <div className="text-xs text-text-secondary uppercase tracking-wider mb-3">
                   Keyboard Level Scaling
                 </div>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                <div className="grid grid-cols-4 gap-3">
                   <Knob
                     value={op.breakPoint ?? 60}
                     min={0}
@@ -502,7 +486,6 @@ export const DexedControls: React.FC<DexedControlsProps> = ({
                     onChange={(v) => updateOperator(opIndex, { breakPoint: Math.round(v) })}
                     label="Break Point"
                     color={knobColor}
-                    size="sm"
                   />
                   <Knob
                     value={op.leftDepth ?? 0}
@@ -511,7 +494,6 @@ export const DexedControls: React.FC<DexedControlsProps> = ({
                     onChange={(v) => updateOperator(opIndex, { leftDepth: Math.round(v) })}
                     label="Left Depth"
                     color={knobColor}
-                    size="sm"
                   />
                   <Knob
                     value={op.rightDepth ?? 0}
@@ -520,7 +502,6 @@ export const DexedControls: React.FC<DexedControlsProps> = ({
                     onChange={(v) => updateOperator(opIndex, { rightDepth: Math.round(v) })}
                     label="Right Depth"
                     color={knobColor}
-                    size="sm"
                   />
                 </div>
                 <div className="grid grid-cols-2 gap-4 mt-4">
@@ -558,7 +539,7 @@ export const DexedControls: React.FC<DexedControlsProps> = ({
                 <div className="text-xs text-text-secondary uppercase tracking-wider mb-3">
                   Modulation &amp; Sensitivity
                 </div>
-                <div className="grid grid-cols-3 gap-3">
+                <div className="grid grid-cols-4 gap-3">
                   <Knob
                     value={op.rateScaling ?? 0}
                     min={0}
@@ -566,7 +547,6 @@ export const DexedControls: React.FC<DexedControlsProps> = ({
                     onChange={(v) => updateOperator(opIndex, { rateScaling: Math.round(v) })}
                     label="Rate Scale"
                     color={knobColor}
-                    size="sm"
                   />
                   <Knob
                     value={op.ampModSens ?? 0}
@@ -575,7 +555,6 @@ export const DexedControls: React.FC<DexedControlsProps> = ({
                     onChange={(v) => updateOperator(opIndex, { ampModSens: Math.round(v) })}
                     label="Amp Mod Sens"
                     color={knobColor}
-                    size="sm"
                   />
                   <Knob
                     value={op.velocitySens ?? 0}
@@ -584,7 +563,6 @@ export const DexedControls: React.FC<DexedControlsProps> = ({
                     onChange={(v) => updateOperator(opIndex, { velocitySens: Math.round(v) })}
                     label="Vel Sens"
                     color={knobColor}
-                    size="sm"
                   />
                 </div>
               </div>

@@ -179,7 +179,7 @@ export const SidMonControls: React.FC<SidMonControlsProps> = ({
           <div className="flex items-center gap-4">
             <Knob value={config.pulseWidth} min={0} max={255} step={1}
               onChange={(v) => upd('pulseWidth', Math.round(v))}
-              label="Pulse Width" color={knob} size="sm"
+              label="Pulse Width" color={knob}
               formatValue={(v) => Math.round(v).toString()} />
           </div>
         )}
@@ -214,7 +214,7 @@ export const SidMonControls: React.FC<SidMonControlsProps> = ({
                 await ed.writeU8(base + 17, raw);
               });
             }}
-            label="Attack" color={knob} size="sm"
+            label="Attack" color={knob}
             formatValue={(v) => Math.round(v).toString()} />
           <Knob value={config.decay} min={0} max={15} step={1}
             onChange={(v) => {
@@ -224,7 +224,7 @@ export const SidMonControls: React.FC<SidMonControlsProps> = ({
                 await ed.writeU8(base + 19, raw);
               });
             }}
-            label="Decay" color={knob} size="sm"
+            label="Decay" color={knob}
             formatValue={(v) => Math.round(v).toString()} />
           <Knob value={config.sustain} min={0} max={15} step={1}
             onChange={(v) => {
@@ -234,7 +234,7 @@ export const SidMonControls: React.FC<SidMonControlsProps> = ({
                 await ed.writeU8(base + 18, raw);
               });
             }}
-            label="Sustain" color={knob} size="sm"
+            label="Sustain" color={knob}
             formatValue={(v) => Math.round(v).toString()} />
           <Knob value={config.release} min={0} max={15} step={1}
             onChange={(v) => {
@@ -244,7 +244,7 @@ export const SidMonControls: React.FC<SidMonControlsProps> = ({
                 await ed.writeU8(base + 22, raw);
               });
             }}
-            label="Release" color={knob} size="sm"
+            label="Release" color={knob}
             formatValue={(v) => Math.round(v).toString()} />
         </div>
       </div>
@@ -257,19 +257,19 @@ export const SidMonControls: React.FC<SidMonControlsProps> = ({
             onChange={(v) => updWithChipRam('vibDelay', Math.round(v), async (ed, base) => {
               await ed.writeU8(base + 11, Math.round(v));
             })}
-            label="Delay" color={knob} size="sm"
+            label="Delay" color={knob}
             formatValue={(v) => Math.round(v).toString()} />
           <Knob value={config.vibSpeed} min={0} max={63} step={1}
             onChange={(v) => updWithChipRam('vibSpeed', Math.round(v), async (ed, base) => {
               await ed.writeU8(base + 10, Math.round(v));
             })}
-            label="Speed" color={knob} size="sm"
+            label="Speed" color={knob}
             formatValue={(v) => Math.round(v).toString()} />
           <Knob value={config.vibDepth} min={0} max={63} step={1}
             onChange={(v) => updWithChipRam('vibDepth', Math.round(v), async (ed, base) => {
               await ed.writeU8(base + 9, Math.round(v));
             })}
-            label="Depth" color={knob} size="sm"
+            label="Depth" color={knob}
             formatValue={(v) => Math.round(v).toString()} />
         </div>
       </div>
@@ -329,7 +329,7 @@ export const SidMonControls: React.FC<SidMonControlsProps> = ({
             onChange={(v) => updWithChipRam('arpSpeed', Math.round(v), async (ed, base) => {
               await ed.writeU8(base + 6, Math.round(v) * 16); // scale 0-15 → 0-240
             })}
-            label="Speed" color={knob} size="sm"
+            label="Speed" color={knob}
             formatValue={(v) => Math.round(v).toString()} />
         </div>
 

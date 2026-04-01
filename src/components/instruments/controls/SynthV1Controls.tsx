@@ -62,10 +62,10 @@ const ADSRRow: React.FC<{
   color?: string;
 }> = ({ a, d, s, r, onA, onD, onS, onR, color = '#ef4444' }) => (
   <div className="grid grid-cols-4 gap-3">
-    <Knob value={a} min={0} max={1} onChange={onA} label="Attack" size="sm" color={color} />
-    <Knob value={d} min={0} max={1} onChange={onD} label="Decay" size="sm" color={color} />
-    <Knob value={s} min={0} max={1} onChange={onS} label="Sustain" size="sm" color={color} />
-    <Knob value={r} min={0} max={1} onChange={onR} label="Release" size="sm" color={color} />
+    <Knob value={a} min={0} max={1} onChange={onA} label="Attack" color={color} />
+    <Knob value={d} min={0} max={1} onChange={onD} label="Decay" color={color} />
+    <Knob value={s} min={0} max={1} onChange={onS} label="Sustain" color={color} />
+    <Knob value={r} min={0} max={1} onChange={onR} label="Release" color={color} />
   </div>
 );
 
@@ -101,7 +101,7 @@ export const SynthV1Controls: React.FC<SynthV1ControlsProps> = ({ config, onChan
             />
             <Knob value={merged[dcoK('Width1', page)] as number} min={0} max={1}
               onChange={(v) => update(dcoK('Width1', page), v)}
-              label="Width" size="sm" color="#22c55e" />
+              label="Width" color="#22c55e" />
           </div>
           {/* Oscillator 2 */}
           <div className="flex flex-col gap-2">
@@ -112,7 +112,7 @@ export const SynthV1Controls: React.FC<SynthV1ControlsProps> = ({ config, onChan
             />
             <Knob value={merged[dcoK('Width2', page)] as number} min={0} max={1}
               onChange={(v) => update(dcoK('Width2', page), v)}
-              label="Width" size="sm" color="#22c55e" />
+              label="Width" color="#22c55e" />
           </div>
         </div>
         <div className="grid grid-cols-4 gap-3 mb-3">
@@ -128,29 +128,29 @@ export const SynthV1Controls: React.FC<SynthV1ControlsProps> = ({ config, onChan
           </div>
           <Knob value={merged[dcoK('Tuning', page)] as number} min={-1} max={1}
             onChange={(v) => update(dcoK('Tuning', page), v)}
-            label="Tune" size="sm" color="#eab308" bipolar />
+            label="Tune" color="#eab308" bipolar />
           <Knob value={merged[dcoK('Glide', page)] as number} min={0} max={1}
             onChange={(v) => update(dcoK('Glide', page), v)}
-            label="Glide" size="sm" color="#3b82f6" />
+            label="Glide" color="#3b82f6" />
           <Knob value={merged[dcoK('Detune', page)] as number} min={0} max={1}
             onChange={(v) => update(dcoK('Detune', page), v)}
-            label="Detune" size="sm" color="#eab308" />
+            label="Detune" color="#eab308" />
         </div>
         <div className="grid grid-cols-4 gap-3">
           <Knob value={merged[dcoK('Balance', page)] as number} min={-1} max={1}
             onChange={(v) => update(dcoK('Balance', page), v)}
-            label="Balance" size="sm" color="#a855f7" bipolar />
+            label="Balance" color="#a855f7" bipolar />
           <Knob value={merged[dcoK('RingMod', page)] as number} min={0} max={1}
             onChange={(v) => update(dcoK('RingMod', page), v)}
-            label="Ring Mod" size="sm" color="#f97316" />
+            label="Ring Mod" color="#f97316" />
           <Knob value={merged[dcoK('Phase', page)] as number} min={0} max={1}
             onChange={(v) => update(dcoK('Phase', page), v)}
-            label="Phase" size="sm" color="#6366f1" />
+            label="Phase" color="#6366f1" />
           <Knob value={merged[dcoK('Panning', page)] as number} min={-1} max={1}
             onChange={(v) => update(dcoK('Panning', page), v)}
-            label="Pan" size="sm" color="#14b8a6" bipolar />
+            label="Pan" color="#14b8a6" bipolar />
         </div>
-        <div className="grid grid-cols-2 gap-3 mt-2">
+        <div className="grid grid-cols-4 gap-3 mt-2">
           <div className="flex items-center gap-2">
             <label className="text-gray-500 text-[10px]">Sync</label>
             <button
@@ -164,18 +164,18 @@ export const SynthV1Controls: React.FC<SynthV1ControlsProps> = ({ config, onChan
       {/* DCF — Filter */}
       <div className="p-3 rounded bg-[#1a1a2a]">
         <SectionHeader title={`DCF ${page} — Filter`} />
-        <div className="grid grid-cols-3 gap-3 mb-3">
+        <div className="grid grid-cols-4 gap-3 mb-3">
           <Knob value={merged[dcfK('Cutoff', page)] as number} min={0} max={1}
             onChange={(v) => update(dcfK('Cutoff', page), v)}
-            label="Cutoff" size="sm" color="#a855f7" />
+            label="Cutoff" color="#a855f7" />
           <Knob value={merged[dcfK('Reso', page)] as number} min={0} max={1}
             onChange={(v) => update(dcfK('Reso', page), v)}
-            label="Reso" size="sm" color="#a855f7" />
+            label="Reso" color="#a855f7" />
           <Knob value={merged[dcfK('Envelope', page)] as number} min={0} max={1}
             onChange={(v) => update(dcfK('Envelope', page), v)}
-            label="Env Amt" size="sm" color="#a855f7" />
+            label="Env Amt" color="#a855f7" />
         </div>
-        <div className="grid grid-cols-3 gap-3 mb-3">
+        <div className="grid grid-cols-4 gap-3 mb-3">
           <ParamSelect
             label="Type" value={merged[dcfK('Type', page)] as number}
             options={DCF_TYPE_NAMES} onChange={(v) => update(dcfK('Type', page), v)}
@@ -193,7 +193,7 @@ export const SynthV1Controls: React.FC<SynthV1ControlsProps> = ({ config, onChan
           </div>
           <Knob value={merged[dcfK('KeyFollow', page)] as number} min={0} max={1}
             onChange={(v) => update(dcfK('KeyFollow', page), v)}
-            label="Key Follow" size="sm" color="#a855f7" />
+            label="Key Follow" color="#a855f7" />
         </div>
         <ADSRRow
           a={merged[dcfK('Attack', page)] as number} d={merged[dcfK('Decay', page)] as number}
@@ -207,16 +207,16 @@ export const SynthV1Controls: React.FC<SynthV1ControlsProps> = ({ config, onChan
       {/* DCA — Amplifier */}
       <div className="p-3 rounded bg-[#2a1a1a]">
         <SectionHeader title={`DCA ${page} — Amplifier`} />
-        <div className="grid grid-cols-3 gap-3 mb-3">
+        <div className="grid grid-cols-4 gap-3 mb-3">
           <Knob value={merged[dcaK('Volume', page)] as number} min={0} max={1}
             onChange={(v) => update(dcaK('Volume', page), v)}
-            label="Volume" size="sm" color="#ef4444" />
+            label="Volume" color="#ef4444" />
           <Knob value={merged[pk('dco', 'Velocity', page)] as number} min={0} max={1}
             onChange={(v) => update(pk('dco', 'Velocity', page), v)}
-            label="DCO Vel" size="sm" color="#ef4444" />
+            label="DCO Vel" color="#ef4444" />
           <Knob value={merged[pk('dca', 'Velocity', page)] as number} min={0} max={1}
             onChange={(v) => update(pk('dca', 'Velocity', page), v)}
-            label="DCA Vel" size="sm" color="#ef4444" />
+            label="DCA Vel" color="#ef4444" />
         </div>
         <ADSRRow
           a={merged[dcaK('Attack', page)] as number} d={merged[dcaK('Decay', page)] as number}
@@ -230,34 +230,34 @@ export const SynthV1Controls: React.FC<SynthV1ControlsProps> = ({ config, onChan
       {/* LFO */}
       <div className="p-3 rounded bg-[#1a1a1a]">
         <SectionHeader title={`LFO ${page}`} />
-        <div className="grid grid-cols-3 gap-3 mb-3">
+        <div className="grid grid-cols-4 gap-3 mb-3">
           <ParamSelect
             label="Shape" value={merged[lfoK('Shape', page)] as number}
             options={LFO_SHAPE_NAMES} onChange={(v) => update(lfoK('Shape', page), v)}
           />
           <Knob value={merged[lfoK('Bpm', page)] as number} min={0} max={1}
             onChange={(v) => update(lfoK('Bpm', page), v)}
-            label="Rate" size="sm" color="#f59e0b" />
+            label="Rate" color="#f59e0b" />
           <Knob value={merged[lfoK('Width', page)] as number} min={0} max={1}
             onChange={(v) => update(lfoK('Width', page), v)}
-            label="Width" size="sm" color="#f59e0b" />
+            label="Width" color="#f59e0b" />
         </div>
         <div className="grid grid-cols-5 gap-3">
           <Knob value={merged[lfoK('Pitch', page)] as number} min={0} max={1}
             onChange={(v) => update(lfoK('Pitch', page), v)}
-            label="Pitch" size="sm" color="#f59e0b" />
+            label="Pitch" color="#f59e0b" />
           <Knob value={merged[lfoK('Cutoff', page)] as number} min={0} max={1}
             onChange={(v) => update(lfoK('Cutoff', page), v)}
-            label="Cutoff" size="sm" color="#f59e0b" />
+            label="Cutoff" color="#f59e0b" />
           <Knob value={merged[lfoK('Reso', page)] as number} min={0} max={1}
             onChange={(v) => update(lfoK('Reso', page), v)}
-            label="Reso" size="sm" color="#f59e0b" />
+            label="Reso" color="#f59e0b" />
           <Knob value={merged[lfoK('Panning', page)] as number} min={0} max={1}
             onChange={(v) => update(lfoK('Panning', page), v)}
-            label="Pan" size="sm" color="#f59e0b" />
+            label="Pan" color="#f59e0b" />
           <Knob value={merged[lfoK('Volume', page)] as number} min={0} max={1}
             onChange={(v) => update(lfoK('Volume', page), v)}
-            label="Volume" size="sm" color="#f59e0b" />
+            label="Volume" color="#f59e0b" />
         </div>
         <div className="flex items-center gap-2 mt-2">
           <label className="text-gray-500 text-[10px]">Sync</label>
@@ -273,7 +273,7 @@ export const SynthV1Controls: React.FC<SynthV1ControlsProps> = ({ config, onChan
         <div className="grid grid-cols-1 gap-3">
           <Knob value={merged[pk('dcf', 'Velocity', page)] as number} min={0} max={1}
             onChange={(v) => update(pk('dcf', 'Velocity', page), v)}
-            label="DCF Velocity" size="sm" color="#64748b" />
+            label="DCF Velocity" color="#64748b" />
         </div>
       </div>
     </div>
@@ -286,15 +286,15 @@ export const SynthV1Controls: React.FC<SynthV1ControlsProps> = ({ config, onChan
         <SectionHeader title="Chorus" />
         <div className="grid grid-cols-5 gap-3">
           <Knob value={merged.chorusWet} min={0} max={1}
-            onChange={(v) => update('chorusWet', v)} label="Wet" size="sm" color="#06b6d4" />
+            onChange={(v) => update('chorusWet', v)} label="Wet" color="#06b6d4" />
           <Knob value={merged.chorusDelay} min={0} max={1}
-            onChange={(v) => update('chorusDelay', v)} label="Delay" size="sm" color="#06b6d4" />
+            onChange={(v) => update('chorusDelay', v)} label="Delay" color="#06b6d4" />
           <Knob value={merged.chorusFeedback} min={-1} max={1}
-            onChange={(v) => update('chorusFeedback', v)} label="Feedback" size="sm" color="#06b6d4" bipolar />
+            onChange={(v) => update('chorusFeedback', v)} label="Feedback" color="#06b6d4" bipolar />
           <Knob value={merged.chorusRate} min={0} max={1}
-            onChange={(v) => update('chorusRate', v)} label="Rate" size="sm" color="#06b6d4" />
+            onChange={(v) => update('chorusRate', v)} label="Rate" color="#06b6d4" />
           <Knob value={merged.chorusMod} min={0} max={1}
-            onChange={(v) => update('chorusMod', v)} label="Mod" size="sm" color="#06b6d4" />
+            onChange={(v) => update('chorusMod', v)} label="Mod" color="#06b6d4" />
         </div>
       </div>
 
@@ -303,13 +303,13 @@ export const SynthV1Controls: React.FC<SynthV1ControlsProps> = ({ config, onChan
         <SectionHeader title="Flanger" />
         <div className="grid grid-cols-4 gap-3">
           <Knob value={merged.flangerWet} min={0} max={1}
-            onChange={(v) => update('flangerWet', v)} label="Wet" size="sm" color="#22c55e" />
+            onChange={(v) => update('flangerWet', v)} label="Wet" color="#22c55e" />
           <Knob value={merged.flangerDelay} min={0} max={1}
-            onChange={(v) => update('flangerDelay', v)} label="Delay" size="sm" color="#22c55e" />
+            onChange={(v) => update('flangerDelay', v)} label="Delay" color="#22c55e" />
           <Knob value={merged.flangerFeedback} min={-1} max={1}
-            onChange={(v) => update('flangerFeedback', v)} label="Feedback" size="sm" color="#22c55e" bipolar />
+            onChange={(v) => update('flangerFeedback', v)} label="Feedback" color="#22c55e" bipolar />
           <Knob value={merged.flangerDaft} min={0} max={1}
-            onChange={(v) => update('flangerDaft', v)} label="Daft" size="sm" color="#22c55e" />
+            onChange={(v) => update('flangerDaft', v)} label="Daft" color="#22c55e" />
         </div>
       </div>
 
@@ -318,15 +318,15 @@ export const SynthV1Controls: React.FC<SynthV1ControlsProps> = ({ config, onChan
         <SectionHeader title="Phaser" />
         <div className="grid grid-cols-5 gap-3">
           <Knob value={merged.phaserWet} min={0} max={1}
-            onChange={(v) => update('phaserWet', v)} label="Wet" size="sm" color="#d946ef" />
+            onChange={(v) => update('phaserWet', v)} label="Wet" color="#d946ef" />
           <Knob value={merged.phaserRate} min={0} max={1}
-            onChange={(v) => update('phaserRate', v)} label="Rate" size="sm" color="#d946ef" />
+            onChange={(v) => update('phaserRate', v)} label="Rate" color="#d946ef" />
           <Knob value={merged.phaserFeedback} min={-1} max={1}
-            onChange={(v) => update('phaserFeedback', v)} label="Feedback" size="sm" color="#d946ef" bipolar />
+            onChange={(v) => update('phaserFeedback', v)} label="Feedback" color="#d946ef" bipolar />
           <Knob value={merged.phaserDepth} min={0} max={1}
-            onChange={(v) => update('phaserDepth', v)} label="Depth" size="sm" color="#d946ef" />
+            onChange={(v) => update('phaserDepth', v)} label="Depth" color="#d946ef" />
           <Knob value={merged.phaserDaft} min={0} max={1}
-            onChange={(v) => update('phaserDaft', v)} label="Daft" size="sm" color="#d946ef" />
+            onChange={(v) => update('phaserDaft', v)} label="Daft" color="#d946ef" />
         </div>
       </div>
 
@@ -335,24 +335,24 @@ export const SynthV1Controls: React.FC<SynthV1ControlsProps> = ({ config, onChan
         <SectionHeader title="Delay" />
         <div className="grid grid-cols-4 gap-3">
           <Knob value={merged.delayWet} min={0} max={1}
-            onChange={(v) => update('delayWet', v)} label="Wet" size="sm" color="#f59e0b" />
+            onChange={(v) => update('delayWet', v)} label="Wet" color="#f59e0b" />
           <Knob value={merged.delayDelay} min={0} max={1}
-            onChange={(v) => update('delayDelay', v)} label="Time" size="sm" color="#f59e0b" />
+            onChange={(v) => update('delayDelay', v)} label="Time" color="#f59e0b" />
           <Knob value={merged.delayFeedback} min={-1} max={1}
-            onChange={(v) => update('delayFeedback', v)} label="Feedback" size="sm" color="#f59e0b" bipolar />
+            onChange={(v) => update('delayFeedback', v)} label="Feedback" color="#f59e0b" bipolar />
           <Knob value={merged.delayBpm} min={0} max={1}
-            onChange={(v) => update('delayBpm', v)} label="BPM Sync" size="sm" color="#f59e0b" />
+            onChange={(v) => update('delayBpm', v)} label="BPM Sync" color="#f59e0b" />
         </div>
       </div>
 
       {/* Reverb */}
       <div className="p-3 rounded bg-[#2a1a1a]">
         <SectionHeader title="Reverb" />
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-4 gap-3">
           <Knob value={merged.reverbWet} min={0} max={1}
-            onChange={(v) => update('reverbWet', v)} label="Wet" size="sm" color="#ef4444" />
+            onChange={(v) => update('reverbWet', v)} label="Wet" color="#ef4444" />
           <Knob value={merged.reverbRoom} min={0} max={1}
-            onChange={(v) => update('reverbRoom', v)} label="Room" size="sm" color="#ef4444" />
+            onChange={(v) => update('reverbRoom', v)} label="Room" color="#ef4444" />
         </div>
       </div>
     </div>

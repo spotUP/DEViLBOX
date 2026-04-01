@@ -110,15 +110,12 @@ interface SectionProps {
 }
 
 const DOMSynthSection: React.FC<SectionProps> = ({ section, getValue, updateParam }) => {
-  const cols = section.columns ?? Math.min(section.controls.length, 4);
-  const gridClass = cols <= 2 ? 'grid-cols-2' : cols <= 3 ? 'grid-cols-3' : 'grid-cols-4';
-
   return (
     <div className="bg-dark-bgSecondary/50 rounded-lg border border-dark-border/30 p-2">
       <div className="text-[9px] font-bold uppercase tracking-wider text-text-muted mb-1.5">
         {section.label}
       </div>
-      <div className={`grid ${gridClass} gap-1`}>
+      <div className="grid grid-cols-4 gap-1">
         {section.controls.map((ctrl: ControlDescriptor) => (
           <DOMSynthControl
             key={ctrl.key}
@@ -153,7 +150,6 @@ const DOMSynthControl: React.FC<ControlProps> = ({ descriptor, value, onChange }
             onChange={(v) => onChange(v)}
             label={descriptor.label}
             color={descriptor.color ?? '#ffaa00'}
-            size="sm"
             formatValue={descriptor.formatValue}
           />
         </div>

@@ -383,8 +383,8 @@ const CMIControls: React.FC<CMIControlsProps> = ({
         {cmi.activeTab === 'harmonic' && (
           <div className="flex flex-col gap-3">
             <div className="flex flex-wrap gap-3">
-              <Knob value={cmi.volume} min={0} max={255} onChange={(v) => cmi.handleParamChange('volume', v)} label="Volume" size="sm" color={CMI_GREEN} formatValue={fmtInt} />
-              <Knob value={cmi.waveSelect} min={0} max={7} onChange={(v) => cmi.handleParamChange('wave_select', v)} label="Wave" size="sm" color={CMI_GREEN} formatValue={fmtWave} />
+              <Knob value={cmi.volume} min={0} max={255} onChange={(v) => cmi.handleParamChange('volume', v)} label="Volume" color={CMI_GREEN} formatValue={fmtInt} />
+              <Knob value={cmi.waveSelect} min={0} max={7} onChange={(v) => cmi.handleParamChange('wave_select', v)} label="Wave" color={CMI_GREEN} formatValue={fmtWave} />
             </div>
             <div className="flex gap-3">
               <div className="flex flex-col gap-1">
@@ -436,8 +436,8 @@ const CMIControls: React.FC<CMIControlsProps> = ({
         {cmi.activeTab === 'wave' && (
           <div className="flex flex-col gap-3">
             <div className="flex flex-wrap gap-3">
-              <Knob value={cmi.waveSelect} min={0} max={7} onChange={(v) => cmi.handleParamChange('wave_select', v)} label="Wave" size="sm" color={CMI_GREEN} formatValue={fmtWave} />
-              <Knob value={cmi.volume} min={0} max={255} onChange={(v) => cmi.handleParamChange('volume', v)} label="Volume" size="sm" color={CMI_GREEN} formatValue={fmtInt} />
+              <Knob value={cmi.waveSelect} min={0} max={7} onChange={(v) => cmi.handleParamChange('wave_select', v)} label="Wave" color={CMI_GREEN} formatValue={fmtWave} />
+              <Knob value={cmi.volume} min={0} max={255} onChange={(v) => cmi.handleParamChange('volume', v)} label="Volume" color={CMI_GREEN} formatValue={fmtInt} />
             </div>
             {/* Waveform display */}
             <div className="flex flex-col gap-1">
@@ -544,13 +544,13 @@ const CMIControls: React.FC<CMIControlsProps> = ({
         {cmi.activeTab === 'control' && (
           <div className="flex flex-col gap-3">
             <div className="flex flex-wrap gap-3">
-              <Knob value={cmi.volume} min={0} max={255} onChange={(v) => cmi.handleParamChange('volume', v)} label="Volume" size="sm" color={CMI_GREEN} formatValue={fmtInt} />
-              <Knob value={cmi.waveSelect} min={0} max={7} onChange={(v) => cmi.handleParamChange('wave_select', v)} label="Wave" size="sm" color={CMI_GREEN} formatValue={fmtWave} />
-              <Knob value={cmi.cutoff} min={0} max={255} onChange={(v) => cmi.handleParamChange('filter_cutoff', v)} label="Cutoff" size="sm" color={CMI_GREEN} formatValue={fmtCutoff} />
-              <Knob value={cmi.filterTrack} min={0} max={255} onChange={(v) => cmi.handleParamChange('filter_track', v)} label="Key Track" size="sm" color={CMI_GREEN} formatValue={fmtTrack} />
-              <Knob value={cmi.attackTime} min={0} max={255} onChange={(v) => cmi.handleParamChange('attack_time', v)} label="Attack" size="sm" color={CMI_GREEN} formatValue={fmtInt} />
-              <Knob value={cmi.releaseTime} min={0} max={255} onChange={(v) => cmi.handleParamChange('release_time', v)} label="Release" size="sm" color={CMI_GREEN} formatValue={fmtInt} />
-              <Knob value={cmi.envRate} min={0} max={255} onChange={(v) => cmi.handleParamChange('envelope_rate', v)} label="Env Rate" size="sm" color={CMI_GREEN} formatValue={fmtInt} />
+              <Knob value={cmi.volume} min={0} max={255} onChange={(v) => cmi.handleParamChange('volume', v)} label="Volume" color={CMI_GREEN} formatValue={fmtInt} />
+              <Knob value={cmi.waveSelect} min={0} max={7} onChange={(v) => cmi.handleParamChange('wave_select', v)} label="Wave" color={CMI_GREEN} formatValue={fmtWave} />
+              <Knob value={cmi.cutoff} min={0} max={255} onChange={(v) => cmi.handleParamChange('filter_cutoff', v)} label="Cutoff" color={CMI_GREEN} formatValue={fmtCutoff} />
+              <Knob value={cmi.filterTrack} min={0} max={255} onChange={(v) => cmi.handleParamChange('filter_track', v)} label="Key Track" color={CMI_GREEN} formatValue={fmtTrack} />
+              <Knob value={cmi.attackTime} min={0} max={255} onChange={(v) => cmi.handleParamChange('attack_time', v)} label="Attack" color={CMI_GREEN} formatValue={fmtInt} />
+              <Knob value={cmi.releaseTime} min={0} max={255} onChange={(v) => cmi.handleParamChange('release_time', v)} label="Release" color={CMI_GREEN} formatValue={fmtInt} />
+              <Knob value={cmi.envRate} min={0} max={255} onChange={(v) => cmi.handleParamChange('envelope_rate', v)} label="Env Rate" color={CMI_GREEN} formatValue={fmtInt} />
             </div>
             <div className="flex gap-3">
               <div className="flex flex-col gap-0.5">
@@ -569,8 +569,8 @@ const CMIControls: React.FC<CMIControlsProps> = ({
         {cmi.activeTab === 'filter' && (
           <div className="flex flex-col gap-3">
             <div className="flex flex-wrap gap-3">
-              <Knob value={cmi.cutoff} min={0} max={255} onChange={(v) => cmi.handleParamChange('filter_cutoff', v)} label="Cutoff" size="sm" color={CMI_GREEN} formatValue={fmtCutoff} />
-              <Knob value={cmi.filterTrack} min={0} max={255} onChange={(v) => cmi.handleParamChange('filter_track', v)} label="Key Track" size="sm" color={CMI_GREEN} formatValue={fmtTrack} />
+              <Knob value={cmi.cutoff} min={0} max={255} onChange={(v) => cmi.handleParamChange('filter_cutoff', v)} label="Cutoff" color={CMI_GREEN} formatValue={fmtCutoff} />
+              <Knob value={cmi.filterTrack} min={0} max={255} onChange={(v) => cmi.handleParamChange('filter_track', v)} label="Key Track" color={CMI_GREEN} formatValue={fmtTrack} />
             </div>
             <div className="flex flex-col gap-1">
               <div className="text-[10px] font-mono font-bold" style={{ color: CMI_GREEN }}>
@@ -588,9 +588,9 @@ const CMIControls: React.FC<CMIControlsProps> = ({
         {cmi.activeTab === 'envelope' && (
           <div className="flex flex-col gap-3">
             <div className="flex flex-wrap gap-3">
-              <Knob value={cmi.attackTime} min={0} max={255} onChange={(v) => cmi.handleParamChange('attack_time', v)} label="Attack" size="sm" color={CMI_GREEN} formatValue={fmtInt} />
-              <Knob value={cmi.releaseTime} min={0} max={255} onChange={(v) => cmi.handleParamChange('release_time', v)} label="Release" size="sm" color={CMI_GREEN} formatValue={fmtInt} />
-              <Knob value={cmi.envRate} min={0} max={255} onChange={(v) => cmi.handleParamChange('envelope_rate', v)} label="Rate" size="sm" color={CMI_GREEN} formatValue={fmtInt} />
+              <Knob value={cmi.attackTime} min={0} max={255} onChange={(v) => cmi.handleParamChange('attack_time', v)} label="Attack" color={CMI_GREEN} formatValue={fmtInt} />
+              <Knob value={cmi.releaseTime} min={0} max={255} onChange={(v) => cmi.handleParamChange('release_time', v)} label="Release" color={CMI_GREEN} formatValue={fmtInt} />
+              <Knob value={cmi.envRate} min={0} max={255} onChange={(v) => cmi.handleParamChange('envelope_rate', v)} label="Rate" color={CMI_GREEN} formatValue={fmtInt} />
             </div>
             <div className="flex flex-col gap-1">
               <div className="text-[10px] font-mono font-bold" style={{ color: CMI_GREEN }}>

@@ -49,9 +49,9 @@ const OscPanel: React.FC<{
           </select>
         </div>
         <Knob value={(merged[octKey] as number) ?? 0} min={-36} max={36}
-          onChange={(v) => update(octKey, Math.round(v))} label="Oct" size="sm" color="#22d3ee" />
+          onChange={(v) => update(octKey, Math.round(v))} label="Oct" color="#22d3ee" />
         <Knob value={(merged[fmKey] as number) ?? 0} min={0} max={1}
-          onChange={(v) => update(fmKey, v)} label="FM" size="sm" color="#f59e0b" />
+          onChange={(v) => update(fmKey, v)} label="FM" color="#f59e0b" />
       </div>
     </div>
   );
@@ -80,23 +80,23 @@ const FilterPanel: React.FC<{
       </div>
       <div className="flex gap-2 flex-wrap items-end">
         <Knob value={(merged[k('Cutoff')] as number) ?? 0.5} min={0} max={1}
-          onChange={(v) => update(k('Cutoff'), v)} label="Cutoff" size="sm" color="#a855f7" />
+          onChange={(v) => update(k('Cutoff'), v)} label="Cutoff" color="#a855f7" />
         <Knob value={(merged[k('Resonance')] as number) ?? 0.3} min={0} max={1}
-          onChange={(v) => update(k('Resonance'), v)} label="Reso" size="sm" color="#a855f7" />
+          onChange={(v) => update(k('Resonance'), v)} label="Reso" color="#a855f7" />
         <Knob value={(merged[k('Distortion')] as number) ?? 0} min={0} max={1}
-          onChange={(v) => update(k('Distortion'), v)} label="Dist" size="sm" color="#ef4444" />
+          onChange={(v) => update(k('Distortion'), v)} label="Dist" color="#ef4444" />
         <Knob value={(merged[k('Pan')] as number) ?? 0} min={-1} max={1}
-          onChange={(v) => update(k('Pan'), v)} label="Pan" size="sm" color="#6366f1" />
+          onChange={(v) => update(k('Pan'), v)} label="Pan" color="#6366f1" />
         <Knob value={(merged[k('Output')] as number) ?? 0} min={0} max={1}
-          onChange={(v) => update(k('Output'), v)} label="Out" size="sm" color="#22c55e" />
+          onChange={(v) => update(k('Output'), v)} label="Out" color="#22c55e" />
         <Knob value={(merged[k('ModMix')] as number) ?? 0} min={-1} max={1}
-          onChange={(v) => update(k('ModMix'), v)} label="ModMix" size="sm" color="#e879f9" />
+          onChange={(v) => update(k('ModMix'), v)} label="ModMix" color="#e879f9" />
         <Knob value={(merged[k('Input0')] as number) ?? 0} min={0} max={1}
-          onChange={(v) => update(k('Input0'), v)} label="In 1" size="sm" color="#64748b" />
+          onChange={(v) => update(k('Input0'), v)} label="In 1" color="#64748b" />
         <Knob value={(merged[k('Input1')] as number) ?? 0} min={0} max={1}
-          onChange={(v) => update(k('Input1'), v)} label="In 2" size="sm" color="#64748b" />
+          onChange={(v) => update(k('Input1'), v)} label="In 2" color="#64748b" />
         <Knob value={(merged[k('Input2')] as number) ?? 0} min={0} max={1}
-          onChange={(v) => update(k('Input2'), v)} label="In 3" size="sm" color="#64748b" />
+          onChange={(v) => update(k('Input2'), v)} label="In 3" color="#64748b" />
       </div>
     </div>
   );
@@ -116,19 +116,19 @@ const EnvPanel: React.FC<{
       <span className="text-gray-400 font-semibold text-[11px] mb-1 block">{label}</span>
       <div className="flex gap-2 flex-wrap items-end">
         <Knob value={(merged[k('Attack')] as number) ?? 0.01} min={0} max={1}
-          onChange={(v) => update(k('Attack'), v)} label="A" size="sm" color="#ef4444" />
+          onChange={(v) => update(k('Attack'), v)} label="A" color="#ef4444" />
         <Knob value={(merged[k('Decay')] as number) ?? 0.3} min={0} max={1}
-          onChange={(v) => update(k('Decay'), v)} label="D" size="sm" color="#f59e0b" />
+          onChange={(v) => update(k('Decay'), v)} label="D" color="#f59e0b" />
         <Knob value={(merged[k('Sustain')] as number) ?? 0.7} min={0} max={1}
-          onChange={(v) => update(k('Sustain'), v)} label="S" size="sm" color="#22c55e" />
+          onChange={(v) => update(k('Sustain'), v)} label="S" color="#22c55e" />
         <Knob value={(merged[k('Release')] as number) ?? 0.3} min={0} max={1}
-          onChange={(v) => update(k('Release'), v)} label="R" size="sm" color="#3b82f6" />
+          onChange={(v) => update(k('Release'), v)} label="R" color="#3b82f6" />
         <Knob value={(merged[k('Shape')] as number) ?? 0} min={-1} max={1}
-          onChange={(v) => update(k('Shape'), v)} label="Shp" size="sm" color="#8b5cf6" />
+          onChange={(v) => update(k('Shape'), v)} label="Shp" color="#8b5cf6" />
         <Knob value={(merged[k('Velocity')] as number) ?? 0.5} min={0} max={1}
-          onChange={(v) => update(k('Velocity'), v)} label="Vel" size="sm" color="#06b6d4" />
+          onChange={(v) => update(k('Velocity'), v)} label="Vel" color="#06b6d4" />
         <Knob value={(merged[k('Retrigger')] as number) ?? 0.004} min={0.004} max={1}
-          onChange={(v) => update(k('Retrigger'), v)} label="Retrig" size="sm" color="#f472b6" />
+          onChange={(v) => update(k('Retrigger'), v)} label="Retrig" color="#f472b6" />
       </div>
     </div>
   );
@@ -148,11 +148,11 @@ const LfoPanel: React.FC<{
       <span className="text-gray-400 font-semibold text-[11px] mb-1 block">LFO {n}</span>
       <div className="flex gap-2 items-end">
         <Knob value={(merged[k('Speed')] as number) ?? 4} min={0} max={16}
-          onChange={(v) => update(k('Speed'), Math.round(v))} label="Spd" size="sm" color="#f97316" />
+          onChange={(v) => update(k('Speed'), Math.round(v))} label="Spd" color="#f97316" />
         <Knob value={(merged[k('Wave')] as number) ?? 0} min={0} max={1}
-          onChange={(v) => update(k('Wave'), v)} label="Wave" size="sm" color="#14b8a6" />
+          onChange={(v) => update(k('Wave'), v)} label="Wave" color="#14b8a6" />
         <Knob value={(merged[k('Phase')] as number) ?? 0} min={0} max={1}
-          onChange={(v) => update(k('Phase'), v)} label="Phase" size="sm" color="#a78bfa" />
+          onChange={(v) => update(k('Phase'), v)} label="Phase" color="#a78bfa" />
       </div>
     </div>
   );
@@ -179,13 +179,13 @@ export const MoniqueControls: React.FC<MoniqueControlsProps> = ({ config, onChan
         </div>
         <div className="flex gap-3 mt-2 items-end">
           <Knob value={merged.fmMulti ?? 0} min={0} max={1}
-            onChange={(v) => updateParam('fmMulti', v)} label="FM Multi" size="sm" color="#f59e0b" />
+            onChange={(v) => updateParam('fmMulti', v)} label="FM Multi" color="#f59e0b" />
           <Knob value={merged.fmSwing ?? 0} min={0} max={1}
-            onChange={(v) => updateParam('fmSwing', v)} label="FM Swing" size="sm" color="#f59e0b" />
+            onChange={(v) => updateParam('fmSwing', v)} label="FM Swing" color="#f59e0b" />
           <Knob value={merged.fmPhase ?? 0} min={0} max={1}
-            onChange={(v) => updateParam('fmPhase', v)} label="FM Phase" size="sm" color="#f59e0b" />
+            onChange={(v) => updateParam('fmPhase', v)} label="FM Phase" color="#f59e0b" />
           <Knob value={merged.masterShift ?? 0.5} min={0} max={1}
-            onChange={(v) => updateParam('masterShift', v)} label="Shift" size="sm" color="#64748b" />
+            onChange={(v) => updateParam('masterShift', v)} label="Shift" color="#64748b" />
         </div>
       </div>
 
@@ -221,19 +221,19 @@ export const MoniqueControls: React.FC<MoniqueControlsProps> = ({ config, onChan
         <h3 className="text-gray-400 font-semibold mb-2 border-b border-gray-700 pb-1">Effects</h3>
         <div className="flex gap-3 flex-wrap items-end">
           <Knob value={merged.reverbRoom ?? 0.3} min={0} max={1}
-            onChange={(v) => updateParam('reverbRoom', v)} label="Rev Room" size="sm" color="#7c3aed" />
+            onChange={(v) => updateParam('reverbRoom', v)} label="Rev Room" color="#7c3aed" />
           <Knob value={merged.reverbMix ?? 0} min={0} max={1}
-            onChange={(v) => updateParam('reverbMix', v)} label="Rev Mix" size="sm" color="#7c3aed" />
+            onChange={(v) => updateParam('reverbMix', v)} label="Rev Mix" color="#7c3aed" />
           <Knob value={merged.reverbWidth ?? 0.5} min={0} max={1}
-            onChange={(v) => updateParam('reverbWidth', v)} label="Rev Width" size="sm" color="#7c3aed" />
+            onChange={(v) => updateParam('reverbWidth', v)} label="Rev Width" color="#7c3aed" />
           <Knob value={merged.chorusMod ?? 0} min={0} max={1}
-            onChange={(v) => updateParam('chorusMod', v)} label="Chorus" size="sm" color="#2563eb" />
+            onChange={(v) => updateParam('chorusMod', v)} label="Chorus" color="#2563eb" />
           <Knob value={merged.chorusPan ?? 0.5} min={0} max={1}
-            onChange={(v) => updateParam('chorusPan', v)} label="Chr Pan" size="sm" color="#2563eb" />
+            onChange={(v) => updateParam('chorusPan', v)} label="Chr Pan" color="#2563eb" />
           <Knob value={merged.delay ?? 0} min={0} max={1}
-            onChange={(v) => updateParam('delay', v)} label="Delay" size="sm" color="#0891b2" />
+            onChange={(v) => updateParam('delay', v)} label="Delay" color="#0891b2" />
           <Knob value={merged.delayPan ?? 0.5} min={0} max={1}
-            onChange={(v) => updateParam('delayPan', v)} label="Dly Pan" size="sm" color="#0891b2" />
+            onChange={(v) => updateParam('delayPan', v)} label="Dly Pan" color="#0891b2" />
           <button
             className={`px-2 py-1 rounded text-[10px] ${(merged.eqBypass ?? 0) > 0.5 ? 'bg-red-700 text-white' : 'bg-gray-700 text-gray-400'}`}
             onClick={() => updateParam('eqBypass', (merged.eqBypass ?? 0) > 0.5 ? 0 : 1)}
@@ -250,21 +250,21 @@ export const MoniqueControls: React.FC<MoniqueControlsProps> = ({ config, onChan
         <h3 className="text-gray-400 font-semibold mb-2 border-b border-gray-700 pb-1">Master</h3>
         <div className="flex gap-3 flex-wrap items-end">
           <Knob value={merged.volume ?? 0.7} min={0} max={1}
-            onChange={(v) => updateParam('volume', v)} label="Volume" size="sm" color="#22c55e" />
+            onChange={(v) => updateParam('volume', v)} label="Volume" color="#22c55e" />
           <Knob value={merged.shape ?? 0} min={0} max={1}
-            onChange={(v) => updateParam('shape', v)} label="Shape" size="sm" color="#ef4444" />
+            onChange={(v) => updateParam('shape', v)} label="Shape" color="#ef4444" />
           <Knob value={merged.distortion ?? 0} min={0} max={1}
-            onChange={(v) => updateParam('distortion', v)} label="Dist" size="sm" color="#ef4444" />
+            onChange={(v) => updateParam('distortion', v)} label="Dist" color="#ef4444" />
           <Knob value={merged.glide ?? 0} min={0} max={1}
-            onChange={(v) => updateParam('glide', v)} label="Glide" size="sm" color="#3b82f6" />
+            onChange={(v) => updateParam('glide', v)} label="Glide" color="#3b82f6" />
           <Knob value={merged.glideTime ?? 0} min={0} max={127}
-            onChange={(v) => updateParam('glideTime', Math.round(v))} label="Glide T" size="sm" color="#3b82f6" />
+            onChange={(v) => updateParam('glideTime', Math.round(v))} label="Glide T" color="#3b82f6" />
           <Knob value={merged.octaveOffset ?? 0} min={-4} max={4}
-            onChange={(v) => updateParam('octaveOffset', Math.round(v))} label="Oct" size="sm" color="#a78bfa" />
+            onChange={(v) => updateParam('octaveOffset', Math.round(v))} label="Oct" color="#a78bfa" />
           <Knob value={merged.noteOffset ?? 0} min={-12} max={12}
-            onChange={(v) => updateParam('noteOffset', Math.round(v))} label="Note" size="sm" color="#a78bfa" />
+            onChange={(v) => updateParam('noteOffset', Math.round(v))} label="Note" color="#a78bfa" />
           <Knob value={merged.speed ?? 120} min={20} max={1000}
-            onChange={(v) => updateParam('speed', Math.round(v))} label="BPM" size="sm" color="#f97316" />
+            onChange={(v) => updateParam('speed', Math.round(v))} label="BPM" color="#f97316" />
         </div>
       </div>
     </div>

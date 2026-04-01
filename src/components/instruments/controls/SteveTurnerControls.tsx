@@ -40,7 +40,6 @@ const KnobCell: React.FC<{
       value={value}
       min={min} max={max} step={1}
       onChange={(v: number) => onChange(Math.round(v))}
-      size="sm"
       color={color}
     />
     <span className="text-[10px] text-text-secondary">{label}</span>
