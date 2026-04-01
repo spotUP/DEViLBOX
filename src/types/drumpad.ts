@@ -295,24 +295,24 @@ export function create808Program(): DrumProgram {
   const program = createEmptyProgram('A-01', 'TR-808');
   const M: DrumMachineType = '808';
 
-  // [name, drumType, note, io808Type]
+  // [name, drumType, note, io808Type] — all C4 = normal pitch in pitch mode
   const kit: [string, DrumType, string, string][] = [
-    ['Kick',       'kick',     'C2',   'kick'],
-    ['Snare',      'snare',    'D2',   'snare'],
-    ['Clap',       'clap',     'D#2',  'clap'],
-    ['Rimshot',    'rimshot',  'C#2',  'rimshot'],
-    ['Closed Hat', 'hihat',    'F#2',  'closedHat'],
-    ['Open Hat',   'hihat',    'A#2',  'openHat'],
-    ['Low Tom',    'tom',      'F2',   'tomLow'],
-    ['Mid Tom',    'tom',      'B2',   'tomMid'],
-    ['High Tom',   'tom',      'D3',   'tomHigh'],
-    ['Cymbal',     'cymbal',   'C#3',  'cymbal'],
-    ['Clave',      'clave',    'D#2',  'clave'],
-    ['Cowbell',    'cowbell',  'G#2',  'cowbell'],
-    ['Maracas',    'maracas',  'D3',   'maracas'],
-    ['Conga Low',  'conga',    'D#3',  'congaLow'],
-    ['Conga High', 'conga',    'A3',   'congaHigh'],
-    ['Cymbal 2',   'cymbal',   'A4',   'cymbal'],
+    ['Kick',       'kick',     'C4',  'kick'],
+    ['Snare',      'snare',    'C4',  'snare'],
+    ['Clap',       'clap',     'C4',  'clap'],
+    ['Rimshot',    'rimshot',  'C4',  'rimshot'],
+    ['Closed Hat', 'hihat',    'C4',  'closedHat'],
+    ['Open Hat',   'hihat',    'C4',  'openHat'],
+    ['Low Tom',    'tom',      'C4',  'tomLow'],
+    ['Mid Tom',    'tom',      'C4',  'tomMid'],
+    ['High Tom',   'tom',      'C4',  'tomHigh'],
+    ['Cymbal',     'cymbal',   'C4',  'cymbal'],
+    ['Clave',      'clave',    'C4',  'clave'],
+    ['Cowbell',    'cowbell',  'C4',  'cowbell'],
+    ['Maracas',    'maracas',  'C4',  'maracas'],
+    ['Conga Low',  'conga',    'C4',  'congaLow'],
+    ['Conga High', 'conga',    'C4',  'congaHigh'],
+    ['Cymbal 2',   'cymbal',   'C4',  'cymbal'],
   ];
 
   kit.forEach(([name, drumType, note, subType], i) => {
@@ -334,19 +334,19 @@ export function create909Program(): DrumProgram {
   const program = createEmptyProgram('B-01', 'TR-909');
   const M: DrumMachineType = '909';
 
-  // [name, drumType, note, tr909Type]
+  // [name, drumType, note, tr909Type] — all C4 = normal pitch in pitch mode
   const kit: [string, DrumType, string, string][] = [
-    ['Kick',       'kick',     'C2',   'kick'],
-    ['Snare',      'snare',    'D2',   'snare'],
-    ['Clap',       'clap',     'D#2',  'clap'],
-    ['Rimshot',    'rimshot',  'C#2',  'rimshot'],
-    ['Closed Hat', 'hihat',    'F#2',  'closedHat'],
-    ['Open Hat',   'hihat',    'A#2',  'openHat'],
-    ['Low Tom',    'tom',      'F2',   'tomLow'],
-    ['Mid Tom',    'tom',      'B2',   'tomMid'],
-    ['High Tom',   'tom',      'D3',   'tomHigh'],
-    ['Crash',      'cymbal',   'C#3',  'crash'],
-    ['Ride',       'cymbal',   'D#3',  'ride'],
+    ['Kick',       'kick',     'C4',  'kick'],
+    ['Snare',      'snare',    'C4',  'snare'],
+    ['Clap',       'clap',     'C4',  'clap'],
+    ['Rimshot',    'rimshot',  'C4',  'rimshot'],
+    ['Closed Hat', 'hihat',    'C4',  'closedHat'],
+    ['Open Hat',   'hihat',    'C4',  'openHat'],
+    ['Low Tom',    'tom',      'C4',  'tomLow'],
+    ['Mid Tom',    'tom',      'C4',  'tomMid'],
+    ['High Tom',   'tom',      'C4',  'tomHigh'],
+    ['Crash',      'cymbal',   'C4',  'crash'],
+    ['Ride',       'cymbal',   'C4',  'ride'],
   ];
 
   kit.forEach(([name, drumType, note, subType], i) => {
