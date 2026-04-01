@@ -77,7 +77,7 @@ export const UADELiveParamsBar: React.FC<UADELiveParamsBarProps> = ({ instrument
   if (!sections || (sections['volume'] == null && sections['period'] == null)) return null;
 
   return (
-    <div className={`rounded-lg border p-3 ${panelBg} flex items-center gap-6`}>
+    <div className={`rounded-lg border p-3 ${panelBg} flex items-center gap-3`}>
       <div className="text-[10px] font-bold uppercase tracking-widest"
         style={{ color: accent, opacity: 0.7, minWidth: 60 }}>
         Live Params

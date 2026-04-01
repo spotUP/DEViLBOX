@@ -102,15 +102,15 @@ export const DubSirenControls: React.FC<DubSirenControlsProps> = ({
   );
 
   const renderMainTab = () => (
-    <div className="flex flex-col gap-4 p-4">
+    <div className="grid grid-cols-2 gap-2 p-2">
       {/* Oscillator Section */}
-      <div className={`p-4 rounded-xl border ${panelBg}`}>
-        <div className="flex items-center gap-2 mb-4">
+      <div className={`p-2 rounded-lg border ${panelBg}`}>
+        <div className="flex items-center gap-2 mb-2">
           <Speaker size={16} className={isCyanTheme ? 'text-accent-highlight' : 'text-red-500'} />
           <h3 className={`font-bold ${isCyanTheme ? 'text-accent-highlight' : 'text-red-400'}`}>OSCILLATOR</h3>
         </div>
         
-        <div className="flex flex-col md:flex-row gap-6 items-center gap-6">
+        <div className="flex flex-col md:flex-row gap-3 items-center gap-3">
           {renderWaveSelector(config.oscillator.type, (t) => updateOsc({ type: t }), "Waveform")}
           
           <Knob
@@ -126,8 +126,8 @@ export const DubSirenControls: React.FC<DubSirenControlsProps> = ({
       </div>
 
       {/* LFO Section */}
-      <div className={`p-4 rounded-xl border ${panelBg}`}>
-        <div className="flex items-center justify-between mb-4">
+      <div className={`p-2 rounded-lg border ${panelBg}`}>
+        <div className="flex items-center justify-between mb-2">
           <div className="flex items-center gap-2">
             <Activity size={16} className={isCyanTheme ? 'text-accent-highlight' : 'text-red-500'} />
             <h3 className={`font-bold ${isCyanTheme ? 'text-accent-highlight' : 'text-red-400'}`}>LFO MODULATION</h3>
@@ -144,7 +144,7 @@ export const DubSirenControls: React.FC<DubSirenControlsProps> = ({
         </div>
 
         <div className={`transition-opacity ${config.lfo.enabled ? 'opacity-100' : 'opacity-40 pointer-events-none'}`}>
-          <div className="flex flex-col md:flex-row gap-6 items-center gap-6">
+          <div className="flex flex-col md:flex-row gap-3 items-center gap-3">
             {renderWaveSelector(config.lfo.type, (t) => updateLFO({ type: t }), "LFO Shape")}
             
             <Knob
@@ -173,10 +173,10 @@ export const DubSirenControls: React.FC<DubSirenControlsProps> = ({
   );
 
   const renderFXTab = () => (
-    <div className="flex flex-col gap-4 p-4">
+    <div className="grid grid-cols-2 gap-2 p-2">
       {/* Delay Section */}
-      <div className={`p-4 rounded-xl border ${panelBg}`}>
-        <div className="flex items-center justify-between mb-4">
+      <div className={`p-2 rounded-lg border ${panelBg}`}>
+        <div className="flex items-center justify-between mb-2">
           <div className="flex items-center gap-2">
             <Repeat size={16} className={isCyanTheme ? 'text-accent-highlight' : 'text-red-500'} />
             <h3 className={`font-bold ${isCyanTheme ? 'text-accent-highlight' : 'text-red-400'}`}>DELAY</h3>
@@ -192,7 +192,7 @@ export const DubSirenControls: React.FC<DubSirenControlsProps> = ({
           </label>
         </div>
 
-        <div className={`flex gap-6 transition-opacity ${config.delay.enabled ? 'opacity-100' : 'opacity-40 pointer-events-none'}`}>
+        <div className={`flex gap-3 transition-opacity ${config.delay.enabled ? 'opacity-100' : 'opacity-40 pointer-events-none'}`}>
           <Knob
             value={config.delay.time}
             min={0.01}
@@ -246,8 +246,8 @@ export const DubSirenControls: React.FC<DubSirenControlsProps> = ({
       </div>
 
       {/* Filter Section */}
-      <div className={`p-4 rounded-xl border ${panelBg}`}>
-        <div className="flex items-center justify-between mb-4">
+      <div className={`p-2 rounded-lg border ${panelBg}`}>
+        <div className="flex items-center justify-between mb-2">
           <div className="flex items-center gap-2">
             <Filter size={16} className={isCyanTheme ? 'text-accent-highlight' : 'text-red-500'} />
             <h3 className={`font-bold ${isCyanTheme ? 'text-accent-highlight' : 'text-red-400'}`}>FILTER</h3>
@@ -326,8 +326,8 @@ export const DubSirenControls: React.FC<DubSirenControlsProps> = ({
       </div>
 
       {/* Reverb Section */}
-      <div className={`p-4 rounded-xl border ${panelBg}`}>
-        <div className="flex items-center justify-between mb-4">
+      <div className={`p-2 rounded-lg border ${panelBg}`}>
+        <div className="flex items-center justify-between mb-2">
           <div className="flex items-center gap-2">
             <Waves size={16} className={isCyanTheme ? 'text-accent-highlight' : 'text-red-500'} />
             <h3 className={`font-bold ${isCyanTheme ? 'text-accent-highlight' : 'text-red-400'}`}>REVERB</h3>
@@ -343,7 +343,7 @@ export const DubSirenControls: React.FC<DubSirenControlsProps> = ({
           </label>
         </div>
 
-        <div className={`flex gap-6 transition-opacity ${config.reverb.enabled ? 'opacity-100' : 'opacity-40 pointer-events-none'}`}>
+        <div className={`flex gap-3 transition-opacity ${config.reverb.enabled ? 'opacity-100' : 'opacity-40 pointer-events-none'}`}>
           <Knob
             value={config.reverb.decay}
             min={0.1}

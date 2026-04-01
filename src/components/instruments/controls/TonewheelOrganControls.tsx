@@ -124,7 +124,7 @@ export const TonewheelOrganControls: React.FC<TonewheelOrganControlsProps> = ({
   // Fallback to VSTBridgePanel if synth not ready after a reasonable wait
   if (!synthReady) {
     return (
-      <div className="flex flex-col gap-4 p-4">
+      <div className="grid grid-cols-2 gap-2 p-2">
         <div className="flex items-center justify-center gap-2 p-4 text-text-secondary">
           <Loader size={16} className="animate-spin" />
           <span className="text-sm">Loading Tonewheel Organ...</span>
@@ -139,11 +139,11 @@ export const TonewheelOrganControls: React.FC<TonewheelOrganControlsProps> = ({
     : 'bg-[#1a1a1a] border-amber-900/30';
 
   return (
-    <div className="synth-controls-flow flex flex-col gap-4 p-4 overflow-y-auto">
+    <div className="synth-controls-flow grid grid-cols-2 gap-2 p-2 overflow-y-auto">
       {/* ═══ DRAWBARS ═══ */}
-      <div className={`p-4 rounded-xl border ${panelBg}`}>
+      <div className={`p-2 rounded-lg border ${panelBg}`}>
         <h3
-          className="font-bold uppercase tracking-tight text-sm mb-4"
+          className="font-bold uppercase tracking-tight text-sm mb-2"
           style={{ color: accentColor }}
         >
           Drawbars
@@ -163,7 +163,7 @@ export const TonewheelOrganControls: React.FC<TonewheelOrganControlsProps> = ({
       </div>
 
       {/* ═══ PERCUSSION ═══ */}
-      <div className={`p-4 rounded-xl border ${panelBg}`}>
+      <div className={`p-2 rounded-lg border ${panelBg}`}>
         <h3
           className="font-bold uppercase tracking-tight text-sm mb-3"
           style={{ color: accentColor }}
@@ -232,14 +232,14 @@ export const TonewheelOrganControls: React.FC<TonewheelOrganControlsProps> = ({
       </div>
 
       {/* ═══ VIBRATO / CHORUS + CONTROLS ═══ */}
-      <div className={`p-4 rounded-xl border ${panelBg}`}>
+      <div className={`p-2 rounded-lg border ${panelBg}`}>
         <h3
           className="font-bold uppercase tracking-tight text-sm mb-3"
           style={{ color: accentColor }}
         >
           Vibrato / Chorus
         </h3>
-        <div className="flex flex-wrap items-start gap-6">
+        <div className="flex flex-wrap items-start gap-3">
           {/* V/C selector buttons */}
           <div className="flex gap-1">
             {VIBRATO_LABELS.map((label, i) => (
@@ -272,7 +272,7 @@ export const TonewheelOrganControls: React.FC<TonewheelOrganControlsProps> = ({
       </div>
 
       {/* ═══ TONE & OUTPUT ═══ */}
-      <div className={`p-4 rounded-xl border ${panelBg}`}>
+      <div className={`p-2 rounded-lg border ${panelBg}`}>
         <h3
           className="font-bold uppercase tracking-tight text-sm mb-3"
           style={{ color: accentColor }}

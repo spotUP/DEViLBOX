@@ -77,7 +77,7 @@ export const RobHubbardControls: React.FC<RobHubbardControlsProps> = ({ config, 
       {/* Sample */}
       <div className={`rounded-lg border p-3 ${panelBg}`}>
         <SectionLabel label="Sample" />
-        <div className="flex gap-6 items-start flex-wrap">
+        <div className="flex gap-3 items-start flex-wrap">
           <Knob value={config.sampleVolume} min={0} max={64} step={1}
             onChange={(v) => upd('sampleVolume', Math.round(v))}
             label="Volume" color={knob} size="sm"

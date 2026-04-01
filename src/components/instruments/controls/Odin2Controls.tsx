@@ -84,8 +84,8 @@ const Section = memo(({ title, color, bg, panelBg, accentColor, children }: {
   title: string; color?: string; bg?: string; panelBg: string; accentColor: string;
   children: React.ReactNode;
 }) => (
-  <div className={`p-4 rounded-xl border ${bg || panelBg}`}>
-    <h3 className="font-bold uppercase tracking-tight text-sm mb-4" style={{ color: color || accentColor }}>
+  <div className={`p-2 rounded-lg border ${bg || panelBg}`}>
+    <h3 className="font-bold uppercase tracking-tight text-sm mb-2" style={{ color: color || accentColor }}>
       {title}
     </h3>
     {children}
@@ -244,7 +244,7 @@ export const Odin2Controls: React.FC<Odin2ControlsProps> = ({
 
   if (!synthReady) {
     return (
-      <div className="flex flex-col gap-4 p-4">
+      <div className="grid grid-cols-2 gap-2 p-2">
         <div className="flex items-center justify-center gap-2 p-4 text-text-secondary">
           <Loader size={16} className="animate-spin" />
           <span className="text-sm">Loading Odin2...</span>
@@ -269,7 +269,7 @@ export const Odin2Controls: React.FC<Odin2ControlsProps> = ({
   ];
 
   return (
-    <div className="synth-controls-flow flex flex-col gap-4 p-4 overflow-y-auto">
+    <div className="synth-controls-flow grid grid-cols-2 gap-2 p-2 overflow-y-auto">
       {/* ═══ MASTER ═══ */}
       <Section title="Master" panelBg={panelBg} accentColor={accentColor}>
         <div className="flex gap-4 justify-center flex-wrap">

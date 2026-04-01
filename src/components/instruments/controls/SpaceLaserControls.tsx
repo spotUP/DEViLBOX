@@ -61,15 +61,15 @@ export const SpaceLaserControls: React.FC<SpaceLaserControlsProps> = ({
   };
 
   const renderLaserTab = () => (
-    <div className="flex flex-col gap-4 p-4">
+    <div className="grid grid-cols-2 gap-2 p-2">
       {/* Laser Sweep Section */}
-      <div className={`p-4 rounded-xl border ${panelBg}`}>
-        <div className="flex items-center gap-2 mb-4">
+      <div className={`p-2 rounded-lg border ${panelBg}`}>
+        <div className="flex items-center gap-2 mb-2">
           <Zap size={16} className={isCyanTheme ? 'text-accent-highlight' : 'text-green-500'} />
           <h3 className={`font-bold ${isCyanTheme ? 'text-accent-highlight' : 'text-green-400'}`}>LASER SWEEP</h3>
         </div>
         
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-6 items-center gap-6">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 items-center gap-3">
           <Knob
             value={config.laser.startFreq}
             min={100}
@@ -123,13 +123,13 @@ export const SpaceLaserControls: React.FC<SpaceLaserControlsProps> = ({
       </div>
 
       {/* Noise Section */}
-      <div className={`p-4 rounded-xl border ${panelBg}`}>
-        <div className="flex items-center gap-2 mb-4">
+      <div className={`p-2 rounded-lg border ${panelBg}`}>
+        <div className="flex items-center gap-2 mb-2">
           <Wind size={16} className={isCyanTheme ? 'text-accent-highlight' : 'text-green-500'} />
           <h3 className={`font-bold ${isCyanTheme ? 'text-accent-highlight' : 'text-green-400'}`}>NOISE GRIT</h3>
         </div>
         
-        <div className="flex gap-6 items-center">
+        <div className="flex gap-3 items-center">
           <Knob
             value={config.noise.amount}
             min={0}
@@ -167,15 +167,15 @@ export const SpaceLaserControls: React.FC<SpaceLaserControlsProps> = ({
   );
 
   const renderFMTab = () => (
-    <div className="flex flex-col gap-4 p-4">
+    <div className="grid grid-cols-2 gap-2 p-2">
       {/* FM Section */}
-      <div className={`p-4 rounded-xl border ${panelBg}`}>
-        <div className="flex items-center gap-2 mb-4">
+      <div className={`p-2 rounded-lg border ${panelBg}`}>
+        <div className="flex items-center gap-2 mb-2">
           <Activity size={16} className={isCyanTheme ? 'text-accent-highlight' : 'text-green-500'} />
           <h3 className={`font-bold ${isCyanTheme ? 'text-accent-highlight' : 'text-green-400'}`}>FM MODULATION</h3>
         </div>
         
-        <div className="flex gap-6 items-center">
+        <div className="flex gap-3 items-center">
           <Knob
             value={config.fm.amount}
             min={0}
@@ -198,8 +198,8 @@ export const SpaceLaserControls: React.FC<SpaceLaserControlsProps> = ({
       </div>
 
       {/* Filter Section */}
-      <div className={`p-4 rounded-xl border ${panelBg}`}>
-        <div className="flex items-center gap-2 mb-4">
+      <div className={`p-2 rounded-lg border ${panelBg}`}>
+        <div className="flex items-center gap-2 mb-2">
           <Filter size={16} className={isCyanTheme ? 'text-accent-highlight' : 'text-green-500'} />
           <h3 className={`font-bold ${isCyanTheme ? 'text-accent-highlight' : 'text-green-400'}`}>FILTER</h3>
         </div>
@@ -231,7 +231,7 @@ export const SpaceLaserControls: React.FC<SpaceLaserControlsProps> = ({
             poles={2} color={accentColor} width={300} height={56}
           />
 
-          <div className="flex gap-6 w-full">
+          <div className="flex gap-3 w-full">
             <Knob
               value={config.filter.cutoff}
               min={20}
@@ -257,10 +257,10 @@ export const SpaceLaserControls: React.FC<SpaceLaserControlsProps> = ({
   );
 
   const renderFXTab = () => (
-    <div className="flex flex-col gap-4 p-4">
+    <div className="grid grid-cols-2 gap-2 p-2">
       {/* Delay Section */}
-      <div className={`p-4 rounded-xl border ${panelBg}`}>
-        <div className="flex items-center justify-between mb-4">
+      <div className={`p-2 rounded-lg border ${panelBg}`}>
+        <div className="flex items-center justify-between mb-2">
           <div className="flex items-center gap-2">
             <Repeat size={16} className={isCyanTheme ? 'text-accent-highlight' : 'text-green-500'} />
             <h3 className={`font-bold ${isCyanTheme ? 'text-accent-highlight' : 'text-green-400'}`}>SPACE DELAY</h3>
@@ -273,7 +273,7 @@ export const SpaceLaserControls: React.FC<SpaceLaserControlsProps> = ({
           />
         </div>
 
-        <div className={`flex gap-6 transition-opacity ${config.delay.enabled ? 'opacity-100' : 'opacity-40 pointer-events-none'}`}>
+        <div className={`flex gap-3 transition-opacity ${config.delay.enabled ? 'opacity-100' : 'opacity-40 pointer-events-none'}`}>
           <Knob
             value={config.delay.time}
             min={0.01}
@@ -305,8 +305,8 @@ export const SpaceLaserControls: React.FC<SpaceLaserControlsProps> = ({
       </div>
 
       {/* Reverb Section */}
-      <div className={`p-4 rounded-xl border ${panelBg}`}>
-        <div className="flex items-center justify-between mb-4">
+      <div className={`p-2 rounded-lg border ${panelBg}`}>
+        <div className="flex items-center justify-between mb-2">
           <div className="flex items-center gap-2">
             <Waves size={16} className={isCyanTheme ? 'text-accent-highlight' : 'text-green-500'} />
             <h3 className={`font-bold ${isCyanTheme ? 'text-accent-highlight' : 'text-green-400'}`}>COSMIC REVERB</h3>
@@ -319,7 +319,7 @@ export const SpaceLaserControls: React.FC<SpaceLaserControlsProps> = ({
           />
         </div>
 
-        <div className={`flex gap-6 transition-opacity ${config.reverb.enabled ? 'opacity-100' : 'opacity-40 pointer-events-none'}`}>
+        <div className={`flex gap-3 transition-opacity ${config.reverb.enabled ? 'opacity-100' : 'opacity-40 pointer-events-none'}`}>
           <Knob
             value={config.reverb.decay}
             min={0.1}

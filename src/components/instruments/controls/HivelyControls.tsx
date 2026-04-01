@@ -137,7 +137,7 @@ export const HivelyControls: React.FC<HivelyControlsProps> = ({
       {/* Volume & Wave Length */}
       <div className={`rounded-lg border p-3 ${panelBg}`}>
         <SectionLabel label="Volume & Wave" />
-        <div className="flex items-center gap-6">
+        <div className="flex items-center gap-3">
           <Knob value={config.volume} min={0} max={64} step={1}
             onChange={(v) => updateParam('volume', Math.round(v))}
             label="Volume" color={knobColor} size="md"
