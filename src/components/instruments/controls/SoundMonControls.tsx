@@ -274,7 +274,7 @@ export const SoundMonControls: React.FC<SoundMonControlsProps> = ({
         <div className="flex items-center gap-4 mt-2">
           <Knob value={config.waveSpeed} min={0} max={15} step={1}
             onChange={(v) => upd('waveSpeed', Math.round(v))}
-            label="Morph Rate" color={knob} size="sm"
+            label="Morph Rate" color={knob}
             formatValue={(v) => Math.round(v).toString()} />
           {/* waveSpeed has no direct byte in the SoundMon instrument header. */}
         </div>
@@ -304,7 +304,7 @@ export const SoundMonControls: React.FC<SoundMonControlsProps> = ({
             <span className="text-[9px] uppercase tracking-wider" style={{ color: accent, opacity: 0.5 }}>Attack</span>
             <Knob value={config.attackVolume} min={0} max={64} step={1}
               onChange={(v) => updADSRWithChipRam('attackVolume', Math.round(v))}
-              label="Volume" color={knob} size="sm"
+              label="Volume" color={knob}
               formatValue={(v) => Math.round(v).toString()} />
             <Knob value={config.attackSpeed} min={0} max={63} step={1}
               onChange={(v) => {
@@ -314,40 +314,40 @@ export const SoundMonControls: React.FC<SoundMonControlsProps> = ({
                   void getEditor().writeU8(uadeChipRam.instrBase + 8, Math.round(v) & 0xFF);
                 }
               }}
-              label="Speed" color={knob} size="sm"
+              label="Speed" color={knob}
               formatValue={(v) => Math.round(v).toString()} />
           </div>
           <div className="flex flex-col items-center gap-2">
             <span className="text-[9px] uppercase tracking-wider" style={{ color: accent, opacity: 0.5 }}>Decay</span>
             <Knob value={config.decayVolume} min={0} max={64} step={1}
               onChange={(v) => updADSRWithChipRam('decayVolume', Math.round(v))}
-              label="Volume" color={knob} size="sm"
+              label="Volume" color={knob}
               formatValue={(v) => Math.round(v).toString()} />
             <Knob value={config.decaySpeed} min={0} max={63} step={1}
               onChange={(v) => updADSRWithChipRam('decaySpeed', Math.round(v))}
-              label="Speed" color={knob} size="sm"
+              label="Speed" color={knob}
               formatValue={(v) => Math.round(v).toString()} />
           </div>
           <div className="flex flex-col items-center gap-2">
             <span className="text-[9px] uppercase tracking-wider" style={{ color: accent, opacity: 0.5 }}>Sustain</span>
             <Knob value={config.sustainVolume} min={0} max={64} step={1}
               onChange={(v) => updADSRWithChipRam('sustainVolume', Math.round(v))}
-              label="Volume" color={knob} size="sm"
+              label="Volume" color={knob}
               formatValue={(v) => Math.round(v).toString()} />
             <Knob value={config.sustainLength} min={0} max={255} step={1}
               onChange={(v) => updADSRWithChipRam('sustainLength', Math.round(v))}
-              label="Length" color={knob} size="sm"
+              label="Length" color={knob}
               formatValue={(v) => Math.round(v).toString()} />
           </div>
           <div className="flex flex-col items-center gap-2">
             <span className="text-[9px] uppercase tracking-wider" style={{ color: accent, opacity: 0.5 }}>Release</span>
             <Knob value={config.releaseVolume} min={0} max={64} step={1}
               onChange={(v) => updADSRWithChipRam('releaseVolume', Math.round(v))}
-              label="Volume" color={knob} size="sm"
+              label="Volume" color={knob}
               formatValue={(v) => Math.round(v).toString()} />
             <Knob value={config.releaseSpeed} min={0} max={63} step={1}
               onChange={(v) => updADSRWithChipRam('releaseSpeed', Math.round(v))}
-              label="Speed" color={knob} size="sm"
+              label="Speed" color={knob}
               formatValue={(v) => Math.round(v).toString()} />
           </div>
         </div>
@@ -365,7 +365,7 @@ export const SoundMonControls: React.FC<SoundMonControlsProps> = ({
                 lfoDelayOffset(uadeChipRam?.instrSize ?? SM_V1V2_INSTR_SIZE),
               );
             }}
-            label="Delay" color={knob} size="sm"
+            label="Delay" color={knob}
             formatValue={(v) => Math.round(v).toString()} />
           <Knob value={config.vibratoSpeed} min={0} max={63} step={1}
             onChange={(v) => {
@@ -375,11 +375,11 @@ export const SoundMonControls: React.FC<SoundMonControlsProps> = ({
                 lfoSpeedOffset(uadeChipRam?.instrSize ?? SM_V1V2_INSTR_SIZE),
               );
             }}
-            label="Speed" color={knob} size="sm"
+            label="Speed" color={knob}
             formatValue={(v) => Math.round(v).toString()} />
           <Knob value={config.vibratoDepth} min={0} max={63} step={1}
             onChange={(v) => updWithChipRam('vibratoDepth', Math.round(v), 11)}
-            label="Depth" color={knob} size="sm"
+            label="Depth" color={knob}
             formatValue={(v) => Math.round(v).toString()} />
         </div>
       </div>
@@ -408,7 +408,7 @@ export const SoundMonControls: React.FC<SoundMonControlsProps> = ({
           <SectionLabel label="Arpeggio Speed" />
           <Knob value={config.arpSpeed} min={0} max={15} step={1}
             onChange={(v) => upd('arpSpeed', Math.round(v))}
-            label="Speed" color={knob} size="sm"
+            label="Speed" color={knob}
             formatValue={(v) => Math.round(v).toString()} />
           {/* arpSpeed has no dedicated byte; arpeggio data is in the synth table region. */}
         </div>

@@ -103,7 +103,7 @@ export const DavidWhittakerControls: React.FC<DavidWhittakerControlsProps> = ({
               value={config.defaultVolume ?? 64}
               min={0} max={64} step={1}
               onChange={(v) => upd('defaultVolume', Math.round(v))}
-              label="Volume" color={knob} size="sm"
+              label="Volume" color={knob}
               formatValue={(v) => Math.round(v).toString()}
             />
             <div className="flex flex-col gap-1">
@@ -137,14 +137,14 @@ export const DavidWhittakerControls: React.FC<DavidWhittakerControlsProps> = ({
               value={config.vibratoSpeed ?? 0}
               min={0} max={255} step={1}
               onChange={(v) => upd('vibratoSpeed', Math.round(v))}
-              label="Speed" color={knob} size="sm"
+              label="Speed" color={knob}
               formatValue={(v) => Math.round(v).toString()}
             />
             <Knob
               value={config.vibratoDepth ?? 0}
               min={0} max={255} step={1}
               onChange={(v) => upd('vibratoDepth', Math.round(v))}
-              label="Depth" color={knob} size="sm"
+              label="Depth" color={knob}
               formatValue={(v) => Math.round(v).toString()}
             />
           </div>

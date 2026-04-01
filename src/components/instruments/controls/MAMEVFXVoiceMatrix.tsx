@@ -138,14 +138,14 @@ export const MAMEVFXVoiceMatrix: React.FC<MAMEVFXVoiceMatrixProps> = ({
         </div>
 
         <div className="grid grid-cols-4 md:grid-cols-8 gap-4 place-items-center">
-          <Knob size="sm" label="VOL L" min={0} max={255} value={voiceParams[0x10] || 0} onChange={(v) => handleVoiceWrite(0x10, v)} color={knobColor} />
-          <Knob size="sm" label="VOL R" min={0} max={255} value={voiceParams[0x20] || 0} onChange={(v) => handleVoiceWrite(0x20, v)} color={knobColor} />
-          <Knob size="sm" label="FREQ L" min={0} max={255} value={voiceParams[0x08] || 0} onChange={(v) => handleVoiceWrite(0x08, v)} color={knobColor} />
-          <Knob size="sm" label="FREQ H" min={0} max={255} value={voiceParams[0x09] || 0} onChange={(v) => handleVoiceWrite(0x09, v)} color={knobColor} />
-          <Knob size="sm" label="K1" min={0} max={255} value={voiceParams[0x48] || 0} onChange={(v) => handleVoiceWrite(0x48, v)} color={knobColor} />
-          <Knob size="sm" label="K2" min={0} max={255} value={voiceParams[0x38] || 0} onChange={(v) => handleVoiceWrite(0x38, v)} color={knobColor} />
-          <Knob size="sm" label="ECOUNT" min={0} max={255} value={voiceParams[0x30] || 0} onChange={(v) => handleVoiceWrite(0x30, v)} color={knobColor} />
-          <Knob size="sm" label="CTRL" min={0} max={255} value={voiceParams[0x00] || 0} onChange={(v) => handleVoiceWrite(0x00, v)} color={knobColor} />
+          <Knob label="VOL L" min={0} max={255} value={voiceParams[0x10] || 0} onChange={(v) => handleVoiceWrite(0x10, v)} color={knobColor} />
+          <Knob label="VOL R" min={0} max={255} value={voiceParams[0x20] || 0} onChange={(v) => handleVoiceWrite(0x20, v)} color={knobColor} />
+          <Knob label="FREQ L" min={0} max={255} value={voiceParams[0x08] || 0} onChange={(v) => handleVoiceWrite(0x08, v)} color={knobColor} />
+          <Knob label="FREQ H" min={0} max={255} value={voiceParams[0x09] || 0} onChange={(v) => handleVoiceWrite(0x09, v)} color={knobColor} />
+          <Knob label="K1" min={0} max={255} value={voiceParams[0x48] || 0} onChange={(v) => handleVoiceWrite(0x48, v)} color={knobColor} />
+          <Knob label="K2" min={0} max={255} value={voiceParams[0x38] || 0} onChange={(v) => handleVoiceWrite(0x38, v)} color={knobColor} />
+          <Knob label="ECOUNT" min={0} max={255} value={voiceParams[0x30] || 0} onChange={(v) => handleVoiceWrite(0x30, v)} color={knobColor} />
+          <Knob label="CTRL" min={0} max={255} value={voiceParams[0x00] || 0} onChange={(v) => handleVoiceWrite(0x00, v)} color={knobColor} />
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

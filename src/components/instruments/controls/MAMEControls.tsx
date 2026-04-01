@@ -195,7 +195,7 @@ export const MAMEControls: React.FC<MAMEControlsProps> = ({
           </div>
           <div className="grid grid-cols-4 md:grid-cols-8 gap-4 place-items-center">
             <Knob 
-              size="sm" 
+              
               label="PAGE" 
               min={0} max={255} 
               value={config.registers[0x00] || 0}
@@ -203,7 +203,7 @@ export const MAMEControls: React.FC<MAMEControlsProps> = ({
               color={knobColor}
             />
             <Knob 
-              size="sm" 
+              
               label="ACTIVE" 
               min={0} max={31} 
               value={config.registers[0x01] || 31}
@@ -211,7 +211,7 @@ export const MAMEControls: React.FC<MAMEControlsProps> = ({
               color={knobColor}
             />
             <Knob 
-              size="sm" 
+              
               label="MODE" 
               min={0} max={255} 
               value={config.registers[0x02] || 0}

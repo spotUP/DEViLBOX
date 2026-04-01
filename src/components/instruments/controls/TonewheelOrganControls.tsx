@@ -265,7 +265,6 @@ export const TonewheelOrganControls: React.FC<TonewheelOrganControlsProps> = ({
             max={1}
             defaultValue={0.5}
             onChange={(v) => setParam(P.VIBRATO_DEPTH, v)}
-            size="sm"
             color={knobColor}
           />
         </div>
@@ -287,7 +286,6 @@ export const TonewheelOrganControls: React.FC<TonewheelOrganControlsProps> = ({
             max={1}
             defaultValue={0.3}
             onChange={(v) => setParam(P.CLICK, v)}
-            size="sm"
             color={knobColor}
           />
           <Knob
@@ -297,7 +295,6 @@ export const TonewheelOrganControls: React.FC<TonewheelOrganControlsProps> = ({
             max={1}
             defaultValue={0}
             onChange={(v) => setParam(P.OVERDRIVE, v)}
-            size="sm"
             color={knobColor}
           />
           <Knob
@@ -307,7 +304,6 @@ export const TonewheelOrganControls: React.FC<TonewheelOrganControlsProps> = ({
             max={1}
             defaultValue={0.8}
             onChange={(v) => setParam(P.VOLUME, v)}
-            size="sm"
             color={knobColor}
           />
         </div>

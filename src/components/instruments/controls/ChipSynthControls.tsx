@@ -322,7 +322,6 @@ export const ChipSynthControls: React.FC<ChipSynthControlsProps> = ({
         onChange={(v) => onParamChange(paramKey, v)}
         label={param.label}
         color={knobColor}
-        size="sm"
         defaultValue={param.default}
         logarithmic={param.logarithmic}
         bipolar={param.bipolar}

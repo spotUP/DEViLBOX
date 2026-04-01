@@ -207,7 +207,7 @@ export const SAMControls: React.FC<SAMControlsProps> = ({
             <Zap size={16} className="text-amber-500" />
             <h3 className="font-bold text-amber-400 uppercase tracking-tight">PERFORMANCE</h3>
           </div>
-          <div className="grid grid-cols-2 gap-3 items-center justify-center h-40">
+          <div className="grid grid-cols-4 gap-3 items-center justify-center h-40">
             <Knob
               value={config.pitch}
               min={0}

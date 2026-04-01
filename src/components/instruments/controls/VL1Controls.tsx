@@ -54,15 +54,15 @@ export const VL1Controls: React.FC<VL1ControlsProps> = ({ config, onChange }) =>
         <h3 className="text-gray-400 font-semibold mb-2 border-b border-gray-700 pb-1">Envelope (ADSR)</h3>
         <div className="flex gap-3 flex-wrap items-end">
           <Knob value={merged.attack ?? 0} min={0} max={1}
-            onChange={(v) => updateParam('attack', v)} label="Attack" size="sm" color="#ef4444" />
+            onChange={(v) => updateParam('attack', v)} label="Attack" color="#ef4444" />
           <Knob value={merged.decay ?? 0} min={0} max={1}
-            onChange={(v) => updateParam('decay', v)} label="Decay" size="sm" color="#f59e0b" />
+            onChange={(v) => updateParam('decay', v)} label="Decay" color="#f59e0b" />
           <Knob value={merged.sustainLevel ?? 0} min={0} max={1}
-            onChange={(v) => updateParam('sustainLevel', v)} label="Sus Lvl" size="sm" color="#22c55e" />
+            onChange={(v) => updateParam('sustainLevel', v)} label="Sus Lvl" color="#22c55e" />
           <Knob value={merged.sustainTime ?? 0} min={0} max={1}
-            onChange={(v) => updateParam('sustainTime', v)} label="Sus Time" size="sm" color="#22c55e" />
+            onChange={(v) => updateParam('sustainTime', v)} label="Sus Time" color="#22c55e" />
           <Knob value={merged.release ?? 0} min={0} max={1}
-            onChange={(v) => updateParam('release', v)} label="Release" size="sm" color="#3b82f6" />
+            onChange={(v) => updateParam('release', v)} label="Release" color="#3b82f6" />
         </div>
       </div>
 
@@ -71,9 +71,9 @@ export const VL1Controls: React.FC<VL1ControlsProps> = ({ config, onChange }) =>
         <h3 className="text-gray-400 font-semibold mb-2 border-b border-gray-700 pb-1">Modulation</h3>
         <div className="flex gap-3 flex-wrap items-end">
           <Knob value={merged.vibrato ?? 0} min={0} max={1}
-            onChange={(v) => updateParam('vibrato', v)} label="Vibrato" size="sm" color="#8b5cf6" />
+            onChange={(v) => updateParam('vibrato', v)} label="Vibrato" color="#8b5cf6" />
           <Knob value={merged.tremolo ?? 0} min={0} max={1}
-            onChange={(v) => updateParam('tremolo', v)} label="Tremolo" size="sm" color="#a855f7" />
+            onChange={(v) => updateParam('tremolo', v)} label="Tremolo" color="#a855f7" />
         </div>
       </div>
 
@@ -100,11 +100,11 @@ export const VL1Controls: React.FC<VL1ControlsProps> = ({ config, onChange }) =>
             </div>
           </div>
           <Knob value={merged.tune ?? 1} min={0.5} max={1.5}
-            onChange={(v) => updateParam('tune', v)} label="Tune" size="sm" color="#64748b" />
+            onChange={(v) => updateParam('tune', v)} label="Tune" color="#64748b" />
           <Knob value={merged.volume ?? 0.7} min={0} max={1}
-            onChange={(v) => updateParam('volume', v)} label="Volume" size="sm" color="#22c55e" />
+            onChange={(v) => updateParam('volume', v)} label="Volume" color="#22c55e" />
           <Knob value={merged.balance ?? 0.5} min={0} max={1}
-            onChange={(v) => updateParam('balance', v)} label="Balance" size="sm" color="#06b6d4" />
+            onChange={(v) => updateParam('balance', v)} label="Balance" color="#06b6d4" />
         </div>
       </div>
 
@@ -123,7 +123,7 @@ export const VL1Controls: React.FC<VL1ControlsProps> = ({ config, onChange }) =>
             {(merged.rhythmOn ?? 0) > 0.5 ? 'RHYTHM ON' : 'RHYTHM OFF'}
           </button>
           <Knob value={merged.tempo ?? 0.5} min={0} max={1}
-            onChange={(v) => updateParam('tempo', v)} label="Tempo" size="sm" color="#f97316" />
+            onChange={(v) => updateParam('tempo', v)} label="Tempo" color="#f97316" />
         </div>
         <div className="flex flex-wrap gap-1">
           {VL1_RHYTHM_NAMES.map((name, i) => (

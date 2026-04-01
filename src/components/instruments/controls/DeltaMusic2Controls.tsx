@@ -192,19 +192,19 @@ export const DeltaMusic2Controls: React.FC<DeltaMusic2ControlsProps> = ({
               <Knob
                 value={entry.speed} min={0} max={255} step={1}
                 onChange={(v) => updateVolEntry(idx, 0, Math.round(v))}
-                label="Speed" color={knob} size="sm"
+                label="Speed" color={knob}
                 formatValue={(v) => Math.round(v).toString()}
               />
               <Knob
                 value={entry.level} min={0} max={255} step={1}
                 onChange={(v) => updateVolEntry(idx, 1, Math.round(v))}
-                label="Level" color={knob} size="sm"
+                label="Level" color={knob}
                 formatValue={(v) => Math.round(v).toString()}
               />
               <Knob
                 value={entry.sustain} min={0} max={255} step={1}
                 onChange={(v) => updateVolEntry(idx, 2, Math.round(v))}
-                label="Sustain" color={knob} size="sm"
+                label="Sustain" color={knob}
                 formatValue={(v) => Math.round(v).toString()}
               />
             </div>
@@ -234,19 +234,19 @@ export const DeltaMusic2Controls: React.FC<DeltaMusic2ControlsProps> = ({
               <Knob
                 value={entry.speed} min={0} max={255} step={1}
                 onChange={(v) => updateVibEntry(idx, 0, Math.round(v))}
-                label="Speed" color={knob} size="sm"
+                label="Speed" color={knob}
                 formatValue={(v) => Math.round(v).toString()}
               />
               <Knob
                 value={entry.delay} min={0} max={255} step={1}
                 onChange={(v) => updateVibEntry(idx, 1, Math.round(v))}
-                label="Delay" color={knob} size="sm"
+                label="Delay" color={knob}
                 formatValue={(v) => Math.round(v).toString()}
               />
               <Knob
                 value={entry.sustain} min={0} max={255} step={1}
                 onChange={(v) => updateVibEntry(idx, 2, Math.round(v))}
-                label="Sustain" color={knob} size="sm"
+                label="Sustain" color={knob}
                 formatValue={(v) => Math.round(v).toString()}
               />
             </div>

@@ -134,7 +134,7 @@ export const V2Controls: React.FC<V2ControlsProps> = ({
           </select>
         </div>
         
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 items-center">
+        <div className="grid grid-cols-4 gap-3 items-center">
           <Knob
             value={config.osc1.transpose}
             min={-64}
@@ -201,7 +201,7 @@ export const V2Controls: React.FC<V2ControlsProps> = ({
           </div>
         </div>
         
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 items-center">
+        <div className="grid grid-cols-4 gap-3 items-center">
           <Knob
             value={config.osc2.transpose}
             min={-64}
@@ -268,7 +268,7 @@ export const V2Controls: React.FC<V2ControlsProps> = ({
           </div>
         </div>
         
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 items-center">
+        <div className="grid grid-cols-4 gap-3 items-center">
           <Knob
             value={config.osc3.transpose}
             min={-64}
@@ -340,7 +340,7 @@ export const V2Controls: React.FC<V2ControlsProps> = ({
             </div>
           );
         })()}
-        <div className="grid grid-cols-2 gap-3 items-center">
+        <div className="grid grid-cols-4 gap-3 items-center">
           <Knob
             value={config.filter1.cutoff}
             min={0}
@@ -390,7 +390,7 @@ export const V2Controls: React.FC<V2ControlsProps> = ({
             </div>
           );
         })()}
-        <div className="grid grid-cols-2 gap-3 items-center">
+        <div className="grid grid-cols-4 gap-3 items-center">
           <Knob
             value={config.filter2.cutoff}
             min={0}
@@ -464,7 +464,7 @@ export const V2Controls: React.FC<V2ControlsProps> = ({
           />
         </div>
 
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 items-center">
+        <div className="grid grid-cols-4 gap-3 items-center">
           <Knob
             value={config.envelope.attack}
             min={0}
@@ -519,7 +519,7 @@ export const V2Controls: React.FC<V2ControlsProps> = ({
           />
         </div>
 
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 items-center">
+        <div className="grid grid-cols-4 gap-3 items-center">
           <Knob
             value={config.envelope2.attack}
             min={0}
@@ -567,7 +567,7 @@ export const V2Controls: React.FC<V2ControlsProps> = ({
             <h3 className="font-bold text-amber-400 uppercase tracking-tight">LFO 1</h3>
           </div>
 
-          <div className="grid grid-cols-2 gap-3 items-center">
+          <div className="grid grid-cols-4 gap-3 items-center">
             <Knob
               value={config.lfo1.rate}
               min={0}
@@ -637,7 +637,7 @@ export const V2Controls: React.FC<V2ControlsProps> = ({
             </label>
           </div>
 
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-3 items-center">
+          <div className="grid grid-cols-4 gap-3 items-center">
             <Knob
               value={lfo2.rate}
               min={0}
@@ -692,7 +692,7 @@ export const V2Controls: React.FC<V2ControlsProps> = ({
               ))}
             </select>
           </div>
-          <div className="grid grid-cols-3 gap-3 items-center">
+          <div className="grid grid-cols-4 gap-3 items-center">
             <Knob
               value={vDist.inGain}
               min={0}
@@ -737,7 +737,7 @@ export const V2Controls: React.FC<V2ControlsProps> = ({
               ))}
             </select>
           </div>
-          <div className="grid grid-cols-3 gap-3 items-center">
+          <div className="grid grid-cols-4 gap-3 items-center">
             <Knob
               value={cDist.inGain}
               min={0}
@@ -771,7 +771,7 @@ export const V2Controls: React.FC<V2ControlsProps> = ({
             <Activity size={16} className="text-amber-500" />
             <h3 className="font-bold text-amber-400 uppercase tracking-tight">CHORUS / FLANGER</h3>
           </div>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 items-center">
+          <div className="grid grid-cols-4 gap-3 items-center">
             <Knob
               value={chorus.amount}
               min={0}
@@ -805,7 +805,7 @@ export const V2Controls: React.FC<V2ControlsProps> = ({
               color={knobColor}
             />
           </div>
-          <div className="grid grid-cols-3 gap-3 items-center mt-4">
+          <div className="grid grid-cols-4 gap-3 items-center mt-4">
             <Knob
               value={chorus.modRate}
               min={0}
@@ -870,7 +870,7 @@ export const V2Controls: React.FC<V2ControlsProps> = ({
               />
             </label>
           </div>
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-3 items-center">
+          <div className="grid grid-cols-4 gap-3 items-center">
             <Knob
               value={comp.threshold}
               min={0}

@@ -102,12 +102,12 @@ export const MAMEDOCVoiceMatrix: React.FC<MAMEDOCVoiceMatrixProps> = ({
         </div>
 
         <div className="grid grid-cols-4 md:grid-cols-6 gap-4 place-items-center">
-          <Knob size="sm" label="FREQ L" min={0} max={255} value={oscParams[0x00] || 0} onChange={(v) => handleOscWrite(0x00, v)} color={knobColor} />
-          <Knob size="sm" label="FREQ H" min={0} max={255} value={oscParams[0x20] || 0} onChange={(v) => handleOscWrite(0x20, v)} color={knobColor} />
-          <Knob size="sm" label="VOLUME" min={0} max={255} value={oscParams[0x40] || 0} onChange={(v) => handleOscWrite(0x40, v)} color={knobColor} />
-          <Knob size="sm" label="CTRL" min={0} max={255} value={oscParams[0x80] || 0} onChange={(v) => handleOscWrite(0x80, v)} color={knobColor} />
-          <Knob size="sm" label="W-SIZE" min={0} max={255} value={oscParams[0xA0] || 0} onChange={(v) => handleOscWrite(0xA0, v)} color={knobColor} />
-          <Knob size="sm" label="W-PTR" min={0} max={255} value={oscParams[0xC0] || 0} onChange={(v) => handleOscWrite(0xC0, v)} color={knobColor} />
+          <Knob label="FREQ L" min={0} max={255} value={oscParams[0x00] || 0} onChange={(v) => handleOscWrite(0x00, v)} color={knobColor} />
+          <Knob label="FREQ H" min={0} max={255} value={oscParams[0x20] || 0} onChange={(v) => handleOscWrite(0x20, v)} color={knobColor} />
+          <Knob label="VOLUME" min={0} max={255} value={oscParams[0x40] || 0} onChange={(v) => handleOscWrite(0x40, v)} color={knobColor} />
+          <Knob label="CTRL" min={0} max={255} value={oscParams[0x80] || 0} onChange={(v) => handleOscWrite(0x80, v)} color={knobColor} />
+          <Knob label="W-SIZE" min={0} max={255} value={oscParams[0xA0] || 0} onChange={(v) => handleOscWrite(0xA0, v)} color={knobColor} />
+          <Knob label="W-PTR" min={0} max={255} value={oscParams[0xC0] || 0} onChange={(v) => handleOscWrite(0xC0, v)} color={knobColor} />
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

@@ -192,11 +192,11 @@ export const DigMugControls: React.FC<DigMugControlsProps> = ({
         <div className="flex gap-4">
           <Knob value={config.waveBlend} min={0} max={63} step={1}
             onChange={(v) => updWithChipRam('waveBlend', Math.round(v), 6)}
-            label="Blend Pos" color={knob} size="sm"
+            label="Blend Pos" color={knob}
             formatValue={(v) => Math.round(v).toString()} />
           <Knob value={config.waveSpeed} min={0} max={63} step={1}
             onChange={(v) => updWithChipRam('waveSpeed', Math.round(v), 14)}
-            label="Morph Spd" color={knob} size="sm"
+            label="Morph Spd" color={knob}
             formatValue={(v) => Math.round(v).toString()} />
         </div>
 
@@ -222,11 +222,11 @@ export const DigMugControls: React.FC<DigMugControlsProps> = ({
             formatValue={(v) => Math.round(v).toString()} />
           <Knob value={config.vibSpeed} min={0} max={63} step={1}
             onChange={(v) => updWithChipRam('vibSpeed', Math.round(v), 5)}
-            label="Vib Speed" color={knob} size="sm"
+            label="Vib Speed" color={knob}
             formatValue={(v) => Math.round(v).toString()} />
           <Knob value={config.vibDepth} min={0} max={63} step={1}
             onChange={(v) => updWithChipRam('vibDepth', Math.round(v), 7)}
-            label="Vib Depth" color={knob} size="sm"
+            label="Vib Depth" color={knob}
             formatValue={(v) => Math.round(v).toString()} />
         </div>
       </div>
@@ -248,7 +248,7 @@ export const DigMugControls: React.FC<DigMugControlsProps> = ({
                 void getEditor().writeU8(uadeChipRam.instrBase + 14, Math.round(val * 17) & 0xFF);
               }
             }}
-            label="Speed" color={knob} size="sm"
+            label="Speed" color={knob}
             formatValue={(v) => Math.round(v).toString()} />
         </div>
 

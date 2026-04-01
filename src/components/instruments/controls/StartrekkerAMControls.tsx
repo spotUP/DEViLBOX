@@ -234,41 +234,41 @@ export const StartrekkerAMControls: React.FC<StartrekkerAMControlsProps> = ({
           <div className="flex flex-col items-center gap-2">
             <span className="text-[9px] font-bold uppercase tracking-wider" style={{ color: accentColor }}>Attack 1</span>
             <Knob value={config.attackTarget} min={-256} max={256} onChange={(v) => updateParam('attackTarget', Math.round(v))}
-              label="Target" color={knobColor} formatValue={(v) => `${Math.round(v)}`} size="sm" />
+              label="Target" color={knobColor} formatValue={(v) => `${Math.round(v)}`} />
             <Knob value={config.attackRate} min={0} max={128} onChange={(v) => updateParam('attackRate', Math.round(v))}
-              label="Rate" color={knobColor} formatValue={(v) => `${Math.round(v)}`} size="sm" />
+              label="Rate" color={knobColor} formatValue={(v) => `${Math.round(v)}`} />
           </div>
 
           {/* Attack 2 */}
           <div className="flex flex-col items-center gap-2">
             <span className="text-[9px] font-bold uppercase tracking-wider" style={{ color: accentColor }}>Attack 2</span>
             <Knob value={config.attack2Target} min={-256} max={256} onChange={(v) => updateParam('attack2Target', Math.round(v))}
-              label="Target" color={knobColor} formatValue={(v) => `${Math.round(v)}`} size="sm" />
+              label="Target" color={knobColor} formatValue={(v) => `${Math.round(v)}`} />
             <Knob value={config.attack2Rate} min={0} max={128} onChange={(v) => updateParam('attack2Rate', Math.round(v))}
-              label="Rate" color={knobColor} formatValue={(v) => `${Math.round(v)}`} size="sm" />
+              label="Rate" color={knobColor} formatValue={(v) => `${Math.round(v)}`} />
           </div>
 
           {/* Decay */}
           <div className="flex flex-col items-center gap-2">
             <span className="text-[9px] font-bold uppercase tracking-wider" style={{ color: accentColor }}>Decay</span>
             <Knob value={config.decayTarget} min={-256} max={256} onChange={(v) => updateParam('decayTarget', Math.round(v))}
-              label="Target" color={knobColor} formatValue={(v) => `${Math.round(v)}`} size="sm" />
+              label="Target" color={knobColor} formatValue={(v) => `${Math.round(v)}`} />
             <Knob value={config.decayRate} min={0} max={128} onChange={(v) => updateParam('decayRate', Math.round(v))}
-              label="Rate" color={knobColor} formatValue={(v) => `${Math.round(v)}`} size="sm" />
+              label="Rate" color={knobColor} formatValue={(v) => `${Math.round(v)}`} />
           </div>
 
           {/* Sustain */}
           <div className="flex flex-col items-center gap-2">
             <span className="text-[9px] font-bold uppercase tracking-wider" style={{ color: accentColor }}>Sustain</span>
             <Knob value={config.sustainCount} min={0} max={999} onChange={(v) => updateParam('sustainCount', Math.round(v))}
-              label="Length" color={knobColor} formatValue={(v) => `${Math.round(v)}`} size="sm" />
+              label="Length" color={knobColor} formatValue={(v) => `${Math.round(v)}`} />
           </div>
 
           {/* Release */}
           <div className="flex flex-col items-center gap-2">
             <span className="text-[9px] font-bold uppercase tracking-wider" style={{ color: accentColor }}>Release</span>
             <Knob value={config.releaseRate} min={0} max={128} onChange={(v) => updateParam('releaseRate', Math.round(v))}
-              label="Rate" color={knobColor} formatValue={(v) => `${Math.round(v)}`} size="sm" />
+              label="Rate" color={knobColor} formatValue={(v) => `${Math.round(v)}`} />
           </div>
         </div>
       </div>

@@ -206,7 +206,7 @@ export const SymphonieControls: React.FC<SymphonieControlsProps> = ({
             <Knob
               value={config.numLoops} min={0} max={255} step={1}
               onChange={(v) => upd('numLoops', Math.round(v))}
-              label="Repeats" color={knob} size="sm"
+              label="Repeats" color={knob}
               formatValue={(v) => Math.round(v) === 0 ? 'Inf' : Math.round(v).toString()}
             />
           </div>

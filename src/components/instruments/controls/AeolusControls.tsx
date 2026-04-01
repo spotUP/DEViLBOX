@@ -110,9 +110,9 @@ export const AeolusControls: React.FC<AeolusControlsProps> = ({ config, onChange
           <StopToggle label="Enable" active={merged.tremulantOn === 1}
             onChange={(on) => updateParam('tremulantOn', on ? 1 : 0)} />
           <Knob label="Speed" value={merged.tremulantSpeed ?? 0.5} min={0} max={1} defaultValue={0.5}
-            onChange={(v) => updateParam('tremulantSpeed', v)} size="sm" color="#d4a017" />
+            onChange={(v) => updateParam('tremulantSpeed', v)} color="#d4a017" />
           <Knob label="Depth" value={merged.tremulantDepth ?? 0.5} min={0} max={1} defaultValue={0.5}
-            onChange={(v) => updateParam('tremulantDepth', v)} size="sm" color="#d4a017" />
+            onChange={(v) => updateParam('tremulantDepth', v)} color="#d4a017" />
         </div>
       </div>
 
@@ -121,9 +121,9 @@ export const AeolusControls: React.FC<AeolusControlsProps> = ({ config, onChange
         <h3 className="font-bold uppercase tracking-tight text-sm mb-2 text-amber-500">Reverb</h3>
         <div className="flex flex-wrap gap-4 justify-center">
           <Knob label="Amount" value={merged.reverbAmount ?? 0.3} min={0} max={1} defaultValue={0.3}
-            onChange={(v) => updateParam('reverbAmount', v)} size="sm" color="#d4a017" />
+            onChange={(v) => updateParam('reverbAmount', v)} color="#d4a017" />
           <Knob label="Size" value={merged.reverbSize ?? 0.5} min={0} max={1} defaultValue={0.5}
-            onChange={(v) => updateParam('reverbSize', v)} size="sm" color="#d4a017" />
+            onChange={(v) => updateParam('reverbSize', v)} color="#d4a017" />
         </div>
       </div>
 
@@ -132,15 +132,15 @@ export const AeolusControls: React.FC<AeolusControlsProps> = ({ config, onChange
         <h3 className="font-bold uppercase tracking-tight text-sm mb-2 text-amber-500">Master</h3>
         <div className="flex flex-wrap gap-4 justify-center">
           <Knob label="Volume" value={merged.volume ?? 0.8} min={0} max={1} defaultValue={0.8}
-            onChange={(v) => updateParam('volume', v)} size="sm" color="#d4a017" />
+            onChange={(v) => updateParam('volume', v)} color="#d4a017" />
           <Knob label="Tuning" value={merged.tuning ?? 440} min={415} max={466} defaultValue={440}
-            onChange={(v) => updateParam('tuning', v)} size="sm" color="#d4a017" />
+            onChange={(v) => updateParam('tuning', v)} color="#d4a017" />
           <Knob label="Wind" value={merged.windPressure ?? 0.5} min={0} max={1} defaultValue={0.5}
-            onChange={(v) => updateParam('windPressure', v)} size="sm" color="#d4a017" />
+            onChange={(v) => updateParam('windPressure', v)} color="#d4a017" />
           <Knob label="Swell Expr" value={merged.swellExpression ?? 0.7} min={0} max={1} defaultValue={0.7}
-            onChange={(v) => updateParam('swellExpression', v)} size="sm" color="#d4a017" />
+            onChange={(v) => updateParam('swellExpression', v)} color="#d4a017" />
           <Knob label="Great Expr" value={merged.greatExpression ?? 1} min={0} max={1} defaultValue={1}
-            onChange={(v) => updateParam('greatExpression', v)} size="sm" color="#d4a017" />
+            onChange={(v) => updateParam('greatExpression', v)} color="#d4a017" />
         </div>
       </div>
     </div>

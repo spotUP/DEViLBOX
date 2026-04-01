@@ -258,7 +258,6 @@ export const SetBfreeControls: React.FC<SetBfreeControlsProps> = ({ config, onCh
             max={22}
             defaultValue={11}
             onChange={(v) => updateParam('percGain', v)}
-            size="sm"
             color="#d4a017"
           />
         </div>
@@ -303,7 +302,6 @@ export const SetBfreeControls: React.FC<SetBfreeControlsProps> = ({ config, onCh
             max={22}
             defaultValue={7}
             onChange={(v) => updateParam('vibratoFreq', v)}
-            size="sm"
             color="#d4a017"
             unit="Hz"
           />
@@ -333,17 +331,17 @@ export const SetBfreeControls: React.FC<SetBfreeControlsProps> = ({ config, onCh
         </div>
         <div className="flex flex-wrap gap-4 mt-3 justify-center">
           <Knob label="Horn Slow" value={merged.hornSlowRpm} min={5} max={200} defaultValue={40}
-            onChange={(v) => updateParam('hornSlowRpm', v)} size="sm" color="#d4a017" unit="rpm" />
+            onChange={(v) => updateParam('hornSlowRpm', v)} color="#d4a017" unit="rpm" />
           <Knob label="Horn Fast" value={merged.hornFastRpm} min={100} max={900} defaultValue={400}
-            onChange={(v) => updateParam('hornFastRpm', v)} size="sm" color="#d4a017" unit="rpm" />
+            onChange={(v) => updateParam('hornFastRpm', v)} color="#d4a017" unit="rpm" />
           <Knob label="Horn Acc" value={merged.hornAccel} min={0.05} max={2.0} defaultValue={0.161}
-            onChange={(v) => updateParam('hornAccel', v)} size="sm" color="#d4a017" unit="s" />
+            onChange={(v) => updateParam('hornAccel', v)} color="#d4a017" unit="s" />
           <Knob label="Drum Slow" value={merged.drumSlowRpm} min={5} max={100} defaultValue={36}
-            onChange={(v) => updateParam('drumSlowRpm', v)} size="sm" color="#d4a017" unit="rpm" />
+            onChange={(v) => updateParam('drumSlowRpm', v)} color="#d4a017" unit="rpm" />
           <Knob label="Drum Fast" value={merged.drumFastRpm} min={60} max={600} defaultValue={357}
-            onChange={(v) => updateParam('drumFastRpm', v)} size="sm" color="#d4a017" unit="rpm" />
+            onChange={(v) => updateParam('drumFastRpm', v)} color="#d4a017" unit="rpm" />
           <Knob label="Drum Acc" value={merged.drumAccel} min={0.5} max={10.0} defaultValue={4.127}
-            onChange={(v) => updateParam('drumAccel', v)} size="sm" color="#d4a017" unit="s" />
+            onChange={(v) => updateParam('drumAccel', v)} color="#d4a017" unit="s" />
         </div>
       </div>
 
@@ -362,12 +360,12 @@ export const SetBfreeControls: React.FC<SetBfreeControlsProps> = ({ config, onCh
             OVERDRIVE
           </button>
           <Knob label="OD Char" value={merged.overdriveCharacter} min={0} max={127} defaultValue={0}
-            onChange={(v) => updateParam('overdriveCharacter', v)} size="sm" color="#d4a017" />
+            onChange={(v) => updateParam('overdriveCharacter', v)} color="#d4a017" />
           <div className="w-px h-8 bg-dark-bgHover" />
           <Knob label="Reverb Mix" value={merged.reverbMix} min={0} max={1} defaultValue={0.1}
-            onChange={(v) => updateParam('reverbMix', v)} size="sm" color="#d4a017" />
+            onChange={(v) => updateParam('reverbMix', v)} color="#d4a017" />
           <Knob label="Reverb Wet" value={merged.reverbWet} min={0} max={1} defaultValue={0.1}
-            onChange={(v) => updateParam('reverbWet', v)} size="sm" color="#d4a017" />
+            onChange={(v) => updateParam('reverbWet', v)} color="#d4a017" />
         </div>
       </div>
 
@@ -376,15 +374,15 @@ export const SetBfreeControls: React.FC<SetBfreeControlsProps> = ({ config, onCh
         <h3 className="font-bold uppercase tracking-tight text-sm mb-3 text-amber-500">Master</h3>
         <div className="flex flex-wrap gap-4 justify-center">
           <Knob label="Volume" value={merged.volume} min={0} max={1} defaultValue={0.8}
-            onChange={(v) => updateParam('volume', v)} size="sm" color="#d4a017" />
+            onChange={(v) => updateParam('volume', v)} color="#d4a017" />
           <Knob label="Key Click" value={merged.keyClick} min={0} max={1} defaultValue={0.5}
-            onChange={(v) => updateParam('keyClick', v)} size="sm" color="#d4a017" />
+            onChange={(v) => updateParam('keyClick', v)} color="#d4a017" />
           <Knob label="Tuning" value={merged.tuning} min={220} max={880} defaultValue={440}
-            onChange={(v) => updateParam('tuning', v)} size="sm" color="#d4a017" unit="Hz" />
+            onChange={(v) => updateParam('tuning', v)} color="#d4a017" unit="Hz" />
           <Knob label="Output" value={merged.outputLevel} min={0} max={1} defaultValue={0.8}
-            onChange={(v) => updateParam('outputLevel', v)} size="sm" color="#d4a017" />
+            onChange={(v) => updateParam('outputLevel', v)} color="#d4a017" />
           <Knob label="Swell" value={merged.swellPedal} min={0} max={1} defaultValue={1}
-            onChange={(v) => updateParam('swellPedal', v)} size="sm" color="#d4a017" />
+            onChange={(v) => updateParam('swellPedal', v)} color="#d4a017" />
         </div>
       </div>
     </div>

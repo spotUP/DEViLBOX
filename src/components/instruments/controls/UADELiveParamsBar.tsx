@@ -91,7 +91,6 @@ export const UADELiveParamsBar: React.FC<UADELiveParamsBarProps> = ({ instrument
             step={1}
             label="Volume"
             color={knob}
-            size="sm"
             formatValue={(v) => Math.round(v).toString()}
             onChange={handleVolumeChange}
           />
@@ -104,7 +103,6 @@ export const UADELiveParamsBar: React.FC<UADELiveParamsBarProps> = ({ instrument
             step={1}
             label="Finetune"
             color={knob}
-            size="sm"
             bipolar
             formatValue={(v) => `${v > 0 ? '+' : ''}${Math.round(v)} ct`}
             onChange={(v) => handleFinetuneChange(Math.round(v))}

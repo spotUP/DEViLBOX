@@ -351,7 +351,6 @@ export const VitalControls: React.FC<VitalControlsProps> = ({
                         max={p.max}
                         defaultValue={p.defaultValue}
                         onChange={(v) => setParam(p.id, v)}
-                        size="sm"
                         color={knobColor}
                       />
                     );
@@ -467,7 +466,6 @@ const LfoTabContent: React.FC<LfoTabContentProps> = ({
                 max={p.max}
                 defaultValue={p.defaultValue}
                 onChange={(v) => setParam(p.id, v)}
-                size="sm"
                 color={knobColor}
               />
             );
@@ -569,7 +567,6 @@ const OtherParamsTab: React.FC<OtherParamsTabProps> = ({
                   max={p.max}
                   defaultValue={p.defaultValue}
                   onChange={(v) => setParam(p.id, v)}
-                  size="sm"
                   color={knobColor}
                 />
               );

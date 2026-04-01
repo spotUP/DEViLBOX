@@ -189,35 +189,35 @@ export const FCControls: React.FC<FCControlsProps> = ({ config, onChange, uadeCh
             width={300} height={56}
           />
         </div>
-        <div className="grid grid-cols-3 gap-3">
+        <div className="grid grid-cols-4 gap-3">
           <div className="flex flex-col items-center gap-2">
             <Knob value={config.atkLength} min={0} max={255} step={1}
               onChange={(v) => updADSRWithChipRam('atkLength', Math.round(v))}
-              label="Atk Len" color={knob} size="sm"
+              label="Atk Len" color={knob}
               formatValue={(v) => Math.round(v).toString()} />
             <Knob value={config.atkVolume} min={0} max={64} step={1}
               onChange={(v) => updADSRWithChipRam('atkVolume', Math.round(v))}
-              label="Atk Vol" color={knob} size="sm"
+              label="Atk Vol" color={knob}
               formatValue={(v) => Math.round(v).toString()} />
           </div>
           <div className="flex flex-col items-center gap-2">
             <Knob value={config.decLength} min={0} max={255} step={1}
               onChange={(v) => updADSRWithChipRam('decLength', Math.round(v))}
-              label="Dec Len" color={knob} size="sm"
+              label="Dec Len" color={knob}
               formatValue={(v) => Math.round(v).toString()} />
             <Knob value={config.decVolume} min={0} max={64} step={1}
               onChange={(v) => updADSRWithChipRam('decVolume', Math.round(v))}
-              label="Dec Vol" color={knob} size="sm"
+              label="Dec Vol" color={knob}
               formatValue={(v) => Math.round(v).toString()} />
           </div>
           <div className="flex flex-col items-center gap-2">
             <Knob value={config.relLength} min={0} max={255} step={1}
               onChange={(v) => updADSRWithChipRam('relLength', Math.round(v))}
-              label="Rel Len" color={knob} size="sm"
+              label="Rel Len" color={knob}
               formatValue={(v) => Math.round(v).toString()} />
             <Knob value={config.sustVolume} min={0} max={64} step={1}
               onChange={(v) => updADSRWithChipRam('sustVolume', Math.round(v))}
-              label="Sus Vol" color={knob} size="sm"
+              label="Sus Vol" color={knob}
               formatValue={(v) => Math.round(v).toString()} />
           </div>
         </div>
@@ -229,15 +229,15 @@ export const FCControls: React.FC<FCControlsProps> = ({ config, onChange, uadeCh
         <div className="flex gap-4">
           <Knob value={config.vibDelay} min={0} max={255} step={1}
             onChange={(v) => updWithChipRam('vibDelay', Math.round(v), 4)}
-            label="Delay" color={knob} size="sm"
+            label="Delay" color={knob}
             formatValue={(v) => Math.round(v).toString()} />
           <Knob value={config.vibSpeed} min={0} max={63} step={1}
             onChange={(v) => updWithChipRam('vibSpeed', Math.round(v), 2)}
-            label="Speed" color={knob} size="sm"
+            label="Speed" color={knob}
             formatValue={(v) => Math.round(v).toString()} />
           <Knob value={config.vibDepth} min={0} max={63} step={1}
             onChange={(v) => updWithChipRam('vibDepth', Math.round(v), 3)}
-            label="Depth" color={knob} size="sm"
+            label="Depth" color={knob}
             formatValue={(v) => Math.round(v).toString()} />
         </div>
       </div>
@@ -261,7 +261,7 @@ export const FCControls: React.FC<FCControlsProps> = ({ config, onChange, uadeCh
           <div className="flex items-center gap-4 mb-3">
             <Knob value={config.synthSpeed} min={0} max={15} step={1}
               onChange={(v) => updWithChipRam('synthSpeed', Math.round(v), 0)}
-              label="Speed" color={knob} size="sm"
+              label="Speed" color={knob}
               formatValue={(v) => Math.round(v).toString()} />
             <span className="text-[10px] text-text-muted">Ticks per macro step (0 = disabled)</span>
           </div>

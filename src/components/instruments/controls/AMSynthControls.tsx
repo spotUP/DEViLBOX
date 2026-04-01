@@ -161,7 +161,6 @@ export const AMSynthControls: React.FC<AMSynthControlsProps> = ({ config, onChan
                   onChange={(v) => updateParam(p.key, v)}
                   formatValue={p.format}
                   bipolar={BIPOLAR_PARAMS.has(p.key)}
-                  size="sm"
                   color={knobColor}
                 />
               );

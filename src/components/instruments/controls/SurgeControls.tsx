@@ -264,7 +264,6 @@ export const SurgeControls: React.FC<SurgeControlsProps> = ({
                             max={p.max}
                             defaultValue={p.defaultValue}
                             onChange={(v) => setParam(p.id, v)}
-                            size="sm"
                             color={knobColor}
                           />
                         );
@@ -309,7 +308,6 @@ export const SurgeControls: React.FC<SurgeControlsProps> = ({
                             max={p.max}
                             defaultValue={p.defaultValue}
                             onChange={(v) => setParam(p.id, v)}
-                            size="sm"
                             color={knobColor}
                           />
                         );
@@ -466,7 +464,6 @@ const SurgeLfoTab: React.FC<SurgeLfoTabProps> = ({
                 max={p.max}
                 defaultValue={p.defaultValue}
                 onChange={(v) => setParam(p.id, v)}
-                size="sm"
                 color={knobColor}
               />
             );
@@ -527,7 +524,6 @@ const SurgeFxTab: React.FC<SurgeFxTabProps> = ({
               max={p.max}
               defaultValue={p.defaultValue}
               onChange={(v) => setParam(p.id, v)}
-              size="sm"
               color={knobColor}
             />
           ))}
@@ -555,7 +551,6 @@ const SurgeFxTab: React.FC<SurgeFxTabProps> = ({
                   max={p.max}
                   defaultValue={p.defaultValue}
                   onChange={(v) => setParam(p.id, v)}
-                  size="sm"
                   color={knobColor}
                 />
               );
@@ -626,7 +621,6 @@ const SurgeOtherTab: React.FC<SurgeOtherTabProps> = ({
                   max={p.max}
                   defaultValue={p.defaultValue}
                   onChange={(v) => setParam(p.id, v)}
-                  size="sm"
                   color={knobColor}
                 />
               );

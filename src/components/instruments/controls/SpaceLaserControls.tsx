@@ -69,7 +69,7 @@ export const SpaceLaserControls: React.FC<SpaceLaserControlsProps> = ({
           <h3 className={`font-bold ${isCyanTheme ? 'text-accent-highlight' : 'text-green-400'}`}>LASER SWEEP</h3>
         </div>
         
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 items-center gap-3">
+        <div className="grid grid-cols-4 gap-3 items-center gap-3">
           <Knob
             value={config.laser.startFreq}
             min={100}

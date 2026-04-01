@@ -127,21 +127,21 @@ export const FuturePlayerControls: React.FC<FuturePlayerControlsProps> = ({
             <div className="text-xs font-semibold text-text-secondary mb-2">Envelope</div>
             <div className="grid grid-cols-4 gap-3">
               <Knob label="Atk Rate" value={config.attackRate} min={0} max={255} step={1}
-                onChange={(v) => upd('attackRate', v)} size="sm" color={knob} />
+                onChange={(v) => upd('attackRate', v)} color={knob} />
               <Knob label="Atk Peak" value={config.attackPeak} min={0} max={255} step={1}
-                onChange={(v) => upd('attackPeak', v)} size="sm" color={knob} />
+                onChange={(v) => upd('attackPeak', v)} color={knob} />
               <Knob label="Dec Rate" value={config.decayRate} min={0} max={255} step={1}
-                onChange={(v) => upd('decayRate', v)} size="sm" color={knob} />
+                onChange={(v) => upd('decayRate', v)} color={knob} />
               <Knob label="Sus Level" value={config.sustainLevel} min={0} max={255} step={1}
-                onChange={(v) => upd('sustainLevel', v)} size="sm" color={knob} />
+                onChange={(v) => upd('sustainLevel', v)} color={knob} />
             </div>
             <div className="grid grid-cols-4 gap-3 mt-3">
               <Knob label="Sus Rate" value={config.sustainRate & 0x7F} min={0} max={127} step={1}
-                onChange={(v) => upd('sustainRate', (config.sustainRate & 0x80) | (v & 0x7F))} size="sm" color={knob} />
+                onChange={(v) => upd('sustainRate', (config.sustainRate & 0x80) | (v & 0x7F))} color={knob} />
               <Knob label="Sus Target" value={config.sustainTarget} min={0} max={255} step={1}
-                onChange={(v) => upd('sustainTarget', v)} size="sm" color={knob} />
+                onChange={(v) => upd('sustainTarget', v)} color={knob} />
               <Knob label="Rel Rate" value={config.releaseRate} min={0} max={255} step={1}
-                onChange={(v) => upd('releaseRate', v)} size="sm" color={knob} />
+                onChange={(v) => upd('releaseRate', v)} color={knob} />
               <div className="flex flex-col items-center">
                 <div className="text-[9px] text-text-muted mb-1">Sus Dir</div>
                 <button
@@ -178,9 +178,9 @@ export const FuturePlayerControls: React.FC<FuturePlayerControlsProps> = ({
             {config.hasPitchMod1 && (
               <div className="grid grid-cols-4 gap-3">
                 <Knob label="Delay" value={config.pitchMod1Delay} min={0} max={255} step={1}
-                  onChange={(v) => upd('pitchMod1Delay', v)} size="sm" color={knob} />
+                  onChange={(v) => upd('pitchMod1Delay', v)} color={knob} />
                 <Knob label="Shift" value={config.pitchMod1Shift} min={0} max={7} step={1}
-                  onChange={(v) => upd('pitchMod1Shift', v)} size="sm" color={knob} />
+                  onChange={(v) => upd('pitchMod1Shift', v)} color={knob} />
                 <div className="flex flex-col items-center">
                   <div className="text-[9px] text-text-muted mb-1">Mode</div>
                   <div className="text-xs text-text-primary">
@@ -212,9 +212,9 @@ export const FuturePlayerControls: React.FC<FuturePlayerControlsProps> = ({
             {config.hasPitchMod2 && (
               <div className="grid grid-cols-4 gap-3">
                 <Knob label="Delay" value={config.pitchMod2Delay} min={0} max={255} step={1}
-                  onChange={(v) => upd('pitchMod2Delay', v)} size="sm" color={knob} />
+                  onChange={(v) => upd('pitchMod2Delay', v)} color={knob} />
                 <Knob label="Shift" value={config.pitchMod2Shift} min={0} max={7} step={1}
-                  onChange={(v) => upd('pitchMod2Shift', v)} size="sm" color={knob} />
+                  onChange={(v) => upd('pitchMod2Shift', v)} color={knob} />
                 <div className="flex flex-col items-center">
                   <div className="text-[9px] text-text-muted mb-1">Mode</div>
                   <div className="text-xs text-text-primary">
@@ -249,11 +249,11 @@ export const FuturePlayerControls: React.FC<FuturePlayerControlsProps> = ({
               </span>
             </div>
             {config.hasSampleMod1 && (
-              <div className="grid grid-cols-3 gap-3">
+              <div className="grid grid-cols-4 gap-3">
                 <Knob label="Delay" value={config.sampleMod1Delay} min={0} max={255} step={1}
-                  onChange={(v) => upd('sampleMod1Delay', v)} size="sm" color={knob} />
+                  onChange={(v) => upd('sampleMod1Delay', v)} color={knob} />
                 <Knob label="Shift" value={config.sampleMod1Shift} min={0} max={7} step={1}
-                  onChange={(v) => upd('sampleMod1Shift', v)} size="sm" color={knob} />
+                  onChange={(v) => upd('sampleMod1Shift', v)} color={knob} />
                 <div className="flex flex-col items-center">
                   <div className="text-[9px] text-text-muted mb-1">Mode</div>
                   <div className="text-xs text-text-primary">
@@ -277,11 +277,11 @@ export const FuturePlayerControls: React.FC<FuturePlayerControlsProps> = ({
               </span>
             </div>
             {config.hasSampleMod2 && (
-              <div className="grid grid-cols-3 gap-3">
+              <div className="grid grid-cols-4 gap-3">
                 <Knob label="Delay" value={config.sampleMod2Delay} min={0} max={255} step={1}
-                  onChange={(v) => upd('sampleMod2Delay', v)} size="sm" color={knob} />
+                  onChange={(v) => upd('sampleMod2Delay', v)} color={knob} />
                 <Knob label="Shift" value={config.sampleMod2Shift} min={0} max={7} step={1}
-                  onChange={(v) => upd('sampleMod2Shift', v)} size="sm" color={knob} />
+                  onChange={(v) => upd('sampleMod2Shift', v)} color={knob} />
                 <div className="flex flex-col items-center">
                   <div className="text-[9px] text-text-muted mb-1">Mode</div>
                   <div className="text-xs text-text-primary">

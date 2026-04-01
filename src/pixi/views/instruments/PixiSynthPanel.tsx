@@ -82,17 +82,17 @@ export const PixiSynthPanel: React.FC<PixiSynthPanelProps> = ({ layout: panelLay
         width: '100%',
         height: '100%',
         flexDirection: 'column',
-        gap: 8,
-        padding: 8,
+        gap: 4,
+        padding: 4,
       }}
     >
       {/* Synth name */}
       <PixiLabel text={panelLayout.name} size="md" weight="bold" color="accent" />
 
-      {/* Two-column grid of all sections */}
-      <pixiContainer layout={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'stretch', gap: 6, width: '100%' }}>
+      {/* Four-column grid of all sections */}
+      <pixiContainer layout={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'stretch', gap: 4, width: '100%' }}>
         {allSections.map((section, sIdx) => (
-          <pixiContainer key={sIdx} layout={{ width: '48%', flexShrink: 0, flexGrow: 1 }}>
+          <pixiContainer key={sIdx} layout={{ width: '24%', flexShrink: 0, flexGrow: 1 }}>
             <PixiSynthSection
               section={section}
               getValue={getValue}
@@ -128,9 +128,9 @@ const PixiSynthSection: React.FC<SynthSectionProps> = ({ section, getValue, upda
   }, [theme]);
 
   return (
-    <pixiContainer layout={{ flexDirection: 'column', gap: 6 }}>
+    <pixiContainer layout={{ flexDirection: 'column', gap: 4 }}>
       {/* Section label */}
-      <pixiContainer layout={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+      <pixiContainer layout={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
         <pixiBitmapText
           text={section.label}
           style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 11, fill: 0xffffff }}
@@ -140,8 +140,8 @@ const PixiSynthSection: React.FC<SynthSectionProps> = ({ section, getValue, upda
         <pixiGraphics draw={drawBorder} layout={{ flex: 1, height: 1 }} />
       </pixiContainer>
 
-      {/* Controls grid */}
-      <pixiContainer layout={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+      {/* Controls grid — 4 columns */}
+      <pixiContainer layout={{ flexDirection: 'row', flexWrap: 'wrap', gap: 4 }}>
         {section.controls.map(ctrl => (
           <PixiSynthControl
             key={ctrl.key}
