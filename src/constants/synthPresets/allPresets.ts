@@ -19,6 +19,7 @@ import { HARMONIC_SYNTH_PRESETS } from './harmonicSynth';
 import { SYNARE_PRESETS } from './synare';
 import { V2_PRESETS } from './v2';
 import { WAVETABLE_PRESETS } from './wavetable';
+import { OIDOS_PRESETS } from './oidos';
 
 export function getPresetsForSynthType(synthType: SynthType): SynthPreset[] {
   switch (synthType) {
@@ -60,6 +61,8 @@ export function getPresetsForSynthType(synthType: SynthType): SynthPreset[] {
       return V2_PRESETS;
     case 'Wavetable':
       return WAVETABLE_PRESETS;
+    case 'OidosSynth':
+      return OIDOS_PRESETS;
     default:
       return [];
   }
@@ -85,4 +88,5 @@ export const ALL_PRESETS: Record<string, SynthPreset[]> = {
   Synare: SYNARE_PRESETS,
   V2: V2_PRESETS,
   Wavetable: WAVETABLE_PRESETS,
+  OidosSynth: OIDOS_PRESETS,
 };

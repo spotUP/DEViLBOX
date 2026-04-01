@@ -365,4 +365,32 @@ export const pluginSynthEntries: Record<string, SynthInfo> = {
     icon: 'Code2',
     color: 'text-lime-400',
   },
+  // Retromulator WASM synths
+  OpenWurli: {
+    type: 'OpenWurli',
+    name: 'Wurlitzer 200A',
+    shortName: 'Wurli',
+    description: 'Wurlitzer 200A electric piano emulation — authentic reed vibration, tremolo, speaker character modeling',
+    bestFor: ['Electric Piano', 'Wurlitzer', 'Keys', 'Vintage', 'Soul'],
+    icon: 'Piano',
+    color: 'text-amber-500',
+  },
+  OPL3: {
+    type: 'OPL3',
+    name: 'OPL3 (YMF262)',
+    shortName: 'OPL3',
+    description: 'Yamaha YMF262 OPL3 FM synthesis — 2-operator FM with 8 waveforms, Nuked OPL3 cycle-accurate emulation',
+    bestFor: ['FM', 'Retro PC', 'AdLib', 'Sound Blaster', 'DOS games'],
+    icon: 'Cpu',
+    color: 'text-cyan-400',
+  },
+  DX7: {
+    type: 'DX7',
+    name: 'DX7 (VDX7)',
+    shortName: 'VDX7',
+    description: 'Cycle-accurate Yamaha DX7 emulation — HD6303R CPU + EGS/OPS chips, 1120 factory patches from 35 sysex banks',
+    bestFor: ['FM', 'Electric Piano', 'Bass', 'Bells', 'Brass', 'Classic DX7'],
+    icon: 'Piano',
+    color: 'text-blue-500',
+  },
 };
