@@ -402,12 +402,14 @@ export const DrumPadManager: React.FC<DrumPadManagerProps> = ({ onClose }) => {
         <ErrorBoundary fallbackMessage="An error occurred in the drum pad interface.">
           {performanceMode ? (
             /* Performance Mode: fullscreen pads with minimal controls */
-            <div className="flex-1 flex flex-col overflow-hidden">
-              <PadGrid
-                onPadSelect={setSelectedPadId}
-                onEmptyPadClick={handleEmptyPadClick}
-                selectedPadId={selectedPadId}
-              />
+            <div className="flex-1 flex items-center justify-center overflow-auto">
+              <div className="w-full max-w-md">
+                <PadGrid
+                  onPadSelect={setSelectedPadId}
+                  onEmptyPadClick={handleEmptyPadClick}
+                  selectedPadId={selectedPadId}
+                />
+              </div>
             </div>
           ) : (
           <div className="flex-1 overflow-auto">
