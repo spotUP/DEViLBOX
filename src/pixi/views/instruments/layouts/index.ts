@@ -35,6 +35,7 @@ import { POLY_SYNTH_LAYOUT } from './polySynth';
 import { OPENWURLI_LAYOUT } from './openwurli';
 import { OPL3_LAYOUT } from './opl3';
 import { DX7_LAYOUT } from './dx7';
+import { OIDOS_LAYOUT } from './oidos';
 
 /** Map from SynthType string to layout descriptor */
 export const SYNTH_LAYOUTS: Record<string, SynthPanelLayout> = {
@@ -53,6 +54,7 @@ export const SYNTH_LAYOUTS: Record<string, SynthPanelLayout> = {
   OpenWurli: OPENWURLI_LAYOUT,
   OPL3: OPL3_LAYOUT,
   DX7: DX7_LAYOUT,
+  OidosSynth: OIDOS_LAYOUT,
 
   // Custom Tone.js synths
   DubSiren: DUB_SIREN_LAYOUT,
