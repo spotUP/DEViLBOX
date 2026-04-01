@@ -155,13 +155,13 @@ export const MAMERSAVoiceMatrix: React.FC<MAMERSAVoiceMatrixProps> = ({
         </div>
 
         <div className="grid grid-cols-4 md:grid-cols-7 gap-4 place-items-center">
-          <Knob size="sm" label="PITCH L" min={0} max={255} value={partParams[0] || 0} onChange={(v) => handlePartWrite(0, v)} color={knobColor} />
-          <Knob size="sm" label="PITCH H" min={0} max={255} value={partParams[1] || 0} onChange={(v) => handlePartWrite(1, v)} color={knobColor} />
-          <Knob size="sm" label="W-LOOP" min={0} max={255} value={partParams[2] || 0} onChange={(v) => handlePartWrite(2, v)} color={knobColor} />
-          <Knob size="sm" label="W-HIGH" min={0} max={255} value={partParams[3] || 0} onChange={(v) => handlePartWrite(3, v)} color={knobColor} />
-          <Knob size="sm" label="E-DEST" min={0} max={255} value={partParams[4] || 0} onChange={(v) => handlePartWrite(4, v)} color={knobColor} />
-          <Knob size="sm" label="E-SPD" min={0} max={255} value={partParams[5] || 0} onChange={(v) => handlePartWrite(5, v)} color={knobColor} />
-          <Knob size="sm" label="E-OFFS" min={0} max={255} value={partParams[7] || 0} onChange={(v) => handlePartWrite(7, v)} color={knobColor} />
+          <Knob label="PITCH L" min={0} max={255} value={partParams[0] || 0} onChange={(v) => handlePartWrite(0, v)} color={knobColor} />
+          <Knob label="PITCH H" min={0} max={255} value={partParams[1] || 0} onChange={(v) => handlePartWrite(1, v)} color={knobColor} />
+          <Knob label="W-LOOP" min={0} max={255} value={partParams[2] || 0} onChange={(v) => handlePartWrite(2, v)} color={knobColor} />
+          <Knob label="W-HIGH" min={0} max={255} value={partParams[3] || 0} onChange={(v) => handlePartWrite(3, v)} color={knobColor} />
+          <Knob label="E-DEST" min={0} max={255} value={partParams[4] || 0} onChange={(v) => handlePartWrite(4, v)} color={knobColor} />
+          <Knob label="E-SPD" min={0} max={255} value={partParams[5] || 0} onChange={(v) => handlePartWrite(5, v)} color={knobColor} />
+          <Knob label="E-OFFS" min={0} max={255} value={partParams[7] || 0} onChange={(v) => handlePartWrite(7, v)} color={knobColor} />
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

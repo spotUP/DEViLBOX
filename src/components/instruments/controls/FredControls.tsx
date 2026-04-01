@@ -155,44 +155,44 @@ export const FredControls: React.FC<FredControlsProps> = ({ config, onChange, ua
           <div className="flex flex-col items-center gap-2">
             <Knob value={config.attackVol} min={0} max={64} step={1}
               onChange={(v) => void updWithChipRam('attackVol', Math.round(v), async (ed, base) => { await ed.writeU8(base + 16, Math.round(v)); })}
-              label="Atk Vol" color={knob} size="sm"
+              label="Atk Vol" color={knob}
               formatValue={(v) => Math.round(v).toString()} />
             <Knob value={config.attackSpeed} min={1} max={255} step={1}
               onChange={(v) => void updWithChipRam('attackSpeed', Math.round(v), async (ed, base) => { await ed.writeU8(base + 15, Math.round(v)); })}
-              label="Atk Spd" color={knob} size="sm"
+              label="Atk Spd" color={knob}
               formatValue={(v) => Math.round(v).toString()} />
           </div>
           {/* Decay */}
           <div className="flex flex-col items-center gap-2">
             <Knob value={config.decayVol} min={0} max={64} step={1}
               onChange={(v) => void updWithChipRam('decayVol', Math.round(v), async (ed, base) => { await ed.writeU8(base + 18, Math.round(v)); })}
-              label="Dec Vol" color={knob} size="sm"
+              label="Dec Vol" color={knob}
               formatValue={(v) => Math.round(v).toString()} />
             <Knob value={config.decaySpeed} min={1} max={255} step={1}
               onChange={(v) => void updWithChipRam('decaySpeed', Math.round(v), async (ed, base) => { await ed.writeU8(base + 17, Math.round(v)); })}
-              label="Dec Spd" color={knob} size="sm"
+              label="Dec Spd" color={knob}
               formatValue={(v) => Math.round(v).toString()} />
           </div>
           {/* Sustain */}
           <div className="flex flex-col items-center gap-2">
             <Knob value={config.sustainTime} min={0} max={255} step={1}
               onChange={(v) => void updWithChipRam('sustainTime', Math.round(v), async (ed, base) => { await ed.writeU8(base + 19, Math.round(v)); })}
-              label="Sus Time" color={knob} size="sm"
+              label="Sus Time" color={knob}
               formatValue={(v) => Math.round(v).toString()} />
             <Knob value={config.envelopeVol} min={0} max={64} step={1}
               onChange={(v) => void updWithChipRam('envelopeVol', Math.round(v), async (ed, base) => { await ed.writeU8(base + 14, Math.round(v)); })}
-              label="Init Vol" color={knob} size="sm"
+              label="Init Vol" color={knob}
               formatValue={(v) => Math.round(v).toString()} />
           </div>
           {/* Release */}
           <div className="flex flex-col items-center gap-2">
             <Knob value={config.releaseVol} min={0} max={64} step={1}
               onChange={(v) => void updWithChipRam('releaseVol', Math.round(v), async (ed, base) => { await ed.writeU8(base + 21, Math.round(v)); })}
-              label="Rel Vol" color={knob} size="sm"
+              label="Rel Vol" color={knob}
               formatValue={(v) => Math.round(v).toString()} />
             <Knob value={config.releaseSpeed} min={1} max={255} step={1}
               onChange={(v) => void updWithChipRam('releaseSpeed', Math.round(v), async (ed, base) => { await ed.writeU8(base + 20, Math.round(v)); })}
-              label="Rel Spd" color={knob} size="sm"
+              label="Rel Spd" color={knob}
               formatValue={(v) => Math.round(v).toString()} />
           </div>
         </div>
@@ -243,19 +243,19 @@ export const FredControls: React.FC<FredControlsProps> = ({ config, onChange, ua
         <div className="flex flex-wrap gap-3">
           <Knob value={config.pulseSpeed} min={1} max={255} step={1}
             onChange={(v) => void updWithChipRam('pulseSpeed', Math.round(v), async (ed, base) => { await ed.writeU8(base + 42, Math.round(v)); })}
-            label="Speed" color={knob} size="sm"
+            label="Speed" color={knob}
             formatValue={(v) => Math.round(v).toString()} />
           <Knob value={config.pulseDelay} min={0} max={255} step={1}
             onChange={(v) => void updWithChipRam('pulseDelay', Math.round(v), async (ed, base) => { await ed.writeU8(base + 45, Math.round(v)); })}
-            label="Delay" color={knob} size="sm"
+            label="Delay" color={knob}
             formatValue={(v) => Math.round(v).toString()} />
           <Knob value={config.pulseRatePos} min={0} max={127} step={1}
             onChange={(v) => void updWithChipRam('pulseRatePos', Math.round(v), async (ed, base) => { await ed.writeU8(base + 41, Math.round(v)); })}
-            label="Rate +" color={knob} size="sm"
+            label="Rate +" color={knob}
             formatValue={(v) => Math.round(v).toString()} />
           <Knob value={config.pulseRateNeg} min={-128} max={0} step={1}
             onChange={(v) => void updWithChipRam('pulseRateNeg', Math.round(v), async (ed, base) => { await ed.writeS8(base + 40, Math.round(v)); })}
-            label="Rate -" color={knob} size="sm"
+            label="Rate -" color={knob}
             formatValue={(v) => Math.round(v).toString()} />
         </div>
         <div className="mt-2 text-[9px] text-text-muted font-mono">

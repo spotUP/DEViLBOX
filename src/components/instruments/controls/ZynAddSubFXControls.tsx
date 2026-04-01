@@ -81,12 +81,12 @@ const VoiceControls: React.FC<VoiceControlsProps> = React.memo(({
           onChange={(v) => update(waveKey, v)} color="green" />
       </div>
       <Knob label="Volume" value={merged[volKey] as number} min={0} max={1} defaultValue={0}
-        onChange={(v) => update(volKey, v)} size="sm" color="#f43f5e" />
+        onChange={(v) => update(volKey, v)} color="#f43f5e" />
       <Knob label="Detune" value={merged[detuneKey] as number} min={-1} max={1} defaultValue={0}
-        onChange={(v) => update(detuneKey, v)} size="sm" color="#f43f5e" />
+        onChange={(v) => update(detuneKey, v)} color="#f43f5e" />
       {octaveKey && (
         <Knob label="Octave" value={merged[octaveKey] as number} min={-4} max={4} defaultValue={0}
-          onChange={(v) => update(octaveKey, Math.round(v))} size="sm" color="#f43f5e" />
+          onChange={(v) => update(octaveKey, Math.round(v))} color="#f43f5e" />
       )}
     </div>
   </div>
@@ -145,13 +145,13 @@ export const ZynAddSubFXControls: React.FC<ZynAddSubFXControlsProps> = ({ config
             </div>
             <div className="flex flex-wrap gap-4 mb-3">
               <Knob label="Volume" value={merged.addVolume} min={0} max={1} defaultValue={0.8}
-                onChange={(v) => updateParam('addVolume', v)} size="sm" color="#f43f5e" />
+                onChange={(v) => updateParam('addVolume', v)} color="#f43f5e" />
               <Knob label="Pan" value={merged.addPanning} min={-1} max={1} defaultValue={0}
-                onChange={(v) => updateParam('addPanning', v)} size="sm" color="#f43f5e" />
+                onChange={(v) => updateParam('addPanning', v)} color="#f43f5e" />
               <Knob label="Detune" value={merged.addDetune} min={-1} max={1} defaultValue={0}
-                onChange={(v) => updateParam('addDetune', v)} size="sm" color="#f43f5e" />
+                onChange={(v) => updateParam('addDetune', v)} color="#f43f5e" />
               <Knob label="Octave" value={merged.addOctave} min={-4} max={4} defaultValue={0}
-                onChange={(v) => updateParam('addOctave', Math.round(v))} size="sm" color="#f43f5e" />
+                onChange={(v) => updateParam('addOctave', Math.round(v))} color="#f43f5e" />
             </div>
             <div className="flex flex-col gap-2">
               <VoiceControls index={0} waveKey="addVoice1Wave" volKey="addVoice1Volume"
@@ -183,21 +183,21 @@ export const ZynAddSubFXControls: React.FC<ZynAddSubFXControlsProps> = ({ config
           </div>
           <div className="flex flex-wrap gap-4 mb-3">
             <Knob label="Volume" value={merged.subVolume} min={0} max={1} defaultValue={0.8}
-              onChange={(v) => updateParam('subVolume', v)} size="sm" color="#f43f5e" />
+              onChange={(v) => updateParam('subVolume', v)} color="#f43f5e" />
             <Knob label="Pan" value={merged.subPanning} min={-1} max={1} defaultValue={0}
-              onChange={(v) => updateParam('subPanning', v)} size="sm" color="#f43f5e" />
+              onChange={(v) => updateParam('subPanning', v)} color="#f43f5e" />
             <Knob label="Octave" value={merged.subOctave} min={-4} max={4} defaultValue={0}
-              onChange={(v) => updateParam('subOctave', Math.round(v))} size="sm" color="#f43f5e" />
+              onChange={(v) => updateParam('subOctave', Math.round(v))} color="#f43f5e" />
             <Knob label="Detune" value={merged.subDetune} min={-1} max={1} defaultValue={0}
-              onChange={(v) => updateParam('subDetune', v)} size="sm" color="#f43f5e" />
+              onChange={(v) => updateParam('subDetune', v)} color="#f43f5e" />
           </div>
           <div className="flex flex-wrap gap-4 mb-3">
             <Knob label="Bandwidth" value={merged.subBandwidth} min={0} max={1} defaultValue={0.5}
-              onChange={(v) => updateParam('subBandwidth', v)} size="sm" color="#f43f5e" />
+              onChange={(v) => updateParam('subBandwidth', v)} color="#f43f5e" />
             <Knob label="BW Scale" value={merged.subBandwidthScale} min={0} max={1} defaultValue={0.5}
-              onChange={(v) => updateParam('subBandwidthScale', v)} size="sm" color="#f43f5e" />
+              onChange={(v) => updateParam('subBandwidthScale', v)} color="#f43f5e" />
             <Knob label="Harmonics" value={merged.subNumHarmonics} min={1} max={64} defaultValue={8}
-              onChange={(v) => updateParam('subNumHarmonics', Math.round(v))} size="sm" color="#f43f5e" />
+              onChange={(v) => updateParam('subNumHarmonics', Math.round(v))} color="#f43f5e" />
           </div>
           <div className="flex flex-col gap-1 mb-2">
             <span className="text-[10px] text-text-muted">Mag Type</span>
@@ -208,7 +208,7 @@ export const ZynAddSubFXControls: React.FC<ZynAddSubFXControlsProps> = ({ config
             {(['subHarmonic1', 'subHarmonic2', 'subHarmonic3', 'subHarmonic4', 'subHarmonic5', 'subHarmonic6'] as const).map((key, i) => (
               <Knob key={key} label={`H${i + 1}`} value={merged[key]} min={0} max={1}
                 defaultValue={DEFAULT_ZYNADDSUBFX[key] ?? 0}
-                onChange={(v) => updateParam(key, v)} size="sm" color="#f43f5e" />
+                onChange={(v) => updateParam(key, v)} color="#f43f5e" />
             ))}
           </div>
         </div>
@@ -230,23 +230,23 @@ export const ZynAddSubFXControls: React.FC<ZynAddSubFXControlsProps> = ({ config
           </div>
           <div className="flex flex-wrap gap-4 mb-3">
             <Knob label="Volume" value={merged.padVolume} min={0} max={1} defaultValue={0.8}
-              onChange={(v) => updateParam('padVolume', v)} size="sm" color="#f43f5e" />
+              onChange={(v) => updateParam('padVolume', v)} color="#f43f5e" />
             <Knob label="Pan" value={merged.padPanning} min={-1} max={1} defaultValue={0}
-              onChange={(v) => updateParam('padPanning', v)} size="sm" color="#f43f5e" />
+              onChange={(v) => updateParam('padPanning', v)} color="#f43f5e" />
             <Knob label="Octave" value={merged.padOctave} min={-4} max={4} defaultValue={0}
-              onChange={(v) => updateParam('padOctave', Math.round(v))} size="sm" color="#f43f5e" />
+              onChange={(v) => updateParam('padOctave', Math.round(v))} color="#f43f5e" />
             <Knob label="Detune" value={merged.padDetune} min={-1} max={1} defaultValue={0}
-              onChange={(v) => updateParam('padDetune', v)} size="sm" color="#f43f5e" />
+              onChange={(v) => updateParam('padDetune', v)} color="#f43f5e" />
           </div>
           <div className="flex flex-wrap gap-4 mb-3">
             <Knob label="Bandwidth" value={merged.padBandwidth} min={0} max={1} defaultValue={0.5}
-              onChange={(v) => updateParam('padBandwidth', v)} size="sm" color="#f43f5e" />
+              onChange={(v) => updateParam('padBandwidth', v)} color="#f43f5e" />
             <Knob label="BW Scale" value={merged.padBandwidthScale} min={0} max={1} defaultValue={0.5}
-              onChange={(v) => updateParam('padBandwidthScale', v)} size="sm" color="#f43f5e" />
+              onChange={(v) => updateParam('padBandwidthScale', v)} color="#f43f5e" />
             <Knob label="Profile W" value={merged.padProfileWidth} min={0} max={1} defaultValue={0.5}
-              onChange={(v) => updateParam('padProfileWidth', v)} size="sm" color="#f43f5e" />
+              onChange={(v) => updateParam('padProfileWidth', v)} color="#f43f5e" />
             <Knob label="Stretch" value={merged.padProfileStretch} min={0} max={1} defaultValue={0.5}
-              onChange={(v) => updateParam('padProfileStretch', v)} size="sm" color="#f43f5e" />
+              onChange={(v) => updateParam('padProfileStretch', v)} color="#f43f5e" />
           </div>
           <div className="flex flex-col gap-1">
             <span className="text-[10px] text-text-muted">Quality</span>
@@ -268,41 +268,41 @@ export const ZynAddSubFXControls: React.FC<ZynAddSubFXControlsProps> = ({ config
             </div>
             <div className="flex flex-wrap gap-4">
               <Knob label="Cutoff" value={merged.filterCutoff} min={0} max={1} defaultValue={0.8}
-                onChange={(v) => updateParam('filterCutoff', v)} size="sm" color="#f43f5e" />
+                onChange={(v) => updateParam('filterCutoff', v)} color="#f43f5e" />
               <Knob label="Reso" value={merged.filterResonance} min={0} max={1} defaultValue={0.2}
-                onChange={(v) => updateParam('filterResonance', v)} size="sm" color="#f43f5e" />
+                onChange={(v) => updateParam('filterResonance', v)} color="#f43f5e" />
               <Knob label="Env Amt" value={merged.filterEnvAmount} min={0} max={1} defaultValue={0}
-                onChange={(v) => updateParam('filterEnvAmount', v)} size="sm" color="#f43f5e" />
+                onChange={(v) => updateParam('filterEnvAmount', v)} color="#f43f5e" />
               <Knob label="Velocity" value={merged.filterVelocity} min={0} max={1} defaultValue={0.5}
-                onChange={(v) => updateParam('filterVelocity', v)} size="sm" color="#f43f5e" />
+                onChange={(v) => updateParam('filterVelocity', v)} color="#f43f5e" />
               <Knob label="Key Trk" value={merged.filterKeyTrack} min={0} max={1} defaultValue={0.5}
-                onChange={(v) => updateParam('filterKeyTrack', v)} size="sm" color="#f43f5e" />
+                onChange={(v) => updateParam('filterKeyTrack', v)} color="#f43f5e" />
             </div>
           </div>
           <div className="p-2 rounded-lg border bg-[#1a1a1a] border-rose-900/30">
             <h3 className="font-bold uppercase tracking-tight text-sm mb-3 text-rose-400">Filter Envelope</h3>
             <div className="flex flex-wrap gap-4 justify-center">
               <Knob label="Attack" value={merged.filterAttack} min={0} max={1} defaultValue={0.01}
-                onChange={(v) => updateParam('filterAttack', v)} size="sm" color="#f43f5e" />
+                onChange={(v) => updateParam('filterAttack', v)} color="#f43f5e" />
               <Knob label="Decay" value={merged.filterDecay} min={0} max={1} defaultValue={0.3}
-                onChange={(v) => updateParam('filterDecay', v)} size="sm" color="#f43f5e" />
+                onChange={(v) => updateParam('filterDecay', v)} color="#f43f5e" />
               <Knob label="Sustain" value={merged.filterSustain} min={0} max={1} defaultValue={0.7}
-                onChange={(v) => updateParam('filterSustain', v)} size="sm" color="#f43f5e" />
+                onChange={(v) => updateParam('filterSustain', v)} color="#f43f5e" />
               <Knob label="Release" value={merged.filterRelease} min={0} max={1} defaultValue={0.3}
-                onChange={(v) => updateParam('filterRelease', v)} size="sm" color="#f43f5e" />
+                onChange={(v) => updateParam('filterRelease', v)} color="#f43f5e" />
             </div>
           </div>
           <div className="p-2 rounded-lg border bg-[#1a1a1a] border-rose-900/30">
             <h3 className="font-bold uppercase tracking-tight text-sm mb-3 text-rose-400">Amp Envelope</h3>
             <div className="flex flex-wrap gap-4 justify-center">
               <Knob label="Attack" value={merged.ampAttack} min={0} max={1} defaultValue={0.01}
-                onChange={(v) => updateParam('ampAttack', v)} size="sm" color="#f43f5e" />
+                onChange={(v) => updateParam('ampAttack', v)} color="#f43f5e" />
               <Knob label="Decay" value={merged.ampDecay} min={0} max={1} defaultValue={0.1}
-                onChange={(v) => updateParam('ampDecay', v)} size="sm" color="#f43f5e" />
+                onChange={(v) => updateParam('ampDecay', v)} color="#f43f5e" />
               <Knob label="Sustain" value={merged.ampSustain} min={0} max={1} defaultValue={1.0}
-                onChange={(v) => updateParam('ampSustain', v)} size="sm" color="#f43f5e" />
+                onChange={(v) => updateParam('ampSustain', v)} color="#f43f5e" />
               <Knob label="Release" value={merged.ampRelease} min={0} max={1} defaultValue={0.2}
-                onChange={(v) => updateParam('ampRelease', v)} size="sm" color="#f43f5e" />
+                onChange={(v) => updateParam('ampRelease', v)} color="#f43f5e" />
             </div>
           </div>
         </div>
@@ -315,31 +315,31 @@ export const ZynAddSubFXControls: React.FC<ZynAddSubFXControlsProps> = ({ config
             <h3 className="font-bold uppercase tracking-tight text-sm mb-3 text-rose-400">Reverb</h3>
             <div className="flex flex-wrap gap-4 justify-center">
               <Knob label="Wet" value={merged.reverbWet} min={0} max={1} defaultValue={0}
-                onChange={(v) => updateParam('reverbWet', v)} size="sm" color="#f43f5e" />
+                onChange={(v) => updateParam('reverbWet', v)} color="#f43f5e" />
               <Knob label="Size" value={merged.reverbSize} min={0} max={1} defaultValue={0.5}
-                onChange={(v) => updateParam('reverbSize', v)} size="sm" color="#f43f5e" />
+                onChange={(v) => updateParam('reverbSize', v)} color="#f43f5e" />
               <Knob label="Damp" value={merged.reverbDamp} min={0} max={1} defaultValue={0.5}
-                onChange={(v) => updateParam('reverbDamp', v)} size="sm" color="#f43f5e" />
+                onChange={(v) => updateParam('reverbDamp', v)} color="#f43f5e" />
             </div>
           </div>
           <div className="p-2 rounded-lg border bg-[#1a1a1a] border-rose-900/30">
             <h3 className="font-bold uppercase tracking-tight text-sm mb-3 text-rose-400">Chorus</h3>
             <div className="flex flex-wrap gap-4 justify-center">
               <Knob label="Wet" value={merged.chorusWet} min={0} max={1} defaultValue={0}
-                onChange={(v) => updateParam('chorusWet', v)} size="sm" color="#f43f5e" />
+                onChange={(v) => updateParam('chorusWet', v)} color="#f43f5e" />
               <Knob label="Rate" value={merged.chorusRate} min={0} max={1} defaultValue={0.3}
-                onChange={(v) => updateParam('chorusRate', v)} size="sm" color="#f43f5e" />
+                onChange={(v) => updateParam('chorusRate', v)} color="#f43f5e" />
               <Knob label="Depth" value={merged.chorusDepth} min={0} max={1} defaultValue={0.3}
-                onChange={(v) => updateParam('chorusDepth', v)} size="sm" color="#f43f5e" />
+                onChange={(v) => updateParam('chorusDepth', v)} color="#f43f5e" />
             </div>
           </div>
           <div className="p-2 rounded-lg border bg-[#1a1a1a] border-rose-900/30">
             <h3 className="font-bold uppercase tracking-tight text-sm mb-3 text-rose-400">Distortion</h3>
             <div className="flex flex-wrap items-start gap-4 justify-center">
               <Knob label="Wet" value={merged.distortionWet} min={0} max={1} defaultValue={0}
-                onChange={(v) => updateParam('distortionWet', v)} size="sm" color="#f43f5e" />
+                onChange={(v) => updateParam('distortionWet', v)} color="#f43f5e" />
               <Knob label="Drive" value={merged.distortionDrive} min={0} max={1} defaultValue={0.3}
-                onChange={(v) => updateParam('distortionDrive', v)} size="sm" color="#f43f5e" />
+                onChange={(v) => updateParam('distortionDrive', v)} color="#f43f5e" />
               <div className="flex flex-col items-center gap-1">
                 <span className="text-[10px] text-text-muted">Type</span>
                 <SegmentButton labels={DIST_LABELS} value={merged.distortionType}
@@ -351,9 +351,9 @@ export const ZynAddSubFXControls: React.FC<ZynAddSubFXControlsProps> = ({ config
             <h3 className="font-bold uppercase tracking-tight text-sm mb-3 text-rose-400">EQ</h3>
             <div className="flex flex-wrap gap-4 justify-center">
               <Knob label="Low" value={merged.eqLow} min={0} max={1} defaultValue={0.5}
-                onChange={(v) => updateParam('eqLow', v)} size="sm" color="#f43f5e" />
+                onChange={(v) => updateParam('eqLow', v)} color="#f43f5e" />
               <Knob label="High" value={merged.eqHigh} min={0} max={1} defaultValue={0.5}
-                onChange={(v) => updateParam('eqHigh', v)} size="sm" color="#f43f5e" />
+                onChange={(v) => updateParam('eqHigh', v)} color="#f43f5e" />
             </div>
           </div>
         </div>

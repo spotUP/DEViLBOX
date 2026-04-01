@@ -80,7 +80,7 @@ export const RobHubbardControls: React.FC<RobHubbardControlsProps> = ({ config, 
         <div className="flex gap-3 items-start flex-wrap">
           <Knob value={config.sampleVolume} min={0} max={64} step={1}
             onChange={(v) => upd('sampleVolume', Math.round(v))}
-            label="Volume" color={knob} size="sm"
+            label="Volume" color={knob}
             formatValue={(v) => Math.round(v).toString()} />
           <div className="flex flex-col gap-2">
             <InfoValue
@@ -101,11 +101,11 @@ export const RobHubbardControls: React.FC<RobHubbardControlsProps> = ({ config, 
         <div className="flex gap-4 items-center">
           <Knob value={config.divider} min={0} max={255} step={1}
             onChange={(v) => upd('divider', Math.round(v))}
-            label="Depth Divisor" color={knob} size="sm"
+            label="Depth Divisor" color={knob}
             formatValue={(v) => Math.round(v).toString()} />
           <Knob value={config.vibratoIdx} min={0} max={255} step={1}
             onChange={(v) => upd('vibratoIdx', Math.round(v))}
-            label="Start Index" color={knob} size="sm"
+            label="Start Index" color={knob}
             formatValue={(v) => Math.round(v).toString()} />
           <span className="text-[10px] text-text-muted">Divisor 0 = disabled</span>
         </div>
@@ -117,11 +117,11 @@ export const RobHubbardControls: React.FC<RobHubbardControlsProps> = ({ config, 
         <div className="flex gap-4 items-center">
           <Knob value={config.hiPos} min={0} max={255} step={1}
             onChange={(v) => upd('hiPos', Math.round(v))}
-            label="Upper Bound" color={knob} size="sm"
+            label="Upper Bound" color={knob}
             formatValue={(v) => Math.round(v).toString()} />
           <Knob value={config.loPos} min={0} max={255} step={1}
             onChange={(v) => upd('loPos', Math.round(v))}
-            label="Lower Bound" color={knob} size="sm"
+            label="Lower Bound" color={knob}
             formatValue={(v) => Math.round(v).toString()} />
           <span className="text-[10px] text-text-muted">Upper 0 = disabled</span>
         </div>

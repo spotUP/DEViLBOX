@@ -37,17 +37,17 @@ export const SfizzControls: React.FC<SfizzControlsProps> = ({ config, onChange }
       <div className="p-2 rounded-lg border bg-[#1a1a1a] border-amber-900/30">
         <h3 className="font-bold uppercase tracking-tight text-sm mb-3 text-amber-500">Output</h3>
         <div className="flex flex-wrap gap-4 justify-center">
-          <Knob label="Volume" value={merged.volume} min={0} max={1} defaultValue={0.8} onChange={(v) => updateParam('volume', v)} size="sm" color="#a78bfa" />
-          <Knob label="Pan" value={merged.pan} min={-1} max={1} defaultValue={0} onChange={(v) => updateParam('pan', v)} size="sm" color="#a78bfa" />
-          <Knob label="Polyphony" value={merged.polyphony} min={1} max={256} defaultValue={64} onChange={(v) => updateParam('polyphony', Math.round(v))} size="sm" color="#a78bfa" />
-          <Knob label="Transpose" value={merged.transpose} min={-24} max={24} defaultValue={0} onChange={(v) => updateParam('transpose', Math.round(v))} size="sm" color="#a78bfa" unit="st" />
+          <Knob label="Volume" value={merged.volume} min={0} max={1} defaultValue={0.8} onChange={(v) => updateParam('volume', v)} color="#a78bfa" />
+          <Knob label="Pan" value={merged.pan} min={-1} max={1} defaultValue={0} onChange={(v) => updateParam('pan', v)} color="#a78bfa" />
+          <Knob label="Polyphony" value={merged.polyphony} min={1} max={256} defaultValue={64} onChange={(v) => updateParam('polyphony', Math.round(v))} color="#a78bfa" />
+          <Knob label="Transpose" value={merged.transpose} min={-24} max={24} defaultValue={0} onChange={(v) => updateParam('transpose', Math.round(v))} color="#a78bfa" unit="st" />
         </div>
       </div>
 
       <div className="p-2 rounded-lg border bg-[#1a1a1a] border-amber-900/30">
         <h3 className="font-bold uppercase tracking-tight text-sm mb-3 text-amber-500">Engine</h3>
         <div className="flex flex-wrap items-center gap-4">
-          <Knob label="Preload" value={merged.preloadSize} min={1024} max={65536} defaultValue={8192} onChange={(v) => updateParam('preloadSize', Math.round(v))} size="sm" color="#a78bfa" />
+          <Knob label="Preload" value={merged.preloadSize} min={1024} max={65536} defaultValue={8192} onChange={(v) => updateParam('preloadSize', Math.round(v))} color="#a78bfa" />
           <div className="flex flex-col items-center gap-1">
             <span className="text-[10px] text-text-muted">Oversampling</span>
             <div className="flex gap-1">
@@ -65,11 +65,11 @@ export const SfizzControls: React.FC<SfizzControlsProps> = ({ config, onChange }
       <div className="p-2 rounded-lg border bg-[#1a1a1a] border-amber-900/30">
         <h3 className="font-bold uppercase tracking-tight text-sm mb-3 text-amber-500">Performance</h3>
         <div className="flex flex-wrap gap-4 justify-center">
-          <Knob label="Mod Wheel" value={merged.modWheel} min={0} max={1} defaultValue={0} onChange={(v) => updateParam('modWheel', v)} size="sm" color="#f472b6" />
-          <Knob label="Expression" value={merged.expression} min={0} max={1} defaultValue={1} onChange={(v) => updateParam('expression', v)} size="sm" color="#f472b6" />
-          <Knob label="Pitch Bend" value={merged.pitchBend} min={-1} max={1} defaultValue={0} onChange={(v) => updateParam('pitchBend', v)} size="sm" color="#f472b6" />
-          <Knob label="Reverb" value={merged.reverbSend} min={0} max={1} defaultValue={0.2} onChange={(v) => updateParam('reverbSend', v)} size="sm" color="#818cf8" />
-          <Knob label="Chorus" value={merged.chorusSend} min={0} max={1} defaultValue={0} onChange={(v) => updateParam('chorusSend', v)} size="sm" color="#818cf8" />
+          <Knob label="Mod Wheel" value={merged.modWheel} min={0} max={1} defaultValue={0} onChange={(v) => updateParam('modWheel', v)} color="#f472b6" />
+          <Knob label="Expression" value={merged.expression} min={0} max={1} defaultValue={1} onChange={(v) => updateParam('expression', v)} color="#f472b6" />
+          <Knob label="Pitch Bend" value={merged.pitchBend} min={-1} max={1} defaultValue={0} onChange={(v) => updateParam('pitchBend', v)} color="#f472b6" />
+          <Knob label="Reverb" value={merged.reverbSend} min={0} max={1} defaultValue={0.2} onChange={(v) => updateParam('reverbSend', v)} color="#818cf8" />
+          <Knob label="Chorus" value={merged.chorusSend} min={0} max={1} defaultValue={0} onChange={(v) => updateParam('chorusSend', v)} color="#818cf8" />
         </div>
       </div>
 

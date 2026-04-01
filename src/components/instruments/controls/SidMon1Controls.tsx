@@ -153,32 +153,32 @@ export const SidMon1Controls: React.FC<SidMon1ControlsProps> = ({ config, onChan
         <div className="grid grid-cols-4 gap-3">
           <Knob value={config.attackSpeed ?? 0} min={0} max={255} step={1}
             onChange={(v) => updU8WithChipRam('attackSpeed', Math.round(v), 20)}
-            label="Atk Speed" color={knob} size="sm"
+            label="Atk Speed" color={knob}
             formatValue={(v) => Math.round(v).toString()} />
           <Knob value={config.attackMax ?? 0} min={0} max={64} step={1}
             onChange={(v) => updU8WithChipRam('attackMax', Math.round(v), 21)}
-            label="Atk Max" color={knob} size="sm"
+            label="Atk Max" color={knob}
             formatValue={(v) => Math.round(v).toString()} />
           <Knob value={config.decaySpeed ?? 0} min={0} max={255} step={1}
             onChange={(v) => updU8WithChipRam('decaySpeed', Math.round(v), 22)}
-            label="Dec Speed" color={knob} size="sm"
+            label="Dec Speed" color={knob}
             formatValue={(v) => Math.round(v).toString()} />
           <Knob value={config.decayMin ?? 0} min={0} max={64} step={1}
             onChange={(v) => updU8WithChipRam('decayMin', Math.round(v), 23)}
-            label="Dec Min" color={knob} size="sm"
+            label="Dec Min" color={knob}
             formatValue={(v) => Math.round(v).toString()} />
           <Knob value={config.sustain ?? 0} min={0} max={255} step={1}
             onChange={(v) => updU8WithChipRam('sustain', Math.round(v), 24)}
-            label="Sustain" color={knob} size="sm"
+            label="Sustain" color={knob}
             formatValue={(v) => Math.round(v).toString()} />
           {/* +25 is unused/padding — skipped */}
           <Knob value={config.releaseSpeed ?? 0} min={0} max={255} step={1}
             onChange={(v) => updU8WithChipRam('releaseSpeed', Math.round(v), 26)}
-            label="Rel Speed" color={knob} size="sm"
+            label="Rel Speed" color={knob}
             formatValue={(v) => Math.round(v).toString()} />
           <Knob value={config.releaseMin ?? 0} min={0} max={64} step={1}
             onChange={(v) => updU8WithChipRam('releaseMin', Math.round(v), 27)}
-            label="Rel Min" color={knob} size="sm"
+            label="Rel Min" color={knob}
             formatValue={(v) => Math.round(v).toString()} />
         </div>
       </div>
@@ -189,11 +189,11 @@ export const SidMon1Controls: React.FC<SidMon1ControlsProps> = ({ config, onChan
         <div className="flex gap-4 items-center">
           <Knob value={config.phaseShift ?? 0} min={0} max={255} step={1}
             onChange={(v) => updU8WithChipRam('phaseShift', Math.round(v), 28)}
-            label="Phase Shift" color={knob} size="sm"
+            label="Phase Shift" color={knob}
             formatValue={(v) => Math.round(v).toString()} />
           <Knob value={config.phaseSpeed ?? 0} min={0} max={255} step={1}
             onChange={(v) => updU8WithChipRam('phaseSpeed', Math.round(v), 29)}
-            label="Phase Speed" color={knob} size="sm"
+            label="Phase Speed" color={knob}
             formatValue={(v) => Math.round(v).toString()} />
           <span className="text-[10px] text-text-muted">Phase Shift 0 = disabled</span>
         </div>
@@ -213,7 +213,7 @@ export const SidMon1Controls: React.FC<SidMon1ControlsProps> = ({ config, onChan
                 void getEditor().writeU8(uadeChipRam.instrBase + 30, steps & 0xFF);
               }
             }}
-            label="Finetune" color={knob} size="sm"
+            label="Finetune" color={knob}
             formatValue={(v) => `${Math.round(v / 67)}/15`} />
           <Knob value={config.pitchFall ?? 0} min={-128} max={127} step={1}
             onChange={(v) => {
@@ -224,7 +224,7 @@ export const SidMon1Controls: React.FC<SidMon1ControlsProps> = ({ config, onChan
                 void getEditor().writeS8(uadeChipRam.instrBase + 31, val);
               }
             }}
-            label="Pitch Fall" color={knob} size="sm"
+            label="Pitch Fall" color={knob}
             formatValue={(v) => Math.round(v).toString()} />
         </div>
       </div>

@@ -186,37 +186,37 @@ export const HivelyControls: React.FC<HivelyControlsProps> = ({
           <div className="flex flex-col items-center gap-2">
             <Knob value={config.envelope.aFrames} min={1} max={255} step={1}
               onChange={(v) => updateEnvelope({ aFrames: Math.round(v) })}
-              label="A.Time" color={knobColor} size="sm"
+              label="A.Time" color={knobColor}
               formatValue={(v) => Math.round(v).toString()} />
             <Knob value={config.envelope.aVolume} min={0} max={64} step={1}
               onChange={(v) => updateEnvelope({ aVolume: Math.round(v) })}
-              label="A.Vol" color={knobColor} size="sm"
+              label="A.Vol" color={knobColor}
               formatValue={(v) => Math.round(v).toString()} />
           </div>
           <div className="flex flex-col items-center gap-2">
             <Knob value={config.envelope.dFrames} min={1} max={255} step={1}
               onChange={(v) => updateEnvelope({ dFrames: Math.round(v) })}
-              label="D.Time" color={knobColor} size="sm"
+              label="D.Time" color={knobColor}
               formatValue={(v) => Math.round(v).toString()} />
             <Knob value={config.envelope.dVolume} min={0} max={64} step={1}
               onChange={(v) => updateEnvelope({ dVolume: Math.round(v) })}
-              label="D.Vol" color={knobColor} size="sm"
+              label="D.Vol" color={knobColor}
               formatValue={(v) => Math.round(v).toString()} />
           </div>
           <div className="flex flex-col items-center gap-2">
             <Knob value={config.envelope.sFrames} min={1} max={255} step={1}
               onChange={(v) => updateEnvelope({ sFrames: Math.round(v) })}
-              label="S.Time" color={knobColor} size="sm"
+              label="S.Time" color={knobColor}
               formatValue={(v) => Math.round(v).toString()} />
           </div>
           <div className="flex flex-col items-center gap-2">
             <Knob value={config.envelope.rFrames} min={1} max={255} step={1}
               onChange={(v) => updateEnvelope({ rFrames: Math.round(v) })}
-              label="R.Time" color={knobColor} size="sm"
+              label="R.Time" color={knobColor}
               formatValue={(v) => Math.round(v).toString()} />
             <Knob value={config.envelope.rVolume} min={0} max={64} step={1}
               onChange={(v) => updateEnvelope({ rVolume: Math.round(v) })}
-              label="R.Vol" color={knobColor} size="sm"
+              label="R.Vol" color={knobColor}
               formatValue={(v) => Math.round(v).toString()} />
           </div>
         </div>
@@ -228,15 +228,15 @@ export const HivelyControls: React.FC<HivelyControlsProps> = ({
         <div className="flex items-center gap-4">
           <Knob value={config.vibratoDelay} min={0} max={255} step={1}
             onChange={(v) => updateParam('vibratoDelay', Math.round(v))}
-            label="Delay" color={knobColor} size="sm"
+            label="Delay" color={knobColor}
             formatValue={(v) => Math.round(v).toString()} />
           <Knob value={config.vibratoDepth} min={0} max={15} step={1}
             onChange={(v) => updateParam('vibratoDepth', Math.round(v))}
-            label="Depth" color={knobColor} size="sm"
+            label="Depth" color={knobColor}
             formatValue={(v) => Math.round(v).toString()} />
           <Knob value={config.vibratoSpeed} min={0} max={63} step={1}
             onChange={(v) => updateParam('vibratoSpeed', Math.round(v))}
-            label="Speed" color={knobColor} size="sm"
+            label="Speed" color={knobColor}
             formatValue={(v) => Math.round(v).toString()} />
         </div>
       </div>
@@ -247,15 +247,15 @@ export const HivelyControls: React.FC<HivelyControlsProps> = ({
         <div className="flex items-center gap-4">
           <Knob value={config.squareLowerLimit} min={0} max={255} step={1}
             onChange={(v) => updateParam('squareLowerLimit', Math.round(v))}
-            label="Lower" color={knobColor} size="sm"
+            label="Lower" color={knobColor}
             formatValue={(v) => Math.round(v).toString()} />
           <Knob value={config.squareUpperLimit} min={0} max={255} step={1}
             onChange={(v) => updateParam('squareUpperLimit', Math.round(v))}
-            label="Upper" color={knobColor} size="sm"
+            label="Upper" color={knobColor}
             formatValue={(v) => Math.round(v).toString()} />
           <Knob value={config.squareSpeed} min={0} max={63} step={1}
             onChange={(v) => updateParam('squareSpeed', Math.round(v))}
-            label="Speed" color={knobColor} size="sm"
+            label="Speed" color={knobColor}
             formatValue={(v) => Math.round(v).toString()} />
         </div>
       </div>
@@ -266,15 +266,15 @@ export const HivelyControls: React.FC<HivelyControlsProps> = ({
         <div className="flex items-center gap-4">
           <Knob value={config.filterLowerLimit} min={0} max={127} step={1}
             onChange={(v) => updateParam('filterLowerLimit', Math.round(v))}
-            label="Lower" color={knobColor} size="sm"
+            label="Lower" color={knobColor}
             formatValue={(v) => Math.round(v).toString()} />
           <Knob value={config.filterUpperLimit} min={0} max={63} step={1}
             onChange={(v) => updateParam('filterUpperLimit', Math.round(v))}
-            label="Upper" color={knobColor} size="sm"
+            label="Upper" color={knobColor}
             formatValue={(v) => Math.round(v).toString()} />
           <Knob value={config.filterSpeed} min={0} max={63} step={1}
             onChange={(v) => updateParam('filterSpeed', Math.round(v))}
-            label="Speed" color={knobColor} size="sm"
+            label="Speed" color={knobColor}
             formatValue={(v) => Math.round(v).toString()} />
         </div>
       </div>
@@ -295,7 +295,7 @@ export const HivelyControls: React.FC<HivelyControlsProps> = ({
           </button>
           <Knob value={config.hardCutReleaseFrames} min={0} max={7} step={1}
             onChange={(v) => updateParam('hardCutReleaseFrames', Math.round(v))}
-            label="Frames" color={knobColor} size="sm"
+            label="Frames" color={knobColor}
             formatValue={(v) => Math.round(v).toString()}
             disabled={!config.hardCutRelease} />
         </div>

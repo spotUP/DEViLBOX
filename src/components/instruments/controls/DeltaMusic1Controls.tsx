@@ -230,13 +230,13 @@ export const DeltaMusic1Controls: React.FC<DeltaMusic1ControlsProps> = ({
             <Knob
               value={config.attackStep} min={0} max={255} step={1}
               onChange={(v) => updU8('attackStep', Math.round(v), OFF_ATTACK_STEP)}
-              label="Step" color={knob} size="sm"
+              label="Step" color={knob}
               formatValue={(v) => Math.round(v).toString()}
             />
             <Knob
               value={config.attackDelay} min={0} max={255} step={1}
               onChange={(v) => updU8('attackDelay', Math.round(v), OFF_ATTACK_DELAY)}
-              label="Delay" color={knob} size="sm"
+              label="Delay" color={knob}
               formatValue={(v) => Math.round(v).toString()}
             />
           </div>
@@ -249,13 +249,13 @@ export const DeltaMusic1Controls: React.FC<DeltaMusic1ControlsProps> = ({
             <Knob
               value={config.decayStep} min={0} max={255} step={1}
               onChange={(v) => updU8('decayStep', Math.round(v), OFF_DECAY_STEP)}
-              label="Step" color={knob} size="sm"
+              label="Step" color={knob}
               formatValue={(v) => Math.round(v).toString()}
             />
             <Knob
               value={config.decayDelay} min={0} max={255} step={1}
               onChange={(v) => updU8('decayDelay', Math.round(v), OFF_DECAY_DELAY)}
-              label="Delay" color={knob} size="sm"
+              label="Delay" color={knob}
               formatValue={(v) => Math.round(v).toString()}
             />
           </div>
@@ -268,7 +268,7 @@ export const DeltaMusic1Controls: React.FC<DeltaMusic1ControlsProps> = ({
             <Knob
               value={config.sustain} min={0} max={65535} step={1}
               onChange={(v) => updU16('sustain', Math.round(v), OFF_SUSTAIN)}
-              label="Length" color={knob} size="sm"
+              label="Length" color={knob}
               formatValue={(v) => Math.round(v).toString()}
             />
             <span className="text-[10px] text-text-muted self-center">ticks (0 = off)</span>
@@ -282,13 +282,13 @@ export const DeltaMusic1Controls: React.FC<DeltaMusic1ControlsProps> = ({
             <Knob
               value={config.releaseStep} min={0} max={255} step={1}
               onChange={(v) => updU8('releaseStep', Math.round(v), OFF_RELEASE_STEP)}
-              label="Step" color={knob} size="sm"
+              label="Step" color={knob}
               formatValue={(v) => Math.round(v).toString()}
             />
             <Knob
               value={config.releaseDelay} min={0} max={255} step={1}
               onChange={(v) => updU8('releaseDelay', Math.round(v), OFF_RELEASE_DELAY)}
-              label="Delay" color={knob} size="sm"
+              label="Delay" color={knob}
               formatValue={(v) => Math.round(v).toString()}
             />
           </div>
@@ -309,19 +309,19 @@ export const DeltaMusic1Controls: React.FC<DeltaMusic1ControlsProps> = ({
           <Knob
             value={config.vibratoWait} min={0} max={255} step={1}
             onChange={(v) => updU8('vibratoWait', Math.round(v), OFF_VIBRATO_WAIT)}
-            label="Wait" color={knob} size="sm"
+            label="Wait" color={knob}
             formatValue={(v) => Math.round(v).toString()}
           />
           <Knob
             value={config.vibratoStep} min={0} max={255} step={1}
             onChange={(v) => updU8('vibratoStep', Math.round(v), OFF_VIBRATO_STEP)}
-            label="Step" color={knob} size="sm"
+            label="Step" color={knob}
             formatValue={(v) => Math.round(v).toString()}
           />
           <Knob
             value={config.vibratoLength} min={0} max={255} step={1}
             onChange={(v) => updU8('vibratoLength', Math.round(v), OFF_VIBRATO_LENGTH)}
-            label="Depth" color={knob} size="sm"
+            label="Depth" color={knob}
             formatValue={(v) => Math.round(v).toString()}
           />
         </div>

@@ -210,7 +210,7 @@ export const InStereo2Controls: React.FC<InStereo2ControlsProps> = ({
             formatValue={(v) => Math.round(v).toString()} />
           <Knob value={config.waveformLength} min={2} max={256} step={2}
             onChange={(v) => updateParam('waveformLength', Math.round(v))}
-            label="Wave Len" color={knob} size="sm"
+            label="Wave Len" color={knob}
             formatValue={(v) => Math.round(v).toString()} />
         </div>
       </div>
@@ -270,19 +270,19 @@ export const InStereo2Controls: React.FC<InStereo2ControlsProps> = ({
         <div className="flex gap-3 flex-wrap mt-3">
           <Knob value={config.adsrLength} min={0} max={127} step={1}
             onChange={(v) => updateParam('adsrLength', Math.round(v))}
-            label="Length" color={knob} size="sm"
+            label="Length" color={knob}
             formatValue={(v) => Math.round(v).toString()} />
           <Knob value={config.adsrRepeat} min={0} max={127} step={1}
             onChange={(v) => updateParam('adsrRepeat', Math.round(v))}
-            label="Repeat" color={knob} size="sm"
+            label="Repeat" color={knob}
             formatValue={(v) => Math.round(v).toString()} />
           <Knob value={config.sustainPoint} min={0} max={127} step={1}
             onChange={(v) => updateParam('sustainPoint', Math.round(v))}
-            label="Sus Point" color={knob} size="sm"
+            label="Sus Point" color={knob}
             formatValue={(v) => Math.round(v).toString()} />
           <Knob value={config.sustainSpeed} min={0} max={255} step={1}
             onChange={(v) => updateParam('sustainSpeed', Math.round(v))}
-            label="Sus Speed" color={knob} size="sm"
+            label="Sus Speed" color={knob}
             formatValue={(v) => Math.round(v).toString()} />
         </div>
       </div>
@@ -315,19 +315,19 @@ export const InStereo2Controls: React.FC<InStereo2ControlsProps> = ({
               <div className="flex gap-3 flex-wrap mt-3">
                 <Knob value={config.egStartLen} min={0} max={255} step={1}
                   onChange={(v) => updateParam('egStartLen', Math.round(v))}
-                  label="Start/Len" color={knob} size="sm"
+                  label="Start/Len" color={knob}
                   formatValue={(v) => Math.round(v).toString()} />
                 <Knob value={config.egStopRep} min={0} max={255} step={1}
                   onChange={(v) => updateParam('egStopRep', Math.round(v))}
-                  label="Stop/Rep" color={knob} size="sm"
+                  label="Stop/Rep" color={knob}
                   formatValue={(v) => Math.round(v).toString()} />
                 <Knob value={config.egSpeedUp} min={0} max={255} step={1}
                   onChange={(v) => updateParam('egSpeedUp', Math.round(v))}
-                  label="Speed Up" color={knob} size="sm"
+                  label="Speed Up" color={knob}
                   formatValue={(v) => Math.round(v).toString()} />
                 <Knob value={config.egSpeedDown} min={0} max={255} step={1}
                   onChange={(v) => updateParam('egSpeedDown', Math.round(v))}
-                  label="Speed Dn" color={knob} size="sm"
+                  label="Speed Dn" color={knob}
                   formatValue={(v) => Math.round(v).toString()} />
               </div>
             )}
@@ -335,11 +335,11 @@ export const InStereo2Controls: React.FC<InStereo2ControlsProps> = ({
               <div className="flex gap-3 flex-wrap mt-3">
                 <Knob value={config.egStartLen} min={0} max={255} step={1}
                   onChange={(v) => updateParam('egStartLen', Math.round(v))}
-                  label="Start Len" color={knob} size="sm"
+                  label="Start Len" color={knob}
                   formatValue={(v) => Math.round(v).toString()} />
                 <Knob value={config.egStopRep} min={0} max={255} step={1}
                   onChange={(v) => updateParam('egStopRep', Math.round(v))}
-                  label="Stop Rep" color={knob} size="sm"
+                  label="Stop Rep" color={knob}
                   formatValue={(v) => Math.round(v).toString()} />
               </div>
             )}
@@ -360,15 +360,15 @@ export const InStereo2Controls: React.FC<InStereo2ControlsProps> = ({
         <div className="flex gap-3">
           <Knob value={config.vibratoDelay} min={0} max={255} step={1}
             onChange={(v) => updateParam('vibratoDelay', Math.round(v))}
-            label="Delay" color={knob} size="sm"
+            label="Delay" color={knob}
             formatValue={(v) => Math.round(v).toString()} />
           <Knob value={config.vibratoSpeed} min={0} max={255} step={1}
             onChange={(v) => updateParam('vibratoSpeed', Math.round(v))}
-            label="Speed" color={knob} size="sm"
+            label="Speed" color={knob}
             formatValue={(v) => Math.round(v).toString()} />
           <Knob value={config.vibratoLevel} min={0} max={255} step={1}
             onChange={(v) => updateParam('vibratoLevel', Math.round(v))}
-            label="Level" color={knob} size="sm"
+            label="Level" color={knob}
             formatValue={(v) => Math.round(v).toString()} />
         </div>
       </div>
@@ -397,11 +397,11 @@ export const InStereo2Controls: React.FC<InStereo2ControlsProps> = ({
         <div className="flex gap-3 mt-3">
           <Knob value={config.amfLength} min={0} max={127} step={1}
             onChange={(v) => updateParam('amfLength', Math.round(v))}
-            label="Length" color={knob} size="sm"
+            label="Length" color={knob}
             formatValue={(v) => Math.round(v).toString()} />
           <Knob value={config.amfRepeat} min={0} max={127} step={1}
             onChange={(v) => updateParam('amfRepeat', Math.round(v))}
-            label="Repeat" color={knob} size="sm"
+            label="Repeat" color={knob}
             formatValue={(v) => Math.round(v).toString()} />
         </div>
       </div>

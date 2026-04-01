@@ -170,7 +170,6 @@ export const VSTBridgePanel: React.FC<VSTBridgePanelProps> = ({
                 max={param.max}
                 defaultValue={param.defaultValue}
                 onChange={(value) => handleParamChange(param.id, value)}
-                size="sm"
                 color={knobColor}
               />
             ))}

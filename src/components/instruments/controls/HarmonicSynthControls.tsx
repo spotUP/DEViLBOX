@@ -208,22 +208,22 @@ export const HarmonicSynthControls: React.FC<HarmonicSynthControlsProps> = ({
       </div>
 
       {/* Controls Grid */}
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-4 gap-3">
         {/* Spectral */}
         <div className={`rounded-lg border p-3 ${panelBg}`}>
           <div className="font-mono text-[10px] font-bold text-text-muted mb-2 tracking-wider">SPECTRAL</div>
           <div className="flex gap-4 justify-center">
             <Knob
               value={config.spectralTilt} min={-100} max={100} onChange={(v) => onChange({ spectralTilt: v })}
-              label="Tilt" size="sm" color={knobColor} bipolar defaultValue={0}
+              label="Tilt" color={knobColor} bipolar defaultValue={0}
             />
             <Knob
               value={config.evenOddBalance} min={-100} max={100} onChange={(v) => onChange({ evenOddBalance: v })}
-              label="E/O" size="sm" color={knobColor} bipolar defaultValue={0}
+              label="E/O" color={knobColor} bipolar defaultValue={0}
             />
             <Knob
               value={config.maxVoices} min={4} max={8} onChange={(v) => onChange({ maxVoices: Math.round(v) })}
-              label="Voices" size="sm" color={knobColor}
+              label="Voices" color={knobColor}
               formatValue={v => `${Math.round(v)}`}
             />
           </div>
@@ -254,11 +254,11 @@ export const HarmonicSynthControls: React.FC<HarmonicSynthControlsProps> = ({
           <div className="flex gap-4 justify-center">
             <Knob
               value={config.filter.cutoff} min={20} max={20000} onChange={(v) => updateFilter({ cutoff: v })}
-              label="Cutoff" unit="Hz" size="sm" color={knobColor} logarithmic
+              label="Cutoff" unit="Hz" color={knobColor} logarithmic
             />
             <Knob
               value={config.filter.resonance} min={0} max={30} onChange={(v) => updateFilter({ resonance: v })}
-              label="Reso" size="sm" color={knobColor}
+              label="Reso" color={knobColor}
             />
           </div>
         </div>
@@ -280,19 +280,19 @@ export const HarmonicSynthControls: React.FC<HarmonicSynthControlsProps> = ({
           <div className="flex gap-3 justify-center">
             <Knob
               value={config.envelope.attack} min={0} max={2000} onChange={(v) => updateEnvelope({ attack: v })}
-              label="A" unit="ms" size="sm" color={knobColor}
+              label="A" unit="ms" color={knobColor}
             />
             <Knob
               value={config.envelope.decay} min={0} max={2000} onChange={(v) => updateEnvelope({ decay: v })}
-              label="D" unit="ms" size="sm" color={knobColor}
+              label="D" unit="ms" color={knobColor}
             />
             <Knob
               value={config.envelope.sustain} min={0} max={100} onChange={(v) => updateEnvelope({ sustain: v })}
-              label="S" unit="%" size="sm" color={knobColor}
+              label="S" unit="%" color={knobColor}
             />
             <Knob
               value={config.envelope.release} min={0} max={5000} onChange={(v) => updateEnvelope({ release: v })}
-              label="R" unit="ms" size="sm" color={knobColor}
+              label="R" unit="ms" color={knobColor}
             />
           </div>
         </div>
@@ -314,11 +314,11 @@ export const HarmonicSynthControls: React.FC<HarmonicSynthControlsProps> = ({
           <div className="flex gap-4 justify-center">
             <Knob
               value={config.lfo.rate} min={0.1} max={20} onChange={(v) => updateLFO({ rate: v })}
-              label="Rate" unit="Hz" size="sm" color={knobColor}
+              label="Rate" unit="Hz" color={knobColor}
             />
             <Knob
               value={config.lfo.depth} min={0} max={100} onChange={(v) => updateLFO({ depth: v })}
-              label="Depth" size="sm" color={knobColor}
+              label="Depth" color={knobColor}
             />
           </div>
         </div>

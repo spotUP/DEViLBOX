@@ -171,7 +171,6 @@ export const OctaMEDControls: React.FC<OctaMEDControlsProps> = ({ config, onChan
             onChange={(v) => upd('voltblSpeed', Math.round(v))}
             label="Vol Tbl Speed"
             color={knob}
-            size="sm"
             formatValue={(v) => Math.round(v).toString()}
           />
           <Knob
@@ -182,7 +181,6 @@ export const OctaMEDControls: React.FC<OctaMEDControlsProps> = ({ config, onChan
             onChange={(v) => upd('wfSpeed', Math.round(v))}
             label="WF Speed"
             color={knob}
-            size="sm"
             formatValue={(v) => Math.round(v).toString()}
           />
           <Knob
@@ -193,7 +191,6 @@ export const OctaMEDControls: React.FC<OctaMEDControlsProps> = ({ config, onChan
             onChange={(v) => upd('vibratoSpeed', Math.round(v))}
             label="Vibrato Speed"
             color={knob}
-            size="sm"
             formatValue={(v) => Math.round(v).toString()}
           />
         </div>

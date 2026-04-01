@@ -146,7 +146,7 @@ export const HippelCoSoControls: React.FC<HippelCoSoControlsProps> = ({
             value={config.volSpeed}
             min={1} max={16} step={1}
             onChange={(v) => updU8WithChipRam('volSpeed', Math.round(v), 0)}
-            label="Vol Speed" color={knob} size="sm"
+            label="Vol Speed" color={knob}
             formatValue={(v) => Math.round(v).toString()}
           />
         </div>
@@ -161,21 +161,21 @@ export const HippelCoSoControls: React.FC<HippelCoSoControlsProps> = ({
             value={config.vibDelay}
             min={0} max={255} step={1}
             onChange={(v) => updU8WithChipRam('vibDelay', Math.round(v), 4)}
-            label="Delay" color={knob} size="sm"
+            label="Delay" color={knob}
             formatValue={(v) => Math.round(v).toString()}
           />
           <Knob
             value={config.vibSpeed}
             min={-128} max={127} step={1}
             onChange={(v) => updS8WithChipRam('vibSpeed', Math.round(v), 2)}
-            label="Speed" color={knob} size="sm"
+            label="Speed" color={knob}
             formatValue={(v) => Math.round(v).toString()}
           />
           <Knob
             value={config.vibDepth}
             min={0} max={255} step={1}
             onChange={(v) => updU8WithChipRam('vibDepth', Math.round(v), 3)}
-            label="Depth" color={knob} size="sm"
+            label="Depth" color={knob}
             formatValue={(v) => Math.round(v).toString()}
           />
         </div>
