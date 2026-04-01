@@ -163,7 +163,7 @@ export const PinkTromboneControls: React.FC<PinkTromboneControlsProps> = ({
               Glottis (Voice Source)
             </span>
           </div>
-          <div className="flex gap-6 justify-center">
+          <div className="flex gap-3 justify-center">
             <Knob
               value={config.tenseness}
               min={0} max={1} step={0.01}
@@ -190,7 +190,7 @@ export const PinkTromboneControls: React.FC<PinkTromboneControlsProps> = ({
               Tongue Shape
             </span>
           </div>
-          <div className="flex gap-6 justify-center">
+          <div className="flex gap-3 justify-center">
             <Knob
               value={config.tongueIndex}
               min={0} max={1} step={0.01}
@@ -217,7 +217,7 @@ export const PinkTromboneControls: React.FC<PinkTromboneControlsProps> = ({
               Lip & Nasal
             </span>
           </div>
-          <div className="flex gap-6 justify-center">
+          <div className="flex gap-3 justify-center">
             <Knob
               value={config.lipDiameter}
               min={0} max={1} step={0.01}
@@ -244,7 +244,7 @@ export const PinkTromboneControls: React.FC<PinkTromboneControlsProps> = ({
               Constriction
             </span>
           </div>
-          <div className="flex gap-6 justify-center">
+          <div className="flex gap-3 justify-center">
             <Knob
               value={config.constrictionIndex}
               min={0} max={1} step={0.01}

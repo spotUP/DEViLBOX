@@ -100,7 +100,7 @@ export const MelodicaControls: React.FC<MelodicaControlsProps> = ({
 
   if (!synthReady) {
     return (
-      <div className="flex flex-col gap-4 p-4">
+      <div className="grid grid-cols-2 gap-2 p-2">
         <div className="flex items-center justify-center gap-2 p-4 text-text-secondary">
           <Loader size={16} className="animate-spin" />
           <span className="text-sm">Loading Melodica...</span>
@@ -115,9 +115,9 @@ export const MelodicaControls: React.FC<MelodicaControlsProps> = ({
     : 'bg-[#1a1a1a] border-teal-900/30';
 
   return (
-    <div className="synth-controls-flow flex flex-col gap-4 p-4 overflow-y-auto">
+    <div className="synth-controls-flow grid grid-cols-2 gap-2 p-2 overflow-y-auto">
       {/* ═══ BREATH & DYNAMICS ═══ */}
-      <div className={`p-4 rounded-xl border ${panelBg}`}>
+      <div className={`p-2 rounded-lg border ${panelBg}`}>
         <h3
           className="font-bold uppercase tracking-tight text-sm mb-3"
           style={{ color: accentColor }}
@@ -161,7 +161,7 @@ export const MelodicaControls: React.FC<MelodicaControlsProps> = ({
       </div>
 
       {/* ═══ TONE ═══ */}
-      <div className={`p-4 rounded-xl border ${panelBg}`}>
+      <div className={`p-2 rounded-lg border ${panelBg}`}>
         <h3
           className="font-bold uppercase tracking-tight text-sm mb-3"
           style={{ color: accentColor }}
@@ -206,7 +206,7 @@ export const MelodicaControls: React.FC<MelodicaControlsProps> = ({
       </div>
 
       {/* ═══ VIBRATO ═══ */}
-      <div className={`p-4 rounded-xl border ${panelBg}`}>
+      <div className={`p-2 rounded-lg border ${panelBg}`}>
         <h3
           className="font-bold uppercase tracking-tight text-sm mb-3"
           style={{ color: accentColor }}
@@ -239,7 +239,7 @@ export const MelodicaControls: React.FC<MelodicaControlsProps> = ({
       </div>
 
       {/* ═══ PLAYING & OUTPUT ═══ */}
-      <div className={`p-4 rounded-xl border ${panelBg}`}>
+      <div className={`p-2 rounded-lg border ${panelBg}`}>
         <h3
           className="font-bold uppercase tracking-tight text-sm mb-3"
           style={{ color: accentColor }}

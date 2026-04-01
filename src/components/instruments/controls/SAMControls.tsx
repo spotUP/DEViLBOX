@@ -64,10 +64,10 @@ export const SAMControls: React.FC<SAMControlsProps> = ({
 
   return (
     <ScrollLockContainer>
-      <div className="synth-controls-flow flex flex-col gap-4 p-4 h-full overflow-y-auto scrollbar-modern">
+      <div className="synth-controls-flow grid grid-cols-2 gap-2 p-2 h-full overflow-y-auto scrollbar-modern">
       {/* Speech Text Section */}
-      <div className={`p-4 rounded-xl border ${panelBg}`}>
-        <div className="flex items-center justify-between mb-4">
+      <div className={`p-2 rounded-lg border ${panelBg}`}>
+        <div className="flex items-center justify-between mb-2">
           <div className="flex items-center gap-2">
             <MessageSquare size={16} className="text-amber-500" />
             <h3 className="font-bold text-amber-400 uppercase tracking-tight">SAM TEXT</h3>
@@ -127,8 +127,8 @@ export const SAMControls: React.FC<SAMControlsProps> = ({
       {/* Main Parameters Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {/* XY Pad for Mouth/Throat */}
-        <div className={`p-4 rounded-xl border ${panelBg} flex flex-col items-center`}>
-          <div className="flex items-center gap-2 mb-4 w-full">
+        <div className={`p-2 rounded-lg border ${panelBg} flex flex-col items-center`}>
+          <div className="flex items-center gap-2 mb-2 w-full">
             <Activity size={16} className="text-amber-500" />
             <h3 className="font-bold text-amber-400 uppercase tracking-tight">VOCAL CHARACTER</h3>
           </div>
@@ -202,12 +202,12 @@ export const SAMControls: React.FC<SAMControlsProps> = ({
         </div>
 
         {/* Knobs for Speed/Pitch */}
-        <div className={`p-4 rounded-xl border ${panelBg}`}>
-          <div className="flex items-center gap-2 mb-4">
+        <div className={`p-2 rounded-lg border ${panelBg}`}>
+          <div className="flex items-center gap-2 mb-2">
             <Zap size={16} className="text-amber-500" />
             <h3 className="font-bold text-amber-400 uppercase tracking-tight">PERFORMANCE</h3>
           </div>
-          <div className="grid grid-cols-2 gap-6 items-center justify-center h-40">
+          <div className="grid grid-cols-2 gap-3 items-center justify-center h-40">
             <Knob
               value={config.pitch}
               min={0}

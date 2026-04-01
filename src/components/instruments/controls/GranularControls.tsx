@@ -52,7 +52,7 @@ export const GranularControls: React.FC<GranularControlsProps> = ({
       </div>
 
       {/* Grain Section */}
-      <div className={`p-4 rounded-xl border ${panelBg}`}>
+      <div className={`p-2 rounded-lg border ${panelBg}`}>
         <p className="text-xs font-bold uppercase tracking-wide mb-3" style={{ color: accentColor }}>Grain</p>
         <div className="flex flex-wrap items-end gap-4">
           <Knob
@@ -87,7 +87,7 @@ export const GranularControls: React.FC<GranularControlsProps> = ({
       </div>
 
       {/* Playback Section */}
-      <div className={`p-4 rounded-xl border ${panelBg}`}>
+      <div className={`p-2 rounded-lg border ${panelBg}`}>
         <p className="text-xs font-bold uppercase tracking-wide mb-3" style={{ color: accentColor }}>Playback</p>
         <div className="flex flex-wrap items-end gap-4">
           <Knob
@@ -118,7 +118,7 @@ export const GranularControls: React.FC<GranularControlsProps> = ({
       </div>
 
       {/* Random Section */}
-      <div className={`p-4 rounded-xl border ${panelBg}`}>
+      <div className={`p-2 rounded-lg border ${panelBg}`}>
         <p className="text-xs font-bold uppercase tracking-wide mb-3" style={{ color: accentColor }}>Random</p>
         <div className="flex flex-wrap items-end gap-4">
           <Knob
@@ -137,7 +137,7 @@ export const GranularControls: React.FC<GranularControlsProps> = ({
       </div>
 
       {/* Grain Envelope Section */}
-      <div className={`p-4 rounded-xl border ${panelBg}`}>
+      <div className={`p-2 rounded-lg border ${panelBg}`}>
         <p className="text-xs font-bold uppercase tracking-wide mb-3" style={{ color: accentColor }}>Grain Envelope</p>
         <div className="flex flex-wrap items-end gap-4">
           <Knob
@@ -156,7 +156,7 @@ export const GranularControls: React.FC<GranularControlsProps> = ({
       </div>
 
       {/* Filter Section */}
-      <div className={`p-4 rounded-xl border ${panelBg}`}>
+      <div className={`p-2 rounded-lg border ${panelBg}`}>
         <p className="text-xs font-bold uppercase tracking-wide mb-3" style={{ color: accentColor }}>Filter</p>
         <div className="flex flex-col gap-3">
           <div className="flex gap-2">

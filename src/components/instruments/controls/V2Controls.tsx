@@ -115,10 +115,10 @@ export const V2Controls: React.FC<V2ControlsProps> = ({
   const LFO_POLARITY = ['Pos', 'Neg', 'Bipolar'];
 
   const renderOscTab = () => (
-    <div className="flex flex-col gap-4 p-4">
+    <div className="grid grid-cols-2 gap-2 p-2">
       {/* Osc 1 Section */}
-      <div className={`p-4 rounded-xl border ${panelBg}`}>
-        <div className="flex items-center justify-between mb-4">
+      <div className={`p-2 rounded-lg border ${panelBg}`}>
+        <div className="flex items-center justify-between mb-2">
           <div className="flex items-center gap-2">
             <Activity size={16} className="text-amber-500" />
             <h3 className="font-bold text-amber-400 uppercase tracking-tight">OSCILLATOR 1</h3>
@@ -134,7 +134,7 @@ export const V2Controls: React.FC<V2ControlsProps> = ({
           </select>
         </div>
         
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-6 items-center gap-6">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 items-center">
           <Knob
             value={config.osc1.transpose}
             min={-64}
@@ -173,8 +173,8 @@ export const V2Controls: React.FC<V2ControlsProps> = ({
       </div>
 
       {/* Osc 2 Section */}
-      <div className={`p-4 rounded-xl border ${panelBg}`}>
-        <div className="flex items-center justify-between mb-4">
+      <div className={`p-2 rounded-lg border ${panelBg}`}>
+        <div className="flex items-center justify-between mb-2">
           <div className="flex items-center gap-2">
             <Activity size={16} className="text-amber-500" />
             <h3 className="font-bold text-amber-400 uppercase tracking-tight">OSCILLATOR 2</h3>
@@ -201,7 +201,7 @@ export const V2Controls: React.FC<V2ControlsProps> = ({
           </div>
         </div>
         
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-6 items-center gap-6">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 items-center">
           <Knob
             value={config.osc2.transpose}
             min={-64}
@@ -240,8 +240,8 @@ export const V2Controls: React.FC<V2ControlsProps> = ({
       </div>
 
       {/* Osc 3 Section */}
-      <div className={`p-4 rounded-xl border ${panelBg}`}>
-        <div className="flex items-center justify-between mb-4">
+      <div className={`p-2 rounded-lg border ${panelBg}`}>
+        <div className="flex items-center justify-between mb-2">
           <div className="flex items-center gap-2">
             <Activity size={16} className="text-amber-500" />
             <h3 className="font-bold text-amber-400 uppercase tracking-tight">OSCILLATOR 3</h3>
@@ -268,7 +268,7 @@ export const V2Controls: React.FC<V2ControlsProps> = ({
           </div>
         </div>
         
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-6 items-center gap-6">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 items-center">
           <Knob
             value={config.osc3.transpose}
             min={-64}
@@ -309,10 +309,10 @@ export const V2Controls: React.FC<V2ControlsProps> = ({
   );
 
   const renderFilterTab = () => (
-    <div className="flex flex-col gap-4 p-4">
+    <div className="grid grid-cols-2 gap-2 p-2">
       {/* Filter 1 */}
-      <div className={`p-4 rounded-xl border ${panelBg}`}>
-        <div className="flex items-center justify-between mb-4">
+      <div className={`p-2 rounded-lg border ${panelBg}`}>
+        <div className="flex items-center justify-between mb-2">
           <div className="flex items-center gap-2">
             <Filter size={16} className="text-amber-500" />
             <h3 className="font-bold text-amber-400 uppercase tracking-tight">VCF 1</h3>
@@ -340,7 +340,7 @@ export const V2Controls: React.FC<V2ControlsProps> = ({
             </div>
           );
         })()}
-        <div className="grid grid-cols-2 gap-6 items-center gap-6">
+        <div className="grid grid-cols-2 gap-3 items-center">
           <Knob
             value={config.filter1.cutoff}
             min={0}
@@ -361,8 +361,8 @@ export const V2Controls: React.FC<V2ControlsProps> = ({
       </div>
 
       {/* Filter 2 */}
-      <div className={`p-4 rounded-xl border ${panelBg}`}>
-        <div className="flex items-center justify-between mb-4">
+      <div className={`p-2 rounded-lg border ${panelBg}`}>
+        <div className="flex items-center justify-between mb-2">
           <div className="flex items-center gap-2">
             <Filter size={16} className="text-amber-500" />
             <h3 className="font-bold text-amber-400 uppercase tracking-tight">VCF 2</h3>
@@ -390,7 +390,7 @@ export const V2Controls: React.FC<V2ControlsProps> = ({
             </div>
           );
         })()}
-        <div className="grid grid-cols-2 gap-6 items-center gap-6">
+        <div className="grid grid-cols-2 gap-3 items-center">
           <Knob
             value={config.filter2.cutoff}
             min={0}
@@ -411,8 +411,8 @@ export const V2Controls: React.FC<V2ControlsProps> = ({
       </div>
 
       {/* Routing */}
-      <div className={`p-4 rounded-xl border ${panelBg}`}>
-        <div className="flex items-center justify-between mb-4">
+      <div className={`p-2 rounded-lg border ${panelBg}`}>
+        <div className="flex items-center justify-between mb-2">
           <div className="flex items-center gap-2">
             <Zap size={16} className="text-amber-500" />
             <h3 className="font-bold text-amber-400 uppercase tracking-tight">ROUTING</h3>
@@ -428,7 +428,7 @@ export const V2Controls: React.FC<V2ControlsProps> = ({
           </select>
         </div>
         
-        <div className="flex gap-6 items-center">
+        <div className="flex gap-3 items-center">
           <Knob
             value={config.routing.balance}
             min={0}
@@ -444,10 +444,10 @@ export const V2Controls: React.FC<V2ControlsProps> = ({
   );
 
   const renderEnvTab = () => (
-    <div className="flex flex-col gap-4 p-4">
+    <div className="grid grid-cols-2 gap-2 p-2">
       {/* Amp Env */}
-      <div className={`p-4 rounded-xl border ${panelBg}`}>
-        <div className="flex items-center gap-2 mb-4">
+      <div className={`p-2 rounded-lg border ${panelBg}`}>
+        <div className="flex items-center gap-2 mb-2">
           <Zap size={16} className="text-amber-500" />
           <h3 className="font-bold text-amber-400 uppercase tracking-tight">AMP ENVELOPE (EG 1)</h3>
         </div>
@@ -464,7 +464,7 @@ export const V2Controls: React.FC<V2ControlsProps> = ({
           />
         </div>
 
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-6 items-center gap-6">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 items-center">
           <Knob
             value={config.envelope.attack}
             min={0}
@@ -501,8 +501,8 @@ export const V2Controls: React.FC<V2ControlsProps> = ({
       </div>
 
       {/* Env 2 */}
-      <div className={`p-4 rounded-xl border ${panelBg}`}>
-        <div className="flex items-center gap-2 mb-4">
+      <div className={`p-2 rounded-lg border ${panelBg}`}>
+        <div className="flex items-center gap-2 mb-2">
           <Zap size={16} className="text-amber-500" />
           <h3 className="font-bold text-amber-400 uppercase tracking-tight">MOD ENVELOPE (EG 2)</h3>
         </div>
@@ -519,7 +519,7 @@ export const V2Controls: React.FC<V2ControlsProps> = ({
           />
         </div>
 
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-6 items-center gap-6">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 items-center">
           <Knob
             value={config.envelope2.attack}
             min={0}
@@ -560,14 +560,14 @@ export const V2Controls: React.FC<V2ControlsProps> = ({
   const renderModTab = () => {
     const lfo2 = config.lfo2 ?? { mode: 1, keySync: true, envMode: false, rate: 64, phase: 2, polarity: 0, amplify: 127 };
     return (
-      <div className="flex flex-col gap-4 p-4">
-        <div className={`p-4 rounded-xl border ${panelBg}`}>
-          <div className="flex items-center gap-2 mb-4">
+      <div className="grid grid-cols-2 gap-2 p-2">
+        <div className={`p-2 rounded-lg border ${panelBg}`}>
+          <div className="flex items-center gap-2 mb-2">
             <Activity size={16} className="text-amber-500" />
             <h3 className="font-bold text-amber-400 uppercase tracking-tight">LFO 1</h3>
           </div>
 
-          <div className="grid grid-cols-2 gap-6 items-center">
+          <div className="grid grid-cols-2 gap-3 items-center">
             <Knob
               value={config.lfo1.rate}
               min={0}
@@ -588,8 +588,8 @@ export const V2Controls: React.FC<V2ControlsProps> = ({
         </div>
 
         {/* LFO 2 */}
-        <div className={`p-4 rounded-xl border ${panelBg}`}>
-          <div className="flex items-center justify-between mb-4">
+        <div className={`p-2 rounded-lg border ${panelBg}`}>
+          <div className="flex items-center justify-between mb-2">
             <div className="flex items-center gap-2">
               <Activity size={16} className="text-amber-500" />
               <h3 className="font-bold text-amber-400 uppercase tracking-tight">LFO 2</h3>
@@ -616,7 +616,7 @@ export const V2Controls: React.FC<V2ControlsProps> = ({
             </div>
           </div>
 
-          <div className="flex items-center gap-3 mb-4">
+          <div className="flex items-center gap-3 mb-2">
             <label className="flex items-center gap-1 cursor-pointer">
               <span className="text-[10px] text-text-muted uppercase">KeySync</span>
               <input
@@ -637,7 +637,7 @@ export const V2Controls: React.FC<V2ControlsProps> = ({
             </label>
           </div>
 
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-6 items-center">
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-3 items-center">
             <Knob
               value={lfo2.rate}
               min={0}
@@ -674,10 +674,10 @@ export const V2Controls: React.FC<V2ControlsProps> = ({
     const chorus = config.chorusFlanger ?? { amount: 64, feedback: 64, delayL: 32, delayR: 32, modRate: 0, modDepth: 0, modPhase: 64 };
     const comp = config.compressor ?? { mode: 0, stereoLink: false, autoGain: true, lookahead: 2, threshold: 90, ratio: 32, attack: 20, release: 64, outGain: 64 };
     return (
-      <div className="flex flex-col gap-4 p-4">
+      <div className="grid grid-cols-2 gap-2 p-2">
         {/* Voice Distortion */}
-        <div className={`p-4 rounded-xl border ${panelBg}`}>
-          <div className="flex items-center justify-between mb-4">
+        <div className={`p-2 rounded-lg border ${panelBg}`}>
+          <div className="flex items-center justify-between mb-2">
             <div className="flex items-center gap-2">
               <Zap size={16} className="text-amber-500" />
               <h3 className="font-bold text-amber-400 uppercase tracking-tight">VOICE DISTORTION</h3>
@@ -692,7 +692,7 @@ export const V2Controls: React.FC<V2ControlsProps> = ({
               ))}
             </select>
           </div>
-          <div className="grid grid-cols-3 gap-6 items-center">
+          <div className="grid grid-cols-3 gap-3 items-center">
             <Knob
               value={vDist.inGain}
               min={0}
@@ -721,8 +721,8 @@ export const V2Controls: React.FC<V2ControlsProps> = ({
         </div>
 
         {/* Channel Distortion */}
-        <div className={`p-4 rounded-xl border ${panelBg}`}>
-          <div className="flex items-center justify-between mb-4">
+        <div className={`p-2 rounded-lg border ${panelBg}`}>
+          <div className="flex items-center justify-between mb-2">
             <div className="flex items-center gap-2">
               <Zap size={16} className="text-amber-500" />
               <h3 className="font-bold text-amber-400 uppercase tracking-tight">CHANNEL DISTORTION</h3>
@@ -737,7 +737,7 @@ export const V2Controls: React.FC<V2ControlsProps> = ({
               ))}
             </select>
           </div>
-          <div className="grid grid-cols-3 gap-6 items-center">
+          <div className="grid grid-cols-3 gap-3 items-center">
             <Knob
               value={cDist.inGain}
               min={0}
@@ -766,12 +766,12 @@ export const V2Controls: React.FC<V2ControlsProps> = ({
         </div>
 
         {/* Chorus/Flanger */}
-        <div className={`p-4 rounded-xl border ${panelBg}`}>
-          <div className="flex items-center gap-2 mb-4">
+        <div className={`p-2 rounded-lg border ${panelBg}`}>
+          <div className="flex items-center gap-2 mb-2">
             <Activity size={16} className="text-amber-500" />
             <h3 className="font-bold text-amber-400 uppercase tracking-tight">CHORUS / FLANGER</h3>
           </div>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-6 items-center">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 items-center">
             <Knob
               value={chorus.amount}
               min={0}
@@ -805,7 +805,7 @@ export const V2Controls: React.FC<V2ControlsProps> = ({
               color={knobColor}
             />
           </div>
-          <div className="grid grid-cols-3 gap-6 items-center mt-4">
+          <div className="grid grid-cols-3 gap-3 items-center mt-4">
             <Knob
               value={chorus.modRate}
               min={0}
@@ -834,8 +834,8 @@ export const V2Controls: React.FC<V2ControlsProps> = ({
         </div>
 
         {/* Compressor */}
-        <div className={`p-4 rounded-xl border ${panelBg}`}>
-          <div className="flex items-center justify-between mb-4">
+        <div className={`p-2 rounded-lg border ${panelBg}`}>
+          <div className="flex items-center justify-between mb-2">
             <div className="flex items-center gap-2">
               <Zap size={16} className="text-amber-500" />
               <h3 className="font-bold text-amber-400 uppercase tracking-tight">COMPRESSOR</h3>
@@ -850,7 +850,7 @@ export const V2Controls: React.FC<V2ControlsProps> = ({
               ))}
             </select>
           </div>
-          <div className="flex items-center gap-3 mb-4">
+          <div className="flex items-center gap-3 mb-2">
             <label className="flex items-center gap-1 cursor-pointer">
               <span className="text-[10px] text-text-muted uppercase">Stereo Link</span>
               <input
@@ -870,7 +870,7 @@ export const V2Controls: React.FC<V2ControlsProps> = ({
               />
             </label>
           </div>
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-6 items-center">
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-3 items-center">
             <Knob
               value={comp.threshold}
               min={0}

@@ -57,9 +57,9 @@ export const FluidSynthControls: React.FC<FluidSynthControlsProps> = ({ config, 
   const merged = { ...DEFAULT_FLUIDSYNTH, ...config } as Required<FluidSynthConfig>;
 
   return (
-    <div className="synth-controls-flow flex flex-col gap-4 p-4 overflow-y-auto text-xs">
+    <div className="synth-controls-flow grid grid-cols-2 gap-2 p-2 overflow-y-auto text-xs">
       {/* Program / Bank */}
-      <div className="p-4 rounded-xl border bg-[#1a1a1a] border-amber-900/30">
+      <div className="p-2 rounded-lg border bg-[#1a1a1a] border-amber-900/30">
         <h3 className="font-bold uppercase tracking-tight text-sm mb-3 text-amber-500">Program</h3>
         <div className="flex flex-wrap items-center gap-4">
           <div className="flex flex-col gap-1">
@@ -80,7 +80,7 @@ export const FluidSynthControls: React.FC<FluidSynthControlsProps> = ({ config, 
       </div>
 
       {/* Reverb */}
-      <div className="p-4 rounded-xl border bg-[#1a1a1a] border-amber-900/30">
+      <div className="p-2 rounded-lg border bg-[#1a1a1a] border-amber-900/30">
         <h3 className="font-bold uppercase tracking-tight text-sm mb-3 text-amber-500">Reverb</h3>
         <div className="flex flex-wrap gap-4 justify-center">
           <Knob label="Room" value={merged.reverbRoomSize} min={0} max={1.2} defaultValue={0.2}
@@ -95,7 +95,7 @@ export const FluidSynthControls: React.FC<FluidSynthControlsProps> = ({ config, 
       </div>
 
       {/* Chorus */}
-      <div className="p-4 rounded-xl border bg-[#1a1a1a] border-amber-900/30">
+      <div className="p-2 rounded-lg border bg-[#1a1a1a] border-amber-900/30">
         <h3 className="font-bold uppercase tracking-tight text-sm mb-3 text-amber-500">Chorus</h3>
         <div className="flex flex-wrap gap-4 justify-center">
           <Knob label="Voices" value={merged.chorusVoices} min={0} max={99} defaultValue={3}
@@ -128,7 +128,7 @@ export const FluidSynthControls: React.FC<FluidSynthControlsProps> = ({ config, 
       </div>
 
       {/* Master */}
-      <div className="p-4 rounded-xl border bg-[#1a1a1a] border-amber-900/30">
+      <div className="p-2 rounded-lg border bg-[#1a1a1a] border-amber-900/30">
         <h3 className="font-bold uppercase tracking-tight text-sm mb-3 text-amber-500">Master</h3>
         <div className="flex flex-wrap gap-4 justify-center">
           <Knob label="Gain" value={merged.gain} min={0} max={10} defaultValue={0.4}

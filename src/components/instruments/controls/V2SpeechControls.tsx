@@ -57,10 +57,10 @@ export const V2SpeechControls: React.FC<V2SpeechControlsProps> = ({
 
   return (
     <ScrollLockContainer>
-      <div className="synth-controls-flow flex flex-col gap-4 p-4 h-full overflow-y-auto scrollbar-modern">
+      <div className="synth-controls-flow grid grid-cols-2 gap-2 p-2 h-full overflow-y-auto scrollbar-modern">
       {/* Speech Text Section */}
-      <div className={`p-4 rounded-xl border ${panelBg}`}>
-        <div className="flex items-center justify-between mb-4">
+      <div className={`p-2 rounded-lg border ${panelBg}`}>
+        <div className="flex items-center justify-between mb-2">
           <div className="flex items-center gap-2">
             <MessageSquare size={16} className="text-amber-500" />
             <h3 className="font-bold text-amber-400 uppercase tracking-tight">V2 SPEECH TEXT</h3>
@@ -110,13 +110,13 @@ export const V2SpeechControls: React.FC<V2SpeechControlsProps> = ({
       )}
 
       {/* Voice Parameters */}
-      <div className={`p-4 rounded-xl border ${panelBg}`}>
-        <div className="flex items-center gap-2 mb-4">
+      <div className={`p-2 rounded-lg border ${panelBg}`}>
+        <div className="flex items-center gap-2 mb-2">
           <Activity size={16} className="text-amber-500" />
           <h3 className="font-bold text-amber-400 uppercase tracking-tight">VOICE PARAMETERS</h3>
         </div>
 
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-6">
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
           <Knob
             value={config.speed}
             min={0}

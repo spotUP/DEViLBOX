@@ -147,10 +147,10 @@ export const VSTBridgePanel: React.FC<VSTBridgePanelProps> = ({
   const groups = groupParams(params);
 
   return (
-    <div className="synth-controls-flow flex flex-col gap-4 p-4 overflow-y-auto">
+    <div className="synth-controls-flow grid grid-cols-2 gap-2 p-2 overflow-y-auto">
       {groups.map((group) => (
-        <div key={group.name} className={`p-4 rounded-xl border ${panelBg}`}>
-          <div className="flex items-center gap-2 mb-4">
+        <div key={group.name} className={`p-2 rounded-lg border ${panelBg}`}>
+          <div className="flex items-center gap-2 mb-2">
             <Sliders size={16} style={{ color: accentColor }} />
             <h3
               className="font-bold uppercase tracking-tight text-sm"

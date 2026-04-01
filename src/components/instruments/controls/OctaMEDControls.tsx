@@ -205,7 +205,7 @@ export const OctaMEDControls: React.FC<OctaMEDControlsProps> = ({ config, onChan
       {/* Loop reference section */}
       <div className={`rounded-lg border p-3 ${panelBg}`}>
         <SectionLabel label="Loop (read-only reference)" />
-        <div className="flex gap-6">
+        <div className="flex gap-3">
           <div className="flex flex-col gap-1">
             <span className="text-[10px] uppercase tracking-wider" style={{ color: accent, opacity: 0.5 }}>
               Loop Start

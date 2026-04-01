@@ -43,10 +43,10 @@ export const OBXdControls: React.FC<OBXdControlsProps> = ({
     : 'bg-[#1a1a1a] border-amber-900/50';
 
   const renderOscillatorTab = () => (
-    <div className="flex flex-col gap-4 p-4">
+    <div className="grid grid-cols-2 gap-2 p-2">
       {/* Oscillator 1 */}
-      <div className={`p-4 rounded-xl border ${panelBg}`}>
-        <div className="flex items-center gap-2 mb-4">
+      <div className={`p-2 rounded-lg border ${panelBg}`}>
+        <div className="flex items-center gap-2 mb-2">
           <Waves size={16} style={{ color: accentColor }} />
           <h3 className="font-bold uppercase tracking-tight" style={{ color: accentColor }}>
             OSCILLATOR 1
@@ -110,8 +110,8 @@ export const OBXdControls: React.FC<OBXdControlsProps> = ({
       </div>
 
       {/* Oscillator 2 */}
-      <div className={`p-4 rounded-xl border ${panelBg}`}>
-        <div className="flex items-center gap-2 mb-4">
+      <div className={`p-2 rounded-lg border ${panelBg}`}>
+        <div className="flex items-center gap-2 mb-2">
           <Waves size={16} style={{ color: accentColor }} />
           <h3 className="font-bold uppercase tracking-tight" style={{ color: accentColor }}>
             OSCILLATOR 2
@@ -175,8 +175,8 @@ export const OBXdControls: React.FC<OBXdControlsProps> = ({
       </div>
 
       {/* OSC Options */}
-      <div className={`p-4 rounded-xl border ${panelBg}`}>
-        <h3 className="font-bold uppercase tracking-tight mb-4" style={{ color: accentColor }}>
+      <div className={`p-2 rounded-lg border ${panelBg}`}>
+        <h3 className="font-bold uppercase tracking-tight mb-2" style={{ color: accentColor }}>
           OPTIONS
         </h3>
         <div className="flex gap-4">
@@ -226,17 +226,17 @@ export const OBXdControls: React.FC<OBXdControlsProps> = ({
   );
 
   const renderFilterTab = () => (
-    <div className="flex flex-col gap-4 p-4">
+    <div className="grid grid-cols-2 gap-2 p-2">
       {/* Filter */}
-      <div className={`p-4 rounded-xl border ${panelBg}`}>
-        <div className="flex items-center gap-2 mb-4">
+      <div className={`p-2 rounded-lg border ${panelBg}`}>
+        <div className="flex items-center gap-2 mb-2">
           <Filter size={16} style={{ color: accentColor }} />
           <h3 className="font-bold uppercase tracking-tight" style={{ color: accentColor }}>
             FILTER
           </h3>
         </div>
 
-        <div className="mb-4">
+        <div className="mb-2">
           {(() => {
             const ft = OBXD_FILTER_TYPE_MAP[config.filterType ?? 'lp24'] ?? OBXD_FILTER_TYPE_MAP.lp24;
             return (
@@ -252,7 +252,7 @@ export const OBXdControls: React.FC<OBXdControlsProps> = ({
           })()}
         </div>
 
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
           <Knob
             value={config.filterCutoff ?? 0.7}
             min={0}
@@ -318,8 +318,8 @@ export const OBXdControls: React.FC<OBXdControlsProps> = ({
       </div>
 
       {/* Filter Envelope */}
-      <div className={`p-4 rounded-xl border ${panelBg}`}>
-        <h3 className="font-bold uppercase tracking-tight mb-4" style={{ color: accentColor }}>
+      <div className={`p-2 rounded-lg border ${panelBg}`}>
+        <h3 className="font-bold uppercase tracking-tight mb-2" style={{ color: accentColor }}>
           FILTER ENVELOPE
         </h3>
 
@@ -335,7 +335,7 @@ export const OBXdControls: React.FC<OBXdControlsProps> = ({
           />
         </div>
 
-        <div className="grid grid-cols-4 gap-6">
+        <div className="grid grid-cols-4 gap-3">
           <Knob
             value={config.filterAttack ?? 0.01}
             min={0}
@@ -378,10 +378,10 @@ export const OBXdControls: React.FC<OBXdControlsProps> = ({
   );
 
   const renderEnvelopeTab = () => (
-    <div className="flex flex-col gap-4 p-4">
+    <div className="grid grid-cols-2 gap-2 p-2">
       {/* Amp Envelope */}
-      <div className={`p-4 rounded-xl border ${panelBg}`}>
-        <div className="flex items-center gap-2 mb-4">
+      <div className={`p-2 rounded-lg border ${panelBg}`}>
+        <div className="flex items-center gap-2 mb-2">
           <Zap size={16} style={{ color: accentColor }} />
           <h3 className="font-bold uppercase tracking-tight" style={{ color: accentColor }}>
             AMP ENVELOPE
@@ -400,7 +400,7 @@ export const OBXdControls: React.FC<OBXdControlsProps> = ({
           />
         </div>
 
-        <div className="grid grid-cols-4 gap-6">
+        <div className="grid grid-cols-4 gap-3">
           <Knob
             value={config.ampAttack ?? 0.01}
             min={0}
@@ -441,15 +441,15 @@ export const OBXdControls: React.FC<OBXdControlsProps> = ({
       </div>
 
       {/* Global */}
-      <div className={`p-4 rounded-xl border ${panelBg}`}>
-        <div className="flex items-center gap-2 mb-4">
+      <div className={`p-2 rounded-lg border ${panelBg}`}>
+        <div className="flex items-center gap-2 mb-2">
           <Volume2 size={16} style={{ color: accentColor }} />
           <h3 className="font-bold uppercase tracking-tight" style={{ color: accentColor }}>
             GLOBAL
           </h3>
         </div>
 
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
           <Knob
             value={config.masterVolume ?? 0.7}
             min={0}
@@ -501,17 +501,17 @@ export const OBXdControls: React.FC<OBXdControlsProps> = ({
   );
 
   const renderModulationTab = () => (
-    <div className="flex flex-col gap-4 p-4">
+    <div className="grid grid-cols-2 gap-2 p-2">
       {/* LFO */}
-      <div className={`p-4 rounded-xl border ${panelBg}`}>
-        <div className="flex items-center gap-2 mb-4">
+      <div className={`p-2 rounded-lg border ${panelBg}`}>
+        <div className="flex items-center gap-2 mb-2">
           <Activity size={16} style={{ color: accentColor }} />
           <h3 className="font-bold uppercase tracking-tight" style={{ color: accentColor }}>
             LFO
           </h3>
         </div>
 
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
           <Knob
             value={config.lfoRate ?? 0.2}
             min={0}
@@ -548,8 +548,8 @@ export const OBXdControls: React.FC<OBXdControlsProps> = ({
         </div>
 
         <div className="mt-4">
-          <h4 className="text-xs text-text-secondary mb-4">LFO ROUTING</h4>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+          <h4 className="text-xs text-text-secondary mb-2">LFO ROUTING</h4>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
             <Knob
               value={config.lfoOscAmount ?? 0}
               min={0}
@@ -591,12 +591,12 @@ export const OBXdControls: React.FC<OBXdControlsProps> = ({
       </div>
 
       {/* Additional Modulation */}
-      <div className={`p-4 rounded-xl border ${panelBg}`}>
-        <h3 className="font-bold uppercase tracking-tight mb-4" style={{ color: accentColor }}>
+      <div className={`p-2 rounded-lg border ${panelBg}`}>
+        <h3 className="font-bold uppercase tracking-tight mb-2" style={{ color: accentColor }}>
           ADDITIONAL
         </h3>
 
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
           <Knob
             value={config.noiseLevel ?? 0}
             min={0}

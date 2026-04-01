@@ -144,7 +144,7 @@ export const AMSynthControls: React.FC<AMSynthControlsProps> = ({ config, onChan
     <div className="p-4 space-y-3 text-xs">
       {GROUPS.map((group) => (
         <div key={group.label} className="bg-[#1a1a1a] border border-dark-border rounded-xl p-4">
-          <h3 className={`font-bold ${headerColor} mb-4 text-[11px] uppercase tracking-wide`}>
+          <h3 className={`font-bold ${headerColor} mb-2 text-[11px] uppercase tracking-wide`}>
             {group.label}
           </h3>
           <div className="grid grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">

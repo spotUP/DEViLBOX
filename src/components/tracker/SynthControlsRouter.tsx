@@ -38,9 +38,13 @@ import { DEFAULT_ZYNADDSUBFX } from '@engine/zynaddsubfx/ZynAddSubFXSynth';
 import { deepMerge } from '@lib/migration';
 import { isMAMEChipType } from '@constants/chipParameters';
 import { SYNTH_REGISTRY } from '@engine/vstbridge/synth-registry';
+import { getSynthLayout } from '@/pixi/views/instruments/layouts';
 
 // ─── Lazy imports ────────────────────────────────────────────────────────────
 
+const DOMSynthPanel = lazy(() =>
+  import('@components/instruments/controls/DOMSynthPanel').then(m => ({ default: m.DOMSynthPanel }))
+);
 const WobbleBassControls = lazy(() =>
   import('@components/instruments/controls/WobbleBassControls').then(m => ({ default: m.WobbleBassControls }))
 );
@@ -598,22 +602,19 @@ export const SynthControlsRouter: React.FC<SynthControlsRouterProps> = ({ instru
       return <FurnaceControls config={cfg} instrumentId={instrument.id} onChange={(u) => onUpdate({ furnace: { ...cfg, ...u } })} />;
     }
 
-    // ── XRNS demoscene synths (WaveSabre, Oidos, Tunefish) ──
-    // These use WASM engines with parameters stored in instrument.xrns
-    if (synthType === 'WaveSabreSynth' || synthType === 'OidosSynth' || synthType === 'TunefishSynth') {
-      const xrnsSynthType = instrument.xrns?.synthType || synthType;
-      const paramCount = instrument.xrns?.parameters?.length || 0;
-      return (
-        <div style={{ padding: '12px', color: 'var(--color-text-secondary)', fontSize: '12px' }}>
-          <div style={{ fontWeight: 'bold', marginBottom: '8px', color: 'var(--color-text)' }}>
-            {xrnsSynthType.replace('wavesabre-', '').replace('WaveSabreSynth', 'WaveSabre').toUpperCase()}
-          </div>
-          <div>WASM synth with {paramCount} parameters</div>
-          <div style={{ marginTop: '8px', opacity: 0.7 }}>
-            Parameters loaded from XRNS file
-          </div>
-        </div>
-      );
+    // ── Synths with declarative layouts (DOMSynthPanel) ──
+    // Covers demoscene synths, Retromulator synths, and any other with SynthPanelLayout
+    {
+      const declLayout = getSynthLayout(synthType);
+      if (declLayout) {
+        return (
+          <DOMSynthPanel
+            layout={declLayout}
+            config={instrument as unknown as Record<string, unknown>}
+            onChange={(updates) => onUpdate(updates)}
+          />
+        );
+      }
     }
 
     // ── No dedicated controls — use fallback ──

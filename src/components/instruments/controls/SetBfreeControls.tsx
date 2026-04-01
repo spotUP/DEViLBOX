@@ -158,8 +158,8 @@ interface DrawbarBankProps {
 }
 
 const DrawbarBank: React.FC<DrawbarBankProps> = React.memo(({ title, keys, merged, update }) => (
-  <div className="p-4 rounded-xl border bg-[#1a1a1a] border-amber-900/30">
-    <h3 className="font-bold uppercase tracking-tight text-sm mb-4 text-amber-500">{title}</h3>
+  <div className="p-2 rounded-lg border bg-[#1a1a1a] border-amber-900/30">
+    <h3 className="font-bold uppercase tracking-tight text-sm mb-2 text-amber-500">{title}</h3>
     <div className="flex justify-center gap-1 sm:gap-2">
       {DRAWBAR_LABELS.map((label, i) => (
         <DrawbarSlider
@@ -192,7 +192,7 @@ export const SetBfreeControls: React.FC<SetBfreeControlsProps> = ({ config, onCh
   const merged = { ...DEFAULT_SETBFREE, ...config } as Required<SetBfreeConfig>;
 
   return (
-    <div className="synth-controls-flow flex flex-col gap-4 p-4 overflow-y-auto text-xs">
+    <div className="synth-controls-flow grid grid-cols-2 gap-2 p-2 overflow-y-auto text-xs">
       {/* ═══ UPPER MANUAL ═══ */}
       <DrawbarBank title="Upper Manual" keys={UPPER_KEYS} merged={merged} update={updateParam} />
 
@@ -200,7 +200,7 @@ export const SetBfreeControls: React.FC<SetBfreeControlsProps> = ({ config, onCh
       <DrawbarBank title="Lower Manual" keys={LOWER_KEYS} merged={merged} update={updateParam} />
 
       {/* ═══ PEDALS (collapsible) ═══ */}
-      <div className="p-4 rounded-xl border bg-[#1a1a1a] border-amber-900/30">
+      <div className="p-2 rounded-lg border bg-[#1a1a1a] border-amber-900/30">
         <button
           onClick={() => setShowPedals(!showPedals)}
           className="font-bold uppercase tracking-tight text-sm text-amber-500 w-full text-left flex items-center gap-2"
@@ -224,7 +224,7 @@ export const SetBfreeControls: React.FC<SetBfreeControlsProps> = ({ config, onCh
       </div>
 
       {/* ═══ PERCUSSION ═══ */}
-      <div className="p-4 rounded-xl border bg-[#1a1a1a] border-amber-900/30">
+      <div className="p-2 rounded-lg border bg-[#1a1a1a] border-amber-900/30">
         <h3 className="font-bold uppercase tracking-tight text-sm mb-3 text-amber-500">Percussion</h3>
         <div className="flex flex-wrap items-center gap-4">
           <SegmentButton
@@ -265,7 +265,7 @@ export const SetBfreeControls: React.FC<SetBfreeControlsProps> = ({ config, onCh
       </div>
 
       {/* ═══ VIBRATO / CHORUS ═══ */}
-      <div className="p-4 rounded-xl border bg-[#1a1a1a] border-amber-900/30">
+      <div className="p-2 rounded-lg border bg-[#1a1a1a] border-amber-900/30">
         <h3 className="font-bold uppercase tracking-tight text-sm mb-3 text-amber-500">Vibrato / Chorus</h3>
         <div className="flex flex-wrap items-start gap-4">
           <SegmentButton
@@ -311,7 +311,7 @@ export const SetBfreeControls: React.FC<SetBfreeControlsProps> = ({ config, onCh
       </div>
 
       {/* ═══ LESLIE SPEAKER ═══ */}
-      <div className="p-4 rounded-xl border bg-[#1a1a1a] border-amber-900/30">
+      <div className="p-2 rounded-lg border bg-[#1a1a1a] border-amber-900/30">
         <h3 className="font-bold uppercase tracking-tight text-sm mb-3 text-amber-500">Leslie Speaker</h3>
         <div className="flex flex-wrap items-start gap-4">
           <SegmentButton
@@ -348,7 +348,7 @@ export const SetBfreeControls: React.FC<SetBfreeControlsProps> = ({ config, onCh
       </div>
 
       {/* ═══ EFFECTS ═══ */}
-      <div className="p-4 rounded-xl border bg-[#1a1a1a] border-amber-900/30">
+      <div className="p-2 rounded-lg border bg-[#1a1a1a] border-amber-900/30">
         <h3 className="font-bold uppercase tracking-tight text-sm mb-3 text-amber-500">Effects</h3>
         <div className="flex flex-wrap items-start gap-4 justify-center">
           <button
@@ -372,7 +372,7 @@ export const SetBfreeControls: React.FC<SetBfreeControlsProps> = ({ config, onCh
       </div>
 
       {/* ═══ MASTER ═══ */}
-      <div className="p-4 rounded-xl border bg-[#1a1a1a] border-amber-900/30">
+      <div className="p-2 rounded-lg border bg-[#1a1a1a] border-amber-900/30">
         <h3 className="font-bold uppercase tracking-tight text-sm mb-3 text-amber-500">Master</h3>
         <div className="flex flex-wrap gap-4 justify-center">
           <Knob label="Volume" value={merged.volume} min={0} max={1} defaultValue={0.8}
