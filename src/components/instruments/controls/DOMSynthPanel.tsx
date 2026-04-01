@@ -110,21 +110,41 @@ interface SectionProps {
 }
 
 const DOMSynthSection: React.FC<SectionProps> = ({ section, getValue, updateParam }) => {
+  // Sort controls: knobs first, then sliders, then toggles/switches
+  const knobs = section.controls.filter((c: ControlDescriptor) => c.type === 'knob' || c.type === 'slider');
+  const toggles = section.controls.filter((c: ControlDescriptor) => c.type === 'toggle' || c.type === 'switch3way');
+
   return (
     <div className="bg-dark-bgSecondary/50 rounded-lg border border-dark-border/30 p-2">
       <div className="text-[9px] font-bold uppercase tracking-wider text-text-muted mb-1.5">
         {section.label}
       </div>
-      <div className="grid grid-cols-4 gap-1">
-        {section.controls.map((ctrl: ControlDescriptor) => (
-          <DOMSynthControl
-            key={ctrl.key}
-            descriptor={ctrl}
-            value={getValue(ctrl.key)}
-            onChange={(v) => updateParam(ctrl.key, v)}
-          />
-        ))}
-      </div>
+      {/* Row 1: Knobs + sliders */}
+      {knobs.length > 0 && (
+        <div className="grid grid-cols-4 gap-1">
+          {knobs.map((ctrl: ControlDescriptor) => (
+            <DOMSynthControl
+              key={ctrl.key}
+              descriptor={ctrl}
+              value={getValue(ctrl.key)}
+              onChange={(v) => updateParam(ctrl.key, v)}
+            />
+          ))}
+        </div>
+      )}
+      {/* Row 2: Toggles + switches */}
+      {toggles.length > 0 && (
+        <div className="flex flex-wrap gap-2 mt-1.5 pt-1.5 border-t border-dark-border/20">
+          {toggles.map((ctrl: ControlDescriptor) => (
+            <DOMSynthControl
+              key={ctrl.key}
+              descriptor={ctrl}
+              value={getValue(ctrl.key)}
+              onChange={(v) => updateParam(ctrl.key, v)}
+            />
+          ))}
+        </div>
+      )}
     </div>
   );
 };

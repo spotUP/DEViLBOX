@@ -207,22 +207,6 @@ export const DeltaMusic1Controls: React.FC<DeltaMusic1ControlsProps> = ({
       <div className={`rounded-lg border p-3 ${panelBg}`}>
         <SectionLabel label="Volume Envelope" />
 
-        {/* Visual ADSR curve using step-based mode.
-            DM1 ADSR: attackStep/attackDelay control ramp-up rate,
-            sustain is a hold counter, releaseStep/releaseDelay control ramp-down. */}
-        <div className="mb-3">
-          <EnvelopeVisualization
-            mode="steps"
-            attackVol={config.volume}    attackSpeed={config.attackStep > 0 ? config.attackDelay : 0}
-            decayVol={config.volume / 2} decaySpeed={config.decayStep > 0 ? config.decayDelay : 0}
-            sustainVol={config.volume / 2} sustainLen={Math.min(config.sustain, 255)}
-            releaseVol={0}               releaseSpeed={config.releaseStep > 0 ? config.releaseDelay : 0}
-            maxVol={64}
-            width={320} height={72}
-            color={accent}
-          />
-        </div>
-
         {/* Attack */}
         <div className="mb-3">
           <span className="text-[9px] uppercase tracking-wider block mb-1" style={{ color: accent, opacity: 0.5 }}>Attack</span>
@@ -293,11 +277,23 @@ export const DeltaMusic1Controls: React.FC<DeltaMusic1ControlsProps> = ({
             />
           </div>
         </div>
+
+        {/* Envelope visualization */}
+        <div className="mt-2">
+          <EnvelopeVisualization
+            mode="steps"
+            attackVol={config.volume}    attackSpeed={config.attackStep > 0 ? config.attackDelay : 0}
+            decayVol={config.volume / 2} decaySpeed={config.decayStep > 0 ? config.decayDelay : 0}
+            sustainVol={config.volume / 2} sustainLen={Math.min(config.sustain, 255)}
+            releaseVol={0}               releaseSpeed={config.releaseStep > 0 ? config.releaseDelay : 0}
+            maxVol={64}
+            width={320} height={72}
+            color={accent}
+          />
+        </div>
       </div>
     </div>
   );
-
-  // ── MODULATION TAB ────────────────────────────────────────────────────────
 
   const renderModulation = () => (
     <div className="flex flex-col gap-3 p-3 overflow-y-auto" style={{ maxHeight: 'calc(100vh - 280px)' }}>

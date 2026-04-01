@@ -314,19 +314,7 @@ export const OBXdControls: React.FC<OBXdControlsProps> = ({
           FILTER ENVELOPE
         </h3>
 
-        <div className="mb-3">
-          <EnvelopeVisualization
-            mode="linear"
-            attack={config.filterAttack ?? 0.01}
-            decay={config.filterDecay ?? 0.3}
-            sustain={config.filterSustain ?? 0.3}
-            release={config.filterRelease ?? 0.3}
-            color={knobColor}
-            width={300} height={56}
-          />
-        </div>
-
-        <div className="grid grid-cols-4 gap-3">
+                <div className="grid grid-cols-4 gap-3">
           <Knob
             value={config.filterAttack ?? 0.01}
             min={0}
@@ -360,6 +348,17 @@ export const OBXdControls: React.FC<OBXdControlsProps> = ({
             color={knobColor}
           />
         </div>
+<div className="mt-2">
+          <EnvelopeVisualization
+            mode="linear"
+            attack={config.filterAttack ?? 0.01}
+            decay={config.filterDecay ?? 0.3}
+            sustain={config.filterSustain ?? 0.3}
+            release={config.filterRelease ?? 0.3}
+            color={knobColor}
+            width={300} height={56}
+          />
+        </div>
       </div>
     </div>
   );
@@ -375,19 +374,7 @@ export const OBXdControls: React.FC<OBXdControlsProps> = ({
           </h3>
         </div>
 
-        <div className="mb-3">
-          <EnvelopeVisualization
-            mode="linear"
-            attack={config.ampAttack ?? 0.01}
-            decay={config.ampDecay ?? 0.2}
-            sustain={config.ampSustain ?? 0.7}
-            release={config.ampRelease ?? 0.3}
-            color={knobColor}
-            width={300} height={56}
-          />
-        </div>
-
-        <div className="grid grid-cols-4 gap-3">
+                <div className="grid grid-cols-4 gap-3">
           <Knob
             value={config.ampAttack ?? 0.01}
             min={0}
@@ -423,6 +410,17 @@ export const OBXdControls: React.FC<OBXdControlsProps> = ({
             label="Release"
             color={knobColor}
             size="md"
+          />
+        </div>
+<div className="mt-2">
+          <EnvelopeVisualization
+            mode="linear"
+            attack={config.ampAttack ?? 0.01}
+            decay={config.ampDecay ?? 0.2}
+            sustain={config.ampSustain ?? 0.7}
+            release={config.ampRelease ?? 0.3}
+            color={knobColor}
+            width={300} height={56}
           />
         </div>
       </div>

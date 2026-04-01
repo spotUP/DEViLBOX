@@ -243,14 +243,6 @@ export const HarmonicSynthControls: React.FC<HarmonicSynthControlsProps> = ({
               <option value="bandpass">BP</option>
             </select>
           </div>
-          <div className="mb-2">
-            <FilterFrequencyResponse
-              filterType={config.filter.type}
-              cutoff={Math.log10(Math.max(config.filter.cutoff, 20) / 20) / 3}
-              resonance={config.filter.resonance / 30}
-              poles={2} color={knobColor} width={300} height={56}
-            />
-          </div>
           <div className="flex gap-4 justify-center">
             <Knob
               value={config.filter.cutoff} min={20} max={20000} onChange={(v) => updateFilter({ cutoff: v })}
@@ -261,22 +253,19 @@ export const HarmonicSynthControls: React.FC<HarmonicSynthControlsProps> = ({
               label="Reso" color={knobColor}
             />
           </div>
+          <div className="mt-2">
+            <FilterFrequencyResponse
+              filterType={config.filter.type}
+              cutoff={Math.log10(Math.max(config.filter.cutoff, 20) / 20) / 3}
+              resonance={config.filter.resonance / 30}
+              poles={2} color={knobColor} width={300} height={56}
+            />
+          </div>
         </div>
 
         {/* Envelope */}
         <div className={`rounded-lg border p-3 ${panelBg}`}>
           <div className="font-mono text-[10px] font-bold text-text-muted mb-2 tracking-wider">ENVELOPE</div>
-          <div className="mb-2">
-            <EnvelopeVisualization
-              mode="linear"
-              attack={config.envelope.attack / 2000}
-              decay={config.envelope.decay / 2000}
-              sustain={config.envelope.sustain / 100}
-              release={config.envelope.release / 5000}
-              color={knobColor}
-              width={300} height={48}
-            />
-          </div>
           <div className="flex gap-3 justify-center">
             <Knob
               value={config.envelope.attack} min={0} max={2000} onChange={(v) => updateEnvelope({ attack: v })}
@@ -293,6 +282,17 @@ export const HarmonicSynthControls: React.FC<HarmonicSynthControlsProps> = ({
             <Knob
               value={config.envelope.release} min={0} max={5000} onChange={(v) => updateEnvelope({ release: v })}
               label="R" unit="ms" color={knobColor}
+            />
+          </div>
+          <div className="mt-2">
+            <EnvelopeVisualization
+              mode="linear"
+              attack={config.envelope.attack / 2000}
+              decay={config.envelope.decay / 2000}
+              sustain={config.envelope.sustain / 100}
+              release={config.envelope.release / 5000}
+              color={knobColor}
+              width={300} height={48}
             />
           </div>
         </div>
