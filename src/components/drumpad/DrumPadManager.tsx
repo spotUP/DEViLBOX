@@ -403,7 +403,7 @@ export const DrumPadManager: React.FC<DrumPadManagerProps> = ({ onClose }) => {
           {performanceMode ? (
             /* Performance Mode: fullscreen pads with minimal controls */
             <div className="flex-1 flex items-center justify-center overflow-auto">
-              <div className="w-full max-w-md">
+              <div style={{ width: '100%', maxWidth: 'min(800px, calc(100vh - 176px))' }}>
                 <PadGrid
                   onPadSelect={setSelectedPadId}
                   onEmptyPadClick={handleEmptyPadClick}

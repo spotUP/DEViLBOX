@@ -162,6 +162,7 @@ export const ProjectMCanvas = React.forwardRef<VJCanvasHandle, ProjectMCanvasPro
             if (content && !cancelled) {
               engine.loadPresetData(content, false);
               currentIdxRef.current = startIdx;
+              presetLoadTimeRef.current = performance.now();
               onPresetChange?.(startIdx, names[startIdx]);
             }
           }
@@ -339,7 +340,7 @@ export const ProjectMCanvas = React.forwardRef<VJCanvasHandle, ProjectMCanvasPro
                 prevHash2 = 0;
                 const names = allPresetNames ?? Object.keys(BUILTIN_PRESETS);
                 if (names.length > 0) {
-                  doLoadPresetRef.current?.(Math.floor(Math.random() * names.length), true);
+                  doLoadPresetRef.current?.(Math.floor(Math.random() * names.length), false);
                 }
               }
             }
@@ -370,12 +371,14 @@ export const ProjectMCanvas = React.forwardRef<VJCanvasHandle, ProjectMCanvasPro
     // Imperative API — smooth=true enables projectM's native soft cut (crossfade).
     // Safe because VJView alternates layers so projectM never does back-to-back swaps.
     React.useImperativeHandle(ref, () => ({
-      nextPreset: () => { doLoadPreset(currentIdxRef.current + 1, true); },
+      // Always use smooth=false (CSS fade-to-black) — projectM's native soft-cut
+      // transition shader causes alternating-frame artifacts in WebGL2.
+      nextPreset: () => { doLoadPreset(currentIdxRef.current + 1, false); },
       randomPreset: () => {
         const names = allPresetNames ?? Object.keys(BUILTIN_PRESETS);
-        doLoadPreset(Math.floor(Math.random() * names.length), true);
+        doLoadPreset(Math.floor(Math.random() * names.length), false);
       },
-      loadPresetByIndex: (idx: number) => { doLoadPreset(idx, true); },
+      loadPresetByIndex: (idx: number) => { doLoadPreset(idx, false); },
       loadPresetByName: (name: string, blendOrSmooth?: number | boolean) => { doLoadPresetByName(name, blendOrSmooth !== false); },
       getPresetNames: () => allPresetNames ?? Object.keys(BUILTIN_PRESETS),
       getCurrentIndex: () => currentIdxRef.current,
