@@ -115,7 +115,7 @@ export const V2Controls: React.FC<V2ControlsProps> = ({
   const LFO_POLARITY = ['Pos', 'Neg', 'Bipolar'];
 
   const renderOscTab = () => (
-    <div className="grid grid-cols-2 gap-2 p-2">
+    <div className="grid grid-cols-3 gap-2 p-2">
       {/* Osc 1 Section */}
       <div className={`p-2 rounded-lg border ${panelBg}`}>
         <div className="flex items-center justify-between mb-2">
@@ -309,7 +309,7 @@ export const V2Controls: React.FC<V2ControlsProps> = ({
   );
 
   const renderFilterTab = () => (
-    <div className="grid grid-cols-2 gap-2 p-2">
+    <div className="grid grid-cols-3 gap-2 p-2">
       {/* Filter 1 */}
       <div className={`p-2 rounded-lg border ${panelBg}`}>
         <div className="flex items-center justify-between mb-2">
@@ -444,7 +444,7 @@ export const V2Controls: React.FC<V2ControlsProps> = ({
   );
 
   const renderEnvTab = () => (
-    <div className="grid grid-cols-2 gap-2 p-2">
+    <div className="grid grid-cols-3 gap-2 p-2">
       {/* Amp Env */}
       <div className={`p-2 rounded-lg border ${panelBg}`}>
         <div className="flex items-center gap-2 mb-2">
@@ -560,7 +560,7 @@ export const V2Controls: React.FC<V2ControlsProps> = ({
   const renderModTab = () => {
     const lfo2 = config.lfo2 ?? { mode: 1, keySync: true, envMode: false, rate: 64, phase: 2, polarity: 0, amplify: 127 };
     return (
-      <div className="grid grid-cols-2 gap-2 p-2">
+      <div className="grid grid-cols-3 gap-2 p-2">
         <div className={`p-2 rounded-lg border ${panelBg}`}>
           <div className="flex items-center gap-2 mb-2">
             <Activity size={16} className="text-amber-500" />
@@ -674,7 +674,7 @@ export const V2Controls: React.FC<V2ControlsProps> = ({
     const chorus = config.chorusFlanger ?? { amount: 64, feedback: 64, delayL: 32, delayR: 32, modRate: 0, modDepth: 0, modPhase: 64 };
     const comp = config.compressor ?? { mode: 0, stereoLink: false, autoGain: true, lookahead: 2, threshold: 90, ratio: 32, attack: 20, release: 64, outGain: 64 };
     return (
-      <div className="grid grid-cols-2 gap-2 p-2">
+      <div className="grid grid-cols-3 gap-2 p-2">
         {/* Voice Distortion */}
         <div className={`p-2 rounded-lg border ${panelBg}`}>
           <div className="flex items-center justify-between mb-2">

@@ -169,7 +169,7 @@ export const StartrekkerAMControls: React.FC<StartrekkerAMControlsProps> = ({
   }
 
   return (
-    <div className="grid grid-cols-2 gap-2 p-2">
+    <div className="grid grid-cols-3 gap-2 p-2">
       {/* ── Waveform Section ── */}
       <div className={`p-2 rounded-lg border ${sectionBg} ${sectionBorder}`}>
         <div className="flex items-center justify-between mb-2">

@@ -43,7 +43,7 @@ export const OBXdControls: React.FC<OBXdControlsProps> = ({
     : 'bg-[#1a1a1a] border-amber-900/50';
 
   const renderOscillatorTab = () => (
-    <div className="grid grid-cols-2 gap-2 p-2">
+    <div className="grid grid-cols-3 gap-2 p-2">
       {/* Oscillator 1 */}
       <div className={`p-2 rounded-lg border ${panelBg}`}>
         <div className="flex items-center gap-2 mb-2">
@@ -226,7 +226,7 @@ export const OBXdControls: React.FC<OBXdControlsProps> = ({
   );
 
   const renderFilterTab = () => (
-    <div className="grid grid-cols-2 gap-2 p-2">
+    <div className="grid grid-cols-3 gap-2 p-2">
       {/* Filter */}
       <div className={`p-2 rounded-lg border ${panelBg}`}>
         <div className="flex items-center gap-2 mb-2">
@@ -378,7 +378,7 @@ export const OBXdControls: React.FC<OBXdControlsProps> = ({
   );
 
   const renderEnvelopeTab = () => (
-    <div className="grid grid-cols-2 gap-2 p-2">
+    <div className="grid grid-cols-3 gap-2 p-2">
       {/* Amp Envelope */}
       <div className={`p-2 rounded-lg border ${panelBg}`}>
         <div className="flex items-center gap-2 mb-2">
@@ -501,7 +501,7 @@ export const OBXdControls: React.FC<OBXdControlsProps> = ({
   );
 
   const renderModulationTab = () => (
-    <div className="grid grid-cols-2 gap-2 p-2">
+    <div className="grid grid-cols-3 gap-2 p-2">
       {/* LFO */}
       <div className={`p-2 rounded-lg border ${panelBg}`}>
         <div className="flex items-center gap-2 mb-2">
@@ -640,7 +640,7 @@ export const OBXdControls: React.FC<OBXdControlsProps> = ({
 
   return (
     <div className="flex flex-col h-full overflow-y-auto">
-      <div className="grid grid-cols-2 gap-2 p-2">
+      <div className="grid grid-cols-3 gap-2 p-2">
         {/* Left column: Oscillators + Envelopes */}
         <div className="flex flex-col gap-2">
           {renderOscillatorTab()}
