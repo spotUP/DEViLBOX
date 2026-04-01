@@ -297,22 +297,22 @@ export function create808Program(): DrumProgram {
 
   // [name, drumType, note, io808Type]
   const kit: [string, DrumType, string, string][] = [
-    ['BD',       'kick',     'C2',   'kick'],
-    ['SD',       'snare',    'D2',   'snare'],
-    ['CP',       'clap',     'D#2',  'clap'],
-    ['RS',       'rimshot',  'C#2',  'rimshot'],
-    ['CH',       'hihat',    'F#2',  'closedHat'],
-    ['OH',       'hihat',    'A#2',  'openHat'],
-    ['LT',       'tom',      'F2',   'tomLow'],
-    ['MT',       'tom',      'B2',   'tomMid'],
-    ['HT',       'tom',      'D3',   'tomHigh'],
-    ['CY',       'cymbal',   'C#3',  'cymbal'],
-    ['CL',       'clave',    'D#2',  'clave'],
-    ['CB',       'cowbell',  'G#2',  'cowbell'],
-    ['MA',       'maracas',  'D3',   'maracas'],
-    ['Conga Lo', 'conga',    'D#3',  'congaLow'],
-    ['Conga Hi', 'conga',    'A3',   'congaHigh'],
-    ['Cymbal 2', 'cymbal',   'A4',   'cymbal'],
+    ['Kick',       'kick',     'C2',   'kick'],
+    ['Snare',      'snare',    'D2',   'snare'],
+    ['Clap',       'clap',     'D#2',  'clap'],
+    ['Rimshot',    'rimshot',  'C#2',  'rimshot'],
+    ['Closed Hat', 'hihat',    'F#2',  'closedHat'],
+    ['Open Hat',   'hihat',    'A#2',  'openHat'],
+    ['Low Tom',    'tom',      'F2',   'tomLow'],
+    ['Mid Tom',    'tom',      'B2',   'tomMid'],
+    ['High Tom',   'tom',      'D3',   'tomHigh'],
+    ['Cymbal',     'cymbal',   'C#3',  'cymbal'],
+    ['Clave',      'clave',    'D#2',  'clave'],
+    ['Cowbell',    'cowbell',  'G#2',  'cowbell'],
+    ['Maracas',    'maracas',  'D3',   'maracas'],
+    ['Conga Low',  'conga',    'D#3',  'congaLow'],
+    ['Conga High', 'conga',    'A3',   'congaHigh'],
+    ['Cymbal 2',   'cymbal',   'A4',   'cymbal'],
   ];
 
   kit.forEach(([name, drumType, note, subType], i) => {
@@ -336,17 +336,17 @@ export function create909Program(): DrumProgram {
 
   // [name, drumType, note, tr909Type]
   const kit: [string, DrumType, string, string][] = [
-    ['BD',    'kick',     'C2',   'kick'],
-    ['SD',    'snare',    'D2',   'snare'],
-    ['CP',    'clap',     'D#2',  'clap'],
-    ['RS',    'rimshot',  'C#2',  'rimshot'],
-    ['CH',    'hihat',    'F#2',  'closedHat'],
-    ['OH',    'hihat',    'A#2',  'openHat'],
-    ['LT',    'tom',      'F2',   'tomLow'],
-    ['MT',    'tom',      'B2',   'tomMid'],
-    ['HT',    'tom',      'D3',   'tomHigh'],
-    ['Crash', 'cymbal',   'C#3',  'crash'],
-    ['Ride',  'cymbal',   'D#3',  'ride'],
+    ['Kick',       'kick',     'C2',   'kick'],
+    ['Snare',      'snare',    'D2',   'snare'],
+    ['Clap',       'clap',     'D#2',  'clap'],
+    ['Rimshot',    'rimshot',  'C#2',  'rimshot'],
+    ['Closed Hat', 'hihat',    'F#2',  'closedHat'],
+    ['Open Hat',   'hihat',    'A#2',  'openHat'],
+    ['Low Tom',    'tom',      'F2',   'tomLow'],
+    ['Mid Tom',    'tom',      'B2',   'tomMid'],
+    ['High Tom',   'tom',      'D3',   'tomHigh'],
+    ['Crash',      'cymbal',   'C#3',  'crash'],
+    ['Ride',       'cymbal',   'D#3',  'ride'],
   ];
 
   kit.forEach(([name, drumType, note, subType], i) => {
