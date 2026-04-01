@@ -282,14 +282,6 @@ export const SynareControls: React.FC<SynareControlsProps> = ({
           <h3 className={`font-bold ${isCyanTheme ? 'text-accent-highlight' : 'text-yellow-400'}`}>FILTER</h3>
         </div>
         
-        <div className="mb-3">
-          <FilterFrequencyResponse
-            filterType="lowpass"
-            cutoff={Math.log10(Math.max(config.filter.cutoff, 20) / 20) / 3}
-            resonance={config.filter.resonance / 100}
-            poles={2} color={knobColor} width={300} height={56}
-          />
-        </div>
         <div className="flex flex-wrap gap-3 items-end">
           <Knob
             value={config.filter.cutoff}
@@ -326,6 +318,14 @@ export const SynareControls: React.FC<SynareControlsProps> = ({
             label="F-Decay"
             color={knobColor}
             formatValue={(v) => `${Math.round(v)}ms`}
+          />
+        </div>
+        <div className="mt-2">
+          <FilterFrequencyResponse
+            filterType="lowpass"
+            cutoff={Math.log10(Math.max(config.filter.cutoff, 20) / 20) / 3}
+            resonance={config.filter.resonance / 100}
+            poles={2} color={knobColor} width={300} height={56}
           />
         </div>
       </div>

@@ -127,6 +127,10 @@ const PixiSynthSection: React.FC<SynthSectionProps> = ({ section, getValue, upda
     g.fill({ color: theme.border.color, alpha: 0.15 });
   }, [theme]);
 
+  // Sort controls: knobs/sliders first, then toggles/switches
+  const knobs = section.controls.filter(c => c.type === 'knob' || c.type === 'slider');
+  const toggles = section.controls.filter(c => c.type === 'toggle' || c.type === 'switch3way');
+
   return (
     <pixiContainer layout={{ flexDirection: 'column', gap: 4 }}>
       {/* Section label */}
@@ -140,17 +144,33 @@ const PixiSynthSection: React.FC<SynthSectionProps> = ({ section, getValue, upda
         <pixiGraphics draw={drawBorder} layout={{ flex: 1, height: 1 }} />
       </pixiContainer>
 
-      {/* Controls grid — 4 columns */}
-      <pixiContainer layout={{ flexDirection: 'row', flexWrap: 'wrap', gap: 4 }}>
-        {section.controls.map(ctrl => (
-          <PixiSynthControl
-            key={ctrl.key}
-            descriptor={ctrl}
-            value={getValue(ctrl.key)}
-            onChange={(v) => updateParam(ctrl.key, v)}
-          />
-        ))}
-      </pixiContainer>
+      {/* Row 1: Knobs + sliders */}
+      {knobs.length > 0 && (
+        <pixiContainer layout={{ flexDirection: 'row', flexWrap: 'wrap', gap: 4 }}>
+          {knobs.map(ctrl => (
+            <PixiSynthControl
+              key={ctrl.key}
+              descriptor={ctrl}
+              value={getValue(ctrl.key)}
+              onChange={(v) => updateParam(ctrl.key, v)}
+            />
+          ))}
+        </pixiContainer>
+      )}
+
+      {/* Row 2: Toggles + switches */}
+      {toggles.length > 0 && (
+        <pixiContainer layout={{ flexDirection: 'row', flexWrap: 'wrap', gap: 4 }}>
+          {toggles.map(ctrl => (
+            <PixiSynthControl
+              key={ctrl.key}
+              descriptor={ctrl}
+              value={getValue(ctrl.key)}
+              onChange={(v) => updateParam(ctrl.key, v)}
+            />
+          ))}
+        </pixiContainer>
+      )}
     </pixiContainer>
   );
 };

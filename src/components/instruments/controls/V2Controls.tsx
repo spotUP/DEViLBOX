@@ -312,34 +312,10 @@ export const V2Controls: React.FC<V2ControlsProps> = ({
     <div className="grid grid-cols-4 gap-2 p-2">
       {/* Filter 1 */}
       <div className={`p-2 rounded-lg border ${panelBg}`}>
-        <div className="flex items-center justify-between mb-2">
-          <div className="flex items-center gap-2">
-            <Filter size={16} className="text-amber-500" />
-            <h3 className="font-bold text-amber-400 uppercase tracking-tight">VCF 1</h3>
-          </div>
-          <select
-            value={config.filter1.mode}
-            onChange={(e) => updateFilter1({ mode: parseInt(e.target.value) })}
-            className="bg-dark-bgSecondary border border-dark-borderLight text-xs text-amber-400 rounded px-2 py-1"
-          >
-            {FILTER_MODES.map((mode, i) => (
-              <option key={mode} value={i}>{mode}</option>
-            ))}
-          </select>
+        <div className="flex items-center gap-2 mb-2">
+          <Filter size={16} className="text-amber-500" />
+          <h3 className="font-bold text-amber-400 uppercase tracking-tight">VCF 1</h3>
         </div>
-        {(() => {
-          const entry = V2_FILTER_MAP[config.filter1.mode];
-          if (!entry) return null;
-          return (
-            <div className="mb-3">
-              <FilterFrequencyResponse
-                filterType={entry.type} cutoff={config.filter1.cutoff / 127}
-                resonance={config.filter1.resonance / 127} poles={entry.poles}
-                color={knobColor} width={280} height={56}
-              />
-            </div>
-          );
-        })()}
         <div className="grid grid-cols-4 gap-3 items-center">
           <Knob
             value={config.filter1.cutoff}
@@ -358,18 +334,23 @@ export const V2Controls: React.FC<V2ControlsProps> = ({
             color={knobColor}
           />
         </div>
-      </div>
-
-      {/* Filter 2 */}
-      <div className={`p-2 rounded-lg border ${panelBg}`}>
-        <div className="flex items-center justify-between mb-2">
-          <div className="flex items-center gap-2">
-            <Filter size={16} className="text-amber-500" />
-            <h3 className="font-bold text-amber-400 uppercase tracking-tight">VCF 2</h3>
-          </div>
+        {(() => {
+          const entry = V2_FILTER_MAP[config.filter1.mode];
+          if (!entry) return null;
+          return (
+            <div className="mt-2">
+              <FilterFrequencyResponse
+                filterType={entry.type} cutoff={config.filter1.cutoff / 127}
+                resonance={config.filter1.resonance / 127} poles={entry.poles}
+                color={knobColor} width={280} height={56}
+              />
+            </div>
+          );
+        })()}
+        <div className="flex flex-wrap gap-2 mt-1.5 pt-1.5 border-t border-dark-border/20">
           <select
-            value={config.filter2.mode}
-            onChange={(e) => updateFilter2({ mode: parseInt(e.target.value) })}
+            value={config.filter1.mode}
+            onChange={(e) => updateFilter1({ mode: parseInt(e.target.value) })}
             className="bg-dark-bgSecondary border border-dark-borderLight text-xs text-amber-400 rounded px-2 py-1"
           >
             {FILTER_MODES.map((mode, i) => (
@@ -377,19 +358,14 @@ export const V2Controls: React.FC<V2ControlsProps> = ({
             ))}
           </select>
         </div>
-        {(() => {
-          const entry = V2_FILTER_MAP[config.filter2.mode];
-          if (!entry) return null;
-          return (
-            <div className="mb-3">
-              <FilterFrequencyResponse
-                filterType={entry.type} cutoff={config.filter2.cutoff / 127}
-                resonance={config.filter2.resonance / 127} poles={entry.poles}
-                color={knobColor} width={280} height={56}
-              />
-            </div>
-          );
-        })()}
+      </div>
+
+      {/* Filter 2 */}
+      <div className={`p-2 rounded-lg border ${panelBg}`}>
+        <div className="flex items-center gap-2 mb-2">
+          <Filter size={16} className="text-amber-500" />
+          <h3 className="font-bold text-amber-400 uppercase tracking-tight">VCF 2</h3>
+        </div>
         <div className="grid grid-cols-4 gap-3 items-center">
           <Knob
             value={config.filter2.cutoff}
@@ -407,6 +383,30 @@ export const V2Controls: React.FC<V2ControlsProps> = ({
             label="Reso"
             color={knobColor}
           />
+        </div>
+        {(() => {
+          const entry = V2_FILTER_MAP[config.filter2.mode];
+          if (!entry) return null;
+          return (
+            <div className="mt-2">
+              <FilterFrequencyResponse
+                filterType={entry.type} cutoff={config.filter2.cutoff / 127}
+                resonance={config.filter2.resonance / 127} poles={entry.poles}
+                color={knobColor} width={280} height={56}
+              />
+            </div>
+          );
+        })()}
+        <div className="flex flex-wrap gap-2 mt-1.5 pt-1.5 border-t border-dark-border/20">
+          <select
+            value={config.filter2.mode}
+            onChange={(e) => updateFilter2({ mode: parseInt(e.target.value) })}
+            className="bg-dark-bgSecondary border border-dark-borderLight text-xs text-amber-400 rounded px-2 py-1"
+          >
+            {FILTER_MODES.map((mode, i) => (
+              <option key={mode} value={i}>{mode}</option>
+            ))}
+          </select>
         </div>
       </div>
 
@@ -452,18 +452,6 @@ export const V2Controls: React.FC<V2ControlsProps> = ({
           <h3 className="font-bold text-amber-400 uppercase tracking-tight">AMP ENVELOPE (EG 1)</h3>
         </div>
 
-        <div className="mb-3">
-          <EnvelopeVisualization
-            mode="linear"
-            attack={config.envelope.attack / 127}
-            decay={config.envelope.decay / 127}
-            sustain={config.envelope.sustain / 127}
-            release={config.envelope.release / 127}
-            color={knobColor}
-            width={300} height={56}
-          />
-        </div>
-
         <div className="grid grid-cols-4 gap-3 items-center">
           <Knob
             value={config.envelope.attack}
@@ -498,6 +486,18 @@ export const V2Controls: React.FC<V2ControlsProps> = ({
             color={knobColor}
           />
         </div>
+
+        <div className="mt-2">
+          <EnvelopeVisualization
+            mode="linear"
+            attack={config.envelope.attack / 127}
+            decay={config.envelope.decay / 127}
+            sustain={config.envelope.sustain / 127}
+            release={config.envelope.release / 127}
+            color={knobColor}
+            width={300} height={56}
+          />
+        </div>
       </div>
 
       {/* Env 2 */}
@@ -507,7 +507,14 @@ export const V2Controls: React.FC<V2ControlsProps> = ({
           <h3 className="font-bold text-amber-400 uppercase tracking-tight">MOD ENVELOPE (EG 2)</h3>
         </div>
 
-        <div className="mb-3">
+        <div className="grid grid-cols-4 gap-3 items-center">
+          <Knob value={config.envelope2.attack} min={0} max={127} onChange={(v) => updateEnv2({ attack: v })} label="Attack" color={knobColor} />
+          <Knob value={config.envelope2.decay} min={0} max={127} onChange={(v) => updateEnv2({ decay: v })} label="Decay" color={knobColor} />
+          <Knob value={config.envelope2.sustain} min={0} max={127} onChange={(v) => updateEnv2({ sustain: v })} label="Sustain" color={knobColor} />
+          <Knob value={config.envelope2.release} min={0} max={127} onChange={(v) => updateEnv2({ release: v })} label="Release" color={knobColor} />
+        </div>
+
+        <div className="mt-2">
           <EnvelopeVisualization
             mode="linear"
             attack={config.envelope2.attack / 127}
@@ -516,41 +523,6 @@ export const V2Controls: React.FC<V2ControlsProps> = ({
             release={config.envelope2.release / 127}
             color={knobColor}
             width={300} height={56}
-          />
-        </div>
-
-        <div className="grid grid-cols-4 gap-3 items-center">
-          <Knob
-            value={config.envelope2.attack}
-            min={0}
-            max={127}
-            onChange={(v) => updateEnv2({ attack: v })}
-            label="Attack"
-            color={knobColor}
-          />
-          <Knob
-            value={config.envelope2.decay}
-            min={0}
-            max={127}
-            onChange={(v) => updateEnv2({ decay: v })}
-            label="Decay"
-            color={knobColor}
-          />
-          <Knob
-            value={config.envelope2.sustain}
-            min={0}
-            max={127}
-            onChange={(v) => updateEnv2({ sustain: v })}
-            label="Sustain"
-            color={knobColor}
-          />
-          <Knob
-            value={config.envelope2.release}
-            min={0}
-            max={127}
-            onChange={(v) => updateEnv2({ release: v })}
-            label="Release"
-            color={knobColor}
           />
         </div>
       </div>

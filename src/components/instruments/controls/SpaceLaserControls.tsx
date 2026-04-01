@@ -205,32 +205,6 @@ export const SpaceLaserControls: React.FC<SpaceLaserControlsProps> = ({
         </div>
 
         <div className="flex flex-col items-center gap-4">
-          <div className="flex gap-2">
-            {['lowpass', 'highpass', 'bandpass', 'notch'].map((type) => (
-              <button
-                key={type}
-                onClick={() => updateFilter({ type: type as 'lowpass' | 'highpass' | 'bandpass' | 'notch' })}
-                className={`
-                  px-3 py-1 text-xs font-bold rounded border uppercase
-                  ${config.filter.type === type
-                    ? `bg-[#2a2a2a]`
-                    : 'bg-[#1a1a1a] border-dark-borderLight text-text-muted hover:border-dark-borderLight'
-                  }
-                `}
-                style={config.filter.type === type ? { borderColor: accentColor, color: accentColor } : undefined}
-              >
-                {type.slice(0, 4)}
-              </button>
-            ))}
-          </div>
-
-          <FilterFrequencyResponse
-            filterType={config.filter.type}
-            cutoff={Math.log10(Math.max(config.filter.cutoff, 20) / 20) / 3}
-            resonance={config.filter.resonance / 100}
-            poles={2} color={accentColor} width={300} height={56}
-          />
-
           <div className="flex gap-3 w-full">
             <Knob
               value={config.filter.cutoff}
@@ -251,6 +225,32 @@ export const SpaceLaserControls: React.FC<SpaceLaserControlsProps> = ({
               formatValue={(v) => `${Math.round(v)}%`}
             />
           </div>
+
+          <FilterFrequencyResponse
+            filterType={config.filter.type}
+            cutoff={Math.log10(Math.max(config.filter.cutoff, 20) / 20) / 3}
+            resonance={config.filter.resonance / 100}
+            poles={2} color={accentColor} width={300} height={56}
+          />
+
+          <div className="flex gap-2">
+            {['lowpass', 'highpass', 'bandpass', 'notch'].map((type) => (
+              <button
+                key={type}
+                onClick={() => updateFilter({ type: type as 'lowpass' | 'highpass' | 'bandpass' | 'notch' })}
+                className={`
+                  px-3 py-1 text-xs font-bold rounded border uppercase
+                  ${config.filter.type === type
+                    ? `bg-[#2a2a2a]`
+                    : 'bg-[#1a1a1a] border-dark-borderLight text-text-muted hover:border-dark-borderLight'
+                  }
+                `}
+                style={config.filter.type === type ? { borderColor: accentColor, color: accentColor } : undefined}
+              >
+                {type.slice(0, 4)}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
     </div>
@@ -260,17 +260,9 @@ export const SpaceLaserControls: React.FC<SpaceLaserControlsProps> = ({
     <div className="grid grid-cols-4 gap-2 p-2">
       {/* Delay Section */}
       <div className={`p-2 rounded-lg border ${panelBg}`}>
-        <div className="flex items-center justify-between mb-2">
-          <div className="flex items-center gap-2">
-            <Repeat size={16} className={isCyanTheme ? 'text-accent-highlight' : 'text-green-500'} />
-            <h3 className={`font-bold ${isCyanTheme ? 'text-accent-highlight' : 'text-green-400'}`}>SPACE DELAY</h3>
-          </div>
-          <input
-            type="checkbox"
-            checked={config.delay.enabled}
-            onChange={(e) => updateDelay({ enabled: e.target.checked })}
-            className={`w-4 h-4 rounded border-2 bg-transparent cursor-pointer ${isCyanTheme ? 'border-accent-highlight checked:bg-accent-highlight' : 'border-green-500 checked:bg-green-500'}`}
-          />
+        <div className="flex items-center gap-2 mb-2">
+          <Repeat size={16} className={isCyanTheme ? 'text-accent-highlight' : 'text-green-500'} />
+          <h3 className={`font-bold ${isCyanTheme ? 'text-accent-highlight' : 'text-green-400'}`}>SPACE DELAY</h3>
         </div>
 
         <div className={`flex gap-3 transition-opacity ${config.delay.enabled ? 'opacity-100' : 'opacity-40 pointer-events-none'}`}>
@@ -302,21 +294,24 @@ export const SpaceLaserControls: React.FC<SpaceLaserControlsProps> = ({
             formatValue={(v) => `${Math.round(v * 100)}%`}
           />
         </div>
+        <div className="flex flex-wrap gap-2 mt-1.5 pt-1.5 border-t border-dark-border/20">
+          <label className="flex items-center gap-2 cursor-pointer">
+            <span className="text-xs text-text-muted">Enable</span>
+            <input
+              type="checkbox"
+              checked={config.delay.enabled}
+              onChange={(e) => updateDelay({ enabled: e.target.checked })}
+              className={`w-4 h-4 rounded border-2 bg-transparent cursor-pointer ${isCyanTheme ? 'border-accent-highlight checked:bg-accent-highlight' : 'border-green-500 checked:bg-green-500'}`}
+            />
+          </label>
+        </div>
       </div>
 
       {/* Reverb Section */}
       <div className={`p-2 rounded-lg border ${panelBg}`}>
-        <div className="flex items-center justify-between mb-2">
-          <div className="flex items-center gap-2">
-            <Waves size={16} className={isCyanTheme ? 'text-accent-highlight' : 'text-green-500'} />
-            <h3 className={`font-bold ${isCyanTheme ? 'text-accent-highlight' : 'text-green-400'}`}>COSMIC REVERB</h3>
-          </div>
-          <input
-            type="checkbox"
-            checked={config.reverb.enabled}
-            onChange={(e) => updateReverb({ enabled: e.target.checked })}
-            className={`w-4 h-4 rounded border-2 bg-transparent cursor-pointer ${isCyanTheme ? 'border-accent-highlight checked:bg-accent-highlight' : 'border-green-500 checked:bg-green-500'}`}
-          />
+        <div className="flex items-center gap-2 mb-2">
+          <Waves size={16} className={isCyanTheme ? 'text-accent-highlight' : 'text-green-500'} />
+          <h3 className={`font-bold ${isCyanTheme ? 'text-accent-highlight' : 'text-green-400'}`}>COSMIC REVERB</h3>
         </div>
 
         <div className={`flex gap-3 transition-opacity ${config.reverb.enabled ? 'opacity-100' : 'opacity-40 pointer-events-none'}`}>
@@ -338,6 +333,17 @@ export const SpaceLaserControls: React.FC<SpaceLaserControlsProps> = ({
             color={knobColor}
             formatValue={(v) => `${Math.round(v * 100)}%`}
           />
+        </div>
+        <div className="flex flex-wrap gap-2 mt-1.5 pt-1.5 border-t border-dark-border/20">
+          <label className="flex items-center gap-2 cursor-pointer">
+            <span className="text-xs text-text-muted">Enable</span>
+            <input
+              type="checkbox"
+              checked={config.reverb.enabled}
+              onChange={(e) => updateReverb({ enabled: e.target.checked })}
+              className={`w-4 h-4 rounded border-2 bg-transparent cursor-pointer ${isCyanTheme ? 'border-accent-highlight checked:bg-accent-highlight' : 'border-green-500 checked:bg-green-500'}`}
+            />
+          </label>
         </div>
       </div>
     </div>
