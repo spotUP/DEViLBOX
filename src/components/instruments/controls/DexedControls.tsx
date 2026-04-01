@@ -88,17 +88,17 @@ export const DexedControls: React.FC<DexedControlsProps> = ({
     const pitchEgLevels = config.pitchEgLevels || [50, 50, 50, 50];
 
     return (
-      <div className="flex flex-col gap-4 p-4">
+      <div className="grid grid-cols-2 gap-2 p-2">
         {/* Algorithm Section */}
-        <div className={`p-4 rounded-xl border ${panelBg}`}>
-          <div className="flex items-center gap-2 mb-4">
+        <div className={`p-2 rounded-lg border ${panelBg}`}>
+          <div className="flex items-center gap-2 mb-2">
             <Settings size={16} style={{ color: accentColor }} />
             <h3 className="font-bold uppercase tracking-tight" style={{ color: accentColor }}>
               ALGORITHM
             </h3>
           </div>
 
-          <div className="flex flex-wrap gap-2 mb-4">
+          <div className="flex flex-wrap gap-2 mb-2">
             {Array.from({ length: 32 }, (_, i) => (
               <button
                 key={i}
@@ -120,15 +120,15 @@ export const DexedControls: React.FC<DexedControlsProps> = ({
         </div>
 
         {/* Global Controls */}
-        <div className={`p-4 rounded-xl border ${panelBg}`}>
-          <div className="flex items-center gap-2 mb-4">
+        <div className={`p-2 rounded-lg border ${panelBg}`}>
+          <div className="flex items-center gap-2 mb-2">
             <Settings size={16} style={{ color: accentColor }} />
             <h3 className="font-bold uppercase tracking-tight" style={{ color: accentColor }}>
               GLOBAL
             </h3>
           </div>
 
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
             <Knob
               value={config.feedback || 0}
               min={0}
@@ -167,15 +167,15 @@ export const DexedControls: React.FC<DexedControlsProps> = ({
         </div>
 
         {/* LFO Section */}
-        <div className={`p-4 rounded-xl border ${panelBg}`}>
-          <div className="flex items-center gap-2 mb-4">
+        <div className={`p-2 rounded-lg border ${panelBg}`}>
+          <div className="flex items-center gap-2 mb-2">
             <Zap size={16} style={{ color: accentColor }} />
             <h3 className="font-bold uppercase tracking-tight" style={{ color: accentColor }}>
               LFO
             </h3>
           </div>
 
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
             <Knob
               value={config.lfoSpeed || 35}
               min={0}
@@ -257,8 +257,8 @@ export const DexedControls: React.FC<DexedControlsProps> = ({
         </div>
 
         {/* Pitch Envelope */}
-        <div className={`p-4 rounded-xl border ${panelBg}`}>
-          <div className="flex items-center gap-2 mb-4">
+        <div className={`p-2 rounded-lg border ${panelBg}`}>
+          <div className="flex items-center gap-2 mb-2">
             <Music size={16} style={{ color: accentColor }} />
             <h3 className="font-bold uppercase tracking-tight" style={{ color: accentColor }}>
               PITCH ENVELOPE
@@ -266,7 +266,7 @@ export const DexedControls: React.FC<DexedControlsProps> = ({
           </div>
 
           <div className="text-xs text-text-secondary uppercase tracking-wider mb-3">Rates</div>
-          <div className="grid grid-cols-4 gap-6">
+          <div className="grid grid-cols-4 gap-3">
             {['R1', 'R2', 'R3', 'R4'].map((label, i) => (
               <Knob
                 key={label}
@@ -286,7 +286,7 @@ export const DexedControls: React.FC<DexedControlsProps> = ({
           </div>
 
           <div className="text-xs text-text-secondary uppercase tracking-wider mb-3 mt-4">Levels</div>
-          <div className="grid grid-cols-4 gap-6">
+          <div className="grid grid-cols-4 gap-3">
             {['L1', 'L2', 'L3', 'L4'].map((label, i) => (
               <Knob
                 key={label}
@@ -307,8 +307,8 @@ export const DexedControls: React.FC<DexedControlsProps> = ({
         </div>
 
         {/* Operator Levels Overview */}
-        <div className={`p-4 rounded-xl border ${panelBg}`}>
-          <div className="flex items-center gap-2 mb-4">
+        <div className={`p-2 rounded-lg border ${panelBg}`}>
+          <div className="flex items-center gap-2 mb-2">
             <Waves size={16} style={{ color: accentColor }} />
             <h3 className="font-bold uppercase tracking-tight" style={{ color: accentColor }}>
               OPERATOR LEVELS
@@ -349,17 +349,17 @@ export const DexedControls: React.FC<DexedControlsProps> = ({
     const egLevels = op.egLevels || [99, 99, 99, 0];
 
     return (
-      <div className="flex flex-col gap-4 p-4">
+      <div className="grid grid-cols-2 gap-2 p-2">
         {/* Frequency Section */}
-        <div className={`p-4 rounded-xl border ${panelBg}`}>
-          <div className="flex items-center gap-2 mb-4">
+        <div className={`p-2 rounded-lg border ${panelBg}`}>
+          <div className="flex items-center gap-2 mb-2">
             <Music size={16} style={{ color: accentColor }} />
             <h3 className="font-bold uppercase tracking-tight" style={{ color: accentColor }}>
               OPERATOR {opIndex + 1} - FREQUENCY
             </h3>
           </div>
 
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
             <Knob
               value={op.level ?? 99}
               min={0}
@@ -423,11 +423,11 @@ export const DexedControls: React.FC<DexedControlsProps> = ({
         </div>
 
         {/* Envelope Rates */}
-        <div className={`p-4 rounded-xl border ${panelBg}`}>
-          <h3 className="font-bold uppercase tracking-tight mb-4" style={{ color: accentColor }}>
+        <div className={`p-2 rounded-lg border ${panelBg}`}>
+          <h3 className="font-bold uppercase tracking-tight mb-2" style={{ color: accentColor }}>
             ENVELOPE RATES
           </h3>
-          <div className="grid grid-cols-4 gap-6">
+          <div className="grid grid-cols-4 gap-3">
             {['R1', 'R2', 'R3', 'R4'].map((label, i) => (
               <Knob
                 key={label}
@@ -448,11 +448,11 @@ export const DexedControls: React.FC<DexedControlsProps> = ({
         </div>
 
         {/* Envelope Levels */}
-        <div className={`p-4 rounded-xl border ${panelBg}`}>
-          <h3 className="font-bold uppercase tracking-tight mb-4" style={{ color: accentColor }}>
+        <div className={`p-2 rounded-lg border ${panelBg}`}>
+          <h3 className="font-bold uppercase tracking-tight mb-2" style={{ color: accentColor }}>
             ENVELOPE LEVELS
           </h3>
-          <div className="grid grid-cols-4 gap-6">
+          <div className="grid grid-cols-4 gap-3">
             {['L1', 'L2', 'L3', 'L4'].map((label, i) => (
               <Knob
                 key={label}
@@ -488,13 +488,13 @@ export const DexedControls: React.FC<DexedControlsProps> = ({
           </button>
 
           {advancedOpen[opIndex] && (
-            <div className="px-4 pb-4 flex flex-col gap-6">
+            <div className="px-4 pb-4 flex flex-col gap-3">
               {/* Keyboard Level Scaling */}
               <div>
                 <div className="text-xs text-text-secondary uppercase tracking-wider mb-3">
                   Keyboard Level Scaling
                 </div>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                   <Knob
                     value={op.breakPoint ?? 60}
                     min={0}
@@ -558,7 +558,7 @@ export const DexedControls: React.FC<DexedControlsProps> = ({
                 <div className="text-xs text-text-secondary uppercase tracking-wider mb-3">
                   Modulation &amp; Sensitivity
                 </div>
-                <div className="grid grid-cols-3 gap-6">
+                <div className="grid grid-cols-3 gap-3">
                   <Knob
                     value={op.rateScaling ?? 0}
                     min={0}

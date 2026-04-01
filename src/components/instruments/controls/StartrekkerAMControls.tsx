@@ -169,10 +169,10 @@ export const StartrekkerAMControls: React.FC<StartrekkerAMControlsProps> = ({
   }
 
   return (
-    <div className="flex flex-col gap-4 p-4">
+    <div className="grid grid-cols-2 gap-2 p-2">
       {/* ── Waveform Section ── */}
-      <div className={`p-4 rounded-xl border ${sectionBg} ${sectionBorder}`}>
-        <div className="flex items-center justify-between mb-4">
+      <div className={`p-2 rounded-lg border ${sectionBg} ${sectionBorder}`}>
+        <div className="flex items-center justify-between mb-2">
           <div className="flex items-center gap-2">
             <Waves size={16} style={{ color: accentColor }} />
             <h3 className="font-bold" style={{ color: accentColor }}>WAVEFORM</h3>
@@ -186,7 +186,7 @@ export const StartrekkerAMControls: React.FC<StartrekkerAMControlsProps> = ({
           </button>
         </div>
 
-        <div className="flex flex-col md:flex-row gap-6 items-center">
+        <div className="flex flex-col md:flex-row gap-3 items-center">
           {/* Waveform selector */}
           <div className="flex gap-2">
             {WAVEFORM_NAMES.map((name, i) => (
@@ -220,7 +220,7 @@ export const StartrekkerAMControls: React.FC<StartrekkerAMControlsProps> = ({
       </div>
 
       {/* ── Envelope Section ── */}
-      <div className={`p-4 rounded-xl border ${sectionBg} ${sectionBorder}`}>
+      <div className={`p-2 rounded-lg border ${sectionBg} ${sectionBorder}`}>
         <div className="flex items-center gap-2 mb-3">
           <Activity size={16} style={{ color: accentColor }} />
           <h3 className="font-bold" style={{ color: accentColor }}>ENVELOPE</h3>
@@ -274,13 +274,13 @@ export const StartrekkerAMControls: React.FC<StartrekkerAMControlsProps> = ({
       </div>
 
       {/* ── Vibrato Section ── */}
-      <div className={`p-4 rounded-xl border ${sectionBg} ${sectionBorder}`}>
-        <div className="flex items-center gap-2 mb-4">
+      <div className={`p-2 rounded-lg border ${sectionBg} ${sectionBorder}`}>
+        <div className="flex items-center gap-2 mb-2">
           <Waves size={16} style={{ color: '#22c55e' }} />
           <h3 className="font-bold text-emerald-400">VIBRATO</h3>
         </div>
 
-        <div className="flex gap-6 items-center justify-center">
+        <div className="flex gap-3 items-center justify-center">
           <Knob value={config.vibFreqStep} min={0} max={500} onChange={(v) => updateParam('vibFreqStep', Math.round(v))}
             label="Speed" color="#22c55e" formatValue={(v) => `${Math.round(v)}`} />
           <Knob value={Math.abs(config.vibAmplitude)} min={0} max={256} onChange={(v) => updateParam('vibAmplitude', Math.round(v) * (config.vibAmplitude < 0 ? -1 : 1))}

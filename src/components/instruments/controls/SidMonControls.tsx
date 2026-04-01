@@ -281,7 +281,7 @@ export const SidMonControls: React.FC<SidMonControlsProps> = ({
     <div className="flex flex-col gap-3 p-3 overflow-y-auto" style={{ maxHeight: 'calc(100vh - 280px)' }}>
       <div className={`rounded-lg border p-3 ${panelBg}`}>
         <SectionLabel label="Filter Mode" />
-        <div className="flex gap-2 mb-4">
+        <div className="flex gap-2 mb-2">
           {FILTER_MODE_NAMES.map((name, i) => (
             <button key={i}
               onClick={() => upd('filterMode', i)}

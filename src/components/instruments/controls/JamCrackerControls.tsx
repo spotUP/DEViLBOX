@@ -176,7 +176,7 @@ export const JamCrackerControls: React.FC<JamCrackerControlsProps> = ({
       )}
 
       {/* Controls */}
-      <div className="flex gap-6 items-start">
+      <div className="flex gap-3 items-start">
         <div className="flex flex-col items-center gap-1">
           <Knob
             value={config.volume / 64}

@@ -77,15 +77,15 @@ export const SynareControls: React.FC<SynareControlsProps> = ({
   };
 
   const renderMainTab = () => (
-    <div className="flex flex-col gap-4 p-4">
+    <div className="grid grid-cols-2 gap-2 p-2">
       {/* Pitch & Tone Section */}
-      <div className={`p-4 rounded-xl border ${panelBg}`}>
-        <div className="flex items-center gap-2 mb-4">
+      <div className={`p-2 rounded-lg border ${panelBg}`}>
+        <div className="flex items-center gap-2 mb-2">
           <Speaker size={16} className={isCyanTheme ? 'text-accent-highlight' : 'text-yellow-500'} />
           <h3 className={`font-bold ${isCyanTheme ? 'text-accent-highlight' : 'text-yellow-400'}`}>PITCH & TONE</h3>
         </div>
         
-        <div className="flex flex-wrap gap-6 items-end">
+        <div className="flex flex-wrap gap-3 items-end">
           {/* Oscillator Type */}
           <div className="flex flex-col items-center gap-2">
             <span className="text-[10px] font-bold text-text-muted uppercase">Wave</span>
@@ -170,8 +170,8 @@ export const SynareControls: React.FC<SynareControlsProps> = ({
       </div>
 
       {/* Noise Section */}
-      <div className={`p-4 rounded-xl border ${panelBg}`}>
-        <div className="flex items-center justify-between mb-4">
+      <div className={`p-2 rounded-lg border ${panelBg}`}>
+        <div className="flex items-center justify-between mb-2">
           <div className="flex items-center gap-2">
             <Wind size={16} className={isCyanTheme ? 'text-accent-highlight' : 'text-yellow-500'} />
             <h3 className={`font-bold ${isCyanTheme ? 'text-accent-highlight' : 'text-yellow-400'}`}>NOISE</h3>
@@ -187,7 +187,7 @@ export const SynareControls: React.FC<SynareControlsProps> = ({
           </label>
         </div>
 
-        <div className={`flex flex-wrap gap-6 items-end transition-opacity ${config.noise.enabled ? 'opacity-100' : 'opacity-40 pointer-events-none'}`}>
+        <div className={`flex flex-wrap gap-3 items-end transition-opacity ${config.noise.enabled ? 'opacity-100' : 'opacity-40 pointer-events-none'}`}>
           {/* Noise Type */}
           <div className="flex flex-col items-center gap-2">
             <span className="text-[10px] font-bold text-text-muted uppercase">Type</span>
@@ -232,8 +232,8 @@ export const SynareControls: React.FC<SynareControlsProps> = ({
       </div>
 
       {/* Sweep Section */}
-      <div className={`p-4 rounded-xl border ${panelBg}`}>
-        <div className="flex items-center justify-between mb-4">
+      <div className={`p-2 rounded-lg border ${panelBg}`}>
+        <div className="flex items-center justify-between mb-2">
           <div className="flex items-center gap-2">
             <MoveDown size={16} className={isCyanTheme ? 'text-accent-highlight' : 'text-yellow-500'} />
             <h3 className={`font-bold ${isCyanTheme ? 'text-accent-highlight' : 'text-yellow-400'}`}>PITCH SWEEP</h3>
@@ -249,7 +249,7 @@ export const SynareControls: React.FC<SynareControlsProps> = ({
           </label>
         </div>
 
-        <div className={`flex flex-wrap gap-6 transition-opacity ${config.sweep.enabled ? 'opacity-100' : 'opacity-40 pointer-events-none'}`}>
+        <div className={`flex flex-wrap gap-3 transition-opacity ${config.sweep.enabled ? 'opacity-100' : 'opacity-40 pointer-events-none'}`}>
           <Knob
             value={config.sweep.amount}
             min={0}
@@ -274,10 +274,10 @@ export const SynareControls: React.FC<SynareControlsProps> = ({
   );
 
   const renderModTab = () => (
-    <div className="flex flex-col gap-4 p-4">
+    <div className="grid grid-cols-2 gap-2 p-2">
       {/* Filter Section */}
-      <div className={`p-4 rounded-xl border ${panelBg}`}>
-        <div className="flex items-center gap-2 mb-4">
+      <div className={`p-2 rounded-lg border ${panelBg}`}>
+        <div className="flex items-center gap-2 mb-2">
           <Activity size={16} className={isCyanTheme ? 'text-accent-highlight' : 'text-yellow-500'} />
           <h3 className={`font-bold ${isCyanTheme ? 'text-accent-highlight' : 'text-yellow-400'}`}>FILTER</h3>
         </div>
@@ -290,7 +290,7 @@ export const SynareControls: React.FC<SynareControlsProps> = ({
             poles={2} color={knobColor} width={300} height={56}
           />
         </div>
-        <div className="flex flex-wrap gap-6 items-end">
+        <div className="flex flex-wrap gap-3 items-end">
           <Knob
             value={config.filter.cutoff}
             min={20}
@@ -331,8 +331,8 @@ export const SynareControls: React.FC<SynareControlsProps> = ({
       </div>
 
       {/* LFO Section */}
-      <div className={`p-4 rounded-xl border ${panelBg}`}>
-        <div className="flex items-center justify-between mb-4">
+      <div className={`p-2 rounded-lg border ${panelBg}`}>
+        <div className="flex items-center justify-between mb-2">
           <div className="flex items-center gap-2">
             <Waves size={16} className={isCyanTheme ? 'text-accent-highlight' : 'text-yellow-500'} />
             <h3 className={`font-bold ${isCyanTheme ? 'text-accent-highlight' : 'text-yellow-400'}`}>MODULATION</h3>
@@ -348,7 +348,7 @@ export const SynareControls: React.FC<SynareControlsProps> = ({
           </label>
         </div>
 
-        <div className={`flex flex-wrap gap-6 transition-opacity ${config.lfo.enabled ? 'opacity-100' : 'opacity-40 pointer-events-none'}`}>
+        <div className={`flex flex-wrap gap-3 transition-opacity ${config.lfo.enabled ? 'opacity-100' : 'opacity-40 pointer-events-none'}`}>
           <Knob
             value={config.lfo.rate}
             min={0.1}

@@ -98,7 +98,7 @@ export const DavidWhittakerControls: React.FC<DavidWhittakerControlsProps> = ({
         {/* Volume & Tuning */}
         <div className={`rounded-lg border p-3 ${panelBg}`}>
           <SectionLabel label="Volume & Tuning" />
-          <div className="flex items-start gap-6">
+          <div className="flex items-start gap-3">
             <Knob
               value={config.defaultVolume ?? 64}
               min={0} max={64} step={1}

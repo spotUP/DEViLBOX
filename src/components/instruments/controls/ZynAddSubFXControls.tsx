@@ -110,7 +110,7 @@ export const ZynAddSubFXControls: React.FC<ZynAddSubFXControlsProps> = ({ config
   const merged = { ...DEFAULT_ZYNADDSUBFX, ...config } as Required<ZynAddSubFXConfig>;
 
   return (
-    <div className="synth-controls-flow flex flex-col gap-4 p-4 overflow-y-auto text-xs">
+    <div className="synth-controls-flow grid grid-cols-2 gap-2 p-2 overflow-y-auto text-xs">
       {/* Tab Bar */}
       <div className="flex gap-1 border-b border-dark-borderLight pb-1">
         {TAB_NAMES.map((name, i) => (
@@ -131,7 +131,7 @@ export const ZynAddSubFXControls: React.FC<ZynAddSubFXControlsProps> = ({ config
       {/* TAB: ADDsynth */}
       {activeTab === 0 && (
         <div className="flex flex-col gap-3">
-          <div className="p-4 rounded-xl border bg-[#1a1a1a] border-rose-900/30">
+          <div className="p-2 rounded-lg border bg-[#1a1a1a] border-rose-900/30">
             <div className="flex items-center gap-4 mb-3">
               <h3 className="font-bold uppercase tracking-tight text-sm text-rose-400">ADDsynth</h3>
               <button
@@ -169,7 +169,7 @@ export const ZynAddSubFXControls: React.FC<ZynAddSubFXControlsProps> = ({ config
 
       {/* TAB: SUBsynth */}
       {activeTab === 1 && (
-        <div className="p-4 rounded-xl border bg-[#1a1a1a] border-rose-900/30">
+        <div className="p-2 rounded-lg border bg-[#1a1a1a] border-rose-900/30">
           <div className="flex items-center gap-4 mb-3">
             <h3 className="font-bold uppercase tracking-tight text-sm text-rose-400">SUBsynth</h3>
             <button
@@ -216,7 +216,7 @@ export const ZynAddSubFXControls: React.FC<ZynAddSubFXControlsProps> = ({ config
 
       {/* TAB: PADsynth */}
       {activeTab === 2 && (
-        <div className="p-4 rounded-xl border bg-[#1a1a1a] border-rose-900/30">
+        <div className="p-2 rounded-lg border bg-[#1a1a1a] border-rose-900/30">
           <div className="flex items-center gap-4 mb-3">
             <h3 className="font-bold uppercase tracking-tight text-sm text-rose-400">PADsynth</h3>
             <button
@@ -259,7 +259,7 @@ export const ZynAddSubFXControls: React.FC<ZynAddSubFXControlsProps> = ({ config
       {/* TAB: Filter & Envelope */}
       {activeTab === 3 && (
         <div className="flex flex-col gap-3">
-          <div className="p-4 rounded-xl border bg-[#1a1a1a] border-rose-900/30">
+          <div className="p-2 rounded-lg border bg-[#1a1a1a] border-rose-900/30">
             <h3 className="font-bold uppercase tracking-tight text-sm mb-3 text-rose-400">Filter</h3>
             <div className="flex flex-col gap-1 mb-3">
               <span className="text-[10px] text-text-muted">Type</span>
@@ -279,7 +279,7 @@ export const ZynAddSubFXControls: React.FC<ZynAddSubFXControlsProps> = ({ config
                 onChange={(v) => updateParam('filterKeyTrack', v)} size="sm" color="#f43f5e" />
             </div>
           </div>
-          <div className="p-4 rounded-xl border bg-[#1a1a1a] border-rose-900/30">
+          <div className="p-2 rounded-lg border bg-[#1a1a1a] border-rose-900/30">
             <h3 className="font-bold uppercase tracking-tight text-sm mb-3 text-rose-400">Filter Envelope</h3>
             <div className="flex flex-wrap gap-4 justify-center">
               <Knob label="Attack" value={merged.filterAttack} min={0} max={1} defaultValue={0.01}
@@ -292,7 +292,7 @@ export const ZynAddSubFXControls: React.FC<ZynAddSubFXControlsProps> = ({ config
                 onChange={(v) => updateParam('filterRelease', v)} size="sm" color="#f43f5e" />
             </div>
           </div>
-          <div className="p-4 rounded-xl border bg-[#1a1a1a] border-rose-900/30">
+          <div className="p-2 rounded-lg border bg-[#1a1a1a] border-rose-900/30">
             <h3 className="font-bold uppercase tracking-tight text-sm mb-3 text-rose-400">Amp Envelope</h3>
             <div className="flex flex-wrap gap-4 justify-center">
               <Knob label="Attack" value={merged.ampAttack} min={0} max={1} defaultValue={0.01}
@@ -311,7 +311,7 @@ export const ZynAddSubFXControls: React.FC<ZynAddSubFXControlsProps> = ({ config
       {/* TAB: Effects */}
       {activeTab === 4 && (
         <div className="flex flex-col gap-3">
-          <div className="p-4 rounded-xl border bg-[#1a1a1a] border-rose-900/30">
+          <div className="p-2 rounded-lg border bg-[#1a1a1a] border-rose-900/30">
             <h3 className="font-bold uppercase tracking-tight text-sm mb-3 text-rose-400">Reverb</h3>
             <div className="flex flex-wrap gap-4 justify-center">
               <Knob label="Wet" value={merged.reverbWet} min={0} max={1} defaultValue={0}
@@ -322,7 +322,7 @@ export const ZynAddSubFXControls: React.FC<ZynAddSubFXControlsProps> = ({ config
                 onChange={(v) => updateParam('reverbDamp', v)} size="sm" color="#f43f5e" />
             </div>
           </div>
-          <div className="p-4 rounded-xl border bg-[#1a1a1a] border-rose-900/30">
+          <div className="p-2 rounded-lg border bg-[#1a1a1a] border-rose-900/30">
             <h3 className="font-bold uppercase tracking-tight text-sm mb-3 text-rose-400">Chorus</h3>
             <div className="flex flex-wrap gap-4 justify-center">
               <Knob label="Wet" value={merged.chorusWet} min={0} max={1} defaultValue={0}
@@ -333,7 +333,7 @@ export const ZynAddSubFXControls: React.FC<ZynAddSubFXControlsProps> = ({ config
                 onChange={(v) => updateParam('chorusDepth', v)} size="sm" color="#f43f5e" />
             </div>
           </div>
-          <div className="p-4 rounded-xl border bg-[#1a1a1a] border-rose-900/30">
+          <div className="p-2 rounded-lg border bg-[#1a1a1a] border-rose-900/30">
             <h3 className="font-bold uppercase tracking-tight text-sm mb-3 text-rose-400">Distortion</h3>
             <div className="flex flex-wrap items-start gap-4 justify-center">
               <Knob label="Wet" value={merged.distortionWet} min={0} max={1} defaultValue={0}
@@ -347,7 +347,7 @@ export const ZynAddSubFXControls: React.FC<ZynAddSubFXControlsProps> = ({ config
               </div>
             </div>
           </div>
-          <div className="p-4 rounded-xl border bg-[#1a1a1a] border-rose-900/30">
+          <div className="p-2 rounded-lg border bg-[#1a1a1a] border-rose-900/30">
             <h3 className="font-bold uppercase tracking-tight text-sm mb-3 text-rose-400">EQ</h3>
             <div className="flex flex-wrap gap-4 justify-center">
               <Knob label="Low" value={merged.eqLow} min={0} max={1} defaultValue={0.5}
