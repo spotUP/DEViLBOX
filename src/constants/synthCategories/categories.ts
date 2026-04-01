@@ -70,7 +70,7 @@ export const SYNTH_CATEGORIES: SynthCategory[] = [
     id: 'vintage',
     name: 'Keys',
     description: 'Keyboard instruments',
-    synths: [SYNTH_INFO.Organ, SYNTH_INFO.MAMEUPD931],
+    synths: [SYNTH_INFO.Organ, SYNTH_INFO.MAMEUPD931, SYNTH_INFO.OpenWurli, SYNTH_INFO.DX7],
   },
   {
     id: 'samples',
@@ -443,6 +443,16 @@ export const SYNTH_CATEGORIES: SynthCategory[] = [
       SYNTH_INFO.WaveSabreAdultery,
       SYNTH_INFO.OidosSynth,
       SYNTH_INFO.TunefishSynth,
+    ],
+  },
+  {
+    id: 'retromulator',
+    name: '🎹 Retromulator',
+    description: 'Classic keyboard and FM synth emulations via Retromulator/Gearmulator WASM',
+    synths: [
+      SYNTH_INFO.OpenWurli,
+      SYNTH_INFO.OPL3,
+      SYNTH_INFO.DX7,
     ],
   },
 ];

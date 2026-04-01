@@ -171,6 +171,9 @@ int dx7LoadSysex(const uint8_t* data, int size) {
     if (size == 4104) {
         std::memcpy(g_dx7->dx7.memory + 0x1000, data + 6, 4096);
         g_dx7->dx7.midiSerialRx.flush();
+        // Send program change to reload voice 0 into EGS
+        g_dx7->dx7.midiSerialRx.write(0xC0);
+        g_dx7->dx7.midiSerialRx.write(0x00);
         return 0;
     }
     // Forward other sysex through serial
