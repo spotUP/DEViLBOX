@@ -62,6 +62,8 @@ import { isFurnaceWaveType } from '../hardware/FurnaceWaveHardware';
 import { isFurnacePCMType } from '../hardware/FurnacePCMHardware';
 import { isFurnaceInsEdType } from '../hardware/FurnaceInsEdHardware';
 import { SpaceLaserHeader, V2Header, DubSirenHeader, SynareHeader, type SynthHeaderProps } from './InstrumentPresetManager';
+import { DOMSynthPanel } from '../controls/DOMSynthPanel';
+import { getSynthLayout } from '@/pixi/views/instruments/layouts';
 
 // ============================================================================
 // LAZY-LOADED CONTROL COMPONENTS
@@ -115,6 +117,7 @@ const SfizzControls = lazy(() => import('../controls/SfizzControls').then(m => (
 const ZynAddSubFXControls = lazy(() => import('../controls/ZynAddSubFXControls').then(m => ({ default: m.ZynAddSubFXControls })));
 const WAMControls = lazy(() => import('../controls/WAMControls').then(m => ({ default: m.WAMControls })));
 const VSTBridgePanel = lazy(() => import('../controls/VSTBridgePanel').then(m => ({ default: m.VSTBridgePanel })));
+
 const HarmonicSynthControls = lazy(() => import('../controls/HarmonicSynthControls').then(m => ({ default: m.HarmonicSynthControls })));
 const ModularSynthControls = lazy(() => import('../synths/modular/ModularSynthControls').then(m => ({ default: m.ModularSynthControls })));
 import { SunVoxModularEditor } from '../synths/modular/SunVoxModularEditor';
@@ -3196,16 +3199,39 @@ export const SynthTypeDispatcher: React.FC<SynthTypeDispatcherProps> = ({
               }}
             />
           </Suspense>
-        ) : (
-          <div className="synth-editor-content overflow-y-auto">
-            <Suspense fallback={<LoadingControls />}>
-              <VSTBridgePanel
-                instrument={instrument}
-                onChange={handleChange}
-              />
-            </Suspense>
-          </div>
-        )}
+        ) : (() => {
+          const declLayout = getSynthLayout(instrument.synthType);
+          if (declLayout) {
+            const configKey = declLayout.configKey;
+            const config = configKey
+              ? { [configKey]: instrument.parameters ?? {} }
+              : (instrument.parameters ?? {}) as Record<string, unknown>;
+            return (
+              <div className="synth-editor-content overflow-y-auto">
+                <DOMSynthPanel
+                  layout={declLayout}
+                  config={config as Record<string, unknown>}
+                  onChange={(updates) => {
+                    const params = configKey
+                      ? (updates[configKey] as Record<string, unknown>)
+                      : updates;
+                    handleChange({ parameters: params as Record<string, unknown> });
+                  }}
+                />
+              </div>
+            );
+          }
+          return (
+            <div className="synth-editor-content overflow-y-auto">
+              <Suspense fallback={<LoadingControls />}>
+                <VSTBridgePanel
+                  instrument={instrument}
+                  onChange={handleChange}
+                />
+              </Suspense>
+            </div>
+          );
+        })()}
       </div>
     );
   }
