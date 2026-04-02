@@ -190,10 +190,16 @@ export const PixiButton: React.FC<PixiButtonProps> = ({
   const drawBg = useCallback((g: import('pixi.js').Graphics) => {
     g.clear();
     if (!colors.showBg) return;
-    const w = g.parent?.width || 100;
-    const h = g.parent?.height || btnHeight;
+    // Read from Yoga computed layout — stable across hover state changes.
+    // g.parent?.width reflects Pixi display bounds which can shrink when
+    // graphics content changes (empty→filled on hover), causing feedback.
+    const parent = g.parent as unknown as Record<string, unknown> | null;
+    const pcl = parent?.layout as Record<string, unknown> | undefined;
+    const cl = pcl?.computedLayout as { width?: number; height?: number } | undefined;
+    const w = cl?.width || widthProp || 100;
+    const h = cl?.height || btnHeight;
     g.roundRect(0, 0, w, h, 4).fill({ color: colors.bg });
-  }, [colors.showBg, colors.bg, btnHeight]);
+  }, [colors.showBg, colors.bg, btnHeight, widthProp]);
 
   return (
     <layoutContainer
