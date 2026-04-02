@@ -77,6 +77,7 @@ export const PixiSlider: React.FC<PixiSliderProps> = ({
 
   const accent = colorProp ?? theme.accent.color;
   const isVert = orientation === 'vertical';
+  const autoSize = length === 0;
 
   const norm = (Math.max(min, Math.min(max, value)) - min) / (max - min);
 
@@ -92,34 +93,38 @@ export const PixiSlider: React.FC<PixiSliderProps> = ({
   // Track and handle drawing
   const drawSlider = useCallback((g: GraphicsType) => {
     g.clear();
+    // When autoSize, read the computed layout height for the track length
+    const effectiveLength = autoSize
+      ? ((g as any).layout?.computedLayout?.height ?? (length || 120))
+      : length;
 
     if (isVert) {
       // Vertical: track centered horizontally, handle moves vertically
       const trackX = (handleWidth - thickness) / 2;
       // Track background
-      g.roundRect(trackX, 0, thickness, length, thickness / 2);
+      g.roundRect(trackX, 0, thickness, effectiveLength, thickness / 2);
       g.fill({ color: theme.bgActive.color });
-      g.roundRect(trackX, 0, thickness, length, thickness / 2);
+      g.roundRect(trackX, 0, thickness, effectiveLength, thickness / 2);
       g.stroke({ color: theme.border.color, alpha: 0.5, width: 1 });
 
       // Value fill (from bottom up for vertical)
-      const fillHeight = norm * length;
+      const fillHeight = norm * effectiveLength;
       if (fillHeight > 1) {
-        g.roundRect(trackX, length - fillHeight, thickness, fillHeight, thickness / 2);
+        g.roundRect(trackX, effectiveLength - fillHeight, thickness, fillHeight, thickness / 2);
         g.fill({ color: accent, alpha: 0.4 });
       }
 
       // Center detent line
       if (detent !== undefined) {
         const detentNorm = (detent - min) / (max - min);
-        const detentY = length - detentNorm * length;
+        const detentY = effectiveLength - detentNorm * effectiveLength;
         g.moveTo(trackX - 2, detentY);
         g.lineTo(trackX + thickness + 2, detentY);
         g.stroke({ color: theme.textMuted.color, alpha: 0.5, width: 1 });
       }
 
       // Handle
-      const handleY = length - norm * length - handleHeight / 2;
+      const handleY = effectiveLength - norm * effectiveLength - handleHeight / 2;
       g.roundRect(0, handleY, handleWidth, handleHeight, 3);
       g.fill({ color: isDragging ? accent : theme.bgHover.color });
       g.roundRect(0, handleY, handleWidth, handleHeight, 3);
@@ -132,13 +137,13 @@ export const PixiSlider: React.FC<PixiSliderProps> = ({
     } else {
       // Horizontal: track centered vertically
       const trackY = (handleHeight - thickness) / 2;
-      g.roundRect(0, trackY, length, thickness, thickness / 2);
+      g.roundRect(0, trackY, effectiveLength, thickness, thickness / 2);
       g.fill({ color: theme.bgActive.color });
-      g.roundRect(0, trackY, length, thickness, thickness / 2);
+      g.roundRect(0, trackY, effectiveLength, thickness, thickness / 2);
       g.stroke({ color: theme.border.color, alpha: 0.5, width: 1 });
 
       // Value fill (from left)
-      const fillWidth = norm * length;
+      const fillWidth = norm * effectiveLength;
       if (fillWidth > 1) {
         g.roundRect(0, trackY, fillWidth, thickness, thickness / 2);
         g.fill({ color: accent, alpha: 0.4 });
@@ -147,14 +152,14 @@ export const PixiSlider: React.FC<PixiSliderProps> = ({
       // Center detent line
       if (detent !== undefined) {
         const detentNorm = (detent - min) / (max - min);
-        const detentX = detentNorm * length;
+        const detentX = detentNorm * effectiveLength;
         g.moveTo(detentX, trackY - 2);
         g.lineTo(detentX, trackY + thickness + 2);
         g.stroke({ color: theme.textMuted.color, alpha: 0.5, width: 1 });
       }
 
       // Handle
-      const handleX = norm * length - handleWidth / 2;
+      const handleX = norm * effectiveLength - handleWidth / 2;
       g.roundRect(handleX, 0, handleWidth, handleHeight, 3);
       g.fill({ color: isDragging ? accent : theme.bgHover.color });
       g.roundRect(handleX, 0, handleWidth, handleHeight, 3);
@@ -165,7 +170,7 @@ export const PixiSlider: React.FC<PixiSliderProps> = ({
       g.lineTo(handleX + handleWidth / 2, handleHeight - 3);
       g.stroke({ color: accent, alpha: 0.6, width: 1 });
     }
-  }, [isVert, length, thickness, handleWidth, handleHeight, norm, accent, theme, isDragging, detent, min, max]);
+  }, [isVert, length, autoSize, thickness, handleWidth, handleHeight, norm, accent, theme, isDragging, detent, min, max]);
 
   // Drag interaction — uses DOM events for smooth tracking after initial PixiJS pointerDown
   const handlePointerDown = useCallback((e: FederatedPointerEvent) => {
@@ -189,10 +194,17 @@ export const PixiSlider: React.FC<PixiSliderProps> = ({
 
     setIsDragging(true);
 
+    // For auto-size sliders, read the actual rendered size from the container
+    const dragLength = autoSize
+      ? (isVert
+        ? ((containerRef.current as any)?.layout?.computedLayout?.height ?? (length || 120))
+        : ((containerRef.current as any)?.layout?.computedLayout?.width ?? (length || 120)))
+      : length;
+
     const onMove = (ev: PointerEvent) => {
       const currentPos = isVert ? ev.clientY : ev.clientX;
       const pixelDelta = currentPos - startPos;
-      const normDelta = isVert ? -pixelDelta / length : pixelDelta / length;
+      const normDelta = isVert ? -pixelDelta / dragLength : pixelDelta / dragLength;
       const newNorm = Math.max(0, Math.min(1, startNorm + normDelta));
       const newValue = clampAndSnap(min + newNorm * (max - min));
       onChangeRef.current(newValue);
@@ -206,14 +218,14 @@ export const PixiSlider: React.FC<PixiSliderProps> = ({
 
     document.addEventListener('pointermove', onMove);
     document.addEventListener('pointerup', onUp);
-  }, [disabled, isVert, norm, length, min, max, clampAndSnap, defaultValue, detent]);
+  }, [disabled, isVert, norm, length, autoSize, min, max, clampAndSnap, defaultValue, detent]);
 
-  // Layout dimensions
-  const containerWidth = isVert ? handleWidth : length;
-  const containerHeight = isVert ? length : handleHeight;
+  // (autoSize moved above draw callback)
+  const containerWidth = isVert ? handleWidth : (autoSize ? undefined : length);
+  const containerHeight = isVert ? (autoSize ? undefined : length) : handleHeight;
   const labelHeight = label ? 14 : 0;
   const valueHeight = showValue ? 14 : 0;
-  const totalHeight = containerHeight + labelHeight + valueHeight + 4;
+  const totalHeight = autoSize ? undefined : ((isVert ? length : handleHeight) + labelHeight + valueHeight + 4);
 
   const defaultFormatVal = (v: number) => {
     if (Math.abs(v) < 0.01) return '0';
@@ -225,13 +237,13 @@ export const PixiSlider: React.FC<PixiSliderProps> = ({
     <pixiContainer
       ref={containerRef}
       eventMode={disabled ? 'none' : 'static'}
-      hitArea={useMemo(() => new Rectangle(0, 0, containerWidth, totalHeight), [containerWidth, totalHeight])}
+      hitArea={autoSize ? undefined : useMemo(() => new Rectangle(0, 0, containerWidth ?? 24, totalHeight ?? 120), [containerWidth, totalHeight])}
       cursor={disabled ? 'not-allowed' : isVert ? 'ns-resize' : 'ew-resize'}
       onPointerDown={handlePointerDown}
       alpha={disabled ? 0.4 : 1}
       layout={{
-        width: containerWidth,
-        height: totalHeight,
+        ...(containerWidth !== undefined ? { width: containerWidth } : {}),
+        ...(totalHeight !== undefined ? { height: totalHeight } : {}),
         flexDirection: 'column',
         alignItems: 'center',
         gap: 2,
@@ -255,7 +267,10 @@ export const PixiSlider: React.FC<PixiSliderProps> = ({
       <pixiGraphics
         draw={drawSlider}
         eventMode="none"
-        layout={{ width: containerWidth, height: containerHeight }}
+        layout={{
+          ...(containerWidth !== undefined ? { width: containerWidth } : { width: handleWidth }),
+          ...(containerHeight !== undefined ? { height: containerHeight } : { flex: 1, minHeight: 0 }),
+        }}
       />
 
       {/* Value display */}
