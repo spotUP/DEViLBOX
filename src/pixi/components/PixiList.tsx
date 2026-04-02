@@ -8,6 +8,7 @@ import { useRef, useCallback, useState, useMemo } from 'react';
 import type { Graphics as GraphicsType, FederatedWheelEvent, FederatedPointerEvent } from 'pixi.js';
 import { PIXI_FONTS } from '../fonts';
 import { usePixiTheme } from '../theme';
+import { PixiIcon } from './PixiIcon';
 
 /** Draw a 5-pointed star into a Graphics object */
 function drawStar(g: GraphicsType, cx: number, cy: number, r: number, points: number, innerRatio: number, color: number, alpha = 1) {
@@ -38,6 +39,10 @@ export interface PixiListItem {
   sublabel?: string;
   /** Hex color for a small category dot rendered before the label */
   dotColor?: number;
+  /** FontAudio icon name — when set, renders a PixiIcon instead of a colored dot */
+  iconName?: string;
+  /** Tint color for the icon (defaults to textMuted) */
+  iconColor?: number;
   /** Star rating data — if present, 5 interactive stars are shown */
   rating?: PixiListItemRating;
 }
@@ -210,11 +215,18 @@ export const PixiList: React.FC<PixiListProps> = ({
               layout={{ position: 'absolute', width: width - 10, height: itemHeight }}
             />
 
-            {item.dotColor != null && (
+            {item.iconName ? (
+              <PixiIcon
+                name={item.iconName}
+                size={14}
+                color={item.iconColor ?? theme.textMuted.color}
+                layout={{ flexShrink: 0, marginRight: 5 }}
+              />
+            ) : item.dotColor != null ? (
               <layoutContainer
                 layout={{ width: 6, height: 6, flexShrink: 0, marginRight: 5, backgroundColor: item.dotColor!, borderRadius: 1 }}
               />
-            )}
+            ) : null}
             <pixiBitmapText
               eventMode="none"
               text={item.label}
