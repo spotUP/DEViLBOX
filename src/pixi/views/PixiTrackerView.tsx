@@ -37,6 +37,7 @@ import { PixiCMIKnobPanel, CMI_PANEL_COLLAPSED_H, CMI_PANEL_EXPANDED_H } from '.
 import { PixiMusicLineTrackTable } from './tracker/PixiMusicLineTrackTable';
 import { PixiMusicLinePatternViewer } from './tracker/PixiMusicLinePatternViewer';
 import { PixiPatternEditor } from './tracker/PixiPatternEditor';
+import { PixiTrackerVisualBg } from './tracker/PixiTrackerVisualBg';
 import { PixiGridSequencer } from './tracker/PixiGridSequencer';
 import { PixiTB303View } from './tracker/PixiTB303View';
 import { PixiSunVoxChannelView } from './sunvox/PixiSunVoxChannelView';
@@ -47,6 +48,7 @@ import { useTrackerView } from '@/hooks/views/useTrackerView';
 import { AUTOMATION_LANE_WIDTH, AUTOMATION_LANE_MIN } from '@/hooks/views/usePatternEditor';
 import { useTrackerStore, useUIStore, useInstrumentStore, useEditorStore, useAutomationStore } from '@stores';
 import { useWorkbenchStore } from '@stores/useWorkbenchStore';
+import { useSettingsStore } from '@stores/useSettingsStore';
 import { useMIDIStore } from '@stores/useMIDIStore';
 import { useShallow } from 'zustand/react/shallow';
 import { TITLE_H } from '../workbench/workbenchLayout';
@@ -75,7 +77,7 @@ export const PixiTrackerView: React.FC = () => {
   const showMacroSlots = useUIStore(s => s.showMacroSlots);
   const showKnobBar = useMIDIStore(s => s.showKnobBar);
   const showInstrumentPanel = useUIStore(s => s.showInstrumentPanel);
-  // trackerVisualBg removed — feature disabled
+  const trackerVisualBg = useSettingsStore(s => s.trackerVisualBg);
 
 
   // PixiTrackerView lives inside a PixiWindow — use the window's own dimensions,
@@ -338,7 +340,10 @@ export const PixiTrackerView: React.FC = () => {
               Use alpha/renderable (NOT visible) — @pixi/layout calls _onChildRemoved()
               on visible=false, detaching Yoga nodes and causing BindingErrors. */}
           {/* Audio-reactive visual background — renders behind everything else */}
-          {/* Visual background removed — feature disabled */}
+          {/* Audio-reactive visual background — behind pattern editor */}
+          <pixiContainer alpha={trackerVisualBg && viewMode === 'tracker' && editorMode === 'classic' ? 1 : 0} renderable={trackerVisualBg && viewMode === 'tracker' && editorMode === 'classic'} eventMode="none" layout={{ position: 'absolute', top: 0, width: Math.max(100, editorWidth), height: Math.max(100, instrumentPanelHeight) }}>
+            <PixiTrackerVisualBg width={Math.max(100, editorWidth)} height={Math.max(100, instrumentPanelHeight)} />
+          </pixiContainer>
           {/* VU meters overlay — covers top half of editor down to the edit bar.
               VU segments draw upward from the bottom of this area, so they
               appear to shoot out from the edit cursor row.
