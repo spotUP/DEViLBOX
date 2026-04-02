@@ -202,7 +202,7 @@ export const DJVocoderControl: React.FC = () => {
   }, []);
 
   return (
-    <div className="flex items-center gap-1.5">
+    <div className="flex items-center gap-1.5 flex-wrap">
       {/* Mic device selector (always visible so user can pick before activating) */}
       {devices.length > 1 && (
         <select
