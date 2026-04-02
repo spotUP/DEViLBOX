@@ -420,13 +420,20 @@ router.post('/analyze', async (req: Request, res: Response) => {
     let companions: Array<{ name: string; data: Buffer }> | undefined;
     if (companionPath) {
       try {
-        const companionUrl = `https://modland.com/pub/modules/${companionPath}`;
+        // companionPath comes as full Modland path (e.g. "TFMX/Chris Huelsbeck/smpl.foo")
+        // or with "pub/modules/" prefix — normalize and encode for the URL
+        const cleanPath = companionPath.replace(/^pub\/modules\//, '');
+        const encodedPath = cleanPath.split('/').map(s => encodeURIComponent(s)).join('/');
+        const companionUrl = `https://modland.com/pub/modules/${encodedPath}`;
+        console.log(`[RenderRoute] Fetching companion: ${companionUrl}`);
         const cfResp = await fetch(companionUrl);
         if (cfResp.ok) {
           const cfData = Buffer.from(await cfResp.arrayBuffer());
           const cfName = companionPath.split('/').pop() || 'companion';
           companions = [{ name: cfName, data: cfData }];
           console.log(`[RenderRoute] Downloaded companion: ${cfName} (${cfData.byteLength} bytes)`);
+        } else {
+          console.warn(`[RenderRoute] Companion fetch failed: ${cfResp.status} for ${companionUrl}`);
         }
       } catch (cfErr) {
         console.warn(`[RenderRoute] Failed to download companion ${companionPath}:`, cfErr);
