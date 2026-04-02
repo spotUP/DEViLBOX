@@ -251,8 +251,10 @@ export const PixiDJPlaylistPanel: React.FC<PixiDJPlaylistPanelProps> = ({
     if (!activePlaylist) return [];
     return activePlaylist.tracks.map((t, i) => ({
       id: `${t.fileName}-${i}`,
-      label: `${(i + 1).toString().padStart(2, ' ')}  ${t.trackName}`,
+      label: `${(i + 1).toString().padStart(2, ' ')}  ${t.played ? '[P] ' : ''}${t.trackName}`,
       sublabel: trackSublabel(t),
+      iconName: 'diskio',
+      iconColor: t.played ? 0x22c55e : undefined, // green icon for played tracks
     }));
   }, [activePlaylist]);
 
