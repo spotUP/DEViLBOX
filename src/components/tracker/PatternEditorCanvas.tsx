@@ -230,6 +230,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
     instruments: state.instruments
   })));
 
+  const trackerVisualBg = useSettingsStore(s => s.trackerVisualBg);
   const showChannelNames = useUIStore(s => s.showChannelNames);
   const showAutomationLanes = useUIStore(s => s.showAutomationLanes);
   const showMacroLanes = useUIStore(s => s.showMacroLanes);
@@ -3038,7 +3039,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
                 {/* Canvas Pattern Grid */}
                 <div
                   ref={containerRef}
-                  className="flex-1 relative bg-dark-bg overflow-hidden touch-none focus:outline-none focus:ring-1 focus:ring-accent-primary/30"
+                  className={`flex-1 relative overflow-hidden touch-none focus:outline-none focus:ring-1 focus:ring-accent-primary/30 ${trackerVisualBg ? 'bg-transparent' : 'bg-dark-bg'}`}
                   data-pattern-editor="true"
         style={{ minHeight: 200 }}
         tabIndex={0}
