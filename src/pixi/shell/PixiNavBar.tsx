@@ -222,7 +222,7 @@ export const PixiNavBar: React.FC = () => {
         {/* Auth — Sign In / username (matches DOM's LogIn icon + text) */}
         <pixiContainer ref={authContainerRef} layout={{ flexShrink: 0, flexDirection: 'row', alignItems: 'center', gap: 4 }}>
           {!n.authUser && navIcons?.logIn && (
-            <pixiSprite texture={navIcons.logIn} width={NAV_ICON} height={NAV_ICON} eventMode="none" />
+            <pixiSprite texture={navIcons.logIn} width={NAV_ICON} height={NAV_ICON} eventMode="none" layout={{ width: NAV_ICON, height: NAV_ICON, flexShrink: 0 }} />
           )}
           <PixiButton
             label={n.authUser ? n.authUser.username.slice(0, 8) : 'Sign In'}
@@ -236,7 +236,7 @@ export const PixiNavBar: React.FC = () => {
         {/* Collaboration (matches DOM's Users icon + Collab text) */}
         <pixiContainer layout={{ flexShrink: 0, flexDirection: 'row', alignItems: 'center', gap: 4 }}>
           {navIcons?.users && (
-            <pixiSprite texture={navIcons.users} width={NAV_ICON} height={NAV_ICON} eventMode="none" />
+            <pixiSprite texture={navIcons.users} width={NAV_ICON} height={NAV_ICON} eventMode="none" layout={{ width: NAV_ICON, height: NAV_ICON, flexShrink: 0 }} />
           )}
           <PixiButton
             label="Collab"
@@ -269,7 +269,7 @@ export const PixiNavBar: React.FC = () => {
         {/* Desktop App download (matches DOM's Download icon + text) */}
         <pixiContainer layout={{ flexShrink: 0, flexDirection: 'row', alignItems: 'center', gap: 4 }}>
           {navIcons?.download && (
-            <pixiSprite texture={navIcons.download} width={NAV_ICON} height={NAV_ICON} eventMode="none" />
+            <pixiSprite texture={navIcons.download} width={NAV_ICON} height={NAV_ICON} eventMode="none" layout={{ width: NAV_ICON, height: NAV_ICON, flexShrink: 0 }} />
           )}
           <PixiButton
             label="Desktop App"
@@ -283,7 +283,7 @@ export const PixiNavBar: React.FC = () => {
         {/* Switch to DOM mode (matches DOM's Monitor icon + DOM text) */}
         <pixiContainer layout={{ flexShrink: 0, flexDirection: 'row', alignItems: 'center', gap: 4 }}>
           {navIcons?.monitor && (
-            <pixiSprite texture={navIcons.monitor} width={NAV_ICON} height={NAV_ICON} eventMode="none" />
+            <pixiSprite texture={navIcons.monitor} width={NAV_ICON} height={NAV_ICON} eventMode="none" layout={{ width: NAV_ICON, height: NAV_ICON, flexShrink: 0 }} />
           )}
           <PixiButton label="Dom" variant="ghost" size="sm" onClick={n.handleSwitchToDom} width={36} />
         </pixiContainer>
@@ -296,7 +296,7 @@ export const PixiNavBar: React.FC = () => {
         {/* MIDI — matches DOM's Music icon + MIDI text */}
         <pixiContainer ref={midiContainerRef} layout={{ flexShrink: 0, flexDirection: 'row', alignItems: 'center', gap: 4 }}>
           {navIcons?.music && (
-            <pixiSprite texture={navIcons.music} width={NAV_ICON} height={NAV_ICON} eventMode="none" />
+            <pixiSprite texture={navIcons.music} width={NAV_ICON} height={NAV_ICON} eventMode="none" layout={{ width: NAV_ICON, height: NAV_ICON, flexShrink: 0 }} />
           )}
           <PixiButton label="MIDI" variant="ghost" size="sm" onClick={handleMIDIClick} width={40} />
         </pixiContainer>
@@ -330,8 +330,8 @@ export const PixiNavBar: React.FC = () => {
 
       </pixiContainer>{/* end main nav row */}
 
-      {/* ── Project tab bar row ── matching DOM: bg-dark-bgTertiary, px-2 py-1, border-b */}
-      <layoutContainer
+      {/* ── Project tab bar row ── hidden in DJ/VJ views */}
+      {n.activeView !== 'dj' && n.activeView !== 'vj' && <layoutContainer
         layout={{
           width,
           height: TAB_ROW_H,
@@ -398,7 +398,7 @@ export const PixiNavBar: React.FC = () => {
                   layout={{ width: 14, height: 14, justifyContent: 'center', alignItems: 'center' }}
                 >
                   {navIcons?.xClose ? (
-                    <pixiSprite texture={navIcons.xClose} width={12} height={12} eventMode="none" />
+                    <pixiSprite texture={navIcons.xClose} width={12} height={12} eventMode="none" layout={{ width: 12, height: 12, flexShrink: 0 }} />
                   ) : (
                     <pixiBitmapText
                       text="x"
@@ -429,7 +429,7 @@ export const PixiNavBar: React.FC = () => {
           }}
         >
           {navIcons?.plus ? (
-            <pixiSprite texture={navIcons.plus} width={NAV_ICON} height={NAV_ICON} eventMode="none" />
+            <pixiSprite texture={navIcons.plus} width={NAV_ICON} height={NAV_ICON} eventMode="none" layout={{ width: NAV_ICON, height: NAV_ICON, flexShrink: 0 }} />
           ) : (
             <pixiBitmapText
               text="+"
@@ -440,7 +440,7 @@ export const PixiNavBar: React.FC = () => {
             />
           )}
         </layoutContainer>
-      </layoutContainer>
+      </layoutContainer>}
 
     </layoutContainer>
   );
