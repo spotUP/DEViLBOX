@@ -75,11 +75,25 @@ export const DJRemoteControlButton: React.FC = () => {
         REMOTE
       </button>
 
+      {/* Click-outside overlay to close */}
+      {showPanel && (
+        <div className="fixed inset-0 z-40" onClick={handleToggle} />
+      )}
+
       {showPanel && (
         <div
           className="absolute top-full right-0 mt-1 w-72 bg-dark-bgSecondary border border-dark-borderLight rounded-lg p-4 shadow-xl z-50"
         >
-          <div className="text-xs font-bold text-text-primary mb-2">iPhone Controller</div>
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-xs font-bold text-text-primary">iPhone Controller</span>
+            <button
+              onClick={handleToggle}
+              className="text-text-tertiary hover:text-text-primary transition-colors text-sm leading-none"
+              title="Close"
+            >
+              X
+            </button>
+          </div>
 
           {roomCode ? (
             <>
