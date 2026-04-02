@@ -7,6 +7,7 @@
 
 import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { DJRemoteMicReceiver } from '@/engine/dj/DJRemoteMicReceiver';
+import { QRCode } from './QRCode';
 
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3001';
 
@@ -82,14 +83,11 @@ export const DJRemoteControlButton: React.FC = () => {
 
           {roomCode ? (
             <>
-              {/* QR Code placeholder — renders the URL as a simple visual code */}
-              <div className="bg-white rounded-lg p-3 mb-3 flex flex-col items-center">
-                {/* Simple text-based QR substitute — for a real QR use a library */}
-                <div className="text-xs text-gray-800 font-mono text-center break-all mb-2">
-                  {controllerURL}
-                </div>
-                <div className="text-[10px] text-gray-500">
-                  Open this URL on your iPhone
+              {/* QR Code — scan with iPhone camera to auto-connect */}
+              <div className="flex flex-col items-center mb-3">
+                <QRCode url={controllerURL} size={200} />
+                <div className="text-[10px] text-text-muted mt-1">
+                  Scan with iPhone camera
                 </div>
               </div>
 
