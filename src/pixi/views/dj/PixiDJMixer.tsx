@@ -180,9 +180,8 @@ const ChannelFader: React.FC<{ deckId: 'A' | 'B' | 'C'; label: string }> = ({ de
         min={0}
         max={1}
         orientation="vertical"
-        length={0}
+        length={VU_HEIGHT}
         onChange={(v) => DJActions.setDeckVolume(deckId, v)}
-        layout={{ flex: 1 }}
       />
       <pixiBitmapText
         text={volumeToDb(volume ?? 0.8)}
