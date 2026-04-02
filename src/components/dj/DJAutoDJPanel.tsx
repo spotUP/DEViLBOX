@@ -5,11 +5,13 @@
  * Reads state from useDJStore, dispatches actions via DJActions.
  */
 
-import React, { useCallback, useRef, useState } from 'react';
-import { SkipForward, Shuffle, SlidersHorizontal, Zap } from 'lucide-react';
+import React, { useCallback, useRef, useState, useEffect } from 'react';
+import { SkipForward, Shuffle, SlidersHorizontal, Zap, HardDrive } from 'lucide-react';
 import { useDJStore, type AutoDJStatus } from '@/stores/useDJStore';
 import { useDJPlaylistStore } from '@/stores/useDJPlaylistStore';
 import { enableAutoDJ, disableAutoDJ, skipAutoDJ } from '@/engine/dj/DJActions';
+import { precachePlaylist, type PrecacheProgress } from '@/engine/dj/DJPlaylistPrecache';
+import { getCachedFilenames } from '@/engine/dj/DJAudioCache';
 import { analyzePlaylist, playlistNeedsAnalysis, type AnalysisProgress, type ModlandFixCandidate } from '@/engine/dj/DJPlaylistAnalyzer';
 
 const STATUS_LABELS: Record<AutoDJStatus, string> = {
@@ -78,6 +80,42 @@ export const DJAutoDJPanel: React.FC<DJAutoDJPanelProps> = ({ onClose }) => {
     ? activePlaylist.tracks.filter(t => t.analysisSkipped).length
     : 0;
   const pendingCount = trackCount - analyzedCount - skippedCount;
+
+  // Pre-cache for offline
+  const [precacheProgress, setPrecacheProgress] = useState<PrecacheProgress | null>(null);
+  const precachingRef = useRef(false);
+  const [cachedCount, setCachedCount] = useState(0);
+
+  // Check how many tracks are cached on mount / playlist change
+  useEffect(() => {
+    if (!activePlaylist) { setCachedCount(0); return; }
+    getCachedFilenames().then(names => {
+      let count = 0;
+      for (const t of activePlaylist.tracks) {
+        if (!t.fileName.startsWith('modland:')) continue;
+        const fn = t.fileName.slice('modland:'.length).split('/').pop() || '';
+        if (names.has(fn)) count++;
+      }
+      setCachedCount(count);
+    });
+  }, [activePlaylist, precacheProgress]); // refresh after precache finishes
+
+  const modlandCount = activePlaylist
+    ? activePlaylist.tracks.filter(t => t.fileName.startsWith('modland:')).length
+    : 0;
+  const uncachedCount = modlandCount - cachedCount;
+
+  const handlePrecache = useCallback(async () => {
+    if (!activePlaylistId || precachingRef.current) return;
+    precachingRef.current = true;
+    setPrecacheProgress({ current: 0, total: 1, cached: 0, failed: 0, skipped: 0, trackName: 'Starting...', status: 'checking' });
+    try {
+      await precachePlaylist(activePlaylistId, (p) => setPrecacheProgress({ ...p }));
+    } finally {
+      precachingRef.current = false;
+      setPrecacheProgress(null);
+    }
+  }, [activePlaylistId]);
 
   // 404 fix dialog state
   const [fixDialog, setFixDialog] = useState<{
@@ -214,6 +252,44 @@ export const DJAutoDJPanel: React.FC<DJAutoDJPanelProps> = ({ onClose }) => {
                 >
                   <Zap size={10} />
                   Analyze ({pendingCount} tracks)
+                </button>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Pre-cache for offline */}
+      {activePlaylist && trackCount >= 2 && !enabled && (
+        <div className="mb-3">
+          {precacheProgress ? (
+            <div className="space-y-1">
+              <div className="flex items-center justify-between text-[10px]">
+                <span className="text-amber-400">{precacheProgress.current}/{precacheProgress.total}</span>
+                <span className="text-green-400 ml-1">{precacheProgress.cached + precacheProgress.skipped} cached</span>
+                {precacheProgress.failed > 0 && <span className="text-red-400 ml-1">{precacheProgress.failed} fail</span>}
+                <span className="text-text-tertiary truncate ml-2 flex-1 text-right">{precacheProgress.trackName}</span>
+              </div>
+              <div className="h-1 bg-dark-bgTertiary rounded-full overflow-hidden">
+                <div className="h-full bg-amber-500 transition-all duration-300"
+                  style={{ width: `${(precacheProgress.current / precacheProgress.total) * 100}%` }} />
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-1">
+              <div className="flex items-center gap-2 text-[10px]">
+                <HardDrive size={10} className="text-amber-400 shrink-0" />
+                <span className="text-green-400">{cachedCount} cached</span>
+                {uncachedCount > 0 && <span className="text-amber-400">{uncachedCount} not cached</span>}
+                {uncachedCount === 0 && modlandCount > 0 && <span className="text-green-500/80 ml-auto">Offline ready</span>}
+              </div>
+              {uncachedCount > 0 && (
+                <button
+                  onClick={handlePrecache}
+                  className="w-full flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-md border border-amber-700 bg-amber-900/20 text-amber-400 hover:bg-amber-900/40 transition-all text-[10px]"
+                >
+                  <HardDrive size={10} />
+                  Cache for Offline ({uncachedCount} tracks)
                 </button>
               )}
             </div>

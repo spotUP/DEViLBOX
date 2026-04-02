@@ -10,8 +10,8 @@
 const DB_NAME = 'DEViLBOX_AudioCache';
 const DB_VERSION = 1;
 const STORE_NAME = 'audioCache';
-const MAX_CACHE_SIZE_MB = 500; // 500 MB limit
-const MAX_CACHE_ENTRIES = 100; // Max 100 cached files
+const MAX_CACHE_SIZE_MB = 2000; // 2 GB limit (gig playlists need 200+ tracks)
+const MAX_CACHE_ENTRIES = 1000; // Max 1000 cached files
 
 export interface CachedAudio {
   hash: string;           // SHA-256 of source file
@@ -43,6 +43,9 @@ export interface CachedAudio {
   mood?: string;                   // e.g. "Energetic", "Chill"
   energy?: number;                 // 0-1 (low → high energy)
   danceability?: number;           // 0-1
+
+  // ── Source file (for offline re-rendering) ──
+  sourceData?: ArrayBuffer;        // Original module file bytes (MOD/XM/IT etc.)
 }
 
 /** Beat grid data — compatible with Serato beat markers */
@@ -155,16 +158,29 @@ export async function cacheAudio(
     const hash = await hashFile(sourceFile);
     const sizeBytes = audioData.byteLength;
 
+    // Check if a stub entry exists (from cacheSourceFile) — preserve its sourceData
+    let existingSource: ArrayBuffer | undefined;
+    try {
+      const existing = await new Promise<CachedAudio | undefined>((resolve) => {
+        const tx = database.transaction(STORE_NAME, 'readonly');
+        const req = tx.objectStore(STORE_NAME).get(hash);
+        req.onsuccess = () => resolve(req.result);
+        req.onerror = () => resolve(undefined);
+      });
+      existingSource = existing?.sourceData;
+    } catch { /* ok */ }
+
     const entry: CachedAudio = {
       hash,
       filename,
       audioData,
       duration,
-      waveformPeaks: Array.from(waveformPeaks), // Convert to plain array for IDB
+      waveformPeaks: Array.from(waveformPeaks),
       sampleRate,
       numberOfChannels,
       timestamp: Date.now(),
       sizeBytes,
+      sourceData: existingSource || sourceFile.slice(0), // preserve or store source
     };
 
     // Check if adding this entry would exceed limits
@@ -372,6 +388,128 @@ export async function updateCacheAnalysis(
 }
 
 /** Remove a specific entry from cache */
+/**
+ * Cache the raw source module file alongside the rendered audio.
+ * If the rendered WAV is evicted, we can re-render from this without network.
+ * If an entry already exists, adds sourceData to it. Otherwise creates a stub entry.
+ */
+export async function cacheSourceFile(fileBuffer: ArrayBuffer, filename: string): Promise<void> {
+  try {
+    const database = await initDB();
+    const hash = await hashFile(fileBuffer);
+
+    const tx = database.transaction(STORE_NAME, 'readwrite');
+    const store = tx.objectStore(STORE_NAME);
+
+    return new Promise((resolve, reject) => {
+      const getReq = store.get(hash);
+      getReq.onsuccess = () => {
+        const existing = getReq.result as CachedAudio | undefined;
+        if (existing) {
+          // Add source to existing entry
+          existing.sourceData = fileBuffer.slice(0);
+          existing.timestamp = Date.now();
+          store.put(existing);
+        } else {
+          // Create stub entry with just the source (no rendered audio yet)
+          const stub: CachedAudio = {
+            hash,
+            filename,
+            audioData: new ArrayBuffer(0), // empty — not yet rendered
+            duration: 0,
+            waveformPeaks: [],
+            sampleRate: 44100,
+            numberOfChannels: 1,
+            timestamp: Date.now(),
+            sizeBytes: fileBuffer.byteLength,
+            sourceData: fileBuffer.slice(0),
+          };
+          store.put(stub);
+        }
+        resolve();
+      };
+      getReq.onerror = () => reject(getReq.error);
+    });
+  } catch (err) {
+    console.warn('[DJAudioCache] Failed to cache source file:', err);
+  }
+}
+
+/**
+ * Retrieve the raw source module file from cache.
+ * Returns null if not cached or if no source data was stored.
+ */
+export async function getSourceFile(fileBuffer: ArrayBuffer): Promise<ArrayBuffer | null> {
+  try {
+    const database = await initDB();
+    const hash = await hashFile(fileBuffer);
+
+    return new Promise((resolve) => {
+      const tx = database.transaction(STORE_NAME, 'readonly');
+      const store = tx.objectStore(STORE_NAME);
+      const request = store.get(hash);
+
+      request.onsuccess = () => {
+        const entry = request.result as CachedAudio | undefined;
+        resolve(entry?.sourceData ?? null);
+      };
+      request.onerror = () => resolve(null);
+    });
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Check if a source file is cached by its Modland filename.
+ * Uses a full scan — call sparingly (use for batch status checks, not per-frame).
+ */
+export async function isSourceCachedByName(filename: string): Promise<boolean> {
+  try {
+    const database = await initDB();
+    return new Promise((resolve) => {
+      const tx = database.transaction(STORE_NAME, 'readonly');
+      const store = tx.objectStore(STORE_NAME);
+      const request = store.getAll();
+      request.onsuccess = () => {
+        const entries = request.result as CachedAudio[];
+        resolve(entries.some(e => e.filename === filename && (e.audioData.byteLength > 0 || (e.sourceData && e.sourceData.byteLength > 0))));
+      };
+      request.onerror = () => resolve(false);
+    });
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Batch check which filenames are cached. Returns a Set of cached filenames.
+ * Much faster than calling isSourceCachedByName for each track individually.
+ */
+export async function getCachedFilenames(): Promise<Set<string>> {
+  try {
+    const database = await initDB();
+    return new Promise((resolve) => {
+      const tx = database.transaction(STORE_NAME, 'readonly');
+      const store = tx.objectStore(STORE_NAME);
+      const request = store.getAll();
+      request.onsuccess = () => {
+        const entries = request.result as CachedAudio[];
+        const names = new Set<string>();
+        for (const e of entries) {
+          if (e.audioData.byteLength > 0 || (e.sourceData && e.sourceData.byteLength > 0)) {
+            names.add(e.filename);
+          }
+        }
+        resolve(names);
+      };
+      request.onerror = () => resolve(new Set());
+    });
+  } catch {
+    return new Set();
+  }
+}
+
 export async function evictCachedAudio(fileBuffer: ArrayBuffer): Promise<void> {
   try {
     const database = await initDB();
