@@ -7,6 +7,7 @@
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import * as ws from './ControllerWebSocket';
+import { ControllerWebRTC } from './ControllerWebRTC';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -151,20 +152,20 @@ const Crossfader: React.FC<{ value: number }> = ({ value }) => {
 
 // ── PTT Button ──────────────────────────────────────────────────────────────
 
-const PTTButton: React.FC<{ duckEnabled: boolean }> = ({ duckEnabled }) => {
+const PTTButton: React.FC<{ duckEnabled: boolean; webrtc: ControllerWebRTC | null }> = ({ duckEnabled, webrtc }) => {
   const [live, setLive] = useState(false);
 
   const onDown = useCallback(() => {
     setLive(true);
+    webrtc?.setMicEnabled(true);
     if (duckEnabled) ws.call('dj_duck', {});
-    // TODO: Phase 4 — unmute WebRTC mic track here
-  }, [duckEnabled]);
+  }, [duckEnabled, webrtc]);
 
   const onUp = useCallback(() => {
     setLive(false);
+    webrtc?.setMicEnabled(false);
     if (duckEnabled) ws.call('dj_unduck', {});
-    // TODO: Phase 4 — mute WebRTC mic track here
-  }, [duckEnabled]);
+  }, [duckEnabled, webrtc]);
 
   return (
     <button
@@ -187,7 +188,7 @@ const PTTButton: React.FC<{ duckEnabled: boolean }> = ({ duckEnabled }) => {
 
 // ── Pairing Screen ──────────────────────────────────────────────────────────
 
-const PairingScreen: React.FC<{ onConnect: (host: string) => void }> = ({ onConnect }) => {
+const PairingScreen: React.FC<{ onConnect: (host: string, roomCode?: string) => void }> = ({ onConnect }) => {
   const [host, setHost] = useState('');
   const [error, setError] = useState('');
 
@@ -195,16 +196,17 @@ const PairingScreen: React.FC<{ onConnect: (host: string) => void }> = ({ onConn
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const h = params.get('host');
+    const room = params.get('room') || undefined;
     if (h) {
       setHost(h);
-      onConnect(h);
+      onConnect(h, room);
     }
   }, [onConnect]);
 
   const handleConnect = () => {
     if (!host) { setError('Enter the desktop IP'); return; }
     setError('');
-    onConnect(host);
+    onConnect(host);  // No room code for manual entry — mic needs QR pairing
   };
 
   return (
@@ -244,7 +246,9 @@ export const ControllerApp: React.FC = () => {
   const [paired, setPaired] = useState(false);
   const [state, setState] = useState<DJState | null>(null);
   const [duckEnabled, setDuckEnabled] = useState(false);
+  const [micStatus, setMicStatus] = useState<string>('');
   const pollRef = useRef<ReturnType<typeof setInterval>>(undefined);
+  const webrtcRef = useRef<ControllerWebRTC | null>(null);
 
   // Wake lock to prevent screen sleep
   useEffect(() => {
@@ -255,7 +259,7 @@ export const ControllerApp: React.FC = () => {
 
   ws.setStatusCallback(setConnected);
 
-  const handleConnect = useCallback(async (host: string) => {
+  const handleConnect = useCallback(async (host: string, roomCode?: string) => {
     try {
       await ws.connect(host, 4003);
       setPaired(true);
@@ -267,6 +271,20 @@ export const ControllerApp: React.FC = () => {
           setState(data);
         } catch { /* ignore poll errors */ }
       }, 200);
+
+      // Connect WebRTC for mic audio if room code provided
+      if (roomCode) {
+        try {
+          const rtc = new ControllerWebRTC();
+          rtc.onStatusChange = (s) => setMicStatus(s);
+          await rtc.connect(host, roomCode, 4002);
+          webrtcRef.current = rtc;
+          setMicStatus('connected');
+        } catch (err) {
+          console.warn('[Controller] WebRTC mic failed (controls still work):', err);
+          setMicStatus('failed');
+        }
+      }
     } catch (err) {
       console.error('[Controller] Connection failed:', err);
     }
@@ -343,7 +361,8 @@ export const ControllerApp: React.FC = () => {
             Duck music while talking
           </label>
         </div>
-        <PTTButton duckEnabled={duckEnabled} />
+        {micStatus && <div style={{ fontSize: 10, color: micStatus === 'connected' ? '#22c55e' : '#888', marginBottom: 4 }}>Mic: {micStatus}</div>}
+        <PTTButton duckEnabled={duckEnabled} webrtc={webrtcRef.current} />
       </div>
     </div>
   );

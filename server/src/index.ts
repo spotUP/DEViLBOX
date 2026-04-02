@@ -72,6 +72,20 @@ app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', timestamp: Date.now() });
 });
 
+// Local network IP for controller QR code pairing
+app.get('/api/network/local-ip', (_req, res) => {
+  const os = require('os');
+  const interfaces = os.networkInterfaces();
+  for (const name of Object.keys(interfaces)) {
+    for (const iface of interfaces[name] ?? []) {
+      if (iface.family === 'IPv4' && !iface.internal) {
+        return res.json({ ip: iface.address });
+      }
+    }
+  }
+  res.json({ ip: 'localhost' });
+});
+
 // Public demo file browsing (no auth required)
 import fs from 'fs';
 import path from 'path';
