@@ -20,6 +20,8 @@ import {
   SETTINGS_TABS,
   KEYBOARD_SCHEMES,
 } from '@hooks/dialogs/useSettingsDialog';
+import { KeyBindingEditor } from '@components/dialogs/KeyBindingEditor';
+import { KeyboardNormalizer } from '@engine/keyboard/KeyboardNormalizer';
 
 /** Normalize any CSS color to #RRGGBB for <input type="color"> */
 function normalizeToHex6(color: string | undefined): string {
@@ -580,6 +582,14 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
                     </select>
                   </div>
                 </div>
+
+                {/* Custom key binding editor */}
+                {s.activeScheme === 'custom' && (
+                  <div className="mt-4 pt-3 border-t border-ft2-border/30">
+                    <h4 className="text-ft2-highlight text-[10px] font-bold mb-2 tracking-wide">CUSTOM BINDINGS</h4>
+                    <KeyBindingEditor platform={s.platformOverride === 'auto' ? (KeyboardNormalizer.isMac() ? 'mac' : 'pc') : s.platformOverride} />
+                  </div>
+                )}
               </section>
 
               {/* MIDI */}
