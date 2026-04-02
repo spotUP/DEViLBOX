@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-04-02T09:08:58.251Z
+ * Generated: 2026-04-02T11:39:13.118Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -19,9 +19,9 @@ export interface ChangelogEntry {
 }
 
 // Build info
-export const BUILD_VERSION = '1.0.3845';
-export const BUILD_NUMBER = '3845';
-export const BUILD_HASH = '3f4b2cf37';
+export const BUILD_VERSION = '1.0.3863';
+export const BUILD_NUMBER = '3863';
+export const BUILD_HASH = '6bc5e03a9';
 export const BUILD_DATE = '2026-04-02';
 
 // Full version (patch IS the build number, so no need to append)
@@ -30,9 +30,81 @@ export const FULL_VERSION = BUILD_VERSION;
 // Auto-generated changelog
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: '1.0.3845',
+    version: '1.0.3863',
     date: '2026-04-02',
     changes: [
+      {
+        type: 'feature',
+        "description": "Complete iPhone remote control with WebRTC mic + pairing"
+      },
+      {
+        type: 'fix',
+        "description": "DOM tracker visual bg visible — make canvas container transparent"
+      },
+      {
+        type: 'fix',
+        "description": "Restore tracker visual background in both DOM and GL views"
+      },
+      {
+        type: 'improvement',
+        "description": "Chore: TrackerView minor update"
+      },
+      {
+        type: 'improvement',
+        "description": "Re-enable tracker visual background"
+      },
+      {
+        type: 'feature',
+        "description": "IPhone remote control for DJ mode (phases 1-3)"
+      },
+      {
+        type: 'improvement',
+        "description": "Remove: tracker visual background effect (glow orb behind pattern editor)"
+      },
+      {
+        type: 'fix',
+        "description": "DX7 audio fix + pre-warm all WASM synths on init"
+      },
+      {
+        type: 'fix',
+        "description": "Crate panel listings use icons instead of colored dots"
+      },
+      {
+        type: 'fix',
+        "description": "Tracker visual background — respect setting + enable in DOM view"
+      },
+      {
+        type: 'fix',
+        "description": "DJ deck layout to match DOM — track info, pitch slider, progress bar"
+      },
+      {
+        type: 'fix',
+        "description": "Add layout props to all navbar icon sprites for flex alignment"
+      },
+      {
+        type: 'fix',
+        "description": "Channel faders stretch to fill full mixer row height"
+      },
+      {
+        type: 'fix',
+        "description": "Restructure DJ mixer to single horizontal row matching DOM"
+      },
+      {
+        type: 'fix',
+        "description": "Replace broken icon references with correct mappings"
+      },
+      {
+        type: 'feature',
+        "description": "Add 14 missing Lucide icon mappings for GL parity"
+      },
+      {
+        type: 'fix',
+        "description": "File browser parity + mixer dB/VU/filter/video polish"
+      },
+      {
+        type: 'feature',
+        "description": "Fuzzy Modland search for 404 tracks, TFMX companion fix, fail report"
+      },
       {
         type: 'improvement',
         "description": "Remove duplicate Dexed/OBXd synths, keep DX7/OBXf replacements"
@@ -166,78 +238,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'fix',
         "description": "Show full pad name — remove 8-char truncation"
-      },
-      {
-        type: 'improvement',
-        "description": "Standardize knob size to md + align 4-col grids in DOM & Pixi"
-      },
-      {
-        type: 'improvement',
-        "description": "Switch synth panels to 4-column grid layout"
-      },
-      {
-        type: 'improvement',
-        "description": "Switch synth panels from 2-column to 3-column grid layout"
-      },
-      {
-        type: 'improvement',
-        "description": "Compact 2-column synth panel layouts + DOMSynthPanel renderer"
-      },
-      {
-        type: 'feature',
-        "description": "Show synth type badge on pad cells in GL sampler (808/SAM/303 etc)"
-      },
-      {
-        type: 'fix',
-        "description": "Remove spurious heldPadsRef.add + guard synth release in GL sampler"
-      },
-      {
-        type: 'fix',
-        "description": "Add V2Speech to speech synth text handling in PadEditor"
-      },
-      {
-        type: 'fix',
-        "description": "Trigger synth pads in GL sampler — 808/909/SAM/DECtalk now play in GL mode"
-      },
-      {
-        type: 'improvement',
-        "description": "Config persistence + hardware UIs for demoscene synths"
-      },
-      {
-        type: 'fix',
-        "description": "V2 preset fix + Tunefish/WaveSabre/V2 Pixi panels & presets"
-      },
-      {
-        type: 'feature',
-        "description": "Add OpenWurli/OPL3/DX7 to synth browser, Oidos panel + presets"
-      },
-      {
-        type: 'feature',
-        "description": "DX7 patch bank browser with 1120 voices"
-      },
-      {
-        type: 'feature',
-        "description": "Complete parameter wiring for OPL3/DX7 synths"
-      },
-      {
-        type: 'feature',
-        "description": "Auto-load DX7 firmware ROM and voice banks"
-      },
-      {
-        type: 'feature',
-        "description": "Add Pixi panel layouts for OpenWurli, OPL3, DX7 synths"
-      },
-      {
-        type: 'feature',
-        "description": "Add DX7 WASM synth (VDX7 cycle-accurate emulation)"
-      },
-      {
-        type: 'fix',
-        "description": "Route UADE formats through render worker in DJ view"
-      },
-      {
-        type: 'feature',
-        "description": "Add OPL3 (YMF262) WASM synth — 18-channel FM, SBI patches"
       }
     ]
   }

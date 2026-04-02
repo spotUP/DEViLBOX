@@ -15,7 +15,7 @@ import { CollaborationModal } from '@components/collaboration/CollaborationModal
 import { Button } from '@components/ui/Button';
 import { isElectron } from '@utils/electron';
 import { useNavBar } from '@hooks/views/useNavBar';
-import { NAV_BAR_VIEWS, switchView } from '@/constants/viewOptions';
+import { VIEW_OPTIONS, switchView } from '@/constants/viewOptions';
 
 const NavBarComponent: React.FC = () => {
   const n = useNavBar();
@@ -178,8 +178,8 @@ const NavBarComponent: React.FC = () => {
             className="bg-dark-bgTertiary text-text-primary text-sm border border-dark-border rounded px-2 py-1 outline-none focus:border-accent-primary"
             title="Switch view"
           >
-            {NAV_BAR_VIEWS.map((v) => (
-              <option key={v.value} value={v.value}>{v.shortLabel}</option>
+            {VIEW_OPTIONS.map((v) => (
+              <option key={v.value} value={v.value}>{v.label}</option>
             ))}
           </select>
 

@@ -23,7 +23,7 @@ import { GenreAnalysisBadge } from './GenreAnalysisBadge';
 import { GrooveSettingsModal } from '@components/dialogs/GrooveSettingsModal';
 import { GROOVE_TEMPLATES } from '@typedefs/audio';
 import {
-  Eye, EyeOff, List, Grid3x3, Piano, Radio,
+  Eye, EyeOff,
   Activity, LayoutGrid, Cpu, SlidersHorizontal, Zap,
 } from 'lucide-react';
 
@@ -63,7 +63,6 @@ export const EditorControlsBar: React.FC<EditorControlsBarProps> = React.memo(({
   const [showGrooveSettings, setShowGrooveSettings] = useState(false);
 
   // DOM-only: UI store for view-mode switching and groove dialog command
-  const setActiveView = useUIStore(s => s.setActiveView);
   const dialogOpen = useUIStore(s => s.dialogOpen);
   const closeDialogCommand = useUIStore(s => s.closeDialogCommand);
 
@@ -78,50 +77,14 @@ export const EditorControlsBar: React.FC<EditorControlsBarProps> = React.memo(({
   // ── Grouped hardware presets ─────────────────────────────────────────────
   const groupedPresets = React.useMemo(() => getGroupedPresets(), []);
 
-  // ── DOM-specific handler ──────────────────────────────────────────────────
-  const handleViewModeChange = useCallback((e: React.ChangeEvent<HTMLSelectElement>) => {
-    const val = e.target.value as TrackerViewMode;
-    if (val === 'arrangement' || val === 'dj' || val === 'drumpad' || val === 'pianoroll' || val === 'vj' || val === 'mixer' || val === 'studio' || val === 'split') {
-      setActiveView(val);
-    } else {
-      onViewModeChange(val);
-    }
-  }, [setActiveView, onViewModeChange]);
-
   const { fps } = c;
   const { quality, averageFps: avgFps } = fps;
 
   return (
     <div className="flex-shrink flex items-center justify-between px-2 py-1 bg-dark-bgTertiary border-b border-dark-border min-h-[28px]">
       <div className="flex items-center gap-2">
-        {/* View Mode Dropdown */}
-        <div className="flex items-center gap-1">
-          {viewMode === 'tracker' && <List size={14} className="shrink-0 text-text-secondary" />}
-          {viewMode === 'grid' && <Grid3x3 size={14} className="shrink-0 text-text-secondary" />}
-          {viewMode === 'pianoroll' && <Piano size={14} className="shrink-0 text-text-secondary" />}
-          {viewMode === 'tb303' && <Radio size={14} className="shrink-0 text-text-secondary" />}
-          <select
-            value={viewMode}
-            onChange={handleViewModeChange}
-            className="px-3 py-1.5 rounded-md text-xs font-mono border transition-all cursor-pointer border-dark-borderLight bg-dark-bgTertiary text-text-secondary hover:bg-dark-bgHover hover:text-text-primary"
-            title="Select editor view"
-          >
-            <option value="tracker">Tracker</option>
-            <option value="grid">Grid</option>
-            <option value="pianoroll">Piano Roll</option>
-            <option value="tb303">TB-303</option>
-            <option value="arrangement">Arrangement</option>
-            <option value="dj">DJ Mixer</option>
-            <option value="drumpad">Drum Pads</option>
-            <option value="vj">VJ View</option>
-            <option value="mixer">Mixer</option>
-            <option value="studio">Studio</option>
-            <option value="split">Split View</option>
-          </select>
-        </div>
-
         {/* Hardware System Preset Selector */}
-        <div className="flex items-center gap-1.5 ml-1 pl-2 border-l border-dark-border">
+        <div className="flex items-center gap-1.5">
           <Cpu size={14} className="shrink-0 text-text-secondary" />
           <select
             className="px-3 py-1.5 rounded-md text-xs font-mono border transition-all cursor-pointer border-dark-borderLight bg-dark-bgTertiary text-text-secondary hover:bg-dark-bgHover hover:text-text-primary"

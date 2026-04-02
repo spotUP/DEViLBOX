@@ -11,7 +11,7 @@ import { useDJStore } from '@/stores/useDJStore';
 import { getDJEngine, disposeDJEngine } from '@/engine/dj/DJEngine';
 import { clearSongCache } from '@/engine/dj/DJSongCache';
 import type { DJEngine } from '@/engine/dj/DJEngine';
-import { useTransportStore, useUIStore } from '@/stores';
+import { useTransportStore } from '@/stores';
 import { useAudioStore } from '@/stores/useAudioStore';
 import { getToneEngine } from '@/engine/ToneEngine';
 import { DJDeck } from './DJDeck';
@@ -266,36 +266,6 @@ export const DJView: React.FC<DJViewProps> = ({ onShowDrumpads: _onShowDrumpads 
       {/* ================================================================== */}
       <div className="flex items-center justify-between px-4 py-2 shrink-0 bg-dark-bgSecondary border-b border-dark-border">
         <div className="flex items-center gap-3">
-          {/* View switcher dropdown */}
-          <select
-            value="dj"
-            onChange={(e) => {
-              const val = e.target.value;
-              if (val !== 'dj') {
-                // VJ is safe — DJ engine stays alive in background
-                if (val !== 'vj') {
-                  const { decks } = useDJStore.getState();
-                  const anyPlaying = decks.A.isPlaying || decks.B.isPlaying || decks.C.isPlaying;
-                  if (anyPlaying && !window.confirm('Audio is playing. Switch view? This will stop DJ playback.')) {
-                    e.target.value = 'dj';
-                    return;
-                  }
-                }
-                useUIStore.getState().setActiveView(val as any);
-              }
-            }}
-            className="px-3 py-1.5 rounded-md text-xs font-mono font-bold tracking-widest uppercase border transition-all cursor-pointer border-dark-borderLight bg-dark-bgTertiary text-text-secondary hover:bg-dark-bgHover hover:text-text-primary"
-            title="Switch view"
-          >
-            <option value="tracker">Tracker</option>
-            <option value="grid">Grid</option>
-            <option value="pianoroll">Piano Roll</option>
-            <option value="tb303">TB-303</option>
-            <option value="arrangement">Arrangement</option>
-            <option value="dj">DJ Mixer</option>
-            <option value="vj">VJ View</option>
-          </select>
-          <div className="h-4 w-px bg-dark-border" />
           <span className="font-mono text-sm font-bold tracking-widest uppercase text-accent-primary">
             DEViLBOX DJ
           </span>
