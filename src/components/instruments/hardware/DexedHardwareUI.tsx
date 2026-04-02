@@ -14,6 +14,7 @@
 
 import React, { useRef, useEffect, useState, useCallback } from 'react';
 import { getToneEngine } from '../../../engine/ToneEngine';
+import { unpackDX7Voice } from '../../../engine/dx7/dx7sysex';
 
 interface DexedUIModule {
   _dexed_ui_init: () => void;
@@ -79,6 +80,82 @@ export const DexedHardwareUI: React.FC<DexedHardwareUIProps> = ({
   const moduleRef = useRef<DexedUIModule | null>(null);
   const [loaded, setLoaded] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [patchInfo, setPatchInfo] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  /** Load a .syx file into both the UI WASM and audio engine */
+  const loadSysexFile = useCallback(async (file: File) => {
+    const buffer = await file.arrayBuffer();
+    const data = new Uint8Array(buffer);
+    const m = moduleRef.current;
+
+    if (data.length === 4104 || data.length === 4096) {
+      // 32-voice bulk dump (with or without sysex wrapper)
+      const voiceData = data.length === 4104 ? data.subarray(6, 4102) : data;
+
+      // Load first voice VCED into the UI
+      const firstVoice = unpackDX7Voice(voiceData.subarray(0, 128));
+      if (m) {
+        const ptr = m._malloc(155);
+        m.HEAPU8.set(firstVoice.subarray(0, 155), ptr);
+        m._dexed_ui_load_sysex(ptr, 155);
+        m._free(ptr);
+      }
+
+      // Load full cartridge into audio engine
+      if (instrumentId) {
+        try {
+          const engine = getToneEngine();
+          const instruments = (engine as any).instruments as Map<number, any>;
+          const key = (instrumentId << 16) | 0xFFFF;
+          const synth = instruments?.get(key);
+          if (synth?.loadSysex) {
+            // Wrap in proper sysex envelope if raw
+            if (data.length === 4096) {
+              const sysex = new Uint8Array(4104);
+              sysex[0] = 0xF0; sysex[1] = 0x43; sysex[2] = 0x00;
+              sysex[3] = 0x09; sysex[4] = 0x20; sysex[5] = 0x00;
+              sysex.set(data, 6);
+              let sum = 0;
+              for (let i = 0; i < 4096; i++) sum += data[i];
+              sysex[4102] = (-sum) & 0x7F;
+              sysex[4103] = 0xF7;
+              synth.loadSysex(sysex.buffer);
+            } else {
+              synth.loadSysex(buffer);
+            }
+          }
+        } catch { /* engine not ready */ }
+      }
+      setPatchInfo(`Loaded ${file.name} (32 voices)`);
+    } else if (data.length >= 155 && data.length <= 163) {
+      // Single voice VCED
+      const vcedStart = data[0] === 0xF0 ? 6 : 0;
+      if (m) {
+        const ptr = m._malloc(155);
+        m.HEAPU8.set(data.subarray(vcedStart, vcedStart + 155), ptr);
+        m._dexed_ui_load_sysex(ptr, 155);
+        m._free(ptr);
+      }
+      setPatchInfo(`Loaded ${file.name} (single voice)`);
+    } else {
+      setPatchInfo(`Unknown format (${data.length} bytes)`);
+    }
+  }, [instrumentId]);
+
+  const handleFileDrop = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    const file = e.dataTransfer.files[0];
+    if (file && (file.name.endsWith('.syx') || file.name.endsWith('.SYX'))) {
+      loadSysexFile(file);
+    }
+  }, [loadSysexFile]);
+
+  const handleFileInput = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) loadSysexFile(file);
+    e.target.value = '';
+  }, [loadSysexFile]);
 
   const fbWidthRef = useRef(866);
   const fbHeightRef = useRef(674);
@@ -329,8 +406,11 @@ export const DexedHardwareUI: React.FC<DexedHardwareUIProps> = ({
   return (
     <div
       ref={containerRef}
+      onDragOver={(e) => e.preventDefault()}
+      onDrop={handleFileDrop}
       style={{
         display: 'flex',
+        flexDirection: 'column',
         alignItems: 'center',
         justifyContent: 'center',
         background: '#1a1a1a',
@@ -352,6 +432,29 @@ export const DexedHardwareUI: React.FC<DexedHardwareUIProps> = ({
           cursor: 'default',
         }}
       />
+      {loaded && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '4px 0' }}>
+          <button
+            onClick={() => fileInputRef.current?.click()}
+            style={{
+              background: '#333', color: '#ccc', border: '1px solid #555',
+              borderRadius: 4, padding: '3px 10px', fontSize: 11, cursor: 'pointer',
+            }}
+          >
+            Load .SYX
+          </button>
+          {patchInfo && (
+            <span style={{ color: '#8f8', fontSize: 11, fontFamily: 'monospace' }}>{patchInfo}</span>
+          )}
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".syx,.SYX"
+            onChange={handleFileInput}
+            style={{ display: 'none' }}
+          />
+        </div>
+      )}
     </div>
   );
 };
