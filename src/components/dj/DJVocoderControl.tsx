@@ -122,9 +122,11 @@ export const DJVocoderControl: React.FC = () => {
         if (!engine) return;
         // Enable vocoder processing (robot voice)
         engine.setVocoderBypass(false);
+        useVocoderStore.getState().setActive(true);
       } else {
         // Disable vocoder but keep engine alive for clean mic PTT
         engineRef.current?.setVocoderBypass(true);
+        useVocoderStore.getState().setActive(false);
       }
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
@@ -185,17 +187,24 @@ export const DJVocoderControl: React.FC = () => {
 
   const handleFormantShift = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const shift = parseFloat(e.target.value);
+    useVocoderStore.getState().setParam('formantShift', shift);
     engineRef.current?.setFormantShift(shift);
   }, []);
 
   const handleWet = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const wet = parseFloat(e.target.value);
+    useVocoderStore.getState().setParam('wet', wet);
     engineRef.current?.setWet(wet);
   }, []);
 
   const handlePresetChange = useCallback((e: React.ChangeEvent<HTMLSelectElement>) => {
     const name = e.target.value;
-    engineRef.current?.loadPreset(name);
+    if (engineRef.current) {
+      engineRef.current.loadPreset(name);
+    } else {
+      // Engine not running yet — update store so preset is ready when PTT starts
+      useVocoderStore.getState().loadPreset(name);
+    }
   }, []);
 
   const handleAutoTuneToggle = useCallback(() => {
