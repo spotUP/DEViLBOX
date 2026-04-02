@@ -11,6 +11,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { Graphics as GraphicsType } from 'pixi.js';
+import { useTick } from '@pixi/react';
 import { usePixiTheme } from '../../theme';
 import { PixiButton, PixiKnob, PixiSlider, PixiLabel } from '../../components';
 import { useDJStore } from '@/stores/useDJStore';
@@ -26,8 +27,18 @@ import {
 import { onNextDownbeat } from '@/engine/dj/DJAutoSync';
 import type { DeckId } from '@/engine/dj/DeckEngine';
 import * as DJActions from '@/engine/dj/DJActions';
+import { PIXI_FONTS } from '../../fonts';
 
 const MIXER_WIDTH = 400;
+
+/** Convert linear volume (0-1) to dB display string */
+function volumeToDb(volume: number): string {
+  if (volume <= 0) return '-\u221EdB';
+  const dB = 20 * Math.log10(volume);
+  if (dB >= -0.5) return '0.0dB';
+  if (dB < -60) return '-\u221EdB';
+  return `${dB.toFixed(1)}dB`;
+}
 
 export const PixiDJMixer: React.FC = () => {
   const theme = usePixiTheme();
@@ -88,12 +99,23 @@ export const PixiDJMixer: React.FC = () => {
 
 // ─── Filter Section ─────────────────────────────────────────────────────────
 
+/** Returns filter mode label and whether the filter is active */
+function getFilterMode(position: number): { text: string; active: boolean } {
+  if (Math.abs(position) < 0.01) return { text: 'OFF', active: false };
+  if (position < 0) return { text: 'HPF', active: true };
+  return { text: 'LPF', active: true };
+}
+
 const MixerFilterSection: React.FC = () => {
   const theme = usePixiTheme();
   const filterA = useDJStore(s => s.decks.A.filterPosition);
   const filterB = useDJStore(s => s.decks.B.filterPosition);
   const filterC = useDJStore(s => s.decks.C.filterPosition);
   const thirdDeck = useDJStore(s => s.thirdDeckActive);
+
+  const filterModeA = getFilterMode(filterA);
+  const filterModeB = getFilterMode(filterB);
+  const filterModeC = getFilterMode(filterC);
 
   const drawBorder = useCallback((g: GraphicsType) => {
     g.clear();
@@ -110,12 +132,14 @@ const MixerFilterSection: React.FC = () => {
         <pixiContainer layout={{ flexDirection: 'column', gap: 4, alignItems: 'center' }}>
           <PixiLabel text="A" size="xs" color="textMuted" />
           <PixiKnob value={filterA} min={-1} max={1} defaultValue={0} size="sm" label="FLT" color={0xaa44ff} bipolar onChange={(v) => DJActions.setDeckFilter('A', v)} />
+          <PixiLabel text={filterModeA.text} size="xs" color="custom" customColor={filterModeA.active ? 0xaa44ff : theme.textMuted.color} customAlpha={filterModeA.active ? 1 : 0.5} />
         </pixiContainer>
 
         {/* Deck B Filter */}
         <pixiContainer layout={{ flexDirection: 'column', gap: 4, alignItems: 'center' }}>
           <PixiLabel text="B" size="xs" color="textMuted" />
           <PixiKnob value={filterB} min={-1} max={1} defaultValue={0} size="sm" label="FLT" color={0xaa44ff} bipolar onChange={(v) => DJActions.setDeckFilter('B', v)} />
+          <PixiLabel text={filterModeB.text} size="xs" color="custom" customColor={filterModeB.active ? 0xaa44ff : theme.textMuted.color} customAlpha={filterModeB.active ? 1 : 0.5} />
         </pixiContainer>
 
         {/* Deck C Filter */}
@@ -123,6 +147,7 @@ const MixerFilterSection: React.FC = () => {
           <pixiContainer layout={{ flexDirection: 'column', gap: 4, alignItems: 'center' }}>
             <PixiLabel text="C" size="xs" color="textMuted" />
             <PixiKnob value={filterC} min={-1} max={1} defaultValue={0} size="sm" label="FLT" color={0xaa44ff} bipolar onChange={(v) => DJActions.setDeckFilter('C', v)} />
+            <PixiLabel text={filterModeC.text} size="xs" color="custom" customColor={filterModeC.active ? 0xaa44ff : theme.textMuted.color} customAlpha={filterModeC.active ? 1 : 0.5} />
           </pixiContainer>
         )}
       </pixiContainer>
@@ -239,6 +264,8 @@ const VU_SEGMENTS = 20;
 const VU_WIDTH = 12;
 const VU_HEIGHT = 102;
 const VU_SEG_HEIGHT = (VU_HEIGHT - 2) / VU_SEGMENTS;
+const PEAK_HOLD_MS = 1500;
+const PEAK_DECAY_SEGMENTS_PER_SEC = 12;
 
 const COLOR_GREEN = 0x22c55e;
 const COLOR_YELLOW = 0xeab308;
@@ -261,14 +288,22 @@ const MixerVUMeters: React.FC = () => {
   const graphicsRef = useRef<GraphicsType | null>(null);
   const thirdDeck = useDJStore(s => s.thirdDeckActive);
   const levelsRef = useRef({ a: 0, b: 0, c: 0 });
+  const peakLevelRef = useRef({ a: 0, b: 0, c: 0 });
+  const peakTimeRef = useRef({ a: 0, b: 0, c: 0 });
   const thirdDeckRef = useRef(thirdDeck);
   thirdDeckRef.current = thirdDeck;
 
   useEffect(() => {
     let rafId: number;
-    const draw = () => {
+    let lastTime = performance.now();
+    const deckKeys = ['a', 'b', 'c'] as const;
+
+    const draw = (now: number) => {
       const g = graphicsRef.current;
       if (!g) { rafId = requestAnimationFrame(draw); return; }
+
+      const dt = (now - lastTime) / 1000;
+      lastTime = now;
 
       // Read levels from DJ engine
       try {
@@ -284,21 +319,34 @@ const MixerVUMeters: React.FC = () => {
         levelsRef.current.c = Math.max(0, levelsRef.current.c - 1);
       }
 
+      // Update peak hold per deck
+      for (const key of deckKeys) {
+        const segs = levelsRef.current[key];
+        if (segs >= peakLevelRef.current[key]) {
+          peakLevelRef.current[key] = segs;
+          peakTimeRef.current[key] = now;
+        } else if (now - peakTimeRef.current[key] > PEAK_HOLD_MS) {
+          peakLevelRef.current[key] = Math.max(segs, peakLevelRef.current[key] - PEAK_DECAY_SEGMENTS_PER_SEC * dt);
+        }
+      }
+
       g.clear();
       const { a, b, c } = levelsRef.current;
       const meterCount = thirdDeckRef.current ? 3 : 2;
 
       for (let deckIdx = 0; deckIdx < meterCount; deckIdx++) {
         const segs = deckIdx === 0 ? a : deckIdx === 1 ? b : c;
+        const peakSeg = Math.round(peakLevelRef.current[deckKeys[deckIdx]]);
         const xOff = deckIdx * (VU_WIDTH + 4);
 
         for (let i = 0; i < VU_SEGMENTS; i++) {
           const y = VU_HEIGHT - 1 - (i + 1) * VU_SEG_HEIGHT;
           const lit = i < segs;
+          const isPeak = !lit && i === peakSeg - 1 && peakSeg > segs;
           g.rect(xOff, y, VU_WIDTH, VU_SEG_HEIGHT - 1);
           g.fill({
-            color: lit ? segmentColor(i) : (theme.bgTertiary?.color ?? 0x313244),
-            alpha: lit ? 0.9 : 0.3,
+            color: (lit || isPeak) ? segmentColor(i) : (theme.bgTertiary?.color ?? 0x313244),
+            alpha: lit ? 0.9 : isPeak ? 0.85 : 0.3,
           });
         }
       }
@@ -359,6 +407,10 @@ const MixerChannelStrips: React.FC = () => {
             length={100}
             onChange={(v) => DJActions.setDeckVolume('A', v)}
           />
+          <pixiBitmapText
+            text={volumeToDb(volumeA ?? 0.8)}
+            style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 9, fill: theme.textMuted.color }}
+          />
         </pixiContainer>
 
         {/* Channel B fader */}
@@ -371,6 +423,10 @@ const MixerChannelStrips: React.FC = () => {
             orientation="vertical"
             length={100}
             onChange={(v) => DJActions.setDeckVolume('B', v)}
+          />
+          <pixiBitmapText
+            text={volumeToDb(volumeB ?? 0.8)}
+            style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 9, fill: theme.textMuted.color }}
           />
         </pixiContainer>
 
@@ -385,6 +441,10 @@ const MixerChannelStrips: React.FC = () => {
               orientation="vertical"
               length={100}
               onChange={(v) => DJActions.setDeckVolume('C', v)}
+            />
+            <pixiBitmapText
+              text={volumeToDb(volumeC ?? 0.8)}
+              style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 9, fill: theme.textMuted.color }}
             />
           </pixiContainer>
         )}
@@ -755,15 +815,53 @@ const MixerCueSection: React.FC = () => {
 
 // ─── Record + Mic ───────────────────────────────────────────────────────────
 
+const formatVideoDuration = (ms: number) => {
+  const s = Math.floor(ms / 1000);
+  const m = Math.floor(s / 60);
+  const pad = (n: number) => n.toString().padStart(2, '0');
+  return `${pad(m)}:${pad(s % 60)}`;
+};
+
 const MixerRecordMic: React.FC = () => {
   const isRecording = useDJSetStore(s => s.isRecording);
   const micEnabled = useDJSetStore(s => s.micEnabled);
   const micGain = useDJSetStore(s => s.micGain);
   const [showBroadcast, setShowBroadcast] = useState(false);
   const [videoRecording, setVideoRecording] = useState(false);
+  const [videoDuration, setVideoDuration] = useState(0);
   const [isLive, setIsLive] = useState(false);
   const videoCaptureRef = useRef<DJVideoCapture | null>(null);
   const videoRecorderRef = useRef<DJVideoRecorder | null>(null);
+  const videoStartRef = useRef(0);
+  const videoDurationTimerRef = useRef<number>(0);
+
+  // Pulsing red dot ref
+  const recDotRef = useRef<GraphicsType | null>(null);
+
+  // Video recording duration timer
+  useEffect(() => {
+    if (!videoRecording) {
+      setVideoDuration(0);
+      return;
+    }
+    videoStartRef.current = Date.now();
+    videoDurationTimerRef.current = window.setInterval(() => {
+      setVideoDuration(Date.now() - videoStartRef.current);
+    }, 1000);
+    return () => clearInterval(videoDurationTimerRef.current);
+  }, [videoRecording]);
+
+  // Pulse the red dot via useTick
+  useTick(() => {
+    if (!recDotRef.current || !videoRecording) return;
+    recDotRef.current.alpha = 0.65 + 0.35 * Math.sin(Date.now() * 0.009);
+  });
+
+  const drawRecDot = useCallback((g: GraphicsType) => {
+    g.clear();
+    g.circle(4, 4, 4);
+    g.fill(0xff2222);
+  }, []);
 
   const handleRecordToggle = useCallback(async () => {
     if (isRecording) {
@@ -840,8 +938,15 @@ const MixerRecordMic: React.FC = () => {
             active={isRecording}
             onClick={handleRecordToggle}
           />
+          {videoRecording && (
+            <pixiGraphics
+              ref={recDotRef}
+              draw={drawRecDot}
+              layout={{ width: 8, height: 8 }}
+            />
+          )}
           <PixiButton
-            label={videoRecording ? 'VSTOP' : 'VIDEO'}
+            label={videoRecording ? `REC ${formatVideoDuration(videoDuration)}` : 'VIDEO'}
             size="sm"
             color={videoRecording ? 'purple' : undefined}
             active={videoRecording}
