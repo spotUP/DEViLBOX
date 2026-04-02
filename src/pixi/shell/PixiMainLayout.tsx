@@ -36,6 +36,7 @@ import { PixiDJView } from '../views/PixiDJView';
 import { PixiVJView } from '../views/PixiVJView';
 import { PixiMixerView } from '../views/PixiMixerView';
 import { PixiSplitView } from '../views/PixiSplitView';
+import { PixiDrumPadManager } from '../dialogs/PixiDrumPadManager';
 import { WorkbenchContainer } from '../workbench/WorkbenchContainer';
 
 // ─── View Error Boundary ─────────────────────────────────────────────────────
@@ -104,7 +105,7 @@ class ViewErrorBoundary extends Component<ViewErrorBoundaryProps, ViewErrorBound
 
 // ─── View router ─────────────────────────────────────────────────────────────
 
-type MainViewId = 'tracker' | 'arrangement' | 'pianoroll' | 'dj' | 'vj' | 'mixer' | 'split' | 'studio';
+type MainViewId = 'tracker' | 'arrangement' | 'pianoroll' | 'dj' | 'vj' | 'mixer' | 'split' | 'studio' | 'drumpad';
 
 // Views that are always mounted (hidden when inactive) to avoid @pixi/layout BindingError.
 // WorkbenchContainer and VJ are excluded — WorkbenchContainer contains its own copies
@@ -120,13 +121,14 @@ const ALWAYS_MOUNTED_VIEWS: Record<AlwaysMountedViewId, React.ComponentType> = {
   dj: PixiDJView,
   mixer: PixiMixerView,
   split: PixiSplitView,
+  drumpad: PixiDrumPadManager,
 };
 
 // Map UIStore activeView to our MainViewId (some views map to tracker)
 function resolveMainView(activeView: string): MainViewId {
   if (activeView === 'studio' || activeView === 'vj') return activeView as MainViewId;
   if (activeView in ALWAYS_MOUNTED_VIEWS) return activeView as MainViewId;
-  // 'drumpad' or any unknown → default to tracker
+  // Unknown views → default to tracker
   return 'tracker';
 }
 
