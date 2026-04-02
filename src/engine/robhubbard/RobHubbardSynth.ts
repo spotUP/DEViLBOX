@@ -49,6 +49,10 @@ export class RobHubbardSynth implements DevilboxSynth {
     }
   }
 
+  async ensureInitialized(): Promise<void> {
+    await this.engine.ready();
+  }
+
   async setInstrument(config: RobHubbardConfig): Promise<void> {
     await this.engine.ready();
 

@@ -39,6 +39,7 @@ export class DJMixerEngine {
 
   // Master chain
   private masterGain: Tone.Gain;
+  private duckGain: Tone.Gain; // separate from masterGain — for mic ducking
   private limiter: Tone.Compressor;
   readonly masterMeter: Tone.Meter;
 
@@ -67,6 +68,7 @@ export class DJMixerEngine {
     this.samplerInput.gain.value = 1;
 
     this.masterGain = new Tone.Gain(1);
+    this.duckGain = new Tone.Gain(1);
 
     // Limiter: fast attack, high ratio compressor acting as a brickwall
     this.limiter = new Tone.Compressor({
@@ -87,7 +89,8 @@ export class DJMixerEngine {
     const masterGainRaw = this.masterGain.input as AudioNode;
     this.samplerInput.connect(masterGainRaw);
 
-    this.masterGain.connect(this.limiter);
+    this.masterGain.connect(this.duckGain);
+    this.duckGain.connect(this.limiter);
     this.limiter.toDestination();
     this.limiter.connect(this.masterMeter);
 
@@ -158,6 +161,16 @@ export class DJMixerEngine {
 
   getMasterVolume(): number {
     return this.masterGain.gain.value;
+  }
+
+  /** Duck the music (reduce master by ~8dB). Fast attack, slow release. */
+  duck(): void {
+    this.duckGain.gain.rampTo(0.4, 0.05); // 50ms attack → -8dB
+  }
+
+  /** Unduck — restore full volume smoothly */
+  unduck(): void {
+    this.duckGain.gain.rampTo(1.0, 0.3); // 300ms release — smooth fade back
   }
 
   getMasterLevel(): number | number[] {
@@ -239,8 +252,8 @@ export class DJMixerEngine {
     const enabled = effects.filter((fx) => fx.enabled);
 
     if (enabled.length === 0) {
-      // No effects — ZERO-GAP SWAP: connect direct to limiter FIRST, then disconnect old
-      this.masterGain.connect(this.limiter);
+      // No effects — ZERO-GAP SWAP: masterGain → duckGain → limiter
+      this.masterGain.connect(this.duckGain);
       try { this.masterGain.disconnect(oldFirstNode); } catch { /* already disconnected */ }
 
       // Dispose old effect nodes
@@ -279,8 +292,8 @@ export class DJMixerEngine {
     }
 
     if (nodes.length === 0) {
-      // All effects failed — ZERO-GAP SWAP: connect direct to limiter FIRST
-      this.masterGain.connect(this.limiter);
+      // All effects failed — ZERO-GAP SWAP: masterGain → duckGain → limiter
+      this.masterGain.connect(this.duckGain);
       try { this.masterGain.disconnect(oldFirstNode); } catch { /* already disconnected */ }
 
       for (const node of oldNodes) {
@@ -294,7 +307,7 @@ export class DJMixerEngine {
     for (let i = 0; i < nodes.length - 1; i++) {
       nodes[i].connect(nodes[i + 1]);
     }
-    nodes[nodes.length - 1].connect(this.limiter);
+    nodes[nodes.length - 1].connect(this.duckGain);
 
     // ZERO-GAP SWAP: connect new chain FIRST, then disconnect old
     // Web Audio allows multiple connections — for one sample frame both paths carry audio

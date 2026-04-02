@@ -52,6 +52,10 @@ export class SoundMonSynth implements DevilboxSynth {
     }
   }
 
+  async ensureInitialized(): Promise<void> {
+    await this.engine.ready();
+  }
+
   async setInstrument(config: SoundMonConfig): Promise<void> {
     await this.engine.ready();
 

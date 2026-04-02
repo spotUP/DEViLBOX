@@ -37,12 +37,20 @@ export class DX7Synth implements DevilboxSynth {
   private _currentBankFile = '';
   private _currentVoice = 0;
   private _onPatchChange: ((bankFile: string, voiceIndex: number, voiceName: string) => void) | null = null;
+  private _resolveInit!: () => void;
+  private _initPromise: Promise<void>;
 
   constructor() {
     this.audioContext = getDevilboxAudioContext();
     this.output = this.audioContext.createGain();
     this.output.gain.value = 1.0;
+    this._initPromise = new Promise((resolve) => { this._resolveInit = resolve; });
     this.initWorklet();
+  }
+
+  /** Wait for WASM + ROM to be fully initialized */
+  async ensureInitialized(): Promise<void> {
+    return this._initPromise;
   }
 
   private async initWorklet() {
@@ -64,6 +72,7 @@ export class DX7Synth implements DevilboxSynth {
           this._romLoaded = true;
           for (const msg of this._pendingMessages) this.workletNode?.port.postMessage(msg);
           this._pendingMessages = [];
+          this._resolveInit();
           this.tryAutoLoadVoices();
           this.tryAutoLoadFirstPatchBank();
         } else if (data.type === 'wasmLoaded') {

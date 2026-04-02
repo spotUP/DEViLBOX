@@ -12,7 +12,7 @@
  */
 
 import * as Tone from 'tone';
-import { useVocoderStore, type CarrierType } from '@/stores/useVocoderStore';
+import { useVocoderStore, type CarrierType, type VocoderFXParams } from '@/stores/useVocoderStore';
 
 const CARRIER_TYPE_MAP: Record<CarrierType, number> = {
   saw: 0,
@@ -24,6 +24,46 @@ const CARRIER_TYPE_MAP: Record<CarrierType, number> = {
 export class VocoderEngine {
   private static workletLoaded = new WeakSet<AudioContext>();
   private static wasmBinary: ArrayBuffer | null = null;
+  private static preloaded = false;
+  private static preloadPromise: Promise<void> | null = null;
+  /** Cached mic stream — kept alive across toggle cycles to avoid
+   *  macOS audio hardware reconfiguration glitches on re-acquire. */
+  private static cachedStream: MediaStream | null = null;
+  private static cachedDeviceId: string | undefined;
+
+  /**
+   * Preload worklet module + WASM binary eagerly so toggling the vocoder
+   * doesn't block the audio thread. Call once when the DJ view mounts.
+   * Safe to call multiple times — subsequent calls are no-ops.
+   */
+  static preload(): void {
+    if (VocoderEngine.preloaded || VocoderEngine.preloadPromise) return;
+    VocoderEngine.preloadPromise = (async () => {
+      try {
+        const ctx = Tone.getContext().rawContext as AudioContext;
+        const baseUrl = import.meta.env.BASE_URL || '/';
+
+        // Load worklet module onto the audio thread (the expensive part)
+        if (!VocoderEngine.workletLoaded.has(ctx)) {
+          try {
+            await ctx.audioWorklet.addModule(`${baseUrl}vocoder/Vocoder.worklet.js?v=1`);
+          } catch { /* already registered */ }
+          VocoderEngine.workletLoaded.add(ctx);
+        }
+
+        // Cache WASM binary
+        if (!VocoderEngine.wasmBinary) {
+          const resp = await fetch(`${baseUrl}vocoder/Vocoder.wasm`);
+          if (resp.ok) VocoderEngine.wasmBinary = await resp.arrayBuffer();
+        }
+
+        VocoderEngine.preloaded = true;
+        console.log('[VocoderEngine] Preloaded worklet + WASM');
+      } catch (err) {
+        console.warn('[VocoderEngine] Preload failed (non-fatal):', err);
+      }
+    })();
+  }
 
   private audioContext: AudioContext;
   private stream: MediaStream | null = null;
@@ -33,9 +73,16 @@ export class VocoderEngine {
   private outputGain: GainNode;
   private ready = false;
   private active = false;
+  private vocoderBypassed = false;
+
+  // Effects chain: outputGain → reverb → delay → destination
+  private reverb: Tone.Reverb | null = null;
+  private delay: Tone.FeedbackDelay | null = null;
+  private destination: AudioNode;
 
   constructor(destination?: AudioNode) {
     this.audioContext = Tone.getContext().rawContext as AudioContext;
+    this.destination = destination || this.audioContext.destination;
 
     // Mic preamp — built-in laptop mics are often very quiet
     this.micPreamp = this.audioContext.createGain();
@@ -44,36 +91,121 @@ export class VocoderEngine {
     this.outputGain = this.audioContext.createGain();
     this.outputGain.gain.value = 1.0;
 
-    if (destination) {
-      console.log('[VocoderEngine] Routing through provided destination (DJ mixer)');
-      this.outputGain.connect(destination);
+    // Initialize effects from store
+    const fx = useVocoderStore.getState().fx;
+    this.buildFXChain(fx);
+
+    console.log('[VocoderEngine] Routing through', destination ? 'DJ mixer' : 'audioContext.destination',
+      'FX:', fx.enabled ? fx.preset : 'disabled');
+  }
+
+  /**
+   * Build/rebuild the effects chain based on FX params.
+   * Uses a Tone.Gain bridge to cross between raw AudioNode (outputGain)
+   * and Tone.js effect nodes, then back to raw AudioNode (destination).
+   */
+  private fxBridge: Tone.Gain | null = null; // raw→Tone adapter
+  private fxTail: Tone.Gain | null = null;   // Tone→raw adapter
+
+  private buildFXChain(fx: VocoderFXParams): void {
+    // Disconnect everything safely
+    try { this.outputGain.disconnect(); } catch { /* ok */ }
+    this.reverb?.dispose(); this.reverb = null;
+    this.delay?.dispose(); this.delay = null;
+    this.fxBridge?.dispose(); this.fxBridge = null;
+    this.fxTail?.dispose(); this.fxTail = null;
+
+    const fxActive = fx.enabled && fx.preset !== 'none';
+
+    if (fxActive) {
+      // Create effects
+      if (fx.reverbWet > 0 && fx.reverbDecay > 0) {
+        this.reverb = new Tone.Reverb({ decay: fx.reverbDecay, preDelay: 0.01, wet: fx.reverbWet });
+      }
+      if (fx.delayWet > 0 && fx.delayTime > 0) {
+        this.delay = new Tone.FeedbackDelay({ delayTime: fx.delayTime, feedback: fx.delayFeedback, wet: fx.delayWet });
+      }
+
+      const toneNodes: Tone.ToneAudioNode[] = [];
+      if (this.reverb) toneNodes.push(this.reverb);
+      if (this.delay) toneNodes.push(this.delay);
+
+      if (toneNodes.length > 0) {
+        // Bridge: raw GainNode → Tone.Gain → effects → Tone.Gain → raw destination
+        this.fxBridge = new Tone.Gain(1);
+        this.fxTail = new Tone.Gain(1);
+
+        // raw outputGain → Tone bridge
+        Tone.connect(this.outputGain, this.fxBridge);
+        // bridge → effects chain
+        this.fxBridge.connect(toneNodes[0]);
+        for (let i = 0; i < toneNodes.length - 1; i++) {
+          toneNodes[i].connect(toneNodes[i + 1]);
+        }
+        // last effect → tail
+        toneNodes[toneNodes.length - 1].connect(this.fxTail);
+        // tail → raw destination
+        Tone.connect(this.fxTail, this.destination as unknown as Tone.InputNode);
+      } else {
+        this.outputGain.connect(this.destination);
+      }
     } else {
-      console.log('[VocoderEngine] Routing directly to audioContext.destination');
-      this.outputGain.connect(this.audioContext.destination);
+      this.outputGain.connect(this.destination);
     }
+  }
+
+  /** Update FX from store state (call when preset changes) */
+  applyFX(fx: VocoderFXParams): void {
+    this.buildFXChain(fx);
+  }
+
+  /**
+   * Toggle vocoder bypass. When bypassed, mic goes straight to FX chain
+   * (clean voice + echo/reverb). When not bypassed, mic goes through
+   * the vocoder worklet first (robot voice + echo/reverb).
+   */
+  setVocoderBypass(bypass: boolean): void {
+    if (!this.active || this.vocoderBypassed === bypass) return;
+    this.vocoderBypassed = bypass;
+
+    // Reconnect the preamp output
+    this.micPreamp.disconnect();
+    if (bypass) {
+      // Clean mic: preamp → outputGain (skip vocoder worklet)
+      this.micPreamp.connect(this.outputGain);
+      console.log('[VocoderEngine] Vocoder bypassed — clean mic + FX');
+    } else if (this.workletNode) {
+      // Robot voice: preamp → worklet → outputGain
+      this.micPreamp.connect(this.workletNode);
+      console.log('[VocoderEngine] Vocoder active — robot voice + FX');
+    }
+  }
+
+  get isBypassed(): boolean {
+    return this.vocoderBypassed;
   }
 
   /** Load WASM binary and worklet module (cached per AudioContext) */
   private async ensureLoaded(): Promise<void> {
+    // If preload is in progress, just wait for it
+    if (VocoderEngine.preloadPromise) {
+      await VocoderEngine.preloadPromise;
+    }
+
     const ctx = this.audioContext;
     const baseUrl = import.meta.env.BASE_URL || '/';
 
-    // Load worklet module (once per context)
-    // Wrapped in try/catch like DB303 — after HMR the WeakSet resets but
-    // the processor name is still registered on the AudioContext.
+    // Load worklet module (once per context) — usually already done by preload()
     if (!VocoderEngine.workletLoaded.has(ctx)) {
-      const workletUrl = `${baseUrl}vocoder/Vocoder.worklet.js?v=${Date.now()}`;
       try {
-        await ctx.audioWorklet.addModule(workletUrl);
+        await ctx.audioWorklet.addModule(`${baseUrl}vocoder/Vocoder.worklet.js?v=1`);
       } catch (err) {
-        // If it's already registered (HMR reload), that's fine — continue.
-        // Only re-throw if the processor genuinely doesn't exist.
         console.warn('[VocoderEngine] addModule warning (may be HMR re-register):', err);
       }
       VocoderEngine.workletLoaded.add(ctx);
     }
 
-    // Load WASM binary (once globally — no JS glue needed, worklet instantiates directly)
+    // Load WASM binary — usually already done by preload()
     if (!VocoderEngine.wasmBinary) {
       const wasmResp = await fetch(`${baseUrl}vocoder/Vocoder.wasm`);
       if (!wasmResp.ok) throw new Error(`Failed to load Vocoder.wasm: ${wasmResp.status}`);
@@ -92,21 +224,35 @@ export class VocoderEngine {
 
     await this.ensureLoaded();
 
-    // Get microphone
-    const constraints: MediaStreamConstraints = {
-      audio: {
-        echoCancellation: true,   // Prevents feedback loop with speakers
-        noiseSuppression: false,  // We want raw vocal timbre for vocoding
-        autoGainControl: false,   // Noise gate handles levels
-        ...(deviceId ? { deviceId: { exact: deviceId } } : {}),
-      },
-    };
-    this.stream = await navigator.mediaDevices.getUserMedia(constraints);
-    const tracks = this.stream.getAudioTracks();
+    // Get microphone — reuse cached stream to avoid macOS audio hardware
+    // reconfiguration glitch on every toggle. Only re-acquire if device changed.
+    const needNewStream = !VocoderEngine.cachedStream
+      || VocoderEngine.cachedStream.getAudioTracks().every(t => t.readyState === 'ended')
+      || (deviceId && deviceId !== VocoderEngine.cachedDeviceId);
+
+    if (needNewStream) {
+      // Release old stream if switching devices
+      VocoderEngine.cachedStream?.getTracks().forEach(t => t.stop());
+      const constraints: MediaStreamConstraints = {
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: false,
+          autoGainControl: false,
+          ...(deviceId ? { deviceId: { exact: deviceId } } : {}),
+        },
+      };
+      VocoderEngine.cachedStream = await navigator.mediaDevices.getUserMedia(constraints);
+      VocoderEngine.cachedDeviceId = deviceId;
+    }
+
+    this.stream = VocoderEngine.cachedStream;
+    // Re-enable tracks (they were disabled on stop)
+    this.stream!.getAudioTracks().forEach(t => { t.enabled = true; });
+    const tracks = this.stream!.getAudioTracks();
     console.log('[VocoderEngine] Mic acquired:', tracks.length, 'tracks,',
       tracks[0]?.label || 'unknown', 'enabled:', tracks[0]?.enabled,
       'muted:', tracks[0]?.muted);
-    this.sourceNode = this.audioContext.createMediaStreamSource(this.stream);
+    this.sourceNode = this.audioContext.createMediaStreamSource(this.stream!);
 
     // Create worklet node
     this.workletNode = new AudioWorkletNode(this.audioContext, 'vocoder-processor', {
@@ -162,12 +308,17 @@ export class VocoderEngine {
     this.sourceNode?.disconnect();
     this.micPreamp.disconnect();
     this.workletNode?.disconnect();
+    this.outputGain.disconnect();
 
     // Tell worklet to dispose WASM
     this.workletNode?.port.postMessage({ type: 'dispose' });
 
-    // Stop mic tracks
-    this.stream?.getTracks().forEach((t) => t.stop());
+    // Disable mic tracks (don't stop — keep stream alive for glitch-free re-enable)
+    this.stream?.getAudioTracks().forEach(t => { t.enabled = false; });
+
+    // Clean up effects
+    this.reverb?.dispose(); this.reverb = null;
+    this.delay?.dispose(); this.delay = null;
 
     this.sourceNode = null;
     this.workletNode = null;

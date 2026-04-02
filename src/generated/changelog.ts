@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-04-02T08:46:56.787Z
+ * Generated: 2026-04-02T09:08:58.251Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -19,9 +19,9 @@ export interface ChangelogEntry {
 }
 
 // Build info
-export const BUILD_VERSION = '1.0.3843';
-export const BUILD_NUMBER = '3843';
-export const BUILD_HASH = 'ac62bf74a';
+export const BUILD_VERSION = '1.0.3845';
+export const BUILD_NUMBER = '3845';
+export const BUILD_HASH = '3f4b2cf37';
 export const BUILD_DATE = '2026-04-02';
 
 // Full version (patch IS the build number, so no need to append)
@@ -30,9 +30,17 @@ export const FULL_VERSION = BUILD_VERSION;
 // Auto-generated changelog
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: '1.0.3843',
+    version: '1.0.3845',
     date: '2026-04-02',
     changes: [
+      {
+        type: 'improvement',
+        "description": "Remove duplicate Dexed/OBXd synths, keep DX7/OBXf replacements"
+      },
+      {
+        type: 'feature',
+        "description": "DJ mixer polish — dB readouts, VU peak hold, filter labels, video timer"
+      },
       {
         type: 'feature',
         "description": "Wire PixiDrumPadManager into GL view router"
@@ -230,14 +238,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'feature',
         "description": "Add OPL3 (YMF262) WASM synth — 18-channel FM, SBI patches"
-      },
-      {
-        type: 'feature',
-        "description": "Add OPL3 WASM build artifacts"
-      },
-      {
-        type: 'fix',
-        "description": "Move OPL3 forward declaration before use"
       }
     ]
   }

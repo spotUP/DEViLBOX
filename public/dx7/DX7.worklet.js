@@ -27,6 +27,8 @@ class DX7Processor extends AudioWorkletProcessor {
     this.curSampleL = 0;
     this.curSampleR = 0;
 
+    // Level monitoring (unused)
+
     this.port.onmessage = (e) => this.handleMessage(e.data);
   }
 
@@ -223,6 +225,9 @@ class DX7Processor extends AudioWorkletProcessor {
     const outL = output[0], outR = output[1];
     const n = outL.length;
 
+    // No worklet gain — VDX7 raw output peaks ~0.3, registry volumeOffsetDb handles boost
+    const gain = 1.0;
+
     // Linear interpolation resampler: native rate → host rate
     for (let i = 0; i < n; i++) {
       this.resamplePhase += this.resampleRatio;
@@ -239,8 +244,8 @@ class DX7Processor extends AudioWorkletProcessor {
 
       // Linear interpolation
       const frac = this.resamplePhase;
-      outL[i] = this.prevSampleL + frac * (this.curSampleL - this.prevSampleL);
-      outR[i] = this.prevSampleR + frac * (this.curSampleR - this.prevSampleR);
+      outL[i] = gain * (this.prevSampleL + frac * (this.curSampleL - this.prevSampleL));
+      outR[i] = gain * (this.prevSampleR + frac * (this.curSampleR - this.prevSampleR));
     }
 
     return true;

@@ -2,10 +2,8 @@
  * TrackerView - Main tracker container with pattern editor and controls
  */
 
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { PatternEditorCanvas } from './PatternEditorCanvas';
-import { TrackerVisualBackground } from './TrackerVisualBackground';
-import { useSettingsStore } from '@stores/useSettingsStore';
 import { GridSequencer } from '@components/grid/GridSequencer';
 import { useTrackerStore, useCursorStore, useInstrumentStore, useUIStore , useFormatStore } from '@stores';
 import { useShallow } from 'zustand/react/shallow';
@@ -96,45 +94,6 @@ const MinimapWrapper: React.FC = () => {
   );
 };
 
-/** Wrapper: renders TrackerVisualBackground behind PatternEditorCanvas using ResizeObserver */
-const TrackerEditorWithBg: React.FC<{
-  trackerVisualBg: boolean;
-  onAcidGenerator: (channelIndex: number) => void;
-  onRandomize: (channelIndex: number) => void;
-  onSwipeLeft: () => void;
-  onSwipeRight: () => void;
-}> = ({ trackerVisualBg, onAcidGenerator, onRandomize, onSwipeLeft, onSwipeRight }) => {
-  const containerRef = useRef<HTMLDivElement>(null);
-  const [size, setSize] = useState({ w: 0, h: 0 });
-
-  useEffect(() => {
-    const el = containerRef.current;
-    if (!el) return;
-    const ro = new ResizeObserver(([entry]) => {
-      const { width, height } = entry.contentRect;
-      setSize({ w: Math.round(width), h: Math.round(height) });
-    });
-    ro.observe(el);
-    return () => ro.disconnect();
-  }, []);
-
-  return (
-    <div ref={containerRef} className="relative flex-1 min-h-0">
-      {trackerVisualBg && size.w > 0 && size.h > 0 && (
-        <div className="absolute inset-0 z-0 pointer-events-none">
-          <TrackerVisualBackground width={size.w} height={size.h} />
-        </div>
-      )}
-      <PatternEditorCanvas
-        onAcidGenerator={onAcidGenerator}
-        onRandomize={onRandomize}
-        onSwipeLeft={onSwipeLeft}
-        onSwipeRight={onSwipeRight}
-      />
-    </div>
-  );
-};
-
 export const TrackerView: React.FC<TrackerViewProps> = ({
   onShowExport,
   onShowHelp,
@@ -178,7 +137,6 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
   // the entire TrackerView on every cursor row/column move
   const cursorChannelIndex = useCursorStore((state) => state.cursor.channelIndex);
 
-  const trackerVisualBg = useSettingsStore((s) => s.trackerVisualBg);
   const pendingModuleFile = useUIStore((state) => state.pendingModuleFile);
   const setPendingModuleFile = useUIStore((state) => state.setPendingModuleFile);
   const pendingCompanionFiles = useUIStore((state) => state.pendingCompanionFiles);
@@ -607,8 +565,7 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
                   </div>
                 </div>
               ) : (
-                <TrackerEditorWithBg
-                  trackerVisualBg={trackerVisualBg}
+                <PatternEditorCanvas
                   onAcidGenerator={handleAcidGenerator}
                   onRandomize={handleRandomize}
                   onSwipeLeft={handleSwipeLeft}

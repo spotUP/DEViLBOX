@@ -999,6 +999,28 @@ export class ToneEngine {
       }
     }
 
+    // Pre-warm WASM synths: trigger a silent note to prime the audio pipeline
+    for (const config of configs) {
+      const key = this.getInstrumentKey(config.id, -1);
+      const instrument = this.instruments.get(key);
+      if (instrument && isDevilboxSynth(instrument)) {
+        try {
+          const ds = instrument as DevilboxSynth;
+          const savedGain = ds.output instanceof GainNode ? (ds.output as GainNode).gain.value : null;
+          if (ds.output instanceof GainNode) (ds.output as GainNode).gain.value = 0;
+          ds.triggerAttack?.('C4', undefined, 0.01);
+          setTimeout(() => {
+            ds.triggerRelease?.('C4');
+            if (savedGain !== null && ds.output instanceof GainNode) {
+              (ds.output as GainNode).gain.value = savedGain;
+            }
+          }, 50);
+        } catch {
+          // Ignore warm-up errors
+        }
+      }
+    }
+
     // Check ROM status for MAME chip synths that have romConfig.
     // Initialization is already handled above in the general WASM init loop.
     const romChipConfigs = configs.filter((c) => {
