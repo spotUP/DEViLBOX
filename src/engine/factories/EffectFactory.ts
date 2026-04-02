@@ -102,6 +102,14 @@ switch (type) {
              dropout: 10, warp: 10, eccentricity: 18 };  // "Played" condition at 33 RPM
   case 'ToneArm':
     return { wow: 20, coil: 50, flutter: 15, riaa: 50, stylus: 30, hiss: 20, pops: 15, rpm: 33.333 };
+  case 'ShimmerReverb':
+    return { decay: 70, shimmer: 50, pitch: 12, damping: 50, size: 70, predelay: 40, modRate: 30, modDepth: 20 };
+  case 'GranularFreeze':
+    return { freeze: 0, grainSize: 80, density: 12, scatter: 30, pitch: 0, spray: 20, shimmer: 0, stereoWidth: 70, feedback: 0, captureLen: 500, attack: 5, release: 40, thru: 0 };
+  case 'TapeDegradation':
+    return { wow: 30, flutter: 20, hiss: 15, dropouts: 0, saturation: 30, toneShift: 50 };
+  case 'AmbientDelay':
+    return { time: 375, feedback: 55, taps: 2, filterType: 'lowpass', filterFreq: 2500, filterQ: 1.5, modRate: 30, modDepth: 15, stereoSpread: 50, diffusion: 20 };
   default:
     return {};
 }
@@ -823,6 +831,73 @@ export async function createEffect(
       });
       (node as Tone.ToneAudioNode & { _fxType?: string })._fxType = 'VinylNoise';
       return node;
+    }
+
+    // *Wave / ambient effects
+    case 'TapeDegradation': {
+      const { TapeDegradationEffect } = await import('@engine/effects/TapeDegradationEffect');
+      node = new TapeDegradationEffect({
+        wow: (Number(p.wow) || 30) / 100,
+        flutter: (Number(p.flutter) || 20) / 100,
+        hiss: (Number(p.hiss) || 15) / 100,
+        dropouts: (Number(p.dropouts) || 0) / 100,
+        saturation: (Number(p.saturation) || 30) / 100,
+        toneShift: (Number(p.toneShift) || 50) / 100,
+        wet: wetValue,
+      });
+      break;
+    }
+    case 'AmbientDelay': {
+      const { AmbientDelayEffect } = await import('@engine/effects/AmbientDelayEffect');
+      node = new AmbientDelayEffect({
+        time: (Number(p.time) || 375) / 1000,
+        feedback: (Number(p.feedback) || 55) / 100,
+        taps: Number(p.taps) || 2,
+        filterType: (p.filterType as 'lowpass' | 'highpass' | 'bandpass') || 'lowpass',
+        filterFreq: Number(p.filterFreq) || 2500,
+        filterQ: Number(p.filterQ) || 1.5,
+        modRate: (Number(p.modRate) || 30) / 100,
+        modDepth: (Number(p.modDepth) || 15) / 100,
+        stereoSpread: (Number(p.stereoSpread) || 50) / 100,
+        diffusion: (Number(p.diffusion) || 20) / 100,
+        wet: wetValue,
+      });
+      break;
+    }
+    case 'ShimmerReverb': {
+      const { ShimmerReverbEffect } = await import('@engine/effects/ShimmerReverbEffect');
+      node = new ShimmerReverbEffect({
+        decay: (Number(p.decay) || 70) / 100,
+        shimmer: (Number(p.shimmer) || 50) / 100,
+        pitch: Number(p.pitch) ?? 12,
+        damping: (Number(p.damping) || 50) / 100,
+        size: (Number(p.size) || 70) / 100,
+        predelay: (Number(p.predelay) || 40) / 1000,
+        modRate: (Number(p.modRate) || 30) / 100,
+        modDepth: (Number(p.modDepth) || 20) / 100,
+        wet: wetValue,
+      });
+      break;
+    }
+    case 'GranularFreeze': {
+      const { GranularFreezeEffect } = await import('@engine/effects/GranularFreezeEffect');
+      node = new GranularFreezeEffect({
+        freeze: Number(p.freeze) || 0,
+        grainSize: (Number(p.grainSize) || 80) / 1000,
+        density: Number(p.density) || 12,
+        scatter: (Number(p.scatter) || 30) / 100,
+        pitch: Number(p.pitch) ?? 0,
+        spray: (Number(p.spray) || 20) / 100,
+        shimmer: (Number(p.shimmer) || 0) / 100,
+        stereoWidth: (Number(p.stereoWidth) || 70) / 100,
+        feedback: (Number(p.feedback) || 0) / 100,
+        captureLength: (Number(p.captureLen) || 500) / 1000,
+        attack: (Number(p.attack) || 5) / 1000,
+        release: (Number(p.release) || 40) / 1000,
+        thru: Number(p.thru) || 0,
+        wet: wetValue,
+      });
+      break;
     }
 
     // WAM 2.0 effects

@@ -33,6 +33,7 @@ import { BlepManager } from './blep/BlepManager';
 import { preloadTR909Resources } from './tr909/TR909Synth';
 import { SynthRegistry } from './registry/SynthRegistry';
 import { VoiceAllocator } from './audio/VoiceAllocator';
+import { getSendBusManager } from './SendBusManager';
 import { getNormalizedVolume } from './factories/volumeNormalization';
 
 // Extracted modules
@@ -71,6 +72,7 @@ import {
 } from './tone/SynthParameterUpdates';
 import {
   type ChannelRoutingContext,
+  type ChannelOutput,
   ChannelMeterState,
   triggerChannelMeter as _triggerChannelMeter,
   clearChannelTriggerLevels as _clearChannelTriggerLevels,
@@ -385,6 +387,9 @@ export class ToneEngine {
     this.synthBus = new Tone.Gain(1);
     // PitchResampler inserted async between synthBus and masterEffectsInput (see initPitchResampler)
     this.synthBus.connect(this.masterEffectsInput);
+
+    // Initialize send/return buses — returns feed into masterEffectsInput
+    getSendBusManager().init(this.masterEffectsInput);
 
     // Meters start disconnected to avoid idle CPU usage from AnalyserNode processing.
     // Connected on play via connectMeters(), disconnected on stop via disconnectMeters().
@@ -4686,6 +4691,11 @@ export class ToneEngine {
   public getMasterLevel(): number { return this.masterMeter.getValue() as number; }
   /** Get the synthBus level (0-1) for WASM engines that bypass per-channel routing */
   public getSynthBusLevel(): number { return this.synthBusMeter.getValue() as number; }
+
+  /** Get channel output by index (for send bus wiring) */
+  public getChannelOutputByIndex(channelIndex: number): ChannelOutput | null {
+    return this.channelOutputs.get(channelIndex) ?? null;
+  }
 
   // Channel metering — delegated to ChannelMeterState
   public triggerChannelMeter(channelIndex: number, velocity: number): void { _triggerChannelMeter(this.channelMeter, channelIndex, velocity); }

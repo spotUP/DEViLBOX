@@ -371,6 +371,49 @@ const tonejs: EffectDescriptor[] = [
     },
     getDefaultParameters: () => ({ pitch: 0, windowSize: 0.1, delayTime: 0, feedback: 0 }),
   },
+
+  // ── *Wave / Ambient ─────────────────────────────────────────────────────
+  {
+    id: 'TapeDegradation', name: 'Tape Degradation', category: 'tonejs', group: 'Lo-Fi',
+    loadMode: 'eager',
+    create: async (c: EffectConfig) => {
+      const { TapeDegradationEffect } = await import('@engine/effects/TapeDegradationEffect');
+      const p = c.parameters;
+      return new TapeDegradationEffect({
+        wow: (Number(p.wow) || 30) / 100,
+        flutter: (Number(p.flutter) || 20) / 100,
+        hiss: (Number(p.hiss) || 15) / 100,
+        dropouts: (Number(p.dropouts) || 0) / 100,
+        saturation: (Number(p.saturation) || 30) / 100,
+        toneShift: (Number(p.toneShift) || 50) / 100,
+        wet: c.wet / 100,
+      });
+    },
+    getDefaultParameters: () => ({ wow: 30, flutter: 20, hiss: 15, dropouts: 0, saturation: 30, toneShift: 50 }),
+  },
+  {
+    id: 'AmbientDelay', name: 'Ambient Delay', category: 'tonejs', group: 'Delay',
+    loadMode: 'eager',
+    bpmSyncParams: ['time'],
+    create: async (c: EffectConfig) => {
+      const { AmbientDelayEffect } = await import('@engine/effects/AmbientDelayEffect');
+      const p = c.parameters;
+      return new AmbientDelayEffect({
+        time: (Number(p.time) || 375) / 1000,
+        feedback: (Number(p.feedback) || 55) / 100,
+        taps: Number(p.taps) || 2,
+        filterType: (p.filterType as 'lowpass' | 'highpass' | 'bandpass') || 'lowpass',
+        filterFreq: Number(p.filterFreq) || 2500,
+        filterQ: Number(p.filterQ) || 1.5,
+        modRate: (Number(p.modRate) || 30) / 100,
+        modDepth: (Number(p.modDepth) || 15) / 100,
+        stereoSpread: (Number(p.stereoSpread) || 50) / 100,
+        diffusion: (Number(p.diffusion) || 20) / 100,
+        wet: c.wet / 100,
+      });
+    },
+    getDefaultParameters: () => ({ time: 375, feedback: 55, taps: 2, filterType: 'lowpass', filterFreq: 2500, filterQ: 1.5, modRate: 30, modDepth: 15, stereoSpread: 50, diffusion: 20 }),
+  },
 ];
 
 EffectRegistry.register(tonejs);

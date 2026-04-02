@@ -960,4 +960,5 @@ export interface DX7Config {
   volume?: number;            // 0-2 (1=unity)
   bank?: number;              // 0-7 (cartridge bank)
   program?: number;           // 0-31 (voice within bank)
+  vcedPreset?: string;        // VCED preset name from dx7presets.ts
 }

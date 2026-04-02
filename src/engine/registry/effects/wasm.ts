@@ -72,6 +72,51 @@ const wasmEffects: EffectDescriptor[] = [
     },
     getDefaultParameters: () => ({ decay: 0.6, damping: 0.4, tension: 0.5, mix: 0.35, drip: 0.5, diffusion: 0.7 }),
   },
+  {
+    id: 'ShimmerReverb', name: 'Shimmer Reverb', category: 'wasm', group: 'Reverb & Delay',
+    loadMode: 'eager',
+    create: async (c: EffectConfig) => {
+      const { ShimmerReverbEffect } = await import('@engine/effects/ShimmerReverbEffect');
+      const p = c.parameters;
+      return new ShimmerReverbEffect({
+        decay: (Number(p.decay) || 70) / 100,
+        shimmer: (Number(p.shimmer) || 50) / 100,
+        pitch: Number(p.pitch) ?? 12,
+        damping: (Number(p.damping) || 50) / 100,
+        size: (Number(p.size) || 70) / 100,
+        predelay: (Number(p.predelay) || 40) / 1000,
+        modRate: (Number(p.modRate) || 30) / 100,
+        modDepth: (Number(p.modDepth) || 20) / 100,
+        wet: c.wet / 100,
+      });
+    },
+    getDefaultParameters: () => ({ decay: 70, shimmer: 50, pitch: 12, damping: 50, size: 70, predelay: 40, modRate: 30, modDepth: 20 }),
+  },
+  {
+    id: 'GranularFreeze', name: 'Granular Freeze', category: 'wasm', group: 'Granular',
+    loadMode: 'eager',
+    create: async (c: EffectConfig) => {
+      const { GranularFreezeEffect } = await import('@engine/effects/GranularFreezeEffect');
+      const p = c.parameters;
+      return new GranularFreezeEffect({
+        freeze: Number(p.freeze) || 0,
+        grainSize: (Number(p.grainSize) || 80) / 1000,
+        density: Number(p.density) || 12,
+        scatter: (Number(p.scatter) || 30) / 100,
+        pitch: Number(p.pitch) ?? 0,
+        spray: (Number(p.spray) || 20) / 100,
+        shimmer: (Number(p.shimmer) || 0) / 100,
+        stereoWidth: (Number(p.stereoWidth) || 70) / 100,
+        feedback: (Number(p.feedback) || 0) / 100,
+        captureLength: (Number(p.captureLen) || 500) / 1000,
+        attack: (Number(p.attack) || 5) / 1000,
+        release: (Number(p.release) || 40) / 1000,
+        thru: Number(p.thru) || 0,
+        wet: c.wet / 100,
+      });
+    },
+    getDefaultParameters: () => ({ freeze: 0, grainSize: 80, density: 12, scatter: 30, pitch: 0, spray: 20, shimmer: 0, stereoWidth: 70, feedback: 0, captureLen: 500, attack: 5, release: 40, thru: 0 }),
+  },
 ];
 
 EffectRegistry.register(wasmEffects);
