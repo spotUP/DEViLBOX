@@ -208,6 +208,11 @@ export const useInstrumentStore = create<InstrumentStore>()(
       set((state) => {
         state.currentInstrumentId = id;
       });
+      // Eagerly create + initialize the synth so it's ready for instant playback
+      import('../engine/ToneEngine').then(({ getToneEngine }) => {
+        const engine = getToneEngine();
+        engine.ensureInstrumentReady(inst);
+      });
       // Auto-enable 303 flag columns when selecting a TB-303/Buzz3o3 instrument
       if (inst.synthType === 'TB303' || inst.synthType === 'Buzz3o3') {
         import('./useEditorStore').then(({ useEditorStore }) => {
@@ -783,6 +788,15 @@ export const useInstrumentStore = create<InstrumentStore>()(
         }
         state.currentInstrumentId = finalConfig.id;
       });
+
+      // Eagerly create + initialize the synth so it's ready for instant playback
+      const savedConfig = get().instruments.find(i => i.id === get().currentInstrumentId);
+      if (savedConfig) {
+        import('../engine/ToneEngine').then(({ getToneEngine }) => {
+          const engine = getToneEngine();
+          engine.ensureInstrumentReady(savedConfig);
+        });
+      }
     },
 
     deleteInstrument: (id) =>

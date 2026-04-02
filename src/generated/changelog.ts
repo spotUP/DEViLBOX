@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-04-02T12:06:50.021Z
+ * Generated: 2026-04-02T12:15:32.836Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -19,9 +19,9 @@ export interface ChangelogEntry {
 }
 
 // Build info
-export const BUILD_VERSION = '1.0.3870';
-export const BUILD_NUMBER = '3870';
-export const BUILD_HASH = 'acbbce779';
+export const BUILD_VERSION = '1.0.3872';
+export const BUILD_NUMBER = '3872';
+export const BUILD_HASH = '7b687175c';
 export const BUILD_DATE = '2026-04-02';
 
 // Full version (patch IS the build number, so no need to append)
@@ -30,9 +30,17 @@ export const FULL_VERSION = BUILD_VERSION;
 // Auto-generated changelog
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: '1.0.3870',
+    version: '1.0.3872',
     date: '2026-04-02',
     changes: [
+      {
+        type: 'fix',
+        "description": "Bind Vite dev server to 0.0.0.0 for iPhone access"
+      },
+      {
+        type: 'fix',
+        "description": "Fix CalfMonoSynth ensureInitialized: actually start init"
+      },
       {
         type: 'fix',
         "description": "Add touch events for iOS Safari compatibility"
@@ -230,14 +238,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'fix',
         "description": "Extend rimshot swing decay 10ms→50ms"
-      },
-      {
-        type: 'fix',
-        "description": "Set all factory kit notes to C4 for correct pitch"
-      },
-      {
-        type: 'fix',
-        "description": "Use pitch noteMode so drum type is always respected"
       }
     ]
   }
