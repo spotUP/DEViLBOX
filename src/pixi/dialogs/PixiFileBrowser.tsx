@@ -6,16 +6,16 @@
  * Renders file list via PixiList with virtual scrolling.
  */
 
-import React, { useState, useCallback, useMemo } from 'react';
+import React, { useState, useCallback, useMemo, useRef } from 'react';
+import type { FederatedWheelEvent, FederatedPointerEvent } from 'pixi.js';
 import { usePixiTheme } from '../theme';
 import { useModalClose } from '@hooks/useDialogKeyboard';
 import { Div, Txt, GlModal } from '../layout';
 import { PIXI_FONTS } from '../fonts';
 import { PixiButton } from '../components/PixiButton';
-import { PixiList } from '../components/PixiList';
 import { PixiIcon } from '../components/PixiIcon';
 import { PixiPureTextInput } from '../input/PixiPureTextInput';
-import { useFileNavigation, isTrackerModule, type FileSource, getLastFileSource, setLastFileSource } from '@/components/dialogs/useFileNavigation';
+import { useFileNavigation, isTrackerModule, type FileSource, type FileItem, getLastFileSource, setLastFileSource } from '@/components/dialogs/useFileNavigation';
 import { hasElectronFS } from '@utils/electron';
 import { PixiModlandPanel, PixiHVSCPanel } from './PixiRemoteBrowserPanels';
 
@@ -43,28 +43,24 @@ interface PixiFileBrowserProps {
   onLoadTrackerModule?: (buffer: ArrayBuffer, filename: string, companionFiles?: Map<string, ArrayBuffer>) => void;
 }
 
-// Adapt PixiList item interface locally
-interface ListItem {
-  id: string;
-  label: string;
-  sublabel?: string;
-  dotColor?: number;
-}
-
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
-const DOT_FOLDER = 0x4a9eff;  // blue
-const DOT_TRACKER = 0x22c55e; // green
-const DOT_JSON = 0xeab308;    // yellow
-const DOT_FILE = 0x888888;    // gray
+const FILE_ROW_H = 36;
 
-function fileIcon(name: string, isDir: boolean): number | undefined {
-  if (isDir) return DOT_FOLDER;
-  if (isTrackerModule(name)) return DOT_TRACKER;
-  if (name.endsWith('.json') || name.endsWith('.dbx') || name.endsWith('.dbox')) return DOT_JSON;
-  return DOT_FILE;
+/** Returns the FontAudio icon name for a file entry */
+function fileIconName(name: string, isDir: boolean): string {
+  if (isDir) return 'open';
+  if (isTrackerModule(name)) return 'diskio';
+  return 'preset-a';
+}
+
+/** Returns icon tint color based on file type */
+function fileIconColor(name: string, isDir: boolean): number {
+  if (isDir) return 0x4a9eff;        // blue for folders
+  if (isTrackerModule(name)) return 0x22c55e; // green for tracker modules
+  return 0x888888;                    // gray for other files
 }
 
 function formatSize(size?: number): string {
@@ -72,6 +68,8 @@ function formatSize(size?: number): string {
   if (size < 1024) return `${size} B`;
   return `${(size / 1024).toFixed(1)} KB`;
 }
+
+interface DisplayRow { id: string; file: FileItem | null; isBack: boolean; }
 
 // ---------------------------------------------------------------------------
 // Component
@@ -102,67 +100,73 @@ export const PixiFileBrowser: React.FC<PixiFileBrowserProps> = ({
     suggestedFilename: 'untitled.dbx',
   });
 
-  // Build list items from nav.files — prepend "..(back)" row when in subdir
-  const listItems: ListItem[] = useMemo(() => {
-    const items: ListItem[] = [];
+  // Build display list — prepend "..(back)" row when in subdir
+  const displayRows: DisplayRow[] = useMemo(() => {
+    const rows: DisplayRow[] = [];
 
     if (nav.currentPath !== '' && fileSource === 'demo') {
-      items.push({ id: '__back__', label: '.. (back)', dotColor: DOT_FOLDER });
+      rows.push({ id: '__back__', file: null, isBack: true });
     }
 
     for (const f of nav.files) {
-      items.push({
-        id: f.id,
-        label: f.name,
-        sublabel: f.isDirectory ? 'DIR' : formatSize(f.size),
-        dotColor: fileIcon(f.name, f.isDirectory),
-      });
+      rows.push({ id: f.id, file: f, isBack: false });
     }
 
-    return items;
+    return rows;
   }, [nav.files, nav.currentPath, fileSource]);
 
-  // Handle item selection
-  const handleSelect = useCallback((id: string) => {
-    if (id === '__back__') return; // select only — double-click navigates
-    const file = nav.files.find(f => f.id === id);
-    if (file && !file.isDirectory) {
-      nav.setSelectedFile(file);
-    } else if (file?.isDirectory) {
-      nav.setSelectedFile(null);
-    }
-  }, [nav]);
+  // Virtual scroll state
+  const [scrollY, setScrollY] = useState(0);
+  const lastClickRef = useRef<{ id: string; time: number }>({ id: '', time: 0 });
 
-  // Handle double-click — navigate into directory or load file
-  const handleDoubleClick = useCallback((id: string) => {
-    if (id === '__back__') {
-      // Navigate up
-      if (hasElectronFS() && nav.currentPath) {
-        const parent = nav.currentPath.split('/').slice(0, -1).join('/') || '/';
-        nav.setCurrentPath(parent);
-        nav.setElectronDirectory(parent);
-      } else if (nav.currentPath) {
-        const parent = nav.currentPath.split('/').slice(0, -1).join('/') || '';
-        nav.setCurrentPath(parent);
+  // Handle item click (select + double-click detection)
+  const handleItemClick = useCallback((row: DisplayRow) => {
+    const now = Date.now();
+    const id = row.id;
+
+    if (lastClickRef.current.id === id && now - lastClickRef.current.time < 300) {
+      // Double-click
+      lastClickRef.current = { id: '', time: 0 };
+
+      if (row.isBack) {
+        if (hasElectronFS() && nav.currentPath) {
+          const parent = nav.currentPath.split('/').slice(0, -1).join('/') || '/';
+          nav.setCurrentPath(parent);
+          nav.setElectronDirectory(parent);
+        } else if (nav.currentPath) {
+          const parent = nav.currentPath.split('/').slice(0, -1).join('/') || '';
+          nav.setCurrentPath(parent);
+        }
+        nav.setSelectedFile(null);
+        return;
       }
-      nav.setSelectedFile(null);
-      return;
-    }
 
-    const file = nav.files.find(f => f.id === id);
-    if (!file) return;
+      const file = row.file;
+      if (!file) return;
 
-    if (file.isDirectory) {
-      if (hasElectronFS()) {
-        nav.setCurrentPath(file.path);
-        nav.setElectronDirectory(file.path);
+      if (file.isDirectory) {
+        if (hasElectronFS()) {
+          nav.setCurrentPath(file.path);
+          nav.setElectronDirectory(file.path);
+        } else {
+          nav.setCurrentPath(file.path);
+        }
+        nav.setSelectedFile(null);
       } else {
-        nav.setCurrentPath(file.path);
+        nav.setSelectedFile(file);
+        if (mode === 'load') nav.handleLoad();
       }
-      nav.setSelectedFile(null);
     } else {
-      nav.setSelectedFile(file);
-      if (mode === 'load') nav.handleLoad();
+      // Single click — select
+      lastClickRef.current = { id, time: now };
+
+      if (row.isBack) return;
+      const file = row.file;
+      if (file && !file.isDirectory) {
+        nav.setSelectedFile(file);
+      } else if (file?.isDirectory) {
+        nav.setSelectedFile(null);
+      }
     }
   }, [nav, mode]);
 
@@ -218,12 +222,14 @@ export const PixiFileBrowser: React.FC<PixiFileBrowserProps> = ({
       >
         <SourceTab
           label="Demo Files"
+          icon="open"
           active={fileSource === 'demo'}
           onSelect={() => handleSourceChange('demo')}
         />
         {nav.user && nav.isServerAvailable && (
           <SourceTab
             label="My Files"
+            icon="logo"
             active={fileSource === 'cloud'}
             onSelect={() => handleSourceChange('cloud')}
           />
@@ -231,6 +237,7 @@ export const PixiFileBrowser: React.FC<PixiFileBrowserProps> = ({
         {mode === 'load' && onLoadTrackerModule && (
           <SourceTab
             label="Modland"
+            icon="logo"
             active={fileSource === 'modland'}
             onSelect={() => handleSourceChange('modland')}
           />
@@ -238,6 +245,7 @@ export const PixiFileBrowser: React.FC<PixiFileBrowserProps> = ({
         {mode === 'load' && onLoadTrackerModule && (
           <SourceTab
             label="HVSC"
+            icon="diskio"
             active={fileSource === 'hvsc'}
             onSelect={() => handleSourceChange('hvsc')}
           />
@@ -268,8 +276,10 @@ export const PixiFileBrowser: React.FC<PixiFileBrowserProps> = ({
             backgroundColor: theme.bgTertiary.color,
             borderBottomWidth: 1,
             borderColor: theme.border.color,
+            gap: 6,
           }}
         >
+          <PixiIcon name="open" size={12} color={theme.textMuted.color} layout={{}} />
           <Txt className="text-xs font-mono text-text-muted">{nav.currentPath}</Txt>
         </Div>
       )}
@@ -318,14 +328,16 @@ export const PixiFileBrowser: React.FC<PixiFileBrowserProps> = ({
               <Txt className="text-sm text-text-muted">No files found</Txt>
             </Div>
           ) : (
-            <PixiList
-              items={listItems}
+            <FileList
+              rows={displayRows}
               width={listW}
               height={listH}
-              itemHeight={30}
               selectedId={nav.selectedFile?.id ?? null}
-              onSelect={handleSelect}
-              onDoubleClick={handleDoubleClick}
+              fileSource={fileSource}
+              onItemClick={handleItemClick}
+              onDelete={fileSource === 'cloud' ? nav.handleDelete : undefined}
+              scrollY={scrollY}
+              onScrollY={setScrollY}
             />
           )}
         </Div>
@@ -385,12 +397,14 @@ export const PixiFileBrowser: React.FC<PixiFileBrowserProps> = ({
 
 interface SourceTabProps {
   label: string;
+  icon?: string;
   active: boolean;
   onSelect: () => void;
 }
 
-const SourceTab: React.FC<SourceTabProps> = ({ label, active, onSelect }) => {
+const SourceTab: React.FC<SourceTabProps> = ({ label, icon, active, onSelect }) => {
   const theme = usePixiTheme();
+  const tint = active ? theme.accent.color : theme.textMuted.color;
 
   return (
     <Div
@@ -401,19 +415,221 @@ const SourceTab: React.FC<SourceTabProps> = ({ label, active, onSelect }) => {
         height: TABS_H,
         paddingLeft: 16,
         paddingRight: 16,
+        flexDirection: 'row',
         justifyContent: 'center',
         alignItems: 'center',
+        gap: 6,
         borderBottomWidth: active ? 2 : 0,
         borderColor: theme.accent.color,
       }}
     >
+      {icon && <PixiIcon name={icon} size={12} color={tint} layout={{}} />}
       <pixiBitmapText
         text={label}
-        style={{ fontFamily: PIXI_FONTS.SANS_MEDIUM, fontSize: 16, fill: 0xffffff }}
-        tint={active ? theme.accent.color : theme.textMuted.color}
+        style={{ fontFamily: PIXI_FONTS.SANS_MEDIUM, fontSize: 13, fill: 0xffffff }}
+        tint={tint}
         layout={{}}
       />
     </Div>
+  );
+};
+
+// ---------------------------------------------------------------------------
+// FileList — custom file list with icons, virtual scrolling, left-aligned rows
+// ---------------------------------------------------------------------------
+
+interface FileListProps {
+  rows: DisplayRow[];
+  width: number;
+  height: number;
+  selectedId: string | null;
+  fileSource: FileSource;
+  onItemClick: (row: DisplayRow) => void;
+  onDelete?: (file: FileItem) => void;
+  scrollY: number;
+  onScrollY: (y: number) => void;
+}
+
+const FileList: React.FC<FileListProps> = ({
+  rows,
+  width,
+  height,
+  selectedId,
+  fileSource,
+  onItemClick,
+  onDelete,
+  scrollY,
+  onScrollY,
+}) => {
+  const theme = usePixiTheme();
+
+  const totalHeight = rows.length * FILE_ROW_H;
+  const maxScroll = Math.max(0, totalHeight - height);
+  const buffer = 3;
+
+  const startIdx = Math.max(0, Math.floor(scrollY / FILE_ROW_H) - buffer);
+  const endIdx = Math.min(rows.length, Math.ceil((scrollY + height) / FILE_ROW_H) + buffer);
+  const visibleRows = useMemo(
+    () => rows.slice(startIdx, endIdx),
+    [rows, startIdx, endIdx],
+  );
+
+  const handleWheel = useCallback((e: FederatedWheelEvent) => {
+    e.stopPropagation();
+    onScrollY(Math.max(0, Math.min(maxScroll, scrollY + e.deltaY)));
+  }, [maxScroll, scrollY, onScrollY]);
+
+  // Scrollbar geometry
+  const trackHeight = height - 4;
+  const thumbHeight = maxScroll > 0 ? Math.max(20, (height / totalHeight) * trackHeight) : 0;
+  const thumbY = maxScroll > 0 ? 2 + (scrollY / maxScroll) * (trackHeight - thumbHeight) : 2;
+
+  const isDraggingRef = useRef(false);
+  const dragOffsetRef = useRef(0);
+
+  const handlePointerMove = useCallback((e: FederatedPointerEvent) => {
+    if (!isDraggingRef.current || maxScroll <= 0) return;
+    const newThumbY = e.globalY - dragOffsetRef.current;
+    const ratio = Math.max(0, Math.min(1, (newThumbY - 2) / (trackHeight - thumbHeight)));
+    onScrollY(ratio * maxScroll);
+  }, [maxScroll, trackHeight, thumbHeight, onScrollY]);
+
+  const handlePointerUp = useCallback(() => {
+    isDraggingRef.current = false;
+  }, []);
+
+  const handleScrollbarDown = useCallback((e: FederatedPointerEvent) => {
+    if (maxScroll <= 0) return;
+    e.stopPropagation();
+    isDraggingRef.current = true;
+    dragOffsetRef.current = e.globalY - thumbY;
+  }, [maxScroll, thumbY]);
+
+  return (
+    <pixiContainer
+      eventMode="static"
+      onWheel={handleWheel}
+      onPointerMove={handlePointerMove}
+      onPointerUp={handlePointerUp}
+      onPointerUpOutside={handlePointerUp}
+      layout={{ width, height, overflow: 'hidden', backgroundColor: theme.bg.color }}
+    >
+      {visibleRows.map((row, i) => {
+        const actualIdx = startIdx + i;
+        const y = actualIdx * FILE_ROW_H - scrollY;
+        const isSelected = row.id === selectedId;
+        const isEven = actualIdx % 2 === 0;
+        const file = row.file;
+
+        const iconName = row.isBack ? 'open' : file ? fileIconName(file.name, file.isDirectory) : 'open';
+        const iconColor = row.isBack ? 0x4a9eff : file ? fileIconColor(file.name, file.isDirectory) : 0x4a9eff;
+        const label = row.isBack ? '.. (back)' : file?.name ?? '';
+        const sublabel = row.isBack ? '' : file ? (file.isDirectory ? 'DIR' : formatSize(file.size)) : '';
+
+        return (
+          <pixiContainer
+            key={row.id}
+            eventMode="static"
+            cursor="pointer"
+            onPointerUp={() => onItemClick(row)}
+            layout={{
+              position: 'absolute',
+              left: 0,
+              top: y,
+              width: width - 10,
+              height: FILE_ROW_H,
+              flexDirection: 'row',
+              alignItems: 'center',
+              paddingLeft: 12,
+              paddingRight: 8,
+              gap: 8,
+            }}
+          >
+            {/* Row background */}
+            <pixiGraphics
+              draw={(g) => {
+                g.clear();
+                g.rect(0, 0, width - 10, FILE_ROW_H);
+                if (isSelected) {
+                  g.fill({ color: theme.accent.color, alpha: 0.15 });
+                } else {
+                  g.fill({ color: isEven ? theme.bg.color : theme.bgSecondary.color });
+                }
+              }}
+              layout={{ position: 'absolute', width: width - 10, height: FILE_ROW_H }}
+            />
+
+            {/* File type icon */}
+            <PixiIcon
+              name={iconName}
+              size={14}
+              color={iconColor}
+              layout={{ flexShrink: 0, width: 18 }}
+            />
+
+            {/* Filename + sublabel column */}
+            <Div layout={{ flex: 1, flexDirection: 'column', justifyContent: 'center', gap: 1 }}>
+              <pixiBitmapText
+                eventMode="none"
+                text={label}
+                style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 13, fill: 0xffffff }}
+                tint={isSelected ? theme.accent.color : theme.text.color}
+                layout={{}}
+              />
+              {sublabel !== '' && (
+                <pixiBitmapText
+                  eventMode="none"
+                  text={sublabel}
+                  style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 10, fill: 0xffffff }}
+                  tint={theme.textMuted.color}
+                  layout={{}}
+                />
+              )}
+            </Div>
+
+            {/* Delete button for cloud files */}
+            {fileSource === 'cloud' && file && !file.isDirectory && onDelete && (
+              <Div
+                eventMode="static"
+                cursor="pointer"
+                onPointerUp={(e: FederatedPointerEvent) => {
+                  e.stopPropagation();
+                  onDelete(file);
+                }}
+                layout={{ flexShrink: 0, padding: 4 }}
+              >
+                <PixiIcon name="close" size={10} color={theme.textMuted.color} layout={{}} />
+              </Div>
+            )}
+          </pixiContainer>
+        );
+      })}
+
+      {/* Scrollbar */}
+      {maxScroll > 0 && (
+        <pixiContainer layout={{ position: 'absolute', left: width - 8, top: 0, width: 6, height }}>
+          <pixiGraphics
+            draw={(g) => {
+              g.clear();
+              g.roundRect(0, 2, 6, trackHeight, 3);
+              g.fill({ color: theme.bgActive.color, alpha: 0.3 });
+            }}
+            layout={{ position: 'absolute', width: 6, height }}
+          />
+          <pixiGraphics
+            draw={(g) => {
+              g.clear();
+              g.roundRect(0, 0, 6, thumbHeight, 3);
+              g.fill({ color: theme.textMuted.color, alpha: 0.4 });
+            }}
+            eventMode="static"
+            cursor="pointer"
+            onPointerDown={handleScrollbarDown}
+            layout={{ position: 'absolute', top: thumbY, width: 6, height: thumbHeight }}
+          />
+        </pixiContainer>
+      )}
+    </pixiContainer>
   );
 };
 
