@@ -285,6 +285,13 @@ int dexed_ui_get_program_count()
 }
 
 EMSCRIPTEN_KEEPALIVE
+uint8_t* dexed_ui_get_voice_data()
+{
+    if (!g_processor) return nullptr;
+    return g_processor->data;
+}
+
+EMSCRIPTEN_KEEPALIVE
 void dexed_ui_shutdown()
 {
     if (g_editor) {
