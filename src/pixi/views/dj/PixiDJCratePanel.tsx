@@ -18,7 +18,7 @@ type CrateTab = 'browser' | 'playlists' | 'online' | 'serato';
 const TABS: { id: CrateTab; label: string; icon?: string }[] = [
   { id: 'browser', label: 'Browser', icon: 'open' },
   { id: 'playlists', label: 'Playlists', icon: 'diskio' },
-  { id: 'online', label: 'Online', icon: 'logo' },
+  { id: 'online', label: 'Online', icon: 'globe' },
   { id: 'serato', label: 'Serato', icon: 'preset-a' },
 ];
 
