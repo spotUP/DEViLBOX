@@ -2,8 +2,10 @@
  * TrackerView - Main tracker container with pattern editor and controls
  */
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { PatternEditorCanvas } from './PatternEditorCanvas';
+import { TrackerVisualBackground } from './TrackerVisualBackground';
+import { useSettingsStore } from '@stores/useSettingsStore';
 import { GridSequencer } from '@components/grid/GridSequencer';
 import { useTrackerStore, useCursorStore, useInstrumentStore, useUIStore , useFormatStore } from '@stores';
 import { useShallow } from 'zustand/react/shallow';
@@ -565,7 +567,8 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
                   </div>
                 </div>
               ) : (
-                <PatternEditorCanvas
+                <TrackerEditorWithBg
+                  trackerVisualBg={trackerVisualBg}
                   onAcidGenerator={handleAcidGenerator}
                   onRandomize={handleRandomize}
                   onSwipeLeft={handleSwipeLeft}
