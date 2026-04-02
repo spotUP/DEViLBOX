@@ -523,7 +523,7 @@ export const DJPlaylistPanel: React.FC<DJPlaylistPanelProps> = ({ onClose }) => 
                         ? 'bg-green-900/20'
                         : autoDJEnabled && i === autoDJNextIdx
                           ? 'bg-blue-900/15'
-                          : 'hover:bg-dark-bg/50'
+                          : 'hover:bg-white/[0.08]'
                   }`}
                 >
                   <GripVertical

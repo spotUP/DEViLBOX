@@ -87,9 +87,51 @@ const AMIGA_EXTENSIONS = new Set([
 /** HivelyTracker formats — these have a dedicated WASM replayer, don't route to UADE */
 const HIVELY_EXTENSIONS = new Set(['ahx', 'hvl']);
 
-/** Amiga formats that use prefix-based naming (e.g. cust.songname, mdat.songname) */
+/** Amiga formats that use prefix-based naming (e.g. cust.songname, mdat.songname).
+ *  Must match UADE_ONLY_PREFIXES in UADEPrefixParsers.ts + TFMX/BP/Custom variants. */
 const AMIGA_PREFIXES = new Set([
-  'cust', 'mdat', 'smpl', 'bp', 'smod', 'dl',
+  // CustomMade / Delitracker Custom
+  'cus', 'cust', 'custom',
+  // TFMX and variants
+  'mdat', 'smpl', 'tfhd1.5', 'tfhd7v', 'tfhdpro', 'tfmx1.5', 'tfmx7v', 'tfmxpro',
+  // SoundMon / BPSoundMon
+  'bp', 'smod',
+  // DaveLowe
+  'dl', 'dlw',
+  // FutureComposer-BSI
+  'bfc', 'bsi', 'fc-bsi',
+  // ArtAndMagic, AMOS, Sierra-AGI
+  'aam', 'abk', 'agi',
+  // AshleyHogg, ActionAmics, BeathovenSynth
+  'ah', 'ast', 'bss', 'bvs',
+  // ChipTracker, CoreDesign
+  'chip', 'cba', 'cd',
+  // DynamicSynth, DariusZendeh
+  'dns', 'dz', 'mkiio',
+  // EarAche, EMS
+  'ea', 'ems', 'emsv6',
+  // ForgottenWorlds, FredMon, FuturePlayer2
+  'fw', 'fredmon', 'fp2',
+  // HowieDavies, MajorTom
+  'hd', 'hn', 'thn', 'mtp2', 'arp',
+  // JochenHippel
+  'hip', 'mcmd', 'sog',
+  // MarkII, MusiclineEditor
+  'mk2', 'mkii', 'ml',
+  // MaxTrax, Silmarils
+  'mxt', 'mok', 'sil',
+  // NoiseTracker, NTSP, PaulSummers, Pokeynoise
+  'nt', 'ntsp', 'psum', 'pn',
+  // RiffRaff, SeanConnolly, RobHubbardST, RonKlaren
+  'riff', 's-c', 'scn', 'sc2', 'rhst', 'rho', 'rkl',
+  // SonicArranger variants
+  'sa-p', 'lion', 'sa_old', 'sas',
+  // SCUMM, SynthDream, SoundProgramming, SoundImages
+  'scumm', 'sdr', 'spl', 'tw',
+  // SUN-Tronic, SynTracker, StoneTracker
+  'sun', 'synmod', 'st',
+  // TimFollin, AHX-thx, TomyTracker, VoodooSupreme
+  'tf', 'thx', 'tomy', 'vss',
 ]);
 
 /** Check if a filename should use UADE (Amiga formats) vs libopenmpt (PC formats) */
