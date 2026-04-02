@@ -292,6 +292,79 @@ export const ICON_LINK: IconNode = [
   ["path", { d: "M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" }],
 ];
 
+/** Globe — used for online/web */
+export const ICON_GLOBE: IconNode = [
+  ["circle", { cx: "12", cy: "12", r: "10" }],
+  ["path", { d: "M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20" }],
+  ["path", { d: "M2 12h20" }],
+];
+
+/** Trash2 — used for delete */
+export const ICON_TRASH_2: IconNode = [
+  ["path", { d: "M3 6h18" }],
+  ["path", { d: "M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" }],
+  ["path", { d: "M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" }],
+  ["line", { x1: "10", x2: "10", y1: "11", y2: "17" }],
+  ["line", { x1: "14", x2: "14", y1: "11", y2: "17" }],
+];
+
+/** Search — used for search fields */
+export const ICON_SEARCH: IconNode = [
+  ["circle", { cx: "11", cy: "11", r: "8" }],
+  ["path", { d: "m21 21-4.3-4.3" }],
+];
+
+/** Shuffle — used for random/shuffle */
+export const ICON_SHUFFLE: IconNode = [
+  ["path", { d: "M2 18h1.4c1.3 0 2.5-.6 3.3-1.7l6.1-8.6c.7-1.1 2-1.7 3.3-1.7H22" }],
+  ["path", { d: "m18 2 4 4-4 4" }],
+  ["path", { d: "M2 6h1.9c1.5 0 2.9.9 3.6 2.2" }],
+  ["path", { d: "M22 18h-5.9c-1.3 0-2.6-.7-3.3-1.8l-.5-.8" }],
+  ["path", { d: "m18 14 4 4-4 4" }],
+];
+
+/** Maximize2 — used for fullscreen */
+export const ICON_MAXIMIZE_2: IconNode = [
+  ["polyline", { points: "15 3 21 3 21 9" }],
+  ["polyline", { points: "9 21 3 21 3 15" }],
+  ["line", { x1: "21", x2: "14", y1: "3", y2: "10" }],
+  ["line", { x1: "3", x2: "10", y1: "21", y2: "14" }],
+];
+
+/** Minimize2 — used for exit fullscreen */
+export const ICON_MINIMIZE_2: IconNode = [
+  ["polyline", { points: "4 14 10 14 10 20" }],
+  ["polyline", { points: "20 10 14 10 14 4" }],
+  ["line", { x1: "14", x2: "21", y1: "10", y2: "3" }],
+  ["line", { x1: "3", x2: "10", y1: "21", y2: "14" }],
+];
+
+/** Star — used for favorites */
+export const ICON_STAR: IconNode = [
+  ["path", { d: "M11.525 2.295a.53.53 0 0 1 .95 0l2.31 4.679a2.123 2.123 0 0 0 1.595 1.16l5.166.756a.53.53 0 0 1 .294.904l-3.736 3.638a2.123 2.123 0 0 0-.611 1.878l.882 5.14a.53.53 0 0 1-.771.56l-4.618-2.428a2.122 2.122 0 0 0-1.973 0L6.396 21.01a.53.53 0 0 1-.77-.56l.881-5.139a2.122 2.122 0 0 0-.611-1.879L2.16 9.795a.53.53 0 0 1 .294-.906l5.165-.755a2.122 2.122 0 0 0 1.597-1.16z" }],
+];
+
+/** Headphones — alias for cue section */
+export const ICON_HEADPHONES_ALIAS: IconNode = ICON_HEADPHONES;
+
+/** ArrowLeft — used for back navigation */
+export const ICON_ARROW_LEFT: IconNode = [
+  ["path", { d: "m12 19-7-7 7-7" }],
+  ["path", { d: "M19 12H5" }],
+];
+
+/** FileAudio — used for audio/music files */
+export const ICON_FILE_AUDIO: IconNode = [
+  ["path", { d: "M17.5 22h.5a2 2 0 0 0 2-2V7l-5-5H6a2 2 0 0 0-2 2v3" }],
+  ["path", { d: "M14 2v4a2 2 0 0 0 2 2h4" }],
+  ["path", { d: "M2 19a2 2 0 1 1 4 0v1a2 2 0 1 1-4 0v-4a6 6 0 0 1 12 0v4a2 2 0 1 1-4 0v-1a2 2 0 1 1 4 0" }],
+];
+
+/** Cloud — used for cloud storage */
+export const ICON_CLOUD: IconNode = [
+  ["path", { d: "M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z" }],
+];
+
 /** Timer */
 export const ICON_TIMER: IconNode = [
   ["line", { x1: "10", x2: "14", y1: "2", y2: "2" }],
@@ -342,4 +415,17 @@ export const FONTAUDIO_TO_LUCIDE: Record<string, IconNode> = {
   'disc-3':       ICON_DISC_3,
   'link':         ICON_LINK,
   'lock':         ICON_LOCK,
+  'globe':        ICON_GLOBE,
+  'trash':        ICON_TRASH_2,
+  'search':       ICON_SEARCH,
+  'shuffle':      ICON_SHUFFLE,
+  'maximize':     ICON_MAXIMIZE_2,
+  'minimize':     ICON_MINIMIZE_2,
+  'star':         ICON_STAR,
+  'headphones':   ICON_HEADPHONES,
+  'arrow-left':   ICON_ARROW_LEFT,
+  'file-audio':   ICON_FILE_AUDIO,
+  'cloud':        ICON_CLOUD,
+  'plus':         ICON_PLUS,
+  'info':         ICON_INFO,
 };
