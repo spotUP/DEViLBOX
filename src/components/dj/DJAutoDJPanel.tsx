@@ -5,11 +5,12 @@
  * Reads state from useDJStore, dispatches actions via DJActions.
  */
 
-import React, { useCallback } from 'react';
-import { SkipForward, Shuffle, SlidersHorizontal } from 'lucide-react';
+import React, { useCallback, useRef, useState } from 'react';
+import { SkipForward, Shuffle, SlidersHorizontal, Zap } from 'lucide-react';
 import { useDJStore, type AutoDJStatus } from '@/stores/useDJStore';
 import { useDJPlaylistStore } from '@/stores/useDJPlaylistStore';
 import { enableAutoDJ, disableAutoDJ, skipAutoDJ } from '@/engine/dj/DJActions';
+import { analyzePlaylist, playlistNeedsAnalysis, type AnalysisProgress } from '@/engine/dj/DJPlaylistAnalyzer';
 
 const STATUS_LABELS: Record<AutoDJStatus, string> = {
   idle: 'OFF',
@@ -66,6 +67,26 @@ export const DJAutoDJPanel: React.FC<DJAutoDJPanelProps> = ({ onClose }) => {
     await skipAutoDJ();
   }, []);
 
+  // Analysis
+  const [analysisProgress, setAnalysisProgress] = useState<AnalysisProgress | null>(null);
+  const analyzingRef = useRef(false);
+  const needsAnalysis = activePlaylist ? playlistNeedsAnalysis(activePlaylist) : false;
+  const analyzedCount = activePlaylist
+    ? activePlaylist.tracks.filter(t => t.bpm > 0 && t.musicalKey).length
+    : 0;
+
+  const handleAnalyze = useCallback(async () => {
+    if (!activePlaylistId || analyzingRef.current) return;
+    analyzingRef.current = true;
+    setAnalysisProgress({ current: 0, total: 1, trackName: 'Starting...', status: 'analyzing' });
+    try {
+      await analyzePlaylist(activePlaylistId, (p) => setAnalysisProgress({ ...p }));
+    } finally {
+      analyzingRef.current = false;
+      setAnalysisProgress(null);
+    }
+  }, [activePlaylistId]);
+
   return (
     <div className="bg-dark-bgSecondary border border-dark-borderLight rounded-lg p-3 text-xs font-mono">
       {/* Header */}
@@ -115,6 +136,38 @@ export const DJAutoDJPanel: React.FC<DJAutoDJPanelProps> = ({ onClose }) => {
       {(!activePlaylist || trackCount < 2) && !enabled && (
         <div className="text-yellow-500/80 text-center py-1 mb-2">
           Select a playlist with 2+ tracks
+        </div>
+      )}
+
+      {/* Analysis */}
+      {activePlaylist && trackCount >= 2 && !enabled && (
+        <div className="mb-3">
+          {analysisProgress ? (
+            <div className="space-y-1">
+              <div className="flex items-center justify-between text-[10px]">
+                <span className="text-cyan-400">Analyzing {analysisProgress.current}/{analysisProgress.total}</span>
+                <span className="text-text-tertiary truncate ml-2">{analysisProgress.trackName}</span>
+              </div>
+              <div className="h-1 bg-dark-bgTertiary rounded-full overflow-hidden">
+                <div
+                  className="h-full bg-cyan-500 transition-all duration-300"
+                  style={{ width: `${(analysisProgress.current / analysisProgress.total) * 100}%` }}
+                />
+              </div>
+            </div>
+          ) : needsAnalysis ? (
+            <button
+              onClick={handleAnalyze}
+              className="w-full flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-md border border-cyan-700 bg-cyan-900/20 text-cyan-400 hover:bg-cyan-900/40 transition-all text-[10px]"
+            >
+              <Zap size={10} />
+              Analyze Playlist ({trackCount - analyzedCount} tracks need BPM/key)
+            </button>
+          ) : (
+            <div className="text-green-500/60 text-center text-[10px] py-0.5">
+              All {trackCount} tracks analyzed
+            </div>
+          )}
         </div>
       )}
 
