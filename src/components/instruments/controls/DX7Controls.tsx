@@ -62,6 +62,7 @@ export const DX7Controls: React.FC<DX7ControlsProps> = ({ instrument, onChange }
   const [loading, setLoading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const configRef = useRef(instrument.dx7);
+  const synthRef = useRef<DX7Synth | null>(null);
 
   useEffect(() => { configRef.current = instrument.dx7; }, [instrument.dx7]);
 
@@ -75,22 +76,47 @@ export const DX7Controls: React.FC<DX7ControlsProps> = ({ instrument, onChange }
     }
   }, []);
 
-  // Get synth instance — try both shared key patterns
+  // Eagerly create synth on mount and cache the reference
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const engine = getToneEngine();
+        const config = { id: instrument.id, synthType: 'DX7' as any };
+        await engine.ensureInstrumentReady(config as any);
+        if (cancelled) return;
+        const key = engine.getInstrumentKey(instrument.id, -1);
+        const synth = engine.instruments.get(key);
+        if (synth && 'loadSysex' in synth) {
+          synthRef.current = synth as unknown as DX7Synth;
+        }
+      } catch (err) {
+        console.warn('[DX7Controls] Failed to ensure synth ready:', err);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [instrument.id]);
+
+  // Get synth instance from ref or live lookup
   const getSynth = useCallback((): DX7Synth | null => {
+    if (synthRef.current) return synthRef.current;
     try {
       const engine = getToneEngine();
-      // Try shared key (instrumentId, -1)
       const key = engine.getInstrumentKey(instrument.id, -1);
       const synth = engine.instruments.get(key);
-      if (synth && 'loadSysex' in synth) return synth as unknown as DX7Synth;
+      if (synth && 'loadSysex' in synth) {
+        synthRef.current = synth as unknown as DX7Synth;
+        return synthRef.current;
+      }
       // Fallback: scan instruments map for DX7Synth with matching id
       for (const [k, v] of engine.instruments) {
         if ((k >>> 16) === instrument.id && v && 'loadSysex' in v) {
-          return v as unknown as DX7Synth;
+          synthRef.current = v as unknown as DX7Synth;
+          return synthRef.current;
         }
       }
-      return null;
-    } catch { return null; }
+    } catch { /* engine not ready */ }
+    return null;
   }, [instrument.id]);
 
   // Bank names for display
