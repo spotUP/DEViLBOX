@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-04-01T00:05:47.067Z
+ * Generated: 2026-04-02T05:20:37.810Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -19,10 +19,10 @@ export interface ChangelogEntry {
 }
 
 // Build info
-export const BUILD_VERSION = '1.0.3803';
-export const BUILD_NUMBER = '3803';
-export const BUILD_HASH = '8368f7e3b';
-export const BUILD_DATE = '2026-04-01';
+export const BUILD_VERSION = '1.0.3828';
+export const BUILD_NUMBER = '3828';
+export const BUILD_HASH = '9ae89e5eb';
+export const BUILD_DATE = '2026-04-02';
 
 // Full version (patch IS the build number, so no need to append)
 export const FULL_VERSION = BUILD_VERSION;
@@ -30,9 +30,109 @@ export const FULL_VERSION = BUILD_VERSION;
 // Auto-generated changelog
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: '1.0.3803',
+    version: '1.0.3828',
     date: '2026-04-01',
     changes: [
+      {
+        type: 'improvement',
+        "description": "Vocoder: enable browser echo cancellation to reduce speaker→mic feedback"
+      },
+      {
+        type: 'improvement',
+        "description": "DJ vocoder: mic routing, noise gate, presets, Kraftwerk head animation"
+      },
+      {
+        type: 'feature',
+        "description": "Add Odin2 hardware UI WASM build (SDL/Emscripten)"
+      },
+      {
+        type: 'fix',
+        "description": "SpaceLaserControls: fix grid layout and separate buttons from knob grid"
+      },
+      {
+        type: 'improvement',
+        "description": "Enforce knobs→visualizers→selects hierarchy across all remaining synths"
+      },
+      {
+        type: 'fix',
+        "description": "Extend rimshot swing decay 10ms→50ms"
+      },
+      {
+        type: 'fix',
+        "description": "Set all factory kit notes to C4 for correct pitch"
+      },
+      {
+        type: 'fix',
+        "description": "Use pitch noteMode so drum type is always respected"
+      },
+      {
+        type: 'fix',
+        "description": "Misc accumulated fixes: vocoder worklet, DJ autoDJ, drumpad, ProjectM"
+      },
+      {
+        type: 'improvement',
+        "description": "Enforce knobs→visualizers→checkboxes hierarchy across synth UIs"
+      },
+      {
+        type: 'fix',
+        "description": "Constrain performance mode pad size in DOM view"
+      },
+      {
+        type: 'fix',
+        "description": "Cap pad size at 90px + show full names in Pads view"
+      },
+      {
+        type: 'fix',
+        "description": "Shrink sampler pads 60→44px so all 16 fit on screen"
+      },
+      {
+        type: 'fix',
+        "description": "Use full names in 808/909 factory kits (Kick/Snare/Closed Hat etc)"
+      },
+      {
+        type: 'fix',
+        "description": "Show full pad name — remove 8-char truncation"
+      },
+      {
+        type: 'improvement',
+        "description": "Standardize knob size to md + align 4-col grids in DOM & Pixi"
+      },
+      {
+        type: 'improvement',
+        "description": "Switch synth panels to 4-column grid layout"
+      },
+      {
+        type: 'improvement',
+        "description": "Switch synth panels from 2-column to 3-column grid layout"
+      },
+      {
+        type: 'improvement',
+        "description": "Compact 2-column synth panel layouts + DOMSynthPanel renderer"
+      },
+      {
+        type: 'feature',
+        "description": "Show synth type badge on pad cells in GL sampler (808/SAM/303 etc)"
+      },
+      {
+        type: 'fix',
+        "description": "Remove spurious heldPadsRef.add + guard synth release in GL sampler"
+      },
+      {
+        type: 'fix',
+        "description": "Add V2Speech to speech synth text handling in PadEditor"
+      },
+      {
+        type: 'fix',
+        "description": "Trigger synth pads in GL sampler — 808/909/SAM/DECtalk now play in GL mode"
+      },
+      {
+        type: 'improvement',
+        "description": "Config persistence + hardware UIs for demoscene synths"
+      },
+      {
+        type: 'fix',
+        "description": "V2 preset fix + Tunefish/WaveSabre/V2 Pixi panels & presets"
+      },
       {
         type: 'feature',
         "description": "Add OpenWurli/OPL3/DX7 to synth browser, Oidos panel + presets"
@@ -138,106 +238,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'improvement',
         "description": "Soften playlist track text and dividers"
-      },
-      {
-        type: 'fix',
-        "description": "Strip directory from UADE filename hint to prevent MEMFS write failure"
-      },
-      {
-        type: 'improvement',
-        "description": "Unify DJ Browser/Playlists/Online/Serato into tabbed Crate panel"
-      },
-      {
-        type: 'fix',
-        "description": "UADE prefix-named formats (cust.*, custom.*) no longer fall through to libopenmpt"
-      },
-      {
-        type: 'feature',
-        "description": "Playlist Smart Mix sort + BPM/key/energy/name sorting"
-      },
-      {
-        type: 'fix',
-        "description": "AutoDJ continuous mixing, hide knob values, readable playlist"
-      },
-      {
-        type: 'feature',
-        "description": "Wire OBXf hardware UI — interactive controls + patch browser"
-      },
-      {
-        type: 'feature',
-        "description": "Knob columns with faders/VUs full height between them"
-      },
-      {
-        type: 'fix',
-        "description": "Restore mixer panel padding/gaps"
-      },
-      {
-        type: 'feature',
-        "description": "Wire OBXf hardware UI — mouse events, param forwarding"
-      },
-      {
-        type: 'fix',
-        "description": "OBXf WASM deadlock — empty themeLocations triggered AlertWindow"
-      },
-      {
-        type: 'fix',
-        "description": "Debug: add OBXf WASM loading diagnostics"
-      },
-      {
-        type: 'feature',
-        "description": "Compact DJ mixer layout + cue mix slider"
-      },
-      {
-        type: 'fix',
-        "description": "Update Pixi DJ mixer PFL labels 1/2 → A/B"
-      },
-      {
-        type: 'fix',
-        "description": "Clarify cue section labels (A/B + Phones label)"
-      },
-      {
-        type: 'fix',
-        "description": "OBXf hardware UI browser freeze"
-      },
-      {
-        type: 'feature',
-        "description": "OBXd controls two-column layout"
-      },
-      {
-        type: 'feature',
-        "description": "WASM vocoder, Kraftwerk hair spikes, OBXd/Dexed UI, VJ fixes"
-      },
-      {
-        type: 'feature',
-        "description": "Implement remaining tracker parity features"
-      },
-      {
-        type: 'fix',
-        "description": "Popout windows use static /popout.html instead of blob URL"
-      },
-      {
-        type: 'fix',
-        "description": "PT F6-F10 jump to correct positions, remove ft2-col-1 border"
-      },
-      {
-        type: 'fix',
-        "description": "Use blob URL for popout windows to eliminate about:blank header"
-      },
-      {
-        type: 'improvement',
-        "description": "JC303 knob panel UI improvements"
-      },
-      {
-        type: 'feature',
-        "description": "Complete remaining tracker parity features"
-      },
-      {
-        type: 'fix',
-        "description": "Replace about:blank URL in popout windows with meaningful path"
-      },
-      {
-        type: 'feature',
-        "description": "Instrument control UI improvements (Dexed, OBXd, synth controls)"
       }
     ]
   }
