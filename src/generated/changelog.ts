@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-04-02T05:20:37.810Z
+ * Generated: 2026-04-02T07:50:41.194Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -19,9 +19,9 @@ export interface ChangelogEntry {
 }
 
 // Build info
-export const BUILD_VERSION = '1.0.3828';
-export const BUILD_NUMBER = '3828';
-export const BUILD_HASH = '9ae89e5eb';
+export const BUILD_VERSION = '1.0.3833';
+export const BUILD_NUMBER = '3833';
+export const BUILD_HASH = 'b3fcbd315';
 export const BUILD_DATE = '2026-04-02';
 
 // Full version (patch IS the build number, so no need to append)
@@ -30,7 +30,33 @@ export const FULL_VERSION = BUILD_VERSION;
 // Auto-generated changelog
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: '1.0.3828',
+    version: '1.0.3833',
+    date: '2026-04-02',
+    changes: [
+      {
+        type: 'feature',
+        "description": "New Pixi DJ components, Helm hardware UI, TR-808 layout"
+      },
+      {
+        type: 'fix',
+        "description": "Chore: DJ view Pixi improvements, tracker replayer fixes, changelog update"
+      },
+      {
+        type: 'feature',
+        "description": "Batch playlist analysis via server-side UADE headless renderer"
+      },
+      {
+        type: 'feature',
+        "description": "Smart sort by BPM/key/energy + crossfader fixes"
+      },
+      {
+        type: 'fix',
+        "description": "Increase IPC ring buffer to 4MB for large module files"
+      }
+    ]
+  },
+  {
+    version: '2026-04-01',
     date: '2026-04-01',
     changes: [
       {
@@ -218,26 +244,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'fix',
         "description": "Remove require() call in useNoteInput — useInstrumentStore already imported"
-      },
-      {
-        type: 'fix',
-        "description": "Force classic UADE mode for CustomMade formats (cust.*, custom.*, cm.*, rk.*)"
-      },
-      {
-        type: 'improvement',
-        "description": "Remove FX Editor button from DJ view (both DOM and GL)"
-      },
-      {
-        type: 'improvement',
-        "description": "Overlay Auto DJ panel instead of pushing content down"
-      },
-      {
-        type: 'fix',
-        "description": "Fix playlist dividers and crate click-outside-to-close"
-      },
-      {
-        type: 'improvement',
-        "description": "Soften playlist track text and dividers"
       }
     ]
   }
