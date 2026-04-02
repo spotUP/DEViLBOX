@@ -72,9 +72,8 @@ export class DX7Synth implements DevilboxSynth {
           this._romLoaded = true;
           for (const msg of this._pendingMessages) this.workletNode?.port.postMessage(msg);
           this._pendingMessages = [];
-          this._resolveInit();
-          this.tryAutoLoadVoices();
-          this.tryAutoLoadFirstPatchBank();
+          // Load voices + patches, then resolve init when everything is ready
+          this._finishInit();
         } else if (data.type === 'wasmLoaded') {
           this._wasmLoaded = true;
           this.tryAutoLoadRom();
@@ -93,6 +92,19 @@ export class DX7Synth implements DevilboxSynth {
     } catch (err) {
       console.error('[DX7] Init failed:', err);
     }
+  }
+
+  /** Load voices + first patch bank, then resolve ensureInitialized() */
+  private async _finishInit() {
+    try {
+      await Promise.all([
+        this.tryAutoLoadVoices(),
+        this.tryAutoLoadFirstPatchBank(),
+      ]);
+    } catch {
+      // Non-fatal — synth works without patches, just silent
+    }
+    this._resolveInit();
   }
 
   /** Auto-load ROM from well-known paths */
@@ -189,10 +201,11 @@ export class DX7Synth implements DevilboxSynth {
       const data = await resp.arrayBuffer();
       this.loadSysex(data);
       this._currentBankFile = bankFile;
-      // Select the voice after a short delay to let the firmware process the sysex
-      setTimeout(() => {
+      // Wait for firmware to process the sysex, then select voice
+      await new Promise<void>(resolve => setTimeout(() => {
         this.selectVoice(voiceIndex);
-      }, 100);
+        resolve();
+      }, 100));
     } catch (err) {
       console.error(`[DX7] Failed to load patch bank ${bankFile}:`, err);
     }

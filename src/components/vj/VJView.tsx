@@ -25,7 +25,6 @@ import { useDJStore } from '@stores/useDJStore';
 import { useTransportStore } from '@stores/useTransportStore';
 import { useSettingsStore } from '@stores/useSettingsStore';
 import { focusPopout } from '@components/ui/PopOutWindow';
-import { VIEW_OPTIONS, switchView } from '@/constants/viewOptions';
 import { VJPresetBrowser } from './VJPresetBrowser';
 import { VJPatternOverlay } from './VJPatternOverlay';
 import { registerCaptureCanvas } from '@/engine/dj/streaming/DJVideoCapture';
@@ -395,22 +394,6 @@ export const VJControls: React.FC<VJControlsProps> = ({
         <div className="absolute top-0 left-0 right-0 pointer-events-auto bg-gradient-to-b from-black/70 to-transparent p-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2 flex-1 mr-4 min-w-0">
-              {/* View selector dropdown */}
-              <select
-                value="vj"
-                onChange={(e) => {
-                  const v = e.target.value;
-                  if (v !== 'vj') {
-                    switchView(v, 'vj');
-                  }
-                }}
-                className="px-3 py-1.5 rounded-md text-xs font-mono font-bold tracking-widest uppercase border transition-all cursor-pointer border-dark-borderLight bg-dark-bgTertiary text-text-secondary hover:bg-dark-bgHover hover:text-text-primary"
-                title="Switch view"
-              >
-                {VIEW_OPTIONS.map(({ value, label }) => (
-                  <option key={value} value={value}>{label}</option>
-                ))}
-              </select>
               <div className="text-white/90 text-sm font-mono truncate">
                 {currentName}
               </div>
