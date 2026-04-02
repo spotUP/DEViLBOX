@@ -8,7 +8,7 @@
  * Extracted from TrackerView.tsx to be reusable in both DOM and GL modes.
  */
 
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { useUIStore } from '@stores';
 import { useSettingsStore } from '@stores/useSettingsStore';
@@ -45,7 +45,7 @@ export interface EditorControlsBarProps {
 
 export const EditorControlsBar: React.FC<EditorControlsBarProps> = React.memo(({
   viewMode,
-  onViewModeChange,
+  onViewModeChange: _onViewModeChange,
   gridChannelIndex,
   onGridChannelChange,
   showAdvancedEdit,
