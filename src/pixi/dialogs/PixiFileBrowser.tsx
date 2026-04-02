@@ -553,7 +553,7 @@ const FileList: React.FC<FileListProps> = ({
                 if (isSelected) {
                   g.fill({ color: theme.accent.color, alpha: 0.15 });
                 } else {
-                  g.fill({ color: isEven ? theme.bg.color : theme.bgSecondary.color });
+                  g.fill({ color: theme.bg.color, alpha: isEven ? 1 : 0.85 });
                 }
               }}
               layout={{ position: 'absolute', width: width - 10, height: FILE_ROW_H }}
