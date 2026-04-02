@@ -206,6 +206,7 @@ export const PixiDJSeratoBrowser: React.FC<PixiDJSeratoBrowserProps> = ({
       id: `${i}`,
       label: t.title || t.filePath.split(/[/\\]/).pop() || '(unknown)',
       sublabel: `${t.artist}  |  ${formatBPM(t.bpm)}  |  ${t.key || '--'}  |  ${formatDuration(t.duration)}`,
+      iconName: 'diskio',
     }));
   }, [filteredTracks]);
 

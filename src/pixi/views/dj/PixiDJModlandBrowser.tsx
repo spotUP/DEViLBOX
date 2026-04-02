@@ -39,6 +39,7 @@ import {
 } from '@/lib/ratingsApi';
 import { useAuthStore } from '@/stores/useAuthStore';
 import { PixiButton } from '../../components/PixiButton';
+import { PixiIcon } from '../../components/PixiIcon';
 import { PixiLabel } from '../../components/PixiLabel';
 import { PixiSelect } from '../../components/PixiSelect';
 import type { SelectOption } from '../../components/PixiSelect';
@@ -639,6 +640,9 @@ export const PixiDJModlandBrowser: React.FC<PixiDJModlandBrowserProps> = ({
                 }}
                 layout={{ position: 'absolute', width: contentW - 8, height: ROW_H }}
               />
+
+              {/* File icon */}
+              <PixiIcon name="diskio" size={14} color={theme.textMuted.color} layout={{ flexShrink: 0, marginRight: 4 }} />
 
               {/* File info */}
               <layoutContainer layout={{ flex: 1, flexDirection: 'column', justifyContent: 'center', gap: 1, overflow: 'hidden' }}>
