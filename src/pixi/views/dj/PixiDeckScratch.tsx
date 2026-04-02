@@ -39,7 +39,7 @@ interface Props {
   layout?: Record<string, unknown>;
 }
 
-export const PixiDeckScratch: React.FC<Props> = ({ deckId, width = 280, height = 56, layout: layoutProp }) => {
+export const PixiDeckScratch: React.FC<Props> = ({ deckId, width = 280, layout: layoutProp }) => {
   const theme = usePixiTheme();
   const themeId = usePixiThemeId();
   const activePatternName = useDJStore((s) => s.decks[deckId].activePatternName);
@@ -95,15 +95,15 @@ export const PixiDeckScratch: React.FC<Props> = ({ deckId, width = 280, height =
   const drawBtn = useCallback((g: GraphicsType, x: number, w: number, active: boolean, waiting: boolean, disabled: boolean) => {
     g.clear();
     const bgColor = active ? deckColor : waiting ? deckColor : theme.bgTertiary.color;
-    const bgAlpha = active ? 0.4 : waiting ? 0.2 : disabled ? 0.05 : 0.1;
+    const bgAlpha = active ? 0.4 : waiting ? 0.2 : disabled ? 0.05 : 0.15;
     const borderColor = active ? deckColor : waiting ? deckColor : theme.border.color;
-    const borderAlpha = active ? 0.6 : waiting ? 0.3 : disabled ? 0.05 : 0.1;
+    const borderAlpha = active ? 0.6 : waiting ? 0.3 : disabled ? 0.05 : 0.4;
     g.roundRect(x, 0, w, BTN_H, 3).fill({ color: bgColor, alpha: bgAlpha });
     g.roundRect(x, 0, w, BTN_H, 3).stroke({ color: borderColor, alpha: borderAlpha, width: 1 });
   }, [deckColor, theme]);
 
   return (
-    <pixiContainer layout={layoutProp ?? { width, height, flexDirection: 'column', gap: 2, paddingTop: 2, paddingLeft: 2 }}>
+    <pixiContainer layout={layoutProp ?? { width, flexDirection: 'column', gap: 2, paddingTop: 2, paddingLeft: 2 }}>
       {/* Row 1: Pattern buttons (wrap to fit all) */}
       <pixiContainer layout={{ flexDirection: 'row', gap: BTN_GAP, flexWrap: 'wrap', alignItems: 'center' }}>
         {VISIBLE_PATTERNS.map((pattern, _i) => {
@@ -115,20 +115,20 @@ export const PixiDeckScratch: React.FC<Props> = ({ deckId, width = 280, height =
           return (
             <pixiContainer
               key={pattern.name}
-              layout={{ width: BTN_W, height: BTN_H }}
+              layout={{ width: BTN_W, height: BTN_H, justifyContent: 'center', alignItems: 'center' }}
               eventMode={disabled ? 'none' : 'static'}
               cursor={disabled ? 'default' : 'pointer'}
               onPointerDown={() => handlePatternDown(pattern.name)}
               onPointerUp={() => handlePatternUp(pattern.name)}
               alpha={isWaiting ? 0.6 : 1}
             >
-              <pixiGraphics draw={(g: GraphicsType) => drawBtn(g, 0, BTN_W, isActive, isWaiting, disabled)} />
+              <pixiGraphics draw={(g: GraphicsType) => drawBtn(g, 0, BTN_W, isActive, isWaiting, disabled)} layout={{ position: 'absolute', width: BTN_W, height: BTN_H }} />
               <pixiBitmapText
                 text={isWaiting ? 'WAIT' : pattern.shortName}
-                style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 11, fill: 0xffffff }}
+                style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 10, fill: 0xffffff }}
                 tint={textColor}
                 alpha={textAlpha}
-                layout={{ position: 'absolute', left: 2, top: 3 }}
+                layout={{}}
               />
             </pixiContainer>
           );
