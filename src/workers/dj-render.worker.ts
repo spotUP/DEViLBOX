@@ -87,11 +87,20 @@ const AMIGA_EXTENSIONS = new Set([
 /** HivelyTracker formats — these have a dedicated WASM replayer, don't route to UADE */
 const HIVELY_EXTENSIONS = new Set(['ahx', 'hvl']);
 
+/** Amiga formats that use prefix-based naming (e.g. cust.songname, mdat.songname) */
+const AMIGA_PREFIXES = new Set([
+  'cust', 'mdat', 'smpl', 'bp', 'smod', 'dl',
+]);
+
 /** Check if a filename should use UADE (Amiga formats) vs libopenmpt (PC formats) */
 function isAmigaFormat(filename: string): boolean {
-  const ext = filename.split('.').pop()?.toLowerCase() ?? '';
+  const lower = filename.toLowerCase();
+  const ext = lower.split('.').pop() ?? '';
   if (HIVELY_EXTENSIONS.has(ext)) return false; // handled by Hively renderer
-  return AMIGA_EXTENSIONS.has(ext);
+  if (AMIGA_EXTENSIONS.has(ext)) return true;
+  // Check prefix-based formats (cust.songname, mdat.songname, etc.)
+  const prefix = lower.split('.')[0];
+  return AMIGA_PREFIXES.has(prefix);
 }
 
 /** Check if a filename should use the HivelyTracker WASM renderer */
