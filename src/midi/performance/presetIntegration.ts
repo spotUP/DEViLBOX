@@ -312,8 +312,8 @@ function inferSynthTypeFromMetadata(metadata: NKSPresetMetadata): SynthType | nu
   if (combined.includes('dub siren') || combined.includes('dubsiren')) return 'DubSiren';
   if (combined.includes('space laser') || combined.includes('spacelaser')) return 'SpaceLaser';
   if (combined.includes('synare')) return 'Synare';
-  if (combined.includes('dexed') || combined.includes('dx7')) return 'Dexed';
-  if (combined.includes('obxd') || combined.includes('ob-x')) return 'OBXd';
+  if (combined.includes('dexed') || combined.includes('dx7')) return 'DX7';
+  if (combined.includes('obxd') || combined.includes('ob-x') || combined.includes('obxf')) return 'OBXf';
   if (combined.includes('v2synth') || combined.includes('v2 synth')) return 'V2';
   if (combined.includes('vital')) return 'Vital';
   if (combined.includes('odin')) return 'Odin2';

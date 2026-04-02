@@ -31,6 +31,7 @@ interface UADEModule {
   _uade_wasm_stop(): void;
   _uade_wasm_set_looping(loop: number): void;
   _uade_wasm_set_one_subsong(on: number): void;
+  _uade_wasm_add_extra_file(namePtr: number, dataPtr: number, len: number): number;
   _malloc(size: number): number;
   _free(ptr: number): void;
   HEAPU8: Uint8Array;
@@ -155,12 +156,35 @@ async function getUADEModule(): Promise<UADEModule> {
 
 // ── Render a buffer to audio ─────────────────────────────────────────────────
 
+function addCompanionFile(mod: UADEModule, filename: string, data: Buffer): void {
+  const nameLen = filename.length * 4 + 1;
+  const namePtr = mod._malloc(nameLen);
+  if (!namePtr) return;
+  mod.stringToUTF8(filename, namePtr, nameLen);
+  const dataPtr = mod._malloc(data.byteLength);
+  if (!dataPtr) { mod._free(namePtr); return; }
+  refreshHeap(mod);
+  mod.HEAPU8.set(data, dataPtr);
+  mod._uade_wasm_add_extra_file(namePtr, dataPtr, data.byteLength);
+  mod._free(namePtr);
+  mod._free(dataPtr);
+}
+
 function renderBuffer(
   mod: UADEModule,
   fileData: Buffer,
   filename: string,
+  companionFiles?: Array<{ name: string; data: Buffer }>,
 ): { samples: Float32Array; duration: number } | null {
   const safeName = filename.replace(/[^a-zA-Z0-9._-]/g, '_').slice(0, 60);
+
+  // Write companion files BEFORE loading (e.g. TFMX smpl.* for mdat.*)
+  if (companionFiles) {
+    for (const cf of companionFiles) {
+      const safeCfName = cf.name.replace(/[^a-zA-Z0-9._-]/g, '_').slice(0, 60);
+      addCompanionFile(mod, safeCfName, cf.data);
+    }
+  }
 
   const ptr = mod._malloc(fileData.byteLength);
   if (!ptr) return null;
@@ -383,6 +407,7 @@ function detectEnergy(samples: Float32Array): number {
 router.post('/analyze', async (req: Request, res: Response) => {
   try {
     const filename = req.query.filename as string || 'unknown.mod';
+    const companionPath = req.query.companion as string | undefined;
 
     // express.raw() middleware puts the binary in req.body as a Buffer
     const fileData = req.body as Buffer;
@@ -391,8 +416,25 @@ router.post('/analyze', async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'Empty file body — send as application/octet-stream' });
     }
 
+    // Download companion file if specified (e.g. TFMX smpl.* for mdat.*)
+    let companions: Array<{ name: string; data: Buffer }> | undefined;
+    if (companionPath) {
+      try {
+        const companionUrl = `https://modland.com/pub/modules/${companionPath}`;
+        const cfResp = await fetch(companionUrl);
+        if (cfResp.ok) {
+          const cfData = Buffer.from(await cfResp.arrayBuffer());
+          const cfName = companionPath.split('/').pop() || 'companion';
+          companions = [{ name: cfName, data: cfData }];
+          console.log(`[RenderRoute] Downloaded companion: ${cfName} (${cfData.byteLength} bytes)`);
+        }
+      } catch (cfErr) {
+        console.warn(`[RenderRoute] Failed to download companion ${companionPath}:`, cfErr);
+      }
+    }
+
     const mod = await getUADEModule();
-    const result = renderBuffer(mod, fileData, filename);
+    const result = renderBuffer(mod, fileData, filename, companions);
 
     if (!result) {
       return res.status(422).json({ error: `Failed to render ${filename}` });

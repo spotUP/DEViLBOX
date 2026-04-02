@@ -19,7 +19,7 @@ import { AudioDataBus } from '@engine/vj/AudioDataBus';
 import { TurntablePhysics } from '@engine/turntable/TurntablePhysics';
 import { getDJEngine } from '@engine/dj/DJEngine';
 import * as DJActions from '@engine/dj/DJActions';
-import { ExternalLink, SkipForward, Shuffle, Pause, Play, List, Maximize, Minimize, Music } from 'lucide-react';
+import { ExternalLink, SkipForward, Shuffle, Pause, Play, List, Maximize, Minimize, Music, Zap } from 'lucide-react';
 import { useUIStore } from '@stores/useUIStore';
 import { useDJStore } from '@stores/useDJStore';
 import { useTransportStore } from '@stores/useTransportStore';
@@ -296,6 +296,23 @@ const PatternOverlayToggle: React.FC = () => {
   );
 };
 
+// ─── Max Headroom mode toggle ───────────────────────────────────────────────
+const MaxHeadroomToggle: React.FC = () => {
+  const enabled = useSettingsStore(s => s.maxHeadroomMode);
+  const toggle = useSettingsStore(s => s.setMaxHeadroomMode);
+  return (
+    <button
+      onClick={() => toggle(!enabled)}
+      className={`p-2 rounded-full transition-colors text-text-primary ${
+        enabled ? 'bg-cyan-600/50 hover:bg-cyan-600/70' : 'bg-white/10 hover:bg-white/20'
+      }`}
+      title={enabled ? 'Disable Max Headroom mode' : 'Enable Max Headroom mode'}
+    >
+      <Zap size={18} />
+    </button>
+  );
+};
+
 // ─── Conditional wrapper for pattern overlay on VJ view ─────────────────────
 const VJPatternOverlayWrapper: React.FC = () => {
   const enabled = useSettingsStore(s => s.vjPatternOverlay);
@@ -446,6 +463,7 @@ export const VJControls: React.FC<VJControlsProps> = ({
             )}
 
             <PatternOverlayToggle />
+            <MaxHeadroomToggle />
 
             {!isPopout && onPopOut && (
               <button

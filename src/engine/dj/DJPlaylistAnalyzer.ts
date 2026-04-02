@@ -11,11 +11,42 @@
 import { useDJPlaylistStore, type PlaylistTrack, type DJPlaylist } from '@/stores/useDJPlaylistStore';
 
 export interface AnalysisProgress {
-  current: number;
+  current: number;     // tracks processed so far (success + fail)
   total: number;
+  analyzed: number;    // successful analyses
+  failed: number;      // failed analyses
   trackName: string;
   status: 'analyzing' | 'done' | 'skipped' | 'error';
 }
+
+export interface AnalysisFailure {
+  trackName: string;
+  fileName: string;
+  reason: string;
+}
+
+export interface AnalysisResult {
+  analyzed: number;
+  failed: number;
+  total: number;
+  failures: AnalysisFailure[];
+}
+
+/** Candidate from Modland search when a 404 track needs manual resolution */
+export interface ModlandFixCandidate {
+  filename: string;
+  full_path: string;
+  format: string;
+  author: string;
+}
+
+/** Callback for when the analyzer finds multiple Modland matches for a 404 track.
+ *  Return the selected candidate's full_path, or null to skip. */
+export type OnFixNeeded = (
+  trackName: string,
+  originalPath: string,
+  candidates: ModlandFixCandidate[],
+) => Promise<string | null>;
 
 /**
  * Check if a playlist track is missing metadata needed for smart sorting.
@@ -41,48 +72,52 @@ export function playlistNeedsAnalysis(playlist: DJPlaylist): boolean {
  *
  * @param playlistId - The playlist to analyze
  * @param onProgress - Optional callback for UI progress updates
- * @returns Number of tracks successfully analyzed
+ * @param onFixNeeded - Optional callback when a 404 track has multiple Modland candidates
+ * @returns Analysis result with counts and failure report
  */
 export async function analyzePlaylist(
   playlistId: string,
   onProgress?: (progress: AnalysisProgress) => void,
-): Promise<number> {
+  onFixNeeded?: OnFixNeeded,
+): Promise<AnalysisResult> {
   const store = useDJPlaylistStore.getState();
   const playlist = store.playlists.find(p => p.id === playlistId);
-  if (!playlist) return 0;
+  if (!playlist) return { analyzed: 0, failed: 0, total: 0, failures: [] };
 
   const tracksToAnalyze = playlist.tracks
     .map((track, index) => ({ track, index }))
     .filter(({ track }) => trackNeedsAnalysis(track) && track.fileName.startsWith('modland:'));
 
-  if (tracksToAnalyze.length === 0) return 0;
+  if (tracksToAnalyze.length === 0) return { analyzed: 0, failed: 0, total: 0, failures: [] } as AnalysisResult;
 
   const total = tracksToAnalyze.length;
   let analyzed = 0;
+  let failed = 0;
+  const failures: AnalysisFailure[] = [];
 
   console.log(`[PlaylistAnalyzer] Analyzing ${total} tracks in "${playlist.name}"`);
 
   for (const { track, index } of tracksToAnalyze) {
     const modlandPath = track.fileName.slice('modland:'.length);
     const filename = modlandPath.split('/').pop() || 'download.mod';
+    const processed = analyzed + failed;
 
-    onProgress?.({ current: analyzed + 1, total, trackName: track.trackName, status: 'analyzing' });
+    onProgress?.({ current: processed + 1, total, analyzed, failed, trackName: track.trackName, status: 'analyzing' });
 
     try {
       // Throttle downloads to avoid Modland 429 rate limiting.
-      // Modland allows ~15 requests/minute. With render time (~5-15s per track)
-      // we need ~4s gap between downloads to stay safe.
-      if (analyzed > 0) {
-        await new Promise(r => setTimeout(r, 4000));
-      }
+      // Delay before EVERY track (not just successes) because fast 404s
+      // can trigger rate limiting too.
+      await new Promise(r => setTimeout(r, 4000));
 
-      // Download with retry on rate limit (429)
-      const { downloadModlandFile } = await import('@/lib/modlandApi');
+      // Download with retry on rate limit (429) and auto-fix on 404
+      const { downloadModlandFile, searchModland } = await import('@/lib/modlandApi');
       let buffer: ArrayBuffer;
+      let currentPath = modlandPath;
       let retries = 0;
       while (true) {
         try {
-          buffer = await downloadModlandFile(modlandPath);
+          buffer = await downloadModlandFile(currentPath);
           break;
         } catch (dlErr) {
           const msg = dlErr instanceof Error ? dlErr.message : String(dlErr);
@@ -90,21 +125,76 @@ export async function analyzePlaylist(
             retries++;
             if (retries > 8) throw dlErr;
             const wait = Math.min(60000, 5000 * Math.pow(2, retries - 1));
-            console.log(`[PlaylistAnalyzer] Rate limited, waiting ${wait / 1000}s (retry ${retries}/5)...`);
+            console.log(`[PlaylistAnalyzer] Rate limited, waiting ${wait / 1000}s (retry ${retries}/8)...`);
             await new Promise(r => setTimeout(r, wait));
             continue;
+          }
+          // On 404: search Modland for the filename and auto-fix the playlist link
+          if (msg.includes('404')) {
+            console.log(`[PlaylistAnalyzer] 404 for ${filename} — searching Modland...`);
+            try {
+              // Try exact filename first, then fuzzy (name without extension)
+              const nameNoExt = filename.replace(/\.[^.]+$/, '');
+              let candidates: ModlandFixCandidate[] = [];
+
+              for (const query of [filename, nameNoExt]) {
+                const results = await searchModland({ q: query, limit: 10 });
+                if (results.results.length > 0) {
+                  candidates = results.results.map(r => ({
+                    filename: r.filename,
+                    full_path: r.full_path,
+                    format: r.format,
+                    author: r.author,
+                  }));
+                  break;
+                }
+                await new Promise(r => setTimeout(r, 1000)); // throttle between searches
+              }
+
+              if (candidates.length > 0) {
+                let selectedPath: string | null = null;
+
+                if (candidates.length === 1) {
+                  // Single match — auto-fix
+                  selectedPath = candidates[0].full_path;
+                  console.log(`[PlaylistAnalyzer] Auto-fix: ${selectedPath}`);
+                } else if (onFixNeeded) {
+                  // Multiple matches — let user choose
+                  selectedPath = await onFixNeeded(track.trackName, modlandPath, candidates);
+                } else {
+                  // No UI callback — pick best match (shortest path = most likely)
+                  selectedPath = candidates[0].full_path;
+                  console.log(`[PlaylistAnalyzer] Auto-fix (best guess): ${selectedPath}`);
+                }
+
+                if (selectedPath) {
+                  const newFileName = `modland:${selectedPath}`;
+                  useDJPlaylistStore.getState().updateTrackMeta(playlistId, index, { fileName: newFileName });
+                  currentPath = selectedPath;
+                  await new Promise(r => setTimeout(r, 2000));
+                  continue; // retry download with new path
+                }
+              }
+            } catch { /* search failed, fall through */ }
           }
           throw dlErr;
         }
       }
 
       // Send to server-side headless renderer for analysis.
-      // The browser-side UADE render worker has a persistent IPC bug
-      // ("cmd buffer full"), so we use the Express server's Node.js UADE
-      // instance which works correctly.
       const serverBase = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+
+      // Detect TFMX companion file: mdat.* needs smpl.* from same directory
+      let companionParam = '';
+      const baseName = filename.toLowerCase();
+      if (baseName.startsWith('mdat.')) {
+        const smplName = 'smpl.' + filename.slice(5);
+        const dirPath = modlandPath.split('/').slice(0, -1).join('/');
+        companionParam = `&companion=${encodeURIComponent(dirPath + '/' + smplName)}`;
+      }
+
       const response = await fetch(
-        `${serverBase}/render/analyze?filename=${encodeURIComponent(filename)}`,
+        `${serverBase}/render/analyze?filename=${encodeURIComponent(filename)}${companionParam}`,
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/octet-stream' },
@@ -136,16 +226,28 @@ export async function analyzePlaylist(
       }
 
       analyzed++;
-      onProgress?.({ current: analyzed, total, trackName: track.trackName, status: 'done' });
-      console.log(`[PlaylistAnalyzer] ${analyzed}/${total} — ${track.trackName}: BPM=${result.bpm}, key=${result.musicalKey ?? '?'}, energy=${result.energy?.toFixed(2) ?? '?'}`);
+      const done = analyzed + failed;
+      onProgress?.({ current: done, total, analyzed, failed, trackName: track.trackName, status: 'done' });
+      console.log(`[PlaylistAnalyzer] ${done}/${total} (${analyzed} ok, ${failed} fail) — ${track.trackName}: BPM=${result.bpm}, key=${result.musicalKey ?? '?'}, energy=${result.energy?.toFixed(2) ?? '?'}`);
     } catch (err) {
-      console.error(`[PlaylistAnalyzer] Failed to analyze ${track.trackName}:`, err);
-      onProgress?.({ current: analyzed + 1, total, trackName: track.trackName, status: 'error' });
+      failed++;
+      const reason = err instanceof Error ? err.message : String(err);
+      failures.push({ trackName: track.trackName, fileName: track.fileName, reason });
+      const done = analyzed + failed;
+      onProgress?.({ current: done, total, analyzed, failed, trackName: track.trackName, status: 'error' });
+      console.warn(`[PlaylistAnalyzer] ${done}/${total} FAIL — ${track.trackName}: ${reason}`);
     }
   }
 
-  console.log(`[PlaylistAnalyzer] Complete — ${analyzed}/${total} tracks analyzed`);
-  return analyzed;
+  console.log(`[PlaylistAnalyzer] Complete — ${analyzed} analyzed, ${failed} failed out of ${total}`);
+  if (failures.length > 0) {
+    console.group('[PlaylistAnalyzer] Failure report:');
+    for (const f of failures) {
+      console.log(`  ${f.trackName}: ${f.reason}`);
+    }
+    console.groupEnd();
+  }
+  return { analyzed, failed, total, failures };
 }
 
 /**
@@ -154,19 +256,25 @@ export async function analyzePlaylist(
  */
 export async function analyzeAllPlaylists(
   onProgress?: (playlistName: string, progress: AnalysisProgress) => void,
-): Promise<number> {
+): Promise<AnalysisResult> {
   const store = useDJPlaylistStore.getState();
   let totalAnalyzed = 0;
+  let totalFailed = 0;
+  let totalCount = 0;
+  const allFailures: AnalysisFailure[] = [];
 
   for (const playlist of store.playlists) {
     if (!playlistNeedsAnalysis(playlist)) continue;
 
-    const count = await analyzePlaylist(
+    const result = await analyzePlaylist(
       playlist.id,
       (p) => onProgress?.(playlist.name, p),
     );
-    totalAnalyzed += count;
+    totalAnalyzed += result.analyzed;
+    totalFailed += result.failed;
+    totalCount += result.total;
+    allFailures.push(...result.failures);
   }
 
-  return totalAnalyzed;
+  return { analyzed: totalAnalyzed, failed: totalFailed, total: totalCount, failures: allFailures };
 }

@@ -30,8 +30,6 @@ import {
   DEFAULT_STRING_MACHINE,
   DEFAULT_FORMANT_SYNTH,
   DEFAULT_WOBBLE_BASS,
-  DEFAULT_DEXED,
-  DEFAULT_OBXD,
   DEFAULT_DRUMKIT,
   DEFAULT_MAME_VFX,
   DEFAULT_MAME_DOC,
@@ -136,12 +134,6 @@ export function getInitialConfig(synthType: string): Partial<InstrumentConfig> {
       break;
     case 'Buzzmachine':
       base.buzzmachine = { ...DEFAULT_BUZZMACHINE };
-      break;
-    case 'Dexed':
-      base.dexed = { ...DEFAULT_DEXED };
-      break;
-    case 'OBXd':
-      base.obxd = { ...DEFAULT_OBXD };
       break;
     case 'DrumKit':
       base.drumKit = { ...DEFAULT_DRUMKIT };

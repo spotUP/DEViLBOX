@@ -17,6 +17,7 @@ import { MeshoptDecoder } from 'meshoptimizer';
 import type { VJSceneProps } from './types';
 import { useSpeechActivityStore } from '@/stores/useSpeechActivityStore';
 import { useVocoderStore } from '@/stores/useVocoderStore';
+import { useSettingsStore } from '@/stores/useSettingsStore';
 
 // Morph target indices (from facecap.glb extras.targetNames)
 const MORPH = {
@@ -81,6 +82,9 @@ const wireframeMat = new THREE.MeshBasicMaterial({
   transparent: true,
   opacity: 0.85,
 });
+// Base + bright colors for audio-reactive glow (lerped in useFrame)
+const WIRE_COLOR_BASE = new THREE.Color(0x00ccff);
+const WIRE_COLOR_BRIGHT = new THREE.Color(0x88eeff);
 
 // Flat-shaded transparent fill — rendered behind wireframe
 const flatShadeMat = new THREE.MeshPhongMaterial({
@@ -185,6 +189,8 @@ export const KraftwerkHead: React.FC<VJSceneProps> = ({ audioRef }) => {
 
   // Visibility — fade in when speech is active, fade out when idle
   const smoothVisibility = useRef(0);
+  // Audio-reactive glow (material color brightness)
+  const smoothGlow = useRef(0);
 
   // Spike hair system
   const spikeMeshRef = useRef<THREE.LineSegments | null>(null);
@@ -204,6 +210,14 @@ export const KraftwerkHead: React.FC<VJSceneProps> = ({ audioRef }) => {
   const headHoldTimer = useRef(0);     // how long to hold the current target
   const headHoldDuration = useRef(2);  // randomized per target
   const headTurnSpeed = useRef(0.03);  // how fast to turn (varies)
+
+  // ── Max Headroom glitch state ──
+  const glitchFrozen = useRef(false);
+  const glitchFreezeTimer = useRef(0);
+  const glitchNextFreezeIn = useRef(1.5);
+  const glitchSnapTarget = useRef<number[]>([]);
+  const glitchIntensity = useRef(0);
+  const headJerkTimer = useRef(0);
 
   // Load the facecap model
   useEffect(() => {
@@ -344,15 +358,93 @@ export const KraftwerkHead: React.FC<VJSceneProps> = ({ audioRef }) => {
     wireframeMat.opacity = 0.85 * vis;
     flatShadeMat.opacity = 0.6 * vis;
 
+    // Audio-reactive wireframe glow — pulse material color brighter with audio
+    {
+      const a = audioRef.current;
+      const glowBass = a ? Math.min(1, (a.bassEnergy + a.subEnergy) * 2.5) : 0;
+      const glowRms = a?.rms ?? 0;
+      const glowBeat = a?.beat ? 1 : 0;
+      const glowTarget = Math.min(1, glowBass * 0.5 + glowRms * 0.3 + glowBeat * 0.5);
+      smoothGlow.current += (glowTarget - smoothGlow.current) * 0.25;
+      wireframeMat.color.lerpColors(WIRE_COLOR_BASE, WIRE_COLOR_BRIGHT, smoothGlow.current);
+    }
+
     // Audio energy
     const bass = audio ? Math.min(1, (audio.bassEnergy + audio.subEnergy) * 2.5) : 0;
     const mid = audio ? Math.min(1, audio.midEnergy * 3) : 0;
     const high = audio ? Math.min(1, audio.highEnergy * 3) : 0;
     const beat = audio?.beat ?? false;
+    const maxHeadroom = useSettingsStore.getState().maxHeadroomMode;
 
-    // ── Morph target animation ──
-    if (headMesh?.morphTargetInfluences) {
+    // ── Max Headroom: glitch freeze/snap system ──
+    const dt = 0.016;
+    if (maxHeadroom && isActive) {
+      // Audio-reactive glitch intensity
+      const gi = Math.min(1, bass * 0.6 + (beat ? 0.4 : 0) + mid * 0.2);
+      glitchIntensity.current += (gi - glitchIntensity.current) * 0.15;
+
+      if (glitchFrozen.current) {
+        glitchFreezeTimer.current -= dt;
+        if (glitchFreezeTimer.current <= 0) {
+          // End freeze → snap to random expression
+          glitchFrozen.current = false;
+          if (headMesh?.morphTargetInfluences) {
+            const m = headMesh.morphTargetInfluences;
+            const snap = glitchSnapTarget.current;
+            for (let i = 0; i < snap.length && i < m.length; i++) m[i] = snap[i];
+          }
+          glitchNextFreezeIn.current = 0.3 + Math.random() * (2.0 - glitchIntensity.current * 1.5);
+        }
+      } else {
+        glitchNextFreezeIn.current -= dt;
+        if (glitchNextFreezeIn.current <= 0) {
+          // Enter freeze — generate random snap targets
+          glitchFrozen.current = true;
+          glitchFreezeTimer.current = 0.05 + Math.random() * (0.35 - glitchIntensity.current * 0.2);
+          const count = headMesh?.morphTargetInfluences?.length ?? 52;
+          const snap = new Array(count).fill(0);
+          snap[MORPH.jawOpen] = Math.random() * 0.6;
+          snap[MORPH.mouthSmile_L] = Math.random() * 0.7;
+          snap[MORPH.mouthSmile_R] = Math.random() * 0.65;
+          snap[MORPH.browInnerUp] = Math.random() * 0.7;
+          snap[MORPH.browOuterUp_L] = Math.random() * 0.5;
+          snap[MORPH.browOuterUp_R] = Math.random() * 0.5;
+          snap[MORPH.eyeWide_L] = Math.random() * 0.8;
+          snap[MORPH.eyeWide_R] = Math.random() * 0.8;
+          const blinkSnap = Math.random() > 0.7 ? 1 : 0;
+          snap[MORPH.eyeBlink_L] = blinkSnap;
+          snap[MORPH.eyeBlink_R] = blinkSnap;
+          snap[MORPH.mouthFunnel] = Math.random() * 0.4;
+          snap[MORPH.mouthPucker] = Math.random() * 0.3;
+          snap[MORPH.cheekPuff] = Math.random() * 0.3;
+          snap[MORPH.noseSneer_L] = Math.random() * 0.3;
+          snap[MORPH.noseSneer_R] = Math.random() * 0.3;
+          snap[MORPH.mouthStretch_L] = Math.random() * 0.4;
+          snap[MORPH.mouthStretch_R] = Math.random() * 0.4;
+          glitchSnapTarget.current = snap;
+        }
+      }
+    } else if (!isActive) {
+      // Reset glitch state when head fades out
+      glitchFrozen.current = false;
+      glitchNextFreezeIn.current = 1.5;
+      glitchIntensity.current = 0;
+    }
+
+    // ── Morph target animation (skipped during Max Headroom freeze) ──
+    const skipMorphs = maxHeadroom && glitchFrozen.current;
+    if (headMesh?.morphTargetInfluences && !skipMorphs) {
       const m = headMesh.morphTargetInfluences;
+
+      // Exaggeration multipliers for Max Headroom mode
+      const jawMax = maxHeadroom ? 0.65 : 0.35;
+      const vocoderJawMax = maxHeadroom ? 0.7 : 0.45;
+      const smileBeat = maxHeadroom ? 0.7 : 0.4;
+      const smileBass = maxHeadroom ? 0.3 : 0.12;
+      const browClamp = maxHeadroom ? 0.9 : 0.5;
+      const browScale = maxHeadroom ? 2.0 : 1.0;
+      const blinkBase = maxHeadroom ? 1.0 : 2.5;
+      const eyeWideBase = maxHeadroom ? 0.3 : 0;
 
       // Compute energy derivatives — drives open/close motion on syllable boundaries
       const midDelta = Math.abs(mid - prevMid.current);
@@ -363,27 +455,22 @@ export const KraftwerkHead: React.FC<VJSceneProps> = ({ audioRef }) => {
       // Phase oscillator — creates natural mouth cycling during sustained speech
       // When vocoder is active, also drive from mic amplitude for mouth variety
       const vocoderDrive = vocoderActive ? vocoderAmplitude * 8 : 0;
-      mouthPhase.current += (mid + high + vocoderDrive) * 0.3;
+      const phaseSpeed = maxHeadroom ? 0.5 : 0.3;
+      mouthPhase.current += (mid + high + vocoderDrive) * phaseSpeed;
 
       if (speechActive || vocoderActive) {
-        // When vocoder is active, use its dedicated amplitude for tighter lip-sync
-        // micPeak values are typically 0.01-0.1 for speech → scale up aggressively
         const vocAmp = vocoderActive ? Math.min(1, vocoderAmplitude * 15) : 0;
 
-        // Jaw: combine absolute energy (baseline open) with delta (syllable pops)
-        // and a phase oscillator for natural cycling
         const syllablePop = Math.min(1, midDelta * 8 + highDelta * 6);
         const phaseModulation = Math.sin(mouthPhase.current) * 0.3 + 0.3;
-        const speechJaw = Math.min(0.35, mid * 0.15 + syllablePop * 0.2 + phaseModulation * 0.12);
-        // Vocoder jaw driven directly by amplitude — more responsive than frequency analysis
-        const vocoderJaw = Math.min(0.45, vocAmp * 0.35 + Math.sin(mouthPhase.current) * vocAmp * 0.1);
+        const speechJaw = Math.min(jawMax, mid * 0.15 + syllablePop * 0.2 + phaseModulation * 0.12);
+        const vocoderJaw = Math.min(vocoderJawMax, vocAmp * 0.35 + Math.sin(mouthPhase.current) * vocAmp * 0.1);
         const jawTarget = vocoderActive ? Math.max(speechJaw, vocoderJaw) : speechJaw;
-        smoothJaw.current += (jawTarget - smoothJaw.current) * 0.5; // fast tracking
+        smoothJaw.current += (jawTarget - smoothJaw.current) * 0.5;
         m[MORPH.jawOpen] = smoothJaw.current;
         m[MORPH.mouthLowerDown_L] = smoothJaw.current * 0.4;
         m[MORPH.mouthLowerDown_R] = smoothJaw.current * 0.4;
 
-        // Alternate between mouth shapes for variety
         const shapePhase = Math.sin(mouthPhase.current * 0.7);
         const funnel = shapePhase > 0.3 ? high * 0.5 : 0;
         const stretch = shapePhase < -0.3 ? mid * 0.4 : 0;
@@ -406,28 +493,25 @@ export const KraftwerkHead: React.FC<VJSceneProps> = ({ audioRef }) => {
       }
 
       // ── Smile — beats trigger, bass sustains ──
-      const smileTarget = beat ? 0.4 : bass * 0.12;
+      const smileTarget = beat ? smileBeat : bass * smileBass;
       smoothSmile.current += (smileTarget - smoothSmile.current) * 0.12;
       m[MORPH.mouthSmile_L] = smoothSmile.current;
-      m[MORPH.mouthSmile_R] = smoothSmile.current * 0.85; // slight asymmetry
+      m[MORPH.mouthSmile_R] = smoothSmile.current * 0.85;
 
       // ── Brows — reactive + idle micro-movement ──
-      const browReactive = high * 0.3 + midDelta * 1.5 + (speechActive ? 0.08 : 0);
+      const browReactive = (high * 0.3 + midDelta * 1.5 + (speechActive ? 0.08 : 0)) * browScale;
       const browIdle = Math.sin(t * 0.4) * 0.12 + Math.sin(t * 1.1) * 0.06;
       smoothBrow.current += (browReactive + browIdle - smoothBrow.current) * 0.2;
-      m[MORPH.browInnerUp] = Math.max(0, Math.min(0.5, smoothBrow.current));
-      // Asymmetric outer brows — one rises slightly more
+      m[MORPH.browInnerUp] = Math.max(0, Math.min(browClamp, smoothBrow.current));
       m[MORPH.browOuterUp_L] = Math.max(0, Math.sin(t * 0.3) * 0.15 + high * 0.2);
       m[MORPH.browOuterUp_R] = Math.max(0, Math.sin(t * 0.3 + 0.5) * 0.2 + high * 0.15);
-      // Furrowed brows on heavy bass
       m[MORPH.browDown_L] = bass > 0.6 ? (bass - 0.6) * 0.4 : 0;
       m[MORPH.browDown_R] = bass > 0.6 ? (bass - 0.6) * 0.35 : 0;
 
       // ── Eyes — natural saccades + slow drift + blink ──
-      // Smooth eye drift (looking around the room)
-      const lookX = Math.sin(t * 0.23) * 0.6 + Math.sin(t * 0.71) * 0.3;
-      const lookY = Math.sin(t * 0.17) * 0.4 + Math.cos(t * 0.53) * 0.2;
-      // Map to look blend shapes (both eyes move together)
+      const eyeScale = maxHeadroom ? 1.5 : 1.0;
+      const lookX = (Math.sin(t * 0.23) * 0.6 + Math.sin(t * 0.71) * 0.3) * eyeScale;
+      const lookY = (Math.sin(t * 0.17) * 0.4 + Math.cos(t * 0.53) * 0.2) * eyeScale;
       m[MORPH.eyeLookIn_L] = Math.max(0, lookX);
       m[MORPH.eyeLookOut_L] = Math.max(0, -lookX);
       m[MORPH.eyeLookIn_R] = Math.max(0, -lookX);
@@ -437,17 +521,17 @@ export const KraftwerkHead: React.FC<VJSceneProps> = ({ audioRef }) => {
       m[MORPH.eyeLookDown_L] = Math.max(0, -lookY) * 0.8;
       m[MORPH.eyeLookDown_R] = Math.max(0, -lookY) * 0.8;
 
-      // Blink — natural pattern (every 2-5s)
+      // Blink — erratic in Max Headroom, natural otherwise
       blinkTimer.current += 0.016;
-      if (blinkTimer.current > 2.5 + Math.sin(t * 0.1) * 1.5) {
+      if (blinkTimer.current > blinkBase + Math.sin(t * 0.1) * 1.5) {
         blinkTimer.current = 0;
         smoothBlink.current = 1;
       }
       smoothBlink.current *= 0.82;
       m[MORPH.eyeBlink_L] = smoothBlink.current;
       m[MORPH.eyeBlink_R] = smoothBlink.current;
-      m[MORPH.eyeWide_L] = 0;
-      m[MORPH.eyeWide_R] = 0;
+      m[MORPH.eyeWide_L] = eyeWideBase;
+      m[MORPH.eyeWide_R] = eyeWideBase;
       m[MORPH.eyeSquint_L] = 0;
       m[MORPH.eyeSquint_R] = 0;
 
@@ -462,17 +546,17 @@ export const KraftwerkHead: React.FC<VJSceneProps> = ({ audioRef }) => {
 
       // ── Jaw micro-movement — subtle breathing even when not speaking ──
       if (!speechActive) {
-        const breathe = Math.sin(t * 0.8) * 0.04 + 0.04;
+        const breatheAmp = maxHeadroom ? 0.08 : 0.04;
+        const breathe = Math.sin(t * (maxHeadroom ? 1.5 : 0.8)) * breatheAmp + breatheAmp;
         m[MORPH.jawOpen] = breathe;
       }
 
       // ── Mouth micro-expressions when idle ──
       if (!speechActive) {
-        // Mouth corner movement — reacting to music
-        const mouthTwitch = Math.sin(t * 0.6) * 0.08;
-        m[MORPH.mouthLeft] = Math.max(0, mouthTwitch);
-        m[MORPH.mouthRight] = Math.max(0, -mouthTwitch);
-        m[MORPH.mouthPucker] = Math.max(0, Math.sin(t * 0.25) * 0.1);
+        const twitch = Math.sin(t * (maxHeadroom ? 2.0 : 0.6)) * (maxHeadroom ? 0.15 : 0.08);
+        m[MORPH.mouthLeft] = Math.max(0, twitch);
+        m[MORPH.mouthRight] = Math.max(0, -twitch);
+        m[MORPH.mouthPucker] = Math.max(0, Math.sin(t * 0.25) * (maxHeadroom ? 0.2 : 0.1));
         m[MORPH.mouthPress_L] = bass * 0.15;
         m[MORPH.mouthPress_R] = bass * 0.15;
       } else {
@@ -507,6 +591,10 @@ export const KraftwerkHead: React.FC<VJSceneProps> = ({ audioRef }) => {
           + midPulse * 0.08             // mid ripples
           + highSparkle * 0.06          // high frequency sparkle
           + beatPop * 0.1;             // beat pop
+        // Max Headroom: erratic per-spike flutter
+        if (maxHeadroom && isActive && Math.random() > 0.9) {
+          length += 0.15 * glitchIntensity.current;
+        }
         length = Math.max(0.01, Math.min(0.3, length));
 
         // Scale opacity with visibility
@@ -533,32 +621,49 @@ export const KraftwerkHead: React.FC<VJSceneProps> = ({ audioRef }) => {
       spikeMat.opacity = 0.9 * vis;
     }
 
-    // ── Natural head movement — look at random targets ──
-    headHoldTimer.current += 0.016;
-    if (headHoldTimer.current > headHoldDuration.current) {
-      // Pick a new target to look at
-      headHoldTimer.current = 0;
-      headHoldDuration.current = 1.5 + Math.random() * 4; // hold 1.5-5.5 seconds
-      headTurnSpeed.current = 0.02 + Math.random() * 0.04; // vary turn speed
-
-      // Sometimes look far left/right, sometimes just glance
-      const range = Math.random() > 0.3 ? 0.2 : 0.4; // 70% subtle, 30% bigger turn
-      headTargetY.current = (Math.random() - 0.5) * 2 * range;
-      headTargetX.current = (Math.random() - 0.4) * 0.15; // mostly level, slight up/down bias
+    // ── Head movement ──
+    if (maxHeadroom && isActive) {
+      // Jerky Max Headroom head: mostly instant snaps
+      const gi = glitchIntensity.current;
+      headJerkTimer.current -= dt;
+      if (headJerkTimer.current <= 0) {
+        headJerkTimer.current = 0.2 + Math.random() * (1.5 - gi * 1.0);
+        const range = 0.15 + Math.random() * 0.45;
+        headTargetY.current = (Math.random() - 0.5) * 2 * range;
+        headTargetX.current = (Math.random() - 0.4) * 0.25;
+        // 75% instant snap, 25% smooth
+        if (Math.random() > 0.25) {
+          headCurrentY.current = headTargetY.current;
+          headCurrentX.current = headTargetX.current;
+        }
+      }
+      headCurrentY.current += (headTargetY.current - headCurrentY.current) * 0.15;
+      headCurrentX.current += (headTargetX.current - headCurrentX.current) * 0.15;
+      if (beat) {
+        beatImpulse.current = 0.12;
+        headCurrentY.current += (Math.random() - 0.5) * 0.1;
+      }
+    } else {
+      // Normal smooth head movement
+      headHoldTimer.current += dt;
+      if (headHoldTimer.current > headHoldDuration.current) {
+        headHoldTimer.current = 0;
+        headHoldDuration.current = 1.5 + Math.random() * 4;
+        headTurnSpeed.current = 0.02 + Math.random() * 0.04;
+        const range = Math.random() > 0.3 ? 0.2 : 0.4;
+        headTargetY.current = (Math.random() - 0.5) * 2 * range;
+        headTargetX.current = (Math.random() - 0.4) * 0.15;
+      }
+      headCurrentY.current += (headTargetY.current - headCurrentY.current) * headTurnSpeed.current;
+      headCurrentX.current += (headTargetX.current - headCurrentX.current) * headTurnSpeed.current;
+      if (beat) beatImpulse.current = 0.06;
     }
-
-    // Smooth interpolation toward target (ease-out feel)
-    headCurrentY.current += (headTargetY.current - headCurrentY.current) * headTurnSpeed.current;
-    headCurrentX.current += (headTargetX.current - headCurrentX.current) * headTurnSpeed.current;
-
-    // Apply head rotation with beat impulse and breathing layered on
-    if (beat) beatImpulse.current = 0.06;
     beatImpulse.current *= 0.93;
 
     group.rotation.y = headCurrentY.current;
     group.rotation.x = headCurrentX.current + beatImpulse.current;
-    group.rotation.z = Math.sin(t * 0.15) * 0.02 + headCurrentY.current * 0.05; // slight head tilt when turning
-    group.position.y = -0.05 + Math.sin(t * 0.8) * 0.005 + bass * 0.03; // gentle breathing bob
+    group.rotation.z = Math.sin(t * 0.15) * 0.02 + headCurrentY.current * 0.05;
+    group.position.y = -0.05 + Math.sin(t * 0.8) * 0.005 + bass * 0.03;
   });
 
   return (

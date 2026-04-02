@@ -38,41 +38,6 @@ export const TB303_NKS_PARAMETERS: NKSParameter[] = [
 ];
 
 // ============================================================================
-// DEXED (DX7 FM Synthesizer)
-// ============================================================================
-export const DEXED_NKS_PARAMETERS: NKSParameter[] = [
-  // Page 0: Algorithm & Global
-  { id: 'dexed.algorithm', name: 'Algorithm', section: NKSSection.SYNTHESIS, type: NKSParameterType.INT, min: 0, max: 31, defaultValue: 0, page: 0, index: 0, isAutomatable: true, accessibilityName: 'FM Algorithm' },
-  { id: 'dexed.feedback', name: 'Feedback', section: NKSSection.SYNTHESIS, type: NKSParameterType.INT, min: 0, max: 7, defaultValue: 0, page: 0, index: 1, isAutomatable: true, accessibilityName: 'Operator Feedback Amount' },
-  { id: 'dexed.lfoSpeed', name: 'LFO Speed', section: NKSSection.LFO, type: NKSParameterType.INT, min: 0, max: 99, defaultValue: 35, page: 0, index: 2, isAutomatable: true, accessibilityName: 'LFO Speed' },
-  { id: 'dexed.lfoPitchModDepth', name: 'LFO Pitch', section: NKSSection.LFO, type: NKSParameterType.INT, min: 0, max: 99, defaultValue: 0, page: 0, index: 3, isAutomatable: true, accessibilityName: 'LFO Pitch Modulation Depth' },
-  { id: 'dexed.lfoAmpModDepth', name: 'LFO Amp', section: NKSSection.LFO, type: NKSParameterType.INT, min: 0, max: 99, defaultValue: 0, page: 0, index: 4, isAutomatable: true, accessibilityName: 'LFO Amplitude Modulation Depth' },
-  { id: 'dexed.lfoWave', name: 'LFO Wave', section: NKSSection.LFO, type: NKSParameterType.SELECTOR, min: 0, max: 5, defaultValue: 0, valueStrings: ['Triangle', 'Saw Down', 'Saw Up', 'Square', 'Sine', 'S&H'], page: 0, index: 5, isAutomatable: true, accessibilityName: 'LFO Waveform' },
-  { id: 'dexed.transpose', name: 'Transpose', section: NKSSection.SYNTHESIS, type: NKSParameterType.INT, min: -24, max: 24, defaultValue: 0, unit: 'semi', page: 0, index: 6, isAutomatable: true, accessibilityName: 'Global Transpose' },
-  { id: 'dexed.oscSync', name: 'Osc Sync', section: NKSSection.SYNTHESIS, type: NKSParameterType.BOOLEAN, min: 0, max: 1, defaultValue: 1, page: 0, index: 7, isAutomatable: true, accessibilityName: 'Oscillator Key Sync' },
-  // Page 1-6: Operators 1-6 (each has Level, Coarse, Fine, Detune, R1, R2, R3, R4)
-  ...generateDexedOperatorPages(),
-];
-
-function generateDexedOperatorPages(): NKSParameter[] {
-  const params: NKSParameter[] = [];
-  for (let op = 0; op < 6; op++) {
-    const page = op + 1;
-    params.push(
-      { id: `dexed.op${op + 1}.level`, name: `OP${op + 1} Level`, section: NKSSection.SYNTHESIS, type: NKSParameterType.INT, min: 0, max: 99, defaultValue: op === 0 ? 99 : 0, page, index: 0, isAutomatable: true },
-      { id: `dexed.op${op + 1}.coarse`, name: `OP${op + 1} Coarse`, section: NKSSection.SYNTHESIS, type: NKSParameterType.INT, min: 0, max: 31, defaultValue: 1, page, index: 1, isAutomatable: true },
-      { id: `dexed.op${op + 1}.fine`, name: `OP${op + 1} Fine`, section: NKSSection.SYNTHESIS, type: NKSParameterType.INT, min: 0, max: 99, defaultValue: 0, page, index: 2, isAutomatable: true },
-      { id: `dexed.op${op + 1}.detune`, name: `OP${op + 1} Detune`, section: NKSSection.SYNTHESIS, type: NKSParameterType.INT, min: 0, max: 14, defaultValue: 7, page, index: 3, isAutomatable: true },
-      { id: `dexed.op${op + 1}.egRate1`, name: `OP${op + 1} R1`, section: NKSSection.ENVELOPE, type: NKSParameterType.INT, min: 0, max: 99, defaultValue: 99, page, index: 4, isAutomatable: true },
-      { id: `dexed.op${op + 1}.egRate2`, name: `OP${op + 1} R2`, section: NKSSection.ENVELOPE, type: NKSParameterType.INT, min: 0, max: 99, defaultValue: 99, page, index: 5, isAutomatable: true },
-      { id: `dexed.op${op + 1}.egRate3`, name: `OP${op + 1} R3`, section: NKSSection.ENVELOPE, type: NKSParameterType.INT, min: 0, max: 99, defaultValue: 99, page, index: 6, isAutomatable: true },
-      { id: `dexed.op${op + 1}.egRate4`, name: `OP${op + 1} R4`, section: NKSSection.ENVELOPE, type: NKSParameterType.INT, min: 0, max: 99, defaultValue: 99, page, index: 7, isAutomatable: true },
-    );
-  }
-  return params;
-}
-
-// ============================================================================
 // OBXd (Oberheim OB-X)
 // ============================================================================
 export const OBXD_NKS_PARAMETERS: NKSParameter[] = [
@@ -1324,8 +1289,6 @@ export const GENERIC_NKS_PARAMETERS: NKSParameter[] = [
 export const SYNTH_PARAMETER_MAPS: Partial<Record<SynthType, NKSParameter[]>> = {
   // Core synths
   'TB303': TB303_NKS_PARAMETERS,
-  'Dexed': DEXED_NKS_PARAMETERS,
-  'OBXd': OBXD_NKS_PARAMETERS,
   'DubSiren': DUBSIREN_NKS_PARAMETERS,
   'SpaceLaser': SPACELASER_NKS_PARAMETERS,
   'Synare': SYNARE_NKS_PARAMETERS,
@@ -1461,7 +1424,6 @@ export const SYNTH_PARAMETER_MAPS: Partial<Record<SynthType, NKSParameter[]>> = 
   'BuzzM4': BUZZM4_NKS_PARAMETERS,
 
   // VSTBridge synths - dedicated parameter maps
-  'DexedBridge': DEXED_NKS_PARAMETERS,
   'TonewheelOrgan': TONEWHEEL_NKS_PARAMETERS,
   'Melodica': MELODICA_NKS_PARAMETERS,
   'Vital': VITAL_NKS_PARAMETERS,
@@ -1615,8 +1577,6 @@ export interface SynthVisualIdentity {
 
 export const SYNTH_VISUAL_IDENTITY: Partial<Record<SynthType, SynthVisualIdentity>> = {
   'TB303':        { color: '#FF6600', controlColor: 0xFF6600, shortName: 'TB303' },
-  'Dexed':        { color: '#3366FF', controlColor: 0x3366FF, shortName: 'Dexed' },
-  'OBXd':         { color: '#CC3333', controlColor: 0xCC3333, shortName: 'OB-Xd' },
   'V2':           { color: '#8833CC', controlColor: 0x8833CC, shortName: 'V2 Synth' },
   'MonoSynth':    { color: '#00CC66', controlColor: 0x00CC66, shortName: 'MonoSynth' },
   'DuoSynth':     { color: '#009999', controlColor: 0x009999, shortName: 'DuoSynth' },
@@ -1896,24 +1856,6 @@ const ENGINE_PARAM_MAP: Record<string, string> = {
   'synare.filter.decay': 'synare.filterDecay',
   'synare.sweep.amount': 'synare.sweepAmount',
   'synare.sweep.time': 'synare.sweepTime',
-
-  // Dexed
-  'dexed.algorithm': 'dexed.algorithm',
-  'dexed.feedback': 'dexed.feedback',
-  'dexed.lfoSpeed': 'dexed.lfoSpeed',
-  'dexed.lfoPitchModDepth': 'dexed.lfoPitchMod',
-  'dexed.lfoAmpModDepth': 'dexed.lfoAmpMod',
-  'dexed.transpose': 'dexed.transpose',
-
-  // OBXd
-  'obxd.filterCutoff': 'obxd.filterCutoff',
-  'obxd.filterResonance': 'obxd.filterReso',
-  'obxd.filterEnvAmount': 'obxd.filterEnv',
-  'obxd.ampAttack': 'obxd.ampAttack',
-  'obxd.ampDecay': 'obxd.ampDecay',
-  'obxd.masterVolume': 'obxd.volume',
-  'obxd.osc1Level': 'obxd.osc1Level',
-  'obxd.osc2Level': 'obxd.osc2Level',
 
   // SpaceLaser
   'spacelaser.laser.startFreq': 'spacelaser.startFreq',

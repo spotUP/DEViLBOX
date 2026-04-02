@@ -17,7 +17,7 @@ import { SAM_PRESETS } from '../samPresets';
 import { PINK_TROMBONE_FACTORY_PRESETS } from '../pinkTrombonePresets';
 import { DECTALK_PRESETS } from '../dectalkPresets';
 import { MAME_CHIP_PRESETS } from '../mameChipPresets';
-import { DEXED_FACTORY_PRESETS, OBXD_FACTORY_PRESETS } from '../jucePresets';
+import { DX7_FACTORY_PRESETS, OBXD_FACTORY_PRESETS } from '../jucePresets';
 import { FURNACE_CHIP_PRESETS } from '../furnaceChipPresets';
 import { SAMPLE_PACK_PRESETS, WAVETABLE_PACK_PRESETS } from '../samplePresets';
 import { AMI_PRESETS } from '../amiPresets';
@@ -92,7 +92,7 @@ export const FACTORY_PRESETS: InstrumentPreset['config'][] = [
   ...DECTALK_PRESETS,
   ...DRUMNIBUS_PRESETS,
   ...DRUMNIBUS_KIT_PRESETS,
-  ...DEXED_FACTORY_PRESETS,
+  ...DX7_FACTORY_PRESETS,
   ...OBXD_FACTORY_PRESETS,
   ...SAMPLE_PACK_PRESETS,
   ...WAVETABLE_PACK_PRESETS,
@@ -120,7 +120,7 @@ export const FACTORY_PRESETS: InstrumentPreset['config'][] = [
   { type: 'synth' as const, name: 'WAM TinySynth Init', synthType: 'WAMTinySynth' as const, volume: -8, pan: 0, effects: [] },
   { type: 'synth' as const, name: 'WAM Faust Flute Init', synthType: 'WAMFaustFlute' as const, volume: -8, pan: 0, effects: [] },
   // External plugin bridges
-  { type: 'synth' as const, name: 'Dexed Bridge Init', synthType: 'DexedBridge' as const, volume: -8, pan: 0, effects: [] },
+  { type: 'synth' as const, name: 'DX7 Init', synthType: 'DX7' as const, volume: -8, pan: 0, effects: [] },
   { type: 'synth' as const, name: 'OBXf Init', synthType: 'OBXf' as const, volume: -8, pan: 0, effects: [] },
   { type: 'synth' as const, name: 'D50 Init', synthType: 'D50' as const, volume: -8, pan: 0, effects: [] },
   { type: 'synth' as const, name: 'Surge Init', synthType: 'Surge' as const, volume: -8, pan: 0, effects: [] },
@@ -159,7 +159,7 @@ export const PRESET_CATEGORIES = {
   Sam: SAM_PRESETS,
   Synare: SYNARE_PRESETS,
   Drumnibus: [...DRUMNIBUS_KIT_PRESETS, ...DRUMNIBUS_PRESETS],
-  Dexed: DEXED_FACTORY_PRESETS,
+  DX7: DX7_FACTORY_PRESETS,
   OBXd: OBXD_FACTORY_PRESETS,
   Samples: SAMPLE_PACK_PRESETS,
   Wavetables: WAVETABLE_PACK_PRESETS,

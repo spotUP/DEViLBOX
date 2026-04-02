@@ -123,14 +123,12 @@ export const VOLUME_NORMALIZATION_OFFSETS: Record<string, number> = {
   'ChiptuneModule': -6,  // Measured: -3.8dB → decrease 6
   'DrumKit': 0,          // Kept (test sample may not load)
   // MAME/WASM synths - CAUTION: test runner can't measure these (WASM doesn't init in test)
-  // These offsets are GUESSES. Only Dexed/OBXd reliably init in test environment.
+  // These offsets are GUESSES. Only Dexed reliably inits in test environment.
   'MAMEVFX': 0,          // Reset to 0 - was unmeasured guess of 8
   'MAMEDOC': 0,          // Reset to 0 - was unmeasured guess of 8
   'MAMERSA': 0,          // Reset to 0 - was unmeasured guess of 8
   'MAMESWP30': 0,        // Reset to 0 - was unmeasured guess of 8
   'CZ101': 0,            // Reset to 0 - was unmeasured guess of 10
-  'Dexed': 41,           // VERIFIED: measured -9.9dB with this offset (correct!)
-  'OBXd': 9,             // VERIFIED: measured -10.0dB with this offset (correct!)
   'MdaEPiano': 6,        // Initial estimate — Rhodes is naturally quiet
   'MdaJX10': 4,          // Initial estimate
   'MdaDX10': 4,          // Initial estimate

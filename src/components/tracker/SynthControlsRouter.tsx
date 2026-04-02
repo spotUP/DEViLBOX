@@ -10,7 +10,7 @@ import type { InstrumentConfig, MAMEConfig } from '@typedefs/instrument';
 import { getToneEngine } from '@engine/ToneEngine';
 import {
   DEFAULT_DUB_SIREN, DEFAULT_SPACE_LASER, DEFAULT_V2, DEFAULT_V2_SPEECH,
-  DEFAULT_SYNARE, DEFAULT_DEXED, DEFAULT_OBXD, DEFAULT_SAM, DEFAULT_PINK_TROMBONE, DEFAULT_DECTALK,
+  DEFAULT_SYNARE, DEFAULT_SAM, DEFAULT_PINK_TROMBONE, DEFAULT_DECTALK,
   DEFAULT_HARMONIC_SYNTH as DEFAULT_HARMONIC_SYNTH_VAL,
   DEFAULT_HIVELY, DEFAULT_JAMCRACKER,
   DEFAULT_SOUNDMON, DEFAULT_SIDMON, DEFAULT_DIGMUG, DEFAULT_FC,
@@ -71,12 +71,6 @@ const DECtalkControls = lazy(() =>
 );
 const SynareControls = lazy(() =>
   import('@components/instruments/controls/SynareControls').then(m => ({ default: m.SynareControls }))
-);
-const DexedControls = lazy(() =>
-  import('@components/instruments/controls/DexedControls').then(m => ({ default: m.DexedControls }))
-);
-const OBXdControls = lazy(() =>
-  import('@components/instruments/controls/OBXdControls').then(m => ({ default: m.OBXdControls }))
 );
 const MdaEPianoControls = lazy(() =>
   import('@components/instruments/controls/MdaEPianoControls').then(m => ({ default: m.MdaEPianoControls }))
@@ -314,18 +308,6 @@ export const SynthControlsRouter: React.FC<SynthControlsRouterProps> = ({ instru
     if (synthType === 'Synare') {
       const cfg = deepMerge(DEFAULT_SYNARE, instrument.synare || {});
       return <SynareControls config={cfg} instrumentId={instrument.id} onChange={(u) => onUpdate({ synare: { ...cfg, ...u } })} />;
-    }
-
-    // ── Dexed (DX7) ─────────────────────────────────────────
-    if (synthType === 'Dexed') {
-      const cfg = deepMerge(DEFAULT_DEXED, instrument.dexed || {});
-      return <DexedControls config={cfg} onChange={(u) => onUpdate({ dexed: { ...cfg, ...u } })} />;
-    }
-
-    // ── OBXd (Oberheim) ─────────────────────────────────────
-    if (synthType === 'OBXd') {
-      const cfg = deepMerge(DEFAULT_OBXD, instrument.obxd || {});
-      return <OBXdControls config={cfg} onChange={(u) => onUpdate({ obxd: { ...cfg, ...u } })} />;
     }
 
     // ── MDA ePiano (Fender Rhodes) ──────────────────────────

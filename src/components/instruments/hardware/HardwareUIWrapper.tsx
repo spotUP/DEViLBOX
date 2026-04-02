@@ -75,8 +75,8 @@ const DEDICATED_UI_MAP: Partial<Record<SynthType, React.ComponentType<HWComponen
   // Synthesizers - Classic
   TB303: TB303Hardware,         // Roland TB-303 Bass Line (1981)
   CZ101: CZ101Hardware,         // Casio CZ-101 Phase Distortion (1984)
-  Dexed: DexedHardwareUI as unknown as React.ComponentType<HWComponentProps>,  // Yamaha DX7 FM Synthesis (1983)
-  OBXd: OBXfHardwareUI as unknown as React.ComponentType<HWComponentProps>,   // Oberheim OB-X Analog (1979) — JUCE OB-Xf UI
+  DX7: DexedHardwareUI as unknown as React.ComponentType<HWComponentProps>,  // Yamaha DX7 FM Synthesis (1983)
+  OBXf: OBXfHardwareUI as unknown as React.ComponentType<HWComponentProps>,   // Oberheim OB-X Analog (1979) — JUCE OB-Xf UI
   Odin2: Odin2HardwareUI as unknown as React.ComponentType<HWComponentProps>, // Odin2 Semi-Modular Synth — JUCE Odin2 UI
   Helm: HelmHardwareUI as unknown as React.ComponentType<HWComponentProps>,   // Helm Polyphonic Synth — JUCE Helm UI
   Surge: SurgeHardwareUI as unknown as React.ComponentType<HWComponentProps>, // Surge XT Hybrid Synth — JUCE Surge XT UI

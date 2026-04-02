@@ -385,8 +385,6 @@ export const SYNTH_CATEGORIES: SynthCategory[] = [
     name: '🎛️ JUCE Synths',
     description: 'Professional quality WASM-based synth emulations',
     synths: [
-      SYNTH_INFO.Dexed,
-      SYNTH_INFO.OBXd,
       SYNTH_INFO.MdaEPiano,
       SYNTH_INFO.MdaJX10,
       SYNTH_INFO.MdaDX10,
@@ -420,7 +418,6 @@ export const SYNTH_CATEGORIES: SynthCategory[] = [
       SYNTH_INFO.Vital,
       SYNTH_INFO.Surge,
       SYNTH_INFO.Odin2,
-      SYNTH_INFO.DexedBridge,
       SYNTH_INFO.Helm,
       SYNTH_INFO.Sorcer,
       SYNTH_INFO.Amsynth,

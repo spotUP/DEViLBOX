@@ -1,0 +1,7 @@
+{
+	"InstallScripts" : 
+	[
+		"/Users/spot/Code/DEViLBOX/juce-wasm/surge-ui/build-bridge/cmake_install.cmake"
+	],
+	"Parallel" : false
+}

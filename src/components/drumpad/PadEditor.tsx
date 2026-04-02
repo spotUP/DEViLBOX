@@ -55,8 +55,6 @@ const SYNTH_TYPE_GROUPS: { label: string; types: { value: SynthType; label: stri
     { value: 'PinkTrombone', label: 'Pink Trombone' },
   ]},
   { label: 'WASM Synths', types: [
-    { value: 'Dexed', label: 'Dexed (DX7)' },
-    { value: 'OBXd', label: 'OB-Xd' },
     { value: 'ToneAM' as SynthType, label: 'amsynth' },
     { value: 'SynthV1', label: 'SynthV1' },
     { value: 'TalNoizeMaker', label: 'TAL NoiseMaker' },

@@ -28,21 +28,21 @@ import type { TrackerCell, Pattern } from '@/types/tracker';
 const NOTE_NAMES = ['C-', 'C#', 'D-', 'D#', 'E-', 'F-', 'F#', 'G-', 'G#', 'A-', 'A#', 'B-'];
 
 function fmtNote(note: number): string {
-  if (note <= 0) return '\u00B7\u00B7\u00B7';
+  if (!note || note <= 0) return '\u00B7\u00B7\u00B7';
   if (note === 97 || note === 255) return '===';
   const octave = Math.floor((note - 1) / 12);
   return `${NOTE_NAMES[(note - 1) % 12]}${octave}`;
 }
 
 function fmtHex(val: number, digits: number): string {
-  if (val <= 0) return '\u00B7'.repeat(digits);
+  if (!val || val <= 0) return '\u00B7'.repeat(digits);
   return val.toString(16).toUpperCase().padStart(digits, '0');
 }
 
 function fmtEffect(typ: number, param: number): string {
-  if (typ <= 0 && param <= 0) return '\u00B7\u00B7\u00B7';
-  const t = typ > 0 ? typ.toString(16).toUpperCase() : '\u00B7';
-  const p = param > 0 ? param.toString(16).toUpperCase().padStart(2, '0') : '\u00B7\u00B7';
+  if ((!typ || typ <= 0) && (!param || param <= 0)) return '\u00B7\u00B7\u00B7';
+  const t = (typ && typ > 0) ? typ.toString(16).toUpperCase() : '\u00B7';
+  const p = (param && param > 0) ? param.toString(16).toUpperCase().padStart(2, '0') : '\u00B7\u00B7';
   return `${t}${p}`;
 }
 
