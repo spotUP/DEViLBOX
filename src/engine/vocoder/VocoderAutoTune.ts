@@ -25,9 +25,8 @@ function noteToFreq(note: number): number {
 
 export class VocoderAutoTune {
   private engine: VocoderEngine;
-  private unsubscribe: (() => void) | null = null;
+  private timer: ReturnType<typeof setInterval> | null = null;
   private lastNote = 0;
-  private activeDeck: 'A' | 'B' = 'A';
   enabled = false;
 
   constructor(engine: VocoderEngine) {
@@ -35,68 +34,64 @@ export class VocoderAutoTune {
   }
 
   start(): void {
-    if (this.unsubscribe) return;
+    if (this.timer) return;
     this.enabled = true;
 
-    // Subscribe to position changes on whichever deck is playing
-    this.unsubscribe = useDJStore.subscribe(
-      (s) => {
-        // Track whichever deck is currently playing
-        const aPlaying = s.decks.A.isPlaying;
-        const bPlaying = s.decks.B.isPlaying;
-        if (aPlaying && !bPlaying) this.activeDeck = 'A';
-        else if (bPlaying && !aPlaying) this.activeDeck = 'B';
-        // If both playing (transition), follow the one with crossfader
-        else if (aPlaying && bPlaying) {
-          this.activeDeck = s.crossfaderPosition < 0.5 ? 'A' : 'B';
-        }
-        return s.decks[this.activeDeck].pattPos;
-      },
-      () => this.onRowChange(),
-    );
+    // Poll at ~30Hz instead of subscribing to every store change.
+    // The subscribe approach caused freezes because the selector ran on
+    // every DJ store update (volume, EQ, crossfader animations, etc.).
+    this.timer = setInterval(() => this.tick(), 33);
 
     console.log('[AutoTune] Started — following melody from active deck');
   }
 
   stop(): void {
-    this.unsubscribe?.();
-    this.unsubscribe = null;
+    if (this.timer) {
+      clearInterval(this.timer);
+      this.timer = null;
+    }
     this.enabled = false;
     console.log('[AutoTune] Stopped');
   }
 
-  private onRowChange(): void {
+  private tick(): void {
     const djEngine = getDJEngineIfActive();
     if (!djEngine) return;
 
-    const deck = djEngine.getDeck(this.activeDeck);
+    const s = useDJStore.getState();
+
+    // Pick the active deck
+    const aPlaying = s.decks.A.isPlaying;
+    const bPlaying = s.decks.B.isPlaying;
+    let deckId: 'A' | 'B' = 'A';
+    if (aPlaying && !bPlaying) deckId = 'A';
+    else if (bPlaying && !aPlaying) deckId = 'B';
+    else if (aPlaying && bPlaying) deckId = s.crossfaderPosition < 0.5 ? 'A' : 'B';
+
+    const deck = djEngine.getDeck(deckId);
     const song = deck.replayer.getSong();
     if (!song?.patterns?.length || !song.songPositions?.length) return;
 
-    const state = useDJStore.getState().decks[this.activeDeck];
-    const patIdx = song.songPositions[state.songPos] ?? 0;
+    const deckState = s.decks[deckId];
+    const patIdx = song.songPositions[deckState.songPos] ?? 0;
     const pattern = song.patterns[patIdx];
     if (!pattern?.channels) return;
 
-    const row = state.pattPos;
+    const row = deckState.pattPos;
 
     // Find the highest pitched note on this row (likely the melody)
     let bestNote = 0;
     for (const ch of pattern.channels) {
       if (!ch.rows || row >= ch.rows.length) continue;
       const cell = ch.rows[row];
-      if (cell && cell.note > 0 && cell.note < 97) { // 97 = note-off
-        if (cell.note > bestNote) {
-          bestNote = cell.note;
-        }
+      if (cell && cell.note > 0 && cell.note < 97) {
+        if (cell.note > bestNote) bestNote = cell.note;
       }
     }
 
-    // Only update if we found a real note and it changed
     if (bestNote > 0 && bestNote !== this.lastNote) {
       this.lastNote = bestNote;
       const freq = noteToFreq(bestNote);
-      // Clamp to reasonable vocal range for vocoder carrier
       const clamped = Math.max(65, Math.min(1000, freq));
       this.engine.setCarrierFreq(clamped);
     }
