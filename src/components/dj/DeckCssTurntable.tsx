@@ -69,6 +69,9 @@ export const DeckCssTurntable: React.FC<DeckCssTurntableProps> = ({ deckId }) =>
 
   // ── Physics rAF loop ──────────────────────────────────────────────────────
 
+  // Cache engine deck ref to avoid repeated lookups in hot loop
+  const engineDeckRef = useRef<ReturnType<ReturnType<typeof getDJEngine>['getDeck']> | null>(null);
+
   useEffect(() => {
     let prevRate = 1;
     let scratchIntegrating = false;
@@ -77,11 +80,16 @@ export const DeckCssTurntable: React.FC<DeckCssTurntableProps> = ({ deckId }) =>
       const dt = lastTickRef.current > 0 ? (now - lastTickRef.current) / 1000 : 0;
       lastTickRef.current = now;
 
-      // Lazy-init engine physics
-      if (!physicsRef.current) {
-        try { physicsRef.current = getDJEngine().getDeck(deckId).physics; } catch { /* engine not ready */ }
+      // Lazy-init engine refs (once, not every frame)
+      if (!physicsRef.current || !engineDeckRef.current) {
+        try {
+          const deck = getDJEngine().getDeck(deckId);
+          physicsRef.current = deck.physics;
+          engineDeckRef.current = deck;
+        } catch { /* engine not ready */ }
       }
       const physics = physicsRef.current;
+      const engineDeck = engineDeckRef.current;
 
       const { isPlaying: playing, effectiveBPM: bpm } = playStateRef.current;
       const baseBPM = bpm || 120;
@@ -94,19 +102,18 @@ export const DeckCssTurntable: React.FC<DeckCssTurntableProps> = ({ deckId }) =>
 
           if (isScratchActiveRef.current && !scratchIntegrating) {
             scratchIntegrating = true;
-            let posSec: number;
-            const deck = useDJStore.getState().decks[deckId];
-            if (deck.playbackMode === 'audio') {
-              try { posSec = getDJEngine().getDeck(deckId).audioPlayer.getPosition(); }
-              catch { posSec = deck.audioPosition; }
-            } else {
-              posSec = deck.elapsedMs / 1000;
+            // Read position directly from engine (no store access)
+            let posSec = 0;
+            if (engineDeck) {
+              try { posSec = engineDeck.playbackMode === 'audio' ? engineDeck.audioPlayer.getPosition() : engineDeck.replayer.getElapsedMs() / 1000; }
+              catch { /* fallback 0 */ }
             }
             angleRef.current = posSec * omegaNormal;
           }
 
           if (isScratchActiveRef.current && Math.abs(rate - prevRate) > 0.01) {
-            DJActions.setScratchVelocity(deckId, rate);
+            // Update velocity directly on store without triggering full action chain
+            useDJStore.getState().setDeckState(deckId, { scratchVelocity: rate });
             prevRate = rate;
           }
 
@@ -125,18 +132,11 @@ export const DeckCssTurntable: React.FC<DeckCssTurntableProps> = ({ deckId }) =>
           }
         }
 
-        if (!scratchIntegrating) {
-          const deck = useDJStore.getState().decks[deckId];
-          let posSec: number;
-          if (deck.playbackMode === 'audio') {
-            try {
-              posSec = getDJEngine().getDeck(deckId).audioPlayer.getPosition();
-            } catch {
-              posSec = deck.audioPosition;
-            }
-          } else {
-            posSec = deck.elapsedMs / 1000;
-          }
+        if (!scratchIntegrating && engineDeck) {
+          // Read position directly from engine — avoid useDJStore.getState() in hot loop
+          let posSec = 0;
+          try { posSec = engineDeck.playbackMode === 'audio' ? engineDeck.audioPlayer.getPosition() : engineDeck.replayer.getElapsedMs() / 1000; }
+          catch { /* fallback 0 */ }
           angleRef.current = posSec * omegaNormal;
         }
       }
