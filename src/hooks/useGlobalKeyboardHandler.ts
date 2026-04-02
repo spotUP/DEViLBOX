@@ -16,6 +16,7 @@ import { CommandRegistry } from '@engine/keyboard/CommandRegistry';
 import { KeyboardNormalizer } from '@engine/keyboard/KeyboardNormalizer';
 import { KeyComboFormatter } from '@engine/keyboard/KeyComboFormatter';
 import type { PlatformType, CommandContext, Command } from '@engine/keyboard/types';
+import { useVocoderStore } from '@stores/useVocoderStore';
 
 // Import command implementations
 import { playRow } from '@engine/keyboard/commands/playRow';
@@ -1807,7 +1808,7 @@ interface UseGlobalKeyboardHandlerOptions {
 
 export function useGlobalKeyboardHandler(options: UseGlobalKeyboardHandlerOptions = {}) {
   const { disabled = false } = options;
-  const { activeScheme, platformOverride } = useKeyboardStore();
+  const { activeScheme, platformOverride, customBindingsVersion } = useKeyboardStore();
   const schemeLoaderRef = useRef<SchemeLoader>(new SchemeLoader());
   const schemeLoadedRef = useRef<string | null>(null);
   /** Track held commands by combo → commandName for keyup release */
@@ -1818,17 +1819,34 @@ export function useGlobalKeyboardHandler(options: UseGlobalKeyboardHandlerOption
     initializeRegistry();
   }, []);
 
-  // Load scheme when it changes
+  // Load scheme when it changes (or when custom bindings are updated)
+  const customBindingsVersionRef = useRef(customBindingsVersion);
   useEffect(() => {
     if (disabled) return;
-    if (schemeLoadedRef.current === activeScheme) return;
+    const isCustomUpdate = activeScheme === 'custom' && customBindingsVersion !== customBindingsVersionRef.current;
+    customBindingsVersionRef.current = customBindingsVersion;
+    if (!isCustomUpdate && schemeLoadedRef.current === activeScheme) return;
 
     const loadScheme = async () => {
       try {
-        await schemeLoaderRef.current.loadScheme(activeScheme);
+        if (activeScheme === 'custom') {
+          // Load custom bindings from store, or init from fasttracker2 if none exist
+          let bindings = useKeyboardStore.getState().customBindings;
+          if (!bindings) {
+            const tempLoader = new SchemeLoader();
+            const ft2 = await tempLoader.loadScheme('fasttracker2');
+            bindings = { pc: { ...ft2.platform.pc }, mac: { ...ft2.platform.mac } };
+            useKeyboardStore.getState().initCustomFromScheme(bindings, 'fasttracker2');
+          }
+          schemeLoaderRef.current.loadCustomScheme(bindings);
+        } else {
+          await schemeLoaderRef.current.loadScheme(activeScheme);
+        }
         schemeLoadedRef.current = activeScheme;
         // Update editor behavior profile to match the new scheme
-        useEditorStore.getState().setActiveBehavior(activeScheme);
+        useEditorStore.getState().setActiveBehavior(
+          activeScheme === 'custom' ? useKeyboardStore.getState().baseScheme : activeScheme
+        );
         console.log(`[Keyboard] Loaded scheme: ${activeScheme}`);
       } catch (error) {
         console.error(`[Keyboard] Failed to load scheme '${activeScheme}':`, error);
@@ -1847,7 +1865,7 @@ export function useGlobalKeyboardHandler(options: UseGlobalKeyboardHandlerOption
     };
 
     loadScheme();
-  }, [activeScheme, disabled]);
+  }, [activeScheme, customBindingsVersion, disabled]);
 
   // Determine platform
   const getPlatform = useCallback((): PlatformType => {
@@ -1902,6 +1920,15 @@ export function useGlobalKeyboardHandler(options: UseGlobalKeyboardHandlerOption
         return;
       }
 
+      // Global push-to-talk: Cmd+Alt+Space (Meta+Alt+Space)
+      if (e.code === 'Space' && e.metaKey && e.altKey && !e.shiftKey && !e.ctrlKey) {
+        e.preventDefault();
+        e.stopPropagation();
+        useVocoderStore.getState().setPTT(true);
+        (e as any).__handled = true;
+        return;
+      }
+
       // Normalize the event
       const normalized = KeyboardNormalizer.normalize(e);
       const platform = getPlatform();
@@ -1948,6 +1975,13 @@ export function useGlobalKeyboardHandler(options: UseGlobalKeyboardHandlerOption
         e.target instanceof HTMLTextAreaElement ||
         (e.target as HTMLElement)?.isContentEditable
       ) {
+        return;
+      }
+
+      // Release PTT when Space is released (any modifier state — user may release modifiers first)
+      if (e.code === 'Space' && useVocoderStore.getState().pttActive) {
+        e.preventDefault();
+        useVocoderStore.getState().setPTT(false);
         return;
       }
 

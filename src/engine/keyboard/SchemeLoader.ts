@@ -62,6 +62,28 @@ export class SchemeLoader {
   }
 
   /**
+   * Load a custom scheme from in-memory bindings (no fetch).
+   * Used when activeScheme === 'custom'.
+   */
+  loadCustomScheme(bindings: { pc: Record<string, string>; mac: Record<string, string> }): void {
+    this.currentScheme = {
+      name: 'Custom',
+      version: '1.0.0',
+      platform: {
+        pc: { ...bindings.pc },
+        mac: { ...bindings.mac },
+      },
+    };
+  }
+
+  /**
+   * Get the current loaded scheme (for reading bindings).
+   */
+  getCurrentScheme(): KeyboardScheme | null {
+    return this.currentScheme;
+  }
+
+  /**
    * Get command name for a key combination
    * @param keyCombo - Key combination string (e.g., 'Ctrl+C', 'Space')
    * @param platform - Target platform ('pc' or 'mac')
