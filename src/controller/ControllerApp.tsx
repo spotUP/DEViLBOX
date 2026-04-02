@@ -154,21 +154,31 @@ const Crossfader: React.FC<{ value: number }> = ({ value }) => {
 
 const PTTButton: React.FC<{ duckEnabled: boolean; webrtc: ControllerWebRTC | null }> = ({ duckEnabled, webrtc }) => {
   const [live, setLive] = useState(false);
+  const liveRef = useRef(false); // avoid stale closure in touch handlers
 
   const onDown = useCallback(() => {
+    if (liveRef.current) return; // already live
+    liveRef.current = true;
     setLive(true);
+    console.log('[PTT] DOWN — duck:', duckEnabled);
     webrtc?.setMicEnabled(true);
-    if (duckEnabled) ws.call('dj_duck', {});
+    if (duckEnabled) ws.call('dj_duck', {}).catch(() => {});
   }, [duckEnabled, webrtc]);
 
   const onUp = useCallback(() => {
+    if (!liveRef.current) return; // already released
+    liveRef.current = false;
     setLive(false);
+    console.log('[PTT] UP — unduck:', duckEnabled);
     webrtc?.setMicEnabled(false);
-    if (duckEnabled) ws.call('dj_unduck', {});
+    if (duckEnabled) ws.call('dj_unduck', {}).catch(() => {});
   }, [duckEnabled, webrtc]);
 
   return (
     <button
+      onTouchStart={(e) => { e.preventDefault(); onDown(); }}
+      onTouchEnd={(e) => { e.preventDefault(); onUp(); }}
+      onTouchCancel={onUp}
       onPointerDown={onDown}
       onPointerUp={onUp}
       onPointerLeave={onUp}
@@ -374,6 +384,9 @@ const FXPad: React.FC<{ label: string; onDown: () => void; onUp: () => void }> =
   const [pressed, setPressed] = useState(false);
   return (
     <button
+      onTouchStart={(e) => { e.preventDefault(); setPressed(true); onDown(); }}
+      onTouchEnd={(e) => { e.preventDefault(); setPressed(false); onUp(); }}
+      onTouchCancel={() => { setPressed(false); onUp(); }}
       onPointerDown={() => { setPressed(true); onDown(); }}
       onPointerUp={() => { setPressed(false); onUp(); }}
       onPointerLeave={() => { if (pressed) { setPressed(false); onUp(); } }}
