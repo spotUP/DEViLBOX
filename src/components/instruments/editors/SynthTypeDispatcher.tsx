@@ -99,6 +99,7 @@ const CMIControls = lazy(() => import('../controls/CMIControls').then(m => ({ de
 const MdaEPianoControls = lazy(() => import('../controls/MdaEPianoControls').then(m => ({ default: m.MdaEPianoControls })));
 const MdaJX10Controls = lazy(() => import('../controls/MdaJX10Controls').then(m => ({ default: m.MdaJX10Controls })));
 const MdaDX10Controls = lazy(() => import('../controls/MdaDX10Controls').then(m => ({ default: m.MdaDX10Controls })));
+const DX7Controls = lazy(() => import('../controls/DX7Controls').then(m => ({ default: m.DX7Controls })));
 const AMSynthControls = lazy(() => import('../controls/AMSynthControls').then(m => ({ default: m.AMSynthControls })));
 const RaffoSynthControls = lazy(() => import('../controls/RaffoSynthControls').then(m => ({ default: m.RaffoSynthControls })));
 const CalfMonoControls = lazy(() => import('../controls/CalfMonoControls').then(m => ({ default: m.CalfMonoControls })));
@@ -2120,6 +2121,74 @@ export const SynthTypeDispatcher: React.FC<SynthTypeDispatcherProps> = ({
             <MdaJX10Controls
               config={jx10Config}
               onChange={handleMdaJX10Change}
+            />
+          </Suspense>
+        </div>
+      </div>
+    );
+  }
+
+  // ============================================================================
+  // DX7 EDITOR (Yamaha DX7 FM synth — patch browser + voice selector)
+  // ============================================================================
+  if (editorMode === 'dexed' || instrument.synthType === 'DX7') {
+    const dexedAccentColor = isCyanTheme ? '#00ffff' : '#d4a017';
+    const dexedHeaderBg = isCyanTheme
+      ? 'bg-[#0a0a00] border-b-2 border-amber-500/60'
+      : 'bg-gradient-to-r from-[#1a1a10] to-[#151510] border-b-4 border-amber-600';
+
+    return (
+      <div className="synth-editor-container bg-gradient-to-b from-[#1a1a10] to-[#101008]">
+        <EditorHeader
+          instrument={instrument}
+          onChange={handleChange}
+          vizMode={vizMode}
+          onVizModeChange={setVizMode}
+          onBake={handleBake}
+          onBakePro={handleBakePro}
+          onUnbake={handleUnbake}
+          isBaked={isBaked}
+          isBaking={isBaking}
+          customHeader={
+            <div className={`synth-editor-header px-4 py-3 ${dexedHeaderBg}`}>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 rounded-lg bg-gradient-to-br from-amber-600 to-amber-800 shadow-lg">
+                    <Music size={24} className="text-text-primary" />
+                  </div>
+                  <div>
+                    <h2 className="text-xl font-black tracking-tight" style={{ color: dexedAccentColor }}>YAMAHA DX7</h2>
+                    <p className={`text-[10px] uppercase tracking-widest ${isCyanTheme ? 'text-amber-400/60' : 'text-amber-600/80'}`}>6-Operator FM Synthesis</p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => handleChange({ isLive: !instrument.isLive })}
+                    className={`p-1.5 rounded transition-all flex items-center gap-1.5 px-2 ${
+                      instrument.isLive
+                        ? 'bg-accent-success/20 text-accent-success ring-1 ring-accent-success/50 animate-pulse-glow'
+                        : 'bg-dark-bgTertiary text-text-muted hover:text-text-secondary border border-dark-borderLight'
+                    }`}
+                  >
+                    <Radio size={14} />
+                    <span className="text-[10px] font-bold uppercase">LIVE</span>
+                  </button>
+
+                  <PresetDropdown
+                    synthType={instrument.synthType}
+                    onChange={handleChange}
+                  />
+                </div>
+              </div>
+            </div>
+          }
+        />
+        <div className="synth-editor-content overflow-y-auto">
+          <Suspense fallback={<LoadingControls />}>
+            <DX7Controls
+              instrument={instrument}
+              onChange={handleChange}
             />
           </Suspense>
         </div>

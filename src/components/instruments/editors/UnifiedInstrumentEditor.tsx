@@ -150,6 +150,7 @@ function getEditorMode(synthType: SynthType): EditorMode {
   if (synthType === 'MdaEPiano') return 'mdaEPiano';
   if (synthType === 'MdaJX10') return 'mdaJX10';
   if (synthType === 'MdaDX10') return 'mdaDX10';
+  if (synthType === 'DX7') return 'dexed';
   if (synthType === 'ToneAM') return 'toneAM';
   if (synthType === 'RaffoSynth') return 'raffo';
   if (synthType === 'CalfMono') return 'calfMono';
