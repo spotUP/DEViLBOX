@@ -433,6 +433,47 @@ export const PadEditor: React.FC<PadEditorProps> = ({ padId, onClose }) => {
                 </div>
               )}
 
+              {/* IO808/TR909 Drum Parameters */}
+              {pad.synthConfig && (pad.synthConfig.synthType === 'TR808' || pad.synthConfig.synthType === 'TR909') && (() => {
+                const drumType = pad.synthConfig?.parameters?.io808Type as string
+                  || pad.synthConfig?.parameters?.tr909Type as string
+                  || pad.synthConfig?.drumMachine?.drumType || '';
+                const params = (pad.synthConfig?.parameters || {}) as Record<string, number | string>;
+                const updateDrumParam = (key: string, value: number) => {
+                  handleUpdate({
+                    synthConfig: {
+                      ...pad.synthConfig!,
+                      parameters: { ...pad.synthConfig!.parameters, [key]: value },
+                    },
+                  });
+                };
+                const knobRow = (label: string, paramKey: string, def: number) => (
+                  <div key={paramKey}>
+                    <label className="block text-[10px] text-text-muted mb-0.5">{label}</label>
+                    <input
+                      type="range" min={0} max={100} step={1}
+                      value={typeof params[paramKey] === 'number' ? params[paramKey] as number : def}
+                      onChange={(e) => updateDrumParam(paramKey, Number(e.target.value))}
+                      className="w-full h-1.5 accent-orange-500"
+                    />
+                    <div className="text-[9px] text-text-muted text-right">{typeof params[paramKey] === 'number' ? Math.round(params[paramKey] as number) : def}%</div>
+                  </div>
+                );
+                const controls: { label: string; key: string; def: number }[] = [];
+                if (drumType === 'kick') { controls.push({ label: 'Tone', key: 'tone', def: 50 }, { label: 'Decay', key: 'decay', def: 50 }); }
+                else if (drumType === 'snare') { controls.push({ label: 'Tone', key: 'tone', def: 50 }, { label: 'Snappy', key: 'snappy', def: 50 }); }
+                else if (drumType === 'openHat' || drumType === 'closedHat' || drumType === 'hihat') { controls.push({ label: 'Decay', key: 'decay', def: 50 }); }
+                else if (drumType === 'cymbal' || drumType === 'crash' || drumType === 'ride') { controls.push({ label: 'Tone', key: 'tone', def: 50 }, { label: 'Decay', key: 'decay', def: 50 }); }
+                else if (drumType === 'tom' || drumType === 'conga' || drumType === 'tomLow' || drumType === 'tomMid' || drumType === 'tomHigh' || drumType === 'congaLow' || drumType === 'congaMid' || drumType === 'congaHigh') { controls.push({ label: 'Tuning', key: 'tuning', def: 50 }); }
+                if (controls.length === 0) return null;
+                return (
+                  <div className="space-y-1">
+                    <div className="text-[10px] font-mono text-text-muted uppercase tracking-wider">Drum Controls</div>
+                    {controls.map(c => knobRow(c.label, c.key, c.def))}
+                  </div>
+                );
+              })()}
+
               {/* Preview / Audition */}
               {(pad.sample || pad.synthConfig) && (
                 <button

@@ -40,48 +40,54 @@ function resolveIO808Type(config: InstrumentConfig): IO808DrumType {
  * Maps our DrumMachineConfig fields → io-808 param names (level comes from velocity at trigger time).
  */
 function extractIO808Params(config: InstrumentConfig): Partial<IO808Params> {
-  const dm = config.drumMachine;
-  if (!dm) return {};
+  const result: Partial<IO808Params> = {};
 
-  const params: Partial<IO808Params> = {};
-  const drumType = dm.drumType;
-
-  // Map per-drum params to IO808 params
-  switch (drumType) {
-    case 'kick':
-      if (dm.kick) {
-        params.tone = dm.kick.tone;
-        params.decay = dm.kick.decay !== undefined ? Math.min(100, dm.kick.decay / 5) : undefined;
-      }
-      break;
-    case 'snare':
-      if (dm.snare) {
-        params.tone = dm.snare.tone;
-        params.snappy = dm.snare.snappy;
-      }
-      break;
-    case 'hihat':
-      if (dm.hihat) {
-        params.decay = dm.hihat.decay !== undefined ? Math.min(100, dm.hihat.decay / 10) : undefined;
-      }
-      break;
-    case 'cymbal':
-      if (dm.cymbal) {
-        params.tone = dm.cymbal.tone;
-        params.decay = dm.cymbal.decay !== undefined ? Math.min(100, dm.cymbal.decay / 70) : undefined;
-      }
-      break;
-    case 'tom':
-    case 'conga':
-      if (dm.conga) {
-        params.tuning = dm.conga.tuning;
-      } else if (dm.tom) {
-        params.tone = dm.tom.tone;
-      }
-      break;
+  // First: check flat keys in config.parameters (used by pad editor and hardware UI)
+  const p = config.parameters as Record<string, unknown> | undefined;
+  if (p) {
+    if (typeof p.tone === 'number') result.tone = p.tone;
+    if (typeof p.decay === 'number') result.decay = p.decay;
+    if (typeof p.snappy === 'number') result.snappy = p.snappy;
+    if (typeof p.tuning === 'number') result.tuning = p.tuning;
+    if (typeof p.level === 'number') result.level = p.level;
   }
 
-  return params;
+  // Second: check nested drumMachine sub-objects (legacy/import path)
+  const dm = config.drumMachine;
+  if (dm) {
+    switch (dm.drumType) {
+      case 'kick':
+        if (dm.kick) {
+          if (result.tone === undefined && dm.kick.tone !== undefined) result.tone = dm.kick.tone;
+          if (result.decay === undefined && dm.kick.decay !== undefined) result.decay = Math.min(100, dm.kick.decay / 5);
+        }
+        break;
+      case 'snare':
+        if (dm.snare) {
+          if (result.tone === undefined && dm.snare.tone !== undefined) result.tone = dm.snare.tone;
+          if (result.snappy === undefined && dm.snare.snappy !== undefined) result.snappy = dm.snare.snappy;
+        }
+        break;
+      case 'hihat':
+        if (dm.hihat) {
+          if (result.decay === undefined && dm.hihat.decay !== undefined) result.decay = Math.min(100, dm.hihat.decay / 10);
+        }
+        break;
+      case 'cymbal':
+        if (dm.cymbal) {
+          if (result.tone === undefined && dm.cymbal.tone !== undefined) result.tone = dm.cymbal.tone;
+          if (result.decay === undefined && dm.cymbal.decay !== undefined) result.decay = Math.min(100, dm.cymbal.decay / 70);
+        }
+        break;
+      case 'tom':
+      case 'conga':
+        if (dm.conga && result.tuning === undefined) result.tuning = dm.conga.tuning;
+        else if (dm.tom && result.tone === undefined) result.tone = dm.tom.tone;
+        break;
+    }
+  }
+
+  return result;
 }
 
 /**
