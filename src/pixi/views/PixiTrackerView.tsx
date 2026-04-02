@@ -47,7 +47,6 @@ import { useTrackerView } from '@/hooks/views/useTrackerView';
 import { AUTOMATION_LANE_WIDTH, AUTOMATION_LANE_MIN } from '@/hooks/views/usePatternEditor';
 import { useTrackerStore, useUIStore, useInstrumentStore, useEditorStore, useAutomationStore } from '@stores';
 import { useWorkbenchStore } from '@stores/useWorkbenchStore';
-import { useSettingsStore } from '@stores/useSettingsStore';
 import { useMIDIStore } from '@stores/useMIDIStore';
 import { useShallow } from 'zustand/react/shallow';
 import { TITLE_H } from '../workbench/workbenchLayout';
