@@ -166,7 +166,12 @@ void DexedAudioProcessorEditor::initProgram() {
     updateUI();
 }
 void DexedAudioProcessorEditor::storeProgram() {}
-void DexedAudioProcessorEditor::cartShow() {}
+void DexedAudioProcessorEditor::cartShow() {
+    // Trigger JS file picker since JUCE FileChooser doesn't work in WASM
+    EM_ASM({
+        if (window._dexedUICartCallback) window._dexedUICartCallback();
+    });
+}
 void DexedAudioProcessorEditor::parmShow() {}
 void DexedAudioProcessorEditor::tuningShow() {}
 void DexedAudioProcessorEditor::discoverMidiCC(Ctrl*) {}
