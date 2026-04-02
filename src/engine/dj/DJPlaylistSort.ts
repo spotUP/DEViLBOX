@@ -1,59 +1,92 @@
 /**
  * DJPlaylistSort — Intelligent playlist ordering for seamless DJ mixing
  *
- * "Smart Sort" uses a greedy nearest-neighbor algorithm across three dimensions:
- *   1. BPM proximity (gradual tempo progression)
- *   2. Harmonic key compatibility (Camelot wheel)
- *   3. Energy flow (smooth build-up/cooldown)
+ * "Smart Sort" uses a greedy nearest-neighbor algorithm that optimizes for
+ * three dimensions simultaneously:
+ *   1. BPM proximity — gradual tempo progression, half/double-time aware
+ *   2. Harmonic compatibility — Camelot wheel adjacency for key-matched mixes
+ *   3. Energy arc — smooth build-up/cooldown, not random zigzag
  *
- * The algorithm picks the best next track at each step, creating an order
- * that minimizes jarring BPM jumps and key clashes while maintaining
- * a natural energy arc.
+ * The scoring is tuned for real DJ mixing:
+ *   - ±3 BPM is seamless (beatmatch with pitch fader)
+ *   - ±6 BPM is workable (noticeable but mixable)
+ *   - >10 BPM needs a creative transition or sounds forced
+ *   - Same/adjacent Camelot key = harmonic magic
+ *   - Clashing key = crowd hears the dissonance
+ *   - Energy should flow in an arc, not bounce randomly
  */
 
 import type { PlaylistTrack } from '@/stores/useDJPlaylistStore';
 import { toCamelot, keyCompatibility } from './DJKeyUtils';
 
-// Weights for the scoring function (lower = better)
-const BPM_WEIGHT = 1.0;        // BPM difference penalty per BPM
-const KEY_CLASH_PENALTY = 40;   // Penalty for clashing keys
-const KEY_MOOD_BONUS = -5;      // Bonus for mood-change (relative major/minor)
-const KEY_ENERGY_BONUS = -10;   // Bonus for energy-boost/drop (adjacent on wheel)
-const KEY_PERFECT_BONUS = -15;  // Bonus for same key
-const ENERGY_WEIGHT = 20;       // Energy difference penalty (0-1 scaled)
-const NO_BPM_PENALTY = 15;     // Penalty when BPM is unknown
+// ── Scoring parameters ──────────────────────────────────────────────────────
+
+// BPM: exponential penalty (squared) so small diffs are cheap, big diffs are brutal
+const BPM_PENALTY_SCALE = 0.8;   // multiplied by diff² — 5 BPM = 20, 10 BPM = 80, 20 BPM = 320
+const BPM_UNKNOWN_PENALTY = 30;  // when either track has no BPM
+
+// Key: Camelot wheel compatibility (lower = better)
+const KEY_SCORE: Record<string, number> = {
+  'perfect':      -20,   // same key — seamless harmonic blend
+  'energy-boost': -12,   // +1 on wheel — lifts the energy
+  'energy-drop':  -12,   // -1 on wheel — brings it down smoothly
+  'mood-change':   -5,   // relative major/minor — subtle mood shift
+  'compatible':   -10,   // generic compatible (shouldn't occur with our keyCompat fn)
+  'clash':         50,   // dissonant — crowd hears it
+};
+const KEY_UNKNOWN_PENALTY = 5; // when either track has no key
+
+// Energy: penalize jumps, reward gradual arc
+const ENERGY_JUMP_SCALE = 60;     // multiplied by diff² — 0.1 = 0.6, 0.3 = 5.4, 0.5 = 15
+const ENERGY_DIRECTION_BONUS = -3; // bonus when energy moves in the same direction as previous transition
+// Energy steps in the 0.05-0.2 range get a small bonus (see transitionScore)
 
 /** Score how well track B follows track A (lower = better match) */
-function transitionScore(a: PlaylistTrack, b: PlaylistTrack): number {
+function transitionScore(
+  a: PlaylistTrack,
+  b: PlaylistTrack,
+  prevEnergyDelta: number, // energy direction from previous transition (0 if first)
+): number {
   let score = 0;
 
-  // BPM distance
+  // ── BPM ──
   if (a.bpm > 0 && b.bpm > 0) {
-    const bpmDiff = Math.abs(a.bpm - b.bpm);
-    // Also check half/double time compatibility
-    const halfDiff = Math.abs(a.bpm - b.bpm * 2);
-    const doubleDiff = Math.abs(a.bpm * 2 - b.bpm);
-    const effectiveDiff = Math.min(bpmDiff, halfDiff, doubleDiff);
-    score += effectiveDiff * BPM_WEIGHT;
+    const direct = Math.abs(a.bpm - b.bpm);
+    const half = Math.abs(a.bpm - b.bpm * 2);
+    const double = Math.abs(a.bpm * 2 - b.bpm);
+    const diff = Math.min(direct, half, double);
+    // Squared penalty: 3 BPM = 7.2, 6 BPM = 28.8, 10 BPM = 80, 20 BPM = 320
+    score += diff * diff * BPM_PENALTY_SCALE;
   } else {
-    score += NO_BPM_PENALTY;
+    score += BPM_UNKNOWN_PENALTY;
   }
 
-  // Key compatibility (Camelot wheel)
+  // ── Key ──
   if (a.musicalKey && b.musicalKey) {
     const compat = keyCompatibility(a.musicalKey, b.musicalKey);
-    switch (compat) {
-      case 'perfect': score += KEY_PERFECT_BONUS; break;
-      case 'energy-boost':
-      case 'energy-drop': score += KEY_ENERGY_BONUS; break;
-      case 'mood-change': score += KEY_MOOD_BONUS; break;
-      case 'clash': score += KEY_CLASH_PENALTY; break;
-    }
+    score += KEY_SCORE[compat] ?? 0;
+  } else {
+    score += KEY_UNKNOWN_PENALTY;
   }
 
-  // Energy flow (prefer gradual changes)
-  if (a.energy != null && b.energy != null) {
-    score += Math.abs(a.energy - b.energy) * ENERGY_WEIGHT;
+  // ── Energy ──
+  const eA = a.energy ?? 0.5;
+  const eB = b.energy ?? 0.5;
+  const eDelta = eB - eA;
+  const eAbsDelta = Math.abs(eDelta);
+
+  // Penalize large energy jumps (squared)
+  score += eAbsDelta * eAbsDelta * ENERGY_JUMP_SCALE;
+
+  // Bonus for maintaining energy direction (smooth arc, not zigzag)
+  if (prevEnergyDelta !== 0) {
+    const sameDirection = (eDelta > 0 && prevEnergyDelta > 0) || (eDelta < 0 && prevEnergyDelta < 0);
+    if (sameDirection) score += ENERGY_DIRECTION_BONUS;
+  }
+
+  // Small bonus for ideal step size (not too flat, not too jumpy)
+  if (eAbsDelta >= 0.05 && eAbsDelta <= 0.2) {
+    score -= 2; // gentle transition — ideal
   }
 
   return score;
@@ -61,7 +94,13 @@ function transitionScore(a: PlaylistTrack, b: PlaylistTrack): number {
 
 /**
  * Smart sort: order tracks for optimal DJ mixing.
- * Uses greedy nearest-neighbor starting from the first track.
+ *
+ * Strategy:
+ * 1. Start from the track closest to median energy (room to build both ways)
+ * 2. Greedy nearest-neighbor: always pick the best next track considering
+ *    BPM proximity, key compatibility, and energy arc direction
+ * 3. Energy direction carries forward — once you start building up,
+ *    the algorithm prefers to keep building rather than zigzag
  */
 export function smartSort(tracks: PlaylistTrack[]): PlaylistTrack[] {
   if (tracks.length <= 2) return [...tracks];
@@ -69,22 +108,28 @@ export function smartSort(tracks: PlaylistTrack[]): PlaylistTrack[] {
   const result: PlaylistTrack[] = [];
   const remaining = new Set(tracks.map((_, i) => i));
 
-  // Start with the first track (or lowest BPM if available)
+  // Find starting track: closest to median energy with lowest BPM
+  // This gives the set room to build energy upward
+  const energies = tracks.map(t => t.energy ?? 0.5).sort((a, b) => a - b);
+  const medianEnergy = energies[Math.floor(energies.length / 2)];
+
   let startIdx = 0;
-  const withBpm = tracks.filter(t => t.bpm > 0);
-  if (withBpm.length > 0) {
-    // Start from the lowest BPM track for a natural build-up
-    let lowestBpm = Infinity;
-    for (const i of remaining) {
-      if (tracks[i].bpm > 0 && tracks[i].bpm < lowestBpm) {
-        lowestBpm = tracks[i].bpm;
-        startIdx = i;
-      }
+  let bestStartScore = Infinity;
+  for (const i of remaining) {
+    const t = tracks[i];
+    const energyDist = Math.abs((t.energy ?? 0.5) - medianEnergy * 0.7); // bias toward lower energy
+    const bpmFactor = t.bpm > 0 ? t.bpm / 200 : 0.5; // prefer lower BPM
+    const startScore = energyDist + bpmFactor * 0.3;
+    if (startScore < bestStartScore) {
+      bestStartScore = startScore;
+      startIdx = i;
     }
   }
 
   result.push(tracks[startIdx]);
   remaining.delete(startIdx);
+
+  let prevEnergyDelta = 0; // track the energy arc direction
 
   // Greedy: always pick the best next track
   while (remaining.size > 0) {
@@ -93,14 +138,19 @@ export function smartSort(tracks: PlaylistTrack[]): PlaylistTrack[] {
     let bestScore = Infinity;
 
     for (const i of remaining) {
-      const score = transitionScore(current, tracks[i]);
+      const score = transitionScore(current, tracks[i], prevEnergyDelta);
       if (score < bestScore) {
         bestScore = score;
         bestIdx = i;
       }
     }
 
-    result.push(tracks[bestIdx]);
+    const picked = tracks[bestIdx];
+    const eNow = current.energy ?? 0.5;
+    const eNext = picked.energy ?? 0.5;
+    prevEnergyDelta = eNext - eNow;
+
+    result.push(picked);
     remaining.delete(bestIdx);
   }
 
