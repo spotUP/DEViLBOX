@@ -125,7 +125,11 @@ export class WorkbenchTiltRenderer {
    * @param params          Preset parameters controlling trapezoid shape.
    */
   renderFrame(worldContainer: ContainerType, tiltFactor: number, params: TiltParams): void {
+    // Temporarily restore visibility for RT capture (setActive hides the world for screen render)
+    const wasVisible = worldContainer.visible;
+    worldContainer.visible = true;
     this.app.renderer.render({ container: worldContainer, target: this.rt, clear: true });
+    worldContainer.visible = wasVisible;
 
     const { w, h } = this;
     const f = tiltFactor;

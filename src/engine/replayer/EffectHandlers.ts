@@ -189,7 +189,10 @@ export function doTremolo(
       if (tremVol > 64) tremVol = 64;
     }
 
-    ch.gainNode.gain.setValueAtTime(tremVol / 64, time);
+    // FT2: tremolo modifies outVol (not gainNode directly) so it combines with
+    // volume envelope. processEnvelopesAndVibrato reads outVol for the final formula.
+    ch.outVol = tremVol;
+    ch._tremoloThisTick = true;
     ch.tremoloPos = (ch.tremoloPos + ch.tremoloSpeed) & 0xFF;
   } else {
     // MOD tremolo: original ProTracker style

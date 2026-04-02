@@ -68,8 +68,7 @@ const BEAT_JUMPS: Record<string, number> = {
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
-const PAD_W = 42;
-const PAD_H = 32;
+const PAD_H = 40;
 const PAD_GAP = 3;
 const TAB_H = 18;
 
@@ -293,14 +292,15 @@ const FXPad: React.FC<FXPadProps> = ({ pad, active, onDown, onUp }) => {
 
   const draw = useCallback((g: GraphicsType) => {
     g.clear();
-    g.roundRect(0, 0, PAD_W, PAD_H, 4);
+    const w = (g as any).layout?.computedLayout?.width ?? 80;
+    g.roundRect(0, 0, w, PAD_H, 4);
     if (active) {
       g.fill({ color: pad.activeColor, alpha: 0.35 });
-      g.roundRect(0, 0, PAD_W, PAD_H, 4);
+      g.roundRect(0, 0, w, PAD_H, 4);
       g.stroke({ color: pad.activeColor, alpha: 0.6, width: 1 });
     } else {
       g.fill({ color: theme.bgTertiary.color });
-      g.roundRect(0, 0, PAD_W, PAD_H, 4);
+      g.roundRect(0, 0, w, PAD_H, 4);
       g.stroke({ color: theme.border.color, alpha: 0.4, width: 1 });
     }
   }, [active, pad.activeColor, theme]);
@@ -313,24 +313,24 @@ const FXPad: React.FC<FXPadProps> = ({ pad, active, onDown, onUp }) => {
       onPointerUp={onUp}
       onPointerUpOutside={onUp}
       layout={{
-        width: PAD_W,
+        flex: 1,
         height: PAD_H,
         justifyContent: 'center',
         alignItems: 'center',
         flexDirection: 'column',
       }}
     >
-      <pixiGraphics draw={draw} layout={{ position: 'absolute', width: PAD_W, height: PAD_H }} />
+      <pixiGraphics draw={draw} layout={{ position: 'absolute', width: '100%', height: PAD_H }} />
       <pixiText
         text={pad.label}
-        style={{ fontSize: 8, fontWeight: 'bold', fill: active ? color : theme.textMuted.color, fontFamily: 'monospace' }}
+        style={{ fontSize: 11, fontWeight: 'bold', fill: active ? color : theme.textMuted.color, fontFamily: 'monospace' }}
         eventMode="none"
       />
       {pad.sublabel && (
         <pixiText
           text={pad.sublabel}
-          style={{ fontSize: 7, fill: active ? color : theme.textMuted.color, fontFamily: 'monospace' }}
-          alpha={0.6}
+          style={{ fontSize: 9, fill: active ? color : theme.textMuted.color, fontFamily: 'monospace' }}
+          alpha={0.7}
           eventMode="none"
         />
       )}

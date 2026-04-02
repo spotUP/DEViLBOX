@@ -162,6 +162,10 @@ export interface ChannelState {
   oldVol: number;                // FT2: sample default volume from last triggerNote (for resetVolumes)
   oldPan: number;                // FT2: sample default panning from last triggerNote (for resetVolumes)
   rowInst: number;               // FT2: instrument number from current row (for EDx noteDelay)
+  _delayedNote?: number;         // EDx: saved note from delayed row (tick 0)
+  _delayedPeriod?: number;       // EDx: saved period from delayed row (tick 0)
+  _delayedVolume?: number;       // EDx: saved volume from delayed row (tick 0)
+  _tremoloThisTick?: boolean;    // Set by doTremolo, prevents outVol overwrite in envelope processing
   volSlideSpeed: number;         // FT2: volume slide speed memory (Axx)
   fVolSlideUpSpeed: number;      // FT2: fine volume slide up memory (EAx)
   fVolSlideDownSpeed: number;    // FT2: fine volume slide down memory (EBx)
@@ -2438,7 +2442,13 @@ export class TrackerReplayer {
 
     // FT2: Note delay (EDx, y >= 1) — defer ALL processing to the delay tick.
     // FT2 skips handleEffects_TickZero entirely on EDx early return.
+    // Save the row's note/period so the delayed trigger uses the CORRECT pitch
+    // (not the stale period from the previous row).
     if (this.useXMPeriods && effect === 0xE && (param & 0xF0) === 0xD0 && (param & 0x0F) >= 1) {
+      // Save delayed row data for the trigger on the matching tick
+      ch._delayedNote = row.note;
+      ch._delayedPeriod = row.period;
+      ch._delayedVolume = row.volume;
       return;
     }
 
@@ -2787,11 +2797,12 @@ export class TrackerReplayer {
   private processAllEffectsTick0(chIndex: number, ch: ChannelState, row: TrackerCell, effect: number, param: number, time: number): void {
     this.processVolColumnTick0(ch, row, time);
     this.processEffect0(chIndex, ch, effect, param, time);
-    // Second effect column — skip if derived from volume column
+    // Second effect column — always process if present
+    // (volColDerived check was too broad — it suppressed real column 2 effects
+    //  whenever the volume column had a tick-1+ command like vol slide)
     const effect2 = row.effTyp2 ?? 0;
     const param2 = row.eff2 ?? 0;
-    const volColDerived = (row.volume ?? 0) >= 0x60;
-    if ((effect2 !== 0 || param2 !== 0) && !volColDerived) {
+    if (effect2 !== 0 || param2 !== 0) {
       this.processEffect0(chIndex, ch, effect2, param2, time);
     }
     // Extra effect slots 3-8 (Furnace imports)
@@ -2884,7 +2895,8 @@ export class TrackerReplayer {
         if (param !== 0) ch.sampleOffset = param;
         break;
 
-      case 0xA: // Volume slide - nothing on tick 0
+      case 0xA: // Volume slide — store memory on tick 0 (FT2: ch->volSlideSpeed = eff)
+        if (param !== 0) ch.volSlideSpeed = param;
         break;
 
       case 0xB: // Position jump
@@ -2928,7 +2940,9 @@ export class TrackerReplayer {
 
       case 0xF: // Set speed/tempo (also handles Furnace groove activation via 09xx→0Fxx mapping)
         if (param === 0) {
-          // F00 = stop in some trackers
+          // F00 = stop playback (FT2/PT2 behavior)
+          this.stop();
+          return;
         } else if (param < 0x20) {
           // Check if this speed value matches a Furnace groove table
           if (this.song?.grooves && param < this.song.grooves.length && this.song.grooves[param]?.length > 0) {
@@ -2965,6 +2979,12 @@ export class TrackerReplayer {
       case 0x11: // Global volume slide (Hxx)
         // Store for per-tick processing
         if (param !== 0) ch.globalVolSlide = param;
+        break;
+
+      case 0x14: // Key off (Kxx) — K00 fires immediately on tick 0
+        if (param === 0 && this.useXMPeriods) {
+          this.xmKeyOff(ch);
+        }
         break;
 
       case 0x15: { // Set envelope position (Lxx)
@@ -3102,8 +3122,64 @@ export class TrackerReplayer {
     }
   }
 
+  /**
+   * Fire a delayed note (EDx handler). Handles:
+   * - Note 97 = key-off (not retrigger)
+   * - Correct XM period via noteToPlaybackPeriod (not MOD table)
+   * - Updates ch.note for arpeggio/vibrato base pitch
+   * - Volume column effects on the delayed tick
+   */
+  private fireDelayedNote(ch: ChannelState, chIndex: number, time: number, accent: boolean, slide: boolean): void {
+    const delayedNote = ch._delayedNote;
+    ch._delayedNote = undefined;
+    ch._delayedPeriod = undefined;
+
+    // Note 97 = key-off — release the channel, don't retrigger
+    if (delayedNote === 97) {
+      if (this.useXMPeriods) {
+        this.xmKeyOff(ch);
+      } else {
+        this.stopChannel(ch, chIndex, time);
+      }
+      return;
+    }
+
+    // Apply the delayed row's note/period so the correct pitch plays
+    if (delayedNote !== undefined && delayedNote > 0 && delayedNote < 97) {
+      ch.xmNote = delayedNote;
+      const usePeriod = this.noteToPlaybackPeriod(delayedNote, ch._delayedPeriod, ch);
+      if (usePeriod > 0) {
+        ch.note = usePeriod;   // Base pitch for arpeggio/vibrato
+        ch.period = usePeriod;
+      }
+    }
+
+    const slideActive = ch.previousSlideFlag;
+    this.triggerNote(ch, time, 0, chIndex, accent, slideActive, slide);
+    // FT2: resetVolumes only if instrument was specified on the delayed row
+    if (ch.rowInst > 0) this.resetXMVolumes(ch, time);
+    // FT2: triggerInstrument is ALWAYS called (regardless of instrument)
+    this.triggerEnvelopes(ch);
+
+    // FT2: apply volume column on delayed trigger (set volume / set panning)
+    const dvc = ch.volColumnVol;
+    if (dvc >= 0x10 && dvc <= 0x50) {
+      ch.outVol = dvc - 0x10;
+      ch.volume = ch.outVol;
+      ch.gainNode.gain.setValueAtTime(ch.volume / 64, time);
+    } else if (dvc >= 0xC0 && dvc <= 0xCF) {
+      ch.outPan = (dvc & 0x0F) << 4;
+      ch.panning = ch.outPan;
+      this.applyPanEffect(ch, ch.panning, time);
+    }
+  }
+
   private processExtendedEffect0(_chIndex: number, ch: ChannelState, x: number, y: number, time: number): void {
     switch (x) {
+      case 0x0: // E0x: Amiga LED filter — E00 = filter ON, E01 = filter OFF
+        getToneEngine().setAmigaFilter(y === 0);
+        break;
+
       case 0x1: // Fine porta up
         if (this.useXMPeriods) {
           // FT2: uses speed memory, param * 4
@@ -3164,6 +3240,11 @@ export class TrackerReplayer {
 
       case 0x7: // Tremolo waveform
         ch.waveControl = (ch.waveControl & 0x0F) | ((y & 0x0F) << 4);
+        break;
+
+      case 0x8: // Set panning (FT2: E8x sets panning to y * 0x11)
+        ch.panning = y * 0x11;
+        this.applyPanEffect(ch, ch.panning, time);
         break;
 
       case 0x9: // Retrigger
@@ -3275,11 +3356,10 @@ export class TrackerReplayer {
       }
     }
 
-    // Process second effect column — skip if derived from volume column
+    // Process second effect column — always process if present
     const effect2 = row.effTyp2 ?? 0;
     const param2 = row.eff2 ?? 0;
-    const volColDerived = vc >= 0x60;
-    if ((effect2 !== 0 || param2 !== 0) && !volColDerived) {
+    if (effect2 !== 0 || param2 !== 0) {
       this.processEffectTickSingle(chIndex, ch, row, effect2, param2, time);
     }
     // Extra effect slots 3-8 (Furnace imports)
@@ -3366,26 +3446,9 @@ export class TrackerReplayer {
           ch.volume = 0;
           ch.gainNode.gain.setValueAtTime(0, time);
         } else if (x === 0xD && y === this.currentTick) {
-          // FT2 noteDelay: triggers note, resets volumes (if inst), triggers instrument, applies vol column
+          // FT2 noteDelay: triggers note (or key-off for note 97), resets volumes, applies vol column
           // Reference: ft2_replayer.c lines 2140-2162
-          const slideActive = ch.previousSlideFlag;
-          this.triggerNote(ch, time, 0, chIndex, accent, slideActive, slide);
-          // FT2: resetVolumes only if instrument was specified on the delayed row
-          if (ch.rowInst > 0) this.resetXMVolumes(ch, time);
-          // FT2: triggerInstrument is ALWAYS called (regardless of instrument)
-          this.triggerEnvelopes(ch);
-
-          // FT2: apply volume column on delayed trigger (set volume / set panning)
-          const dvc = ch.volColumnVol;
-          if (dvc >= 0x10 && dvc <= 0x50) {
-            ch.outVol = dvc - 0x10;
-            ch.volume = ch.outVol;
-            ch.gainNode.gain.setValueAtTime(ch.volume / 64, time);
-          } else if (dvc >= 0xC0 && dvc <= 0xCF) {
-            ch.outPan = (dvc & 0x0F) << 4;
-            ch.panning = ch.outPan;
-            this.applyPanEffect(ch, ch.panning, time);
-          }
+          this.fireDelayedNote(ch, chIndex, time, accent, slide);
         }
         break;
 
@@ -3401,11 +3464,11 @@ export class TrackerReplayer {
       case 0x14: { // Kxx - Key-off at tick (FT2: effect 20)
         // FT2: triggers keyOff when (speed - tick) == (param & 31)
         if (this.useXMPeriods) {
-          if (this.currentTick === (param & 31)) {
+          if (this.currentTick === param) {
             this.xmKeyOff(ch);
           }
         } else {
-          if (this.currentTick === (param & 31)) {
+          if (this.currentTick === param) {
             this.stopChannel(ch, chIndex, time);
           }
         }
@@ -3471,7 +3534,8 @@ export class TrackerReplayer {
         if (x === 0x9 && y > 0) {
           // FT2 retrigNote: triggerNote(0,0,0,ch) + triggerInstrument(ch)
           // Reference: ft2_replayer.c lines 2119-2129
-          if (this.currentTick % y === 0) {
+          // Skip tick 0 — note already triggered there; modulo fires on 0 which is wrong
+          if (this.currentTick > 0 && this.currentTick % y === 0) {
             this.triggerNote(ch, time, 0, chIndex, false, false, false);
             this.triggerEnvelopes(ch);
           }
@@ -3479,26 +3543,8 @@ export class TrackerReplayer {
           ch.volume = 0;
           ch.gainNode.gain.setValueAtTime(0, time);
         } else if (x === 0xD && y === this.currentTick) {
-          // FT2 noteDelay: triggers note, resets volumes (if inst), triggers instrument, applies volume column
-          // Reference: ft2_replayer.c lines 2140-2162
-          const slideActive = ch.previousSlideFlag;
-          this.triggerNote(ch, time, 0, chIndex, accent, slideActive, slide);
-          // FT2: resetVolumes only if instrument was specified on the delayed row
-          if (ch.rowInst > 0) this.resetXMVolumes(ch, time);
-          // FT2: triggerInstrument is ALWAYS called (regardless of instrument)
-          this.triggerEnvelopes(ch);
-
-          // FT2: apply volume column on delayed trigger (set volume / set panning)
-          const dvc = ch.volColumnVol;
-          if (dvc >= 0x10 && dvc <= 0x50) {
-            ch.outVol = dvc - 0x10;
-            ch.volume = ch.outVol;
-            ch.gainNode.gain.setValueAtTime(ch.volume / 64, time);
-          } else if (dvc >= 0xC0 && dvc <= 0xCF) {
-            ch.outPan = (dvc & 0x0F) << 4;
-            ch.panning = ch.outPan;
-            this.applyPanEffect(ch, ch.panning, time);
-          }
+          // FT2 noteDelay: triggers note (or key-off for note 97), resets volumes, applies vol column
+          this.fireDelayedNote(ch, chIndex, time, accent, slide);
         }
         break;
       case 0x11: this.doGlobalVolumeSlide(ch.globalVolSlide, time); break;
@@ -3507,11 +3553,11 @@ export class TrackerReplayer {
         // FT2: triggers keyOff when (speed - tick) == (param & 31)
         // In FT2 tick model: speed-tick = currentTick in our upward-counting model
         if (this.useXMPeriods) {
-          if (this.currentTick === (param & 31)) {
+          if (this.currentTick === param) {
             this.xmKeyOff(ch);
           }
         } else {
-          if (this.currentTick === (param & 31)) {
+          if (this.currentTick === param) {
             this.stopChannel(ch, chIndex, time);
           }
         }
@@ -3781,8 +3827,12 @@ export class TrackerReplayer {
     if (!ch.instrument?.metadata) return;
     const meta = ch.instrument.metadata;
 
-    // Sync outVol/outPan from current effect-modified values
-    ch.outVol = ch.volume;
+    // Sync outVol/outPan from current effect-modified values.
+    // FT2: tremolo sets outVol directly in doTremolo(); don't overwrite it here.
+    if (!ch._tremoloThisTick) {
+      ch.outVol = ch.volume;
+    }
+    ch._tremoloThisTick = false; // Reset for next tick
     ch.outPan = ch.panning;
 
     // *** FADEOUT ON KEY OFF ***
@@ -3992,7 +4042,8 @@ export class TrackerReplayer {
       } else if (av.type === 'rampUp') {
         autoVibVal = (((ch.autoVibPos >> 1) + 64) & 127) - 64;
       } else if (av.type === 'rampDown') {
-        autoVibVal = (((-(ch.autoVibPos >> 1)) + 64) & 127) - 64;
+        // FT2 uses bitwise NOT (~) for rampDown: (-1 - (pos >> 1)), not -(pos >> 1)
+        autoVibVal = ((((~(ch.autoVibPos >> 1)) & 0xFF) + 64) & 127) - 64;
       } else {
         // sine (default)
         autoVibVal = AUTO_VIB_SINE_TAB[ch.autoVibPos & 0xFF];
@@ -4610,6 +4661,11 @@ export class TrackerReplayer {
    * Used when global volume changes (effect Gxx)
    */
   private updateAllChannelVolumes(time: number): void {
+    // For XM: don't write directly to gainNode — processEnvelopesAndVibrato
+    // will compute the correct volume using globalVolume on the next tick.
+    // Writing here causes a one-tick glitch (wrong formula, immediately overwritten).
+    // For MOD: no envelope processing, so we must write directly.
+    if (this.useXMPeriods) return; // XM: envelope handler uses globalVolume automatically
     const globalScale = this.globalVolume / 64;
     for (const ch of this.channels) {
       const effectiveVolume = (ch.volume / 64) * globalScale;

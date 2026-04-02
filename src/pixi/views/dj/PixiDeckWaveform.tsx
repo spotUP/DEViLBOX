@@ -5,7 +5,6 @@
 
 import { useCallback } from 'react';
 import type { Graphics as GraphicsType, FederatedPointerEvent } from 'pixi.js';
-import { PIXI_FONTS } from '../../fonts';
 import { usePixiTheme, usePixiThemeId, getDeckColors } from '../../theme';
 import { useDJStore } from '@/stores/useDJStore';
 import { getDJEngine } from '@/engine/dj/DJEngine';
@@ -90,18 +89,13 @@ export const PixiDeckWaveform: React.FC<PixiDeckWaveformProps> = ({ deckId, heig
     g.fill({ color: 0xffffff, alpha: 0.8 });
   }, [peaks, position, duration, height, theme, DECK_COLOR]);
 
+  // Hide when no audio data (matches DOM DeckAudioWaveform)
+  const hasPeaks = !!(peaks && peaks.length > 0);
+  if (!hasPeaks) return null;
+
   return (
     <pixiContainer eventMode="static" cursor="pointer" onPointerUp={handleSeek} layout={{ width: '100%', height }}>
       <pixiGraphics eventMode="none" draw={drawWaveform} layout={{ width: '100%', height }} />
-      {(!peaks || peaks.length === 0) && (
-        <pixiBitmapText
-          eventMode="none"
-          text="No waveform data"
-          style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 11, fill: 0xffffff }}
-          tint={theme.textMuted.color}
-          layout={{ position: 'absolute', top: height / 2 - 6, left: 0, right: 0, alignSelf: 'center' }}
-        />
-      )}
     </pixiContainer>
   );
 };
