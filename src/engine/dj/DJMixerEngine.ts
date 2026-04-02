@@ -146,9 +146,18 @@ export class DJMixerEngine {
         break;
     }
 
-    // Smooth ramp to avoid clicks
-    this.inputA.gain.rampTo(gainA, 0.01);
-    this.inputB.gain.rampTo(gainB, 0.01);
+    // Smooth ramp to avoid clicks — but hard-zero when fully cut
+    // (Tone.js exponential ramp never reaches exactly 0, so loud tracks bleed through)
+    if (gainA < 0.001) {
+      this.inputA.gain.value = 0;
+    } else {
+      this.inputA.gain.rampTo(gainA, 0.01);
+    }
+    if (gainB < 0.001) {
+      this.inputB.gain.value = 0;
+    } else {
+      this.inputB.gain.rampTo(gainB, 0.01);
+    }
   }
 
   // ==========================================================================
