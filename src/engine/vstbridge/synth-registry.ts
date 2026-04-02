@@ -52,22 +52,6 @@ export function registerVSTBridge(desc: VSTBridgeDescriptor): void {
 }
 
 // ---------------------------------------------------------------------------
-// Example: Register Dexed via VSTBridge (for testing/validation)
-// This creates a 'DexedBridge' synth type that uses the same WASM as Dexed
-// but routes through the generic VSTBridge worklet instead of Dexed.worklet.js
-// ---------------------------------------------------------------------------
-registerVSTBridge({
-  id: 'DexedBridge',
-  name: 'Dexed DX7 (Bridge)',
-  wasmDir: 'dexed',
-  wasmFile: 'Dexed',
-  synthClassName: 'DexedSynth',
-  moduleFactoryName: 'createDexedModule',
-  volumeOffsetDb: -10,
-  commands: ['loadSysEx', 'loadPatch'],
-});
-
-// ---------------------------------------------------------------------------
 // Vital — Spectral Warping Wavetable Synthesizer by Matt Tytel
 // 3 wavetable oscillators with spectral morphing, 2 filters, 8 LFOs, 6 envelopes
 // ---------------------------------------------------------------------------
@@ -262,17 +246,4 @@ registerVSTBridge({
   volumeOffsetDb: 0,
 });
 
-// ---------------------------------------------------------------------------
-// OB-Xd — Oberheim OB-X/OB-Xa Modeling by discoDSP (GPL3)
-// 2 oscillators (saw/pulse/tri/noise), biquad filter, LFO, 8-voice polyphonic
-// 45 parameters across 10 groups
-// ---------------------------------------------------------------------------
-registerVSTBridge({
-  id: 'OBXd',
-  name: 'OB-Xd (Analog)',
-  wasmDir: 'obxd',
-  wasmFile: 'OBXd',
-  synthClassName: 'OBXdSynth',
-  moduleFactoryName: 'createOBXdModule',
-  volumeOffsetDb: 0,
-});
+

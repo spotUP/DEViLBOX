@@ -165,7 +165,7 @@ const PARAMETER_ROUTES: Record<string, ParameterRoute> = {
   'dexed.lfoAmpMod':   { type: 'config', path: 'dexed.lfoAmpModDepth',   transform: n => Math.round(n * 99) },
   'dexed.transpose':   { type: 'config', path: 'dexed.transpose',         transform: n => Math.round(-24 + n * 48) },
 
-  // ── OBXd ──────────────────────────────────────────────────────────
+  // ── OBXd (removed — kept for backwards compat with saved MIDI mappings) ──
   'obxd.osc1Level':    { type: 'config', path: 'obxd.osc1Level' },
   'obxd.osc2Level':    { type: 'config', path: 'obxd.osc2Level' },
   'obxd.filterCutoff': { type: 'config', path: 'obxd.filterCutoff' },

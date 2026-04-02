@@ -13,7 +13,7 @@ import { SYNTH_REGISTRY as VST_SYNTH_REGISTRY } from '../../vstbridge/synth-regi
 import { VSTBridgeSynth } from '../../vstbridge/VSTBridgeSynth';
 
 // Bridge all VSTBridge synths into SynthRegistry
-// Skip IDs already registered (e.g. OBXd is handled by misc.ts via direct JUCE WASM)
+// Skip IDs already registered
 for (const [id, vstDesc] of VST_SYNTH_REGISTRY.entries()) {
   if (SynthRegistry.has(id)) continue;
   SynthRegistry.register({

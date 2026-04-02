@@ -59,8 +59,6 @@ import {
   updateV2Parameters as _updateV2Parameters,
   updateSynareParameters as _updateSynareParameters,
   updateFurnaceParameters as _updateFurnaceParameters,
-  updateDexedParameters as _updateDexedParameters,
-  updateOBXdParameters as _updateOBXdParameters,
   updateComplexSynthParameters as _updateComplexSynthParameters,
   updateToneJsSynthInPlace as _updateToneJsSynthInPlace,
   updateBuzzmachineParameters as _updateBuzzmachineParameters,
@@ -948,7 +946,7 @@ export class ToneEngine {
     }
 
     // Wait for ALL WASM-based synths to initialize their AudioWorklet
-    // This includes: MAME synths, Buzzmachine, Dexed, OBXd, TB303, V2, DubSiren, etc.
+    // This includes: MAME synths, Buzzmachine, TB303, V2, DubSiren, etc.
     const wasmPromises: Promise<void>[] = [];
     for (const config of configs) {
       const key = this.getInstrumentKey(config.id, -1);
@@ -1047,7 +1045,7 @@ export class ToneEngine {
    */
   public async ensureWASMSynthsReady(configs: InstrumentConfig[]): Promise<void> {
     const wasmConfigs = configs.filter((c) => 
-      ['TB303', 'Buzz3o3', 'V2', 'V2Speech', 'Sam', 'DECtalk', 'PinkTrombone', 'Synare', 'DubSiren', 'SpaceLaser', 'Dexed', 'OBXd', 'Furnace', 'HivelySynth', 'UADESynth', 'SymphonieSynth', 'MusicLineSynth',
+      ['TB303', 'Buzz3o3', 'V2', 'V2Speech', 'Sam', 'DECtalk', 'PinkTrombone', 'Synare', 'DubSiren', 'SpaceLaser', 'Furnace', 'HivelySynth', 'UADESynth', 'SymphonieSynth', 'MusicLineSynth',
        'SoundMonSynth', 'SidMonSynth', 'DigMugSynth', 'FCSynth', 'FredSynth', 'TFMXSynth',
        'OctaMEDSynth', 'SidMon1Synth', 'HippelCoSoSynth', 'RobHubbardSynth', 'SteveTurnerSynth', 'FredEditorReplayerSynth', 'DavidWhittakerSynth',
        'SonicArrangerSynth', 'InStereo2Synth', 'InStereo1Synth', 'DeltaMusic1Synth', 'DeltaMusic2Synth',
@@ -1483,7 +1481,7 @@ export class ToneEngine {
     const isWASMSynth = [
       // AudioWorklet WASM synths — use shared instances (one per instrument ID)
       // to avoid exhausting fixed player-handle pools across channels.
-      'TB303', 'Buzz3o3', 'V2', 'V2Speech', 'Sam', 'DECtalk', 'PinkTrombone', 'DubSiren', 'SpaceLaser', 'Synare', 'Dexed', 'OBXd', 'WAM',
+      'TB303', 'Buzz3o3', 'V2', 'V2Speech', 'Sam', 'DECtalk', 'PinkTrombone', 'DubSiren', 'SpaceLaser', 'Synare', 'WAM',
       'TR808', 'TR909',
       'SonicArrangerSynth', 'InStereo2Synth', 'InStereo1Synth', 'JamCrackerSynth', 'FuturePlayerSynth',
       'SoundMonSynth', 'SidMonSynth', 'SidMon1Synth',
@@ -2064,9 +2062,6 @@ export class ToneEngine {
       case 'FurnacePCMDAC':
       case 'DrumKit':
       case 'ChiptuneModule':
-      // JUCE WASM Synths -- falls through
-      case 'Dexed':
-      case 'OBXd':
       // MAME-based Synths -- falls through
       case 'MAMEVFX':
       case 'MAMEDOC':
@@ -3041,8 +3036,6 @@ export class ToneEngine {
     'RaffoSynth', 'CalfMono', 'SetBfree', 'SynthV1',
     'TalNoizeMaker', 'Aeolus', 'FluidSynth', 'Sfizz',
     'ZynAddSubFX', 'Monique', 'VL1',
-    // JUCE WASM synths (polyphony handled internally by WASM)
-    'Dexed', 'OBXd',
   ]);
 
   /**
@@ -4357,8 +4350,8 @@ export class ToneEngine {
   /**
    * Update Dexed (DX7) parameters in real-time
    */
-  public updateDexedParameters(instrumentId: number, config: NonNullable<InstrumentConfig['dexed']>): void { _updateDexedParameters(this._synthCtx, instrumentId, config); }
-  public updateOBXdParameters(instrumentId: number, config: NonNullable<InstrumentConfig['obxd']>): void { _updateOBXdParameters(this._synthCtx, instrumentId, config); }
+  public updateDexedParameters(_instrumentId: number, _config: unknown): void { /* Dexed removed — DX7 replaces it */ }
+  public updateOBXdParameters(_instrumentId: number, _config: unknown): void { /* OBXd removed — OBXf replaces it */ }
   public updateComplexSynthParameters(instrumentId: number, config: unknown): void { _updateComplexSynthParameters(this._synthCtx, instrumentId, config); }
   public updateToneJsSynthInPlace(instrumentId: number, config: InstrumentConfig): void { _updateToneJsSynthInPlace(this._synthCtx, instrumentId, config); }
   public updateBuzzmachineParameters(instrumentId: number, buzzmachine: NonNullable<InstrumentConfig['buzzmachine']>): void { _updateBuzzmachineParameters(this._synthCtx, instrumentId, buzzmachine); }

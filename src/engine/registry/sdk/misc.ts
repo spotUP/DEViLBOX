@@ -1,7 +1,7 @@
 /**
  * Miscellaneous synth registrations (lazy-loaded)
  *
- * Covers: DubSiren, SpaceLaser, V2/V2Speech, Sam, Synare, Dexed, OBXd,
+ * Covers: DubSiren, SpaceLaser, V2/V2Speech, Sam, Synare,
  * CZ101, CEM3394, SCSP, VFX, D50, MAMEDOC, MAMERSA, MAMESWP30,
  * SuperSaw, PolySynth, Organ, DrumMachine, ChipSynth, PWMSynth,
  * StringMachine, FormantSynth, WobbleBass, DrumKit, ChiptuneModule, Wavetable
@@ -17,8 +17,6 @@ import { V2SpeechSynth } from '../../v2/V2SpeechSynth';
 import { SAMSynth } from '../../sam/SAMSynth';
 import { DECtalkSynth } from '../../dectalk/DECtalkSynth';
 import { SynareSynth } from '../../SynareSynth';
-import { DexedSynth } from '../../dexed/DexedSynth';
-import { OBXdSynth } from '../../obxd/OBXdSynth';
 import { CZ101Synth } from '../../cz101/CZ101Synth';
 import { CEM3394Synth } from '../../cem3394/CEM3394Synth';
 import { SCSPSynth } from '../../scsp/SCSPSynth';
@@ -36,7 +34,7 @@ import {
 
 const VOLUME_OFFSETS: Record<string, number> = {
   DubSiren: 13, SpaceLaser: 24, V2: 0, V2Speech: 0, Sam: 16, DECtalk: 10, PinkTrombone: 6, Synare: 7,
-  Dexed: 41, OBXd: 9, CZ101: 0, CEM3394: 19, SCSP: 15,
+  CZ101: 0, CEM3394: 19, SCSP: 15,
   MAMEVFX: 0, VFX: 0, D50: 0, MAMEDOC: 0, MAMERSA: 0, MAMESWP30: 0,
   DrumKit: 0, Wavetable: 5, SuperSaw: 9, PolySynth: 8, Organ: 3,
   DrumMachine: 18, ChipSynth: 5, PWMSynth: 9, StringMachine: 11,
@@ -175,42 +173,6 @@ const speechAndSpecialDescs: SynthDescriptor[] = [
 // ── JUCE WASM synths ─────────────────────────────────────────────────────────
 
 const juceWasmDescs: SynthDescriptor[] = [
-  {
-    id: 'Dexed',
-    name: 'Yamaha DX7 (Dexed)',
-    category: 'wasm',
-    loadMode: 'lazy',
-    sharedInstance: true,
-    useSynthBus: true,
-    volumeOffsetDb: 41,
-    create: (config) => {
-      const synth = new DexedSynth(config.dexed as any || {});
-      synth.output.gain.value = Tone.dbToGain(getNormalizedVolume('Dexed', config.volume));
-      return synth as unknown as Tone.ToneAudioNode;
-    },
-    onTriggerRelease: (synth, _note, time) => {
-      (synth as any).triggerRelease(time);
-      return true;
-    },
-  },
-  {
-    id: 'OBXd',
-    name: 'Oberheim OB-X',
-    category: 'wasm',
-    loadMode: 'lazy',
-    sharedInstance: true,
-    useSynthBus: true,
-    volumeOffsetDb: 9,
-    create: (config) => {
-      const synth = new OBXdSynth(config.obxd as any || {});
-      synth.output.gain.value = Tone.dbToGain(getNormalizedVolume('OBXd', config.volume));
-      return synth as unknown as Tone.ToneAudioNode;
-    },
-    onTriggerRelease: (synth, _note, time) => {
-      (synth as any).triggerRelease(time);
-      return true;
-    },
-  },
   {
     id: 'CZ101',
     name: 'Casio CZ-101',

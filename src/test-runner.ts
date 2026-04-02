@@ -238,8 +238,6 @@ const SYNTH_CONFIGS: Record<string, Record<string, unknown>> = {
   },
 
   // === WASM Synths ===
-  'Dexed':  { synthType: 'Dexed', volume: -12 },
-  'OBXd':   { synthType: 'OBXd', volume: -12 },
   'CZ101':  { synthType: 'CZ101', volume: -12 },
   'Sam':    { synthType: 'Sam', volume: -12 },
 
@@ -313,7 +311,6 @@ const SYNTH_CONFIGS: Record<string, Record<string, unknown>> = {
   'OBXf': { synthType: 'OBXf', volume: -12 },
   'Sorcer': { synthType: 'Sorcer', volume: -12 },
   'D50': { synthType: 'D50', volume: -12 },
-  'DexedBridge': { synthType: 'DexedBridge', volume: -12 },
   'TonewheelOrgan': { synthType: 'TonewheelOrgan', volume: -12 },
   'Melodica': { synthType: 'Melodica', volume: -12 },
   'VFX': { synthType: 'VFX', volume: -12 },
@@ -687,10 +684,6 @@ const SYNTH_CONFIGS_FULL: Record<string, any> = {
   'CEM3394': { synthType: 'CEM3394', volume: -12 },
   'SCSP': { synthType: 'SCSP', volume: -12 },
 
-  // === JUCE/WASM Synths === (DISABLED for faster testing)
-  // 'Dexed': { synthType: 'Dexed', volume: -12 },
-  // 'OBXd': { synthType: 'OBXd', volume: -12 },
-
   // === Additional Missing Furnace Chips === (DISABLED for faster testing)
   // 'Furnace': { synthType: 'Furnace', volume: -12, furnace: DEFAULT_FURNACE },
   // 'FurnaceVERA': { synthType: 'FurnaceVERA', volume: -12 },
@@ -1000,14 +993,14 @@ function getRequiredEngine(synthName: string): string | null {
   if (MAME_ENGINE_SYNTHS.includes(synthName)) return 'MAME';
   if (synthName.startsWith('MAME')) return 'standalone-wasm';
   if (['V2', 'V2Speech', 'CZ101', 'SCSP', 'CEM3394'].includes(synthName)) return 'standalone-wasm';
-  if (['Dexed', 'OBXd', 'D50', 'VFX'].includes(synthName)) return 'standalone-wasm';
+  if (['D50', 'VFX'].includes(synthName)) return 'standalone-wasm';
   // SuperCollider uses scsynth WASM
   if (synthName === 'SuperCollider') return 'standalone-wasm';
   // VL1 uses pure JS AudioWorklet
   if (synthName === 'VL1') return 'standalone-wasm';
   // VSTBridge synths use WASM plugins
   if (['Helm', 'Vital', 'Surge', 'Amsynth', 'Monique', 'Odin2', 'OBXf', 'Sorcer',
-       'DexedBridge', 'TonewheelOrgan', 'Melodica'].includes(synthName)) return 'standalone-wasm';
+       'TonewheelOrgan', 'Melodica'].includes(synthName)) return 'standalone-wasm';
   // WAM synths load external WAM plugins
   if (synthName.startsWith('WAM')) return 'standalone-wasm';
   // Amiga tracker synths use AudioWorklet WASM replayers
@@ -1395,8 +1388,8 @@ function getPhraseForSynth(name: string): PhraseStep[] {
     { note: 'C1', ms: 200 }, { note: null, ms:  80 },
     { note: 'C1', ms: 200 },
   ];
-  // FM WASM synths (Dexed, OBXd, CZ101) — slower arpeggio to let modulation breathe
-  if (['Dexed', 'OBXd', 'CZ101'].includes(name)) return [
+  // FM WASM synths (CZ101) — slower arpeggio to let modulation breathe
+  if (['CZ101'].includes(name)) return [
     { note: 'C3',  ms: 380 },
     { note: 'E3',  ms: 380 },
     { note: 'G3',  ms: 380 },
@@ -1445,7 +1438,7 @@ function getPhraseForSynth(name: string): PhraseStep[] {
   ];
   // VSTBridge / plugin synths — longer notes to let filters and envelopes develop
   if (['Helm', 'Vital', 'Surge', 'Amsynth', 'Monique', 'Odin2', 'OBXf', 'Sorcer',
-       'D50', 'DexedBridge', 'TonewheelOrgan', 'Melodica', 'VFX',
+       'D50', 'TonewheelOrgan', 'Melodica', 'VFX',
        'SuperCollider'].includes(name)) return [
     { note: 'C3',  ms: 400 },
     { note: 'E3',  ms: 400 },
@@ -1736,7 +1729,7 @@ async function testVolumeLevels(skipPreWarm = false) {
       }
 
       // Extra stabilization time for WASM synths BEFORE checking init status.
-      // Worklet-based synths (Dexed, OBXd, etc.) resolve ensureInitialized() when
+      // Worklet-based synths resolve ensureInitialized() when
       // the worklet is registered, but _isReady is set later when the worklet sends
       // a 'ready' message via the message port. This wait covers that gap.
       if (isWasmSynth) {
@@ -4993,7 +4986,7 @@ async function runEffectTests() {
 
 /**
  * Parse the synth filter input. Supports:
- * - Comma-separated names: "TB303, Dexed, OBXd"
+ * - Comma-separated names: "TB303, V2, CZ101"
  * - Regex patterns wrapped in slashes
  * - Partial matching for convenience
  * Returns a list of matching synth names from SYNTH_CONFIGS.

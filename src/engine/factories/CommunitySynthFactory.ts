@@ -34,8 +34,6 @@ import { V2SpeechSynth } from '../v2/V2SpeechSynth';
 import { DB303Synth } from '../db303/DB303Synth';
 import { BuzzmachineGenerator } from '../buzzmachines/BuzzmachineGenerator';
 import { BuzzmachineType } from '../buzzmachines/BuzzmachineEngine';
-import { DexedSynth } from '../dexed/DexedSynth';
-import { OBXdSynth } from '../obxd/OBXdSynth';
 import { MdaEPianoSynth } from '../mda-epiano/MdaEPianoSynth';
 import { MdaJX10Synth } from '../mda-jx10/MdaJX10Synth';
 import { MdaDX10Synth } from '../mda-dx10/MdaDX10Synth';
@@ -888,36 +886,6 @@ export function createSynare(config: InstrumentConfig): Tone.ToneAudioNode {
   const synth = new SynareSynth(synareConfig);
 
   synth.volume.value = getNormalizedVolume('Synare', config.volume);
-
-  return synth as unknown as Tone.ToneAudioNode;
-}
-
-export function createDexed(config: InstrumentConfig): Tone.ToneAudioNode {
-  const dexedConfig = config.dexed || {};
-  const synth = new DexedSynth(dexedConfig);
-
-  // Check for native VCED preset (loaded via loadSysEx)
-  const vcedPresetName = (config as unknown as Record<string, unknown>).dexedVcedPreset;
-  if (typeof vcedPresetName === 'string') {
-    synth.loadVCEDPreset(vcedPresetName);
-  }
-
-  synth.output.gain.value = Tone.dbToGain(getNormalizedVolume('Dexed', config.volume));
-
-  return synth as unknown as Tone.ToneAudioNode;
-}
-
-export function createOBXd(config: InstrumentConfig): Tone.ToneAudioNode {
-  const obxdConfig = config.obxd || {};
-  const synth = new OBXdSynth(obxdConfig);
-
-  // Check for native patch preset (complete engine state snapshot)
-  const nativePresetName = (config as unknown as Record<string, unknown>).obxdNativePatch;
-  if (typeof nativePresetName === 'string') {
-    synth.loadNativePreset(nativePresetName);
-  }
-
-  synth.output.gain.value = Tone.dbToGain(getNormalizedVolume('OBXd', config.volume));
 
   return synth as unknown as Tone.ToneAudioNode;
 }

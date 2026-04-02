@@ -4,9 +4,7 @@
 
 import type { SynthPanelLayout } from '../synthPanelTypes';
 import { TB303_LAYOUT } from './tb303';
-import { DEXED_LAYOUT } from './dexed';
 import { DUB_SIREN_LAYOUT } from './dubSiren';
-import { OBXD_LAYOUT } from './obxd';
 import { CHIP_SYNTH_LAYOUT } from './chipSynth';
 import { HARMONIC_SYNTH_LAYOUT } from './harmonicSynth';
 import { SPACE_LASER_LAYOUT } from './spaceLaser';
@@ -48,8 +46,6 @@ export const SYNTH_LAYOUTS: Record<string, SynthPanelLayout> = {
   Buzz3o3: TB303_LAYOUT,
 
   // JUCE WASM synths
-  Dexed: DEXED_LAYOUT,
-  OBXd: OBXD_LAYOUT,
   Odin2: ODIN2_LAYOUT,
   Surge: SURGE_LAYOUT,
   Vital: VITAL_LAYOUT,

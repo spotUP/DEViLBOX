@@ -38,7 +38,7 @@ SynthRegistry.registerLazy(
 // ── VSTBridge synths ─────────────────────────────────────────────────────────
 SynthRegistry.registerLazy(
   [
-    'DexedBridge', 'Vital', 'Odin2', 'Surge', 'TonewheelOrgan',
+    'Vital', 'Odin2', 'Surge', 'TonewheelOrgan',
     'Melodica', 'Monique', 'Helm', 'Sorcer', 'OBXf', 'Open303',
   ],
   () => import('./vstbridge').then(() => {}),
@@ -60,7 +60,7 @@ SynthRegistry.registerLazy(
 SynthRegistry.registerLazy(
   [
     'DubSiren', 'SpaceLaser', 'V2', 'V2Speech', 'Sam', 'DECtalk', 'Synare',
-    'Dexed', 'OBXd', 'CZ101', 'CEM3394', 'SCSP',
+    'CZ101', 'CEM3394', 'SCSP',
     'MAMEVFX', 'VFX', 'D50', 'MAMEDOC', 'MAMERSA', 'MAMESWP30',
     'DrumKit', 'Wavetable', 'ChiptuneModule',
   ],

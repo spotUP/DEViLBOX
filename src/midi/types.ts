@@ -35,7 +35,7 @@ export type TB303Parameter =
   | 'filterTracking'
   | 'filterFM';
 
-export type KnobBankMode = '303' | 'Siren' | 'FX' | 'Mixer' | 'Furnace' | 'V2' | 'Synare' | 'Dexed' | 'OBXd' | 'SpaceLaser' | 'SAM' | 'Organ' | 'Melodica' | 'MasterFX';
+export type KnobBankMode = '303' | 'Siren' | 'FX' | 'Mixer' | 'Furnace' | 'V2' | 'Synare' | 'SpaceLaser' | 'SAM' | 'Organ' | 'Melodica' | 'MasterFX';
 
 export type MappableParameter =
   | TB303Parameter
@@ -146,7 +146,7 @@ export type MappableParameter =
   | 'dexed.lfoPitchMod'
   | 'dexed.lfoAmpMod'
   | 'dexed.transpose'
-  // OBXd
+  // OBXd params (kept for backwards compatibility with old MIDI mappings)
   | 'obxd.osc1Level'
   | 'obxd.osc2Level'
   | 'obxd.filterCutoff'

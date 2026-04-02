@@ -128,7 +128,7 @@ async function testSynth(synthType: SynthType): Promise<SynthTestResult> {
     }
 
     // WASM-based synths: await ready (Promise property or function) or ensureInitialized() if
-    // available. Catches V2, Sam, TB303, Dexed, OBXd, VSTBridge synths (Vital, Odin2, Surge,
+    // available. Catches V2, Sam, TB303, VSTBridge synths (Vital, Odin2, Surge,
     // Helm, Melodica, etc.), MAME synths, and FurnaceDispatchSynth.
     // V2 gets 12s (its internal timeout is 10s); all others get 8s.
     {
@@ -410,8 +410,6 @@ export async function testCustomSynths(): Promise<SynthTestSummary> {
     'Synare',
     'V2',
     'Sam',
-    'Dexed',
-    'OBXd',
     'SuperSaw',
     'Organ',
     'DrumMachine',

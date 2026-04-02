@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-04-02T07:50:41.194Z
+ * Generated: 2026-04-02T08:46:56.787Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -19,9 +19,9 @@ export interface ChangelogEntry {
 }
 
 // Build info
-export const BUILD_VERSION = '1.0.3833';
-export const BUILD_NUMBER = '3833';
-export const BUILD_HASH = 'b3fcbd315';
+export const BUILD_VERSION = '1.0.3843';
+export const BUILD_NUMBER = '3843';
+export const BUILD_HASH = 'ac62bf74a';
 export const BUILD_DATE = '2026-04-02';
 
 // Full version (patch IS the build number, so no need to append)
@@ -30,9 +30,49 @@ export const FULL_VERSION = BUILD_VERSION;
 // Auto-generated changelog
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: '1.0.3833',
+    version: '1.0.3843',
     date: '2026-04-02',
     changes: [
+      {
+        type: 'feature',
+        "description": "Wire PixiDrumPadManager into GL view router"
+      },
+      {
+        type: 'fix',
+        "description": "GL/DOM parity — flex centering, DJ deck layout, button fixes"
+      },
+      {
+        type: 'feature',
+        "description": "Per-pad IO808/TR909 drum parameter editing"
+      },
+      {
+        type: 'feature',
+        "description": "Helm hardware UI build files — JUCE editor to WASM"
+      },
+      {
+        type: 'feature',
+        "description": "Surge XT hardware UI — full JUCE editor compiled to WASM"
+      },
+      {
+        type: 'feature',
+        "description": "Add Max Headroom mode setting"
+      },
+      {
+        type: 'improvement',
+        "description": "Chore: update generated changelog"
+      },
+      {
+        type: 'fix',
+        "description": "Pixi DJ deck component refinements"
+      },
+      {
+        type: 'feature',
+        "description": "Kraftwerk head overlay improvements"
+      },
+      {
+        type: 'fix',
+        "description": "16 FT2 effect command bugs from exhaustive audit"
+      },
       {
         type: 'feature',
         "description": "New Pixi DJ components, Helm hardware UI, TR-808 layout"
@@ -198,52 +238,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'fix',
         "description": "Move OPL3 forward declaration before use"
-      },
-      {
-        type: 'feature',
-        "description": "Add OPL3 JUCE-WASM bridge scaffold"
-      },
-      {
-        type: 'improvement',
-        "description": "Chore: gitignore third-party/retromulator clone"
-      },
-      {
-        type: 'fix',
-        "description": "Disable Import button while UADE engine is still loading"
-      },
-      {
-        type: 'fix',
-        "description": "Preload UADE WASM engine during import so song is ready on Play"
-      },
-      {
-        type: 'fix',
-        "description": "Import dialog blocks until song is fully ready to play"
-      },
-      {
-        type: 'improvement',
-        "description": "Double-click songs in DJ browsers to load to next free deck"
-      },
-      {
-        type: 'fix',
-        "description": "Remove aggressive API rate limiting (100 req/15min was too low for dev)"
-      },
-      {
-        type: 'fix',
-        "description": "Fix playlist sort dropdown clipped by Crate overflow"
-      },
-      {
-        type: 'fix',
-        "description": "Strip directory from UADE filename in parseUADEFile + add trigger note for compiled 68k"
-      }
-    ]
-  },
-  {
-    version: '2026-03-31',
-    date: '2026-03-31',
-    changes: [
-      {
-        type: 'fix',
-        "description": "Remove require() call in useNoteInput — useInstrumentStore already imported"
       }
     ]
   }

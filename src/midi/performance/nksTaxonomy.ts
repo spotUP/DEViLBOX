@@ -201,8 +201,6 @@ export const SYNTH_TYPE_TO_NKS: Partial<Record<SynthType, NKSTypeMapping>> = {
 
   // FM synths
   FMSynth:        { type: 'Synth Lead', subType: 'Classic Poly', characters: ['FM', 'Digital'] },
-  Dexed:          { type: 'Synth Lead', subType: 'Classic Poly', characters: ['FM', 'Digital'] },
-  DexedBridge:    { type: 'Synth Lead', subType: 'Classic Poly', characters: ['FM', 'Digital'] },
 
   // Classic synths
   MonoSynth:      { type: 'Synth Lead', subType: 'Classic Mono', characters: ['Analog', 'Monophonic'] },
@@ -212,7 +210,6 @@ export const SYNTH_TYPE_TO_NKS: Partial<Record<SynthType, NKSTypeMapping>> = {
   Synth:          { type: 'Synth Lead', subType: 'Classic Poly', characters: ['Digital'] },
 
   // Subtractive / analog modeling
-  OBXd:           { type: 'Synth Lead', subType: 'Classic Poly', characters: ['Analog', 'Huge'] },
   V2:             { type: 'Synth Lead', subType: 'Classic Poly', characters: ['Analog', 'Digital'] },
   V2Speech:       { type: 'Vocal', subType: 'Computer', characters: ['Synthetic', 'Digital'] },
 

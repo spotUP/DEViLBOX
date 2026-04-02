@@ -1429,8 +1429,6 @@ describe('VST-Style Interface Compliance', () => {
   // Synths expected to have modern VST-style interface
   const MODERN_SYNTHS: SynthType[] = [
     'V2',
-    'Dexed',
-    'OBXd',
     'Synare',
     'DubSiren',
     'SpaceLaser',
@@ -1594,7 +1592,7 @@ describe('Synth Type Completeness Audit', () => {
     'PWMSynth', 'StringMachine', 'FormantSynth', 'Furnace',
     'WobbleBass', 'Buzzmachine', 'DrumKit', 'ChiptuneModule',
     'DubSiren', 'SpaceLaser', 'V2', 'Sam', 'Synare',
-    'Dexed', 'OBXd', 'Buzz3o3',
+    'Buzz3o3',
   ];
 
   const TESTED_SYNTH_TYPES = [
@@ -2400,8 +2398,6 @@ describe('Fallback Detection Tests', () => {
     'BuzzNoise',
     'Buzz3o3',
     'Buzzmachine',
-    'Dexed',
-    'OBXd',
   ];
 
   // Expected constructor/class names for synths
@@ -2604,7 +2600,6 @@ describe('Fallback Detection Tests', () => {
         'TB303', 'Buzz3o3',
         'Furnace', 'FurnaceGB', 'FurnaceNES',
         'BuzzKick', 'BuzzNoise',
-        'Dexed', 'OBXd',
         'Synare', 'Sam', 'V2',
       ];
 
