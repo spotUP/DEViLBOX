@@ -17,6 +17,7 @@ import scRoutes from './routes/sc';
 import deepsidRoutes from './routes/deepsid';
 import aiRoutes from './routes/ai';
 import analysisRoutes from './routes/analysis';
+import renderRoutes from './routes/render';
 import djsetsRoutes from './routes/djsets';
 import ratingsRoutes from './routes/ratings';
 import { handleStreamConnection, checkFfmpeg } from './routes/stream';
@@ -62,6 +63,7 @@ app.use('/api/sc', scRoutes);
 app.use('/api/deepsid', deepsidRoutes);
 app.use('/api/ai', aiRoutes);
 app.use('/api/analysis', analysisRoutes);
+app.use('/api/render', express.raw({ type: 'application/octet-stream', limit: '10mb' }), renderRoutes);
 app.use('/api/djsets', djsetsRoutes);
 app.use('/api/ratings', ratingsRoutes);
 
