@@ -8,6 +8,7 @@
 
 import { useCallback, useRef, useState } from 'react';
 import type { Graphics as GraphicsType } from 'pixi.js';
+import { PIXI_FONTS } from '../../fonts';
 import { usePixiTheme } from '../../theme';
 import { useDJStore } from '@/stores/useDJStore';
 import { getDJEngine } from '@/engine/dj/DJEngine';
@@ -268,10 +269,12 @@ const TabButton: React.FC<{ label: string; active: boolean; color: number; onCli
       layout={{ width: 60, height: TAB_H, justifyContent: 'center', alignItems: 'center' }}
     >
       <pixiGraphics draw={draw} layout={{ position: 'absolute', width: 60, height: TAB_H }} />
-      <pixiText
+      <pixiBitmapText
         text={label}
-        style={{ fontSize: 8, fontWeight: 'bold', fill: active ? color : theme.textMuted.color, fontFamily: 'monospace' }}
+        style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 9, fill: 0xffffff }}
+        tint={active ? color : theme.textMuted.color}
         eventMode="none"
+        layout={{}}
       />
     </pixiContainer>
   );
@@ -321,17 +324,21 @@ const FXPad: React.FC<FXPadProps> = ({ pad, active, onDown, onUp }) => {
       }}
     >
       <pixiGraphics draw={draw} layout={{ position: 'absolute', width: '100%', height: PAD_H }} />
-      <pixiText
+      <pixiBitmapText
         text={pad.label}
-        style={{ fontSize: 11, fontWeight: 'bold', fill: active ? color : theme.textMuted.color, fontFamily: 'monospace' }}
+        style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 11, fill: 0xffffff }}
+        tint={active ? color : theme.textMuted.color}
         eventMode="none"
+        layout={{}}
       />
       {pad.sublabel && (
-        <pixiText
+        <pixiBitmapText
           text={pad.sublabel}
-          style={{ fontSize: 9, fill: active ? color : theme.textMuted.color, fontFamily: 'monospace' }}
+          style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 9, fill: 0xffffff }}
+          tint={active ? color : theme.textMuted.color}
           alpha={0.7}
           eventMode="none"
+          layout={{}}
         />
       )}
     </pixiContainer>
