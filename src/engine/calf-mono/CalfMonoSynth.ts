@@ -260,12 +260,15 @@ export class CalfMonoSynthImpl implements DevilboxSynth {
   }
 
   async ensureInitialized(): Promise<void> {
-    if (this._initPromise) return this._initPromise;
+    if (!this._initPromise) {
+      this._initPromise = this._doInit();
+    }
+    return this._initPromise;
   }
 
+  /** Alias for ensureInitialized() — kept for backward compatibility */
   async init(): Promise<void> {
-    this._initPromise = this._doInit();
-    return this._initPromise;
+    return this.ensureInitialized();
   }
 
   private async _doInit(): Promise<void> {

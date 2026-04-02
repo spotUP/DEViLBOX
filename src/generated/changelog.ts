@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-04-02T11:39:13.118Z
+ * Generated: 2026-04-02T12:06:50.021Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -19,9 +19,9 @@ export interface ChangelogEntry {
 }
 
 // Build info
-export const BUILD_VERSION = '1.0.3863';
-export const BUILD_NUMBER = '3863';
-export const BUILD_HASH = '6bc5e03a9';
+export const BUILD_VERSION = '1.0.3870';
+export const BUILD_NUMBER = '3870';
+export const BUILD_HASH = 'acbbce779';
 export const BUILD_DATE = '2026-04-02';
 
 // Full version (patch IS the build number, so no need to append)
@@ -30,9 +30,37 @@ export const FULL_VERSION = BUILD_VERSION;
 // Auto-generated changelog
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: '1.0.3863',
+    version: '1.0.3870',
     date: '2026-04-02',
     changes: [
+      {
+        type: 'fix',
+        "description": "Add touch events for iOS Safari compatibility"
+      },
+      {
+        type: 'fix',
+        "description": "Remove unused useCallback import and onViewModeChange param"
+      },
+      {
+        type: 'fix',
+        "description": "Fix DX7 prewarm: await voices + patch bank before ready"
+      },
+      {
+        type: 'fix',
+        "description": "Replace broken QR generator with qrcode library"
+      },
+      {
+        type: 'fix',
+        "description": "Fix recursive dist/ nesting: enable emptyOutDir"
+      },
+      {
+        type: 'feature',
+        "description": "Add QR code for iPhone pairing"
+      },
+      {
+        type: 'fix',
+        "description": "Remove radial visual bg presets + add mode cycler to tracker header"
+      },
       {
         type: 'feature',
         "description": "Complete iPhone remote control with WebRTC mic + pairing"
@@ -210,34 +238,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'fix',
         "description": "Use pitch noteMode so drum type is always respected"
-      },
-      {
-        type: 'fix',
-        "description": "Misc accumulated fixes: vocoder worklet, DJ autoDJ, drumpad, ProjectM"
-      },
-      {
-        type: 'improvement',
-        "description": "Enforce knobs→visualizers→checkboxes hierarchy across synth UIs"
-      },
-      {
-        type: 'fix',
-        "description": "Constrain performance mode pad size in DOM view"
-      },
-      {
-        type: 'fix',
-        "description": "Cap pad size at 90px + show full names in Pads view"
-      },
-      {
-        type: 'fix',
-        "description": "Shrink sampler pads 60→44px so all 16 fit on screen"
-      },
-      {
-        type: 'fix',
-        "description": "Use full names in 808/909 factory kits (Kick/Snare/Closed Hat etc)"
-      },
-      {
-        type: 'fix',
-        "description": "Show full pad name — remove 8-char truncation"
       }
     ]
   }
