@@ -98,11 +98,21 @@ add_subdirectory(melodica)
 add_subdirectory(monique)
 
 # ============================================================================
+# Shimmer Reverb (Dattorro plate + grain pitch shifter) - Built from scratch
+# ============================================================================
+add_subdirectory(shimmer-reverb)
+
+# ============================================================================
+# GranularFreeze (Live-capture granular freeze effect) - Built from scratch
+# ============================================================================
+add_subdirectory(granular-freeze)
+
+# ============================================================================
 # Combined build target
 # ============================================================================
 add_custom_target(all_synths
     DEPENDS DexedWASM OBXdWASM RdPianoWASM MoogFiltersWASM
             MVerbWASM LeslieWASM SpringReverbWASM TonewheelWASM MelodicaWASM
-            MoniqueWASMBuild
+            MoniqueWASMBuild ShimmerReverbWASM GranularFreezeWASM
     COMMENT "Building all JUCE WASM synths and effects"
 )
