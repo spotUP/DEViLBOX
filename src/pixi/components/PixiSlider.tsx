@@ -93,10 +93,12 @@ export const PixiSlider: React.FC<PixiSliderProps> = ({
   // Track and handle drawing
   const drawSlider = useCallback((g: GraphicsType) => {
     g.clear();
-    // When autoSize, read the computed layout height for the track length
-    const effectiveLength = autoSize
-      ? ((g as any).layout?.computedLayout?.height ?? (length || 120))
-      : length;
+    // When autoSize, read the actual rendered size for the track length
+    let effectiveLength = length;
+    if (autoSize) {
+      const cl = (g as any).layout?.computedLayout;
+      effectiveLength = (isVert ? cl?.height : cl?.width) || length || 120;
+    }
 
     if (isVert) {
       // Vertical: track centered horizontally, handle moves vertically
@@ -196,12 +198,18 @@ export const PixiSlider: React.FC<PixiSliderProps> = ({
 
     setIsDragging(true);
 
-    // For auto-size sliders, read the actual rendered size from the container
-    const dragLength = autoSize
-      ? (isVert
-        ? ((containerRef.current as any)?.layout?.computedLayout?.height ?? (length || 120))
-        : ((containerRef.current as any)?.layout?.computedLayout?.width ?? (length || 120)))
-      : length;
+    // For auto-size sliders, read the actual rendered bounds
+    let dragLength = length;
+    if (autoSize && containerRef.current) {
+      const bounds = containerRef.current.getBounds();
+      dragLength = isVert ? bounds.height : bounds.width;
+      if (dragLength <= 0) {
+        // Fallback to computed layout
+        dragLength = isVert
+          ? ((containerRef.current as any)?.layout?.computedLayout?.height ?? 120)
+          : ((containerRef.current as any)?.layout?.computedLayout?.width ?? 120);
+      }
+    }
 
     const onMove = (ev: PointerEvent) => {
       const currentPos = isVert ? ev.clientY : ev.clientX;
