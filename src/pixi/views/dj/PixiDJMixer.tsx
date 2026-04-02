@@ -173,15 +173,16 @@ const ChannelFader: React.FC<{ deckId: 'A' | 'B' | 'C'; label: string }> = ({ de
   const volume = useDJStore(s => s.decks[deckId].volume);
 
   return (
-    <pixiContainer layout={{ flexDirection: 'column', gap: 2, alignItems: 'center' }}>
+    <pixiContainer layout={{ flexDirection: 'column', gap: 2, alignItems: 'center', alignSelf: 'stretch' }}>
       <PixiLabel text={label} size="xs" color="textMuted" />
       <PixiSlider
         value={volume ?? 0.8}
         min={0}
         max={1}
         orientation="vertical"
-        length={100}
+        length={0}
         onChange={(v) => DJActions.setDeckVolume(deckId, v)}
+        layout={{ flex: 1 }}
       />
       <pixiBitmapText
         text={volumeToDb(volume ?? 0.8)}
