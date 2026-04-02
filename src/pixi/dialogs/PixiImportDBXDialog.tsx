@@ -179,7 +179,7 @@ export const PixiImportDBXDialog: React.FC<PixiImportDBXDialogProps> = ({
             {/* Stats row — grid-cols-3 gap-2 mb-5 → flexRow gap 8, marginBottom 20 */}
             <layoutContainer layout={{ flexDirection: 'row', gap: 8, marginBottom: 20 }}>
               <StatCard
-                icon="⏱"
+                icon="waveform"
                 value={String(preview.bpm)}
                 label="BPM"
                 accentColor={theme.accent.color}
@@ -187,7 +187,7 @@ export const PixiImportDBXDialog: React.FC<PixiImportDBXDialogProps> = ({
                 theme={theme}
               />
               <StatCard
-                icon="▦"
+                icon="preset-a"
                 value={String(preview.patternCount)}
                 label="Patterns"
                 accentColor={theme.accent.color}
