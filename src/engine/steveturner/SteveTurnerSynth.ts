@@ -42,6 +42,10 @@ export class SteveTurnerSynth implements DevilboxSynth {
     ensureEngineLoaded().catch(() => {});
   }
 
+  async ensureInitialized(): Promise<void> {
+    await ensureEngineLoaded();
+  }
+
   setInstrumentIndex(index: number): void {
     this.instrumentIndex = index;
   }

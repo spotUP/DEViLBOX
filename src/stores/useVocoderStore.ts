@@ -85,6 +85,37 @@ export const VOCODER_PRESETS: VocoderPreset[] = [
 
 export const DEFAULT_VOCODER_PARAMS: VocoderParams = { ...VOCODER_PRESETS[0].params };
 
+// ── Effects ─────────────────────────────────────────────────────────────────
+
+export type VocoderFXPreset = 'none' | 'space-echo' | 'dub-delay' | 'hall-reverb' | 'plate-reverb' | 'radio';
+
+export interface VocoderFXParams {
+  enabled: boolean;
+  preset: VocoderFXPreset;
+  reverbDecay: number;     // 0.5-10s
+  reverbWet: number;       // 0-1
+  delayTime: number;       // 0.05-1.0s
+  delayFeedback: number;   // 0-0.9
+  delayWet: number;        // 0-1
+}
+
+export const VOCODER_FX_PRESETS: Record<VocoderFXPreset, Omit<VocoderFXParams, 'enabled' | 'preset'>> = {
+  'none':         { reverbDecay: 0, reverbWet: 0, delayTime: 0, delayFeedback: 0, delayWet: 0 },
+  'space-echo':   { reverbDecay: 2.5, reverbWet: 0.2, delayTime: 0.75, delayFeedback: 0.35, delayWet: 0.3 },
+  'dub-delay':    { reverbDecay: 2.0, reverbWet: 0.15, delayTime: 1.0, delayFeedback: 0.55, delayWet: 0.35 },
+  'hall-reverb':  { reverbDecay: 5.0, reverbWet: 0.5, delayTime: 0, delayFeedback: 0, delayWet: 0 },
+  'plate-reverb': { reverbDecay: 2.5, reverbWet: 0.4, delayTime: 0, delayFeedback: 0, delayWet: 0 },
+  'radio':        { reverbDecay: 0.5, reverbWet: 0.12, delayTime: 0.6, delayFeedback: 0.25, delayWet: 0.2 },
+};
+
+export const DEFAULT_FX: VocoderFXParams = {
+  enabled: true,
+  preset: 'space-echo',
+  ...VOCODER_FX_PRESETS['space-echo'],
+};
+
+// ── Store ────────────────────────────────────────────────────────────────────
+
 interface VocoderState {
   /** Whether the vocoder is currently active and processing */
   isActive: boolean;
@@ -94,12 +125,16 @@ interface VocoderState {
   params: VocoderParams;
   /** Currently selected preset name (null if tweaked away from preset) */
   presetName: string | null;
+  /** Effects parameters */
+  fx: VocoderFXParams;
 
   setActive: (active: boolean) => void;
   setAmplitude: (amp: number) => void;
   setParam: <K extends keyof VocoderParams>(key: K, value: VocoderParams[K]) => void;
   setParams: (params: Partial<VocoderParams>) => void;
   loadPreset: (name: string) => void;
+  setFXEnabled: (enabled: boolean) => void;
+  loadFXPreset: (preset: VocoderFXPreset) => void;
 }
 
 export const useVocoderStore = create<VocoderState>((set) => ({
@@ -107,6 +142,7 @@ export const useVocoderStore = create<VocoderState>((set) => ({
   amplitude: 0,
   params: { ...DEFAULT_VOCODER_PARAMS },
   presetName: VOCODER_PRESETS[0].name,
+  fx: { ...DEFAULT_FX },
 
   setActive: (active) => set({ isActive: active }),
   setAmplitude: (amp) => set({ amplitude: amp }),
@@ -118,4 +154,8 @@ export const useVocoderStore = create<VocoderState>((set) => ({
     const preset = VOCODER_PRESETS.find(p => p.name === name);
     if (preset) set({ params: { ...preset.params }, presetName: name });
   },
+  setFXEnabled: (enabled) =>
+    set((s) => ({ fx: { ...s.fx, enabled } })),
+  loadFXPreset: (preset) =>
+    set({ fx: { enabled: true, preset, ...VOCODER_FX_PRESETS[preset] } }),
 }));

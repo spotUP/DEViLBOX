@@ -62,6 +62,10 @@ export class SidMonSynth implements DevilboxSynth {
     }
   }
 
+  async ensureInitialized(): Promise<void> {
+    await this.engine.ready();
+  }
+
   async setInstrument(config: SidMonConfig): Promise<void> {
     await this.engine.ready();
 

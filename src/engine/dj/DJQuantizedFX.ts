@@ -224,10 +224,8 @@ export function crossfaderSweep(
   const clampedTarget = Math.max(0, Math.min(1, target));
 
   const cancelSchedule = scheduleQuantized(referenceDeckId, () => {
-    let startVal = 0.5;
-    try {
-      startVal = getDJEngine().mixer.getCrossfader();
-    } catch { /* fallback */ }
+    // Read from store (single source of truth) — engine value can be stale
+    const startVal = useDJStore.getState().crossfaderPosition;
 
     const sweepStart = performance.now();
 

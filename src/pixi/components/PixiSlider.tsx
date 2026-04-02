@@ -101,16 +101,17 @@ export const PixiSlider: React.FC<PixiSliderProps> = ({
     if (isVert) {
       // Vertical: track centered horizontally, handle moves vertically
       const trackX = (handleWidth - thickness) / 2;
+      const trackR = Math.min(thickness / 2, 2);
       // Track background
-      g.roundRect(trackX, 0, thickness, effectiveLength, thickness / 2);
+      g.roundRect(trackX, 0, thickness, effectiveLength, trackR);
       g.fill({ color: theme.bgActive.color });
-      g.roundRect(trackX, 0, thickness, effectiveLength, thickness / 2);
+      g.roundRect(trackX, 0, thickness, effectiveLength, trackR);
       g.stroke({ color: theme.border.color, alpha: 0.5, width: 1 });
 
       // Value fill (from bottom up for vertical)
       const fillHeight = norm * effectiveLength;
       if (fillHeight > 1) {
-        g.roundRect(trackX, effectiveLength - fillHeight, thickness, fillHeight, thickness / 2);
+        g.roundRect(trackX, effectiveLength - fillHeight, thickness, fillHeight, trackR);
         g.fill({ color: accent, alpha: 0.4 });
       }
 
@@ -125,9 +126,9 @@ export const PixiSlider: React.FC<PixiSliderProps> = ({
 
       // Handle
       const handleY = effectiveLength - norm * effectiveLength - handleHeight / 2;
-      g.roundRect(0, handleY, handleWidth, handleHeight, 3);
+      g.roundRect(0, handleY, handleWidth, handleHeight, 2);
       g.fill({ color: isDragging ? accent : theme.bgHover.color });
-      g.roundRect(0, handleY, handleWidth, handleHeight, 3);
+      g.roundRect(0, handleY, handleWidth, handleHeight, 2);
       g.stroke({ color: isDragging ? accent : theme.borderLight.color, width: 1 });
 
       // Handle center line
@@ -137,15 +138,16 @@ export const PixiSlider: React.FC<PixiSliderProps> = ({
     } else {
       // Horizontal: track centered vertically
       const trackY = (handleHeight - thickness) / 2;
-      g.roundRect(0, trackY, effectiveLength, thickness, thickness / 2);
+      const trackR = Math.min(thickness / 2, 2);
+      g.roundRect(0, trackY, effectiveLength, thickness, trackR);
       g.fill({ color: theme.bgActive.color });
-      g.roundRect(0, trackY, effectiveLength, thickness, thickness / 2);
+      g.roundRect(0, trackY, effectiveLength, thickness, trackR);
       g.stroke({ color: theme.border.color, alpha: 0.5, width: 1 });
 
       // Value fill (from left)
       const fillWidth = norm * effectiveLength;
       if (fillWidth > 1) {
-        g.roundRect(0, trackY, fillWidth, thickness, thickness / 2);
+        g.roundRect(0, trackY, fillWidth, thickness, trackR);
         g.fill({ color: accent, alpha: 0.4 });
       }
 
@@ -160,9 +162,9 @@ export const PixiSlider: React.FC<PixiSliderProps> = ({
 
       // Handle
       const handleX = norm * effectiveLength - handleWidth / 2;
-      g.roundRect(handleX, 0, handleWidth, handleHeight, 3);
+      g.roundRect(handleX, 0, handleWidth, handleHeight, 2);
       g.fill({ color: isDragging ? accent : theme.bgHover.color });
-      g.roundRect(handleX, 0, handleWidth, handleHeight, 3);
+      g.roundRect(handleX, 0, handleWidth, handleHeight, 2);
       g.stroke({ color: isDragging ? accent : theme.borderLight.color, width: 1 });
 
       // Handle center line

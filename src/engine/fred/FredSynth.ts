@@ -58,6 +58,10 @@ export class FredSynth implements DevilboxSynth {
     }
   }
 
+  async ensureInitialized(): Promise<void> {
+    await this.engine.ready();
+  }
+
   async setInstrument(config: FredConfig): Promise<void> {
     await this.engine.ready();
 

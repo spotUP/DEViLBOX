@@ -59,6 +59,10 @@ export class FCSynth implements DevilboxSynth {
     }
   }
 
+  async ensureInitialized(): Promise<void> {
+    await this.engine.ready();
+  }
+
   async setInstrument(config: FCConfig): Promise<void> {
     await this.engine.ready();
 

@@ -52,6 +52,7 @@ export type OnFixNeeded = (
  * Check if a playlist track is missing metadata needed for smart sorting.
  */
 export function trackNeedsAnalysis(track: PlaylistTrack): boolean {
+  if (track.analysisSkipped) return false;
   return track.bpm === 0 || !track.musicalKey || track.energy == null;
 }
 
@@ -233,6 +234,8 @@ export async function analyzePlaylist(
       failed++;
       const reason = err instanceof Error ? err.message : String(err);
       failures.push({ trackName: track.trackName, fileName: track.fileName, reason });
+      // Mark as skipped so it won't be re-scanned next time
+      useDJPlaylistStore.getState().updateTrackMeta(playlistId, index, { analysisSkipped: true });
       const done = analyzed + failed;
       onProgress?.({ current: done, total, analyzed, failed, trackName: track.trackName, status: 'error' });
       console.warn(`[PlaylistAnalyzer] ${done}/${total} FAIL — ${track.trackName}: ${reason}`);

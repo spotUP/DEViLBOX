@@ -60,6 +60,10 @@ export class SuperColliderSynth implements DevilboxSynth {
     this._initEngine();
   }
 
+  async ensureInitialized(): Promise<void> {
+    if (this._enginePromise) await this._enginePromise;
+  }
+
   private _initEngine(): void {
     console.log('[SC:Synth] _initEngine called, binary length:', this._config.binary?.length ?? 0, 'synthDefName:', this._config.synthDefName);
 

@@ -251,6 +251,7 @@ export class CalfMonoSynthImpl implements DevilboxSynth {
   private ready = false;
   private config: CalfMonoConfig;
   private pendingPatch: number[] | null = null;
+  private _initPromise: Promise<void> | null = null;
 
   constructor() {
     this.config = { ...DEFAULT_CALF_MONO };
@@ -258,7 +259,16 @@ export class CalfMonoSynthImpl implements DevilboxSynth {
     this.output = ctx.createGain();
   }
 
+  async ensureInitialized(): Promise<void> {
+    if (this._initPromise) return this._initPromise;
+  }
+
   async init(): Promise<void> {
+    this._initPromise = this._doInit();
+    return this._initPromise;
+  }
+
+  private async _doInit(): Promise<void> {
     const ctx = getDevilboxAudioContext();
     if (!ctx) throw new Error('No audio context');
 

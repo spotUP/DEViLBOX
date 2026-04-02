@@ -74,6 +74,10 @@ export const DJAutoDJPanel: React.FC<DJAutoDJPanelProps> = ({ onClose }) => {
   const analyzedCount = activePlaylist
     ? activePlaylist.tracks.filter(t => t.bpm > 0 && t.musicalKey).length
     : 0;
+  const skippedCount = activePlaylist
+    ? activePlaylist.tracks.filter(t => t.analysisSkipped).length
+    : 0;
+  const pendingCount = trackCount - analyzedCount - skippedCount;
 
   // 404 fix dialog state
   const [fixDialog, setFixDialog] = useState<{
@@ -93,7 +97,11 @@ export const DJAutoDJPanel: React.FC<DJAutoDJPanelProps> = ({ onClose }) => {
   );
 
   const handleAnalyze = useCallback(async () => {
-    if (!activePlaylistId || analyzingRef.current) return;
+    if (!activePlaylistId) return;
+    // Reset stuck state from previous run (e.g. unresolved fix dialog)
+    analyzingRef.current = false;
+    setFixDialog(null);
+
     analyzingRef.current = true;
     setAnalysisProgress({ current: 0, total: 1, analyzed: 0, failed: 0, trackName: 'Starting...', status: 'analyzing' });
     try {
@@ -178,17 +186,36 @@ export const DJAutoDJPanel: React.FC<DJAutoDJPanelProps> = ({ onClose }) => {
                 />
               </div>
             </div>
-          ) : needsAnalysis ? (
-            <button
-              onClick={handleAnalyze}
-              className="w-full flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-md border border-cyan-700 bg-cyan-900/20 text-cyan-400 hover:bg-cyan-900/40 transition-all text-[10px]"
-            >
-              <Zap size={10} />
-              Analyze Playlist ({trackCount - analyzedCount} tracks need BPM/key)
-            </button>
           ) : (
-            <div className="text-green-500/60 text-center text-[10px] py-0.5">
-              All {trackCount} tracks analyzed
+            <div className="space-y-1.5">
+              {/* Status bar */}
+              <div className="flex items-center gap-2 text-[10px]">
+                <span className="text-green-400">{analyzedCount} analyzed</span>
+                {skippedCount > 0 && <span className="text-red-400/60">{skippedCount} skipped</span>}
+                {pendingCount > 0 && <span className="text-yellow-400">{pendingCount} pending</span>}
+                {!needsAnalysis && pendingCount === 0 && (
+                  <span className="text-green-500/80 ml-auto">Ready</span>
+                )}
+              </div>
+              {/* Progress bar showing ratio */}
+              <div className="h-1 bg-dark-bgTertiary rounded-full overflow-hidden flex">
+                {analyzedCount > 0 && (
+                  <div className="h-full bg-green-500" style={{ width: `${(analyzedCount / trackCount) * 100}%` }} />
+                )}
+                {skippedCount > 0 && (
+                  <div className="h-full bg-red-500/40" style={{ width: `${(skippedCount / trackCount) * 100}%` }} />
+                )}
+              </div>
+              {/* Analyze button if needed */}
+              {needsAnalysis && (
+                <button
+                  onClick={handleAnalyze}
+                  className="w-full flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-md border border-cyan-700 bg-cyan-900/20 text-cyan-400 hover:bg-cyan-900/40 transition-all text-[10px]"
+                >
+                  <Zap size={10} />
+                  Analyze ({pendingCount} tracks)
+                </button>
+              )}
             </div>
           )}
         </div>

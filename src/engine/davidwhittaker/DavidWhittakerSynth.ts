@@ -47,6 +47,10 @@ export class DavidWhittakerSynth implements DevilboxSynth {
     }
   }
 
+  async ensureInitialized(): Promise<void> {
+    await this.engine.ready();
+  }
+
   async setInstrument(config: DavidWhittakerConfig): Promise<void> {
     await this.engine.ready();
 

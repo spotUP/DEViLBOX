@@ -37,7 +37,6 @@ import { PixiCMIKnobPanel, CMI_PANEL_COLLAPSED_H, CMI_PANEL_EXPANDED_H } from '.
 import { PixiMusicLineTrackTable } from './tracker/PixiMusicLineTrackTable';
 import { PixiMusicLinePatternViewer } from './tracker/PixiMusicLinePatternViewer';
 import { PixiPatternEditor } from './tracker/PixiPatternEditor';
-import { PixiTrackerVisualBg } from './tracker/PixiTrackerVisualBg';
 import { PixiGridSequencer } from './tracker/PixiGridSequencer';
 import { PixiTB303View } from './tracker/PixiTB303View';
 import { PixiSunVoxChannelView } from './sunvox/PixiSunVoxChannelView';
@@ -77,7 +76,7 @@ export const PixiTrackerView: React.FC = () => {
   const showMacroSlots = useUIStore(s => s.showMacroSlots);
   const showKnobBar = useMIDIStore(s => s.showKnobBar);
   const showInstrumentPanel = useUIStore(s => s.showInstrumentPanel);
-  const trackerVisualBg = useSettingsStore(s => s.trackerVisualBg);
+  // trackerVisualBg removed — feature disabled
 
 
   // PixiTrackerView lives inside a PixiWindow — use the window's own dimensions,
@@ -340,9 +339,7 @@ export const PixiTrackerView: React.FC = () => {
               Use alpha/renderable (NOT visible) — @pixi/layout calls _onChildRemoved()
               on visible=false, detaching Yoga nodes and causing BindingErrors. */}
           {/* Audio-reactive visual background — renders behind everything else */}
-          <pixiContainer alpha={trackerVisualBg && viewMode === 'tracker' && editorMode === 'classic' ? 1 : 0} renderable={trackerVisualBg && viewMode === 'tracker' && editorMode === 'classic'} eventMode="none" layout={{ position: 'absolute', top: 0, width: Math.max(100, editorWidth), height: Math.max(100, instrumentPanelHeight) }}>
-            <PixiTrackerVisualBg width={Math.max(100, editorWidth)} height={Math.max(100, instrumentPanelHeight)} />
-          </pixiContainer>
+          {/* Visual background removed — feature disabled */}
           {/* VU meters overlay — covers top half of editor down to the edit bar.
               VU segments draw upward from the bottom of this area, so they
               appear to shoot out from the edit cursor row.
