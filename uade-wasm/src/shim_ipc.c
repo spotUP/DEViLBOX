@@ -39,7 +39,7 @@
 #define UADE_SHIM_RSP_FD   9002   /* core → frontend: responses */
 
 /* Ring buffer size (must be power of 2) */
-#define SHIM_BUFSIZE (1 << 18)   /* 256 KiB */
+#define SHIM_BUFSIZE (1 << 22)   /* 4 MiB — must fit module data sent through UADE IPC */
 #define SHIM_BUFMASK (SHIM_BUFSIZE - 1)
 
 typedef struct {
