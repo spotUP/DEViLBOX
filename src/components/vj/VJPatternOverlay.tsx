@@ -95,6 +95,8 @@ interface AnimState {
   chromaShift: number;
   trailAlpha: number;
   energyPulse: number;
+  replayerRow: number;
+  replayerPatIdx: number;
 }
 
 function createAnimState(): AnimState {
@@ -104,6 +106,7 @@ function createAnimState(): AnimState {
     prevRow: -1, scrollOffset: 0, time: 0,
     glitchAmount: 0, glitchSeed: 0, chromaShift: 0,
     trailAlpha: 0, energyPulse: 0,
+    replayerRow: -1, replayerPatIdx: -1,
   };
 }
 
@@ -296,12 +299,18 @@ export const VJPatternOverlay: React.FC<VJPatternOverlayProps> = React.memo(({ s
       anim.trailAlpha = decay(anim.trailAlpha, 4);
       anim.energyPulse = anim.energyPulse * 0.9 + (frame.rms * 0.8 + frame.bassEnergy * 0.2) * 0.1;
 
-      // Sub-row scroll for tracker source only
+      // Sub-row scroll + accurate row tracking for tracker source
+      // Uses the replayer's time-stamped state ring instead of the throttled store
+      // to avoid stutter when the tracker view is unmounted (VJ view active).
+      anim.replayerRow = -1;
+      anim.replayerPatIdx = -1;
       if (anyPlaying && snapshots[0].source === 'tracker') {
         const replayer = getTrackerReplayer();
         const audioTime = Tone.now() + 0.01;
         const audioState = replayer.getStateAtTime(audioTime);
         if (audioState) {
+          anim.replayerRow = audioState.row;
+          anim.replayerPatIdx = audioState.pattern;
           const nextState = replayer.getStateAtTime(audioTime + 0.5, true);
           const dur = (nextState && nextState.row !== audioState.row)
             ? nextState.time - audioState.time
@@ -357,8 +366,16 @@ export const VJPatternOverlay: React.FC<VJPatternOverlayProps> = React.memo(({ s
 
       for (let si = 0; si < snapshots.length; si++) {
         const { snapshot, source: src } = snapshots[si];
-        const { pattern, currentRow, isPlaying: srcPlaying, label: sourceLabel } = snapshot;
+        const { currentRow, isPlaying: srcPlaying, label: sourceLabel } = snapshot;
         const { xBase, numChannels } = layoutBuf[si];
+
+        // For tracker source, use the replayer's pattern index for accuracy
+        let pattern = snapshot.pattern;
+        if (src === 'tracker' && anim.replayerPatIdx >= 0) {
+          const patterns = useTrackerStore.getState().patterns;
+          const replayerPat = patterns[anim.replayerPatIdx];
+          if (replayerPat) pattern = replayerPat;
+        }
         const channels = pattern.channels;
         const patLen = pattern.length;
         const sectionW = layoutBuf[si].sectionW;
@@ -375,8 +392,11 @@ export const VJPatternOverlay: React.FC<VJPatternOverlayProps> = React.memo(({ s
         // Minimum floor so the dim deck doesn't vanish entirely
         sourceOpacity = 0.08 + sourceOpacity * 0.92;
 
-        // Display row = currentRow (no sub-row for DJ, tracker uses anim.scrollOffset)
-        const displayRow = currentRow;
+        // Display row: for tracker source, prefer the replayer's accurate row
+        // over the throttled store value (avoids stutter when tracker view is unmounted)
+        const displayRow = (src === 'tracker' && anim.replayerRow >= 0)
+          ? anim.replayerRow
+          : currentRow;
 
         ctx.save();
         ctx.translate(xBase, 0);

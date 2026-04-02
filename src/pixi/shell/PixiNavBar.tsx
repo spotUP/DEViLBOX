@@ -24,8 +24,7 @@ import { BUILD_NUMBER } from '@constants/version';
 import { usePixiDropdownStore } from '../stores/usePixiDropdownStore';
 import { PixiDJSetBrowser } from '../views/dj/PixiDJSetBrowser';
 import { useNavBar } from '@hooks/views/useNavBar';
-import { NAV_BAR_VIEWS } from '@/constants/viewOptions';
-import { switchView } from '@/constants/viewOptions';
+import { VIEW_OPTIONS, switchView } from '@/constants/viewOptions';
 import type { FederatedPointerEvent } from 'pixi.js';
 import type { ProjectTab } from '@stores';
 import { getLucideTexture, preloadLucideIcons } from '../utils/lucideToTexture';
@@ -37,7 +36,7 @@ import {
 const NAV_ROW_H = 42;
 const TAB_ROW_H = MODERN_NAV_H - NAV_ROW_H; // 34px — matches DOM's ~32px tab bar
 
-const VIEW_SELECT_OPTIONS = NAV_BAR_VIEWS.map(v => ({ value: v.value, label: v.shortLabel }));
+const VIEW_SELECT_OPTIONS = VIEW_OPTIONS.map(v => ({ value: v.value, label: v.label }));
 
 // ─── PixiNavBar ──────────────────────────────────────────────────────────────
 
