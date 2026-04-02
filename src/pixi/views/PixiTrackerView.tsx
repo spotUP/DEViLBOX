@@ -48,6 +48,7 @@ import { useTrackerView } from '@/hooks/views/useTrackerView';
 import { AUTOMATION_LANE_WIDTH, AUTOMATION_LANE_MIN } from '@/hooks/views/usePatternEditor';
 import { useTrackerStore, useUIStore, useInstrumentStore, useEditorStore, useAutomationStore } from '@stores';
 import { useWorkbenchStore } from '@stores/useWorkbenchStore';
+import { useSettingsStore } from '@stores/useSettingsStore';
 import { useMIDIStore } from '@stores/useMIDIStore';
 import { useShallow } from 'zustand/react/shallow';
 import { TITLE_H } from '../workbench/workbenchLayout';
@@ -76,6 +77,7 @@ export const PixiTrackerView: React.FC = () => {
   const showMacroSlots = useUIStore(s => s.showMacroSlots);
   const showKnobBar = useMIDIStore(s => s.showKnobBar);
   const showInstrumentPanel = useUIStore(s => s.showInstrumentPanel);
+  const trackerVisualBg = useSettingsStore(s => s.trackerVisualBg);
 
 
   // PixiTrackerView lives inside a PixiWindow — use the window's own dimensions,
@@ -338,7 +340,7 @@ export const PixiTrackerView: React.FC = () => {
               Use alpha/renderable (NOT visible) — @pixi/layout calls _onChildRemoved()
               on visible=false, detaching Yoga nodes and causing BindingErrors. */}
           {/* Audio-reactive visual background — renders behind everything else */}
-          <pixiContainer alpha={viewMode === 'tracker' && editorMode === 'classic' ? 1 : 0} renderable={viewMode === 'tracker' && editorMode === 'classic'} eventMode="none" layout={{ position: 'absolute', top: 0, width: Math.max(100, editorWidth), height: Math.max(100, instrumentPanelHeight) }}>
+          <pixiContainer alpha={trackerVisualBg && viewMode === 'tracker' && editorMode === 'classic' ? 1 : 0} renderable={trackerVisualBg && viewMode === 'tracker' && editorMode === 'classic'} eventMode="none" layout={{ position: 'absolute', top: 0, width: Math.max(100, editorWidth), height: Math.max(100, instrumentPanelHeight) }}>
             <PixiTrackerVisualBg width={Math.max(100, editorWidth)} height={Math.max(100, instrumentPanelHeight)} />
           </pixiContainer>
           {/* VU meters overlay — covers top half of editor down to the edit bar.
