@@ -33,14 +33,18 @@ export function doArpeggio(
   ch: ChannelState,
   param: number,
   currentTick: number,
+  speed: number,
   useXMPeriods: boolean,
   linearPeriods: boolean,
   updatePeriodDirect: UpdatePeriodDirect,
   periodPlusSemitones: PeriodPlusSemitones,
 ): void {
   if (useXMPeriods) {
-    // FT2 arpeggio: uses arpeggioTab to select tick offset, then binary search on LUT
-    const tick = FT2_ARPEGGIO_TAB[currentTick & 31];
+    // FT2 arpeggio: uses arpeggioTab indexed by DOWNWARD-counting tick (song.tick).
+    // FT2's song.tick counts from speed down to 1. Our currentTick counts 0 up to speed-1.
+    // Convert: ft2Tick = speed - currentTick.
+    const ft2Tick = speed - currentTick;
+    const tick = FT2_ARPEGGIO_TAB[ft2Tick & 31];
     if (tick === 0) {
       updatePeriodDirect(ch, ch.period);
     } else {

@@ -2827,7 +2827,13 @@ export class TrackerReplayer {
     // Chip-specific effects are forwarded to WASM and then we skip TS-side processing
     // to avoid double volume/panning/pitch changes.
     if (ch.instrument?.synthType?.startsWith('Furnace')) {
-      const isGlobalEffect = effect === 0x0B || effect === 0x0D || effect === 0x0F;
+      // Pattern flow effects must be handled by TS, not forwarded to WASM.
+      // This includes: Bxx (pos jump), Dxx (pattern break), Fxx (speed/tempo),
+      // and E-commands that control pattern flow or have TS-side note behavior:
+      //   E6x (pattern loop), EEx (pattern delay), EDx (note delay), E9x (retrigger), ECx (note cut)
+      const isGlobalEffect = effect === 0x0B || effect === 0x0D || effect === 0x0F
+        || (effect === 0x0E && (x === 0x6 || x === 0x9 || x === 0xC || x === 0xD || x === 0xE))
+        || effect === 0x14; // Kxx key-off
       if (!isGlobalEffect) {
         const engine = getToneEngine();
         if (effect === 0x0E) {
@@ -2842,7 +2848,7 @@ export class TrackerReplayer {
         if (effect === 0x3 && param !== 0) { ch.tonePortaSpeed = this.useXMPeriods ? param * 4 : param; }
         return;
       }
-      // Fall through for global effects (0x0B, 0x0D, 0x0F) — TS must handle these
+      // Fall through for global/pattern-flow effects — TS must handle these
     }
 
     switch (effect) {
@@ -3373,9 +3379,14 @@ export class TrackerReplayer {
     // Route continuous effects to Furnace dispatch engine (ticks 1+)
     // The dispatch engine needs per-tick commands for pitch slides, vibrato, etc.
     // Skip TS-side effect processing for FurnaceDispatch — WASM handles these natively.
+    // BUT: pattern flow / note control effects (ECx, EDx, E9x, Kxx) must still be handled by TS.
     if (ch.instrument?.synthType?.startsWith('Furnace')) {
+      const ex = (param >> 4) & 0x0F;
+      const isTSEffect = (effect === 0x0E && (ex === 0x9 || ex === 0xC || ex === 0xD))
+        || effect === 0x14 || effect === 0x11; // Kxx, Hxx (global vol slide)
       this.forwardEffectToFurnace(ch, chIndex, effect, param, x, y);
-      return;
+      if (!isTSEffect) return; // Chip-only effect — skip TS processing
+      // Fall through for effects that need TS-side handling
     }
 
     switch (effect) {
@@ -3499,9 +3510,13 @@ export class TrackerReplayer {
 
     // Route continuous effects to Furnace dispatch engine (ticks 1+)
     // Skip TS-side processing for FurnaceDispatch — WASM handles these natively.
+    // BUT: pattern flow / note control effects must still be handled by TS.
     if (ch.instrument?.synthType?.startsWith('Furnace')) {
+      const ex = (param >> 4) & 0x0F;
+      const isTSEffect = (effect === 0x0E && (ex === 0x9 || ex === 0xC || ex === 0xD))
+        || effect === 0x14 || effect === 0x11;
       this.forwardEffectToFurnace(ch, chIndex, effect, param, x, y);
-      return;
+      if (!isTSEffect) return;
     }
 
     switch (effect) {
@@ -3597,7 +3612,7 @@ export class TrackerReplayer {
   // ==========================================================================
 
   private doArpeggio(ch: ChannelState, param: number): void {
-    _doArpeggio(ch, param, this.currentTick, this.useXMPeriods, this.linearPeriods,
+    _doArpeggio(ch, param, this.currentTick, this.speed, this.useXMPeriods, this.linearPeriods,
       (c, p) => this.updatePeriodDirect(c, p),
       (b, s, f) => this.periodPlusSemitones(b, s, f));
   }
