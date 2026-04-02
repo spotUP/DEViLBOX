@@ -13,6 +13,7 @@ import { getToneEngine } from '../engine/ToneEngine';
 import { useFormatStore } from './useFormatStore';
 import type { EffectConfig } from '@typedefs/instrument';
 import { getChannelEffectsManager } from '../engine/ChannelEffectsManager';
+import { getSendBusManager } from '../engine/SendBusManager';
 
 // Forward effective mute state to TrackerReplayer's channelMuteMask.
 // This is essential for WASM synth engines (FC, TFMX, etc.) whose audio
@@ -561,11 +562,28 @@ export const useMixerStore = create<MixerStore>()(
 
     // Send levels
     setChannelSendLevel(ch: number, sendIndex: number, level: number): void {
+      const clampedLevel = Math.max(0, Math.min(1, level));
       set((state) => {
         if (ch < 0 || ch >= state.channels.length) return;
         if (sendIndex < 0 || sendIndex >= state.channels[ch].sendLevels.length) return;
-        state.channels[ch].sendLevels[sendIndex] = Math.max(0, Math.min(1, level));
+        state.channels[ch].sendLevels[sendIndex] = clampedLevel;
       });
+
+      // Wire audio graph: connect channel output to send bus input
+      try {
+        const engine = getToneEngine();
+        const channelOutput = engine.getChannelOutputByIndex(ch);
+        if (!channelOutput) return;
+
+        const sendGain = getSendBusManager().getOrCreateSendGainForChannel(
+          ch, sendIndex, channelOutput.channel
+        );
+        if (sendGain) {
+          sendGain.gain.rampTo(clampedLevel, 0.05);
+        }
+      } catch {
+        // Engine not initialized yet — send levels will be applied when channels are created
+      }
     },
   }))
 );

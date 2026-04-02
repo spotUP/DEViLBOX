@@ -39,11 +39,13 @@ export class DX7Synth implements DevilboxSynth {
   private _onPatchChange: ((bankFile: string, voiceIndex: number, voiceName: string) => void) | null = null;
   private _resolveInit!: () => void;
   private _initPromise: Promise<void>;
+  private _vcedPresetName: string | undefined;
 
-  constructor() {
+  constructor(vcedPreset?: string) {
     this.audioContext = getDevilboxAudioContext();
     this.output = this.audioContext.createGain();
     this.output.gain.value = 1.0;
+    this._vcedPresetName = vcedPreset;
     this._initPromise = new Promise((resolve) => { this._resolveInit = resolve; });
     this.initWorklet();
   }
@@ -104,7 +106,51 @@ export class DX7Synth implements DevilboxSynth {
     } catch {
       // Non-fatal — synth works without patches, just silent
     }
+
+    // If a VCED preset was requested, load it now
+    if (this._vcedPresetName) {
+      this._loadVcedPreset(this._vcedPresetName);
+    }
+
     this._resolveInit();
+  }
+
+  /** Load a named VCED preset (156-byte single-voice patch) */
+  private _loadVcedPreset(name: string) {
+    import('./dx7presets').then(({ DX7_VCED_PRESETS }) => {
+      const preset = DX7_VCED_PRESETS.find(p => p.name === name);
+      if (preset && preset.data.length === 156) {
+        // Send as DX7 VCED sysex: F0 43 00 00 01 1B <155 data bytes> <checksum> F7
+        // Format 0 substatus 0 = voice (VCED), byte count = 0x01 0x1B = 155
+        const sysex = new Uint8Array(163);
+        sysex[0] = 0xF0;
+        sysex[1] = 0x43; // Yamaha
+        sysex[2] = 0x00; // Channel 0
+        sysex[3] = 0x00; // Format/substatus: voice parameter
+        sysex[4] = 0x01; // Byte count MSB
+        sysex[5] = 0x1B; // Byte count LSB (155)
+        sysex.set(preset.data.subarray(0, 155), 6);
+        let sum = 0;
+        for (let i = 0; i < 155; i++) sum += preset.data[i];
+        sysex[161] = (-sum) & 0x7F;
+        sysex[162] = 0xF7;
+        this.loadSysex(sysex.buffer);
+        console.log(`[DX7] Loaded VCED preset: ${name}`);
+      } else {
+        console.warn(`[DX7] VCED preset not found: ${name}`);
+      }
+    }).catch(err => {
+      console.error(`[DX7] Failed to load VCED preset:`, err);
+    });
+  }
+
+  /** Load a VCED preset by name (public API for preset switching) */
+  loadVcedPreset(name: string) {
+    if (this._ready) {
+      this._loadVcedPreset(name);
+    } else {
+      this._vcedPresetName = name;
+    }
   }
 
   /** Auto-load ROM from well-known paths */

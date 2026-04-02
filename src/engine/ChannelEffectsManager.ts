@@ -61,6 +61,21 @@ class ChannelEffectsManager {
 
     chain.effects.push({ config, node, enabled: true });
     this.rebuildChainRouting(chain);
+
+    // Wire sidechain source if this is a SidechainCompressor with a source channel
+    if (config.type === 'SidechainCompressor' && config.sidechainSource != null && config.sidechainSource >= 0) {
+      try {
+        const { getToneEngine } = await import('./ToneEngine');
+        const engine = getToneEngine();
+        const sourceOutput = engine.getChannelOutputByIndex(config.sidechainSource);
+        if (sourceOutput && 'getSidechainInput' in node) {
+          const scInput = (node as any).getSidechainInput() as Tone.Gain;
+          sourceOutput.channel.connect(scInput);
+        }
+      } catch {
+        // Engine not ready yet — sidechain will need to be wired later
+      }
+    }
   }
 
   /**

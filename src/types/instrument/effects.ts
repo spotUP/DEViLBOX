@@ -65,6 +65,11 @@ export type AudioEffectType =
   | 'Tumult'           // Tumult noise/ambience generator (AudioWorklet, 1:1 port)
   | 'TapeSimulator'   // Kiss of Shame tape deck emulator (WASM port)
   | 'ToneArm'         // Physics-based vinyl playback simulation (AudioWorklet, 1:1 port)
+  // *Wave / ambient effects
+  | 'ShimmerReverb'   // Shimmer reverb with pitch-shifted feedback (WASM)
+  | 'GranularFreeze'  // Live-capture granular freeze effect (WASM)
+  | 'TapeDegradation' // Tape wow/flutter/hiss degradation
+  | 'AmbientDelay'    // Modulated multi-tap delay with feedback filter
   // WAM 2.0 effects (external Web Audio Module plugins)
   | 'WAMBigMuff'        // Big Muff Pi fuzz
   | 'WAMTS9'            // TS-9 Overdrive
@@ -91,4 +96,7 @@ export interface EffectConfig {
   // Neural-specific (only when category === 'neural')
   neuralModelIndex?: number;   // Index into GUITARML_MODEL_REGISTRY
   neuralModelName?: string;    // Display name cache
+
+  // Sidechain routing (only for SidechainCompressor)
+  sidechainSource?: number;  // Channel index to use as sidechain input (-1 or undefined = none)
 }

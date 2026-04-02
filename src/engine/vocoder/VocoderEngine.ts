@@ -80,6 +80,12 @@ export class VocoderEngine {
   private delay: Tone.FeedbackDelay | null = null;
   private destination: AudioNode;
 
+  // Recording: capture processed output (after vocoder + FX) to AudioBuffer
+  private recorder: MediaRecorder | null = null;
+  private recordChunks: Blob[] = [];
+  private recordDest: MediaStreamAudioDestinationNode | null = null;
+  private _isRecording = false;
+
   constructor(destination?: AudioNode) {
     this.audioContext = Tone.getContext().rawContext as AudioContext;
     this.destination = destination || this.audioContext.destination;
@@ -420,9 +426,89 @@ export class VocoderEngine {
     return this.ready;
   }
 
+  // ── Recording: capture processed output to AudioBuffer ──────────────────
+
+  /**
+   * Start recording the processed vocoder output (after all effects).
+   * Call stopRecording() to get the AudioBuffer.
+   */
+  startRecording(): void {
+    if (this._isRecording) return;
+
+    // Create a MediaStreamDestination to tap the output
+    this.recordDest = this.audioContext.createMediaStreamDestination();
+    // Connect the outputGain to the recording destination (in parallel with normal output)
+    this.outputGain.connect(this.recordDest);
+
+    this.recordChunks = [];
+    this.recorder = new MediaRecorder(this.recordDest.stream, {
+      mimeType: MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
+        ? 'audio/webm;codecs=opus' : 'audio/webm',
+    });
+
+    this.recorder.ondataavailable = (e) => {
+      if (e.data.size > 0) this.recordChunks.push(e.data);
+    };
+
+    this.recorder.start(100); // 100ms chunks
+    this._isRecording = true;
+    console.log('[VocoderEngine] Recording started');
+  }
+
+  /**
+   * Stop recording and return the captured audio as an AudioBuffer.
+   * Returns null if recording failed or was empty.
+   */
+  async stopRecording(): Promise<AudioBuffer | null> {
+    if (!this._isRecording || !this.recorder) return null;
+
+    return new Promise((resolve) => {
+      this.recorder!.onstop = async () => {
+        // Disconnect recording tap
+        try { this.outputGain.disconnect(this.recordDest!); } catch { /* ok */ }
+        this.recordDest = null;
+
+        if (this.recordChunks.length === 0) {
+          resolve(null);
+          return;
+        }
+
+        const blob = new Blob(this.recordChunks, { type: this.recorder!.mimeType });
+        this.recordChunks = [];
+        this.recorder = null;
+        this._isRecording = false;
+
+        try {
+          const arrayBuffer = await blob.arrayBuffer();
+          const audioBuffer = await this.audioContext.decodeAudioData(arrayBuffer);
+          console.log(`[VocoderEngine] Recorded ${audioBuffer.duration.toFixed(1)}s, ${audioBuffer.numberOfChannels}ch`);
+          resolve(audioBuffer);
+        } catch (err) {
+          console.error('[VocoderEngine] Failed to decode recording:', err);
+          resolve(null);
+        }
+      };
+
+      this.recorder!.stop();
+    });
+  }
+
+  get isRecording(): boolean {
+    return this._isRecording;
+  }
+
+  /** Expose micPreamp for external audio routing (e.g., remote mic) */
+  getMicPreamp(): GainNode {
+    return this.micPreamp;
+  }
+
   /** Full cleanup */
   dispose(): void {
     this.stop();
+    if (this._isRecording) {
+      this.recorder?.stop();
+      this._isRecording = false;
+    }
     this.micPreamp.disconnect();
     this.outputGain.disconnect();
   }

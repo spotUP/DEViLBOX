@@ -32,6 +32,7 @@ interface SendBus {
 
 class SendBusManager {
   private buses: SendBus[] = [];
+  private sendGainCache = new Map<string, Tone.Gain>(); // key: `${channelIndex}-${busIndex}`
 
   /**
    * Initialize send buses. Call after ToneEngine is ready.
@@ -129,15 +130,25 @@ class SendBusManager {
   }
 
   /**
-   * Create a send gain node for a channel → bus connection.
-   * The caller is responsible for connecting the channel's output to this gain.
+   * Get or create a send gain for a channel → bus connection.
+   * On first call, connects the channel's Tone.Channel to the bus input.
    */
-  createSendGain(busIndex: number, level: number = 0): Tone.Gain | null {
+  getOrCreateSendGainForChannel(
+    channelIndex: number,
+    busIndex: number,
+    channelNode: Tone.Channel
+  ): Tone.Gain | null {
     const bus = this.buses[busIndex];
     if (!bus) return null;
 
-    const sendGain = new Tone.Gain(level);
-    sendGain.connect(bus.input);
+    const key = `${channelIndex}-${busIndex}`;
+    let sendGain = this.sendGainCache.get(key);
+    if (!sendGain) {
+      sendGain = new Tone.Gain(0);
+      channelNode.connect(sendGain);
+      sendGain.connect(bus.input);
+      this.sendGainCache.set(key, sendGain);
+    }
     return sendGain;
   }
 
@@ -162,6 +173,12 @@ class SendBusManager {
   }
 
   dispose(): void {
+    for (const gain of this.sendGainCache.values()) {
+      try { gain.disconnect(); } catch { /* ok */ }
+      gain.dispose();
+    }
+    this.sendGainCache.clear();
+
     for (const bus of this.buses) {
       for (const fx of bus.effects) {
         try { fx.node.disconnect(); } catch { /* ok */ }

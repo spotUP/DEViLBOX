@@ -17,7 +17,7 @@ export const DX7_FACTORY_PRESETS: InstrumentPreset['config'][] = DX7_VCED_PRESET
   volume: -10,
   pan: 0,
   effects: [],
-  dexedVcedPreset: preset.name,
+  dx7: { vcedPreset: preset.name },
 }));
 
 /** OBXf presets are loaded natively via the JUCE hardware UI preset browser */
