@@ -257,6 +257,7 @@ interface SettingsStore {
   vuMeterMirror: boolean; // Mirror VU meters downward (from top of pattern editor)
   customBannerImage: string | null; // Base64 data URL for custom banner image
   wobbleWindows: boolean; // Compiz-style wobbly windows in GL UI
+  maxHeadroomMode: boolean; // Max Headroom glitchy AI head behavior in VJ view
 
   // CRT Shader
   crtEnabled: boolean;
@@ -300,6 +301,7 @@ interface SettingsStore {
   setVuMeterMirror: (enabled: boolean) => void;
   setCustomBannerImage: (dataUrl: string | null) => void;
   setWobbleWindows: (enabled: boolean) => void;
+  setMaxHeadroomMode: (enabled: boolean) => void;
   setRenderMode: (mode: 'dom' | 'webgl') => void;
   setWelcomeJingleEnabled: (v: boolean) => void;
   setCrtEnabled:  (enabled: boolean) => void;
@@ -488,6 +490,7 @@ export const useSettingsStore = create<SettingsStore>()(
       vuMeterMirror: false,  // Default: VU meters extend upward
       customBannerImage: null,  // No custom banner by default
       wobbleWindows: false,  // Wobbly windows disabled by default
+      maxHeadroomMode: false,
       crtEnabled: false,
       crtParams:  { ...CRT_DEFAULT_PARAMS },
       lensEnabled: false,
@@ -643,6 +646,11 @@ export const useSettingsStore = create<SettingsStore>()(
           state.wobbleWindows = wobbleWindows;
         }),
 
+      setMaxHeadroomMode: (maxHeadroomMode) =>
+        set((state) => {
+          state.maxHeadroomMode = maxHeadroomMode;
+        }),
+
       setRenderMode: (renderMode) =>
         set((state) => {
           // Block WebGL mode on mobile phones — GL UI doesn't work on mobile
@@ -732,6 +740,7 @@ export const useSettingsStore = create<SettingsStore>()(
         vuMeterMirror: state.vuMeterMirror,
         customBannerImage: state.customBannerImage,
         wobbleWindows: state.wobbleWindows,
+        maxHeadroomMode: state.maxHeadroomMode,
         crtEnabled: state.crtEnabled,
         crtParams:  state.crtParams,
         lensEnabled: state.lensEnabled,
