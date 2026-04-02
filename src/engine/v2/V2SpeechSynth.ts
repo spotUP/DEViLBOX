@@ -76,6 +76,10 @@ export class V2SpeechSynth implements DevilboxSynth {
     return this._readyPromise;
   }
 
+  async ensureInitialized(): Promise<void> {
+    return this._readyPromise;
+  }
+
   private _stopSource(): void {
     if (this._sourceNode) {
       try { this._sourceNode.stop(); } catch { /* already stopped */ }

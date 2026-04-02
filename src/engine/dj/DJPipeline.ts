@@ -23,6 +23,23 @@ import type { DeckId } from './DeckEngine';
 import { getDJEngineIfActive } from './DJEngine';
 import type { BeatGridData } from './DJAudioCache';
 
+// ── Auto-gain ────────────────────────────────────────────────────────────────
+
+const TARGET_RMS_DB = -14;
+const PEAK_HEADROOM_DB = -1; // never push peaks above this
+
+/**
+ * Compute auto-gain trim in dB from analysis data.
+ * Targets -14 dB RMS but clamps so peaks never exceed -1 dB (prevents clipping).
+ */
+export function computeAutoTrim(rmsDb: number, peakDb: number): number {
+  if (rmsDb <= -80) return 0; // no meaningful audio
+  const rmsBasedTrim = TARGET_RMS_DB - rmsDb;
+  // Clamp: if applying this trim would push peaks above headroom, reduce it
+  const maxTrimFromPeak = peakDb > -80 ? (PEAK_HEADROOM_DB - peakDb) : 12;
+  return Math.max(-12, Math.min(12, Math.min(rmsBasedTrim, maxTrimFromPeak)));
+}
+
 // ── Types ────────────────────────────────────────────────────────────────────
 
 export type TaskPriority = 'high' | 'normal' | 'low';
@@ -404,12 +421,9 @@ export class DJPipeline {
       // Update deck state immediately
       if (deckId) {
         // Auto-gain: target -14 dB RMS
-        const TARGET_RMS_DB = -14;
         const rmsDb = cached.rmsDb ?? -100;
         const peakDb = cached.peakDb ?? -100;
-        const autoTrimDb = rmsDb > -80
-          ? Math.max(-12, Math.min(12, TARGET_RMS_DB - rmsDb))
-          : 0;
+        const autoTrimDb = computeAutoTrim(rmsDb, peakDb);
         const deckState = useDJStore.getState().decks[deckId];
         const trimGain = deckState.autoGainEnabled ? autoTrimDb : 0;
 
@@ -493,12 +507,9 @@ export class DJPipeline {
         });
 
         if (deckId) {
-          const TARGET_RMS_DB = -14;
           const rmsDb = serverAnalysis.rmsDb;
           const peakDb = serverAnalysis.peakDb;
-          const autoTrimDb = rmsDb > -80
-            ? Math.max(-12, Math.min(12, TARGET_RMS_DB - rmsDb))
-            : 0;
+          const autoTrimDb = computeAutoTrim(rmsDb, peakDb);
           const deckState = useDJStore.getState().decks[deckId];
           const trimGain = deckState.autoGainEnabled ? autoTrimDb : 0;
 
@@ -792,10 +803,7 @@ export class DJPipeline {
     if (task.deckId) {
       if (analysis) {
         // Auto-gain: target -14 dB RMS (standard DJ loudness reference)
-        const TARGET_RMS_DB = -14;
-        const autoTrimDb = analysis.rmsDb > -80
-          ? Math.max(-12, Math.min(12, TARGET_RMS_DB - analysis.rmsDb))
-          : 0;
+        const autoTrimDb = computeAutoTrim(analysis.rmsDb, analysis.peakDb);
         const deckState = useDJStore.getState().decks[task.deckId];
         const trimGain = deckState.autoGainEnabled ? autoTrimDb : 0;
 

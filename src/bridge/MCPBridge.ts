@@ -154,6 +154,17 @@ import {
 } from './handlers/writeHandlers';
 import { analyzeSongHandler } from './handlers/analysisHandlers';
 import { generatePattern, transformPattern } from './handlers/generatorHandlers';
+import {
+  getDJState, getDJPlaylistState,
+  djTogglePlay, djStop, djCue, djSync,
+  djCrossfader, djCrossfaderCurve,
+  djEQ, djEQKill, djFilter,
+  djVolume, djMasterVolume,
+  djPitch, djKeyLock, djNudge,
+  djLoop, djLoopClear,
+  djAutoDJEnable, djAutoDJDisable, djAutoDJSkip,
+  djDuck, djUnduck,
+} from './handlers/djHandlers';
 
 const WS_URL = 'ws://localhost:4003';
 const INITIAL_BACKOFF_MS = 2000;
@@ -367,6 +378,31 @@ const handlers: Record<string, Handler> = {
   get_console_errors: () => getConsoleErrors(),
   clear_console_errors: () => clearConsoleErrors(),
   evaluate_script: evaluateScript,
+
+  // ─── DJ Remote Control ─────────────────────────────────────────────────
+  dj_get_state: getDJState,
+  dj_get_playlist_state: getDJPlaylistState,
+  dj_toggle_play: djTogglePlay,
+  dj_stop: djStop,
+  dj_cue: djCue,
+  dj_sync: djSync,
+  dj_crossfader: djCrossfader,
+  dj_crossfader_curve: djCrossfaderCurve,
+  dj_eq: djEQ,
+  dj_eq_kill: djEQKill,
+  dj_filter: djFilter,
+  dj_volume: djVolume,
+  dj_master_volume: djMasterVolume,
+  dj_pitch: djPitch,
+  dj_key_lock: djKeyLock,
+  dj_nudge: djNudge,
+  dj_loop: djLoop,
+  dj_loop_clear: djLoopClear,
+  dj_auto_dj_enable: djAutoDJEnable,
+  dj_auto_dj_disable: djAutoDJDisable,
+  dj_auto_dj_skip: djAutoDJSkip,
+  dj_duck: djDuck,
+  dj_unduck: djUnduck,
 };
 
 let ws: WebSocket | null = null;

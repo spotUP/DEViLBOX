@@ -75,31 +75,40 @@ export const MixerCueSection: React.FC = () => {
 
   return (
     <div className="flex flex-col items-center gap-1" title="Headphone cue section">
-      {/* CUE + MIX knobs side by side */}
-      <div className="flex gap-1 items-start">
-        <Knob
-          value={cueVolume}
-          min={0}
-          max={1.5}
-          onChange={handleCueVolumeChange}
-          label="CUE"
-          size="sm"
-          color="#ffcc00"
-          defaultValue={1}
-          hideValue
-          title="Cue volume — headphone pre-fader listen level"
-        />
-        <Knob
-          value={cueMix}
+      {/* CUE volume knob */}
+      <Knob
+        value={cueVolume}
+        min={0}
+        max={1.5}
+        onChange={handleCueVolumeChange}
+        label="CUE"
+        size="sm"
+        color="#ffcc00"
+        defaultValue={1}
+        hideValue
+        title="Cue volume — headphone pre-fader listen level"
+      />
+
+      {/* Cue/Master crossfader — horizontal slider for quick headphone blend */}
+      <div className="w-full px-1">
+        <div className="flex justify-between text-[7px] font-mono text-text-muted mb-0.5">
+          <span>CUE</span>
+          <span>MST</span>
+        </div>
+        <input
+          type="range"
           min={0}
           max={1}
-          onChange={handleCueMixChange}
-          label="MIX"
-          size="sm"
-          color="#66ccff"
-          defaultValue={0.5}
-          hideValue
-          title="Cue mix — 0 = PFL only, center = blend, 1 = master only"
+          step={0.01}
+          value={cueMix}
+          onChange={(e) => handleCueMixChange(parseFloat(e.target.value))}
+          onDoubleClick={() => handleCueMixChange(0.5)}
+          className="w-full h-2 appearance-none bg-dark-bgTertiary rounded-full cursor-pointer
+            [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-3 [&::-webkit-slider-thumb]:h-4
+            [&::-webkit-slider-thumb]:rounded-sm [&::-webkit-slider-thumb]:bg-[#66ccff] [&::-webkit-slider-thumb]:border
+            [&::-webkit-slider-thumb]:border-[#66ccff]/50 [&::-webkit-slider-thumb]:shadow-sm
+            [&::-webkit-slider-thumb]:hover:bg-[#88ddff]"
+          title="Cue crossfader — left = PFL only, center = blend, right = master only. Double-click to center."
         />
       </div>
 

@@ -7,8 +7,9 @@
  */
 
 import React, { useState, useCallback, useRef, useEffect } from 'react';
-import { useVocoderStore, VOCODER_PRESETS } from '@/stores/useVocoderStore';
+import { useVocoderStore, VOCODER_PRESETS, VOCODER_FX_PRESETS, type VocoderFXPreset } from '@/stores/useVocoderStore';
 import { VocoderEngine } from '@/engine/vocoder/VocoderEngine';
+import { getDJEngineIfActive } from '@/engine/dj/DJEngine';
 
 interface AudioInputDevice {
   deviceId: string;
@@ -20,11 +21,19 @@ export const DJVocoderControl: React.FC = () => {
   const amplitude = useVocoderStore(s => s.amplitude);
   const params = useVocoderStore(s => s.params);
   const presetName = useVocoderStore(s => s.presetName);
+  const fxEnabled = useVocoderStore(s => s.fx.enabled);
+  const fxPreset = useVocoderStore(s => s.fx.preset);
   const [error, setError] = useState<string | null>(null);
   const [muted, setMuted] = useState(false);
+  const [duckingEnabled, setDuckingEnabled] = useState(false);
   const [devices, setDevices] = useState<AudioInputDevice[]>([]);
   const [selectedDeviceId, setSelectedDeviceId] = useState<string>('');
   const engineRef = useRef<VocoderEngine | null>(null);
+
+  // Preload vocoder worklet + WASM on mount so toggle doesn't cause audio glitch
+  useEffect(() => {
+    VocoderEngine.preload();
+  }, []);
 
   // Enumerate audio input devices on mount and when devices change
   useEffect(() => {
@@ -66,33 +75,47 @@ export const DJVocoderControl: React.FC = () => {
     };
   }, []);
 
+  // Ensure the engine is running (called on first PTT or vocoder toggle)
+  const ensureEngine = useCallback(async (): Promise<VocoderEngine | null> => {
+    if (engineRef.current) return engineRef.current;
+    try {
+      setError(null);
+      const djEngine = getDJEngineIfActive();
+      const destination = djEngine?.mixer.samplerInput;
+      const engine = new VocoderEngine(destination);
+      await engine.start(selectedDeviceId || undefined);
+      engineRef.current = engine;
+      // Start muted — push-to-talk mode
+      setMuted(true);
+      engine.setMuted(true);
+
+      // Re-enumerate after permission grant
+      const allDevices = await navigator.mediaDevices.enumerateDevices();
+      const inputs = allDevices
+        .filter(d => d.kind === 'audioinput')
+        .map(d => ({ deviceId: d.deviceId, label: d.label || `Mic ${d.deviceId.slice(0, 8)}` }));
+      setDevices(inputs);
+      return engine;
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      setError(msg.includes('Permission') || msg.includes('NotAllowed') ? 'Mic blocked' : 'Failed');
+      console.error('[DJVocoderControl]', err);
+      return null;
+    }
+  }, [selectedDeviceId]);
+
   const handleToggle = useCallback(async () => {
     try {
       setError(null);
 
       if (!isActive) {
-        // Route through DJ mixer so vocoder goes through limiter + master FX
-        const { getDJEngineIfActive } = await import('@/engine/dj/DJEngine');
-        const djEngine = getDJEngineIfActive();
-        const destination = djEngine?.mixer.samplerInput;
-        const engine = new VocoderEngine(destination);
-        await engine.start(selectedDeviceId || undefined);
-        engineRef.current = engine;
-        setMuted(false);
-
-        // Re-enumerate after permission grant (labels become available)
-        const allDevices = await navigator.mediaDevices.enumerateDevices();
-        const inputs = allDevices
-          .filter(d => d.kind === 'audioinput')
-          .map(d => ({
-            deviceId: d.deviceId,
-            label: d.label || `Mic ${d.deviceId.slice(0, 8)}`,
-          }));
-        setDevices(inputs);
+        const engine = await ensureEngine();
+        if (!engine) return;
+        // Enable vocoder processing (robot voice)
+        engine.setVocoderBypass(false);
       } else {
-        engineRef.current?.stop();
-        engineRef.current = null;
-        setMuted(false);
+        // Disable vocoder but keep engine alive for clean mic PTT
+        engineRef.current?.setVocoderBypass(true);
       }
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
@@ -112,7 +135,6 @@ export const DJVocoderControl: React.FC = () => {
     if (engineRef.current?.isActive) {
       engineRef.current.stop();
       try {
-        const { getDJEngineIfActive } = await import('@/engine/dj/DJEngine');
         const djEngine = getDJEngineIfActive();
         const destination = djEngine?.mixer.samplerInput;
         const engine = new VocoderEngine(destination);
@@ -125,11 +147,32 @@ export const DJVocoderControl: React.FC = () => {
     }
   }, []);
 
-  const handleMute = useCallback(() => {
-    const next = !muted;
-    setMuted(next);
-    engineRef.current?.setMuted(next);
-  }, [muted]);
+  // Push-to-talk: hold to unmute mic, release to mute (delay tail rings out)
+  // Starts engine on first press if not running (clean mic + FX, no vocoder)
+  const handlePTTDown = useCallback(async () => {
+    let engine = engineRef.current;
+    if (!engine) {
+      engine = await ensureEngine();
+      if (!engine) return;
+      if (!isActive) engine.setVocoderBypass(true);
+    }
+    setMuted(false);
+    engine.setMuted(false);
+    // Duck music while talking
+    if (duckingEnabled) {
+      try { getDJEngineIfActive()?.mixer.duck(); } catch { /* ok */ }
+    }
+  }, [ensureEngine, isActive, duckingEnabled]);
+
+  const handlePTTUp = useCallback(() => {
+    if (!engineRef.current) return;
+    setMuted(true);
+    engineRef.current.setMuted(true);
+    // Unduck music
+    if (duckingEnabled) {
+      try { getDJEngineIfActive()?.mixer.unduck(); } catch { /* ok */ }
+    }
+  }, [duckingEnabled]);
 
   const handleFormantShift = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const shift = parseFloat(e.target.value);
@@ -144,6 +187,18 @@ export const DJVocoderControl: React.FC = () => {
   const handlePresetChange = useCallback((e: React.ChangeEvent<HTMLSelectElement>) => {
     const name = e.target.value;
     engineRef.current?.loadPreset(name);
+  }, []);
+
+  const handleFXToggle = useCallback(() => {
+    const next = !fxEnabled;
+    useVocoderStore.getState().setFXEnabled(next);
+    engineRef.current?.applyFX(useVocoderStore.getState().fx);
+  }, [fxEnabled]);
+
+  const handleFXPresetChange = useCallback((e: React.ChangeEvent<HTMLSelectElement>) => {
+    const preset = e.target.value as VocoderFXPreset;
+    useVocoderStore.getState().loadFXPreset(preset);
+    engineRef.current?.applyFX(useVocoderStore.getState().fx);
   }, []);
 
   return (
@@ -164,6 +219,24 @@ export const DJVocoderControl: React.FC = () => {
         </select>
       )}
 
+      {/* Push-to-talk: always available — hold to speak, release to let echo ring out */}
+      <button
+        onPointerDown={handlePTTDown}
+        onPointerUp={handlePTTUp}
+        onPointerLeave={handlePTTUp}
+        className={`
+          px-2 py-1 rounded text-[10px] font-bold transition-all select-none touch-none
+          ${!muted
+            ? 'bg-green-600 text-white shadow-[0_0_8px_rgba(34,197,94,0.4)]'
+            : 'bg-dark-bgTertiary hover:bg-dark-bgHover border border-dark-border text-text-muted'
+          }
+        `}
+        title="Hold to talk — release to let echo ring out"
+      >
+        {!muted ? 'LIVE' : 'TALK'}
+      </button>
+
+      {/* Vocoder toggle — switches between clean mic and robot voice */}
       <button
         onClick={handleToggle}
         className={`
@@ -173,81 +246,94 @@ export const DJVocoderControl: React.FC = () => {
             : 'bg-dark-bgTertiary hover:bg-dark-bgHover border border-dark-border text-text-muted'
           }
         `}
-        title={isActive ? 'Disable vocoder' : 'Enable robot voice (vocoder + mic)'}
+        title={isActive ? 'Switch to clean mic' : 'Enable robot voice'}
       >
-        {isActive && (
+        {isActive && !muted && (
           <span
             className="absolute inset-0 bg-purple-400 rounded pointer-events-none"
-            style={{ opacity: muted ? 0 : amplitude * 0.5 }}
+            style={{ opacity: amplitude * 0.5 }}
           />
         )}
-        <span className="relative">ROBOT</span>
+        <span className="relative">VOCODER</span>
       </button>
 
+      {/* Level meter — always visible when engine is running */}
+      {engineRef.current && (
+        <div
+          className="w-8 h-2 bg-dark-bgTertiary rounded-sm overflow-hidden"
+          title={`Level: ${Math.round(amplitude * 100)}%`}
+        >
+          <div
+            className={`h-full transition-[width] duration-75 ${isActive ? 'bg-purple-500' : 'bg-green-500'}`}
+            style={{ width: `${Math.min(100, (muted ? 0 : amplitude) * 300)}%` }}
+          />
+        </div>
+      )}
+
+      {/* FX + ducking controls — always available */}
+      <div className="flex items-center gap-1 border-l border-dark-borderLight pl-1.5 ml-0.5">
+        <label className="flex items-center gap-0.5 cursor-pointer" title="Duck music volume while talking">
+          <input
+            type="checkbox"
+            checked={duckingEnabled}
+            onChange={() => setDuckingEnabled(!duckingEnabled)}
+            className="w-3 h-3 accent-amber-500"
+          />
+          <span className="text-[9px] text-text-muted">Duck</span>
+        </label>
+      </div>
+      <div className="flex items-center gap-1 border-l border-dark-borderLight pl-1.5 ml-0.5">
+        <label className="flex items-center gap-0.5 cursor-pointer" title="Enable mic effects (echo/reverb)">
+          <input
+            type="checkbox"
+            checked={fxEnabled}
+            onChange={handleFXToggle}
+            className="w-3 h-3 accent-cyan-500"
+          />
+          <span className="text-[9px] text-text-muted">FX</span>
+        </label>
+        {fxEnabled && (
+          <select
+            value={fxPreset}
+            onChange={handleFXPresetChange}
+            className="px-1 py-0.5 text-[9px] rounded border border-dark-border bg-dark-bgTertiary text-cyan-400 max-w-[90px]"
+            title="Effect preset"
+          >
+            {Object.keys(VOCODER_FX_PRESETS).map(name => (
+              <option key={name} value={name}>
+                {name === 'none' ? 'Dry' : name.split('-').map(w => w[0].toUpperCase() + w.slice(1)).join(' ')}
+              </option>
+            ))}
+          </select>
+        )}
+      </div>
+
+      {/* Vocoder-specific controls — only when vocoder is active */}
       {isActive && (
         <>
-          {/* Mic mute button */}
-          <button
-            onClick={handleMute}
-            className={`
-              px-1.5 py-1 rounded text-[10px] font-bold transition-all
-              ${muted
-                ? 'bg-red-700 hover:bg-red-600 text-white'
-                : 'bg-dark-bgTertiary hover:bg-dark-bgHover border border-dark-border text-text-muted'
-              }
-            `}
-            title={muted ? 'Unmute mic' : 'Mute mic'}
-          >
-            {muted ? 'MUTED' : 'MIC'}
-          </button>
-
-          {/* Preset selector */}
           <select
             value={presetName || ''}
             onChange={handlePresetChange}
             className="px-1 py-0.5 text-[10px] rounded border border-dark-border bg-dark-bgTertiary text-dark-textSecondary"
-            title="Vocoder preset"
+            title="Vocoder voice preset"
           >
             {!presetName && <option value="">Custom</option>}
             {VOCODER_PRESETS.map(p => (
               <option key={p.name} value={p.name}>{p.name}</option>
             ))}
           </select>
-
-          {/* Formant shift slider */}
           <input
-            type="range"
-            min="0.25"
-            max="4.0"
-            step="0.05"
-            value={params.formantShift}
-            onChange={handleFormantShift}
+            type="range" min="0.25" max="4.0" step="0.05"
+            value={params.formantShift} onChange={handleFormantShift}
             className="w-12 h-1 accent-purple-500"
-            title={`Formant: ${params.formantShift.toFixed(2)}x (${params.formantShift < 1 ? 'deeper' : params.formantShift > 1 ? 'higher' : 'normal'})`}
+            title={`Formant: ${params.formantShift.toFixed(2)}x`}
           />
-
-          {/* Wet/dry slider */}
           <input
-            type="range"
-            min="0"
-            max="1"
-            step="0.01"
-            value={params.wet}
-            onChange={handleWet}
+            type="range" min="0" max="1" step="0.01"
+            value={params.wet} onChange={handleWet}
             className="w-12 h-1 accent-purple-500"
             title={`Wet: ${Math.round(params.wet * 100)}%`}
           />
-
-          {/* Small level meter */}
-          <div
-            className="w-8 h-2 bg-dark-bgTertiary rounded-sm overflow-hidden"
-            title={`Level: ${Math.round(amplitude * 100)}%`}
-          >
-            <div
-              className="h-full bg-purple-500 transition-[width] duration-75"
-              style={{ width: `${Math.min(100, (muted ? 0 : amplitude) * 300)}%` }}
-            />
-          </div>
         </>
       )}
 

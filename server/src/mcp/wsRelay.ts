@@ -39,6 +39,10 @@ const pending = new Map<string, PendingResolve>();
 const mcpClients = new Set<WebSocket>();
 const mcpPending = new Map<string, WebSocket>();
 
+// Track controller clients (iPhone remote) and their pending requests
+const controllerClients = new Set<WebSocket>();
+const controllerPending = new Map<string, WebSocket>();
+
 let server: http.Server;
 let wss: WebSocketServer;
 let mode: 'server' | 'client' | 'none' = 'none';
@@ -49,8 +53,48 @@ export function startRelay(): void {
 
   wss.on('connection', (ws: WebSocket, req: http.IncomingMessage) => {
     const isMcpClient = req.url?.startsWith('/mcp');
+    const isController = req.url?.startsWith('/controller');
 
-    if (isMcpClient) {
+    if (isController) {
+      // iPhone controller connection — forward requests to browser, route responses back
+      controllerClients.add(ws);
+      console.error('[mcp-bridge] Controller connected');
+
+      ws.on('message', (data) => {
+        let msg: BridgeRequest;
+        try {
+          msg = JSON.parse(data.toString()) as BridgeRequest;
+        } catch {
+          return;
+        }
+
+        if (msg.type !== 'call') return;
+
+        if (!browserSocket || browserSocket.readyState !== WebSocket.OPEN) {
+          ws.send(JSON.stringify({
+            id: msg.id,
+            type: 'error',
+            error: 'No browser connected. Open DEViLBOX in a browser.',
+          }));
+          return;
+        }
+
+        controllerPending.set(msg.id, ws);
+        browserSocket.send(data.toString());
+      });
+
+      ws.on('close', () => {
+        console.error('[mcp-bridge] Controller disconnected');
+        controllerClients.delete(ws);
+        for (const [id, client] of controllerPending) {
+          if (client === ws) controllerPending.delete(id);
+        }
+      });
+
+      ws.on('error', (err) => {
+        console.error('[mcp-bridge] Controller error:', err.message);
+      });
+    } else if (isMcpClient) {
       // MCP subprocess connection — forward its requests to browser
       mcpClients.add(ws);
       console.error('[mcp-bridge] MCP subprocess connected');
@@ -107,6 +151,14 @@ export function startRelay(): void {
           return;
         }
 
+        // Check if this response belongs to a controller request
+        const ctrlClient = controllerPending.get(msg.id);
+        if (ctrlClient && ctrlClient.readyState === WebSocket.OPEN) {
+          controllerPending.delete(msg.id);
+          ctrlClient.send(data.toString());
+          return;
+        }
+
         // Check if this response belongs to an MCP subprocess request
         const mcpClient = mcpPending.get(msg.id);
         if (mcpClient && mcpClient.readyState === WebSocket.OPEN) {
@@ -138,6 +190,13 @@ export function startRelay(): void {
           }
         }
         mcpPending.clear();
+        // Reject all pending controller requests
+        for (const [id, client] of controllerPending) {
+          if (client.readyState === WebSocket.OPEN) {
+            client.send(JSON.stringify({ id, type: 'error', error: 'Browser disconnected' }));
+          }
+        }
+        controllerPending.clear();
       });
 
       ws.on('error', (err) => {

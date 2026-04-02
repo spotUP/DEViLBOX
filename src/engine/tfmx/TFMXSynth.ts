@@ -44,6 +44,10 @@ export class TFMXSynth implements DevilboxSynth {
     }
   }
 
+  async ensureInitialized(): Promise<void> {
+    await this.engine.ready();
+  }
+
   async setInstrument(config: TFMXConfig): Promise<void> {
     await this.engine.ready();
 

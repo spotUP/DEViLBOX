@@ -46,6 +46,10 @@ export class HippelCoSoSynth implements DevilboxSynth {
     }
   }
 
+  async ensureInitialized(): Promise<void> {
+    await this.engine.ready();
+  }
+
   async setInstrument(config: HippelCoSoConfig): Promise<void> {
     await this.engine.ready();
 

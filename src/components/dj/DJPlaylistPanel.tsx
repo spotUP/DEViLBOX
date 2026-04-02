@@ -533,7 +533,12 @@ export const DJPlaylistPanel: React.FC<DJPlaylistPanelProps> = ({ onClose }) => 
                   <span className="text-xs font-mono text-text-muted/30 w-4 text-right shrink-0">
                     {i + 1}
                   </span>
-                  <span className="flex-1 text-text-secondary text-sm font-mono truncate min-w-0">
+                  {track.played && (
+                    <span className="text-green-500/50 text-[9px] shrink-0" title="Played">P</span>
+                  )}
+                  <span className={`flex-1 text-sm font-mono truncate min-w-0 ${
+                    track.played ? 'text-text-muted/40' : 'text-text-secondary'
+                  }`}>
                     {track.trackName}
                   </span>
                   {track.bpm > 0 && (

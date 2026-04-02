@@ -13,7 +13,7 @@ const dx7Desc: SynthDescriptor = {
   loadMode: 'eager',
   sharedInstance: false,
   useSynthBus: true,
-  volumeOffsetDb: 0,
+  volumeOffsetDb: 14,
 
   create: () => new DX7Synth(),
 

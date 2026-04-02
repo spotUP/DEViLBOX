@@ -283,8 +283,8 @@ const NavBarComponent: React.FC = () => {
         </div>
       </nav>
 
-      {/* Tab Bar */}
-      <div className="flex items-center px-2 py-1 border-b border-dark-border bg-dark-bgTertiary">
+      {/* Tab Bar — hidden in DJ/VJ views where project tabs aren't relevant */}
+      {n.activeView !== 'dj' && n.activeView !== 'vj' && <div className="flex items-center px-2 py-1 border-b border-dark-border bg-dark-bgTertiary">
         {/* Tabs */}
         <div className="flex items-center gap-1 flex-1 overflow-x-auto scrollbar-none">
           {n.tabs.map((tab) => (
@@ -327,7 +327,7 @@ const NavBarComponent: React.FC = () => {
         >
           <Plus size={16} />
         </button>
-      </div>
+      </div>}
 
       {/* Download Modal */}
       <DownloadModal

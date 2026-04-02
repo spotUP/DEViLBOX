@@ -32,6 +32,10 @@ export interface PlaylistTrack {
   musicalKey?: string;
   /** Energy level 0-1 from analysis */
   energy?: number;
+  /** True if analysis was skipped (404, render fail) — don't re-scan */
+  analysisSkipped?: boolean;
+  /** True if this track was played in the current session (cleared on playlist load) */
+  played?: boolean;
 }
 
 export interface DJPlaylist {
@@ -55,7 +59,8 @@ interface DJPlaylistState {
   removeTrack: (playlistId: string, index: number) => void;
   reorderTrack: (playlistId: string, fromIndex: number, toIndex: number) => void;
   sortTracks: (playlistId: string, sortedTracks: PlaylistTrack[]) => void;
-  updateTrackMeta: (playlistId: string, index: number, meta: Partial<Pick<PlaylistTrack, 'musicalKey' | 'energy' | 'bpm' | 'duration' | 'fileName' | 'sourceUrl'>>) => void;
+  updateTrackMeta: (playlistId: string, index: number, meta: Partial<Pick<PlaylistTrack, 'musicalKey' | 'energy' | 'bpm' | 'duration' | 'fileName' | 'sourceUrl' | 'analysisSkipped' | 'played'>>) => void;
+  markTrackPlayed: (playlistId: string, index: number) => void;
   importPlaylists: (playlists: DJPlaylist[]) => void;
 }
 
@@ -157,11 +162,20 @@ export const useDJPlaylistStore = create<DJPlaylistState>()(
         syncPlaylists();
       },
 
-      updateTrackMeta: (playlistId: string, index: number, meta: Partial<Pick<PlaylistTrack, 'musicalKey' | 'energy' | 'bpm' | 'duration' | 'fileName' | 'sourceUrl'>>) => {
+      updateTrackMeta: (playlistId: string, index: number, meta: Partial<Pick<PlaylistTrack, 'musicalKey' | 'energy' | 'bpm' | 'duration' | 'fileName' | 'sourceUrl' | 'analysisSkipped' | 'played'>>) => {
         set((state) => {
           const p = state.playlists.find((pl) => pl.id === playlistId);
           if (p && index >= 0 && index < p.tracks.length) {
             Object.assign(p.tracks[index], meta);
+          }
+        });
+      },
+
+      markTrackPlayed: (playlistId: string, index: number) => {
+        set((state) => {
+          const p = state.playlists.find((pl) => pl.id === playlistId);
+          if (p && index >= 0 && index < p.tracks.length) {
+            p.tracks[index].played = true;
           }
         });
       },
@@ -189,6 +203,16 @@ export const useDJPlaylistStore = create<DJPlaylistState>()(
         state.playlists = [];
         state.activePlaylistId = null;
         return state;
+      },
+      onRehydrateStorage: () => (state) => {
+        // Clear all "played" flags on session start — they're per-session only
+        if (state) {
+          for (const pl of state.playlists) {
+            for (const t of pl.tracks) {
+              t.played = undefined;
+            }
+          }
+        }
       },
     },
   ),

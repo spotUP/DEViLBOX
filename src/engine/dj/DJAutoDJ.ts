@@ -25,8 +25,6 @@ const PRELOAD_LEAD_TIME_SEC = 60;
 const MAX_SKIP_ATTEMPTS = 3;
 const SKIP_TRANSITION_BARS = 4;
 
-/** Crossfader deviation threshold above which user intervention is assumed. */
-const CROSSFADER_INTERVENTION_THRESHOLD = 0.08;
 
 // ── Singleton ────────────────────────────────────────────────────────────────
 
@@ -51,11 +49,6 @@ class DJAutoDJ {
   private shuffleOrder: number[] = [];
   private shufflePosition = 0;
 
-  // Manual intervention detection
-  private crossfaderUnsubscribe: (() => void) | null = null;
-  private deckFileUnsubscribe: (() => void) | null = null;
-  private transitionStart = { crossfader: 0, target: 1, time: 0, durationMs: 0 };
-  private loadingActive = false; // true while Auto DJ is loading to idle deck
 
   // ── Public API ───────────────────────────────────────────────────────────
 
@@ -105,7 +98,7 @@ class DJAutoDJ {
     if (!store.decks[this.activeDeck].isPlaying) {
       let idx = currentIndex;
       let loaded = false;
-      this.loadingActive = true;
+
       for (let attempts = 0; attempts < playlist.tracks.length; attempts++) {
         const track = playlist.tracks[idx];
         if (track) {
@@ -113,6 +106,9 @@ class DJAutoDJ {
           if (loaded) {
             const nextIdx = this.computeNextIndex(idx, playlist.tracks.length);
             useDJStore.getState().setAutoDJTrackIndices(idx, nextIdx);
+            // Mark track as played in the playlist
+            const plId = useDJPlaylistStore.getState().activePlaylistId;
+            if (plId) useDJPlaylistStore.getState().markTrackPlayed(plId, idx);
             try {
               const deck = getDJEngine().getDeck(this.activeDeck);
               await deck.play();
@@ -127,7 +123,7 @@ class DJAutoDJ {
         idx = (idx + 1) % playlist.tracks.length;
         if (idx === currentIndex) break; // Wrapped around — no loadable tracks
       }
-      this.loadingActive = false;
+
       if (!loaded) {
         console.warn('[AutoDJ] No loadable tracks found in playlist');
         this.disable();
@@ -138,7 +134,6 @@ class DJAutoDJ {
     this.preloading = false;
     this.preloadedDeck = null;
     this.startPolling();
-    this.startInterventionWatch();
     const finalIdx = useDJStore.getState().autoDJCurrentTrackIndex;
     console.log(`[AutoDJ] Enabled — starting from track ${finalIdx + 1}/${playlist.tracks.length}`);
   }
@@ -146,11 +141,10 @@ class DJAutoDJ {
   /** Disable Auto DJ gracefully. Current track keeps playing. */
   disable(): void {
     this.stopPolling();
-    this.stopInterventionWatch();
     this.cancelTransition();
     this.preloading = false;
     this.preloadedDeck = null;
-    this.loadingActive = false;
+
 
     const store = useDJStore.getState();
     store.setAutoDJEnabled(false);
@@ -178,9 +172,9 @@ class DJAutoDJ {
       if (!track) return;
 
       store.setAutoDJStatus('preloading');
-      this.loadingActive = true;
+
       const loaded = await loadPlaylistTrackToDeck(track, this.idleDeck);
-      this.loadingActive = false;
+
       if (loaded) {
         this.preloadedDeck = this.idleDeck;
         this.triggerTransition(SKIP_TRANSITION_BARS);
@@ -202,6 +196,8 @@ class DJAutoDJ {
     }
   }
 
+  private pollCount = 0;
+
   private pollLoop(): void {
     const store = useDJStore.getState();
     if (!store.autoDJEnabled) {
@@ -211,6 +207,17 @@ class DJAutoDJ {
 
     const status = store.autoDJStatus;
     const timeRemaining = this.getTimeRemaining();
+    this.pollCount++;
+
+    // Debug log every 10th poll (~5s)
+    if (this.pollCount % 10 === 0) {
+      const cf = store.crossfaderPosition.toFixed(2);
+      const aPlay = store.decks.A.isPlaying;
+      const bPlay = store.decks.B.isPlaying;
+      const aFile = store.decks.A.fileName?.split('/').pop() ?? 'empty';
+      const bFile = store.decks.B.fileName?.split('/').pop() ?? 'empty';
+      console.log(`[AutoDJ poll] status=${status} active=${this.activeDeck} idle=${this.idleDeck} cf=${cf} timeLeft=${timeRemaining.toFixed(1)}s A:[${aPlay ? 'PLAY' : 'stop'}]${aFile} B:[${bPlay ? 'PLAY' : 'stop'}]${bFile} preloaded=${this.preloadedDeck ?? 'none'}`);
+    }
 
     switch (status) {
       case 'playing': {
@@ -226,6 +233,7 @@ class DJAutoDJ {
         // Check if it's time to start the transition
         const transitionDuration = this.getTransitionDurationSec();
         if (timeRemaining <= transitionDuration) {
+          console.log(`[AutoDJ] Triggering transition: timeLeft=${timeRemaining.toFixed(1)}s <= transitionDur=${transitionDuration.toFixed(1)}s`);
           this.triggerTransition(store.autoDJTransitionBars);
         }
         break;
@@ -242,6 +250,10 @@ class DJAutoDJ {
         const crossfaderDone = this.idleDeck === 'B' ? crossfader >= 0.98
           : this.idleDeck === 'A' ? crossfader <= 0.02 : false;
 
+        if (this.pollCount % 4 === 0) {
+          console.log(`[AutoDJ transition] outgoing=${this.activeDeck}:${outgoingPlaying} incoming=${this.idleDeck}:${incomingPlaying} cf=${crossfader.toFixed(2)} cfDone=${crossfaderDone}`);
+        }
+
         if (incomingPlaying && (!outgoingPlaying || crossfaderDone)) {
           this.completeTransition();
         }
@@ -254,6 +266,7 @@ class DJAutoDJ {
 
       case 'preload-failed':
         // Retry preload — previous attempt failed, try again
+        console.log('[AutoDJ] Retrying after preload failure');
         this.preloading = false;
         this.preloadedDeck = null;
         store.setAutoDJStatus('playing');
@@ -282,7 +295,6 @@ class DJAutoDJ {
     let nextIdx = store.autoDJNextTrackIndex;
     let attempts = 0;
 
-    this.loadingActive = true;
     while (attempts < MAX_SKIP_ATTEMPTS) {
       const track = playlist.tracks[nextIdx];
       if (!track) {
@@ -293,18 +305,19 @@ class DJAutoDJ {
         continue;
       }
 
-      console.log(`[AutoDJ] Preloading track ${nextIdx + 1}/${playlist.tracks.length}: ${track.trackName}`);
+      console.log(`[AutoDJ] Preloading track ${nextIdx + 1}/${playlist.tracks.length} to deck ${this.idleDeck}: ${track.trackName}`);
 
       try {
         const loaded = await loadPlaylistTrackToDeck(track, this.idleDeck);
         if (loaded) {
           this.preloadedDeck = this.idleDeck;
-          this.loadingActive = false;
+    
           useDJStore.getState().setAutoDJTrackIndices(
             useDJStore.getState().autoDJCurrentTrackIndex,
             nextIdx,
           );
           useDJStore.getState().setAutoDJStatus('transition-pending');
+          console.log(`[AutoDJ] Preload complete → deck ${this.idleDeck}, status=transition-pending`);
           this.preloading = false;
           return;
         }
@@ -322,7 +335,7 @@ class DJAutoDJ {
     console.error('[AutoDJ] Failed to preload any track after', MAX_SKIP_ATTEMPTS, 'attempts');
     useDJStore.getState().setAutoDJStatus('preload-failed');
     this.preloading = false;
-    this.loadingActive = false;
+
   }
 
   // ── Private: Transition ──────────────────────────────────────────────────
@@ -331,23 +344,14 @@ class DJAutoDJ {
     const store = useDJStore.getState();
     if (!this.preloadedDeck) return;
 
-    // Record transition timeline for intervention detection
-    const crossfaderStart = store.crossfaderPosition;
-    const crossfaderTarget = this.idleDeck === 'B' ? 1 : 0;
-    const durationMs = this.getTransitionDurationSec() * 1000;
-    this.transitionStart = {
-      crossfader: crossfaderStart,
-      target: crossfaderTarget,
-      time: performance.now(),
-      durationMs,
-    };
-
     // Mark incoming deck as playing in the store — beatMatchedTransition starts
     // it at the engine level but doesn't update the store, which causes
     // completeTransition to never trigger (it checks incomingPlaying).
     store.setDeckPlaying(this.idleDeck, true);
     store.setAutoDJStatus('transitioning');
-    console.log(`[AutoDJ] Starting ${bars}-bar transition: ${this.activeDeck} → ${this.idleDeck}`);
+    const aFile = store.decks.A.fileName?.split('/').pop() ?? 'empty';
+    const bFile = store.decks.B.fileName?.split('/').pop() ?? 'empty';
+    console.log(`[AutoDJ] Starting ${bars}-bar transition: ${this.activeDeck} → ${this.idleDeck} | cf=${store.crossfaderPosition.toFixed(2)}→${this.idleDeck === 'B' ? 1 : 0} | A:${aFile} B:${bFile}`);
 
     this.transitionCancel = beatMatchedTransition(
       this.activeDeck,
@@ -404,61 +408,13 @@ class DJAutoDJ {
     this.preloading = false;
     this.preloadedDeck = null;
 
-    // Restart deck-file watch so it tracks the new active deck
-    this.startInterventionWatch();
+    // Mark the new track as played
+    const plId = useDJPlaylistStore.getState().activePlaylistId;
+    if (plId) useDJPlaylistStore.getState().markTrackPlayed(plId, newCurrentIdx);
 
-    console.log(`[AutoDJ] Transition complete — now playing track ${newCurrentIdx + 1}/${trackCount}`);
-  }
-
-  // ── Private: Intervention detection ─────────────────────────────────────
-
-  private startInterventionWatch(): void {
-    this.stopInterventionWatch();
-
-    // 1. Watch crossfader — detect user grab during active transition
-    this.crossfaderUnsubscribe = useDJStore.subscribe(
-      s => s.crossfaderPosition,
-      (current) => {
-        const store = useDJStore.getState();
-        if (!store.autoDJEnabled || store.autoDJStatus !== 'transitioning') return;
-
-        // Compute where the crossfader should be right now based on linear interpolation
-        const elapsed = performance.now() - this.transitionStart.time;
-        const progress = Math.min(1, elapsed / Math.max(1, this.transitionStart.durationMs));
-        const expected = this.transitionStart.crossfader +
-          (this.transitionStart.target - this.transitionStart.crossfader) * progress;
-
-        const deviation = Math.abs(current - expected);
-        if (deviation > CROSSFADER_INTERVENTION_THRESHOLD) {
-          console.log(`[AutoDJ] Manual crossfader intervention detected (deviation ${deviation.toFixed(2)}) — disabling`);
-          this.disable();
-        }
-      },
-    );
-
-    // 2. Watch active deck's loaded track — detect user manually loading a track
-    this.deckFileUnsubscribe = useDJStore.subscribe(
-      s => s.decks[this.activeDeck].fileName,
-      (_current) => {
-        // Only flag as intervention if Auto DJ isn't the one loading
-        if (this.loadingActive) return;
-        const store = useDJStore.getState();
-        if (!store.autoDJEnabled) return;
-        console.log(`[AutoDJ] Manual track load on active deck ${this.activeDeck} — disabling`);
-        this.disable();
-      },
-    );
-  }
-
-  private stopInterventionWatch(): void {
-    if (this.crossfaderUnsubscribe) {
-      this.crossfaderUnsubscribe();
-      this.crossfaderUnsubscribe = null;
-    }
-    if (this.deckFileUnsubscribe) {
-      this.deckFileUnsubscribe();
-      this.deckFileUnsubscribe = null;
-    }
+    const aFile = useDJStore.getState().decks.A.fileName?.split('/').pop() ?? 'empty';
+    const bFile = useDJStore.getState().decks.B.fileName?.split('/').pop() ?? 'empty';
+    console.log(`[AutoDJ] Transition complete — active=${this.activeDeck} idle=${this.idleDeck} cf=${crossfaderSnap} track ${newCurrentIdx + 1}/${trackCount} next=${newNextIdx} A:${aFile} B:${bFile}`);
   }
 
   // ── Private: Helpers ─────────────────────────────────────────────────────
