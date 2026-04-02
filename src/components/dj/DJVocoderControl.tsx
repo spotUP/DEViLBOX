@@ -230,7 +230,7 @@ export const DJVocoderControl: React.FC = () => {
         <select
           value={selectedDeviceId}
           onChange={handleDeviceChange}
-          className="px-1 py-0.5 text-[10px] rounded border border-dark-border bg-dark-bgTertiary text-dark-textSecondary max-w-[120px] truncate"
+          className="px-1.5 py-1 text-xs rounded border border-dark-border bg-dark-bgTertiary text-dark-textSecondary max-w-[140px] truncate"
           title="Select microphone input"
         >
           {devices.map(d => (
@@ -327,7 +327,7 @@ export const DJVocoderControl: React.FC = () => {
           <select
             value={fxPreset}
             onChange={handleFXPresetChange}
-            className="px-1 py-0.5 text-[9px] rounded border border-dark-border bg-dark-bgTertiary text-cyan-400 max-w-[90px]"
+            className="px-1.5 py-1 text-xs rounded border border-dark-border bg-dark-bgTertiary text-cyan-400"
             title="Effect preset"
           >
             {Object.keys(VOCODER_FX_PRESETS).map(name => (
@@ -345,7 +345,7 @@ export const DJVocoderControl: React.FC = () => {
           <select
             value={presetName || ''}
             onChange={handlePresetChange}
-            className="px-1 py-0.5 text-[10px] rounded border border-dark-border bg-dark-bgTertiary text-dark-textSecondary"
+            className="px-1.5 py-1 text-xs rounded border border-dark-border bg-dark-bgTertiary text-dark-textSecondary"
             title="Vocoder voice preset"
           >
             {!presetName && <option value="">Custom</option>}
