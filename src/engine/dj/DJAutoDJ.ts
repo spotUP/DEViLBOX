@@ -342,6 +342,10 @@ class DJAutoDJ {
       durationMs,
     };
 
+    // Mark incoming deck as playing in the store — beatMatchedTransition starts
+    // it at the engine level but doesn't update the store, which causes
+    // completeTransition to never trigger (it checks incomingPlaying).
+    store.setDeckPlaying(this.idleDeck, true);
     store.setAutoDJStatus('transitioning');
     console.log(`[AutoDJ] Starting ${bars}-bar transition: ${this.activeDeck} → ${this.idleDeck}`);
 
@@ -379,6 +383,13 @@ class DJAutoDJ {
     const oldActive = this.activeDeck;
     this.activeDeck = this.idleDeck;
     this.idleDeck = oldActive;
+
+    // Snap crossfader to the exact position for the new active deck.
+    // The sweep may have ended at 0.98 instead of 1.0 — force it to the
+    // canonical value so the NEXT transition starts from the correct end.
+    const crossfaderSnap = this.activeDeck === 'A' ? 0 : 1;
+    try { getDJEngine().setCrossfader(crossfaderSnap); } catch { /* engine not ready */ }
+    useDJStore.getState().setCrossfader(crossfaderSnap);
 
     const store = useDJStore.getState();
     const playlist = this.getActivePlaylist();
