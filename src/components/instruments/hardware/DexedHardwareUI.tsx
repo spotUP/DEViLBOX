@@ -353,11 +353,19 @@ export const DexedHardwareUI: React.FC<DexedHardwareUIProps> = ({
           } catch { /* engine not ready */ }
         };
 
+        // Cart button callback: JUCE cart button → JS file picker
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (window as any)._dexedUICartCallback = () => {
+          fileInputRef.current?.click();
+        };
+
         eventCleanups.push(() => {
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           delete (window as any)._dexedUIParamCallback;
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           delete (window as any)._dexedUIMidiCallback;
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          delete (window as any)._dexedUICartCallback;
         });
 
         setLoaded(true);
