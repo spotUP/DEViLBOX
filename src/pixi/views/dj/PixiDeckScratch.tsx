@@ -22,10 +22,10 @@ const LFO_LABELS: { division: FaderLFODivision; label: string }[] = [
   { division: '1/32', label: '1/32' },
 ];
 
-// Show first 6 patterns inline; rest would need scrolling (matching DOM version's visible set)
-const VISIBLE_PATTERNS = SCRATCH_PATTERNS.slice(0, 6);
+// Show ALL patterns (matches DOM which shows all 12+)
+const VISIBLE_PATTERNS = SCRATCH_PATTERNS;
 
-const BTN_W = 36;
+const BTN_W = 32;
 const BTN_H = 18;
 const BTN_GAP = 2;
 const LFO_BTN_W = 28;
@@ -104,8 +104,8 @@ export const PixiDeckScratch: React.FC<Props> = ({ deckId, width = 280, height =
 
   return (
     <pixiContainer layout={layoutProp ?? { width, height, flexDirection: 'column', gap: 2, paddingTop: 2, paddingLeft: 2 }}>
-      {/* Row 1: Pattern buttons */}
-      <pixiContainer layout={{ flexDirection: 'row', gap: BTN_GAP, height: ROW_H, alignItems: 'center' }}>
+      {/* Row 1: Pattern buttons (wrap to fit all) */}
+      <pixiContainer layout={{ flexDirection: 'row', gap: BTN_GAP, flexWrap: 'wrap', alignItems: 'center' }}>
         {VISIBLE_PATTERNS.map((pattern, _i) => {
           const isActive = activePatternName === pattern.name;
           const isWaiting = waitingPattern === pattern.name;

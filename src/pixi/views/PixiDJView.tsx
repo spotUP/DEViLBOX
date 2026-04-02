@@ -36,6 +36,9 @@ export const PixiDJView: React.FC = () => {
     if (isPlaying) stop();
     getToneEngine().releaseAll();
 
+    // Ensure AudioContext is running (browser may have suspended it)
+    import('tone').then(Tone => Tone.start().catch(() => {}));
+
     engineRef.current = getDJEngine();
     setDJModeActive(true);
 
@@ -52,6 +55,19 @@ export const PixiDJView: React.FC = () => {
       useTransportStore.getState().setGlobalPitch(0);
     };
   }, [setDJModeActive]);
+
+  // Subscribe to PFL/cue changes and route to engine (matches DOM DJView)
+  useEffect(() => {
+    const engine = engineRef.current;
+    if (!engine) return;
+    const u1 = useDJStore.subscribe(s => s.decks.A.pflEnabled, v => engine.mixer.setPFL('A', v));
+    const u2 = useDJStore.subscribe(s => s.decks.B.pflEnabled, v => engine.mixer.setPFL('B', v));
+    const u3 = useDJStore.subscribe(s => s.decks.C.pflEnabled, v => engine.mixer.setPFL('C', v));
+    const u4 = useDJStore.subscribe(s => s.cueVolume, v => engine.cueEngine.setCueVolume(v));
+    const u5 = useDJStore.subscribe(s => s.cueMix, v => engine.cueEngine.setCueMix(v));
+    const u6 = useDJStore.subscribe(s => s.cueDeviceId, v => { if (v) void engine.cueEngine.setCueDevice(v); });
+    return () => { u1(); u2(); u3(); u4(); u5(); u6(); };
+  }, []);
 
   const [browserPanel, setBrowserPanel] = useState<DJBrowserPanel>('none');
   const [samplerOpen, setSamplerOpen] = useState(false);

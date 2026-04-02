@@ -1413,6 +1413,7 @@ export const PixiDJDeck: React.FC<PixiDJDeckProps> = ({ deckId }) => {
   const DECK_COLOR = deckId === 'A' ? deckA : deckId === 'B' ? deckB : deckC;
 
   const deckNum = deckId === 'A' ? '1' : deckId === 'B' ? '2' : '3';
+  const isB = deckId === 'B';
 
   return (
     <pixiContainer
@@ -1421,35 +1422,36 @@ export const PixiDJDeck: React.FC<PixiDJDeckProps> = ({ deckId }) => {
         flexBasis: 0,
         height: '100%',
         flexDirection: 'column',
-        padding: 8,
-        gap: 6,
+        padding: 6,
+        gap: 4,
         overflow: 'hidden',
       }}
     >
       {/* ── Track info + scopes (matches DOM DeckTrackInfo + DeckScopes) ── */}
-      <pixiContainer layout={{ flexDirection: 'row', alignItems: 'flex-start', gap: 8 }}>
+      <pixiContainer layout={{ flexDirection: 'row', alignItems: 'flex-start', gap: 4, flexShrink: 0 }}>
         <pixiContainer layout={{ flex: 1, flexDirection: 'column', gap: 2, overflow: 'hidden' }}>
-          {/* Deck label */}
-          <pixiBitmapText
-            text={`Deck ${deckNum}`}
-            style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 10, fill: 0xffffff }}
-            tint={DECK_COLOR}
-            alpha={0.6}
-            layout={{}}
-          />
-          {/* Track name */}
-          <pixiBitmapText
-            text={trackName || 'No track loaded'}
-            style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 13, fill: 0xffffff }}
-            tint={trackName ? theme.text.color : theme.textMuted.color}
-            layout={{}}
-          />
+          {/* Deck label + track name on same line */}
+          <pixiContainer layout={{ flexDirection: 'row', gap: 4, alignItems: 'center' }}>
+            <pixiBitmapText
+              text={`DECK ${deckNum}`}
+              style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 9, fill: 0xffffff }}
+              tint={DECK_COLOR}
+              alpha={0.6}
+              layout={{}}
+            />
+            <pixiBitmapText
+              text={trackName || 'No track loaded'}
+              style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 12, fill: 0xffffff }}
+              tint={trackName ? theme.text.color : theme.textMuted.color}
+              layout={{}}
+            />
+          </pixiContainer>
           {/* BPM + Key + Pitch% + Time row (matches DOM DeckTrackInfo) */}
-          <pixiContainer layout={{ flexDirection: 'row', gap: 8, alignItems: 'center' }}>
-            {/* BPM - large LED style */}
+          <pixiContainer layout={{ flexDirection: 'row', gap: 6, alignItems: 'center' }}>
+            {/* BPM — text-2xl equivalent (20px) */}
             <pixiBitmapText
               text={displayBPM > 0 ? displayBPM.toFixed(1) : '---.-'}
-              style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 18, fill: 0xffffff }}
+              style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 20, fill: 0xffffff }}
               tint={isBPMMatched ? theme.success.color : theme.text.color}
               layout={{}}
             />
@@ -1463,7 +1465,7 @@ export const PixiDJDeck: React.FC<PixiDJDeckProps> = ({ deckId }) => {
             {pitchPercent !== null && (
               <pixiBitmapText
                 text={pitchPercent}
-                style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 10, fill: 0xffffff }}
+                style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 9, fill: 0xffffff }}
                 tint={theme.textSecondary.color}
                 layout={{}}
               />
@@ -1500,12 +1502,12 @@ export const PixiDJDeck: React.FC<PixiDJDeckProps> = ({ deckId }) => {
       </pixiContainer>
 
       {/* ── Track overview / progress bar ── */}
-      <pixiContainer layout={{ height: 16, width: '100%' }}>
+      <pixiContainer layout={{ height: 10, width: '100%', flexShrink: 0 }}>
         <pixiGraphics
           draw={(g: GraphicsType) => {
             g.clear();
             const barW = (g as any).layout?.computedLayout?.width ?? 280;
-            const barH = 16;
+            const barH = 10;
             g.roundRect(0, 0, barW, barH, 2);
             g.fill({ color: theme.bg.color });
             const progress = durationMs > 0 ? Math.min(1, audioPosition / durationMs) : 0;
@@ -1522,50 +1524,51 @@ export const PixiDJDeck: React.FC<PixiDJDeckProps> = ({ deckId }) => {
             g.roundRect(0, 0, barW, barH, 2);
             g.stroke({ color: theme.border.color, alpha: 0.2, width: 1 });
           }}
-          layout={{ width: '100%', height: 16 }}
+          layout={{ width: '100%', height: 10 }}
         />
-        <pixiBitmapText
-          text={durationMs > 0
-            ? `${formatTime(audioPosition)} / ${formatTime(durationMs)}`
-            : 'No track loaded'
-          }
-          style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 11, fill: 0xffffff }}
-          tint={theme.textMuted.color}
-          layout={{ position: 'absolute', left: 4, top: 3 }}
-        />
+        {durationMs > 0 && trackName && (
+          <pixiBitmapText
+            text={`${formatTime(audioPosition)} / ${formatTime(durationMs)}`}
+            style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 8, fill: 0xffffff }}
+            tint={theme.textMuted.color}
+            layout={{ position: 'absolute', left: 4, top: 0 }}
+          />
+        )}
       </pixiContainer>
 
-      {/* ── Waveform (audio mode) ── */}
-      <PixiDeckWaveform deckId={deckId} height={60} />
+      {/* ── Waveform (audio mode — self-hides when no peaks) ── */}
+      <PixiDeckWaveform deckId={deckId} height={48} />
 
-      {/* ── Main controls area: visualizer/vinyl + pitch slider (matches DOM) ── */}
+      {/* ── Main controls area: visualizer/vinyl + pitch slider (matches DOM flex-1 min-h-0) ── */}
+      {/* Deck B uses row-reverse so pitch slider is on the left */}
       {viewMode === 'visualizer' && (
-        <pixiContainer layout={{ flexDirection: 'row', gap: 8, flex: 1, minHeight: 0 }}>
+        <pixiContainer layout={{ flexDirection: isB ? 'row-reverse' : 'row', gap: 4, flex: 1, minHeight: 0 }}>
           <pixiContainer layout={{ flex: 1, minWidth: 0, minHeight: 0, flexDirection: 'column', gap: 4 }}>
-            {/* Spectrum visualizer with beat flash border */}
-            <pixiContainer layout={{ width: '100%', height: 80 }}>
+            {/* Spectrum visualizer with beat flash border — flex: 1 to fill available space */}
+            <pixiContainer layout={{ width: '100%', flex: 1, minHeight: 0 }}>
               <PixiSpectrumDisplay deckId={deckId} height={80} deckColor={DECK_COLOR} vizMode={vizMode} onBeatFlash={handleBeatFlash} />
               {beatFlash > 0 && (
                 <pixiGraphics
                   draw={(g: GraphicsType) => {
                     g.clear();
                     const bw = (g as any).layout?.computedLayout?.width ?? 280;
-                    g.roundRect(0, 0, bw, 80, 4).stroke({ color: DECK_COLOR, width: 3, alpha: beatFlash });
+                    const bh = (g as any).layout?.computedLayout?.height ?? 80;
+                    g.roundRect(0, 0, bw, bh, 4).stroke({ color: DECK_COLOR, width: 3, alpha: beatFlash });
                   }}
-                  layout={{ position: 'absolute', top: 0, left: 0, width: '100%', height: 80 }}
+                  layout={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%' }}
                   eventMode="none"
                 />
               )}
             </pixiContainer>
             {/* Visualizer mode nav */}
-            <pixiContainer layout={{ flexDirection: 'row', gap: 4, justifyContent: 'center', alignItems: 'center' }}>
+            <pixiContainer layout={{ flexDirection: 'row', gap: 4, justifyContent: 'center', alignItems: 'center', flexShrink: 0 }}>
               <PixiButton icon="prev" label="" variant="ghost" width={28} onClick={cycleVizPrev} />
               <PixiLabel text={VIZ_LABELS[vizMode]} size="xs" color="textMuted" />
               <PixiButton icon="next" label="" variant="ghost" width={28} onClick={cycleVizNext} />
             </pixiContainer>
           </pixiContainer>
-          {/* Pitch slider */}
-          <pixiContainer layout={{ flexDirection: 'column', gap: 2, alignItems: 'center', flexShrink: 0 }}>
+          {/* Pitch slider — self-stretch to fill main area height */}
+          <pixiContainer layout={{ flexDirection: 'column', gap: 2, alignItems: 'center', flexShrink: 0, alignSelf: 'stretch' }}>
             <PixiLabel text="PITCH" size="xs" color="textMuted" />
             <PixiSlider
               value={pitchOffset ?? 0}
@@ -1587,10 +1590,12 @@ export const PixiDJDeck: React.FC<PixiDJDeckProps> = ({ deckId }) => {
       )}
 
       {viewMode === 'vinyl' && (
-        <pixiContainer layout={{ flexDirection: 'row', gap: 8, flex: 1, minHeight: 0, alignItems: 'center' }}>
-          <PixiVinylDisplay deckId={deckId} size={250} deckColor={DECK_COLOR} />
-          {/* Pitch slider */}
-          <pixiContainer layout={{ flexDirection: 'column', gap: 2, alignItems: 'center', flexShrink: 0 }}>
+        <pixiContainer layout={{ flexDirection: isB ? 'row-reverse' : 'row', gap: 4, flex: 1, minHeight: 0, alignItems: 'center' }}>
+          <pixiContainer layout={{ flex: 1, minWidth: 0, minHeight: 0 }}>
+            <PixiVinylDisplay deckId={deckId} size={250} deckColor={DECK_COLOR} />
+          </pixiContainer>
+          {/* Pitch slider — self-stretch to fill main area height */}
+          <pixiContainer layout={{ flexDirection: 'column', gap: 2, alignItems: 'center', flexShrink: 0, alignSelf: 'stretch' }}>
             <PixiLabel text="PITCH" size="xs" color="textMuted" />
             <PixiSlider
               value={pitchOffset ?? 0}
@@ -1612,7 +1617,7 @@ export const PixiDJDeck: React.FC<PixiDJDeckProps> = ({ deckId }) => {
       )}
 
       {viewMode === '3d' && (
-        <pixiContainer layout={{ flexDirection: 'row', gap: 8, flex: 1, minHeight: 0, alignItems: 'center' }}>
+        <pixiContainer layout={{ flexDirection: isB ? 'row-reverse' : 'row', gap: 4, flex: 1, minHeight: 0, alignItems: 'center' }}>
           <pixiContainer layout={{ flex: 1, minWidth: 0, minHeight: 0 }}>
             <PixiTurntable2D
               deckId={deckId}
@@ -1620,8 +1625,8 @@ export const PixiDJDeck: React.FC<PixiDJDeckProps> = ({ deckId }) => {
               height={260}
             />
           </pixiContainer>
-          {/* Pitch slider */}
-          <pixiContainer layout={{ flexDirection: 'column', gap: 2, alignItems: 'center', flexShrink: 0 }}>
+          {/* Pitch slider — self-stretch to fill main area height */}
+          <pixiContainer layout={{ flexDirection: 'column', gap: 2, alignItems: 'center', flexShrink: 0, alignSelf: 'stretch' }}>
             <PixiLabel text="PITCH" size="xs" color="textMuted" />
             <PixiSlider
               value={pitchOffset ?? 0}
@@ -1643,20 +1648,14 @@ export const PixiDJDeck: React.FC<PixiDJDeckProps> = ({ deckId }) => {
       )}
 
       {/* ── Cue points (matches DOM placement before transport) ── */}
-      <PixiDeckCuePoints deckId={deckId} layout={{ width: '100%', height: 36, flexShrink: 0 }} />
+      <PixiDeckCuePoints deckId={deckId} layout={{ width: '100%', height: 28, flexShrink: 0 }} />
 
-      {/* ── Transport + Nudge + Loop (matches DOM: DeckTransport + DeckNudge + DeckLoopControls) ── */}
-      <pixiContainer layout={{ flexDirection: 'row', gap: 4, alignItems: 'center', height: 40, flexShrink: 0 }}>
+      {/* ── Transport + Nudge + Loop — ALL ONE ROW (matches DOM) ── */}
+      <pixiContainer layout={{ flexDirection: 'row', gap: 2, alignItems: 'center', height: 28, flexShrink: 0, flexWrap: 'wrap' }}>
         <PixiDeckTransport deckId={deckId} />
-        {/* Nudge (matches DOM DeckNudge: chevron left/right) */}
-        <PixiButton icon="prev" label="" variant="ghost" width={40} onClick={() => handleNudge(-1)} />
-        <PixiButton icon="next" label="" variant="ghost" width={40} onClick={() => handleNudge(1)} />
-      </pixiContainer>
-      {/* ── Loop controls (matches DOM DeckLoopControls: LOOP + sizes + SLIP) ── */}
-      <pixiContainer layout={{ flexDirection: 'row', gap: 2, alignItems: 'center', height: 40, flexShrink: 0 }}>
-        {/* LOOP toggle button */}
+        <PixiButton icon="prev" label="" variant="ghost" width={24} height={24} onClick={() => handleNudge(-1)} />
+        <PixiButton icon="next" label="" variant="ghost" width={24} height={24} onClick={() => handleNudge(1)} />
         <PixiLoopButton label="LOOP" active={loopActive} color={DECK_COLOR} onClick={handleLoopToggle} />
-        {/* Loop size buttons: 1, 2, 4, 8, 16, 32 */}
         {LOOP_SIZES.map((size) => (
           <PixiLoopSizeButton
             key={size}
@@ -1667,20 +1666,21 @@ export const PixiDJDeck: React.FC<PixiDJDeckProps> = ({ deckId }) => {
             onClick={() => handleLoopSizeChange(size)}
           />
         ))}
-        {/* SLIP toggle button */}
         <PixiLoopButton label="SLIP" active={slipEnabled} color={0xd97706} onClick={handleSlipToggle} />
       </pixiContainer>
 
       {/* ── FX Pads + Beat Jump (matches DOM placement after transport) ── */}
-      <pixiContainer layout={{ flexShrink: 0 }}>
+      <pixiContainer layout={{ flexShrink: 0, width: '100%' }}>
         <PixiDeckFXPads deckId={deckId} />
       </pixiContainer>
 
       {/* ── Scratch presets + Fader LFO (matches DOM: last section) ── */}
-      <PixiDeckScratch deckId={deckId} layout={{ width: '100%', height: 56, flexShrink: 0 }} />
+      <PixiDeckScratch deckId={deckId} layout={{ width: '100%', height: 44, flexShrink: 0 }} />
 
       {/* Beat grid */}
-      <PixiDeckBeatGrid deckId={deckId} />
+      <pixiContainer layout={{ flexShrink: 0, width: '100%' }}>
+        <PixiDeckBeatGrid deckId={deckId} />
+      </pixiContainer>
     </pixiContainer>
   );
 };

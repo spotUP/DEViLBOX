@@ -211,7 +211,7 @@ export const PixiButton: React.FC<PixiButtonProps> = ({
         flexDirection: isVertical ? 'column' : 'row',
         justifyContent: 'center',
         alignItems: 'center',
-        gap: isVertical ? 1 : 0,
+        gap: isVertical ? 1 : (icon && label ? 4 : 0),
         borderRadius: 4,
         ...layout,
       }}
@@ -226,7 +226,7 @@ export const PixiButton: React.FC<PixiButtonProps> = ({
           tint={colors.text}
           alpha={disabled ? 0.5 : 1}
           eventMode="none"
-          layout={{ marginRight: !isVertical && label ? 4 : 0 }}
+          layout={{ width: iconFontSize, height: iconFontSize, flexShrink: 0 }}
         />
       )}
       {/* Text label */}
