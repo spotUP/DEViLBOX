@@ -98,6 +98,13 @@ export const KeyBindingEditor: React.FC<KeyBindingEditorProps> = ({ platform }) 
       // Check for conflict
       const existingCmd = bindings[combo];
       if (existingCmd && existingCmd !== rebindingCommand) {
+        const ok = window.confirm(
+          `"${combo}" is already bound to "${existingCmd}".\n\nReassign it to "${rebindingCommand}"?`
+        );
+        if (!ok) {
+          setRebindingCommand(null);
+          return;
+        }
         // Remove old binding for this combo
         removeCustomBinding(combo, platform);
       }
