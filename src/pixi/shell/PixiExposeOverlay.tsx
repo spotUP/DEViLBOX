@@ -263,13 +263,15 @@ export const PixiExposeOverlay: React.FC<PixiExposeOverlayProps> = ({ width, hei
               />
             ) : (
               /* Fallback: large icon when no thumbnail is available */
-              <pixiBitmapText
-                text={view.icon}
-                style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 36, fill: 0xffffff }}
-                tint={view.color}
-                alpha={0.5}
-                layout={{ position: 'absolute', left: cardW / 2 - 14, top: thumbH / 2 - 10 }}
-              />
+              <pixiContainer layout={{ position: 'absolute', width: cardW, height: thumbH, justifyContent: 'center', alignItems: 'center' }}>
+                <pixiBitmapText
+                  text={view.icon}
+                  style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 36, fill: 0xffffff }}
+                  tint={view.color}
+                  alpha={0.5}
+                  layout={{}}
+                />
+              </pixiContainer>
             )}
 
             {/* Label bar at bottom */}
