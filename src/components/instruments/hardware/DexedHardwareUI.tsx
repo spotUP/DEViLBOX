@@ -107,9 +107,8 @@ export const DexedHardwareUI: React.FC<DexedHardwareUIProps> = ({
       if (instrumentId) {
         try {
           const engine = getToneEngine();
-          const instruments = (engine as any).instruments as Map<number, any>;
           const key = (instrumentId << 16) | 0xFFFF;
-          const synth = instruments?.get(key);
+          const synth = engine.instruments.get(key) as any;
           if (synth?.loadSysex) {
             // Wrap in proper sysex envelope if raw
             if (data.length === 4096) {
@@ -303,34 +302,12 @@ export const DexedHardwareUI: React.FC<DexedHardwareUIProps> = ({
           () => canvas.removeEventListener('wheel', onWheel)
         );
 
-        // Parameter callback: WASM UI knob/program change → JS → audio engine
+        // Parameter callback: program change triggers immediate sync
+        // (individual knob changes are caught by the ~10Hz polling in renderLoop)
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (window as any)._dexedUIParamCallback = (paramId: number, _normalizedValue: number) => {
-          if (!instrumentId) return;
-          try {
-            const engine = getToneEngine();
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            const instruments = (engine as any).instruments as Map<number, any>;
-            const key = (instrumentId << 16) | 0xFFFF;
-            const synth = instruments?.get(key);
-
-            if (paramId === -1) {
-              // Full UI update (program change or knob edit) — read voice data and send as VCED sysex
-              const voicePtr = m._dexed_ui_get_voice_data();
-              if (voicePtr && synth?.loadSysex) {
-                const vced = m.HEAPU8.slice(voicePtr, voicePtr + 155);
-                const sysex = new Uint8Array(163);
-                sysex[0] = 0xF0; sysex[1] = 0x43; sysex[2] = 0x00;
-                sysex[3] = 0x00; sysex[4] = 0x01; sysex[5] = 0x1B;
-                sysex.set(vced, 6);
-                let sum = 0;
-                for (let i = 0; i < 155; i++) sum += vced[i];
-                sysex[161] = (-sum) & 0x7F;
-                sysex[162] = 0xF7;
-                synth.loadSysex(sysex.buffer);
-              }
-            }
-          } catch { /* engine not ready */ }
+        (window as any)._dexedUIParamCallback = (_paramId: number, _normalizedValue: number) => {
+          // Force immediate voice sync on next frame by resetting hash
+          lastVoiceHash = 0;
         };
 
         // MIDI callback: JUCE on-screen keyboard → JS → audio worklet
@@ -339,16 +316,14 @@ export const DexedHardwareUI: React.FC<DexedHardwareUIProps> = ({
           if (!instrumentId) return;
           try {
             const engine = getToneEngine();
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            const instruments = (engine as any).instruments as Map<number, any>;
             const key = (instrumentId << 16) | 0xFFFF;
-            const synth = instruments?.get(key);
-            if (!synth?._worklet) return;
+            const synth = engine.instruments.get(key) as any;
+            if (!synth) return;
 
             if (type === 'noteOn') {
-              synth._worklet.port.postMessage({ type: 'noteOn', note, velocity: vel });
+              synth.triggerAttack(note, undefined, vel / 127);
             } else if (type === 'noteOff') {
-              synth._worklet.port.postMessage({ type: 'noteOff', note });
+              synth.triggerRelease(note);
             }
           } catch { /* engine not ready */ }
         };
@@ -370,11 +345,46 @@ export const DexedHardwareUI: React.FC<DexedHardwareUIProps> = ({
 
         setLoaded(true);
 
-        // rAF render loop
+        // Voice data sync: poll UI WASM voice data and push to VDX7 audio engine on change
+        let lastVoiceHash = 0;
+        let syncCounter = 0;
+        const computeHash = (data: Uint8Array): number => {
+          let h = 0;
+          for (let i = 0; i < data.length; i++) h = ((h << 5) - h + data[i]) | 0;
+          return h;
+        };
+        const syncVoiceToAudio = () => {
+          if (!instrumentId) return;
+          const voicePtr = m._dexed_ui_get_voice_data();
+          if (!voicePtr) return;
+          const vced = m.HEAPU8.subarray(voicePtr, voicePtr + 155);
+          const hash = computeHash(vced);
+          if (hash === lastVoiceHash) return;
+          lastVoiceHash = hash;
+          try {
+            const engine = getToneEngine();
+            const key = (instrumentId << 16) | 0xFFFF;
+            const synth = engine.instruments.get(key);
+            if (synth && 'loadSysex' in synth) {
+              const sysex = new Uint8Array(163);
+              sysex[0] = 0xF0; sysex[1] = 0x43; sysex[2] = 0x00;
+              sysex[3] = 0x00; sysex[4] = 0x01; sysex[5] = 0x1B;
+              sysex.set(vced, 6);
+              let sum = 0;
+              for (let i = 0; i < 155; i++) sum += vced[i];
+              sysex[161] = (-sum) & 0x7F;
+              sysex[162] = 0xF7;
+              (synth as any).loadSysex(sysex.buffer);
+            }
+          } catch { /* engine not ready */ }
+        };
+
+        // rAF render loop — sync voice data at ~10Hz (every 6th frame)
         const renderLoop = () => {
           if (cancelled) return;
           if (m._dexed_ui_tick) m._dexed_ui_tick();
           blitFramebuffer(m, ctx, imgData, w, h);
+          if (++syncCounter % 6 === 0) syncVoiceToAudio();
           rafId = requestAnimationFrame(renderLoop);
         };
         rafId = requestAnimationFrame(renderLoop);
@@ -397,13 +407,9 @@ export const DexedHardwareUI: React.FC<DexedHardwareUIProps> = ({
       if (instrumentId) {
         try {
           const engine = getToneEngine();
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          const instruments = (engine as any).instruments as Map<number, any>;
           const key = (instrumentId << 16) | 0xFFFF;
-          const synth = instruments?.get(key);
-          if (synth?._worklet) {
-            synth._worklet.port.postMessage({ type: 'allNotesOff' });
-          }
+          const synth = engine.instruments.get(key) as any;
+          if (synth?.triggerRelease) synth.triggerRelease();
         } catch { /* engine not ready */ }
       }
 
