@@ -1,8 +1,8 @@
 /**
- * DX7Controls — DOM-based patch browser and voice selector for the DX7 synth.
+ * DX7Controls — DOM-based patch browser and controls for the DX7 synth.
  *
  * Provides bank/voice browsing from the patch manifest (35 banks × 32 voices),
- * built-in VCED preset selection, .SYX file loading, and volume control.
+ * built-in VCED preset selection, .SYX file loading, and volume/tuning controls.
  * For full operator-level editing, use the Hardware UI (DexedHardwareUI).
  */
 
@@ -14,6 +14,7 @@ interface DX7ControlsProps {
   instrument: {
     id: number;
     synthType: string;
+    volume?: number;
     dx7?: {
       volume?: number;
       bank?: number;
@@ -23,6 +24,35 @@ interface DX7ControlsProps {
   };
   onChange: (updates: Record<string, unknown>) => void;
 }
+
+/** Simple horizontal slider with label and value */
+const ParamSlider: React.FC<{
+  label: string;
+  value: number;
+  min?: number;
+  max?: number;
+  step?: number;
+  displayValue?: string;
+  onChange: (v: number) => void;
+  accentColor?: string;
+}> = ({ label, value, min = 0, max = 1, step = 0.01, displayValue, onChange, accentColor = '#d4a017' }) => (
+  <div className="flex items-center gap-2">
+    <span className="text-text-secondary text-[10px] w-20 shrink-0">{label}</span>
+    <input
+      type="range"
+      min={min}
+      max={max}
+      step={step}
+      value={value}
+      onChange={(e) => onChange(Number(e.target.value))}
+      className="flex-1 h-1.5 appearance-none bg-dark-bgTertiary rounded cursor-pointer"
+      style={{
+        accentColor,
+      }}
+    />
+    <span className="text-text-muted text-[10px] w-12 text-right font-mono">{displayValue ?? `${Math.round(value * 100)}%`}</span>
+  </div>
+);
 
 export const DX7Controls: React.FC<DX7ControlsProps> = ({ instrument, onChange }) => {
   const [manifest, setManifest] = useState<DX7PatchManifest | null>(null);
@@ -45,12 +75,21 @@ export const DX7Controls: React.FC<DX7ControlsProps> = ({ instrument, onChange }
     }
   }, []);
 
-  // Get synth instance
-  const getSynth = useCallback((): any => {
+  // Get synth instance — try both shared key patterns
+  const getSynth = useCallback((): DX7Synth | null => {
     try {
       const engine = getToneEngine();
-      const key = (instrument.id << 16) | 0xFFFF;
-      return engine.instruments.get(key) as any;
+      // Try shared key (instrumentId, -1)
+      const key = engine.getInstrumentKey(instrument.id, -1);
+      const synth = engine.instruments.get(key);
+      if (synth && 'loadSysex' in synth) return synth as unknown as DX7Synth;
+      // Fallback: scan instruments map for DX7Synth with matching id
+      for (const [k, v] of engine.instruments) {
+        if ((k >>> 16) === instrument.id && v && 'loadSysex' in v) {
+          return v as unknown as DX7Synth;
+        }
+      }
+      return null;
     } catch { return null; }
   }, [instrument.id]);
 
@@ -90,16 +129,21 @@ export const DX7Controls: React.FC<DX7ControlsProps> = ({ instrument, onChange }
     setCurrentVoiceName(currentBank?.voices[voiceIndex] || `Voice ${voiceIndex + 1}`);
 
     const synth = getSynth();
-    if (synth?.selectVoice) {
-      synth.selectVoice(voiceIndex);
-    }
+    if (synth) synth.selectVoice(voiceIndex);
     onChange({ dx7: { ...configRef.current, program: voiceIndex, vcedPreset: undefined } });
   }, [currentBank, getSynth, onChange]);
 
-  // Load VCED preset
+  // Load VCED preset — call synth directly AND update state
   const loadVcedPreset = useCallback((name: string) => {
     setCurrentVoiceName(name);
+    const synth = getSynth();
+    if (synth) synth.loadVcedPreset(name);
     onChange({ dx7: { ...configRef.current, vcedPreset: name, bank: undefined, program: undefined } });
+  }, [getSynth, onChange]);
+
+  // Volume change
+  const handleVolumeChange = useCallback((v: number) => {
+    onChange({ volume: v });
   }, [onChange]);
 
   // File loading
@@ -108,7 +152,7 @@ export const DX7Controls: React.FC<DX7ControlsProps> = ({ instrument, onChange }
     const data = new Uint8Array(buffer);
     const synth = getSynth();
 
-    if ((data.length === 4104 || data.length === 4096) && synth?.loadSysex) {
+    if ((data.length === 4104 || data.length === 4096) && synth) {
       if (data.length === 4096) {
         const sysex = new Uint8Array(4104);
         sysex[0] = 0xF0; sysex[1] = 0x43; sysex[2] = 0x00;
@@ -134,6 +178,8 @@ export const DX7Controls: React.FC<DX7ControlsProps> = ({ instrument, onChange }
     });
   }, []);
 
+  const volume = instrument.volume ?? -6;
+
   return (
     <div className="p-3 space-y-3 text-xs">
       {/* Current Voice Display */}
@@ -147,6 +193,22 @@ export const DX7Controls: React.FC<DX7ControlsProps> = ({ instrument, onChange }
         </div>
         <div className="text-amber-500/40 text-[10px] mt-1">
           {currentBank ? `Bank: ${currentBank.file.replace('.syx', '').toUpperCase()} • Voice ${selectedVoice + 1}/32` : 'Select a bank below'}
+        </div>
+      </div>
+
+      {/* Master Controls */}
+      <div className="border border-ft2-border rounded p-2">
+        <div className="text-ft2-highlight text-[10px] font-bold uppercase mb-2 tracking-wider">Master</div>
+        <div className="space-y-2">
+          <ParamSlider
+            label="Volume"
+            value={volume}
+            min={-40}
+            max={6}
+            step={0.5}
+            displayValue={`${volume > 0 ? '+' : ''}${volume.toFixed(1)} dB`}
+            onChange={handleVolumeChange}
+          />
         </div>
       </div>
 
