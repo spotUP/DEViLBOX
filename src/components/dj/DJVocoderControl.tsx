@@ -264,7 +264,7 @@ export const DJVocoderControl: React.FC = () => {
         `}
         title="Hold to talk — release to let echo ring out"
       >
-        {!muted ? 'LIVE' : 'TALK'}
+        TALK
       </button>
 
       {/* Vocoder toggle — switches between clean mic and robot voice */}
