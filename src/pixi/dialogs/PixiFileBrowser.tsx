@@ -229,7 +229,7 @@ export const PixiFileBrowser: React.FC<PixiFileBrowserProps> = ({
         {nav.user && nav.isServerAvailable && (
           <SourceTab
             label="My Files"
-            icon="logo"
+            icon="cloud"
             active={fileSource === 'cloud'}
             onSelect={() => handleSourceChange('cloud')}
           />
@@ -237,7 +237,7 @@ export const PixiFileBrowser: React.FC<PixiFileBrowserProps> = ({
         {mode === 'load' && onLoadTrackerModule && (
           <SourceTab
             label="Modland"
-            icon="logo"
+            icon="globe"
             active={fileSource === 'modland'}
             onSelect={() => handleSourceChange('modland')}
           />
