@@ -24,10 +24,11 @@ export const DJVocoderControl: React.FC = () => {
   const presetName = useVocoderStore(s => s.presetName);
   const fxEnabled = useVocoderStore(s => s.fx.enabled);
   const fxPreset = useVocoderStore(s => s.fx.preset);
+  const globalPTT = useVocoderStore(s => s.pttActive);
   const [error, setError] = useState<string | null>(null);
   const [muted, setMuted] = useState(false);
-  const [duckingEnabled, setDuckingEnabled] = useState(false);
-  const [autoTuneEnabled, setAutoTuneEnabled] = useState(false);
+  const [duckingEnabled, setDuckingEnabled] = useState(true);
+  const [autoTuneEnabled, setAutoTuneEnabled] = useState(true);
   const autoTuneRef = useRef<VocoderAutoTune | null>(null);
   const [devices, setDevices] = useState<AudioInputDevice[]>([]);
   const [selectedDeviceId, setSelectedDeviceId] = useState<string>('');
@@ -251,18 +252,19 @@ export const DJVocoderControl: React.FC = () => {
       )}
 
       {/* Push-to-talk: always available — hold to speak, release to let echo ring out */}
+      {/* Highlights when either local PTT (pointer) or global PTT (Space key) is active */}
       <button
         onPointerDown={handlePTTDown}
         onPointerUp={handlePTTUp}
         onPointerLeave={handlePTTUp}
         className={`
           px-2 py-1 rounded text-[10px] font-bold transition-all select-none touch-none
-          ${!muted
+          ${!muted || globalPTT
             ? 'bg-green-600 text-white shadow-[0_0_8px_rgba(34,197,94,0.4)]'
             : 'bg-dark-bgTertiary hover:bg-dark-bgHover border border-dark-border text-text-muted'
           }
         `}
-        title="Hold to talk — release to let echo ring out"
+        title="Hold to talk (or press Space) — release to let echo ring out"
       >
         TALK
       </button>
