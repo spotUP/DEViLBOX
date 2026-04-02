@@ -598,7 +598,19 @@ export const useInstrumentStore = create<InstrumentStore>()(
             }
 
             if (updatedInstrument.synthType === 'DX7' && updatedInstrument.dx7 && updates.dx7) {
-              engine.updateComplexSynthParameters(id, updatedInstrument.dx7);
+              const dx7Updates = updates.dx7 as Record<string, unknown>;
+              if (dx7Updates.vcedPreset) {
+                // Load VCED preset on running synth without recreation
+                const instruments = (engine as any).instruments as Map<number, any>;
+                const key = (id << 16) | 0xFFFF;
+                const synth = instruments?.get(key);
+                if (synth?.loadVcedPreset) {
+                  synth.loadVcedPreset(dx7Updates.vcedPreset as string);
+                  return; // Handled
+                }
+              }
+              // Other dx7 changes — recreate synth
+              engine.invalidateInstrument(id);
               return; // Handled
             }
 

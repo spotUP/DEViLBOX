@@ -66,6 +66,8 @@ export const DJPlaylistPanel: React.FC<DJPlaylistPanelProps> = ({ onClose }) => 
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editName, setEditName] = useState('');
   const [dragIndex, setDragIndex] = useState<number | null>(null);
+  const [loadingTrackIndex, setLoadingTrackIndex] = useState<number | null>(null);
+  const [loadingDeckId, setLoadingDeckId] = useState<string | null>(null);
   const [isLoadingFile, setIsLoadingFile] = useState(false);
   const [showSortMenu, setShowSortMenu] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -248,6 +250,21 @@ export const DJPlaylistPanel: React.FC<DJPlaylistPanelProps> = ({ onClose }) => 
       input.click();
     },
     [loadSongToDeck],
+  );
+
+  /** Wrapper that shows inline loading state on the track row */
+  const loadTrackWithProgress = useCallback(
+    async (track: PlaylistTrack, deckId: 'A' | 'B' | 'C', index: number) => {
+      setLoadingTrackIndex(index);
+      setLoadingDeckId(deckId);
+      try {
+        await loadTrackToDeck(track, deckId);
+      } finally {
+        setLoadingTrackIndex(null);
+        setLoadingDeckId(null);
+      }
+    },
+    [loadTrackToDeck],
   );
 
   // ── Drag reorder ─────────────────────────────────────────────────────────
@@ -515,15 +532,17 @@ export const DJPlaylistPanel: React.FC<DJPlaylistPanelProps> = ({ onClose }) => 
                   onDragStart={() => handleDragStart(i)}
                   onDragOver={(e) => handleDragOver(e, i)}
                   onDragEnd={handleDragEnd}
-                  onDoubleClick={() => loadTrackToDeck(track, pickFreeDeck())}
+                  onDoubleClick={() => loadTrackWithProgress(track, pickFreeDeck(), i)}
                   className={`flex items-center gap-1.5 px-1.5 py-1 border-b border-white/[0.04] transition-colors group cursor-pointer ${
-                    dragIndex === i
-                      ? 'bg-accent-primary/10'
-                      : autoDJEnabled && i === autoDJCurrentIdx
-                        ? 'bg-green-900/20'
-                        : autoDJEnabled && i === autoDJNextIdx
-                          ? 'bg-blue-900/15'
-                          : 'hover:bg-white/[0.08]'
+                    loadingTrackIndex === i
+                      ? 'bg-cyan-900/20'
+                      : dragIndex === i
+                        ? 'bg-accent-primary/10'
+                        : autoDJEnabled && i === autoDJCurrentIdx
+                          ? 'bg-green-900/20'
+                          : autoDJEnabled && i === autoDJNextIdx
+                            ? 'bg-blue-900/15'
+                            : 'hover:bg-white/[0.08]'
                   }`}
                 >
                   <GripVertical
@@ -533,11 +552,15 @@ export const DJPlaylistPanel: React.FC<DJPlaylistPanelProps> = ({ onClose }) => 
                   <span className="text-xs font-mono text-text-muted/30 w-4 text-right shrink-0">
                     {i + 1}
                   </span>
-                  {track.played && (
+                  {loadingTrackIndex === i ? (
+                    <span className="text-cyan-400 text-[9px] shrink-0 animate-pulse" title={`Loading to deck ${loadingDeckId}`}>
+                      {loadingDeckId}
+                    </span>
+                  ) : track.played ? (
                     <span className="text-green-500/50 text-[9px] shrink-0" title="Played">P</span>
-                  )}
+                  ) : null}
                   <span className={`flex-1 text-sm font-mono truncate min-w-0 ${
-                    track.played ? 'text-text-muted/40' : 'text-text-secondary'
+                    loadingTrackIndex === i ? 'text-cyan-400' : track.played ? 'text-text-muted/40' : 'text-text-secondary'
                   }`}>
                     {track.trackName}
                   </span>
@@ -556,7 +579,7 @@ export const DJPlaylistPanel: React.FC<DJPlaylistPanelProps> = ({ onClose }) => 
                     <span className="text-xs font-mono text-text-muted/30 shrink-0">{formatDuration(track.duration)}</span>
                   )}
                   <button
-                    onClick={() => loadTrackToDeck(track, 'A')}
+                    onClick={() => loadTrackWithProgress(track, 'A', i)}
                     className="px-1 text-xs font-mono font-bold text-blue-400/70 hover:text-blue-300
                                opacity-0 group-hover:opacity-100 transition-opacity"
                     title="Deck 1"
@@ -564,7 +587,7 @@ export const DJPlaylistPanel: React.FC<DJPlaylistPanelProps> = ({ onClose }) => 
                     1
                   </button>
                   <button
-                    onClick={() => loadTrackToDeck(track, 'B')}
+                    onClick={() => loadTrackWithProgress(track, 'B', i)}
                     className="px-1 text-xs font-mono font-bold text-red-400/70 hover:text-red-300
                                opacity-0 group-hover:opacity-100 transition-opacity"
                     title="Deck 2"
@@ -573,7 +596,7 @@ export const DJPlaylistPanel: React.FC<DJPlaylistPanelProps> = ({ onClose }) => 
                   </button>
                   {useDJStore.getState().thirdDeckActive && (
                     <button
-                      onClick={() => loadTrackToDeck(track, 'C')}
+                      onClick={() => loadTrackWithProgress(track, 'C', i)}
                       className="px-1 text-xs font-mono font-bold text-emerald-400/70 hover:text-emerald-300
                                  opacity-0 group-hover:opacity-100 transition-opacity"
                       title="Deck 3"

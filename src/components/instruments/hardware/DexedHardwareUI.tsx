@@ -34,6 +34,7 @@ interface DexedUIModule {
   _dexed_ui_set_program: (program: number) => void;
   _dexed_ui_get_program: () => number;
   _dexed_ui_get_program_count: () => number;
+  _dexed_ui_get_voice_data: () => number;
   _dexed_ui_shutdown: () => void;
   _malloc: (size: number) => number;
   _free: (ptr: number) => void;
@@ -302,9 +303,9 @@ export const DexedHardwareUI: React.FC<DexedHardwareUIProps> = ({
           () => canvas.removeEventListener('wheel', onWheel)
         );
 
-        // Parameter callback: WASM UI knob → JS → audio worklet
+        // Parameter callback: WASM UI knob/program change → JS → audio engine
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (window as any)._dexedUIParamCallback = (paramId: number, normalizedValue: number) => {
+        (window as any)._dexedUIParamCallback = (paramId: number, _normalizedValue: number) => {
           if (!instrumentId) return;
           try {
             const engine = getToneEngine();
@@ -312,12 +313,22 @@ export const DexedHardwareUI: React.FC<DexedHardwareUIProps> = ({
             const instruments = (engine as any).instruments as Map<number, any>;
             const key = (instrumentId << 16) | 0xFFFF;
             const synth = instruments?.get(key);
-            if (synth?._worklet) {
-              synth._worklet.port.postMessage({
-                type: 'setParameter',
-                index: paramId,
-                value: normalizedValue,
-              });
+
+            if (paramId === -1) {
+              // Full UI update (program change or knob edit) — read voice data and send as VCED sysex
+              const voicePtr = m._dexed_ui_get_voice_data();
+              if (voicePtr && synth?.loadSysex) {
+                const vced = m.HEAPU8.slice(voicePtr, voicePtr + 155);
+                const sysex = new Uint8Array(163);
+                sysex[0] = 0xF0; sysex[1] = 0x43; sysex[2] = 0x00;
+                sysex[3] = 0x00; sysex[4] = 0x01; sysex[5] = 0x1B;
+                sysex.set(vced, 6);
+                let sum = 0;
+                for (let i = 0; i < 155; i++) sum += vced[i];
+                sysex[161] = (-sum) & 0x7F;
+                sysex[162] = 0xF7;
+                synth.loadSysex(sysex.buffer);
+              }
             }
           } catch { /* engine not ready */ }
         };
