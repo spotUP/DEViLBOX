@@ -1,12 +1,10 @@
 /**
  * PixiDJMixer — Center mixer panel matching DOM DJMixer layout:
- *   1. Filters (with bottom border)
- *   2. EQ + VU meters (with bottom border)
- *   3. Channel strips (with bottom border)
- *   4. Crossfader (with bottom border)
- *   5. Transition controls (with bottom border)
- *   6. Master + Cue
- *   7. Broadcast
+ *   1. EQ(A) | Fader(A) | VU(A) VU(B) | Fader(B) | EQ(B) — single horizontal row
+ *   2. Crossfader (with bottom border)
+ *   3. Transition controls (with bottom border)
+ *   4. Master + Cue
+ *   5. Broadcast
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -64,20 +62,14 @@ export const PixiDJMixer: React.FC = () => {
         height: '100%',
         flexDirection: 'column',
         alignItems: 'center',
-        padding: 8,
-        gap: 8,
+        padding: 4,
+        gap: 4,
       }}
     >
       <pixiGraphics draw={drawBg} layout={{ position: 'absolute', width: MIXER_WIDTH, height: '100%' }} />
 
-      {/* Row 1: Filters (matches DOM) */}
-      <MixerFilterSection />
-
-      {/* Row 2: EQ + VU meters (matches DOM) */}
-      <MixerEQSection />
-
-      {/* Row 3: Channel strips (matches DOM) */}
-      <MixerChannelStrips />
+      {/* Row 1: EQ(A) | Fader(A) | VU(A,B) | Fader(B) | EQ(B) — single horizontal row */}
+      <MixerMainRow />
 
       {/* Row 4: Crossfader (matches DOM) */}
       <MixerCrossfader />
@@ -97,7 +89,46 @@ export const PixiDJMixer: React.FC = () => {
   );
 };
 
-// ─── Filter Section ─────────────────────────────────────────────────────────
+// ─── EQ Band Row ────────────────────────────────────────────────────────────
+
+/** EQ knob + kill button for one band. side controls kill button placement. */
+const EQBandRow: React.FC<{
+  deckId: 'A' | 'B' | 'C';
+  band: 'high' | 'mid' | 'low';
+  label: string;
+  value: number;
+  isKilled: boolean;
+  side: 'left' | 'right';
+}> = ({ deckId, band, label, value, isKilled, side }) => {
+  const handleKillToggle = useCallback(() => {
+    const killKey = `eq${band.charAt(0).toUpperCase() + band.slice(1)}Kill` as 'eqLowKill' | 'eqMidKill' | 'eqHighKill';
+    const current = useDJStore.getState().decks[deckId][killKey];
+    DJActions.setDeckEQKill(deckId, band, !current);
+  }, [deckId, band]);
+
+  const killBtn = (
+    <PixiButton
+      label="K"
+      variant={isKilled ? 'ft2' : 'ghost'}
+      color={isKilled ? 'red' : undefined}
+      size="sm"
+      active={isKilled}
+      width={20}
+      height={20}
+      onClick={handleKillToggle}
+    />
+  );
+
+  return (
+    <pixiContainer layout={{ flexDirection: 'row', gap: 2, alignItems: 'center' }}>
+      {side === 'left' && killBtn}
+      <PixiKnob value={value} min={-24} max={6} defaultValue={0} size="sm" label={label} bipolar onChange={(v) => DJActions.setDeckEQ(deckId, band, v)} />
+      {side === 'right' && killBtn}
+    </pixiContainer>
+  );
+};
+
+// ─── Deck EQ Column ─────────────────────────────────────────────────────────
 
 /** Returns filter mode label and whether the filter is active */
 function getFilterMode(position: number): { text: string; active: boolean } {
@@ -106,154 +137,100 @@ function getFilterMode(position: number): { text: string; active: boolean } {
   return { text: 'LPF', active: true };
 }
 
-const MixerFilterSection: React.FC = () => {
+/** Filter knob on top, then HI/MID/LO EQ bands with kill buttons */
+const DeckEQColumn: React.FC<{
+  deckId: 'A' | 'B' | 'C';
+  side: 'left' | 'right';
+}> = ({ deckId, side }) => {
   const theme = usePixiTheme();
-  const filterA = useDJStore(s => s.decks.A.filterPosition);
-  const filterB = useDJStore(s => s.decks.B.filterPosition);
-  const filterC = useDJStore(s => s.decks.C.filterPosition);
-  const thirdDeck = useDJStore(s => s.thirdDeckActive);
+  const filter = useDJStore(s => s.decks[deckId].filterPosition);
+  const eqHigh = useDJStore(s => s.decks[deckId].eqHigh);
+  const eqMid = useDJStore(s => s.decks[deckId].eqMid);
+  const eqLow = useDJStore(s => s.decks[deckId].eqLow);
+  const killHigh = useDJStore(s => s.decks[deckId].eqHighKill);
+  const killMid = useDJStore(s => s.decks[deckId].eqMidKill);
+  const killLow = useDJStore(s => s.decks[deckId].eqLowKill);
 
-  const filterModeA = getFilterMode(filterA);
-  const filterModeB = getFilterMode(filterB);
-  const filterModeC = getFilterMode(filterC);
-
-  const drawBorder = useCallback((g: GraphicsType) => {
-    g.clear();
-    g.rect(0, 0, MIXER_WIDTH - 16, 1);
-    g.fill({ color: theme.border.color, alpha: 0.2 });
-  }, [theme]);
+  const filterMode = getFilterMode(filter);
 
   return (
-    <pixiContainer layout={{ flexDirection: 'column', gap: 4, alignItems: 'center' }}>
-      <PixiLabel text="FILTER" size="xs" color="textMuted" />
-
-      <pixiContainer layout={{ flexDirection: 'row', gap: 16 }}>
-        {/* Deck A Filter: -1 (HPF) to 0 (off) to +1 (LPF) */}
-        <pixiContainer layout={{ flexDirection: 'column', gap: 4, alignItems: 'center' }}>
-          <PixiLabel text="A" size="xs" color="textMuted" />
-          <PixiKnob value={filterA} min={-1} max={1} defaultValue={0} size="sm" label="FLT" color={0xaa44ff} bipolar onChange={(v) => DJActions.setDeckFilter('A', v)} />
-          <PixiLabel text={filterModeA.text} size="xs" color="custom" customColor={filterModeA.active ? 0xaa44ff : theme.textMuted.color} customAlpha={filterModeA.active ? 1 : 0.5} />
-        </pixiContainer>
-
-        {/* Deck B Filter */}
-        <pixiContainer layout={{ flexDirection: 'column', gap: 4, alignItems: 'center' }}>
-          <PixiLabel text="B" size="xs" color="textMuted" />
-          <PixiKnob value={filterB} min={-1} max={1} defaultValue={0} size="sm" label="FLT" color={0xaa44ff} bipolar onChange={(v) => DJActions.setDeckFilter('B', v)} />
-          <PixiLabel text={filterModeB.text} size="xs" color="custom" customColor={filterModeB.active ? 0xaa44ff : theme.textMuted.color} customAlpha={filterModeB.active ? 1 : 0.5} />
-        </pixiContainer>
-
-        {/* Deck C Filter */}
-        {thirdDeck && (
-          <pixiContainer layout={{ flexDirection: 'column', gap: 4, alignItems: 'center' }}>
-            <PixiLabel text="C" size="xs" color="textMuted" />
-            <PixiKnob value={filterC} min={-1} max={1} defaultValue={0} size="sm" label="FLT" color={0xaa44ff} bipolar onChange={(v) => DJActions.setDeckFilter('C', v)} />
-            <PixiLabel text={filterModeC.text} size="xs" color="custom" customColor={filterModeC.active ? 0xaa44ff : theme.textMuted.color} customAlpha={filterModeC.active ? 1 : 0.5} />
-          </pixiContainer>
-        )}
-      </pixiContainer>
-
-      <pixiGraphics draw={drawBorder} layout={{ width: MIXER_WIDTH - 16, height: 1 }} />
+    <pixiContainer layout={{ flexDirection: 'column', gap: 2, alignItems: 'center' }}>
+      {/* Filter knob on top */}
+      <PixiKnob value={filter} min={-1} max={1} defaultValue={0} size="sm" label="FLT" color={0xaa44ff} bipolar onChange={(v) => DJActions.setDeckFilter(deckId, v)} />
+      <PixiLabel text={filterMode.text} size="xs" color="custom" customColor={filterMode.active ? 0xaa44ff : theme.textMuted.color} customAlpha={filterMode.active ? 1 : 0.5} />
+      {/* EQ bands */}
+      <EQBandRow deckId={deckId} band="high" label="HI" value={eqHigh} isKilled={killHigh} side={side} />
+      <EQBandRow deckId={deckId} band="mid" label="MID" value={eqMid} isKilled={killMid} side={side} />
+      <EQBandRow deckId={deckId} band="low" label="LO" value={eqLow} isKilled={killLow} side={side} />
     </pixiContainer>
   );
 };
 
-// ─── EQ Section ─────────────────────────────────────────────────────────────
+// ─── Channel Fader ──────────────────────────────────────────────────────────
 
-/** EQ knob + kill button row for one band */
-const EQBandRow: React.FC<{
-  deckId: 'A' | 'B' | 'C';
-  band: 'high' | 'mid' | 'low';
-  label: string;
-  value: number;
-  isKilled: boolean;
-}> = ({ deckId, band, label, value, isKilled }) => {
-  const handleKillToggle = useCallback(() => {
-    const killKey = `eq${band.charAt(0).toUpperCase() + band.slice(1)}Kill` as 'eqLowKill' | 'eqMidKill' | 'eqHighKill';
-    const current = useDJStore.getState().decks[deckId][killKey];
-    DJActions.setDeckEQKill(deckId, band, !current);
-  }, [deckId, band]);
+const ChannelFader: React.FC<{ deckId: 'A' | 'B' | 'C'; label: string }> = ({ deckId, label }) => {
+  const theme = usePixiTheme();
+  const volume = useDJStore(s => s.decks[deckId].volume);
 
   return (
-    <pixiContainer layout={{ flexDirection: 'row', gap: 2, alignItems: 'center' }}>
-      <PixiKnob value={value} min={-24} max={6} defaultValue={0} size="sm" label={label} bipolar onChange={(v) => DJActions.setDeckEQ(deckId, band, v)} />
-      <PixiButton
-        label="K"
-        variant={isKilled ? 'ft2' : 'ghost'}
-        color={isKilled ? 'red' : undefined}
-        size="sm"
-        active={isKilled}
-        width={20}
-        height={20}
-        onClick={handleKillToggle}
+    <pixiContainer layout={{ flexDirection: 'column', gap: 2, alignItems: 'center' }}>
+      <PixiLabel text={label} size="xs" color="textMuted" />
+      <PixiSlider
+        value={volume ?? 0.8}
+        min={0}
+        max={1}
+        orientation="vertical"
+        length={100}
+        onChange={(v) => DJActions.setDeckVolume(deckId, v)}
+      />
+      <pixiBitmapText
+        text={volumeToDb(volume ?? 0.8)}
+        style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 9, fill: theme.textMuted.color }}
       />
     </pixiContainer>
   );
 };
 
-const MixerEQSection: React.FC = () => {
+// ─── Main Row (EQ + Faders + VU) ────────────────────────────────────────────
+
+const MixerMainRow: React.FC = () => {
   const theme = usePixiTheme();
-  const eqHighA = useDJStore(s => s.decks.A.eqHigh);
-  const eqMidA = useDJStore(s => s.decks.A.eqMid);
-  const eqLowA = useDJStore(s => s.decks.A.eqLow);
-  const eqHighB = useDJStore(s => s.decks.B.eqHigh);
-  const eqMidB = useDJStore(s => s.decks.B.eqMid);
-  const eqLowB = useDJStore(s => s.decks.B.eqLow);
-  const eqHighC = useDJStore(s => s.decks.C.eqHigh);
-  const eqMidC = useDJStore(s => s.decks.C.eqMid);
-  const eqLowC = useDJStore(s => s.decks.C.eqLow);
-  const killHighA = useDJStore(s => s.decks.A.eqHighKill);
-  const killMidA = useDJStore(s => s.decks.A.eqMidKill);
-  const killLowA = useDJStore(s => s.decks.A.eqLowKill);
-  const killHighB = useDJStore(s => s.decks.B.eqHighKill);
-  const killMidB = useDJStore(s => s.decks.B.eqMidKill);
-  const killLowB = useDJStore(s => s.decks.B.eqLowKill);
-  const killHighC = useDJStore(s => s.decks.C.eqHighKill);
-  const killMidC = useDJStore(s => s.decks.C.eqMidKill);
-  const killLowC = useDJStore(s => s.decks.C.eqLowKill);
   const thirdDeck = useDJStore(s => s.thirdDeckActive);
 
   const drawBorder = useCallback((g: GraphicsType) => {
     g.clear();
-    g.rect(0, 0, MIXER_WIDTH - 16, 1);
+    g.rect(0, 0, MIXER_WIDTH - 8, 1);
     g.fill({ color: theme.border.color, alpha: 0.2 });
   }, [theme]);
 
   return (
-    <pixiContainer layout={{ flexDirection: 'column', gap: 4, alignItems: 'center' }}>
-      <PixiLabel text="EQ" size="xs" color="textMuted" />
+    <pixiContainer layout={{ flexDirection: 'column', gap: 4, alignItems: 'center', width: '100%', flexShrink: 0 }}>
+      <pixiContainer layout={{ flexDirection: 'row', alignItems: 'stretch', gap: 4, width: '100%', flexShrink: 0, justifyContent: 'center' }}>
+        {/* Deck A: EQ column (kill buttons on left/outside) */}
+        <DeckEQColumn deckId="A" side="left" />
 
-      <pixiContainer layout={{ flexDirection: 'row', gap: 16 }}>
-        {/* Deck A EQ — dB range: -24 to +6 */}
-        <pixiContainer layout={{ flexDirection: 'column', gap: 4, alignItems: 'center' }}>
-          <PixiLabel text="A" size="xs" color="textMuted" />
-          <EQBandRow deckId="A" band="high" label="HI" value={eqHighA} isKilled={killHighA} />
-          <EQBandRow deckId="A" band="mid" label="MID" value={eqMidA} isKilled={killMidA} />
-          <EQBandRow deckId="A" band="low" label="LO" value={eqLowA} isKilled={killLowA} />
-        </pixiContainer>
+        {/* Deck A fader */}
+        <ChannelFader deckId="A" label="1" />
 
-        {/* VU Meters in center (matching DOM layout: EQ | VU | EQ) */}
+        {/* Center VU meters */}
         <MixerVUMeters />
 
-        {/* Deck B EQ */}
-        <pixiContainer layout={{ flexDirection: 'column', gap: 4, alignItems: 'center' }}>
-          <PixiLabel text="B" size="xs" color="textMuted" />
-          <EQBandRow deckId="B" band="high" label="HI" value={eqHighB} isKilled={killHighB} />
-          <EQBandRow deckId="B" band="mid" label="MID" value={eqMidB} isKilled={killMidB} />
-          <EQBandRow deckId="B" band="low" label="LO" value={eqLowB} isKilled={killLowB} />
-        </pixiContainer>
+        {/* Deck B fader */}
+        <ChannelFader deckId="B" label="2" />
 
-        {/* Deck C EQ */}
+        {/* Deck B: EQ column (kill buttons on right/outside) */}
+        <DeckEQColumn deckId="B" side="right" />
+
+        {/* Deck C if active */}
         {thirdDeck && (
-          <pixiContainer layout={{ flexDirection: 'column', gap: 4, alignItems: 'center' }}>
-            <PixiLabel text="C" size="xs" color="textMuted" />
-            <EQBandRow deckId="C" band="high" label="HI" value={eqHighC} isKilled={killHighC} />
-            <EQBandRow deckId="C" band="mid" label="MID" value={eqMidC} isKilled={killMidC} />
-            <EQBandRow deckId="C" band="low" label="LO" value={eqLowC} isKilled={killLowC} />
-          </pixiContainer>
+          <>
+            <ChannelFader deckId="C" label="3" />
+            <DeckEQColumn deckId="C" side="right" />
+          </>
         )}
       </pixiContainer>
 
-      <pixiGraphics draw={drawBorder} layout={{ width: MIXER_WIDTH - 16, height: 1 }} />
+      <pixiGraphics draw={drawBorder} layout={{ width: MIXER_WIDTH - 8, height: 1 }} />
     </pixiContainer>
   );
 };
@@ -374,83 +351,6 @@ const MixerVUMeters: React.FC = () => {
         <PixiLabel text="B" size="xs" color="textMuted" />
         {thirdDeck && <PixiLabel text="C" size="xs" color="textMuted" />}
       </pixiContainer>
-    </pixiContainer>
-  );
-};
-
-// ─── Channel Strips ─────────────────────────────────────────────────────────
-
-const MixerChannelStrips: React.FC = () => {
-  const theme = usePixiTheme();
-  const volumeA = useDJStore(s => s.decks.A.volume);
-  const volumeB = useDJStore(s => s.decks.B.volume);
-  const volumeC = useDJStore(s => s.decks.C.volume);
-  const thirdDeck = useDJStore(s => s.thirdDeckActive);
-
-  const drawBorder = useCallback((g: GraphicsType) => {
-    g.clear();
-    g.rect(0, 0, MIXER_WIDTH - 16, 1);
-    g.fill({ color: theme.border.color, alpha: 0.2 });
-  }, [theme]);
-
-  return (
-    <pixiContainer layout={{ flexDirection: 'column', gap: 4, alignItems: 'center' }}>
-      <pixiContainer layout={{ flexDirection: 'row', gap: 24, alignItems: 'center' }}>
-        {/* Channel A fader */}
-        <pixiContainer layout={{ flexDirection: 'column', gap: 4, alignItems: 'center' }}>
-          <PixiLabel text="1" size="xs" color="textMuted" />
-          <PixiSlider
-            value={volumeA ?? 0.8}
-            min={0}
-            max={1}
-            orientation="vertical"
-            length={100}
-            onChange={(v) => DJActions.setDeckVolume('A', v)}
-          />
-          <pixiBitmapText
-            text={volumeToDb(volumeA ?? 0.8)}
-            style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 9, fill: theme.textMuted.color }}
-          />
-        </pixiContainer>
-
-        {/* Channel B fader */}
-        <pixiContainer layout={{ flexDirection: 'column', gap: 4, alignItems: 'center' }}>
-          <PixiLabel text="2" size="xs" color="textMuted" />
-          <PixiSlider
-            value={volumeB ?? 0.8}
-            min={0}
-            max={1}
-            orientation="vertical"
-            length={100}
-            onChange={(v) => DJActions.setDeckVolume('B', v)}
-          />
-          <pixiBitmapText
-            text={volumeToDb(volumeB ?? 0.8)}
-            style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 9, fill: theme.textMuted.color }}
-          />
-        </pixiContainer>
-
-        {/* Channel C fader */}
-        {thirdDeck && (
-          <pixiContainer layout={{ flexDirection: 'column', gap: 4, alignItems: 'center' }}>
-            <PixiLabel text="3" size="xs" color="textMuted" />
-            <PixiSlider
-              value={volumeC ?? 0.8}
-              min={0}
-              max={1}
-              orientation="vertical"
-              length={100}
-              onChange={(v) => DJActions.setDeckVolume('C', v)}
-            />
-            <pixiBitmapText
-              text={volumeToDb(volumeC ?? 0.8)}
-              style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 9, fill: theme.textMuted.color }}
-            />
-          </pixiContainer>
-        )}
-      </pixiContainer>
-
-      <pixiGraphics draw={drawBorder} layout={{ width: MIXER_WIDTH - 16, height: 1 }} />
     </pixiContainer>
   );
 };
@@ -779,16 +679,22 @@ const MixerCueSection: React.FC = () => {
         defaultValue={1}
         onChange={handleCueVolumeChange}
       />
-      <PixiKnob
-        value={cueMix}
-        min={0}
-        max={1}
-        size="sm"
-        label="MIX"
-        color={0x66ccff}
-        defaultValue={0.5}
-        onChange={handleCueMixChange}
-      />
+      {/* Cue/Master crossfader — horizontal for quick headphone blend */}
+      <pixiContainer layout={{ flexDirection: 'column', gap: 1, alignItems: 'center', width: 80 }}>
+        <pixiContainer layout={{ flexDirection: 'row', justifyContent: 'space-between', width: 80 }}>
+          <PixiLabel text="CUE" size="xs" color="textMuted" />
+          <PixiLabel text="MST" size="xs" color="textMuted" />
+        </pixiContainer>
+        <PixiSlider
+          value={cueMix}
+          min={0}
+          max={1}
+          orientation="horizontal"
+          length={76}
+          detent={0.5}
+          onChange={handleCueMixChange}
+        />
+      </pixiContainer>
       {/* PFL buttons with headphone label (matches DOM) */}
       <pixiContainer layout={{ flexDirection: 'row', gap: 3, alignItems: 'center' }}>
         <PixiLabel text="PFL" size="xs" color="textMuted" />
