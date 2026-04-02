@@ -21,6 +21,7 @@ import { getDJEngine } from '@engine/dj/DJEngine';
 import * as DJActions from '@engine/dj/DJActions';
 import { ExternalLink, SkipForward, Shuffle, Pause, Play, List, Maximize, Minimize, Music, Zap } from 'lucide-react';
 import { useUIStore } from '@stores/useUIStore';
+import { VIEW_OPTIONS, switchView } from '@/constants/viewOptions';
 import { useDJStore } from '@stores/useDJStore';
 import { useTransportStore } from '@stores/useTransportStore';
 import { useSettingsStore } from '@stores/useSettingsStore';
@@ -390,10 +391,21 @@ export const VJControls: React.FC<VJControlsProps> = ({
           showControls ? 'opacity-100' : 'opacity-0'
         }`}
       >
-        {/* Top bar: view selector + preset name + layer switcher */}
+        {/* Top bar: view switcher + preset name + counter */}
         <div className="absolute top-0 left-0 right-0 pointer-events-auto bg-gradient-to-b from-black/70 to-transparent p-4">
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2 flex-1 mr-4 min-w-0">
+            <div className="flex items-center gap-3 flex-1 mr-4 min-w-0">
+              {/* View switcher — since NavBar is hidden in VJ fullscreen mode */}
+              <select
+                value="vj"
+                onChange={(e) => switchView(e.target.value, 'vj')}
+                className="bg-white/10 text-white text-xs border border-white/20 rounded px-2 py-1 outline-none cursor-pointer"
+                title="Switch view"
+              >
+                {VIEW_OPTIONS.map((v) => (
+                  <option key={v.value} value={v.value} className="bg-gray-900 text-white">{v.label}</option>
+                ))}
+              </select>
               <div className="text-white/90 text-sm font-mono truncate">
                 {currentName}
               </div>
