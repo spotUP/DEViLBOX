@@ -70,26 +70,6 @@ export const KNOB_BANKS: Record<KnobBankMode, KnobAssignment[]> = {
     { cc: 76, param: 'synare.sweepAmount', label: 'Sweep' },
     { cc: 77, param: 'synare.sweepTime', label: 'Swp Time' },
   ],
-  'Dexed': [
-    { cc: 70, param: 'dexed.algorithm', label: 'Algorithm' },
-    { cc: 71, param: 'dexed.feedback', label: 'Feedback' },
-    { cc: 72, param: 'dexed.op1Level', label: 'Op1 Lvl' },
-    { cc: 73, param: 'dexed.op1Coarse', label: 'Op1 Coarse' },
-    { cc: 74, param: 'dexed.lfoSpeed', label: 'LFO Spd' },
-    { cc: 75, param: 'dexed.lfoPitchMod', label: 'LFO Pitch' },
-    { cc: 76, param: 'dexed.lfoAmpMod', label: 'LFO Amp' },
-    { cc: 77, param: 'dexed.transpose', label: 'Transpose' },
-  ],
-  'OBXd': [
-    { cc: 70, param: 'obxd.osc1Level', label: 'Osc1 Lvl' },
-    { cc: 71, param: 'obxd.osc2Level', label: 'Osc2 Lvl' },
-    { cc: 72, param: 'obxd.filterCutoff', label: 'Cutoff' },
-    { cc: 73, param: 'obxd.filterReso', label: 'Reso' },
-    { cc: 74, param: 'obxd.filterEnv', label: 'Flt Env' },
-    { cc: 75, param: 'obxd.ampAttack', label: 'Attack' },
-    { cc: 76, param: 'obxd.ampDecay', label: 'Decay' },
-    { cc: 77, param: 'obxd.volume', label: 'Volume' },
-  ],
   'SpaceLaser': [
     { cc: 70, param: 'spacelaser.startFreq', label: 'Start Hz' },
     { cc: 71, param: 'spacelaser.endFreq', label: 'End Hz' },
@@ -268,14 +248,6 @@ export const JOYSTICK_MAP: Partial<Record<KnobBankMode, JoystickMapping>> = {
     x: { param: 'synare.filterCutoff', min: 20, max: 20000, curve: 'log' },
     y: { param: 'synare.filterEnvMod', min: 0, max: 100, curve: 'linear' },
   },
-  'Dexed': {
-    x: { param: 'dexed.lfoPitchMod', min: 0, max: 99, curve: 'linear' },
-    y: { param: 'dexed.lfoAmpMod', min: 0, max: 99, curve: 'linear' },
-  },
-  'OBXd': {
-    x: { param: 'obxd.filterCutoff', min: 0, max: 1, curve: 'linear' },
-    y: { param: 'obxd.filterReso', min: 0, max: 1, curve: 'linear' },
-  },
   'SpaceLaser': {
     x: { param: 'spacelaser.fmAmount', min: 0, max: 100, curve: 'linear' },
     y: { param: 'spacelaser.filterCutoff', min: 20, max: 20000, curve: 'log' },
@@ -310,12 +282,6 @@ export function getKnobBankForSynth(synthType: SynthType): KnobBankMode | null {
 
   // Synare percussion
   if (synthType === 'Synare') return 'Synare';
-
-  // Dexed DX7
-  if (synthType === 'Dexed' || synthType === 'DexedBridge') return 'Dexed';
-
-  // OBXd
-  if (synthType === 'OBXd') return 'OBXd';
 
   // SpaceLaser
   if (synthType === 'SpaceLaser') return 'SpaceLaser';

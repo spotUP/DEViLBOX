@@ -10,7 +10,7 @@ import { SkipForward, Shuffle, SlidersHorizontal, Zap } from 'lucide-react';
 import { useDJStore, type AutoDJStatus } from '@/stores/useDJStore';
 import { useDJPlaylistStore } from '@/stores/useDJPlaylistStore';
 import { enableAutoDJ, disableAutoDJ, skipAutoDJ } from '@/engine/dj/DJActions';
-import { analyzePlaylist, playlistNeedsAnalysis, type AnalysisProgress } from '@/engine/dj/DJPlaylistAnalyzer';
+import { analyzePlaylist, playlistNeedsAnalysis, type AnalysisProgress, type ModlandFixCandidate } from '@/engine/dj/DJPlaylistAnalyzer';
 
 const STATUS_LABELS: Record<AutoDJStatus, string> = {
   idle: 'OFF',
@@ -75,17 +75,38 @@ export const DJAutoDJPanel: React.FC<DJAutoDJPanelProps> = ({ onClose }) => {
     ? activePlaylist.tracks.filter(t => t.bpm > 0 && t.musicalKey).length
     : 0;
 
+  // 404 fix dialog state
+  const [fixDialog, setFixDialog] = useState<{
+    trackName: string;
+    originalPath: string;
+    candidates: ModlandFixCandidate[];
+    resolve: (path: string | null) => void;
+  } | null>(null);
+
+  const handleFixNeeded = useCallback(
+    (trackName: string, originalPath: string, candidates: ModlandFixCandidate[]): Promise<string | null> => {
+      return new Promise((resolve) => {
+        setFixDialog({ trackName, originalPath, candidates, resolve });
+      });
+    },
+    [],
+  );
+
   const handleAnalyze = useCallback(async () => {
     if (!activePlaylistId || analyzingRef.current) return;
     analyzingRef.current = true;
-    setAnalysisProgress({ current: 0, total: 1, trackName: 'Starting...', status: 'analyzing' });
+    setAnalysisProgress({ current: 0, total: 1, analyzed: 0, failed: 0, trackName: 'Starting...', status: 'analyzing' });
     try {
-      await analyzePlaylist(activePlaylistId, (p) => setAnalysisProgress({ ...p }));
+      await analyzePlaylist(
+        activePlaylistId,
+        (p) => setAnalysisProgress({ ...p }),
+        handleFixNeeded,
+      );
     } finally {
       analyzingRef.current = false;
       setAnalysisProgress(null);
     }
-  }, [activePlaylistId]);
+  }, [activePlaylistId, handleFixNeeded]);
 
   return (
     <div className="bg-dark-bgSecondary border border-dark-borderLight rounded-lg p-3 text-xs font-mono">
@@ -145,8 +166,10 @@ export const DJAutoDJPanel: React.FC<DJAutoDJPanelProps> = ({ onClose }) => {
           {analysisProgress ? (
             <div className="space-y-1">
               <div className="flex items-center justify-between text-[10px]">
-                <span className="text-cyan-400">Analyzing {analysisProgress.current}/{analysisProgress.total}</span>
-                <span className="text-text-tertiary truncate ml-2">{analysisProgress.trackName}</span>
+                <span className="text-cyan-400">{analysisProgress.current}/{analysisProgress.total}</span>
+                <span className="text-green-400 ml-1">{analysisProgress.analyzed} ok</span>
+                {analysisProgress.failed > 0 && <span className="text-red-400 ml-1">{analysisProgress.failed} fail</span>}
+                <span className="text-text-tertiary truncate ml-2 flex-1 text-right">{analysisProgress.trackName}</span>
               </div>
               <div className="h-1 bg-dark-bgTertiary rounded-full overflow-hidden">
                 <div
@@ -237,6 +260,36 @@ export const DJAutoDJPanel: React.FC<DJAutoDJPanelProps> = ({ onClose }) => {
           <SlidersHorizontal size={12} />
         </button>
       </div>
+
+      {/* 404 fix dialog — pick correct Modland match */}
+      {fixDialog && (
+        <div className="mt-3 border border-amber-700 bg-amber-900/10 rounded-md p-2">
+          <div className="text-[10px] text-amber-400 mb-1.5 font-bold">
+            404: "{fixDialog.trackName}" not found
+          </div>
+          <div className="text-[9px] text-text-tertiary mb-2 truncate">
+            {fixDialog.originalPath}
+          </div>
+          <div className="space-y-1 max-h-32 overflow-y-auto">
+            {fixDialog.candidates.map((c, i) => (
+              <button
+                key={i}
+                onClick={() => { fixDialog.resolve(c.full_path); setFixDialog(null); }}
+                className="w-full text-left px-2 py-1 rounded text-[10px] border border-dark-borderLight bg-dark-bgTertiary hover:bg-dark-bgHover hover:border-amber-600 transition-all"
+              >
+                <div className="text-text-primary truncate">{c.filename}</div>
+                <div className="text-text-tertiary truncate">{c.author} / {c.format}</div>
+              </button>
+            ))}
+          </div>
+          <button
+            onClick={() => { fixDialog.resolve(null); setFixDialog(null); }}
+            className="mt-1.5 w-full px-2 py-1 rounded text-[10px] border border-dark-borderLight bg-dark-bgTertiary text-text-tertiary hover:text-red-400 transition-all"
+          >
+            Skip this track
+          </button>
+        </div>
+      )}
     </div>
   );
 };

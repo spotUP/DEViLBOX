@@ -14,7 +14,7 @@
 
 import React, { useRef, useEffect, useState, useCallback } from 'react';
 import { getToneEngine } from '../../../engine/ToneEngine';
-import { OBXD_NATIVE_PRESETS } from '../../../engine/obxd/OBXdSynth';
+import { OBXD_NATIVE_PRESETS } from '../../../constants/oberheimPresets';
 
 // OBXf UI param string ID → OBXd audio worklet param index mapping
 // OBXf (OB-Xf fork) has ~80+ params with string IDs; OBXd audio WASM has 45 integer-indexed params

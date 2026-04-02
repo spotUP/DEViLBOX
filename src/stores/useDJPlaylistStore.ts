@@ -55,7 +55,7 @@ interface DJPlaylistState {
   removeTrack: (playlistId: string, index: number) => void;
   reorderTrack: (playlistId: string, fromIndex: number, toIndex: number) => void;
   sortTracks: (playlistId: string, sortedTracks: PlaylistTrack[]) => void;
-  updateTrackMeta: (playlistId: string, index: number, meta: Partial<Pick<PlaylistTrack, 'musicalKey' | 'energy' | 'bpm'>>) => void;
+  updateTrackMeta: (playlistId: string, index: number, meta: Partial<Pick<PlaylistTrack, 'musicalKey' | 'energy' | 'bpm' | 'duration' | 'fileName' | 'sourceUrl'>>) => void;
   importPlaylists: (playlists: DJPlaylist[]) => void;
 }
 
@@ -157,7 +157,7 @@ export const useDJPlaylistStore = create<DJPlaylistState>()(
         syncPlaylists();
       },
 
-      updateTrackMeta: (playlistId: string, index: number, meta: Partial<Pick<PlaylistTrack, 'musicalKey' | 'energy' | 'bpm'>>) => {
+      updateTrackMeta: (playlistId: string, index: number, meta: Partial<Pick<PlaylistTrack, 'musicalKey' | 'energy' | 'bpm' | 'duration' | 'fileName' | 'sourceUrl'>>) => {
         set((state) => {
           const p = state.playlists.find((pl) => pl.id === playlistId);
           if (p && index >= 0 && index < p.tracks.length) {

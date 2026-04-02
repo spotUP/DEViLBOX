@@ -203,11 +203,7 @@ export type SynthType =
   | 'FluidSynth'       // FluidSynth - SF2 SoundFont player (15 params)
   | 'Sfizz'            // Sfizz - SFZ sample player (12 params)
   | 'ZynAddSubFX'      // ZynAddSubFX - ADD/SUB/PAD mega-synth (70 params)
-  // JUCE WASM Synths
-  | 'Dexed'            // Yamaha DX7 FM Synthesizer (6-op FM)
-  | 'OBXd'             // Oberheim OB-X Analog Synthesizer
   // VST Bridge (dynamically registered WASM synths)
-  | 'DexedBridge'      // Dexed DX7 via VSTBridge (test/validation)
   | 'Vital'            // Vital Spectral Warping Wavetable Synthesizer
   | 'Odin2'            // Odin2 Semi-Modular Hybrid Synthesizer
   | 'Surge'            // Surge XT Hybrid Synthesizer

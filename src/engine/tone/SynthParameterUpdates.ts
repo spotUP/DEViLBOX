@@ -506,32 +506,6 @@ export function updateFurnaceParameters(ctx: SynthUpdateContext, instrumentId: n
 }
 
 /**
- * Update Dexed (DX7) parameters in real-time
- */
-export function updateDexedParameters(ctx: SynthUpdateContext, instrumentId: number, config: NonNullable<InstrumentConfig['dexed']>): void {
-  ctx.instruments.forEach((instrument, key) => {
-    if (ctx.instrumentIdFromKey(key) === instrumentId) {
-      if (instrument && typeof (instrument as unknown as { applyConfig?: unknown }).applyConfig === 'function') {
-        (instrument as unknown as { applyConfig: (config: unknown) => void }).applyConfig(config);
-      }
-    }
-  });
-}
-
-/**
- * Update OBXd (Oberheim) parameters in real-time
- */
-export function updateOBXdParameters(ctx: SynthUpdateContext, instrumentId: number, config: NonNullable<InstrumentConfig['obxd']>): void {
-  ctx.instruments.forEach((instrument, key) => {
-    if (ctx.instrumentIdFromKey(key) === instrumentId) {
-      if (instrument && typeof (instrument as unknown as { applyConfig?: unknown }).applyConfig === 'function') {
-        (instrument as unknown as { applyConfig: (config: unknown) => void }).applyConfig(config);
-      }
-    }
-  });
-}
-
-/**
  * Generic method to update complex synths that use the applyConfig pattern
  */
 export function updateComplexSynthParameters(ctx: SynthUpdateContext, instrumentId: number, config: unknown): void {

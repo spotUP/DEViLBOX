@@ -13,8 +13,6 @@ export { DubSirenControls } from './DubSirenControls';
 export { SpaceLaserControls } from './SpaceLaserControls';
 export { V2Controls } from './V2Controls';
 export { SynareControls } from './SynareControls';
-export { DexedControls } from './DexedControls';
-export { OBXdControls } from './OBXdControls';
 export { MdaEPianoControls } from './MdaEPianoControls';
 export { MdaJX10Controls } from './MdaJX10Controls';
 export { MdaDX10Controls } from './MdaDX10Controls';

@@ -74,8 +74,6 @@ import {
   createPinkTrombone,
   createDECtalk,
   createSynare,
-  createDexed,
-  createOBXd,
   createMdaEPiano,
   createMdaJX10,
   createMdaDX10,
@@ -381,15 +379,6 @@ export class InstrumentFactory {
 
       case 'WAM':
         instrument = createWAM(config);
-        break;
-
-      // JUCE WASM Synths
-      case 'Dexed':
-        instrument = createDexed(config);
-        break;
-
-      case 'OBXd':
-        instrument = createOBXd(config);
         break;
 
       // MDA Instrument Plugins

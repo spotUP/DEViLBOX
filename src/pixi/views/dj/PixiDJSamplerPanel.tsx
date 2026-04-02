@@ -95,7 +95,7 @@ function getSynthBadge(synthType: string): string {
   const badges: Record<string, string> = {
     TR808: '808', TR909: '909',
     Sam: 'SAM', DECtalk: 'DEC', V2Speech: 'V2S', PinkTrombone: 'PKT',
-    TB303: '303', Dexed: 'DX7', OBXd: 'OBX',
+    TB303: '303',
   };
   return badges[synthType] ?? 'SYN';
 }

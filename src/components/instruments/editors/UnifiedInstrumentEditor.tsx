@@ -71,16 +71,6 @@ function isSynareType(synthType: SynthType): boolean {
   return synthType === 'Synare';
 }
 
-/** Check if synth type is Dexed (DX7) */
-function isDexedType(synthType: SynthType): boolean {
-  return synthType === 'Dexed';
-}
-
-/** Check if synth type is OBXd (Oberheim) */
-function isOBXdType(synthType: SynthType): boolean {
-  return synthType === 'OBXd';
-}
-
 /** Check if synth type is HivelyTracker */
 function isHivelyType(synthType: SynthType): boolean {
   return synthType === 'HivelySynth';
@@ -157,8 +147,6 @@ function getEditorMode(synthType: SynthType): EditorMode {
   if (isSynareType(synthType)) return 'synare';
   if (isMAMEChipType(synthType)) return 'mamechip';
   if (isMAMEType(synthType)) return 'mame';
-  if (isDexedType(synthType)) return 'dexed';
-  if (isOBXdType(synthType)) return 'obxd';
   if (synthType === 'MdaEPiano') return 'mdaEPiano';
   if (synthType === 'MdaJX10') return 'mdaJX10';
   if (synthType === 'MdaDX10') return 'mdaDX10';

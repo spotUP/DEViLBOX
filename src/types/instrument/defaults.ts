@@ -47,8 +47,6 @@ import type {
   WAMConfig,
   V2Config,
   V2SpeechConfig,
-  DexedConfig,
-  OBXdConfig,
   RdPianoConfig,
   MAMEConfig,
   SuperColliderConfig,
@@ -253,8 +251,6 @@ export interface InstrumentConfig {
   // Buzzmachines
   buzzmachine?: BuzzmachineConfig;
   // JUCE WASM Synths
-  dexed?: DexedConfig;
-  obxd?: OBXdConfig;
   rdpiano?: RdPianoConfig;
   // MDA Instrument Plugins
   mdaEPiano?: import('../../engine/mda-epiano/MdaEPianoSynth').MdaEPianoConfig;
@@ -1293,95 +1289,6 @@ export const DEFAULT_FURNACE: FurnaceConfig = {
   macros: [],
   opMacros: Array.from({ length: 4 }, () => ({})),
   wavetables: [],
-};
-
-export const DEFAULT_DEXED: DexedConfig = {
-  algorithm: 0,
-  feedback: 0,
-  oscSync: true,
-  operators: Array.from({ length: 6 }, () => ({
-    level: 99,
-    coarse: 1,
-    fine: 0,
-    detune: 7,
-    mode: 'ratio' as const,
-    egRates: [99, 99, 99, 99] as [number, number, number, number],
-    egLevels: [99, 99, 99, 0] as [number, number, number, number],
-    breakPoint: 0,
-    leftDepth: 0,
-    rightDepth: 0,
-    leftCurve: 0,
-    rightCurve: 0,
-    rateScaling: 0,
-    ampModSens: 0,
-    velocitySens: 0,
-  })),
-  pitchEgRates: [99, 99, 99, 99],
-  pitchEgLevels: [50, 50, 50, 50],
-  lfoSpeed: 35,
-  lfoDelay: 0,
-  lfoPitchModDepth: 0,
-  lfoAmpModDepth: 0,
-  lfoSync: false,
-  lfoWave: 'triangle',
-  lfoPitchModSens: 0,
-  transpose: 0,
-  name: 'INIT VOICE',
-};
-
-export const DEFAULT_OBXD: OBXdConfig = {
-  osc1Waveform: 'saw',
-  osc1Octave: 0,
-  osc1Detune: 0,
-  osc1PulseWidth: 0.5,
-  osc1Level: 1,
-
-  osc2Waveform: 'saw',
-  osc2Octave: 0,
-  osc2Detune: 0.1,
-  osc2PulseWidth: 0.5,
-  osc2Level: 0.7,
-
-  oscSync: false,
-  oscXor: false,
-
-  filterCutoff: 0.7,
-  filterResonance: 0.3,
-  filterType: 'lp24',
-  filterEnvAmount: 0.5,
-  filterKeyTrack: 0,
-  filterVelocity: 0.3,
-
-  filterAttack: 0.01,
-  filterDecay: 0.3,
-  filterSustain: 0.3,
-  filterRelease: 0.3,
-
-  ampAttack: 0.01,
-  ampDecay: 0.2,
-  ampSustain: 0.7,
-  ampRelease: 0.3,
-
-  lfoRate: 0.2,
-  lfoWaveform: 'sine',
-  lfoDelay: 0,
-  lfoOscAmount: 0,
-  lfoFilterAmount: 0,
-  lfoAmpAmount: 0,
-  lfoPwAmount: 0,
-
-  masterVolume: 0.7,
-  voices: 8,
-  unison: false,
-  unisonDetune: 0.1,
-  portamento: 0,
-  panSpread: 0.3,
-  velocitySensitivity: 0.5,
-
-  noiseLevel: 0,
-  subOscLevel: 0,
-  subOscOctave: -1,
-  drift: 0.02,
 };
 
 export const DEFAULT_RDPIANO: RdPianoConfig = {

@@ -23,8 +23,6 @@ import {
   DEFAULT_STRING_MACHINE,
   DEFAULT_FORMANT_SYNTH,
   DEFAULT_WOBBLE_BASS,
-  DEFAULT_DEXED,
-  DEFAULT_OBXD,
   DEFAULT_DRUMKIT,
   DEFAULT_FURNACE,
 } from '@typedefs/instrument';
@@ -116,11 +114,13 @@ export function ensureCompleteInstrumentConfig(inst: InstrumentConfig): Instrume
     case 'Buzzmachine':
       result.buzzmachine = deepMerge(DEFAULT_BUZZMACHINE, inst.buzzmachine || {});
       break;
-    case 'Dexed':
-      result.dexed = deepMerge(DEFAULT_DEXED, inst.dexed || {});
+    case 'Dexed' as any:
+      result.synthType = 'DX7' as any;
+      delete (result as any).dexed;
       break;
-    case 'OBXd':
-      result.obxd = deepMerge(DEFAULT_OBXD, inst.obxd || {});
+    case 'OBXd' as any:
+      result.synthType = 'OBXf' as any;
+      delete (result as any).obxd;
       break;
     case 'DrumKit':
       result.drumKit = deepMerge(DEFAULT_DRUMKIT, inst.drumKit || {});
@@ -331,10 +331,8 @@ function hasIncompleteConfig(inst: InstrumentConfig): boolean {
       return !inst.dubSiren || !inst.dubSiren.reverb;
     case 'SpaceLaser':
       return !inst.spaceLaser;
-    case 'Dexed':
-      return !inst.dexed;
-    case 'OBXd':
-      return !inst.obxd;
+    case 'OBXd' as any:
+      return true;  // Always migrate OBXd → OBXf
     case 'DrumKit':
       return !inst.drumKit;
     case 'Furnace':

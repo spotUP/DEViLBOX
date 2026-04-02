@@ -265,8 +265,6 @@ export const useInstrumentStore = create<InstrumentStore>()(
         updates.v2 ||
         updates.wam ||
         updates.mame ||
-        updates.dexed ||
-        updates.obxd ||
         updates.rdpiano ||
         updates.drumKit ||
         updates.chiptuneModule ||
@@ -601,7 +599,6 @@ export const useInstrumentStore = create<InstrumentStore>()(
 
             // Zynthian WASM synths — all use DevilboxSynth.applyConfig() pattern
             const zynthianConfigMap: Record<string, string> = {
-              Dexed: 'dexed', OBXd: 'obxd',
               MdaEPiano: 'mdaEPiano', MdaJX10: 'mdaJX10', MdaDX10: 'mdaDX10',
               AMSynth: 'amsynth', RaffoSynth: 'raffo', CalfMono: 'calfMono',
               SetBfree: 'setbfree', SynthV1: 'synthv1', Monique: 'monique', VL1: 'vl1',
@@ -615,14 +612,9 @@ export const useInstrumentStore = create<InstrumentStore>()(
                 engine.invalidateInstrument(id);
                 return;
               }
-              // Dexed VCED presets require synth recreation (native SysEx loading)
-              if (zynthConfigKey === 'dexed' && (updates as any).dexedVcedPreset) {
-                engine.invalidateInstrument(id);
-                return;
-              }
-              // Native patch presets (OBXd, SynthV1, etc.) require synth recreation
+              // Native patch presets (SynthV1, etc.) require synth recreation
               const nativePatchKeys = [
-                'obxdNativePatch', 'synthv1NativePatch', 'calfMonoNativePatch',
+                'synthv1NativePatch', 'calfMonoNativePatch',
                 'talNativePatch', 'raffoNativePatch', 'setbfreeNativePatch',
               ];
               if (nativePatchKeys.some(k => (updates as any)[k])) {

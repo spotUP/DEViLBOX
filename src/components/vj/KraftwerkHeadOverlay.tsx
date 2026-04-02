@@ -22,9 +22,9 @@ const SceneWithAudio: React.FC = () => {
       <KraftwerkHead audioRef={audioRef} />
       <EffectComposer>
         <Bloom
-          intensity={1.0}
-          luminanceThreshold={0.2}
-          luminanceSmoothing={0.7}
+          intensity={1.2}
+          luminanceThreshold={0.15}
+          luminanceSmoothing={0.6}
           mipmapBlur
         />
       </EffectComposer>

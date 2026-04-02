@@ -11,7 +11,7 @@ import type { InstrumentConfig, EffectConfig } from '@typedefs/instrument';
 import type { GTUltraConfig } from '@typedefs/instrument/exotic';
 import {
   DEFAULT_FURNACE, DEFAULT_DUB_SIREN, DEFAULT_SPACE_LASER, DEFAULT_V2, DEFAULT_V2_SPEECH, DEFAULT_SYNARE,
-  DEFAULT_MAME_VFX, DEFAULT_MAME_DOC, DEFAULT_DEXED, DEFAULT_OBXD, DEFAULT_SAM,
+  DEFAULT_MAME_VFX, DEFAULT_MAME_DOC, DEFAULT_SAM,
   DEFAULT_HARMONIC_SYNTH as DEFAULT_HARMONIC_SYNTH_VAL,
   DEFAULT_HIVELY,
   DEFAULT_GTULTRA,
@@ -96,8 +96,6 @@ const SynareControls = lazy(() => import('../controls/SynareControls').then(m =>
 const MAMEControls = lazy(() => import('../controls/MAMEControls').then(m => ({ default: m.MAMEControls })));
 const ChipSynthControls = lazy(() => import('../controls/ChipSynthControls').then(m => ({ default: m.ChipSynthControls })));
 const CMIControls = lazy(() => import('../controls/CMIControls').then(m => ({ default: m.CMIControls })));
-const DexedControls = lazy(() => import('../controls/DexedControls').then(m => ({ default: m.DexedControls })));
-const OBXdControls = lazy(() => import('../controls/OBXdControls').then(m => ({ default: m.OBXdControls })));
 const MdaEPianoControls = lazy(() => import('../controls/MdaEPianoControls').then(m => ({ default: m.MdaEPianoControls })));
 const MdaJX10Controls = lazy(() => import('../controls/MdaJX10Controls').then(m => ({ default: m.MdaJX10Controls })));
 const MdaDX10Controls = lazy(() => import('../controls/MdaDX10Controls').then(m => ({ default: m.MdaDX10Controls })));
@@ -482,40 +480,6 @@ export const SynthTypeDispatcher: React.FC<SynthTypeDispatcherProps> = ({
     }
   }, [instrument.id]);
 
-  // Handle Dexed (DX7) config updates
-  const handleDexedChange = useCallback((updates: Partial<typeof instrument.dexed>) => {
-    const currentDexed = instrument.dexed || DEFAULT_DEXED;
-    const newConfig = { ...currentDexed, ...updates };
-    handleChange({
-      dexed: newConfig,
-    });
-
-    // Real-time update
-    try {
-      const engine = getToneEngine();
-      engine.updateDexedParameters(instrument.id, newConfig);
-    } catch {
-      // Ignored
-    }
-  }, [instrument.dexed, instrument.id, handleChange]);
-
-  // Handle OBXd (Oberheim) config updates
-  const handleOBXdChange = useCallback((updates: Partial<typeof instrument.obxd>) => {
-    const currentOBXd = instrument.obxd || DEFAULT_OBXD;
-    const newConfig = { ...currentOBXd, ...updates };
-    handleChange({
-      obxd: newConfig,
-    });
-
-    // Real-time update
-    try {
-      const engine = getToneEngine();
-      engine.updateOBXdParameters(instrument.id, newConfig);
-    } catch {
-      // Ignored
-    }
-  }, [instrument.obxd, instrument.id, handleChange]);
-
   // Handle MDA ePiano config updates
   const handleMdaEPianoChange = useCallback((updates: Partial<MdaEPianoConfig>) => {
     const currentConfig = instrument.mdaEPiano || DEFAULT_MDA_EPIANO;
@@ -627,7 +591,7 @@ export const SynthTypeDispatcher: React.FC<SynthTypeDispatcherProps> = ({
     if (!instrument?.id) return;
     const st = instrument.synthType || '';
     const needsPreInit = st.startsWith('MAME') ||
-      ['CZ101', 'CEM3394', 'SCSP', 'D50', 'Dexed', 'OBXd', 'MdaEPiano', 'MdaJX10', 'MdaDX10', 'ToneAM', 'RaffoSynth', 'CalfMono', 'SetBfree', 'SynthV1', 'TalNoizeMaker', 'Aeolus', 'FluidSynth', 'Sfizz', 'ZynAddSubFX', 'V2', 'TB303'].includes(st);
+      ['CZ101', 'CEM3394', 'SCSP', 'D50', 'MdaEPiano', 'MdaJX10', 'MdaDX10', 'ToneAM', 'RaffoSynth', 'CalfMono', 'SetBfree', 'SynthV1', 'TalNoizeMaker', 'Aeolus', 'FluidSynth', 'Sfizz', 'ZynAddSubFX', 'V2', 'TB303'].includes(st);
     if (!needsPreInit) return;
     (async () => {
       try {
@@ -2092,129 +2056,6 @@ export const SynthTypeDispatcher: React.FC<SynthTypeDispatcherProps> = ({
               onChange={handleMAMEChange}
             />
           </Suspense>
-        </div>
-      </div>
-    );
-  }
-
-  // ============================================================================
-  // DEXED (DX7) EDITOR
-  // ============================================================================
-  if (editorMode === 'dexed') {
-    const dexedConfig = deepMerge(DEFAULT_DEXED, instrument.dexed || {});
-    const hasHardware = hasHardwareUI(instrument.synthType);
-
-    return (
-      <div className="synth-editor-container bg-gradient-to-b from-[#1e1e1e] to-[#151515]">
-        <EditorHeader
-          instrument={instrument}
-          onChange={handleChange}
-          vizMode={vizMode}
-          onVizModeChange={setVizMode}
-          showHelpButton={false}
-          onBake={handleBake}
-          onBakePro={handleBakePro}
-          onUnbake={handleUnbake}
-          isBaked={isBaked}
-          isBaking={isBaking}
-          customHeaderControls={
-            hasHardware ? (
-              <button
-                onClick={() => setUIMode(uiMode === 'simple' ? 'hardware' : 'simple')}
-                className={`p-1.5 rounded transition-all flex items-center gap-1.5 px-2 ${
-                  uiMode === 'hardware'
-                    ? 'bg-accent-primary/20 text-accent-primary ring-1 ring-accent-primary/50'
-                    : 'bg-dark-bgTertiary text-text-muted hover:text-text-secondary border border-dark-borderLight'
-                }`}
-                title={uiMode === 'hardware' ? 'Switch to Simple Controls' : 'Switch to Hardware UI'}
-              >
-                {uiMode === 'hardware' ? <Cpu size={14} /> : <Monitor size={14} />}
-                <span className="text-[10px] font-bold uppercase">
-                  {uiMode === 'hardware' ? 'Hardware UI' : 'Simple UI'}
-                </span>
-              </button>
-            ) : undefined
-          }
-        />
-
-        <div className="synth-editor-content overflow-y-auto">
-          {uiMode === 'hardware' && hasHardware ? (
-            <HardwareUIWrapper
-              synthType={instrument.synthType}
-              parameters={(instrument.parameters || {}) as Record<string, number>}
-              instrumentId={instrument.id}
-              onParamChange={handleChipParamChange}
-            />
-          ) : (
-            <Suspense fallback={<LoadingControls />}>
-              <DexedControls
-                config={dexedConfig}
-                onChange={handleDexedChange}
-              />
-            </Suspense>
-          )}
-        </div>
-      </div>
-    );
-  }
-
-  // ============================================================================
-  // OBXd (OBERHEIM) EDITOR
-  // ============================================================================
-  if (editorMode === 'obxd') {
-    const obxdConfig = deepMerge(DEFAULT_OBXD, instrument.obxd || {});
-    const hasHardware = hasHardwareUI(instrument.synthType);
-
-    return (
-      <div className="synth-editor-container bg-gradient-to-b from-[#1e1e1e] to-[#151515]">
-        {/* Use common header with visualization */}
-        <EditorHeader
-          instrument={instrument}
-          onChange={handleChange}
-          vizMode={vizMode}
-          onVizModeChange={setVizMode}
-          showHelpButton={false}
-          onBake={handleBake}
-          onBakePro={handleBakePro}
-          onUnbake={handleUnbake}
-          isBaked={isBaked}
-          isBaking={isBaking}
-          customHeaderControls={
-            hasHardware ? (
-              <button
-                onClick={() => setUIMode(uiMode === 'simple' ? 'hardware' : 'simple')}
-                className={`p-1.5 rounded transition-all flex items-center gap-1.5 px-2 ${
-                  uiMode === 'hardware'
-                    ? 'bg-accent-primary/20 text-accent-primary ring-1 ring-accent-primary/50'
-                    : 'bg-dark-bgTertiary text-text-muted hover:text-text-secondary border border-dark-borderLight'
-                }`}
-                title={uiMode === 'hardware' ? 'Switch to Simple Controls' : 'Switch to Hardware UI'}
-              >
-                {uiMode === 'hardware' ? <Cpu size={14} /> : <Monitor size={14} />}
-                <span className="text-[10px] font-bold uppercase">
-                  {uiMode === 'hardware' ? 'Hardware UI' : 'Simple UI'}
-                </span>
-              </button>
-            ) : undefined
-          }
-        />
-
-        <div className="synth-editor-content overflow-y-auto">
-          {uiMode === 'hardware' && hasHardware ? (
-            <HardwareUIWrapper
-              synthType={instrument.synthType}
-              parameters={(instrument.parameters || {}) as Record<string, number>}
-              instrumentId={instrument.id}
-              onParamChange={handleChipParamChange}
-            />
-          ) : (
-            <Suspense fallback={<LoadingControls />}>
-              <OBXdControls
-                config={obxdConfig}
-                onChange={handleOBXdChange}
-              />
-            </Suspense>
-          )}
         </div>
       </div>
     );
