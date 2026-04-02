@@ -142,6 +142,10 @@ export default defineConfig({
       },
     } as any,
     rollupOptions: {
+      input: {
+        main: 'index.html',
+        controller: 'controller.html',
+      },
       // Ensure worklet files are copied to output
       external: (id) => id.includes('chiptune3.worklet') || id.includes('libopenmpt.worklet'),
       output: {
