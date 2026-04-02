@@ -113,6 +113,8 @@ export default defineConfig({
     entries: ['src/**/*.{ts,tsx,js,jsx}'],
   },
   server: {
+    // Listen on all interfaces so iPhone controller can connect over WiFi
+    host: '0.0.0.0',
     // Cross-Origin Isolation headers required for SharedArrayBuffer (scsynth WASM pthreads)
     headers: {
       'Cross-Origin-Opener-Policy': 'same-origin',
