@@ -81,7 +81,6 @@ function findMatches(
 const TITLE_H = 28;
 const ROW_H = 28;
 const FOOTER_H = 36;
-const LABEL_W = 44;
 const INPUT_W = 56;
 const GAP = 6;
 const PAD = 10;
@@ -168,12 +167,6 @@ export const PixiFXSearchReplace: React.FC<PixiFXSearchReplaceProps> = ({
   const drawScopeCurrent = drawScopeBtn(scope === 'current');
   const drawScopeAll = drawScopeBtn(scope === 'all');
 
-  const contentY = TITLE_H + PAD;
-  const row1Y = contentY;
-  const row2Y = contentY + ROW_H + GAP;
-  const row3Y = contentY + (ROW_H + GAP) * 2;
-  const footerY = height - FOOTER_H + (FOOTER_H - 24) / 2;
-
   const statusText = lastReplaced !== null
     ? `Replaced: ${lastReplaced} cell${lastReplaced !== 1 ? 's' : ''}`
     : matchCount !== null
@@ -186,6 +179,7 @@ export const PixiFXSearchReplace: React.FC<PixiFXSearchReplaceProps> = ({
         position: 'absolute',
         width,
         height,
+        flexDirection: 'column',
         backgroundColor: theme.bgSecondary.color,
         borderWidth: 1,
         borderColor: theme.border.color,
@@ -193,160 +187,169 @@ export const PixiFXSearchReplace: React.FC<PixiFXSearchReplaceProps> = ({
       eventMode="static"
     >
 
-      {/* Title */}
-      <pixiBitmapText
-        text="FX SEARCH & REPLACE"
-        style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 12, fill: 0xffffff }}
-        tint={theme.text.color}
-        layout={{ position: 'absolute', left: PAD, top: (TITLE_H - 12) / 2 }}
-      />
-
-      {/* Close button */}
-      <PixiButton
-        label="X"
-        variant="ghost"
-        size="sm"
-        onClick={onClose}
-        layout={{ position: 'absolute', right: 4, top: (TITLE_H - 24) / 2, width: 24 }}
-      />
-
-      {/* Row 1: Find */}
-      <pixiBitmapText
-        text="FIND:"
-        style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 11, fill: 0xffffff }}
-        tint={theme.textMuted.color}
-        layout={{ position: 'absolute', left: PAD, top: row1Y + (ROW_H - 11) / 2 }}
-      />
-      <PixiPureTextInput
-        value={searchTypStr}
-        onChange={setSearchTypStr}
-        placeholder="EF"
-        width={INPUT_W}
-        height={22}
-        fontSize={13}
-        font="mono"
-        layout={{ position: 'absolute', left: PAD + LABEL_W, top: row1Y + (ROW_H - 22) / 2 }}
-      />
-      <pixiBitmapText
-        text="PARAM:"
-        style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 11, fill: 0xffffff }}
-        tint={theme.textMuted.color}
-        layout={{ position: 'absolute', left: PAD + LABEL_W + INPUT_W + GAP, top: row1Y + (ROW_H - 11) / 2 }}
-      />
-      <PixiPureTextInput
-        value={searchEffStr}
-        onChange={setSearchEffStr}
-        placeholder="any"
-        width={INPUT_W}
-        height={22}
-        fontSize={13}
-        font="mono"
-        layout={{ position: 'absolute', left: PAD + LABEL_W + INPUT_W + GAP + 44, top: row1Y + (ROW_H - 22) / 2 }}
-      />
-
-      {/* Row 2: Replace */}
-      <pixiBitmapText
-        text="REPL:"
-        style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 11, fill: 0xffffff }}
-        tint={theme.textMuted.color}
-        layout={{ position: 'absolute', left: PAD, top: row2Y + (ROW_H - 11) / 2 }}
-      />
-      <PixiPureTextInput
-        value={replaceTypStr}
-        onChange={setReplaceTypStr}
-        placeholder="EF"
-        width={INPUT_W}
-        height={22}
-        fontSize={13}
-        font="mono"
-        layout={{ position: 'absolute', left: PAD + LABEL_W, top: row2Y + (ROW_H - 22) / 2 }}
-      />
-      <pixiBitmapText
-        text="PARAM:"
-        style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 11, fill: 0xffffff }}
-        tint={theme.textMuted.color}
-        layout={{ position: 'absolute', left: PAD + LABEL_W + INPUT_W + GAP, top: row2Y + (ROW_H - 11) / 2 }}
-      />
-      <PixiPureTextInput
-        value={replaceEffStr}
-        onChange={setReplaceEffStr}
-        placeholder="--"
-        width={INPUT_W}
-        height={22}
-        fontSize={13}
-        font="mono"
-        layout={{ position: 'absolute', left: PAD + LABEL_W + INPUT_W + GAP + 44, top: row2Y + (ROW_H - 22) / 2 }}
-      />
-
-      {/* Row 3: Scope */}
-      <pixiBitmapText
-        text="SCOPE:"
-        style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 11, fill: 0xffffff }}
-        tint={theme.textMuted.color}
-        layout={{ position: 'absolute', left: PAD, top: row3Y + (ROW_H - 11) / 2 }}
-      />
-      <pixiContainer
-        eventMode="static"
-        cursor="pointer"
-        onPointerUp={() => setScope('current')}
-        onClick={() => setScope('current')}
-        layout={{ position: 'absolute', left: PAD + LABEL_W, top: row3Y + (ROW_H - 20) / 2, width: 100, height: 20 }}
-      >
-        <pixiGraphics draw={drawScopeCurrent} layout={{ position: 'absolute', width: 100, height: 20 }} />
+      {/* Title row */}
+      <pixiContainer layout={{ width: '100%', height: TITLE_H, flexDirection: 'row', alignItems: 'center', paddingLeft: PAD, paddingRight: 4 }}>
         <pixiBitmapText
-          text="Cur.Pattern"
-          style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 11, fill: 0xffffff }}
-          tint={scope === 'current' ? theme.accent.color : theme.textSecondary.color}
-          layout={{ position: 'absolute', left: 6, top: 5 }}
+          text="FX SEARCH & REPLACE"
+          style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 12, fill: 0xffffff }}
+          tint={theme.text.color}
+          layout={{ flexGrow: 1 }}
+        />
+        <PixiButton
+          label="X"
+          variant="ghost"
+          size="sm"
+          onClick={onClose}
+          layout={{ width: 24 }}
         />
       </pixiContainer>
-      <pixiContainer
-        eventMode="static"
-        cursor="pointer"
-        onPointerUp={() => setScope('all')}
-        onClick={() => setScope('all')}
-        layout={{ position: 'absolute', left: PAD + LABEL_W + 106, top: row3Y + (ROW_H - 20) / 2, width: 90, height: 20 }}
-      >
-        <pixiGraphics draw={drawScopeAll} layout={{ position: 'absolute', width: 100, height: 20 }} />
+
+      {/* Row 1: Find */}
+      <pixiContainer layout={{ width: '100%', height: ROW_H, flexDirection: 'row', alignItems: 'center', gap: 4, paddingLeft: PAD, marginTop: PAD }}>
         <pixiBitmapText
-          text="All Patterns"
-          style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 11, fill: 0xffffff }}
-          tint={scope === 'all' ? theme.accent.color : theme.textSecondary.color}
-          layout={{ position: 'absolute', left: 6, top: 5 }}
+          text="FIND:"
+          style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 11, fill: 0xffffff }}
+          tint={theme.textMuted.color}
+          layout={{}}
         />
+        <PixiPureTextInput
+          value={searchTypStr}
+          onChange={setSearchTypStr}
+          placeholder="EF"
+          width={INPUT_W}
+          height={22}
+          fontSize={13}
+          font="mono"
+          layout={{}}
+        />
+        <pixiBitmapText
+          text="PARAM:"
+          style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 11, fill: 0xffffff }}
+          tint={theme.textMuted.color}
+          layout={{}}
+        />
+        <PixiPureTextInput
+          value={searchEffStr}
+          onChange={setSearchEffStr}
+          placeholder="any"
+          width={INPUT_W}
+          height={22}
+          fontSize={13}
+          font="mono"
+          layout={{}}
+        />
+      </pixiContainer>
+
+      {/* Row 2: Replace */}
+      <pixiContainer layout={{ width: '100%', height: ROW_H, flexDirection: 'row', alignItems: 'center', gap: 4, paddingLeft: PAD, marginTop: GAP }}>
+        <pixiBitmapText
+          text="REPL:"
+          style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 11, fill: 0xffffff }}
+          tint={theme.textMuted.color}
+          layout={{}}
+        />
+        <PixiPureTextInput
+          value={replaceTypStr}
+          onChange={setReplaceTypStr}
+          placeholder="EF"
+          width={INPUT_W}
+          height={22}
+          fontSize={13}
+          font="mono"
+          layout={{}}
+        />
+        <pixiBitmapText
+          text="PARAM:"
+          style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 11, fill: 0xffffff }}
+          tint={theme.textMuted.color}
+          layout={{}}
+        />
+        <PixiPureTextInput
+          value={replaceEffStr}
+          onChange={setReplaceEffStr}
+          placeholder="--"
+          width={INPUT_W}
+          height={22}
+          fontSize={13}
+          font="mono"
+          layout={{}}
+        />
+      </pixiContainer>
+
+      {/* Row 3: Scope */}
+      <pixiContainer layout={{ width: '100%', height: ROW_H, flexDirection: 'row', alignItems: 'center', gap: 4, paddingLeft: PAD, marginTop: GAP }}>
+        <pixiBitmapText
+          text="SCOPE:"
+          style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 11, fill: 0xffffff }}
+          tint={theme.textMuted.color}
+          layout={{}}
+        />
+        <pixiContainer
+          eventMode="static"
+          cursor="pointer"
+          onPointerUp={() => setScope('current')}
+          onClick={() => setScope('current')}
+          layout={{ width: 100, height: 20, flexDirection: 'row', alignItems: 'center', paddingLeft: 6 }}
+        >
+          <pixiGraphics draw={drawScopeCurrent} layout={{ position: 'absolute', width: 100, height: 20 }} />
+          <pixiBitmapText
+            text="Cur.Pattern"
+            style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 11, fill: 0xffffff }}
+            tint={scope === 'current' ? theme.accent.color : theme.textSecondary.color}
+            layout={{}}
+          />
+        </pixiContainer>
+        <pixiContainer
+          eventMode="static"
+          cursor="pointer"
+          onPointerUp={() => setScope('all')}
+          onClick={() => setScope('all')}
+          layout={{ width: 100, height: 20, flexDirection: 'row', alignItems: 'center', paddingLeft: 6 }}
+        >
+          <pixiGraphics draw={drawScopeAll} layout={{ position: 'absolute', width: 100, height: 20 }} />
+          <pixiBitmapText
+            text="All Patterns"
+            style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 11, fill: 0xffffff }}
+            tint={scope === 'all' ? theme.accent.color : theme.textSecondary.color}
+            layout={{}}
+          />
+        </pixiContainer>
       </pixiContainer>
 
       {/* Footer: status + buttons */}
-      {statusText !== '' && (
-        <pixiBitmapText
-          text={statusText}
-          style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 11, fill: 0xffffff }}
-          tint={lastReplaced !== null ? theme.success.color : theme.accentSecondary.color}
-          layout={{ position: 'absolute', left: PAD, top: footerY + (24 - 11) / 2 }}
+      <pixiContainer layout={{ width: '100%', height: FOOTER_H, flexDirection: 'row', alignItems: 'center', gap: 4, paddingLeft: PAD, paddingRight: 4, marginTop: 'auto' }}>
+        {statusText !== '' && (
+          <pixiBitmapText
+            text={statusText}
+            style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 11, fill: 0xffffff }}
+            tint={lastReplaced !== null ? theme.success.color : theme.accentSecondary.color}
+            layout={{}}
+          />
+        )}
+        <pixiContainer layout={{ flexGrow: 1 }} />
+        <PixiButton
+          label="Find All"
+          variant="ghost"
+          size="sm"
+          onClick={handleFindAll}
+          layout={{}}
         />
-      )}
-      <PixiButton
-        label="Find All"
-        variant="ghost"
-        size="sm"
-        onClick={handleFindAll}
-        layout={{ position: 'absolute', right: 4 + 60 + 4 + 60 + 4, top: footerY }}
-      />
-      <PixiButton
-        label="Replace All"
-        variant="ft2"
-        color="blue"
-        size="sm"
-        onClick={handleReplaceAll}
-        layout={{ position: 'absolute', right: 4 + 60 + 4, top: footerY }}
-      />
-      <PixiButton
-        label="Close"
-        variant="ghost"
-        size="sm"
-        onClick={onClose}
-        layout={{ position: 'absolute', right: 4, top: footerY }}
-      />
+        <PixiButton
+          label="Replace All"
+          variant="ft2"
+          color="blue"
+          size="sm"
+          onClick={handleReplaceAll}
+          layout={{}}
+        />
+        <PixiButton
+          label="Close"
+          variant="ghost"
+          size="sm"
+          onClick={onClose}
+          layout={{}}
+        />
+      </pixiContainer>
     </layoutContainer>
   );
 };

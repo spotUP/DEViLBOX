@@ -1242,6 +1242,7 @@ const PixiLoopButton: React.FC<{
         style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 10, fill: 0xffffff }}
         tint={active ? theme.text.color : theme.textSecondary.color}
         eventMode="none"
+        layout={{}}
       />
     </pixiContainer>
   );
@@ -1292,6 +1293,7 @@ const PixiLoopSizeButton: React.FC<{
         style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: size >= 10 ? 9 : 11, fill: 0xffffff }}
         tint={active ? color : selected ? theme.text.color : theme.textMuted.color}
         eventMode="none"
+        layout={{}}
       />
     </pixiContainer>
   );
@@ -1651,10 +1653,10 @@ export const PixiDJDeck: React.FC<PixiDJDeckProps> = ({ deckId }) => {
       <PixiDeckCuePoints deckId={deckId} layout={{ width: '100%', height: 28, flexShrink: 0 }} />
 
       {/* ── Transport + Nudge + Loop — ALL ONE ROW (matches DOM) ── */}
-      <pixiContainer layout={{ flexDirection: 'row', gap: 2, alignItems: 'center', height: 28, flexShrink: 0, flexWrap: 'wrap' }}>
+      <pixiContainer layout={{ flexDirection: 'row', gap: 2, alignItems: 'center', flexShrink: 0, width: '100%' }}>
         <PixiDeckTransport deckId={deckId} />
-        <PixiButton icon="prev" label="" variant="ghost" width={24} height={24} onClick={() => handleNudge(-1)} />
-        <PixiButton icon="next" label="" variant="ghost" width={24} height={24} onClick={() => handleNudge(1)} />
+        <PixiButton icon="prev" label="" variant="default" width={40} height={40} onClick={() => handleNudge(-1)} />
+        <PixiButton icon="next" label="" variant="default" width={40} height={40} onClick={() => handleNudge(1)} />
         <PixiLoopButton label="LOOP" active={loopActive} color={DECK_COLOR} onClick={handleLoopToggle} />
         {LOOP_SIZES.map((size) => (
           <PixiLoopSizeButton
@@ -1675,7 +1677,7 @@ export const PixiDJDeck: React.FC<PixiDJDeckProps> = ({ deckId }) => {
       </pixiContainer>
 
       {/* ── Scratch presets + Fader LFO (matches DOM: last section) ── */}
-      <PixiDeckScratch deckId={deckId} layout={{ width: '100%', height: 44, flexShrink: 0 }} />
+      <PixiDeckScratch deckId={deckId} layout={{ width: '100%', flexShrink: 0 }} />
 
       {/* Beat grid */}
       <pixiContainer layout={{ flexShrink: 0, width: '100%' }}>

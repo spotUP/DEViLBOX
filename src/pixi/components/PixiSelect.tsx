@@ -295,22 +295,26 @@ export const PixiSelect: React.FC<PixiSelectProps> = ({
         borderWidth: 1,
         borderColor: open ? theme.accent.color : theme.border.color,
         borderRadius: 3,
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingLeft: 6,
+        paddingRight: 6,
         ...layoutProp,
       }}
     >
       <pixiBitmapText
         eventMode="none"
         text={selectedLabel}
-        style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 13, fill: 0xffffff }}
+        style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 11, fill: 0xffffff }}
         tint={theme.textSecondary.color}
-        layout={{ position: 'absolute', left: 6, top: (height - 13) / 2 }}
+        layout={{ flex: 1 }}
       />
       <pixiBitmapText
         eventMode="none"
         text="▾"
-        style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 12, fill: 0xffffff }}
+        style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 10, fill: 0xffffff }}
         tint={theme.textMuted.color}
-        layout={{ position: 'absolute', left: width - 14, top: (height - 12) / 2 }}
+        layout={{}}
       />
     </layoutContainer>
   );
