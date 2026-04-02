@@ -21,6 +21,7 @@ import { DJFxQuickPresets } from './DJFxQuickPresets';
 import { DJControllerSelector } from './DJControllerSelector';
 import { DJAutoDJPanel } from './DJAutoDJPanel';
 import { DJVocoderControl } from './DJVocoderControl';
+import { DJRemoteControlButton } from './DJRemoteControlButton';
 import { useDJKeyboardHandler } from './DJKeyboardHandler';
 import type { SeratoTrack } from '@/lib/serato';
 import { getDJPipeline } from '@/engine/dj/DJPipeline';
@@ -340,6 +341,7 @@ export const DJView: React.FC<DJViewProps> = ({ onShowDrumpads: _onShowDrumpads 
             Auto DJ{autoDJEnabled ? ' ON' : ''}
           </button>
           <DJVocoderControl />
+          <DJRemoteControlButton />
           <button
             onClick={() => setShowCrate(!showCrate)}
             className={`px-3 py-1.5 rounded-md text-xs font-mono border transition-all
