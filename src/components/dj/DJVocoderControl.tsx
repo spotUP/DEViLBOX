@@ -9,6 +9,7 @@
 import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { useVocoderStore, VOCODER_PRESETS, VOCODER_FX_PRESETS, type VocoderFXPreset } from '@/stores/useVocoderStore';
 import { VocoderEngine } from '@/engine/vocoder/VocoderEngine';
+import { VocoderAutoTune } from '@/engine/vocoder/VocoderAutoTune';
 import { getDJEngineIfActive } from '@/engine/dj/DJEngine';
 
 interface AudioInputDevice {
@@ -26,6 +27,8 @@ export const DJVocoderControl: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [muted, setMuted] = useState(false);
   const [duckingEnabled, setDuckingEnabled] = useState(false);
+  const [autoTuneEnabled, setAutoTuneEnabled] = useState(false);
+  const autoTuneRef = useRef<VocoderAutoTune | null>(null);
   const [devices, setDevices] = useState<AudioInputDevice[]>([]);
   const [selectedDeviceId, setSelectedDeviceId] = useState<string>('');
   const engineRef = useRef<VocoderEngine | null>(null);
@@ -88,6 +91,12 @@ export const DJVocoderControl: React.FC = () => {
       // Start muted — push-to-talk mode
       setMuted(true);
       engine.setMuted(true);
+
+      // Start autotune if it was enabled before engine was created
+      if (autoTuneEnabled) {
+        autoTuneRef.current = new VocoderAutoTune(engine);
+        autoTuneRef.current.start();
+      }
 
       // Re-enumerate after permission grant
       const allDevices = await navigator.mediaDevices.enumerateDevices();
@@ -189,6 +198,19 @@ export const DJVocoderControl: React.FC = () => {
     engineRef.current?.loadPreset(name);
   }, []);
 
+  const handleAutoTuneToggle = useCallback(() => {
+    const next = !autoTuneEnabled;
+    setAutoTuneEnabled(next);
+    if (next && engineRef.current) {
+      if (!autoTuneRef.current) {
+        autoTuneRef.current = new VocoderAutoTune(engineRef.current);
+      }
+      autoTuneRef.current.start();
+    } else {
+      autoTuneRef.current?.stop();
+    }
+  }, [autoTuneEnabled]);
+
   const handleFXToggle = useCallback(() => {
     const next = !fxEnabled;
     useVocoderStore.getState().setFXEnabled(next);
@@ -270,8 +292,8 @@ export const DJVocoderControl: React.FC = () => {
         </div>
       )}
 
-      {/* FX + ducking controls — always available */}
-      <div className="flex items-center gap-1 border-l border-dark-borderLight pl-1.5 ml-0.5">
+      {/* Duck + AutoTune controls — always available */}
+      <div className="flex items-center gap-2 border-l border-dark-borderLight pl-1.5 ml-0.5">
         <label className="flex items-center gap-0.5 cursor-pointer" title="Duck music volume while talking">
           <input
             type="checkbox"
@@ -280,6 +302,15 @@ export const DJVocoderControl: React.FC = () => {
             className="w-3 h-3 accent-amber-500"
           />
           <span className="text-[9px] text-text-muted">Duck</span>
+        </label>
+        <label className="flex items-center gap-0.5 cursor-pointer" title="Auto-tune voice to the melody playing on the active deck">
+          <input
+            type="checkbox"
+            checked={autoTuneEnabled}
+            onChange={handleAutoTuneToggle}
+            className="w-3 h-3 accent-pink-500"
+          />
+          <span className="text-[9px] text-text-muted">Tune</span>
         </label>
       </div>
       <div className="flex items-center gap-1 border-l border-dark-borderLight pl-1.5 ml-0.5">
