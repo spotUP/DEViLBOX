@@ -130,6 +130,8 @@ export default defineConfig({
     },
   },
   build: {
+    // Clean dist/ before each build to prevent recursive nesting
+    emptyOutDir: true,
     minify: 'terser',
     terserOptions: {
       compress: {
