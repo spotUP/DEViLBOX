@@ -9,8 +9,11 @@
  */
 
 import React, { useState, useCallback, useEffect } from 'react';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { useUIStore } from '@stores';
+import { useSettingsStore } from '@stores/useSettingsStore';
 import { useEditorControls } from '@hooks/views/useEditorControls';
+import { BG_MODES, getBgModeLabel } from './TrackerVisualBackground';
 import { getGroupedPresets } from '@/constants/systemPresets';
 import { SubsongSelector } from './SubsongSelector';
 import { SIDSubsongSelector } from './SIDSubsongSelector';
@@ -296,6 +299,9 @@ export const EditorControlsBar: React.FC<EditorControlsBarProps> = React.memo(({
         {/* Genre Analysis Badge */}
         <GenreAnalysisBadge />
 
+        {/* Visual Background mode cycle (only when enabled) */}
+        <VisualBgCycler />
+
         {/* Status Message (ProTracker Style) */}
         {c.statusMessage && (
           <div className="flex items-center px-3 ml-2 pl-3 border-l border-dark-border">
@@ -339,3 +345,31 @@ export const EditorControlsBar: React.FC<EditorControlsBarProps> = React.memo(({
     </div>
   );
 });
+
+/** Compact < MODE > cycler for tracker visual background */
+const VisualBgCycler: React.FC = () => {
+  const enabled = useSettingsStore(s => s.trackerVisualBg);
+  const modeIndex = useSettingsStore(s => s.trackerVisualMode);
+  const setMode = useSettingsStore(s => s.setTrackerVisualMode);
+
+  if (!enabled) return null;
+
+  const total = BG_MODES.length;
+  const current = BG_MODES[modeIndex % total];
+  const label = current ? getBgModeLabel(current) : '?';
+
+  const prev = () => setMode((modeIndex - 1 + total) % total);
+  const next = () => setMode((modeIndex + 1) % total);
+
+  return (
+    <div className="flex items-center gap-0.5 ml-1 pl-2 border-l border-dark-border">
+      <button onClick={prev} className="p-0.5 text-text-muted hover:text-text-primary" title="Previous visual mode">
+        <ChevronLeft size={12} />
+      </button>
+      <span className="text-[9px] font-mono text-text-secondary min-w-[60px] text-center">{label}</span>
+      <button onClick={next} className="p-0.5 text-text-muted hover:text-text-primary" title="Next visual mode">
+        <ChevronRight size={12} />
+      </button>
+    </div>
+  );
+};

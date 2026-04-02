@@ -21,7 +21,9 @@ import { useTrackerAnalysisDisplay } from '@/hooks/useTrackerAnalysis';
 import { getGroupedPresets } from '@/constants/systemPresets';
 import { usePixiTheme } from '../../theme';
 import { PIXI_FONTS } from '../../fonts';
-import { PixiButton } from '../../components/PixiButton';
+import { PixiButton, PixiLabel } from '../../components';
+import { useSettingsStore } from '@stores/useSettingsStore';
+import { BG_MODES, getBgModeLabel } from '@/components/tracker/TrackerVisualBackground';
 import { PixiSelect, type SelectOption } from '../../components/PixiSelect';
 import { PixiViewHeader } from '../../components/PixiViewHeader';
 
@@ -631,6 +633,9 @@ export const PixiEditorControlsBar: React.FC<PixiEditorControlsBarProps> = ({
       {/* Genre Analysis Badge */}
       <PixiGenreAnalysisBadge />
 
+      {/* Visual Background mode cycle */}
+      <PixiVisualBgCycler />
+
       {/* Status message */}
       <pixiBitmapText
         text={c.statusMessage?.toUpperCase() ?? ''}
@@ -647,5 +652,26 @@ export const PixiEditorControlsBar: React.FC<PixiEditorControlsBarProps> = ({
         layout={{}}
       />
     </PixiViewHeader>
+  );
+};
+
+/** Compact < MODE > cycler for tracker visual background (GL version) */
+const PixiVisualBgCycler: React.FC = () => {
+  const enabled = useSettingsStore(s => s.trackerVisualBg);
+  const modeIndex = useSettingsStore(s => s.trackerVisualMode);
+  const setMode = useSettingsStore(s => s.setTrackerVisualMode);
+
+  if (!enabled) return null;
+
+  const total = BG_MODES.length;
+  const current = BG_MODES[modeIndex % total];
+  const label = current ? getBgModeLabel(current) : '?';
+
+  return (
+    <pixiContainer layout={{ flexDirection: 'row', gap: 2, alignItems: 'center', marginLeft: 4 }}>
+      <PixiButton icon="caret-left" label="" variant="ghost" width={18} height={18} onClick={() => setMode((modeIndex - 1 + total) % total)} />
+      <PixiLabel text={label} size="xs" color="textMuted" />
+      <PixiButton icon="caret-right" label="" variant="ghost" width={18} height={18} onClick={() => setMode((modeIndex + 1) % total)} />
+    </pixiContainer>
   );
 };

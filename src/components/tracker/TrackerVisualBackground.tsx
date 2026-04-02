@@ -31,17 +31,16 @@ type BgMode =
   | { type: 'am'; preset: string; label: string };
 
 export const BG_MODES: BgMode[] = [
-  // 6 WebGL modes (skip 'pattern' and audioMotion from VISUALIZER_MODES)
+  // WebGL modes (skip 'pattern', audioMotion, and circularSpectrum/radial)
   ...VISUALIZER_MODES
-    .filter((m): m is WebGLVisualizerMode => m !== 'pattern' && !m.startsWith('am'))
+    .filter((m): m is WebGLVisualizerMode =>
+      m !== 'pattern' && !m.startsWith('am') && m !== 'circularSpectrum')
     .map((mode) => ({ type: 'webgl' as const, mode })),
-  // audioMotion presets
+  // audioMotion presets (no radial modes)
   { type: 'am', preset: 'ledBars',         label: 'LED BARS' },
   { type: 'am', preset: 'smoothBars',      label: 'SMOOTH BARS' },
   { type: 'am', preset: 'mirrorBars',      label: 'MIRROR BARS' },
   { type: 'am', preset: 'graphLine',       label: 'GRAPH LINE' },
-  { type: 'am', preset: 'radialSpectrum',  label: 'RADIAL SPIN' },
-  { type: 'am', preset: 'radialGraph',     label: 'RADIAL GRAPH' },
   { type: 'am', preset: 'dualStereo',      label: 'DUAL STEREO' },
   { type: 'am', preset: 'lumiBars',        label: 'LUMI BARS' },
   { type: 'am', preset: 'alphaBars',       label: 'GHOST BARS' },
@@ -53,8 +52,6 @@ export const BG_MODES: BgMode[] = [
   { type: 'am', preset: 'octaveBands',     label: 'OCTAVE BANDS' },
   { type: 'am', preset: 'noteLabels',      label: 'NOTE LABELS' },
   { type: 'am', preset: 'mirrorReflex',    label: 'MIRROR REFLEX' },
-  { type: 'am', preset: 'radialInvert',    label: 'RADIAL INVERT' },
-  { type: 'am', preset: 'radialLED',       label: 'RADIAL LED' },
   { type: 'am', preset: 'linearBars',      label: 'LINEAR' },
   { type: 'am', preset: 'aWeighted',       label: 'A-WEIGHTED' },
   { type: 'am', preset: 'lumiMirror',      label: 'LUMI MIRROR' },
