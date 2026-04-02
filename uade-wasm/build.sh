@@ -173,7 +173,7 @@ CFLAGS=(
 # Linker flags (Emscripten 4.x: -sFLAG=VALUE, no space)
 LDFLAGS=(
     # Memory
-    "-sINITIAL_MEMORY=33554432"     # 32 MB initial
+    "-sINITIAL_MEMORY=50331648"     # 48 MB initial (2×4MB IPC ring buffers + 68k RAM + MEMFS)
     "-sMAXIMUM_MEMORY=134217728"    # 128 MB max
     "-sALLOW_MEMORY_GROWTH=1"
     # WASM exports
