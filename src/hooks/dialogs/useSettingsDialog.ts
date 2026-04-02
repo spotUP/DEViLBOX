@@ -42,6 +42,7 @@ export const KEYBOARD_SCHEMES = [
   { id: 'octamed', name: 'OctaMED SoundStudio', description: 'Amiga OctaMED layout - from official documentation' },
   { id: 'renoise', name: 'Renoise', description: 'Modern DAW/tracker layout - from official documentation' },
   { id: 'openmpt', name: 'OpenMPT', description: 'ModPlug Tracker layout - from official wiki documentation' },
+  { id: 'custom', name: 'Custom', description: 'Your own key bindings — start from any scheme and customize' },
 ];
 
 export interface CRTSliderDef {
