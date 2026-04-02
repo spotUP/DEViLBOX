@@ -11,8 +11,6 @@ import { useVocoderStore, VOCODER_PRESETS, VOCODER_FX_PRESETS, type VocoderFXPre
 import { VocoderEngine } from '@/engine/vocoder/VocoderEngine';
 import { VocoderAutoTune } from '@/engine/vocoder/VocoderAutoTune';
 import { getDJEngineIfActive } from '@/engine/dj/DJEngine';
-import { useInstrumentStore } from '@/stores/useInstrumentStore';
-import { bufferToDataUrl } from '@/utils/audio/SampleProcessing';
 
 interface AudioInputDevice {
   deviceId: string;
@@ -30,7 +28,6 @@ export const DJVocoderControl: React.FC = () => {
   const [muted, setMuted] = useState(false);
   const [duckingEnabled, setDuckingEnabled] = useState(false);
   const [autoTuneEnabled, setAutoTuneEnabled] = useState(false);
-  const [recording, setRecording] = useState(false);
   const autoTuneRef = useRef<VocoderAutoTune | null>(null);
   const [devices, setDevices] = useState<AudioInputDevice[]>([]);
   const [selectedDeviceId, setSelectedDeviceId] = useState<string>('');
@@ -214,56 +211,6 @@ export const DJVocoderControl: React.FC = () => {
     }
   }, [autoTuneEnabled]);
 
-  const handleRecordToggle = useCallback(async () => {
-    const engine = engineRef.current;
-    if (!engine) return;
-
-    if (!recording) {
-      // Start recording
-      engine.startRecording();
-      setRecording(true);
-    } else {
-      // Stop recording and create a sample instrument
-      setRecording(false);
-      const buffer = await engine.stopRecording();
-      if (!buffer || buffer.duration < 0.1) {
-        console.warn('[VocoderRecord] Recording too short or empty');
-        return;
-      }
-
-      try {
-        const dataUrl = await bufferToDataUrl(buffer);
-        const arrayBuf = await buffer.getChannelData(0).buffer.slice(0); // raw copy
-        const name = `Vocal ${new Date().toLocaleTimeString()}`;
-
-        useInstrumentStore.getState().addInstrument({
-          id: Date.now() % 128 || 1,
-          name,
-          type: 'sample',
-          synthType: 'Sampler',
-          effects: [],
-          volume: 0,
-          pan: 0,
-          sample: {
-            url: dataUrl,
-            baseNote: 'C4',
-            detune: 0,
-            loop: false,
-            loopStart: 0,
-            loopEnd: 0,
-            sampleRate: buffer.sampleRate,
-            reverse: false,
-            playbackRate: 1.0,
-          },
-        });
-
-        console.log(`[VocoderRecord] Sample "${name}" created (${buffer.duration.toFixed(1)}s)`);
-      } catch (err) {
-        console.error('[VocoderRecord] Failed to create sample:', err);
-      }
-    }
-  }, [recording]);
-
   const handleFXToggle = useCallback(() => {
     const next = !fxEnabled;
     useVocoderStore.getState().setFXEnabled(next);
@@ -309,21 +256,6 @@ export const DJVocoderControl: React.FC = () => {
         title="Hold to talk — release to let echo ring out"
       >
         {!muted ? 'LIVE' : 'TALK'}
-      </button>
-
-      {/* Record: capture processed output to a sample instrument */}
-      <button
-        onClick={handleRecordToggle}
-        className={`
-          px-2 py-1 rounded text-xs font-bold transition-all
-          ${recording
-            ? 'bg-red-600 text-white animate-pulse'
-            : 'bg-dark-bgTertiary hover:bg-dark-bgHover border border-dark-border text-text-muted'
-          }
-        `}
-        title={recording ? 'Stop recording and save as sample' : 'Record processed voice to sample instrument'}
-      >
-        {recording ? 'STOP' : 'REC'}
       </button>
 
       {/* Vocoder toggle — switches between clean mic and robot voice */}
