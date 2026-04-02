@@ -31,6 +31,7 @@ import { DexedHardwareUI } from './DexedHardwareUI';
 import { OBXfHardwareUI } from './OBXfHardwareUI';
 import { Odin2HardwareUI } from './Odin2HardwareUI';
 import { HelmHardwareUI } from './HelmHardwareUI';
+import { SurgeHardwareUI } from './SurgeHardwareUI';
 import VL1Hardware from './VL1Hardware';
 import { V2Hardware } from './V2Hardware';
 import { TunefishHardware } from './TunefishHardware';
@@ -78,6 +79,7 @@ const DEDICATED_UI_MAP: Partial<Record<SynthType, React.ComponentType<HWComponen
   OBXd: OBXfHardwareUI as unknown as React.ComponentType<HWComponentProps>,   // Oberheim OB-X Analog (1979) — JUCE OB-Xf UI
   Odin2: Odin2HardwareUI as unknown as React.ComponentType<HWComponentProps>, // Odin2 Semi-Modular Synth — JUCE Odin2 UI
   Helm: HelmHardwareUI as unknown as React.ComponentType<HWComponentProps>,   // Helm Polyphonic Synth — JUCE Helm UI
+  Surge: SurgeHardwareUI as unknown as React.ComponentType<HWComponentProps>, // Surge XT Hybrid Synth — JUCE Surge XT UI
 
   // Synthesizers - MAME (dedicated)
   MAMERSA: D50Hardware,         // Roland D-50 LA Synthesis (1987)
