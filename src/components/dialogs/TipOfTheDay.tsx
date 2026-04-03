@@ -20,9 +20,9 @@ const ChangeTypeLabel: React.FC<{ type: 'feature' | 'fix' | 'improvement' }> = (
     improvement: 'Improved',
   };
   const colors = {
-    feature: 'bg-green-500/20 text-green-400',
-    fix: 'bg-amber-500/20 text-amber-400',
-    improvement: 'bg-blue-500/20 text-blue-400',
+    feature: 'bg-accent-success/20 text-accent-success',
+    fix: 'bg-accent-warning/20 text-accent-warning',
+    improvement: 'bg-accent-primary/20 text-accent-primary',
   };
   return (
     <span className={`px-1.5 py-0.5 text-[10px] font-bold rounded ${colors[type]}`}>
