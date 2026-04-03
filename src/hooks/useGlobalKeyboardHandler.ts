@@ -1920,13 +1920,23 @@ export function useGlobalKeyboardHandler(options: UseGlobalKeyboardHandlerOption
         return;
       }
 
-      // Global push-to-talk: Cmd+Alt+Space (Meta+Alt+Space)
-      if (e.code === 'Space' && e.metaKey && e.altKey && !e.shiftKey && !e.ctrlKey) {
-        e.preventDefault();
-        e.stopPropagation();
-        useVocoderStore.getState().setPTT(true);
-        (e as any).__handled = true;
-        return;
+      // Global push-to-talk: hold T (any view except tracker/arrangement/pianoroll)
+      // or hold Space in DJ/VJ views (Space is play_stop_toggle in tracker but
+      // irrelevant in DJ/VJ where deck buttons control playback).
+      {
+        const view = useUIStore.getState().activeView;
+        const noMods = !e.metaKey && !e.altKey && !e.ctrlKey && !e.shiftKey;
+        const isPTTKey =
+          (e.code === 'Space' && noMods && (view === 'dj' || view === 'vj')) ||
+          (e.code === 'KeyT' && noMods && view !== 'tracker' && view !== 'arrangement' && view !== 'pianoroll');
+        if (isPTTKey && !e.repeat) {
+          console.log('[GlobalPTT]', e.code, 'keydown in', view, '— activating PTT');
+          e.preventDefault();
+          e.stopPropagation();
+          useVocoderStore.getState().setPTT(true);
+          (e as any).__handled = true;
+          return;
+        }
       }
 
       // Normalize the event
@@ -1978,8 +1988,8 @@ export function useGlobalKeyboardHandler(options: UseGlobalKeyboardHandlerOption
         return;
       }
 
-      // Release PTT when Space is released (any modifier state — user may release modifiers first)
-      if (e.code === 'Space' && useVocoderStore.getState().pttActive) {
+      // Release PTT when the PTT key is released
+      if ((e.code === 'KeyT' || e.code === 'Space') && useVocoderStore.getState().pttActive) {
         e.preventDefault();
         useVocoderStore.getState().setPTT(false);
         return;
