@@ -30,7 +30,7 @@ import { DeckScratch } from './DeckScratch';
 import { DeckFXPads } from './DeckFXPads';
 import { DeckCuePoints } from './DeckCuePoints';
 import { DeckBeatGrid } from './DeckBeatGrid';
-import { DeckAudioWaveform } from './DeckAudioWaveform';
+// DeckAudioWaveform moved to full-width strip in DJView
 import { DeckPatternDisplay } from './DeckPatternDisplay';
 
 interface DJDeckProps {
@@ -270,8 +270,7 @@ export const DJDeck: React.FC<DJDeckProps> = ({ deckId }) => {
         </div>
       )}
 
-      {/* Combined audio waveform: overview strip + scrolling waveform (audio mode only) */}
-      <DeckAudioWaveform deckId={deckId} />
+      {/* Waveform moved to full-width strip at top of DJView */}
 
       {/* Main controls area: pattern display / vinyl + pitch slider */}
       <div className={`flex gap-2 flex-1 min-h-0 ${isB ? 'flex-row-reverse' : ''}`}>
@@ -283,9 +282,9 @@ export const DJDeck: React.FC<DJDeckProps> = ({ deckId }) => {
             <DeckVisualizer deckId={deckId} resetKey={vizResetKey} />
           )}
 
-          {/* Pattern overlay — shows for tracker modules in any view mode except visualizer (which has its own) */}
-          {hasPatternData && deckViewMode !== 'visualizer' && (
-            <div className="absolute inset-0 pointer-events-none" style={{ opacity: 0.55 }}>
+          {/* Pattern overlay (tracker modules) or oscilloscope (audio-only tracks) */}
+          {deckViewMode !== 'visualizer' && (hasPatternData || hasAudioWaveform) && (
+            <div className="absolute inset-0 pointer-events-none" style={{ opacity: hasPatternData ? 0.55 : 0.7 }}>
               <DeckPatternDisplay deckId={deckId} />
             </div>
           )}

@@ -10,7 +10,7 @@ import { PixiButton, PixiLabel, PixiSlider } from '../../components';
 import { useDJStore } from '@/stores/useDJStore';
 import { PixiDeckTransport } from './PixiDeckTransport';
 import { PixiDeckTurntable } from './PixiDeckTurntable';
-import { PixiDeckWaveform } from './PixiDeckWaveform';
+// PixiDeckWaveform moved to full-width strip in PixiDJView
 import { PixiDeckScratch } from './PixiDeckScratch';
 import { PixiDeckCuePoints } from './PixiDeckCuePoints';
 import { PixiDeckScopes } from './PixiDeckScopes';
@@ -1538,8 +1538,7 @@ export const PixiDJDeck: React.FC<PixiDJDeckProps> = ({ deckId }) => {
         )}
       </pixiContainer>
 
-      {/* ── Waveform (audio mode — self-hides when no peaks) ── */}
-      <PixiDeckWaveform deckId={deckId} height={48} />
+      {/* Waveform moved to full-width strip at top of PixiDJView */}
 
       {/* ── Main controls area: visualizer/vinyl + pitch slider (matches DOM flex-1 min-h-0) ── */}
       {/* Deck B uses row-reverse so pitch slider is on the left */}
