@@ -737,7 +737,7 @@ export const PixiEditInstrumentModal: React.FC<PixiEditInstrumentModalProps> = (
                               const cardW = Math.floor((MODAL_W - 32 - 32 - 12) / 2); // padding + gap
                               return (
                                 <layoutContainer
-                                  key={`${category.id}-${synth.type}`}
+                                  key={`${category.id}-${synth.type}-${synth.shortName}`}
                                   eventMode="static"
                                   cursor="pointer"
                                   onPointerTap={() => handleCreateWithType(synth.type)}
