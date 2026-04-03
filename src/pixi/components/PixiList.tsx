@@ -157,6 +157,7 @@ export const PixiList: React.FC<PixiListProps> = ({
   const STAR_EMPTY = 0xffffff;    // white (40% alpha applied via container)
   const STAR_USER = 0xfbbf24;     // amber-400 (brighter for user's own)
 
+  const [hoveredItemId, setHoveredItemId] = useState<string | null>(null);
   const [hoveredStar, setHoveredStar] = useState<{ itemId: string; star: number } | null>(null);
 
   const handleStarClick = useCallback((itemId: string, star: number) => {
@@ -181,6 +182,7 @@ export const PixiList: React.FC<PixiListProps> = ({
         const actualIdx = startIdx + i;
         const y = actualIdx * itemHeight - scrollY;
         const isSelected = item.id === selectedId;
+        const isHovered = item.id === hoveredItemId;
         const isEven = actualIdx % 2 === 0;
 
         return (
@@ -190,6 +192,8 @@ export const PixiList: React.FC<PixiListProps> = ({
             cursor="pointer"
             onPointerUp={() => handleItemClick(item.id)}
             onClick={() => handleItemClick(item.id)}
+            onPointerEnter={() => setHoveredItemId(item.id)}
+            onPointerLeave={() => setHoveredItemId((prev) => prev === item.id ? null : prev)}
             layout={{
               position: 'absolute',
               left: 0,
@@ -208,6 +212,8 @@ export const PixiList: React.FC<PixiListProps> = ({
                 g.rect(0, 0, width - 10, itemHeight);
                 if (isSelected) {
                   g.fill({ color: theme.accent.color, alpha: 0.15 });
+                } else if (isHovered) {
+                  g.fill({ color: theme.accent.color, alpha: 0.08 });
                 } else {
                   g.fill({ color: theme.bg.color, alpha: isEven ? 1 : 0.85 });
                 }
