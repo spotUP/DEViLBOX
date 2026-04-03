@@ -799,7 +799,7 @@ export const ImportModuleDialog: React.FC<ImportModuleDialogProps> = ({
 
               {/* Companion files badge */}
               {displayedCompanions.length > 0 && (
-                <div className="flex items-center gap-2 p-2 bg-green-500/10 border border-green-500/30 rounded text-xs text-green-400">
+                <div className="flex items-center gap-2 p-2 bg-accent-success/10 border border-accent-success/30 rounded text-xs text-accent-success">
                   <Folder size={12} />
                   {displayedCompanions.length} companion file{displayedCompanions.length > 1 ? 's' : ''} loaded
                   <span className="text-text-muted ml-1 truncate">
@@ -852,7 +852,7 @@ export const ImportModuleDialog: React.FC<ImportModuleDialogProps> = ({
 
               {/* Format capability warnings */}
               {formatCapabilities && !formatCapabilities.isEditable && (
-                <div className="flex items-start gap-2 p-3 bg-red-500/10 border border-red-500/30 rounded text-xs text-red-400">
+                <div className="flex items-start gap-2 p-3 bg-accent-error/10 border border-accent-error/30 rounded text-xs text-accent-error">
                   <AlertCircle size={14} className="shrink-0 mt-0.5" />
                   <div>
                     <span className="font-semibold">Playback only — not editable.</span>
@@ -869,7 +869,7 @@ export const ImportModuleDialog: React.FC<ImportModuleDialogProps> = ({
               )}
 
               {formatCapabilities && formatCapabilities.isEditable && formatCapabilities.isNativeExportable && (
-                <div className="flex items-start gap-2 p-3 bg-green-500/10 border border-green-500/30 rounded text-xs text-green-400">
+                <div className="flex items-start gap-2 p-3 bg-accent-success/10 border border-accent-success/30 rounded text-xs text-accent-success">
                   <Info size={14} className="shrink-0 mt-0.5" />
                   <div>
                     <span className="font-semibold">Editable and exportable.</span>
@@ -890,7 +890,7 @@ export const ImportModuleDialog: React.FC<ImportModuleDialogProps> = ({
               )}
 
               {formatCapabilities && !formatCapabilities.hasPatternData && (
-                <div className="flex items-start gap-2 p-3 bg-blue-500/10 border border-blue-500/30 rounded text-xs text-blue-400">
+                <div className="flex items-start gap-2 p-3 bg-accent-primary/10 border border-accent-primary/30 rounded text-xs text-accent-primary">
                   <Info size={14} className="shrink-0 mt-0.5" />
                   <div>
                     <span className="font-semibold">No pattern display.</span>
@@ -912,7 +912,7 @@ export const ImportModuleDialog: React.FC<ImportModuleDialogProps> = ({
                   fullWidth
                   onClick={handlePreview}
                   icon={isPlaying ? <Square size={14} /> : <Play size={14} />}
-                  className={isPlaying ? 'text-accent-error hover:text-accent-error/80' : 'text-green-400 hover:text-green-300'}
+                  className={isPlaying ? 'text-accent-error hover:text-accent-error/80' : 'text-accent-success hover:text-accent-success/80'}
                 >
                   {isPlaying ? 'Stop Preview' : 'Preview'}
                 </Button>

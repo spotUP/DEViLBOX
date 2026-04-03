@@ -132,7 +132,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
                           ))}
                           <button
                             onClick={s.resetCustomTheme}
-                            className="text-[8px] font-mono px-1.5 py-0.5 rounded border border-ft2-border text-ft2-textDim hover:border-red-400 hover:text-red-400 transition-colors"
+                            className="text-[8px] font-mono px-1.5 py-0.5 rounded border border-ft2-border text-ft2-textDim hover:border-accent-error hover:text-accent-error transition-colors"
                           >
                             Reset
                           </button>
@@ -474,7 +474,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
                         </label>
                         {s.customBannerImage && (
                           <button onClick={() => s.setCustomBannerImage(null)}
-                            className="text-[9px] font-mono px-2 py-0.5 rounded border bg-transparent border-ft2-border text-red-400 hover:border-red-400 transition-colors">Remove</button>
+                            className="text-[9px] font-mono px-2 py-0.5 rounded border bg-transparent border-ft2-border text-accent-error hover:border-accent-error transition-colors">Remove</button>
                         )}
                       </div>
                     </div>
@@ -607,7 +607,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
                   <div className="pt-3 border-t border-ft2-border/30 space-y-2">
                     <button onClick={() => { onClose(); useUIStore.getState().openModal('midi-wizard'); }}
                       className="w-full flex items-center gap-2 px-3 py-2 bg-purple-500/10 border border-purple-500/30 rounded text-left hover:bg-purple-500/20 transition-colors">
-                      <span className="text-purple-400 text-xs">🎛</span>
+                      <span className="text-accent-secondary text-xs">🎛</span>
                       <div className="flex-1">
                         <p className="text-xs text-ft2-highlight font-mono">Controller Setup Wizard</p>
                         <p className="text-[9px] text-ft2-textDim font-mono">Detect and configure MIDI controller</p>
