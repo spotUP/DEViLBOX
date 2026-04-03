@@ -29,6 +29,8 @@ import { usePixiTheme } from '../theme';
 import { usePixiDropdownStore } from '../stores/usePixiDropdownStore';
 import type { SelectOption } from '../components/PixiSelect';
 import { VU_GREEN, VU_YELLOW, VU_RED } from '../colors';
+import { CHANNEL_FX_PRESETS } from '../../constants/channelFxPresets';
+import { useMixerStore } from '../../stores/useMixerStore';
 
 // ─── Props ────────────────────────────────────────────────────────────────────
 
@@ -67,6 +69,15 @@ const VU_COLOR_YELLOW = VU_YELLOW;
 const VU_COLOR_RED    = VU_RED;
 
 const STRIP_WIDTH = 72;
+
+// Channel FX preset dropdown options
+const CHANNEL_FX_OPTIONS: SelectOption[] = [
+  { value: '__none__', label: '-- clear --' },
+  ...CHANNEL_FX_PRESETS.map((p, i) => ({
+    value: String(i),
+    label: p.name,
+  })),
+];
 
 // ─── FX slot ──────────────────────────────────────────────────────────────────
 
@@ -147,6 +158,71 @@ const PixiEffectSlot: React.FC<PixiEffectSlotProps> = ({
         style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 10, fill: 0xffffff }}
         tint={effectType ? theme.accent.color : theme.textMuted.color}
         layout={{ position: 'absolute', left: 4, top: 3 }}
+      />
+    </pixiContainer>
+  );
+};
+
+// ─── Channel FX Preset Button ─────────────────────────────────────────────────
+
+const ChannelFxPresetButton: React.FC<{ channelIndex: number; width: number }> = ({ channelIndex, width }) => {
+  const theme = usePixiTheme();
+  const [hovered, setHovered] = useState(false);
+  const btnRef = useRef<ContainerType>(null);
+  const idRef = useRef(`ch-fx-preset-${channelIndex}`);
+
+  const handleClick = useCallback(() => {
+    const el = btnRef.current;
+    if (!el) return;
+    const pos = el.toGlobal({ x: 0, y: 18 });
+    const id = idRef.current;
+    usePixiDropdownStore.getState().openDropdown({
+      kind: 'select',
+      id,
+      x: pos.x,
+      y: pos.y,
+      width: 140,
+      options: CHANNEL_FX_OPTIONS,
+      onSelect: (value) => {
+        if (value === '__none__') {
+          useMixerStore.getState().loadChannelInsertPreset(channelIndex, []);
+        } else {
+          const idx = parseInt(value, 10);
+          const preset = CHANNEL_FX_PRESETS[idx];
+          if (preset) {
+            useMixerStore.getState().loadChannelInsertPreset(channelIndex, preset.effects);
+          }
+        }
+        usePixiDropdownStore.getState().closeDropdown(id);
+      },
+      onClose: () => usePixiDropdownStore.getState().closeDropdown(id),
+    });
+  }, [channelIndex]);
+
+  return (
+    <pixiContainer
+      ref={btnRef}
+      eventMode="static"
+      cursor="pointer"
+      onPointerOver={() => setHovered(true)}
+      onPointerOut={() => setHovered(false)}
+      onPointerUp={handleClick}
+      layout={{
+        width,
+        height: 16,
+        backgroundColor: hovered ? theme.bgHover.color : theme.bgTertiary.color,
+        borderWidth: 1,
+        borderColor: theme.border.color,
+        borderRadius: 2,
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginTop: 2,
+      }}
+    >
+      <pixiBitmapText
+        text="FX"
+        style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 9, fill: 0xffffff }}
+        tint={theme.accent.color}
       />
     </pixiContainer>
   );
@@ -362,8 +438,11 @@ export const PixiMixerChannelStrip: React.FC<PixiMixerChannelStripProps> = ({
         onChange={handleVolumeChange}
         orientation="vertical"
         length={100}
-        handleWidth={28}
-        handleHeight={10}
+        handleWidth={14}
+        handleHeight={14}
+        handleColor={0xf59e0b}
+        handleRadius={7}
+        thickness={4}
         detent={1.0}
         detentRange={0.02}
         defaultValue={1.0}
@@ -409,21 +488,49 @@ export const PixiMixerChannelStrip: React.FC<PixiMixerChannelStripProps> = ({
         />
       )}
 
-      {/* 10. Send knobs (compact, hidden for master) */}
+      {/* 10. Send level bars (compact, hidden for master) */}
       {!isMaster && sendLevels && onSendLevelChange && (
-        <layoutContainer layout={{ flexDirection: 'row', gap: 2, width: STRIP_WIDTH, justifyContent: 'center', marginTop: 2 }}>
-          {sendLevels.slice(0, 4).map((level, i) => (
-            <PixiKnob
-              key={`send-${i}`}
-              value={level}
-              min={0}
-              max={1}
-              onChange={(v) => onSendLevelChange(i, v)}
-              size="sm"
-              label={`S${i + 1}`}
-              color={0x14b8a6}
-            />
-          ))}
+        <layoutContainer layout={{ flexDirection: 'column', gap: 1, width: STRIP_WIDTH, marginTop: 2, paddingLeft: 4, paddingRight: 4 }}>
+          <pixiBitmapText
+            text="SENDS"
+            style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 8, fill: 0xffffff }}
+            tint={theme.textMuted.color}
+            layout={{ width: STRIP_WIDTH - 8 }}
+          />
+          <layoutContainer layout={{ flexDirection: 'row', gap: 1, width: STRIP_WIDTH - 8 }}>
+            {sendLevels.slice(0, 4).map((level, i) => {
+              const barWidth = Math.floor((STRIP_WIDTH - 12) / 4);
+              return (
+                <layoutContainer
+                  key={`send-bar-${i}`}
+                  eventMode="static"
+                  cursor="pointer"
+                  onPointerUp={() => {
+                    // Toggle: off → 0.5, on → cycle 0.25/0.5/0.75/1.0, or off
+                    const next = level <= 0 ? 0.5 : level >= 1 ? 0 : Math.min(1, level + 0.25);
+                    onSendLevelChange(i, next);
+                  }}
+                  layout={{
+                    width: barWidth,
+                    height: 12,
+                    backgroundColor: theme.bgActive.color,
+                    borderWidth: 1,
+                    borderColor: level > 0 ? 0x14b8a6 : theme.border.color,
+                    overflow: 'hidden',
+                  }}
+                >
+                  {/* Filled portion */}
+                  <layoutContainer
+                    layout={{
+                      width: Math.round(barWidth * level),
+                      height: 10,
+                      backgroundColor: 0x14b8a6,
+                    }}
+                  />
+                </layoutContainer>
+              );
+            })}
+          </layoutContainer>
         </layoutContainer>
       )}
 
@@ -435,6 +542,11 @@ export const PixiMixerChannelStrip: React.FC<PixiMixerChannelStripProps> = ({
           tint={theme.accent.color}
           layout={{ width: STRIP_WIDTH, marginTop: 2 }}
         />
+      )}
+
+      {/* 11b. Channel FX preset button (hidden for master) */}
+      {!isMaster && (
+        <ChannelFxPresetButton channelIndex={channelIndex} width={STRIP_WIDTH - 8} />
       )}
 
       {/* 12. Record arm button (hidden for master) */}
