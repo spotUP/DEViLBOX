@@ -2335,7 +2335,13 @@ export class ToneEngine {
         break;
       }
     }
-    analyser.output.connect(this.getInstrumentOutputDestination(instrumentId, isNative));
+    try {
+      analyser.output.connect(this.getInstrumentOutputDestination(instrumentId, isNative));
+    } catch (e) {
+      // May fail if synth was recreated on a different audio context
+      console.warn('[ToneEngine] Analyser connect failed (context mismatch):', e);
+      return analyser;
+    }
 
     // Redirect ALL existing effect chains for this instrument to the analyser
     let foundChains = 0;
