@@ -154,9 +154,12 @@ export class DX7Synth implements DevilboxSynth {
     for (let i = 6; i < 161; i++) sum += sysex[i];
     sysex[161] = (-sum) & 0x7F;
     sysex[162] = 0xF7;
-    // Send via serial path (non-4104 size goes through firmware sysex parser)
+    // Send via serial path (non-4104 size goes through firmware sysex parser).
+    // Single-voice sysex loads directly into the edit buffer — do NOT send a
+    // program change after, as that would overwrite the edit buffer with the
+    // current bank's voice 0.
     this.loadSysex(sysex.buffer);
-    console.log(`[DX7] _loadVcedData: sent 163-byte single-voice sysex`);
+    console.log(`[DX7] _loadVcedData: sent 163-byte single-voice sysex (edit buffer)`);
   }
 
   /** Convert VCED (155 bytes unpacked) to VMEM (128 bytes packed) */
