@@ -478,6 +478,7 @@ export const PixiRoot: React.FC = () => {
         {activeView === 'drumpad' && <PixiDrumPadManager />}
         <PixiSettingsModal isOpen={modalOpen === 'settings'} onClose={closeModal} />
         <PixiEditInstrumentModal isOpen={modalOpen === 'instruments'} onClose={closeModal} />
+        <PixiEditInstrumentModal isOpen={modalOpen === 'newInstrument'} onClose={closeModal} createMode />
         <PixiMasterEffectsModal isOpen={modalOpen === 'masterFx'} onClose={closeModal} />
         <PixiInstrumentEffectsModal isOpen={modalOpen === 'instrumentFx'} onClose={closeModal} />
         <PixiClipRenameDialog />

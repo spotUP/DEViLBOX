@@ -223,7 +223,7 @@ export const PixiInstrumentPanel: React.FC<PixiInstrumentPanelProps> = ({ width,
   // ─── Action bar handlers ────────────────────────────────────────────────────
 
   const handleAdd = useCallback(() => {
-    useUIStore.getState().setShowNewInstrumentBrowser(true);
+    useUIStore.getState().openModal('newInstrument');
   }, []);
 
   const handlePreset = useCallback(() => {
