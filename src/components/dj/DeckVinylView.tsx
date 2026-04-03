@@ -331,7 +331,8 @@ export const DeckVinylView: React.FC<DeckVinylViewProps> = ({ deckId, size = DEF
       // Scale: tangential px/s → angular velocity in rad/s
       // At the edge of a 250px vinyl, a full drag across = ~400px = ~2π
       const pixelVelocity = tangential / dt;
-      const omega = (pixelVelocity / (size * 0.8)) * OMEGA_NORMAL;
+      const sensitivity = useDJStore.getState().jogWheelSensitivity;
+      const omega = (pixelVelocity / (size * 0.8)) * OMEGA_NORMAL * sensitivity;
 
       // Pure hand velocity — no bias. With slipmat physics, holding still = stopped.
       // The motor platter keeps spinning underneath through slipmat coupling.

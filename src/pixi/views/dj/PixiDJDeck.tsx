@@ -111,7 +111,7 @@ const PixiSpectrumDisplay: React.FC<{
       } else if (vizMode === 'circular' && fft && fft.length > 0) {
         drawCircular(g, fft, width, height, deckColor, theme);
       } else if (vizMode === 'mirrored' && fft && fft.length > 0) {
-        drawMirrored(g, fft, width, height, deckColor);
+        drawMirrored(g, fft, width, height, deckColor, theme);
       } else if (vizMode === 'terrain' && fft && fft.length > 0) {
         drawTerrain(g, fft, width, height, vizTimeRef.current, deckColor, theme);
       } else if (vizMode === 'starfield' && fft && fft.length > 0) {
@@ -124,7 +124,7 @@ const PixiSpectrumDisplay: React.FC<{
       } else if (vizMode === 'particles') {
         drawParticles(g, fft ?? new Float32Array(128).fill(-100), width, height, vizTimeRef.current, dt, burstsRef, lastBurstTimeRef, theme);
       } else if (fft && fft.length > 0) {
-        drawSpectrumBars(g, fft, width, height, deckColor);
+        drawSpectrumBars(g, fft, width, height, deckColor, theme);
       }
 
       g.rect(0, 0, width, height).stroke({ color: theme.bgTertiary.color, width: 0.5 });
@@ -137,7 +137,7 @@ const PixiSpectrumDisplay: React.FC<{
   return <pixiGraphics ref={graphicsRef} draw={() => {}} layout={{ width: '100%', height }} />;
 };
 
-function drawSpectrumBars(g: GraphicsType, fft: Float32Array, w: number, h: number, accentColor: number) {
+function drawSpectrumBars(g: GraphicsType, fft: Float32Array, w: number, h: number, accentColor: number, theme: PixiTheme) {
   const bars = 32;
   const gap = 1;
   const barW = (w - gap * (bars + 1)) / bars;
@@ -147,7 +147,7 @@ function drawSpectrumBars(g: GraphicsType, fft: Float32Array, w: number, h: numb
     const val = Math.max(0, Math.min(1, (db + 100) / 80));
     const barH = val * (h - 4);
     if (barH < 1) continue;
-    const color = val > 0.8 ? 0xff4444 : val > 0.5 ? 0xffaa00 : accentColor;
+    const color = val > 0.8 ? theme.error.color : val > 0.5 ? theme.warning.color : accentColor;
     g.rect(gap + i * (barW + gap), h - 2 - barH, barW, barH).fill({ color, alpha: 0.85 });
   }
 }
@@ -179,14 +179,14 @@ function drawCircular(g: GraphicsType, fft: Float32Array, w: number, h: number, 
     const cosA = Math.cos(angle), sinA = Math.sin(angle);
     const x1 = cx + cosA * radius, y1 = cy + sinA * radius;
     const x2 = cx + cosA * (radius + barLen), y2 = cy + sinA * (radius + barLen);
-    const color = val > 0.7 ? 0xff4444 : val > 0.4 ? 0xffaa00 : accentColor;
+    const color = val > 0.7 ? theme.error.color : val > 0.4 ? theme.warning.color : accentColor;
     g.moveTo(x1, y1).lineTo(x2, y2).stroke({ color, width: 2 });
   }
   g.circle(cx, cy, radius * 0.3).fill({ color: theme.bgSecondary.color });
   g.circle(cx, cy, radius * 0.3).stroke({ color: accentColor, width: 1 });
 }
 
-function drawMirrored(g: GraphicsType, fft: Float32Array, w: number, h: number, accentColor: number) {
+function drawMirrored(g: GraphicsType, fft: Float32Array, w: number, h: number, accentColor: number, theme: PixiTheme) {
   const bars = 48;
   const barW = w / bars - 1;
   const step = Math.max(1, Math.floor(fft.length / bars));
@@ -195,7 +195,7 @@ function drawMirrored(g: GraphicsType, fft: Float32Array, w: number, h: number, 
     const db = fft[i * step] ?? -100;
     const val = Math.max(0, Math.min(1, (db + 100) / 80));
     const barH = val * mid * 0.9;
-    const color = val > 0.7 ? 0xff4444 : val > 0.4 ? 0xffaa00 : accentColor;
+    const color = val > 0.7 ? theme.error.color : val > 0.4 ? theme.warning.color : accentColor;
     g.rect(i * (barW + 1), mid - barH, barW, barH).fill({ color, alpha: 0.85 });
     g.rect(i * (barW + 1), mid, barW, barH).fill({ color, alpha: 0.85 });
   }
@@ -285,7 +285,7 @@ function drawStarfield(
     const psy = cy + star.y * prevScale * (h * 0.4);
 
     const brightness = (1 - star.z) * 0.8 + 0.2;
-    const color = star.hue < 0.6 ? 0xffffff : star.hue < 0.8 ? accentColor : 0x8888ff;
+    const color = star.hue < 0.6 ? 0xffffff : star.hue < 0.8 ? accentColor : theme.accentSecondary.color;
 
     if (star.z < 0.7) {
       g.moveTo(psx, psy).lineTo(sx, sy).stroke({ color, width: size * 0.5, alpha: brightness * 0.5 });
@@ -634,7 +634,8 @@ const PixiVinylDisplay: React.FC<{
 
         // Scale: tangential px/s → angular velocity in rad/s
         const pixelVelocity = tangential / dt;
-        const omega = (pixelVelocity / (size * 0.8)) * OMEGA_NORMAL;
+        const sensitivity = useDJStore.getState().jogWheelSensitivity;
+        const omega = (pixelVelocity / (size * 0.8)) * OMEGA_NORMAL * sensitivity;
 
         physicsRef.current?.setHandVelocity(omega);
       }
@@ -1038,7 +1039,8 @@ const PixiTurntable2D: React.FC<{
         const dt = Math.max(0.001, (now - lastPointerTimeRef.current) / 1000);
         lastPointerTimeRef.current = now;
         const pixelVelocity = tangential / dt;
-        const omega = (pixelVelocity / (platterR * 4)) * OMEGA_NORMAL;
+        const sensitivity2D = useDJStore.getState().jogWheelSensitivity;
+        const omega = (pixelVelocity / (platterR * 4)) * OMEGA_NORMAL * sensitivity2D;
         physicsRef.current?.setHandVelocity(omega);
       }
 

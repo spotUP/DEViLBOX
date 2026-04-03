@@ -13,6 +13,7 @@ import { useSettingsStore, type CRTParams } from '@stores/useSettingsStore';
 import { useKeyboardStore } from '@stores/useKeyboardStore';
 import { useEditorStore } from '@stores/useEditorStore';
 import { useAudioStore } from '@stores/useAudioStore';
+import { useDJStore } from '@stores/useDJStore';
 import { useModlandContributionModal } from '@stores/useModlandContributionModal';
 import { getTrackerReplayer } from '@engine/TrackerReplayer';
 import { getDJEngineIfActive } from '@engine/dj/DJEngine';
@@ -158,6 +159,8 @@ export function useSettingsDialog({ isOpen }: UseSettingsDialogOptions) {
   const setScratchAcceleration = useUIStore((s) => s.setScratchAcceleration);
   const platterMass = useUIStore((s) => s.platterMass);
   const setPlatterMass = useUIStore((s) => s.setPlatterMass);
+  const jogWheelSensitivity = useDJStore((s) => s.jogWheelSensitivity);
+  const setJogWheelSensitivity = useDJStore((s) => s.setJogWheelSensitivity);
 
   // ── Store: useThemeStore ─────────────────────────────────────────────────
   const currentThemeId = useThemeStore((s) => s.currentThemeId);
@@ -383,6 +386,7 @@ export function useSettingsDialog({ isOpen }: UseSettingsDialogOptions) {
     tb303Collapsed, setTB303Collapsed, oscilloscopeVisible, setOscilloscopeVisible,
     scratchEnabled, setScratchEnabled, scratchAcceleration, setScratchAcceleration,
     platterMass, setPlatterMass,
+    jogWheelSensitivity, setJogWheelSensitivity,
     // Theme store
     currentThemeId, setTheme, customThemeColors, copyThemeToCustom,
     setCustomColor, resetCustomTheme,

@@ -523,7 +523,41 @@ export const useUIStore = create<UIStore>()(
       // View switching actions
       setActiveView: (view) =>
         set((state) => {
+          const prev = state.activeView;
           state.activeView = view;
+
+          // Mutual exclusion: stop tracker when entering DJ, stop DJ when leaving DJ
+          if (view === 'dj' && prev !== 'dj') {
+            // Defer to avoid calling engine mid-store-update
+            setTimeout(() => {
+              try {
+                const { useTransportStore } = require('@stores/useTransportStore');
+                const { getTrackerReplayer } = require('@engine/TrackerReplayer');
+                const { getToneEngine } = require('@engine/ToneEngine');
+                const transport = useTransportStore.getState();
+                if (transport.isPlaying) {
+                  getTrackerReplayer().stop();
+                  transport.stop();
+                  getToneEngine().stop();
+                }
+              } catch { /* not ready */ }
+            }, 0);
+          } else if (prev === 'dj' && view !== 'dj' && view !== 'vj') {
+            setTimeout(() => {
+              try {
+                const { useDJStore } = require('@stores/useDJStore');
+                const { getDJEngineIfActive } = require('@engine/dj/DJEngine');
+                const djStore = useDJStore.getState();
+                const djEngine = getDJEngineIfActive();
+                for (const deckId of ['A', 'B', 'C'] as const) {
+                  if (djStore.decks[deckId].isPlaying) {
+                    djStore.setDeckPlaying(deckId, false);
+                    try { djEngine?.getDeck(deckId).stop(); } catch { /* */ }
+                  }
+                }
+              } catch { /* not ready */ }
+            }, 0);
+          }
         }),
 
       toggleActiveView: () =>
