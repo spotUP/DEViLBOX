@@ -118,22 +118,11 @@ class DX7Processor extends AudioWorkletProcessor {
   }
 
   loadSysex(arrayBuf) {
-    const m = this.module;
     const bytes = new Uint8Array(arrayBuf);
-    const ptr = m._malloc(bytes.length);
-    m.HEAPU8.set(bytes, ptr);
-    m._dx7LoadSysex(ptr, bytes.length);
-    m._free(ptr);
-    // For 32-voice bulk dumps: also load as cartridge voices so program changes
-    // read from the updated data (firmware uses cartridge when present).
-    if (bytes.length === 4104) {
-      const vPtr = m._malloc(4096);
-      // Copy voice data (skip 6-byte sysex header) into fresh WASM memory
-      for (let i = 0; i < 4096; i++) m.HEAPU8[vPtr + i] = bytes[6 + i];
-      m._dx7LoadVoices(vPtr, 4096);
-      m._free(vPtr);
-      m._dx7SetBank(0);
-    }
+    const ptr = this.module._malloc(bytes.length);
+    this.module.HEAPU8.set(bytes, ptr);
+    this.module._dx7LoadSysex(ptr, bytes.length);
+    this.module._free(ptr);
     this.port.postMessage({ type: 'sysexLoaded' });
   }
 
