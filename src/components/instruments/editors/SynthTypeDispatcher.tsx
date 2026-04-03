@@ -2067,7 +2067,7 @@ export const SynthTypeDispatcher: React.FC<SynthTypeDispatcherProps> = ({
   // ============================================================================
   // MDA ePIANO EDITOR (Fender Rhodes)
   // ============================================================================
-  if (editorMode === 'mdaEPiano' || instrument.synthType === 'MdaEPiano') {
+  if (editorMode === 'mdaEPiano' /* MdaEPiano now uses 'layout' mode */) {
     const epianoConfig = { ...DEFAULT_MDA_EPIANO, ...(instrument.mdaEPiano || {}) };
 
     return (
@@ -2100,7 +2100,7 @@ export const SynthTypeDispatcher: React.FC<SynthTypeDispatcherProps> = ({
   // ============================================================================
   // MDA JX-10 EDITOR (Roland-inspired poly synth)
   // ============================================================================
-  if (editorMode === 'mdaJX10' || instrument.synthType === 'MdaJX10') {
+  if (editorMode === 'mdaJX10' /* MdaJX10 now uses 'layout' mode */) {
     const jx10Config = { ...DEFAULT_MDA_JX10, ...(instrument.mdaJX10 || {}) };
 
     return (
@@ -2268,7 +2268,7 @@ export const SynthTypeDispatcher: React.FC<SynthTypeDispatcherProps> = ({
   // ============================================================================
   // MDA DX10 EDITOR (2-operator FM synth)
   // ============================================================================
-  if (editorMode === 'mdaDX10' || instrument.synthType === 'MdaDX10') {
+  if (editorMode === 'mdaDX10' /* MdaDX10 now uses 'layout' mode */) {
     const dx10Config = { ...DEFAULT_MDA_DX10, ...(instrument.mdaDX10 || {}) };
 
     return (
