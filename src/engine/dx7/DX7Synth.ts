@@ -134,31 +134,29 @@ export class DX7Synth implements DevilboxSynth {
     });
   }
 
-  /** Load raw VCED data (155 bytes unpacked) via bulk dump sysex to internal RAM */
+  /** Load raw VCED data (155 bytes unpacked) via single-voice sysex.
+   *  Uses format 0 (single voice, 155 bytes) which only replaces the edit buffer
+   *  without overwriting the other 31 voices in the bank. */
   _loadVcedData(vced: Uint8Array) {
-    const packed = DX7Synth.vcedToVmem(vced);
-    // Build a 4104-byte bulk dump sysex (same format as .syx patch files)
-    // This uses the same path as loadPatchBank which is proven to work
-    const sysex = new Uint8Array(4104);
+    // Build a 163-byte single-voice sysex (format 0)
+    // F0 43 00 00 01 1B <155 VCED bytes> checksum F7
+    const sysex = new Uint8Array(163);
     sysex[0] = 0xF0;
     sysex[1] = 0x43; // Yamaha
     sysex[2] = 0x00; // Channel 0
-    sysex[3] = 0x09; // Format 9 = 32-voice bulk dump
-    sysex[4] = 0x20; // Byte count MSB (4096)
-    sysex[5] = 0x00; // Byte count LSB
-    // Voice 0 = our packed preset, voices 1-31 = zeros (init patches)
-    sysex.set(packed, 6);
-    // Checksum over 4096 data bytes
+    sysex[3] = 0x00; // Format 0 = single voice
+    sysex[4] = 0x01; // Byte count MSB (155)
+    sysex[5] = 0x1B; // Byte count LSB
+    // Copy 155 VCED bytes
+    for (let i = 0; i < 155; i++) sysex[6 + i] = vced[i];
+    // Checksum over 155 data bytes
     let sum = 0;
-    for (let i = 6; i < 4102; i++) sum += sysex[i];
-    sysex[4102] = (-sum) & 0x7F;
-    sysex[4103] = 0xF7;
-    // Send via loadSysex (writes to internal RAM) + loadVoices (updates cartridge)
+    for (let i = 6; i < 161; i++) sum += sysex[i];
+    sysex[161] = (-sum) & 0x7F;
+    sysex[162] = 0xF7;
+    // Send via serial path (non-4104 size goes through firmware sysex parser)
     this.loadSysex(sysex.buffer);
-    this.loadVoices(sysex.buffer.slice(6, 6 + 4096));
-    // Select voice 0 (where we placed our preset) after a short delay for firmware processing
-    setTimeout(() => { if (!this._disposed) this.selectVoice(0); }, 50);
-    console.log(`[DX7] _loadVcedData: sent 4104-byte sysex bulk dump`);
+    console.log(`[DX7] _loadVcedData: sent 163-byte single-voice sysex`);
   }
 
   /** Convert VCED (155 bytes unpacked) to VMEM (128 bytes packed) */
