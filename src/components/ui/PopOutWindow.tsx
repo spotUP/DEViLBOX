@@ -136,11 +136,32 @@ export const PopOutWindow: React.FC<PopOutWindowProps> = ({
         popupHead.appendChild(clone);
       });
 
+      // Clone CSS custom properties (theme tokens) from <html> element
+      // applyTheme() sets --color-* vars on document.documentElement.style
+      const parentStyle = document.documentElement.style.cssText;
+      if (parentStyle) {
+        popup.document.documentElement.style.cssText = parentStyle;
+      }
+      // Also clone data-theme attribute for theme-specific CSS selectors
+      const dataTheme = document.documentElement.getAttribute('data-theme');
+      if (dataTheme) {
+        popup.document.documentElement.setAttribute('data-theme', dataTheme);
+      }
+
       // Defer state updates to next frame to avoid synchronous setState in effect
       requestAnimationFrame(() => {
         setMountEl(mount);
         setReady(true);
       });
+
+      // MutationObserver: mirror theme CSS variable changes on <html>
+      const themeObserver = new MutationObserver(() => {
+        if (popup.closed) return;
+        popup.document.documentElement.style.cssText = document.documentElement.style.cssText;
+        const dt = document.documentElement.getAttribute('data-theme');
+        if (dt) popup.document.documentElement.setAttribute('data-theme', dt);
+      });
+      themeObserver.observe(document.documentElement, { attributes: true, attributeFilter: ['style', 'data-theme'] });
 
       // MutationObserver: mirror Vite HMR style injections during dev
       const observer = new MutationObserver((mutations) => {
@@ -194,6 +215,7 @@ export const PopOutWindow: React.FC<PopOutWindowProps> = ({
       popup.onbeforeunload = handlePopupClose;
 
       // Store cleanup references for the effect cleanup
+      (popup as any).__themeObserver = themeObserver;
       (popup as any).__observer = observer;
       (popup as any).__handleClose = handlePopupClose;
     };
@@ -209,10 +231,12 @@ export const PopOutWindow: React.FC<PopOutWindowProps> = ({
     // Cleanup on unmount
     return () => {
       clearTimeout(fallbackTimer);
+      const themeObs = (popup as any).__themeObserver as MutationObserver | undefined;
       const obs = (popup as any).__observer as MutationObserver | undefined;
       const handleClose = (popup as any).__handleClose as (() => void) | undefined;
       closingRef.current = true;
       openPopouts.delete(title);
+      themeObs?.disconnect();
       obs?.disconnect();
       if (popup && !popup.closed) {
         if (handleClose) {

@@ -53,6 +53,8 @@ Stores + Hooks (shared)  →  DOM Components (React HTML/canvas)
 2. **Never duplicate logic** — Data transforms, cell change handlers, adapter functions live in shared hooks/utils (e.g., `useGTUltraFormatData.ts`, `gtuAdapter.ts`). Renderers only handle presentation.
 3. **Never use DOM overlays in the Pixi/GL UI** — `PixiDOMOverlay` breaks CRT shaders and post-processing effects. All Pixi views must render natively using Pixi components.
 4. **Pattern editors are modular** — Use `PatternEditorCanvas` (DOM) and `PixiPatternEditor`/format-specific grid (Pixi) with shared format channel data from the adapter layer.
+5. **DOM is the source of truth — always fix DOM first, then GL** — The user tests in DOM mode. When they report a UI issue, ALWAYS check and fix the DOM component first (`src/components/`), then apply the same fix to the Pixi/GL equivalent (`src/pixi/`). Never fix GL without first verifying DOM is correct. Every new UI component, dialog, or view MUST be implemented in both DOM and GL. The GL version must be visually 1:1 with the DOM version.
+6. **Always use design tokens — NEVER hardcode colors** — DOM components use Tailwind token classes (`text-accent-primary`, `bg-accent-error/10`, `text-text-muted`, etc.) — NEVER raw Tailwind colors (`text-red-400`, `bg-blue-500`). Pixi/GL components use `theme.*` from `usePixiTheme()` (`theme.accent.color`, `theme.error.color`, `theme.success.color`, etc.) — NEVER hardcoded hex values (`0xff4444`, `0x60a5fa`). For tinted backgrounds in GL, use `tintBg(theme.error.color)` pattern. The only exceptions are intentional decorative palettes (channel colors, hot cue colors, oscilloscope voice colors).
 
 ---
 

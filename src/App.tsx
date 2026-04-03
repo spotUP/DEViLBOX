@@ -75,6 +75,7 @@ const DrumPadManager = lazy(() => import('@components/drumpad/DrumPadManager').t
 const TipOfTheDay = lazy(() => import('@components/dialogs/TipOfTheDay').then(m => ({ default: m.TipOfTheDay })));
 const SamplePackBrowser = lazy(() => import('@components/instruments/SamplePackBrowser').then(m => ({ default: m.SamplePackBrowser })));
 const InstrumentEditorPopout = lazy(() => import('./components/instruments/InstrumentEditorPopout').then(m => ({ default: m.InstrumentEditorPopout })));
+const HardwareUIPopout = lazy(() => import('./components/instruments/HardwareUIPopout').then(m => ({ default: m.HardwareUIPopout })));
 const PianoRoll = lazy(() => import('./components/pianoroll/PianoRoll').then(m => ({ default: m.PianoRoll })));
 const OscilloscopePopout = lazy(() => import('./components/visualization/OscilloscopePopout').then(m => ({ default: m.OscilloscopePopout })));
 const ArrangementView = lazy(() => import('./components/arrangement').then(m => ({ default: m.ArrangementView })));
@@ -186,6 +187,7 @@ function App() {
     showSamplePackModal, setShowSamplePackModal, applyAutoCompact,
     activeView, toggleActiveView,
     instrumentEditorPoppedOut, setInstrumentEditorPoppedOut,
+    hardwareUiPoppedOut, setHardwareUiPoppedOut,
     masterEffectsPoppedOut, setMasterEffectsPoppedOut,
     instrumentEffectsPoppedOut, setInstrumentEffectsPoppedOut,
     pianoRollPoppedOut, setPianoRollPoppedOut,
@@ -919,6 +921,19 @@ function App() {
               </PopOutWindow>
             </Suspense>
           )}
+          {hardwareUiPoppedOut && (
+            <Suspense fallback={null}>
+              <PopOutWindow
+                isOpen={true}
+                onClose={() => setHardwareUiPoppedOut(false)}
+                title="DEViLBOX — Hardware UI"
+                width={800}
+                height={600}
+              >
+                <HardwareUIPopout />
+              </PopOutWindow>
+            </Suspense>
+          )}
           {masterEffectsPoppedOut && (
             <Suspense fallback={null}>
               <PopOutWindow
@@ -1419,6 +1434,21 @@ function App() {
             height={800}
           >
             <InstrumentEditorPopout />
+          </PopOutWindow>
+        </Suspense>
+      )}
+
+      {/* Popped-out Hardware UI (compact canvas-only window) */}
+      {hardwareUiPoppedOut && (
+        <Suspense fallback={null}>
+          <PopOutWindow
+            isOpen={true}
+            onClose={() => setHardwareUiPoppedOut(false)}
+            title="DEViLBOX — Hardware UI"
+            width={900}
+            height={750}
+          >
+            <HardwareUIPopout />
           </PopOutWindow>
         </Suspense>
       )}

@@ -15,7 +15,7 @@ import { useInstrumentStore } from '@stores/useInstrumentStore';
 import { SYNTH_INFO, ALL_SYNTH_TYPES, getSynthInfo } from '@constants/synthCategories';
 import { UnifiedInstrumentEditor } from './editors';
 import { EffectChain, TestKeyboard, CategorizedSynthSelector } from './shared';
-import { hasBuiltInInput } from './hardware/HardwareUIWrapper';
+import { hasBuiltInInput, hasHardwareUI } from './hardware/HardwareUIWrapper';
 import { SavePresetDialog } from './presets';
 import { InstrumentList } from './InstrumentList';
 import * as LucideIcons from 'lucide-react';
@@ -226,19 +226,34 @@ export const EditInstrumentModal: React.FC<EditInstrumentModalProps> = ({
     setTempInstrument(null);
   };
 
-  // Handle pop-out: close modal and open in separate window, or focus existing
+  // Handle pop-out: if hardware UI → pop out just the HW canvas, otherwise full editor
   const handlePopOut = () => {
-    const alreadyPoppedOut = useUIStore.getState().instrumentEditorPoppedOut;
-    if (alreadyPoppedOut) {
-      focusPopout('DEViLBOX — Instrument Editor');
+    const ui = useUIStore.getState();
+    const inst = isCreating ? tempInstrument : currentInstrument;
+    const isHW = inst && hasHardwareUI(inst.synthType);
+
+    if (isHW) {
+      // Pop out just the hardware UI (compact canvas window)
+      if (ui.hardwareUiPoppedOut) {
+        focusPopout('DEViLBOX — Hardware UI');
+        onClose();
+        return;
+      }
       onClose();
-      return;
+      ui.setHardwareUiPoppedOut(true);
+    } else {
+      // Pop out full instrument editor
+      if (ui.instrumentEditorPoppedOut) {
+        focusPopout('DEViLBOX — Instrument Editor');
+        onClose();
+        return;
+      }
+      setPreviewInstrument(null);
+      setIsCreating(false);
+      setTempInstrument(null);
+      onClose();
+      ui.setInstrumentEditorPoppedOut(true);
     }
-    setPreviewInstrument(null);
-    setIsCreating(false);
-    setTempInstrument(null);
-    onClose();
-    useUIStore.getState().setInstrumentEditorPoppedOut(true);
   };
 
   // Update temp instrument in create mode
