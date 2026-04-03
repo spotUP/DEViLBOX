@@ -465,16 +465,16 @@ export const TestKeyboard: React.FC<TestKeyboardProps> = ({ instrument }) => {
       </div>
 
       {/* Velocity Control */}
-      <div className="flex items-center gap-3 bg-ft2-header rounded border border-ft2-border p-2">
-        <span className="text-xs font-bold text-ft2-highlight">VELOCITY:</span>
+      <div className="flex items-center gap-2 px-2 py-1">
+        <span className="text-[10px] font-bold text-ft2-highlight shrink-0">VEL</span>
         <input
           type="range"
           min="0"
           max="100"
           defaultValue="80"
-          className="flex-1 h-1 bg-ft2-bg rounded-lg appearance-none cursor-pointer accent-ft2-cursor"
+          className="w-24 h-1 bg-ft2-bg rounded-lg appearance-none cursor-pointer accent-ft2-cursor"
         />
-        <span className="text-xs font-mono text-ft2-text">80%</span>
+        <span className="text-[10px] font-mono text-ft2-text">80%</span>
       </div>
       </div>
     </div>
