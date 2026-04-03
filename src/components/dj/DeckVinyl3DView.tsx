@@ -463,7 +463,8 @@ export function TurntableScene({ deckId, orbitRef, embedded }: TurntableScenePro
     const dt = Math.max(0.001, (now - lastPointerTimeRef.current) / 1000);
     lastPointerTimeRef.current = now;
     const pixelVelocity = -dx / dt;
-    const omega = (pixelVelocity / 400) * OMEGA_NORMAL;
+    const sensitivity = useDJStore.getState().jogWheelSensitivity;
+    const omega = (pixelVelocity / 400) * OMEGA_NORMAL * sensitivity;
     physicsRef.current?.setHandVelocity(omega);
     lastPointerRef.current = { x: e.nativeEvent.clientX, y: e.nativeEvent.clientY };
   }, []);

@@ -666,7 +666,7 @@ export class DeckEngine {
     // Hard-set gains after decay to clean, definitive values.
     // Uses cancelScheduledValues + setValueAtTime (atomic) instead of rampTo
     // (which relies on cancelAndHoldAtTime that can misbehave with rapid overlapping ramps).
-    const hardResetGains = () => {
+    const hardReset = () => {
       if (this.isScratchActive) return; // scratch restarted, don't interfere
       const now = Tone.getContext().rawContext.currentTime;
       // Kill any residual scratch buffer output
@@ -677,9 +677,17 @@ export class DeckEngine {
       // Hard-set deckGain to exactly 1.0 — cancel all automation, then set atomically
       this.deckGain.gain.cancelScheduledValues(now);
       this.deckGain.gain.setValueAtTime(1, now);
+      // Force playback rate to restMultiplier — prevents rate drift from
+      // incomplete _decayToRest animations or stale physics velocities
+      if (this._playbackMode === 'audio') {
+        this.audioPlayer.setPlaybackRate(this.restMultiplier);
+      } else {
+        this.replayer.setPitchMultiplier(this.restMultiplier);
+        this.replayer.setTempoMultiplier(this.restMultiplier);
+      }
     };
-    setTimeout(hardResetGains, decayMs + 50);
-    setTimeout(hardResetGains, decayMs + 300);
+    setTimeout(hardReset, decayMs + 50);
+    setTimeout(hardReset, decayMs + 300);
   }
 
   /** Switch from forward playback to backward (reverse scratch). */

@@ -7,14 +7,12 @@
  * DOM reference: src/components/dialogs/SettingsModal.tsx
  */
 
-import React, { useCallback } from 'react';
-import type { FederatedPointerEvent, FederatedWheelEvent, Graphics as GraphicsType } from 'pixi.js';
-import { useApplication } from '@pixi/react';
-import { PixiButton, PixiCheckbox, PixiSlider, PixiNumericInput, PixiIcon } from '../components';
+import React from 'react';
+import { PixiButton, PixiCheckbox, PixiSlider, PixiNumericInput, PixiLabel } from '../components';
+import { PixiModal } from '../components/PixiModal';
 import { PixiSelect, type SelectOption } from '../components/PixiSelect';
 import { PixiScrollView } from '../components/PixiScrollView';
 import { usePixiTheme } from '../theme';
-import { PIXI_FONTS } from '../fonts';
 import { Div, Txt } from '../layout';
 
 import { useUIStore } from '@stores/useUIStore';
@@ -25,7 +23,6 @@ import { LENS_PRESETS, LENS_PRESET_ORDER } from '../LensFilter';
 import { SID_ENGINES } from '@engine/deepsid/DeepSIDEngineManager';
 import { getASIDDeviceManager } from '@lib/sid/ASIDDeviceManager';
 import { notify } from '@stores';
-import { useModalClose } from '@hooks/useDialogKeyboard';
 import {
   useSettingsDialog,
   SETTINGS_TABS,
@@ -89,10 +86,6 @@ interface PixiSettingsModalProps {
 
 export const PixiSettingsModal: React.FC<PixiSettingsModalProps> = ({ isOpen, onClose }) => {
   const theme = usePixiTheme();
-  const { app } = useApplication();
-
-  // Standard modal keyboard handling (Enter/Escape to close)
-  useModalClose({ isOpen, onClose });
 
   // ── Shared settings dialog logic ─────────────────────────────────────────
   const s = useSettingsDialog({ isOpen });
@@ -106,144 +99,76 @@ export const PixiSettingsModal: React.FC<PixiSettingsModalProps> = ({ isOpen, on
   const crtSectionH = s.crtEnabled ? CRT_SLIDERS.length * 28 + 4 * 18 + 60 : 40;
   const lensSectionH = s.lensEnabled ? LENS_SLIDERS.length * 28 + 2 * 18 + 60 + 40 : 40;
   const contentH = 2000 + crtSectionH + lensSectionH;
-  const scrollAreaH = MODAL_H - 48 - 44; // header + footer
+  const scrollAreaH = MODAL_H - 44; // header only (no footer)
 
   // CRT sliders grouped
   const crtGroups: string[] = [];
   CRT_SLIDERS.forEach((slider) => { if (!crtGroups.includes(slider.group)) crtGroups.push(slider.group); });
 
-  let screenW = 1920;
-  let screenH = 1080;
-  try { screenW = app?.screen?.width ?? 1920; screenH = app?.screen?.height ?? 1080; } catch { /* app not ready */ }
-
-  const drawOverlay = (g: GraphicsType) => {
-    g.clear();
-    // Transparent hit area — no visual fill, just captures pointer/wheel events outside the modal
-    g.rect(0, 0, screenW, screenH);
-    g.fill({ color: 0x000000, alpha: 0 });
-  };
-
-  const handleOverlayClick = (_e: FederatedPointerEvent) => { onClose(); };
-  // Panel click handlers removed — overlay uses onPointerTap which only fires
-  // when both press+release happen on the overlay itself, so no need to block
-  // propagation from the panel.
-  const blockWheel = useCallback((e: FederatedWheelEvent) => {
-    e.stopPropagation();
-    (e.nativeEvent as WheelEvent | undefined)?.preventDefault?.();
-    (e.nativeEvent as WheelEvent | undefined)?.stopImmediatePropagation?.();
-  }, []);
-
   return (
-    <pixiContainer renderable={isOpen} eventMode={isOpen ? 'static' : 'none'} layout={{ position: 'absolute', width: '100%', height: '100%' }}>
-      {/* Always mount structure to avoid addChild → Yoga BindingError */}
-      <pixiGraphics
-        draw={drawOverlay}
-        eventMode="static"
-        onPointerTap={handleOverlayClick}
-        onWheel={blockWheel}
-        layout={{ position: 'absolute', width: screenW, height: screenH }}
-      />
-
+    <PixiModal isOpen={isOpen} onClose={onClose} width={MODAL_W} height={MODAL_H}>
+      {/* ── Header with integrated tabs ─────────────────────────────── */}
       <layoutContainer
-        eventMode="auto"
         layout={{
-          position: 'absolute',
-          left: Math.round((screenW - MODAL_W) / 2),
-          top: Math.round((screenH - MODAL_H) / 2),
-          width: MODAL_W,
-          height: MODAL_H,
-          flexDirection: 'column',
-          backgroundColor: theme.bg.color,
-          borderWidth: 2,
+          flexDirection: 'row',
+          alignItems: 'center',
+          paddingLeft: 16,
+          paddingRight: 8,
+          height: 44,
+          gap: 12,
+          backgroundColor: theme.bgSecondary.color,
+          borderBottomWidth: 1,
           borderColor: theme.border.color,
-          overflow: 'hidden',
         }}
       >
-        {/* Header — DOM: px-4 py-3 bg-ft2-header border-b-2 */}
-        <layoutContainer
-          layout={{
-            flexDirection: 'row',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            paddingLeft: 16,
-            paddingRight: 16,
-            paddingTop: 12,
-            paddingBottom: 12,
-            backgroundColor: theme.bgTertiary.color,
-            borderBottomWidth: 2,
-            borderColor: theme.border.color,
-          }}
-        >
-          <pixiBitmapText
-            text="SETTINGS"
-            style={{ fontFamily: PIXI_FONTS.SANS_BOLD, fontSize: 16, fill: 0xffffff }}
-            tint={theme.accent.color}
-            layout={{}}
-          />
-          <layoutContainer
-            eventMode="static"
-            cursor="pointer"
-            onClick={onClose}
-            layout={{
-              width: 24,
-              height: 24,
-              justifyContent: 'center',
-              alignItems: 'center',
-              borderRadius: 4,
-            }}
-          >
-            <PixiIcon name="close" size={16} color={theme.textMuted.color} layout={{}} />
-          </layoutContainer>
-        </layoutContainer>
+        <PixiLabel text="SETTINGS" size="md" weight="bold" color="text" />
 
-        {/* Tab Bar */}
-        <layoutContainer
-          layout={{
-            flexDirection: 'row',
-            paddingLeft: 8,
-            paddingRight: 8,
-            backgroundColor: theme.bgTertiary.color,
-            borderBottomWidth: 1,
-            borderColor: theme.border.color,
-            height: 32,
-            alignItems: 'center',
-          }}
-        >
-          {SETTINGS_TABS.map((tab) => {
-            const isActive = s.activeTab === tab.id;
-            return (
-              <layoutContainer
-                key={tab.id}
-                eventMode="static"
-                cursor="pointer"
-                onPointerDown={() => s.setActiveTab(tab.id)}
-                onClick={() => s.setActiveTab(tab.id)}
-                layout={{
-                  paddingLeft: 12,
-                  paddingRight: 12,
-                  paddingTop: 6,
-                  paddingBottom: 6,
-                  // backgroundColor drives the active indicator — known to update correctly
-                  // unlike borderBottomWidth which can fail to re-render on 0→2 transitions
-                  backgroundColor: isActive ? theme.bgSecondary.color : undefined,
-                  borderRadius: isActive ? 4 : 0,
-                }}
-              >
-                <pixiBitmapText
-                  text={tab.label.toUpperCase()}
-                  style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 10, fill: 0xffffff }}
-                  tint={isActive ? theme.accent.color : theme.textMuted.color}
-                  layout={{}}
-                />
-              </layoutContainer>
-            );
-          })}
-        </layoutContainer>
+        {/* Divider */}
+        <layoutContainer layout={{ width: 1, height: 20, backgroundColor: theme.border.color }} />
 
-        {/* Content — DOM: p-4 space-y-6 max-h-[70vh] overflow-y-auto */}
+        {/* Tabs */}
+        {SETTINGS_TABS.map((tab) => {
+          const isActive = s.activeTab === tab.id;
+          return (
+            <layoutContainer
+              key={tab.id}
+              eventMode="static"
+              cursor="pointer"
+              onPointerDown={() => s.setActiveTab(tab.id)}
+              onClick={() => s.setActiveTab(tab.id)}
+              layout={{
+                paddingLeft: 12,
+                paddingRight: 12,
+                height: 26,
+                borderRadius: 6,
+                alignItems: 'center',
+                justifyContent: 'center',
+                backgroundColor: isActive ? theme.bg.color : 0x00000000,
+                borderWidth: 1,
+                borderColor: isActive ? theme.accent.color : 0x00000000,
+              }}
+            >
+              <PixiLabel
+                text={tab.label.toUpperCase()}
+                size="xs"
+                weight="semibold"
+                color={isActive ? 'accent' : 'textMuted'}
+              />
+            </layoutContainer>
+          );
+        })}
+
+        {/* Spacer */}
+        <layoutContainer layout={{ flex: 1 }} />
+
+        {/* Close button */}
+        <PixiButton icon="close" label="" variant="ghost" size="sm" onClick={onClose} />
+      </layoutContainer>
+
+      {/* Content */}
         <PixiScrollView
           width={MODAL_W}
-          height={scrollAreaH - 32}
+          height={scrollAreaH}
           contentHeight={contentH}
           direction="vertical"
           bgColor={theme.bg.color}
@@ -606,6 +531,25 @@ export const PixiSettingsModal: React.FC<PixiSettingsModalProps> = ({ isOpen, on
                 color={theme.accent.color}
               />
               <Txt className="text-[10px] font-mono text-text-primary">{`${Math.round(s.platterMass * 100)}%`}</Txt>
+            </Div>
+          </SettingRow>
+
+          <SettingRow label="Scratch Sensitivity:" description="How fast the record responds to drag">
+            <Div className="flex-row items-center gap-2">
+              <PixiSlider
+                value={Math.round(s.jogWheelSensitivity * 100)}
+                min={50}
+                max={200}
+                step={5}
+                onChange={(v) => s.setJogWheelSensitivity(v / 100)}
+                orientation="horizontal"
+                length={120}
+                thickness={4}
+                handleWidth={10}
+                handleHeight={10}
+                color={theme.accent.color}
+              />
+              <Txt className="text-[10px] font-mono text-text-primary">{`${Math.round(s.jogWheelSensitivity * 100)}%`}</Txt>
             </Div>
           </SettingRow>
 
@@ -1069,24 +1013,6 @@ export const PixiSettingsModal: React.FC<PixiSettingsModalProps> = ({ isOpen, on
         </Div>
       </PixiScrollView>
 
-      {/* Footer — DOM: px-4 py-3 bg-ft2-header border-t-2 flex justify-end */}
-      <layoutContainer
-        layout={{
-          flexDirection: 'row',
-          alignItems: 'center',
-          justifyContent: 'flex-end',
-          paddingLeft: 16,
-          paddingRight: 16,
-          paddingTop: 12,
-          paddingBottom: 12,
-          backgroundColor: theme.bgTertiary.color,
-          borderTopWidth: 2,
-          borderColor: theme.border.color,
-        }}
-      >
-        <PixiButton label="CLOSE" variant="primary" width={80} onClick={onClose} />
-      </layoutContainer>
-      </layoutContainer>
-    </pixiContainer>
+    </PixiModal>
   );
 };
