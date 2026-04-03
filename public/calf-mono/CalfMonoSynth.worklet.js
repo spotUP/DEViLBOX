@@ -177,12 +177,7 @@ class CalfMonoSynthProcessor extends AudioWorkletProcessor {
         return result;
       };
 
-      const config = {
-        // Provide wasmMemory getter so Emscripten can access it during init.
-        // The memory is captured from WebAssembly.instantiate above.
-        get wasmMemory() { return capturedMemory; },
-        set wasmMemory(m) { capturedMemory = m; },
-      };
+      const config = {};
       if (wasmBinary) {
         config.wasmBinary = wasmBinary;
       }
