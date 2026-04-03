@@ -8,7 +8,8 @@ import { useCallback, useRef, useEffect } from 'react';
 import type { Graphics as GraphicsType } from 'pixi.js';
 import { PIXI_FONTS } from '../../fonts';
 import { usePixiTheme } from '../../theme';
-import { PixiKnob, PixiToggle, PixiSlider, PixiSwitch3Way, PixiLabel } from '../../components';
+import { PixiKnob, PixiToggle, PixiSlider, PixiSwitch3Way, PixiLabel, PixiSelect } from '../../components';
+import type { SelectOption } from '../../components';
 import type { SynthPanelLayout, SectionDescriptor, ControlDescriptor } from './synthPanelTypes';
 
 interface PixiSynthPanelProps {
@@ -127,9 +128,9 @@ const PixiSynthSection: React.FC<SynthSectionProps> = ({ section, getValue, upda
     g.fill({ color: theme.border.color, alpha: 0.15 });
   }, [theme]);
 
-  // Sort controls: knobs/sliders first, then toggles/switches
+  // Sort controls: knobs/sliders first, then toggles/switches/selects
   const knobs = section.controls.filter(c => c.type === 'knob' || c.type === 'slider');
-  const toggles = section.controls.filter(c => c.type === 'toggle' || c.type === 'switch3way');
+  const toggles = section.controls.filter(c => c.type === 'toggle' || c.type === 'switch3way' || c.type === 'select');
 
   return (
     <pixiContainer layout={{ flexDirection: 'column', gap: 4 }}>
@@ -234,6 +235,19 @@ const PixiSynthControl: React.FC<SynthControlProps> = ({ descriptor, value, onCh
             value={(typeof value === 'number' ? value : 0) as 0 | 1 | 2}
             labels={descriptor.labels}
             onChange={(v) => onChange(v)}
+          />
+        </pixiContainer>
+      );
+
+    case 'select':
+      return (
+        <pixiContainer layout={{ flexDirection: 'column', gap: 2 }}>
+          <PixiLabel text={descriptor.label} size="xs" color="textMuted" />
+          <PixiSelect
+            options={descriptor.options as SelectOption[]}
+            value={typeof value === 'string' ? value : String(value ?? '')}
+            onChange={(v) => onChange(v)}
+            width={120}
           />
         </pixiContainer>
       );

@@ -40,7 +40,14 @@ export interface Switch3WayDescriptor {
   labels: [string, string, string];
 }
 
-export type ControlDescriptor = KnobDescriptor | ToggleDescriptor | SliderDescriptor | Switch3WayDescriptor;
+export interface SelectDescriptor {
+  type: 'select';
+  key: string;
+  label: string;
+  options: { value: string; label: string }[];
+}
+
+export type ControlDescriptor = KnobDescriptor | ToggleDescriptor | SliderDescriptor | Switch3WayDescriptor | SelectDescriptor;
 
 export interface SectionDescriptor {
   label: string;

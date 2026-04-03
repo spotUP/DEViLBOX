@@ -83,6 +83,10 @@ export class DX7Synth implements DevilboxSynth {
           console.error('[DX7]', data.message);
         } else if (data.type === 'patchName') {
           console.log(`[DX7] Patch ${data.index}: ${data.name}`);
+        } else if (data.type === 'debugInfo') {
+          console.log(`[DX7:DEBUG] State dump:`, data);
+        } else if (data.type === 'debugLoadResult') {
+          console.log(`[DX7:DEBUG] Load+check result:`, data);
         }
       };
 
@@ -117,12 +121,11 @@ export class DX7Synth implements DevilboxSynth {
 
   /** Load a named VCED preset (156-byte single-voice patch) */
   private _loadVcedPreset(name: string) {
+    if (this._disposed) return;
     import('./dx7presets').then(({ DX7_VCED_PRESETS }) => {
+      if (this._disposed) return;
       const preset = DX7_VCED_PRESETS.find(p => p.name === name);
       if (preset && preset.data.length === 156) {
-        // Convert VCED (unpacked 155 bytes) → VMEM (packed 128 bytes) and send as bulk dump.
-        // The bulk dump path writes directly to VDX7 memory — reliable.
-        // The VCED sysex path relies on firmware serial processing — fragile.
         this._loadVcedData(preset.data.subarray(0, 155));
         console.log(`[DX7] Loaded VCED preset: ${name}`);
       } else {
@@ -133,21 +136,30 @@ export class DX7Synth implements DevilboxSynth {
     });
   }
 
-  /** Load raw VCED data (155 bytes unpacked) via the proven loadVoices+setBank path */
+  /** Load raw VCED data (155 bytes unpacked) via bulk dump sysex to internal RAM */
   _loadVcedData(vced: Uint8Array) {
     const packed = DX7Synth.vcedToVmem(vced);
-    // Build a 4096-byte voice bank with this voice at slot 0 (rest zeroed = init voices)
-    const bank = new Uint8Array(4096);
-    bank.set(packed, 0); // Voice 0 = our VCED, voices 1-31 = empty
-    // Use the proven loadVoices → setBank → programChange path
-    // This is the same path the ROM voice loading uses (which produces sound)
-    this.send({ type: 'loadVoices', data: bank.buffer });
-    this.send({ type: 'setBank', bank: 0 });
-    // Small delay for setBank to be processed before program change
-    setTimeout(() => {
-      this.send({ type: 'programChange', program: 0 });
-    }, 50);
-    console.log(`[DX7] _loadVcedData: loaded via loadVoices+setBank path`);
+    // Build a 4104-byte bulk dump sysex (same format as .syx patch files)
+    // This uses the same path as loadPatchBank which is proven to work
+    const sysex = new Uint8Array(4104);
+    sysex[0] = 0xF0;
+    sysex[1] = 0x43; // Yamaha
+    sysex[2] = 0x00; // Channel 0
+    sysex[3] = 0x09; // Format 9 = 32-voice bulk dump
+    sysex[4] = 0x20; // Byte count MSB (4096)
+    sysex[5] = 0x00; // Byte count LSB
+    // Voice 0 = our packed preset, voices 1-31 = zeros (init patches)
+    sysex.set(packed, 6);
+    // Checksum over 4096 data bytes
+    let sum = 0;
+    for (let i = 6; i < 4102; i++) sum += sysex[i];
+    sysex[4102] = (-sum) & 0x7F;
+    sysex[4103] = 0xF7;
+    // Send via loadSysex — same path as loadPatchBank (writes to 0x1000 + program change)
+    this.loadSysex(sysex.buffer);
+    // Select voice 0 (where we placed our preset) after a short delay for firmware processing
+    setTimeout(() => { if (!this._disposed) this.selectVoice(0); }, 50);
+    console.log(`[DX7] _loadVcedData: sent 4104-byte sysex bulk dump`);
   }
 
   /** Convert VCED (155 bytes unpacked) to VMEM (128 bytes packed) */
@@ -350,6 +362,16 @@ export class DX7Synth implements DevilboxSynth {
     this.send({ type: 'loadSysex', data });
   }
 
+  /** Set a single VCED voice parameter via SysEx parameter change message.
+   *  paramNum: 0-155 (VCED byte offset), value: 0-99 (or max for that param).
+   *  This sends a DX7 SysEx parameter change: F0 43 10 gg pp dd F7 */
+  setVcedParam(paramNum: number, value: number) {
+    const group = paramNum > 127 ? 0x01 : 0x00; // pp bits for params 128-155
+    const paramByte = paramNum > 127 ? paramNum - 128 : paramNum;
+    const sysex = new Uint8Array([0xF0, 0x43, 0x10, group, paramByte, value & 0x7F, 0xF7]);
+    this.send({ type: 'loadSysex', data: sysex.buffer });
+  }
+
   private send(msg: Record<string, unknown>) {
     if (this._ready && this.workletNode) this.workletNode.port.postMessage(msg);
     else this._pendingMessages.push(msg);
@@ -473,5 +495,17 @@ export class DX7Synth implements DevilboxSynth {
       this.workletNode = null;
     }
     this.output.disconnect();
+  }
+
+  /** Debug: dump internal state to console */
+  debug() {
+    this.send({ type: 'debug' });
+  }
+
+  /** Debug: load sysex and check if EGS registers change */
+  debugLoadAndCheck(data: ArrayBuffer) {
+    if (this._ready && this.workletNode) {
+      this.workletNode.port.postMessage({ type: 'debugLoadAndCheck', data });
+    }
   }
 }
