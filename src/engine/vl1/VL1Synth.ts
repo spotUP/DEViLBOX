@@ -390,7 +390,7 @@ export class VL1SynthEngine implements DevilboxSynth {
     }
   }
 
-  private applyConfig(config: VL1Config): void {
+  applyConfig(config: VL1Config): void {
     if (!this._worklet || !this.isInitialized) return;
     for (const [key, index] of Object.entries(PARAM_INDEX)) {
       const value = (config as Record<string, number | undefined>)[key];

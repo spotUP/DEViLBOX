@@ -287,7 +287,7 @@ export class MdaEPianoSynth implements DevilboxSynth {
     }
   }
 
-  private applyConfig(config: MdaEPianoConfig): void {
+  applyConfig(config: MdaEPianoConfig): void {
     if (!this._worklet || !this.isInitialized) return;
     for (let i = 0; i < CONFIG_KEYS.length; i++) {
       const value = config[CONFIG_KEYS[i]];
