@@ -394,6 +394,9 @@ export const DJPlaylistPanel: React.FC<DJPlaylistPanelProps> = ({ onClose }) => 
     setShowSortMenu(false);
   }, [activePlaylist, sortTracksAction]);
 
+  // Hover state (JS-based — CSS :hover doesn't work on touch/mobile devices)
+  const [hoveredIdx, setHoveredIdx] = useState<number | null>(null);
+
   // ── Render ───────────────────────────────────────────────────────────────
 
   return (
@@ -604,7 +607,9 @@ export const DJPlaylistPanel: React.FC<DJPlaylistPanelProps> = ({ onClose }) => 
                   onDragOver={(e) => handleDragOver(e, i)}
                   onDragEnd={handleDragEnd}
                   onDoubleClick={() => loadTrackWithProgress(track, pickFreeDeck(), i)}
-                  className={`flex items-center gap-1.5 px-1.5 py-1 border-b border-white/[0.04] transition-colors group cursor-pointer hover:bg-white/20 ${
+                  onPointerEnter={() => setHoveredIdx(i)}
+                  onPointerLeave={() => setHoveredIdx(prev => prev === i ? null : prev)}
+                  className={`flex items-center gap-1.5 px-1.5 py-1 border-b border-white/[0.04] transition-colors cursor-pointer ${
                     loadingTrackIndex === i
                       ? 'bg-cyan-900/20'
                       : dragIndex === i
@@ -613,7 +618,9 @@ export const DJPlaylistPanel: React.FC<DJPlaylistPanelProps> = ({ onClose }) => 
                           ? 'bg-green-900/20'
                           : autoDJEnabled && i === autoDJNextIdx
                             ? 'bg-blue-900/15'
-                            : ''
+                            : hoveredIdx === i
+                              ? 'bg-white/20'
+                              : ''
                   }`}
                 >
                   <GripVertical
@@ -649,35 +656,39 @@ export const DJPlaylistPanel: React.FC<DJPlaylistPanelProps> = ({ onClose }) => 
                   {track.duration > 0 && (
                     <span className="text-xs font-mono text-text-muted/30 shrink-0">{formatDuration(track.duration)}</span>
                   )}
-                  <button
-                    onClick={() => loadTrackWithProgress(track, 'A', i)}
-                    className="px-1 text-xs font-mono font-bold text-blue-400/40 hover:text-blue-300 transition-colors"
-                    title="Deck 1"
-                  >
-                    1
-                  </button>
-                  <button
-                    onClick={() => loadTrackWithProgress(track, 'B', i)}
-                    className="px-1 text-xs font-mono font-bold text-red-400/40 hover:text-red-300 transition-colors"
-                    title="Deck 2"
-                  >
-                    2
-                  </button>
-                  {useDJStore.getState().thirdDeckActive && (
-                    <button
-                      onClick={() => loadTrackWithProgress(track, 'C', i)}
-                      className="px-1 text-xs font-mono font-bold text-emerald-400/40 hover:text-emerald-300 transition-colors"
-                      title="Deck 3"
-                    >
-                      3
-                    </button>
+                  {hoveredIdx === i && (
+                    <>
+                      <button
+                        onClick={() => loadTrackWithProgress(track, 'A', i)}
+                        className="px-1 text-xs font-mono font-bold text-blue-400 transition-colors"
+                        title="Deck 1"
+                      >
+                        1
+                      </button>
+                      <button
+                        onClick={() => loadTrackWithProgress(track, 'B', i)}
+                        className="px-1 text-xs font-mono font-bold text-red-400 transition-colors"
+                        title="Deck 2"
+                      >
+                        2
+                      </button>
+                      {useDJStore.getState().thirdDeckActive && (
+                        <button
+                          onClick={() => loadTrackWithProgress(track, 'C', i)}
+                          className="px-1 text-xs font-mono font-bold text-emerald-400 transition-colors"
+                          title="Deck 3"
+                        >
+                          3
+                        </button>
+                      )}
+                      <button
+                        onClick={() => removeTrack(activePlaylist.id, i)}
+                        className="p-0.5 text-accent-error transition-colors"
+                      >
+                        <X size={8} />
+                      </button>
+                    </>
                   )}
-                  <button
-                    onClick={() => removeTrack(activePlaylist.id, i)}
-                    className="p-0.5 text-text-muted/20 hover:text-accent-error transition-colors"
-                  >
-                    <X size={8} />
-                  </button>
                 </div>
               ))}
             </div>

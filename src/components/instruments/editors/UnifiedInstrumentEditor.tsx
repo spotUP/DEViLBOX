@@ -26,6 +26,7 @@ import { HardwareUIWrapper, hasHardwareUI } from '../hardware/HardwareUIWrapper'
 
 // Extracted sub-modules
 import { SynthTypeDispatcher, type EditorMode } from './SynthTypeDispatcher';
+import { getSynthLayout } from '@/pixi/views/instruments/layouts';
 
 // ============================================================================
 // SYNTH TYPE CATEGORIZATION HELPERS
@@ -187,7 +188,7 @@ function getEditorMode(synthType: SynthType): EditorMode {
   if (synthType === 'HarmonicSynth') return 'harmonicsynth';
   if (synthType === 'ModularSynth') return 'modular';
   if (synthType === 'SunVoxModular') return 'sunvox-modular';
-  if (synthType === 'WAM') return 'wam';
+  if (synthType === 'WAM' || synthType.startsWith('WAM')) return 'wam';
   if (synthType === 'TonewheelOrgan') return 'tonewheelOrgan';
   if (synthType === 'Melodica') return 'melodica';
   if (synthType === 'Vital') return 'vital';
@@ -200,6 +201,8 @@ function getEditorMode(synthType: SynthType): EditorMode {
   if (synthType === 'StartrekkerAMSynth') return 'startrekker-am';
   if (synthType === 'WobbleBass') return 'wobblebass';
   if (SYNTH_REGISTRY.has(synthType)) return 'vstbridge';
+  // Catch-all: synths with declarative layout descriptors (TR909, C64SID, V2Speech, Open303, etc.)
+  if (getSynthLayout(synthType)) return 'layout';
   return 'generic';
 }
 

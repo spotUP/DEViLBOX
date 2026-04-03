@@ -576,9 +576,10 @@ export const PixiEditInstrumentModal: React.FC<PixiEditInstrumentModalProps> = (
           {/* ── Right group: hardware toggle + presets + action buttons ── */}
           {currentInstrument && hasPixiHardwareUI(currentInstrument.synthType) && (
             <PixiButton
-              label={hardwareUIMode ? 'Simple' : 'Hardware'}
-              variant={hardwareUIMode ? 'primary' : 'ghost'}
+              label={hardwareUIMode ? 'Simple UI' : 'Hardware UI'}
+              variant="primary"
               size="sm"
+              icon={hardwareUIMode ? 'preset-a' : 'preset-a'}
               onClick={() => setHardwareUIMode(!hardwareUIMode)}
             />
           )}
