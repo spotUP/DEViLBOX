@@ -131,11 +131,23 @@ export const DexedHardwareUI: React.FC<DexedHardwareUIProps> = ({
     } else if (data.length >= 155 && data.length <= 163) {
       // Single voice VCED
       const vcedStart = data[0] === 0xF0 ? 6 : 0;
+      const vcedData = data.subarray(vcedStart, vcedStart + 155);
       if (m) {
         const ptr = m._malloc(155);
-        m.HEAPU8.set(data.subarray(vcedStart, vcedStart + 155), ptr);
+        m.HEAPU8.set(vcedData, ptr);
         m._dexed_ui_load_sysex(ptr, 155);
         m._free(ptr);
+      }
+      // Also send to audio engine via bulk dump path
+      if (instrumentId) {
+        try {
+          const engine = getToneEngine();
+          const key = (instrumentId << 16) | 0xFFFF;
+          const synth = engine.instruments.get(key) as any;
+          if (synth?._loadVcedData) {
+            synth._loadVcedData(new Uint8Array(vcedData));
+          }
+        } catch { /* engine not ready */ }
       }
       setPatchInfo(`Loaded ${file.name} (single voice)`);
     } else {
@@ -365,16 +377,9 @@ export const DexedHardwareUI: React.FC<DexedHardwareUIProps> = ({
             const engine = getToneEngine();
             const key = (instrumentId << 16) | 0xFFFF;
             const synth = engine.instruments.get(key);
-            if (synth && 'loadSysex' in synth) {
-              const sysex = new Uint8Array(163);
-              sysex[0] = 0xF0; sysex[1] = 0x43; sysex[2] = 0x00;
-              sysex[3] = 0x00; sysex[4] = 0x01; sysex[5] = 0x1B;
-              sysex.set(vced, 6);
-              let sum = 0;
-              for (let i = 0; i < 155; i++) sum += vced[i];
-              sysex[161] = (-sum) & 0x7F;
-              sysex[162] = 0xF7;
-              (synth as any).loadSysex(sysex.buffer);
+            if (synth && '_loadVcedData' in synth) {
+              // Use bulk dump path (direct memory write) — reliable
+              (synth as any)._loadVcedData(new Uint8Array(vced));
             }
           } catch { /* engine not ready */ }
         };
