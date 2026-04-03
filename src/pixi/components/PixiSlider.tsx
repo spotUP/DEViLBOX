@@ -42,6 +42,10 @@ interface PixiSliderProps {
   formatValue?: (value: number) => string;
   disabled?: boolean;
   color?: number;
+  /** Handle fill color (default: theme bgHover, dragging: accent) */
+  handleColor?: number;
+  /** Handle border radius (default: 2, use handleWidth/2 for circle) */
+  handleRadius?: number;
   layout?: Record<string, unknown>;
 }
 
@@ -66,6 +70,8 @@ export const PixiSlider: React.FC<PixiSliderProps> = ({
   formatValue,
   disabled = false,
   color: colorProp,
+  handleColor: handleColorProp,
+  handleRadius = 2,
   layout: layoutProp,
 }) => {
   const theme = usePixiTheme();
@@ -128,15 +134,19 @@ export const PixiSlider: React.FC<PixiSliderProps> = ({
 
       // Handle
       const handleY = effectiveLength - norm * effectiveLength - handleHeight / 2;
-      g.roundRect(0, handleY, handleWidth, handleHeight, 2);
-      g.fill({ color: isDragging ? accent : theme.bgHover.color });
-      g.roundRect(0, handleY, handleWidth, handleHeight, 2);
-      g.stroke({ color: isDragging ? accent : theme.borderLight.color, width: 1 });
+      const hFill = handleColorProp ?? (isDragging ? accent : theme.bgHover.color);
+      const hStroke = isDragging ? accent : (handleColorProp ? handleColorProp : theme.borderLight.color);
+      g.roundRect(0, handleY, handleWidth, handleHeight, handleRadius);
+      g.fill({ color: hFill });
+      g.roundRect(0, handleY, handleWidth, handleHeight, handleRadius);
+      g.stroke({ color: hStroke, alpha: isDragging ? 1 : 0.6, width: 1 });
 
-      // Handle center line
-      g.moveTo(4, handleY + handleHeight / 2);
-      g.lineTo(handleWidth - 4, handleY + handleHeight / 2);
-      g.stroke({ color: accent, alpha: 0.6, width: 1 });
+      // Handle center line (skip for round handles)
+      if (handleRadius < handleWidth / 3) {
+        g.moveTo(4, handleY + handleHeight / 2);
+        g.lineTo(handleWidth - 4, handleY + handleHeight / 2);
+        g.stroke({ color: accent, alpha: 0.6, width: 1 });
+      }
     } else {
       // Horizontal: track centered vertically
       const trackY = (handleHeight - thickness) / 2;
@@ -164,15 +174,19 @@ export const PixiSlider: React.FC<PixiSliderProps> = ({
 
       // Handle
       const handleX = norm * effectiveLength - handleWidth / 2;
-      g.roundRect(handleX, 0, handleWidth, handleHeight, 2);
-      g.fill({ color: isDragging ? accent : theme.bgHover.color });
-      g.roundRect(handleX, 0, handleWidth, handleHeight, 2);
-      g.stroke({ color: isDragging ? accent : theme.borderLight.color, width: 1 });
+      const hFillH = handleColorProp ?? (isDragging ? accent : theme.bgHover.color);
+      const hStrokeH = isDragging ? accent : (handleColorProp ? handleColorProp : theme.borderLight.color);
+      g.roundRect(handleX, 0, handleWidth, handleHeight, handleRadius);
+      g.fill({ color: hFillH });
+      g.roundRect(handleX, 0, handleWidth, handleHeight, handleRadius);
+      g.stroke({ color: hStrokeH, alpha: isDragging ? 1 : 0.6, width: 1 });
 
-      // Handle center line
-      g.moveTo(handleX + handleWidth / 2, 3);
-      g.lineTo(handleX + handleWidth / 2, handleHeight - 3);
-      g.stroke({ color: accent, alpha: 0.6, width: 1 });
+      // Handle center line (skip for round handles)
+      if (handleRadius < handleHeight / 3) {
+        g.moveTo(handleX + handleWidth / 2, 3);
+        g.lineTo(handleX + handleWidth / 2, handleHeight - 3);
+        g.stroke({ color: accent, alpha: 0.6, width: 1 });
+      }
     }
   }, [isVert, length, autoSize, thickness, handleWidth, handleHeight, norm, accent, theme, isDragging, detent, min, max]);
 
