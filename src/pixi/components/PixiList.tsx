@@ -140,14 +140,14 @@ export const PixiList: React.FC<PixiListProps> = ({
       const local = root.toLocal(e.global);
       const rowIdx = Math.floor((local.y + scrollY) / itemHeight);
       const startIdx = Math.floor(scrollY / itemHeight);
-      const endIdx = startIdx + Math.ceil(height / itemHeight) + bufferItems * 2;
-      if (rowIdx >= 0 && rowIdx < items.length && rowIdx >= startIdx - bufferItems && rowIdx < endIdx) {
+      const endIdx = startIdx + Math.ceil(height / itemHeight) + buffer * 2;
+      if (rowIdx >= 0 && rowIdx < items.length && rowIdx >= startIdx - buffer && rowIdx < endIdx) {
         setHoveredItemId(items[rowIdx].id);
       } else {
         setHoveredItemId(null);
       }
     }
-  }, [maxScroll, trackHeight, thumbHeight, scrollY, itemHeight, height, bufferItems, items]);
+  }, [maxScroll, trackHeight, thumbHeight, scrollY, itemHeight, height, buffer, items]);
 
   const handlePointerUp = useCallback(() => {
     isDraggingRef.current = false;
