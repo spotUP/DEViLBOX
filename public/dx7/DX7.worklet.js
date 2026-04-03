@@ -122,6 +122,16 @@ class DX7Processor extends AudioWorkletProcessor {
     const ptr = this.module._malloc(bytes.length);
     this.module.HEAPU8.set(bytes, ptr);
     this.module._dx7LoadSysex(ptr, bytes.length);
+    // For 32-voice bulk dumps, also update the cartridge so program changes
+    // read from the correct source (firmware defaults to cartridge after loadVoices)
+    if (bytes.length === 4104) {
+      const voiceData = bytes.subarray(6, 6 + 4096);
+      const vPtr = this.module._malloc(4096);
+      this.module.HEAPU8.set(voiceData, vPtr);
+      this.module._dx7LoadVoices(vPtr, 4096);
+      this.module._free(vPtr);
+      this.module._dx7SetBank(0);
+    }
     this.module._free(ptr);
     this.port.postMessage({ type: 'sysexLoaded' });
   }
