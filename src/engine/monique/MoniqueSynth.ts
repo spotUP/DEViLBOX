@@ -757,7 +757,7 @@ export class MoniqueSynthEngine implements DevilboxSynth {
     }
   }
 
-  private applyConfig(config: MoniqueConfig): void {
+  applyConfig(config: MoniqueConfig): void {
     if (!this._worklet || !this.isInitialized) return;
     for (const [key, index] of Object.entries(PARAM_INDEX)) {
       const value = (config as Record<string, number | undefined>)[key];
