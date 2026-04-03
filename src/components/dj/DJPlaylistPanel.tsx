@@ -604,7 +604,7 @@ export const DJPlaylistPanel: React.FC<DJPlaylistPanelProps> = ({ onClose }) => 
                   onDragOver={(e) => handleDragOver(e, i)}
                   onDragEnd={handleDragEnd}
                   onDoubleClick={() => loadTrackWithProgress(track, pickFreeDeck(), i)}
-                  className={`flex items-center gap-1.5 px-1.5 py-1 border-b border-white/[0.04] transition-colors group cursor-pointer ${
+                  className={`flex items-center gap-1.5 px-1.5 py-1 border-b border-white/[0.04] transition-colors group cursor-pointer hover:bg-white/20 ${
                     loadingTrackIndex === i
                       ? 'bg-cyan-900/20'
                       : dragIndex === i
@@ -613,7 +613,7 @@ export const DJPlaylistPanel: React.FC<DJPlaylistPanelProps> = ({ onClose }) => 
                           ? 'bg-green-900/20'
                           : autoDJEnabled && i === autoDJNextIdx
                             ? 'bg-blue-900/15'
-                            : 'hover:bg-white/[0.08]'
+                            : ''
                   }`}
                 >
                   <GripVertical
