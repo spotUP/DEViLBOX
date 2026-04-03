@@ -38,6 +38,7 @@ export const SFIZZ_LAYOUT: SynthPanelLayout = {
           { value: '0', label: '1x' }, { value: '1', label: '2x' },
           { value: '2', label: '4x' }, { value: '3', label: '8x' },
         ]},
+        { type: 'knob', key: 'preloadSize', label: 'PRELOAD', color: '#ff9900', min: 1024, max: 65536, defaultValue: 8192, formatValue: (v) => `${Math.round(v / 1024)}K` },
       ],
     },
   ],

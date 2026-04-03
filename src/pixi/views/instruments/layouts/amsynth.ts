@@ -31,6 +31,17 @@ export const AMSYNTH_LAYOUT: SynthPanelLayout = {
             ]},
             { type: 'knob', key: 'osc2Pulsewidth', label: 'PW', color: '#ff9900', min: 0, max: 1, defaultValue: 0.5, formatValue: fmtPct },
             { type: 'knob', key: 'osc2Detune', label: 'DETUNE', color: '#ffcc00', min: -1, max: 1, defaultValue: 0, bipolar: true, formatValue: (v) => `${Math.round(v * 100)} ct` },
+            { type: 'select', key: 'osc2Pitch', label: 'PITCH', options: [
+              { value: '-12', label: '-12' }, { value: '-11', label: '-11' }, { value: '-10', label: '-10' },
+              { value: '-9', label: '-9' }, { value: '-8', label: '-8' }, { value: '-7', label: '-7' },
+              { value: '-6', label: '-6' }, { value: '-5', label: '-5' }, { value: '-4', label: '-4' },
+              { value: '-3', label: '-3' }, { value: '-2', label: '-2' }, { value: '-1', label: '-1' },
+              { value: '0', label: '0' },
+              { value: '1', label: '+1' }, { value: '2', label: '+2' }, { value: '3', label: '+3' },
+              { value: '4', label: '+4' }, { value: '5', label: '+5' }, { value: '6', label: '+6' },
+              { value: '7', label: '+7' }, { value: '8', label: '+8' }, { value: '9', label: '+9' },
+              { value: '10', label: '+10' }, { value: '11', label: '+11' }, { value: '12', label: '+12' },
+            ]},
             { type: 'select', key: 'osc2Range', label: 'RANGE', options: [
               { value: '-3', label: '-3 oct' }, { value: '-2', label: '-2 oct' }, { value: '-1', label: '-1 oct' },
               { value: '0', label: '0' }, { value: '1', label: '+1 oct' }, { value: '2', label: '+2 oct' },
@@ -102,6 +113,9 @@ export const AMSYNTH_LAYOUT: SynthPanelLayout = {
             ]},
             { type: 'knob', key: 'lfoFreq', label: 'RATE', color: '#9966ff', min: 0, max: 7.5, defaultValue: 3, formatValue: fmtHz },
             { type: 'knob', key: 'freqModAmount', label: 'PITCH', color: '#cc66ff', min: 0, max: 1.26, defaultValue: 0, formatValue: fmtPct },
+            { type: 'select', key: 'freqModOsc', label: 'FM OSC', options: [
+              { value: '0', label: 'Both' }, { value: '1', label: 'Osc1' }, { value: '2', label: 'Osc2' },
+            ]},
             { type: 'knob', key: 'filterModAmount', label: 'FILTER', color: '#cc66ff', min: -1, max: 1, defaultValue: 0, bipolar: true, formatValue: (v) => `${Math.round(v * 100)}%` },
             { type: 'knob', key: 'ampModAmount', label: 'AMP', color: '#cc66ff', min: -1, max: 1, defaultValue: 0, bipolar: true, formatValue: (v) => `${Math.round(v * 100)}%` },
           ],

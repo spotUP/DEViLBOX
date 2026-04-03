@@ -13,6 +13,8 @@ export const FLUIDSYNTH_LAYOUT: SynthPanelLayout = {
         { type: 'knob', key: 'polyphony', label: 'POLY', color: '#66ccff', min: 1, max: 256, defaultValue: 64, formatValue: (v) => `${Math.round(v)}` },
         { type: 'knob', key: 'tuning', label: 'TUNE', color: '#ffcc00', min: 430, max: 450, defaultValue: 440, formatValue: (v) => `${Math.round(v)} Hz` },
         { type: 'knob', key: 'transpose', label: 'XPOSE', color: '#ffcc00', min: -24, max: 24, defaultValue: 0, bipolar: true, formatValue: (v) => `${Math.round(v)} st` },
+        { type: 'knob', key: 'program', label: 'PROG', color: '#ff9900', min: 0, max: 127, defaultValue: 0, formatValue: (v) => `${Math.round(v)}` },
+        { type: 'knob', key: 'bank', label: 'BANK', color: '#ff9900', min: 0, max: 128, defaultValue: 0, formatValue: (v) => `${Math.round(v)}` },
       ],
     },
     {
