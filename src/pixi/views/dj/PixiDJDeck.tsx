@@ -1574,8 +1574,8 @@ export const PixiDJDeck: React.FC<PixiDJDeckProps> = ({ deckId }) => {
               layout={{ position: 'absolute', bottom: 4, right: 4 }}
             />
           </pixiContainer>
-          {/* Pitch slider — thin, self-stretch (matches DOM) */}
-          <pixiContainer layout={{ flexDirection: 'column', gap: 2, alignItems: 'center', flexShrink: 0, alignSelf: 'stretch', width: 24 }}>
+          {/* Pitch slider */}
+          <pixiContainer layout={{ flexDirection: 'column', gap: 2, alignItems: 'center', flexShrink: 0, alignSelf: 'stretch', width: 32 }}>
             <PixiSlider
               value={pitchOffset ?? 0}
               min={-0.08}
@@ -1583,9 +1583,9 @@ export const PixiDJDeck: React.FC<PixiDJDeckProps> = ({ deckId }) => {
               orientation="vertical"
               length={0}
               detent={0}
-              thickness={3}
-              handleWidth={12}
-              handleHeight={20}
+              thickness={4}
+              handleWidth={24}
+              handleHeight={14}
               onChange={(v) => setDeckPitch?.(deckId, v)}
               layout={{ flex: 1, minHeight: 0 }}
             />
@@ -1604,8 +1604,8 @@ export const PixiDJDeck: React.FC<PixiDJDeckProps> = ({ deckId }) => {
           <pixiContainer layout={{ flex: 1, minWidth: 0, minHeight: 0 }}>
             <PixiVinylDisplay deckId={deckId} size={250} deckColor={DECK_COLOR} />
           </pixiContainer>
-          {/* Pitch slider — thin, self-stretch (matches DOM) */}
-          <pixiContainer layout={{ flexDirection: 'column', gap: 2, alignItems: 'center', flexShrink: 0, alignSelf: 'stretch', width: 24 }}>
+          {/* Pitch slider */}
+          <pixiContainer layout={{ flexDirection: 'column', gap: 2, alignItems: 'center', flexShrink: 0, alignSelf: 'stretch', width: 32 }}>
             <PixiSlider
               value={pitchOffset ?? 0}
               min={-0.08}
@@ -1613,9 +1613,9 @@ export const PixiDJDeck: React.FC<PixiDJDeckProps> = ({ deckId }) => {
               orientation="vertical"
               length={0}
               detent={0}
-              thickness={3}
-              handleWidth={12}
-              handleHeight={20}
+              thickness={4}
+              handleWidth={24}
+              handleHeight={14}
               onChange={(v) => setDeckPitch?.(deckId, v)}
               layout={{ flex: 1, minHeight: 0 }}
             />
@@ -1638,8 +1638,8 @@ export const PixiDJDeck: React.FC<PixiDJDeckProps> = ({ deckId }) => {
               height={260}
             />
           </pixiContainer>
-          {/* Pitch slider — thin, self-stretch (matches DOM) */}
-          <pixiContainer layout={{ flexDirection: 'column', gap: 2, alignItems: 'center', flexShrink: 0, alignSelf: 'stretch', width: 24 }}>
+          {/* Pitch slider */}
+          <pixiContainer layout={{ flexDirection: 'column', gap: 2, alignItems: 'center', flexShrink: 0, alignSelf: 'stretch', width: 32 }}>
             <PixiSlider
               value={pitchOffset ?? 0}
               min={-0.08}
@@ -1647,9 +1647,9 @@ export const PixiDJDeck: React.FC<PixiDJDeckProps> = ({ deckId }) => {
               orientation="vertical"
               length={0}
               detent={0}
-              thickness={3}
-              handleWidth={12}
-              handleHeight={20}
+              thickness={4}
+              handleWidth={24}
+              handleHeight={14}
               onChange={(v) => setDeckPitch?.(deckId, v)}
               layout={{ flex: 1, minHeight: 0 }}
             />
