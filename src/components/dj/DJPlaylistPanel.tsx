@@ -619,7 +619,7 @@ export const DJPlaylistPanel: React.FC<DJPlaylistPanelProps> = ({ onClose }) => 
                           : autoDJEnabled && i === autoDJNextIdx
                             ? 'bg-blue-900/15'
                             : hoveredIdx === i
-                              ? 'bg-white/20'
+                              ? 'bg-white/5'
                               : ''
                   }`}
                 >
@@ -656,39 +656,37 @@ export const DJPlaylistPanel: React.FC<DJPlaylistPanelProps> = ({ onClose }) => 
                   {track.duration > 0 && (
                     <span className="text-xs font-mono text-text-muted/30 shrink-0">{formatDuration(track.duration)}</span>
                   )}
-                  {hoveredIdx === i && (
-                    <>
+                  <span className={`flex items-center gap-0.5 shrink-0 transition-opacity ${hoveredIdx === i ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); loadTrackWithProgress(track, 'A', i); }}
+                      className="px-1 text-xs font-mono font-bold text-blue-400 hover:text-blue-300 transition-colors"
+                      title="Deck 1"
+                    >
+                      1
+                    </button>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); loadTrackWithProgress(track, 'B', i); }}
+                      className="px-1 text-xs font-mono font-bold text-red-400 hover:text-red-300 transition-colors"
+                      title="Deck 2"
+                    >
+                      2
+                    </button>
+                    {useDJStore.getState().thirdDeckActive && (
                       <button
-                        onClick={() => loadTrackWithProgress(track, 'A', i)}
-                        className="px-1 text-xs font-mono font-bold text-blue-400 transition-colors"
-                        title="Deck 1"
+                        onClick={(e) => { e.stopPropagation(); loadTrackWithProgress(track, 'C', i); }}
+                        className="px-1 text-xs font-mono font-bold text-emerald-400 hover:text-emerald-300 transition-colors"
+                        title="Deck 3"
                       >
-                        1
+                        3
                       </button>
-                      <button
-                        onClick={() => loadTrackWithProgress(track, 'B', i)}
-                        className="px-1 text-xs font-mono font-bold text-red-400 transition-colors"
-                        title="Deck 2"
-                      >
-                        2
-                      </button>
-                      {useDJStore.getState().thirdDeckActive && (
-                        <button
-                          onClick={() => loadTrackWithProgress(track, 'C', i)}
-                          className="px-1 text-xs font-mono font-bold text-emerald-400 transition-colors"
-                          title="Deck 3"
-                        >
-                          3
-                        </button>
-                      )}
-                      <button
-                        onClick={() => removeTrack(activePlaylist.id, i)}
-                        className="p-0.5 text-accent-error transition-colors"
-                      >
-                        <X size={8} />
-                      </button>
-                    </>
-                  )}
+                    )}
+                    <button
+                      onClick={(e) => { e.stopPropagation(); removeTrack(activePlaylist.id, i); }}
+                      className="p-0.5 text-accent-error hover:text-red-400 transition-colors"
+                    >
+                      <X size={8} />
+                    </button>
+                  </span>
                 </div>
               ))}
             </div>
