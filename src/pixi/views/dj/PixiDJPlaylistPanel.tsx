@@ -278,6 +278,7 @@ export const PixiDJPlaylistPanel: React.FC<PixiDJPlaylistPanelProps> = ({
 
   return (
     <layoutContainer
+      eventMode="static"
       layout={{
         width: '100%' as unknown as number,
         height: PANEL_H,
