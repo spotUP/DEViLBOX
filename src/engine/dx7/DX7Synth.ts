@@ -244,28 +244,6 @@ export class DX7Synth implements DevilboxSynth {
     console.warn('[DX7] No firmware ROM found. Load manually via loadFirmware()');
   }
 
-  /** Auto-load voice banks from well-known paths */
-  private async tryAutoLoadVoices() {
-    const baseUrl = import.meta.env.BASE_URL || '/';
-    const voicePaths = [
-      `${baseUrl}roms/dx7/DX7_Voice_Rom2.BIN`,
-      `${baseUrl}roms/dx7/voices.bin`,
-    ];
-    for (const path of voicePaths) {
-      try {
-        const resp = await fetch(path);
-        if (resp.ok) {
-          const data = await resp.arrayBuffer();
-          if (data.byteLength >= 4096) {
-            console.log(`[DX7] Auto-loaded voices from ${path} (${data.byteLength} bytes)`);
-            this.loadVoices(data);
-            return;
-          }
-        }
-      } catch { /* try next */ }
-    }
-  }
-
   /** Auto-load the first patch bank from manifest */
   private async tryAutoLoadFirstPatchBank() {
     const manifest = await DX7Synth.fetchPatchManifest();
