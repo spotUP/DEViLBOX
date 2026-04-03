@@ -126,10 +126,10 @@ export const PixiEditInstrumentModal: React.FC<PixiEditInstrumentModalProps> = (
   // ── Local state ─────────────────────────────────────────────────────────
   const [isCreating, setIsCreating] = useState(createMode);
   const [activeTab, setActiveTab] = useState<ActiveTab>('sound');
-  const [selectedSynthType, setSelectedSynthType] = useState<SynthType>('Synth');
-  const [newName, setNewName] = useState('New Instrument');
+  const newName = 'New Instrument';
   const [synthSearch, setSynthSearch] = useState('');
   const [createCategoryFilter, setCreateCategoryFilter] = useState<string | null>(null);
+  const [expandedCategories, setExpandedCategories] = useState<Record<string, boolean>>({});
 
   // Preset state
   const [showSynthBrowser, setShowSynthBrowser] = useState(false);
@@ -150,6 +150,7 @@ export const PixiEditInstrumentModal: React.FC<PixiEditInstrumentModalProps> = (
       setActiveTab('sound');
       setSynthSearch('');
       setCreateCategoryFilter(null);
+      setExpandedCategories({});
       setShowSaveDialog(false);
       setShowSynthBrowser(false);
       setPresetName('');
@@ -356,16 +357,6 @@ export const PixiEditInstrumentModal: React.FC<PixiEditInstrumentModalProps> = (
     setCurrentInstrument(Number(id));
   }, [setCurrentInstrument]);
 
-  const handleCreate = useCallback(() => {
-    const inst = createInstrument();
-    if (inst != null) {
-      updateInstrument(inst, { name: newName, synthType: selectedSynthType });
-      setCurrentInstrument(inst);
-      notify.success(`Created ${newName}`);
-    }
-    setIsCreating(false);
-  }, [createInstrument, updateInstrument, setCurrentInstrument, newName, selectedSynthType]);
-
   /** Create with a specific synth type (for clicking items in the categorized browser) */
   const handleCreateWithType = useCallback((synthType: SynthType) => {
     const info = getSynthInfo(synthType);
@@ -554,150 +545,294 @@ export const PixiEditInstrumentModal: React.FC<PixiEditInstrumentModalProps> = (
         >
           {isCreating ? (
             /* ── Categorized synth browser (create mode) — full width ──────── */
-            <>
-              {/* Search bar */}
-              <layoutContainer layout={{ padding: 8, gap: 4, flexDirection: 'row', alignItems: 'center' }}>
-                <PixiLabel text="SELECT SYNTH TYPE" size="xs" weight="bold" color="textMuted" />
-                <pixiContainer layout={{ flex: 1 }} />
-                <PixiPureTextInput
-                  value={synthSearch}
-                  onChange={setSynthSearch}
-                  placeholder="Search synths..."
-                  width={240}
-                  height={24}
-                />
-              </layoutContainer>
-
-              {/* Category filter chips */}
-              <layoutContainer layout={{ paddingLeft: 8, paddingRight: 8, paddingBottom: 6, flexDirection: 'row', flexWrap: 'wrap', gap: 4 }}>
-                <PixiButton
-                  label={`All (${totalAllSynths})`}
-                  variant={createCategoryFilter === null ? 'ft2' : 'ghost'}
-                  color={createCategoryFilter === null ? 'yellow' : undefined}
-                  size="sm"
-                  width={60}
-                  onClick={() => setCreateCategoryFilter(null)}
-                />
-                {SYNTH_CATEGORIES.map(cat => {
-                  const count = cat.synths.filter(s => s?.icon).length;
-                  return (
-                    <PixiButton
-                      key={cat.id}
-                      label={`${cat.name} (${count})`}
-                      variant={createCategoryFilter === cat.id ? 'ft2' : 'ghost'}
-                      color={createCategoryFilter === cat.id ? 'yellow' : undefined}
-                      size="sm"
-                      onClick={() => setCreateCategoryFilter(createCategoryFilter === cat.id ? null : cat.id)}
+            <PixiScrollView
+              width={MODAL_W}
+              height={CONTENT_H}
+              contentHeight={
+                /* sticky header (~90) + categories content */
+                90 + (filteredCategorySynths.length === 0
+                  ? 100
+                  : filteredCategorySynths.reduce((h, cat) => {
+                      const rows = Math.ceil(cat.synths.length / 2);
+                      return h + 36 + rows * 100 + 12; // header + cards + gap
+                    }, 0))
+              }
+              bgColor={theme.bgSecondary.color}
+            >
+              <layoutContainer layout={{ width: MODAL_W - 16, flexDirection: 'column', padding: 8, gap: 8 }}>
+                {/* ── Sticky-style header: search + chips + results count ── */}
+                <layoutContainer layout={{ flexDirection: 'column', gap: 6 }}>
+                  {/* Search bar */}
+                  <layoutContainer
+                    layout={{
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      height: 28,
+                      gap: 6,
+                      backgroundColor: theme.bgTertiary?.color ?? 0x1a1a1a,
+                      borderRadius: 6,
+                      borderWidth: 1,
+                      borderColor: theme.border.color,
+                      paddingLeft: 8,
+                      paddingRight: 4,
+                    }}
+                  >
+                    <PixiIcon name="search" size={14} color={theme.textMuted.color} />
+                    <PixiPureTextInput
+                      value={synthSearch}
+                      onChange={setSynthSearch}
+                      placeholder="Search synths..."
+                      width={MODAL_W - 80}
+                      height={22}
                     />
-                  );
-                })}
-              </layoutContainer>
+                    {synthSearch && (
+                      <layoutContainer
+                        eventMode="static"
+                        cursor="pointer"
+                        onPointerTap={() => setSynthSearch('')}
+                        layout={{ width: 20, height: 20, alignItems: 'center', justifyContent: 'center' }}
+                      >
+                        <PixiIcon name="close" size={12} color={theme.textMuted.color} />
+                      </layoutContainer>
+                    )}
+                  </layoutContainer>
 
-              {/* Scrollable synth list */}
-              <PixiScrollView
-                width={MODAL_W}
-                height={CONTENT_H - 120}
-                contentHeight={
-                  filteredCategorySynths.reduce((h, cat) => h + 24 + cat.synths.length * 60, 0) || 60
-                }
-                bgColor={theme.bgSecondary.color}
-              >
-                <layoutContainer layout={{ width: MODAL_W - 16, flexDirection: 'column', padding: 4 }}>
-                  {filteredCategorySynths.length === 0 ? (
-                    <layoutContainer layout={{ padding: 20, alignItems: 'center' }}>
+                  {/* Category filter chips */}
+                  <layoutContainer layout={{ flexDirection: 'row', flexWrap: 'wrap', gap: 4 }}>
+                    <layoutContainer
+                      eventMode="static"
+                      cursor="pointer"
+                      onPointerTap={() => setCreateCategoryFilter(null)}
+                      layout={{
+                        paddingLeft: 8,
+                        paddingRight: 8,
+                        height: 22,
+                        borderRadius: 11,
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        backgroundColor: createCategoryFilter === null ? 0xFB923C : (theme.bgTertiary?.color ?? 0x2a2a2a),
+                        borderWidth: 1,
+                        borderColor: createCategoryFilter === null ? 0xFB923C : (theme.border.color),
+                      }}
+                    >
                       <pixiBitmapText
-                        text="No synths found"
-                        style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 12, fill: theme.textMuted.color }}
+                        text={`All (${totalAllSynths})`}
+                        style={{
+                          fontFamily: PIXI_FONTS.MONO,
+                          fontSize: 10,
+                          fill: createCategoryFilter === null ? 0x000000 : theme.textSecondary.color,
+                        }}
                       />
                     </layoutContainer>
-                  ) : (
-                    filteredCategorySynths.map(category => (
-                      <layoutContainer key={category.id} layout={{ flexDirection: 'column', marginBottom: 4 }}>
-                        {/* Category header */}
-                        <layoutContainer layout={{ height: 22, paddingLeft: 8, paddingTop: 4, paddingBottom: 2, justifyContent: 'center' }}>
+                    {SYNTH_CATEGORIES.map(cat => {
+                      const count = cat.synths.filter(s => s?.icon).length;
+                      const isActive = createCategoryFilter === cat.id;
+                      return (
+                        <layoutContainer
+                          key={cat.id}
+                          eventMode="static"
+                          cursor="pointer"
+                          onPointerTap={() => setCreateCategoryFilter(isActive ? null : cat.id)}
+                          layout={{
+                            paddingLeft: 8,
+                            paddingRight: 8,
+                            height: 22,
+                            borderRadius: 11,
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            backgroundColor: isActive ? 0xFB923C : (theme.bgTertiary?.color ?? 0x2a2a2a),
+                            borderWidth: 1,
+                            borderColor: isActive ? 0xFB923C : (theme.border.color),
+                          }}
+                        >
                           <pixiBitmapText
-                            text={category.name.toUpperCase()}
-                            style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 10, fill: theme.textMuted.color }}
+                            text={`${cat.name} (${count})`}
+                            style={{
+                              fontFamily: PIXI_FONTS.MONO,
+                              fontSize: 10,
+                              fill: isActive ? 0x000000 : theme.textSecondary.color,
+                            }}
                           />
                         </layoutContainer>
+                      );
+                    })}
+                  </layoutContainer>
 
-                        {/* Synth items */}
-                        {category.synths.map((synth: SynthInfoType) => {
-                          const isSelected = selectedSynthType === synth.type;
-                          return (
-                            <layoutContainer
-                              key={`${category.id}-${synth.type}`}
-                              eventMode="static"
-                              cursor="pointer"
-                              onPointerTap={() => {
-                                setSelectedSynthType(synth.type);
-                                handleCreateWithType(synth.type);
-                              }}
-                              layout={{
-                                flexDirection: 'row',
-                                alignItems: 'center',
-                                height: 56,
-                                paddingLeft: 8,
-                                paddingRight: 8,
-                                gap: 10,
-                                backgroundColor: isSelected ? 0x2a2a3a : undefined,
-                                borderRadius: 4,
-                                borderWidth: isSelected ? 1 : 0,
-                                borderColor: isSelected ? (theme.accent?.color ?? 0x4488ff) : 0x000000,
-                              }}
-                            >
-                              {/* Icon */}
-                              <layoutContainer
-                                layout={{
-                                  width: 32,
-                                  height: 32,
-                                  alignItems: 'center',
-                                  justifyContent: 'center',
-                                  backgroundColor: theme.bgActive?.color ?? 0x2a2a2a,
-                                  borderRadius: 4,
-                                }}
-                              >
-                                <PixiIcon name="waveform" size={16} color={twColor(synth.color)} />
-                              </layoutContainer>
-
-                              {/* Name + description */}
-                              <layoutContainer layout={{ flex: 1, flexDirection: 'column', gap: 2, overflow: 'hidden' }}>
-                                <pixiBitmapText
-                                  text={synth.name}
-                                  style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 13, fill: 0xffffff }}
-                                />
-                                <pixiBitmapText
-                                  text={synth.description.length > 80 ? synth.description.slice(0, 77) + '...' : synth.description}
-                                  style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 10, fill: theme.textMuted.color }}
-                                />
-                                {synth.bestFor.length > 0 && (
-                                  <pixiBitmapText
-                                    text={synth.bestFor.slice(0, 4).join(' / ')}
-                                    style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 9, fill: theme.textMuted.color }}
-                                  />
-                                )}
-                              </layoutContainer>
-                            </layoutContainer>
-                          );
-                        })}
-                      </layoutContainer>
-                    ))
+                  {/* Results count when filtering */}
+                  {(synthSearch || createCategoryFilter) && (
+                    <pixiBitmapText
+                      text={`Showing ${filteredCategorySynths.reduce((n, c) => n + c.synths.length, 0)} synth${filteredCategorySynths.reduce((n, c) => n + c.synths.length, 0) !== 1 ? 's' : ''}${synthSearch ? ` matching "${synthSearch}"` : ''}${createCategoryFilter ? ` in ${SYNTH_CATEGORIES.find(c => c.id === createCategoryFilter)?.name ?? ''}` : ''}`}
+                      style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 10, fill: theme.textMuted.color }}
+                    />
                   )}
                 </layoutContainer>
-              </PixiScrollView>
 
-              {/* Footer: name input + Create button */}
-              <layoutContainer layout={{ padding: 8, gap: 8, flexDirection: 'row', alignItems: 'center' }}>
-                <PixiPureTextInput
-                  value={newName}
-                  onChange={setNewName}
-                  placeholder="Instrument name"
-                  width={200}
-                  height={24}
-                />
-                <PixiButton label="Create" variant="primary" onClick={handleCreate} />
+                {/* ── Category sections ─────────────────────────────────── */}
+                {filteredCategorySynths.length === 0 ? (
+                  <layoutContainer layout={{ padding: 24, alignItems: 'center', flexDirection: 'column', gap: 4 }}>
+                    <pixiBitmapText
+                      text="No synths found"
+                      style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 12, fill: theme.textMuted.color }}
+                    />
+                    <pixiBitmapText
+                      text="Try a different search term or category"
+                      style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 10, fill: theme.textMuted.color }}
+                    />
+                    <layoutContainer
+                      eventMode="static"
+                      cursor="pointer"
+                      onPointerTap={() => { setSynthSearch(''); setCreateCategoryFilter(null); }}
+                      layout={{
+                        marginTop: 8,
+                        paddingLeft: 12,
+                        paddingRight: 12,
+                        height: 24,
+                        borderRadius: 6,
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        backgroundColor: theme.bgTertiary?.color ?? 0x2a2a2a,
+                        borderWidth: 1,
+                        borderColor: theme.border.color,
+                      }}
+                    >
+                      <pixiBitmapText
+                        text="Clear filters"
+                        style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 10, fill: theme.textSecondary.color }}
+                      />
+                    </layoutContainer>
+                  </layoutContainer>
+                ) : (
+                  filteredCategorySynths.map(category => {
+                    const isCatExpanded = expandedCategories[category.id] !== false;
+                    return (
+                      <layoutContainer key={category.id} layout={{ flexDirection: 'column', marginBottom: 4 }}>
+                        {/* Category header — clickable to expand/collapse */}
+                        <layoutContainer
+                          eventMode="static"
+                          cursor="pointer"
+                          onPointerTap={() =>
+                            setExpandedCategories(prev => ({ ...prev, [category.id]: !isCatExpanded }))
+                          }
+                          layout={{
+                            flexDirection: 'row',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            marginBottom: 6,
+                            paddingLeft: 2,
+                            paddingRight: 4,
+                          }}
+                        >
+                          <layoutContainer layout={{ flexDirection: 'column', gap: 1 }}>
+                            <pixiBitmapText
+                              text={category.name}
+                              style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 12, fill: 0xffffff }}
+                            />
+                            <pixiBitmapText
+                              text={category.description}
+                              style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 10, fill: theme.textMuted.color }}
+                            />
+                          </layoutContainer>
+                          <layoutContainer layout={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                            <pixiBitmapText
+                              text={String(category.synths.length)}
+                              style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 10, fill: theme.textMuted.color }}
+                            />
+                            <PixiIcon
+                              name={isCatExpanded ? 'caret-down' : 'caret-right'}
+                              size={14}
+                              color={theme.textMuted.color}
+                            />
+                          </layoutContainer>
+                        </layoutContainer>
+
+                        {/* 2-column synth card grid */}
+                        {isCatExpanded && (
+                          <layoutContainer layout={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
+                            {category.synths.map((synth: SynthInfoType) => {
+                              const cardW = Math.floor((MODAL_W - 16 - 16 - 6) / 2); // padding + gap
+                              return (
+                                <layoutContainer
+                                  key={`${category.id}-${synth.type}`}
+                                  eventMode="static"
+                                  cursor="pointer"
+                                  onPointerTap={() => handleCreateWithType(synth.type)}
+                                  layout={{
+                                    width: cardW,
+                                    flexDirection: 'column',
+                                    padding: 8,
+                                    borderRadius: 6,
+                                    borderWidth: 1,
+                                    borderColor: theme.border.color,
+                                    backgroundColor: theme.bgSecondary?.color ?? 0x1e1e1e,
+                                    gap: 4,
+                                  }}
+                                >
+                                  {/* Icon + Name row */}
+                                  <layoutContainer layout={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                                    <layoutContainer
+                                      layout={{
+                                        width: 30,
+                                        height: 30,
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        backgroundColor: theme.bgTertiary?.color ?? 0x2a2a2a,
+                                        borderRadius: 4,
+                                      }}
+                                    >
+                                      <PixiIcon name="waveform" size={16} color={twColor(synth.color)} />
+                                    </layoutContainer>
+                                    <layoutContainer layout={{ flexDirection: 'column', gap: 1, flex: 1, overflow: 'hidden' }}>
+                                      <pixiBitmapText
+                                        text={synth.name}
+                                        style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 11, fill: 0xffffff }}
+                                      />
+                                      <pixiBitmapText
+                                        text={synth.shortName}
+                                        style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 9, fill: theme.textMuted.color }}
+                                      />
+                                    </layoutContainer>
+                                  </layoutContainer>
+
+                                  {/* Description */}
+                                  <pixiBitmapText
+                                    text={synth.description.length > 60 ? synth.description.slice(0, 57) + '...' : synth.description}
+                                    style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 9, fill: theme.textSecondary.color }}
+                                  />
+
+                                  {/* Tags */}
+                                  {synth.bestFor.length > 0 && (
+                                    <layoutContainer layout={{ flexDirection: 'row', flexWrap: 'wrap', gap: 3 }}>
+                                      {synth.bestFor.slice(0, 3).map(tag => (
+                                        <layoutContainer
+                                          key={tag}
+                                          layout={{
+                                            paddingLeft: 5,
+                                            paddingRight: 5,
+                                            paddingTop: 1,
+                                            paddingBottom: 1,
+                                            borderRadius: 8,
+                                            backgroundColor: theme.bgTertiary?.color ?? 0x2a2a2a,
+                                          }}
+                                        >
+                                          <pixiBitmapText
+                                            text={tag}
+                                            style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 9, fill: theme.textMuted.color }}
+                                          />
+                                        </layoutContainer>
+                                      ))}
+                                    </layoutContainer>
+                                  )}
+                                </layoutContainer>
+                              );
+                            })}
+                          </layoutContainer>
+                        )}
+                      </layoutContainer>
+                    );
+                  })
+                )}
               </layoutContainer>
-            </>
+            </PixiScrollView>
           ) : (
             /* ── Instrument list (edit mode) ──────────────────────────────── */
             <>
