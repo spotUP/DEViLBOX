@@ -38,8 +38,13 @@ export function useDeckStateSync(deckId: DeckId): void {
         const store = useDJStore.getState();
 
         if (deck.playbackMode === 'audio') {
-          // Audio file mode — poll audio player position
-          if (deck.audioPlayer.isCurrentlyPlaying() && !isSeekActive(deckId)) {
+          const isEngPlaying = deck.audioPlayer.isCurrentlyPlaying();
+          const isStorePlaying = store.decks[deckId].isPlaying;
+
+          // Always update position when either the engine or store says we're playing.
+          // This prevents position freezing when the Tone.js Player state briefly flickers
+          // or the browser throttles the audio context.
+          if ((isEngPlaying || isStorePlaying) && !isSeekActive(deckId)) {
             const pos = deck.audioPlayer.getPosition();
             const dur = deck.audioPlayer.getDuration();
             const update: Record<string, unknown> = {
@@ -55,9 +60,14 @@ export function useDeckStateSync(deckId: DeckId): void {
             }
             store.setDeckState(deckId, update);
           }
-          // Detect end of audio playback
-          if (!deck.audioPlayer.isCurrentlyPlaying() && store.decks[deckId].isPlaying) {
-            store.setDeckPlaying(deckId, false);
+          // Detect end of audio playback — but don't interfere with AutoDJ
+          // or scratch mode (audioPlayer is paused during backward scratch).
+          if (!isEngPlaying && isStorePlaying) {
+            const autoDJActive = store.autoDJEnabled && store.autoDJStatus !== 'idle';
+            const scratchActive = deck.isScratchActive;
+            if (!autoDJActive && !scratchActive) {
+              store.setDeckPlaying(deckId, false);
+            }
           }
         } else {
           // Tracker module mode — poll replayer position
