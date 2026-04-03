@@ -157,15 +157,19 @@ export const DX7Controls: React.FC<DX7ControlsProps> = ({ instrument, onChange }
     setLoading(false);
   }, [manifest, getSynth, onChange]);
 
-  // Select voice within current bank
-  const selectVoiceInBank = useCallback((voiceIndex: number) => {
+  // Select voice within current bank — loads the bank if needed
+  const selectVoiceInBank = useCallback(async (voiceIndex: number) => {
     setSelectedVoice(voiceIndex);
     setCurrentVoiceName(currentBank?.voices[voiceIndex] || `Voice ${voiceIndex + 1}`);
 
     const synth = getSynth();
-    if (synth) synth.selectVoice(voiceIndex);
-    onChange({ dx7: { ...configRef.current, program: voiceIndex, vcedPreset: undefined } });
-  }, [currentBank, getSynth, onChange]);
+    if (synth && currentBank) {
+      // Always load the bank sysex first — a VCED preset may have overwritten
+      // the firmware's voice memory with a single-voice bulk dump.
+      await synth.loadPatchBank(currentBank.file, voiceIndex);
+    }
+    onChange({ dx7: { ...configRef.current, bank: selectedBank, program: voiceIndex, vcedPreset: undefined } });
+  }, [currentBank, selectedBank, getSynth, onChange]);
 
   // Load VCED preset — update state (store handles synth call)
   const loadVcedPreset = useCallback((name: string) => {
