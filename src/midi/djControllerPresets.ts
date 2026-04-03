@@ -81,7 +81,9 @@ export type DJAction =
   | 'tracker_fader_gain'
   | 'tracker_scratch_trans' | 'tracker_scratch_crab' | 'tracker_scratch_flare'
   | 'tracker_scratch_chirp' | 'tracker_scratch_stab' | 'tracker_scratch_8crab'
-  | 'tracker_scratch_twdl' | 'tracker_scratch_stop';
+  | 'tracker_scratch_twdl' | 'tracker_scratch_stop'
+  // Vocoder push-to-talk
+  | 'ptt';
 
 // ============================================================================
 // CONTROLLER PRESETS

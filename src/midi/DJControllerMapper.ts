@@ -17,6 +17,7 @@ import { getDJEngine } from '../engine/dj/DJEngine';
 import { useDJStore } from '../stores/useDJStore';
 import { DJBeatSync } from '../engine/dj/DJBeatSync';
 import { getTrackerScratchController } from '../engine/TrackerScratchController';
+import { useVocoderStore } from '../stores/useVocoderStore';
 import type { DJControllerPreset, DJControllerCCMapping, DJControllerNoteMapping } from './djControllerPresets';
 import type { MIDIMessage } from './types';
 class DJControllerMapper {
@@ -206,6 +207,12 @@ class DJControllerMapper {
       if (loopRollState) {
         this.releaseLoopRoll(loopRollKey, loopRollState);
       }
+
+      // PTT release (hold-to-talk: note-on = talk, note-off = mute)
+      const noteMapping = this.noteLookup.get(touchKey);
+      if (noteMapping?.action === 'ptt') {
+        useVocoderStore.getState().setPTT(false);
+      }
     }
   }
 
@@ -267,6 +274,12 @@ class DJControllerMapper {
     // Tracker scratch actions work without DJ engine
     if (action.startsWith('tracker_')) {
       this.executeTrackerScratchAction(action);
+      return;
+    }
+
+    // Push-to-talk: note-on activates, note-off deactivates (hold-to-talk)
+    if (action === 'ptt') {
+      useVocoderStore.getState().setPTT(true);
       return;
     }
 

@@ -58,6 +58,8 @@ export type EditorAction =
   | 'dj.deckB.eqKillLow'
   | 'dj.deckB.eqKillMid'
   | 'dj.deckB.eqKillHi'
+  // Vocoder push-to-talk
+  | 'vocoder.ptt'
   // CommandRegistry bridge - any command name (e.g., 'cmd:play_stop_toggle')
   | `cmd:${string}`;
 
@@ -439,6 +441,8 @@ export const ACTION_DISPLAY_NAMES: Record<string, string> = {
   'dj.deckB.eqKillLow': 'DJ Kill Lo B',
   'dj.deckB.eqKillMid': 'DJ Kill Mid B',
   'dj.deckB.eqKillHi': 'DJ Kill Hi B',
+  // Vocoder
+  'vocoder.ptt': 'Push to Talk (Vocoder)',
 };
 
 /**
@@ -475,4 +479,5 @@ export const ACTIONS_BY_CATEGORY: Record<string, EditorAction[]> = {
     'dj.deckA.eqKillLow', 'dj.deckA.eqKillMid', 'dj.deckA.eqKillHi',
     'dj.deckB.eqKillLow', 'dj.deckB.eqKillMid', 'dj.deckB.eqKillHi',
   ],
+  'Vocoder': ['vocoder.ptt'],
 };

@@ -7,6 +7,7 @@ import { getButtonMapManager } from '../../midi/ButtonMapManager';
 import { useTransportStore, useTrackerStore, useCursorStore } from '../../stores';
 import { useEditorStore } from '../../stores/useEditorStore';
 import { useMIDIStore } from '../../stores/useMIDIStore';
+import { useVocoderStore } from '../../stores/useVocoderStore';
 
 /**
  * Register all editor action handlers for MIDI button control
@@ -162,6 +163,12 @@ export function useButtonMappings(): void {
     }));
     cleanups.push(manager.registerAction('dj.knobPage.prev', () => {
       useMIDIStore.getState().prevDJKnobPage();
+    }));
+
+    // Vocoder push-to-talk (toggle — for momentary buttons, note-on/off is handled by DJControllerMapper)
+    cleanups.push(manager.registerAction('vocoder.ptt', () => {
+      const { pttActive, setPTT } = useVocoderStore.getState();
+      setPTT(!pttActive);
     }));
 
     registerDJActions();
