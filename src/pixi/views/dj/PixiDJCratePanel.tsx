@@ -40,7 +40,7 @@ export const PixiDJCratePanel: React.FC<PixiDJCratePanelProps> = ({ onClose }) =
   }, []);
 
   return (
-    <pixiContainer layout={{ width: '100%', height: '100%', flexDirection: 'column' }}>
+    <pixiContainer eventMode="static" layout={{ width: '100%', height: '100%', flexDirection: 'column' }}>
       {/* Tab bar */}
       <Div
         layout={{ width: '100%', height: 28, flexDirection: 'row', alignItems: 'center', gap: 2, paddingLeft: 4, paddingRight: 4 }}
@@ -63,7 +63,7 @@ export const PixiDJCratePanel: React.FC<PixiDJCratePanelProps> = ({ onClose }) =
       </Div>
 
       {/* Tab content */}
-      <pixiContainer layout={{ width: '100%', flex: 1 }}>
+      <pixiContainer eventMode="static" layout={{ width: '100%', flex: 1 }}>
         {activeTab === 'playlists' && <PixiDJPlaylistPanel />}
         {activeTab === 'online' && <PixiDJModlandBrowser />}
         {activeTab === 'serato' && <PixiDJSeratoBrowser />}
