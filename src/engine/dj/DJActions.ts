@@ -667,9 +667,10 @@ export async function stopRecording(
 // AUTO DJ
 // ============================================================================
 
-/** Enable Auto DJ — plays through the active playlist with beatmatched transitions. */
-export async function enableAutoDJ(startIndex?: number): Promise<void> {
-  await getAutoDJ().enable(startIndex);
+/** Enable Auto DJ — plays through the active playlist with beatmatched transitions.
+ *  Returns null on success, or an error message string on failure. */
+export async function enableAutoDJ(startIndex?: number): Promise<string | null> {
+  return await getAutoDJ().enable(startIndex);
 }
 
 /** Disable Auto DJ — current track keeps playing. */

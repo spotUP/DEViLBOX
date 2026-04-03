@@ -67,12 +67,23 @@ class DJAutoDJ {
    * Enable Auto DJ mode. Starts playing through the active playlist.
    * If a deck is already playing, uses that as the starting point.
    */
-  async enable(startIndex?: number): Promise<void> {
+  async enable(startIndex?: number): Promise<string | null> {
+    console.log('[AutoDJ] enable() called, startIndex:', startIndex);
     const playlist = this.getActivePlaylist();
-    if (!playlist || playlist.tracks.length < 2) {
-      console.warn('[AutoDJ] Need at least 2 tracks in a playlist');
-      return;
+    if (!playlist) {
+      console.warn('[AutoDJ] No active playlist');
+      return 'Create a playlist and add tracks first';
     }
+    if (playlist.tracks.length < 2) {
+      console.warn('[AutoDJ] Need at least 2 tracks — have:', playlist.tracks.length);
+      return `Need at least 2 tracks in playlist (have ${playlist.tracks.length})`;
+    }
+    const modlandCount = playlist.tracks.filter(t => t.fileName.startsWith('modland:')).length;
+    if (modlandCount < 2) {
+      console.warn('[AutoDJ] Need at least 2 downloadable (modland) tracks — have:', modlandCount);
+      return `Need at least 2 downloadable tracks (have ${modlandCount} — add tracks from Modland browser)`;
+    }
+    console.log(`[AutoDJ] Playlist: "${playlist.name}", ${playlist.tracks.length} tracks`);
 
     const store = useDJStore.getState();
 
@@ -107,12 +118,14 @@ class DJAutoDJ {
 
     // If nothing is playing, find the first loadable track and play it
     if (!store.decks[this.activeDeck].isPlaying) {
+      console.log(`[AutoDJ] No deck playing, loading first track to deck ${this.activeDeck}...`);
       let idx = currentIndex;
       let loaded = false;
 
       for (let attempts = 0; attempts < playlist.tracks.length; attempts++) {
         const track = playlist.tracks[idx];
         if (track) {
+          console.log(`[AutoDJ] Trying track ${idx}: "${track.trackName}" (${track.fileName.substring(0, 60)}...)`);
           loaded = await loadPlaylistTrackToDeck(track, this.activeDeck);
           if (loaded) {
             const nextIdx = this.computeNextIndex(idx, playlist.tracks.length);
@@ -138,7 +151,7 @@ class DJAutoDJ {
       if (!loaded) {
         console.warn('[AutoDJ] No loadable tracks found in playlist');
         this.disable();
-        return;
+        return 'Could not load any tracks from playlist — check network connection';
       }
     }
 
@@ -147,6 +160,7 @@ class DJAutoDJ {
     this.startPolling();
     const finalIdx = useDJStore.getState().autoDJCurrentTrackIndex;
     console.log(`[AutoDJ] Enabled — starting from track ${finalIdx + 1}/${playlist.tracks.length}`);
+    return null; // success
   }
 
   /** Disable Auto DJ gracefully. Current track keeps playing. */
