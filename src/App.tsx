@@ -51,6 +51,7 @@ import { DevServerDownBanner } from '@components/ui/DevServerDownBanner';
 import { MobileMenu } from '@components/layout/MobileMenu';
 import { useResponsive } from '@contexts/ResponsiveContext';
 import { usePatternPlayback } from '@hooks/audio/usePatternPlayback';
+import { useGlobalPTT } from '@hooks/useGlobalPTT';
 import { GlobalDragDropHandler } from '@components/ui/GlobalDragDropHandler';
 import { notify } from '@stores/useNotificationStore';
 import { loadFile } from '@lib/file/UnifiedFileLoader';
@@ -139,12 +140,13 @@ function AppRouter() {
     if (forceMode === 'dom' || forceMode === 'webgl') {
       useSettingsStore.getState().setRenderMode(forceMode);
     }
-    // Handle #/_view=xxx to switch to a specific view
+    // Handle ?view=xxx or #/_view=xxx to switch to a specific view
+    const viewParam = params.get('view');
     const hashMatch = window.location.hash.match(/_view=(\w+)/);
-    if (hashMatch) {
-      const view = hashMatch[1];
+    const requestedView = viewParam || hashMatch?.[1];
+    if (requestedView) {
       setTimeout(() => {
-        useUIStore.getState().setActiveView(view as never);
+        useUIStore.getState().setActiveView(requestedView as never);
       }, 500); // delay to let app initialize
     }
   }, []);
@@ -349,6 +351,9 @@ function App() {
 
   // Register global keyboard shortcuts from active scheme
   useGlobalKeyboardHandler();
+
+  // Global push-to-talk (Cmd+Alt+Space) — works from any view
+  useGlobalPTT();
 
   const { updateMasterEffect } = useAudioStore();
 
