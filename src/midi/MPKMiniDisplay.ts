@@ -51,6 +51,14 @@ class MPKMiniDisplay {
   private currentPreset: Uint8Array | null = null;
   private deviceName: string | null = null;
 
+  // Pad LED state
+  private readonly padNotes = [36, 37, 38, 39, 40, 41, 42, 43]; // Bank A: C2-G#2
+  private padFlashTimers: (ReturnType<typeof setTimeout> | null)[] = new Array(8).fill(null);
+
+  // OLED display debounce
+  private lastDisplayUpdate = 0;
+  private displayDebounceMs = 250; // max 4 updates/sec
+
   private constructor() {}
 
   static getInstance(): MPKMiniDisplay {
@@ -313,6 +321,97 @@ class MPKMiniDisplay {
     this.currentPreset.set(nameBytes, offset.name - 7);
 
     // Send the updated preset
+    const sysex = this.buildSysExMessage(this.currentPreset);
+    return this.sendSysEx(sysex);
+  }
+
+  // ===========================================================================
+  // Pad LED Feedback
+  // ===========================================================================
+
+  /**
+   * Send raw MIDI data directly to the MPK Mini output device
+   * (bypasses the selected output to avoid disrupting other MIDI routing)
+   */
+  private sendToMPK(channel: number, note: number, velocity: number): void {
+    const mpkOutputId = this.findMPKMiniOutputId();
+    if (!mpkOutputId) return;
+    const midiManager = getMIDIManager();
+    midiManager.sendRawToDevice(
+      mpkOutputId,
+      new Uint8Array([0x90 | (channel & 0x0f), note & 0x7f, velocity & 0x7f])
+    );
+  }
+
+  /**
+   * Turn a pad LED on or off (pad index 0-7)
+   */
+  setPadLED(padIndex: number, on: boolean): void {
+    if (padIndex < 0 || padIndex > 7) return;
+    const note = this.padNotes[padIndex];
+    this.sendToMPK(0, note, on ? 127 : 0);
+  }
+
+  /**
+   * Flash a pad LED briefly then turn it off
+   */
+  flashPad(padIndex: number, durationMs = 100): void {
+    if (padIndex < 0 || padIndex > 7) return;
+    // Clear any existing flash timer for this pad
+    if (this.padFlashTimers[padIndex] !== null) {
+      clearTimeout(this.padFlashTimers[padIndex]!);
+    }
+    this.setPadLED(padIndex, true);
+    this.padFlashTimers[padIndex] = setTimeout(() => {
+      this.setPadLED(padIndex, false);
+      this.padFlashTimers[padIndex] = null;
+    }, durationMs);
+  }
+
+  /**
+   * Turn off all pad LEDs
+   */
+  clearAllPadLEDs(): void {
+    for (let i = 0; i < 8; i++) {
+      if (this.padFlashTimers[i] !== null) {
+        clearTimeout(this.padFlashTimers[i]!);
+        this.padFlashTimers[i] = null;
+      }
+      this.setPadLED(i, false);
+    }
+  }
+
+  // ===========================================================================
+  // OLED Display Enhancement
+  // ===========================================================================
+
+  /**
+   * Update the OLED display with status info (debounced to max 4 updates/sec)
+   * Format: "DVB 140 ACID   " — 16 chars max
+   */
+  async updateStatusDisplay(bpm: number, bankName: string, instrumentName?: string): Promise<void> {
+    const now = Date.now();
+    if (now - this.lastDisplayUpdate < this.displayDebounceMs) return;
+    this.lastDisplayUpdate = now;
+
+    const bpmStr = Math.round(bpm).toString();
+    const label = instrumentName ? instrumentName.slice(0, 8) : bankName.slice(0, 8);
+    const display = `DVB ${bpmStr} ${label}`.slice(0, 16).padEnd(16);
+
+    await this.sendMPKLCDDisplay(display);
+  }
+
+  /**
+   * Update the program name on the OLED display
+   */
+  async sendMPKLCDDisplay(text: string): Promise<boolean> {
+    if (!this.currentPreset) {
+      this.currentPreset = this.createDefaultPreset();
+    }
+
+    const nameBytes = this.stringToBytes(text, 16);
+    this.currentPreset.set(nameBytes, 1); // offset 1 = program name
+
     const sysex = this.buildSysExMessage(this.currentPreset);
     return this.sendSysEx(sysex);
   }
