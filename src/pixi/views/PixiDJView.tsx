@@ -7,6 +7,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { PixiButton, PixiViewHeader } from '../components';
 import { PixiDJDeck } from './dj/PixiDJDeck';
 import { PixiDJMixer } from './dj/PixiDJMixer';
+import { PixiDeckWaveform } from './dj/PixiDeckWaveform';
 import { PixiDJCratePanel } from './dj/PixiDJCratePanel';
 import { useDJStore } from '@stores/useDJStore';
 import { useTransportStore } from '@stores/useTransportStore';
@@ -91,6 +92,12 @@ export const PixiDJView: React.FC = () => {
         autoDJOpen={autoDJOpen || autoDJEnabled}
         onAutoDJToggle={() => setAutoDJOpen(p => !p)}
       />
+
+      {/* Full-width waveform strip — Serato-style */}
+      <pixiContainer layout={{ width: '100%', height: 120, flexShrink: 0, flexDirection: 'column' }}>
+        <PixiDeckWaveform deckId="A" height={60} />
+        <PixiDeckWaveform deckId="B" height={60} />
+      </pixiContainer>
 
       {/* Crate panel — GL-native tabbed browser, collapses to 0 height when hidden */}
       <pixiContainer layout={{ width: '100%', height: browserPanel === 'crate' ? 280 : 0, flexShrink: 0 }}>
