@@ -3400,7 +3400,19 @@ export const SynthTypeDispatcher: React.FC<SynthTypeDispatcherProps> = ({
         ? { [configKey]: (instrument as unknown as Record<string, unknown>)[configKey] ?? instrument.parameters ?? {} }
         : instrument as unknown as Record<string, unknown>;
       return (
-        <div className="p-3 space-y-3">
+        <div className="synth-editor-container bg-gradient-to-b from-[#1e1e1e] to-[#151515]">
+          <EditorHeader
+            instrument={instrument}
+            onChange={handleChange}
+            vizMode={vizMode}
+            onVizModeChange={setVizMode}
+            onBake={handleBake}
+            onBakePro={handleBakePro}
+            onUnbake={handleUnbake}
+            isBaked={isBaked}
+            isBaking={isBaking}
+          />
+          <div className="p-3 space-y-3">
           <DOMSynthPanel
             layout={layout}
             config={config}
@@ -3436,6 +3448,7 @@ export const SynthTypeDispatcher: React.FC<SynthTypeDispatcherProps> = ({
               )}
             </div>
           )}
+          </div>
         </div>
       );
     }
