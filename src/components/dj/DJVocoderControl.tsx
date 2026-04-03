@@ -11,6 +11,7 @@ import { useVocoderStore, VOCODER_PRESETS, VOCODER_FX_PRESETS, type VocoderFXPre
 import { VocoderEngine } from '@/engine/vocoder/VocoderEngine';
 import { VocoderAutoTune } from '@/engine/vocoder/VocoderAutoTune';
 import { getDJEngineIfActive } from '@/engine/dj/DJEngine';
+import { registerPTTHandlers, unregisterPTTHandlers } from '@/hooks/useGlobalPTT';
 
 interface AudioInputDevice {
   deviceId: string;
@@ -37,6 +38,7 @@ export const DJVocoderControl: React.FC = () => {
   // Preload vocoder worklet + WASM on mount so toggle doesn't cause audio glitch
   useEffect(() => {
     VocoderEngine.preload();
+    return () => unregisterPTTHandlers();
   }, []);
 
   // Enumerate audio input devices on mount and when devices change
@@ -185,6 +187,11 @@ export const DJVocoderControl: React.FC = () => {
       try { getDJEngineIfActive()?.mixer.unduck(); } catch { /* ok */ }
     }
   }, [duckingEnabled]);
+
+  // Register PTT handlers so global keyboard shortcut (Space/T) uses this engine
+  useEffect(() => {
+    registerPTTHandlers(handlePTTDown, handlePTTUp);
+  }, [handlePTTDown, handlePTTUp]);
 
   const handleFormantShift = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const shift = parseFloat(e.target.value);

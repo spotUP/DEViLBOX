@@ -127,6 +127,8 @@ interface VocoderState {
   presetName: string | null;
   /** Effects parameters */
   fx: VocoderFXParams;
+  /** Global push-to-talk state (set by keyboard shortcut, consumed by DJVocoderControl) */
+  pttActive: boolean;
 
   setActive: (active: boolean) => void;
   setAmplitude: (amp: number) => void;
@@ -135,6 +137,7 @@ interface VocoderState {
   loadPreset: (name: string) => void;
   setFXEnabled: (enabled: boolean) => void;
   loadFXPreset: (preset: VocoderFXPreset) => void;
+  setPTT: (active: boolean) => void;
 }
 
 export const useVocoderStore = create<VocoderState>((set) => ({
@@ -143,6 +146,7 @@ export const useVocoderStore = create<VocoderState>((set) => ({
   params: { ...DEFAULT_VOCODER_PARAMS },
   presetName: VOCODER_PRESETS[0].name,
   fx: { ...DEFAULT_FX },
+  pttActive: false,
 
   setActive: (active) => set({ isActive: active }),
   setAmplitude: (amp) => set({ amplitude: amp }),
@@ -158,4 +162,5 @@ export const useVocoderStore = create<VocoderState>((set) => ({
     set((s) => ({ fx: { ...s.fx, enabled } })),
   loadFXPreset: (preset) =>
     set({ fx: { enabled: true, preset, ...VOCODER_FX_PRESETS[preset] } }),
+  setPTT: (active) => set({ pttActive: active }),
 }));
