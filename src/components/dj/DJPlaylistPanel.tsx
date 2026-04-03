@@ -651,16 +651,14 @@ export const DJPlaylistPanel: React.FC<DJPlaylistPanelProps> = ({ onClose }) => 
                   )}
                   <button
                     onClick={() => loadTrackWithProgress(track, 'A', i)}
-                    className="px-1 text-xs font-mono font-bold text-blue-400/70 hover:text-blue-300
-                               opacity-0 group-hover:opacity-100 transition-opacity"
+                    className="px-1 text-xs font-mono font-bold text-blue-400/40 hover:text-blue-300 transition-colors"
                     title="Deck 1"
                   >
                     1
                   </button>
                   <button
                     onClick={() => loadTrackWithProgress(track, 'B', i)}
-                    className="px-1 text-xs font-mono font-bold text-red-400/70 hover:text-red-300
-                               opacity-0 group-hover:opacity-100 transition-opacity"
+                    className="px-1 text-xs font-mono font-bold text-red-400/40 hover:text-red-300 transition-colors"
                     title="Deck 2"
                   >
                     2
@@ -668,8 +666,7 @@ export const DJPlaylistPanel: React.FC<DJPlaylistPanelProps> = ({ onClose }) => 
                   {useDJStore.getState().thirdDeckActive && (
                     <button
                       onClick={() => loadTrackWithProgress(track, 'C', i)}
-                      className="px-1 text-xs font-mono font-bold text-emerald-400/70 hover:text-emerald-300
-                                 opacity-0 group-hover:opacity-100 transition-opacity"
+                      className="px-1 text-xs font-mono font-bold text-emerald-400/40 hover:text-emerald-300 transition-colors"
                       title="Deck 3"
                     >
                       3
@@ -677,8 +674,7 @@ export const DJPlaylistPanel: React.FC<DJPlaylistPanelProps> = ({ onClose }) => 
                   )}
                   <button
                     onClick={() => removeTrack(activePlaylist.id, i)}
-                    className="p-0.5 text-text-muted/30 hover:text-accent-error transition-colors
-                               opacity-0 group-hover:opacity-100"
+                    className="p-0.5 text-text-muted/20 hover:text-accent-error transition-colors"
                   >
                     <X size={8} />
                   </button>
