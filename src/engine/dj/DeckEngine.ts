@@ -77,7 +77,9 @@ export class DeckEngine {
    * Both jog-wheel release and pattern stop decay back to this.
    */
   private restMultiplier = 1;
-  private isScratchActive = false;   // true while jog wheel is physically held
+  private _isScratchActive = false;   // true while jog wheel is physically held
+  /** Whether jog wheel scratch is currently active (hand on record). */
+  get isScratchActive(): boolean { return this._isScratchActive; }
   private backwardPauseTimeoutId: ReturnType<typeof setTimeout> | null = null;
   private decayRafId: number | null = null;
 
@@ -123,17 +125,30 @@ export class DeckEngine {
   private slipGhostStartTime = 0;      // performance.now() when ghost started
   private slipGhostRate = 1;           // playback rate for ghost advancement
 
+  // Raw native AudioParam for deckGain — bypasses Tone.Signal entirely
+  // to avoid any Tone.js interception that corrupts automation during scratch.
+  private _rawDeckGainParam: AudioParam | null = null;
+
   /**
-   * Safely ramp deckGain to a target value using raw Web Audio automation.
-   * Avoids Tone.js `linearRampTo` / `rampTo` which internally call
-   * `cancelAndHoldAtTime` — a method that corrupts prior `setValueAtTime`
-   * anchors and causes gain drift during rapid scratch transitions.
+   * Safely ramp deckGain to a target value using the RAW native AudioParam.
+   * Completely bypasses Tone.Signal to avoid any automation corruption.
    */
   private _rampDeckGain(target: number, durationSec: number): void {
+    const param = this._rawDeckGainParam;
+    if (!param) return;
     const now = Tone.getContext().rawContext.currentTime;
-    this.deckGain.gain.cancelScheduledValues(now);
-    this.deckGain.gain.setValueAtTime(this.deckGain.gain.value, now);
-    this.deckGain.gain.linearRampToValueAtTime(target, now + durationSec);
+    param.cancelScheduledValues(now);
+    param.setValueAtTime(param.value, now);
+    param.linearRampToValueAtTime(target, now + durationSec);
+  }
+
+  /** Hard-set deckGain to an exact value with no ramp (atomic). */
+  private _setDeckGain(value: number): void {
+    const param = this._rawDeckGainParam;
+    if (!param) return;
+    const now = Tone.getContext().rawContext.currentTime;
+    param.cancelScheduledValues(now);
+    param.setValueAtTime(value, now);
   }
 
   constructor(options: DeckEngineOptions) {
@@ -141,6 +156,11 @@ export class DeckEngine {
 
     // Create the audio chain nodes (order: replayer → deckGain → EQ3 → HPF → LPF → pitchShift → channelGain → output)
     this.deckGain = new Tone.Gain(1);
+    // Cache raw native AudioParam to bypass Tone.Signal for scratch gain transitions
+    const nativeGain = getNativeAudioNode(this.deckGain as unknown as Record<string, unknown>);
+    if (nativeGain && 'gain' in nativeGain) {
+      this._rawDeckGainParam = (nativeGain as GainNode).gain;
+    }
     this.eq3 = new Tone.EQ3({ low: 0, mid: 0, high: 0 });
     this.filterHPF = new Tone.Filter({ type: 'highpass', frequency: 20, Q: 1, rolloff: -24 });
     this.filterLPF = new Tone.Filter({ type: 'lowpass', frequency: 20000, Q: 1, rolloff: -24 });
@@ -181,7 +201,7 @@ export class DeckEngine {
     // rate ramp from 0.04x → 1.0x confuses sample buffer end-time tracking.
     this.scratchPlayback.onPatternEnd = () => {
       this._endPatternScratch();
-      if (!this.isScratchActive) {
+      if (!this._isScratchActive) {
         if (this.decayRafId !== null) {
           cancelAnimationFrame(this.decayRafId);
           this.decayRafId = null;
@@ -526,8 +546,8 @@ export class DeckEngine {
 
   /** Enter scratch mode — cancels any in-progress decay and marks jog wheel as active */
   startScratch(): void {
-    if (this.isScratchActive) return;
-    this.isScratchActive = true;
+    if (this._isScratchActive) return;
+    this._isScratchActive = true;
     // Cancel any in-progress restore animation so scratch takes full control
     if (this.decayRafId !== null) {
       cancelAnimationFrame(this.decayRafId);
@@ -658,8 +678,8 @@ export class DeckEngine {
    * If slip mode is active, snaps back to the ghost position.
    */
   stopScratch(decayMs = 200): void {
-    if (!this.isScratchActive) return;
-    this.isScratchActive = false;
+    if (!this._isScratchActive) return;
+    this._isScratchActive = false;
 
     // Slip mode: snap back to ghost position
     this.slipSnapBack();
@@ -674,16 +694,15 @@ export class DeckEngine {
     // Uses cancelScheduledValues + setValueAtTime (atomic) instead of rampTo
     // (which relies on cancelAndHoldAtTime that can misbehave with rapid overlapping ramps).
     const hardReset = () => {
-      if (this.isScratchActive) return; // scratch restarted, don't interfere
+      if (this._isScratchActive) return; // scratch restarted, don't interfere
       const now = Tone.getContext().rawContext.currentTime;
       // Kill any residual scratch buffer output
       if (this.scratchBufferReady && this.scratchBuffer) {
         this.scratchBuffer.playbackGain.gain.cancelScheduledValues(now);
         this.scratchBuffer.playbackGain.gain.setValueAtTime(0, now);
       }
-      // Hard-set deckGain to exactly 1.0 — cancel all automation, then set atomically
-      this.deckGain.gain.cancelScheduledValues(now);
-      this.deckGain.gain.setValueAtTime(1, now);
+      // Hard-set deckGain to exactly 1.0 via raw native AudioParam
+      this._setDeckGain(1);
       // Force playback rate to restMultiplier — prevents rate drift from
       // incomplete _decayToRest animations or stale physics velocities
       if (this._playbackMode === 'audio') {
@@ -926,7 +945,7 @@ export class DeckEngine {
     this.scratchPlayback.stopPattern();
     this._endPatternScratch();
     // Only restore if the jog wheel isn't actively being held (it has its own restore path)
-    if (!this.isScratchActive) {
+    if (!this._isScratchActive) {
       this._decayToRest(300);
     }
   }
