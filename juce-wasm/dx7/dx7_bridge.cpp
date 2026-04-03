@@ -169,7 +169,15 @@ int dx7LoadSysex(const uint8_t* data, int size) {
     if (!g_dx7 || !data) return -1;
     // DX7 32-voice bulk dump: 4104 bytes
     if (size == 4104) {
+        // Write to internal RAM AND update the cartridge data so the firmware
+        // reads from the correct source regardless of cartridge state.
         std::memcpy(g_dx7->dx7.memory + 0x1000, data + 6, 4096);
+        // Also update the voicesData cartridge (bank 0) so program changes work
+        if (g_dx7->voicesData.size() < 4096)
+            g_dx7->voicesData.resize(4096);
+        std::memcpy(g_dx7->voicesData.data(), data + 6, 4096);
+        g_dx7->dx7.loadVoices(g_dx7->voicesData.data(), g_dx7->voicesData.size());
+        g_dx7->dx7.setBank(0, true);
         g_dx7->dx7.midiSerialRx.flush();
         // Send program change to reload voice 0 into EGS
         g_dx7->dx7.midiSerialRx.write(0xC0);
