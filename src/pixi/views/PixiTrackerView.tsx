@@ -45,6 +45,7 @@ import { PixiPianoRollView } from './PixiPianoRollView';
 import { PixiGTUltraView } from './gtultra/PixiGTUltraView';
 import { PixiSc68View } from './sc68/PixiSc68View';
 import { useTrackerView } from '@/hooks/views/useTrackerView';
+import { useMIDIFeedback } from '@/hooks/useMIDIFeedback';
 import { AUTOMATION_LANE_WIDTH, AUTOMATION_LANE_MIN } from '@/hooks/views/usePatternEditor';
 import { useTrackerStore, useUIStore, useInstrumentStore, useEditorStore, useAutomationStore } from '@stores';
 import { useWorkbenchStore } from '@stores/useWorkbenchStore';
@@ -71,6 +72,9 @@ export const PixiTrackerView: React.FC = () => {
     editorMode,
     handleExportML,
   } = useTrackerView();
+
+  // MPK Mini pad LED feedback + OLED display sync
+  useMIDIFeedback();
 
   const modalOpen = useUIStore(s => s.modalOpen);
   const closeModal = useUIStore(s => s.closeModal);
