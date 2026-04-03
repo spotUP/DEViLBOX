@@ -170,8 +170,10 @@ export function configToVCED(config: {
   const vced = new Uint8Array(156);
 
   // Default operator: sine wave, max level, fast attack/sustain envelope
+  // DX7 VCED format stores operators in reverse: OP6 at offset 0, OP1 at offset 105.
+  // Config operators[0] = OP1 (carrier in most algorithms), so we reverse the mapping.
   for (let op = 0; op < 6; op++) {
-    const src = config.operators?.[op];
+    const src = config.operators?.[5 - op]; // Config[0]=OP1 → VCED slot 5 (offset 105)
     const ui = op * 21;
 
     // EG rates (default: instant attack, sustain)
@@ -190,7 +192,7 @@ export function configToVCED(config: {
     vced[ui + 13] = src?.rateScaling ?? 0;
     vced[ui + 14] = src?.ampModSens ?? 0;
     vced[ui + 15] = src?.velocitySens ?? 0;
-    vced[ui + 16] = src?.level ?? (op === 0 ? 99 : 0); // Only op1 on by default
+    vced[ui + 16] = src?.level ?? (op === 5 ? 99 : 0); // OP1 (VCED slot 5) on by default
     vced[ui + 17] = src?.mode ?? 0;
     vced[ui + 18] = src?.coarse ?? 1;
     vced[ui + 19] = src?.fine ?? 0;
