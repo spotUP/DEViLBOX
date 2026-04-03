@@ -35,11 +35,15 @@ interface HardwareUIDescriptor {
 
 /** Known hardware UI descriptors keyed by synthType */
 const HARDWARE_UI_REGISTRY: Record<string, HardwareUIDescriptor> = {
+  // JUCE framebuffer blit synths
   DX7: { scriptUrl: '/dexed/DexedUI.js', factoryName: 'createDexedUIModule', fnPrefix: 'dexed_ui' },
   Monique: { scriptUrl: '/monique/MoniqueUI.js', factoryName: 'createMoniqueUIModule', fnPrefix: 'monique_ui' },
   Amsynth: { scriptUrl: '/amsynth/AmsynthUI.js', factoryName: 'createAmsynthUIModule', fnPrefix: 'amsynth_ui' },
   OBXf: { scriptUrl: '/obxf/OBXfUI.js', factoryName: 'createOBXfUIModule', fnPrefix: 'obxf_ui' },
   VL1: { scriptUrl: '/vl1/VL1UI.js', factoryName: 'createVL1UIModule', fnPrefix: 'vl1_ui', useDPR: true },
+  Odin2: { scriptUrl: '/odin2/Odin2UI.js', factoryName: 'createOdin2UIModule', fnPrefix: 'odin2_ui' },
+  Surge: { scriptUrl: '/surge/SurgeUI.js', factoryName: 'createSurgeUI', fnPrefix: 'surge_ui' },
+  Helm: { scriptUrl: '/helm/HelmUI.js', factoryName: 'createHelmUIModule', fnPrefix: 'helm_ui' },
 };
 
 interface PixiHardwareUIProps {
