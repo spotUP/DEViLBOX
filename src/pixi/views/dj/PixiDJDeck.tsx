@@ -16,6 +16,7 @@ import { PixiDeckCuePoints } from './PixiDeckCuePoints';
 import { PixiDeckScopes } from './PixiDeckScopes';
 import { PixiDeckBeatGrid } from './PixiDeckBeatGrid';
 import { PixiDeckFXPads } from './PixiDeckFXPads';
+import { PixiDeckPatternDisplay } from './PixiDeckPatternDisplay';
 import { getDJEngine } from '@engine/dj/DJEngine';
 import { TurntablePhysics, OMEGA_NORMAL } from '@/engine/turntable/TurntablePhysics';
 import { useDeckVisualizationData } from '@/hooks/dj/useDeckVisualizationData';
@@ -1604,6 +1605,9 @@ export const PixiDJDeck: React.FC<PixiDJDeckProps> = ({ deckId }) => {
         <pixiContainer layout={{ flexDirection: isB ? 'row-reverse' : 'row', gap: 4, flex: 1, minHeight: 0, alignItems: 'center' }}>
           <pixiContainer layout={{ flex: 1, minWidth: 0, minHeight: 0 }}>
             <PixiVinylDisplay deckId={deckId} size={250} deckColor={DECK_COLOR} />
+            <pixiContainer alpha={0.55} eventMode="none" layout={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%' }}>
+              <PixiDeckPatternDisplay deckId={deckId} />
+            </pixiContainer>
           </pixiContainer>
           {/* Pitch slider */}
           <pixiContainer layout={{ flexDirection: 'column', gap: 2, alignItems: 'center', flexShrink: 0, alignSelf: 'stretch', width: 32 }}>
@@ -1638,6 +1642,9 @@ export const PixiDJDeck: React.FC<PixiDJDeckProps> = ({ deckId }) => {
               deckColor={DECK_COLOR}
               height={260}
             />
+            <pixiContainer alpha={0.55} eventMode="none" layout={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%' }}>
+              <PixiDeckPatternDisplay deckId={deckId} />
+            </pixiContainer>
           </pixiContainer>
           {/* Pitch slider */}
           <pixiContainer layout={{ flexDirection: 'column', gap: 2, alignItems: 'center', flexShrink: 0, alignSelf: 'stretch', width: 32 }}>
