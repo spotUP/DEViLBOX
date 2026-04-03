@@ -308,18 +308,13 @@ export class DX7Synth implements DevilboxSynth {
       const resp = await fetch(`${baseUrl}roms/dx7/Patches/${bankFile}`);
       if (!resp.ok) throw new Error(`Failed to fetch ${bankFile}`);
       const data = await resp.arrayBuffer();
-      // dx7LoadSysex in the bridge handles EVERYTHING for 4104-byte bulk dumps:
-      // writes to internal RAM (0x1000), updates cartridge, calls setBank(0),
-      // and sends program change 0. No extra loadVoices or selectVoice(0) needed.
+      console.log(`[DX7] loadPatchBank: ${bankFile} (${data.byteLength} bytes), voiceIndex=${voiceIndex}`);
       this.loadSysex(data);
       this._currentBankFile = bankFile;
-      // Only send program change if voiceIndex != 0 (bridge already sent PC 0)
-      if (voiceIndex !== 0) {
-        await new Promise<void>(resolve => setTimeout(() => {
-          this.selectVoice(voiceIndex);
-          resolve();
-        }, 100));
-      }
+      await new Promise<void>(resolve => setTimeout(() => {
+        this.selectVoice(voiceIndex);
+        resolve();
+      }, 100));
     } catch (err) {
       console.error(`[DX7] Failed to load patch bank ${bankFile}:`, err);
     }
