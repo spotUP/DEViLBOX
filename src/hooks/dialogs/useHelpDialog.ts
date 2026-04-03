@@ -10,6 +10,7 @@ import { FurnaceChipType } from '../../engine/chips/FurnaceChipEngine';
 import type { HelpTab } from '../../data/helpContent';
 import { TUTORIAL_STEPS } from '../../data/helpContent';
 import type { ChipEffect } from '../../data/ChipEffectReference';
+import { MANUAL_CHAPTERS, MANUAL_PARTS } from '../../data/manualChapters';
 
 // ── typeMap: synthType string → FurnaceChipType ───────────────────────────────
 
@@ -52,6 +53,13 @@ export interface UseHelpDialogResult {
   currentChip: number | null;
   chipEffects: ChipEffect[];
   chipName: string;
+  /** Manual tab */
+  manualChapterIndex: number;
+  setManualChapterIndex: (index: number) => void;
+  manualSearchQuery: string;
+  setManualSearchQuery: (query: string) => void;
+  filteredChapters: typeof MANUAL_CHAPTERS;
+  manualParts: typeof MANUAL_PARTS;
 }
 
 // ── useHelpDialog ─────────────────────────────────────────────────────────────
@@ -59,6 +67,8 @@ export interface UseHelpDialogResult {
 export function useHelpDialog({ isOpen, initialTab = 'shortcuts' }: UseHelpDialogParams): UseHelpDialogResult {
   const [activeTab, setActiveTab] = useState<HelpTab>(initialTab);
   const [tutorialStep, setTutorialStep] = useState(0);
+  const [manualChapterIndex, setManualChapterIndex] = useState(0);
+  const [manualSearchQuery, setManualSearchQuery] = useState('');
 
   // Sync tab when isOpen/initialTab changes
   useEffect(() => {
@@ -99,6 +109,15 @@ export function useHelpDialog({ isOpen, initialTab = 'shortcuts' }: UseHelpDialo
     return entry ? entry[0] : 'Selected Chip';
   }, [currentChip]);
 
+  // Manual chapter filtering
+  const filteredChapters = useMemo(() => {
+    if (!manualSearchQuery.trim()) return MANUAL_CHAPTERS;
+    const q = manualSearchQuery.toLowerCase();
+    return MANUAL_CHAPTERS.filter(
+      ch => ch.title.toLowerCase().includes(q) || ch.content.toLowerCase().includes(q)
+    );
+  }, [manualSearchQuery]);
+
   // Tutorial navigation helpers
   const prevTutorialStep = () => setTutorialStep(s => Math.max(0, s - 1));
   const nextTutorialStep = () => setTutorialStep(s => Math.min(TUTORIAL_STEPS.length - 1, s + 1));
@@ -115,5 +134,11 @@ export function useHelpDialog({ isOpen, initialTab = 'shortcuts' }: UseHelpDialo
     currentChip,
     chipEffects,
     chipName,
+    manualChapterIndex,
+    setManualChapterIndex,
+    manualSearchQuery,
+    setManualSearchQuery,
+    filteredChapters,
+    manualParts: MANUAL_PARTS,
   };
 }

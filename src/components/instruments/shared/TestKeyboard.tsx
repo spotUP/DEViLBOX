@@ -335,6 +335,7 @@ export const TestKeyboard: React.FC<TestKeyboardProps> = ({ instrument }) => {
                 return (
                   <button
                     key={key.note}
+                    onContextMenu={(e) => e.preventDefault()}
                     onMouseDown={(e) => {
                       e.preventDefault();
                       if (Date.now() - lastTouchTimeRef.current < 500) return;
@@ -408,6 +409,7 @@ export const TestKeyboard: React.FC<TestKeyboardProps> = ({ instrument }) => {
                 return (
                   <button
                     key={key.note}
+                    onContextMenu={(e) => e.preventDefault()}
                     onMouseDown={(e) => {
                       e.preventDefault();
                       if (Date.now() - lastTouchTimeRef.current < 500) return;

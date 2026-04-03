@@ -18,6 +18,7 @@ import { JamCrackerEngine } from '@engine/jamcracker/JamCrackerEngine';
 import { jcToChannels } from '@/components/jamcracker/jamcrackerAdapter';
 import type { JCSongInfo, JCPatternData } from '@/components/jamcracker/jamcrackerAdapter';
 import type { FormatChannel } from '@/components/shared/format-editor-types';
+import { setFormatPlaybackRow, setFormatPlaybackPlaying } from '@engine/FormatPlaybackState';
 
 export interface UseJamCrackerDataResult {
   /** Song-level metadata returned by the WASM engine */
@@ -142,6 +143,9 @@ export function useJamCrackerData(): UseJamCrackerDataResult {
           if (cancelled) return;
           setPlayPos(update.songPos);
           setCurrentRow(update.row);
+          // Drive FormatPlaybackState so PatternEditorCanvas RAF loop scrolls in format mode
+          setFormatPlaybackRow(update.row);
+          setFormatPlaybackPlaying(true);
 
           // Update pattern data when song position changes
           const pidx = getPatIdxForPos(info, update.songPos);
@@ -157,6 +161,7 @@ export function useJamCrackerData(): UseJamCrackerDataResult {
     return () => {
       cancelled = true;
       unsubPos?.();
+      setFormatPlaybackPlaying(false);
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [jamCrackerFileData]);

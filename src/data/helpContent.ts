@@ -5,7 +5,7 @@
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
-export type HelpTab = 'shortcuts' | 'effects' | 'chip-effects' | 'tutorial';
+export type HelpTab = 'manual' | 'shortcuts' | 'effects' | 'chip-effects' | 'tutorial';
 
 export interface EffectCommand {
   code: string;
@@ -364,6 +364,7 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
 // ── Tab definitions ───────────────────────────────────────────────────────────
 
 export const HELP_TABS: { id: HelpTab; label: string }[] = [
+  { id: 'manual', label: 'MANUAL' },
   { id: 'shortcuts', label: 'KEYBOARD SHORTCUTS' },
   { id: 'effects', label: 'STANDARD EFFECTS' },
   { id: 'chip-effects', label: 'CHIP EFFECTS' },

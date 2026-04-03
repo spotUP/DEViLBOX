@@ -7,6 +7,7 @@
 
 import React, { useRef, useEffect, useCallback, useState, useMemo } from 'react';
 import { useTrackerStore, useCursorStore, useTransportStore, useThemeStore, useInstrumentStore, useEditorStore, useAutomationStore } from '@stores';
+import { useWasmPositionStore } from '@stores/useWasmPositionStore';
 import { AutomationLanes } from './AutomationLanes';
 import { AutomationParameterPicker } from '../automation/AutomationParameterPicker';
 import { MacroLanes } from './MacroLanes';
@@ -2195,6 +2196,9 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
     const tick = () => {
       // FORMAT MODE: use format engine's playback state (skip all tracker store reads)
       if (isFormatModeRef.current) {
+        const _fps = getFormatPlaybackState();
+        const _fmtRow = formatCurrentRowRef.current;
+        if (_fmtRow === 0 && prevRow > 0) console.warn(`[FORMAT RAF] row→0! fps.isPlaying=${_fps.isPlaying} fps.row=${_fps.row} formatRef=${_fmtRow} prevRow=${prevRow} bridge=${!!bridgeRef.current}`);
         const bridge = bridgeRef.current;
 
         if (bridge) {
@@ -2256,8 +2260,17 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
 
       // PERF: When idle, still update overlay positions for cursor movement
       // but skip expensive playback state reads.
-      if (!isPlaying && !prevPlaying) {
-        const cursorRow = useCursorStore.getState().cursor.rowIndex;
+      // Also check wasmPos.active — WASM engines (JamCracker etc.) don't set
+      // transportStore.isPlaying (doing so causes infinite engine respawn),
+      // so we must fall through to the main playback path when they're active.
+      const wasmPosEarly = useWasmPositionStore.getState();
+      if (!isPlaying && !prevPlaying && !wasmPosEarly.active) {
+        // Use frozen stop position from WASM engine if available (non-zero),
+        // otherwise fall back to cursor. This prevents the display from jumping
+        // to row 0 when the engine restarts asynchronously after stop.
+        const cursorRow = wasmPosEarly.stopRow > 0
+          ? wasmPosEarly.stopRow
+          : useCursorStore.getState().cursor.rowIndex;
         const h = dimensions.height;
         const rh = rowHeightRef.current;
         const centerLineTop = Math.floor(h / 2) - rh / 2;
@@ -2277,7 +2290,16 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
       let activePatternIdx = trackerState.currentPatternIndex;
       let smoothOffset = 0;
 
-      if (isPlaying) {
+      // WASM engine position — check FIRST (bypasses replayer which returns stale state)
+      const wasmPos = wasmPosEarly;
+      if (wasmPos.active) {
+        currentRow = wasmPos.row;
+        // Use songPos to determine active pattern (multi-pattern WASM songs)
+        const patternOrder = trackerState.patternOrder;
+        if (wasmPos.songPos >= 0 && wasmPos.songPos < patternOrder.length) {
+          activePatternIdx = patternOrder[wasmPos.songPos] ?? wasmPos.songPos;
+        }
+      } else if (isPlaying) {
         // Check if scratch is active — use scratch position instead of replayer
         const scratch = getTrackerScratchController();
         if (scratch.isActive) {
@@ -2295,7 +2317,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
           if (audioState) {
             currentRow       = audioState.row;
             activePatternIdx = audioState.pattern;
-            
+
             // Compute smooth offset for worker rendering
             if (transportState.smoothScrolling && audioState.duration > 0) {
               const progress = Math.min(Math.max(
@@ -2311,21 +2333,32 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
 
       // Send playback state to worker EVERY frame during playback
       // The main thread has accurate replayer state, worker just renders it
-      const shouldSendUpdate = isPlaying || 
-        currentRow !== prevRow || 
-        activePatternIdx !== prevPattern || 
-        isPlaying !== prevPlaying;
-        
+      // Treat WASM engine position as "playing" for the worker's rendering
+      const effectiveIsPlaying = isPlaying || wasmPos.active;
+      const shouldSendUpdate = effectiveIsPlaying ||
+        currentRow !== prevRow ||
+        activePatternIdx !== prevPattern ||
+        effectiveIsPlaying !== prevPlaying;
+
       if (shouldSendUpdate) {
+        if (!prevPlaying && effectiveIsPlaying) {
+          console.log(`[Canvas DOM] playback started: row=${currentRow} pattern=${activePatternIdx} wasmActive=${wasmPos.active} bridge=${!!bridgeRef.current}`);
+        }
+        if (prevPlaying && !effectiveIsPlaying) {
+          console.warn(`[Canvas DOM] STOP TRANSITION: row=${currentRow} cursor=${useCursorStore.getState().cursor.rowIndex} transport=${transportState.currentRow} wasmRow=${wasmPos.row} wasmActive=${wasmPos.active} stopRow=${wasmPosEarly.stopRow}`);
+        }
+        if (currentRow === 0 && prevRow > 0) {
+          console.warn(`[Canvas DOM] ROW JUMPED TO 0 from ${prevRow}! isPlaying=${isPlaying} wasmActive=${wasmPos.active} effectivePlaying=${effectiveIsPlaying}`);
+        }
         prevRow = currentRow;
         prevPattern = activePatternIdx;
-        prevPlaying = isPlaying;
+        prevPlaying = effectiveIsPlaying;
         bridgeRef.current?.post({
           type:         'playback',
           row:          currentRow,
           smoothOffset, // Send the accurately computed offset
           patternIndex: activePatternIdx,
-          isPlaying,
+          isPlaying:    effectiveIsPlaying,
           bpm:          transportState.bpm,
           speed:        transportState.speed,
           smoothScrolling: transportState.smoothScrolling,

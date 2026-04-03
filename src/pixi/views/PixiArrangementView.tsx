@@ -5,6 +5,7 @@
 
 import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { PixiButton, PixiLabel, PixiViewHeader } from '../components';
+import { usePixiTheme } from '../theme';
 import { PixiArrangementCanvas } from './arrangement/PixiArrangementCanvas';
 import type { ClipRenderData, ClipChannelNotes } from './arrangement/PixiArrangementCanvas';
 import { PixiTrackHeaders } from './arrangement/PixiTrackHeaders';
@@ -42,6 +43,7 @@ const ARR_TRACK_HEIGHT = 40;
 const ARR_RULER_HEIGHT = 24;
 
 export const PixiArrangementView: React.FC = () => {
+  const theme = usePixiTheme();
   const isPlaying = useTransportStore(s => s.isPlaying);
 
   // Resolve actual window pixel dimensions
@@ -138,7 +140,7 @@ export const PixiArrangementView: React.FC = () => {
     id: m.id,
     row: m.row,
     label: m.name,
-    color: cssColorToPixi(m.color, 0x06b6d4),
+    color: cssColorToPixi(m.color, theme.accentHighlight.color),
     timeSig: m.type === 'timesig' ? m.name : undefined,
   })), [storeMarkers]);
 
@@ -178,7 +180,7 @@ export const PixiArrangementView: React.FC = () => {
 
         // Color: clip color → track color → default
         const trackIdx = trackIdToIndex.get(clip.trackId) ?? 0;
-        const trackColor = visibleTracks[trackIdx]?.color ?? 0x3b82f6;
+        const trackColor = visibleTracks[trackIdx]?.color ?? theme.accent.color;
         const color = clip.color ? cssColorToPixi(clip.color, trackColor) : trackColor;
 
         // Name: custom name → pattern name → generic

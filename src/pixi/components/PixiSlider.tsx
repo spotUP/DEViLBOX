@@ -132,8 +132,9 @@ export const PixiSlider: React.FC<PixiSliderProps> = ({
         g.stroke({ color: theme.textMuted.color, alpha: 0.5, width: 1 });
       }
 
-      // Handle
-      const handleY = effectiveLength - norm * effectiveLength - handleHeight / 2;
+      // Handle — clamp travel so handle stays within track bounds
+      const trackTravel = effectiveLength - handleHeight;
+      const handleY = trackTravel - norm * trackTravel;
       const hFill = handleColorProp ?? (isDragging ? accent : theme.bgHover.color);
       const hStroke = isDragging ? accent : (handleColorProp ? handleColorProp : theme.borderLight.color);
       g.roundRect(0, handleY, handleWidth, handleHeight, handleRadius);
@@ -173,7 +174,8 @@ export const PixiSlider: React.FC<PixiSliderProps> = ({
       }
 
       // Handle
-      const handleX = norm * effectiveLength - handleWidth / 2;
+      const hTrackTravel = effectiveLength - handleWidth;
+      const handleX = norm * hTrackTravel;
       const hFillH = handleColorProp ?? (isDragging ? accent : theme.bgHover.color);
       const hStrokeH = isDragging ? accent : (handleColorProp ? handleColorProp : theme.borderLight.color);
       g.roundRect(handleX, 0, handleWidth, handleHeight, handleRadius);

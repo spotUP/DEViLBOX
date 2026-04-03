@@ -6,7 +6,7 @@
  *   Row 2+3 (72px) — Transport section (left flex:1) + Visualizer (right, fixed width)
  *     Row 2 (36px): Position [Tap][Ins][Del] | BPM | Pattern | Edit Step | Play Song | Play Pattern
  *     Row 3 (36px): Song Len | Speed [Groove] | Length | Song Len
- *   Row 4 (32px)  — File / action buttons: Load Save Revisions Export New Clear Order Instruments Pads Master FX Reference Help Settings Fullscreen
+ *   Row 4 (32px)  — File / action buttons: Load Save Revisions Export New Clear Order Instruments Pads Master FX Help Fullscreen
  *
  * Stores used:
  *   useTransportStore — bpm, speed, isPlaying, isLooping, play, stop, setBPM, setSpeed,
@@ -238,7 +238,6 @@ export const PixiFT2Toolbar: React.FC = () => {
   const handleShowInstruments  = useCallback(() => useUIStore.getState().openModal('instruments'), []);
   const handleShowPatternOrder = useCallback(() => useUIStore.getState().openModal('patternOrder'), []);
   const handleShowDrumpads     = useCallback(() => useUIStore.getState().openModal('drumpads'), []);
-  const handleShowSettings     = useCallback(() => useUIStore.getState().openModal('settings'), []);
 
   // ── File operations ───────────────────────────────────────────────────────
   const handleLoad = useCallback(() => {
@@ -624,9 +623,7 @@ export const PixiFT2Toolbar: React.FC = () => {
           active={aiOpen}
           onClick={toggleAI}
         />
-        <PixiButton label="Reference" variant="ghost" size="sm" onClick={() => handleShowHelp('chip-effects')} />
         <PixiButton label="Help"      variant="ghost" size="sm" onClick={() => handleShowHelp('shortcuts')} />
-        <PixiButton label="Settings"  variant="ghost" size="sm" onClick={handleShowSettings} />
         <PixiButton
           label="Info"
           variant={modalOpen === 'moduleInfo' ? 'ft2' : 'ghost'}

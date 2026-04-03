@@ -216,7 +216,6 @@ export const usePatternPlayback = () => {
     const pattern = patternRef.current;
     const patterns = patternsRef.current;
 
-
     // IF we are playing and the song structure changed, we need to RELOAD the song in the replayer
     // otherwise it won't know about the new patterns (like B/D animation helpers)
     if (isPlaying && pattern) {
@@ -336,6 +335,40 @@ export const usePatternPlayback = () => {
           } else {
             console.warn('[Playback] No UADESynth instrument config found in store');
           }
+        }
+        return;
+      }
+
+      // ── JamCracker: opaque WASM player — bypass TrackerReplayer reload loop ─
+      // JamCracker uses its own WASM engine for playback. The replayer's internal
+      // scheduler runs but suppressNotes=true, so replayer.isPlaying() returns
+      // false → needsReload=true on EVERY effect re-fire → infinite loadSong/play
+      // cycle that restarts the engine from position 0. Fix: start once via
+      // loadSong+play, then ALWAYS return early. Position is tracked via
+      // useWasmPositionStore, wired in startNativeEngines.
+      if (format === 'JamCracker' && jamCrackerFileData) {
+        if (!hasStartedRef.current) {
+          hasStartedRef.current = true;
+          // Build the song config and start the engine via the normal path
+          // (loadSong → replayer.play → startNativeEngines → JamCracker loadTune+play)
+          const modData = pattern.importMetadata?.modData;
+          replayer.loadSong({
+            name: pattern.importMetadata?.sourceFile ?? pattern.name ?? 'Untitled',
+            format,
+            patterns,
+            instruments: instrumentsRef.current,
+            songPositions: patternOrderRef.current,
+            songLength: modData?.songLength ?? patternOrderRef.current.length,
+            restartPosition: modData?.restartPosition ?? 0,
+            numChannels: pattern.channels.length,
+            initialSpeed: modData?.initialSpeed ?? transportSpeed,
+            initialBPM: modData?.initialBPM ?? bpmRef.current,
+            linearPeriods,
+            jamCrackerFileData,
+          });
+          replayer.play().catch((err) => {
+            console.error('Failed to start JamCracker playback:', err);
+          });
         }
         return;
       }
@@ -595,6 +628,18 @@ export const usePatternPlayback = () => {
         replayerRef.current.skipNextReload = false;
         return;
       }
+
+      // JamCracker: do NOT reset hasStartedRef or call replayer.stop() here.
+      // The user's stop handler (FT2Toolbar/spacebar) already called
+      // getTrackerReplayer().stop() which stopped the engine and saved position.
+      // If we reset hasStartedRef here, the next async play() re-fire would
+      // re-enter the JamCracker bypass's loadSong+play path, restarting the
+      // engine from row 0 and overwriting the saved position.
+      if (jamCrackerFileData) {
+        setFormatPlaybackPlaying(false);
+        return;
+      }
+
       // Stop playback — keep current position (don't reset row/position)
       if ((window as any).PLAYBACK_DEBUG) console.log('[Playback] Stopping playback');
       hasStartedRef.current = false;
@@ -621,6 +666,8 @@ export const usePatternPlayback = () => {
     return () => {
       // Don't stop during forcePosition seek
       if (replayerRef.current.skipNextReload) return;
+      // Don't stop JamCracker from cleanup — user's stop handler manages lifecycle
+      if (jamCrackerFileData) return;
       if (!isPlaying && hasStartedRef.current) {
         replayerRef.current.stop();
         replayerRef.current.onRowChange = null;

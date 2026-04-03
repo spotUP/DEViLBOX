@@ -18,7 +18,7 @@ target_include_directories(ShimmerReverbWASM PRIVATE
 set_target_properties(ShimmerReverbWASM PROPERTIES
     OUTPUT_NAME "ShimmerReverb"
     SUFFIX ".js"
-    RUNTIME_OUTPUT_DIRECTORY "${CMAKE_SOURCE_DIR}/../public/shimmer-reverb"
+    RUNTIME_OUTPUT_DIRECTORY "${CMAKE_SOURCE_DIR}/../../public/shimmer-reverb"
 )
 
 target_link_options(ShimmerReverbWASM PRIVATE

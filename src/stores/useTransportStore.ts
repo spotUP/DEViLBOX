@@ -106,6 +106,11 @@ let pendingPatternLength: number | undefined = undefined;
 let throttleTimer: number | null = null;
 const THROTTLE_INTERVAL = 250; // Throttle React re-renders during playback (RAF reads position directly)
 
+// Generation counter — incremented by stop() to invalidate in-flight play() calls.
+// play() is async (awaits unlockIOSAudio + Tone.start). If the user stops during
+// those awaits, the stale play() must NOT set isPlaying=true after stop.
+let _playGeneration = 0;
+
 // Cancel pending throttle update (called on seek to prevent old row values reverting)
 export function cancelPendingRowUpdate(): void {
   if (throttleTimer !== null) {
@@ -207,15 +212,23 @@ export const useTransportStore = create<TransportStore>()(
       }),
 
     play: async () => {
+      const gen = ++_playGeneration;
+
       // Auto-bake any instruments that need it before starting playback
       useInstrumentStore.getState().autoBakeInstruments();
-      
+
       // CRITICAL for iOS: Start audio context synchronously during user gesture
       // Dynamic import creates async delay that breaks iOS gesture chain
       // See: https://github.com/Tonejs/Tone.js/issues/164
       await unlockIOSAudio(); // Play silent MP3 + pump AudioContext for iOS
       await Tone.start();
-      
+
+      // If stop() was called while we were awaiting, abort — don't override
+      // isPlaying=false with isPlaying=true. This race happens when play() is
+      // called fire-and-forget (e.g. from forcePosition) and the user stops
+      // before the awaits resolve.
+      if (gen !== _playGeneration) return;
+
       set((state) => {
         state.isPlaying = true;
         state.isPaused = false;
@@ -235,6 +248,13 @@ export const useTransportStore = create<TransportStore>()(
     },
 
     stop: () => {
+      // Invalidate any in-flight async play() — it must not set isPlaying=true
+      // after stop. play() checks _playGeneration before setting isPlaying.
+      ++_playGeneration;
+      // Cancel any pending throttled row update — without this, a queued
+      // setCurrentRowThrottled timer (up to 250ms) can fire after stop and
+      // overwrite the stop-position that TrackerReplayer.stop() just saved.
+      cancelPendingRowUpdate();
       set((state) => {
         // Keep currentRow at last playback position (don't reset to 0)
         // so the pattern editor stays where playback stopped.

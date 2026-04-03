@@ -234,6 +234,28 @@ export const VJPatternOverlay: React.FC<VJPatternOverlayProps> = React.memo(({ s
       if (snapshotBuf.length === 0) {
         const fallback = getPatternSnapshot('tracker');
         if (!fallback) {
+          // No pattern data at all — draw oscilloscope waveform instead
+          bus.update();
+          const wf = bus.getFrame().waveform;
+          const wfW = ROW_NUM_W + 4 * CELL_W;
+          if (canvas.width !== wfW) canvas.width = wfW;
+          ctx.clearRect(0, 0, wfW, CANVAS_H);
+          const midY = CANVAS_H / 2;
+          const baseHue = (bandHue(bus.getFrame()) + anim.hueShift) % 360;
+          // Waveform line
+          ctx.strokeStyle = hsl(baseHue, 80, 70, 0.9);
+          ctx.lineWidth = 2;
+          ctx.shadowColor = hsl(baseHue, 90, 65, 0.7);
+          ctx.shadowBlur = 6 + bus.getFrame().rms * 12;
+          ctx.beginPath();
+          const wfStep = wf.length / wfW;
+          for (let x = 0; x < wfW; x++) {
+            const v = wf[Math.floor(x * wfStep)] ?? 0;
+            const y = midY + v * midY * 0.85;
+            if (x === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+          }
+          ctx.stroke();
+          ctx.shadowBlur = 0;
           rafRef.current = requestAnimationFrame(render);
           return;
         }
