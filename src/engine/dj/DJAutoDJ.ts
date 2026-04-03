@@ -15,8 +15,16 @@ import { useDJStore } from '@/stores/useDJStore';
 import { useDJPlaylistStore } from '@/stores/useDJPlaylistStore';
 import type { DeckId } from './DeckEngine';
 import { getDJEngine } from './DJEngine';
-import { beatMatchedTransition, setTrackedFilterPosition } from './DJQuantizedFX';
+import {
+  beatMatchedTransition, setTrackedFilterPosition,
+  cutTransition, filterBuildTransition, bassSwapTransition, echoOutTransition,
+} from './DJQuantizedFX';
 import { loadPlaylistTrackToDeck } from './DJTrackLoader';
+import { keyCompatibility } from './DJKeyUtils';
+
+// ── Transition Types ────────────────────────────────────────────────────────
+
+type TransitionType = 'crossfade' | 'cut' | 'echo-out' | 'filter-build' | 'bass-swap';
 
 // ── Constants ────────────────────────────────────────────────────────────────
 
@@ -48,6 +56,9 @@ class DJAutoDJ {
   private preloadedDeck: DeckId | null = null;
   private shuffleOrder: number[] = [];
   private shufflePosition = 0;
+  // Stale position detection — if timeRemaining doesn't change for too long, force preload
+  private lastTimeRemaining = Infinity;
+  private staleCount = 0;
 
 
   // ── Public API ───────────────────────────────────────────────────────────
@@ -221,9 +232,22 @@ class DJAutoDJ {
 
     switch (status) {
       case 'playing': {
-        // Check if it's time to preload (or always preload if duration unknown)
-        const shouldPreload = timeRemaining < PRELOAD_LEAD_TIME_SEC || timeRemaining === Infinity;
+        // Detect stale position — browser throttling can freeze audioPosition
+        if (Math.abs(timeRemaining - this.lastTimeRemaining) < 0.1) {
+          this.staleCount++;
+        } else {
+          this.staleCount = 0;
+        }
+        this.lastTimeRemaining = timeRemaining;
+
+        // Preload when: time is low, duration unknown, OR position has been frozen
+        // (staleCount > 12 = ~6 seconds of frozen position at 500ms poll interval)
+        const positionFrozen = this.staleCount > 12 && timeRemaining < Infinity;
+        const shouldPreload = timeRemaining < PRELOAD_LEAD_TIME_SEC || timeRemaining === Infinity || positionFrozen;
         if (shouldPreload && !this.preloading && !this.preloadedDeck) {
+          if (positionFrozen) {
+            console.warn(`[AutoDJ] Position frozen at ${timeRemaining.toFixed(1)}s for ${this.staleCount} polls — forcing preload`);
+          }
           this.preloadNextTrack();
         }
         break;
@@ -240,12 +264,13 @@ class DJAutoDJ {
       }
 
       case 'transitioning': {
-        // Check if the outgoing deck has stopped (transition complete)
+        // Check if the transition is done.
+        // The crossfader sweep is the authoritative signal — when it reaches the
+        // target, the transition is complete regardless of the store's isPlaying
+        // flags (which can be stale due to useDeckStateSync racing with
+        // scheduleQuantized).
         const outgoingPlaying = store.decks[this.activeDeck].isPlaying;
         const incomingPlaying = store.decks[this.idleDeck].isPlaying;
-
-        // Transition is done when incoming is playing and outgoing has stopped
-        // OR when the crossfader has fully moved to the incoming side
         const crossfader = store.crossfaderPosition;
         const crossfaderDone = this.idleDeck === 'B' ? crossfader >= 0.98
           : this.idleDeck === 'A' ? crossfader <= 0.02 : false;
@@ -254,7 +279,10 @@ class DJAutoDJ {
           console.log(`[AutoDJ transition] outgoing=${this.activeDeck}:${outgoingPlaying} incoming=${this.idleDeck}:${incomingPlaying} cf=${crossfader.toFixed(2)} cfDone=${crossfaderDone}`);
         }
 
-        if (incomingPlaying && (!outgoingPlaying || crossfaderDone)) {
+        // Complete when crossfader is done AND outgoing has stopped
+        // (don't require incomingPlaying — the store flag can be reset by
+        // useDeckStateSync before the scheduled play() fires)
+        if (crossfaderDone && !outgoingPlaying) {
           this.completeTransition();
         }
         break;
@@ -340,25 +368,108 @@ class DJAutoDJ {
 
   // ── Private: Transition ──────────────────────────────────────────────────
 
-  private triggerTransition(bars: number): void {
+  private triggerTransition(_userBars: number): void {
     const store = useDJStore.getState();
     if (!this.preloadedDeck) return;
 
-    // Mark incoming deck as playing in the store — beatMatchedTransition starts
-    // it at the engine level but doesn't update the store, which causes
-    // completeTransition to never trigger (it checks incomingPlaying).
+    const outState = store.decks[this.activeDeck];
+    const inState = store.decks[this.idleDeck];
+
+    // Smart transition type selection
+    const transType = this.selectTransitionType(outState, inState);
+
+    // Smart transition duration
+    const bars = this.getSmartTransitionBars(outState, inState, transType);
+
+    // Mark incoming deck as playing in the store
     store.setDeckPlaying(this.idleDeck, true);
     store.setAutoDJStatus('transitioning');
+
     const aFile = store.decks.A.fileName?.split('/').pop() ?? 'empty';
     const bFile = store.decks.B.fileName?.split('/').pop() ?? 'empty';
-    console.log(`[AutoDJ] Starting ${bars}-bar transition: ${this.activeDeck} → ${this.idleDeck} | cf=${store.crossfaderPosition.toFixed(2)}→${this.idleDeck === 'B' ? 1 : 0} | A:${aFile} B:${bFile}`);
+    console.log(`[AutoDJ] ${transType.toUpperCase()} ${bars}-bar: ${this.activeDeck} → ${this.idleDeck} | A:${aFile} B:${bFile}`);
 
-    this.transitionCancel = beatMatchedTransition(
-      this.activeDeck,
-      this.idleDeck,
-      bars,
-      store.autoDJWithFilter,
-    );
+    switch (transType) {
+      case 'cut':
+        this.transitionCancel = cutTransition(this.activeDeck, this.idleDeck);
+        break;
+      case 'echo-out':
+        this.transitionCancel = echoOutTransition(this.activeDeck, this.idleDeck, bars * 4);
+        break;
+      case 'filter-build':
+        this.transitionCancel = filterBuildTransition(this.activeDeck, this.idleDeck, bars);
+        break;
+      case 'bass-swap':
+        this.transitionCancel = bassSwapTransition(this.activeDeck, this.idleDeck, bars);
+        break;
+      case 'crossfade':
+      default:
+        this.transitionCancel = beatMatchedTransition(
+          this.activeDeck, this.idleDeck, bars, store.autoDJWithFilter,
+        );
+        break;
+    }
+  }
+
+  /**
+   * Intelligently select transition type based on track characteristics.
+   */
+  private selectTransitionType(outgoing: { effectiveBPM: number; energy?: number; musicalKey?: string | null }, incoming: { effectiveBPM: number; energy?: number; musicalKey?: string | null }): TransitionType {
+    const bpmDiff = Math.abs((outgoing.effectiveBPM || 125) - (incoming.effectiveBPM || 125));
+    const outEnergy = outgoing.energy ?? 0.5;
+    const inEnergy = incoming.energy ?? 0.5;
+    const keyCompat = keyCompatibility(outgoing.musicalKey, incoming.musicalKey);
+
+    // High energy + close BPM = punchy cut or bass swap
+    if (bpmDiff < 4 && outEnergy > 0.6) {
+      const roll = Math.random();
+      if (keyCompat === 'perfect' || keyCompat === 'energy-boost') {
+        // Compatible key → bass swap sounds great
+        if (roll < 0.3) return 'bass-swap';
+        if (roll < 0.5) return 'cut';
+      } else {
+        if (roll < 0.3) return 'cut';
+      }
+    }
+
+    // Energy dropping → echo out for dramatic effect
+    if (inEnergy < outEnergy - 0.15) {
+      if (Math.random() < 0.5) return 'echo-out';
+    }
+
+    // Energy building → filter build for anticipation
+    if (inEnergy > outEnergy + 0.1) {
+      if (Math.random() < 0.4) return 'filter-build';
+    }
+
+    // Default: standard crossfade (always safe)
+    return 'crossfade';
+  }
+
+  /**
+   * Smart transition duration based on context.
+   */
+  private getSmartTransitionBars(
+    outgoing: { effectiveBPM: number; energy?: number },
+    incoming: { effectiveBPM: number; energy?: number },
+    transType: TransitionType,
+  ): number {
+    // Cuts are instant
+    if (transType === 'cut') return 1;
+    // Echo out is short
+    if (transType === 'echo-out') return 4;
+
+    const bpmDiff = Math.abs((outgoing.effectiveBPM || 125) - (incoming.effectiveBPM || 125));
+    const energyJump = Math.abs((outgoing.energy ?? 0.5) - (incoming.energy ?? 0.5));
+
+    // Close BPM + high energy = short punchy
+    if (bpmDiff < 3 && (outgoing.energy ?? 0.5) > 0.6) return 4;
+    // Big BPM gap = longer blend to mask the difference
+    if (bpmDiff > 10) return 32;
+    // Big energy jump = medium to smooth it
+    if (energyJump > 0.3) return 16;
+    // Default
+    return 8;
   }
 
   private cancelTransition(): void {
@@ -387,6 +498,8 @@ class DJAutoDJ {
     const oldActive = this.activeDeck;
     this.activeDeck = this.idleDeck;
     this.idleDeck = oldActive;
+    this.staleCount = 0;
+    this.lastTimeRemaining = Infinity;
 
     // Snap crossfader to the exact position for the new active deck.
     // The sweep may have ended at 0.98 instead of 1.0 — force it to the
@@ -415,6 +528,12 @@ class DJAutoDJ {
     const aFile = useDJStore.getState().decks.A.fileName?.split('/').pop() ?? 'empty';
     const bFile = useDJStore.getState().decks.B.fileName?.split('/').pop() ?? 'empty';
     console.log(`[AutoDJ] Transition complete — active=${this.activeDeck} idle=${this.idleDeck} cf=${crossfaderSnap} track ${newCurrentIdx + 1}/${trackCount} next=${newNextIdx} A:${aFile} B:${bFile}`);
+
+    // Immediately start preloading the next track.
+    // Don't wait for the poll loop — the new active deck's store position
+    // may not have synced yet, so getTimeRemaining() could return a stale
+    // value that prevents preload from triggering.
+    this.preloadNextTrack();
   }
 
   // ── Private: Helpers ─────────────────────────────────────────────────────
