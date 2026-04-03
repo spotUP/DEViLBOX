@@ -40,6 +40,8 @@ let patternLoopEnd   = 0;
 let cuePoint         = -1;
 let totalPositions   = 1;
 let colors: DeckColors = { bg: '#6e1418', bgSecondary: '#7c1a1e', bgTertiary: '#8c2028', border: '#581014' };
+let beats: number[] | null = null;
+let downbeats: number[] | null = null;
 
 function applyOverview(ov: WaveformOverviewState): void {
   frequencyPeaks   = ov.frequencyPeaks;
@@ -49,6 +51,8 @@ function applyOverview(ov: WaveformOverviewState): void {
   cuePoint         = ov.cuePoint;
   totalPositions   = ov.totalPositions;
   colors           = ov.colors;
+  beats            = ov.beats ?? null;
+  downbeats        = ov.downbeats ?? null;
 }
 
 // ─── Message handler ──────────────────────────────────────────────────────────
@@ -233,8 +237,13 @@ function renderScrollingWaveform(): void {
     ctx.fillRect(otherCenterX - 0.5, topY, 1, wfH);
   }
 
-  // ── This deck's waveform (foreground) ──
+  // ── This deck's waveform (foreground) — 3-band frequency coloring ──
   const numBins = waveformPeaks.length;
+  const hasFreq = frequencyPeaks && frequencyPeaks.length === 3 && frequencyPeaks[0].length > 0;
+  const freqLow  = hasFreq ? frequencyPeaks![0] : null;
+  const freqMid  = hasFreq ? frequencyPeaks![1] : null;
+  const freqHigh = hasFreq ? frequencyPeaks![2] : null;
+  const freqBins = freqLow?.length ?? 0;
 
   for (let px = 0; px < width; px++) {
     const timeSec  = startSec + (px / width) * windowSec;
@@ -242,16 +251,65 @@ function renderScrollingWaveform(): void {
     const binIndex = Math.floor(fraction * numBins);
     if (binIndex < 0 || binIndex >= numBins) continue;
 
-    const amp  = waveformPeaks[binIndex];
-    const barH = amp * (wfH / 2) * 0.85;
-    ctx.fillStyle = timeSec < audioPosition
-      ? 'rgba(80, 130, 220, 0.4)'
-      : 'rgba(100, 170, 255, 0.7)';
-    ctx.fillRect(px, midY - barH, 1, barH * 2);
+    const played = timeSec < audioPosition;
+    const alphaScale = played ? 0.5 : 1.0;
+
+    if (freqLow && freqMid && freqHigh && freqBins > 0) {
+      // Frequency-band coloring: stack low (blue) + mid (green) + high (yellow)
+      const freqIdx = Math.floor(fraction * freqBins);
+      if (freqIdx >= 0 && freqIdx < freqBins) {
+        const lo = freqLow[freqIdx] ?? 0;
+        const mi = freqMid[freqIdx] ?? 0;
+        const hi = freqHigh[freqIdx] ?? 0;
+        const halfH = wfH / 2;
+
+        // Low band (bass) — blue, from center outward
+        const loH = lo * halfH * 0.85;
+        ctx.fillStyle = `rgba(60, 130, 246, ${0.7 * alphaScale})`;
+        ctx.fillRect(px, midY - loH, 1, loH * 2);
+
+        // Mid band — green, overlaid slightly shorter
+        const miH = mi * halfH * 0.65;
+        ctx.fillStyle = `rgba(74, 222, 128, ${0.55 * alphaScale})`;
+        ctx.fillRect(px, midY - miH, 1, miH * 2);
+
+        // High band — yellow/white, smallest
+        const hiH = hi * halfH * 0.45;
+        ctx.fillStyle = `rgba(251, 191, 36, ${0.5 * alphaScale})`;
+        ctx.fillRect(px, midY - hiH, 1, hiH * 2);
+      }
+    } else {
+      // Fallback: monochrome (no frequency data available)
+      const amp  = waveformPeaks[binIndex];
+      const barH = amp * (wfH / 2) * 0.85;
+      ctx.fillStyle = played ? 'rgba(80, 130, 220, 0.4)' : 'rgba(100, 170, 255, 0.7)';
+      ctx.fillRect(px, midY - barH, 1, barH * 2);
+    }
+  }
+
+  // ── Beat grid ticks in scrolling view ──
+  const endSec = audioPosition + windowSec / 2;
+  const downbeatSet = downbeats ? new Set(downbeats.map(d => Math.round(d * 100))) : null;
+
+  if (beats && beats.length > 0) {
+    for (const beatSec of beats) {
+      if (beatSec < startSec || beatSec > endSec) continue;
+      const x = ((beatSec - startSec) / windowSec) * width;
+      const isDownbeat = downbeatSet?.has(Math.round(beatSec * 100)) ?? false;
+
+      if (isDownbeat) {
+        // Downbeat (bar start): full height, brighter
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.15)';
+        ctx.fillRect(Math.round(x), topY, 1, wfH);
+      } else {
+        // Regular beat: half height, subtle
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.06)';
+        ctx.fillRect(Math.round(x), midY - wfH * 0.25, 1, wfH * 0.5);
+      }
+    }
   }
 
   // Cue markers in scrolling view
-  const endSec = audioPosition + windowSec / 2;
   for (const cue of cuePoints) {
     const cueSec = cue.position / 1000;
     if (cueSec < startSec || cueSec > endSec) continue;

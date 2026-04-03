@@ -43,6 +43,8 @@ function snapshotOverview(deckId: 'A' | 'B' | 'C', container: HTMLElement): Wave
     cuePoint:         d.cuePoint,
     totalPositions:   d.totalPositions,
     colors:           snapshotColors(container),
+    beats:            d.beatGrid?.beats ?? null,
+    downbeats:        d.beatGrid?.downbeats ?? null,
   };
 }
 
@@ -114,7 +116,7 @@ export const DeckAudioWaveform: React.FC<DeckAudioWaveformProps> = ({ deckId }) 
     const unsubOverview = useDJStore.subscribe(
       (s) => {
         const d = s.decks[deckId];
-        return [d.frequencyPeaks, d.loopActive, d.patternLoopStart, d.patternLoopEnd, d.cuePoint, d.totalPositions] as const;
+        return [d.frequencyPeaks, d.loopActive, d.patternLoopStart, d.patternLoopEnd, d.cuePoint, d.totalPositions, d.beatGrid] as const;
       },
       () => {
         if (containerRef.current) {

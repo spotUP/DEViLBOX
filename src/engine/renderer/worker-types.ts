@@ -260,6 +260,10 @@ export interface WaveformOverviewState {
   cuePoint: number;
   totalPositions: number;
   colors: DeckColors;
+  /** Beat positions in seconds (from analysis) for waveform grid overlay */
+  beats: number[] | null;
+  /** Downbeat (bar start) positions in seconds */
+  downbeats: number[] | null;
 }
 
 export type WaveformMsg =
