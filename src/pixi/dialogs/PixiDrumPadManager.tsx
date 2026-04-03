@@ -272,8 +272,9 @@ export const PixiDrumPadManager: React.FC = () => {
   const { app } = useApplication();
   const theme = usePixiTheme();
 
-  const screenW = app?.screen?.width ?? 1920;
-  const screenH = app?.screen?.height ?? 1080;
+  let screenW = 1920;
+  let screenH = 1080;
+  try { screenW = app?.screen?.width || 1920; screenH = app?.screen?.height || 1080; } catch { /* app not ready */ }
 
   /* ── Store state ── */
   const {
