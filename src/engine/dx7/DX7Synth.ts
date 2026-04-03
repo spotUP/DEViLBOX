@@ -100,10 +100,11 @@ export class DX7Synth implements DevilboxSynth {
     }
   }
 
-  /** Load voices + first patch bank, then resolve ensureInitialized() */
+  /** Load first patch bank, then resolve ensureInitialized() */
   private async _finishInit() {
     try {
-      await this.tryAutoLoadVoices();
+      // Only load patch bank — dx7LoadSysex in the bridge handles BOTH internal RAM
+      // and cartridge sync. Do NOT call loadVoices separately (causes double-load).
       await this.tryAutoLoadFirstPatchBank();
     } catch {
       // Non-fatal — synth works without patches, just silent
@@ -134,32 +135,29 @@ export class DX7Synth implements DevilboxSynth {
     });
   }
 
-  /** Load raw VCED data (155 bytes unpacked) via single-voice sysex.
-   *  Uses format 0 (single voice, 155 bytes) which only replaces the edit buffer
-   *  without overwriting the other 31 voices in the bank. */
+  /** Load raw VCED data (155 bytes unpacked) via 32-voice bulk dump sysex.
+   *  Places the packed voice at slot 0. The bridge's dx7LoadSysex handles
+   *  writing to BOTH internal RAM and cartridge, plus sends program change 0. */
   _loadVcedData(vced: Uint8Array) {
-    // Build a 163-byte single-voice sysex (format 0)
-    // F0 43 00 00 01 1B <155 VCED bytes> checksum F7
-    const sysex = new Uint8Array(163);
+    const packed = DX7Synth.vcedToVmem(vced);
+    // Build 4104-byte bulk dump: voice 0 = our preset, voices 1-31 = init patch
+    const sysex = new Uint8Array(4104);
     sysex[0] = 0xF0;
     sysex[1] = 0x43; // Yamaha
     sysex[2] = 0x00; // Channel 0
-    sysex[3] = 0x00; // Format 0 = single voice
-    sysex[4] = 0x01; // Byte count MSB (155)
-    sysex[5] = 0x1B; // Byte count LSB
-    // Copy 155 VCED bytes
-    for (let i = 0; i < 155; i++) sysex[6 + i] = vced[i];
-    // Checksum over 155 data bytes
+    sysex[3] = 0x09; // Format 9 = 32-voice bulk dump
+    sysex[4] = 0x20; // Byte count MSB (4096)
+    sysex[5] = 0x00; // Byte count LSB
+    sysex.set(packed, 6); // Voice 0 at offset 6
+    // Checksum
     let sum = 0;
-    for (let i = 6; i < 161; i++) sum += sysex[i];
-    sysex[161] = (-sum) & 0x7F;
-    sysex[162] = 0xF7;
-    // Send via serial path (non-4104 size goes through firmware sysex parser).
-    // Single-voice sysex loads directly into the edit buffer — do NOT send a
-    // program change after, as that would overwrite the edit buffer with the
-    // current bank's voice 0.
+    for (let i = 6; i < 4102; i++) sum += sysex[i];
+    sysex[4102] = (-sum) & 0x7F;
+    sysex[4103] = 0xF7;
+    // Bridge dx7LoadSysex handles: memcpy to 0x1000, cartridge update,
+    // setBank(0), and program change 0. No extra calls needed.
     this.loadSysex(sysex.buffer);
-    console.log(`[DX7] _loadVcedData: sent 163-byte single-voice sysex (edit buffer)`);
+    console.log(`[DX7] _loadVcedData: sent 4104-byte bulk dump`);
   }
 
   /** Convert VCED (155 bytes unpacked) to VMEM (128 bytes packed) */
@@ -310,19 +308,18 @@ export class DX7Synth implements DevilboxSynth {
       const resp = await fetch(`${baseUrl}roms/dx7/Patches/${bankFile}`);
       if (!resp.ok) throw new Error(`Failed to fetch ${bankFile}`);
       const data = await resp.arrayBuffer();
-      // Load as sysex (writes to internal RAM at 0x1000)
+      // dx7LoadSysex in the bridge handles EVERYTHING for 4104-byte bulk dumps:
+      // writes to internal RAM (0x1000), updates cartridge, calls setBank(0),
+      // and sends program change 0. No extra loadVoices or selectVoice(0) needed.
       this.loadSysex(data);
-      // Also load as voices (updates cartridge) — firmware reads from cartridge
-      // for program changes, so both must be in sync
-      if (data.byteLength === 4104) {
-        this.loadVoices(data.slice(6, 6 + 4096));
-      }
       this._currentBankFile = bankFile;
-      // Wait for firmware to process the sysex, then select voice
-      await new Promise<void>(resolve => setTimeout(() => {
-        this.selectVoice(voiceIndex);
-        resolve();
-      }, 100));
+      // Only send program change if voiceIndex != 0 (bridge already sent PC 0)
+      if (voiceIndex !== 0) {
+        await new Promise<void>(resolve => setTimeout(() => {
+          this.selectVoice(voiceIndex);
+          resolve();
+        }, 100));
+      }
     } catch (err) {
       console.error(`[DX7] Failed to load patch bank ${bankFile}:`, err);
     }
