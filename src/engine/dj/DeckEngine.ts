@@ -268,7 +268,10 @@ export class DeckEngine {
       const bufferId = this.id === 'A' ? 0 : this.id === 'B' ? 1 : 2;
       this.scratchBuffer = new DeckScratchBuffer(ctx, bufferId);
       await this.scratchBuffer.init();
-      this.scratchBuffer.wireIntoChain(this.filterLPF, this.channelGain);
+      // Capture from LPF output, play back into pitchShift input (same path as normal chain).
+      // Previously connected directly to channelGain, bypassing pitchShift — caused
+      // scratch audio to be louder than normal playback.
+      this.scratchBuffer.wireIntoChain(this.filterLPF, this.pitchShift);
       this.scratchBufferReady = true;
     } catch (err) {
       console.warn('[DeckEngine] Scratch buffer init failed, reverse scratch disabled:', err);
