@@ -239,7 +239,7 @@ export const KeyBindingEditor: React.FC<KeyBindingEditorProps> = ({ platform }) 
                   </button>
                   <button
                     onClick={() => removeCustomBinding(combo, platform)}
-                    className="ml-1 px-1.5 py-0.5 bg-ft2-border text-ft2-text hover:text-red-400 hover:bg-ft2-header transition-colors text-[9px]"
+                    className="ml-1 px-1.5 py-0.5 bg-ft2-border text-ft2-text hover:text-accent-error hover:bg-ft2-header transition-colors text-[9px]"
                     title="Remove binding"
                   >
                     X

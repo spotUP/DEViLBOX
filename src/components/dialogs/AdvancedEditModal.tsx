@@ -155,7 +155,7 @@ export const AdvancedEditModal: React.FC<AdvancedEditModalProps> = ({
                   <button
                     onClick={onReverse}
                     disabled={!hasSelection}
-                    className="px-3 py-1.5 text-xs bg-orange-600 hover:bg-orange-700 text-text-primary rounded disabled:opacity-30 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-1"
+                    className="px-3 py-1.5 text-xs bg-accent-primary hover:bg-accent-primary/80 text-text-primary rounded disabled:opacity-30 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-1"
                   >
                     <ArrowUpDown size={12} />
                     Reverse
@@ -163,7 +163,7 @@ export const AdvancedEditModal: React.FC<AdvancedEditModalProps> = ({
                   <button
                     onClick={onDuplicate}
                     disabled={!hasSelection}
-                    className="px-3 py-1.5 text-xs bg-orange-600 hover:bg-orange-700 text-text-primary rounded disabled:opacity-30 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-1"
+                    className="px-3 py-1.5 text-xs bg-accent-primary hover:bg-accent-primary/80 text-text-primary rounded disabled:opacity-30 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-1"
                   >
                     <Copy size={12} />
                     Duplicate
@@ -171,7 +171,7 @@ export const AdvancedEditModal: React.FC<AdvancedEditModalProps> = ({
                   <button
                     onClick={onExpand}
                     disabled={!hasSelection}
-                    className="px-3 py-1.5 text-xs bg-orange-600 hover:bg-orange-700 text-text-primary rounded disabled:opacity-30 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-1"
+                    className="px-3 py-1.5 text-xs bg-accent-primary hover:bg-accent-primary/80 text-text-primary rounded disabled:opacity-30 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-1"
                   >
                     <Maximize2 size={12} />
                     Expand 2x
@@ -179,7 +179,7 @@ export const AdvancedEditModal: React.FC<AdvancedEditModalProps> = ({
                   <button
                     onClick={onShrink}
                     disabled={!hasSelection}
-                    className="px-3 py-1.5 text-xs bg-orange-600 hover:bg-orange-700 text-text-primary rounded disabled:opacity-30 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-1"
+                    className="px-3 py-1.5 text-xs bg-accent-primary hover:bg-accent-primary/80 text-text-primary rounded disabled:opacity-30 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-1"
                   >
                     <Minimize2 size={12} />
                     Shrink 2x
@@ -271,25 +271,25 @@ export const AdvancedEditModal: React.FC<AdvancedEditModalProps> = ({
                   <button
                     onClick={() => onShowRemapInstrument?.('block')}
                     disabled={!hasSelection}
-                    className="px-3 py-1.5 text-xs bg-purple-600 hover:bg-purple-700 text-text-primary rounded disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                    className="px-3 py-1.5 text-xs bg-accent-secondary hover:bg-accent-secondary/80 text-text-primary rounded disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
                   >
                     Remap Block
                   </button>
                   <button
                     onClick={() => onShowRemapInstrument?.('track')}
-                    className="px-3 py-1.5 text-xs bg-purple-600 hover:bg-purple-700 text-text-primary rounded transition-colors"
+                    className="px-3 py-1.5 text-xs bg-accent-secondary hover:bg-accent-secondary/80 text-text-primary rounded transition-colors"
                   >
                     Remap Track
                   </button>
                   <button
                     onClick={() => onShowRemapInstrument?.('pattern')}
-                    className="px-3 py-1.5 text-xs bg-purple-600 hover:bg-purple-700 text-text-primary rounded transition-colors"
+                    className="px-3 py-1.5 text-xs bg-accent-secondary hover:bg-accent-secondary/80 text-text-primary rounded transition-colors"
                   >
                     Remap Pattern
                   </button>
                   <button
                     onClick={() => onShowRemapInstrument?.('song')}
-                    className="px-3 py-1.5 text-xs bg-purple-600 hover:bg-purple-700 text-text-primary rounded transition-colors"
+                    className="px-3 py-1.5 text-xs bg-accent-secondary hover:bg-accent-secondary/80 text-text-primary rounded transition-colors"
                   >
                     Remap Song
                   </button>
