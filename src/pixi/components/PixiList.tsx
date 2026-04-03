@@ -123,13 +123,31 @@ export const PixiList: React.FC<PixiListProps> = ({
   const isDraggingRef = useRef(false);
   const dragOffsetRef = useRef(0);
 
-  // Global pointer move/up for scrollbar drag (attached to the list container)
+  // Root container ref for coordinate conversion
+  const rootRef = useRef<import('pixi.js').Container | null>(null);
+
+  // Global pointer move/up for scrollbar drag + row hover tracking
   const handlePointerMove = useCallback((e: FederatedPointerEvent) => {
-    if (!isDraggingRef.current || maxScroll <= 0) return;
-    const newThumbY = e.globalY - dragOffsetRef.current;
-    const ratio = Math.max(0, Math.min(1, (newThumbY - 2) / (trackHeight - thumbHeight)));
-    setScrollY(ratio * maxScroll);
-  }, [maxScroll, trackHeight, thumbHeight]);
+    // Scrollbar drag
+    if (isDraggingRef.current && maxScroll > 0) {
+      const newThumbY = e.globalY - dragOffsetRef.current;
+      const ratio = Math.max(0, Math.min(1, (newThumbY - 2) / (trackHeight - thumbHeight)));
+      setScrollY(ratio * maxScroll);
+    }
+    // Row hover tracking — compute which row is under pointer from local Y
+    const root = rootRef.current;
+    if (root) {
+      const local = root.toLocal(e.global);
+      const rowIdx = Math.floor((local.y + scrollY) / itemHeight);
+      const startIdx = Math.floor(scrollY / itemHeight);
+      const endIdx = startIdx + Math.ceil(height / itemHeight) + bufferItems * 2;
+      if (rowIdx >= 0 && rowIdx < items.length && rowIdx >= startIdx - bufferItems && rowIdx < endIdx) {
+        setHoveredItemId(items[rowIdx].id);
+      } else {
+        setHoveredItemId(null);
+      }
+    }
+  }, [maxScroll, trackHeight, thumbHeight, scrollY, itemHeight, height, bufferItems, items]);
 
   const handlePointerUp = useCallback(() => {
     isDraggingRef.current = false;
@@ -178,11 +196,14 @@ export const PixiList: React.FC<PixiListProps> = ({
 
   return (
     <pixiContainer
+      ref={rootRef as any}
       eventMode="static"
+      hitArea={new Rectangle(0, 0, width, height)}
       onWheel={handleWheel}
       onPointerMove={handlePointerMove}
       onPointerUp={handlePointerUp}
       onPointerUpOutside={handlePointerUp}
+      onPointerLeave={() => setHoveredItemId(null)}
       layout={{ width, height, overflow: 'hidden', backgroundColor: theme.bg.color, ...layoutProp }}
     >
 
@@ -205,8 +226,6 @@ export const PixiList: React.FC<PixiListProps> = ({
             hitArea={new Rectangle(0, 0, width - 10, itemHeight)}
             onPointerUp={() => handleItemClick(item.id)}
             onClick={() => handleItemClick(item.id)}
-            onPointerEnter={() => setHoveredItemId(item.id)}
-            onPointerLeave={() => setHoveredItemId((prev) => prev === item.id ? null : prev)}
             layout={{
               position: 'absolute',
               left: 0,
