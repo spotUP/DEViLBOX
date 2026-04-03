@@ -99,6 +99,8 @@ export class DeckEngine {
   private backwardStartPattPos = 0;
   private backwardStartElapsedMs = 0;
   private songTimeIndex: number[] = [];
+  /** Per-song-position rowMs value (accounts for Fxx speed/BPM changes) */
+  private songRowMs: number[] = [];
 
   // EQ kill state (stored separately from gain values)
   private eqKillState = { low: false, mid: false, high: false };
@@ -440,15 +442,46 @@ export class DeckEngine {
    * Used to estimate seek position after a backward scratch.
    */
   private _buildTimeIndex(song: TrackerSong): number[] {
-    const bpm   = song.initialBPM   ?? 125;
-    const speed = song.initialSpeed ?? 6;
-    const rowMs = (speed * 2.5 / bpm) * 1000;
+    let bpm   = song.initialBPM   ?? 125;
+    let speed = song.initialSpeed ?? 6;
     const times: number[] = [0];
+    const rowMsArr: number[] = [];
+
     for (let i = 0; i < song.songLength; i++) {
       const patternIdx = song.songPositions[i];
       const pattern    = song.patterns[patternIdx];
-      times.push(times[i]! + (pattern?.length ?? 64) * rowMs);
+      const numRows    = pattern?.length ?? 64;
+      let patternMs = 0;
+
+      // Walk each row to detect Fxx speed/BPM changes
+      for (let row = 0; row < numRows; row++) {
+        const rowMs = (speed * 2500 / bpm);
+        patternMs += rowMs;
+
+        if (!pattern) continue;
+        // Scan all channels for Fxx (effect type 0xF)
+        for (const ch of pattern.channels) {
+          const cell = ch.rows[row];
+          if (!cell) continue;
+          // Check primary effect column
+          if (cell.effTyp === 0xF && cell.eff > 0) {
+            if (cell.eff < 0x20) speed = cell.eff;
+            else bpm = cell.eff;
+          }
+          // Check second effect column
+          if (cell.effTyp2 === 0xF && cell.eff2 > 0) {
+            if (cell.eff2 < 0x20) speed = cell.eff2;
+            else bpm = cell.eff2;
+          }
+        }
+      }
+
+      // Store the rowMs at the END of this pattern (for row interpolation)
+      rowMsArr.push(speed * 2500 / bpm);
+      times.push(times[i]! + patternMs);
     }
+
+    this.songRowMs = rowMsArr;
     return times;
   }
 
@@ -462,7 +495,7 @@ export class DeckEngine {
       if ((this.songTimeIndex[mid] ?? 0) <= ms) lo = mid; else hi = mid - 1;
     }
     const songPos = lo;
-    const rowMs = ((song.initialSpeed ?? 6) * 2.5 / (song.initialBPM ?? 125)) * 1000;
+    const rowMs = this.songRowMs[songPos] ?? ((song.initialSpeed ?? 6) * 2500 / (song.initialBPM ?? 125));
     const rowsIn = Math.max(0, Math.floor((ms - (this.songTimeIndex[songPos] ?? 0)) / rowMs));
     const patternIdx = song.songPositions[songPos];
     const pattern = song.patterns[patternIdx];
@@ -521,7 +554,7 @@ export class DeckEngine {
             this.replayer.setPitchMultiplier(0.15);
           }
         } else {
-          this.scratchBuffer?.setRate(0.05);
+          this.scratchBuffer?.setRate(-0.05);
         }
         return;
       }
@@ -558,7 +591,7 @@ export class DeckEngine {
           }
           this.patternScratchDir = -1;
         } else {
-          this.scratchBuffer?.setRate(absV);
+          this.scratchBuffer?.setRate(-absV);
         }
       }
       return;
@@ -569,7 +602,7 @@ export class DeckEngine {
       // Audio mode: manipulate audioPlayer rate, not replayer
       if (v >= 0) {
         if (this.scratchDirection === -1) {
-          void this._switchToForward(Math.max(0.15, v));
+          this._switchToForward(Math.max(0.15, v));
         } else {
           this.audioPlayer.setPlaybackRate(Math.max(0.15, v));
         }
@@ -577,14 +610,14 @@ export class DeckEngine {
         if (this.scratchDirection !== -1) {
           this._switchToBackward(Math.abs(v));
         } else {
-          this.scratchBuffer?.setRate(Math.abs(v));
+          this.scratchBuffer?.setRate(-Math.abs(v));
         }
       }
     } else {
       // Tracker mode: manipulate replayer
       if (v >= 0) {
         if (this.scratchDirection === -1) {
-          void this._switchToForward(Math.max(0.15, v));
+          this._switchToForward(Math.max(0.15, v));
         } else {
           const fwdRate = Math.max(0.15, v);
           this.replayer.setPitchMultiplier(fwdRate);
@@ -594,7 +627,7 @@ export class DeckEngine {
         if (this.scratchDirection !== -1) {
           this._switchToBackward(Math.abs(v));
         } else {
-          this.scratchBuffer?.setRate(Math.abs(v));
+          this.scratchBuffer?.setRate(-Math.abs(v));
         }
       }
     }
@@ -612,11 +645,25 @@ export class DeckEngine {
     this.slipSnapBack();
 
     if (this.scratchDirection === -1) {
-      // End backward scratch, then decay to rest
-      void this._switchToForward(1).then(() => this._decayToRest(decayMs));
-    } else {
-      this._decayToRest(decayMs);
+      // End backward scratch (synchronous), then decay to rest
+      this._switchToForward(1);
     }
+    this._decayToRest(decayMs);
+
+    // Safety: force scratch buffer playback gain to zero after decay completes.
+    // Prevents volume accumulation if ramp sequences don't complete cleanly.
+    const forceZeroScratchGain = () => {
+      if (this.scratchBufferReady && this.scratchBuffer && !this.isScratchActive) {
+        const now = Tone.getContext().rawContext.currentTime;
+        this.scratchBuffer.playbackGain.gain.cancelScheduledValues(now);
+        this.scratchBuffer.playbackGain.gain.setValueAtTime(0, now);
+      }
+      if (!this.isScratchActive) {
+        this.deckGain.gain.rampTo(1, 0.005);
+      }
+    };
+    setTimeout(forceZeroScratchGain, decayMs + 50);
+    setTimeout(forceZeroScratchGain, decayMs + 300);
   }
 
   /** Switch from forward playback to backward (reverse scratch). */
@@ -637,50 +684,73 @@ export class DeckEngine {
     this.backwardStartElapsedMs = this._playbackMode === 'audio'
       ? this.audioPlayer.getPosition() * 1000
       : this.replayer.getElapsedMs();
-
     // Stop any running preset scratch pattern
     this.scratchPlayback.stopPattern();
 
-    // Fade out forward chain (20ms)
-    this.deckGain.gain.rampTo(0, 0.02);
+    // Fade out forward chain immediately (not 20ms ramp — prevents overlap)
+    this.deckGain.gain.cancelAndHoldAtTime(Tone.getContext().rawContext.currentTime);
+    this.deckGain.gain.rampTo(0, 0.005);
 
-    // Start reverse audio immediately
+    // Start reverse audio
     this.scratchBuffer.startReverse(rate);
 
     this.scratchDirection = -1;
 
-    // Pause source after fade so new output is silent
+    // Clear any stale backward pause timeout before scheduling a new one
+    if (this.backwardPauseTimeoutId !== null) {
+      clearTimeout(this.backwardPauseTimeoutId);
+    }
+
+    // Stop the forward source after the fade so it's not playing underneath the reverse.
+    // For audio mode, use pause() to preserve state without creating new source nodes.
     this.backwardPauseTimeoutId = setTimeout(() => {
       this.backwardPauseTimeoutId = null;
       if (this.scratchDirection === -1) {
         if (this._playbackMode === 'audio') {
-          this.audioPlayer.setPlaybackRate(0.001);
+          this.audioPlayer.pause();
         } else {
           this.replayer.pause();
         }
       }
-    }, 25);
+    }, 10);
   }
 
-  /** Switch from backward playback to forward, seeking to estimated position. */
-  private async _switchToForward(fwdRate: number): Promise<void> {
-    this.scratchDirection = 1; // Mark early to prevent re-entry
+  /**
+   * Switch from backward playback to forward, seeking to estimated position.
+   *
+   * FULLY SYNCHRONOUS — no awaits. This prevents the volume-accumulation bug
+   * caused by rapid backward→forward→backward gestures racing through async gaps.
+   * The scratch buffer is hard-zeroed and stopped immediately via silenceAndStop().
+   */
+  private _switchToForward(fwdRate: number): void {
+    this.scratchDirection = 1;
 
-    const framesBack = this.scratchBuffer
-      ? await this.scratchBuffer.stopReverse()
-      : 0;
+    // Cancel the backward pause timeout — if it hasn't fired yet, prevent it
+    // from pausing the player now that we're going forward again.
+    if (this.backwardPauseTimeoutId !== null) {
+      clearTimeout(this.backwardPauseTimeoutId);
+      this.backwardPauseTimeoutId = null;
+    }
 
-    const ctx    = Tone.getContext().rawContext as AudioContext;
-    const msBack = (framesBack / ctx.sampleRate) * 1000;
-    const targetMs = Math.max(0, this.backwardStartElapsedMs - msBack);
+    // Immediately silence AND stop the scratch buffer worklet synchronously.
+    if (this.scratchBuffer) {
+      const now = Tone.getContext().rawContext.currentTime;
+      this.scratchBuffer.playbackGain.gain.cancelScheduledValues(now);
+      this.scratchBuffer.playbackGain.gain.setValueAtTime(0, now);
+      this.scratchBuffer.silenceAndStop();
+    }
+
+    // Resume from where the backward scratch started.
+    const targetMs = Math.max(0, this.backwardStartElapsedMs);
 
     if (this._playbackMode === 'audio') {
-      // Audio mode: seek the audio player to the estimated position
       this.audioPlayer.seek(targetMs / 1000);
-      this.deckGain.gain.rampTo(1, 0.02);
       this.audioPlayer.setPlaybackRate(fwdRate);
+      this.deckGain.gain.rampTo(1, 0.02);
+      if (!this.audioPlayer.isCurrentlyPlaying()) {
+        this.audioPlayer.resume();
+      }
     } else {
-      // Tracker mode: seek the replayer
       const song = this.replayer.getSong();
       if (song && this.songTimeIndex.length > 1) {
         let lo = 0, hi = this.songTimeIndex.length - 2;
@@ -689,7 +759,7 @@ export class DeckEngine {
           if ((this.songTimeIndex[mid] ?? 0) <= targetMs) lo = mid; else hi = mid - 1;
         }
         const songPos = lo;
-        const rowMs   = ((song.initialSpeed ?? 6) * 2.5 / (song.initialBPM ?? 125)) * 1000;
+        const rowMs   = this.songRowMs[songPos] ?? ((song.initialSpeed ?? 6) * 2500 / (song.initialBPM ?? 125));
         const rowsIn  = Math.max(0,
           Math.floor((targetMs - (this.songTimeIndex[songPos] ?? 0)) / rowMs),
         );
