@@ -111,7 +111,8 @@ function synthTypeListItems() {
       id: st,
       label: info?.shortName ?? st,
       sublabel: info?.description?.slice(0, 60) ?? '',
-      dotColor: twColor(info?.color ?? ''),
+      iconName: 'waveform' as const,
+      iconColor: twColor(info?.color ?? ''),
     };
   });
 }
@@ -457,7 +458,7 @@ export const PixiEditInstrumentModal: React.FC<PixiEditInstrumentModalProps> = (
   return (
     <PixiModal isOpen={isOpen} onClose={onClose} width={MODAL_W} height={MODAL_H}>
       <PixiModalHeader
-        title={isCreating ? 'Create Instrument' : 'Edit Instrument'}
+        title={isCreating ? 'Add New Instrument' : 'Edit Instrument'}
         onClose={onClose}
       />
 
@@ -522,40 +523,41 @@ export const PixiEditInstrumentModal: React.FC<PixiEditInstrumentModalProps> = (
         {/* ── LEFT PANEL ──────────────────────────────────────────────────── */}
         <layoutContainer
           layout={{
-            width: LEFT_PANEL_W,
+            width: isCreating ? MODAL_W : LEFT_PANEL_W,
             flexDirection: 'column',
             backgroundColor: theme.bgSecondary.color,
-            borderRightWidth: 1,
+            borderRightWidth: isCreating ? 0 : 1,
             borderColor: theme.border.color,
           }}
         >
           {isCreating ? (
-            /* ── Synth type browser (create mode) ─────────────────────────── */
+            /* ── Synth type browser (create mode) — full width ───────────── */
             <>
-              <layoutContainer layout={{ padding: 6, gap: 4, flexDirection: 'column' }}>
-                <PixiLabel text="SYNTH TYPE" size="xs" weight="bold" color="textMuted" />
+              <layoutContainer layout={{ padding: 8, gap: 4, flexDirection: 'row', alignItems: 'center' }}>
+                <PixiLabel text="SELECT SYNTH TYPE" size="xs" weight="bold" color="textMuted" />
+                <pixiContainer layout={{ flex: 1 }} />
                 <PixiPureTextInput
                   value={synthSearch}
                   onChange={setSynthSearch}
                   placeholder="Search…"
-                  width={LEFT_PANEL_W - 16}
+                  width={200}
                   height={24}
                 />
               </layoutContainer>
               <PixiList
                 items={filteredSynthItems}
-                width={LEFT_PANEL_W}
-                height={CONTENT_H - 90}
+                width={MODAL_W}
+                height={CONTENT_H - 80}
                 itemHeight={36}
                 selectedId={selectedSynthType}
                 onSelect={(id) => setSelectedSynthType(id as SynthType)}
               />
-              <layoutContainer layout={{ padding: 6, gap: 4, flexDirection: 'column' }}>
+              <layoutContainer layout={{ padding: 8, gap: 8, flexDirection: 'row', alignItems: 'center' }}>
                 <PixiPureTextInput
                   value={newName}
                   onChange={setNewName}
                   placeholder="Instrument name"
-                  width={LEFT_PANEL_W - 16}
+                  width={200}
                   height={24}
                 />
                 <PixiButton label="Create" variant="primary" onClick={handleCreate} />
