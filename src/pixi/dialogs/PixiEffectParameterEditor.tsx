@@ -46,14 +46,16 @@ const KNOB_H = 84;
 const ROW_GAP = 8;
 const SECTION_PAD = 10;
 
-/** Accent colors per effect category */
-const CATEGORY_ACCENT: Record<string, number> = {
-  tonejs: 0x3b82f6,
-  neural: 0xa855f7,
-  buzzmachine: 0xf97316,
-  wasm: 0x10b981,
-  wam: 0x14b8a6,
-};
+/** Accent colors per effect category (theme-derived) */
+function getCategoryAccent(theme: ReturnType<typeof usePixiTheme>): Record<string, number> {
+  return {
+    tonejs: theme.accent.color,
+    neural: theme.accentSecondary.color,
+    buzzmachine: theme.warning.color,
+    wasm: theme.success.color,
+    wam: theme.accentHighlight.color,
+  };
+}
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -118,7 +120,8 @@ export const PixiEffectParameterEditor: React.FC<PixiEffectParameterEditorProps>
   onWetChange,
 }) => {
   const theme = usePixiTheme();
-  const accent = CATEGORY_ACCENT[effect.category] ?? theme.accent.color;
+  const categoryAccent = getCategoryAccent(theme);
+  const accent = categoryAccent[effect.category] ?? theme.accent.color;
 
   // Resolve parameter definitions
   const neuralParams = useMemo(() => getNeuralParamDefs(effect), [effect.category, effect.neuralModelIndex]);
@@ -192,7 +195,7 @@ export const PixiEffectParameterEditor: React.FC<PixiEffectParameterEditorProps>
             width: 7,
             height: 7,
             borderRadius: 4,
-            backgroundColor: effect.enabled ? 0x22ff44 : theme.bgActive.color,
+            backgroundColor: effect.enabled ? theme.success.color : theme.bgActive.color,
           }}
         />
         <PixiLabel

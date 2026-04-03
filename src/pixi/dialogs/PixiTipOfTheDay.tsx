@@ -14,7 +14,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { PixiModal, PixiButton, PixiCheckbox, PixiIcon } from '../components';
-import { usePixiTheme, usePixiThemeId } from '../theme';
+import { usePixiTheme } from '../theme';
 import { useModalClose } from '@hooks/useDialogKeyboard';
 import { PIXI_FONTS } from '../fonts';
 import { DEVILBOX_TIPS } from '../../constants/tips';
@@ -26,18 +26,29 @@ import type { ChangelogEntry } from '@generated/changelog';
 const W = 576; // max-w-xl
 const CONTENT_H = 300;
 
-const CHANGE_COLORS: Record<string, { bg: number; text: number }> = {
-  feature:     { bg: 0x143a1f, text: 0x4ade80 },  // bg-green-500/20, text-green-400
-  fix:         { bg: 0x3a2e14, text: 0xfbbf24 },  // bg-amber-500/20, text-amber-400
-  improvement: { bg: 0x142a3a, text: 0x60a5fa },  // bg-blue-500/20, text-blue-400
-};
+/** Darken a color to ~20% intensity for use as a tinted background */
+function tintBg(color: number): number {
+  const r = ((color >> 16) & 0xff) * 0.15 | 0;
+  const g = ((color >> 8) & 0xff) * 0.15 | 0;
+  const b = (color & 0xff) * 0.15 | 0;
+  return (r << 16) | (g << 8) | b;
+}
+
+// Change type colors — derived from theme tokens at render time via usePixiTheme()
+// These are static fallbacks; the real colors come from the theme in ChangeBadge
 const CHANGE_LABELS: Record<string, string> = { feature: 'New', fix: 'Fix', improvement: 'Improved' };
 
 // ─── Change type badge — matches DOM ChangeTypeLabel ──────────────────────────
 // px-1.5 py-0.5 text-[10px] font-bold rounded
 
 const ChangeBadge: React.FC<{ type: string }> = ({ type }) => {
-  const c = CHANGE_COLORS[type] ?? { bg: 0x333333, text: 0x888888 };
+  const theme = usePixiTheme();
+  const colorMap: Record<string, { bg: number; text: number }> = {
+    feature:     { bg: tintBg(theme.success.color), text: theme.success.color },
+    fix:         { bg: tintBg(theme.warning.color), text: theme.warning.color },
+    improvement: { bg: tintBg(theme.accent.color),  text: theme.accent.color },
+  };
+  const c = colorMap[type] ?? { bg: theme.bgTertiary.color, text: theme.textMuted.color };
   return (
     <layoutContainer
       layout={{
@@ -60,21 +71,21 @@ const ChangeBadge: React.FC<{ type: string }> = ({ type }) => {
 // ─── Category badge — matches DOM category pill ───────────────────────────────
 // text-[10px] font-bold uppercase tracking-[0.2em] px-3 py-1 rounded-full
 
-const CategoryBadge: React.FC<{ category: string; accentColor: number; isCyan: boolean }> = ({
-  category, accentColor, isCyan,
+const CategoryBadge: React.FC<{ category: string; accentColor: number }> = ({
+  category, accentColor,
 }) => (
   <layoutContainer
     layout={{
       paddingLeft: 12, paddingRight: 12,
       paddingTop: 4, paddingBottom: 4,
-      backgroundColor: isCyan ? 0x002a2a : 0x1a1a1a,
+      backgroundColor: tintBg(accentColor),
       borderRadius: 12,
     }}
   >
     <pixiBitmapText
       text={`Category: ${category}`}
       style={{ fontFamily: PIXI_FONTS.SANS_BOLD, fontSize: 12, fill: 0xffffff }}
-      tint={isCyan ? accentColor : 0x888888}
+      tint={accentColor}
       layout={{}}
     />
   </layoutContainer>
@@ -89,8 +100,9 @@ const VersionEntry: React.FC<{
   accentColor: number;
   mutedColor: number;
   secondaryColor: number;
-  isCyan: boolean;
-}> = ({ entry, isLatest, accentColor, mutedColor, secondaryColor, isCyan }) => (
+  borderColor: number;
+  textColor: number;
+}> = ({ entry, isLatest, accentColor, mutedColor, secondaryColor, borderColor, textColor }) => (
   <layoutContainer
     layout={{
       flexDirection: 'column',
@@ -98,8 +110,8 @@ const VersionEntry: React.FC<{
       paddingLeft: 20, paddingRight: 20,
       paddingTop: 16, paddingBottom: 16,
       borderBottomWidth: 1,
-      borderColor: 0x333333,
-      ...(isLatest ? { backgroundColor: isCyan ? 0x061a1a : 0x1e1010 } : {}),
+      borderColor,
+      ...(isLatest ? { backgroundColor: tintBg(accentColor) } : {}),
     }}
   >
     {/* Version header row — flex items-center gap-2 mb-3 */}
@@ -107,7 +119,7 @@ const VersionEntry: React.FC<{
       <pixiBitmapText
         text={`v${entry.version}`}
         style={{ fontFamily: PIXI_FONTS.SANS_BOLD, fontSize: 14, fill: 0xffffff }}
-        tint={isLatest ? accentColor : 0xeeeeee}
+        tint={isLatest ? accentColor : textColor}
         layout={{}}
       />
       <pixiBitmapText
@@ -161,7 +173,8 @@ const TabButton: React.FC<{
   onClick: () => void;
 }> = ({ label, icon, active, accentColor, mutedColor, activeBg, onClick }) => {
   const [hovered, setHovered] = useState(false);
-  const tint = active ? accentColor : hovered ? 0xcccccc : mutedColor;
+  const theme = usePixiTheme();
+  const tint = active ? accentColor : hovered ? theme.text.color : mutedColor;
   return (
     <layoutContainer
       eventMode="static"
@@ -210,8 +223,6 @@ export const PixiTipOfTheDay: React.FC<PixiTipOfTheDayProps> = ({
   initialTab = 'tips',
 }) => {
   const theme = usePixiTheme();
-  const themeId = usePixiThemeId();
-  const isCyan = themeId === 'cyan-lineart';
 
   useModalClose({ isOpen, onClose });
 
@@ -226,15 +237,15 @@ export const PixiTipOfTheDay: React.FC<PixiTipOfTheDayProps> = ({
   const mutedColor = theme.textMuted.color;
   const secondaryColor = theme.textSecondary.color;
 
-  // Theme-derived colors matching DOM TipOfTheDay
-  const panelBg = isCyan ? 0x051515 : 0x1a1a1a;
-  const panelBorder = isCyan ? 0x008888 : theme.border.color;
-  const headerBg = isCyan ? 0x072020 : theme.bgSecondary.color;
-  const tabBg = isCyan ? 0x041010 : 0x151515;         // bg-black/20 on panel
-  const activeTabBg = isCyan ? 0x0a1e1e : 0x1f1f1f;   // bg-white/5 on panel
-  const contentBg = isCyan ? 0x041313 : 0x171717;      // bg-black/10 on panel
-  const navFooterBg = isCyan ? 0x041010 : 0x151515;    // bg-black/20 on panel
-  const actionFooterBg = isCyan ? 0x030c0c : 0x101010; // bg-black/40 on panel
+  // All colors derived from theme tokens — no hardcoded hex
+  const panelBg = theme.bg.color;
+  const panelBorder = theme.border.color;
+  const headerBg = theme.bgSecondary.color;
+  const tabBg = theme.bgTertiary.color;
+  const activeTabBg = theme.bgActive.color;
+  const contentBg = theme.bgTertiary.color;
+  const navFooterBg = theme.bgTertiary.color;
+  const actionFooterBg = theme.bgSecondary.color;
 
   useEffect(() => {
     if (isOpen) {
@@ -289,11 +300,11 @@ export const PixiTipOfTheDay: React.FC<PixiTipOfTheDayProps> = ({
               width: 36, height: 36,
               justifyContent: 'center',
               alignItems: 'center',
-              backgroundColor: isCyan ? 0x003333 : 0x2a0808,
+              backgroundColor: tintBg(accentColor),
               borderRadius: 8,
             }}
           >
-            <PixiIcon name={activeTab === 'tips' ? 'thunderbolt' : 'preset-a'} size={20} color={0xffffff} layout={{}} />
+            <PixiIcon name={activeTab === 'tips' ? 'thunderbolt' : 'preset-a'} size={20} color={theme.text.color} layout={{}} />
           </layoutContainer>
           <layoutContainer layout={{ flexDirection: 'column', gap: 2 }}>
             <pixiBitmapText
@@ -353,12 +364,12 @@ export const PixiTipOfTheDay: React.FC<PixiTipOfTheDayProps> = ({
                 width: 64, height: 64,
                 justifyContent: 'center',
                 alignItems: 'center',
-                backgroundColor: isCyan ? 0x003333 : 0x2a0808,
+                backgroundColor: tintBg(accentColor),
                 borderRadius: 32,
                 marginBottom: 8,
               }}
             >
-              <PixiIcon name="thunderbolt" size={28} color={0xffffff} layout={{ width: 28, height: 28 }} />
+              <PixiIcon name="thunderbolt" size={28} color={theme.text.color} layout={{ width: 28, height: 28 }} />
             </layoutContainer>
 
             {/* Tip title — text-xl font-bold */}
@@ -376,7 +387,7 @@ export const PixiTipOfTheDay: React.FC<PixiTipOfTheDayProps> = ({
               layout={{ maxWidth: W - 80 }}
             />
             {/* Category badge */}
-            <CategoryBadge category={tip.category} accentColor={accentColor} isCyan={isCyan} />
+            <CategoryBadge category={tip.category} accentColor={accentColor} />
           </layoutContainer>
         ) : (
           <layoutContainer layout={{ flexDirection: 'column' }}>
@@ -388,7 +399,8 @@ export const PixiTipOfTheDay: React.FC<PixiTipOfTheDayProps> = ({
                 accentColor={accentColor}
                 mutedColor={mutedColor}
                 secondaryColor={secondaryColor}
-                isCyan={isCyan}
+                borderColor={theme.border.color}
+                textColor={theme.text.color}
               />
             ))}
           </layoutContainer>

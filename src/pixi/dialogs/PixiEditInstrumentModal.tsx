@@ -15,7 +15,6 @@ import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react'
 import {
   PixiModal,
   PixiModalHeader,
-  PixiModalFooter,
   PixiButton,
   PixiLabel,
   PixiList,
@@ -33,7 +32,7 @@ import { usePixiTheme } from '../theme';
 import { usePixiResponsive } from '../hooks/usePixiResponsive';
 import { useInstrumentStore, notify } from '@stores';
 import { usePresetStore, type PresetCategory } from '@stores/usePresetStore';
-import { ALL_SYNTH_TYPES, getSynthInfo, SYNTH_CATEGORIES } from '@constants/synthCategories';
+import { getSynthInfo, SYNTH_CATEGORIES } from '@constants/synthCategories';
 import type { SynthInfo as SynthInfoType } from '@constants/synthCategories';
 import { getPresetsForSynthType } from '@constants/synthPresets/allPresets';
 import type { SynthType } from '@typedefs/instrument';
@@ -43,14 +42,21 @@ import { PixiAmigaSynthPanel } from '../views/instruments/PixiAmigaSynthPanel';
 import { AMIGA_SYNTH_LAYOUTS } from '../views/instruments/amigaSynthLayouts';
 import type { ModularPatchConfig } from '@typedefs/modular';
 import { MODULAR_INIT_PATCH } from '@constants/modularPresets';
+import { PixiSynthPanel } from '../views/instruments/PixiSynthPanel';
+import { PixiDX7PatchBrowser } from '../views/instruments/PixiDX7PatchBrowser';
+import { PixiTestKeyboard } from '../views/instruments/PixiTestKeyboard';
+import { PixiPresetDropdown } from '../views/instruments/PixiPresetDropdown';
+import { PixiDynamicParamPanel } from '../views/instruments/PixiDynamicParamPanel';
+import { PixiHardwareUI, hasPixiHardwareUI } from '../views/instruments/PixiHardwareUI';
+import { PixiFilterCurve } from '../views/instruments/PixiFilterCurve';
+import { PixiADSRVisualizer } from '../views/instruments/PixiADSRVisualizer';
+import { getSynthLayout } from '../views/instruments/layouts';
 
 // ── Layout constants ────────────────────────────────────────────────────────
 
 const LEFT_PANEL_W = 220;
 const LEFT_PANEL_COLLAPSED_W = 32;
 const HEADER_H = 38;
-const TAB_BAR_H = 32;
-const FOOTER_H = 44;
 const PAD = 16;
 const KNOB_SIZE = 'sm' as const;
 
@@ -121,7 +127,7 @@ export const PixiEditInstrumentModal: React.FC<PixiEditInstrumentModalProps> = (
   const [leftPanelCollapsed, setLeftPanelCollapsed] = useState(false);
   const currentLeftW = leftPanelCollapsed ? LEFT_PANEL_COLLAPSED_W : LEFT_PANEL_W;
   const RIGHT_PANEL_W = MODAL_W - currentLeftW;
-  const CONTENT_H = MODAL_H - HEADER_H - FOOTER_H;
+  const CONTENT_H = MODAL_H - HEADER_H;
 
   // ── Store ───────────────────────────────────────────────────────────────
   const instruments = useInstrumentStore((s) => s.instruments);
@@ -137,6 +143,7 @@ export const PixiEditInstrumentModal: React.FC<PixiEditInstrumentModalProps> = (
   const [synthSearch, setSynthSearch] = useState('');
   const [createCategoryFilter, setCreateCategoryFilter] = useState<string | null>(null);
   const [expandedCategories, setExpandedCategories] = useState<Record<string, boolean>>({});
+  const [hardwareUIMode, setHardwareUIMode] = useState(false);
 
   // Preset state
   const [showSynthBrowser, setShowSynthBrowser] = useState(false);
@@ -443,18 +450,6 @@ export const PixiEditInstrumentModal: React.FC<PixiEditInstrumentModalProps> = (
     [updateInstrument],
   );
 
-  const toggleEffect = useCallback(
-    (effectId: string, enabled: boolean) => {
-      const inst = instRef.current;
-      if (!inst?.effects) return;
-      const effects = inst.effects.map((fx) =>
-        fx.id === effectId ? { ...fx, enabled } : fx,
-      );
-      updateInstrument(inst.id, { effects });
-    },
-    [updateInstrument],
-  );
-
   const handlePopOut = useCallback(() => {
     const url = `${window.location.origin}${window.location.pathname}#instrument-editor`;
     window.open(url, '_blank', 'width=800,height=600,menubar=no,toolbar=no');
@@ -477,68 +472,308 @@ export const PixiEditInstrumentModal: React.FC<PixiEditInstrumentModalProps> = (
 
   return (
     <PixiModal isOpen={isOpen} onClose={onClose} width={MODAL_W} height={MODAL_H} borderRadius={0} borderWidth={0}>
-      <PixiModalHeader
-        title={isCreating ? 'Add New Instrument' : 'Edit Instrument'}
-        onClose={onClose}
-      />
-
-      {/* ── Header action buttons (pop out, browse synths) ────────────── */}
-      {!isCreating && currentInstrument && (
+      {/* ── Unified header row (matches DOM) ─────────────────────────── */}
+      {isCreating ? (
+        <PixiModalHeader
+          title="Add New Instrument"
+          onClose={onClose}
+        />
+      ) : currentInstrument ? (
         <layoutContainer
           layout={{
             flexDirection: 'row',
             alignItems: 'center',
-            gap: 4,
+            height: HEADER_H,
             paddingLeft: 8,
             paddingRight: 8,
-            height: 28,
+            gap: 6,
             backgroundColor: theme.bgSecondary.color,
             borderBottomWidth: 1,
             borderColor: theme.border.color,
           }}
         >
-          <PixiButton icon="open" label="" variant="ghost" width={28} onClick={handlePopOut} />
+          {/* ── Left group: nav + icon + name + tabs ───────────────────── */}
+          <PixiButton icon="prev" label="" variant="ghost" size="sm" onClick={handlePrev} />
+
+          {/* Synth icon with color */}
+          {synthInfo && (
+            <layoutContainer
+              layout={{
+                width: 28,
+                height: 28,
+                borderRadius: 6,
+                alignItems: 'center',
+                justifyContent: 'center',
+                backgroundColor: theme.bg.color,
+              }}
+            >
+              <PixiIcon
+                name={synthInfo.icon === 'Music2' ? 'waveform' : 'preset-a'}
+                size={16}
+                color={twColor(synthInfo.color)}
+                layout={{}}
+              />
+            </layoutContainer>
+          )}
+
+          {/* Instrument name input */}
+          <PixiPureTextInput
+            value={currentInstrument.name}
+            onChange={handleRename}
+            width={160}
+            height={24}
+            fontSize={13}
+          />
+
+          {/* Counter */}
+          <PixiLabel
+            text={`(${instIdx + 1}/${instruments.length})`}
+            size="xs"
+            color="textMuted"
+          />
+
+          {/* Synth type name (colored) */}
+          {synthInfo && (
+            <PixiLabel
+              text={synthInfo.shortName}
+              size="xs"
+              weight="semibold"
+              color="custom"
+              customColor={twColor(synthInfo.color)}
+            />
+          )}
+
+          <PixiButton icon="next" label="" variant="ghost" size="sm" onClick={handleNext} />
+
+          {/* Divider */}
+          <layoutContainer
+            layout={{
+              width: 1,
+              height: 20,
+              backgroundColor: theme.border.color,
+              marginLeft: 4,
+              marginRight: 4,
+            }}
+          />
+
+          {/* Sound / Effects tabs — integrated in header */}
+          {currentInstrument.synthType === 'SuperCollider' ? (
+            <>
+              <HeaderTab label="Script" active={activeTab === 'script'} onSelect={() => setActiveTab('script')} />
+              <HeaderTab label="Controls" active={activeTab === 'controls'} onSelect={() => setActiveTab('controls')} />
+              <HeaderTab label="Effects" active={activeTab === 'effects'} onSelect={() => setActiveTab('effects')} />
+            </>
+          ) : (
+            <>
+              <HeaderTab label="Sound" active={activeTab === 'sound'} onSelect={() => setActiveTab('sound')} />
+              <HeaderTab label="Effects" active={activeTab === 'effects'} onSelect={() => setActiveTab('effects')} />
+            </>
+          )}
+
+          {/* ── Spacer ─────────────────────────────────────────────────── */}
+          <layoutContainer layout={{ flex: 1 }} />
+
+          {/* ── Right group: hardware toggle + presets + action buttons ── */}
+          {currentInstrument && hasPixiHardwareUI(currentInstrument.synthType) && (
+            <PixiButton
+              label={hardwareUIMode ? 'Simple' : 'Hardware'}
+              variant={hardwareUIMode ? 'primary' : 'ghost'}
+              size="sm"
+              onClick={() => setHardwareUIMode(!hardwareUIMode)}
+            />
+          )}
+          {currentInstrument && (
+            <PixiPresetDropdown
+              synthType={currentInstrument.synthType as SynthType}
+              onChange={(updates) => {
+                const inst = instRef.current;
+                if (inst) updateInstrument(inst.id, updates);
+              }}
+              width={140}
+            />
+          )}
           <PixiButton
             label="Browse Synths"
-            variant="ghost"
-            width={110}
+            variant={showSynthBrowser ? 'primary' : 'ghost'}
             size="sm"
             onClick={() => setShowSynthBrowser(!showSynthBrowser)}
           />
-          <layoutContainer layout={{ flex: 1 }} />
+          <PixiButton
+            label="+ Add"
+            variant="ghost"
+            size="sm"
+            onClick={() => setIsCreating(true)}
+          />
+          <PixiButton
+            icon="save"
+            label="Save"
+            variant="ghost"
+            size="sm"
+            onClick={() => {
+              if (currentInstrument) setPresetName(currentInstrument.name);
+              setShowSaveDialog((v) => !v);
+            }}
+          />
+          <PixiButton icon="open" label="" variant="ghost" size="sm" onClick={handlePopOut} />
+          <PixiButton icon="close" label="" variant="ghost" size="sm" onClick={onClose} />
         </layoutContainer>
+      ) : (
+        <PixiModalHeader title="Edit Instrument" onClose={onClose} />
       )}
 
-      {/* ── Synth type browser (inline, toggled) ─────────────────────── */}
+      {/* ── Synth type browser (reuses the categorized create-mode browser) ── */}
       {showSynthBrowser && !isCreating && currentInstrument && (
-        <layoutContainer
-          layout={{
-            flexDirection: 'row',
-            flexWrap: 'wrap',
-            gap: 4,
-            padding: 8,
-            borderRadius: 6,
-            borderWidth: 1,
-            borderColor: theme.border?.color ?? 0x444444,
-            backgroundColor: theme.bgSecondary?.color ?? 0x1a1a1a,
-            width: MODAL_W,
-            borderBottomWidth: 1,
-          }}
-        >
-          {ALL_SYNTH_TYPES.map((st) => (
-            <PixiButton
-              key={st}
-              label={getSynthInfo(st)?.shortName ?? st}
-              variant={currentInstrument.synthType === st ? 'primary' : 'ghost'}
-              width={Math.floor((MODAL_W - 32) / 4)}
-              size="sm"
-              onClick={() => handleChangeSynthType(st)}
-            />
-          ))}
+        <layoutContainer layout={{ flex: 1, flexDirection: 'column', width: MODAL_W }}>
+          <PixiScrollView
+            width={MODAL_W}
+            height={CONTENT_H}
+            contentHeight={
+              140 + (filteredCategorySynths.length === 0
+                ? 100
+                : filteredCategorySynths.reduce((h, cat) => {
+                    const rows = Math.ceil(cat.synths.length / 2);
+                    return h + 50 + rows * 140 + 16;
+                  }, 0))
+            }
+            bgColor={theme.bgSecondary.color}
+          >
+            <layoutContainer layout={{ width: MODAL_W - 16, flexDirection: 'column', padding: 16, gap: 16 }}>
+              {/* Search bar */}
+              <PixiPureTextInput
+                value={synthSearch}
+                onChange={setSynthSearch}
+                placeholder="Search synths by name, description, or use case..."
+                width={MODAL_W - 64}
+                height={32}
+                fontSize={12}
+              />
+
+              {/* Category filter chips */}
+              <layoutContainer layout={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
+                <layoutContainer
+                  eventMode="static"
+                  cursor="pointer"
+                  onPointerTap={() => setCreateCategoryFilter(null)}
+                  layout={{
+                    paddingLeft: 12, paddingRight: 12, height: 26, borderRadius: 13,
+                    alignItems: 'center', justifyContent: 'center',
+                    backgroundColor: createCategoryFilter === null ? 0xFB923C : (theme.bgTertiary?.color ?? 0x2a2a2a),
+                    borderWidth: 1, borderColor: createCategoryFilter === null ? 0xFB923C : theme.border.color,
+                  }}
+                >
+                  <pixiBitmapText
+                    text={`All (${totalAllSynths})`}
+                    style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 11, fill: createCategoryFilter === null ? 0x000000 : theme.textSecondary.color }}
+                    layout={{}}
+                  />
+                </layoutContainer>
+                {SYNTH_CATEGORIES.map(cat => {
+                  const count = cat.synths.filter(s => s?.icon).length;
+                  const isActive = createCategoryFilter === cat.id;
+                  return (
+                    <layoutContainer
+                      key={cat.id}
+                      eventMode="static"
+                      cursor="pointer"
+                      onPointerTap={() => setCreateCategoryFilter(isActive ? null : cat.id)}
+                      layout={{
+                        paddingLeft: 12, paddingRight: 12, height: 26, borderRadius: 13,
+                        alignItems: 'center', justifyContent: 'center',
+                        backgroundColor: isActive ? 0xFB923C : (theme.bgTertiary?.color ?? 0x2a2a2a),
+                        borderWidth: 1, borderColor: isActive ? 0xFB923C : theme.border.color,
+                      }}
+                    >
+                      <pixiBitmapText
+                        text={`${cat.name} (${count})`}
+                        style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 11, fill: isActive ? 0x000000 : theme.textSecondary.color }}
+                        layout={{}}
+                      />
+                    </layoutContainer>
+                  );
+                })}
+              </layoutContainer>
+
+              {/* Category sections with synth cards */}
+              {filteredCategorySynths.length === 0 ? (
+                <layoutContainer layout={{ padding: 24, alignItems: 'center', flexDirection: 'column', gap: 4 }}>
+                  <pixiBitmapText text="No synths found" style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 12, fill: theme.textMuted.color }} layout={{}} />
+                </layoutContainer>
+              ) : (
+                filteredCategorySynths.map(category => {
+                  const isCatExpanded = expandedCategories[category.id] !== false;
+                  return (
+                    <layoutContainer key={category.id} layout={{ flexDirection: 'column', marginBottom: 4 }}>
+                      <layoutContainer
+                        eventMode="static" cursor="pointer"
+                        onPointerTap={() => setExpandedCategories(prev => ({ ...prev, [category.id]: !isCatExpanded }))}
+                        layout={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6, paddingLeft: 2, paddingRight: 4 }}
+                      >
+                        <layoutContainer layout={{ flexDirection: 'column', gap: 2 }}>
+                          <pixiBitmapText text={category.name} style={{ fontFamily: PIXI_FONTS.SANS_SEMIBOLD, fontSize: 14, fill: 0xffffff }} layout={{}} />
+                          <pixiBitmapText text={category.description} style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 12, fill: theme.textMuted.color }} layout={{}} />
+                        </layoutContainer>
+                        <layoutContainer layout={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                          <pixiBitmapText text={String(category.synths.length)} style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 10, fill: theme.textMuted.color }} layout={{}} />
+                          <PixiIcon name={isCatExpanded ? 'caret-down' : 'caret-right'} size={14} color={theme.textMuted.color} layout={{}} />
+                        </layoutContainer>
+                      </layoutContainer>
+
+                      {isCatExpanded && (
+                        <layoutContainer layout={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12 }}>
+                          {category.synths.map((synth: SynthInfoType) => {
+                            const cardW = Math.floor((MODAL_W - 32 - 32 - 12) / 2);
+                            const isCurrentType = currentInstrument.synthType === synth.type;
+                            return (
+                              <layoutContainer
+                                key={`${category.id}-${synth.type}-${synth.shortName}`}
+                                eventMode="static" cursor="pointer"
+                                onPointerTap={() => handleChangeSynthType(synth.type)}
+                                layout={{
+                                  width: cardW, flexDirection: 'column', padding: 16, borderRadius: 8,
+                                  borderWidth: isCurrentType ? 2 : 1,
+                                  borderColor: isCurrentType ? (theme.accent?.color ?? 0xFB923C) : theme.border.color,
+                                  backgroundColor: theme.bgSecondary?.color ?? 0x1e1e1e, gap: 8,
+                                }}
+                              >
+                                <layoutContainer layout={{ flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 4 }}>
+                                  <layoutContainer layout={{ width: 34, height: 34, alignItems: 'center', justifyContent: 'center', backgroundColor: theme.bgTertiary?.color ?? 0x2a2a2a, borderRadius: 6 }}>
+                                    <PixiIcon name="waveform" size={18} color={twColor(synth.color)} layout={{}} />
+                                  </layoutContainer>
+                                  <layoutContainer layout={{ flexDirection: 'column', gap: 2, flex: 1, overflow: 'hidden' }}>
+                                    <pixiBitmapText text={synth.name} style={{ fontFamily: PIXI_FONTS.SANS_SEMIBOLD, fontSize: 13, fill: 0xffffff }} layout={{}} />
+                                    <pixiBitmapText text={synth.shortName} style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 11, fill: theme.textMuted.color }} layout={{}} />
+                                  </layoutContainer>
+                                </layoutContainer>
+                                <pixiBitmapText
+                                  text={synth.description.length > 70 ? synth.description.slice(0, 67) + '...' : synth.description}
+                                  style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 11, fill: theme.textSecondary.color }}
+                                  layout={{}}
+                                />
+                                {synth.bestFor.length > 0 && (
+                                  <layoutContainer layout={{ flexDirection: 'row', flexWrap: 'wrap', gap: 4 }}>
+                                    {synth.bestFor.slice(0, 3).map(tag => (
+                                      <layoutContainer key={tag} layout={{ paddingLeft: 8, paddingRight: 8, paddingTop: 2, paddingBottom: 2, borderRadius: 10, backgroundColor: theme.bgTertiary?.color ?? 0x2a2a2a }}>
+                                        <pixiBitmapText text={tag} style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 10, fill: theme.textMuted.color }} layout={{}} />
+                                      </layoutContainer>
+                                    ))}
+                                  </layoutContainer>
+                                )}
+                              </layoutContainer>
+                            );
+                          })}
+                        </layoutContainer>
+                      )}
+                    </layoutContainer>
+                  );
+                })
+              )}
+            </layoutContainer>
+          </PixiScrollView>
         </layoutContainer>
       )}
 
-      {/* ── Body: left + right panels ────────────────────────────────────── */}
+      {/* ── Body: left + right panels (hidden when synth browser is open) ─── */}
+      {!(showSynthBrowser && !isCreating && currentInstrument) && (
       <layoutContainer layout={{ flex: 1, flexDirection: 'row', width: MODAL_W }}>
         {/* ── LEFT PANEL ──────────────────────────────────────────────────── */}
         <layoutContainer
@@ -906,58 +1141,6 @@ export const PixiEditInstrumentModal: React.FC<PixiEditInstrumentModalProps> = (
 
         {/* ── RIGHT PANEL ─────────────────────────────────────────────────── */}
         <layoutContainer layout={{ flex: 1, flexDirection: 'column' }}>
-          {/* ── Nav + name row ────────────────────────────────────────────── */}
-          {!isCreating && currentInstrument && (
-            <layoutContainer
-              layout={{
-                flexDirection: 'row',
-                alignItems: 'center',
-                gap: 6,
-                paddingLeft: 8,
-                paddingRight: 8,
-                height: 32,
-                borderBottomWidth: 1,
-                borderColor: theme.border.color,
-              }}
-            >
-              <PixiButton
-                icon="prev"
-                label=""
-                variant="ghost"
-                size="sm"
-                onClick={handlePrev}
-              />
-              <PixiLabel
-                text={`${instIdx + 1}/${instruments.length}`}
-                size="xs"
-                color="textMuted"
-              />
-              <PixiButton
-                icon="next"
-                label=""
-                variant="ghost"
-                size="sm"
-                onClick={handleNext}
-              />
-              <PixiPureTextInput
-                value={currentInstrument.name}
-                onChange={handleRename}
-                width={180}
-                height={22}
-              />
-              <layoutContainer layout={{ flex: 1 }} />
-              {synthInfo && (
-                <PixiLabel
-                  text={synthInfo.shortName}
-                  size="xs"
-                  weight="semibold"
-                  color="custom"
-                  customColor={twColor(synthInfo.color)}
-                />
-              )}
-            </layoutContainer>
-          )}
-
           {/* ── Preset selector row ─────────────────────────────────────── */}
           {!isCreating && currentInstrument && (
             <layoutContainer
@@ -1203,57 +1386,8 @@ export const PixiEditInstrumentModal: React.FC<PixiEditInstrumentModalProps> = (
             </layoutContainer>
           )}
 
-          {/* ── Tab bar ──────────────────────────────────────────────────── */}
-          <layoutContainer
-            layout={{
-              flexDirection: 'row',
-              width: RIGHT_PANEL_W,
-              height: TAB_BAR_H,
-              borderBottomWidth: 1,
-              borderColor: theme.border.color,
-            }}
-          >
-            {currentInstrument?.synthType === 'SuperCollider' ? (
-              <>
-                <TabButton
-                  label="Script"
-                  active={activeTab === 'script'}
-                  onSelect={() => setActiveTab('script')}
-                  width={RIGHT_PANEL_W / 3}
-                />
-                <TabButton
-                  label="Controls"
-                  active={activeTab === 'controls'}
-                  onSelect={() => setActiveTab('controls')}
-                  width={RIGHT_PANEL_W / 3}
-                />
-                <TabButton
-                  label="Effects"
-                  active={activeTab === 'effects'}
-                  onSelect={() => setActiveTab('effects')}
-                  width={RIGHT_PANEL_W / 3}
-                />
-              </>
-            ) : (
-              <>
-                <TabButton
-                  label="Sound"
-                  active={activeTab === 'sound'}
-                  onSelect={() => setActiveTab('sound')}
-                  width={RIGHT_PANEL_W / 2}
-                />
-                <TabButton
-                  label="Effects"
-                  active={activeTab === 'effects'}
-                  onSelect={() => setActiveTab('effects')}
-                  width={RIGHT_PANEL_W / 2}
-                />
-              </>
-            )}
-          </layoutContainer>
-
           {/* ── Content area ──────────────────────────────────────────────── */}
-          <layoutContainer layout={{ flex: 1, padding: PAD, gap: 8, flexDirection: 'column', overflow: 'hidden' }}>
+          <layoutContainer layout={{ flex: 1, padding: PAD, gap: 8, flexDirection: 'column', overflow: 'scroll' }}>
             {/* SC Script tab — read-only source display */}
             {activeTab === 'script' && currentInstrument?.synthType === 'SuperCollider' && (
               <SCScriptPanel source={currentInstrument.superCollider?.source ?? ''} />
@@ -1267,7 +1401,7 @@ export const PixiEditInstrumentModal: React.FC<PixiEditInstrumentModalProps> = (
                 config={currentInstrument.modularSynth || MODULAR_INIT_PATCH}
                 onChange={updateModularPatch}
                 width={RIGHT_PANEL_W - PAD * 2}
-                height={CONTENT_H - TAB_BAR_H - PAD * 2}
+                height={CONTENT_H - PAD * 2}
               />
             )}
             {activeTab === 'sound' && currentInstrument && currentInstrument.synthType === 'SunVoxModular' && (
@@ -1275,18 +1409,95 @@ export const PixiEditInstrumentModal: React.FC<PixiEditInstrumentModalProps> = (
                 config={currentInstrument.sunvoxModular || MODULAR_INIT_PATCH}
                 onChange={(patch) => { const inst = instRef.current; if (inst) updateInstrument(inst.id, { sunvoxModular: { ...patch, backend: 'sunvox' } }); }}
                 width={RIGHT_PANEL_W - PAD * 2}
-                height={CONTENT_H - TAB_BAR_H - PAD * 2}
+                height={CONTENT_H - PAD * 2}
               />
             )}
-            {activeTab === 'sound' && currentInstrument && currentInstrument.synthType !== 'ModularSynth' && currentInstrument.synthType !== 'SunVoxModular' && (
-              isNativeWASMSynth(currentInstrument.synthType) && (SONG_ENGINE_SYNTH_TYPES.has(currentInstrument.synthType ?? '') || (!currentInstrument.sample?.url && !(currentInstrument.parameters as Record<string, unknown>)?.sampleUrl)) ? (
+            {/* Hardware UI mode — renders WASM framebuffer as Pixi Sprite */}
+            {activeTab === 'sound' && currentInstrument && hardwareUIMode && hasPixiHardwareUI(currentInstrument.synthType) && (
+              <PixiHardwareUI
+                synthType={currentInstrument.synthType}
+                instrumentId={currentInstrument.id}
+                width={RIGHT_PANEL_W - PAD * 2}
+                height={CONTENT_H - PAD * 2}
+              />
+            )}
+            {/* Simple/knob mode (default) */}
+            {activeTab === 'sound' && currentInstrument && !(hardwareUIMode && hasPixiHardwareUI(currentInstrument.synthType)) && currentInstrument.synthType !== 'ModularSynth' && currentInstrument.synthType !== 'SunVoxModular' && (
+              currentInstrument.synthType === 'DX7' ? (
+                <PixiDX7PatchBrowser instrument={currentInstrument} onChange={(updates) => {
+                  const inst = instRef.current;
+                  if (!inst) return;
+                  updateInstrument(inst.id, updates);
+                }} />
+              ) : isNativeWASMSynth(currentInstrument.synthType) && (SONG_ENGINE_SYNTH_TYPES.has(currentInstrument.synthType ?? '') || (!currentInstrument.sample?.url && !(currentInstrument.parameters as Record<string, unknown>)?.sampleUrl)) ? (
                 <NativeInstrumentPanel instrument={currentInstrument} onUpdate={updateInstrument} />
-              ) : (
-                <SoundPanel instrument={currentInstrument} updateParam={updateParam} updateOsc={updateOsc} updateFilter={updateFilter} updateEnvelope={updateEnvelope} />
-              )
+              ) : (() => {
+                // Use declarative layout descriptor if one exists (matches DOM's DOMSynthPanel fallback)
+                const declLayout = getSynthLayout(currentInstrument.synthType);
+                if (declLayout) {
+                  const configKey = declLayout.configKey;
+                  const config = configKey
+                    ? { [configKey]: (currentInstrument as unknown as Record<string, unknown>)[configKey] ?? currentInstrument.parameters ?? {} }
+                    : currentInstrument as unknown as Record<string, unknown>;
+                  return (
+                    <PixiSynthPanel
+                      layout={declLayout}
+                      config={config}
+                      onChange={(updates) => {
+                        const inst = instRef.current;
+                        if (!inst) return;
+                        updateInstrument(inst.id, updates as Partial<InstrumentConfig>);
+                      }}
+                      synthType={currentInstrument.synthType}
+                    />
+                  );
+                }
+                // Dynamic parameter panel for synths with runtime-discoverable params
+                // (Buzzmachines, MAME chips, VSTBridge, WAM, etc.)
+                if (isDynamicParamSynth(currentInstrument.synthType)) {
+                  return <PixiDynamicParamPanel
+                    instrument={currentInstrument}
+                    onChange={(updates) => {
+                      const inst = instRef.current;
+                      if (inst) updateInstrument(inst.id, updates);
+                    }}
+                    title={currentInstrument.synthType}
+                  />;
+                }
+                // Final fallback: generic oscillator/filter/envelope knobs
+                return <SoundPanel instrument={currentInstrument} updateParam={updateParam} updateOsc={updateOsc} updateFilter={updateFilter} updateEnvelope={updateEnvelope} />;
+              })()
+            )}
+            {/* Filter curve + ADSR visualizer — shown for synths with filter/envelope */}
+            {activeTab === 'sound' && currentInstrument && !isNativeWASMSynth(currentInstrument.synthType) && !(hardwareUIMode && hasPixiHardwareUI(currentInstrument.synthType)) && (
+              <pixiContainer layout={{ display: 'flex', flexDirection: 'row', gap: 4, width: RIGHT_PANEL_W - PAD * 2 }}>
+                {currentInstrument.filter && (
+                  <PixiFilterCurve
+                    cutoff={currentInstrument.filter.frequency ?? 2000}
+                    resonance={currentInstrument.filter.Q ?? 1}
+                    type={(currentInstrument.filter.type as 'lowpass' | 'highpass' | 'bandpass' | 'notch') ?? 'lowpass'}
+                    width={(RIGHT_PANEL_W - PAD * 2 - 4) / 2}
+                    height={70}
+                  />
+                )}
+                {currentInstrument.envelope && (
+                  <PixiADSRVisualizer
+                    attack={currentInstrument.envelope.attack ?? 0.01}
+                    decay={currentInstrument.envelope.decay ?? 0.1}
+                    sustain={currentInstrument.envelope.sustain ?? 0.8}
+                    release={currentInstrument.envelope.release ?? 0.3}
+                    width={(RIGHT_PANEL_W - PAD * 2 - 4) / 2}
+                    height={70}
+                  />
+                )}
+              </pixiContainer>
+            )}
+            {/* Test Keyboard — shown at bottom of sound tab for all non-modular synths */}
+            {activeTab === 'sound' && currentInstrument && !isNativeWASMSynth(currentInstrument.synthType) && currentInstrument.synthType !== 'ModularSynth' && currentInstrument.synthType !== 'SunVoxModular' && (
+              <PixiTestKeyboard instrument={currentInstrument} width={RIGHT_PANEL_W - PAD * 2} />
             )}
             {activeTab === 'effects' && currentInstrument && (
-              <EffectsPanel effects={currentInstrument.effects} toggleEffect={toggleEffect} />
+              <EffectsPanel instrumentId={currentInstrument.id} effects={currentInstrument.effects} />
             )}
             {!currentInstrument && !isCreating && (
               <layoutContainer layout={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
@@ -1296,34 +1507,35 @@ export const PixiEditInstrumentModal: React.FC<PixiEditInstrumentModalProps> = (
           </layoutContainer>
         </layoutContainer>
       </layoutContainer>
+      )}
 
-      {/* ── Footer ───────────────────────────────────────────────────────── */}
-      <PixiModalFooter align="right">
-        <PixiButton label="Close" variant="default" onClick={onClose} />
-      </PixiModalFooter>
+      {/* Footer removed — close button is in the unified header */}
     </PixiModal>
   );
 };
 
 // ── Sub-components ──────────────────────────────────────────────────────────
 
-/** Simple tab toggle button (no close/new) */
-const TabButton: React.FC<{
+
+/** Compact header-integrated tab (pill style, matching DOM's inline tabs) */
+const HeaderTab: React.FC<{
   label: string;
   active: boolean;
   onSelect: () => void;
-  width: number;
-}> = ({ label, active, onSelect, width }) => {
+}> = ({ label, active, onSelect }) => {
   const theme = usePixiTheme();
   return (
     <layoutContainer
       layout={{
-        width,
+        paddingLeft: 12,
+        paddingRight: 12,
+        height: 26,
+        borderRadius: 6,
         alignItems: 'center',
         justifyContent: 'center',
-        backgroundColor: active ? theme.accent.color : theme.bgSecondary.color,
-        borderRightWidth: 1,
-        borderColor: theme.border.color,
+        backgroundColor: active ? theme.bg.color : 0x00000000,
+        borderWidth: 1,
+        borderColor: active ? theme.accent.color : 0x00000000,
       }}
       eventMode="static"
       cursor="pointer"
@@ -1333,9 +1545,8 @@ const TabButton: React.FC<{
       <PixiLabel
         text={label}
         size="sm"
-        weight="bold"
-        color={active ? 'custom' : 'textSecondary'}
-        customColor={active ? 0x000000 : undefined}
+        weight="semibold"
+        color={active ? 'accent' : 'textMuted'}
       />
     </layoutContainer>
   );
@@ -1450,6 +1661,8 @@ const NATIVE_WASM_SYNTH_TYPES = new Set([
   'TFMXSynth', 'OctaMEDSynth', 'SidMon1Synth', 'HippelCoSoSynth',
   'RobHubbardSynth', 'SteveTurnerSynth', 'DavidWhittakerSynth', 'SunVoxSynth',
   'DeltaMusic1Synth', 'DeltaMusic2Synth', 'StartrekkerAMSynth',
+  // Autonomous replayer engines (no synth param UI)
+  'KlysSynth', 'Sc68Synth', 'GTUltraSynth', 'FredEditorReplayerSynth', 'ChiptuneModule',
 ]);
 
 // Whole-song engine types — always show NativeInstrumentPanel even if sample data present
@@ -1460,10 +1673,30 @@ const SONG_ENGINE_SYNTH_TYPES = new Set([
   'TFMXSynth', 'OctaMEDSynth', 'SidMon1Synth', 'HippelCoSoSynth',
   'RobHubbardSynth', 'SteveTurnerSynth', 'DavidWhittakerSynth', 'JamCrackerSynth',
   'FuturePlayerSynth', 'DeltaMusic1Synth', 'DeltaMusic2Synth', 'StartrekkerAMSynth',
+  'HivelySynth', 'SunVoxSynth',
+  'KlysSynth', 'Sc68Synth', 'GTUltraSynth', 'FredEditorReplayerSynth', 'ChiptuneModule',
 ]);
 
 function isNativeWASMSynth(synthType?: string): boolean {
   return NATIVE_WASM_SYNTH_TYPES.has(synthType ?? '');
+}
+
+// Synth types that use runtime-discovered parameters (no static layout possible)
+function isDynamicParamSynth(synthType?: string): boolean {
+  if (!synthType) return false;
+  // Buzzmachines (except Buzz3o3 which uses TB303 layout)
+  if (synthType === 'Buzzmachine' || (synthType.startsWith('Buzz') && synthType !== 'Buzz3o3')) return true;
+  // MAME chip synths
+  if (synthType.startsWith('MAME') || synthType === 'CZ101' || synthType === 'CEM3394' ||
+      synthType === 'SCSP' || synthType === 'D50' || synthType === 'VFX') return true;
+  // WAM plugins
+  if (synthType === 'WAM' || synthType.startsWith('WAM')) return true;
+  // VSTBridge synths without static layouts (Helm, Sorcer, OBXf, Open303, Melodica, TonewheelOrgan)
+  if (synthType === 'Helm' || synthType === 'Sorcer' || synthType === 'OBXf' ||
+      synthType === 'Open303' || synthType === 'Melodica' || synthType === 'TonewheelOrgan') return true;
+  // SuperCollider without script tab
+  if (synthType === 'SuperCollider') return true;
+  return false;
 }
 
 const NativeInstrumentPanel: React.FC<{
@@ -1997,61 +2230,101 @@ const SoundPanel: React.FC<SoundPanelProps> = ({
 
 // ── Effects Panel ───────────────────────────────────────────────────────────
 
+const AVAILABLE_FX: EffectConfig['type'][] = [
+  'Distortion', 'Reverb', 'Delay', 'Chorus', 'Phaser', 'Tremolo', 'Vibrato',
+  'AutoFilter', 'AutoPanner', 'AutoWah', 'BitCrusher', 'Compressor', 'EQ3',
+  'Filter', 'PingPongDelay', 'PitchShift', 'FeedbackDelay', 'JCReverb',
+  'StereoWidener', 'SpaceEcho', 'BiPhase', 'DubFilter',
+];
+
 interface EffectsPanelProps {
+  instrumentId: number;
   effects: EffectConfig[];
-  toggleEffect: (id: string, enabled: boolean) => void;
 }
 
-const EffectsPanel: React.FC<EffectsPanelProps> = ({ effects, toggleEffect }) => {
+const EffectsPanel: React.FC<EffectsPanelProps> = ({ instrumentId, effects }) => {
   const theme = usePixiTheme();
-
-  if (!effects || effects.length === 0) {
-    return (
-      <layoutContainer layout={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
-        <PixiLabel text="No effects on this instrument" size="sm" color="textMuted" />
-      </layoutContainer>
-    );
-  }
+  const [showAddMenu, setShowAddMenu] = useState(false);
+  const addEffect = useInstrumentStore((s) => s.addEffect);
+  const removeEffect = useInstrumentStore((s) => s.removeEffect);
+  const updateEffect = useInstrumentStore((s) => s.updateEffect);
 
   return (
     <layoutContainer layout={{ flexDirection: 'column', gap: 6 }}>
-      <SectionHeading text="EFFECT CHAIN" />
-      {effects.map((fx, i) => (
+      {/* Header with Add button */}
+      <layoutContainer layout={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+        <SectionHeading text="EFFECT CHAIN" />
+        <PixiButton
+          label="+ Add Effect"
+          variant={showAddMenu ? 'primary' : 'ghost'}
+          size="sm"
+          onClick={() => setShowAddMenu(!showAddMenu)}
+        />
+      </layoutContainer>
+
+      {/* Add effect menu */}
+      {showAddMenu && (
         <layoutContainer
-          key={fx.id}
           layout={{
-            flexDirection: 'row',
-            alignItems: 'center',
-            gap: 8,
-            padding: 6,
-            borderRadius: 4,
-            backgroundColor: theme.bgTertiary.color,
-            borderWidth: 1,
-            borderColor: theme.border.color,
+            flexDirection: 'row', flexWrap: 'wrap', gap: 4, padding: 8,
+            backgroundColor: theme.bgTertiary.color, borderRadius: 6,
+            borderWidth: 1, borderColor: theme.accent?.color ?? 0xFB923C,
           }}
         >
-          <PixiToggle
-            label=""
-            value={fx.enabled}
-            onChange={(v) => toggleEffect(fx.id, v)}
-            size="sm"
-          />
-          <PixiLabel text={`${i + 1}.`} size="xs" weight="bold" color="textMuted" />
-          <PixiLabel text={fx.type} size="sm" weight="semibold" color="text" />
-          <layoutContainer layout={{ flex: 1 }} />
-          <PixiKnob
-            value={fx.wet ?? 100}
-            min={0}
-            max={100}
-            onChange={() => {}}
-            label="Wet"
-            unit="%"
-            size="sm"
-            disabled
-          />
+          {AVAILABLE_FX.map((fxType) => (
+            <PixiButton
+              key={fxType}
+              label={fxType}
+              variant="ghost"
+              size="sm"
+              onClick={() => { addEffect(instrumentId, fxType); setShowAddMenu(false); }}
+            />
+          ))}
         </layoutContainer>
-      ))}
-      <PixiLabel text="Full effect editing available in DOM mode" size="xs" color="textMuted" />
+      )}
+
+      {/* Effect list */}
+      {(!effects || effects.length === 0) ? (
+        <layoutContainer layout={{ padding: 24, alignItems: 'center', justifyContent: 'center' }}>
+          <PixiLabel text="No effects. Click + Add Effect to get started." size="sm" color="textMuted" />
+        </layoutContainer>
+      ) : (
+        effects.map((fx, i) => (
+          <layoutContainer
+            key={fx.id}
+            layout={{
+              flexDirection: 'row', alignItems: 'center', gap: 8, padding: 6, borderRadius: 4,
+              backgroundColor: theme.bgTertiary.color, borderWidth: 1, borderColor: theme.border.color,
+            }}
+          >
+            <PixiToggle
+              label=""
+              value={fx.enabled}
+              onChange={(v) => updateEffect(instrumentId, fx.id, { enabled: v })}
+              size="sm"
+            />
+            <PixiLabel text={`${i + 1}.`} size="xs" weight="bold" color="textMuted" />
+            <PixiLabel text={fx.type} size="sm" weight="semibold" color={fx.enabled ? 'text' : 'textMuted'} />
+            <layoutContainer layout={{ flex: 1 }} />
+            <PixiKnob
+              value={fx.wet ?? 100}
+              min={0}
+              max={100}
+              onChange={(v) => updateEffect(instrumentId, fx.id, { wet: Math.round(v) })}
+              label="Wet"
+              unit="%"
+              size="sm"
+            />
+            <PixiButton
+              icon="close"
+              label=""
+              variant="ghost"
+              size="sm"
+              onClick={() => removeEffect(instrumentId, fx.id)}
+            />
+          </layoutContainer>
+        ))
+      )}
     </layoutContainer>
   );
 };

@@ -13,6 +13,10 @@ import { PixiModal, PixiButton, PixiLabel, PixiScrollView, PixiSelect, PixiIcon 
 import type { SelectOption } from '../components';
 import { usePixiTheme } from '../theme';
 import { PIXI_FONTS } from '../fonts';
+
+function tintBg(color: number, factor = 0.15): number {
+  return (((color >> 16 & 0xff) * factor | 0) << 16) | (((color >> 8 & 0xff) * factor | 0) << 8) | ((color & 0xff) * factor | 0);
+}
 import { SIDScopeTab } from './sid/SIDScopeTab';
 import { SIDStereoTab } from './sid/SIDStereoTab';
 import { SIDFilterTab } from './sid/SIDFilterTab';
@@ -234,7 +238,7 @@ export const PixiSIDInfoModal: React.FC<PixiSIDInfoModalProps> = ({ isOpen, onCl
           />
           <Badge
             text={`${sidMetadata.format}v${sidMetadata.version}`}
-            bg={0x1e3a5f}
+            bg={theme.accent.color}
             fg={0x93c5fd}
           />
         </layoutContainer>
@@ -305,8 +309,8 @@ export const PixiSIDInfoModal: React.FC<PixiSIDInfoModalProps> = ({ isOpen, onCl
                   padding: 16,
                   borderRadius: 8,
                   borderWidth: 1,
-                  backgroundColor: 0x0c1e3a,
-                  borderColor: 0x1e3a5f,
+                  backgroundColor: tintBg(theme.accent.color),
+                  borderColor: theme.accent.color,
                 }}
               >
                 <pixiBitmapText
@@ -338,7 +342,7 @@ export const PixiSIDInfoModal: React.FC<PixiSIDInfoModalProps> = ({ isOpen, onCl
                     alignItems: 'center',
                     marginTop: 4,
                     borderTopWidth: 1,
-                    borderColor: 0x1e3a5f,
+                    borderColor: theme.accent.color,
                     paddingTop: 8,
                   }}
                 >
@@ -491,8 +495,8 @@ export const PixiSIDInfoModal: React.FC<PixiSIDInfoModalProps> = ({ isOpen, onCl
                     justifyContent: 'center',
                     borderRadius: 8,
                     borderWidth: 1,
-                    backgroundColor: 0x0c1e3a,
-                    borderColor: 0x1e3a5f,
+                    backgroundColor: tintBg(theme.accent.color),
+                    borderColor: theme.accent.color,
                   }}
                 >
                   <PixiLabel text="Loading composer…" size="xs" color="textMuted" />
@@ -508,8 +512,8 @@ export const PixiSIDInfoModal: React.FC<PixiSIDInfoModalProps> = ({ isOpen, onCl
                       padding: 16,
                       borderRadius: 8,
                       borderWidth: 1,
-                      backgroundColor: 0x0c1e3a,
-                      borderColor: 0x1e3a5f,
+                      backgroundColor: tintBg(theme.accent.color),
+                      borderColor: theme.accent.color,
                     }}
                   >
                     <PixiLabel text={composer.name} size="sm" weight="bold" color="text" />
@@ -598,8 +602,8 @@ export const PixiSIDInfoModal: React.FC<PixiSIDInfoModalProps> = ({ isOpen, onCl
                 padding: 16,
                 borderRadius: 8,
                 borderWidth: 1,
-                backgroundColor: 0x2d0a0a,
-                borderColor: 0x5f1e1e,
+                backgroundColor: tintBg(theme.error.color),
+                borderColor: theme.error.color,
               }}
             >
               <PixiLabel text="> YouTube Performances" size="xs" weight="semibold" color="error" />

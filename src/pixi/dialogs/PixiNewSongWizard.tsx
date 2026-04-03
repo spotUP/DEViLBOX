@@ -16,25 +16,23 @@ import { useTabsStore } from '@stores/useTabsStore';
 import { SYSTEM_PRESETS } from '@constants/systemPresets';
 import type { SystemPreset } from '@constants/systemPresets';
 import { AMIGA_UADE_PRESET_IDS, getInstrumentPresetsForSystem } from '@constants/uadeInstrumentPresets';
-import { PixiButton, PixiIcon } from '../components';
+import { PixiModal, PixiModalHeader, PixiModalFooter, PixiButton, PixiIcon } from '../components';
 import { PixiPureTextInput } from '../input/PixiPureTextInput';
 import { usePixiTheme } from '../theme';
-import { useModalClose } from '@hooks/useDialogKeyboard';
-import { PIXI_FONTS } from '../fonts';
+import type { FederatedWheelEvent } from 'pixi.js';
 import { Div, Txt } from '../layout';
-import type { FederatedPointerEvent, FederatedWheelEvent } from 'pixi.js';
-import { useApplication } from '@pixi/react';
-import type { Graphics as GraphicsType } from 'pixi.js';
 import { useNewSongWizard, GROUPED_PRESETS } from '@hooks/dialogs/useNewSongWizard';
 import type { StartMode } from '@hooks/dialogs/useNewSongWizard';
 
 const MODAL_W = 640;
 const MODAL_H = 560;
 
+function tintBg(color: number, factor = 0.15): number {
+  return (((color >> 16 & 0xff) * factor | 0) << 16) | (((color >> 8 & 0xff) * factor | 0) << 8) | ((color & 0xff) * factor | 0);
+}
+
 export const PixiNewSongWizard: React.FC = () => {
   const theme = usePixiTheme();
-  const { app } = useApplication();
-
   const {
     isOpen,
     close,
@@ -54,8 +52,6 @@ export const PixiNewSongWizard: React.FC = () => {
     finishStandard,
     resetWizardState,
   } = useNewSongWizard();
-
-  useModalClose({ isOpen, onClose: close });
 
   // Pixi-specific state: filter and scroll managed at this level (passed as props to GlStep2)
   const [filter, setFilter] = useState('');
@@ -118,30 +114,6 @@ export const PixiNewSongWizard: React.FC = () => {
     [selectedPresetId, finishStandard, resetWizardState, close],
   );
 
-  // Screen dimensions — safe access for app.screen getter
-  let screenW = 1920, screenH = 1080;
-  try { if (app?.screen) { screenW = app.screen.width ?? 1920; screenH = app.screen.height ?? 1080; } } catch { /* renderer not ready */ }
-
-  const drawOverlay = useCallback((g: GraphicsType) => {
-    g.clear();
-    g.rect(0, 0, screenW, screenH);
-    g.fill({ color: theme.bg.color, alpha: 0.7 });
-  }, [screenW, screenH]);
-
-  const handleOverlayClick = useCallback(() => {
-    resetWizardState();
-    setFilter('');
-    setScrollY(0);
-    close();
-  }, [resetWizardState, close]);
-
-  const handlePanelClick = useCallback((e: FederatedPointerEvent) => {
-    e.stopPropagation();
-  }, []);
-
-  const blockWheel = useCallback((e: { stopPropagation: () => void }) => {
-    e.stopPropagation();
-  }, []);
 
   const handleNext = useCallback(() => {
     if (step === 1) {
@@ -167,79 +139,9 @@ export const PixiNewSongWizard: React.FC = () => {
     finish('preset', withPresetInstruments);
   }, [finish, withPresetInstruments]);
 
-  if (!isOpen) return null;
-
   return (
-    <pixiContainer layout={{ position: 'absolute', width: '100%', height: '100%' }}>
-      <pixiGraphics
-        draw={drawOverlay}
-        eventMode="static"
-        onPointerTap={handleOverlayClick}
-        onWheel={blockWheel}
-        layout={{ position: 'absolute', width: screenW, height: screenH }}
-      />
-
-      <layoutContainer
-        eventMode="static"
-        onPointerDown={handlePanelClick}
-        onPointerUp={handlePanelClick}
-        layout={{
-          position: 'absolute',
-          left: Math.round((screenW - MODAL_W) / 2),
-          top: Math.round((screenH - MODAL_H) / 2),
-          width: MODAL_W,
-          height: MODAL_H,
-          flexDirection: 'column',
-          backgroundColor: theme.bgSecondary.color,
-          borderWidth: 1,
-          borderColor: theme.border.color,
-          borderRadius: 8,
-          overflow: 'hidden',
-        }}
-      >
-        {/* Header — DOM: px-5 py-4 border-b */}
-        <layoutContainer
-          layout={{
-            flexDirection: 'row',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            paddingLeft: 20,
-            paddingRight: 20,
-            paddingTop: 16,
-            paddingBottom: 16,
-            borderBottomWidth: 1,
-            borderColor: theme.border.color,
-          }}
-        >
-          <layoutContainer layout={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-            <pixiBitmapText
-              text="New Song"
-              style={{ fontFamily: PIXI_FONTS.SANS_SEMIBOLD, fontSize: 16, fill: 0xffffff }}
-              tint={theme.text.color}
-              layout={{}}
-            />
-            <pixiBitmapText
-              text={`Step ${step} of ${stepCount}`}
-              style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 14, fill: 0xffffff }}
-              tint={theme.textMuted.color}
-              layout={{}}
-            />
-          </layoutContainer>
-          <layoutContainer
-            eventMode="static"
-            cursor="pointer"
-            onPointerUp={handleCancel}
-            layout={{
-              width: 24,
-              height: 24,
-              justifyContent: 'center',
-              alignItems: 'center',
-              borderRadius: 4,
-            }}
-          >
-            <PixiIcon name="close" size={16} color={theme.textMuted.color} layout={{}} />
-          </layoutContainer>
-        </layoutContainer>
+    <PixiModal isOpen={isOpen} onClose={handleCancel} width={MODAL_W} height={MODAL_H} bgColor={theme.bgSecondary.color}>
+      <PixiModalHeader title="New Song" subtitle={`Step ${step} of ${stepCount}`} onClose={handleCancel} />
 
         {/* Body */}
         <layoutContainer layout={{ flex: 1, flexDirection: 'column', overflow: 'hidden' }}>
@@ -266,33 +168,19 @@ export const PixiNewSongWizard: React.FC = () => {
           )}
         </layoutContainer>
 
-        {/* Footer — DOM: px-5 py-3 border-t justify-between */}
-        <layoutContainer
-          layout={{
-            flexDirection: 'row',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            paddingLeft: 20,
-            paddingRight: 20,
-            paddingTop: 12,
-            paddingBottom: 12,
-            borderTopWidth: 1,
-            borderColor: theme.border.color,
-          }}
-        >
-          <PixiButton label="Cancel" variant="ghost" size="sm" onClick={handleCancel} />
-          <layoutContainer layout={{ flexDirection: 'row', gap: 8 }}>
-            {step > 1 && <PixiButton label="Back" variant="ghost" size="sm" onClick={handleBack} />}
-            <PixiButton
-              label={nextLabel}
-              variant="primary"
-              size="sm"
-              onClick={step === 3 ? handleFinish : handleNext}
-            />
-          </layoutContainer>
+      <PixiModalFooter align="between">
+        <PixiButton label="Cancel" variant="ghost" size="sm" onClick={handleCancel} />
+        <layoutContainer layout={{ flexDirection: 'row', gap: 8 }}>
+          {step > 1 && <PixiButton label="Back" variant="ghost" size="sm" onClick={handleBack} />}
+          <PixiButton
+            label={nextLabel}
+            variant="primary"
+            size="sm"
+            onClick={step === 3 ? handleFinish : handleNext}
+          />
         </layoutContainer>
-      </layoutContainer>
-    </pixiContainer>
+      </PixiModalFooter>
+    </PixiModal>
   );
 };
 
@@ -479,9 +367,9 @@ const GlStep2: React.FC<GlStep2Props> = ({
             {/* Native format badge */}
             {selected.templateFile && (
               <Div className="flex-row items-center gap-2 p-2 rounded" layout={{
-                backgroundColor: 0x1a3a1a, borderWidth: 1, borderColor: 0x2a6a2a, borderRadius: 4,
+                backgroundColor: tintBg(theme.success.color), borderWidth: 1, borderColor: theme.success.color, borderRadius: 4,
               }}>
-                <PixiIcon name="diskio" size={12} color={0x4ade80} layout={{}} />
+                <PixiIcon name="diskio" size={12} color={theme.success.color} layout={{}} />
                 <Txt className="text-[11px] text-accent-success">
                   Native format — creates editable file you can export
                 </Txt>

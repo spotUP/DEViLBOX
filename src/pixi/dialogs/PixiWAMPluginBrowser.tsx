@@ -18,12 +18,6 @@ interface PixiWAMPluginBrowserProps {
   typeFilter?: 'instrument' | 'effect';
 }
 
-const TYPE_COLORS: Record<string, number> = {
-  instrument: 0x00d4aa,
-  effect: 0x8b5cf6,
-  utility: 0x3b82f6,
-};
-
 const ITEM_H = 36;
 
 export const PixiWAMPluginBrowser: React.FC<PixiWAMPluginBrowserProps> = ({
@@ -34,6 +28,11 @@ export const PixiWAMPluginBrowser: React.FC<PixiWAMPluginBrowserProps> = ({
   typeFilter,
 }) => {
   const theme = usePixiTheme();
+  const typeColors: Record<string, number> = {
+    instrument: theme.accentHighlight.color,
+    effect: theme.accentSecondary.color,
+    utility: theme.accent.color,
+  };
   const [search] = useState('');
   const [activeType, setActiveType] = useState<'instrument' | 'effect' | undefined>(typeFilter);
 
@@ -158,7 +157,7 @@ export const PixiWAMPluginBrowser: React.FC<PixiWAMPluginBrowserProps> = ({
                     draw={(g) => {
                       g.clear();
                       g.circle(4, 4, 4);
-                      g.fill({ color: TYPE_COLORS[plugin.type] ?? 0x4488ff });
+                      g.fill({ color: typeColors[plugin.type] ?? theme.accent.color });
                     }}
                     layout={{ width: 8, height: 8 }}
                   />

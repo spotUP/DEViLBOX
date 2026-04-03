@@ -89,12 +89,14 @@ const SOURCE_OPTIONS: SelectOption[] = [
 
 // ── Star rating helpers ──────────────────────────────────────────────────────
 
+/** Tint a color toward black (for subtle error/info backgrounds) */
+function tintBg(color: number, factor = 0.15): number {
+  return (((color >> 16 & 0xff) * factor | 0) << 16) | (((color >> 8 & 0xff) * factor | 0) << 8) | ((color & 0xff) * factor | 0);
+}
+
 const STAR_SIZE = 16;
 const STAR_GAP = 2;
-const STAR_FILLED = 0xf59e0b;
 const STAR_EMPTY = 0xffffff;
-const STAR_USER = 0xfbbf24;
-const STAR_HOVER = 0xfcd34d;
 
 function drawStar(g: GraphicsType, cx: number, cy: number, r: number, color: number, alpha = 1) {
   const inner = r * 0.45;
@@ -124,6 +126,9 @@ export const PixiDJModlandBrowser: React.FC<PixiDJModlandBrowserProps> = ({
 }) => {
   const theme = usePixiTheme();
   const thirdDeckActive = useThirdDeckActive();
+  const STAR_FILLED = theme.warning.color;
+  const STAR_USER = theme.warning.color;
+  const STAR_HOVER = theme.warning.color;
 
   // ── State ────────────────────────────────────────────────────────────────
   const [query, setQuery] = useState('');
@@ -554,9 +559,9 @@ export const PixiDJModlandBrowser: React.FC<PixiDJModlandBrowserProps> = ({
             paddingRight: 6,
             paddingTop: 3,
             paddingBottom: 3,
-            backgroundColor: 0x3B1515,
+            backgroundColor: tintBg(theme.error.color),
             borderWidth: 1,
-            borderColor: 0x7F2020,
+            borderColor: theme.error.color,
             borderRadius: 4,
           }}
         >
@@ -656,14 +661,14 @@ export const PixiDJModlandBrowser: React.FC<PixiDJModlandBrowserProps> = ({
                   <pixiBitmapText
                     text={file.format}
                     style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 11, fill: 0xffffff }}
-                    tint={file.source === 'hvsc' ? 0x60a5fa : theme.textMuted.color}
+                    tint={file.source === 'hvsc' ? theme.accent.color : theme.textMuted.color}
                     layout={{}}
                   />
                   {sourceTag ? (
                     <pixiBitmapText
                       text="HVSC"
                       style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 9, fill: 0xffffff }}
-                      tint={0x60a5fa}
+                      tint={theme.accent.color}
                       layout={{}}
                     />
                   ) : null}

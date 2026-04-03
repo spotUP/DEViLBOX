@@ -25,6 +25,10 @@ interface PlayerData {
 }
 
 const PAD = 16;
+
+function tintBg(color: number, factor = 0.15): number {
+  return (((color >> 16 & 0xff) * factor | 0) << 16) | (((color >> 8 & 0xff) * factor | 0) << 8) | ((color & 0xff) * factor | 0);
+}
 const API_URL = import.meta.env.VITE_API_URL || 'https://devilbox.uprough.net/api';
 
 /** Key-value info row */
@@ -120,8 +124,8 @@ export const SIDPlayerTab: React.FC<SIDPlayerTabProps> = ({ width, height, playe
             padding: 16,
             borderRadius: 8,
             borderWidth: 1,
-            backgroundColor: 0x0c1e3a,
-            borderColor: 0x1e3a5f,
+            backgroundColor: tintBg(theme.accent.color),
+            borderColor: theme.accent.color,
           }}
         >
           <pixiBitmapText

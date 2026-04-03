@@ -374,7 +374,7 @@ export const PixiMasterEffectsModal: React.FC<PixiMasterEffectsModalProps> = ({
                 text={`${masterEffects.length} FX${neuralEffectCount >= 3 ? ` • ⚠ ${neuralEffectCount} neural` : ''}`}
                 size="xs"
                 color={neuralEffectCount >= 3 ? 'custom' : 'textMuted'}
-                customColor={neuralEffectCount >= 3 ? 0xeab308 : undefined}
+                customColor={neuralEffectCount >= 3 ? theme.warning.color : undefined}
               />
               <layoutContainer layout={{ flex: 1 }} />
               <PixiButton
@@ -430,7 +430,7 @@ export const PixiMasterEffectsModal: React.FC<PixiMasterEffectsModalProps> = ({
                     text={item.name}
                     size="xs"
                     color={item.enabled ? 'custom' : 'custom'}
-                    customColor={item.enabled ? 0x22c55e : 0xef4444}
+                    customColor={item.enabled ? theme.success.color : theme.error.color}
                   />
                   {idx < signalFlowItems.length - 1 && (
                     <PixiLabel text="→" size="xs" color="textMuted" />

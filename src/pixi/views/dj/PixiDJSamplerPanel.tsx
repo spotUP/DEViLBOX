@@ -100,12 +100,12 @@ function getSynthBadge(synthType: string): string {
   return badges[synthType] ?? 'SYN';
 }
 
-/** Accent color for a synth type badge */
-function getSynthColor(synthType: string): number {
-  if (synthType === 'TR808' || synthType === 'TR909') return 0xf97316; // orange
-  if (synthType === 'Sam' || synthType === 'DECtalk' || synthType === 'V2Speech' || synthType === 'PinkTrombone') return 0xf59e0b; // amber
-  if (synthType === 'TB303') return 0x22c55e; // green
-  return 0x60a5fa; // blue default
+/** Accent color for a synth type badge — themed */
+function getSynthColor(synthType: string, theme: ReturnType<typeof usePixiTheme>): number {
+  if (synthType === 'TR808' || synthType === 'TR909') return theme.warning.color;
+  if (synthType === 'Sam' || synthType === 'DECtalk' || synthType === 'V2Speech' || synthType === 'PinkTrombone') return theme.warning.color;
+  if (synthType === 'TB303') return theme.success.color;
+  return theme.accent.color;
 }
 
 // ─── Individual Pad ─────────────────────────────────────────────────────────
@@ -177,7 +177,7 @@ const PadCell: React.FC<PadCellProps> = ({
         <pixiBitmapText
           text={getSynthBadge(pad.synthConfig!.synthType)}
           style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 8, fill: 0xffffff }}
-          tint={getSynthColor(pad.synthConfig!.synthType)}
+          tint={getSynthColor(pad.synthConfig!.synthType, theme)}
           layout={{ position: 'absolute', right: 4, top: 3 }}
         />
       )}

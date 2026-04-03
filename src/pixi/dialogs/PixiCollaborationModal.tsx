@@ -71,7 +71,7 @@ export const PixiCollaborationModal: React.FC<PixiCollaborationModalProps> = ({ 
             paddingTop: 8,
             paddingBottom: 8,
             marginBottom: 8,
-            backgroundColor: 0x3a1010,
+            backgroundColor: (((theme.error.color >> 16 & 0xff) * 0.15 | 0) << 16) | (((theme.error.color >> 8 & 0xff) * 0.15 | 0) << 8) | ((theme.error.color & 0xff) * 0.15 | 0),
             borderRadius: 4,
             borderWidth: 1,
             borderColor: theme.error.color,

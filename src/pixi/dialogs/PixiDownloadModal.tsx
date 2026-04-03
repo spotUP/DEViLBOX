@@ -5,7 +5,7 @@
  * DOM reference: src/components/dialogs/DownloadModal.tsx
  */
 
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import { PixiModal, PixiIcon } from '../components';
 import { usePixiTheme } from '../theme';
 import { PIXI_FONTS } from '../fonts';
@@ -17,10 +17,12 @@ interface PixiDownloadModalProps {
 
 const RELEASES_URL = 'https://github.com/spotUP/DEViLBOX/releases/latest';
 
-const platforms = [
-  { name: 'Windows', desc: 'Installer (.exe) or Portable (.zip)' },
-  { name: 'macOS', desc: 'Disk Image (.dmg) for Intel/Apple Silicon' },
-  { name: 'Linux', desc: 'AppImage, Debian, or Tarball' },
+type PlatformColorKey = 'accent' | 'textSecondary' | 'warning';
+
+const platforms: { name: string; desc: string; colorKey: PlatformColorKey }[] = [
+  { name: 'Windows', desc: 'Installer (.exe) or Portable (.zip)', colorKey: 'accent' },
+  { name: 'macOS', desc: 'Disk Image (.dmg) for Intel/Apple Silicon', colorKey: 'textSecondary' },
+  { name: 'Linux', desc: 'AppImage, Debian, or Tarball', colorKey: 'warning' },
 ];
 
 const MODAL_W = 480;
@@ -29,10 +31,17 @@ const MODAL_H = 420;
 export const PixiDownloadModal: React.FC<PixiDownloadModalProps> = ({ isOpen, onClose }) => {
   const theme = usePixiTheme();
   const [closeHovered, setCloseHovered] = useState(false);
+  const [hoveredCard, setHoveredCard] = useState<string | null>(null);
 
   const handleDownload = useCallback(() => {
     window.open(RELEASES_URL, '_blank');
   }, []);
+
+  const platformColors = useMemo(() => ({
+    accent: theme.accent.color,
+    textSecondary: theme.textSecondary.color,
+    warning: theme.warning.color,
+  }), [theme]);
 
   if (!isOpen) return null;
 
@@ -106,40 +115,59 @@ export const PixiDownloadModal: React.FC<PixiDownloadModalProps> = ({ isOpen, on
 
         {/* Platform cards — DOM: space-y-3 */}
         <layoutContainer layout={{ flexDirection: 'column', gap: 12 }}>
-          {platforms.map((p) => (
-            <layoutContainer
-              key={p.name}
-              eventMode="static"
-              cursor="pointer"
-              onPointerUp={handleDownload}
-              onClick={handleDownload}
-              layout={{
-                flexDirection: 'row',
-                alignItems: 'center',
-                gap: 16,
-                padding: 16,
-                borderRadius: 12,
-                borderWidth: 1,
-                backgroundColor: theme.bg.color,
-                borderColor: theme.border.color,
-              }}
-            >
-              <layoutContainer layout={{ flexDirection: 'column', flex: 1 }}>
-                <pixiBitmapText
-                  text={p.name}
-                  style={{ fontFamily: PIXI_FONTS.SANS_SEMIBOLD, fontSize: 16, fill: 0xffffff }}
-                  tint={theme.text.color}
-                  layout={{}}
-                />
-                <pixiBitmapText
-                  text={p.desc}
-                  style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 14, fill: 0xffffff }}
-                  tint={theme.textMuted.color}
-                  layout={{}}
-                />
+          {platforms.map((p) => {
+            const isHovered = hoveredCard === p.name;
+            const iconColor = platformColors[p.colorKey];
+            return (
+              <layoutContainer
+                key={p.name}
+                eventMode="static"
+                cursor="pointer"
+                onPointerOver={() => setHoveredCard(p.name)}
+                onPointerOut={() => setHoveredCard(null)}
+                onPointerUp={handleDownload}
+                onClick={handleDownload}
+                layout={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  gap: 16,
+                  padding: 16,
+                  borderRadius: 12,
+                  borderWidth: 1,
+                  backgroundColor: theme.bg.color,
+                  borderColor: isHovered ? theme.accent.color : theme.border.color,
+                }}
+              >
+                <layoutContainer
+                  layout={{
+                    width: 40,
+                    height: 40,
+                    justifyContent: 'center',
+                    alignItems: 'center',
+                    borderRadius: 8,
+                    backgroundColor: theme.bgSecondary.color,
+                  }}
+                >
+                  <PixiIcon name="open" size={20} color={iconColor} layout={{}} />
+                </layoutContainer>
+                <layoutContainer layout={{ flexDirection: 'column', flex: 1 }}>
+                  <pixiBitmapText
+                    text={p.name}
+                    style={{ fontFamily: PIXI_FONTS.SANS_SEMIBOLD, fontSize: 16, fill: 0xffffff }}
+                    tint={isHovered ? theme.accent.color : theme.text.color}
+                    layout={{}}
+                  />
+                  <pixiBitmapText
+                    text={p.desc}
+                    style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 14, fill: 0xffffff }}
+                    tint={theme.textMuted.color}
+                    layout={{}}
+                  />
+                </layoutContainer>
+                <PixiIcon name="open" size={14} color={isHovered ? theme.text.color : theme.textMuted.color} layout={{}} />
               </layoutContainer>
-            </layoutContainer>
-          ))}
+            );
+          })}
         </layoutContainer>
 
         {/* Footer note — DOM: mt-8 pt-6 border-t text-center text-[10px] font-mono uppercase */}
