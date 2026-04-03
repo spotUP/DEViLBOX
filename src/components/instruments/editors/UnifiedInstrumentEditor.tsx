@@ -150,18 +150,8 @@ function getEditorMode(synthType: SynthType): EditorMode {
   if (isMAMEType(synthType)) return 'mame';
   // MdaEPiano/JX10/DX10 — fall through to 'layout' mode (knobs via DOMSynthPanel)
   if (synthType === 'DX7') return 'dexed';
-  if (synthType === 'ToneAM') return 'toneAM';
-  if (synthType === 'RaffoSynth') return 'raffo';
-  if (synthType === 'CalfMono') return 'calfMono';
-  if (synthType === 'SetBfree') return 'setbfree';
-  if (synthType === 'SynthV1') return 'synthv1';
-  if (synthType === 'Monique') return 'moniqueSynth';
-  if (synthType === 'VL1') return 'vl1Synth';
-  if (synthType === 'TalNoizeMaker') return 'talNoizeMaker';
-  if (synthType === 'Aeolus') return 'aeolus';
-  if (synthType === 'FluidSynth') return 'fluidsynth';
-  if (synthType === 'Sfizz') return 'sfizz';
-  if (synthType === 'ZynAddSubFX') return 'zynaddsubfx';
+  // ToneAM, Raffo, CalfMono, SetBfree, SynthV1, Monique, VL1, TalNoizeMaker,
+  // Aeolus, FluidSynth, Sfizz, ZynAddSubFX — all fall through to 'layout' mode
   if (isHivelyType(synthType)) return 'hively';
   if (isGTUltraType(synthType)) return 'gtultra';
   if (synthType === 'JamCrackerSynth') return 'jamcracker';
