@@ -11,6 +11,7 @@ import { PixiLabel } from '../../components/PixiLabel';
 import { useDJStore, type AutoDJStatus } from '@/stores/useDJStore';
 import { useDJPlaylistStore } from '@/stores/useDJPlaylistStore';
 import { enableAutoDJ, disableAutoDJ, skipAutoDJ } from '@/engine/dj/DJActions';
+import { useUIStore } from '@/stores/useUIStore';
 
 const STATUS_LABELS: Record<AutoDJStatus, string> = {
   idle: 'OFF',
@@ -48,15 +49,16 @@ export const PixiDJAutoDJPanel: React.FC<PixiDJAutoDJPanelProps> = ({ isOpen, on
   const currentTrack = activePlaylist?.tracks[currentIdx];
   const nextTrack = activePlaylist?.tracks[nextIdx];
 
-  const canStart = !!activePlaylist && trackCount >= 2;
-
   const handleToggle = useCallback(async () => {
     if (enabled) {
       disableAutoDJ();
-    } else if (canStart) {
-      await enableAutoDJ(0);
+    } else {
+      const error = await enableAutoDJ(0);
+      if (error) {
+        useUIStore.getState().setStatusMessage(`Auto DJ: ${error}`, false, 4000);
+      }
     }
-  }, [enabled, canStart]);
+  }, [enabled]);
 
   const handleSkip = useCallback(async () => {
     await skipAutoDJ();
@@ -98,7 +100,7 @@ export const PixiDJAutoDJPanel: React.FC<PixiDJAutoDJPanelProps> = ({ isOpen, on
           variant={enabled ? 'ft2' : 'ghost'}
           color={enabled ? 'green' : undefined}
           size="sm"
-          disabled={!canStart && !enabled}
+          disabled={false}
           onClick={handleToggle}
           layout={{ flex: 1, height: 28 }}
         />

@@ -9,6 +9,7 @@ import React, { useCallback, useRef, useState } from 'react';
 import { SkipForward, Shuffle, SlidersHorizontal, Zap } from 'lucide-react';
 import { useDJStore, type AutoDJStatus } from '@/stores/useDJStore';
 import { useDJPlaylistStore } from '@/stores/useDJPlaylistStore';
+import { useUIStore } from '@/stores/useUIStore';
 import { enableAutoDJ, disableAutoDJ, skipAutoDJ } from '@/engine/dj/DJActions';
 import { analyzePlaylist, playlistNeedsAnalysis, type AnalysisProgress, type ModlandFixCandidate } from '@/engine/dj/DJPlaylistAnalyzer';
 
@@ -58,10 +59,12 @@ export const DJAutoDJPanel: React.FC<DJAutoDJPanelProps> = ({ onClose }) => {
     if (enabled) {
       disableAutoDJ();
     } else {
-      if (!activePlaylist || trackCount < 2) return;
-      await enableAutoDJ(0);
+      const error = await enableAutoDJ(0);
+      if (error) {
+        useUIStore.getState().setStatusMessage(`Auto DJ: ${error}`, false, 4000);
+      }
     }
-  }, [enabled, activePlaylist, trackCount]);
+  }, [enabled]);
 
   const handleSkip = useCallback(async () => {
     await skipAutoDJ();
