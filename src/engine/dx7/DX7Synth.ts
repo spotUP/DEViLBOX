@@ -154,9 +154,11 @@ export class DX7Synth implements DevilboxSynth {
     for (let i = 6; i < 4102; i++) sum += sysex[i];
     sysex[4102] = (-sum) & 0x7F;
     sysex[4103] = 0xF7;
-    // Bridge dx7LoadSysex handles: memcpy to 0x1000, cartridge update,
-    // setBank(0), and program change 0. No extra calls needed.
+    // Bridge dx7LoadSysex: memcpy to 0x1000, cartridge update, setBank(0),
+    // and program change 0 via serial. The serial PC needs firmware CPU cycles
+    // to process — send a redundant PC after 100ms to ensure EGS reloads.
     this.loadSysex(sysex.buffer);
+    setTimeout(() => { if (!this._disposed) this.selectVoice(0); }, 100);
     console.log(`[DX7] _loadVcedData: sent 4104-byte bulk dump`);
   }
 
