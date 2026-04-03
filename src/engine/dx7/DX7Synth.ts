@@ -103,9 +103,7 @@ export class DX7Synth implements DevilboxSynth {
   /** Load voices + first patch bank, then resolve ensureInitialized() */
   private async _finishInit() {
     try {
-      // NOTE: Do NOT call tryAutoLoadVoices() — it inserts a "cartridge" which
-      // causes the firmware to ignore internal RAM at 0x1000 where loadSysex writes.
-      // All voice loading goes through loadPatchBank → loadSysex instead.
+      // Load first patch bank (this writes to internal RAM + updates cartridge via worklet)
       await this.tryAutoLoadFirstPatchBank();
     } catch {
       // Non-fatal — synth works without patches, just silent
