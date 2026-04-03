@@ -98,6 +98,9 @@ export class DeckEngine {
   private backwardStartSongPos = 0;
   private backwardStartPattPos = 0;
   private backwardStartElapsedMs = 0;
+  private backwardDisplacementMs = 0;   // accumulated backward travel (ms of audio)
+  private lastBackwardVelocityTime = 0; // performance.now() of last backward velocity update
+  private lastBackwardRate = 0;         // rate at last backward velocity update
   private songTimeIndex: number[] = [];
   /** Per-song-position rowMs value (accounts for Fxx speed/BPM changes) */
   private songRowMs: number[] = [];
@@ -554,6 +557,7 @@ export class DeckEngine {
             this.replayer.setPitchMultiplier(0.15);
           }
         } else {
+          this._accumulateBackwardDisplacement(0.05);
           this.scratchBuffer?.setRate(-0.05);
         }
         return;
@@ -566,7 +570,10 @@ export class DeckEngine {
           // Transition backward → forward
           this.scratchBuffer?.silenceAndStop();
           this.scratchBuffer?.unfreezeCapture();
-          this.deckGain.gain.rampTo(1, 0.005);
+          { const n = Tone.getContext().rawContext.currentTime;
+            this.deckGain.gain.cancelScheduledValues(n);
+            this.deckGain.gain.setValueAtTime(this.deckGain.gain.value, n);
+            this.deckGain.gain.linearRampTo(1, 0.005); }
           this.patternScratchDir = 1;
         }
         if (isAudio) {
@@ -581,7 +588,10 @@ export class DeckEngine {
           // Transition forward → backward: freeze capture, mute forward source,
           // start ring buffer backward from the exact worklet write position.
           this.scratchBuffer?.freezeCapture();
-          this.deckGain.gain.rampTo(0, 0.005);
+          { const n = Tone.getContext().rawContext.currentTime;
+            this.deckGain.gain.cancelScheduledValues(n);
+            this.deckGain.gain.setValueAtTime(this.deckGain.gain.value, n);
+            this.deckGain.gain.linearRampTo(0, 0.005); }
           this.scratchBuffer?.startReverseFromWritePos(absV);
           if (isAudio) {
             this.audioPlayer.setPlaybackRate(0.001);
@@ -591,6 +601,7 @@ export class DeckEngine {
           }
           this.patternScratchDir = -1;
         } else {
+          this._accumulateBackwardDisplacement(absV);
           this.scratchBuffer?.setRate(-absV);
         }
       }
@@ -610,6 +621,7 @@ export class DeckEngine {
         if (this.scratchDirection !== -1) {
           this._switchToBackward(Math.abs(v));
         } else {
+          this._accumulateBackwardDisplacement(Math.abs(v));
           this.scratchBuffer?.setRate(-Math.abs(v));
         }
       }
@@ -627,6 +639,7 @@ export class DeckEngine {
         if (this.scratchDirection !== -1) {
           this._switchToBackward(Math.abs(v));
         } else {
+          this._accumulateBackwardDisplacement(Math.abs(v));
           this.scratchBuffer?.setRate(-Math.abs(v));
         }
       }
@@ -650,20 +663,23 @@ export class DeckEngine {
     }
     this._decayToRest(decayMs);
 
-    // Safety: force scratch buffer playback gain to zero after decay completes.
-    // Prevents volume accumulation if ramp sequences don't complete cleanly.
-    const forceZeroScratchGain = () => {
-      if (this.scratchBufferReady && this.scratchBuffer && !this.isScratchActive) {
-        const now = Tone.getContext().rawContext.currentTime;
+    // Hard-set gains after decay to clean, definitive values.
+    // Uses cancelScheduledValues + setValueAtTime (atomic) instead of rampTo
+    // (which relies on cancelAndHoldAtTime that can misbehave with rapid overlapping ramps).
+    const hardResetGains = () => {
+      if (this.isScratchActive) return; // scratch restarted, don't interfere
+      const now = Tone.getContext().rawContext.currentTime;
+      // Kill any residual scratch buffer output
+      if (this.scratchBufferReady && this.scratchBuffer) {
         this.scratchBuffer.playbackGain.gain.cancelScheduledValues(now);
         this.scratchBuffer.playbackGain.gain.setValueAtTime(0, now);
       }
-      if (!this.isScratchActive) {
-        this.deckGain.gain.rampTo(1, 0.005);
-      }
+      // Hard-set deckGain to exactly 1.0 — cancel all automation, then set atomically
+      this.deckGain.gain.cancelScheduledValues(now);
+      this.deckGain.gain.setValueAtTime(1, now);
     };
-    setTimeout(forceZeroScratchGain, decayMs + 50);
-    setTimeout(forceZeroScratchGain, decayMs + 300);
+    setTimeout(hardResetGains, decayMs + 50);
+    setTimeout(hardResetGains, decayMs + 300);
   }
 
   /** Switch from forward playback to backward (reverse scratch). */
@@ -684,12 +700,18 @@ export class DeckEngine {
     this.backwardStartElapsedMs = this._playbackMode === 'audio'
       ? this.audioPlayer.getPosition() * 1000
       : this.replayer.getElapsedMs();
+    // Reset backward displacement tracking
+    this.backwardDisplacementMs = 0;
+    this.lastBackwardVelocityTime = performance.now();
+    this.lastBackwardRate = rate;
     // Stop any running preset scratch pattern
     this.scratchPlayback.stopPattern();
 
-    // Fade out forward chain immediately (not 20ms ramp — prevents overlap)
-    this.deckGain.gain.cancelAndHoldAtTime(Tone.getContext().rawContext.currentTime);
-    this.deckGain.gain.rampTo(0, 0.005);
+    // Fade out forward chain: cancel all automation, anchor current value, ramp to 0
+    const nowB = Tone.getContext().rawContext.currentTime;
+    this.deckGain.gain.cancelScheduledValues(nowB);
+    this.deckGain.gain.setValueAtTime(this.deckGain.gain.value, nowB);
+    this.deckGain.gain.linearRampTo(0, 0.005);
 
     // Start reverse audio
     this.scratchBuffer.startReverse(rate);
@@ -713,6 +735,20 @@ export class DeckEngine {
         }
       }
     }, 10);
+  }
+
+  /**
+   * Accumulate backward displacement between velocity updates.
+   * Called on each backward velocity update to track how far
+   * the scratch has traveled backward (for accurate resume position).
+   */
+  private _accumulateBackwardDisplacement(absRate: number): void {
+    const now = performance.now();
+    const dtSec = (now - this.lastBackwardVelocityTime) / 1000;
+    // Use the PREVIOUS rate × elapsed time to estimate displacement
+    this.backwardDisplacementMs += this.lastBackwardRate * dtSec * 1000;
+    this.lastBackwardVelocityTime = now;
+    this.lastBackwardRate = absRate;
   }
 
   /**
@@ -740,13 +776,20 @@ export class DeckEngine {
       this.scratchBuffer.silenceAndStop();
     }
 
-    // Resume from where the backward scratch started.
-    const targetMs = Math.max(0, this.backwardStartElapsedMs);
+    // Flush the final backward displacement segment (from last velocity update to now)
+    this._accumulateBackwardDisplacement(0);
+
+    // Resume from backward start minus how far backward we actually traveled
+    const targetMs = Math.max(0, this.backwardStartElapsedMs - this.backwardDisplacementMs);
 
     if (this._playbackMode === 'audio') {
       this.audioPlayer.seek(targetMs / 1000);
       this.audioPlayer.setPlaybackRate(fwdRate);
-      this.deckGain.gain.rampTo(1, 0.02);
+      // Restore deckGain: cancel all existing automation first, then ramp cleanly
+      const now = Tone.getContext().rawContext.currentTime;
+      this.deckGain.gain.cancelScheduledValues(now);
+      this.deckGain.gain.setValueAtTime(this.deckGain.gain.value, now);
+      this.deckGain.gain.linearRampTo(1, 0.02);
       if (!this.audioPlayer.isCurrentlyPlaying()) {
         this.audioPlayer.resume();
       }
@@ -771,7 +814,11 @@ export class DeckEngine {
         this.replayer.seekTo(this.backwardStartSongPos, this.backwardStartPattPos);
       }
       this.replayer.resume();
-      this.deckGain.gain.rampTo(1, 0.02);
+      // Restore deckGain: cancel all existing automation first, then ramp cleanly
+      const nowT = Tone.getContext().rawContext.currentTime;
+      this.deckGain.gain.cancelScheduledValues(nowT);
+      this.deckGain.gain.setValueAtTime(this.deckGain.gain.value, nowT);
+      this.deckGain.gain.linearRampTo(1, 0.02);
       this.replayer.setPitchMultiplier(fwdRate);
       this.replayer.setTempoMultiplier(fwdRate);
     }
@@ -889,7 +936,10 @@ export class DeckEngine {
     if (this.patternScratchDir === -1 && this.scratchBufferReady && this.scratchBuffer) {
       this.scratchBuffer.silenceAndStop();
       this.scratchBuffer.unfreezeCapture();
-      this.deckGain.gain.rampTo(1, 0.005);
+      const n = Tone.getContext().rawContext.currentTime;
+      this.deckGain.gain.cancelScheduledValues(n);
+      this.deckGain.gain.setValueAtTime(this.deckGain.gain.value, n);
+      this.deckGain.gain.linearRampTo(1, 0.005);
     }
 
     if (this._playbackMode === 'audio') {
