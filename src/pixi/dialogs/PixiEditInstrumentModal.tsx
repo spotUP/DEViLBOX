@@ -30,6 +30,7 @@ import {
 import { PIXI_FONTS } from '../fonts';
 import { PixiPureTextInput } from '../input/PixiPureTextInput';
 import { usePixiTheme } from '../theme';
+import { usePixiResponsive } from '../hooks/usePixiResponsive';
 import { useInstrumentStore, notify } from '@stores';
 import { usePresetStore, type PresetCategory } from '@stores/usePresetStore';
 import { ALL_SYNTH_TYPES, getSynthInfo, SYNTH_CATEGORIES } from '@constants/synthCategories';
@@ -45,14 +46,11 @@ import { MODULAR_INIT_PATCH } from '@constants/modularPresets';
 
 // ── Layout constants ────────────────────────────────────────────────────────
 
-const MODAL_W = 800;
-const MODAL_H = 550;
 const LEFT_PANEL_W = 220;
-const RIGHT_PANEL_W = MODAL_W - LEFT_PANEL_W;
+const LEFT_PANEL_COLLAPSED_W = 32;
 const HEADER_H = 38;
 const TAB_BAR_H = 32;
 const FOOTER_H = 44;
-const CONTENT_H = MODAL_H - HEADER_H - FOOTER_H;
 const PAD = 16;
 const KNOB_SIZE = 'sm' as const;
 
@@ -115,6 +113,15 @@ export const PixiEditInstrumentModal: React.FC<PixiEditInstrumentModalProps> = (
   createMode = false,
 }) => {
   const theme = usePixiTheme();
+  const { width: screenW, height: screenH } = usePixiResponsive();
+
+  // ── Fullscreen layout (dynamic) ────────────────────────────────────────
+  const MODAL_W = screenW;
+  const MODAL_H = screenH;
+  const [leftPanelCollapsed, setLeftPanelCollapsed] = useState(false);
+  const currentLeftW = leftPanelCollapsed ? LEFT_PANEL_COLLAPSED_W : LEFT_PANEL_W;
+  const RIGHT_PANEL_W = MODAL_W - currentLeftW;
+  const CONTENT_H = MODAL_H - HEADER_H - FOOTER_H;
 
   // ── Store ───────────────────────────────────────────────────────────────
   const instruments = useInstrumentStore((s) => s.instruments);
@@ -469,7 +476,7 @@ export const PixiEditInstrumentModal: React.FC<PixiEditInstrumentModalProps> = (
   // ── Render ──────────────────────────────────────────────────────────────
 
   return (
-    <PixiModal isOpen={isOpen} onClose={onClose} width={MODAL_W} height={MODAL_H}>
+    <PixiModal isOpen={isOpen} onClose={onClose} width={MODAL_W} height={MODAL_H} borderRadius={0} borderWidth={0}>
       <PixiModalHeader
         title={isCreating ? 'Add New Instrument' : 'Edit Instrument'}
         onClose={onClose}
@@ -536,7 +543,7 @@ export const PixiEditInstrumentModal: React.FC<PixiEditInstrumentModalProps> = (
         {/* ── LEFT PANEL ──────────────────────────────────────────────────── */}
         <layoutContainer
           layout={{
-            width: isCreating ? MODAL_W : LEFT_PANEL_W,
+            width: isCreating ? MODAL_W : currentLeftW,
             flexDirection: 'column',
             backgroundColor: theme.bgSecondary.color,
             borderRightWidth: isCreating ? 0 : 1,
@@ -822,6 +829,32 @@ export const PixiEditInstrumentModal: React.FC<PixiEditInstrumentModalProps> = (
                 )}
               </layoutContainer>
             </PixiScrollView>
+          ) : leftPanelCollapsed ? (
+            /* ── Collapsed left panel — narrow strip with expand button ───── */
+            <layoutContainer
+              layout={{
+                width: LEFT_PANEL_COLLAPSED_W,
+                flexDirection: 'column',
+                alignItems: 'center',
+                paddingTop: 6,
+              }}
+            >
+              <layoutContainer
+                eventMode="static"
+                cursor="pointer"
+                onPointerTap={() => setLeftPanelCollapsed(false)}
+                layout={{
+                  width: 24,
+                  height: 24,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  borderRadius: 4,
+                  backgroundColor: theme.bgTertiary?.color ?? 0x2a2a2a,
+                }}
+              >
+                <PixiIcon name="next" size={12} color={theme.textSecondary.color} layout={{}} />
+              </layoutContainer>
+            </layoutContainer>
           ) : (
             /* ── Instrument list (edit mode) ──────────────────────────────── */
             <>
@@ -835,7 +868,23 @@ export const PixiEditInstrumentModal: React.FC<PixiEditInstrumentModalProps> = (
                   borderColor: theme.border.color,
                 }}
               >
-                <PixiLabel text="INSTRUMENTS" size="xs" weight="bold" color="textMuted" />
+                <layoutContainer layout={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                  <layoutContainer
+                    eventMode="static"
+                    cursor="pointer"
+                    onPointerTap={() => setLeftPanelCollapsed(true)}
+                    layout={{
+                      width: 20,
+                      height: 20,
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      borderRadius: 3,
+                    }}
+                  >
+                    <PixiIcon name="prev" size={10} color={theme.textMuted.color} layout={{}} />
+                  </layoutContainer>
+                  <PixiLabel text="INSTRUMENTS" size="xs" weight="bold" color="textMuted" />
+                </layoutContainer>
                 <PixiButton
                   label="+ New"
                   variant="ghost"
@@ -1211,7 +1260,7 @@ export const PixiEditInstrumentModal: React.FC<PixiEditInstrumentModalProps> = (
             )}
             {/* SC Controls tab — param sliders */}
             {activeTab === 'controls' && currentInstrument?.synthType === 'SuperCollider' && (
-              <SCControlsPanel instrument={currentInstrument} onUpdate={updateInstrument} />
+              <SCControlsPanel instrument={currentInstrument} onUpdate={updateInstrument} panelWidth={RIGHT_PANEL_W} />
             )}
             {activeTab === 'sound' && currentInstrument && currentInstrument.synthType === 'ModularSynth' && (
               <PixiModularSynthEditor
@@ -1331,7 +1380,8 @@ const SCScriptPanel: React.FC<{ source: string }> = ({ source }) => {
 const SCControlsPanel: React.FC<{
   instrument: InstrumentConfig;
   onUpdate: (id: number, changes: Partial<InstrumentConfig>) => void;
-}> = ({ instrument, onUpdate }) => {
+  panelWidth?: number;
+}> = ({ instrument, onUpdate, panelWidth = 580 }) => {
   const scConfig = instrument.superCollider;
   const params = scConfig?.params ?? [];
   const synthDefName = scConfig?.synthDefName ?? 'unknown';
@@ -1378,7 +1428,7 @@ const SCControlsPanel: React.FC<{
                 step={(param.max - param.min) / 200}
                 onChange={(v) => handleParamChange(param.name, v)}
                 orientation="horizontal"
-                length={RIGHT_PANEL_W - PAD * 2 - 16}
+                length={panelWidth - PAD * 2 - 16}
                 thickness={6}
                 showValue={false}
               />
