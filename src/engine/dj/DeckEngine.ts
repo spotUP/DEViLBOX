@@ -618,7 +618,7 @@ export class DeckEngine {
           // Transition forward → backward: freeze capture, mute forward source,
           // start ring buffer backward from the exact worklet write position.
           this.scratchBuffer?.freezeCapture();
-          this._rampDeckGain(0, 0.005);
+          this._setDeckGain(0);
           this.scratchBuffer?.startReverseFromWritePos(absV);
           if (isAudio) {
             this.audioPlayer.setPlaybackRate(0.001);
@@ -742,7 +742,7 @@ export class DeckEngine {
     this.scratchPlayback.stopPattern();
 
     // Fade out forward chain
-    this._rampDeckGain(0, 0.005);
+    this._setDeckGain(0);
 
     // Start reverse audio
     this.scratchBuffer.startReverse(rate);
