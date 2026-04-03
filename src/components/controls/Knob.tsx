@@ -244,7 +244,7 @@ export const Knob: React.FC<KnobProps> = React.memo(({
   // Handle mouse/touch down — registers global listeners only for this drag session
   const handleMouseDown = useCallback((e: React.MouseEvent | React.TouchEvent) => {
     if (disabled) return;
-    e.preventDefault();
+    try { e.preventDefault(); } catch { /* passive listener */ }
 
     const isTouchEvent = 'touches' in e;
     const clientY = isTouchEvent ? e.touches[0].clientY : e.clientY;
