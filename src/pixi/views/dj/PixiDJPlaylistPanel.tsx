@@ -255,8 +255,14 @@ export const PixiDJPlaylistPanel: React.FC<PixiDJPlaylistPanelProps> = ({
       sublabel: trackSublabel(t),
       iconName: 'diskio',
       iconColor: t.played ? 0x22c55e : undefined, // green icon for played tracks
+      actions: [
+        { label: '1', color: 0x3b82f6, onClick: () => loadTrackToDeck(t, 'A') },
+        { label: '2', color: 0xef4444, onClick: () => loadTrackToDeck(t, 'B') },
+        ...(thirdDeckActive ? [{ label: '3', color: 0x22c55e, onClick: () => loadTrackToDeck(t, 'C' as DeckId) }] : []),
+        { label: 'X', color: 0x666666, onClick: () => handleRemoveTrack(i) },
+      ],
     }));
-  }, [activePlaylist]);
+  }, [activePlaylist, thirdDeckActive, loadTrackToDeck, handleRemoveTrack]);
 
   // Find selected track index
   const selectedIdx = useMemo(() => {
