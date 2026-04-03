@@ -317,7 +317,12 @@ export const useInstrumentStore = create<InstrumentStore>()(
         updates.oidos ||
         updates.openWurli ||
         updates.opl3 ||
-        updates.dx7
+        updates.dx7 ||
+        updates.pinkTrombone ||
+        updates.dectalk ||
+        updates.lfo ||
+        updates.volume !== undefined ||
+        updates.pan !== undefined
       );
 
       set((state) => {
@@ -476,6 +481,30 @@ export const useInstrumentStore = create<InstrumentStore>()(
           const updatedInstrument = get().instruments.find((inst) => inst.id === id);
           
           if (updatedInstrument) {
+            // Universal volume/pan handler — adjust output gain directly, never invalidate
+            if ((updates.volume !== undefined || updates.pan !== undefined) && !updates.oscillator && !updates.envelope && !updates.filter) {
+              const instruments = (engine as any).instruments as Map<number, any>;
+              if (instruments) {
+                for (const [key, synth] of instruments.entries()) {
+                  if ((key >>> 16) === id && synth) {
+                    if (updates.volume !== undefined) {
+                      // Convert dB to linear gain: 10^(dB/20)
+                      const vol = updatedInstrument.volume ?? -6;
+                      const linearGain = Math.pow(10, vol / 20);
+                      if (synth.output?.gain) {
+                        synth.output.gain.value = linearGain;
+                      } else if (synth.set && typeof synth.set === 'function') {
+                        try { synth.set('volume', vol); } catch { /* */ }
+                      }
+                    }
+                  }
+                }
+              }
+              // If ONLY volume/pan changed, we're done — don't invalidate
+              const otherKeys = Object.keys(updates).filter(k => k !== 'volume' && k !== 'pan');
+              if (otherKeys.length === 0) return; // Handled
+            }
+
             if ((updatedInstrument.synthType === 'TB303' || updatedInstrument.synthType === 'Buzz3o3') && updatedInstrument.tb303 && updates.tb303) {
               engine.updateTB303Parameters(id, updatedInstrument.tb303);
               return; // Handled
@@ -597,20 +626,39 @@ export const useInstrumentStore = create<InstrumentStore>()(
               return; // Handled
             }
 
-            if (updatedInstrument.synthType === 'DX7' && updatedInstrument.dx7 && updates.dx7) {
+            if (updatedInstrument.synthType === 'DX7' && updates.dx7) {
               const dx7Updates = updates.dx7 as Record<string, unknown>;
-              if (dx7Updates.vcedPreset) {
-                // Load VCED preset on running synth without recreation
-                const instruments = (engine as any).instruments as Map<number, any>;
-                const key = (id << 16) | 0xFFFF;
-                const synth = instruments?.get(key);
-                if (synth?.loadVcedPreset) {
-                  synth.loadVcedPreset(dx7Updates.vcedPreset as string);
-                  return; // Handled
+              // Find all DX7 synth instances for this instrument
+              const instruments = (engine as any).instruments as Map<number, any>;
+              const findDX7 = () => {
+                if (!instruments) return null;
+                for (const [key, synth] of instruments.entries()) {
+                  if ((key >>> 16) === id && synth?.loadSysex) return synth;
+                }
+                return null;
+              };
+              const synth = findDX7();
+
+              if (dx7Updates.vcedPreset && synth?.loadVcedPreset) {
+                synth.loadVcedPreset(dx7Updates.vcedPreset as string);
+              }
+              if (dx7Updates.vced && typeof dx7Updates.vced === 'object' && synth?.setVcedParam) {
+                for (const [paramStr, value] of Object.entries(dx7Updates.vced as Record<string, number>)) {
+                  const paramNum = parseInt(paramStr, 10);
+                  if (!isNaN(paramNum)) synth.setVcedParam(paramNum, Math.round(value));
                 }
               }
-              // Other dx7 changes — recreate synth
-              engine.invalidateInstrument(id);
+              if (dx7Updates.bank !== undefined && synth?.loadPatchBank) {
+                const manifest = (synth.constructor as any).getPatchManifest?.();
+                const bankIdx = dx7Updates.bank as number;
+                const program = (dx7Updates.program as number) ?? 0;
+                if (manifest?.banks?.[bankIdx]) {
+                  synth.loadPatchBank(manifest.banks[bankIdx].file, program);
+                }
+              } else if (dx7Updates.program !== undefined && synth?.selectVoice) {
+                synth.selectVoice(dx7Updates.program as number);
+              }
+              // NEVER invalidate DX7 — all changes go through SysEx, not synth recreation
               return; // Handled
             }
 
@@ -643,6 +691,18 @@ export const useInstrumentStore = create<InstrumentStore>()(
                 engine.updateComplexSynthParameters(id, synthConfig);
                 return; // Handled
               }
+            }
+
+            // PinkTrombone speech synth — uses applyConfig pattern
+            if (updatedInstrument.synthType === 'PinkTrombone' && updatedInstrument.pinkTrombone && updates.pinkTrombone) {
+              engine.updateComplexSynthParameters(id, updatedInstrument.pinkTrombone);
+              return; // Handled
+            }
+
+            // DECtalk speech synth — uses applyConfig pattern
+            if (updatedInstrument.synthType === 'DECtalk' && updatedInstrument.dectalk && updates.dectalk) {
+              engine.updateComplexSynthParameters(id, updatedInstrument.dectalk);
+              return; // Handled
             }
 
             // WASM singleton engines (Hively, JamCracker, FC, etc.) run autonomously
@@ -685,7 +745,7 @@ export const useInstrumentStore = create<InstrumentStore>()(
             const toneJsSynthTypes = ['Synth', 'FMSynth', 'ToneAM', 'MonoSynth', 'DuoSynth', 'PluckSynth',
               'MembraneSynth', 'MetalSynth', 'NoiseSynth'];
             if (toneJsSynthTypes.includes(updatedInstrument.synthType) &&
-                (updates.oscillator || updates.envelope || updates.filter || updates.filterEnvelope || updates.volume !== undefined)) {
+                (updates.oscillator || updates.envelope || updates.filter || updates.filterEnvelope || updates.lfo || updates.volume !== undefined)) {
               engine.updateToneJsSynthInPlace(id, updatedInstrument);
               return; // Handled — no invalidation needed
             }

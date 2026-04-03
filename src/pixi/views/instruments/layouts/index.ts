@@ -38,6 +38,28 @@ import { TUNEFISH_LAYOUT } from './tunefish';
 import { SLAUGHTER_LAYOUT } from './wavesabreSlaughter';
 import { FALCON_LAYOUT } from './wavesabreFalcon';
 import { V2_LAYOUT } from './v2';
+import { MDA_EPIANO_LAYOUT } from './mdaEPiano';
+import { MDA_JX10_LAYOUT } from './mdaJX10';
+import { MDA_DX10_LAYOUT } from './mdaDX10';
+import { AMSYNTH_LAYOUT } from './amsynth';
+import { RAFFO_LAYOUT } from './raffo';
+import { CALF_MONO_LAYOUT } from './calfMono';
+import { SETBFREE_LAYOUT } from './setbfree';
+import { SYNTHV1_LAYOUT } from './synthv1';
+import { MONIQUE_LAYOUT } from './monique';
+import { VL1_LAYOUT } from './vl1';
+import { TAL_NOIZEMAKER_LAYOUT } from './talNoizeMaker';
+import { AEOLUS_LAYOUT } from './aeolus';
+import { FLUIDSYNTH_LAYOUT } from './fluidsynth';
+import { SFIZZ_LAYOUT } from './sfizz';
+import { ZYNADDSUBFX_LAYOUT } from './zynaddsubfx';
+import { PINK_TROMBONE_LAYOUT } from './pinkTrombone';
+import { DECTALK_LAYOUT } from './dectalk';
+import { SAM_LAYOUT } from './sam';
+import { TR808_LAYOUT } from './tr808';
+import { TR909_LAYOUT } from './tr909';
+import { C64SID_LAYOUT } from './c64sid';
+import { V2SPEECH_LAYOUT } from './v2speech';
 
 /** Map from SynthType string to layout descriptor */
 export const SYNTH_LAYOUTS: Record<string, SynthPanelLayout> = {
@@ -97,6 +119,39 @@ export const SYNTH_LAYOUTS: Record<string, SynthPanelLayout> = {
   MetalSynth: METAL_SYNTH_LAYOUT,
   MembraneSynth: MEMBRANE_SYNTH_LAYOUT,
   NoiseSynth: NOISE_SYNTH_LAYOUT,
+
+  // WASM synths (MDA, AMSynth, Raffo, etc.)
+  MdaEPiano: MDA_EPIANO_LAYOUT,
+  MdaJX10: MDA_JX10_LAYOUT,
+  MdaDX10: MDA_DX10_LAYOUT,
+  Amsynth: AMSYNTH_LAYOUT,
+  RaffoSynth: RAFFO_LAYOUT,
+  CalfMono: CALF_MONO_LAYOUT,
+  SetBfree: SETBFREE_LAYOUT,
+  SynthV1: SYNTHV1_LAYOUT,
+  Monique: MONIQUE_LAYOUT,
+  VL1: VL1_LAYOUT,
+  TalNoizeMaker: TAL_NOIZEMAKER_LAYOUT,
+  Aeolus: AEOLUS_LAYOUT,
+  FluidSynth: FLUIDSYNTH_LAYOUT,
+  Sfizz: SFIZZ_LAYOUT,
+  ZynAddSubFX: ZYNADDSUBFX_LAYOUT,
+
+  // VSTBridge synths that share existing layouts
+  Open303: TB303_LAYOUT,
+
+  // Drum machines
+  TR808: TR808_LAYOUT,
+  TR909: TR909_LAYOUT,
+
+  // Playback engines with minimal controls
+  C64SID: C64SID_LAYOUT,
+
+  // Speech synths
+  V2Speech: V2SPEECH_LAYOUT,
+  PinkTrombone: PINK_TROMBONE_LAYOUT,
+  DECtalk: DECTALK_LAYOUT,
+  Sam: SAM_LAYOUT,
 
   // Furnace chip emulation (all share a minimal AMP layout)
   Furnace: FURNACE_LAYOUT,

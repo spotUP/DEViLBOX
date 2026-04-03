@@ -112,7 +112,7 @@ interface SectionProps {
 const DOMSynthSection: React.FC<SectionProps> = ({ section, getValue, updateParam }) => {
   // Sort controls: knobs first, then sliders, then toggles/switches
   const knobs = section.controls.filter((c: ControlDescriptor) => c.type === 'knob' || c.type === 'slider');
-  const toggles = section.controls.filter((c: ControlDescriptor) => c.type === 'toggle' || c.type === 'switch3way');
+  const toggles = section.controls.filter((c: ControlDescriptor) => c.type === 'toggle' || c.type === 'switch3way' || c.type === 'select');
 
   return (
     <div className="bg-dark-bgSecondary/50 rounded-lg border border-dark-border/30 p-2">
@@ -236,6 +236,24 @@ const DOMSynthControl: React.FC<ControlProps> = ({ descriptor, value, onChange }
             ))}
           </div>
           <div className="text-[7px] text-text-muted uppercase">{descriptor.label}</div>
+        </div>
+      );
+    }
+
+    case 'select': {
+      const strVal = typeof value === 'string' ? value : String(value ?? '');
+      return (
+        <div className="flex flex-col gap-0.5">
+          <div className="text-[7px] text-text-muted uppercase">{descriptor.label}</div>
+          <select
+            value={strVal}
+            onChange={(e) => onChange(e.target.value)}
+            className="px-1.5 py-0.5 text-[10px] bg-dark-bgTertiary text-text-primary border border-dark-border rounded focus:border-accent-primary focus:outline-none"
+          >
+            {descriptor.options.map((opt) => (
+              <option key={opt.value} value={opt.value}>{opt.label}</option>
+            ))}
+          </select>
         </div>
       );
     }

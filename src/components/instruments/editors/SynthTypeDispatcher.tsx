@@ -63,6 +63,8 @@ import { isFurnacePCMType } from '../hardware/FurnacePCMHardware';
 import { isFurnaceInsEdType } from '../hardware/FurnaceInsEdHardware';
 import { SpaceLaserHeader, V2Header, DubSirenHeader, SynareHeader, type SynthHeaderProps } from './InstrumentPresetManager';
 import { DOMSynthPanel } from '../controls/DOMSynthPanel';
+const LiveFilterCurve = lazy(() => import('../../visualization/LiveFilterCurve').then(m => ({ default: m.LiveFilterCurve })));
+const LiveADSRVisualizer = lazy(() => import('../../visualization/LiveADSRVisualizer').then(m => ({ default: m.LiveADSRVisualizer })));
 import { getSynthLayout } from '@/pixi/views/instruments/layouts';
 
 // ============================================================================
@@ -174,7 +176,7 @@ const WavetableListEditor = lazy(() => import('./WavetableEditor').then(m => ({ 
 
 
 // Types
-export type EditorMode = 'generic' | 'tb303' | 'furnace' | 'buzzmachine' | 'sample' | 'dubsiren' | 'spacelaser' | 'granular' | 'v2' | 'sam' | 'pinktrombone' | 'dectalk' | 'synare' | 'mame' | 'mamechip' | 'dexed' | 'obxd' | 'mdaEPiano' | 'mdaJX10' | 'mdaDX10' | 'toneAM' | 'raffo' | 'calfMono' | 'setbfree' | 'synthv1' | 'moniqueSynth' | 'vl1Synth' | 'talNoizeMaker' | 'aeolus' | 'fluidsynth' | 'sfizz' | 'zynaddsubfx' | 'wam' | 'tonewheelOrgan' | 'melodica' | 'vital' | 'odin2' | 'surge' | 'vstbridge' | 'harmonicsynth' | 'modular' | 'sunvox-modular' | 'hively' | 'gtultra' | 'jamcracker' | 'soundmon' | 'sidmon' | 'digmug' | 'fc' | 'deltamusic1' | 'deltamusic2' | 'fred' | 'tfmx' | 'octamed' | 'sidmon1' | 'hippelcoso' | 'robhubbard' | 'steveturner' | 'davidwhittaker' | 'sonic-arranger' | 'instereo2' | 'musicline' | 'supercollider' | 'wobblebass' | 'startrekker-am' | 'futureplayer' | 'symphonie' | 'xrns-synth' | 'sunvox-synth';
+export type EditorMode = 'generic' | 'layout' | 'tb303' | 'furnace' | 'buzzmachine' | 'sample' | 'dubsiren' | 'spacelaser' | 'granular' | 'v2' | 'sam' | 'pinktrombone' | 'dectalk' | 'synare' | 'mame' | 'mamechip' | 'dexed' | 'obxd' | 'mdaEPiano' | 'mdaJX10' | 'mdaDX10' | 'toneAM' | 'raffo' | 'calfMono' | 'setbfree' | 'synthv1' | 'moniqueSynth' | 'vl1Synth' | 'talNoizeMaker' | 'aeolus' | 'fluidsynth' | 'sfizz' | 'zynaddsubfx' | 'wam' | 'tonewheelOrgan' | 'melodica' | 'vital' | 'odin2' | 'surge' | 'vstbridge' | 'harmonicsynth' | 'modular' | 'sunvox-modular' | 'hively' | 'gtultra' | 'jamcracker' | 'soundmon' | 'sidmon' | 'digmug' | 'fc' | 'deltamusic1' | 'deltamusic2' | 'fred' | 'tfmx' | 'octamed' | 'sidmon1' | 'hippelcoso' | 'robhubbard' | 'steveturner' | 'davidwhittaker' | 'sonic-arranger' | 'instereo2' | 'musicline' | 'supercollider' | 'wobblebass' | 'startrekker-am' | 'futureplayer' | 'symphonie' | 'xrns-synth' | 'sunvox-synth';
 
 export interface SynthTypeDispatcherProps {
   editorMode: EditorMode;
@@ -2136,6 +2138,7 @@ export const SynthTypeDispatcher: React.FC<SynthTypeDispatcherProps> = ({
     const dexedHeaderBg = isCyanTheme
       ? 'bg-[#0a0a00] border-b-2 border-amber-500/60'
       : 'bg-gradient-to-r from-[#1a1a10] to-[#151510] border-b-4 border-amber-600';
+    const hasHardware = hasHardwareUI(instrument.synthType);
 
     return (
       <div className="synth-editor-container bg-gradient-to-b from-[#1a1a10] to-[#101008]">
@@ -2149,6 +2152,24 @@ export const SynthTypeDispatcher: React.FC<SynthTypeDispatcherProps> = ({
           onUnbake={handleUnbake}
           isBaked={isBaked}
           isBaking={isBaking}
+          customHeaderControls={
+            hasHardware ? (
+              <button
+                onClick={() => setUIMode(uiMode === 'simple' ? 'hardware' : 'simple')}
+                className={`p-1.5 rounded transition-all flex items-center gap-1.5 px-2 ${
+                  uiMode === 'hardware'
+                    ? 'bg-accent-primary/20 text-accent-primary ring-1 ring-accent-primary/50'
+                    : 'bg-dark-bgTertiary text-text-muted hover:text-text-secondary border border-dark-borderLight'
+                }`}
+                title={uiMode === 'hardware' ? 'Switch to Simple Controls' : 'Switch to Hardware UI'}
+              >
+                {uiMode === 'hardware' ? <Cpu size={14} /> : <Monitor size={14} />}
+                <span className="text-[10px] font-bold uppercase">
+                  {uiMode === 'hardware' ? 'Hardware UI' : 'Simple UI'}
+                </span>
+              </button>
+            ) : undefined
+          }
           customHeader={
             <div className={`synth-editor-header px-4 py-3 ${dexedHeaderBg}`}>
               <div className="flex items-center justify-between">
@@ -2163,6 +2184,21 @@ export const SynthTypeDispatcher: React.FC<SynthTypeDispatcherProps> = ({
                 </div>
 
                 <div className="flex items-center gap-2">
+                  {hasHardware && (
+                    <button
+                      onClick={() => setUIMode(uiMode === 'simple' ? 'hardware' : 'simple')}
+                      className={`p-1.5 rounded transition-all flex items-center gap-1.5 px-2 ${
+                        uiMode === 'hardware'
+                          ? 'bg-accent-primary/20 text-accent-primary ring-1 ring-accent-primary/50'
+                          : 'bg-dark-bgTertiary text-text-muted hover:text-text-secondary border border-dark-borderLight'
+                      }`}
+                      title={uiMode === 'hardware' ? 'Switch to Patch Browser' : 'Switch to Hardware UI'}
+                    >
+                      {uiMode === 'hardware' ? <Cpu size={14} /> : <Monitor size={14} />}
+                      <span className="text-[10px] font-bold uppercase">{uiMode === 'hardware' ? 'Simple' : 'Hardware'}</span>
+                    </button>
+                  )}
+
                   <button
                     onClick={() => handleChange({ isLive: !instrument.isLive })}
                     className={`p-1.5 rounded transition-all flex items-center gap-1.5 px-2 ${
@@ -2185,12 +2221,45 @@ export const SynthTypeDispatcher: React.FC<SynthTypeDispatcherProps> = ({
           }
         />
         <div className="synth-editor-content overflow-y-auto">
-          <Suspense fallback={<LoadingControls />}>
-            <DX7Controls
-              instrument={instrument}
-              onChange={handleChange}
+          {uiMode === 'hardware' && hasHardware ? (
+            <HardwareUIWrapper
+              synthType={instrument.synthType}
+              parameters={(instrument.parameters || {}) as Record<string, number>}
+              instrumentId={instrument.id}
+              onParamChange={(key, value) => {
+                handleChange({
+                  parameters: {
+                    ...instrument.parameters,
+                    [key]: value,
+                  },
+                });
+              }}
             />
-          </Suspense>
+          ) : (
+            <>
+              <Suspense fallback={<LoadingControls />}>
+                <DX7Controls
+                  instrument={instrument}
+                  onChange={handleChange}
+                />
+              </Suspense>
+              {/* DX7 FM parameter knobs (all 155 VCED params) */}
+              {(() => {
+                const declLayout = getSynthLayout('DX7');
+                if (!declLayout) return null;
+                const config = { dx7: instrument.dx7 ?? {} } as Record<string, unknown>;
+                return (
+                  <div className="border-t border-dark-border/30 mt-2 pt-2">
+                    <DOMSynthPanel
+                      layout={declLayout}
+                      config={config}
+                      onChange={(updates) => handleChange(updates as Partial<InstrumentConfig>)}
+                    />
+                  </div>
+                );
+              })()}
+            </>
+          )}
         </div>
       </div>
     );
@@ -3320,6 +3389,54 @@ export const SynthTypeDispatcher: React.FC<SynthTypeDispatcherProps> = ({
         </Suspense>
       </div>
     );
+  }
+
+  // Layout descriptor fallback — synths with SYNTH_LAYOUTS entries but no dedicated editor mode
+  if (editorMode === 'layout') {
+    const layout = getSynthLayout(instrument.synthType);
+    if (layout) {
+      const configKey = layout.configKey;
+      const config = configKey
+        ? { [configKey]: (instrument as unknown as Record<string, unknown>)[configKey] ?? instrument.parameters ?? {} }
+        : instrument as unknown as Record<string, unknown>;
+      return (
+        <div className="p-3 space-y-3">
+          <DOMSynthPanel
+            layout={layout}
+            config={config}
+            onChange={(updates) => handleChange(updates as Partial<InstrumentConfig>)}
+          />
+          {/* Filter curve + ADSR visualizer for synths with envelope/filter */}
+          <div className="flex gap-2">
+            {instrument.filter && (
+              <Suspense fallback={null}>
+                <LiveFilterCurve
+                  instrumentId={instrument.id}
+                  cutoff={instrument.filter.frequency ?? 2000}
+                  resonance={instrument.filter.Q ?? 1}
+                  type={(instrument.filter.type as 'lowpass') ?? 'lowpass'}
+                  width="auto"
+                  height={70}
+                />
+              </Suspense>
+            )}
+            {instrument.envelope && (
+              <Suspense fallback={null}>
+                <LiveADSRVisualizer
+                  instrumentId={instrument.id}
+                  attack={instrument.envelope.attack ?? 0.01}
+                  decay={instrument.envelope.decay ?? 0.1}
+                  sustain={instrument.envelope.sustain ?? 0.8}
+                  release={instrument.envelope.release ?? 0.3}
+                  width="auto"
+                  height={70}
+                />
+              </Suspense>
+            )}
+          </div>
+        </div>
+      );
+    }
   }
 
   return null;
