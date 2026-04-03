@@ -9,6 +9,10 @@ import { useState, useCallback } from 'react';
 import { PixiModal, PixiModalHeader, PixiModalFooter, PixiButton, PixiLabel } from '../components';
 import { usePixiTheme } from '../theme';
 import { pickFile } from '../services/glFilePicker';
+
+function tintBg(color: number, factor = 0.15): number {
+  return (((color >> 16 & 0xff) * factor | 0) << 16) | (((color >> 8 & 0xff) * factor | 0) << 8) | ((color & 0xff) * factor | 0);
+}
 import { useRomDialogStore } from '@/stores/useRomDialogStore';
 import { useInstrumentStore } from '@/stores/useInstrumentStore';
 import { getToneEngine } from '@engine/ToneEngine';
@@ -200,8 +204,8 @@ export const PixiRomUploadDialog: React.FC = () => {
               padding: 8,
               borderRadius: 6,
               borderWidth: 1,
-              backgroundColor: 0x3B1515,
-              borderColor: 0x7F2020,
+              backgroundColor: tintBg(theme.error.color),
+              borderColor: theme.error.color,
               width: MODAL_W - 26,
             }}
           >

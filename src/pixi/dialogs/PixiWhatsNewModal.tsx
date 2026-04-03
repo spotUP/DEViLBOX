@@ -31,11 +31,10 @@ const CONTENT_H = 320;
 // ─── Change type badge — matches DOM ChangeTypeLabel ──────────────────────────
 // px-1.5 py-0.5 text-[10px] font-bold rounded
 
-const CHANGE_COLORS: Record<string, { bg: number; text: number }> = {
-  feature:     { bg: 0x143a1f, text: 0x4ade80 },
-  fix:         { bg: 0x3a2e14, text: 0xfbbf24 },
-  improvement: { bg: 0x142a3a, text: 0x60a5fa },
-};
+/** Darken a color to ~15% intensity for tinted background */
+function tintBg(color: number, factor = 0.15): number {
+  return (((color >> 16 & 0xff) * factor | 0) << 16) | (((color >> 8 & 0xff) * factor | 0) << 8) | ((color & 0xff) * factor | 0);
+}
 
 const CHANGE_LABELS: Record<string, string> = {
   feature: 'New',
@@ -44,7 +43,13 @@ const CHANGE_LABELS: Record<string, string> = {
 };
 
 const ChangeBadge: React.FC<{ type: string }> = ({ type }) => {
-  const c = CHANGE_COLORS[type] ?? { bg: 0x333333, text: 0x888888 };
+  const theme = usePixiTheme();
+  const colorMap: Record<string, { bg: number; text: number }> = {
+    feature:     { bg: tintBg(theme.success.color), text: theme.success.color },
+    fix:         { bg: tintBg(theme.warning.color), text: theme.warning.color },
+    improvement: { bg: tintBg(theme.accent.color),  text: theme.accent.color },
+  };
+  const c = colorMap[type] ?? { bg: theme.bgTertiary.color, text: theme.textMuted.color };
   return (
     <layoutContainer
       layout={{
@@ -79,7 +84,7 @@ const VersionEntry: React.FC<{ entry: ChangelogEntry; isLatest: boolean; width: 
         borderBottomWidth: 1,
         borderColor,
         width,
-        ...(isLatest ? { backgroundColor: 0x0d1a0d } : {}),
+        ...(isLatest ? { backgroundColor: tintBg(theme.accent.color) } : {}),
       }}
     >
       {/* Version + date + LATEST badge */}
@@ -166,7 +171,7 @@ export const PixiWhatsNewModal: React.FC<PixiWhatsNewModalProps> = ({ onClose })
           paddingRight: 20,
           paddingTop: 16,
           paddingBottom: 16,
-          backgroundColor: 0x1a0d2e,
+          backgroundColor: tintBg(theme.accent.color),
           borderBottomWidth: 1,
           borderColor: theme.border.color,
         }}
@@ -177,7 +182,7 @@ export const PixiWhatsNewModal: React.FC<PixiWhatsNewModalProps> = ({ onClose })
             layout={{
               padding: 8,
               borderRadius: 8,
-              backgroundColor: 0x1a2a1a,
+              backgroundColor: tintBg(theme.accent.color, 0.2),
             }}
           >
             <PixiIcon name="thunderbolt" size={20} color={theme.accent.color} layout={{}} />

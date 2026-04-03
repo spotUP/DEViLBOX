@@ -36,6 +36,10 @@ interface CSDbScener {
 
 const PAD = 16;
 
+function tintBg(color: number, factor = 0.15): number {
+  return (((color >> 16 & 0xff) * factor | 0) << 16) | (((color >> 8 & 0xff) * factor | 0) << 8) | ((color & 0xff) * factor | 0);
+}
+
 /** Clickable link row */
 const LinkRow: React.FC<{
   text: string;
@@ -184,8 +188,8 @@ export const SIDCSDbTab: React.FC<SIDCSDbTabProps> = ({ width, height, csdbId, c
                 padding: 12,
                 borderRadius: 8,
                 borderWidth: 1,
-                backgroundColor: 0x0c1e3a,
-                borderColor: 0x1e3a5f,
+                backgroundColor: tintBg(theme.accent.color),
+                borderColor: theme.accent.color,
               }}
             >
               <PixiLabel text="Groups" size="xs" weight="semibold" color="textSecondary" />

@@ -6,6 +6,7 @@ import { useMixerStore } from '../../stores/useMixerStore';
 import { useTrackerStore } from '@stores/useTrackerStore';
 import { getToneEngine } from '@engine/ToneEngine';
 import { PixiMixerChannelStrip } from '../mixer/PixiMixerChannelStrip';
+import { PixiSendBusStrip } from '../mixer/PixiSendBusStrip';
 import { PixiLabel } from '../components/PixiLabel';
 import { PixiButton } from '../components/PixiButton';
 import { PixiViewHeader } from '../components/PixiViewHeader';
@@ -47,10 +48,20 @@ export const PixiMixerView: React.FC = () => {
 
   // ── Store subscriptions ───────────────────────────────────────────────────
 
-  const channels       = useMixerStore(s => s.channels);
+  const allChannels    = useMixerStore(s => s.channels);
   const master         = useMixerStore(s => s.master);
+  const sendBuses      = useMixerStore(s => s.sendBuses);
   const isSoloing      = useMixerStore(s => s.isSoloing);
   const instruments    = useInstrumentStore(s => s.instruments);
+
+  // Only show channels that the current song uses
+  const patternChannelCount = useTrackerStore(s => {
+    const patterns = s.patterns;
+    if (patterns.length === 0) return 4;
+    return patterns[0]?.channels.length ?? 4;
+  });
+  const visibleCount = Math.max(1, Math.min(patternChannelCount, allChannels.length));
+  const channels = allChannels.slice(0, visibleCount);
   const setChannelVolume = useMixerStore(s => s.setChannelVolume);
   const setChannelPan    = useMixerStore(s => s.setChannelPan);
   const setMute          = useMixerStore(s => s.setChannelMute);
@@ -66,6 +77,9 @@ export const PixiMixerView: React.FC = () => {
 
   useEffect(() => {
     mountedRef.current = true;
+
+    // Ensure meters are connected when mixer view is visible
+    try { getToneEngine().connectMeters(); } catch { /* engine not ready */ }
 
     const tick = () => {
       if (!mountedRef.current) return;
@@ -174,7 +188,26 @@ export const PixiMixerView: React.FC = () => {
           </pixiContainer>
         </pixiContainer>
 
-        {/* Divider */}
+        {/* Divider: channels | sends */}
+        <layoutContainer alpha={theme.border.alpha} layout={{ width: 1, height: 240, marginTop: 16, backgroundColor: theme.border.color }} />
+
+        {/* SEND BUSES */}
+        <pixiContainer layout={{ flexDirection: 'column', alignItems: 'flex-start', gap: 4 }}>
+          <PixiLabel text="SENDS" size="xs" color="textMuted" layout={{ paddingLeft: 4, paddingBottom: 2 }} />
+          <pixiContainer layout={{ flexDirection: 'row', alignItems: 'flex-start', gap: 2 }}>
+            {sendBuses.map((bus, i) => (
+              <PixiSendBusStrip
+                key={i}
+                busIndex={i}
+                bus={bus}
+                width={56}
+                height={240}
+              />
+            ))}
+          </pixiContainer>
+        </pixiContainer>
+
+        {/* Divider: sends | master */}
         <layoutContainer alpha={theme.border.alpha} layout={{ width: 1, height: 240, marginTop: 16, backgroundColor: theme.border.color }} />
 
         {/* MASTER — spacer matches CHANNELS header so VU meters align */}

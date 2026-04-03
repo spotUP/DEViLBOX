@@ -134,8 +134,8 @@ export const PixiAddToHomeScreenModal: React.FC<PixiAddToHomeScreenModalProps> =
                 padding: 12,
                 borderRadius: 6,
                 borderWidth: 1,
-                backgroundColor: 0x0a2a3a,
-                borderColor: 0x1a5a7a,
+                backgroundColor: (((theme.accent.color >> 16 & 0xff) * 0.15 | 0) << 16) | (((theme.accent.color >> 8 & 0xff) * 0.15 | 0) << 8) | ((theme.accent.color & 0xff) * 0.15 | 0),
+                borderColor: theme.accent.color,
                 marginTop: 16,
               }}
             >
@@ -143,7 +143,7 @@ export const PixiAddToHomeScreenModal: React.FC<PixiAddToHomeScreenModalProps> =
                 text="Tip: Once added, launch DEViLBOX from your home screen for true fullscreen mode without the Safari browser UI."
                 size="xs"
                 color="custom"
-                customColor={0x60a5fa}
+                customColor={theme.accent.color}
                 layout={{ maxWidth: MODAL_W - 80 }}
               />
             </layoutContainer>
@@ -172,8 +172,8 @@ export const PixiAddToHomeScreenModal: React.FC<PixiAddToHomeScreenModalProps> =
                 padding: 12,
                 borderRadius: 6,
                 borderWidth: 1,
-                backgroundColor: 0x0a2a3a,
-                borderColor: 0x1a5a7a,
+                backgroundColor: (((theme.accent.color >> 16 & 0xff) * 0.15 | 0) << 16) | (((theme.accent.color >> 8 & 0xff) * 0.15 | 0) << 8) | ((theme.accent.color & 0xff) * 0.15 | 0),
+                borderColor: theme.accent.color,
                 marginTop: 16,
               }}
             >
@@ -181,7 +181,7 @@ export const PixiAddToHomeScreenModal: React.FC<PixiAddToHomeScreenModalProps> =
                 text="Runs fullscreen without browser UI, can be launched from your app drawer"
                 size="xs"
                 color="custom"
-                customColor={0x60a5fa}
+                customColor={theme.accent.color}
                 layout={{ maxWidth: MODAL_W - 80 }}
               />
             </layoutContainer>

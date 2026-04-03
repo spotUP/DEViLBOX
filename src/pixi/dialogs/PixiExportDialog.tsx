@@ -48,6 +48,10 @@ const MODAL_W = 560;
 const MODAL_H = 520;
 const CONTENT_W = MODAL_W - 26;
 
+function tintBg(color: number, factor = 0.15): number {
+  return (((color >> 16 & 0xff) * factor | 0) << 16) | (((color >> 8 & 0xff) * factor | 0) << 8) | ((color & 0xff) * factor | 0);
+}
+
 const getLoopInfo = (chipFormat: string, chipLoopRow: number, theme: ReturnType<typeof usePixiTheme>) => {
   if (chipFormat === 'vgm') {
     return chipLoopRow > 0
@@ -577,8 +581,8 @@ export const PixiExportDialog: React.FC<PixiExportDialogProps> = ({ isOpen, onCl
                     <layoutContainer layout={{ width: CONTENT_W - 24, height: 8, borderRadius: 4, overflow: 'hidden' }}>
                       <pixiGraphics draw={(g: any) => {
                         g.clear();
-                        g.roundRect(0, 0, CONTENT_W - 24, 8, 4).fill(theme.bgSecondary?.color ?? 0x222222);
-                        g.roundRect(0, 0, (CONTENT_W - 24) * ex.renderProgress, 8, 4).fill(theme.accent?.color ?? 0x4488ff);
+                        g.roundRect(0, 0, CONTENT_W - 24, 8, 4).fill(theme.bgSecondary.color);
+                        g.roundRect(0, 0, (CONTENT_W - 24) * ex.renderProgress, 8, 4).fill(theme.accent.color);
                       }} />
                     </layoutContainer>
                   </layoutContainer>
@@ -827,10 +831,10 @@ export const PixiExportDialog: React.FC<PixiExportDialogProps> = ({ isOpen, onCl
                 {/* Recording controls */}
                 <layoutContainer layout={{
                   flexDirection: 'column', gap: 4, padding: 8, borderRadius: 6,
-                  borderWidth: 1, borderColor: 0xff4444,
-                  backgroundColor: 0x1a0000, width: CONTENT_W - 24,
+                  borderWidth: 1, borderColor: theme.error.color,
+                  backgroundColor: tintBg(theme.error.color), width: CONTENT_W - 24,
                 }}>
-                  <PixiLabel text="RECORDING" size="xs" weight="bold" color="custom" customColor={0xff4444} />
+                  <PixiLabel text="RECORDING" size="xs" weight="bold" color="error" />
                   <layoutContainer layout={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                     <PixiButton
                       label={chipIsRecording ? 'Stop Recording' : 'Record'}

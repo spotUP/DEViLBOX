@@ -163,11 +163,11 @@ export const SIDSTILTab: React.FC<SIDSTILTabProps> = ({
       {/* STIL content */}
       <PixiScrollView width={width} height={height - (hasSubsongs ? 36 : 0)} contentHeight={contentH}>
         <layoutContainer layout={{ flexDirection: 'column', gap: 8, padding: PAD, width: contentW }}>
-          {info.title && <STILField label="TITLE" value={info.title} labelColor={0x93c5fd} valueColor={theme.text.color} />}
-          {info.author && <STILField label="AUTHOR" value={info.author} labelColor={0x93c5fd} valueColor={theme.text.color} />}
-          {info.artist && <STILField label="ARTIST" value={info.artist} labelColor={0x93c5fd} valueColor={theme.text.color} />}
-          {info.name && <STILField label="NAME" value={info.name} labelColor={0x93c5fd} valueColor={theme.text.color} />}
-          {info.year && <STILField label="YEAR" value={info.year} labelColor={0x93c5fd} valueColor={theme.text.color} />}
+          {info.title && <STILField label="TITLE" value={info.title} labelColor={theme.accent.color} valueColor={theme.text.color} />}
+          {info.author && <STILField label="AUTHOR" value={info.author} labelColor={theme.accent.color} valueColor={theme.text.color} />}
+          {info.artist && <STILField label="ARTIST" value={info.artist} labelColor={theme.accent.color} valueColor={theme.text.color} />}
+          {info.name && <STILField label="NAME" value={info.name} labelColor={theme.accent.color} valueColor={theme.text.color} />}
+          {info.year && <STILField label="YEAR" value={info.year} labelColor={theme.accent.color} valueColor={theme.text.color} />}
 
           {/* Comments */}
           {comments.length > 0 && (

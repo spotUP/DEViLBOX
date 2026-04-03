@@ -19,6 +19,10 @@ import {
 import { PixiSelect, type SelectOption } from '../components/PixiSelect';
 import { usePixiTheme } from '../theme';
 import { pickFile } from '../services/glFilePicker';
+
+function tintBg(color: number, factor = 0.15): number {
+  return (((color >> 16 & 0xff) * factor | 0) << 16) | (((color >> 8 & 0xff) * factor | 0) << 8) | ((color & 0xff) * factor | 0);
+}
 import { downloadFile } from '../services/glFileDownload';
 
 import { useMIDIStore } from '../../stores/useMIDIStore';
@@ -556,8 +560,8 @@ export const PixiTD3PatternDialog: React.FC<PixiTD3PatternDialogProps> = ({ isOp
               padding: 10,
               borderRadius: 6,
               borderWidth: 1,
-              backgroundColor: sendResult.success ? 0x0a2010 : 0x3B1515,
-              borderColor: sendResult.success ? 0x206040 : 0x7F2020,
+              backgroundColor: sendResult.success ? 0x0a2010 : tintBg(theme.error.color),
+              borderColor: sendResult.success ? 0x206040 : theme.error.color,
               width: CONTENT_W,
             }}
           >

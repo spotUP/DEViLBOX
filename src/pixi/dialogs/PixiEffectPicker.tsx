@@ -32,18 +32,21 @@ type ExtendedCategory = EffectCategory | 'chip';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-const CATEGORY_HEX_COLORS: Record<string, number> = {
-  'text-blue-400':    0x60A5FA,
-  'text-emerald-400': 0x34D399,
-  'text-green-400':   0x4ADE80,
-  'text-yellow-400':  0xFACC15,
-  'text-red-400':     0xF87171,
-  'text-purple-400':  0xC084FC,
-  'text-orange-400':  0xFB923C,
-  'text-accent-highlight':    0x22D3EE,
-  'text-neutral-400': 0xA3A3A3,
-  'text-pink-400':    0xF472B6,
-};
+/** Map Tailwind category color classes to theme-derived hex colors */
+function getCategoryHexColors(theme: ReturnType<typeof usePixiTheme>): Record<string, number> {
+  return {
+    'text-blue-400':           theme.accent.color,
+    'text-emerald-400':        theme.success.color,
+    'text-green-400':          theme.success.color,
+    'text-yellow-400':         theme.warning.color,
+    'text-red-400':            theme.error.color,
+    'text-purple-400':         theme.accentSecondary.color,
+    'text-orange-400':         theme.warning.color,
+    'text-accent-highlight':   theme.accentHighlight.color,
+    'text-neutral-400':        theme.textMuted.color,
+    'text-pink-400':           0xF472B6,
+  };
+}
 
 const CATEGORY_LABELS: Record<ExtendedCategory, string> = {
   pitch: 'Pitch',
@@ -81,6 +84,7 @@ export const PixiEffectPicker: React.FC<PixiEffectPickerProps> = ({
   synthType,
 }) => {
   const theme = usePixiTheme();
+  const categoryHexColors = getCategoryHexColors(theme);
   const [filter, setFilter] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<ExtendedCategory | 'all'>('all');
 
@@ -258,7 +262,7 @@ export const PixiEffectPicker: React.FC<PixiEffectPickerProps> = ({
               const colorClass = eff.isFurnace
                 ? EXTENDED_CATEGORY_COLORS.chip
                 : EXTENDED_CATEGORY_COLORS[eff.category];
-              const hexColor = CATEGORY_HEX_COLORS[colorClass] ?? 0xA3A3A3;
+              const hexColor = categoryHexColors[colorClass] ?? theme.textMuted.color;
               const tickLabel = eff.tick === 'tick-0' ? 'T0' : eff.tick === 'tick-N' ? 'TN' : 'T*';
 
               return (

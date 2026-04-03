@@ -116,6 +116,10 @@ function blendColor(base: number, overlay: number, alpha: number): number {
   return (Math.round(r1 + (r2 - r1) * alpha) << 16) | (Math.round(g1 + (g2 - g1) * alpha) << 8) | Math.round(b1 + (b2 - b1) * alpha);
 }
 
+function tintBg(color: number, factor = 0.15): number {
+  return (((color >> 16 & 0xff) * factor | 0) << 16) | (((color >> 8 & 0xff) * factor | 0) << 8) | ((color & 0xff) * factor | 0);
+}
+
 // ── Component ────────────────────────────────────────────────────────────────
 
 export const PixiImportModuleDialog: React.FC<PixiImportModuleDialogProps> = ({
@@ -546,8 +550,8 @@ export const PixiImportModuleDialog: React.FC<PixiImportModuleDialogProps> = ({
               padding: 12,
               borderRadius: 6,
               borderWidth: 1,
-              backgroundColor: 0x3B1515,
-              borderColor: 0x7F2020,
+              backgroundColor: tintBg(theme.error.color),
+              borderColor: theme.error.color,
               width: CONTENT_W,
             }}
           >

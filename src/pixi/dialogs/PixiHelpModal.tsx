@@ -4,13 +4,15 @@
  * GL replacement for src/components/help/HelpModal.tsx
  */
 
-import React, { useMemo } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import { PixiModal, PixiModalFooter, PixiButton } from '../components';
 import { PixiScrollView } from '../components/PixiScrollView';
+import { PixiPureTextInput } from '../input/PixiPureTextInput';
 import { usePixiTheme } from '../theme';
 import { PIXI_FONTS } from '../fonts';
 import { EFFECT_COMMANDS, TUTORIAL_STEPS, HELP_TABS, type HelpTab, type EffectCommand } from '@/data/helpContent';
 import { useHelpDialog } from '@hooks/dialogs/useHelpDialog';
+import { useKeyboardStore } from '@stores/useKeyboardStore';
 
 // ── Types ───────────────────────────────────────────────────────────────────
 
@@ -33,78 +35,232 @@ const CONTENT_W = W - 24;
 const CONTENT_H = H - 36 - 36 - 44; // header, tabs, footer
 const HIGHLIGHT = 0xFDE047;
 
-const KEYBOARD_SHORTCUTS: ShortcutGroup[] = [
-  {
-    title: 'Navigation',
-    shortcuts: [
-      { keys: '↑ ↓ ← →', description: 'Move cursor in pattern' },
-      { keys: 'Tab', description: 'Next channel' },
-      { keys: 'Shift+Tab', description: 'Previous channel' },
-      { keys: 'Home', description: 'Jump to row 0' },
-      { keys: 'End', description: 'Jump to last row' },
-      { keys: 'Page Up/Down', description: 'Jump 16 rows up/down' },
-      { keys: 'Ctrl+↑/↓', description: 'Fast cursor (16 rows)' },
-      { keys: 'F9', description: 'Jump to row 0 (0%)' },
-      { keys: 'F10', description: 'Jump to 25% of pattern' },
-      { keys: 'F11', description: 'Jump to 50% of pattern' },
-      { keys: 'F12', description: 'Jump to 75% of pattern' },
-    ],
-  },
-  {
+/** Build shortcut groups dynamically from active keyboard scheme JSON (matches DOM HelpModal) */
+function buildShortcutGroups(schemeData: Record<string, string> | null): ShortcutGroup[] {
+  const noteEntry: ShortcutGroup = {
     title: 'Note Entry',
     shortcuts: [
       { keys: 'Z,S,X,D,C...', description: 'Piano keys lower row (C-B)' },
       { keys: 'Q,2,W,3,E...', description: 'Piano keys upper row (+1 octave)' },
-      { keys: 'F1-F7', description: 'Select octave 1-7' },
       { keys: '0-9, A-F', description: 'Hex digits (instrument, volume, effect)' },
-      { keys: 'CapsLock', description: 'Note off (===)' },
-      { keys: 'Space', description: 'Stop + Toggle Edit mode' },
-      { keys: 'Enter', description: 'Toggle Edit/Record mode' },
     ],
-  },
-  {
-    title: 'Editing',
-    shortcuts: [
-      { keys: 'Delete', description: 'Clear note' },
-      { keys: 'Shift+Del', description: 'Clear note + instrument' },
-      { keys: 'Ctrl+Del', description: 'Clear all columns' },
-      { keys: 'Backspace', description: 'Clear and move up' },
-      { keys: 'Insert', description: 'Insert row (shift down)' },
-      { keys: 'Shift+↑/↓', description: 'Change instrument number' },
-    ],
-  },
-  {
-    title: 'Block Operations (FT2 Style)',
-    shortcuts: [
-      { keys: 'Alt+Arrow', description: 'Mark block selection' },
-      { keys: 'Shift+F3', description: 'Cut block' },
-      { keys: 'Shift+F4', description: 'Copy block' },
-      { keys: 'Shift+F5', description: 'Paste block' },
-      { keys: 'Ctrl+F3', description: 'Cut channel' },
-      { keys: 'Ctrl+F4', description: 'Copy channel' },
-      { keys: 'Ctrl+F5', description: 'Paste channel' },
-      { keys: 'Alt+F3', description: 'Cut pattern' },
-      { keys: 'Alt+F4', description: 'Copy pattern' },
-      { keys: 'Alt+F5', description: 'Paste pattern' },
-    ],
-  },
-  {
-    title: 'Track Jump (FT2 Style)',
-    shortcuts: [
-      { keys: 'Alt+Q,W,E,R,T,Y,U,I', description: 'Jump to tracks 1-8' },
-      { keys: 'Alt+A,S,D,F,G,H,J,K', description: 'Jump to tracks 9-16' },
-    ],
-  },
-  {
-    title: 'General',
-    shortcuts: [
-      { keys: '?', description: 'Show this help' },
-      { keys: 'Ctrl+Shift+E', description: 'Export dialog' },
-      { keys: 'Ctrl+Shift+P', description: 'Toggle patterns panel' },
-      { keys: 'Escape', description: 'Close dialogs / Stop playback' },
-    ],
-  },
-];
+  };
+
+  if (!schemeData || Object.keys(schemeData).length === 0) return [noteEntry];
+
+  const cats: Record<string, { keys: string; description: string }[]> = {};
+  const addTo = (cat: string, keys: string, cmd: string) => {
+    if (!cats[cat]) cats[cat] = [];
+    cats[cat].push({ keys, description: cmd.replace(/_/g, ' ') });
+  };
+
+  for (const [key, cmd] of Object.entries(schemeData)) {
+    if (typeof cmd !== 'string') continue;
+    if (/^(play_|stop|pause|continue_)/.test(cmd)) addTo('Transport', key, cmd);
+    else if (/^(cursor_|jump_to_|goto_|seek_|scroll_|snap_|screen_|song_start|song_end|stay_in)/.test(cmd)) addTo('Navigation', key, cmd);
+    else if (/^(insert_|delete_|clear_|roll_|advance_|backspace)/.test(cmd)) addTo('Editing', key, cmd);
+    else if (/^(select_|mark_block|block_|unmark|copy_|cut_|paste_|quick_)/.test(cmd)) addTo('Selection & Clipboard', key, cmd);
+    else if (/^transpose_/.test(cmd)) addTo('Transpose', key, cmd);
+    else if (/^(set_octave|next_octave|prev_octave)/.test(cmd)) addTo('Octave', key, cmd);
+    else if (/^(set_instrument|next_instrument|prev_instrument|set_sample|instrument_|swap_instrument)/.test(cmd)) addTo('Instruments', key, cmd);
+    else if (/^(mute_|solo_|unmute_|set_track|set_multi|reset_channel|channel_)/.test(cmd)) addTo('Channels', key, cmd);
+    else if (/^(next_pattern|prev_pattern|next_block|prev_block|clone_|next_order|prev_order|next_sequence|prev_sequence|set_position|save_position|goto_position|sequence_|set_playback)/.test(cmd)) addTo('Patterns & Position', key, cmd);
+    else if (/^(increase_|decrease_|set_step|set_edit|set_quantize|double_block|halve_block)/.test(cmd)) addTo('Step & Volume', key, cmd);
+    else if (/^(toggle_|show_|open_|view_|close_|help$|configure|order_list|layout_|display_|cycle_|switch_to)/.test(cmd)) addTo('View & Settings', key, cmd);
+    else if (/^(undo|redo|save_|export_|load_|new_|fast_save)/.test(cmd)) addTo('File & History', key, cmd);
+    else if (/^(tracker_|power_cut|dj_)/.test(cmd)) addTo('DJ & Scratch', key, cmd);
+    else addTo('Other', key, cmd);
+  }
+
+  const groups: ShortcutGroup[] = [noteEntry];
+  const order = ['Transport', 'Navigation', 'Editing', 'Selection & Clipboard', 'Transpose',
+    'Octave', 'Instruments', 'Channels', 'Patterns & Position', 'Step & Volume',
+    'View & Settings', 'File & History', 'DJ & Scratch', 'Other'];
+  for (const cat of order) {
+    if (cats[cat]?.length) groups.push({ title: cat, shortcuts: cats[cat] });
+  }
+  return groups;
+}
+
+// ── Helpers ────────────────────────────────────────────────────────────────
+
+/** Parsed markdown line — one element per visual line in the Pixi render */
+interface MdLine {
+  type: 'h1' | 'h2' | 'h3' | 'bullet' | 'code' | 'gap' | 'text';
+  text: string;
+}
+
+/** Parse markdown content into a flat list of typed lines for Pixi rendering */
+function parseMarkdownLines(md: string): MdLine[] {
+  const raw = md.split('\n');
+  const out: MdLine[] = [];
+  let i = 0;
+
+  while (i < raw.length) {
+    const line = raw[i];
+
+    // Fenced code block
+    if (line.startsWith('```')) {
+      i++; // skip opening fence
+      while (i < raw.length && !raw[i].startsWith('```')) {
+        out.push({ type: 'code', text: raw[i] });
+        i++;
+      }
+      i++; // skip closing fence
+      continue;
+    }
+
+    // Headings
+    const hMatch = line.match(/^(#{1,6})\s+(.+)$/);
+    if (hMatch) {
+      const level = hMatch[1].length;
+      const text = hMatch[2].replace(/\*\*(.+?)\*\*/g, '$1');
+      if (level === 1) out.push({ type: 'h1', text });
+      else if (level === 2) out.push({ type: 'h2', text });
+      else out.push({ type: 'h3', text });
+      i++;
+      continue;
+    }
+
+    // Horizontal rule
+    if (/^---+$/.test(line.trim())) {
+      out.push({ type: 'gap', text: '' });
+      i++;
+      continue;
+    }
+
+    // Table rows — skip separator rows, render data rows as text
+    if (line.trimStart().startsWith('|')) {
+      if (!/^\s*\|[\s:|-]+\|\s*$/.test(line)) {
+        const cells = line.split('|').slice(1, -1).map(c => c.trim()).join('  |  ');
+        out.push({ type: 'text', text: cells });
+      }
+      i++;
+      continue;
+    }
+
+    // Unordered list item
+    if (/^\s*[-*]\s+/.test(line)) {
+      const content = line.replace(/^\s*[-*]\s+/, '');
+      out.push({ type: 'bullet', text: stripInlineMarkdown(content) });
+      i++;
+      continue;
+    }
+
+    // Ordered list item
+    if (/^\s*\d+[.)]\s+/.test(line)) {
+      const content = line.replace(/^\s*\d+[.)]\s+/, '');
+      out.push({ type: 'bullet', text: stripInlineMarkdown(content) });
+      i++;
+      continue;
+    }
+
+    // Empty line → gap
+    if (line.trim() === '') {
+      out.push({ type: 'gap', text: '' });
+      i++;
+      continue;
+    }
+
+    // Regular text (strip inline markdown for display)
+    out.push({ type: 'text', text: stripInlineMarkdown(line) });
+    i++;
+  }
+
+  return out;
+}
+
+/** Strip inline markdown tokens for bitmap text display */
+function stripInlineMarkdown(text: string): string {
+  return text
+    .replace(/\*\*(.+?)\*\*/g, '$1')       // bold
+    .replace(/`([^`]+)`/g, '$1')           // inline code
+    .replace(/!\[([^\]]*)\]\([^)]+\)/g, '[$1]') // images
+    .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1');    // links
+}
+
+/** Render parsed markdown lines as Pixi layout elements */
+const MarkdownContent: React.FC<{ lines: MdLine[]; maxWidth: number }> = ({ lines, maxWidth }) => {
+  const theme = usePixiTheme();
+  return (
+    <>
+      {lines.map((line, i) => {
+        switch (line.type) {
+          case 'h1':
+            return (
+              <pixiBitmapText
+                key={i}
+                text={line.text}
+                style={{ fontFamily: PIXI_FONTS.SANS_BOLD, fontSize: 16, fill: 0xffffff }}
+                tint={theme.text.color}
+                layout={{ marginTop: 8, marginBottom: 4, maxWidth }}
+              />
+            );
+          case 'h2':
+            return (
+              <pixiBitmapText
+                key={i}
+                text={line.text}
+                style={{ fontFamily: PIXI_FONTS.SANS_BOLD, fontSize: 14, fill: 0xffffff }}
+                tint={theme.text.color}
+                layout={{ marginTop: 6, marginBottom: 3, maxWidth }}
+              />
+            );
+          case 'h3':
+            return (
+              <pixiBitmapText
+                key={i}
+                text={line.text}
+                style={{ fontFamily: PIXI_FONTS.SANS_SEMIBOLD, fontSize: 12, fill: 0xffffff }}
+                tint={theme.text.color}
+                layout={{ marginTop: 4, marginBottom: 2, maxWidth }}
+              />
+            );
+          case 'bullet':
+            return (
+              <layoutContainer key={i} layout={{ flexDirection: 'row', gap: 4, paddingLeft: 8, maxWidth }}>
+                <pixiBitmapText
+                  text={'\u2022'}
+                  style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 12, fill: 0xffffff }}
+                  tint={theme.textSecondary.color}
+                  layout={{}}
+                />
+                <pixiBitmapText
+                  text={line.text}
+                  style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 12, fill: 0xffffff }}
+                  tint={theme.textSecondary.color}
+                  layout={{ maxWidth: maxWidth - 20 }}
+                />
+              </layoutContainer>
+            );
+          case 'code':
+            return (
+              <pixiBitmapText
+                key={i}
+                text={line.text}
+                style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 11, fill: 0xffffff }}
+                tint={theme.accent.color}
+                layout={{ paddingLeft: 8, maxWidth }}
+              />
+            );
+          case 'gap':
+            return <layoutContainer key={i} layout={{ height: 8 }} />;
+          case 'text':
+          default:
+            return (
+              <pixiBitmapText
+                key={i}
+                text={line.text}
+                style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 12, fill: 0xffffff }}
+                tint={theme.textSecondary.color}
+                layout={{ maxWidth }}
+              />
+            );
+        }
+      })}
+    </>
+  );
+};
 
 // ── Sub-components ──────────────────────────────────────────────────────────
 
@@ -251,16 +407,33 @@ export const PixiHelpModal: React.FC<PixiHelpModalProps> = ({
 }) => {
   const theme = usePixiTheme();
   const h = useHelpDialog({ isOpen, initialTab });
+  const activeScheme = useKeyboardStore((s) => s.activeScheme);
+
+  // Dynamically load keyboard scheme JSON (matches DOM HelpModal)
+  const [schemeData, setSchemeData] = useState<Record<string, string> | null>(null);
+  useEffect(() => {
+    if (!isOpen) return;
+    const isMac = navigator.platform?.includes('Mac') || navigator.userAgent?.includes('Mac');
+    fetch(`/keyboard-schemes/${activeScheme}.json`)
+      .then(r => r.json())
+      .then(data => {
+        const plat = data.platform || data;
+        setSchemeData(plat[isMac ? 'mac' : 'pc'] || plat.pc || {});
+      })
+      .catch(() => setSchemeData(null));
+  }, [isOpen, activeScheme]);
+
+  const shortcutGroups = useMemo(() => buildShortcutGroups(schemeData), [schemeData]);
 
   // ── Estimated content heights for scroll view ─────────────────────────
 
   const shortcutsContentHeight = useMemo(() => {
     let height = 0;
-    for (const g of KEYBOARD_SHORTCUTS) {
+    for (const g of shortcutGroups) {
       height += 24 + g.shortcuts.length * 18 + 16;
     }
     return height + 40;
-  }, []);
+  }, [shortcutGroups]);
 
   const effectsContentHeight = useMemo(() => {
     return 60 + EFFECT_COMMANDS.length * 72;
@@ -270,6 +443,44 @@ export const PixiHelpModal: React.FC<PixiHelpModalProps> = ({
     if (h.chipEffects.length === 0) return 160;
     return 80 + h.chipEffects.length * 50;
   }, [h.chipEffects]);
+
+  const currentManualChapter = useMemo(() => {
+    if (h.filteredChapters.length === 0) return null;
+    return h.filteredChapters[h.manualChapterIndex] || h.filteredChapters[0];
+  }, [h.filteredChapters, h.manualChapterIndex]);
+
+  const parsedManualLines = useMemo(() => {
+    if (!currentManualChapter) return [];
+    return parseMarkdownLines(currentManualChapter.content);
+  }, [currentManualChapter]);
+
+  const manualContentHeight = useMemo(() => {
+    if (!currentManualChapter) return 200;
+    let height = 60; // chapter title + part subtitle
+    for (const line of parsedManualLines) {
+      switch (line.type) {
+        case 'h1': height += 28; break;
+        case 'h2': height += 24; break;
+        case 'h3': height += 20; break;
+        case 'gap': height += 8; break;
+        case 'bullet': height += 18; break;
+        case 'code': height += 16; break;
+        default: height += 16; break;
+      }
+    }
+    return Math.max(200, height + 80); // extra for nav buttons
+  }, [currentManualChapter, parsedManualLines]);
+
+  const manualSidebarHeight = useMemo(() => {
+    let height = 0;
+    for (const part of h.manualParts) {
+      height += 24; // part header
+      const partChapters = h.filteredChapters.filter(c => c.partNumber === part.number);
+      height += partChapters.length * 22;
+      height += 4; // gap
+    }
+    return Math.max(200, height + 20);
+  }, [h.filteredChapters, h.manualParts]);
 
   if (!isOpen) return null;
 
@@ -360,7 +571,7 @@ export const PixiHelpModal: React.FC<PixiHelpModalProps> = ({
             contentHeight={shortcutsContentHeight}
           >
             <layoutContainer layout={{ flexDirection: 'column', gap: 8, width: CONTENT_W }}>
-              {KEYBOARD_SHORTCUTS.map((group, idx) => (
+              {shortcutGroups.map((group, idx) => (
                 <ShortcutSection key={idx} group={group} width={CONTENT_W - 12} />
               ))}
             </layoutContainer>
@@ -507,6 +718,177 @@ export const PixiHelpModal: React.FC<PixiHelpModalProps> = ({
               )}
             </layoutContainer>
           </PixiScrollView>
+        )}
+
+        {/* ── Manual ───────────────────────────────────────────────── */}
+        {h.activeTab === 'manual' && (
+          h.filteredChapters.length === 0 ? (
+            <layoutContainer layout={{ width: CONTENT_W, height: CONTENT_H, justifyContent: 'center', alignItems: 'center', flexDirection: 'column', gap: 8 }}>
+              <pixiBitmapText
+                text={h.manualSearchQuery ? 'No chapters match your search.' : 'Manual not yet generated.'}
+                style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 13, fill: 0xffffff }}
+                tint={theme.textMuted.color}
+                layout={{}}
+              />
+              {h.manualSearchQuery && (
+                <PixiPureTextInput
+                  value={h.manualSearchQuery}
+                  onChange={h.setManualSearchQuery}
+                  placeholder="Search manual..."
+                  width={200}
+                  height={22}
+                  fontSize={11}
+                />
+              )}
+            </layoutContainer>
+          ) : (
+            <layoutContainer layout={{ flexDirection: 'row', gap: 8, width: CONTENT_W, height: CONTENT_H }}>
+              {/* Left sidebar: search + chapter list */}
+              <layoutContainer layout={{ flexDirection: 'column', width: 180, height: CONTENT_H }}>
+                {/* Search input */}
+                <layoutContainer
+                  layout={{
+                    paddingLeft: 2,
+                    paddingRight: 2,
+                    paddingTop: 4,
+                    paddingBottom: 4,
+                    borderBottomWidth: 1,
+                    borderColor: theme.border.color,
+                    width: 180,
+                  }}
+                >
+                  <PixiPureTextInput
+                    value={h.manualSearchQuery}
+                    onChange={h.setManualSearchQuery}
+                    placeholder="Search manual..."
+                    width={176}
+                    height={22}
+                    fontSize={11}
+                  />
+                </layoutContainer>
+                {/* Chapter tree */}
+                <PixiScrollView width={180} height={CONTENT_H - 30} contentHeight={manualSidebarHeight}>
+                  <layoutContainer layout={{ flexDirection: 'column', gap: 2, width: 180 }}>
+                    {h.manualParts.map((part) => {
+                      const partChapters = h.filteredChapters.filter(c => c.partNumber === part.number);
+                      if (partChapters.length === 0) return null;
+                      return (
+                        <layoutContainer key={part.number} layout={{ flexDirection: 'column', gap: 1, width: 176 }}>
+                          {/* Part header */}
+                          <layoutContainer
+                            layout={{
+                              paddingLeft: 4,
+                              paddingTop: 4,
+                              paddingBottom: 2,
+                              width: 176,
+                            }}
+                          >
+                            <pixiBitmapText
+                              text={`PART ${part.number}: ${part.name.toUpperCase()}`}
+                              style={{ fontFamily: PIXI_FONTS.SANS_BOLD, fontSize: 9, fill: 0xffffff }}
+                              tint={theme.textMuted.color}
+                              layout={{}}
+                            />
+                          </layoutContainer>
+                          {/* Chapter entries */}
+                          {partChapters.map((chapter) => {
+                            const globalIdx = h.filteredChapters.indexOf(chapter);
+                            const isActive = globalIdx === h.manualChapterIndex;
+                            return (
+                              <layoutContainer
+                                key={chapter.id}
+                                eventMode="static"
+                                cursor="pointer"
+                                onPointerUp={() => h.setManualChapterIndex(globalIdx)}
+                                onClick={() => h.setManualChapterIndex(globalIdx)}
+                                layout={{
+                                  paddingLeft: 6,
+                                  paddingRight: 4,
+                                  paddingTop: 3,
+                                  paddingBottom: 3,
+                                  width: 176,
+                                  backgroundColor: isActive ? theme.accent.color : undefined,
+                                  borderRadius: 2,
+                                }}
+                              >
+                                <pixiBitmapText
+                                  text={`${chapter.number}. ${chapter.title}`}
+                                  style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 10, fill: 0xffffff }}
+                                  tint={isActive ? theme.bg.color : theme.text.color}
+                                  layout={{ maxWidth: 164 }}
+                                />
+                              </layoutContainer>
+                            );
+                          })}
+                        </layoutContainer>
+                      );
+                    })}
+                  </layoutContainer>
+                </PixiScrollView>
+              </layoutContainer>
+
+              {/* Right content: chapter body */}
+              <PixiScrollView width={CONTENT_W - 180 - 8} height={CONTENT_H} contentHeight={manualContentHeight}>
+                <layoutContainer layout={{ flexDirection: 'column', gap: 2, width: CONTENT_W - 180 - 20 }}>
+                  {currentManualChapter && (
+                    <>
+                      {/* Chapter title */}
+                      <pixiBitmapText
+                        text={`${currentManualChapter.number}. ${currentManualChapter.title}`}
+                        style={{ fontFamily: PIXI_FONTS.SANS_BOLD, fontSize: 14, fill: 0xffffff }}
+                        tint={HIGHLIGHT}
+                        layout={{ marginBottom: 2 }}
+                      />
+                      {/* Part subtitle */}
+                      <pixiBitmapText
+                        text={`Part ${currentManualChapter.partNumber}: ${currentManualChapter.part}`}
+                        style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 11, fill: 0xffffff }}
+                        tint={theme.textMuted.color}
+                        layout={{ marginBottom: 8 }}
+                      />
+                      {/* Rendered markdown content */}
+                      <MarkdownContent lines={parsedManualLines} maxWidth={CONTENT_W - 180 - 32} />
+
+                      {/* Prev/Next navigation */}
+                      <layoutContainer
+                        layout={{
+                          flexDirection: 'row',
+                          justifyContent: 'space-between',
+                          alignItems: 'center',
+                          width: CONTENT_W - 180 - 20,
+                          marginTop: 16,
+                          paddingTop: 8,
+                          borderTopWidth: 1,
+                          borderColor: theme.border.color,
+                        }}
+                      >
+                        <PixiButton
+                          label="PREV"
+                          variant="ft2"
+                          size="sm"
+                          disabled={h.manualChapterIndex === 0}
+                          onClick={() => h.setManualChapterIndex(Math.max(0, h.manualChapterIndex - 1))}
+                        />
+                        <pixiBitmapText
+                          text={`${h.manualChapterIndex + 1} / ${h.filteredChapters.length}`}
+                          style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 10, fill: 0xffffff }}
+                          tint={theme.textMuted.color}
+                          layout={{}}
+                        />
+                        <PixiButton
+                          label="NEXT"
+                          variant="ft2"
+                          size="sm"
+                          disabled={h.manualChapterIndex === h.filteredChapters.length - 1}
+                          onClick={() => h.setManualChapterIndex(Math.min(h.filteredChapters.length - 1, h.manualChapterIndex + 1))}
+                        />
+                      </layoutContainer>
+                    </>
+                  )}
+                </layoutContainer>
+              </PixiScrollView>
+            </layoutContainer>
+          )
         )}
 
         {/* ── Tutorial ─────────────────────────────────────────────── */}

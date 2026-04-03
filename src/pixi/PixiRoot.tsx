@@ -25,6 +25,7 @@ import { PixiCollaborationToolbar } from './views/collaboration/PixiCollaboratio
 import { PixiCollaborationSplitView } from './views/collaboration/PixiCollaborationSplitView';
 import { PixiGlobalDropdownLayer } from './components/PixiGlobalDropdownLayer';
 import { PixiGlobalTooltipLayer } from './components/PixiGlobalTooltipLayer';
+import { PixiToast } from './components/PixiToast';
 import { PixiMainLayout } from './shell/PixiMainLayout';
 import { CRTRenderer } from './CRTRenderer';
 import { LensFilter } from './LensFilter';
@@ -504,6 +505,9 @@ export const PixiRoot: React.FC = () => {
         <PixiPeerCursor width={width} height={height} />
         <PixiCollaborationToolbar />
       </pixiContainer>
+
+      {/* Toast notifications — above content, below tooltips */}
+      <PixiToast />
 
       {/* Global tooltip layer — above all modals (rendered last = on top) */}
       <PixiGlobalTooltipLayer />

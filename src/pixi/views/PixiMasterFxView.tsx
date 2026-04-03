@@ -69,10 +69,10 @@ const EffectCard: React.FC<EffectCardProps> = ({ effect, onToggle }) => {
 
   const drawLed = useCallback((g: GraphicsType) => {
     g.clear();
-    const ledColor = enabled ? 0x22dd66 : 0x333344;
+    const ledColor = enabled ? theme.success.color : theme.bgTertiary.color;
     g.circle(LED_R, LED_R, LED_R);
     g.fill({ color: ledColor });
-  }, [enabled]);
+  }, [enabled, theme.success.color, theme.bgTertiary.color]);
 
   const drawWetBar = useCallback((g: GraphicsType) => {
     g.clear();

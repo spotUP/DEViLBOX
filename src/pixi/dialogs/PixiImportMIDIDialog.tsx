@@ -203,8 +203,8 @@ export const PixiImportMIDIDialog: React.FC<PixiImportMIDIDialogProps> = ({
               padding: 12,
               borderRadius: 6,
               borderWidth: 1,
-              backgroundColor: 0x3B1515,
-              borderColor: 0x7F2020,
+              backgroundColor: (((theme.error.color >> 16 & 0xff) * 0.15 | 0) << 16) | (((theme.error.color >> 8 & 0xff) * 0.15 | 0) << 8) | ((theme.error.color & 0xff) * 0.15 | 0),
+              borderColor: theme.error.color,
               width: CONTENT_W,
             }}
           >

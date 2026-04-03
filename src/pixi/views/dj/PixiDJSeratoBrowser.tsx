@@ -57,6 +57,10 @@ const COL_DUR_W = 50;
 // Colors
 const PURPLE = 0x9333ea;
 
+function tintBg(color: number, factor = 0.15): number {
+  return (((color >> 16 & 0xff) * factor | 0) << 16) | (((color >> 8 & 0xff) * factor | 0) << 8) | ((color & 0xff) * factor | 0);
+}
+
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
@@ -257,7 +261,7 @@ export const PixiDJSeratoBrowser: React.FC<PixiDJSeratoBrowserProps> = ({
           <Div layout={{
             width: PANEL_W - PAD * 2,
             padding: 6,
-            backgroundColor: 0x2a0808,
+            backgroundColor: tintBg(theme.error.color),
             borderWidth: 1,
             borderColor: theme.error.color,
             borderRadius: 4,
@@ -368,7 +372,7 @@ export const PixiDJSeratoBrowser: React.FC<PixiDJSeratoBrowserProps> = ({
         <Div layout={{
           width: PANEL_W - PAD * 2,
           padding: 6,
-          backgroundColor: 0x2a0808,
+          backgroundColor: tintBg(theme.error.color),
           borderWidth: 1,
           borderColor: theme.error.color,
           borderRadius: 4,

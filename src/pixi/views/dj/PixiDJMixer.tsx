@@ -78,10 +78,7 @@ export const PixiDJMixer: React.FC = () => {
       <MixerTransitionSection />
 
       {/* Row 6: Master + Cue (matches DOM) */}
-      <pixiContainer layout={{ flexDirection: 'row', gap: 12, alignItems: 'center' }}>
-        <MixerMaster />
-        <MixerCueSection />
-      </pixiContainer>
+      <MixerMasterCueRow />
 
       {/* Row 7: Broadcast (matches DOM) */}
       <MixerRecordMic />
@@ -156,8 +153,8 @@ const DeckEQColumn: React.FC<{
   return (
     <pixiContainer layout={{ flexDirection: 'column', gap: 2, alignItems: 'center' }}>
       {/* Filter knob on top */}
-      <PixiKnob value={filter} min={-1} max={1} defaultValue={0} size="sm" label="FLT" color={0xaa44ff} bipolar onChange={(v) => DJActions.setDeckFilter(deckId, v)} />
-      <PixiLabel text={filterMode.text} size="xs" color="custom" customColor={filterMode.active ? 0xaa44ff : theme.textMuted.color} customAlpha={filterMode.active ? 1 : 0.5} />
+      <PixiKnob value={filter} min={-1} max={1} defaultValue={0} size="sm" label="FLT" color={theme.accentSecondary.color} bipolar onChange={(v) => DJActions.setDeckFilter(deckId, v)} />
+      <PixiLabel text={filterMode.text} size="xs" color="custom" customColor={filterMode.active ? theme.accentSecondary.color : theme.textMuted.color} customAlpha={filterMode.active ? 1 : 0.5} />
       {/* EQ bands */}
       <EQBandRow deckId={deckId} band="high" label="HI" value={eqHigh} isKilled={killHigh} side={side} />
       <EQBandRow deckId={deckId} band="mid" label="MID" value={eqMid} isKilled={killMid} side={side} />
@@ -244,14 +241,10 @@ const VU_SEG_HEIGHT = (VU_HEIGHT - 2) / VU_SEGMENTS;
 const PEAK_HOLD_MS = 1500;
 const PEAK_DECAY_SEGMENTS_PER_SEC = 12;
 
-const COLOR_GREEN = 0x22c55e;
-const COLOR_YELLOW = 0xeab308;
-const COLOR_RED = 0xef4444;
-
-function segmentColor(index: number): number {
-  if (index >= 17) return COLOR_RED;
-  if (index >= 12) return COLOR_YELLOW;
-  return COLOR_GREEN;
+function segmentColor(index: number, colorGreen: number, colorYellow: number, colorRed: number): number {
+  if (index >= 17) return colorRed;
+  if (index >= 12) return colorYellow;
+  return colorGreen;
 }
 
 function dbToSegments(dB: number): number {
@@ -322,7 +315,7 @@ const MixerVUMeters: React.FC = () => {
           const isPeak = !lit && i === peakSeg - 1 && peakSeg > segs;
           g.rect(xOff, y, VU_WIDTH, VU_SEG_HEIGHT - 1);
           g.fill({
-            color: (lit || isPeak) ? segmentColor(i) : (theme.bgTertiary?.color ?? 0x313244),
+            color: (lit || isPeak) ? segmentColor(i, theme.success.color, theme.warning.color, theme.error.color) : (theme.bgTertiary?.color ?? 0x313244),
             alpha: lit ? 0.9 : isPeak ? 0.85 : 0.3,
           });
         }
@@ -509,11 +502,11 @@ const MASTER_VU_SEGMENTS = 8;
 const MASTER_VU_SEG_W = 5;
 const MASTER_VU_SEG_H = 4;
 
-function masterSegmentColor(index: number): number {
+function masterSegmentColor(index: number, colorGreen: number, colorYellow: number, colorRed: number): number {
   // 8 segments: 0-4 green, 5-6 yellow, 7 red (matching DOM's 8-segment scheme)
-  if (index >= 7) return COLOR_RED;
-  if (index >= 5) return COLOR_YELLOW;
-  return COLOR_GREEN;
+  if (index >= 7) return colorRed;
+  if (index >= 5) return colorYellow;
+  return colorGreen;
 }
 
 function masterDbToSegments(dB: number): number {
@@ -532,12 +525,6 @@ const MixerMaster: React.FC = () => {
   const handleVolumeChange = useCallback((value: number) => {
     DJActions.setMasterVolume(value);
   }, []);
-
-  const drawBorder = useCallback((g: GraphicsType) => {
-    g.clear();
-    g.rect(0, 0, MIXER_WIDTH - 16, 1);
-    g.fill({ color: theme.border.color, alpha: 0.2 });
-  }, [theme]);
 
   // Animate master stereo VU via rAF
   useEffect(() => {
@@ -573,7 +560,7 @@ const MixerMaster: React.FC = () => {
         const y = (MASTER_VU_SEGMENTS - 1 - i) * (MASTER_VU_SEG_H + 1);
         const lit = i < l;
         g.rect(0, y, MASTER_VU_SEG_W, MASTER_VU_SEG_H);
-        g.fill({ color: lit ? masterSegmentColor(i) : bgColor, alpha: lit ? 0.9 : 0.3 });
+        g.fill({ color: lit ? masterSegmentColor(i, theme.success.color, theme.warning.color, theme.error.color) : bgColor, alpha: lit ? 0.9 : 0.3 });
       }
 
       // Draw R channel (offset by width + gap)
@@ -582,7 +569,7 @@ const MixerMaster: React.FC = () => {
         const y = (MASTER_VU_SEGMENTS - 1 - i) * (MASTER_VU_SEG_H + 1);
         const lit = i < r;
         g.rect(rX, y, MASTER_VU_SEG_W, MASTER_VU_SEG_H);
-        g.fill({ color: lit ? masterSegmentColor(i) : bgColor, alpha: lit ? 0.9 : 0.3 });
+        g.fill({ color: lit ? masterSegmentColor(i, theme.success.color, theme.warning.color, theme.error.color) : bgColor, alpha: lit ? 0.9 : 0.3 });
       }
 
       rafId = requestAnimationFrame(tick);
@@ -595,8 +582,7 @@ const MixerMaster: React.FC = () => {
   const vuTotalH = MASTER_VU_SEGMENTS * (MASTER_VU_SEG_H + 1) - 1;
 
   return (
-    <pixiContainer layout={{ flexDirection: 'column', gap: 4, alignItems: 'center', marginBottom: 4 }}>
-      <pixiGraphics draw={drawBorder} layout={{ width: MIXER_WIDTH - 16, height: 1 }} />
+    <pixiContainer layout={{ flexDirection: 'column', gap: 4, alignItems: 'center' }}>
       <PixiKnob
         value={masterVolume}
         min={0}
@@ -629,11 +615,33 @@ const MixerMaster: React.FC = () => {
           draw={(g: GraphicsType) => {
             g.clear();
             g.circle(2.5, 2.5, 2.5);
-            g.fill({ color: limiterActive ? COLOR_RED : (theme.bgTertiary?.color ?? 0x313244), alpha: limiterActive ? 1 : 0.5 });
+            g.fill({ color: limiterActive ? theme.error.color : (theme.bgTertiary?.color ?? 0x313244), alpha: limiterActive ? 1 : 0.5 });
           }}
           layout={{ width: 5, height: 5 }}
         />
         <PixiLabel text="LIM" size="xs" color="textMuted" />
+      </pixiContainer>
+    </pixiContainer>
+  );
+};
+
+// ─── Master + Cue Row (with shared top border) ────────────────────────────
+
+const MixerMasterCueRow: React.FC = () => {
+  const theme = usePixiTheme();
+
+  const drawBorder = useCallback((g: GraphicsType) => {
+    g.clear();
+    g.rect(0, 0, MIXER_WIDTH - 16, 1);
+    g.fill({ color: theme.border.color, alpha: 0.2 });
+  }, [theme]);
+
+  return (
+    <pixiContainer layout={{ flexDirection: 'column', gap: 4, alignItems: 'center', width: '100%' }}>
+      <pixiGraphics draw={drawBorder} layout={{ width: MIXER_WIDTH - 16, height: 1 }} />
+      <pixiContainer layout={{ flexDirection: 'row', gap: 12, alignItems: 'flex-start', justifyContent: 'center', width: '100%' }}>
+        <MixerMaster />
+        <MixerCueSection />
       </pixiContainer>
     </pixiContainer>
   );
@@ -675,7 +683,7 @@ const MixerCueSection: React.FC = () => {
         max={1.5}
         size="sm"
         label="CUE"
-        color={0xffcc00}
+        color={theme.warning.color}
         defaultValue={1}
         onChange={handleCueVolumeChange}
       />
@@ -729,6 +737,7 @@ const formatVideoDuration = (ms: number) => {
 };
 
 const MixerRecordMic: React.FC = () => {
+  const theme = usePixiTheme();
   const isRecording = useDJSetStore(s => s.isRecording);
   const micEnabled = useDJSetStore(s => s.micEnabled);
   const micGain = useDJSetStore(s => s.micGain);
@@ -766,8 +775,8 @@ const MixerRecordMic: React.FC = () => {
   const drawRecDot = useCallback((g: GraphicsType) => {
     g.clear();
     g.circle(4, 4, 4);
-    g.fill(0xff2222);
-  }, []);
+    g.fill(theme.error.color);
+  }, [theme.error.color]);
 
   const handleRecordToggle = useCallback(async () => {
     if (isRecording) {
