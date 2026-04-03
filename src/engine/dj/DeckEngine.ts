@@ -170,13 +170,31 @@ export class DeckEngine {
     this.waveformAnalyser = new Tone.Analyser('waveform', 256);
     this.fftAnalyser = new Tone.FFT(1024);
 
-    // Wire: deckGain → EQ3 → HPF → LPF → pitchShift → channelGain → [output + meter + analyser]
+    // Wire: deckGain → EQ3 → HPF → LPF → pitchShift → channelGain → limiter → [output + meter + analyser]
     this.deckGain.connect(this.eq3);
     this.eq3.connect(this.filterHPF);
     this.filterHPF.connect(this.filterLPF);
     this.filterLPF.connect(this.pitchShift);
     this.pitchShift.connect(this.channelGain);
-    this.channelGain.connect(options.outputNode);
+
+    // Brick-wall limiter — prevents output from exceeding 0 dBFS regardless of
+    // internal gain transients from rapid scratch transitions, PitchShift granular
+    // artifacts, or Player source overlap. Every real DJ mixer has one.
+    const ctx = Tone.getContext().rawContext as AudioContext;
+    const limiter = ctx.createDynamicsCompressor();
+    limiter.threshold.value = -1;   // Start limiting at -1 dBFS
+    limiter.knee.value = 0;          // Hard knee (brick-wall)
+    limiter.ratio.value = 20;        // Near-infinite ratio
+    limiter.attack.value = 0.001;    // 1ms attack (catch transients)
+    limiter.release.value = 0.01;    // 10ms release (fast recovery)
+    const nativeChannelGain = getNativeAudioNode(this.channelGain as unknown as Record<string, unknown>);
+    if (nativeChannelGain) {
+      nativeChannelGain.connect(limiter);
+      limiter.connect((getNativeAudioNode(options.outputNode as unknown as Record<string, unknown>))!);
+    } else {
+      this.channelGain.connect(options.outputNode);
+    }
+    // Analysers tap from channelGain (pre-limiter) for accurate VU/spectrum
     this.channelGain.connect(this.meter);
     this.channelGain.connect(this.waveformAnalyser);
     this.channelGain.connect(this.fftAnalyser);
