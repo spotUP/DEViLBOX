@@ -1316,15 +1316,6 @@ missingLibrarySymbols.forEach(missingLibrarySymbol)
   'err',
   'callMain',
   'abort',
-  'wasmExports',
-  'HEAPF32',
-  'HEAPF64',
-  'HEAP8',
-  'HEAPU8',
-  'HEAP16',
-  'HEAPU16',
-  'HEAP32',
-  'HEAPU32',
   'HEAP64',
   'HEAPU64',
   'writeStackCookie',
@@ -1347,7 +1338,7 @@ missingLibrarySymbols.forEach(missingLibrarySymbol)
   'warnOnce',
   'readEmAsmArgsArray',
   'alignMemory',
-  'wasmTable',
+  // wasmTable removed — accessed by worklet
   'noExitRuntime',
   'addOnPreRun',
   'addOnPostRun',
@@ -1446,7 +1437,7 @@ var __emscripten_stack_restore = makeInvalidEarlyAccess('__emscripten_stack_rest
 var __emscripten_stack_alloc = makeInvalidEarlyAccess('__emscripten_stack_alloc');
 var _emscripten_stack_get_current = makeInvalidEarlyAccess('_emscripten_stack_get_current');
 var wasmMemory;
-var wasmTable = makeInvalidEarlyAccess('wasmTable');
+var wasmTable;
 
 function assignWasmExports(wasmExports) {
   _calf_mono_create = Module['_calf_mono_create'] = createExportWrapper('calf_mono_create', 1);
