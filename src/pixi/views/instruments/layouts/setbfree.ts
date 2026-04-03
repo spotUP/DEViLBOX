@@ -9,8 +9,8 @@ export const SETBFREE_LAYOUT: SynthPanelLayout = {
   configKey: 'setbfree',
   tabs: [
     {
-      id: 'upper',
-      label: 'UPPER',
+      id: 'main',
+      label: 'MAIN',
       sections: [
         {
           label: 'UPPER DRAWBARS',
@@ -36,11 +36,31 @@ export const SETBFREE_LAYOUT: SynthPanelLayout = {
             { type: 'knob', key: 'percGain', label: 'GAIN', color: '#ff9900', min: 0, max: 22, defaultValue: 11, formatValue: (v) => `${Math.round(v)}` },
           ],
         },
+        {
+          label: 'LESLIE',
+          controls: [
+            { type: 'select', key: 'leslieSpeed', label: 'SPEED', options: [
+              { value: '0', label: 'Stop' }, { value: '1', label: 'Slow' }, { value: '2', label: 'Fast' },
+            ]},
+            { type: 'toggle', key: 'leslieBrake', label: 'BRAKE', labels: ['OFF', 'ON'] },
+          ],
+        },
+        {
+          label: 'EFFECTS',
+          controls: [
+            { type: 'toggle', key: 'overdriveEnable', label: 'DRIVE', labels: ['OFF', 'ON'] },
+            { type: 'knob', key: 'overdriveCharacter', label: 'CHAR', color: '#ff3366', min: 0, max: 127, defaultValue: 0, formatValue: (v) => `${Math.round(v)}` },
+            { type: 'knob', key: 'reverbMix', label: 'REVERB', color: '#cc66ff', min: 0, max: 1, defaultValue: 0.1, formatValue: fmtPct },
+            { type: 'knob', key: 'reverbWet', label: 'REV WET', color: '#cc66ff', min: 0, max: 1, defaultValue: 0.1, formatValue: fmtPct },
+            { type: 'knob', key: 'keyClick', label: 'CLICK', color: '#ff9900', min: 0, max: 1, defaultValue: 0.5, formatValue: fmtPct },
+            { type: 'knob', key: 'volume', label: 'VOLUME', color: '#00ff99', min: 0, max: 1, defaultValue: 0.8, formatValue: fmtPct },
+          ],
+        },
       ],
     },
     {
-      id: 'lower',
-      label: 'LOWER',
+      id: 'detail',
+      label: 'DETAIL',
       sections: [
         {
           label: 'LOWER DRAWBARS',
@@ -70,12 +90,6 @@ export const SETBFREE_LAYOUT: SynthPanelLayout = {
             { type: 'knob', key: 'pedal1', label: "1'", color: '#ffffff', min: 0, max: 8, defaultValue: 0, formatValue: fmtDb },
           ],
         },
-      ],
-    },
-    {
-      id: 'leslie',
-      label: 'LESLIE',
-      sections: [
         {
           label: 'VIBRATO / CHORUS',
           controls: [
@@ -89,12 +103,8 @@ export const SETBFREE_LAYOUT: SynthPanelLayout = {
           ],
         },
         {
-          label: 'LESLIE SPEAKER',
+          label: 'LESLIE DETAIL',
           controls: [
-            { type: 'select', key: 'leslieSpeed', label: 'SPEED', options: [
-              { value: '0', label: 'Stop' }, { value: '1', label: 'Slow' }, { value: '2', label: 'Fast' },
-            ]},
-            { type: 'toggle', key: 'leslieBrake', label: 'BRAKE', labels: ['OFF', 'ON'] },
             { type: 'knob', key: 'hornSlowRpm', label: 'H SLOW', color: '#33ccff', min: 5, max: 200, defaultValue: 40, formatValue: fmtRpm },
             { type: 'knob', key: 'hornFastRpm', label: 'H FAST', color: '#33ccff', min: 100, max: 900, defaultValue: 400, formatValue: fmtRpm },
             { type: 'knob', key: 'drumSlowRpm', label: 'D SLOW', color: '#9966ff', min: 5, max: 100, defaultValue: 36, formatValue: fmtRpm },
@@ -104,14 +114,8 @@ export const SETBFREE_LAYOUT: SynthPanelLayout = {
           ],
         },
         {
-          label: 'EFFECTS',
+          label: 'MASTER',
           controls: [
-            { type: 'toggle', key: 'overdriveEnable', label: 'DRIVE', labels: ['OFF', 'ON'] },
-            { type: 'knob', key: 'overdriveCharacter', label: 'CHAR', color: '#ff3366', min: 0, max: 127, defaultValue: 0, formatValue: (v) => `${Math.round(v)}` },
-            { type: 'knob', key: 'reverbMix', label: 'REVERB', color: '#cc66ff', min: 0, max: 1, defaultValue: 0.1, formatValue: fmtPct },
-            { type: 'knob', key: 'reverbWet', label: 'REV WET', color: '#cc66ff', min: 0, max: 1, defaultValue: 0.1, formatValue: fmtPct },
-            { type: 'knob', key: 'keyClick', label: 'CLICK', color: '#ff9900', min: 0, max: 1, defaultValue: 0.5, formatValue: fmtPct },
-            { type: 'knob', key: 'volume', label: 'VOLUME', color: '#00ff99', min: 0, max: 1, defaultValue: 0.8, formatValue: fmtPct },
             { type: 'knob', key: 'outputLevel', label: 'OUTPUT', color: '#00ff99', min: 0, max: 1, defaultValue: 0.7, formatValue: fmtPct },
             { type: 'knob', key: 'tuning', label: 'TUNING', color: '#ffcc00', min: 220, max: 880, defaultValue: 440, formatValue: (v) => `${Math.round(v)} Hz` },
             { type: 'knob', key: 'swellPedal', label: 'SWELL', color: '#ff9900', min: 0, max: 1, defaultValue: 1, formatValue: fmtPct },
