@@ -193,15 +193,11 @@ export const PixiList: React.FC<PixiListProps> = ({
         const isHovered = item.id === hoveredItemId;
         const isEven = actualIdx % 2 === 0;
 
-        const rowBg = isSelected
-          ? theme.accent.color
-          : isHovered
-            ? theme.accent.color
-            : theme.bg.color;
+        const rowBgTint = isSelected ? theme.accent.color : isHovered ? theme.accent.color : theme.bg.color;
         const rowBgAlpha = isSelected ? 0.15 : isHovered ? 0.08 : isEven ? 1 : 0.85;
 
         return (
-          <layoutContainer
+          <pixiContainer
             key={item.id}
             eventMode="static"
             cursor="pointer"
@@ -218,10 +214,16 @@ export const PixiList: React.FC<PixiListProps> = ({
               flexDirection: 'row',
               alignItems: 'center',
               paddingLeft: 8,
-              backgroundColor: rowBg,
-              backgroundAlpha: rowBgAlpha,
             }}
           >
+            {/* Row background — uses tint+alpha (reactive) instead of draw (cached) */}
+            <pixiGraphics
+              draw={(g) => { g.clear(); g.rect(0, 0, width - 10, itemHeight).fill(0xffffff); }}
+              tint={rowBgTint}
+              alpha={rowBgAlpha}
+              eventMode="none"
+              layout={{ position: 'absolute', width: width - 10, height: itemHeight }}
+            />
 
             {item.iconName ? (
               <PixiIcon
@@ -338,7 +340,7 @@ export const PixiList: React.FC<PixiListProps> = ({
                 )}
               </pixiContainer>
             )}
-          </layoutContainer>
+          </pixiContainer>
         );
       })}
 
