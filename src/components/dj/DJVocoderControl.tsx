@@ -162,13 +162,17 @@ export const DJVocoderControl: React.FC = () => {
   }, []);
 
   // Push-to-talk: hold to unmute mic, release to mute (delay tail rings out)
-  // Starts engine on first press if not running (clean mic + FX, no vocoder)
+  // Starts engine on first press if not running — always enables vocoder (robot voice).
   const handlePTTDown = useCallback(async () => {
     let engine = engineRef.current;
     if (!engine) {
       engine = await ensureEngine();
       if (!engine) return;
-      if (!isActive) engine.setVocoderBypass(true);
+    }
+    // Always ensure vocoder is active (robot voice, not clean mic)
+    if (!isActive || engine.isBypassed) {
+      engine.setVocoderBypass(false);
+      useVocoderStore.getState().setActive(true);
     }
     setMuted(false);
     engine.setMuted(false);

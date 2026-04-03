@@ -2203,7 +2203,7 @@ export async function exportNative(_params: Record<string, unknown>): Promise<Re
 
       const entry = exporterMap[layoutFormatId];
       if (entry) {
-        const mod = await import(`../../lib/export/${entry.module}`);
+        const mod = await import(/* @vite-ignore */ `../../lib/export/${entry.module}`);
         const exportFn = mod[entry.fn];
         const raw = await exportFn(song);
         // Normalize result: some return ArrayBuffer/Uint8Array, others return { data, filename, warnings }

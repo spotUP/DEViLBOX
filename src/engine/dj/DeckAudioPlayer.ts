@@ -130,9 +130,24 @@ export class DeckAudioPlayer {
 
   pause(): void {
     if (this.player.state === 'started') {
+      // Snapshot position before stopping so getPosition() returns it while paused
+      this._pendingOffset = this.getPosition();
       this.player.fadeOut = 0.01;
       this.player.stop();
+      this._rateTrackingActive = false;
     }
+  }
+
+  /** Resume from pending offset (set by seek while paused). Single start, no overlapping sources. */
+  resume(): void {
+    if (!this._loaded || this.player.state === 'started') return;
+    this.player.fadeIn = 0.01;
+    const offset = this._pendingOffset ?? 0;
+    this.player.start(undefined, offset);
+    this._pendingOffset = null;
+    this._rateChangePos = offset;
+    this._rateChangeTime = Tone.now();
+    this._rateTrackingActive = true;
   }
 
   stop(): void {
@@ -156,9 +171,10 @@ export class DeckAudioPlayer {
     this._rateChangeTime = Tone.now();
     this._rateTrackingActive = wasPlaying;
     if (wasPlaying) {
-      const t = Tone.now();
-      this.player.stop(t);
-      this.player.start(t + 0.005, clamped);
+      // Stop current source then start fresh from new offset.
+      // Use immediate stop to prevent overlapping source nodes.
+      this.player.stop();
+      this.player.start(undefined, clamped);
     } else {
       this._pendingOffset = clamped;
       this._rateTrackingActive = false;

@@ -362,10 +362,10 @@ export const DJView: React.FC<DJViewProps> = ({ onShowDrumpads: _onShowDrumpads 
           <DJRemoteControlButton />
           <button
             onClick={() => setShowCrate(!showCrate)}
-            className={`px-3 py-1.5 rounded-md text-xs font-mono border transition-all
+            className={`px-3 py-1.5 rounded-md text-xs font-mono font-bold border transition-all
               ${showCrate
-                ? 'border-accent-primary bg-dark-bgActive text-text-primary'
-                : 'border-dark-borderLight bg-dark-bgTertiary text-text-secondary hover:bg-dark-bgHover hover:text-text-primary'
+                ? 'border-accent-primary bg-accent-primary/20 text-accent-primary'
+                : 'border-accent-primary bg-accent-primary/10 text-accent-primary hover:bg-accent-primary/20'
               }`}
           >
             Crate

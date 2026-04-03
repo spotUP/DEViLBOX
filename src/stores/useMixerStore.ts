@@ -401,9 +401,26 @@ function applyToEngine(fn: () => void): void {
   }
 }
 
+export interface SendBusState {
+  name: string;
+  volume: number;    // 0-1 return level
+  muted: boolean;
+  effects: EffectConfig[];  // Return bus effect chain
+}
+
+function defaultSendBuses(): SendBusState[] {
+  return [
+    { name: 'Send A', volume: 1, muted: false, effects: [] },
+    { name: 'Send B', volume: 1, muted: false, effects: [] },
+    { name: 'Send C', volume: 1, muted: false, effects: [] },
+    { name: 'Send D', volume: 1, muted: false, effects: [] },
+  ];
+}
+
 interface MixerStoreState {
   channels: MixerChannelState[];
   master: { volume: number };
+  sendBuses: SendBusState[];
   domPanelVisible: boolean;
   isSoloing: boolean;
 }
@@ -426,6 +443,16 @@ interface MixerStoreActions {
 
   // Send levels
   setChannelSendLevel: (ch: number, sendIndex: number, level: number) => void;
+
+  // Send bus return controls
+  setSendBusVolume: (busIndex: number, volume: number) => void;
+  setSendBusMute: (busIndex: number, muted: boolean) => void;
+  addSendBusEffect: (busIndex: number, effect: EffectConfig) => void;
+  removeSendBusEffect: (busIndex: number, effectIndex: number) => void;
+  setSendBusEffects: (busIndex: number, effects: EffectConfig[]) => void;
+
+  // Effect presets
+  loadChannelInsertPreset: (ch: number, effects: EffectConfig[]) => void;
 }
 
 type MixerStore = MixerStoreState & MixerStoreActions;
@@ -434,6 +461,7 @@ function buildInitialState(): MixerStoreState {
   return {
     channels: defaultChannels(),
     master: { volume: 1 },
+    sendBuses: defaultSendBuses(),
     domPanelVisible: false,
     isSoloing: false,
   };
@@ -583,6 +611,86 @@ export const useMixerStore = create<MixerStore>()(
         }
       } catch {
         // Engine not initialized yet — send levels will be applied when channels are created
+      }
+    },
+
+    // Send bus return controls
+    setSendBusVolume(busIndex: number, volume: number): void {
+      const clamped = Math.max(0, Math.min(1, volume));
+      set((state) => {
+        if (busIndex < 0 || busIndex >= state.sendBuses.length) return;
+        state.sendBuses[busIndex].volume = clamped;
+      });
+      try { getSendBusManager().setBusVolume(busIndex, clamped); } catch { /* engine not ready */ }
+    },
+
+    setSendBusMute(busIndex: number, muted: boolean): void {
+      set((state) => {
+        if (busIndex < 0 || busIndex >= state.sendBuses.length) return;
+        state.sendBuses[busIndex].muted = muted;
+      });
+      try { getSendBusManager().setBusMute(busIndex, muted); } catch { /* engine not ready */ }
+    },
+
+    addSendBusEffect(busIndex: number, effect: EffectConfig): void {
+      set((state) => {
+        if (busIndex < 0 || busIndex >= state.sendBuses.length) return;
+        state.sendBuses[busIndex].effects.push(effect);
+      });
+      getSendBusManager().addBusEffect(busIndex, effect);
+    },
+
+    removeSendBusEffect(busIndex: number, effectIndex: number): void {
+      set((state) => {
+        if (busIndex < 0 || busIndex >= state.sendBuses.length) return;
+        state.sendBuses[busIndex].effects.splice(effectIndex, 1);
+      });
+      getSendBusManager().removeBusEffect(busIndex, effectIndex);
+    },
+
+    setSendBusEffects(busIndex: number, effects: EffectConfig[]): void {
+      // Clear existing, then add all new effects
+      const bus = getSendBusManager();
+      const currentInfo = bus.getBusInfo();
+      if (busIndex < 0 || busIndex >= currentInfo.length) return;
+
+      // Remove all existing effects (reverse order)
+      for (let i = currentInfo[busIndex].effectCount - 1; i >= 0; i--) {
+        bus.removeBusEffect(busIndex, i);
+      }
+
+      set((state) => {
+        if (busIndex < 0 || busIndex >= state.sendBuses.length) return;
+        state.sendBuses[busIndex].effects = effects;
+      });
+
+      // Add new effects
+      for (const fx of effects) {
+        bus.addBusEffect(busIndex, fx);
+      }
+    },
+
+    // Effect presets — load a full effect chain onto a channel
+    loadChannelInsertPreset(ch: number, effects: EffectConfig[]): void {
+      // Clear existing insert effects
+      const mgr = getChannelEffectsManager();
+      const existing = mgr.getEffects(ch);
+      for (let i = existing.length - 1; i >= 0; i--) {
+        mgr.removeEffect(ch, i);
+      }
+
+      set((state) => {
+        if (ch < 0 || ch >= state.channels.length) return;
+        state.channels[ch].insertEffects = [];
+      });
+
+      // Add new effects
+      for (const fx of effects) {
+        set((state) => {
+          if (ch < 0 || ch >= state.channels.length) return;
+          state.channels[ch].insertEffects.push(fx);
+        });
+        mgr.addEffect(ch, fx);
       }
     },
   }))

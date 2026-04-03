@@ -4,10 +4,11 @@
  */
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { X, Keyboard, Zap, BookOpen, Cpu } from 'lucide-react';
+import { X, Keyboard, Zap, BookOpen, Cpu, Book } from 'lucide-react';
 import { EFFECT_COMMANDS, TUTORIAL_STEPS, type HelpTab } from '@/data/helpContent';
 import { useHelpDialog } from '@hooks/dialogs/useHelpDialog';
 import { useKeyboardStore } from '../../stores/useKeyboardStore';
+import { ManualTab } from './ManualTab';
 
 interface HelpModalProps {
   isOpen: boolean;
@@ -153,6 +154,19 @@ export const HelpModal: React.FC<HelpModalProps> = ({ isOpen, onClose, initialTa
         {/* Tab Navigation */}
         <div className="bg-ft2-panel border-b border-ft2-border flex">
           <button
+            onClick={() => h.setActiveTab('manual')}
+            className={`
+              flex-1 px-4 py-3 font-mono text-sm transition-colors border-r border-ft2-border
+              ${h.activeTab === 'manual'
+                ? 'bg-ft2-cursor text-ft2-bg font-bold'
+                : 'text-ft2-text hover:bg-ft2-bg'
+              }
+            `}
+          >
+            <Book size={16} className="inline mr-2" />
+            MANUAL
+          </button>
+          <button
             onClick={() => h.setActiveTab('shortcuts')}
             className={`
               flex-1 px-4 py-3 font-mono text-sm transition-colors border-r border-ft2-border
@@ -208,6 +222,20 @@ export const HelpModal: React.FC<HelpModalProps> = ({ isOpen, onClose, initialTa
 
         {/* Content */}
         <div className="flex-1 overflow-y-auto scrollbar-ft2 p-6">
+          {/* Manual Tab */}
+          {h.activeTab === 'manual' && (
+            <ManualTab
+              chapters={h.filteredChapters}
+              parts={h.manualParts}
+              currentIndex={h.manualChapterIndex}
+              onSelectChapter={h.setManualChapterIndex}
+              searchQuery={h.manualSearchQuery}
+              onSearchChange={h.setManualSearchQuery}
+              activeSchemeData={schemeData}
+              activeSchemeName={activeScheme}
+            />
+          )}
+
           {/* Keyboard Shortcuts Tab */}
           {h.activeTab === 'shortcuts' && (
             <div className="space-y-6">

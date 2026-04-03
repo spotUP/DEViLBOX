@@ -28,8 +28,8 @@ export const VOCODER_PRESETS: VocoderPreset[] = [
   {
     name: 'Kraftwerk',
     params: {
-      bands: 32, filtersPerBand: 6, reactionTime: 0.015,
-      formantShift: 1.0, carrierType: 'saw', carrierFreq: 130.81, wet: 0.85,
+      bands: 16, filtersPerBand: 4, reactionTime: 0.025,
+      formantShift: 0.7, carrierType: 'saw', carrierFreq: 110.0, wet: 1.0,
     },
   },
   {

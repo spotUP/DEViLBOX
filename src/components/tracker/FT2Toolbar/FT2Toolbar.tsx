@@ -23,6 +23,8 @@ import { getTrackerScratchController } from '@engine/TrackerScratchController';
 import { useFormatStore } from '@stores/useFormatStore';
 import { useGTUltraStore } from '@stores/useGTUltraStore';
 import { setFormatPlaybackPlaying, resetFormatPlaybackState } from '@engine/FormatPlaybackState';
+import { useWasmPositionStore } from '@stores/useWasmPositionStore';
+import { useCursorStore } from '@stores/useCursorStore';
 import { Maximize2, Minimize2, MousePointerClick, ExternalLink } from 'lucide-react';
 import { focusPopout } from '@components/ui/PopOutWindow';
 import { VisualizerFrame } from '@components/visualization/VisualizerFrame';
@@ -45,7 +47,7 @@ import { NibblesGame } from '@components/visualization/NibblesGame';
 import { SineScroller } from '@components/visualization/SineScroller';
 import { AudioMotionVisualizer } from '@components/visualization/AudioMotionVisualizer';
 import { JingleVisualizer } from '@components/visualization/JingleVisualizer';
-import { SettingsModal } from '@components/dialogs/SettingsModal';
+
 
 import { ImportModuleDialog, type ImportOptions } from '@components/dialogs/ImportModuleDialog';
 import { FileBrowser } from '@components/dialogs/FileBrowser';
@@ -253,7 +255,7 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = React.memo(({
   
   const [showFxPresetsMenu, setShowFxPresetsMenu] = useState(false);
 
-  const [showSettings, setShowSettings] = useState(false);
+
   const [showImportDialog, setShowImportDialog] = useState(false);
   const [pendingFile, setPendingFile] = useState<File | null>(null);
   const [showFileBrowser, setShowFileBrowser] = useState(false);
@@ -567,16 +569,37 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = React.memo(({
       return;
     }
 
-    // If already playing, stop with turntable spin-down
+    // If already playing, stop
     if (isPlaying) {
+      // WASM singleton engines: stop directly — turntable brake enters scratch mode
+      // which calls exitScratchModeAndStop, killing the engine via stopNativeEngines.
+      if (editorMode === 'jamcracker') {
+        // Save WASM position BEFORE stop clears it
+        const wasmPos = useWasmPositionStore.getState();
+        if (wasmPos.active) {
+          setCurrentRow(wasmPos.row);
+          useCursorStore.getState().cursor.rowIndex !== wasmPos.row &&
+            useCursorStore.setState({ cursor: { ...useCursorStore.getState().cursor, rowIndex: wasmPos.row } });
+        }
+        getTrackerReplayer().stop();
+        stop();
+        engine.stop(); // Must match playStopToggle — mute/unmute cycle resets audio graph
+        return;
+      }
+      // Standard formats: stop with turntable spin-down
       getTrackerScratchController().triggerElectronicBrake(() => {
         engine.releaseAll();
       });
       return;
     }
+
     setIsLooping(false);
     setCurrentRow(0);
     await engine.init();
+    // Reset ToneEngine state before first play — matches what playStopToggle does.
+    // Without this, native synth audio routing is broken on first play.
+    engine.stop();
+    await new Promise(r => setTimeout(r, 60)); // Wait for mute/unmute cycle (50ms)
     await play();
   };
 
@@ -605,8 +628,14 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = React.memo(({
       return;
     }
 
-    // If already playing, stop with turntable spin-down
+    // If already playing, stop
     if (isPlaying) {
+      if (editorMode2 === 'jamcracker') {
+        getTrackerReplayer().stop();
+        stop();
+        engine.stop();
+        return;
+      }
       getTrackerScratchController().triggerElectronicBrake(() => {
         engine.releaseAll();
       });
@@ -615,6 +644,10 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = React.memo(({
     setIsLooping(true);
     setCurrentRow(0);
     await engine.init();
+    // Reset ToneEngine state before first play — matches what playStopToggle does.
+    // Without this, native synth audio routing is broken on first play.
+    engine.stop();
+    await new Promise(r => setTimeout(r, 60));
     await play();
   };
 
@@ -868,9 +901,8 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = React.memo(({
           title="Per-instrument effects"
         >Inst FX</Button>
         <Button variant={aiOpen ? 'primary' : 'ghost'} size="sm" onClick={toggleAI} title="AI composition tools">AI</Button>
-        <Button variant="ghost" size="sm" onClick={() => onShowHelp?.('chip-effects')} title="Effect commands reference">Reference</Button>
-        <Button variant="ghost" size="sm" onClick={() => onShowHelp?.('shortcuts')} title="Help & keyboard shortcuts (?)">Help</Button>
-        <Button variant="ghost" size="sm" onClick={() => setShowSettings(true)} title="Settings (Ctrl+,)">Settings</Button>
+        <Button variant="ghost" size="sm" onClick={() => onShowHelp?.()} title="Help & keyboard shortcuts (?)">Help</Button>
+
         <Button
           variant={useUIStore.getState().modalOpen === 'moduleInfo' ? 'primary' : 'ghost'}
           size="sm"
@@ -887,7 +919,6 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = React.memo(({
         </Button>
       </div>
 
-      {showSettings && <SettingsModal onClose={() => setShowSettings(false)} />}
       <ImportModuleDialog
         isOpen={showImportDialog}
         onClose={() => { setShowImportDialog(false); setPendingFile(null); setPendingCompanions([]); }}

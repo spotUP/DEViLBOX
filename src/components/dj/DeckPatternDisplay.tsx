@@ -14,6 +14,7 @@ import React, { useMemo, useRef, useEffect, useState } from 'react';
 import { useDJStore } from '@/stores/useDJStore';
 import { getDJEngine } from '@/engine/dj/DJEngine';
 import { ReadOnlyPatternCanvas } from '@/components/tracker/ReadOnlyPatternCanvas';
+import { DJOscilloscope } from '@/components/visualization/DJOscilloscope';
 
 interface DeckPatternDisplayProps {
   deckId: 'A' | 'B' | 'C';
@@ -98,12 +99,16 @@ export const DeckPatternDisplay: React.FC<DeckPatternDisplayProps> = ({ deckId }
 
   return (
     <div className="bg-dark-bg border border-dark-border rounded-sm overflow-hidden w-full h-full">
-      <ReadOnlyPatternCanvas
-        pattern={patternData}
-        currentRow={visualRow}
-        numChannels={numChannels}
-        isPlaying={isPlaying}
-      />
+      {patternData ? (
+        <ReadOnlyPatternCanvas
+          pattern={patternData}
+          currentRow={visualRow}
+          numChannels={numChannels}
+          isPlaying={isPlaying}
+        />
+      ) : (
+        <DJOscilloscope />
+      )}
     </div>
   );
 };
