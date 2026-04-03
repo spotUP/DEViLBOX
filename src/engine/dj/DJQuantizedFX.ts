@@ -48,6 +48,9 @@ export function getQuantizeMode(): QuantizeMode {
  * Schedules `action` to fire on the next beat/bar boundary (or immediately
  * if quantize is off or no beat grid exists). Returns a cancel function.
  */
+/** Humanization jitter: ±30ms around the quantized beat for natural feel */
+const HUMANIZE_JITTER_MS = 30;
+
 function scheduleQuantized(deckId: DeckId, action: () => void): () => void {
   if (quantizeMode === 'off') {
     action();
@@ -64,7 +67,17 @@ function scheduleQuantized(deckId: DeckId, action: () => void): () => void {
     return () => {};
   }
 
-  return fn(deckId, action);
+  // Add micro-timing jitter for human feel (±30ms)
+  const jitteredAction = () => {
+    const jitter = (Math.random() - 0.5) * 2 * HUMANIZE_JITTER_MS;
+    if (jitter > 5) {
+      setTimeout(action, jitter);
+    } else {
+      action(); // fire slightly early or on-time
+    }
+  };
+
+  return fn(deckId, jitteredAction);
 }
 
 // ── EQ Kill (quantized) ─────────────────────────────────────────────────────
@@ -345,6 +358,215 @@ export function beatMatchedTransition(
     cancelled = true;
     cancellers.forEach(c => c());
   };
+}
+
+// ── Cut Transition ──────────────────────────────────────────────────────────
+
+/**
+ * Hard cut: snap crossfader to incoming deck on next downbeat.
+ * No overlap — outgoing deck stops immediately. Punchy and energetic.
+ */
+export function cutTransition(
+  fromDeck: DeckId,
+  toDeck: DeckId,
+): () => void {
+  let cancelled = false;
+
+  syncBPMToOther(toDeck, fromDeck);
+  phaseAlign(toDeck, fromDeck, 'bar');
+
+  const cancel = scheduleQuantized(fromDeck, () => {
+    if (cancelled) return;
+
+    // Start incoming deck
+    try { getDJEngine().getDeck(toDeck).play(); } catch { /* */ }
+
+    // Hard snap crossfader
+    const target = toDeck === 'A' ? 0 : toDeck === 'B' ? 1 : 0.5;
+    try { getDJEngine().setCrossfader(target); } catch { /* */ }
+    useDJStore.getState().setCrossfader(target);
+
+    // Stop outgoing immediately
+    try { getDJEngine().getDeck(fromDeck).stop(); } catch { /* */ }
+    useDJStore.getState().setDeckPlaying(fromDeck, false);
+  });
+
+  return () => { cancelled = true; cancel(); };
+}
+
+// ── Filter Build Transition ────────────────────────────────────────────────
+
+/**
+ * Incoming deck starts with HPF (muffled) and sweeps to full over the
+ * transition period. Creates a "building" effect. Outgoing fades out normally.
+ */
+export function filterBuildTransition(
+  fromDeck: DeckId,
+  toDeck: DeckId,
+  bars: number = 8,
+): () => void {
+  const cancellers: (() => void)[] = [];
+  let cancelled = false;
+
+  syncBPMToOther(toDeck, fromDeck);
+  phaseAlign(toDeck, fromDeck, 'bar');
+
+  let beatsPerBar = 4;
+  try { beatsPerBar = useDJStore.getState().decks[fromDeck].beatGrid?.timeSignature || 4; } catch { /* */ }
+  const totalBeats = bars * beatsPerBar;
+
+  const cancelSchedule = scheduleQuantized(fromDeck, () => {
+    if (cancelled) return;
+
+    // Start incoming with HPF applied
+    try {
+      const engine = getDJEngine();
+      engine.getDeck(toDeck).setFilterPosition(-0.8);
+      setTrackedFilterPosition(toDeck, -0.8);
+      engine.getDeck(toDeck).play();
+    } catch { /* */ }
+
+    // Crossfade normally
+    const crossfadeTarget = toDeck === 'A' ? 0 : toDeck === 'B' ? 1 : 0.5;
+    cancellers.push(
+      crossfaderSweep(crossfadeTarget, totalBeats, fromDeck, () => {
+        if (!cancelled) {
+          try { getDJEngine().getDeck(fromDeck).stop(); } catch { /* */ }
+          useDJStore.getState().setDeckPlaying(fromDeck, false);
+        }
+      })
+    );
+
+    // Sweep incoming HPF from -0.8 → 0 over the transition (building effect)
+    cancellers.push(
+      filterSweep(toDeck, 0, totalBeats, () => {
+        // Ensure filter is fully open at end
+        if (!cancelled) {
+          try { getDJEngine().getDeck(toDeck).setFilterPosition(0); setTrackedFilterPosition(toDeck, 0); } catch { /* */ }
+        }
+      })
+    );
+
+    // Also sweep outgoing HPF out
+    cancellers.push(
+      filterSweep(fromDeck, -0.8, Math.floor(totalBeats * 0.75))
+    );
+  });
+
+  cancellers.push(cancelSchedule);
+  return () => { cancelled = true; cancellers.forEach(c => c()); };
+}
+
+// ── Bass Swap Transition ───────────────────────────────────────────────────
+
+/**
+ * Kill bass on outgoing, bring in incoming bass, then full crossfade.
+ * Sounds like a real DJ swapping the low end between tracks.
+ * Best with tracks in compatible keys.
+ */
+export function bassSwapTransition(
+  fromDeck: DeckId,
+  toDeck: DeckId,
+  bars: number = 8,
+): () => void {
+  const cancellers: (() => void)[] = [];
+  let cancelled = false;
+
+  syncBPMToOther(toDeck, fromDeck);
+  phaseAlign(toDeck, fromDeck, 'bar');
+
+  let beatsPerBar = 4;
+  try { beatsPerBar = useDJStore.getState().decks[fromDeck].beatGrid?.timeSignature || 4; } catch { /* */ }
+  const totalBeats = bars * beatsPerBar;
+  const halfBeats = Math.floor(totalBeats / 2);
+
+  const cancelSchedule = scheduleQuantized(fromDeck, () => {
+    if (cancelled) return;
+
+    try {
+      const engine = getDJEngine();
+      // Start incoming at reduced volume
+      engine.getDeck(toDeck).play();
+    } catch { /* */ }
+
+    // Phase 1 (first half): crossfade to 50%, kill outgoing bass
+    const midTarget = toDeck === 'B' ? 0.5 : 0.5;
+    cancellers.push(
+      crossfaderSweep(midTarget, halfBeats, fromDeck, () => {
+        if (cancelled) return;
+        // At midpoint: kill outgoing bass, ensure incoming bass is full
+        try {
+          getDJEngine().getDeck(fromDeck).setEQ('low', -24);
+          useDJStore.getState().setDeckEQ(fromDeck, 'low', -24);
+        } catch { /* */ }
+
+        // Phase 2 (second half): complete crossfade
+        const finalTarget = toDeck === 'A' ? 0 : toDeck === 'B' ? 1 : 0.5;
+        cancellers.push(
+          crossfaderSweep(finalTarget, halfBeats, fromDeck, () => {
+            if (!cancelled) {
+              // Restore outgoing bass EQ for next use
+              try {
+                getDJEngine().getDeck(fromDeck).setEQ('low', 0);
+                useDJStore.getState().setDeckEQ(fromDeck, 'low', 0);
+                getDJEngine().getDeck(fromDeck).stop();
+              } catch { /* */ }
+              useDJStore.getState().setDeckPlaying(fromDeck, false);
+            }
+          })
+        );
+      })
+    );
+  });
+
+  cancellers.push(cancelSchedule);
+  return () => { cancelled = true; cancellers.forEach(c => c()); };
+}
+
+// ── Echo-Out Transition ────────────────────────────────────────────────────
+
+/**
+ * Echo out the outgoing deck while snapping to incoming.
+ * Combines echoOut volume fade with crossfader snap.
+ */
+export function echoOutTransition(
+  fromDeck: DeckId,
+  toDeck: DeckId,
+  beats: number = 8,
+): () => void {
+  const cancellers: (() => void)[] = [];
+  let cancelled = false;
+
+  syncBPMToOther(toDeck, fromDeck);
+  phaseAlign(toDeck, fromDeck, 'bar');
+
+  const cancelSchedule = scheduleQuantized(fromDeck, () => {
+    if (cancelled) return;
+
+    // Start incoming
+    try { getDJEngine().getDeck(toDeck).play(); } catch { /* */ }
+
+    // Snap crossfader to incoming
+    const target = toDeck === 'A' ? 0 : toDeck === 'B' ? 1 : 0.5;
+    try { getDJEngine().setCrossfader(target); } catch { /* */ }
+    useDJStore.getState().setCrossfader(target);
+
+    // Echo out the outgoing deck (volume fade)
+    cancellers.push(
+      echoOut(fromDeck, beats, () => {
+        if (!cancelled) {
+          try { getDJEngine().getDeck(fromDeck).stop(); } catch { /* */ }
+          useDJStore.getState().setDeckPlaying(fromDeck, false);
+          // Restore volume for next use
+          try { getDJEngine().getDeck(fromDeck).setVolume(1); } catch { /* */ }
+          useDJStore.getState().setDeckVolume(fromDeck, 1);
+        }
+      })
+    );
+  });
+
+  cancellers.push(cancelSchedule);
+  return () => { cancelled = true; cancellers.forEach(c => c()); };
 }
 
 // ── Echo Out ─────────────────────────────────────────────────────────────────
