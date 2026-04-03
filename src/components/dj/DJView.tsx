@@ -22,12 +22,14 @@ import { DJControllerSelector } from './DJControllerSelector';
 import { DJAutoDJPanel } from './DJAutoDJPanel';
 import { DJVocoderControl } from './DJVocoderControl';
 import { DJRemoteControlButton } from './DJRemoteControlButton';
+import { DeckAudioWaveform } from './DeckAudioWaveform';
 import { useDJKeyboardHandler } from './DJKeyboardHandler';
 import type { SeratoTrack } from '@/lib/serato';
 import { getDJPipeline } from '@/engine/dj/DJPipeline';
 import { useDeckStateSync } from '@/hooks/dj/useDeckStateSync';
 import { useDJHealth } from '@/hooks/dj/useDJHealth';
 import type { DeckId } from '@/engine/dj/DeckEngine';
+import { onNextBeat } from '@/engine/dj/DJAutoSync';
 
 /** Headless bridge — polls engine state and updates the store for one deck. */
 function DeckStateSyncBridge({ deckId }: { deckId: DeckId }) {
@@ -155,7 +157,19 @@ export const DJView: React.FC<DJViewProps> = ({ onShowDrumpads: _onShowDrumpads 
   useEffect(() => {
     const engine = engineRef.current;
     if (!engine) return;
-    engine.mixer.rebuildMasterEffects(masterEffects);
+    // Sync FX changes to the next beat of the active deck for tight timing.
+    // If no deck is playing, apply immediately.
+    const store = useDJStore.getState();
+    const activeDeck: DeckId = store.decks.A.isPlaying ? 'A' : store.decks.B.isPlaying ? 'B' : 'A';
+    const isPlaying = store.decks.A.isPlaying || store.decks.B.isPlaying;
+    if (isPlaying) {
+      const cancel = onNextBeat(activeDeck, () => {
+        engine.mixer.rebuildMasterEffects(masterEffects);
+      });
+      return cancel;
+    } else {
+      engine.mixer.rebuildMasterEffects(masterEffects);
+    }
   }, [masterEffectsKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Handle loading a Serato track to a deck
@@ -353,6 +367,14 @@ export const DJView: React.FC<DJViewProps> = ({ onShowDrumpads: _onShowDrumpads 
           <DJAutoDJPanel onClose={() => setShowAutoDJ(false)} />
         </div>
       )}
+
+      {/* ================================================================== */}
+      {/* FULL-WIDTH WAVEFORMS — Serato-style stacked at top               */}
+      {/* ================================================================== */}
+      <div className="flex flex-col w-full shrink-0 border-b border-dark-border">
+        <DeckAudioWaveform deckId="A" />
+        <DeckAudioWaveform deckId="B" />
+      </div>
 
       {/* ================================================================== */}
       {/* MAIN LAYOUT: Deck A | Mixer | Deck B [| Deck C]                   */}
