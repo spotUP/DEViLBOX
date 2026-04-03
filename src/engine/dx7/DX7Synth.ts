@@ -103,7 +103,7 @@ export class DX7Synth implements DevilboxSynth {
   /** Load voices + first patch bank, then resolve ensureInitialized() */
   private async _finishInit() {
     try {
-      // Load first patch bank (this writes to internal RAM + updates cartridge via worklet)
+      await this.tryAutoLoadVoices();
       await this.tryAutoLoadFirstPatchBank();
     } catch {
       // Non-fatal — synth works without patches, just silent
@@ -153,8 +153,9 @@ export class DX7Synth implements DevilboxSynth {
     for (let i = 6; i < 4102; i++) sum += sysex[i];
     sysex[4102] = (-sum) & 0x7F;
     sysex[4103] = 0xF7;
-    // Send via loadSysex — same path as loadPatchBank (writes to 0x1000 + program change)
+    // Send via loadSysex (writes to internal RAM) + loadVoices (updates cartridge)
     this.loadSysex(sysex.buffer);
+    this.loadVoices(sysex.buffer.slice(6, 6 + 4096));
     // Select voice 0 (where we placed our preset) after a short delay for firmware processing
     setTimeout(() => { if (!this._disposed) this.selectVoice(0); }, 50);
     console.log(`[DX7] _loadVcedData: sent 4104-byte sysex bulk dump`);
@@ -244,9 +245,27 @@ export class DX7Synth implements DevilboxSynth {
     console.warn('[DX7] No firmware ROM found. Load manually via loadFirmware()');
   }
 
-  // tryAutoLoadVoices removed — loadVoices inserts a cartridge which causes the
-  // firmware to ignore internal RAM where loadSysex writes. All voice loading
-  // goes through loadPatchBank → loadSysex instead.
+  /** Auto-load voice banks from well-known paths */
+  private async tryAutoLoadVoices() {
+    const baseUrl = import.meta.env.BASE_URL || '/';
+    const voicePaths = [
+      `${baseUrl}roms/dx7/DX7_Voice_Rom2.BIN`,
+      `${baseUrl}roms/dx7/voices.bin`,
+    ];
+    for (const path of voicePaths) {
+      try {
+        const resp = await fetch(path);
+        if (resp.ok) {
+          const data = await resp.arrayBuffer();
+          if (data.byteLength >= 4096) {
+            console.log(`[DX7] Auto-loaded voices from ${path} (${data.byteLength} bytes)`);
+            this.loadVoices(data);
+            return;
+          }
+        }
+      } catch { /* try next */ }
+    }
+  }
 
   /** Auto-load the first patch bank from manifest */
   private async tryAutoLoadFirstPatchBank() {
@@ -290,7 +309,13 @@ export class DX7Synth implements DevilboxSynth {
       const resp = await fetch(`${baseUrl}roms/dx7/Patches/${bankFile}`);
       if (!resp.ok) throw new Error(`Failed to fetch ${bankFile}`);
       const data = await resp.arrayBuffer();
+      // Load as sysex (writes to internal RAM at 0x1000)
       this.loadSysex(data);
+      // Also load as voices (updates cartridge) — firmware reads from cartridge
+      // for program changes, so both must be in sync
+      if (data.byteLength === 4104) {
+        this.loadVoices(data.slice(6, 6 + 4096));
+      }
       this._currentBankFile = bankFile;
       // Wait for firmware to process the sysex, then select voice
       await new Promise<void>(resolve => setTimeout(() => {
