@@ -677,14 +677,32 @@ export const useInstrumentStore = create<InstrumentStore>()(
                 engine.invalidateInstrument(id);
                 return;
               }
-              // Native patch presets (SynthV1, etc.) require synth recreation
-              const nativePatchKeys = [
-                'synthv1NativePatch', 'calfMonoNativePatch',
-                'talNativePatch', 'raffoNativePatch', 'setbfreeNativePatch',
-              ];
-              if (nativePatchKeys.some(k => (updates as any)[k])) {
-                engine.invalidateInstrument(id);
-                return;
+              // Native patch presets — load on running synth if possible, else recreate
+              const nativePatchKeyMap: Record<string, string> = {
+                synthv1NativePatch: 'loadNativePreset',
+                calfMonoNativePatch: 'loadNativePreset',
+                talNativePatch: 'loadNativePreset',
+                raffoNativePatch: 'loadNativePreset',
+                setbfreeNativePatch: 'loadNativePreset',
+              };
+              for (const [patchKey, method] of Object.entries(nativePatchKeyMap)) {
+                const patchName = (updates as any)[patchKey];
+                if (patchName) {
+                  // Try to load on running instance first
+                  const instruments = (engine as any).instruments as Map<number, any>;
+                  let loaded = false;
+                  if (instruments) {
+                    for (const [key, synth] of instruments.entries()) {
+                      if ((key >>> 16) === id && synth?.[method]) {
+                        synth[method](patchName);
+                        loaded = true;
+                        break;
+                      }
+                    }
+                  }
+                  if (!loaded) engine.invalidateInstrument(id);
+                  return;
+                }
               }
               const synthConfig = (updatedInstrument as any)[zynthConfigKey];
               if (synthConfig && (updates as any)[zynthConfigKey]) {
