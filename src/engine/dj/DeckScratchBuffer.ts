@@ -93,11 +93,11 @@ export class DeckScratchBuffer {
    * Tap filter output into captureNode and wire playbackGain into channelGain.
    * Call once after init().
    */
-  wireIntoChain(filter: Tone.Filter, channelGain: Tone.Gain): void {
+  wireIntoChain(filter: Tone.Filter, outputNode: Tone.ToneAudioNode): void {
     if (!this.initialized) return;
 
     const nativeFilter  = getNativeAudioNode(filter  as unknown as Record<string, unknown>);
-    const nativeChannel = getNativeAudioNode(channelGain as unknown as Record<string, unknown>);
+    const nativeChannel = getNativeAudioNode(outputNode as unknown as Record<string, unknown>);
 
     if (!nativeFilter || !nativeChannel) {
       console.warn('[DeckScratchBuffer] Could not get native nodes; scratch disabled');
