@@ -23,13 +23,17 @@ import {
   PixiToggle,
   PixiSelect,
   PixiSlider,
+  PixiScrollView,
+  PixiIcon,
   type SelectOption,
 } from '../components';
+import { PIXI_FONTS } from '../fonts';
 import { PixiPureTextInput } from '../input/PixiPureTextInput';
 import { usePixiTheme } from '../theme';
 import { useInstrumentStore, notify } from '@stores';
 import { usePresetStore, type PresetCategory } from '@stores/usePresetStore';
-import { ALL_SYNTH_TYPES, getSynthInfo } from '@constants/synthCategories';
+import { ALL_SYNTH_TYPES, getSynthInfo, SYNTH_CATEGORIES } from '@constants/synthCategories';
+import type { SynthInfo as SynthInfoType } from '@constants/synthCategories';
 import { getPresetsForSynthType } from '@constants/synthPresets/allPresets';
 import type { SynthType } from '@typedefs/instrument';
 import type { InstrumentConfig, EffectConfig } from '@typedefs/instrument';
@@ -103,20 +107,6 @@ function instrumentListItems(instruments: InstrumentConfig[]) {
 
 
 
-/** Synth type list items for the create-mode browser */
-function synthTypeListItems() {
-  return ALL_SYNTH_TYPES.map((st) => {
-    const info = getSynthInfo(st);
-    return {
-      id: st,
-      label: info?.shortName ?? st,
-      sublabel: info?.description?.slice(0, 60) ?? '',
-      iconName: 'waveform' as const,
-      iconColor: twColor(info?.color ?? ''),
-    };
-  });
-}
-
 // ── Component ───────────────────────────────────────────────────────────────
 
 export const PixiEditInstrumentModal: React.FC<PixiEditInstrumentModalProps> = ({
@@ -139,6 +129,7 @@ export const PixiEditInstrumentModal: React.FC<PixiEditInstrumentModalProps> = (
   const [selectedSynthType, setSelectedSynthType] = useState<SynthType>('Synth');
   const [newName, setNewName] = useState('New Instrument');
   const [synthSearch, setSynthSearch] = useState('');
+  const [createCategoryFilter, setCreateCategoryFilter] = useState<string | null>(null);
 
   // Preset state
   const [showSynthBrowser, setShowSynthBrowser] = useState(false);
@@ -158,6 +149,7 @@ export const PixiEditInstrumentModal: React.FC<PixiEditInstrumentModalProps> = (
       setIsCreating(createMode);
       setActiveTab('sound');
       setSynthSearch('');
+      setCreateCategoryFilter(null);
       setShowSaveDialog(false);
       setShowSynthBrowser(false);
       setPresetName('');
@@ -199,14 +191,31 @@ export const PixiEditInstrumentModal: React.FC<PixiEditInstrumentModalProps> = (
 
   const instListItems = useMemo(() => instrumentListItems(instruments), [instruments]);
 
-  const filteredSynthItems = useMemo(() => {
-    const items = synthTypeListItems();
-    if (!synthSearch) return items;
-    const q = synthSearch.toLowerCase();
-    return items.filter(
-      (it) => it.label.toLowerCase().includes(q) || it.sublabel.toLowerCase().includes(q),
-    );
-  }, [synthSearch]);
+  /** Categorized synth data for create mode browser */
+  const filteredCategorySynths = useMemo(() => {
+    const query = synthSearch.toLowerCase().trim();
+    return SYNTH_CATEGORIES
+      .filter(cat => !createCategoryFilter || cat.id === createCategoryFilter)
+      .map(cat => ({
+        ...cat,
+        synths: cat.synths.filter(synth => {
+          if (!synth || !synth.icon) return false;
+          if (!query) return true;
+          return (
+            synth.name.toLowerCase().includes(query) ||
+            synth.shortName.toLowerCase().includes(query) ||
+            synth.description.toLowerCase().includes(query) ||
+            synth.bestFor.some((tag: string) => tag.toLowerCase().includes(query))
+          );
+        }),
+      }))
+      .filter(cat => cat.synths.length > 0);
+  }, [synthSearch, createCategoryFilter]);
+
+  const totalAllSynths = useMemo(
+    () => SYNTH_CATEGORIES.reduce((sum, cat) => sum + cat.synths.filter(s => s?.icon).length, 0),
+    [],
+  );
 
   // ── Config ref for knob callbacks (avoid stale closures) ────────────────
   const instRef = useRef(currentInstrument);
@@ -356,6 +365,19 @@ export const PixiEditInstrumentModal: React.FC<PixiEditInstrumentModalProps> = (
     }
     setIsCreating(false);
   }, [createInstrument, updateInstrument, setCurrentInstrument, newName, selectedSynthType]);
+
+  /** Create with a specific synth type (for clicking items in the categorized browser) */
+  const handleCreateWithType = useCallback((synthType: SynthType) => {
+    const info = getSynthInfo(synthType);
+    const name = newName === 'New Instrument' && info ? info.name : newName;
+    const inst = createInstrument();
+    if (inst != null) {
+      updateInstrument(inst, { name, synthType });
+      setCurrentInstrument(inst);
+      notify.success(`Created ${name}`);
+    }
+    setIsCreating(false);
+  }, [createInstrument, updateInstrument, setCurrentInstrument, newName]);
 
   const handleRename = useCallback((name: string) => {
     if (!currentInstrument) return;
@@ -531,27 +553,140 @@ export const PixiEditInstrumentModal: React.FC<PixiEditInstrumentModalProps> = (
           }}
         >
           {isCreating ? (
-            /* ── Synth type browser (create mode) — full width ───────────── */
+            /* ── Categorized synth browser (create mode) — full width ──────── */
             <>
+              {/* Search bar */}
               <layoutContainer layout={{ padding: 8, gap: 4, flexDirection: 'row', alignItems: 'center' }}>
                 <PixiLabel text="SELECT SYNTH TYPE" size="xs" weight="bold" color="textMuted" />
                 <pixiContainer layout={{ flex: 1 }} />
                 <PixiPureTextInput
                   value={synthSearch}
                   onChange={setSynthSearch}
-                  placeholder="Search…"
-                  width={200}
+                  placeholder="Search synths..."
+                  width={240}
                   height={24}
                 />
               </layoutContainer>
-              <PixiList
-                items={filteredSynthItems}
+
+              {/* Category filter chips */}
+              <layoutContainer layout={{ paddingLeft: 8, paddingRight: 8, paddingBottom: 6, flexDirection: 'row', flexWrap: 'wrap', gap: 4 }}>
+                <PixiButton
+                  label={`All (${totalAllSynths})`}
+                  variant={createCategoryFilter === null ? 'ft2' : 'ghost'}
+                  color={createCategoryFilter === null ? 'yellow' : undefined}
+                  size="sm"
+                  width={60}
+                  onClick={() => setCreateCategoryFilter(null)}
+                />
+                {SYNTH_CATEGORIES.map(cat => {
+                  const count = cat.synths.filter(s => s?.icon).length;
+                  return (
+                    <PixiButton
+                      key={cat.id}
+                      label={`${cat.name} (${count})`}
+                      variant={createCategoryFilter === cat.id ? 'ft2' : 'ghost'}
+                      color={createCategoryFilter === cat.id ? 'yellow' : undefined}
+                      size="sm"
+                      onClick={() => setCreateCategoryFilter(createCategoryFilter === cat.id ? null : cat.id)}
+                    />
+                  );
+                })}
+              </layoutContainer>
+
+              {/* Scrollable synth list */}
+              <PixiScrollView
                 width={MODAL_W}
-                height={CONTENT_H - 80}
-                itemHeight={36}
-                selectedId={selectedSynthType}
-                onSelect={(id) => setSelectedSynthType(id as SynthType)}
-              />
+                height={CONTENT_H - 120}
+                contentHeight={
+                  filteredCategorySynths.reduce((h, cat) => h + 24 + cat.synths.length * 60, 0) || 60
+                }
+                bgColor={theme.bgSecondary.color}
+              >
+                <layoutContainer layout={{ width: MODAL_W - 16, flexDirection: 'column', padding: 4 }}>
+                  {filteredCategorySynths.length === 0 ? (
+                    <layoutContainer layout={{ padding: 20, alignItems: 'center' }}>
+                      <pixiBitmapText
+                        text="No synths found"
+                        style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 12, fill: theme.textMuted.color }}
+                      />
+                    </layoutContainer>
+                  ) : (
+                    filteredCategorySynths.map(category => (
+                      <layoutContainer key={category.id} layout={{ flexDirection: 'column', marginBottom: 4 }}>
+                        {/* Category header */}
+                        <layoutContainer layout={{ height: 22, paddingLeft: 8, paddingTop: 4, paddingBottom: 2, justifyContent: 'center' }}>
+                          <pixiBitmapText
+                            text={category.name.toUpperCase()}
+                            style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 10, fill: theme.textMuted.color }}
+                          />
+                        </layoutContainer>
+
+                        {/* Synth items */}
+                        {category.synths.map((synth: SynthInfoType) => {
+                          const isSelected = selectedSynthType === synth.type;
+                          return (
+                            <layoutContainer
+                              key={`${category.id}-${synth.type}`}
+                              eventMode="static"
+                              cursor="pointer"
+                              onPointerTap={() => {
+                                setSelectedSynthType(synth.type);
+                                handleCreateWithType(synth.type);
+                              }}
+                              layout={{
+                                flexDirection: 'row',
+                                alignItems: 'center',
+                                height: 56,
+                                paddingLeft: 8,
+                                paddingRight: 8,
+                                gap: 10,
+                                backgroundColor: isSelected ? 0x2a2a3a : undefined,
+                                borderRadius: 4,
+                                borderWidth: isSelected ? 1 : 0,
+                                borderColor: isSelected ? (theme.accent?.color ?? 0x4488ff) : 0x000000,
+                              }}
+                            >
+                              {/* Icon */}
+                              <layoutContainer
+                                layout={{
+                                  width: 32,
+                                  height: 32,
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  backgroundColor: theme.bgActive?.color ?? 0x2a2a2a,
+                                  borderRadius: 4,
+                                }}
+                              >
+                                <PixiIcon name="waveform" size={16} color={twColor(synth.color)} />
+                              </layoutContainer>
+
+                              {/* Name + description */}
+                              <layoutContainer layout={{ flex: 1, flexDirection: 'column', gap: 2, overflow: 'hidden' }}>
+                                <pixiBitmapText
+                                  text={synth.name}
+                                  style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 13, fill: 0xffffff }}
+                                />
+                                <pixiBitmapText
+                                  text={synth.description.length > 80 ? synth.description.slice(0, 77) + '...' : synth.description}
+                                  style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 10, fill: theme.textMuted.color }}
+                                />
+                                {synth.bestFor.length > 0 && (
+                                  <pixiBitmapText
+                                    text={synth.bestFor.slice(0, 4).join(' / ')}
+                                    style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 9, fill: theme.textMuted.color }}
+                                  />
+                                )}
+                              </layoutContainer>
+                            </layoutContainer>
+                          );
+                        })}
+                      </layoutContainer>
+                    ))
+                  )}
+                </layoutContainer>
+              </PixiScrollView>
+
+              {/* Footer: name input + Create button */}
               <layoutContainer layout={{ padding: 8, gap: 8, flexDirection: 'row', alignItems: 'center' }}>
                 <PixiPureTextInput
                   value={newName}
