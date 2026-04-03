@@ -777,13 +777,13 @@ export class ToneEngine {
     // synth instrument is first created (via ensureWASMSynthsReady or getInstrument).
     // No reason to load 347KB of chip emulation for non-Furnace formats.
 
-    // Initialize BLEP processor (non-blocking, loads in background)
-    this.blepManager.init().then(() => {
-      // Connect BLEP into audio chain: masterEffectsInput → BLEP → masterChannel
+    // Initialize BLEP processor — await so the chain is stable before playback starts.
+    try {
+      await this.blepManager.init();
       this.reconnectBlepChain();
-    }).catch(error => {
+    } catch (error) {
       console.warn('[ToneEngine] BLEP init failed (continuing without BLEP):', error);
-    });
+    }
 
     // Preload TR909 samples in background (shared singleton — fast for all pads)
     preloadTR909Resources(nativeCtx).catch(e => {
@@ -2197,7 +2197,6 @@ export class ToneEngine {
       case 'MdaEPiano':
       case 'MdaJX10':
       case 'MdaDX10':
-      case 'ToneAM':
       case 'Amsynth':
       case 'RaffoSynth':
       case 'CalfMono':
@@ -3060,9 +3059,11 @@ export class ToneEngine {
     'StringMachine', 'FormantSynth', 'Wavetable', 'WobbleBass',
     // Zynthian WASM synths (polyphony handled internally by WASM)
     'MdaEPiano', 'MdaJX10', 'MdaDX10', 'ToneAM',
-    'RaffoSynth', 'CalfMono', 'SetBfree', 'SynthV1',
+    'Amsynth', 'RaffoSynth', 'CalfMono', 'SetBfree', 'SynthV1',
     'TalNoizeMaker', 'Aeolus', 'FluidSynth', 'Sfizz',
     'ZynAddSubFX', 'Monique', 'VL1',
+    // Retromulator WASM synths (polyphony handled internally by emulated hardware)
+    'DX7', 'OPL3', 'OpenWurli',
   ]);
 
   /**
