@@ -18,6 +18,8 @@ import type { UADEEngine } from '../uade/UADEEngine';
 import { MusicLineEngine } from '../musicline/MusicLineEngine';
 import { C64SIDEngine } from '../C64SIDEngine';
 import { SilenceDetector } from './SilenceDetector';
+import { useWasmPositionStore } from '../../stores/useWasmPositionStore';
+import { JamCrackerEngine } from '../jamcracker/JamCrackerEngine';
 
 export { C64SIDEngine };
 
@@ -144,8 +146,7 @@ const WASM_ENGINES: NativeEngineDescriptor[] = [
     supportsPause: false,
     supportsResume: false,
     needsDirectRouting: false,
-    staticRef: null,
-    dynamicResolver: async () => (await import('@/engine/jamcracker/JamCrackerEngine')).JamCrackerEngine as unknown as WASMSingletonStatic,
+    staticRef: JamCrackerEngine as unknown as WASMSingletonStatic,
   },
   {
     key: 'FuturePlayer',
@@ -464,6 +465,14 @@ export interface NativeEngineStartResult {
 // Start native engines (called from TrackerReplayer.play())
 // ---------------------------------------------------------------------------
 
+/** Track which engine keys are currently running to prevent duplicate starts */
+const _runningEngineKeys = new Set<string>();
+
+/** Clear running engine tracking (call on stop/dispose) */
+export function clearRunningEngineKeys(): void {
+  _runningEngineKeys.clear();
+}
+
 export async function startNativeEngines(
   song: TrackerSong,
   separationInputTone: Tone.ToneAudioNode,
@@ -496,10 +505,11 @@ export async function startNativeEngines(
 
     try {
       const EngineClass = await resolveEngine(desc);
+
       const instance = EngineClass.getInstance();
       await instance.ready();
 
-      // Load file data
+      // Load file data into the engine
       const fileData = song[desc.fileDataKey] as ArrayBuffer | Uint8Array;
       const dataCopy = fileData instanceof Uint8Array
         ? fileData.slice(0) : (fileData as ArrayBuffer).slice(0);
@@ -521,6 +531,7 @@ export async function startNativeEngines(
       }
 
       startedEngineKeys.add(desc.key);
+      _runningEngineKeys.add(desc.key);
 
       if (!muted) {
         instance.play();
@@ -534,6 +545,26 @@ export async function startNativeEngines(
         // Capture UADEEngine for position sync in TrackerReplayer
         if (desc.key === 'UADEEditable') {
           uadeEngine = instance as unknown as UADEEngine;
+        }
+
+        // Generic position sync for WASM engines with onPositionUpdate.
+        // IMPORTANT: Do NOT call store.play() or set isPlaying here — that triggers
+        // usePatternPlayback reload effect → startNativeEngines() → infinite respawn loop.
+        // The TrackerReplayer.play() already sets isPlaying via the normal flow.
+        // We only update currentRow so the pattern editor scrolls.
+        if ('onPositionUpdate' in instance && typeof (instance as any).onPositionUpdate === 'function' && desc.key !== 'Hively' && desc.key !== 'UADEEditable') {
+          // Wire position updates to the lightweight WASM position store.
+          // This bypasses useTransportStore entirely to avoid triggering
+          // the usePatternPlayback effect chain (which causes recursive engine spawns).
+          // Unfreeze first — clear() freezes the store to reject late worklet messages
+          // from the previous play session. Must unfreeze before new callbacks arrive.
+          useWasmPositionStore.getState().unfreeze();
+          (instance as any).onPositionUpdate((update: { songPos?: number; row: number }) => {
+            useWasmPositionStore.getState().setPosition(update.row, update.songPos);
+          });
+          // Also connect meters on first play
+          try { getToneEngine().connectMeters(); } catch { /* ok */ }
+          console.log(`[NativeEngineRouting] ${desc.key} position sync wired`);
         }
 
         // Direct routing for engines without a synth in song.instruments
@@ -725,6 +756,12 @@ export function stopNativeEngines(
   routedNativeEngines: Set<string>,
   c64SidEngine: C64SIDEngine | null,
 ): C64SIDEngine | null {
+  // Clear the running engine guard so next play() can start fresh
+  _runningEngineKeys.clear();
+
+  // Clear WASM position tracking (synchronous — async import caused race with startNativeEngines)
+  useWasmPositionStore.getState().clear();
+
   // Stop silence detectors
   for (const [, detector] of activeSilenceDetectors) {
     detector.dispose();
@@ -746,12 +783,10 @@ export function stopNativeEngines(
       const ref = tryResolveSync(desc);
       if (ref) {
         try { if (ref.hasInstance()) ref.getInstance().stop(); } catch { /* ignored */ }
-      } else {
-        // Dynamic import - fire and forget
-        resolveEngine(desc).then(cls => {
-          if (cls.hasInstance()) cls.getInstance().stop();
-        }).catch(() => {});
       }
+      // If not synchronously resolvable, skip — startNativeEngines' loadTune()
+      // calls _jc_stop() internally, and an async stop() here would race with
+      // the subsequent play(), killing the engine after it's already restarted.
     }
   }
 

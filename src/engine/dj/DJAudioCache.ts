@@ -510,6 +510,30 @@ export async function getCachedFilenames(): Promise<Set<string>> {
   }
 }
 
+/**
+ * Get cached audio by filename (for playlist tracks that don't have the source buffer).
+ * Scans all entries — use sparingly.
+ */
+export async function getCachedAudioByFilename(filename: string): Promise<CachedAudio | null> {
+  try {
+    const database = await initDB();
+    return new Promise((resolve) => {
+      const tx = database.transaction(STORE_NAME, 'readonly');
+      const store = tx.objectStore(STORE_NAME);
+      const request = store.getAll();
+      request.onsuccess = () => {
+        const entries = request.result as CachedAudio[];
+        const match = entries.find(e => e.filename === filename && e.audioData.byteLength > 0);
+        if (match) void touchCacheEntry(match.hash);
+        resolve(match ?? null);
+      };
+      request.onerror = () => resolve(null);
+    });
+  } catch {
+    return null;
+  }
+}
+
 export async function evictCachedAudio(fileBuffer: ArrayBuffer): Promise<void> {
   try {
     const database = await initDB();

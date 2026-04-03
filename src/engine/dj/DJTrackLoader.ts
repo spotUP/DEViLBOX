@@ -14,6 +14,7 @@ import { parseModuleToSong } from '@/lib/import/parseModuleToSong';
 import { detectBPM } from './DJBeatDetector';
 import { cacheSong } from './DJSongCache';
 import { isAudioFile } from '@/lib/audioFileUtils';
+import { getCachedAudioByFilename } from './DJAudioCache';
 
 /**
  * Load a playlist track to a deck automatically (no user interaction).
@@ -27,6 +28,35 @@ export async function loadPlaylistTrackToDeck(
   track: PlaylistTrack,
   deckId: DeckId,
 ): Promise<boolean> {
+  // Try cached audio first (from pre-caching) — works offline
+  try {
+    const cached = await getCachedAudioByFilename(track.fileName);
+    if (cached && cached.audioData.byteLength > 0) {
+      console.log(`[DJTrackLoader] Using cached audio for: ${track.fileName}`);
+      await getDJEngine().loadAudioToDeck(
+        deckId, cached.audioData, track.fileName,
+        track.trackName || cached.filename,
+        cached.bpm || 125,
+      );
+      useDJStore.getState().setDeckState(deckId, {
+        fileName: track.fileName,
+        trackName: track.trackName || cached.filename,
+        detectedBPM: cached.bpm || 125,
+        effectiveBPM: cached.bpm || 125,
+        playbackMode: 'audio',
+        durationMs: cached.duration * 1000,
+        waveformPeaks: cached.waveformPeaks instanceof Float32Array
+          ? cached.waveformPeaks : new Float32Array(cached.waveformPeaks),
+        audioPosition: 0,
+        elapsedMs: 0,
+        isPlaying: false,
+      });
+      return true;
+    }
+  } catch (err) {
+    console.warn('[DJTrackLoader] Cache lookup failed:', err);
+  }
+
   // Modland tracks: auto-download from server
   if (track.fileName.startsWith('modland:')) {
     const modlandPath = track.fileName.slice('modland:'.length);

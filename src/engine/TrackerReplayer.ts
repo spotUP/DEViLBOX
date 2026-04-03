@@ -28,6 +28,7 @@ import { getAutomationPlayer } from './AutomationPlayer';
 import { useTransportStore, cancelPendingRowUpdate } from '@/stores/useTransportStore';
 import { useAutomationStore } from '@/stores/useAutomationStore';
 import { useCursorStore } from '@/stores/useCursorStore';
+import { useWasmPositionStore } from '@/stores/useWasmPositionStore';
 import { unlockIOSAudio } from '@utils/ios-audio-unlock';
 import { ft2NoteToPeriod, ft2Period2Hz, ft2GetSampleC4Rate } from './effects/FT2Tables';
 // HivelyEngine used via dynamic import
@@ -568,8 +569,20 @@ export class TrackerReplayer {
       this.separationNode.outputTone.connect(outputNode);
       this.isDJDeck = true;
     } else {
-      const engine = getToneEngine();
-      this.separationNode.outputTone.connect(engine.masterInput);
+      try {
+        const engine = getToneEngine();
+        this.separationNode.outputTone.connect(engine.masterInput);
+      } catch (err) {
+        // AudioContext mismatch during view transitions — defer connection
+        // until the shared context is ready
+        console.warn('[TrackerReplayer] Deferred audio connection — context not ready:', (err as Error).message);
+        setTimeout(() => {
+          try {
+            const engine = getToneEngine();
+            this.separationNode.outputTone.connect(engine.masterInput);
+          } catch { /* will reconnect on next song load */ }
+        }, 500);
+      }
     }
   }
 
@@ -965,7 +978,11 @@ export class TrackerReplayer {
   // ==========================================================================
 
   loadSong(song: TrackerSong): void {
-    this.stop();
+    // Stop without saving position — loadSong is a preparation step, not a
+    // user-initiated stop. The user's stop already saved the correct position
+    // via stop(true). Without this, the effect's loadSong → stop → setCurrentRow(0)
+    // overwrites the saved position for WASM singleton engines (JamCracker etc.).
+    this.stop(false);
     this._hasPlayedOnce = false;
 
     // Restore any native engines rerouted to separation chain (UADE/Hively)
@@ -1772,17 +1789,23 @@ export class TrackerReplayer {
     this._hasPlayedOnce = true;
   }
 
-  stop(): void {
+  stop(preservePosition = true): void {
     // Sync transport store to the last visually-displayed row before stopping.
     // The pattern editor reads currentRow from the store when stopped (line 1134
     // of PixiPatternEditor). Use lastDequeuedState (what was on screen) rather
     // than pattPos (which is ahead due to look-ahead scheduling).
-    if (this.playing) {
+    // preservePosition=false skips this (used by loadSong — a preparation stop
+    // that should not overwrite the position saved by the user's stop action).
+    if (this.playing && preservePosition) {
       // Drain the ring buffer up to NOW to get the most current audible position,
       // not the stale lastDequeuedState from the previous rAF frame.
       this.getStateAtTime(Tone.now());
+      // For WASM engines (JamCracker etc.), prefer the WASM position store
+      // which tracks the engine's actual position. The replayer's lastDequeuedState
+      // is stale (row 0) because no notes were scheduled.
+      const wasmPos = useWasmPositionStore.getState();
       const lastVisual = this.lastDequeuedState;
-      const stopRow = lastVisual ? lastVisual.row : this.pattPos;
+      const stopRow = wasmPos.active ? wasmPos.row : (lastVisual ? lastVisual.row : this.pattPos);
       useTransportStore.getState().setCurrentRow(stopRow);
       // Move the editing cursor to the stop position so the pattern editor
       // doesn't jump back to the pre-play cursor position on stop.

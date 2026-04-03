@@ -20,6 +20,7 @@ import { KlysInstrumentEditor } from './KlysInstrumentEditor';
 import { klysToFormatChannels, KLYS_COLUMNS } from './klysAdapter';
 import { KlysEngine } from '@/engine/klystrack/KlysEngine';
 import { getTrackerReplayer } from '@engine/TrackerReplayer';
+import { getToneEngine } from '@engine/ToneEngine';
 import { exportAsKlystrack } from '@lib/export/KlysExporter';
 import { useResponsiveSafe } from '@/contexts/ResponsiveContext';
 
@@ -189,6 +190,8 @@ export const KlysView: React.FC<{ width?: number; height?: number }> = ({ width:
     if (!KlysEngine.hasInstance()) return;
     KlysEngine.getInstance().stop();
     useTransportStore.setState((s) => { s.isPlaying = false; s.isPaused = false; });
+    // Match playStopToggle — mute/unmute cycle resets audio graph for next play
+    getToneEngine().stop();
   }, []);
 
   const handleExport = useCallback(async () => {

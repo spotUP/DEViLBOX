@@ -23,6 +23,7 @@ import { usePixiTheme, type PixiTheme } from '../../theme';
 import { PIXI_FONTS } from '../../fonts';
 import { MegaText, type GlyphLabel } from '../../utils/MegaText';
 import { useTrackerStore, useTransportStore, useUIStore, useCursorStore } from '@stores';
+import { useWasmPositionStore } from '@stores/useWasmPositionStore';
 import { getTrackerReplayer } from '@engine/TrackerReplayer';
 import { getTrackerScratchController } from '@engine/TrackerScratchController';
 import { GENERATORS, type GeneratorType } from '@utils/patternGenerators';
@@ -1178,9 +1179,14 @@ export const PixiPatternEditor: React.FC<PixiPatternEditorProps> = ({ width, hei
     halfFrameRef.current = halfFrameRef.current * 0.9 + (dtSec * 0.5) * 0.1; // EMA smooth
 
     const { isPlaying: playing, smoothScrolling: smooth } = useTransportStore.getState();
-    
+
+    // Check WASM engine position — these engines don't set transportStore.isPlaying
+    // (doing so causes infinite engine respawn via usePatternPlayback effect chain)
+    const wasmPos = useWasmPositionStore.getState();
+    const effectivePlaying = playing || wasmPos.active;
+
     // PERF: Early return when idle - skip expensive store reads
-    if (!playing) {
+    if (!effectivePlaying) {
       if (smoothOffsetRef.current !== 0) {
         smoothOffsetRef.current = 0;
         if (gridScrollContainerRef.current) gridScrollContainerRef.current.pivot.y = 0;
@@ -1189,11 +1195,8 @@ export const PixiPatternEditor: React.FC<PixiPatternEditorProps> = ({ width, hei
       prevPatternRef.current = -1;
       return;
     }
-    
+
     // Only read other stores when actually playing
-    const replayer = getTrackerReplayer();
-    const audioTime = Tone.now() + halfFrameRef.current;
-    const audioState = replayer.getStateAtTime(audioTime);
     const ts = useTrackerStore.getState();
 
     let newRow: number;
@@ -1201,34 +1204,51 @@ export const PixiPatternEditor: React.FC<PixiPatternEditorProps> = ({ width, hei
     let newPattern: number;
     let newSongPosition = -1;
 
-    if (audioState) {
-      newRow = audioState.row;
-      newPattern = audioState.pattern;
-      newSongPosition = audioState.position;
+    if (wasmPos.active) {
+      // WASM engine is the authoritative position source
+      newRow = wasmPos.row;
       newOffset = 0;
-      if (smooth) {
-        // Recalculate row duration on row change OR when cached value is 0 (first frame)
-        if (cachedRowDurRef.current === 0 || newRow !== prevRowRef.current || newPattern !== prevPatternRef.current) {
-          const nextState = replayer.getStateAtTime(audioTime + 0.5, true);
-          if (nextState && nextState.row !== audioState.row) {
-            cachedRowDurRef.current = nextState.time - audioState.time;
-          } else {
-            // Compute from BPM/speed — use replayer's actual values for accuracy
-            const bpm = useTransportStore.getState().bpm;
-            const speed = useTransportStore.getState().speed;
-            cachedRowDurRef.current = (2.5 / bpm) * speed;
+      const patternOrder = ts.patternOrder;
+      if (wasmPos.songPos >= 0 && wasmPos.songPos < patternOrder.length) {
+        newPattern = patternOrder[wasmPos.songPos] ?? wasmPos.songPos;
+      } else {
+        newPattern = ts.currentPatternIndex;
+      }
+      newSongPosition = wasmPos.songPos;
+    } else {
+      const replayer = getTrackerReplayer();
+      const audioTime = Tone.now() + halfFrameRef.current;
+      const audioState = replayer.getStateAtTime(audioTime);
+
+      if (audioState) {
+        newRow = audioState.row;
+        newPattern = audioState.pattern;
+        newSongPosition = audioState.position;
+        newOffset = 0;
+        if (smooth) {
+          // Recalculate row duration on row change OR when cached value is 0 (first frame)
+          if (cachedRowDurRef.current === 0 || newRow !== prevRowRef.current || newPattern !== prevPatternRef.current) {
+            const nextState = replayer.getStateAtTime(audioTime + 0.5, true);
+            if (nextState && nextState.row !== audioState.row) {
+              cachedRowDurRef.current = nextState.time - audioState.time;
+            } else {
+              // Compute from BPM/speed — use replayer's actual values for accuracy
+              const bpm = useTransportStore.getState().bpm;
+              const speed = useTransportStore.getState().speed;
+              cachedRowDurRef.current = (2.5 / bpm) * speed;
+            }
+          }
+          const dur = cachedRowDurRef.current;
+          if (dur > 0) {
+            const progress = Math.min(Math.max((audioTime - audioState.time) / dur, 0), 1);
+            newOffset = progress * rowHeightRef.current;
           }
         }
-        const dur = cachedRowDurRef.current;
-        if (dur > 0) {
-          const progress = Math.min(Math.max((audioTime - audioState.time) / dur, 0), 1);
-          newOffset = progress * rowHeightRef.current;
-        }
+      } else {
+        newRow = useTransportStore.getState().currentRow;
+        newOffset = 0;
+        newPattern = ts.currentPatternIndex;
       }
-    } else {
-      newRow = useTransportStore.getState().currentRow;
-      newOffset = 0;
-      newPattern = ts.currentPatternIndex;
     }
 
     smoothOffsetRef.current = newOffset;
@@ -1258,18 +1278,6 @@ export const PixiPatternEditor: React.FC<PixiPatternEditorProps> = ({ width, hei
     }
 
     if (newRow !== prevRowRef.current || newPattern !== prevPatternRef.current) {
-      // Debug: log row timing to detect visual groove/swing
-      if (typeof window !== 'undefined' && (window as any).SCROLL_DEBUG && audioState) {
-        const now = performance.now();
-        const lastTime = (window as any)._lastRowTime || now;
-        const delta = now - lastTime;
-        (window as any)._lastRowTime = now;
-        const stateTime = audioState.time;
-        const lastStateTime = (window as any)._lastStateTime || stateTime;
-        const stateDelta = (stateTime - lastStateTime) * 1000;
-        (window as any)._lastStateTime = stateTime;
-        console.log(`[Scroll] row=${newRow} wallΔ=${delta.toFixed(1)}ms stateΔ=${stateDelta.toFixed(1)}ms stateT=${stateTime.toFixed(4)} audioT=${audioTime.toFixed(4)}`);
-      }
       const patternChanged = newPattern !== prevPatternRef.current;
       prevRowRef.current = newRow;
       prevPatternRef.current = newPattern;
@@ -1278,6 +1286,7 @@ export const PixiPatternEditor: React.FC<PixiPatternEditorProps> = ({ width, hei
       // redraw draws from the NEW pattern data in this same frame, instead of
       // waiting for React to re-render (which causes a 1-3 frame "pause").
       const patchedParams: Partial<RenderParams> = {
+        isPlaying: effectivePlaying,
         playbackRow: newRow,
         playbackPatternIdx: newPattern,
         songPosition: newSongPosition,

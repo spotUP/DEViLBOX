@@ -18,7 +18,7 @@ target_include_directories(GranularFreezeWASM PRIVATE
 set_target_properties(GranularFreezeWASM PROPERTIES
     OUTPUT_NAME "GranularFreeze"
     SUFFIX ".js"
-    RUNTIME_OUTPUT_DIRECTORY "${CMAKE_SOURCE_DIR}/../public/granular-freeze"
+    RUNTIME_OUTPUT_DIRECTORY "${CMAKE_SOURCE_DIR}/../../public/granular-freeze"
 )
 
 target_link_options(GranularFreezeWASM PRIVATE

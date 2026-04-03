@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-04-02T12:15:32.836Z
+ * Generated: 2026-04-03T22:29:24.448Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -19,10 +19,10 @@ export interface ChangelogEntry {
 }
 
 // Build info
-export const BUILD_VERSION = '1.0.3872';
-export const BUILD_NUMBER = '3872';
-export const BUILD_HASH = '7b687175c';
-export const BUILD_DATE = '2026-04-02';
+export const BUILD_VERSION = '1.0.3964';
+export const BUILD_NUMBER = '3964';
+export const BUILD_HASH = 'faa01a037';
+export const BUILD_DATE = '2026-04-03';
 
 // Full version (patch IS the build number, so no need to append)
 export const FULL_VERSION = BUILD_VERSION;
@@ -30,214 +30,214 @@ export const FULL_VERSION = BUILD_VERSION;
 // Auto-generated changelog
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: '1.0.3872',
-    date: '2026-04-02',
+    version: '1.0.3964',
+    date: '2026-04-04',
     changes: [
       {
         type: 'fix',
-        "description": "Bind Vite dev server to 0.0.0.0 for iPhone access"
+        "description": "Velocity slider — fixed 96px width instead of full-width stretch"
       },
       {
         type: 'fix',
-        "description": "Fix CalfMonoSynth ensureInitialized: actually start init"
+        "description": "Guard worklet cartridge update — check function exists + try/catch"
       },
       {
         type: 'fix',
-        "description": "Add touch events for iOS Safari compatibility"
+        "description": "Suppress passive event listener warning in Knob component"
       },
       {
         type: 'fix',
-        "description": "Remove unused useCallback import and onViewModeChange param"
+        "description": "Hide filter curve + ADSR visualizer for WASM synths"
       },
       {
         type: 'fix',
-        "description": "Fix DX7 prewarm: await voices + patch bank before ready"
+        "description": "MdaEPiano/JX10/DX10 — remove synthType fallback to slider controls"
       },
       {
         type: 'fix',
-        "description": "Replace broken QR generator with qrcode library"
+        "description": "Patch banks silent — update cartridge on sysex load"
       },
       {
         type: 'fix',
-        "description": "Fix recursive dist/ nesting: enable emptyOutDir"
-      },
-      {
-        type: 'feature',
-        "description": "Add QR code for iPhone pairing"
-      },
-      {
-        type: 'fix',
-        "description": "Remove radial visual bg presets + add mode cycler to tracker header"
-      },
-      {
-        type: 'feature',
-        "description": "Complete iPhone remote control with WebRTC mic + pairing"
-      },
-      {
-        type: 'fix',
-        "description": "DOM tracker visual bg visible — make canvas container transparent"
-      },
-      {
-        type: 'fix',
-        "description": "Restore tracker visual background in both DOM and GL views"
-      },
-      {
-        type: 'improvement',
-        "description": "Chore: TrackerView minor update"
-      },
-      {
-        type: 'improvement',
-        "description": "Re-enable tracker visual background"
-      },
-      {
-        type: 'feature',
-        "description": "IPhone remote control for DJ mode (phases 1-3)"
-      },
-      {
-        type: 'improvement',
-        "description": "Remove: tracker visual background effect (glow orb behind pattern editor)"
-      },
-      {
-        type: 'fix',
-        "description": "DX7 audio fix + pre-warm all WASM synths on init"
-      },
-      {
-        type: 'fix',
-        "description": "Crate panel listings use icons instead of colored dots"
-      },
-      {
-        type: 'fix',
-        "description": "Tracker visual background — respect setting + enable in DOM view"
-      },
-      {
-        type: 'fix',
-        "description": "DJ deck layout to match DOM — track info, pitch slider, progress bar"
-      },
-      {
-        type: 'fix',
-        "description": "Add layout props to all navbar icon sprites for flex alignment"
-      },
-      {
-        type: 'fix',
-        "description": "Channel faders stretch to fill full mixer row height"
-      },
-      {
-        type: 'fix',
-        "description": "Restructure DJ mixer to single horizontal row matching DOM"
-      },
-      {
-        type: 'fix',
-        "description": "Replace broken icon references with correct mappings"
-      },
-      {
-        type: 'feature',
-        "description": "Add 14 missing Lucide icon mappings for GL parity"
-      },
-      {
-        type: 'fix',
-        "description": "File browser parity + mixer dB/VU/filter/video polish"
-      },
-      {
-        type: 'feature',
-        "description": "Fuzzy Modland search for 404 tracks, TFMX companion fix, fail report"
-      },
-      {
-        type: 'improvement',
-        "description": "Remove duplicate Dexed/OBXd synths, keep DX7/OBXf replacements"
-      },
-      {
-        type: 'feature',
-        "description": "DJ mixer polish — dB readouts, VU peak hold, filter labels, video timer"
-      },
-      {
-        type: 'feature',
-        "description": "Wire PixiDrumPadManager into GL view router"
-      },
-      {
-        type: 'fix',
-        "description": "GL/DOM parity — flex centering, DJ deck layout, button fixes"
-      },
-      {
-        type: 'feature',
-        "description": "Per-pad IO808/TR909 drum parameter editing"
-      },
-      {
-        type: 'feature',
-        "description": "Helm hardware UI build files — JUCE editor to WASM"
-      },
-      {
-        type: 'feature',
-        "description": "Surge XT hardware UI — full JUCE editor compiled to WASM"
-      },
-      {
-        type: 'feature',
-        "description": "Add Max Headroom mode setting"
-      },
-      {
-        type: 'improvement',
-        "description": "Chore: update generated changelog"
-      },
-      {
-        type: 'fix',
-        "description": "Pixi DJ deck component refinements"
-      },
-      {
-        type: 'feature',
-        "description": "Kraftwerk head overlay improvements"
-      },
-      {
-        type: 'fix',
-        "description": "16 FT2 effect command bugs from exhaustive audit"
-      },
-      {
-        type: 'feature',
-        "description": "New Pixi DJ components, Helm hardware UI, TR-808 layout"
-      },
-      {
-        type: 'fix',
-        "description": "Chore: DJ view Pixi improvements, tracker replayer fixes, changelog update"
-      },
-      {
-        type: 'feature',
-        "description": "Batch playlist analysis via server-side UADE headless renderer"
-      },
-      {
-        type: 'feature',
-        "description": "Smart sort by BPM/key/energy + crossfader fixes"
-      },
-      {
-        type: 'fix',
-        "description": "Increase IPC ring buffer to 4MB for large module files"
+        "description": "MdaEPiano knobs instead of sliders, add Odin2/Surge/Helm hw UIs"
       }
     ]
   },
   {
-    version: '2026-04-01',
-    date: '2026-04-01',
+    version: '2026-04-03',
+    date: '2026-04-03',
     changes: [
       {
         type: 'improvement',
-        "description": "Vocoder: enable browser echo cancellation to reduce speaker→mic feedback"
+        "description": "Chore: track DX7 WASM build artifacts in git (prevent accidental loss)"
       },
       {
-        type: 'improvement',
-        "description": "DJ vocoder: mic routing, noise gate, presets, Kraftwerk head animation"
+        type: 'fix',
+        "description": "Complete parameter coverage — all synth layouts now 100%"
+      },
+      {
+        type: 'fix',
+        "description": "Playlist hover — always-rendered buttons with opacity toggle, subtle hover bg"
+      },
+      {
+        type: 'fix',
+        "description": "VCED operator order — config[0]=OP1 maps to VCED slot 5, not 0"
+      },
+      {
+        type: 'fix',
+        "description": "DOM playlist hover — JS-based onPointerEnter/Leave, not CSS :hover"
+      },
+      {
+        type: 'fix',
+        "description": "DOM playlist hover — 20% white on all rows, always applied"
+      },
+      {
+        type: 'fix',
+        "description": "PixiList crash — bufferItems should be buffer (prop name)"
+      },
+      {
+        type: 'fix',
+        "description": "DOM playlist — make 1/2/X buttons always visible, brighter on hover"
+      },
+      {
+        type: 'fix',
+        "description": "PixiList hover — track from parent pointermove instead of per-row events"
+      },
+      {
+        type: 'fix',
+        "description": "Replace hardcoded Tailwind colors with design token classes"
+      },
+      {
+        type: 'fix',
+        "description": "PixiList rows — add explicit hitArea for click and hover"
+      },
+      {
+        type: 'fix',
+        "description": "PixiList hover — use tint+alpha (reactive) on pixiGraphics background"
+      },
+      {
+        type: 'fix',
+        "description": "PixiList hover — use reactive backgroundColor instead of draw callback"
       },
       {
         type: 'feature',
-        "description": "Add Odin2 hardware UI WASM build (SDL/Emscripten)"
+        "description": "GL/DOM UI parity — design system tokens, dialog conversions, feature gaps"
       },
       {
         type: 'fix',
-        "description": "SpaceLaserControls: fix grid layout and separate buttons from knob grid"
+        "description": "Crate/playlist panels need eventMode=\"static\" on all containers"
       },
       {
-        type: 'improvement',
-        "description": "Enforce knobs→visualizers→selects hierarchy across all remaining synths"
+        type: 'feature',
+        "description": "Hover-revealed action buttons on playlist track rows"
+      },
+      {
+        type: 'feature',
+        "description": "Add hover state to PixiList rows"
       },
       {
         type: 'fix',
-        "description": "Extend rimshot swing decay 10ms→50ms"
+        "description": "Crate panel needs click before becoming active"
+      },
+      {
+        type: 'feature',
+        "description": "Add brick-wall limiter on deck channel output"
+      },
+      {
+        type: 'fix',
+        "description": "Revert pitchShift routing — internal delay buffers cause volume boost"
+      },
+      {
+        type: 'fix',
+        "description": "Scratch buffer playback now routes through pitchShift"
+      },
+      {
+        type: 'fix',
+        "description": "Root cause of scratch volume boost — gain overlap during transitions"
+      },
+      {
+        type: 'fix',
+        "description": "Bypass Tone.Signal entirely for scratch gain + fix sync false-stop"
+      },
+      {
+        type: 'fix',
+        "description": "Eliminate gain corruption from Tone.js linearRampTo wrapper"
+      },
+      {
+        type: 'feature',
+        "description": "Mount PixiDeckPatternDisplay overlay on vinyl and 3D deck views"
+      },
+      {
+        type: 'fix',
+        "description": "Auto DJ enable returns error messages instead of failing silently"
+      },
+      {
+        type: 'feature',
+        "description": "Scratch sensitivity setting + view switch mutual exclusion"
+      },
+      {
+        type: 'fix',
+        "description": "Scratch backward displacement tracking and gain automation safety"
+      },
+      {
+        type: 'fix',
+        "description": "Scratch flanging, position reset, and volume accumulation"
+      },
+      {
+        type: 'feature',
+        "description": "Edit Instrument modal — fullscreen with collapsible left panel"
+      },
+      {
+        type: 'fix',
+        "description": "Duplicate WaveSabre key + DrumPadManager crash on app.screen"
+      },
+      {
+        type: 'fix',
+        "description": "File browser — single click opens directories, fix event propagation"
+      },
+      {
+        type: 'fix',
+        "description": "Simplify Add Instrument search bar — use PixiPureTextInput directly"
+      },
+      {
+        type: 'fix',
+        "description": "Add Instrument dialog sizing/spacing/fonts to match DOM"
+      },
+      {
+        type: 'fix',
+        "description": "Add layout={{}} to all bitmap text and icons in Add Instrument dialog"
+      },
+      {
+        type: 'fix',
+        "description": "Restore audio by using loadVoices+setBank path for VCED presets"
+      },
+      {
+        type: 'feature',
+        "description": "Add New Instrument dialog — 1:1 with DOM CategorizedSynthSelector"
+      },
+      {
+        type: 'fix',
+        "description": "Stabilize sync indicator with 1-second rolling average"
+      },
+      {
+        type: 'feature',
+        "description": "Categorized Add New Instrument browser matching DOM"
+      },
+      {
+        type: 'feature',
+        "description": "Beat-snap drag + visual sync indicator on waveforms"
+      },
+      {
+        type: 'fix',
+        "description": "Improve Add New Instrument dialog — full width, icons, better layout"
+      },
+      {
+        type: 'feature',
+        "description": "Serato-style full-width waveforms at top of DJ view"
+      },
+      {
+        type: 'fix',
+        "description": "ADD instrument button opens GL-native create dialog"
       }
     ]
   }
