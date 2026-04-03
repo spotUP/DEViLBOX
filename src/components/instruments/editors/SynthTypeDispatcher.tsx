@@ -3406,34 +3406,36 @@ export const SynthTypeDispatcher: React.FC<SynthTypeDispatcherProps> = ({
             config={config}
             onChange={(updates) => handleChange(updates as Partial<InstrumentConfig>)}
           />
-          {/* Filter curve + ADSR visualizer for synths with envelope/filter */}
-          <div className="flex gap-2">
-            {instrument.filter && (
-              <Suspense fallback={null}>
-                <LiveFilterCurve
-                  instrumentId={instrument.id}
-                  cutoff={instrument.filter.frequency ?? 2000}
-                  resonance={instrument.filter.Q ?? 1}
-                  type={(instrument.filter.type as 'lowpass') ?? 'lowpass'}
-                  width="auto"
-                  height={70}
-                />
-              </Suspense>
-            )}
-            {instrument.envelope && (
-              <Suspense fallback={null}>
-                <LiveADSRVisualizer
-                  instrumentId={instrument.id}
-                  attack={instrument.envelope.attack ?? 0.01}
-                  decay={instrument.envelope.decay ?? 0.1}
-                  sustain={instrument.envelope.sustain ?? 0.8}
-                  release={instrument.envelope.release ?? 0.3}
-                  width="auto"
-                  height={70}
-                />
-              </Suspense>
-            )}
-          </div>
+          {/* Filter curve + ADSR visualizer — only for Tone.js synths with real filter/envelope configs */}
+          {!configKey && (instrument.filter?.frequency != null || instrument.envelope?.attack != null) && (
+            <div className="flex gap-2">
+              {instrument.filter?.frequency != null && (
+                <Suspense fallback={null}>
+                  <LiveFilterCurve
+                    instrumentId={instrument.id}
+                    cutoff={instrument.filter.frequency ?? 2000}
+                    resonance={instrument.filter.Q ?? 1}
+                    type={(instrument.filter.type as 'lowpass') ?? 'lowpass'}
+                    width="auto"
+                    height={70}
+                  />
+                </Suspense>
+              )}
+              {instrument.envelope?.attack != null && (
+                <Suspense fallback={null}>
+                  <LiveADSRVisualizer
+                    instrumentId={instrument.id}
+                    attack={instrument.envelope.attack ?? 0.01}
+                    decay={instrument.envelope.decay ?? 0.1}
+                    sustain={instrument.envelope.sustain ?? 0.8}
+                    release={instrument.envelope.release ?? 0.3}
+                    width="auto"
+                    height={70}
+                  />
+                </Suspense>
+              )}
+            </div>
+          )}
         </div>
       );
     }
