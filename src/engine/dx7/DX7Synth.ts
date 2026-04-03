@@ -120,21 +120,10 @@ export class DX7Synth implements DevilboxSynth {
     import('./dx7presets').then(({ DX7_VCED_PRESETS }) => {
       const preset = DX7_VCED_PRESETS.find(p => p.name === name);
       if (preset && preset.data.length === 156) {
-        // Send as DX7 VCED sysex: F0 43 00 00 01 1B <155 data bytes> <checksum> F7
-        // Format 0 substatus 0 = voice (VCED), byte count = 0x01 0x1B = 155
-        const sysex = new Uint8Array(163);
-        sysex[0] = 0xF0;
-        sysex[1] = 0x43; // Yamaha
-        sysex[2] = 0x00; // Channel 0
-        sysex[3] = 0x00; // Format/substatus: voice parameter
-        sysex[4] = 0x01; // Byte count MSB
-        sysex[5] = 0x1B; // Byte count LSB (155)
-        sysex.set(preset.data.subarray(0, 155), 6);
-        let sum = 0;
-        for (let i = 0; i < 155; i++) sum += preset.data[i];
-        sysex[161] = (-sum) & 0x7F;
-        sysex[162] = 0xF7;
-        this.loadSysex(sysex.buffer);
+        // Convert VCED (unpacked 155 bytes) → VMEM (packed 128 bytes) and send as bulk dump.
+        // The bulk dump path writes directly to VDX7 memory — reliable.
+        // The VCED sysex path relies on firmware serial processing — fragile.
+        this._loadVcedData(preset.data.subarray(0, 155));
         console.log(`[DX7] Loaded VCED preset: ${name}`);
       } else {
         console.warn(`[DX7] VCED preset not found: ${name}`);
@@ -142,6 +131,71 @@ export class DX7Synth implements DevilboxSynth {
     }).catch(err => {
       console.error(`[DX7] Failed to load VCED preset:`, err);
     });
+  }
+
+  /** Load raw VCED data (155 bytes unpacked) via the proven loadVoices+setBank path */
+  _loadVcedData(vced: Uint8Array) {
+    const packed = DX7Synth.vcedToVmem(vced);
+    // Build a 4096-byte voice bank with this voice at slot 0 (rest zeroed = init voices)
+    const bank = new Uint8Array(4096);
+    bank.set(packed, 0); // Voice 0 = our VCED, voices 1-31 = empty
+    // Use the proven loadVoices → setBank → programChange path
+    // This is the same path the ROM voice loading uses (which produces sound)
+    this.send({ type: 'loadVoices', data: bank.buffer });
+    this.send({ type: 'setBank', bank: 0 });
+    // Small delay for setBank to be processed before program change
+    setTimeout(() => {
+      this.send({ type: 'programChange', program: 0 });
+    }, 50);
+    console.log(`[DX7] _loadVcedData: loaded via loadVoices+setBank path`);
+  }
+
+  /** Convert VCED (155 bytes unpacked) to VMEM (128 bytes packed) */
+  static vcedToVmem(vced: Uint8Array): Uint8Array {
+    const vmem = new Uint8Array(128);
+    // 6 operators: VCED has 21 bytes/op, VMEM has 17 bytes/op
+    for (let op = 0; op < 6; op++) {
+      const vs = op * 21; // VCED source offset
+      const vd = op * 17; // VMEM dest offset
+      // Bytes 0-7: EG rates and levels — direct copy
+      for (let i = 0; i < 8; i++) vmem[vd + i] = vced[vs + i];
+      // Byte 8: KLS break point
+      vmem[vd + 8] = vced[vs + 8];
+      // Bytes 9-10: KLS left/right depth
+      vmem[vd + 9] = vced[vs + 9];
+      vmem[vd + 10] = vced[vs + 10];
+      // Byte 11: KLS left curve (0-3) | right curve (0-3) packed
+      vmem[vd + 11] = (vced[vs + 11] & 0x03) | ((vced[vs + 12] & 0x03) << 2);
+      // Byte 12: Rate scaling (0-7) | detune (0-14) packed
+      vmem[vd + 12] = (vced[vs + 13] & 0x07) | ((vced[vs + 20] & 0x0F) << 3);
+      // Byte 13: Amp mod sens (0-3) | key vel sens (0-7) packed
+      vmem[vd + 13] = (vced[vs + 14] & 0x03) | ((vced[vs + 15] & 0x07) << 2);
+      // Byte 14: Output level
+      vmem[vd + 14] = vced[vs + 16];
+      // Byte 15: Freq coarse (0-31) | osc mode (0-1) packed
+      vmem[vd + 15] = (vced[vs + 17] & 0x01) | ((vced[vs + 18] & 0x1F) << 1);
+      // Byte 16: Freq fine
+      vmem[vd + 16] = vced[vs + 19];
+    }
+    // Global params start at VCED offset 126, VMEM offset 102
+    // Pitch EG rates and levels (8 bytes)
+    for (let i = 0; i < 8; i++) vmem[102 + i] = vced[126 + i];
+    // Byte 110: Algorithm (0-31)
+    vmem[110] = vced[134] & 0x1F;
+    // Byte 111: Feedback (0-7) | Osc key sync (0-1) packed
+    vmem[111] = (vced[135] & 0x07) | ((vced[136] & 0x01) << 3);
+    // Bytes 112-115: LFO speed, delay, PMD, AMD
+    vmem[112] = vced[137];
+    vmem[113] = vced[138];
+    vmem[114] = vced[139];
+    vmem[115] = vced[140];
+    // Byte 116: LFO sync (0-1) | LFO wave (0-5) | LFO PMS (0-7) packed
+    vmem[116] = (vced[141] & 0x01) | ((vced[142] & 0x07) << 1) | ((vced[143] & 0x07) << 4);
+    // Byte 117: Transpose
+    vmem[117] = vced[144];
+    // Bytes 118-127: Voice name (10 ASCII chars)
+    for (let i = 0; i < 10; i++) vmem[118 + i] = vced[145 + i];
+    return vmem;
   }
 
   /** Load a VCED preset by name (public API for preset switching) */

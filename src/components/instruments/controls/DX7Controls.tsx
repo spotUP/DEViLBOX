@@ -82,13 +82,21 @@ export const DX7Controls: React.FC<DX7ControlsProps> = ({ instrument, onChange }
     (async () => {
       try {
         const engine = getToneEngine();
-        const config = { id: instrument.id, synthType: 'DX7' as any };
-        await engine.ensureInstrumentReady(config as any);
+        // Pass the full instrument config (not a minimal stub) so getInstrument works correctly
+        console.log('[DX7Controls] Ensuring synth ready for id:', instrument.id);
+        await engine.ensureInstrumentReady(instrument as any);
         if (cancelled) return;
         const key = engine.getInstrumentKey(instrument.id, -1);
         const synth = engine.instruments.get(key);
+        console.log('[DX7Controls] After ensureReady: key=', key, 'synth=', synth, 'hasLoadSysex=', synth && 'loadSysex' in synth, 'mapSize=', engine.instruments.size);
         if (synth && 'loadSysex' in synth) {
           synthRef.current = synth as unknown as DX7Synth;
+          console.log('[DX7Controls] Synth cached in ref, isReady=', (synth as any).isReady, '_ready=', (synth as any)._ready);
+        } else {
+          // Log all keys in the map for debugging
+          const keys: string[] = [];
+          engine.instruments.forEach((_v, k) => keys.push(`${k}(id=${k >>> 16})`));
+          console.warn('[DX7Controls] Synth NOT found. Map keys:', keys.join(', '));
         }
       } catch (err) {
         console.warn('[DX7Controls] Failed to ensure synth ready:', err);
@@ -159,13 +167,11 @@ export const DX7Controls: React.FC<DX7ControlsProps> = ({ instrument, onChange }
     onChange({ dx7: { ...configRef.current, program: voiceIndex, vcedPreset: undefined } });
   }, [currentBank, getSynth, onChange]);
 
-  // Load VCED preset — call synth directly AND update state
+  // Load VCED preset — update state (store handles synth call)
   const loadVcedPreset = useCallback((name: string) => {
     setCurrentVoiceName(name);
-    const synth = getSynth();
-    if (synth) synth.loadVcedPreset(name);
     onChange({ dx7: { ...configRef.current, vcedPreset: name, bank: undefined, program: undefined } });
-  }, [getSynth, onChange]);
+  }, [onChange]);
 
   // Volume change
   const handleVolumeChange = useCallback((v: number) => {
@@ -177,6 +183,7 @@ export const DX7Controls: React.FC<DX7ControlsProps> = ({ instrument, onChange }
     const buffer = await file.arrayBuffer();
     const data = new Uint8Array(buffer);
     const synth = getSynth();
+    console.log('[DX7Controls] handleFile:', file.name, 'size=', data.length, 'synth=', synth);
 
     if ((data.length === 4104 || data.length === 4096) && synth) {
       if (data.length === 4096) {
@@ -193,6 +200,14 @@ export const DX7Controls: React.FC<DX7ControlsProps> = ({ instrument, onChange }
         synth.loadSysex(buffer);
       }
       setCurrentVoiceName(`${file.name} (32 voices)`);
+    } else if (data.length >= 155 && data.length <= 163 && synth) {
+      // Single voice VCED
+      const vcedStart = data[0] === 0xF0 ? 6 : 0;
+      const vcedData = data.subarray(vcedStart, vcedStart + 155);
+      (synth as any)._loadVcedData(new Uint8Array(vcedData));
+      setCurrentVoiceName(`${file.name} (single voice)`);
+    } else if (!synth) {
+      console.warn('[DX7Controls] No synth available for file loading');
     }
   }, [getSynth]);
 
