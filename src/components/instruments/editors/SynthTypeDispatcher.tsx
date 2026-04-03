@@ -2301,7 +2301,7 @@ export const SynthTypeDispatcher: React.FC<SynthTypeDispatcherProps> = ({
   // ============================================================================
   // TONE AM SYNTH (Tone.js Amplitude Modulation)
   // ============================================================================
-  if (editorMode === 'toneAM' || instrument.synthType === 'ToneAM') {
+  if (editorMode === 'toneAM') {
     const toneAMKnobColor = isCyanTheme ? '#00ffff' : '#e879f9';
     const toneAMPanelBg = isCyanTheme
       ? 'bg-[#051515] border-accent-highlight/20'
@@ -2403,7 +2403,7 @@ export const SynthTypeDispatcher: React.FC<SynthTypeDispatcherProps> = ({
   // ============================================================================
   // RAFFO SYNTH EDITOR (Minimoog clone)
   // ============================================================================
-  if (editorMode === 'raffo' || instrument.synthType === 'RaffoSynth') {
+  if (editorMode === 'raffo') {
     const raffoConfig = { ...DEFAULT_RAFFO, ...(instrument.raffo || {}) };
 
     return (
@@ -2434,7 +2434,7 @@ export const SynthTypeDispatcher: React.FC<SynthTypeDispatcherProps> = ({
   }
 
   // ── Calf Monosynth ───────────────────────────────────────
-  if (editorMode === 'calfMono' || instrument.synthType === 'CalfMono') {
+  if (editorMode === 'calfMono') {
     const calfConfig = { ...DEFAULT_CALF_MONO, ...(instrument.calfMono || {}) };
     return (
       <div className="synth-editor-container bg-gradient-to-b from-[#1e1e1e] to-[#151515]">
@@ -2449,7 +2449,7 @@ export const SynthTypeDispatcher: React.FC<SynthTypeDispatcherProps> = ({
   }
 
   // ── setBfree Hammond B3 ──────────────────────────────────
-  if (editorMode === 'setbfree' || instrument.synthType === 'SetBfree') {
+  if (editorMode === 'setbfree') {
     const bfreeConfig = { ...DEFAULT_SETBFREE, ...(instrument.setbfree || {}) };
     return (
       <div className="synth-editor-container bg-gradient-to-b from-[#1e1e1e] to-[#151515]">
@@ -2464,7 +2464,7 @@ export const SynthTypeDispatcher: React.FC<SynthTypeDispatcherProps> = ({
   }
 
   // ── SynthV1 (4-osc poly) ─────────────────────────────────
-  if (editorMode === 'synthv1' || instrument.synthType === 'SynthV1') {
+  if (editorMode === 'synthv1') {
     const sv1Config = { ...DEFAULT_SYNTHV1, ...(instrument.synthv1 || {}) };
     return (
       <div className="synth-editor-container bg-gradient-to-b from-[#1e1e1e] to-[#151515]">
@@ -2479,7 +2479,7 @@ export const SynthTypeDispatcher: React.FC<SynthTypeDispatcherProps> = ({
   }
 
   // ── Monique (Morphing Mono) ──────────────────────────────
-  if (editorMode === 'moniqueSynth' || instrument.synthType === 'Monique') {
+  if (editorMode === 'moniqueSynth') {
     const moniqueConfig = { ...DEFAULT_MONIQUE, ...(instrument.monique || {}) };
     return (
       <div className="synth-editor-container bg-gradient-to-b from-[#1e1e1e] to-[#151515]">
@@ -2528,7 +2528,7 @@ export const SynthTypeDispatcher: React.FC<SynthTypeDispatcherProps> = ({
   }
 
   // ── VL1 (Casio VL-Tone) ──────────────────────────────────
-  if (editorMode === 'vl1Synth' || instrument.synthType === 'VL1') {
+  if (editorMode === 'vl1Synth') {
     const vl1Config = { ...DEFAULT_VL1, ...(instrument.vl1 || {}) };
     return (
       <div className="synth-editor-container bg-gradient-to-b from-[#1e1e1e] to-[#151515]">
@@ -2554,7 +2554,7 @@ export const SynthTypeDispatcher: React.FC<SynthTypeDispatcherProps> = ({
   }
 
   // ── amsynth (Classic Analog Modeling) ──────────────────────
-  if (instrument.synthType === 'Amsynth') {
+  if (editorMode === 'amsynth' as string) {
     return (
       <div className="synth-editor-container bg-gradient-to-b from-[#1e1e1e] to-[#151515]">
         <EditorHeader
@@ -2605,7 +2605,7 @@ export const SynthTypeDispatcher: React.FC<SynthTypeDispatcherProps> = ({
   }
 
   // ── TAL-NoiseMaker ───────────────────────────────────────
-  if (editorMode === 'talNoizeMaker' || instrument.synthType === 'TalNoizeMaker') {
+  if (editorMode === 'talNoizeMaker') {
     const talConfig = { ...DEFAULT_TAL_NOIZEMAKER, ...(instrument.talNoizeMaker || {}) };
     return (
       <div className="synth-editor-container bg-gradient-to-b from-[#1e1e1e] to-[#151515]">
@@ -2620,7 +2620,7 @@ export const SynthTypeDispatcher: React.FC<SynthTypeDispatcherProps> = ({
   }
 
   // ── Aeolus (Pipe Organ) ──────────────────────────────────
-  if (editorMode === 'aeolus' || instrument.synthType === 'Aeolus') {
+  if (editorMode === 'aeolus') {
     const aeolusConfig = { ...DEFAULT_AEOLUS, ...(instrument.aeolus || {}) };
     return (
       <div className="synth-editor-container bg-gradient-to-b from-[#1e1e1e] to-[#151515]">
@@ -2635,7 +2635,7 @@ export const SynthTypeDispatcher: React.FC<SynthTypeDispatcherProps> = ({
   }
 
   // ── FluidSynth (SF2) ─────────────────────────────────────
-  if (editorMode === 'fluidsynth' || instrument.synthType === 'FluidSynth') {
+  if (editorMode === 'fluidsynth') {
     const fsConfig = { ...DEFAULT_FLUIDSYNTH, ...(instrument.fluidsynth || {}) };
     return (
       <div className="synth-editor-container bg-gradient-to-b from-[#1e1e1e] to-[#151515]">
@@ -2650,7 +2650,7 @@ export const SynthTypeDispatcher: React.FC<SynthTypeDispatcherProps> = ({
   }
 
   // ── Sfizz (SFZ) ──────────────────────────────────────────
-  if (editorMode === 'sfizz' || instrument.synthType === 'Sfizz') {
+  if (editorMode === 'sfizz') {
     const sfizzConfig = { ...DEFAULT_SFIZZ, ...(instrument.sfizz || {}) };
     return (
       <div className="synth-editor-container bg-gradient-to-b from-[#1e1e1e] to-[#151515]">
@@ -2665,7 +2665,7 @@ export const SynthTypeDispatcher: React.FC<SynthTypeDispatcherProps> = ({
   }
 
   // ── ZynAddSubFX ──────────────────────────────────────────
-  if (editorMode === 'zynaddsubfx' || instrument.synthType === 'ZynAddSubFX') {
+  if (editorMode === 'zynaddsubfx') {
     const zasfxConfig = { ...DEFAULT_ZYNADDSUBFX, ...(instrument.zynaddsubfx || {}) };
     return (
       <div className="synth-editor-container bg-gradient-to-b from-[#1e1e1e] to-[#151515]">
