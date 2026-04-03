@@ -201,6 +201,21 @@ export const DeckAudioWaveform: React.FC<DeckAudioWaveformProps> = ({ deckId }) 
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [deckId, hasPeaks]);
 
+  // ── Beat snap helper ─────────────────────────────────────────────────────
+
+  /** Snap a seek position to the nearest beat if within 150ms */
+  const snapToNearestBeat = useCallback((seekSec: number): number => {
+    const beats = useDJStore.getState().decks[deckId].beatGrid?.beats;
+    if (!beats || beats.length === 0) return seekSec;
+    let nearest = beats[0], minDist = Math.abs(seekSec - nearest);
+    for (const b of beats) {
+      const dist = Math.abs(seekSec - b);
+      if (dist < minDist) { minDist = dist; nearest = b; }
+      if (b > seekSec + 0.2) break; // sorted, stop early
+    }
+    return minDist < 0.15 ? nearest : seekSec;
+  }, [deckId]);
+
   // ── Click / drag to seek ─────────────────────────────────────────────────
 
   const seekToFraction = useCallback((fraction: number) => {
@@ -249,7 +264,7 @@ export const DeckAudioWaveform: React.FC<DeckAudioWaveformProps> = ({ deckId }) 
 
     const onMouseMove = (ev: MouseEvent) => {
       if (!isDraggingRef.current) return;
-      const seekSec = calcSeekSec(ev.clientX);
+      const seekSec = snapToNearestBeat(calcSeekSec(ev.clientX));
       markSeek(deckId);
       useDJStore.getState().setDeckState(deckId, { audioPosition: seekSec, elapsedMs: seekSec * 1000 });
     };
@@ -257,7 +272,8 @@ export const DeckAudioWaveform: React.FC<DeckAudioWaveformProps> = ({ deckId }) 
     const onMouseUp = (ev: MouseEvent) => {
       if (isDraggingRef.current) {
         isDraggingRef.current = false;
-        const seekSec = calcSeekSec(ev.clientX);
+        // Snap to beat on release for clean alignment
+        const seekSec = snapToNearestBeat(calcSeekSec(ev.clientX));
         const dur = useDJStore.getState().decks[deckId].durationMs / 1000;
         if (dur > 0) seekToFraction(seekSec / dur);
       }

@@ -23,6 +23,7 @@ import { DJAutoDJPanel } from './DJAutoDJPanel';
 import { DJVocoderControl } from './DJVocoderControl';
 import { DJRemoteControlButton } from './DJRemoteControlButton';
 import { DeckAudioWaveform } from './DeckAudioWaveform';
+import { getPhaseInfo } from '@/engine/dj/DJAutoSync';
 import { useDJKeyboardHandler } from './DJKeyboardHandler';
 import type { SeratoTrack } from '@/lib/serato';
 import { getDJPipeline } from '@/engine/dj/DJPipeline';
@@ -60,6 +61,28 @@ export const DJView: React.FC<DJViewProps> = ({ onShowDrumpads: _onShowDrumpads 
   const [showAutoDJ, setShowAutoDJ] = useState(false);
   const autoDJEnabled = useDJStore((s) => s.autoDJEnabled);
   const health = useDJHealth();
+
+  // Sync status: poll phase alignment between decks at 10Hz
+  const [syncDriftMs, setSyncDriftMs] = useState<number | null>(null);
+  useEffect(() => {
+    const timer = setInterval(() => {
+      const s = useDJStore.getState();
+      if (!s.decks.A.isPlaying || !s.decks.B.isPlaying || !s.decks.A.beatGrid || !s.decks.B.beatGrid) {
+        setSyncDriftMs(null);
+        return;
+      }
+      try {
+        const phaseA = getPhaseInfo('A');
+        const phaseB = getPhaseInfo('B');
+        if (!phaseA || !phaseB) { setSyncDriftMs(null); return; }
+        let phaseDiff = Math.abs(phaseA.beatPhase - phaseB.beatPhase);
+        if (phaseDiff > 0.5) phaseDiff = 1 - phaseDiff;
+        const beatPeriodMs = (60 / s.decks.A.beatGrid!.bpm) * 1000;
+        setSyncDriftMs(Math.round(phaseDiff * beatPeriodMs));
+      } catch { setSyncDriftMs(null); }
+    }, 100);
+    return () => clearInterval(timer);
+  }, []);
 
   // Initialize DJEngine on mount, silence tracker + dispose on unmount
   useEffect(() => {
@@ -371,9 +394,27 @@ export const DJView: React.FC<DJViewProps> = ({ onShowDrumpads: _onShowDrumpads 
       {/* ================================================================== */}
       {/* FULL-WIDTH WAVEFORMS — Serato-style stacked at top               */}
       {/* ================================================================== */}
-      <div className="flex flex-col w-full shrink-0 border-b border-dark-border">
+      <div className={`flex flex-col w-full shrink-0 border-b relative transition-shadow duration-300 ${
+        syncDriftMs !== null && syncDriftMs < 30
+          ? 'border-green-500/50 shadow-[0_0_12px_rgba(34,197,94,0.3)]'
+          : syncDriftMs !== null && syncDriftMs > 80
+            ? 'border-red-500/30 shadow-[0_0_8px_rgba(239,68,68,0.2)]'
+            : 'border-dark-border'
+      }`}>
         <DeckAudioWaveform deckId="A" />
         <DeckAudioWaveform deckId="B" />
+        {/* Sync status badge between the two waveforms */}
+        {syncDriftMs !== null && (
+          <div className={`absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 px-2 py-0.5 rounded text-[10px] font-mono font-bold pointer-events-none z-10 ${
+            syncDriftMs < 30
+              ? 'bg-green-500/80 text-white'
+              : syncDriftMs < 80
+                ? 'bg-yellow-500/80 text-black'
+                : 'bg-red-500/80 text-white'
+          }`}>
+            {syncDriftMs < 30 ? 'SYNCED' : `${syncDriftMs}ms`}
+          </div>
+        )}
       </div>
 
       {/* ================================================================== */}
