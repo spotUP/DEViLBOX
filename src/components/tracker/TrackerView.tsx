@@ -38,6 +38,7 @@ import { EditorControlsBar } from './EditorControlsBar';
 import { TB303View } from '@components/demo/TB303View';
 import { MobileTrackerView } from './MobileTrackerView';
 import { useResponsive } from '@hooks/useResponsive';
+import { useMIDIFeedback } from '@hooks/useMIDIFeedback';
 import { Music2, Activity, ExternalLink, Undo2 } from 'lucide-react';
 import { PopOutWindow } from '@components/ui/PopOutWindow';
 import { InstrumentList } from '@components/instruments/InstrumentList';
@@ -160,6 +161,9 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
     blockOps,
     handleExportML,
   } = useTrackerView();
+
+  // MPK Mini pad LED feedback + OLED display sync
+  useMIDIFeedback();
 
   const {
     patterns,

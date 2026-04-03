@@ -539,6 +539,20 @@ class MIDIManager {
   }
 
   /**
+   * Send raw MIDI data to a specific output device by ID
+   * (bypasses the selected output — used for hardware LED feedback, etc.)
+   */
+  sendRawToDevice(deviceId: string, data: Uint8Array): void {
+    const output = this.outputs.get(deviceId);
+    if (!output) return;
+    try {
+      output.send(data);
+    } catch (error) {
+      console.error(`[MIDIManager] Failed to send to device ${deviceId}:`, error);
+    }
+  }
+
+  /**
    * Send Note On
    */
   sendNoteOn(channel: number, note: number, velocity: number): void {
