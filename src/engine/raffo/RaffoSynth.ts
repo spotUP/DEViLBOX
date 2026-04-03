@@ -310,7 +310,7 @@ export class RaffoSynthEngine implements DevilboxSynth {
     }
   }
 
-  private applyConfig(config: RaffoSynthConfig): void {
+  applyConfig(config: RaffoSynthConfig): void {
     if (!this._worklet || !this.isInitialized) return;
     for (let i = 0; i < CONFIG_KEYS.length; i++) {
       const value = config[CONFIG_KEYS[i]];

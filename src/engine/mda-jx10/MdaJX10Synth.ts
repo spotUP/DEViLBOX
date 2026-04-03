@@ -288,7 +288,7 @@ export class MdaJX10Synth implements DevilboxSynth {
     }
   }
 
-  private applyConfig(config: MdaJX10Config): void {
+  applyConfig(config: MdaJX10Config): void {
     if (!this._worklet || !this.isInitialized) return;
     for (let i = 0; i < CONFIG_KEYS.length; i++) {
       const value = config[CONFIG_KEYS[i]];
