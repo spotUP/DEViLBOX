@@ -577,7 +577,7 @@ export const PixiEditInstrumentModal: React.FC<PixiEditInstrumentModalProps> = (
                       paddingRight: 4,
                     }}
                   >
-                    <PixiIcon name="search" size={14} color={theme.textMuted.color} />
+                    <PixiIcon name="search" size={14} color={theme.textMuted.color} layout={{}} />
                     <PixiPureTextInput
                       value={synthSearch}
                       onChange={setSynthSearch}
@@ -592,7 +592,7 @@ export const PixiEditInstrumentModal: React.FC<PixiEditInstrumentModalProps> = (
                         onPointerTap={() => setSynthSearch('')}
                         layout={{ width: 20, height: 20, alignItems: 'center', justifyContent: 'center' }}
                       >
-                        <PixiIcon name="close" size={12} color={theme.textMuted.color} />
+                        <PixiIcon name="close" size={12} color={theme.textMuted.color} layout={{}} />
                       </layoutContainer>
                     )}
                   </layoutContainer>
@@ -622,6 +622,7 @@ export const PixiEditInstrumentModal: React.FC<PixiEditInstrumentModalProps> = (
                           fontSize: 10,
                           fill: createCategoryFilter === null ? 0x000000 : theme.textSecondary.color,
                         }}
+                        layout={{}}
                       />
                     </layoutContainer>
                     {SYNTH_CATEGORIES.map(cat => {
@@ -652,6 +653,7 @@ export const PixiEditInstrumentModal: React.FC<PixiEditInstrumentModalProps> = (
                               fontSize: 10,
                               fill: isActive ? 0x000000 : theme.textSecondary.color,
                             }}
+                            layout={{}}
                           />
                         </layoutContainer>
                       );
@@ -663,6 +665,7 @@ export const PixiEditInstrumentModal: React.FC<PixiEditInstrumentModalProps> = (
                     <pixiBitmapText
                       text={`Showing ${filteredCategorySynths.reduce((n, c) => n + c.synths.length, 0)} synth${filteredCategorySynths.reduce((n, c) => n + c.synths.length, 0) !== 1 ? 's' : ''}${synthSearch ? ` matching "${synthSearch}"` : ''}${createCategoryFilter ? ` in ${SYNTH_CATEGORIES.find(c => c.id === createCategoryFilter)?.name ?? ''}` : ''}`}
                       style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 10, fill: theme.textMuted.color }}
+                    layout={{}}
                     />
                   )}
                 </layoutContainer>
@@ -673,10 +676,12 @@ export const PixiEditInstrumentModal: React.FC<PixiEditInstrumentModalProps> = (
                     <pixiBitmapText
                       text="No synths found"
                       style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 12, fill: theme.textMuted.color }}
+                    layout={{}}
                     />
                     <pixiBitmapText
                       text="Try a different search term or category"
                       style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 10, fill: theme.textMuted.color }}
+                    layout={{}}
                     />
                     <layoutContainer
                       eventMode="static"
@@ -698,6 +703,7 @@ export const PixiEditInstrumentModal: React.FC<PixiEditInstrumentModalProps> = (
                       <pixiBitmapText
                         text="Clear filters"
                         style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 10, fill: theme.textSecondary.color }}
+                      layout={{}}
                       />
                     </layoutContainer>
                   </layoutContainer>
@@ -726,21 +732,25 @@ export const PixiEditInstrumentModal: React.FC<PixiEditInstrumentModalProps> = (
                             <pixiBitmapText
                               text={category.name}
                               style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 12, fill: 0xffffff }}
+                            layout={{}}
                             />
                             <pixiBitmapText
                               text={category.description}
                               style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 10, fill: theme.textMuted.color }}
+                            layout={{}}
                             />
                           </layoutContainer>
                           <layoutContainer layout={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                             <pixiBitmapText
                               text={String(category.synths.length)}
                               style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 10, fill: theme.textMuted.color }}
+                            layout={{}}
                             />
                             <PixiIcon
                               name={isCatExpanded ? 'caret-down' : 'caret-right'}
                               size={14}
                               color={theme.textMuted.color}
+                              layout={{}}
                             />
                           </layoutContainer>
                         </layoutContainer>
@@ -779,16 +789,18 @@ export const PixiEditInstrumentModal: React.FC<PixiEditInstrumentModalProps> = (
                                         borderRadius: 4,
                                       }}
                                     >
-                                      <PixiIcon name="waveform" size={16} color={twColor(synth.color)} />
+                                      <PixiIcon name="waveform" size={16} color={twColor(synth.color)} layout={{}} />
                                     </layoutContainer>
                                     <layoutContainer layout={{ flexDirection: 'column', gap: 1, flex: 1, overflow: 'hidden' }}>
                                       <pixiBitmapText
                                         text={synth.name}
                                         style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 11, fill: 0xffffff }}
+                                      layout={{}}
                                       />
                                       <pixiBitmapText
                                         text={synth.shortName}
                                         style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 9, fill: theme.textMuted.color }}
+                                      layout={{}}
                                       />
                                     </layoutContainer>
                                   </layoutContainer>
@@ -797,6 +809,7 @@ export const PixiEditInstrumentModal: React.FC<PixiEditInstrumentModalProps> = (
                                   <pixiBitmapText
                                     text={synth.description.length > 60 ? synth.description.slice(0, 57) + '...' : synth.description}
                                     style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 9, fill: theme.textSecondary.color }}
+                                  layout={{}}
                                   />
 
                                   {/* Tags */}
@@ -817,6 +830,7 @@ export const PixiEditInstrumentModal: React.FC<PixiEditInstrumentModalProps> = (
                                           <pixiBitmapText
                                             text={tag}
                                             style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 9, fill: theme.textMuted.color }}
+                                          layout={{}}
                                           />
                                         </layoutContainer>
                                       ))}
