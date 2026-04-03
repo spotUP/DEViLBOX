@@ -550,31 +550,31 @@ export const PixiEditInstrumentModal: React.FC<PixiEditInstrumentModalProps> = (
               height={CONTENT_H}
               contentHeight={
                 /* sticky header (~90) + categories content */
-                90 + (filteredCategorySynths.length === 0
+                140 + (filteredCategorySynths.length === 0
                   ? 100
                   : filteredCategorySynths.reduce((h, cat) => {
                       const rows = Math.ceil(cat.synths.length / 2);
-                      return h + 36 + rows * 100 + 12; // header + cards + gap
+                      return h + 50 + rows * 140 + 16; // header + cards + gap
                     }, 0))
               }
               bgColor={theme.bgSecondary.color}
             >
-              <layoutContainer layout={{ width: MODAL_W - 16, flexDirection: 'column', padding: 8, gap: 8 }}>
+              <layoutContainer layout={{ width: MODAL_W - 16, flexDirection: 'column', padding: 16, gap: 16 }}>
                 {/* ── Sticky-style header: search + chips + results count ── */}
-                <layoutContainer layout={{ flexDirection: 'column', gap: 6 }}>
+                <layoutContainer layout={{ flexDirection: 'column', gap: 12 }}>
                   {/* Search bar */}
                   <layoutContainer
                     layout={{
                       flexDirection: 'row',
                       alignItems: 'center',
-                      height: 28,
-                      gap: 6,
+                      height: 36,
+                      gap: 8,
                       backgroundColor: theme.bgTertiary?.color ?? 0x1a1a1a,
-                      borderRadius: 6,
+                      borderRadius: 8,
                       borderWidth: 1,
                       borderColor: theme.border.color,
-                      paddingLeft: 8,
-                      paddingRight: 4,
+                      paddingLeft: 10,
+                      paddingRight: 8,
                     }}
                   >
                     <PixiIcon name="search" size={14} color={theme.textMuted.color} layout={{}} />
@@ -598,16 +598,16 @@ export const PixiEditInstrumentModal: React.FC<PixiEditInstrumentModalProps> = (
                   </layoutContainer>
 
                   {/* Category filter chips */}
-                  <layoutContainer layout={{ flexDirection: 'row', flexWrap: 'wrap', gap: 4 }}>
+                  <layoutContainer layout={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
                     <layoutContainer
                       eventMode="static"
                       cursor="pointer"
                       onPointerTap={() => setCreateCategoryFilter(null)}
                       layout={{
-                        paddingLeft: 8,
-                        paddingRight: 8,
-                        height: 22,
-                        borderRadius: 11,
+                        paddingLeft: 12,
+                        paddingRight: 12,
+                        height: 26,
+                        borderRadius: 13,
                         alignItems: 'center',
                         justifyContent: 'center',
                         backgroundColor: createCategoryFilter === null ? 0xFB923C : (theme.bgTertiary?.color ?? 0x2a2a2a),
@@ -619,7 +619,7 @@ export const PixiEditInstrumentModal: React.FC<PixiEditInstrumentModalProps> = (
                         text={`All (${totalAllSynths})`}
                         style={{
                           fontFamily: PIXI_FONTS.MONO,
-                          fontSize: 10,
+                          fontSize: 11,
                           fill: createCategoryFilter === null ? 0x000000 : theme.textSecondary.color,
                         }}
                         layout={{}}
@@ -635,10 +635,10 @@ export const PixiEditInstrumentModal: React.FC<PixiEditInstrumentModalProps> = (
                           cursor="pointer"
                           onPointerTap={() => setCreateCategoryFilter(isActive ? null : cat.id)}
                           layout={{
-                            paddingLeft: 8,
-                            paddingRight: 8,
-                            height: 22,
-                            borderRadius: 11,
+                            paddingLeft: 12,
+                            paddingRight: 12,
+                            height: 26,
+                            borderRadius: 13,
                             alignItems: 'center',
                             justifyContent: 'center',
                             backgroundColor: isActive ? 0xFB923C : (theme.bgTertiary?.color ?? 0x2a2a2a),
@@ -650,7 +650,7 @@ export const PixiEditInstrumentModal: React.FC<PixiEditInstrumentModalProps> = (
                             text={`${cat.name} (${count})`}
                             style={{
                               fontFamily: PIXI_FONTS.MONO,
-                              fontSize: 10,
+                              fontSize: 11,
                               fill: isActive ? 0x000000 : theme.textSecondary.color,
                             }}
                             layout={{}}
@@ -728,15 +728,15 @@ export const PixiEditInstrumentModal: React.FC<PixiEditInstrumentModalProps> = (
                             paddingRight: 4,
                           }}
                         >
-                          <layoutContainer layout={{ flexDirection: 'column', gap: 1 }}>
+                          <layoutContainer layout={{ flexDirection: 'column', gap: 2 }}>
                             <pixiBitmapText
                               text={category.name}
-                              style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 12, fill: 0xffffff }}
+                              style={{ fontFamily: PIXI_FONTS.SANS_SEMIBOLD, fontSize: 14, fill: 0xffffff }}
                             layout={{}}
                             />
                             <pixiBitmapText
                               text={category.description}
-                              style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 10, fill: theme.textMuted.color }}
+                              style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 12, fill: theme.textMuted.color }}
                             layout={{}}
                             />
                           </layoutContainer>
@@ -757,9 +757,9 @@ export const PixiEditInstrumentModal: React.FC<PixiEditInstrumentModalProps> = (
 
                         {/* 2-column synth card grid */}
                         {isCatExpanded && (
-                          <layoutContainer layout={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
+                          <layoutContainer layout={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12 }}>
                             {category.synths.map((synth: SynthInfoType) => {
-                              const cardW = Math.floor((MODAL_W - 16 - 16 - 6) / 2); // padding + gap
+                              const cardW = Math.floor((MODAL_W - 32 - 32 - 12) / 2); // padding + gap
                               return (
                                 <layoutContainer
                                   key={`${category.id}-${synth.type}`}
@@ -769,37 +769,37 @@ export const PixiEditInstrumentModal: React.FC<PixiEditInstrumentModalProps> = (
                                   layout={{
                                     width: cardW,
                                     flexDirection: 'column',
-                                    padding: 8,
-                                    borderRadius: 6,
+                                    padding: 16,
+                                    borderRadius: 8,
                                     borderWidth: 1,
                                     borderColor: theme.border.color,
                                     backgroundColor: theme.bgSecondary?.color ?? 0x1e1e1e,
-                                    gap: 4,
+                                    gap: 8,
                                   }}
                                 >
                                   {/* Icon + Name row */}
-                                  <layoutContainer layout={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                                  <layoutContainer layout={{ flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 4 }}>
                                     <layoutContainer
                                       layout={{
-                                        width: 30,
-                                        height: 30,
+                                        width: 34,
+                                        height: 34,
                                         alignItems: 'center',
                                         justifyContent: 'center',
                                         backgroundColor: theme.bgTertiary?.color ?? 0x2a2a2a,
-                                        borderRadius: 4,
+                                        borderRadius: 6,
                                       }}
                                     >
-                                      <PixiIcon name="waveform" size={16} color={twColor(synth.color)} layout={{}} />
+                                      <PixiIcon name="waveform" size={18} color={twColor(synth.color)} layout={{}} />
                                     </layoutContainer>
-                                    <layoutContainer layout={{ flexDirection: 'column', gap: 1, flex: 1, overflow: 'hidden' }}>
+                                    <layoutContainer layout={{ flexDirection: 'column', gap: 2, flex: 1, overflow: 'hidden' }}>
                                       <pixiBitmapText
                                         text={synth.name}
-                                        style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 11, fill: 0xffffff }}
+                                        style={{ fontFamily: PIXI_FONTS.SANS_SEMIBOLD, fontSize: 13, fill: 0xffffff }}
                                       layout={{}}
                                       />
                                       <pixiBitmapText
                                         text={synth.shortName}
-                                        style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 9, fill: theme.textMuted.color }}
+                                        style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 11, fill: theme.textMuted.color }}
                                       layout={{}}
                                       />
                                     </layoutContainer>
@@ -807,29 +807,29 @@ export const PixiEditInstrumentModal: React.FC<PixiEditInstrumentModalProps> = (
 
                                   {/* Description */}
                                   <pixiBitmapText
-                                    text={synth.description.length > 60 ? synth.description.slice(0, 57) + '...' : synth.description}
-                                    style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 9, fill: theme.textSecondary.color }}
+                                    text={synth.description.length > 70 ? synth.description.slice(0, 67) + '...' : synth.description}
+                                    style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 11, fill: theme.textSecondary.color }}
                                   layout={{}}
                                   />
 
                                   {/* Tags */}
                                   {synth.bestFor.length > 0 && (
-                                    <layoutContainer layout={{ flexDirection: 'row', flexWrap: 'wrap', gap: 3 }}>
+                                    <layoutContainer layout={{ flexDirection: 'row', flexWrap: 'wrap', gap: 4 }}>
                                       {synth.bestFor.slice(0, 3).map(tag => (
                                         <layoutContainer
                                           key={tag}
                                           layout={{
-                                            paddingLeft: 5,
-                                            paddingRight: 5,
-                                            paddingTop: 1,
-                                            paddingBottom: 1,
-                                            borderRadius: 8,
+                                            paddingLeft: 8,
+                                            paddingRight: 8,
+                                            paddingTop: 2,
+                                            paddingBottom: 2,
+                                            borderRadius: 10,
                                             backgroundColor: theme.bgTertiary?.color ?? 0x2a2a2a,
                                           }}
                                         >
                                           <pixiBitmapText
                                             text={tag}
-                                            style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 9, fill: theme.textMuted.color }}
+                                            style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 10, fill: theme.textMuted.color }}
                                           layout={{}}
                                           />
                                         </layoutContainer>
