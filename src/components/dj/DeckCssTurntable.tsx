@@ -226,7 +226,8 @@ export const DeckCssTurntable: React.FC<DeckCssTurntableProps> = ({ deckId }) =>
 
       const pixelVelocity = tangential / dt;
       const platterSize = rect.width * 0.72; // platter is ~72% of turntable width
-      const omega = (pixelVelocity / (platterSize * 0.8)) * OMEGA_NORMAL;
+      const sensitivity = useDJStore.getState().jogWheelSensitivity;
+      const omega = (pixelVelocity / (platterSize * 0.8)) * OMEGA_NORMAL * sensitivity;
       physicsRef.current?.setHandVelocity(omega);
     }
 

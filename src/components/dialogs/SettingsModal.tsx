@@ -651,6 +651,17 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
                       <span className="text-ft2-text text-[10px] font-mono w-8 text-right">{Math.round(s.platterMass * 100)}%</span>
                     </div>
                   </div>
+                  <div className="flex items-center justify-between">
+                    <div className="flex flex-col">
+                      <label className="text-ft2-text text-xs font-mono">Scratch Sensitivity:</label>
+                      <span className="text-[9px] text-ft2-textDim font-mono">How fast the record responds to drag</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <input type="range" min="50" max="200" value={Math.round(s.jogWheelSensitivity * 100)}
+                        onChange={(e) => s.setJogWheelSensitivity(parseInt(e.target.value) / 100)} className="w-20 accent-ft2-cursor" />
+                      <span className="text-ft2-text text-[10px] font-mono w-8 text-right">{Math.round(s.jogWheelSensitivity * 100)}%</span>
+                    </div>
+                  </div>
                   <div className="pt-2 border-t border-ft2-border/30 text-ft2-textDim text-[9px] font-mono">
                     <div className="text-ft2-highlight font-bold">How to scratch:</div>
                     <div>Scroll wheel/trackpad during playback</div>
