@@ -10,6 +10,11 @@ const FILTER_TYPE = [
   { value: '0', label: 'LP' }, { value: '1', label: 'HP' }, { value: '2', label: 'BP' },
   { value: '3', label: 'Notch' }, { value: '4', label: 'Peak' }, { value: '5', label: 'LShelf' },
 ];
+const SUB_MAG_TYPE = [
+  { value: '0', label: 'Linear' }, { value: '1', label: 'dB' },
+  { value: '2', label: '-40dB' }, { value: '3', label: '-60dB' },
+];
+const fmtOct = (v: number) => `${v > 0 ? '+' : ''}${Math.round(v)}`;
 
 export const ZYNADDSUBFX_LAYOUT: SynthPanelLayout = {
   name: 'ZynAddSubFX',
@@ -26,6 +31,7 @@ export const ZYNADDSUBFX_LAYOUT: SynthPanelLayout = {
             { type: 'knob', key: 'addVolume', label: 'VOL', color: '#00ff99', min: 0, max: 1, defaultValue: 0.8, formatValue: fmtPct },
             { type: 'knob', key: 'addPanning', label: 'PAN', color: '#66ccff', min: -1, max: 1, defaultValue: 0, bipolar: true, formatValue: (v) => `${Math.round(v * 100)}%` },
             { type: 'knob', key: 'addDetune', label: 'DETUNE', color: '#ffcc00', min: -1, max: 1, defaultValue: 0, bipolar: true, formatValue: (v) => `${Math.round(v * 100)}%` },
+            { type: 'knob', key: 'addOctave', label: 'OCT', color: '#66ccff', min: -4, max: 4, defaultValue: 0, bipolar: true, formatValue: fmtOct },
           ],
         },
         {
@@ -42,6 +48,25 @@ export const ZYNADDSUBFX_LAYOUT: SynthPanelLayout = {
             { type: 'select', key: 'addVoice2Wave', label: 'WAVE', options: VOICE_WAVE },
             { type: 'knob', key: 'addVoice2Volume', label: 'VOL', color: '#ff9900', min: 0, max: 1, defaultValue: 0, formatValue: fmtPct },
             { type: 'knob', key: 'addVoice2Detune', label: 'DETUNE', color: '#ffcc00', min: -1, max: 1, defaultValue: 0, bipolar: true, formatValue: (v) => `${Math.round(v * 100)}%` },
+            { type: 'knob', key: 'addVoice2Octave', label: 'OCT', color: '#66ccff', min: -4, max: 4, defaultValue: 0, bipolar: true, formatValue: fmtOct },
+          ],
+        },
+        {
+          label: 'VOICE 3',
+          controls: [
+            { type: 'select', key: 'addVoice3Wave', label: 'WAVE', options: VOICE_WAVE },
+            { type: 'knob', key: 'addVoice3Volume', label: 'VOL', color: '#ff9900', min: 0, max: 1, defaultValue: 0, formatValue: fmtPct },
+            { type: 'knob', key: 'addVoice3Detune', label: 'DETUNE', color: '#ffcc00', min: -1, max: 1, defaultValue: 0, bipolar: true, formatValue: (v) => `${Math.round(v * 100)}%` },
+            { type: 'knob', key: 'addVoice3Octave', label: 'OCT', color: '#66ccff', min: -4, max: 4, defaultValue: 0, bipolar: true, formatValue: fmtOct },
+          ],
+        },
+        {
+          label: 'VOICE 4',
+          controls: [
+            { type: 'select', key: 'addVoice4Wave', label: 'WAVE', options: VOICE_WAVE },
+            { type: 'knob', key: 'addVoice4Volume', label: 'VOL', color: '#ff9900', min: 0, max: 1, defaultValue: 0, formatValue: fmtPct },
+            { type: 'knob', key: 'addVoice4Detune', label: 'DETUNE', color: '#ffcc00', min: -1, max: 1, defaultValue: 0, bipolar: true, formatValue: (v) => `${Math.round(v * 100)}%` },
+            { type: 'knob', key: 'addVoice4Octave', label: 'OCT', color: '#66ccff', min: -4, max: 4, defaultValue: 0, bipolar: true, formatValue: fmtOct },
           ],
         },
       ],
@@ -57,6 +82,22 @@ export const ZYNADDSUBFX_LAYOUT: SynthPanelLayout = {
             { type: 'knob', key: 'subVolume', label: 'VOL', color: '#00ff99', min: 0, max: 1, defaultValue: 0.8, formatValue: fmtPct },
             { type: 'knob', key: 'subBandwidth', label: 'BWIDTH', color: '#cc66ff', min: 0, max: 1, defaultValue: 0.5, formatValue: fmtPct },
             { type: 'knob', key: 'subNumHarmonics', label: 'HARMS', color: '#9966ff', min: 1, max: 64, defaultValue: 8, formatValue: (v) => `${Math.round(v)}` },
+            { type: 'knob', key: 'subPanning', label: 'PAN', color: '#66ccff', min: -1, max: 1, defaultValue: 0, bipolar: true, formatValue: (v) => `${Math.round(v * 100)}%` },
+            { type: 'knob', key: 'subOctave', label: 'OCT', color: '#66ccff', min: -4, max: 4, defaultValue: 0, bipolar: true, formatValue: fmtOct },
+            { type: 'knob', key: 'subDetune', label: 'DETUNE', color: '#ffcc00', min: -1, max: 1, defaultValue: 0, bipolar: true, formatValue: (v) => `${Math.round(v * 100)}%` },
+            { type: 'knob', key: 'subBandwidthScale', label: 'BW SCL', color: '#cc66ff', min: 0, max: 1, defaultValue: 0.5, formatValue: fmtPct },
+            { type: 'select', key: 'subMagType', label: 'MAG TYPE', options: SUB_MAG_TYPE },
+          ],
+        },
+        {
+          label: 'SUB HARMONICS',
+          controls: [
+            { type: 'knob', key: 'subHarmonic1', label: 'H1', color: '#9966ff', min: 0, max: 1, defaultValue: 1, formatValue: fmtPct },
+            { type: 'knob', key: 'subHarmonic2', label: 'H2', color: '#9966ff', min: 0, max: 1, defaultValue: 0, formatValue: fmtPct },
+            { type: 'knob', key: 'subHarmonic3', label: 'H3', color: '#9966ff', min: 0, max: 1, defaultValue: 0, formatValue: fmtPct },
+            { type: 'knob', key: 'subHarmonic4', label: 'H4', color: '#9966ff', min: 0, max: 1, defaultValue: 0, formatValue: fmtPct },
+            { type: 'knob', key: 'subHarmonic5', label: 'H5', color: '#9966ff', min: 0, max: 1, defaultValue: 0, formatValue: fmtPct },
+            { type: 'knob', key: 'subHarmonic6', label: 'H6', color: '#9966ff', min: 0, max: 1, defaultValue: 0, formatValue: fmtPct },
           ],
         },
         {
@@ -69,6 +110,12 @@ export const ZYNADDSUBFX_LAYOUT: SynthPanelLayout = {
               { value: '0', label: 'Low' }, { value: '1', label: 'Med' },
               { value: '2', label: 'High' }, { value: '3', label: 'Ultra' },
             ]},
+            { type: 'knob', key: 'padPanning', label: 'PAN', color: '#66ccff', min: -1, max: 1, defaultValue: 0, bipolar: true, formatValue: (v) => `${Math.round(v * 100)}%` },
+            { type: 'knob', key: 'padBandwidthScale', label: 'BW SCL', color: '#cc66ff', min: 0, max: 1, defaultValue: 0.5, formatValue: fmtPct },
+            { type: 'knob', key: 'padProfileWidth', label: 'P WIDTH', color: '#cc66ff', min: 0, max: 1, defaultValue: 0.5, formatValue: fmtPct },
+            { type: 'knob', key: 'padProfileStretch', label: 'P STRCH', color: '#cc66ff', min: 0, max: 1, defaultValue: 0, formatValue: fmtPct },
+            { type: 'knob', key: 'padOctave', label: 'OCT', color: '#66ccff', min: -4, max: 4, defaultValue: 0, bipolar: true, formatValue: fmtOct },
+            { type: 'knob', key: 'padDetune', label: 'DETUNE', color: '#ffcc00', min: -1, max: 1, defaultValue: 0, bipolar: true, formatValue: (v) => `${Math.round(v * 100)}%` },
           ],
         },
       ],
@@ -85,6 +132,7 @@ export const ZYNADDSUBFX_LAYOUT: SynthPanelLayout = {
             { type: 'knob', key: 'filterResonance', label: 'RESO', color: '#ff6600', min: 0, max: 1, defaultValue: 0.2, formatValue: fmtPct },
             { type: 'knob', key: 'filterEnvAmount', label: 'ENV AMT', color: '#22c55e', min: 0, max: 1, defaultValue: 0, formatValue: fmtPct },
             { type: 'knob', key: 'filterKeyTrack', label: 'KEY TRK', color: '#66ccff', min: 0, max: 1, defaultValue: 0.5, formatValue: fmtPct },
+            { type: 'knob', key: 'filterVelocity', label: 'VEL', color: '#22c55e', min: 0, max: 1, defaultValue: 0, formatValue: fmtPct },
           ],
         },
         {
