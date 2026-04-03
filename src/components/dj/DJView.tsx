@@ -62,13 +62,16 @@ export const DJView: React.FC<DJViewProps> = ({ onShowDrumpads: _onShowDrumpads 
   const autoDJEnabled = useDJStore((s) => s.autoDJEnabled);
   const health = useDJHealth();
 
-  // Sync status: poll phase alignment between decks at 10Hz
+  // Sync status: poll phase alignment between decks at 10Hz with hysteresis
+  // Uses a rolling average to avoid flickering between green/yellow/red
   const [syncDriftMs, setSyncDriftMs] = useState<number | null>(null);
+  const driftHistoryRef = useRef<number[]>([]);
   useEffect(() => {
     const timer = setInterval(() => {
       const s = useDJStore.getState();
       if (!s.decks.A.isPlaying || !s.decks.B.isPlaying || !s.decks.A.beatGrid || !s.decks.B.beatGrid) {
         setSyncDriftMs(null);
+        driftHistoryRef.current = [];
         return;
       }
       try {
@@ -78,7 +81,15 @@ export const DJView: React.FC<DJViewProps> = ({ onShowDrumpads: _onShowDrumpads 
         let phaseDiff = Math.abs(phaseA.beatPhase - phaseB.beatPhase);
         if (phaseDiff > 0.5) phaseDiff = 1 - phaseDiff;
         const beatPeriodMs = (60 / s.decks.A.beatGrid!.bpm) * 1000;
-        setSyncDriftMs(Math.round(phaseDiff * beatPeriodMs));
+        const rawDrift = Math.round(phaseDiff * beatPeriodMs);
+
+        // Rolling average of last 10 samples (1 second) for stable display
+        const history = driftHistoryRef.current;
+        history.push(rawDrift);
+        if (history.length > 10) history.shift();
+        const avgDrift = Math.round(history.reduce((a, b) => a + b, 0) / history.length);
+
+        setSyncDriftMs(avgDrift);
       } catch { setSyncDriftMs(null); }
     }, 100);
     return () => clearInterval(timer);
