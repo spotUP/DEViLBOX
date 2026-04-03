@@ -30,7 +30,7 @@ type TransitionType = 'crossfade' | 'cut' | 'echo-out' | 'filter-build' | 'bass-
 
 const POLL_INTERVAL_MS = 500;
 const PRELOAD_LEAD_TIME_SEC = 60;
-const MAX_SKIP_ATTEMPTS = 3;
+const MAX_SKIP_ATTEMPTS = 50; // Skip up to 50 unloadable tracks (local files without modland: prefix)
 const SKIP_TRANSITION_BARS = 4;
 
 
