@@ -33,6 +33,12 @@ export interface PixiListItemRating {
   userRating?: number;
 }
 
+export interface PixiListAction {
+  label: string;
+  color?: number;
+  onClick: () => void;
+}
+
 export interface PixiListItem {
   id: string;
   label: string;
@@ -45,6 +51,8 @@ export interface PixiListItem {
   iconColor?: number;
   /** Star rating data — if present, 5 interactive stars are shown */
   rating?: PixiListItemRating;
+  /** Action buttons shown on hover (right-aligned) */
+  actions?: PixiListAction[];
 }
 
 interface PixiListProps {
@@ -257,6 +265,39 @@ export const PixiList: React.FC<PixiListProps> = ({
                 tint={theme.textMuted.color}
                 layout={{ flexShrink: 0, marginRight: 8 }}
               />
+            )}
+
+            {/* Hover action buttons (right-aligned) */}
+            {isHovered && item.actions && item.actions.length > 0 && (
+              <pixiContainer
+                eventMode="static"
+                layout={{ flexDirection: 'row', flexShrink: 0, gap: 2, marginRight: 4 }}
+              >
+                {item.actions.map((action, ai) => (
+                  <pixiContainer
+                    key={ai}
+                    eventMode="static"
+                    cursor="pointer"
+                    onPointerUp={(e: FederatedPointerEvent) => { e.stopPropagation(); action.onClick(); }}
+                    layout={{
+                      height: itemHeight - 4,
+                      paddingLeft: 5,
+                      paddingRight: 5,
+                      justifyContent: 'center',
+                      alignItems: 'center',
+                      backgroundColor: action.color ?? theme.accent.color,
+                      borderRadius: 3,
+                    }}
+                  >
+                    <pixiBitmapText
+                      eventMode="none"
+                      text={action.label}
+                      style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 10, fill: 0xffffff }}
+                      layout={{}}
+                    />
+                  </pixiContainer>
+                ))}
+              </pixiContainer>
             )}
 
             {/* Star ratings */}
