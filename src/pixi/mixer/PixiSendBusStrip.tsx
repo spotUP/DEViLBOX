@@ -24,7 +24,7 @@ import type { Container as ContainerType } from 'pixi.js';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-const TEAL = 0x14b8a6;
+// Send bus accent color derived from theme.accentHighlight
 const BUS_LETTERS = ['A', 'B', 'C', 'D'];
 
 // Build preset dropdown options
@@ -125,7 +125,7 @@ export const PixiSendBusStrip: React.FC<PixiSendBusStripProps> = ({
       <pixiBitmapText
         text={letter}
         style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 14, fill: 0xffffff }}
-        tint={TEAL}
+        tint={theme.accentHighlight.color}
         layout={{ width, height: 14 }}
       />
 
@@ -141,7 +141,7 @@ export const PixiSendBusStrip: React.FC<PixiSendBusStripProps> = ({
       <pixiBitmapText
         text={effectCount > 0 ? `FX:${effectCount}` : 'FX:0'}
         style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 9, fill: 0xffffff }}
-        tint={effectCount > 0 ? TEAL : theme.textMuted.color}
+        tint={effectCount > 0 ? theme.accentHighlight.color : theme.textMuted.color}
         layout={{ width, height: 10 }}
       />
 
@@ -163,7 +163,7 @@ export const PixiSendBusStrip: React.FC<PixiSendBusStripProps> = ({
         defaultValue={1.0}
         formatValue={formatVolume}
         layout={{ width }}
-        color={TEAL}
+        color={theme.accentHighlight.color}
       />
 
       {/* 5. Mute button */}
@@ -190,7 +190,7 @@ export const PixiSendBusStrip: React.FC<PixiSendBusStripProps> = ({
           height: 18,
           backgroundColor: fxHovered ? theme.bgHover.color : theme.bgTertiary.color,
           borderWidth: 1,
-          borderColor: TEAL,
+          borderColor: theme.accentHighlight.color,
           borderRadius: 2,
           justifyContent: 'center',
           alignItems: 'center',
@@ -199,7 +199,7 @@ export const PixiSendBusStrip: React.FC<PixiSendBusStripProps> = ({
         <pixiBitmapText
           text="FX"
           style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 10, fill: 0xffffff }}
-          tint={TEAL}
+          tint={theme.accentHighlight.color}
         />
       </pixiContainer>
     </pixiContainer>

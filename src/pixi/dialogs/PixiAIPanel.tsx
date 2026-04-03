@@ -26,6 +26,11 @@ const PROVIDER_ROW_H = 22;
 const INPUT_ROW_H = 28;
 const INPUT_PAD = 6;
 
+/** Darken a color by a factor (0-1) to create a tinted background */
+function tintBg(color: number, factor = 0.15): number {
+  return (((color >> 16 & 0xff) * factor | 0) << 16) | (((color >> 8 & 0xff) * factor | 0) << 8) | ((color & 0xff) * factor | 0);
+}
+
 /** Simple word-wrap for BitmapText */
 function wrapText(text: string, maxChars: number): string[] {
   const lines: string[] = [];
@@ -55,10 +60,11 @@ function messageHeight(msg: AIMessage): number {
 
 /** Single message row */
 const MessageRow: React.FC<{ msg: AIMessage; width: number }> = ({ msg, width }) => {
+  const theme = usePixiTheme();
   const isUser = msg.role === 'user';
   const wrapped = useMemo(() => wrapText(msg.content || (msg.isStreaming ? '...' : ''), MAX_CHARS_PER_LINE), [msg.content, msg.isStreaming]);
-  const textColor = isUser ? 0x60A5FA : 0xD4D4D4;
-  const bgColor = isUser ? 0x1E3A5F : 0x2A2A2A;
+  const textColor = isUser ? theme.accent.color : theme.textSecondary.color;
+  const bgColor = isUser ? tintBg(theme.accent.color) : theme.bgTertiary.color;
 
   const h = messageHeight(msg);
 
@@ -79,7 +85,7 @@ const MessageRow: React.FC<{ msg: AIMessage; width: number }> = ({ msg, width })
       <pixiBitmapText
         text={isUser ? 'You' : 'AI'}
         style={{ fontFamily: PIXI_FONTS.SANS_SEMIBOLD, fontSize: 10, fill: 0xffffff }}
-        tint={isUser ? 0x60A5FA : 0x4ADE80}
+        tint={isUser ? theme.accent.color : theme.success.color}
         layout={{ paddingLeft: 6, paddingTop: 3 }}
       />
 
@@ -100,7 +106,7 @@ const MessageRow: React.FC<{ msg: AIMessage; width: number }> = ({ msg, width })
           key={`tc-${i}`}
           text={`  ${tc.result ? '+' : '>'} ${tc.tool}`}
           style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 10, fill: 0xffffff }}
-          tint={tc.result ? 0x4ADE80 : 0xFACC15}
+          tint={tc.result ? theme.success.color : theme.warning.color}
           layout={{ paddingLeft: 6 }}
         />
       ))}

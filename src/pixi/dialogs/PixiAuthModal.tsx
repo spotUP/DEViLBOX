@@ -125,9 +125,9 @@ export const PixiAuthModal: React.FC<PixiAuthModalProps> = ({ isOpen, onClose, o
           layout={{
             width: INPUT_W,
             padding: 12,
-            backgroundColor: 0x0c1a2e,
+            backgroundColor: (((theme.accent.color >> 16 & 0xff) * 0.15 | 0) << 16) | (((theme.accent.color >> 8 & 0xff) * 0.15 | 0) << 8) | ((theme.accent.color & 0xff) * 0.15 | 0),
             borderWidth: 1,
-            borderColor: 0x1e3a5f,
+            borderColor: theme.accent.color,
             borderRadius: 4,
           }}
         >
@@ -149,9 +149,9 @@ export const PixiAuthModal: React.FC<PixiAuthModalProps> = ({ isOpen, onClose, o
             layout={{
               width: INPUT_W,
               padding: 12,
-              backgroundColor: 0x2a0c0c,
+              backgroundColor: (((theme.error.color >> 16 & 0xff) * 0.15 | 0) << 16) | (((theme.error.color >> 8 & 0xff) * 0.15 | 0) << 8) | ((theme.error.color & 0xff) * 0.15 | 0),
               borderWidth: 1,
-              borderColor: 0x5f1e1e,
+              borderColor: theme.error.color,
               borderRadius: 4,
             }}
           >

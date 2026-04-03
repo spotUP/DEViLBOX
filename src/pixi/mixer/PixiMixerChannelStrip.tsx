@@ -68,7 +68,7 @@ const VU_COLOR_GREEN  = VU_GREEN;
 const VU_COLOR_YELLOW = VU_YELLOW;
 const VU_COLOR_RED    = VU_RED;
 
-const STRIP_WIDTH = 72;
+const STRIP_WIDTH = 56; // matches DOM MixerPanel strip width
 
 // Channel FX preset dropdown options
 const CHANNEL_FX_OPTIONS: SelectOption[] = [
@@ -506,8 +506,10 @@ export const PixiMixerChannelStrip: React.FC<PixiMixerChannelStripProps> = ({
                   eventMode="static"
                   cursor="pointer"
                   onPointerUp={() => {
-                    // Toggle: off → 0.5, on → cycle 0.25/0.5/0.75/1.0, or off
-                    const next = level <= 0 ? 0.5 : level >= 1 ? 0 : Math.min(1, level + 0.25);
+                    // Cycle through preset levels matching DOM: [0, 0.5, 0.75, 1]
+                    const SEND_CYCLE = [0, 0.5, 0.75, 1];
+                    const curIdx = SEND_CYCLE.findIndex(v => Math.abs(v - level) < 0.01);
+                    const next = SEND_CYCLE[(curIdx + 1) % SEND_CYCLE.length];
                     onSendLevelChange(i, next);
                   }}
                   layout={{
@@ -515,7 +517,7 @@ export const PixiMixerChannelStrip: React.FC<PixiMixerChannelStripProps> = ({
                     height: 12,
                     backgroundColor: theme.bgActive.color,
                     borderWidth: 1,
-                    borderColor: level > 0 ? 0x14b8a6 : theme.border.color,
+                    borderColor: level > 0 ? theme.accentHighlight.color : theme.border.color,
                     overflow: 'hidden',
                   }}
                 >
@@ -524,7 +526,7 @@ export const PixiMixerChannelStrip: React.FC<PixiMixerChannelStripProps> = ({
                     layout={{
                       width: Math.round(barWidth * level),
                       height: 10,
-                      backgroundColor: 0x14b8a6,
+                      backgroundColor: theme.accentHighlight.color,
                     }}
                   />
                 </layoutContainer>

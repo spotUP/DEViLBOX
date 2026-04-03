@@ -57,10 +57,15 @@ function fileIconName(name: string, isDir: boolean): string {
 }
 
 /** Returns icon tint color based on file type */
-function fileIconColor(name: string, isDir: boolean): number {
-  if (isDir) return 0x4a9eff;        // blue for folders
-  if (isTrackerModule(name)) return 0x22c55e; // green for tracker modules
-  return 0x888888;                    // gray for other files
+function fileIconColor(name: string, isDir: boolean, theme: ReturnType<typeof usePixiTheme>): number {
+  if (isDir) return theme.accent.color;           // blue for folders
+  if (isTrackerModule(name)) return theme.success.color; // green for tracker modules
+  return theme.textMuted.color;                    // gray for other files
+}
+
+/** Tint a color toward black (for subtle error/info backgrounds) */
+function tintBg(color: number, factor = 0.15): number {
+  return (((color >> 16 & 0xff) * factor | 0) << 16) | (((color >> 8 & 0xff) * factor | 0) << 8) | ((color & 0xff) * factor | 0);
 }
 
 function formatSize(size?: number): string {
@@ -331,7 +336,7 @@ export const PixiFileBrowser: React.FC<PixiFileBrowserProps> = ({
                 width: listW,
                 padding: 8,
                 marginBottom: 8,
-                backgroundColor: 0x2a0808,
+                backgroundColor: tintBg(theme.error.color),
                 borderWidth: 1,
                 borderColor: theme.error.color,
                 borderRadius: 4,
@@ -544,7 +549,7 @@ const FileList: React.FC<FileListProps> = ({
         const file = row.file;
 
         const iconName = row.isBack ? 'open' : file ? fileIconName(file.name, file.isDirectory) : 'open';
-        const iconColor = row.isBack ? 0x4a9eff : file ? fileIconColor(file.name, file.isDirectory) : 0x4a9eff;
+        const iconColor = row.isBack ? theme.accent.color : file ? fileIconColor(file.name, file.isDirectory, theme) : theme.accent.color;
         const label = row.isBack ? '.. (back)' : file?.name ?? '';
         const sublabel = row.isBack ? '' : file ? (file.isDirectory ? 'DIR' : formatSize(file.size)) : '';
 

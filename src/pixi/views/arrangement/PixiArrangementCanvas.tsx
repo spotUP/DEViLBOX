@@ -371,7 +371,7 @@ export const PixiArrangementCanvas: React.FC<PixiArrangementCanvasProps> = ({
       // Check for overlap with existing clips on the same track
       const { clips: allClips } = paramsRef.current;
       const overlaps = hasOverlapOnTrack(allClips, drag.drawTrackIndex, startRow, endRow - startRow, new Set());
-      const ghostColor = overlaps ? 0xff4444 : 0x4a9eff;
+      const ghostColor = overlaps ? paramsRef.current.theme.error.color : paramsRef.current.theme.accent.color;
 
       g.roundRect(cx + CLIP_PADDING, cy, cw - CLIP_PADDING * 2, ch, 3);
       g.fill({ color: ghostColor, alpha: 0.35 });

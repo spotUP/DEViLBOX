@@ -155,7 +155,7 @@ const PadCell: React.FC<PadCellProps> = React.memo(({ pad, selected, focused, ve
           : theme.bg.color;
 
   const borderColor = focused && !selected
-    ? 0x60a5fa // blue-400 for keyboard focus
+    ? theme.accent.color // blue for keyboard focus
     : selected
       ? theme.accent.color
       : theme.border.color;

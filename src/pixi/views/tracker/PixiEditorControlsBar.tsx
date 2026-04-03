@@ -644,6 +644,19 @@ export const PixiEditorControlsBar: React.FC<PixiEditorControlsBarProps> = ({
         layout={{ display: c.statusMessage ? 'flex' : 'none', marginRight: 8 }}
       />
 
+      {/* IT Mask Indicator (persistent when itMaskVariables behavior is active) */}
+      {c.maskDisplay && (
+        <>
+          <Sep />
+          <pixiBitmapText
+            text={`[MASK: ${c.maskDisplay}]`}
+            style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 10, fill: 0xffffff }}
+            tint={theme.accentHighlight.color}
+            layout={{}}
+          />
+        </>
+      )}
+
       {/* FPS pill */}
       <pixiBitmapText
         text={`${c.fps.averageFps} FPS`}

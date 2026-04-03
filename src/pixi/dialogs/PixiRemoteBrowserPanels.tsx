@@ -50,6 +50,11 @@ const SEARCH_H = 40;
 const ITEM_H = 38;
 const PAD = 12;
 
+/** Tint a color toward black (for subtle error/info backgrounds) */
+function tintBg(color: number, factor = 0.15): number {
+  return (((color >> 16 & 0xff) * factor | 0) << 16) | (((color >> 8 & 0xff) * factor | 0) << 8) | ((color & 0xff) * factor | 0);
+}
+
 // ---------------------------------------------------------------------------
 // Modland Panel
 // ---------------------------------------------------------------------------
@@ -201,7 +206,7 @@ export const PixiModlandPanel: React.FC<ModlandPanelProps> = ({
         id: file.full_path,
         label: file.filename,
         sublabel: `${file.format} — ${file.author}`,
-        dotColor: 0x22c55e,
+        dotColor: theme.success.color,
         rating: ratingData ? { avg: ratingData.avg, count: ratingData.count, userRating: r?.userRating } as PixiListItemRating : undefined,
       };
     }),
@@ -268,7 +273,7 @@ export const PixiModlandPanel: React.FC<ModlandPanelProps> = ({
               width: width - PAD * 2,
               padding: 8,
               marginBottom: 8,
-              backgroundColor: 0x2a0808,
+              backgroundColor: tintBg(theme.error.color),
               borderWidth: 1,
               borderColor: theme.error.color,
               borderRadius: 4,
@@ -479,7 +484,7 @@ export const PixiHVSCPanel: React.FC<HVSCPanelProps> = ({
         id: '__back__',
         label: '..(back)',
         sublabel: '',
-        dotColor: 0x888888,
+        dotColor: theme.textMuted.color,
       });
     }
 
@@ -494,7 +499,7 @@ export const PixiHVSCPanel: React.FC<HVSCPanelProps> = ({
         sublabel: entry.isDirectory
           ? ''
           : `${entry.author ? `${entry.author} — ` : ''}${entry.size ? `${(entry.size / 1024).toFixed(1)} KB` : ''}`,
-        dotColor: entry.isDirectory ? 0x4a9eff : 0x888888,
+        dotColor: entry.isDirectory ? theme.accent.color : theme.textMuted.color,
         rating: !entry.isDirectory && ratingData
           ? { avg: ratingData.avg, count: ratingData.count, userRating: r?.userRating } as PixiListItemRating
           : undefined,
@@ -558,7 +563,7 @@ export const PixiHVSCPanel: React.FC<HVSCPanelProps> = ({
               width: width - PAD * 2,
               padding: 8,
               marginBottom: 8,
-              backgroundColor: 0x2a0808,
+              backgroundColor: tintBg(theme.error.color),
               borderWidth: 1,
               borderColor: theme.error.color,
               borderRadius: 4,

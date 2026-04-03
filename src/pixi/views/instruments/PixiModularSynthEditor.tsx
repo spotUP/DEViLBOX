@@ -27,8 +27,10 @@ registerBuiltInModules();
 registerSunVoxModules();
 
 const STRIP_GAP = 4, PORT_R = 5, CELL = 22, HDR = 56;
-// Color-code: audio=green, CV=blue, gate=red, trigger=orange
-const SIG_CLR: Record<SignalType, number> = { audio: 0x44ff44, cv: 0x4488ff, gate: 0xff4444, trigger: 0xff8844 };
+// Color-code: audio=green, CV=blue, gate=red, trigger=orange — themed via getSigClr()
+function getSigClr(theme: ReturnType<typeof usePixiTheme>): Record<SignalType, number> {
+  return { audio: theme.success.color, cv: theme.accent.color, gate: theme.error.color, trigger: theme.warning.color };
+}
 type ViewMode = 'rack' | 'matrix' | 'canvas';
 
 // Category config matching DOM ModuleShelf
@@ -238,6 +240,7 @@ const getStripH = (mod: ModularModuleInstance, collapsed: boolean) => {
 
 const RackView: React.FC<RackViewProps> = ({ modules, connections, width, height, wiring, selectedModule, onSelect, onPort, onParam, onRemove, onReorder }) => {
   const theme = usePixiTheme();
+  const sigClr = getSigClr(theme);
   const [collapsedModules, setCollapsedModules] = useState<Set<string>>(new Set());
   const [hoveredModule, setHoveredModule] = useState<string | null>(null);
 
@@ -294,7 +297,7 @@ const RackView: React.FC<RackViewProps> = ({ modules, connections, width, height
       const s = portPos.get(pk(cn.source)), t = portPos.get(pk(cn.target)); if (!s || !t) return;
       const mod = modules.find((m) => m.id === cn.source.moduleId);
       const port = mod ? getDesc(mod.descriptorId)?.ports.find((p) => p.id === cn.source.portId) : undefined;
-      const clr = SIG_CLR[port?.signal ?? 'audio'];
+      const clr = sigClr[port?.signal ?? 'audio'];
       const laneOffset = (ci % 8 - 3.5) * 6;
       const midY = (s.y + t.y) / 2 + laneOffset;
       g.moveTo(s.x, s.y);
@@ -412,19 +415,23 @@ const ModuleStrip: React.FC<{
   );
 };
 
-const PortColumn: React.FC<{ label: string; ports: ModulePortDef[]; moduleId: string; wiring: PortRef | null; onPort: (r: PortRef, d: 'input' | 'output') => void }> = ({ label, ports, moduleId, wiring, onPort }) => (
+const PortColumn: React.FC<{ label: string; ports: ModulePortDef[]; moduleId: string; wiring: PortRef | null; onPort: (r: PortRef, d: 'input' | 'output') => void }> = ({ label, ports, moduleId, wiring, onPort }) => {
+  const theme = usePixiTheme();
+  const sigClr = getSigClr(theme);
+  return (
   <layoutContainer layout={{ flexDirection: 'column', gap: 3, alignItems: 'center' }}>
     <PixiLabel text={label} size="xs" color="textMuted" />
     {ports.map((p) => {
       const active = wiring?.moduleId === moduleId && wiring?.portId === p.id;
       return (
         <layoutContainer key={p.id} layout={{ width: 14, height: 14 }} eventMode="static" cursor="pointer" onPointerUp={() => onPort({ moduleId, portId: p.id }, p.direction)}>
-          <pixiGraphics eventMode="none" draw={useCallback((g: GraphicsType) => { g.clear(); g.circle(6, 6, PORT_R); g.fill({ color: SIG_CLR[p.signal], alpha: active ? 1 : 0.7 }); if (active) { g.circle(6, 6, PORT_R + 2); g.stroke({ color: 0xffffff, width: 1.5 }); } }, [active, p.signal])} layout={{}} />
+          <pixiGraphics eventMode="none" draw={useCallback((g: GraphicsType) => { g.clear(); g.circle(6, 6, PORT_R); g.fill({ color: sigClr[p.signal], alpha: active ? 1 : 0.7 }); if (active) { g.circle(6, 6, PORT_R + 2); g.stroke({ color: 0xffffff, width: 1.5 }); } }, [active, p.signal, sigClr])} layout={{}} />
         </layoutContainer>
       );
     })}
   </layoutContainer>
-);
+  );
+};
 
 // ── Matrix View ──────────────────────────────────────────────────────────
 
@@ -436,6 +443,7 @@ const MatrixView: React.FC<{
   onParam: (m: string, p: string, v: number) => void;
 }> = ({ modules, connections, width, height, onToggle, onCycleAmount, onParam }) => {
   const theme = usePixiTheme();
+  const sigClr = getSigClr(theme);
   const [selMod, setSelMod] = useState<string | null>(null);
 
   const outs = useMemo(() => {
@@ -466,7 +474,7 @@ const MatrixView: React.FC<{
       if (conn) {
         const r = 4 + 3 * conn.amount;
         g.circle(HDR + ii * CELL + CELL / 2, HDR + oi * CELL + CELL / 2, r);
-        g.fill({ color: SIG_CLR[o.sig], alpha: 0.5 + 0.4 * conn.amount });
+        g.fill({ color: sigClr[o.sig], alpha: 0.5 + 0.4 * conn.amount });
       }
     }));
   }, [ins, outs, connMap, theme]);
@@ -489,12 +497,12 @@ const MatrixView: React.FC<{
         <layoutContainer layout={{ width: cW, height: cH }}>
           {ins.map((inp, i) => (
             <layoutContainer key={`c${i}`} layout={{ position: 'absolute', left: HDR + i * CELL, top: 2, width: CELL, height: HDR - 4 }} eventMode="static" cursor="pointer" onPointerUp={() => setSelMod(inp.ref.moduleId)}>
-              <PixiLabel text={inp.label.slice(0, 8)} size="xs" color="custom" customColor={SIG_CLR[inp.sig]} />
+              <PixiLabel text={inp.label.slice(0, 8)} size="xs" color="custom" customColor={sigClr[inp.sig]} />
             </layoutContainer>
           ))}
           {outs.map((out, i) => (
             <layoutContainer key={`r${i}`} layout={{ position: 'absolute', left: 2, top: HDR + i * CELL + 3, width: HDR - 4 }} eventMode="static" cursor="pointer" onPointerUp={() => setSelMod(out.ref.moduleId)}>
-              <PixiLabel text={out.label.slice(0, 10)} size="xs" color="custom" customColor={SIG_CLR[out.sig]} />
+              <PixiLabel text={out.label.slice(0, 10)} size="xs" color="custom" customColor={sigClr[out.sig]} />
             </layoutContainer>
           ))}
           <pixiGraphics draw={drawGrid} layout={{ position: 'absolute', left: 0, top: 0 }} />
@@ -542,6 +550,7 @@ interface CanvasViewProps {
 
 const CanvasView: React.FC<CanvasViewProps> = ({ modules, connections, width, height, wiring, selectedModule, onSelect, onPort, onParam, onRemove, onUpdateModules }) => {
   const theme = usePixiTheme();
+  const sigClr = getSigClr(theme);
   const [canvasOffset, setCanvasOffset] = useState({ x: 0, y: 0 });
   const [canvasZoom, setCanvasZoom] = useState(1);
   const isPanningRef = useRef(false);
@@ -690,7 +699,7 @@ const CanvasView: React.FC<CanvasViewProps> = ({ modules, connections, width, he
       const s = getPortPos(cn.source), t = getPortPos(cn.target); if (!s || !t) return;
       const mod = modules.find(m => m.id === cn.source.moduleId);
       const port = mod ? getDesc(mod.descriptorId)?.ports.find(p => p.id === cn.source.portId) : undefined;
-      const clr = SIG_CLR[port?.signal ?? 'audio'];
+      const clr = sigClr[port?.signal ?? 'audio'];
       const laneOffset = (ci % 8 - 3.5) * 6;
       const midY = (s.y + t.y) / 2 + laneOffset;
       g.moveTo(s.x, s.y).lineTo(s.x + 20, s.y).lineTo(s.x + 20, midY).lineTo(t.x - 20, midY).lineTo(t.x - 20, t.y).lineTo(t.x, t.y);

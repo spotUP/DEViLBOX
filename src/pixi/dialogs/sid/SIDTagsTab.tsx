@@ -19,19 +19,21 @@ interface SIDTagsTabProps {
 
 const PAD = 16;
 
-const TAG_COLORS: Record<string, number> = {
-  music: 0x7c3aed,
-  collection: 0x16a34a,
-};
-const DEFAULT_TAG_COLOR = 0x475569;
+const getTagColors = (theme: ReturnType<typeof usePixiTheme>): Record<string, number> => ({
+  music: theme.accentSecondary.color,
+  collection: theme.success.color,
+});
+const getDefaultTagColor = (theme: ReturnType<typeof usePixiTheme>): number => theme.textMuted.color;
 
 /** Colored tag badge with optional remove button */
 const TagBadge: React.FC<{
   tag: TagInfo;
+  tagColors: Record<string, number>;
+  defaultTagColor: number;
   onRemove?: () => void;
   onAdd?: () => void;
-}> = ({ tag, onRemove, onAdd }) => {
-  const bg = TAG_COLORS[tag.type] ?? DEFAULT_TAG_COLOR;
+}> = ({ tag, tagColors, defaultTagColor, onRemove, onAdd }) => {
+  const bg = tagColors[tag.type] ?? defaultTagColor;
   return (
     <layoutContainer
       layout={{
@@ -71,6 +73,8 @@ const TagBadge: React.FC<{
 export const SIDTagsTab: React.FC<SIDTagsTabProps> = ({ width, height, fileId }) => {
   const theme = usePixiTheme();
   const contentW = width - PAD * 2;
+  const tagColors = useMemo(() => getTagColors(theme), [theme]);
+  const defaultTagColor = useMemo(() => getDefaultTagColor(theme), [theme]);
 
   const [allTags, setAllTags] = useState<TagInfo[]>([]);
   const [fileTags, setFileTags] = useState<TagInfo[]>([]);
@@ -184,7 +188,7 @@ export const SIDTagsTab: React.FC<SIDTagsTabProps> = ({ width, height, fileId })
           />
         )}
         {fileTags.map((tag) => (
-          <TagBadge key={tag.id} tag={tag} onRemove={() => handleRemove(tag)} />
+          <TagBadge key={tag.id} tag={tag} tagColors={tagColors} defaultTagColor={defaultTagColor} onRemove={() => handleRemove(tag)} />
         ))}
       </layoutContainer>
 
@@ -200,7 +204,7 @@ export const SIDTagsTab: React.FC<SIDTagsTabProps> = ({ width, height, fileId })
       <PixiScrollView width={contentW} height={listH} contentHeight={Math.max(listH, availableTags.length * 30)}>
         <layoutContainer layout={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, width: contentW - 12, padding: 4 }}>
           {availableTags.map((tag) => (
-            <TagBadge key={tag.id} tag={tag} onAdd={() => handleAdd(tag)} />
+            <TagBadge key={tag.id} tag={tag} tagColors={tagColors} defaultTagColor={defaultTagColor} onAdd={() => handleAdd(tag)} />
           ))}
           {!loading && availableTags.length === 0 && (
             <pixiBitmapText

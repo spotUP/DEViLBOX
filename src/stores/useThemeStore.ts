@@ -1695,6 +1695,9 @@ const applyTheme = (theme: Theme) => {
   root.style.setProperty('--theme-button-radius', colors.buttonRadius || '4px');
   root.style.setProperty('--theme-knob-style', colors.knobStyle || 'default');
   root.style.setProperty('--theme-button-style', colors.buttonStyle || 'default');
+
+  // Persist accent for pre-React loading screen (index.html reads this synchronously)
+  try { localStorage.setItem('devilbox-accent', colors.accent); } catch { /* quota */ }
 };
 
 export const useThemeStore = create<ThemeStore>()(

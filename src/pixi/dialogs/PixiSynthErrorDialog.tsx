@@ -6,7 +6,12 @@
 
 import { useState, useCallback } from 'react';
 import { PixiModal, PixiModalHeader, PixiModalFooter, PixiButton, PixiLabel } from '../components';
+import { usePixiTheme } from '../theme';
 import { useSynthErrorStore, type SynthError } from '@/stores/useSynthErrorStore';
+
+function tintBg(color: number, factor = 0.15): number {
+  return (((color >> 16 & 0xff) * factor | 0) << 16) | (((color >> 8 & 0xff) * factor | 0) << 8) | ((color & 0xff) * factor | 0);
+}
 
 const ERROR_TYPE_LABELS: Record<SynthError['errorType'], string> = {
   init: 'Initialization Error',
@@ -19,6 +24,7 @@ const MODAL_W = 480;
 const MODAL_H = 380;
 
 export const PixiSynthErrorDialog: React.FC = () => {
+  const theme = usePixiTheme();
   const activeError = useSynthErrorStore((s) => s.activeError);
   const dismissError = useSynthErrorStore((s) => s.dismissError);
   const copyToClipboard = useSynthErrorStore((s) => s.copyToClipboard);
@@ -74,14 +80,14 @@ export const PixiSynthErrorDialog: React.FC = () => {
             padding: 12,
             borderRadius: 8,
             borderWidth: 1,
-            backgroundColor: 0x3B1515,
-            borderColor: 0x7F2020,
+            backgroundColor: tintBg(theme.error.color),
+            borderColor: theme.error.color,
             flexDirection: 'column',
             gap: 6,
             width: MODAL_W - 26,
           }}
         >
-          <PixiLabel text={synthLabel} size="sm" weight="bold" color="custom" customColor={0xFF6666} />
+          <PixiLabel text={synthLabel} size="sm" weight="bold" color="custom" customColor={theme.error.color} />
           <PixiLabel text={activeError?.message ?? ''} size="xs" color="text" layout={{ maxWidth: MODAL_W - 50 }} />
         </layoutContainer>
 
@@ -107,9 +113,9 @@ export const PixiSynthErrorDialog: React.FC = () => {
               gap: 8,
               padding: 10,
               borderRadius: 6,
-              backgroundColor: 0x1A1A2E,
+              backgroundColor: theme.bgTertiary.color,
               borderWidth: 1,
-              borderColor: 0x333355,
+              borderColor: theme.border.color,
               width: MODAL_W - 26,
               overflow: 'hidden',
             }}
@@ -142,13 +148,13 @@ export const PixiSynthErrorDialog: React.FC = () => {
                   layout={{
                     padding: 6,
                     borderRadius: 4,
-                    backgroundColor: 0x0D0D1A,
+                    backgroundColor: theme.bg.color,
                     maxHeight: 60,
                     overflow: 'hidden',
                     width: MODAL_W - 50,
                   }}
                 >
-                  <PixiLabel text={stackText} size="xs" font="mono" color="custom" customColor={0xFF8888} />
+                  <PixiLabel text={stackText} size="xs" font="mono" color="custom" customColor={theme.error.color} />
                 </layoutContainer>
               </layoutContainer>
             )}
@@ -160,7 +166,7 @@ export const PixiSynthErrorDialog: React.FC = () => {
                 layout={{
                   padding: 6,
                   borderRadius: 4,
-                  backgroundColor: 0x0D0D1A,
+                  backgroundColor: theme.bg.color,
                   maxHeight: 80,
                   overflow: 'hidden',
                   width: MODAL_W - 50,
