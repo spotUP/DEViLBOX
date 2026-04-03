@@ -87,6 +87,7 @@ interface UIStore {
   // Pop-out window state
   tb303PoppedOut: boolean;
   instrumentEditorPoppedOut: boolean;
+  hardwareUiPoppedOut: boolean;
   masterEffectsPoppedOut: boolean;
   instrumentEffectsPoppedOut: boolean;
   pianoRollPoppedOut: boolean;
@@ -166,6 +167,7 @@ interface UIStore {
   // Pop-out window actions
   setTB303PoppedOut: (v: boolean) => void;
   setInstrumentEditorPoppedOut: (v: boolean) => void;
+  setHardwareUiPoppedOut: (v: boolean) => void;
   setMasterEffectsPoppedOut: (v: boolean) => void;
   setInstrumentEffectsPoppedOut: (v: boolean) => void;
   setPianoRollPoppedOut: (v: boolean) => void;
@@ -267,6 +269,7 @@ export const useUIStore = create<UIStore>()(
       // Pop-out window state
       tb303PoppedOut: false,
       instrumentEditorPoppedOut: false,
+      hardwareUiPoppedOut: false,
       masterEffectsPoppedOut: false,
       instrumentEffectsPoppedOut: false,
       pianoRollPoppedOut: false,
@@ -602,6 +605,11 @@ export const useUIStore = create<UIStore>()(
       setInstrumentEditorPoppedOut: (v) =>
         set((state) => {
           state.instrumentEditorPoppedOut = v;
+        }),
+
+      setHardwareUiPoppedOut: (v: boolean) =>
+        set((state) => {
+          state.hardwareUiPoppedOut = v;
         }),
 
       setMasterEffectsPoppedOut: (v) =>

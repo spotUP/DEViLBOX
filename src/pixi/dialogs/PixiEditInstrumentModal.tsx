@@ -30,7 +30,7 @@ import { PIXI_FONTS } from '../fonts';
 import { PixiPureTextInput } from '../input/PixiPureTextInput';
 import { usePixiTheme } from '../theme';
 import { usePixiResponsive } from '../hooks/usePixiResponsive';
-import { useInstrumentStore, notify } from '@stores';
+import { useInstrumentStore, useUIStore, notify } from '@stores';
 import { usePresetStore, type PresetCategory } from '@stores/usePresetStore';
 import { getSynthInfo, SYNTH_CATEGORIES } from '@constants/synthCategories';
 import type { SynthInfo as SynthInfoType } from '@constants/synthCategories';
@@ -451,9 +451,16 @@ export const PixiEditInstrumentModal: React.FC<PixiEditInstrumentModalProps> = (
   );
 
   const handlePopOut = useCallback(() => {
-    const url = `${window.location.origin}${window.location.pathname}#instrument-editor`;
-    window.open(url, '_blank', 'width=800,height=600,menubar=no,toolbar=no');
-  }, []);
+    const inst = instRef.current;
+    const isHW = inst && hasPixiHardwareUI(inst.synthType);
+    const ui = useUIStore.getState();
+    if (isHW) {
+      ui.setHardwareUiPoppedOut(true);
+    } else {
+      ui.setInstrumentEditorPoppedOut(true);
+    }
+    onClose();
+  }, [onClose]);
 
   const handleChangeSynthType = useCallback(
     (synthType: SynthType) => {
