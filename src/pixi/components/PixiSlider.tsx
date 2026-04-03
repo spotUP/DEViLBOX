@@ -198,17 +198,31 @@ export const PixiSlider: React.FC<PixiSliderProps> = ({
 
     setIsDragging(true);
 
-    // For auto-size sliders, read the actual rendered bounds
-    let dragLength = length;
-    if (autoSize && containerRef.current) {
-      const bounds = containerRef.current.getBounds();
-      dragLength = isVert ? bounds.height : bounds.width;
-      if (dragLength <= 0) {
-        // Fallback to computed layout
-        dragLength = isVert
-          ? ((containerRef.current as any)?.layout?.computedLayout?.height ?? 120)
-          : ((containerRef.current as any)?.layout?.computedLayout?.width ?? 120);
-      }
+    // Compute drag length in DOM screen pixels.
+    // PixiJS logical pixels don't match DOM pixels when the canvas is CSS-scaled
+    // (e.g. zoom < 1.0, CRT shader, retina). Map two PixiJS points to screen.
+    let dragLength = length || 120;
+    if (containerRef.current) {
+      try {
+        const effectiveLen = length || ((containerRef.current as any)?.layout?.computedLayout?.[isVert ? 'height' : 'width'] ?? 120);
+        // Map local space endpoints to global PixiJS coords
+        const p0 = containerRef.current.toGlobal({ x: 0, y: 0 });
+        const p1 = containerRef.current.toGlobal(
+          isVert ? { x: 0, y: effectiveLen } : { x: effectiveLen, y: 0 }
+        );
+        // PixiJS global coords → DOM coords via canvas CSS transform
+        const canvas = document.querySelector('canvas');
+        if (canvas) {
+          const rect = canvas.getBoundingClientRect();
+          const cssScale = isVert
+            ? rect.height / canvas.height
+            : rect.width / canvas.width;
+          const screenDist = isVert
+            ? Math.abs(p1.y - p0.y) * cssScale
+            : Math.abs(p1.x - p0.x) * cssScale;
+          if (screenDist > 10) dragLength = screenDist;
+        }
+      } catch { /* fallback to logical length */ }
     }
 
     const onMove = (ev: PointerEvent) => {
