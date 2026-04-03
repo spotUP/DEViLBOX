@@ -157,15 +157,37 @@ export const PixiFileBrowser: React.FC<PixiFileBrowserProps> = ({
         if (mode === 'load') nav.handleLoad();
       }
     } else {
-      // Single click — select
+      // Single click — select file or open directory
       lastClickRef.current = { id, time: now };
 
-      if (row.isBack) return;
-      const file = row.file;
-      if (file && !file.isDirectory) {
-        nav.setSelectedFile(file);
-      } else if (file?.isDirectory) {
+      if (row.isBack) {
+        // Navigate up on single click (matches DOM)
+        if (hasElectronFS() && nav.currentPath) {
+          const parent = nav.currentPath.split('/').slice(0, -1).join('/') || '/';
+          nav.setCurrentPath(parent);
+          nav.setElectronDirectory(parent);
+        } else if (nav.currentPath) {
+          const parent = nav.currentPath.split('/').slice(0, -1).join('/') || '';
+          nav.setCurrentPath(parent);
+        }
         nav.setSelectedFile(null);
+        return;
+      }
+
+      const file = row.file;
+      if (!file) return;
+
+      if (file.isDirectory) {
+        // Open directory on single click (matches DOM)
+        if (hasElectronFS()) {
+          nav.setCurrentPath(file.path);
+          nav.setElectronDirectory(file.path);
+        } else {
+          nav.setCurrentPath(file.path);
+        }
+        nav.setSelectedFile(null);
+      } else {
+        nav.setSelectedFile(file);
       }
     }
   }, [nav, mode]);
@@ -545,8 +567,9 @@ const FileList: React.FC<FileListProps> = ({
               gap: 8,
             }}
           >
-            {/* Row background */}
+            {/* Row background — eventMode none so clicks pass to container */}
             <pixiGraphics
+              eventMode="none"
               draw={(g) => {
                 g.clear();
                 g.rect(0, 0, width - 10, FILE_ROW_H);
@@ -568,7 +591,7 @@ const FileList: React.FC<FileListProps> = ({
             />
 
             {/* Filename + sublabel column */}
-            <Div layout={{ flex: 1, flexDirection: 'column', justifyContent: 'center', gap: 1 }}>
+            <Div eventMode="none" layout={{ flex: 1, flexDirection: 'column', justifyContent: 'center', gap: 1 }}>
               <pixiBitmapText
                 eventMode="none"
                 text={label}
