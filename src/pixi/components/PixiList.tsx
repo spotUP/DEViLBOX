@@ -5,6 +5,7 @@
  */
 
 import { useRef, useCallback, useState, useMemo } from 'react';
+import { Rectangle } from 'pixi.js';
 import type { Graphics as GraphicsType, FederatedWheelEvent, FederatedPointerEvent } from 'pixi.js';
 import { PIXI_FONTS } from '../fonts';
 import { usePixiTheme } from '../theme';
@@ -201,6 +202,7 @@ export const PixiList: React.FC<PixiListProps> = ({
             key={item.id}
             eventMode="static"
             cursor="pointer"
+            hitArea={new Rectangle(0, 0, width - 10, itemHeight)}
             onPointerUp={() => handleItemClick(item.id)}
             onClick={() => handleItemClick(item.id)}
             onPointerEnter={() => setHoveredItemId(item.id)}
