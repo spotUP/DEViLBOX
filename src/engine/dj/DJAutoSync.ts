@@ -268,7 +268,7 @@ function getCurrentPosition(deckId: DeckId): number {
   return state.elapsedMs / 1000;
 }
 
-function getPhaseInfo(deckId: DeckId): PhaseInfo | null {
+export function getPhaseInfo(deckId: DeckId): PhaseInfo | null {
   const state = useDJStore.getState().decks[deckId];
   const beatGrid = state.beatGrid;
   if (!beatGrid || beatGrid.beats.length === 0) return null;
