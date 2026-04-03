@@ -862,7 +862,7 @@ export const PixiStatusBar: React.FC = () => {
   const isAudioRunning = useAudioStore((s) => s.contextState === 'running');
 
   const onShowTips = useCallback(() => {
-    openModal('help', { initialTab: 'tips' });
+    openModal('tips', { initialTab: 'tips' });
   }, [openModal]);
   const minimapVisible = useWorkbenchStore((s) => s.minimapVisible) && activeView === 'studio';
   const collabStatus = useCollaborationStore((s) => s.status);
