@@ -562,40 +562,15 @@ export const PixiEditInstrumentModal: React.FC<PixiEditInstrumentModalProps> = (
               <layoutContainer layout={{ width: MODAL_W - 16, flexDirection: 'column', padding: 16, gap: 16 }}>
                 {/* ── Sticky-style header: search + chips + results count ── */}
                 <layoutContainer layout={{ flexDirection: 'column', gap: 12 }}>
-                  {/* Search bar */}
-                  <layoutContainer
-                    layout={{
-                      flexDirection: 'row',
-                      alignItems: 'center',
-                      height: 36,
-                      gap: 8,
-                      backgroundColor: theme.bgTertiary?.color ?? 0x1a1a1a,
-                      borderRadius: 8,
-                      borderWidth: 1,
-                      borderColor: theme.border.color,
-                      paddingLeft: 10,
-                      paddingRight: 8,
-                    }}
-                  >
-                    <PixiIcon name="search" size={14} color={theme.textMuted.color} layout={{}} />
-                    <PixiPureTextInput
-                      value={synthSearch}
-                      onChange={setSynthSearch}
-                      placeholder="Search synths..."
-                      width={MODAL_W - 80}
-                      height={22}
-                    />
-                    {synthSearch && (
-                      <layoutContainer
-                        eventMode="static"
-                        cursor="pointer"
-                        onPointerTap={() => setSynthSearch('')}
-                        layout={{ width: 20, height: 20, alignItems: 'center', justifyContent: 'center' }}
-                      >
-                        <PixiIcon name="close" size={12} color={theme.textMuted.color} layout={{}} />
-                      </layoutContainer>
-                    )}
-                  </layoutContainer>
+                  {/* Search bar — uses PixiPureTextInput directly (it has its own border/bg) */}
+                  <PixiPureTextInput
+                    value={synthSearch}
+                    onChange={setSynthSearch}
+                    placeholder="Search synths by name, description, or use case..."
+                    width={MODAL_W - 64}
+                    height={32}
+                    fontSize={12}
+                  />
 
                   {/* Category filter chips */}
                   <layoutContainer layout={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
