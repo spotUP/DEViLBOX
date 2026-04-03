@@ -694,13 +694,17 @@ export const useInstrumentStore = create<InstrumentStore>()(
                   if (instruments) {
                     for (const [key, synth] of instruments.entries()) {
                       if ((key >>> 16) === id && synth?.[method]) {
+                        console.log(`[InstrumentStore] Native patch: calling ${method}('${patchName}') on ${updatedInstrument.synthType} id=${id}, isInitialized=${synth.isInitialized}`);
                         synth[method](patchName);
                         loaded = true;
                         break;
                       }
                     }
                   }
-                  if (!loaded) engine.invalidateInstrument(id);
+                  if (!loaded) {
+                    console.log(`[InstrumentStore] Native patch: synth not found for id=${id}, invalidating`);
+                    engine.invalidateInstrument(id);
+                  }
                   return;
                 }
               }
