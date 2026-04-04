@@ -531,6 +531,7 @@ export class TrackerReplayer {
   private c64SidEngine: C64SIDEngine | null = null;
   private hivelyEngine: import('./hively/HivelyEngine').HivelyEngine | null = null;
   private _hvlPositionUnsub: (() => void) | null = null;
+  private _mlPositionUnsub: (() => void) | null = null;
   private _uadePositionUnsub: (() => void) | null = null;
   private _tfmxChannelUnsub: (() => void) | null = null;
 
@@ -1416,6 +1417,26 @@ export class TrackerReplayer {
         _playLog('HVL position subscription active');
       }
 
+      // Subscribe to MusicLineEngine position updates (same queueDisplayState path as Hively)
+      if (result.musicLineEngine) {
+        let lastMLRow = -1;
+        let lastMLPos = -1;
+        this._mlPositionUnsub = result.musicLineEngine.onPosition((update) => {
+          if (!this.playing || !this.song) return;
+          if (update.row === lastMLRow && update.position === lastMLPos) return;
+          lastMLRow = update.row;
+          lastMLPos = update.position;
+          this.songPos = update.position;
+          this.pattPos = update.row;
+          const patternNum = this.song.songPositions[update.position] ?? 0;
+          const time = Tone.now();
+          this.queueDisplayState(time, update.row, patternNum, update.position, 0, (2.5 / this.bpm) * this.speed);
+          if (this.onRowChange) {
+            this.onRowChange(update.row, patternNum, update.position);
+          }
+        });
+      }
+
       // Subscribe to UADEEngine position updates for real-time row/pattern tracking.
       // Derives pattern/row from CIA tick count using the speed detected during scan.
       if (result.uadeEngine && this.song.uadeFirstTick != null) {
@@ -1867,6 +1888,12 @@ export class TrackerReplayer {
       this._hvlPositionUnsub = null;
     }
     this.hivelyEngine = null;
+
+    // Clean up MusicLine position subscription
+    if (this._mlPositionUnsub) {
+      this._mlPositionUnsub();
+      this._mlPositionUnsub = null;
+    }
 
     // Clean up UADE position subscription
     if (this._uadePositionUnsub) {
