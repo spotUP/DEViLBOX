@@ -150,10 +150,15 @@ class MusicLineProcessor extends AudioWorkletProcessor {
       // Instrument parameter access
       case 'read-inst-all': {
         if (!this.wasm) break;
-        const { instIdx, offsets } = data;
+        const { instIdx, offsets, sizes } = data;
         const result = {};
         for (const [name, off] of Object.entries(offsets)) {
-          result[name] = this.wasm._ml_read_inst_u8(instIdx, off);
+          const sz = sizes && sizes[name] === 2 ? 2 : 1;
+          if (sz === 2) {
+            result[name] = this.wasm._ml_read_inst_u16(instIdx, off);
+          } else {
+            result[name] = this.wasm._ml_read_inst_u8(instIdx, off);
+          }
         }
         this.port.postMessage({ type: 'inst-all', instIdx, data: result });
         break;
