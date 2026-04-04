@@ -13,7 +13,7 @@ import type { ColumnDef, FormatChannel, FormatCell, OnCellChange } from '@/compo
 import { PatternEditorCanvas } from '@/components/tracker/PatternEditorCanvas';
 import { Knob } from '@components/controls/Knob';
 import { useInstrumentColors } from '@/hooks/useInstrumentColors';
-import { SectionLabel } from '@components/instruments/shared';
+import { SectionLabel, WaveformLineCanvas, BarChart } from '@components/instruments/shared';
 
 // ── Adapter helpers ─────────────────────────────────────────────────────────
 
@@ -173,108 +173,6 @@ function arg3Label(mode: number): string {
   return 'Stop Pos';
 }
 
-// ── Tiny canvas-based visualizations ─────────────────────────────────────────
-
-const WaveformLineCanvas: React.FC<{
-  data: number[];
-  width: number;
-  height: number;
-  color: string;
-}> = ({ data, width, height, color }) => {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-
-  useEffect(() => {
-    const cvs = canvasRef.current;
-    if (!cvs) return;
-    const ctx = cvs.getContext('2d');
-    if (!ctx) return;
-
-    ctx.clearRect(0, 0, width, height);
-    ctx.fillStyle = '#0a0a0a';
-    ctx.fillRect(0, 0, width, height);
-
-    ctx.strokeStyle = 'var(--color-border)';
-    ctx.lineWidth = 1;
-    ctx.beginPath();
-    ctx.moveTo(0, height / 2);
-    ctx.lineTo(width, height / 2);
-    ctx.stroke();
-
-    if (data.length === 0) return;
-
-    ctx.strokeStyle = color;
-    ctx.lineWidth = 1.5;
-    ctx.beginPath();
-    const len = Math.min(data.length, 128);
-    for (let i = 0; i < len; i++) {
-      const x = (i / (len - 1)) * width;
-      const y = ((1 - (data[i] + 128) / 255) * (height - 2)) + 1;
-      if (i === 0) ctx.moveTo(x, y);
-      else ctx.lineTo(x, y);
-    }
-    ctx.stroke();
-  }, [data, width, height, color]);
-
-  return <canvas ref={canvasRef} width={width} height={height} className="rounded" />;
-};
-
-const BarChart: React.FC<{
-  data: number[];
-  width: number;
-  height: number;
-  color: string;
-  signed?: boolean;
-}> = ({ data, width, height, color, signed }) => {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-
-  useEffect(() => {
-    const cvs = canvasRef.current;
-    if (!cvs) return;
-    const ctx = cvs.getContext('2d');
-    if (!ctx) return;
-
-    ctx.clearRect(0, 0, width, height);
-    ctx.fillStyle = '#0a0a0a';
-    ctx.fillRect(0, 0, width, height);
-
-    if (data.length === 0) return;
-
-    const len = Math.min(data.length, 128);
-    const barW = Math.max(1, width / len);
-
-    if (signed) {
-      ctx.strokeStyle = 'var(--color-border)';
-      ctx.lineWidth = 1;
-      ctx.beginPath();
-      ctx.moveTo(0, height / 2);
-      ctx.lineTo(width, height / 2);
-      ctx.stroke();
-
-      ctx.fillStyle = color;
-      for (let i = 0; i < len; i++) {
-        const v = data[i];
-        const normH = (Math.abs(v) / 128) * (height / 2);
-        const x = (i / len) * width;
-        if (v >= 0) {
-          ctx.fillRect(x, height / 2 - normH, barW, normH);
-        } else {
-          ctx.fillRect(x, height / 2, barW, normH);
-        }
-      }
-    } else {
-      ctx.fillStyle = color;
-      for (let i = 0; i < len; i++) {
-        const v = data[i];
-        const barH = (v / 255) * height;
-        const x = (i / len) * width;
-        ctx.fillRect(x, height - barH, barW, barH);
-      }
-    }
-  }, [data, width, height, color, signed]);
-
-  return <canvas ref={canvasRef} width={width} height={height} className="rounded" />;
-};
-
 // ── Component ────────────────────────────────────────────────────────────────
 
 export const SonicArrangerControls: React.FC<SonicArrangerControlsProps> = ({
@@ -362,7 +260,7 @@ export const SonicArrangerControls: React.FC<SonicArrangerControlsProps> = ({
       </div>
       <div className={`rounded-lg border p-3 ${panelBg}`}>
         <SectionLabel color={accent} label="Waveform" />
-        <WaveformLineCanvas data={config.waveformData} width={320} height={72} color={accent} />
+        <WaveformLineCanvas data={config.waveformData} width={320} height={72} color={accent} maxSamples={128} />
         <div className="flex items-center gap-3 mt-2 text-[10px] text-text-muted">
           <span>Wave #{config.waveformNumber}</span>
           <span>Length: {config.waveformLength} words</span>
