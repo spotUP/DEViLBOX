@@ -20,3 +20,6 @@ export { FMAlgorithmDiagram } from './FMAlgorithmDiagram';
 export type { FMAlgorithmDiagramProps } from './FMAlgorithmDiagram';
 export { FilterFrequencyResponse } from './FilterFrequencyResponse';
 export type { FilterFrequencyResponseProps, FilterType } from './FilterFrequencyResponse';
+export { WaveformLineCanvas } from './WaveformLineCanvas';
+export { BarChart } from './BarChart';
+export { HarmonicBarsCanvas } from './HarmonicBarsCanvas';

@@ -6,12 +6,12 @@
  * - Bottom: Spectral, Filter, Envelope, LFO knobs
  */
 
-import React, { useRef, useCallback, useState, useEffect } from 'react';
+import React, { useCallback, useState } from 'react';
 import type { HarmonicSynthConfig } from '@/types/instrument';
 import { DEFAULT_HARMONIC_SYNTH } from '@/types/instrument';
 import { Knob } from '@components/controls/Knob';
 import { useInstrumentColors } from '@/hooks/useInstrumentColors';
-import { FilterFrequencyResponse, EnvelopeVisualization } from '@components/instruments/shared';
+import { FilterFrequencyResponse, EnvelopeVisualization, HarmonicBarsCanvas } from '@components/instruments/shared';
 
 interface HarmonicSynthControlsProps {
   config: HarmonicSynthConfig;
@@ -63,8 +63,7 @@ export const HarmonicSynthControls: React.FC<HarmonicSynthControlsProps> = ({
   instrumentId: _instrumentId,
   onChange,
 }) => {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const [isDragging, setIsDragging] = useState(false);
+  const [_isDragging, setIsDragging] = useState(false);
 
   const { isCyan: isCyanTheme, knob: knobColor, panelBg } = useInstrumentColors('#4ade80');
   const barColor = isCyanTheme ? 'rgba(0, 255, 255, 0.7)' : 'rgba(74, 222, 128, 0.7)';
@@ -72,93 +71,16 @@ export const HarmonicSynthControls: React.FC<HarmonicSynthControlsProps> = ({
 
   const harmonics = config.harmonics || DEFAULT_HARMONIC_SYNTH.harmonics;
 
-  // Draw harmonic bars
-  const drawHarmonics = useCallback(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-
-    const dpr = window.devicePixelRatio || 1;
-    const w = canvas.clientWidth;
-    const h = canvas.clientHeight;
-    canvas.width = w * dpr;
-    canvas.height = h * dpr;
-    ctx.scale(dpr, dpr);
-
-    // Background
-    ctx.fillStyle = isCyanTheme ? '#030d0d' : '#111111';
-    ctx.fillRect(0, 0, w, h);
-
-    // Grid lines
-    ctx.strokeStyle = isCyanTheme ? 'rgba(0, 255, 255, 0.06)' : 'rgba(255, 255, 255, 0.06)';
-    ctx.lineWidth = 1;
-    for (let i = 1; i < 4; i++) {
-      const y = (h / 4) * i;
-      ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(w, y); ctx.stroke();
-    }
-
-    // Bars
-    const barW = w / NUM_HARMONICS;
-    const gap = Math.max(1, barW * 0.1);
-
-    for (let i = 0; i < NUM_HARMONICS; i++) {
-      const amp = harmonics[i] || 0;
-      const barH = amp * h;
-      const x = i * barW + gap / 2;
-      const y = h - barH;
-
-      // Gradient
-      const grad = ctx.createLinearGradient(x, y, x, h);
-      grad.addColorStop(0, barHighlight);
-      grad.addColorStop(1, barColor);
-      ctx.fillStyle = grad;
-      ctx.fillRect(x, y, barW - gap, barH);
-
-      // Harmonic number labels (every 4th)
-      if ((i + 1) % 4 === 1 || i === 0) {
-        ctx.fillStyle = isCyanTheme ? 'rgba(0, 255, 255, 0.4)' : 'rgba(255, 255, 255, 0.3)';
-        ctx.font = '9px monospace';
-        ctx.textAlign = 'center';
-        ctx.fillText(String(i + 1), x + (barW - gap) / 2, h - 3);
-      }
-    }
-  }, [harmonics, isCyanTheme, barColor, barHighlight]);
-
-  useEffect(() => {
-    drawHarmonics();
-  }, [drawHarmonics]);
-
-  // Mouse interaction for harmonic bar editing
-  const setHarmonicFromMouse = useCallback((e: React.MouseEvent) => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const rect = canvas.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
-
-    const idx = Math.floor((x / rect.width) * NUM_HARMONICS);
-    const amp = Math.max(0, Math.min(1, 1 - y / rect.height));
-
+  // Normalized-coordinate harmonic editor (nx=0-1 horizontal, ny=0-1 vertical top-down)
+  const setHarmonicFromNormalized = useCallback((nx: number, ny: number) => {
+    const idx = Math.floor(nx * NUM_HARMONICS);
+    const amp = Math.max(0, Math.min(1, 1 - ny));
     if (idx >= 0 && idx < NUM_HARMONICS) {
       const newH = [...harmonics];
       newH[idx] = amp;
       onChange({ harmonics: newH });
     }
   }, [harmonics, onChange]);
-
-  const handleMouseDown = useCallback((e: React.MouseEvent) => {
-    setIsDragging(true);
-    setHarmonicFromMouse(e);
-  }, [setHarmonicFromMouse]);
-
-  const handleMouseMove = useCallback((e: React.MouseEvent) => {
-    if (isDragging) setHarmonicFromMouse(e);
-  }, [isDragging, setHarmonicFromMouse]);
-
-  const handleMouseUp = useCallback(() => {
-    setIsDragging(false);
-  }, []);
 
   // Helpers for nested updates
   const updateFilter = (updates: Partial<typeof config.filter>) => {
@@ -189,14 +111,22 @@ export const HarmonicSynthControls: React.FC<HarmonicSynthControlsProps> = ({
             ))}
           </div>
         </div>
-        <canvas
-          ref={canvasRef}
-          className="w-full cursor-crosshair"
-          style={{ height: '120px' }}
-          onMouseDown={handleMouseDown}
-          onMouseMove={handleMouseMove}
-          onMouseUp={handleMouseUp}
-          onMouseLeave={handleMouseUp}
+        <HarmonicBarsCanvas
+          harmonics={harmonics}
+          count={NUM_HARMONICS}
+          width={600}
+          height={120}
+          barColor={barColor}
+          highlightColor={barHighlight}
+          backgroundColor={isCyanTheme ? '#030d0d' : '#111111'}
+          gridColor={isCyanTheme ? 'rgba(0, 255, 255, 0.06)' : 'rgba(255, 255, 255, 0.06)'}
+          gradient
+          showLabels
+          labelColor={isCyanTheme ? 'rgba(0, 255, 255, 0.4)' : 'rgba(255, 255, 255, 0.3)'}
+          hiDpi
+          onDragStart={(nx, ny) => { setIsDragging(true); setHarmonicFromNormalized(nx, ny); }}
+          onDrag={setHarmonicFromNormalized}
+          onDragEnd={() => setIsDragging(false)}
         />
       </div>
 
