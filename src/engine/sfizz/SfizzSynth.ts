@@ -229,13 +229,16 @@ export class SfizzSynthEngine implements DevilboxSynth {
       console.warn('Sfizz: worklet not ready, cannot load SFZ');
       return;
     }
-    const samplesObj: Record<string, ArrayBuffer> = {};
-    const transferables: ArrayBuffer[] = [];
-    for (const [name, data] of samples) {
-      samplesObj[name] = data;
-      transferables.push(data);
+    // Step 1: Write sample files to MEMFS
+    if (samples.size > 0) {
+      const files: { path: string; data: ArrayBuffer }[] = [];
+      for (const [name, data] of samples) {
+        files.push({ path: `/${name}`, data });
+      }
+      this._worklet.port.postMessage({ type: 'writeFiles', files });
     }
-    this._worklet.port.postMessage({ type: 'loadSFZ', sfzContent, samples: samplesObj }, transferables);
+    // Step 2: Load SFZ text (references samples already in MEMFS)
+    this._worklet.port.postMessage({ type: 'loadSfzString', sfzText: sfzContent, virtualPath: '/loaded.sfz' });
   }
 
   triggerAttack(frequency: number | string, _time?: number, velocity?: number): this {
