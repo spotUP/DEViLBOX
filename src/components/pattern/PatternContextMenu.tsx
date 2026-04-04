@@ -2,8 +2,7 @@
  * PatternContextMenu - Right-click menu for pattern list items
  */
 
-import React, { useMemo, useState, useCallback, useEffect, useRef } from 'react';
-import { createPortal } from 'react-dom';
+import React, { useMemo, useState, useCallback } from 'react';
 import {
   Clock,
   Edit3,
@@ -13,9 +12,10 @@ import {
   Maximize2,
   Minimize2,
   Download,
-  X,
 } from 'lucide-react';
 import { ContextMenu, useContextMenu, type MenuItemType } from '@components/common/ContextMenu';
+import { RenameDialog } from '@components/common/RenameDialog';
+import { ConfirmDialog } from '@components/common/ConfirmDialog';
 import { useLiveModeStore } from '@stores/useLiveModeStore';
 import { useTrackerStore } from '@stores/useTrackerStore';
 
@@ -23,170 +23,6 @@ interface PatternContextMenuProps {
   patternIndex: number;
   children: React.ReactNode;
 }
-
-// Rename Dialog Component
-const RenameDialog: React.FC<{
-  isOpen: boolean;
-  currentName: string;
-  onConfirm: (newName: string) => void;
-  onClose: () => void;
-}> = ({ isOpen, currentName, onConfirm, onClose }) => {
-  const [name, setName] = useState(currentName);
-  const inputRef = useRef<HTMLInputElement>(null);
-
-  useEffect(() => {
-    if (isOpen) {
-      requestAnimationFrame(() => setName(currentName));
-      setTimeout(() => inputRef.current?.select(), 0);
-    }
-  }, [isOpen, currentName]);
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (name.trim() && name !== currentName) {
-      onConfirm(name.trim());
-    }
-    onClose();
-  };
-
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Escape') {
-      onClose();
-    }
-  };
-
-  if (!isOpen) return null;
-
-  return createPortal(
-    <div
-      className="fixed inset-0 bg-black/50 flex items-center justify-center z-[60]"
-      onClick={onClose}
-    >
-      <div
-        className="bg-dark-bgSecondary border border-dark-border rounded-lg shadow-xl p-4 min-w-[300px]"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="text-sm font-semibold text-text-primary">Rename Pattern</h3>
-          <button
-            onClick={onClose}
-            className="p-1 text-text-muted hover:text-text-primary hover:bg-dark-bgTertiary rounded"
-          >
-            <X size={14} />
-          </button>
-        </div>
-        <form onSubmit={handleSubmit}>
-          <input
-            ref={inputRef}
-            type="text"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            onKeyDown={handleKeyDown}
-            maxLength={64}
-            className="w-full px-3 py-2 bg-dark-bg border border-dark-border rounded text-sm text-text-primary
-                     focus:outline-none focus:border-accent-primary"
-            placeholder="Enter pattern name"
-            autoFocus
-          />
-          <div className="flex justify-end gap-2 mt-4">
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-3 py-1.5 text-sm text-text-secondary hover:text-text-primary
-                       hover:bg-dark-bgTertiary rounded transition-colors"
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              disabled={!name.trim() || name === currentName}
-              className="px-3 py-1.5 text-sm bg-accent-primary text-text-inverse rounded
-                       hover:bg-accent-primary/80 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-            >
-              Rename
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>,
-    document.body
-  );
-};
-
-// Confirmation Dialog Component
-const ConfirmDialog: React.FC<{
-  isOpen: boolean;
-  title: string;
-  message: string;
-  confirmLabel?: string;
-  danger?: boolean;
-  onConfirm: () => void;
-  onClose: () => void;
-}> = ({ isOpen, title, message, confirmLabel = 'Confirm', danger = false, onConfirm, onClose }) => {
-  const handleKeyDown = useCallback((e: KeyboardEvent) => {
-    if (e.key === 'Escape') {
-      onClose();
-    } else if (e.key === 'Enter') {
-      onConfirm();
-      onClose();
-    }
-  }, [onClose, onConfirm]);
-
-  useEffect(() => {
-    if (isOpen) {
-      window.addEventListener('keydown', handleKeyDown);
-      return () => window.removeEventListener('keydown', handleKeyDown);
-    }
-  }, [isOpen, handleKeyDown]);
-
-  if (!isOpen) return null;
-
-  return createPortal(
-    <div
-      className="fixed inset-0 bg-black/50 flex items-center justify-center z-[60]"
-      onClick={onClose}
-    >
-      <div
-        className="bg-dark-bgSecondary border border-dark-border rounded-lg shadow-xl p-4 min-w-[300px] max-w-[400px]"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="flex items-center justify-between mb-3">
-          <h3 className="text-sm font-semibold text-text-primary">{title}</h3>
-          <button
-            onClick={onClose}
-            className="p-1 text-text-muted hover:text-text-primary hover:bg-dark-bgTertiary rounded"
-          >
-            <X size={14} />
-          </button>
-        </div>
-        <p className="text-sm text-text-secondary mb-4">{message}</p>
-        <div className="flex justify-end gap-2">
-          <button
-            onClick={onClose}
-            className="px-3 py-1.5 text-sm text-text-secondary hover:text-text-primary
-                     hover:bg-dark-bgTertiary rounded transition-colors"
-          >
-            Cancel
-          </button>
-          <button
-            onClick={() => {
-              onConfirm();
-              onClose();
-            }}
-            className={`px-3 py-1.5 text-sm rounded transition-colors ${
-              danger
-                ? 'bg-accent-error text-text-primary hover:bg-accent-error/80'
-                : 'bg-accent-primary text-text-inverse hover:bg-accent-primary/80'
-            }`}
-          >
-            {confirmLabel}
-          </button>
-        </div>
-      </div>
-    </div>,
-    document.body
-  );
-};
 
 export const PatternContextMenu: React.FC<PatternContextMenuProps> = ({
   patternIndex,
@@ -388,6 +224,8 @@ export const PatternContextMenu: React.FC<PatternContextMenuProps> = ({
         currentName={pattern?.name || ''}
         onConfirm={handleRename}
         onClose={() => setShowRenameDialog(false)}
+        title="Rename Pattern"
+        placeholder="Enter pattern name"
       />
 
       {/* Delete Confirmation Dialog */}
