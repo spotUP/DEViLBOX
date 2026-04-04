@@ -76,7 +76,10 @@ export function useGTUltraEngineInit(): void {
             }
           };
         })(),
-        onAsidWrite: (chip, reg, value) => getGTUltraASIDBridge().writeRegister(chip, reg, value),
+        onAsidWrite: (chip, reg, value, tick, tableType, tableIndex) => {
+          getGTUltraASIDBridge().writeRegister(chip, reg, value);
+          getGTUltraASIDBridge().captureRegisterWrite(chip, reg, value, tick, tableType, tableIndex);
+        },
         onPatternData: (pattern, length, data) => useGTUltraStore.getState().updatePatternData(pattern, length, data),
         onOrderData: (channel, data) => useGTUltraStore.getState().updateOrderData(channel, data),
         onInstrumentData: (instrument, data) => {

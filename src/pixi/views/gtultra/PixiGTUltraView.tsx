@@ -25,6 +25,7 @@ import { useGTKeyboardHandler } from '@/components/gtultra/GTKeyboardHandler';
 import { useGTUltraEngineInit } from '@/engine/gtultra/useGTUltraEngineInit';
 import { PixiGTDAWView } from './daw/PixiGTDAWView';
 import { useGTDAWKeyboardHandler } from './daw/useGTDAWKeyboardHandler';
+import { PixiAutomationLaneStrip } from '../tracker/PixiAutomationLaneStrip';
 
 const TOOLBAR_H = 32;
 const ORDER_H = 160;
@@ -206,6 +207,18 @@ export const PixiGTUltraView: React.FC<Props> = ({ width, height }) => {
           height={Math.max(100, patternHeight)}
         />
       </pixiContainer>
+
+      {/* ─── Automation Lane Strip ─── */}
+      {ready && (
+        <PixiAutomationLaneStrip
+          width={width}
+          format="gtultra"
+          formatConfig={{ sidCount }}
+          patternLength={useGTUltraStore.getState().patternLength}
+          currentRow={playbackPos.row}
+          isPlaying={!!playbackPos.row || playbackPos.position > 0}
+        />
+      )}
     </pixiContainer>
   );
 };
