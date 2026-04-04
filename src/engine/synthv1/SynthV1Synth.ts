@@ -114,6 +114,32 @@ export const CONFIG_KEYS: (keyof SynthV1Config)[] = [
   'reverbWet', 'reverbRoom',
 ];
 
+/** Map CONFIG_KEYS index → WASM ParamIndex enum value.
+ *  WASM has 147 params (NUM_PARAMS), CONFIG_KEYS has 100. The WASM enum
+ *  has extra params (BANDL, SYNC2, ENVTIME, ENABLED, RATE, SWEEP, OUT, DEF, DYN, KEY)
+ *  that CONFIG_KEYS doesn't expose. Indices diverge after position 1. */
+const WASM_PARAM_INDEX: Record<number, number> = {
+  0:0, 1:1, 2:4, 3:5, 4:12, 5:13, 6:14, 7:3, 8:8, 9:11,
+  10:17, 11:18, 12:19, 13:20, 14:21, 15:22, 16:23, 17:24, 18:25,
+  // 19: dcf1KeyFollow — no WASM equivalent
+  20:44, 21:45, 22:46, 23:47, 24:48,
+  25:29, 26:27, 27:28, 28:33, 29:36, 30:37, 31:38, 32:39, 33:31,
+  34:9, 35:10, 36:50, 37:56,
+  // 38: dcf1Velocity, 39: dca1Velocity — no WASM equivalent
+  40:59, 41:60, 42:63, 43:64, 44:71, 45:72, 46:73, 47:62, 48:67, 49:70,
+  50:76, 51:77, 52:78, 53:79, 54:80, 55:81, 56:82, 57:83, 58:84,
+  // 59: dcf2KeyFollow — no WASM equivalent
+  60:103, 61:104, 62:105, 63:106, 64:107,
+  65:88, 66:86, 67:87, 68:92, 69:95, 70:96, 71:97, 72:98, 73:90,
+  74:68, 75:69, 76:109, 77:115,
+  // 78: dcf2Velocity, 79: dca2Velocity — no WASM equivalent
+  80:118, 81:119, 82:120, 83:121, 84:122,
+  85:123, 86:124, 87:125, 88:126,
+  89:127, 90:128, 91:129, 92:130, 93:131,
+  94:132, 95:133, 96:134, 97:135,
+  98:136, 99:137,
+};
+
 export const SYNTHV1_PARAM_NAMES: Record<number, string> = {};
 CONFIG_KEYS.forEach((k, i) => {
   // Convert camelCase to spaced: dco1Shape1 → "DCO1 Shape1"
@@ -576,8 +602,9 @@ export class SynthV1Engine implements DevilboxSynth {
     if (!this._worklet || !this.isInitialized) return;
     for (let i = 0; i < CONFIG_KEYS.length; i++) {
       const value = this.config[CONFIG_KEYS[i]];
-      if (value !== undefined) {
-        this._worklet.port.postMessage({ type: 'setParam', index: i, value });
+      const wasmIdx = WASM_PARAM_INDEX[i];
+      if (value !== undefined && wasmIdx !== undefined) {
+        this._worklet.port.postMessage({ type: 'setParam', index: wasmIdx, value });
       }
     }
   }
@@ -609,11 +636,12 @@ export class SynthV1Engine implements DevilboxSynth {
   }
 
   set(param: string, value: number): void {
-    const index = CONFIG_KEYS.indexOf(param as keyof SynthV1Config);
-    if (index >= 0) {
+    const configIdx = CONFIG_KEYS.indexOf(param as keyof SynthV1Config);
+    if (configIdx >= 0) {
       (this.config as unknown as Record<string, number>)[param] = value;
-      if (this._worklet && this.isInitialized) {
-        this._worklet.port.postMessage({ type: 'setParam', index, value });
+      const wasmIdx = WASM_PARAM_INDEX[configIdx];
+      if (wasmIdx !== undefined && this._worklet && this.isInitialized) {
+        this._worklet.port.postMessage({ type: 'setParam', index: wasmIdx, value });
       }
     }
   }
