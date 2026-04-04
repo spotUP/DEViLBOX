@@ -28,6 +28,7 @@ import { PixiButton, PixiNumericInput } from '../../components';
 import { PixiFXSearchReplace } from '../../components/PixiFXSearchReplace';
 import { PixiVisualizer } from './PixiVisualizer';
 import { useTransportStore, useTrackerStore, useUIStore, useInstrumentStore, useProjectStore, useAudioStore, useAutomationStore, useEditorStore } from '@stores';
+import { useWasmPositionStore } from '@/stores/useWasmPositionStore';
 import { useAIStore } from '@stores/useAIStore';
 import { useSettingsStore } from '@stores/useSettingsStore';
 import { useFormatStore } from '@stores/useFormatStore';
@@ -174,11 +175,16 @@ export const PixiFT2Toolbar: React.FC = () => {
   // ── Project store (isDirty for Save button label) ─────────────────────────
   const isDirty = useProjectStore(s => s.isDirty);
 
+  // ── WASM position (for formats like MusicLine that bypass replayer) ───────
+  const wasmSongPos = useWasmPositionStore(s => s.songPos);
+  const wasmActive = useWasmPositionStore(s => s.active);
+
   // ── Derived values ────────────────────────────────────────────────────────
+  const displayPositionIndex = (isPlaying && wasmActive) ? Math.min(wasmSongPos, patternOrder.length - 1) : currentPositionIndex;
   const currentPattern = patterns[currentPatternIndex];
   const patternLength = currentPattern?.length ?? 64;
   const songLength = patternOrder.length;
-  const currentPatternInOrder = patternOrder[currentPositionIndex] ?? currentPatternIndex;
+  const currentPatternInOrder = patternOrder[displayPositionIndex] ?? currentPatternIndex;
 
   // Groove button moved to EditorControlsBar (matching DOM)
 
@@ -441,7 +447,7 @@ export const PixiFT2Toolbar: React.FC = () => {
 
             {/* Col 1: Position + Tap/Ins/Del (260px matching DOM .ft2-col-1) */}
             <pixiContainer layout={{ width: 260, flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-              <FT2Cell label="Position" value={currentPositionIndex} min={0} max={Math.max(0, songLength - 1)} onChange={handlePositionChange} width={44} />
+              <FT2Cell label="Position" value={displayPositionIndex} min={0} max={Math.max(0, songLength - 1)} onChange={handlePositionChange} width={44} />
               <PixiButton
                 label={tapActive ? `Tap${tapCount > 0 ? ` (${tapCount})` : ''}` : 'Tap'}
                 variant={tapActive ? 'ft2' : 'ghost'}
