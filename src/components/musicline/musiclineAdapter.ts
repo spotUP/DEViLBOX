@@ -14,6 +14,7 @@ import type { ColumnDef, FormatCell, FormatChannel, OnCellChange } from '@/compo
 import type { Pattern } from '@/types/tracker';
 import { MusicLineEngine } from '@/engine/musicline/MusicLineEngine';
 import { useTrackerStore } from '@stores';
+import { ML_TRACK_CMD_FLAG } from '@/lib/import/formats/MusicLineParser';
 
 // --------------------------------------------------------------------------
 // Note / hex formatters
@@ -165,14 +166,19 @@ export function musiclineToFormatChannels(
   // into empty space when the WASM row counter goes beyond a shorter channel's length.
   let maxRows = 0;
   for (let ch = 0; ch < channelTrackTables.length; ch++) {
-    const partIdx = channelTrackTables[ch][currentPos] ?? 0;
-    const pat = patterns[partIdx];
+    const entry = channelTrackTables[ch][currentPos] ?? 0;
+    // Special commands (END/JUMP/WAIT) have no associated pattern
+    if (entry & ML_TRACK_CMD_FLAG) continue;
+    const pat = patterns[entry];
     maxRows = Math.max(maxRows, pat?.length ?? 128);
   }
+  if (maxRows === 0) maxRows = 128; // fallback if all channels are on special commands
 
   for (let ch = 0; ch < channelTrackTables.length; ch++) {
-    const partIdx = channelTrackTables[ch][currentPos] ?? 0;
-    const pat = patterns[partIdx];
+    const entry = channelTrackTables[ch][currentPos] ?? 0;
+    const isCmd = !!(entry & ML_TRACK_CMD_FLAG);
+    const partIdx = isCmd ? 0 : entry;
+    const pat = isCmd ? undefined : patterns[partIdx];
     const rows: FormatCell[] = [];
 
     for (let row = 0; row < maxRows; row++) {
@@ -196,8 +202,11 @@ export function musiclineToFormatChannels(
       }
     }
 
+    const label = isCmd ? `CH${(ch + 1).toString().padStart(2, '0')} ---`
+      : `CH${(ch + 1).toString().padStart(2, '0')} P:${partIdx.toString().padStart(2, '0')}`;
+
     result.push({
-      label: `CH${(ch + 1).toString().padStart(2, '0')} P:${partIdx.toString().padStart(2, '0')}`,
+      label,
       patternLength: maxRows,
       rows,
       isPatternChannel: true,
@@ -223,15 +232,19 @@ export function musiclineToFormatChannelsPerChannel(
   let maxRows = 0;
   for (let ch = 0; ch < channelTrackTables.length; ch++) {
     const pos = Math.min(channelPositions[ch] ?? 0, maxPos);
-    const partIdx = channelTrackTables[ch][pos] ?? 0;
-    const pat = patterns[partIdx];
+    const entry = channelTrackTables[ch][pos] ?? 0;
+    if (entry & ML_TRACK_CMD_FLAG) continue;
+    const pat = patterns[entry];
     maxRows = Math.max(maxRows, pat?.length ?? 128);
   }
+  if (maxRows === 0) maxRows = 128;
 
   for (let ch = 0; ch < channelTrackTables.length; ch++) {
     const pos = Math.min(channelPositions[ch] ?? 0, maxPos);
-    const partIdx = channelTrackTables[ch][pos] ?? 0;
-    const pat = patterns[partIdx];
+    const entry = channelTrackTables[ch][pos] ?? 0;
+    const isCmd = !!(entry & ML_TRACK_CMD_FLAG);
+    const partIdx = isCmd ? 0 : entry;
+    const pat = isCmd ? undefined : patterns[partIdx];
     const rows: FormatCell[] = [];
 
     for (let row = 0; row < maxRows; row++) {
@@ -250,8 +263,11 @@ export function musiclineToFormatChannelsPerChannel(
       }
     }
 
+    const label = isCmd ? `CH${(ch + 1).toString().padStart(2, '0')} ---`
+      : `CH${(ch + 1).toString().padStart(2, '0')} P:${partIdx.toString().padStart(2, '0')}`;
+
     result.push({
-      label: `CH${(ch + 1).toString().padStart(2, '0')} P:${partIdx.toString().padStart(2, '0')}`,
+      label,
       patternLength: maxRows,
       rows,
       isPatternChannel: true,
