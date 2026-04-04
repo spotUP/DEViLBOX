@@ -106,3 +106,14 @@ void paula_get_channel_levels(float* out4) {
         s_channel_peaks[c] = 0.0f;
     }
 }
+
+/* Diagnostic: print Paula channel state */
+#include <stdio.h>
+void paula_dump_state(void) {
+    int i;
+    for (i = 0; i < 4; i++) {
+        printf("[Paula ch%d] dma=%d sample=%p len=%u vol=%.2f step=%.4f pos=%.1f\n",
+            i, s_ch[i].dma_on, (void*)s_ch[i].sample, s_ch[i].sample_len,
+            s_ch[i].volume, s_ch[i].step, s_ch[i].pos);
+    }
+}

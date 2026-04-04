@@ -403,8 +403,7 @@ export async function tryRouteFormat(
   }
 
   // ── PreTracker ───────────────────────────────────────────────────────────
-  // UADE enhanced scan handles both pattern extraction and audio playback.
-  // The transpiled WASM replayer is broken (eagleplayer function table needs UADE host).
+  // UADE for audio. WASM replayer WIP (songInit+playerInit work, startSong crashes).
   if (matchesExt(filename, ['prt'])) {
     const { parseUADEFile } = await import('@lib/import/formats/UADEParser');
     return parseUADEFile(buffer, originalFileName, prefs.uade ?? 'enhanced', subsong, preScannedMeta);

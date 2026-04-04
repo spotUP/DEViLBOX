@@ -83,6 +83,10 @@ static juce::Image* g_framebuffer = nullptr;
 static int g_fbWidth = FB_WIDTH;
 static int g_fbHeight = FB_HEIGHT;
 
+// Parameter change tracking — snapshot of values from last tick
+static float* g_paramSnapshot = nullptr;
+static int g_numParams = 0;
+
 // Defined in juce_Messaging_wasm.cpp — drains the deferred message queue
 extern "C" void juce_wasm_dispatch_messages();
 
@@ -136,7 +140,19 @@ void monique_ui_init(int sampleRate)
     }
 
     g_framebuffer = new juce::Image(juce::Image::ARGB, g_fbWidth, g_fbHeight, true);
-    EM_ASM({ console.log("[MoniqueUI WASM] Init complete: " + $0 + "x" + $1); }, g_fbWidth, g_fbHeight);
+
+    // Initialize parameter change tracking
+    if (g_processor->synth_data) {
+        auto& params = g_processor->synth_data->get_atomateable_parameters();
+        g_numParams = params.size();
+        g_paramSnapshot = new float[g_numParams];
+        for (int i = 0; i < g_numParams; i++) {
+            g_paramSnapshot[i] = params.getUnchecked(i)->get_value();
+        }
+    }
+
+    EM_ASM({ console.log("[MoniqueUI WASM] Init complete: " + $0 + "x" + $1 + ", params=" + $2); },
+            g_fbWidth, g_fbHeight, g_numParams);
 }
 
 EMSCRIPTEN_KEEPALIVE
@@ -148,6 +164,21 @@ void monique_ui_tick()
 
     if (g_processor->ui_refresher)
         g_processor->ui_refresher->timerCallback();
+
+    // Poll for parameter changes and notify JS
+    if (g_paramSnapshot && g_processor->synth_data) {
+        auto& params = g_processor->synth_data->get_atomateable_parameters();
+        for (int i = 0; i < g_numParams && i < params.size(); i++) {
+            float val = params.getUnchecked(i)->get_value();
+            if (val != g_paramSnapshot[i]) {
+                g_paramSnapshot[i] = val;
+                EM_ASM({
+                    if (window._moniqueUIParamCallback)
+                        window._moniqueUIParamCallback($0, $1);
+                }, i, val);
+            }
+        }
+    }
 
     juce::Graphics g(*g_framebuffer);
     g.fillAll(juce::Colours::black);
@@ -223,6 +254,32 @@ void monique_ui_on_mouse_wheel(int x, int y, float deltaX, float deltaY)
 }
 
 EMSCRIPTEN_KEEPALIVE
+int monique_ui_get_num_params()
+{
+    return g_numParams;
+}
+
+EMSCRIPTEN_KEEPALIVE
+float monique_ui_get_param(int index)
+{
+    if (!g_processor || !g_processor->synth_data) return 0.0f;
+    auto& params = g_processor->synth_data->get_atomateable_parameters();
+    if (index < 0 || index >= params.size()) return 0.0f;
+    return params.getUnchecked(index)->get_value();
+}
+
+EMSCRIPTEN_KEEPALIVE
+void monique_ui_set_param(int index, float value)
+{
+    if (!g_processor || !g_processor->synth_data) return;
+    auto& params = g_processor->synth_data->get_atomateable_parameters();
+    if (index < 0 || index >= params.size()) return;
+    params.getUnchecked(index)->set_value(value);
+    if (g_paramSnapshot && index < g_numParams)
+        g_paramSnapshot[index] = value; // update snapshot to avoid re-triggering callback
+}
+
+EMSCRIPTEN_KEEPALIVE
 void monique_ui_shutdown()
 {
     if (g_editor) {
@@ -234,6 +291,7 @@ void monique_ui_shutdown()
     delete g_midiForwarder; g_midiForwarder = nullptr;
     delete g_editor;      g_editor = nullptr;
     delete g_framebuffer; g_framebuffer = nullptr;
+    delete[] g_paramSnapshot; g_paramSnapshot = nullptr; g_numParams = 0;
     delete g_processor;   g_processor = nullptr;
 }
 

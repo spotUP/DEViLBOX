@@ -201,9 +201,20 @@ class SfizzProcessor extends AudioWorkletProcessor {
 
   writeFilesToFS(files) {
     if (!this.module || !this.module.FS) return;
+    console.log(`[Sfizz Worklet] writeFilesToFS: ${files.length} files`);
     for (const { path, data } of files) {
+      console.log(`[Sfizz Worklet]   writing: ${path} (${data.byteLength} bytes)`);
       this.writeSampleToFS(path, data);
     }
+    // List what's in /sfz/ after writing
+    try {
+      const listDir = (p) => {
+        try { return this.module.FS.readdir(p).filter(n => n !== '.' && n !== '..'); } catch { return []; }
+      };
+      console.log('[Sfizz Worklet]   /sfz/ contents:', listDir('/sfz'));
+      const sub = listDir('/sfz').find(d => { try { return this.module.FS.isDir(this.module.FS.stat('/sfz/' + d).mode); } catch { return false; } });
+      if (sub) console.log(`[Sfizz Worklet]   /sfz/${sub}/ contents:`, listDir('/sfz/' + sub));
+    } catch {}
     this.port.postMessage({ type: 'filesWritten', count: files.length });
   }
 
@@ -242,6 +253,7 @@ class SfizzProcessor extends AudioWorkletProcessor {
 
   loadSfzFile(path) {
     if (!this.engine || !this.module) return;
+    console.log(`[Sfizz Worklet] loadSfzFile: ${path}`);
     const pathPtr = this.module._malloc(path.length + 1);
     const heap = new Uint8Array(this.module.wasmMemory.buffer);
     for (let i = 0; i < path.length; i++) {
