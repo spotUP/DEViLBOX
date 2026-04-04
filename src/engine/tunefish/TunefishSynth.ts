@@ -266,9 +266,14 @@ export class TunefishSynth implements DevilboxSynth {
     }
   }
 
+  private _prevParams: number[] = [];
+
   applyConfig(config: TunefishInstrumentConfig): void {
     this.config = { ...config };
     const params = tunefishConfigToParams(config);
+    // Only send if params actually changed — avoids audio glitches from redundant messages
+    if (this._prevParams.length === params.length && params.every((v, i) => v === this._prevParams[i])) return;
+    this._prevParams = [...params];
     this.setParameters(params);
   }
 
