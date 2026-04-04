@@ -153,26 +153,36 @@ export const MoniqueHardwareUI: React.FC<MoniqueHardwareUIProps> = ({
         if (!ctx) return;
         const imgData = ctx.createImageData(w, h);
 
-        // Mouse event handlers
+        // Mouse event handlers — track drag state to prevent parent scroll
+        let isDragging = false;
+
         const onMouseDown = (e: MouseEvent) => {
           e.preventDefault();
+          e.stopPropagation();
+          isDragging = true;
           canvas.focus();
           const [cx, cy] = canvasCoords(canvas, e);
           m._monique_ui_on_mouse_down(cx, cy, getModifiers(e));
         };
 
         const onMouseUp = (e: MouseEvent) => {
+          isDragging = false;
           const [cx, cy] = canvasCoords(canvas, e);
           m._monique_ui_on_mouse_up(cx, cy, getModifiers(e));
         };
 
         const onMouseMove = (e: MouseEvent) => {
+          if (isDragging) {
+            e.preventDefault();
+            e.stopPropagation();
+          }
           const [cx, cy] = canvasCoords(canvas, e);
           m._monique_ui_on_mouse_move(cx, cy, getModifiers(e));
         };
 
         const onWheel = (e: WheelEvent) => {
           e.preventDefault();
+          e.stopPropagation();
           const [cx, cy] = canvasCoords(canvas, e);
           m._monique_ui_on_mouse_wheel(cx, cy, e.deltaX, e.deltaY);
         };
@@ -222,6 +232,7 @@ export const MoniqueHardwareUI: React.FC<MoniqueHardwareUIProps> = ({
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         (window as any)._moniqueUIParamCallback = (index: number, value: number) => {
           console.log(`[MoniqueHW] param ${index} = ${value}, instrumentId=${instrumentId}`);
+          if (!instrumentId) return;
           try {
             const engine = getToneEngine();
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -324,6 +335,8 @@ export const MoniqueHardwareUI: React.FC<MoniqueHardwareUIProps> = ({
           height: 'auto',
           display: loaded ? 'block' : 'none',
           cursor: 'default',
+          touchAction: 'none',    // Prevent browser scroll on drag
+          userSelect: 'none',     // Prevent text selection during drag
         }}
       />
     </div>
