@@ -23,8 +23,13 @@ import { usePixiTheme } from '@/pixi/theme';
 import { PIXI_FONTS } from '@/pixi/fonts';
 import { PixiButton } from '@/pixi/components/PixiButton';
 import { getTrackerReplayer } from '@engine/TrackerReplayer';
-import { PixiTFMXTrackstepMatrix } from './PixiTFMXTrackstepMatrix';
-import { PixiTFMXPatternEditor } from './PixiTFMXPatternEditor';
+import { PixiFormatPatternEditor } from '@/pixi/views/shared/PixiFormatPatternEditor';
+import {
+  tfmxPatternToChannels,
+  tfmxTrackstepToChannels,
+  TFMX_PATTERN_COLUMNS,
+  TFMX_TRACKSTEP_COLUMNS,
+} from '@/components/tfmx/tfmxAdapter';
 
 const TOOLBAR_HEIGHT = 32;
 const MATRIX_HEIGHT  = 160;
@@ -75,6 +80,17 @@ export const PixiTFMXView: React.FC<Props> = ({ width, height }) => {
       }
     }
   }, [isPlaying, currentPositionIndex, native, flatToTrackstep, setSelectedPattern]);
+
+  // Convert native data to FormatChannel[] via adapter
+  const trackstepChannels = useMemo(() => {
+    if (!native) return [];
+    return tfmxTrackstepToChannels(native);
+  }, [native]);
+
+  const patternChannels = useMemo(() => {
+    if (!native) return [];
+    return tfmxPatternToChannels(native, selectedPattern);
+  }, [native, selectedPattern]);
 
   const patternEditorHeight = height - TOOLBAR_HEIGHT - MATRIX_HEIGHT;
 
@@ -183,26 +199,25 @@ export const PixiTFMXView: React.FC<Props> = ({ width, height }) => {
 
       {/* Trackstep Matrix */}
       <pixiContainer layout={{ width, height: MATRIX_HEIGHT }}>
-        <PixiTFMXTrackstepMatrix
+        <PixiFormatPatternEditor
           width={width}
           height={MATRIX_HEIGHT}
-          native={native}
-          activeStep={activeStepIdx}
-          selectedPattern={selectedPattern}
-          onSelectPattern={setSelectedPattern}
-          onStepChange={setActiveStepIdx}
+          columns={TFMX_TRACKSTEP_COLUMNS}
+          channels={trackstepChannels}
+          currentRow={activeStepIdx}
+          isPlaying={isPlaying}
         />
         <pixiGraphics draw={drawMatrixBorder} layout={{ position: 'absolute', width, height: MATRIX_HEIGHT }} />
       </pixiContainer>
 
       {/* Pattern Editor */}
       <pixiContainer layout={{ flex: 1, width, height: Math.max(100, patternEditorHeight) }}>
-        <PixiTFMXPatternEditor
+        <PixiFormatPatternEditor
           width={width}
           height={Math.max(100, patternEditorHeight)}
-          native={native}
-          patternIndex={selectedPattern}
-          currentRow={isPlaying ? currentRow : undefined}
+          columns={TFMX_PATTERN_COLUMNS}
+          channels={patternChannels}
+          currentRow={isPlaying ? currentRow : 0}
           isPlaying={isPlaying}
         />
       </pixiContainer>

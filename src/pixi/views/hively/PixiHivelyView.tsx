@@ -11,7 +11,7 @@
  * └──────────────────────────────────────────────────┘
  */
 
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import type { Graphics as GraphicsType } from 'pixi.js';
 import { useTrackerStore } from '@/stores/useTrackerStore';
 import { useFormatStore } from '@/stores/useFormatStore';
@@ -22,7 +22,8 @@ import { usePixiTheme } from '@/pixi/theme';
 import { PIXI_FONTS } from '@/pixi/fonts';
 import { PixiButton } from '@/pixi/components/PixiButton';
 import { PixiHivelyPositionEditor } from './PixiHivelyPositionEditor';
-import { PixiHivelyTrackEditor } from './PixiHivelyTrackEditor';
+import { PixiFormatPatternEditor } from '@/pixi/views/shared/PixiFormatPatternEditor';
+import { HIVELY_COLUMNS, hivelyToFormatChannels } from '@/components/hively/hivelyAdapter';
 
 const TOOLBAR_HEIGHT = 32;
 const POSITION_EDITOR_HEIGHT = 160;
@@ -42,6 +43,7 @@ export const PixiHivelyView: React.FC<HivelyViewProps> = ({ width, height }) => 
   const currentPositionIndex = useTrackerStore(s => s.currentPositionIndex);
   const setCurrentPosition = useTrackerStore(s => s.setCurrentPosition);
   const isPlaying = useTransportStore(s => s.isPlaying);
+  const currentRow = useTransportStore(s => s.currentRow);
 
   const [editPosition, setEditPosition] = useState(0);
   const [focusTarget, setFocusTarget] = useState<'position' | 'track'>('track');
@@ -100,6 +102,11 @@ export const PixiHivelyView: React.FC<HivelyViewProps> = ({ width, height }) => 
     g.rect(0, POSITION_EDITOR_HEIGHT - 2, width, 2);
     g.fill({ color: focusTarget === 'position' ? HVL_ACCENT : 0x333333 });
   }, [width, focusTarget]);
+
+  const channels = useMemo(
+    () => nativeData ? hivelyToFormatChannels(nativeData, activePosition) : [],
+    [nativeData, activePosition],
+  );
 
   // ── No module loaded ───────────────────────────────────────────────────────
 
@@ -240,13 +247,16 @@ export const PixiHivelyView: React.FC<HivelyViewProps> = ({ width, height }) => 
 
       {/* Track Editor */}
       <pixiContainer layout={{ flex: 1, width, height: trackEditorHeight }}>
-        <PixiHivelyTrackEditor
-          width={width}
-          height={trackEditorHeight}
-          nativeData={nativeData}
-          currentPosition={activePosition}
-          onFocusPositionEditor={handleFocusPositionEditor}
-        />
+        {channels.length > 0 && trackEditorHeight > 0 && (
+          <PixiFormatPatternEditor
+            width={width}
+            height={trackEditorHeight}
+            columns={HIVELY_COLUMNS}
+            channels={channels}
+            currentRow={currentRow}
+            isPlaying={isPlaying}
+          />
+        )}
       </pixiContainer>
     </pixiContainer>
   );
