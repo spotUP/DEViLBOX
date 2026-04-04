@@ -24,6 +24,7 @@ program
   .option('--dry-run', 'Parse and report only, no output files')
   .option('--verbose', 'Show symbol table and warnings')
   .option('--pass2', 'Enable Pass 2 restructuring (experimental)', false)
+  .option('--no-func-split', 'Disable function splitting at RTS boundaries (for disassembled binaries)', false)
   .option('-P, --preamble <file>', 'Prepend ASM file before main source (repeatable)', (v: string, acc: string[]) => [...acc, v], [] as string[])
   .action((inputs: string[], opts) => {
     for (const inputPath of inputs) {
@@ -48,7 +49,7 @@ program
         console.log(`[${name}] Paula writes: ${resolved.paulaWrites.length}`);
       }
 
-      const cOutput = emit(ast, resolved, basename(inputPath));
+      const cOutput = emit(ast, resolved, basename(inputPath), { noFuncSplit: opts.noFuncSplit });
       const finalOutput = opts.pass2 ? restructure(cOutput) : cOutput;
 
       if (opts.dryRun) {

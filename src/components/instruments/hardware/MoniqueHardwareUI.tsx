@@ -216,9 +216,29 @@ export const MoniqueHardwareUI: React.FC<MoniqueHardwareUIProps> = ({
           } catch { /* engine not ready */ }
         };
 
+        // Parameter change callback: UI knob changes → real audio engine
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (window as any)._moniqueUIParamCallback = (index: number, value: number) => {
+          if (!instrumentId) return;
+          try {
+            const engine = getToneEngine();
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const instruments = (engine as any).instruments as Map<number, any>;
+            const key = (instrumentId << 16) | 0xFFFF;
+            const synth = instruments?.get(key);
+            if (synth?.setParam) {
+              synth.setParam(index, value);
+            } else if (synth?._worklet) {
+              synth._worklet.port.postMessage({ type: 'setParam', index, value });
+            }
+          } catch { /* engine not ready */ }
+        };
+
         eventCleanups.push(() => {
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           delete (window as any)._moniqueUIMidiCallback;
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          delete (window as any)._moniqueUIParamCallback;
         });
 
         setLoaded(true);
