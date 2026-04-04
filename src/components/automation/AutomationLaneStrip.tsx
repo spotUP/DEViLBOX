@@ -3,15 +3,9 @@ import {
   type AutomationParamDef,
   type AutomationFormat,
   getParamsForFormat,
-  groupParams,
 } from '../../engine/automation/AutomationParams';
 import { getAutomationCapture, type CaptureEntry } from '../../engine/automation/AutomationCapture';
-
-interface LaneConfig {
-  id: string;
-  paramId: string | null;
-  height: number; // 24 | 48 | 72
-}
+import { useRegisterLaneStore } from '../../stores/useRegisterLaneStore';
 
 interface AutomationLaneStripProps {
   format: AutomationFormat;
@@ -22,8 +16,6 @@ interface AutomationLaneStripProps {
   isPlaying: boolean;
 }
 
-let laneIdCounter = 0;
-
 export const AutomationLaneStrip: React.FC<AutomationLaneStripProps> = ({
   format,
   formatConfig,
@@ -31,44 +23,27 @@ export const AutomationLaneStrip: React.FC<AutomationLaneStripProps> = ({
   currentRow,
   isPlaying,
 }) => {
-  const [lanes, setLanes] = useState<LaneConfig[]>([]);
+  const lanes = useRegisterLaneStore(s => s.lanes);
+  const removeLane = useRegisterLaneStore(s => s.removeLane);
+  const setLaneHeight = useRegisterLaneStore(s => s.setLaneHeight);
   const [collapsed, setCollapsed] = useState(false);
 
   const allParams = useMemo(
     () => getParamsForFormat(format, formatConfig),
     [format, formatConfig],
   );
-  const paramGroups = useMemo(() => groupParams(allParams), [allParams]);
   const paramById = useMemo(() => {
     const map = new Map<string, AutomationParamDef>();
     for (const p of allParams) map.set(p.id, p);
     return map;
   }, [allParams]);
 
-  const addLane = useCallback(() => {
-    setLanes(prev => [...prev, {
-      id: `lane-${++laneIdCounter}`,
-      paramId: null,
-      height: 48,
-    }]);
-  }, []);
-
-  const removeLane = useCallback((laneId: string) => {
-    setLanes(prev => prev.filter(l => l.id !== laneId));
-  }, []);
-
-  const setLaneParam = useCallback((laneId: string, paramId: string) => {
-    setLanes(prev => prev.map(l => l.id === laneId ? { ...l, paramId } : l));
-  }, []);
-
-  const setLaneHeight = useCallback((laneId: string, height: number) => {
-    setLanes(prev => prev.map(l => l.id === laneId ? { ...l, height } : l));
-  }, []);
+  if (lanes.length === 0) return null;
 
   return (
     <div className="flex-shrink-0 border-t border-dark-border bg-dark-bgPrimary">
       {/* Header bar */}
-      <div className="flex items-center h-6 px-2 bg-dark-bgSecondary border-b border-dark-border text-xs text-text-muted select-none">
+      <div className="flex items-center h-5 px-2 bg-dark-bgSecondary border-b border-dark-border text-xs text-text-muted select-none">
         <button
           onClick={() => setCollapsed(!collapsed)}
           className="mr-2 text-text-muted hover:text-text-primary w-3"
@@ -76,75 +51,54 @@ export const AutomationLaneStrip: React.FC<AutomationLaneStripProps> = ({
           {collapsed ? '\u25B6' : '\u25BC'}
         </button>
         <span className="font-medium">Automation</span>
-        <span className="ml-2 opacity-50">{lanes.length} lane{lanes.length !== 1 ? 's' : ''}</span>
-        <button
-          onClick={addLane}
-          className="ml-auto px-2 py-0.5 text-xs bg-dark-bgTertiary hover:bg-accent-primary/20 text-text-muted hover:text-text-primary rounded"
-        >
-          + Add Lane
-        </button>
+        <span className="ml-2 opacity-50">{lanes.length}</span>
       </div>
 
       {/* Lanes */}
-      {!collapsed && lanes.map(lane => (
-        <div key={lane.id} className="border-b border-dark-border" style={{ height: lane.height }}>
-          {/* Lane header */}
-          <div className="flex items-center h-5 px-2 bg-dark-bgSecondary text-xs gap-1">
-            <button
-              onClick={() => removeLane(lane.id)}
-              className="text-text-muted hover:text-accent-error text-xs w-3 flex-shrink-0"
-              title="Remove lane"
-            >
-              x
-            </button>
+      {!collapsed && lanes.map(lane => {
+        const paramDef = paramById.get(lane.paramId);
+        return (
+          <div key={lane.id} className="border-b border-dark-border" style={{ height: lane.height }}>
+            {/* Lane header */}
+            <div className="flex items-center h-4 px-2 bg-dark-bgSecondary text-xs gap-1">
+              <button
+                onClick={() => removeLane(lane.paramId)}
+                className="text-text-muted hover:text-accent-error text-xs w-3 flex-shrink-0"
+                title="Remove lane"
+              >
+                x
+              </button>
+              <span className="text-text-secondary truncate text-[10px]">
+                {paramDef?.label ?? lane.paramId}
+              </span>
+              <span className="flex-1" />
+              <button
+                onClick={() => {
+                  const heights = [24, 48, 72];
+                  const idx = heights.indexOf(lane.height);
+                  setLaneHeight(lane.paramId, heights[(idx + 1) % heights.length]);
+                }}
+                className="text-text-muted hover:text-text-primary text-[10px] w-3 flex-shrink-0 text-center"
+                title="Resize lane"
+              >
+                {lane.height === 24 ? 'S' : lane.height === 48 ? 'M' : 'L'}
+              </button>
+            </div>
 
-            <select
-              value={lane.paramId ?? ''}
-              onChange={e => setLaneParam(lane.id, e.target.value)}
-              className="flex-1 bg-dark-bgTertiary text-text-primary text-xs border border-dark-border rounded px-1 py-0 truncate min-w-0"
-            >
-              <option value="">Select parameter...</option>
-              {paramGroups.map(group => (
-                <optgroup key={group.label} label={group.label}>
-                  {group.params.map(p => (
-                    <option key={p.id} value={p.id}>{p.label}</option>
-                  ))}
-                </optgroup>
-              ))}
-            </select>
-
-            <button
-              onClick={() => {
-                const heights = [24, 48, 72];
-                const idx = heights.indexOf(lane.height);
-                setLaneHeight(lane.id, heights[(idx + 1) % heights.length]);
-              }}
-              className="text-text-muted hover:text-text-primary text-xs w-4 flex-shrink-0 text-center"
-              title="Resize lane"
-            >
-              {lane.height === 24 ? 'S' : lane.height === 48 ? 'M' : 'L'}
-            </button>
-          </div>
-
-          {/* Lane curve area */}
-          <div className="relative" style={{ height: lane.height - 20 }}>
-            {lane.paramId ? (
+            {/* Lane curve area */}
+            <div className="relative" style={{ height: lane.height - 16 }}>
               <LaneCurveCanvas
                 paramId={lane.paramId}
-                paramDef={paramById.get(lane.paramId)}
+                paramDef={paramDef}
                 patternLength={patternLength}
-                height={lane.height - 20}
+                height={lane.height - 16}
                 currentRow={currentRow}
                 isPlaying={isPlaying}
               />
-            ) : (
-              <div className="w-full h-full flex items-center justify-center text-text-muted text-xs opacity-40">
-                Select a parameter
-              </div>
-            )}
+            </div>
           </div>
-        </div>
-      ))}
+        );
+      })}
     </div>
   );
 };
@@ -164,7 +118,6 @@ const LaneCurveCanvas: React.FC<{
   const widthRef = useRef(800);
   const [dragIdx, setDragIdx] = useState<number | null>(null);
 
-  // Track container width
   useEffect(() => {
     const el = containerRef.current;
     if (!el) return;
@@ -175,7 +128,7 @@ const LaneCurveCanvas: React.FC<{
           widthRef.current = w;
           const canvas = canvasRef.current;
           if (canvas && canvas.width !== w * 2) {
-            canvas.width = w * 2; // 2x for retina
+            canvas.width = w * 2;
             canvas.height = height * 2;
           }
         }
@@ -185,12 +138,10 @@ const LaneCurveCanvas: React.FC<{
     return () => obs.disconnect();
   }, [height]);
 
-  // RAF draw loop
   useEffect(() => {
     let running = true;
     const draw = () => {
       if (!running) return;
-
       const canvas = canvasRef.current;
       if (!canvas) { animFrameRef.current = requestAnimationFrame(draw); return; }
       const ctx = canvas.getContext('2d');
@@ -200,12 +151,10 @@ const LaneCurveCanvas: React.FC<{
       const h = canvas.height;
       ctx.clearRect(0, 0, w, h);
 
-      // Get captured data
       const capture = getAutomationCapture();
       const entries = capture.getAll(paramId);
 
       if (entries.length === 0) {
-        // Empty state — dashed center line
         ctx.strokeStyle = 'rgba(255,255,255,0.08)';
         ctx.lineWidth = 1;
         ctx.setLineDash([6, 6]);
@@ -216,7 +165,6 @@ const LaneCurveCanvas: React.FC<{
         ctx.setLineDash([]);
       } else {
         drawCurve(ctx, entries, w, h, patternLength);
-        // Draw control points
         const maxTick = Math.max(patternLength, entries[entries.length - 1].tick + 1);
         for (let i = 0; i < entries.length; i++) {
           const px = (entries[i].tick / maxTick) * w;
@@ -228,7 +176,6 @@ const LaneCurveCanvas: React.FC<{
         }
       }
 
-      // Playback position line
       if (isPlaying && patternLength > 0) {
         const px = (currentRow / patternLength) * w;
         ctx.strokeStyle = 'rgba(255,255,255,0.4)';
@@ -286,7 +233,6 @@ const LaneCurveCanvas: React.FC<{
     if (idx >= 0) {
       setDragIdx(idx);
     } else {
-      // Click in empty space — add a new point
       const { tick, value } = getMousePos(e);
       const capture = getAutomationCapture();
       capture.push(paramId, tick, value);
@@ -299,19 +245,15 @@ const LaneCurveCanvas: React.FC<{
     const capture = getAutomationCapture();
     const entries = capture.getAll(paramId);
     if (dragIdx < entries.length) {
-      // Update the value of the dragged point
       entries[dragIdx].value = value;
     }
   }, [dragIdx, getMousePos, paramId]);
 
-  const handleMouseUp = useCallback(() => {
-    setDragIdx(null);
-  }, []);
+  const handleMouseUp = useCallback(() => { setDragIdx(null); }, []);
 
   const handleDoubleClick = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
     const idx = findNearPoint(e);
     if (idx >= 0) {
-      // Remove point — clear the param and re-push all except this one
       const capture = getAutomationCapture();
       const entries = capture.getAll(paramId);
       capture.clearParam(paramId);
@@ -348,7 +290,6 @@ function drawCurve(
   if (entries.length === 0) return;
   const maxTick = Math.max(patternLength, entries[entries.length - 1].tick + 1);
 
-  // Filled area + stroke
   ctx.beginPath();
   for (let i = 0; i < entries.length; i++) {
     const x = (entries[i].tick / maxTick) * w;
@@ -357,12 +298,10 @@ function drawCurve(
     else ctx.lineTo(x, y);
   }
 
-  // Stroke the curve
   ctx.strokeStyle = 'rgba(96, 165, 250, 0.8)';
   ctx.lineWidth = 2;
   ctx.stroke();
 
-  // Fill below
   const lastEntry = entries[entries.length - 1];
   ctx.lineTo((lastEntry.tick / maxTick) * w, h);
   ctx.lineTo((entries[0].tick / maxTick) * w, h);

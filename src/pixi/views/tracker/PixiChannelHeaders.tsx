@@ -23,6 +23,9 @@ import {
 import { useUIStore, useInstrumentStore } from '@stores';
 import { useLiveModeStore } from '@stores/useLiveModeStore';
 import { useTrackerStore } from '@stores/useTrackerStore';
+import { useFormatStore } from '@stores/useFormatStore';
+import { useRegisterLaneStore } from '@stores/useRegisterLaneStore';
+import { getParamsForFormat, groupParams, type AutomationFormat } from '@/engine/automation/AutomationParams';
 import { GENERATORS, type GeneratorType } from '@utils/patternGenerators';
 import type { ChannelData } from '@typedefs/tracker';
 import type { ContextMenuItem } from '../../input/PixiContextMenu';
@@ -465,6 +468,28 @@ const PixiChannelHeadersInner: React.FC<PixiChannelHeadersProps> = ({
           }));
         })()},
         { label: 'Delete Channel', action: () => removeChannel(ch), disabled: patterns[0]?.channels.length <= 1 },
+        // Register automation lanes
+        ...(() => {
+          const { editorMode } = useFormatStore.getState();
+          const fmt: AutomationFormat | null =
+            editorMode === 'goattracker' ? 'gtultra' :
+            editorMode === 'furnace' ? 'furnace' :
+            editorMode === 'classic' ? 'uade' : null;
+          if (!fmt) return [];
+          const params = getParamsForFormat(fmt);
+          const groups = groupParams(params);
+          const store = useRegisterLaneStore.getState();
+          return [
+            { label: '', separator: true },
+            { label: 'Register Lanes', submenu: groups.map(group => ({
+              label: group.label,
+              submenu: group.params.map(p => ({
+                label: `${store.hasLane(p.id) ? '✓ ' : ''}${p.label}`,
+                action: () => store.toggleLane(p.id),
+              })),
+            }))},
+          ];
+        })(),
       ];
     }
 
