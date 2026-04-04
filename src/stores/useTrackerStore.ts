@@ -1439,10 +1439,8 @@ export const useTrackerStore = create<TrackerStore>()(
     addChannel: () =>
       set((state) => {
         // Use the scheme-specific maxChannels, falling back to global MAX_CHANNELS
-        const { useEditorStore: getEditorStore } = require('@stores/useEditorStore');
-        const behaviorMax = getEditorStore.getState().activeBehavior.maxChannels;
+        const behaviorMax = useEditorStore.getState().activeBehavior.maxChannels;
         const maxChannels = Math.min(behaviorMax, MAX_CHANNELS);
-        console.log('[addChannel] behaviorMax:', behaviorMax, 'maxChannels:', maxChannels, 'current:', state.patterns[0]?.channels.length);
         // Get available colors (excluding null)
         const availableColors = CHANNEL_COLORS.filter((c) => c !== null) as string[];
         // Pick a random color for the new channel
