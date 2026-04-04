@@ -207,6 +207,38 @@ const CONFIG_KEYS: (keyof AeolusConfig)[] = [
   'couplerSwellGreat', 'couplerGreatPedal', 'couplerSwellPedal', 'couplerSwellOctave',
 ];
 
+// Maps CONFIG_KEYS index → WASM aeolus_set_param index.
+// WASM has 32 params (enum in aeolus_bridge.cpp):
+//   0-13:  14 stops (Great 0-6, Swell 7-10, Pedal 11-13)
+//   14-16: Expression (Great, Swell, Pedal)
+//   17-19: Tremulant (speed, depth, enable)
+//   20-24: Reverb (amount, delay, time, bass_time, treble_time)
+//   25:    Master Volume
+//   26:    Tuning
+//   27:    Temperament
+//   28-31: Azimuth, Stereo Width, Direct Level, Reflection Level
+// CONFIG_KEYS has 34 entries; entries with no WASM equivalent are omitted.
+const WASM_PARAM_INDEX: Record<number, number> = {
+  // Great stops: CONFIG 0-6 → WASM stops 0-6 (CONFIG 7 = greatStop7 has no WASM stop)
+  0: 0, 1: 1, 2: 2, 3: 3, 4: 4, 5: 5, 6: 6,
+  // Swell stops: CONFIG 8-11 → WASM stops 7-10 (CONFIG 12-15 = swellStop4-7 have no WASM stop)
+  8: 7, 9: 8, 10: 9, 11: 10,
+  // Pedal stops: CONFIG 16-18 → WASM stops 11-13 (CONFIG 19-20 = pedalStop3-4 have no WASM stop)
+  16: 11, 17: 12, 18: 13,
+  // Tremulant: CONFIG 21-23 → WASM 17-19
+  21: 17, 22: 18, 23: 19,
+  // Reverb: CONFIG 24 (amount) → WASM 20, CONFIG 25 (size) → WASM 22 (reverb time)
+  24: 20, 25: 22,
+  // Volume: CONFIG 26 → WASM 25
+  26: 25,
+  // Tuning: CONFIG 27 → WASM 26
+  27: 26,
+  // windPressure (CONFIG 28) has no WASM equivalent
+  // Expression: CONFIG 29 (swellExpression) → WASM 15, CONFIG 30 (greatExpression) → WASM 14
+  29: 15, 30: 14,
+  // Couplers (CONFIG 31-34) have no WASM equivalent
+};
+
 export class AeolusSynthEngine implements DevilboxSynth {
   readonly name = 'AeolusSynthEngine';
   readonly output: GainNode;
@@ -307,8 +339,9 @@ export class AeolusSynthEngine implements DevilboxSynth {
     if (!this._worklet || !this.isInitialized) return;
     for (let i = 0; i < CONFIG_KEYS.length; i++) {
       const value = config[CONFIG_KEYS[i]];
-      if (value !== undefined) {
-        this._worklet.port.postMessage({ type: 'setParam', index: i, value });
+      const wasmIdx = WASM_PARAM_INDEX[i];
+      if (value !== undefined && wasmIdx !== undefined) {
+        this._worklet.port.postMessage({ type: 'setParam', index: wasmIdx, value });
       }
     }
   }
@@ -336,11 +369,12 @@ export class AeolusSynthEngine implements DevilboxSynth {
   }
 
   set(param: string, value: number): void {
-    const index = CONFIG_KEYS.indexOf(param as keyof AeolusConfig);
-    if (index >= 0) {
+    const configIdx = CONFIG_KEYS.indexOf(param as keyof AeolusConfig);
+    if (configIdx >= 0) {
       (this.config as Record<string, number>)[param] = value;
-      if (this._worklet && this.isInitialized) {
-        this._worklet.port.postMessage({ type: 'setParam', index, value });
+      const wasmIdx = WASM_PARAM_INDEX[configIdx];
+      if (wasmIdx !== undefined && this._worklet && this.isInitialized) {
+        this._worklet.port.postMessage({ type: 'setParam', index: wasmIdx, value });
       }
     }
   }
