@@ -54,15 +54,23 @@ self.onmessage = (e: MessageEvent<TurntableMsg>) => {
       isPlaying = msg.isPlaying; effectiveBPM = msg.effectiveBPM;
       dirty = true;
       break;
-    case 'position':
+    case 'position': {
       posSec = msg.posSec;
-      // Update lastScratchAngle when not actively scratching so scratch starts from correct angle
+      const rps = (effectiveBPM / BASE_BPM) * BASE_RPS;
+      const targetAngle = posSec * rps * 2 * Math.PI;
       if (!scratchIntegrating) {
-        const rps = (effectiveBPM / BASE_BPM) * BASE_RPS;
-        lastScratchAngle = posSec * rps * 2 * Math.PI;
+        // Gently correct drift: if angle drifted more than half a revolution,
+        // snap to prevent the record visually jumping. Otherwise let dt-based
+        // integration handle smooth spinning.
+        const diff = targetAngle - angle;
+        if (Math.abs(diff) > Math.PI) {
+          angle = targetAngle;
+        }
+        lastScratchAngle = targetAngle;
       }
       dirty = true;
       break;
+    }
     case 'velocity':
       scratchVelocity = msg.v;
       dirty = true;
@@ -122,8 +130,10 @@ function renderFrame(dt: number): void {
     // During scratch: integrate from velocity (smooth, no store jitter)
     angle += scratchVelocity * omegaNormal * dt;
   } else if (isPlaying) {
-    // Playing: derive from audio position (authoritative)
-    angle = posSec * omegaNormal;
+    // Smooth spinning: integrate at current RPM for silky 60fps rotation.
+    // Position messages correct drift but we don't snap to them — the store
+    // updates at ~10-20 Hz which causes visible stutter if used directly.
+    angle += omegaNormal * dt;
   } else {
     // Stopped + not scratching: keep angle at last scratch position
     // (don't snap back to posSec-derived angle)
