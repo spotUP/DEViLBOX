@@ -217,6 +217,15 @@ export const amigaSynthEntries: Record<string, SynthInfo> = {
     icon: 'Cpu',
     color: 'text-purple-400',
   },
+  GTUltraSynth: {
+    type: 'GTUltraSynth',
+    name: 'GoatTracker Ultra',
+    shortName: 'GTU',
+    description: 'GoatTracker Ultra SID — full C64 SID tracker with wave/pulse/filter/speed tables',
+    bestFor: ['C64', 'SID', 'Chiptune', 'Tracker'],
+    icon: 'Cpu',
+    color: 'text-green-400',
+  },
   KlysSynth: {
     type: 'KlysSynth',
     name: 'Klystrack',
