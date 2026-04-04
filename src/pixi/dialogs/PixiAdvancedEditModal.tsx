@@ -8,7 +8,47 @@ import React, { useState, useCallback } from 'react';
 import { PixiModal, PixiModalHeader, PixiButton, PixiLabel, PixiNumericInput } from '../components';
 import { usePixiTheme } from '../theme';
 import { PIXI_FONTS } from '../fonts';
-import { useCursorStore } from '@stores';
+import { useCursorStore, useTrackerStore } from '@stores';
+
+// ─── Macro Slots Grid ─────────────────────────────────────────────────────────
+
+const fmtHex = (v: number) => v ? v.toString(16).toUpperCase().padStart(2, '0') : '..';
+
+const MacroSlotsGrid: React.FC = () => {
+  const theme = usePixiTheme();
+  const macroSlots = useTrackerStore(s => s.macroSlots);
+  const writeMacroSlot = useTrackerStore(s => s.writeMacroSlot);
+  const readMacroSlot = useTrackerStore(s => s.readMacroSlot);
+
+  return (
+    <layoutContainer layout={{ flexDirection: 'column', gap: 4, width: '100%', paddingTop: 4 }}>
+      {macroSlots.map((slot, i) => {
+        const isEmpty = !slot.note && !slot.instrument && !slot.volume && !slot.effTyp && !slot.eff;
+        return (
+          <layoutContainer
+            key={i}
+            layout={{ flexDirection: 'row', gap: 6, alignItems: 'center', width: '100%', paddingHorizontal: 4, paddingVertical: 2 }}
+          >
+            <pixiBitmapText
+              text={String(i + 1)}
+              style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 11, fill: 0xffffff }}
+              tint={theme.textSecondary.color}
+              layout={{ width: 14 }}
+            />
+            <pixiBitmapText
+              text={isEmpty ? '.. .. .. .. ..' : `${slot.note || '..'} ${fmtHex(slot.instrument)} ${fmtHex(slot.volume)} ${fmtHex(slot.effTyp)}${fmtHex(slot.eff)}`}
+              style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 10, fill: 0xffffff }}
+              tint={isEmpty ? theme.textMuted.color : theme.text.color}
+              layout={{ flex: 1 }}
+            />
+            <PixiButton label="Save" variant="ghost" size="sm" onClick={() => writeMacroSlot(i)} />
+            <PixiButton label="Recall" variant="ghost" size="sm" onClick={() => readMacroSlot(i)} />
+          </layoutContainer>
+        );
+      })}
+    </layoutContainer>
+  );
+};
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -335,7 +375,8 @@ export const PixiAdvancedEditModal: React.FC<PixiAdvancedEditModalProps> = ({
           onToggle={() => toggleSection('macros')}
           width={MODAL_W}
         >
-          <PixiLabel text="Ctrl+1-8 to recall, Ctrl+Shift+1-8 to save" size="sm" color="textSecondary" />
+          <PixiLabel text="Ctrl+Shift+1-8 to save · Ctrl+1-8 to recall" size="sm" color="textSecondary" />
+          <MacroSlotsGrid />
         </Section>
       </layoutContainer>
     </PixiModal>
