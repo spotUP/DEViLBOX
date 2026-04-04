@@ -611,15 +611,25 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
                       />
                     </div>
                   </div>
-                  {/* PatternEditorCanvas replaces custom MusicLinePatternViewer */}
-                  <div className="flex-1 min-h-0 overflow-hidden">
-                    <PatternEditorCanvas
-                      formatColumns={MUSICLINE_COLUMNS}
-                      formatChannels={mlFormatData.channels}
-                      formatCurrentRow={mlFormatData.currentRow}
-                      formatIsPlaying={mlFormatData.isPlaying}
-                      onFormatCellChange={mlFormatData.handleCellChange}
-                    />
+                  {/* Per-channel PatternEditorCanvas — each channel scrolls independently */}
+                  <div className="flex-1 min-h-0 overflow-hidden flex flex-row">
+                    {mlFormatData.channels.map((ch, chIdx) => (
+                      <div key={chIdx} className="flex-1 min-w-0 overflow-hidden" style={{ borderRight: chIdx < mlFormatData.channels.length - 1 ? '1px solid var(--color-border)' : undefined }}>
+                        <PatternEditorCanvas
+                          formatColumns={MUSICLINE_COLUMNS}
+                          formatChannels={[ch]}
+                          formatCurrentRow={
+                            mlFormatData.perChannelRows.length > chIdx
+                              ? mlFormatData.perChannelRows[chIdx]
+                              : mlFormatData.currentRow
+                          }
+                          formatIsPlaying={mlFormatData.isPlaying}
+                          onFormatCellChange={(_channelIdx, rowIdx, columnKey, value) => {
+                            mlFormatData.handleCellChange(chIdx, rowIdx, columnKey, value);
+                          }}
+                        />
+                      </div>
+                    ))}
                   </div>
                 </div>
               ) : (
