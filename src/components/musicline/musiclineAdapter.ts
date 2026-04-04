@@ -207,6 +207,60 @@ export function musiclineToFormatChannels(
   return result;
 }
 
+/**
+ * Per-channel variant: each channel uses its own position from the WASM engine.
+ * MusicLine channels advance independently with different speeds and pattern lengths.
+ */
+export function musiclineToFormatChannelsPerChannel(
+  channelTrackTables: number[][],
+  patterns: Pattern[],
+  channelPositions: number[],
+  maxPos: number,
+): FormatChannel[] {
+  const result: FormatChannel[] = [];
+
+  // Find max pattern length across all channels (at their individual positions)
+  let maxRows = 0;
+  for (let ch = 0; ch < channelTrackTables.length; ch++) {
+    const pos = Math.min(channelPositions[ch] ?? 0, maxPos);
+    const partIdx = channelTrackTables[ch][pos] ?? 0;
+    const pat = patterns[partIdx];
+    maxRows = Math.max(maxRows, pat?.length ?? 128);
+  }
+
+  for (let ch = 0; ch < channelTrackTables.length; ch++) {
+    const pos = Math.min(channelPositions[ch] ?? 0, maxPos);
+    const partIdx = channelTrackTables[ch][pos] ?? 0;
+    const pat = patterns[partIdx];
+    const rows: FormatCell[] = [];
+
+    for (let row = 0; row < maxRows; row++) {
+      const cell = pat?.channels[0]?.rows[row];
+      if (cell) {
+        const cellData = cell as unknown as Record<string, number>;
+        const fxValues: Record<string, number> = {};
+        for (let f = 0; f < FX_KEYS.length; f++) {
+          const typ = cellData[FX_KEYS[f][0]] ?? 0;
+          const par = cellData[FX_KEYS[f][1]] ?? 0;
+          fxValues[`fx${f}`] = typ ? (typ << 8) | par : (par ? par : 0);
+        }
+        rows.push({ note: cell.note ?? 0, instrument: cell.instrument ?? 0, ...fxValues });
+      } else {
+        rows.push({ note: 0, instrument: 0, fx0: 0, fx1: 0, fx2: 0, fx3: 0, fx4: 0 });
+      }
+    }
+
+    result.push({
+      label: `CH${(ch + 1).toString().padStart(2, '0')} P:${partIdx.toString().padStart(2, '0')}`,
+      patternLength: maxRows,
+      rows,
+      isPatternChannel: true,
+    });
+  }
+
+  return result;
+}
+
 // --------------------------------------------------------------------------
 // Cell change callback factory
 // --------------------------------------------------------------------------

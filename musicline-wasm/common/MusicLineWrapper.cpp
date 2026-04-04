@@ -192,6 +192,30 @@ int ml_get_row() {
 }
 
 /**
+ * ml_get_channel_row(ch) → current pattern row for a specific channel.
+ */
+int ml_get_channel_row(int ch) {
+    if (!s_song) return 0;
+    MLModule* mod = s_song->get_module();
+    if (!mod) return 0;
+    int numCh = mod->m_TuneList[0] ? mod->m_TuneList[0]->Channels : 0;
+    if (ch < 0 || ch >= numCh || !mod->m_ChannelBuf[ch]) return 0;
+    return mod->m_ChannelBuf[ch]->m_PartPos;
+}
+
+/**
+ * ml_get_channel_position(ch) → current tune-list position for a specific channel.
+ */
+int ml_get_channel_position(int ch) {
+    if (!s_song) return 0;
+    MLModule* mod = s_song->get_module();
+    if (!mod) return 0;
+    int numCh = mod->m_TuneList[0] ? mod->m_TuneList[0]->Channels : 0;
+    if (ch < 0 || ch >= numCh || !mod->m_ChannelBuf[ch]) return 0;
+    return mod->m_ChannelBuf[ch]->m_TunePos;
+}
+
+/**
  * ml_get_speed() → current tick size in samples (integer).
  * This is m_nCurrentTickSize on MLModule (562 or 563 at INTERNAL_RATE).
  */
