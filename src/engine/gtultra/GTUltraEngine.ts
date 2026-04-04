@@ -32,7 +32,7 @@ export interface GTUltraCallbacks {
   onError?: (error: string) => void;
   onSongLoaded?: (ok: boolean, channelCount?: number) => void;
   onPosition?: (pos: GTUltraPosition) => void;
-  onAsidWrite?: (chip: number, reg: number, value: number) => void;
+  onAsidWrite?: (chip: number, reg: number, value: number, tick: number, tableType?: 'wave' | 'pulse' | 'filter', tableIndex?: number) => void;
   onPatternData?: (pattern: number, length: number, data: Uint8Array) => void;
   onOrderData?: (channel: number, data: Uint8Array) => void;
   onInstrumentData?: (instrument: number, data: Uint8Array) => void;
@@ -145,7 +145,10 @@ export class GTUltraEngine {
         this.callbacks.onAsidWrite?.(
           msg.chip as number,
           msg.reg as number,
-          msg.value as number
+          msg.value as number,
+          (msg.tick as number) ?? 0,
+          msg.tableType as 'wave' | 'pulse' | 'filter' | undefined,
+          msg.tableIndex as number | undefined,
         );
         break;
       case 'songCleared':
