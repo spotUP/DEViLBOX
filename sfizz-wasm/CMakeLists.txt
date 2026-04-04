@@ -3,7 +3,7 @@ project(SfizzWASM)
 set(CMAKE_CXX_STANDARD 17)
 
 set(SFIZZ_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/../third-party/sfizz")
-set(SFIZZ_BUILD "${SFIZZ_ROOT}/build-wasm")
+set(SFIZZ_BUILD "${SFIZZ_ROOT}/build-wasm-nopthread")
 set(SFIZZ_LIB_DIR "${SFIZZ_BUILD}/library/lib")
 
 add_executable(SfizzWASM common/sfizz_bridge.cpp)
@@ -93,5 +93,11 @@ target_link_options(SfizzWASM PRIVATE
     "SHELL:-s ENVIRONMENT='web,worker'"
     "SHELL:-s SINGLE_FILE=0"
     "SHELL:-s NO_EXIT_RUNTIME=1"
-    "SHELL:-s ASSERTIONS=1"
+    "SHELL:-s ASSERTIONS=0"
+    "SHELL:-s DISABLE_EXCEPTION_CATCHING=1"
+    "SHELL:-s PTHREAD_POOL_SIZE=0"
+    "SHELL:-s USE_PTHREADS=0"
+    "SHELL:-Wl,--wrap=pthread_create"
+    "SHELL:-Wl,--wrap=pthread_join"
+    "SHELL:-Wl,--wrap=pthread_detach"
 )
