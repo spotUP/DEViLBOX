@@ -240,7 +240,7 @@ export class SfizzSynthEngine implements DevilboxSynth {
 
   triggerAttack(frequency: number | string, _time?: number, velocity?: number): this {
     const note = typeof frequency === 'string' ? noteToMidi(frequency) : Math.round(12 * Math.log2(frequency / 440) + 69);
-    const vel = Math.round((velocity ?? 0.8) * 127);
+    const vel = Math.max(0, Math.min(1, velocity ?? 0.8));
     if (!this.isInitialized || !this._worklet) {
       this.pendingNotes.push({ note, velocity: vel });
       return this;
