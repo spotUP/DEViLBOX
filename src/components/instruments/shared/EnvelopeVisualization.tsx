@@ -23,7 +23,7 @@
  *   />
  */
 
-import React, { useRef, useEffect, useCallback } from 'react';
+import React, { useRef, useEffect, useCallback, useState } from 'react';
 
 // ── Shared style constants ─────────────────────────────────────────────────────
 
@@ -51,9 +51,11 @@ interface ADSRProps {
   tl: number;
   maxTl?: number;   // Default: 127
   maxRate?: number; // Default: 31
-  width?: number;
+  width?: number | 'auto';
   height?: number;
   color?: string;
+  backgroundColor?: string;
+  border?: string;
 }
 
 interface LinearProps {
@@ -66,9 +68,11 @@ interface LinearProps {
   sustain: number;
   /** Release time 0–1 */
   release: number;
-  width?: number;
+  width?: number | 'auto';
   height?: number;
   color?: string;
+  backgroundColor?: string;
+  border?: string;
 }
 
 interface StepsProps {
@@ -91,25 +95,68 @@ interface StepsProps {
   releaseSpeed: number;
   /** Max volume value (e.g. 64 for SoundMon) */
   maxVol: number;
-  width?: number;
+  width?: number | 'auto';
   height?: number;
   color?: string;
+  backgroundColor?: string;
+  border?: string;
 }
 
-export type EnvelopeVisualizationProps = ADSRProps | LinearProps | StepsProps;
+interface SIDProps {
+  mode: 'sid';
+  /** Attack nibble 0-15 (index into SID attack timing table) */
+  attack: number;
+  /** Decay nibble 0-15 (index into SID decay timing table) */
+  decay: number;
+  /** Sustain nibble 0-15 (0 = silent, 15 = full volume) */
+  sustain: number;
+  /** Release nibble 0-15 (index into SID decay timing table) */
+  release: number;
+  width?: number | 'auto';
+  height?: number;
+  color?: string;
+  backgroundColor?: string;
+  border?: string;
+}
+
+// SID 6581/8580 ADSR timing tables (milliseconds)
+const SID_ATTACK_MS = [2, 8, 16, 24, 38, 56, 68, 80, 100, 250, 500, 800, 1000, 3000, 5000, 8000];
+const SID_DECAY_MS  = [6, 24, 48, 72, 114, 168, 204, 240, 300, 750, 1500, 2400, 3000, 9000, 15000, 24000];
+
+export type EnvelopeVisualizationProps = ADSRProps | LinearProps | StepsProps | SIDProps;
 
 // ── Component ──────────────────────────────────────────────────────────────────
 
 export const EnvelopeVisualization: React.FC<EnvelopeVisualizationProps> = (props) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [measuredWidth, setMeasuredWidth] = useState<number>(0);
 
-  const w = props.width  ?? 280;
+  const isAuto = props.width === 'auto';
+  const w: number = isAuto ? measuredWidth : (typeof props.width === 'number' ? props.width : 280);
   const h = props.height ?? 72;
   const strokeColor = props.color ?? COLOR_ENV;
+  const bgColor = props.backgroundColor ?? COLOR_BACKGROUND;
+  const borderStyle = props.border ?? '1px solid rgba(255,255,255,0.06)';
+
+  // ResizeObserver for width='auto'
+  useEffect(() => {
+    if (!isAuto) return;
+    const el = containerRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        const cr = entry.contentRect;
+        if (cr.width > 0) setMeasuredWidth(Math.floor(cr.width));
+      }
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [isAuto]);
 
   const draw = useCallback(() => {
     const canvas = canvasRef.current;
-    if (!canvas) return;
+    if (!canvas || w === 0) return;
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
@@ -121,7 +168,7 @@ export const EnvelopeVisualization: React.FC<EnvelopeVisualizationProps> = (prop
     ctx.scale(dpr, dpr);
 
     // Background + grid
-    ctx.fillStyle = COLOR_BACKGROUND;
+    ctx.fillStyle = bgColor;
     ctx.fillRect(0, 0, w, h);
     ctx.strokeStyle = COLOR_GRID;
     ctx.lineWidth   = 1;
@@ -134,19 +181,31 @@ export const EnvelopeVisualization: React.FC<EnvelopeVisualizationProps> = (prop
       drawADSR(ctx, w, h, props, strokeColor);
     } else if (props.mode === 'linear') {
       drawLinear(ctx, w, h, props, strokeColor);
+    } else if (props.mode === 'sid') {
+      drawSID(ctx, w, h, props, strokeColor);
     } else {
       drawSteps(ctx, w, h, props, strokeColor);
     }
-  }, [props, w, h, strokeColor]);
+  }, [props, w, h, strokeColor, bgColor]);
 
   useEffect(() => { draw(); }, [draw]);
 
-  return (
+  const canvasEl = (
     <canvas
       ref={canvasRef}
-      style={{ display: 'block', borderRadius: 4, border: '1px solid rgba(255,255,255,0.06)' }}
+      style={{ display: 'block', borderRadius: 4, border: borderStyle }}
     />
   );
+
+  if (isAuto) {
+    return (
+      <div ref={containerRef} style={{ width: '100%' }}>
+        {canvasEl}
+      </div>
+    );
+  }
+
+  return canvasEl;
 };
 
 // ── ADSR mode (FM-style rate-based) ───────────────────────────────────────────
@@ -345,6 +404,49 @@ function drawSteps(
   ctx.setLineDash([3, 5]);
   ctx.beginPath(); ctx.moveTo(x2, toY(sustainVol)); ctx.lineTo(w, toY(sustainVol)); ctx.stroke();
   ctx.setLineDash([]);
+}
+
+// ── SID mode (C64 SID 4-bit nibble ADSR) ─────────────────────────────────────
+
+function drawSID(
+  ctx: CanvasRenderingContext2D,
+  w: number, h: number,
+  p: SIDProps, color: string,
+) {
+  const atkMs = SID_ATTACK_MS[Math.min(15, Math.max(0, p.attack))];
+  const decMs = SID_DECAY_MS[Math.min(15, Math.max(0, p.decay))];
+  const susLevel = Math.min(15, Math.max(0, p.sustain)) / 15;
+  const relMs = SID_DECAY_MS[Math.min(15, Math.max(0, p.release))];
+  const susHoldMs = 200;
+  const totalMs = atkMs + decMs + susHoldMs + relMs;
+  if (totalMs === 0) return;
+
+  const tx = (ms: number) => (ms / totalMs) * w;
+  const xA = tx(atkMs);
+  const xD = tx(atkMs + decMs);
+  const xS = tx(atkMs + decMs + susHoldMs);
+  const ySus = h * (1 - susLevel);
+
+  // Fill under curve
+  ctx.beginPath();
+  ctx.moveTo(0, h); ctx.lineTo(xA, 2); ctx.lineTo(xD, ySus);
+  ctx.lineTo(xS, ySus); ctx.lineTo(w, h); ctx.closePath();
+  ctx.fillStyle = color; ctx.globalAlpha = 0.12; ctx.fill(); ctx.globalAlpha = 1;
+
+  // Envelope curve
+  ctx.strokeStyle = color; ctx.lineWidth = 2; ctx.lineJoin = 'round';
+  ctx.beginPath();
+  ctx.moveTo(0, h); ctx.lineTo(xA, 2); ctx.lineTo(xD, ySus);
+  ctx.lineTo(xS, ySus); ctx.lineTo(w, h); ctx.stroke();
+
+  // Phase labels
+  ctx.fillStyle = 'rgba(255,255,255,0.3)'; ctx.font = '8px monospace'; ctx.textAlign = 'center';
+  const mid = (x1: number, x2: number) => (x1 + x2) / 2;
+  if (xA > 12) ctx.fillText('A', mid(0, xA), h - 4);
+  ctx.fillText('D', mid(xA, xD), h - 4);
+  ctx.fillText('S', mid(xD, xS), h - 4);
+  ctx.fillText('R', mid(xS, w), h - 4);
+  ctx.textAlign = 'left';
 }
 
 export default EnvelopeVisualization;
