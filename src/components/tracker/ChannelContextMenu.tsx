@@ -167,6 +167,9 @@ export const ChannelContextMenu: React.FC<ChannelContextMenuProps> = ({
     const fmt: AutomationFormat | null =
       editorMode === 'goattracker' ? 'gtultra' :
       editorMode === 'furnace' ? 'furnace' :
+      editorMode === 'hively' ? 'hively' :
+      editorMode === 'klystrack' ? 'klystrack' :
+      editorMode === 'sc68' ? 'sc68' :
       editorMode === 'classic' ? 'uade' : null;
     if (!fmt) return [];
 

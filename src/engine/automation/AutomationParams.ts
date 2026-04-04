@@ -227,6 +227,29 @@ export function getFurnaceSNESParams(channelCount: number): AutomationParamDef[]
   return params;
 }
 
+// ── SC68 / YM2149 parameters (3 channels + noise + envelope) ──
+
+export function getSC68Params(): AutomationParamDef[] {
+  const params: AutomationParamDef[] = [];
+  for (let ch = 0; ch < 3; ch++) {
+    const prefix = `ym.${ch}`;
+    const group = `Channel ${ch + 1}`;
+    params.push(
+      { id: `${prefix}.tonePeriod`, label: 'Tone Period', group, channel: ch, min: 0, max: 4095, unit: '12-bit', sourceType: 'register', color: 'var(--color-synth-synthesis)' },
+      { id: `${prefix}.volume`, label: 'Volume', group, channel: ch, min: 0, max: 15, unit: '4-bit', sourceType: 'register', color: 'var(--color-synth-output)' },
+      { id: `${prefix}.toneEnable`, label: 'Tone Enable', group, channel: ch, min: 0, max: 1, unit: 'bit', sourceType: 'register', color: 'var(--color-synth-synthesis)' },
+      { id: `${prefix}.noiseEnable`, label: 'Noise Enable', group, channel: ch, min: 0, max: 1, unit: 'bit', sourceType: 'register', color: 'var(--color-synth-synthesis)' },
+      { id: `${prefix}.envEnable`, label: 'Env Enable', group, channel: ch, min: 0, max: 1, unit: 'bit', sourceType: 'register', color: 'var(--color-synth-envelope)' },
+    );
+  }
+  params.push(
+    { id: 'ym.noisePeriod', label: 'Noise Period', group: 'Global', min: 0, max: 31, unit: '5-bit', sourceType: 'register', color: 'var(--color-synth-synthesis)' },
+    { id: 'ym.envPeriod', label: 'Env Period', group: 'Global', min: 0, max: 65535, unit: '16-bit', sourceType: 'register', color: 'var(--color-synth-envelope)' },
+    { id: 'ym.envShape', label: 'Env Shape', group: 'Global', min: 0, max: 15, unit: '4-bit', sourceType: 'register', color: 'var(--color-synth-envelope)' },
+  );
+  return params;
+}
+
 // ── Grouped params for dropdown UI ──
 
 export function groupParams(params: AutomationParamDef[]): AutomationParamGroup[] {
@@ -241,7 +264,7 @@ export function groupParams(params: AutomationParamDef[]): AutomationParamGroup[
 
 // ── Format → params lookup ──
 
-export type AutomationFormat = 'gtultra' | 'uade' | 'furnace';
+export type AutomationFormat = 'gtultra' | 'uade' | 'furnace' | 'hively' | 'klystrack' | 'sc68';
 
 // ── Furnace chip ID classification ──
 // Maps Furnace DIV_SYSTEM enum values to param set categories
@@ -321,6 +344,12 @@ export function getParamsForFormat(format: AutomationFormat, config?: {
       }
       return getFurnaceUniversalParams(chCount);
     }
+    case 'hively':
+      return getPaulaParams(); // Hively uses Amiga Paula hardware
+    case 'klystrack':
+      return getSIDParams(1); // Klystrack is a SID tracker
+    case 'sc68':
+      return getSC68Params(); // SC68 uses YM2149
     default:
       return [];
   }

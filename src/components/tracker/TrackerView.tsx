@@ -53,6 +53,7 @@ import { PatternMinimap } from './PatternMinimap';
 import { PianoRoll } from '../pianoroll';
 import { AutomationPanel } from '@components/automation/AutomationPanel';
 import { AutomationLaneStrip } from '@components/automation/AutomationLaneStrip';
+import type { AutomationFormat } from '../../engine/automation/AutomationParams';
 import { getFormatPlaybackState } from '../../engine/FormatPlaybackState';
 import { useAutomationStore } from '@stores/useAutomationStore';
 import { GTUltraView } from '@components/gtultra/GTUltraView';
@@ -721,8 +722,8 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
 
           {/* Automation Lane Strip — for all formats with register capture */}
           {(editorMode === 'furnace' || editorMode === 'classic' || editorMode === 'hively' || editorMode === 'klystrack' || editorMode === 'sc68') && (() => {
-            const fmtMap: Record<string, 'furnace' | 'uade'> = {
-              furnace: 'furnace', classic: 'uade', hively: 'uade', sc68: 'uade', klystrack: 'uade',
+            const fmtMap: Record<string, AutomationFormat> = {
+              furnace: 'furnace', classic: 'uade', hively: 'hively', sc68: 'sc68', klystrack: 'klystrack',
             };
             const fmt = fmtMap[editorMode] ?? 'uade';
             const ps = getFormatPlaybackState();

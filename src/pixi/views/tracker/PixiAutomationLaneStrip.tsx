@@ -274,7 +274,7 @@ export const PixiAutomationLaneStrip: React.FC<PixiAutomationLaneStripProps> = (
             {pickerLaneIdx === idx && (
               <pixiContainer layout={{ position: 'absolute', top: LANE_HEADER_H, left: 4, width: Math.min(240, width - 20) }}>
                 <pixiGraphics draw={drawPicker} layout={{ position: 'absolute', width: Math.min(240, width - 20), height: 200 }} />
-                <pixiContainer layout={{ flexDirection: 'column', padding: 4, gap: 1, maxHeight: 290, overflow: 'hidden' }}>
+                <pixiContainer layout={{ flexDirection: 'column', padding: 4, gap: 1, maxHeight: 300, overflow: 'scroll' }}>
                   {paramGroups.map(group => (
                     <pixiContainer key={group.label} layout={{ flexDirection: 'column', gap: 0 }}>
                       <pixiBitmapText
