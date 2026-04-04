@@ -43,6 +43,9 @@ import { useChannelAutomationParams } from '@hooks/useChannelAutomationParams';
 import { CHANNEL_COLORS } from '@typedefs/tracker';
 import { MASTER_FX_PRESETS } from '@constants/masterFxPresets';
 import { notify } from '@stores/useNotificationStore';
+import { useFormatStore } from '@stores/useFormatStore';
+import { useRegisterLaneStore } from '@stores/useRegisterLaneStore';
+import { getParamsForFormat, groupParams, type AutomationFormat } from '../../engine/automation/AutomationParams';
 
 interface ChannelContextMenuProps {
   channelIndex: number;
@@ -149,6 +152,32 @@ export const ChannelContextMenu: React.FC<ChannelContextMenuProps> = ({
     })),
     [nksParams]
   );
+
+  // Register-capture automation params (SID/Paula/Furnace based on current format)
+  const editorMode = useFormatStore(s => s.editorMode);
+  const toggleRegisterLane = useRegisterLaneStore(s => s.toggleLane);
+  const hasRegisterLane = useRegisterLaneStore(s => s.hasLane);
+
+  const registerParamMenuItems = useMemo((): MenuItemType[] => {
+    const fmt: AutomationFormat | null =
+      editorMode === 'goattracker' ? 'gtultra' :
+      editorMode === 'furnace' ? 'furnace' :
+      editorMode === 'classic' ? 'uade' : null;
+    if (!fmt) return [];
+
+    const params = getParamsForFormat(fmt);
+    const groups = groupParams(params);
+    return groups.map(group => ({
+      id: `reg-group-${group.label}`,
+      label: group.label,
+      submenu: group.params.map(p => ({
+        id: `reg-${p.id}`,
+        label: p.label,
+        checked: hasRegisterLane(p.id),
+        onClick: () => toggleRegisterLane(p.id),
+      })),
+    }));
+  }, [editorMode, toggleRegisterLane, hasRegisterLane]);
 
   // Build menu items based on mode
   const menuItems = useMemo((): MenuItemType[] => {
@@ -582,6 +611,15 @@ export const ChannelContextMenu: React.FC<ChannelContextMenuProps> = ({
               setShowLane(channelIndex, true);
             },
           })),
+          // Register-capture lanes (SID/Paula/Furnace)
+          ...(registerParamMenuItems.length > 0 ? [
+            { type: 'divider' } as const,
+            {
+              id: 'register-lanes',
+              label: 'Register Lanes',
+              submenu: registerParamMenuItems,
+            },
+          ] : []),
           { type: 'divider' } as const,
           // Show/Hide lane
           {
@@ -688,6 +726,7 @@ export const ChannelContextMenu: React.FC<ChannelContextMenuProps> = ({
     removeCurve,
     handleApplyChannelFxPreset,
     automationParams,
+    registerParamMenuItems,
   ]);
 
   return (
