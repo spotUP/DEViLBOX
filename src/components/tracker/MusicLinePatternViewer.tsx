@@ -12,6 +12,7 @@
 import React, { useRef, useEffect, useState, useCallback } from 'react';
 import { useTrackerStore , useFormatStore } from '@stores';
 import { useTransportStore } from '@stores/useTransportStore';
+import { useWasmPositionStore } from '@/stores/useWasmPositionStore';
 import { useEditorStore } from '@stores/useEditorStore';
 import { MusicLineEngine } from '@/engine/musicline/MusicLineEngine';
 
@@ -58,9 +59,13 @@ export const MusicLinePatternViewer: React.FC = () => {
   const channelTrackTables = useFormatStore((s) => s.channelTrackTables);
   const patterns = useTrackerStore((s) => s.patterns);
   const currentPos = useTrackerStore((s) => s.currentPositionIndex);
-  const currentRow = useTransportStore((s) => s.currentRow);
+  const transportRow = useTransportStore((s) => s.currentRow);
   const currentRowPerChannel = useTransportStore((s) => s.currentRowPerChannel);
   const isPlaying = useTransportStore((s) => s.isPlaying);
+  const wasmRow = useWasmPositionStore((s) => s.row);
+  const wasmActive = useWasmPositionStore((s) => s.active);
+  // WASM engines (MusicLine) report position to useWasmPositionStore, not useTransportStore
+  const currentRow = wasmActive ? wasmRow : transportRow;
 
   const recordMode = useEditorStore((s) => s.recordMode);
   const editStep = useEditorStore((s) => s.editStep);
