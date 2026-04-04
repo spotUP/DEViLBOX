@@ -24,10 +24,9 @@ class MusicLineProcessor extends AudioWorkletProcessor {
     this._resampPos = 0.0;        // fractional read position into source buffer
     this._previewResampPos = 0.0; // fractional read position for preview resampler
 
-    // Position reporting (~250ms intervals)
+    // Position reporting (~66ms intervals, ~15fps — matches Hively)
     this._reportCounter = 0;
-    // 250ms / (128 samples / dstRate) = dstRate * 0.25 / 128
-    this._reportInterval = Math.ceil(sampleRate * 0.25 / 128);
+    this._reportInterval = Math.ceil(sampleRate * 0.066 / 128);
 
     // WASM heap pointers for audio buffers
     this._renderPtr = 0;     // song render buffer (stereo interleaved F32)
@@ -316,6 +315,10 @@ class MusicLineProcessor extends AudioWorkletProcessor {
 
   loadSong(buffer) {
     if (!this.wasm || !this.initialized) return;
+
+    // Re-init the backend before loading — FreeMod() leaves stale ring buffer
+    // state that LoadMod+InitTune don't reset. Fresh MlineBackend fixes this.
+    this.wasm._ml_init(Math.floor(sampleRate));
 
     const data = new Uint8Array(buffer);
     const ptr = this.wasm._malloc(data.length);
