@@ -155,7 +155,7 @@ export const GTUltraControls: React.FC<GTUltraControlsProps> = ({
     const sLevel = sustain / 15;
     const totalMs = ams + dms + Math.max(rms, 200);
     if (totalMs === 0) return '';
-    const w = 180, h = 32, scale = w / totalMs;
+    const w = 180, h = 64, scale = w / totalMs;
     const x1 = ams * scale, x2 = x1 + dms * scale, x3 = x2 + 200 * scale, x4 = x3 + rms * scale;
     return `M0,${h} L${x1.toFixed(1)},0 L${x2.toFixed(1)},${(h * (1 - sLevel)).toFixed(1)} L${x3.toFixed(1)},${(h * (1 - sLevel)).toFixed(1)} L${x4.toFixed(1)},${h}`;
   }, [attack, decay, sustain, release]);
@@ -198,13 +198,14 @@ export const GTUltraControls: React.FC<GTUltraControlsProps> = ({
   //  TAB 1: Instrument
   // ══════════════════════════════════════════════════════════════════
   const renderInstrumentTab = () => (
-    <div className="flex flex-col gap-3 p-3 overflow-y-auto synth-controls-flow" style={{ maxHeight: 'calc(100vh - 280px)' }}>
+    <div className="grid gap-3 p-3 overflow-y-auto synth-controls-flow"
+      style={{ maxHeight: 'calc(100vh - 280px)', gridTemplateColumns: 'repeat(3, 1fr)' }}>
 
       {/* ADSR */}
       <div className={`rounded-lg border p-3 ${panelBg}`}>
         <SectionLabel label="ADSR Envelope" />
         <div className="mb-2 rounded px-1" style={{ background: '#060a08' }}>
-          <svg viewBox="0 0 180 32" width="100%" height={36} preserveAspectRatio="none">
+          <svg viewBox="0 0 180 64" width="100%" height={72} preserveAspectRatio="none">
             {envPoints && <path d={envPoints} fill="none" stroke={accentColor} strokeWidth={1.5} opacity={0.8} />}
           </svg>
         </div>
@@ -219,7 +220,7 @@ export const GTUltraControls: React.FC<GTUltraControlsProps> = ({
         </div>
       </div>
 
-      {/* Waveform + SID modulation */}
+      {/* Column 1: Waveform */}
       <div className={`rounded-lg border p-3 ${panelBg}`}>
         <SectionLabel label="Waveform" />
         <div className="flex flex-wrap gap-1.5 mb-2">
@@ -253,74 +254,76 @@ export const GTUltraControls: React.FC<GTUltraControlsProps> = ({
         </div>
       </div>
 
-      {/* Gate Timer + Hard Restart + Vibrato */}
-      <div className={`rounded-lg border p-3 ${panelBg}`}>
-        <SectionLabel label="Timing" />
-        <div className="flex flex-col gap-2">
-          <NumBox label="Gate Timer" value={gateTimerValue} min={0} max={63} hex
-            onValueChange={(v) => onChange({ gatetimer: (configRef.current.gatetimer & 0xC0) | (v & 0x3F) })} />
-          <div className="flex gap-4 ml-[84px]">
-            <label className="flex items-center gap-1 cursor-pointer">
-              <input type="checkbox" checked={hardRestartEnabled}
-                onChange={() => onChange({ gatetimer: configRef.current.gatetimer ^ 0x40 })} style={{ accentColor }} />
-              <span className="text-[9px] text-text-secondary">Hard Restart</span>
-            </label>
-            <label className="flex items-center gap-1 cursor-pointer">
-              <input type="checkbox" checked={hardRestartImmediate}
-                onChange={() => onChange({ gatetimer: configRef.current.gatetimer ^ 0x80 })} style={{ accentColor }} />
-              <span className="text-[9px] text-text-secondary">Immediate</span>
-            </label>
+      {/* Column 2: Timing + Panning */}
+      <div className="flex flex-col gap-3">
+        <div className={`rounded-lg border p-3 ${panelBg}`}>
+          <SectionLabel label="Timing" />
+          <div className="flex flex-col gap-2">
+            <NumBox label="Gate Timer" value={gateTimerValue} min={0} max={63} hex
+              onValueChange={(v) => onChange({ gatetimer: (configRef.current.gatetimer & 0xC0) | (v & 0x3F) })} />
+            <div className="flex gap-4 ml-[84px]">
+              <label className="flex items-center gap-1 cursor-pointer">
+                <input type="checkbox" checked={hardRestartEnabled}
+                  onChange={() => onChange({ gatetimer: configRef.current.gatetimer ^ 0x40 })} style={{ accentColor }} />
+                <span className="text-[9px] text-text-secondary">Hard Restart</span>
+              </label>
+              <label className="flex items-center gap-1 cursor-pointer">
+                <input type="checkbox" checked={hardRestartImmediate}
+                  onChange={() => onChange({ gatetimer: configRef.current.gatetimer ^ 0x80 })} style={{ accentColor }} />
+                <span className="text-[9px] text-text-secondary">Immediate</span>
+              </label>
+            </div>
+            <NumBox label="Vibrato Delay" value={config.vibdelay} min={0} max={255} hex
+              onValueChange={(v) => onChange({ vibdelay: v })} />
           </div>
-          <NumBox label="Vibrato Delay" value={config.vibdelay} min={0} max={255} hex
-            onValueChange={(v) => onChange({ vibdelay: v })} />
+        </div>
+
+        <div className={`rounded-lg border p-3 ${panelBg}`}>
+          <SectionLabel label="Panning" />
+          <div className="flex flex-col gap-1">
+            <div className="flex items-center gap-2">
+              <span className="text-[10px] text-text-secondary w-12 text-right">Min</span>
+              <input type="range" min={0} max={15} value={panMin}
+                onChange={(e) => onChange({ pan: (parseInt(e.target.value) << 4) | panMax } as Partial<GTUltraConfig>)}
+                style={{ flex: 1, accentColor }} />
+              <span className="text-[9px] font-mono w-4" style={{ color: accentColor }}>{panMin.toString(16).toUpperCase()}</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-[10px] text-text-secondary w-12 text-right">Max</span>
+              <input type="range" min={0} max={15} value={panMax}
+                onChange={(e) => onChange({ pan: (panMin << 4) | parseInt(e.target.value) } as Partial<GTUltraConfig>)}
+                style={{ flex: 1, accentColor }} />
+              <span className="text-[9px] font-mono w-4" style={{ color: accentColor }}>{panMax.toString(16).toUpperCase()}</span>
+            </div>
+            <div className="text-[8px] text-text-secondary opacity-60 ml-14">0=Left 8=Center F=Right</div>
+          </div>
         </div>
       </div>
 
-      {/* Panning */}
-      <div className={`rounded-lg border p-3 ${panelBg}`}>
-        <SectionLabel label="Panning" />
-        <div className="flex flex-col gap-1">
-          <div className="flex items-center gap-2">
-            <span className="text-[10px] text-text-secondary w-12 text-right">Min</span>
-            <input type="range" min={0} max={15} value={panMin}
-              onChange={(e) => onChange({ pan: (parseInt(e.target.value) << 4) | panMax } as Partial<GTUltraConfig>)}
-              style={{ flex: 1, accentColor }} />
-            <span className="text-[9px] font-mono w-4" style={{ color: accentColor }}>{panMin.toString(16).toUpperCase()}</span>
+      {/* Column 3: Table Pointers + Effects */}
+      <div className="flex flex-col gap-3">
+        <div className={`rounded-lg border p-3 ${panelBg}`}>
+          <SectionLabel label="Table Pointers" />
+          <div className="flex flex-col gap-2">
+            <NumBox label="Wave Table" value={config.wavePtr} min={0} max={255} hex onValueChange={(v) => onChange({ wavePtr: v })} />
+            <NumBox label="Pulse Table" value={config.pulsePtr} min={0} max={255} hex onValueChange={(v) => onChange({ pulsePtr: v })} />
+            <NumBox label="Filter Table" value={config.filterPtr} min={0} max={255} hex onValueChange={(v) => onChange({ filterPtr: v })} />
+            <NumBox label="Speed Table" value={config.speedPtr} min={0} max={255} hex onValueChange={(v) => onChange({ speedPtr: v })} />
           </div>
-          <div className="flex items-center gap-2">
-            <span className="text-[10px] text-text-secondary w-12 text-right">Max</span>
-            <input type="range" min={0} max={15} value={panMax}
-              onChange={(e) => onChange({ pan: (panMin << 4) | parseInt(e.target.value) } as Partial<GTUltraConfig>)}
-              style={{ flex: 1, accentColor }} />
-            <span className="text-[9px] font-mono w-4" style={{ color: accentColor }}>{panMax.toString(16).toUpperCase()}</span>
-          </div>
-          <div className="text-[8px] text-text-secondary opacity-60 ml-14">0=Left 8=Center F=Right</div>
+          <div className="text-[8px] text-text-secondary mt-1.5 opacity-60">0 = disabled. Edit in Tables tab.</div>
         </div>
-      </div>
 
-      {/* Table Pointers */}
-      <div className={`rounded-lg border p-3 ${panelBg}`}>
-        <SectionLabel label="Table Pointers" />
-        <div className="flex flex-col gap-2">
-          <NumBox label="Wave Table" value={config.wavePtr} min={0} max={255} hex onValueChange={(v) => onChange({ wavePtr: v })} />
-          <NumBox label="Pulse Table" value={config.pulsePtr} min={0} max={255} hex onValueChange={(v) => onChange({ pulsePtr: v })} />
-          <NumBox label="Filter Table" value={config.filterPtr} min={0} max={255} hex onValueChange={(v) => onChange({ filterPtr: v })} />
-          <NumBox label="Speed Table" value={config.speedPtr} min={0} max={255} hex onValueChange={(v) => onChange({ speedPtr: v })} />
+        <div className={`rounded-lg border p-3 ${panelBg}`}>
+          <button className="text-[10px] font-bold uppercase tracking-widest w-full text-left"
+            style={{ color: accentColor, opacity: 0.7 }} onClick={() => setShowEffectRef(!showEffectRef)}>
+            {showEffectRef ? '[-]' : '[+]'} Pattern Effects
+          </button>
+          {showEffectRef && (
+            <div className="grid grid-cols-2 gap-x-4 gap-y-0.5 mt-2 font-mono text-[9px]">
+              {EFFECT_REF.map((r) => <span key={r} style={{ color: '#999' }}>{r}</span>)}
+            </div>
+          )}
         </div>
-        <div className="text-[8px] text-text-secondary mt-1.5 opacity-60">0 = disabled (filter/speed). Edit tables in the Tables tab.</div>
-      </div>
-
-      {/* Pattern Effect Cheatsheet */}
-      <div className={`rounded-lg border p-3 ${panelBg}`}>
-        <button className="text-[10px] font-bold uppercase tracking-widest w-full text-left"
-          style={{ color: accentColor, opacity: 0.7 }} onClick={() => setShowEffectRef(!showEffectRef)}>
-          {showEffectRef ? '[-]' : '[+]'} Pattern Effects
-        </button>
-        {showEffectRef && (
-          <div className="grid grid-cols-2 gap-x-4 gap-y-0.5 mt-2 font-mono text-[9px]">
-            {EFFECT_REF.map((r) => <span key={r} style={{ color: '#999' }}>{r}</span>)}
-          </div>
-        )}
       </div>
     </div>
   );
