@@ -589,6 +589,8 @@ export const SynthTypeDispatcher: React.FC<SynthTypeDispatcherProps> = ({
       const result = await (synth as any).loadSFZFromFiles(files);
       if (result.success) {
         setSfizzLoadedName(result.name);
+        // Update config so re-renders don't overwrite the loaded file with a built-in preset
+        handleSfizzChange({ sfzPreset: '__file__' } as any);
       }
     }
   }, [instrument.id]);

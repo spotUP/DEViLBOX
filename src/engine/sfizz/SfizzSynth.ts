@@ -350,8 +350,9 @@ export class SfizzSynthEngine implements DevilboxSynth {
       : sfzFile.name;
     this._worklet.port.postMessage({ type: 'loadSfzFile', path: `/sfz/${sfzName}` });
 
-    this.config.sfzPreset = undefined;
-    this._lastSfzPreset = undefined;
+    // Mark as custom file load so sendConfig won't overwrite with a built-in preset
+    this.config.sfzPreset = '__file__';
+    this._lastSfzPreset = '__file__';
 
     return { success: true, name: sfzFile.name };
   }
