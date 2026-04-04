@@ -8,6 +8,7 @@
 import { useCallback, useMemo } from 'react';
 import { useTrackerStore, useFormatStore } from '@stores';
 import { useTransportStore } from '@stores/useTransportStore';
+import { useWasmPositionStore } from '@/stores/useWasmPositionStore';
 import { musiclineToFormatChannels, makeMusicLineCellChange } from './musiclineAdapter';
 import type { FormatChannel, OnCellChange } from '@/components/shared/format-editor-types';
 
@@ -21,9 +22,17 @@ export interface MusicLineFormatData {
 export function useMusicLineFormatData(): MusicLineFormatData {
   const channelTrackTables = useFormatStore((s) => s.channelTrackTables);
   const patterns = useTrackerStore((s) => s.patterns);
-  const currentPos = useTrackerStore((s) => s.currentPositionIndex);
-  const currentRow = useTransportStore((s) => s.currentRow);
+  const editPos = useTrackerStore((s) => s.currentPositionIndex);
+  const transportRow = useTransportStore((s) => s.currentRow);
   const isPlaying = useTransportStore((s) => s.isPlaying);
+
+  // WASM engines (MusicLine) report position to useWasmPositionStore
+  const wasmRow = useWasmPositionStore((s) => s.row);
+  const wasmSongPos = useWasmPositionStore((s) => s.songPos);
+  const wasmActive = useWasmPositionStore((s) => s.active);
+
+  const currentRow = wasmActive ? wasmRow : transportRow;
+  const currentPos = (isPlaying && wasmActive) ? wasmSongPos : editPos;
 
   const channels = useMemo(() => {
     if (!channelTrackTables || channelTrackTables.length === 0) return [];
@@ -33,13 +42,12 @@ export function useMusicLineFormatData(): MusicLineFormatData {
   const handleCellChange = useCallback<OnCellChange>(
     (channelIdx, rowIdx, columnKey, value) => {
       if (!channelTrackTables) return;
-      const changeFn = makeMusicLineCellChange(channelTrackTables, currentPos);
+      const changeFn = makeMusicLineCellChange(channelTrackTables, editPos);
       changeFn(channelIdx, rowIdx, columnKey, value);
     },
-    [channelTrackTables, currentPos],
+    [channelTrackTables, editPos],
   );
 
-  // Use the global row for now; PatternEditorCanvas doesn't support per-channel rows yet
   const displayRow = isPlaying ? currentRow : 0;
 
   return { channels, currentRow: displayRow, isPlaying, handleCellChange };
