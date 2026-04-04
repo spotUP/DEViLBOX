@@ -48,7 +48,7 @@ import { PixiSc68View } from './sc68/PixiSc68View';
 import { useTrackerView } from '@/hooks/views/useTrackerView';
 import { useMIDIFeedback } from '@/hooks/useMIDIFeedback';
 import { AUTOMATION_LANE_WIDTH, AUTOMATION_LANE_MIN } from '@/hooks/views/usePatternEditor';
-import { useTrackerStore, useUIStore, useInstrumentStore, useEditorStore, useAutomationStore } from '@stores';
+import { useTrackerStore, useUIStore, useInstrumentStore, useEditorStore, useAutomationStore, useFormatStore } from '@stores';
 import { useWorkbenchStore } from '@stores/useWorkbenchStore';
 import { useSettingsStore } from '@stores/useSettingsStore';
 import { useMIDIStore } from '@stores/useMIDIStore';
@@ -341,16 +341,24 @@ export const PixiTrackerView: React.FC = () => {
             )}
           </pixiContainer>
 
-          {/* Automation Lane Strip — for classic (UADE) and furnace modes */}
-          {viewMode === 'tracker' && (editorMode === 'classic' || editorMode === 'furnace') && (
-            <PixiAutomationLaneStrip
-              width={Math.max(100, editorWidth)}
-              format={editorMode === 'furnace' ? 'furnace' : 'uade'}
-              patternLength={64}
-              currentRow={0}
-              isPlaying={false}
-            />
-          )}
+          {/* Automation Lane Strip — for all formats with register capture */}
+          {viewMode === 'tracker' && (editorMode === 'classic' || editorMode === 'furnace' || editorMode === 'hively' || editorMode === 'klystrack' || editorMode === 'sc68') && (() => {
+            const fmt = editorMode === 'furnace' ? 'furnace' as const : 'uade' as const;
+            const fn = useFormatStore.getState().furnaceNative;
+            const formatConfig = fmt === 'furnace' && fn
+              ? { chipIds: fn.chipIds, channelCount: fn.subsongs[fn.activeSubsong]?.channels.length ?? 4 }
+              : undefined;
+            return (
+              <PixiAutomationLaneStrip
+                width={Math.max(100, editorWidth)}
+                format={fmt}
+                formatConfig={formatConfig}
+                patternLength={64}
+                currentRow={0}
+                isPlaying={false}
+              />
+            );
+          })()}
 
           {/* Overlays — ALWAYS mounted to avoid @pixi/layout Yoga BindingErrors.
               Use alpha/renderable (NOT visible) — @pixi/layout calls _onChildRemoved()
