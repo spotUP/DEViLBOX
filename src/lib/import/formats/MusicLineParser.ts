@@ -278,6 +278,13 @@ export function parseMusicLineFile(data: Uint8Array): TrackerSong | null {
   }
   const smplList: SmplData[] = [];
 
+  // INFO chunk metadata (9 null-terminated strings)
+  let infoTitle = '';
+  let infoAuthor = '';
+  let infoDate = '';
+  let infoDuration = '';
+  const infoText: string[] = ['', '', '', '', ''];
+
   // ── Chunk parsing loop ────────────────────────────────────────────────────
   while (pos + 4 <= len) {
     // Forward scan: if current position doesn't have a valid chunk ID, advance
@@ -410,8 +417,27 @@ export function parseMusicLineFile(data: Uint8Array): TrackerSong | null {
 
     } else if (chunkId === CHUNK_INFO) {
       // INFO chunk: 9 null-terminated strings (title, author, date, duration, text[0..4])
-      // Not needed for playback — skip with declared size.
-      pos = dataStart + chunkSize;
+      const infoEnd = dataStart + chunkSize;
+      let infoPos = dataStart;
+      const readInfoString = (maxLen: number): string => {
+        let s = '';
+        let count = 0;
+        while (infoPos < infoEnd && count < maxLen) {
+          const c = data[infoPos++];
+          count++;
+          if (c === 0) break;
+          s += String.fromCharCode(c);
+        }
+        return s.trim();
+      };
+      infoTitle = readInfoString(64);
+      infoAuthor = readInfoString(64);
+      infoDate = readInfoString(16);
+      infoDuration = readInfoString(16);
+      for (let ti = 0; ti < 5; ti++) {
+        infoText[ti] = readInfoString(64);
+      }
+      pos = infoEnd;
 
     } else if (chunkId === CHUNK_MODL || chunkId === CHUNK_VERS) {
       // MODL/VERS encountered inside the loop (shouldn't happen after header handling,
@@ -564,6 +590,9 @@ export function parseMusicLineFile(data: Uint8Array): TrackerSong | null {
     channelTrackTables: mappedTrackTables,
     channelSpeeds,
     channelGrooves,
+    musiclineMetadata: (infoTitle || infoAuthor || infoDate || infoDuration || infoText.some(t => t))
+      ? { title: infoTitle, author: infoAuthor, date: infoDate, duration: infoDuration, infoText: [...infoText] }
+      : undefined,
     uadeVariableLayout,
   };
 
