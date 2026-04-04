@@ -97,7 +97,12 @@ class FluidSynthProcessor extends AudioWorkletProcessor {
         wasmBuffer = wasmBinary;
       }
 
-      this.module = await globalThis.createFluidSynth({ wasmBinary: wasmBuffer });
+      this.module = await globalThis.createFluidSynth({
+        wasmBinary: wasmBuffer,
+        // Suppress noisy FluidSynth stderr (stub warnings, ROM sample warnings, etc.)
+        print: () => {},
+        printErr: () => {},
+      });
       const m = this.module;
 
       // Create the synth engine
