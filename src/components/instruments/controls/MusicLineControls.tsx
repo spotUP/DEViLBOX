@@ -41,6 +41,7 @@ import { MusicLineEngine } from '@/engine/musicline/MusicLineEngine';
 import { Knob } from '@components/controls/Knob';
 import { useInstrumentColors } from '@/hooks/useInstrumentColors';
 import { MusicLineArpeggioEditor } from '@/components/musicline/MusicLineArpeggioEditor';
+import { MusicLineWaveformVisualizer } from '@/components/musicline/MusicLineWaveformVisualizer';
 
 // ── Constants ──────────────────────────────────────────────────────────────────
 
@@ -234,7 +235,42 @@ const FX_MODULES: FxModuleDef[] = [
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
-type MLTab = 'info' | 'effects' | 'arpeggio';
+type MLTab = 'info' | 'waveform' | 'effects' | 'arpeggio';
+
+// ── Dropdown option maps for cycle gadgets ────────────────────────────────────
+
+const WAVE_TYPE_OPTIONS = [
+  { value: 0, label: 'Sine' },
+  { value: 1, label: 'RampDown' },
+  { value: 2, label: 'SawTooth' },
+  { value: 3, label: 'Square' },
+];
+
+const DIRECTION_OPTIONS = [
+  { value: 0, label: 'Forward' },
+  { value: 1, label: 'Backward' },
+];
+
+const PHASE_TYPE_OPTIONS = [
+  { value: 0, label: 'Old' },
+  { value: 1, label: 'High' },
+  { value: 2, label: 'Med' },
+  { value: 3, label: 'Low' },
+];
+
+const FILTER_TYPE_OPTIONS = [
+  { value: 0, label: 'Normal' },
+  { value: 1, label: 'Resonance' },
+];
+
+const ARPEGGIO_MODE_OPTIONS = [
+  { value: 0, label: 'Transpose' },
+  { value: 1, label: 'FixNote' },
+];
+
+// ── Copy/Swap/Cut buffer ──────────────────────────────────────────────────────
+
+let instCopyBuffer: InstFields | null = null;
 
 interface MusicLineControlsProps {
   instrument: InstrumentConfig;
@@ -242,6 +278,46 @@ interface MusicLineControlsProps {
 }
 
 type InstFields = Record<string, number>;
+
+// ── Cycle gadget (dropdown selector) ──────────────────────────────────────────
+
+function CycleSelect({ value, options, label, color, onChange }: {
+  value: number;
+  options: Array<{ value: number; label: string }>;
+  label: string;
+  color: string;
+  onChange: (v: number) => void;
+}) {
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 2, minWidth: 70 }}>
+      <span style={{
+        fontSize: 9, letterSpacing: 1, textTransform: 'uppercase', fontFamily: 'monospace',
+        color: color + 'aa',
+      }}>
+        {label}
+      </span>
+      <select
+        value={value}
+        onChange={(e) => onChange(Number(e.target.value))}
+        style={{
+          background: '#0e0e1c',
+          border: `1px solid ${color}40`,
+          borderRadius: 3,
+          color: color,
+          fontSize: 10,
+          fontFamily: 'monospace',
+          padding: '3px 4px',
+          cursor: 'pointer',
+          outline: 'none',
+        }}
+      >
+        {options.map((opt) => (
+          <option key={opt.value} value={opt.value}>{opt.label}</option>
+        ))}
+      </select>
+    </div>
+  );
+}
 
 // ── Component ──────────────────────────────────────────────────────────────────
 
@@ -365,7 +441,34 @@ export const MusicLineControls: React.FC<MusicLineControlsProps> = ({ instrument
     });
   }, []);
 
-  const tabs: MLTab[] = ['info', 'effects', 'arpeggio'];
+  // Copy/Swap/Cut handlers
+  const handleCopy = useCallback(() => {
+    if (!fields) return;
+    instCopyBuffer = { ...fields };
+  }, [fields]);
+
+  const handleSwap = useCallback(() => {
+    if (!fields || !instCopyBuffer) return;
+    const currentFields = { ...fields };
+    // Apply buffer to current instrument
+    for (const [key, val] of Object.entries(instCopyBuffer)) {
+      writeField(key, val);
+    }
+    // Save current to buffer
+    instCopyBuffer = currentFields;
+  }, [fields, writeField]);
+
+  const handleCut = useCallback(() => {
+    if (!fields) return;
+    // Copy current to buffer
+    instCopyBuffer = { ...fields };
+    // Reset all fields to zero defaults
+    for (const key of Object.keys(ALL_OFFSETS)) {
+      writeField(key, 0);
+    }
+  }, [fields, writeField]);
+
+  const tabs: MLTab[] = ['info', 'waveform', 'effects', 'arpeggio'];
 
   return (
     <div
@@ -380,8 +483,8 @@ export const MusicLineControls: React.FC<MusicLineControlsProps> = ({ instrument
         overflow: 'hidden',
       }}
     >
-      {/* Tab bar */}
-      <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
+      {/* Tab bar + Copy/Swap/Cut */}
+      <div style={{ display: 'flex', gap: 4, flexShrink: 0, alignItems: 'center' }}>
         {tabs.map((t) => (
           <button
             key={t}
@@ -402,10 +505,50 @@ export const MusicLineControls: React.FC<MusicLineControlsProps> = ({ instrument
             {t}
           </button>
         ))}
+        <div style={{ flex: 1 }} />
+        {/* Copy / Swap / Cut buttons */}
+        {[
+          { label: 'Copy', handler: handleCopy, tip: 'Copy instrument to buffer' },
+          { label: 'Swap', handler: handleSwap, tip: 'Swap instrument with buffer' },
+          { label: 'Cut', handler: handleCut, tip: 'Copy to buffer + reset' },
+        ].map(({ label, handler, tip }) => (
+          <button
+            key={label}
+            onClick={handler}
+            title={tip}
+            disabled={!fields || (label === 'Swap' && !instCopyBuffer)}
+            style={{
+              padding: '4px 10px',
+              background: '#12121e',
+              border: '1px solid #2a2a4a',
+              borderRadius: 3,
+              color: (!fields || (label === 'Swap' && !instCopyBuffer)) ? '#2a2a4a' : '#7a7a9a',
+              fontSize: 10,
+              fontFamily: 'monospace',
+              letterSpacing: 0.5,
+              cursor: (!fields || (label === 'Swap' && !instCopyBuffer)) ? 'default' : 'pointer',
+              opacity: (!fields || (label === 'Swap' && !instCopyBuffer)) ? 0.4 : 1,
+            }}
+          >
+            {label}
+          </button>
+        ))}
       </div>
 
       {tab === 'info' && (
         <InfoTab waveformType={waveformType} volume={volume} loopDef={loopDef} freq={freq} />
+      )}
+
+      {tab === 'waveform' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          <div style={{ fontSize: 10, letterSpacing: 2, color: '#4a4a6a', textTransform: 'uppercase' }}>
+            Real-Time Waveform
+          </div>
+          <MusicLineWaveformVisualizer />
+          <div style={{ fontSize: 9, color: '#3a3a5a', lineHeight: 1.6, letterSpacing: 0.5 }}>
+            Live audio waveform from the MusicLine engine output.
+          </div>
+        </div>
       )}
 
       {tab === 'effects' && (
@@ -651,14 +794,12 @@ function FxModuleParams({ fxIndex, fields, writeField }: {
     case 3: return <ArpeggioParams fields={fields} writeField={writeField} color={knobColor} style={panelStyle} />;
     case 4: return <LoopParams fields={fields} writeField={writeField} color={knobColor} style={panelStyle} />;
     case 5: return <TransformParams fields={fields} writeField={writeField} color={knobColor} style={panelStyle} />;
-    case 6: return <CommonFxParams fields={fields} writeField={writeField} color={knobColor} style={panelStyle}
-      prefix="phs" extraFields={[{ name: 'phsType', label: 'Type', max: 255 }]} />;
+    case 6: return <PhaseFxParams fields={fields} writeField={writeField} color={knobColor} style={panelStyle} />;
     case 7: return <CommonFxParams fields={fields} writeField={writeField} color={knobColor} style={panelStyle}
       prefix="mix" extraFields={[{ name: 'mixWaveNum', label: 'WaveNum', max: 255 }]} />;
     case 8: return <CommonFxParams fields={fields} writeField={writeField} color={knobColor} style={panelStyle}
       prefix="res" extraFields={[{ name: 'resAmp', label: 'Amp', max: 255 }, { name: 'resFilBoost', label: 'FilBoost', max: 255 }]} />;
-    case 9: return <CommonFxParams fields={fields} writeField={writeField} color={knobColor} style={panelStyle}
-      prefix="fil" extraFields={[{ name: 'filType', label: 'Type', max: 255 }]} />;
+    case 9: return <FilterFxParams fields={fields} writeField={writeField} color={knobColor} style={panelStyle} />;
     default: return null;
   }
 }
@@ -707,12 +848,12 @@ function VibratoParams({ fields, writeField, color, style, prefix }: {
 }) {
   return (
     <div style={style}>
-      <Knob value={fields[`${prefix}Dir`] ?? 0} min={0} max={255}
-        label="Dir" size="sm" color={color}
-        onChange={(v) => writeField(`${prefix}Dir`, Math.round(v))} />
-      <Knob value={fields[`${prefix}WaveNum`] ?? 0} min={0} max={255}
-        label="Wave" size="sm" color={color}
-        onChange={(v) => writeField(`${prefix}WaveNum`, Math.round(v))} />
+      <CycleSelect value={fields[`${prefix}WaveNum`] ?? 0} options={WAVE_TYPE_OPTIONS}
+        label="Wave Type" color={color}
+        onChange={(v) => writeField(`${prefix}WaveNum`, v)} />
+      <CycleSelect value={fields[`${prefix}Dir`] ?? 0} options={DIRECTION_OPTIONS}
+        label="Direction" color={color}
+        onChange={(v) => writeField(`${prefix}Dir`, v)} />
       <Knob value={fields[`${prefix}Speed`] ?? 0} min={0} max={65535}
         label="Speed" size="sm" color={color}
         onChange={(v) => writeField(`${prefix}Speed`, Math.round(v))} />
@@ -745,9 +886,9 @@ function ArpeggioParams({ fields, writeField, color, style }: {
       <Knob value={fields.arpSpeed ?? 0} min={0} max={255}
         label="Speed" size="sm" color={color}
         onChange={(v) => writeField('arpSpeed', Math.round(v))} />
-      <Knob value={fields.arpGroove ?? 0} min={0} max={255}
-        label="Groove" size="sm" color={color}
-        onChange={(v) => writeField('arpGroove', Math.round(v))} />
+      <CycleSelect value={fields.arpGroove ?? 0} options={ARPEGGIO_MODE_OPTIONS}
+        label="Mode" color={color}
+        onChange={(v) => writeField('arpGroove', v)} />
     </div>
   );
 }
@@ -827,8 +968,74 @@ function TransformParams({ fields, writeField, color, style }: {
   );
 }
 
-// ── Common FX params (Phase, Mix, Resonance, Filter) ───────────────────────
-// All share Start/Repeat/RepEnd/Speed/Turns/Delay pattern with type-specific extras
+// ── Phase params (with dropdown for Type) ─────────────────────────────────
+
+function PhaseFxParams({ fields, writeField, color, style }: {
+  fields: InstFields; writeField: (n: string, v: number) => void;
+  color: string; style: React.CSSProperties;
+}) {
+  return (
+    <div style={style}>
+      <CycleSelect value={fields.phsType ?? 0} options={PHASE_TYPE_OPTIONS}
+        label="Phase Type" color={color}
+        onChange={(v) => writeField('phsType', v)} />
+      <Knob value={fields.phsStart ?? 0} min={0} max={65535}
+        label="Start" size="sm" color={color}
+        onChange={(v) => writeField('phsStart', Math.round(v))} />
+      <Knob value={fields.phsRepeat ?? 0} min={0} max={65535}
+        label="Repeat" size="sm" color={color}
+        onChange={(v) => writeField('phsRepeat', Math.round(v))} />
+      <Knob value={fields.phsRepEnd ?? 0} min={0} max={65535}
+        label="Rep End" size="sm" color={color}
+        onChange={(v) => writeField('phsRepEnd', Math.round(v))} />
+      <Knob value={fields.phsSpeed ?? 0} min={0} max={65535}
+        label="Speed" size="sm" color={color}
+        onChange={(v) => writeField('phsSpeed', Math.round(v))} />
+      <Knob value={fields.phsTurns ?? 0} min={0} max={65535}
+        label="Turns" size="sm" color={color}
+        onChange={(v) => writeField('phsTurns', Math.round(v))} />
+      <Knob value={fields.phsDelay ?? 0} min={0} max={65535}
+        label="Delay" size="sm" color={color}
+        onChange={(v) => writeField('phsDelay', Math.round(v))} />
+    </div>
+  );
+}
+
+// ── Filter params (with dropdown for Type) ────────────────────────────────
+
+function FilterFxParams({ fields, writeField, color, style }: {
+  fields: InstFields; writeField: (n: string, v: number) => void;
+  color: string; style: React.CSSProperties;
+}) {
+  return (
+    <div style={style}>
+      <CycleSelect value={fields.filType ?? 0} options={FILTER_TYPE_OPTIONS}
+        label="Filter Type" color={color}
+        onChange={(v) => writeField('filType', v)} />
+      <Knob value={fields.filStart ?? 0} min={0} max={65535}
+        label="Start" size="sm" color={color}
+        onChange={(v) => writeField('filStart', Math.round(v))} />
+      <Knob value={fields.filRepeat ?? 0} min={0} max={65535}
+        label="Repeat" size="sm" color={color}
+        onChange={(v) => writeField('filRepeat', Math.round(v))} />
+      <Knob value={fields.filRepEnd ?? 0} min={0} max={65535}
+        label="Rep End" size="sm" color={color}
+        onChange={(v) => writeField('filRepEnd', Math.round(v))} />
+      <Knob value={fields.filSpeed ?? 0} min={0} max={65535}
+        label="Speed" size="sm" color={color}
+        onChange={(v) => writeField('filSpeed', Math.round(v))} />
+      <Knob value={fields.filTurns ?? 0} min={0} max={65535}
+        label="Turns" size="sm" color={color}
+        onChange={(v) => writeField('filTurns', Math.round(v))} />
+      <Knob value={fields.filDelay ?? 0} min={0} max={65535}
+        label="Delay" size="sm" color={color}
+        onChange={(v) => writeField('filDelay', Math.round(v))} />
+    </div>
+  );
+}
+
+// ── Common FX params (Mix, Resonance) ─────────────────────────────────────
+// Share Start/Repeat/RepEnd/Speed/Turns/Delay pattern with type-specific extras
 
 function CommonFxParams({ fields, writeField, color, style, prefix, extraFields }: {
   fields: InstFields; writeField: (n: string, v: number) => void;
