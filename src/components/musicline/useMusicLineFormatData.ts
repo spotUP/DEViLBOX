@@ -55,19 +55,21 @@ export function useMusicLineFormatData(): MusicLineFormatData {
     [channelTrackTables, editPos],
   );
 
-  const displayRow = isPlaying ? currentRow : 0;
+  // Clamp row to pattern length — WASM row counter can exceed the displayed
+  // pattern's length between position update reports (~250ms interval).
+  const maxRow = channels.length > 0 ? (channels[0].patternLength - 1) : 0;
+  const clampedRow = Math.min(currentRow, maxRow);
+  const displayRow = isPlaying ? clampedRow : 0;
 
   // Drive FormatPlaybackState for smooth RAF-based scroll in the pattern editor.
-  // The track table matrix uses formatIsPlaying={false} which gates the RAF
-  // reading of FormatPlaybackState, so only the pattern editor scrolls.
   useEffect(() => {
     setFormatPlaybackPlaying(isPlaying);
     return () => setFormatPlaybackPlaying(false);
   }, [isPlaying]);
 
   useEffect(() => {
-    if (isPlaying) setFormatPlaybackRow(currentRow);
-  }, [isPlaying, currentRow]);
+    if (isPlaying) setFormatPlaybackRow(clampedRow);
+  }, [isPlaying, clampedRow]);
 
   return { channels, currentRow: displayRow, isPlaying, handleCellChange };
 }
