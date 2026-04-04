@@ -125,8 +125,6 @@ export const GTU_PULSE_COLUMNS  = makeTableColumns(GT_COLORS.pulse);
 export const GTU_FILTER_COLUMNS = makeTableColumns(GT_COLORS.filter);
 export const GTU_SPEED_COLUMNS  = makeTableColumns(GT_COLORS.speed);
 
-const TABLE_COLUMN_DEFS = [GTU_WAVE_COLUMNS, GTU_PULSE_COLUMNS, GTU_FILTER_COLUMNS, GTU_SPEED_COLUMNS];
-
 /**
  * Convert GT Ultra store data to FormatChannel[] for the shared pattern editor.
  *
@@ -134,16 +132,14 @@ const TABLE_COLUMN_DEFS = [GTU_WAVE_COLUMNS, GTU_PULSE_COLUMNS, GTU_FILTER_COLUM
  * to shared pattern numbers. This resolves each channel's current pattern and
  * builds the FormatChannel array from the raw Uint8Array pattern data.
  *
- * After the pattern channels, appends table channels:
- *   Wave table, Pulse table, Filter table, Speed table
- * Orders live in the GTOrderMatrix above the pattern editor (not duplicated here).
+ * Orders live in the GTOrderMatrix above the pattern editor.
+ * Tables (wave/pulse/filter/speed) are in the instrument editor Tables tab.
  */
 export function gtUltraToFormatChannels(
   channelCount: number,
   orderData: Record<number, Uint8Array>,
   patternData: Map<number, { length: number; data: Uint8Array }>,
   currentOrderPos: number,
-  tableData?: Record<string, { left: Uint8Array; right: Uint8Array }>,
 ): FormatChannel[] {
   const result: FormatChannel[] = [];
 
@@ -181,28 +177,6 @@ export function gtUltraToFormatChannels(
       patternLength: patLen,
       rows,
       isPatternChannel: true,
-    });
-  }
-
-  // Table channels — Wave, Pulse, Filter, Speed (L + R as note + instrument columns)
-  const TABLE_NAMES = ['WAVE', 'PULSE', 'FLTR', 'SPEED'];
-  const TABLE_KEYS = ['wave', 'pulse', 'filter', 'speed'];
-  for (let t = 0; t < 4; t++) {
-    const tbl = tableData?.[TABLE_KEYS[t]];
-    const rows: FormatCell[] = [];
-    for (let i = 0; i < 255; i++) {
-      rows.push({
-        note: tbl ? tbl.left[i] : 0,
-        instrument: tbl ? tbl.right[i] : 0,
-        command: 0,
-        data: 0,
-      });
-    }
-    result.push({
-      label: TABLE_NAMES[t],
-      patternLength: 255,
-      rows,
-      columns: TABLE_COLUMN_DEFS[t],
     });
   }
 
