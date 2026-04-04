@@ -554,11 +554,9 @@ export async function startNativeEngines(
         // We only update currentRow so the pattern editor scrolls.
         if ('onPositionUpdate' in instance && typeof (instance as any).onPositionUpdate === 'function' && desc.key !== 'Hively' && desc.key !== 'UADEEditable') {
           // Wire position updates to the lightweight WASM position store.
+          // Wire position updates to the lightweight WASM position store.
           // This bypasses useTransportStore entirely to avoid triggering
           // the usePatternPlayback effect chain (which causes recursive engine spawns).
-          // Unfreeze first — clear() freezes the store to reject late worklet messages
-          // from the previous play session. Must unfreeze before new callbacks arrive.
-          useWasmPositionStore.getState().unfreeze();
           (instance as any).onPositionUpdate((update: { songPos?: number; row: number }) => {
             useWasmPositionStore.getState().setPosition(update.row, update.songPos);
           });

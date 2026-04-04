@@ -345,23 +345,29 @@ extern uint32 panning_left[256];
 extern uint32 panning_right[256];
 extern int8 waves[];
 
-/* Wave offset constants (from replay.c) */
-#define WO_TRIANGLE_04  (0)
-#define WO_TRIANGLE_08  (0x04)
-#define WO_TRIANGLE_10  (0x04+0x08)
-#define WO_TRIANGLE_20  (0x04+0x08+0x10)
-#define WO_TRIANGLE_40  (0x04+0x08+0x10+0x20)
-#define WO_TRIANGLE_80  (0x04+0x08+0x10+0x20+0x40)
-#define WO_SAWTOOTH_04  (0x04+0x08+0x10+0x20+0x40+0x80)
-#define WO_SAWTOOTH_08  (0x04+0x08+0x10+0x20+0x40+0x80+0x04)
-#define WO_SAWTOOTH_10  (0x04+0x08+0x10+0x20+0x40+0x80+0x04+0x08)
-#define WO_SAWTOOTH_20  (0x04+0x08+0x10+0x20+0x40+0x80+0x04+0x08+0x10)
-#define WO_SAWTOOTH_40  (0x04+0x08+0x10+0x20+0x40+0x80+0x04+0x08+0x10+0x20)
-#define WO_SAWTOOTH_80  (0x04+0x08+0x10+0x20+0x40+0x80+0x04+0x08+0x10+0x20+0x40)
-#define WHITENOISELEN   (0x280*3)
-#define WO_WHITENOISE   (WO_SAWTOOTH_80+0x80)
+/* Wave offset constants — MUST match hvl_replay.c exactly.
+ * The waves[] layout is: [lowpass filters][triangles][sawtooths][squares][noise][highpass filters]
+ * Each filtered waveform set spans 31 filter positions × (0xfc+0xfc+0x80*0x1f+0x80+0x280*3) bytes.
+ * The WaveformTab pointers must point AFTER the lowpass section, not at offset 0. */
+#define FILTER_SET_SIZE  (0xfc+0xfc+0x80*0x1f+0x80+3*0x280)
+#define WO_LOWPASSES     0
+#define WO_TRIANGLE_04   (WO_LOWPASSES+(FILTER_SET_SIZE*31))
+#define WO_TRIANGLE_08   (WO_TRIANGLE_04+0x04)
+#define WO_TRIANGLE_10   (WO_TRIANGLE_08+0x08)
+#define WO_TRIANGLE_20   (WO_TRIANGLE_10+0x10)
+#define WO_TRIANGLE_40   (WO_TRIANGLE_20+0x20)
+#define WO_TRIANGLE_80   (WO_TRIANGLE_40+0x40)
+#define WO_SAWTOOTH_04   (WO_TRIANGLE_80+0x80)
+#define WO_SAWTOOTH_08   (WO_SAWTOOTH_04+0x04)
+#define WO_SAWTOOTH_10   (WO_SAWTOOTH_08+0x08)
+#define WO_SAWTOOTH_20   (WO_SAWTOOTH_10+0x10)
+#define WO_SAWTOOTH_40   (WO_SAWTOOTH_20+0x20)
+#define WO_SAWTOOTH_80   (WO_SAWTOOTH_40+0x40)
+#define WO_SQUARES       (WO_SAWTOOTH_80+0x80)
+#define WHITENOISELEN    (0x280*3)
+#define WO_WHITENOISE    (WO_SQUARES+(0x80*0x20))
 
-#define MAX_PLAYERS 4
+#define MAX_PLAYERS 16
 static struct hvl_tune *g_players[MAX_PLAYERS] = {NULL};
 static int16 *g_playerMixL[MAX_PLAYERS] = {NULL};
 static int16 *g_playerMixR[MAX_PLAYERS] = {NULL};
@@ -430,6 +436,10 @@ int32 hively_create_player(uint32 sampleRate) {
     ht->ht_WaveformTab[0] = &waves[WO_TRIANGLE_04];
     ht->ht_WaveformTab[1] = &waves[WO_SAWTOOTH_04];
     ht->ht_WaveformTab[3] = &waves[WO_WHITENOISE];
+
+    /* Channel gain — 256 = unity (matches hvl_reset) */
+    for (int32 i = 0; i < MAX_CHANNELS; i++)
+        ht->ht_ChannelGain[i] = 256;
 
     /* Initialize voice */
     ht->ht_Voices[0].vc_Delta = 1;
