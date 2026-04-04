@@ -1331,6 +1331,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
       lineNumber:          theme.colors.textMuted,
       lineNumberHighlight: theme.colors.accentSecondary,
       selection:           theme.colors.accentGlow,
+      bookmark:            theme.colors.warning,
     };
   }, [getCurrentTheme]);
 
@@ -1350,6 +1351,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
       rowSecondaryHighlightInterval: ui.rowSecondaryHighlightInterval,
       showBeatLabels:     ui.showBeatLabels,
       noteDisplayOffset:  getTrackerReplayer().getSong()?.noteDisplayOffset ?? 0,
+      bookmarks:          editor.bookmarks,
     };
     if (isFormatMode && formatColumns) {
       base.columns = formatColumns.map(toColumnSpec);
@@ -1825,7 +1827,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
       if (isFormatModeRef.current) return;
       const b = bridgeRef.current;
       if (!b) return;
-      if (s.columnVisibility !== prev.columnVisibility || s.showGhostPatterns !== prev.showGhostPatterns || s.recordMode !== prev.recordMode) {
+      if (s.columnVisibility !== prev.columnVisibility || s.showGhostPatterns !== prev.showGhostPatterns || s.recordMode !== prev.recordMode || s.bookmarks !== prev.bookmarks) {
         b.post({ type: 'uiState', uiState: snapshotUI() });
       }
     });

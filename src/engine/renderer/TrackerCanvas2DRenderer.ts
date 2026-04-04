@@ -189,6 +189,19 @@ export class TrackerCanvas2DRenderer {
       ctx.fillText(label, 2, y + rowH - Math.round(6 * (this.mobile ? MOBILE_SCALE : 1)));
     }
 
+    // ── Bookmark indicators ──────────────────────────────────────────────────
+    if (ui.bookmarks && ui.bookmarks.length > 0) {
+      ctx.fillStyle = theme.bookmark || '#f59e0b';
+      ctx.globalAlpha = 0.9;
+      for (const bm of ui.bookmarks) {
+        if (bm >= startRow && bm < endRow) {
+          const y = (bm - scrollRow) * rowH;
+          ctx.fillRect(0, y, 3, rowH);
+        }
+      }
+      ctx.globalAlpha = 1;
+    }
+
     // ── Channel separator lines ─────────────────────────────────────────────
     ctx.strokeStyle = theme.trackerBorder || theme.border;
     ctx.lineWidth   = 1;

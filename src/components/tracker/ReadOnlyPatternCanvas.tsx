@@ -117,6 +117,7 @@ export const ReadOnlyPatternCanvas: React.FC<ReadOnlyPatternCanvasProps> = React
       lineNumber:          t.colors.textMuted,
       lineNumberHighlight: t.colors.accentSecondary,
       selection:           t.colors.accentGlow,
+      bookmark:            t.colors.warning,
     };
   }, [getCurrentTheme]);
 

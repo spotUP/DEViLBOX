@@ -22,7 +22,7 @@ import type { Graphics as GraphicsType, FederatedPointerEvent, Container as Cont
 import { usePixiTheme, type PixiTheme } from '../../theme';
 import { PIXI_FONTS } from '../../fonts';
 import { MegaText, type GlyphLabel } from '../../utils/MegaText';
-import { useTrackerStore, useTransportStore, useUIStore, useCursorStore } from '@stores';
+import { useTrackerStore, useTransportStore, useUIStore, useCursorStore, useEditorStore } from '@stores';
 import { useWasmPositionStore } from '@stores/useWasmPositionStore';
 import { getTrackerReplayer } from '@engine/TrackerReplayer';
 import { getTrackerScratchController } from '@engine/TrackerScratchController';
@@ -229,6 +229,8 @@ interface RenderParams {
   songLength: number;            // total positions in song order
   /** Per-frame cache shared between renderGrid and generateLabels to avoid redundant O(n) walks. */
   songRowCache: Map<number, { pattern: TrackerPattern; row: number } | null>;
+  /** Bookmarked row indices (sorted). */
+  bookmarks: number[];
 }
 
 /**
@@ -309,6 +311,20 @@ function renderGrid(g: GraphicsType, p: RenderParams, vStart: number): void {
     }
 
     // Center-line highlight moved to renderOverlay to avoid grid redraw during scrolling
+  }
+
+  // ── Bookmark indicators — small colored bar at left edge of gutter ──────────
+  if (p.bookmarks.length > 0) {
+    for (let i = 0; i < p.visibleLines; i++) {
+      const rowNum = vStart + i;
+      if (rowNum < 0 || rowNum >= p.patternLength) continue;
+      if (p.bookmarks.indexOf(rowNum) === -1) continue;
+      const y = p.baseY + i * p.rowHeight;
+      if (y + p.rowHeight < 0 || y > p.gridHeight) continue;
+      // Colored bar along the left edge of the row number gutter
+      g.rect(0, y, 3, p.rowHeight);
+      g.fill({ color: p.theme.warning.color, alpha: 0.9 });
+    }
   }
 
   const anySolo = p.channelSolo.some(Boolean);
@@ -677,6 +693,7 @@ export const PixiPatternEditor: React.FC<PixiPatternEditorProps> = ({ width, hei
   const rowHighlightInterval = useUIStore(s => s.rowHighlightInterval);
   const rowSecondaryHighlightInterval = useUIStore(s => s.rowSecondaryHighlightInterval);
   const showBeatLabels = useUIStore(s => s.showBeatLabels);
+  const bookmarks = useEditorStore(s => s.bookmarks);
 
   // ── Cell context menu (GL-native via PixiContextMenu) ─────────────────────
   const [ctxMenuState, setCtxMenuState] = useState<{
@@ -1374,6 +1391,7 @@ export const PixiPatternEditor: React.FC<PixiPatternEditorProps> = ({ width, hei
     songPositions: _song?.songPositions ?? [],
     songLength: _song?.songPositions?.length ?? 0,
     songRowCache: renderParamsRef.current?.songRowCache ?? new Map(),
+    bookmarks,
   };
 
   // ── Imperative redraw — called from subscription (cursor) and useEffect (other deps) ──
@@ -1481,7 +1499,7 @@ export const PixiPatternEditor: React.FC<PixiPatternEditorProps> = ({ width, hei
       showGhostPatterns, trackerVisualBg, numChannels, channelOffsets, channelWidths,
       displayPattern, displayPatternIndex, patterns, isPlaying, recordMode, scrollLeft,
       rowHeight, rowHighlightInterval, rowSecondaryHighlightInterval, channelMuted, channelSolo, useHex, blankEmpty,
-      showBeatLabels, columnVisibility, currentPatternIndex, playbackPatternIdx,
+      showBeatLabels, columnVisibility, currentPatternIndex, playbackPatternIdx, bookmarks,
       imperativeRedraw]);
 
   // ── Click → cell mapping ──────────────────────────────────────────────────
