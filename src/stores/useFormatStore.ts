@@ -583,9 +583,8 @@ export const useFormatStore = create<FormatStore>()(
 
     applyEditorMode: (song) => {
       useEditorStore.getState().setLinearPeriods(song.linearPeriods ?? false);
-      // Clear automation capture data and register lanes from previous song
+      // Clear automation capture data from previous song
       import('../engine/automation/AutomationCapture').then(m => m.getAutomationCapture().clear());
-      import('../stores/useRegisterLaneStore').then(m => m.useRegisterLaneStore.getState().clear());
       let newEditorMode: EditorMode = 'classic';
       set((state) => {
         state.c64SidFileData = song.c64SidFileData ?? null;

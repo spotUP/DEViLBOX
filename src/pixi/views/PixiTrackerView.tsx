@@ -37,8 +37,6 @@ import { PixiCMIKnobPanel, CMI_PANEL_COLLAPSED_H, CMI_PANEL_EXPANDED_H } from '.
 import { PixiMusicLineTrackTable } from './tracker/PixiMusicLineTrackTable';
 import { PixiMusicLinePatternViewer } from './tracker/PixiMusicLinePatternViewer';
 import { PixiPatternEditor } from './tracker/PixiPatternEditor';
-import { PixiAutomationLaneStrip } from './tracker/PixiAutomationLaneStrip';
-import { getFormatPlaybackState } from '@/engine/FormatPlaybackState';
 import { PixiTrackerVisualBg } from './tracker/PixiTrackerVisualBg';
 import { PixiGridSequencer } from './tracker/PixiGridSequencer';
 import { PixiTB303View } from './tracker/PixiTB303View';
@@ -359,26 +357,6 @@ export const PixiTrackerView: React.FC = () => {
             )}
           </pixiContainer>
 
-          {/* Automation Lane Strip — for all formats with register capture */}
-          {viewMode === 'tracker' && (editorMode === 'classic' || editorMode === 'furnace' || editorMode === 'hively' || editorMode === 'klystrack' || editorMode === 'sc68') && (() => {
-            const fmt = editorMode === 'furnace' ? 'furnace' as const : 'uade' as const;
-            const fn = useFormatStore.getState().furnaceNative;
-            const formatConfig = fmt === 'furnace' && fn
-              ? { chipIds: fn.chipIds, channelCount: fn.subsongs[fn.activeSubsong]?.channels.length ?? 4 }
-              : undefined;
-            const ps = getFormatPlaybackState();
-            const pat = useTrackerStore.getState().patterns[useTrackerStore.getState().currentPatternIndex];
-            return (
-              <PixiAutomationLaneStrip
-                width={Math.max(100, editorWidth)}
-                format={fmt}
-                formatConfig={formatConfig}
-                patternLength={pat?.length ?? 64}
-                currentRow={ps.row}
-                isPlaying={ps.isPlaying}
-              />
-            );
-          })()}
 
           {/* Overlays — ALWAYS mounted to avoid @pixi/layout Yoga BindingErrors.
               Use alpha/renderable (NOT visible) — @pixi/layout calls _onChildRemoved()

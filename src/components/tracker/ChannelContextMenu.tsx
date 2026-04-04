@@ -44,7 +44,6 @@ import { CHANNEL_COLORS } from '@typedefs/tracker';
 import { MASTER_FX_PRESETS } from '@constants/masterFxPresets';
 import { notify } from '@stores/useNotificationStore';
 import { useFormatStore } from '@stores/useFormatStore';
-import { useRegisterLaneStore } from '@stores/useRegisterLaneStore';
 import { useGTUltraStore } from '@stores/useGTUltraStore';
 import { getParamsForFormat, groupParams, type AutomationFormat } from '../../engine/automation/AutomationParams';
 
@@ -156,8 +155,6 @@ export const ChannelContextMenu: React.FC<ChannelContextMenuProps> = ({
 
   // Register-capture automation params (SID/Paula/Furnace based on current format)
   const editorMode = useFormatStore(s => s.editorMode);
-  const toggleRegisterLane = useRegisterLaneStore(s => s.toggleLane);
-  const hasRegisterLane = useRegisterLaneStore(s => s.hasLane);
 
   const furnaceNative = useFormatStore(s => s.furnaceNative);
   const gtSidCount = editorMode === 'goattracker'
@@ -187,11 +184,13 @@ export const ChannelContextMenu: React.FC<ChannelContextMenuProps> = ({
       submenu: group.params.map(p => ({
         id: `reg-${p.id}`,
         label: p.label,
-        checked: hasRegisterLane(p.id),
-        onClick: () => toggleRegisterLane(p.id),
+        onClick: () => {
+          setActiveParameter(channelIndex, p.id);
+          setShowLane(channelIndex, true);
+        },
       })),
     }));
-  }, [editorMode, toggleRegisterLane, hasRegisterLane, furnaceNative, gtSidCount]);
+  }, [editorMode, setActiveParameter, setShowLane, channelIndex, furnaceNative, gtSidCount]);
 
   // Build menu items based on mode
   const menuItems = useMemo((): MenuItemType[] => {
