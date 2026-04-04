@@ -162,6 +162,7 @@ const LaneCurveCanvas: React.FC<{
   const containerRef = useRef<HTMLDivElement>(null);
   const animFrameRef = useRef<number>(0);
   const widthRef = useRef(800);
+  const [dragIdx, setDragIdx] = useState<number | null>(null);
 
   // Track container width
   useEffect(() => {
@@ -215,6 +216,16 @@ const LaneCurveCanvas: React.FC<{
         ctx.setLineDash([]);
       } else {
         drawCurve(ctx, entries, w, h, patternLength);
+        // Draw control points
+        const maxTick = Math.max(patternLength, entries[entries.length - 1].tick + 1);
+        for (let i = 0; i < entries.length; i++) {
+          const px = (entries[i].tick / maxTick) * w;
+          const py = (1 - entries[i].value) * h;
+          ctx.beginPath();
+          ctx.arc(px, py, 3, 0, Math.PI * 2);
+          ctx.fillStyle = i === dragIdx ? 'rgba(255,255,255,0.9)' : 'rgba(96, 165, 250, 0.7)';
+          ctx.fill();
+        }
       }
 
       // Playback position line
@@ -233,7 +244,82 @@ const LaneCurveCanvas: React.FC<{
     };
     draw();
     return () => { running = false; cancelAnimationFrame(animFrameRef.current); };
-  }, [paramId, patternLength, currentRow, isPlaying]);
+  }, [paramId, patternLength, currentRow, isPlaying, dragIdx]);
+
+  const getMousePos = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
+    const canvas = canvasRef.current;
+    if (!canvas) return { tick: 0, value: 0 };
+    const rect = canvas.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    const capture = getAutomationCapture();
+    const entries = capture.getAll(paramId);
+    const maxTick = entries.length > 0
+      ? Math.max(patternLength, entries[entries.length - 1].tick + 1)
+      : patternLength;
+    return {
+      tick: Math.round((x / rect.width) * maxTick),
+      value: Math.max(0, Math.min(1, 1 - (y / rect.height))),
+    };
+  }, [paramId, patternLength]);
+
+  const findNearPoint = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
+    const canvas = canvasRef.current;
+    if (!canvas) return -1;
+    const rect = canvas.getBoundingClientRect();
+    const mx = e.clientX - rect.left;
+    const my = e.clientY - rect.top;
+    const capture = getAutomationCapture();
+    const entries = capture.getAll(paramId);
+    if (entries.length === 0) return -1;
+    const maxTick = Math.max(patternLength, entries[entries.length - 1].tick + 1);
+    for (let i = 0; i < entries.length; i++) {
+      const px = (entries[i].tick / maxTick) * rect.width;
+      const py = (1 - entries[i].value) * rect.height;
+      if (Math.abs(px - mx) < 6 && Math.abs(py - my) < 6) return i;
+    }
+    return -1;
+  }, [paramId, patternLength]);
+
+  const handleMouseDown = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
+    const idx = findNearPoint(e);
+    if (idx >= 0) {
+      setDragIdx(idx);
+    } else {
+      // Click in empty space — add a new point
+      const { tick, value } = getMousePos(e);
+      const capture = getAutomationCapture();
+      capture.push(paramId, tick, value);
+    }
+  }, [findNearPoint, getMousePos, paramId]);
+
+  const handleMouseMove = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
+    if (dragIdx === null) return;
+    const { value } = getMousePos(e);
+    const capture = getAutomationCapture();
+    const entries = capture.getAll(paramId);
+    if (dragIdx < entries.length) {
+      // Update the value of the dragged point
+      entries[dragIdx].value = value;
+    }
+  }, [dragIdx, getMousePos, paramId]);
+
+  const handleMouseUp = useCallback(() => {
+    setDragIdx(null);
+  }, []);
+
+  const handleDoubleClick = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
+    const idx = findNearPoint(e);
+    if (idx >= 0) {
+      // Remove point — clear the param and re-push all except this one
+      const capture = getAutomationCapture();
+      const entries = capture.getAll(paramId);
+      capture.clearParam(paramId);
+      for (let i = 0; i < entries.length; i++) {
+        if (i !== idx) capture.push(paramId, entries[i].tick, entries[i].value, entries[i].sourceRef);
+      }
+    }
+  }, [findNearPoint, paramId]);
 
   return (
     <div ref={containerRef} className="w-full h-full">
@@ -241,7 +327,12 @@ const LaneCurveCanvas: React.FC<{
         ref={canvasRef}
         width={1600}
         height={height * 2}
-        className="w-full h-full"
+        className="w-full h-full cursor-crosshair"
+        onMouseDown={handleMouseDown}
+        onMouseMove={handleMouseMove}
+        onMouseUp={handleMouseUp}
+        onMouseLeave={handleMouseUp}
+        onDoubleClick={handleDoubleClick}
       />
     </div>
   );

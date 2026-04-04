@@ -915,6 +915,9 @@ export class FurnaceDispatchEngine {
   private oscCallbacks: Set<OscDataCallback> = new Set();
   private latestOscData: (Int16Array | null)[] = [];
 
+  // Command log callbacks for automation capture
+  private _cmdLogCallbacks: Set<(entries: Array<{ tick: number; cmd: number; channel: number; value1: number; value2: number }>) => void> = new Set();
+
   // Cache for WASM binary and JS code
   private static wasmBinary: ArrayBuffer | null = null;
   private static jsCode: string | null = null;
@@ -1263,6 +1266,17 @@ export class FurnaceDispatchEngine {
           cb(data.order as number, data.row as number, data.audioTime as number | undefined);
         }
         break;
+
+      case 'cmdLog': {
+        // Automation capture: decode command log entries from worklet
+        const entries = data.entries as Array<{ tick: number; cmd: number; channel: number; value1: number; value2: number }>;
+        if (entries && entries.length > 0) {
+          for (const cb of this._cmdLogCallbacks) {
+            cb(entries);
+          }
+        }
+        break;
+      }
 
       case 'debug':
         if ((window as any).FURNACE_DEBUG) console.log(data.msg);
@@ -1785,6 +1799,17 @@ export class FurnaceDispatchEngine {
   onOscData(callback: OscDataCallback): () => void {
     this.oscCallbacks.add(callback);
     return () => { this.oscCallbacks.delete(callback); };
+  }
+
+  /** Enable/disable command log capture for automation lanes */
+  enableCmdLog(enable: boolean): void {
+    this.workletNode?.port.postMessage({ type: 'enableCmdLog', enable });
+  }
+
+  /** Subscribe to command log entries (for automation capture) */
+  onCmdLog(callback: (entries: Array<{ tick: number; cmd: number; channel: number; value1: number; value2: number }>) => void): () => void {
+    this._cmdLogCallbacks.add(callback);
+    return () => { this._cmdLogCallbacks.delete(callback); };
   }
 
   /**
