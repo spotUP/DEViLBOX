@@ -559,7 +559,7 @@ export async function startNativeEngines(
         // usePatternPlayback reload effect → startNativeEngines() → infinite respawn loop.
         // The TrackerReplayer.play() already sets isPlaying via the normal flow.
         // We only update currentRow so the pattern editor scrolls.
-        if ('onPositionUpdate' in instance && typeof (instance as any).onPositionUpdate === 'function' && desc.key !== 'Hively' && desc.key !== 'UADEEditable') {
+        if ('onPositionUpdate' in instance && typeof (instance as any).onPositionUpdate === 'function' && desc.key !== 'Hively' && desc.key !== 'UADEEditable' && desc.key !== 'MusicLine') {
           // Wire position updates to the lightweight WASM position store.
           // Wire position updates to the lightweight WASM position store.
           // This bypasses useTransportStore entirely to avoid triggering
