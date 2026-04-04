@@ -44,7 +44,8 @@ import { PopOutWindow } from '@components/ui/PopOutWindow';
 import { InstrumentList } from '@components/instruments/InstrumentList';
 import { getTrackerReplayer } from '@engine/TrackerReplayer';
 import { MusicLineTrackTableEditor } from './MusicLineTrackTableEditor';
-import { MusicLinePatternViewer } from './MusicLinePatternViewer';
+import { useMusicLineFormatData } from '@/components/musicline/useMusicLineFormatData';
+import { MUSICLINE_COLUMNS } from '@/components/musicline/musiclineAdapter';
 import { downloadPattern } from '@lib/export/PatternExport';
 import { downloadTrack } from '@lib/export/TrackExport';
 import { DJPitchSlider } from '@components/transport/DJPitchSlider';
@@ -225,6 +226,9 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
   // Pattern order modal
   const [showPatternOrder, setShowPatternOrder] = useState(false);
   const channelTrackTables = useFormatStore((state) => state.channelTrackTables);
+
+  // MusicLine format data (hook must be called unconditionally — rules of hooks)
+  const mlFormatData = useMusicLineFormatData();
 
   // Mobile swipe handlers for cursor navigation
   const handleSwipeLeft = useCallback(() => {
@@ -605,9 +609,15 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
                       />
                     </div>
                   </div>
-                  {/* Multi-channel note viewer */}
-                  <div className="flex-1 min-h-0">
-                    <MusicLinePatternViewer />
+                  {/* PatternEditorCanvas replaces custom MusicLinePatternViewer */}
+                  <div className="flex-1 min-h-0 overflow-hidden">
+                    <PatternEditorCanvas
+                      formatColumns={MUSICLINE_COLUMNS}
+                      formatChannels={mlFormatData.channels}
+                      formatCurrentRow={mlFormatData.currentRow}
+                      formatIsPlaying={mlFormatData.isPlaying}
+                      onFormatCellChange={mlFormatData.handleCellChange}
+                    />
                   </div>
                 </div>
               ) : (
