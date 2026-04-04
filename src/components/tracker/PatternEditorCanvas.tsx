@@ -3138,7 +3138,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
         {/* Automation Lanes Overlay — positioned imperatively by RAF loop */}
         {pattern && (
           <>
-            {showAutomationLanes && !isFormatMode && (
+            {showAutomationLanes && (
               <>
               {/* Per-channel automation parameter pickers */}
               {pattern.channels.map((_, chIdx) => (
@@ -3169,8 +3169,13 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
                   marginTop: -prevLen * rowHeight,
                   pointerEvents: 'none',
                   zIndex: 5,
-                  clipPath: `inset(0 0 0 ${channelOffsets[0] ?? LINE_NUMBER_WIDTH}px)`,
-                  overflow: 'hidden',
+                  clipPath: (() => {
+                    const leftClip = channelOffsets[0] ?? LINE_NUMBER_WIDTH;
+                    const patChCount = pattern.channels.length;
+                    const rightEdge = patChCount > 0 ? (channelOffsets[patChCount - 1] ?? 0) + (channelWidths[patChCount - 1] ?? 0) : dimensions.width;
+                    const rightClip = Math.max(0, dimensions.width - rightEdge);
+                    return `inset(0 ${rightClip}px 0 ${leftClip}px)`;
+                  })(),
                 }}
               >
               <AutomationLanes
