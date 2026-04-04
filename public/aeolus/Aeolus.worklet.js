@@ -70,7 +70,7 @@ class AeolusProcessor extends AudioWorkletProcessor {
 
       case 'setParam':
         if (this.synth && this.isInitialized) {
-          this.Module._aeolus_set_param(this.synth, data.param, data.value);
+          this.Module._aeolus_set_param(this.synth, data.index, data.value);
         } else {
           this.pendingMessages.push(event.data);
         }
