@@ -53,7 +53,7 @@ const ARP_CHORDS: { label: string; semitones: number[] }[] = [
 
 // ── Draw Canvas — shared drag-to-draw pattern ──────────────────────────────
 
-const DRAW_H = 80;
+const DRAW_H = 100;
 const DRAW_STEPS = 32;
 
 interface DrawCanvasProps {
@@ -264,16 +264,16 @@ const ArpGrid: React.FC<{ color: string }> = ({ color }) => {
     });
   }, []);
 
-  const cellSize = 10;
+  const cellSize = 14;
   const noteNames = ['C', '', 'D', '', 'E', 'F', '', 'G', '', 'A', '', 'B'];
 
   return (
     <div style={{ overflowX: 'auto' }}>
-      <div style={{ display: 'grid', gridTemplateColumns: `20px repeat(${ARP_GRID_COLS}, ${cellSize}px)`, gap: 1, fontSize: 7 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: `20px repeat(${ARP_GRID_COLS}, ${cellSize}px)`, gap: 1, fontSize: 10 }}>
         {/* Header */}
         <div />
         {Array.from({ length: ARP_GRID_COLS }, (_, c) => (
-          <div key={c} style={{ textAlign: 'center', color: '#555', fontSize: 7 }}>{c + 1}</div>
+          <div key={c} style={{ textAlign: 'center', color: '#555', fontSize: 10 }}>{c + 1}</div>
         ))}
         {/* Grid rows (top = highest note) */}
         {Array.from({ length: ARP_GRID_ROWS }, (_, rowIdx) => {
@@ -282,7 +282,7 @@ const ArpGrid: React.FC<{ color: string }> = ({ color }) => {
           const isBlackKey = !noteName;
           return (
             <React.Fragment key={rowIdx}>
-              <div style={{ color: '#555', textAlign: 'right', paddingRight: 2, fontSize: 7, lineHeight: `${cellSize}px` }}>
+              <div style={{ color: '#555', textAlign: 'right', paddingRight: 2, fontSize: 10, lineHeight: `${cellSize}px` }}>
                 {noteName || '·'}{semitone % 12 === 0 ? Math.floor(semitone / 12) : ''}
               </div>
               {Array.from({ length: ARP_GRID_COLS }, (_, col) => (
@@ -433,7 +433,7 @@ export const GTSoundDesigner: React.FC = () => {
   // ── Helpers ──
 
   const SectionLabel = ({ label, color }: { label: string; color?: string }) => (
-    <div className="text-[10px] font-bold uppercase tracking-widest mb-1.5"
+    <div className="text-sm font-bold uppercase tracking-widest mb-1.5"
       style={{ color: color ?? accentColor, opacity: 0.7 }}>{label}</div>
   );
 
@@ -466,7 +466,7 @@ export const GTSoundDesigner: React.FC = () => {
           <SectionLabel label="Presets" />
           <button
             onClick={toggleAudition}
-            className="px-3 py-1 text-[10px] font-bold rounded ml-auto"
+            className="px-3 py-1 text-sm font-bold rounded ml-auto"
             style={{
               background: isAuditioning ? '#ff4444' : accentColor,
               color: '#000',
@@ -479,7 +479,7 @@ export const GTSoundDesigner: React.FC = () => {
         {/* Category filter */}
         <div className="flex gap-1 mb-2 flex-wrap">
           <button
-            className="px-2 py-0.5 text-[9px] font-mono rounded"
+            className="px-2 py-0.5 text-xs font-mono rounded"
             style={{
               background: activeCategory === 'all' ? accentColor : 'transparent',
               color: activeCategory === 'all' ? '#000' : '#666',
@@ -490,7 +490,7 @@ export const GTSoundDesigner: React.FC = () => {
           {getPresetCategories().map(cat => (
             <button
               key={cat}
-              className="px-2 py-0.5 text-[9px] font-mono rounded"
+              className="px-2 py-0.5 text-xs font-mono rounded"
               style={{
                 background: activeCategory === cat ? accentColor : 'transparent',
                 color: activeCategory === cat ? '#000' : '#666',
@@ -514,8 +514,8 @@ export const GTSoundDesigner: React.FC = () => {
                 minWidth: 120,
               }}
             >
-              <div className="text-[10px] font-bold" style={{ color: accentColor }}>{preset.name}</div>
-              <div className="text-[8px] text-text-secondary mt-0.5">{preset.description}</div>
+              <div className="text-sm font-bold" style={{ color: accentColor }}>{preset.name}</div>
+              <div className="text-xs text-text-secondary mt-0.5">{preset.description}</div>
             </button>
           ))}
         </div>
@@ -543,11 +543,11 @@ export const GTSoundDesigner: React.FC = () => {
                 { label: 'R', value: release, table: DECAY_MS, set: (v: number) => setADSR(attack, decay, sustain, v) },
               ].map(({ label, value, table, set }) => (
                 <div key={label} className="flex flex-col items-center gap-0.5">
-                  <span className="text-[9px] font-bold text-text-secondary">{label}</span>
+                  <span className="text-xs font-bold text-text-secondary">{label}</span>
                   <input type="range" min={0} max={15} value={value}
                     onChange={(e) => set(parseInt(e.target.value))}
                     style={{ width: '100%', accentColor }} />
-                  <span className="text-[8px] font-mono" style={{ color: accentColor }}>
+                  <span className="text-xs font-mono" style={{ color: accentColor }}>
                     {table ? (table[value] >= 1000 ? `${(table[value] / 1000).toFixed(1)}s` : `${table[value]}ms`) : `${Math.round(value / 15 * 100)}%`}
                   </span>
                 </div>
@@ -565,7 +565,7 @@ export const GTSoundDesigner: React.FC = () => {
                 const active = !!(waveform & wf.bit);
                 return (
                   <button key={wf.bit} onClick={() => toggleWaveBit(wf.bit)}
-                    className="px-2 py-1 text-[10px] font-mono rounded"
+                    className="px-2 py-1 text-sm font-mono rounded"
                     style={{
                       background: active ? TABLE_COLORS.wave : '#111',
                       color: active ? '#000' : '#555',
@@ -576,7 +576,7 @@ export const GTSoundDesigner: React.FC = () => {
                 );
               })}
               <button onClick={() => toggleWaveBit(0x01)}
-                className="px-2 py-1 text-[10px] font-mono rounded"
+                className="px-2 py-1 text-sm font-mono rounded"
                 style={{
                   background: gate ? TABLE_COLORS.wave + '40' : '#111',
                   color: gate ? TABLE_COLORS.wave : '#555',
@@ -592,45 +592,45 @@ export const GTSoundDesigner: React.FC = () => {
                 {waveSteps.map((step, i) => (
                   <div key={i} className="flex items-center gap-2 px-2 py-1 rounded"
                     style={{ background: '#0a0f0c', border: '1px solid #1a3328' }}>
-                    <span className="text-[9px] font-mono w-4" style={{ color: '#555' }}>{i + 1}</span>
+                    <span className="text-xs font-mono w-4" style={{ color: '#555' }}>{i + 1}</span>
                     {step.isCommand ? (
-                      <span className="text-[9px] font-mono" style={{ color: '#888' }}>
+                      <span className="text-xs font-mono" style={{ color: '#888' }}>
                         {waveCommandLabel(step.cmdByte ?? 0)} ${(step.cmdParam ?? 0).toString(16).toUpperCase().padStart(2, '0')}
                       </span>
                     ) : (
                       <>
-                        <span className="text-[10px] font-bold" style={{ color: TABLE_COLORS.wave }}>
+                        <span className="text-sm font-bold" style={{ color: TABLE_COLORS.wave }}>
                           {waveformName(step.waveform)}
                         </span>
-                        {step.gate && <span className="text-[8px]" style={{ color: TABLE_COLORS.wave }}>G</span>}
+                        {step.gate && <span className="text-xs" style={{ color: TABLE_COLORS.wave }}>G</span>}
                         {step.delay > 0 && (
-                          <span className="text-[8px] font-mono text-text-secondary">
+                          <span className="text-xs font-mono text-text-secondary">
                             +{step.delay}f
                           </span>
                         )}
                         {step.noteOffset !== 0x80 && step.noteOffset !== 0 && (
-                          <span className="text-[8px] font-mono" style={{ color: TABLE_COLORS.speed }}>
+                          <span className="text-xs font-mono" style={{ color: TABLE_COLORS.speed }}>
                             n:{step.noteOffset.toString(16).toUpperCase()}
                           </span>
                         )}
                       </>
                     )}
                     <button onClick={() => removeWaveStep(i)}
-                      className="ml-auto text-[9px] text-text-secondary hover:text-red-400"
+                      className="ml-auto text-xs text-text-secondary hover:text-red-400"
                     >x</button>
                   </div>
                 ))}
                 <button onClick={addWaveStep}
-                  className="text-[9px] font-mono py-1 rounded"
+                  className="text-xs font-mono py-1 rounded"
                   style={{ color: TABLE_COLORS.wave, border: `1px dashed ${TABLE_COLORS.wave}40` }}>
                   + Add Step
                 </button>
               </div>
             ) : (
-              <div className="text-[9px] text-text-secondary text-center py-4">
+              <div className="text-xs text-text-secondary text-center py-4">
                 {inst?.wavePtr ? 'No wave table data at this pointer' : 'No wave table assigned'}
                 <br />
-                <button onClick={addWaveStep} className="mt-2 text-[9px] font-mono py-1 px-3 rounded"
+                <button onClick={addWaveStep} className="mt-2 text-xs font-mono py-1 px-3 rounded"
                   style={{ color: TABLE_COLORS.wave, border: `1px dashed ${TABLE_COLORS.wave}40` }}>
                   + Create Wave Sequence
                 </button>
@@ -669,7 +669,7 @@ export const GTSoundDesigner: React.FC = () => {
                 { label: 'Wobble', steps: [{ type: 'set' as const, value: 2048, speed: 0 }, { type: 'mod' as const, value: 32, speed: 6 }, { type: 'mod' as const, value: 32, speed: 0xFA }] },
               ].map(preset => (
                 <button key={preset.label}
-                  className="px-2 py-0.5 text-[8px] font-mono rounded"
+                  className="px-2 py-0.5 text-xs font-mono rounded"
                   style={{ color: TABLE_COLORS.pulse, border: `1px solid ${TABLE_COLORS.pulse}40` }}
                   onClick={() => {
                     if (!engine || !inst?.pulsePtr) return;
@@ -693,7 +693,7 @@ export const GTSoundDesigner: React.FC = () => {
             <div className="flex gap-1 mb-2">
               {['LP', 'BP', 'HP'].map(mode => (
                 <button key={mode}
-                  className="px-3 py-1 text-[9px] font-mono rounded"
+                  className="px-3 py-1 text-xs font-mono rounded"
                   style={{
                     color: TABLE_COLORS.filter,
                     border: `1px solid ${TABLE_COLORS.filter}40`,
@@ -703,7 +703,7 @@ export const GTSoundDesigner: React.FC = () => {
                 </button>
               ))}
               <div className="flex items-center gap-1 ml-auto">
-                <span className="text-[8px] text-text-secondary">Res</span>
+                <span className="text-xs text-text-secondary">Res</span>
                 <input type="range" min={0} max={15} defaultValue={8}
                   style={{ width: 60, accentColor: TABLE_COLORS.filter }} />
               </div>
@@ -732,7 +732,7 @@ export const GTSoundDesigner: React.FC = () => {
                 { label: 'Wah', steps: [{ type: 'set' as const, value: 0x90, param: 0x40 }, { type: 'mod' as const, value: 16, param: 0x08 }, { type: 'mod' as const, value: 16, param: 0xF8 }] },
               ].map(preset => (
                 <button key={preset.label}
-                  className="px-2 py-0.5 text-[8px] font-mono rounded"
+                  className="px-2 py-0.5 text-xs font-mono rounded"
                   style={{ color: TABLE_COLORS.filter, border: `1px solid ${TABLE_COLORS.filter}40` }}
                   onClick={() => {
                     if (!engine || !inst?.filterPtr) return;
@@ -760,7 +760,7 @@ export const GTSoundDesigner: React.FC = () => {
             <div className="flex gap-1 mt-2 flex-wrap">
               {ARP_CHORDS.map(chord => (
                 <button key={chord.label}
-                  className="px-2 py-0.5 text-[8px] font-mono rounded"
+                  className="px-2 py-0.5 text-xs font-mono rounded"
                   style={{ color: TABLE_COLORS.speed, border: `1px solid ${TABLE_COLORS.speed}40` }}
                   onClick={() => {
                     if (!engine || !inst?.speedPtr) return;
@@ -787,13 +787,13 @@ export const GTSoundDesigner: React.FC = () => {
               {/* Gate Timer */}
               <div>
                 <div className="flex items-center justify-between mb-1">
-                  <span className="text-[9px] text-text-secondary">Gate Timer</span>
-                  <span className="text-[9px] font-mono" style={{ color: accentColor }}>{gateTimerValue}</span>
+                  <span className="text-xs text-text-secondary">Gate Timer</span>
+                  <span className="text-xs font-mono" style={{ color: accentColor }}>{gateTimerValue}</span>
                 </div>
                 <input type="range" min={0} max={63} value={gateTimerValue}
                   onChange={(e) => setGateTimer(parseInt(e.target.value))}
                   style={{ width: '100%', accentColor }} />
-                <div className="text-[8px] text-text-secondary opacity-60">
+                <div className="text-xs text-text-secondary opacity-60">
                   Note duration in frames (0 = default)
                 </div>
               </div>
@@ -801,13 +801,13 @@ export const GTSoundDesigner: React.FC = () => {
               {/* Vibrato Delay */}
               <div>
                 <div className="flex items-center justify-between mb-1">
-                  <span className="text-[9px] text-text-secondary">Vibrato Delay</span>
-                  <span className="text-[9px] font-mono" style={{ color: accentColor }}>{vibdelay}</span>
+                  <span className="text-xs text-text-secondary">Vibrato Delay</span>
+                  <span className="text-xs font-mono" style={{ color: accentColor }}>{vibdelay}</span>
                 </div>
                 <input type="range" min={0} max={255} value={vibdelay}
                   onChange={(e) => setVibDelay(parseInt(e.target.value))}
                   style={{ width: '100%', accentColor }} />
-                <div className="text-[8px] text-text-secondary opacity-60">
+                <div className="text-xs text-text-secondary opacity-60">
                   Frames before vibrato starts (0 = off)
                 </div>
               </div>
@@ -822,7 +822,7 @@ export const GTSoundDesigner: React.FC = () => {
                     useGTUltraStore.getState().refreshAllInstruments();
                   }}
                   style={{ accentColor }} />
-                <span className="text-[9px] text-text-secondary">Hard Restart</span>
+                <span className="text-xs text-text-secondary">Hard Restart</span>
               </label>
             </div>
           </div>
