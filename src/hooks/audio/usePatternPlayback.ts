@@ -570,7 +570,7 @@ export const usePatternPlayback = () => {
 
         // Format-mode views (HivelyView, etc.) read currentRow from the transport
         // store and don't use getStateAtTime(), so they need every-row updates.
-        const isFormatEngine = !!hivelyNative;
+        const isFormatEngine = !!hivelyNative || !!musiclineFileData;
 
         replayer.onRowChange = (row, patternNum, position) => {
           // Format engines: update currentRow on every row (throttled to 50Hz)
