@@ -315,6 +315,7 @@ export class SetBfreeSynthEngine implements DevilboxSynth {
 
   constructor(config: Partial<SetBfreeConfig> = {}) {
     this.output = getDevilboxAudioContext().createGain();
+    this.output.gain.value = 3.0; // SetBfree output is naturally quiet — boost to match other synths
     this.config = { ...DEFAULT_SETBFREE, ...config };
     this._initPromise = this.initialize();
   }
@@ -401,15 +402,20 @@ export class SetBfreeSynthEngine implements DevilboxSynth {
     }
   }
 
+  private _prevConfig: SetBfreeConfig | null = null;
+
   private sendConfig(config: SetBfreeConfig): void {
     if (!this._worklet || !this.isInitialized) return;
+    const prev = this._prevConfig;
     for (let i = 0; i < CONFIG_KEYS.length; i++) {
-      const value = config[CONFIG_KEYS[i]];
+      const key = CONFIG_KEYS[i];
+      const value = config[key];
       const wasmIdx = WASM_PARAM_INDEX[i];
-      if (value !== undefined && wasmIdx !== undefined) {
+      if (value !== undefined && wasmIdx !== undefined && (!prev || value !== prev[key])) {
         this._worklet.port.postMessage({ type: 'parameter', paramId: wasmIdx, value });
       }
     }
+    this._prevConfig = { ...config };
   }
 
   triggerAttack(frequency: number | string, _time?: number, velocity?: number): this {
