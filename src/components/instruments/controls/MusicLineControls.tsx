@@ -261,23 +261,46 @@ export const MusicLineControls: React.FC<MusicLineControlsProps> = ({ instrument
   const loopDef = LOOP_SIZE_DEFS[waveformType] ?? { samples: 256, approxNote: '?' };
   const freq = Math.round(PAL_C3_RATE / loopDef.samples);
 
-  // Load all fields from WASM
+  // Load all fields from WASM (with timeout fallback)
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
 
+    // Build zero-defaults for all fields
+    const defaults: InstFields = {};
+    for (const key of Object.keys(ALL_OFFSETS)) defaults[key] = 0;
+
     (async () => {
       if (!MusicLineEngine.hasInstance()) {
+        setFields(defaults);
+        fieldsRef.current = defaults;
         setLoading(false);
         return;
       }
       const engine = MusicLineEngine.getInstance();
-      await engine.ready();
 
-      const data = await engine.readInstAll(mlInstIdx, ALL_OFFSETS, SIZES);
-      if (cancelled) return;
-      setFields(data);
-      fieldsRef.current = data;
+      // Timeout after 2s — don't hang forever if worklet doesn't respond
+      const timeout = setTimeout(() => {
+        if (!cancelled) {
+          setFields(defaults);
+          fieldsRef.current = defaults;
+          setLoading(false);
+        }
+      }, 2000);
+
+      try {
+        await engine.ready();
+        const data = await engine.readInstAll(mlInstIdx, ALL_OFFSETS, SIZES);
+        clearTimeout(timeout);
+        if (cancelled) return;
+        setFields(data);
+        fieldsRef.current = data;
+      } catch {
+        clearTimeout(timeout);
+        if (cancelled) return;
+        setFields(defaults);
+        fieldsRef.current = defaults;
+      }
       setLoading(false);
     })();
 
