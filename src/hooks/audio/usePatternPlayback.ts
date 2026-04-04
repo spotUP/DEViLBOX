@@ -373,6 +373,36 @@ export const usePatternPlayback = () => {
         return;
       }
 
+      // ── MusicLine: opaque WASM player — bypass reload loop ──────────────
+      // Same pattern as JamCracker: MusicLineEngine handles playback via WASM.
+      // The replayer advances positions internally, changing the pattern key,
+      // which would trigger needsReload=true and restart the engine.
+      if (musiclineFileData && channelTrackTables && channelTrackTables.length > 0) {
+        if (!hasStartedRef.current) {
+          hasStartedRef.current = true;
+          const modData = pattern.importMetadata?.modData;
+          replayer.loadSong({
+            name: pattern.importMetadata?.sourceFile ?? pattern.name ?? 'Untitled',
+            format,
+            patterns,
+            instruments: instrumentsRef.current,
+            songPositions: patternOrderRef.current,
+            songLength: modData?.songLength ?? patternOrderRef.current.length,
+            restartPosition: modData?.restartPosition ?? 0,
+            numChannels: pattern.channels.length,
+            initialSpeed: modData?.initialSpeed ?? transportSpeed,
+            initialBPM: modData?.initialBPM ?? bpmRef.current,
+            linearPeriods,
+            channelTrackTables: channelTrackTables ?? undefined,
+            musiclineFileData,
+          });
+          replayer.play().catch((err) => {
+            console.error('Failed to start MusicLine playback:', err);
+          });
+        }
+        return;
+      }
+
       // Skip reload if forcePosition was just called — the replayer already seeked.
       // But only skip if we've already loaded a song (hasStartedRef.current).
       // If the replayer hasn't started yet, we MUST proceed to loadSong even if
