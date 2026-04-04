@@ -233,7 +233,10 @@ class FluidSynthProcessor extends AudioWorkletProcessor {
       m.FS.writeFile(memPath, u8);
 
       // Allocate C string for the path and load
-      const pathBytes = new TextEncoder().encode(memPath + '\0');
+      // TextEncoder not available in AudioWorklet — manual ASCII encode
+      const pathStr = memPath + '\0';
+      const pathBytes = new Uint8Array(pathStr.length);
+      for (let i = 0; i < pathStr.length; i++) pathBytes[i] = pathStr.charCodeAt(i);
       const pathPtr = m._malloc(pathBytes.length);
       new Uint8Array(m.HEAPU8.buffer, pathPtr, pathBytes.length).set(pathBytes);
       const sfId = m._fluidsynth_load_sf2(pathPtr);
