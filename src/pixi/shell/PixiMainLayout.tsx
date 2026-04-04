@@ -156,11 +156,15 @@ export const PixiMainLayout: React.FC = () => {
   // Fullscreen views hide nav + status bar (matching DOM AppLayout.isFullscreenView)
   const isFullscreenView = mainViewId === 'vj';
   const editorFullscreen = useUIStore(s => s.editorFullscreen);
-  const hideChrome = isFullscreenView || editorFullscreen;
+  // VJ hides everything; editor fullscreen hides status bar but keeps nav (with tab bar hidden inside it)
+  const hideAllChrome = isFullscreenView;
+  const hideStatusBar = isFullscreenView || editorFullscreen;
 
-  const mainViewH = hideChrome
+  const mainViewH = hideAllChrome
     ? height
-    : height - MODERN_NAV_H - MODERN_STATUS_BAR_H;
+    : hideStatusBar
+      ? height - MODERN_NAV_H
+      : height - MODERN_NAV_H - MODERN_STATUS_BAR_H;
 
   // ─── Yoga BindingError recovery ────────────────────────────────────────────
   // When BindingErrors are suppressed, trigger a renderer resize to force
@@ -297,8 +301,8 @@ export const PixiMainLayout: React.FC = () => {
 
   return (
     <pixiContainer layout={{ width, height, flexDirection: 'column' }}>
-      {/* NavBar — hidden in fullscreen views (VJ) */}
-      {!hideChrome && (
+      {/* NavBar — hidden in VJ fullscreen only (tab bar hidden inside it for editor fullscreen) */}
+      {!hideAllChrome && (
         <pixiContainer zIndex={100} layout={{ width, height: MODERN_NAV_H, flexShrink: 0 }}>
           <PixiNavBar />
         </pixiContainer>
@@ -380,8 +384,8 @@ export const PixiMainLayout: React.FC = () => {
         )}
       </pixiContainer>
 
-      {/* Status bar — hidden in fullscreen views (VJ) */}
-      {!hideChrome && (
+      {/* Status bar — hidden in VJ and editor fullscreen */}
+      {!hideStatusBar && (
         <pixiContainer zIndex={100} layout={{ width, height: MODERN_STATUS_BAR_H, flexShrink: 0 }}>
           <PixiStatusBar />
         </pixiContainer>
