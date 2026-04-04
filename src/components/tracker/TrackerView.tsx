@@ -997,7 +997,7 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
       )}
       {showAutomation && (
         <div className="fixed inset-0 z-[99990] flex items-center justify-center p-4 bg-black/50 animate-fade-in">
-          <div className="bg-dark-bgPrimary border border-dark-border rounded-lg shadow-2xl max-w-6xl w-full max-h-[90vh] flex flex-col overflow-hidden">
+          <div className="bg-dark-bgPrimary border border-dark-border rounded-lg shadow-2xl max-w-6xl w-full max-h-[95vh] flex flex-col overflow-y-auto scrollbar-modern">
             {/* Header */}
             <div className="flex items-center justify-between px-6 py-4 border-b border-dark-border bg-dark-bgSecondary">
               <h2 className="text-lg font-bold text-text-primary flex items-center gap-2">
