@@ -16,6 +16,7 @@ import { HivelySynth } from './hively/HivelySynth';
 import { GTUltraSynth } from './gtultra/GTUltraSynth';
 import { KlysSynth } from './klystrack/KlysSynth';
 import { JamCrackerSynth } from './jamcracker/JamCrackerSynth';
+import { PreTrackerSynth } from './pretracker/PreTrackerSynth';
 import { SoundMonSynth } from './soundmon/SoundMonSynth';
 import { SidMonSynth } from './sidmon/SidMonSynth';
 import { DigMugSynth } from './digmug/DigMugSynth';
@@ -654,6 +655,10 @@ export class InstrumentFactory {
         break;
       }
 
+      case 'PreTrackerSynth':
+        instrument = new PreTrackerSynth();
+        break;
+
       case 'FuturePlayerSynth': {
         const fpSynth = new FuturePlayerSynth();
         // Set raw binary instrument pointer from parser metadata
@@ -837,6 +842,7 @@ export class InstrumentFactory {
       }
 
       case 'UADESynth':
+      case 'UADEEditableSynth':
       case 'DeltaMusic1Synth':
       case 'DeltaMusic2Synth': {
         const uadeSynth = new UADESynth();

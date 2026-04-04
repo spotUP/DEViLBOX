@@ -224,6 +224,7 @@ export type SynthType =
   | 'GTUltraSynth'    // GoatTracker Ultra SID instrument (shared WASM engine)
   // UADE - Universal Amiga Demod-player (130+ exotic Amiga formats)
   | 'UADESynth'       // UADE catch-all (playback-only via 68k emulation)
+  | 'UADEEditableSynth' // UADE editable (native pattern display + UADE audio streaming)
   // UADE Format-Specific Synths (native DSP via WASM)
   | 'SoundMonSynth'   // SoundMon II / Brian Postma (wavetable + ADSR)
   | 'SidMonSynth'     // SidMon II (SID-like synthesis)
@@ -246,6 +247,7 @@ export type SynthType =
   | 'InStereo2Synth'     // InStereo! 2.0 (wavetable synthesis + ADSR/LFO/EG tables)
   | 'InStereo1Synth'     // InStereo! 1.0 (wavetable synthesis + ADSR/EGC tables)
   | 'JamCrackerSynth' // JamCracker Pro (transpiled 68k replayer + Paula emulation WASM)
+  | 'PreTrackerSynth' // PreTracker (transpiled 68k replayer + Paula emulation WASM)
   | 'FuturePlayerSynth' // Future Player (transpiled 68k replayer + Paula emulation WASM)
   | 'KlysSynth'       // Klystrack chiptune synth (klystron WASM engine)
   // SunVox modular synthesizer
