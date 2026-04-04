@@ -41,7 +41,7 @@ import React, { useRef, useEffect, useState, useMemo } from 'react';
 import type { FredConfig, UADEChipRamInfo } from '@/types/instrument';
 import { Knob } from '@components/controls/Knob';
 import { useInstrumentColors } from '@/hooks/useInstrumentColors';
-import { EnvelopeVisualization, SectionLabel } from '@components/instruments/shared';
+import { EnvelopeVisualization, SectionLabel, NumBox } from '@components/instruments/shared';
 import { PatternEditorCanvas } from '@/components/tracker/PatternEditorCanvas';
 import type { ColumnDef, FormatChannel, FormatCell, OnCellChange } from '@/components/shared/format-editor-types';
 import { UADEChipEditor } from '@/engine/uade/UADEChipEditor';
@@ -125,26 +125,6 @@ export const FredControls: React.FC<FredControlsProps> = ({ config, onChange, ua
     }
   }
 
-  const NumBox: React.FC<{
-    label: string; value: number; min: number; max: number;
-    onChange: (v: number) => void; signed?: boolean; width?: string;
-  }> = ({ label, value, min, max, onChange: onBx, signed, width = '52px' }) => (
-    <div className="flex items-center gap-1.5">
-      <span className="text-[10px] text-text-secondary w-20 text-right whitespace-nowrap">{label}</span>
-      <input
-        type="number"
-        value={value}
-        min={signed ? min : Math.max(0, min)}
-        max={max}
-        onChange={(e) => {
-          const v = parseInt(e.target.value);
-          if (!isNaN(v)) onBx(Math.max(min, Math.min(max, v)));
-        }}
-        className="text-xs font-mono text-center border rounded px-1 py-0.5"
-        style={{ width, background: '#0a0800', borderColor: dim, color: accent }}
-      />
-    </div>
-  );
 
   // -- ENVELOPE TAB --
   const renderEnvelope = () => (
@@ -289,9 +269,11 @@ export const FredControls: React.FC<FredControlsProps> = ({ config, onChange, ua
         <SectionLabel color={accent} label="Arpeggio Settings" />
         <div className="flex gap-4 mb-3">
           <NumBox label="Active Steps" value={config.arpeggioLimit} min={0} max={16}
-            onChange={(v) => void updWithChipRam('arpeggioLimit', v, async (ed, base) => { await ed.writeU8(base + 51, v); })} />
+            color={accent} borderColor={dim} background="#0a0800" width="52px"
+            onValueChange={(v) => void updWithChipRam('arpeggioLimit', v, async (ed, base) => { await ed.writeU8(base + 51, v); })} />
           <NumBox label="Speed (ticks)" value={config.arpeggioSpeed} min={1} max={255}
-            onChange={(v) => void updWithChipRam('arpeggioSpeed', v, async (ed, base) => { await ed.writeU8(base + 38, v); })} />
+            color={accent} borderColor={dim} background="#0a0800" width="52px"
+            onValueChange={(v) => void updWithChipRam('arpeggioSpeed', v, async (ed, base) => { await ed.writeU8(base + 38, v); })} />
         </div>
       </div>
       <div className={`rounded-lg border p-3 ${panelBg} flex flex-col`} style={{ flex: 1, minHeight: 0 }}>
