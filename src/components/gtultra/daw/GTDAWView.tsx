@@ -29,7 +29,7 @@ import { Oscilloscope } from '@/components/visualization/Oscilloscope';
 
 const TOOLBAR_H = 36;
 const BOTTOM_H = 220;
-const SIDEBAR_W = 280;
+const SIDEBAR_W = 480;
 const ARRANGEMENT_H = 180;
 
 // ─── Root Layout ───
@@ -828,7 +828,7 @@ const DAWInstrumentDesigner: React.FC = () => {
 
       {/* Waveforms with mini-canvas visualizations */}
       <div style={{ color: DAW_CSS.textMuted, marginTop: 10, marginBottom: 4 }}>WAVEFORM</div>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 4 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 4 }}>
         {WAVEFORMS.map((wf) => {
           const isOn = (waveform & wf.bit) !== 0;
           const pulseWidthFrac = wf.bit === 0x40 ? getPulseWidthFrac(inst.pulsePtr, tableData) : 0.5;
@@ -864,19 +864,16 @@ const DAWInstrumentDesigner: React.FC = () => {
         <span>Sync: {(waveform & 0x02) ? <span style={{ color: DAW_CSS.success }}>ON</span> : 'off'}</span>
       </div>
 
-      {/* Table pointers */}
-      <div style={{ color: DAW_CSS.textMuted, marginTop: 10, marginBottom: 4 }}>TABLES</div>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2px 8px', color: DAW_CSS.textSec }}>
+      {/* Table pointers + Gate/Vibrato — single 4-column row */}
+      <div style={{ color: DAW_CSS.textMuted, marginTop: 10, marginBottom: 4 }}>TABLES &amp; SETTINGS</div>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: '2px 8px', color: DAW_CSS.textSec }}>
         <span>Wave: <span style={{ color: inst.wavePtr ? '#60e060' : DAW_CSS.textMuted }}>{inst.wavePtr.toString(16).toUpperCase().padStart(2, '0')}</span></span>
         <span>Pulse: <span style={{ color: inst.pulsePtr ? '#ff8866' : DAW_CSS.textMuted }}>{inst.pulsePtr.toString(16).toUpperCase().padStart(2, '0')}</span></span>
+        <span>Gate: <span style={{ color: inst.gatetimer ? '#60e060' : DAW_CSS.textMuted }}>{inst.gatetimer.toString(16).toUpperCase().padStart(2, '0')}</span></span>
+        <span>Vib: <span style={{ color: inst.vibdelay ? '#60e060' : DAW_CSS.textMuted }}>{inst.vibdelay.toString(16).toUpperCase().padStart(2, '0')}</span></span>
         <span>Filter: <span style={{ color: inst.filterPtr ? '#ffcc00' : DAW_CSS.textMuted }}>{inst.filterPtr.toString(16).toUpperCase().padStart(2, '0')}</span></span>
         <span>Speed: <span style={{ color: inst.speedPtr ? '#6699ff' : DAW_CSS.textMuted }}>{inst.speedPtr.toString(16).toUpperCase().padStart(2, '0')}</span></span>
-      </div>
-
-      {/* Gate / Vibrato */}
-      <div style={{ display: 'flex', gap: 12, marginTop: 8, color: DAW_CSS.textSec }}>
-        <span>Gate: {inst.gatetimer.toString(16).toUpperCase().padStart(2, '0')}</span>
-        <span>Vib: {inst.vibdelay.toString(16).toUpperCase().padStart(2, '0')}</span>
+        <span>1stWv: <span style={{ color: '#60e060' }}>{inst.firstwave.toString(16).toUpperCase().padStart(2, '0')}</span></span>
       </div>
     </div>
   );

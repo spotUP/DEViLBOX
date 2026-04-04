@@ -76,10 +76,10 @@ export const PixiGTInstrumentDesigner: React.FC<Props> = ({ width, height, compa
   const studioBtnY = envY + envH + 36;
 
   // DAW-specific layout
-  const waveCardW = compact ? 0 : Math.floor((width - pad * 2 - 6) / 2);
+  const waveCardW = compact ? 0 : Math.floor((width - pad * 2 - 18) / 4);
   const waveCardH = 40;
   const dawWaveY = envY + envH + 40;
-  const dawFilterY = dawWaveY + waveCardH * 2 + 16 + 40;
+  const dawFilterY = dawWaveY + waveCardH + 16 + 40;
   const dawFilterSectionH = 100;
   const dawTableY = dawFilterY + dawFilterSectionH + 14;
   const dawGateY = dawTableY + 60;
@@ -155,12 +155,10 @@ export const PixiGTInstrumentDesigner: React.FC<Props> = ({ width, height, compa
         }
       }
 
-      // DAW: check waveform cards (2x2 grid)
+      // DAW: check waveform cards (4x1 grid)
       for (let i = 0; i < WAVEFORMS.length; i++) {
-        const row = Math.floor(i / 2);
-        const col = i % 2;
-        const cx = pad + col * (waveCardW + 6);
-        const cy = dawWaveY + row * (waveCardH + 4);
+        const cx = pad + i * (waveCardW + 6);
+        const cy = dawWaveY;
         if (mx >= cx && mx <= cx + waveCardW && my >= cy && my <= cy + waveCardH) {
           toggleWaveform(WAVEFORMS[i].bit);
           return;
@@ -312,17 +310,32 @@ export const PixiGTInstrumentDesigner: React.FC<Props> = ({ width, height, compa
         });
       }
 
-      // Table pointers
+      // Table pointers + Settings — 4-column grid
       const tblY = studioBtnY + STUDIO_BTN_H + 12;
+      const colW = Math.floor((width - pad * 2) / 4);
       labels.push({ x: pad, y: tblY, text: 'Tables:', color: theme.textMuted.color, fontFamily: ff });
-      const tblNames = ['Wave', 'Pulse', 'Filter', 'Speed'];
+      labels.push({ x: pad + colW * 2, y: tblY, text: 'Settings:', color: theme.textMuted.color, fontFamily: ff });
+
       const tblPtrs = [inst.wavePtr, inst.pulsePtr, inst.filterPtr, inst.speedPtr];
-      for (let i = 0; i < 4; i++) {
-        const ty = tblY + 14 + i * 14;
-        const val = tblPtrs[i].toString(16).toUpperCase().padStart(2, '0');
-        labels.push({ x: pad + 4, y: ty, text: `${tblNames[i]}:`, color: theme.textMuted.color, fontFamily: ff });
-        labels.push({ x: pad + 60, y: ty, text: val, color: tblPtrs[i] ? 0x60e060 : C_WAVE_OFF, fontFamily: ff });
-      }
+      // Row 1: Wave, Pulse, VibDly, Gate
+      const row1Y = tblY + 14;
+      labels.push({ x: pad + 4, y: row1Y, text: `Wave:`, color: theme.textMuted.color, fontFamily: ff });
+      labels.push({ x: pad + 48, y: row1Y, text: tblPtrs[0].toString(16).toUpperCase().padStart(2, '0'), color: tblPtrs[0] ? 0x60e060 : C_WAVE_OFF, fontFamily: ff });
+      labels.push({ x: pad + colW, y: row1Y, text: `Pulse:`, color: theme.textMuted.color, fontFamily: ff });
+      labels.push({ x: pad + colW + 48, y: row1Y, text: tblPtrs[1].toString(16).toUpperCase().padStart(2, '0'), color: tblPtrs[1] ? 0x60e060 : C_WAVE_OFF, fontFamily: ff });
+      labels.push({ x: pad + colW * 2, y: row1Y, text: `VibDly:`, color: theme.textMuted.color, fontFamily: ff });
+      labels.push({ x: pad + colW * 2 + 48, y: row1Y, text: inst.vibdelay.toString(16).toUpperCase().padStart(2, '0'), color: inst.vibdelay ? 0x60e060 : C_WAVE_OFF, fontFamily: ff });
+      labels.push({ x: pad + colW * 3, y: row1Y, text: `Gate:`, color: theme.textMuted.color, fontFamily: ff });
+      labels.push({ x: pad + colW * 3 + 48, y: row1Y, text: inst.gatetimer.toString(16).toUpperCase().padStart(2, '0'), color: inst.gatetimer ? 0x60e060 : C_WAVE_OFF, fontFamily: ff });
+
+      // Row 2: Filter, Speed, 1stWv
+      const row2Y = row1Y + 14;
+      labels.push({ x: pad + 4, y: row2Y, text: `Filter:`, color: theme.textMuted.color, fontFamily: ff });
+      labels.push({ x: pad + 48, y: row2Y, text: tblPtrs[2].toString(16).toUpperCase().padStart(2, '0'), color: tblPtrs[2] ? 0x60e060 : C_WAVE_OFF, fontFamily: ff });
+      labels.push({ x: pad + colW, y: row2Y, text: `Speed:`, color: theme.textMuted.color, fontFamily: ff });
+      labels.push({ x: pad + colW + 48, y: row2Y, text: tblPtrs[3].toString(16).toUpperCase().padStart(2, '0'), color: tblPtrs[3] ? 0x60e060 : C_WAVE_OFF, fontFamily: ff });
+      labels.push({ x: pad + colW * 2, y: row2Y, text: `1stWv:`, color: theme.textMuted.color, fontFamily: ff });
+      labels.push({ x: pad + colW * 2 + 48, y: row2Y, text: inst.firstwave.toString(16).toUpperCase().padStart(2, '0'), color: 0x60e060, fontFamily: ff });
 
     } else {
       // ────────────────────────────────────────────
@@ -389,10 +402,8 @@ export const PixiGTInstrumentDesigner: React.FC<Props> = ({ width, height, compa
 
       for (let i = 0; i < WAVEFORMS.length; i++) {
         const wf = WAVEFORMS[i];
-        const row = Math.floor(i / 2);
-        const col = i % 2;
-        const cx = pad + col * (waveCardW + 6);
-        const cy = dawWaveY + row * (waveCardH + 4);
+        const cx = pad + i * (waveCardW + 6);
+        const cy = dawWaveY;
         const isOn = (waveform & wf.bit) !== 0;
 
         bg.roundRect(cx, cy, waveCardW, waveCardH, DAW_RADIUS)
@@ -542,20 +553,21 @@ export const PixiGTInstrumentDesigner: React.FC<Props> = ({ width, height, compa
         labels.push({ x: tmx + 2, y: dawTableY + miniH + 2, text: tableNames[t], color: DAW_TEXT_MUTED, fontFamily: ff });
       }
 
-      // Gate Timing Section
+      // Gate + Vibrato Section — side by side
+      const halfW = Math.floor((width - pad * 2 - 8) / 2);
+
+      // Gate (left half)
       labels.push({ x: pad, y: dawGateY - 14, text: 'GATE', color: DAW_TEXT_MUTED, fontFamily: ff });
       labels.push({ x: pad, y: dawGateY, text: `Timer: ${inst.gatetimer.toString(16).toUpperCase().padStart(2, '0')}`, color: DAW_TEXT_SEC, fontFamily: ff });
 
       if (inst.gatetimer > 0) {
-        // Draw gate pattern visualization — repeating on/off bars
         const gateVizX = pad;
         const gateVizY = dawGateY + 14;
-        const gateVizW = width - pad * 2;
+        const gateVizW = halfW;
         const stepCount = 16;
         const stepW = gateVizW / stepCount;
         const stepH = 10;
         const onSteps = Math.max(1, inst.gatetimer);
-        // Gate pattern: on for `onSteps` frames, off for 1, repeating
         const cycleLen = onSteps + 1;
 
         bg.roundRect(gateVizX, gateVizY, gateVizW, stepH, 2).fill({ color: DAW_BG });
@@ -569,16 +581,15 @@ export const PixiGTInstrumentDesigner: React.FC<Props> = ({ width, height, compa
         }
       }
 
-      // Vibrato Section
-      const vibLabelY = dawVibratoY - 14;
-      labels.push({ x: pad, y: vibLabelY, text: 'VIBRATO', color: DAW_TEXT_MUTED, fontFamily: ff });
-      labels.push({ x: pad, y: dawVibratoY, text: `Delay: ${inst.vibdelay.toString(16).toUpperCase().padStart(2, '0')}`, color: DAW_TEXT_SEC, fontFamily: ff });
+      // Vibrato (right half)
+      const vibX = pad + halfW + 8;
+      labels.push({ x: vibX, y: dawGateY - 14, text: 'VIBRATO', color: DAW_TEXT_MUTED, fontFamily: ff });
+      labels.push({ x: vibX, y: dawGateY, text: `Delay: ${inst.vibdelay.toString(16).toUpperCase().padStart(2, '0')}`, color: DAW_TEXT_SEC, fontFamily: ff });
 
       if (inst.vibdelay > 0) {
-        // Draw vibrato visualization: flat line then sine wave
-        const vibVizX = pad;
-        const vibVizY = dawVibratoY + 14;
-        const vibVizW = width - pad * 2;
+        const vibVizX = vibX;
+        const vibVizY = dawGateY + 14;
+        const vibVizW = halfW;
         const vibVizH = 16;
         const midY = vibVizY + vibVizH / 2;
         const totalFrames = 64;
@@ -586,17 +597,14 @@ export const PixiGTInstrumentDesigner: React.FC<Props> = ({ width, height, compa
 
         bg.roundRect(vibVizX, vibVizY, vibVizW, vibVizH, 2).fill({ color: DAW_BG });
 
-        // Flat delay portion
         const delayEndX = vibVizX + (delayFrames / totalFrames) * vibVizW;
         env.moveTo(vibVizX + 2, midY);
         env.lineTo(delayEndX, midY);
         env.stroke({ color: DAW_TEXT_MUTED, width: 1 });
 
-        // Delay marker
         env.moveTo(delayEndX, vibVizY + 2).lineTo(delayEndX, vibVizY + vibVizH - 2);
         env.stroke({ color: chColor, width: 1, alpha: 0.5 });
 
-        // Sine wave portion after delay
         const sineStartX = delayEndX;
         const sineW = vibVizX + vibVizW - sineStartX;
         if (sineW > 4) {
