@@ -25,3 +25,6 @@ export { WaveformLineCanvas } from './WaveformLineCanvas';
 export { BarChart } from './BarChart';
 export { HarmonicBarsCanvas } from './HarmonicBarsCanvas';
 export { SegmentButton } from './SegmentButton';
+export { NumBox } from './NumBox';
+export { SelectControl } from './SelectControl';
+export { DrawbarSlider } from './DrawbarSlider';
