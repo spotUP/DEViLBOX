@@ -51,7 +51,7 @@ export const HIVELY_PRESETS: InstrumentPreset['config'][] = [
       pe(1, 0),        // sawtooth
       pe(1, 0),
       pe(2, 0),        // switch to square
-      pe(2, 0),
+      pe(2, 0, false, 5, 0),
     ]},
   }),
 
@@ -78,7 +78,7 @@ export const HIVELY_PRESETS: InstrumentPreset['config'][] = [
       pe(2, 0, false, 0, 40),   // square with filter sweep
       pe(2, 0, false, 0, 30),
       pe(1, 0, false, 0, 20),   // morph to saw
-      pe(1, 0, false, 0, 10),
+      pe(1, 0, false, 5, 0),
     ]},
   }),
 
@@ -97,7 +97,7 @@ export const HIVELY_PRESETS: InstrumentPreset['config'][] = [
       pe(2, 0),        // square
       pe(1, 0),        // saw
       pe(2, 0),        // square
-      pe(1, 0),        // saw — alternating creates buzz
+      pe(1, 0, false, 5, 0),        // saw — alternating creates buzz
     ]},
   }),
 
@@ -112,7 +112,7 @@ export const HIVELY_PRESETS: InstrumentPreset['config'][] = [
       pe(1, 0, false, 0, 50),   // saw + filter high
       pe(1, 0, false, 0, 60),
       pe(2, 0, false, 0, 50),   // square
-      pe(1, 0, false, 0, 40),
+      pe(1, 0, false, 5, 0),
     ]},
   }),
 
@@ -143,7 +143,7 @@ export const HIVELY_PRESETS: InstrumentPreset['config'][] = [
       pe(2, 0),        // square
       pe(2, 0),
       pe(1, 0),        // back to saw
-      pe(0, 0),        // back to tri
+      pe(0, 0, false, 5, 0),        // back to tri
     ]},
   }),
 
@@ -162,7 +162,7 @@ export const HIVELY_PRESETS: InstrumentPreset['config'][] = [
       pe(0, 0),        // triangle — soft
       pe(0, 0),
       pe(0, 0),
-      pe(0, 0),
+      pe(0, 0, false, 5, 0),
     ]},
   }),
 
@@ -179,7 +179,7 @@ export const HIVELY_PRESETS: InstrumentPreset['config'][] = [
       pe(1, 0, false, 0, 30),
       pe(1, 0, false, 0, 40),
       pe(1, 0, false, 0, 30),
-      pe(1, 0, false, 0, 20),
+      pe(1, 0, false, 5, 0),
     ]},
   }),
 
@@ -242,7 +242,7 @@ export const HIVELY_PRESETS: InstrumentPreset['config'][] = [
       pe(1, 0, false, 2, 8),    // saw + slide down
       pe(1, 0, false, 2, 8),
       pe(1, 0, false, 2, 8),
-      pe(1, 0, false, 2, 8),
+      pe(1, 0, false, 5, 0),
     ]},
   }),
 
@@ -259,7 +259,7 @@ export const HIVELY_PRESETS: InstrumentPreset['config'][] = [
       pe(2, 7),          // +7 semitones (5th)
       pe(2, 12),         // +12 semitones (octave)
       pe(2, 7),          // back down
-      pe(2, 4),
+      pe(2, 4, false, 5, 0),
     ]},
   }),
 
@@ -274,7 +274,7 @@ export const HIVELY_PRESETS: InstrumentPreset['config'][] = [
       pe(1, 0, false, 4, 20),   // saw + filter mod
       pe(2, 0, false, 4, 40),   // square + stronger filter mod
       pe(1, 0, false, 4, 60),
-      pe(2, 0, false, 4, 40),
+      pe(2, 0, false, 5, 0),
     ]},
   }),
 ];

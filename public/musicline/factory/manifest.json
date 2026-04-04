@@ -1,0 +1,278 @@
+{
+  "waves": [
+    {
+      "name": "accordion",
+      "file": "accordion.256",
+      "size": 256
+    },
+    {
+      "name": "altosax",
+      "file": "altosax.256",
+      "size": 256
+    },
+    {
+      "name": "bass",
+      "file": "bass.256",
+      "size": 256
+    },
+    {
+      "name": "clarinette",
+      "file": "clarinette.256",
+      "size": 256
+    },
+    {
+      "name": "clav",
+      "file": "clav.256",
+      "size": 256
+    },
+    {
+      "name": "digital1",
+      "file": "digital1.256",
+      "size": 256
+    },
+    {
+      "name": "digital2",
+      "file": "digital2.256",
+      "size": 256
+    },
+    {
+      "name": "distgtr",
+      "file": "distgtr.256",
+      "size": 256
+    },
+    {
+      "name": "downramp",
+      "file": "downramp.256",
+      "size": 256
+    },
+    {
+      "name": "englishhorn",
+      "file": "englishhorn.256",
+      "size": 256
+    },
+    {
+      "name": "epiano1lp",
+      "file": "epiano1lp.256",
+      "size": 256
+    },
+    {
+      "name": "guitar",
+      "file": "guitar.256",
+      "size": 256
+    },
+    {
+      "name": "guitar2",
+      "file": "guitar2.256",
+      "size": 256
+    },
+    {
+      "name": "hardep",
+      "file": "hardep.256",
+      "size": 256
+    },
+    {
+      "name": "harmonica",
+      "file": "harmonica.256",
+      "size": 256
+    },
+    {
+      "name": "harmonica2",
+      "file": "harmonica2.256",
+      "size": 256
+    },
+    {
+      "name": "harpsichord",
+      "file": "harpsichord.256",
+      "size": 256
+    },
+    {
+      "name": "mini1a",
+      "file": "mini1a.256",
+      "size": 256
+    },
+    {
+      "name": "oboe",
+      "file": "oboe.256",
+      "size": 256
+    },
+    {
+      "name": "organ1",
+      "file": "organ1.256",
+      "size": 256
+    },
+    {
+      "name": "pad1",
+      "file": "pad1.256",
+      "size": 256
+    },
+    {
+      "name": "pipeorgan2",
+      "file": "pipeorgan2.256",
+      "size": 256
+    },
+    {
+      "name": "polysynth",
+      "file": "polysynth.256",
+      "size": 256
+    },
+    {
+      "name": "pwm1",
+      "file": "pwm1.256",
+      "size": 256
+    },
+    {
+      "name": "pwm2",
+      "file": "pwm2.256",
+      "size": 256
+    },
+    {
+      "name": "ramp",
+      "file": "ramp.256",
+      "size": 256
+    },
+    {
+      "name": "rezobass",
+      "file": "rezobass.256",
+      "size": 256
+    },
+    {
+      "name": "saw",
+      "file": "saw.256",
+      "size": 256
+    },
+    {
+      "name": "sawtooth",
+      "file": "sawtooth.256",
+      "size": 256
+    },
+    {
+      "name": "sinus",
+      "file": "sinus.256",
+      "size": 256
+    },
+    {
+      "name": "softep",
+      "file": "softep.256",
+      "size": 256
+    },
+    {
+      "name": "square",
+      "file": "square.256",
+      "size": 256
+    },
+    {
+      "name": "string1",
+      "file": "string1.256",
+      "size": 256
+    },
+    {
+      "name": "tenorsax",
+      "file": "tenorsax.256",
+      "size": 256
+    },
+    {
+      "name": "triangle",
+      "file": "triangle.256",
+      "size": 256
+    },
+    {
+      "name": "trumpet",
+      "file": "trumpet.256",
+      "size": 256
+    },
+    {
+      "name": "tuba",
+      "file": "tuba.256",
+      "size": 256
+    },
+    {
+      "name": "tunedbell",
+      "file": "tunedbell.256",
+      "size": 256
+    },
+    {
+      "name": "upramp",
+      "file": "upramp.256",
+      "size": 256
+    },
+    {
+      "name": "vibe",
+      "file": "vibe.256",
+      "size": 256
+    },
+    {
+      "name": "violin",
+      "file": "violin.256",
+      "size": 256
+    },
+    {
+      "name": "vs48",
+      "file": "vs48.256",
+      "size": 256
+    },
+    {
+      "name": "vs58",
+      "file": "vs58.256",
+      "size": 256
+    },
+    {
+      "name": "vs72",
+      "file": "vs72.256",
+      "size": 256
+    },
+    {
+      "name": "vs88",
+      "file": "vs88.256",
+      "size": 256
+    },
+    {
+      "name": "zero",
+      "file": "zero.256",
+      "size": 256
+    }
+  ],
+  "instruments": [
+    {
+      "name": "64Snare",
+      "file": "64Snare"
+    },
+    {
+      "name": "Bass",
+      "file": "Bass"
+    },
+    {
+      "name": "Buipp",
+      "file": "Buipp"
+    },
+    {
+      "name": "Lead",
+      "file": "Lead"
+    },
+    {
+      "name": "Noice",
+      "file": "Noice"
+    },
+    {
+      "name": "Ooooo",
+      "file": "Ooooo"
+    },
+    {
+      "name": "PowerString",
+      "file": "PowerString"
+    }
+  ],
+  "samples": [
+    {
+      "name": "Bassdrum",
+      "file": "Bassdrum"
+    },
+    {
+      "name": "Hihat",
+      "file": "Hihat"
+    },
+    {
+      "name": "Snaredrum",
+      "file": "Snaredrum"
+    }
+  ]
+}

@@ -20,6 +20,15 @@ export interface MusicLinePositionUpdate {
   speed: number;
 }
 
+export interface MusicLineArpEntry {
+  note: number;
+  smpl: number;
+  fx1: number;
+  param1: number;
+  fx2: number;
+  param2: number;
+}
+
 type PositionCallback = (update: MusicLinePositionUpdate) => void;
 
 export class MusicLineEngine {
@@ -179,6 +188,12 @@ export class MusicLineEngine {
             this._patternCallbacks.get(data.requestId)!(data);
           }
           break;
+
+        case 'arp-data':
+          if (data.requestId && this._patternCallbacks.has(data.requestId)) {
+            this._patternCallbacks.get(data.requestId)!(data);
+          }
+          break;
       }
     };
 
@@ -321,6 +336,83 @@ export class MusicLineEngine {
       this.workletNode.port.addEventListener('message', handler);
       this.workletNode.port.postMessage({ type: 'get-song-info' });
     });
+  }
+
+  // --------------------------------------------------------------------------
+  // Instrument parameter access (read/write via WASM bridge)
+  // --------------------------------------------------------------------------
+
+  readInstAll(instIdx: number, offsets: Record<string, number>): Promise<Record<string, unknown>> {
+    return new Promise((resolve) => {
+      if (!this.workletNode) { resolve({}); return; }
+      const handler = (event: MessageEvent) => {
+        if (event.data.type === 'inst-all' && event.data.instIdx === instIdx) {
+          this.workletNode!.port.removeEventListener('message', handler);
+          resolve(event.data.data);
+        }
+      };
+      this.workletNode.port.addEventListener('message', handler);
+      this.workletNode.port.postMessage({ type: 'read-inst-all', instIdx, offsets });
+    });
+  }
+
+  getInstOffsets(): Promise<{ offsets: number[]; instSizeof: number }> {
+    return new Promise((resolve) => {
+      if (!this.workletNode) { resolve({ offsets: [], instSizeof: 0 }); return; }
+      const handler = (event: MessageEvent) => {
+        if (event.data.type === 'inst-offsets') {
+          this.workletNode!.port.removeEventListener('message', handler);
+          resolve({ offsets: event.data.offsets, instSizeof: event.data.instSizeof });
+        }
+      };
+      this.workletNode.port.addEventListener('message', handler);
+      this.workletNode.port.postMessage({ type: 'get-inst-offsets' });
+    });
+  }
+
+  writeInstField(instIdx: number, offset: number, size: number, value: number): void {
+    this.workletNode?.port.postMessage({ type: 'write-inst-field', instIdx, offset, size, value });
+  }
+
+  setEffectFlag(instIdx: number, fxIndex: number, value: boolean): void {
+    this.workletNode?.port.postMessage({ type: 'set-effect-flag', instIdx, fxIndex, value: value ? 1 : 0 });
+  }
+
+  // --------------------------------------------------------------------------
+  // Arpeggio table access (read/write via WASM bridge)
+  // --------------------------------------------------------------------------
+
+  /** Read the instrument's arpeggio config (table index, speed, groove). */
+  readInstArpConfig(instIdx: number): Promise<{ table: number; speed: number; groove: number; numArps: number }> {
+    return new Promise((resolve) => {
+      if (!this.workletNode) { resolve({ table: -1, speed: 0, groove: 0, numArps: 0 }); return; }
+      const handler = (event: MessageEvent) => {
+        if (event.data.type === 'inst-arp-config' && event.data.instIdx === instIdx) {
+          this.workletNode!.port.removeEventListener('message', handler);
+          resolve({ table: event.data.table, speed: event.data.speed, groove: event.data.groove, numArps: event.data.numArps });
+        }
+      };
+      this.workletNode.port.addEventListener('message', handler);
+      this.workletNode.port.postMessage({ type: 'get-inst-arp-config', instIdx });
+    });
+  }
+
+  /** Read a full arpeggio table. Returns Promise with rows array. */
+  readArpTable(arpIdx: number): Promise<{ length: number; rows: MusicLineArpEntry[] }> {
+    return new Promise((resolve) => {
+      if (!this.workletNode) { resolve({ length: 0, rows: [] }); return; }
+      const requestId = `arp-${this._requestId++}`;
+      this._patternCallbacks.set(requestId, (data) => {
+        this._patternCallbacks.delete(requestId);
+        resolve({ length: data.length, rows: data.rows });
+      });
+      this.workletNode.port.postMessage({ type: 'get-arp-data', arpIdx, requestId });
+    });
+  }
+
+  /** Write a single field in an arpeggio entry (fire-and-forget). */
+  writeArpEntry(arpIdx: number, row: number, fieldIdx: number, value: number): void {
+    this.workletNode?.port.postMessage({ type: 'set-arp-entry', arpIdx, row, fieldIdx, value });
   }
 
   dispose(): void {

@@ -5,13 +5,70 @@
  *  - Synthesis: waveform display (2 waveforms), volume, waveform length
  *  - Envelope: ADSR table + sustain, EG table + mode/params
  *  - Modulation: vibrato, portamento, LFO table
- *  - Arpeggio: 3 sub-tables with length/repeat/values
+ *  - Arpeggio: 3 sub-tables with length/repeat/values (PatternEditorCanvas)
  */
 
 import React, { useRef, useEffect, useCallback, useState, useMemo } from 'react';
 import type { InStereo2Config } from '@/types/instrument';
+import type { ColumnDef, FormatChannel, FormatCell, OnCellChange } from '@/components/shared/format-editor-types';
+import { PatternEditorCanvas } from '@/components/tracker/PatternEditorCanvas';
 import { Knob } from '@components/controls/Knob';
 import { useThemeStore } from '@stores';
+
+// ── Arpeggio adapter ────────────────────────────────────────────────────────
+
+/** Display a signed byte (-128..127) as unsigned hex (00-FF). */
+function signedHex2(val: number): string {
+  return ((val & 0xFF)).toString(16).toUpperCase().padStart(2, '0');
+}
+
+const ARP_COLUMN: ColumnDef[] = [
+  {
+    key: 'semitone',
+    label: 'ST',
+    charWidth: 2,
+    type: 'hex',
+    color: '#ffcc66',
+    emptyColor: '#334455',
+    emptyValue: undefined,
+    hexDigits: 2,
+    formatter: signedHex2,
+  },
+];
+
+/** Convert an arpeggio sub-table to a single-channel FormatChannel. */
+function arpToFormatChannel(
+  arp: { length: number; repeat: number; values: number[] },
+  label: string,
+): FormatChannel {
+  const rows: FormatCell[] = arp.values.slice(0, 14).map((v) => ({
+    semitone: v & 0xFF,
+  }));
+  return {
+    label,
+    patternLength: 14,
+    rows,
+    isPatternChannel: false,
+  };
+}
+
+/** Create an OnCellChange for a specific arpeggio sub-table index. */
+function makeArpCellChange(
+  configRef: React.MutableRefObject<InStereo2Config>,
+  tableIdx: 0 | 1 | 2,
+  onChange: (updates: Partial<InStereo2Config>) => void,
+): OnCellChange {
+  return (_channelIdx: number, rowIdx: number, _columnKey: string, value: number) => {
+    const signed = value > 127 ? value - 256 : value;
+    const arps = configRef.current.arpeggios.map((a, i) => {
+      if (i !== tableIdx) return { ...a };
+      const vals = [...a.values];
+      vals[rowIdx] = signed;
+      return { ...a, values: vals };
+    }) as InStereo2Config['arpeggios'];
+    onChange({ ...configRef.current, arpeggios: arps });
+  };
+}
 
 interface InStereo2ControlsProps {
   config: InStereo2Config;
@@ -426,16 +483,18 @@ export const InStereo2Controls: React.FC<InStereo2ControlsProps> = ({
     [onChange],
   );
 
-  const updateArpValue = useCallback(
-    (tableIdx: 0 | 1 | 2, entryIdx: number, value: number) => {
-      const arps = configRef.current.arpeggios.map((a, i) => {
-        if (i !== tableIdx) return { ...a };
-        const vals = [...a.values];
-        vals[entryIdx] = value;
-        return { ...a, values: vals };
-      }) as InStereo2Config['arpeggios'];
-      onChange({ ...configRef.current, arpeggios: arps });
-    },
+  // Memoize arpeggio format channels and cell-change handlers
+  const arpChannels = useMemo(() =>
+    ([0, 1, 2] as const).map((tIdx) =>
+      [arpToFormatChannel(config.arpeggios[tIdx], `Arp ${tIdx + 1}`)] as FormatChannel[]
+    ),
+    [config.arpeggios],
+  );
+
+  const arpCellChanges = useMemo(() =>
+    ([0, 1, 2] as const).map((tIdx) =>
+      makeArpCellChange(configRef, tIdx, onChange)
+    ),
     [onChange],
   );
 
@@ -473,26 +532,15 @@ export const InStereo2Controls: React.FC<InStereo2ControlsProps> = ({
                     />
                   </div>
                 </div>
-                {/* 14 value cells in a row */}
-                <div className="flex gap-0.5">
-                  {arp.values.slice(0, 14).map((val, vIdx) => {
-                    const inRange = vIdx < arp.length;
-                    const inLoop = arp.length > 0 && arp.repeat > 0 && vIdx >= (arp.length - arp.repeat) && vIdx < arp.length;
-                    return (
-                      <input
-                        key={vIdx}
-                        type="number" min={-128} max={127}
-                        value={val}
-                        onChange={(e) => updateArpValue(tIdx, vIdx, Math.max(-128, Math.min(127, parseInt(e.target.value) || 0)))}
-                        className="w-7 text-[9px] font-mono text-center border rounded py-0.5"
-                        style={{
-                          background: inLoop ? accent + '18' : inRange ? '#111' : '#080808',
-                          borderColor: inLoop ? accent + '44' : inRange ? 'var(--color-border-light)' : 'var(--color-bg-tertiary)',
-                          color: inRange ? '#ccc' : '#444',
-                        }}
-                      />
-                    );
-                  })}
+                <div style={{ height: 240 }}>
+                  <PatternEditorCanvas
+                    formatColumns={ARP_COLUMN}
+                    formatChannels={arpChannels[tIdx]}
+                    formatCurrentRow={0}
+                    formatIsPlaying={false}
+                    onFormatCellChange={arpCellChanges[tIdx]}
+                    hideVUMeters={true}
+                  />
                 </div>
               </div>
             );

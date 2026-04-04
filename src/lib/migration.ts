@@ -25,6 +25,7 @@ import {
   DEFAULT_WOBBLE_BASS,
   DEFAULT_DRUMKIT,
   DEFAULT_FURNACE,
+  DEFAULT_HIVELY,
 } from '@typedefs/instrument';
 import { stringNoteToXM, effectStringToXM } from './xmConversions';
 
@@ -127,6 +128,9 @@ export function ensureCompleteInstrumentConfig(inst: InstrumentConfig): Instrume
       break;
     case 'Furnace':
       result.furnace = deepMerge(DEFAULT_FURNACE, inst.furnace || {});
+      break;
+    case 'HivelySynth':
+      result.hively = deepMerge(DEFAULT_HIVELY, inst.hively || {});
       break;
     // Synth, MonoSynth, FMSynth, AMSynth, PluckSynth, MetalSynth, MembraneSynth, NoiseSynth
     // don't have specific config objects - they use Tone.js defaults

@@ -727,11 +727,19 @@ export const useInstrumentStore = create<InstrumentStore>()(
               return; // Handled
             }
 
+            if (updatedInstrument.synthType === 'HivelySynth' && updatedInstrument.hively) {
+              const instrument = engine.getInstrument(id, updatedInstrument);
+              if (instrument && typeof (instrument as any).setInstrument === 'function') {
+                (instrument as any).setInstrument(updatedInstrument.hively).catch(() => {});
+              }
+              return;
+            }
+
             // WASM singleton engines (Hively, JamCracker, FC, etc.) run autonomously
             // in their worklet — config changes are UI-only state (volume, phase, etc.)
             // and must NOT trigger invalidateInstrument which would kill the audio.
             const wasmSynthTypes = [
-              'HivelySynth', 'JamCrackerSynth', 'FCSynth', 'SoundMonSynth', 'SidMonSynth',
+              'JamCrackerSynth', 'FCSynth', 'SoundMonSynth', 'SidMonSynth',
               'DigMugSynth', 'DeltaMusic1Synth', 'DeltaMusic2Synth', 'FredSynth', 'TFMXSynth',
               'SonicArrangerSynth', 'HippelCoSoSynth', 'RobHubbardSynth', 'DavidWhittakerSynth',
               'OctaMEDSynth', 'SidMon1Synth', 'MusicLineSynth', 'KlysSynth',

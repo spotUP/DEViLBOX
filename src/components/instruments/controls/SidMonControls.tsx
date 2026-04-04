@@ -1,5 +1,5 @@
 /**
- * SidMonControls.tsx — SidMon II (SID-like synthesis) instrument editor
+ * SidMonControls.tsx -- SidMon II (SID-like synthesis) instrument editor
  *
  * Exposes all SidMonConfig parameters: waveform selector, ADSR, filter,
  * vibrato, and arpeggio table.
@@ -7,7 +7,7 @@
  * Enhanced with:
  *  - WaveformThumbnail: visual previews on waveform selector buttons
  *  - EnvelopeVisualization mode="adsr": SID-format ADSR curve
- *  - SequenceEditor: arpeggio table editor
+ *  - PatternEditorCanvas: vertical tracker-style arpeggio table editor
  *
  * When loaded via UADE (uadeChipRam present), scalar params that have a direct
  * 1-byte equivalent in the SidMon 2 instrument header are written to chip RAM
@@ -15,43 +15,43 @@
  *
  * SidMon 2 instrument byte layout (offset from instrBase, 32 bytes total):
  *
- *   +0   : wave (×16 = table offset)       — skipped
- *   +1   : waveLen                          — skipped
- *   +2   : waveSpeed                        — skipped
- *   +3   : waveDelay                        — skipped
- *   +4   : arpeggio (×16 = table offset)   — skipped (separate table)
- *   +5   : arpeggioLen                      — skipped
- *   +6   : arpeggioSpeed                    ✓ written (arpSpeed * 16)
- *   +7   : arpeggioDelay                    — skipped
- *   +8   : vibrato (×16 = table offset)    — skipped
- *   +9   : vibratoLen (→ vibDepth in UI)   ✓ written
- *   +10  : vibratoSpeed                     ✓ written
- *   +11  : vibratoDelay                     ✓ written
- *   +12  : pitchBend (signed)              — skipped
- *   +13  : pitchBendDelay                  — skipped
+ *   +0   : wave (x16 = table offset)       -- skipped
+ *   +1   : waveLen                          -- skipped
+ *   +2   : waveSpeed                        -- skipped
+ *   +3   : waveDelay                        -- skipped
+ *   +4   : arpeggio (x16 = table offset)   -- skipped (separate table)
+ *   +5   : arpeggioLen                      -- skipped
+ *   +6   : arpeggioSpeed                    written (arpSpeed * 16)
+ *   +7   : arpeggioDelay                    -- skipped
+ *   +8   : vibrato (x16 = table offset)    -- skipped
+ *   +9   : vibratoLen (-> vibDepth in UI)   written
+ *   +10  : vibratoSpeed                     written
+ *   +11  : vibratoDelay                     written
+ *   +12  : pitchBend (signed)              -- skipped
+ *   +13  : pitchBendDelay                  -- skipped
  *   +14..+15 : (skipped)
- *   +16  : attackMax                        — skipped (NOT SID attack)
- *   +17  : attackSpeed → SID attack = 15 - floor(raw*16/256)   ✓ written
- *   +18  : decayMin   → SID sustain = round(raw*15/255)        ✓ written
- *   +19  : decaySpeed → SID decay   = 15 - floor(raw*16/256)  ✓ written
- *   +20  : sustain hold counter                                 — skipped
- *   +21  : releaseMin                                           — skipped
- *   +22  : releaseSpeed → SID release = 15 - floor(raw*16/256) ✓ written
+ *   +16  : attackMax                        -- skipped (NOT SID attack)
+ *   +17  : attackSpeed -> SID attack = 15 - floor(raw*16/256)   written
+ *   +18  : decayMin   -> SID sustain = round(raw*15/255)        written
+ *   +19  : decaySpeed -> SID decay   = 15 - floor(raw*16/256)  written
+ *   +20  : sustain hold counter                                 -- skipped
+ *   +21  : releaseMin                                           -- skipped
+ *   +22  : releaseSpeed -> SID release = 15 - floor(raw*16/256) written
  *   +23..+31 : (skipped)
  */
 
-import React, { useRef, useEffect, useCallback, useState } from 'react';
+import React, { useRef, useEffect, useCallback, useState, useMemo } from 'react';
 import type { SidMonConfig, UADEChipRamInfo } from '@/types/instrument';
 import { Knob } from '@components/controls/Knob';
 import { useThemeStore } from '@stores';
 import {
   EnvelopeVisualization,
   FilterFrequencyResponse,
-  SequenceEditor,
   WaveformThumbnail,
 } from '@components/instruments/shared';
 import type { FilterType } from '@components/instruments/shared';
-import type { SequencePreset } from '@components/instruments/shared';
+import { PatternEditorCanvas } from '@/components/tracker/PatternEditorCanvas';
+import type { ColumnDef, FormatChannel, FormatCell, OnCellChange } from '@/components/shared/format-editor-types';
 import { UADEChipEditor } from '@/engine/uade/UADEChipEditor';
 import { UADEEngine } from '@/engine/uade/UADEEngine';
 import { Download } from 'lucide-react';
@@ -77,15 +77,47 @@ const WAVEFORMS: { name: string; type: 'triangle' | 'saw' | 'square' | 'noise' }
 const FILTER_MODE_NAMES = ['LP', 'HP', 'BP'];
 const FILTER_MODE_TYPES: FilterType[] = ['lowpass', 'highpass', 'bandpass'];
 
-const ARP_PRESETS: SequencePreset[] = [
-  { name: 'Major',  data: [0, 4, 7, 0, 4, 7, 12, 12, 0, 4, 7, 0, 4, 7, 12, 12], loop: 0 },
-  { name: 'Minor',  data: [0, 3, 7, 0, 3, 7, 12, 12, 0, 3, 7, 0, 3, 7, 12, 12], loop: 0 },
-  { name: 'Octave', data: [0, 12, 0, 12, 0, 12, 0, 12, 0, 12, 0, 12, 0, 12, 0, 12], loop: 0 },
-  { name: 'Power',  data: [0, 7, 12, 7, 0, 7, 12, 7, 0, 7, 12, 7, 0, 7, 12, 7], loop: 0 },
-  { name: 'Clear',  data: new Array(16).fill(0) },
+// -- Arpeggio adapter (inline -- single column) ---
+
+function signedHex2(val: number): string {
+  if (val === 0) return ' 00';
+  const abs = Math.abs(val);
+  const sign = val < 0 ? '-' : '+';
+  return `${sign}${abs.toString(16).toUpperCase().padStart(2, '0')}`;
+}
+
+const ARP_COLUMN: ColumnDef[] = [
+  {
+    key: 'semitone',
+    label: 'ST',
+    charWidth: 3,
+    type: 'hex',
+    color: '#ff66aa',
+    emptyColor: 'var(--color-border-light)',
+    emptyValue: 0,
+    hexDigits: 2,
+    formatter: signedHex2,
+  },
 ];
 
-// ── Component ──────────────────────────────────────────────────────────────────
+function arpToFormatChannel(data: number[]): FormatChannel[] {
+  const rows: FormatCell[] = data.map((v) => ({ semitone: v }));
+  return [{ label: 'Arp', patternLength: data.length, rows, isPatternChannel: false }];
+}
+
+function makeArpCellChange(
+  data: number[],
+  onChangeData: (d: number[]) => void,
+): OnCellChange {
+  return (_ch: number, row: number, _col: string, value: number) => {
+    const next = [...data];
+    // Treat values > 63 as signed (hex input gives unsigned 0-FF)
+    next[row] = value > 127 ? value - 256 : (value > 63 ? value - 128 : value);
+    onChangeData(next);
+  };
+}
+
+// -- Component ---
 
 export const SidMonControls: React.FC<SidMonControlsProps> = ({
   config,
@@ -119,11 +151,6 @@ export const SidMonControls: React.FC<SidMonControlsProps> = ({
     onChange({ [key]: value } as Partial<SidMonConfig>);
   }, [onChange]);
 
-  /**
-   * Like `upd`, but also writes a chip RAM byte when a UADE context is active.
-   * chipWriter receives the editor and instrBase; any async errors are swallowed
-   * to avoid interrupting the UI interaction.
-   */
   const updWithChipRam = useCallback(<K extends keyof SidMonConfig>(
     key: K,
     value: SidMonConfig[K],
@@ -143,11 +170,9 @@ export const SidMonControls: React.FC<SidMonControlsProps> = ({
     </div>
   );
 
-  // ── MAIN TAB ──────────────────────────────────────────────────────────────
+  // -- MAIN TAB ---
   const renderMain = () => (
     <div className="flex flex-col gap-3 p-3 overflow-y-auto" style={{ maxHeight: 'calc(100vh - 280px)' }}>
-
-      {/* Waveform — buttons with visual thumbnails */}
       <div className={`rounded-lg border p-3 ${panelBg}`}>
         <SectionLabel label="Waveform" />
         <div className="grid grid-cols-4 gap-2 mb-3">
@@ -161,14 +186,8 @@ export const SidMonControls: React.FC<SidMonControlsProps> = ({
                   background: active ? accent + '28' : '#0a0012',
                   border: `1px solid ${active ? accent : '#2a002a'}`,
                 }}>
-                <WaveformThumbnail
-                  type={wf.type}
-                  width={56} height={22}
-                  color={active ? accent : '#555'}
-                  style="line"
-                />
-                <span className="text-[9px] font-mono leading-tight"
-                  style={{ color: active ? accent : '#555' }}>
+                <WaveformThumbnail type={wf.type} width={56} height={22} color={active ? accent : '#555'} style="line" />
+                <span className="text-[9px] font-mono leading-tight" style={{ color: active ? accent : '#555' }}>
                   {wf.name}
                 </span>
               </button>
@@ -179,102 +198,64 @@ export const SidMonControls: React.FC<SidMonControlsProps> = ({
           <div className="flex items-center gap-4">
             <Knob value={config.pulseWidth} min={0} max={255} step={1}
               onChange={(v) => upd('pulseWidth', Math.round(v))}
-              label="Pulse Width" color={knob}
-              formatValue={(v) => Math.round(v).toString()} />
+              label="Pulse Width" color={knob} formatValue={(v) => Math.round(v).toString()} />
           </div>
         )}
       </div>
-
-      {/* ADSR — knobs + SID-format envelope curve */}
       <div className={`rounded-lg border p-3 ${panelBg}`}>
-        <SectionLabel label="ADSR (SID format, 0–15)" />
-
+        <SectionLabel label="ADSR (SID format, 0-15)" />
         <div className="flex gap-4">
           <Knob value={config.attack} min={0} max={15} step={1}
             onChange={(v) => {
               const sid = Math.round(v);
               const raw = Math.round((15 - sid) * 256 / 16);
-              updWithChipRam('attack', sid, async (ed, base) => {
-                await ed.writeU8(base + 17, raw);
-              });
+              updWithChipRam('attack', sid, async (ed, base) => { await ed.writeU8(base + 17, raw); });
             }}
-            label="Attack" color={knob}
-            formatValue={(v) => Math.round(v).toString()} />
+            label="Attack" color={knob} formatValue={(v) => Math.round(v).toString()} />
           <Knob value={config.decay} min={0} max={15} step={1}
             onChange={(v) => {
               const sid = Math.round(v);
               const raw = Math.round((15 - sid) * 256 / 16);
-              updWithChipRam('decay', sid, async (ed, base) => {
-                await ed.writeU8(base + 19, raw);
-              });
+              updWithChipRam('decay', sid, async (ed, base) => { await ed.writeU8(base + 19, raw); });
             }}
-            label="Decay" color={knob}
-            formatValue={(v) => Math.round(v).toString()} />
+            label="Decay" color={knob} formatValue={(v) => Math.round(v).toString()} />
           <Knob value={config.sustain} min={0} max={15} step={1}
             onChange={(v) => {
               const sid = Math.round(v);
               const raw = Math.round(sid * 255 / 15);
-              updWithChipRam('sustain', sid, async (ed, base) => {
-                await ed.writeU8(base + 18, raw);
-              });
+              updWithChipRam('sustain', sid, async (ed, base) => { await ed.writeU8(base + 18, raw); });
             }}
-            label="Sustain" color={knob}
-            formatValue={(v) => Math.round(v).toString()} />
+            label="Sustain" color={knob} formatValue={(v) => Math.round(v).toString()} />
           <Knob value={config.release} min={0} max={15} step={1}
             onChange={(v) => {
               const sid = Math.round(v);
               const raw = Math.round((15 - sid) * 256 / 16);
-              updWithChipRam('release', sid, async (ed, base) => {
-                await ed.writeU8(base + 22, raw);
-              });
+              updWithChipRam('release', sid, async (ed, base) => { await ed.writeU8(base + 22, raw); });
             }}
-            label="Release" color={knob}
-            formatValue={(v) => Math.round(v).toString()} />
+            label="Release" color={knob} formatValue={(v) => Math.round(v).toString()} />
         </div>
         <div className="mt-2">
-          <EnvelopeVisualization
-            mode="adsr"
-            ar={config.attack}
-            dr={config.decay}
-            rr={config.release}
-            sl={config.sustain}
-            tl={0}
-            maxRate={15}
-            maxTl={1}
-            width={320} height={64}
-            color={accent}
-          />
+          <EnvelopeVisualization mode="adsr" ar={config.attack} dr={config.decay} rr={config.release} sl={config.sustain} tl={0} maxRate={15} maxTl={1} width={320} height={64} color={accent} />
         </div>
       </div>
-
-      {/* Vibrato */}
       <div className={`rounded-lg border p-3 ${panelBg}`}>
         <SectionLabel label="Vibrato" />
         <div className="flex gap-4">
           <Knob value={config.vibDelay} min={0} max={255} step={1}
-            onChange={(v) => updWithChipRam('vibDelay', Math.round(v), async (ed, base) => {
-              await ed.writeU8(base + 11, Math.round(v));
-            })}
-            label="Delay" color={knob}
-            formatValue={(v) => Math.round(v).toString()} />
+            onChange={(v) => updWithChipRam('vibDelay', Math.round(v), async (ed, base) => { await ed.writeU8(base + 11, Math.round(v)); })}
+            label="Delay" color={knob} formatValue={(v) => Math.round(v).toString()} />
           <Knob value={config.vibSpeed} min={0} max={63} step={1}
-            onChange={(v) => updWithChipRam('vibSpeed', Math.round(v), async (ed, base) => {
-              await ed.writeU8(base + 10, Math.round(v));
-            })}
-            label="Speed" color={knob}
-            formatValue={(v) => Math.round(v).toString()} />
+            onChange={(v) => updWithChipRam('vibSpeed', Math.round(v), async (ed, base) => { await ed.writeU8(base + 10, Math.round(v)); })}
+            label="Speed" color={knob} formatValue={(v) => Math.round(v).toString()} />
           <Knob value={config.vibDepth} min={0} max={63} step={1}
-            onChange={(v) => updWithChipRam('vibDepth', Math.round(v), async (ed, base) => {
-              await ed.writeU8(base + 9, Math.round(v));
-            })}
-            label="Depth" color={knob}
-            formatValue={(v) => Math.round(v).toString()} />
+            onChange={(v) => updWithChipRam('vibDepth', Math.round(v), async (ed, base) => { await ed.writeU8(base + 9, Math.round(v)); })}
+            label="Depth" color={knob} formatValue={(v) => Math.round(v).toString()} />
         </div>
       </div>
     </div>
   );
 
-  // ── FILTER TAB ──────────────────────────────────────────────────────────
+  // -- FILTER TAB ---
   const renderFilter = () => (
     <div className="flex flex-col gap-3 p-3 overflow-y-auto" style={{ maxHeight: 'calc(100vh - 280px)' }}>
       <div className={`rounded-lg border p-3 ${panelBg}`}>
@@ -296,54 +277,46 @@ export const SidMonControls: React.FC<SidMonControlsProps> = ({
         <div className="flex gap-4">
           <Knob value={config.filterCutoff} min={0} max={255} step={1}
             onChange={(v) => upd('filterCutoff', Math.round(v))}
-            label="Cutoff" color={knob} size="md"
-            formatValue={(v) => Math.round(v).toString()} />
+            label="Cutoff" color={knob} size="md" formatValue={(v) => Math.round(v).toString()} />
           <Knob value={config.filterResonance} min={0} max={15} step={1}
             onChange={(v) => upd('filterResonance', Math.round(v))}
-            label="Resonance" color={knob} size="md"
-            formatValue={(v) => Math.round(v).toString()} />
+            label="Resonance" color={knob} size="md" formatValue={(v) => Math.round(v).toString()} />
         </div>
         <div className="mt-2">
-          <FilterFrequencyResponse
-            filterType={FILTER_MODE_TYPES[config.filterMode] ?? 'lowpass'}
-            cutoff={config.filterCutoff / 255}
-            resonance={config.filterResonance / 15}
-            poles={2}
-            color={accent}
-            width={320} height={64}
-          />
+          <FilterFrequencyResponse filterType={FILTER_MODE_TYPES[config.filterMode] ?? 'lowpass'} cutoff={config.filterCutoff / 255} resonance={config.filterResonance / 15} poles={2} color={accent} width={320} height={64} />
         </div>
       </div>
     </div>
   );
 
-  // ── ARPEGGIO TAB ──────────────────────────────────────────────────────────
+  // -- ARPEGGIO TAB ---
+  const arpChannels = useMemo(() => arpToFormatChannel(config.arpTable), [config.arpTable]);
+  const arpCellChange = useMemo(
+    () => makeArpCellChange(config.arpTable, (d) => upd('arpTable', d)),
+    [config.arpTable, upd],
+  );
+
   const renderArpeggio = () => (
-    <div className="flex flex-col gap-3 p-3 overflow-y-auto" style={{ maxHeight: 'calc(100vh - 280px)' }}>
-      <div className={`rounded-lg border p-3 ${panelBg}`}>
+    <div className="flex flex-col gap-3 p-3" style={{ height: 'calc(100vh - 280px)' }}>
+      <div className={`rounded-lg border p-3 ${panelBg} flex flex-col`} style={{ flex: 1, minHeight: 0 }}>
         <div className="flex items-center justify-between mb-3">
           <SectionLabel label="Arpeggio Speed" />
           <Knob value={config.arpSpeed} min={0} max={15} step={1}
             onChange={(v) => updWithChipRam('arpSpeed', Math.round(v), async (ed, base) => {
-              await ed.writeU8(base + 6, Math.round(v) * 16); // scale 0-15 → 0-240
+              await ed.writeU8(base + 6, Math.round(v) * 16);
             })}
-            label="Speed" color={knob}
-            formatValue={(v) => Math.round(v).toString()} />
+            label="Speed" color={knob} formatValue={(v) => Math.round(v).toString()} />
         </div>
-
-        <SequenceEditor
-          label="Arpeggio Table"
-          data={config.arpTable}
-          onChange={(d) => upd('arpTable', d)}
-          min={-64} max={63}
-          bipolar
-          fixedLength
-          showNoteNames
-          presets={ARP_PRESETS}
-          playbackPosition={arpPlaybackPosition}
-          color={accent}
-          height={100}
-        />
+        <div style={{ flex: 1, minHeight: 120 }}>
+          <PatternEditorCanvas
+            formatColumns={ARP_COLUMN}
+            formatChannels={arpChannels}
+            formatCurrentRow={arpPlaybackPosition ?? 0}
+            formatIsPlaying={arpPlaybackPosition !== undefined}
+            onFormatCellChange={arpCellChange}
+            hideVUMeters={true}
+          />
+        </div>
       </div>
     </div>
   );

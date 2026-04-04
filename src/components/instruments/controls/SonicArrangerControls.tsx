@@ -3,14 +3,126 @@
  *
  * Exposes all SonicArrangerConfig parameters across 3 tabs:
  *  - Synthesis: effect mode, effect args, waveform display
- *  - Envelope: volume, fine tuning, ADSR table, AMF table
- *  - Modulation: vibrato, portamento, arpeggio tables
+ *  - Envelope: volume, fine tuning, ADSR table (BarChart + PatternEditorCanvas), AMF table
+ *  - Modulation: vibrato, portamento, arpeggio tables (PatternEditorCanvas)
  */
 
 import React, { useRef, useEffect, useCallback, useState, useMemo } from 'react';
 import type { SonicArrangerConfig } from '@/types/instrument';
+import type { ColumnDef, FormatChannel, FormatCell, OnCellChange } from '@/components/shared/format-editor-types';
+import { PatternEditorCanvas } from '@/components/tracker/PatternEditorCanvas';
 import { Knob } from '@components/controls/Knob';
 import { useThemeStore } from '@stores';
+
+// ── Adapter helpers ─────────────────────────────────────────────────────────
+
+/** Display a signed byte (-128..127) as unsigned hex (00-FF). */
+function signedHex2(val: number): string {
+  return ((val & 0xFF)).toString(16).toUpperCase().padStart(2, '0');
+}
+
+/** Display an unsigned byte (0-255) as hex (00-FF). */
+function unsignedHex2(val: number): string {
+  return (val & 0xFF).toString(16).toUpperCase().padStart(2, '0');
+}
+
+const ARP_COLUMN: ColumnDef[] = [
+  {
+    key: 'semitone',
+    label: 'ST',
+    charWidth: 2,
+    type: 'hex',
+    color: '#ffcc66',
+    emptyColor: '#334455',
+    emptyValue: undefined,
+    hexDigits: 2,
+    formatter: signedHex2,
+  },
+];
+
+const ADSR_COLUMN: ColumnDef[] = [
+  {
+    key: 'value',
+    label: 'Vol',
+    charWidth: 2,
+    type: 'hex',
+    color: '#66ffaa',
+    emptyColor: '#334455',
+    emptyValue: undefined,
+    hexDigits: 2,
+    formatter: unsignedHex2,
+  },
+];
+
+const AMF_COLUMN: ColumnDef[] = [
+  {
+    key: 'value',
+    label: 'Pit',
+    charWidth: 2,
+    type: 'hex',
+    color: '#ff88cc',
+    emptyColor: '#334455',
+    emptyValue: undefined,
+    hexDigits: 2,
+    formatter: signedHex2,
+  },
+];
+
+/** Convert an arpeggio sub-table to a single-channel FormatChannel. */
+function arpToFormatChannel(
+  arp: { length: number; repeat: number; values: number[] },
+  label: string,
+): FormatChannel {
+  const rows: FormatCell[] = arp.values.slice(0, 14).map((v) => ({
+    semitone: v & 0xFF,
+  }));
+  return { label, patternLength: 14, rows, isPatternChannel: false };
+}
+
+/** Convert a byte table (ADSR or AMF) to a single-channel FormatChannel. */
+function tableToFormatChannel(
+  data: number[],
+  label: string,
+): FormatChannel {
+  const len = Math.min(data.length, 128);
+  const rows: FormatCell[] = Array.from({ length: len }, (_, i) => ({
+    value: data[i] & 0xFF,
+  }));
+  return { label, patternLength: len, rows, isPatternChannel: false };
+}
+
+/** Create an OnCellChange for a specific arpeggio sub-table index. */
+function makeArpCellChange(
+  configRef: React.MutableRefObject<SonicArrangerConfig>,
+  tableIdx: 0 | 1 | 2,
+  onChange: (updates: Partial<SonicArrangerConfig>) => void,
+): OnCellChange {
+  return (_channelIdx: number, rowIdx: number, _columnKey: string, value: number) => {
+    const signed = value > 127 ? value - 256 : value;
+    const arps = configRef.current.arpeggios.map((a, i) => {
+      if (i !== tableIdx) return { ...a };
+      const vals = [...a.values];
+      vals[rowIdx] = signed;
+      return { ...a, values: vals };
+    }) as SonicArrangerConfig['arpeggios'];
+    onChange({ ...configRef.current, arpeggios: arps });
+  };
+}
+
+/** Create an OnCellChange for a byte table (adsrTable or amfTable). */
+function makeTableCellChange(
+  configRef: React.MutableRefObject<SonicArrangerConfig>,
+  tableKey: 'adsrTable' | 'amfTable',
+  signed: boolean,
+  onChange: (updates: Partial<SonicArrangerConfig>) => void,
+): OnCellChange {
+  return (_channelIdx: number, rowIdx: number, _columnKey: string, value: number) => {
+    const realValue = signed ? (value > 127 ? value - 256 : value) : value;
+    const table = [...configRef.current[tableKey]];
+    table[rowIdx] = realValue;
+    onChange({ ...configRef.current, [tableKey]: table });
+  };
+}
 
 interface SonicArrangerControlsProps {
   config: SonicArrangerConfig;
@@ -42,7 +154,6 @@ const EFFECT_MODES: { value: number; name: string }[] = [
   { value: 17, name: 'FM Drum' },
 ];
 
-/** Context-sensitive label for effectArg1 based on the active effect mode. */
 function arg1Label(mode: number): string {
   if (mode === 9 || mode === 15) return 'Target Wave';
   if (mode === 3 || mode === 11) return 'Delta';
@@ -50,13 +161,11 @@ function arg1Label(mode: number): string {
   return 'Arg 1';
 }
 
-/** Context-sensitive label for effectArg2 based on the active effect mode. */
 function arg2Label(mode: number): string {
   if (mode === 10 || mode === 17) return 'Detune';
   return 'Start Pos';
 }
 
-/** Context-sensitive label for effectArg3 based on the active effect mode. */
 function arg3Label(mode: number): string {
   if (mode === 10) return 'Repeats';
   if (mode === 17) return 'Threshold';
@@ -65,7 +174,6 @@ function arg3Label(mode: number): string {
 
 // ── Tiny canvas-based visualizations ─────────────────────────────────────────
 
-/** Waveform line graph — 128 signed int8 samples rendered to a small canvas. */
 const WaveformLineCanvas: React.FC<{
   data: number[];
   width: number;
@@ -81,12 +189,9 @@ const WaveformLineCanvas: React.FC<{
     if (!ctx) return;
 
     ctx.clearRect(0, 0, width, height);
-
-    // background
     ctx.fillStyle = '#0a0a0a';
     ctx.fillRect(0, 0, width, height);
 
-    // centre line
     ctx.strokeStyle = 'var(--color-border)';
     ctx.lineWidth = 1;
     ctx.beginPath();
@@ -96,14 +201,12 @@ const WaveformLineCanvas: React.FC<{
 
     if (data.length === 0) return;
 
-    // waveform
     ctx.strokeStyle = color;
     ctx.lineWidth = 1.5;
     ctx.beginPath();
     const len = Math.min(data.length, 128);
     for (let i = 0; i < len; i++) {
       const x = (i / (len - 1)) * width;
-      // data is signed int8 (-128..127), map to canvas Y (top=0, bottom=height)
       const y = ((1 - (data[i] + 128) / 255) * (height - 2)) + 1;
       if (i === 0) ctx.moveTo(x, y);
       else ctx.lineTo(x, y);
@@ -114,7 +217,6 @@ const WaveformLineCanvas: React.FC<{
   return <canvas ref={canvasRef} width={width} height={height} className="rounded" />;
 };
 
-/** Bar chart for ADSR table (128 uint8 values 0-255). */
 const BarChart: React.FC<{
   data: number[];
   width: number;
@@ -131,8 +233,6 @@ const BarChart: React.FC<{
     if (!ctx) return;
 
     ctx.clearRect(0, 0, width, height);
-
-    // background
     ctx.fillStyle = '#0a0a0a';
     ctx.fillRect(0, 0, width, height);
 
@@ -142,7 +242,6 @@ const BarChart: React.FC<{
     const barW = Math.max(1, width / len);
 
     if (signed) {
-      // centre line
       ctx.strokeStyle = 'var(--color-border)';
       ctx.lineWidth = 1;
       ctx.beginPath();
@@ -152,7 +251,7 @@ const BarChart: React.FC<{
 
       ctx.fillStyle = color;
       for (let i = 0; i < len; i++) {
-        const v = data[i]; // -128..127
+        const v = data[i];
         const normH = (Math.abs(v) / 128) * (height / 2);
         const x = (i / len) * width;
         if (v >= 0) {
@@ -164,7 +263,7 @@ const BarChart: React.FC<{
     } else {
       ctx.fillStyle = color;
       for (let i = 0; i < len; i++) {
-        const v = data[i]; // 0-255
+        const v = data[i];
         const barH = (v / 255) * height;
         const x = (i / len) * width;
         ctx.fillRect(x, height - barH, barW, barH);
@@ -183,7 +282,6 @@ export const SonicArrangerControls: React.FC<SonicArrangerControlsProps> = ({
 }) => {
   const [activeTab, setActiveTab] = useState<SATab>('synthesis');
 
-  // --- configRef pattern (from CLAUDE.md) ---
   const configRef = useRef(config);
   useEffect(() => { configRef.current = config; }, [config]);
 
@@ -206,16 +304,43 @@ export const SonicArrangerControls: React.FC<SonicArrangerControlsProps> = ({
     </div>
   );
 
+  // ── Memoized format channels + cell-change handlers ────────────────────────
+
+  const adsrChannel = useMemo(
+    () => [tableToFormatChannel(config.adsrTable, 'ADSR')] as FormatChannel[],
+    [config.adsrTable],
+  );
+  const adsrCellChange = useMemo(
+    () => makeTableCellChange(configRef, 'adsrTable', false, onChange),
+    [onChange],
+  );
+  const amfChannel = useMemo(
+    () => [tableToFormatChannel(config.amfTable, 'AMF')] as FormatChannel[],
+    [config.amfTable],
+  );
+  const amfCellChange = useMemo(
+    () => makeTableCellChange(configRef, 'amfTable', true, onChange),
+    [onChange],
+  );
+  const arpChannels = useMemo(() =>
+    ([0, 1, 2] as const).map((tIdx) =>
+      [arpToFormatChannel(config.arpeggios[tIdx], `Arp ${tIdx + 1}`)] as FormatChannel[]
+    ),
+    [config.arpeggios],
+  );
+  const arpCellChanges = useMemo(() =>
+    ([0, 1, 2] as const).map((tIdx) =>
+      makeArpCellChange(configRef, tIdx, onChange)
+    ),
+    [onChange],
+  );
+
   // ── SYNTHESIS TAB ──────────────────────────────────────────────────────────
 
   const renderSynthesis = () => (
     <div className="flex flex-col gap-3 p-3 overflow-y-auto" style={{ maxHeight: 'calc(100vh - 280px)' }}>
-
-      {/* Effect Mode selector */}
       <div className={`rounded-lg border p-3 ${panelBg}`}>
         <SectionLabel label="Synthesis Effect" />
-
-        {/* Effect argument knobs */}
         <div className="flex gap-3 flex-wrap">
           <Knob value={config.effectArg1} min={0} max={127} step={1}
             onChange={(v) => updateParam('effectArg1', Math.round(v))}
@@ -234,7 +359,6 @@ export const SonicArrangerControls: React.FC<SonicArrangerControlsProps> = ({
             label="Effect Speed" color={knob}
             formatValue={(v) => Math.round(v).toString()} />
         </div>
-
         <select
           value={config.effect}
           onChange={(e) => updateParam('effect', parseInt(e.target.value))}
@@ -248,15 +372,9 @@ export const SonicArrangerControls: React.FC<SonicArrangerControlsProps> = ({
           ))}
         </select>
       </div>
-
-      {/* Waveform display */}
       <div className={`rounded-lg border p-3 ${panelBg}`}>
         <SectionLabel label="Waveform" />
-        <WaveformLineCanvas
-          data={config.waveformData}
-          width={320} height={72}
-          color={accent}
-        />
+        <WaveformLineCanvas data={config.waveformData} width={320} height={72} color={accent} />
         <div className="flex items-center gap-3 mt-2 text-[10px] text-text-muted">
           <span>Wave #{config.waveformNumber}</span>
           <span>Length: {config.waveformLength} words</span>
@@ -269,8 +387,6 @@ export const SonicArrangerControls: React.FC<SonicArrangerControlsProps> = ({
 
   const renderEnvelope = () => (
     <div className="flex flex-col gap-3 p-3 overflow-y-auto" style={{ maxHeight: 'calc(100vh - 280px)' }}>
-
-      {/* Volume + Fine Tuning */}
       <div className={`rounded-lg border p-3 ${panelBg}`}>
         <SectionLabel label="Volume & Tuning" />
         <div className="flex gap-4">
@@ -284,15 +400,9 @@ export const SonicArrangerControls: React.FC<SonicArrangerControlsProps> = ({
             formatValue={(v) => Math.round(v).toString()} />
         </div>
       </div>
-
-      {/* ADSR Section */}
       <div className={`rounded-lg border p-3 ${panelBg}`}>
         <SectionLabel label="ADSR Envelope" />
-        <BarChart
-          data={config.adsrTable}
-          width={320} height={56}
-          color={accent}
-        />
+        <BarChart data={config.adsrTable} width={320} height={56} color={accent} />
         <div className="flex gap-3 flex-wrap mt-3">
           <Knob value={config.adsrDelay} min={0} max={255} step={1}
             onChange={(v) => updateParam('adsrDelay', Math.round(v))}
@@ -315,17 +425,20 @@ export const SonicArrangerControls: React.FC<SonicArrangerControlsProps> = ({
             label="Sus Delay" color={knob}
             formatValue={(v) => Math.round(v).toString()} />
         </div>
+        <div style={{ height: 280, marginTop: 8 }}>
+          <PatternEditorCanvas
+            formatColumns={ADSR_COLUMN}
+            formatChannels={adsrChannel}
+            formatCurrentRow={0}
+            formatIsPlaying={false}
+            onFormatCellChange={adsrCellChange}
+            hideVUMeters={true}
+          />
+        </div>
       </div>
-
-      {/* AMF Section */}
       <div className={`rounded-lg border p-3 ${panelBg}`}>
         <SectionLabel label="AMF (Pitch Modulation)" />
-        <BarChart
-          data={config.amfTable}
-          width={320} height={56}
-          color={accent}
-          signed
-        />
+        <BarChart data={config.amfTable} width={320} height={56} color={accent} signed />
         <div className="flex gap-3 mt-3">
           <Knob value={config.amfDelay} min={0} max={255} step={1}
             onChange={(v) => updateParam('amfDelay', Math.round(v))}
@@ -340,13 +453,22 @@ export const SonicArrangerControls: React.FC<SonicArrangerControlsProps> = ({
             label="Repeat" color={knob}
             formatValue={(v) => Math.round(v).toString()} />
         </div>
+        <div style={{ height: 280, marginTop: 8 }}>
+          <PatternEditorCanvas
+            formatColumns={AMF_COLUMN}
+            formatChannels={amfChannel}
+            formatCurrentRow={0}
+            formatIsPlaying={false}
+            onFormatCellChange={amfCellChange}
+            hideVUMeters={true}
+          />
+        </div>
       </div>
     </div>
   );
 
   // ── MODULATION TAB ─────────────────────────────────────────────────────────
 
-  /** Update a single field in one arpeggio sub-table. */
   const updateArpField = useCallback(
     (index: 0 | 1 | 2, field: 'length' | 'repeat', value: number) => {
       const arps = configRef.current.arpeggios.map((a, i) =>
@@ -357,24 +479,8 @@ export const SonicArrangerControls: React.FC<SonicArrangerControlsProps> = ({
     [onChange],
   );
 
-  /** Update a single value entry in one arpeggio sub-table. */
-  const updateArpValue = useCallback(
-    (tableIdx: 0 | 1 | 2, entryIdx: number, value: number) => {
-      const arps = configRef.current.arpeggios.map((a, i) => {
-        if (i !== tableIdx) return { ...a };
-        const vals = [...a.values];
-        vals[entryIdx] = value;
-        return { ...a, values: vals };
-      }) as SonicArrangerConfig['arpeggios'];
-      onChange({ ...configRef.current, arpeggios: arps });
-    },
-    [onChange],
-  );
-
   const renderModulation = () => (
     <div className="flex flex-col gap-3 p-3 overflow-y-auto" style={{ maxHeight: 'calc(100vh - 280px)' }}>
-
-      {/* Vibrato */}
       <div className={`rounded-lg border p-3 ${panelBg}`}>
         <SectionLabel label="Vibrato" />
         <div className="flex gap-3">
@@ -392,8 +498,6 @@ export const SonicArrangerControls: React.FC<SonicArrangerControlsProps> = ({
             formatValue={(v) => Math.round(v).toString()} />
         </div>
       </div>
-
-      {/* Portamento */}
       <div className={`rounded-lg border p-3 ${panelBg}`}>
         <SectionLabel label="Portamento" />
         <div className="flex items-center gap-4">
@@ -404,8 +508,6 @@ export const SonicArrangerControls: React.FC<SonicArrangerControlsProps> = ({
           <span className="text-[10px] text-text-muted">0 = disabled</span>
         </div>
       </div>
-
-      {/* Arpeggio tables (3 sub-tables) */}
       <div className={`rounded-lg border p-3 ${panelBg}`}>
         <SectionLabel label="Arpeggio Tables" />
         <div className="flex flex-col gap-3">
@@ -414,50 +516,31 @@ export const SonicArrangerControls: React.FC<SonicArrangerControlsProps> = ({
             return (
               <div key={tIdx} className="rounded border p-2" style={{ borderColor: dim, background: '#0a0a0a' }}>
                 <div className="flex items-center gap-2 mb-2">
-                  <span className="text-[10px] font-bold" style={{ color: accent }}>
-                    Arp {tIdx + 1}
-                  </span>
+                  <span className="text-[10px] font-bold" style={{ color: accent }}>Arp {tIdx + 1}</span>
                   <div className="flex items-center gap-1">
                     <label className="text-[9px] text-text-muted">Len</label>
-                    <input
-                      type="number" min={0} max={14}
-                      value={arp.length}
+                    <input type="number" min={0} max={14} value={arp.length}
                       onChange={(e) => updateArpField(tIdx, 'length', Math.max(0, Math.min(14, parseInt(e.target.value) || 0)))}
                       className="w-10 text-[10px] font-mono text-center border rounded px-1 py-0.5"
-                      style={{ background: 'var(--color-bg-secondary)', borderColor: dim, color: 'var(--color-text-secondary)' }}
-                    />
+                      style={{ background: 'var(--color-bg-secondary)', borderColor: dim, color: 'var(--color-text-secondary)' }} />
                   </div>
                   <div className="flex items-center gap-1">
                     <label className="text-[9px] text-text-muted">Rep</label>
-                    <input
-                      type="number" min={0} max={14}
-                      value={arp.repeat}
+                    <input type="number" min={0} max={14} value={arp.repeat}
                       onChange={(e) => updateArpField(tIdx, 'repeat', Math.max(0, Math.min(14, parseInt(e.target.value) || 0)))}
                       className="w-10 text-[10px] font-mono text-center border rounded px-1 py-0.5"
-                      style={{ background: 'var(--color-bg-secondary)', borderColor: dim, color: 'var(--color-text-secondary)' }}
-                    />
+                      style={{ background: 'var(--color-bg-secondary)', borderColor: dim, color: 'var(--color-text-secondary)' }} />
                   </div>
                 </div>
-                {/* 14 value cells in a row */}
-                <div className="flex gap-0.5">
-                  {arp.values.slice(0, 14).map((val, vIdx) => {
-                    const inRange = vIdx < arp.length;
-                    const inLoop = arp.length > 0 && arp.repeat > 0 && vIdx >= (arp.length - arp.repeat) && vIdx < arp.length;
-                    return (
-                      <input
-                        key={vIdx}
-                        type="number" min={-128} max={127}
-                        value={val}
-                        onChange={(e) => updateArpValue(tIdx, vIdx, Math.max(-128, Math.min(127, parseInt(e.target.value) || 0)))}
-                        className="w-7 text-[9px] font-mono text-center border rounded py-0.5"
-                        style={{
-                          background: inLoop ? accent + '18' : inRange ? '#111' : '#080808',
-                          borderColor: inLoop ? accent + '44' : inRange ? 'var(--color-border-light)' : 'var(--color-bg-tertiary)',
-                          color: inRange ? '#ccc' : '#444',
-                        }}
-                      />
-                    );
-                  })}
+                <div style={{ height: 240 }}>
+                  <PatternEditorCanvas
+                    formatColumns={ARP_COLUMN}
+                    formatChannels={arpChannels[tIdx]}
+                    formatCurrentRow={0}
+                    formatIsPlaying={false}
+                    onFormatCellChange={arpCellChanges[tIdx]}
+                    hideVUMeters={true}
+                  />
                 </div>
               </div>
             );

@@ -148,7 +148,7 @@ export class HivelySynth implements DevilboxSynth {
       // Convert MIDI note to HVL note (HVL note 1 = C-0 = MIDI 0)
       // MIDI 0 = C-0 = HVL 1, MIDI 12 = C-1 = HVL 13, etc.
       const hvlNote = Math.max(1, Math.min(60, midiNote + 1));
-      const vel = Math.round((velocity ?? 1) * 127);
+      const vel = Math.max(64, Math.round((velocity ?? 1) * 127));
 
       this.engine.sendMessage({
         type: 'noteOn',

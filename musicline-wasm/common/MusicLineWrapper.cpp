@@ -17,6 +17,7 @@
 #include "../structs.h"
 
 #include <cstdint>
+#include <cstddef>
 #include <cstring>
 #include <cstdlib>
 #include <cstdio>
@@ -474,6 +475,220 @@ int ml_get_num_instruments() {
         if (mod->m_InstList[i]) count++;
     }
     return count;
+}
+
+// ---------------------------------------------------------------------------
+// Instrument parameter access (for the editor UI)
+// ---------------------------------------------------------------------------
+
+static Inst* get_inst_ptr(int instIdx, bool preview) {
+    MlineBackend* be = preview ? s_preview : s_song;
+    if (!be) return nullptr;
+    MLModule* mod = be->get_module();
+    if (!mod) return nullptr;
+    int mlIdx = instIdx + 1;
+    if (mlIdx < 1 || mlIdx >= MAX_INSTURUMENTS) return nullptr;
+    return mod->m_InstList[mlIdx];
+}
+
+int ml_get_inst_sizeof() { return (int)sizeof(Inst); }
+
+int ml_read_inst_u8(int instIdx, int offset) {
+    Inst* inst = get_inst_ptr(instIdx, true);
+    if (!inst || offset < 0 || offset >= (int)sizeof(Inst)) return -1;
+    return ((uint8_t*)inst)[offset];
+}
+
+int ml_read_inst_u16(int instIdx, int offset) {
+    Inst* inst = get_inst_ptr(instIdx, true);
+    if (!inst || offset < 0 || offset + 1 >= (int)sizeof(Inst)) return -1;
+    uint8_t* p = ((uint8_t*)inst) + offset;
+    return p[0] | (p[1] << 8);
+}
+
+int ml_read_inst_s16(int instIdx, int offset) {
+    Inst* inst = get_inst_ptr(instIdx, true);
+    if (!inst || offset < 0 || offset + 1 >= (int)sizeof(Inst)) return -1;
+    uint8_t* p = ((uint8_t*)inst) + offset;
+    int16_t val = (int16_t)(p[0] | (p[1] << 8));
+    return (int)val;
+}
+
+void ml_write_inst_u8(int instIdx, int offset, int value) {
+    Inst* inst = get_inst_ptr(instIdx, true);
+    if (!inst || offset < 0 || offset >= (int)sizeof(Inst)) return;
+    ((uint8_t*)inst)[offset] = (uint8_t)(value & 0xFF);
+}
+
+void ml_write_inst_u16(int instIdx, int offset, int value) {
+    Inst* inst = get_inst_ptr(instIdx, true);
+    if (!inst || offset < 0 || offset + 1 >= (int)sizeof(Inst)) return;
+    uint8_t* p = ((uint8_t*)inst) + offset;
+    p[0] = (uint8_t)(value & 0xFF);
+    p[1] = (uint8_t)((value >> 8) & 0xFF);
+}
+
+void ml_write_inst_s16(int instIdx, int offset, int value) {
+    ml_write_inst_u16(instIdx, offset, value);
+}
+
+const char* ml_get_inst_title(int instIdx) {
+    Inst* inst = get_inst_ptr(instIdx, true);
+    if (!inst) return "";
+    return (const char*)inst->Title;
+}
+
+const char* ml_get_inst_name(int instIdx) {
+    Inst* inst = get_inst_ptr(instIdx, true);
+    if (!inst) return "";
+    return (const char*)inst->Smpl.Title;
+}
+
+int ml_dump_inst_offsets(int* buffer) {
+    int i = 0;
+    #define OFF(field) buffer[i++] = (int)offsetof(Inst, field)
+    #define SZ(field) buffer[i++] = (int)sizeof(((Inst*)0)->field)
+    OFF(Smpl.Type); SZ(Smpl.Type);
+    OFF(Smpl.FineTune); SZ(Smpl.FineTune);
+    OFF(Smpl.SemiTone); SZ(Smpl.SemiTone);
+    OFF(Volume); SZ(Volume);
+    OFF(Transpose); SZ(Transpose);
+    OFF(SlideSpeed); SZ(SlideSpeed);
+    OFF(Effects); SZ(Effects);
+    OFF(Env); SZ(Env);
+    OFF(Vib); SZ(Vib);
+    OFF(Tre); SZ(Tre);
+    OFF(Arp); SZ(Arp);
+    OFF(Tra); SZ(Tra);
+    OFF(Pha); SZ(Pha);
+    OFF(Mix); SZ(Mix);
+    OFF(Res); SZ(Res);
+    OFF(Fil); SZ(Fil);
+    OFF(Loo); SZ(Loo);
+    OFF(SmplStart); SZ(SmplStart);
+    OFF(SmplEnd); SZ(SmplEnd);
+    OFF(SmplRepStart); SZ(SmplRepStart);
+    OFF(SmplRepLen); SZ(SmplRepLen);
+    OFF(Title); SZ(Title);
+    #undef OFF
+    #undef SZ
+    return i;
+}
+
+int ml_get_effect_flag(int instIdx, int fxIndex) {
+    Inst* inst = get_inst_ptr(instIdx, true);
+    if (!inst || fxIndex < 0 || fxIndex >= 32) return 0;
+    return inst->Effects[fxIndex] ? 1 : 0;
+}
+
+void ml_set_effect_flag(int instIdx, int fxIndex, int value) {
+    Inst* inst = get_inst_ptr(instIdx, true);
+    if (!inst || fxIndex < 0 || fxIndex >= 32) return;
+    inst->Effects[fxIndex] = (value != 0);
+}
+
+// ============================================================================
+// Arpeggio Table Access API
+// ============================================================================
+
+/**
+ * ml_get_num_arps() -> number of allocated arpeggio tables.
+ * m_ArpgList has 256 slots; count non-null entries.
+ */
+/**
+ * ml_get_inst_arp_table(instIdx) -> arp table index (iArp.Table) for the instrument.
+ * Returns -1 if instrument not found.
+ */
+int ml_get_inst_arp_table(int instIdx) {
+    Inst* inst = get_inst_ptr(instIdx, false);
+    if (!inst) return -1;
+    return inst->Arp.Table;
+}
+
+/**
+ * ml_get_inst_arp_speed(instIdx) -> arp speed (iArp.Speed) for the instrument.
+ */
+int ml_get_inst_arp_speed(int instIdx) {
+    Inst* inst = get_inst_ptr(instIdx, false);
+    if (!inst) return 0;
+    return inst->Arp.Speed;
+}
+
+/**
+ * ml_get_inst_arp_groove(instIdx) -> arp groove (iArp.Groove) for the instrument.
+ */
+int ml_get_inst_arp_groove(int instIdx) {
+    Inst* inst = get_inst_ptr(instIdx, false);
+    if (!inst) return 0;
+    return inst->Arp.Groove;
+}
+
+int ml_get_num_arps() {
+    if (!s_song) return 0;
+    MLModule* mod = s_song->get_module();
+    if (!mod) return 0;
+    int count = 0;
+    for (int i = 0; i < 256; i++) {
+        if (mod->m_ArpgList[i]) count++;
+    }
+    return count;
+}
+
+/**
+ * ml_get_arp_length(arpIdx) -> length of arpeggio table (always 128 rows if allocated, 0 if not).
+ */
+int ml_get_arp_length(int arpIdx) {
+    if (!s_song || arpIdx < 0 || arpIdx >= 256) return 0;
+    MLModule* mod = s_song->get_module();
+    if (!mod || !mod->m_ArpgList[arpIdx]) return 0;
+    return 128;
+}
+
+/**
+ * ml_get_arp_entry(arpIdx, row, fieldIdx) -> read a field from an arpeggio entry.
+ * Fields: 0=Note, 1=Smpl (wavesample), 2=Fx[0] lo byte (fx1 cmd), 3=Fx[0] hi byte (fx1 param),
+ *         4=Fx[1] lo byte (fx2 cmd), 5=Fx[1] hi byte (fx2 param).
+ *
+ * ArpgLine layout: u8 Note, u8 Smpl, u16 Fx[2]
+ * Each Fx word: low byte = command, high byte = parameter.
+ */
+int ml_get_arp_entry(int arpIdx, int row, int fieldIdx) {
+    if (!s_song || arpIdx < 0 || arpIdx >= 256 || row < 0 || row >= 128) return 0;
+    if (fieldIdx < 0 || fieldIdx > 5) return 0;
+    MLModule* mod = s_song->get_module();
+    if (!mod || !mod->m_ArpgList[arpIdx]) return 0;
+    ArpgLine* line = &mod->m_ArpgList[arpIdx]->Data[row];
+    switch (fieldIdx) {
+        case 0: return line->Note;
+        case 1: return line->Smpl;
+        case 2: return line->Fx[0] & 0xFF;        // fx1 command (low byte)
+        case 3: return (line->Fx[0] >> 8) & 0xFF;  // fx1 parameter (high byte)
+        case 4: return line->Fx[1] & 0xFF;        // fx2 command (low byte)
+        case 5: return (line->Fx[1] >> 8) & 0xFF;  // fx2 parameter (high byte)
+        default: return 0;
+    }
+}
+
+/**
+ * ml_set_arp_entry(arpIdx, row, fieldIdx, value) -> write a field of an arpeggio entry.
+ * Returns 1 on success, 0 on error.
+ */
+int ml_set_arp_entry(int arpIdx, int row, int fieldIdx, int value) {
+    if (!s_song || arpIdx < 0 || arpIdx >= 256 || row < 0 || row >= 128) return 0;
+    if (fieldIdx < 0 || fieldIdx > 5) return 0;
+    MLModule* mod = s_song->get_module();
+    if (!mod || !mod->m_ArpgList[arpIdx]) return 0;
+    ArpgLine* line = &mod->m_ArpgList[arpIdx]->Data[row];
+    switch (fieldIdx) {
+        case 0: line->Note = static_cast<u8>(value); break;
+        case 1: line->Smpl = static_cast<u8>(value); break;
+        case 2: line->Fx[0] = (line->Fx[0] & 0xFF00) | (static_cast<u16>(value) & 0xFF); break;
+        case 3: line->Fx[0] = (line->Fx[0] & 0x00FF) | ((static_cast<u16>(value) & 0xFF) << 8); break;
+        case 4: line->Fx[1] = (line->Fx[1] & 0xFF00) | (static_cast<u16>(value) & 0xFF); break;
+        case 5: line->Fx[1] = (line->Fx[1] & 0x00FF) | ((static_cast<u16>(value) & 0xFF) << 8); break;
+        default: return 0;
+    }
+    return 1;
 }
 
 } // extern "C"

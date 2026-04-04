@@ -148,6 +148,87 @@ class MusicLineProcessor extends AudioWorkletProcessor {
         break;
       }
 
+      // Instrument parameter access
+      case 'read-inst-all': {
+        if (!this.wasm) break;
+        const { instIdx, offsets } = data;
+        const result = {};
+        for (const [name, off] of Object.entries(offsets)) {
+          result[name] = this.wasm._ml_read_inst_u8(instIdx, off);
+        }
+        this.port.postMessage({ type: 'inst-all', instIdx, data: result });
+        break;
+      }
+
+      case 'get-inst-offsets': {
+        if (!this.wasm) break;
+        const bufSize = 128;
+        const ptr = this.wasm._malloc(bufSize * 4);
+        const count = this.wasm._ml_dump_inst_offsets(ptr);
+        const arr = [];
+        for (let i = 0; i < count; i++) {
+          arr.push(this.wasm.getValue(ptr + i * 4, 'i32'));
+        }
+        this.wasm._free(ptr);
+        const instSizeof = this.wasm._ml_get_inst_sizeof();
+        this.port.postMessage({ type: 'inst-offsets', offsets: arr, instSizeof });
+        break;
+      }
+
+      case 'write-inst-field': {
+        if (!this.wasm) break;
+        const { instIdx: wi, offset: wo, size: ws, value: wv } = data;
+        if (ws === 1) this.wasm._ml_write_inst_u8(wi, wo, wv);
+        else if (ws === 2) this.wasm._ml_write_inst_u16(wi, wo, wv);
+        break;
+      }
+
+      case 'set-effect-flag': {
+        if (!this.wasm) break;
+        this.wasm._ml_set_effect_flag(data.instIdx, data.fxIndex, data.value);
+        break;
+      }
+
+      case 'get-inst-arp-config': {
+        if (!this.wasm || !this.songLoaded) break;
+        const { instIdx: iaci } = data;
+        this.port.postMessage({
+          type: 'inst-arp-config',
+          instIdx: iaci,
+          table: this.wasm._ml_get_inst_arp_table(iaci),
+          speed: this.wasm._ml_get_inst_arp_speed(iaci),
+          groove: this.wasm._ml_get_inst_arp_groove(iaci),
+          numArps: this.wasm._ml_get_num_arps(),
+        });
+        break;
+      }
+
+      case 'get-arp-data': {
+        if (!this.wasm || !this.songLoaded) break;
+        const { arpIdx, requestId: arpReqId } = data;
+        const length = this.wasm._ml_get_arp_length(arpIdx);
+        const rows = [];
+        for (let r = 0; r < length; r++) {
+          rows.push({
+            note:    this.wasm._ml_get_arp_entry(arpIdx, r, 0),
+            smpl:    this.wasm._ml_get_arp_entry(arpIdx, r, 1),
+            fx1:     this.wasm._ml_get_arp_entry(arpIdx, r, 2),
+            param1:  this.wasm._ml_get_arp_entry(arpIdx, r, 3),
+            fx2:     this.wasm._ml_get_arp_entry(arpIdx, r, 4),
+            param2:  this.wasm._ml_get_arp_entry(arpIdx, r, 5),
+          });
+        }
+        this.port.postMessage({ type: 'arp-data', requestId: arpReqId, arpIdx, length, rows });
+        break;
+      }
+
+      case 'set-arp-entry': {
+        if (!this.wasm || !this.songLoaded) break;
+        const { arpIdx: ai, row: ar, fieldIdx: af, value: av } = data;
+        this.wasm._ml_set_arp_entry(ai, ar, af, av);
+        break;
+      }
+
       default:
         break;
     }
