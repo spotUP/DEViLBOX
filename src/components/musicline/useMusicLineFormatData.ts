@@ -33,9 +33,13 @@ export function useMusicLineFormatData(): MusicLineFormatData {
   const wasmActive = useWasmPositionStore((s) => s.active);
 
   const currentRow = wasmActive ? wasmRow : transportRow;
+  const patternOrder = useTrackerStore((s) => s.patternOrder);
   // During playback, show the patterns for the current playback position.
   // Safe now that usePatternPlayback has a MusicLine bypass (won't reload).
-  const displayPos = (isPlaying && wasmActive) ? wasmSongPos : editPos;
+  // Clamp to valid range — WASM engine may report positions beyond the order length when looping.
+  const maxPos = Math.max(0, patternOrder.length - 1);
+  const rawPlayPos = (isPlaying && wasmActive) ? wasmSongPos : editPos;
+  const displayPos = Math.min(rawPlayPos, maxPos);
 
   const channels = useMemo(() => {
     if (!channelTrackTables || channelTrackTables.length === 0) return [];
