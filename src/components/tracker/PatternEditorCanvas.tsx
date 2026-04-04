@@ -89,6 +89,10 @@ interface PatternEditorCanvasProps {
   onFormatCellChange?: OnCellChange;
   /** Hide VU meters (for sub-editors like perf list that aren't main song views) */
   hideVUMeters?: boolean;
+  /** Channel index offset for automation lanes in per-channel format mode.
+   *  When MusicLine renders each channel as a separate instance, this tells
+   *  the automation system which real channel this instance represents. */
+  formatChannelOffset?: number;
 }
 
 // PERFORMANCE: Memoize to prevent re-renders on every scroll step
@@ -107,6 +111,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
   formatIsPlaying,
   onFormatCellChange,
   hideVUMeters = false,
+  formatChannelOffset = 0,
 }) => {
   const { isMobile } = useResponsiveSafe();
 
@@ -3144,7 +3149,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
               {pattern.channels.map((_, chIdx) => (
                 <AutomationParameterPicker
                   key={`auto-picker-${chIdx}`}
-                  channelIndex={chIdx}
+                  channelIndex={chIdx + formatChannelOffset}
                   left={channelOffsets[chIdx] || 0}
                   width={channelWidths[chIdx] || 80}
                   top={-20}
@@ -3187,6 +3192,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
                 channelOffsets={channelOffsets}
                 channelWidths={channelWidths}
                 rowNumWidth={LINE_NUMBER_WIDTH}
+                channelIndexOffset={formatChannelOffset}
                 scrollOffset={0}
                 visibleStart={0}
                 containerHeight={dimensions.height}

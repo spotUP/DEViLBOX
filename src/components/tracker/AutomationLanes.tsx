@@ -28,6 +28,10 @@ interface AutomationLanesProps {
   prevPatternLength?: number;
   nextPatternId?: string;
   nextPatternLength?: number;
+  /** Offset to add to channel indices when reading/writing automation store.
+   *  Used by MusicLine per-channel instances where each PatternEditorCanvas
+   *  shows 1 channel but needs to map to the correct store channel index. */
+  channelIndexOffset?: number;
 }
 
 /** Resolve parameter color from NKS section of the first channel that has automation */
@@ -67,7 +71,12 @@ export const AutomationLanes: React.FC<AutomationLanesProps> = ({
   prevPatternLength,
   nextPatternId,
   nextPatternLength,
+  channelIndexOffset = 0,
 }) => {
+  // When rendering a per-channel format instance (MusicLine), local channel 0
+  // maps to store channel `channelIndexOffset`. Apply this offset when querying
+  // the automation store so curves are read/written to the correct channel.
+  const chOff = channelIndexOffset;
   // Subscribe directly to curves array to ensure re-render on changes
   const allCurves = useAutomationStore((state) => state.curves);
   const addPoint = useAutomationStore((state) => state.addPoint);
@@ -94,7 +103,7 @@ export const AutomationLanes: React.FC<AutomationLanesProps> = ({
         : lane?.activeParameter ? [lane.activeParameter] : [];
       // Also include any params that have curves with data (even if not explicitly active)
       const curvesForCh = allCurves.filter(
-        (c) => c.patternId === patternId && c.channelIndex === i && c.points.length > 0
+        (c) => c.patternId === patternId && c.channelIndex === (i + chOff) && c.points.length > 0
       );
       const fromCurves = curvesForCh.map(c => c.parameter);
       // Merge: explicit first, then any from curves not already in the list
@@ -122,7 +131,7 @@ export const AutomationLanes: React.FC<AutomationLanesProps> = ({
       const group: Array<{ curve: AutomationCurve; param: string }> = [];
       for (const p of params) {
         const curve = allCurves.find(
-          (c) => c.patternId === patternId && c.channelIndex === i && c.parameter === p
+          (c) => c.patternId === patternId && c.channelIndex === (i + chOff) && c.parameter === p
         );
         if (curve && curve.points.length > 0) {
           group.push({ curve, param: p });
@@ -152,13 +161,13 @@ export const AutomationLanes: React.FC<AutomationLanesProps> = ({
       const group: Array<{ curve: AutomationCurve; param: string }> = [];
       for (const p of params) {
         const curve = allCurves.find(
-          (c) => c.patternId === prevPatternId && c.channelIndex === i && c.parameter === p
+          (c) => c.patternId === prevPatternId && c.channelIndex === (i + chOff) && c.parameter === p
         );
         if (curve && curve.points.length > 0) group.push({ curve, param: p });
       }
       // Also include curves not in explicit params
       for (const c of allCurves) {
-        if (c.patternId === prevPatternId && c.channelIndex === i && c.points.length > 0
+        if (c.patternId === prevPatternId && c.channelIndex === (i + chOff) && c.points.length > 0
             && !group.some(g => g.param === c.parameter)) {
           group.push({ curve: c, param: c.parameter });
         }
@@ -187,12 +196,12 @@ export const AutomationLanes: React.FC<AutomationLanesProps> = ({
       const group: Array<{ curve: AutomationCurve; param: string }> = [];
       for (const p of params) {
         const curve = allCurves.find(
-          (c) => c.patternId === nextPatternId && c.channelIndex === i && c.parameter === p
+          (c) => c.patternId === nextPatternId && c.channelIndex === (i + chOff) && c.parameter === p
         );
         if (curve && curve.points.length > 0) group.push({ curve, param: p });
       }
       for (const c of allCurves) {
-        if (c.patternId === nextPatternId && c.channelIndex === i && c.points.length > 0
+        if (c.patternId === nextPatternId && c.channelIndex === (i + chOff) && c.points.length > 0
             && !group.some(g => g.param === c.parameter)) {
           group.push({ curve: c, param: c.parameter });
         }
