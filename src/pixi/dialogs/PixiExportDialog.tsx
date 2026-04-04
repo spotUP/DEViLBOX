@@ -75,6 +75,8 @@ export const PixiExportDialog: React.FC<PixiExportDialogProps> = ({ isOpen, onCl
 
   // Audio export state
   const [audioScope, setAudioScope] = useState<'pattern' | 'song' | 'arrangement'>('song');
+  const [audioSampleRate, setAudioSampleRate] = useState(44100);
+  const [audioBitDepth, setAudioBitDepth] = useState<16 | 24 | 32>(16);
 
   // MIDI export state
   const [midiScope, setMidiScope] = useState<'pattern' | 'song'>('song');
@@ -217,6 +219,7 @@ export const PixiExportDialog: React.FC<PixiExportDialogProps> = ({ isOpen, onCl
                 (p: number) => ex.setRenderProgress(p),
               );
             } else if (audioScope === 'arrangement') {
+
               const clips = useArrangementStore.getState?.()?.clips ?? [];
               if (clips.length > 0) {
                 const patternIdToIndex = new Map(ex.patterns.map((p, i) => [p.id, i]));
@@ -234,9 +237,11 @@ export const PixiExportDialog: React.FC<PixiExportDialogProps> = ({ isOpen, onCl
                 break;
               }
             } else if (audioScope === 'song') {
+
               const sequence = ex.patterns.map((_: any, i: number) => i);
               await exportSongAsWav(ex.patterns, sequence, ex.instruments, ex.bpm, ex.metadata.name || 'song', (p: number) => ex.setRenderProgress(p));
             } else {
+
               const pattern = ex.patterns[ex.selectedPatternIndex];
               if (!pattern) { notify.warning('Please select a valid pattern'); break; }
               await exportPatternAsWav(pattern, ex.instruments, ex.bpm, `${ex.metadata.name || 'pattern'}_${ex.selectedPatternIndex}`, (p: number) => ex.setRenderProgress(p));
@@ -338,7 +343,8 @@ export const PixiExportDialog: React.FC<PixiExportDialogProps> = ({ isOpen, onCl
       notify.error('Export failed: ' + (error as Error).message);
     }
   }, [ex, onClose,
-      audioScope, midiScope, midiFormat, midiIncludeAutomation,
+      audioScope, audioSampleRate, audioBitDepth,
+      midiScope, midiFormat, midiIncludeAutomation,
       xmChannels, bakeSynths, modChannels, chipFormat, chipTitle, chipAuthor, chipLoopPoint]);
 
   // ── Import handler ─────────────────────────────────────────────────────────
@@ -551,8 +557,40 @@ export const PixiExportDialog: React.FC<PixiExportDialogProps> = ({ isOpen, onCl
                   </layoutContainer>
                 )}
 
+                {/* Sample rate selector */}
+                <layoutContainer layout={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', width: CONTENT_W - 24 }}>
+                  <PixiLabel text="Sample Rate" size="xs" color="textMuted" />
+                  <PixiSelect
+                    options={[
+                      { value: '22050', label: '22,050 Hz' },
+                      { value: '44100', label: '44,100 Hz' },
+                      { value: '48000', label: '48,000 Hz' },
+                      { value: '88200', label: '88,200 Hz' },
+                      { value: '96000', label: '96,000 Hz' },
+                    ]}
+                    value={String(audioSampleRate)}
+                    onChange={(v) => setAudioSampleRate(Number(v))}
+                    width={160}
+                  />
+                </layoutContainer>
+
+                {/* Bit depth selector */}
+                <layoutContainer layout={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', width: CONTENT_W - 24 }}>
+                  <PixiLabel text="Bit Depth" size="xs" color="textMuted" />
+                  <PixiSelect
+                    options={[
+                      { value: '16', label: '16-bit (PCM)' },
+                      { value: '24', label: '24-bit (PCM)' },
+                      { value: '32', label: '32-bit (Float)' },
+                    ]}
+                    value={String(audioBitDepth)}
+                    onChange={(v) => setAudioBitDepth(Number(v) as 16 | 24 | 32)}
+                    width={160}
+                  />
+                </layoutContainer>
+
                 {/* Metadata display */}
-                <PixiLabel text="Format: WAV 16-bit 44.1kHz" size="xs" font="mono" color="textMuted" />
+                <PixiLabel text={`Format: WAV ${audioBitDepth}-bit ${(audioSampleRate / 1000).toFixed(1)}kHz`} size="xs" font="mono" color="textMuted" />
                 {audioScope === 'arrangement' ? (
                   <>
                     <PixiLabel text={`BPM: ${ex.bpm}`} size="xs" font="mono" color="textMuted" />
