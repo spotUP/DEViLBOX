@@ -134,6 +134,16 @@ interface FormatStore {
   deleteKlysSequenceEntry: (position: number) => void;
   /** Update a single pattern index in the MusicLine per-channel track table */
   setMusicLineTrackEntry: (channel: number, position: number, patternIndex: number) => void;
+  /** Clear a MusicLine track entry to empty (pattern 0, no command) */
+  clearMusicLineTrackEntry: (channel: number, position: number) => void;
+  /** Insert an empty entry at position for a single channel, shifting entries down. Last entry is lost. */
+  insertMusicLineTrackEntry: (channel: number, position: number) => void;
+  /** Remove the entry at position for a single channel, shifting entries up. An empty entry (0) is added at the bottom. */
+  deleteMusicLineTrackEntry: (channel: number, position: number) => void;
+  /** Insert an empty entry at position for ALL channels, shifting entries down. Last entry per channel is lost. */
+  insertMusicLineTrackEntryAllChannels: (position: number) => void;
+  /** Remove the entry at position for ALL channels, shifting entries up. An empty entry (0) is added at the bottom of each. */
+  deleteMusicLineTrackEntryAllChannels: (position: number) => void;
   setSongDBInfo: (info: FormatStore['songDBInfo']) => void;
   setSidMetadata: (info: FormatStore['sidMetadata']) => void;
   setOriginalModuleData: (data: FormatStore['originalModuleData']) => void;
@@ -424,6 +434,52 @@ export const useFormatStore = create<FormatStore>()(
       const track = state.channelTrackTables[channel];
       if (position < 0 || position >= track.length) return;
       track[position] = patternIndex;
+    }),
+    clearMusicLineTrackEntry: (channel, position) => set((state) => {
+      if (!state.channelTrackTables) return;
+      if (channel < 0 || channel >= state.channelTrackTables.length) return;
+      const track = state.channelTrackTables[channel];
+      if (position < 0 || position >= track.length) return;
+      track[position] = 0;
+    }),
+    insertMusicLineTrackEntry: (channel, position) => set((state) => {
+      if (!state.channelTrackTables) return;
+      if (channel < 0 || channel >= state.channelTrackTables.length) return;
+      const track = state.channelTrackTables[channel];
+      if (position < 0 || position >= track.length) return;
+      // Insert empty entry (0) at position, shift down, drop last
+      track.splice(position, 0, 0);
+      track.length = track.length - 1;
+    }),
+    deleteMusicLineTrackEntry: (channel, position) => set((state) => {
+      if (!state.channelTrackTables) return;
+      if (channel < 0 || channel >= state.channelTrackTables.length) return;
+      const track = state.channelTrackTables[channel];
+      if (position < 0 || position >= track.length) return;
+      const len = track.length;
+      // Remove entry at position, shift up, add empty at bottom
+      track.splice(position, 1);
+      track.push(0);
+      // Ensure length stays the same (immer draft safety)
+      track.length = len;
+    }),
+    insertMusicLineTrackEntryAllChannels: (position) => set((state) => {
+      if (!state.channelTrackTables) return;
+      for (const track of state.channelTrackTables) {
+        if (position < 0 || position >= track.length) continue;
+        track.splice(position, 0, 0);
+        track.length = track.length - 1;
+      }
+    }),
+    deleteMusicLineTrackEntryAllChannels: (position) => set((state) => {
+      if (!state.channelTrackTables) return;
+      for (const track of state.channelTrackTables) {
+        if (position < 0 || position >= track.length) continue;
+        const len = track.length;
+        track.splice(position, 1);
+        track.push(0);
+        track.length = len;
+      }
     }),
     setSongDBInfo: (info) => set((state) => { state.songDBInfo = info; }),
     setSidMetadata: (info) => set((state) => { state.sidMetadata = info; }),
