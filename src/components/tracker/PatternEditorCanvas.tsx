@@ -3155,6 +3155,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
                   marginTop: -prevLen * rowHeight,
                   pointerEvents: 'none',
                   zIndex: 5,
+                  clipPath: `inset(0 0 0 ${channelOffsets[0] ?? LINE_NUMBER_WIDTH}px)`,
                 }}
               >
               <AutomationLanes
