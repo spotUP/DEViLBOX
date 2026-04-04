@@ -250,15 +250,15 @@ export const DJDeck: React.FC<DJDeckProps> = ({ deckId }) => {
         </div>
       )}
 
-      {/* Track info + turntable */}
+      {/* Deck header + scopes + turntable */}
       <div className="flex items-start gap-2">
-        <div className="relative z-10 flex-1 min-w-0 overflow-hidden">
+        <div className="flex-1 min-w-0 overflow-hidden">
           <div className={`text-xs font-mono font-bold tracking-[0.3em] uppercase ${deckColor} opacity-60 mb-1`}>
             Deck {deckNum}
           </div>
+          <DeckScopes deckId={deckId} size={64} />
           <DeckTrackInfo deckId={deckId} />
         </div>
-        <DeckScopes deckId={deckId} size={64} />
         {deckViewMode === 'visualizer' && <DeckTurntable deckId={deckId} />}
       </div>
 
@@ -278,9 +278,9 @@ export const DJDeck: React.FC<DJDeckProps> = ({ deckId }) => {
         <div className="flex-1 min-w-0 min-h-0 flex items-center justify-center relative">
           {deckViewMode === 'vinyl' ? (
             <DeckCssTurntable deckId={deckId} />
-          ) : (
+          ) : (hasPatternData || hasAudioWaveform) ? (
             <DeckVisualizer deckId={deckId} resetKey={vizResetKey} />
-          )}
+          ) : null}
 
           {/* Pattern overlay (tracker modules) or oscilloscope (audio-only tracks) */}
           {deckViewMode !== 'visualizer' && (hasPatternData || hasAudioWaveform) && (

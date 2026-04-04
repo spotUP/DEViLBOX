@@ -20,6 +20,8 @@ const BPM_MATCH_THRESHOLD = 0.5; // BPM within 0.5 = "matched"
 
 export const DeckTrackInfo: React.FC<DeckTrackInfoProps> = ({ deckId }) => {
   const trackName = useDJStore((s) => s.decks[deckId].trackName);
+  const trackAuthor = useDJStore((s) => s.decks[deckId].trackAuthor);
+  const fileName = useDJStore((s) => s.decks[deckId].fileName);
   const effectiveBPM = useDJStore((s) => s.decks[deckId].effectiveBPM);
   const detectedBPM = useDJStore((s) => s.decks[deckId].detectedBPM);
   const elapsedMs = useDJStore((s) => s.decks[deckId].elapsedMs);
@@ -105,6 +107,16 @@ export const DeckTrackInfo: React.FC<DeckTrackInfoProps> = ({ deckId }) => {
     return `-${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
   }, [playbackMode, durationMs, elapsedMs]);
 
+  // Author: from store field, or extract from Modland path (e.g. modland:/pub/modules/Protracker/Tip/file.mod → "Tip")
+  const displayAuthor = useMemo(() => {
+    if (trackAuthor) return trackAuthor;
+    if (fileName?.startsWith('modland:')) {
+      const parts = fileName.replace('modland:', '').split('/').filter(Boolean);
+      if (parts.length >= 4) return decodeURIComponent(parts[parts.length - 2]);
+    }
+    return '';
+  }, [trackAuthor, fileName]);
+
   // Analysis state indicator
   const analysisIndicator = useMemo(() => {
     const pct = analysisProgress > 0 ? ` ${analysisProgress}%` : '';
@@ -118,13 +130,13 @@ export const DeckTrackInfo: React.FC<DeckTrackInfoProps> = ({ deckId }) => {
 
   return (
     <div className="flex flex-col gap-1 min-w-0">
-      {/* Track name + analysis state */}
+      {/* Track name + author + analysis state */}
       <div className="flex items-center gap-2">
-        <div
-          className="text-sm text-text-primary truncate flex-1"
-          title={trackName || 'No track loaded'}
-        >
-          {trackName || 'No track loaded'}
+        <div className="text-sm truncate flex-1" title={trackName || 'No track loaded'}>
+          <span className="text-text-primary">{trackName || 'No track loaded'}</span>
+          {displayAuthor && (
+            <span className="text-text-muted ml-1.5">— {displayAuthor}</span>
+          )}
         </div>
         {analysisIndicator && (
           <span className={`text-[9px] font-bold ${analysisIndicator.color} animate-pulse tracking-wider flex-shrink-0`}>

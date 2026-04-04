@@ -643,7 +643,7 @@ const PixiDJTopBar: React.FC<DJTopBarProps> = ({ browserPanel, onBrowserPanelCha
   }, []);
 
   return (
-    <PixiViewHeader activeView="dj" title="DEVILBOX DJ" subtitle="DUAL DECK MIXER">
+    <PixiViewHeader activeView="dj" title="" subtitle="">
 
       {/* Controller selector */}
       <PixiDJControllerSelect width={140} height={24} layout={{ height: 28, width: 140 }} />
