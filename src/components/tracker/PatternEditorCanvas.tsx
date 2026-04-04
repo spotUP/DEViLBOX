@@ -1971,8 +1971,11 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
 
       if (isFormatModeRef.current) {
         const fps = getFormatPlaybackState();
-        isPlaying = fps.isPlaying;
-        playRow = fps.isPlaying ? fps.row : formatCurrentRowRef.current;
+        // Respect the formatIsPlaying prop — the track table matrix passes false
+        // to prevent it from scrolling when FormatPlaybackState is globally active.
+        const fpsActive = fps.isPlaying && formatIsPlayingRef.current;
+        isPlaying = fpsActive;
+        playRow = fpsActive ? fps.row : formatCurrentRowRef.current;
         if (fps.isPlaying && fps.rowDuration > 0) {
           const elapsed = performance.now() - fps.rowChangeTime;
           const progress = Math.min(Math.max(elapsed / fps.rowDuration, 0), 1);
