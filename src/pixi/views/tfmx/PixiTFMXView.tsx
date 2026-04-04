@@ -31,6 +31,8 @@ import {
   TFMX_TRACKSTEP_COLUMNS,
 } from '@/components/tfmx/tfmxAdapter';
 
+import { PixiCollapsibleSection } from '../../components/PixiCollapsibleSection';
+
 const TOOLBAR_HEIGHT = 32;
 const MATRIX_HEIGHT  = 160;
 
@@ -197,8 +199,8 @@ export const PixiTFMXView: React.FC<Props> = ({ width, height }) => {
         />
       </pixiContainer>
 
-      {/* Trackstep Matrix */}
-      <pixiContainer layout={{ width, height: MATRIX_HEIGHT }}>
+      {/* Trackstep Matrix (collapsible) */}
+      <PixiCollapsibleSection label="Tracksteps" width={width} expandedHeight={MATRIX_HEIGHT}>
         <PixiFormatPatternEditor
           width={width}
           height={MATRIX_HEIGHT}
@@ -208,7 +210,7 @@ export const PixiTFMXView: React.FC<Props> = ({ width, height }) => {
           isPlaying={isPlaying}
         />
         <pixiGraphics draw={drawMatrixBorder} layout={{ position: 'absolute', width, height: MATRIX_HEIGHT }} />
-      </pixiContainer>
+      </PixiCollapsibleSection>
 
       {/* Pattern Editor */}
       <pixiContainer layout={{ flex: 1, width, height: Math.max(100, patternEditorHeight) }}>

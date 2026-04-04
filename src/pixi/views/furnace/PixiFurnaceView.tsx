@@ -21,6 +21,8 @@ import { PIXI_FONTS } from '@/pixi/fonts';
 import { PixiFurnaceOrderMatrix } from './PixiFurnaceOrderMatrix';
 import { PixiFurnacePatternEditor } from './PixiFurnacePatternEditor';
 
+import { PixiCollapsibleSection } from '../../components/PixiCollapsibleSection';
+
 const ORDER_MATRIX_HEIGHT = 160;
 const TOOLBAR_HEIGHT = 32;
 
@@ -128,8 +130,8 @@ export const PixiFurnaceView: React.FC<FurnaceViewProps> = ({ width, height }) =
 
       {/* Main content: Order Matrix (top) + Pattern Editor (bottom) */}
       <pixiContainer layout={{ flex: 1, width, flexDirection: 'column' }}>
-        {/* Order Matrix */}
-        <pixiContainer layout={{ width, height: ORDER_MATRIX_HEIGHT }}>
+        {/* Order Matrix (collapsible) */}
+        <PixiCollapsibleSection label="Orders" width={width} expandedHeight={ORDER_MATRIX_HEIGHT}>
           <PixiFurnaceOrderMatrix
             width={width}
             height={ORDER_MATRIX_HEIGHT}
@@ -138,7 +140,7 @@ export const PixiFurnaceView: React.FC<FurnaceViewProps> = ({ width, height }) =
             onPositionChange={handlePositionChange}
             onOrderChange={handleOrderChange}
           />
-        </pixiContainer>
+        </PixiCollapsibleSection>
 
         {/* Pattern Editor */}
         <PixiFurnacePatternEditor

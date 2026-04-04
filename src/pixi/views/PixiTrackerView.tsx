@@ -50,6 +50,7 @@ import { useTrackerView } from '@/hooks/views/useTrackerView';
 import { useMIDIFeedback } from '@/hooks/useMIDIFeedback';
 import { AUTOMATION_LANE_WIDTH, AUTOMATION_LANE_MIN } from '@/hooks/views/usePatternEditor';
 import { useTrackerStore, useUIStore, useInstrumentStore, useEditorStore, useAutomationStore, useFormatStore } from '@stores';
+import { useEffect } from 'react';
 import { useWorkbenchStore } from '@stores/useWorkbenchStore';
 import { useSettingsStore } from '@stores/useSettingsStore';
 import { useMIDIStore } from '@stores/useMIDIStore';
@@ -65,6 +66,19 @@ const MIDI_KNOB_BAR_H_EXPANDED = 56;
 
 export const PixiTrackerView: React.FC = () => {
   const theme = usePixiTheme();
+  const editorFullscreen = useUIStore(s => s.editorFullscreen);
+  const toggleEditorFullscreen = useUIStore(s => s.toggleEditorFullscreen);
+
+  // Escape exits editor fullscreen
+  useEffect(() => {
+    if (!editorFullscreen) return;
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') { toggleEditorFullscreen(); e.preventDefault(); }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [editorFullscreen, toggleEditorFullscreen]);
+
   // Shared logic: keyboard hooks, view mode, grid channel, editor mode, ML export
   const {
     viewMode,
@@ -96,7 +110,7 @@ export const PixiTrackerView: React.FC = () => {
 
   // Hide instrument panel on narrow windows (matches DOM TrackerView)
   const canShowInstrumentPanel = windowWidth >= 900;
-  const instrumentPanelVisible = viewMode !== 'tb303' && viewMode !== 'sunvox' && canShowInstrumentPanel && showInstrumentPanel;
+  const instrumentPanelVisible = !editorFullscreen && viewMode !== 'tb303' && viewMode !== 'sunvox' && canShowInstrumentPanel && showInstrumentPanel;
   const INSTRUMENT_PANEL_W = 200;
 
   // Pattern data for automation/macro lanes overlay.
@@ -222,26 +236,42 @@ export const PixiTrackerView: React.FC = () => {
         flexDirection: 'column',
       }}
     >
-      {/* FT2 Toolbar + Menu bar */}
-      <PixiFT2Toolbar />
+      {/* FT2 Toolbar + Menu bar (hidden in fullscreen) */}
+      {!editorFullscreen && <PixiFT2Toolbar />}
 
-      {/* TB-303 Knob Panel — shown when a TB-303 instrument is active and not in TB-303/SunVox view */}
-      <pixiContainer layout={{ width: '100%', height: tb303PanelH, flexShrink: 0 }} alpha={tb303PanelH > 0 ? 1 : 0} renderable={tb303PanelH > 0}>
-        <PixiTB303KnobPanel width={windowWidth} />
-      </pixiContainer>
+      {/* Knob panels (hidden in fullscreen) */}
+      {!editorFullscreen && (
+        <>
+          <pixiContainer layout={{ width: '100%', height: tb303PanelH, flexShrink: 0 }} alpha={tb303PanelH > 0 ? 1 : 0} renderable={tb303PanelH > 0}>
+            <PixiTB303KnobPanel width={windowWidth} />
+          </pixiContainer>
+          <pixiContainer layout={{ width: '100%', height: scPanelH, flexShrink: 0 }} alpha={scPanelH > 0 ? 1 : 0} renderable={scPanelH > 0}>
+            <PixiSCKnobPanel width={windowWidth} />
+          </pixiContainer>
+          <pixiContainer layout={{ width: '100%', height: cmiPanelH, flexShrink: 0 }} alpha={cmiPanelH > 0 ? 1 : 0} renderable={cmiPanelH > 0}>
+            <PixiCMIKnobPanel width={windowWidth} />
+          </pixiContainer>
+        </>
+      )}
 
-      {/* SuperCollider Knob Panel — shown when an SC instrument with compiled binary is active */}
-      <pixiContainer layout={{ width: '100%', height: scPanelH, flexShrink: 0 }} alpha={scPanelH > 0 ? 1 : 0} renderable={scPanelH > 0}>
-        <PixiSCKnobPanel width={windowWidth} />
-      </pixiContainer>
-
-      {/* Fairlight CMI Knob Panel — shown when a MAMECMI instrument is active */}
-      <pixiContainer layout={{ width: '100%', height: cmiPanelH, flexShrink: 0 }} alpha={cmiPanelH > 0 ? 1 : 0} renderable={cmiPanelH > 0}>
-        <PixiCMIKnobPanel width={windowWidth} />
-      </pixiContainer>
-
-      {/* Editor controls bar — pure Pixi, no DOM overlay */}
-      <PixiEditorControlsBar viewMode={viewMode} onViewModeChange={setViewMode} gridChannelIndex={gridChannelIndex} onGridChannelChange={setGridChannelIndex} />
+      {/* Editor controls bar (hidden in fullscreen, show minimal exit button) */}
+      {editorFullscreen ? (
+        <pixiContainer
+          eventMode="static"
+          cursor="pointer"
+          onPointerUp={toggleEditorFullscreen}
+          layout={{ width: '100%', height: 18, flexDirection: 'row', alignItems: 'center', paddingLeft: 6 }}
+        >
+          <pixiBitmapText
+            eventMode="none"
+            text="Exit Fullscreen"
+            style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 9, fill: 0xffffff }}
+            tint={theme.textMuted.color}
+          />
+        </pixiContainer>
+      ) : (
+        <PixiEditorControlsBar viewMode={viewMode} onViewModeChange={setViewMode} gridChannelIndex={gridChannelIndex} onGridChannelChange={setGridChannelIndex} />
+      )}
 
       {/* Main content: editor + instrument panel */}
       <pixiContainer
