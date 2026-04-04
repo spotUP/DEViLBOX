@@ -1342,7 +1342,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
     const base: UIStateSnapshot = {
       useHex:             ui.useHexNumbers,
       blankEmpty:         ui.blankEmptyCells,
-      showGhostPatterns:  editor.showGhostPatterns,
+      showGhostPatterns:  isFormatMode ? false : editor.showGhostPatterns,
       columnVisibility:   editor.columnVisibility,
       trackerVisualBg:    settings.trackerVisualBg,
       recordMode:         editor.recordMode,
