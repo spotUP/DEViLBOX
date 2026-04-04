@@ -1012,6 +1012,9 @@ export function createTalNoizeMaker(config: InstrumentConfig): Tone.ToneAudioNod
   const nativePresetName = (config as unknown as Record<string, unknown>).talNativePatch;
   if (typeof nativePresetName === 'string') {
     synth.loadNativePreset(nativePresetName);
+  } else {
+    // Load first native preset as default — WASM init state is silent without a patch
+    synth.loadNativePreset('! Startup Juno Osc TAL');
   }
 
   synth.output.gain.value = Tone.dbToGain(getNormalizedVolume('TalNoizeMaker', config.volume));
