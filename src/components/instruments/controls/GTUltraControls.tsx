@@ -433,35 +433,38 @@ export const GTUltraControls: React.FC<GTUltraControlsProps> = ({
       <div className="flex flex-col gap-3 p-3 overflow-y-auto synth-controls-flow" style={{ maxHeight: 'calc(100vh - 280px)' }}>
         {Array.from({ length: chipCount }, (_, chipIdx) => (
           <div key={chipIdx} className={`rounded-lg border p-3 ${panelBg}`}>
-            <SectionLabel color={accentColor} label={chipCount > 1 ? `SID ${chipIdx + 1}` : 'SID Registers'} />
-            <div className="font-mono text-[10px]" style={{ lineHeight: '1.6' }}>
-              {[0, 1, 2].map((voice) => {
-                const base = voice * 7;
-                return (
-                  <div key={voice} className="mb-1.5">
-                    <div className="text-[9px] font-bold mb-0.5" style={{ color: accentColor, opacity: 0.6 }}>Voice {voice + 1}</div>
-                    <div className="grid gap-x-2" style={{ gridTemplateColumns: 'auto 1fr' }}>
-                      {SID_VOICE_REGS.map(({ offset, label }) => {
-                        const reg = base + offset, val = sidRegisters[chipIdx]?.[reg] ?? 0;
-                        return (<React.Fragment key={reg}>
-                          <span className="text-text-secondary text-right">R{reg.toString().padStart(2, '0')} {label}</span>
-                          <span style={{ color: val > 0 ? accentColor : '#444' }}>{hex2(val)}</span>
-                        </React.Fragment>);
-                      })}
+            {chipCount > 1 && <SectionLabel color={accentColor} label={`SID ${chipIdx + 1}`} />}
+            <div className="font-mono text-xs" style={{ lineHeight: '1.6' }}>
+              {/* Voices + Filter side by side */}
+              <div className="grid gap-3" style={{ gridTemplateColumns: 'repeat(4, 1fr)' }}>
+                {[0, 1, 2].map((voice) => {
+                  const base = voice * 7;
+                  return (
+                    <div key={voice}>
+                      <div className="text-xs font-bold mb-1" style={{ color: accentColor, opacity: 0.6 }}>Voice {voice + 1}</div>
+                      <div className="grid gap-x-2" style={{ gridTemplateColumns: 'auto 1fr' }}>
+                        {SID_VOICE_REGS.map(({ offset, label }) => {
+                          const reg = base + offset, val = sidRegisters[chipIdx]?.[reg] ?? 0;
+                          return (<React.Fragment key={reg}>
+                            <span className="text-text-secondary text-right">{label}</span>
+                            <span style={{ color: val > 0 ? accentColor : '#444' }}>{hex2(val)}</span>
+                          </React.Fragment>);
+                        })}
+                      </div>
                     </div>
+                  );
+                })}
+                <div>
+                  <div className="text-xs font-bold mb-1" style={{ color: accentColor, opacity: 0.6 }}>Filter</div>
+                  <div className="grid gap-x-2" style={{ gridTemplateColumns: 'auto 1fr' }}>
+                    {SID_GLOBAL_REGS.map(({ offset, label }) => {
+                      const val = sidRegisters[chipIdx]?.[offset] ?? 0;
+                      return (<React.Fragment key={offset}>
+                        <span className="text-text-secondary text-right">{label}</span>
+                        <span style={{ color: val > 0 ? accentColor : '#444' }}>{hex2(val)}</span>
+                      </React.Fragment>);
+                    })}
                   </div>
-                );
-              })}
-              <div className="mt-1">
-                <div className="text-[9px] font-bold mb-0.5" style={{ color: accentColor, opacity: 0.6 }}>Filter</div>
-                <div className="grid gap-x-2" style={{ gridTemplateColumns: 'auto 1fr' }}>
-                  {SID_GLOBAL_REGS.map(({ offset, label }) => {
-                    const val = sidRegisters[chipIdx]?.[offset] ?? 0;
-                    return (<React.Fragment key={offset}>
-                      <span className="text-text-secondary text-right">R{offset.toString().padStart(2, '0')} {label}</span>
-                      <span style={{ color: val > 0 ? accentColor : '#444' }}>{hex2(val)}</span>
-                    </React.Fragment>);
-                  })}
                 </div>
               </div>
             </div>
