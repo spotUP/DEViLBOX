@@ -55,42 +55,11 @@ const SliderSample: React.FC<{ label: string; color?: string }> = ({ label, colo
   );
 };
 
-// ── ADSR mini canvas ──
-const ADSRMini: React.FC<{ a: number; d: number; s: number; r: number; color: string; width?: number; height?: number }> = ({ a, d, s, r, color, width = 160, height = 50 }) => {
-  const ref = useRef<HTMLCanvasElement>(null);
-  useEffect(() => {
-    const c = ref.current;
-    if (!c) return;
-    const ctx = c.getContext('2d');
-    if (!ctx) return;
-    ctx.clearRect(0, 0, width, height);
-    const ATTACK_MS = [2, 8, 16, 24, 38, 56, 68, 80, 100, 250, 500, 800, 1000, 3000, 5000, 8000];
-    const DECAY_MS = [6, 24, 48, 72, 114, 168, 204, 240, 300, 750, 1500, 2400, 3000, 9000, 15000, 24000];
-    const aT = ATTACK_MS[a] / 1000, dT = DECAY_MS[d] / 1000, sL = s / 15, rT = DECAY_MS[r] / 1000;
-    const total = aT + dT + rT + 0.2;
-    const tx = (t: number) => (t / total) * width;
-    const ly = (l: number) => height * (1 - l);
-    ctx.beginPath();
-    ctx.moveTo(0, height);
-    ctx.lineTo(tx(aT), 2);
-    ctx.lineTo(tx(aT + dT), ly(sL));
-    ctx.lineTo(tx(aT + dT + 0.2), ly(sL));
-    ctx.lineTo(tx(total), height);
-    ctx.closePath();
-    ctx.fillStyle = color + '25';
-    ctx.fill();
-    ctx.beginPath();
-    ctx.moveTo(0, height);
-    ctx.lineTo(tx(aT), 2);
-    ctx.lineTo(tx(aT + dT), ly(sL));
-    ctx.lineTo(tx(aT + dT + 0.2), ly(sL));
-    ctx.lineTo(tx(total), height);
-    ctx.strokeStyle = color;
-    ctx.lineWidth = 2;
-    ctx.stroke();
-  }, [a, d, s, r, color, width, height]);
-  return <canvas ref={ref} width={width} height={height} style={{ width, height, borderRadius: 4, background: '#121218', border: '1px solid #2a2a3a' }} />;
-};
+// ── ADSR mini — uses shared EnvelopeVisualization ──
+import { EnvelopeVisualization } from '@components/instruments/shared';
+const ADSRMini: React.FC<{ a: number; d: number; s: number; r: number; color: string; width?: number; height?: number }> = ({ a, d, s, r, color, width = 160, height = 50 }) => (
+  <EnvelopeVisualization mode="sid" attack={a} decay={d} sustain={s} release={r} width={width} height={height} color={color} backgroundColor="#121218" border="1px solid #2a2a3a" />
+);
 
 // ── Large Component Mocks ──
 
