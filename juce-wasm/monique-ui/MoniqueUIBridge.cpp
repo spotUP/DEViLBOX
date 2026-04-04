@@ -83,13 +83,11 @@ static juce::Image* g_framebuffer = nullptr;
 static int g_fbWidth = FB_WIDTH;
 static int g_fbHeight = FB_HEIGHT;
 
-// Parameter change tracking — snapshot of values from last tick
-static float* g_paramSnapshot = nullptr;
-static int g_numParams = 0;
-
-// Map from automateable_parameters index → audio WASM param index
-// Built at init by matching Parameter* pointers against known synth_data fields
-static int* g_paramToAudioIndex = nullptr;
+// Parameter change tracking — direct pointers to synth_data fields
+// in the same order as the audio WASM's MoniqueParams enum (120 params).
+static constexpr int AUDIO_PARAM_COUNT = 120;
+static Parameter* g_audioParams[AUDIO_PARAM_COUNT] = {};
+static float g_audioSnapshot[AUDIO_PARAM_COUNT] = {};
 
 // Defined in juce_Messaging_wasm.cpp — drains the deferred message queue
 extern "C" void juce_wasm_dispatch_messages();
@@ -145,18 +143,102 @@ void monique_ui_init(int sampleRate)
 
     g_framebuffer = new juce::Image(juce::Image::ARGB, g_fbWidth, g_fbHeight, true);
 
-    // Initialize parameter change tracking
+    // Build direct parameter pointer array matching audio WASM's MoniqueParams enum.
+    // This ensures index parity between UI polling and audio setParam.
     if (g_processor->synth_data) {
-        auto& params = g_processor->synth_data->get_atomateable_parameters();
-        g_numParams = params.size();
-        g_paramSnapshot = new float[g_numParams];
-        for (int i = 0; i < g_numParams; i++) {
-            g_paramSnapshot[i] = params.getUnchecked(i)->get_value();
+        auto* sd = g_processor->synth_data;
+        int p = 0;
+        // Master (5): volume, glide, octave_offset, note_offset, sync
+        g_audioParams[p++] = &sd->volume;
+        g_audioParams[p++] = &sd->glide;
+        g_audioParams[p++] = &sd->octave_offset;
+        g_audioParams[p++] = &sd->note_offset;
+        g_audioParams[p++] = &sd->sync;
+        // Osc1-3 (4 each = 12): wave, tune, fm_amount, sync
+        for (int i = 0; i < 3; i++) {
+            g_audioParams[p++] = &sd->osc_datas[i]->wave;
+            g_audioParams[p++] = &sd->osc_datas[i]->tune;
+            g_audioParams[p++] = &sd->osc_datas[i]->fm_amount;
+            g_audioParams[p++] = &sd->osc_datas[i]->sync;
         }
+        // FM Osc (4): fm_freq, fm_shape, fm_swing, master_shift
+        g_audioParams[p++] = &sd->fm_osc_data->fm_freq;
+        g_audioParams[p++] = &sd->fm_osc_data->fm_shape;
+        g_audioParams[p++] = &sd->fm_osc_data->fm_swing;
+        g_audioParams[p++] = &sd->fm_osc_data->master_shift;
+        // Filter1-3 (7 each = 21): type, cutoff, resonance, distortion, output, pan, adsr_lfo_mix
+        for (int i = 0; i < 3; i++) {
+            g_audioParams[p++] = &sd->filter_datas[i]->filter_type;
+            g_audioParams[p++] = &sd->filter_datas[i]->cutoff;
+            g_audioParams[p++] = &sd->filter_datas[i]->resonance;
+            g_audioParams[p++] = &sd->filter_datas[i]->distortion;
+            g_audioParams[p++] = &sd->filter_datas[i]->output;
+            g_audioParams[p++] = &sd->filter_datas[i]->pan;
+            g_audioParams[p++] = &sd->filter_datas[i]->adsr_lfo_mix;
+        }
+        // FiltEnv1-3 via filter_datas[i]->env_data (6 each = 18)
+        for (int i = 0; i < 3; i++) {
+            g_audioParams[p++] = &sd->filter_datas[i]->env_data->attack;
+            g_audioParams[p++] = &sd->filter_datas[i]->env_data->decay;
+            g_audioParams[p++] = &sd->filter_datas[i]->env_data->sustain;
+            g_audioParams[p++] = &sd->filter_datas[i]->env_data->sustain_time;
+            g_audioParams[p++] = &sd->filter_datas[i]->env_data->release;
+            g_audioParams[p++] = &sd->filter_datas[i]->env_data->shape;
+        }
+        // Env — main output (6)
+        g_audioParams[p++] = &sd->env_data->attack;
+        g_audioParams[p++] = &sd->env_data->decay;
+        g_audioParams[p++] = &sd->env_data->sustain;
+        g_audioParams[p++] = &sd->env_data->sustain_time;
+        g_audioParams[p++] = &sd->env_data->release;
+        g_audioParams[p++] = &sd->env_data->shape;
+        // LFO1-3 (3 each = 9): speed, wave, phase_shift
+        for (int i = 0; i < 3; i++) {
+            g_audioParams[p++] = &sd->lfo_datas[i]->speed;
+            g_audioParams[p++] = &sd->lfo_datas[i]->wave;
+            g_audioParams[p++] = &sd->lfo_datas[i]->phase_shift;
+        }
+        // MFO1-4 (3 each = 12): speed, wave, phase_shift
+        for (int i = 0; i < 4; i++) {
+            g_audioParams[p++] = &sd->mfo_datas[i]->speed;
+            g_audioParams[p++] = &sd->mfo_datas[i]->wave;
+            g_audioParams[p++] = &sd->mfo_datas[i]->phase_shift;
+        }
+        // Routing — filter input sustain levels (3 filters x 3 oscs = 9)
+        for (int f = 0; f < 3; f++)
+            for (int o = 0; o < 3; o++)
+                g_audioParams[p++] = &sd->filter_datas[f]->input_sustains[o];
+        // FX (8): distortion, shape, delay, delay_pan, reverb room, reverb mix, chorus mod, bypass
+        g_audioParams[p++] = &sd->distortion;
+        g_audioParams[p++] = &sd->shape;
+        g_audioParams[p++] = &sd->delay;
+        g_audioParams[p++] = &sd->delay_pan;
+        g_audioParams[p++] = &sd->reverb_data->room;
+        g_audioParams[p++] = &sd->reverb_data->dry_wet_mix;
+        g_audioParams[p++] = &sd->chorus_data->modulation;
+        g_audioParams[p++] = &sd->effect_bypass;
+        // Morph (4)
+        for (int i = 0; i < 4; i++)
+            g_audioParams[p++] = &sd->morhp_states[i];
+        // Arp (4): is_on, is_sequencer, speed_multi, shuffle
+        g_audioParams[p++] = &sd->arp_sequencer_data->is_on;
+        g_audioParams[p++] = &sd->arp_sequencer_data->connect;
+        g_audioParams[p++] = &sd->arp_sequencer_data->speed_multi;
+        g_audioParams[p++] = &sd->arp_sequencer_data->shuffle;
+        // EQ (8): 7 bands + bypass
+        for (int i = 0; i < 7; i++)
+            g_audioParams[p++] = &sd->eq_data->velocity[i];
+        g_audioParams[p++] = &sd->eq_data->bypass;
+
+        // Initialize snapshot
+        for (int i = 0; i < AUDIO_PARAM_COUNT; i++) {
+            g_audioSnapshot[i] = g_audioParams[i] ? g_audioParams[i]->get_value() : 0.0f;
+        }
+        EM_ASM({ console.log("[MoniqueUI WASM] Mapped " + $0 + " audio params for sync"); }, p);
     }
 
     EM_ASM({ console.log("[MoniqueUI WASM] Init complete: " + $0 + "x" + $1 + ", params=" + $2); },
-            g_fbWidth, g_fbHeight, g_numParams);
+            g_fbWidth, g_fbHeight, AUDIO_PARAM_COUNT);
 }
 
 EMSCRIPTEN_KEEPALIVE
@@ -169,9 +251,18 @@ void monique_ui_tick()
     if (g_processor->ui_refresher)
         g_processor->ui_refresher->timerCallback();
 
-    // TODO: Poll synth_data parameters and forward changes to audio engine.
-    // Requires building a mapping from automateable_parameters indices to
-    // the audio WASM's MoniqueParams enum. See handoff doc for details.
+    // Poll synth_data parameters and forward changes to audio engine
+    for (int i = 0; i < AUDIO_PARAM_COUNT; i++) {
+        if (!g_audioParams[i]) continue;
+        float val = g_audioParams[i]->get_value();
+        if (val != g_audioSnapshot[i]) {
+            g_audioSnapshot[i] = val;
+            EM_ASM({
+                if (window._moniqueUIParamCallback)
+                    window._moniqueUIParamCallback($0, $1);
+            }, i, val);
+        }
+    }
 
     juce::Graphics g(*g_framebuffer);
     g.fillAll(juce::Colours::black);
@@ -249,27 +340,22 @@ void monique_ui_on_mouse_wheel(int x, int y, float deltaX, float deltaY)
 EMSCRIPTEN_KEEPALIVE
 int monique_ui_get_num_params()
 {
-    return g_numParams;
+    return AUDIO_PARAM_COUNT;
 }
 
 EMSCRIPTEN_KEEPALIVE
 float monique_ui_get_param(int index)
 {
-    if (!g_processor || !g_processor->synth_data) return 0.0f;
-    auto& params = g_processor->synth_data->get_atomateable_parameters();
-    if (index < 0 || index >= params.size()) return 0.0f;
-    return params.getUnchecked(index)->get_value();
+    if (index < 0 || index >= AUDIO_PARAM_COUNT || !g_audioParams[index]) return 0.0f;
+    return g_audioParams[index]->get_value();
 }
 
 EMSCRIPTEN_KEEPALIVE
 void monique_ui_set_param(int index, float value)
 {
-    if (!g_processor || !g_processor->synth_data) return;
-    auto& params = g_processor->synth_data->get_atomateable_parameters();
-    if (index < 0 || index >= params.size()) return;
-    params.getUnchecked(index)->set_value(value);
-    if (g_paramSnapshot && index < g_numParams)
-        g_paramSnapshot[index] = value; // update snapshot to avoid re-triggering callback
+    if (index < 0 || index >= AUDIO_PARAM_COUNT || !g_audioParams[index]) return;
+    g_audioParams[index]->set_value(value);
+    g_audioSnapshot[index] = value;
 }
 
 EMSCRIPTEN_KEEPALIVE
@@ -284,7 +370,7 @@ void monique_ui_shutdown()
     delete g_midiForwarder; g_midiForwarder = nullptr;
     delete g_editor;      g_editor = nullptr;
     delete g_framebuffer; g_framebuffer = nullptr;
-    delete[] g_paramSnapshot; g_paramSnapshot = nullptr; g_numParams = 0;
+    for (int i = 0; i < AUDIO_PARAM_COUNT; i++) g_audioParams[i] = nullptr;
     delete g_processor;   g_processor = nullptr;
 }
 
