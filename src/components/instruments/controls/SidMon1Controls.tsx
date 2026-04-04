@@ -34,12 +34,13 @@
  *                at sections.waveData + phaseShift * 32
  */
 
-import React, { useRef, useEffect, useCallback, useState } from 'react';
+import React, { useRef, useEffect, useCallback, useState, useMemo } from 'react';
 import type { SidMon1Config, UADEChipRamInfo } from '@/types/instrument';
 import { Knob } from '@components/controls/Knob';
 import { useThemeStore } from '@stores';
-import { SequenceEditor, EnvelopeVisualization } from '@components/instruments/shared';
-import type { SequencePreset } from '@components/instruments/shared';
+import { EnvelopeVisualization } from '@components/instruments/shared';
+import { PatternEditorCanvas } from '@/components/tracker/PatternEditorCanvas';
+import type { ColumnDef, FormatChannel, FormatCell, OnCellChange } from '@/components/shared/format-editor-types';
 import { UADEChipEditor } from '@/engine/uade/UADEChipEditor';
 import { UADEEngine } from '@/engine/uade/UADEEngine';
 
@@ -52,33 +53,40 @@ interface SidMon1ControlsProps {
 
 type SM1Tab = 'main' | 'arpeggio' | 'waveform';
 
-// ── Presets ────────────────────────────────────────────────────────────────────
+// ── PatternEditorCanvas column definitions ─────────────────────────────────
 
-const ARP_PRESETS: SequencePreset[] = [
-  { name: 'Major',  data: [0, 4, 7, 0, 4, 7, 12, 12, 0, 4, 7, 0, 4, 7, 12, 12], loop: 0 },
-  { name: 'Minor',  data: [0, 3, 7, 0, 3, 7, 12, 12, 0, 3, 7, 0, 3, 7, 12, 12], loop: 0 },
-  { name: 'Octave', data: [0, 12, 0, 12, 0, 12, 0, 12, 0, 12, 0, 12, 0, 12, 0, 12], loop: 0 },
-  { name: 'Clear',  data: new Array(16).fill(0) },
+const ARP_COLUMN: ColumnDef[] = [
+  {
+    key: 'value',
+    label: 'Arp',
+    charWidth: 3,
+    type: 'hex',
+    color: '#44aaff',
+    emptyColor: 'var(--color-border-light)',
+    emptyValue: 0,
+    hexDigits: 2,
+    formatter: (v: number) => v.toString(16).toUpperCase().padStart(2, '0'),
+  },
 ];
 
-const WAVE_PRESETS: SequencePreset[] = [
+function signedHex2(val: number): string {
+  if (val === 0) return ' 00';
+  const abs = Math.abs(val);
+  const sign = val < 0 ? '-' : '+';
+  return `${sign}${abs.toString(16).toUpperCase().padStart(2, '0')}`;
+}
+
+const WAVE_COLUMN: ColumnDef[] = [
   {
-    name: 'Sine',
-    data: Array.from({ length: 32 }, (_, i) => Math.round(Math.sin((i / 32) * Math.PI * 2) * 100)),
-  },
-  {
-    name: 'Saw',
-    data: Array.from({ length: 32 }, (_, i) => Math.round(((i / 31) * 2 - 1) * 100)),
-  },
-  {
-    name: 'Square',
-    data: Array.from({ length: 32 }, (_, i) => (i < 16 ? 100 : -100)),
-  },
-  {
-    name: 'Triangle',
-    data: Array.from({ length: 32 }, (_, i) =>
-      i < 16 ? Math.round((i / 15) * 2 - 1) * 100 : Math.round((1 - ((i - 16) / 15)) * 2 - 1) * 100
-    ),
+    key: 'value',
+    label: 'Wave',
+    charWidth: 3,
+    type: 'hex',
+    color: '#44aaff',
+    emptyColor: 'var(--color-border-light)',
+    emptyValue: 0,
+    hexDigits: 2,
+    formatter: signedHex2,
   },
 ];
 
@@ -232,101 +240,124 @@ export const SidMon1Controls: React.FC<SidMon1ControlsProps> = ({ config, onChan
   );
 
   // ── ARPEGGIO TAB ──────────────────────────────────────────────────────────
-  const renderArpeggio = () => {
+
+  const arpChannels = useMemo((): FormatChannel[] => {
     const arp = config.arpeggio ?? new Array(16).fill(0);
-    return (
-      <div className="flex flex-col gap-3 p-3 overflow-y-auto" style={{ maxHeight: 'calc(100vh - 280px)' }}>
-        <div className={`rounded-lg border p-3 ${panelBg}`}>
-          <SectionLabel label="Arpeggio (16 steps)" />
-          <SequenceEditor
-            label="Arpeggio"
-            data={arp}
-            onChange={(d) => {
-              upd('arpeggio', d);
-              // Write all 16 arpeggio bytes as a block at instrBase + 4
-              if (uadeChipRam) {
-                void getEditor().writeBlock(uadeChipRam.instrBase + 4, d.slice(0, 16));
-              }
-            }}
-            min={0} max={255}
-            fixedLength
-            presets={ARP_PRESETS}
-            color={accent}
-            height={80}
-            cellFormat="hex"
-            showCells
+    const rows: FormatCell[] = arp.map((v) => ({ value: v }));
+    return [{ label: 'Arp', patternLength: arp.length, rows, isPatternChannel: false }];
+  }, [config.arpeggio]);
+
+  const arpCellChange = useMemo((): OnCellChange => {
+    return (_ch: number, row: number, _col: string, value: number) => {
+      const arp = [...(configRef.current.arpeggio ?? new Array(16).fill(0))];
+      arp[row] = value & 0xFF;
+      upd('arpeggio', arp);
+      if (uadeChipRam) {
+        void getEditor().writeBlock(uadeChipRam.instrBase + 4, arp.slice(0, 16));
+      }
+    };
+  }, [upd, uadeChipRam, getEditor]);
+
+  const renderArpeggio = () => (
+    <div className="flex flex-col gap-3 p-3" style={{ height: 'calc(100vh - 280px)' }}>
+      <div className={`rounded-lg border p-3 ${panelBg} flex flex-col`} style={{ flex: 1, minHeight: 0 }}>
+        <SectionLabel label="Arpeggio (16 steps, unsigned byte)" />
+        <div style={{ flex: 1, minHeight: 120 }}>
+          <PatternEditorCanvas
+            formatColumns={ARP_COLUMN}
+            formatChannels={arpChannels}
+            formatCurrentRow={0}
+            formatIsPlaying={false}
+            onFormatCellChange={arpCellChange}
+            hideVUMeters={true}
           />
         </div>
       </div>
-    );
-  };
+    </div>
+  );
 
   // ── WAVEFORM TAB ──────────────────────────────────────────────────────────
-  const renderWaveform = () => {
-    const mainWave  = config.mainWave  ?? new Array(32).fill(0);
-    const phaseWave = config.phaseWave ?? new Array(32).fill(0);
 
-    return (
-      <div className="flex flex-col gap-3 p-3 overflow-y-auto" style={{ maxHeight: 'calc(100vh - 280px)' }}>
+  const mainWaveChannels = useMemo((): FormatChannel[] => {
+    const wave = config.mainWave ?? new Array(32).fill(0);
+    const rows: FormatCell[] = wave.map((v) => ({ value: v }));
+    return [{ label: 'Main', patternLength: wave.length, rows, isPatternChannel: false }];
+  }, [config.mainWave]);
 
-        {/* Main Wave */}
-        <div className={`rounded-lg border p-3 ${panelBg}`}>
-          <SectionLabel label="Main Wave (32 bytes)" />
-          <SequenceEditor
-            label="Main Wave"
-            data={mainWave}
-            onChange={(d) => {
-              upd('mainWave', d);
-              if (uadeChipRam && uadeChipRam.sections.waveData) {
-                // Read waveform index from instrBase+0..+3, write 32 bytes
-                void (async () => {
-                  const editor = getEditor();
-                  const waveIdx = await editor.readU32(uadeChipRam.instrBase);
-                  const addr = uadeChipRam.sections.waveData + waveIdx * 32;
-                  // Convert signed int8 → unsigned byte for chip RAM
-                  const bytes = d.slice(0, 32).map((v) => ((v ?? 0) + 256) & 0xFF);
-                  void editor.writeBlock(addr, bytes);
-                })();
-              }
-            }}
-            min={-128} max={127}
-            bipolar
-            fixedLength
-            presets={WAVE_PRESETS}
-            color={accent}
-            height={80}
-          />
-        </div>
+  const mainWaveCellChange = useMemo((): OnCellChange => {
+    return (_ch: number, row: number, _col: string, value: number) => {
+      const wave = [...(configRef.current.mainWave ?? new Array(32).fill(0))];
+      // Hex input gives unsigned 0-FF; treat >127 as signed
+      wave[row] = value > 127 ? value - 256 : value;
+      upd('mainWave', wave);
+      if (uadeChipRam && uadeChipRam.sections.waveData) {
+        void (async () => {
+          const editor = getEditor();
+          const waveIdx = await editor.readU32(uadeChipRam.instrBase);
+          const addr = uadeChipRam.sections.waveData + waveIdx * 32;
+          const bytes = wave.slice(0, 32).map((v) => ((v ?? 0) + 256) & 0xFF);
+          void editor.writeBlock(addr, bytes);
+        })();
+      }
+    };
+  }, [upd, uadeChipRam, getEditor]);
 
-        {/* Phase Wave */}
-        <div className={`rounded-lg border p-3 ${panelBg}`}>
-          <SectionLabel label="Phase Wave (32 bytes)" />
-          <SequenceEditor
-            label="Phase Wave"
-            data={phaseWave}
-            onChange={(d) => {
-              upd('phaseWave', d);
-              if (uadeChipRam && uadeChipRam.sections.waveData) {
-                // phaseShift index at instrBase+28; write 32 bytes at waveData + phaseShift * 32
-                const phaseIdx = config.phaseShift ?? 0;
-                if (phaseIdx > 0) {
-                  const addr = uadeChipRam.sections.waveData + phaseIdx * 32;
-                  const bytes = d.slice(0, 32).map((v) => ((v ?? 0) + 256) & 0xFF);
-                  void getEditor().writeBlock(addr, bytes);
-                }
-              }
-            }}
-            min={-128} max={127}
-            bipolar
-            fixedLength
-            presets={WAVE_PRESETS}
-            color={knob}
-            height={80}
+  const phaseWaveChannels = useMemo((): FormatChannel[] => {
+    const wave = config.phaseWave ?? new Array(32).fill(0);
+    const rows: FormatCell[] = wave.map((v) => ({ value: v }));
+    return [{ label: 'Phase', patternLength: wave.length, rows, isPatternChannel: false }];
+  }, [config.phaseWave]);
+
+  const phaseWaveCellChange = useMemo((): OnCellChange => {
+    return (_ch: number, row: number, _col: string, value: number) => {
+      const wave = [...(configRef.current.phaseWave ?? new Array(32).fill(0))];
+      wave[row] = value > 127 ? value - 256 : value;
+      upd('phaseWave', wave);
+      if (uadeChipRam && uadeChipRam.sections.waveData) {
+        const phaseIdx = configRef.current.phaseShift ?? 0;
+        if (phaseIdx > 0) {
+          const addr = uadeChipRam.sections.waveData + phaseIdx * 32;
+          const bytes = wave.slice(0, 32).map((v) => ((v ?? 0) + 256) & 0xFF);
+          void getEditor().writeBlock(addr, bytes);
+        }
+      }
+    };
+  }, [upd, uadeChipRam, getEditor]);
+
+  const renderWaveform = () => (
+    <div className="flex flex-col gap-3 p-3" style={{ height: 'calc(100vh - 280px)' }}>
+
+      {/* Main Wave */}
+      <div className={`rounded-lg border p-3 ${panelBg} flex flex-col`} style={{ flex: 1, minHeight: 0 }}>
+        <SectionLabel label="Main Wave (32 bytes, signed)" />
+        <div style={{ flex: 1, minHeight: 120 }}>
+          <PatternEditorCanvas
+            formatColumns={WAVE_COLUMN}
+            formatChannels={mainWaveChannels}
+            formatCurrentRow={0}
+            formatIsPlaying={false}
+            onFormatCellChange={mainWaveCellChange}
+            hideVUMeters={true}
           />
         </div>
       </div>
-    );
-  };
+
+      {/* Phase Wave */}
+      <div className={`rounded-lg border p-3 ${panelBg} flex flex-col`} style={{ flex: 1, minHeight: 0 }}>
+        <SectionLabel label="Phase Wave (32 bytes, signed)" />
+        <div style={{ flex: 1, minHeight: 120 }}>
+          <PatternEditorCanvas
+            formatColumns={WAVE_COLUMN}
+            formatChannels={phaseWaveChannels}
+            formatCurrentRow={0}
+            formatIsPlaying={false}
+            onFormatCellChange={phaseWaveCellChange}
+            hideVUMeters={true}
+          />
+        </div>
+      </div>
+    </div>
+  );
 
   const TABS: Array<[SM1Tab, string]> = [
     ['main',     'Parameters'],

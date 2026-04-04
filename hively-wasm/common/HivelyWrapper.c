@@ -588,8 +588,10 @@ void hively_player_note_on(int32 handle, int32 note, int32 velocity) {
     voice->vc_ADSR.rVolume = voice->vc_ADSR.rFrames ? (Ins->ins_Envelope.rVolume - Ins->ins_Envelope.dVolume) * 256 / voice->vc_ADSR.rFrames : Ins->ins_Envelope.rVolume * 256;
 
     voice->vc_WaveLength = Ins->ins_WaveLength;
-    /* Scale volume by velocity */
-    voice->vc_NoteMaxVolume = (Ins->ins_Volume * velocity) / 127;
+    /* Scale volume by velocity — ensure minimum 1 to avoid integer truncation silence */
+    int32 scaledVol = (Ins->ins_Volume * velocity) / 127;
+    if (scaledVol < 1 && velocity > 0) scaledVol = 1;
+    voice->vc_NoteMaxVolume = scaledVol;
 
     voice->vc_VibratoCurrent = 0;
     voice->vc_VibratoDelay = Ins->ins_VibratoDelay;

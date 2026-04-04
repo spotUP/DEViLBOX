@@ -1,12 +1,12 @@
 /**
- * SoundMonControls.tsx — SoundMon II (Brian Postma) instrument editor
+ * SoundMonControls.tsx -- SoundMon II (Brian Postma) instrument editor
  *
  * Exposes all SoundMonConfig parameters: waveform type, ADSR volumes/speeds,
  * vibrato, arpeggio table, and portamento.
  *
  * Enhanced with:
  *  - EnvelopeVisualization: visual ADSR curve in the Volume Envelope section
- *  - SequenceEditor: proper step-sequence editor for the arpeggio table
+ *  - PatternEditorCanvas: vertical tracker-style arpeggio table editor
  *  - WaveformThumbnail: mini previews on each wave-type button
  *
  * When loaded via UADE (uadeChipRam present), scalar params that have a direct
@@ -17,54 +17,54 @@
  * file offset of the 0xFF marker byte):
  *
  *   +0   : 0xFF marker
- *   +1   : table index (waveType source — not written; would corrupt table ptr)
+ *   +1   : table index (waveType source -- not written; would corrupt table ptr)
  *   +2-3 : waveform length word (BE)
  *   +4   : adsrControl
  *   +5   : adsrTable byte
  *   +6-7 : adsrLen word (BE)
- *   +8   : adsrSpeed  → attackSpeed  ✓ written
+ *   +8   : adsrSpeed  -> attackSpeed  written
  *   +9   : lfoControl
  *   +10  : lfoTable byte
- *   +11  : lfoDepth   → vibratoDepth ✓ written
+ *   +11  : lfoDepth   -> vibratoDepth written
  *   +12-13: lfoLen word (BE)
  *
  *   V1/V2 (instrSize == 29):
  *     +14  : skip byte
- *     +15  : lfoDelay  → vibratoDelay ✓ written
- *     +16  : lfoSpeed  → vibratoSpeed ✓ written
+ *     +15  : lfoDelay  -> vibratoDelay written
+ *     +16  : lfoSpeed  -> vibratoSpeed written
  *     ... ADSR/EG/volume (skipped)
  *
  *   V3 (instrSize == 32):
- *     +14  : lfoDelay  → vibratoDelay ✓ written
- *     +15  : lfoSpeed  → vibratoSpeed ✓ written
+ *     +14  : lfoDelay  -> vibratoDelay written
+ *     +15  : lfoSpeed  -> vibratoSpeed written
  *     ... ADSR/EG/FX/mod/volume (skipped)
  *
  * Fields NOT written to chip RAM (with reason):
- *   waveType       — table index pointer at +1; instead of overwriting the pointer,
+ *   waveType       -- table index pointer at +1; instead of overwriting the pointer,
  *                    we generate the waveform and write 64 bytes to the synth table
  *                    region at synthTables + (tableIndex << 6)
- *   waveSpeed      — purely a SoundMonConfig concept; no chip RAM equivalent
- *   portamentoSpeed — no dedicated byte in the instrument header
- *   arpTable       — stored in separate synth table region; not in instr header
- *   arpSpeed       — no dedicated byte in the instrument header
+ *   waveSpeed      -- purely a SoundMonConfig concept; no chip RAM equivalent
+ *   portamentoSpeed -- no dedicated byte in the instrument header
+ *   arpTable       -- stored in separate synth table region; not in instr header
+ *   arpSpeed       -- no dedicated byte in the instrument header
  *
  * Fields written to ADSR table in synth table region (via updADSRWithChipRam):
- *   attackVolume, decayVolume, sustainVolume, releaseVolume — re-encoded as
+ *   attackVolume, decayVolume, sustainVolume, releaseVolume -- re-encoded as
  *   volume sequence in synthTables + (adsrTable << 6) using encodeSoundMonADSR()
- *   attackSpeed, decaySpeed, sustainLength, releaseSpeed — also encoded into
+ *   attackSpeed, decaySpeed, sustainLength, releaseSpeed -- also encoded into
  *   the ADSR sequence shape
  */
 
-import React, { useRef, useEffect, useCallback, useState } from 'react';
+import React, { useRef, useEffect, useCallback, useState, useMemo } from 'react';
 import type { SoundMonConfig, UADEChipRamInfo } from '@/types/instrument';
 import { Knob } from '@components/controls/Knob';
 import { useThemeStore } from '@stores';
 import {
   EnvelopeVisualization,
-  SequenceEditor,
   WaveformThumbnail,
 } from '@components/instruments/shared';
-import type { SequencePreset } from '@components/instruments/shared';
+import { PatternEditorCanvas } from '@/components/tracker/PatternEditorCanvas';
+import type { ColumnDef, FormatChannel, FormatCell, OnCellChange } from '@/components/shared/format-editor-types';
 import { UADEChipEditor } from '@/engine/uade/UADEChipEditor';
 import { UADEEngine } from '@/engine/uade/UADEEngine';
 import { encodeSoundMonADSR, generateSoundMonWaveform } from '@/engine/uade/chipRamEncoders';
@@ -80,7 +80,7 @@ interface SoundMonControlsProps {
 
 type SMTab = 'main' | 'arpeggio';
 
-// ── Wave type definitions (16 waveforms) ───────────────────────────────────────
+// -- Wave type definitions (16 waveforms) ---
 
 interface WaveDef {
   name: string;
@@ -106,22 +106,47 @@ const WAVE_DEFS: WaveDef[] = [
   { name: 'FM 2',    type: 'triangle'},
 ];
 
-// ── Arpeggio presets ────────────────────────────────────────────────────────────
+// -- Arpeggio adapter (inline -- single column) ---
 
-const ARP_PRESETS: SequencePreset[] = [
-  { name: 'Major',      data: [0, 4, 7, 0, 4, 7, 12, 12, 0, 4, 7, 0, 4, 7, 12, 12], loop: 0 },
-  { name: 'Minor',      data: [0, 3, 7, 0, 3, 7, 12, 12, 0, 3, 7, 0, 3, 7, 12, 12], loop: 0 },
-  { name: 'Octave',     data: [0, 12, 0, 12, 0, 12, 0, 12, 0, 12, 0, 12, 0, 12, 0, 12], loop: 0 },
-  { name: 'Power',      data: [0, 7, 12, 7, 0, 7, 12, 7, 0, 7, 12, 7, 0, 7, 12, 7], loop: 0 },
-  { name: 'Dom7',       data: [0, 4, 7, 10, 12, 10, 7, 4, 0, 4, 7, 10, 12, 10, 7, 4], loop: 0 },
-  { name: 'Ascend Oct', data: [0, 2, 4, 5, 7, 9, 11, 12, 0, 2, 4, 5, 7, 9, 11, 12], loop: 0 },
-  { name: 'Trill',      data: [0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1], loop: 0 },
-  { name: 'Clear',      data: new Array(16).fill(0) },
+function signedHex2(val: number): string {
+  if (val === 0) return ' 00';
+  const abs = Math.abs(val);
+  const sign = val < 0 ? '-' : '+';
+  return `${sign}${abs.toString(16).toUpperCase().padStart(2, '0')}`;
+}
+
+const ARP_COLUMN: ColumnDef[] = [
+  {
+    key: 'semitone',
+    label: 'ST',
+    charWidth: 3,
+    type: 'hex',
+    color: '#44aaff',
+    emptyColor: 'var(--color-border-light)',
+    emptyValue: 0,
+    hexDigits: 2,
+    formatter: signedHex2,
+  },
 ];
 
-// ── SoundMon instrument size constants ─────────────────────────────────────────
+function arpToFormatChannel(data: number[]): FormatChannel[] {
+  const rows: FormatCell[] = data.map((v) => ({ semitone: v }));
+  return [{ label: 'Arp', patternLength: data.length, rows, isPatternChannel: false }];
+}
+
+function makeArpCellChange(
+  data: number[],
+  onChangeData: (d: number[]) => void,
+): OnCellChange {
+  return (_ch: number, row: number, _col: string, value: number) => {
+    const next = [...data];
+    next[row] = value > 127 ? value - 256 : (value > 63 ? value - 128 : value);
+    onChangeData(next);
+  };
+}
+
+// -- SoundMon instrument size constants ---
 // V1/V2 synth instrument block = 29 bytes; V3 = 32 bytes.
-// Used to determine which lfoDelay/lfoSpeed offset applies.
 const SM_V1V2_INSTR_SIZE = 29;
 
 /** Byte offset of lfoDelay (vibratoDelay) relative to instrBase. */
@@ -134,7 +159,7 @@ function lfoSpeedOffset(instrSize: number): number {
   return instrSize === SM_V1V2_INSTR_SIZE ? 16 : 15;
 }
 
-// ── Component ──────────────────────────────────────────────────────────────────
+// -- Component ---
 
 export const SoundMonControls: React.FC<SoundMonControlsProps> = ({
   config,
@@ -167,10 +192,6 @@ export const SoundMonControls: React.FC<SoundMonControlsProps> = ({
     onChange({ [key]: value } as Partial<SoundMonConfig>);
   }, [onChange]);
 
-  /**
-   * Like `upd`, but also writes a single byte to chip RAM when a UADE context
-   * is active. byteOffset is relative to instrBase.
-   */
   const updWithChipRam = useCallback(
     (key: keyof SoundMonConfig, value: SoundMonConfig[keyof SoundMonConfig], byteOffset: number) => {
       upd(key as Parameters<typeof upd>[0], value as Parameters<typeof upd>[1]);
@@ -181,18 +202,12 @@ export const SoundMonControls: React.FC<SoundMonControlsProps> = ({
     [upd, uadeChipRam, getEditor],
   );
 
-  /**
-   * Update an ADSR volume parameter and re-encode the full ADSR volume sequence
-   * to chip RAM in the synth table region. SoundMon stores ADSR as a flat
-   * sequence of volume bytes at sections.synthTables + (adsrTable << 6).
-   */
   const updADSRWithChipRam = useCallback(
     (key: keyof SoundMonConfig, value: number) => {
       upd(key as Parameters<typeof upd>[0], value as Parameters<typeof upd>[1]);
       if (uadeChipRam && uadeChipRam.sections.synthTables) {
         void (async () => {
           const editor = getEditor();
-          // Read adsrTable index (byte +5, shifted left 6) and adsrLen (uint16 BE at +6)
           const headerBytes = await editor.readBytes(uadeChipRam.instrBase + 5, 3);
           const adsrTableOff = headerBytes[0] << 6;
           const adsrLen = (headerBytes[1] << 8) | headerBytes[2];
@@ -207,11 +222,6 @@ export const SoundMonControls: React.FC<SoundMonControlsProps> = ({
     [upd, uadeChipRam, getEditor],
   );
 
-  /**
-   * Update waveType and write the generated waveform to chip RAM.
-   * Waveform data (64 bytes) lives at sections.synthTables + (tableIndex << 6).
-   * We read the table index from instrBase+1 to find the write address.
-   */
   const updWaveTypeWithChipRam = useCallback(
     (waveType: number) => {
       upd('waveType', waveType);
@@ -236,23 +246,20 @@ export const SoundMonControls: React.FC<SoundMonControlsProps> = ({
     </div>
   );
 
-  // ── MAIN TAB ──────────────────────────────────────────────────────────────────
+  // -- MAIN TAB ---
 
   const renderMain = () => (
     <div className="flex flex-col gap-3 p-3 overflow-y-auto" style={{ maxHeight: 'calc(100vh - 280px)' }}>
 
-      {/* Waveform selector — 4×4 grid with mini waveform thumbnails */}
+      {/* Waveform selector */}
       <div className={`rounded-lg border p-3 ${panelBg}`}>
         <SectionLabel label="Waveform" />
-        {/* waveSpeed has no direct byte in the SoundMon instrument header. */}
         <div className="flex items-center gap-4 mb-3">
           <Knob value={config.waveSpeed} min={0} max={15} step={1}
             onChange={(v) => upd('waveSpeed', Math.round(v))}
             label="Morph Rate" color={knob}
             formatValue={(v) => Math.round(v).toString()} />
         </div>
-        {/* waveType (+1) is a table index pointer into the synth table region;
-            overwriting it alone would corrupt the waveform table reference. */}
         <div className="grid grid-cols-4 gap-1 mt-2">
           {WAVE_DEFS.map((def, i) => {
             const active = config.waveType === i;
@@ -280,11 +287,10 @@ export const SoundMonControls: React.FC<SoundMonControlsProps> = ({
         </div>
       </div>
 
-      {/* Volume Envelope — knobs + visual curve */}
+      {/* Volume Envelope */}
       <div className={`rounded-lg border p-3 ${panelBg}`}>
         <SectionLabel label="Volume Envelope" />
 
-        {/* ADSR Knobs — 4 columns (A / D / S / R) */}
         <div className="grid grid-cols-4 gap-3">
           <div className="flex flex-col items-center gap-2">
             <span className="text-[9px] uppercase tracking-wider" style={{ color: accent, opacity: 0.5 }}>Attack</span>
@@ -295,7 +301,6 @@ export const SoundMonControls: React.FC<SoundMonControlsProps> = ({
             <Knob value={config.attackSpeed} min={0} max={63} step={1}
               onChange={(v) => {
                 updADSRWithChipRam('attackSpeed', Math.round(v));
-                // Also write to fixed header byte +8
                 if (uadeChipRam) {
                   void getEditor().writeU8(uadeChipRam.instrBase + 8, Math.round(v) & 0xFF);
                 }
@@ -338,7 +343,6 @@ export const SoundMonControls: React.FC<SoundMonControlsProps> = ({
           </div>
         </div>
 
-        {/* Envelope visualization */}
         <div className="mt-2">
           <EnvelopeVisualization
             mode="steps"
@@ -392,43 +396,41 @@ export const SoundMonControls: React.FC<SoundMonControlsProps> = ({
             onChange={(v) => upd('portamentoSpeed', Math.round(v))}
             label="Speed" color={knob} size="md"
             formatValue={(v) => Math.round(v).toString()} />
-          {/* portamentoSpeed has no dedicated byte in the instrument header. */}
           <span className="text-[10px] text-text-muted">0 = disabled</span>
         </div>
       </div>
     </div>
   );
 
-  // ── ARPEGGIO TAB ──────────────────────────────────────────────────────────────
+  // -- ARPEGGIO TAB ---
+
+  const arpChannels = useMemo(() => arpToFormatChannel(config.arpTable), [config.arpTable]);
+  const arpCellChange = useMemo(
+    () => makeArpCellChange(config.arpTable, (d) => upd('arpTable', d)),
+    [config.arpTable, upd],
+  );
 
   const renderArpeggio = () => (
-    <div className="flex flex-col gap-3 p-3 overflow-y-auto" style={{ maxHeight: 'calc(100vh - 280px)' }}>
-      <div className={`rounded-lg border p-3 ${panelBg}`}>
+    <div className="flex flex-col gap-3 p-3" style={{ height: 'calc(100vh - 280px)' }}>
+      <div className={`rounded-lg border p-3 ${panelBg} flex flex-col`} style={{ flex: 1, minHeight: 0 }}>
         <div className="flex items-center justify-between mb-3">
           <SectionLabel label="Arpeggio Speed" />
           <Knob value={config.arpSpeed} min={0} max={15} step={1}
             onChange={(v) => upd('arpSpeed', Math.round(v))}
             label="Speed" color={knob}
             formatValue={(v) => Math.round(v).toString()} />
-          {/* arpSpeed has no dedicated byte; arpeggio data is in the synth table region. */}
         </div>
 
-        <SequenceEditor
-          label="Arpeggio Table"
-          data={config.arpTable}
-          onChange={(d) => upd('arpTable', d)}
-          min={-64} max={63}
-          bipolar
-          fixedLength
-          showNoteNames
-          presets={ARP_PRESETS}
-          playbackPosition={arpPlaybackPosition}
-          color={accent}
-          height={100}
-        />
-        {/* arpTable entries are in the synth table region
-            (sections.synthTables + table_index * 64), requiring table index
-            lookup and 64-byte re-encoding — not yet implemented. */}
+        <div style={{ flex: 1, minHeight: 120 }}>
+          <PatternEditorCanvas
+            formatColumns={ARP_COLUMN}
+            formatChannels={arpChannels}
+            formatCurrentRow={arpPlaybackPosition ?? 0}
+            formatIsPlaying={arpPlaybackPosition !== undefined}
+            onFormatCellChange={arpCellChange}
+            hideVUMeters={true}
+          />
+        </div>
       </div>
     </div>
   );

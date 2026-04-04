@@ -16,11 +16,20 @@
  *   byte[5..63] = vol envelope opcodes (ADSR — written via encodeFCVolEnvelope)
  */
 
-import React, { useRef, useEffect, useCallback, useState } from 'react';
+import React, { useRef, useEffect, useCallback, useState, useMemo } from 'react';
 import type { FCConfig, UADEChipRamInfo } from '@/types/instrument';
 import { Knob } from '@components/controls/Knob';
 import { useThemeStore } from '@stores';
 import { EnvelopeVisualization } from '@components/instruments/shared';
+import { PatternEditorCanvas } from '@/components/tracker/PatternEditorCanvas';
+import {
+  FC_SYNTH_MACRO_COLUMNS,
+  FC_ARPEGGIO_COLUMNS,
+  fcSynthMacroToFormatChannel,
+  fcArpeggioToFormatChannel,
+  makeSynthMacroCellChange,
+  makeArpeggioCellChange,
+} from '@/components/fc/fcAdapter';
 import { UADEChipEditor } from '@/engine/uade/UADEChipEditor';
 import { UADEEngine } from '@/engine/uade/UADEEngine';
 import { encodeFCVolEnvelope, encodeFCFreqMacro } from '@/engine/uade/chipRamEncoders';
@@ -244,115 +253,82 @@ export const FCControls: React.FC<FCControlsProps> = ({ config, onChange, uadeCh
     </div>
   );
 
-  // ── SYNTH MACRO TAB ──
-  const renderSynth = () => {
-    const updateStep = (i: number, field: 'waveNum' | 'transposition' | 'effect', value: number) => {
-      const table = configRef.current.synthTable.map((s, idx) =>
-        idx === i ? { ...s, [field]: value } : s
-      );
-      onChange({ synthTable: table });
-      writeFreqMacroToChipRam({ ...configRef.current, synthTable: table });
-    };
+  // ── SYNTH MACRO TAB — PatternEditorCanvas in format mode ──
+  const synthMacroChannels = useMemo(
+    () => fcSynthMacroToFormatChannel(config),
+    [config]
+  );
+  const synthMacroCellChange = useMemo(
+    () => {
+      const baseCellChange = makeSynthMacroCellChange(config, (updates) => {
+        onChange(updates);
+        if (updates.synthTable) {
+          writeFreqMacroToChipRam({ ...configRef.current, ...updates });
+        }
+      });
+      return baseCellChange;
+    },
+    [config, onChange, writeFreqMacroToChipRam]
+  );
 
-    return (
-      <div className="flex flex-col gap-3 p-3 overflow-y-auto" style={{ maxHeight: 'calc(100vh - 280px)' }}>
-        <div className={`rounded-lg border p-3 ${panelBg}`}>
-          <SectionLabel label="Synth Macro Sequencer" />
-          <div className="flex items-center gap-4 mb-3">
-            <Knob value={config.synthSpeed} min={0} max={15} step={1}
-              onChange={(v) => updWithChipRam('synthSpeed', Math.round(v), 0)}
-              label="Speed" color={knob}
-              formatValue={(v) => Math.round(v).toString()} />
-            <span className="text-[10px] text-text-muted">Ticks per macro step (0 = disabled)</span>
-          </div>
+  const renderSynth = () => (
+    <div className="flex flex-col gap-3 p-3 overflow-y-auto" style={{ maxHeight: 'calc(100vh - 280px)' }}>
+      <div className={`rounded-lg border p-3 ${panelBg}`}>
+        <SectionLabel label="Synth Macro Sequencer" />
+        <div className="flex items-center gap-4 mb-3">
+          <Knob value={config.synthSpeed} min={0} max={15} step={1}
+            onChange={(v) => updWithChipRam('synthSpeed', Math.round(v), 0)}
+            label="Speed" color={knob}
+            formatValue={(v) => Math.round(v).toString()} />
+          <span className="text-[10px] text-text-muted">Ticks per macro step (0 = disabled)</span>
+        </div>
 
-          {/* Macro step grid */}
-          <div className="flex font-mono text-[10px] text-text-muted px-1 border-b mb-1"
-            style={{ borderColor: dim }}>
-            <span className="w-6 text-center">#</span>
-            <span className="w-28 text-center">Waveform</span>
-            <span className="w-12 text-center">Trans</span>
-            <span className="w-12 text-center">FX</span>
-          </div>
-
-          <div className="overflow-y-auto" style={{ maxHeight: '260px' }}>
-            {config.synthTable.map((step, i) => (
-              <div key={i} className="flex items-center gap-1 py-0.5 font-mono">
-                <span className="w-6 text-center text-[10px] text-text-muted">
-                  {i.toString().padStart(2, '0')}
-                </span>
-                <select
-                  value={step.waveNum}
-                  onChange={(e) => updateStep(i, 'waveNum', parseInt(e.target.value))}
-                  className="text-[10px] font-mono border rounded px-1"
-                  style={{ width: '108px', background: '#100d00', borderColor: dim, color: accent }}>
-                  {Array.from({ length: 47 }, (_, n) => (
-                    <option key={n} value={n} style={{ background: 'var(--color-bg-secondary)', color: 'var(--color-text-secondary)' }}>
-                      {n}: {waveLabel(n)}
-                    </option>
-                  ))}
-                </select>
-                <input
-                  type="number"
-                  value={step.transposition}
-                  min={-64}
-                  max={63}
-                  onChange={(e) => { const v = parseInt(e.target.value); if (!isNaN(v)) updateStep(i, 'transposition', Math.max(-64, Math.min(63, v))); }}
-                  className="text-[10px] font-mono text-center border rounded py-0.5"
-                  style={{ width: '44px', background: '#100d00', borderColor: dim, color: step.transposition !== 0 ? '#ffcc44' : '#444' }}
-                />
-                <input
-                  type="number"
-                  value={step.effect}
-                  min={0}
-                  max={15}
-                  onChange={(e) => { const v = parseInt(e.target.value); if (!isNaN(v)) updateStep(i, 'effect', Math.max(0, Math.min(15, v))); }}
-                  className="text-[10px] font-mono text-center border rounded py-0.5"
-                  style={{ width: '40px', background: '#100d00', borderColor: dim, color: step.effect !== 0 ? '#ff8844' : '#444' }}
-                />
-              </div>
-            ))}
-          </div>
+        {/* Pattern editor in format mode */}
+        <div style={{ flex: 1, minHeight: 200 }}>
+          <PatternEditorCanvas
+            formatColumns={FC_SYNTH_MACRO_COLUMNS}
+            formatChannels={synthMacroChannels}
+            formatCurrentRow={0}
+            formatIsPlaying={false}
+            onFormatCellChange={synthMacroCellChange}
+            hideVUMeters={true}
+          />
         </div>
       </div>
-    );
-  };
+    </div>
+  );
 
-  // ── ARPEGGIO TAB ──
+  // ── ARPEGGIO TAB — PatternEditorCanvas in format mode ──
+  const arpeggioChannels = useMemo(
+    () => fcArpeggioToFormatChannel(config),
+    [config]
+  );
+  const arpeggioCellChange = useMemo(
+    () => {
+      const baseCellChange = makeArpeggioCellChange(config, (updates) => {
+        onChange(updates);
+        if (updates.arpTable) {
+          writeFreqMacroToChipRam({ ...configRef.current, ...updates });
+        }
+      });
+      return baseCellChange;
+    },
+    [config, onChange, writeFreqMacroToChipRam]
+  );
+
   const renderArpeggio = () => (
     <div className="flex flex-col gap-3 p-3 overflow-y-auto" style={{ maxHeight: 'calc(100vh - 280px)' }}>
       <div className={`rounded-lg border p-3 ${panelBg}`}>
         <SectionLabel label="Arpeggio Table (semitone offsets)" />
-        <div className="grid grid-cols-8 gap-1">
-          {config.arpTable.map((v, i) => (
-            <div key={i} className="flex flex-col items-center gap-0.5">
-              <span className="text-[9px] font-mono text-text-muted">
-                {i.toString().padStart(2, '0')}
-              </span>
-              <input
-                type="number"
-                value={v}
-                min={-64}
-                max={63}
-                onChange={(e) => {
-                  const val = parseInt(e.target.value);
-                  if (!isNaN(val)) {
-                    const arr = [...configRef.current.arpTable];
-                    arr[i] = Math.max(-64, Math.min(63, val));
-                    upd('arpTable', arr);
-                    writeFreqMacroToChipRam({ ...configRef.current, arpTable: arr });
-                  }
-                }}
-                className="text-[10px] font-mono text-center border rounded py-0.5"
-                style={{
-                  width: '36px',
-                  background: '#0e0c00',
-                  borderColor: v !== 0 ? dim : 'var(--color-bg-tertiary)',
-                  color: v !== 0 ? accent : '#444',
-                }}
-              />
-            </div>
-          ))}
+        <div style={{ flex: 1, minHeight: 200 }}>
+          <PatternEditorCanvas
+            formatColumns={FC_ARPEGGIO_COLUMNS}
+            formatChannels={arpeggioChannels}
+            formatCurrentRow={0}
+            formatIsPlaying={false}
+            onFormatCellChange={arpeggioCellChange}
+            hideVUMeters={true}
+          />
         </div>
       </div>
     </div>

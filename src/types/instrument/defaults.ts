@@ -533,9 +533,9 @@ export const DEFAULT_HIVELY: HivelyConfig = {
   hardCutReleaseFrames: 0,
   envelope: {
     aFrames: 1, aVolume: 64,
-    dFrames: 1, dVolume: 64,
-    sFrames: 1,
-    rFrames: 1, rVolume: 0,
+    dFrames: 8, dVolume: 50,
+    sFrames: 50,
+    rFrames: 6, rVolume: 0,
   },
   performanceList: {
     speed: 1,

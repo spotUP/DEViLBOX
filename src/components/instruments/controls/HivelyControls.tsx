@@ -6,11 +6,17 @@
  * filter modulation, hard cut, and performance list editor.
  */
 
-import React, { useState, useRef, useEffect, useCallback } from 'react';
+import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import type { HivelyConfig, HivelyPerfEntryConfig } from '@/types/instrument';
 import { Knob } from '@components/controls/Knob';
 import { useThemeStore } from '@stores';
 import { EnvelopeVisualization } from '@components/instruments/shared';
+import { PatternEditorCanvas } from '@/components/tracker/PatternEditorCanvas';
+import {
+  HIVELY_PERFLIST_COLUMNS,
+  hivelyPerfListToFormatChannel,
+  makePerfListCellChange,
+} from '@/components/hively/hivelyAdapter';
 
 interface HivelyControlsProps {
   config: HivelyConfig;
@@ -21,16 +27,6 @@ interface HivelyControlsProps {
 type HivelyTab = 'main' | 'perflist';
 
 const WAVE_LENGTH_LABELS = ['4', '8', '16', '32', '64', '128'];
-
-// HVL note names (1-60, 0 = off)
-const NOTE_NAMES = [
-  '---',
-  'C-1','C#1','D-1','D#1','E-1','F-1','F#1','G-1','G#1','A-1','A#1','B-1',
-  'C-2','C#2','D-2','D#2','E-2','F-2','F#2','G-2','G#2','A-2','A#2','B-2',
-  'C-3','C#3','D-3','D#3','E-3','F-3','F#3','G-3','G#3','A-3','A#3','B-3',
-  'C-4','C#4','D-4','D#4','E-4','F-4','F#4','G-4','G#4','A-4','A#4','B-4',
-  'C-5','C#5','D-5','D#5','E-5','F-5','F#5','G-5','G#5','A-5','A#5','B-5',
-];
 
 // Performance list effect names (reference grid)
 const PL_FX_NAMES: Record<number, string> = {
@@ -46,7 +42,6 @@ export const HivelyControls: React.FC<HivelyControlsProps> = ({
 }) => {
   const [activeTab, setActiveTab] = useState<HivelyTab>('main');
   const [perfCursorY, setPerfCursorY] = useState(0);
-  const perfListRef = useRef<HTMLDivElement>(null);
 
   const configRef = useRef(config);
   useEffect(() => { configRef.current = config; }, [config]);
@@ -71,12 +66,6 @@ export const HivelyControls: React.FC<HivelyControlsProps> = ({
 
   const updatePerfList = useCallback((updates: Partial<HivelyConfig['performanceList']>) => {
     onChange({ performanceList: { ...configRef.current.performanceList, ...updates } });
-  }, [onChange]);
-
-  const updatePerfEntry = useCallback((index: number, updates: Partial<HivelyPerfEntryConfig>) => {
-    const entries = [...configRef.current.performanceList.entries];
-    entries[index] = { ...entries[index], ...updates };
-    onChange({ performanceList: { ...configRef.current.performanceList, entries } });
   }, [onChange]);
 
   // Performance list row operations
@@ -303,7 +292,16 @@ export const HivelyControls: React.FC<HivelyControlsProps> = ({
     </div>
   );
 
-  // ── PERFORMANCE LIST TAB — DOM-based for direct cell editing (dropdowns, inputs) ──
+  // ── PERFORMANCE LIST TAB — PatternEditorCanvas in format mode ──
+  const perfListChannels = useMemo(
+    () => hivelyPerfListToFormatChannel(config),
+    [config]
+  );
+  const perfListCellChange = useMemo(
+    () => makePerfListCellChange(config, onChange),
+    [config, onChange]
+  );
+
   const renderPerfListTab = () => {
     const entries = config.performanceList.entries;
 
@@ -333,111 +331,16 @@ export const HivelyControls: React.FC<HivelyControlsProps> = ({
           </div>
         </div>
 
-        {/* Column headers */}
-        <div className="flex font-mono text-xs text-text-muted px-1 border-b"
-          style={{ borderColor: dimColor }}>
-          <span className="w-10 text-center">#</span>
-          <span className="flex-[2] text-center">Note</span>
-          <span className="w-8 text-center">F</span>
-          <span className="flex-1 text-center">Wav</span>
-          <span className="flex-1 text-center">Fx1</span>
-          <span className="flex-1 text-center">P1</span>
-          <span className="flex-1 text-center">Fx2</span>
-          <span className="flex-1 text-center">P2</span>
-        </div>
-
-        {/* Performance list rows */}
-        <div ref={perfListRef}
-          className="overflow-y-auto font-mono text-sm"
-          style={{ maxHeight: '380px' }}
-          tabIndex={0}
-          onKeyDown={handlePerfKeyDown}>
-          {entries.map((entry, i) => {
-            const isSelected = i === perfCursorY;
-            return (
-              <div key={i}
-                className="flex items-center px-1 cursor-pointer transition-colors min-h-[32px]"
-                style={{
-                  background: isSelected ? (isCyanTheme ? '#0a2020' : '#0f2818') : 'transparent',
-                  borderLeft: isSelected ? `3px solid ${accentColor}` : '3px solid transparent',
-                }}
-                onClick={() => setPerfCursorY(i)}>
-                {/* Row index */}
-                <span className="w-10 text-center text-text-muted text-xs">{i.toString().padStart(3, '0')}</span>
-
-                {/* Note */}
-                <select className="flex-[2] text-center bg-transparent border-none outline-none cursor-pointer text-sm min-h-[32px]"
-                  style={{ color: entry.note > 0 ? accentColor : '#555' }}
-                  value={entry.note}
-                  onChange={(e) => updatePerfEntry(i, { note: parseInt(e.target.value) })}>
-                  {NOTE_NAMES.map((name, ni) => (
-                    <option key={ni} value={ni} style={{ background: 'var(--color-bg-secondary)', color: 'var(--color-text-secondary)' }}>{name}</option>
-                  ))}
-                </select>
-
-                {/* Fixed */}
-                <button className="w-8 text-center min-h-[32px]"
-                  style={{ color: entry.fixed ? '#ffcc00' : '#444' }}
-                  onClick={(e) => { e.stopPropagation(); updatePerfEntry(i, { fixed: !entry.fixed }); }}>
-                  {entry.fixed ? '*' : '·'}
-                </button>
-
-                {/* Waveform */}
-                <select className="flex-1 text-center bg-transparent border-none outline-none cursor-pointer min-h-[32px]"
-                  style={{ color: entry.waveform > 0 ? '#66ccff' : '#555' }}
-                  value={entry.waveform}
-                  onChange={(e) => updatePerfEntry(i, { waveform: parseInt(e.target.value) })}>
-                  {[0,1,2,3,4].map(v => (
-                    <option key={v} value={v} style={{ background: 'var(--color-bg-secondary)' }}>{v}</option>
-                  ))}
-                </select>
-
-                {/* FX1 */}
-                <select className="flex-1 text-center bg-transparent border-none outline-none cursor-pointer min-h-[32px]"
-                  style={{ color: entry.fx[0] > 0 ? '#ffaa44' : '#555' }}
-                  value={entry.fx[0]}
-                  onChange={(e) => updatePerfEntry(i, { fx: [parseInt(e.target.value), entry.fx[1]] })}>
-                  {Array.from({ length: 16 }, (_, n) => (
-                    <option key={n} value={n} style={{ background: 'var(--color-bg-secondary)' }}>
-                      {n.toString(16).toUpperCase()}
-                    </option>
-                  ))}
-                </select>
-
-                {/* FX Param 1 */}
-                <input type="text" className="flex-1 text-center bg-transparent border-none outline-none font-mono min-h-[32px]"
-                  style={{ color: entry.fxParam[0] > 0 ? '#ffaa44' : '#555' }}
-                  value={entry.fxParam[0].toString(16).toUpperCase().padStart(2, '0')}
-                  onChange={(e) => {
-                    const v = parseInt(e.target.value, 16);
-                    if (!isNaN(v)) updatePerfEntry(i, { fxParam: [Math.min(255, v), entry.fxParam[1]] });
-                  }}
-                  maxLength={2} />
-
-                {/* FX2 */}
-                <select className="flex-1 text-center bg-transparent border-none outline-none cursor-pointer min-h-[32px]"
-                  style={{ color: entry.fx[1] > 0 ? '#bb88ff' : '#555' }}
-                  value={entry.fx[1]}
-                  onChange={(e) => updatePerfEntry(i, { fx: [entry.fx[0], parseInt(e.target.value)] })}>
-                  {Array.from({ length: 16 }, (_, n) => (
-                    <option key={n} value={n} style={{ background: 'var(--color-bg-secondary)' }}>
-                      {n.toString(16).toUpperCase()}
-                    </option>
-                  ))}
-                </select>
-
-                {/* FX Param 2 */}
-                <input type="text" className="flex-1 text-center bg-transparent border-none outline-none font-mono min-h-[32px]"
-                  style={{ color: entry.fxParam[1] > 0 ? '#bb88ff' : '#555' }}
-                  value={entry.fxParam[1].toString(16).toUpperCase().padStart(2, '0')}
-                  onChange={(e) => {
-                    const v = parseInt(e.target.value, 16);
-                    if (!isNaN(v)) updatePerfEntry(i, { fxParam: [entry.fxParam[0], Math.min(255, v)] });
-                  }}
-                  maxLength={2} />
-              </div>
-            );
-          })}
+        {/* Pattern editor in format mode */}
+        <div style={{ flex: 1, minHeight: 200 }}>
+          <PatternEditorCanvas
+            formatColumns={HIVELY_PERFLIST_COLUMNS}
+            formatChannels={perfListChannels}
+            formatCurrentRow={0}
+            formatIsPlaying={false}
+            onFormatCellChange={perfListCellChange}
+            hideVUMeters={true}
+          />
         </div>
 
         {/* Effect reference */}
@@ -454,34 +357,6 @@ export const HivelyControls: React.FC<HivelyControlsProps> = ({
     );
   };
 
-  // Performance list keyboard navigation (insert/delete rows, cursor movement)
-  const handlePerfKeyDown = useCallback((e: React.KeyboardEvent) => {
-    const entries = configRef.current.performanceList.entries;
-    switch (e.key) {
-      case 'ArrowUp':
-        e.preventDefault();
-        setPerfCursorY((y) => Math.max(0, y - 1));
-        break;
-      case 'ArrowDown':
-        e.preventDefault();
-        setPerfCursorY((y) => Math.min(entries.length - 1, y + 1));
-        break;
-      case 'PageUp':
-        e.preventDefault();
-        setPerfCursorY((y) => Math.max(0, y - 16));
-        break;
-      case 'PageDown':
-        e.preventDefault();
-        setPerfCursorY((y) => Math.min(entries.length - 1, y + 16));
-        break;
-      case 'Enter':
-        if (e.shiftKey) { e.preventDefault(); insertPerfRow(perfCursorY); }
-        break;
-      case 'Backspace':
-        if (e.shiftKey) { e.preventDefault(); deletePerfRow(perfCursorY); }
-        break;
-    }
-  }, [perfCursorY, insertPerfRow, deletePerfRow]);
 
   return (
     <div className="flex flex-col h-full">
