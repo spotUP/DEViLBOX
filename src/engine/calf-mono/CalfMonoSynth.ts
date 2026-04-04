@@ -17,42 +17,48 @@ import { loadNativePatch, captureNativeState } from '@/engine/common/NativePatch
 import { CALFMONO_NATIVE_FACTORY_PRESETS } from './calfMonoNativePresets';
 export { CALFMONO_NATIVE_FACTORY_PRESETS };
 
+// Parameter indices MUST match the C++ enum in calf_mono_standalone.h:60-74
 export const CalfMonoParam = {
-  O1_WAVE: 0, O2_WAVE: 1, O1_PW: 2, O2_PW: 3,
-  O1_XPOSE: 4, O2_XPOSE: 5, O1_STRETCH: 6, O1_WINDOW: 7,
-  O12_DETUNE: 8, SCALE_DETUNE: 9,
-  O2_UNISON: 10, O2_UNISON_FRQ: 11,
-  PHASE_MODE: 12, O12_MIX: 13,
-  FILTER: 14, CUTOFF: 15, RES: 16, FILTER_SEP: 17, KEY_FOLLOW: 18,
-  ADSR_A: 19, ADSR_D: 20, ADSR_S: 21, ADSR_F: 22, ADSR_R: 23,
-  ENV2CUTOFF: 24, ENV2RES: 25, ENV2AMP: 26,
-  ADSR2_A: 27, ADSR2_D: 28, ADSR2_S: 29, ADSR2_F: 30, ADSR2_R: 31,
-  ADSR2_CUTOFF: 32, ADSR2_RES: 33, ADSR2_AMP: 34,
-  LFO_RATE: 35, LFO_DELAY: 36, LFO1_TRIG: 37,
-  LFO2FILTER: 38, LFO2PITCH: 39, LFO2PW: 40, MWHL2LFO: 41,
-  LFO2_RATE: 42, LFO2_DELAY: 43, LFO2_TRIG: 44,
-  VEL2FILTER: 45, VEL2AMP: 46,
-  PORTAMENTO: 47, LEGATO: 48,
-  MASTER: 49, PBEND_RANGE: 50, MIDI: 51,
+  O1_WAVE: 0, O2_WAVE: 1, O1_PW: 2, O2_PW: 3,          // par_wave1..par_pw2
+  O12_DETUNE: 4, O2_XPOSE: 5, PHASE_MODE: 6,            // par_detune, par_osc2xpose, par_oscmode
+  O12_MIX: 7, FILTER: 8, CUTOFF: 9, RES: 10,            // par_oscmix..par_resonance
+  FILTER_SEP: 11,                                         // par_cutoffsep
+  ENV1CUTOFF: 12, ENV1RES: 13, ENV1AMP: 14,              // par_env1tocutoff..par_env1toamp
+  ADSR_A: 15, ADSR_D: 16, ADSR_S: 17, ADSR_F: 18,      // par_env1attack..par_env1fade
+  ADSR_R: 19,                                             // par_env1release
+  KEY_FOLLOW: 20, LEGATO: 21, PORTAMENTO: 22,            // par_keyfollow..par_portamento
+  VEL2FILTER: 23, VEL2AMP: 24,                           // par_vel2filter, par_vel2amp
+  MASTER: 25, PBEND_RANGE: 26,                           // par_master, par_pwhlrange
+  LFO_RATE: 27, LFO_DELAY: 28,                           // par_lforate, par_lfodelay
+  LFO2FILTER: 29, LFO2PITCH: 30, LFO2PW: 31,            // par_lfofilter..par_lfopw
+  MWHL2LFO: 32, SCALE_DETUNE: 33,                        // par_mwhl_lfo, par_scaledetune
+  ENV2CUTOFF: 34, ENV2RES: 35, ENV2AMP: 36,              // par_env2tocutoff..par_env2toamp
+  ADSR2_A: 37, ADSR2_D: 38, ADSR2_S: 39,                // par_env2attack..par_env2sustain
+  ADSR2_F: 40, ADSR2_R: 41,                              // par_env2fade, par_env2release
+  O1_STRETCH: 42, O1_WINDOW: 43,                         // par_stretch1, par_window1
+  LFO1_TRIG: 44, LFO2_TRIG: 45,                         // par_lfo1trig, par_lfo2trig
+  LFO2_RATE: 46, LFO2_DELAY: 47,                        // par_lfo2rate, par_lfo2delay
+  O2_UNISON: 48, O2_UNISON_FRQ: 49,                     // par_o2unison, par_o2unisonfrq
+  O1_XPOSE: 50, MIDI: 51,                               // par_osc1xpose, par_midi
 } as const;
 
 export const CALF_MONO_PARAM_NAMES: Record<number, string> = {
   0: 'Osc1 Wave', 1: 'Osc2 Wave', 2: 'Osc1 PW', 3: 'Osc2 PW',
-  4: 'Osc1 Transpose', 5: 'Osc2 Transpose', 6: 'Osc1 Stretch', 7: 'Osc1 Window',
-  8: 'Osc Detune', 9: 'Scale Detune',
-  10: 'Osc2 Unison', 11: 'Unison Freq',
-  12: 'Phase Mode', 13: 'Osc Mix',
-  14: 'Filter Type', 15: 'Cutoff', 16: 'Resonance', 17: 'Filter Sep', 18: 'Key Follow',
-  19: 'EG1 Attack', 20: 'EG1 Decay', 21: 'EG1 Sustain', 22: 'EG1 Fade', 23: 'EG1 Release',
-  24: 'EG1→Cutoff', 25: 'EG1→Res', 26: 'EG1→Amp',
-  27: 'EG2 Attack', 28: 'EG2 Decay', 29: 'EG2 Sustain', 30: 'EG2 Fade', 31: 'EG2 Release',
-  32: 'EG2→Cutoff', 33: 'EG2→Res', 34: 'EG2→Amp',
-  35: 'LFO1 Rate', 36: 'LFO1 Delay', 37: 'LFO1 Trigger',
-  38: 'LFO1→Filter', 39: 'LFO1→Pitch', 40: 'LFO1→PW', 41: 'ModWheel→LFO',
-  42: 'LFO2 Rate', 43: 'LFO2 Delay', 44: 'LFO2 Trigger',
-  45: 'Vel→Filter', 46: 'Vel→Amp',
-  47: 'Portamento', 48: 'Legato',
-  49: 'Volume', 50: 'PBend Range', 51: 'MIDI Ch',
+  4: 'Osc Detune', 5: 'Osc2 Transpose', 6: 'Phase Mode', 7: 'Osc Mix',
+  8: 'Filter Type', 9: 'Cutoff', 10: 'Resonance', 11: 'Filter Sep',
+  12: 'EG1→Cutoff', 13: 'EG1→Res', 14: 'EG1→Amp',
+  15: 'EG1 Attack', 16: 'EG1 Decay', 17: 'EG1 Sustain', 18: 'EG1 Fade', 19: 'EG1 Release',
+  20: 'Key Follow', 21: 'Legato', 22: 'Portamento', 23: 'Vel→Filter', 24: 'Vel→Amp',
+  25: 'Master', 26: 'P.Bend Range',
+  27: 'LFO1 Rate', 28: 'LFO1 Delay', 29: 'LFO→Filter', 30: 'LFO→Pitch', 31: 'LFO→PW',
+  32: 'ModWheel→LFO', 33: 'Scale Detune',
+  34: 'EG2→Cutoff', 35: 'EG2→Res', 36: 'EG2→Amp',
+  37: 'EG2 Attack', 38: 'EG2 Decay', 39: 'EG2 Sustain', 40: 'EG2 Fade', 41: 'EG2 Release',
+  42: 'Osc1 Stretch', 43: 'Osc1 Window',
+  44: 'LFO1 Trigger', 45: 'LFO2 Trigger',
+  46: 'LFO2 Rate', 47: 'LFO2 Delay',
+  48: 'Osc2 Unison', 49: 'Unison Freq',
+  50: 'Osc1 Transpose', 51: 'MIDI Ch',
 };
 
 export interface CalfMonoConfig {
@@ -129,23 +135,37 @@ export const DEFAULT_CALF_MONO: CalfMonoConfig = {
   master: 50, pbendRange: 200, midi: 0,
 };
 
+// Must match C++ enum in calf_mono_standalone.h:60-74
 const CONFIG_TO_PARAM: [keyof CalfMonoConfig, number][] = [
-  ['o1Wave', 0], ['o2Wave', 1], ['o1Pw', 2], ['o2Pw', 3],
-  ['o1Xpose', 4], ['o2Xpose', 5], ['o1Stretch', 6], ['o1Window', 7],
-  ['o12Detune', 8], ['scaleDetune', 9],
-  ['o2Unison', 10], ['o2UnisonFrq', 11],
-  ['phaseMode', 12], ['o12Mix', 13],
-  ['filter', 14], ['cutoff', 15], ['res', 16], ['filterSep', 17], ['keyFollow', 18],
-  ['adsrA', 19], ['adsrD', 20], ['adsrS', 21], ['adsrF', 22], ['adsrR', 23],
-  ['env2cutoff', 24], ['env2res', 25], ['env2amp', 26],
-  ['adsr2A', 27], ['adsr2D', 28], ['adsr2S', 29], ['adsr2F', 30], ['adsr2R', 31],
-  ['adsr2Cutoff', 32], ['adsr2Res', 33], ['adsr2Amp', 34],
-  ['lfoRate', 35], ['lfoDelay', 36], ['lfo1Trig', 37],
-  ['lfo2filter', 38], ['lfo2pitch', 39], ['lfo2pw', 40], ['mwhl2lfo', 41],
-  ['lfo2Rate', 42], ['lfo2Delay', 43], ['lfo2Trig', 44],
-  ['vel2filter', 45], ['vel2amp', 46],
-  ['portamento', 47], ['legato', 48],
-  ['master', 49], ['pbendRange', 50], ['midi', 51],
+  ['o1Wave', CalfMonoParam.O1_WAVE], ['o2Wave', CalfMonoParam.O2_WAVE],
+  ['o1Pw', CalfMonoParam.O1_PW], ['o2Pw', CalfMonoParam.O2_PW],
+  ['o12Detune', CalfMonoParam.O12_DETUNE], ['o2Xpose', CalfMonoParam.O2_XPOSE],
+  ['phaseMode', CalfMonoParam.PHASE_MODE], ['o12Mix', CalfMonoParam.O12_MIX],
+  ['filter', CalfMonoParam.FILTER], ['cutoff', CalfMonoParam.CUTOFF],
+  ['res', CalfMonoParam.RES], ['filterSep', CalfMonoParam.FILTER_SEP],
+  ['env2cutoff', CalfMonoParam.ENV1CUTOFF], ['env2res', CalfMonoParam.ENV1RES],
+  ['env2amp', CalfMonoParam.ENV1AMP],
+  ['adsrA', CalfMonoParam.ADSR_A], ['adsrD', CalfMonoParam.ADSR_D],
+  ['adsrS', CalfMonoParam.ADSR_S], ['adsrF', CalfMonoParam.ADSR_F],
+  ['adsrR', CalfMonoParam.ADSR_R],
+  ['keyFollow', CalfMonoParam.KEY_FOLLOW], ['legato', CalfMonoParam.LEGATO],
+  ['portamento', CalfMonoParam.PORTAMENTO],
+  ['vel2filter', CalfMonoParam.VEL2FILTER], ['vel2amp', CalfMonoParam.VEL2AMP],
+  ['master', CalfMonoParam.MASTER], ['pbendRange', CalfMonoParam.PBEND_RANGE],
+  ['lfoRate', CalfMonoParam.LFO_RATE], ['lfoDelay', CalfMonoParam.LFO_DELAY],
+  ['lfo2filter', CalfMonoParam.LFO2FILTER], ['lfo2pitch', CalfMonoParam.LFO2PITCH],
+  ['lfo2pw', CalfMonoParam.LFO2PW], ['mwhl2lfo', CalfMonoParam.MWHL2LFO],
+  ['scaleDetune', CalfMonoParam.SCALE_DETUNE],
+  ['adsr2Cutoff', CalfMonoParam.ENV2CUTOFF], ['adsr2Res', CalfMonoParam.ENV2RES],
+  ['adsr2Amp', CalfMonoParam.ENV2AMP],
+  ['adsr2A', CalfMonoParam.ADSR2_A], ['adsr2D', CalfMonoParam.ADSR2_D],
+  ['adsr2S', CalfMonoParam.ADSR2_S], ['adsr2F', CalfMonoParam.ADSR2_F],
+  ['adsr2R', CalfMonoParam.ADSR2_R],
+  ['o1Stretch', CalfMonoParam.O1_STRETCH], ['o1Window', CalfMonoParam.O1_WINDOW],
+  ['lfo1Trig', CalfMonoParam.LFO1_TRIG], ['lfo2Trig', CalfMonoParam.LFO2_TRIG],
+  ['lfo2Rate', CalfMonoParam.LFO2_RATE], ['lfo2Delay', CalfMonoParam.LFO2_DELAY],
+  ['o2Unison', CalfMonoParam.O2_UNISON], ['o2UnisonFrq', CalfMonoParam.O2_UNISON_FRQ],
+  ['o1Xpose', CalfMonoParam.O1_XPOSE], ['midi', CalfMonoParam.MIDI],
 ];
 
 export const CALF_MONO_PRESETS: Record<string, Partial<CalfMonoConfig>> = {
