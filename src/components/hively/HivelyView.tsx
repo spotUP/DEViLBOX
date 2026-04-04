@@ -12,7 +12,7 @@
  */
 
 import React, { useRef, useEffect, useState, useCallback } from 'react';
-import { useTrackerStore, useFormatStore } from '@stores';
+import { useTrackerStore, useFormatStore, useUIStore } from '@stores';
 import { useTransportStore } from '@stores/useTransportStore';
 import { getTrackerReplayer } from '@engine/TrackerReplayer';
 import { exportAsHively } from '@lib/export/HivelyExporter';
@@ -30,6 +30,7 @@ export const HivelyView: React.FC<{ width?: number; height?: number }> = () => {
   const setCurrentPosition = useTrackerStore(s => s.setCurrentPosition);
   const isPlaying = useTransportStore(s => s.isPlaying);
   const currentRow = useTransportStore(s => s.currentRow);
+  const editorFullscreen = useUIStore(s => s.editorFullscreen);
 
   const [editPosition, setEditPosition] = useState(0);
   const [matrixCollapsed, setMatrixCollapsed] = useState(isMobile); // Collapsed by default on mobile
@@ -108,6 +109,7 @@ export const HivelyView: React.FC<{ width?: number; height?: number }> = () => {
       }}
     >
       {/* Toolbar */}
+      {!editorFullscreen && (
       <div style={{
         display: 'flex', alignItems: 'center', gap: '8px',
         height: `${TOOLBAR_H}px`, padding: '0 12px',
@@ -131,8 +133,10 @@ export const HivelyView: React.FC<{ width?: number; height?: number }> = () => {
           >Export AHX</button>
         )}
       </div>
+      )}
 
       {/* Position editor */}
+      {!editorFullscreen && (
       <div style={{
         height: `${positionH}px`,
         borderBottom: '1px solid var(--color-border)',
@@ -148,6 +152,7 @@ export const HivelyView: React.FC<{ width?: number; height?: number }> = () => {
           onToggleCollapse={() => setMatrixCollapsed(!matrixCollapsed)}
         />
       </div>
+      )}
 
       {/* Pattern Editor */}
       <div style={{ flex: 1, minHeight: 0, overflow: 'hidden' }}>
