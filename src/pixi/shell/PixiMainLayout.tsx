@@ -155,8 +155,10 @@ export const PixiMainLayout: React.FC = () => {
 
   // Fullscreen views hide nav + status bar (matching DOM AppLayout.isFullscreenView)
   const isFullscreenView = mainViewId === 'vj';
+  const editorFullscreen = useUIStore(s => s.editorFullscreen);
+  const hideChrome = isFullscreenView || editorFullscreen;
 
-  const mainViewH = isFullscreenView
+  const mainViewH = hideChrome
     ? height
     : height - MODERN_NAV_H - MODERN_STATUS_BAR_H;
 
@@ -296,7 +298,7 @@ export const PixiMainLayout: React.FC = () => {
   return (
     <pixiContainer layout={{ width, height, flexDirection: 'column' }}>
       {/* NavBar — hidden in fullscreen views (VJ) */}
-      {!isFullscreenView && (
+      {!hideChrome && (
         <pixiContainer zIndex={100} layout={{ width, height: MODERN_NAV_H, flexShrink: 0 }}>
           <PixiNavBar />
         </pixiContainer>
@@ -379,7 +381,7 @@ export const PixiMainLayout: React.FC = () => {
       </pixiContainer>
 
       {/* Status bar — hidden in fullscreen views (VJ) */}
-      {!isFullscreenView && (
+      {!hideChrome && (
         <pixiContainer zIndex={100} layout={{ width, height: MODERN_STATUS_BAR_H, flexShrink: 0 }}>
           <PixiStatusBar />
         </pixiContainer>
