@@ -108,7 +108,9 @@ class GTUltraProcessor extends AudioWorkletProcessor {
         this.module.HEAPU8.set(data, ptr);
         const ok = this._loadSng(ptr, data.length);
         this.module._free(ptr);
-        this.port.postMessage({ type: 'songLoaded', ok: ok !== 0 });
+        // Include channel count so the UI can set sidCount immediately
+        const channelCount = this._getChannelCount();
+        this.port.postMessage({ type: 'songLoaded', ok: ok !== 0, channelCount });
         break;
       }
 

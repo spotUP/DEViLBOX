@@ -87,7 +87,7 @@ const WAVE_CMD_REF = [
 // ── Component ──
 
 export const GTUltraControls: React.FC<GTUltraControlsProps> = ({
-  config,
+  config: _config,
   instrumentId: _instrumentId,
   onChange,
 }) => {
@@ -95,10 +95,29 @@ export const GTUltraControls: React.FC<GTUltraControlsProps> = ({
   const [showEffectRef, setShowEffectRef] = useState(false);
   const [showTableRef, setShowTableRef] = useState(false);
 
+  const { isCyan: isCyanTheme, accent: accentColor, dim: dimColor, panelBg } = useInstrumentColors('#44ff88', { dim: '#1a3328' });
+
+  // Read live instrument data from GT store (updates when switching instruments)
+  const currentInstrument = useGTUltraStore((s) => s.currentInstrument);
+  const instrumentData = useGTUltraStore((s) => s.instrumentData);
+  const inst = instrumentData[currentInstrument];
+
+  // Build a live config from GT store instrument data
+  const config = useMemo(() => ({
+    ..._config,
+    ad: inst?.ad ?? _config.ad,
+    sr: inst?.sr ?? _config.sr,
+    firstwave: inst?.firstwave ?? _config.firstwave,
+    gatetimer: inst?.gatetimer ?? _config.gatetimer,
+    vibdelay: inst?.vibdelay ?? _config.vibdelay,
+    wavePtr: inst?.wavePtr ?? _config.wavePtr,
+    pulsePtr: inst?.pulsePtr ?? _config.pulsePtr,
+    filterPtr: inst?.filterPtr ?? _config.filterPtr,
+    speedPtr: inst?.speedPtr ?? _config.speedPtr,
+  }), [_config, inst]);
+
   const configRef = useRef(config);
   useEffect(() => { configRef.current = config; }, [config]);
-
-  const { isCyan: isCyanTheme, accent: accentColor, dim: dimColor, panelBg } = useInstrumentColors('#44ff88', { dim: '#1a3328' });
 
   // Store data
   const sidRegisters = useGTUltraStore((s) => s.sidRegisters);
@@ -360,9 +379,10 @@ export const GTUltraControls: React.FC<GTUltraControlsProps> = ({
       <div className="flex flex-1 min-h-0 gap-px" style={{ background: '#111' }}>
         {TABLE_DEFS.map((td, i) => {
           const ptr = config[td.ptrKey] ?? 0;
-          // During playback, show live execution position; otherwise show instrument pointer
+          // During playback, follow live execution position; otherwise don't auto-scroll
+          // (the tables are global — scrolling to the instrument pointer is misleading)
           const livePos = isPlaying ? (liveTablePos as Record<string, number>)[td.key] ?? 0 : 0;
-          const currentRow = isPlaying && livePos > 0 ? livePos : ptr;
+          const currentRow = isPlaying && livePos > 0 ? livePos : 0;
           return (
             <div key={td.key} className="flex flex-col flex-1 min-w-0">
               <div className="flex items-center gap-1 px-1 py-0.5" style={{ background: '#060a08' }}>

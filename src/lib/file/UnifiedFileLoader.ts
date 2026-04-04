@@ -634,11 +634,8 @@ async function loadSongFile(file: File, options: FileLoadOptions, preReadBuffer?
       if (gtStore.engine) {
         gtStore.engine.loadSong(gtBuf);
         gtStore.setSongName(file.name.replace(/\.sng$/i, ''));
-        // Refresh song info which triggers pattern data loading via onSongInfo callback
-        gtStore.refreshSongInfo();
-        gtStore.refreshAllOrders();
-        gtStore.refreshAllInstruments();
-        gtStore.refreshAllTables();
+        // loadSong triggers onSongLoaded → refreshSongInfo → onSongInfo
+        // which sets sidCount then refreshes orders/patterns/instruments/tables.
       } else {
         // Store the raw ArrayBuffer for pending load — avoids Uint8Array.buffer
         // offset issues if the typed array wraps a pooled/shared buffer.

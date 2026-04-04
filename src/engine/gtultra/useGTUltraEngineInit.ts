@@ -9,6 +9,7 @@ import { useEffect } from 'react';
 import * as Tone from 'tone';
 import { useGTUltraStore } from '@/stores/useGTUltraStore';
 import { useInstrumentStore } from '@/stores/useInstrumentStore';
+import { useProjectStore } from '@/stores/useProjectStore';
 import { GTUltraEngine } from './GTUltraEngine';
 import { getGTUltraASIDBridge } from './GTUltraASIDBridge';
 import { setFormatPlaybackRow } from '@engine/FormatPlaybackState';
@@ -109,14 +110,27 @@ export function useGTUltraEngineInit(): void {
           const store = useGTUltraStore.getState();
           store.setSongName(info.name);
           store.setSongAuthor(info.author);
+          if (info.channelCount > 3) store.setSidCount(2);
+          else store.setSidCount(1);
           if (info.numPatterns > 0) store.refreshAllPatterns(info.numPatterns);
+          // Refresh orders AFTER sidCount is set so all channels are fetched
+          store.refreshAllOrders();
+          // Update project metadata so the project tab shows the song name
+          useProjectStore.getState().setMetadata({
+            name: info.name || store.songName || 'Untitled',
+            author: info.author || '',
+          });
         },
-        onSongLoaded: (ok) => {
+        onSongLoaded: (ok, channelCount) => {
           if (!ok) {
             console.error('[GTUltra] Song load failed in WASM engine');
             return;
           }
           const store = useGTUltraStore.getState();
+          // Set sidCount immediately from the songLoaded response (no async wait)
+          const newSidCount = (channelCount && channelCount > 3) ? 2 : 1;
+          console.log(`[GTUltra] onSongLoaded: channelCount=${channelCount} → sidCount=${newSidCount}`);
+          store.setSidCount(newSidCount as 1 | 2);
           store.refreshSongInfo();
           store.refreshAllOrders();
           store.refreshAllInstruments();
