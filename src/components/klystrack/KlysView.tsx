@@ -12,7 +12,7 @@
  */
 
 import React, { useRef, useEffect, useState, useCallback, useMemo } from 'react';
-import { useTrackerStore , useFormatStore } from '@stores';
+import { useTrackerStore , useFormatStore, useUIStore } from '@stores';
 import { useTransportStore } from '@stores/useTransportStore';
 import { PatternEditorCanvas } from '@/components/tracker/PatternEditorCanvas';
 import { KlysPositionEditor, KLYS_MATRIX_HEIGHT, KLYS_MATRIX_COLLAPSED_HEIGHT } from './KlysPositionEditor';
@@ -33,6 +33,7 @@ export const KlysView: React.FC<{ width?: number; height?: number }> = ({ width:
   const setCurrentPosition = useTrackerStore(s => s.setCurrentPosition);
   const isPlaying = useTransportStore(s => s.isPlaying);
   const currentRow = useTransportStore(s => s.currentRow);
+  const editorFullscreen = useUIStore(s => s.editorFullscreen);
 
   const [editPosition, setEditPosition] = useState(0);
   const [selectedInstrument, setSelectedInstrument] = useState(0);
@@ -283,6 +284,7 @@ export const KlysView: React.FC<{ width?: number; height?: number }> = ({ width:
       }}
     >
       {/* Toolbar */}
+      {!editorFullscreen && (
       <div style={{
         display: 'flex', alignItems: 'center', gap: '12px',
         height: '36px', padding: '0 12px',
@@ -309,8 +311,10 @@ export const KlysView: React.FC<{ width?: number; height?: number }> = ({ width:
         </button>
         {toolbarSlot}
       </div>
+      )}
 
       {/* Position Editor */}
+      {!editorFullscreen && (
       <div style={{
         height: `${matrixCollapsed ? KLYS_MATRIX_COLLAPSED_HEIGHT : POSITION_H}px`,
         borderBottom: '1px solid var(--color-border)',
@@ -328,6 +332,7 @@ export const KlysView: React.FC<{ width?: number; height?: number }> = ({ width:
           onToggleCollapse={() => setMatrixCollapsed(!matrixCollapsed)}
         />
       </div>
+      )}
 
       {/* Main content: pattern + side panel */}
       <div style={{ flex: 1, minHeight: 0, display: 'flex', overflow: 'hidden' }}>

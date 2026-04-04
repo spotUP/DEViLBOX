@@ -15,7 +15,7 @@
  */
 
 import React, { useRef, useEffect, useState, useCallback, useMemo } from 'react';
-import { useFormatStore } from '@stores';
+import { useFormatStore, useUIStore } from '@stores';
 import { useTrackerStore } from '@stores';
 import { useTransportStore } from '@stores/useTransportStore';
 import { PatternEditorCanvas } from '@/components/tracker/PatternEditorCanvas';
@@ -34,6 +34,7 @@ export const TFMXView: React.FC<{ width?: number; height?: number }> = () => {
   const isPlaying = useTransportStore(s => s.isPlaying);
   const currentRow = useTransportStore(s => s.currentRow);
   const currentPositionIndex = useTrackerStore(s => s.currentPositionIndex);
+  const editorFullscreen = useUIStore(s => s.editorFullscreen);
 
   const [activeStepIdx, setActiveStepIdx] = useState(0);
   const [matrixCollapsed, setMatrixCollapsed] = useState(isMobile);
@@ -188,6 +189,7 @@ export const TFMXView: React.FC<{ width?: number; height?: number }> = () => {
       }}
     >
       {/* Toolbar */}
+      {!editorFullscreen && (
       <div style={{
         display: 'flex', alignItems: 'center', gap: '8px',
         height: `${TOOLBAR_H}px`, padding: '0 12px',
@@ -223,8 +225,10 @@ export const TFMXView: React.FC<{ width?: number; height?: number }> = () => {
           onClick={handleExport}
         >Export MDAT</button>
       </div>
+      )}
 
       {/* Trackstep Matrix */}
+      {!editorFullscreen && (
       <div style={{
         height: `${matrixH}px`,
         borderBottom: '1px solid var(--color-border)',
@@ -242,6 +246,7 @@ export const TFMXView: React.FC<{ width?: number; height?: number }> = () => {
           onToggleCollapse={() => setMatrixCollapsed(!matrixCollapsed)}
         />
       </div>
+      )}
 
       {/* Pattern Editor */}
       <div style={{ flex: 1, minHeight: 0, overflow: 'hidden' }}>
