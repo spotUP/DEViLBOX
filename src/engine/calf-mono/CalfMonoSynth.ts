@@ -384,10 +384,12 @@ export class CalfMonoSynthImpl implements DevilboxSynth {
   getConfig(): CalfMonoConfig { return { ...this.config }; }
 
   applyConfig(cfg: Partial<CalfMonoConfig>): void {
-    this.config = { ...this.config, ...cfg };
+    const prev = this.config;
+    this.config = { ...prev, ...cfg };
+    // Only send params that actually changed — avoids audio glitches from redundant messages
     for (const [key, idx] of CONFIG_TO_PARAM) {
       const val = this.config[key];
-      if (val !== undefined) this.setParam(idx, val);
+      if (val !== undefined && val !== prev[key]) this.setParam(idx, val);
     }
   }
 
