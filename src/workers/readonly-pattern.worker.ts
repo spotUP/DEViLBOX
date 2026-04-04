@@ -81,6 +81,7 @@ const DEFAULT_THEME: ThemeSnapshot = {
   lineNumber: '#707070',
   lineNumberHighlight: '#f97316',
   selection: 'rgba(59,130,246,0.3)',
+  bookmark: '#f59e0b',
 };
 
 let theme: ThemeSnapshot = DEFAULT_THEME;
@@ -160,6 +161,7 @@ function renderFrame(): void {
       rowSecondaryHighlightInterval: 16,
       showBeatLabels: false,
       noteDisplayOffset: 0,
+      bookmarks: [],
     },
     layout,
     dragOver: null,

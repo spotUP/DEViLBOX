@@ -25,7 +25,6 @@ import { PixiDJSamplerPanel } from './dj/PixiDJSamplerPanel';
 import { PixiDJAutoDJPanel } from './dj/PixiDJAutoDJPanel';
 import { getPhaseInfo } from '@engine/dj/DJAutoSync';
 import { useDeckStateSync } from '@hooks/dj/useDeckStateSync';
-import { useDJHealth } from '@hooks/dj/useDJHealth';
 import { usePixiTheme } from '../theme';
 import { DECK_A, DECK_B, DECK_C } from '../colors';
 import { PIXI_FONTS } from '../fonts';
@@ -52,7 +51,6 @@ export const PixiDJView: React.FC = () => {
   const engineRef = useRef<DJEngine | null>(null);
   const setDJModeActive = useDJStore(s => s.setDJModeActive);
   const thirdDeckActive = useDJStore(s => s.thirdDeckActive);
-  const health = useDJHealth();
 
   // Drag-and-drop state
   const [dragOverDeck, setDragOverDeck] = useState<DeckId | null>(null);
@@ -293,7 +291,6 @@ export const PixiDJView: React.FC = () => {
         onSamplerToggle={() => setSamplerOpen(p => !p)}
         autoDJOpen={autoDJOpen || autoDJEnabled}
         onAutoDJToggle={() => setAutoDJOpen(p => !p)}
-        audioHealth={health?.audioContext ?? null}
       />
 
       {/* Full-width waveform strip -- Serato-style */}
@@ -625,10 +622,9 @@ interface DJTopBarProps {
   onSamplerToggle: () => void;
   autoDJOpen: boolean;
   onAutoDJToggle: () => void;
-  audioHealth: 'running' | 'suspended' | 'closed' | null;
 }
 
-const PixiDJTopBar: React.FC<DJTopBarProps> = ({ browserPanel, onBrowserPanelChange, samplerOpen, onSamplerToggle, autoDJOpen, onAutoDJToggle, audioHealth }) => {
+const PixiDJTopBar: React.FC<DJTopBarProps> = ({ browserPanel, onBrowserPanelChange, samplerOpen, onSamplerToggle, autoDJOpen, onAutoDJToggle }) => {
   const deckViewMode = useDJStore(s => s.deckViewMode);
   const thirdDeckActive = useDJStore(s => s.thirdDeckActive);
   const vocoderActive = useVocoderStore(s => s.isActive);
@@ -715,42 +711,7 @@ const PixiDJTopBar: React.FC<DJTopBarProps> = ({ browserPanel, onBrowserPanelCha
         onClick={() => togglePanel('crate')}
       />
 
-      {/* Audio health badge — only visible when AudioContext is not running */}
-      {audioHealth && audioHealth !== 'running' && (
-        <PixiAudioHealthBadge state={audioHealth} />
-      )}
     </PixiViewHeader>
-  );
-};
-
-// ─── Audio Health Badge ───────────────────────────────────────────────────────
-
-const PixiAudioHealthBadge: React.FC<{ state: 'suspended' | 'closed' }> = ({ state }) => {
-  const theme = usePixiTheme();
-  const bgColor = state === 'suspended'
-    ? (theme.warning?.color ?? 0xeab308)
-    : (theme.error?.color ?? 0xef4444);
-  const label = `Audio: ${state}`;
-  const badgeW = label.length * 7 + 12;
-  const badgeH = 18;
-
-  return (
-    <pixiContainer layout={{ height: badgeH, width: badgeW }}>
-      <pixiGraphics
-        draw={(g) => {
-          g.clear();
-          g.roundRect(0, 0, badgeW, badgeH, 3);
-          g.fill({ color: bgColor, alpha: 0.9 });
-        }}
-      />
-      <pixiBitmapText
-        text={label}
-        style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 10, fill: 0xffffff }}
-        x={badgeW / 2}
-        y={badgeH / 2}
-        anchor={0.5}
-      />
-    </pixiContainer>
   );
 };
 

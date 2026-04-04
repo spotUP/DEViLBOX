@@ -55,6 +55,7 @@ let ui: UIStateSnapshot = {
   rowSecondaryHighlightInterval: 16,
   showBeatLabels: false,
   noteDisplayOffset: 0,
+  bookmarks: [],
 };
 let layout: ChannelLayoutSnapshot = { offsets: [], widths: [], totalWidth: 0 };
 let playback = { row: 0, smoothOffset: 0, patternIndex: 0, isPlaying: false };

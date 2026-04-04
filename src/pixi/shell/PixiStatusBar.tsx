@@ -71,6 +71,42 @@ const PixiDot: React.FC<{ color: number; size?: number }> = ({ color, size = 6 }
   );
 };
 
+// ─── Audio Health Badge ──────────────────────────────────────────────────────
+// Prominent warning badge shown globally when AudioContext is suspended/closed.
+
+const PixiAudioHealthBadge: React.FC = () => {
+  const theme = usePixiTheme();
+  const contextState = useAudioStore((s) => s.contextState);
+  const state = contextState === 'running' ? null : (contextState ?? 'suspended');
+  if (!state) return null;
+
+  const bgColor = state === 'suspended'
+    ? (theme.warning?.color ?? 0xeab308)
+    : (theme.error?.color ?? 0xef4444);
+  const label = `Audio: ${state}`;
+  const badgeW = label.length * 7 + 12;
+  const badgeH = 18;
+
+  return (
+    <pixiContainer layout={{ height: badgeH, width: badgeW, alignSelf: 'center' }}>
+      <pixiGraphics
+        draw={(g: GraphicsType) => {
+          g.clear();
+          g.roundRect(0, 0, badgeW, badgeH, 3);
+          g.fill({ color: bgColor, alpha: 0.9 });
+        }}
+      />
+      <pixiBitmapText
+        text={label}
+        style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 10, fill: 0xffffff }}
+        x={badgeW / 2}
+        y={badgeH / 2}
+        anchor={0.5}
+      />
+    </pixiContainer>
+  );
+};
+
 // ─── DJ Status Content ────────────────────────────────────────────────────────
 
 const DJStatusContent: React.FC<{ barHeight: number }> = ({ barHeight }) => {
@@ -560,14 +596,20 @@ const RightSide: React.FC<RightSideProps> = ({
       </pixiContainer>
       <PixiSep height={10} />
 
-      {/* Audio state indicator */}
-      <PixiDot color={audioDotColor} />
-      <pixiBitmapText
-        text={audioLabel}
-        style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 12, fill: 0xffffff }}
-        tint={audioLabelColor}
-        layout={textLayout}
-      />
+      {/* Audio state indicator — prominent badge when suspended/closed */}
+      {isAudioRunning ? (
+        <>
+          <PixiDot color={audioDotColor} />
+          <pixiBitmapText
+            text={audioLabel}
+            style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 12, fill: 0xffffff }}
+            tint={audioLabelColor}
+            layout={textLayout}
+          />
+        </>
+      ) : (
+        <PixiAudioHealthBadge />
+      )}
     </pixiContainer>
   );
 };
