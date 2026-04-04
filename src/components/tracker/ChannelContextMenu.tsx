@@ -45,6 +45,7 @@ import { MASTER_FX_PRESETS } from '@constants/masterFxPresets';
 import { notify } from '@stores/useNotificationStore';
 import { useFormatStore } from '@stores/useFormatStore';
 import { useRegisterLaneStore } from '@stores/useRegisterLaneStore';
+import { useGTUltraStore } from '@stores/useGTUltraStore';
 import { getParamsForFormat, groupParams, type AutomationFormat } from '../../engine/automation/AutomationParams';
 
 interface ChannelContextMenuProps {
@@ -158,6 +159,10 @@ export const ChannelContextMenu: React.FC<ChannelContextMenuProps> = ({
   const toggleRegisterLane = useRegisterLaneStore(s => s.toggleLane);
   const hasRegisterLane = useRegisterLaneStore(s => s.hasLane);
 
+  const furnaceNative = useFormatStore(s => s.furnaceNative);
+  const gtSidCount = editorMode === 'goattracker'
+    ? (useGTUltraStore?.getState?.()?.sidCount ?? 1) : 1;
+
   const registerParamMenuItems = useMemo((): MenuItemType[] => {
     const fmt: AutomationFormat | null =
       editorMode === 'goattracker' ? 'gtultra' :
@@ -165,7 +170,13 @@ export const ChannelContextMenu: React.FC<ChannelContextMenuProps> = ({
       editorMode === 'classic' ? 'uade' : null;
     if (!fmt) return [];
 
-    const params = getParamsForFormat(fmt);
+    const config = fmt === 'gtultra'
+      ? { sidCount: gtSidCount }
+      : fmt === 'furnace' && furnaceNative
+        ? { chipIds: furnaceNative.chipIds, channelCount: furnaceNative.subsongs[furnaceNative.activeSubsong]?.channels.length ?? 4 }
+        : undefined;
+
+    const params = getParamsForFormat(fmt, config);
     const groups = groupParams(params);
     return groups.map(group => ({
       id: `reg-group-${group.label}`,
@@ -177,7 +188,7 @@ export const ChannelContextMenu: React.FC<ChannelContextMenuProps> = ({
         onClick: () => toggleRegisterLane(p.id),
       })),
     }));
-  }, [editorMode, toggleRegisterLane, hasRegisterLane]);
+  }, [editorMode, toggleRegisterLane, hasRegisterLane, furnaceNative, gtSidCount]);
 
   // Build menu items based on mode
   const menuItems = useMemo((): MenuItemType[] => {
