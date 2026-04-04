@@ -3,11 +3,14 @@
  * Dynamically resolves parameters from the channel's instrument via NKS maps
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useTrackerStore, useAutomationStore, useThemeStore } from '@stores';
 import { AutomationCurveCanvas } from './AutomationCurve';
 import { useChannelAutomationParams } from '@hooks/useChannelAutomationParams';
 import { useAutomationRecording } from '@hooks/useAutomationRecording';
+import { useFormatStore } from '@stores/useFormatStore';
+import { useRegisterLaneStore } from '@stores/useRegisterLaneStore';
+import { getParamsForFormat, groupParams, type AutomationFormat } from '../../engine/automation/AutomationParams';
 
 export const AutomationPanel: React.FC = () => {
   const { patterns, currentPatternIndex } = useTrackerStore();
@@ -194,6 +197,9 @@ export const AutomationPanel: React.FC = () => {
         )}
       </div>
 
+      {/* Register Lanes — chip register parameters (SID/Paula/Furnace) */}
+      <RegisterLanesSection />
+
       {/* Automation Curve Editor */}
       <div className="flex-1 overflow-y-auto scrollbar-modern">
         <AutomationCurveCanvas
@@ -202,6 +208,71 @@ export const AutomationPanel: React.FC = () => {
           patternLength={pattern.length}
           onChange={handleCurveChange}
         />
+      </div>
+    </div>
+  );
+};
+
+/** Register Lanes section — shows chip register params based on current format */
+const RegisterLanesSection: React.FC = () => {
+  const editorMode = useFormatStore(s => s.editorMode);
+  const lanes = useRegisterLaneStore(s => s.lanes);
+  const toggleLane = useRegisterLaneStore(s => s.toggleLane);
+  const hasLane = useRegisterLaneStore(s => s.hasLane);
+
+  const fmt: AutomationFormat | null = useMemo(() => {
+    if (editorMode === 'goattracker') return 'gtultra';
+    if (editorMode === 'furnace') return 'furnace';
+    if (editorMode === 'classic') return 'uade';
+    return null;
+  }, [editorMode]);
+
+  const registerGroups = useMemo(() => {
+    if (!fmt) return [];
+    return groupParams(getParamsForFormat(fmt));
+  }, [fmt]);
+
+  if (registerGroups.length === 0) return null;
+
+  return (
+    <div className="border-b border-dark-border bg-dark-bgSecondary p-3">
+      <div className="flex items-center gap-2 mb-2">
+        <span className="text-text-muted text-[10px] font-medium uppercase tracking-wider">
+          Register Lanes
+        </span>
+        <span className="text-text-muted text-[10px] opacity-50">
+          {lanes.length} active
+        </span>
+      </div>
+      <div className="flex gap-4 flex-wrap max-h-32 overflow-y-auto scrollbar-modern">
+        {registerGroups.map((group) => (
+          <div key={group.label} className="flex flex-col gap-1">
+            <div className="text-text-muted text-[9px] font-medium uppercase tracking-wider opacity-60">
+              {group.label}
+            </div>
+            <div className="flex gap-1 flex-wrap">
+              {group.params.map((p) => {
+                const active = hasLane(p.id);
+                return (
+                  <button
+                    key={p.id}
+                    onClick={() => toggleLane(p.id)}
+                    className={`
+                      px-2 py-0.5 text-[10px] rounded border transition-all
+                      ${active
+                        ? 'bg-accent-primary/20 text-accent-primary border-accent-primary/50'
+                        : 'bg-dark-bgTertiary text-text-muted border-dark-border hover:border-dark-borderLight hover:text-text-secondary'
+                      }
+                    `}
+                    title={`${active ? 'Hide' : 'Show'} ${p.label} lane`}
+                  >
+                    {p.label}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        ))}
       </div>
     </div>
   );
