@@ -2224,11 +2224,13 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
           // Read frame-accurate row from FormatPlaybackState (updated by format engines)
           // instead of the standard TrackerReplayer which has no format engine state.
           const fps = getFormatPlaybackState();
-          const newPlaying = fps.isPlaying;
-          let newRow = fps.isPlaying ? fps.row : formatCurrentRowRef.current;
+          // Respect formatIsPlaying prop — the track table matrix passes false
+          // to prevent scrolling when FormatPlaybackState is globally active.
+          const newPlaying = fps.isPlaying && formatIsPlayingRef.current;
+          let newRow = newPlaying ? fps.row : formatCurrentRowRef.current;
           let smoothOffset = 0;
 
-          if (fps.isPlaying && fps.rowDuration > 0) {
+          if (newPlaying && fps.rowDuration > 0) {
             const elapsed = performance.now() - fps.rowChangeTime;
             const progress = Math.min(Math.max(elapsed / fps.rowDuration, 0), 1);
             const transportState = useTransportStore.getState();
