@@ -1,28 +1,35 @@
 /**
  * FurnaceOrderEditor — Order matrix for Furnace modules.
- * Uses SequenceMatrixEditor for shared chrome/canvas/collapse (same as GT Ultra, Hively, Klystrack).
+ * Uses PatternEditorCanvas in format mode for visual consistency with the pattern editor.
  *
- * Grid: rows = order positions, columns = channels, cells = pattern indices (hex).
- * Per-digit cursor. Arrow keys navigate, hex keys (0-9, A-F) write values.
- * Insert key adds row, Ctrl+Backspace deletes row.
+ * Grid: rows = order positions, columns = channels, cells = pattern indices (hex 2-digit).
  */
 
-import React, { useState, useCallback } from 'react';
+import React, { useMemo, useCallback } from 'react';
 import type { FurnaceNativeData } from '@/types/tracker';
-import { useFormatStore } from '@stores';
-import {
-  SequenceMatrixEditor, MATRIX_CHAR_W, MATRIX_ROW_H, MATRIX_HEADER_H,
-  MATRIX_HEIGHT, MATRIX_COLLAPSED_HEIGHT,
-  type MatrixRenderContext,
-} from '../shared/SequenceMatrixEditor';
+import { PatternEditorCanvas } from '@/components/tracker/PatternEditorCanvas';
+import type { ColumnDef, FormatChannel, OnCellChange } from '@/components/shared/format-editor-types';
 
-export const FURNACE_ORDER_MATRIX_HEIGHT = MATRIX_HEIGHT;
-export const FURNACE_ORDER_MATRIX_COLLAPSED_HEIGHT = MATRIX_COLLAPSED_HEIGHT;
+export const FURNACE_ORDER_MATRIX_HEIGHT = 200;
+export const FURNACE_ORDER_MATRIX_COLLAPSED_HEIGHT = 28;
 
-const POS_COL_W = MATRIX_CHAR_W * 4;
-const CH_COL_W  = MATRIX_CHAR_W * 4;
-const HEX = '0123456789abcdef';
-const DIGIT_COLS = 2;
+function formatHex2(val: number): string {
+  return val.toString(16).toUpperCase().padStart(2, '0');
+}
+
+function makeChannelColumn(name: string): ColumnDef {
+  return {
+    key: 'order',
+    label: name,
+    charWidth: 2,
+    type: 'hex',
+    hexDigits: 2,
+    color: '#e0e0e0',
+    emptyColor: '#444',
+    emptyValue: undefined, // All values meaningful (0x00 = pattern 0)
+    formatter: formatHex2,
+  };
+}
 
 interface Props {
   width: number;
@@ -37,164 +44,71 @@ interface Props {
 
 export const FurnaceOrderEditor: React.FC<Props> = ({
   width, height, collapsed, onToggleCollapse,
-  nativeData, currentPosition, onPositionChange, onOrderChange,
+  nativeData, currentPosition, onPositionChange: _onPositionChange, onOrderChange,
 }) => {
   const sub = nativeData.subsongs[nativeData.activeSubsong];
-  const insertRow = useFormatStore(s => s.insertFurnaceOrderRow);
-  const deleteRow = useFormatStore(s => s.deleteFurnaceOrderRow);
   const numPos = sub?.ordersLen ?? 0;
   const numCh  = sub?.channels.length ?? 0;
 
-  const [curCh, setCurCh]       = useState(0);
-  const [curDigit, setCurDigit] = useState(0); // 0=hi, 1=lo
+  // One shared column def (all channels use the same 2-digit hex column)
+  const formatColumns = useMemo<ColumnDef[]>(() => {
+    return [{ key: 'order', label: 'Val', charWidth: 2, type: 'hex', hexDigits: 2, color: '#e0e0e0', emptyColor: '#444', emptyValue: undefined, formatter: formatHex2 }];
+  }, []);
 
-  // ── Render callback ─────────────────────────────────────────────────────
-
-  const onRender = useCallback((rc: MatrixRenderContext) => {
-    const { ctx, width: w, theme, visibleRows, scrollOffset } = rc;
-
-    // Column header
-    ctx.fillStyle = theme.bgHighlight;
-    ctx.fillRect(0, 0, w, MATRIX_HEADER_H);
-    ctx.fillStyle = theme.textMuted;
-    ctx.fillText('Pos', 4, MATRIX_HEADER_H / 2);
+  // Build FormatChannel[] — one channel per Furnace channel
+  const formatChannels = useMemo<FormatChannel[]>(() => {
+    const channels: FormatChannel[] = [];
     for (let ch = 0; ch < numCh; ch++) {
       const label = sub?.channels[ch]?.name ?? `CH${ch}`;
-      const maxChars = Math.floor(CH_COL_W / MATRIX_CHAR_W);
-      const truncated = label.length > maxChars ? label.substring(0, maxChars) : label;
-      ctx.fillStyle = ch === curCh ? '#ccc' : theme.textMuted;
-      ctx.fillText(truncated, POS_COL_W + ch * CH_COL_W, MATRIX_HEADER_H / 2);
-    }
-
-    const dataY0 = MATRIX_HEADER_H;
-    for (let vi = 0; vi < visibleRows; vi++) {
-      const pos = scrollOffset + vi;
-      if (pos >= numPos) break;
-      const y = dataY0 + vi * MATRIX_ROW_H;
-      const isCurrent = pos === currentPosition;
-
-      // Current row highlight
-      if (isCurrent) {
-        ctx.fillStyle = theme.bgCurrent;
-        ctx.fillRect(0, y, w, MATRIX_ROW_H);
-
-        // Active channel cell highlight
-        const activeX = POS_COL_W + curCh * CH_COL_W;
-        ctx.fillStyle = 'rgba(255,255,255,0.08)';
-        ctx.fillRect(activeX - 2, y, CH_COL_W, MATRIX_ROW_H);
-
-        // Per-digit cursor
-        const digitX = POS_COL_W + curCh * CH_COL_W + curDigit * (MATRIX_CHAR_W * 0.9);
-        ctx.fillStyle = 'rgba(255, 255, 136, 0.35)';
-        ctx.fillRect(digitX - 1, y, MATRIX_CHAR_W, MATRIX_ROW_H);
-
-        // Row outline
-        ctx.strokeStyle = 'rgba(255,255,255,0.4)';
-        ctx.lineWidth = 1;
-        ctx.strokeRect(0.5, y + 0.5, w - 1, MATRIX_ROW_H - 1);
-      }
-
-      // Position number
-      ctx.fillStyle = isCurrent ? theme.accent : theme.textMuted;
-      ctx.fillText(pos.toString(16).toUpperCase().padStart(3, '0'), 4, y + MATRIX_ROW_H / 2);
-
-      // Per-channel pattern index
-      for (let ch = 0; ch < numCh; ch++) {
+      const col = makeChannelColumn(label);
+      const rows = [];
+      for (let pos = 0; pos < numPos; pos++) {
         const patIdx = sub?.orders[ch]?.[pos] ?? 0;
-        ctx.fillStyle = isCurrent && ch === curCh ? '#fff' : '#e0e0e0';
-        ctx.fillText(
-          patIdx.toString(16).toUpperCase().padStart(2, '0'),
-          POS_COL_W + ch * CH_COL_W,
-          y + MATRIX_ROW_H / 2,
-        );
+        rows.push({ order: patIdx });
       }
+      channels.push({
+        label,
+        patternLength: numPos,
+        rows,
+        columns: [col],
+      });
     }
-  }, [sub, numCh, numPos, currentPosition, curCh, curDigit]);
+    return channels;
+  }, [sub, numCh, numPos]);
 
-  // ── Click handler ───────────────────────────────────────────────────────
+  const handleCellChange = useCallback<OnCellChange>((channelIdx, rowIdx, _columnKey, value) => {
+    onOrderChange(channelIdx, rowIdx, value & 0xFF);
+  }, [onOrderChange]);
 
-  const onClick = useCallback((x: number, y: number, rc: MatrixRenderContext) => {
-    const pos = rc.scrollOffset + Math.floor(y / MATRIX_ROW_H);
-    if (pos >= 0 && pos < numPos) onPositionChange(pos);
-
-    const relX = x - POS_COL_W;
-    if (relX >= 0) {
-      const ch = Math.min(numCh - 1, Math.floor(relX / CH_COL_W));
-      if (ch >= 0) {
-        setCurCh(ch);
-        const digitRel = relX - ch * CH_COL_W;
-        setCurDigit(digitRel < CH_COL_W / 2 ? 0 : 1);
-      }
-    }
-  }, [numPos, numCh, onPositionChange]);
-
-  // ── Keyboard handler ────────────────────────────────────────────────────
-
-  const onKeyDown = useCallback((e: React.KeyboardEvent, _rc: MatrixRenderContext): boolean => {
-    e.stopPropagation();
-    const { key } = e;
-
-    // Navigation
-    if (key === 'ArrowUp')   { onPositionChange(Math.max(0, currentPosition - 1)); return true; }
-    if (key === 'ArrowDown') { onPositionChange(Math.min(numPos - 1, currentPosition + 1)); return true; }
-    if (key === 'ArrowRight') {
-      const next = curDigit + 1;
-      if (next < DIGIT_COLS) { setCurDigit(next); }
-      else if (curCh < numCh - 1) { setCurCh(c => c + 1); setCurDigit(0); }
-      return true;
-    }
-    if (key === 'ArrowLeft') {
-      const prev = curDigit - 1;
-      if (prev >= 0) { setCurDigit(prev); }
-      else if (curCh > 0) { setCurCh(c => c - 1); setCurDigit(DIGIT_COLS - 1); }
-      return true;
-    }
-    if (key === 'Tab') {
-      if (e.shiftKey) { if (curCh > 0) { setCurCh(c => c - 1); setCurDigit(0); } }
-      else { if (curCh < numCh - 1) { setCurCh(c => c + 1); setCurDigit(0); } }
-      return true;
-    }
-    if (key === 'PageUp')  { onPositionChange(Math.max(0, currentPosition - 16)); return true; }
-    if (key === 'PageDown') { onPositionChange(Math.min(numPos - 1, currentPosition + 16)); return true; }
-    if (key === 'Home')    { onPositionChange(0); return true; }
-    if (key === 'End')     { onPositionChange(numPos - 1); return true; }
-
-    // Insert/delete order row
-    if (key === 'Insert') { insertRow(currentPosition); return true; }
-    if (e.ctrlKey && key === 'Backspace') { deleteRow(currentPosition); return true; }
-
-    // Hex digit entry
-    const hexIdx = HEX.indexOf(key.toLowerCase());
-    if (hexIdx < 0) return false;
-
-    const cur = sub?.orders[curCh]?.[currentPosition] ?? 0;
-    const newVal = curDigit === 0
-      ? (hexIdx << 4) | (cur & 0x0F)
-      : (cur & 0xF0) | hexIdx;
-    onOrderChange(curCh, currentPosition, newVal & 0xFF);
-
-    // Advance cursor
-    if (curDigit < DIGIT_COLS - 1) { setCurDigit(d => d + 1); }
-    else if (curCh < numCh - 1) { setCurCh(c => c + 1); setCurDigit(0); }
-    return true;
-  }, [sub, currentPosition, numPos, numCh, curCh, curDigit,
-      onPositionChange, onOrderChange, insertRow, deleteRow]);
-
-  // ── Render ──────────────────────────────────────────────────────────────
+  if (collapsed) {
+    return (
+      <div
+        style={{ height: FURNACE_ORDER_MATRIX_COLLAPSED_HEIGHT, display: 'flex', alignItems: 'center', cursor: 'pointer', paddingLeft: 8, fontSize: 11, color: '#888', background: 'var(--color-bg-secondary)' }}
+        onClick={onToggleCollapse}
+      >
+        ORDERS [click to expand]
+      </div>
+    );
+  }
 
   return (
-    <SequenceMatrixEditor
-      label="ORDERS"
-      width={width}
-      height={height}
-      collapsed={collapsed}
-      onToggleCollapse={onToggleCollapse}
-      totalRows={numPos}
-      activeRow={currentPosition}
-      onRender={onRender}
-      onClick={onClick}
-      onKeyDown={onKeyDown}
-      renderDeps={[sub, numCh, numPos, currentPosition, curCh, curDigit]}
-    />
+    <div style={{ width, height, position: 'relative' }}>
+      {onToggleCollapse && (
+        <div
+          style={{ position: 'absolute', top: 0, right: 8, zIndex: 1, cursor: 'pointer', fontSize: 11, color: '#888', lineHeight: '20px' }}
+          onClick={onToggleCollapse}
+        >
+          [collapse]
+        </div>
+      )}
+      <PatternEditorCanvas
+        formatColumns={formatColumns}
+        formatChannels={formatChannels}
+        formatCurrentRow={currentPosition}
+        formatIsPlaying={false}
+        onFormatCellChange={handleCellChange}
+        hideVUMeters={true}
+      />
+    </div>
   );
 };
