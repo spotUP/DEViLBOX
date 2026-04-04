@@ -1,7 +1,7 @@
 import React, { useRef, useEffect, useCallback } from 'react';
 import type { GranularConfig, FilterType } from '@/types/instrument';
 import { Knob } from '@components/controls/Knob';
-import { useThemeStore } from '@stores';
+import { useInstrumentColors } from '@/hooks/useInstrumentColors';
 
 interface GranularControlsProps {
   config: GranularConfig;
@@ -15,19 +15,11 @@ export const GranularControls: React.FC<GranularControlsProps> = ({
   const configRef = useRef(config);
   useEffect(() => { configRef.current = config; }, [config]);
 
-  const currentThemeId = useThemeStore((state) => state.currentThemeId);
-  const isCyanTheme = currentThemeId === 'cyan-lineart';
-
-  const accentColor = isCyanTheme ? '#00ffff' : '#a78bfa';
-  const knobColor = isCyanTheme ? '#00ffff' : '#a78bfa';
+  const { isCyan: isCyanTheme, accent: accentColor, knob: knobColor, panelBg } = useInstrumentColors('#a78bfa');
   const knobColor2 = isCyanTheme ? '#00cccc' : '#8b5cf6';
   const knobColor3 = isCyanTheme ? '#009999' : '#7c3aed';
   const knobColorEnv = isCyanTheme ? '#00aaaa' : '#c4b5fd';
   const knobColorFilter = isCyanTheme ? '#008888' : '#6d28d9';
-
-  const panelBg = isCyanTheme
-    ? 'bg-[#051515] border-accent-highlight/20'
-    : 'bg-[#1a1a1a] border-dark-border';
 
   const update = useCallback((key: keyof GranularConfig, value: number | boolean | string) => {
     onChange({ [key]: value } as Partial<GranularConfig>);

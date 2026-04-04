@@ -46,7 +46,7 @@
 
 import React, { useRef, useEffect, useCallback, useState } from 'react';
 import type { TFMXConfig, UADEChipRamInfo } from '@/types/instrument';
-import { useThemeStore } from '@stores';
+import { useInstrumentColors } from '@/hooks/useInstrumentColors';
 import { SectionLabel } from '@components/instruments/shared';
 import { UADEChipEditor } from '@/engine/uade/UADEChipEditor';
 import { UADEEngine } from '@/engine/uade/UADEEngine';
@@ -282,13 +282,8 @@ export const TFMXControls: React.FC<TFMXControlsProps> = ({ config, onChange, ua
     return chipEditorRef.current;
   }, []);
 
-  const currentThemeId = useThemeStore((s) => s.currentThemeId);
-  const isCyan = currentThemeId === 'cyan-lineart';
-
-  const accent   = isCyan ? '#00ffff' : '#ff6644';
+  const { isCyan, accent, dim, panelBg } = useInstrumentColors('#ff6644', { dim: '#331100' });
   const accentDim = isCyan ? '#009999' : '#cc4422';
-  const dim      = isCyan ? '#004444' : '#331100';
-  const panelBg  = isCyan ? 'bg-[#041510] border-accent-highlight/20' : 'bg-[#1a0800] border-red-900/30';
   const panelBg2 = isCyan ? '#041510' : '#1a0800';
   const inputBg  = isCyan ? '#020e0a' : '#0e0500';
 

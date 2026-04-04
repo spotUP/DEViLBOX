@@ -19,7 +19,7 @@
 import React, { useRef, useEffect, useCallback, useState, useMemo } from 'react';
 import type { FCConfig, UADEChipRamInfo } from '@/types/instrument';
 import { Knob } from '@components/controls/Knob';
-import { useThemeStore } from '@stores';
+import { useInstrumentColors } from '@/hooks/useInstrumentColors';
 import { EnvelopeVisualization, SectionLabel } from '@components/instruments/shared';
 import { PatternEditorCanvas } from '@/components/tracker/PatternEditorCanvas';
 import {
@@ -68,13 +68,7 @@ export const FCControls: React.FC<FCControlsProps> = ({ config, onChange, uadeCh
     return chipEditorRef.current;
   }, []);
 
-  const currentThemeId = useThemeStore((s) => s.currentThemeId);
-  const isCyan = currentThemeId === 'cyan-lineart';
-
-  const accent  = isCyan ? '#00ffff' : '#ffdd44';
-  const knob    = isCyan ? '#00ffff' : '#ffee77';
-  const dim     = isCyan ? '#004444' : '#332a00';
-  const panelBg = isCyan ? 'bg-[#041510] border-accent-highlight/20' : 'bg-[#1a1500] border-yellow-900/30';
+  const { isCyan, accent, knob, dim, panelBg } = useInstrumentColors('#ffdd44', { knob: '#ffee77', dim: '#332a00' });
 
   const upd = useCallback(<K extends keyof FCConfig>(key: K, value: FCConfig[K]) => {
     onChange({ [key]: value } as Partial<FCConfig>);

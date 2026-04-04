@@ -43,7 +43,7 @@
 import React, { useRef, useEffect, useCallback, useState, useMemo } from 'react';
 import type { SidMonConfig, UADEChipRamInfo } from '@/types/instrument';
 import { Knob } from '@components/controls/Knob';
-import { useThemeStore } from '@stores';
+import { useInstrumentColors } from '@/hooks/useInstrumentColors';
 import {
   EnvelopeVisualization,
   FilterFrequencyResponse,
@@ -140,13 +140,7 @@ export const SidMonControls: React.FC<SidMonControlsProps> = ({
     return chipEditorRef.current;
   }, [uadeChipRam]);
 
-  const currentThemeId = useThemeStore((s) => s.currentThemeId);
-  const isCyan = currentThemeId === 'cyan-lineart';
-
-  const accent  = isCyan ? '#00ffff' : '#ff66aa';
-  const knob    = isCyan ? '#00ffff' : '#ff88bb';
-  const dim     = isCyan ? '#004444' : '#330022';
-  const panelBg = isCyan ? 'bg-[#041510] border-accent-highlight/20' : 'bg-[#1a0010] border-pink-900/30';
+  const { isCyan, accent, knob, dim, panelBg } = useInstrumentColors('#ff66aa', { knob: '#ff88bb', dim: '#330022' });
 
   const upd = useCallback(<K extends keyof SidMonConfig>(key: K, value: SidMonConfig[K]) => {
     onChange({ [key]: value } as Partial<SidMonConfig>);

@@ -13,7 +13,7 @@
 import React, { useRef, useEffect, useCallback, useState } from 'react';
 import type { FuturePlayerConfig } from '@/types/instrument/exotic';
 import { Knob } from '@components/controls/Knob';
-import { useThemeStore } from '@stores';
+import { useInstrumentColors } from '@/hooks/useInstrumentColors';
 import { EnvelopeVisualization } from '@components/instruments/shared';
 
 // ── Tab type ────────────────────────────────────────────────────────────────
@@ -39,11 +39,7 @@ export const FuturePlayerControls: React.FC<FuturePlayerControlsProps> = ({
   const configRef = useRef(config);
   useEffect(() => { configRef.current = config; }, [config]);
 
-  const currentThemeId = useThemeStore((s) => s.currentThemeId);
-  const isCyan = currentThemeId === 'cyan-lineart';
-
-  const knob    = isCyan ? '#00ffff' : '#ffbb66';
-  const panelBg = isCyan ? 'bg-[#041510] border-accent-highlight/20' : 'bg-[#1a0e00] border-orange-900/30';
+  const { isCyan, knob, panelBg } = useInstrumentColors('#ffbb66');
 
   const upd = useCallback(<K extends keyof FuturePlayerConfig>(key: K, value: FuturePlayerConfig[K]) => {
     onChange({ [key]: value } as Partial<FuturePlayerConfig>);

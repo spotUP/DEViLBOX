@@ -7,7 +7,7 @@ import React, { useRef, useEffect, useCallback } from 'react';
 import type { AMSynthConfig } from '@/engine/amsynth/AMSynthSynth';
 import { DEFAULT_AMSYNTH, AMSYNTH_PARAM_NAMES } from '@/engine/amsynth/AMSynthSynth';
 import { Knob } from '@components/controls/Knob';
-import { useThemeStore } from '@stores';
+import { useInstrumentColors } from '@/hooks/useInstrumentColors';
 
 interface AMSynthControlsProps {
   config: Partial<AMSynthConfig>;
@@ -133,9 +133,7 @@ export const AMSynthControls: React.FC<AMSynthControlsProps> = ({ config, onChan
     onChange({ ...configRef.current, [key]: value });
   }, [onChange]);
 
-  const currentThemeId = useThemeStore((state) => state.currentThemeId);
-  const isCyanTheme = currentThemeId === 'cyan-lineart';
-  const knobColor = isCyanTheme ? '#00ffff' : '#88ff88';
+  const { isCyan: isCyanTheme, knob: knobColor } = useInstrumentColors('#88ff88');
   const headerColor = isCyanTheme ? 'text-cyan-400' : 'text-green-400';
 
   const merged = { ...DEFAULT_AMSYNTH, ...config };

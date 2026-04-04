@@ -13,7 +13,7 @@ import type { GTUltraConfig } from '@typedefs/instrument/exotic';
 import { PatternEditorCanvas } from '@/components/tracker/PatternEditorCanvas';
 import { EnvelopeVisualization, SectionLabel } from '@components/instruments/shared';
 import { useGTUltraStore } from '@stores/useGTUltraStore';
-import { useThemeStore } from '@stores';
+import { useInstrumentColors } from '@/hooks/useInstrumentColors';
 
 // ── Types ──
 
@@ -98,11 +98,7 @@ export const GTUltraControls: React.FC<GTUltraControlsProps> = ({
   const configRef = useRef(config);
   useEffect(() => { configRef.current = config; }, [config]);
 
-  const currentThemeId = useThemeStore((s) => s.currentThemeId);
-  const isCyanTheme = currentThemeId === 'cyan-lineart';
-  const accentColor = isCyanTheme ? '#00ffff' : '#44ff88';
-  const dimColor = isCyanTheme ? '#004444' : '#1a3328';
-  const panelBg = isCyanTheme ? 'bg-[#041510] border-accent-highlight/20' : 'bg-[#0a1a12] border-green-900/30';
+  const { isCyan: isCyanTheme, accent: accentColor, dim: dimColor, panelBg } = useInstrumentColors('#44ff88', { dim: '#1a3328' });
 
   // Store data
   const sidRegisters = useGTUltraStore((s) => s.sidRegisters);

@@ -8,7 +8,7 @@
 import React, { useState, useCallback, useMemo, useRef, useEffect } from 'react';
 import { getChipSynthDef, type ChipParameterDef } from '@constants/chipParameters';
 import { Knob } from '@components/controls/Knob';
-import { useThemeStore } from '@stores';
+import { useInstrumentColors } from '@/hooks/useInstrumentColors';
 import type { SynthType } from '@typedefs/instrument';
 import type JSZipType from 'jszip';
 import { VowelEditor } from './VowelEditor';
@@ -35,10 +35,8 @@ export const ChipSynthControls: React.FC<ChipSynthControlsProps> = ({
   onRomUpload,
   onSpeak,
 }) => {
-  const currentThemeId = useThemeStore((state) => state.currentThemeId);
-  const isCyanTheme = currentThemeId === 'cyan-lineart';
-
   const chipDef = useMemo(() => getChipSynthDef(synthType), [synthType]);
+  const { isCyan: isCyanTheme, accent: accentColor, knob: knobColor } = useInstrumentColors(chipDef?.color ?? '#ffcc33');
   const [activeOpTab, setActiveOpTab] = useState(0); // 0 = Global, 1-N = Operators
   
   // Use ref to prevent stale closures in callbacks
@@ -129,8 +127,6 @@ export const ChipSynthControls: React.FC<ChipSynthControlsProps> = ({
 
   if (!chipDef) return null;
 
-  const accentColor = isCyanTheme ? '#00ffff' : chipDef.color;
-  const knobColor = isCyanTheme ? '#00ffff' : chipDef.color;
   const bgColor = isCyanTheme ? 'rgba(0, 20, 20, 0.4)' : 'rgba(0,0,0,0.3)';
   const textColor = isCyanTheme ? '#00ffff' : '#e2e8f0';
   const mutedColor = isCyanTheme ? '#006060' : '#94a3b8';

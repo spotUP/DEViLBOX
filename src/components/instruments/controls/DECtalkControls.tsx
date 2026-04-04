@@ -1,7 +1,7 @@
 import React, { useRef, useEffect, useCallback } from 'react';
 import type { DECtalkConfig } from '@engine/dectalk/DECtalkSynth';
 import { DECTALK_VOICES, DECtalkSynth } from '@engine/dectalk/DECtalkSynth';
-import { useThemeStore } from '@stores';
+import { useInstrumentColors } from '@/hooks/useInstrumentColors';
 import { ScrollLockContainer } from '@components/ui/ScrollLockContainer';
 import { getToneEngine } from '@engine/ToneEngine';
 
@@ -19,12 +19,7 @@ export const DECtalkControls: React.FC<DECtalkControlsProps> = ({
   const configRef = useRef(config);
   useEffect(() => { configRef.current = config; }, [config]);
 
-  const currentThemeId = useThemeStore((state) => state.currentThemeId);
-  const isCyanTheme = currentThemeId === 'cyan-lineart';
-  const accentColor = isCyanTheme ? '#00ffff' : '#00ff88';
-  const panelBg = isCyanTheme
-    ? 'bg-[#051515] border-accent-highlight/20'
-    : 'bg-[#1a1a1a] border-dark-border';
+  const { accent: accentColor, panelBg } = useInstrumentColors('#00ff88');
 
   // Find active DECtalk synth instance for speak button
   const synthRef = useRef<DECtalkSynth | null>(null);

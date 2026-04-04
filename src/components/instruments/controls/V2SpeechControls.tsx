@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import type { V2SpeechConfig } from '@/types/instrument';
 import { Knob } from '@components/controls/Knob';
 import { MessageSquare, Zap, Activity, Book, ChevronDown, ChevronUp, Wand2 } from 'lucide-react';
-import { useThemeStore } from '@stores';
+import { useInstrumentColors } from '@/hooks/useInstrumentColors';
 // @ts-expect-error -- SamJs is a JavaScript library without types
 import SamJs from '@engine/sam/samjs';
 import { VowelEditor } from './VowelEditor';
@@ -24,13 +24,7 @@ export const V2SpeechControls: React.FC<V2SpeechControlsProps> = ({
   useEffect(() => { configRef.current = config; });
 
   // Theme-aware styling
-  const currentThemeId = useThemeStore((state) => state.currentThemeId);
-  const isCyanTheme = currentThemeId === 'cyan-lineart';
-
-  const knobColor = isCyanTheme ? '#00ffff' : '#ffcc33';
-  const panelBg = isCyanTheme
-    ? 'bg-[#051515] border-accent-highlight/20'
-    : 'bg-[#1a1a1a] border-dark-border';
+  const { knob: knobColor, panelBg } = useInstrumentColors('#ffcc33');
 
   // Convert plain text to SAM phonemes
   const handleConvertToPhonemes = () => {

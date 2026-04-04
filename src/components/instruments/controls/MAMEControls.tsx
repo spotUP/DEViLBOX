@@ -3,7 +3,7 @@ import type { MAMEConfig } from '@typedefs/instrument';
 import { Knob } from '@components/controls/Knob';
 import { Cpu, Database, Save, Activity, HardDrive } from 'lucide-react';
 import { MAMEEngine } from '@engine/MAMEEngine';
-import { useThemeStore } from '@stores';
+import { useInstrumentColors } from '@/hooks/useInstrumentColors';
 import { MAMEVFXVoiceMatrix } from './MAMEVFXVoiceMatrix';
 import { MAMEDOCVoiceMatrix } from './MAMEDOCVoiceMatrix';
 import { MAMERSAVoiceMatrix } from './MAMERSAVoiceMatrix';
@@ -37,17 +37,7 @@ export const MAMEControls: React.FC<MAMEControlsProps> = ({
   useEffect(() => { configRef.current = config; }, [config]);
 
   // Theme-aware styling
-  const currentThemeId = useThemeStore((state) => state.currentThemeId);
-  const isCyanTheme = currentThemeId === 'cyan-lineart';
-
-  // Colors based on theme
-  const accentColor = isCyanTheme ? '#00ffff' : '#ff4444'; 
-  const knobColor = isCyanTheme ? '#00ffff' : '#ff8888';
-  
-  // Background styles
-  const panelBg = isCyanTheme
-    ? 'bg-[#051515] border-accent-highlight/20'
-    : 'bg-[#1a1a1a] border-dark-border';
+  const { accent: accentColor, knob: knobColor, panelBg } = useInstrumentColors('#ff4444', { knob: '#ff8888' });
 
   const handleFileUpload = useCallback(async (e: React.ChangeEvent<HTMLInputElement>, bank: number) => {
     const file = e.target.files?.[0];
