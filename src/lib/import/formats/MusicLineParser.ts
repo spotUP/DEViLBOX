@@ -91,6 +91,14 @@ const CHNL_CMD_TYPE_MASK = 0xC0; // bits 7:6 = command type
 const CHNL_CMD_END = 0x40;      // type 01: end channel
 const CHNL_CMD_JUMP = 0x80;     // type 10: jump (loop)
 
+// Tagged values for special commands stored in channelTrackTables.
+// Bit 15 set = special command. Bits 9:8 encode the command type.
+// Low 8 bits = parameter (jump target position or wait count).
+export const ML_TRACK_CMD_FLAG = 0x8000;  // bit 15: this entry is a special command
+export const ML_TRACK_CMD_END  = 0x8000;  // END (no parameter)
+export const ML_TRACK_CMD_JUMP = 0x8100;  // JUMP — low byte = target position
+export const ML_TRACK_CMD_WAIT = 0x8200;  // WAIT — low byte = tick count
+
 // Valid chunk IDs — used for forward scan (mirrors module.cpp isValidChunkId)
 const VALID_CHUNK_IDS = new Set([
   CHUNK_MODL, CHUNK_VERS, CHUNK_TUNE, CHUNK_PART, CHUNK_ARPG, CHUNK_INST, CHUNK_SMPL, CHUNK_INFO,
@@ -476,7 +484,11 @@ export function parseMusicLineFile(data: Uint8Array): TrackerSong | null {
       // Point to silent pattern for as many positions as the longest channel
       return [];  // Will be filled below after we know maxLen
     }
-    return table.map(pn => partToPatternIndex.get(pn) ?? 0);
+    return table.map(pn => {
+      // Pass through special commands (bit 15 set) unchanged
+      if (pn & ML_TRACK_CMD_FLAG) return pn;
+      return partToPatternIndex.get(pn) ?? 0;
+    });
   });
 
   // Fill empty channel tables with silent pattern references matching the longest sequence
@@ -588,17 +600,19 @@ function parseChnlData(data: Uint8Array, offset: number, byteCount: number): Chn
     const byte1 = data[p + 1];
 
     if (byte1 & CHNL_CMD_FLAG) {
-      // Command entry
+      // Command entry — store tagged value in the sequence
       const cmdType = byte1 & CHNL_CMD_TYPE_MASK;
       if (cmdType === CHNL_CMD_END) {
-        // End: channel stops
-        break;
+        patternSeq.push(ML_TRACK_CMD_END);
+        break; // end of channel
       } else if (cmdType === CHNL_CMD_JUMP) {
-        // Jump (loop): byte0 = position to jump to
-        // We stop the linear scan here; replayer handles the loop
-        break;
+        patternSeq.push(ML_TRACK_CMD_JUMP | (byte0 & 0xFF));
+        break; // jump terminates linear scan
+      } else {
+        // WAIT: byte0 = tick count
+        patternSeq.push(ML_TRACK_CMD_WAIT | (byte0 & 0xFF));
+        // continue scanning — wait doesn't end the sequence
       }
-      // WAIT: continue scanning
     } else {
       // Play-part entry
       // Part index: byte0 is the low 8 bits; byte1 bits 7:6 are the high 2 bits

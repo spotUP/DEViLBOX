@@ -17,10 +17,27 @@ import { useTransportStore } from '@stores/useTransportStore';
 import { useWasmPositionStore } from '@/stores/useWasmPositionStore';
 import { PatternEditorCanvas } from '@/components/tracker/PatternEditorCanvas';
 import type { ColumnDef, FormatChannel, OnCellChange } from '@/components/shared/format-editor-types';
+import { ML_TRACK_CMD_FLAG, ML_TRACK_CMD_END, ML_TRACK_CMD_JUMP, ML_TRACK_CMD_WAIT } from '@/lib/import/formats/MusicLineParser';
 
-function formatHex2(val: number): string {
-  if (val === 0xFFFF) return '..';
-  return val.toString(16).toUpperCase().padStart(2, '0');
+/**
+ * Format a track table entry for display (3 chars wide).
+ * Normal entries: 2-digit hex pattern index (right-padded with space).
+ * Special commands (bit 15 set):
+ *   END      → "END"
+ *   JUMP pos → "Jxx" (xx = hex position)
+ *   WAIT cnt → "Wxx" (xx = hex tick count)
+ */
+function formatTrackEntry(val: number): string {
+  if (val === 0xFFFF) return '...';
+  if (val & ML_TRACK_CMD_FLAG) {
+    const cmdType = val & 0xFF00;
+    const param = val & 0xFF;
+    if (cmdType === ML_TRACK_CMD_END) return 'END';
+    if (cmdType === (ML_TRACK_CMD_JUMP & 0xFF00)) return 'J' + param.toString(16).toUpperCase().padStart(2, '0');
+    if (cmdType === (ML_TRACK_CMD_WAIT & 0xFF00)) return 'W' + param.toString(16).toUpperCase().padStart(2, '0');
+    return '???';
+  }
+  return val.toString(16).toUpperCase().padStart(2, '0') + ' ';
 }
 
 // Sentinel for undefined/empty cells
@@ -44,18 +61,18 @@ export const MusicLineTrackTableEditor: React.FC<MusicLineTrackTableEditorProps>
   const numChannels = channelTrackTables.length;
   const maxPositions = Math.max(0, ...channelTrackTables.map(t => t.length));
 
-  // Global column definition (each channel uses the same 2-digit hex column)
+  // Global column definition (each channel uses the same 3-char column)
   // eslint-disable-next-line react-hooks/rules-of-hooks
   const formatColumns = useMemo<ColumnDef[]>(() => [{
     key: 'track',
     label: 'Trk',
-    charWidth: 2,
+    charWidth: 3,
     type: 'hex' as const,
-    hexDigits: 2,
+    hexDigits: 3,
     color: '#ffffff',
     emptyColor: '#808080',
     emptyValue: EMPTY_SENTINEL,
-    formatter: formatHex2,
+    formatter: formatTrackEntry,
   }], []);
 
   // Build FormatChannel[] — one per MusicLine channel
@@ -75,13 +92,13 @@ export const MusicLineTrackTableEditor: React.FC<MusicLineTrackTableEditorProps>
         columns: [{
           key: 'track',
           label: `C${ch + 1}`,
-          charWidth: 2,
+          charWidth: 3,
           type: 'hex' as const,
-          hexDigits: 2,
+          hexDigits: 3,
           color: '#ffffff',
           emptyColor: '#808080',
           emptyValue: EMPTY_SENTINEL,
-          formatter: formatHex2,
+          formatter: formatTrackEntry,
         }],
       });
     }
@@ -90,7 +107,7 @@ export const MusicLineTrackTableEditor: React.FC<MusicLineTrackTableEditorProps>
 
   // eslint-disable-next-line react-hooks/rules-of-hooks
   const handleCellChange = useCallback<OnCellChange>((channelIdx, rowIdx, _columnKey, value) => {
-    setTrackEntry(channelIdx, rowIdx, value & 0xFF);
+    setTrackEntry(channelIdx, rowIdx, value & 0xFFFF);
     onSeek?.(rowIdx);
   }, [setTrackEntry, onSeek]);
 
