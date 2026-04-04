@@ -11,8 +11,9 @@
 import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import type { GTUltraConfig } from '@typedefs/instrument/exotic';
 import { PatternEditorCanvas } from '@/components/tracker/PatternEditorCanvas';
-import { EnvelopeVisualization, SectionLabel } from '@components/instruments/shared';
+import { EnvelopeVisualization, SectionLabel, NumBox } from '@components/instruments/shared';
 import { useGTUltraStore } from '@stores/useGTUltraStore';
+import { GTSoundDesigner } from '@/components/gtultra/GTSoundDesigner';
 import { useInstrumentColors } from '@/hooks/useInstrumentColors';
 
 // ── Types ──
@@ -23,7 +24,7 @@ interface GTUltraControlsProps {
   onChange: (updates: Partial<GTUltraConfig>) => void;
 }
 
-type GTTab = 'instrument' | 'tables' | 'monitor';
+type GTTab = 'instrument' | 'designer' | 'tables' | 'monitor';
 
 // ── Constants ──
 
@@ -181,18 +182,6 @@ export const GTUltraControls: React.FC<GTUltraControlsProps> = ({
     </div>
   );
 
-  const NumBox = ({ label, value, min, max, hex, onValueChange }: {
-    label: string; value: number; min: number; max: number; hex?: boolean; onValueChange: (v: number) => void;
-  }) => (
-    <div className="flex items-center gap-1.5">
-      <span className="text-[10px] text-text-secondary w-20 text-right whitespace-nowrap">{label}</span>
-      <input type="number" value={value} min={min} max={max}
-        onChange={(e) => { const v = parseInt(e.target.value); if (!isNaN(v)) onValueChange(Math.max(min, Math.min(max, v))); }}
-        className="text-xs font-mono text-center border rounded px-1 py-0.5"
-        style={{ width: 48, background: '#0a0f0c', borderColor: dimColor, color: accentColor }} />
-      {hex && <span className="text-[9px] font-mono text-text-secondary">${hex2(value)}</span>}
-    </div>
-  );
 
   // ══════════════════════════════════════════════════════════════════
   //  TAB 1: Instrument
@@ -267,6 +256,7 @@ export const GTUltraControls: React.FC<GTUltraControlsProps> = ({
           <SectionLabel color={accentColor} label="Timing" />
           <div className="flex flex-col gap-2">
             <NumBox label="Gate Timer" value={gateTimerValue} min={0} max={63} hex
+              color={accentColor} borderColor={dimColor} background="#0a0f0c"
               onValueChange={(v) => onChange({ gatetimer: (configRef.current.gatetimer & 0xC0) | (v & 0x3F) })} />
             <div className="flex gap-4 ml-[84px]">
               <label className="flex items-center gap-1 cursor-pointer">
@@ -281,6 +271,7 @@ export const GTUltraControls: React.FC<GTUltraControlsProps> = ({
               </label>
             </div>
             <NumBox label="Vibrato Delay" value={config.vibdelay} min={0} max={255} hex
+              color={accentColor} borderColor={dimColor} background="#0a0f0c"
               onValueChange={(v) => onChange({ vibdelay: v })} />
           </div>
         </div>
@@ -312,10 +303,10 @@ export const GTUltraControls: React.FC<GTUltraControlsProps> = ({
         <div className={`rounded-lg border p-3 ${panelBg}`}>
           <SectionLabel color={accentColor} label="Table Pointers" />
           <div className="flex flex-col gap-2">
-            <NumBox label="Wave Table" value={config.wavePtr} min={0} max={255} hex onValueChange={(v) => onChange({ wavePtr: v })} />
-            <NumBox label="Pulse Table" value={config.pulsePtr} min={0} max={255} hex onValueChange={(v) => onChange({ pulsePtr: v })} />
-            <NumBox label="Filter Table" value={config.filterPtr} min={0} max={255} hex onValueChange={(v) => onChange({ filterPtr: v })} />
-            <NumBox label="Speed Table" value={config.speedPtr} min={0} max={255} hex onValueChange={(v) => onChange({ speedPtr: v })} />
+            <NumBox label="Wave Table" value={config.wavePtr} min={0} max={255} hex color={accentColor} borderColor={dimColor} background="#0a0f0c" onValueChange={(v) => onChange({ wavePtr: v })} />
+            <NumBox label="Pulse Table" value={config.pulsePtr} min={0} max={255} hex color={accentColor} borderColor={dimColor} background="#0a0f0c" onValueChange={(v) => onChange({ pulsePtr: v })} />
+            <NumBox label="Filter Table" value={config.filterPtr} min={0} max={255} hex color={accentColor} borderColor={dimColor} background="#0a0f0c" onValueChange={(v) => onChange({ filterPtr: v })} />
+            <NumBox label="Speed Table" value={config.speedPtr} min={0} max={255} hex color={accentColor} borderColor={dimColor} background="#0a0f0c" onValueChange={(v) => onChange({ speedPtr: v })} />
           </div>
           <div className="text-[8px] text-text-secondary mt-1.5 opacity-60">0 = disabled. Edit in Tables tab.</div>
         </div>
@@ -474,7 +465,7 @@ export const GTUltraControls: React.FC<GTUltraControlsProps> = ({
   return (
     <div className="flex flex-col h-full">
       <div className="flex border-b" style={{ borderColor: dimColor }}>
-        {([['instrument', 'Instrument'], ['tables', 'Tables'], ['monitor', 'SID Monitor']] as const).map(([id, label]) => (
+        {([['instrument', 'Instrument'], ['designer', 'Sound Designer'], ['tables', 'Tables'], ['monitor', 'SID Monitor']] as const).map(([id, label]) => (
           <button key={id} onClick={() => setActiveTab(id)}
             className="px-4 py-2 text-xs font-bold uppercase tracking-wider transition-colors"
             style={{ color: activeTab === id ? accentColor : '#666',
@@ -485,6 +476,7 @@ export const GTUltraControls: React.FC<GTUltraControlsProps> = ({
         ))}
       </div>
       {activeTab === 'instrument' && renderInstrumentTab()}
+      {activeTab === 'designer' && <GTSoundDesigner />}
       {activeTab === 'tables' && renderTablesTab()}
       {activeTab === 'monitor' && renderMonitorTab()}
     </div>
