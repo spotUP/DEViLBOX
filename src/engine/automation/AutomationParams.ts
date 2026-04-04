@@ -243,10 +243,37 @@ export function groupParams(params: AutomationParamDef[]): AutomationParamGroup[
 
 export type AutomationFormat = 'gtultra' | 'uade' | 'furnace';
 
+// ── Furnace chip ID classification ──
+// Maps Furnace DIV_SYSTEM enum values to param set categories
+
+const FM_CHIP_IDS = new Set([
+  2, 3, 5, 13, 15, 16, 19, 20, 28, 32, 33, 34, 35, 36, 37, 38, 44, 48,
+  52, 53, 57, 58, 59, 80, 82, 84, 85, 86, 89, 90, 91, 92, 93, 100,
+]); // Genesis, OPN, OPL, OPM, OPZ, YM variants
+const SID_CHIP_IDS = new Set([11, 12]); // C64_6581, C64_8580
+const AY_CHIP_IDS = new Set([4, 17, 22, 23, 43, 83]); // SMS, AY8910, SAA1099, AY8930, SWAN, T6W28
+const GB_CHIP_IDS = new Set([6]); // GB
+const NES_CHIP_IDS = new Set([8, 9, 27, 29, 30]); // NES, NES_VRC7, VRC6, FDS, MMC5
+const SNES_CHIP_IDS = new Set([26]); // SNES
+const PCE_CHIP_IDS = new Set([7]); // PCE
+
+/** Classify a Furnace chipId into a parameter category */
+function classifyFurnaceChip(chipId: number): 'fm' | 'sid' | 'ay' | 'gb' | 'nes' | 'snes' | 'generic' {
+  if (FM_CHIP_IDS.has(chipId)) return 'fm';
+  if (SID_CHIP_IDS.has(chipId)) return 'sid';
+  if (AY_CHIP_IDS.has(chipId)) return 'ay';
+  if (GB_CHIP_IDS.has(chipId)) return 'gb';
+  if (NES_CHIP_IDS.has(chipId)) return 'nes';
+  if (SNES_CHIP_IDS.has(chipId)) return 'snes';
+  if (PCE_CHIP_IDS.has(chipId)) return 'generic';
+  return 'generic';
+}
+
 export function getParamsForFormat(format: AutomationFormat, config?: {
   sidCount?: number;
   channelCount?: number;
   chipType?: string;
+  chipIds?: number[];
 }): AutomationParamDef[] {
   switch (format) {
     case 'gtultra':
@@ -255,6 +282,24 @@ export function getParamsForFormat(format: AutomationFormat, config?: {
       return getPaulaParams();
     case 'furnace': {
       const chCount = config?.channelCount ?? 4;
+
+      // If we have actual chipIds from the loaded song, use them for precise filtering
+      if (config?.chipIds && config.chipIds.length > 0) {
+        const categories = new Set(config.chipIds.map(classifyFurnaceChip));
+        const params: AutomationParamDef[] = [];
+        // Always include universal params
+        params.push(...getFurnaceUniversalParams(chCount));
+        // Add chip-specific params based on what's loaded
+        if (categories.has('fm')) params.push(...getFurnaceFMOperatorParams(chCount));
+        if (categories.has('sid')) params.push(...getFurnaceSIDParams(chCount).filter(p => p.id.includes('c64')));
+        if (categories.has('ay')) params.push(...getFurnaceAYParams(chCount).filter(p => p.id.includes('ay')));
+        if (categories.has('gb')) params.push(...getFurnaceGBParams(chCount).filter(p => p.id.includes('gb')));
+        if (categories.has('nes')) params.push(...getFurnaceNESParams(chCount).filter(p => p.id.includes('nes')));
+        if (categories.has('snes')) params.push(...getFurnaceSNESParams(chCount).filter(p => p.id.includes('snes')));
+        return params;
+      }
+
+      // Fallback to string-based chipType matching
       const chip = config?.chipType ?? 'generic';
       if (chip.includes('ym') || chip.includes('opn') || chip.includes('opl') || chip.includes('opm')) {
         return [...getFurnaceUniversalParams(chCount), ...getFurnaceFMOperatorParams(chCount)];
