@@ -92,7 +92,6 @@ export const GTUltraControls: React.FC<GTUltraControlsProps> = ({
   onChange,
 }) => {
   const [activeTab, setActiveTab] = useState<GTTab>('instrument');
-  const [activeTable, setActiveTable] = useState(0);
   const [showEffectRef, setShowEffectRef] = useState(false);
   const [showTableRef, setShowTableRef] = useState(false);
 
@@ -325,58 +324,56 @@ export const GTUltraControls: React.FC<GTUltraControlsProps> = ({
   );
 
   // ══════════════════════════════════════════════════════════════════
-  //  TAB 2: Tables (Wave/Pulse/Filter/Speed)
+  //  TAB 2: Tables — All 4 stacked vertically
   // ══════════════════════════════════════════════════════════════════
-  const tableDef = TABLE_DEFS[activeTable];
-  const currentTableData = tableData?.[tableDef.key];
+  const allTableChannels = useMemo(() => {
+    return TABLE_DEFS.map((td) => {
+      const tbl = tableData?.[td.key];
+      const rows: Record<string, number>[] = [];
+      for (let i = 0; i < 255; i++) {
+        rows.push({ left: tbl?.left[i] ?? 0, right: tbl?.right[i] ?? 0 });
+      }
+      return { label: td.label, patternLength: 255, rows, isPatternChannel: false };
+    });
+  }, [tableData]);
 
-  const tableChannels = useMemo(() => {
-    if (!currentTableData) return [];
-    const rows: Record<string, number>[] = [];
-    for (let i = 0; i < 255; i++) {
-      rows.push({ left: currentTableData.left[i] ?? 0, right: currentTableData.right[i] ?? 0 });
-    }
-    return [{ label: tableDef.label, patternLength: 255, rows, isPatternChannel: false }];
-  }, [currentTableData, tableDef.label]);
-
-  const tableCellChange = useCallback((_ch: number, row: number, colKey: string, value: number) => {
-    const engine = useGTUltraStore.getState().engine;
-    if (!engine) return;
-    const side = colKey === 'left' ? 0 : 1;
-    engine.setTableEntry(activeTable, side, row, value);
-    const refresh = useGTUltraStore.getState().refreshAllTables;
-    if (refresh) refresh();
-  }, [activeTable]);
-
-  const tablePtr = config[tableDef.ptrKey] ?? 0;
+  const makeTableCellChange = useCallback((tableIdx: number) => {
+    return (_ch: number, row: number, colKey: string, value: number) => {
+      const engine = useGTUltraStore.getState().engine;
+      if (!engine) return;
+      const side = colKey === 'left' ? 0 : 1;
+      engine.setTableEntry(tableIdx, side, row, value);
+      const refresh = useGTUltraStore.getState().refreshAllTables;
+      if (refresh) refresh();
+    };
+  }, []);
 
   const renderTablesTab = () => (
-    <div className="flex flex-col h-full">
-      <div className="flex border-b" style={{ borderColor: dimColor }}>
-        {TABLE_DEFS.map((td, i) => (
-          <button key={td.key} onClick={() => setActiveTable(i)}
-            className="px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider transition-colors"
-            style={{ color: activeTable === i ? td.color : '#555',
-              borderBottom: activeTable === i ? `2px solid ${td.color}` : '2px solid transparent' }}>
-            {td.label}
-          </button>
-        ))}
-      </div>
-      <div className="flex items-center gap-3 px-3 py-1.5 text-[9px] font-mono"
-        style={{ color: tableDef.color, background: '#060a08' }}>
-        <span>Ptr: ${hex2(tablePtr)}</span><span>255 entries</span>
-      </div>
-      <div style={{ flex: 1, minHeight: 200 }}>
-        <PatternEditorCanvas
-          formatColumns={tableDef.cols}
-          formatChannels={tableChannels}
-          formatCurrentRow={tablePtr}
-          formatIsPlaying={false}
-          onFormatCellChange={tableCellChange}
-          hideVUMeters={true}
-        />
-      </div>
-      <div className="px-3 py-1.5 border-t" style={{ borderColor: dimColor }}>
+    <div className="flex flex-col gap-2 p-2 overflow-y-auto" style={{ maxHeight: 'calc(100vh - 280px)' }}>
+      {TABLE_DEFS.map((td, i) => {
+        const ptr = config[td.ptrKey] ?? 0;
+        return (
+          <div key={td.key} className="rounded border" style={{ borderColor: td.color + '40' }}>
+            <div className="flex items-center gap-2 px-2 py-1" style={{ background: '#060a08' }}>
+              <span className="text-[10px] font-bold uppercase" style={{ color: td.color }}>{td.label}</span>
+              <span className="text-[9px] font-mono" style={{ color: td.color, opacity: 0.7 }}>Ptr: ${hex2(ptr)}</span>
+            </div>
+            <div style={{ height: 180 }}>
+              <PatternEditorCanvas
+                formatColumns={td.cols}
+                formatChannels={[allTableChannels[i]]}
+                formatCurrentRow={ptr}
+                formatIsPlaying={false}
+                onFormatCellChange={makeTableCellChange(i)}
+                hideVUMeters={true}
+              />
+            </div>
+          </div>
+        );
+      })}
+
+      {/* Command reference */}
+      <div className="px-2 py-1">
         <button className="text-[9px] font-mono w-full text-left" style={{ color: '#666' }}
           onClick={() => setShowTableRef(!showTableRef)}>
           {showTableRef ? '[-]' : '[+]'} Wave Table Commands
