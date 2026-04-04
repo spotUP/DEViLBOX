@@ -78,6 +78,9 @@ interface FormatStore {
   channelTrackTables: number[][] | null;
   channelSpeeds: number[] | null;
   channelGrooves: number[] | null;
+  musiclineMetadata: { title: string; author: string; date: string; duration: string; infoText: string[] } | null;
+  /** MusicLine keyboard input mode: 'mono' (single channel) or 'poly' (rotate across channels) */
+  musiclineKeyboardMode: 'mono' | 'poly';
   originalModuleData: { base64: string; format: 'MOD' | 'XM' | 'IT' | 'S3M' | 'UNKNOWN'; sourceFile?: string } | null;
   songDBInfo: { authors: string[]; publishers: string[]; album: string; year: string; format: string; duration_ms: number } | null;
   sidMetadata: { format: string; version: number; title: string; author: string; copyright: string; chipModel: '6581' | '8580' | 'Unknown'; clockSpeed: 'PAL' | 'NTSC' | 'Unknown'; subsongs: number; defaultSubsong: number; currentSubsong: number; secondSID: boolean; thirdSID: boolean } | null;
@@ -144,10 +147,16 @@ interface FormatStore {
   insertMusicLineTrackEntryAllChannels: (position: number) => void;
   /** Remove the entry at position for ALL channels, shifting entries up. An empty entry (0) is added at the bottom of each. */
   deleteMusicLineTrackEntryAllChannels: (position: number) => void;
+  /** Remove patterns not referenced by any channel track table. Returns count of removed patterns. */
+  removeUnusedMusicLineParts: () => number;
+  /** Toggle MusicLine keyboard mode between mono and poly */
+  toggleMusicLineKeyboardMode: () => void;
+  /** Update MusicLine metadata field */
+  setMusicLineMetadataField: (field: string, value: string) => void;
   setSongDBInfo: (info: FormatStore['songDBInfo']) => void;
   setSidMetadata: (info: FormatStore['sidMetadata']) => void;
   setOriginalModuleData: (data: FormatStore['originalModuleData']) => void;
-  applyEditorMode: (song: { linearPeriods?: boolean; furnaceNative?: FurnaceNativeData; hivelyNative?: HivelyNativeData; hivelyFileData?: ArrayBuffer; klysNative?: KlysNativeData; klysFileData?: ArrayBuffer; musiclineFileData?: Uint8Array; c64SidFileData?: Uint8Array; jamCrackerFileData?: ArrayBuffer; futurePlayerFileData?: ArrayBuffer; preTrackerFileData?: ArrayBuffer; maFileData?: ArrayBuffer; hippelFileData?: ArrayBuffer; sonixFileData?: ArrayBuffer; pxtoneFileData?: ArrayBuffer; organyaFileData?: ArrayBuffer; eupFileData?: ArrayBuffer; ixsFileData?: ArrayBuffer; psycleFileData?: ArrayBuffer; sc68FileData?: ArrayBuffer; zxtuneFileData?: ArrayBuffer; pumaTrackerFileData?: ArrayBuffer; steveTurnerFileData?: ArrayBuffer; sidmon1WasmFileData?: ArrayBuffer; artOfNoiseFileData?: ArrayBuffer; bdFileData?: ArrayBuffer; sd2FileData?: ArrayBuffer; symphonieFileData?: ArrayBuffer; uadeEditableFileData?: ArrayBuffer; uadeEditableFileName?: string; libopenmptFileData?: ArrayBuffer; hivelyMeta?: { stereoMode: number; mixGain: number; speedMultiplier: number; version: number }; furnaceSubsongs?: FurnaceSubsongPlayback[]; furnaceActiveSubsong?: number; channelTrackTables?: number[][]; channelSpeeds?: number[]; channelGrooves?: number[]; goatTrackerData?: Uint8Array; tfmxNative?: TFMXNativeData }) => void;
+  applyEditorMode: (song: { linearPeriods?: boolean; furnaceNative?: FurnaceNativeData; hivelyNative?: HivelyNativeData; hivelyFileData?: ArrayBuffer; klysNative?: KlysNativeData; klysFileData?: ArrayBuffer; musiclineFileData?: Uint8Array; c64SidFileData?: Uint8Array; jamCrackerFileData?: ArrayBuffer; futurePlayerFileData?: ArrayBuffer; preTrackerFileData?: ArrayBuffer; maFileData?: ArrayBuffer; hippelFileData?: ArrayBuffer; sonixFileData?: ArrayBuffer; pxtoneFileData?: ArrayBuffer; organyaFileData?: ArrayBuffer; eupFileData?: ArrayBuffer; ixsFileData?: ArrayBuffer; psycleFileData?: ArrayBuffer; sc68FileData?: ArrayBuffer; zxtuneFileData?: ArrayBuffer; pumaTrackerFileData?: ArrayBuffer; steveTurnerFileData?: ArrayBuffer; sidmon1WasmFileData?: ArrayBuffer; artOfNoiseFileData?: ArrayBuffer; bdFileData?: ArrayBuffer; sd2FileData?: ArrayBuffer; symphonieFileData?: ArrayBuffer; uadeEditableFileData?: ArrayBuffer; uadeEditableFileName?: string; libopenmptFileData?: ArrayBuffer; hivelyMeta?: { stereoMode: number; mixGain: number; speedMultiplier: number; version: number }; furnaceSubsongs?: FurnaceSubsongPlayback[]; furnaceActiveSubsong?: number; channelTrackTables?: number[][]; channelSpeeds?: number[]; channelGrooves?: number[]; musiclineMetadata?: { title: string; author: string; date: string; duration: string; infoText: string[] }; goatTrackerData?: Uint8Array; tfmxNative?: TFMXNativeData }) => void;
   setFurnaceActiveSubsong: (index: number) => void;
   reset: () => void;
 }
@@ -165,6 +174,8 @@ const clearNative = (state: any) => {
   state.channelTrackTables = null;
   state.channelSpeeds = null;
   state.channelGrooves = null;
+  state.musiclineMetadata = null;
+  state.musiclineKeyboardMode = 'mono';
   state.tfmxNative = null;
   state.tfmxSelectedPattern = 0;
 };
@@ -216,6 +227,8 @@ export const useFormatStore = create<FormatStore>()(
     channelTrackTables: null,
     channelSpeeds: null,
     channelGrooves: null,
+    musiclineMetadata: null,
+    musiclineKeyboardMode: 'mono',
     originalModuleData: null,
     songDBInfo: null,
     sidMetadata: null,
@@ -481,6 +494,89 @@ export const useFormatStore = create<FormatStore>()(
         track.length = len;
       }
     }),
+    removeUnusedMusicLineParts: () => {
+      const state = get();
+      const tables = state.channelTrackTables;
+      if (!tables || tables.length === 0) return 0;
+
+      // Dynamically import useTrackerStore to avoid circular dependency
+      // eslint-disable-next-line @typescript-eslint/no-var-requires
+      const { useTrackerStore } = require('./useTrackerStore') as { useTrackerStore: { getState: () => { patterns: unknown[]; deletePattern: (idx: number) => void } } };
+      const trackerState = useTrackerStore.getState();
+      const totalPatterns = trackerState.patterns.length;
+      if (totalPatterns === 0) return 0;
+
+      // 1. Collect all referenced pattern indices from track tables
+      const referenced = new Set<number>();
+      for (const track of tables) {
+        for (const entry of track) {
+          // Skip special commands (bit 15 set) and empty sentinels
+          if (entry & 0x8000) continue;
+          if (entry === 0xFFFF) continue;
+          referenced.add(entry);
+        }
+      }
+
+      // 2. Find unused pattern indices
+      const unused: number[] = [];
+      for (let i = 0; i < totalPatterns; i++) {
+        if (!referenced.has(i)) unused.push(i);
+      }
+      if (unused.length === 0) return 0;
+
+      // Don't remove ALL patterns — keep at least one
+      if (unused.length >= totalPatterns) return 0;
+
+      // 3. Build old->new index map (accounting for removals)
+      const indexMap = new Map<number, number>();
+      const unusedSet = new Set(unused);
+      let newIdx = 0;
+      for (let oldIdx = 0; oldIdx < totalPatterns; oldIdx++) {
+        if (!unusedSet.has(oldIdx)) {
+          indexMap.set(oldIdx, newIdx);
+          newIdx++;
+        }
+      }
+
+      // 4. Update track tables — remap pattern indices
+      set((draft) => {
+        if (!draft.channelTrackTables) return;
+        for (const track of draft.channelTrackTables) {
+          for (let i = 0; i < track.length; i++) {
+            const entry = track[i];
+            if (entry & 0x8000) continue; // special command
+            if (entry === 0xFFFF) continue; // empty
+            const mapped = indexMap.get(entry);
+            if (mapped !== undefined) {
+              track[i] = mapped;
+            }
+          }
+        }
+      });
+
+      // 5. Remove unused patterns from tracker store (highest index first to avoid shifting)
+      for (let i = unused.length - 1; i >= 0; i--) {
+        trackerState.deletePattern(unused[i]);
+      }
+
+      return unused.length;
+    },
+    toggleMusicLineKeyboardMode: () => set((state) => {
+      state.musiclineKeyboardMode = state.musiclineKeyboardMode === 'mono' ? 'poly' : 'mono';
+    }),
+    setMusicLineMetadataField: (field, value) => set((state) => {
+      if (!state.musiclineMetadata) {
+        state.musiclineMetadata = { title: '', author: '', date: '', duration: '', infoText: ['', '', '', '', ''] };
+      }
+      if (field === 'title') state.musiclineMetadata.title = value;
+      else if (field === 'author') state.musiclineMetadata.author = value;
+      else if (field === 'date') state.musiclineMetadata.date = value;
+      else if (field === 'duration') state.musiclineMetadata.duration = value;
+      else if (field.startsWith('info')) {
+        const idx = parseInt(field.replace('info', ''), 10);
+        if (idx >= 0 && idx < 5) state.musiclineMetadata.infoText[idx] = value;
+      }
+    }),
     setSongDBInfo: (info) => set((state) => { state.songDBInfo = info; }),
     setSidMetadata: (info) => set((state) => { state.sidMetadata = info; }),
     setOriginalModuleData: (data) => set((state) => { state.originalModuleData = data; }),
@@ -556,6 +652,7 @@ export const useFormatStore = create<FormatStore>()(
           state.channelTrackTables = song.channelTrackTables;
           state.channelSpeeds = song.channelSpeeds ?? null;
           state.channelGrooves = song.channelGrooves ?? null;
+          state.musiclineMetadata = song.musiclineMetadata ?? null;
         } else if (song.jamCrackerFileData) {
           newEditorMode = 'jamcracker';
           state.editorMode = 'jamcracker';
