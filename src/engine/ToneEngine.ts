@@ -3194,6 +3194,7 @@ export class ToneEngine {
   ): void {
     const channelIndex = this.liveVoiceAllocation.get(note);
     if (channelIndex === undefined) {
+      console.warn(`[ToneEngine] triggerPolyNoteRelease: note ${note} not in liveVoiceAllocation (synthType=${config.synthType})`);
       return; // Note wasn't playing
     }
 
