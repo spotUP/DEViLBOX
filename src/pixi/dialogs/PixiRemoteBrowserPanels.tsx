@@ -41,6 +41,7 @@ import {
 } from '@/lib/ratingsApi';
 import { useAuthStore } from '@/stores/useAuthStore';
 import type { PixiListItemRating } from '../components/PixiList';
+import { tintBg } from '../colors';
 
 // ---------------------------------------------------------------------------
 // Shared constants
@@ -49,11 +50,6 @@ import type { PixiListItemRating } from '../components/PixiList';
 const SEARCH_H = 40;
 const ITEM_H = 38;
 const PAD = 12;
-
-/** Tint a color toward black (for subtle error/info backgrounds) */
-function tintBg(color: number, factor = 0.15): number {
-  return (((color >> 16 & 0xff) * factor | 0) << 16) | (((color >> 8 & 0xff) * factor | 0) << 8) | ((color & 0xff) * factor | 0);
-}
 
 // ---------------------------------------------------------------------------
 // Modland Panel

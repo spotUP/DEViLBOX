@@ -82,7 +82,7 @@ function getFT2Colors(
     red:     { base: 0x1a0808, hover: 0x2a1010, active: theme.error.color,   text: theme.error.color },
     green:   { base: 0x081a0f, hover: 0x102a18, active: theme.success.color, text: theme.success.color },
     yellow:  { base: 0x1a1808, hover: 0x2a2810, active: theme.warning.color, text: theme.warning.color },
-    blue:    { base: 0x081018, hover: 0x101828, active: 0x3b82f6, text: 0x3b82f6 },
+    blue:    { base: 0x081018, hover: 0x101828, active: theme.accent.color, text: theme.accent.color },
     purple:  { base: 0x100818, hover: 0x181028, active: 0x8b5cf6, text: 0x8b5cf6 },
   };
 }
@@ -146,8 +146,13 @@ export const PixiButton: React.FC<PixiButtonProps> = ({
     }
 
     if (variant === 'danger') {
-      if (pressed || hovered) return { bg: 0xb91c1c, ...noBorder, text: 0xffffff, showBg: true };
-      return { bg: 0xdc2626, ...noBorder, text: 0xffffff, showBg: true };
+      // Darken error color for hover/pressed: reduce each channel by ~20%
+      if (pressed || hovered) {
+        const c = theme.error.color;
+        const darkened = (((c >> 16 & 0xff) * 0.8 | 0) << 16) | (((c >> 8 & 0xff) * 0.8 | 0) << 8) | ((c & 0xff) * 0.8 | 0);
+        return { bg: darkened, ...noBorder, text: 0xffffff, showBg: true };
+      }
+      return { bg: theme.error.color, ...noBorder, text: 0xffffff, showBg: true };
     }
 
     if (variant === 'ghost') {

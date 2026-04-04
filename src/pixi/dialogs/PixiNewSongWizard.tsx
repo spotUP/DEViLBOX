@@ -23,13 +23,10 @@ import type { FederatedWheelEvent } from 'pixi.js';
 import { Div, Txt } from '../layout';
 import { useNewSongWizard, GROUPED_PRESETS } from '@hooks/dialogs/useNewSongWizard';
 import type { StartMode } from '@hooks/dialogs/useNewSongWizard';
+import { tintBg } from '../colors';
 
 const MODAL_W = 640;
 const MODAL_H = 560;
-
-function tintBg(color: number, factor = 0.15): number {
-  return (((color >> 16 & 0xff) * factor | 0) << 16) | (((color >> 8 & 0xff) * factor | 0) << 8) | ((color & 0xff) * factor | 0);
-}
 
 export const PixiNewSongWizard: React.FC = () => {
   const theme = usePixiTheme();

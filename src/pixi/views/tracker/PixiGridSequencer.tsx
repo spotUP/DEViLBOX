@@ -18,6 +18,7 @@ import type { Graphics as GraphicsType, FederatedPointerEvent } from 'pixi.js';
 import { usePixiTheme } from '../../theme';
 import { PIXI_FONTS } from '../../fonts';
 import { PixiButton, PixiNumericInput, PixiLabel, PixiSelect } from '../../components';
+import { PixiAcidPatternDialog } from '../../dialogs/PixiAcidPatternDialog';
 import { useGridPattern } from '@/hooks/useGridPattern';
 import { useTransportStore } from '@/stores/useTransportStore';
 import { useTrackerStore } from '@/stores/useTrackerStore';
@@ -26,6 +27,21 @@ import { useShallow } from 'zustand/react/shallow';
 import { SCALES, isNoteInScale } from '@/lib/scales';
 import { getToneEngine } from '@engine/ToneEngine';
 import * as Tone from 'tone';
+
+const ROOT_NOTE_OPTIONS = [
+  { value: '0', label: 'C' },
+  { value: '1', label: 'C#' },
+  { value: '2', label: 'D' },
+  { value: '3', label: 'D#' },
+  { value: '4', label: 'E' },
+  { value: '5', label: 'F' },
+  { value: '6', label: 'F#' },
+  { value: '7', label: 'G' },
+  { value: '8', label: 'G#' },
+  { value: '9', label: 'A' },
+  { value: '10', label: 'A#' },
+  { value: '11', label: 'B' },
+];
 
 const NOTE_NAMES = ['B', 'A#', 'A', 'G#', 'G', 'F#', 'F', 'E', 'D#', 'D', 'C#', 'C'] as const;
 const NOTE_NAMES_FORWARD = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'] as const;
@@ -58,6 +74,7 @@ export const PixiGridSequencer: React.FC<PixiGridSequencerProps> = ({
     setBaseOctave,
     maxSteps,
     setMaxSteps,
+    resizeAllPatterns,
     setNote,
     toggleAccent,
     toggleSlide,
@@ -76,7 +93,10 @@ export const PixiGridSequencer: React.FC<PixiGridSequencerProps> = ({
 
   // Scale mode state
   const [scaleKey, setScaleKey] = useState<string>('chromatic');
-  const [rootNote] = useState<number>(0);
+  const [rootNote, setRootNote] = useState<number>(0);
+
+  // Acid pattern generator dialog state
+  const [showAcidGenerator, setShowAcidGenerator] = useState(false);
 
   // Focus state for keyboard navigation
   const [focusedCell, setFocusedCell] = useState<{ noteIndex: number; stepIndex: number } | null>({ noteIndex: 11, stepIndex: 0 });
@@ -447,6 +467,23 @@ export const PixiGridSequencer: React.FC<PixiGridSequencerProps> = ({
 
         <PixiLabel text="STEPS" size="xs" color="textMuted" />
         <PixiNumericInput value={maxSteps} min={4} max={64} onChange={setMaxSteps} width={44} />
+        <PixiButton label="Apply All" variant="ghost" size="sm" onClick={() => resizeAllPatterns(maxSteps)} />
+
+        {/* Separator */}
+        <pixiGraphics
+          draw={(g: GraphicsType) => { g.clear(); g.rect(0, 4, 1, 24); g.fill({ color: theme.border.color, alpha: 0.25 }); }}
+          layout={{ width: 1, height: 32 }}
+        />
+
+        {/* Root note selector */}
+        <PixiLabel text="ROOT" size="xs" color="textMuted" />
+        <PixiSelect
+          value={String(rootNote)}
+          options={ROOT_NOTE_OPTIONS}
+          onChange={(v: string) => setRootNote(parseInt(v, 10))}
+          width={52}
+          height={24}
+        />
 
         {/* Scale selector */}
         <PixiSelect
@@ -457,11 +494,18 @@ export const PixiGridSequencer: React.FC<PixiGridSequencerProps> = ({
           height={24}
         />
 
+        {/* Separator */}
+        <pixiGraphics
+          draw={(g: GraphicsType) => { g.clear(); g.rect(0, 4, 1, 24); g.fill({ color: theme.border.color, alpha: 0.25 }); }}
+          layout={{ width: 1, height: 32 }}
+        />
+
         {/* Spacer */}
         <pixiContainer layout={{ flex: 1 }} />
 
-        <PixiButton label="RANDOM" variant="ghost" size="sm" onClick={handleRandomize} />
-        <PixiButton label="CLEAR" variant="ghost" size="sm" color="red" onClick={clearAll} />
+        <PixiButton label="Acid" variant="ghost" size="sm" onClick={() => setShowAcidGenerator(true)} />
+        <PixiButton label="Random" variant="ghost" size="sm" onClick={handleRandomize} />
+        <PixiButton label="Clear" variant="ghost" size="sm" color="red" onClick={clearAll} />
       </pixiContainer>
 
       {/* Grid Area — native Pixi rendering */}
@@ -501,6 +545,15 @@ export const PixiGridSequencer: React.FC<PixiGridSequencerProps> = ({
           />
         ))}
       </pixiContainer>
+
+      {/* Acid Pattern Generator Dialog */}
+      {showAcidGenerator && (
+        <PixiAcidPatternDialog
+          isOpen={showAcidGenerator}
+          onClose={() => setShowAcidGenerator(false)}
+          channelIndex={channelIndex}
+        />
+      )}
     </pixiContainer>
   );
 };

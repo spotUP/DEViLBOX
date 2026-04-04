@@ -374,7 +374,7 @@ const ModuleStrip: React.FC<{
   const bodyH = collapsed ? 0 : Math.max(52, paramRows * 48 + 8);
   const stripH = collapsed ? 28 : 28 + bodyH;
 
-  const stripBg = hovered && !selected ? 0x222222 : theme.bgSecondary.color;
+  const stripBg = hovered && !selected ? theme.bgTertiary.color : theme.bgSecondary.color;
 
   return (
     <layoutContainer

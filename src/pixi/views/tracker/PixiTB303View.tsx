@@ -317,7 +317,7 @@ export const PixiTB303View: React.FC<PixiTB303ViewProps> = ({ channelIndex = 0, 
       g.roundRect(x, LED_H + 4, STEP_W, STEP_H, 4);
       g.fill({
         color: step.active
-          ? (isCurrent ? 0xef4444 : theme.accent.color)
+          ? (isCurrent ? theme.error.color : theme.accent.color)
           : (isBeat ? theme.bgTertiary.color : theme.bgSecondary.color),
         alpha: step.active ? (isCurrent ? 0.5 : 0.25) : 0.8,
       });
@@ -326,7 +326,7 @@ export const PixiTB303View: React.FC<PixiTB303ViewProps> = ({ channelIndex = 0, 
 
       // LED
       g.circle(x + STEP_W / 2, LED_H / 2, 3);
-      g.fill({ color: isCurrent ? 0xef4444 : (step.active ? theme.accent.color : theme.textMuted.color), alpha: isCurrent ? 1 : 0.3 });
+      g.fill({ color: isCurrent ? theme.error.color : (step.active ? theme.accent.color : theme.textMuted.color), alpha: isCurrent ? 1 : 0.3 });
 
       if (step.active) {
         // Accent indicator
@@ -369,7 +369,7 @@ export const PixiTB303View: React.FC<PixiTB303ViewProps> = ({ channelIndex = 0, 
         labels.push({ x: x + STEP_W / 2 - 6, y: LED_H + 42, text: octLabel, color: step.octave !== 2 ? theme.accent.color : theme.textMuted.color });
 
         // Accent
-        labels.push({ x: x + STEP_W / 2 - 5, y: LED_H + 4 + STEP_H - 28, text: 'AC', color: step.accent ? 0xd97706 : theme.textMuted.color, bold: step.accent });
+        labels.push({ x: x + STEP_W / 2 - 5, y: LED_H + 4 + STEP_H - 28, text: 'AC', color: step.accent ? theme.warning.color : theme.textMuted.color, bold: step.accent });
 
         // Slide
         labels.push({ x: x + STEP_W / 2 - 5, y: LED_H + 4 + STEP_H - 14, text: 'SL', color: step.slide ? theme.accentSecondary.color : theme.textMuted.color, bold: step.slide });

@@ -19,10 +19,7 @@ import {
 import { PixiSelect, type SelectOption } from '../components/PixiSelect';
 import { usePixiTheme } from '../theme';
 import { pickFile } from '../services/glFilePicker';
-
-function tintBg(color: number, factor = 0.15): number {
-  return (((color >> 16 & 0xff) * factor | 0) << 16) | (((color >> 8 & 0xff) * factor | 0) << 8) | ((color & 0xff) * factor | 0);
-}
+import { tintBg } from '../colors';
 import { downloadFile } from '../services/glFileDownload';
 
 import { useMIDIStore } from '../../stores/useMIDIStore';

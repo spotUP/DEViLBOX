@@ -476,7 +476,7 @@ export const PixiGTInstrumentDesigner: React.FC<Props> = ({ width, height, compa
       bg.roundRect(pad + 30, cutoffY, barW, barH, 2).fill({ color: DAW_BG });
       bg.roundRect(pad + 30, cutoffY, barW, barH, 2).stroke({ color: DAW_PANEL_BORDER, width: 1 });
       if (inst.filterPtr > 0) {
-        env.roundRect(pad + 30, cutoffY, barW * cutoffFrac, barH, 2).fill({ color: 0xef4444, alpha: 0.7 });
+        env.roundRect(pad + 30, cutoffY, barW * cutoffFrac, barH, 2).fill({ color: theme.error.color, alpha: 0.7 });
       }
       labels.push({ x: pad + 34 + barW, y: cutoffY, text: filterInfo.cutoff.toString(), color: DAW_TEXT_SEC, fontFamily: ff });
 
@@ -487,7 +487,7 @@ export const PixiGTInstrumentDesigner: React.FC<Props> = ({ width, height, compa
       bg.roundRect(pad + 30, resY, barW, barH, 2).fill({ color: DAW_BG });
       bg.roundRect(pad + 30, resY, barW, barH, 2).stroke({ color: DAW_PANEL_BORDER, width: 1 });
       if (inst.filterPtr > 0) {
-        env.roundRect(pad + 30, resY, barW * resFrac, barH, 2).fill({ color: 0xf59e0b, alpha: 0.7 });
+        env.roundRect(pad + 30, resY, barW * resFrac, barH, 2).fill({ color: theme.warning.color, alpha: 0.7 });
       }
       labels.push({ x: pad + 34 + barW, y: resY, text: filterInfo.resonance.toString(), color: DAW_TEXT_SEC, fontFamily: ff });
 
@@ -499,8 +499,8 @@ export const PixiGTInstrumentDesigner: React.FC<Props> = ({ width, height, compa
         const [mLabel, mActive] = modeLabels[mi];
         const mx = pad + mi * 36;
         bg.roundRect(mx, modeY, 30, 14, 2).fill({ color: mActive ? DAW_SURFACE_HOVER : DAW_SURFACE });
-        bg.roundRect(mx, modeY, 30, 14, 2).stroke({ color: mActive ? 0xef4444 : DAW_PANEL_BORDER, width: 1 });
-        labels.push({ x: mx + 6, y: modeY + 2, text: mLabel, color: mActive ? 0xef4444 : DAW_TEXT_MUTED, fontFamily: ff });
+        bg.roundRect(mx, modeY, 30, 14, 2).stroke({ color: mActive ? theme.error.color : DAW_PANEL_BORDER, width: 1 });
+        labels.push({ x: mx + 6, y: modeY + 2, text: mLabel, color: mActive ? theme.error.color : DAW_TEXT_MUTED, fontFamily: ff });
       }
       labels.push({ x: pad + 120, y: modeY + 2, text: modeName, color: DAW_TEXT_SEC, fontFamily: ff });
 
@@ -519,7 +519,7 @@ export const PixiGTInstrumentDesigner: React.FC<Props> = ({ width, height, compa
       labels.push({ x: pad, y: dawTableY - 14, text: 'TABLES', color: DAW_TEXT_MUTED, fontFamily: ff });
       const tableNames = ['Wave', 'Pulse', 'Filter', 'Speed'];
       const tableKeys = ['wave', 'pulse', 'filter', 'speed'];
-      const tableColors = [DAW_ACCENT, 0xf59e0b, 0xef4444, 0x10b981];
+      const tableColors = [DAW_ACCENT, theme.warning.color, theme.error.color, theme.success.color];
       const miniW = Math.floor((width - pad * 2 - 12) / 4);
       const miniH = 35;
 

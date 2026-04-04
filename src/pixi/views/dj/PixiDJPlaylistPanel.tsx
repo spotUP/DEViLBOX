@@ -8,6 +8,7 @@
 
 import React, { useState, useCallback, useMemo } from 'react';
 import { usePixiTheme } from '../../theme';
+import { DECK_A, DECK_B, DECK_C } from '../../colors';
 import { PixiButton } from '../../components/PixiButton';
 import { PixiLabel } from '../../components/PixiLabel';
 import { PixiList } from '../../components/PixiList';
@@ -254,11 +255,11 @@ export const PixiDJPlaylistPanel: React.FC<PixiDJPlaylistPanelProps> = ({
       label: `${(i + 1).toString().padStart(2, ' ')}  ${t.played ? '[P] ' : ''}${t.trackName}`,
       sublabel: trackSublabel(t),
       iconName: 'diskio',
-      iconColor: t.played ? 0x22c55e : undefined, // green icon for played tracks
+      iconColor: t.played ? theme.success.color : undefined, // green icon for played tracks
       actions: [
-        { label: '1', color: 0x3b82f6, onClick: () => loadTrackToDeck(t, 'A') },
-        { label: '2', color: 0xef4444, onClick: () => loadTrackToDeck(t, 'B') },
-        ...(thirdDeckActive ? [{ label: '3', color: 0x22c55e, onClick: () => loadTrackToDeck(t, 'C' as DeckId) }] : []),
+        { label: '1', color: DECK_A, onClick: () => loadTrackToDeck(t, 'A') },
+        { label: '2', color: DECK_B, onClick: () => loadTrackToDeck(t, 'B') },
+        ...(thirdDeckActive ? [{ label: '3', color: DECK_C, onClick: () => loadTrackToDeck(t, 'C' as DeckId) }] : []),
         { label: 'X', color: 0x666666, onClick: () => handleRemoveTrack(i) },
       ],
     }));

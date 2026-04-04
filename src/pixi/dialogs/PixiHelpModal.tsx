@@ -86,7 +86,7 @@ function buildShortcutGroups(schemeData: Record<string, string> | null): Shortcu
 
 /** Parsed markdown line — one element per visual line in the Pixi render */
 interface MdLine {
-  type: 'h1' | 'h2' | 'h3' | 'bullet' | 'code' | 'gap' | 'text';
+  type: 'h1' | 'h2' | 'h3' | 'bullet' | 'code' | 'gap' | 'text' | 'shortcuts' | 'image-alt';
   text: string;
 }
 
@@ -98,6 +98,23 @@ function parseMarkdownLines(md: string): MdLine[] {
 
   while (i < raw.length) {
     const line = raw[i];
+
+    // Dynamic token: {{keyboard-shortcuts}}
+    if (line.trim() === '{{keyboard-shortcuts}}') {
+      out.push({ type: 'shortcuts', text: '' });
+      i++;
+      continue;
+    }
+
+    // Block-level image: ![alt](src) — show alt text only (images don't render in Pixi text)
+    const imgMatch = line.match(/^!\[([^\]]*)\]\([^)]+\)$/);
+    if (imgMatch) {
+      if (imgMatch[1]) {
+        out.push({ type: 'image-alt', text: `[${imgMatch[1]}]` });
+      }
+      i++;
+      continue;
+    }
 
     // Fenced code block
     if (line.startsWith('```')) {
@@ -180,7 +197,7 @@ function stripInlineMarkdown(text: string): string {
 }
 
 /** Render parsed markdown lines as Pixi layout elements */
-const MarkdownContent: React.FC<{ lines: MdLine[]; maxWidth: number }> = ({ lines, maxWidth }) => {
+const MarkdownContent: React.FC<{ lines: MdLine[]; maxWidth: number; shortcutGroups?: ShortcutGroup[] }> = ({ lines, maxWidth, shortcutGroups }) => {
   const theme = usePixiTheme();
   return (
     <>
@@ -241,6 +258,33 @@ const MarkdownContent: React.FC<{ lines: MdLine[]; maxWidth: number }> = ({ line
                 style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 11, fill: 0xffffff }}
                 tint={theme.accent.color}
                 layout={{ paddingLeft: 8, maxWidth }}
+              />
+            );
+          case 'shortcuts':
+            return (
+              <layoutContainer key={i} layout={{ flexDirection: 'column', gap: 6, maxWidth }}>
+                {(shortcutGroups && shortcutGroups.length > 0) ? (
+                  shortcutGroups.map((group, gIdx) => (
+                    <ShortcutSection key={`sc-${gIdx}`} group={group} width={maxWidth - 8} />
+                  ))
+                ) : (
+                  <pixiBitmapText
+                    text="No keyboard scheme loaded. Shortcuts will appear here when a scheme is active."
+                    style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 11, fill: 0xffffff }}
+                    tint={theme.textMuted.color}
+                    layout={{ maxWidth }}
+                  />
+                )}
+              </layoutContainer>
+            );
+          case 'image-alt':
+            return (
+              <pixiBitmapText
+                key={i}
+                text={line.text}
+                style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 11, fill: 0xffffff }}
+                tint={theme.textMuted.color}
+                layout={{ paddingLeft: 4, marginTop: 4, marginBottom: 4, maxWidth }}
               />
             );
           case 'gap':
@@ -465,11 +509,19 @@ export const PixiHelpModal: React.FC<PixiHelpModalProps> = ({
         case 'gap': height += 8; break;
         case 'bullet': height += 18; break;
         case 'code': height += 16; break;
+        case 'image-alt': height += 22; break;
+        case 'shortcuts': {
+          // Estimate height for embedded shortcut groups
+          for (const g of shortcutGroups) {
+            height += 24 + g.shortcuts.length * 18 + 24;
+          }
+          break;
+        }
         default: height += 16; break;
       }
     }
     return Math.max(200, height + 80); // extra for nav buttons
-  }, [currentManualChapter, parsedManualLines]);
+  }, [currentManualChapter, parsedManualLines, shortcutGroups]);
 
   const manualSidebarHeight = useMemo(() => {
     let height = 0;
@@ -847,7 +899,7 @@ export const PixiHelpModal: React.FC<PixiHelpModalProps> = ({
                         layout={{ marginBottom: 8 }}
                       />
                       {/* Rendered markdown content */}
-                      <MarkdownContent lines={parsedManualLines} maxWidth={CONTENT_W - 180 - 32} />
+                      <MarkdownContent lines={parsedManualLines} maxWidth={CONTENT_W - 180 - 32} shortcutGroups={shortcutGroups} />
 
                       {/* Prev/Next navigation */}
                       <layoutContainer

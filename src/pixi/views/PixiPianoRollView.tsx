@@ -634,8 +634,10 @@ export const PixiPianoRollView: React.FC<{ isActive?: boolean; windowId?: string
             e.stopPropagation();
             const pr = usePianoRollStore.getState();
             const selectedIds = Array.from(pr.selection.notes);
+            const selectedNoteObjs = pianoData.notes.filter(n => pr.selection.notes.has(n.id));
             const noNotes = pianoData.notes.length === 0;
             const noSelection = selectedIds.length === 0;
+            const hasClipboard = !!pr.clipboard;
             const close = () => usePixiDropdownStore.getState().closeAll();
             usePixiDropdownStore.getState().openDropdown({
               kind: 'menu',
@@ -644,6 +646,58 @@ export const PixiPianoRollView: React.FC<{ isActive?: boolean; windowId?: string
               y: e.global.y,
               width: 180,
               items: [
+                {
+                  type: 'action',
+                  label: 'Copy',
+                  shortcut: 'Ctrl+C',
+                  disabled: noSelection,
+                  onClick: () => {
+                    if (selectedNoteObjs.length > 0) pr.copyNotes(selectedNoteObjs);
+                    close();
+                  },
+                },
+                {
+                  type: 'action',
+                  label: 'Cut',
+                  shortcut: 'Ctrl+X',
+                  disabled: noSelection,
+                  onClick: () => {
+                    if (selectedNoteObjs.length > 0) {
+                      pr.copyNotes(selectedNoteObjs);
+                      pianoData.deleteNotes(selectedIds);
+                      pr.clearSelection();
+                      handleNotesChanged();
+                    }
+                    close();
+                  },
+                },
+                {
+                  type: 'action',
+                  label: 'Paste',
+                  shortcut: 'Ctrl+V',
+                  disabled: !hasClipboard,
+                  onClick: () => {
+                    const clip = pr.clipboard;
+                    if (clip) {
+                      pianoData.pasteNotes(clip, Math.floor(pr.view.scrollX), Math.round(pr.view.scrollY + 60), view.channelIndex);
+                      handleNotesChanged();
+                    }
+                    close();
+                  },
+                },
+                {
+                  type: 'action',
+                  label: 'Delete',
+                  shortcut: 'Del',
+                  disabled: noSelection,
+                  onClick: () => {
+                    pianoData.deleteNotes(selectedIds);
+                    pr.clearSelection();
+                    handleNotesChanged();
+                    close();
+                  },
+                },
+                { type: 'separator' },
                 {
                   type: 'action',
                   label: 'Select All',
@@ -657,7 +711,7 @@ export const PixiPianoRollView: React.FC<{ isActive?: boolean; windowId?: string
                 {
                   type: 'action',
                   label: 'Quantize',
-                  shortcut: 'Q',
+                  shortcut: 'Ctrl+Q',
                   disabled: noNotes,
                   onClick: () => {
                     const gridDivision = usePianoRollStore.getState().view.gridDivision;
@@ -671,6 +725,30 @@ export const PixiPianoRollView: React.FC<{ isActive?: boolean; windowId?: string
                     close();
                   },
                 },
+                { type: 'separator' },
+                {
+                  type: 'action',
+                  label: 'Toggle Slide',
+                  shortcut: 'S',
+                  disabled: noSelection,
+                  onClick: () => {
+                    pianoData.toggleSlide(selectedIds, true);
+                    handleNotesChanged();
+                    close();
+                  },
+                },
+                {
+                  type: 'action',
+                  label: 'Toggle Accent',
+                  shortcut: 'A',
+                  disabled: noSelection,
+                  onClick: () => {
+                    pianoData.toggleAccent(selectedIds, true);
+                    handleNotesChanged();
+                    close();
+                  },
+                },
+                { type: 'separator' },
                 {
                   type: 'action',
                   label: 'Transpose +1',
@@ -689,19 +767,6 @@ export const PixiPianoRollView: React.FC<{ isActive?: boolean; windowId?: string
                   disabled: noSelection,
                   onClick: () => {
                     pianoData.transposeNotes(selectedIds, -1);
-                    handleNotesChanged();
-                    close();
-                  },
-                },
-                { type: 'separator' },
-                {
-                  type: 'action',
-                  label: 'Delete',
-                  shortcut: 'Del',
-                  disabled: noSelection,
-                  onClick: () => {
-                    pianoData.deleteNotes(selectedIds);
-                    pr.clearSelection();
                     handleNotesChanged();
                     close();
                   },

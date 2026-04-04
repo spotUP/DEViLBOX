@@ -11,7 +11,7 @@
 
 import { useCallback, useMemo } from 'react';
 import type { Graphics as GraphicsType } from 'pixi.js';
-import { useUIStore, useFormatStore, useTrackerStore, useTransportStore } from '@stores';
+import { useUIStore, useFormatStore, useTrackerStore, useTransportStore, useLiveModeStore } from '@stores';
 import type { TrackerViewMode } from '@stores/useUIStore';
 import { switchView } from '@/constants/viewOptions';
 import { useShallow } from 'zustand/react/shallow';
@@ -458,6 +458,25 @@ const ModuleInfoButton: React.FC = () => {
   );
 };
 
+// ─── Live Mode Indicator ────────────────────────────────────────────────────
+
+const PixiLiveModeIndicator: React.FC = () => {
+  const { isLiveMode, toggleLiveMode } = useLiveModeStore(
+    useShallow(s => ({ isLiveMode: s.isLiveMode, toggleLiveMode: s.toggleLiveMode }))
+  );
+
+  return (
+    <PixiButton
+      label={isLiveMode ? 'LIVE' : 'EDIT'}
+      variant={isLiveMode ? 'ft2' : 'ghost'}
+      color={isLiveMode ? 'green' : undefined}
+      size="sm"
+      active={isLiveMode}
+      onClick={toggleLiveMode}
+    />
+  );
+};
+
 // ─── Main component ──────────────────────────────────────────────────────────
 
 export const PixiEditorControlsBar: React.FC<PixiEditorControlsBarProps> = ({
@@ -594,6 +613,9 @@ export const PixiEditorControlsBar: React.FC<PixiEditorControlsBarProps> = ({
         size="sm"
         onClick={c.handleRecSettings}
       />
+
+      {/* Live / Edit mode indicator */}
+      <PixiLiveModeIndicator />
 
       <Sep />
 
