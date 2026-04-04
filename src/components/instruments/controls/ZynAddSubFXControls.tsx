@@ -24,7 +24,36 @@ const TAB_NAMES = ['ADDsynth', 'SUBsynth', 'PADsynth', 'Filter/Env', 'Effects'] 
 // SegmentButton
 // ============================================================================
 
-import { SegmentButton } from '@components/instruments/shared';
+interface SegmentButtonProps {
+  labels: string[];
+  value: number;
+  onChange: (value: number) => void;
+  color?: string;
+}
+
+const SegmentButton: React.FC<SegmentButtonProps> = React.memo(({ labels, value, onChange, color }) => {
+  const activeClass = color === 'green' ? 'bg-emerald-600 text-white'
+    : color === 'blue' ? 'bg-sky-500 text-white'
+    : 'bg-rose-500 text-white';
+  return (
+    <div className="flex gap-1 flex-wrap">
+      {labels.map((label, i) => (
+        <button
+          key={label}
+          onClick={() => onChange(i)}
+          className={`px-2 py-1 text-[10px] font-bold rounded transition-all ${
+            Math.round(value) === i
+              ? activeClass
+              : 'bg-dark-bgTertiary text-text-secondary hover:bg-dark-bgHover'
+          }`}
+        >
+          {label}
+        </button>
+      ))}
+    </div>
+  );
+});
+SegmentButton.displayName = 'SegmentButton';
 
 // ============================================================================
 // VoiceControls — a single additive voice
@@ -49,7 +78,7 @@ const VoiceControls: React.FC<VoiceControlsProps> = React.memo(({
       <div className="flex flex-col items-center gap-1">
         <span className="text-[10px] text-text-muted">Wave</span>
         <SegmentButton labels={WAVE_LABELS} value={merged[waveKey] as number}
-          onChange={(v) => update(waveKey, v)} activeClass="bg-emerald-600 text-white" />
+          onChange={(v) => update(waveKey, v)} color="green" />
       </div>
       <Knob label="Volume" value={merged[volKey] as number} min={0} max={1} defaultValue={0}
         onChange={(v) => update(volKey, v)} color="#f43f5e" />
@@ -235,7 +264,7 @@ export const ZynAddSubFXControls: React.FC<ZynAddSubFXControlsProps> = ({ config
             <div className="flex flex-col gap-1 mb-3">
               <span className="text-[10px] text-text-muted">Type</span>
               <SegmentButton labels={FILTER_LABELS} value={merged.filterType}
-                onChange={(v) => updateParam('filterType', v)} activeClass="bg-sky-500 text-white" />
+                onChange={(v) => updateParam('filterType', v)} color="blue" />
             </div>
             <div className="flex flex-wrap gap-4">
               <Knob label="Cutoff" value={merged.filterCutoff} min={0} max={1} defaultValue={0.8}
