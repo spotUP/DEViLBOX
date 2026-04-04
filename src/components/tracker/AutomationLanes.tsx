@@ -5,7 +5,6 @@
 
 import React, { useMemo, useState, useRef, useCallback } from 'react';
 import { useAutomationStore, useInstrumentStore, useTrackerStore, useCursorStore } from '@stores';
-import { useRegisterLaneStore } from '@stores/useRegisterLaneStore';
 import { interpolateAutomationValue } from '@typedefs/automation';
 import type { AutomationCurve } from '@typedefs/automation';
 import { getSectionColor } from '@hooks/useChannelAutomationParams';
@@ -84,10 +83,6 @@ export const AutomationLanes: React.FC<AutomationLanesProps> = ({
   } | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  // Filter out params that have active register lanes (avoid drawing in both places)
-  const registerLanes = useRegisterLaneStore(s => s.lanes);
-  const registerParamIds = useMemo(() => new Set(registerLanes.map(l => l.paramId)), [registerLanes]);
-
   // Resolve per-channel active parameters (multi-lane support)
   // Combines explicitly active params with any params that already have curve data
   const channelParameterLists = useMemo(() => {
@@ -107,12 +102,10 @@ export const AutomationLanes: React.FC<AutomationLanesProps> = ({
       for (const p of fromCurves) {
         if (!merged.includes(p)) merged.push(p);
       }
-      // Exclude params that are shown as register lanes (avoid double-drawing)
-      const filtered = merged.filter(p => !registerParamIds.has(p));
-      result.push(filtered.length > 0 ? filtered : (merged.length > 0 ? [] : [parameter]));
+      result.push(merged.length > 0 ? merged : [parameter]);
     }
     return result;
-  }, [channelCount, channelLanes, parameter, allCurves, patternId, registerParamIds]);
+  }, [channelCount, channelLanes, parameter, allCurves, patternId]);
 
   // Legacy single-param alias for backward compatibility
   const channelParameters = useMemo(

@@ -24,7 +24,7 @@ import { useUIStore, useInstrumentStore } from '@stores';
 import { useLiveModeStore } from '@stores/useLiveModeStore';
 import { useTrackerStore } from '@stores/useTrackerStore';
 import { useFormatStore } from '@stores/useFormatStore';
-import { useRegisterLaneStore } from '@stores/useRegisterLaneStore';
+import { useAutomationStore } from '@stores/useAutomationStore';
 import { getParamsForFormat, groupParams, type AutomationFormat } from '@/engine/automation/AutomationParams';
 import { GENERATORS, type GeneratorType } from '@utils/patternGenerators';
 import type { ChannelData } from '@typedefs/tracker';
@@ -474,6 +474,9 @@ const PixiChannelHeadersInner: React.FC<PixiChannelHeadersProps> = ({
           const fmt: AutomationFormat | null =
             editorMode === 'goattracker' ? 'gtultra' :
             editorMode === 'furnace' ? 'furnace' :
+            editorMode === 'hively' ? 'hively' :
+            editorMode === 'klystrack' ? 'klystrack' :
+            editorMode === 'sc68' ? 'sc68' :
             editorMode === 'classic' ? 'uade' : null;
           if (!fmt) return [];
           const config = fmt === 'furnace' && furnaceNative
@@ -481,14 +484,17 @@ const PixiChannelHeadersInner: React.FC<PixiChannelHeadersProps> = ({
             : undefined;
           const params = getParamsForFormat(fmt, config);
           const groups = groupParams(params);
-          const store = useRegisterLaneStore.getState();
+          const { setActiveParameter, setShowLane } = useAutomationStore.getState();
           return [
             { label: '', separator: true },
             { label: 'Register Lanes', submenu: groups.map(group => ({
               label: group.label,
               submenu: group.params.map(p => ({
-                label: `${store.hasLane(p.id) ? '✓ ' : ''}${p.label}`,
-                action: () => store.toggleLane(p.id),
+                label: p.label,
+                action: () => {
+                  setActiveParameter(ch, p.id);
+                  setShowLane(ch, true);
+                },
               })),
             }))},
           ];

@@ -9,7 +9,6 @@ import { AutomationCurveCanvas } from './AutomationCurve';
 import { useChannelAutomationParams } from '@hooks/useChannelAutomationParams';
 import { useAutomationRecording } from '@hooks/useAutomationRecording';
 import { useFormatStore } from '@stores/useFormatStore';
-import { useRegisterLaneStore } from '@stores/useRegisterLaneStore';
 import { getParamsForFormat, groupParams, type AutomationFormat } from '../../engine/automation/AutomationParams';
 
 export const AutomationPanel: React.FC = () => {
@@ -197,8 +196,8 @@ export const AutomationPanel: React.FC = () => {
         )}
       </div>
 
-      {/* Register Lanes — chip register parameters (SID/Paula/Furnace) */}
-      <RegisterLanesSection />
+      {/* Register parameters — chip register params (SID/Paula/Furnace) */}
+      <RegisterParamsSection channelIndex={channelIndex} patternId={pattern.id} />
 
       {/* Automation Curve Editor */}
       <div className="flex-1 overflow-y-auto scrollbar-modern">
@@ -213,18 +212,18 @@ export const AutomationPanel: React.FC = () => {
   );
 };
 
-/** Register Lanes section — shows chip register params based on current format */
-const RegisterLanesSection: React.FC = () => {
+/** Register params section — chip register params selectable as automation targets */
+const RegisterParamsSection: React.FC<{ channelIndex: number; patternId: string }> = ({ channelIndex }) => {
   const editorMode = useFormatStore(s => s.editorMode);
-  const lanes = useRegisterLaneStore(s => s.lanes);
-  const toggleLane = useRegisterLaneStore(s => s.toggleLane);
-  const hasLane = useRegisterLaneStore(s => s.hasLane);
-
+  const { setActiveParameter, setShowLane } = useAutomationStore();
   const furnaceNative = useFormatStore(s => s.furnaceNative);
 
   const fmt: AutomationFormat | null = useMemo(() => {
     if (editorMode === 'goattracker') return 'gtultra';
     if (editorMode === 'furnace') return 'furnace';
+    if (editorMode === 'hively') return 'hively';
+    if (editorMode === 'klystrack') return 'klystrack';
+    if (editorMode === 'sc68') return 'sc68';
     if (editorMode === 'classic') return 'uade';
     return null;
   }, [editorMode]);
@@ -243,10 +242,7 @@ const RegisterLanesSection: React.FC = () => {
     <div className="border-b border-dark-border bg-dark-bgSecondary p-3">
       <div className="flex items-center gap-2 mb-2">
         <span className="text-text-muted text-[10px] font-medium uppercase tracking-wider">
-          Register Lanes
-        </span>
-        <span className="text-text-muted text-[10px] opacity-50">
-          {lanes.length} active
+          Register Parameters
         </span>
       </div>
       <div className="flex gap-4 flex-wrap max-h-32 overflow-y-auto scrollbar-modern">
@@ -256,25 +252,19 @@ const RegisterLanesSection: React.FC = () => {
               {group.label}
             </div>
             <div className="flex gap-1 flex-wrap">
-              {group.params.map((p) => {
-                const active = hasLane(p.id);
-                return (
-                  <button
-                    key={p.id}
-                    onClick={() => toggleLane(p.id)}
-                    className={`
-                      px-2 py-0.5 text-[10px] rounded border transition-all
-                      ${active
-                        ? 'bg-accent-primary/20 text-accent-primary border-accent-primary/50'
-                        : 'bg-dark-bgTertiary text-text-muted border-dark-border hover:border-dark-borderLight hover:text-text-secondary'
-                      }
-                    `}
-                    title={`${active ? 'Hide' : 'Show'} ${p.label} lane`}
-                  >
-                    {p.label}
-                  </button>
-                );
-              })}
+              {group.params.map((p) => (
+                <button
+                  key={p.id}
+                  onClick={() => {
+                    setActiveParameter(channelIndex, p.id);
+                    setShowLane(channelIndex, true);
+                  }}
+                  className="px-2 py-0.5 text-[10px] rounded border transition-all bg-dark-bgTertiary text-text-muted border-dark-border hover:border-dark-borderLight hover:text-text-secondary"
+                  title={`Show ${p.label} automation on channel`}
+                >
+                  {p.label}
+                </button>
+              ))}
             </div>
           </div>
         ))}

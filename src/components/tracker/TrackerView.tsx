@@ -54,9 +54,6 @@ import { DJPitchSlider } from '@components/transport/DJPitchSlider';
 import { PatternMinimap } from './PatternMinimap';
 import { PianoRoll } from '../pianoroll';
 import { AutomationPanel } from '@components/automation/AutomationPanel';
-import { AutomationLaneStrip } from '@components/automation/AutomationLaneStrip';
-import type { AutomationFormat } from '../../engine/automation/AutomationParams';
-import { getFormatPlaybackState } from '../../engine/FormatPlaybackState';
 import { useAutomationStore } from '@stores/useAutomationStore';
 import { GTUltraView } from '@components/gtultra/GTUltraView';
 import { useGTUltraStore } from '@/stores/useGTUltraStore';
@@ -805,29 +802,6 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
             </div>
           )}
 
-          {/* Automation Lane Strip — for all formats with register capture */}
-          {(editorMode === 'furnace' || editorMode === 'classic' || editorMode === 'hively' || editorMode === 'klystrack' || editorMode === 'sc68') && (() => {
-            const fmtMap: Record<string, AutomationFormat> = {
-              furnace: 'furnace', classic: 'uade', hively: 'hively', sc68: 'sc68', klystrack: 'klystrack',
-            };
-            const fmt = fmtMap[editorMode] ?? 'uade';
-            const ps = getFormatPlaybackState();
-            const pat = patterns[currentPatternIndex];
-            const fn = useFormatStore.getState().furnaceNative;
-            const formatConfig = fmt === 'furnace' && fn
-              ? { chipIds: fn.chipIds, channelCount: fn.subsongs[fn.activeSubsong]?.channels.length ?? 4 }
-              : undefined;
-            return (
-              <AutomationLaneStrip
-                format={fmt}
-                formatConfig={formatConfig}
-                patternId={pat?.id ?? '0'}
-                patternLength={pat?.length ?? 64}
-                currentRow={ps.row}
-                isPlaying={ps.isPlaying}
-              />
-            );
-          })()}
         </div>
 
         {/* Pattern Minimap - Flex item 2 (hidden in fullscreen) */}
