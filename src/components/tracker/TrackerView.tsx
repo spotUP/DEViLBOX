@@ -670,7 +670,7 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
                     {mlFormatData.channels.map((ch, chIdx) => (
                       <div
                         key={chIdx}
-                        className={`flex-1 min-w-0 overflow-hidden cursor-pointer ${chIdx === mlFormatData.selectedChannel ? 'border-t-2 border-t-accent-primary/40 bg-accent-primary/5' : 'border-t-2 border-t-transparent'}`}
+                        className={`flex-1 min-w-0 overflow-hidden cursor-pointer relative ${chIdx === mlFormatData.selectedChannel ? 'border-t-2 border-t-accent-primary/40 bg-accent-primary/5' : 'border-t-2 border-t-transparent'}`}
                         style={{ borderRight: chIdx < mlFormatData.channels.length - 1 ? '1px solid var(--color-border)' : undefined }}
                         onClick={() => mlFormatData.setSelectedChannel(chIdx)}
                       >
@@ -683,6 +683,7 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
                               : mlFormatData.currentRow
                           }
                           formatIsPlaying={mlFormatData.isPlaying && mlFormatData.followMode === 1}
+                          formatChannelOffset={chIdx}
                           onFormatCellChange={(_channelIdx, rowIdx, columnKey, value) => {
                             mlFormatData.handleCellChange(chIdx, rowIdx, columnKey, value);
                           }}
