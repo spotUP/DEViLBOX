@@ -477,19 +477,32 @@ class MusicLineProcessor extends AudioWorkletProcessor {
       }
     }
 
-    // ── Position reporting (~250ms) ────────────────────────────────────────
-    this._reportCounter++;
-    if (this._reportCounter >= this._reportInterval) {
-      this._reportCounter = 0;
-      if (this.songLoaded) {
-        // Per-channel row and position for independent channel scrolling
-        const numCh = this.numChannels || 0;
-        const channelRows = new Array(numCh);
-        const channelPositions = new Array(numCh);
-        for (let ch = 0; ch < numCh; ch++) {
-          channelRows[ch] = this.wasm._ml_get_channel_row ? this.wasm._ml_get_channel_row(ch) : 0;
-          channelPositions[ch] = this.wasm._ml_get_channel_position ? this.wasm._ml_get_channel_position(ch) : 0;
+    // ── Position reporting (on row change, not timer) ───────────────────────
+    // Report whenever ANY channel's row or position changes. This gives
+    // tick-accurate updates for smooth per-channel scrolling instead of
+    // jumping N rows at fixed poll intervals.
+    if (this.songLoaded) {
+      const numCh = this.numChannels || 0;
+      let changed = false;
+
+      if (!this._prevChRows) {
+        this._prevChRows = new Array(numCh).fill(-1);
+        this._prevChPos = new Array(numCh).fill(-1);
+      }
+
+      const channelRows = new Array(numCh);
+      const channelPositions = new Array(numCh);
+      for (let ch = 0; ch < numCh; ch++) {
+        channelRows[ch] = this.wasm._ml_get_channel_row(ch);
+        channelPositions[ch] = this.wasm._ml_get_channel_position(ch);
+        if (channelRows[ch] !== this._prevChRows[ch] || channelPositions[ch] !== this._prevChPos[ch]) {
+          changed = true;
         }
+      }
+
+      if (changed) {
+        this._prevChRows = channelRows.slice();
+        this._prevChPos = channelPositions.slice();
         this.port.postMessage({
           type: 'position',
           position: this.wasm._ml_get_position(),
