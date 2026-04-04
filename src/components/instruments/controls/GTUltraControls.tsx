@@ -108,6 +108,8 @@ export const GTUltraControls: React.FC<GTUltraControlsProps> = ({
   const sidRegisters = useGTUltraStore((s) => s.sidRegisters);
   const sidCount = useGTUltraStore((s) => s.sidCount);
   const tableData = useGTUltraStore((s) => s.tableData);
+  const playbackPos = useGTUltraStore((s) => s.playbackPos);
+  const isPlaying = useGTUltraStore((s) => s.playing);
 
   // ADSR
   const attack  = (config.ad >> 4) & 0xF;
@@ -348,24 +350,42 @@ export const GTUltraControls: React.FC<GTUltraControlsProps> = ({
     };
   }, []);
 
+  // Get live table execution position from playback state
+  // tablePositions is packed: wave | (pulse << 8) | (filter << 16) per voice
+  // Use voice 0 as the display source (most common single-voice editing)
+  const liveTablePos = useMemo(() => {
+    const packed = playbackPos.tablePositions?.[0] ?? 0;
+    return {
+      wave: packed & 0xFF,
+      pulse: (packed >> 8) & 0xFF,
+      filter: (packed >> 16) & 0xFF,
+      speed: 0, // speed table has no position tracker
+    };
+  }, [playbackPos.tablePositions]);
+
   const renderTablesTab = () => (
     <div className="flex flex-col h-full">
       {/* 4 tables side by side */}
       <div className="flex flex-1 min-h-0 gap-px" style={{ background: '#111' }}>
         {TABLE_DEFS.map((td, i) => {
           const ptr = config[td.ptrKey] ?? 0;
+          // During playback, show live execution position; otherwise show instrument pointer
+          const livePos = isPlaying ? (liveTablePos as Record<string, number>)[td.key] ?? 0 : 0;
+          const currentRow = isPlaying && livePos > 0 ? livePos : ptr;
           return (
             <div key={td.key} className="flex flex-col flex-1 min-w-0">
               <div className="flex items-center gap-1 px-1 py-0.5" style={{ background: '#060a08' }}>
                 <span className="text-[9px] font-bold uppercase" style={{ color: td.color }}>{td.label}</span>
-                <span className="text-[8px] font-mono" style={{ color: td.color, opacity: 0.6 }}>${hex2(ptr)}</span>
+                <span className="text-[8px] font-mono" style={{ color: td.color, opacity: 0.6 }}>
+                  ${hex2(ptr)}{isPlaying && livePos > 0 ? ` @${hex2(livePos)}` : ''}
+                </span>
               </div>
               <div style={{ flex: 1, minHeight: 0 }}>
                 <PatternEditorCanvas
                   formatColumns={td.cols}
                   formatChannels={[allTableChannels[i]]}
-                  formatCurrentRow={ptr}
-                  formatIsPlaying={false}
+                  formatCurrentRow={currentRow}
+                  formatIsPlaying={isPlaying}
                   onFormatCellChange={makeTableCellChange(i)}
                   hideVUMeters={true}
                 />

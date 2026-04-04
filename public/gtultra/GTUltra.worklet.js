@@ -60,6 +60,8 @@ class GTUltraProcessor extends AudioWorkletProcessor {
           this._getCopyright = this.module.cwrap('gt_get_copyright', 'number', []);
           this._getNumSongs = this.module.cwrap('gt_get_num_songs', 'number', []);
           this._getChannelCount = this.module.cwrap('gt_get_channel_count', 'number', []);
+          this._getTablePositions = this.module.cwrap('gt_get_table_positions', 'number', ['number']);
+          this._getMaxChannels = this._getChannelCount;
 
           // Editing
           this._setPatternCell = this.module.cwrap('gt_set_pattern_cell', null, ['number', 'number', 'number', 'number', 'number', 'number']);
@@ -455,10 +457,19 @@ class GTUltraProcessor extends AudioWorkletProcessor {
     // Send position updates every 2 blocks (~5.8ms at 44.1kHz) for smooth scrolling
     if (++this.posCounter >= 2) {
       this.posCounter = 0;
+      // Pack table positions for all active voices (up to 6 for stereo SID)
+      const tblPos = [];
+      if (this._getTablePositions) {
+        const numCh = this._getMaxChannels ? this._getMaxChannels() : 3;
+        for (let ch = 0; ch < numCh; ch++) {
+          tblPos.push(this._getTablePositions(ch));
+        }
+      }
       this.port.postMessage({
         type: 'position',
         row: this._getCurrentRow(),
-        pos: this._getCurrentPos()
+        pos: this._getCurrentPos(),
+        tablePositions: tblPos,
       });
     }
 
