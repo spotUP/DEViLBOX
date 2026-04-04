@@ -126,8 +126,13 @@ export class HivelySynth implements DevilboxSynth {
   }
 
   triggerAttack(note?: string | number, _time?: number, velocity?: number): void {
-    console.warn('[HivelySynth] triggerAttack note=' + note + ' mode=' + this._instrumentMode + ' handle=' + this._playerHandle + ' disposed=' + this._disposed);
     if (this._disposed) return;
+
+    // Lazy setup: if we have a pending config but haven't finished setup yet,
+    // wait for setup then trigger the note
+    if (!this._instrumentMode && this._pendingConfig && !this._setupPromise) {
+      this.setInstrument(this._pendingConfig);
+    }
 
     if (this._instrumentMode && this._playerHandle >= 0) {
       // Standalone instrument mode: trigger note on the WASM player
@@ -150,6 +155,14 @@ export class HivelySynth implements DevilboxSynth {
         handle: this._playerHandle,
         note: hvlNote,
         velocity: vel,
+      });
+    } else if (this._setupPromise) {
+      // Setup still in progress — queue this note to fire when ready
+      const n = note, v = velocity;
+      this._setupPromise.then(() => {
+        if (!this._disposed && this._playerHandle >= 0) {
+          this.triggerAttack(n, undefined, v);
+        }
       });
     } else {
       // Song playback mode
