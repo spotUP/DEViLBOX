@@ -8,7 +8,6 @@ export { InstrumentSpectrum } from './InstrumentSpectrum';
 export { InstrumentSpectrogram } from './InstrumentSpectrogram';
 export { InstrumentLissajous } from './InstrumentLissajous';
 export { InstrumentLevelMeter } from './InstrumentLevelMeter';
-export { LiveADSRVisualizer } from './LiveADSRVisualizer';
 export { LiveFilterCurve } from './LiveFilterCurve';
 export { LFOVisualizer } from './LFOVisualizer';
 export { NoteActivityDisplay } from './NoteActivityDisplay';

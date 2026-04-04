@@ -22,8 +22,9 @@ import { GTToolbar } from '../GTToolbar';
 import { DAW_CSS, DAW_CH_CSS } from './dawColors';
 import {
   encodeAD, encodeSR, attackLabel, decayLabel, sustainLabel,
-  ATTACK_MS, DECAY_MS, WAVEFORMS,
+  WAVEFORMS,
 } from '@/lib/gtultra/GTVisualMapping';
+import { EnvelopeVisualization } from '@components/instruments/shared';
 import { getPresetCategories, getPresetsByCategory, type GTSIDPreset } from '@/constants/gtultraPresets';
 import { Oscilloscope } from '@/components/visualization/Oscilloscope';
 
@@ -810,7 +811,18 @@ const DAWInstrumentDesigner: React.FC = () => {
 
       {/* ADSR */}
       <div style={{ color: DAW_CSS.textMuted, marginBottom: 4 }}>ENVELOPE</div>
-      <DAWEnvelopeCanvas attack={attack} decay={decay} sustain={sustain} release={release} color={chColor} />
+      <EnvelopeVisualization
+        mode="sid"
+        attack={attack}
+        decay={decay}
+        sustain={sustain}
+        release={release}
+        width="auto"
+        height={60}
+        color={chColor}
+        backgroundColor={DAW_CSS.bg}
+        border={`1px solid ${DAW_CSS.panelBorder}`}
+      />
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 8px', marginTop: 4 }}>
         <label style={{ color: DAW_CSS.textSec }}>A:{attack} {attackLabel(attack)}
           <input type="range" min={0} max={15} value={attack} onChange={(e) => setADSR(+e.target.value, decay, sustain, release)} style={sliderStyle} />
@@ -877,58 +889,6 @@ const DAWInstrumentDesigner: React.FC = () => {
       </div>
     </div>
   );
-};
-
-// ─── ADSR Envelope Canvas (tiny reusable) ───
-
-const DAWEnvelopeCanvas: React.FC<{ attack: number; decay: number; sustain: number; release: number; color: string }> = ({ attack, decay, sustain, release, color }) => {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-
-    const w = canvas.width;
-    const h = canvas.height;
-    ctx.clearRect(0, 0, w, h);
-
-    const aT = ATTACK_MS[attack] / 1000;
-    const dT = DECAY_MS[decay] / 1000;
-    const sL = sustain / 15;
-    const rT = DECAY_MS[release] / 1000;
-    const total = aT + dT + rT + 0.2;
-
-    const tx = (t: number) => (t / total) * w;
-    const ly = (l: number) => h * (1 - l);
-
-    // Fill
-    ctx.beginPath();
-    ctx.moveTo(0, h);
-    ctx.lineTo(tx(aT), 2);
-    ctx.lineTo(tx(aT + dT), ly(sL));
-    ctx.lineTo(tx(aT + dT + 0.2), ly(sL));
-    ctx.lineTo(tx(total), h);
-    ctx.closePath();
-    ctx.fillStyle = color;
-    ctx.globalAlpha = 0.15;
-    ctx.fill();
-    ctx.globalAlpha = 1;
-
-    // Line
-    ctx.beginPath();
-    ctx.moveTo(0, h);
-    ctx.lineTo(tx(aT), 2);
-    ctx.lineTo(tx(aT + dT), ly(sL));
-    ctx.lineTo(tx(aT + dT + 0.2), ly(sL));
-    ctx.lineTo(tx(total), h);
-    ctx.strokeStyle = color;
-    ctx.lineWidth = 2;
-    ctx.stroke();
-  }, [attack, decay, sustain, release, color]);
-
-  return <canvas ref={canvasRef} width={260} height={60} style={{ width: '100%', height: 60, borderRadius: 4, background: DAW_CSS.bg, border: `1px solid ${DAW_CSS.panelBorder}` }} />;
 };
 
 // ─── Bottom Panel ───

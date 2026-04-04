@@ -11,6 +11,7 @@
 import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import type { GTUltraConfig } from '@typedefs/instrument/exotic';
 import { PatternEditorCanvas } from '@/components/tracker/PatternEditorCanvas';
+import { EnvelopeVisualization } from '@components/instruments/shared';
 import { useGTUltraStore } from '@stores/useGTUltraStore';
 import { useThemeStore } from '@stores';
 
@@ -26,8 +27,7 @@ type GTTab = 'instrument' | 'tables' | 'monitor';
 
 // ── Constants ──
 
-const ATTACK_MS  = [2, 8, 16, 24, 38, 56, 68, 80, 100, 250, 500, 800, 1000, 3000, 5000, 8000];
-const DECAY_MS   = [6, 24, 48, 72, 114, 168, 204, 240, 300, 750, 1500, 2400, 3000, 9000, 15000, 24000];
+import { ATTACK_MS, DECAY_MS } from '@/lib/gtultra/GTVisualMapping';
 const RELEASE_MS = DECAY_MS;
 
 const SID_VOICE_REGS = [
@@ -149,17 +149,6 @@ export const GTUltraControls: React.FC<GTUltraControlsProps> = ({
     onChange({ firstwave: configRef.current.firstwave ^ 0x01 });
   }, [onChange]);
 
-  // Envelope visualization
-  const envPoints = useMemo(() => {
-    const ams = ATTACK_MS[attack], dms = DECAY_MS[decay], rms = RELEASE_MS[release];
-    const sLevel = sustain / 15;
-    const totalMs = ams + dms + Math.max(rms, 200);
-    if (totalMs === 0) return '';
-    const w = 180, h = 64, scale = w / totalMs;
-    const x1 = ams * scale, x2 = x1 + dms * scale, x3 = x2 + 200 * scale, x4 = x3 + rms * scale;
-    return `M0,${h} L${x1.toFixed(1)},0 L${x2.toFixed(1)},${(h * (1 - sLevel)).toFixed(1)} L${x3.toFixed(1)},${(h * (1 - sLevel)).toFixed(1)} L${x4.toFixed(1)},${h}`;
-  }, [attack, decay, sustain, release]);
-
   // ── Helpers ──
   const SectionLabel = ({ label }: { label: string }) => (
     <div className="text-[10px] font-bold uppercase tracking-widest mb-1.5"
@@ -204,11 +193,18 @@ export const GTUltraControls: React.FC<GTUltraControlsProps> = ({
       {/* ADSR */}
       <div className={`rounded-lg border p-3 ${panelBg}`}>
         <SectionLabel label="ADSR Envelope" />
-        <div className="mb-2 rounded px-1" style={{ background: '#060a08' }}>
-          <svg viewBox="0 0 180 64" width="100%" height={72} preserveAspectRatio="none">
-            {envPoints && <path d={envPoints} fill="none" stroke={accentColor} strokeWidth={1.5} opacity={0.8} />}
-          </svg>
-        </div>
+        <EnvelopeVisualization
+          mode="sid"
+          attack={attack}
+          decay={decay}
+          sustain={sustain}
+          release={release}
+          width="auto"
+          height={72}
+          color={accentColor}
+          backgroundColor="#060a08"
+          border="none"
+        />
         <div className="flex justify-center gap-2">
           <AdsrSlider label="A" value={attack} timeMs={ATTACK_MS[attack]} onValueChange={setAttack} />
           <AdsrSlider label="D" value={decay} timeMs={DECAY_MS[decay]} onValueChange={setDecay} />

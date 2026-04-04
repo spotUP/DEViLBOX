@@ -64,7 +64,7 @@ import { isFurnaceInsEdType } from '../hardware/FurnaceInsEdHardware';
 import { SpaceLaserHeader, V2Header, DubSirenHeader, SynareHeader, type SynthHeaderProps } from './InstrumentPresetManager';
 import { DOMSynthPanel } from '../controls/DOMSynthPanel';
 const LiveFilterCurve = lazy(() => import('../../visualization/LiveFilterCurve').then(m => ({ default: m.LiveFilterCurve })));
-const LiveADSRVisualizer = lazy(() => import('../../visualization/LiveADSRVisualizer').then(m => ({ default: m.LiveADSRVisualizer })));
+import { EnvelopeVisualization } from '@components/instruments/shared';
 import { getSynthLayout } from '@/pixi/views/instruments/layouts';
 
 // ============================================================================
@@ -3434,17 +3434,16 @@ export const SynthTypeDispatcher: React.FC<SynthTypeDispatcherProps> = ({
                 </Suspense>
               )}
               {instrument.envelope?.attack != null && (
-                <Suspense fallback={null}>
-                  <LiveADSRVisualizer
-                    instrumentId={instrument.id}
-                    attack={instrument.envelope.attack ?? 0.01}
-                    decay={instrument.envelope.decay ?? 0.1}
-                    sustain={instrument.envelope.sustain ?? 0.8}
-                    release={instrument.envelope.release ?? 0.3}
-                    width="auto"
-                    height={70}
-                  />
-                </Suspense>
+                <EnvelopeVisualization
+                  mode="ms"
+                  attack={instrument.envelope.attack ?? 10}
+                  decay={instrument.envelope.decay ?? 100}
+                  sustain={instrument.envelope.sustain ?? 80}
+                  release={instrument.envelope.release ?? 300}
+                  width="auto"
+                  height={70}
+                  border="none"
+                />
               )}
             </div>
           )}

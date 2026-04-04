@@ -30,10 +30,8 @@ import { Knob } from '@components/controls/Knob';
 import { WaveformSelector } from '@components/ui/WaveformSelector';
 import { LFOControls } from '../LFOControls';
 import type { SynthEditorTab } from '../shared/SynthEditorTabs';
-import {
-  LiveADSRVisualizer,
-  LiveFilterCurve,
-} from '@components/visualization';
+import { LiveFilterCurve } from '@components/visualization';
+import { EnvelopeVisualization } from '@components/instruments/shared';
 
 // Sample-based synth types
 const SAMPLE_SYNTH_TYPES = ['Sampler', 'Player', 'GranularSynth'];
@@ -250,14 +248,14 @@ export function renderAllSections(
         {hasEnv && instrument.envelope && (
           <div>
             <SectionHeader color="#22c55e" title="Amp Envelope" />
-            <LiveADSRVisualizer
-              instrumentId={instrument.id}
+            <EnvelopeVisualization
+              mode="ms"
               attack={instrument.envelope.attack}
               decay={instrument.envelope.decay}
               sustain={instrument.envelope.sustain}
               release={instrument.envelope.release}
               width="auto" height={100}
-              color="#22c55e" activeColor="#4ade80" backgroundColor="#0a0a0a"
+              color="#22c55e" backgroundColor="#0a0a0a" border="none"
             />
             <div className="flex gap-2 mt-2 justify-center">
               <Knob value={instrument.envelope.attack} min={1} max={2000}
@@ -408,8 +406,8 @@ function renderEnvelopeTab(
 
           <div className="flex gap-4">
             <div className="flex-1">
-              <LiveADSRVisualizer
-                instrumentId={instrument.id}
+              <EnvelopeVisualization
+                mode="ms"
                 attack={instrument.envelope.attack}
                 decay={instrument.envelope.decay}
                 sustain={instrument.envelope.sustain}
@@ -417,8 +415,8 @@ function renderEnvelopeTab(
                 width="auto"
                 height={100}
                 color="#22c55e"
-                activeColor="#4ade80"
                 backgroundColor="#0a0a0a"
+                border="none"
               />
             </div>
 
