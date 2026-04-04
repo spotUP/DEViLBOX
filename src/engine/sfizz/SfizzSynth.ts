@@ -399,6 +399,8 @@ export class SfizzSynthEngine implements DevilboxSynth {
   set(param: string, value: number): void {
     const key = param as keyof SfizzConfig;
     if (CONFIG_KEYS.includes(key)) {
+      const prev = (this.config as Record<string, number>)[param];
+      if (prev === value) return; // Skip unchanged — avoids audio glitches from redundant messages
       (this.config as Record<string, number>)[param] = value;
       if (this._worklet && this.isInitialized) {
         const msg = buildParamMessage(key, value);
