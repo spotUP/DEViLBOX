@@ -2,8 +2,9 @@
  * PixiDJDeck — Complete deck component: track info + turntable + waveform + transport.
  */
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { Graphics as GraphicsType, FederatedPointerEvent } from 'pixi.js';
+import { useTick } from '@pixi/react';
 import { PIXI_FONTS } from '../../fonts';
 import { usePixiTheme, usePixiThemeId, getDeckColors, type PixiTheme } from '../../theme';
 import { PixiButton, PixiLabel, PixiSlider } from '../../components';
@@ -980,7 +981,7 @@ const PixiTurntable2D: React.FC<{
     // Power button
     const pwrX = deckW * 0.76;
     const pwrY = deckH * 0.88;
-    g.circle(pwrX, pwrY, 9).fill(currentPower ? deckColor : 0x333333).stroke({ color: theme.textMuted.color, width: 1 });
+    g.circle(pwrX, pwrY, 9).fill(currentPower ? deckColor : theme.bgTertiary.color).stroke({ color: theme.textMuted.color, width: 1 });
     // Power symbol
     g.moveTo(pwrX, pwrY - 5).lineTo(pwrX, pwrY - 2).stroke({ color: 0xffffff, width: 1.5 });
     g.arc(pwrX, pwrY, 4, -Math.PI * 0.75, -Math.PI * 0.25).stroke({ color: 0xffffff, width: 1 });
@@ -1302,6 +1303,100 @@ const PixiLoopSizeButton: React.FC<{
   );
 };
 
+/* ─── Beat phase indicator (1-2-3-4 LED dots, matches DOM DeckBeatPhase) ─── */
+
+const BEAT_COUNT = 4;
+const ON_BEAT_THRESHOLD = 0.12;
+
+const PixiBeatPhase: React.FC<{ deckId: 'A' | 'B' | 'C'; deckColor: number }> = ({ deckId, deckColor }) => {
+  const theme = usePixiTheme();
+  const hasBeatGrid = useDJStore(s => !!s.decks[deckId].beatGrid);
+  const timeSignature = useDJStore(s => s.decks[deckId].beatGrid?.timeSignature ?? 4);
+  const viz = useDeckVisualizationData(deckId);
+  const gRef = useRef<GraphicsType | null>(null);
+
+  const drawPlaceholder = useCallback((g: GraphicsType) => {
+    gRef.current = g;
+    g.clear();
+    for (let i = 0; i < BEAT_COUNT; i++) {
+      g.roundRect(i * 13, 0, 10, 10, 2);
+      g.fill({ color: theme.bgTertiary.color });
+    }
+  }, [theme.bgTertiary.color]);
+
+  useTick(() => {
+    const g = gRef.current;
+    if (!g || !hasBeatGrid) return;
+    g.clear();
+    const phase = viz.getBeatPhase();
+    const currentBeat = phase ? Math.floor(phase.barPhase * timeSignature) % BEAT_COUNT : -1;
+    const subBeatPhase = phase ? phase.beatPhase : 0;
+    const isOnBeat = subBeatPhase < ON_BEAT_THRESHOLD || subBeatPhase > (1 - ON_BEAT_THRESHOLD);
+
+    for (let i = 0; i < BEAT_COUNT; i++) {
+      const x = i * 13;
+      const isActive = i === currentBeat;
+      const isDownbeat = i === 0;
+      g.roundRect(x, 0, 10, 10, 2);
+      g.fill({ color: theme.bgTertiary.color });
+      const brightness = isActive
+        ? (isOnBeat ? 1.0 : Math.max(0.3, 1.0 - subBeatPhase * 0.8))
+        : 0.08;
+      const color = isDownbeat ? deckColor : 0xffffff;
+      g.roundRect(x, 0, 10, 10, 2);
+      g.fill({ color, alpha: brightness });
+    }
+  });
+
+  return <pixiGraphics draw={drawPlaceholder} layout={{ width: BEAT_COUNT * 13, height: 10 }} />;
+};
+
+/* ─── Channel toggles (1-2-3-4 + ALL, matches DOM DeckChannelToggles) ───── */
+
+const NUM_CHANNELS = 4;
+
+const PixiChannelToggles: React.FC<{ deckId: 'A' | 'B' | 'C' }> = ({ deckId }) => {
+  const channelMask = useDJStore(s => s.decks[deckId].channelMask);
+
+  const isEnabled = (i: number) => (channelMask & (1 << i)) !== 0;
+  const allEnabled = (() => { for (let i = 0; i < NUM_CHANNELS; i++) if (!isEnabled(i)) return false; return true; })();
+
+  const handleClick = useCallback((index: number) => {
+    useDJStore.getState().toggleDeckChannel(deckId, index);
+  }, [deckId]);
+
+  const handleAll = useCallback(() => {
+    useDJStore.getState().setAllDeckChannels(deckId, true);
+  }, [deckId]);
+
+  return (
+    <pixiContainer layout={{ flexDirection: 'row', gap: 2, alignItems: 'center' }}>
+      {Array.from({ length: NUM_CHANNELS }, (_, i) => (
+        <PixiButton
+          key={i}
+          label={String(i + 1)}
+          variant="ft2"
+          size="sm"
+          width={28}
+          height={28}
+          color={isEnabled(i) ? 'blue' : undefined}
+          active={isEnabled(i)}
+          onClick={() => handleClick(i)}
+        />
+      ))}
+      <PixiButton
+        label="ALL"
+        variant="ft2"
+        size="sm"
+        width={36}
+        height={28}
+        active={allEnabled}
+        onClick={handleAll}
+      />
+    </pixiContainer>
+  );
+};
+
 interface PixiDJDeckProps {
   deckId: 'A' | 'B' | 'C';
 }
@@ -1311,6 +1406,8 @@ export const PixiDJDeck: React.FC<PixiDJDeckProps> = ({ deckId }) => {
   const bpm = useDJStore(s => s.decks[deckId].effectiveBPM);
   const detectedBPM = useDJStore(s => s.decks[deckId].detectedBPM);
   const trackName = useDJStore(s => s.decks[deckId].trackName);
+  const trackAuthor = useDJStore(s => s.decks[deckId].trackAuthor);
+  const deckFileName = useDJStore(s => s.decks[deckId].fileName);
   const pitchOffset = useDJStore(s => s.decks[deckId].pitchOffset);
   const setDeckPitch = useDJStore(s => s.setDeckPitch);
   const loopActive = useDJStore(s => s.decks[deckId].loopActive);
@@ -1347,6 +1444,16 @@ export const PixiDJDeck: React.FC<PixiDJDeckProps> = ({ deckId }) => {
     const seconds = totalSeconds % 60;
     return `-${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
   })();
+
+  // Author: from store or extract from Modland path
+  const displayAuthor = useMemo(() => {
+    if (trackAuthor) return trackAuthor;
+    if (deckFileName?.startsWith('modland:')) {
+      const parts = deckFileName.replace('modland:', '').split('/').filter(Boolean);
+      if (parts.length >= 4) return decodeURIComponent(parts[parts.length - 2]);
+    }
+    return '';
+  }, [trackAuthor, deckFileName]);
 
   // Visualizer mode cycling
   const [vizMode, setVizMode] = useState<VizMode>('spectrum');
@@ -1431,10 +1538,10 @@ export const PixiDJDeck: React.FC<PixiDJDeckProps> = ({ deckId }) => {
         overflow: 'hidden',
       }}
     >
-      {/* ── Track info + scopes + turntable (matches DOM) ── */}
+      {/* ── Track info + turntable (matches DOM) ── */}
       <pixiContainer layout={{ flexDirection: 'row', alignItems: 'flex-start', gap: 8, flexShrink: 0 }}>
         <pixiContainer layout={{ flex: 1, flexDirection: 'column', gap: 1, overflow: 'hidden' }}>
-          {/* Deck label — own line with letter spacing (matches DOM) */}
+          {/* Deck label */}
           <pixiBitmapText
             text={`D E C K   ${deckNum}`}
             style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 10, fill: 0xffffff }}
@@ -1442,16 +1549,30 @@ export const PixiDJDeck: React.FC<PixiDJDeckProps> = ({ deckId }) => {
             alpha={0.6}
             layout={{}}
           />
-          {/* Track name — own line (matches DOM) */}
-          <pixiBitmapText
-            text={trackName || 'No track loaded'}
-            style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 14, fill: 0xffffff }}
-            tint={trackName ? theme.text.color : theme.textMuted.color}
-            layout={{}}
-          />
+          {/* Scopes — below deck label, above track info (matches DOM) */}
+          <PixiDeckScopes deckId={deckId} size={48} layout={{ width: 200, height: 48, flexDirection: 'row', gap: 2 }} />
+          {/* Track name + author */}
+          <pixiContainer layout={{ flexDirection: 'row', gap: 6, alignItems: 'center' }}>
+            <pixiBitmapText
+              text={trackName || 'No track loaded'}
+              style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 14, fill: 0xffffff }}
+              tint={trackName ? theme.text.color : theme.textMuted.color}
+              layout={{}}
+            />
+            {displayAuthor !== '' && (
+              <pixiBitmapText
+                text={`— ${displayAuthor}`}
+                style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 12, fill: 0xffffff }}
+                tint={theme.textMuted.color}
+                layout={{}}
+              />
+            )}
+          </pixiContainer>
           {/* BPM + Key row (matches DOM DeckTrackInfo) */}
           <pixiContainer layout={{ flexDirection: 'row', gap: 6, alignItems: 'center' }}>
-            {/* BPM — large LED style (matches DOM text-2xl) */}
+            {/* Beat phase indicator (1-2-3-4) */}
+            <PixiBeatPhase deckId={deckId} deckColor={DECK_COLOR} />
+            {/* BPM — large LED style */}
             <pixiBitmapText
               text={displayBPM > 0 ? displayBPM.toFixed(1) : '---.-'}
               style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 24, fill: 0xffffff }}
@@ -1500,8 +1621,6 @@ export const PixiDJDeck: React.FC<PixiDJDeckProps> = ({ deckId }) => {
             )}
           </pixiContainer>
         </pixiContainer>
-        {/* Scopes — wider to avoid truncation */}
-        <PixiDeckScopes deckId={deckId} size={48} layout={{ width: 200, height: 48, flexDirection: 'row', gap: 2 }} />
         {/* Mini turntable in visualizer mode (matches DOM) */}
         {viewMode === 'visualizer' && <PixiDeckTurntable deckId={deckId} size={80} />}
       </pixiContainer>
@@ -1690,8 +1809,11 @@ export const PixiDJDeck: React.FC<PixiDJDeckProps> = ({ deckId }) => {
             onClick={() => handleLoopSizeChange(size)}
           />
         ))}
-        <PixiLoopButton label="SLIP" active={slipEnabled} color={0xd97706} onClick={handleSlipToggle} />
+        <PixiLoopButton label="SLIP" active={slipEnabled} color={theme.warning.color} onClick={handleSlipToggle} />
       </pixiContainer>
+
+      {/* ── Channel toggles (1-2-3-4 + ALL, matches DOM DeckChannelToggles) ── */}
+      <PixiChannelToggles deckId={deckId} />
 
       {/* ── FX Pads + Beat Jump (matches DOM placement after transport) ── */}
       <pixiContainer layout={{ flexShrink: 0, width: '100%' }}>

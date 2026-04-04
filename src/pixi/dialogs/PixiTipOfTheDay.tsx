@@ -20,19 +20,12 @@ import { PIXI_FONTS } from '../fonts';
 import { DEVILBOX_TIPS } from '../../constants/tips';
 import { CHANGELOG, CURRENT_VERSION, BUILD_NUMBER } from '@generated/changelog';
 import type { ChangelogEntry } from '@generated/changelog';
+import { tintBg } from '../colors';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const W = 576; // max-w-xl
 const CONTENT_H = 300;
-
-/** Darken a color to ~20% intensity for use as a tinted background */
-function tintBg(color: number): number {
-  const r = ((color >> 16) & 0xff) * 0.15 | 0;
-  const g = ((color >> 8) & 0xff) * 0.15 | 0;
-  const b = (color & 0xff) * 0.15 | 0;
-  return (r << 16) | (g << 8) | b;
-}
 
 // Change type colors — derived from theme tokens at render time via usePixiTheme()
 // These are static fallbacks; the real colors come from the theme in ChangeBadge

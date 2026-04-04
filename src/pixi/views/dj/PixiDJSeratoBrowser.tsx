@@ -7,6 +7,7 @@
  */
 
 import React, { useState, useCallback, useEffect, useMemo } from 'react';
+import { tintBg } from '../../colors';
 import { usePixiTheme } from '../../theme';
 import { Div } from '../../layout';
 import { PIXI_FONTS } from '../../fonts';
@@ -56,10 +57,6 @@ const COL_DUR_W = 50;
 
 // Colors
 const PURPLE = 0x9333ea;
-
-function tintBg(color: number, factor = 0.15): number {
-  return (((color >> 16 & 0xff) * factor | 0) << 16) | (((color >> 8 & 0xff) * factor | 0) << 8) | ((color & 0xff) * factor | 0);
-}
 
 // ---------------------------------------------------------------------------
 // Helpers

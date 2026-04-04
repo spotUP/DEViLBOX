@@ -18,6 +18,7 @@ import { PixiPureTextInput } from '../input/PixiPureTextInput';
 import { useFileNavigation, isTrackerModule, type FileSource, type FileItem, getLastFileSource, setLastFileSource } from '@/components/dialogs/useFileNavigation';
 import { hasElectronFS } from '@utils/electron';
 import { PixiModlandPanel, PixiHVSCPanel } from './PixiRemoteBrowserPanels';
+import { tintBg } from '../colors';
 
 // ---------------------------------------------------------------------------
 // Layout constants
@@ -61,11 +62,6 @@ function fileIconColor(name: string, isDir: boolean, theme: ReturnType<typeof us
   if (isDir) return theme.accent.color;           // blue for folders
   if (isTrackerModule(name)) return theme.success.color; // green for tracker modules
   return theme.textMuted.color;                    // gray for other files
-}
-
-/** Tint a color toward black (for subtle error/info backgrounds) */
-function tintBg(color: number, factor = 0.15): number {
-  return (((color >> 16 & 0xff) * factor | 0) << 16) | (((color >> 8 & 0xff) * factor | 0) << 8) | ((color & 0xff) * factor | 0);
 }
 
 function formatSize(size?: number): string {

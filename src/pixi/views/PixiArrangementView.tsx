@@ -5,6 +5,8 @@
 
 import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { PixiButton, PixiLabel, PixiViewHeader } from '../components';
+import { PixiSelect } from '../components/PixiSelect';
+import type { SelectOption } from '../components/PixiSelect';
 import { usePixiTheme } from '../theme';
 import { PixiArrangementCanvas } from './arrangement/PixiArrangementCanvas';
 import type { ClipRenderData, ClipChannelNotes } from './arrangement/PixiArrangementCanvas';
@@ -36,6 +38,34 @@ function cssColorToPixi(color: string | null, fallback: number): number {
   return parseInt(hex, 16) || fallback;
 }
 
+/** Snap-to-grid options matching the DOM ArrangementToolbar */
+const SNAP_OPTIONS: SelectOption[] = [
+  { value: '1', label: 'Row' },
+  { value: '6', label: 'Beat' },
+  { value: '12', label: '1/2 Bar' },
+  { value: '24', label: 'Bar' },
+  { value: '48', label: '2 Bars' },
+  { value: '96', label: '4 Bars' },
+  { value: '0', label: 'Off' },
+];
+
+/** Thin vertical divider between toolbar groups */
+const ToolbarDivider: React.FC = () => {
+  const theme = usePixiTheme();
+  return (
+    <layoutContainer
+      layout={{
+        width: 1,
+        height: 20,
+        backgroundColor: theme.border.color,
+        marginLeft: 2,
+        marginRight: 2,
+        alignSelf: 'center',
+      }}
+    />
+  );
+};
+
 const TRACK_HEADERS_W = 200;
 const ARR_TOOLBAR_H = 36;
 const SCROLLBAR_SIZE = 8;
@@ -45,6 +75,8 @@ const ARR_RULER_HEIGHT = 24;
 export const PixiArrangementView: React.FC = () => {
   const theme = usePixiTheme();
   const isPlaying = useTransportStore(s => s.isPlaying);
+  const togglePlayPause = useTransportStore(s => s.togglePlayPause);
+  const transportStop = useTransportStore(s => s.stop);
 
   // Resolve actual window pixel dimensions
   const win = useWorkbenchStore(s => s.windows['arrangement']);
@@ -307,24 +339,28 @@ export const PixiArrangementView: React.FC = () => {
     return () => window.removeEventListener('keydown', handler);
   }, [handleSetTool]);
 
-  // Zoom
+  // Zoom (1.5x factor matches DOM toolbar)
   const handleZoomIn = useCallback(() => {
     const s = useArrangementStore.getState();
-    s.setPixelsPerRow(s.view.pixelsPerRow * 2);
+    s.setPixelsPerRow(Math.min(32, s.view.pixelsPerRow * 1.5));
   }, []);
 
   const handleZoomOut = useCallback(() => {
     const s = useArrangementStore.getState();
-    s.setPixelsPerRow(s.view.pixelsPerRow / 2);
+    s.setPixelsPerRow(Math.max(0.5, s.view.pixelsPerRow / 1.5));
   }, []);
 
-  // Snap division cycling
-  const SNAP_VALUES = [1, 2, 4, 8, 16];
-  const handleCycleSnap = useCallback(() => {
-    const s = useArrangementStore.getState();
-    const idx = SNAP_VALUES.indexOf(s.view.snapDivision);
-    const next = SNAP_VALUES[(idx + 1) % SNAP_VALUES.length];
-    s.setSnapDivision(next);
+  // Snap change via dropdown
+  const handleSnapChange = useCallback((val: string) => {
+    useArrangementStore.getState().setSnapDivision(Number(val));
+  }, []);
+
+  // Undo / Redo
+  const handleUndo = useCallback(() => {
+    useArrangementStore.getState().undo();
+  }, []);
+  const handleRedo = useCallback(() => {
+    useArrangementStore.getState().redo();
   }, []);
 
   // Follow playback
@@ -349,6 +385,27 @@ export const PixiArrangementView: React.FC = () => {
       {/* Toolbar */}
       <PixiViewHeader activeView="arrangement" title="ARRANGEMENT">
 
+        {/* Transport */}
+        <PixiButton
+          icon="play"
+          label=""
+          variant={isPlaying ? 'ft2' : 'ghost'}
+          color={isPlaying ? 'green' : undefined}
+          size="sm"
+          active={isPlaying}
+          onClick={togglePlayPause}
+        />
+        <PixiButton
+          icon="stop"
+          label=""
+          variant="ghost"
+          size="sm"
+          onClick={transportStop}
+        />
+
+        <ToolbarDivider />
+
+        {/* Tool buttons */}
         <PixiButton
           label="Select"
           variant={tool === 'select' ? 'ft2' : 'ghost'}
@@ -382,22 +439,36 @@ export const PixiArrangementView: React.FC = () => {
           onClick={() => handleSetTool('split')}
         />
 
+        <ToolbarDivider />
+
         {/* Zoom */}
-        <PixiButton label="-" variant="ghost" size="sm" onClick={handleZoomOut} />
-        <PixiLabel text="Zoom" size="xs" color="textMuted" />
-        <PixiButton label="+" variant="ghost" size="sm" onClick={handleZoomIn} />
+        <PixiButton icon="prev" label="" variant="ghost" size="sm" onClick={handleZoomOut} />
+        <PixiLabel
+          text={view.pixelsPerRow.toFixed(1)}
+          size="xs"
+          color="textMuted"
+          layout={{ width: 32, alignItems: 'center' }}
+        />
+        <PixiButton icon="next" label="" variant="ghost" size="sm" onClick={handleZoomIn} />
         <PixiButton label="Fit" variant="ghost" size="sm" onClick={() => useArrangementStore.getState().zoomToFit()} />
 
-        {/* Snap */}
-        <PixiButton
-          label={`Snap:${view.snapDivision}`}
-          variant="ghost"
-          size="sm"
-          onClick={handleCycleSnap}
+        <ToolbarDivider />
+
+        {/* Snap dropdown */}
+        <PixiLabel text="Snap:" size="xs" color="textMuted" />
+        <PixiSelect
+          options={SNAP_OPTIONS}
+          value={String(view.snapDivision)}
+          onChange={handleSnapChange}
+          width={80}
+          height={22}
         />
+
+        <ToolbarDivider />
 
         {/* Follow playback */}
         <PixiButton
+          icon="play"
           label="Follow"
           variant={view.followPlayback ? 'ft2' : 'ghost'}
           color={view.followPlayback ? 'blue' : undefined}
@@ -405,6 +476,12 @@ export const PixiArrangementView: React.FC = () => {
           active={view.followPlayback}
           onClick={handleToggleFollow}
         />
+
+        <ToolbarDivider />
+
+        {/* Undo / Redo */}
+        <PixiButton icon="undo" label="" variant="ghost" size="sm" onClick={handleUndo} />
+        <PixiButton icon="redo" label="" variant="ghost" size="sm" onClick={handleRedo} />
 
         <pixiContainer layout={{ flex: 1 }} />
 
@@ -417,14 +494,7 @@ export const PixiArrangementView: React.FC = () => {
         />
 
         {/* Add track */}
-        <PixiButton label="+ Track" variant="ghost" size="sm" onClick={handleAddTrack} />
-
-        <PixiLabel
-          text={`Row: ${view.scrollRow}`}
-          size="xs"
-          color="textMuted"
-          layout={{ marginRight: 8 }}
-        />
+        <PixiButton icon="next" label="Track" variant="ghost" size="sm" onClick={handleAddTrack} />
       </PixiViewHeader>
 
       {/* Main area: Track headers | Canvas + scrollbars — hover tracked for wheel scroll */}
