@@ -2740,7 +2740,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
                   className="overflow-x-hidden overflow-y-hidden flex-1"
                   data-vu-scroll
                 >
-                  <div className="flex" style={{ width: totalChannelsWidth - LINE_NUMBER_WIDTH + centerPadding, paddingLeft: centerPadding }}>
+                  <div className="flex" style={{ width: totalChannelsWidth - LINE_NUMBER_WIDTH, marginLeft: centerPadding }}>
                     {formatChannels.map((ch, idx) => {
                       const channel = ch.isPatternChannel ? pattern?.channels[idx] : undefined;
                       const isCollapsed = channel?.collapsed;
@@ -2885,7 +2885,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
               <div className="flex h-[20px] border-t border-dark-border">
                 <div className="flex-shrink-0 border-r border-dark-border" style={{ width: LINE_NUMBER_WIDTH }} />
                 <div className="overflow-hidden flex-1">
-                  <div className="flex" style={{ width: totalChannelsWidth - LINE_NUMBER_WIDTH + centerPadding, paddingLeft: centerPadding }}>
+                  <div className="flex" style={{ width: totalChannelsWidth - LINE_NUMBER_WIDTH, marginLeft: centerPadding }}>
                     {formatChannels.map((ch, chIdx) => {
                       const chCols = ch.columns ?? formatColumns;
                       const FORMAT_COL_GAP = 4;
@@ -2937,7 +2937,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
                 className="overflow-x-hidden overflow-y-hidden flex-1"
                 data-vu-scroll
               >
-                <div className="flex" style={{ width: totalChannelsWidth }}>
+                <div className="flex" style={{ width: totalChannelsWidth, marginLeft: centerPadding }}>
                   {(pattern?.channels ?? []).map((channel, idx) => {
                     // Trigger levels are animation-driven via RAF; ChannelVUMeter is disabled
                     const trigger = { level: 0, triggered: false };
