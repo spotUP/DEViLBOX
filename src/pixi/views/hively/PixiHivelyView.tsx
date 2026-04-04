@@ -25,6 +25,8 @@ import { PixiHivelyPositionEditor } from './PixiHivelyPositionEditor';
 import { PixiFormatPatternEditor } from '@/pixi/views/shared/PixiFormatPatternEditor';
 import { HIVELY_COLUMNS, hivelyToFormatChannels } from '@/components/hively/hivelyAdapter';
 
+import { PixiCollapsibleSection } from '../../components/PixiCollapsibleSection';
+
 const TOOLBAR_HEIGHT = 32;
 const POSITION_EDITOR_HEIGHT = 160;
 
@@ -229,8 +231,8 @@ export const PixiHivelyView: React.FC<HivelyViewProps> = ({ width, height }) => 
         </pixiContainer>
       </pixiContainer>
 
-      {/* Position Editor */}
-      <pixiContainer layout={{ width, height: POSITION_EDITOR_HEIGHT }}>
+      {/* Position Editor (collapsible) */}
+      <PixiCollapsibleSection label="Positions" width={width} expandedHeight={POSITION_EDITOR_HEIGHT}>
         <PixiHivelyPositionEditor
           width={width}
           height={POSITION_EDITOR_HEIGHT}
@@ -243,7 +245,7 @@ export const PixiHivelyView: React.FC<HivelyViewProps> = ({ width, height }) => 
           draw={drawPosBorder}
           layout={{ position: 'absolute', width, height: POSITION_EDITOR_HEIGHT }}
         />
-      </pixiContainer>
+      </PixiCollapsibleSection>
 
       {/* Track Editor */}
       <pixiContainer layout={{ flex: 1, width, height: trackEditorHeight }}>
