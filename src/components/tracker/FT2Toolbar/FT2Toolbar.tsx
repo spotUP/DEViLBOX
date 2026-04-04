@@ -654,6 +654,11 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = React.memo(({
   const isPlayingSong = isGT ? gtPlaying : (isPlaying && !isLooping);
   const isPlayingPattern = isGT ? false : (isPlaying && isLooping);
 
+  // WASM engines (MusicLine etc.) report position to wasmPositionStore, not trackerStore
+  const wasmSongPos = useWasmPositionStore(s => s.songPos);
+  const wasmActive = useWasmPositionStore(s => s.active);
+  const displayPositionIndex = (isPlaying && wasmActive) ? Math.min(wasmSongPos, patternOrder.length - 1) : currentPositionIndex;
+
   const handleLengthChange = (newLength: number) => {
     if (newLength >= 1 && newLength <= 256) resizePattern(currentPatternIndex, newLength);
   };
@@ -664,7 +669,7 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = React.memo(({
         <div className="flex-shrink min-w-0">
           <div className="ft2-toolbar-row">
             <div className="ft2-section ft2-col-1">
-              <FT2NumericInput label="Position" value={currentPositionIndex} onChange={handlePositionChange} min={0} max={patternOrder.length - 1} />
+              <FT2NumericInput label="Position" value={displayPositionIndex} onChange={handlePositionChange} min={0} max={patternOrder.length - 1} />
               <div className="flex gap-1 ml-auto">
                 <Button
                   variant={tapActive ? 'primary' : 'default'}
@@ -690,7 +695,7 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = React.memo(({
               />
             </div>
             <div className="ft2-section ft2-col-3">
-              <FT2NumericInput label="Pattern" value={patternOrder[currentPositionIndex] ?? currentPatternIndex} onChange={handlePatternChange} min={0} max={patterns.length - 1} />
+              <FT2NumericInput label="Pattern" value={patternOrder[displayPositionIndex] ?? currentPatternIndex} onChange={handlePatternChange} min={0} max={patterns.length - 1} />
             </div>
             <div className="ft2-section ft2-col-4">
               <FT2NumericInput label="Edit Step" value={editStep} onChange={setEditStep} min={0} max={16} />
