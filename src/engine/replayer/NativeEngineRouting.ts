@@ -459,6 +459,7 @@ export interface NativeEngineStartResult {
   c64SidEngine: C64SIDEngine | null;
   hivelyEngine: HivelyEngine | null;
   uadeEngine: UADEEngine | null;
+  musicLineEngine: MusicLineEngine | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -485,6 +486,7 @@ export async function startNativeEngines(
   let c64SidEngine: C64SIDEngine | null = null;
   let hivelyEngine: HivelyEngine | null = null;
   let uadeEngine: UADEEngine | null = null;
+  let musicLineEngine: MusicLineEngine | null = null;
 
   // Clean up any leftover silence detectors from a previous session
   for (const [, detector] of activeSilenceDetectors) {
@@ -545,6 +547,11 @@ export async function startNativeEngines(
         // Capture UADEEngine for position sync in TrackerReplayer
         if (desc.key === 'UADEEditable') {
           uadeEngine = instance as unknown as UADEEngine;
+        }
+
+        // Capture MusicLineEngine for position sync in TrackerReplayer
+        if (desc.key === 'MusicLine') {
+          musicLineEngine = instance as unknown as MusicLineEngine;
         }
 
         // Generic position sync for WASM engines with onPositionUpdate.
@@ -742,7 +749,7 @@ export async function startNativeEngines(
     }
   }
 
-  return { suppressNotes, c64SidEngine, hivelyEngine, uadeEngine };
+  return { suppressNotes, c64SidEngine, hivelyEngine, uadeEngine, musicLineEngine };
 }
 
 // ---------------------------------------------------------------------------
