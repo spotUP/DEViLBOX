@@ -60,9 +60,9 @@ interface GTOrderMatrixProps {
 
 // ─── Component ──────────────────────────────────────────────────────────────
 
-export const GTOrderMatrix: React.FC<GTOrderMatrixProps> = ({ width, height, collapsed, onToggleCollapse }) => {
+export const GTOrderMatrix: React.FC<GTOrderMatrixProps> = React.memo(({ width, height, collapsed, onToggleCollapse }) => {
   const orderData = useGTUltraStore((s) => s.orderData);
-  const playbackPos = useGTUltraStore((s) => s.playbackPos);
+  const songPos = useGTUltraStore((s) => s.playbackPos.songPos);
   const sidCount = useGTUltraStore((s) => s.sidCount);
   const engine = useGTUltraStore((s) => s.engine);
 
@@ -125,11 +125,11 @@ export const GTOrderMatrix: React.FC<GTOrderMatrixProps> = ({ width, height, col
       <PatternEditorCanvas
         formatColumns={formatColumns}
         formatChannels={formatChannels}
-        formatCurrentRow={playbackPos.position}
+        formatCurrentRow={songPos}
         formatIsPlaying={false}
         onFormatCellChange={handleCellChange}
         hideVUMeters={true}
       />
     </div>
   );
-};
+});

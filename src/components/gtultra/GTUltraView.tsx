@@ -13,7 +13,7 @@
  * special channels on the right side of the pattern editor.
  */
 
-import React, { useEffect, useRef, useState, lazy, Suspense } from 'react';
+import React, { useCallback, useEffect, useRef, useState, lazy, Suspense } from 'react';
 import { PatternEditorCanvas } from '@/components/tracker/PatternEditorCanvas';
 import { GTU_COLUMNS } from './gtuAdapter';
 import { GTToolbar } from './GTToolbar';
@@ -52,6 +52,7 @@ export const GTUltraView: React.FC<{ width?: number; height?: number }> = () => 
   useGTDAWKeyboardHandler(viewMode === 'daw');
   useGTUltraEngineInit();
 
+  const toggleOrdersCollapsed = useCallback(() => setOrdersCollapsed(v => !v), []);
   const matrixH = ordersCollapsed ? GT_ORDER_MATRIX_COLLAPSED_HEIGHT : GT_ORDER_MATRIX_HEIGHT;
 
   // DAW mode renders the modern visual editor
@@ -79,7 +80,7 @@ export const GTUltraView: React.FC<{ width?: number; height?: number }> = () => 
           width={containerWidth}
           height={matrixH}
           collapsed={ordersCollapsed}
-          onToggleCollapse={() => setOrdersCollapsed(!ordersCollapsed)}
+          onToggleCollapse={toggleOrdersCollapsed}
         />
       </div>
 

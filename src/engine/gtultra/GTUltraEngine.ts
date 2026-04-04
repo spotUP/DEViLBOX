@@ -30,7 +30,7 @@ export interface GTUltraSongInfo {
 export interface GTUltraCallbacks {
   onReady?: () => void;
   onError?: (error: string) => void;
-  onSongLoaded?: (ok: boolean) => void;
+  onSongLoaded?: (ok: boolean, channelCount?: number) => void;
   onPosition?: (pos: GTUltraPosition) => void;
   onAsidWrite?: (chip: number, reg: number, value: number) => void;
   onPatternData?: (pattern: number, length: number, data: Uint8Array) => void;
@@ -136,7 +136,7 @@ export class GTUltraEngine {
         this.callbacks.onError?.(msg.error as string);
         break;
       case 'songLoaded':
-        this.callbacks.onSongLoaded?.(msg.ok as boolean);
+        this.callbacks.onSongLoaded?.(msg.ok as boolean, msg.channelCount as number | undefined);
         break;
       case 'position':
         this.callbacks.onPosition?.(msg as unknown as GTUltraPosition);

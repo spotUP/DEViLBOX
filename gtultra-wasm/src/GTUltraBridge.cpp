@@ -387,7 +387,16 @@ int gt_load_sng(const unsigned char* data, int len) {
     fwrite(data, 1, len, f);
     fclose(f);
     strcpy(songfilename, "/tmp/temp.sng");
-    return loadsong(&gtObject, 0);
+    int ok = loadsong(&gtObject, 0);
+
+    /* Sync gt_sid_count from loaded song metadata so gt_get_channel_count()
+     * returns the correct value immediately (before gt_play is called). */
+    if (ok && editorInfo.maxSIDChannels > 0) {
+        gt_sid_count = (editorInfo.maxSIDChannels + 2) / 3;
+        if (gt_sid_count < 1) gt_sid_count = 1;
+        if (gt_sid_count > 4) gt_sid_count = 4;
+    }
+    return ok;
 }
 
 EMSCRIPTEN_KEEPALIVE
@@ -493,6 +502,11 @@ void gt_play(int songNum, int fromPos, int fromRow) {
         framerate = NTSCFRAMERATE * editorInfo.multiplier;
     else
         framerate = PALFRAMERATE * editorInfo.multiplier;
+
+    /* Sync SID count from song metadata (6ch = dual SID, 9ch = triple, etc.) */
+    gt_sid_count = (editorInfo.maxSIDChannels + 2) / 3;
+    if (gt_sid_count < 1) gt_sid_count = 1;
+    if (gt_sid_count > 4) gt_sid_count = 4;
 
     gt_playroutine_accumulator = 0;
     gtObject.psnum = songNum;
