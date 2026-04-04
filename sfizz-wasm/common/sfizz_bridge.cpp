@@ -20,15 +20,45 @@
 
 #ifdef __EMSCRIPTEN__
 #include <sched.h>
+#include <pthread.h>
+
 extern "C" {
-  /* Stubs for pthread scheduler functions used by sfizz's FilePool */
+  /* ── Pthread stubs for single-threaded AudioWorklet ──
+   *
+   * sfizz's FilePool creates two std::thread members in its constructor.
+   * Emscripten's no-pthread stubs return EAGAIN from pthread_create,
+   * which makes std::thread throw system_error → abort().
+   *
+   * We use --wrap linker flag to intercept these calls. The linker
+   * redirects all calls to pthread_create → __wrap_pthread_create.
+   * With freewheeling mode, samples load synchronously — background
+   * threads aren't needed.
+   */
   int sched_get_priority_min(int policy) { (void)policy; return 0; }
   int sched_get_priority_max(int policy) { (void)policy; return 0; }
-}
-#include <pthread.h>
-extern "C" {
+
   int pthread_setschedparam(pthread_t thread, int policy, const struct sched_param *param) {
-    (void)thread; (void)policy; (void)param; return 0;
+    (void)thread; (void)policy; (void)param;
+    return 0;
+  }
+
+  /* --wrap interceptors: linker redirects pthread_X → __wrap_pthread_X */
+  int __wrap_pthread_create(pthread_t *thread, const pthread_attr_t *attr,
+                            void *(*start_routine)(void *), void *arg) {
+    (void)attr; (void)start_routine; (void)arg;
+    if (thread) *thread = (pthread_t)1; // non-zero = "valid" handle
+    return 0; // pretend success — thread won't actually run
+  }
+
+  int __wrap_pthread_join(pthread_t thread, void **retval) {
+    (void)thread;
+    if (retval) *retval = nullptr;
+    return 0;
+  }
+
+  int __wrap_pthread_detach(pthread_t thread) {
+    (void)thread;
+    return 0;
   }
 }
 #endif
