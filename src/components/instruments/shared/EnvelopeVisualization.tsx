@@ -119,9 +119,8 @@ interface SIDProps {
   border?: string;
 }
 
-// SID 6581/8580 ADSR timing tables (milliseconds)
-const SID_ATTACK_MS = [2, 8, 16, 24, 38, 56, 68, 80, 100, 250, 500, 800, 1000, 3000, 5000, 8000];
-const SID_DECAY_MS  = [6, 24, 48, 72, 114, 168, 204, 240, 300, 750, 1500, 2400, 3000, 9000, 15000, 24000];
+// SID 6581/8580 ADSR timing tables — canonical source in GTVisualMapping
+import { ATTACK_MS as SID_ATTACK_MS, DECAY_MS as SID_DECAY_MS } from '@/lib/gtultra/GTVisualMapping';
 
 interface MSProps {
   mode: 'ms';
