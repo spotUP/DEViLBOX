@@ -113,14 +113,7 @@ interface NeuralEffectEditorProps {
   onClose?: () => void;
 }
 
-function SectionHeader({ color, title }: { color: string; title: string }) {
-  return (
-    <div className="flex items-center gap-2.5 mb-4">
-      <div className="w-1.5 h-5 rounded-full" style={{ backgroundColor: color, boxShadow: `0 0 8px ${color}60` }} />
-      <h3 className="text-xs font-black text-white/90 uppercase tracking-[0.15em]">{title}</h3>
-    </div>
-  );
-}
+import { SectionHeader } from '@components/instruments/shared';
 
 /** Neural pedal enclosure shadow */
 const NEURAL_SHADOW = [
@@ -217,7 +210,7 @@ const NeuralEffectEditor: React.FC<NeuralEffectEditorProps> = ({
         {/* Implemented Parameters */}
         {implementedParams.length > 0 && (
           <section className="rounded-xl p-4 border border-border bg-black/30 backdrop-blur-sm shadow-inner-dark">
-            <SectionHeader color="#a855f7" title="Parameters" />
+            <SectionHeader size="lg" color="#a855f7" title="Parameters" />
             <div className="flex flex-wrap justify-around gap-4">
               {implementedParams.map((param) => (
                 <Knob
@@ -265,7 +258,7 @@ const NeuralEffectEditor: React.FC<NeuralEffectEditorProps> = ({
 
         {/* Mix */}
         <section className="rounded-xl p-4 border border-border bg-black/30 backdrop-blur-sm shadow-inner-dark">
-          <SectionHeader color="#ec4899" title="Output" />
+          <SectionHeader size="lg" color="#ec4899" title="Output" />
           <div className="flex justify-center">
             <Knob
               value={effect.wet}

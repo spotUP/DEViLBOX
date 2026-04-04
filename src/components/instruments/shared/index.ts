@@ -10,6 +10,7 @@ export { SynthEditorTabs } from './SynthEditorTabs';
 export { EditorHeader, VisualizationRow } from './EditorHeader';
 export type { EditorHeaderProps, VizMode } from './EditorHeader';
 export { SectionLabel } from './SectionLabel';
+export { SectionHeader } from './SectionHeader';
 export { EnvelopeVisualization } from './EnvelopeVisualization';
 export type { EnvelopeVisualizationProps } from './EnvelopeVisualization';
 export { SequenceEditor } from './SequenceEditor';
