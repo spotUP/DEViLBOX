@@ -31,24 +31,10 @@ import { WaveformSelector } from '@components/ui/WaveformSelector';
 import { LFOControls } from '../LFOControls';
 import type { SynthEditorTab } from '../shared/SynthEditorTabs';
 import { LiveFilterCurve } from '@components/visualization';
-import { EnvelopeVisualization } from '@components/instruments/shared';
+import { EnvelopeVisualization, SectionHeader } from '@components/instruments/shared';
 
 // Sample-based synth types
 const SAMPLE_SYNTH_TYPES = ['Sampler', 'Player', 'GranularSynth'];
-
-// ============================================================================
-// SECTION HEADER COMPONENT
-// ============================================================================
-
-// eslint-disable-next-line react-refresh/only-export-components
-function SectionHeader({ color, title }: { color: string; title: string }) {
-  return (
-    <div className="flex items-center gap-2 mb-4">
-      <div className={`w-1 h-4 rounded-full`} style={{ backgroundColor: color }} />
-      <h3 className="text-sm font-bold text-text-primary uppercase tracking-wide">{title}</h3>
-    </div>
-  );
-}
 
 // ============================================================================
 // MAIN TAB CONTENT RENDERER

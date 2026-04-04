@@ -26,7 +26,7 @@ export const AutoPannerEditor: React.FC<VisualEffectEditorProps> = ({
     <div className="space-y-4">
       <EffectOscilloscope pre={pre} post={post} color="#22c55e" />
       <section className="rounded-xl p-4 border border-border bg-black/30 backdrop-blur-sm shadow-inner-dark">
-        <SectionHeader color="#22c55e" title="Auto Panner" />
+        <SectionHeader size="lg" color="#22c55e" title="Auto Panner" />
         <div className="flex justify-around items-end">
           <Knob
             value={frequency}
@@ -80,7 +80,7 @@ export const AutoWahEditor: React.FC<VisualEffectEditorProps> = ({
     <div className="space-y-4">
       <EffectSpectrum pre={pre} post={post} color="#f43f5e" />
       <section className="rounded-xl p-4 border border-border bg-black/30 backdrop-blur-sm shadow-inner-dark">
-        <SectionHeader color="#f43f5e" title="Auto Wah" />
+        <SectionHeader size="lg" color="#f43f5e" title="Auto Wah" />
         <div className="flex justify-around items-end">
           <Knob
             value={baseFrequency}
@@ -157,7 +157,7 @@ export const BitCrusherEditor: React.FC<VisualEffectEditorProps> = ({
     <div className="space-y-4">
       <EffectOscilloscope pre={pre} post={post} color="#84cc16" />
       <section className="rounded-xl p-4 border border-border bg-black/30 backdrop-blur-sm shadow-inner-dark">
-        <SectionHeader color="#84cc16" title="Bit Crusher" />
+        <SectionHeader size="lg" color="#84cc16" title="Bit Crusher" />
         <div className="flex justify-around items-end">
           <Knob
             value={bits}
@@ -202,7 +202,7 @@ export const ChebyshevEditor: React.FC<VisualEffectEditorProps> = ({
       <EffectOscilloscope pre={pre} post={post} color="#f59e0b" />
       <WaveshaperCurve type="Chebyshev" order={order} color="#f59e0b" height={100} />
       <section className="rounded-xl p-4 border border-border bg-black/30 backdrop-blur-sm shadow-inner-dark">
-        <SectionHeader color="#f59e0b" title="Chebyshev Waveshaper" />
+        <SectionHeader size="lg" color="#f59e0b" title="Chebyshev Waveshaper" />
         <div className="flex justify-around items-end">
           <Knob
             value={order}
@@ -246,7 +246,7 @@ export const FrequencyShifterEditor: React.FC<VisualEffectEditorProps> = ({
     <div className="space-y-4">
       <EffectOscilloscope pre={pre} post={post} color="#06b6d4" />
       <section className="rounded-xl p-4 border border-border bg-black/30 backdrop-blur-sm shadow-inner-dark">
-        <SectionHeader color="#06b6d4" title="Frequency Shifter" />
+        <SectionHeader size="lg" color="#06b6d4" title="Frequency Shifter" />
         <div className="flex justify-around items-end">
           <Knob
             value={frequency}
@@ -293,7 +293,7 @@ export const PitchShiftEditor: React.FC<VisualEffectEditorProps> = ({
     <div className="space-y-4">
       <EffectOscilloscope pre={pre} post={post} color="#8b5cf6" />
       <section className="rounded-xl p-4 border border-border bg-black/30 backdrop-blur-sm shadow-inner-dark">
-        <SectionHeader color="#8b5cf6" title="Pitch Shift" />
+        <SectionHeader size="lg" color="#8b5cf6" title="Pitch Shift" />
         <div className="flex justify-around items-end">
           <Knob
             value={pitch}
@@ -358,7 +358,7 @@ export const JCReverbEditor: React.FC<VisualEffectEditorProps> = ({
     <div className="space-y-4">
       <EffectOscilloscope pre={pre} post={post} color="#6366f1" />
       <section className="rounded-xl p-4 border border-border bg-black/30 backdrop-blur-sm shadow-inner-dark">
-        <SectionHeader color="#6366f1" title="JC Reverb" />
+        <SectionHeader size="lg" color="#6366f1" title="JC Reverb" />
         <div className="flex justify-around items-end">
           <Knob
             value={roomSize}
@@ -402,7 +402,7 @@ export const StereoWidenerEditor: React.FC<VisualEffectEditorProps> = ({
     <div className="space-y-4">
       <EffectOscilloscope pre={pre} post={post} color="#ec4899" />
       <section className="rounded-xl p-4 border border-border bg-black/30 backdrop-blur-sm shadow-inner-dark">
-        <SectionHeader color="#ec4899" title="Stereo Widener" />
+        <SectionHeader size="lg" color="#ec4899" title="Stereo Widener" />
         <div className="flex justify-around items-end">
           <Knob
             value={width}
