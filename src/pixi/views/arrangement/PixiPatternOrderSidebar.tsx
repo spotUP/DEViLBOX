@@ -3,12 +3,14 @@
  * Visually 1:1 with DOM PatternOrderSidebar. Same store data.
  */
 
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import type { Graphics as GraphicsType, FederatedPointerEvent } from 'pixi.js';
 import { usePixiTheme } from '../../theme';
 import { PIXI_FONTS } from '../../fonts';
 import { useTrackerStore } from '@stores';
 import { notify } from '@stores/useNotificationStore';
+import { PixiContextMenu } from '../../input/PixiContextMenu';
+import type { ContextMenuItem } from '../../input/PixiContextMenu';
 
 interface PixiPatternOrderSidebarProps {
   width?: number;
@@ -86,10 +88,36 @@ export const PixiPatternOrderSidebar: React.FC<PixiPatternOrderSidebarProps> = (
     return idx >= 0 && idx < patternOrder.length ? idx : null;
   }, [patternOrder.length]);
 
+  // ── Right-click context menu ───────────────────────────────────────────────
+  const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number; idx: number } | null>(null);
+  const duplicatePosition = useTrackerStore(s => s.duplicatePosition);
+  const removeFromOrder = useTrackerStore(s => s.removeFromOrder);
+  const addToOrder = useTrackerStore(s => s.addToOrder);
+  const currentPatternIndex = useTrackerStore(s => s.currentPatternIndex);
+
+  const ctxMenuItems = useMemo((): ContextMenuItem[] => {
+    if (!ctxMenu) return [];
+    const idx = ctxMenu.idx;
+    return [
+      { label: `Duplicate Pos ${idx}`, action: () => { duplicatePosition(idx); setCtxMenu(null); } },
+      { label: `Remove Pos ${idx}`, action: () => { if (patternOrder.length > 1) { removeFromOrder(idx); } setCtxMenu(null); }, disabled: patternOrder.length <= 1 },
+      { label: '', separator: true },
+      { label: 'Add Current Pattern', action: () => { addToOrder(currentPatternIndex); setCtxMenu(null); } },
+    ];
+  }, [ctxMenu, patternOrder.length, duplicatePosition, removeFromOrder, addToOrder, currentPatternIndex]);
+
   const handlePointerDown = useCallback((e: FederatedPointerEvent) => {
+    const nativeEvent = e.nativeEvent as PointerEvent;
     const local = e.getLocalPosition(e.currentTarget);
     const idx = posFromY(local.y);
     if (idx === null) return;
+
+    // Right-click → context menu
+    if (nativeEvent.button === 2) {
+      setCtxMenu({ x: nativeEvent.clientX, y: nativeEvent.clientY, idx });
+      return;
+    }
+
     dragStartY.current = local.y;
     isDragging.current = false;
     setDragIdx(idx);
@@ -168,6 +196,15 @@ export const PixiPatternOrderSidebar: React.FC<PixiPatternOrderSidebarProps> = (
           </pixiContainer>
         );
       })}
+
+      {/* Right-click context menu */}
+      <PixiContextMenu
+        items={ctxMenuItems}
+        x={ctxMenu?.x ?? 0}
+        y={ctxMenu?.y ?? 0}
+        isOpen={!!ctxMenu}
+        onClose={() => setCtxMenu(null)}
+      />
     </pixiContainer>
   );
 };
