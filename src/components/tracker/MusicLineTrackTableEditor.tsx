@@ -100,7 +100,7 @@ export const MusicLineTrackTableEditor: React.FC<MusicLineTrackTableEditorProps>
         formatColumns={formatColumns}
         formatChannels={formatChannels}
         formatCurrentRow={(isPlaying && wasmActive) ? Math.min(wasmSongPos, maxPositions - 1) : editPos}
-        formatIsPlaying={false}
+        formatIsPlaying={isPlaying && wasmActive}
         onFormatCellChange={handleCellChange}
         hideVUMeters={true}
       />
