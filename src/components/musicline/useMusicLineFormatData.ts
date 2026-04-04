@@ -5,7 +5,7 @@
  * a cell change handler. Used by DOM (TrackerView) and can be used by Pixi.
  */
 
-import { useCallback, useEffect, useMemo } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTrackerStore, useFormatStore } from '@stores';
 import { useTransportStore } from '@stores/useTransportStore';
 import { useWasmPositionStore } from '@/stores/useWasmPositionStore';
@@ -20,9 +20,13 @@ export interface MusicLineFormatData {
   perChannelRows: number[];
   isPlaying: boolean;
   handleCellChange: OnCellChange;
+  /** Which channel the global scroll follows */
+  selectedChannel: number;
+  setSelectedChannel: (ch: number) => void;
 }
 
 export function useMusicLineFormatData(): MusicLineFormatData {
+  const [selectedChannel, setSelectedChannel] = useState(0);
   const channelTrackTables = useFormatStore((s) => s.channelTrackTables);
   const patterns = useTrackerStore((s) => s.patterns);
   const editPos = useTrackerStore((s) => s.currentPositionIndex);
@@ -64,10 +68,10 @@ export function useMusicLineFormatData(): MusicLineFormatData {
     [channelTrackTables, editPos],
   );
 
-  // Use channel 0's row for global scroll (best we can do with single-scroll editor)
-  const ch0Row = (channelRows.length > 0) ? channelRows[0] : currentRow;
-  const maxRow = channels.length > 0 ? (channels[0].patternLength - 1) : 0;
-  const clampedRow = Math.min(wasmActive ? ch0Row : currentRow, maxRow);
+  // Follow the selected channel's row for global scroll
+  const followRow = (channelRows.length > selectedChannel) ? channelRows[selectedChannel] : currentRow;
+  const maxRow = channels.length > selectedChannel ? (channels[selectedChannel].patternLength - 1) : 0;
+  const clampedRow = Math.min(wasmActive ? followRow : currentRow, maxRow);
   const displayRow = isPlaying ? clampedRow : 0;
 
   // Drive FormatPlaybackState for scroll in the pattern editor.
@@ -89,5 +93,5 @@ export function useMusicLineFormatData(): MusicLineFormatData {
     });
   }, [isPlaying, wasmActive, channelRows, channels]);
 
-  return { channels, currentRow: displayRow, perChannelRows, isPlaying, handleCellChange };
+  return { channels, currentRow: displayRow, perChannelRows, isPlaying, handleCellChange, selectedChannel, setSelectedChannel };
 }
