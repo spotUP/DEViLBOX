@@ -275,6 +275,30 @@ const CONFIG_KEYS: (keyof SetBfreeConfig)[] = [
   'volume', 'keyClick', 'tuning', 'outputLevel', 'swellPedal',
 ];
 
+/** Map CONFIG_KEYS index → WASM param index.
+ *  WASM has 44 params (NUM_PARAMS). CONFIG_KEYS has 53 entries.
+ *  9 TypeScript-only params (percGain, vibratoFreq, leslieBrake, horn/drum RPM/Accel,
+ *  overdriveCharacter, reverbWet, tuning, outputLevel, swellPedal) have no WASM equivalent.
+ */
+const WASM_PARAM_INDEX: Record<number, number> = {
+  // Drawbars 0-26: 1:1 match
+  ...Object.fromEntries(Array.from({ length: 27 }, (_, i) => [i, i])),
+  // Percussion: CONFIG 27-30 → WASM 27-30 (percGain at CONFIG 31 has no WASM equivalent)
+  27: 27, 28: 28, 29: 29, 30: 30,
+  // Vibrato: CONFIG 32-34 → WASM 31-33 (vibratoFreq at CONFIG 35 has no WASM equivalent)
+  32: 31, 33: 32, 34: 33,
+  // Leslie: CONFIG 36 → WASM 34 (leslieBrake, horn/drum RPM/Accel have no WASM equivalent)
+  36: 34,
+  // Overdrive: CONFIG 44 → WASM 35 (overdriveCharacter has no direct WASM equivalent)
+  44: 35,
+  // Reverb: CONFIG 46 → WASM 38
+  46: 38,
+  // Volume: CONFIG 48 → WASM 39
+  48: 39,
+  // Key click: CONFIG 49 → WASM 40
+  49: 40,
+};
+
 export class SetBfreeSynthEngine implements DevilboxSynth {
   readonly name = 'SetBfreeSynthEngine';
   readonly output: GainNode;
@@ -381,8 +405,9 @@ export class SetBfreeSynthEngine implements DevilboxSynth {
     if (!this._worklet || !this.isInitialized) return;
     for (let i = 0; i < CONFIG_KEYS.length; i++) {
       const value = config[CONFIG_KEYS[i]];
-      if (value !== undefined) {
-        this._worklet.port.postMessage({ type: 'setParam', index: i, value });
+      const wasmIdx = WASM_PARAM_INDEX[i];
+      if (value !== undefined && wasmIdx !== undefined) {
+        this._worklet.port.postMessage({ type: 'setParam', index: wasmIdx, value });
       }
     }
   }
@@ -410,11 +435,12 @@ export class SetBfreeSynthEngine implements DevilboxSynth {
   }
 
   set(param: string, value: number): void {
-    const index = CONFIG_KEYS.indexOf(param as keyof SetBfreeConfig);
-    if (index >= 0) {
+    const configIdx = CONFIG_KEYS.indexOf(param as keyof SetBfreeConfig);
+    if (configIdx >= 0) {
       (this.config as Record<string, number>)[param] = value;
-      if (this._worklet && this.isInitialized) {
-        this._worklet.port.postMessage({ type: 'setParam', index, value });
+      const wasmIdx = WASM_PARAM_INDEX[configIdx];
+      if (wasmIdx !== undefined && this._worklet && this.isInitialized) {
+        this._worklet.port.postMessage({ type: 'setParam', index: wasmIdx, value });
       }
     }
   }
@@ -449,7 +475,11 @@ export class SetBfreeSynthEngine implements DevilboxSynth {
   loadNativePreset(name: string): void {
     const preset = SETBFREE_NATIVE_FACTORY_PRESETS.find(p => p.name === name);
     if (preset) {
-      this.loadPatch(preset.values);
+      // Apply via set() which maps CONFIG_KEYS → WASM indices correctly
+      // (loadPatch sends raw indices which don't match WASM param ordering)
+      for (let i = 0; i < Math.min(preset.values.length, CONFIG_KEYS.length); i++) {
+        this.set(CONFIG_KEYS[i], preset.values[i]);
+      }
     } else {
       console.warn(`[SetBfree] Native preset not found: ${name}`);
     }
