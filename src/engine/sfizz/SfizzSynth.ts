@@ -44,6 +44,7 @@ export interface SfizzConfig {
   reverbSend?: number;     // 0-1
   chorusSend?: number;     // 0-1
   transpose?: number;      // -24 to 24
+  sfzPreset?: string;      // Name of the SFZ preset to load
 }
 
 export const DEFAULT_SFIZZ: SfizzConfig = {
@@ -53,17 +54,18 @@ export const DEFAULT_SFIZZ: SfizzConfig = {
   expression: 1.0, pitchBend: 0,
   reverbSend: 0.2, chorusSend: 0,
   transpose: 0,
+  sfzPreset: 'Sine Pad',
 };
 
 export const SFIZZ_PRESETS: Record<string, SfizzConfig> = {
-  'Sine Pad': { ...DEFAULT_SFIZZ },
-  'Saw Lead': { ...DEFAULT_SFIZZ, volume: 0.7 },
-  'Square Lead': { ...DEFAULT_SFIZZ, volume: 0.6 },
-  'Triangle Soft': { ...DEFAULT_SFIZZ, volume: 0.8 },
-  'Noise Texture': { ...DEFAULT_SFIZZ, volume: 0.4 },
-  'Pluck': { ...DEFAULT_SFIZZ, volume: 0.75 },
-  'Warm Pad': { ...DEFAULT_SFIZZ, volume: 0.7 },
-  'Bass': { ...DEFAULT_SFIZZ, volume: 0.8 },
+  'Sine Pad': { ...DEFAULT_SFIZZ, sfzPreset: 'Sine Pad' },
+  'Saw Lead': { ...DEFAULT_SFIZZ, sfzPreset: 'Saw Lead', volume: 0.7 },
+  'Square Lead': { ...DEFAULT_SFIZZ, sfzPreset: 'Square Lead', volume: 0.6 },
+  'Triangle Soft': { ...DEFAULT_SFIZZ, sfzPreset: 'Triangle Soft', volume: 0.8 },
+  'Noise Texture': { ...DEFAULT_SFIZZ, sfzPreset: 'Noise Texture', volume: 0.4 },
+  'Pluck': { ...DEFAULT_SFIZZ, sfzPreset: 'Pluck', volume: 0.75 },
+  'Warm Pad': { ...DEFAULT_SFIZZ, sfzPreset: 'Warm Pad', volume: 0.7 },
+  'Bass': { ...DEFAULT_SFIZZ, sfzPreset: 'Bass', volume: 0.8 },
 };
 
 /** SFZ definitions for each preset — sfizz built-in oscillators + opcodes */
@@ -244,14 +246,22 @@ export class SfizzSynthEngine implements DevilboxSynth {
     }
   }
 
+  private _lastSfzPreset: string | undefined;
+
   private sendConfig(config: SfizzConfig): void {
     if (!this._worklet || !this.isInitialized) return;
     for (const key of CONFIG_KEYS) {
       const value = config[key];
       if (value !== undefined) {
-        const msg = buildParamMessage(key, value);
+        const msg = buildParamMessage(key, value as number);
         if (msg) this._worklet.port.postMessage(msg);
       }
+    }
+    // Load new SFZ if preset changed
+    if (config.sfzPreset && config.sfzPreset !== this._lastSfzPreset) {
+      this._lastSfzPreset = config.sfzPreset;
+      const sfz = SFIZZ_PRESET_SFZ[config.sfzPreset];
+      if (sfz) this.loadSFZ(sfz, new Map());
     }
   }
 
@@ -346,6 +356,10 @@ export class SfizzSynthImpl extends SfizzSynthEngine {
   }
 
   applyConfig(config: Partial<SfizzConfig>): void {
+    // Handle sfzPreset change (loads different SFZ instrument)
+    if (config.sfzPreset) {
+      this.setPreset(config.sfzPreset);
+    }
     for (const [key, value] of Object.entries(config)) {
       if (typeof value === 'number') {
         this.set(key, value);
