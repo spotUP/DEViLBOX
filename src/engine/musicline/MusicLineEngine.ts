@@ -285,6 +285,18 @@ export class MusicLineEngine {
     return () => this._positionCallbacks.delete(cb);
   }
 
+  /**
+   * Generic position update interface used by NativeEngineRouting.
+   * Maps MusicLine's {position, row, speed} to the {songPos, row} format.
+   */
+  onPositionUpdate(cb: (update: { songPos?: number; row: number }) => void): () => void {
+    const wrapper: PositionCallback = (update) => {
+      cb({ songPos: update.position, row: update.row });
+    };
+    this._positionCallbacks.add(wrapper);
+    return () => this._positionCallbacks.delete(wrapper);
+  }
+
   /** Subscribe to song end events. Returns unsubscribe function. */
   onEnded(cb: () => void): () => void {
     this._endedCallbacks.add(cb);
