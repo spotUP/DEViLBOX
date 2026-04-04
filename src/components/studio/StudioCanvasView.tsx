@@ -10,7 +10,7 @@
  * - Keyboard: R to reset layout
  */
 
-import React, { useCallback, useRef, useEffect, useLayoutEffect, useState, lazy, Suspense } from 'react';
+import React, { useCallback, useRef, useEffect, useLayoutEffect, useMemo, useState, lazy, Suspense } from 'react';
 import { useInstrumentStore } from '@stores/useInstrumentStore';
 import { useUIStore } from '@stores/useUIStore';
 import { useWorkbenchStore, type CameraState } from '@stores/useWorkbenchStore';
@@ -23,6 +23,9 @@ const TrackerView = lazy(() =>
 const UnifiedInstrumentEditor = lazy(() =>
   import('../instruments/editors/UnifiedInstrumentEditor').then(m => ({ default: m.UnifiedInstrumentEditor }))
 );
+const TestKeyboard = lazy(() =>
+  import('../instruments/shared/TestKeyboard').then(m => ({ default: m.TestKeyboard }))
+);
 const MixerContent = lazy(() =>
   import('../panels/MixerPanel').then(m => ({ default: m.MixerView }))
 );
@@ -32,12 +35,21 @@ const MasterEffectsPanel = lazy(() =>
 const InstrumentEffectsPanel = lazy(() =>
   import('../effects/InstrumentEffectsPanel').then(m => ({ default: m.InstrumentEffectsPanel }))
 );
+const PianoRoll = lazy(() =>
+  import('../pianoroll/PianoRoll').then(m => ({ default: m.PianoRoll }))
+);
+const ArrangementView = lazy(() =>
+  import('../arrangement/ArrangementView').then(m => ({ default: m.ArrangementView }))
+);
+const DJView = lazy(() =>
+  import('../dj/DJView').then(m => ({ default: m.DJView }))
+);
 
 // ─── Camera (uses CameraState from useWorkbenchStore) ────────────────────────
 
 // ─── Panel Layout ───────────────────────────────────────────────────────────
 
-type StudioPanelId = 'tracker' | 'instrument' | 'mixer' | 'masterFx' | 'instrumentFx';
+type StudioPanelId = 'tracker' | 'instrument' | 'mixer' | 'masterFx' | 'instrumentFx' | 'pianoroll' | 'arrangement' | 'dj';
 
 interface PanelLayout {
   x: number;
@@ -47,29 +59,56 @@ interface PanelLayout {
 }
 
 const GAP = 8; // px gap between panels
-const PANEL_MIN_W = 200;
 const PANEL_MIN_H = 150;
+
+// Per-panel minimum widths — prevent panels from being resized too small to be useful
+const PANEL_MIN_WIDTHS: Record<StudioPanelId, number> = {
+  tracker: 600,
+  instrument: 800,
+  mixer: 400,
+  masterFx: 300,
+  instrumentFx: 300,
+  pianoroll: 600,
+  arrangement: 600,
+  dj: 800,
+};
+const PANEL_MIN_W = 200; // fallback
 
 function computeDefaultPanels(viewW: number, viewH: number): Record<StudioPanelId, PanelLayout> {
   const pad = 10;
 
-  // Content-appropriate sizes — panels extend beyond viewport (canvas is pannable/zoomable)
-  const trackerW = Math.max(1400, Math.round(viewW * 0.65));
-  const instrW = Math.max(640, Math.round(viewW * 0.35));
-  const totalW = trackerW + instrW + GAP;
+  // Row 1: Tracker + Instrument (main editing)
+  const trackerW = Math.max(1200, Math.round(viewW * 0.55));
+  const instrW = Math.max(1100, Math.round(viewW * 0.50));
   const topH = Math.max(900, Math.round(viewH * 0.75));
-  const fxH = Math.max(400, Math.round(viewH * 0.40));
-  const mixerH = Math.max(500, Math.round(viewH * 0.35));
 
+  // Row 2: FX panels side by side
+  const totalTopW = trackerW + instrW + GAP;
+  const fxW = Math.max(500, Math.round(totalTopW * 0.5) - GAP / 2);
+  const fxH = Math.max(400, Math.round(viewH * 0.40));
   const fxY = pad + topH + GAP;
-  const mixerY = fxY + fxH + GAP;
+
+  // Row 3: Mixer + Piano Roll
+  const mixerW = Math.max(700, Math.min(900, Math.round(viewW * 0.45)));
+  const pianoW = Math.max(800, Math.round(viewW * 0.55));
+  const row3H = Math.max(500, Math.round(viewH * 0.45));
+  const row3Y = fxY + fxH + GAP;
+
+  // Row 4: Arrangement + DJ
+  const arrW = Math.max(1200, Math.round(viewW * 0.55));
+  const djW = Math.max(1000, Math.round(viewW * 0.50));
+  const row4H = Math.max(700, Math.round(viewH * 0.65));
+  const row4Y = row3Y + row3H + GAP;
 
   return {
     tracker:      { x: pad, y: pad, w: trackerW, h: topH },
     instrument:   { x: pad + trackerW + GAP, y: pad, w: instrW, h: topH },
-    masterFx:     { x: pad, y: fxY, w: Math.round(totalW * 0.5) - GAP / 2, h: fxH },
-    instrumentFx: { x: pad + Math.round(totalW * 0.5) + GAP / 2, y: fxY, w: Math.round(totalW * 0.5) - GAP / 2, h: fxH },
-    mixer:        { x: pad, y: mixerY, w: totalW, h: mixerH },
+    masterFx:     { x: pad, y: fxY, w: fxW, h: fxH },
+    instrumentFx: { x: pad + fxW + GAP, y: fxY, w: fxW, h: fxH },
+    mixer:        { x: pad, y: row3Y, w: mixerW, h: row3H },
+    pianoroll:    { x: pad + mixerW + GAP, y: row3Y, w: pianoW, h: row3H },
+    arrangement:  { x: pad, y: row4Y, w: arrW, h: row4H },
+    dj:           { x: pad + arrW + GAP, y: row4Y, w: djW, h: row4H },
   };
 }
 
@@ -82,6 +121,9 @@ const PANEL_LABELS: Record<StudioPanelId, string> = {
   mixer: 'MIXER',
   masterFx: 'MASTER FX',
   instrumentFx: 'INSTRUMENT FX',
+  pianoroll: 'PIANO ROLL',
+  arrangement: 'ARRANGEMENT',
+  dj: 'DJ',
 };
 
 const PANEL_COLORS: Record<StudioPanelId, string> = {
@@ -90,6 +132,9 @@ const PANEL_COLORS: Record<StudioPanelId, string> = {
   mixer: 'border-2 border-green-500/40',
   masterFx: 'border-2 border-orange-500/40',
   instrumentFx: 'border-2 border-pink-500/40',
+  pianoroll: 'border-2 border-cyan-500/40',
+  arrangement: 'border-2 border-yellow-500/40',
+  dj: 'border-2 border-red-500/40',
 };
 
 const EDGE_SIZE = 6; // px — hit area for edge resize handles
@@ -182,6 +227,12 @@ const InstrumentPanelContent: React.FC = () => {
             instrument={current}
             onChange={(updates) => updateInstrument(current.id, updates)}
           />
+        </Suspense>
+      </div>
+      {/* Test keyboard — on-screen piano for auditioning sounds */}
+      <div className="shrink-0 border-t border-dark-border">
+        <Suspense fallback={null}>
+          <TestKeyboard instrument={current} />
         </Suspense>
       </div>
     </div>
@@ -336,16 +387,16 @@ export const StudioCanvasView: React.FC = () => {
   const openModal = useUIStore(s => s.openModal);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  // Camera state — shared with GL workbench via useWorkbenchStore
-  const camera = useWorkbenchStore(s => s.camera);
+  // Camera state — pan only, no zoom (CSS scaling makes DOM panels blurry)
+  const rawCamera = useWorkbenchStore(s => s.camera);
+  const camera = useMemo(() => ({ ...rawCamera, scale: 1 }), [rawCamera]);
   const panCamera = useWorkbenchStore(s => s.panCamera);
-  const zoomCamera = useWorkbenchStore(s => s.zoomCamera);
   const setCamera = useWorkbenchStore(s => s.setCamera);
 
   // Panel layouts
   const [panels, setPanels] = useState<Record<StudioPanelId, PanelLayout>>({ ...DEFAULT_PANELS });
-  const [collapsed, setCollapsed] = useState<Record<StudioPanelId, boolean>>({ tracker: false, instrument: false, mixer: false, masterFx: false, instrumentFx: false });
-  const [zOrder, setZOrder] = useState<StudioPanelId[]>(['mixer', 'masterFx', 'instrumentFx', 'instrument', 'tracker']); // last = frontmost
+  const [collapsed, setCollapsed] = useState<Record<StudioPanelId, boolean>>({ tracker: false, instrument: false, mixer: false, masterFx: false, instrumentFx: false, pianoroll: false, arrangement: false, dj: false });
+  const [zOrder, setZOrder] = useState<StudioPanelId[]>(['dj', 'arrangement', 'pianoroll', 'mixer', 'masterFx', 'instrumentFx', 'instrument', 'tracker']); // last = frontmost
   const initializedRef = useRef(false);
 
   // Auto-size panels and fit-to-view on first mount
@@ -402,15 +453,16 @@ export const StudioCanvasView: React.FC = () => {
         const orig = rs.layout;
 
         let { x, y, w, h } = orig;
+        const minW = PANEL_MIN_WIDTHS[rs.id] ?? PANEL_MIN_W;
 
         // Horizontal
         if (edge === 'w' || edge === 'nw' || edge === 'sw') {
-          const newW = Math.max(PANEL_MIN_W, w - dx);
+          const newW = Math.max(minW, w - dx);
           x = orig.x + (w - newW);
           w = newW;
         }
         if (edge === 'e' || edge === 'ne' || edge === 'se') {
-          w = Math.max(PANEL_MIN_W, w + dx);
+          w = Math.max(minW, w + dx);
         }
 
         // Vertical
@@ -448,12 +500,23 @@ export const StudioCanvasView: React.FC = () => {
 
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Meta' || e.key === 'Control') cmdHeldRef.current = true;
+      if (e.key === 'Meta' || e.key === 'Control') {
+        cmdHeldRef.current = true;
+        if (!isPanning.current && !dragRef.current && !resizeRef.current) {
+          document.body.style.cursor = 'grab';
+        }
+      }
     };
     const onKeyUp = (e: KeyboardEvent) => {
-      if (e.key === 'Meta' || e.key === 'Control') cmdHeldRef.current = false;
+      if (e.key === 'Meta' || e.key === 'Control') {
+        cmdHeldRef.current = false;
+        if (!isPanning.current) document.body.style.cursor = '';
+      }
     };
-    const onBlur = () => { cmdHeldRef.current = false; };
+    const onBlur = () => {
+      cmdHeldRef.current = false;
+      if (!isPanning.current) document.body.style.cursor = '';
+    };
     window.addEventListener('keydown', onKeyDown);
     window.addEventListener('keyup',   onKeyUp);
     window.addEventListener('blur',    onBlur);
@@ -506,28 +569,64 @@ export const StudioCanvasView: React.FC = () => {
     return () => el.removeEventListener('mousedown', handleDown);
   }, []);
 
-  // ── Wheel zoom (uses store's zoomCamera — same math as GL workbench) ──────
+  // ── Wheel pan (no zoom in DOM studio — CSS scaling makes panels blurry) ────
   useEffect(() => {
     const el = containerRef.current;
     if (!el) return;
 
     const handleWheel = (e: WheelEvent) => {
-      // Without Ctrl/Cmd, only zoom when pointer is over the background (not inside panels)
-      if (!e.ctrlKey && !e.metaKey) {
-        const target = e.target as HTMLElement;
-        const isPanel = !!(target as HTMLElement).closest?.('[data-studio-panel]');
-        if (isPanel) return; // let the panel handle its own scroll
-      }
+      const target = e.target as HTMLElement;
+      const isPanel = !!target.closest?.('[data-studio-panel]');
+      if (isPanel) return; // let the panel handle its own scroll
 
       e.preventDefault();
-      const delta = Math.max(-0.4, Math.min(0.4, -e.deltaY * 0.001));
-      const rect = el.getBoundingClientRect();
-      zoomCamera(delta, rect.width / 2, rect.height / 2);
+      // Scroll = pan (shift inverts axis for horizontal scroll)
+      const dx = e.shiftKey ? -e.deltaY : -e.deltaX;
+      const dy = e.shiftKey ? 0 : -e.deltaY;
+      panCamera(dx, dy);
     };
 
     el.addEventListener('wheel', handleWheel, { passive: false });
     return () => el.removeEventListener('wheel', handleWheel);
-  }, [zoomCamera]);
+  }, [panCamera]);
+
+  // ── Panel navigation (prev/next) ─────────────────────────────────────────
+
+  // Dynamic panel order — only includes visible (non-collapsed) panels,
+  // sorted by spatial position (top-to-bottom, left-to-right)
+  const ALL_PANELS: StudioPanelId[] = ['tracker', 'instrument', 'masterFx', 'instrumentFx', 'mixer', 'pianoroll', 'arrangement', 'dj'];
+  const visiblePanels = useMemo(() =>
+    ALL_PANELS
+      .filter(id => !collapsed[id])
+      .sort((a, b) => {
+        const pa = panels[a], pb = panels[b];
+        const rowA = Math.round(pa.y / 100), rowB = Math.round(pb.y / 100);
+        return rowA !== rowB ? rowA - rowB : pa.x - pb.x;
+      }),
+    [panels, collapsed]
+  );
+
+  const [focusedPanel, setFocusedPanel] = useState(-1);
+
+  const panToPanel = useCallback((index: number) => {
+    const rect = containerRef.current?.getBoundingClientRect();
+    if (!rect || visiblePanels.length === 0) return;
+    const wrapped = ((index % visiblePanels.length) + visiblePanels.length) % visiblePanels.length;
+    const id = visiblePanels[wrapped];
+    const p = panels[id];
+    const cx = rect.width / 2 - (p.x + p.w / 2);
+    const cy = rect.height / 2 - (p.y + p.h / 2);
+    setCamera({ x: cx, y: cy, scale: 1 });
+    setFocusedPanel(wrapped);
+  }, [panels, visiblePanels, setCamera]);
+
+  const handlePrevPanel = useCallback(() => {
+    panToPanel(focusedPanel <= 0 ? visiblePanels.length - 1 : focusedPanel - 1);
+  }, [focusedPanel, visiblePanels.length, panToPanel]);
+
+  const handleNextPanel = useCallback(() => {
+    panToPanel(focusedPanel >= visiblePanels.length - 1 ? 0 : focusedPanel + 1);
+  }, [focusedPanel, visiblePanels.length, panToPanel]);
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -536,15 +635,24 @@ export const StudioCanvasView: React.FC = () => {
       if (tag === 'input' || tag === 'textarea') return;
 
       if (e.key === 'r' && !e.ctrlKey && !e.metaKey && !e.altKey) {
-        setCamera({ x: 0, y: 0, scale: 1 });
+        setCamera({ x: 0, y: 0, scale: 1 }); // scale always 1 in DOM studio
         const rect = containerRef.current?.getBoundingClientRect();
         setPanels(rect && rect.width > 0 ? computeDefaultPanels(rect.width, rect.height) : { ...DEFAULT_PANELS });
+        setFocusedPanel(-1);
+      }
+      if (e.key === 'ArrowLeft' && !e.ctrlKey && !e.metaKey && !e.altKey) {
+        e.preventDefault();
+        handlePrevPanel();
+      }
+      if (e.key === 'ArrowRight' && !e.ctrlKey && !e.metaKey && !e.altKey) {
+        e.preventDefault();
+        handleNextPanel();
       }
     };
 
     window.addEventListener('keydown', handleKey);
     return () => window.removeEventListener('keydown', handleKey);
-  }, [setCamera]);
+  }, [setCamera, handlePrevPanel, handleNextPanel]);
 
   // ── Panel drag handler ─────────────────────────────────────────────────────
 
@@ -582,6 +690,7 @@ export const StudioCanvasView: React.FC = () => {
     setCamera({ x: 0, y: 0, scale: 1 });
     const rect = containerRef.current?.getBoundingClientRect();
     setPanels(rect && rect.width > 0 ? computeDefaultPanels(rect.width, rect.height) : { ...DEFAULT_PANELS });
+    setFocusedPanel(-1);
   }, [setCamera]);
 
   // ── Collapse / z-order handlers ──────────────────────────────────────────
@@ -637,22 +746,50 @@ export const StudioCanvasView: React.FC = () => {
       </DraggablePanel>
 
       <DraggablePanel id="mixer" layout={panels.mixer} camera={camera}collapsed={collapsed.mixer} zIndex={zOrder.indexOf('mixer')} onDragStart={handleDragStart} onEdgeResizeStart={handleEdgeResizeStart} onBringToFront={handleBringToFront} onToggleCollapse={handleToggleCollapse}>
-        <Suspense fallback={<div className="flex-1 flex items-center justify-center text-text-muted text-xs">Loading mixer...</div>}>
-          <MixerContent />
+        <div className="flex-1 min-h-0 overflow-x-auto overflow-y-hidden">
+          <Suspense fallback={<div className="flex-1 flex items-center justify-center text-text-muted text-xs">Loading mixer...</div>}>
+            <MixerContent />
+          </Suspense>
+        </div>
+      </DraggablePanel>
+
+      <DraggablePanel id="pianoroll" layout={panels.pianoroll} camera={camera} collapsed={collapsed.pianoroll} zIndex={zOrder.indexOf('pianoroll')} onDragStart={handleDragStart} onEdgeResizeStart={handleEdgeResizeStart} onBringToFront={handleBringToFront} onToggleCollapse={handleToggleCollapse}>
+        <Suspense fallback={<div className="flex-1 flex items-center justify-center text-text-muted text-xs">Loading piano roll...</div>}>
+          <PianoRoll channelIndex={0} />
+        </Suspense>
+      </DraggablePanel>
+
+      <DraggablePanel id="arrangement" layout={panels.arrangement} camera={camera} collapsed={collapsed.arrangement} zIndex={zOrder.indexOf('arrangement')} onDragStart={handleDragStart} onEdgeResizeStart={handleEdgeResizeStart} onBringToFront={handleBringToFront} onToggleCollapse={handleToggleCollapse}>
+        <Suspense fallback={<div className="flex-1 flex items-center justify-center text-text-muted text-xs">Loading arrangement...</div>}>
+          <ArrangementView />
+        </Suspense>
+      </DraggablePanel>
+
+      <DraggablePanel id="dj" layout={panels.dj} camera={camera} collapsed={collapsed.dj} zIndex={zOrder.indexOf('dj')} onDragStart={handleDragStart} onEdgeResizeStart={handleEdgeResizeStart} onBringToFront={handleBringToFront} onToggleCollapse={handleToggleCollapse}>
+        <Suspense fallback={<div className="flex-1 flex items-center justify-center text-text-muted text-xs">Loading DJ...</div>}>
+          <DJView />
         </Suspense>
       </DraggablePanel>
 
       {/* Toolbar (top-right) */}
       <div className="absolute top-2 right-2 flex items-center gap-1 bg-dark-bgSecondary/90 backdrop-blur-sm border border-dark-border rounded-lg px-2 py-1 z-10">
-        <span className="text-[9px] font-mono text-text-muted mr-1">{Math.round(camera.scale * 100)}%</span>
-        <button onClick={handleReset} className="p-1 hover:bg-dark-bgHover rounded text-text-secondary" title="Reset layout (R)">
+        <button onClick={handlePrevPanel} className="p-1 hover:bg-dark-bgHover rounded text-text-secondary" title="Previous panel">
+          <ChevronLeft size={14} />
+        </button>
+        <span className="text-[10px] font-mono text-text-muted min-w-[90px] text-center">
+          {focusedPanel >= 0 && focusedPanel < visiblePanels.length ? PANEL_LABELS[visiblePanels[focusedPanel]] : 'OVERVIEW'}
+        </span>
+        <button onClick={handleNextPanel} className="p-1 hover:bg-dark-bgHover rounded text-text-secondary" title="Next panel">
+          <ChevronRight size={14} />
+        </button>
+        <button onClick={handleReset} className="p-1 hover:bg-dark-bgHover rounded text-text-secondary ml-1" title="Reset layout (R)">
           <RotateCcw size={14} />
         </button>
       </div>
 
       {/* Help hint (bottom-left) */}
       <div className="absolute bottom-2 left-2 text-[9px] font-mono text-text-muted opacity-50 z-10">
-        Drag: pan | Scroll: zoom | Middle/Cmd+drag: pan anywhere | R: reset
+        Drag: pan | Scroll: pan | Arrows: prev/next panel | R: reset
       </div>
     </div>
   );
