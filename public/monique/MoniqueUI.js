@@ -5056,10 +5056,12 @@ function checkIncomingModuleAPI() {
   ignoredModuleProp('fetchSettings');
 }
 var ASM_CONSTS = {
-  1706276: ($0) => { console.log("[MoniqueUI WASM] init called, sampleRate=" + $0); },  
- 1706343: ($0, $1, $2) => { console.log("[MoniqueUI WASM] Init complete: " + $0 + "x" + $1 + ", params=" + $2); },  
- 1706431: ($0, $1) => { if (window._moniqueUIMidiCallback) window._moniqueUIMidiCallback('noteOn', $0, $1); },  
- 1706519: ($0) => { if (window._moniqueUIMidiCallback) window._moniqueUIMidiCallback('noteOff', $0, 0); }
+  1706292: ($0) => { console.log("[MoniqueUI WASM] init called, sampleRate=" + $0); },  
+ 1706359: ($0) => { console.log("[MoniqueUI WASM] Mapped " + $0 + " audio params for sync"); },  
+ 1706436: ($0, $1, $2) => { console.log("[MoniqueUI WASM] Init complete: " + $0 + "x" + $1 + ", params=" + $2); },  
+ 1706524: ($0, $1) => { if (window._moniqueUIParamCallback) window._moniqueUIParamCallback($0, $1); },  
+ 1706604: ($0, $1) => { if (window._moniqueUIMidiCallback) window._moniqueUIMidiCallback('noteOn', $0, $1); },  
+ 1706692: ($0) => { if (window._moniqueUIMidiCallback) window._moniqueUIMidiCallback('noteOff', $0, 0); }
 };
 
 // Imports from the Wasm binary.
