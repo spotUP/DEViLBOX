@@ -783,8 +783,10 @@ export class MoniqueSynthEngine implements DevilboxSynth {
   // Accepts both (time) and (note, time) signatures for compatibility with ToneEngine.
   triggerRelease(_noteOrTime?: number | string, _time?: number): this {
     if (!this._worklet || !this.isInitialized) return this;
-    // Always send allNotesOff — reliable regardless of note tracking state
-    console.log(`[MoniqueSynth] triggerRelease called, _currentNote=${this._currentNote}`);
+    // Send noteOff for tracked note if known, otherwise allNotesOff
+    if (this._currentNote >= 0) {
+      this._worklet.port.postMessage({ type: 'noteOff', note: this._currentNote });
+    }
     this._worklet.port.postMessage({ type: 'allNotesOff' });
     this._currentNote = -1;
     return this;
