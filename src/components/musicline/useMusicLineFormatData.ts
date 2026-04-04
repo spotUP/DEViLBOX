@@ -57,7 +57,9 @@ export function useMusicLineFormatData(): MusicLineFormatData {
 
   const displayRow = isPlaying ? currentRow : 0;
 
-  // Drive FormatPlaybackState so PatternEditorCanvas RAF loop scrolls
+  // Drive FormatPlaybackState for smooth RAF-based scroll in the pattern editor.
+  // The track table matrix uses formatIsPlaying={false} which gates the RAF
+  // reading of FormatPlaybackState, so only the pattern editor scrolls.
   useEffect(() => {
     setFormatPlaybackPlaying(isPlaying);
     return () => setFormatPlaybackPlaying(false);
