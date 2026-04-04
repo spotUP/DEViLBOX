@@ -429,6 +429,30 @@ export class MusicLineEngine {
     this.workletNode?.port.postMessage({ type: 'set-arp-entry', arpIdx, row, fieldIdx, value });
   }
 
+  // --------------------------------------------------------------------------
+  // Channel mute control (maps to m_ChannelsOn bitfield in WASM)
+  // --------------------------------------------------------------------------
+
+  /** Set a single channel on (unmuted) or off (muted). ch is 0-based. */
+  setChannelOn(ch: number, on: boolean): void {
+    this.workletNode?.port.postMessage({ type: 'set-channel-on', channel: ch, on });
+  }
+
+  /** Get the current channel-on bitmask (8 bits). Returns via callback. */
+  getChannelsOn(): Promise<number> {
+    return new Promise((resolve) => {
+      if (!this.workletNode) { resolve(0xFF); return; }
+      const handler = (event: MessageEvent) => {
+        if (event.data.type === 'channels-on') {
+          this.workletNode!.port.removeEventListener('message', handler);
+          resolve(event.data.mask);
+        }
+      };
+      this.workletNode.port.addEventListener('message', handler);
+      this.workletNode.port.postMessage({ type: 'get-channels-on' });
+    });
+  }
+
   dispose(): void {
     this._disposed = true;
     this.stop();
