@@ -29,18 +29,18 @@ export function useMusicLineFormatData(): MusicLineFormatData {
 
   // WASM engines (MusicLine) report position to useWasmPositionStore
   const wasmRow = useWasmPositionStore((s) => s.row);
+  const wasmSongPos = useWasmPositionStore((s) => s.songPos);
   const wasmActive = useWasmPositionStore((s) => s.active);
 
   const currentRow = wasmActive ? wasmRow : transportRow;
+  // During playback, show the patterns for the current playback position.
+  // Safe now that usePatternPlayback has a MusicLine bypass (won't reload).
+  const displayPos = (isPlaying && wasmActive) ? wasmSongPos : editPos;
 
-  // IMPORTANT: channels must stay tied to editPos, NOT wasmSongPos.
-  // Changing channels during playback triggers usePatternPlayback's needsReload
-  // which restarts the WASM engine in a loop. The WASM engine handles its own
-  // pattern sequencing — we only need to update the display cursor row.
   const channels = useMemo(() => {
     if (!channelTrackTables || channelTrackTables.length === 0) return [];
-    return musiclineToFormatChannels(channelTrackTables, patterns, editPos);
-  }, [channelTrackTables, patterns, editPos]);
+    return musiclineToFormatChannels(channelTrackTables, patterns, displayPos);
+  }, [channelTrackTables, patterns, displayPos]);
 
   const handleCellChange = useCallback<OnCellChange>(
     (channelIdx, rowIdx, columnKey, value) => {
