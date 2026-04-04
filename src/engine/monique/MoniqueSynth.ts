@@ -779,13 +779,17 @@ export class MoniqueSynthEngine implements DevilboxSynth {
     return this;
   }
 
-  // Monique is monophonic — always release the current note to ensure
-  // the JUCE shim's noteOff matches the voice's currentNote
-  triggerRelease(_time?: number): this {
+  // Monique is monophonic — release the specified note or current note
+  triggerRelease(frequency?: number | string, _time?: number): this {
     if (!this._worklet || !this.isInitialized) return this;
-    if (this._currentNote >= 0) {
-      this._worklet.port.postMessage({ type: 'noteOff', note: this._currentNote });
-      this._currentNote = -1;
+    // If a specific note was given, convert and release it
+    let note = this._currentNote;
+    if (frequency !== undefined) {
+      note = typeof frequency === 'string' ? noteToMidi(frequency) : Math.round(12 * Math.log2(frequency / 440) + 69);
+    }
+    if (note >= 0) {
+      this._worklet.port.postMessage({ type: 'noteOff', note });
+      if (note === this._currentNote) this._currentNote = -1;
     }
     return this;
   }
