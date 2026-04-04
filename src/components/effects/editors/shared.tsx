@@ -13,16 +13,9 @@ export interface VisualEffectEditorProps {
 }
 
 /**
- * Section header component — pedal panel label
+ * Section header component — pedal panel label (re-exported with 'lg' size)
  */
-export function SectionHeader({ color, title }: { color: string; title: string }) {
-  return (
-    <div className="flex items-center gap-2.5 mb-4">
-      <div className="w-1.5 h-5 rounded-full" style={{ backgroundColor: color, boxShadow: `0 0 8px ${color}60` }} />
-      <h3 className="text-xs font-black text-white/90 uppercase tracking-[0.15em]">{title}</h3>
-    </div>
-  );
-}
+export { SectionHeader } from '@components/instruments/shared';
 
 /**
  * Helper to get parameter value with default

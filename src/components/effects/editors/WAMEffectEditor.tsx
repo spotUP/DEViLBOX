@@ -19,7 +19,7 @@ export const GenericEffectEditor: React.FC<VisualEffectEditorProps> = ({
   return (
     <div className="space-y-4">
       <section className="rounded-xl p-4 border border-border bg-black/30 backdrop-blur-sm shadow-inner-dark">
-        <SectionHeader color="#6b7280" title={effect.type} />
+        <SectionHeader size="lg" color="#6b7280" title={effect.type} />
         <div className="flex justify-center">
           <Knob
             value={effect.wet}
@@ -239,7 +239,7 @@ export const WAMEffectEditor: React.FC<VisualEffectEditorProps> = ({
       )}
       {/* Mix knob */}
       <section className="rounded-xl p-4 border border-border bg-black/30 backdrop-blur-sm shadow-inner-dark">
-        <SectionHeader color="#6b7280" title="Mix" />
+        <SectionHeader size="lg" color="#6b7280" title="Mix" />
         <div className="flex justify-center">
           <Knob
             value={effect.wet}

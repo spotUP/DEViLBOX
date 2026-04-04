@@ -33,7 +33,7 @@ export const BiPhaseEditor: React.FC<VisualEffectEditorProps> = ({
     <div className="space-y-4">
       <EffectOscilloscope pre={pre} post={post} color="#a855f7" />
       <section className="rounded-xl p-4 border border-border bg-black/30 backdrop-blur-sm shadow-inner-dark">
-        <SectionHeader color="#a855f7" title="Routing" />
+        <SectionHeader size="lg" color="#a855f7" title="Routing" />
         <div className="flex gap-2 justify-center mb-2">
           <button
             onClick={() => onUpdateParameter('routing', 0)}
@@ -58,7 +58,7 @@ export const BiPhaseEditor: React.FC<VisualEffectEditorProps> = ({
         </div>
       </section>
       <section className="rounded-xl p-4 border border-border bg-black/30 backdrop-blur-sm shadow-inner-dark">
-        <SectionHeader color="#a855f7" title="Phase A" />
+        <SectionHeader size="lg" color="#a855f7" title="Phase A" />
         <div className="flex justify-around items-end">
           <div className={synced ? 'opacity-40 pointer-events-none' : ''}>
             <Knob
@@ -84,7 +84,7 @@ export const BiPhaseEditor: React.FC<VisualEffectEditorProps> = ({
         {renderBpmSync(effect, onUpdateParameter)}
       </section>
       <section className="rounded-xl p-4 border border-border bg-black/30 backdrop-blur-sm shadow-inner-dark">
-        <SectionHeader color="#c084fc" title="Phase B" />
+        <SectionHeader size="lg" color="#c084fc" title="Phase B" />
         <div className="flex justify-around items-end">
           <Knob
             value={rateB}
@@ -150,7 +150,7 @@ export const TapeSaturationEditor: React.FC<VisualEffectEditorProps> = ({
       <EffectOscilloscope pre={pre} post={post} color="#ef4444" />
       <WaveshaperCurve type="TapeSaturation" drive={drive / 100} color="#ef4444" height={100} />
       <section className="rounded-xl p-4 border border-border bg-black/30 backdrop-blur-sm shadow-inner-dark">
-        <SectionHeader color="#ef4444" title="Tape Saturation" />
+        <SectionHeader size="lg" color="#ef4444" title="Tape Saturation" />
         <div className="flex justify-around items-end">
           <Knob
             value={drive}
@@ -254,7 +254,7 @@ export const VinylNoiseEditor: React.FC<VisualEffectEditorProps> = ({
       <EffectOscilloscope pre={pre} post={post} color="#d97706" />
       {/* ── Section 1: Noise ─────────────────────────────────────────────── */}
       <section className="rounded-xl p-4 border border-border bg-black/30 backdrop-blur-sm shadow-inner-dark">
-        <SectionHeader color="#d97706" title="Noise" />
+        <SectionHeader size="lg" color="#d97706" title="Noise" />
 
         {/* RPM selector — sets rotation speed (LFO frequency) only */}
         <div className="flex gap-2 mb-2">
@@ -367,7 +367,7 @@ export const VinylNoiseEditor: React.FC<VisualEffectEditorProps> = ({
 
       {/* ── Section 2: Tone ──────────────────────────────────────────────── */}
       <section className="rounded-xl p-4 border border-border bg-black/30 backdrop-blur-sm shadow-inner-dark">
-        <SectionHeader color="#ca8a04" title="Tone" />
+        <SectionHeader size="lg" color="#ca8a04" title="Tone" />
         <div className="flex justify-around items-end">
           <Knob
             value={riaa}
@@ -401,7 +401,7 @@ export const VinylNoiseEditor: React.FC<VisualEffectEditorProps> = ({
 
       {/* ── Section 3: Distortion ────────────────────────────────────────── */}
       <section className="rounded-xl p-4 border border-border bg-black/30 backdrop-blur-sm shadow-inner-dark">
-        <SectionHeader color="#b45309" title="Distortion" />
+        <SectionHeader size="lg" color="#b45309" title="Distortion" />
         <div className="flex justify-around items-end">
           <Knob
             value={pinch}
@@ -426,7 +426,7 @@ export const VinylNoiseEditor: React.FC<VisualEffectEditorProps> = ({
 
       {/* ── Section 4: Time / Space ──────────────────────────────────────── */}
       <section className="rounded-xl p-4 border border-border bg-black/30 backdrop-blur-sm shadow-inner-dark">
-        <SectionHeader color="#78350f" title="Time / Space" />
+        <SectionHeader size="lg" color="#78350f" title="Time / Space" />
         <div className="flex justify-around items-end">
           <Knob
             value={ghostEcho}
@@ -469,7 +469,7 @@ export const VinylNoiseEditor: React.FC<VisualEffectEditorProps> = ({
 
       {/* ── Section 5: Output ────────────────────────────────────────────── */}
       <section className="rounded-xl p-4 border border-border bg-black/30 backdrop-blur-sm shadow-inner-dark">
-        <SectionHeader color="#d97706" title="Output" />
+        <SectionHeader size="lg" color="#d97706" title="Output" />
         <div className="flex justify-center">
           <Knob
             value={effect.wet}
@@ -510,7 +510,7 @@ export const MVerbEditor: React.FC<VisualEffectEditorProps> = ({
     <div className="space-y-4">
       <EffectOscilloscope pre={pre} post={post} color="#7c3aed" />
       <section className="rounded-xl p-4 border border-border bg-black/30 backdrop-blur-sm shadow-inner-dark">
-        <SectionHeader color="#7c3aed" title="Reverb" />
+        <SectionHeader size="lg" color="#7c3aed" title="Reverb" />
         <div className="flex justify-around items-end flex-wrap gap-y-4">
           <Knob value={decay} min={0} max={1} onChange={(v) => onUpdateParameter('decay', v)} label="Decay" color="#7c3aed" formatValue={(v) => `${Math.round(v * 100)}%`} />
           <Knob value={size} min={0} max={1} onChange={(v) => onUpdateParameter('size', v)} label="Size" color="#7c3aed" formatValue={(v) => `${Math.round(v * 100)}%`} />
@@ -519,7 +519,7 @@ export const MVerbEditor: React.FC<VisualEffectEditorProps> = ({
         </div>
       </section>
       <section className="rounded-xl p-4 border border-border bg-black/30 backdrop-blur-sm shadow-inner-dark">
-        <SectionHeader color="#a78bfa" title="Character" />
+        <SectionHeader size="lg" color="#a78bfa" title="Character" />
         <div className="flex justify-around items-end flex-wrap gap-y-4">
           <Knob value={bandwidth} min={0} max={1} onChange={(v) => onUpdateParameter('bandwidth', v)} label="Bandwidth" color="#a78bfa" formatValue={(v) => `${Math.round(v * 100)}%`} />
           <Knob value={predelay} min={0} max={1} onChange={(v) => onUpdateParameter('predelay', v)} label="Pre-Delay" color="#a78bfa" formatValue={(v) => `${Math.round(v * 100)}%`} />
@@ -564,7 +564,7 @@ export const LeslieEditor: React.FC<VisualEffectEditorProps> = ({
     <div className="space-y-4">
       <EffectOscilloscope pre={pre} post={post} color="#f97316" />
       <section className="rounded-xl p-4 border border-border bg-black/30 backdrop-blur-sm shadow-inner-dark">
-        <SectionHeader color="#f97316" title="Speed" />
+        <SectionHeader size="lg" color="#f97316" title="Speed" />
         <div className="grid grid-cols-3 gap-1 mb-3">
           {SPEED_LABELS.map((label, i) => (
             <button
@@ -585,7 +585,7 @@ export const LeslieEditor: React.FC<VisualEffectEditorProps> = ({
         </div>
       </section>
       <section className="rounded-xl p-4 border border-border bg-black/30 backdrop-blur-sm shadow-inner-dark">
-        <SectionHeader color="#fb923c" title="Rotors" />
+        <SectionHeader size="lg" color="#fb923c" title="Rotors" />
         <div className="flex justify-around items-end flex-wrap gap-y-4">
           <Knob value={hornRate} min={0.1} max={10} onChange={(v) => onUpdateParameter('hornRate', v)} label="Horn Hz" color="#fb923c" formatValue={(v) => `${v.toFixed(1)}`} />
           <Knob value={hornDepth} min={0} max={1} onChange={(v) => onUpdateParameter('hornDepth', v)} label="Horn Dep" color="#fb923c" formatValue={(v) => `${Math.round(v * 100)}%`} />
@@ -625,7 +625,7 @@ export const SpringReverbEditor: React.FC<VisualEffectEditorProps> = ({
     <div className="flex flex-col items-center space-y-4 w-full">
       <EffectOscilloscope pre={pre} post={post} color="#059669" />
       <section className="rounded-xl p-4 border border-border bg-black/30 backdrop-blur-sm shadow-inner-dark w-full">
-        <SectionHeader color="#059669" title="Spring Tank" />
+        <SectionHeader size="lg" color="#059669" title="Spring Tank" />
         <div className="flex justify-center gap-8 items-end">
           <Knob value={decay} min={0} max={1} onChange={(v) => onUpdateParameter('decay', v)} label="Decay" color="#059669" formatValue={(v) => `${Math.round(v * 100)}%`} />
           <Knob value={damping} min={0} max={1} onChange={(v) => onUpdateParameter('damping', v)} label="Damp" color="#059669" formatValue={(v) => `${Math.round(v * 100)}%`} />
@@ -633,7 +633,7 @@ export const SpringReverbEditor: React.FC<VisualEffectEditorProps> = ({
         </div>
       </section>
       <section className="rounded-xl p-4 border border-border bg-black/30 backdrop-blur-sm shadow-inner-dark w-full">
-        <SectionHeader color="#34d399" title="Character" />
+        <SectionHeader size="lg" color="#34d399" title="Character" />
         <div className="flex justify-center gap-8 items-end">
           <Knob value={drip} min={0} max={1} onChange={(v) => onUpdateParameter('drip', v)} label="Drip" color="#34d399" formatValue={(v) => `${Math.round(v * 100)}%`} />
           <Knob value={diffusion} min={0} max={1} onChange={(v) => onUpdateParameter('diffusion', v)} label="Diffusion" color="#34d399" formatValue={(v) => `${Math.round(v * 100)}%`} />
