@@ -561,18 +561,8 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
         </div>
       )}
 
-      {/* Editor Controls Toolbar (minimal in fullscreen — just an exit button) */}
-      {editorFullscreen ? (
-        <div className="flex items-center h-5 px-2 bg-dark-bgSecondary border-b border-dark-border">
-          <button
-            onClick={toggleEditorFullscreen}
-            className="text-text-muted hover:text-text-primary text-xs"
-            title="Exit editor fullscreen (Esc)"
-          >
-            Exit Fullscreen
-          </button>
-        </div>
-      ) : (
+      {/* Editor Controls Toolbar (hidden in fullscreen) */}
+      {!editorFullscreen && (
       <EditorControlsBar
         viewMode={viewMode}
         onViewModeChange={setViewMode}
@@ -825,8 +815,8 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
           </div>
         )}
 
-        {/* Instrument Panel Toggle Button - Flex item 3 - Hide on narrow windows and in fullscreen */}
-        {!editorFullscreen && windowWidth >= 900 && (
+        {/* Instrument Panel Toggle Button - Flex item 3 */}
+        {windowWidth >= 900 && (
           <button
             onClick={() => setShowInstrumentPanel(!showInstrumentPanel)}
             className={`
@@ -841,9 +831,9 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
           </button>
         )}
 
-        {/* Instrument List Panel - Flex item 3 - Hide on narrow windows and in fullscreen */}
-        {!editorFullscreen && windowWidth >= 900 && showInstrumentPanel && (
-          <div className="flex-shrink-0 w-fit min-w-48 max-w-80 border-l border-ft2-border flex flex-col overflow-hidden animate-fade-in">
+        {/* Instrument List Panel - Flex item 3 - Collapsed in fullscreen */}
+        {windowWidth >= 900 && showInstrumentPanel && (
+          <div className={`flex-shrink-0 border-l border-ft2-border flex flex-col overflow-hidden animate-fade-in ${editorFullscreen ? 'w-36' : 'w-fit min-w-48 max-w-80'}`}>
             <InstrumentList
               variant="ft2"
               showPreviewOnClick={true}
