@@ -160,13 +160,22 @@ export function musiclineToFormatChannels(
 ): FormatChannel[] {
   const result: FormatChannel[] = [];
 
+  // Find max pattern length across all channels so all columns are the same height.
+  // Shorter channels get padded with empty rows — prevents the editor from scrolling
+  // into empty space when the WASM row counter goes beyond a shorter channel's length.
+  let maxRows = 0;
   for (let ch = 0; ch < channelTrackTables.length; ch++) {
     const partIdx = channelTrackTables[ch][currentPos] ?? 0;
     const pat = patterns[partIdx];
-    const numRows = pat?.length ?? 128;
+    maxRows = Math.max(maxRows, pat?.length ?? 128);
+  }
+
+  for (let ch = 0; ch < channelTrackTables.length; ch++) {
+    const partIdx = channelTrackTables[ch][currentPos] ?? 0;
+    const pat = patterns[partIdx];
     const rows: FormatCell[] = [];
 
-    for (let row = 0; row < numRows; row++) {
+    for (let row = 0; row < maxRows; row++) {
       const cell = pat?.channels[0]?.rows[row];
       if (cell) {
         const cellData = cell as unknown as Record<string, number>;
@@ -189,7 +198,7 @@ export function musiclineToFormatChannels(
 
     result.push({
       label: `CH${(ch + 1).toString().padStart(2, '0')} P:${partIdx.toString().padStart(2, '0')}`,
-      patternLength: numRows,
+      patternLength: maxRows,
       rows,
       isPatternChannel: true,
     });
