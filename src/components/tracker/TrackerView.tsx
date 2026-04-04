@@ -719,14 +719,22 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
             </div>
           )}
 
-          {/* Automation Lane Strip — for Furnace and UADE (classic) formats */}
-          {(editorMode === 'furnace' || editorMode === 'classic') && (() => {
-            const fmt = editorMode === 'furnace' ? 'furnace' as const : 'uade' as const;
+          {/* Automation Lane Strip — for all formats with register capture */}
+          {(editorMode === 'furnace' || editorMode === 'classic' || editorMode === 'hively' || editorMode === 'klystrack' || editorMode === 'sc68') && (() => {
+            const fmtMap: Record<string, 'furnace' | 'uade'> = {
+              furnace: 'furnace', classic: 'uade', hively: 'uade', sc68: 'uade', klystrack: 'uade',
+            };
+            const fmt = fmtMap[editorMode] ?? 'uade';
             const ps = getFormatPlaybackState();
             const pat = patterns[currentPatternIndex];
+            const fn = useFormatStore.getState().furnaceNative;
+            const formatConfig = fmt === 'furnace' && fn
+              ? { chipIds: fn.chipIds, channelCount: fn.subsongs[fn.activeSubsong]?.channels.length ?? 4 }
+              : undefined;
             return (
               <AutomationLaneStrip
                 format={fmt}
+                formatConfig={formatConfig}
                 patternId={pat?.id ?? '0'}
                 patternLength={pat?.length ?? 64}
                 currentRow={ps.row}
