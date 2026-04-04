@@ -486,6 +486,14 @@ void gt_play(int songNum, int fromPos, int fromRow) {
     if (editorInfo.adparam == 0) editorInfo.adparam = 0x0f00;
     if (editorInfo.multiplier == 0) editorInfo.multiplier = 1;
 
+    /* Update framerate from multiplier + PAL/NTSC — sound_init() is never called
+     * from the WASM bridge, so framerate stays at its static initializer (50).
+     * Songs with multiplier > 1 need proportionally higher tick rates. */
+    if (editorInfo.ntsc)
+        framerate = NTSCFRAMERATE * editorInfo.multiplier;
+    else
+        framerate = PALFRAMERATE * editorInfo.multiplier;
+
     gt_playroutine_accumulator = 0;
     gtObject.psnum = songNum;
     gtObject.startpattpos = fromPos;
@@ -557,6 +565,40 @@ int gt_get_current_pos(void) {
 EMSCRIPTEN_KEEPALIVE
 int gt_is_playing(void) {
     return gtObject.songinit || (gtObject.chn[0].gate != 0);
+}
+
+/* Table execution position tracking — returns current position in each table
+ * for live scrolling in the instrument editor during playback.
+ * channel: 0-11 (voice index). Returns 0 if inactive. */
+EMSCRIPTEN_KEEPALIVE
+int gt_get_wave_table_pos(int channel) {
+    if (channel < 0 || channel >= MAX_PLAY_CH) return 0;
+    return gtObject.chn[channel].ptr[WTBL];
+}
+
+EMSCRIPTEN_KEEPALIVE
+int gt_get_pulse_table_pos(int channel) {
+    if (channel < 0 || channel >= MAX_PLAY_CH) return 0;
+    return gtObject.chn[channel].ptr[PTBL];
+}
+
+/* Filter table position is per-SID chip (0-3), not per-channel */
+EMSCRIPTEN_KEEPALIVE
+int gt_get_filter_table_pos(int sidIndex) {
+    if (sidIndex < 0 || sidIndex >= 4) return 0;
+    return gtObject.filterInfo[sidIndex].filterptr;
+}
+
+/* Pack all 4 table positions for the current instrument's voice into one call.
+ * Returns: wave | (pulse << 8) | (filter << 16). Speed has no position. */
+EMSCRIPTEN_KEEPALIVE
+int gt_get_table_positions(int channel) {
+    if (channel < 0 || channel >= MAX_PLAY_CH) return 0;
+    int wave = gtObject.chn[channel].ptr[WTBL];
+    int pulse = gtObject.chn[channel].ptr[PTBL];
+    int sidIdx = channel / 3;
+    int filter = (sidIdx < 4) ? gtObject.filterInfo[sidIdx].filterptr : 0;
+    return wave | (pulse << 8) | (filter << 16);
 }
 
 /* Debug: return packed state info for diagnosing silent playback */
