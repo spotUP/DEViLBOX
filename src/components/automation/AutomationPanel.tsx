@@ -220,6 +220,8 @@ const RegisterLanesSection: React.FC = () => {
   const toggleLane = useRegisterLaneStore(s => s.toggleLane);
   const hasLane = useRegisterLaneStore(s => s.hasLane);
 
+  const furnaceNative = useFormatStore(s => s.furnaceNative);
+
   const fmt: AutomationFormat | null = useMemo(() => {
     if (editorMode === 'goattracker') return 'gtultra';
     if (editorMode === 'furnace') return 'furnace';
@@ -229,8 +231,11 @@ const RegisterLanesSection: React.FC = () => {
 
   const registerGroups = useMemo(() => {
     if (!fmt) return [];
-    return groupParams(getParamsForFormat(fmt));
-  }, [fmt]);
+    const config = fmt === 'furnace' && furnaceNative
+      ? { chipIds: furnaceNative.chipIds, channelCount: furnaceNative.subsongs[furnaceNative.activeSubsong]?.channels.length ?? 4 }
+      : undefined;
+    return groupParams(getParamsForFormat(fmt, config));
+  }, [fmt, furnaceNative]);
 
   if (registerGroups.length === 0) return null;
 

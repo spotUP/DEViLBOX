@@ -470,13 +470,16 @@ const PixiChannelHeadersInner: React.FC<PixiChannelHeadersProps> = ({
         { label: 'Delete Channel', action: () => removeChannel(ch), disabled: patterns[0]?.channels.length <= 1 },
         // Register automation lanes
         ...(() => {
-          const { editorMode } = useFormatStore.getState();
+          const { editorMode, furnaceNative } = useFormatStore.getState();
           const fmt: AutomationFormat | null =
             editorMode === 'goattracker' ? 'gtultra' :
             editorMode === 'furnace' ? 'furnace' :
             editorMode === 'classic' ? 'uade' : null;
           if (!fmt) return [];
-          const params = getParamsForFormat(fmt);
+          const config = fmt === 'furnace' && furnaceNative
+            ? { chipIds: furnaceNative.chipIds, channelCount: furnaceNative.subsongs[furnaceNative.activeSubsong]?.channels.length ?? 4 }
+            : undefined;
+          const params = getParamsForFormat(fmt, config);
           const groups = groupParams(params);
           const store = useRegisterLaneStore.getState();
           return [
