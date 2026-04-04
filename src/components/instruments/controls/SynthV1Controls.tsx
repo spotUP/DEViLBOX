@@ -7,6 +7,7 @@
 
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { Knob } from '@components/controls/Knob';
+import { SelectControl } from '@components/instruments/shared';
 import type { SynthV1Config } from '@/engine/synthv1/SynthV1Synth';
 import {
   DEFAULT_SYNTHV1,
@@ -35,24 +36,6 @@ const SectionHeader: React.FC<{ title: string }> = ({ title }) => (
   </h3>
 );
 
-/** Reusable select dropdown */
-const ParamSelect: React.FC<{
-  label: string;
-  value: number;
-  options: string[];
-  onChange: (v: number) => void;
-}> = ({ label, value, options, onChange }) => (
-  <div className="flex flex-col gap-1">
-    <label className="text-gray-500 text-[10px]">{label}</label>
-    <select
-      className="bg-[#2a2a2a] text-gray-200 border border-gray-600 rounded px-1 py-0.5 text-[10px]"
-      value={Math.round(value)}
-      onChange={(e) => onChange(parseInt(e.target.value))}
-    >
-      {options.map((n, i) => <option key={i} value={i}>{n}</option>)}
-    </select>
-  </div>
-);
 
 /** Reusable ADSR knob row */
 const ADSRRow: React.FC<{
@@ -98,7 +81,7 @@ export const SynthV1Controls: React.FC<SynthV1ControlsProps> = ({ config, onChan
             <Knob value={merged[dcoK('Width1', page)] as number} min={0} max={1}
               onChange={(v) => update(dcoK('Width1', page), v)}
               label="Width" color="#22c55e" />
-            <ParamSelect
+            <SelectControl
               label="Shape" value={merged[dcoK('Shape1', page)] as number}
               options={DCO_SHAPE_NAMES} onChange={(v) => update(dcoK('Shape1', page), v)}
             />
@@ -109,7 +92,7 @@ export const SynthV1Controls: React.FC<SynthV1ControlsProps> = ({ config, onChan
             <Knob value={merged[dcoK('Width2', page)] as number} min={0} max={1}
               onChange={(v) => update(dcoK('Width2', page), v)}
               label="Width" color="#22c55e" />
-            <ParamSelect
+            <SelectControl
               label="Shape" value={merged[dcoK('Shape2', page)] as number}
               options={DCO_SHAPE_NAMES} onChange={(v) => update(dcoK('Shape2', page), v)}
             />
@@ -179,7 +162,7 @@ export const SynthV1Controls: React.FC<SynthV1ControlsProps> = ({ config, onChan
             label="Key Follow" color="#a855f7" />
         </div>
         <div className="grid grid-cols-4 gap-3 mb-3">
-          <ParamSelect
+          <SelectControl
             label="Type" value={merged[dcfK('Type', page)] as number}
             options={DCF_TYPE_NAMES} onChange={(v) => update(dcfK('Type', page), v)}
           />
@@ -237,7 +220,7 @@ export const SynthV1Controls: React.FC<SynthV1ControlsProps> = ({ config, onChan
           <Knob value={merged[lfoK('Width', page)] as number} min={0} max={1}
             onChange={(v) => update(lfoK('Width', page), v)}
             label="Width" color="#f59e0b" />
-          <ParamSelect
+          <SelectControl
             label="Shape" value={merged[lfoK('Shape', page)] as number}
             options={LFO_SHAPE_NAMES} onChange={(v) => update(lfoK('Shape', page), v)}
           />
