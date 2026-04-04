@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-04-03T23:45:23.949Z
+ * Generated: 2026-04-04T14:26:40.634Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -19,10 +19,10 @@ export interface ChangelogEntry {
 }
 
 // Build info
-export const BUILD_VERSION = '1.0.3990';
-export const BUILD_NUMBER = '3990';
-export const BUILD_HASH = 'dd47e18d8';
-export const BUILD_DATE = '2026-04-03';
+export const BUILD_VERSION = '1.0.4063';
+export const BUILD_NUMBER = '4063';
+export const BUILD_HASH = '334b7daa9';
+export const BUILD_DATE = '2026-04-04';
 
 // Full version (patch IS the build number, so no need to append)
 export const FULL_VERSION = BUILD_VERSION;
@@ -30,214 +30,208 @@ export const FULL_VERSION = BUILD_VERSION;
 // Auto-generated changelog
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: '1.0.3990',
+    version: '1.0.4063',
     date: '2026-04-04',
     changes: [
       {
         type: 'fix',
-        "description": "Native presets load on running synth instead of recreating"
+        "description": "Prevent matrix from scrolling during playback"
       },
-      {
-        type: 'fix',
-        "description": "SelectVoiceInBank always loads bank sysex before selecting voice"
-      },
-      {
-        type: 'fix',
-        "description": "Prevent context menu on test keyboard + accumulated session changes"
-      },
-      {
-        type: 'fix',
-        "description": "Restore selectVoice delay + add loadPatchBank debug log"
-      },
-      {
-        type: 'fix',
-        "description": "Add EditorHeader with PresetDropdown to layout mode"
-      },
-      {
-        type: 'fix',
-        "description": "Strip all redundant voice loading — let bridge handle everything"
-      },
-      {
-        type: 'feature',
-        "description": "Add 10 more factory presets (25 total)"
-      },
-      {
-        type: 'fix',
-        "description": "SetBfree — 2 tabs: MAIN (upper drawbars, perc, leslie, fx) and DETAIL (lower/pedal drawbars, vibrato, leslie detail, master)"
-      },
-      {
-        type: 'fix',
-        "description": "Raffo — single screen layout, no tabs for 32 params"
-      },
-      {
-        type: 'fix',
-        "description": "Don't send program change after single-voice sysex"
-      },
-      {
-        type: 'fix',
-        "description": "VCED presets use single-voice sysex (don't wipe entire bank)"
-      },
-      {
-        type: 'fix',
-        "description": "Remove HEAP*/wasmExports/wasmTable from unexported abort list"
-      },
-      {
-        type: 'fix',
-        "description": "Proper cartridge sync — loadVoices called alongside loadSysex"
-      },
-      {
-        type: 'fix',
-        "description": "Remove wasmMemory from unexportedSymbols abort getter list"
-      },
-      {
-        type: 'fix',
-        "description": "Patch banks — load voice data as cartridge in worklet"
-      },
-      {
-        type: 'fix',
-        "description": "Remove wasmMemory assert that blocked module init"
-      },
-      {
-        type: 'fix',
-        "description": "Remove wasmMemory early-access guard that aborted on init"
-      },
-      {
-        type: 'fix',
-        "description": "Patch banks silent — remove loadVoices init (cartridge conflict)"
-      },
-      {
-        type: 'feature',
-        "description": "Smart hardware UI popout + theme fixes"
-      },
-      {
-        type: 'fix',
-        "description": "Make applyConfig public on 7 WASM synths"
-      },
-      {
-        type: 'fix',
-        "description": "All WASM synths use layout mode — no more slider fallbacks"
-      },
-      {
-        type: 'fix',
-        "description": "Add to NATIVE_POLY_TYPES so note-off reaches the right instance"
-      },
-      {
-        type: 'fix',
-        "description": "MdaDX10 — single screen layout, no tabs for 16 params"
-      },
-      {
-        type: 'fix',
-        "description": "MdaJX10 — single screen layout, no tabs for 24 params"
-      },
-      {
-        type: 'fix',
-        "description": "MdaEPiano — single screen layout, no tabs needed for 12 params"
-      },
-      {
-        type: 'fix',
-        "description": "Knob preventDefault only for mouse, skip for passive touch events"
-      },
-      {
-        type: 'fix',
-        "description": "Velocity slider — fixed 96px width instead of full-width stretch"
-      },
-      {
-        type: 'fix',
-        "description": "Guard worklet cartridge update — check function exists + try/catch"
-      },
-      {
-        type: 'fix',
-        "description": "Suppress passive event listener warning in Knob component"
-      },
-      {
-        type: 'fix',
-        "description": "Hide filter curve + ADSR visualizer for WASM synths"
-      },
-      {
-        type: 'fix',
-        "description": "MdaEPiano/JX10/DX10 — remove synthType fallback to slider controls"
-      },
-      {
-        type: 'fix',
-        "description": "Patch banks silent — update cartridge on sysex load"
-      },
-      {
-        type: 'fix',
-        "description": "MdaEPiano knobs instead of sliders, add Odin2/Surge/Helm hw UIs"
-      }
-    ]
-  },
-  {
-    version: '2026-04-03',
-    date: '2026-04-03',
-    changes: [
       {
         type: 'improvement',
-        "description": "Chore: track DX7 WASM build artifacts in git (prevent accidental loss)"
+        "description": "Extract useInstrumentColors hook, migrate 38 instrument controls"
       },
       {
         type: 'fix',
-        "description": "Complete parameter coverage — all synth layouts now 100%"
+        "description": "Gate FormatPlaybackState on formatIsPlaying prop"
       },
       {
         type: 'fix',
-        "description": "Playlist hover — always-rendered buttons with opacity toggle, subtle hover bg"
+        "description": "Clamp displayPos to valid pattern order range"
       },
       {
         type: 'fix',
-        "description": "VCED operator order — config[0]=OP1 maps to VCED slot 5, not 0"
+        "description": "Follow playback position now that bypass prevents reload"
       },
       {
         type: 'fix',
-        "description": "DOM playlist hover — JS-based onPointerEnter/Leave, not CSS :hover"
+        "description": "Add WASM bypass in usePatternPlayback to prevent crash"
+      },
+      {
+        type: 'improvement',
+        "description": "Extract shared SectionLabel, migrate 19 inline copies"
       },
       {
         type: 'fix',
-        "description": "DOM playlist hover — 20% white on all rows, always applied"
+        "description": "Prevent reload loop by keeping channels tied to editPos"
+      },
+      {
+        type: 'improvement',
+        "description": "Unify 7 ADSR envelope visualizations into shared EnvelopeVisualization"
       },
       {
         type: 'fix',
-        "description": "PixiList crash — bufferItems should be buffer (prop name)"
+        "description": "Drive FormatPlaybackState for pattern editor scrolling"
+      },
+      {
+        type: 'improvement',
+        "description": "Chore: remove dead MusicLinePatternViewer.tsx"
       },
       {
         type: 'fix',
-        "description": "DOM playlist — make 1/2/X buttons always visible, brighter on hover"
+        "description": "Read playback position from WASM position store"
       },
       {
         type: 'fix',
-        "description": "PixiList hover — track from parent pointermove instead of per-row events"
-      },
-      {
-        type: 'fix',
-        "description": "Replace hardcoded Tailwind colors with design token classes"
-      },
-      {
-        type: 'fix',
-        "description": "PixiList rows — add explicit hitArea for click and hover"
-      },
-      {
-        type: 'fix',
-        "description": "PixiList hover — use tint+alpha (reactive) on pixiGraphics background"
-      },
-      {
-        type: 'fix',
-        "description": "PixiList hover — use reactive backgroundColor instead of draw callback"
+        "description": "Follow playback song position in pattern viewer"
       },
       {
         type: 'feature',
-        "description": "GL/DOM UI parity — design system tokens, dialog conversions, feature gaps"
+        "description": "Multi-column layout for SID instrument editor"
       },
       {
         type: 'fix',
-        "description": "Crate/playlist panels need eventMode=\"static\" on all containers"
+        "description": "Correct playback speed for multispeed SID songs"
+      },
+      {
+        type: 'fix',
+        "description": "Pattern editor scrolls during WASM playback"
       },
       {
         type: 'feature',
-        "description": "Hover-revealed action buttons on playlist track rows"
+        "description": "Add ms mode to EnvelopeVisualization for millisecond-based ADSR"
       },
       {
         type: 'feature',
-        "description": "Add hover state to PixiList rows"
+        "description": "Add SID mode and responsive width to EnvelopeVisualization"
+      },
+      {
+        type: 'fix',
+        "description": "Include MusicLine in isFormatEngine for per-row updates"
+      },
+      {
+        type: 'fix',
+        "description": "Skip generic onPositionUpdate so TrackerReplayer path is used"
+      },
+      {
+        type: 'feature',
+        "description": "Add master WASM build script and build documentation"
+      },
+      {
+        type: 'feature',
+        "description": "Live table position tracking during playback"
+      },
+      {
+        type: 'fix',
+        "description": "Wire position sync through TrackerReplayer queueDisplayState"
+      },
+      {
+        type: 'fix',
+        "description": "Lay out 4 tables side by side horizontally"
+      },
+      {
+        type: 'fix',
+        "description": "Show all 4 tables stacked on one page instead of sub-tabs"
+      },
+      {
+        type: 'feature',
+        "description": "Full SID instrument editor + move tables from pattern view"
+      },
+      {
+        type: 'feature',
+        "description": "Bookmarks, PWA install, audio health, keybinding hint"
+      },
+      {
+        type: 'improvement',
+        "description": "Chore(sfizz): rebuild WASM"
+      },
+      {
+        type: 'feature',
+        "description": "Add arpeggio table WASM API and engine methods"
+      },
+      {
+        type: 'improvement',
+        "description": "Migrate Hively, Klystrack, TFMX to generic format editor"
+      },
+      {
+        type: 'feature',
+        "description": "Add scroll-wheel on knobs + double-click instrument rename"
+      },
+      {
+        type: 'feature',
+        "description": "Unify all order/matrix editors with PatternEditorCanvas"
+      },
+      {
+        type: 'feature',
+        "description": "Add right-click context menu to GL pattern order sidebar"
+      },
+      {
+        type: 'fix',
+        "description": "Suppress noisy WASM stderr output during init"
+      },
+      {
+        type: 'fix',
+        "description": "Replace MusicLinePatternViewer with PatternEditorCanvas in mobile view"
+      },
+      {
+        type: 'fix',
+        "description": "HEAPU8 not exported on Module — use wasmMemory fallback"
+      },
+      {
+        type: 'feature',
+        "description": "Replace custom DOM pattern viewer with PatternEditorCanvas"
+      },
+      {
+        type: 'feature',
+        "description": "Add drag-to-reorder to GL pattern order sidebar"
+      },
+      {
+        type: 'fix',
+        "description": "TextEncoder not available in AudioWorklet scope"
+      },
+      {
+        type: 'fix',
+        "description": "Aeolus param mapping + Sfizz missing setParam handler"
+      },
+      {
+        type: 'fix',
+        "description": "CONFIG_KEYS→WASM param index mapping was wrong"
+      },
+      {
+        type: 'feature',
+        "description": "HivelyTracker standalone synth + MusicLine editor + unified sequence editors"
+      },
+      {
+        type: 'feature',
+        "description": "Add audio export sample rate and bit depth UI to GL export"
+      },
+      {
+        type: 'fix',
+        "description": "Add interactive MacroSlotsPanel to GL Advanced Edit modal"
+      },
+      {
+        type: 'fix',
+        "description": "Merge Settings Input tab keyboard section into single block"
+      },
+      {
+        type: 'fix',
+        "description": "Improve DOM studio canvas view"
+      },
+      {
+        type: 'fix',
+        "description": "Escape Tailwind bracket class in querySelector"
+      },
+      {
+        type: 'fix',
+        "description": "Debug(hively): log HivelySynth creation in InstrumentFactory"
+      },
+      {
+        type: 'fix',
+        "description": "Lazy setup + queued note on pending config"
+      },
+      {
+        type: 'improvement',
+        "description": "Chore: update generated changelog"
       }
     ]
   }

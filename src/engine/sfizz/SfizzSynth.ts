@@ -171,7 +171,11 @@ export class SfizzSynthEngine implements DevilboxSynth {
           }
           this.pendingNotes = [];
         } else if (event.data.type === 'error') {
-          console.error('Sfizz error:', event.data.error);
+          console.error('[Sfizz] Worklet error:', event.data.message || event.data.error);
+        } else if (event.data.type === 'sfzLoaded') {
+          console.log('[Sfizz] SFZ loaded:', event.data.success, 'regions:', event.data.numRegions, 'groups:', event.data.numGroups);
+        } else if (event.data.type === 'filesWritten') {
+          console.log('[Sfizz] Files written to MEMFS:', event.data.count);
         }
       };
 
@@ -216,11 +220,12 @@ export class SfizzSynthEngine implements DevilboxSynth {
         sfzRes.text(),
         wavRes.arrayBuffer(),
       ]);
+      console.log('[Sfizz] Loading default SFZ, sfz length:', sfzContent.length, 'wav size:', wavData.byteLength);
       const samples = new Map<string, ArrayBuffer>();
       samples.set('default_sample.wav', wavData);
       this.loadSFZ(sfzContent, samples);
-    } catch {
-      // No default SFZ available — user must load one manually
+    } catch (e) {
+      console.error('[Sfizz] Failed to load default SFZ:', e);
     }
   }
 
@@ -229,18 +234,25 @@ export class SfizzSynthEngine implements DevilboxSynth {
       console.warn('Sfizz: worklet not ready, cannot load SFZ');
       return;
     }
-    const samplesObj: Record<string, ArrayBuffer> = {};
+    // Write sample files to MEMFS first
+    const files: Array<{ path: string; data: ArrayBuffer }> = [];
     const transferables: ArrayBuffer[] = [];
     for (const [name, data] of samples) {
-      samplesObj[name] = data;
+      files.push({ path: '/' + name, data });
       transferables.push(data);
     }
-    this._worklet.port.postMessage({ type: 'loadSFZ', sfzContent, samples: samplesObj }, transferables);
+    if (files.length > 0) {
+      this._worklet.port.postMessage({ type: 'writeFiles', files }, transferables);
+    }
+    // Write SFZ text to MEMFS and load via file path (ensures correct sample resolution)
+    const sfzBytes = new TextEncoder().encode(sfzContent);
+    this._worklet.port.postMessage({ type: 'writeSample', path: '/default.sfz', data: sfzBytes.buffer }, [sfzBytes.buffer]);
+    this._worklet.port.postMessage({ type: 'loadSfzFile', path: '/default.sfz' });
   }
 
   triggerAttack(frequency: number | string, _time?: number, velocity?: number): this {
     const note = typeof frequency === 'string' ? noteToMidi(frequency) : Math.round(12 * Math.log2(frequency / 440) + 69);
-    const vel = Math.round((velocity ?? 0.8) * 127);
+    const vel = velocity ?? 0.8; // sfizz expects 0.0-1.0 float, not 0-127
     if (!this.isInitialized || !this._worklet) {
       this.pendingNotes.push({ note, velocity: vel });
       return this;

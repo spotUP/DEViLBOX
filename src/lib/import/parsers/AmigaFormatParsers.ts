@@ -403,17 +403,13 @@ export async function tryRouteFormat(
   }
 
   // ── PreTracker ───────────────────────────────────────────────────────────
+  // UADE enhanced scan extracts real pattern/sample data.
+  // Attach preTrackerFileData so NativeEngineRouting activates the WASM engine for playback.
   if (matchesExt(filename, ['prt'])) {
-    try {
-      const { isPreTrackerFormat, parsePreTrackerFile } = await import('@lib/import/formats/PreTrackerParser');
-      if (isPreTrackerFormat(buffer)) {
-        return parsePreTrackerFile(buffer, originalFileName);
-      }
-    } catch (err) {
-      console.warn(`[PreTrackerParser] Native parse failed for ${filename}, falling back to UADE:`, err);
-    }
     const { parseUADEFile } = await import('@lib/import/formats/UADEParser');
-    return parseUADEFile(buffer, originalFileName, prefs.uade ?? 'enhanced', subsong, preScannedMeta);
+    const song = await parseUADEFile(buffer, originalFileName, prefs.uade ?? 'enhanced', subsong, preScannedMeta);
+    song.preTrackerFileData = buffer.slice(0);
+    return song;
   }
 
   // ── Jochen Hippel CoSo ────────────────────────────────────────────────────

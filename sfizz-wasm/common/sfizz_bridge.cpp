@@ -17,6 +17,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <cstdio>
+#include <cmath>
 
 #ifdef __EMSCRIPTEN__
 #include <sched.h>
@@ -98,10 +99,7 @@ int sfizz_bridge_load_string(void* ptr, const char* sfzText, const char* virtual
 
 /* ── MIDI Events ───────────────────────────────────────────── */
 
-void sfizz_bridge_note_on(void* ptr, int delay, int note, float velocity) {
-    if (!ptr) return;
-    sfizz_send_hd_note_on((sfizz_synth_t*)ptr, delay, note, velocity);
-}
+/* note_on moved below render for test tone access */
 
 void sfizz_bridge_note_off(void* ptr, int delay, int note, float velocity) {
     if (!ptr) return;
@@ -135,10 +133,73 @@ void sfizz_bridge_program_change(void* ptr, int delay, int program) {
 
 /* ── Audio Rendering ───────────────────────────────────────── */
 
+static float testPhase = 0.0f;
+static int testActive = 0;
+
 void sfizz_bridge_render(void* ptr, float* left, float* right, int numFrames) {
     if (!ptr || !left || !right) return;
     float* channels[2] = { left, right };
     sfizz_render_block((sfizz_synth_t*)ptr, channels, 2, numFrames);
+
+    // DEBUG: Mix in a test tone when voices are active to verify audio pipeline
+    if (testActive > 0) {
+        for (int i = 0; i < numFrames; i++) {
+            float sample = 0.3f * sinf(testPhase);
+            testPhase += 2.0f * 3.14159265f * 440.0f / 44100.0f;
+            if (testPhase > 2.0f * 3.14159265f) testPhase -= 2.0f * 3.14159265f;
+            left[i] += sample;
+            right[i] += sample;
+        }
+    }
+}
+
+void sfizz_bridge_note_on(void* ptr, int delay, int note, float velocity) {
+    if (!ptr) return;
+    sfizz_send_hd_note_on((sfizz_synth_t*)ptr, delay, note, velocity);
+    testActive++;
+    printf("[sfizz-bridge] noteOn %d vel=%f testActive=%d\n", note, velocity, testActive);
+}
+
+/* Diagnostic: self-test — uses 128-frame blocks to match samplesPerBlock */
+float sfizz_bridge_test_render(void* ptr) {
+    if (!ptr) return -1.0f;
+    sfizz_synth_t* synth = (sfizz_synth_t*)ptr;
+
+    printf("[sfizz-test] samplesPerBlock check\n");
+
+    // Test with built-in oscillator (no file I/O)
+    const char* oscSfz = "<region> sample=*sine lokey=0 hikey=127";
+    sfizz_load_string(synth, "/osc.sfz", oscSfz);
+    printf("[sfizz-test] osc loaded, regions=%d\n", sfizz_get_num_regions(synth));
+
+    sfizz_send_note_on(synth, 0, 60, 100);
+    printf("[sfizz-test] noteOn, voices=%d\n", sfizz_get_num_active_voices(synth));
+
+    // Render 128-frame blocks (matches samplesPerBlock=128)
+    float left[128] = {0};
+    float right[128] = {0};
+    float* channels[2] = { left, right };
+    float peak = 0;
+    for (int block = 0; block < 8; block++) {
+        memset(left, 0, sizeof(left));
+        memset(right, 0, sizeof(right));
+        sfizz_render_block(synth, channels, 2, 128);
+        for (int i = 0; i < 128; i++) {
+            float v = left[i] < 0 ? -left[i] : left[i];
+            if (v > peak) peak = v;
+        }
+        if (block == 0) {
+            printf("[sfizz-test] block0: first4=[%f,%f,%f,%f] voices=%d\n",
+                   left[0], left[1], left[2], left[3], sfizz_get_num_active_voices(synth));
+        }
+    }
+    printf("[sfizz-test] osc peak=%f after 8 blocks\n", peak);
+
+    sfizz_send_note_off(synth, 0, 60, 0);
+
+    // Reload original SFZ for normal operation
+    sfizz_load_file(synth, "/default.sfz");
+    return peak;
 }
 
 /* ── Configuration ─────────────────────────────────────────── */

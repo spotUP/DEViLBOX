@@ -117,34 +117,7 @@ const DrawbarSlider: React.FC<DrawbarSliderProps> = React.memo(({
 });
 DrawbarSlider.displayName = 'DrawbarSlider';
 
-// ============================================================================
-// SegmentButton — a row of mutually exclusive toggle buttons
-// ============================================================================
-
-interface SegmentButtonProps {
-  labels: string[];
-  value: number;
-  onChange: (value: number) => void;
-}
-
-const SegmentButton: React.FC<SegmentButtonProps> = React.memo(({ labels, value, onChange }) => (
-  <div className="flex gap-1">
-    {labels.map((label, i) => (
-      <button
-        key={label}
-        onClick={() => onChange(i)}
-        className={`px-3 py-1.5 text-xs font-bold rounded transition-all ${
-          Math.round(value) === i
-            ? 'bg-amber-600 text-black'
-            : 'bg-dark-bgTertiary text-text-secondary hover:bg-dark-bgHover'
-        }`}
-      >
-        {label}
-      </button>
-    ))}
-  </div>
-));
-SegmentButton.displayName = 'SegmentButton';
+import { SegmentButton } from '@components/instruments/shared';
 
 // ============================================================================
 // DrawbarBank — a labeled row of 9 drawbar sliders

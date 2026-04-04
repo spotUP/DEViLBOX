@@ -52,7 +52,11 @@ class SfizzProcessor extends AudioWorkletProcessor {
 
       case 'noteOn':
         if (this.engine) {
+          console.log('[Sfizz Worklet] noteOn:', data.note, 'vel:', data.velocity, 'sfzLoaded:', this.sfzLoaded);
           this.module._sfizz_bridge_note_on(this.engine, data.delay || 0, data.note, data.velocity);
+          const voices = this.module._sfizz_bridge_get_num_active_voices(this.engine);
+          console.log('[Sfizz Worklet] after noteOn, voices:', voices, 'preloaded:', this.module._sfizz_bridge_get_num_preloaded_samples(this.engine));
+          this._dumpNext = true; // dump next render frame
         }
         break;
 
@@ -229,6 +233,8 @@ class SfizzProcessor extends AudioWorkletProcessor {
     this.module._free(pathPtr);
 
     this.sfzLoaded = !!ok;
+    const preloaded = ok ? this.module._sfizz_bridge_get_num_preloaded_samples(this.engine) : 0;
+    console.log('[Sfizz Worklet] SFZ load result:', !!ok, 'preloaded samples:', preloaded);
     this.port.postMessage({
       type: 'sfzLoaded',
       success: !!ok,
@@ -239,6 +245,20 @@ class SfizzProcessor extends AudioWorkletProcessor {
 
   loadSfzFile(path) {
     if (!this.engine || !this.module) return;
+
+    // Verify MEMFS state before loading
+    try {
+      const rootFiles = this.module.FS.readdir('/');
+      console.log('[Sfizz Worklet] MEMFS root:', rootFiles);
+      for (const f of rootFiles) {
+        if (f === '.' || f === '..') continue;
+        try {
+          const stat = this.module.FS.stat('/' + f);
+          console.log('[Sfizz Worklet] MEMFS /' + f + ':', stat.size, 'bytes');
+        } catch(e) { /* dir */ }
+      }
+    } catch(e) { console.error('[Sfizz Worklet] MEMFS error:', e); }
+
     const pathPtr = this.module._malloc(path.length + 1);
     for (let i = 0; i < path.length; i++) {
       this.module.HEAPU8[pathPtr + i] = path.charCodeAt(i);
@@ -249,6 +269,13 @@ class SfizzProcessor extends AudioWorkletProcessor {
     this.module._free(pathPtr);
 
     this.sfzLoaded = !!ok;
+    const preloaded = ok ? this.module._sfizz_bridge_get_num_preloaded_samples(this.engine) : 0;
+    console.log('[Sfizz Worklet] SFZ load result:', !!ok, 'preloaded:', preloaded);
+    // C-level self-test
+    if (ok && this.module._sfizz_bridge_test_render) {
+      const peak = this.module._sfizz_bridge_test_render(this.engine);
+      console.log('[Sfizz Worklet] C-level test render peak:', peak);
+    }
     this.port.postMessage({
       type: 'sfzLoaded',
       success: !!ok,
@@ -258,6 +285,7 @@ class SfizzProcessor extends AudioWorkletProcessor {
   }
 
   async initEngine(sr, wasmBinary, jsCode) {
+    console.log('[Sfizz Worklet] initEngine start, sr:', sr);
     this.initializing = true;
     try {
       this.cleanup();
@@ -357,7 +385,9 @@ class SfizzProcessor extends AudioWorkletProcessor {
       }
 
       // Create synth with sample rate and buffer size
+      console.log('[Sfizz Worklet] Creating engine...');
       this.engine = this.module._sfizz_bridge_create(sr || sampleRate, this.bufferSize);
+      console.log('[Sfizz Worklet] Engine ptr:', this.engine);
 
       // Allocate output buffers
       this.outputPtrL = this.module._malloc(this.bufferSize * 4);
@@ -371,6 +401,7 @@ class SfizzProcessor extends AudioWorkletProcessor {
       this.initialized = true;
       this.initializing = false;
 
+      console.log('[Sfizz Worklet] Ready!');
       this.port.postMessage({ type: 'ready' });
     } catch (error) {
       this.initializing = false;
@@ -433,9 +464,38 @@ class SfizzProcessor extends AudioWorkletProcessor {
     // Render audio
     this.module._sfizz_bridge_render(this.engine, this.outputPtrL, this.outputPtrR, frames);
 
-    // Copy to output
-    outL.set(this.outputBufferL.subarray(0, frames));
-    outR.set(this.outputBufferR.subarray(0, frames));
+    // Read directly from WASM memory (bypass cached Float32Array views)
+    const mem = this.module.wasmMemory;
+    if (mem) {
+      const rawL = new Float32Array(mem.buffer, this.outputPtrL, frames);
+      const rawR = new Float32Array(mem.buffer, this.outputPtrR, frames);
+      outL.set(rawL);
+      outR.set(rawR);
+    } else {
+      outL.set(this.outputBufferL.subarray(0, frames));
+      outR.set(this.outputBufferR.subarray(0, frames));
+    }
+
+    // Diagnostic: dump raw buffer after noteOn
+    if (!this._renderLogged) {
+      this._renderLogged = true;
+      const voices = this.module._sfizz_bridge_get_num_active_voices(this.engine);
+      console.log('[Sfizz Worklet] First render, active voices:', voices, 'ptrL:', this.outputPtrL);
+    }
+    if (this._dumpNext) {
+      this._dumpNext = false;
+      const mem = this.module.wasmMemory;
+      if (mem) {
+        const raw = new Float32Array(mem.buffer, this.outputPtrL, 16);
+        let peak = 0;
+        for (let i = 0; i < frames; i++) {
+          const v = Math.abs(new Float32Array(mem.buffer, this.outputPtrL, frames)[i]);
+          if (v > peak) peak = v;
+        }
+        console.log('[Sfizz Worklet] Post-noteOn render: peak=' + peak + ' first16=' + Array.from(raw).map(v => v.toFixed(6)).join(','));
+        console.log('[Sfizz Worklet] voices=' + this.module._sfizz_bridge_get_num_active_voices(this.engine));
+      }
+    }
 
     return true;
   }

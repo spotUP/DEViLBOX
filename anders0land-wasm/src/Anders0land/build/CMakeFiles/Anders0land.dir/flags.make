@@ -6,5 +6,5 @@ C_DEFINES =
 
 C_INCLUDES = @CMakeFiles/Anders0land.dir/includes_C.rsp
 
-C_FLAGS = 
+C_FLAGS = -O3 -DNDEBUG
 
