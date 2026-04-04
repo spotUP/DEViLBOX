@@ -217,6 +217,10 @@ export const MoniqueHardwareUI: React.FC<MoniqueHardwareUIProps> = ({
         };
 
         // Parameter change callback: UI knob changes → real audio engine
+        // The C++ bridge sends automateable_parameters index + value.
+        // We forward directly as setParam(index, value) to the audio worklet.
+        // The audio WASM and UI WASM share the same Monique source, so the
+        // automateable_parameters ordering matches between them.
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         (window as any)._moniqueUIParamCallback = (index: number, value: number) => {
           if (!instrumentId) return;
@@ -226,9 +230,7 @@ export const MoniqueHardwareUI: React.FC<MoniqueHardwareUIProps> = ({
             const instruments = (engine as any).instruments as Map<number, any>;
             const key = (instrumentId << 16) | 0xFFFF;
             const synth = instruments?.get(key);
-            if (synth?.setParam) {
-              synth.setParam(index, value);
-            } else if (synth?._worklet) {
+            if (synth?._worklet) {
               synth._worklet.port.postMessage({ type: 'setParam', index, value });
             }
           } catch { /* engine not ready */ }

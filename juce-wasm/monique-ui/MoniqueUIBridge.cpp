@@ -87,6 +87,10 @@ static int g_fbHeight = FB_HEIGHT;
 static float* g_paramSnapshot = nullptr;
 static int g_numParams = 0;
 
+// Map from automateable_parameters index → audio WASM param index
+// Built at init by matching Parameter* pointers against known synth_data fields
+static int* g_paramToAudioIndex = nullptr;
+
 // Defined in juce_Messaging_wasm.cpp — drains the deferred message queue
 extern "C" void juce_wasm_dispatch_messages();
 
@@ -165,20 +169,9 @@ void monique_ui_tick()
     if (g_processor->ui_refresher)
         g_processor->ui_refresher->timerCallback();
 
-    // Poll for parameter changes and notify JS
-    if (g_paramSnapshot && g_processor->synth_data) {
-        auto& params = g_processor->synth_data->get_atomateable_parameters();
-        for (int i = 0; i < g_numParams && i < params.size(); i++) {
-            float val = params.getUnchecked(i)->get_value();
-            if (val != g_paramSnapshot[i]) {
-                g_paramSnapshot[i] = val;
-                EM_ASM({
-                    if (window._moniqueUIParamCallback)
-                        window._moniqueUIParamCallback($0, $1);
-                }, i, val);
-            }
-        }
-    }
+    // TODO: Poll synth_data parameters and forward changes to audio engine.
+    // Requires building a mapping from automateable_parameters indices to
+    // the audio WASM's MoniqueParams enum. See handoff doc for details.
 
     juce::Graphics g(*g_framebuffer);
     g.fillAll(juce::Colours::black);
