@@ -109,7 +109,7 @@ target_link_options(MoniqueUIBuild PRIVATE
     "SHELL:-s ALLOW_MEMORY_GROWTH=1"
     "SHELL:-s ENVIRONMENT='web'"
     "SHELL:-s EXPORTED_RUNTIME_METHODS=['ccall','cwrap','setValue','getValue','HEAPU8','HEAP8']"
-    "SHELL:-s EXPORTED_FUNCTIONS=['_malloc','_free','_monique_ui_init','_monique_ui_tick','_monique_ui_get_fb','_monique_ui_get_width','_monique_ui_get_height','_monique_ui_on_mouse_down','_monique_ui_on_mouse_up','_monique_ui_on_mouse_move','_monique_ui_on_mouse_wheel','_monique_ui_shutdown']"
+    "SHELL:-s EXPORTED_FUNCTIONS=['_malloc','_free','_monique_ui_init','_monique_ui_tick','_monique_ui_get_fb','_monique_ui_get_width','_monique_ui_get_height','_monique_ui_on_mouse_down','_monique_ui_on_mouse_up','_monique_ui_on_mouse_move','_monique_ui_on_mouse_wheel','_monique_ui_shutdown','_monique_ui_get_num_params','_monique_ui_get_param','_monique_ui_set_param']"
     "SHELL:-s NO_EXIT_RUNTIME=1"
     "SHELL:-s INITIAL_MEMORY=134217728"  # 128MB initial (UI + framebuffer + synth data)
     "SHELL:-s ALLOW_TABLE_GROWTH=1"
