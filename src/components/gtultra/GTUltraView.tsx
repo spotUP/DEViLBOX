@@ -23,6 +23,7 @@ import { useGTDAWKeyboardHandler } from '../../pixi/views/gtultra/daw/useGTDAWKe
 import { useGTUltraEngineInit } from '../../engine/gtultra/useGTUltraEngineInit';
 import { useGTUltraFormatData } from './useGTUltraFormatData';
 import { useGTUltraStore } from '../../stores/useGTUltraStore';
+import { useUIStore } from '../../stores/useUIStore';
 import { AutomationLaneStrip } from '../automation/AutomationLaneStrip';
 
 const GTDAWView = lazy(() => import('./daw/GTDAWView').then(m => ({ default: m.GTDAWView })));
@@ -34,6 +35,7 @@ export const GTUltraView: React.FC<{ width?: number; height?: number }> = () => 
   const sidCount = useGTUltraStore((s) => s.sidCount);
   const patternLength = useGTUltraStore((s) => s.patternLength ?? 64);
   const { channels, currentRow, isPlaying, handleCellChange } = useGTUltraFormatData();
+  const editorFullscreen = useUIStore(s => s.editorFullscreen);
 
   const containerRef = useRef<HTMLDivElement>(null);
   const [containerWidth, setContainerWidth] = useState(800);
@@ -74,18 +76,22 @@ export const GTUltraView: React.FC<{ width?: number; height?: number }> = () => 
       background: 'var(--color-tracker-row-even)', color: '#c0c0c0',
       fontFamily: 'monospace',
     }}>
-      <div style={{ height: `${TOOLBAR_H}px`, flexShrink: 0 }}>
-        <GTToolbar />
-      </div>
+      {!editorFullscreen && (
+        <>
+          <div style={{ height: `${TOOLBAR_H}px`, flexShrink: 0 }}>
+            <GTToolbar />
+          </div>
 
-      <div style={{ height: matrixH, flexShrink: 0 }}>
-        <GTOrderMatrix
-          width={containerWidth}
-          height={matrixH}
-          collapsed={ordersCollapsed}
-          onToggleCollapse={toggleOrdersCollapsed}
-        />
-      </div>
+          <div style={{ height: matrixH, flexShrink: 0 }}>
+            <GTOrderMatrix
+              width={containerWidth}
+              height={matrixH}
+              collapsed={ordersCollapsed}
+              onToggleCollapse={toggleOrdersCollapsed}
+            />
+          </div>
+        </>
+      )}
 
       <div style={{ flex: 1, minHeight: 0, overflow: 'hidden' }}>
         <PatternEditorCanvas

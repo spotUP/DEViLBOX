@@ -26,6 +26,7 @@ import { useGTUltraEngineInit } from '@/engine/gtultra/useGTUltraEngineInit';
 import { PixiGTDAWView } from './daw/PixiGTDAWView';
 import { useGTDAWKeyboardHandler } from './daw/useGTDAWKeyboardHandler';
 import { PixiAutomationLaneStrip } from '../tracker/PixiAutomationLaneStrip';
+import { useUIStore } from '@stores';
 
 const TOOLBAR_H = 32;
 const ORDER_H = 160;
@@ -51,8 +52,9 @@ export const PixiGTUltraView: React.FC<Props> = ({ width, height }) => {
     return <PixiGTDAWView width={width} height={height} />;
   }
 
+  const editorFullscreen = useUIStore(s => s.editorFullscreen);
   const [ordersCollapsed, setOrdersCollapsed] = useState(false);
-  const orderH = ordersCollapsed ? ORDER_COLLAPSED_H : ORDER_H;
+  const orderH = editorFullscreen ? 0 : (ordersCollapsed ? ORDER_COLLAPSED_H : ORDER_H);
 
   const songName = useGTUltraStore((s) => s.songName);
   const songAuthor = useGTUltraStore((s) => s.songAuthor);
@@ -129,13 +131,13 @@ export const PixiGTUltraView: React.FC<Props> = ({ width, height }) => {
         />
       </pixiContainer>
 
-      {/* ─── Toolbar ─── */}
+      {/* ─── Toolbar (hidden in fullscreen) ─── */}
       <pixiContainer
-        alpha={ready ? 1 : 0}
-        renderable={ready}
+        alpha={ready && !editorFullscreen ? 1 : 0}
+        renderable={ready && !editorFullscreen}
         layout={{
           width,
-          height: TOOLBAR_H,
+          height: editorFullscreen ? 0 : TOOLBAR_H,
           flexDirection: 'row',
           alignItems: 'center',
           paddingLeft: 8,
@@ -199,8 +201,8 @@ export const PixiGTUltraView: React.FC<Props> = ({ width, height }) => {
         <pixiBitmapText text={infoText} style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 10, fill: 0xffffff }} tint={theme.textMuted.color} />
       </pixiContainer>
 
-      {/* ─── Order List (AHX-style position editor, collapsible) ─── */}
-      <pixiContainer alpha={ready ? 1 : 0} renderable={ready} layout={{ width, height: orderH }}>
+      {/* ─── Order List (AHX-style position editor, collapsible, hidden in fullscreen) ─── */}
+      <pixiContainer alpha={ready && !editorFullscreen ? 1 : 0} renderable={ready && !editorFullscreen} layout={{ width, height: orderH }}>
         {ordersCollapsed ? (
           <pixiContainer
             eventMode="static"
