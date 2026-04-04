@@ -83,6 +83,9 @@ target_compile_definitions(GTUltra PRIVATE
     VERSION="1.0.0"
 )
 
+# Output to public/gtultra/
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR}/../public/gtultra)
+
 # Emscripten link flags
 set_target_properties(GTUltra PROPERTIES
     SUFFIX ".js"
