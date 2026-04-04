@@ -87,13 +87,25 @@ void sfizz_bridge_destroy(void* ptr) {
 
 int sfizz_bridge_load_file(void* ptr, const char* path) {
     if (!ptr || !path) return 0;
-    return sfizz_load_file((sfizz_synth_t*)ptr, path) ? 1 : 0;
+    sfizz_synth_t* synth = (sfizz_synth_t*)ptr;
+    bool ok = sfizz_load_file(synth, path);
+    if (ok) {
+        // sfizz's loadSfzFile calls clear() which resets the buffer pool.
+        // Re-set samples_per_block to force buffer re-allocation.
+        sfizz_set_samples_per_block(synth, 128);
+    }
+    return ok ? 1 : 0;
 }
 
 int sfizz_bridge_load_string(void* ptr, const char* sfzText, const char* virtualPath) {
     if (!ptr || !sfzText) return 0;
+    sfizz_synth_t* synth = (sfizz_synth_t*)ptr;
     const char* vpath = virtualPath ? virtualPath : "/virtual.sfz";
-    return sfizz_load_string((sfizz_synth_t*)ptr, vpath, sfzText) ? 1 : 0;
+    bool ok = sfizz_load_string(synth, vpath, sfzText);
+    if (ok) {
+        sfizz_set_samples_per_block(synth, 128);
+    }
+    return ok ? 1 : 0;
 }
 
 /* ── MIDI Events ───────────────────────────────────────────── */
