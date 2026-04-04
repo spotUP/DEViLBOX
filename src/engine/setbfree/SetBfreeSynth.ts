@@ -407,7 +407,7 @@ export class SetBfreeSynthEngine implements DevilboxSynth {
       const value = config[CONFIG_KEYS[i]];
       const wasmIdx = WASM_PARAM_INDEX[i];
       if (value !== undefined && wasmIdx !== undefined) {
-        this._worklet.port.postMessage({ type: 'setParam', index: wasmIdx, value });
+        this._worklet.port.postMessage({ type: 'parameter', paramId: wasmIdx, value });
       }
     }
   }
@@ -440,7 +440,7 @@ export class SetBfreeSynthEngine implements DevilboxSynth {
       (this.config as Record<string, number>)[param] = value;
       const wasmIdx = WASM_PARAM_INDEX[configIdx];
       if (wasmIdx !== undefined && this._worklet && this.isInitialized) {
-        this._worklet.port.postMessage({ type: 'setParam', index: wasmIdx, value });
+        this._worklet.port.postMessage({ type: 'parameter', paramId: wasmIdx, value });
       }
     }
   }
