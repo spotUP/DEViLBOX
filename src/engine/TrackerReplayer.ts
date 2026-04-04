@@ -114,7 +114,8 @@ export type TrackerFormat =
   | 'KT'              // Klystrack chiptune tracker (.kt)
   | 'Organya'         // Cave Story / Organya (.org)
   | 'PxTone'          // PxTone Collage (.ptcop, .pttune)
-  | 'SteveTurner';    // Steve Turner (.jpo) — Amiga 4-voice with 7-phase envelope
+  | 'SteveTurner'    // Steve Turner (.jpo) — Amiga 4-voice with 7-phase envelope
+  | 'PreTracker';    // PreTracker (.prt) — Amiga 4-channel by Ratt/Abyss
 
 /**
  * Channel state - all the per-channel data needed for playback

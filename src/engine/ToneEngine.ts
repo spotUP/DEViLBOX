@@ -1072,11 +1072,11 @@ export class ToneEngine {
    */
   public async ensureWASMSynthsReady(configs: InstrumentConfig[]): Promise<void> {
     const wasmConfigs = configs.filter((c) => 
-      ['TB303', 'Buzz3o3', 'V2', 'V2Speech', 'Sam', 'DECtalk', 'PinkTrombone', 'Synare', 'DubSiren', 'SpaceLaser', 'Furnace', 'HivelySynth', 'UADESynth', 'SymphonieSynth', 'MusicLineSynth',
+      ['TB303', 'Buzz3o3', 'V2', 'V2Speech', 'Sam', 'DECtalk', 'PinkTrombone', 'Synare', 'DubSiren', 'SpaceLaser', 'Furnace', 'HivelySynth', 'UADESynth', 'UADEEditableSynth', 'SymphonieSynth', 'MusicLineSynth',
        'SoundMonSynth', 'SidMonSynth', 'DigMugSynth', 'FCSynth', 'FredSynth', 'TFMXSynth',
        'OctaMEDSynth', 'SidMon1Synth', 'HippelCoSoSynth', 'RobHubbardSynth', 'SteveTurnerSynth', 'FredEditorReplayerSynth', 'DavidWhittakerSynth',
        'SonicArrangerSynth', 'InStereo2Synth', 'InStereo1Synth', 'DeltaMusic1Synth', 'DeltaMusic2Synth',
-       'StartrekkerAMSynth', 'SunVoxSynth', 'JamCrackerSynth', 'FuturePlayerSynth',
+       'StartrekkerAMSynth', 'SunVoxSynth', 'JamCrackerSynth', 'PreTrackerSynth', 'FuturePlayerSynth',
        'KlysSynth', 'WaveSabreSynth', 'OidosSynth', 'TunefishSynth'].includes(c.synthType || '') ||
       c.synthType?.startsWith('Furnace')
     );
@@ -1087,7 +1087,7 @@ export class ToneEngine {
     // is a singleton that handles all channels internally.
     const seenNativePlayers = new Set<string>();
     const deduped = wasmConfigs.filter(c => {
-      if (c.synthType === 'HivelySynth' || c.synthType === 'UADESynth' || c.synthType === 'SymphonieSynth' || c.synthType === 'MusicLineSynth' || c.synthType === 'JamCrackerSynth' || c.synthType === 'FuturePlayerSynth') {
+      if (c.synthType === 'HivelySynth' || c.synthType === 'UADESynth' || c.synthType === 'UADEEditableSynth' || c.synthType === 'SymphonieSynth' || c.synthType === 'MusicLineSynth' || c.synthType === 'JamCrackerSynth' || c.synthType === 'PreTrackerSynth' || c.synthType === 'FuturePlayerSynth') {
         if (seenNativePlayers.has(c.synthType!)) return false;
         seenNativePlayers.add(c.synthType!);
       }
@@ -1510,13 +1510,13 @@ export class ToneEngine {
       // to avoid exhausting fixed player-handle pools across channels.
       'TB303', 'Buzz3o3', 'V2', 'V2Speech', 'Sam', 'DECtalk', 'PinkTrombone', 'DubSiren', 'SpaceLaser', 'Synare', 'WAM',
       'TR808', 'TR909',
-      'SonicArrangerSynth', 'InStereo2Synth', 'InStereo1Synth', 'JamCrackerSynth', 'FuturePlayerSynth',
+      'SonicArrangerSynth', 'InStereo2Synth', 'InStereo1Synth', 'JamCrackerSynth', 'PreTrackerSynth', 'FuturePlayerSynth',
       'SoundMonSynth', 'SidMonSynth', 'SidMon1Synth',
       'DigMugSynth', 'DeltaMusic1Synth', 'DeltaMusic2Synth',
       'FCSynth', 'TFMXSynth', 'MusicLineSynth', 'SymphonieSynth', 'SunVoxSynth',
       'FredSynth', 'HippelCoSoSynth', 'RobHubbardSynth', 'SteveTurnerSynth', 'FredEditorReplayerSynth', 'StartrekkerAMSynth',
       'OctaMEDSynth', 'DavidWhittakerSynth',
-      'HivelySynth', 'KlysSynth', 'MAMEVASynth', 'UADESynth',
+      'HivelySynth', 'KlysSynth', 'MAMEVASynth', 'UADESynth', 'UADEEditableSynth',
       'WaveSabreSynth', 'OidosSynth', 'TunefishSynth', 'SunVoxModular',
       // Zynthian WASM synths — shared instances
       'MdaEPiano', 'MdaJX10', 'MdaDX10', 'Amsynth', 'RaffoSynth', 'CalfMono',
@@ -1581,7 +1581,7 @@ export class ToneEngine {
     // Singleton WASM engine synths: FuturePlayer and JamCracker engines are singletons.
     // Reuse any existing instance of the same synthType (just update the instrument pointer/index).
     // This avoids creating disconnected synth instances that can't route audio.
-    if (config.synthType === 'FuturePlayerSynth' || config.synthType === 'JamCrackerSynth') {
+    if (config.synthType === 'FuturePlayerSynth' || config.synthType === 'JamCrackerSynth' || config.synthType === 'PreTrackerSynth') {
       for (const [existingKey, existingSynth] of this.instruments) {
         const storedType = this.instrumentSynthTypes.get(existingKey);
         if (storedType === config.synthType && existingSynth) {
@@ -2161,9 +2161,11 @@ export class ToneEngine {
       // WASM song players (full-module playback via AudioWorklet)
       case 'HivelySynth':
       case 'UADESynth':
+      case 'UADEEditableSynth':
       case 'SymphonieSynth':
       case 'MusicLineSynth':
       case 'JamCrackerSynth':
+      case 'PreTrackerSynth':
       case 'FuturePlayerSynth':
       // Klystrack chiptune synth
       case 'KlysSynth':
