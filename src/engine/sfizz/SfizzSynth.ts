@@ -173,17 +173,17 @@ const CONFIG_KEYS: (keyof SfizzConfig)[] = [
  */
 function buildParamMessage(key: keyof SfizzConfig, value: number): Record<string, unknown> | null {
   switch (key) {
-    case 'volume':       return { type: 'setVolume', value };
+    case 'volume':       return { type: 'setVolume', value: value > 0 ? 20 * Math.log10(value) : -80 }; // 0-1 linear → dB
     case 'polyphony':    return { type: 'setNumVoices', value: Math.round(value) };
     case 'oversampling': return { type: 'setOversampling', value: Math.round(value) };
     case 'preloadSize':  return { type: 'setPreloadSize', value: Math.round(value) };
-    // MIDI CCs: pan=10, sustain=64, modWheel=1, expression=11, reverbSend=91, chorusSend=93
-    case 'pan':          return { type: 'cc', delay: 0, cc: 10, value: Math.round((value + 1) * 0.5 * 127) }; // -1..1 → 0..127
-    case 'sustainPedal': return { type: 'cc', delay: 0, cc: 64, value: value >= 0.5 ? 127 : 0 };
-    case 'modWheel':     return { type: 'cc', delay: 0, cc: 1,  value: Math.round(value * 127) };
-    case 'expression':   return { type: 'cc', delay: 0, cc: 11, value: Math.round(value * 127) };
-    case 'reverbSend':   return { type: 'cc', delay: 0, cc: 91, value: Math.round(value * 127) };
-    case 'chorusSend':   return { type: 'cc', delay: 0, cc: 93, value: Math.round(value * 127) };
+    // MIDI CCs via sfizz HD API: value is 0.0-1.0 float (NOT 0-127 integer)
+    case 'pan':          return { type: 'cc', delay: 0, cc: 10, value: (value + 1) * 0.5 }; // -1..1 → 0..1
+    case 'sustainPedal': return { type: 'cc', delay: 0, cc: 64, value: value >= 0.5 ? 1.0 : 0 };
+    case 'modWheel':     return { type: 'cc', delay: 0, cc: 1,  value };
+    case 'expression':   return { type: 'cc', delay: 0, cc: 11, value };
+    case 'reverbSend':   return { type: 'cc', delay: 0, cc: 91, value };
+    case 'chorusSend':   return { type: 'cc', delay: 0, cc: 93, value };
     case 'pitchBend':    return { type: 'pitchWheel', delay: 0, value: Math.round(value * 8191) }; // -1..1 → -8191..8191
     case 'transpose':    return null; // Transpose is handled at note level, not by worklet
     default:             return null;
