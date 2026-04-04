@@ -14,7 +14,7 @@
  * via GTUltraControls in the SynthTypeDispatcher. No custom sidebar needed.
  */
 
-import React, { useCallback, useMemo } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import type { Graphics as GraphicsType } from 'pixi.js';
 import { PIXI_FONTS } from '@/pixi/fonts';
 import { usePixiTheme } from '@/pixi/theme';
@@ -29,6 +29,7 @@ import { PixiAutomationLaneStrip } from '../tracker/PixiAutomationLaneStrip';
 
 const TOOLBAR_H = 32;
 const ORDER_H = 160;
+const ORDER_COLLAPSED_H = 24;
 
 
 interface Props {
@@ -50,6 +51,9 @@ export const PixiGTUltraView: React.FC<Props> = ({ width, height }) => {
     return <PixiGTDAWView width={width} height={height} />;
   }
 
+  const [ordersCollapsed, setOrdersCollapsed] = useState(false);
+  const orderH = ordersCollapsed ? ORDER_COLLAPSED_H : ORDER_H;
+
   const songName = useGTUltraStore((s) => s.songName);
   const songAuthor = useGTUltraStore((s) => s.songAuthor);
   const tempo = useGTUltraStore((s) => s.tempo);
@@ -63,7 +67,7 @@ export const PixiGTUltraView: React.FC<Props> = ({ width, height }) => {
   const recordMode = useGTUltraStore((s) => s.recordMode);
   const jamMode = useGTUltraStore((s) => s.jamMode);
 
-  const patternHeight = height - TOOLBAR_H - ORDER_H;
+  const patternHeight = height - TOOLBAR_H - orderH;
 
   const infoText = useMemo(() => {
     const pos = playbackPos.position.toString(16).toUpperCase().padStart(2, '0');
@@ -195,9 +199,40 @@ export const PixiGTUltraView: React.FC<Props> = ({ width, height }) => {
         <pixiBitmapText text={infoText} style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 10, fill: 0xffffff }} tint={theme.textMuted.color} />
       </pixiContainer>
 
-      {/* ─── Order List (AHX-style position editor) ─── */}
-      <pixiContainer alpha={ready ? 1 : 0} renderable={ready} layout={{ width, height: ORDER_H }}>
-        <PixiGTOrderList width={width} height={ORDER_H} />
+      {/* ─── Order List (AHX-style position editor, collapsible) ─── */}
+      <pixiContainer alpha={ready ? 1 : 0} renderable={ready} layout={{ width, height: orderH }}>
+        {ordersCollapsed ? (
+          <pixiContainer
+            eventMode="static"
+            cursor="pointer"
+            onPointerUp={() => setOrdersCollapsed(false)}
+            layout={{ width, height: ORDER_COLLAPSED_H, flexDirection: 'row', alignItems: 'center', paddingLeft: 6 }}
+          >
+            <pixiBitmapText
+              eventMode="none"
+              text={'\u25B6 Orders'}
+              style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 9, fill: 0xffffff }}
+              tint={theme.textMuted.color}
+            />
+          </pixiContainer>
+        ) : (
+          <>
+            <pixiContainer
+              eventMode="static"
+              cursor="pointer"
+              onPointerUp={() => setOrdersCollapsed(true)}
+              layout={{ position: 'absolute', top: 0, right: 6, height: 16, alignItems: 'center' }}
+            >
+              <pixiBitmapText
+                eventMode="none"
+                text={'\u25BC'}
+                style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 9, fill: 0xffffff }}
+                tint={theme.textMuted.color}
+              />
+            </pixiContainer>
+            <PixiGTOrderList width={width} height={orderH} />
+          </>
+        )}
       </pixiContainer>
 
       {/* ─── Pattern Grid (fills remaining space) ─── */}

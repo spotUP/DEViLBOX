@@ -6,6 +6,7 @@
 
 import React from 'react';
 import { PixiFormatPatternEditor } from './PixiFormatPatternEditor';
+import { PixiCollapsibleSection } from '../../components/PixiCollapsibleSection';
 import type { ColumnDef, FormatChannel } from '@/components/shared/format-editor-types';
 import { PIXI_FONTS } from '@/pixi/fonts';
 import { usePixiTheme } from '@/pixi/theme';
@@ -61,11 +62,11 @@ export const PixiGenericFormatView: React.FC<Props> = (props) => {
         </pixiContainer>
       )}
 
-      {/* Overview slot (e.g. song order list) */}
+      {/* Overview slot (e.g. song order list, collapsible) */}
       {props.overviewSlot && (
-        <pixiContainer layout={{ width: props.width, height: overviewH }}>
+        <PixiCollapsibleSection label="Orders" width={props.width} expandedHeight={overviewH}>
           {props.overviewSlot}
-        </pixiContainer>
+        </PixiCollapsibleSection>
       )}
 
       {/* Pattern editor with channel headers */}

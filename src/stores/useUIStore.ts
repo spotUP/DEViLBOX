@@ -42,6 +42,7 @@ interface UIStore {
   modalOpen: string | null;
   modalData: Record<string, unknown> | null;
   showPatterns: boolean;
+  editorFullscreen: boolean;
   showAutomationLanes: boolean;
   showMacroLanes: boolean;
   showMacroSlots: boolean;
@@ -116,6 +117,7 @@ interface UIStore {
   openModal: (modalId: string, data?: Record<string, unknown>) => void;
   closeModal: () => void;
   togglePatterns: () => void;
+  toggleEditorFullscreen: () => void;
   toggleAutomationLanes: () => void;
   toggleMacroLanes: () => void;
   toggleMacroSlots: () => void;
@@ -224,6 +226,7 @@ export const useUIStore = create<UIStore>()(
       modalOpen: null,
       modalData: null,
       showPatterns: false,
+      editorFullscreen: false,
       showAutomationLanes: false,
       showMacroLanes: false,
       showMacroSlots: false,
@@ -349,6 +352,11 @@ export const useUIStore = create<UIStore>()(
       togglePatterns: () =>
         set((state) => {
           state.showPatterns = !state.showPatterns;
+        }),
+
+      toggleEditorFullscreen: () =>
+        set((state) => {
+          state.editorFullscreen = !state.editorFullscreen;
         }),
 
       toggleAutomationLanes: () =>
