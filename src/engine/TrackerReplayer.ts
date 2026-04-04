@@ -689,6 +689,9 @@ export class TrackerReplayer {
   /** Get loaded song data */
   getSong(): TrackerSong | null { return this.song; }
 
+  /** Whether a WASM engine handles playback (forcePosition is meaningless) */
+  get isSuppressNotes(): boolean { return this._suppressNotes; }
+
   /** Jump to a specific position while playing */
   jumpToPosition(songPos: number, pattPos: number = 0): void {
     this.seekTo(songPos, pattPos);

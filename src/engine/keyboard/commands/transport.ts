@@ -52,21 +52,29 @@ export function playPattern(): boolean {
   const playing = replayer.isPlaying() || store.isPlaying;
 
   if (playing) {
-    replayer.forcePosition(replayer.getSongPos(), 0);
-  } else {
-    unlockIOSAudio();
-    Tone.start();
-    store.setIsLooping(true);
-    store.setCurrentRow(0);
-    // Fast path: if AudioContext is already running, skip async init
-    const ctx = Tone.getContext().rawContext as AudioContext;
-    if (ctx.state === 'running') {
-      store.play();
+    if (replayer.isSuppressNotes) {
+      // WASM engines handle their own playback — forcePosition is meaningless.
+      // Stop and restart cleanly so usePatternPlayback relaunches the engine.
+      replayer.stop();
+      store.stop();
+      getToneEngine().stop();
     } else {
-      getToneEngine().init()
-        .then(() => useTransportStore.getState().play())
-        .catch(e => console.error('[playPattern]', e));
+      replayer.forcePosition(replayer.getSongPos(), 0);
+      return true;
     }
+  }
+  unlockIOSAudio();
+  Tone.start();
+  store.setIsLooping(true);
+  store.setCurrentRow(0);
+  // Fast path: if AudioContext is already running, skip async init
+  const ctx = Tone.getContext().rawContext as AudioContext;
+  if (ctx.state === 'running') {
+    store.play();
+  } else {
+    getToneEngine().init()
+      .then(() => useTransportStore.getState().play())
+      .catch(e => console.error('[playPattern]', e));
   }
   return true;
 }
@@ -80,22 +88,30 @@ export function playSong(): boolean {
   const playing = replayer.isPlaying() || store.isPlaying;
 
   if (playing) {
-    replayer.forcePosition(0, 0);
-  } else {
-    unlockIOSAudio();
-    Tone.start();
-    store.setIsLooping(false);
-    store.setCurrentPattern(0);
-    store.setCurrentRow(0);
-    // Fast path: if AudioContext is already running, skip async init
-    const ctx = Tone.getContext().rawContext as AudioContext;
-    if (ctx.state === 'running') {
-      store.play();
+    if (replayer.isSuppressNotes) {
+      // WASM engines handle their own playback — forcePosition is meaningless.
+      // Stop and restart cleanly so usePatternPlayback relaunches the engine.
+      replayer.stop();
+      store.stop();
+      getToneEngine().stop();
     } else {
-      getToneEngine().init()
-        .then(() => useTransportStore.getState().play())
-        .catch(e => console.error('[playSong]', e));
+      replayer.forcePosition(0, 0);
+      return true;
     }
+  }
+  unlockIOSAudio();
+  Tone.start();
+  store.setIsLooping(false);
+  store.setCurrentPattern(0);
+  store.setCurrentRow(0);
+  // Fast path: if AudioContext is already running, skip async init
+  const ctx = Tone.getContext().rawContext as AudioContext;
+  if (ctx.state === 'running') {
+    store.play();
+  } else {
+    getToneEngine().init()
+      .then(() => useTransportStore.getState().play())
+      .catch(e => console.error('[playSong]', e));
   }
   return true;
 }
