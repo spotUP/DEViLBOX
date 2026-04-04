@@ -20,6 +20,8 @@ import { quantizedEQKill, getQuantizeMode, setTrackedFilterPosition } from './DJ
 import { quantizedPlay, syncBPMToOther, phaseAlign } from './DJAutoSync';
 import { DJBeatSync } from './DJBeatSync';
 import { getAutoDJ } from './DJAutoDJ';
+import { smartSort } from './DJPlaylistSort';
+import { useDJPlaylistStore } from '@/stores/useDJPlaylistStore';
 import type { DeckId, FaderLFODivision } from './DeckEngine';
 
 // ============================================================================
@@ -670,6 +672,15 @@ export async function stopRecording(
 /** Enable Auto DJ — plays through the active playlist with beatmatched transitions.
  *  Returns null on success, or an error message string on failure. */
 export async function enableAutoDJ(startIndex?: number): Promise<string | null> {
+  // Smart-sort the playlist before starting for optimal BPM/key/energy flow
+  const { activePlaylistId, playlists, sortTracks } = useDJPlaylistStore.getState();
+  if (activePlaylistId) {
+    const playlist = playlists.find((p) => p.id === activePlaylistId);
+    if (playlist && playlist.tracks.length >= 2) {
+      const sorted = smartSort([...playlist.tracks]);
+      sortTracks(activePlaylistId, sorted);
+    }
+  }
   return await getAutoDJ().enable(startIndex);
 }
 

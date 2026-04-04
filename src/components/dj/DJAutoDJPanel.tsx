@@ -62,9 +62,11 @@ export const DJAutoDJPanel: React.FC<DJAutoDJPanelProps> = ({ onClose }) => {
       const error = await enableAutoDJ(0);
       if (error) {
         useUIStore.getState().setStatusMessage(`Auto DJ: ${error}`, false, 4000);
+      } else {
+        onClose?.();
       }
     }
-  }, [enabled]);
+  }, [enabled, onClose]);
 
   const handleSkip = useCallback(async () => {
     await skipAutoDJ();
