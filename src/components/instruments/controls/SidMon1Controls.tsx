@@ -4,7 +4,7 @@
  * Exposes all SidMon1Config parameters: ADSR envelope speeds/levels,
  * phase oscillator, tuning, arpeggio table, and waveform data.
  *
- * Enhanced with SequenceEditor for arpeggio and waveform tables.
+ * Enhanced with PatternEditorCanvas for arpeggio and waveform tables.
  *
  * When loaded via UADE (uadeChipRam present), scalar params that have a direct
  * 1-byte equivalent in the SidMon 1 instrument header are written to chip RAM
