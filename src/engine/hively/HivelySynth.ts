@@ -23,6 +23,8 @@ export class HivelySynth implements DevilboxSynth {
   private _disposed = false;
   private _playerHandle = -1;
   private _instrumentMode = false;
+  private _pendingConfig: HivelyConfig | null = null;
+  private _setupPromise: Promise<void> | null = null;
 
   /**
    * Track whether the singleton engine output is already connected to a
@@ -54,17 +56,27 @@ export class HivelySynth implements DevilboxSynth {
    * Call this with a HivelyConfig to enable per-note triggering.
    */
   async setInstrument(config: HivelyConfig): Promise<void> {
+    this._pendingConfig = config;
+    this._setupPromise = this._doSetInstrument(config);
+    return this._setupPromise;
+  }
+
+  private async _doSetInstrument(config: HivelyConfig): Promise<void> {
+    console.warn('[HivelySynth] setInstrument called, config entries:', config.performanceList.entries.length);
     this._instrumentMode = true;
 
     // Wait for engine to be ready
     await this.engine.ready();
+    if (this._disposed) return;
 
     // Request player creation from worklet
     this.engine.sendMessage({ type: 'createPlayer' });
 
     // The handle will come back via a 'playerCreated' message.
-    // For simplicity, we'll use a promise-based approach.
     this._playerHandle = await this.engine.waitForPlayerHandle();
+    if (this._disposed || this._playerHandle < 0) return;
+
+    console.warn('[HivelySynth] player created, handle=' + this._playerHandle);
 
     // Serialize and upload instrument data to WASM
     const insBuffer = this.serializeInstrument(config);
@@ -114,6 +126,7 @@ export class HivelySynth implements DevilboxSynth {
   }
 
   triggerAttack(note?: string | number, _time?: number, velocity?: number): void {
+    console.warn('[HivelySynth] triggerAttack note=' + note + ' mode=' + this._instrumentMode + ' handle=' + this._playerHandle + ' disposed=' + this._disposed);
     if (this._disposed) return;
 
     if (this._instrumentMode && this._playerHandle >= 0) {

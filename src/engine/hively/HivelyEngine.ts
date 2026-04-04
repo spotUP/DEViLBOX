@@ -92,7 +92,7 @@ export class HivelyEngine {
 
       // Register worklet module with this context
       try {
-        await context.audioWorklet.addModule(`${baseUrl}hively/Hively.worklet.js`);
+        await context.audioWorklet.addModule(`${baseUrl}hively/Hively.worklet.js?v=${Date.now()}`);
       } catch {
         // Module might already be registered
       }
@@ -205,6 +205,10 @@ export class HivelyEngine {
             const resolve = this._playerHandleResolvers.shift()!;
             resolve(data.handle);
           }
+          break;
+
+        case 'debug':
+          console.warn('[HivelyWorklet]', data.msg);
           break;
       }
     };
