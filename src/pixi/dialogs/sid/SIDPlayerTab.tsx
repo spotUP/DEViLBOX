@@ -7,6 +7,7 @@ import React, { useEffect, useState } from 'react';
 import { PixiLabel, PixiScrollView } from '../../components';
 import { usePixiTheme } from '../../theme';
 import { PIXI_FONTS } from '../../fonts';
+import { tintBg } from '../../colors';
 
 interface SIDPlayerTabProps {
   width: number;
@@ -26,9 +27,6 @@ interface PlayerData {
 
 const PAD = 16;
 
-function tintBg(color: number, factor = 0.15): number {
-  return (((color >> 16 & 0xff) * factor | 0) << 16) | (((color >> 8 & 0xff) * factor | 0) << 8) | ((color & 0xff) * factor | 0);
-}
 const API_URL = import.meta.env.VITE_API_URL || 'https://devilbox.uprough.net/api';
 
 /** Key-value info row */

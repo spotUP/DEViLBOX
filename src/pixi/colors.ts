@@ -84,6 +84,13 @@ export const ACTION_PATTERN  = 0xa78bfa; // purple
 export const ACTION_MOVE     = 0x2dd4bf; // teal
 export const ACTION_BULK     = 0xfb923c; // orange
 
+// ─── Color Utilities ────────────────────────────────────────────────────────
+
+/** Darken a color to create a tinted background (e.g., dark red for error states) */
+export function tintBg(color: number, factor = 0.15): number {
+  return (((color >> 16 & 0xff) * factor | 0) << 16) | (((color >> 8 & 0xff) * factor | 0) << 8) | ((color & 0xff) * factor | 0);
+}
+
 // ─── Misc ───────────────────────────────────────────────────────────────────
 
 export const WHITE          = 0xffffff;

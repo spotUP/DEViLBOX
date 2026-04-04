@@ -36,6 +36,7 @@ import {
   CHIP_FORMATS,
   type ExportMode,
 } from '@hooks/dialogs/useExportDialog';
+import { tintBg } from '../colors';
 
 interface PixiExportDialogProps {
   isOpen: boolean;
@@ -47,10 +48,6 @@ interface PixiExportDialogProps {
 const MODAL_W = 560;
 const MODAL_H = 520;
 const CONTENT_W = MODAL_W - 26;
-
-function tintBg(color: number, factor = 0.15): number {
-  return (((color >> 16 & 0xff) * factor | 0) << 16) | (((color >> 8 & 0xff) * factor | 0) << 8) | ((color & 0xff) * factor | 0);
-}
 
 const getLoopInfo = (chipFormat: string, chipLoopRow: number, theme: ReturnType<typeof usePixiTheme>) => {
   if (chipFormat === 'vgm') {

@@ -8,6 +8,7 @@
  */
 
 import React, { useState, useCallback, useEffect, useRef, useMemo } from 'react';
+import { tintBg } from '../../colors';
 import type { Graphics as GraphicsType } from 'pixi.js';
 import {
   searchModland,
@@ -88,11 +89,6 @@ const SOURCE_OPTIONS: SelectOption[] = [
 ];
 
 // ── Star rating helpers ──────────────────────────────────────────────────────
-
-/** Tint a color toward black (for subtle error/info backgrounds) */
-function tintBg(color: number, factor = 0.15): number {
-  return (((color >> 16 & 0xff) * factor | 0) << 16) | (((color >> 8 & 0xff) * factor | 0) << 8) | ((color & 0xff) * factor | 0);
-}
 
 const STAR_SIZE = 16;
 const STAR_GAP = 2;

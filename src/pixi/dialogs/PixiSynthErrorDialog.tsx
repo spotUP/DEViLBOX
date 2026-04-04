@@ -8,10 +8,7 @@ import { useState, useCallback } from 'react';
 import { PixiModal, PixiModalHeader, PixiModalFooter, PixiButton, PixiLabel } from '../components';
 import { usePixiTheme } from '../theme';
 import { useSynthErrorStore, type SynthError } from '@/stores/useSynthErrorStore';
-
-function tintBg(color: number, factor = 0.15): number {
-  return (((color >> 16 & 0xff) * factor | 0) << 16) | (((color >> 8 & 0xff) * factor | 0) << 8) | ((color & 0xff) * factor | 0);
-}
+import { tintBg } from '../colors';
 
 const ERROR_TYPE_LABELS: Record<SynthError['errorType'], string> = {
   init: 'Initialization Error',

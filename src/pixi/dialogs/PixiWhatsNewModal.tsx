@@ -17,6 +17,7 @@ import { usePixiTheme } from '../theme';
 import { PIXI_FONTS } from '../fonts';
 import { CHANGELOG, CURRENT_VERSION } from '@generated/changelog';
 import type { ChangelogEntry } from '@generated/changelog';
+import { tintBg } from '../colors';
 
 const STORAGE_KEY = 'devilbox-seen-version';
 
@@ -30,11 +31,6 @@ const CONTENT_H = 320;
 
 // ─── Change type badge — matches DOM ChangeTypeLabel ──────────────────────────
 // px-1.5 py-0.5 text-[10px] font-bold rounded
-
-/** Darken a color to ~15% intensity for tinted background */
-function tintBg(color: number, factor = 0.15): number {
-  return (((color >> 16 & 0xff) * factor | 0) << 16) | (((color >> 8 & 0xff) * factor | 0) << 8) | ((color & 0xff) * factor | 0);
-}
 
 const CHANGE_LABELS: Record<string, string> = {
   feature: 'New',

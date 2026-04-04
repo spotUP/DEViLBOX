@@ -8,15 +8,16 @@ import { useCallback, useMemo, useRef, useState } from 'react';
 import type { Graphics as GraphicsType, FederatedPointerEvent } from 'pixi.js';
 import { useTrackerStore, useEditorStore } from '@stores';
 import type { TrackerCell } from '@typedefs/tracker';
+import { LANE_CUTOFF, LANE_RESONANCE, LANE_ENVMOD, LANE_PAN } from '../../colors';
 
 const LANE_WIDTH = 14;
 
-// Parameter colors (Pixi hex)
+// Parameter colors — use centralized constants from colors.ts
 const PARAM_COLORS: Record<string, number> = {
-  cutoff: 0x22c55e,    // Green
-  resonance: 0xeab308, // Yellow
-  envMod: 0x06b6d4,    // Cyan
-  pan: 0x3b82f6,       // Blue
+  cutoff: LANE_CUTOFF,
+  resonance: LANE_RESONANCE,
+  envMod: LANE_ENVMOD,
+  pan: LANE_PAN,
 };
 
 interface PixiMacroLanesProps {

@@ -15,6 +15,7 @@ import type { Graphics as GraphicsType } from 'pixi.js';
 import { useTransportStore, useTrackerStore, useEditorStore, useSettingsStore } from '@stores';
 import { useShallow } from 'zustand/react/shallow';
 import { getToneEngine } from '@engine/ToneEngine';
+import { VU_GREEN, VU_YELLOW, VU_RED } from '../../colors';
 
 // VU meter constants — must match DOM ChannelVUMeters.tsx for parity
 const DECAY_RATE = 0.92;
@@ -30,17 +31,12 @@ const LINE_NUMBER_WIDTH = 40;
 // Layout constants matching PixiPatternEditor for channel offset calculation
 const CHAR_WIDTH = 8;
 
-// Segment colors (Pixi hex)
-const COLOR_GREEN = 0x22c55e;
-const COLOR_YELLOW = 0xeab308;
-const COLOR_RED = 0xef4444;
-
 // Pre-allocated fill style objects to avoid GC pressure in the rAF loop
-const FILL_GREEN = { color: COLOR_GREEN, alpha: 0.9 };
-const FILL_YELLOW = { color: COLOR_YELLOW, alpha: 0.9 };
-const FILL_RED = { color: COLOR_RED, alpha: 0.9 };
+const FILL_GREEN = { color: VU_GREEN, alpha: 0.9 };
+const FILL_YELLOW = { color: VU_YELLOW, alpha: 0.9 };
+const FILL_RED = { color: VU_RED, alpha: 0.9 };
 const FILL_CLEAR = { color: 0x000000, alpha: 0 };
-const FILL_SOLID = { color: COLOR_GREEN, alpha: 0.35 }; // Fill style background
+const FILL_SOLID = { color: VU_GREEN, alpha: 0.35 }; // Fill style background
 
 interface MeterState {
   level: number;

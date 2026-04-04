@@ -20,6 +20,7 @@ import {
 } from '../components';
 import { PixiSelect, type SelectOption } from '../components/PixiSelect';
 import { usePixiTheme } from '../theme';
+import { tintBg } from '../colors';
 import { useInstrumentStore } from '@/stores/useInstrumentStore';
 import type { InstrumentConfig } from '@/types/instrument';
 import type { IFF8SVXResult } from '@lib/audio/IFF8SVXParser';
@@ -84,10 +85,6 @@ function blendColor(base: number, overlay: number, alpha: number): number {
   const r1 = (base >> 16) & 0xFF, g1 = (base >> 8) & 0xFF, b1 = base & 0xFF;
   const r2 = (overlay >> 16) & 0xFF, g2 = (overlay >> 8) & 0xFF, b2 = overlay & 0xFF;
   return (Math.round(r1 + (r2 - r1) * alpha) << 16) | (Math.round(g1 + (g2 - g1) * alpha) << 8) | Math.round(b1 + (b2 - b1) * alpha);
-}
-
-function tintBg(color: number, factor = 0.15): number {
-  return (((color >> 16 & 0xff) * factor | 0) << 16) | (((color >> 8 & 0xff) * factor | 0) << 8) | ((color & 0xff) * factor | 0);
 }
 
 // ── Component ──────────────────────────────────────────────────────────────────

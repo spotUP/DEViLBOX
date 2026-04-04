@@ -736,19 +736,31 @@ const formatVideoDuration = (ms: number) => {
   return `${pad(m)}:${pad(s % 60)}`;
 };
 
+const formatRecordDuration = (ms: number) => {
+  const s = Math.floor(ms / 1000);
+  const m = Math.floor(s / 60);
+  const h = Math.floor(m / 60);
+  const pad = (n: number) => n.toString().padStart(2, '0');
+  return h > 0 ? `${h}:${pad(m % 60)}:${pad(s % 60)}` : `${pad(m)}:${pad(s % 60)}`;
+};
+
 const MixerRecordMic: React.FC = () => {
   const theme = usePixiTheme();
   const isRecording = useDJSetStore(s => s.isRecording);
+  const recordingDuration = useDJSetStore(s => s.recordingDuration);
+  const isPlayingSet = useDJSetStore(s => s.isPlayingSet);
   const micEnabled = useDJSetStore(s => s.micEnabled);
   const micGain = useDJSetStore(s => s.micGain);
   const [showBroadcast, setShowBroadcast] = useState(false);
   const [videoRecording, setVideoRecording] = useState(false);
   const [videoDuration, setVideoDuration] = useState(0);
   const [isLive, setIsLive] = useState(false);
+  const [saving, setSaving] = useState(false);
   const videoCaptureRef = useRef<DJVideoCapture | null>(null);
   const videoRecorderRef = useRef<DJVideoRecorder | null>(null);
   const videoStartRef = useRef(0);
   const videoDurationTimerRef = useRef<number>(0);
+  const recDurationTimerRef = useRef<number>(0);
 
   // Pulsing red dot ref
   const recDotRef = useRef<GraphicsType | null>(null);
@@ -765,6 +777,21 @@ const MixerRecordMic: React.FC = () => {
     }, 1000);
     return () => clearInterval(videoDurationTimerRef.current);
   }, [videoRecording]);
+
+  // Recording duration timer — polls engine.recorder.elapsed() every 250ms
+  useEffect(() => {
+    if (!isRecording) return;
+    recDurationTimerRef.current = window.setInterval(async () => {
+      try {
+        const { getDJEngineIfActive } = await import('@/engine/dj/DJEngine');
+        const engine = getDJEngineIfActive();
+        if (engine?.recorder) {
+          useDJSetStore.getState().setRecordingDuration(engine.recorder.elapsed() / 1000);
+        }
+      } catch { /* engine not active */ }
+    }, 250);
+    return () => clearInterval(recDurationTimerRef.current);
+  }, [isRecording]);
 
   // Pulse the red dot via useTick
   useTick(() => {
@@ -786,14 +813,80 @@ const MixerRecordMic: React.FC = () => {
       const { useAuthStore } = await import('@/stores/useAuthStore');
       const auth = useAuthStore.getState();
       const set = await DJActions.stopRecording(name, auth.user?.id || 'local', auth.user?.username || 'DJ');
+      if (!set) return;
+
       // Save to server if authenticated
-      if (set && auth.token) {
+      if (auth.token) {
+        setSaving(true);
         try {
-          const { saveDJSet } = await import('@/lib/djSetApi');
+          const { saveDJSet, uploadBlob } = await import('@/lib/djSetApi');
+          const { getDJEngine: getEngine } = await import('@/engine/dj/DJEngine');
+          const engine = getEngine();
+
+          // Upload local tracks as blobs
+          for (const track of set.metadata.trackList) {
+            if (track.source.type === 'local') {
+              for (const deckId of ['A', 'B', 'C'] as const) {
+                try {
+                  const deck = engine.getDeck(deckId);
+                  const bytes = deck.audioPlayer?.getOriginalFileBytes?.();
+                  if (bytes) {
+                    const blob = new Blob([bytes], { type: 'application/octet-stream' });
+                    const { id: blobId } = await uploadBlob(blob, track.fileName);
+                    const originalSource = { ...track.source };
+                    (track as any).source = { type: 'embedded', blobId, originalSource };
+
+                    // Rewrite matching load events
+                    for (const evt of set.events) {
+                      if (evt.type === 'load' && evt.values?.fileName === track.fileName) {
+                        (evt.values as any).source = track.source;
+                      }
+                    }
+                    break; // Found the deck, move to next track
+                  }
+                } catch { /* deck might not exist */ }
+              }
+            }
+          }
+
+          // Upload mic recording if present
+          try {
+            const { getDJEngineIfActive: getEng } = await import('@/engine/dj/DJEngine');
+            const eng = getEng();
+            if (eng?.mic?.isRecording) {
+              const micBlob = eng.mic.stopRecording();
+              if (micBlob && micBlob.size > 0) {
+                const { id } = await uploadBlob(micBlob, 'mic-recording.webm');
+                set.micAudioId = id;
+              }
+            }
+          } catch { /* no mic */ }
+
           await saveDJSet(set);
-        } catch (err) { console.error('[PixiDJMixer] Save failed:', err); }
+          useDJSetStore.getState().fetchSets();
+          console.log('[PixiDJMixer] Set saved:', set.metadata.name);
+        } catch (err) {
+          console.error('[PixiDJMixer] Save failed:', err);
+          alert('Failed to save DJ set to server. Set recorded locally.');
+        } finally {
+          setSaving(false);
+        }
       }
     } else {
+      // Warn if not signed in — set can't be saved to server
+      const { useAuthStore } = await import('@/stores/useAuthStore');
+      const auth = useAuthStore.getState();
+      if (!auth.token) {
+        const proceed = window.confirm(
+          'You are not signed in!\n\n' +
+          'Your DJ set will be recorded, but it CANNOT be saved to the server without an account. ' +
+          'If you close the browser or navigate away, your recording will be lost.\n\n' +
+          'Sign in first to save your sets safely.\n\n' +
+          'Record anyway?'
+        );
+        if (!proceed) return;
+      }
+
       // Start recording via DJActions
       await DJActions.startRecording();
     }
@@ -847,10 +940,11 @@ const MixerRecordMic: React.FC = () => {
       {showBroadcast && (
         <>
           <PixiButton
-            label={isRecording ? 'STOP' : 'REC'}
+            label={saving ? 'Saving...' : isRecording ? formatRecordDuration(recordingDuration) : 'REC'}
             size="sm"
             color={isRecording ? 'red' : undefined}
             active={isRecording}
+            disabled={saving || isPlayingSet}
             onClick={handleRecordToggle}
           />
           {videoRecording && (

@@ -23,3 +23,6 @@ export type { Tab } from './PixiTabBar';
 export { PixiTabBar } from './PixiTabBar';
 export { PixiIcon } from './PixiIcon';
 export { PixiViewHeader, VIEW_HEADER_HEIGHT } from './PixiViewHeader';
+export { PixiBpmSyncControl } from './PixiBpmSyncControl';
+export { PixiVirtualKeyboard } from './PixiVirtualKeyboard';
+export type { PixiVirtualKeyboardProps } from './PixiVirtualKeyboard';

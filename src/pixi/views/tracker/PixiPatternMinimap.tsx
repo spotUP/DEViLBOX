@@ -15,11 +15,9 @@ import { useShallow } from 'zustand/react/shallow';
 
 const MINIMAP_WIDTH = 16;
 
-const COLOR_BEAT = 0x3b82f6;
+// Dynamic color constants — resolved from theme inside the component.
+// COLOR_OTHER remains a static derived value (no direct theme equivalent).
 const COLOR_OTHER = 0x6366f1;
-const COLOR_SELECTION = 0xfacc15;
-const COLOR_PLAYING = 0x22c55e;
-const COLOR_STOPPED = 0xef4444;
 
 interface PixiPatternMinimapProps {
   height: number;
@@ -88,7 +86,7 @@ export const PixiPatternMinimap: React.FC<PixiPatternMinimapProps> = ({ height }
       if (d === 0) continue;
       const y = row * r.rowHeight;
       const w = (d / maxDensity) * 14;
-      const color = row % 4 === 0 ? COLOR_BEAT : COLOR_OTHER;
+      const color = row % 4 === 0 ? r.theme.accent.color : COLOR_OTHER;
       g.rect(1, y, w, Math.max(1, r.rowHeight - 0.5));
       g.fill({ color, alpha: 0.5 });
     }
@@ -111,10 +109,10 @@ export const PixiPatternMinimap: React.FC<PixiPatternMinimapProps> = ({ height }
       const minRow = Math.min(sel.startRow, sel.endRow);
       const maxRow = Math.max(sel.startRow, sel.endRow);
       g.rect(0, minRow * r.rowHeight, MINIMAP_WIDTH, (maxRow - minRow + 1) * r.rowHeight);
-      g.fill({ color: COLOR_SELECTION, alpha: 0.2 });
+      g.fill({ color: r.theme.warning.color, alpha: 0.2 });
     }
 
-    const indicatorColor = r.isPlaying ? COLOR_PLAYING : COLOR_STOPPED;
+    const indicatorColor = r.isPlaying ? r.theme.success.color : r.theme.error.color;
     g.rect(0, activeRow * r.rowHeight, MINIMAP_WIDTH, Math.max(2, r.rowHeight));
     g.fill({ color: indicatorColor, alpha: 0.8 });
   }, []);

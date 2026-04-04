@@ -3,8 +3,9 @@
  * Layout: Top bar | [Deck A | Mixer | Deck B] (flex row)
  */
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { PixiButton, PixiViewHeader } from '../components';
+import { PixiSelect, type SelectOption } from '../components/PixiSelect';
 import { PixiDJDeck } from './dj/PixiDJDeck';
 import { PixiDJMixer } from './dj/PixiDJMixer';
 import { PixiDeckWaveform } from './dj/PixiDeckWaveform';
@@ -26,6 +27,7 @@ import { getPhaseInfo } from '@engine/dj/DJAutoSync';
 import { useDeckStateSync } from '@hooks/dj/useDeckStateSync';
 import { useDJHealth } from '@hooks/dj/useDJHealth';
 import { usePixiTheme } from '../theme';
+import { DECK_A, DECK_B, DECK_C } from '../colors';
 import { PIXI_FONTS } from '../fonts';
 import { isAudioFile } from '@lib/audioFileUtils';
 import { isUADEFormat } from '@lib/import/formats/UADEParser';
@@ -34,6 +36,9 @@ import { getDJPipeline } from '@engine/dj/DJPipeline';
 import { parseModuleToSong } from '@lib/import/parseModuleToSong';
 import { detectBPM } from '@engine/dj/DJBeatDetector';
 import type { DeckId } from '@engine/dj/DeckEngine';
+import { getScenarioById, getScenariosByCategory } from '@/midi/djScenarioPresets';
+import { getDJControllerMapper } from '@/midi/DJControllerMapper';
+import { DJRemoteMicReceiver } from '@/engine/dj/DJRemoteMicReceiver';
 
 type DJBrowserPanel = 'none' | 'crate';
 
@@ -351,7 +356,7 @@ export const PixiDJView: React.FC = () => {
 
 const PixiDragDropOverlay: React.FC<{ deckId: DeckId }> = ({ deckId }) => {
   const deckLabel = `Drop to load Deck ${deckId}`;
-  const deckColor = deckId === 'A' ? 0x3b82f6 : deckId === 'B' ? 0xef4444 : 0x22c55e;
+  const deckColor = deckId === 'A' ? DECK_A : deckId === 'B' ? DECK_B : DECK_C;
 
   return (
     <pixiContainer
@@ -380,6 +385,233 @@ const PixiDragDropOverlay: React.FC<{ deckId: DeckId }> = ({ deckId }) => {
           anchor={0.5}
         />
       </pixiContainer>
+    </pixiContainer>
+  );
+};
+
+// ─── Scenario Selector ──────────────────────────────────────────────────────
+
+const SCENARIO_STORAGE_KEY = 'devilbox-dj-scenario-preset';
+
+const PixiDJScenarioSelector: React.FC<{ width?: number; height?: number; layout?: Record<string, unknown> }> = ({
+  width = 140,
+  height = 24,
+  layout: layoutProp,
+}) => {
+  const [selectedId, setSelectedId] = useState<string>(() =>
+    localStorage.getItem(SCENARIO_STORAGE_KEY) || 'open-format',
+  );
+
+  const applyScenario = useCallback((id: string) => {
+    const scenario = getScenarioById(id);
+    if (!scenario) return;
+
+    const store = useDJStore.getState();
+    const mapper = getDJControllerMapper();
+    const currentPreset = mapper.getPreset();
+
+    if (scenario.jogWheelSensitivity !== undefined) {
+      store.setJogWheelSensitivity(scenario.jogWheelSensitivity);
+    }
+    if (scenario.crossfaderCurve) {
+      store.setCrossfaderCurve(scenario.crossfaderCurve);
+    }
+    if (scenario.keyLockDefault !== undefined) {
+      store.setDeckKeyLock('A', scenario.keyLockDefault);
+      store.setDeckKeyLock('B', scenario.keyLockDefault);
+    }
+    if (currentPreset?.manufacturer === 'Generic' && scenario.knobMappings && scenario.padMappings) {
+      mapper.setPreset({
+        ...currentPreset,
+        ccMappings: scenario.knobMappings,
+        noteMappings: scenario.padMappings,
+      });
+    }
+  }, []);
+
+  // Apply scenario on mount
+  useEffect(() => {
+    if (selectedId) applyScenario(selectedId);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const options = useMemo((): SelectOption[] => {
+    const opts: SelectOption[] = [{ value: '', label: 'Default' }];
+    const grouped = getScenariosByCategory();
+    for (const [category, presets] of Object.entries(grouped)) {
+      for (const p of presets) {
+        opts.push({ value: p.id, label: p.name, group: category });
+      }
+    }
+    return opts;
+  }, []);
+
+  const handleChange = useCallback((value: string) => {
+    setSelectedId(value);
+    if (value) {
+      applyScenario(value);
+      localStorage.setItem(SCENARIO_STORAGE_KEY, value);
+    } else {
+      localStorage.removeItem(SCENARIO_STORAGE_KEY);
+    }
+  }, [applyScenario]);
+
+  return (
+    <PixiSelect
+      options={options}
+      value={selectedId}
+      onChange={handleChange}
+      width={width}
+      height={height}
+      placeholder="Scenario"
+      layout={layoutProp}
+    />
+  );
+};
+
+// ─── Remote Control ─────────────────────────────────────────────────────────
+
+const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+
+const PixiDJRemoteControl: React.FC = () => {
+  const theme = usePixiTheme();
+  const [showPanel, setShowPanel] = useState(false);
+  const [roomCode, setRoomCode] = useState<string | null>(null);
+  const [localIP, setLocalIP] = useState('');
+  const [micStatus, setMicStatus] = useState('');
+  const receiverRef = useRef<DJRemoteMicReceiver | null>(null);
+
+  const handleToggle = useCallback(async () => {
+    if (showPanel) {
+      receiverRef.current?.disconnect();
+      receiverRef.current = null;
+      setShowPanel(false);
+      setRoomCode(null);
+      setMicStatus('');
+      return;
+    }
+    setShowPanel(true);
+    try {
+      const ipResp = await fetch(`${API_BASE}/network/local-ip`);
+      const { ip } = await ipResp.json();
+      setLocalIP(ip);
+
+      const receiver = new DJRemoteMicReceiver();
+      receiver.onStatusChange = (s) => setMicStatus(s);
+      receiverRef.current = receiver;
+      const code = await receiver.createRoom();
+      setRoomCode(code);
+    } catch (err) {
+      console.error('[PixiRemoteControl] Setup failed:', err);
+      setMicStatus('error');
+    }
+  }, [showPanel]);
+
+  useEffect(() => {
+    return () => { receiverRef.current?.disconnect(); };
+  }, []);
+
+  const controllerURL = localIP && roomCode
+    ? `http://${localIP}:5173/controller.html?host=${localIP}&room=${roomCode}`
+    : '';
+
+  const handleCopyURL = useCallback(() => {
+    if (controllerURL) navigator.clipboard?.writeText(controllerURL);
+  }, [controllerURL]);
+
+  const statusColor = micStatus === 'connected'
+    ? theme.success.color
+    : micStatus === 'waiting'
+      ? theme.warning.color
+      : theme.textMuted.color;
+
+  return (
+    <pixiContainer layout={{ flexDirection: 'column', position: 'relative' }}>
+      <PixiButton
+        label="Remote"
+        variant={showPanel ? 'ft2' : 'ghost'}
+        color={showPanel ? 'blue' : undefined}
+        size="sm"
+        active={showPanel}
+        onClick={handleToggle}
+      />
+
+      {showPanel && (
+        <pixiContainer
+          layout={{
+            position: 'absolute',
+            top: 30,
+            right: 0,
+            width: 260,
+            flexDirection: 'column',
+            padding: 10,
+            gap: 6,
+          }}
+          zIndex={100}
+        >
+          <pixiGraphics
+            draw={(g) => {
+              g.clear();
+              g.roundRect(0, 0, 260, roomCode ? 130 : 50, 6);
+              g.fill({ color: theme.bgSecondary.color });
+              g.roundRect(0, 0, 260, roomCode ? 130 : 50, 6);
+              g.stroke({ color: theme.borderLight.color, width: 1 });
+            }}
+            layout={{ position: 'absolute', top: 0, left: 0, width: 260, height: roomCode ? 130 : 50 }}
+          />
+
+          {/* Header */}
+          <pixiContainer layout={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
+            <pixiBitmapText
+              text="iPhone Controller"
+              style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 11, fill: theme.text.color }}
+            />
+            <PixiButton label="X" variant="ghost" size="sm" onClick={handleToggle} />
+          </pixiContainer>
+
+          {roomCode ? (
+            <pixiContainer layout={{ flexDirection: 'column', gap: 6, width: '100%' }}>
+              {/* Room code */}
+              <pixiContainer layout={{ flexDirection: 'row', gap: 6, alignItems: 'center' }}>
+                <pixiBitmapText
+                  text="Room:"
+                  style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 10, fill: theme.textMuted.color }}
+                />
+                <pixiBitmapText
+                  text={roomCode}
+                  style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 12, fill: theme.accent.color }}
+                />
+              </pixiContainer>
+
+              {/* URL display */}
+              <pixiBitmapText
+                text={controllerURL}
+                style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 8, fill: theme.textSecondary.color }}
+                layout={{ width: 240 }}
+              />
+
+              {/* Copy URL button */}
+              <PixiButton label="Copy URL" variant="ghost" size="sm" onClick={handleCopyURL} />
+
+              {/* Mic status */}
+              <pixiContainer layout={{ flexDirection: 'row', gap: 4, alignItems: 'center' }}>
+                <pixiBitmapText
+                  text="Mic:"
+                  style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 10, fill: theme.textMuted.color }}
+                />
+                <pixiBitmapText
+                  text={micStatus || 'initializing...'}
+                  style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 10, fill: statusColor }}
+                />
+              </pixiContainer>
+            </pixiContainer>
+          ) : (
+            <pixiBitmapText
+              text="Setting up..."
+              style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 10, fill: theme.textMuted.color }}
+            />
+          )}
+        </pixiContainer>
+      )}
     </pixiContainer>
   );
 };
@@ -415,6 +647,9 @@ const PixiDJTopBar: React.FC<DJTopBarProps> = ({ browserPanel, onBrowserPanelCha
 
       {/* Controller selector */}
       <PixiDJControllerSelect width={140} height={24} layout={{ height: 28, width: 140 }} />
+
+      {/* Scenario selector */}
+      <PixiDJScenarioSelector width={140} height={24} layout={{ height: 28, width: 140 }} />
 
       {/* FX Quick Presets */}
       <PixiDJFxPresets width={130} height={24} layout={{ height: 28, width: 130 }} />
@@ -466,6 +701,9 @@ const PixiDJTopBar: React.FC<DJTopBarProps> = ({ browserPanel, onBrowserPanelCha
         active={vocoderActive}
         onClick={handleVocoderToggle}
       />
+
+      {/* Remote Control */}
+      <PixiDJRemoteControl />
 
       {/* Crate */}
       <PixiButton

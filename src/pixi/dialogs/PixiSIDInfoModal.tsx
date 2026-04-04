@@ -13,10 +13,7 @@ import { PixiModal, PixiButton, PixiLabel, PixiScrollView, PixiSelect, PixiIcon 
 import type { SelectOption } from '../components';
 import { usePixiTheme } from '../theme';
 import { PIXI_FONTS } from '../fonts';
-
-function tintBg(color: number, factor = 0.15): number {
-  return (((color >> 16 & 0xff) * factor | 0) << 16) | (((color >> 8 & 0xff) * factor | 0) << 8) | ((color & 0xff) * factor | 0);
-}
+import { tintBg } from '../colors';
 import { SIDScopeTab } from './sid/SIDScopeTab';
 import { SIDStereoTab } from './sid/SIDStereoTab';
 import { SIDFilterTab } from './sid/SIDFilterTab';

@@ -92,7 +92,7 @@ export const PixiDeckTransport: React.FC<PixiDeckTransportProps> = ({ deckId }) 
   const qLabel = qMode === 'off' ? 'Q' : qMode === 'beat' ? 'Q:BT' : 'Q:BR';
 
   // Key lock button color matching DOM (amber)
-  const keyLockColor = keyLockEnabled ? 0xd97706 : theme.textMuted.color;
+  const keyLockColor = keyLockEnabled ? theme.warning.color : theme.textMuted.color;
 
   return (
     <pixiContainer layout={{ flexDirection: 'row', gap: 6, alignItems: 'center' }}>

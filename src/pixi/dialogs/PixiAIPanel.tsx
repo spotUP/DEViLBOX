@@ -16,6 +16,7 @@ import { usePixiResponsive } from '../hooks/usePixiResponsive';
 import { useModalClose } from '@hooks/useDialogKeyboard';
 import { useAIStore, AI_PROVIDERS, getModelsForProvider, type AIMessage } from '@stores/useAIStore';
 import { sendMessage, stopStreaming } from '@/services/aiChatService';
+import { tintBg } from '../colors';
 
 const PANEL_W = 440;
 const MSG_PAD = 8;
@@ -25,11 +26,6 @@ const INPUT_AREA_H = 60;
 const PROVIDER_ROW_H = 22;
 const INPUT_ROW_H = 28;
 const INPUT_PAD = 6;
-
-/** Darken a color by a factor (0-1) to create a tinted background */
-function tintBg(color: number, factor = 0.15): number {
-  return (((color >> 16 & 0xff) * factor | 0) << 16) | (((color >> 8 & 0xff) * factor | 0) << 8) | ((color & 0xff) * factor | 0);
-}
 
 /** Simple word-wrap for BitmapText */
 function wrapText(text: string, maxChars: number): string[] {
