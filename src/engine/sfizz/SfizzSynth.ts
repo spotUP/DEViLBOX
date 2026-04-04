@@ -56,14 +56,64 @@ export const DEFAULT_SFIZZ: SfizzConfig = {
 };
 
 export const SFIZZ_PRESETS: Record<string, SfizzConfig> = {
-  'Natural': { ...DEFAULT_SFIZZ },
-  'Expressive': { ...DEFAULT_SFIZZ, expression: 0.8, modWheel: 0.5, reverbSend: 0.3 },
-  'Staccato': { ...DEFAULT_SFIZZ, sustainPedal: 0, expression: 1.0, reverbSend: 0.1, chorusSend: 0 },
-  'Legato': { ...DEFAULT_SFIZZ, sustainPedal: 1, expression: 0.7, reverbSend: 0.3, chorusSend: 0.1 },
-  'Ambient': { ...DEFAULT_SFIZZ, reverbSend: 0.7, chorusSend: 0.5, expression: 0.6, modWheel: 0.3 },
-  'Orchestral': { ...DEFAULT_SFIZZ, expression: 0.9, modWheel: 0.6, reverbSend: 0.5, chorusSend: 0.2, polyphony: 64 },
-  'Chamber': { ...DEFAULT_SFIZZ, expression: 0.75, reverbSend: 0.35, chorusSend: 0.1, polyphony: 32 },
-  'Solo Bright': { ...DEFAULT_SFIZZ, expression: 1.0, modWheel: 0.7, reverbSend: 0.2, chorusSend: 0, volume: 0.85 },
+  'Sine Pad': { ...DEFAULT_SFIZZ },
+  'Saw Lead': { ...DEFAULT_SFIZZ, volume: 0.7 },
+  'Square Lead': { ...DEFAULT_SFIZZ, volume: 0.6 },
+  'Triangle Soft': { ...DEFAULT_SFIZZ, volume: 0.8 },
+  'Noise Texture': { ...DEFAULT_SFIZZ, volume: 0.4 },
+  'Pluck': { ...DEFAULT_SFIZZ, volume: 0.75 },
+  'Warm Pad': { ...DEFAULT_SFIZZ, volume: 0.7 },
+  'Bass': { ...DEFAULT_SFIZZ, volume: 0.8 },
+};
+
+/** SFZ definitions for each preset — sfizz built-in oscillators + opcodes */
+const SFIZZ_PRESET_SFZ: Record<string, string> = {
+  'Sine Pad': `<global> amp_veltrack=80
+<group> <region> sample=*sine
+ampeg_attack=0.3 ampeg_decay=1.0 ampeg_sustain=80 ampeg_release=0.8`,
+
+  'Saw Lead': `<global> amp_veltrack=100
+<group> <region> sample=*saw
+ampeg_attack=0.01 ampeg_decay=0.3 ampeg_sustain=70 ampeg_release=0.2
+cutoff=4000 resonance=3 fil_type=lpf_2p`,
+
+  'Square Lead': `<global> amp_veltrack=100
+<group> <region> sample=*square
+ampeg_attack=0.005 ampeg_decay=0.2 ampeg_sustain=65 ampeg_release=0.15
+cutoff=3000 resonance=2 fil_type=lpf_2p`,
+
+  'Triangle Soft': `<global> amp_veltrack=60
+<group> <region> sample=*triangle
+ampeg_attack=0.1 ampeg_decay=0.5 ampeg_sustain=90 ampeg_release=0.5`,
+
+  'Noise Texture': `<global> amp_veltrack=40
+<group> <region> sample=*noise
+ampeg_attack=0.5 ampeg_decay=2.0 ampeg_sustain=30 ampeg_release=1.0
+cutoff=2000 resonance=1 fil_type=lpf_2p`,
+
+  'Pluck': `<global> amp_veltrack=100
+<group> <region> sample=*saw
+ampeg_attack=0.001 ampeg_decay=0.4 ampeg_sustain=0 ampeg_release=0.1
+cutoff=6000 resonance=2 fil_type=lpf_2p
+fileg_attack=0 fileg_decay=0.15 fileg_sustain=0 fileg_depth=4000`,
+
+  'Warm Pad': `<global> amp_veltrack=60
+<group>
+<region> sample=*saw
+ampeg_attack=0.5 ampeg_decay=1.5 ampeg_sustain=75 ampeg_release=1.0
+cutoff=1500 resonance=1 fil_type=lpf_2p
+volume=-6
+<region> sample=*square
+ampeg_attack=0.6 ampeg_decay=1.5 ampeg_sustain=75 ampeg_release=1.0
+cutoff=1200 resonance=0.5 fil_type=lpf_2p
+volume=-8 pitch_keycenter=60 transpose=7`,
+
+  'Bass': `<global> amp_veltrack=100
+<group> <region> sample=*saw
+ampeg_attack=0.005 ampeg_decay=0.3 ampeg_sustain=50 ampeg_release=0.1
+cutoff=1500 resonance=4 fil_type=lpf_2p
+fileg_attack=0 fileg_decay=0.1 fileg_sustain=0 fileg_depth=3000
+hikey=59 lokey=0`,
 };
 
 const CONFIG_KEYS: (keyof SfizzConfig)[] = [
@@ -205,22 +255,11 @@ export class SfizzSynthEngine implements DevilboxSynth {
     }
   }
 
-  private async loadDefaultSFZ(baseUrl: string): Promise<void> {
-    try {
-      const [sfzRes, wavRes] = await Promise.all([
-        fetch(`${baseUrl}sfizz/default.sfz`),
-        fetch(`${baseUrl}sfizz/default_sample.wav`),
-      ]);
-      if (!sfzRes.ok || !wavRes.ok) return;
-      const [sfzContent, wavData] = await Promise.all([
-        sfzRes.text(),
-        wavRes.arrayBuffer(),
-      ]);
-      const samples = new Map<string, ArrayBuffer>();
-      samples.set('default_sample.wav', wavData);
-      this.loadSFZ(sfzContent, samples);
-    } catch {
-      // No default SFZ available — user must load one manually
+  private loadDefaultSFZ(_baseUrl: string): void {
+    // Load default preset SFZ using sfizz built-in oscillator (no sample files needed)
+    const sfz = SFIZZ_PRESET_SFZ['Sine Pad'];
+    if (sfz) {
+      this.loadSFZ(sfz, new Map());
     }
   }
 
@@ -283,6 +322,11 @@ export class SfizzSynthEngine implements DevilboxSynth {
     if (preset) {
       this.config = { ...preset };
       this.sendConfig(this.config);
+      // Load the SFZ definition for this preset (different oscillator/envelope/filter)
+      const sfz = SFIZZ_PRESET_SFZ[name];
+      if (sfz) {
+        this.loadSFZ(sfz, new Map());
+      }
     }
   }
 
