@@ -46,12 +46,13 @@ export const AppLayout: React.FC<AppLayoutProps> = ({
 }) => {
   const { isMobile } = useResponsive();
   const activeView = useUIStore((s) => s.activeView);
+  const editorFullscreen = useUIStore((s) => s.editorFullscreen);
   const isFullscreenView = activeView === 'vj';
 
   return (
     <div className="h-screen w-screen flex flex-col bg-dark-bg text-text-primary overflow-hidden">
-      {/* Top Navigation Bar - Hidden on mobile and in fullscreen views (VJ) */}
-      {!isFullscreenView && (
+      {/* Top Navigation Bar - Hidden on mobile, in fullscreen views (VJ), and editor fullscreen */}
+      {!isFullscreenView && !editorFullscreen && (
         <div className={isMobile ? 'hidden' : 'block'}>
           <NavBar />
         </div>
