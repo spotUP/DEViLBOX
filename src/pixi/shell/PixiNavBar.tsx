@@ -45,6 +45,7 @@ export const PixiNavBar: React.FC = () => {
   const { width } = usePixiResponsive();
 
   const n = useNavBar();
+  const editorFullscreen = useUIStore(s => s.editorFullscreen);
 
   // ── Lucide icon textures for nav buttons ──────────────────────────────────
   const NAV_ICON = 14;
@@ -329,8 +330,8 @@ export const PixiNavBar: React.FC = () => {
 
       </pixiContainer>{/* end main nav row */}
 
-      {/* ── Project tab bar row ── hidden in DJ/VJ views */}
-      {n.activeView !== 'dj' && n.activeView !== 'vj' && <layoutContainer
+      {/* ── Project tab bar row ── hidden in DJ/VJ views and editor fullscreen */}
+      {n.activeView !== 'dj' && n.activeView !== 'vj' && !editorFullscreen && <layoutContainer
         layout={{
           width,
           height: TAB_ROW_H,
