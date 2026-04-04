@@ -600,6 +600,17 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
                         {channelTrackTables?.length ?? 0} channels · {patterns.length} parts
                       </span>
                       <button
+                        className={`px-2 py-0.5 text-xs rounded border ${
+                          mlFormatData.followMode === 0
+                            ? 'bg-dark-bgSecondary text-text-muted border-dark-border'
+                            : 'bg-accent-primary/20 text-accent-primary border-accent-primary/40'
+                        }`}
+                        onClick={mlFormatData.cycleFollowMode}
+                        title="Cycle follow mode: Off / Pattern / Tune"
+                      >
+                        Follow: {mlFormatData.followMode === 0 ? 'Off' : mlFormatData.followMode === 1 ? 'Pattern' : 'Tune'}
+                      </button>
+                      <button
                         className="px-2 py-0.5 text-xs bg-green-800 hover:bg-green-700 text-green-100 rounded border border-green-600"
                         onClick={handleExportML}
                       >Export .ml</button>
@@ -631,7 +642,7 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
                               ? mlFormatData.perChannelRows[chIdx]
                               : mlFormatData.currentRow
                           }
-                          formatIsPlaying={mlFormatData.isPlaying}
+                          formatIsPlaying={mlFormatData.isPlaying && mlFormatData.followMode === 1}
                           onFormatCellChange={(_channelIdx, rowIdx, columnKey, value) => {
                             mlFormatData.handleCellChange(chIdx, rowIdx, columnKey, value);
                           }}
