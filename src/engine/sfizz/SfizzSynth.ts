@@ -127,7 +127,7 @@ export class SfizzSynthEngine implements DevilboxSynth {
       if (!SfizzSynthEngine.isWorkletLoaded) {
         if (!SfizzSynthEngine.workletLoadPromise) {
           SfizzSynthEngine.workletLoadPromise = rawContext.audioWorklet.addModule(
-            `${baseUrl}sfizz/Sfizz.worklet.js`
+            `${baseUrl}sfizz/Sfizz.worklet.js?v=${Date.now()}`
           );
         }
         await SfizzSynthEngine.workletLoadPromise;
