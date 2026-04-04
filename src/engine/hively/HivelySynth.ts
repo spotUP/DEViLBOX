@@ -30,7 +30,6 @@ export class HivelySynth implements DevilboxSynth {
    * into the Tone.js graph — additional instances share the same routing
    * and avoid duplicate connections that would multiply the volume.
    */
-  private static _engineConnectedToSynth = false;
   private _ownsEngineConnection = false;
 
   constructor() {
@@ -39,14 +38,11 @@ export class HivelySynth implements DevilboxSynth {
 
     this.engine = HivelyEngine.getInstance();
 
-    // Only the first live HivelySynth bridges engine → synth output.
-    // Subsequent instances get a silent output node (they don't need their
-    // own audio path because the engine is a singleton whole-song player).
-    if (!HivelySynth._engineConnectedToSynth) {
-      this.engine.output.connect(this.output);
-      HivelySynth._engineConnectedToSynth = true;
-      this._ownsEngineConnection = true;
-    }
+    // Connect engine output to EVERY HivelySynth instance. The engine is a
+    // singleton, but each instrument slot needs its own output for the mixer.
+    // Without this, only the first created HivelySynth produces audio.
+    this.engine.output.connect(this.output);
+    this._ownsEngineConnection = true;
   }
 
   async ensureInitialized(): Promise<void> {
@@ -203,7 +199,6 @@ export class HivelySynth implements DevilboxSynth {
       try {
         this.engine.output.disconnect(this.output);
       } catch { /* may already be disconnected */ }
-      HivelySynth._engineConnectedToSynth = false;
       this._ownsEngineConnection = false;
     }
   }
