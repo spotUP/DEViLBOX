@@ -431,6 +431,13 @@ class FurnaceDispatchProcessor extends AudioWorkletProcessor {
         this.sequencerActive = false;
         break;
       }
+      case 'enableCmdLog': {
+        this._cmdLogEnabled = !!data.enable;
+        if (this.wasm && this.wasm.cmdLogEnable) {
+          this.wasm.cmdLogEnable(this._cmdLogEnabled ? 1 : 0);
+        }
+        break;
+      }
       case 'seqSeek': {
         if (this.wasm) this.wasm.seqSeek(data.order, data.row);
         break;
@@ -661,7 +668,13 @@ class FurnaceDispatchProcessor extends AudioWorkletProcessor {
         seqGetOrder: this.module._furnace_seq_get_order,
         seqGetRow: this.module._furnace_seq_get_row,
         seqIsPlaying: this.module._furnace_seq_is_playing,
+        // Command log for automation capture
+        cmdLogEnable: this.module._furnace_cmd_log_enable,
+        cmdLogCount: this.module._furnace_cmd_log_count,
+        cmdLogGet: this.module._furnace_cmd_log_get,
       };
+      this._cmdLogEnabled = false;
+      this._cmdLogPollCounter = 0;
 
       // Allocate audio output buffers in WASM memory (shared scratch for render)
       this.outputPtrL = this.module._malloc(this.bufferSize * 4);
@@ -980,6 +993,31 @@ class FurnaceDispatchProcessor extends AudioWorkletProcessor {
           try { this.wasm.tick(chip.handle); } catch { /* skip bad chip */ }
         }
         this.tickAccumulator -= this.samplesPerTick;
+      }
+
+      // Drain command log periodically and post to main thread
+      if (this._cmdLogEnabled && this.wasm.cmdLogCount) {
+        this._cmdLogPollCounter++;
+        if (this._cmdLogPollCounter >= 10) {
+          this._cmdLogPollCounter = 0;
+          const count = this.wasm.cmdLogCount();
+          if (count > 0) {
+            const ptr = this.wasm.cmdLogGet();
+            const entries = [];
+            for (let i = 0; i < count; i++) {
+              const base = ptr / 4 + i * 6;
+              entries.push({
+                tick: this.module.HEAP32[base],
+                cmd: this.module.HEAP32[base + 1],
+                channel: this.module.HEAP32[base + 2],
+                value1: this.module.HEAP32[base + 3],
+                value2: this.module.HEAP32[base + 4],
+              });
+            }
+            this.module._free(ptr);
+            this.port.postMessage({ type: 'cmdLog', entries });
+          }
+        }
       }
 
       // Render each chip and mix into output with postAmp scaling

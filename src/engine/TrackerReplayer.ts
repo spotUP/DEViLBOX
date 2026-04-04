@@ -27,6 +27,7 @@ import { getPatternScheduler } from './PatternScheduler';
 import { getAutomationPlayer } from './AutomationPlayer';
 import { getAutomationCapture } from './automation/AutomationCapture';
 import { decodePaulaRegister } from './automation/decoders/PaulaRegisterDecoder';
+import { decodeFurnaceCommand } from './automation/decoders/FurnaceCommandDecoder';
 import { useTransportStore, cancelPendingRowUpdate } from '@/stores/useTransportStore';
 import { useAutomationStore } from '@/stores/useAutomationStore';
 import { useCursorStore } from '@/stores/useCursorStore';
@@ -536,6 +537,7 @@ export class TrackerReplayer {
   private _mlPositionUnsub: (() => void) | null = null;
   private _uadePositionUnsub: (() => void) | null = null;
   private _uadePaulaLogInterval: number | null = null;
+  private _furnaceCmdLogUnsub: (() => void) | null = null;
   private _tfmxChannelUnsub: (() => void) | null = null;
 
   /** Get the active C64 SID engine (for subsong switching etc.) */
@@ -1709,6 +1711,18 @@ export class TrackerReplayer {
           }
         });
 
+        // Enable command log for automation capture
+        dispatchEngine.enableCmdLog(true);
+        this._furnaceCmdLogUnsub = dispatchEngine.onCmdLog((entries) => {
+          const capture = getAutomationCapture();
+          for (const entry of entries) {
+            const decoded = decodeFurnaceCommand(entry.cmd, entry.channel, entry.value1, entry.value2);
+            for (const d of decoded) {
+              capture.push(d.paramId, entry.tick, d.value);
+            }
+          }
+        });
+
         // Start WASM sequencer from current position
         _log('[TrackerReplayer] WASM seq: calling seqPlay(%d, %d)', this.songPos, this.pattPos);
         dispatchEngine.seqPlay(this.songPos, this.pattPos);
@@ -1928,6 +1942,11 @@ export class TrackerReplayer {
     if (this._uadePaulaLogInterval != null) {
       clearInterval(this._uadePaulaLogInterval);
       this._uadePaulaLogInterval = null;
+    }
+    // Clean up Furnace command log subscription
+    if (this._furnaceCmdLogUnsub) {
+      this._furnaceCmdLogUnsub();
+      this._furnaceCmdLogUnsub = null;
     }
 
     // Clean up TFMX channel subscription
