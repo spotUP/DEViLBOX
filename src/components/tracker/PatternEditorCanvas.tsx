@@ -1976,7 +1976,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
         const fpsActive = fps.isPlaying && formatIsPlayingRef.current;
         isPlaying = fpsActive;
         playRow = fpsActive ? fps.row : formatCurrentRowRef.current;
-        if (fps.isPlaying && fps.rowDuration > 0) {
+        if (fpsActive && fps.rowDuration > 0) {
           const elapsed = performance.now() - fps.rowChangeTime;
           const progress = Math.min(Math.max(elapsed / fps.rowDuration, 0), 1);
           const ts = useTransportStore.getState();
@@ -2302,8 +2302,9 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
       let smoothOffset = 0;
 
       // WASM engine position — check FIRST (bypasses replayer which returns stale state)
+      // Skip for format mode — format mode already handled position via FormatPlaybackState.
       const wasmPos = wasmPosEarly;
-      if (wasmPos.active) {
+      if (wasmPos.active && !isFormatModeRef.current) {
         currentRow = wasmPos.row;
         // Use songPos to determine active pattern (multi-pattern WASM songs)
         const patternOrder = trackerState.patternOrder;
