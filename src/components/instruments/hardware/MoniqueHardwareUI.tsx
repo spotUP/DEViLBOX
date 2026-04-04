@@ -221,17 +221,18 @@ export const MoniqueHardwareUI: React.FC<MoniqueHardwareUIProps> = ({
         // so the index matches the audio WASM's setParam directly.
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         (window as any)._moniqueUIParamCallback = (index: number, value: number) => {
-          if (!instrumentId) return;
+          console.log(`[MoniqueHW] param ${index} = ${value}, instrumentId=${instrumentId}`);
           try {
             const engine = getToneEngine();
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             const instruments = (engine as any).instruments as Map<number, any>;
             const key = (instrumentId << 16) | 0xFFFF;
             const synth = instruments?.get(key);
+            console.log(`[MoniqueHW] synth found:`, !!synth, 'worklet:', !!synth?._worklet);
             if (synth?._worklet) {
               synth._worklet.port.postMessage({ type: 'setParam', index, value });
             }
-          } catch { /* engine not ready */ }
+          } catch (e) { console.error('[MoniqueHW] error:', e); }
         };
 
         eventCleanups.push(() => {
