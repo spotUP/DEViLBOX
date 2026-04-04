@@ -23,7 +23,6 @@ import { playRow } from '@engine/keyboard/commands/playRow';
 import { playFromCursor } from '@engine/keyboard/commands/playFromCursor';
 import { clonePattern } from '@engine/keyboard/commands/clonePattern';
 import { playStopToggle, playPattern, playSong, stopPlayback } from '@engine/keyboard/commands/transport';
-import { getTrackerReplayer } from '@engine/TrackerReplayer';
 import {
   cursorUp, cursorDown, cursorLeft, cursorRight,
   cursorPageUp, cursorPageDown, cursorHome, cursorEnd,
@@ -1905,18 +1904,12 @@ export function useGlobalKeyboardHandler(options: UseGlobalKeyboardHandlerOption
       }
 
       // Right Shift = play song from start, Right Alt/Option = play pattern from start.
-      // If a song is loaded, forcePosition handles both playing and stopped states
-      // (tight restart — bypasses async React effect cycle).
-      // Cold start (no song loaded) falls through to playSong/playPattern.
+      // Uses the same code path as the toolbar buttons — playSong/playPattern handle
+      // both cold start and restart (including WASM engine stop+restart).
       if (e.code === 'ShiftRight' || e.code === 'AltRight') {
         e.preventDefault();
         e.stopPropagation();
-        const replayer = getTrackerReplayer();
-        if (replayer.getSong()) {
-          replayer.forcePosition(e.code === 'ShiftRight' ? 0 : replayer.getSongPos(), 0);
-        } else {
-          if (e.code === 'ShiftRight') playSong(); else playPattern();
-        }
+        if (e.code === 'ShiftRight') playSong(); else playPattern();
         return;
       }
 
