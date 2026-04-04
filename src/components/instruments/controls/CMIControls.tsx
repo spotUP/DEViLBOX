@@ -8,6 +8,7 @@
 import React, { useCallback, useRef, useEffect } from 'react';
 import { Knob } from '@components/controls/Knob';
 import { ScrollLockContainer } from '@components/ui/ScrollLockContainer';
+import { HarmonicBarsCanvas } from '@components/instruments/shared';
 import type { SynthType } from '@typedefs/instrument';
 import {
   useCMIPanel,
@@ -35,80 +36,6 @@ interface CMIControlsProps {
   onTextChange?: (key: string, value: string) => void;
   onLoadPreset?: (program: number) => void;
 }
-
-// ── Canvas: Harmonic Bars ────────────────────────────────────────────────────
-
-const HarmonicBarsCanvas: React.FC<{
-  harmonics: number[];
-  width: number;
-  height: number;
-  onStartDrag: (nx: number, ny: number) => void;
-  onDrag: (nx: number, ny: number) => void;
-  onEndDrag: () => void;
-  dragActive: React.MutableRefObject<boolean>;
-}> = ({ harmonics, width, height, onStartDrag, onDrag, onEndDrag, dragActive }) => {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-
-    ctx.clearRect(0, 0, width, height);
-
-    // Background
-    ctx.fillStyle = '#0a0a0a';
-    ctx.fillRect(0, 0, width, height);
-
-    // Grid
-    ctx.strokeStyle = CMI_GREEN_FAINT;
-    ctx.lineWidth = 0.5;
-    for (let y = 0; y <= 4; y++) {
-      ctx.beginPath();
-      ctx.moveTo(0, (y / 4) * height);
-      ctx.lineTo(width, (y / 4) * height);
-      ctx.stroke();
-    }
-
-    // Bars
-    const barW = width / NUM_HARMONICS;
-    for (let i = 0; i < NUM_HARMONICS; i++) {
-      const amp = Math.max(0, Math.min(1, harmonics[i] || 0));
-      if (amp > 0.001) {
-        const h = amp * height;
-        ctx.fillStyle = CMI_GREEN;
-        ctx.fillRect(i * barW + 1, height - h, barW - 2, h);
-        // Bright top
-        ctx.fillStyle = CMI_GREEN_BRIGHT;
-        ctx.fillRect(i * barW + 1, height - h, barW - 2, 2);
-      }
-    }
-
-    // Border
-    ctx.strokeStyle = CMI_GREEN_DIM;
-    ctx.lineWidth = 1;
-    ctx.strokeRect(0, 0, width, height);
-  }, [harmonics, width, height]);
-
-  const getRelativeCoords = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
-    const rect = e.currentTarget.getBoundingClientRect();
-    return { nx: (e.clientX - rect.left) / width, ny: (e.clientY - rect.top) / height };
-  }, [width, height]);
-
-  return (
-    <canvas
-      ref={canvasRef}
-      width={width}
-      height={height}
-      style={{ cursor: 'crosshair', borderRadius: 4, width, height }}
-      onMouseDown={(e) => { const c = getRelativeCoords(e); onStartDrag(c.nx, c.ny); }}
-      onMouseMove={(e) => { if (dragActive.current) { const c = getRelativeCoords(e); onDrag(c.nx, c.ny); } }}
-      onMouseUp={onEndDrag}
-      onMouseLeave={onEndDrag}
-    />
-  );
-};
 
 // ── Canvas: Waveform Display ─────────────────────────────────────────────────
 
@@ -390,12 +317,16 @@ const CMIControls: React.FC<CMIControlsProps> = ({
               <div className="flex flex-col gap-1">
                 <HarmonicBarsCanvas
                   harmonics={cmi.harmonics}
+                  count={NUM_HARMONICS}
                   width={VIS_W}
                   height={BAR_H}
-                  onStartDrag={cmi.startHarmonicDrag}
+                  barColor={CMI_GREEN}
+                  highlightColor={CMI_GREEN_BRIGHT}
+                  gridColor={CMI_GREEN_FAINT}
+                  borderColor={CMI_GREEN_DIM}
+                  onDragStart={cmi.startHarmonicDrag}
                   onDrag={cmi.updateHarmonicAt}
-                  onEndDrag={cmi.endHarmonicDrag}
-                  dragActive={cmi.harmonicDragActive}
+                  onDragEnd={cmi.endHarmonicDrag}
                 />
                 <WaveformCanvas waveform={cmi.customWaveform} width={VIS_W} height={WAVE_PREVIEW_H} />
                 <div className="flex items-center gap-2 mt-1">
