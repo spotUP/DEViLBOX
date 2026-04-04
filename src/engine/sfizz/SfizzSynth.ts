@@ -68,54 +68,96 @@ export const SFIZZ_PRESETS: Record<string, SfizzConfig> = {
   'Bass': { ...DEFAULT_SFIZZ, sfzPreset: 'Bass', volume: 0.8 },
 };
 
-/** SFZ definitions for each preset — sfizz built-in oscillators + opcodes */
+/** SFZ definitions for each preset — sfizz built-in oscillators + opcodes.
+ * sfizz's built-in oscillators are basic — for rich sounds, load real SFZ libraries.
+ * These presets use layering, filter envelopes, and detuning to be more interesting. */
 const SFIZZ_PRESET_SFZ: Record<string, string> = {
   'Sine Pad': `<global> amp_veltrack=80
-<group> <region> sample=*sine
-ampeg_attack=0.3 ampeg_decay=1.0 ampeg_sustain=80 ampeg_release=0.8`,
+<group>
+<region> sample=*sine
+ampeg_attack=0.4 ampeg_decay=2.0 ampeg_sustain=70 ampeg_release=1.2
+<region> sample=*sine
+ampeg_attack=0.6 ampeg_decay=2.0 ampeg_sustain=60 ampeg_release=1.5
+pitch_keycenter=60 transpose=12 volume=-12`,
 
   'Saw Lead': `<global> amp_veltrack=100
-<group> <region> sample=*saw
-ampeg_attack=0.01 ampeg_decay=0.3 ampeg_sustain=70 ampeg_release=0.2
-cutoff=4000 resonance=3 fil_type=lpf_2p`,
-
-  'Square Lead': `<global> amp_veltrack=100
-<group> <region> sample=*square
-ampeg_attack=0.005 ampeg_decay=0.2 ampeg_sustain=65 ampeg_release=0.15
-cutoff=3000 resonance=2 fil_type=lpf_2p`,
-
-  'Triangle Soft': `<global> amp_veltrack=60
-<group> <region> sample=*triangle
-ampeg_attack=0.1 ampeg_decay=0.5 ampeg_sustain=90 ampeg_release=0.5`,
-
-  'Noise Texture': `<global> amp_veltrack=40
-<group> <region> sample=*noise
-ampeg_attack=0.5 ampeg_decay=2.0 ampeg_sustain=30 ampeg_release=1.0
-cutoff=2000 resonance=1 fil_type=lpf_2p`,
-
-  'Pluck': `<global> amp_veltrack=100
-<group> <region> sample=*saw
-ampeg_attack=0.001 ampeg_decay=0.4 ampeg_sustain=0 ampeg_release=0.1
-cutoff=6000 resonance=2 fil_type=lpf_2p
-fileg_attack=0 fileg_decay=0.15 fileg_sustain=0 fileg_depth=4000`,
-
-  'Warm Pad': `<global> amp_veltrack=60
 <group>
 <region> sample=*saw
-ampeg_attack=0.5 ampeg_decay=1.5 ampeg_sustain=75 ampeg_release=1.0
-cutoff=1500 resonance=1 fil_type=lpf_2p
-volume=-6
+ampeg_attack=0.01 ampeg_decay=0.4 ampeg_sustain=60 ampeg_release=0.25
+cutoff=3500 resonance=4 fil_type=lpf_2p
+fileg_attack=0 fileg_decay=0.3 fileg_sustain=20 fileg_depth=5000
+<region> sample=*saw
+ampeg_attack=0.01 ampeg_decay=0.4 ampeg_sustain=60 ampeg_release=0.25
+cutoff=3500 resonance=4 fil_type=lpf_2p
+fileg_attack=0 fileg_decay=0.3 fileg_sustain=20 fileg_depth=5000
+tune=15 volume=-6`,
+
+  'Square Lead': `<global> amp_veltrack=100
+<group>
 <region> sample=*square
-ampeg_attack=0.6 ampeg_decay=1.5 ampeg_sustain=75 ampeg_release=1.0
-cutoff=1200 resonance=0.5 fil_type=lpf_2p
-volume=-8 pitch_keycenter=60 transpose=7`,
+ampeg_attack=0.005 ampeg_decay=0.3 ampeg_sustain=55 ampeg_release=0.2
+cutoff=2500 resonance=5 fil_type=lpf_2p
+fileg_attack=0 fileg_decay=0.2 fileg_sustain=10 fileg_depth=4000
+<region> sample=*square
+ampeg_attack=0.005 ampeg_decay=0.3 ampeg_sustain=55 ampeg_release=0.2
+cutoff=2500 resonance=5 fil_type=lpf_2p
+tune=-10 volume=-6`,
+
+  'Triangle Soft': `<global> amp_veltrack=50
+<group>
+<region> sample=*triangle
+ampeg_attack=0.15 ampeg_decay=1.0 ampeg_sustain=85 ampeg_release=0.8
+cutoff=5000 resonance=0.5 fil_type=lpf_2p
+<region> sample=*sine
+ampeg_attack=0.2 ampeg_decay=1.0 ampeg_sustain=80 ampeg_release=1.0
+pitch_keycenter=60 transpose=12 volume=-18`,
+
+  'Noise Texture': `<global> amp_veltrack=40
+<group>
+<region> sample=*noise
+ampeg_attack=0.8 ampeg_decay=3.0 ampeg_sustain=20 ampeg_release=2.0
+cutoff=1200 resonance=6 fil_type=lpf_2p
+fileg_attack=0.5 fileg_decay=2.0 fileg_sustain=0 fileg_depth=3000
+<region> sample=*sine
+ampeg_attack=1.0 ampeg_decay=2.0 ampeg_sustain=40 ampeg_release=2.0
+volume=-12`,
+
+  'Pluck': `<global> amp_veltrack=100
+<group>
+<region> sample=*saw
+ampeg_attack=0.001 ampeg_decay=0.5 ampeg_sustain=0 ampeg_release=0.15
+cutoff=8000 resonance=3 fil_type=lpf_2p
+fileg_attack=0 fileg_decay=0.12 fileg_sustain=0 fileg_depth=6000
+<region> sample=*square
+ampeg_attack=0.001 ampeg_decay=0.3 ampeg_sustain=0 ampeg_release=0.1
+cutoff=6000 resonance=2 fil_type=lpf_2p
+fileg_attack=0 fileg_decay=0.08 fileg_sustain=0 fileg_depth=4000
+pitch_keycenter=60 transpose=12 volume=-10`,
+
+  'Warm Pad': `<global> amp_veltrack=50
+<group>
+<region> sample=*saw
+ampeg_attack=0.8 ampeg_decay=2.0 ampeg_sustain=65 ampeg_release=1.5
+cutoff=1200 resonance=1.5 fil_type=lpf_2p
+<region> sample=*saw
+ampeg_attack=0.9 ampeg_decay=2.0 ampeg_sustain=65 ampeg_release=1.5
+cutoff=1000 resonance=1 fil_type=lpf_2p
+tune=12 volume=-4
+<region> sample=*square
+ampeg_attack=1.0 ampeg_decay=2.0 ampeg_sustain=60 ampeg_release=1.8
+cutoff=800 resonance=0.5 fil_type=lpf_2p
+pitch_keycenter=60 transpose=7 volume=-10`,
 
   'Bass': `<global> amp_veltrack=100
-<group> <region> sample=*saw
-ampeg_attack=0.005 ampeg_decay=0.3 ampeg_sustain=50 ampeg_release=0.1
-cutoff=1500 resonance=4 fil_type=lpf_2p
-fileg_attack=0 fileg_decay=0.1 fileg_sustain=0 fileg_depth=3000
-hikey=59 lokey=0`,
+<group>
+<region> sample=*saw
+ampeg_attack=0.003 ampeg_decay=0.35 ampeg_sustain=45 ampeg_release=0.1
+cutoff=1200 resonance=5 fil_type=lpf_2p
+fileg_attack=0 fileg_decay=0.08 fileg_sustain=0 fileg_depth=4000
+<region> sample=*square
+ampeg_attack=0.003 ampeg_decay=0.4 ampeg_sustain=50 ampeg_release=0.1
+cutoff=800 resonance=2 fil_type=lpf_2p
+pitch_keycenter=60 transpose=-12 volume=-6`,
 };
 
 const CONFIG_KEYS: (keyof SfizzConfig)[] = [
