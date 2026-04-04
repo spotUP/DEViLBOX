@@ -5,7 +5,7 @@
  * Contains all synth-specific change handlers and the editor mode dispatch logic.
  */
 
-import React, { useCallback, useEffect, lazy, Suspense } from 'react';
+import React, { useCallback, useEffect, useState, lazy, Suspense } from 'react';
 import { useGTUltraStore } from '@stores/useGTUltraStore';
 import type { InstrumentConfig, EffectConfig } from '@typedefs/instrument';
 import type { GTUltraConfig } from '@typedefs/instrument/exotic';
@@ -580,6 +580,18 @@ export const SynthTypeDispatcher: React.FC<SynthTypeDispatcherProps> = ({
     const newConfig = { ...currentConfig, ...updates };
     handleChange({ sfizz: newConfig });
   }, [instrument.sfizz, handleChange]);
+
+  const [sfizzLoadedName, setSfizzLoadedName] = useState<string | undefined>();
+  const handleSfizzLoadFiles = useCallback(async (files: FileList) => {
+    const engine = getToneEngine();
+    const synth = engine.instruments.get(engine.getInstrumentKey(instrument.id, -1));
+    if (synth && 'loadSFZFromFiles' in synth) {
+      const result = await (synth as any).loadSFZFromFiles(files);
+      if (result.success) {
+        setSfizzLoadedName(result.name);
+      }
+    }
+  }, [instrument.id]);
 
   // Handle ZynAddSubFX config updates
   const handleZynAddSubFXChange = useCallback((updates: Partial<ZynAddSubFXConfig>) => {
@@ -2657,7 +2669,7 @@ export const SynthTypeDispatcher: React.FC<SynthTypeDispatcherProps> = ({
         <EditorHeader instrument={instrument} onChange={handleChange} vizMode={vizMode} onVizModeChange={setVizMode} showHelpButton={false} onBake={handleBake} onBakePro={handleBakePro} onUnbake={handleUnbake} isBaked={isBaked} isBaking={isBaking} />
         <div className="synth-editor-content overflow-y-auto">
           <Suspense fallback={<LoadingControls />}>
-            <SfizzControls config={sfizzConfig} onChange={handleSfizzChange} />
+            <SfizzControls config={sfizzConfig} onChange={handleSfizzChange} onLoadFiles={handleSfizzLoadFiles} loadedName={sfizzLoadedName} />
           </Suspense>
         </div>
       </div>

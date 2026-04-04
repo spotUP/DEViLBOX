@@ -315,6 +315,47 @@ export class SfizzSynthEngine implements DevilboxSynth {
     }
   }
 
+  /** Load an SFZ instrument from a FileList (e.g. from <input type="file" webkitdirectory>).
+   *  Finds the .sfz file, reads all other files as samples, writes them to MEMFS. */
+  async loadSFZFromFiles(files: FileList | File[]): Promise<{ success: boolean; name?: string; regions?: number }> {
+    const fileArr = Array.from(files);
+
+    // Find the .sfz file
+    const sfzFile = fileArr.find(f => f.name.toLowerCase().endsWith('.sfz'));
+    if (!sfzFile) {
+      return { success: false };
+    }
+
+    // Read SFZ text
+    const sfzContent = await sfzFile.text();
+
+    // Find the base directory (relative to the .sfz file)
+    const sfzDir = sfzFile.webkitRelativePath
+      ? sfzFile.webkitRelativePath.substring(0, sfzFile.webkitRelativePath.lastIndexOf('/'))
+      : '';
+
+    // Read all non-SFZ files as samples
+    const samples = new Map<string, ArrayBuffer>();
+    for (const file of fileArr) {
+      if (file === sfzFile) continue;
+      const data = await file.arrayBuffer();
+      // Compute path relative to the SFZ file's directory
+      let relPath = file.webkitRelativePath || file.name;
+      if (sfzDir && relPath.startsWith(sfzDir + '/')) {
+        relPath = relPath.substring(sfzDir.length + 1);
+      }
+      samples.set(relPath, data);
+    }
+
+    this.loadSFZ(sfzContent, samples);
+
+    // Update config to reflect loaded instrument name
+    this.config.sfzPreset = undefined;
+    this._lastSfzPreset = undefined;
+
+    return { success: true, name: sfzFile.name };
+  }
+
   loadSFZ(sfzContent: string, samples: Map<string, ArrayBuffer>): void {
     if (!this._worklet) {
       console.warn('Sfizz: worklet not ready, cannot load SFZ');
