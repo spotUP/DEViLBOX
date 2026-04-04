@@ -123,7 +123,24 @@ interface SIDProps {
 const SID_ATTACK_MS = [2, 8, 16, 24, 38, 56, 68, 80, 100, 250, 500, 800, 1000, 3000, 5000, 8000];
 const SID_DECAY_MS  = [6, 24, 48, 72, 114, 168, 204, 240, 300, 750, 1500, 2400, 3000, 9000, 15000, 24000];
 
-export type EnvelopeVisualizationProps = ADSRProps | LinearProps | StepsProps | SIDProps;
+interface MSProps {
+  mode: 'ms';
+  /** Attack time in milliseconds */
+  attack: number;
+  /** Decay time in milliseconds */
+  decay: number;
+  /** Sustain level 0-100 (percentage) */
+  sustain: number;
+  /** Release time in milliseconds */
+  release: number;
+  width?: number | 'auto';
+  height?: number;
+  color?: string;
+  backgroundColor?: string;
+  border?: string;
+}
+
+export type EnvelopeVisualizationProps = ADSRProps | LinearProps | StepsProps | SIDProps | MSProps;
 
 // ── Component ──────────────────────────────────────────────────────────────────
 
@@ -183,6 +200,8 @@ export const EnvelopeVisualization: React.FC<EnvelopeVisualizationProps> = (prop
       drawLinear(ctx, w, h, props, strokeColor);
     } else if (props.mode === 'sid') {
       drawSID(ctx, w, h, props, strokeColor);
+    } else if (props.mode === 'ms') {
+      drawMS(ctx, w, h, props, strokeColor);
     } else {
       drawSteps(ctx, w, h, props, strokeColor);
     }
@@ -432,6 +451,57 @@ function drawSID(
   ctx.moveTo(0, h); ctx.lineTo(xA, 2); ctx.lineTo(xD, ySus);
   ctx.lineTo(xS, ySus); ctx.lineTo(w, h); ctx.closePath();
   ctx.fillStyle = color; ctx.globalAlpha = 0.12; ctx.fill(); ctx.globalAlpha = 1;
+
+  // Envelope curve
+  ctx.strokeStyle = color; ctx.lineWidth = 2; ctx.lineJoin = 'round';
+  ctx.beginPath();
+  ctx.moveTo(0, h); ctx.lineTo(xA, 2); ctx.lineTo(xD, ySus);
+  ctx.lineTo(xS, ySus); ctx.lineTo(w, h); ctx.stroke();
+
+  // Phase labels
+  ctx.fillStyle = 'rgba(255,255,255,0.3)'; ctx.font = '8px monospace'; ctx.textAlign = 'center';
+  const mid = (x1: number, x2: number) => (x1 + x2) / 2;
+  if (xA > 12) ctx.fillText('A', mid(0, xA), h - 4);
+  ctx.fillText('D', mid(xA, xD), h - 4);
+  ctx.fillText('S', mid(xD, xS), h - 4);
+  ctx.fillText('R', mid(xS, w), h - 4);
+  ctx.textAlign = 'left';
+}
+
+// ── MS mode (millisecond-based ADSR) ─────────────────────────────────────────
+
+function drawMS(
+  ctx: CanvasRenderingContext2D,
+  w: number, h: number,
+  p: MSProps, color: string,
+) {
+  const atkMs = Math.max(0, p.attack);
+  const decMs = Math.max(0, p.decay);
+  const relMs = Math.max(0, p.release);
+  const susLevel = Math.max(0, Math.min(100, p.sustain)) / 100;
+
+  const adsr = atkMs + decMs + relMs;
+  const susHoldMs = Math.max(adsr * 0.2, 50);
+  const totalMs = adsr + susHoldMs;
+  if (totalMs === 0) return;
+
+  const tx = (ms: number) => (ms / totalMs) * w;
+  const xA = tx(atkMs);
+  const xD = tx(atkMs + decMs);
+  const xS = tx(atkMs + decMs + susHoldMs);
+  const ySus = 2 + (1 - susLevel) * (h - 4);
+
+  // Fill under curve
+  ctx.beginPath();
+  ctx.moveTo(0, h); ctx.lineTo(xA, 2); ctx.lineTo(xD, ySus);
+  ctx.lineTo(xS, ySus); ctx.lineTo(w, h); ctx.closePath();
+  ctx.fillStyle = color; ctx.globalAlpha = 0.12; ctx.fill(); ctx.globalAlpha = 1;
+
+  // Sustain dashed guide
+  ctx.strokeStyle = 'rgba(125, 211, 252, 0.35)';
+  ctx.lineWidth = 1; ctx.setLineDash([3, 3]);
+  ctx.beginPath(); ctx.moveTo(xD, ySus); ctx.lineTo(xS, ySus); ctx.stroke();
+  ctx.setLineDash([]);
 
   // Envelope curve
   ctx.strokeStyle = color; ctx.lineWidth = 2; ctx.lineJoin = 'round';
