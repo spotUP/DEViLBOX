@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-04-03T22:29:24.448Z
+ * Generated: 2026-04-03T23:45:23.949Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -19,9 +19,9 @@ export interface ChangelogEntry {
 }
 
 // Build info
-export const BUILD_VERSION = '1.0.3964';
-export const BUILD_NUMBER = '3964';
-export const BUILD_HASH = 'faa01a037';
+export const BUILD_VERSION = '1.0.3990';
+export const BUILD_NUMBER = '3990';
+export const BUILD_HASH = 'dd47e18d8';
 export const BUILD_DATE = '2026-04-03';
 
 // Full version (patch IS the build number, so no need to append)
@@ -30,9 +30,113 @@ export const FULL_VERSION = BUILD_VERSION;
 // Auto-generated changelog
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: '1.0.3964',
+    version: '1.0.3990',
     date: '2026-04-04',
     changes: [
+      {
+        type: 'fix',
+        "description": "Native presets load on running synth instead of recreating"
+      },
+      {
+        type: 'fix',
+        "description": "SelectVoiceInBank always loads bank sysex before selecting voice"
+      },
+      {
+        type: 'fix',
+        "description": "Prevent context menu on test keyboard + accumulated session changes"
+      },
+      {
+        type: 'fix',
+        "description": "Restore selectVoice delay + add loadPatchBank debug log"
+      },
+      {
+        type: 'fix',
+        "description": "Add EditorHeader with PresetDropdown to layout mode"
+      },
+      {
+        type: 'fix',
+        "description": "Strip all redundant voice loading — let bridge handle everything"
+      },
+      {
+        type: 'feature',
+        "description": "Add 10 more factory presets (25 total)"
+      },
+      {
+        type: 'fix',
+        "description": "SetBfree — 2 tabs: MAIN (upper drawbars, perc, leslie, fx) and DETAIL (lower/pedal drawbars, vibrato, leslie detail, master)"
+      },
+      {
+        type: 'fix',
+        "description": "Raffo — single screen layout, no tabs for 32 params"
+      },
+      {
+        type: 'fix',
+        "description": "Don't send program change after single-voice sysex"
+      },
+      {
+        type: 'fix',
+        "description": "VCED presets use single-voice sysex (don't wipe entire bank)"
+      },
+      {
+        type: 'fix',
+        "description": "Remove HEAP*/wasmExports/wasmTable from unexported abort list"
+      },
+      {
+        type: 'fix',
+        "description": "Proper cartridge sync — loadVoices called alongside loadSysex"
+      },
+      {
+        type: 'fix',
+        "description": "Remove wasmMemory from unexportedSymbols abort getter list"
+      },
+      {
+        type: 'fix',
+        "description": "Patch banks — load voice data as cartridge in worklet"
+      },
+      {
+        type: 'fix',
+        "description": "Remove wasmMemory assert that blocked module init"
+      },
+      {
+        type: 'fix',
+        "description": "Remove wasmMemory early-access guard that aborted on init"
+      },
+      {
+        type: 'fix',
+        "description": "Patch banks silent — remove loadVoices init (cartridge conflict)"
+      },
+      {
+        type: 'feature',
+        "description": "Smart hardware UI popout + theme fixes"
+      },
+      {
+        type: 'fix',
+        "description": "Make applyConfig public on 7 WASM synths"
+      },
+      {
+        type: 'fix',
+        "description": "All WASM synths use layout mode — no more slider fallbacks"
+      },
+      {
+        type: 'fix',
+        "description": "Add to NATIVE_POLY_TYPES so note-off reaches the right instance"
+      },
+      {
+        type: 'fix',
+        "description": "MdaDX10 — single screen layout, no tabs for 16 params"
+      },
+      {
+        type: 'fix',
+        "description": "MdaJX10 — single screen layout, no tabs for 24 params"
+      },
+      {
+        type: 'fix',
+        "description": "MdaEPiano — single screen layout, no tabs needed for 12 params"
+      },
+      {
+        type: 'fix',
+        "description": "Knob preventDefault only for mouse, skip for passive touch events"
+      },
       {
         type: 'fix',
         "description": "Velocity slider — fixed 96px width instead of full-width stretch"
@@ -134,110 +238,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'feature',
         "description": "Add hover state to PixiList rows"
-      },
-      {
-        type: 'fix',
-        "description": "Crate panel needs click before becoming active"
-      },
-      {
-        type: 'feature',
-        "description": "Add brick-wall limiter on deck channel output"
-      },
-      {
-        type: 'fix',
-        "description": "Revert pitchShift routing — internal delay buffers cause volume boost"
-      },
-      {
-        type: 'fix',
-        "description": "Scratch buffer playback now routes through pitchShift"
-      },
-      {
-        type: 'fix',
-        "description": "Root cause of scratch volume boost — gain overlap during transitions"
-      },
-      {
-        type: 'fix',
-        "description": "Bypass Tone.Signal entirely for scratch gain + fix sync false-stop"
-      },
-      {
-        type: 'fix',
-        "description": "Eliminate gain corruption from Tone.js linearRampTo wrapper"
-      },
-      {
-        type: 'feature',
-        "description": "Mount PixiDeckPatternDisplay overlay on vinyl and 3D deck views"
-      },
-      {
-        type: 'fix',
-        "description": "Auto DJ enable returns error messages instead of failing silently"
-      },
-      {
-        type: 'feature',
-        "description": "Scratch sensitivity setting + view switch mutual exclusion"
-      },
-      {
-        type: 'fix',
-        "description": "Scratch backward displacement tracking and gain automation safety"
-      },
-      {
-        type: 'fix',
-        "description": "Scratch flanging, position reset, and volume accumulation"
-      },
-      {
-        type: 'feature',
-        "description": "Edit Instrument modal — fullscreen with collapsible left panel"
-      },
-      {
-        type: 'fix',
-        "description": "Duplicate WaveSabre key + DrumPadManager crash on app.screen"
-      },
-      {
-        type: 'fix',
-        "description": "File browser — single click opens directories, fix event propagation"
-      },
-      {
-        type: 'fix',
-        "description": "Simplify Add Instrument search bar — use PixiPureTextInput directly"
-      },
-      {
-        type: 'fix',
-        "description": "Add Instrument dialog sizing/spacing/fonts to match DOM"
-      },
-      {
-        type: 'fix',
-        "description": "Add layout={{}} to all bitmap text and icons in Add Instrument dialog"
-      },
-      {
-        type: 'fix',
-        "description": "Restore audio by using loadVoices+setBank path for VCED presets"
-      },
-      {
-        type: 'feature',
-        "description": "Add New Instrument dialog — 1:1 with DOM CategorizedSynthSelector"
-      },
-      {
-        type: 'fix',
-        "description": "Stabilize sync indicator with 1-second rolling average"
-      },
-      {
-        type: 'feature',
-        "description": "Categorized Add New Instrument browser matching DOM"
-      },
-      {
-        type: 'feature',
-        "description": "Beat-snap drag + visual sync indicator on waveforms"
-      },
-      {
-        type: 'fix',
-        "description": "Improve Add New Instrument dialog — full width, icons, better layout"
-      },
-      {
-        type: 'feature',
-        "description": "Serato-style full-width waveforms at top of DJ view"
-      },
-      {
-        type: 'fix',
-        "description": "ADD instrument button opens GL-native create dialog"
       }
     ]
   }
