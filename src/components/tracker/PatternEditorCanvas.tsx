@@ -2196,9 +2196,6 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
     const tick = () => {
       // FORMAT MODE: use format engine's playback state (skip all tracker store reads)
       if (isFormatModeRef.current) {
-        const _fps = getFormatPlaybackState();
-        const _fmtRow = formatCurrentRowRef.current;
-        if (_fmtRow === 0 && prevRow > 0) console.warn(`[FORMAT RAF] row→0! fps.isPlaying=${_fps.isPlaying} fps.row=${_fps.row} formatRef=${_fmtRow} prevRow=${prevRow} bridge=${!!bridgeRef.current}`);
         const bridge = bridgeRef.current;
 
         if (bridge) {
@@ -2239,6 +2236,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
           const shouldSend = newPlaying ||
             newRow !== prevRow || newPlaying !== prevPlaying;
           if (shouldSend) {
+            const wasPlaying = prevPlaying;
             prevRow     = newRow;
             prevPlaying = newPlaying;
             bridge.post({
@@ -2248,6 +2246,19 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
               patternIndex: 0,
               isPlaying: newPlaying,
             });
+            // On stop transition: sync worker cursor to last playback row.
+            // Worker renderers use cursor.rowIndex when !isPlaying, but format
+            // mode skips cursor→worker sync (line ~1835), so cursor.rowIndex
+            // stays at 0. Post the last row so the editor doesn't jump.
+            if (wasPlaying && !newPlaying) {
+              const cs = useCursorStore.getState().cursor;
+              bridge.post({ type: 'cursor', cursor: {
+                rowIndex:     newRow,
+                channelIndex: cs.channelIndex,
+                columnType:   cs.columnType,
+                digitIndex:   cs.digitIndex,
+              }});
+            }
           }
         }
 
@@ -2265,12 +2276,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
       // so we must fall through to the main playback path when they're active.
       const wasmPosEarly = useWasmPositionStore.getState();
       if (!isPlaying && !prevPlaying && !wasmPosEarly.active) {
-        // Use frozen stop position from WASM engine if available (non-zero),
-        // otherwise fall back to cursor. This prevents the display from jumping
-        // to row 0 when the engine restarts asynchronously after stop.
-        const cursorRow = wasmPosEarly.stopRow > 0
-          ? wasmPosEarly.stopRow
-          : useCursorStore.getState().cursor.rowIndex;
+        const cursorRow = useCursorStore.getState().cursor.rowIndex;
         const h = dimensions.height;
         const rh = rowHeightRef.current;
         const centerLineTop = Math.floor(h / 2) - rh / 2;
@@ -2343,12 +2349,6 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
       if (shouldSendUpdate) {
         if (!prevPlaying && effectiveIsPlaying) {
           console.log(`[Canvas DOM] playback started: row=${currentRow} pattern=${activePatternIdx} wasmActive=${wasmPos.active} bridge=${!!bridgeRef.current}`);
-        }
-        if (prevPlaying && !effectiveIsPlaying) {
-          console.warn(`[Canvas DOM] STOP TRANSITION: row=${currentRow} cursor=${useCursorStore.getState().cursor.rowIndex} transport=${transportState.currentRow} wasmRow=${wasmPos.row} wasmActive=${wasmPos.active} stopRow=${wasmPosEarly.stopRow}`);
-        }
-        if (currentRow === 0 && prevRow > 0) {
-          console.warn(`[Canvas DOM] ROW JUMPED TO 0 from ${prevRow}! isPlaying=${isPlaying} wasmActive=${wasmPos.active} effectivePlaying=${effectiveIsPlaying}`);
         }
         prevRow = currentRow;
         prevPattern = activePatternIdx;
