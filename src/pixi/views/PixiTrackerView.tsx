@@ -37,6 +37,7 @@ import { PixiCMIKnobPanel, CMI_PANEL_COLLAPSED_H, CMI_PANEL_EXPANDED_H } from '.
 import { PixiMusicLineTrackTable } from './tracker/PixiMusicLineTrackTable';
 import { PixiMusicLinePatternViewer } from './tracker/PixiMusicLinePatternViewer';
 import { PixiPatternEditor } from './tracker/PixiPatternEditor';
+import { PixiAutomationLaneStrip } from './tracker/PixiAutomationLaneStrip';
 import { PixiTrackerVisualBg } from './tracker/PixiTrackerVisualBg';
 import { PixiGridSequencer } from './tracker/PixiGridSequencer';
 import { PixiTB303View } from './tracker/PixiTB303View';
@@ -339,6 +340,17 @@ export const PixiTrackerView: React.FC = () => {
               />
             )}
           </pixiContainer>
+
+          {/* Automation Lane Strip — for classic (UADE) and furnace modes */}
+          {viewMode === 'tracker' && (editorMode === 'classic' || editorMode === 'furnace') && (
+            <PixiAutomationLaneStrip
+              width={Math.max(100, editorWidth)}
+              format={editorMode === 'furnace' ? 'furnace' : 'uade'}
+              patternLength={64}
+              currentRow={0}
+              isPlaying={false}
+            />
+          )}
 
           {/* Overlays — ALWAYS mounted to avoid @pixi/layout Yoga BindingErrors.
               Use alpha/renderable (NOT visible) — @pixi/layout calls _onChildRemoved()
