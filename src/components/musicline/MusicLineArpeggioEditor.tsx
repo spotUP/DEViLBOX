@@ -1,13 +1,16 @@
 /**
- * MusicLineArpeggioEditor -- Standalone arpeggio table editor for MusicLine.
+ * MusicLineArpeggioEditor -- Arpeggio table editor matching original Mline116.asm behavior.
  *
- * Features:
- * - Dropdown to select any arpeggio table (0..numArps-1)
- * - Scrollable grid: 12 visible rows, columns: Row#, Note, WaveSample, Fx1, Par1, Fx2, Par2
- * - Note column displays note names (C-1..B-5) or special values (Wait/End/Restart)
- * - Effect columns displayed as hex with named sub-effect tooltips
- * - Click-to-select cell, keyboard editing (hex input for numeric fields, note input for note field)
- * - Reads data from MusicLineEngine arp API, writes changes via writeArpEntry
+ * Cursor system: 9 positions (nibble-level editing), matching ArpOffset/ArpShift from ASM:
+ *   Col 0: Note        (keyboard note entry, NOT hex)
+ *   Col 1: WaveSample  high nibble (hex)
+ *   Col 2: WaveSample  low nibble  (hex)
+ *   Col 3: FX1 number  high nibble (hex)
+ *   Col 4: FX1 param   high nibble (hex)
+ *   Col 5: FX1 param   low nibble  (hex)
+ *   Col 6: FX2 number  high nibble (hex)
+ *   Col 7: FX2 param   high nibble (hex)
+ *   Col 8: FX2 param   low nibble  (hex)
  *
  * Row format (6 bytes each):
  *   field 0: Note     — 0=wait, 1-60=note, 61=end, 62=restart, bit7=relative transpose
@@ -16,6 +19,15 @@
  *   field 3: Effect1Param
  *   field 4: Effect2Num
  *   field 5: Effect2Param
+ *
+ * Edit modes (matching _ArpEdMode):
+ *   0 = Vertical   (cursor advances DOWN after entry)
+ *   1 = Horizontal (cursor advances RIGHT after entry)
+ *
+ * Special keys:
+ *   Delete    — clear current field/cell
+ *   Backspace — delete entire row, shift remaining rows up
+ *   Return    — insert empty row at cursor, shift remaining down
  */
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
@@ -25,10 +37,42 @@ import type { MusicLineArpEntry } from '@/engine/musicline/MusicLineEngine';
 // ── Constants ──────────────────────────────────────────────────────────────────
 
 const VISIBLE_ROWS = 12;
-const ROW_HEIGHT = 22;
+const MAX_ROWS = 128;
+const ROW_HEIGHT = 20;
 const GRID_HEIGHT = VISIBLE_ROWS * ROW_HEIGHT;
+const NUM_CURSOR_COLS = 9;
 
 const ML_NOTES = ['C-', 'C#', 'D-', 'D#', 'E-', 'F-', 'F#', 'G-', 'G#', 'A-', 'A#', 'B-'];
+
+/** Byte offset within 6-byte row for each cursor column (matches ArpOffset from ASM) */
+const ARP_OFFSET = [0, 1, 1, 2, 3, 3, 4, 5, 5];
+
+/** 1 = edit high nibble, 0 = edit low nibble (matches ArpShift from ASM) */
+const ARP_SHIFT = [0, 1, 0, 0, 1, 0, 0, 1, 0];
+
+/** Field keys matching MusicLineArpEntry for each byte offset */
+const FIELD_KEYS: (keyof MusicLineArpEntry)[] = ['note', 'smpl', 'fx1', 'param1', 'fx2', 'param2'];
+
+/** Colors for each visual group */
+const COL_COLORS = [
+  '#60e060', // 0: note
+  '#e0c040', // 1: ws hi
+  '#e0c040', // 2: ws lo
+  '#60a0e0', // 3: fx1 num
+  '#6080c0', // 4: fx1 param hi
+  '#6080c0', // 5: fx1 param lo
+  '#c060e0', // 6: fx2 num
+  '#a060c0', // 7: fx2 param hi
+  '#a060c0', // 8: fx2 param lo
+];
+
+/** Column widths in px */
+const COL_WIDTHS = [36, 12, 12, 12, 12, 12, 12, 12, 12];
+
+const ROW_NUM_WIDTH = 28;
+// Gaps between groups: note | ws | fpp | fpp
+const GROUP_GAP = 6;
+const TOTAL_WIDTH = ROW_NUM_WIDTH + COL_WIDTHS.reduce((s, w) => s + w, 0) + GROUP_GAP * 3;
 
 const SUB_FX_NAMES: Record<number, string> = {
   0: '---',
@@ -40,30 +84,41 @@ const SUB_FX_NAMES: Record<number, string> = {
   6: 'Restart',
 };
 
-type ColumnKey = 'note' | 'smpl' | 'fx1' | 'param1' | 'fx2' | 'param2';
-
-interface ColumnDef {
-  key: ColumnKey;
-  label: string;
-  width: number;
-  fieldIdx: number;
-  maxValue: number;
-  /** Number of hex digits for display (0 = use note formatter) */
-  hexDigits: number;
-  color: string;
-}
-
-const COLUMNS: ColumnDef[] = [
-  { key: 'note',   label: 'Note', width: 42, fieldIdx: 0, maxValue: 255, hexDigits: 0, color: '#60e060' },
-  { key: 'smpl',   label: 'WS',   width: 32, fieldIdx: 1, maxValue: 255, hexDigits: 2, color: '#e0c040' },
-  { key: 'fx1',    label: 'F1',   width: 24, fieldIdx: 2, maxValue: 15,  hexDigits: 1, color: '#60a0e0' },
-  { key: 'param1', label: 'P1',   width: 32, fieldIdx: 3, maxValue: 255, hexDigits: 2, color: '#6080c0' },
-  { key: 'fx2',    label: 'F2',   width: 24, fieldIdx: 4, maxValue: 15,  hexDigits: 1, color: '#c060e0' },
-  { key: 'param2', label: 'P2',   width: 32, fieldIdx: 5, maxValue: 255, hexDigits: 2, color: '#a060c0' },
-];
-
-const ROW_NUM_WIDTH = 30;
-const TOTAL_WIDTH = ROW_NUM_WIDTH + COLUMNS.reduce((s, c) => s + c.width, 0);
+// FT2-style QWERTY-to-note mapping (same as inputConstants.ts NOTE_MAP)
+const QWERTY_NOTE_MAP: Record<string, { semitone: number; octaveOffset: number }> = {
+  // Bottom row (lower octave): C=0, C#=1, D=2, ...
+  z: { semitone: 0, octaveOffset: 0 },
+  s: { semitone: 1, octaveOffset: 0 },
+  x: { semitone: 2, octaveOffset: 0 },
+  d: { semitone: 3, octaveOffset: 0 },
+  c: { semitone: 4, octaveOffset: 0 },
+  v: { semitone: 5, octaveOffset: 0 },
+  g: { semitone: 6, octaveOffset: 0 },
+  b: { semitone: 7, octaveOffset: 0 },
+  h: { semitone: 8, octaveOffset: 0 },
+  n: { semitone: 9, octaveOffset: 0 },
+  j: { semitone: 10, octaveOffset: 0 },
+  m: { semitone: 11, octaveOffset: 0 },
+  ',': { semitone: 0, octaveOffset: 1 },
+  // Top row (higher octave)
+  q: { semitone: 0, octaveOffset: 1 },
+  '2': { semitone: 1, octaveOffset: 1 },
+  w: { semitone: 2, octaveOffset: 1 },
+  '3': { semitone: 3, octaveOffset: 1 },
+  e: { semitone: 4, octaveOffset: 1 },
+  r: { semitone: 5, octaveOffset: 1 },
+  '5': { semitone: 6, octaveOffset: 1 },
+  t: { semitone: 7, octaveOffset: 1 },
+  '6': { semitone: 8, octaveOffset: 1 },
+  y: { semitone: 9, octaveOffset: 1 },
+  '7': { semitone: 10, octaveOffset: 1 },
+  u: { semitone: 11, octaveOffset: 1 },
+  i: { semitone: 0, octaveOffset: 2 },
+  '9': { semitone: 1, octaveOffset: 2 },
+  o: { semitone: 2, octaveOffset: 2 },
+  '0': { semitone: 3, octaveOffset: 2 },
+  p: { semitone: 4, octaveOffset: 2 },
+};
 
 // ── Formatters ─────────────────────────────────────────────────────────────────
 
@@ -82,14 +137,24 @@ function formatNote(value: number): string {
   return value.toString(16).toUpperCase().padStart(2, '0');
 }
 
-function formatHex(value: number, digits: number): string {
-  if (value === 0) return digits === 1 ? '-' : '--';
-  return value.toString(16).toUpperCase().padStart(digits, '0');
+function formatHexNibble(value: number): string {
+  return value.toString(16).toUpperCase();
 }
 
-function formatCell(col: ColumnDef, value: number): string {
-  if (col.hexDigits === 0) return formatNote(value);
-  return formatHex(value, col.hexDigits);
+/** Format a row for display: returns 9 strings for each cursor column */
+function formatRow(entry: MusicLineArpEntry): string[] {
+  const { note, smpl, fx1, param1, fx2, param2 } = entry;
+  return [
+    formatNote(note),                           // col 0: note (3 chars)
+    formatHexNibble((smpl >> 4) & 0xf),         // col 1: ws hi
+    formatHexNibble(smpl & 0xf),                // col 2: ws lo
+    formatHexNibble((fx1 >> 4) & 0xf),          // col 3: fx1 num (high nibble only — fx num is 0-F)
+    formatHexNibble((param1 >> 4) & 0xf),       // col 4: fx1 param hi
+    formatHexNibble(param1 & 0xf),              // col 5: fx1 param lo
+    formatHexNibble((fx2 >> 4) & 0xf),          // col 6: fx2 num
+    formatHexNibble((param2 >> 4) & 0xf),       // col 7: fx2 param hi
+    formatHexNibble(param2 & 0xf),              // col 8: fx2 param lo
+  ];
 }
 
 // ── Props ──────────────────────────────────────────────────────────────────────
@@ -113,17 +178,22 @@ export const MusicLineArpeggioEditor: React.FC<MusicLineArpeggioEditorProps> = (
   const [tableLength, setTableLength] = useState(0);
   const [loading, setLoading] = useState(true);
 
-  // Selected cell: [row, colIndex]
+  // Cursor position
   const [selRow, setSelRow] = useState(0);
   const [selCol, setSelCol] = useState(0);
-  const [hexBuffer, setHexBuffer] = useState('');
 
-  const gridRef = useRef<HTMLDivElement>(null);
+  // Edit mode: 0 = Vertical (advance down), 1 = Horizontal (advance right)
+  const [editMode, setEditMode] = useState<0 | 1>(0);
+
+  // Octave for note input (0-based, so octave 1 = offset 0, range 0-4 gives notes 1-60)
+  const [octave, setOctave] = useState(2);
+
   const scrollRef = useRef<HTMLDivElement>(null);
+  const rowsRef = useRef(rows);
+  rowsRef.current = rows;
 
-  // Default empty table: 128 rows of zeros (matching original MusicLine's 128-row arp tables)
   const makeEmptyRows = (): MusicLineArpEntry[] =>
-    Array.from({ length: 128 }, () => ({ note: 0, smpl: 0, fx1: 0, param1: 0, fx2: 0, param2: 0 }));
+    Array.from({ length: MAX_ROWS }, () => ({ note: 0, smpl: 0, fx1: 0, param1: 0, fx2: 0, param2: 0 }));
 
   // ── Load number of arp tables on mount ─────────────────────────────────────
 
@@ -131,7 +201,7 @@ export const MusicLineArpeggioEditor: React.FC<MusicLineArpeggioEditorProps> = (
     let cancelled = false;
     const timeout = setTimeout(() => {
       if (!cancelled && numArps === 0) {
-        setNumArps(1); // At least 1 table so the editor is usable
+        setNumArps(1);
       }
     }, 2000);
 
@@ -159,13 +229,11 @@ export const MusicLineArpeggioEditor: React.FC<MusicLineArpeggioEditorProps> = (
 
     const timeout = setTimeout(() => {
       if (!cancelled) {
-        // Timeout: show empty 128-row table so user can create arpeggios
         setRows(makeEmptyRows());
-        setTableLength(128);
+        setTableLength(MAX_ROWS);
         setLoading(false);
         setSelRow(0);
         setSelCol(0);
-        setHexBuffer('');
       }
     }, 2000);
 
@@ -173,7 +241,7 @@ export const MusicLineArpeggioEditor: React.FC<MusicLineArpeggioEditorProps> = (
       if (!MusicLineEngine.hasInstance()) {
         clearTimeout(timeout);
         setRows(makeEmptyRows());
-        setTableLength(128);
+        setTableLength(MAX_ROWS);
         setLoading(false);
         return;
       }
@@ -185,9 +253,13 @@ export const MusicLineArpeggioEditor: React.FC<MusicLineArpeggioEditorProps> = (
         clearTimeout(timeout);
         if (cancelled) return;
 
-        // If table is empty, show 128 empty rows so user can create content
         const effectiveRows = data.rows.length > 0 ? data.rows : makeEmptyRows();
-        const effectiveLength = data.length > 0 ? data.length : 128;
+        const effectiveLength = data.length > 0 ? data.length : MAX_ROWS;
+
+        // Pad to MAX_ROWS if shorter
+        while (effectiveRows.length < MAX_ROWS) {
+          effectiveRows.push({ note: 0, smpl: 0, fx1: 0, param1: 0, fx2: 0, param2: 0 });
+        }
 
         setRows(effectiveRows);
         setTableLength(effectiveLength);
@@ -195,12 +267,11 @@ export const MusicLineArpeggioEditor: React.FC<MusicLineArpeggioEditorProps> = (
         clearTimeout(timeout);
         if (cancelled) return;
         setRows(makeEmptyRows());
-        setTableLength(128);
+        setTableLength(MAX_ROWS);
       }
       setLoading(false);
       setSelRow(0);
       setSelCol(0);
-      setHexBuffer('');
     })();
 
     return () => { cancelled = true; clearTimeout(timeout); };
@@ -219,106 +290,227 @@ export const MusicLineArpeggioEditor: React.FC<MusicLineArpeggioEditorProps> = (
   const handleCellClick = useCallback((row: number, col: number) => {
     setSelRow(row);
     setSelCol(col);
-    setHexBuffer('');
   }, []);
 
-  // ── Write a value to the engine and update local state ─────────────────────
+  // ── Write a byte-level value to the engine and update local state ──────────
 
-  const commitValue = useCallback((row: number, colIdx: number, value: number) => {
-    const col = COLUMNS[colIdx];
-    const clamped = Math.max(0, Math.min(col.maxValue, value));
+  const commitByte = useCallback((row: number, fieldIdx: number, value: number) => {
+    const fieldKey = FIELD_KEYS[fieldIdx];
+    const clamped = Math.max(0, Math.min(255, value));
 
     if (MusicLineEngine.hasInstance()) {
       const engine = MusicLineEngine.getInstance();
-      engine.writeArpEntry(selectedTable, row, col.fieldIdx, clamped);
+      engine.writeArpEntry(selectedTable, row, fieldIdx, clamped);
     }
 
     setRows((prev) => {
       const next = [...prev];
-      next[row] = { ...next[row], [col.key]: clamped };
+      next[row] = { ...next[row], [fieldKey]: clamped };
       return next;
     });
   }, [selectedTable]);
 
+  /** Write a nibble at the current cursor column */
+  const commitNibble = useCallback((row: number, cursorCol: number, nibbleValue: number) => {
+    const fieldIdx = ARP_OFFSET[cursorCol];
+    const isHigh = ARP_SHIFT[cursorCol] === 1;
+    const fieldKey = FIELD_KEYS[fieldIdx];
+    const currentByte = rowsRef.current[row]?.[fieldKey] ?? 0;
+
+    let newByte: number;
+    if (isHigh) {
+      newByte = (nibbleValue << 4) | (currentByte & 0x0f);
+    } else {
+      newByte = (currentByte & 0xf0) | (nibbleValue & 0x0f);
+    }
+
+    commitByte(row, fieldIdx, newByte);
+  }, [commitByte]);
+
+  /** Advance cursor after an entry based on edit mode */
+  const advanceCursor = useCallback(() => {
+    if (editMode === 0) {
+      // Vertical: move down
+      setSelRow((r) => Math.min(r + 1, tableLength - 1));
+    } else {
+      // Horizontal: move right, wrap to next row
+      setSelCol((c) => {
+        if (c < NUM_CURSOR_COLS - 1) return c + 1;
+        setSelRow((r) => Math.min(r + 1, tableLength - 1));
+        return 0;
+      });
+    }
+  }, [editMode, tableLength]);
+
+  // ── Insert row at cursor (shift remaining down) ────────────────────────────
+
+  const insertRow = useCallback((atRow: number) => {
+    setRows((prev) => {
+      const next = [...prev];
+      const emptyRow: MusicLineArpEntry = { note: 0, smpl: 0, fx1: 0, param1: 0, fx2: 0, param2: 0 };
+      next.splice(atRow, 0, emptyRow);
+      // Trim to MAX_ROWS
+      if (next.length > MAX_ROWS) next.length = MAX_ROWS;
+      return next;
+    });
+    // Write all rows from atRow onwards to engine
+    // (deferred — engine will get updates on next full table write or per-cell edits)
+  }, []);
+
+  // ── Delete row at cursor (shift remaining up) ─────────────────────────────
+
+  const deleteRow = useCallback((atRow: number) => {
+    setRows((prev) => {
+      const next = [...prev];
+      next.splice(atRow, 1);
+      // Append empty row at end to keep MAX_ROWS
+      next.push({ note: 0, smpl: 0, fx1: 0, param1: 0, fx2: 0, param2: 0 });
+      return next;
+    });
+  }, []);
+
+  // ── Clear current field/cell ──────────────────────────────────────────────
+
+  const clearCurrentField = useCallback(() => {
+    const cursorCol = selCol;
+    if (cursorCol === 0) {
+      // Note column: clear the whole note byte
+      commitByte(selRow, 0, 0);
+    } else {
+      // Nibble column: clear just the nibble
+      commitNibble(selRow, cursorCol, 0);
+    }
+  }, [selRow, selCol, commitByte, commitNibble]);
+
   // ── Keyboard handling ──────────────────────────────────────────────────────
 
   const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
-    const col = COLUMNS[selCol];
+    const cursorCol = selCol;
 
     // Navigation
     if (e.key === 'ArrowDown') {
       e.preventDefault();
       setSelRow((r) => Math.min(r + 1, tableLength - 1));
-      setHexBuffer('');
       return;
     }
     if (e.key === 'ArrowUp') {
       e.preventDefault();
       setSelRow((r) => Math.max(r - 1, 0));
-      setHexBuffer('');
       return;
     }
     if (e.key === 'ArrowRight' || (e.key === 'Tab' && !e.shiftKey)) {
       e.preventDefault();
-      setSelCol((c) => Math.min(c + 1, COLUMNS.length - 1));
-      setHexBuffer('');
+      setSelCol((c) => Math.min(c + 1, NUM_CURSOR_COLS - 1));
       return;
     }
     if (e.key === 'ArrowLeft' || (e.key === 'Tab' && e.shiftKey)) {
       e.preventDefault();
       setSelCol((c) => Math.max(c - 1, 0));
-      setHexBuffer('');
       return;
     }
 
-    // Delete / clear
-    if (e.key === 'Delete' || e.key === 'Backspace') {
+    // Page up/down — jump by VISIBLE_ROWS
+    if (e.key === 'PageDown') {
       e.preventDefault();
-      commitValue(selRow, selCol, 0);
-      setHexBuffer('');
+      setSelRow((r) => Math.min(r + VISIBLE_ROWS, tableLength - 1));
       return;
     }
-
-    // Note column: special values
-    if (col.key === 'note') {
-      // Quick entry for special note values
-      if (e.key === 'e' || e.key === 'E') {
-        // 'E' = End (61)
-        commitValue(selRow, selCol, 61);
-        setSelRow((r) => Math.min(r + 1, tableLength - 1));
-        return;
-      }
-      if (e.key === 'r' || e.key === 'R') {
-        // 'R' = Restart (62)
-        commitValue(selRow, selCol, 62);
-        setSelRow((r) => Math.min(r + 1, tableLength - 1));
-        return;
-      }
-    }
-
-    // Hex input for all columns
-    const hexChar = e.key.match(/^[0-9a-fA-F]$/);
-    if (hexChar) {
+    if (e.key === 'PageUp') {
       e.preventDefault();
-      const digits = col.hexDigits === 0 ? 2 : col.hexDigits; // note col uses 2-digit hex
-      const newBuf = (hexBuffer + hexChar[0]).slice(-digits);
-      setHexBuffer(newBuf);
-      const value = parseInt(newBuf, 16);
-      commitValue(selRow, selCol, value);
-      if (newBuf.length >= digits) {
-        setHexBuffer('');
-        setSelRow((r) => Math.min(r + 1, tableLength - 1));
-      }
+      setSelRow((r) => Math.max(r - VISIBLE_ROWS, 0));
       return;
     }
 
-    // Enter = advance row
+    // Home/End
+    if (e.key === 'Home') {
+      e.preventDefault();
+      setSelRow(0);
+      return;
+    }
+    if (e.key === 'End') {
+      e.preventDefault();
+      setSelRow(tableLength - 1);
+      return;
+    }
+
+    // Delete — clear current field
+    if (e.key === 'Delete') {
+      e.preventDefault();
+      clearCurrentField();
+      return;
+    }
+
+    // Backspace — delete entire row, shift remaining up
+    if (e.key === 'Backspace') {
+      e.preventDefault();
+      deleteRow(selRow);
+      return;
+    }
+
+    // Enter/Return — insert empty row at cursor, shift remaining down
     if (e.key === 'Enter') {
       e.preventDefault();
-      setSelRow((r) => Math.min(r + 1, tableLength - 1));
-      setHexBuffer('');
+      insertRow(selRow);
+      return;
     }
-  }, [selRow, selCol, hexBuffer, tableLength, commitValue]);
+
+    // Octave change: F1-F5
+    if (e.key >= 'F1' && e.key <= 'F5') {
+      e.preventDefault();
+      setOctave(parseInt(e.key[1], 10) - 1);
+      return;
+    }
+
+    // Edit mode toggle: F6
+    if (e.key === 'F6') {
+      e.preventDefault();
+      setEditMode((m) => (m === 0 ? 1 : 0));
+      return;
+    }
+
+    // ── Note column (col 0): keyboard note entry ──
+    if (cursorCol === 0) {
+      const key = e.key.toLowerCase();
+
+      // Special: '1' = End (61), '`' or '~' = Restart (62)
+      if (key === '1') {
+        e.preventDefault();
+        commitByte(selRow, 0, 61);
+        advanceCursor();
+        return;
+      }
+      if (key === '`' || key === '~') {
+        e.preventDefault();
+        commitByte(selRow, 0, 62);
+        advanceCursor();
+        return;
+      }
+
+      // QWERTY note mapping
+      const mapping = QWERTY_NOTE_MAP[key];
+      if (mapping) {
+        e.preventDefault();
+        // MusicLine note: 1-60, where 1 = C-1, 12 = B-1, 13 = C-2, etc.
+        const noteValue = (octave + mapping.octaveOffset) * 12 + mapping.semitone + 1;
+        if (noteValue >= 1 && noteValue <= 60) {
+          commitByte(selRow, 0, noteValue);
+          advanceCursor();
+        }
+        return;
+      }
+      return; // Don't fall through to hex for the note column
+    }
+
+    // ── Hex nibble columns (cols 1-8) ──
+    const hexMatch = e.key.match(/^[0-9a-fA-F]$/);
+    if (hexMatch) {
+      e.preventDefault();
+      const nibbleValue = parseInt(hexMatch[0], 16);
+      commitNibble(selRow, cursorCol, nibbleValue);
+      advanceCursor();
+      return;
+    }
+  }, [selRow, selCol, octave, tableLength, editMode, commitByte, commitNibble, advanceCursor, clearCurrentField, deleteRow, insertRow]);
 
   // ── Scroll selected row into view ──────────────────────────────────────────
 
@@ -333,6 +525,27 @@ export const MusicLineArpeggioEditor: React.FC<MusicLineArpeggioEditorProps> = (
       scrollRef.current.scrollTop = bot - GRID_HEIGHT;
     }
   }, [selRow]);
+
+  // ── Render helpers ─────────────────────────────────────────────────────────
+
+  /** Get the left offset + group gap for a cursor column */
+  const getColLeft = (colIdx: number): number => {
+    let left = ROW_NUM_WIDTH;
+    for (let i = 0; i < colIdx; i++) {
+      left += COL_WIDTHS[i];
+      // Group gaps: after col 0 (note), after col 2 (ws), after col 5 (fpp1)
+      if (i === 0 || i === 2 || i === 5) left += GROUP_GAP;
+    }
+    return left;
+  };
+
+  /** Determine which cursor column was clicked based on x position */
+  const getCursorColFromX = (x: number): number => {
+    for (let i = NUM_CURSOR_COLS - 1; i >= 0; i--) {
+      if (x >= getColLeft(i)) return i;
+    }
+    return 0;
+  };
 
   // ── Render ─────────────────────────────────────────────────────────────────
 
@@ -349,23 +562,24 @@ export const MusicLineArpeggioEditor: React.FC<MusicLineArpeggioEditorProps> = (
       style={{
         display: 'flex',
         flexDirection: 'column',
-        gap: 8,
+        gap: 6,
         flex: 1,
         minHeight: 0,
         fontFamily: 'monospace',
         fontSize: 11,
       }}
     >
-      {/* ── Header: table selector + info ── */}
+      {/* ── Header: table selector + octave + edit mode ── */}
       <div
         style={{
           display: 'flex',
           alignItems: 'center',
-          gap: 12,
-          padding: '6px 8px',
+          gap: 10,
+          padding: '5px 8px',
           background: '#0e0e18',
           border: '1px solid #1e1e2e',
           borderRadius: 4,
+          flexWrap: 'wrap',
         }}
       >
         <label style={{ color: '#7a7a9a', fontSize: 10 }}>
@@ -391,10 +605,27 @@ export const MusicLineArpeggioEditor: React.FC<MusicLineArpeggioEditorProps> = (
           </select>
         </label>
         <span style={{ color: '#7a7a9a', fontSize: 10 }}>
-          Rows: <span style={{ color: '#a0a0ff' }}>{tableLength}</span>
+          Oct: <span style={{ color: '#60e060' }}>{octave + 1}</span>
+          <span style={{ color: '#3a3a5a', marginLeft: 2 }}>(F1-F5)</span>
         </span>
-        <span style={{ color: '#3a3a5a', fontSize: 9, marginLeft: 'auto' }}>
-          Hex input / E=End / R=Restart / Del=Clear
+        <span
+          onClick={() => setEditMode((m) => (m === 0 ? 1 : 0))}
+          style={{
+            color: editMode === 0 ? '#60a0e0' : '#e0c040',
+            fontSize: 10,
+            cursor: 'pointer',
+            userSelect: 'none',
+            padding: '1px 4px',
+            background: '#14141e',
+            border: '1px solid #2a2a3e',
+            borderRadius: 3,
+          }}
+        >
+          {editMode === 0 ? 'Vert' : 'Horiz'}
+          <span style={{ color: '#3a3a5a', marginLeft: 2 }}>(F6)</span>
+        </span>
+        <span style={{ color: '#7a7a9a', fontSize: 10 }}>
+          Rows: <span style={{ color: '#a0a0ff' }}>{tableLength}</span>
         </span>
       </div>
 
@@ -403,7 +634,7 @@ export const MusicLineArpeggioEditor: React.FC<MusicLineArpeggioEditorProps> = (
         style={{
           display: 'flex',
           gap: 8,
-          padding: '3px 8px',
+          padding: '2px 8px',
           fontSize: 9,
           color: '#5a5a7a',
           flexWrap: 'wrap',
@@ -424,25 +655,26 @@ export const MusicLineArpeggioEditor: React.FC<MusicLineArpeggioEditorProps> = (
           borderBottom: '1px solid #2a2a3e',
           padding: '2px 0',
           userSelect: 'none',
+          position: 'relative',
+          height: 14,
         }}
       >
         <div style={{ width: ROW_NUM_WIDTH, textAlign: 'right', paddingRight: 4, color: '#4a4a6a', fontSize: 9 }}>
           #
         </div>
-        {COLUMNS.map((col) => (
-          <div
-            key={col.key}
-            style={{
-              width: col.width,
-              textAlign: 'center',
-              color: col.color,
-              fontSize: 9,
-              opacity: 0.7,
-            }}
-          >
-            {col.label}
-          </div>
-        ))}
+        {/* Group headers instead of per-nibble */}
+        <div style={{ position: 'absolute', left: getColLeft(0), color: '#60e060', fontSize: 9, opacity: 0.7 }}>
+          Note
+        </div>
+        <div style={{ position: 'absolute', left: getColLeft(1), color: '#e0c040', fontSize: 9, opacity: 0.7 }}>
+          WS
+        </div>
+        <div style={{ position: 'absolute', left: getColLeft(3), color: '#60a0e0', fontSize: 9, opacity: 0.7 }}>
+          FPP
+        </div>
+        <div style={{ position: 'absolute', left: getColLeft(6), color: '#c060e0', fontSize: 9, opacity: 0.7 }}>
+          FPP
+        </div>
       </div>
 
       {/* ── Scrollable grid ── */}
@@ -450,7 +682,6 @@ export const MusicLineArpeggioEditor: React.FC<MusicLineArpeggioEditorProps> = (
         ref={scrollRef}
         tabIndex={0}
         onKeyDown={handleKeyDown}
-        onFocus={() => gridRef.current?.focus()}
         style={{
           flex: 1,
           minHeight: GRID_HEIGHT,
@@ -461,18 +692,28 @@ export const MusicLineArpeggioEditor: React.FC<MusicLineArpeggioEditorProps> = (
           cursor: 'default',
         }}
       >
-        <div ref={gridRef} style={{ width: TOTAL_WIDTH }}>
+        <div style={{ width: TOTAL_WIDTH }}>
           {rows.slice(0, tableLength).map((entry, rowIdx) => {
             const isSelectedRow = rowIdx === selRow;
+            const formatted = formatRow(entry);
+
             return (
               <div
                 key={rowIdx}
+                onClick={(e) => {
+                  const rect = e.currentTarget.getBoundingClientRect();
+                  const x = e.clientX - rect.left;
+                  const col = getCursorColFromX(x);
+                  handleCellClick(rowIdx, col);
+                }}
                 style={{
                   display: 'flex',
+                  position: 'relative',
                   height: ROW_HEIGHT,
                   alignItems: 'center',
                   background: isSelectedRow ? '#1a1a2e' : rowIdx % 4 === 0 ? '#0c0c16' : 'transparent',
                   borderBottom: '1px solid #12121e',
+                  cursor: 'pointer',
                 }}
               >
                 {/* Row number */}
@@ -483,39 +724,42 @@ export const MusicLineArpeggioEditor: React.FC<MusicLineArpeggioEditorProps> = (
                     paddingRight: 4,
                     color: rowIdx % 4 === 0 ? '#5a5a8a' : '#3a3a5a',
                     fontSize: 10,
+                    flexShrink: 0,
                   }}
                 >
                   {rowIdx.toString(16).toUpperCase().padStart(2, '0')}
                 </div>
 
-                {/* Data cells */}
-                {COLUMNS.map((col, colIdx) => {
-                  const value = entry[col.key];
+                {/* Data cells — positioned using getColLeft */}
+                {formatted.map((text, colIdx) => {
                   const isSelected = isSelectedRow && colIdx === selCol;
-                  const displayText = formatCell(col, value);
-                  // Show sub-effect name as title tooltip for fx columns
-                  const tooltip = (col.key === 'fx1' || col.key === 'fx2')
-                    ? SUB_FX_NAMES[value] ?? `Unknown (${value})`
+                  const fieldIdx = ARP_OFFSET[colIdx];
+                  const byteValue = entry[FIELD_KEYS[fieldIdx]];
+                  const isEmpty = colIdx === 0 ? byteValue === 0 : text === '0';
+
+                  // Tooltip for fx number columns
+                  const tooltip = (colIdx === 3 || colIdx === 6)
+                    ? SUB_FX_NAMES[(byteValue >> 4) & 0xf] ?? `Unknown`
                     : undefined;
 
                   return (
                     <div
-                      key={col.key}
-                      onClick={() => handleCellClick(rowIdx, colIdx)}
+                      key={colIdx}
                       title={tooltip}
                       style={{
-                        width: col.width,
+                        position: 'absolute',
+                        left: getColLeft(colIdx),
+                        width: COL_WIDTHS[colIdx],
                         textAlign: 'center',
-                        color: value === 0 ? '#2a2a3e' : col.color,
-                        cursor: 'pointer',
+                        color: isEmpty ? '#2a2a3e' : COL_COLORS[colIdx],
                         background: isSelected ? '#2a2a4e' : 'transparent',
                         borderRadius: isSelected ? 2 : 0,
-                        outline: isSelected ? `1px solid ${col.color}44` : 'none',
+                        outline: isSelected ? `1px solid ${COL_COLORS[colIdx]}44` : 'none',
                         lineHeight: `${ROW_HEIGHT}px`,
-                        transition: 'background 0.05s',
+                        fontSize: colIdx === 0 ? 11 : 10,
                       }}
                     >
-                      {displayText}
+                      {text}
                     </div>
                   );
                 })}
@@ -523,6 +767,11 @@ export const MusicLineArpeggioEditor: React.FC<MusicLineArpeggioEditorProps> = (
             );
           })}
         </div>
+      </div>
+
+      {/* ── Help bar ── */}
+      <div style={{ padding: '2px 8px', fontSize: 9, color: '#3a3a5a' }}>
+        Note: QWERTY keys | 1=END `=RST | Hex: 0-9 A-F | Del=Clear | BkSp=Del Row | Enter=Ins Row | F1-F5=Oct | F6=Mode
       </div>
     </div>
   );
