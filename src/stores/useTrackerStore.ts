@@ -1451,7 +1451,7 @@ export const useTrackerStore = create<TrackerStore>()(
           // At limit — show message but don't add
           if (typeof window !== 'undefined') {
             import('@stores/useUIStore').then(({ useUIStore }) => {
-              useUIStore.getState().setStatusMessage(`MAX ${maxChannels} CHANNELS (${getEditorStore.getState().activeBehavior.name})`);
+              useUIStore.getState().setStatusMessage(`MAX ${maxChannels} CHANNELS (${useEditorStore.getState().activeBehavior.name})`);
             });
           }
           return;
