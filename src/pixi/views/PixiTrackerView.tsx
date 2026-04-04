@@ -110,8 +110,8 @@ export const PixiTrackerView: React.FC = () => {
 
   // Hide instrument panel on narrow windows (matches DOM TrackerView)
   const canShowInstrumentPanel = windowWidth >= 900;
-  const instrumentPanelVisible = !editorFullscreen && viewMode !== 'tb303' && viewMode !== 'sunvox' && canShowInstrumentPanel && showInstrumentPanel;
-  const INSTRUMENT_PANEL_W = 200;
+  const instrumentPanelVisible = viewMode !== 'tb303' && viewMode !== 'sunvox' && canShowInstrumentPanel && showInstrumentPanel;
+  const INSTRUMENT_PANEL_W = editorFullscreen ? 140 : 200;
 
   // Pattern data for automation/macro lanes overlay.
   // Use stable primitive selectors — avoids re-rendering the whole tracker view on every cell edit.
@@ -255,21 +255,8 @@ export const PixiTrackerView: React.FC = () => {
       )}
 
       {/* Editor controls bar (hidden in fullscreen, show minimal exit button) */}
-      {editorFullscreen ? (
-        <pixiContainer
-          eventMode="static"
-          cursor="pointer"
-          onPointerUp={toggleEditorFullscreen}
-          layout={{ width: '100%', height: 18, flexDirection: 'row', alignItems: 'center', paddingLeft: 6 }}
-        >
-          <pixiBitmapText
-            eventMode="none"
-            text="Exit Fullscreen"
-            style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 9, fill: 0xffffff }}
-            tint={theme.textMuted.color}
-          />
-        </pixiContainer>
-      ) : (
+      {/* Editor controls bar (hidden in fullscreen) */}
+      {!editorFullscreen && (
         <PixiEditorControlsBar viewMode={viewMode} onViewModeChange={setViewMode} gridChannelIndex={gridChannelIndex} onGridChannelChange={setGridChannelIndex} />
       )}
 
