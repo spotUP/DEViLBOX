@@ -16,11 +16,13 @@ import { Button } from '@components/ui/Button';
 import { isElectron } from '@utils/electron';
 import { useNavBar } from '@hooks/views/useNavBar';
 import { VIEW_OPTIONS, switchView } from '@/constants/viewOptions';
+import { useUIStore } from '@stores';
 
 const NavBarComponent: React.FC = () => {
   const n = useNavBar();
 
   const currentThemeId = useThemeStore((state) => state.currentThemeId);
+  const editorFullscreen = useUIStore((state) => state.editorFullscreen);
 
   const [showThemeMenu, setShowThemeMenu] = useState(false);
   const [showDownloadModal, setShowDownloadModal] = useState(false);
@@ -283,8 +285,8 @@ const NavBarComponent: React.FC = () => {
         </div>
       </nav>
 
-      {/* Tab Bar — hidden in DJ/VJ views where project tabs aren't relevant */}
-      {n.activeView !== 'dj' && n.activeView !== 'vj' && <div className="flex items-center px-2 py-1 border-b border-dark-border bg-dark-bgTertiary">
+      {/* Tab Bar — hidden in DJ/VJ views and editor fullscreen */}
+      {n.activeView !== 'dj' && n.activeView !== 'vj' && !editorFullscreen && <div className="flex items-center px-2 py-1 border-b border-dark-border bg-dark-bgTertiary">
         {/* Tabs */}
         <div className="flex items-center gap-1 flex-1 overflow-x-auto scrollbar-none">
           {n.tabs.map((tab) => (
