@@ -58,14 +58,17 @@ const HEX_CHARS = '0123456789abcdef';
 export const MusicLinePatternViewer: React.FC = () => {
   const channelTrackTables = useFormatStore((s) => s.channelTrackTables);
   const patterns = useTrackerStore((s) => s.patterns);
-  const currentPos = useTrackerStore((s) => s.currentPositionIndex);
+  const editPos = useTrackerStore((s) => s.currentPositionIndex);
   const transportRow = useTransportStore((s) => s.currentRow);
   const currentRowPerChannel = useTransportStore((s) => s.currentRowPerChannel);
   const isPlaying = useTransportStore((s) => s.isPlaying);
   const wasmRow = useWasmPositionStore((s) => s.row);
+  const wasmSongPos = useWasmPositionStore((s) => s.songPos);
   const wasmActive = useWasmPositionStore((s) => s.active);
   // WASM engines (MusicLine) report position to useWasmPositionStore, not useTransportStore
   const currentRow = wasmActive ? wasmRow : transportRow;
+  // During playback, show patterns for the playback song position, not the edit position
+  const currentPos = (isPlaying && wasmActive) ? wasmSongPos : editPos;
 
   const recordMode = useEditorStore((s) => s.recordMode);
   const editStep = useEditorStore((s) => s.editStep);
