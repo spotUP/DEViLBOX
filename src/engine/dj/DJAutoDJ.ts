@@ -177,6 +177,51 @@ class DJAutoDJ {
     console.log('[AutoDJ] Disabled');
   }
 
+  /** Pause Auto DJ — stops polling/transitions but keeps current track playing. */
+  pause(): void {
+    this.stopPolling();
+    this.cancelTransition();
+    useDJStore.getState().setAutoDJStatus('playing'); // keep status visible
+    console.log('[AutoDJ] Paused');
+  }
+
+  /** Resume Auto DJ — restarts polling from current position. */
+  resume(): void {
+    const store = useDJStore.getState();
+    if (!store.autoDJEnabled) return;
+    this.startPolling();
+    store.setAutoDJStatus('playing');
+    console.log('[AutoDJ] Resumed');
+  }
+
+  /** Jump to a specific track index with a smooth transition. */
+  async playFromIndex(index: number): Promise<void> {
+    const store = useDJStore.getState();
+    if (!store.autoDJEnabled) return;
+
+    const playlist = this.getActivePlaylist();
+    if (!playlist || index < 0 || index >= playlist.tracks.length) return;
+
+    this.cancelTransition();
+    this.preloading = false;
+    this.preloadedDeck = null;
+
+    const track = playlist.tracks[index];
+    store.setAutoDJStatus('preloading');
+    store.setAutoDJTrackIndices(index, (index + 1) % playlist.tracks.length);
+
+    const loaded = await loadPlaylistTrackToDeck(track, this.idleDeck);
+    if (!loaded) {
+      store.setAutoDJStatus('playing');
+      return;
+    }
+
+    // Use the same smooth transition as skip
+    this.preloadedDeck = this.idleDeck;
+    this.triggerTransition(SKIP_TRANSITION_BARS);
+    console.log(`[AutoDJ] Transitioning to index ${index}: ${track.trackName}`);
+  }
+
   /** Skip to the next track immediately with a short transition. */
   async skip(): Promise<void> {
     const store = useDJStore.getState();

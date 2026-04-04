@@ -693,3 +693,18 @@ export function disableAutoDJ(): void {
 export async function skipAutoDJ(): Promise<void> {
   await getAutoDJ().skip();
 }
+
+/** Pause Auto DJ — stops transitions but keeps current track playing. */
+export function pauseAutoDJ(): void {
+  getAutoDJ().pause();
+}
+
+/** Resume Auto DJ after pause. */
+export function resumeAutoDJ(): void {
+  getAutoDJ().resume();
+}
+
+/** Jump to a specific track in the playlist and play it. */
+export async function playAutoDJFromIndex(index: number): Promise<void> {
+  await getAutoDJ().playFromIndex(index);
+}

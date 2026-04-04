@@ -6,11 +6,11 @@
  */
 
 import React, { useCallback, useRef, useState } from 'react';
-import { SkipForward, Shuffle, SlidersHorizontal, Zap } from 'lucide-react';
+import { SkipForward, Shuffle, SlidersHorizontal, Zap, Pause, Play } from 'lucide-react';
 import { useDJStore, type AutoDJStatus } from '@/stores/useDJStore';
 import { useDJPlaylistStore } from '@/stores/useDJPlaylistStore';
 import { useUIStore } from '@/stores/useUIStore';
-import { enableAutoDJ, disableAutoDJ, skipAutoDJ } from '@/engine/dj/DJActions';
+import { enableAutoDJ, disableAutoDJ, skipAutoDJ, pauseAutoDJ, resumeAutoDJ, playAutoDJFromIndex } from '@/engine/dj/DJActions';
 import { analyzePlaylist, playlistNeedsAnalysis, type AnalysisProgress, type ModlandFixCandidate } from '@/engine/dj/DJPlaylistAnalyzer';
 
 const STATUS_LABELS: Record<AutoDJStatus, string> = {
@@ -53,23 +53,42 @@ export const DJAutoDJPanel: React.FC<DJAutoDJPanelProps> = ({ onClose }) => {
   const trackCount = activePlaylist?.tracks.length ?? 0;
 
   const currentTrack = activePlaylist?.tracks[currentIdx];
-  const nextTrack = activePlaylist?.tracks[nextIdx];
+
+  const [paused, setPaused] = useState(false);
 
   const handleToggle = useCallback(async () => {
     if (enabled) {
       disableAutoDJ();
+      setPaused(false);
     } else {
       const error = await enableAutoDJ(0);
       if (error) {
         useUIStore.getState().setStatusMessage(`Auto DJ: ${error}`, false, 4000);
       } else {
+        setPaused(false);
         onClose?.();
       }
     }
   }, [enabled, onClose]);
 
+  const handlePauseResume = useCallback(() => {
+    if (paused) {
+      resumeAutoDJ();
+      setPaused(false);
+    } else {
+      pauseAutoDJ();
+      setPaused(true);
+    }
+  }, [paused]);
+
   const handleSkip = useCallback(async () => {
+    setPaused(false);
     await skipAutoDJ();
+  }, []);
+
+  const handlePlayFromHere = useCallback(async (index: number) => {
+    setPaused(false);
+    await playAutoDJFromIndex(index);
   }, []);
 
   // Analysis
@@ -140,12 +159,12 @@ export const DJAutoDJPanel: React.FC<DJAutoDJPanelProps> = ({ onClose }) => {
         )}
       </div>
 
-      {/* Main toggle + skip */}
+      {/* Main toggle + pause + skip */}
       <div className="flex items-center gap-2 mb-3">
         <button
           onClick={handleToggle}
           disabled={!activePlaylist || trackCount < 2}
-          className={`flex-1 px-3 py-2 rounded-md font-bold uppercase tracking-wider transition-all border ${
+          className={`px-3 py-2 rounded-md font-bold uppercase tracking-wider transition-all border ${
             enabled
               ? 'bg-green-600 border-green-500 text-white hover:bg-green-700'
               : activePlaylist && trackCount >= 2
@@ -156,13 +175,26 @@ export const DJAutoDJPanel: React.FC<DJAutoDJPanelProps> = ({ onClose }) => {
           {enabled ? 'Stop Auto DJ' : 'Start Auto DJ'}
         </button>
         {enabled && (
-          <button
-            onClick={handleSkip}
-            className="px-3 py-2 rounded-md border border-dark-borderLight bg-dark-bgTertiary text-text-secondary hover:bg-dark-bgHover hover:text-text-primary transition-all"
-            title="Skip to next track"
-          >
-            <SkipForward size={14} />
-          </button>
+          <>
+            <button
+              onClick={handlePauseResume}
+              className={`px-3 py-2 rounded-md border transition-all ${
+                paused
+                  ? 'border-amber-500 bg-amber-900/20 text-amber-400 hover:bg-amber-900/40'
+                  : 'border-dark-borderLight bg-dark-bgTertiary text-text-secondary hover:bg-dark-bgHover hover:text-text-primary'
+              }`}
+              title={paused ? 'Resume auto transitions' : 'Pause auto transitions'}
+            >
+              {paused ? <Play size={14} /> : <Pause size={14} />}
+            </button>
+            <button
+              onClick={handleSkip}
+              className="px-3 py-2 rounded-md border border-dark-borderLight bg-dark-bgTertiary text-text-secondary hover:bg-dark-bgHover hover:text-text-primary transition-all"
+              title="Skip to next track"
+            >
+              <SkipForward size={14} />
+            </button>
+          </>
         )}
       </div>
 
@@ -226,21 +258,46 @@ export const DJAutoDJPanel: React.FC<DJAutoDJPanelProps> = ({ onClose }) => {
         </div>
       )}
 
-      {/* Track info */}
-      {enabled && (
+      {/* Track info + upcoming queue */}
+      {enabled && activePlaylist && (
         <div className="space-y-1 mb-3 text-[10px]">
+          {/* Current track */}
           <div className="flex items-center gap-2">
-            <span className="text-green-400 w-12">NOW</span>
+            <span className="text-green-400 w-8 flex-shrink-0">NOW</span>
             <span className="text-text-primary truncate flex-1">
-              {currentTrack?.trackName ?? '—'} <span className="text-text-tertiary">({currentIdx + 1}/{trackCount})</span>
+              {currentTrack?.trackName ?? '—'}
             </span>
+            <span className="text-text-tertiary flex-shrink-0">{currentIdx + 1}/{trackCount}</span>
           </div>
-          <div className="flex items-center gap-2">
-            <span className="text-blue-400 w-12">NEXT</span>
-            <span className="text-text-secondary truncate flex-1">
-              {nextTrack?.trackName ?? '—'}
-            </span>
-          </div>
+          {/* Upcoming tracks (next 4) */}
+          {Array.from({ length: Math.min(4, trackCount - currentIdx - 1) }, (_, i) => {
+            const idx = (currentIdx + 1 + i) % trackCount;
+            const track = activePlaylist.tracks[idx];
+            const isNext = idx === nextIdx;
+            return (
+              <div key={idx} className="flex items-center gap-2 group">
+                <span className={`w-8 flex-shrink-0 ${isNext ? 'text-blue-400' : 'text-text-tertiary'}`}>
+                  {isNext ? 'NEXT' : `${idx + 1}`}
+                </span>
+                <span className={`truncate flex-1 ${isNext ? 'text-text-secondary' : 'text-text-tertiary'}`}>
+                  {track?.trackName ?? '—'}
+                </span>
+                <button
+                  onClick={() => handlePlayFromHere(idx)}
+                  className="opacity-0 group-hover:opacity-100 text-[9px] px-1.5 py-0.5 rounded border border-dark-borderLight
+                             text-accent-primary hover:bg-accent-primary/10 transition-all flex-shrink-0"
+                  title={`Play from "${track?.trackName}"`}
+                >
+                  Play
+                </button>
+              </div>
+            );
+          })}
+          {paused && (
+            <div className="text-amber-400/80 text-center py-0.5 text-[9px] uppercase tracking-wider">
+              Paused — transitions stopped
+            </div>
+          )}
         </div>
       )}
 
