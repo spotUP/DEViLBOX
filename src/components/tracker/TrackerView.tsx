@@ -52,6 +52,8 @@ import { DJPitchSlider } from '@components/transport/DJPitchSlider';
 import { PatternMinimap } from './PatternMinimap';
 import { PianoRoll } from '../pianoroll';
 import { AutomationPanel } from '@components/automation/AutomationPanel';
+import { AutomationLaneStrip } from '@components/automation/AutomationLaneStrip';
+import { getFormatPlaybackState } from '../../engine/FormatPlaybackState';
 import { useAutomationStore } from '@stores/useAutomationStore';
 import { GTUltraView } from '@components/gtultra/GTUltraView';
 import { useGTUltraStore } from '@/stores/useGTUltraStore';
@@ -706,6 +708,21 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
               <TB303View channelIndex={gridChannelIndex} />
             </div>
           )}
+
+          {/* Automation Lane Strip — for Furnace format */}
+          {editorMode === 'furnace' && (() => {
+            const ps = getFormatPlaybackState();
+            const pat = patterns[currentPatternIndex];
+            return (
+              <AutomationLaneStrip
+                format="furnace"
+                patternId={pat?.id ?? '0'}
+                patternLength={pat?.length ?? 64}
+                currentRow={ps.row}
+                isPlaying={ps.isPlaying}
+              />
+            );
+          })()}
         </div>
 
         {/* Pattern Minimap - Flex item 2 */}
