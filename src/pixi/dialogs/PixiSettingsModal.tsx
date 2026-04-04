@@ -699,10 +699,6 @@ export const PixiSettingsModal: React.FC<PixiSettingsModalProps> = ({ isOpen, on
               </Txt>
             </Div>
           </SettingRow>
-          </layoutContainer>
-
-          {/* Keyboard section is part of INPUT tab */}
-          <layoutContainer renderable={s.activeTab === 'input'} layout={{ width: CONTENT_W, height: s.activeTab === 'input' ? contentH : 0, overflow: 'hidden', flexDirection: 'column', gap: 12 }}>
           {/* ═══════ KEYBOARD ═══════ */}
           <SectionHeader text="KEYBOARD" />
 
