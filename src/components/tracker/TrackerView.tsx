@@ -45,6 +45,7 @@ import { InstrumentList } from '@components/instruments/InstrumentList';
 import { getTrackerReplayer } from '@engine/TrackerReplayer';
 import { MusicLineTrackTableEditor } from './MusicLineTrackTableEditor';
 import { useMusicLineFormatData } from '@/components/musicline/useMusicLineFormatData';
+import { MusicLineChannelStatus } from '@/components/musicline/MusicLineChannelStatus';
 import { MUSICLINE_COLUMNS } from '@/components/musicline/musiclineAdapter';
 import { downloadPattern } from '@lib/export/PatternExport';
 import { downloadTrack } from '@lib/export/TrackExport';
@@ -603,6 +604,7 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
                         onClick={handleExportML}
                       >Export .ml</button>
                     </div>
+                    <MusicLineChannelStatus />
                     <div className="px-3 pb-3">
                       <MusicLineTrackTableEditor
                         onSeek={(pos) => {
@@ -615,7 +617,12 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
                   {/* Per-channel PatternEditorCanvas — each channel scrolls independently */}
                   <div className="flex-1 min-h-0 overflow-hidden flex flex-row">
                     {mlFormatData.channels.map((ch, chIdx) => (
-                      <div key={chIdx} className="flex-1 min-w-0 overflow-hidden" style={{ borderRight: chIdx < mlFormatData.channels.length - 1 ? '1px solid var(--color-border)' : undefined }}>
+                      <div
+                        key={chIdx}
+                        className={`flex-1 min-w-0 overflow-hidden cursor-pointer ${chIdx === mlFormatData.selectedChannel ? 'border-t-2 border-t-accent-primary' : 'border-t-2 border-t-transparent'}`}
+                        style={{ borderRight: chIdx < mlFormatData.channels.length - 1 ? '1px solid var(--color-border)' : undefined }}
+                        onClick={() => mlFormatData.setSelectedChannel(chIdx)}
+                      >
                         <PatternEditorCanvas
                           formatColumns={MUSICLINE_COLUMNS}
                           formatChannels={[ch]}
