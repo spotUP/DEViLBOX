@@ -26,6 +26,7 @@ export interface DeckState {
   // Track info
   fileName: string | null;
   trackName: string;
+  trackAuthor: string;
   detectedBPM: number;
 
   // Transport
@@ -135,6 +136,7 @@ export type CrossfaderCurve = 'linear' | 'cut' | 'smooth';
 const defaultDeckState: DeckState = {
   fileName: null,
   trackName: '',
+  trackAuthor: '',
   detectedBPM: 125,
   isPlaying: false,
   songPos: 0,

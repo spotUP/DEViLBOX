@@ -313,15 +313,6 @@ export const DJView: React.FC<DJViewProps> = ({ onShowDrumpads: _onShowDrumpads 
       {/* TOP BAR                                                            */}
       {/* ================================================================== */}
       <div className="flex items-center justify-between px-4 py-2 shrink-0 bg-dark-bgSecondary border-b border-dark-border">
-        <div className="flex items-center gap-3">
-          <span className="font-mono text-sm font-bold tracking-widest uppercase text-accent-primary">
-            DEViLBOX DJ
-          </span>
-          <span className="font-mono text-[10px] text-text-muted uppercase tracking-wider">
-            Dual Deck Mixer
-          </span>
-        </div>
-
         <div className="flex items-center gap-2 flex-wrap">
           <DJControllerSelector />
           <DJFxQuickPresets />
@@ -347,17 +338,24 @@ export const DJView: React.FC<DJViewProps> = ({ onShowDrumpads: _onShowDrumpads 
           >
             Deck C
           </button>
-          <button
-            onClick={() => setShowAutoDJ(!showAutoDJ)}
-            className={`px-3 py-1.5 rounded-md text-xs font-mono border transition-all
-              ${showAutoDJ || autoDJEnabled
-                ? 'border-green-500 bg-green-900/20 text-green-400'
-                : 'border-dark-borderLight bg-dark-bgTertiary text-text-secondary hover:bg-dark-bgHover hover:text-text-primary'
-              }`}
-            title="Auto DJ — automatic beatmixed playlist playback"
-          >
-            Auto DJ{autoDJEnabled ? ' ON' : ''}
-          </button>
+          <div className="relative">
+            <button
+              onClick={() => setShowAutoDJ(!showAutoDJ)}
+              className={`px-3 py-1.5 rounded-md text-xs font-mono border transition-all
+                ${showAutoDJ || autoDJEnabled
+                  ? 'border-green-500 bg-green-900/20 text-green-400'
+                  : 'border-dark-borderLight bg-dark-bgTertiary text-text-secondary hover:bg-dark-bgHover hover:text-text-primary'
+                }`}
+              title="Auto DJ — automatic beatmixed playlist playback"
+            >
+              Auto DJ{autoDJEnabled ? ' ON' : ''}
+            </button>
+            {showAutoDJ && (
+              <div className="absolute top-full right-0 mt-1 z-[99989] w-80">
+                <DJAutoDJPanel onClose={() => setShowAutoDJ(false)} />
+              </div>
+            )}
+          </div>
           <DJVocoderControl />
           <DJRemoteControlButton />
           <button
@@ -393,14 +391,7 @@ export const DJView: React.FC<DJViewProps> = ({ onShowDrumpads: _onShowDrumpads 
       {/* ================================================================== */}
       {/* AUTO DJ PANEL                                                     */}
       {/* ================================================================== */}
-      {showAutoDJ && (
-        <div
-          className="absolute inset-x-0 top-12 bottom-0 z-[99989] px-2 pt-2"
-          onClick={(e) => { if (e.target === e.currentTarget) setShowAutoDJ(false); }}
-        >
-          <DJAutoDJPanel onClose={() => setShowAutoDJ(false)} />
-        </div>
-      )}
+      {/* Auto DJ panel is now a dropdown under the button */}
 
       {/* ================================================================== */}
       {/* FULL-WIDTH WAVEFORMS — Serato-style stacked at top               */}
