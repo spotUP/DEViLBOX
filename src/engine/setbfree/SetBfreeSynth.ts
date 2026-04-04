@@ -440,6 +440,7 @@ export class SetBfreeSynthEngine implements DevilboxSynth {
       (this.config as Record<string, number>)[param] = value;
       const wasmIdx = WASM_PARAM_INDEX[configIdx];
       if (wasmIdx !== undefined && this._worklet && this.isInitialized) {
+        if (configIdx < 9) console.log(`[SetBfree] set ${param} configIdx=${configIdx} wasmIdx=${wasmIdx} value=${value}`);
         this._worklet.port.postMessage({ type: 'setParam', index: wasmIdx, value });
       }
     }
