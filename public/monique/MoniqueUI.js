@@ -978,6 +978,16 @@ async function createWasm() {
 
   
   
+  var ___cxa_rethrow_primary_exception = (ptr) => {
+      if (!ptr) return;
+      var info = new ExceptionInfo(ptr);
+      exceptionCaught.push(info);
+      info.set_rethrown(true);
+      ___cxa_rethrow();
+    };
+
+  
+  
   var ___cxa_throw = (ptr, type, destructor) => {
       var info = new ExceptionInfo(ptr);
       // Initialize ExceptionInfo content after it was allocated in __cxa_allocate_exception.
@@ -5046,10 +5056,11 @@ function checkIncomingModuleAPI() {
   ignoredModuleProp('fetchSettings');
 }
 var ASM_CONSTS = {
-  1705204: ($0) => { console.log("[MoniqueUI WASM] init called, sampleRate=" + $0); },  
- 1705271: ($0, $1) => { console.log("[MoniqueUI WASM] Init complete: " + $0 + "x" + $1); },  
- 1705340: ($0, $1) => { if (window._moniqueUIMidiCallback) window._moniqueUIMidiCallback('noteOn', $0, $1); },  
- 1705428: ($0) => { if (window._moniqueUIMidiCallback) window._moniqueUIMidiCallback('noteOff', $0, 0); }
+  1706292: ($0) => { console.log("[MoniqueUI WASM] init called, sampleRate=" + $0); },  
+ 1706359: ($0, $1, $2) => { console.log("[MoniqueUI WASM] Init complete: " + $0 + "x" + $1 + ", params=" + $2); },  
+ 1706447: ($0, $1) => { if (window._moniqueUIParamCallback) window._moniqueUIParamCallback($0, $1); },  
+ 1706527: ($0, $1) => { if (window._moniqueUIMidiCallback) window._moniqueUIMidiCallback('noteOn', $0, $1); },  
+ 1706615: ($0) => { if (window._moniqueUIMidiCallback) window._moniqueUIMidiCallback('noteOff', $0, 0); }
 };
 
 // Imports from the Wasm binary.
@@ -5062,6 +5073,9 @@ var _monique_ui_on_mouse_down = Module['_monique_ui_on_mouse_down'] = makeInvali
 var _monique_ui_on_mouse_up = Module['_monique_ui_on_mouse_up'] = makeInvalidEarlyAccess('_monique_ui_on_mouse_up');
 var _monique_ui_on_mouse_move = Module['_monique_ui_on_mouse_move'] = makeInvalidEarlyAccess('_monique_ui_on_mouse_move');
 var _monique_ui_on_mouse_wheel = Module['_monique_ui_on_mouse_wheel'] = makeInvalidEarlyAccess('_monique_ui_on_mouse_wheel');
+var _monique_ui_get_num_params = Module['_monique_ui_get_num_params'] = makeInvalidEarlyAccess('_monique_ui_get_num_params');
+var _monique_ui_get_param = Module['_monique_ui_get_param'] = makeInvalidEarlyAccess('_monique_ui_get_param');
+var _monique_ui_set_param = Module['_monique_ui_set_param'] = makeInvalidEarlyAccess('_monique_ui_set_param');
 var _monique_ui_shutdown = Module['_monique_ui_shutdown'] = makeInvalidEarlyAccess('_monique_ui_shutdown');
 var _free = Module['_free'] = makeInvalidEarlyAccess('_free');
 var _malloc = Module['_malloc'] = makeInvalidEarlyAccess('_malloc');
@@ -5097,6 +5111,9 @@ function assignWasmExports(wasmExports) {
   _monique_ui_on_mouse_up = Module['_monique_ui_on_mouse_up'] = createExportWrapper('monique_ui_on_mouse_up', 3);
   _monique_ui_on_mouse_move = Module['_monique_ui_on_mouse_move'] = createExportWrapper('monique_ui_on_mouse_move', 3);
   _monique_ui_on_mouse_wheel = Module['_monique_ui_on_mouse_wheel'] = createExportWrapper('monique_ui_on_mouse_wheel', 4);
+  _monique_ui_get_num_params = Module['_monique_ui_get_num_params'] = createExportWrapper('monique_ui_get_num_params', 0);
+  _monique_ui_get_param = Module['_monique_ui_get_param'] = createExportWrapper('monique_ui_get_param', 1);
+  _monique_ui_set_param = Module['_monique_ui_set_param'] = createExportWrapper('monique_ui_set_param', 2);
   _monique_ui_shutdown = Module['_monique_ui_shutdown'] = createExportWrapper('monique_ui_shutdown', 0);
   _free = Module['_free'] = createExportWrapper('free', 1);
   _malloc = Module['_malloc'] = createExportWrapper('malloc', 1);
@@ -5136,6 +5153,8 @@ var wasmImports = {
   __cxa_find_matching_catch_3: ___cxa_find_matching_catch_3,
   /** @export */
   __cxa_rethrow: ___cxa_rethrow,
+  /** @export */
+  __cxa_rethrow_primary_exception: ___cxa_rethrow_primary_exception,
   /** @export */
   __cxa_throw: ___cxa_throw,
   /** @export */

@@ -263,7 +263,7 @@ export async function parsePreTrackerFile(
       length: meta.rowsPerPattern,
       channels,
       importMetadata: {
-        sourceFormat: 'MOD' as const,
+        sourceFormat: 'PreTracker' as const,
         sourceFile: filename,
         importedAt: new Date().toISOString(),
         originalChannelCount: NUM_CHANNELS,
@@ -284,7 +284,7 @@ export async function parsePreTrackerFile(
         id: i + 1,
         name: name || `Sample ${i + 1}`,
         type: 'synth' as const,
-        synthType: 'UADEEditableSynth' as const,
+        synthType: 'PreTrackerSynth' as const,
         effects: [],
         volume: 0,
         pan: 0,
@@ -326,7 +326,7 @@ export async function parsePreTrackerFile(
         })),
       })),
       importMetadata: {
-        sourceFormat: 'MOD' as const,
+        sourceFormat: 'PreTracker' as const,
         sourceFile: filename,
         importedAt: new Date().toISOString(),
         originalChannelCount: NUM_CHANNELS,
@@ -342,5 +342,6 @@ export async function parsePreTrackerFile(
     initialSpeed: 6,
     initialBPM: 125,
     linearPeriods: false,
+    preTrackerFileData: buffer.slice(0),
   };
 }

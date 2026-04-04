@@ -427,7 +427,11 @@ function collectUnresolved(ast: AstNode[], resolved: ResolveResult): Set<string>
   return stubs;
 }
 
-export function emit(ast: AstNode[], resolved: ResolveResult, sourceFile?: string): string {
+export interface EmitOptions {
+  noFuncSplit?: boolean;
+}
+export function emit(ast: AstNode[], resolved: ResolveResult, sourceFile?: string, options?: EmitOptions): string {
+  const noFuncSplit = options?.noFuncSplit ?? false;
   // ── Case-normalization pass ─────────────────────────────────────────────
   // The 68k assembler is case-insensitive, but C is not.  Build a map from
   // lowercase label/symbol name → actual casing as defined, then rewrite all
@@ -608,6 +612,12 @@ export function emit(ast: AstNode[], resolved: ResolveResult, sourceFile?: strin
     }
   }
 
+  // When noFuncSplit is enabled, clear funcLabels so all code stays in one function.
+  // This is needed for disassembled binaries where fall-through between labels is common.
+  if (noFuncSplit) {
+    funcLabels.clear();
+  }
+
   // Pre-pass: simulate the emitter's function boundary logic to find labels that
   // will start functions due to !inFunction (after data/section nodes or after RTS).
   // These implicit function entries must be in funcLabels for cross-function goto detection.
@@ -622,7 +632,7 @@ export function emit(ast: AstNode[], resolved: ResolveResult, sourceFile?: strin
       // After RTS or tail-call return, the function closes → next label starts a new function
       if (node.kind === 'instruction') {
         const mn = node.mnemonic.toUpperCase();
-        if (mn === 'RTS') {
+        if (mn === 'RTS' && !noFuncSplit) {
           // Peek ahead for label
           let peekIdx = i + 1;
           while (peekIdx < ast.length && ast[peekIdx].kind === 'comment') peekIdx++;
@@ -631,7 +641,7 @@ export function emit(ast: AstNode[], resolved: ResolveResult, sourceFile?: strin
           }
         }
         // Tail calls: BRA/JMP to a function label that emits "return;"
-        if ((mn === 'BRA' || mn === 'JMP') && 'label' in (node.operands[0] ?? {}) && (node.operands[0] as any).label) {
+        if (!noFuncSplit && (mn === 'BRA' || mn === 'JMP') && 'label' in (node.operands[0] ?? {}) && (node.operands[0] as any).label) {
           const target = (node.operands[0] as any).label as string;
           if (funcLabels.has(target)) {
             let peekIdx = i + 1;
@@ -835,9 +845,9 @@ export function emit(ast: AstNode[], resolved: ResolveResult, sourceFile?: strin
         if (!simInFunc) simInFunc = true;
         const mn = node.mnemonic.toUpperCase();
         // Mirror emission close logic
-        const closesFunc = mn === 'RTS'
+        const closesFunc = !noFuncSplit && (mn === 'RTS'
           || (mn === 'JMP' && node.operands[0]?.kind === 'address')
-          || (emitInstruction(node).includes('return;'));
+          || (emitInstruction(node).includes('return;')));
         if (closesFunc) {
           let pi = i + 1;
           while (pi < ast.length && ast[pi].kind === 'comment') pi++;
@@ -1003,7 +1013,7 @@ export function emit(ast: AstNode[], resolved: ResolveResult, sourceFile?: strin
           // Start a new function only if: this label is a BSR/JSR target (funcLabels)
           // OR we are not currently inside any function.
           // Otherwise emit as a C goto label within the current function body.
-          const startsFunction = funcLabels.has(node.name) || !inFunction;
+          const startsFunction = funcLabels.has(node.name) || (!noFuncSplit && !inFunction);
 
           if (startsFunction) {
             if (inFunction) closeFunction();
@@ -1035,7 +1045,7 @@ export function emit(ast: AstNode[], resolved: ResolveResult, sourceFile?: strin
       }
 
       case 'instruction': {
-        if (!inFunction) {
+        if (!inFunction && !noFuncSplit) {
           lines.push(`\nstatic void _anon${anonCount++}(void) {`);
           inFunction = true;
         }
@@ -1122,7 +1132,7 @@ export function emit(ast: AstNode[], resolved: ResolveResult, sourceFile?: strin
         // so the next label starts a new one. Don't close for BRA/JMP to local labels.
         const isUnconditionalExit = mn === 'RTS' || c.includes('return;')
           || ((mn === 'JMP') && node.operands[0]?.kind === 'address');  // JMP (An)
-        if (isUnconditionalExit && inFunction) {
+        if (isUnconditionalExit && inFunction && !noFuncSplit) {
           // Peek ahead: if the next meaningful node is a label, close this function
           // so the label becomes a new function.
           let peekIdx = i + 1;
