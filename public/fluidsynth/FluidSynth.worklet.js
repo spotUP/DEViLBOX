@@ -238,7 +238,8 @@ class FluidSynthProcessor extends AudioWorkletProcessor {
       const pathBytes = new Uint8Array(pathStr.length);
       for (let i = 0; i < pathStr.length; i++) pathBytes[i] = pathStr.charCodeAt(i);
       const pathPtr = m._malloc(pathBytes.length);
-      new Uint8Array(m.HEAPU8.buffer, pathPtr, pathBytes.length).set(pathBytes);
+      const heap = m.HEAPU8 || new Uint8Array(m.wasmMemory?.buffer || m.HEAPF32?.buffer);
+      new Uint8Array(heap.buffer, pathPtr, pathBytes.length).set(pathBytes);
       const sfId = m._fluidsynth_load_sf2(pathPtr);
       m._free(pathPtr);
 
