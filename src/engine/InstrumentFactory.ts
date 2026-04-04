@@ -620,6 +620,7 @@ export class InstrumentFactory {
         break;
 
       case 'HivelySynth': {
+        console.warn('[InstrumentFactory] Creating HivelySynth, hasHivelyConfig:', !!config.hively);
         const hvlSynth = new HivelySynth();
         if (config.hively) {
           hvlSynth.setInstrument(config.hively).catch(err =>
