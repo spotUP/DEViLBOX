@@ -15,6 +15,7 @@ import { useTrackerStore, useFormatStore } from '@stores';
 import { useTransportStore } from '@stores/useTransportStore';
 import { usePixiTheme } from '../../theme';
 import { PIXI_FONTS } from '../../fonts';
+import { ML_TRACK_CMD_FLAG, ML_TRACK_CMD_END, ML_TRACK_CMD_JUMP, ML_TRACK_CMD_WAIT } from '@/lib/import/formats/MusicLineParser';
 
 // Layout constants — matches DOM MusicLineTrackTableEditor
 const ROW_HEIGHT = 18;
@@ -39,6 +40,20 @@ const HVL_DIM        = 0x808080;
 const HVL_BORDER     = 0x333333;
 const HVL_SEP        = 0x222222;
 const HVL_SPEED      = 0xfbbf24;
+const HVL_CMD        = 0xff6688; // special command color (END/JUMP/WAIT)
+
+/** Format a track table entry for Pixi display (3 chars). */
+function formatTrackEntryPixi(val: number): string {
+  if (val & ML_TRACK_CMD_FLAG) {
+    const cmdType = val & 0xFF00;
+    const param = val & 0xFF;
+    if (cmdType === ML_TRACK_CMD_END) return 'END';
+    if (cmdType === (ML_TRACK_CMD_JUMP & 0xFF00)) return 'J' + param.toString(16).toUpperCase().padStart(2, '0');
+    if (cmdType === (ML_TRACK_CMD_WAIT & 0xFF00)) return 'W' + param.toString(16).toUpperCase().padStart(2, '0');
+    return '???';
+  }
+  return val.toString(16).toUpperCase().padStart(2, '0');
+}
 
 interface Props {
   width: number;
@@ -288,16 +303,17 @@ export const PixiMusicLineTrackTable: React.FC<Props> = ({ width, height, onSeek
         color: isCurrent ? HVL_CURSOR : HVL_DIM,
       });
 
-      // Pattern index per channel (hex, 2 digits)
+      // Track entry per channel (pattern index or special command)
       for (let ch = 0; ch < numChannels; ch++) {
-        const patIdx = channelTrackTables[ch]?.[pos];
-        const isEmpty = patIdx === undefined;
+        const entry = channelTrackTables[ch]?.[pos];
+        const isEmpty = entry === undefined;
+        const isCmd = !isEmpty && !!(entry & ML_TRACK_CMD_FLAG);
         const cellX = POS_COL_WIDTH + ch * CHAN_COL_WIDTH + 4;
         out.push({
           x: cellX,
           y: rowY,
-          text: isEmpty ? '\u00b7\u00b7' : patIdx.toString(16).toUpperCase().padStart(2, '0'),
-          color: isEmpty ? HVL_DIM : HVL_TEXT,
+          text: isEmpty ? '\u00b7\u00b7' : formatTrackEntryPixi(entry),
+          color: isEmpty ? HVL_DIM : isCmd ? HVL_CMD : HVL_TEXT,
         });
       }
     }
