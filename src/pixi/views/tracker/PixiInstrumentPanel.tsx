@@ -121,12 +121,16 @@ export const PixiInstrumentPanel: React.FC<PixiInstrumentPanelProps> = ({ width,
   const select      = useInstrumentStore((s) => s.setCurrentInstrument);
   const deleteInstrument = useInstrumentStore((s) => s.deleteInstrument);
   const cloneInstrument  = useInstrumentStore((s) => s.cloneInstrument);
+  const updateInstrument = useInstrumentStore((s) => s.updateInstrument);
   const useHexNumbers    = useUIStore((s) => s.useHexNumbers);
 
   const [scrollY, setScrollY] = useState(0);
   const [hoveredId, setHoveredId] = useState<number | null>(null);
   const [searchFilter, setSearchFilter] = useState('');
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const [editingName, setEditingName] = useState('');
   const lastClickRef = useRef<{ id: number; time: number }>({ id: -1, time: 0 });
+  const lastNameClickRef = useRef<{ id: number; time: number }>({ id: -1, time: 0 });
 
   const sorted = useMemo(
     () => [...instruments].sort((a, b) => a.id - b.id),
@@ -219,6 +223,32 @@ export const PixiInstrumentPanel: React.FC<PixiInstrumentPanelProps> = ({ width,
       lastClickRef.current = { id, time: now };
     }
   }, [select, previewInstrument]);
+
+  // Double-click on instrument name to start inline rename
+  const handleNameClick = useCallback((id: number, name: string) => {
+    const now = Date.now();
+    if (lastNameClickRef.current.id === id && now - lastNameClickRef.current.time < 300) {
+      // Double-click — enter edit mode
+      setEditingId(id);
+      setEditingName(name);
+      lastNameClickRef.current = { id: -1, time: 0 };
+    } else {
+      lastNameClickRef.current = { id, time: now };
+    }
+  }, []);
+
+  const handleRenameSave = useCallback((value: string) => {
+    if (editingId !== null && value.trim()) {
+      updateInstrument(editingId, { name: value.trim() });
+    }
+    setEditingId(null);
+    setEditingName('');
+  }, [editingId, updateInstrument]);
+
+  const handleRenameCancel = useCallback(() => {
+    setEditingId(null);
+    setEditingName('');
+  }, []);
 
   // ─── Action bar handlers ────────────────────────────────────────────────────
 
@@ -399,13 +429,33 @@ export const PixiInstrumentPanel: React.FC<PixiInstrumentPanelProps> = ({ width,
                 layout={{ width: 18, flexShrink: 0, marginRight: 8 }}
               />
 
-              {/* Name */}
-              <pixiBitmapText
-                text={inst.name || `Instrument ${inst.id}`}
-                style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 15, fill: 0xffffff }}
-                tint={isSelected ? 0xffffff : theme.text.color}
-                layout={{ flex: 1, overflow: 'hidden', maxWidth: Math.max(40, nameMaxW) }}
-              />
+              {/* Name (double-click to rename) */}
+              {editingId === inst.id ? (
+                <PixiPureTextInput
+                  value={editingName}
+                  onChange={setEditingName}
+                  onSubmit={handleRenameSave}
+                  onCancel={handleRenameCancel}
+                  onBlur={handleRenameSave}
+                  width={Math.max(40, nameMaxW)}
+                  height={ITEM_H - 6}
+                  fontSize={13}
+                  autoFocus
+                />
+              ) : (
+                <pixiBitmapText
+                  text={inst.name || `Instrument ${inst.id}`}
+                  style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 15, fill: 0xffffff }}
+                  tint={isSelected ? 0xffffff : theme.text.color}
+                  eventMode="static"
+                  cursor="text"
+                  onPointerUp={(e: FederatedPointerEvent) => {
+                    e.stopPropagation();
+                    handleNameClick(inst.id, inst.name || `Instrument ${inst.id}`);
+                  }}
+                  layout={{ flex: 1, overflow: 'hidden', maxWidth: Math.max(40, nameMaxW) }}
+                />
+              )}
 
               {/* Loop indicator */}
               {inst.sample?.loop && (
