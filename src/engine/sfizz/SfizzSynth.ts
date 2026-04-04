@@ -316,40 +316,40 @@ export class SfizzSynthEngine implements DevilboxSynth {
   }
 
   /** Load an SFZ instrument from a FileList (e.g. from <input type="file" webkitdirectory>).
-   *  Finds the .sfz file, reads all other files as samples, writes them to MEMFS. */
-  async loadSFZFromFiles(files: FileList | File[]): Promise<{ success: boolean; name?: string; regions?: number }> {
+   *  Writes ALL files (SFZ, includes, samples) to MEMFS, then loads via loadSfzFile. */
+  async loadSFZFromFiles(files: FileList | File[]): Promise<{ success: boolean; name?: string }> {
+    if (!this._worklet) return { success: false };
     const fileArr = Array.from(files);
 
     // Find the .sfz file
     const sfzFile = fileArr.find(f => f.name.toLowerCase().endsWith('.sfz'));
-    if (!sfzFile) {
-      return { success: false };
-    }
-
-    // Read SFZ text
-    const sfzContent = await sfzFile.text();
+    if (!sfzFile) return { success: false };
 
     // Find the base directory (relative to the .sfz file)
     const sfzDir = sfzFile.webkitRelativePath
       ? sfzFile.webkitRelativePath.substring(0, sfzFile.webkitRelativePath.lastIndexOf('/'))
       : '';
 
-    // Read all non-SFZ files as samples
-    const samples = new Map<string, ArrayBuffer>();
+    // Write ALL files to MEMFS (SFZ, text includes, samples — everything)
+    const memfsFiles: { path: string; data: ArrayBuffer }[] = [];
     for (const file of fileArr) {
-      if (file === sfzFile) continue;
       const data = await file.arrayBuffer();
-      // Compute path relative to the SFZ file's directory
       let relPath = file.webkitRelativePath || file.name;
       if (sfzDir && relPath.startsWith(sfzDir + '/')) {
         relPath = relPath.substring(sfzDir.length + 1);
       }
-      samples.set(relPath, data);
+      memfsFiles.push({ path: `/sfz/${relPath}`, data });
     }
 
-    this.loadSFZ(sfzContent, samples);
+    // Write files to MEMFS
+    this._worklet.port.postMessage({ type: 'writeFiles', files: memfsFiles });
 
-    // Update config to reflect loaded instrument name
+    // Load via file path (sfizz resolves #include and default_path relative to the .sfz)
+    const sfzName = sfzFile.webkitRelativePath
+      ? sfzFile.webkitRelativePath.substring(sfzDir.length + 1)
+      : sfzFile.name;
+    this._worklet.port.postMessage({ type: 'loadSfzFile', path: `/sfz/${sfzName}` });
+
     this.config.sfzPreset = undefined;
     this._lastSfzPreset = undefined;
 

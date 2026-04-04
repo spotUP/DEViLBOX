@@ -188,6 +188,10 @@ mame-wasm/cmi/build/
 # Fairlight CMI sample library (65MB, deployed separately)
 public/data/samples/packs/fairlight-cmi/
 
+# SFZ instrument libraries (large, deployed separately)
+public/data/samples/sfz/
+public/data/samples/karoryfer.bear-sax/
+
 # New WASM synth build artifacts
 amsynth-wasm/build/
 calf-mono-wasm/build/
