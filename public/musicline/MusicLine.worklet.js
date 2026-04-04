@@ -329,6 +329,7 @@ class MusicLineProcessor extends AudioWorkletProcessor {
 
     if (ok) {
       this.songLoaded = true;
+      this.numChannels = this.wasm._ml_get_num_channels ? this.wasm._ml_get_num_channels() : 0;
       this.playing = false;
       this._resampPos = 0.0;
 
@@ -481,11 +482,21 @@ class MusicLineProcessor extends AudioWorkletProcessor {
     if (this._reportCounter >= this._reportInterval) {
       this._reportCounter = 0;
       if (this.songLoaded) {
+        // Per-channel row and position for independent channel scrolling
+        const numCh = this.numChannels || 0;
+        const channelRows = new Array(numCh);
+        const channelPositions = new Array(numCh);
+        for (let ch = 0; ch < numCh; ch++) {
+          channelRows[ch] = this.wasm._ml_get_channel_row ? this.wasm._ml_get_channel_row(ch) : 0;
+          channelPositions[ch] = this.wasm._ml_get_channel_position ? this.wasm._ml_get_channel_position(ch) : 0;
+        }
         this.port.postMessage({
           type: 'position',
           position: this.wasm._ml_get_position(),
           row:      this.wasm._ml_get_row(),
           speed:    this.wasm._ml_get_speed(),
+          channelRows,
+          channelPositions,
         });
       }
     }
