@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import type { SpaceLaserConfig } from '@/types/instrument';
 import { Knob } from '@components/controls/Knob';
 import { Zap, Activity, Filter, Repeat, Waves, Wind } from 'lucide-react';
-import { useThemeStore } from '@stores';
+import { useInstrumentColors } from '@/hooks/useInstrumentColors';
 import { FilterFrequencyResponse } from '@components/instruments/shared';
 
 interface SpaceLaserControlsProps {
@@ -23,17 +23,7 @@ export const SpaceLaserControls: React.FC<SpaceLaserControlsProps> = ({
   useEffect(() => { configRef.current = config; }, [config]);
 
   // Theme-aware styling
-  const currentThemeId = useThemeStore((state) => state.currentThemeId);
-  const isCyanTheme = currentThemeId === 'cyan-lineart';
-
-  // Colors based on theme
-  const accentColor = isCyanTheme ? '#00ffff' : '#00ff00'; // Green for Space Laser
-  const knobColor = isCyanTheme ? '#00ffff' : '#88ff88';
-  
-  // Background styles
-  const panelBg = isCyanTheme
-    ? 'bg-[#051515] border-accent-highlight/20'
-    : 'bg-[#1a1a1a] border-dark-border';
+  const { isCyan: isCyanTheme, accent: accentColor, knob: knobColor, panelBg } = useInstrumentColors('#00ff00', { knob: '#88ff88' });
 
   // Helper to update nested configs
   const updateLaser = (updates: Partial<typeof config.laser>) => {

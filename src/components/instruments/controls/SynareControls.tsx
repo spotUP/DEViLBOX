@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import type { SynareConfig } from '@/types/instrument';
 import { Knob } from '@components/controls/Knob';
 import { Drum, Activity, Waves, MoveDown, Speaker, Wind } from 'lucide-react';
-import { useThemeStore } from '@stores';
+import { useInstrumentColors } from '@/hooks/useInstrumentColors';
 import { FilterFrequencyResponse } from '@components/instruments/shared';
 import { getToneEngine } from '@engine/ToneEngine';
 
@@ -26,20 +26,12 @@ export const SynareControls: React.FC<SynareControlsProps> = ({
   useEffect(() => { configRef.current = config; }, [config]);
 
   // Theme-aware styling
-  const currentThemeId = useThemeStore((state) => state.currentThemeId);
-  const isCyanTheme = currentThemeId === 'cyan-lineart';
+  const { isCyan: isCyanTheme, accent: accentColor, knob: knobColor, panelBg } = useInstrumentColors('#ffcc00', { knob: '#ff9900' });
 
-  // Colors based on theme
-  const accentColor = isCyanTheme ? '#00ffff' : '#ffcc00'; // Yellow for Synare
-  const knobColor = isCyanTheme ? '#00ffff' : '#ff9900';
-  
   // Background styles
   const mainBg = isCyanTheme
     ? 'bg-[#030808]'
     : 'bg-gradient-to-b from-[#1e1e1e] to-[#151515]';
-  const panelBg = isCyanTheme
-    ? 'bg-[#051515] border-accent-highlight/20'
-    : 'bg-[#1a1a1a] border-dark-border';
   const headerBg = isCyanTheme
     ? 'bg-[#041010] border-b-2 border-accent-highlight'
     : 'bg-gradient-to-r from-[#2a2a2a] to-[#1a1a1a] border-b-4 border-[#ffcc00]';

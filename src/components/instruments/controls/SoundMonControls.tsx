@@ -58,7 +58,7 @@
 import React, { useRef, useEffect, useCallback, useState, useMemo } from 'react';
 import type { SoundMonConfig, UADEChipRamInfo } from '@/types/instrument';
 import { Knob } from '@components/controls/Knob';
-import { useThemeStore } from '@stores';
+import { useInstrumentColors } from '@/hooks/useInstrumentColors';
 import {
   EnvelopeVisualization,
   SectionLabel,
@@ -181,13 +181,7 @@ export const SoundMonControls: React.FC<SoundMonControlsProps> = ({
     return chipEditorRef.current;
   }, []);
 
-  const currentThemeId = useThemeStore((s) => s.currentThemeId);
-  const isCyan = currentThemeId === 'cyan-lineart';
-
-  const accent  = isCyan ? '#00ffff' : '#44aaff';
-  const knob    = isCyan ? '#00ffff' : '#66bbff';
-  const dim     = isCyan ? '#004444' : '#001833';
-  const panelBg = isCyan ? 'bg-[#041510] border-accent-highlight/20' : 'bg-[#000e1a] border-blue-900/30';
+  const { isCyan, accent, knob, dim, panelBg } = useInstrumentColors('#44aaff', { knob: '#66bbff', dim: '#001833' });
 
   const upd = useCallback(<K extends keyof SoundMonConfig>(key: K, value: SoundMonConfig[K]) => {
     onChange({ [key]: value } as Partial<SoundMonConfig>);

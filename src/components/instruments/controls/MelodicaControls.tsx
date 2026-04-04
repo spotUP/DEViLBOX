@@ -9,7 +9,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Knob } from '@components/controls/Knob';
 import { Loader } from 'lucide-react';
-import { useThemeStore } from '@stores';
+import { useInstrumentColors } from '@/hooks/useInstrumentColors';
 import { getToneEngine } from '@engine/ToneEngine';
 import type { InstrumentConfig } from '@typedefs/instrument';
 import type { VSTBridgeSynth } from '@engine/vstbridge/VSTBridgeSynth';
@@ -44,10 +44,7 @@ export const MelodicaControls: React.FC<MelodicaControlsProps> = ({
   const [synthReady, setSynthReady] = useState(false);
   const synthRef = useRef<VSTBridgeSynth | null>(null);
 
-  const currentThemeId = useThemeStore((state) => state.currentThemeId);
-  const isCyanTheme = currentThemeId === 'cyan-lineart';
-  const accentColor = isCyanTheme ? '#00ffff' : '#2dd4bf';
-  const knobColor = isCyanTheme ? '#00ffff' : '#2dd4bf';
+  const { isCyan: isCyanTheme, accent: accentColor, knob: knobColor } = useInstrumentColors('#2dd4bf');
 
   // Connect to the VSTBridge synth
   useEffect(() => {
@@ -112,7 +109,7 @@ export const MelodicaControls: React.FC<MelodicaControlsProps> = ({
 
   const panelBg = isCyanTheme
     ? 'bg-[#051515] border-accent-highlight/20'
-    : 'bg-[#1a1a1a] border-teal-900/30';
+    : 'bg-[#1a1a1a] border-teal-900/30';  // custom border
 
   return (
     <div className="synth-controls-flow grid grid-cols-4 gap-2 p-2 overflow-y-auto">

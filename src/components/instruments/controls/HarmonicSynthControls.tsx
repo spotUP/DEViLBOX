@@ -10,7 +10,7 @@ import React, { useRef, useCallback, useState, useEffect } from 'react';
 import type { HarmonicSynthConfig } from '@/types/instrument';
 import { DEFAULT_HARMONIC_SYNTH } from '@/types/instrument';
 import { Knob } from '@components/controls/Knob';
-import { useThemeStore } from '@stores';
+import { useInstrumentColors } from '@/hooks/useInstrumentColors';
 import { FilterFrequencyResponse, EnvelopeVisualization } from '@components/instruments/shared';
 
 interface HarmonicSynthControlsProps {
@@ -66,16 +66,9 @@ export const HarmonicSynthControls: React.FC<HarmonicSynthControlsProps> = ({
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [isDragging, setIsDragging] = useState(false);
 
-  const currentThemeId = useThemeStore((state) => state.currentThemeId);
-  const isCyanTheme = currentThemeId === 'cyan-lineart';
-
-  const knobColor = isCyanTheme ? '#00ffff' : '#4ade80';
+  const { isCyan: isCyanTheme, knob: knobColor, panelBg } = useInstrumentColors('#4ade80');
   const barColor = isCyanTheme ? 'rgba(0, 255, 255, 0.7)' : 'rgba(74, 222, 128, 0.7)';
   const barHighlight = isCyanTheme ? 'rgba(0, 255, 255, 1)' : 'rgba(74, 222, 128, 1)';
-
-  const panelBg = isCyanTheme
-    ? 'bg-[#051515] border-accent-highlight/20'
-    : 'bg-[#1a1a1a] border-dark-border';
 
   const harmonics = config.harmonics || DEFAULT_HARMONIC_SYNTH.harmonics;
 

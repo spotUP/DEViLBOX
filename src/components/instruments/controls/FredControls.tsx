@@ -40,7 +40,7 @@
 import React, { useRef, useEffect, useState, useMemo } from 'react';
 import type { FredConfig, UADEChipRamInfo } from '@/types/instrument';
 import { Knob } from '@components/controls/Knob';
-import { useThemeStore } from '@stores';
+import { useInstrumentColors } from '@/hooks/useInstrumentColors';
 import { EnvelopeVisualization, SectionLabel } from '@components/instruments/shared';
 import { PatternEditorCanvas } from '@/components/tracker/PatternEditorCanvas';
 import type { ColumnDef, FormatChannel, FormatCell, OnCellChange } from '@/components/shared/format-editor-types';
@@ -111,13 +111,7 @@ export const FredControls: React.FC<FredControlsProps> = ({ config, onChange, ua
     return chipEditorRef.current;
   }
 
-  const currentThemeId = useThemeStore((s) => s.currentThemeId);
-  const isCyan = currentThemeId === 'cyan-lineart';
-
-  const accent  = isCyan ? '#00ffff' : '#ff8800';
-  const knob    = isCyan ? '#00ffff' : '#ffaa44';
-  const dim     = isCyan ? '#004444' : '#332200';
-  const panelBg = isCyan ? 'bg-[#041510] border-accent-highlight/20' : 'bg-[#1a0e00] border-orange-900/30';
+  const { isCyan, accent, knob, dim, panelBg } = useInstrumentColors('#ff8800', { knob: '#ffaa44', dim: '#332200' });
 
   async function updWithChipRam<K extends keyof FredConfig>(
     key: K,

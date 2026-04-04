@@ -3,7 +3,7 @@ import type { PinkTromboneConfig } from '@engine/pinktrombone/PinkTromboneSynth'
 import { PINK_TROMBONE_PRESETS } from '@engine/pinktrombone/PinkTromboneSynth';
 import { PinkTromboneSynth } from '@engine/pinktrombone/PinkTromboneSynth';
 import { Knob } from '@components/controls/Knob';
-import { useThemeStore } from '@stores';
+import { useInstrumentColors } from '@/hooks/useInstrumentColors';
 import { ScrollLockContainer } from '@components/ui/ScrollLockContainer';
 
 interface PinkTromboneControlsProps {
@@ -19,14 +19,7 @@ export const PinkTromboneControls: React.FC<PinkTromboneControlsProps> = ({
   const configRef = useRef(config);
   useEffect(() => { configRef.current = config; }, [config]);
 
-  const currentThemeId = useThemeStore((state) => state.currentThemeId);
-  const isCyanTheme = currentThemeId === 'cyan-lineart';
-
-  const knobColor = isCyanTheme ? '#00ffff' : '#ff6699';
-  const accentColor = isCyanTheme ? '#00ffff' : '#ff6699';
-  const panelBg = isCyanTheme
-    ? 'bg-[#051515] border-accent-highlight/20'
-    : 'bg-[#1a1a1a] border-dark-border';
+  const { accent: accentColor, knob: knobColor, panelBg } = useInstrumentColors('#ff6699');
 
   /** Push config updates to both the store AND the live synth */
   const pushConfig = useCallback((updates: Partial<PinkTromboneConfig>) => {

@@ -7,7 +7,7 @@
  */
 
 import React from 'react';
-import { useThemeStore } from '@stores';
+import { useInstrumentColors } from '@/hooks/useInstrumentColors';
 import { X, Trash2, Repeat, Play } from 'lucide-react';
 
 const VOWELS = [
@@ -35,9 +35,8 @@ export const VowelEditor: React.FC<VowelEditorProps> = ({
   onLoopToggle,
   accentColor,
 }) => {
-  const currentThemeId = useThemeStore((state) => state.currentThemeId);
-  const isCyanTheme = currentThemeId === 'cyan-lineart';
-  const color = accentColor ?? (isCyanTheme ? '#00ffff' : '#ffcc33');
+  const { isCyan: isCyanTheme, accent } = useInstrumentColors('#ffcc33');
+  const color = accentColor ?? accent;
   const panelBorder = isCyanTheme ? 'rgba(0, 255, 255, 0.2)' : 'rgba(255,255,255,0.08)';
   const mutedColor = isCyanTheme ? '#006060' : '#94a3b8';
   const bgColor = isCyanTheme ? 'rgba(0, 20, 20, 0.4)' : 'rgba(0,0,0,0.3)';

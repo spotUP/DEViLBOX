@@ -11,7 +11,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Knob } from '@components/controls/Knob';
 import { Loader } from 'lucide-react';
-import { useThemeStore } from '@stores';
+import { useInstrumentColors } from '@/hooks/useInstrumentColors';
 import { getToneEngine } from '@engine/ToneEngine';
 import type { InstrumentConfig } from '@typedefs/instrument';
 import type { VSTBridgeSynth } from '@engine/vstbridge/VSTBridgeSynth';
@@ -78,10 +78,7 @@ export const SurgeControls: React.FC<SurgeControlsProps> = ({
   const [synthReady, setSynthReady] = useState(false);
   const synthRef = useRef<VSTBridgeSynth | null>(null);
 
-  const currentThemeId = useThemeStore((state) => state.currentThemeId);
-  const isCyanTheme = currentThemeId === 'cyan-lineart';
-  const accentColor = isCyanTheme ? '#00ffff' : '#ff8c00';
-  const knobColor = isCyanTheme ? '#00ffff' : '#ff8c00';
+  const { isCyan: isCyanTheme, accent: accentColor, knob: knobColor } = useInstrumentColors('#ff8c00');
 
   // Connect to the VSTBridge synth
   useEffect(() => {
@@ -188,7 +185,7 @@ export const SurgeControls: React.FC<SurgeControlsProps> = ({
 
   const panelBg = isCyanTheme
     ? 'bg-[#051515] border-accent-highlight/20'
-    : 'bg-[#1a1a1a] border-orange-900/30';
+    : 'bg-[#1a1a1a] border-orange-900/30';  // custom border, not using hook panelBg
 
   const tabBarBg = isCyanTheme ? 'bg-[#061818]' : 'bg-[#111]';
 

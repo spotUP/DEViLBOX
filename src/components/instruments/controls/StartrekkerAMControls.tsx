@@ -10,7 +10,7 @@ import * as Tone from 'tone';
 import type { StartrekkerAMConfig } from '@typedefs/instrument/exotic';
 import { StartrekkerAMEngine } from '@/engine/startrekker-am/StartrekkerAMEngine';
 import { Knob } from '@components/controls/Knob';
-import { useThemeStore } from '@stores';
+import { useInstrumentColors } from '@/hooks/useInstrumentColors';
 import { Waves, Activity, Zap, Radio } from 'lucide-react';
 
 interface StartrekkerAMControlsProps {
@@ -135,10 +135,7 @@ export const StartrekkerAMControls: React.FC<StartrekkerAMControlsProps> = ({
   const configRef = useRef(config);
   useEffect(() => { configRef.current = config; }, [config]);
 
-  const currentThemeId = useThemeStore((state) => state.currentThemeId);
-  const isCyanTheme = currentThemeId === 'cyan-lineart';
-  const accentColor = isCyanTheme ? '#00ffff' : '#00cccc';
-  const knobColor = isCyanTheme ? '#00ffff' : '#00dddd';
+  const { isCyan: isCyanTheme, accent: accentColor, knob: knobColor } = useInstrumentColors('#00cccc', { knob: '#00dddd' });
   const sectionBorder = isCyanTheme ? 'border-accent-highlight/20' : 'border-[#1a3a3a]';
   const sectionBg = isCyanTheme ? 'bg-[#051515]' : 'bg-[#0a1a1a]';
 

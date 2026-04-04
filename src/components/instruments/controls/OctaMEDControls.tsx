@@ -8,7 +8,8 @@
 import React, { useRef, useEffect, useCallback, useState } from 'react';
 import type { OctaMEDConfig, UADEChipRamInfo } from '@/types/instrument';
 import { Knob } from '@components/controls/Knob';
-import { useThemeStore, useTrackerStore, useInstrumentStore, useProjectStore, useTransportStore } from '@stores';
+import { useTrackerStore, useInstrumentStore, useProjectStore, useTransportStore } from '@stores';
+import { useInstrumentColors } from '@/hooks/useInstrumentColors';
 import { SectionLabel, SequenceEditor } from '@components/instruments/shared';
 import { UADEChipEditor } from '@engine/uade/UADEChipEditor';
 import { UADEEngine } from '@engine/uade/UADEEngine';
@@ -102,13 +103,7 @@ export const OctaMEDControls: React.FC<OctaMEDControlsProps> = ({ config, onChan
   }, []);
 
   const numChannels = useTrackerStore((s) => s.patterns[0]?.channels.length ?? 4);
-  const currentThemeId = useThemeStore((s) => s.currentThemeId);
-  const isCyan = currentThemeId === 'cyan-lineart';
-
-  const accent  = isCyan ? '#00ffff' : '#44aaff';
-  const knob    = isCyan ? '#00ffff' : '#66bbff';
-  const dim     = isCyan ? '#004444' : '#001833';
-  const panelBg = isCyan ? 'bg-[#041510] border-accent-highlight/20' : 'bg-[#000e1a] border-blue-900/30';
+  const { isCyan, accent, knob, dim, panelBg } = useInstrumentColors('#44aaff', { knob: '#66bbff', dim: '#001833' });
 
   const upd = useCallback(<K extends keyof OctaMEDConfig>(key: K, value: OctaMEDConfig[K]) => {
     onChange({ [key]: value } as Partial<OctaMEDConfig>);

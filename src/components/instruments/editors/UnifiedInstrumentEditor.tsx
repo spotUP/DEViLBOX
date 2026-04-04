@@ -14,7 +14,8 @@ import React, { useState, useCallback } from 'react';
 import type { InstrumentConfig, SynthType } from '@typedefs/instrument';
 import { EditorHeader, type VizMode } from '../shared/EditorHeader';
 import { SYNTH_REGISTRY } from '@engine/vstbridge/synth-registry';
-import { useThemeStore, useInstrumentStore } from '@stores';
+import { useInstrumentStore } from '@stores';
+import { useInstrumentColors } from '@/hooks/useInstrumentColors';
 import { isMAMEChipType } from '@constants/chipParameters';
 import { Monitor, Cpu } from 'lucide-react';
 
@@ -258,8 +259,7 @@ export const UnifiedInstrumentEditor: React.FC<UnifiedInstrumentEditorProps> = (
         ? 'sample'
         : synthEditorMode;
 
-  const currentThemeId = useThemeStore((state) => state.currentThemeId);
-  const isCyanTheme = currentThemeId === 'cyan-lineart';
+  const { isCyan: isCyanTheme } = useInstrumentColors('#60a5fa');
 
   // ============================================================================
   // DISPATCH TO SYNTH-SPECIFIC EDITORS

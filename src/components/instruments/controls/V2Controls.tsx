@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import type { V2Config } from '@/types/instrument';
 import { Knob } from '@components/controls/Knob';
 import { Activity, Filter, Zap } from 'lucide-react';
-import { useThemeStore } from '@stores';
+import { useInstrumentColors } from '@/hooks/useInstrumentColors';
 import { FilterFrequencyResponse, EnvelopeVisualization } from '@components/instruments/shared';
 
 // Maps FILTER_MODES index ('Off','Low','Band','High','Notch','All','MoogL','MoogH')
@@ -36,17 +36,7 @@ export const V2Controls: React.FC<V2ControlsProps> = ({
   useEffect(() => { configRef.current = config; }, [config]);
 
   // Theme-aware styling
-  const currentThemeId = useThemeStore((state) => state.currentThemeId);
-  const isCyanTheme = currentThemeId === 'cyan-lineart';
-
-  // Colors based on theme
-  const accentColor = isCyanTheme ? '#00ffff' : '#ffaa00'; // Amber/Orange for V2
-  const knobColor = isCyanTheme ? '#00ffff' : '#ffcc33';
-  
-  // Background styles
-  const panelBg = isCyanTheme
-    ? 'bg-[#051515] border-accent-highlight/20'
-    : 'bg-[#1a1a1a] border-dark-border';
+  const { accent: accentColor, knob: knobColor, panelBg } = useInstrumentColors('#ffaa00', { knob: '#ffcc33' });
 
   // Helpers to update nested configs
   const updateOsc1 = (updates: Partial<typeof config.osc1>) => {
