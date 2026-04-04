@@ -9,7 +9,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Knob } from '@components/controls/Knob';
 import { Sliders, Loader } from 'lucide-react';
-import { useThemeStore } from '@stores';
+import { useInstrumentColors } from '@/hooks/useInstrumentColors';
 import { getToneEngine } from '@engine/ToneEngine';
 import type { InstrumentConfig } from '@typedefs/instrument';
 import type { VSTBridgeParam } from '@engine/vstbridge/synth-registry';
@@ -58,10 +58,7 @@ export const VSTBridgePanel: React.FC<VSTBridgePanelProps> = ({
   const [isLoading, setIsLoading] = useState(true);
   const synthRef = useRef<VSTBridgeSynth | null>(null);
 
-  const currentThemeId = useThemeStore((state) => state.currentThemeId);
-  const isCyanTheme = currentThemeId === 'cyan-lineart';
-  const accentColor = isCyanTheme ? '#00ffff' : '#a78bfa';
-  const knobColor = isCyanTheme ? '#00ffff' : '#a78bfa';
+  const { isCyan: isCyanTheme, accent: accentColor, knob: knobColor } = useInstrumentColors('#a78bfa');
 
   const panelBg = isCyanTheme
     ? 'bg-[#051515] border-accent-highlight/20'

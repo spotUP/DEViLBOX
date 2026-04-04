@@ -8,7 +8,7 @@
 import React, { useRef, useEffect, useCallback, useState } from 'react';
 import type { InstrumentConfig } from '@/types/instrument';
 import { Knob } from '@components/controls/Knob';
-import { useThemeStore } from '@stores';
+import { useInstrumentColors } from '@/hooks/useInstrumentColors';
 import { UADEChipEditor } from '@/engine/uade/UADEChipEditor';
 import { UADEEngine } from '@/engine/uade/UADEEngine';
 
@@ -50,13 +50,7 @@ export const UADELiveParamsBar: React.FC<UADELiveParamsBarProps> = ({ instrument
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [instrument.id]);
 
-  const currentThemeId = useThemeStore((s) => s.currentThemeId);
-  const isCyan = currentThemeId === 'cyan-lineart';
-
-  const accent  = isCyan ? '#00ffff' : '#44aaff';
-  const knob    = isCyan ? '#00ffff' : '#66bbff';
-  const dim     = isCyan ? '#004444' : '#001833';
-  const panelBg = isCyan ? 'bg-[#041510] border-accent-highlight/20' : 'bg-[#000e1a] border-blue-900/30';
+  const { accent, knob, dim, panelBg } = useInstrumentColors('#44aaff', { knob: '#66bbff', dim: '#001833' });
 
   const handleVolumeChange = useCallback((v: number) => {
     const rounded = Math.round(v);

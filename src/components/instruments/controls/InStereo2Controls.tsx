@@ -13,7 +13,7 @@ import type { InStereo2Config } from '@/types/instrument';
 import type { ColumnDef, FormatChannel, FormatCell, OnCellChange } from '@/components/shared/format-editor-types';
 import { PatternEditorCanvas } from '@/components/tracker/PatternEditorCanvas';
 import { Knob } from '@components/controls/Knob';
-import { useThemeStore } from '@stores';
+import { useInstrumentColors } from '@/hooks/useInstrumentColors';
 import { SectionLabel } from '@components/instruments/shared';
 
 // ── Arpeggio adapter ────────────────────────────────────────────────────────
@@ -234,13 +234,7 @@ export const InStereo2Controls: React.FC<InStereo2ControlsProps> = ({
   const configRef = useRef(config);
   useEffect(() => { configRef.current = config; }, [config]);
 
-  const currentThemeId = useThemeStore((s) => s.currentThemeId);
-  const isCyan = currentThemeId === 'cyan-lineart';
-
-  const accent  = isCyan ? '#00ffff' : '#ff8844';
-  const knob    = isCyan ? '#00ffff' : '#ffaa66';
-  const dim     = isCyan ? '#004444' : '#331a00';
-  const panelBg = isCyan ? 'bg-[#041510] border-accent-highlight/20' : 'bg-[#140a00] border-orange-900/30';
+  const { isCyan, accent, knob, dim, panelBg } = useInstrumentColors('#ff8844', { knob: '#ffaa66', dim: '#331a00' });
 
   const updateParam = useCallback((key: keyof InStereo2Config, value: number) => {
     onChange({ ...configRef.current, [key]: value });

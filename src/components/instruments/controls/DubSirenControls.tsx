@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import type { DubSirenConfig } from '@/types/instrument';
 import { Knob } from '@components/controls/Knob';
 import { Waves, Activity, Filter, Repeat, Speaker, Wind } from 'lucide-react';
-import { useThemeStore } from '@stores';
+import { useInstrumentColors } from '@/hooks/useInstrumentColors';
 import { getToneEngine } from '@engine/ToneEngine';
 import { FilterFrequencyResponse } from '@components/instruments/shared';
 import type { FilterType } from '@components/instruments/shared';
@@ -23,17 +23,7 @@ export const DubSirenControls: React.FC<DubSirenControlsProps> = ({
   const [activeTab, setActiveTab] = useState<DubSirenTab>('main');
   
   // Theme-aware styling
-  const currentThemeId = useThemeStore((state) => state.currentThemeId);
-  const isCyanTheme = currentThemeId === 'cyan-lineart';
-
-  // Colors based on theme
-  const accentColor = isCyanTheme ? '#00ffff' : '#ff4444'; // Red for Dub Siren
-  const knobColor = isCyanTheme ? '#00ffff' : '#ff8888';
-  
-  // Background styles
-  const panelBg = isCyanTheme
-    ? 'bg-[#051515] border-accent-highlight/20'
-    : 'bg-[#1a1a1a] border-dark-border';
+  const { isCyan: isCyanTheme, accent: accentColor, knob: knobColor, panelBg } = useInstrumentColors('#ff4444', { knob: '#ff8888' });
 
   // Helper to update nested configs
   const updateOsc = (updates: Partial<typeof config.oscillator>) => {

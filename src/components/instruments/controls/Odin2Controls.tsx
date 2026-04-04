@@ -11,7 +11,7 @@
 import React, { useState, useEffect, useRef, useCallback, memo } from 'react';
 import { Knob } from '@components/controls/Knob';
 import { Loader } from 'lucide-react';
-import { useThemeStore } from '@stores';
+import { useInstrumentColors } from '@/hooks/useInstrumentColors';
 import { getToneEngine } from '@engine/ToneEngine';
 import type { InstrumentConfig } from '@typedefs/instrument';
 import type { VSTBridgeSynth } from '@engine/vstbridge/VSTBridgeSynth';
@@ -190,10 +190,7 @@ export const Odin2Controls: React.FC<Odin2ControlsProps> = ({
   const [synthReady, setSynthReady] = useState(false);
   const synthRef = useRef<VSTBridgeSynth | null>(null);
 
-  const currentThemeId = useThemeStore((state) => state.currentThemeId);
-  const isCyanTheme = currentThemeId === 'cyan-lineart';
-  const accentColor = isCyanTheme ? '#00ffff' : '#4a9eff';
-  const knobColor = isCyanTheme ? '#00ffff' : '#4a9eff';
+  const { isCyan: isCyanTheme, accent: accentColor, knob: knobColor } = useInstrumentColors('#4a9eff');
   const fxAccent = isCyanTheme ? '#00ccaa' : '#7c3aed';
 
   useEffect(() => {

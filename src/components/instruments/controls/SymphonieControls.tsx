@@ -11,7 +11,7 @@
 import React, { useRef, useEffect, useCallback, useState } from 'react';
 import type { SymphonieConfig } from '@/types/instrument/exotic';
 import { Knob } from '@components/controls/Knob';
-import { useThemeStore } from '@stores';
+import { useInstrumentColors } from '@/hooks/useInstrumentColors';
 import { SectionLabel } from '@components/instruments/shared';
 
 // ── Instrument type labels ─────────────────────────────────────────────────
@@ -60,13 +60,7 @@ export const SymphonieControls: React.FC<SymphonieControlsProps> = ({
   const configRef = useRef(config);
   useEffect(() => { configRef.current = config; }, [config]);
 
-  const currentThemeId = useThemeStore((s) => s.currentThemeId);
-  const isCyan = currentThemeId === 'cyan-lineart';
-
-  const accent  = isCyan ? '#00ffff' : '#bb88ff';
-  const knob    = isCyan ? '#00ffff' : '#cc99ff';
-  const dim     = isCyan ? '#004444' : '#1a0033';
-  const panelBg = isCyan ? 'bg-[#041510] border-accent-highlight/20' : 'bg-[#120820] border-purple-900/30';
+  const { isCyan, accent, knob, dim, panelBg } = useInstrumentColors('#bb88ff', { knob: '#cc99ff', dim: '#1a0033' });
 
   const upd = useCallback(<K extends keyof SymphonieConfig>(key: K, value: SymphonieConfig[K]) => {
     onChange({ [key]: value } as Partial<SymphonieConfig>);

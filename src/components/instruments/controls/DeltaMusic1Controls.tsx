@@ -37,7 +37,7 @@
 import React, { useRef, useEffect, useCallback, useState, useMemo } from 'react';
 import type { DeltaMusic1Config, UADEChipRamInfo } from '@/types/instrument';
 import { Knob } from '@components/controls/Knob';
-import { useThemeStore } from '@stores';
+import { useInstrumentColors } from '@/hooks/useInstrumentColors';
 import { EnvelopeVisualization, SectionLabel } from '@components/instruments/shared';
 import { PatternEditorCanvas } from '@/components/tracker/PatternEditorCanvas';
 import type { ColumnDef, FormatChannel, FormatCell, OnCellChange } from '@/components/shared/format-editor-types';
@@ -139,13 +139,7 @@ export const DeltaMusic1Controls: React.FC<DeltaMusic1ControlsProps> = ({
     return chipEditorRef.current;
   }, []);
 
-  const currentThemeId = useThemeStore((s) => s.currentThemeId);
-  const isCyan = currentThemeId === 'cyan-lineart';
-
-  const accent  = isCyan ? '#00ffff' : '#ff9944';
-  const knob    = isCyan ? '#00ffff' : '#ffbb66';
-  const dim     = isCyan ? '#004444' : '#331800';
-  const panelBg = isCyan ? 'bg-[#041510] border-accent-highlight/20' : 'bg-[#1a0e00] border-orange-900/30';
+  const { isCyan, accent, knob, dim, panelBg } = useInstrumentColors('#ff9944', { knob: '#ffbb66', dim: '#331800' });
 
   // Basic updater — just calls onChange with the partial config
   const upd = useCallback(<K extends keyof DeltaMusic1Config>(key: K, value: DeltaMusic1Config[K]) => {

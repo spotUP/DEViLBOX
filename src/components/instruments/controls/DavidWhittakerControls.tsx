@@ -10,8 +10,8 @@
 import React, { useRef, useEffect, useCallback, useState } from 'react';
 import type { DavidWhittakerConfig, UADEChipRamInfo } from '@/types/instrument';
 import { Knob } from '@components/controls/Knob';
-import { useThemeStore } from '@stores';
 import { SectionLabel, SequenceEditor } from '@components/instruments/shared';
+import { useInstrumentColors } from '@/hooks/useInstrumentColors';
 import type { SequencePreset } from '@components/instruments/shared';
 import { UADEChipEditor } from '@/engine/uade/UADEChipEditor';
 import { UADEEngine } from '@/engine/uade/UADEEngine';
@@ -67,13 +67,7 @@ export const DavidWhittakerControls: React.FC<DavidWhittakerControlsProps> = ({
     return chipEditorRef.current;
   }, []);
 
-  const currentThemeId = useThemeStore((s) => s.currentThemeId);
-  const isCyan = currentThemeId === 'cyan-lineart';
-
-  const accent  = isCyan ? '#00ffff' : '#44aaff';
-  const knob    = isCyan ? '#00ffff' : '#66bbff';
-  const dim     = isCyan ? '#004444' : '#001833';
-  const panelBg = isCyan ? 'bg-[#041510] border-accent-highlight/20' : 'bg-[#000e1a] border-blue-900/30';
+  const { isCyan, accent, knob, dim, panelBg } = useInstrumentColors('#44aaff', { knob: '#66bbff', dim: '#001833' });
 
   const upd = useCallback(<K extends keyof DavidWhittakerConfig>(key: K, value: DavidWhittakerConfig[K]) => {
     onChange({ [key]: value } as Partial<DavidWhittakerConfig>);

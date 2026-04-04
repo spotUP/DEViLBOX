@@ -20,7 +20,7 @@ import React, { useRef, useEffect, useState, useCallback, useMemo } from 'react'
 import { Trash2, ChevronDown } from 'lucide-react';
 import { getToneEngine } from '@engine/ToneEngine';
 import { MacroType } from '@engine/mame/MAMEMacroTypes';
-import { useThemeStore } from '@stores/useThemeStore';
+import { useInstrumentColors } from '@/hooks/useInstrumentColors';
 
 // ============================================================================
 // TYPES
@@ -172,10 +172,7 @@ function SingleMacroEditor({
   const [isDragging, setIsDragging] = useState(false);
   const [selectedStep, setSelectedStep] = useState<number | null>(null);
 
-  const currentThemeId = useThemeStore((s) => s.currentThemeId);
-  const isCyanTheme = currentThemeId === 'cyan-lineart';
-
-  const effectiveColor = isCyanTheme ? '#00ffff' : color;
+  const { isCyan: isCyanTheme, accent: effectiveColor } = useInstrumentColors(color);
   const bgColor = isCyanTheme ? '#030808' : '#0a0a0b';
   const gridColor = isCyanTheme ? 'rgba(0, 255, 255, 0.08)' : 'rgba(100, 100, 120, 0.15)';
   const textColor = isCyanTheme ? '#00ffff' : '#888';
@@ -442,8 +439,7 @@ export function MAMEMacroEditor({
 }: MAMEMacroEditorProps) {
   const [presetMenuOpen, setPresetMenuOpen] = useState<number | null>(null);
 
-  const currentThemeId = useThemeStore((s) => s.currentThemeId);
-  const isCyanTheme = currentThemeId === 'cyan-lineart';
+  const { isCyan: isCyanTheme } = useInstrumentColors('#00d4aa');
 
   // Determine which macro types to show based on chip capabilities
   const availableMacroTypes = useMemo(() => {

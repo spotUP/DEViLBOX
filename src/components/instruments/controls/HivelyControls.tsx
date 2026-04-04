@@ -9,7 +9,7 @@
 import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import type { HivelyConfig, HivelyPerfEntryConfig } from '@/types/instrument';
 import { Knob } from '@components/controls/Knob';
-import { useThemeStore } from '@stores';
+import { useInstrumentColors } from '@/hooks/useInstrumentColors';
 import { EnvelopeVisualization, SectionLabel } from '@components/instruments/shared';
 import { PatternEditorCanvas } from '@/components/tracker/PatternEditorCanvas';
 import {
@@ -46,15 +46,7 @@ export const HivelyControls: React.FC<HivelyControlsProps> = ({
   const configRef = useRef(config);
   useEffect(() => { configRef.current = config; }, [config]);
 
-  const currentThemeId = useThemeStore((state) => state.currentThemeId);
-  const isCyanTheme = currentThemeId === 'cyan-lineart';
-
-  const accentColor = isCyanTheme ? '#00ffff' : '#44ff88';
-  const knobColor = isCyanTheme ? '#00ffff' : '#66ddaa';
-  const dimColor = isCyanTheme ? '#004444' : '#1a3328';
-  const panelBg = isCyanTheme
-    ? 'bg-[#041510] border-accent-highlight/20'
-    : 'bg-[#0a1a12] border-green-900/30';
+  const { isCyan: isCyanTheme, accent: accentColor, knob: knobColor, dim: dimColor, panelBg } = useInstrumentColors('#44ff88', { knob: '#66ddaa', dim: '#1a3328' });
   // Update helpers using refs to avoid stale state
   const updateParam = useCallback(<K extends keyof HivelyConfig>(key: K, value: HivelyConfig[K]) => {
     onChange({ [key]: value } as Partial<HivelyConfig>);

@@ -28,7 +28,7 @@
 import React, { useRef, useEffect, useCallback, useState } from 'react';
 import type { DeltaMusic2Config, DeltaMusic2VolEntry, DeltaMusic2VibEntry, UADEChipRamInfo } from '@/types/instrument';
 import { Knob } from '@components/controls/Knob';
-import { useThemeStore } from '@stores';
+import { useInstrumentColors } from '@/hooks/useInstrumentColors';
 import { SectionLabel } from '@components/instruments/shared';
 import { UADEChipEditor } from '@/engine/uade/UADEChipEditor';
 import { UADEEngine } from '@/engine/uade/UADEEngine';
@@ -79,13 +79,7 @@ export const DeltaMusic2Controls: React.FC<DeltaMusic2ControlsProps> = ({
     return chipEditorRef.current;
   }, []);
 
-  const currentThemeId = useThemeStore((s) => s.currentThemeId);
-  const isCyan = currentThemeId === 'cyan-lineart';
-
-  const accent  = isCyan ? '#00ffff' : '#ff9944';
-  const knob    = isCyan ? '#00ffff' : '#ffbb66';
-  const dim     = isCyan ? '#004444' : '#331800';
-  const panelBg = isCyan ? 'bg-[#041510] border-accent-highlight/20' : 'bg-[#1a0e00] border-orange-900/30';
+  const { isCyan, accent, knob, dim, panelBg } = useInstrumentColors('#ff9944', { knob: '#ffbb66', dim: '#331800' });
 
   // ── Volume table updater ──────────────────────────────────────────────────
 

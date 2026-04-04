@@ -12,7 +12,7 @@
 import React, { useRef, useEffect, useCallback, useState, useMemo } from 'react';
 import type { DigMugConfig, UADEChipRamInfo } from '@/types/instrument';
 import { Knob } from '@components/controls/Knob';
-import { useThemeStore } from '@stores';
+import { useInstrumentColors } from '@/hooks/useInstrumentColors';
 import { SectionLabel, WaveformThumbnail } from '@components/instruments/shared';
 import { PatternEditorCanvas } from '@/components/tracker/PatternEditorCanvas';
 import type { ColumnDef, FormatChannel, FormatCell, OnCellChange } from '@/components/shared/format-editor-types';
@@ -108,13 +108,7 @@ export const DigMugControls: React.FC<DigMugControlsProps> = ({
     return chipEditorRef.current;
   }, []);
 
-  const currentThemeId = useThemeStore((s) => s.currentThemeId);
-  const isCyan = currentThemeId === 'cyan-lineart';
-
-  const accent  = isCyan ? '#00ffff' : '#aaff44';
-  const knob    = isCyan ? '#00ffff' : '#bbff66';
-  const dim     = isCyan ? '#004444' : '#1a3300';
-  const panelBg = isCyan ? 'bg-[#041510] border-accent-highlight/20' : 'bg-[#0a1400] border-lime-900/30';
+  const { isCyan, accent, knob, dim, panelBg } = useInstrumentColors('#aaff44', { knob: '#bbff66', dim: '#1a3300' });
 
   const upd = useCallback(<K extends keyof DigMugConfig>(key: K, value: DigMugConfig[K]) => {
     onChange({ [key]: value } as Partial<DigMugConfig>);
