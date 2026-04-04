@@ -13,7 +13,6 @@ import type { AutomationCurve } from '@typedefs/automation';
 import { getNKSParametersForSynth } from '@/midi/performance/synthParameterMaps';
 import { NKSSection } from '@/midi/performance/types';
 import type { SynthType } from '@typedefs/instrument';
-import { useRegisterLaneStore } from '@stores/useRegisterLaneStore';
 
 import { AUTOMATION_LANE_WIDTH, AUTOMATION_LANE_MIN } from '@hooks/views/usePatternEditor';
 
@@ -106,10 +105,6 @@ export const PixiAutomationLanes: React.FC<PixiAutomationLanesProps> = ({
   const [dragState, setDragState] = useState<{ curveId: string; channelIndex: number } | null>(null);
   const lastClickRef = useRef<{ time: number; row: number }>({ time: 0, row: -1 });
 
-  // Filter out params shown as register lanes
-  const registerLanes = useRegisterLaneStore(s => s.lanes);
-  const registerParamIds = useMemo(() => new Set(registerLanes.map(l => l.paramId)), [registerLanes]);
-
   // Per-channel active parameters (multi-lane support)
   const channelParameterLists = useMemo(() => {
     const result: string[][] = [];
@@ -127,12 +122,10 @@ export const PixiAutomationLanes: React.FC<PixiAutomationLanesProps> = ({
       for (const p of fromCurves) {
         if (!merged.includes(p)) merged.push(p);
       }
-      // Exclude params shown as register lanes
-      const filtered = merged.filter(p => !registerParamIds.has(p));
-      result.push(filtered.length > 0 ? filtered : (merged.length > 0 ? [] : [parameter]));
+      result.push(merged.length > 0 ? merged : [parameter]);
     }
     return result;
-  }, [channelCount, channelLanes, parameter, allCurves, patternId, registerParamIds]);
+  }, [channelCount, channelLanes, parameter, allCurves, patternId]);
 
   const channelParameters = useMemo(
     () => channelParameterLists.map(pl => pl[0] || parameter),
