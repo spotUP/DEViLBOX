@@ -34,12 +34,13 @@
  *   +30-77 table[48]     ✓ written (48 × uint8, synth-only sound table)
  */
 
-import React, { useRef, useEffect, useCallback, useState } from 'react';
+import React, { useRef, useEffect, useCallback, useState, useMemo } from 'react';
 import type { DeltaMusic1Config, UADEChipRamInfo } from '@/types/instrument';
 import { Knob } from '@components/controls/Knob';
 import { useThemeStore } from '@stores';
-import { EnvelopeVisualization, SequenceEditor } from '@components/instruments/shared';
-import type { SequencePreset } from '@components/instruments/shared';
+import { EnvelopeVisualization } from '@components/instruments/shared';
+import { PatternEditorCanvas } from '@/components/tracker/PatternEditorCanvas';
+import type { ColumnDef, FormatChannel, FormatCell, OnCellChange } from '@/components/shared/format-editor-types';
 import { UADEChipEditor } from '@/engine/uade/UADEChipEditor';
 import { UADEEngine } from '@/engine/uade/UADEEngine';
 
@@ -64,14 +65,43 @@ const OFF_ARPEGGIO       = 16; // 8 × uint8 at +16..+23
 const OFF_TABLE          = 30; // 48 × uint8 at +30..+77
 // +24-29 sample lengths — NOT written (structural)
 
-// ── Arpeggio presets ────────────────────────────────────────────────────────
+// ── Arpeggio PatternEditorCanvas adapter ────────────────────────────────────
 
-const ARP_PRESETS: SequencePreset[] = [
-  { name: 'Major',  data: [0, 4, 7, 0, 4, 7, 0, 0], loop: 0 },
-  { name: 'Minor',  data: [0, 3, 7, 0, 3, 7, 0, 0], loop: 0 },
-  { name: 'Octave', data: [0, 12, 0, 12, 0, 12, 0, 0], loop: 0 },
-  { name: 'Power',  data: [0, 7, 12, 0, 7, 12, 0, 0], loop: 0 },
-  { name: 'Clear',  data: new Array(8).fill(0) },
+function signedHex2(val: number): string {
+  if (val === 0) return ' 00';
+  const abs = Math.abs(val);
+  const sign = val < 0 ? '-' : '+';
+  return `${sign}${abs.toString(16).toUpperCase().padStart(2, '0')}`;
+}
+
+const ARP_COLUMN: ColumnDef[] = [
+  {
+    key: 'semitone',
+    label: 'ST',
+    charWidth: 3,
+    type: 'hex',
+    color: '#ff9944',
+    emptyColor: 'var(--color-border-light)',
+    emptyValue: 0,
+    hexDigits: 2,
+    formatter: signedHex2,
+  },
+];
+
+// ── Sound table PatternEditorCanvas adapter ─────────────────────────────────
+
+const TABLE_COLUMN: ColumnDef[] = [
+  {
+    key: 'value',
+    label: 'VAL',
+    charWidth: 3,
+    type: 'hex',
+    color: '#ff9944',
+    emptyColor: 'var(--color-border-light)',
+    emptyValue: 0,
+    hexDigits: 2,
+    formatter: (v: number) => v.toString(16).toUpperCase().padStart(2, '0'),
+  },
 ];
 
 // ── Tab type ────────────────────────────────────────────────────────────────
@@ -95,7 +125,6 @@ export const DeltaMusic1Controls: React.FC<DeltaMusic1ControlsProps> = ({
   uadeChipRam,
 }) => {
   const [activeTab, setActiveTab] = useState<DM1Tab>('envelope');
-  const [editingCell, setEditingCell] = useState<number | null>(null);
 
   // configRef pattern: prevents stale closures in callbacks
   const configRef = useRef(config);
@@ -372,47 +401,63 @@ export const DeltaMusic1Controls: React.FC<DeltaMusic1ControlsProps> = ({
 
   // ── ARPEGGIO TAB ──────────────────────────────────────────────────────────
 
-  const renderArpeggio = () => {
-    // Build 8-element sequence for the SequenceEditor
+  const arpChannels = useMemo((): FormatChannel[] => {
     const arpData = config.arpeggio.slice(0, 8);
     while (arpData.length < 8) arpData.push(0);
+    const rows: FormatCell[] = arpData.map((v) => ({ semitone: v }));
+    return [{ label: 'Arp', patternLength: 8, rows, isPatternChannel: false }];
+  }, [config.arpeggio]);
 
-    return (
-      <div className="flex flex-col gap-3 p-3 overflow-y-auto" style={{ maxHeight: 'calc(100vh - 280px)' }}>
-        <div className={`rounded-lg border p-3 ${panelBg}`}>
-          <SectionLabel label="Arpeggio Table" />
-          <SequenceEditor
-            label="Arpeggio (8 steps)"
-            data={arpData}
-            onChange={(d) => {
-              // Pad/truncate to exactly 8 entries
-              const arr = d.slice(0, 8);
-              while (arr.length < 8) arr.push(0);
-              upd('arpeggio', arr);
-              if (uadeChipRam) {
-                void getEditor().writeBlock(
-                  uadeChipRam.instrBase + OFF_ARPEGGIO,
-                  arr.map((v) => v & 0xFF),
-                );
-              }
-            }}
-            min={0} max={63}
-            bipolar={false}
-            fixedLength
-            showNoteNames={false}
-            presets={ARP_PRESETS}
-            color={accent}
-            height={80}
+  const arpCellChange = useMemo((): OnCellChange => {
+    return (_ch: number, row: number, _col: string, value: number) => {
+      const arpData = configRef.current.arpeggio.slice(0, 8);
+      while (arpData.length < 8) arpData.push(0);
+      // Treat values > 63 as signed (hex input gives unsigned 0-FF)
+      arpData[row] = value > 127 ? value - 256 : (value > 63 ? value - 128 : value);
+      upd('arpeggio', arpData);
+      if (uadeChipRam) {
+        void getEditor().writeBlock(
+          uadeChipRam.instrBase + OFF_ARPEGGIO,
+          arpData.map((v) => v & 0xFF),
+        );
+      }
+    };
+  }, [upd, uadeChipRam, getEditor]);
+
+  const renderArpeggio = () => (
+    <div className="flex flex-col gap-3 p-3" style={{ height: 'calc(100vh - 280px)' }}>
+      <div className={`rounded-lg border p-3 ${panelBg} flex flex-col`} style={{ flex: 1, minHeight: 0 }}>
+        <SectionLabel label="Arpeggio Table (8 steps)" />
+        <div className="text-[10px] text-text-muted mb-2">
+          8 semitone offsets played in sequence. 0 = no arpeggio.
+        </div>
+        <div style={{ flex: 1, minHeight: 120 }}>
+          <PatternEditorCanvas
+            formatColumns={ARP_COLUMN}
+            formatChannels={arpChannels}
+            formatCurrentRow={0}
+            formatIsPlaying={false}
+            onFormatCellChange={arpCellChange}
+            hideVUMeters={true}
           />
-          <div className="text-[10px] text-text-muted mt-2">
-            8 semitone offsets played in sequence. 0 = no arpeggio.
-          </div>
         </div>
       </div>
-    );
-  };
+    </div>
+  );
 
   // ── SOUND TABLE TAB (synth only, editable) ──────────────────────────────
+
+  const tableChannels = useMemo((): FormatChannel[] => {
+    if (config.isSample || !config.table) return [];
+    const rows: FormatCell[] = config.table.map((v) => ({ value: v }));
+    return [{ label: 'Tbl', patternLength: config.table.length, rows, isPatternChannel: false }];
+  }, [config.table, config.isSample]);
+
+  const tableCellChange = useMemo((): OnCellChange => {
+    return (_ch: number, row: number, _col: string, value: number) => {
+      updateTableEntry(row, value);
+    };
+  }, [updateTableEntry]);
 
   const renderTable = () => {
     if (config.isSample || !config.table) {
@@ -423,73 +468,22 @@ export const DeltaMusic1Controls: React.FC<DeltaMusic1ControlsProps> = ({
       );
     }
 
-    const table = config.table;
-
-    /** Decode a byte into its display label. */
-    const decodeLabel = (entry: number): string => {
-      if (entry === 0xFF) return 'LP';
-      if (entry >= 0x80) return `D${entry & 0x7F}`;
-      return `W${entry}`;
-    };
-
-    /** Get cell colors based on byte value. */
-    const cellStyle = (entry: number): { bg: string; text: string } => {
-      if (entry === 0xFF) return { bg: '#1a0000', text: '#884444' };
-      if (entry >= 0x80) return { bg: '#1a1400', text: '#888822' };
-      if (entry < 0x80)  return { bg: accent + '1a', text: accent };
-      return { bg: '#0a0e14', text: '#555' };
-    };
-
     return (
-      <div className="flex flex-col gap-3 p-3 overflow-y-auto" style={{ maxHeight: 'calc(100vh - 280px)' }}>
-        <div className={`rounded-lg border p-3 ${panelBg}`}>
+      <div className="flex flex-col gap-3 p-3" style={{ height: 'calc(100vh - 280px)' }}>
+        <div className={`rounded-lg border p-3 ${panelBg} flex flex-col`} style={{ flex: 1, minHeight: 0 }}>
           <SectionLabel label="Sound Table (48-byte sequence)" />
-          <div className="grid grid-cols-8 gap-1">
-            {table.map((entry, idx) => {
-              const { bg, text } = cellStyle(entry);
-              const label = decodeLabel(entry);
-              const isEditing = editingCell === idx;
-
-              return (
-                <div key={idx}
-                  className="flex flex-col items-center py-1 rounded text-[8px] font-mono cursor-pointer select-none"
-                  style={{ background: bg, border: `1px solid ${isEditing ? accent : text + '44'}` }}
-                  onClick={() => { if (!isEditing) setEditingCell(idx); }}
-                >
-                  <span style={{ color: text, opacity: 0.5 }}>{idx}</span>
-                  {isEditing ? (
-                    <input
-                      type="number"
-                      min={0} max={255} step={1}
-                      defaultValue={entry}
-                      autoFocus
-                      className="w-[32px] text-center text-[9px] font-mono bg-transparent outline-none"
-                      style={{ color: text, caretColor: accent, border: 'none' }}
-                      onBlur={(e) => {
-                        const v = parseInt(e.currentTarget.value, 10);
-                        if (!isNaN(v)) updateTableEntry(idx, v);
-                        setEditingCell(null);
-                      }}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter') {
-                          const v = parseInt(e.currentTarget.value, 10);
-                          if (!isNaN(v)) updateTableEntry(idx, v);
-                          setEditingCell(null);
-                        } else if (e.key === 'Escape') {
-                          setEditingCell(null);
-                        }
-                      }}
-                      onClick={(e) => e.stopPropagation()}
-                    />
-                  ) : (
-                    <span style={{ color: text }}>{label}</span>
-                  )}
-                </div>
-              );
-            })}
+          <div className="text-[10px] text-text-muted mb-2">
+            W## = waveform segment (0-7F), D## = delay (80-FE), FF = loop
           </div>
-          <div className="mt-2 flex flex-col gap-1 text-[9px]" style={{ color: accent, opacity: 0.6 }}>
-            <span>Click a cell to edit. W## = waveform segment (0-127), D## = delay (128-254), LP = loop (255)</span>
+          <div style={{ flex: 1, minHeight: 120 }}>
+            <PatternEditorCanvas
+              formatColumns={TABLE_COLUMN}
+              formatChannels={tableChannels}
+              formatCurrentRow={0}
+              formatIsPlaying={false}
+              onFormatCellChange={tableCellChange}
+              hideVUMeters={true}
+            />
           </div>
         </div>
       </div>

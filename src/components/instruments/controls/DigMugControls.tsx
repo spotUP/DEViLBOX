@@ -1,20 +1,21 @@
 /**
- * DigMugControls.tsx — Digital Mugician (V1/V2) instrument editor
+ * DigMugControls.tsx -- Digital Mugician (V1/V2) instrument editor
  *
  * Exposes all DigMugConfig parameters: 4-wave selector, blend position,
  * morph speed, volume, vibrato, and arpeggio table.
  *
  * Enhanced with:
  *  - WaveformThumbnail: mini visual previews on each of the 4 wave slots
- *  - SequenceEditor: proper step-sequence editor for the arpeggio table
+ *  - PatternEditorCanvas: vertical tracker-style arpeggio table editor
  */
 
-import React, { useRef, useEffect, useCallback, useState } from 'react';
+import React, { useRef, useEffect, useCallback, useState, useMemo } from 'react';
 import type { DigMugConfig, UADEChipRamInfo } from '@/types/instrument';
 import { Knob } from '@components/controls/Knob';
 import { useThemeStore } from '@stores';
-import { SequenceEditor, WaveformThumbnail } from '@components/instruments/shared';
-import type { SequencePreset } from '@components/instruments/shared';
+import { WaveformThumbnail } from '@components/instruments/shared';
+import { PatternEditorCanvas } from '@/components/tracker/PatternEditorCanvas';
+import type { ColumnDef, FormatChannel, FormatCell, OnCellChange } from '@/components/shared/format-editor-types';
 import { UADEChipEditor } from '@/engine/uade/UADEChipEditor';
 import { UADEEngine } from '@/engine/uade/UADEEngine';
 
@@ -47,15 +48,46 @@ const DM_WAVES: { name: string; type: 'sine' | 'triangle' | 'saw' | 'square' | '
   { name: 'Reed',      type: 'square'   },
 ];
 
-const ARP_PRESETS: SequencePreset[] = [
-  { name: 'Major',  data: [0, 4, 7, 0, 4, 7, 12, 12, 0, 4, 7, 0, 4, 7, 12, 12], loop: 0 },
-  { name: 'Minor',  data: [0, 3, 7, 0, 3, 7, 12, 12, 0, 3, 7, 0, 3, 7, 12, 12], loop: 0 },
-  { name: 'Octave', data: [0, 12, 0, 12, 0, 12, 0, 12, 0, 12, 0, 12, 0, 12, 0, 12], loop: 0 },
-  { name: 'Power',  data: [0, 7, 12, 7, 0, 7, 12, 7, 0, 7, 12, 7, 0, 7, 12, 7], loop: 0 },
-  { name: 'Clear',  data: new Array(16).fill(0) },
+// -- Arpeggio adapter (inline -- single column) ---
+
+function signedHex2(val: number): string {
+  if (val === 0) return ' 00';
+  const abs = Math.abs(val);
+  const sign = val < 0 ? '-' : '+';
+  return `${sign}${abs.toString(16).toUpperCase().padStart(2, '0')}`;
+}
+
+const ARP_COLUMN: ColumnDef[] = [
+  {
+    key: 'semitone',
+    label: 'ST',
+    charWidth: 3,
+    type: 'hex',
+    color: '#aaff44',
+    emptyColor: 'var(--color-border-light)',
+    emptyValue: 0,
+    hexDigits: 2,
+    formatter: signedHex2,
+  },
 ];
 
-// ── Component ──────────────────────────────────────────────────────────────────
+function arpToFormatChannel(data: number[]): FormatChannel[] {
+  const rows: FormatCell[] = data.map((v) => ({ semitone: v }));
+  return [{ label: 'Arp', patternLength: data.length, rows, isPatternChannel: false }];
+}
+
+function makeArpCellChange(
+  data: number[],
+  onChangeData: (d: number[]) => void,
+): OnCellChange {
+  return (_ch: number, row: number, _col: string, value: number) => {
+    const next = [...data];
+    next[row] = value > 127 ? value - 256 : (value > 63 ? value - 128 : value);
+    onChangeData(next);
+  };
+}
+
+// -- Component ---
 
 export const DigMugControls: React.FC<DigMugControlsProps> = ({
   config,
@@ -88,20 +120,6 @@ export const DigMugControls: React.FC<DigMugControlsProps> = ({
     onChange({ [key]: value } as Partial<DigMugConfig>);
   }, [onChange]);
 
-  /**
-   * Like `upd`, but also writes the new value to chip RAM when a UADE context
-   * is active. byteOffset is relative to instrBase.
-   *
-   * Chip RAM layout for DigMug 16-byte instrument struct:
-   *   +0  wave         (uint8, waveform index — wavetable[0])
-   *   +2  volume       (uint8, 0-64)
-   *   +5  pitch        (uint8, pitch envelope table index — vibSpeed)
-   *   +6  effectStep   (uint8, wavetable effect position — waveBlend)
-   *   +7  pitchDelay   (uint8, pitch envelope delay — vibDepth)
-   *   +12 source1      (uint8, effect source wave 1 — wavetable[2])
-   *   +13 source2      (uint8, effect source wave 2 — wavetable[3])
-   *   +14 effectSpeed  (uint8, wavetable effect speed — arpSpeed 0-15 → ×17)
-   */
   const updWithChipRam = useCallback(
     (key: keyof DigMugConfig, value: number, byteOffset: number) => {
       upd(key as Parameters<typeof upd>[0], value as Parameters<typeof upd>[1]);
@@ -135,8 +153,6 @@ export const DigMugControls: React.FC<DigMugControlsProps> = ({
     wt[slot] = value;
     onChange({ wavetable: wt });
 
-    // Write to chip RAM: slot 0 → +0 (wave), slot 2 → +12 (source1), slot 3 → +13 (source2)
-    // Slot 1 has no direct chip RAM byte in the 16-byte DM instrument struct.
     if (uadeChipRam) {
       const byteOffset = slot === 0 ? 0 : slot === 2 ? 12 : slot === 3 ? 13 : -1;
       if (byteOffset >= 0) {
@@ -145,15 +161,11 @@ export const DigMugControls: React.FC<DigMugControlsProps> = ({
     }
   }, [onChange, uadeChipRam, getEditor]);
 
-  // ── MAIN TAB ──────────────────────────────────────────────────────────────
+  // -- MAIN TAB ---
   const renderMain = () => (
     <div className="flex flex-col gap-3 p-3 overflow-y-auto" style={{ maxHeight: 'calc(100vh - 280px)' }}>
-
-      {/* 4-wave slot selectors with thumbnails */}
       <div className={`rounded-lg border p-3 ${panelBg}`}>
         <SectionLabel label="Wavetable Slots (4 waves)" />
-
-        {/* Slot buttons — each shows a thumbnail of the selected wave */}
         <div className="grid grid-cols-4 gap-2 mb-3">
           {([0, 1, 2, 3] as const).map((slot) => {
             const waveIdx = config.wavetable[slot];
@@ -161,17 +173,9 @@ export const DigMugControls: React.FC<DigMugControlsProps> = ({
             return (
               <div key={slot} className="flex flex-col gap-1">
                 <span className="text-[10px] text-text-muted text-center">Wave {slot + 1}</span>
-                {/* Waveform preview */}
-                <div className="rounded overflow-hidden border"
-                  style={{ borderColor: dim }}>
-                  <WaveformThumbnail
-                    type={waveDef.type}
-                    width={72} height={28}
-                    color={accent}
-                    style="line"
-                  />
+                <div className="rounded overflow-hidden border" style={{ borderColor: dim }}>
+                  <WaveformThumbnail type={waveDef.type} width={72} height={28} color={accent} style="line" />
                 </div>
-                {/* Select dropdown below preview */}
                 <select
                   value={waveIdx}
                   onChange={(e) => updateWavetable(slot, parseInt(e.target.value))}
@@ -187,20 +191,14 @@ export const DigMugControls: React.FC<DigMugControlsProps> = ({
             );
           })}
         </div>
-
-        {/* Blend + Morph controls */}
         <div className="flex gap-4">
           <Knob value={config.waveBlend} min={0} max={63} step={1}
             onChange={(v) => updWithChipRam('waveBlend', Math.round(v), 6)}
-            label="Blend Pos" color={knob}
-            formatValue={(v) => Math.round(v).toString()} />
+            label="Blend Pos" color={knob} formatValue={(v) => Math.round(v).toString()} />
           <Knob value={config.waveSpeed} min={0} max={63} step={1}
             onChange={(v) => updWithChipRam('waveSpeed', Math.round(v), 14)}
-            label="Morph Spd" color={knob}
-            formatValue={(v) => Math.round(v).toString()} />
+            label="Morph Spd" color={knob} formatValue={(v) => Math.round(v).toString()} />
         </div>
-
-        {/* Blend position bar */}
         <div className="mt-2 h-3 rounded overflow-hidden" style={{ background: 'var(--color-bg-secondary)', border: `1px solid ${dim}` }}>
           <div className="h-full transition-all" style={{
             width: `${(config.waveBlend / 63) * 100}%`,
@@ -211,60 +209,55 @@ export const DigMugControls: React.FC<DigMugControlsProps> = ({
           <span>W1</span><span>W2</span><span>W3</span><span>W4</span>
         </div>
       </div>
-
-      {/* Volume + Vibrato */}
       <div className={`rounded-lg border p-3 ${panelBg}`}>
         <SectionLabel label="Volume & Vibrato" />
         <div className="flex gap-4">
           <Knob value={config.volume} min={0} max={64} step={1}
             onChange={(v) => updWithChipRam('volume', Math.round(v), 2)}
-            label="Volume" color={knob} size="md"
-            formatValue={(v) => Math.round(v).toString()} />
+            label="Volume" color={knob} size="md" formatValue={(v) => Math.round(v).toString()} />
           <Knob value={config.vibSpeed} min={0} max={63} step={1}
             onChange={(v) => updWithChipRam('vibSpeed', Math.round(v), 5)}
-            label="Vib Speed" color={knob}
-            formatValue={(v) => Math.round(v).toString()} />
+            label="Vib Speed" color={knob} formatValue={(v) => Math.round(v).toString()} />
           <Knob value={config.vibDepth} min={0} max={63} step={1}
             onChange={(v) => updWithChipRam('vibDepth', Math.round(v), 7)}
-            label="Vib Depth" color={knob}
-            formatValue={(v) => Math.round(v).toString()} />
+            label="Vib Depth" color={knob} formatValue={(v) => Math.round(v).toString()} />
         </div>
       </div>
     </div>
   );
 
-  // ── ARPEGGIO TAB ──────────────────────────────────────────────────────────
+  // -- ARPEGGIO TAB ---
+  const arpChannels = useMemo(() => arpToFormatChannel(config.arpTable), [config.arpTable]);
+  const arpCellChange = useMemo(
+    () => makeArpCellChange(config.arpTable, (d) => upd('arpTable', d)),
+    [config.arpTable, upd],
+  );
+
   const renderArpeggio = () => (
-    <div className="flex flex-col gap-3 p-3 overflow-y-auto" style={{ maxHeight: 'calc(100vh - 280px)' }}>
-      <div className={`rounded-lg border p-3 ${panelBg}`}>
+    <div className="flex flex-col gap-3 p-3" style={{ height: 'calc(100vh - 280px)' }}>
+      <div className={`rounded-lg border p-3 ${panelBg} flex flex-col`} style={{ flex: 1, minHeight: 0 }}>
         <div className="flex items-center justify-between mb-3">
           <SectionLabel label="Arpeggio Speed" />
           <Knob value={config.arpSpeed} min={0} max={15} step={1}
             onChange={(v) => {
               const val = Math.round(v);
               upd('arpSpeed', val);
-              // chip RAM effectSpeed (+14) is 0-255; arpSpeed 0-15 → × 17
               if (uadeChipRam) {
                 void getEditor().writeU8(uadeChipRam.instrBase + 14, Math.round(val * 17) & 0xFF);
               }
             }}
-            label="Speed" color={knob}
-            formatValue={(v) => Math.round(v).toString()} />
+            label="Speed" color={knob} formatValue={(v) => Math.round(v).toString()} />
         </div>
-
-        <SequenceEditor
-          label="Arpeggio Table"
-          data={config.arpTable}
-          onChange={(d) => upd('arpTable', d)}
-          min={-64} max={63}
-          bipolar
-          fixedLength
-          showNoteNames
-          presets={ARP_PRESETS}
-          playbackPosition={arpPlaybackPosition}
-          color={accent}
-          height={100}
-        />
+        <div style={{ flex: 1, minHeight: 120 }}>
+          <PatternEditorCanvas
+            formatColumns={ARP_COLUMN}
+            formatChannels={arpChannels}
+            formatCurrentRow={arpPlaybackPosition ?? 0}
+            formatIsPlaying={arpPlaybackPosition !== undefined}
+            onFormatCellChange={arpCellChange}
+            hideVUMeters={true}
+          />
+        </div>
       </div>
     </div>
   );

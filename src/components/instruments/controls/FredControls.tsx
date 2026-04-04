@@ -1,5 +1,5 @@
 /**
- * FredControls.tsx — Fred Editor (PWM synthesis) instrument editor
+ * FredControls.tsx -- Fred Editor (PWM synthesis) instrument editor
  *
  * Exposes all FredConfig parameters: ADSR envelope, vibrato, arpeggio,
  * and PWM pulse-width modulation controls.
@@ -8,41 +8,42 @@
  * directly to chip RAM so UADE picks them up on the next note trigger.
  *
  * Fred instrument byte layout (64 bytes at instrBase):
- *   +0..+3   : pointer (uint32) — skip
- *   +4..+5   : loopPtr (int16)  — skip
- *   +6..+7   : length (uint16)  — skip
- *   +8..+9   : relative (uint16 BE)   ✓ writeU16
- *   +10      : vibratoDelay (uint8)   ✓ writeU8
+ *   +0..+3   : pointer (uint32) -- skip
+ *   +4..+5   : loopPtr (int16)  -- skip
+ *   +6..+7   : length (uint16)  -- skip
+ *   +8..+9   : relative (uint16 BE)   writeU16
+ *   +10      : vibratoDelay (uint8)   writeU8
  *   +11      : (skip)
- *   +12      : vibratoSpeed (uint8)   ✓ writeU8
- *   +13      : vibratoDepth (uint8)   ✓ writeU8
- *   +14      : envelopeVol (uint8)    ✓ writeU8
- *   +15      : attackSpeed (uint8)    ✓ writeU8
- *   +16      : attackVol (uint8)      ✓ writeU8
- *   +17      : decaySpeed (uint8)     ✓ writeU8
- *   +18      : decayVol (uint8)       ✓ writeU8
- *   +19      : sustainTime (uint8)    ✓ writeU8
- *   +20      : releaseSpeed (uint8)   ✓ writeU8
- *   +21      : releaseVol (uint8)     ✓ writeU8
- *   +22..+37 : arpeggio[16] (int8×16) ✓ writeBlock
- *   +38      : arpeggioSpeed (uint8)  ✓ writeU8
- *   +39      : type (int8) — skip (sample type)
- *   +40      : pulseRateNeg (int8)    ✓ writeS8
- *   +41      : pulseRatePos (uint8)   ✓ writeU8
- *   +42      : pulseSpeed (uint8)     ✓ writeU8
- *   +43      : pulsePosL (uint8)      ✓ writeU8
- *   +44      : pulsePosH (uint8)      ✓ writeU8
- *   +45      : pulseDelay (uint8)     ✓ writeU8
- *   +51      : arpeggioLimit (uint8)  ✓ writeU8
+ *   +12      : vibratoSpeed (uint8)   writeU8
+ *   +13      : vibratoDepth (uint8)   writeU8
+ *   +14      : envelopeVol (uint8)    writeU8
+ *   +15      : attackSpeed (uint8)    writeU8
+ *   +16      : attackVol (uint8)      writeU8
+ *   +17      : decaySpeed (uint8)     writeU8
+ *   +18      : decayVol (uint8)       writeU8
+ *   +19      : sustainTime (uint8)    writeU8
+ *   +20      : releaseSpeed (uint8)   writeU8
+ *   +21      : releaseVol (uint8)     writeU8
+ *   +22..+37 : arpeggio[16] (int8x16) writeBlock
+ *   +38      : arpeggioSpeed (uint8)  writeU8
+ *   +39      : type (int8) -- skip (sample type)
+ *   +40      : pulseRateNeg (int8)    writeS8
+ *   +41      : pulseRatePos (uint8)   writeU8
+ *   +42      : pulseSpeed (uint8)     writeU8
+ *   +43      : pulsePosL (uint8)      writeU8
+ *   +44      : pulsePosH (uint8)      writeU8
+ *   +45      : pulseDelay (uint8)     writeU8
+ *   +51      : arpeggioLimit (uint8)  writeU8
  *   +52..+63 : padding
  */
 
-import React, { useRef, useEffect, useState } from 'react';
+import React, { useRef, useEffect, useState, useMemo } from 'react';
 import type { FredConfig, UADEChipRamInfo } from '@/types/instrument';
 import { Knob } from '@components/controls/Knob';
 import { useThemeStore } from '@stores';
-import { EnvelopeVisualization, SequenceEditor } from '@components/instruments/shared';
-import type { SequencePreset } from '@components/instruments/shared';
+import { EnvelopeVisualization } from '@components/instruments/shared';
+import { PatternEditorCanvas } from '@/components/tracker/PatternEditorCanvas';
+import type { ColumnDef, FormatChannel, FormatCell, OnCellChange } from '@/components/shared/format-editor-types';
 import { UADEChipEditor } from '@/engine/uade/UADEChipEditor';
 import { UADEEngine } from '@/engine/uade/UADEEngine';
 import { Download } from 'lucide-react';
@@ -56,12 +57,44 @@ interface FredControlsProps {
 
 type FredTab = 'envelope' | 'pwm' | 'arpeggio' | 'vibrato';
 
-const ARP_PRESETS: SequencePreset[] = [
-  { name: 'Major',  data: [0, 4, 7, 0, 4, 7, 12, 12, 0, 4, 7, 0, 4, 7, 12, 12], loop: 0 },
-  { name: 'Minor',  data: [0, 3, 7, 0, 3, 7, 12, 12, 0, 3, 7, 0, 3, 7, 12, 12], loop: 0 },
-  { name: 'Octave', data: [0, 12, 0, 12, 0, 12, 0, 12, 0, 12, 0, 12, 0, 12, 0, 12], loop: 0 },
-  { name: 'Clear',  data: new Array(16).fill(0) },
+// -- Arpeggio adapter (inline -- single column) ---
+
+function signedHex2(val: number): string {
+  if (val === 0) return ' 00';
+  const abs = Math.abs(val);
+  const sign = val < 0 ? '-' : '+';
+  return `${sign}${abs.toString(16).toUpperCase().padStart(2, '0')}`;
+}
+
+const ARP_COLUMN: ColumnDef[] = [
+  {
+    key: 'semitone',
+    label: 'ST',
+    charWidth: 3,
+    type: 'hex',
+    color: '#ff8800',
+    emptyColor: 'var(--color-border-light)',
+    emptyValue: 0,
+    hexDigits: 2,
+    formatter: signedHex2,
+  },
 ];
+
+function arpToFormatChannel(data: number[]): FormatChannel[] {
+  const rows: FormatCell[] = data.map((v) => ({ semitone: v }));
+  return [{ label: 'Arp', patternLength: data.length, rows, isPatternChannel: false }];
+}
+
+function makeArpCellChange(
+  data: number[],
+  onChangeData: (d: number[]) => void,
+): OnCellChange {
+  return (_ch: number, row: number, _col: string, value: number) => {
+    const next = [...data];
+    next[row] = value > 127 ? value - 256 : (value > 63 ? value - 128 : value);
+    onChangeData(next);
+  };
+}
 
 export const FredControls: React.FC<FredControlsProps> = ({ config, onChange, uadeChipRam }) => {
   const [activeTab, setActiveTab] = useState<FredTab>('envelope');
@@ -86,10 +119,6 @@ export const FredControls: React.FC<FredControlsProps> = ({ config, onChange, ua
   const dim     = isCyan ? '#004444' : '#332200';
   const panelBg = isCyan ? 'bg-[#041510] border-accent-highlight/20' : 'bg-[#1a0e00] border-orange-900/30';
 
-  /**
-   * Like `upd`, but also writes to chip RAM when a UADE context is active.
-   * `chipWriter` receives the editor and instrBase address.
-   */
   async function updWithChipRam<K extends keyof FredConfig>(
     key: K,
     value: FredConfig[K],
@@ -130,13 +159,11 @@ export const FredControls: React.FC<FredControlsProps> = ({ config, onChange, ua
     </div>
   );
 
-  // ── ENVELOPE TAB ──
+  // -- ENVELOPE TAB --
   const renderEnvelope = () => (
     <div className="flex flex-col gap-3 p-3 overflow-y-auto" style={{ maxHeight: 'calc(100vh - 280px)' }}>
       <div className={`rounded-lg border p-3 ${panelBg}`}>
         <SectionLabel label="Envelope" />
-
-        {/* Envelope curve visualization */}
         <div className="mb-3">
           <EnvelopeVisualization
             mode="steps"
@@ -149,9 +176,7 @@ export const FredControls: React.FC<FredControlsProps> = ({ config, onChange, ua
             color={accent}
           />
         </div>
-
         <div className="grid grid-cols-4 gap-3 mb-3">
-          {/* Attack */}
           <div className="flex flex-col items-center gap-2">
             <Knob value={config.attackVol} min={0} max={64} step={1}
               onChange={(v) => void updWithChipRam('attackVol', Math.round(v), async (ed, base) => { await ed.writeU8(base + 16, Math.round(v)); })}
@@ -162,7 +187,6 @@ export const FredControls: React.FC<FredControlsProps> = ({ config, onChange, ua
               label="Atk Spd" color={knob}
               formatValue={(v) => Math.round(v).toString()} />
           </div>
-          {/* Decay */}
           <div className="flex flex-col items-center gap-2">
             <Knob value={config.decayVol} min={0} max={64} step={1}
               onChange={(v) => void updWithChipRam('decayVol', Math.round(v), async (ed, base) => { await ed.writeU8(base + 18, Math.round(v)); })}
@@ -173,7 +197,6 @@ export const FredControls: React.FC<FredControlsProps> = ({ config, onChange, ua
               label="Dec Spd" color={knob}
               formatValue={(v) => Math.round(v).toString()} />
           </div>
-          {/* Sustain */}
           <div className="flex flex-col items-center gap-2">
             <Knob value={config.sustainTime} min={0} max={255} step={1}
               onChange={(v) => void updWithChipRam('sustainTime', Math.round(v), async (ed, base) => { await ed.writeU8(base + 19, Math.round(v)); })}
@@ -184,7 +207,6 @@ export const FredControls: React.FC<FredControlsProps> = ({ config, onChange, ua
               label="Init Vol" color={knob}
               formatValue={(v) => Math.round(v).toString()} />
           </div>
-          {/* Release */}
           <div className="flex flex-col items-center gap-2">
             <Knob value={config.releaseVol} min={0} max={64} step={1}
               onChange={(v) => void updWithChipRam('releaseVol', Math.round(v), async (ed, base) => { await ed.writeU8(base + 21, Math.round(v)); })}
@@ -197,7 +219,6 @@ export const FredControls: React.FC<FredControlsProps> = ({ config, onChange, ua
           </div>
         </div>
       </div>
-
       <div className={`rounded-lg border p-3 ${panelBg}`}>
         <SectionLabel label="Relative Tuning" />
         <div className="flex items-center gap-4">
@@ -213,7 +234,7 @@ export const FredControls: React.FC<FredControlsProps> = ({ config, onChange, ua
     </div>
   );
 
-  // ── PWM TAB ──
+  // -- PWM TAB --
   const renderPWM = () => (
     <div className="flex flex-col gap-3 p-3 overflow-y-auto" style={{ maxHeight: 'calc(100vh - 280px)' }}>
       <div className={`rounded-lg border p-3 ${panelBg}`}>
@@ -237,7 +258,6 @@ export const FredControls: React.FC<FredControlsProps> = ({ config, onChange, ua
           </div>
         </div>
       </div>
-
       <div className={`rounded-lg border p-3 ${panelBg}`}>
         <SectionLabel label="PWM Modulation" />
         <div className="flex flex-wrap gap-3">
@@ -259,15 +279,25 @@ export const FredControls: React.FC<FredControlsProps> = ({ config, onChange, ua
             formatValue={(v) => Math.round(v).toString()} />
         </div>
         <div className="mt-2 text-[9px] text-text-muted font-mono">
-          PWM sweeps pulse width from Low→High at +Rate then High→Low at |Rate-|
+          PWM sweeps pulse width from Low to High at +Rate then High to Low at |Rate-|
         </div>
       </div>
     </div>
   );
 
-  // ── ARPEGGIO TAB ──
+  // -- ARPEGGIO TAB --
+  const arpChannels = useMemo(() => arpToFormatChannel(config.arpeggio), [config.arpeggio]);
+  const arpCellChange = useMemo(
+    () => makeArpCellChange(config.arpeggio, (d) => void updWithChipRam('arpeggio', d, async (ed, base) => {
+      const bytes = d.slice(0, 16).map((v) => v < 0 ? v + 256 : v);
+      await ed.writeBlock(base + 22, bytes);
+    })),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [config.arpeggio],
+  );
+
   const renderArpeggio = () => (
-    <div className="flex flex-col gap-3 p-3 overflow-y-auto" style={{ maxHeight: 'calc(100vh - 280px)' }}>
+    <div className="flex flex-col gap-3 p-3" style={{ height: 'calc(100vh - 280px)' }}>
       <div className={`rounded-lg border p-3 ${panelBg}`}>
         <SectionLabel label="Arpeggio Settings" />
         <div className="flex gap-4 mb-3">
@@ -277,32 +307,26 @@ export const FredControls: React.FC<FredControlsProps> = ({ config, onChange, ua
             onChange={(v) => void updWithChipRam('arpeggioSpeed', v, async (ed, base) => { await ed.writeU8(base + 38, v); })} />
         </div>
       </div>
-
-      <div className={`rounded-lg border p-3 ${panelBg}`}>
+      <div className={`rounded-lg border p-3 ${panelBg} flex flex-col`} style={{ flex: 1, minHeight: 0 }}>
         <SectionLabel label="Arpeggio Table (semitone offsets)" />
-        <SequenceEditor
-          label="Arpeggio"
-          data={config.arpeggio}
-          onChange={(d) => void updWithChipRam('arpeggio', d, async (ed, base) => {
-            const bytes = d.slice(0, 16).map((v) => v < 0 ? v + 256 : v);
-            await ed.writeBlock(base + 22, bytes);
-          })}
-          min={-64} max={63}
-          bipolar
-          fixedLength
-          showNoteNames
-          presets={ARP_PRESETS}
-          color={accent}
-          height={100}
-        />
+        <div style={{ flex: 1, minHeight: 120 }}>
+          <PatternEditorCanvas
+            formatColumns={ARP_COLUMN}
+            formatChannels={arpChannels}
+            formatCurrentRow={0}
+            formatIsPlaying={false}
+            onFormatCellChange={arpCellChange}
+            hideVUMeters={true}
+          />
+        </div>
         <p className="text-[9px] text-text-muted mt-1">
-          Steps 0–{config.arpeggioLimit - 1} active (set by Active Steps limit above)
+          Steps 0-{config.arpeggioLimit - 1} active (set by Active Steps limit above)
         </p>
       </div>
     </div>
   );
 
-  // ── VIBRATO TAB ──
+  // -- VIBRATO TAB --
   const renderVibrato = () => (
     <div className="flex flex-col gap-3 p-3 overflow-y-auto" style={{ maxHeight: 'calc(100vh - 280px)' }}>
       <div className={`rounded-lg border p-3 ${panelBg}`}>
