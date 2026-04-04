@@ -377,7 +377,9 @@ export const usePatternPlayback = () => {
       // Same pattern as JamCracker: MusicLineEngine handles playback via WASM.
       // The replayer advances positions internally, changing the pattern key,
       // which would trigger needsReload=true and restart the engine.
-      if (musiclineFileData && channelTrackTables && channelTrackTables.length > 0) {
+      // Only bypass when isPlaying — when stopped, fall through to the stop handler
+      // so hasStartedRef resets and the next play works.
+      if (isPlaying && musiclineFileData && channelTrackTables && channelTrackTables.length > 0) {
         if (!hasStartedRef.current) {
           hasStartedRef.current = true;
           const modData = pattern.importMetadata?.modData;
