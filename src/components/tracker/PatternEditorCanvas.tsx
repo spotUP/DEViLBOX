@@ -3078,7 +3078,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
                   {/* Add channel button */}
                   {(pattern?.channels.length ?? 0) < 16 && !isFormatMode && (
                     <button
-                      onClick={() => { console.log('[+] addChannel clicked'); addChannel(); }}
+                      onClick={addChannel}
                       className="flex-shrink-0 w-12 flex items-center justify-center border-r border-dark-border
                         text-text-muted hover:text-accent-primary hover:bg-dark-bgHover transition-colors"
                       title="Add Channel"
