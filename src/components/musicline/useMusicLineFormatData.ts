@@ -5,10 +5,11 @@
  * a cell change handler. Used by DOM (TrackerView) and can be used by Pixi.
  */
 
-import { useCallback, useMemo } from 'react';
+import { useCallback, useEffect, useMemo } from 'react';
 import { useTrackerStore, useFormatStore } from '@stores';
 import { useTransportStore } from '@stores/useTransportStore';
 import { useWasmPositionStore } from '@/stores/useWasmPositionStore';
+import { setFormatPlaybackRow, setFormatPlaybackPlaying } from '@/engine/FormatPlaybackState';
 import { musiclineToFormatChannels, makeMusicLineCellChange } from './musiclineAdapter';
 import type { FormatChannel, OnCellChange } from '@/components/shared/format-editor-types';
 
@@ -49,6 +50,16 @@ export function useMusicLineFormatData(): MusicLineFormatData {
   );
 
   const displayRow = isPlaying ? currentRow : 0;
+
+  // Drive FormatPlaybackState so PatternEditorCanvas RAF loop scrolls
+  useEffect(() => {
+    setFormatPlaybackPlaying(isPlaying);
+    return () => setFormatPlaybackPlaying(false);
+  }, [isPlaying]);
+
+  useEffect(() => {
+    if (isPlaying) setFormatPlaybackRow(currentRow);
+  }, [isPlaying, currentRow]);
 
   return { channels, currentRow: displayRow, isPlaying, handleCellChange };
 }
