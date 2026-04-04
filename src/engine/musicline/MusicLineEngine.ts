@@ -356,7 +356,7 @@ export class MusicLineEngine {
   // Instrument parameter access (read/write via WASM bridge)
   // --------------------------------------------------------------------------
 
-  readInstAll(instIdx: number, offsets: Record<string, number>): Promise<Record<string, unknown>> {
+  readInstAll(instIdx: number, offsets: Record<string, number>, sizes?: Record<string, number>): Promise<Record<string, number>> {
     return new Promise((resolve) => {
       if (!this.workletNode) { resolve({}); return; }
       const handler = (event: MessageEvent) => {
@@ -366,7 +366,7 @@ export class MusicLineEngine {
         }
       };
       this.workletNode.port.addEventListener('message', handler);
-      this.workletNode.port.postMessage({ type: 'read-inst-all', instIdx, offsets });
+      this.workletNode.port.postMessage({ type: 'read-inst-all', instIdx, offsets, sizes });
     });
   }
 
