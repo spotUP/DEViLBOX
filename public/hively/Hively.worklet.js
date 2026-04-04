@@ -84,8 +84,9 @@ class HivelyProcessor extends AudioWorkletProcessor {
       // ── Standalone Instrument Player Messages ──
 
       case 'createPlayer': {
-        if (!this.wasm) break;
+        if (!this.wasm) { this.port.postMessage({ type: 'debug', msg: 'createPlayer: no wasm!' }); break; }
         const h = this.wasm._hively_create_player(Math.floor(sampleRate));
+        this.port.postMessage({ type: 'debug', msg: 'createPlayer handle=' + h + ' sr=' + Math.floor(sampleRate) });
         if (h >= 0) {
           if (!this.playerOutPtrs) {
             this.playerOutPtrs = {};
@@ -126,6 +127,7 @@ class HivelyProcessor extends AudioWorkletProcessor {
 
       case 'noteOn':
         if (this.wasm) {
+          this.port.postMessage({ type: 'debug', msg: 'noteOn handle=' + data.handle + ' note=' + data.note + ' vel=' + (data.velocity || 127) + ' players=' + JSON.stringify(this.playerOutPtrs ? Object.keys(this.playerOutPtrs) : null) });
           this.wasm._hively_player_note_on(data.handle, data.note, data.velocity || 127);
         }
         break;
@@ -352,13 +354,28 @@ class HivelyProcessor extends AudioWorkletProcessor {
         const ptrs = this.playerOutPtrs[hi];
         if (!ptrs) continue;
 
+        // Re-read HEAPF32 in case render caused memory growth
+        const currentHeap = this.wasm.HEAPF32;
         const n = this.wasm._hively_player_render(hi, ptrs.l, ptrs.r, numSamples);
+        // Re-read again after render (malloc inside render may grow heap)
+        const heapAfter = this.wasm.HEAPF32;
         if (n > 0) {
           const offL = ptrs.l >> 2;
           const offR = ptrs.r >> 2;
+          let maxSample = 0;
           for (let i = 0; i < n; i++) {
-            outputL[i] += heapF32[offL + i];
-            outputR[i] += heapF32[offR + i];
+            const sL = heapAfter[offL + i];
+            const sR = heapAfter[offR + i];
+            outputL[i] += sL;
+            outputR[i] += sR;
+            const abs = Math.abs(sL) + Math.abs(sR);
+            if (abs > maxSample) maxSample = abs;
+          }
+          // Log once per second if active
+          if (!this._playerDbgCount) this._playerDbgCount = 0;
+          this._playerDbgCount++;
+          if (this._playerDbgCount % 375 === 1) {
+            this.port.postMessage({ type: 'debug', msg: 'render player=' + hi + ' n=' + n + ' max=' + maxSample.toFixed(6) + ' heapStale=' + (currentHeap !== heapAfter) });
           }
         }
       }
