@@ -10,7 +10,7 @@ import { useTrackerStore, useFormatStore } from '@stores';
 import { useTransportStore } from '@stores/useTransportStore';
 import { useWasmPositionStore } from '@/stores/useWasmPositionStore';
 import { setFormatPlaybackRow, setFormatPlaybackPlaying } from '@/engine/FormatPlaybackState';
-import { musiclineToFormatChannels, makeMusicLineCellChange } from './musiclineAdapter';
+import { musiclineToFormatChannels, musiclineToFormatChannelsPerChannel, makeMusicLineCellChange } from './musiclineAdapter';
 import type { FormatChannel, OnCellChange } from '@/components/shared/format-editor-types';
 
 export interface MusicLineFormatData {
@@ -26,25 +26,32 @@ export function useMusicLineFormatData(): MusicLineFormatData {
   const editPos = useTrackerStore((s) => s.currentPositionIndex);
   const transportRow = useTransportStore((s) => s.currentRow);
   const isPlaying = useTransportStore((s) => s.isPlaying);
+  const patternOrder = useTrackerStore((s) => s.patternOrder);
 
-  // WASM engines (MusicLine) report position to useWasmPositionStore
+  // WASM engines (MusicLine) report per-channel position to useWasmPositionStore
   const wasmRow = useWasmPositionStore((s) => s.row);
-  const wasmSongPos = useWasmPositionStore((s) => s.songPos);
   const wasmActive = useWasmPositionStore((s) => s.active);
+  const channelRows = useWasmPositionStore((s) => s.channelRows);
+  const channelPositions = useWasmPositionStore((s) => s.channelPositions);
 
   const currentRow = wasmActive ? wasmRow : transportRow;
-  const patternOrder = useTrackerStore((s) => s.patternOrder);
-  // During playback, show the patterns for the current playback position.
-  // Safe now that usePatternPlayback has a MusicLine bypass (won't reload).
-  // Clamp to valid range — WASM engine may report positions beyond the order length when looping.
   const maxPos = Math.max(0, patternOrder.length - 1);
-  const rawPlayPos = (isPlaying && wasmActive) ? wasmSongPos : editPos;
-  const displayPos = Math.min(rawPlayPos, maxPos);
 
+  // Build per-channel display data. Each channel uses its own position and shows
+  // its own pattern — MusicLine channels advance independently with different
+  // speeds and pattern lengths.
   const channels = useMemo(() => {
     if (!channelTrackTables || channelTrackTables.length === 0) return [];
-    return musiclineToFormatChannels(channelTrackTables, patterns, displayPos);
-  }, [channelTrackTables, patterns, displayPos]);
+
+    const hasPerChannel = isPlaying && wasmActive && channelPositions.length > 0;
+
+    if (hasPerChannel) {
+      // Per-channel: each channel shows its own position's pattern
+      return musiclineToFormatChannelsPerChannel(channelTrackTables, patterns, channelPositions, maxPos);
+    }
+    // Not playing or no per-channel data: all channels show editPos
+    return musiclineToFormatChannels(channelTrackTables, patterns, Math.min(editPos, maxPos));
+  }, [channelTrackTables, patterns, isPlaying, wasmActive, channelPositions, editPos, maxPos]);
 
   const handleCellChange = useCallback<OnCellChange>(
     (channelIdx, rowIdx, columnKey, value) => {
@@ -55,13 +62,13 @@ export function useMusicLineFormatData(): MusicLineFormatData {
     [channelTrackTables, editPos],
   );
 
-  // Clamp row to pattern length — WASM row counter can exceed the displayed
-  // pattern's length between position update reports (~250ms interval).
+  // Use channel 0's row for global scroll (best we can do with single-scroll editor)
+  const ch0Row = (channelRows.length > 0) ? channelRows[0] : currentRow;
   const maxRow = channels.length > 0 ? (channels[0].patternLength - 1) : 0;
-  const clampedRow = Math.min(currentRow, maxRow);
+  const clampedRow = Math.min(wasmActive ? ch0Row : currentRow, maxRow);
   const displayRow = isPlaying ? clampedRow : 0;
 
-  // Drive FormatPlaybackState for smooth RAF-based scroll in the pattern editor.
+  // Drive FormatPlaybackState for scroll in the pattern editor.
   useEffect(() => {
     setFormatPlaybackPlaying(isPlaying);
     return () => setFormatPlaybackPlaying(false);

@@ -18,6 +18,8 @@ export interface MusicLinePositionUpdate {
   position: number;
   row: number;
   speed: number;
+  channelRows?: number[];
+  channelPositions?: number[];
 }
 
 export interface MusicLineArpEntry {
@@ -170,7 +172,7 @@ export class MusicLineEngine {
 
         case 'position':
           for (const cb of this._positionCallbacks) {
-            cb({ position: data.position, row: data.row, speed: data.speed });
+            cb({ position: data.position, row: data.row, speed: data.speed, channelRows: data.channelRows, channelPositions: data.channelPositions });
           }
           break;
 
