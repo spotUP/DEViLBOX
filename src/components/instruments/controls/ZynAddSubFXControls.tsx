@@ -20,10 +20,6 @@ const MAG_LABELS = ['Linear', 'dB', '-40dB', '-60dB'];
 const DIST_LABELS = ['Atan', 'Asym1', 'Pow', 'Sine', 'Quant'];
 const TAB_NAMES = ['ADDsynth', 'SUBsynth', 'PADsynth', 'Filter/Env', 'Effects'] as const;
 
-// ============================================================================
-// SegmentButton
-// ============================================================================
-
 import { SegmentButton } from '@components/instruments/shared';
 
 // ============================================================================
@@ -49,7 +45,7 @@ const VoiceControls: React.FC<VoiceControlsProps> = React.memo(({
       <div className="flex flex-col items-center gap-1">
         <span className="text-[10px] text-text-muted">Wave</span>
         <SegmentButton labels={WAVE_LABELS} value={merged[waveKey] as number}
-          onChange={(v) => update(waveKey, v)} activeClass="bg-emerald-600 text-white" />
+          onChange={(v) => update(waveKey, v)} color="green" />
       </div>
       <Knob label="Volume" value={merged[volKey] as number} min={0} max={1} defaultValue={0}
         onChange={(v) => update(volKey, v)} color="#f43f5e" />
@@ -235,7 +231,7 @@ export const ZynAddSubFXControls: React.FC<ZynAddSubFXControlsProps> = ({ config
             <div className="flex flex-col gap-1 mb-3">
               <span className="text-[10px] text-text-muted">Type</span>
               <SegmentButton labels={FILTER_LABELS} value={merged.filterType}
-                onChange={(v) => updateParam('filterType', v)} activeClass="bg-sky-500 text-white" />
+                onChange={(v) => updateParam('filterType', v)} color="blue" />
             </div>
             <div className="flex flex-wrap gap-4">
               <Knob label="Cutoff" value={merged.filterCutoff} min={0} max={1} defaultValue={0.8}
