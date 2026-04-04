@@ -13,6 +13,8 @@
 
 import React, { useMemo, useCallback } from 'react';
 import { useTrackerStore, useFormatStore } from '@stores';
+import { useTransportStore } from '@stores/useTransportStore';
+import { useWasmPositionStore } from '@/stores/useWasmPositionStore';
 import { PatternEditorCanvas } from '@/components/tracker/PatternEditorCanvas';
 import type { ColumnDef, FormatChannel, OnCellChange } from '@/components/shared/format-editor-types';
 
@@ -32,7 +34,10 @@ interface MusicLineTrackTableEditorProps {
 export const MusicLineTrackTableEditor: React.FC<MusicLineTrackTableEditorProps> = ({ onSeek }) => {
   const channelTrackTables = useFormatStore((state) => state.channelTrackTables);
   const setTrackEntry = useFormatStore((state) => state.setMusicLineTrackEntry);
-  const currentPos = useTrackerStore((state) => state.currentPositionIndex);
+  const editPos = useTrackerStore((state) => state.currentPositionIndex);
+  const isPlaying = useTransportStore((s) => s.isPlaying);
+  const wasmSongPos = useWasmPositionStore((s) => s.songPos);
+  const wasmActive = useWasmPositionStore((s) => s.active);
 
   if (!channelTrackTables || channelTrackTables.length === 0) return null;
 
@@ -94,7 +99,7 @@ export const MusicLineTrackTableEditor: React.FC<MusicLineTrackTableEditorProps>
       <PatternEditorCanvas
         formatColumns={formatColumns}
         formatChannels={formatChannels}
-        formatCurrentRow={currentPos}
+        formatCurrentRow={(isPlaying && wasmActive) ? Math.min(wasmSongPos, maxPositions - 1) : editPos}
         formatIsPlaying={false}
         onFormatCellChange={handleCellChange}
         hideVUMeters={true}
