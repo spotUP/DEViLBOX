@@ -412,6 +412,18 @@ export const GTUltraControls: React.FC<GTUltraControlsProps> = ({
     </div>
   );
 
+  // Poll SID registers when monitor tab is visible
+  useEffect(() => {
+    if (activeTab !== 'monitor') return;
+    // Immediate refresh
+    useGTUltraStore.getState().refreshSidRegisters();
+    // Poll at ~15 Hz (every 66ms)
+    const id = setInterval(() => {
+      useGTUltraStore.getState().refreshSidRegisters();
+    }, 66);
+    return () => clearInterval(id);
+  }, [activeTab]);
+
   // ══════════════════════════════════════════════════════════════════
   //  TAB 3: SID Monitor
   // ══════════════════════════════════════════════════════════════════
