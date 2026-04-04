@@ -50,6 +50,18 @@ function forwardReplayerMuteMask(channels: MixerChannelState[], isSoloing: boole
   } catch {
     // LibopenmptEngine not active
   }
+  try {
+    // Forward to MusicLine engine if active (uses m_ChannelsOn bitfield)
+    const { MusicLineEngine } = require('../engine/musicline/MusicLineEngine');
+    if (MusicLineEngine.hasInstance()) {
+      const ml = MusicLineEngine.getInstance();
+      for (let ch = 0; ch < 8; ch++) {
+        ml.setChannelOn(ch, (mask & (1 << ch)) !== 0);
+      }
+    }
+  } catch {
+    // MusicLineEngine not active
+  }
 }
 
 // ── SunVox mute bridge ─────────────────────────────────────────────────────

@@ -715,4 +715,37 @@ int ml_set_arp_entry(int arpIdx, int row, int fieldIdx, int value) {
     return 1;
 }
 
+// ============================================================================
+// Channel Mute API
+// ============================================================================
+
+/**
+ * ml_set_channel_on(ch, on) — mute/unmute a single channel.
+ * ch: 0-based channel index (0-7).
+ * on: 1 = unmuted (channel active), 0 = muted (channel silenced).
+ *
+ * Maps to MLModule::m_ChannelsOn bitfield: bit N = channel N active.
+ * This is read by PlayTune on each tick to set m_ChannelOff per channel.
+ */
+void ml_set_channel_on(int ch, int on) {
+    if (!s_song || ch < 0 || ch >= 8) return;
+    MLModule* mod = s_song->get_module();
+    if (!mod) return;
+    if (on) {
+        mod->m_ChannelsOn |= (1 << ch);
+    } else {
+        mod->m_ChannelsOn &= ~(1 << ch);
+    }
+}
+
+/**
+ * ml_get_channels_on() — return the current m_ChannelsOn bitmask (8 bits).
+ */
+int ml_get_channels_on() {
+    if (!s_song) return 0xFF;
+    MLModule* mod = s_song->get_module();
+    if (!mod) return 0xFF;
+    return mod->m_ChannelsOn;
+}
+
 } // extern "C"

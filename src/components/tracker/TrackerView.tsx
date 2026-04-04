@@ -46,6 +46,7 @@ import { getTrackerReplayer } from '@engine/TrackerReplayer';
 import { MusicLineTrackTableEditor } from './MusicLineTrackTableEditor';
 import { useMusicLineFormatData } from '@/components/musicline/useMusicLineFormatData';
 import { MusicLineChannelStatus } from '@/components/musicline/MusicLineChannelStatus';
+import { MusicLineToolbar } from '@/components/musicline/MusicLineToolbar';
 import { MUSICLINE_COLUMNS } from '@/components/musicline/musiclineAdapter';
 import { downloadPattern } from '@lib/export/PatternExport';
 import { downloadTrack } from '@lib/export/TrackExport';
@@ -245,6 +246,16 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
 
   // MusicLine format data (hook must be called unconditionally — rules of hooks)
   const mlFormatData = useMusicLineFormatData();
+
+  // MusicLine: remove unused parts
+  const handleRemoveUnusedParts = useCallback(() => {
+    const count = useFormatStore.getState().removeUnusedMusicLineParts();
+    if (count > 0) {
+      useUIStore.getState().setStatusMessage(`Removed ${count} unused part${count > 1 ? 's' : ''}`);
+    } else {
+      useUIStore.getState().setStatusMessage('No unused parts found');
+    }
+  }, []);
 
   // Mobile swipe handlers for cursor navigation
   const handleSwipeLeft = useCallback(() => {
@@ -630,7 +641,23 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
                         className="px-2 py-0.5 text-xs bg-green-800 hover:bg-green-700 text-green-100 rounded border border-green-600"
                         onClick={handleExportML}
                       >Export .ml</button>
+                      <button
+                        className="px-2 py-0.5 text-xs bg-dark-bgSecondary hover:bg-dark-bgTertiary text-text-muted rounded border border-dark-border"
+                        onClick={handleRemoveUnusedParts}
+                        title="Remove patterns not referenced by any channel track table"
+                      >Rm Unused Parts</button>
+                      <button
+                        className="px-2 py-0.5 text-xs bg-dark-bgSecondary text-text-muted/40 rounded border border-dark-border cursor-not-allowed"
+                        disabled
+                        title="Remove unused wavesamples (not yet implemented)"
+                      >Rm Unused WS</button>
+                      <button
+                        className="px-2 py-0.5 text-xs bg-dark-bgSecondary text-text-muted/40 rounded border border-dark-border cursor-not-allowed"
+                        disabled
+                        title="Merge duplicate wavesamples by byte comparison (not yet implemented)"
+                      >Rm Equal WS</button>
                     </div>
+                    <MusicLineToolbar numChannels={channelTrackTables?.length ?? 0} />
                     <MusicLineChannelStatus />
                     <div className="px-3 pb-3">
                       <MusicLineTrackTableEditor
