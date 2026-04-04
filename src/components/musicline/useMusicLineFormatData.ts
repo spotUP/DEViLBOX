@@ -13,6 +13,9 @@ import { setFormatPlaybackRow, setFormatPlaybackPlaying } from '@/engine/FormatP
 import { musiclineToFormatChannels, musiclineToFormatChannelsPerChannel, makeMusicLineCellChange } from './musiclineAdapter';
 import type { FormatChannel, OnCellChange } from '@/components/shared/format-editor-types';
 
+/** 0 = no follow, 1 = follow pattern, 2 = follow tune position */
+export type MusicLineFollowMode = 0 | 1 | 2;
+
 export interface MusicLineFormatData {
   channels: FormatChannel[];
   currentRow: number;
@@ -23,10 +26,19 @@ export interface MusicLineFormatData {
   /** Which channel the global scroll follows */
   selectedChannel: number;
   setSelectedChannel: (ch: number) => void;
+  /** Current follow mode: 0=off, 1=pattern, 2=tune */
+  followMode: MusicLineFollowMode;
+  setFollowMode: (mode: MusicLineFollowMode) => void;
+  /** Cycle through follow modes 0 → 1 → 2 → 0 */
+  cycleFollowMode: () => void;
 }
 
 export function useMusicLineFormatData(): MusicLineFormatData {
   const [selectedChannel, setSelectedChannel] = useState(0);
+  const [followMode, setFollowMode] = useState<MusicLineFollowMode>(1);
+  const cycleFollowMode = useCallback(() => {
+    setFollowMode((prev) => ((prev + 1) % 3) as MusicLineFollowMode);
+  }, []);
   const channelTrackTables = useFormatStore((s) => s.channelTrackTables);
   const patterns = useTrackerStore((s) => s.patterns);
   const editPos = useTrackerStore((s) => s.currentPositionIndex);
@@ -75,14 +87,15 @@ export function useMusicLineFormatData(): MusicLineFormatData {
   const displayRow = isPlaying ? clampedRow : 0;
 
   // Drive FormatPlaybackState for scroll in the pattern editor.
+  // Only drive when followMode=1 (follow pattern). Mode 0 = no follow, mode 2 = tune follow (handled separately).
   useEffect(() => {
-    setFormatPlaybackPlaying(isPlaying);
+    setFormatPlaybackPlaying(isPlaying && followMode === 1);
     return () => setFormatPlaybackPlaying(false);
-  }, [isPlaying]);
+  }, [isPlaying, followMode]);
 
   useEffect(() => {
-    if (isPlaying) setFormatPlaybackRow(clampedRow);
-  }, [isPlaying, clampedRow]);
+    if (isPlaying && followMode === 1) setFormatPlaybackRow(clampedRow);
+  }, [isPlaying, followMode, clampedRow]);
 
   // Build per-channel row array, clamped to each channel's pattern length
   const perChannelRows = useMemo(() => {
@@ -93,5 +106,5 @@ export function useMusicLineFormatData(): MusicLineFormatData {
     });
   }, [isPlaying, wasmActive, channelRows, channels]);
 
-  return { channels, currentRow: displayRow, perChannelRows, isPlaying, handleCellChange, selectedChannel, setSelectedChannel };
+  return { channels, currentRow: displayRow, perChannelRows, isPlaying, handleCellChange, selectedChannel, setSelectedChannel, followMode, setFollowMode, cycleFollowMode };
 }
