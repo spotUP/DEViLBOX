@@ -1518,6 +1518,11 @@ export class ToneEngine {
       'OctaMEDSynth', 'DavidWhittakerSynth',
       'HivelySynth', 'KlysSynth', 'MAMEVASynth', 'UADESynth',
       'WaveSabreSynth', 'OidosSynth', 'TunefishSynth', 'SunVoxModular',
+      // Zynthian WASM synths — shared instances
+      'MdaEPiano', 'MdaJX10', 'MdaDX10', 'Amsynth', 'RaffoSynth', 'CalfMono',
+      'SetBfree', 'SynthV1', 'TalNoizeMaker', 'Aeolus', 'FluidSynth', 'Sfizz',
+      'ZynAddSubFX', 'Monique', 'VL1',
+      'DX7', 'OPL3', 'OpenWurli',
     ].includes(config.synthType || '');
     const isVSTBridge = !isWASMSynth && typeof config.synthType === 'string' && SYNTH_REGISTRY.has(config.synthType);
     const isSharedType = config.synthType === 'Sampler' || config.synthType === 'Player' || config.synthType === 'SunVoxSynth' || isMAME || isFurnace || isBuzzmachine || isWASMSynth || isVSTBridge;
