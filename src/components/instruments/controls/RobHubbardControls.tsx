@@ -9,7 +9,7 @@ import React, { useRef, useEffect, useCallback, useState } from 'react';
 import type { RobHubbardConfig, UADEChipRamInfo } from '@/types/instrument';
 import { Knob } from '@components/controls/Knob';
 import { useThemeStore } from '@stores';
-import { SequenceEditor, WaveformThumbnail } from '@components/instruments/shared';
+import { SectionLabel, SequenceEditor, WaveformThumbnail } from '@components/instruments/shared';
 import { UADEChipEditor } from '@/engine/uade/UADEChipEditor';
 import { UADEEngine } from '@/engine/uade/UADEEngine';
 
@@ -52,13 +52,6 @@ export const RobHubbardControls: React.FC<RobHubbardControlsProps> = ({ config, 
     }
   }, [onChange, uadeChipRam, getEditor]);
 
-  const SectionLabel: React.FC<{ label: string }> = ({ label }) => (
-    <div className="text-[10px] font-bold uppercase tracking-widest mb-2"
-      style={{ color: accent, opacity: 0.7 }}>
-      {label}
-    </div>
-  );
-
   const InfoValue: React.FC<{ label: string; value: string }> = ({ label, value }) => (
     <div className="flex flex-col gap-0.5">
       <span className="text-[9px] font-bold uppercase tracking-wider" style={{ color: accent, opacity: 0.5 }}>
@@ -76,7 +69,7 @@ export const RobHubbardControls: React.FC<RobHubbardControlsProps> = ({ config, 
 
       {/* Sample */}
       <div className={`rounded-lg border p-3 ${panelBg}`}>
-        <SectionLabel label="Sample" />
+        <SectionLabel color={accent} label="Sample" />
         <div className="flex gap-3 items-start flex-wrap">
           <Knob value={config.sampleVolume} min={0} max={64} step={1}
             onChange={(v) => upd('sampleVolume', Math.round(v))}
@@ -97,7 +90,7 @@ export const RobHubbardControls: React.FC<RobHubbardControlsProps> = ({ config, 
 
       {/* Vibrato */}
       <div className={`rounded-lg border p-3 ${panelBg}`}>
-        <SectionLabel label="Vibrato" />
+        <SectionLabel color={accent} label="Vibrato" />
         <div className="flex gap-4 items-center">
           <Knob value={config.divider} min={0} max={255} step={1}
             onChange={(v) => upd('divider', Math.round(v))}
@@ -113,7 +106,7 @@ export const RobHubbardControls: React.FC<RobHubbardControlsProps> = ({ config, 
 
       {/* Wobble */}
       <div className={`rounded-lg border p-3 ${panelBg}`}>
-        <SectionLabel label="Wobble" />
+        <SectionLabel color={accent} label="Wobble" />
         <div className="flex gap-4 items-center">
           <Knob value={config.hiPos} min={0} max={255} step={1}
             onChange={(v) => upd('hiPos', Math.round(v))}
@@ -129,7 +122,7 @@ export const RobHubbardControls: React.FC<RobHubbardControlsProps> = ({ config, 
 
       {/* Tuning */}
       <div className={`rounded-lg border p-3 ${panelBg}`}>
-        <SectionLabel label="Tuning" />
+        <SectionLabel color={accent} label="Tuning" />
         <div className="flex gap-4 items-center flex-wrap">
           <div className="flex flex-col gap-1">
             <span className="text-[9px] font-bold uppercase tracking-wider" style={{ color: accent, opacity: 0.5 }}>
@@ -171,7 +164,7 @@ export const RobHubbardControls: React.FC<RobHubbardControlsProps> = ({ config, 
     return (
       <div className="flex flex-col gap-3 p-3 overflow-y-auto" style={{ maxHeight: 'calc(100vh - 280px)' }}>
         <div className={`rounded-lg border p-3 ${panelBg}`}>
-          <SectionLabel label="Vibrato Wave Table" />
+          <SectionLabel color={accent} label="Vibrato Wave Table" />
           {hasData ? (
             <>
               <SequenceEditor
@@ -215,7 +208,7 @@ export const RobHubbardControls: React.FC<RobHubbardControlsProps> = ({ config, 
     return (
       <div className="flex flex-col gap-3 p-3 overflow-y-auto" style={{ maxHeight: 'calc(100vh - 280px)' }}>
         <div className={`rounded-lg border p-3 ${panelBg}`}>
-          <SectionLabel label="Sample Waveform" />
+          <SectionLabel color={accent} label="Sample Waveform" />
           {hasData ? (
             <>
               <div className="mb-2 rounded overflow-hidden">

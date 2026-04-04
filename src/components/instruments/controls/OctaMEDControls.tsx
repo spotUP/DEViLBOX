@@ -9,7 +9,7 @@ import React, { useRef, useEffect, useCallback, useState } from 'react';
 import type { OctaMEDConfig, UADEChipRamInfo } from '@/types/instrument';
 import { Knob } from '@components/controls/Knob';
 import { useThemeStore, useTrackerStore, useInstrumentStore, useProjectStore, useTransportStore } from '@stores';
-import { SequenceEditor } from '@components/instruments/shared';
+import { SectionLabel, SequenceEditor } from '@components/instruments/shared';
 import { UADEChipEditor } from '@engine/uade/UADEChipEditor';
 import { UADEEngine } from '@engine/uade/UADEEngine';
 
@@ -136,21 +136,12 @@ export const OctaMEDControls: React.FC<OctaMEDControlsProps> = ({ config, onChan
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [onChange, uadeChipRam]);
 
-  const SectionLabel: React.FC<{ label: string }> = ({ label }) => (
-    <div
-      className="text-[10px] font-bold uppercase tracking-widest mb-2"
-      style={{ color: accent, opacity: 0.7 }}
-    >
-      {label}
-    </div>
-  );
-
   // ── PARAMS TAB ──
   const renderParams = () => (
     <div className="flex flex-col gap-3 p-3 overflow-y-auto" style={{ maxHeight: 'calc(100vh - 280px)' }}>
       {/* Playback section */}
       <div className={`rounded-lg border p-3 ${panelBg}`}>
-        <SectionLabel label="Playback" />
+        <SectionLabel color={accent} label="Playback" />
         <div className="flex flex-wrap gap-4">
           <Knob
             value={config.volume}
@@ -201,7 +192,7 @@ export const OctaMEDControls: React.FC<OctaMEDControlsProps> = ({ config, onChan
 
       {/* Loop reference section */}
       <div className={`rounded-lg border p-3 ${panelBg}`}>
-        <SectionLabel label="Loop (read-only reference)" />
+        <SectionLabel color={accent} label="Loop (read-only reference)" />
         <div className="flex gap-3">
           <div className="flex flex-col gap-1">
             <span className="text-[10px] uppercase tracking-wider" style={{ color: accent, opacity: 0.5 }}>
@@ -228,7 +219,7 @@ export const OctaMEDControls: React.FC<OctaMEDControlsProps> = ({ config, onChan
   const renderVoltbl = () => (
     <div className="flex flex-col gap-3 p-3 overflow-y-auto" style={{ maxHeight: 'calc(100vh - 280px)' }}>
       <div className={`rounded-lg border p-3 ${panelBg}`}>
-        <SectionLabel label="Vol Command Table (128 bytes)" />
+        <SectionLabel color={accent} label="Vol Command Table (128 bytes)" />
 
         {/* Legend */}
         <div className="flex flex-wrap gap-3 mb-3 text-[10px] font-mono">
@@ -288,7 +279,7 @@ export const OctaMEDControls: React.FC<OctaMEDControlsProps> = ({ config, onChan
   const renderWftbl = () => (
     <div className="flex flex-col gap-3 p-3 overflow-y-auto" style={{ maxHeight: 'calc(100vh - 280px)' }}>
       <div className={`rounded-lg border p-3 ${panelBg}`}>
-        <SectionLabel label="WF Command Table (128 bytes)" />
+        <SectionLabel color={accent} label="WF Command Table (128 bytes)" />
 
         {/* Legend */}
         <div className="flex flex-wrap gap-3 mb-3 text-[10px] font-mono">
@@ -349,12 +340,7 @@ export const OctaMEDControls: React.FC<OctaMEDControlsProps> = ({ config, onChan
     <div className="flex flex-col gap-3 p-3 overflow-y-auto" style={{ maxHeight: 'calc(100vh - 280px)' }}>
       {config.waveforms.map((wf, idx) => (
         <div key={idx} className={`rounded-lg border p-3 ${panelBg}`}>
-          <div
-            className="text-[10px] font-bold uppercase tracking-widest mb-2"
-            style={{ color: accent, opacity: 0.7 }}
-          >
-            Wave {idx + 1}
-          </div>
+          <SectionLabel color={accent} label={`Wave ${idx + 1}`} />
           <SequenceEditor
             label={`Wave ${idx + 1}`}
             data={Array.from(wf)}

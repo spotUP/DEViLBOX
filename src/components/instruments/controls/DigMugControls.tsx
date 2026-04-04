@@ -13,7 +13,7 @@ import React, { useRef, useEffect, useCallback, useState, useMemo } from 'react'
 import type { DigMugConfig, UADEChipRamInfo } from '@/types/instrument';
 import { Knob } from '@components/controls/Knob';
 import { useThemeStore } from '@stores';
-import { WaveformThumbnail } from '@components/instruments/shared';
+import { SectionLabel, WaveformThumbnail } from '@components/instruments/shared';
 import { PatternEditorCanvas } from '@/components/tracker/PatternEditorCanvas';
 import type { ColumnDef, FormatChannel, FormatCell, OnCellChange } from '@/components/shared/format-editor-types';
 import { UADEChipEditor } from '@/engine/uade/UADEChipEditor';
@@ -141,13 +141,6 @@ export const DigMugControls: React.FC<DigMugControlsProps> = ({
     } catch (e) { console.error('[DigMugControls] Export failed:', e); }
   }, [uadeChipRam, getEditor]);
 
-  const SectionLabel: React.FC<{ label: string }> = ({ label }) => (
-    <div className="text-[10px] font-bold uppercase tracking-widest mb-2"
-      style={{ color: accent, opacity: 0.7 }}>
-      {label}
-    </div>
-  );
-
   const updateWavetable = useCallback((slot: 0 | 1 | 2 | 3, value: number) => {
     const wt: [number, number, number, number] = [...configRef.current.wavetable] as [number, number, number, number];
     wt[slot] = value;
@@ -165,7 +158,7 @@ export const DigMugControls: React.FC<DigMugControlsProps> = ({
   const renderMain = () => (
     <div className="flex flex-col gap-3 p-3 overflow-y-auto" style={{ maxHeight: 'calc(100vh - 280px)' }}>
       <div className={`rounded-lg border p-3 ${panelBg}`}>
-        <SectionLabel label="Wavetable Slots (4 waves)" />
+        <SectionLabel color={accent} label="Wavetable Slots (4 waves)" />
         <div className="grid grid-cols-4 gap-2 mb-3">
           {([0, 1, 2, 3] as const).map((slot) => {
             const waveIdx = config.wavetable[slot];
@@ -210,7 +203,7 @@ export const DigMugControls: React.FC<DigMugControlsProps> = ({
         </div>
       </div>
       <div className={`rounded-lg border p-3 ${panelBg}`}>
-        <SectionLabel label="Volume & Vibrato" />
+        <SectionLabel color={accent} label="Volume & Vibrato" />
         <div className="flex gap-4">
           <Knob value={config.volume} min={0} max={64} step={1}
             onChange={(v) => updWithChipRam('volume', Math.round(v), 2)}
@@ -237,7 +230,7 @@ export const DigMugControls: React.FC<DigMugControlsProps> = ({
     <div className="flex flex-col gap-3 p-3" style={{ height: 'calc(100vh - 280px)' }}>
       <div className={`rounded-lg border p-3 ${panelBg} flex flex-col`} style={{ flex: 1, minHeight: 0 }}>
         <div className="flex items-center justify-between mb-3">
-          <SectionLabel label="Arpeggio Speed" />
+          <SectionLabel color={accent} label="Arpeggio Speed" />
           <Knob value={config.arpSpeed} min={0} max={15} step={1}
             onChange={(v) => {
               const val = Math.round(v);

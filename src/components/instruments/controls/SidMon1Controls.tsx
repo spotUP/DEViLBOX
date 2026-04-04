@@ -38,7 +38,7 @@ import React, { useRef, useEffect, useCallback, useState, useMemo } from 'react'
 import type { SidMon1Config, UADEChipRamInfo } from '@/types/instrument';
 import { Knob } from '@components/controls/Knob';
 import { useThemeStore } from '@stores';
-import { EnvelopeVisualization } from '@components/instruments/shared';
+import { EnvelopeVisualization, SectionLabel } from '@components/instruments/shared';
 import { PatternEditorCanvas } from '@/components/tracker/PatternEditorCanvas';
 import type { ColumnDef, FormatChannel, FormatCell, OnCellChange } from '@/components/shared/format-editor-types';
 import { UADEChipEditor } from '@/engine/uade/UADEChipEditor';
@@ -132,20 +132,13 @@ export const SidMon1Controls: React.FC<SidMon1ControlsProps> = ({ config, onChan
     [upd, uadeChipRam, getEditor],
   );
 
-  const SectionLabel: React.FC<{ label: string }> = ({ label }) => (
-    <div className="text-[10px] font-bold uppercase tracking-widest mb-2"
-      style={{ color: accent, opacity: 0.7 }}>
-      {label}
-    </div>
-  );
-
   // ── MAIN TAB ──────────────────────────────────────────────────────────────
   const renderMain = () => (
     <div className="flex flex-col gap-3 p-3 overflow-y-auto" style={{ maxHeight: 'calc(100vh - 280px)' }}>
 
       {/* ADSR Envelope */}
       <div className={`rounded-lg border p-3 ${panelBg}`}>
-        <SectionLabel label="ADSR Envelope" />
+        <SectionLabel color={accent} label="ADSR Envelope" />
         <div className="mb-3">
           <EnvelopeVisualization
             mode="steps"
@@ -193,7 +186,7 @@ export const SidMon1Controls: React.FC<SidMon1ControlsProps> = ({ config, onChan
 
       {/* Phase Oscillator */}
       <div className={`rounded-lg border p-3 ${panelBg}`}>
-        <SectionLabel label="Phase Oscillator" />
+        <SectionLabel color={accent} label="Phase Oscillator" />
         <div className="flex gap-4 items-center">
           <Knob value={config.phaseShift ?? 0} min={0} max={255} step={1}
             onChange={(v) => updU8WithChipRam('phaseShift', Math.round(v), 28)}
@@ -209,7 +202,7 @@ export const SidMon1Controls: React.FC<SidMon1ControlsProps> = ({ config, onChan
 
       {/* Tuning */}
       <div className={`rounded-lg border p-3 ${panelBg}`}>
-        <SectionLabel label="Tuning" />
+        <SectionLabel color={accent} label="Tuning" />
         <div className="flex gap-4 items-center">
           <Knob value={config.finetune ?? 0} min={0} max={1005} step={67}
             onChange={(v) => {
@@ -261,7 +254,7 @@ export const SidMon1Controls: React.FC<SidMon1ControlsProps> = ({ config, onChan
   const renderArpeggio = () => (
     <div className="flex flex-col gap-3 p-3" style={{ height: 'calc(100vh - 280px)' }}>
       <div className={`rounded-lg border p-3 ${panelBg} flex flex-col`} style={{ flex: 1, minHeight: 0 }}>
-        <SectionLabel label="Arpeggio (16 steps, unsigned byte)" />
+        <SectionLabel color={accent} label="Arpeggio (16 steps, unsigned byte)" />
         <div style={{ flex: 1, minHeight: 120 }}>
           <PatternEditorCanvas
             formatColumns={ARP_COLUMN}
@@ -329,7 +322,7 @@ export const SidMon1Controls: React.FC<SidMon1ControlsProps> = ({ config, onChan
 
       {/* Main Wave */}
       <div className={`rounded-lg border p-3 ${panelBg} flex flex-col`} style={{ flex: 1, minHeight: 0 }}>
-        <SectionLabel label="Main Wave (32 bytes, signed)" />
+        <SectionLabel color={accent} label="Main Wave (32 bytes, signed)" />
         <div style={{ flex: 1, minHeight: 120 }}>
           <PatternEditorCanvas
             formatColumns={WAVE_COLUMN}
@@ -344,7 +337,7 @@ export const SidMon1Controls: React.FC<SidMon1ControlsProps> = ({ config, onChan
 
       {/* Phase Wave */}
       <div className={`rounded-lg border p-3 ${panelBg} flex flex-col`} style={{ flex: 1, minHeight: 0 }}>
-        <SectionLabel label="Phase Wave (32 bytes, signed)" />
+        <SectionLabel color={accent} label="Phase Wave (32 bytes, signed)" />
         <div style={{ flex: 1, minHeight: 120 }}>
           <PatternEditorCanvas
             formatColumns={WAVE_COLUMN}

@@ -47,6 +47,7 @@ import { useThemeStore } from '@stores';
 import {
   EnvelopeVisualization,
   FilterFrequencyResponse,
+  SectionLabel,
   WaveformThumbnail,
 } from '@components/instruments/shared';
 import type { FilterType } from '@components/instruments/shared';
@@ -163,18 +164,11 @@ export const SidMonControls: React.FC<SidMonControlsProps> = ({
     }
   }, [onChange, getEditor, uadeChipRam]);
 
-  const SectionLabel: React.FC<{ label: string }> = ({ label }) => (
-    <div className="text-[10px] font-bold uppercase tracking-widest mb-2"
-      style={{ color: accent, opacity: 0.7 }}>
-      {label}
-    </div>
-  );
-
   // -- MAIN TAB ---
   const renderMain = () => (
     <div className="flex flex-col gap-3 p-3 overflow-y-auto" style={{ maxHeight: 'calc(100vh - 280px)' }}>
       <div className={`rounded-lg border p-3 ${panelBg}`}>
-        <SectionLabel label="Waveform" />
+        <SectionLabel color={accent} label="Waveform" />
         <div className="grid grid-cols-4 gap-2 mb-3">
           {WAVEFORMS.map((wf, i) => {
             const active = config.waveform === i;
@@ -203,7 +197,7 @@ export const SidMonControls: React.FC<SidMonControlsProps> = ({
         )}
       </div>
       <div className={`rounded-lg border p-3 ${panelBg}`}>
-        <SectionLabel label="ADSR (SID format, 0-15)" />
+        <SectionLabel color={accent} label="ADSR (SID format, 0-15)" />
         <div className="flex gap-4">
           <Knob value={config.attack} min={0} max={15} step={1}
             onChange={(v) => {
@@ -239,7 +233,7 @@ export const SidMonControls: React.FC<SidMonControlsProps> = ({
         </div>
       </div>
       <div className={`rounded-lg border p-3 ${panelBg}`}>
-        <SectionLabel label="Vibrato" />
+        <SectionLabel color={accent} label="Vibrato" />
         <div className="flex gap-4">
           <Knob value={config.vibDelay} min={0} max={255} step={1}
             onChange={(v) => updWithChipRam('vibDelay', Math.round(v), async (ed, base) => { await ed.writeU8(base + 11, Math.round(v)); })}
@@ -259,7 +253,7 @@ export const SidMonControls: React.FC<SidMonControlsProps> = ({
   const renderFilter = () => (
     <div className="flex flex-col gap-3 p-3 overflow-y-auto" style={{ maxHeight: 'calc(100vh - 280px)' }}>
       <div className={`rounded-lg border p-3 ${panelBg}`}>
-        <SectionLabel label="Filter Mode" />
+        <SectionLabel color={accent} label="Filter Mode" />
         <div className="flex gap-2 mb-2">
           {FILTER_MODE_NAMES.map((name, i) => (
             <button key={i}
@@ -300,7 +294,7 @@ export const SidMonControls: React.FC<SidMonControlsProps> = ({
     <div className="flex flex-col gap-3 p-3" style={{ height: 'calc(100vh - 280px)' }}>
       <div className={`rounded-lg border p-3 ${panelBg} flex flex-col`} style={{ flex: 1, minHeight: 0 }}>
         <div className="flex items-center justify-between mb-3">
-          <SectionLabel label="Arpeggio Speed" />
+          <SectionLabel color={accent} label="Arpeggio Speed" />
           <Knob value={config.arpSpeed} min={0} max={15} step={1}
             onChange={(v) => updWithChipRam('arpSpeed', Math.round(v), async (ed, base) => {
               await ed.writeU8(base + 6, Math.round(v) * 16);

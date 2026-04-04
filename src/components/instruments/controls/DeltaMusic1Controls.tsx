@@ -38,7 +38,7 @@ import React, { useRef, useEffect, useCallback, useState, useMemo } from 'react'
 import type { DeltaMusic1Config, UADEChipRamInfo } from '@/types/instrument';
 import { Knob } from '@components/controls/Knob';
 import { useThemeStore } from '@stores';
-import { EnvelopeVisualization } from '@components/instruments/shared';
+import { EnvelopeVisualization, SectionLabel } from '@components/instruments/shared';
 import { PatternEditorCanvas } from '@/components/tracker/PatternEditorCanvas';
 import type { ColumnDef, FormatChannel, FormatCell, OnCellChange } from '@/components/shared/format-editor-types';
 import { UADEChipEditor } from '@/engine/uade/UADEChipEditor';
@@ -206,13 +206,6 @@ export const DeltaMusic1Controls: React.FC<DeltaMusic1ControlsProps> = ({
     }
   }, [onChange, uadeChipRam, getEditor]);
 
-  const SectionLabel: React.FC<{ label: string }> = ({ label }) => (
-    <div className="text-[10px] font-bold uppercase tracking-widest mb-2"
-      style={{ color: accent, opacity: 0.7 }}>
-      {label}
-    </div>
-  );
-
   // ── ENVELOPE TAB ─────────────────────────────────────────────────────────
 
   const renderEnvelope = () => (
@@ -220,7 +213,7 @@ export const DeltaMusic1Controls: React.FC<DeltaMusic1ControlsProps> = ({
 
       {/* Volume */}
       <div className={`rounded-lg border p-3 ${panelBg}`}>
-        <SectionLabel label="Volume" />
+        <SectionLabel color={accent} label="Volume" />
         <div className="flex items-center gap-4">
           <Knob
             value={config.volume} min={0} max={64} step={1}
@@ -234,7 +227,7 @@ export const DeltaMusic1Controls: React.FC<DeltaMusic1ControlsProps> = ({
 
       {/* ADSR Envelope */}
       <div className={`rounded-lg border p-3 ${panelBg}`}>
-        <SectionLabel label="Volume Envelope" />
+        <SectionLabel color={accent} label="Volume Envelope" />
 
         {/* Attack */}
         <div className="mb-3">
@@ -329,7 +322,7 @@ export const DeltaMusic1Controls: React.FC<DeltaMusic1ControlsProps> = ({
 
       {/* Vibrato */}
       <div className={`rounded-lg border p-3 ${panelBg}`}>
-        <SectionLabel label="Vibrato" />
+        <SectionLabel color={accent} label="Vibrato" />
         <div className="flex gap-4">
           <Knob
             value={config.vibratoWait} min={0} max={255} step={1}
@@ -355,7 +348,7 @@ export const DeltaMusic1Controls: React.FC<DeltaMusic1ControlsProps> = ({
 
       {/* Bend Rate */}
       <div className={`rounded-lg border p-3 ${panelBg}`}>
-        <SectionLabel label="Pitch Bend" />
+        <SectionLabel color={accent} label="Pitch Bend" />
         <div className="flex items-center gap-4">
           <Knob
             value={config.bendRate} min={-128} max={127} step={1}
@@ -369,7 +362,7 @@ export const DeltaMusic1Controls: React.FC<DeltaMusic1ControlsProps> = ({
 
       {/* Portamento */}
       <div className={`rounded-lg border p-3 ${panelBg}`}>
-        <SectionLabel label="Portamento" />
+        <SectionLabel color={accent} label="Portamento" />
         <div className="flex items-center gap-4">
           <Knob
             value={config.portamento} min={0} max={255} step={1}
@@ -384,7 +377,7 @@ export const DeltaMusic1Controls: React.FC<DeltaMusic1ControlsProps> = ({
       {/* Table Delay (synth instruments only) */}
       {!config.isSample && (
         <div className={`rounded-lg border p-3 ${panelBg}`}>
-          <SectionLabel label="Synth Table Delay" />
+          <SectionLabel color={accent} label="Synth Table Delay" />
           <div className="flex items-center gap-4">
             <Knob
               value={config.tableDelay} min={0} max={127} step={1}
@@ -427,7 +420,7 @@ export const DeltaMusic1Controls: React.FC<DeltaMusic1ControlsProps> = ({
   const renderArpeggio = () => (
     <div className="flex flex-col gap-3 p-3" style={{ height: 'calc(100vh - 280px)' }}>
       <div className={`rounded-lg border p-3 ${panelBg} flex flex-col`} style={{ flex: 1, minHeight: 0 }}>
-        <SectionLabel label="Arpeggio Table (8 steps)" />
+        <SectionLabel color={accent} label="Arpeggio Table (8 steps)" />
         <div className="text-[10px] text-text-muted mb-2">
           8 semitone offsets played in sequence. 0 = no arpeggio.
         </div>
@@ -471,7 +464,7 @@ export const DeltaMusic1Controls: React.FC<DeltaMusic1ControlsProps> = ({
     return (
       <div className="flex flex-col gap-3 p-3" style={{ height: 'calc(100vh - 280px)' }}>
         <div className={`rounded-lg border p-3 ${panelBg} flex flex-col`} style={{ flex: 1, minHeight: 0 }}>
-          <SectionLabel label="Sound Table (48-byte sequence)" />
+          <SectionLabel color={accent} label="Sound Table (48-byte sequence)" />
           <div className="text-[10px] text-text-muted mb-2">
             W## = waveform segment (0-7F), D## = delay (80-FE), FF = loop
           </div>
