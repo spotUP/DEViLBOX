@@ -216,7 +216,7 @@ export const PixiGTUltraView: React.FC<Props> = ({ width, height }) => {
           formatConfig={{ sidCount }}
           patternLength={useGTUltraStore.getState().patternLength}
           currentRow={playbackPos.row}
-          isPlaying={!!playbackPos.row || playbackPos.position > 0}
+          isPlaying={useGTUltraStore.getState().playing}
         />
       )}
     </pixiContainer>

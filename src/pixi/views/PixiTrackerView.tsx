@@ -38,6 +38,7 @@ import { PixiMusicLineTrackTable } from './tracker/PixiMusicLineTrackTable';
 import { PixiMusicLinePatternViewer } from './tracker/PixiMusicLinePatternViewer';
 import { PixiPatternEditor } from './tracker/PixiPatternEditor';
 import { PixiAutomationLaneStrip } from './tracker/PixiAutomationLaneStrip';
+import { getFormatPlaybackState } from '@/engine/FormatPlaybackState';
 import { PixiTrackerVisualBg } from './tracker/PixiTrackerVisualBg';
 import { PixiGridSequencer } from './tracker/PixiGridSequencer';
 import { PixiTB303View } from './tracker/PixiTB303View';
@@ -348,14 +349,16 @@ export const PixiTrackerView: React.FC = () => {
             const formatConfig = fmt === 'furnace' && fn
               ? { chipIds: fn.chipIds, channelCount: fn.subsongs[fn.activeSubsong]?.channels.length ?? 4 }
               : undefined;
+            const ps = getFormatPlaybackState();
+            const pat = useTrackerStore.getState().patterns[useTrackerStore.getState().currentPatternIndex];
             return (
               <PixiAutomationLaneStrip
                 width={Math.max(100, editorWidth)}
                 format={fmt}
                 formatConfig={formatConfig}
-                patternLength={64}
-                currentRow={0}
-                isPlaying={false}
+                patternLength={pat?.length ?? 64}
+                currentRow={ps.row}
+                isPlaying={ps.isPlaying}
               />
             );
           })()}
