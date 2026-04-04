@@ -10,7 +10,7 @@ import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react'
 import type { HivelyConfig, HivelyPerfEntryConfig } from '@/types/instrument';
 import { Knob } from '@components/controls/Knob';
 import { useThemeStore } from '@stores';
-import { EnvelopeVisualization } from '@components/instruments/shared';
+import { EnvelopeVisualization, SectionLabel } from '@components/instruments/shared';
 import { PatternEditorCanvas } from '@/components/tracker/PatternEditorCanvas';
 import {
   HIVELY_PERFLIST_COLUMNS,
@@ -85,14 +85,6 @@ export const HivelyControls: React.FC<HivelyControlsProps> = ({
     if (perfCursorY >= entries.length) setPerfCursorY(entries.length - 1);
   }, [onChange, perfCursorY]);
 
-  // ── Section header helper ──
-  const SectionLabel: React.FC<{ label: string }> = ({ label }) => (
-    <div className="text-[10px] font-bold uppercase tracking-widest mb-2"
-      style={{ color: accentColor, opacity: 0.7 }}>
-      {label}
-    </div>
-  );
-
   // ── Number input box (HVL style) ──
   const NumberBox: React.FC<{
     label: string; value: number; min: number; max: number;
@@ -125,7 +117,7 @@ export const HivelyControls: React.FC<HivelyControlsProps> = ({
     <div className="flex flex-col gap-4 p-3 overflow-y-auto synth-controls-flow" style={{ maxHeight: 'calc(100vh - 280px)' }}>
       {/* Volume & Wave Length */}
       <div className={`rounded-lg border p-3 ${panelBg}`}>
-        <SectionLabel label="Volume & Wave" />
+        <SectionLabel color={accentColor} label="Volume & Wave" />
         <div className="flex items-center gap-3">
           <Knob value={config.volume} min={0} max={64} step={1}
             onChange={(v) => updateParam('volume', Math.round(v))}
@@ -153,7 +145,7 @@ export const HivelyControls: React.FC<HivelyControlsProps> = ({
 
       {/* Envelope ADSR */}
       <div className={`rounded-lg border p-3 ${panelBg}`}>
-        <SectionLabel label="Envelope" />
+        <SectionLabel color={accentColor} label="Envelope" />
         <div className="grid grid-cols-4 gap-3">
           <div className="flex flex-col items-center gap-2">
             <Knob value={config.envelope.aFrames} min={1} max={255} step={1}
@@ -213,7 +205,7 @@ export const HivelyControls: React.FC<HivelyControlsProps> = ({
 
       {/* Vibrato */}
       <div className={`rounded-lg border p-3 ${panelBg}`}>
-        <SectionLabel label="Vibrato" />
+        <SectionLabel color={accentColor} label="Vibrato" />
         <div className="flex items-center gap-4">
           <Knob value={config.vibratoDelay} min={0} max={255} step={1}
             onChange={(v) => updateParam('vibratoDelay', Math.round(v))}
@@ -232,7 +224,7 @@ export const HivelyControls: React.FC<HivelyControlsProps> = ({
 
       {/* Square Wave Modulation */}
       <div className={`rounded-lg border p-3 ${panelBg}`}>
-        <SectionLabel label="Square Modulation" />
+        <SectionLabel color={accentColor} label="Square Modulation" />
         <div className="flex items-center gap-4">
           <Knob value={config.squareLowerLimit} min={0} max={255} step={1}
             onChange={(v) => updateParam('squareLowerLimit', Math.round(v))}
@@ -251,7 +243,7 @@ export const HivelyControls: React.FC<HivelyControlsProps> = ({
 
       {/* Filter Modulation */}
       <div className={`rounded-lg border p-3 ${panelBg}`}>
-        <SectionLabel label="Filter Modulation" />
+        <SectionLabel color={accentColor} label="Filter Modulation" />
         <div className="flex items-center gap-4">
           <Knob value={config.filterLowerLimit} min={0} max={127} step={1}
             onChange={(v) => updateParam('filterLowerLimit', Math.round(v))}
@@ -270,7 +262,7 @@ export const HivelyControls: React.FC<HivelyControlsProps> = ({
 
       {/* Hard Cut */}
       <div className={`rounded-lg border p-3 ${panelBg}`}>
-        <SectionLabel label="Hard Cut" />
+        <SectionLabel color={accentColor} label="Hard Cut" />
         <div className="flex items-center gap-4">
           <button
             onClick={() => updateParam('hardCutRelease', !config.hardCutRelease)}

@@ -47,6 +47,7 @@
 import React, { useRef, useEffect, useCallback, useState } from 'react';
 import type { TFMXConfig, UADEChipRamInfo } from '@/types/instrument';
 import { useThemeStore } from '@stores';
+import { SectionLabel } from '@components/instruments/shared';
 import { UADEChipEditor } from '@/engine/uade/UADEChipEditor';
 import { UADEEngine } from '@/engine/uade/UADEEngine';
 
@@ -315,13 +316,6 @@ export const TFMXControls: React.FC<TFMXControlsProps> = ({ config, onChange, ua
 
   // ── Sub-renderers ─────────────────────────────────────────────────────────
 
-  const SectionLabel: React.FC<{ label: string }> = ({ label }) => (
-    <div className="text-[10px] font-bold uppercase tracking-widest mb-2"
-      style={{ color: accent, opacity: 0.7 }}>
-      {label}
-    </div>
-  );
-
   const StatRow: React.FC<{ label: string; value: string }> = ({ label, value }) => (
     <div className="flex items-center gap-2 py-0.5">
       <span className="text-[10px] text-text-muted w-36">{label}</span>
@@ -337,7 +331,7 @@ export const TFMXControls: React.FC<TFMXControlsProps> = ({ config, onChange, ua
       <div className="flex flex-col gap-3 p-3 overflow-y-auto" style={{ maxHeight: 'calc(100vh - 280px)' }}>
         {/* Overview stats */}
         <div className={`rounded-lg border p-3 ${panelBg}`}>
-          <SectionLabel label="TFMX Instrument Data" />
+          <SectionLabel color={accent} label="TFMX Instrument Data" />
           <StatRow label="SndModSeq count"  value={config.sndSeqsCount.toString()} />
           <StatRow label="SndModSeq bytes"  value={`${config.sndModSeqData.byteLength} B`} />
           <StatRow label="VolModSeq bytes"  value={`${config.volModSeqData.byteLength} B`} />
@@ -352,7 +346,7 @@ export const TFMXControls: React.FC<TFMXControlsProps> = ({ config, onChange, ua
         {/* Sample bank */}
         {samples.length > 0 && (
           <div className={`rounded-lg border p-3 ${panelBg}`}>
-            <SectionLabel label="Sample Bank" />
+            <SectionLabel color={accent} label="Sample Bank" />
             <div className="font-mono text-[9px] flex border-b mb-1 pb-0.5"
               style={{ borderColor: dim, color: 'var(--color-text-muted)' }}>
               <span className="w-5">#</span>
@@ -384,7 +378,7 @@ export const TFMXControls: React.FC<TFMXControlsProps> = ({ config, onChange, ua
         {/* Export .mdat — only shown when chip RAM context is available */}
         {uadeChipRam && (
           <div className={`rounded-lg border p-3 ${panelBg}`}>
-            <SectionLabel label="Export" />
+            <SectionLabel color={accent} label="Export" />
             <button
               onClick={() => {
                 void getEditor().exportModule(
@@ -429,7 +423,7 @@ export const TFMXControls: React.FC<TFMXControlsProps> = ({ config, onChange, ua
       <div className="flex flex-col gap-3 p-3 overflow-y-auto" style={{ maxHeight: 'calc(100vh - 280px)' }}>
         {/* Header fields */}
         <div className={`rounded-lg border p-3 ${panelBg}`}>
-          <SectionLabel label="VolModSeq Header (bytes 0–4)" />
+          <SectionLabel color={accent} label="VolModSeq Header (bytes 0–4)" />
           <div className="grid grid-cols-2 gap-x-4 gap-y-1">
             {([
               ['[0] Env Speed',  0, hdr.envelopeSpeed],
@@ -471,7 +465,7 @@ export const TFMXControls: React.FC<TFMXControlsProps> = ({ config, onChange, ua
         {/* Volume envelope data */}
         <div className={`rounded-lg border p-3 ${panelBg}`}>
           <div className="flex items-center justify-between mb-2">
-            <SectionLabel label="Volume Envelope (bytes 5–63)" />
+            <SectionLabel color={accent} label="Volume Envelope (bytes 5–63)" />
             <button
               onClick={() => setShowVolHex((v) => !v)}
               className="text-[9px] px-2 py-0.5 rounded border"
@@ -582,7 +576,7 @@ export const TFMXControls: React.FC<TFMXControlsProps> = ({ config, onChange, ua
           <>
             {/* Sequence selector */}
             <div className={`rounded-lg border p-3 ${panelBg}`}>
-              <SectionLabel label="Sound Modulation Sequences" />
+              <SectionLabel color={accent} label="Sound Modulation Sequences" />
               <div className="flex items-center gap-2 flex-wrap">
                 {Array.from({ length: seqCount }, (_, i) => (
                   <button
@@ -603,7 +597,7 @@ export const TFMXControls: React.FC<TFMXControlsProps> = ({ config, onChange, ua
             {/* Sequence entries */}
             <div className={`rounded-lg border p-3 ${panelBg}`}>
               <div className="flex items-center justify-between mb-2">
-                <SectionLabel label={`SndModSeq #${clampedSeq}`} />
+                <SectionLabel color={accent} label={`SndModSeq #${clampedSeq}`} />
                 <button
                   onClick={() => setShowSndHex((v) => !v)}
                   className="text-[9px] px-2 py-0.5 rounded border"

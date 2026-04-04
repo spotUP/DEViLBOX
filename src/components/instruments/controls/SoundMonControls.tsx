@@ -61,6 +61,7 @@ import { Knob } from '@components/controls/Knob';
 import { useThemeStore } from '@stores';
 import {
   EnvelopeVisualization,
+  SectionLabel,
   WaveformThumbnail,
 } from '@components/instruments/shared';
 import { PatternEditorCanvas } from '@/components/tracker/PatternEditorCanvas';
@@ -239,13 +240,6 @@ export const SoundMonControls: React.FC<SoundMonControlsProps> = ({
     [upd, uadeChipRam, getEditor],
   );
 
-  const SectionLabel: React.FC<{ label: string }> = ({ label }) => (
-    <div className="text-[10px] font-bold uppercase tracking-widest mb-2"
-      style={{ color: accent, opacity: 0.7 }}>
-      {label}
-    </div>
-  );
-
   // -- MAIN TAB ---
 
   const renderMain = () => (
@@ -253,7 +247,7 @@ export const SoundMonControls: React.FC<SoundMonControlsProps> = ({
 
       {/* Waveform selector */}
       <div className={`rounded-lg border p-3 ${panelBg}`}>
-        <SectionLabel label="Waveform" />
+        <SectionLabel color={accent} label="Waveform" />
         <div className="flex items-center gap-4 mb-3">
           <Knob value={config.waveSpeed} min={0} max={15} step={1}
             onChange={(v) => upd('waveSpeed', Math.round(v))}
@@ -289,7 +283,7 @@ export const SoundMonControls: React.FC<SoundMonControlsProps> = ({
 
       {/* Volume Envelope */}
       <div className={`rounded-lg border p-3 ${panelBg}`}>
-        <SectionLabel label="Volume Envelope" />
+        <SectionLabel color={accent} label="Volume Envelope" />
 
         <div className="grid grid-cols-4 gap-3">
           <div className="flex flex-col items-center gap-2">
@@ -359,7 +353,7 @@ export const SoundMonControls: React.FC<SoundMonControlsProps> = ({
 
       {/* Vibrato */}
       <div className={`rounded-lg border p-3 ${panelBg}`}>
-        <SectionLabel label="Vibrato" />
+        <SectionLabel color={accent} label="Vibrato" />
         <div className="flex gap-4">
           <Knob value={config.vibratoDelay} min={0} max={255} step={1}
             onChange={(v) => {
@@ -390,7 +384,7 @@ export const SoundMonControls: React.FC<SoundMonControlsProps> = ({
 
       {/* Portamento */}
       <div className={`rounded-lg border p-3 ${panelBg}`}>
-        <SectionLabel label="Portamento" />
+        <SectionLabel color={accent} label="Portamento" />
         <div className="flex items-center gap-4">
           <Knob value={config.portamentoSpeed} min={0} max={63} step={1}
             onChange={(v) => upd('portamentoSpeed', Math.round(v))}
@@ -414,7 +408,7 @@ export const SoundMonControls: React.FC<SoundMonControlsProps> = ({
     <div className="flex flex-col gap-3 p-3" style={{ height: 'calc(100vh - 280px)' }}>
       <div className={`rounded-lg border p-3 ${panelBg} flex flex-col`} style={{ flex: 1, minHeight: 0 }}>
         <div className="flex items-center justify-between mb-3">
-          <SectionLabel label="Arpeggio Speed" />
+          <SectionLabel color={accent} label="Arpeggio Speed" />
           <Knob value={config.arpSpeed} min={0} max={15} step={1}
             onChange={(v) => upd('arpSpeed', Math.round(v))}
             label="Speed" color={knob}

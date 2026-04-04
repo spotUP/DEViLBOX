@@ -11,7 +11,7 @@
 import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import type { GTUltraConfig } from '@typedefs/instrument/exotic';
 import { PatternEditorCanvas } from '@/components/tracker/PatternEditorCanvas';
-import { EnvelopeVisualization } from '@components/instruments/shared';
+import { EnvelopeVisualization, SectionLabel } from '@components/instruments/shared';
 import { useGTUltraStore } from '@stores/useGTUltraStore';
 import { useThemeStore } from '@stores';
 
@@ -150,10 +150,6 @@ export const GTUltraControls: React.FC<GTUltraControlsProps> = ({
   }, [onChange]);
 
   // ── Helpers ──
-  const SectionLabel = ({ label }: { label: string }) => (
-    <div className="text-[10px] font-bold uppercase tracking-widest mb-1.5"
-      style={{ color: accentColor, opacity: 0.7 }}>{label}</div>
-  );
 
   const AdsrSlider = ({ label, value, timeMs, onValueChange }: {
     label: string; value: number; timeMs: number; onValueChange: (v: number) => void;
@@ -192,7 +188,7 @@ export const GTUltraControls: React.FC<GTUltraControlsProps> = ({
 
       {/* ADSR */}
       <div className={`rounded-lg border p-3 ${panelBg}`}>
-        <SectionLabel label="ADSR Envelope" />
+        <SectionLabel color={accentColor} label="ADSR Envelope" />
         <EnvelopeVisualization
           mode="sid"
           attack={attack}
@@ -218,7 +214,7 @@ export const GTUltraControls: React.FC<GTUltraControlsProps> = ({
 
       {/* Column 1: Waveform */}
       <div className={`rounded-lg border p-3 ${panelBg}`}>
-        <SectionLabel label="Waveform" />
+        <SectionLabel color={accentColor} label="Waveform" />
         <div className="flex flex-wrap gap-1.5 mb-2">
           {WAVEFORM_BITS.map(({ bit, label }) => {
             const active = !!(config.firstwave & (1 << bit));
@@ -253,7 +249,7 @@ export const GTUltraControls: React.FC<GTUltraControlsProps> = ({
       {/* Column 2: Timing + Panning */}
       <div className="flex flex-col gap-3">
         <div className={`rounded-lg border p-3 ${panelBg}`}>
-          <SectionLabel label="Timing" />
+          <SectionLabel color={accentColor} label="Timing" />
           <div className="flex flex-col gap-2">
             <NumBox label="Gate Timer" value={gateTimerValue} min={0} max={63} hex
               onValueChange={(v) => onChange({ gatetimer: (configRef.current.gatetimer & 0xC0) | (v & 0x3F) })} />
@@ -275,7 +271,7 @@ export const GTUltraControls: React.FC<GTUltraControlsProps> = ({
         </div>
 
         <div className={`rounded-lg border p-3 ${panelBg}`}>
-          <SectionLabel label="Panning" />
+          <SectionLabel color={accentColor} label="Panning" />
           <div className="flex flex-col gap-1">
             <div className="flex items-center gap-2">
               <span className="text-[10px] text-text-secondary w-12 text-right">Min</span>
@@ -299,7 +295,7 @@ export const GTUltraControls: React.FC<GTUltraControlsProps> = ({
       {/* Column 3: Table Pointers + Effects */}
       <div className="flex flex-col gap-3">
         <div className={`rounded-lg border p-3 ${panelBg}`}>
-          <SectionLabel label="Table Pointers" />
+          <SectionLabel color={accentColor} label="Table Pointers" />
           <div className="flex flex-col gap-2">
             <NumBox label="Wave Table" value={config.wavePtr} min={0} max={255} hex onValueChange={(v) => onChange({ wavePtr: v })} />
             <NumBox label="Pulse Table" value={config.pulsePtr} min={0} max={255} hex onValueChange={(v) => onChange({ pulsePtr: v })} />
@@ -418,7 +414,7 @@ export const GTUltraControls: React.FC<GTUltraControlsProps> = ({
       <div className="flex flex-col gap-3 p-3 overflow-y-auto synth-controls-flow" style={{ maxHeight: 'calc(100vh - 280px)' }}>
         {Array.from({ length: chipCount }, (_, chipIdx) => (
           <div key={chipIdx} className={`rounded-lg border p-3 ${panelBg}`}>
-            <SectionLabel label={chipCount > 1 ? `SID ${chipIdx + 1}` : 'SID Registers'} />
+            <SectionLabel color={accentColor} label={chipCount > 1 ? `SID ${chipIdx + 1}` : 'SID Registers'} />
             <div className="font-mono text-[10px]" style={{ lineHeight: '1.6' }}>
               {[0, 1, 2].map((voice) => {
                 const base = voice * 7;

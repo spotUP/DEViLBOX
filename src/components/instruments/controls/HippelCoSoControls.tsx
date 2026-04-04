@@ -21,7 +21,7 @@ import React, { useRef, useEffect, useCallback, useState } from 'react';
 import type { HippelCoSoConfig, UADEChipRamInfo } from '@/types/instrument';
 import { Knob } from '@components/controls/Knob';
 import { useThemeStore } from '@stores';
-import { SequenceEditor } from '@components/instruments/shared';
+import { SectionLabel, SequenceEditor } from '@components/instruments/shared';
 import type { SequencePreset } from '@components/instruments/shared';
 import { UADEChipEditor } from '@/engine/uade/UADEChipEditor';
 import { UADEEngine } from '@/engine/uade/UADEEngine';
@@ -126,21 +126,12 @@ export const HippelCoSoControls: React.FC<HippelCoSoControlsProps> = ({
     onChange({ [key]: value } as Partial<HippelCoSoConfig>);
   }, [onChange]);
 
-  const SectionLabel: React.FC<{ label: string }> = ({ label }) => (
-    <div
-      className="text-[10px] font-bold uppercase tracking-widest mb-2"
-      style={{ color: accent, opacity: 0.7 }}
-    >
-      {label}
-    </div>
-  );
-
   // ── MAIN TAB ──────────────────────────────────────────────────────────────
   const renderMain = () => (
     <div className="flex flex-col gap-3 p-3 overflow-y-auto" style={{ maxHeight: 'calc(100vh - 280px)' }}>
       {/* Timing */}
       <div className={`rounded-lg border p-3 ${panelBg}`}>
-        <SectionLabel label="Timing" />
+        <SectionLabel color={accent} label="Timing" />
         <div className="flex gap-4">
           <Knob
             value={config.volSpeed}
@@ -155,7 +146,7 @@ export const HippelCoSoControls: React.FC<HippelCoSoControlsProps> = ({
 
       {/* Vibrato */}
       <div className={`rounded-lg border p-3 ${panelBg}`}>
-        <SectionLabel label="Vibrato" />
+        <SectionLabel color={accent} label="Vibrato" />
         <div className="flex gap-4">
           <Knob
             value={config.vibDelay}
@@ -189,7 +180,7 @@ export const HippelCoSoControls: React.FC<HippelCoSoControlsProps> = ({
 
       {/* Frequency Sequence — relative pitch offsets (semitones) */}
       <div className={`rounded-lg border p-3 ${panelBg}`}>
-        <SectionLabel label="Frequency Sequence" />
+        <SectionLabel color={accent} label="Frequency Sequence" />
         <SequenceEditor
           label="fseq"
           data={config.fseq}
@@ -209,7 +200,7 @@ export const HippelCoSoControls: React.FC<HippelCoSoControlsProps> = ({
 
       {/* Volume Sequence — 0-63 volume levels */}
       <div className={`rounded-lg border p-3 ${panelBg}`}>
-        <SectionLabel label="Volume Sequence" />
+        <SectionLabel color={accent} label="Volume Sequence" />
         <SequenceEditor
           label="vseq"
           data={config.vseq.map(v => Math.max(0, v))}  // clamp -128 loop markers for display

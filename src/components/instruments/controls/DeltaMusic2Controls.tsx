@@ -29,6 +29,7 @@ import React, { useRef, useEffect, useCallback, useState } from 'react';
 import type { DeltaMusic2Config, DeltaMusic2VolEntry, DeltaMusic2VibEntry, UADEChipRamInfo } from '@/types/instrument';
 import { Knob } from '@components/controls/Knob';
 import { useThemeStore } from '@stores';
+import { SectionLabel } from '@components/instruments/shared';
 import { UADEChipEditor } from '@/engine/uade/UADEChipEditor';
 import { UADEEngine } from '@/engine/uade/UADEEngine';
 
@@ -85,13 +86,6 @@ export const DeltaMusic2Controls: React.FC<DeltaMusic2ControlsProps> = ({
   const knob    = isCyan ? '#00ffff' : '#ffbb66';
   const dim     = isCyan ? '#004444' : '#331800';
   const panelBg = isCyan ? 'bg-[#041510] border-accent-highlight/20' : 'bg-[#1a0e00] border-orange-900/30';
-
-  const SectionLabel: React.FC<{ label: string }> = ({ label }) => (
-    <div className="text-[10px] font-bold uppercase tracking-widest mb-2"
-      style={{ color: accent, opacity: 0.7 }}>
-      {label}
-    </div>
-  );
 
   // ── Volume table updater ──────────────────────────────────────────────────
 
@@ -179,7 +173,7 @@ export const DeltaMusic2Controls: React.FC<DeltaMusic2ControlsProps> = ({
   const renderEnvelope = () => (
     <div className="flex flex-col gap-3 p-3 overflow-y-auto" style={{ maxHeight: 'calc(100vh - 280px)' }}>
       <div className={`rounded-lg border p-3 ${panelBg}`}>
-        <SectionLabel label="Volume Table (5 entries)" />
+        <SectionLabel color={accent} label="Volume Table (5 entries)" />
         <div className="text-[10px] text-text-muted mb-2">
           Each entry: Speed (step rate), Level (0-255), Sustain (ticks at this level).
         </div>
@@ -221,7 +215,7 @@ export const DeltaMusic2Controls: React.FC<DeltaMusic2ControlsProps> = ({
 
       {/* Vibrato table */}
       <div className={`rounded-lg border p-3 ${panelBg}`}>
-        <SectionLabel label="Vibrato Table (5 entries)" />
+        <SectionLabel color={accent} label="Vibrato Table (5 entries)" />
         <div className="text-[10px] text-text-muted mb-2">
           Each entry: Speed (LFO rate), Delay (ticks before start), Sustain (ticks at this vibrato).
         </div>
@@ -256,7 +250,7 @@ export const DeltaMusic2Controls: React.FC<DeltaMusic2ControlsProps> = ({
 
       {/* Pitch bend */}
       <div className={`rounded-lg border p-3 ${panelBg}`}>
-        <SectionLabel label="Pitch Bend" />
+        <SectionLabel color={accent} label="Pitch Bend" />
         <div className="flex items-center gap-4">
           <Knob
             value={config.pitchBend} min={0} max={65535} step={1}
@@ -286,7 +280,7 @@ export const DeltaMusic2Controls: React.FC<DeltaMusic2ControlsProps> = ({
     return (
       <div className="flex flex-col gap-3 p-3 overflow-y-auto" style={{ maxHeight: 'calc(100vh - 280px)' }}>
         <div className={`rounded-lg border p-3 ${panelBg}`}>
-          <SectionLabel label="Wavetable Sequence (48 bytes)" />
+          <SectionLabel color={accent} label="Wavetable Sequence (48 bytes)" />
           <div className="grid grid-cols-8 gap-1">
             {Array.from(table).map((entry, idx) => {
               const isLoop  = entry === 0xFF;

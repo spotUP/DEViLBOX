@@ -41,7 +41,7 @@ import React, { useRef, useEffect, useState, useMemo } from 'react';
 import type { FredConfig, UADEChipRamInfo } from '@/types/instrument';
 import { Knob } from '@components/controls/Knob';
 import { useThemeStore } from '@stores';
-import { EnvelopeVisualization } from '@components/instruments/shared';
+import { EnvelopeVisualization, SectionLabel } from '@components/instruments/shared';
 import { PatternEditorCanvas } from '@/components/tracker/PatternEditorCanvas';
 import type { ColumnDef, FormatChannel, FormatCell, OnCellChange } from '@/components/shared/format-editor-types';
 import { UADEChipEditor } from '@/engine/uade/UADEChipEditor';
@@ -131,13 +131,6 @@ export const FredControls: React.FC<FredControlsProps> = ({ config, onChange, ua
     }
   }
 
-  const SectionLabel: React.FC<{ label: string }> = ({ label }) => (
-    <div className="text-[10px] font-bold uppercase tracking-widest mb-2"
-      style={{ color: accent, opacity: 0.7 }}>
-      {label}
-    </div>
-  );
-
   const NumBox: React.FC<{
     label: string; value: number; min: number; max: number;
     onChange: (v: number) => void; signed?: boolean; width?: string;
@@ -163,7 +156,7 @@ export const FredControls: React.FC<FredControlsProps> = ({ config, onChange, ua
   const renderEnvelope = () => (
     <div className="flex flex-col gap-3 p-3 overflow-y-auto" style={{ maxHeight: 'calc(100vh - 280px)' }}>
       <div className={`rounded-lg border p-3 ${panelBg}`}>
-        <SectionLabel label="Envelope" />
+        <SectionLabel color={accent} label="Envelope" />
         <div className="mb-3">
           <EnvelopeVisualization
             mode="steps"
@@ -220,7 +213,7 @@ export const FredControls: React.FC<FredControlsProps> = ({ config, onChange, ua
         </div>
       </div>
       <div className={`rounded-lg border p-3 ${panelBg}`}>
-        <SectionLabel label="Relative Tuning" />
+        <SectionLabel color={accent} label="Relative Tuning" />
         <div className="flex items-center gap-4">
           <Knob value={config.relative} min={256} max={4096} step={1}
             onChange={(v) => void updWithChipRam('relative', Math.round(v), async (ed, base) => { await ed.writeU16(base + 8, Math.round(v)); })}
@@ -238,7 +231,7 @@ export const FredControls: React.FC<FredControlsProps> = ({ config, onChange, ua
   const renderPWM = () => (
     <div className="flex flex-col gap-3 p-3 overflow-y-auto" style={{ maxHeight: 'calc(100vh - 280px)' }}>
       <div className={`rounded-lg border p-3 ${panelBg}`}>
-        <SectionLabel label="Pulse Width Range" />
+        <SectionLabel color={accent} label="Pulse Width Range" />
         <div className="flex items-center gap-4">
           <Knob value={config.pulsePosL} min={0} max={64} step={1}
             onChange={(v) => void updWithChipRam('pulsePosL', Math.round(v), async (ed, base) => { await ed.writeU8(base + 43, Math.round(v)); })}
@@ -259,7 +252,7 @@ export const FredControls: React.FC<FredControlsProps> = ({ config, onChange, ua
         </div>
       </div>
       <div className={`rounded-lg border p-3 ${panelBg}`}>
-        <SectionLabel label="PWM Modulation" />
+        <SectionLabel color={accent} label="PWM Modulation" />
         <div className="flex flex-wrap gap-3">
           <Knob value={config.pulseSpeed} min={1} max={255} step={1}
             onChange={(v) => void updWithChipRam('pulseSpeed', Math.round(v), async (ed, base) => { await ed.writeU8(base + 42, Math.round(v)); })}
@@ -299,7 +292,7 @@ export const FredControls: React.FC<FredControlsProps> = ({ config, onChange, ua
   const renderArpeggio = () => (
     <div className="flex flex-col gap-3 p-3" style={{ height: 'calc(100vh - 280px)' }}>
       <div className={`rounded-lg border p-3 ${panelBg}`}>
-        <SectionLabel label="Arpeggio Settings" />
+        <SectionLabel color={accent} label="Arpeggio Settings" />
         <div className="flex gap-4 mb-3">
           <NumBox label="Active Steps" value={config.arpeggioLimit} min={0} max={16}
             onChange={(v) => void updWithChipRam('arpeggioLimit', v, async (ed, base) => { await ed.writeU8(base + 51, v); })} />
@@ -308,7 +301,7 @@ export const FredControls: React.FC<FredControlsProps> = ({ config, onChange, ua
         </div>
       </div>
       <div className={`rounded-lg border p-3 ${panelBg} flex flex-col`} style={{ flex: 1, minHeight: 0 }}>
-        <SectionLabel label="Arpeggio Table (semitone offsets)" />
+        <SectionLabel color={accent} label="Arpeggio Table (semitone offsets)" />
         <div style={{ flex: 1, minHeight: 120 }}>
           <PatternEditorCanvas
             formatColumns={ARP_COLUMN}
@@ -330,7 +323,7 @@ export const FredControls: React.FC<FredControlsProps> = ({ config, onChange, ua
   const renderVibrato = () => (
     <div className="flex flex-col gap-3 p-3 overflow-y-auto" style={{ maxHeight: 'calc(100vh - 280px)' }}>
       <div className={`rounded-lg border p-3 ${panelBg}`}>
-        <SectionLabel label="Vibrato" />
+        <SectionLabel color={accent} label="Vibrato" />
         <div className="flex gap-4">
           <Knob value={config.vibratoDelay} min={0} max={255} step={1}
             onChange={(v) => void updWithChipRam('vibratoDelay', Math.round(v), async (ed, base) => { await ed.writeU8(base + 10, Math.round(v)); })}
