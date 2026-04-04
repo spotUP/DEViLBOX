@@ -35,14 +35,12 @@
  *   +190 Loop (16 bytes: Start u16, Repeat u16, RepEnd u16, Length u16, LpStep u16, Wait u16, Delay u16, Turns u16)
  */
 
-import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import type { InstrumentConfig } from '@typedefs/instrument';
-import { PatternEditorCanvas } from '@/components/tracker/PatternEditorCanvas';
-import type { ColumnDef, FormatChannel, FormatCell, OnCellChange } from '@/components/shared/format-editor-types';
 import { MusicLineEngine } from '@/engine/musicline/MusicLineEngine';
-import type { MusicLineArpEntry } from '@/engine/musicline/MusicLineEngine';
 import { Knob } from '@components/controls/Knob';
 import { useInstrumentColors } from '@/hooks/useInstrumentColors';
+import { MusicLineArpeggioEditor } from '@/components/musicline/MusicLineArpeggioEditor';
 
 // ── Constants ──────────────────────────────────────────────────────────────────
 
@@ -233,42 +231,6 @@ const FX_MODULES: FxModuleDef[] = [
   { name: 'Filter',        fxIndex: 9, register: 2, bit: 3, color: '#60d080' },
   { name: 'Hold Sustain',  fxIndex: 10, register: 2, bit: 4, color: '#a0a0c0' },
 ];
-
-// ── MusicLine note formatter ─────────────────────────────────────────────────
-
-const ML_NOTES = ['C-', 'C#', 'D-', 'D#', 'E-', 'F-', 'F#', 'G-', 'G#', 'A-', 'A#', 'B-'];
-
-function formatMLNote(value: number): string {
-  if (value === 0) return '---';
-  const note = (value - 1) % 12;
-  const octave = Math.floor((value - 1) / 12) + 1;
-  return `${ML_NOTES[note]}${octave}`;
-}
-
-function formatHex1(value: number): string {
-  if (value === 0) return '-';
-  return value.toString(16).toUpperCase();
-}
-
-function formatHex2(value: number): string {
-  if (value === 0) return '--';
-  return value.toString(16).toUpperCase().padStart(2, '0');
-}
-
-// ── Column definitions for arpeggio table ────────────────────────────────────
-
-const ML_ARP_COLUMNS: ColumnDef[] = [
-  { key: 'note', label: 'Note', charWidth: 3, type: 'note', color: '#60e060', emptyColor: '#2a2a3a', emptyValue: 0, formatter: formatMLNote },
-  { key: 'smpl', label: 'WS', charWidth: 2, type: 'hex', hexDigits: 2, color: '#e0c040', emptyColor: '#2a2a3a', emptyValue: 0, formatter: formatHex2 },
-  { key: 'fx1', label: 'F1', charWidth: 1, type: 'hex', hexDigits: 1, color: '#60a0e0', emptyColor: '#2a2a3a', emptyValue: 0, formatter: formatHex1 },
-  { key: 'param1', label: 'P1', charWidth: 2, type: 'hex', hexDigits: 2, color: '#6080c0', emptyColor: '#2a2a3a', emptyValue: 0, formatter: formatHex2 },
-  { key: 'fx2', label: 'F2', charWidth: 1, type: 'hex', hexDigits: 1, color: '#c060e0', emptyColor: '#2a2a3a', emptyValue: 0, formatter: formatHex1 },
-  { key: 'param2', label: 'P2', charWidth: 2, type: 'hex', hexDigits: 2, color: '#a060c0', emptyColor: '#2a2a3a', emptyValue: 0, formatter: formatHex2 },
-];
-
-const ARP_FIELD_MAP: Record<string, number> = {
-  note: 0, smpl: 1, fx1: 2, param1: 3, fx2: 4, param2: 5,
-};
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -879,7 +841,7 @@ function CommonFxParams({ fields, writeField, color, style, prefix, extraFields 
   );
 }
 
-// ── Arpeggio Panel (existing functionality) ─────────────────────────────────
+// ── Arpeggio Panel — uses standalone MusicLineArpeggioEditor ─────────────────
 
 interface ArpPanelProps {
   instIdx: number;
@@ -887,8 +849,6 @@ interface ArpPanelProps {
 
 function ArpPanel({ instIdx }: ArpPanelProps) {
   const [arpConfig, setArpConfig] = useState<{ table: number; speed: number; groove: number; numArps: number } | null>(null);
-  const [arpRows, setArpRows] = useState<MusicLineArpEntry[]>([]);
-  const [arpLength, setArpLength] = useState(0);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -906,90 +866,42 @@ function ArpPanel({ instIdx }: ArpPanelProps) {
       const config = await engine.readInstArpConfig(instIdx);
       if (cancelled) return;
       setArpConfig(config);
-
-      if (config.table >= 0) {
-        const data = await engine.readArpTable(config.table);
-        if (cancelled) return;
-        setArpRows(data.rows);
-        setArpLength(data.length);
-      }
       setLoading(false);
     })();
 
     return () => { cancelled = true; };
   }, [instIdx]);
 
-  const formatChannels: FormatChannel[] = useMemo(() => {
-    if (arpRows.length === 0) return [];
-    const rows: FormatCell[] = arpRows.map((entry) => ({
-      note: entry.note,
-      smpl: entry.smpl,
-      fx1: entry.fx1,
-      param1: entry.param1,
-      fx2: entry.fx2,
-      param2: entry.param2,
-    }));
-    return [{
-      label: `Arp ${arpConfig?.table ?? 0}`,
-      patternLength: arpLength,
-      rows,
-      isPatternChannel: false,
-    }];
-  }, [arpRows, arpLength, arpConfig?.table]);
-
-  const onCellChange: OnCellChange = useCallback((_chIdx: number, rowIdx: number, columnKey: string, value: number) => {
-    const fieldIdx = ARP_FIELD_MAP[columnKey];
-    if (fieldIdx === undefined || !arpConfig || arpConfig.table < 0) return;
-
-    if (MusicLineEngine.hasInstance()) {
-      const engine = MusicLineEngine.getInstance();
-      engine.writeArpEntry(arpConfig.table, rowIdx, fieldIdx, value);
-    }
-
-    setArpRows((prev) => {
-      const next = [...prev];
-      next[rowIdx] = { ...next[rowIdx], [columnKey]: value };
-      return next;
-    });
-  }, [arpConfig]);
-
   if (loading) {
     return <div style={{ color: '#4a4a6a', fontSize: 11, padding: 12 }}>Loading arpeggio data...</div>;
   }
 
-  if (!arpConfig || arpConfig.table < 0 || arpLength === 0) {
+  if (!arpConfig || arpConfig.numArps === 0) {
     return (
       <div style={{ color: '#4a4a6a', fontSize: 11, padding: 12 }}>
-        No arpeggio table assigned to this instrument.
-        {arpConfig && arpConfig.numArps > 0 && (
-          <span style={{ display: 'block', marginTop: 8, color: '#3a3a5a' }}>
-            Song has {arpConfig.numArps} arpeggio table{arpConfig.numArps !== 1 ? 's' : ''}.
-          </span>
-        )}
+        No arpeggio tables in this song.
       </div>
     );
   }
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 8, flex: 1, minHeight: 0 }}>
+      {/* Instrument arp config info */}
       <div style={{
         display: 'flex', gap: 16, padding: '8px 12px',
         background: '#0e0e18', border: '1px solid #1e1e2e', borderRadius: 4, fontSize: 10,
       }}>
-        <span style={{ color: '#7a7a9a' }}>Table: <span style={{ color: '#a0a0ff' }}>{arpConfig.table}</span></span>
+        <span style={{ color: '#7a7a9a' }}>
+          Inst Table: <span style={{ color: '#a0a0ff' }}>{arpConfig.table >= 0 ? arpConfig.table : 'none'}</span>
+        </span>
         <span style={{ color: '#7a7a9a' }}>Speed: <span style={{ color: '#a0a0ff' }}>{arpConfig.speed}</span></span>
         <span style={{ color: '#7a7a9a' }}>Groove: <span style={{ color: '#a0a0ff' }}>{arpConfig.groove}</span></span>
-        <span style={{ color: '#7a7a9a' }}>Rows: <span style={{ color: '#a0a0ff' }}>{arpLength}</span></span>
       </div>
 
-      <div style={{ flex: 1, minHeight: 200 }}>
-        <PatternEditorCanvas
-          formatColumns={ML_ARP_COLUMNS}
-          formatChannels={formatChannels}
-          onFormatCellChange={onCellChange}
-          hideVUMeters={true}
-        />
-      </div>
+      {/* Full arpeggio table editor with dropdown to browse any table */}
+      <MusicLineArpeggioEditor
+        initialTable={arpConfig.table >= 0 ? arpConfig.table : 0}
+      />
     </div>
   );
 }
