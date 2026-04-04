@@ -629,13 +629,11 @@ export const usePatternPlayback = () => {
         return;
       }
 
-      // JamCracker: do NOT reset hasStartedRef or call replayer.stop() here.
-      // The user's stop handler (FT2Toolbar/spacebar) already called
-      // getTrackerReplayer().stop() which stopped the engine and saved position.
-      // If we reset hasStartedRef here, the next async play() re-fire would
-      // re-enter the JamCracker bypass's loadSong+play path, restarting the
-      // engine from row 0 and overwriting the saved position.
+      // JamCracker: reset hasStartedRef so the next play triggers a fresh
+      // loadSong+play. The async play() race that previously caused unwanted
+      // restarts is now handled by the generation counter in useTransportStore.
       if (jamCrackerFileData) {
+        hasStartedRef.current = false;
         setFormatPlaybackPlaying(false);
         return;
       }
