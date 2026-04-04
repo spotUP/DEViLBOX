@@ -16,6 +16,8 @@ import type { FormatChannel, OnCellChange } from '@/components/shared/format-edi
 export interface MusicLineFormatData {
   channels: FormatChannel[];
   currentRow: number;
+  /** Per-channel current row (for independent scrolling) */
+  perChannelRows: number[];
   isPlaying: boolean;
   handleCellChange: OnCellChange;
 }
@@ -78,5 +80,14 @@ export function useMusicLineFormatData(): MusicLineFormatData {
     if (isPlaying) setFormatPlaybackRow(clampedRow);
   }, [isPlaying, clampedRow]);
 
-  return { channels, currentRow: displayRow, isPlaying, handleCellChange };
+  // Build per-channel row array, clamped to each channel's pattern length
+  const perChannelRows = useMemo(() => {
+    if (!isPlaying || !wasmActive || channelRows.length === 0) return [];
+    return channels.map((ch, i) => {
+      const row = channelRows[i] ?? 0;
+      return Math.min(row, Math.max(0, ch.patternLength - 1));
+    });
+  }, [isPlaying, wasmActive, channelRows, channels]);
+
+  return { channels, currentRow: displayRow, perChannelRows, isPlaying, handleCellChange };
 }
