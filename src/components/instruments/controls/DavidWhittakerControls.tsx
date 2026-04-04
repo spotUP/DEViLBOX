@@ -11,7 +11,7 @@ import React, { useRef, useEffect, useCallback, useState } from 'react';
 import type { DavidWhittakerConfig, UADEChipRamInfo } from '@/types/instrument';
 import { Knob } from '@components/controls/Knob';
 import { useThemeStore } from '@stores';
-import { SequenceEditor } from '@components/instruments/shared';
+import { SectionLabel, SequenceEditor } from '@components/instruments/shared';
 import type { SequencePreset } from '@components/instruments/shared';
 import { UADEChipEditor } from '@/engine/uade/UADEChipEditor';
 import { UADEEngine } from '@/engine/uade/UADEEngine';
@@ -79,15 +79,6 @@ export const DavidWhittakerControls: React.FC<DavidWhittakerControlsProps> = ({
     onChange({ [key]: value } as Partial<DavidWhittakerConfig>);
   }, [onChange]);
 
-  const SectionLabel: React.FC<{ label: string }> = ({ label }) => (
-    <div
-      className="text-[10px] font-bold uppercase tracking-widest mb-2"
-      style={{ color: accent, opacity: 0.7 }}
-    >
-      {label}
-    </div>
-  );
-
   // ── MAIN TAB ──────────────────────────────────────────────────────────────
   const renderMain = () => {
     const relVal = config.relative ?? 8364;
@@ -97,7 +88,7 @@ export const DavidWhittakerControls: React.FC<DavidWhittakerControlsProps> = ({
       <div className="flex flex-col gap-3 p-3 overflow-y-auto" style={{ maxHeight: 'calc(100vh - 280px)' }}>
         {/* Volume & Tuning */}
         <div className={`rounded-lg border p-3 ${panelBg}`}>
-          <SectionLabel label="Volume & Tuning" />
+          <SectionLabel color={accent} label="Volume & Tuning" />
           <div className="flex items-start gap-3">
             <Knob
               value={config.defaultVolume ?? 64}
@@ -131,7 +122,7 @@ export const DavidWhittakerControls: React.FC<DavidWhittakerControlsProps> = ({
 
         {/* Vibrato */}
         <div className={`rounded-lg border p-3 ${panelBg}`}>
-          <SectionLabel label="Vibrato" />
+          <SectionLabel color={accent} label="Vibrato" />
           <div className="flex gap-4">
             <Knob
               value={config.vibratoSpeed ?? 0}
@@ -163,7 +154,7 @@ export const DavidWhittakerControls: React.FC<DavidWhittakerControlsProps> = ({
 
         {/* Volume Sequence — 0-64 volume levels */}
         <div className={`rounded-lg border p-3 ${panelBg}`}>
-          <SectionLabel label="Volume Sequence" />
+          <SectionLabel color={accent} label="Volume Sequence" />
           <SequenceEditor
             label="volseq"
             data={volseq.map(v => Math.max(0, v))}  // clamp -128 loop markers
@@ -181,7 +172,7 @@ export const DavidWhittakerControls: React.FC<DavidWhittakerControlsProps> = ({
 
         {/* Frequency Sequence — semitone offsets */}
         <div className={`rounded-lg border p-3 ${panelBg}`}>
-          <SectionLabel label="Frequency Sequence" />
+          <SectionLabel color={accent} label="Frequency Sequence" />
           <SequenceEditor
             label="frqseq"
             data={frqseq}

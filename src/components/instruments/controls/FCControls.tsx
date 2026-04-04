@@ -20,7 +20,7 @@ import React, { useRef, useEffect, useCallback, useState, useMemo } from 'react'
 import type { FCConfig, UADEChipRamInfo } from '@/types/instrument';
 import { Knob } from '@components/controls/Knob';
 import { useThemeStore } from '@stores';
-import { EnvelopeVisualization } from '@components/instruments/shared';
+import { EnvelopeVisualization, SectionLabel } from '@components/instruments/shared';
 import { PatternEditorCanvas } from '@/components/tracker/PatternEditorCanvas';
 import {
   FC_SYNTH_MACRO_COLUMNS,
@@ -154,19 +154,12 @@ export const FCControls: React.FC<FCControlsProps> = ({ config, onChange, uadeCh
     [uadeChipRam, getEditor],
   );
 
-  const SectionLabel: React.FC<{ label: string }> = ({ label }) => (
-    <div className="text-[10px] font-bold uppercase tracking-widest mb-2"
-      style={{ color: accent, opacity: 0.7 }}>
-      {label}
-    </div>
-  );
-
   // ── ENVELOPE TAB ──
   const renderEnvelope = () => (
     <div className="flex flex-col gap-3 p-3 overflow-y-auto" style={{ maxHeight: 'calc(100vh - 280px)' }}>
       {/* Initial waveform */}
       <div className={`rounded-lg border p-3 ${panelBg}`}>
-        <SectionLabel label="Base Waveform" />
+        <SectionLabel color={accent} label="Base Waveform" />
         <div className="flex items-center gap-3">
           <select
             value={config.waveNumber}
@@ -185,7 +178,7 @@ export const FCControls: React.FC<FCControlsProps> = ({ config, onChange, uadeCh
 
       {/* ADSR */}
       <div className={`rounded-lg border p-3 ${panelBg}`}>
-        <SectionLabel label="Volume Envelope" />
+        <SectionLabel color={accent} label="Volume Envelope" />
         <div className="mb-3">
           <EnvelopeVisualization
             mode="steps"
@@ -234,7 +227,7 @@ export const FCControls: React.FC<FCControlsProps> = ({ config, onChange, uadeCh
 
       {/* Vibrato */}
       <div className={`rounded-lg border p-3 ${panelBg}`}>
-        <SectionLabel label="Vibrato" />
+        <SectionLabel color={accent} label="Vibrato" />
         <div className="flex gap-4">
           <Knob value={config.vibDelay} min={0} max={255} step={1}
             onChange={(v) => updWithChipRam('vibDelay', Math.round(v), 4)}
@@ -274,7 +267,7 @@ export const FCControls: React.FC<FCControlsProps> = ({ config, onChange, uadeCh
   const renderSynth = () => (
     <div className="flex flex-col gap-3 p-3 overflow-y-auto" style={{ maxHeight: 'calc(100vh - 280px)' }}>
       <div className={`rounded-lg border p-3 ${panelBg}`}>
-        <SectionLabel label="Synth Macro Sequencer" />
+        <SectionLabel color={accent} label="Synth Macro Sequencer" />
         <div className="flex items-center gap-4 mb-3">
           <Knob value={config.synthSpeed} min={0} max={15} step={1}
             onChange={(v) => updWithChipRam('synthSpeed', Math.round(v), 0)}
@@ -319,7 +312,7 @@ export const FCControls: React.FC<FCControlsProps> = ({ config, onChange, uadeCh
   const renderArpeggio = () => (
     <div className="flex flex-col gap-3 p-3 overflow-y-auto" style={{ maxHeight: 'calc(100vh - 280px)' }}>
       <div className={`rounded-lg border p-3 ${panelBg}`}>
-        <SectionLabel label="Arpeggio Table (semitone offsets)" />
+        <SectionLabel color={accent} label="Arpeggio Table (semitone offsets)" />
         <div style={{ flex: 1, minHeight: 200 }}>
           <PatternEditorCanvas
             formatColumns={FC_ARPEGGIO_COLUMNS}

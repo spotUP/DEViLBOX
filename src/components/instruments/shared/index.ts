@@ -9,6 +9,7 @@ export { EffectChain } from './EffectChain';
 export { SynthEditorTabs } from './SynthEditorTabs';
 export { EditorHeader, VisualizationRow } from './EditorHeader';
 export type { EditorHeaderProps, VizMode } from './EditorHeader';
+export { SectionLabel } from './SectionLabel';
 export { EnvelopeVisualization } from './EnvelopeVisualization';
 export type { EnvelopeVisualizationProps } from './EnvelopeVisualization';
 export { SequenceEditor } from './SequenceEditor';
