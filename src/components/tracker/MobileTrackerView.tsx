@@ -5,6 +5,8 @@
 
 import React, { useState, useCallback, useEffect, useRef, Suspense, lazy } from 'react';
 import { PatternEditorCanvas } from './PatternEditorCanvas';
+import { useMusicLineFormatData } from '@/components/musicline/useMusicLineFormatData';
+import { MUSICLINE_COLUMNS } from '@/components/musicline/musiclineAdapter';
 import { MobilePatternInput } from './mobile/MobilePatternInput';
 import { MobileTransportBar } from './mobile/MobileTransportBar';
 import { useTransportStore, useTrackerStore, useCursorStore, useInstrumentStore, useEditorStore } from '@stores';
@@ -23,7 +25,7 @@ const GTDAWView = lazy(() => import('@/components/gtultra/daw/GTDAWView').then(m
 const KlysView = lazy(() => import('@/components/klystrack/KlysView').then(m => ({ default: m.KlysView })));
 const JamCrackerView = lazy(() => import('@/components/jamcracker/JamCrackerView').then(m => ({ default: m.JamCrackerView })));
 const Sc68Visualizer = lazy(() => import('@/components/tracker/Sc68Visualizer').then(m => ({ default: m.Sc68Visualizer })));
-const MusicLinePatternViewer = lazy(() => import('@/components/tracker/MusicLinePatternViewer').then(m => ({ default: m.MusicLinePatternViewer })));
+// MusicLinePatternViewer replaced by PatternEditorCanvas
 const MusicLineTrackTableEditor = lazy(() => import('@/components/tracker/MusicLineTrackTableEditor').then(m => ({ default: m.MusicLineTrackTableEditor })));
 
 // Piano input collapse states
@@ -46,6 +48,7 @@ export const MobileTrackerView: React.FC<MobileTrackerViewProps> = () => {
   const [pianoState, setPianoState] = useState<PianoState>('compact');
   const autoCollapseTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  const mlFormatData = useMusicLineFormatData();
   const isPlaying = useTransportStore((s) => s.isPlaying);
   const cursor = useCursorStore((s) => s.cursor);
   const moveCursor = useCursorStore((s) => s.moveCursor);
@@ -193,7 +196,13 @@ export const MobileTrackerView: React.FC<MobileTrackerViewProps> = () => {
                       <MusicLineTrackTableEditor />
                     </div>
                     <div className="flex-1 min-h-0">
-                      <MusicLinePatternViewer />
+                      <PatternEditorCanvas
+                        formatColumns={MUSICLINE_COLUMNS}
+                        formatChannels={mlFormatData.channels}
+                        formatCurrentRow={mlFormatData.currentRow}
+                        formatIsPlaying={mlFormatData.isPlaying}
+                        onFormatCellChange={mlFormatData.handleCellChange}
+                      />
                     </div>
                   </div>
                 )}
