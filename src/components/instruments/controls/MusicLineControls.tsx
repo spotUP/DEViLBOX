@@ -858,15 +858,32 @@ function ArpPanel({ instIdx }: ArpPanelProps) {
 
     (async () => {
       if (!MusicLineEngine.hasInstance()) {
+        // No engine — show editor with defaults
+        setArpConfig({ table: 0, speed: 6, groove: 0, numArps: 0 });
         setLoading(false);
         return;
       }
       const engine = MusicLineEngine.getInstance();
-      await engine.ready();
 
-      const config = await engine.readInstArpConfig(instIdx);
-      if (cancelled) return;
-      setArpConfig(config);
+      // Timeout after 2s — don't hang forever if worklet doesn't respond
+      const timeout = setTimeout(() => {
+        if (!cancelled) {
+          setArpConfig({ table: 0, speed: 6, groove: 0, numArps: 0 });
+          setLoading(false);
+        }
+      }, 2000);
+
+      try {
+        await engine.ready();
+        const config = await engine.readInstArpConfig(instIdx);
+        clearTimeout(timeout);
+        if (cancelled) return;
+        setArpConfig(config);
+      } catch {
+        clearTimeout(timeout);
+        if (cancelled) return;
+        setArpConfig({ table: 0, speed: 6, groove: 0, numArps: 0 });
+      }
       setLoading(false);
     })();
 
@@ -874,34 +891,28 @@ function ArpPanel({ instIdx }: ArpPanelProps) {
   }, [instIdx]);
 
   if (loading) {
-    return <div style={{ color: '#4a4a6a', fontSize: 11, padding: 12 }}>Loading arpeggio data...</div>;
+    return <div style={{ color: 'var(--color-text-muted)', fontSize: 11, padding: 12 }}>Loading arpeggio data...</div>;
   }
 
-  if (!arpConfig || arpConfig.numArps === 0) {
-    return (
-      <div style={{ color: '#4a4a6a', fontSize: 11, padding: 12 }}>
-        No arpeggio tables in this song.
-      </div>
-    );
-  }
+  const cfg = arpConfig ?? { table: 0, speed: 6, groove: 0, numArps: 0 };
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 8, flex: 1, minHeight: 0 }}>
       {/* Instrument arp config info */}
       <div style={{
         display: 'flex', gap: 16, padding: '8px 12px',
-        background: '#0e0e18', border: '1px solid #1e1e2e', borderRadius: 4, fontSize: 10,
+        background: 'var(--color-bg-tertiary)', border: '1px solid var(--color-border)', borderRadius: 4, fontSize: 10,
       }}>
-        <span style={{ color: '#7a7a9a' }}>
-          Inst Table: <span style={{ color: '#a0a0ff' }}>{arpConfig.table >= 0 ? arpConfig.table : 'none'}</span>
+        <span style={{ color: 'var(--color-text-muted)' }}>
+          Table: <span style={{ color: 'var(--color-accent)' }}>{cfg.table >= 0 ? cfg.table : 'none'}</span>
         </span>
-        <span style={{ color: '#7a7a9a' }}>Speed: <span style={{ color: '#a0a0ff' }}>{arpConfig.speed}</span></span>
-        <span style={{ color: '#7a7a9a' }}>Groove: <span style={{ color: '#a0a0ff' }}>{arpConfig.groove}</span></span>
+        <span style={{ color: 'var(--color-text-muted)' }}>Speed: <span style={{ color: 'var(--color-accent)' }}>{cfg.speed}</span></span>
+        <span style={{ color: 'var(--color-text-muted)' }}>Groove: <span style={{ color: 'var(--color-accent)' }}>{cfg.groove}</span></span>
       </div>
 
-      {/* Full arpeggio table editor with dropdown to browse any table */}
+      {/* Full arpeggio table editor — always shown so user can create/edit arpeggios */}
       <MusicLineArpeggioEditor
-        initialTable={arpConfig.table >= 0 ? arpConfig.table : 0}
+        initialTable={cfg.table >= 0 ? cfg.table : 0}
       />
     </div>
   );
