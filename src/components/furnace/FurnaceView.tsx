@@ -12,7 +12,7 @@
  */
 
 import React, { useRef, useEffect, useState, useCallback } from 'react';
-import { useTrackerStore, useFormatStore } from '@stores';
+import { useTrackerStore, useFormatStore, useUIStore } from '@stores';
 import { useTransportStore } from '@stores/useTransportStore';
 import { PatternEditorCanvas } from '@/components/tracker/PatternEditorCanvas';
 import { FurnaceOrderEditor, FURNACE_ORDER_MATRIX_HEIGHT, FURNACE_ORDER_MATRIX_COLLAPSED_HEIGHT } from './FurnaceOrderEditor';
@@ -28,6 +28,7 @@ export const FurnaceView: React.FC<{ width?: number; height?: number }> = () => 
   const setFurnaceOrderEntry = useFormatStore(s => s.setFurnaceOrderEntry);
   const isPlaying = useTransportStore(s => s.isPlaying);
   const currentRow = useTransportStore(s => s.currentRow);
+  const editorFullscreen = useUIStore(s => s.editorFullscreen);
 
   const [editPosition, setEditPosition] = useState(0);
   const [orderCollapsed, setOrderCollapsed] = useState(isMobile); // Collapsed by default on mobile
@@ -91,6 +92,7 @@ export const FurnaceView: React.FC<{ width?: number; height?: number }> = () => 
       }}
     >
       {/* Toolbar */}
+      {!editorFullscreen && (
       <div style={{
         display: 'flex', alignItems: 'center', gap: '8px',
         height: `${TOOLBAR_H}px`, padding: '0 12px',
@@ -102,8 +104,10 @@ export const FurnaceView: React.FC<{ width?: number; height?: number }> = () => 
         <span style={{ color: 'var(--color-text-muted)' }}>|</span>
         <span style={{ fontSize: '11px', color: 'var(--color-text-muted)', flex: 1 }}>{toolbarInfo}</span>
       </div>
+      )}
 
       {/* Order Editor */}
+      {!editorFullscreen && (
       <div style={{
         height: `${orderH}px`,
         borderBottom: '1px solid var(--color-border)',
@@ -120,6 +124,7 @@ export const FurnaceView: React.FC<{ width?: number; height?: number }> = () => 
           onOrderChange={handleOrderChange}
         />
       </div>
+      )}
 
       {/* Pattern Editor */}
       <div style={{ flex: 1, minHeight: 0, overflow: 'hidden' }}>
