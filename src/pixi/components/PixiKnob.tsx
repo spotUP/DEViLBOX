@@ -16,7 +16,7 @@
  */
 
 import { useRef, useCallback, useEffect, useState } from 'react';
-import type { Graphics as GraphicsType, Container as ContainerType, FederatedPointerEvent } from 'pixi.js';
+import type { Graphics as GraphicsType, Container as ContainerType, FederatedPointerEvent, FederatedWheelEvent } from 'pixi.js';
 import { PIXI_FONTS } from '../fonts';
 import { usePixiTheme } from '../theme';
 import { usePixiTooltipStore } from '../stores/usePixiTooltipStore';
@@ -313,6 +313,23 @@ export const PixiKnob: React.FC<PixiKnobProps> = ({
   const handlePointerOver = useCallback(() => { if (!disabled) setIsHovered(true); }, [disabled]);
   const handlePointerOut = useCallback(() => setIsHovered(false), []);
 
+  // ─── Wheel handler ─────────────────────────────────────────────────────
+  const handleWheel = useCallback((e: FederatedWheelEvent) => {
+    if (disabled) return;
+    e.stopPropagation();
+    e.preventDefault();
+
+    const currentNorm = getNormalized(valueRef.current);
+    const range = max - min;
+    const baseStep = step !== undefined && step > 0 ? step / range : 0.01;
+    // Shift = 5x faster
+    const delta = e.shiftKey ? baseStep * 5 : baseStep;
+    // Scroll up (negative deltaY) = increase value
+    const direction = e.deltaY < 0 ? 1 : -1;
+    const newNorm = Math.max(0, Math.min(1, currentNorm + direction * delta));
+    applyValue(newNorm);
+  }, [disabled, getNormalized, applyValue, min, max, step]);
+
   // Cleanup RAF on unmount
   useEffect(() => {
     return () => {
@@ -353,6 +370,7 @@ export const PixiKnob: React.FC<PixiKnobProps> = ({
         onRightClick={handleRightClick}
         onPointerOver={handlePointerOver}
         onPointerOut={handlePointerOut}
+        onWheel={handleWheel}
         alpha={disabled ? 0.4 : 1}
         layout={{
           width: totalWidth,
