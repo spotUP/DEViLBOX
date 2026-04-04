@@ -24,4 +24,3 @@ export type { FilterFrequencyResponseProps, FilterType } from './FilterFrequency
 export { WaveformLineCanvas } from './WaveformLineCanvas';
 export { BarChart } from './BarChart';
 export { HarmonicBarsCanvas } from './HarmonicBarsCanvas';
-export { SegmentButton } from './SegmentButton';
