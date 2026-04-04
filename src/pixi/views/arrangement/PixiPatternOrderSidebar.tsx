@@ -3,11 +3,12 @@
  * Visually 1:1 with DOM PatternOrderSidebar. Same store data.
  */
 
-import { useCallback } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import type { Graphics as GraphicsType, FederatedPointerEvent } from 'pixi.js';
 import { usePixiTheme } from '../../theme';
 import { PIXI_FONTS } from '../../fonts';
 import { useTrackerStore } from '@stores';
+import { notify } from '@stores/useNotificationStore';
 
 interface PixiPatternOrderSidebarProps {
   width?: number;
@@ -27,6 +28,13 @@ export const PixiPatternOrderSidebar: React.FC<PixiPatternOrderSidebarProps> = (
   const currentPositionIndex = useTrackerStore(s => s.currentPositionIndex);
   const setCurrentPosition = useTrackerStore(s => s.setCurrentPosition);
   const setCurrentPattern = useTrackerStore(s => s.setCurrentPattern);
+
+  // ── Drag-to-reorder state (declared before draw so draw can reference) ────
+  const reorderPositions = useTrackerStore(s => s.reorderPositions);
+  const [dragIdx, setDragIdx] = useState<number | null>(null);
+  const [dropTarget, setDropTarget] = useState<number | null>(null);
+  const dragStartY = useRef(0);
+  const isDragging = useRef(false);
 
   const draw = useCallback((g: GraphicsType) => {
     g.clear();
@@ -64,15 +72,58 @@ export const PixiPatternOrderSidebar: React.FC<PixiPatternOrderSidebarProps> = (
     g.moveTo(width - 1, 0);
     g.lineTo(width - 1, height);
     g.stroke({ color: theme.border.color, width: 1 });
-  }, [width, height, patternOrder.length, currentPositionIndex, theme]);
+    // Drop target highlight
+    if (dropTarget !== null && dragIdx !== null && dropTarget !== dragIdx) {
+      const dtY = HEADER_H + dropTarget * ROW_H;
+      g.rect(0, dtY, width, ROW_H);
+      g.fill({ color: theme.accent.color, alpha: 0.25 });
+    }
+  }, [width, height, patternOrder.length, currentPositionIndex, theme, dropTarget, dragIdx]);
 
-  const handleClick = useCallback((e: FederatedPointerEvent) => {
+  // ── Drag-to-reorder + click-to-select ──────────────────────────────────────
+  const posFromY = useCallback((localY: number) => {
+    const idx = Math.floor((localY - HEADER_H) / ROW_H);
+    return idx >= 0 && idx < patternOrder.length ? idx : null;
+  }, [patternOrder.length]);
+
+  const handlePointerDown = useCallback((e: FederatedPointerEvent) => {
     const local = e.getLocalPosition(e.currentTarget);
-    const posIdx = Math.floor((local.y - HEADER_H) / ROW_H);
-    if (posIdx < 0 || posIdx >= patternOrder.length) return;
-    setCurrentPosition(posIdx, true);
-    setCurrentPattern(patternOrder[posIdx], true);
-  }, [patternOrder, setCurrentPosition, setCurrentPattern]);
+    const idx = posFromY(local.y);
+    if (idx === null) return;
+    dragStartY.current = local.y;
+    isDragging.current = false;
+    setDragIdx(idx);
+  }, [posFromY]);
+
+  const handlePointerMove = useCallback((e: FederatedPointerEvent) => {
+    if (dragIdx === null) return;
+    const local = e.getLocalPosition(e.currentTarget);
+    if (!isDragging.current && Math.abs(local.y - dragStartY.current) > 4) {
+      isDragging.current = true;
+    }
+    if (isDragging.current) {
+      setDropTarget(posFromY(local.y));
+    }
+  }, [dragIdx, posFromY]);
+
+  const handlePointerUp = useCallback((e: FederatedPointerEvent) => {
+    if (dragIdx === null) return;
+    if (isDragging.current && dropTarget !== null && dropTarget !== dragIdx) {
+      reorderPositions(dragIdx, dropTarget);
+      notify.success('Position reordered', 2000);
+    } else if (!isDragging.current) {
+      // Click — select position
+      const local = e.getLocalPosition(e.currentTarget);
+      const idx = posFromY(local.y);
+      if (idx !== null) {
+        setCurrentPosition(idx, true);
+        setCurrentPattern(patternOrder[idx], true);
+      }
+    }
+    setDragIdx(null);
+    setDropTarget(null);
+    isDragging.current = false;
+  }, [dragIdx, dropTarget, patternOrder, posFromY, reorderPositions, setCurrentPosition, setCurrentPattern]);
 
   return (
     <pixiContainer layout={{ width, height }}>
@@ -80,7 +131,10 @@ export const PixiPatternOrderSidebar: React.FC<PixiPatternOrderSidebarProps> = (
         draw={draw}
         eventMode="static"
         cursor="pointer"
-        onClick={handleClick}
+        onPointerDown={handlePointerDown}
+        onPointerMove={handlePointerMove}
+        onPointerUp={handlePointerUp}
+        onPointerUpOutside={handlePointerUp}
         layout={{ width, height }}
       />
 
