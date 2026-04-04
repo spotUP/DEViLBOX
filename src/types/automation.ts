@@ -9,11 +9,19 @@ export type InterpolationType = 'linear' | 'exponential' | 'easeIn' | 'easeOut' 
 /** Automation parameter key — NKS param id (e.g. 'tb303.cutoff', 'dexed.algorithm') */
 export type AutomationParameter = string;
 
+/** Reference to the data source that produced an automation point, enabling write-back */
+export type AutomationSourceRef =
+  | { type: 'table'; tableType: 'wave' | 'pulse' | 'filter'; tableId: number; index: number }
+  | { type: 'effect'; row: number; channel: number; effectCol: number }
+  | { type: 'macro'; instrumentId: number; macroType: string; frame: number }
+  | { type: 'furnace-effect'; row: number; channel: number; effectCol: number };
+
 export interface AutomationPoint {
   row: number;
   value: number; // 0-1 normalized
   tension?: number; // 0-1, per-point curve tension (optional override)
   curveType?: InterpolationType; // per-segment interpolation override
+  sourceRef?: AutomationSourceRef; // Reference to the data source that produced this point
 }
 
 export interface AutomationCurve {
