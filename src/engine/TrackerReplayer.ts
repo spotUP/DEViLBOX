@@ -272,6 +272,14 @@ export interface TrackerSong {
   hivelyFileData?: ArrayBuffer;
   /** Raw MusicLine binary for loading into the MusicLineEngine WASM */
   musiclineFileData?: Uint8Array;
+  /** MusicLine INFO chunk metadata (title, author, date, duration, info text 1-5) */
+  musiclineMetadata?: {
+    title: string;
+    author: string;
+    date: string;
+    duration: string;
+    infoText: string[];
+  };
   /** Raw C64 SID binary for loading into the C64SIDEngine */
   c64SidFileData?: Uint8Array;
   /** Raw JamCracker .jam binary for loading into the JamCrackerEngine WASM */
