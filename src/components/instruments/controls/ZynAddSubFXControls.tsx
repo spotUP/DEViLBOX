@@ -20,40 +20,7 @@ const MAG_LABELS = ['Linear', 'dB', '-40dB', '-60dB'];
 const DIST_LABELS = ['Atan', 'Asym1', 'Pow', 'Sine', 'Quant'];
 const TAB_NAMES = ['ADDsynth', 'SUBsynth', 'PADsynth', 'Filter/Env', 'Effects'] as const;
 
-// ============================================================================
-// SegmentButton
-// ============================================================================
-
-interface SegmentButtonProps {
-  labels: string[];
-  value: number;
-  onChange: (value: number) => void;
-  color?: string;
-}
-
-const SegmentButton: React.FC<SegmentButtonProps> = React.memo(({ labels, value, onChange, color }) => {
-  const activeClass = color === 'green' ? 'bg-emerald-600 text-white'
-    : color === 'blue' ? 'bg-sky-500 text-white'
-    : 'bg-rose-500 text-white';
-  return (
-    <div className="flex gap-1 flex-wrap">
-      {labels.map((label, i) => (
-        <button
-          key={label}
-          onClick={() => onChange(i)}
-          className={`px-2 py-1 text-[10px] font-bold rounded transition-all ${
-            Math.round(value) === i
-              ? activeClass
-              : 'bg-dark-bgTertiary text-text-secondary hover:bg-dark-bgHover'
-          }`}
-        >
-          {label}
-        </button>
-      ))}
-    </div>
-  );
-});
-SegmentButton.displayName = 'SegmentButton';
+import { SegmentButton } from '@components/instruments/shared';
 
 // ============================================================================
 // VoiceControls — a single additive voice
