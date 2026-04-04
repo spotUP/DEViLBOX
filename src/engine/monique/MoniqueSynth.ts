@@ -779,17 +779,17 @@ export class MoniqueSynthEngine implements DevilboxSynth {
     return this;
   }
 
-  // Monique is monophonic — release the specified note or current note
-  triggerRelease(frequency?: number | string, _time?: number): this {
+  // Monique is monophonic — release whatever is playing.
+  // ToneEngine calls triggerRelease(time) for monosynths — first arg is time, not note.
+  triggerRelease(_time?: number): this {
     if (!this._worklet || !this.isInitialized) return this;
-    // If a specific note was given, convert and release it
-    let note = this._currentNote;
-    if (frequency !== undefined) {
-      note = typeof frequency === 'string' ? noteToMidi(frequency) : Math.round(12 * Math.log2(frequency / 440) + 69);
-    }
-    if (note >= 0) {
-      this._worklet.port.postMessage({ type: 'noteOff', note });
-      if (note === this._currentNote) this._currentNote = -1;
+    // Always send noteOff for current note AND allNotesOff as fallback.
+    // _currentNote may already be -1 if note-stealing released it during a new noteOn.
+    if (this._currentNote >= 0) {
+      this._worklet.port.postMessage({ type: 'noteOff', note: this._currentNote });
+      this._currentNote = -1;
+    } else {
+      this._worklet.port.postMessage({ type: 'allNotesOff' });
     }
     return this;
   }
