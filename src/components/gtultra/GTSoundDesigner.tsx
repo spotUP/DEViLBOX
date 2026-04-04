@@ -6,7 +6,7 @@
  * and writing the same underlying GT store table data.
  */
 
-import React, { useState, useCallback, useMemo } from 'react';
+import React, { useState, useCallback, useMemo, useRef, useEffect } from 'react';
 import { useGTUltraStore } from '@/stores/useGTUltraStore';
 import { useInstrumentColors } from '@/hooks/useInstrumentColors';
 import {
@@ -23,7 +23,8 @@ import {
 import {
   decodeWaveSequence, encodeWaveSequence, waveformName, waveCommandLabel,
   decodePulseSequence, encodePulseSequence,
-  type WaveStep,
+  decodeFilterSequence, encodeFilterSequence,
+  type WaveStep, type FilterStep,
 } from '@/lib/gtultra/GTTableCodec';
 
 // ── Constants ──────────────────────────────────────────────────────────────
@@ -49,6 +50,261 @@ const ARP_CHORDS: { label: string; semitones: number[] }[] = [
   { label: '7th', semitones: [0, 4, 7, 10] },
   { label: 'Sus4', semitones: [0, 5, 7] },
 ];
+
+// ── Draw Canvas — shared drag-to-draw pattern ──────────────────────────────
+
+const DRAW_H = 80;
+const DRAW_STEPS = 32;
+
+interface DrawCanvasProps {
+  values: number[]; // 0-1 normalized, length = DRAW_STEPS
+  color: string;
+  label?: string;
+  onDraw: (values: number[]) => void;
+}
+
+const DrawCanvas: React.FC<DrawCanvasProps> = ({ values, color, label, onDraw }) => {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const isDragging = useRef(false);
+  const localValues = useRef<number[]>([...values]);
+
+  useEffect(() => { localValues.current = [...values]; }, [values]);
+
+  const draw = useCallback(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    const w = canvas.width, h = canvas.height;
+    const dpr = window.devicePixelRatio || 1;
+    ctx.clearRect(0, 0, w, h);
+
+    // Background grid
+    ctx.strokeStyle = '#1a1a1a';
+    ctx.lineWidth = dpr;
+    for (let i = 0; i <= 4; i++) {
+      const y = (i / 4) * h;
+      ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(w, y); ctx.stroke();
+    }
+
+    // Bars
+    const vals = localValues.current;
+    const barW = w / DRAW_STEPS;
+    for (let i = 0; i < DRAW_STEPS; i++) {
+      const v = vals[i] ?? 0;
+      const barH = v * h;
+      ctx.fillStyle = color + '80';
+      ctx.fillRect(i * barW + 1 * dpr, h - barH, barW - 2 * dpr, barH);
+    }
+
+    // Line
+    ctx.beginPath();
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 1.5 * dpr;
+    for (let i = 0; i < DRAW_STEPS; i++) {
+      const x = (i + 0.5) * barW;
+      const y = h - (vals[i] ?? 0) * h;
+      i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+    }
+    ctx.stroke();
+
+    // Label
+    if (label) {
+      ctx.font = `${9 * dpr}px monospace`;
+      ctx.fillStyle = '#555';
+      ctx.fillText(label, 4 * dpr, 10 * dpr);
+    }
+  }, [color, label]);
+
+  useEffect(() => { draw(); }, [draw, values]);
+
+  const getStep = useCallback((e: React.MouseEvent) => {
+    const canvas = canvasRef.current;
+    if (!canvas) return null;
+    const rect = canvas.getBoundingClientRect();
+    const x = (e.clientX - rect.left) / rect.width;
+    const y = 1 - (e.clientY - rect.top) / rect.height;
+    const step = Math.floor(x * DRAW_STEPS);
+    return { step: Math.max(0, Math.min(DRAW_STEPS - 1, step)), value: Math.max(0, Math.min(1, y)) };
+  }, []);
+
+  const handlePointerDown = useCallback((e: React.MouseEvent) => {
+    isDragging.current = true;
+    const pt = getStep(e);
+    if (pt) { localValues.current[pt.step] = pt.value; draw(); }
+    (e.target as HTMLElement).setPointerCapture((e as unknown as PointerEvent).pointerId);
+  }, [getStep, draw]);
+
+  const handlePointerMove = useCallback((e: React.MouseEvent) => {
+    if (!isDragging.current) return;
+    const pt = getStep(e);
+    if (pt) { localValues.current[pt.step] = pt.value; draw(); }
+  }, [getStep, draw]);
+
+  const handlePointerUp = useCallback(() => {
+    if (!isDragging.current) return;
+    isDragging.current = false;
+    onDraw([...localValues.current]);
+  }, [onDraw]);
+
+  const dpr = typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1;
+
+  return (
+    <canvas
+      ref={canvasRef}
+      width={Math.round(280 * dpr)}
+      height={Math.round(DRAW_H * dpr)}
+      style={{ width: '100%', height: DRAW_H, borderRadius: 4, background: '#060a08', border: '1px solid #1a1a1a', cursor: 'crosshair' }}
+      onPointerDown={handlePointerDown}
+      onPointerMove={handlePointerMove}
+      onPointerUp={handlePointerUp}
+    />
+  );
+};
+
+// ── Pulse Draw Canvas wrapper ───────────────────────────────────────────────
+
+function pulseStepsToValues(steps: { type: string; value: number; speed: number }[]): number[] {
+  // Simple: expand to 32 values (0-1 normalized from 0-4095)
+  const vals = new Array(DRAW_STEPS).fill(0.5);
+  if (steps.length === 0) return vals;
+  let pw = 2048; // default
+  let idx = 0;
+  for (const step of steps) {
+    if (step.type === 'set') {
+      pw = step.value;
+      if (idx < DRAW_STEPS) vals[idx] = pw / 4095;
+      idx++;
+    } else {
+      // Modulation: fill frames
+      for (let f = 0; f < step.value && idx < DRAW_STEPS; f++) {
+        const speed = step.speed < 0x80 ? step.speed : step.speed - 256;
+        pw = Math.max(0, Math.min(4095, pw + speed));
+        vals[idx] = pw / 4095;
+        idx++;
+      }
+    }
+  }
+  // Fill remaining with last value
+  for (; idx < DRAW_STEPS; idx++) vals[idx] = pw / 4095;
+  return vals;
+}
+
+function valuesToPulseSteps(values: number[]): { type: 'set'; value: number; speed: number }[] {
+  // Convert drawn values to simple absolute-set steps
+  return values.filter((_, i) => i === 0 || Math.abs(values[i] - values[i - 1]) > 0.01)
+    .map(v => ({ type: 'set' as const, value: Math.round(v * 4095), speed: 0 }));
+}
+
+const PulseDrawCanvas: React.FC<{
+  pulseSteps: { type: string; value: number; speed: number }[];
+  color: string;
+  onDraw: (values: number[]) => void;
+}> = ({ pulseSteps, color, onDraw }) => {
+  const values = useMemo(() => pulseStepsToValues(pulseSteps), [pulseSteps]);
+  return <DrawCanvas values={values} color={color} label="Pulse Width" onDraw={onDraw} />;
+};
+
+// ── Filter Draw Canvas wrapper ──────────────────────────────────────────────
+
+function filterStepsToValues(steps: FilterStep[]): number[] {
+  const vals = new Array(DRAW_STEPS).fill(0.5);
+  if (steps.length === 0) return vals;
+  let cutoff = 128;
+  let idx = 0;
+  for (const step of steps) {
+    if (step.type === 'set') {
+      cutoff = step.param;
+      if (idx < DRAW_STEPS) vals[idx] = cutoff / 255;
+      idx++;
+    } else {
+      for (let f = 0; f < step.value && idx < DRAW_STEPS; f++) {
+        const speed = step.param < 0x80 ? step.param : step.param - 256;
+        cutoff = Math.max(0, Math.min(255, cutoff + speed));
+        vals[idx] = cutoff / 255;
+        idx++;
+      }
+    }
+  }
+  for (; idx < DRAW_STEPS; idx++) vals[idx] = cutoff / 255;
+  return vals;
+}
+
+function valuesToFilterSteps(values: number[]): FilterStep[] {
+  return values.filter((_, i) => i === 0 || Math.abs(values[i] - values[i - 1]) > 0.01)
+    .map(v => ({ type: 'set' as const, value: 0x90, param: Math.round(v * 255) }));
+}
+
+const FilterDrawCanvas: React.FC<{
+  filterSteps: FilterStep[];
+  color: string;
+  onDraw: (values: number[]) => void;
+}> = ({ filterSteps, color, onDraw }) => {
+  const values = useMemo(() => filterStepsToValues(filterSteps), [filterSteps]);
+  return <DrawCanvas values={values} color={color} label="Filter Cutoff" onDraw={onDraw} />;
+};
+
+// ── Arpeggio Step Grid ──────────────────────────────────────────────────────
+
+const ARP_GRID_ROWS = 24; // 2 octaves
+const ARP_GRID_COLS = 8;  // 8 steps
+
+const ArpGrid: React.FC<{ color: string }> = ({ color }) => {
+  const [steps, setSteps] = useState<boolean[][]>(
+    () => Array.from({ length: ARP_GRID_COLS }, () => new Array(ARP_GRID_ROWS).fill(false))
+  );
+
+  const toggleCell = useCallback((col: number, row: number) => {
+    setSteps(prev => {
+      const next = prev.map(c => [...c]);
+      // Clear column first (one note per step)
+      next[col] = new Array(ARP_GRID_ROWS).fill(false);
+      next[col][row] = !prev[col][row];
+      return next;
+    });
+  }, []);
+
+  const cellSize = 10;
+  const noteNames = ['C', '', 'D', '', 'E', 'F', '', 'G', '', 'A', '', 'B'];
+
+  return (
+    <div style={{ overflowX: 'auto' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: `20px repeat(${ARP_GRID_COLS}, ${cellSize}px)`, gap: 1, fontSize: 7 }}>
+        {/* Header */}
+        <div />
+        {Array.from({ length: ARP_GRID_COLS }, (_, c) => (
+          <div key={c} style={{ textAlign: 'center', color: '#555', fontSize: 7 }}>{c + 1}</div>
+        ))}
+        {/* Grid rows (top = highest note) */}
+        {Array.from({ length: ARP_GRID_ROWS }, (_, rowIdx) => {
+          const semitone = ARP_GRID_ROWS - 1 - rowIdx;
+          const noteName = noteNames[semitone % 12];
+          const isBlackKey = !noteName;
+          return (
+            <React.Fragment key={rowIdx}>
+              <div style={{ color: '#555', textAlign: 'right', paddingRight: 2, fontSize: 7, lineHeight: `${cellSize}px` }}>
+                {noteName || '·'}{semitone % 12 === 0 ? Math.floor(semitone / 12) : ''}
+              </div>
+              {Array.from({ length: ARP_GRID_COLS }, (_, col) => (
+                <div
+                  key={col}
+                  onClick={() => toggleCell(col, semitone)}
+                  style={{
+                    width: cellSize, height: cellSize,
+                    background: steps[col][semitone] ? color : (isBlackKey ? '#0a0a0a' : '#111'),
+                    border: `1px solid ${steps[col][semitone] ? color : '#222'}`,
+                    borderRadius: 1,
+                    cursor: 'pointer',
+                  }}
+                />
+              ))}
+            </React.Fragment>
+          );
+        })}
+      </div>
+    </div>
+  );
+};
 
 // ── Component ──────────────────────────────────────────────────────────────
 
@@ -87,6 +343,11 @@ export const GTSoundDesigner: React.FC = () => {
     if (!tableData?.pulse || !inst?.pulsePtr) return [];
     return decodePulseSequence(tableData.pulse.left, tableData.pulse.right, inst.pulsePtr);
   }, [tableData?.pulse, inst?.pulsePtr]);
+
+  const filterSteps = useMemo(() => {
+    if (!tableData?.filter || !inst?.filterPtr) return [];
+    return decodeFilterSequence(tableData.filter.left, tableData.filter.right, inst.filterPtr);
+  }, [tableData?.filter, inst?.filterPtr]);
 
   // ── ADSR Callbacks ──
 
@@ -381,33 +642,24 @@ export const GTSoundDesigner: React.FC = () => {
         {/* ════ Column 2: Pulse Width + Filter ════ */}
         <div className="flex flex-col gap-3">
 
-          {/* Pulse Width */}
+          {/* Pulse Width — drag-to-draw canvas */}
           <div className={`rounded-lg border p-3 ${panelBg}`}>
             <SectionLabel label="Pulse Width" color={TABLE_COLORS.pulse} />
-            {pulseSteps.length > 0 ? (
-              <div className="flex flex-col gap-1">
-                {pulseSteps.map((step, i) => (
-                  <div key={i} className="flex items-center gap-2 px-2 py-1 rounded"
-                    style={{ background: '#0a0f0c', border: '1px solid #2a1a18' }}>
-                    <span className="text-[9px] font-mono w-4" style={{ color: '#555' }}>{i + 1}</span>
-                    {step.type === 'set' ? (
-                      <span className="text-[10px] font-mono" style={{ color: TABLE_COLORS.pulse }}>
-                        PW={step.value} ({Math.round(step.value / 4095 * 100)}%)
-                      </span>
-                    ) : (
-                      <span className="text-[9px] font-mono" style={{ color: TABLE_COLORS.pulse }}>
-                        Sweep {step.speed < 0x80 ? '↑' : '↓'} x{step.value} frames
-                      </span>
-                    )}
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="text-[9px] text-text-secondary text-center py-4">
-                {inst?.pulsePtr ? 'No pulse table data' : 'No pulse table assigned'}
-              </div>
-            )}
-
+            <PulseDrawCanvas
+              pulseSteps={pulseSteps}
+              color={TABLE_COLORS.pulse}
+              onDraw={(values) => {
+                if (!engine || !inst?.pulsePtr) return;
+                const steps = valuesToPulseSteps(values);
+                const { left, right } = encodePulseSequence(steps);
+                const ptr = inst.pulsePtr - 1;
+                for (let i = 0; i < left.length; i++) {
+                  engine.setTableEntry(1, 0, ptr + i, left[i]);
+                  engine.setTableEntry(1, 1, ptr + i, right[i]);
+                }
+                useGTUltraStore.getState().refreshAllTables();
+              }}
+            />
             {/* Quick PWM presets */}
             <div className="flex gap-1 mt-2 flex-wrap">
               {[
@@ -434,18 +686,66 @@ export const GTSoundDesigner: React.FC = () => {
             </div>
           </div>
 
-          {/* Filter (placeholder — shows current state) */}
+          {/* Filter — cutoff draw + mode/resonance */}
           <div className={`rounded-lg border p-3 ${panelBg}`}>
             <SectionLabel label="Filter" color={TABLE_COLORS.filter} />
-            <div className="text-[9px] text-text-secondary text-center py-4">
-              {inst?.filterPtr ? (
-                <span>Filter table at ${(inst.filterPtr).toString(16).toUpperCase().padStart(2, '0')}</span>
-              ) : (
-                'No filter table assigned'
-              )}
+            {/* Mode selector */}
+            <div className="flex gap-1 mb-2">
+              {['LP', 'BP', 'HP'].map(mode => (
+                <button key={mode}
+                  className="px-3 py-1 text-[9px] font-mono rounded"
+                  style={{
+                    color: TABLE_COLORS.filter,
+                    border: `1px solid ${TABLE_COLORS.filter}40`,
+                    background: '#111',
+                  }}>
+                  {mode}
+                </button>
+              ))}
+              <div className="flex items-center gap-1 ml-auto">
+                <span className="text-[8px] text-text-secondary">Res</span>
+                <input type="range" min={0} max={15} defaultValue={8}
+                  style={{ width: 60, accentColor: TABLE_COLORS.filter }} />
+              </div>
             </div>
-            <div className="text-[8px] text-text-secondary opacity-60 text-center">
-              Visual filter editor coming soon — use Tables tab for now
+            {/* Cutoff draw canvas */}
+            <FilterDrawCanvas
+              filterSteps={filterSteps}
+              color={TABLE_COLORS.filter}
+              onDraw={(values) => {
+                if (!engine || !inst?.filterPtr) return;
+                const steps = valuesToFilterSteps(values);
+                const { left, right } = encodeFilterSequence(steps);
+                const ptr = inst.filterPtr - 1;
+                for (let i = 0; i < left.length; i++) {
+                  engine.setTableEntry(2, 0, ptr + i, left[i]);
+                  engine.setTableEntry(2, 1, ptr + i, right[i]);
+                }
+                useGTUltraStore.getState().refreshAllTables();
+              }}
+            />
+            {/* Filter presets */}
+            <div className="flex gap-1 mt-2 flex-wrap">
+              {[
+                { label: 'Sweep ↓', steps: [{ type: 'set' as const, value: 0x90, param: 0xFF }, { type: 'mod' as const, value: 64, param: 0xFC }] },
+                { label: 'Sweep ↑', steps: [{ type: 'set' as const, value: 0x90, param: 0x20 }, { type: 'mod' as const, value: 64, param: 0x04 }] },
+                { label: 'Wah', steps: [{ type: 'set' as const, value: 0x90, param: 0x40 }, { type: 'mod' as const, value: 16, param: 0x08 }, { type: 'mod' as const, value: 16, param: 0xF8 }] },
+              ].map(preset => (
+                <button key={preset.label}
+                  className="px-2 py-0.5 text-[8px] font-mono rounded"
+                  style={{ color: TABLE_COLORS.filter, border: `1px solid ${TABLE_COLORS.filter}40` }}
+                  onClick={() => {
+                    if (!engine || !inst?.filterPtr) return;
+                    const { left, right } = encodeFilterSequence(preset.steps);
+                    const ptr = inst.filterPtr - 1;
+                    for (let i = 0; i < left.length; i++) {
+                      engine.setTableEntry(2, 0, ptr + i, left[i]);
+                      engine.setTableEntry(2, 1, ptr + i, right[i]);
+                    }
+                    useGTUltraStore.getState().refreshAllTables();
+                  }}
+                >{preset.label}</button>
+              ))}
             </div>
           </div>
         </div>
@@ -453,34 +753,29 @@ export const GTSoundDesigner: React.FC = () => {
         {/* ════ Column 3: Arpeggio + Settings ════ */}
         <div className="flex flex-col gap-3">
 
-          {/* Arpeggio Quick Chords */}
+          {/* Arpeggio — step grid + chord presets */}
           <div className={`rounded-lg border p-3 ${panelBg}`}>
             <SectionLabel label="Arpeggio" color={TABLE_COLORS.speed} />
-            <div className="flex gap-1 flex-wrap">
+            <ArpGrid color={TABLE_COLORS.speed} />
+            <div className="flex gap-1 mt-2 flex-wrap">
               {ARP_CHORDS.map(chord => (
                 <button key={chord.label}
-                  className="px-2.5 py-1 text-[9px] font-mono rounded"
+                  className="px-2 py-0.5 text-[8px] font-mono rounded"
                   style={{ color: TABLE_COLORS.speed, border: `1px solid ${TABLE_COLORS.speed}40` }}
                   onClick={() => {
                     if (!engine || !inst?.speedPtr) return;
-                    // Write arpeggio pattern: each semitone as a speed table entry
                     const ptr = inst.speedPtr - 1;
                     for (let i = 0; i < chord.semitones.length; i++) {
-                      // Speed table: left=0 for arp, right=semitone offset
                       engine.setTableEntry(3, 0, ptr + i, 0);
                       engine.setTableEntry(3, 1, ptr + i, chord.semitones[i]);
                     }
+                    // End marker
+                    engine.setTableEntry(3, 0, ptr + chord.semitones.length, 0xFF);
+                    engine.setTableEntry(3, 1, ptr + chord.semitones.length, ptr + 1); // loop back
                     useGTUltraStore.getState().refreshAllTables();
                   }}
-                >{chord.label} ({chord.semitones.join(',')})</button>
+                >{chord.label}</button>
               ))}
-            </div>
-            <div className="text-[9px] text-text-secondary mt-2">
-              {inst?.speedPtr ? (
-                <span>Speed table at ${(inst.speedPtr).toString(16).toUpperCase().padStart(2, '0')}</span>
-              ) : (
-                'No speed table assigned'
-              )}
             </div>
           </div>
 
