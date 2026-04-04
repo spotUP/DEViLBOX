@@ -213,16 +213,19 @@ class SfizzProcessor extends AudioWorkletProcessor {
     const pathStr = virtualPath || '/virtual.sfz';
     const pathPtr = this.module._malloc(pathStr.length + 1);
 
+    // Re-read HEAPU8 after malloc — heap may have grown, invalidating old view
+    const heap = new Uint8Array(this.module.wasmMemory.buffer);
+
     // Write strings to WASM heap
     for (let i = 0; i < sfzText.length; i++) {
-      this.module.HEAPU8[textPtr + i] = sfzText.charCodeAt(i);
+      heap[textPtr + i] = sfzText.charCodeAt(i);
     }
-    this.module.HEAPU8[textPtr + sfzText.length] = 0;
+    heap[textPtr + sfzText.length] = 0;
 
     for (let i = 0; i < pathStr.length; i++) {
-      this.module.HEAPU8[pathPtr + i] = pathStr.charCodeAt(i);
+      heap[pathPtr + i] = pathStr.charCodeAt(i);
     }
-    this.module.HEAPU8[pathPtr + pathStr.length] = 0;
+    heap[pathPtr + pathStr.length] = 0;
 
     const ok = this.module._sfizz_bridge_load_string(this.engine, textPtr, pathPtr);
     this.module._free(textPtr);
@@ -240,10 +243,11 @@ class SfizzProcessor extends AudioWorkletProcessor {
   loadSfzFile(path) {
     if (!this.engine || !this.module) return;
     const pathPtr = this.module._malloc(path.length + 1);
+    const heap = new Uint8Array(this.module.wasmMemory.buffer);
     for (let i = 0; i < path.length; i++) {
-      this.module.HEAPU8[pathPtr + i] = path.charCodeAt(i);
+      heap[pathPtr + i] = path.charCodeAt(i);
     }
-    this.module.HEAPU8[pathPtr + path.length] = 0;
+    heap[pathPtr + path.length] = 0;
 
     const ok = this.module._sfizz_bridge_load_file(this.engine, pathPtr);
     this.module._free(pathPtr);
