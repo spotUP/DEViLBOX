@@ -349,31 +349,34 @@ export const GTUltraControls: React.FC<GTUltraControlsProps> = ({
   }, []);
 
   const renderTablesTab = () => (
-    <div className="flex flex-col gap-2 p-2 overflow-y-auto" style={{ maxHeight: 'calc(100vh - 280px)' }}>
-      {TABLE_DEFS.map((td, i) => {
-        const ptr = config[td.ptrKey] ?? 0;
-        return (
-          <div key={td.key} className="rounded border" style={{ borderColor: td.color + '40' }}>
-            <div className="flex items-center gap-2 px-2 py-1" style={{ background: '#060a08' }}>
-              <span className="text-[10px] font-bold uppercase" style={{ color: td.color }}>{td.label}</span>
-              <span className="text-[9px] font-mono" style={{ color: td.color, opacity: 0.7 }}>Ptr: ${hex2(ptr)}</span>
+    <div className="flex flex-col h-full">
+      {/* 4 tables side by side */}
+      <div className="flex flex-1 min-h-0 gap-px" style={{ background: '#111' }}>
+        {TABLE_DEFS.map((td, i) => {
+          const ptr = config[td.ptrKey] ?? 0;
+          return (
+            <div key={td.key} className="flex flex-col flex-1 min-w-0">
+              <div className="flex items-center gap-1 px-1 py-0.5" style={{ background: '#060a08' }}>
+                <span className="text-[9px] font-bold uppercase" style={{ color: td.color }}>{td.label}</span>
+                <span className="text-[8px] font-mono" style={{ color: td.color, opacity: 0.6 }}>${hex2(ptr)}</span>
+              </div>
+              <div style={{ flex: 1, minHeight: 0 }}>
+                <PatternEditorCanvas
+                  formatColumns={td.cols}
+                  formatChannels={[allTableChannels[i]]}
+                  formatCurrentRow={ptr}
+                  formatIsPlaying={false}
+                  onFormatCellChange={makeTableCellChange(i)}
+                  hideVUMeters={true}
+                />
+              </div>
             </div>
-            <div style={{ height: 180 }}>
-              <PatternEditorCanvas
-                formatColumns={td.cols}
-                formatChannels={[allTableChannels[i]]}
-                formatCurrentRow={ptr}
-                formatIsPlaying={false}
-                onFormatCellChange={makeTableCellChange(i)}
-                hideVUMeters={true}
-              />
-            </div>
-          </div>
-        );
-      })}
+          );
+        })}
+      </div>
 
       {/* Command reference */}
-      <div className="px-2 py-1">
+      <div className="px-2 py-1 border-t" style={{ borderColor: dimColor }}>
         <button className="text-[9px] font-mono w-full text-left" style={{ color: '#666' }}
           onClick={() => setShowTableRef(!showTableRef)}>
           {showTableRef ? '[-]' : '[+]'} Wave Table Commands
