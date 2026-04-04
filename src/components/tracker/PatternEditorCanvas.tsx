@@ -266,7 +266,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
   const LNW = mobileCanvas ? M_LINE_NUMBER_WIDTH : LINE_NUMBER_WIDTH;
 
   // Channel Metrics: calculate numChannels, offsets, and widths once per pattern/theme change
-  const { numChannels, channelOffsets, channelWidths, totalChannelsWidth } = useMemo(() => {
+  const { numChannels, channelOffsets: rawChannelOffsets, channelWidths, totalChannelsWidth } = useMemo(() => {
     // FORMAT MODE: compute widths from column definitions (per-channel columns supported)
     if (isFormatMode && formatColumns && formatChannels) {
       const FORMAT_COL_GAP  = mobileCanvas ? Math.round(4 * MOBILE_SCALE) : 4;
@@ -350,6 +350,20 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
       totalChannelsWidth: currentX - LNW
     };
   }, [pattern, instruments, columnVisibility, isFormatMode, formatColumns, formatChannels, mobileCanvas, CW, LNW, showAutomationLanes, channelLaneCounts]);
+
+  // Center channels horizontally when in fullscreen and channels don't fill the viewport
+  const editorFullscreen = useUIStore(s => s.editorFullscreen);
+  const centerPadding = useMemo(() => {
+    if (!editorFullscreen || numChannels === 0) return 0;
+    const usedWidth = LNW + totalChannelsWidth;
+    if (usedWidth >= dimensions.width) return 0;
+    return Math.floor((dimensions.width - usedWidth) / 2);
+  }, [editorFullscreen, totalChannelsWidth, dimensions.width, numChannels, LNW]);
+
+  const channelOffsets = useMemo(() => {
+    if (centerPadding === 0) return rawChannelOffsets;
+    return rawChannelOffsets.map(x => x + centerPadding);
+  }, [rawChannelOffsets, centerPadding]);
 
   // Keep channelOffsetsRef/channelWidthsRef in sync for the RAF loop (selection math)
   useEffect(() => {

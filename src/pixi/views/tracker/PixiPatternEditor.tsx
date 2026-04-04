@@ -683,10 +683,20 @@ export const PixiPatternEditor: React.FC<PixiPatternEditorProps> = ({ width, hei
     peerSelectionRef,
     bdAnimations,
     numChannels,
-    channelOffsets,
+    channelOffsets: rawChannelOffsets,
     channelWidths,
     totalChannelsWidth,
   } = usePatternEditor();
+
+  // Center channels when in fullscreen and they don't fill the viewport
+  const editorFullscreen = useUIStore(s => s.editorFullscreen);
+  const channelOffsets = useMemo(() => {
+    if (!editorFullscreen || numChannels === 0) return rawChannelOffsets;
+    const usedWidth = LINE_NUMBER_WIDTH + totalChannelsWidth;
+    if (usedWidth >= width) return rawChannelOffsets;
+    const pad = Math.floor((width - usedWidth) / 2);
+    return rawChannelOffsets.map(x => x + pad);
+  }, [editorFullscreen, rawChannelOffsets, totalChannelsWidth, width, numChannels]);
 
   const useHex = useUIStore(s => s.useHexNumbers);
   const blankEmpty = useUIStore(s => s.blankEmptyCells);
