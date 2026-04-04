@@ -5,11 +5,11 @@
  * a cell change handler. Used by DOM (TrackerView) and can be used by Pixi.
  */
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { useTrackerStore, useFormatStore } from '@stores';
 import { useTransportStore } from '@stores/useTransportStore';
 import { useWasmPositionStore } from '@/stores/useWasmPositionStore';
-import { setFormatPlaybackRow, setFormatPlaybackPlaying } from '@/engine/FormatPlaybackState';
+// FormatPlaybackState not used — each channel has its own PatternEditorCanvas prop
 import { musiclineToFormatChannels, musiclineToFormatChannelsPerChannel, makeMusicLineCellChange } from './musiclineAdapter';
 import type { FormatChannel, OnCellChange } from '@/components/shared/format-editor-types';
 
@@ -86,16 +86,10 @@ export function useMusicLineFormatData(): MusicLineFormatData {
   const clampedRow = Math.min(wasmActive ? followRow : currentRow, maxRow);
   const displayRow = isPlaying ? clampedRow : 0;
 
-  // Drive FormatPlaybackState for scroll in the pattern editor.
-  // Only drive when followMode=1 (follow pattern). Mode 0 = no follow, mode 2 = tune follow (handled separately).
-  useEffect(() => {
-    setFormatPlaybackPlaying(isPlaying && followMode === 1);
-    return () => setFormatPlaybackPlaying(false);
-  }, [isPlaying, followMode]);
-
-  useEffect(() => {
-    if (isPlaying && followMode === 1) setFormatPlaybackRow(clampedRow);
-  }, [isPlaying, followMode, clampedRow]);
+  // NOTE: We do NOT drive FormatPlaybackState for MusicLine.
+  // Each channel has its own PatternEditorCanvas with independent formatCurrentRow
+  // props. FormatPlaybackState is a global singleton that would cause the selected
+  // channel's smooth offset to visually advance it ahead of the others.
 
   // Build per-channel row array, clamped to each channel's pattern length
   const perChannelRows = useMemo(() => {

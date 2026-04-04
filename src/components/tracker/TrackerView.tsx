@@ -39,7 +39,7 @@ import { TB303View } from '@components/demo/TB303View';
 import { MobileTrackerView } from './MobileTrackerView';
 import { useResponsive } from '@hooks/useResponsive';
 import { useMIDIFeedback } from '@hooks/useMIDIFeedback';
-import { Music2, Activity, ExternalLink, Undo2 } from 'lucide-react';
+import { Music2, Activity, ExternalLink, Undo2, Maximize2, Minimize2 } from 'lucide-react';
 import { PopOutWindow } from '@components/ui/PopOutWindow';
 import { InstrumentList } from '@components/instruments/InstrumentList';
 import { getTrackerReplayer } from '@engine/TrackerReplayer';
@@ -199,6 +199,18 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
   const closeDialogCommand = useUIStore((state) => state.closeDialogCommand);
   const patternEditorPoppedOut = useUIStore((state) => state.patternEditorPoppedOut);
   const setPatternEditorPoppedOut = useUIStore((state) => state.setPatternEditorPoppedOut);
+  const editorFullscreen = useUIStore((state) => state.editorFullscreen);
+  const toggleEditorFullscreen = useUIStore((state) => state.toggleEditorFullscreen);
+
+  // Escape exits editor fullscreen mode
+  useEffect(() => {
+    if (!editorFullscreen) return;
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') { toggleEditorFullscreen(); e.preventDefault(); }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [editorFullscreen, toggleEditorFullscreen]);
 
   // Import handlers (extracted to hook)
   const { handleModuleImport, handleSunVoxImport } = useModuleImport();
@@ -525,29 +537,42 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
     </div>
   ) : (
     <div className="flex-1 min-h-0 flex flex-col bg-dark-bg overflow-y-hidden">
-      {/* FT2 Style Toolbar (shrinkable when space is limited) */}
-      <div className="flex-shrink min-h-[80px]">
-        <FT2Toolbar
-          onShowExport={onShowExport}
-          onShowHelp={onShowHelp}
-          onShowMasterFX={onShowMasterFX}
-          onShowInstrumentFX={onShowInstrumentFX}
-          onShowInstruments={onShowInstruments}
-          onShowPatternOrder={() => setShowPatternOrder(true)}
-          onShowDrumpads={onShowDrumpads}
-          showMasterFX={showMasterFX}
-          showInstrumentFX={showInstrumentFX}
-        />
-      </div>
+      {/* FT2 Style Toolbar (hidden in editor fullscreen mode) */}
+      {!editorFullscreen && (
+        <div className="flex-shrink min-h-[80px]">
+          <FT2Toolbar
+            onShowExport={onShowExport}
+            onShowHelp={onShowHelp}
+            onShowMasterFX={onShowMasterFX}
+            onShowInstrumentFX={onShowInstrumentFX}
+            onShowInstruments={onShowInstruments}
+            onShowPatternOrder={() => setShowPatternOrder(true)}
+            onShowDrumpads={onShowDrumpads}
+            showMasterFX={showMasterFX}
+            showInstrumentFX={showInstrumentFX}
+          />
+        </div>
+      )}
 
-      {/* Instrument Knob Panel - follows cursor channel, adapts to synth type */}
-      {viewMode !== 'tb303' && (
+      {/* Instrument Knob Panel (hidden in editor fullscreen mode) */}
+      {!editorFullscreen && viewMode !== 'tb303' && (
         <div className="flex-shrink-0">
           <InstrumentKnobPanel />
         </div>
       )}
 
-      {/* Editor Controls Toolbar - Compact & Shrinkable */}
+      {/* Editor Controls Toolbar (minimal in fullscreen — just an exit button) */}
+      {editorFullscreen ? (
+        <div className="flex items-center h-5 px-2 bg-dark-bgSecondary border-b border-dark-border">
+          <button
+            onClick={toggleEditorFullscreen}
+            className="text-text-muted hover:text-text-primary text-xs"
+            title="Exit editor fullscreen (Esc)"
+          >
+            Exit Fullscreen
+          </button>
+        </div>
+      ) : (
       <EditorControlsBar
         viewMode={viewMode}
         onViewModeChange={setViewMode}
@@ -558,6 +583,7 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
         onShowAutomation={() => setShowAutomation(true)}
         onShowDrumpads={onShowDrumpads}
       />
+      )}
 
       {/* Main Content Area with Pattern Editor and Instrument Panel - Flexbox Layout */}
       <div className="flex-1 min-h-0 min-w-0 relative z-10 flex overflow-hidden">
@@ -630,7 +656,7 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
                     {mlFormatData.channels.map((ch, chIdx) => (
                       <div
                         key={chIdx}
-                        className={`flex-1 min-w-0 overflow-hidden cursor-pointer ${chIdx === mlFormatData.selectedChannel ? 'border-t-2 border-t-accent-primary' : 'border-t-2 border-t-transparent'}`}
+                        className={`flex-1 min-w-0 overflow-hidden cursor-pointer ${chIdx === mlFormatData.selectedChannel ? 'border-t-2 border-t-accent-primary/40 bg-accent-primary/5' : 'border-t-2 border-t-transparent'}`}
                         style={{ borderRight: chIdx < mlFormatData.channels.length - 1 ? '1px solid var(--color-border)' : undefined }}
                         onClick={() => mlFormatData.setSelectedChannel(chIdx)}
                       >
@@ -714,19 +740,43 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
                 return (
                   <div className="relative flex-1 min-h-0 flex flex-col">
                     {editorContent}
-                    <button
-                      className="absolute bottom-1 right-1 z-[99990] p-1 rounded bg-dark-bg/80 hover:bg-dark-bgTertiary text-text-muted hover:text-accent-primary border border-dark-border/50 transition-colors"
-                      onClick={() => setPatternEditorPoppedOut(true)}
-                      title="Pop out editor to separate window"
-                    >
-                      <ExternalLink size={14} />
-                    </button>
+                    <div className="absolute bottom-1 right-1 z-[99990] flex gap-1">
+                      <button
+                        className="p-1 rounded bg-dark-bg/80 hover:bg-dark-bgTertiary text-text-muted hover:text-accent-primary border border-dark-border/50 transition-colors"
+                        onClick={toggleEditorFullscreen}
+                        title={editorFullscreen ? 'Exit fullscreen (Esc)' : 'Fullscreen editor'}
+                      >
+                        {editorFullscreen ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
+                      </button>
+                      {!editorFullscreen && (
+                        <button
+                          className="p-1 rounded bg-dark-bg/80 hover:bg-dark-bgTertiary text-text-muted hover:text-accent-primary border border-dark-border/50 transition-colors"
+                          onClick={() => setPatternEditorPoppedOut(true)}
+                          title="Pop out editor to separate window"
+                        >
+                          <ExternalLink size={14} />
+                        </button>
+                      )}
+                    </div>
                   </div>
                 );
               }
 
-              // Standard format (PatternEditorCanvas)
-              return editorContent;
+              // Standard format (PatternEditorCanvas) — with fullscreen button
+              return (
+                <div className="relative flex-1 min-h-0 flex flex-col">
+                  {editorContent}
+                  <div className="absolute bottom-1 right-1 z-[99990]">
+                    <button
+                      className="p-1 rounded bg-dark-bg/80 hover:bg-dark-bgTertiary text-text-muted hover:text-accent-primary border border-dark-border/50 transition-colors"
+                      onClick={toggleEditorFullscreen}
+                      title={editorFullscreen ? 'Exit fullscreen (Esc)' : 'Fullscreen editor'}
+                    >
+                      {editorFullscreen ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
+                    </button>
+                  </div>
+                </div>
+              );
             })()
           ) : viewMode === 'grid' ? (
             <GridSequencer channelIndex={gridChannelIndex} />
@@ -763,18 +813,20 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
           })()}
         </div>
 
-        {/* Pattern Minimap - Flex item 2 */}
-        {viewMode === 'tracker' && (
+        {/* Pattern Minimap - Flex item 2 (hidden in fullscreen) */}
+        {!editorFullscreen && viewMode === 'tracker' && (
           <MinimapWrapper />
         )}
 
-        {/* DJ Pitch Slider - Flex item 3 */}
-        <div className="flex-shrink-0 self-stretch border-l border-ft2-border bg-ft2-header">
-          <DJPitchSlider className="h-full" />
-        </div>
+        {/* DJ Pitch Slider - Flex item 3 (hidden in fullscreen) */}
+        {!editorFullscreen && (
+          <div className="flex-shrink-0 self-stretch border-l border-ft2-border bg-ft2-header">
+            <DJPitchSlider className="h-full" />
+          </div>
+        )}
 
-        {/* Instrument Panel Toggle Button - Flex item 3 - Hide on narrow windows */}
-        {windowWidth >= 900 && (
+        {/* Instrument Panel Toggle Button - Flex item 3 - Hide on narrow windows and in fullscreen */}
+        {!editorFullscreen && windowWidth >= 900 && (
           <button
             onClick={() => setShowInstrumentPanel(!showInstrumentPanel)}
             className={`
@@ -789,8 +841,8 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
           </button>
         )}
 
-        {/* Instrument List Panel - Flex item 3 - Hide on narrow windows */}
-        {windowWidth >= 900 && showInstrumentPanel && (
+        {/* Instrument List Panel - Flex item 3 - Hide on narrow windows and in fullscreen */}
+        {!editorFullscreen && windowWidth >= 900 && showInstrumentPanel && (
           <div className="flex-shrink-0 w-fit min-w-48 max-w-80 border-l border-ft2-border flex flex-col overflow-hidden animate-fade-in">
             <InstrumentList
               variant="ft2"
