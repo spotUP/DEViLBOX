@@ -25,6 +25,8 @@ import { StereoSeparationNode } from './StereoSeparationNode';
 // getNativeAudioNode used in audio-context utilities
 import { getPatternScheduler } from './PatternScheduler';
 import { getAutomationPlayer } from './AutomationPlayer';
+import { getAutomationCapture } from './automation/AutomationCapture';
+import { decodePaulaRegister } from './automation/decoders/PaulaRegisterDecoder';
 import { useTransportStore, cancelPendingRowUpdate } from '@/stores/useTransportStore';
 import { useAutomationStore } from '@/stores/useAutomationStore';
 import { useCursorStore } from '@/stores/useCursorStore';
@@ -533,6 +535,7 @@ export class TrackerReplayer {
   private _hvlPositionUnsub: (() => void) | null = null;
   private _mlPositionUnsub: (() => void) | null = null;
   private _uadePositionUnsub: (() => void) | null = null;
+  private _uadePaulaLogInterval: number | null = null;
   private _tfmxChannelUnsub: (() => void) | null = null;
 
   /** Get the active C64 SID engine (for subsong switching etc.) */
@@ -1481,6 +1484,27 @@ export class TrackerReplayer {
           }
         });
         _playLog('UADE position subscription active');
+
+        // Enable Paula register logging for automation capture
+        result.uadeEngine.enablePaulaLog(true);
+        this._uadePaulaLogInterval = window.setInterval(async () => {
+          if (!this.playing) return;
+          try {
+            const entries = await result.uadeEngine!.getPaulaLog();
+            const capture = getAutomationCapture();
+            for (const entry of entries) {
+              const decoded = decodePaulaRegister(entry.channel, entry.reg, entry.value);
+              for (const d of decoded) {
+                capture.push(d.paramId, entry.tick, d.value, {
+                  type: 'effect',
+                  row: Math.floor((entry.tick - firstTick) / speed),
+                  channel: entry.channel,
+                  effectCol: 0,
+                });
+              }
+            }
+          } catch { /* ignore errors during shutdown */ }
+        }, 100); // Poll 10x/sec
       }
 
       // TFMX: use timing table + onChannelData for position sync
@@ -1899,6 +1923,11 @@ export class TrackerReplayer {
     if (this._uadePositionUnsub) {
       this._uadePositionUnsub();
       this._uadePositionUnsub = null;
+    }
+    // Clean up UADE Paula log polling
+    if (this._uadePaulaLogInterval != null) {
+      clearInterval(this._uadePaulaLogInterval);
+      this._uadePaulaLogInterval = null;
     }
 
     // Clean up TFMX channel subscription

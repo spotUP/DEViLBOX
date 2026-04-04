@@ -709,13 +709,14 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
             </div>
           )}
 
-          {/* Automation Lane Strip — for Furnace format */}
-          {editorMode === 'furnace' && (() => {
+          {/* Automation Lane Strip — for Furnace and UADE (classic) formats */}
+          {(editorMode === 'furnace' || editorMode === 'classic') && (() => {
+            const fmt = editorMode === 'furnace' ? 'furnace' as const : 'uade' as const;
             const ps = getFormatPlaybackState();
             const pat = patterns[currentPatternIndex];
             return (
               <AutomationLaneStrip
-                format="furnace"
+                format={fmt}
                 patternId={pat?.id ?? '0'}
                 patternLength={pat?.length ?? 64}
                 currentRow={ps.row}
