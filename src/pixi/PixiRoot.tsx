@@ -80,6 +80,7 @@ import { PixiEditInstrumentModal } from './dialogs/PixiEditInstrumentModal';
 import { PixiMasterEffectsModal } from './dialogs/PixiMasterEffectsModal';
 import { PixiInstrumentEffectsModal } from './dialogs/PixiInstrumentEffectsModal';
 import { PixiNonEditableDialog } from './dialogs/PixiNonEditableDialog';
+import { PixiAddToHomeScreenModal } from './dialogs/PixiAddToHomeScreenModal';
 import { PixiAIPanel } from './dialogs/PixiAIPanel';
 import { PixiPatternBarEditor } from './dialogs/PixiPatternBarEditor';
 import { clearExplicitlySaved } from '@hooks/useProjectPersistence';
@@ -488,6 +489,7 @@ export const PixiRoot: React.FC = () => {
         <PixiNonEditableDialog />
         <PixiArrangementContextMenu />
         <PixiPatternBarEditor isOpen={modalOpen === 'parameterEditor'} onClose={closeModal} />
+        <PixiAddToHomeScreenModal isOpen={modalOpen === 'addToHomeScreen'} onClose={closeModal} />
         <PixiAIPanel />
       </pixiContainer>
 

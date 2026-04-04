@@ -715,6 +715,21 @@ export const PixiSettingsModal: React.FC<PixiSettingsModalProps> = ({ isOpen, on
             {KEYBOARD_SCHEMES.find(k => k.id === s.activeScheme)?.description || 'Select a tracker layout'}
           </Txt>
 
+          {s.activeScheme === 'custom' && (
+            <Div className="flex-col gap-1" layout={{ width: CONTENT_W, paddingTop: 4, paddingBottom: 4, paddingLeft: 8, paddingRight: 8 }}>
+              <Txt className="text-[9px] font-mono text-text-muted">
+                Custom keybindings are configured via ~/.claude/keybindings.json
+              </Txt>
+              <PixiButton
+                label="View All Shortcuts"
+                variant="default"
+                size="sm"
+                onClick={() => { onClose(); useUIStore.getState().openModal('help', { initialTab: 'shortcuts' }); }}
+                layout={{ width: 140 }}
+              />
+            </Div>
+          )}
+
           <SettingRow label="Platform:" description="Override Cmd/Ctrl detection">
             <PixiSelect
               options={PLATFORM_OPTIONS}

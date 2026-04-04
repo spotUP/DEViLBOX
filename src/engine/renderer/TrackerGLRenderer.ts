@@ -238,6 +238,7 @@ export class TrackerGLRenderer {
     lineNumber:          [0,0,0,1] as [number,number,number,number],
     lineNumberHighlight: [0,0,0,1] as [number,number,number,number],
     selection:           [0,0,0,1] as [number,number,number,number],
+    bookmark:            [0.961, 0.620, 0.044, 1.0] as [number,number,number,number],
     accent:              [0,0,0,1] as [number,number,number,number],
     flagAccent:          [0.961, 0.620, 0.044, 1.0] as [number,number,number,number],
     flagSlide:           [0.024, 0.714, 0.831, 1.0] as [number,number,number,number],
@@ -431,6 +432,7 @@ export class TrackerGLRenderer {
       this.colors.lineNumber          = parseColor(theme.lineNumber);
       this.colors.lineNumberHighlight = parseColor(theme.lineNumberHighlight);
       this.colors.selection           = parseRgba(theme.selection);
+      this.colors.bookmark            = parseColor(theme.bookmark || '#f59e0b');
       this.colors.accent              = parseColor(theme.accent);
     }
     const colors = this.colors;
@@ -548,6 +550,18 @@ export class TrackerGLRenderer {
         const bgColor = isHL2 ? colors.rowSecondaryHighlight : isHL ? colors.rowHighlight : colors.rowNormal;
         const alpha = isGhostRow ? bgColor[3] * 0.35 : bgColor[3];
         this.addRect(0, y, width, rowH, [bgColor[0], bgColor[1], bgColor[2], alpha]);
+      }
+    }
+
+    // Bookmark indicators — small colored bar at left edge of gutter
+    if (ui.bookmarks && ui.bookmarks.length > 0) {
+      const bmColor = colors.bookmark;
+      for (const bm of ui.bookmarks) {
+        if (bm < vStart || bm >= visibleEnd) continue;
+        if (bm < 0 || bm >= pattern.length) continue;
+        const y = baseY + (bm - vStart) * rowH;
+        if (y + rowH < 0 || y > height) continue;
+        this.addRect(0, y, 3, rowH, [bmColor[0], bmColor[1], bmColor[2], 0.9]);
       }
     }
 

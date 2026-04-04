@@ -26,6 +26,7 @@ export interface ThemeSnapshot {
   lineNumber: string;
   lineNumberHighlight: string;
   selection: string;
+  bookmark: string;
 }
 
 // ─── Pattern data snapshot (serializable) ────────────────────────────────────
@@ -111,6 +112,7 @@ export interface UIStateSnapshot {
   showBeatLabels: boolean;     // Show beat.tick format in line number gutter
   noteDisplayOffset: number;   // Semitones to add to note for display (e.g. -12 for MOD)
   columns?: ColumnSpec[];      // When present, renderer uses column-driven path instead of fixed Note/Inst/Vol/Eff
+  bookmarks: number[];         // Sorted bookmarked row indices
 }
 
 // ─── Column specification ────────────────────────────────────────────────────
