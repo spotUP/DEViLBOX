@@ -52,6 +52,8 @@ export interface GTPlaybackPosition {
   row: number;
   position: number;  // alias for songPos (order list position)
   songPos: number;
+  /** Packed table positions per voice: wave | (pulse << 8) | (filter << 16) */
+  tablePositions?: number[];
 }
 
 export interface GTInstrumentView {
