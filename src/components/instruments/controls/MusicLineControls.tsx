@@ -296,7 +296,8 @@ export const MusicLineControls: React.FC<MusicLineControlsProps> = ({ instrument
     }
 
     setFields((prev) => {
-      const next = { ...prev!, [fieldName]: value };
+      if (!prev) return prev;
+      const next = { ...prev, [fieldName]: value };
       fieldsRef.current = next;
       return next;
     });
