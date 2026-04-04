@@ -338,6 +338,12 @@ class MusicLineProcessor extends AudioWorkletProcessor {
       this.playing = false;
       this._resampPos = 0.0;
 
+      // Pre-allocate per-channel buffers for position reporting (reused in process())
+      this._prevChRows = new Array(this.numChannels).fill(-1);
+      this._prevChPos = new Array(this.numChannels).fill(-1);
+      this._channelRowsBuf = new Array(this.numChannels);
+      this._channelPosBuf = new Array(this.numChannels);
+
       const title  = this.wasm.UTF8ToString(this.wasm._ml_get_title());
       const author = this.wasm.UTF8ToString(this.wasm._ml_get_author());
       const subsongs = this.wasm._ml_get_subsong_count();
@@ -490,13 +496,15 @@ class MusicLineProcessor extends AudioWorkletProcessor {
       const numCh = this.numChannels || 0;
       let changed = false;
 
-      if (!this._prevChRows) {
+      if (!this._prevChRows || this._prevChRows.length !== numCh) {
         this._prevChRows = new Array(numCh).fill(-1);
         this._prevChPos = new Array(numCh).fill(-1);
+        this._channelRowsBuf = new Array(numCh);
+        this._channelPosBuf = new Array(numCh);
       }
 
-      const channelRows = new Array(numCh);
-      const channelPositions = new Array(numCh);
+      const channelRows = this._channelRowsBuf;
+      const channelPositions = this._channelPosBuf;
       for (let ch = 0; ch < numCh; ch++) {
         channelRows[ch] = this.wasm._ml_get_channel_row(ch);
         channelPositions[ch] = this.wasm._ml_get_channel_position(ch);
@@ -506,15 +514,17 @@ class MusicLineProcessor extends AudioWorkletProcessor {
       }
 
       if (changed) {
-        this._prevChRows = channelRows.slice();
-        this._prevChPos = channelPositions.slice();
+        for (let ch = 0; ch < numCh; ch++) {
+          this._prevChRows[ch] = channelRows[ch];
+          this._prevChPos[ch] = channelPositions[ch];
+        }
         this.port.postMessage({
           type: 'position',
           position: this.wasm._ml_get_position(),
           row:      this.wasm._ml_get_row(),
           speed:    this.wasm._ml_get_speed(),
-          channelRows,
-          channelPositions,
+          channelRows: channelRows.slice(),
+          channelPositions: channelPositions.slice(),
         });
       }
     }

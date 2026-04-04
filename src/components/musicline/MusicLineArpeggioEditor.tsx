@@ -214,7 +214,7 @@ export const MusicLineArpeggioEditor: React.FC<MusicLineArpeggioEditorProps> = (
       setHexBuffer('');
       return;
     }
-    if (e.key === 'ArrowRight' || e.key === 'Tab') {
+    if (e.key === 'ArrowRight' || (e.key === 'Tab' && !e.shiftKey)) {
       e.preventDefault();
       setSelCol((c) => Math.min(c + 1, COLUMNS.length - 1));
       setHexBuffer('');

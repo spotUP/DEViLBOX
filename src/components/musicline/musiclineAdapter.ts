@@ -150,14 +150,20 @@ const FX_KEYS: Array<[string, string]> = [
 /**
  * Build FormatChannel[] from the TrackerStore pattern data.
  *
+ * When `channelPositions` is provided, each channel uses its own position from
+ * the WASM engine (MusicLine channels advance independently with different
+ * speeds and pattern lengths). Otherwise all channels use `currentPos`.
+ *
  * @param channelTrackTables - per-channel track tables (part index per position)
  * @param patterns - all patterns (parts) from the TrackerStore
- * @param currentPos - current song position index
+ * @param currentPos - current song position index (used when channelPositions is omitted)
+ * @param channelPositions - optional per-channel positions from the WASM engine
  */
 export function musiclineToFormatChannels(
   channelTrackTables: number[][],
   patterns: Pattern[],
   currentPos: number,
+  channelPositions?: number[],
 ): FormatChannel[] {
   const result: FormatChannel[] = [];
 
@@ -166,7 +172,10 @@ export function musiclineToFormatChannels(
   // into empty space when the WASM row counter goes beyond a shorter channel's length.
   let maxRows = 0;
   for (let ch = 0; ch < channelTrackTables.length; ch++) {
-    const entry = channelTrackTables[ch][currentPos] ?? 0;
+    const pos = channelPositions
+      ? Math.min(channelPositions[ch] ?? 0, currentPos)
+      : currentPos;
+    const entry = channelTrackTables[ch][pos] ?? 0;
     // Special commands (END/JUMP/WAIT) have no associated pattern
     if (entry & ML_TRACK_CMD_FLAG) continue;
     const pat = patterns[entry];
@@ -175,7 +184,10 @@ export function musiclineToFormatChannels(
   if (maxRows === 0) maxRows = 128; // fallback if all channels are on special commands
 
   for (let ch = 0; ch < channelTrackTables.length; ch++) {
-    const entry = channelTrackTables[ch][currentPos] ?? 0;
+    const pos = channelPositions
+      ? Math.min(channelPositions[ch] ?? 0, currentPos)
+      : currentPos;
+    const entry = channelTrackTables[ch][pos] ?? 0;
     const isCmd = !!(entry & ML_TRACK_CMD_FLAG);
     const partIdx = isCmd ? 0 : entry;
     const pat = isCmd ? undefined : patterns[partIdx];
@@ -219,6 +231,8 @@ export function musiclineToFormatChannels(
 /**
  * Per-channel variant: each channel uses its own position from the WASM engine.
  * MusicLine channels advance independently with different speeds and pattern lengths.
+ *
+ * @deprecated Use `musiclineToFormatChannels` with `channelPositions` parameter instead.
  */
 export function musiclineToFormatChannelsPerChannel(
   channelTrackTables: number[][],
@@ -226,55 +240,7 @@ export function musiclineToFormatChannelsPerChannel(
   channelPositions: number[],
   maxPos: number,
 ): FormatChannel[] {
-  const result: FormatChannel[] = [];
-
-  // Find max pattern length across all channels (at their individual positions)
-  let maxRows = 0;
-  for (let ch = 0; ch < channelTrackTables.length; ch++) {
-    const pos = Math.min(channelPositions[ch] ?? 0, maxPos);
-    const entry = channelTrackTables[ch][pos] ?? 0;
-    if (entry & ML_TRACK_CMD_FLAG) continue;
-    const pat = patterns[entry];
-    maxRows = Math.max(maxRows, pat?.length ?? 128);
-  }
-  if (maxRows === 0) maxRows = 128;
-
-  for (let ch = 0; ch < channelTrackTables.length; ch++) {
-    const pos = Math.min(channelPositions[ch] ?? 0, maxPos);
-    const entry = channelTrackTables[ch][pos] ?? 0;
-    const isCmd = !!(entry & ML_TRACK_CMD_FLAG);
-    const partIdx = isCmd ? 0 : entry;
-    const pat = isCmd ? undefined : patterns[partIdx];
-    const rows: FormatCell[] = [];
-
-    for (let row = 0; row < maxRows; row++) {
-      const cell = pat?.channels[0]?.rows[row];
-      if (cell) {
-        const cellData = cell as unknown as Record<string, number>;
-        const fxValues: Record<string, number> = {};
-        for (let f = 0; f < FX_KEYS.length; f++) {
-          const typ = cellData[FX_KEYS[f][0]] ?? 0;
-          const par = cellData[FX_KEYS[f][1]] ?? 0;
-          fxValues[`fx${f}`] = typ ? (typ << 8) | par : (par ? par : 0);
-        }
-        rows.push({ note: cell.note ?? 0, instrument: cell.instrument ?? 0, ...fxValues });
-      } else {
-        rows.push({ note: 0, instrument: 0, fx0: 0, fx1: 0, fx2: 0, fx3: 0, fx4: 0 });
-      }
-    }
-
-    const label = isCmd ? `CH${(ch + 1).toString().padStart(2, '0')} ---`
-      : `CH${(ch + 1).toString().padStart(2, '0')} P:${partIdx.toString().padStart(2, '0')}`;
-
-    result.push({
-      label,
-      patternLength: maxRows,
-      rows,
-      isPatternChannel: true,
-    });
-  }
-
-  return result;
+  return musiclineToFormatChannels(channelTrackTables, patterns, maxPos, channelPositions);
 }
 
 // --------------------------------------------------------------------------

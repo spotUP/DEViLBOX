@@ -56,13 +56,12 @@ export const MusicLineTrackTableEditor: React.FC<MusicLineTrackTableEditorProps>
   const wasmSongPos = useWasmPositionStore((s) => s.songPos);
   const wasmActive = useWasmPositionStore((s) => s.active);
 
-  if (!channelTrackTables || channelTrackTables.length === 0) return null;
-
-  const numChannels = channelTrackTables.length;
-  const maxPositions = Math.max(0, ...channelTrackTables.map(t => t.length));
+  const numChannels = channelTrackTables?.length ?? 0;
+  const maxPositions = numChannels > 0
+    ? Math.max(0, ...channelTrackTables!.map(t => t.length))
+    : 0;
 
   // Global column definition (each channel uses the same 3-char column)
-  // eslint-disable-next-line react-hooks/rules-of-hooks
   const formatColumns = useMemo<ColumnDef[]>(() => [{
     key: 'track',
     label: 'Trk',
@@ -76,8 +75,8 @@ export const MusicLineTrackTableEditor: React.FC<MusicLineTrackTableEditorProps>
   }], []);
 
   // Build FormatChannel[] — one per MusicLine channel
-  // eslint-disable-next-line react-hooks/rules-of-hooks
   const formatChannels = useMemo<FormatChannel[]>(() => {
+    if (!channelTrackTables || numChannels === 0) return [];
     const channels: FormatChannel[] = [];
     for (let ch = 0; ch < numChannels; ch++) {
       const rows = [];
@@ -105,11 +104,12 @@ export const MusicLineTrackTableEditor: React.FC<MusicLineTrackTableEditorProps>
     return channels;
   }, [channelTrackTables, numChannels, maxPositions]);
 
-  // eslint-disable-next-line react-hooks/rules-of-hooks
   const handleCellChange = useCallback<OnCellChange>((channelIdx, rowIdx, _columnKey, value) => {
     setTrackEntry(channelIdx, rowIdx, value & 0xFFFF);
     onSeek?.(rowIdx);
   }, [setTrackEntry, onSeek]);
+
+  if (!channelTrackTables || channelTrackTables.length === 0) return null;
 
   return (
     <div style={{ width: '100%', height: 160 }}>
