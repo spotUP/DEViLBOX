@@ -11,10 +11,15 @@
 
 import { getSIDHardwareManager } from '@/lib/sid/SIDHardwareManager';
 import { useGTUltraStore } from '@/stores/useGTUltraStore';
+import { SIDRegisterDecoder } from '../automation/decoders/SIDRegisterDecoder';
+import { getAutomationCapture } from '../automation/AutomationCapture';
+import type { AutomationSourceRef } from '../../types/automation';
 
 export class GTUltraASIDBridge {
   private enabled = false;
   private _writeCount = 0;
+  private sidDecoder = new SIDRegisterDecoder(2);
+  private captureEnabled = true;
 
   /** Total number of register writes sent to hardware */
   getWriteCount(): number { return this._writeCount; }
@@ -75,6 +80,36 @@ export class GTUltraASIDBridge {
   /** Reset all SID registers on hardware. */
   async reset(): Promise<void> {
     await getSIDHardwareManager().resetSID();
+  }
+
+  /** Enable/disable automation capture from SID register writes */
+  enableCapture(enabled: boolean): void {
+    this.captureEnabled = enabled;
+    if (!enabled) {
+      this.sidDecoder.reset();
+    }
+  }
+
+  /** Process a register write for automation capture */
+  captureRegisterWrite(
+    chip: number,
+    reg: number,
+    value: number,
+    tick: number,
+    tableType?: 'wave' | 'pulse' | 'filter',
+    tableIndex?: number,
+  ): void {
+    if (!this.captureEnabled) return;
+
+    const decoded = this.sidDecoder.write(chip, reg, value);
+    const capture = getAutomationCapture();
+    const sourceRef: AutomationSourceRef | undefined = tableType != null && tableIndex != null
+      ? { type: 'table', tableType, tableId: chip, index: tableIndex }
+      : undefined;
+
+    for (const entry of decoded) {
+      capture.push(entry.paramId, tick, entry.value, sourceRef);
+    }
   }
 }
 

@@ -21,7 +21,7 @@ export interface AutomationPoint {
   value: number; // 0-1 normalized
   tension?: number; // 0-1, per-point curve tension (optional override)
   curveType?: InterpolationType; // per-segment interpolation override
-  sourceRef?: AutomationSourceRef; // Reference to the data source that produced this point
+  sourceRef?: AutomationSourceRef;
 }
 
 export interface AutomationCurve {
