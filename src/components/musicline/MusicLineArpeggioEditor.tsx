@@ -121,17 +121,34 @@ export const MusicLineArpeggioEditor: React.FC<MusicLineArpeggioEditorProps> = (
   const gridRef = useRef<HTMLDivElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
 
+  // Default empty table: 128 rows of zeros (matching original MusicLine's 128-row arp tables)
+  const makeEmptyRows = (): MusicLineArpEntry[] =>
+    Array.from({ length: 128 }, () => ({ note: 0, smpl: 0, fx1: 0, param1: 0, fx2: 0, param2: 0 }));
+
   // ── Load number of arp tables on mount ─────────────────────────────────────
 
   useEffect(() => {
-    if (!MusicLineEngine.hasInstance()) return;
-    const engine = MusicLineEngine.getInstance();
-    engine.ready().then(() => {
-      // Use readInstArpConfig with inst 0 just to get numArps
-      engine.readInstArpConfig(0).then((cfg) => {
-        setNumArps(cfg.numArps);
+    let cancelled = false;
+    const timeout = setTimeout(() => {
+      if (!cancelled && numArps === 0) {
+        setNumArps(1); // At least 1 table so the editor is usable
+      }
+    }, 2000);
+
+    if (MusicLineEngine.hasInstance()) {
+      const engine = MusicLineEngine.getInstance();
+      engine.ready().then(() => {
+        engine.readInstArpConfig(0).then((cfg) => {
+          clearTimeout(timeout);
+          if (!cancelled) setNumArps(Math.max(1, cfg.numArps));
+        }).catch(() => {
+          clearTimeout(timeout);
+          if (!cancelled) setNumArps(1);
+        });
       });
-    });
+    }
+
+    return () => { cancelled = true; clearTimeout(timeout); };
   }, []);
 
   // ── Load table data when selectedTable changes ─────────────────────────────
@@ -140,26 +157,53 @@ export const MusicLineArpeggioEditor: React.FC<MusicLineArpeggioEditorProps> = (
     let cancelled = false;
     setLoading(true);
 
+    const timeout = setTimeout(() => {
+      if (!cancelled) {
+        // Timeout: show empty 128-row table so user can create arpeggios
+        setRows(makeEmptyRows());
+        setTableLength(128);
+        setLoading(false);
+        setSelRow(0);
+        setSelCol(0);
+        setHexBuffer('');
+      }
+    }, 2000);
+
     (async () => {
       if (!MusicLineEngine.hasInstance()) {
+        clearTimeout(timeout);
+        setRows(makeEmptyRows());
+        setTableLength(128);
         setLoading(false);
         return;
       }
       const engine = MusicLineEngine.getInstance();
       await engine.ready();
 
-      const data = await engine.readArpTable(selectedTable);
-      if (cancelled) return;
+      try {
+        const data = await engine.readArpTable(selectedTable);
+        clearTimeout(timeout);
+        if (cancelled) return;
 
-      setRows(data.rows);
-      setTableLength(data.length);
+        // If table is empty, show 128 empty rows so user can create content
+        const effectiveRows = data.rows.length > 0 ? data.rows : makeEmptyRows();
+        const effectiveLength = data.length > 0 ? data.length : 128;
+
+        setRows(effectiveRows);
+        setTableLength(effectiveLength);
+      } catch {
+        clearTimeout(timeout);
+        if (cancelled) return;
+        setRows(makeEmptyRows());
+        setTableLength(128);
+      }
       setLoading(false);
       setSelRow(0);
       setSelCol(0);
       setHexBuffer('');
     })();
 
-    return () => { cancelled = true; };
+    return () => { cancelled = true; clearTimeout(timeout); };
   }, [selectedTable]);
 
   // ── Table selector change ──────────────────────────────────────────────────
@@ -294,7 +338,7 @@ export const MusicLineArpeggioEditor: React.FC<MusicLineArpeggioEditorProps> = (
 
   if (loading) {
     return (
-      <div style={{ color: '#4a4a6a', fontSize: 11, padding: 12 }}>
+      <div style={{ color: 'var(--color-text-muted)', fontSize: 11, padding: 12 }}>
         Loading arpeggio data...
       </div>
     );
