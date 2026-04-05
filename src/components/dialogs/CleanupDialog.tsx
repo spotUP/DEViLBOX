@@ -3,7 +3,7 @@
  * and lets the user selectively remove unused instruments, patterns, and loop tails.
  */
 
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Trash2 } from 'lucide-react';
 import { Modal } from '@components/ui/Modal';
 import { ModalHeader } from '@components/ui/ModalHeader';
@@ -48,14 +48,11 @@ export const CleanupDialog: React.FC<CleanupDialogProps> = ({ isOpen, onClose })
   // Selection state — sets of indices/instrumentIds selected for removal
   const [selectedInstruments, setSelectedInstruments] = useState<Set<number>>(new Set());
   const [selectedPatterns, setSelectedPatterns] = useState<Set<number>>(new Set());
-  const [selectedLoopTails, setSelectedLoopTails] = useState<Set<number>>(new Set());
-
   // Reset selections whenever dialog opens
-  useMemo(() => {
+  useEffect(() => {
     if (isOpen) {
       setSelectedInstruments(new Set());
       setSelectedPatterns(new Set());
-      setSelectedLoopTails(new Set());
     }
   }, [isOpen]);
 
@@ -100,24 +97,9 @@ export const CleanupDialog: React.FC<CleanupDialogProps> = ({ isOpen, onClose })
   };
   const deselectAllPatterns = () => setSelectedPatterns(new Set());
 
-  // ── Loop tail helpers ───────────────────────────────────────────────────────
-  const toggleLoopTail = (instrumentIndex: number) => {
-    setSelectedLoopTails((prev) => {
-      const next = new Set(prev);
-      if (next.has(instrumentIndex)) next.delete(instrumentIndex);
-      else next.add(instrumentIndex);
-      return next;
-    });
-  };
-
-  const selectAllLoopTails = () => {
-    setSelectedLoopTails(new Set(report.loopTails.map((t) => t.instrumentIndex)));
-  };
-  const deselectAllLoopTails = () => setSelectedLoopTails(new Set());
-
   // ── Remove selected ─────────────────────────────────────────────────────────
   const totalSelected =
-    selectedInstruments.size + selectedPatterns.size + selectedLoopTails.size;
+    selectedInstruments.size + selectedPatterns.size;
 
   const handleRemoveSelected = () => {
     const instrStore = useInstrumentStore.getState();
@@ -155,9 +137,9 @@ export const CleanupDialog: React.FC<CleanupDialogProps> = ({ isOpen, onClose })
     id: string;
     title: string;
     count: number;
-    onSelectAll: () => void;
-    onDeselectAll: () => void;
-    allSelected: boolean;
+    onSelectAll?: () => void;
+    onDeselectAll?: () => void;
+    allSelected?: boolean;
     informational?: boolean;
   }> = ({ id, title, count, onSelectAll, onDeselectAll, allSelected, informational }) => (
     <div
@@ -169,7 +151,7 @@ export const CleanupDialog: React.FC<CleanupDialogProps> = ({ isOpen, onClose })
         {title}
         <span className="ml-2 text-text-muted font-normal">({count})</span>
       </span>
-      {!informational && count > 0 && (
+      {!informational && count > 0 && onSelectAll && onDeselectAll && (
         <span
           className="text-xs text-accent-primary hover:underline cursor-pointer"
           onClick={(e) => {
@@ -295,12 +277,6 @@ export const CleanupDialog: React.FC<CleanupDialogProps> = ({ isOpen, onClose })
             id="looptails"
             title="Loop Tail Data"
             count={report.loopTails.length}
-            onSelectAll={selectAllLoopTails}
-            onDeselectAll={deselectAllLoopTails}
-            allSelected={
-              report.loopTails.length > 0 &&
-              selectedLoopTails.size === report.loopTails.length
-            }
           />
           {!collapsedSections.has('looptails') && (
             <div className="divide-y divide-dark-border">
@@ -308,20 +284,14 @@ export const CleanupDialog: React.FC<CleanupDialogProps> = ({ isOpen, onClose })
                 <p className="px-3 py-2 text-xs text-text-muted italic">None found</p>
               ) : (
                 <>
-                  <p className="px-3 py-1.5 text-xs text-accent-warning">
-                    Loop tail truncation is not yet implemented — selection is tracked but no data will be removed.
+                  <p className="px-3 py-1.5 text-xs text-text-muted italic">
+                    Informational — automatic loop tail truncation coming soon.
                   </p>
                   {report.loopTails.map((t) => (
-                    <label
+                    <div
                       key={t.instrumentIndex}
-                      className="flex items-center gap-3 px-3 py-1.5 cursor-pointer hover:bg-dark-bgHover transition-colors"
+                      className="flex items-center gap-3 px-3 py-1.5"
                     >
-                      <input
-                        type="checkbox"
-                        checked={selectedLoopTails.has(t.instrumentIndex)}
-                        onChange={() => toggleLoopTail(t.instrumentIndex)}
-                        className="accent-accent-primary"
-                      />
                       <span className="font-mono text-xs text-text-muted w-8 flex-shrink-0">
                         {String(t.instrumentIndex).padStart(2, '0')}
                       </span>
@@ -331,7 +301,7 @@ export const CleanupDialog: React.FC<CleanupDialogProps> = ({ isOpen, onClose })
                       <span className="text-xs text-text-muted flex-shrink-0">
                         {formatBytes(t.tailBytes)} reclaimable
                       </span>
-                    </label>
+                    </div>
                   ))}
                 </>
               )}

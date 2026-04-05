@@ -4,7 +4,7 @@
  * remove unused instruments, patterns, and loop tails.
  */
 
-import { useState, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { PixiModal, PixiModalHeader, PixiModalFooter, PixiButton, PixiLabel } from '../components';
 import { PixiCheckbox } from '../components/PixiCheckbox';
 import { usePixiTheme } from '../theme';
@@ -39,9 +39,9 @@ interface SectionHeaderProps {
   count: number;
   collapsed: boolean;
   onToggle: () => void;
-  allSelected: boolean;
-  onSelectAll: () => void;
-  onDeselectAll: () => void;
+  allSelected?: boolean;
+  onSelectAll?: () => void;
+  onDeselectAll?: () => void;
   informational?: boolean;
 }
 
@@ -110,14 +110,11 @@ export const PixiCleanupDialog: React.FC<PixiCleanupDialogProps> = ({ isOpen, on
   // Selection state
   const [selectedInstruments, setSelectedInstruments] = useState<Set<number>>(new Set());
   const [selectedPatterns, setSelectedPatterns] = useState<Set<number>>(new Set());
-  const [selectedLoopTails, setSelectedLoopTails] = useState<Set<number>>(new Set());
-
   // Reset selections when dialog opens
-  useMemo(() => {
+  useEffect(() => {
     if (isOpen) {
       setSelectedInstruments(new Set());
       setSelectedPatterns(new Set());
-      setSelectedLoopTails(new Set());
     }
   }, [isOpen]);
 
@@ -162,23 +159,8 @@ export const PixiCleanupDialog: React.FC<PixiCleanupDialogProps> = ({ isOpen, on
 
   const deselectAllPatterns = useCallback(() => setSelectedPatterns(new Set()), []);
 
-  // ── Loop tail helpers ─────────────────────────────────────────────────────
-  const toggleLoopTail = useCallback((instrumentIndex: number) => {
-    setSelectedLoopTails((prev) => {
-      const next = new Set(prev);
-      if (next.has(instrumentIndex)) next.delete(instrumentIndex); else next.add(instrumentIndex);
-      return next;
-    });
-  }, []);
-
-  const selectAllLoopTails = useCallback(() => {
-    setSelectedLoopTails(new Set(report.loopTails.map((t) => t.instrumentIndex)));
-  }, [report.loopTails]);
-
-  const deselectAllLoopTails = useCallback(() => setSelectedLoopTails(new Set()), []);
-
   // ── Remove selected ───────────────────────────────────────────────────────
-  const totalSelected = selectedInstruments.size + selectedPatterns.size + selectedLoopTails.size;
+  const totalSelected = selectedInstruments.size + selectedPatterns.size;
 
   const handleRemoveSelected = useCallback(() => {
     const instrStore = useInstrumentStore.getState();
@@ -207,9 +189,6 @@ export const PixiCleanupDialog: React.FC<PixiCleanupDialogProps> = ({ isOpen, on
     selectedInstruments.size === report.unusedInstruments.length;
   const patsAllSelected = report.unusedPatterns.length > 0 &&
     selectedPatterns.size === report.unusedPatterns.length;
-  const tailsAllSelected = report.loopTails.length > 0 &&
-    selectedLoopTails.size === report.loopTails.length;
-
   return (
     <PixiModal isOpen={isOpen} onClose={onClose} width={480} height={560}>
       <PixiModalHeader title="Song Cleanup" onClose={onClose} />
@@ -320,9 +299,6 @@ export const PixiCleanupDialog: React.FC<PixiCleanupDialogProps> = ({ isOpen, on
             count={report.loopTails.length}
             collapsed={collapsedSections.has('looptails')}
             onToggle={() => toggleSection('looptails')}
-            allSelected={tailsAllSelected}
-            onSelectAll={selectAllLoopTails}
-            onDeselectAll={deselectAllLoopTails}
           />
           {!collapsedSections.has('looptails') && (
             <layoutContainer layout={{ flexDirection: 'column', paddingLeft: 8, paddingBottom: 4 }}>
@@ -331,9 +307,9 @@ export const PixiCleanupDialog: React.FC<PixiCleanupDialogProps> = ({ isOpen, on
               ) : (
                 <>
                   <PixiLabel
-                    text="Loop tail truncation is not yet implemented — selection is tracked but no data will be removed."
+                    text="Informational — automatic loop tail truncation coming soon."
                     size="xs"
-                    color="warning"
+                    color="textMuted"
                     font="sans"
                   />
                   {report.loopTails.map((t) => (
@@ -341,10 +317,6 @@ export const PixiCleanupDialog: React.FC<PixiCleanupDialogProps> = ({ isOpen, on
                       key={t.instrumentIndex}
                       layout={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingTop: 3, paddingBottom: 3, width: 432 }}
                     >
-                      <PixiCheckbox
-                        checked={selectedLoopTails.has(t.instrumentIndex)}
-                        onChange={() => toggleLoopTail(t.instrumentIndex)}
-                      />
                       <pixiBitmapText
                         text={String(t.instrumentIndex).padStart(2, '0')}
                         style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 12, fill: 0xffffff }}
