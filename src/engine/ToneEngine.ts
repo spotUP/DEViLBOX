@@ -273,8 +273,9 @@ export class ToneEngine {
   // Accent velocity boost factor
   private static readonly ACCENT_BOOST = 1.35; // 35% velocity increase for accents
 
-  /** Enable note trigger debug logging. Toggle from console: getToneEngine().constructor.NOTE_DEBUG = true */
-  public static NOTE_DEBUG = false;
+  /** Enable note trigger debug logging. Toggle: (window as any).NOTE_DEBUG = true/false */
+  public static get NOTE_DEBUG(): boolean { return (globalThis as any).__NOTE_DEBUG ?? false; }
+  public static set NOTE_DEBUG(v: boolean) { (globalThis as any).__NOTE_DEBUG = v; }
 
   // ===== PERFORMANCE OPTIMIZATION: Pre-computed lookup tables =====
 
