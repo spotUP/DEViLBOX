@@ -52,6 +52,7 @@ static void reset_stack(void) {
 }
 
 extern void paula_dump_state(void);
+extern int g_paula_write_count;
 
 EXPORT int player_init(const uint8_t *module_data, uint32_t module_size) {
     paula_reset();
@@ -126,17 +127,15 @@ EXPORT int player_init(const uint8_t *module_data, uint32_t module_size) {
 }
 
 EXPORT int player_render(float *buf, int frames) {
+    static int rr = 0; if (++rr <= 3) printf("[RENDER] frames=%d fpt=%.1f accum=%.1f init=%d\n", frames, g_frames_per_tick, g_accum, g_initialized);
     if (!g_initialized) { memset(buf, 0, frames * 2 * sizeof(float)); return 0; }
     float *out = buf;
     int remaining = frames;
-    static int first_render = 1;
-    if (first_render) { printf("[PRT] render: fpt=%.1f rate=%.0f\n", g_frames_per_tick, g_output_rate); first_render = 0; }
     while (remaining > 0) {
         int n = (int)(g_frames_per_tick - g_accum);
         if (n < 1) n = 1;
         if (n > remaining) n = remaining;
         int got = paula_render(out, n);
-        if (got <= 0) { printf("[PRT] paula_render returned %d\n", got); break; }
         out += got * 2;
         remaining -= got;
         g_accum += (double)got;
@@ -149,7 +148,8 @@ EXPORT int player_render(float *buf, int frames) {
             prt_cmd = PRT_CMD_PLAYER_TICK;
             prt_replayer_entry();
             static int tc = 0;
-            if (++tc <= 3) { printf("[PRT] tick %d\n", tc); paula_dump_state(); }
+            tc++;
+            if (tc <= 5) { printf("[PRT] tick %d pw=%d\n", tc, g_paula_write_count); paula_dump_state(); }
         }
     }
     return frames;
