@@ -35,6 +35,7 @@
 import type { TrackerCell } from '@/types';
 import type { VariableLengthEncoder } from '../UADEPatternEncoder';
 import { registerVariableEncoder } from '../UADEPatternEncoder';
+import { registerGenericInstrumentLayout } from '../GenericInstrumentLayoutFactory';
 
 // XM note → Amiga period (ProTracker period table, same as AmigaUtils)
 const AMIGA_PERIODS = [
@@ -191,3 +192,6 @@ export const amosMusicBankEncoder: VariableLengthEncoder = {
 };
 
 registerVariableEncoder(amosMusicBankEncoder);
+
+// ─── Instrument Layout Registration ──────────────────────────────────────────
+registerGenericInstrumentLayout('amosMusicBank', { kind: 'stub' });

@@ -18,6 +18,7 @@
 import type { TrackerCell } from '@/types';
 import type { VariableLengthEncoder } from '../UADEPatternEncoder';
 import { registerVariableEncoder } from '../UADEPatternEncoder';
+import { registerGenericInstrumentLayout } from '../GenericInstrumentLayoutFactory';
 
 // PT periods for reverse lookup (same as parser)
 const PT_PERIODS: number[] = [
@@ -93,3 +94,6 @@ export const hippelCoSoEncoder: VariableLengthEncoder = {
 };
 
 registerVariableEncoder(hippelCoSoEncoder);
+
+// ─── Instrument Layout Registration ──────────────────────────────────────────
+registerGenericInstrumentLayout('hippelCoSo', { kind: 'stub' });

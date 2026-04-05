@@ -19,6 +19,7 @@
 
 import type { TrackerCell } from '@/types';
 import { registerPatternEncoder } from '../UADEPatternEncoder';
+import { registerGenericInstrumentLayout } from '../GenericInstrumentLayoutFactory';
 
 function encodeTFMXCell(cell: TrackerCell): Uint8Array {
   const out = new Uint8Array(4);
@@ -82,3 +83,6 @@ function encodeTFMXCell(cell: TrackerCell): Uint8Array {
 registerPatternEncoder('tfmx', () => encodeTFMXCell);
 
 export { encodeTFMXCell };
+
+// ─── Instrument Layout Registration ──────────────────────────────────────────
+registerGenericInstrumentLayout('tfmx', { kind: 'stub' });

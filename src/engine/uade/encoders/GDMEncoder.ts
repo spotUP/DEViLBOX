@@ -18,6 +18,7 @@
 import type { TrackerCell } from '@/types';
 import type { VariableLengthEncoder } from '../UADEPatternEncoder';
 import { registerVariableEncoder } from '../UADEPatternEncoder';
+import { registerGenericInstrumentLayout } from '../GenericInstrumentLayoutFactory';
 
 // Reverse of GDM_EFF_TRANS: XM effTyp → GDM effect index
 const XM_TO_GDM: Map<number, number> = new Map([
@@ -158,3 +159,6 @@ export const gdmEncoder: VariableLengthEncoder = {
 };
 
 registerVariableEncoder(gdmEncoder);
+
+// ─── Instrument Layout Registration ──────────────────────────────────────────
+registerGenericInstrumentLayout('gdm', { kind: 'stub' });

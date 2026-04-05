@@ -26,6 +26,7 @@
 import type { TrackerCell } from '@/types';
 import type { VariableLengthEncoder } from '../UADEPatternEncoder';
 import { registerVariableEncoder } from '../UADEPatternEncoder';
+import { registerGenericInstrumentLayout } from '../GenericInstrumentLayoutFactory';
 
 const NOTE_KEYOFF = 97;
 
@@ -154,3 +155,6 @@ const imagoOrpheusEncoder: VariableLengthEncoder = {
 registerVariableEncoder(imagoOrpheusEncoder);
 
 export { imagoOrpheusEncoder, encodeIMFNote, reverseIMFEffect };
+
+// ─── Instrument Layout Registration ──────────────────────────────────────────
+registerGenericInstrumentLayout('imf', { kind: 'stub' });

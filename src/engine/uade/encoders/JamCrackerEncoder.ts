@@ -16,6 +16,7 @@
 
 import type { TrackerCell } from '@/types';
 import { registerPatternEncoder } from '../UADEPatternEncoder';
+import { registerGenericInstrumentLayout } from '../GenericInstrumentLayoutFactory';
 
 /**
  * Reverse XM note → JamCracker note index.
@@ -77,3 +78,6 @@ function encodeJCCell(cell: TrackerCell): Uint8Array {
 registerPatternEncoder('jamCracker', () => encodeJCCell);
 
 export { encodeJCCell };
+
+// ─── Instrument Layout Registration ──────────────────────────────────────────
+registerGenericInstrumentLayout('jamCracker', { kind: 'stub' });

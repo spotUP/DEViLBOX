@@ -15,6 +15,7 @@
 
 import type { TrackerCell } from '@/types';
 import { registerPatternEncoder } from '../UADEPatternEncoder';
+import { registerGenericInstrumentLayout } from '../GenericInstrumentLayoutFactory';
 
 function encodeUNICCell(cell: TrackerCell): Uint8Array {
   const out = new Uint8Array(3);
@@ -43,3 +44,6 @@ function encodeUNICCell(cell: TrackerCell): Uint8Array {
 registerPatternEncoder('unic', () => encodeUNICCell);
 
 export { encodeUNICCell };
+
+// ─── Instrument Layout Registration ──────────────────────────────────────────
+registerGenericInstrumentLayout('unic', { kind: 'protracker' });

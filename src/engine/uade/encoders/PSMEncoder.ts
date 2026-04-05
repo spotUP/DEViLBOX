@@ -19,6 +19,7 @@
 import type { TrackerCell } from '@/types';
 import type { VariableLengthEncoder } from '../UADEPatternEncoder';
 import { registerVariableEncoder } from '../UADEPatternEncoder';
+import { registerGenericInstrumentLayout } from '../GenericInstrumentLayoutFactory';
 
 // Reverse PSM16 effect: XM effTyp → PSM16 command
 function reversePSM16Effect(effTyp: number, eff: number): { cmd: number; param: number } {
@@ -134,3 +135,6 @@ export const psmEncoder: VariableLengthEncoder = {
 };
 
 registerVariableEncoder(psmEncoder);
+
+// ─── Instrument Layout Registration ──────────────────────────────────────────
+registerGenericInstrumentLayout('psm', { kind: 'stub' });

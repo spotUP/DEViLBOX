@@ -16,6 +16,7 @@
 
 import type { TrackerCell } from '@/types';
 import { registerPatternEncoder } from '../UADEPatternEncoder';
+import { registerGenericInstrumentLayout } from '../GenericInstrumentLayoutFactory';
 
 /**
  * Convert XM note back to IMS note index.
@@ -57,3 +58,6 @@ function encodeIMSCell(cell: TrackerCell): Uint8Array {
 registerPatternEncoder('ims', () => encodeIMSCell);
 
 export { encodeIMSCell };
+
+// ─── Instrument Layout Registration ──────────────────────────────────────────
+registerGenericInstrumentLayout('ims', { kind: 'protracker' });

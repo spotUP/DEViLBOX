@@ -18,6 +18,7 @@
 import type { TrackerCell } from '@/types';
 import type { VariableLengthEncoder } from '../UADEPatternEncoder';
 import { registerVariableEncoder } from '../UADEPatternEncoder';
+import { registerGenericInstrumentLayout } from '../GenericInstrumentLayoutFactory';
 
 export const xmEncoder: VariableLengthEncoder = {
   formatId: 'xm',
@@ -67,3 +68,6 @@ export const xmEncoder: VariableLengthEncoder = {
 };
 
 registerVariableEncoder(xmEncoder);
+
+// ─── Instrument Layout Registration ──────────────────────────────────────────
+registerGenericInstrumentLayout('xm', { kind: 'stub' });

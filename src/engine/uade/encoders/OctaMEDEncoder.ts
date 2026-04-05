@@ -22,6 +22,7 @@
 import type { TrackerCell } from '@/types';
 import { registerPatternEncoder } from '../UADEPatternEncoder';
 import { encodeMED4Cell, encodeMED3Cell } from './MEDEncoder';
+import { registerGenericInstrumentLayout } from '../GenericInstrumentLayoutFactory';
 
 /**
  * Encode a TrackerCell to OctaMED MMD1+ binary (4 bytes).
@@ -42,3 +43,6 @@ export function encodeOctaMED3Cell(cell: TrackerCell): Uint8Array {
 // Register under OctaMED-specific format IDs
 registerPatternEncoder('octamed_mmd1', () => encodeOctaMEDCell);
 registerPatternEncoder('octamed_mmd0', () => encodeOctaMED3Cell);
+
+// ─── Instrument Layout Registration ──────────────────────────────────────────
+registerGenericInstrumentLayout('octamed_mmd1', { kind: 'stub' }, ['octamed_mmd0']);

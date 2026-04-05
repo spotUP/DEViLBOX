@@ -15,6 +15,7 @@
 
 import type { TrackerCell } from '@/types';
 import { registerPatternEncoder } from '../UADEPatternEncoder';
+import { registerGenericInstrumentLayout } from '../GenericInstrumentLayoutFactory';
 
 // First 57 entries of DM_PERIODS (finetune 0 group) for reverse lookup
 const DM_PERIODS_FT0: number[] = [
@@ -93,3 +94,6 @@ export function encodeDigitalMugicianCell(cell: TrackerCell): Uint8Array {
 }
 
 registerPatternEncoder('digitalMugician', () => encodeDigitalMugicianCell);
+
+// ─── Instrument Layout Registration ──────────────────────────────────────────
+registerGenericInstrumentLayout('digitalMugician', { kind: 'stub' });

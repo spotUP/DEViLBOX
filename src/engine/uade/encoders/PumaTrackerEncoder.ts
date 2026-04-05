@@ -24,6 +24,7 @@
 import type { TrackerCell } from '@/types';
 import type { VariableLengthEncoder } from '../UADEPatternEncoder';
 import { registerVariableEncoder } from '../UADEPatternEncoder';
+import { registerGenericInstrumentLayout } from '../GenericInstrumentLayoutFactory';
 
 interface PumaEntry {
   noteX2: number;
@@ -100,3 +101,6 @@ export const pumaTrackerEncoder: VariableLengthEncoder = {
 };
 
 registerVariableEncoder(pumaTrackerEncoder);
+
+// ─── Instrument Layout Registration ──────────────────────────────────────────
+registerGenericInstrumentLayout('pumaTracker', { kind: 'stub' });

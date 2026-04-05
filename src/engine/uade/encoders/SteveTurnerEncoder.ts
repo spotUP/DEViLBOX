@@ -19,6 +19,7 @@
 
 import type { TrackerCell } from '@/types';
 import { registerVariableEncoder, type VariableLengthEncoder } from '../UADEPatternEncoder';
+import { registerGenericInstrumentLayout } from '../GenericInstrumentLayoutFactory';
 
 /**
  * Encode a channel's rows back to Steve Turner pattern block bytes.
@@ -119,3 +120,6 @@ const steveTurnerEncoder: VariableLengthEncoder = {
 registerVariableEncoder(steveTurnerEncoder);
 
 export { encodeSteveTurnerPattern };
+
+// ─── Instrument Layout Registration ──────────────────────────────────────────
+registerGenericInstrumentLayout('steveTurner', { kind: 'stub' });

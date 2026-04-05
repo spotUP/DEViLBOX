@@ -30,6 +30,7 @@
 import type { TrackerCell } from '@/types';
 import type { VariableLengthEncoder } from '../UADEPatternEncoder';
 import { registerVariableEncoder } from '../UADEPatternEncoder';
+import { registerGenericInstrumentLayout } from '../GenericInstrumentLayoutFactory';
 
 export const faceTheMusicEncoder: VariableLengthEncoder = {
   formatId: 'faceTheMusic',
@@ -140,3 +141,6 @@ export const faceTheMusicEncoder: VariableLengthEncoder = {
 };
 
 registerVariableEncoder(faceTheMusicEncoder);
+
+// ─── Instrument Layout Registration ──────────────────────────────────────────
+registerGenericInstrumentLayout('faceTheMusic', { kind: 'stub' });

@@ -19,6 +19,7 @@
 
 import type { TrackerCell } from '@/types';
 import { registerPatternEncoder } from '../UADEPatternEncoder';
+import { registerGenericInstrumentLayout } from '../GenericInstrumentLayoutFactory';
 
 /**
  * Reverse-translate XM effect → AMF/Asylum effect.
@@ -66,3 +67,6 @@ function encodeAMFCell(cell: TrackerCell): Uint8Array {
 registerPatternEncoder('amf', () => encodeAMFCell);
 
 export { encodeAMFCell };
+
+// ─── Instrument Layout Registration ──────────────────────────────────────────
+registerGenericInstrumentLayout('amf', { kind: 'stub' });

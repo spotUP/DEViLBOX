@@ -14,6 +14,7 @@
 
 import type { TrackerCell } from '@/types';
 import { registerPatternEncoder } from '../UADEPatternEncoder';
+import { registerGenericInstrumentLayout } from '../GenericInstrumentLayoutFactory';
 
 function reverseXMFEffect(effTyp: number, eff: number): { xmfEff: number; param: number } {
   if (effTyp === 0 && eff === 0) return { xmfEff: 0, param: 0 };
@@ -55,3 +56,6 @@ function encodeXMFCell(cell: TrackerCell): Uint8Array {
 registerPatternEncoder('xmf', () => encodeXMFCell);
 
 export { encodeXMFCell };
+
+// ─── Instrument Layout Registration ──────────────────────────────────────────
+registerGenericInstrumentLayout('xmf', { kind: 'stub' });

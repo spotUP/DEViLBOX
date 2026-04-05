@@ -13,6 +13,7 @@
 
 import type { TrackerCell } from '@/types';
 import { registerPatternEncoder } from '../UADEPatternEncoder';
+import { registerGenericInstrumentLayout } from '../GenericInstrumentLayoutFactory';
 
 function encodeQCCell(cell: TrackerCell): Uint8Array {
   const out = new Uint8Array(4);
@@ -53,3 +54,6 @@ function encodeQCCell(cell: TrackerCell): Uint8Array {
 registerPatternEncoder('quadraComposer', () => encodeQCCell);
 
 export { encodeQCCell };
+
+// ─── Instrument Layout Registration ──────────────────────────────────────────
+registerGenericInstrumentLayout('quadraComposer', { kind: 'protracker' });

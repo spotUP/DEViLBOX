@@ -17,6 +17,7 @@
 
 import type { TrackerCell } from '@/types';
 import { registerPatternEncoder } from '../UADEPatternEncoder';
+import { registerGenericInstrumentLayout } from '../GenericInstrumentLayoutFactory';
 
 function encodeMTMCell(cell: TrackerCell): Uint8Array {
   const out = new Uint8Array(3);
@@ -41,3 +42,6 @@ function encodeMTMCell(cell: TrackerCell): Uint8Array {
 registerPatternEncoder('mtm', () => encodeMTMCell);
 
 export { encodeMTMCell };
+
+// ─── Instrument Layout Registration ──────────────────────────────────────────
+registerGenericInstrumentLayout('mtm', { kind: 'protracker' });

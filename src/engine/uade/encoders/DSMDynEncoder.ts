@@ -20,6 +20,7 @@
 
 import type { TrackerCell } from '@/types';
 import { registerPatternEncoder } from '../UADEPatternEncoder';
+import { registerGenericInstrumentLayout } from '../GenericInstrumentLayoutFactory';
 
 function encodeDSMDynCell(cell: TrackerCell): Uint8Array {
   const out = new Uint8Array(4);
@@ -48,3 +49,6 @@ function encodeDSMDynCell(cell: TrackerCell): Uint8Array {
 registerPatternEncoder('dsm_dyn', () => encodeDSMDynCell);
 
 export { encodeDSMDynCell };
+
+// ─── Instrument Layout Registration ──────────────────────────────────────────
+registerGenericInstrumentLayout('dsm_dyn', { kind: 'stub' });

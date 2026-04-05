@@ -34,6 +34,7 @@
 import type { TrackerCell } from '@/types';
 import type { VariableLengthEncoder } from '../UADEPatternEncoder';
 import { registerVariableEncoder } from '../UADEPatternEncoder';
+import { registerGenericInstrumentLayout } from '../GenericInstrumentLayoutFactory';
 
 /** Convert XM note → Actionamics note index (1-based). */
 function xmNoteToAST(xmNote: number): number {
@@ -128,3 +129,6 @@ export const actionamicsEncoder: VariableLengthEncoder = {
 };
 
 registerVariableEncoder(actionamicsEncoder);
+
+// ─── Instrument Layout Registration ──────────────────────────────────────────
+registerGenericInstrumentLayout('actionamics', { kind: 'stub' });

@@ -33,6 +33,7 @@
 import type { TrackerCell } from '@/types';
 import type { VariableLengthEncoder } from '../UADEPatternEncoder';
 import { registerVariableEncoder } from '../UADEPatternEncoder';
+import { registerGenericInstrumentLayout } from '../GenericInstrumentLayoutFactory';
 
 // Duration values and their SMUS encoding indices
 // The table maps: index → tick count
@@ -151,3 +152,6 @@ export const iffSmusEncoder: VariableLengthEncoder = {
 };
 
 registerVariableEncoder(iffSmusEncoder);
+
+// ─── Instrument Layout Registration ──────────────────────────────────────────
+registerGenericInstrumentLayout('iffSmus', { kind: 'stub' });

@@ -21,6 +21,7 @@
 
 import type { TrackerCell } from '@/types';
 import { registerPatternEncoder } from '../UADEPatternEncoder';
+import { registerGenericInstrumentLayout } from '../GenericInstrumentLayoutFactory';
 
 // MED period table for MMD0 encoding
 const MED_PERIODS = [
@@ -79,3 +80,6 @@ registerPatternEncoder('med_mmd1', () => encodeMED4Cell);
 registerPatternEncoder('med_mmd0', () => encodeMED3Cell);
 
 export { encodeMED4Cell, encodeMED3Cell };
+
+// ─── Instrument Layout Registration ──────────────────────────────────────────
+registerGenericInstrumentLayout('med_mmd1', { kind: 'stub' }, ['med_mmd0']);

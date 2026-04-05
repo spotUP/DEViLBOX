@@ -42,6 +42,7 @@
 import type { TrackerCell } from '@/types';
 import type { VariableLengthEncoder } from '../UADEPatternEncoder';
 import { registerPatternEncoder, registerVariableEncoder } from '../UADEPatternEncoder';
+import { registerGenericInstrumentLayout } from '../GenericInstrumentLayoutFactory';
 
 /** Reverse XM effect type → HVL effect command */
 function xmEffectToHvl(cell: TrackerCell): { fx: number; fxParam: number } {
@@ -158,3 +159,6 @@ registerPatternEncoder('hivelyAHX', () => encodeAHXCell);
 registerVariableEncoder(hivelyHVLEncoder);
 
 export { encodeAHXCell as encodeHivelyAHXCell };
+
+// ─── Instrument Layout Registration ──────────────────────────────────────────
+registerGenericInstrumentLayout('hivelyAHX', { kind: 'stub' }, ['hivelyHVL']);

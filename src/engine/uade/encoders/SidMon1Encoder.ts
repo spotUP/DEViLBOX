@@ -18,6 +18,7 @@
 
 import type { TrackerCell } from '@/types';
 import { registerPatternEncoder } from '../UADEPatternEncoder';
+import { registerGenericInstrumentLayout } from '../GenericInstrumentLayoutFactory';
 
 // SM1 period table (from parser) — index 0 is unused, 1-66 are valid
 const SM1_PERIODS: number[] = [
@@ -88,3 +89,6 @@ export function encodeSidMon1Cell(cell: TrackerCell): Uint8Array {
 }
 
 registerPatternEncoder('sidMon1', () => encodeSidMon1Cell);
+
+// ─── Instrument Layout Registration ──────────────────────────────────────────
+registerGenericInstrumentLayout('sidMon1', { kind: 'stub' });

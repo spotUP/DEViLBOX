@@ -24,6 +24,7 @@
 
 import type { TrackerCell } from '@/types';
 import { registerPatternEncoder } from '../UADEPatternEncoder';
+import { registerGenericInstrumentLayout } from '../GenericInstrumentLayoutFactory';
 
 const AVP_REF_XM = 37;
 const AVP_REF_IDX = 60;
@@ -50,3 +51,6 @@ export function encodeActivisionProCell(cell: TrackerCell): Uint8Array {
 }
 
 registerPatternEncoder('activisionPro', () => encodeActivisionProCell);
+
+// ─── Instrument Layout Registration ──────────────────────────────────────────
+registerGenericInstrumentLayout('activisionPro', { kind: 'stub' });

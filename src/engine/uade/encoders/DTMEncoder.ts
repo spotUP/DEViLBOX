@@ -20,6 +20,7 @@
 import type { TrackerCell } from '@/types';
 import { registerPatternEncoder } from '../UADEPatternEncoder';
 import { encodeMODCell } from './MODEncoder';
+import { registerGenericInstrumentLayout } from '../GenericInstrumentLayoutFactory';
 
 /**
  * Encode a TrackerCell to DTM 2.04 format (4 bytes).
@@ -57,3 +58,7 @@ registerPatternEncoder('dtm_pt', () => encodeMODCell);
 registerPatternEncoder('dtm_204', () => encodeDTM204Cell);
 
 export { encodeDTM204Cell };
+
+// ─── Instrument Layout Registration ──────────────────────────────────────────
+registerGenericInstrumentLayout('dtm_pt', { kind: 'protracker' });
+registerGenericInstrumentLayout('dtm_204', { kind: 'stub' });

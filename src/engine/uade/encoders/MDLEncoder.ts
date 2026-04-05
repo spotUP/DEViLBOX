@@ -22,6 +22,7 @@
 import type { TrackerCell } from '@/types';
 import type { VariableLengthEncoder } from '../UADEPatternEncoder';
 import { registerVariableEncoder } from '../UADEPatternEncoder';
+import { registerGenericInstrumentLayout } from '../GenericInstrumentLayoutFactory';
 
 const MDLNOTE_NOTE    = 1 << 0;
 const MDLNOTE_SAMPLE  = 1 << 1;
@@ -173,3 +174,6 @@ const mdlEncoder: VariableLengthEncoder = {
 registerVariableEncoder(mdlEncoder);
 
 export { mdlEncoder, encodeMDLTrack };
+
+// ─── Instrument Layout Registration ──────────────────────────────────────────
+registerGenericInstrumentLayout('mdl', { kind: 'stub' });

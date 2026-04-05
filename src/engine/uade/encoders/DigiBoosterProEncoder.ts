@@ -24,6 +24,7 @@
 import type { TrackerCell } from '@/types';
 import type { VariableLengthEncoder } from '../UADEPatternEncoder';
 import { registerVariableEncoder } from '../UADEPatternEncoder';
+import { registerGenericInstrumentLayout } from '../GenericInstrumentLayoutFactory';
 
 // Reverse of DBM_EFFECT_MAP from parser: XM effTyp → DBM command
 // Only for effects that have a clean 1:1 mapping
@@ -166,3 +167,6 @@ export const digiBoosterProEncoder: VariableLengthEncoder = {
 };
 
 registerVariableEncoder(digiBoosterProEncoder);
+
+// ─── Instrument Layout Registration ──────────────────────────────────────────
+registerGenericInstrumentLayout('digiBoosterPro', { kind: 'stub' });

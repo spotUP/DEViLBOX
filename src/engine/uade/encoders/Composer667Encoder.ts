@@ -21,6 +21,7 @@
 
 import type { TrackerCell } from '@/types';
 import { registerPatternEncoder } from '../UADEPatternEncoder';
+import { registerGenericInstrumentLayout } from '../GenericInstrumentLayoutFactory';
 
 /**
  * Reverse-translate XM effect → 669 effect parameter byte.
@@ -93,3 +94,6 @@ function encode669Cell(cell: TrackerCell): Uint8Array {
 registerPatternEncoder('composer667', () => encode669Cell);
 
 export { encode669Cell };
+
+// ─── Instrument Layout Registration ──────────────────────────────────────────
+registerGenericInstrumentLayout('composer667', { kind: 'stub' });

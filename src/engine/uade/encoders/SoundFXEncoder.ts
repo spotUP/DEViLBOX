@@ -21,6 +21,7 @@
 import type { TrackerCell } from '@/types';
 import { registerPatternEncoder } from '../UADEPatternEncoder';
 import { xmNoteToPeriod } from './MODEncoder';
+import { registerGenericInstrumentLayout } from '../GenericInstrumentLayoutFactory';
 
 const XM_NOTE_CUT = 97;
 
@@ -72,3 +73,6 @@ function encodeSoundFXCell(cell: TrackerCell): Uint8Array {
 registerPatternEncoder('soundfx', () => encodeSoundFXCell);
 
 export { encodeSoundFXCell };
+
+// ─── Instrument Layout Registration ──────────────────────────────────────────
+registerGenericInstrumentLayout('soundfx', { kind: 'protracker', maxInstruments: 15 });

@@ -35,6 +35,7 @@
 
 import type { TrackerCell } from '@/types';
 import { registerPatternEncoder } from '../UADEPatternEncoder';
+import { registerGenericInstrumentLayout } from '../GenericInstrumentLayoutFactory';
 
 // SymEvent command constants (from parser)
 const CMD_KEYON         = 0;
@@ -175,3 +176,6 @@ export function encodeSymphonieProCell(cell: TrackerCell): Uint8Array {
 }
 
 registerPatternEncoder('symphoniePro', () => encodeSymphonieProCell);
+
+// ─── Instrument Layout Registration ──────────────────────────────────────────
+registerGenericInstrumentLayout('symphoniePro', { kind: 'stub' });
