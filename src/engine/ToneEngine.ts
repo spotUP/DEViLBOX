@@ -111,6 +111,7 @@ import {
   updateMasterEffectParams as _updateMasterEffectParams,
   updateInstrumentEffectParams as _updateInstrumentEffectParams,
 } from './tone/MasterEffectsChain';
+import { captureLiveAudio, mixAndNormalize, MONO_WASM_SYNTHS } from '@/lib/audio/LiveCapture';
 import {
   type InstrumentEffectsContext,
   buildInstrumentEffectChain as _buildInstrumentEffectChain,
@@ -4307,6 +4308,128 @@ export class ToneEngine {
     }, duration);
 
     return result as unknown as AudioBuffer;
+  }
+
+  /**
+   * Live-bake a WASM/AudioWorklet synth by recording its output in real-time.
+   * Unlike bakeInstrument() which uses Tone.Offline, this works with AudioWorklet synths
+   * that require a real-time audio context.
+   */
+  public async liveBakeInstrument(
+    instrumentId: number,
+    config: InstrumentConfig,
+    duration: number = 4,
+    note: string = 'C4',
+  ): Promise<AudioBuffer> {
+    // Ensure synth is loaded and initialized
+    await this.ensureInstrumentReady(config);
+
+    const instrument = this.getInstrument(instrumentId, config);
+    if (!instrument || !isDevilboxSynth(instrument)) {
+      throw new Error(`[ToneEngine] liveBakeInstrument: instrument ${instrumentId} is not a DevilboxSynth`);
+    }
+
+    const synthOutput = instrument.output;
+
+    // Disconnect synth output from normal signal chain (silent bake)
+    // We disconnect ALL destinations — the effect chain bridge, synthBus, etc.
+    try {
+      synthOutput.disconnect();
+    } catch {
+      // May not be connected to anything yet
+    }
+
+    try {
+      const buffer = await captureLiveAudio(
+        synthOutput,
+        () => {
+          // Trigger note attack
+          if (instrument.triggerAttack) {
+            instrument.triggerAttack(note, undefined, 0.8);
+          }
+        },
+        () => {
+          // Release note
+          if (instrument.triggerRelease) {
+            instrument.triggerRelease(note);
+          }
+        },
+        duration,
+      );
+      return buffer;
+    } finally {
+      // Reconnect synth to its normal signal chain by rebuilding the effect chain
+      // This is the safest way to restore all connections (bridge, effects, analyser, bus)
+      const key = this.getInstrumentKey(instrumentId, -1);
+      const effectConfigs = config.effects || [];
+      await this.buildInstrumentEffectChain(key, effectConfigs, instrument);
+    }
+  }
+
+  /**
+   * Live-bake a chord from a WASM synth.
+   * Polyphonic synths: trigger all notes simultaneously, single capture.
+   * Monophonic synths: capture each note sequentially, mix and normalize.
+   */
+  public async liveBakeChord(
+    instrumentId: number,
+    config: InstrumentConfig,
+    notes: string[],
+  ): Promise<AudioBuffer> {
+    const isMono = MONO_WASM_SYNTHS.has(config.synthType || '');
+
+    if (isMono) {
+      // Sequential capture + mix for mono synths
+      const buffers: AudioBuffer[] = [];
+      for (const note of notes) {
+        buffers.push(await this.liveBakeInstrument(instrumentId, config, 4, note));
+      }
+      return mixAndNormalize(buffers);
+    }
+
+    // Polyphonic: simultaneous capture
+    await this.ensureInstrumentReady(config);
+
+    const instrument = this.getInstrument(instrumentId, config);
+    if (!instrument || !isDevilboxSynth(instrument)) {
+      throw new Error(`[ToneEngine] liveBakeChord: instrument ${instrumentId} is not a DevilboxSynth`);
+    }
+
+    const synthOutput = instrument.output;
+
+    try {
+      synthOutput.disconnect();
+    } catch {
+      // May not be connected
+    }
+
+    try {
+      const buffer = await captureLiveAudio(
+        synthOutput,
+        () => {
+          // Trigger ALL chord notes simultaneously
+          for (const note of notes) {
+            if (instrument.triggerAttack) {
+              instrument.triggerAttack(note, undefined, 0.8);
+            }
+          }
+        },
+        () => {
+          // Release ALL notes
+          for (const note of notes) {
+            if (instrument.triggerRelease) {
+              instrument.triggerRelease(note);
+            }
+          }
+        },
+        4,
+      );
+      return buffer;
+    } finally {
+      const key = this.getInstrumentKey(instrumentId, -1);
+      const effectConfigs = config.effects || [];
+      await this.buildInstrumentEffectChain(key, effectConfigs, instrument);
+    }
   }
 
   /**
