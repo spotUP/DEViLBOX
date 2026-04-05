@@ -183,11 +183,13 @@ export const InstrumentList: React.FC<InstrumentListProps> = memo(({
         || (inst as any).modPlayback?.usePeriodPlayback;
       const isSampleInst = inst.type === 'sample' || inst.synthType === 'Sampler' || inst.synthType === 'Player';
       const isBass = inst.synthType === 'TB303' || inst.name.toLowerCase().includes('bass');
-      const previewNote = (isSampleInst && inst.sample?.baseNote)
+      const rawPreviewNote = (isSampleInst && inst.sample?.baseNote)
         ? inst.sample.baseNote                // Always use the sample's natural pitch
         : isModSample
           ? (inst.sample?.baseNote || 'C3')
           : (isBass ? 'C3' : 'C4');
+      // Strip dash from tracker-style notes (C-4 → C4) for Tone.js
+      const previewNote = rawPreviewNote.replace('-', '');
 
       const now = Tone.now();
 
