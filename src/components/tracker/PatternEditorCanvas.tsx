@@ -2318,7 +2318,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
           macroOverlayRef.current.style.top = `${overlayTop}px`;
         }
         if (automationOverlayRef.current) {
-          automationOverlayRef.current.style.transform = `translateY(${overlayTop - automationPrevLenRef.current * rowHeightRef.current}px)`;
+          automationOverlayRef.current.style.top = `${overlayTop - automationPrevLenRef.current * rowHeightRef.current}px`;
         }
         rafId = requestAnimationFrame(tick);
         return;
@@ -3172,14 +3172,12 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
                 ref={automationOverlayRef}
                 style={{
                   position: 'absolute',
-                  top: 0,
+                  top: scrollYRef.current - prevLen * rowHeight,
                   left: 0,
                   right: 0,
                   height: (prevLen + pattern.length + nextLen) * rowHeight,
                   pointerEvents: 'none',
                   zIndex: 5,
-                  willChange: 'transform',
-                  transform: `translateY(${scrollYRef.current - prevLen * rowHeight}px)`,
                   clipPath: (() => {
                     const leftClip = channelOffsets[0] ?? LINE_NUMBER_WIDTH;
                     const patChCount = pattern.channels.length;
