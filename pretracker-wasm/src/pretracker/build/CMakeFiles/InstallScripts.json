@@ -1,0 +1,7 @@
+{
+	"InstallScripts" : 
+	[
+		"/Users/spot/Code/DEViLBOX/pretracker-wasm/src/pretracker/build/cmake_install.cmake"
+	],
+	"Parallel" : false
+}

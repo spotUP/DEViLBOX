@@ -1,0 +1,3 @@
+/Users/spot/Code/DEViLBOX/pretracker-wasm/src/pretracker/build/CMakeFiles/Pretracker.dir
+/Users/spot/Code/DEViLBOX/pretracker-wasm/src/pretracker/build/CMakeFiles/edit_cache.dir
+/Users/spot/Code/DEViLBOX/pretracker-wasm/src/pretracker/build/CMakeFiles/rebuild_cache.dir
