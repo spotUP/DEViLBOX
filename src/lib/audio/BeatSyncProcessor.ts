@@ -178,7 +178,7 @@ export async function timeStretchToFit(
 
     // Normalize to prevent clipping from overlap-add accumulation
     for (let i = 0; i < outputLength; i++) {
-      if (normAcc[i] > 1e-8) {
+      if (normAcc[i] > 1e-4) {
         output[i] /= normAcc[i];
       }
     }

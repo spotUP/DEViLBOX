@@ -186,7 +186,7 @@ export const CleanupDialog: React.FC<CleanupDialogProps> = ({ isOpen, onClose })
       <div className="p-4 space-y-3 overflow-y-auto scrollbar-modern" style={{ maxHeight: '60vh' }}>
         <p className="text-xs text-text-muted">
           Analysis found the following unused or redundant data. Select items to remove, then click
-          &quot;Remove Selected&quot;.
+          &quot;Remove Selected&quot;. This action cannot be undone.
         </p>
 
         {/* ── Unused Instruments ─────────────────────────────────────────── */}

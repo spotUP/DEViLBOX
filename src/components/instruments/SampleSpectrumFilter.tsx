@@ -28,6 +28,27 @@ const MAX_DB = 6;
 const CANVAS_W = 1120;
 const CANVAS_H = 200;
 const FFT_SIZE = 4096;
+
+// Canvas colors — derived from design tokens via CSS custom properties
+function getCssVar(name: string, fallback: string): string {
+  if (typeof document === 'undefined') return fallback;
+  return getComputedStyle(document.documentElement).getPropertyValue(name).trim() || fallback;
+}
+
+function getCanvasColors() {
+  return {
+    bg: getCssVar('--color-bg-primary', '#0a0a0f'),
+    spectrumBars: `rgba(99,102,241,0.25)`, // accent-primary at 25% opacity
+    grid: `rgba(255,255,255,0.06)`,
+    gridLabel: `rgba(255,255,255,0.25)`,
+    zeroLine: `rgba(255,255,255,0.15)`,
+    curve: getCssVar('--color-accent-primary', 'rgba(59,130,246,0.9)'),
+    curveFill: `rgba(59,130,246,0.08)`,
+    pointActive: getCssVar('--color-accent-primary', '#3b82f6'),
+    pointIdle: getCssVar('--color-accent-secondary', '#60a5fa'),
+    pointStroke: getCssVar('--color-text-primary', '#fff'),
+  };
+}
 const POINT_RADIUS = 6;
 
 // Frequency grid lines (Hz)
@@ -121,9 +142,10 @@ export const SampleSpectrumFilter: React.FC<SampleSpectrumFilterProps> = ({
 
     const W = CANVAS_W;
     const H = CANVAS_H;
+    const colors = getCanvasColors();
 
     // Background
-    ctx.fillStyle = '#0a0a0f';
+    ctx.fillStyle = colors.bg;
     ctx.fillRect(0, 0, W, H);
 
     // Spectrum bars
@@ -131,7 +153,7 @@ export const SampleSpectrumFilter: React.FC<SampleSpectrumFilterProps> = ({
     if (spectrum) {
       const sampleRate = audioBuffer?.sampleRate ?? 44100;
       const numBins = spectrum.length;
-      ctx.fillStyle = 'rgba(99,102,241,0.25)';
+      ctx.fillStyle = colors.spectrumBars;
       for (let b = 1; b < numBins; b++) {
         const freq = (b * sampleRate) / FFT_SIZE;
         if (freq < MIN_FREQ || freq > MAX_FREQ) continue;
@@ -147,10 +169,10 @@ export const SampleSpectrumFilter: React.FC<SampleSpectrumFilterProps> = ({
     }
 
     // dB grid
-    ctx.strokeStyle = 'rgba(255,255,255,0.06)';
+    ctx.strokeStyle = colors.grid;
     ctx.lineWidth = 1;
     ctx.setLineDash([3, 4]);
-    ctx.fillStyle = 'rgba(255,255,255,0.25)';
+    ctx.fillStyle = colors.gridLabel;
     ctx.font = '10px monospace';
     for (const db of DB_GRID) {
       const y = dbToY(db, H);
@@ -175,7 +197,7 @@ export const SampleSpectrumFilter: React.FC<SampleSpectrumFilterProps> = ({
 
     // 0 dB reference line
     const y0 = dbToY(0, H);
-    ctx.strokeStyle = 'rgba(255,255,255,0.15)';
+    ctx.strokeStyle = colors.zeroLine;
     ctx.lineWidth = 1;
     ctx.beginPath();
     ctx.moveTo(0, y0);
@@ -186,7 +208,7 @@ export const SampleSpectrumFilter: React.FC<SampleSpectrumFilterProps> = ({
     const sorted = [...points].sort((a, b) => a.frequency - b.frequency);
     if (sorted.length >= 2) {
       ctx.beginPath();
-      ctx.strokeStyle = 'rgba(59,130,246,0.9)';
+      ctx.strokeStyle = colors.curve;
       ctx.lineWidth = 2;
       // Sample the curve at many x positions
       for (let px = 0; px <= W; px += 2) {
@@ -200,7 +222,7 @@ export const SampleSpectrumFilter: React.FC<SampleSpectrumFilterProps> = ({
 
       // Fill area under curve
       ctx.beginPath();
-      ctx.fillStyle = 'rgba(59,130,246,0.08)';
+      ctx.fillStyle = colors.curveFill;
       ctx.moveTo(0, H);
       for (let px = 0; px <= W; px += 2) {
         const freq = xToFreq(px, W);
@@ -220,9 +242,9 @@ export const SampleSpectrumFilter: React.FC<SampleSpectrumFilterProps> = ({
       const y = dbToY(p.gain, H);
       ctx.beginPath();
       ctx.arc(x, y, POINT_RADIUS, 0, Math.PI * 2);
-      ctx.fillStyle = draggingIdx === i ? '#3b82f6' : '#60a5fa';
+      ctx.fillStyle = draggingIdx === i ? colors.pointActive : colors.pointIdle;
       ctx.fill();
-      ctx.strokeStyle = '#fff';
+      ctx.strokeStyle = colors.pointStroke;
       ctx.lineWidth = 1.5;
       ctx.stroke();
     }

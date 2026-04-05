@@ -20,6 +20,7 @@ import { PixiLabel, PixiButton, PixiSlider } from '../../components';
 import { useInstrumentStore, useTrackerStore } from '@stores';
 import { scan9xxOffsets } from '@/lib/analysis/scan9xxOffsets';
 import type { InstrumentConfig, DeepPartial } from '@typedefs/instrument';
+import { bufferToDataUrl } from '@/utils/audio/SampleProcessing';
 import { PixiBeatSyncDialog } from '../../dialogs/PixiBeatSyncDialog';
 import { PixiSpectrumFilterPanel } from '../../dialogs/PixiSpectrumFilterPanel';
 
@@ -53,6 +54,27 @@ export const PixiSampleEditor: React.FC<PixiSampleEditorProps> = ({
 
   // ── Spectrum Filter panel ─────────────────────────────────────────────
   const [showSpectrumFilter, setShowSpectrumFilter] = useState(false);
+
+  // ── Persist processed buffer to instrument store ─────────────────────
+  const handleBufferProcessed = useCallback(async (buf: AudioBuffer, prefix: string) => {
+    setAudioBuffer(buf);
+    const dataUrl = await bufferToDataUrl(buf);
+    const sampleInfo = (instrument.parameters as Record<string, unknown>)?.sampleInfo as Record<string, unknown> | undefined;
+    const name = sampleInfo?.name as string | undefined;
+    updateInstrument(instrument.id, {
+      parameters: {
+        ...instrument.parameters,
+        sampleUrl: dataUrl,
+        sampleInfo: {
+          name: name ? (name.startsWith(prefix + '_') ? name : prefix + '_' + name) : prefix + '_Sample',
+          duration: buf.duration,
+          size: Math.round(((dataUrl.split(',')[1] || '').length * 3) / 4),
+          sampleRate: buf.sampleRate,
+          channels: buf.numberOfChannels,
+        },
+      },
+    });
+  }, [instrument.id, instrument.parameters, updateInstrument]);
 
   // ── View state ──────────────────────────────────────────────────────
   const [viewStart, setViewStart] = useState(0);
@@ -503,7 +525,7 @@ export const PixiSampleEditor: React.FC<PixiSampleEditorProps> = ({
           selectionEnd={-1}
           width={WAVEFORM_W}
           onApply={(buf) => {
-            setAudioBuffer(buf);
+            handleBufferProcessed(buf, 'Filter');
             setShowSpectrumFilter(false);
           }}
           onClose={() => setShowSpectrumFilter(false)}
@@ -597,7 +619,7 @@ export const PixiSampleEditor: React.FC<PixiSampleEditorProps> = ({
         onClose={() => setShowBeatSync(false)}
         audioBuffer={audioBuffer}
         onApply={(buf) => {
-          setAudioBuffer(buf);
+          handleBufferProcessed(buf, 'BeatSync');
           setShowBeatSync(false);
         }}
       />

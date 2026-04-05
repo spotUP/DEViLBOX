@@ -198,7 +198,7 @@ export const PixiCleanupDialog: React.FC<PixiCleanupDialogProps> = ({ isOpen, on
 
         {/* Description */}
         <PixiLabel
-          text="Analysis found the following unused or redundant data. Select items to remove, then click Remove Selected."
+          text="Analysis found the following unused or redundant data. Select items to remove, then click Remove Selected. This action cannot be undone."
           size="xs"
           color="textMuted"
           font="sans"
