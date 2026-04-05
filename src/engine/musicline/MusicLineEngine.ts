@@ -216,9 +216,22 @@ export class MusicLineEngine {
   }
 
   /** Load a .ml song from binary data */
+  /** Track loaded song data length + first bytes to skip redundant reloads */
+  private _loadedDataSignature = '';
+
   async loadSong(data: Uint8Array): Promise<MusicLineSongInfo> {
     await this._initPromise;
     if (!this.workletNode) throw new Error('MusicLineEngine not initialized');
+
+    // Skip reload if the same data is already loaded — _ml_init() inside the
+    // worklet's loadSong corrupts state when called multiple times in succession.
+    // startNativeEngines calls loadSong on every play, but the data hasn't changed.
+    const sig = `${data.byteLength}:${data[0]}:${data[1]}:${data[2]}:${data[3]}`;
+    if (this._loadedDataSignature === sig && this._playing === false) {
+      // Same data, just needs play() — return cached info
+      return this._loadPromise ?? Promise.resolve({ title: '', author: '', subsongs: 1 });
+    }
+    this._loadedDataSignature = sig;
 
     this._loadPromise = new Promise<MusicLineSongInfo>((resolve, reject) => {
       this._resolveLoad = resolve;
@@ -455,6 +468,7 @@ export class MusicLineEngine {
 
   dispose(): void {
     this._disposed = true;
+    this._loadedDataSignature = '';
     this.stop();
     this.workletNode?.disconnect();
     this.workletNode = null;
