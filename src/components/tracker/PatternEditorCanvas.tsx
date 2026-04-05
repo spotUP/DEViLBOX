@@ -2680,7 +2680,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
   const mobileTrigger = { level: 0, triggered: false };
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col h-full" onContextMenu={(e) => { e.preventDefault(); containerRef.current?.focus(); handleContextMenu(e); }}>
       {/* Mobile Channel Header */}
       {isMobile && (
         <div className="flex-shrink-0 bg-dark-bgTertiary border-b border-dark-border relative touch-none" {...channelHeaderGestures}>
