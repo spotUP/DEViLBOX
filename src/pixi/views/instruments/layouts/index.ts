@@ -56,8 +56,11 @@ import { ZYNADDSUBFX_LAYOUT } from './zynaddsubfx';
 import { PINK_TROMBONE_LAYOUT } from './pinkTrombone';
 import { DECTALK_LAYOUT } from './dectalk';
 import { SAM_LAYOUT } from './sam';
+import { TR707_LAYOUT } from './tr707';
 import { TR808_LAYOUT } from './tr808';
 import { TR909_LAYOUT } from './tr909';
+import { CZ101_LAYOUT } from './cz101';
+import { D50_LAYOUT } from './d50';
 import { C64SID_LAYOUT } from './c64sid';
 import { V2SPEECH_LAYOUT } from './v2speech';
 
@@ -137,10 +140,15 @@ export const SYNTH_LAYOUTS: Record<string, SynthPanelLayout> = {
   Sfizz: SFIZZ_LAYOUT,
   ZynAddSubFX: ZYNADDSUBFX_LAYOUT,
 
+  // MAME chip synths with dedicated panels
+  CZ101: CZ101_LAYOUT,
+  D50: D50_LAYOUT,
+
   // VSTBridge synths that share existing layouts
   Open303: TB303_LAYOUT,
 
   // Drum machines
+  MAMETR707: TR707_LAYOUT,
   TR808: TR808_LAYOUT,
   TR909: TR909_LAYOUT,
 
