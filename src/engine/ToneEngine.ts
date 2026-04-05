@@ -1749,7 +1749,9 @@ export class ToneEngine {
         // to match SampleEditor's display priority and ensure preset changes take effect
         let sampleUrl = (config.sample?.url || config.parameters?.sampleUrl) as string | undefined;
         // CRITICAL FIX: Use the actual base note from the sample config, not hardcoded C4
-        const baseNote = config.sample?.baseNote || 'C4';
+        // Strip dash from tracker-style notes (C-4 → C4) for Tone.js compatibility
+        const rawBaseNote = config.sample?.baseNote || 'C4';
+        const baseNote = rawBaseNote.replace('-', '');
         const hasLoop = config.sample?.loop === true;
         const loopStart = config.sample?.loopStart || 0;
         const loopEnd = config.sample?.loopEnd || 0;
