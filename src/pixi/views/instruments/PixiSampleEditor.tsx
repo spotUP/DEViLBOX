@@ -12,13 +12,17 @@
  * DOM reference: src/components/instruments/SampleEditor.tsx
  */
 
-import React, { useCallback, useRef, useState, useEffect } from 'react';
+import React, { useCallback, useRef, useState, useEffect, useMemo } from 'react';
 import { Graphics } from 'pixi.js';
 import type { FederatedPointerEvent } from 'pixi.js';
 import { usePixiTheme } from '../../theme';
 import { PixiLabel, PixiButton, PixiSlider } from '../../components';
-import { useInstrumentStore } from '@stores';
+import { useInstrumentStore, useTrackerStore } from '@stores';
+import { scan9xxOffsets } from '@/lib/analysis/scan9xxOffsets';
 import type { InstrumentConfig, DeepPartial } from '@typedefs/instrument';
+import { bufferToDataUrl } from '@/utils/audio/SampleProcessing';
+import { PixiBeatSyncDialog } from '../../dialogs/PixiBeatSyncDialog';
+import { PixiSpectrumFilterPanel } from '../../dialogs/PixiSpectrumFilterPanel';
 
 // ── Types ───────────────────────────────────────────────────────────────
 
@@ -45,6 +49,38 @@ export const PixiSampleEditor: React.FC<PixiSampleEditorProps> = ({
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // ── Beat Sync dialog ─────────────────────────────────────────────────
+  const [showBeatSync, setShowBeatSync] = useState(false);
+
+  // ── Spectrum Filter panel ─────────────────────────────────────────────
+  const [showSpectrumFilter, setShowSpectrumFilter] = useState(false);
+
+  // ── Persist processed buffer to instrument store ─────────────────────
+  const handleBufferProcessed = useCallback(async (buf: AudioBuffer, prefix: string) => {
+    setAudioBuffer(buf);
+    const dataUrl = await bufferToDataUrl(buf);
+    const sampleInfo = (instrument.parameters as Record<string, unknown>)?.sampleInfo as Record<string, unknown> | undefined;
+    const name = sampleInfo?.name as string | undefined;
+    updateInstrument(instrument.id, {
+      parameters: {
+        ...instrument.parameters,
+        sampleUrl: dataUrl,
+        sampleInfo: {
+          name: name ? (name.startsWith(prefix + '_') ? name : prefix + '_' + name) : prefix + '_Sample',
+          duration: buf.duration,
+          size: Math.round(((dataUrl.split(',')[1] || '').length * 3) / 4),
+          sampleRate: buf.sampleRate,
+          channels: buf.numberOfChannels,
+        },
+      },
+    });
+    // Force ToneEngine to recreate its Player with the new buffer
+    try {
+      const { getToneEngine } = await import('@engine/ToneEngine');
+      getToneEngine().invalidateInstrument(instrument.id);
+    } catch { /* ToneEngine not active */ }
+  }, [instrument.id, instrument.parameters, updateInstrument]);
+
   // ── View state ──────────────────────────────────────────────────────
   const [viewStart, setViewStart] = useState(0);
   const [viewEnd, setViewEnd] = useState(1);
@@ -56,6 +92,14 @@ export const PixiSampleEditor: React.FC<PixiSampleEditorProps> = ({
   const loopStart = (params.loopStart as number) ?? 0;
   const loopEnd = (params.loopEnd as number) ?? 1;
   const loopType: LoopType = (params.loopType as LoopType) ?? 'forward';
+
+  // Scan current pattern for 9xx offsets referencing this instrument
+  const currentPattern = useTrackerStore((s) => s.patterns[s.currentPatternIndex]);
+  const offsetMarkers = useMemo(() => {
+    if (!currentPattern || !audioBuffer || !instrument.id) return undefined;
+    const offsets = scan9xxOffsets(currentPattern, instrument.id);
+    return offsets.length > 0 ? offsets : undefined;
+  }, [currentPattern, audioBuffer, instrument.id]);
 
   // ── Dragging ────────────────────────────────────────────────────────
   const [dragTarget, setDragTarget] = useState<'loopStart' | 'loopEnd' | null>(null);
@@ -222,6 +266,26 @@ export const PixiSampleEditor: React.FC<PixiSampleEditorProps> = ({
       }
     }
 
+    // ── 9xx offset markers ────────────────────────────────────────────
+    if (offsetMarkers && audioBuffer) {
+      const totalSamples = audioBuffer.length;
+      const viewStartSample = Math.floor(viewStart * totalSamples);
+      const viewEndSample = Math.floor(viewEnd * totalSamples);
+      const visibleSamples = viewEndSample - viewStartSample;
+      const markerColor = 0x00d2d2; // muted cyan
+
+      for (const val of offsetMarkers) {
+        const samplePos = val * 128;
+        if (samplePos < viewStartSample || samplePos > viewEndSample) continue;
+        const px = ((samplePos - viewStartSample) / visibleSamples) * w;
+
+        // Dashed vertical line (approximate with short segments)
+        for (let y = 0; y < h; y += 6) {
+          g.moveTo(px, y).lineTo(px, Math.min(y + 3, h)).stroke({ color: markerColor, width: 1, alpha: 0.7 });
+        }
+      }
+    }
+
     // ── Playback cursor ────────────────────────────────────────────────
     if (playbackPosition > 0) {
       const pX = ((playbackPosition - viewStart) / (viewEnd - viewStart)) * w;
@@ -229,7 +293,7 @@ export const PixiSampleEditor: React.FC<PixiSampleEditorProps> = ({
         g.moveTo(pX, 0).lineTo(pX, h).stroke({ color: theme.warning.color, width: 2 });
       }
     }
-  }, [WAVEFORM_W, WAVEFORM_H, audioBuffer, viewStart, viewEnd, loopEnabled, loopStart, loopEnd, playbackPosition, theme]);
+  }, [WAVEFORM_W, WAVEFORM_H, audioBuffer, viewStart, viewEnd, loopEnabled, loopStart, loopEnd, playbackPosition, theme, offsetMarkers]);
 
   // ── Pointer interaction for loop handle dragging ────────────────────
   const handlePointerDown = useCallback((e: FederatedPointerEvent) => {
@@ -317,6 +381,26 @@ export const PixiSampleEditor: React.FC<PixiSampleEditorProps> = ({
           size="sm"
           onClick={zoomFit}
           tooltip="Zoom to Fit"
+        />
+
+        {/* Beat Sync button */}
+        <PixiButton
+          label="Beat Sync"
+          variant="ghost"
+          size="sm"
+          disabled={!audioBuffer}
+          onClick={() => setShowBeatSync(true)}
+          tooltip="Fit sample to tracker rows"
+        />
+
+        {/* Spectrum Filter button */}
+        <PixiButton
+          label="Filter"
+          variant={showSpectrumFilter ? 'primary' : 'ghost'}
+          size="sm"
+          disabled={!audioBuffer}
+          onClick={() => setShowSpectrumFilter(!showSpectrumFilter)}
+          tooltip="Spectral filter curve editor"
         />
 
         {/* Loop toggle */}
@@ -433,6 +517,21 @@ export const PixiSampleEditor: React.FC<PixiSampleEditorProps> = ({
         )}
       </layoutContainer>
 
+      {/* Spectrum Filter Panel */}
+      {showSpectrumFilter && (
+        <PixiSpectrumFilterPanel
+          audioBuffer={audioBuffer}
+          selectionStart={-1}
+          selectionEnd={-1}
+          width={WAVEFORM_W}
+          onApply={(buf) => {
+            handleBufferProcessed(buf, 'Filter');
+            setShowSpectrumFilter(false);
+          }}
+          onClose={() => setShowSpectrumFilter(false)}
+        />
+      )}
+
       {/* Loop sliders (when enabled) */}
       {loopEnabled && audioBuffer && (
         <layoutContainer layout={{ flexDirection: 'row', gap: 12, paddingLeft: 4, paddingRight: 4 }}>
@@ -513,6 +612,17 @@ export const PixiSampleEditor: React.FC<PixiSampleEditorProps> = ({
           <PixiLabel text="No sample" size="xs" color="textMuted" />
         )}
       </layoutContainer>
+
+      {/* Beat Sync Dialog */}
+      <PixiBeatSyncDialog
+        isOpen={showBeatSync}
+        onClose={() => setShowBeatSync(false)}
+        audioBuffer={audioBuffer}
+        onApply={(buf) => {
+          handleBufferProcessed(buf, 'BeatSync');
+          setShowBeatSync(false);
+        }}
+      />
     </layoutContainer>
   );
 };
