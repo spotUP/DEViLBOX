@@ -54,10 +54,10 @@ class MusicLineProcessor extends AudioWorkletProcessor {
         break;
 
       case 'play':
-        // Re-init playback from the start (stop + init resets position to 0)
-        if (this.wasm && this.songLoaded) {
+        // Reset playback to start — _ml_stop resets position without clearing song data
+        // (unlike _ml_init which would clear the loaded module)
+        if (this.wasm && this.songLoaded && this.playing === false) {
           this.wasm._ml_stop();
-          this.wasm._ml_init();
         }
         this.playing = true;
         this._resampPos = 0.0;
