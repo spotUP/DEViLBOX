@@ -82,10 +82,27 @@ else
 fi
 echo ""
 
-# Step 4: Install dependencies on server
+# Step 4: Install dependencies and configure environment on server
 echo -e "${BLUE}[4/6] Installing dependencies on server...${NC}"
 ssh "${SERVER_USER}@${SERVER_IP}" << 'ENDSSH'
 cd /var/www/devilbox/server
+
+# Create production .env if it doesn't exist
+if [ ! -f .env ]; then
+  cat > .env << 'ENVEOF'
+PORT=3001
+NODE_ENV=production
+JWT_SECRET=$(openssl rand -hex 32)
+CORS_ORIGIN=https://devilbox.uprough.net
+DATA_ROOT=./data
+DB_DIR=./data
+ENVEOF
+  echo "✓ Created production .env"
+elif ! grep -q "DATA_ROOT" .env; then
+  echo "DATA_ROOT=./data" >> .env
+  echo "✓ Added DATA_ROOT to existing .env"
+fi
+
 npm install --production
 if [ $? -eq 0 ]; then
     echo "✓ Dependencies installed"

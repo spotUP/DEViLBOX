@@ -90,6 +90,9 @@ app.get('/api/network/local-ip', (_req, res) => {
 import fs from 'fs';
 import path from 'path';
 
+// Resolve data root once — works in both direct deploy (relative to dist/) and Docker
+const dataRoot = path.resolve(process.env.DATA_ROOT || path.join(__dirname, '..', 'data'));
+
 app.get('/api/demo/:type/*', (req, res) => {
   try {
     const { type } = req.params;
@@ -100,7 +103,6 @@ app.get('/api/demo/:type/*', (req, res) => {
       return res.status(400).json({ error: 'Invalid type' });
     }
 
-    const dataRoot = path.resolve(process.env.DATA_ROOT || '/var/www/devilbox/data');
     const basePath = path.join(dataRoot, 'public', type);
     const targetPath = path.join(basePath, subpath);
 
@@ -137,7 +139,7 @@ app.get('/api/demo/:type/*', (req, res) => {
 });
 
 // Static file serving for public demo content
-app.use('/data/public', express.static(process.env.DATA_ROOT + '/public' || '/var/www/devilbox/data/public'));
+app.use('/data/public', express.static(path.join(dataRoot, 'public')));
 
 // Error handler
 app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
