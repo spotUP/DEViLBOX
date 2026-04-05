@@ -495,12 +495,6 @@ export const AutomationLanes: React.FC<AutomationLanesProps> = ({
           onDoubleClick={isCurrentPattern ? (e) => handleDoubleClick(e, curve, yOffset) : undefined}
         >
           <svg width={lw} height={pHeight}>
-            {/* Fill */}
-            <path
-              d={fillPoints.join(' ')}
-              fill={color}
-              fillOpacity={0.1 * opacity}
-            />
             {/* Line */}
             <path
               d={pathPoints.join(' ')}
@@ -548,33 +542,6 @@ export const AutomationLanes: React.FC<AutomationLanesProps> = ({
         pointerEvents: 'none',
       }}
     >
-      {/* Automation lane backgrounds with active channel highlight */}
-      {Array.from({ length: channelCount }, (_, ch) => {
-        const chOffset = channelOffsets[ch] - rowNumWidth;
-        const chWidth = channelWidths[ch];
-        if (chWidth < 20) return null;
-        const group = channelCurveGroups.get(ch);
-        const laneCount = group ? Math.max(1, group.length) : 1;
-        const autoArea = laneCount <= 1 ? AUTOMATION_LANE_WIDTH
-          : Math.max(AUTOMATION_LANE_WIDTH, laneCount * AUTOMATION_LANE_MIN + 4);
-        const areaLeft = chOffset + chWidth - autoArea;
-        const isActive = ch === activeChannelIndex;
-        return (
-          <div
-            key={`bg-${ch}`}
-            style={{
-              position: 'absolute',
-              left: areaLeft,
-              top: 0,
-              width: autoArea,
-              height: totalVirtualHeight,
-              backgroundColor: isActive ? 'rgba(255,255,255,0.03)' : 'rgba(255,255,255,0.01)',
-              borderLeft: '1px solid rgba(255,255,255,0.06)',
-              pointerEvents: 'none',
-            }}
-          />
-        );
-      })}
 
       {/* Previous pattern curves (ghost, above) */}
       {prevCurves.length > 0 && renderPatternCurves(
