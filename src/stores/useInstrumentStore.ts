@@ -821,7 +821,38 @@ export const useInstrumentStore = create<InstrumentStore>()(
         if (updatedConfig) {
           try {
             const { getTrackerReplayer } = require('@engine/TrackerReplayer');
-            getTrackerReplayer().updateInstrument(updatedConfig);
+            const replayer = getTrackerReplayer();
+            replayer.updateInstrument(updatedConfig);
+
+            // Hybrid playback: when libopenmpt handles audio and the user replaces
+            // a sample instrument with a synth, silence the sample in the soundlib
+            // and mark the instrument so ToneEngine fires its notes.
+            const song = replayer.getSong();
+            if (song?.libopenmptFileData && synthTypeChanging) {
+              const isNowSynth = updatedConfig.synthType !== 'Sampler' && updatedConfig.synthType !== 'Player';
+              if (isNowSynth) {
+                replayer.markInstrumentReplaced(id);
+                // Silence the sample in OpenMPT soundlib + hot-reload
+                void (async () => {
+                  try {
+                    const osl = await import('@lib/import/wasm/OpenMPTSoundlib');
+                    const silentSample = new Int8Array(4); // 4 bytes of silence
+                    await osl.setSampleData(id - 1, silentSample, 8363);
+                    const editBridge = await import('@engine/libopenmpt/OpenMPTEditBridge');
+                    const { LibopenmptEngine } = await import('@engine/libopenmpt/LibopenmptEngine');
+                    if (LibopenmptEngine.hasInstance()) {
+                      const data = await osl.saveModule(editBridge.getFormat());
+                      if (data) LibopenmptEngine.getInstance().hotReload(data);
+                    }
+                  } catch (e) {
+                    console.error('[InstrumentStore] Failed to silence sample in libopenmpt:', e);
+                  }
+                })();
+              } else {
+                // Reverted back to Sampler — remove from replaced set
+                replayer.unmarkInstrumentReplaced(id);
+              }
+            }
           } catch { /* replayer not initialized yet */ }
         }
       }
