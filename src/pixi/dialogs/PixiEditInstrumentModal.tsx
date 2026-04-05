@@ -54,6 +54,7 @@ import { PixiArpeggioEditor } from '../views/instruments/PixiArpeggioEditor';
 import { PixiMacroListEditor } from '../views/instruments/PixiMacroCurveEditor';
 import { getSynthLayout } from '../views/instruments/layouts';
 import { PixiSampleEditor } from '../views/instruments/PixiSampleEditor';
+import { PixiDrumKitMapper } from '../views/instruments/PixiDrumKitMapper';
 import { PixiWavetableEditor } from '../views/instruments/PixiWavetableEditor';
 import type { WavetableData } from '../views/instruments/PixiWavetableEditor';
 
@@ -91,7 +92,7 @@ function twColor(tw: string): number {
 
 // ── Types ───────────────────────────────────────────────────────────────────
 
-type ActiveTab = 'sound' | 'effects' | 'script' | 'controls' | 'arpeggio' | 'macros' | 'sample' | 'wavetable';
+type ActiveTab = 'sound' | 'effects' | 'script' | 'controls' | 'arpeggio' | 'macros' | 'sample' | 'wavetable' | 'keymap';
 
 interface PixiEditInstrumentModalProps {
   isOpen: boolean;
@@ -591,6 +592,9 @@ export const PixiEditInstrumentModal: React.FC<PixiEditInstrumentModalProps> = (
               )}
               {currentInstrument?.furnace?.macros && currentInstrument.furnace.macros.length > 0 && (
                 <HeaderTab label="Macros" active={activeTab === 'macros'} onSelect={() => setActiveTab('macros')} />
+              )}
+              {currentInstrument?.synthType === 'DrumKit' && (
+                <HeaderTab label="Keymap" active={activeTab === 'keymap'} onSelect={() => setActiveTab('keymap')} />
               )}
               <HeaderTab label="Effects" active={activeTab === 'effects'} onSelect={() => setActiveTab('effects')} />
             </>
@@ -1580,6 +1584,13 @@ export const PixiEditInstrumentModal: React.FC<PixiEditInstrumentModalProps> = (
                     },
                   });
                 }}
+                width={RIGHT_PANEL_W - PAD * 2}
+                height={CONTENT_H - PAD * 2}
+              />
+            )}
+            {activeTab === 'keymap' && currentInstrument?.synthType === 'DrumKit' && (
+              <PixiDrumKitMapper
+                instrument={currentInstrument}
                 width={RIGHT_PANEL_W - PAD * 2}
                 height={CONTENT_H - PAD * 2}
               />
