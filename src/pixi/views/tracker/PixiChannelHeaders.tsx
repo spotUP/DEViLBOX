@@ -26,6 +26,7 @@ import { useTrackerStore } from '@stores/useTrackerStore';
 import { useFormatStore } from '@stores/useFormatStore';
 import { useAutomationStore } from '@stores/useAutomationStore';
 import { getParamsForFormat, groupParams, type AutomationFormat } from '@/engine/automation/AutomationParams';
+import { MASTER_FX_PRESETS } from '@constants/masterFxPresets';
 import { getNKSParametersForSynth } from '@/midi/performance/synthParameterMaps';
 import type { SynthType } from '@typedefs/instrument';
 import { GENERATORS, type GeneratorType } from '@utils/patternGenerators';
@@ -451,6 +452,18 @@ const PixiChannelHeadersInner: React.FC<PixiChannelHeadersProps> = ({
           { label: 'Bounce', action: () => onBounce(ch) },
           { label: 'Chaos', action: () => onChaos(ch) },
         ]},
+        { label: '', separator: true },
+        // FX Presets
+        { label: 'FX Presets', submenu: (() => {
+          if (!channel.instrumentId) return [{ label: '(no instrument)', disabled: true }];
+          return MASTER_FX_PRESETS.map(preset => ({
+            label: preset.name,
+            action: () => {
+              const effects = preset.effects.map((fx: any, i: number) => ({ ...fx, id: `fx-${Date.now()}-${i}` }));
+              useInstrumentStore.getState().updateInstrument(channel.instrumentId!, { effects });
+            },
+          }));
+        })()},
         { label: '', separator: true },
         { label: channel.muted ? 'Unmute' : 'Mute', action: () => toggleChannelMute(ch) },
         { label: channel.solo ? 'Unsolo' : 'Solo', action: () => toggleChannelSolo(ch) },
