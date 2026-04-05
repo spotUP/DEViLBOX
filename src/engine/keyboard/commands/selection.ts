@@ -5,6 +5,7 @@
 import { useTrackerStore } from '@stores/useTrackerStore';
 import { useCursorStore } from '@/stores/useCursorStore';
 import { useUIStore } from '@stores/useUIStore';
+import { useEditorStore } from '@stores/useEditorStore';
 
 /**
  * Copy current selection to clipboard
@@ -40,13 +41,29 @@ export function cutSelection(): boolean {
  * Paste from clipboard
  */
 export function pasteSelection(): boolean {
-  const { clipboard, paste } = useTrackerStore.getState();
+  const { clipboard, paste, pasteMix: doMix, pasteFlood: doFlood, pastePushForward: doPush } = useTrackerStore.getState();
   if (!clipboard) {
     useUIStore.getState().setStatusMessage('Nothing to paste', false, 1000);
     return true;
   }
-  paste();
-  useUIStore.getState().setStatusMessage('Pasted', false, 1000);
+  const mode = useEditorStore.getState().pasteMode;
+  switch (mode) {
+    case 'mix':
+      doMix();
+      useUIStore.getState().setStatusMessage('Pasted (mix)', false, 800);
+      break;
+    case 'flood':
+      doFlood();
+      useUIStore.getState().setStatusMessage('Pasted (flood)', false, 800);
+      break;
+    case 'insert':
+      doPush();
+      useUIStore.getState().setStatusMessage('Pasted (insert)', false, 800);
+      break;
+    default:
+      paste();
+      useUIStore.getState().setStatusMessage('Pasted', false, 800);
+  }
   return true;
 }
 

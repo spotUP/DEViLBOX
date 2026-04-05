@@ -27,6 +27,7 @@ import { RandomizeDialog } from '@components/dialogs/RandomizeDialog';
 import { PatternOrderModal } from '@components/dialogs/PatternOrderModal';
 import { StrumDialog } from '@components/dialogs/StrumDialog';
 import { AdvancedEditModal } from '@components/dialogs/AdvancedEditModal';
+import { CleanupDialog } from '@components/dialogs/CleanupDialog';
 import { NonEditableDialog } from '@components/dialogs/NonEditableDialog';
 import { NewSongWizard } from '@components/dialogs/NewSongWizard';
 import { KeyboardShortcutSheet } from './KeyboardShortcutSheet';
@@ -278,6 +279,7 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
   const showInstrumentPanel = useUIStore((s) => s.showInstrumentPanel);
   const setShowInstrumentPanel = useUIStore((s) => s.setShowInstrumentPanel);
   const [showAdvancedEdit, setShowAdvancedEdit] = useState(false);
+  const [showCleanup, setShowCleanup] = useState(false);
   const [showAutomation, setShowAutomation] = useState(false);
 
   // Merge keyboard-triggered dialog commands into local dialog state
@@ -580,6 +582,7 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
         onToggleAdvancedEdit={() => setShowAdvancedEdit(!showAdvancedEdit)}
         onShowAutomation={() => setShowAutomation(true)}
         onShowDrumpads={onShowDrumpads}
+        onShowCleanup={() => setShowCleanup(true)}
       />
       )}
 
@@ -984,6 +987,7 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
           onMath={blockOps.mathBlock}
         />
       )}
+      <CleanupDialog isOpen={showCleanup} onClose={() => setShowCleanup(false)} />
       {showAcidGenerator && (
         <AcidPatternGeneratorDialog
           channelIndex={acidGeneratorChannel}
