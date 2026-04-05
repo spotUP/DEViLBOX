@@ -51,9 +51,9 @@ export const MONIQUE_LAYOUT: SynthPanelLayout = {
         {
           label: 'FM GLOBAL',
           controls: [
-            { type: 'knob', key: 'fmMulti', label: 'MULTI', color: '#ff9900', min: 0, max: 1, defaultValue: 0, formatValue: fmtPct },
+            { type: 'knob', key: 'fmFreq', label: 'FREQ', color: '#ff9900', min: 0, max: 1, defaultValue: 0, formatValue: fmtPct },
             { type: 'knob', key: 'fmSwing', label: 'SWING', color: '#ff9900', min: 0, max: 1, defaultValue: 0, formatValue: fmtPct },
-            { type: 'knob', key: 'fmPhase', label: 'PHASE', color: '#ff9900', min: 0, max: 1, defaultValue: 0, formatValue: fmtPct },
+            { type: 'knob', key: 'fmShape', label: 'SHAPE', color: '#ff9900', min: 0, max: 1, defaultValue: 0, formatValue: fmtPct },
             { type: 'knob', key: 'masterShift', label: 'SHIFT', color: '#66ccff', min: 0, max: 1, defaultValue: 0.5, formatValue: fmtPct },
           ],
         },
@@ -122,8 +122,7 @@ export const MONIQUE_LAYOUT: SynthPanelLayout = {
             { type: 'knob', key: 'env1Sustain', label: 'SUS', color: '#22c55e', min: 0, max: 1, defaultValue: 0.7, formatValue: fmtPct },
             { type: 'knob', key: 'env1Release', label: 'REL', color: '#22c55e', min: 0, max: 1, defaultValue: 0.3, formatValue: fmtPct },
             { type: 'knob', key: 'env1Shape', label: 'SHAPE', color: '#22c55e', min: -1, max: 1, defaultValue: 0, bipolar: true, formatValue: fmtBipolarPct },
-            { type: 'knob', key: 'env1Retrigger', label: 'RETRIG', color: '#22c55e', min: 0.004, max: 1, defaultValue: 0.004, formatValue: fmtPct },
-            { type: 'knob', key: 'env1Velocity', label: 'VEL', color: '#22c55e', min: 0, max: 1, defaultValue: 0, formatValue: fmtPct },
+            { type: 'knob', key: 'env1SusTime', label: 'S.TIME', color: '#22c55e', min: 0.004, max: 1, defaultValue: 0.004, formatValue: fmtPct },
           ],
         },
         {
@@ -134,8 +133,7 @@ export const MONIQUE_LAYOUT: SynthPanelLayout = {
             { type: 'knob', key: 'env2Sustain', label: 'SUS', color: '#06b6d4', min: 0, max: 1, defaultValue: 0.7, formatValue: fmtPct },
             { type: 'knob', key: 'env2Release', label: 'REL', color: '#06b6d4', min: 0, max: 1, defaultValue: 0.3, formatValue: fmtPct },
             { type: 'knob', key: 'env2Shape', label: 'SHAPE', color: '#06b6d4', min: -1, max: 1, defaultValue: 0, bipolar: true, formatValue: fmtBipolarPct },
-            { type: 'knob', key: 'env2Retrigger', label: 'RETRIG', color: '#06b6d4', min: 0.004, max: 1, defaultValue: 0.004, formatValue: fmtPct },
-            { type: 'knob', key: 'env2Velocity', label: 'VEL', color: '#06b6d4', min: 0, max: 1, defaultValue: 0, formatValue: fmtPct },
+            { type: 'knob', key: 'env2SusTime', label: 'S.TIME', color: '#06b6d4', min: 0.004, max: 1, defaultValue: 0.004, formatValue: fmtPct },
           ],
         },
         {
@@ -146,8 +144,7 @@ export const MONIQUE_LAYOUT: SynthPanelLayout = {
             { type: 'knob', key: 'env3Sustain', label: 'SUS', color: '#f59e0b', min: 0, max: 1, defaultValue: 0.7, formatValue: fmtPct },
             { type: 'knob', key: 'env3Release', label: 'REL', color: '#f59e0b', min: 0, max: 1, defaultValue: 0.3, formatValue: fmtPct },
             { type: 'knob', key: 'env3Shape', label: 'SHAPE', color: '#f59e0b', min: -1, max: 1, defaultValue: 0, bipolar: true, formatValue: fmtBipolarPct },
-            { type: 'knob', key: 'env3Retrigger', label: 'RETRIG', color: '#f59e0b', min: 0.004, max: 1, defaultValue: 0.004, formatValue: fmtPct },
-            { type: 'knob', key: 'env3Velocity', label: 'VEL', color: '#f59e0b', min: 0, max: 1, defaultValue: 0, formatValue: fmtPct },
+            { type: 'knob', key: 'env3SusTime', label: 'S.TIME', color: '#f59e0b', min: 0.004, max: 1, defaultValue: 0.004, formatValue: fmtPct },
           ],
         },
         {
@@ -158,8 +155,7 @@ export const MONIQUE_LAYOUT: SynthPanelLayout = {
             { type: 'knob', key: 'env4Sustain', label: 'SUS', color: '#ff3366', min: 0, max: 1, defaultValue: 0.8, formatValue: fmtPct },
             { type: 'knob', key: 'env4Release', label: 'REL', color: '#ff3366', min: 0, max: 1, defaultValue: 0.3, formatValue: fmtPct },
             { type: 'knob', key: 'env4Shape', label: 'SHAPE', color: '#ff3366', min: -1, max: 1, defaultValue: 0, bipolar: true, formatValue: fmtBipolarPct },
-            { type: 'knob', key: 'env4Retrigger', label: 'RETRIG', color: '#ff3366', min: 0.004, max: 1, defaultValue: 0.004, formatValue: fmtPct },
-            { type: 'knob', key: 'env4Velocity', label: 'VEL', color: '#ff3366', min: 0, max: 1, defaultValue: 0, formatValue: fmtPct },
+            { type: 'knob', key: 'env4SusTime', label: 'S.TIME', color: '#ff3366', min: 0.004, max: 1, defaultValue: 0.004, formatValue: fmtPct },
           ],
         },
       ],
@@ -203,14 +199,12 @@ export const MONIQUE_LAYOUT: SynthPanelLayout = {
           controls: [
             { type: 'knob', key: 'reverbRoom', label: 'ROOM', color: '#cc66ff', min: 0, max: 1, defaultValue: 0.3, formatValue: fmtPct },
             { type: 'knob', key: 'reverbMix', label: 'MIX', color: '#cc66ff', min: 0, max: 1, defaultValue: 0, formatValue: fmtPct },
-            { type: 'knob', key: 'reverbWidth', label: 'WIDTH', color: '#cc66ff', min: 0, max: 1, defaultValue: 0, formatValue: fmtPct },
           ],
         },
         {
           label: 'CHORUS',
           controls: [
             { type: 'knob', key: 'chorusMod', label: 'MOD', color: '#33ccff', min: 0, max: 1, defaultValue: 0, formatValue: fmtPct },
-            { type: 'knob', key: 'chorusPan', label: 'PAN', color: '#33ccff', min: 0, max: 1, defaultValue: 0, formatValue: fmtPct },
           ],
         },
         {
@@ -234,7 +228,6 @@ export const MONIQUE_LAYOUT: SynthPanelLayout = {
             { type: 'knob', key: 'distortion', label: 'DIST', color: '#ff3366', min: 0, max: 1, defaultValue: 0, formatValue: fmtPct },
             { type: 'knob', key: 'shape', label: 'SHAPE', color: '#ff9900', min: 0, max: 1, defaultValue: 0, formatValue: fmtPct },
             { type: 'knob', key: 'glide', label: 'GLIDE', color: '#33ccff', min: 0, max: 1, defaultValue: 0, formatValue: fmtPct },
-            { type: 'knob', key: 'glideTime', label: 'GLIDE T', color: '#33ccff', min: 0, max: 127, defaultValue: 0, formatValue: fmtInt },
             { type: 'knob', key: 'octaveOffset', label: 'OCTAVE', color: '#ffcc00', min: -4, max: 4, defaultValue: 0, bipolar: true, formatValue: fmtInt },
             { type: 'knob', key: 'noteOffset', label: 'NOTE', color: '#ffcc00', min: -12, max: 12, defaultValue: 0, bipolar: true, formatValue: fmtInt },
             { type: 'knob', key: 'speed', label: 'SPEED', color: '#66ccff', min: 20, max: 1000, defaultValue: 200, formatValue: fmtInt },
