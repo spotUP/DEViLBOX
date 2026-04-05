@@ -522,7 +522,9 @@ export const useInstrumentStore = create<InstrumentStore>()(
             }
 
             if (updatedInstrument.synthType === 'V2' && updatedInstrument.v2 && updates.v2) {
-              engine.updateV2Parameters(id, updatedInstrument.v2);
+              // V2 uses binary patches — applyConfig converts config→bytes→loadPatch.
+              // updateV2Parameters calls setParameter() which is a no-op for V2.
+              engine.updateComplexSynthParameters(id, updatedInstrument.v2);
               return; // Handled
             }
 
