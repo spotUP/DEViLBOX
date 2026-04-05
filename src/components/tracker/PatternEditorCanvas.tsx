@@ -1750,6 +1750,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
     // Create canvas imperatively — prevents StrictMode double-transferControlToOffscreen error
     const canvas = document.createElement('canvas');
     canvas.style.cssText = `display:block;width:${dimensions.width}px;height:${dimensions.height}px;`;
+    canvas.oncontextmenu = (e) => e.preventDefault();
     container.appendChild(canvas);
     canvasRef.current = canvas;
 
@@ -1954,6 +1955,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
 
     const canvas = document.createElement('canvas');
     canvas.style.cssText = 'display:block;width:100%;height:100%;position:relative;z-index:0;';
+    canvas.oncontextmenu = (e) => e.preventDefault();
     container.appendChild(canvas);
     canvasRef.current = canvas;
 
