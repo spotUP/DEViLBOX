@@ -124,10 +124,11 @@ function unpackFrequencyPeaks(buf: Buffer): number[][] {
 
 // ── Database operations (lazy-init to avoid crash before initDatabase()) ─────
 
-let lookupStmt: ReturnType<typeof db.prepare>;
-let insertStmt: ReturnType<typeof db.prepare>;
-let countStmt: ReturnType<typeof db.prepare>;
-let sizeStmt: ReturnType<typeof db.prepare>;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+let lookupStmt: any;
+let insertStmt: any;
+let countStmt: any;
+let sizeStmt: any;
 let _stmtsReady = false;
 
 function ensureStatements() {
