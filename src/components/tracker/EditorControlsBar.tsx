@@ -24,7 +24,7 @@ import { GrooveSettingsModal } from '@components/dialogs/GrooveSettingsModal';
 import { GROOVE_TEMPLATES } from '@typedefs/audio';
 import {
   Eye, EyeOff,
-  Activity, LayoutGrid, Cpu, SlidersHorizontal, Zap,
+  Activity, LayoutGrid, Cpu, SlidersHorizontal, Zap, Trash2,
 } from 'lucide-react';
 
 import { type TrackerViewMode } from '@stores/useUIStore';
@@ -42,6 +42,8 @@ export interface EditorControlsBarProps {
   onShowAutomation?: () => void;
   /** Optional drumpad callback override (defaults to openModal('drumpads')) */
   onShowDrumpads?: () => void;
+  /** When provided, renders a "Cleanup" button in the toolbar */
+  onShowCleanup?: () => void;
 }
 
 export const EditorControlsBar: React.FC<EditorControlsBarProps> = React.memo(({
@@ -53,6 +55,7 @@ export const EditorControlsBar: React.FC<EditorControlsBarProps> = React.memo(({
   onToggleAdvancedEdit,
   onShowAutomation,
   onShowDrumpads: onShowDrumpadsProp,
+  onShowCleanup,
 }) => {
   // ── Shared hook ───────────────────────────────────────────────────────────
   const c = useEditorControls({
@@ -178,6 +181,18 @@ export const EditorControlsBar: React.FC<EditorControlsBarProps> = React.memo(({
           >
             <Activity size={12} />
             <span>Automation</span>
+          </button>
+        )}
+
+        {/* Song Cleanup Dialog */}
+        {onShowCleanup && (
+          <button
+            onClick={onShowCleanup}
+            className="flex items-center gap-1 px-2 py-1 text-xs rounded transition-colors bg-dark-bgSecondary text-text-secondary hover:text-text-primary"
+            title="Analyze song and remove unused data"
+          >
+            <Trash2 size={12} />
+            <span>Cleanup</span>
           </button>
         )}
 
