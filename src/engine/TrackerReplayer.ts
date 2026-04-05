@@ -706,6 +706,19 @@ export class TrackerReplayer {
   /** Get loaded song data */
   getSong(): TrackerSong | null { return this.song; }
 
+  /** Update a single instrument in the replayer's cached instrument map.
+   *  Called when the user replaces/edits an instrument while a song is loaded. */
+  updateInstrument(config: InstrumentConfig): void {
+    this.instrumentMap.set(config.id, config);
+    // Also update the song.instruments array so channel state refs stay current
+    if (this.song) {
+      const idx = this.song.instruments.findIndex(i => i.id === config.id);
+      if (idx >= 0) {
+        this.song.instruments[idx] = config;
+      }
+    }
+  }
+
   /** Whether a WASM engine handles playback (forcePosition is meaningless) */
   get isSuppressNotes(): boolean { return this._suppressNotes; }
 
