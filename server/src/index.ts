@@ -5,6 +5,11 @@
 // Load environment variables FIRST — before any route modules read process.env constants
 import 'dotenv/config';
 
+// Initialize database tables BEFORE importing route modules — several routes
+// call db.prepare() at module scope which fails if tables don't exist yet.
+import { initDatabase } from './db/database';
+initDatabase();
+
 import express from 'express';
 import cors from 'cors';
 import rateLimit from 'express-rate-limit';
@@ -21,7 +26,6 @@ import renderRoutes from './routes/render';
 import djsetsRoutes from './routes/djsets';
 import ratingsRoutes from './routes/ratings';
 import { handleStreamConnection, checkFfmpeg } from './routes/stream';
-import { initDatabase } from './db/database';
 import { initDataDirectories } from './utils/fileSystem';
 import { initModlandIndex, scheduleModlandUpdates } from './services/modlandIndexer';
 import { initSongDB, scheduleSongDBUpdates } from './services/songdbIndexer';
@@ -149,8 +153,7 @@ app.use((err: any, req: express.Request, res: express.Response, next: express.Ne
   });
 });
 
-// Initialize database and file system
-initDatabase();
+// Initialize file system (DB already initialized at top of file)
 initDataDirectories();
 
 // Initialize Modland index (non-blocking — runs in background)
