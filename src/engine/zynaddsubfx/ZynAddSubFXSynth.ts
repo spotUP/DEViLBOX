@@ -416,8 +416,12 @@ export class ZynAddSubFXSynthEngine implements DevilboxSynth {
       }
       return this;
     }
-    // Always use allNotesOff — individual noteOff has note-matching issues in the WASM bridge
-    this._worklet.port.postMessage({ type: 'allNotesOff' });
+    if (frequency !== undefined) {
+      const note = typeof frequency === 'string' ? noteToMidi(frequency) : Math.round(12 * Math.log2(frequency / 440) + 69);
+      this._worklet.port.postMessage({ type: 'noteOff', note });
+    } else {
+      this._worklet.port.postMessage({ type: 'allNotesOff' });
+    }
     return this;
   }
 

@@ -232,7 +232,11 @@ void zasfx_note_on(void* ptr, int note, int velocity) {
 void zasfx_note_off(void* ptr, int note) {
     if (!ptr) return;
     auto* inst = (ZasfxInstance*)ptr;
-    inst->master->noteOff(0, (note_t)note);
+    // Part::NoteOff(note) searches the notePool by note value but fails to match
+    // in mono/legato modes. Use Part::cleanup() which immediately kills all voices
+    // on the part — same mechanism as Master::ShutUp() but per-part.
+    // In a tracker, only one note plays per instrument at a time, so this is safe.
+    getPart(inst)->cleanup();
 }
 
 void zasfx_all_notes_off(void* ptr) {

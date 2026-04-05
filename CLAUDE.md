@@ -1,5 +1,16 @@
 # DEViLBOX Project Memory
 
+## CRITICAL: Always Fix the Root Cause
+
+**!!! NO WORKAROUNDS — FIX THE ACTUAL BUG !!!**
+
+- **NEVER use workarounds, shims, or "good enough" hacks.** If noteOff doesn't work, fix the noteOff code — don't send allNotesOff as a band-aid.
+- **NEVER leave a known root cause unfixed** while papering over the symptom. The lazy path creates tech debt that compounds.
+- **Trace to the actual source** — if the bug is in C++/WASM, fix the C++/WASM and rebuild. If it's in the store, fix the store. Don't patch around it in a different layer.
+- **If a proper fix requires a rebuild, do the rebuild.** The extra 30 seconds is always worth it vs shipping a workaround that breaks later.
+
+---
+
 ## CRITICAL: Never Guess or Assume
 
 **!!! ALWAYS CHECK THE FACTS — GO BY THE FACTS !!!**
