@@ -345,11 +345,18 @@ class FurnaceDispatchProcessor extends AudioWorkletProcessor {
         if (chip && this.wasm && data.flagsStr) {
           const heapBuffer = this.getHeapBuffer();
           if (heapBuffer) {
-            const encoder = new TextEncoder();
-            const encoded = encoder.encode(data.flagsStr);
+            // Manual UTF-8 encode (TextEncoder not available in AudioWorkletGlobalScope)
+            const str = data.flagsStr;
+            const encoded = [];
+            for (let ci = 0; ci < str.length; ci++) {
+              let code = str.charCodeAt(ci);
+              if (code < 0x80) { encoded.push(code); }
+              else if (code < 0x800) { encoded.push(0xC0 | (code >> 6), 0x80 | (code & 0x3F)); }
+              else { encoded.push(0xE0 | (code >> 12), 0x80 | ((code >> 6) & 0x3F), 0x80 | (code & 0x3F)); }
+            }
             const dataPtr = this.module._malloc(encoded.length + 1);
             const heap = new Uint8Array(heapBuffer, dataPtr, encoded.length + 1);
-            heap.set(encoded);
+            for (let bi = 0; bi < encoded.length; bi++) heap[bi] = encoded[bi];
             heap[encoded.length] = 0; // null terminate
             this.wasm.setFlags(chip.handle, dataPtr, encoded.length);
             this.module._free(dataPtr);
