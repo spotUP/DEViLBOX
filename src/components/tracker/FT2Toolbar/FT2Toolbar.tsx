@@ -599,6 +599,16 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = React.memo(({
 
     setIsLooping(false);
     setCurrentRow(0);
+
+    // MusicLine: skip the engine.stop()+delay — the WASM engine handles its own
+    // init/load cycle via startNativeEngines. The stop+delay causes a race where
+    // startNativeEngines runs twice (once from play(), once from the effect re-fire).
+    if (editorMode === 'musicline') {
+      await engine.init();
+      await play();
+      return;
+    }
+
     await engine.init();
     // Reset ToneEngine state before first play — matches what playStopToggle does.
     // Without this, native synth audio routing is broken on first play.
