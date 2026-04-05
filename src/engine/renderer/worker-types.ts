@@ -81,6 +81,7 @@ export interface CursorSnapshot {
   channelIndex: number;
   columnType: string;
   digitIndex: number;
+  noteColumnIndex?: number;
 }
 
 export interface SelectionSnapshot {
