@@ -1,6 +1,7 @@
 // paula_soft.c — minimal Paula chip emulator for transpiled Amiga replayers
 #include "paula_soft.h"
 #include <string.h>
+#include <stdio.h>
 
 typedef struct {
     const int8_t* sample;
