@@ -31,6 +31,7 @@
 
 import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
 import type { InstrumentConfig } from '@/types';
+import { createSamplerInstrument } from './AmigaUtils';
 
 // ── Constants ───────────────────────────────────────────────────────────────
 
@@ -144,23 +145,118 @@ export async function parseBenDaglishFile(
   // Strip ".bd" suffix or "bd." prefix (case-insensitive)
   const moduleName = baseName.replace(/\.bd$/i, '').replace(/^bd\./i, '') || baseName;
 
-  // ── Instrument placeholders ───────────────────────────────────────────────
+  // ── Extract real samples via SampleInfo1 table ────────────────────────────
   //
-  // MI_MaxSamples is not declared in the assembly InfoBuffer for this format.
-  // 8 placeholder instruments are created as a reasonable default.
+  // Algorithm from Benn Daglishv3.asm InitPlayer:
+  // 1. Follow BRA at offset 0: target = 2 + u16BE(buf, 2)
+  // 2. Scan forward for D040 D040 D040 41FA sequence
+  // 3. SampleInfo1 = scanPos + 8 + s16(scanPos+8) (PC-relative LEA)
+  // 4. Longword offset table → sample descriptors (null-terminated)
+  // 5. Descriptor: u32(sampleOff) u32(loopOff) u16(lenWords) u16(loopLenWords)
 
+  const buf = new Uint8Array(buffer);
   const instruments: InstrumentConfig[] = [];
 
-  for (let i = 0; i < DEFAULT_INSTRUMENTS; i++) {
-    instruments.push({
-      id: i + 1,
-      name: `Sample ${i + 1}`,
-      type: 'synth' as const,
-      synthType: 'Synth' as const,
-      effects: [],
-      volume: 0,
-      pan: 0,
-    } as InstrumentConfig);
+  let samplesExtracted = false;
+
+  {
+    // Find SampleInfo1: scan all LEA d16(PC),A0 (0x41FA) instructions.
+    // The correct one points to a table of longwords where hi-word=0 (offsets < 0x10000).
+    let sampleInfo1Off = -1;
+    for (let i = 0; i < Math.min(buf.length - 4, 0x2000); i += 2) {
+      if (u16BE(buf, i) !== 0x41FA) continue;
+      const disp = u16BE(buf, i + 2);
+      const signedDisp = disp < 0x8000 ? disp : disp - 0x10000;
+      const target = (i + 2) + signedDisp;
+      if (target < 0 || target + 16 > buf.length) continue;
+      // Validate: count longword entries with hi-word = 0
+      let count = 0;
+      for (let j = 0; j < 64; j++) {
+        const off = target + j * 4;
+        if (off + 4 > buf.length) break;
+        const v = u32BE(buf, off);
+        if (v === 0 || (v >>> 16) !== 0) break;
+        count++;
+      }
+      if (count >= 3) { sampleInfo1Off = target; break; }
+    }
+
+    if (sampleInfo1Off > 0 && sampleInfo1Off < buf.length) {
+      // Read entries: longwords with hi-word=0, terminated by 0 or non-zero hi-word
+      const sampleDescs: number[] = [];
+      for (let i = 0; i < 64; i++) {
+        const off = sampleInfo1Off + i * 4;
+        if (off + 4 > buf.length) break;
+        const v = u32BE(buf, off);
+        if (v === 0 || (v >>> 16) !== 0) break;
+        sampleDescs.push(v);
+      }
+
+      for (let i = 0; i < sampleDescs.length; i++) {
+        const descFileOff = sampleInfo1Off + sampleDescs[i];
+        if (descFileOff + 12 > buf.length) continue;
+
+        const sampleOff = u32BE(buf, descFileOff);
+        const loopOff = u32BE(buf, descFileOff + 4);
+        const lenWords = u16BE(buf, descFileOff + 8);
+        const loopLenWords = u16BE(buf, descFileOff + 10);
+        const pcmFileOff = sampleInfo1Off + sampleOff;
+        const lenBytes = lenWords * 2;
+
+        if (lenBytes > 0 && pcmFileOff > 0 && pcmFileOff + lenBytes <= buf.length) {
+          const isFORM = pcmFileOff + 4 <= buf.length &&
+            buf[pcmFileOff] === 0x46 && buf[pcmFileOff + 1] === 0x4F &&
+            buf[pcmFileOff + 2] === 0x52 && buf[pcmFileOff + 3] === 0x4D;
+
+          let pcm: Uint8Array;
+          if (isFORM) {
+            pcm = new Uint8Array(0);
+            for (let j = pcmFileOff + 12; j < pcmFileOff + lenBytes - 8; j += 2) {
+              if (buf[j] === 0x42 && buf[j + 1] === 0x4F &&
+                  buf[j + 2] === 0x44 && buf[j + 3] === 0x59) {
+                const bodyLen = u32BE(buf, j + 4);
+                const bodyOff = j + 8;
+                pcm = new Uint8Array(Math.min(bodyLen, buf.length - bodyOff));
+                for (let k = 0; k < pcm.length; k++) pcm[k] = buf[bodyOff + k];
+                break;
+              }
+            }
+            if (pcm.length === 0) {
+              pcm = new Uint8Array(lenBytes);
+              for (let k = 0; k < lenBytes; k++) pcm[k] = buf[pcmFileOff + k];
+            }
+          } else {
+            pcm = new Uint8Array(lenBytes);
+            for (let k = 0; k < lenBytes; k++) pcm[k] = buf[pcmFileOff + k];
+          }
+
+          const hasLoop = sampleOff !== loopOff && loopLenWords > 0;
+          const loopStartBytes = hasLoop ? (sampleInfo1Off + loopOff) - pcmFileOff : 0;
+          const loopEndBytes = hasLoop ? loopStartBytes + loopLenWords * 2 : 0;
+
+          instruments.push(createSamplerInstrument(
+            i + 1, `BD Sample ${i + 1}`, pcm, 64, 8287,
+            Math.max(0, loopStartBytes), Math.max(0, loopEndBytes)
+          ));
+          samplesExtracted = true;
+        }
+      }
+    }
+  }
+
+  if (!samplesExtracted || instruments.length === 0) {
+    instruments.length = 0;
+    for (let i = 0; i < DEFAULT_INSTRUMENTS; i++) {
+      instruments.push({
+        id: i + 1,
+        name: `BD Sample ${i + 1}`,
+        type: 'synth' as const,
+        synthType: 'Synth' as const,
+        effects: [],
+        volume: 0,
+        pan: 0,
+      } as InstrumentConfig);
+    }
   }
 
   // ── Empty pattern (placeholder — UADE handles actual audio) ───────────────
@@ -214,5 +310,7 @@ export async function parseBenDaglishFile(
     initialBPM: 125,
     linearPeriods: false,
     bdFileData: buffer.slice(0),
+    uadeEditableFileData: buffer.slice(0) as ArrayBuffer,
+    uadeEditableFileName: filename,
   };
 }
