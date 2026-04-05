@@ -23,7 +23,7 @@ import {
   Scissors, Copy, ClipboardPaste, Crop, VolumeX, Volume2, Volume1,
   Undo2, Redo2, Eye, Download,
   ArrowLeft, ArrowRight, Maximize2, FlipHorizontal,
-  Activity, Waves, Clock
+  Activity, Waves, Clock, Filter
 } from 'lucide-react';
 import { useInstrumentStore, useTrackerStore } from '../../stores';
 import { scan9xxOffsets } from '@/lib/analysis/scan9xxOffsets';
@@ -37,6 +37,7 @@ import { AudioToMidiModal } from './AudioToMidiModal';
 import { AmigaPalModal } from './AmigaPalModal';
 import { BeatSyncDialog } from './BeatSyncDialog';
 import { BeatSlicerPanel } from './BeatSlicerPanel';
+import { SampleSpectrumFilter } from './SampleSpectrumFilter';
 import type { ProcessedResult } from '../../utils/audio/SampleProcessing';
 import { bufferToDataUrl } from '../../utils/audio/SampleProcessing';
 import { drawSampleWaveform } from '../../utils/audio/drawSampleWaveform';
@@ -238,6 +239,8 @@ export const SampleEditor: React.FC<SampleEditorProps> = ({ instrument, onChange
     setShowBeatSync,
     showAmigaPal,
     setShowAmigaPal,
+    showSpectrumFilter,
+    setShowSpectrumFilter,
     isPlaying,
     setIsPlaying,
     playbackPosition,
@@ -967,6 +970,18 @@ export const SampleEditor: React.FC<SampleEditorProps> = ({ instrument, onChange
                 Beat Sync
               </button>
               <button
+                onClick={() => setShowSpectrumFilter(!showSpectrumFilter)}
+                className={
+                  'flex items-center gap-1 px-2 py-1 rounded text-[10px] font-bold uppercase transition-colors ' +
+                  (showSpectrumFilter
+                    ? 'bg-blue-500 text-text-primary'
+                    : 'bg-blue-500/10 text-blue-400 border border-blue-500/30 hover:bg-blue-500/20')
+                }
+              >
+                <Filter size={11} />
+                Filter
+              </button>
+              <button
                 onClick={() => setShowResampleModal(true)}
                 className="flex items-center gap-1 px-2 py-1 rounded text-[10px] font-bold uppercase transition-colors bg-orange-500/10 text-orange-400 border border-orange-500/30 hover:bg-orange-500/20"
               >
@@ -1008,6 +1023,21 @@ export const SampleEditor: React.FC<SampleEditorProps> = ({ instrument, onChange
           )}
         </div>
       </div>
+
+      {/* ─── Spectrum Filter Panel ───────────────────────────────── */}
+      {showSpectrumFilter && (
+        <SampleSpectrumFilter
+          audioBuffer={audioBuffer}
+          selectionStart={selectionStart}
+          selectionEnd={selectionEnd}
+          onApply={async (buf) => {
+            const dataUrl = await bufferToDataUrl(buf);
+            handleBufferProcessed({ buffer: buf, dataUrl }, 'Filter');
+            setShowSpectrumFilter(false);
+          }}
+          onClose={() => setShowSpectrumFilter(false)}
+        />
+      )}
 
       {/* ─── Enhancement Panel ───────────────────────────────────── */}
       {showEnhancer && audioBuffer && (
