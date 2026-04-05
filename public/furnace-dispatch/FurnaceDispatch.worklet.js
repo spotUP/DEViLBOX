@@ -964,45 +964,76 @@ class FurnaceDispatchProcessor extends AudioWorkletProcessor {
         }
       }
 
-      // Advance tick accumulator — tick ALL chips in lock-step
-      // (Furnace pattern: for (i=0; i<systemLen; i++) disCont[i].dispatch->tick())
-      this.tickAccumulator += numSamples;
-      while (this.tickAccumulator >= this.samplesPerTick) {
-        if (this.sequencerActive && this.wasm.seqIsPlaying && this.wasm.seqIsPlaying()) {
-          // WASM sequencer drives everything — calls dispatch_cmd() internally
+      // Interleaved tick/render — render audio in chunks between tick boundaries.
+      // This matches Furnace's nextBuf() which ticks then renders samplesPerTick
+      // samples, ensuring macro/envelope changes apply at sample-accurate positions
+      // instead of all at once (which causes clicks/pops/distortion).
+      let remaining = numSamples;
+      let outOffset = 0;
+
+      while (remaining > 0) {
+        // How many samples until the next tick?
+        const samplesUntilTick = Math.max(1, Math.ceil(this.samplesPerTick - this.tickAccumulator));
+        const chunk = Math.min(remaining, samplesUntilTick);
+
+        // Render this chunk from each chip
+        for (const chip of this.chips.values()) {
           try {
-            const pos = this.wasm.seqTick();
-            this._lastSeqOrder = (pos >> 16) & 0xFFFF;
-            this._lastSeqRow = pos & 0xFFFF;
-            // Update tick rate if sequencer divider changed (effects 0xC0-0xC3/0xF0)
-            if (this.wasm.seqGetDivider) {
-              const newDiv = this.wasm.seqGetDivider();
-              if (newDiv > 0 && newDiv !== this.tickRate) {
-                this.tickRate = newDiv;
-                this.samplesPerTick = sampleRate / this.tickRate;
-              }
+            this.wasm.render(chip.handle, this.outputPtrL, this.outputPtrR, chunk);
+            // Re-acquire buffer views — WASM heap may have grown during render
+            this.updateBufferViews();
+            const amp = POST_AMP[chip.platformType] || 1.0;
+            for (let i = 0; i < chunk; i++) {
+              outputL[outOffset + i] += this.outputBufferL[i] * amp;
+              outputR[outOffset + i] += this.outputBufferR[i] * amp;
             }
-          } catch (e) {
-            console.error('[FurnaceDispatch] seqTick WASM trap:', e);
-            this.sequencerActive = false;
-            this.wasmCrashed = true;
-            // WASM state is corrupted after a trap — destroy all chips to prevent
-            // cascading crashes in tick/render calls.
-            for (const chip of this.chips.values()) {
-              try { this.wasm.destroy(chip.handle); } catch { /* already broken */ }
+          } catch (chipErr) {
+            if (!this._badChips) this._badChips = new Set();
+            if (!this._badChips.has(chip.platformType)) {
+              this._badChips.add(chip.platformType);
+              this.port.postMessage({ type: 'error', message: `WASM render error: ${chipErr.message || chipErr}` });
             }
-            this.chips.clear();
-            this.port.postMessage({ type: 'error', message: 'WASM sequencer crashed: ' + (e.message || e) });
           }
         }
-        // Always tick chips for macro processing and audio generation
-        for (const chip of this.chips.values()) {
-          try { this.wasm.tick(chip.handle); } catch { /* skip bad chip */ }
+
+        outOffset += chunk;
+        remaining -= chunk;
+        this.tickAccumulator += chunk;
+
+        // Tick boundary reached — process sequencer + chip ticks
+        if (this.tickAccumulator >= this.samplesPerTick) {
+          if (this.sequencerActive && this.wasm.seqIsPlaying && this.wasm.seqIsPlaying()) {
+            try {
+              const pos = this.wasm.seqTick();
+              this._lastSeqOrder = (pos >> 16) & 0xFFFF;
+              this._lastSeqRow = pos & 0xFFFF;
+              if (this.wasm.seqGetDivider) {
+                const newDiv = this.wasm.seqGetDivider();
+                if (newDiv > 0 && newDiv !== this.tickRate) {
+                  this.tickRate = newDiv;
+                  this.samplesPerTick = sampleRate / this.tickRate;
+                }
+              }
+            } catch (e) {
+              console.error('[FurnaceDispatch] seqTick WASM trap:', e);
+              this.sequencerActive = false;
+              this.wasmCrashed = true;
+              for (const chip of this.chips.values()) {
+                try { this.wasm.destroy(chip.handle); } catch { /* already broken */ }
+              }
+              this.chips.clear();
+              this.port.postMessage({ type: 'error', message: 'WASM sequencer crashed: ' + (e.message || e) });
+              break;
+            }
+          }
+          for (const chip of this.chips.values()) {
+            try { this.wasm.tick(chip.handle); } catch { /* skip bad chip */ }
+          }
+          this.tickAccumulator -= this.samplesPerTick;
         }
-        this.tickAccumulator -= this.samplesPerTick;
       }
 
-      // Drain command log periodically and post to main thread
+      // Drain command log periodically
       if (this._cmdLogEnabled && this.wasm.cmdLogCount) {
         this._cmdLogPollCounter++;
         if (this._cmdLogPollCounter >= 10) {
@@ -1023,32 +1054,6 @@ class FurnaceDispatchProcessor extends AudioWorkletProcessor {
             }
             this.module._free(ptr);
             this.port.postMessage({ type: 'cmdLog', entries });
-          }
-        }
-      }
-
-      // Render each chip and mix into output with postAmp scaling
-      // (Furnace pattern: each disCont[] renders to its own buffer, scaled by getPostAmp(), then mixed)
-      // Per-chip try-catch: a WASM trap in one chip must not silence all others.
-      for (const chip of this.chips.values()) {
-        try {
-          this.wasm.render(chip.handle, this.outputPtrL, this.outputPtrR, numSamples);
-          // Re-acquire buffer views — WASM heap may have grown during render,
-          // detaching the old Float32Array views and causing distortion/gaps.
-          this.updateBufferViews();
-          const amp = POST_AMP[chip.platformType] || 1.0;
-          // Mix this chip's output into the main output
-          for (let i = 0; i < numSamples; i++) {
-            outputL[i] += this.outputBufferL[i] * amp;
-            outputR[i] += this.outputBufferR[i] * amp;
-          }
-        } catch (chipErr) {
-          // Report each bad chip once, then skip it silently
-          if (!this._badChips) this._badChips = new Set();
-          if (!this._badChips.has(chip.platformType)) {
-            this._badChips.add(chip.platformType);
-            const msg = `WASM render error for platform ${chip.platformType}: ${chipErr.message || chipErr}`;
-            this.port.postMessage({ type: 'error', message: msg });
           }
         }
       }
