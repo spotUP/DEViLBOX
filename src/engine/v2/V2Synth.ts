@@ -54,8 +54,8 @@ export class V2Synth implements DevilboxSynth {
 
     // Fetch WASM binary and JS code in parallel
     const [wasmResponse, jsResponse] = await Promise.all([
-      fetch(`${baseUrl}V2Synth.wasm${cacheBuster}`, { cache: 'no-store' }),
-      fetch(`${baseUrl}V2Synth.js${cacheBuster}`, { cache: 'no-store' })
+      fetch(`${baseUrl}v2/V2Synth.wasm${cacheBuster}`, { cache: 'no-store' }),
+      fetch(`${baseUrl}v2/V2Synth.js${cacheBuster}`, { cache: 'no-store' })
     ]);
 
     if (!wasmResponse.ok) {
@@ -165,11 +165,15 @@ export class V2Synth implements DevilboxSynth {
     this._noteOn(0, midiNote, vel);
   }
 
-  public triggerRelease(note?: string | number) {
+  public triggerRelease(noteOrTime?: string | number) {
     if (!this._initialized || !this._worklet) return;
-    if (note !== undefined) {
-      const midiNote = typeof note === 'string' ? noteToMidi(note) : note;
+    // V2 is in ToneEngine's mono-style list, so triggerRelease receives safeTime
+    // (a small float) not a note string. Always send allNotesOff.
+    if (typeof noteOrTime === 'string') {
+      const midiNote = noteToMidi(noteOrTime);
       this._noteOff(0, midiNote);
+    } else {
+      this._worklet!.port.postMessage({ type: 'allNotesOff', channel: 0 });
     }
   }
 
