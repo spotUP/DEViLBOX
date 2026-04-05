@@ -604,12 +604,21 @@ export const CellContextMenu: React.FC<CellContextMenuProps> = ({
           const { SynthBaker } = await import('@/lib/audio/SynthBaker');
           const buffer = await SynthBaker.bakeChord(instConfig, noteStrings);
 
-          // Convert AudioBuffer to ArrayBuffer (WAV-like PCM for storage)
+          // Encode AudioBuffer as WAV (browsers can't decode raw PCM)
           const pcmData = buffer.getChannelData(0);
-          const arrayBuffer = pcmData.buffer.slice(
-            pcmData.byteOffset,
-            pcmData.byteOffset + pcmData.byteLength
-          );
+          const { encodeWav } = await import('@/lib/import/WavEncoder');
+          const wavDataUrl = encodeWav({
+            pcmData,
+            sampleRate: buffer.sampleRate,
+            channels: 1,
+            bitDepth: 16,
+            name: 'baked-chord',
+          });
+
+          // Convert data URL to blob URL + ArrayBuffer for storage
+          const wavResponse = await fetch(wavDataUrl);
+          const wavArrayBuffer = await wavResponse.arrayBuffer();
+          const blobUrl = URL.createObjectURL(new Blob([wavArrayBuffer], { type: 'audio/wav' }));
 
           // Build instrument name: "SourceName C5Maj" truncated to 22 chars
           const rootName = xmNoteShortName(rootNote);
@@ -619,12 +628,11 @@ export const CellContextMenu: React.FC<CellContextMenuProps> = ({
 
           // Create new sampler instrument with the baked chord
           const createInstrument = useInstrumentStore.getState().createInstrument;
-          const blobUrl = URL.createObjectURL(new Blob([arrayBuffer], { type: 'audio/pcm' }));
           const newId = createInstrument({
             name: fullName,
             synthType: 'Sampler',
             sample: {
-              audioBuffer: arrayBuffer,
+              audioBuffer: wavArrayBuffer,
               url: blobUrl,
               baseNote: 'C-4',
               loop: false,
