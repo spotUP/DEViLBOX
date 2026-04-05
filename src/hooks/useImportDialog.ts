@@ -14,14 +14,12 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 import {
   loadModuleFile,
-  previewModule,
-  stopPreview,
   isSupportedModule,
   type ModuleInfo,
 } from '@/lib/import/ModuleLoader';
 import { isUADEFormat } from '@/lib/import/formats/UADEParser';
 import { getNativeFormatMetadata, getNativeFormatExtendedMetadata } from '@/lib/import/NativeFormatMetadata';
-import { detectFormat, getLibopenmptPlayableKeys, type FormatDefinition } from '@/lib/import/FormatRegistry';
+import { detectFormat, type FormatDefinition } from '@/lib/import/FormatRegistry';
 import type { UADEMetadata } from '@/engine/uade/UADEEngine';
 import { computeSongDBHash, lookupSongDB, type SongDBResult } from '@/lib/songdb';
 import { parseSIDHeader, type SIDHeaderInfo } from '@/lib/sid/SIDHeaderParser';
@@ -74,7 +72,6 @@ export interface ImportDialogState {
   loadedFileName: string;
   isLoading: boolean;
   error: string | null;
-  isPlaying: boolean;
   uadeMetadata: UADEMetadata | null;
   songDBInfo: SongDBResult | null;
   sidHeader: SIDHeaderInfo | null;
@@ -85,17 +82,12 @@ export interface ImportDialogState {
   // Derived state
   nativeFmt: FormatDefinition | null;
   isNativeOnly: boolean;
-  isMusicLine: boolean;
-  isHively: boolean;
-  canPreview: boolean;
 }
 
 export interface ImportDialogActions {
   handleFileSelect: (file: File, overrideCompanions?: File[]) => Promise<void>;
-  handlePreview: () => Promise<void>;
   handleImport: (onImport: (info: ModuleInfo, options: ImportOptions) => void, onClose: () => void) => Promise<void>;
   handleClose: (onClose: () => void) => void;
-  stopEnginePreview: () => void;
   setSelectedSubsong: (subsong: number) => void;
   reset: () => void;
 }
@@ -112,7 +104,6 @@ export function useImportDialog(
   const [loadedFileName, setLoadedFileName] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [isPlaying, setIsPlaying] = useState(false);
   const [uadeMetadata, setUadeMetadata] = useState<UADEMetadata | null>(null);
   const [songDBInfo, setSongDBInfo] = useState<SongDBResult | null>(null);
   const [sidHeader, setSidHeader] = useState<SIDHeaderInfo | null>(null);
@@ -120,8 +111,6 @@ export function useImportDialog(
   const [activeCompanions, setActiveCompanions] = useState<File[]>([]);
   const [formatCapabilities, setFormatCapabilities] = useState<FormatCapabilityInfo | null>(null);
 
-  // Refs for preview engines
-  const mlPreviewRef = useRef<any>(null);
   const companionFilesRef = useRef<File[]>([]);
   const uadeScanActiveRef = useRef(false);
 
@@ -133,22 +122,6 @@ export function useImportDialog(
   // ── Derived state ──────────────────────────────────────────────────────────
   const nativeFmt = detectNativeFormat(loadedFileName);
   const isNativeOnly = !!(nativeFmt?.nativeOnly);
-  const isMusicLine = nativeFmt?.key === 'musicLine';
-  const isHively = nativeFmt?.key === 'hvl';
-  
-  const LIBOPENMPT_PLAYABLE_NATIVE_KEYS = getLibopenmptPlayableKeys();
-  const canPreview = !uadeMetadata && (
-    !nativeFmt || isMusicLine || isHively || LIBOPENMPT_PLAYABLE_NATIVE_KEYS.has(nativeFmt.key)
-  );
-
-  // ── Stop engine preview ────────────────────────────────────────────────────
-  const stopEnginePreview = useCallback(() => {
-    if (mlPreviewRef.current) {
-      mlPreviewRef.current.stop();
-      try { mlPreviewRef.current.output.disconnect(); } catch { /* already disconnected */ }
-      mlPreviewRef.current = null;
-    }
-  }, []);
 
   // ── File select handler ────────────────────────────────────────────────────
   const handleFileSelect = useCallback(async (file: File, overrideCompanions?: File[]) => {
@@ -295,63 +268,12 @@ export function useImportDialog(
     }
   }, []);
 
-  // ── Preview handler ────────────────────────────────────────────────────────
-  const handlePreview = useCallback(async () => {
-    if (!moduleInfo) return;
-    
-    if (isMusicLine || isHively) {
-      if (isPlaying) {
-        stopEnginePreview();
-        setIsPlaying(false);
-      } else {
-        try {
-          const audioContext = new AudioContext();
-          if (isMusicLine && moduleInfo.arrayBuffer) {
-            const { MusicLineEngine } = await import('@/engine/musicline/MusicLineEngine');
-            const engine = MusicLineEngine.getInstance();
-            await engine.ready();
-            engine.output.connect(audioContext.destination);
-            await engine.loadSong(new Uint8Array(moduleInfo.arrayBuffer));
-            engine.play();
-            mlPreviewRef.current = engine;
-          } else if (isHively && moduleInfo.arrayBuffer) {
-            const { HivelyEngine } = await import('@/engine/hively/HivelyEngine');
-            const engine = HivelyEngine.getInstance();
-            await engine.ready();
-            engine.output.connect(audioContext.destination);
-            await engine.loadTune(moduleInfo.arrayBuffer);
-            engine.play();
-            mlPreviewRef.current = engine;
-          }
-          setIsPlaying(true);
-        } catch (err) {
-          console.error('[useImportDialog] Preview failed:', err);
-        }
-      }
-      return;
-    }
-
-    if (isPlaying) {
-      stopPreview(moduleInfo);
-      setIsPlaying(false);
-    } else {
-      previewModule(moduleInfo);
-      setIsPlaying(true);
-    }
-  }, [moduleInfo, isPlaying, isMusicLine, isHively, stopEnginePreview]);
-
   // ── Import handler ─────────────────────────────────────────────────────────
   const handleImport = useCallback(async (
     onImport: (info: ModuleInfo, options: ImportOptions) => void,
     onClose: () => void
   ) => {
     if (!moduleInfo) return;
-    
-    if (isPlaying) {
-      if (isMusicLine || isHively) stopEnginePreview();
-      else stopPreview(moduleInfo);
-      setIsPlaying(false);
-    }
 
     // Build companion file map
     let companionMap: Map<string, ArrayBuffer> | undefined;
@@ -371,15 +293,10 @@ export function useImportDialog(
       companionFiles: companionMap,
     });
     onClose();
-  }, [moduleInfo, isPlaying, isMusicLine, isHively, stopEnginePreview, selectedSubsong, uadeMetadata, activeCompanions]);
+  }, [moduleInfo, selectedSubsong, uadeMetadata, activeCompanions]);
 
   // ── Close handler ──────────────────────────────────────────────────────────
   const handleClose = useCallback((onClose: () => void) => {
-    if (isPlaying) {
-      if (isMusicLine || isHively) stopEnginePreview();
-      else if (moduleInfo) stopPreview(moduleInfo);
-    }
-    
     // Cancel any in-flight UADE scan
     if (uadeScanActiveRef.current) {
       import('@engine/uade/UADEEngine').then(({ UADEEngine }) => {
@@ -390,21 +307,19 @@ export function useImportDialog(
     setModuleInfo(null);
     setLoadedFileName('');
     setError(null);
-    setIsPlaying(false);
     setUadeMetadata(null);
     setSidHeader(null);
     setSelectedSubsong(0);
     setActiveCompanions([]);
     setFormatCapabilities(null);
     onClose();
-  }, [moduleInfo, isPlaying, isMusicLine, isHively, stopEnginePreview]);
+  }, []);
 
   // ── Reset state ────────────────────────────────────────────────────────────
   const reset = useCallback(() => {
     setModuleInfo(null);
     setLoadedFileName('');
     setError(null);
-    setIsPlaying(false);
     setUadeMetadata(null);
     setSongDBInfo(null);
     setSidHeader(null);
@@ -426,7 +341,6 @@ export function useImportDialog(
     loadedFileName,
     isLoading,
     error,
-    isPlaying,
     uadeMetadata,
     songDBInfo,
     sidHeader,
@@ -435,17 +349,12 @@ export function useImportDialog(
     formatCapabilities,
     nativeFmt,
     isNativeOnly,
-    isMusicLine,
-    isHively,
-    canPreview,
   };
 
   const actions: ImportDialogActions = {
     handleFileSelect,
-    handlePreview,
     handleImport,
     handleClose,
-    stopEnginePreview,
     setSelectedSubsong,
     reset,
   };
