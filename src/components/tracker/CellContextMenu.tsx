@@ -25,6 +25,13 @@ import {
 import { ContextMenu, type MenuItemType } from '@components/common/ContextMenu';
 import { useTrackerStore } from '@stores/useTrackerStore';
 import { useCursorStore } from '@stores/useCursorStore';
+import { useAutomationStore } from '@stores/useAutomationStore';
+import { useInstrumentStore } from '@stores/useInstrumentStore';
+import { useFormatStore } from '@stores/useFormatStore';
+import { useUIStore } from '@stores/useUIStore';
+import { getNKSParametersForSynth } from '@/midi/performance/synthParameterMaps';
+import type { SynthType } from '@typedefs/instrument';
+import { getParamsForFormat, groupParams, type AutomationFormat } from '@/engine/automation/AutomationParams';
 import {
   CHORD_TYPES, ARP_PRESETS_UNIQUE,
   chordNotes, invertChord, chordLabel, arpLabel,
@@ -280,6 +287,96 @@ export const CellContextMenu: React.FC<CellContextMenuProps> = ({
     removeChannel(channelIndex);
     onClose();
   }, [removeChannel, channelIndex, onClose]);
+
+  // Automation submenu items (NKS + register params)
+  const automationMenuItems = useMemo((): MenuItemType[] => {
+    const { setActiveParameter, setShowLane, getShowLane, getCurvesForPattern, removeCurve } = useAutomationStore.getState();
+    const showLane = getShowLane(channelIndex);
+    const items: MenuItemType[] = [];
+
+    // NKS synth params
+    const channel = patterns[currentPatternIndex]?.channels[channelIndex];
+    if (channel?.instrumentId != null) {
+      const inst = useInstrumentStore.getState().instruments[channel.instrumentId];
+      if (inst) {
+        const nksParams = getNKSParametersForSynth(inst.synthType as SynthType)
+          .filter(p => p.isAutomatable).slice(0, 8);
+        for (const p of nksParams) {
+          items.push({
+            id: `auto-nks-${p.id}`,
+            label: p.name,
+            onClick: () => {
+              setActiveParameter(channelIndex, p.id);
+              setShowLane(channelIndex, true);
+              if (!useUIStore.getState().showAutomationLanes) useUIStore.getState().toggleAutomationLanes();
+            },
+          });
+        }
+      }
+    }
+
+    // Register params (SID/Paula/Furnace)
+    const editorMode = useFormatStore.getState().editorMode;
+    const furnaceNative = useFormatStore.getState().furnaceNative;
+    const fmtMap: Record<string, AutomationFormat> = {
+      goattracker: 'gtultra', furnace: 'furnace', hively: 'hively',
+      klystrack: 'klystrack', sc68: 'sc68', classic: 'uade',
+    };
+    const fmt = fmtMap[editorMode];
+    if (fmt) {
+      const config = fmt === 'furnace' && furnaceNative
+        ? { chipIds: furnaceNative.chipIds, channelCount: furnaceNative.subsongs[furnaceNative.activeSubsong]?.channels.length ?? 4 }
+        : undefined;
+      const groups = groupParams(getParamsForFormat(fmt, config));
+      if (groups.length > 0) {
+        if (items.length > 0) items.push({ type: 'divider' });
+        items.push({
+          id: 'register-params',
+          label: 'Register Params',
+          submenu: groups.map(g => ({
+            id: `reg-g-${g.label}`,
+            label: g.label,
+            submenu: g.params.map(p => ({
+              id: `reg-${p.id}`,
+              label: p.label,
+              onClick: () => {
+                setActiveParameter(channelIndex, p.id);
+                setShowLane(channelIndex, true);
+                if (!useUIStore.getState().showAutomationLanes) useUIStore.getState().toggleAutomationLanes();
+              },
+            })),
+          })),
+        });
+      }
+    }
+
+    // Show/hide + clear
+    items.push({ type: 'divider' });
+    items.push({
+      id: 'auto-toggle',
+      label: showLane ? 'Hide Lane' : 'Show Lane',
+      onClick: () => {
+        setShowLane(channelIndex, !showLane);
+        if (!showLane && !useUIStore.getState().showAutomationLanes) useUIStore.getState().toggleAutomationLanes();
+      },
+    });
+    const pat = patterns[currentPatternIndex];
+    const curves = pat ? getCurvesForPattern(pat.id, channelIndex) : [];
+    if (curves.length > 0) {
+      items.push({
+        id: 'auto-clear',
+        label: 'Clear Automation',
+        danger: true,
+        onClick: () => curves.forEach(c => removeCurve(c.id)),
+      });
+    }
+
+    return [{
+      id: 'automation',
+      label: 'Automation',
+      submenu: items,
+    }];
+  }, [channelIndex, patterns, currentPatternIndex]);
 
   const menuItems = useMemo((): MenuItemType[] => [
     // Block Operations (if selection active)
@@ -567,6 +664,9 @@ export const CellContextMenu: React.FC<CellContextMenuProps> = ({
       icon: <LayoutGrid size={14} />,
       onClick: handleSelectChannel,
     },
+    // Automation
+    { type: 'divider' as const },
+    ...automationMenuItems,
     ...(pattern && pattern.channels.length > 1 ? [
       { type: 'divider' as const },
       {
@@ -628,6 +728,7 @@ export const CellContextMenu: React.FC<CellContextMenuProps> = ({
     onClose,
     selection,
     setCell,
+    automationMenuItems,
   ]);
 
   if (!position) return null;
