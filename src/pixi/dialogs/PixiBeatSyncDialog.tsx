@@ -215,7 +215,7 @@ export const PixiBeatSyncDialog: React.FC<PixiBeatSyncDialogProps> = ({
                 text={String(bpm)}
                 style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 16, fill: 0xffffff }}
                 tint={theme.text.color}
-                layout={{ minWidth: 36, textAlign: 'center' }}
+                layout={{ minWidth: 36, alignSelf: 'center' }}
               />
               <PixiButton label="+" variant="ghost" size="sm" onClick={() => setBpm(Math.min(999, bpm + 1))} />
             </layoutContainer>
@@ -230,7 +230,7 @@ export const PixiBeatSyncDialog: React.FC<PixiBeatSyncDialogProps> = ({
                 text={String(speed)}
                 style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 16, fill: 0xffffff }}
                 tint={theme.text.color}
-                layout={{ minWidth: 36, textAlign: 'center' }}
+                layout={{ minWidth: 36, alignSelf: 'center' }}
               />
               <PixiButton label="+" variant="ghost" size="sm" onClick={() => setSpeed(Math.min(31, speed + 1))} />
             </layoutContainer>
