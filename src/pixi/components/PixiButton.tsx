@@ -5,12 +5,14 @@
  * Reference: src/components/ui/Button.tsx
  */
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Texture } from 'pixi.js';
+import type { Container as ContainerType } from 'pixi.js';
 import { PIXI_FONTS } from '../fonts';
 import { FONTAUDIO_TO_LUCIDE } from '../utils/lucideIcons';
 import { getLucideTexture, preloadLucideIcons } from '../utils/lucideToTexture';
 import { usePixiTheme, usePixiThemeId, type PixiTheme } from '../theme';
+import { usePixiTooltipStore } from '../stores/usePixiTooltipStore';
 
 // Preload all mapped Lucide icons once (white, at common sizes)
 let _iconsPreloaded = false;
@@ -45,6 +47,7 @@ interface PixiButtonProps {
   active?: boolean;
   width?: number;
   height?: number;
+  tooltip?: string;
   onClick?: () => void;
   layout?: Record<string, unknown>;
 }
@@ -104,6 +107,7 @@ export const PixiButton: React.FC<PixiButtonProps> = ({
   disabled = false,
   loading = false,
   active = false,
+  tooltip: tooltipText,
   width: widthProp,
   height: heightProp,
   onClick,
@@ -113,6 +117,9 @@ export const PixiButton: React.FC<PixiButtonProps> = ({
   const themeId = usePixiThemeId();
   const [hovered, setHovered] = useState(false);
   const [pressed, setPressed] = useState(false);
+  const containerRef = useRef<ContainerType>(null);
+  const showTooltip = usePixiTooltipStore(s => s.showTooltip);
+  const hideTooltip = usePixiTooltipStore(s => s.hideTooltip);
 
   const config = SIZE_CONFIG[size];
   const btnHeight = heightProp ?? config.height;
@@ -170,8 +177,25 @@ export const PixiButton: React.FC<PixiButtonProps> = ({
 
   const colors = getColors();
 
-  const handlePointerOver = useCallback(() => { if (!disabled) setHovered(true); }, [disabled]);
-  const handlePointerOut = useCallback(() => { setHovered(false); setPressed(false); }, []);
+  const handlePointerOver = useCallback(() => {
+    if (!disabled) {
+      setHovered(true);
+      if (tooltipText && containerRef.current) {
+        const bounds = containerRef.current.getBounds();
+        showTooltip({
+          text: tooltipText,
+          x: bounds.x + bounds.width / 2,
+          y: bounds.y,
+          accent: theme.accent.color,
+        });
+      }
+    }
+  }, [disabled, tooltipText, showTooltip, theme.accent.color]);
+  const handlePointerOut = useCallback(() => {
+    setHovered(false);
+    setPressed(false);
+    if (tooltipText) hideTooltip();
+  }, [tooltipText, hideTooltip]);
   const handlePointerDown = useCallback(() => { if (!disabled) setPressed(true); }, [disabled]);
   const handlePointerUp = useCallback(() => { setPressed(false); }, []);
   const handleClick = useCallback(() => {
@@ -208,6 +232,7 @@ export const PixiButton: React.FC<PixiButtonProps> = ({
 
   return (
     <layoutContainer
+      ref={containerRef}
       eventMode={disabled ? 'none' : 'static'}
       cursor={disabled ? 'not-allowed' : 'pointer'}
       onPointerOver={handlePointerOver}
