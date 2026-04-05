@@ -764,16 +764,12 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
       return;
     }
 
-    // Standard mode
-    const cell = getCellFromCoords(e.clientX, e.clientY);
-    const rowIndex = cell?.rowIndex ?? cursorRef.current.rowIndex;
-    const channelIndex = cell?.channelIndex ?? cursorRef.current.channelIndex;
-    if (cell) {
-      const cursorStore = useCursorStore.getState();
-      cursorStore.moveCursorToRow(cell.rowIndex);
-      cursorStore.moveCursorToChannelAndColumn(cell.channelIndex, cell.columnType as any, cell.noteColumnIndex);
-    }
-    cellContextMenu.openMenu(e, rowIndex, channelIndex);
+    // Standard mode — use cursor position for channel/row.
+    // The contextmenu event's clientX is offset when Chrome DevTools is docked
+    // (Chrome bug: coordinates include DevTools panel width). The cursor position
+    // is always correct since it's set by pointerdown which has reliable coordinates.
+    const cursor = cursorRef.current;
+    cellContextMenu.openMenu(e, cursor.rowIndex, cursor.channelIndex);
   }, [getCellFromCoords, cellContextMenu, isFormatMode, formatChannels, channelOffsets, channelWidths]);
 
   // ── Format mode: copy rows from selection (or current row) to clipboard ──
