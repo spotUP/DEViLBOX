@@ -53,10 +53,9 @@ export class V2Synth implements DevilboxSynth {
     }
 
     // Fetch WASM binary and JS code in parallel
-    // WASM/JS live in public/v2/, worklet lives at public/ root
     const [wasmResponse, jsResponse] = await Promise.all([
-      fetch(`${baseUrl}v2/V2Synth.wasm${cacheBuster}`, { cache: 'no-store' }),
-      fetch(`${baseUrl}v2/V2Synth.js${cacheBuster}`, { cache: 'no-store' })
+      fetch(`${baseUrl}V2Synth.wasm${cacheBuster}`, { cache: 'no-store' }),
+      fetch(`${baseUrl}V2Synth.js${cacheBuster}`, { cache: 'no-store' })
     ]);
 
     if (!wasmResponse.ok) {
@@ -166,18 +165,11 @@ export class V2Synth implements DevilboxSynth {
     this._noteOn(0, midiNote, vel);
   }
 
-  public triggerRelease(noteOrTime?: string | number) {
+  public triggerRelease(note?: string | number) {
     if (!this._initialized || !this._worklet) return;
-    // V2 is in ToneEngine's mono-style list, so triggerRelease receives safeTime
-    // (a small float) not a note. Send noteOff for the last played note.
-    if (typeof noteOrTime === 'string') {
-      const midiNote = noteToMidi(noteOrTime);
+    if (note !== undefined) {
+      const midiNote = typeof note === 'string' ? noteToMidi(note) : note;
       this._noteOff(0, midiNote);
-    } else {
-      // Mono release — send noteOff for all channels (time arg, not a note)
-      for (let ch = 0; ch < 16; ch++) {
-        this._worklet!.port.postMessage({ type: 'allNotesOff', channel: ch });
-      }
     }
   }
 

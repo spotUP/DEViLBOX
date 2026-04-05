@@ -34,7 +34,6 @@ import { getAverageFps } from './performance';
 import { PixiNewSongWizard } from './dialogs/PixiNewSongWizard';
 import { PixiInterpolateDialog } from './dialogs/PixiInterpolateDialog';
 import { PixiHumanizeDialog } from './dialogs/PixiHumanizeDialog';
-import { PixiCleanupDialog } from './dialogs/PixiCleanupDialog';
 import { PixiScaleVolumeDialog } from './dialogs/PixiScaleVolumeDialog';
 import { PixiFadeVolumeDialog } from './dialogs/PixiFadeVolumeDialog';
 import { PixiStrumDialog } from './dialogs/PixiStrumDialog';
@@ -350,7 +349,6 @@ export const PixiRoot: React.FC = () => {
         <PixiNewSongWizard />
         <PixiInterpolateDialog isOpen={modalOpen === 'interpolate'} onClose={closeModal} />
         <PixiHumanizeDialog isOpen={modalOpen === 'humanize'} onClose={closeModal} />
-        <PixiCleanupDialog isOpen={modalOpen === 'cleanup'} onClose={closeModal} />
         <PixiScaleVolumeDialog
           isOpen={modalOpen === 'scaleVolume'}
           onClose={closeModal}

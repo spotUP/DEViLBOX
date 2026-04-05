@@ -267,8 +267,8 @@ export const DEFAULT_V2_INSTRUMENT: V2InstrumentConfig = {
   
   filter1: {
     mode: 'low',
-    cutoff: 80,
-    resonance: 40,
+    cutoff: 127,
+    resonance: 0,
   },
   
   filter2: {
@@ -288,11 +288,11 @@ export const DEFAULT_V2_INSTRUMENT: V2InstrumentConfig = {
   },
   
   ampEnvelope: {
-    attack: 10,
-    decay: 50,
-    sustain: 100,
+    attack: 0,
+    decay: 64,
+    sustain: 127,
     sustainTime: 64,
-    release: 60,
+    release: 80,
     amplify: 0,
   },
   
@@ -613,11 +613,9 @@ export function v2ConfigToBytes(config: V2InstrumentConfig): Uint8Array {
   bytes[i++] = config.lfo2.phase;
   bytes[i++] = lfoPolarityToNumber(config.lfo2.polarity);
   bytes[i++] = config.lfo2.amplify;
-
-  // oscsync — last field of syVV2 voice struct (0=none, 1=osc, 2=full)
+  
+  // Globals
   bytes[i++] = keySyncToNumber(config.voice.keySync);
-
-  // Channel params (syVChan)
   bytes[i++] = config.voice.channelVolume;
   bytes[i++] = config.voice.auxARecv;
   bytes[i++] = config.voice.auxBRecv;
@@ -745,11 +743,12 @@ const COMP_MODES: Array<'off' | 'peak' | 'rms'> = ['off', 'peak', 'rms'];
 export function v2ConfigToInstrument(cfg: V2ConfigInput): V2InstrumentConfig {
   const d = DEFAULT_V2_INSTRUMENT;
 
-  // Convert signed (-64..+63) transpose/detune to unsigned (0..127) where 64=center.
-  // V2Config ALWAYS uses signed values: 0=no change, -24=down, +12=up.
-  // V2 binary format uses unsigned: 64=no change, 40=down 24, 76=up 12.
+  // Helper to clamp transpose/detune from signed (-64..+63) to unsigned (0..127)
   const toUnsigned = (v: number | undefined, def: number): number => {
     if (v === undefined) return def;
+    // If already 0-127 range (unsigned), use directly
+    if (v >= 0 && v <= 127) return v;
+    // If signed (-64 to +63), convert to unsigned
     return Math.max(0, Math.min(127, v + 64));
   };
 
