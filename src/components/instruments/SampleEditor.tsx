@@ -886,7 +886,7 @@ export const SampleEditor: React.FC<SampleEditorProps> = ({ instrument, onChange
     });
   }, [isPlaying, setIsPlaying, setAudioBuffer, clearSelection, instrument, updateInstrument, isGranular]);
 
-  // ─── Buffer processed (enhancer / resampler) ─────────────────────
+  // ─── Buffer processed (enhancer / resampler / beat sync / filter) ─
   const handleBufferProcessed = useCallback(
     async (result: ProcessedResult, prefix: string) => {
       const { buffer: newBuf, dataUrl } = result;
@@ -908,6 +908,11 @@ export const SampleEditor: React.FC<SampleEditorProps> = ({ instrument, onChange
           },
         },
       });
+      // Force ToneEngine to recreate its Player with the new buffer
+      try {
+        const { getToneEngine } = await import('@engine/ToneEngine');
+        getToneEngine().invalidateInstrument(instrument.id);
+      } catch { /* ToneEngine not active */ }
     },
     [instrument.id, instrument.parameters, sampleInfo, updateInstrument, setAudioBuffer],
   );

@@ -74,6 +74,11 @@ export const PixiSampleEditor: React.FC<PixiSampleEditorProps> = ({
         },
       },
     });
+    // Force ToneEngine to recreate its Player with the new buffer
+    try {
+      const { getToneEngine } = await import('@engine/ToneEngine');
+      getToneEngine().invalidateInstrument(instrument.id);
+    } catch { /* ToneEngine not active */ }
   }, [instrument.id, instrument.parameters, updateInstrument]);
 
   // ── View state ──────────────────────────────────────────────────────
