@@ -691,6 +691,22 @@ export const ChannelContextMenu: React.FC<ChannelContextMenuProps> = ({
           onClick: () => setChannelColor(channelIndex, color),
         })),
       },
+      // Max voices
+      {
+        id: 'max-voices',
+        label: 'Max Voices',
+        submenu: [0, 1, 2, 4, 8, 16].map(n => ({
+          id: `voices-${n}`,
+          label: n === 0 ? 'Unlimited' : `${n}`,
+          checked: (channel.channelMeta?.maxVoices || 0) === n,
+          onClick: () => {
+            useTrackerStore.getState().setChannelMeta(channelIndex, { maxVoices: n });
+            import('@engine/ToneEngine').then(({ getToneEngine }) => {
+              getToneEngine().setChannelMaxVoices(channelIndex, n);
+            });
+          },
+        })),
+      },
       // Delete channel
       {
         id: 'delete',
