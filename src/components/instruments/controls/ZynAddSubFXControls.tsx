@@ -17,7 +17,6 @@ interface ZynAddSubFXControlsProps {
 const WAVE_LABELS = ['Sine', 'Tri', 'Saw', 'Sq', 'Noise', 'Voice', 'Chirp'];
 const FILTER_LABELS = ['LP', 'HP', 'BP', 'Notch', 'Peak', 'LShelf'];
 const MAG_LABELS = ['Linear', 'dB', '-40dB', '-60dB'];
-const DIST_LABELS = ['Atan', 'Asym1', 'Pow', 'Sine', 'Quant'];
 const TAB_NAMES = ['ADDsynth', 'SUBsynth', 'PADsynth', 'Filter/Env', 'Effects'] as const;
 
 import { SegmentButton } from '@components/instruments/shared';
@@ -210,10 +209,6 @@ export const ZynAddSubFXControls: React.FC<ZynAddSubFXControlsProps> = ({ config
               onChange={(v) => updateParam('padBandwidth', v)} color="#f43f5e" />
             <Knob label="BW Scale" value={merged.padBandwidthScale} min={0} max={1} defaultValue={0.5}
               onChange={(v) => updateParam('padBandwidthScale', v)} color="#f43f5e" />
-            <Knob label="Profile W" value={merged.padProfileWidth} min={0} max={1} defaultValue={0.5}
-              onChange={(v) => updateParam('padProfileWidth', v)} color="#f43f5e" />
-            <Knob label="Stretch" value={merged.padProfileStretch} min={0} max={1} defaultValue={0.5}
-              onChange={(v) => updateParam('padProfileStretch', v)} color="#f43f5e" />
           </div>
           <div className="flex flex-col gap-1">
             <span className="text-[10px] text-text-muted">Quality</span>
@@ -281,46 +276,33 @@ export const ZynAddSubFXControls: React.FC<ZynAddSubFXControlsProps> = ({ config
           <div className="p-2 rounded-lg border bg-[#1a1a1a] border-rose-900/30">
             <h3 className="font-bold uppercase tracking-tight text-sm mb-3 text-rose-400">Reverb</h3>
             <div className="flex flex-wrap gap-4 justify-center">
-              <Knob label="Wet" value={merged.reverbWet} min={0} max={1} defaultValue={0}
+              <Knob label="Mix" value={merged.reverbWet} min={0} max={1} defaultValue={0}
                 onChange={(v) => updateParam('reverbWet', v)} color="#f43f5e" />
-              <Knob label="Size" value={merged.reverbSize} min={0} max={1} defaultValue={0.5}
-                onChange={(v) => updateParam('reverbSize', v)} color="#f43f5e" />
-              <Knob label="Damp" value={merged.reverbDamp} min={0} max={1} defaultValue={0.5}
-                onChange={(v) => updateParam('reverbDamp', v)} color="#f43f5e" />
+              <Knob label="Preset" value={merged.reverbSize} min={0} max={7} defaultValue={1}
+                onChange={(v) => updateParam('reverbSize', Math.round(v))} color="#f43f5e"
+                formatValue={(v) => `${Math.round(v)}`} />
             </div>
           </div>
           <div className="p-2 rounded-lg border bg-[#1a1a1a] border-rose-900/30">
             <h3 className="font-bold uppercase tracking-tight text-sm mb-3 text-rose-400">Chorus</h3>
             <div className="flex flex-wrap gap-4 justify-center">
-              <Knob label="Wet" value={merged.chorusWet} min={0} max={1} defaultValue={0}
-                onChange={(v) => updateParam('chorusWet', v)} color="#f43f5e" />
-              <Knob label="Rate" value={merged.chorusRate} min={0} max={1} defaultValue={0.3}
-                onChange={(v) => updateParam('chorusRate', v)} color="#f43f5e" />
-              <Knob label="Depth" value={merged.chorusDepth} min={0} max={1} defaultValue={0.3}
-                onChange={(v) => updateParam('chorusDepth', v)} color="#f43f5e" />
+              <Knob label="Type" value={merged.chorusWet} min={0} max={8} defaultValue={0}
+                onChange={(v) => updateParam('chorusWet', Math.round(v))} color="#f43f5e"
+                formatValue={(v) => `${Math.round(v)}`} />
+              <Knob label="Preset" value={merged.chorusRate} min={0} max={7} defaultValue={0}
+                onChange={(v) => updateParam('chorusRate', Math.round(v))} color="#f43f5e"
+                formatValue={(v) => `${Math.round(v)}`} />
             </div>
           </div>
           <div className="p-2 rounded-lg border bg-[#1a1a1a] border-rose-900/30">
             <h3 className="font-bold uppercase tracking-tight text-sm mb-3 text-rose-400">Distortion</h3>
             <div className="flex flex-wrap items-start gap-4 justify-center">
-              <Knob label="Wet" value={merged.distortionWet} min={0} max={1} defaultValue={0}
-                onChange={(v) => updateParam('distortionWet', v)} color="#f43f5e" />
-              <Knob label="Drive" value={merged.distortionDrive} min={0} max={1} defaultValue={0.3}
-                onChange={(v) => updateParam('distortionDrive', v)} color="#f43f5e" />
-              <div className="flex flex-col items-center gap-1">
-                <span className="text-[10px] text-text-muted">Type</span>
-                <SegmentButton labels={DIST_LABELS} value={merged.distortionType}
-                  onChange={(v) => updateParam('distortionType', v)} />
-              </div>
-            </div>
-          </div>
-          <div className="p-2 rounded-lg border bg-[#1a1a1a] border-rose-900/30">
-            <h3 className="font-bold uppercase tracking-tight text-sm mb-3 text-rose-400">EQ</h3>
-            <div className="flex flex-wrap gap-4 justify-center">
-              <Knob label="Low" value={merged.eqLow} min={0} max={1} defaultValue={0.5}
-                onChange={(v) => updateParam('eqLow', v)} color="#f43f5e" />
-              <Knob label="High" value={merged.eqHigh} min={0} max={1} defaultValue={0.5}
-                onChange={(v) => updateParam('eqHigh', v)} color="#f43f5e" />
+              <Knob label="Type" value={merged.distortionWet} min={0} max={8} defaultValue={0}
+                onChange={(v) => updateParam('distortionWet', Math.round(v))} color="#f43f5e"
+                formatValue={(v) => `${Math.round(v)}`} />
+              <Knob label="Preset" value={merged.distortionDrive} min={0} max={7} defaultValue={0}
+                onChange={(v) => updateParam('distortionDrive', Math.round(v))} color="#f43f5e"
+                formatValue={(v) => `${Math.round(v)}`} />
             </div>
           </div>
         </div>
