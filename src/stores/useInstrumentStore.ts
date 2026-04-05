@@ -825,36 +825,54 @@ export const useInstrumentStore = create<InstrumentStore>()(
             const replayer = getTrackerReplayer();
             replayer.updateInstrument(updatedConfig);
 
-            // Hybrid playback: when libopenmpt handles audio and the user replaces
-            // a sample instrument with a synth, silence the sample in the soundlib
-            // and mark the instrument so ToneEngine fires its notes.
+            // Universal hybrid playback: when ANY WASM engine handles audio and
+            // the user replaces a sample instrument with a synth, mark it so
+            // ToneEngine fires notes and the WASM engine mutes those channels.
+            // Works for ALL engines: libopenmpt, UADE, Klystrack, SID, Hively, etc.
             const song = replayer.getSong();
-            if (song?.libopenmptFileData && synthTypeChanging) {
+            if (synthTypeChanging && song) {
               const isNowSynth = updatedConfig.synthType !== 'Sampler' && updatedConfig.synthType !== 'Player';
-              if (isNowSynth) {
-                // Warn about format incompatibility (but don't prevent it)
+              const hasWasmEngine = !!(
+                song.libopenmptFileData || song.uadeEditableFileData ||
+                song.hivelyFileData || song.klysFileData || song.musiclineFileData ||
+                song.c64SidFileData || song.jamCrackerFileData || song.futurePlayerFileData ||
+                song.preTrackerFileData || song.maFileData || song.hippelFileData ||
+                song.sonixFileData || song.pxtoneFileData || song.organyaFileData ||
+                song.eupFileData || song.ixsFileData || song.psycleFileData ||
+                song.sc68FileData || song.zxtuneFileData || song.pumaTrackerFileData ||
+                song.artOfNoiseFileData || song.bdFileData || song.sd2FileData ||
+                song.startrekkerAMFileData || song.symphonieFileData
+              );
+
+              if (hasWasmEngine && isNowSynth) {
+                // Warn about format incompatibility (but never prevent it)
                 const fmt = song.format?.toUpperCase() || 'native';
                 useUIStore.getState().setStatusMessage(
                   `SYNTH REPLACEMENT BREAKS ${fmt} COMPAT — SAVE AS .DBX`, false, 4000,
                 );
                 replayer.markInstrumentReplaced(id);
-                // Silence the sample in OpenMPT soundlib + hot-reload
-                void (async () => {
-                  try {
-                    const osl = await import('@lib/import/wasm/OpenMPTSoundlib');
-                    const silentSample = new Int8Array(4); // 4 bytes of silence
-                    await osl.setSampleData(id - 1, silentSample, 8363);
-                    const editBridge = await import('@engine/libopenmpt/OpenMPTEditBridge');
-                    const { LibopenmptEngine } = await import('@engine/libopenmpt/LibopenmptEngine');
-                    if (LibopenmptEngine.hasInstance()) {
-                      const data = await osl.saveModule(editBridge.getFormat());
-                      if (data) LibopenmptEngine.getInstance().hotReload(data);
+
+                // Engine-specific silencing
+                if (song.libopenmptFileData) {
+                  // libopenmpt: silence the sample in soundlib + hot-reload
+                  void (async () => {
+                    try {
+                      const osl = await import('@lib/import/wasm/OpenMPTSoundlib');
+                      await osl.setSampleData(id - 1, new Int8Array(4), 8363);
+                      const editBridge = await import('@engine/libopenmpt/OpenMPTEditBridge');
+                      const { LibopenmptEngine } = await import('@engine/libopenmpt/LibopenmptEngine');
+                      if (LibopenmptEngine.hasInstance()) {
+                        const data = await osl.saveModule(editBridge.getFormat());
+                        if (data) LibopenmptEngine.getInstance().hotReload(data);
+                      }
+                    } catch (e) {
+                      console.error('[InstrumentStore] Failed to silence sample in libopenmpt:', e);
                     }
-                  } catch (e) {
-                    console.error('[InstrumentStore] Failed to silence sample in libopenmpt:', e);
-                  }
-                })();
-              } else {
+                  })();
+                }
+                // For all other WASM engines: the dynamic mute mask in the sequencer
+                // (updateWasmMuteMask) handles muting channels on each row tick.
+              } else if (hasWasmEngine && !isNowSynth) {
                 // Reverted back to Sampler — remove from replaced set
                 replayer.unmarkInstrumentReplaced(id);
               }
