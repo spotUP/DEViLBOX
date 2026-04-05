@@ -12,12 +12,13 @@
  * DOM reference: src/components/instruments/SampleEditor.tsx
  */
 
-import React, { useCallback, useRef, useState, useEffect } from 'react';
+import React, { useCallback, useRef, useState, useEffect, useMemo } from 'react';
 import { Graphics } from 'pixi.js';
 import type { FederatedPointerEvent } from 'pixi.js';
 import { usePixiTheme } from '../../theme';
 import { PixiLabel, PixiButton, PixiSlider } from '../../components';
-import { useInstrumentStore } from '@stores';
+import { useInstrumentStore, useTrackerStore } from '@stores';
+import { scan9xxOffsets } from '@/lib/analysis/scan9xxOffsets';
 import type { InstrumentConfig, DeepPartial } from '@typedefs/instrument';
 
 // ── Types ───────────────────────────────────────────────────────────────
@@ -56,6 +57,19 @@ export const PixiSampleEditor: React.FC<PixiSampleEditorProps> = ({
   const loopStart = (params.loopStart as number) ?? 0;
   const loopEnd = (params.loopEnd as number) ?? 1;
   const loopType: LoopType = (params.loopType as LoopType) ?? 'forward';
+
+  // Scan current pattern for 9xx offsets referencing this instrument
+  const offsetMarkers = useMemo(() => {
+    const patterns = useTrackerStore.getState().patterns;
+    const patIdx = useTrackerStore.getState().currentPatternIndex;
+    const pattern = patterns[patIdx];
+    if (!pattern || !audioBuffer) return undefined;
+    const instruments = useInstrumentStore.getState().instruments;
+    const instIdx = instruments.indexOf(instrument);
+    if (instIdx < 0) return undefined;
+    const offsets = scan9xxOffsets(pattern, instIdx + 1);
+    return offsets.length > 0 ? offsets : undefined;
+  }, [instrument, audioBuffer]);
 
   // ── Dragging ────────────────────────────────────────────────────────
   const [dragTarget, setDragTarget] = useState<'loopStart' | 'loopEnd' | null>(null);
@@ -222,6 +236,26 @@ export const PixiSampleEditor: React.FC<PixiSampleEditorProps> = ({
       }
     }
 
+    // ── 9xx offset markers ────────────────────────────────────────────
+    if (offsetMarkers && audioBuffer) {
+      const totalSamples = audioBuffer.length;
+      const viewStartSample = Math.floor(viewStart * totalSamples);
+      const viewEndSample = Math.floor(viewEnd * totalSamples);
+      const visibleSamples = viewEndSample - viewStartSample;
+      const markerColor = 0x00d2d2; // muted cyan
+
+      for (const val of offsetMarkers) {
+        const samplePos = val * 128;
+        if (samplePos < viewStartSample || samplePos > viewEndSample) continue;
+        const px = ((samplePos - viewStartSample) / visibleSamples) * w;
+
+        // Dashed vertical line (approximate with short segments)
+        for (let y = 0; y < h; y += 6) {
+          g.moveTo(px, y).lineTo(px, Math.min(y + 3, h)).stroke({ color: markerColor, width: 1, alpha: 0.7 });
+        }
+      }
+    }
+
     // ── Playback cursor ────────────────────────────────────────────────
     if (playbackPosition > 0) {
       const pX = ((playbackPosition - viewStart) / (viewEnd - viewStart)) * w;
@@ -229,7 +263,7 @@ export const PixiSampleEditor: React.FC<PixiSampleEditorProps> = ({
         g.moveTo(pX, 0).lineTo(pX, h).stroke({ color: theme.warning.color, width: 2 });
       }
     }
-  }, [WAVEFORM_W, WAVEFORM_H, audioBuffer, viewStart, viewEnd, loopEnabled, loopStart, loopEnd, playbackPosition, theme]);
+  }, [WAVEFORM_W, WAVEFORM_H, audioBuffer, viewStart, viewEnd, loopEnabled, loopStart, loopEnd, playbackPosition, theme, offsetMarkers]);
 
   // ── Pointer interaction for loop handle dragging ────────────────────
   const handlePointerDown = useCallback((e: FederatedPointerEvent) => {
