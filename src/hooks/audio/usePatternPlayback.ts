@@ -142,6 +142,14 @@ export const usePatternPlayback = () => {
 
   // Track if we've started playback
   const hasStartedRef = useRef(false);
+  /** Track whether MusicLine song was loaded into the replayer — persists across stop/play.
+   *  Reset when musiclineFileData changes (new song loaded). */
+  const mlLoadedRef = useRef(false);
+  const prevMlFileDataRef = useRef(musiclineFileData);
+  if (musiclineFileData !== prevMlFileDataRef.current) {
+    prevMlFileDataRef.current = musiclineFileData;
+    mlLoadedRef.current = false;
+  }
   // UADE live channel data subscription cleanup
   const uadeChannelUnsubRef = useRef<(() => void) | null>(null);
   // UADE live row counter (increments on note triggers during playback)
@@ -382,22 +390,28 @@ export const usePatternPlayback = () => {
       if (isPlaying && musiclineFileData && channelTrackTables && channelTrackTables.length > 0) {
         if (!hasStartedRef.current) {
           hasStartedRef.current = true;
-          const modData = pattern.importMetadata?.modData;
-          replayer.loadSong({
-            name: pattern.importMetadata?.sourceFile ?? pattern.name ?? 'Untitled',
-            format,
-            patterns,
-            instruments: instrumentsRef.current,
-            songPositions: patternOrderRef.current,
-            songLength: modData?.songLength ?? patternOrderRef.current.length,
-            restartPosition: modData?.restartPosition ?? 0,
-            numChannels: pattern.channels.length,
-            initialSpeed: modData?.initialSpeed ?? transportSpeed,
-            initialBPM: modData?.initialBPM ?? bpmRef.current,
-            linearPeriods,
-            channelTrackTables: channelTrackTables ?? undefined,
-            musiclineFileData,
-          });
+          // Only loadSong on very first play — it calls stop() internally which
+          // kills any running engine. On replay, just call play() which triggers
+          // startNativeEngines (that handles loadSong at the engine level).
+          if (!mlLoadedRef.current) {
+            mlLoadedRef.current = true;
+            const modData = pattern.importMetadata?.modData;
+            replayer.loadSong({
+              name: pattern.importMetadata?.sourceFile ?? pattern.name ?? 'Untitled',
+              format,
+              patterns,
+              instruments: instrumentsRef.current,
+              songPositions: patternOrderRef.current,
+              songLength: modData?.songLength ?? patternOrderRef.current.length,
+              restartPosition: modData?.restartPosition ?? 0,
+              numChannels: pattern.channels.length,
+              initialSpeed: modData?.initialSpeed ?? transportSpeed,
+              initialBPM: modData?.initialBPM ?? bpmRef.current,
+              linearPeriods,
+              channelTrackTables: channelTrackTables ?? undefined,
+              musiclineFileData,
+            });
+          }
           replayer.play().catch((err) => {
             console.error('Failed to start MusicLine playback:', err);
           });
