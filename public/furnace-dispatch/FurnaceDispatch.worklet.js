@@ -768,10 +768,12 @@ class FurnaceDispatchProcessor extends AudioWorkletProcessor {
   }
 
   getHeapBuffer() {
-    // Get WASM memory buffer from multiple sources
+    // Prefer wasmMemory.buffer — it's always current after heap growth.
+    // HEAPU8/HEAPF32 typed array views may be detached/stale in AudioWorklet
+    // because Emscripten's updateMemoryViews() may not run in this scope.
+    if (this.module.wasmMemory) return this.module.wasmMemory.buffer;
     if (this.module.HEAPU8) return this.module.HEAPU8.buffer;
     if (this.module.HEAPF32) return this.module.HEAPF32.buffer;
-    if (this.module.wasmMemory) return this.module.wasmMemory.buffer;
     return null;
   }
 
@@ -836,17 +838,25 @@ class FurnaceDispatchProcessor extends AudioWorkletProcessor {
   updateBufferViews() {
     if (!this.module || !this.outputPtrL) return;
 
-    // Try multiple sources for WASM memory buffer
+    // Get the CURRENT WASM memory buffer — must use wasmMemory.buffer directly
+    // because module.HEAPF32.buffer can be stale after heap growth (the typed
+    // array view gets detached but the reference isn't updated until Emscripten
+    // patches it, which may not happen inside an AudioWorklet).
     const wasmMem = this.module.wasmMemory;
-    const heapBuffer = this.module.HEAPF32
-      ? this.module.HEAPF32.buffer
-      : (wasmMem ? wasmMem.buffer : null);
+    const heapBuffer = wasmMem ? wasmMem.buffer : (this.module.HEAPF32 ? this.module.HEAPF32.buffer : null);
     if (!heapBuffer) return;
 
-    if (this.lastHeapBuffer !== heapBuffer) {
+    // Detect detached buffers or heap growth — recreate typed array views
+    const needsUpdate = this.lastHeapBuffer !== heapBuffer
+      || !this.outputBufferL
+      || this.outputBufferL.buffer !== heapBuffer;
+
+    if (needsUpdate) {
       this.outputBufferL = new Float32Array(heapBuffer, this.outputPtrL, this.bufferSize);
       this.outputBufferR = new Float32Array(heapBuffer, this.outputPtrR, this.bufferSize);
       this.lastHeapBuffer = heapBuffer;
+      // Reset error flag so process() can recover after heap growth
+      this._errorReported = false;
     }
   }
 
