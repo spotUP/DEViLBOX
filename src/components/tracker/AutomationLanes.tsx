@@ -4,7 +4,7 @@
  */
 
 import React, { useMemo, useState, useRef, useCallback } from 'react';
-import { useAutomationStore, useInstrumentStore, useTrackerStore, useCursorStore } from '@stores';
+import { useAutomationStore, useInstrumentStore, useTrackerStore } from '@stores';
 import { interpolateAutomationValue } from '@typedefs/automation';
 import type { AutomationCurve } from '@typedefs/automation';
 import { getSectionColor } from '@hooks/useChannelAutomationParams';
