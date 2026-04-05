@@ -79,12 +79,8 @@ export interface SampleEditorState {
   setShowAudioToMidiModal: (v: boolean) => void;
   showBeatSlicer: boolean;
   setShowBeatSlicer: (v: boolean) => void;
-  showBeatSync: boolean;
-  setShowBeatSync: (v: boolean) => void;
   showAmigaPal: boolean;
   setShowAmigaPal: (v: boolean) => void;
-  showSpectrumFilter: boolean;
-  setShowSpectrumFilter: (v: boolean) => void;
 
   // Playback
   isPlaying: boolean;
@@ -223,9 +219,7 @@ export function useSampleEditorState(opts: UseSampleEditorStateOptions): SampleE
   const [showMpcResampleModal, setShowMpcResampleModal] = useState(false);
   const [showAudioToMidiModal, setShowAudioToMidiModal] = useState(false);
   const [showBeatSlicer, setShowBeatSlicer] = useState(false);
-  const [showBeatSync, setShowBeatSync] = useState(false);
   const [showAmigaPal, setShowAmigaPal] = useState(false);
-  const [showSpectrumFilter, setShowSpectrumFilter] = useState(false);
 
   // ─── Playback ────────────────────────────────────────────────────
   const [isPlaying, setIsPlaying] = useState(false);
@@ -411,9 +405,7 @@ export function useSampleEditorState(opts: UseSampleEditorStateOptions): SampleE
     showMpcResampleModal, setShowMpcResampleModal,
     showAudioToMidiModal, setShowAudioToMidiModal,
     showBeatSlicer, setShowBeatSlicer,
-    showBeatSync, setShowBeatSync,
     showAmigaPal, setShowAmigaPal,
-    showSpectrumFilter, setShowSpectrumFilter,
     isPlaying, setIsPlaying,
     playbackPosition, setPlaybackPosition,
     isLoading, setIsLoading,

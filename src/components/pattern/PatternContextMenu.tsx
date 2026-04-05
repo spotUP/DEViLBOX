@@ -18,7 +18,6 @@ import { RenameDialog } from '@components/common/RenameDialog';
 import { ConfirmDialog } from '@components/common/ConfirmDialog';
 import { useLiveModeStore } from '@stores/useLiveModeStore';
 import { useTrackerStore } from '@stores/useTrackerStore';
-import { useEditorStore, type PasteMode } from '@stores/useEditorStore';
 
 interface PatternContextMenuProps {
   patternIndex: number;
@@ -34,7 +33,6 @@ export const PatternContextMenu: React.FC<PatternContextMenuProps> = ({
   const {
     patterns,
     currentPatternIndex,
-    clipboard,
     setCurrentPattern,
     duplicatePattern,
     deletePattern,
@@ -42,10 +40,6 @@ export const PatternContextMenu: React.FC<PatternContextMenuProps> = ({
     shrinkPattern,
     resizePattern,
     updatePatternName,
-    paste,
-    pasteMix,
-    pasteFlood,
-    pastePushForward,
   } = useTrackerStore();
 
   // Dialog states
@@ -177,26 +171,6 @@ export const PatternContextMenu: React.FC<PatternContextMenuProps> = ({
 
     items.push({ type: 'divider' });
 
-    // Paste modes
-    const pasteDisabled = !clipboard;
-    const makePasteItem = (label: string, mode: PasteMode, action: () => void) => ({
-      id: `paste-${mode}`,
-      label,
-      icon: <Copy size={14} />,
-      disabled: pasteDisabled,
-      onClick: () => {
-        useEditorStore.getState().setPasteMode(mode);
-        action();
-      },
-    });
-
-    items.push(makePasteItem('Paste (Overwrite)', 'overwrite', paste));
-    items.push(makePasteItem('Paste Mix', 'mix', pasteMix));
-    items.push(makePasteItem('Paste Flood', 'flood', pasteFlood));
-    items.push(makePasteItem('Paste Insert', 'insert', pastePushForward));
-
-    items.push({ type: 'divider' });
-
     // Export
     items.push({
       id: 'export',
@@ -225,17 +199,12 @@ export const PatternContextMenu: React.FC<PatternContextMenuProps> = ({
     canDelete,
     patternIndex,
     pattern,
-    clipboard,
     queuePattern,
     setCurrentPattern,
     duplicatePattern,
     expandPattern,
     shrinkPattern,
     handleSetLength,
-    paste,
-    pasteMix,
-    pasteFlood,
-    pastePushForward,
   ]);
 
   return (
