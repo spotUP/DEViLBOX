@@ -814,6 +814,14 @@ export const useInstrumentStore = create<InstrumentStore>()(
             console.warn('[InstrumentStore] Could not invalidate instrument:', error);
           }
         }
+        // Sync updated instrument to the replayer's cached map so playback uses new config
+        const updatedConfig = get().instruments.find(i => i.id === id);
+        if (updatedConfig) {
+          try {
+            const { getTrackerReplayer } = require('@engine/TrackerReplayer');
+            getTrackerReplayer().updateInstrument(updatedConfig);
+          } catch { /* replayer not initialized yet */ }
+        }
       }
     },
 
