@@ -357,6 +357,10 @@ export interface TrackerSong {
    *  Uses full-pattern re-serialization instead of per-cell patching. */
   uadeVariableLayout?: import('./uade/UADEPatternEncoder').UADEVariablePatternLayout;
 
+  /** UADE instrument layout — enables live chip RAM patching of instrument
+   *  parameters (volume, finetune, loop points, envelopes) during playback. */
+  uadeInstrumentLayout?: import('./uade/UADEInstrumentLayout').UADEInstrumentLayout;
+
   /** CIA tick of the first reconstructed row — offset for real-time position calculation.
    *  During playback, row = floor((tickCount - uadeFirstTick) / initialSpeed). */
   uadeFirstTick?: number;
