@@ -35,13 +35,18 @@ export function initHashDatabase(): Database.Database {
 }
 
 /**
- * Get database instance (initializes on first call)
+ * Get database instance (initializes on first call).
+ * Returns null if the hash DB file doesn't exist (e.g., fresh deploy without the 865MB file).
  */
-function getDb(): Database.Database {
+function getDb(): Database.Database | null {
   if (!hashDb) {
-    initHashDatabase();
+    try {
+      initHashDatabase();
+    } catch {
+      return null;
+    }
   }
-  return hashDb!;
+  return hashDb;
 }
 
 // ── Types ───────────────────────────────────────────────────────────────────
@@ -75,7 +80,8 @@ export interface HashLookupResult {
  */
 export function findByHash(hash: string): HashLookupResult {
   const db = getDb();
-  
+  if (!db) return { match: false };
+
   // Query files table
   const file = db.prepare(`
     SELECT song_id, hash_id, pattern_hash, url
@@ -106,7 +112,8 @@ export function findByHash(hash: string): HashLookupResult {
  */
 export function getSamplesBySongId(songId: number): HashSample[] {
   const db = getDb();
-  
+  if (!db) return [];
+
   const samples = db.prepare(`
     SELECT hash_id, song_id, song_sample_id, text, length_bytes, length
     FROM samples
@@ -122,7 +129,8 @@ export function getSamplesBySongId(songId: number): HashSample[] {
  */
 export function findByPatternHash(patternHash: number): HashFile[] {
   const db = getDb();
-  
+  if (!db) return [];
+
   const files = db.prepare(`
     SELECT song_id, hash_id, pattern_hash, url
     FROM files
@@ -139,7 +147,8 @@ export function findByPatternHash(patternHash: number): HashFile[] {
  */
 export function getHashDbStats() {
   const db = getDb();
-  
+  if (!db) return { files: 0, samples: 0, sizeBytes: 0 };
+
   const fileCount = db.prepare('SELECT COUNT(*) as count FROM files').get() as { count: number };
   const sampleCount = db.prepare('SELECT COUNT(*) as count FROM samples').get() as { count: number };
   const uniquePatterns = db.prepare('SELECT COUNT(DISTINCT pattern_hash) as count FROM files WHERE pattern_hash IS NOT NULL').get() as { count: number };
