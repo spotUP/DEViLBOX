@@ -7,6 +7,7 @@
 import { useEffect, useCallback, useRef } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { useTrackerStore, useCursorStore, useTransportStore, useInstrumentStore } from '@stores';
+import { useWasmPositionStore } from '@/stores/useWasmPositionStore';
 import { useEditorStore } from '@stores/useEditorStore';
 import { useUIStore } from '@stores/useUIStore';
 import { useFormatStore } from '@stores/useFormatStore';
@@ -1475,6 +1476,15 @@ export const useTrackerInput = () => {
           // Renoise: Escape stops playback if playing
           const behavior = useEditorStore.getState().activeBehavior;
           if (behavior.spaceBehavior === 'play-stop' && isPlaying) {
+            // Save WASM position before stop (MusicLine, JamCracker, etc.)
+            const wasmPos = useWasmPositionStore.getState();
+            if (wasmPos.active) {
+              useTransportStore.getState().setCurrentRow(wasmPos.row);
+              const cursor = useCursorStore.getState().cursor;
+              if (cursor.rowIndex !== wasmPos.row) {
+                useCursorStore.setState({ cursor: { ...cursor, rowIndex: wasmPos.row } });
+              }
+            }
             getTrackerReplayer().stop();
             stop();
             getToneEngine().releaseAll();

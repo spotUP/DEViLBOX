@@ -573,17 +573,21 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = React.memo(({
     if (isPlaying) {
       // WASM singleton engines: stop directly — turntable brake enters scratch mode
       // which calls exitScratchModeAndStop, killing the engine via stopNativeEngines.
-      if (editorMode === 'jamcracker') {
+      if (editorMode === 'jamcracker' || editorMode === 'musicline') {
         // Save WASM position BEFORE stop clears it
         const wasmPos = useWasmPositionStore.getState();
         if (wasmPos.active) {
           setCurrentRow(wasmPos.row);
           useCursorStore.getState().cursor.rowIndex !== wasmPos.row &&
             useCursorStore.setState({ cursor: { ...useCursorStore.getState().cursor, rowIndex: wasmPos.row } });
+          // Also save the song position for MusicLine
+          if (editorMode === 'musicline' && wasmPos.songPos >= 0) {
+            setCurrentPosition(wasmPos.songPos, true);
+          }
         }
         getTrackerReplayer().stop();
         stop();
-        engine.stop(); // Must match playStopToggle — mute/unmute cycle resets audio graph
+        engine.stop();
         return;
       }
       // Standard formats: stop with turntable spin-down
