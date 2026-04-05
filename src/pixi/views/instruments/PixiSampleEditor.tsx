@@ -21,6 +21,7 @@ import { useInstrumentStore, useTrackerStore } from '@stores';
 import { scan9xxOffsets } from '@/lib/analysis/scan9xxOffsets';
 import type { InstrumentConfig, DeepPartial } from '@typedefs/instrument';
 import { PixiBeatSyncDialog } from '../../dialogs/PixiBeatSyncDialog';
+import { PixiSpectrumFilterPanel } from '../../dialogs/PixiSpectrumFilterPanel';
 
 // ── Types ───────────────────────────────────────────────────────────────
 
@@ -49,6 +50,9 @@ export const PixiSampleEditor: React.FC<PixiSampleEditorProps> = ({
 
   // ── Beat Sync dialog ─────────────────────────────────────────────────
   const [showBeatSync, setShowBeatSync] = useState(false);
+
+  // ── Spectrum Filter panel ─────────────────────────────────────────────
+  const [showSpectrumFilter, setShowSpectrumFilter] = useState(false);
 
   // ── View state ──────────────────────────────────────────────────────
   const [viewStart, setViewStart] = useState(0);
@@ -367,6 +371,16 @@ export const PixiSampleEditor: React.FC<PixiSampleEditorProps> = ({
           tooltip="Fit sample to tracker rows"
         />
 
+        {/* Spectrum Filter button */}
+        <PixiButton
+          label="Filter"
+          variant={showSpectrumFilter ? 'primary' : 'ghost'}
+          size="sm"
+          disabled={!audioBuffer}
+          onClick={() => setShowSpectrumFilter(!showSpectrumFilter)}
+          tooltip="Spectral filter curve editor"
+        />
+
         {/* Loop toggle */}
         <layoutContainer
           layout={{
@@ -480,6 +494,21 @@ export const PixiSampleEditor: React.FC<PixiSampleEditorProps> = ({
           />
         )}
       </layoutContainer>
+
+      {/* Spectrum Filter Panel */}
+      {showSpectrumFilter && (
+        <PixiSpectrumFilterPanel
+          audioBuffer={audioBuffer}
+          selectionStart={-1}
+          selectionEnd={-1}
+          width={WAVEFORM_W}
+          onApply={(buf) => {
+            setAudioBuffer(buf);
+            setShowSpectrumFilter(false);
+          }}
+          onClose={() => setShowSpectrumFilter(false)}
+        />
+      )}
 
       {/* Loop sliders (when enabled) */}
       {loopEnabled && audioBuffer && (
