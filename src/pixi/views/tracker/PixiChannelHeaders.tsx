@@ -494,6 +494,8 @@ const PixiChannelHeadersInner: React.FC<PixiChannelHeadersProps> = ({
                 action: () => {
                   setActiveParameter(ch, p.id);
                   setShowLane(ch, true);
+                  const uiState = useUIStore.getState();
+                  if (!uiState.showAutomationLanes) uiState.toggleAutomationLanes();
                 },
               })),
             }))},
