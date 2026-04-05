@@ -172,7 +172,7 @@ export const DEFAULT_ZYNADDSUBFX: ZynAddSubFXConfig = {
   filterAttack: 0.01, filterDecay: 0.3, filterSustain: 0.7, filterRelease: 0.3,
   filterKeyTrack: 0.5,
   // Amp envelope
-  ampAttack: 0.01, ampDecay: 0.1, ampSustain: 1.0, ampRelease: 0.2,
+  ampAttack: 0.01, ampDecay: 0.1, ampSustain: 1.0, ampRelease: 0.5,
   // Effects: all dry
   reverbWet: 0, reverbSize: 0.5, reverbDamp: 0.5,
   chorusWet: 0, chorusRate: 0.3, chorusDepth: 0.3,
@@ -377,6 +377,9 @@ export class ZynAddSubFXSynthEngine implements DevilboxSynth {
         type: 'setParamRaw', index: ve.bridgeIdx, value: ((ve.vol ?? 0) > 0) ? 127 : 0
       });
     }
+    // Ensure amp envelope forced release is enabled (without this, noteOff may be ignored)
+    // P_AMPENV_FORCED_RELEASE = 86, value > 63 = enabled
+    this._worklet.port.postMessage({ type: 'setParamRaw', index: 86, value: 127 });
     // Send all config params
     for (let i = 0; i < CONFIG_KEYS.length; i++) {
       const value = config[CONFIG_KEYS[i]];
@@ -402,13 +405,19 @@ export class ZynAddSubFXSynthEngine implements DevilboxSynth {
   }
 
   triggerRelease(frequency?: number | string, _time?: number): this {
-    if (!this._worklet || !this.isInitialized) return this;
-    if (frequency !== undefined) {
-      const note = typeof frequency === 'string' ? noteToMidi(frequency) : Math.round(12 * Math.log2(frequency / 440) + 69);
-      this._worklet.port.postMessage({ type: 'noteOff', note });
-    } else {
-      this._worklet.port.postMessage({ type: 'allNotesOff' });
+    if (!this._worklet || !this.isInitialized) {
+      // Clear pending notes that haven't played yet — avoids stuck notes
+      // when noteOff arrives before WASM init completes
+      if (frequency !== undefined) {
+        const note = typeof frequency === 'string' ? noteToMidi(frequency) : Math.round(12 * Math.log2(frequency / 440) + 69);
+        this.pendingNotes = this.pendingNotes.filter(p => p.note !== note);
+      } else {
+        this.pendingNotes = [];
+      }
+      return this;
     }
+    // Always use allNotesOff — individual noteOff has note-matching issues in the WASM bridge
+    this._worklet.port.postMessage({ type: 'allNotesOff' });
     return this;
   }
 
@@ -487,8 +496,11 @@ export class ZynAddSubFXSynthImpl extends ZynAddSubFXSynthEngine {
   }
 
   applyConfig(config: Partial<ZynAddSubFXConfig>): void {
+    // Only send params that actually changed — avoids flooding the worklet
+    // and overwriting WASM state with stale defaults (same pattern as MoniqueSynth)
+    const prev = (this as any).config as Record<string, number | undefined>;
     for (const [key, value] of Object.entries(config)) {
-      if (typeof value === 'number') {
+      if (typeof value === 'number' && value !== prev[key]) {
         this.set(key, value);
       }
     }

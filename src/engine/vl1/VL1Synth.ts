@@ -392,9 +392,11 @@ export class VL1SynthEngine implements DevilboxSynth {
 
   applyConfig(config: VL1Config): void {
     if (!this._worklet || !this.isInitialized) return;
+    const prev = this.config as Record<string, number | undefined>;
     for (const [key, index] of Object.entries(PARAM_INDEX)) {
       const value = (config as Record<string, number | undefined>)[key];
-      if (value !== undefined) {
+      if (value !== undefined && value !== prev[key]) {
+        (this.config as Record<string, number>)[key] = value;
         this._worklet.port.postMessage({ type: 'setParam', index, value });
       }
     }
@@ -414,7 +416,18 @@ export class VL1SynthEngine implements DevilboxSynth {
   }
 
   triggerRelease(frequency?: number | string, _time?: number): this {
-    if (!this._worklet || !this.isInitialized) return this;
+    if (!this._worklet || !this.isInitialized) {
+      // Clear pending notes to prevent stuck notes when noteOff arrives before init
+      if (frequency !== undefined) {
+        const note = typeof frequency === 'string'
+          ? noteToMidi(frequency)
+          : Math.round(12 * Math.log2(frequency / 440) + 69);
+        this.pendingNotes = this.pendingNotes.filter(p => p.note !== note);
+      } else {
+        this.pendingNotes = [];
+      }
+      return this;
+    }
     if (frequency !== undefined) {
       const note = typeof frequency === 'string'
         ? noteToMidi(frequency)
