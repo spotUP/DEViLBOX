@@ -17,6 +17,7 @@ import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
 import type { Pattern, ChannelData, TrackerCell } from '@/types';
 import type { InstrumentConfig } from '@/types/instrument';
 import type { UADEVariablePatternLayout } from '@/engine/uade/UADEPatternEncoder';
+import { getInstrumentLayout } from '@/engine/uade/UADEInstrumentLayout';
 import { convertToInstrument } from '../InstrumentConverter';
 import { xmEncoder } from '@/engine/uade/encoders/XMEncoder';
 
@@ -715,5 +716,6 @@ export async function parseXMFile(buffer: ArrayBuffer, filename: string): Promis
     initialBPM:      header.defaultBPM,
     linearPeriods:   !!(header.flags & 0x01),
     uadeVariableLayout,
+    uadeInstrumentLayout: getInstrumentLayout('xm'),
   };
 }
