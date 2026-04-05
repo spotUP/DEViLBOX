@@ -10,6 +10,7 @@
 
 import React, { useRef, useEffect, useState, useCallback } from 'react';
 import { getToneEngine } from '../../../engine/ToneEngine';
+import { useInstrumentStore } from '@stores/useInstrumentStore';
 
 interface MoniqueUIModule {
   _monique_ui_init: (sampleRate: number) => void;
@@ -59,8 +60,10 @@ interface MoniqueHardwareUIProps {
 }
 
 export const MoniqueHardwareUI: React.FC<MoniqueHardwareUIProps> = (props) => {
-  const { onParamChange: _onParamChange, instrumentId } = props;
-  console.log('[MoniqueHW] render, instrumentId=', instrumentId, 'all props:', Object.keys(props));
+  const { onParamChange: _onParamChange, instrumentId: instrumentIdProp } = props;
+  // instrumentId may be undefined from caller — fall back to current instrument from store
+  const storeInstrumentId = useInstrumentStore((s) => s.currentInstrumentId);
+  const instrumentId = instrumentIdProp ?? storeInstrumentId ?? 1;
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const instrumentIdRef = useRef(instrumentId);
   instrumentIdRef.current = instrumentId;
