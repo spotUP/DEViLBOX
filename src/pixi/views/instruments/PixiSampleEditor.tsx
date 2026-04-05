@@ -20,6 +20,7 @@ import { PixiLabel, PixiButton, PixiSlider } from '../../components';
 import { useInstrumentStore, useTrackerStore } from '@stores';
 import { scan9xxOffsets } from '@/lib/analysis/scan9xxOffsets';
 import type { InstrumentConfig, DeepPartial } from '@typedefs/instrument';
+import { PixiBeatSyncDialog } from '../../dialogs/PixiBeatSyncDialog';
 
 // ── Types ───────────────────────────────────────────────────────────────
 
@@ -45,6 +46,9 @@ export const PixiSampleEditor: React.FC<PixiSampleEditorProps> = ({
   const [audioBuffer, setAudioBuffer] = useState<AudioBuffer | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // ── Beat Sync dialog ─────────────────────────────────────────────────
+  const [showBeatSync, setShowBeatSync] = useState(false);
 
   // ── View state ──────────────────────────────────────────────────────
   const [viewStart, setViewStart] = useState(0);
@@ -353,6 +357,16 @@ export const PixiSampleEditor: React.FC<PixiSampleEditorProps> = ({
           tooltip="Zoom to Fit"
         />
 
+        {/* Beat Sync button */}
+        <PixiButton
+          label="Beat Sync"
+          variant="ghost"
+          size="sm"
+          disabled={!audioBuffer}
+          onClick={() => setShowBeatSync(true)}
+          tooltip="Fit sample to tracker rows"
+        />
+
         {/* Loop toggle */}
         <layoutContainer
           layout={{
@@ -547,6 +561,17 @@ export const PixiSampleEditor: React.FC<PixiSampleEditorProps> = ({
           <PixiLabel text="No sample" size="xs" color="textMuted" />
         )}
       </layoutContainer>
+
+      {/* Beat Sync Dialog */}
+      <PixiBeatSyncDialog
+        isOpen={showBeatSync}
+        onClose={() => setShowBeatSync(false)}
+        audioBuffer={audioBuffer}
+        onApply={(buf) => {
+          setAudioBuffer(buf);
+          setShowBeatSync(false);
+        }}
+      />
     </layoutContainer>
   );
 };
