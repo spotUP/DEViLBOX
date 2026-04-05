@@ -746,9 +746,8 @@ export function v2ConfigToInstrument(cfg: V2ConfigInput): V2InstrumentConfig {
   // Helper to clamp transpose/detune from signed (-64..+63) to unsigned (0..127)
   const toUnsigned = (v: number | undefined, def: number): number => {
     if (v === undefined) return def;
-    // If already 0-127 range (unsigned), use directly
-    if (v >= 0 && v <= 127) return v;
-    // If signed (-64 to +63), convert to unsigned
+    // V2Config uses signed values: 0=center, -24=down, +12=up
+    // V2 binary uses unsigned: 64=center, 40=down 24, 76=up 12
     return Math.max(0, Math.min(127, v + 64));
   };
 

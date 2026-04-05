@@ -169,7 +169,6 @@ void v2synth_note_on(int channel, int note, int velocity) {
     g_midiBuffer[2] = velocity & 0x7F;
     g_midiBuffer[3] = 0xFD; // End marker
     
-    printf("[V2] NoteOn ch=%d note=%d vel=%d\n", channel, note, velocity);
     
     synthProcessMIDI(g_synth, g_midiBuffer);
 }
@@ -210,7 +209,6 @@ void v2synth_control_change(int channel, int cc, int value) {
     g_midiBuffer[2] = value & 0x7F;
     g_midiBuffer[3] = 0xFD; // End marker
     
-    printf("[V2] CC ch=%d cc=%d val=%d\n", channel, cc, value);
     
     synthProcessMIDI(g_synth, g_midiBuffer);
 }
@@ -266,14 +264,6 @@ void v2synth_render(float* buffer, uint32_t numSamples) {
     }
     
     synthRender(g_synth, buffer, numSamples, nullptr, 0);
-    
-    // Debug: check first few samples
-    float maxSample = 0;
-    for (uint32_t i = 0; i < numSamples * 2 && i < 200; i++) {
-        float absVal = buffer[i] < 0 ? -buffer[i] : buffer[i];
-        if (absVal > maxSample) maxSample = absVal;
-    }
-    printf("[V2] Render %d samples, first200 max=%.6f\n", numSamples, maxSample);
 }
 
 /**
