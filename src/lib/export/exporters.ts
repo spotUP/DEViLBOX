@@ -170,6 +170,7 @@ export interface SongExport {
   originalModuleData?: { base64: string; format: string; sourceFile?: string }; // Original module for libopenmpt playback
   nativeEngineData?: Record<string, string>; // Base64-encoded binary FileData for native WASM engines
   nativeEngineMeta?: Record<string, unknown>; // JSON-serializable native engine metadata
+  replacedInstruments?: number[]; // Instrument IDs replaced with synths for hybrid playback
 }
 
 export interface SFXExport {
@@ -241,6 +242,18 @@ export function exportSong(
     ...(() => {
       const nem = getNativeEngineMetaForExport();
       return nem ? { nativeEngineMeta: nem } : {};
+    })(),
+    // Replaced instrument IDs for hybrid WASM/ToneEngine playback
+    ...(() => {
+      try {
+        // eslint-disable-next-line @typescript-eslint/no-var-requires
+        const { getTrackerReplayer } = require('@engine/TrackerReplayer');
+        const replayer = getTrackerReplayer();
+        if (replayer.hasReplacedInstruments) {
+          return { replacedInstruments: replayer.replacedInstrumentIds };
+        }
+      } catch { /* replayer not initialized */ }
+      return {};
     })(),
   };
 
