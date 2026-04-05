@@ -28,7 +28,7 @@ class V2SynthProcessor extends AudioWorkletProcessor {
         this.setGlobals(msg.globalsData);
         break;
       case 'noteOn':
-        console.log('[V2Synth] noteOn ch:', msg.channel, 'note:', msg.note, 'vel:', msg.velocity, 'init:', this.initialized);
+        // console.log('[V2Synth] noteOn ch:', msg.channel, 'note:', msg.note, 'vel:', msg.velocity, 'init:', this.initialized);
         this.noteOn(msg.channel, msg.note, msg.velocity);
         break;
       case 'noteOff':
@@ -195,12 +195,12 @@ class V2SynthProcessor extends AudioWorkletProcessor {
     // Debug: log first frame that has audio
     if (!this._dbgLogged && maxSample > 0.0001) {
       this._dbgLogged = true;
-      console.log('[V2Synth process] AUDIO DETECTED maxSample=' + maxSample.toFixed(4));
+      // console.log('[V2Synth process] AUDIO DETECTED maxSample=' + maxSample.toFixed(4));
     }
     if (!this._dbgFrames) this._dbgFrames = 0;
     this._dbgFrames++;
     if (this._dbgFrames === 200 && !this._dbgLogged) {
-      console.log('[V2Synth process] 200 frames, maxSample so far=', maxSample, 'initialized=', this.initialized);
+      // console.log('[V2Synth process] 200 frames, maxSample so far=', maxSample, 'initialized=', this.initialized);
     }
 
     return true;
