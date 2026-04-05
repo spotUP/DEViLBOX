@@ -41,6 +41,7 @@ import { FurnaceParser } from '@/lib/import/formats/FurnaceParser';
 import { DefleMaskParser } from '@/lib/import/formats/DefleMaskParser';
 import { deepMerge, ensureCompleteInstrumentConfig } from '@/lib/migration';
 import { WaveformProcessor } from '@/lib/audio/WaveformProcessor';
+import { UADEEngine } from '@/engine/uade/UADEEngine';
 
 // Extracted helper modules
 import {
@@ -522,7 +523,7 @@ export const useInstrumentStore = create<InstrumentStore>()(
             }
 
             if (updatedInstrument.synthType === 'V2' && updatedInstrument.v2 && updates.v2) {
-              engine.updateV2Parameters(id, updatedInstrument.v2);
+              engine.updateComplexSynthParameters(id, updatedInstrument.v2);
               return; // Handled
             }
 
@@ -822,6 +823,76 @@ export const useInstrumentStore = create<InstrumentStore>()(
             getTrackerReplayer().updateInstrument(updatedConfig);
           } catch { /* replayer not initialized yet */ }
         }
+
+        // ── UADE instrument replacement ──────────────────────────────────
+        // Route instrument edits to chip RAM patcher (parameter changes)
+        // or module rebuilder (sample data changes) when a UADE format is loaded.
+        try {
+          const { getTrackerReplayer } = require('@engine/TrackerReplayer');
+          const song = getTrackerReplayer().getSong();
+          if (song?.uadeInstrumentLayout && UADEEngine.hasInstance()) {
+            const layout = song.uadeInstrumentLayout;
+            const instrIndex = id - 1; // Store uses 1-based IDs, layout uses 0-based
+            const finalConfig = get().instruments.find(i => i.id === id);
+
+            // Detect sample data change
+            const hasSampleChange = updates.sample?.audioBuffer != null;
+
+            if (hasSampleChange && finalConfig?.sample?.audioBuffer) {
+              // Path 2: rebuild + reload (sample data changed)
+              void (async () => {
+                try {
+                  const { replaceAndReload, convertTo8bitAmiga } = await import('@/engine/uade/UADEModuleRebuilder');
+                  const audioCtx = new OfflineAudioContext(1, 1, 44100);
+                  const decoded = await audioCtx.decodeAudioData(
+                    (finalConfig.sample!.audioBuffer as ArrayBuffer).slice(0),
+                  );
+                  const pcm = convertTo8bitAmiga(decoded.getChannelData(0));
+                  const loopStart = finalConfig.sample?.loopStart ?? 0;
+                  const loopEnd = finalConfig.sample?.loopEnd ?? 0;
+                  const loopLen = finalConfig.sample?.loop ? Math.max(2, loopEnd - loopStart) : 2;
+                  const replacements = new Map([[instrIndex, { pcm, loopStart, loopLen }]]);
+                  await replaceAndReload(song, layout, replacements);
+                } catch (e) {
+                  console.error('[InstrumentStore] UADE sample replacement failed:', e);
+                }
+              })();
+            } else if (layout.maxInstruments > 0 && finalConfig) {
+              // Path 1: live chip RAM patching (parameter changes only)
+              void (async () => {
+                try {
+                  const { UADEInstrumentPatcher } = await import('@/engine/uade/UADEInstrumentPatcher');
+                  const { UADEChipEditor } = await import('@/engine/uade/UADEChipEditor');
+                  const editor = new UADEChipEditor(UADEEngine.getInstance());
+                  const patcher = new UADEInstrumentPatcher(editor);
+
+                  // Map InstrumentConfig fields → layout field names
+                  // volume: InstrumentConfig.volume is -60..0 dB → scale to 0..64 for Amiga
+                  const fieldMapping: [string, number | undefined][] = [
+                    ['volume', finalConfig.volume !== undefined
+                      ? Math.round(Math.max(0, (finalConfig.volume + 60) / 60) * 64) : undefined],
+                    ['finetune', finalConfig.metadata?.modPlayback?.finetune],
+                  ];
+
+                  for (const [fieldName, value] of fieldMapping) {
+                    if (value !== undefined && layout.fields[fieldName]) {
+                      await patcher.patchField(layout, instrIndex, fieldName, value);
+                    }
+                  }
+
+                  // Patch sections (envelopes, wavetables) if the format supports them
+                  if (layout.sectionEncoders) {
+                    for (const sectionName of Object.keys(layout.sectionEncoders)) {
+                      await patcher.patchSection(layout, instrIndex, sectionName, finalConfig as unknown as Record<string, unknown>);
+                    }
+                  }
+                } catch (e) {
+                  console.error('[InstrumentStore] UADE instrument patch failed:', e);
+                }
+              })();
+            }
+          }
+        } catch { /* UADE not loaded */ }
       }
     },
 
