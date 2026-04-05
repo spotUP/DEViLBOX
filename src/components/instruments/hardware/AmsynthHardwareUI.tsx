@@ -171,20 +171,11 @@ export const AmsynthHardwareUI: React.FC<AmsynthHardwareUIProps> = ({
         const nativeW = fbWidthRef.current;
         const nativeH = fbHeightRef.current;
 
-        const updateCanvasCSS = () => {
-          const container = containerRef.current;
-          if (!container) return;
-          const cw = container.clientWidth;
-          const ch = container.clientHeight;
-          const s = Math.min(cw / nativeW, ch / nativeH);
-          canvas.style.width = `${Math.floor(nativeW * s)}px`;
-          canvas.style.height = `${Math.floor(nativeH * s)}px`;
-        };
-        updateCanvasCSS();
-
-        const ro = new ResizeObserver(updateCanvasCSS);
-        if (containerRef.current) ro.observe(containerRef.current);
-        eventCleanups.push(() => ro.disconnect());
+        // Display at native skin size (1:1 pixels) — no downscaling to avoid blur.
+        // DPR backing ensures crispness on Retina; CSS size = logical native dimensions.
+        canvas.style.width = `${nativeW}px`;
+        canvas.style.height = `${nativeH}px`;
+        canvas.style.imageRendering = 'auto';
 
         const ctx = canvas.getContext('2d');
         if (!ctx) return;
