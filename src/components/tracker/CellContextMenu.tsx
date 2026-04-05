@@ -597,19 +597,9 @@ export const CellContextMenu: React.FC<CellContextMenuProps> = ({
           return name;
         });
 
-        // WASM synths can't be baked (they can't run in OfflineAudioContext)
-        const wasmSynthTypes = new Set([
-          'ZynAddSubFX', 'Monique', 'Amsynth', 'RaffoSynth', 'CalfMono',
-          'SetBfree', 'SynthV1', 'TalNoizeMaker', 'Aeolus', 'FluidSynth', 'Sfizz',
-          'MdaEPiano', 'MdaJX10', 'MdaDX10', 'DX7', 'OPL3', 'OpenWurli', 'VL1',
-          'TB303', 'Buzz3o3', 'DB303', 'V2', 'V2Speech',
-        ]);
-        const isWAMSynth = instConfig.synthType?.startsWith('WAM');
-        const isMAMESynth = instConfig.synthType?.startsWith('MAME');
-        const isFurnaceSynth = instConfig.synthType?.startsWith('Furnace');
-        if (wasmSynthTypes.has(instConfig.synthType || '') || isWAMSynth || isMAMESynth || isFurnaceSynth) {
+        // Only block Sampler (already a sample)
+        if (instConfig.synthType === 'Sampler') {
           onClose();
-          useUIStore.getState().setStatusMessage(`Cannot bake ${instConfig.synthType} — use a Tone.js synth (FM, AM, Synth)`);
           return;
         }
 
@@ -617,8 +607,21 @@ export const CellContextMenu: React.FC<CellContextMenuProps> = ({
         useUIStore.getState().setStatusMessage('Baking chord...');
 
         try {
-          const { SynthBaker } = await import('@/lib/audio/SynthBaker');
-          const buffer = await SynthBaker.bakeChord(instConfig, noteStrings);
+          const { isDevilboxSynth } = await import('@typedefs/synth');
+          const { getToneEngine } = await import('@engine/ToneEngine');
+          const engine = getToneEngine();
+
+          // Check if loaded instrument is a WASM synth needing live bake
+          const loadedInst = engine.getInstrument(rootInst, instConfig);
+          const needsLiveBake = loadedInst && isDevilboxSynth(loadedInst);
+
+          let buffer: AudioBuffer;
+          if (needsLiveBake) {
+            buffer = await engine.liveBakeChord(rootInst, instConfig, noteStrings);
+          } else {
+            const { SynthBaker } = await import('@/lib/audio/SynthBaker');
+            buffer = await SynthBaker.bakeChord(instConfig, noteStrings);
+          }
 
           // Encode AudioBuffer as WAV (browsers can't decode raw PCM)
           const pcmData = buffer.getChannelData(0);
