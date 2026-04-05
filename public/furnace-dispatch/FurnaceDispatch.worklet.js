@@ -722,8 +722,7 @@ class FurnaceDispatchProcessor extends AudioWorkletProcessor {
     // If same platform chip already exists, reuse it (Furnace pattern: disCont[] reuse)
     if (this.chips.has(platformType)) {
       const existing = this.chips.get(platformType);
-      console.log('[FurnaceDispatch Worklet] Reusing existing chip for platform', platformType,
-                  'handle', existing.handle);
+      // Reuse existing chip — no log (can happen 4-5x per song load)
       this.port.postMessage({
         type: 'chipCreated',
         handle: existing.handle,
