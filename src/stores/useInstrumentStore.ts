@@ -13,6 +13,7 @@ import type {
   SynthType,
 } from '@typedefs/instrument';
 import type { BeatSlice, BeatSliceConfig } from '@typedefs/beatSlicer';
+import { isDevilboxSynth } from '@typedefs/synth';
 import {
   DEFAULT_ENVELOPE,
   DEFAULT_OSCILLATOR,
@@ -1065,10 +1066,16 @@ export const useInstrumentStore = create<InstrumentStore>()(
 
           const multiMap: Record<string, string> = {};
 
+          // Detect if this is a WASM synth that needs live baking
+          const loadedInst = engine.getInstrument(instrument.id, instrument);
+          const needsLiveBake = loadedInst && isDevilboxSynth(loadedInst);
+
           for (const note of usedNotes) {
             // Create a config that forces this specific note for baking
             // (Note: triggerAttack in bakeInstrument will use this frequency)
-            const buffer = await engine.bakeInstrument(instrument, 2, note);
+            const buffer = needsLiveBake
+              ? await engine.liveBakeInstrument(instrument.id, instrument, 4, note)
+              : await engine.bakeInstrument(instrument, 2, note);
             const wavData = await WaveformProcessor.bufferToWav(buffer);
             const blob = new Blob([wavData], { type: 'audio/wav' });
             multiMap[note] = URL.createObjectURL(blob);
@@ -1105,7 +1112,11 @@ export const useInstrumentStore = create<InstrumentStore>()(
           });
         } else {
           // LITE BAKE: Standard C-4 render
-          const buffer = await engine.bakeInstrument(instrument, 2, "C4");
+          const loadedInst = engine.getInstrument(instrument.id, instrument);
+          const needsLiveBake = loadedInst && isDevilboxSynth(loadedInst);
+          const buffer = needsLiveBake
+            ? await engine.liveBakeInstrument(instrument.id, instrument, 4, 'C4')
+            : await engine.bakeInstrument(instrument, 2, 'C4');
           const wavData = await WaveformProcessor.bufferToWav(buffer);
           const blob = new Blob([wavData], { type: 'audio/wav' });
           const url = URL.createObjectURL(blob);

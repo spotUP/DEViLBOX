@@ -9,17 +9,15 @@ WORKDIR /app
 # Copy package files
 COPY server/package*.json ./
 
-# Install dependencies
-RUN npm install --omit=dev
+# Install ALL dependencies (including devDeps for TypeScript build)
+RUN npm install
 
 # Copy source code
 COPY server/src ./src
 COPY server/tsconfig.json ./
 
-# Build TypeScript
-RUN npm install typescript tsx --save-dev && \
-    npm run build && \
-    npm prune --production
+# Build TypeScript, then prune devDeps
+RUN npm run build && npm prune --production
 
 # Create data directory and seed with demo content
 RUN mkdir -p /data/public/songs /data/public/instruments /data/users
