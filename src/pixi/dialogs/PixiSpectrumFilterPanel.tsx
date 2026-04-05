@@ -11,7 +11,7 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { Graphics } from 'pixi.js';
 import type { FederatedPointerEvent } from 'pixi.js';
-import { PixiButton, PixiLabel } from '../components';
+import { PixiButton, PixiLabel, PixiSlider } from '../components';
 import { usePixiTheme } from '../theme';
 import {
   type FilterPoint,
@@ -33,7 +33,7 @@ const MAX_DB = 6;
 const PANEL_H = 200;
 const FFT_SIZE = 4096;
 const POINT_RADIUS = 6;
-const PRESET_BAR_H = 32;
+const PRESET_BAR_H = 56;
 const ACTION_BAR_H = 32;
 
 // Frequency grid lines (Hz)
@@ -103,7 +103,7 @@ export const PixiSpectrumFilterPanel: React.FC<PixiSpectrumFilterPanelProps> = (
   const theme = usePixiTheme();
 
   const [preset, setPreset] = useState<FilterPreset>('custom');
-  const cutoff = 2000;
+  const [cutoff, setCutoff] = useState(2000);
   const [points, setPoints] = useState<FilterPoint[]>(() => getPresetPoints('custom'));
   const [draggingIdx, setDraggingIdx] = useState<number | null>(null);
   const [isPreviewing, setIsPreviewing] = useState(false);
@@ -301,6 +301,16 @@ export const PixiSpectrumFilterPanel: React.FC<PixiSpectrumFilterPanelProps> = (
     setPoints(getPresetPoints(p, cutoff));
   }, [cutoff]);
 
+  const handleCutoffChange = useCallback((value: number) => {
+    setCutoff(value);
+    setPreset(prev => {
+      if (prev !== 'custom') {
+        setPoints(getPresetPoints(prev, value));
+      }
+      return prev;
+    });
+  }, []);
+
   // ── Preview ──────────────────────────────────────────────────────────
   const handlePreview = useCallback(() => {
     if (!audioBuffer) return;
@@ -356,9 +366,7 @@ export const PixiSpectrumFilterPanel: React.FC<PixiSpectrumFilterPanelProps> = (
       <layoutContainer
         layout={{
           height: PRESET_BAR_H,
-          flexDirection: 'row',
-          alignItems: 'center',
-          gap: 4,
+          flexDirection: 'column',
           paddingLeft: 8,
           paddingRight: 8,
           backgroundColor: theme.bgSecondary.color,
@@ -366,22 +374,53 @@ export const PixiSpectrumFilterPanel: React.FC<PixiSpectrumFilterPanelProps> = (
           borderBottomColor: theme.border.color,
         }}
       >
-        <PixiLabel text="PRESET:" size="xs" weight="bold" color="textMuted" />
-        {PRESETS.map(({ key, label }) => (
-          <PixiButton
-            key={key}
-            label={label}
-            variant={preset === key ? 'primary' : 'ghost'}
-            size="sm"
-            onClick={() => applyPreset(key)}
+        {/* Row 1: preset buttons */}
+        <layoutContainer
+          layout={{
+            height: 28,
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: 4,
+          }}
+        >
+          <PixiLabel text="PRESET:" size="xs" weight="bold" color="textMuted" />
+          {PRESETS.map(({ key, label }) => (
+            <PixiButton
+              key={key}
+              label={label}
+              variant={preset === key ? 'primary' : 'ghost'}
+              size="sm"
+              onClick={() => applyPreset(key)}
+            />
+          ))}
+        </layoutContainer>
+        {/* Row 2: cutoff slider */}
+        <layoutContainer
+          layout={{
+            height: 28,
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: 8,
+          }}
+        >
+          <PixiLabel text="CUTOFF:" size="xs" weight="bold" color="textMuted" />
+          <PixiSlider
+            value={cutoff}
+            min={20}
+            max={20000}
+            onChange={handleCutoffChange}
+            orientation="horizontal"
+            length={width - 120}
+            handleWidth={12}
+            handleHeight={12}
+            thickness={4}
           />
-        ))}
-        <layoutContainer layout={{ flex: 1 }} />
-        <PixiLabel
-          text={`Cutoff: ${cutoff >= 1000 ? `${(cutoff / 1000).toFixed(1)}kHz` : `${cutoff}Hz`}`}
-          size="xs"
-          color="textMuted"
-        />
+          <PixiLabel
+            text={cutoff >= 1000 ? `${(cutoff / 1000).toFixed(1)}kHz` : `${cutoff}Hz`}
+            size="xs"
+            color="textMuted"
+          />
+        </layoutContainer>
       </layoutContainer>
 
       {/* Graphics canvas — spectrum + curve editor */}
