@@ -30,18 +30,6 @@ export class AutomationPlayer {
    */
   public setAutomationData(data: AutomationData): void {
     this.automationData = data;
-    // Debug logging
-    const patternIds = Object.keys(data);
-    console.log('[AutomationPlayer] setAutomationData:', {
-      patternCount: patternIds.length,
-      patterns: patternIds.map(pid => ({
-        patternId: pid,
-        channels: Object.keys(data[pid] || {}).map(ch => ({
-          channel: ch,
-          params: Object.keys(data[pid][Number(ch)] || {})
-        }))
-      }))
-    });
   }
 
   /**
