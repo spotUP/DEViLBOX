@@ -1,6 +1,6 @@
 /**
  * MoniqueControls.tsx - Visual UI for Monique Monosynth
- * ~100 parameters organized into oscillator/filter/envelope/LFO/effects/master groups.
+ * All 120 parameters organized into groups matching C++ MoniqueParams enum.
  */
 
 import React, { useRef, useEffect, useCallback } from 'react';
@@ -79,18 +79,18 @@ const FilterPanel: React.FC<{
         </select>
       </div>
       <div className="flex gap-2 flex-wrap items-end">
-        <Knob value={(merged[k('Cutoff')] as number) ?? 0.5} min={0} max={1}
+        <Knob value={(merged[k('Cutoff')] as number) ?? 0.2} min={0} max={1}
           onChange={(v) => update(k('Cutoff'), v)} label="Cutoff" color="#a855f7" />
         <Knob value={(merged[k('Resonance')] as number) ?? 0.3} min={0} max={1}
           onChange={(v) => update(k('Resonance'), v)} label="Reso" color="#a855f7" />
         <Knob value={(merged[k('Distortion')] as number) ?? 0} min={0} max={1}
           onChange={(v) => update(k('Distortion'), v)} label="Dist" color="#ef4444" />
-        <Knob value={(merged[k('Pan')] as number) ?? 0} min={-1} max={1}
-          onChange={(v) => update(k('Pan'), v)} label="Pan" color="#6366f1" />
         <Knob value={(merged[k('Output')] as number) ?? 0} min={0} max={1}
           onChange={(v) => update(k('Output'), v)} label="Out" color="#22c55e" />
+        <Knob value={(merged[k('Pan')] as number) ?? 0} min={-1} max={1}
+          onChange={(v) => update(k('Pan'), v)} label="Pan" color="#6366f1" />
         <Knob value={(merged[k('ModMix')] as number) ?? 0} min={-1} max={1}
-          onChange={(v) => update(k('ModMix'), v)} label="ModMix" color="#e879f9" />
+          onChange={(v) => update(k('ModMix'), v)} label="Env/LFO" color="#e879f9" />
         <Knob value={(merged[k('Input0')] as number) ?? 0} min={0} max={1}
           onChange={(v) => update(k('Input0'), v)} label="In 1" color="#64748b" />
         <Knob value={(merged[k('Input1')] as number) ?? 0} min={0} max={1}
@@ -115,20 +115,18 @@ const EnvPanel: React.FC<{
     <div className="p-2 rounded bg-[#1a1a1a]">
       <span className="text-gray-400 font-semibold text-[11px] mb-1 block">{label}</span>
       <div className="flex gap-2 flex-wrap items-end">
-        <Knob value={(merged[k('Attack')] as number) ?? 0.01} min={0} max={1}
+        <Knob value={(merged[k('Attack')] as number) ?? 0.05} min={0} max={1}
           onChange={(v) => update(k('Attack'), v)} label="A" color="#ef4444" />
-        <Knob value={(merged[k('Decay')] as number) ?? 0.3} min={0} max={1}
+        <Knob value={(merged[k('Decay')] as number) ?? 0.02} min={0} max={1}
           onChange={(v) => update(k('Decay'), v)} label="D" color="#f59e0b" />
-        <Knob value={(merged[k('Sustain')] as number) ?? 0.7} min={0} max={1}
+        <Knob value={(merged[k('Sustain')] as number) ?? 0.9} min={0} max={1}
           onChange={(v) => update(k('Sustain'), v)} label="S" color="#22c55e" />
-        <Knob value={(merged[k('Release')] as number) ?? 0.3} min={0} max={1}
+        <Knob value={(merged[k('SusTime')] as number) ?? 1} min={0} max={1}
+          onChange={(v) => update(k('SusTime'), v)} label="S.Time" color="#14b8a6" />
+        <Knob value={(merged[k('Release')] as number) ?? 0.2} min={0} max={1}
           onChange={(v) => update(k('Release'), v)} label="R" color="#3b82f6" />
         <Knob value={(merged[k('Shape')] as number) ?? 0} min={-1} max={1}
           onChange={(v) => update(k('Shape'), v)} label="Shp" color="#8b5cf6" />
-        <Knob value={(merged[k('Velocity')] as number) ?? 0.5} min={0} max={1}
-          onChange={(v) => update(k('Velocity'), v)} label="Vel" color="#06b6d4" />
-        <Knob value={(merged[k('Retrigger')] as number) ?? 0.004} min={0.004} max={1}
-          onChange={(v) => update(k('Retrigger'), v)} label="Retrig" color="#f472b6" />
       </div>
     </div>
   );
@@ -136,16 +134,16 @@ const EnvPanel: React.FC<{
 
 /* ---------- LFO panel ---------- */
 const LfoPanel: React.FC<{
-  idx: number; merged: MoniqueConfig;
+  idx: number; prefix: string; merged: MoniqueConfig;
   update: (key: keyof MoniqueConfig, value: number) => void;
-}> = ({ idx, merged, update }) => {
+}> = ({ idx, prefix, merged, update }) => {
   const n = idx + 1;
-  const pre = `lfo${n}` as const;
+  const pre = `${prefix}${n}` as const;
   const k = (s: string) => `${pre}${s}` as keyof MoniqueConfig;
 
   return (
     <div className="p-2 rounded bg-[#1a1a1a]">
-      <span className="text-gray-400 font-semibold text-[11px] mb-1 block">LFO {n}</span>
+      <span className="text-gray-400 font-semibold text-[11px] mb-1 block">{prefix.toUpperCase()} {n}</span>
       <div className="flex gap-2 items-end">
         <Knob value={(merged[k('Speed')] as number) ?? 4} min={0} max={16}
           onChange={(v) => update(k('Speed'), Math.round(v))} label="Spd" color="#f97316" />
@@ -178,13 +176,13 @@ export const MoniqueControls: React.FC<MoniqueControlsProps> = ({ config, onChan
           {[0, 1, 2].map(i => <OscPanel key={i} idx={i} merged={merged} update={updateParam} />)}
         </div>
         <div className="flex gap-3 mt-2 items-end">
-          <Knob value={merged.fmMulti ?? 0} min={0} max={1}
-            onChange={(v) => updateParam('fmMulti', v)} label="FM Multi" color="#f59e0b" />
+          <Knob value={merged.fmFreq ?? 0} min={0} max={1}
+            onChange={(v) => updateParam('fmFreq', v)} label="FM Freq" color="#f59e0b" />
+          <Knob value={merged.fmShape ?? 0} min={0} max={1}
+            onChange={(v) => updateParam('fmShape', v)} label="FM Shape" color="#f59e0b" />
           <Knob value={merged.fmSwing ?? 0} min={0} max={1}
             onChange={(v) => updateParam('fmSwing', v)} label="FM Swing" color="#f59e0b" />
-          <Knob value={merged.fmPhase ?? 0} min={0} max={1}
-            onChange={(v) => updateParam('fmPhase', v)} label="FM Phase" color="#f59e0b" />
-          <Knob value={merged.masterShift ?? 0.5} min={0} max={1}
+          <Knob value={merged.masterShift ?? 0} min={0} max={1}
             onChange={(v) => updateParam('masterShift', v)} label="Shift" color="#64748b" />
         </div>
       </div>
@@ -212,7 +210,15 @@ export const MoniqueControls: React.FC<MoniqueControlsProps> = ({ config, onChan
       <div>
         <h3 className="text-gray-400 font-semibold mb-2 border-b border-gray-700 pb-1">LFOs</h3>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-          {[0, 1, 2].map(i => <LfoPanel key={i} idx={i} merged={merged} update={updateParam} />)}
+          {[0, 1, 2].map(i => <LfoPanel key={i} idx={i} prefix="lfo" merged={merged} update={updateParam} />)}
+        </div>
+      </div>
+
+      {/* MFOs */}
+      <div>
+        <h3 className="text-gray-400 font-semibold mb-2 border-b border-gray-700 pb-1">MFOs</h3>
+        <div className="grid grid-cols-1 sm:grid-cols-4 gap-2">
+          {[0, 1, 2, 3].map(i => <LfoPanel key={i} idx={i} prefix="mfo" merged={merged} update={updateParam} />)}
         </div>
       </div>
 
@@ -220,28 +226,28 @@ export const MoniqueControls: React.FC<MoniqueControlsProps> = ({ config, onChan
       <div>
         <h3 className="text-gray-400 font-semibold mb-2 border-b border-gray-700 pb-1">Effects</h3>
         <div className="flex gap-3 flex-wrap items-end">
-          <Knob value={merged.reverbRoom ?? 0.3} min={0} max={1}
+          <Knob value={merged.distortion ?? 0} min={0} max={1}
+            onChange={(v) => updateParam('distortion', v)} label="Dist" color="#ef4444" />
+          <Knob value={merged.shape ?? 0} min={0} max={1}
+            onChange={(v) => updateParam('shape', v)} label="Shape" color="#ef4444" />
+          <Knob value={merged.reverbRoom ?? 0.333} min={0} max={1}
             onChange={(v) => updateParam('reverbRoom', v)} label="Rev Room" color="#7c3aed" />
           <Knob value={merged.reverbMix ?? 0} min={0} max={1}
             onChange={(v) => updateParam('reverbMix', v)} label="Rev Mix" color="#7c3aed" />
-          <Knob value={merged.reverbWidth ?? 0.5} min={0} max={1}
-            onChange={(v) => updateParam('reverbWidth', v)} label="Rev Width" color="#7c3aed" />
           <Knob value={merged.chorusMod ?? 0} min={0} max={1}
             onChange={(v) => updateParam('chorusMod', v)} label="Chorus" color="#2563eb" />
-          <Knob value={merged.chorusPan ?? 0.5} min={0} max={1}
-            onChange={(v) => updateParam('chorusPan', v)} label="Chr Pan" color="#2563eb" />
           <Knob value={merged.delay ?? 0} min={0} max={1}
             onChange={(v) => updateParam('delay', v)} label="Delay" color="#0891b2" />
-          <Knob value={merged.delayPan ?? 0.5} min={0} max={1}
+          <Knob value={merged.delayPan ?? 0} min={0} max={1}
             onChange={(v) => updateParam('delayPan', v)} label="Dly Pan" color="#0891b2" />
           <button
-            className={`px-2 py-1 rounded text-[10px] ${(merged.eqBypass ?? 0) > 0.5 ? 'bg-red-700 text-white' : 'bg-gray-700 text-gray-400'}`}
-            onClick={() => updateParam('eqBypass', (merged.eqBypass ?? 0) > 0.5 ? 0 : 1)}
-          >{(merged.eqBypass ?? 0) > 0.5 ? 'EQ OFF' : 'EQ ON'}</button>
+            className={`px-2 py-1 rounded text-[10px] ${(merged.eqBypass ?? 1) > 0.5 ? 'bg-green-700 text-white' : 'bg-red-700 text-white'}`}
+            onClick={() => updateParam('eqBypass', (merged.eqBypass ?? 1) > 0.5 ? 0 : 1)}
+          >{(merged.eqBypass ?? 1) > 0.5 ? 'EQ ON' : 'EQ OFF'}</button>
           <button
-            className={`px-2 py-1 rounded text-[10px] ${(merged.effectBypass ?? 0) > 0.5 ? 'bg-red-700 text-white' : 'bg-gray-700 text-gray-400'}`}
-            onClick={() => updateParam('effectBypass', (merged.effectBypass ?? 0) > 0.5 ? 0 : 1)}
-          >{(merged.effectBypass ?? 0) > 0.5 ? 'FX OFF' : 'FX ON'}</button>
+            className={`px-2 py-1 rounded text-[10px] ${(merged.effectBypass ?? 1) > 0.5 ? 'bg-green-700 text-white' : 'bg-red-700 text-white'}`}
+            onClick={() => updateParam('effectBypass', (merged.effectBypass ?? 1) > 0.5 ? 0 : 1)}
+          >{(merged.effectBypass ?? 1) > 0.5 ? 'FX ON' : 'FX OFF'}</button>
         </div>
       </div>
 
@@ -249,22 +255,18 @@ export const MoniqueControls: React.FC<MoniqueControlsProps> = ({ config, onChan
       <div>
         <h3 className="text-gray-400 font-semibold mb-2 border-b border-gray-700 pb-1">Master</h3>
         <div className="flex gap-3 flex-wrap items-end">
-          <Knob value={merged.volume ?? 0.7} min={0} max={1}
+          <Knob value={merged.volume ?? 0.9} min={0} max={1}
             onChange={(v) => updateParam('volume', v)} label="Volume" color="#22c55e" />
-          <Knob value={merged.shape ?? 0} min={0} max={1}
-            onChange={(v) => updateParam('shape', v)} label="Shape" color="#ef4444" />
-          <Knob value={merged.distortion ?? 0} min={0} max={1}
-            onChange={(v) => updateParam('distortion', v)} label="Dist" color="#ef4444" />
-          <Knob value={merged.glide ?? 0} min={0} max={1}
+          <Knob value={merged.glide ?? 0.05} min={0} max={1}
             onChange={(v) => updateParam('glide', v)} label="Glide" color="#3b82f6" />
-          <Knob value={merged.glideTime ?? 0} min={0} max={127}
-            onChange={(v) => updateParam('glideTime', Math.round(v))} label="Glide T" color="#3b82f6" />
-          <Knob value={merged.octaveOffset ?? 0} min={-4} max={4}
+          <Knob value={merged.octaveOffset ?? 0} min={-2} max={2}
             onChange={(v) => updateParam('octaveOffset', Math.round(v))} label="Oct" color="#a78bfa" />
-          <Knob value={merged.noteOffset ?? 0} min={-12} max={12}
+          <Knob value={merged.noteOffset ?? 0} min={0} max={12}
             onChange={(v) => updateParam('noteOffset', Math.round(v))} label="Note" color="#a78bfa" />
-          <Knob value={merged.speed ?? 120} min={20} max={1000}
-            onChange={(v) => updateParam('speed', Math.round(v))} label="BPM" color="#f97316" />
+          <button
+            className={`px-2 py-1 rounded text-[10px] ${(merged.sync ?? 1) > 0.5 ? 'bg-cyan-700 text-white' : 'bg-gray-700 text-gray-400'}`}
+            onClick={() => updateParam('sync', (merged.sync ?? 1) > 0.5 ? 0 : 1)}
+          >{(merged.sync ?? 1) > 0.5 ? 'SYNC ON' : 'SYNC OFF'}</button>
         </div>
       </div>
     </div>
