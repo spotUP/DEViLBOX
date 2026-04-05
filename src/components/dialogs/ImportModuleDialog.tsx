@@ -4,12 +4,10 @@
  */
 
 import React, { useState, useRef, useCallback, useEffect } from 'react';
-import { X, Play, Square, Music, FileAudio, AlertCircle, Folder } from 'lucide-react';
+import { X, Music, FileAudio, AlertCircle, Folder } from 'lucide-react';
 import { Button } from '@components/ui/Button';
 import {
   loadModuleFile,
-  previewModule,
-  stopPreview,
   getSupportedExtensions,
   isSupportedModule,
   type ModuleInfo,
@@ -17,7 +15,7 @@ import {
 import { isUADEFormat } from '@lib/import/formats/UADEParser';
 import { getNativeFormatMetadata, getNativeFormatExtendedMetadata } from '@lib/import/NativeFormatMetadata';
 import { useSettingsStore, type FormatEnginePreferences } from '@/stores/useSettingsStore';
-import { detectFormat, getLibopenmptPlayableKeys, type FormatDefinition } from '@lib/import/FormatRegistry';
+import { detectFormat, type FormatDefinition } from '@lib/import/FormatRegistry';
 import type { UADEMetadata } from '@engine/uade/UADEEngine';
 import { computeSongDBHash, lookupSongDB, type SongDBResult } from '@lib/songdb';
 import { parseSIDHeader, type SIDHeaderInfo } from '@/lib/sid/SIDHeaderParser';
@@ -103,7 +101,6 @@ export const ImportModuleDialog: React.FC<ImportModuleDialogProps> = ({
   const [uadeInitProgress, setUadeInitProgress] = useState(0);
   const [uadeInitPhase, setUadeInitPhase] = useState('');
   const [error, setError]               = useState<string | null>(null);
-  const [isPlaying, setIsPlaying]       = useState(false);
   const [uadeMetadata, setUadeMetadata] = useState<UADEMetadata | null>(null);
   const [selectedSubsong, setSelectedSubsong] = useState(0);
   const [songDBInfo, setSongDBInfo] = useState<SongDBResult | null>(null);
@@ -112,8 +109,6 @@ export const ImportModuleDialog: React.FC<ImportModuleDialogProps> = ({
   const [activeCompanions, setActiveCompanions] = useState<File[]>([]);
   // Track whether a UADE scan is in-flight so handleClose can cancel it
   const uadeScanActiveRef = useRef(false);
-  // MusicLine preview engine reference (connect/disconnect on preview start/stop)
-  const mlPreviewRef = useRef<{ stop: () => void; output: GainNode } | null>(null);
   // Keep companion files fresh in callbacks without re-creating handleFileSelect
   const companionFilesRef = useRef<File[]>(companionFiles ?? []);
   useEffect(() => { companionFilesRef.current = companionFiles ?? []; }, [companionFiles]);
@@ -342,81 +337,8 @@ export const ImportModuleDialog: React.FC<ImportModuleDialogProps> = ({
     }
   }, [initialFile, isOpen, handleFileSelect]);
 
-  // Native format keys where libopenmpt can successfully preview the file (from FormatRegistry).
-  const LIBOPENMPT_PLAYABLE_NATIVE_KEYS = getLibopenmptPlayableKeys();
-
-  const isMusicLine = nativeFmt?.key === 'musicLine';
-  const isHively    = nativeFmt?.key === 'hvl';
-
-  // Preview is available when:
-  //   - No uadeMetadata (UADE-exclusive formats hide preview already via uadeMetadata)
-  //   - AND one of: no native format (standard libopenmpt), libopenmpt-playable native, or dedicated engine
-  const canPreview = !uadeMetadata && (
-    !nativeFmt ||
-    isMusicLine ||
-    isHively ||
-    LIBOPENMPT_PLAYABLE_NATIVE_KEYS.has(nativeFmt.key)
-  );
-
-  const stopEnginePreview = useCallback(() => {
-    if (mlPreviewRef.current) {
-      mlPreviewRef.current.stop();
-      try { mlPreviewRef.current.output.disconnect(); } catch { /* already disconnected */ }
-      mlPreviewRef.current = null;
-    }
-  }, []);
-
-  const handlePreview = useCallback(async () => {
-    if (!moduleInfo) return;
-
-    if (isMusicLine || isHively) {
-      if (isPlaying) {
-        stopEnginePreview();
-        setIsPlaying(false);
-      } else {
-        try {
-          if (isMusicLine) {
-            const { MusicLineEngine } = await import('@engine/musicline/MusicLineEngine');
-            const engine = MusicLineEngine.getInstance();
-            await engine.ready();
-            await engine.loadSong(new Uint8Array(moduleInfo.arrayBuffer));
-            engine.output.connect(engine.output.context.destination);
-            mlPreviewRef.current = { stop: () => engine.stop(), output: engine.output };
-            engine.play();
-          } else {
-            // HVL/AHX — use HivelyEngine
-            const { HivelyEngine } = await import('@engine/hively/HivelyEngine');
-            const engine = HivelyEngine.getInstance();
-            await engine.ready();
-            await engine.loadTune(moduleInfo.arrayBuffer.slice(0));
-            engine.output.connect(engine.output.context.destination);
-            mlPreviewRef.current = { stop: () => engine.stop(), output: engine.output };
-            engine.play();
-          }
-          setIsPlaying(true);
-        } catch (err) {
-          console.error('[ImportModuleDialog] Engine preview failed:', err);
-        }
-      }
-      return;
-    }
-
-    if (isPlaying) {
-      stopPreview(moduleInfo);
-      setIsPlaying(false);
-    } else {
-      previewModule(moduleInfo);
-      setIsPlaying(true);
-    }
-  }, [moduleInfo, isPlaying, isMusicLine, isHively, stopEnginePreview]);
-
   const handleImport = useCallback(async () => {
     if (!moduleInfo) return;
-    if (isPlaying) {
-      if (isMusicLine || isHively) stopEnginePreview();
-      else stopPreview(moduleInfo);
-      setIsPlaying(false);
-    }
     // Always use native parser when available; always use UADE enhanced (editable) mode.
     if (nativeFmt && !isNativeOnly) {
       setFormatEngine(nativeFmt.key as keyof FormatEnginePreferences, 'native');
@@ -438,13 +360,9 @@ export const ImportModuleDialog: React.FC<ImportModuleDialogProps> = ({
       setIsImporting(false);
     }
     onClose();
-  }, [moduleInfo, isPlaying, isMusicLine, isHively, stopEnginePreview, nativeFmt, isNativeOnly, setFormatEngine, onImport, onClose, selectedSubsong, activeCompanions]);
+  }, [moduleInfo, nativeFmt, isNativeOnly, setFormatEngine, onImport, onClose, selectedSubsong, activeCompanions]);
 
   const handleClose = useCallback(() => {
-    if (isPlaying) {
-      if (isMusicLine || isHively) stopEnginePreview();
-      else if (moduleInfo) stopPreview(moduleInfo);
-    }
     // Cancel any in-flight UADE scan so it doesn't resolve after the dialog closes
     if (uadeScanActiveRef.current) {
       import('@engine/uade/UADEEngine').then(({ UADEEngine }) => {
@@ -454,13 +372,12 @@ export const ImportModuleDialog: React.FC<ImportModuleDialogProps> = ({
     setModuleInfo(null);
     setLoadedFileName('');
     setError(null);
-    setIsPlaying(false);
     setUadeMetadata(null);
     setSidHeader(null);
     setSelectedSubsong(0);
     setActiveCompanions([]);
     onClose();
-  }, [moduleInfo, isPlaying, isMusicLine, isHively, stopEnginePreview, onClose]);
+  }, [onClose]);
 
   // Build accept string for the single-file picker inside the dialog
   const ACCEPTED_FORMATS = getSupportedExtensions().join(',');
@@ -905,18 +822,7 @@ export const ImportModuleDialog: React.FC<ImportModuleDialogProps> = ({
                 </div>
               )}
 
-              {/* Preview button — shown only when a playback engine exists for this format */}
-              {canPreview && (
-                <Button
-                  variant="ghost"
-                  fullWidth
-                  onClick={handlePreview}
-                  icon={isPlaying ? <Square size={14} /> : <Play size={14} />}
-                  className={isPlaying ? 'text-accent-error hover:text-accent-error/80' : 'text-accent-success hover:text-accent-success/80'}
-                >
-                  {isPlaying ? 'Stop Preview' : 'Preview'}
-                </Button>
-              )}
+
             </div>
           )}
 

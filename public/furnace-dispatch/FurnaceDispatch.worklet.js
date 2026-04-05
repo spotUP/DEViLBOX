@@ -225,6 +225,7 @@ class FurnaceDispatchProcessor extends AudioWorkletProcessor {
               heap.set(insData);
               this.wasm.loadIns2(data.insIndex, dataPtr, insData.length);
               this.module._free(dataPtr);
+              this.updateBufferViews(); // Heap may have grown
               console.log('[FurnaceDispatch Worklet] loadIns2 index:', data.insIndex, 'size:', insData.length);
             }
           }
@@ -254,6 +255,8 @@ class FurnaceDispatchProcessor extends AudioWorkletProcessor {
         const chip = this.getChip(data.platformType);
         if (chip && this.wasm) {
           this.wasm.renderSamples(chip.handle);
+          // renderSamples may grow WASM heap (sample format conversion) — refresh views
+          this.updateBufferViews();
           console.log('[FurnaceDispatch Worklet] renderSamples called for platform', data.platformType, 'handle', chip.handle);
         } else {
           console.warn('[FurnaceDispatch Worklet] renderSamples SKIPPED: chip=', !!chip, 'wasm=', !!this.wasm, 'platform=', data.platformType);
@@ -829,6 +832,8 @@ class FurnaceDispatchProcessor extends AudioWorkletProcessor {
 
     this.wasm[wasmFuncName](handle, index, dataPtr, dataLen);
     this.module._free(dataPtr);
+    // Heap may have grown during malloc/WASM call — refresh buffer views
+    this.updateBufferViews();
 
     console.log('[FurnaceDispatch Worklet]', wasmFuncName, 'handle:', handle, 'index:', index, 'size:', dataLen);
   }
@@ -843,7 +848,12 @@ class FurnaceDispatchProcessor extends AudioWorkletProcessor {
       : (wasmMem ? wasmMem.buffer : null);
     if (!heapBuffer) return;
 
-    if (this.lastHeapBuffer !== heapBuffer) {
+    // Detect heap growth: buffer reference changes, OR existing views are detached
+    const needsUpdate = this.lastHeapBuffer !== heapBuffer
+      || !this.outputBufferL
+      || (this.outputBufferL.buffer && this.outputBufferL.buffer.byteLength === 0);
+
+    if (needsUpdate) {
       this.outputBufferL = new Float32Array(heapBuffer, this.outputPtrL, this.bufferSize);
       this.outputBufferR = new Float32Array(heapBuffer, this.outputPtrR, this.bufferSize);
       this.lastHeapBuffer = heapBuffer;
