@@ -240,7 +240,7 @@ export const PixiBeatSyncDialog: React.FC<PixiBeatSyncDialogProps> = ({
         {/* ─── Target Rows ─── */}
         <layoutContainer layout={{ flexDirection: 'column', gap: 6 }}>
           <PixiLabel text="Target Rows" size="xs" weight="bold" color="textMuted" />
-          <layoutContainer layout={{ flexDirection: 'row', gap: 4, flexWrap: 'wrap' }}>
+          <layoutContainer layout={{ flexDirection: 'row', gap: 4, flexWrap: 'wrap', alignItems: 'center' }}>
             {ROW_PRESETS.map((r) => (
               <PixiButton
                 key={r}
@@ -250,6 +250,15 @@ export const PixiBeatSyncDialog: React.FC<PixiBeatSyncDialogProps> = ({
                 onClick={() => setTargetRows(r)}
               />
             ))}
+            {/* Custom rows spinner */}
+            <PixiButton label="-" variant="ghost" size="sm" onClick={() => setTargetRows(Math.max(1, targetRows - 1))} />
+            <pixiBitmapText
+              text={String(targetRows)}
+              style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 16, fill: 0xffffff }}
+              tint={ROW_PRESETS.includes(targetRows as typeof ROW_PRESETS[number]) ? theme.textMuted.color : theme.accent.color}
+              layout={{ minWidth: 30, alignSelf: 'center' }}
+            />
+            <PixiButton label="+" variant="ghost" size="sm" onClick={() => setTargetRows(Math.min(256, targetRows + 1))} />
           </layoutContainer>
         </layoutContainer>
 
