@@ -28,6 +28,7 @@ import {
 } from 'lucide-react';
 
 import { type TrackerViewMode } from '@stores/useUIStore';
+import { useEditorStore, type PasteMode, MASK_NOTE, MASK_INSTRUMENT, MASK_VOLUME, MASK_EFFECT, MASK_EFFECT2 } from '@stores/useEditorStore';
 
 export interface EditorControlsBarProps {
   viewMode: TrackerViewMode;
@@ -73,6 +74,11 @@ export const EditorControlsBar: React.FC<EditorControlsBarProps> = React.memo(({
       closeDialogCommand();
     }
   }, [dialogOpen, closeDialogCommand]);
+
+  const pasteMode = useEditorStore((s) => s.pasteMode);
+  const setPasteMode = useEditorStore((s) => s.setPasteMode);
+  const pasteMask = useEditorStore((s) => s.pasteMask);
+  const toggleMaskBit = useEditorStore((s) => s.toggleMaskBit);
 
   // ── Grouped hardware presets ─────────────────────────────────────────────
   const groupedPresets = React.useMemo(() => getGroupedPresets(), []);
@@ -227,6 +233,46 @@ export const EditorControlsBar: React.FC<EditorControlsBarProps> = React.memo(({
         >
           {c.masterMuted ? 'Unmute' : 'Mute'}
         </button>
+
+        {/* Separator */}
+        <div className="w-px h-4 bg-border opacity-50 mx-1" />
+
+        {/* Paste Mode & Mask */}
+        <div className="flex items-center gap-1">
+          <select
+            value={pasteMode}
+            onChange={(e) => setPasteMode(e.target.value as PasteMode)}
+            className="h-5 bg-dark-bgSecondary text-text-secondary text-[10px] border border-dark-border rounded px-1 cursor-pointer hover:text-text-primary focus:outline-none"
+            title="Paste mode"
+          >
+            <option value="overwrite">Paste</option>
+            <option value="mix">Mix</option>
+            <option value="flood">Flood</option>
+            <option value="insert">Insert</option>
+          </select>
+          <div className="flex gap-px" title="Paste mask — toggle columns">
+            {([
+              ['N', MASK_NOTE],
+              ['I', MASK_INSTRUMENT],
+              ['V', MASK_VOLUME],
+              ['E', MASK_EFFECT],
+              ['E2', MASK_EFFECT2],
+            ] as const).map(([label, bit]) => (
+              <button
+                key={label}
+                className={`px-1 h-5 text-[9px] font-mono rounded transition-colors ${
+                  pasteMask & (bit as number)
+                    ? 'bg-accent-primary/30 text-accent-primary'
+                    : 'bg-dark-bgSecondary text-text-muted hover:text-text-secondary'
+                }`}
+                onClick={() => toggleMaskBit('paste', bit as number)}
+                title={`Toggle ${label} in paste`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        </div>
 
         {/* Stepped/Smooth Scrolling Toggle */}
         <button
