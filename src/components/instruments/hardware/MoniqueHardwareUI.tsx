@@ -63,6 +63,8 @@ export const MoniqueHardwareUI: React.FC<MoniqueHardwareUIProps> = ({
   instrumentId,
 }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const instrumentIdRef = useRef(instrumentId);
+  instrumentIdRef.current = instrumentId;
   const moduleRef = useRef<MoniqueUIModule | null>(null);
   const [loaded, setLoaded] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -209,7 +211,7 @@ export const MoniqueHardwareUI: React.FC<MoniqueHardwareUIProps> = ({
             // Get the cached VSTBridgeSynth — shared instruments use key = (id << 16) | 0xFFFF
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             const instruments = (engine as any).instruments as Map<number, any>;
-            const key = (instrumentId << 16) | 0xFFFF;
+            const key = (instrumentIdRef.current! << 16) | 0xFFFF;
             const synth = instruments?.get(key);
             if (!synth?._worklet) {
               console.warn(`[MoniqueHardwareUI] Synth worklet not ready for instrument ${instrumentId}`);
@@ -231,13 +233,13 @@ export const MoniqueHardwareUI: React.FC<MoniqueHardwareUIProps> = ({
         // so the index matches the audio WASM's setParam directly.
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         (window as any)._moniqueUIParamCallback = (index: number, value: number) => {
-          console.log(`[MoniqueHW] param ${index} = ${value}, instrumentId=${instrumentId}`);
-          if (!instrumentId) return;
+          console.log(`[MoniqueHW] param ${index} = ${value}, instrumentId=${instrumentIdRef.current}`);
+          if (!instrumentIdRef.current) return;
           try {
             const engine = getToneEngine();
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             const instruments = (engine as any).instruments as Map<number, any>;
-            const key = (instrumentId << 16) | 0xFFFF;
+            const key = (instrumentIdRef.current << 16) | 0xFFFF;
             const synth = instruments?.get(key);
             console.log(`[MoniqueHW] synth found:`, !!synth, 'worklet:', !!synth?._worklet);
             if (synth?._worklet) {
@@ -279,12 +281,12 @@ export const MoniqueHardwareUI: React.FC<MoniqueHardwareUIProps> = ({
       eventCleanups.forEach((fn) => fn());
 
       // Send allNotesOff to prevent stuck notes on unmount
-      if (instrumentId) {
+      if (instrumentIdRef.current) {
         try {
           const engine = getToneEngine();
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           const instruments = (engine as any).instruments as Map<number, any>;
-          const key = (instrumentId << 16) | 0xFFFF;
+          const key = (instrumentIdRef.current! << 16) | 0xFFFF;
           const synth = instruments?.get(key);
           if (synth?._worklet) {
             synth._worklet.port.postMessage({ type: 'allNotesOff' });
