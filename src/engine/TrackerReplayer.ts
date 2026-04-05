@@ -1002,7 +1002,9 @@ export class TrackerReplayer {
     // user-initiated stop. The user's stop already saved the correct position
     // via stop(true). Without this, the effect's loadSong → stop → setCurrentRow(0)
     // overwrites the saved position for WASM singleton engines (JamCracker etc.).
-    this.stop(false);
+    // Skip native engine stop — startNativeEngines will handle reload. Stopping
+    // them here destroys WASM state that the subsequent play() needs.
+    this.stop(false, true);
     this._hasPlayedOnce = false;
 
     // Restore any native engines rerouted to separation chain (UADE/Hively)
@@ -1875,7 +1877,7 @@ export class TrackerReplayer {
     this._hasPlayedOnce = true;
   }
 
-  stop(preservePosition = true): void {
+  stop(preservePosition = true, skipNativeStop = false): void {
     // Sync transport store to the last visually-displayed row before stopping.
     // The pattern editor reads currentRow from the store when stopped (line 1134
     // of PixiPatternEditor). Use lastDequeuedState (what was on screen) rather
@@ -1942,7 +1944,9 @@ export class TrackerReplayer {
     }
 
     // Stop routed native engines (UADE/Hively/SID/MusicLine/JamCracker)
-    this.c64SidEngine = stopNativeEngines(this.song, this.routedNativeEngines, this.c64SidEngine);
+    if (!skipNativeStop) {
+      this.c64SidEngine = stopNativeEngines(this.song, this.routedNativeEngines, this.c64SidEngine);
+    }
 
     // Clean up HVL position subscription
     if (this._hvlPositionUnsub) {
