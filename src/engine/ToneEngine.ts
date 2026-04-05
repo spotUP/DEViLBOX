@@ -1505,6 +1505,7 @@ export class ToneEngine {
     const isMAME = config.synthType?.startsWith('MAME') || config.synthType === 'CZ101' || config.synthType === 'CEM3394' || config.synthType === 'SCSP';
     const isFurnace = config.synthType?.startsWith('Furnace') || config.synthType === 'Furnace';
     const isBuzzmachine = config.synthType?.startsWith('Buzz') || config.synthType === 'Buzzmachine';
+    const isWAM = config.synthType?.startsWith('WAM');
     const isWASMSynth = [
       // AudioWorklet WASM synths — use shared instances (one per instrument ID)
       // to avoid exhausting fixed player-handle pools across channels.
@@ -1525,7 +1526,7 @@ export class ToneEngine {
       'DX7', 'OPL3', 'OpenWurli',
     ].includes(config.synthType || '');
     const isVSTBridge = !isWASMSynth && typeof config.synthType === 'string' && SYNTH_REGISTRY.has(config.synthType);
-    const isSharedType = config.synthType === 'Sampler' || config.synthType === 'Player' || config.synthType === 'SunVoxSynth' || isMAME || isFurnace || isBuzzmachine || isWASMSynth || isVSTBridge;
+    const isSharedType = config.synthType === 'Sampler' || config.synthType === 'Player' || config.synthType === 'SunVoxSynth' || isMAME || isFurnace || isBuzzmachine || isWASMSynth || isWAM || isVSTBridge;
     const key = isSharedType
       ? this.getInstrumentKey(instrumentId, -1)  // Use shared instance
       : this.getInstrumentKey(instrumentId, channelIndex);
