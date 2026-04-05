@@ -41,6 +41,7 @@ import { FurnaceParser } from '@/lib/import/formats/FurnaceParser';
 import { DefleMaskParser } from '@/lib/import/formats/DefleMaskParser';
 import { deepMerge, ensureCompleteInstrumentConfig } from '@/lib/migration';
 import { WaveformProcessor } from '@/lib/audio/WaveformProcessor';
+import { useUIStore } from '@/stores/useUIStore';
 
 // Extracted helper modules
 import {
@@ -831,6 +832,11 @@ export const useInstrumentStore = create<InstrumentStore>()(
             if (song?.libopenmptFileData && synthTypeChanging) {
               const isNowSynth = updatedConfig.synthType !== 'Sampler' && updatedConfig.synthType !== 'Player';
               if (isNowSynth) {
+                // Warn about format incompatibility (but don't prevent it)
+                const fmt = song.format?.toUpperCase() || 'native';
+                useUIStore.getState().setStatusMessage(
+                  `SYNTH REPLACEMENT BREAKS ${fmt} COMPAT — SAVE AS .DBX`, false, 4000,
+                );
                 replayer.markInstrumentReplaced(id);
                 // Silence the sample in OpenMPT soundlib + hot-reload
                 void (async () => {
