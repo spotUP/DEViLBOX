@@ -547,7 +547,5 @@ export async function parseQuartetFile(
     initialSpeed: tempoValue,
     initialBPM: 125,
     linearPeriods: false,
-    uadeEditableFileData: buffer.slice(0) as ArrayBuffer,
-    uadeEditableFileName: filename,
   };
 }

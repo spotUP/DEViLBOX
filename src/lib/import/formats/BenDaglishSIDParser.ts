@@ -196,7 +196,5 @@ export async function parseBenDaglishSIDFile(
     initialSpeed: 6,
     initialBPM: 125,
     linearPeriods: false,
-    uadeEditableFileData: buffer.slice(0) as ArrayBuffer,
-    uadeEditableFileName: filename,
   };
 }

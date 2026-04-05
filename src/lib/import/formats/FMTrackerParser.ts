@@ -118,7 +118,5 @@ export function parseFMTrackerFile(bytes: Uint8Array, filename: string): Tracker
     initialSpeed:    6,
     initialBPM:      125,
     linearPeriods:   false,
-    uadeEditableFileData: bytes.buffer.slice(0) as ArrayBuffer,
-    uadeEditableFileName: filename,
   };
 }
