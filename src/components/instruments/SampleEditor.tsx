@@ -23,7 +23,7 @@ import {
   Scissors, Copy, ClipboardPaste, Crop, VolumeX, Volume2, Volume1,
   Undo2, Redo2, Eye, Download,
   ArrowLeft, ArrowRight, Maximize2, FlipHorizontal,
-  Activity, Waves
+  Activity, Waves, Clock
 } from 'lucide-react';
 import { useInstrumentStore, useTrackerStore } from '../../stores';
 import { scan9xxOffsets } from '@/lib/analysis/scan9xxOffsets';
@@ -35,6 +35,7 @@ import { AmiResamplerModal } from './AmiResamplerModal';
 import { MpcResamplerModal } from './MpcResamplerModal';
 import { AudioToMidiModal } from './AudioToMidiModal';
 import { AmigaPalModal } from './AmigaPalModal';
+import { BeatSyncDialog } from './BeatSyncDialog';
 import { BeatSlicerPanel } from './BeatSlicerPanel';
 import type { ProcessedResult } from '../../utils/audio/SampleProcessing';
 import { bufferToDataUrl } from '../../utils/audio/SampleProcessing';
@@ -233,6 +234,8 @@ export const SampleEditor: React.FC<SampleEditorProps> = ({ instrument, onChange
     setShowAudioToMidiModal,
     showBeatSlicer,
     setShowBeatSlicer,
+    showBeatSync,
+    setShowBeatSync,
     showAmigaPal,
     setShowAmigaPal,
     isPlaying,
@@ -957,6 +960,13 @@ export const SampleEditor: React.FC<SampleEditorProps> = ({ instrument, onChange
                 Slicer
               </button>
               <button
+                onClick={() => setShowBeatSync(true)}
+                className="flex items-center gap-1 px-2 py-1 rounded text-[10px] font-bold uppercase transition-colors bg-cyan-500/10 text-cyan-400 border border-cyan-500/30 hover:bg-cyan-500/20"
+              >
+                <Clock size={11} />
+                Beat Sync
+              </button>
+              <button
                 onClick={() => setShowResampleModal(true)}
                 className="flex items-center gap-1 px-2 py-1 rounded text-[10px] font-bold uppercase transition-colors bg-orange-500/10 text-orange-400 border border-orange-500/30 hover:bg-orange-500/20"
               >
@@ -1429,6 +1439,18 @@ export const SampleEditor: React.FC<SampleEditorProps> = ({ instrument, onChange
         onApply={(r: ProcessedResult) => {
           setShowAmigaPal(false);
           handleBufferProcessed(r, 'AmigaPal');
+        }}
+      />
+
+      {/* ─── BeatSyncDialog ────────────────────────────────────────── */}
+      <BeatSyncDialog
+        isOpen={showBeatSync}
+        onClose={() => setShowBeatSync(false)}
+        audioBuffer={audioBuffer}
+        onApply={async (buf) => {
+          setShowBeatSync(false);
+          const dataUrl = await bufferToDataUrl(buf);
+          handleBufferProcessed({ buffer: buf, dataUrl }, 'BeatSync');
         }}
       />
     </div>
