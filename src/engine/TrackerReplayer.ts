@@ -28,6 +28,7 @@ import { getAutomationPlayer } from './AutomationPlayer';
 import { getAutomationCapture } from './automation/AutomationCapture';
 import { decodePaulaRegister } from './automation/decoders/PaulaRegisterDecoder';
 import { decodeFurnaceCommand } from './automation/decoders/FurnaceCommandDecoder';
+import { syncCaptureToStore, resetCaptureSync } from './automation/AutomationCaptureSync';
 import { useTransportStore, cancelPendingRowUpdate } from '@/stores/useTransportStore';
 import { useAutomationStore } from '@/stores/useAutomationStore';
 import { useCursorStore } from '@/stores/useCursorStore';
@@ -547,6 +548,7 @@ export class TrackerReplayer {
   private _uadePositionUnsub: (() => void) | null = null;
   private _uadePaulaLogInterval: number | null = null;
   private _furnaceCmdLogUnsub: (() => void) | null = null;
+  private _captureSyncInterval: number | null = null;
   private _tfmxChannelUnsub: (() => void) | null = null;
 
   /** Get the active C64 SID engine (for subsong switching etc.) */
@@ -1562,6 +1564,19 @@ export class TrackerReplayer {
     }
 
     this.playing = true;
+
+    // Start automation capture → store sync (converts register writes to automation curves)
+    resetCaptureSync();
+    if (this._captureSyncInterval != null) clearInterval(this._captureSyncInterval);
+    this._captureSyncInterval = window.setInterval(() => {
+      if (!this.playing || !this.song) return;
+      const pat = this.song.patterns[this.song.songPositions?.[this.songPos] ?? 0];
+      if (!pat) return;
+      const speed = this.speed || this.song.initialSpeed || 6;
+      const firstTick = (this.song as any).uadeFirstTick ?? 0;
+      syncCaptureToStore(pat.id, speed, firstTick, pat.length);
+    }, 100);
+
     const transportState = useTransportStore.getState();
     this.lastGrooveTemplateId = transportState.grooveTemplateId;
     this.lastSwingAmount = transportState.swing;
@@ -1957,6 +1972,12 @@ export class TrackerReplayer {
       this._furnaceCmdLogUnsub();
       this._furnaceCmdLogUnsub = null;
     }
+    // Clean up automation capture sync
+    if (this._captureSyncInterval != null) {
+      clearInterval(this._captureSyncInterval);
+      this._captureSyncInterval = null;
+    }
+    resetCaptureSync();
 
     // Clean up TFMX channel subscription
     if (this._tfmxChannelUnsub) {
