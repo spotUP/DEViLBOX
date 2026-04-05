@@ -400,15 +400,7 @@ export class WAMSynth implements DevilboxSynth {
    * through the effect so you hear the processed tone.
    */
   triggerAttack(frequency: number | string, time?: number, velocity = 1): this {
-    if (!this._isInitialized || !this._wamInstance) {
-      // WAM not ready yet — queue the trigger after initialization completes
-      this._initPromise.then(() => {
-        if (this._isInitialized && this._wamInstance) {
-          this.triggerAttack(frequency, undefined, velocity);
-        }
-      });
-      return this;
-    }
+    if (!this._isInitialized || !this._wamInstance) return this;
 
     const midiNote = noteToMidi(frequency);
     const vel = Math.round(velocity * 127);
@@ -464,15 +456,7 @@ export class WAMSynth implements DevilboxSynth {
    * For effect plugins: stops the internal oscillator for this note.
    */
   triggerRelease(frequency?: number | string, time?: number): this {
-    if (!this._isInitialized || !this._wamInstance) {
-      // WAM not ready — queue release after initialization
-      this._initPromise.then(() => {
-        if (this._isInitialized && this._wamInstance) {
-          this.triggerRelease(frequency);
-        }
-      });
-      return this;
-    }
+    if (!this._isInitialized || !this._wamInstance) return this;
 
     const triggerTime = time ?? this._audioContext.currentTime;
 
