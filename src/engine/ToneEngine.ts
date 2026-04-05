@@ -273,6 +273,9 @@ export class ToneEngine {
   // Accent velocity boost factor
   private static readonly ACCENT_BOOST = 1.35; // 35% velocity increase for accents
 
+  /** Enable note trigger debug logging. Toggle from console: getToneEngine().constructor.NOTE_DEBUG = true */
+  public static NOTE_DEBUG = false;
+
   // ===== PERFORMANCE OPTIMIZATION: Pre-computed lookup tables =====
 
   // MIDI note frequency LUT (128 entries, A4=440Hz standard)
@@ -2639,12 +2642,18 @@ export class ToneEngine {
     channelIndex?: number,
     hammer?: boolean
   ): void {
+    if (ToneEngine.NOTE_DEBUG) {
+      console.log(`[NOTE] ▶ attack id=${instrumentId} ${config.synthType} ${note} ch=${channelIndex ?? '-'} vel=${velocity.toFixed(2)}`);
+    }
     if (config.synthType === 'SuperCollider') {
       console.log('[SC:ToneEngine] triggerNoteAttack called — id:', instrumentId, 'note:', note, 'channelIndex:', channelIndex);
     }
     const instrument = this.getInstrument(instrumentId, config, channelIndex);
 
     if (!instrument) {
+      if (ToneEngine.NOTE_DEBUG) {
+        console.warn(`[NOTE] ✗ DROPPED (no instrument) id=${instrumentId} ${config.synthType} ${note}`);
+      }
       if (config.synthType === 'SuperCollider') {
         console.warn('[SC:ToneEngine] triggerNoteAttack: getInstrument returned null!');
       }
@@ -2663,8 +2672,8 @@ export class ToneEngine {
     // Check if instrument can play - allow triggerAttack (synths) or start (Players)
     const canPlay = (instrument as any).triggerAttack || (instrument as any).start;
     if (!canPlay) {
-      if (config.synthType === 'SuperCollider') {
-        console.warn('[SC:ToneEngine] triggerNoteAttack: instrument has no triggerAttack or start method!');
+      if (ToneEngine.NOTE_DEBUG) {
+        console.warn(`[NOTE] ✗ DROPPED (no triggerAttack/start) id=${instrumentId} ${config.synthType} ${note}`);
       }
       return;
     }
@@ -2675,6 +2684,9 @@ export class ToneEngine {
     const useImmediate = config.isLive || config.synthType === 'SuperCollider';
     const safeTime = useImmediate ? this.getImmediateTime() : this.getSafeTime(time);
     if (safeTime === null) {
+      if (ToneEngine.NOTE_DEBUG) {
+        console.warn(`[NOTE] ✗ DROPPED (context not ready) id=${instrumentId} ${config.synthType} ${note}`);
+      }
       return; // Audio context not ready
     }
 
@@ -3346,12 +3358,21 @@ export class ToneEngine {
   ): void {
     const safeTime = this.getSafeTime(time);
     if (safeTime === null) {
+      if (ToneEngine.NOTE_DEBUG) {
+        console.warn(`[NOTE] ✗ DROPPED (context not ready) id=${instrumentId} ${config.synthType} ${note} ch=${channelIndex}`);
+      }
       return;
+    }
+
+    if (ToneEngine.NOTE_DEBUG) {
+      console.log(`[NOTE] ▶ trigger id=${instrumentId} ${config.synthType} ${note} ch=${channelIndex} dur=${duration.toFixed(3)} vel=${velocity.toFixed(2)}`);
     }
 
     const instrument = this.getInstrument(instrumentId, config, channelIndex);
     if (!instrument) {
-      console.warn(`[ToneEngine] triggerNote: No instrument for id=${instrumentId} type=${config.synthType}`);
+      if (ToneEngine.NOTE_DEBUG) {
+        console.warn(`[NOTE] ✗ DROPPED (no instrument) id=${instrumentId} ${config.synthType} ${note} ch=${channelIndex}`);
+      }
       return;
     }
     
