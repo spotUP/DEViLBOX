@@ -129,6 +129,7 @@ export const GTOrderMatrix: React.FC<GTOrderMatrixProps> = React.memo(({ width, 
         formatIsPlaying={false}
         onFormatCellChange={handleCellChange}
         hideVUMeters={true}
+        hideAutomationLanes={true}
       />
     </div>
   );
