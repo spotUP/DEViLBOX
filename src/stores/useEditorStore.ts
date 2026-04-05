@@ -23,6 +23,8 @@ const MASK_ALL = 0b11111;       // All columns
 
 const _toggleMaskBit = (mask: number, bit: number): number => mask ^ bit;
 
+export type PasteMode = 'overwrite' | 'mix' | 'flood' | 'insert';
+
 interface EditorStore {
   // Editor settings
   currentOctave: number;
@@ -45,6 +47,9 @@ interface EditorStore {
   copyMask: number;
   pasteMask: number;
   transposeMask: number;
+
+  pasteMode: PasteMode;
+  setPasteMode: (mode: PasteMode) => void;
 
   // Multi-channel recording
   multiRecEnabled: boolean;
@@ -155,6 +160,7 @@ export const useEditorStore = create<EditorStore>()(
     copyMask: MASK_ALL,
     pasteMask: MASK_ALL,
     transposeMask: MASK_NOTE,
+    pasteMode: 'overwrite' as PasteMode,
 
     multiRecEnabled: false,
     multiEditEnabled: false,
@@ -256,6 +262,8 @@ export const useEditorStore = create<EditorStore>()(
     },
 
     // ── Mask operations ──────────────────────────────────────────────────
+
+    setPasteMode: (mode) => set({ pasteMode: mode }),
 
     setCopyMask: (mask) =>
       set((state) => { state.copyMask = mask & MASK_ALL; }),

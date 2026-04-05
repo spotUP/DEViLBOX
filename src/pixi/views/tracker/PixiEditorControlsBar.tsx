@@ -12,6 +12,7 @@
 import { useCallback, useMemo } from 'react';
 import type { Graphics as GraphicsType } from 'pixi.js';
 import { useUIStore, useFormatStore, useTrackerStore, useTransportStore, useLiveModeStore } from '@stores';
+import { useEditorStore, type PasteMode, MASK_NOTE, MASK_INSTRUMENT, MASK_VOLUME, MASK_EFFECT, MASK_EFFECT2 } from '@stores/useEditorStore';
 import type { TrackerViewMode } from '@stores/useUIStore';
 import { switchView } from '@/constants/viewOptions';
 import { useShallow } from 'zustand/react/shallow';
@@ -28,6 +29,13 @@ import { PixiSelect, type SelectOption } from '../../components/PixiSelect';
 import { PixiViewHeader } from '../../components/PixiViewHeader';
 
 const BAR_H = 36;
+
+const PASTE_MODE_OPTIONS: SelectOption[] = [
+  { value: 'overwrite', label: 'Overwrite' },
+  { value: 'mix',       label: 'Mix' },
+  { value: 'flood',     label: 'Flood' },
+  { value: 'insert',    label: 'Insert' },
+];
 
 const TRACKER_SUB_MODES = [
   { value: 'tracker', label: 'Tracker' },
@@ -490,6 +498,12 @@ export const PixiEditorControlsBar: React.FC<PixiEditorControlsBarProps> = ({
   // ── Shared hook ───────────────────────────────────────────────────────────
   const c = useEditorControls();
 
+  // ── Paste mode & mask ─────────────────────────────────────────────────────
+  const pasteMode = useEditorStore((s) => s.pasteMode);
+  const setPasteMode = useEditorStore((s) => s.setPasteMode);
+  const pasteMask = useEditorStore((s) => s.pasteMask);
+  const toggleMaskBit = useEditorStore((s) => s.toggleMaskBit);
+
   // ── Channel selector options ──────────────────────────────────────────────
   const channelOptions = useMemo<SelectOption[]>(
     () => Array.from({ length: c.channelCount }, (_, i) => ({ value: String(i), label: `Ch ${i + 1}` })),
@@ -577,6 +591,64 @@ export const PixiEditorControlsBar: React.FC<PixiEditorControlsBarProps> = ({
         onClick={c.handleAdvancedEdit}
         layout={{ display: viewMode === 'tracker' ? 'flex' : 'none' }}
       />
+
+      {/* Cleanup — tracker view only */}
+      <PixiButton
+        label="Cleanup"
+        variant="ghost"
+        size="sm"
+        onClick={() => useUIStore.getState().openModal('cleanup')}
+        layout={{ display: viewMode === 'tracker' ? 'flex' : 'none' }}
+      />
+
+      {/* Paste mode dropdown — tracker view only */}
+      <PixiSelect
+        options={PASTE_MODE_OPTIONS}
+        value={pasteMode}
+        onChange={(val) => setPasteMode(val as PasteMode)}
+        width={88}
+        height={24}
+        layout={{ display: viewMode === 'tracker' ? 'flex' : 'none' }}
+      />
+
+      {/* Paste mask toggles — tracker view only */}
+      <pixiContainer layout={{ display: viewMode === 'tracker' ? 'flex' : 'none', flexDirection: 'row', alignItems: 'center', gap: 2 }}>
+        <PixiButton
+          label="N"
+          variant={(pasteMask & MASK_NOTE) ? 'primary' : 'ghost'}
+          size="sm"
+          active={!!(pasteMask & MASK_NOTE)}
+          onClick={() => toggleMaskBit('paste', MASK_NOTE)}
+        />
+        <PixiButton
+          label="I"
+          variant={(pasteMask & MASK_INSTRUMENT) ? 'primary' : 'ghost'}
+          size="sm"
+          active={!!(pasteMask & MASK_INSTRUMENT)}
+          onClick={() => toggleMaskBit('paste', MASK_INSTRUMENT)}
+        />
+        <PixiButton
+          label="V"
+          variant={(pasteMask & MASK_VOLUME) ? 'primary' : 'ghost'}
+          size="sm"
+          active={!!(pasteMask & MASK_VOLUME)}
+          onClick={() => toggleMaskBit('paste', MASK_VOLUME)}
+        />
+        <PixiButton
+          label="E"
+          variant={(pasteMask & MASK_EFFECT) ? 'primary' : 'ghost'}
+          size="sm"
+          active={!!(pasteMask & MASK_EFFECT)}
+          onClick={() => toggleMaskBit('paste', MASK_EFFECT)}
+        />
+        <PixiButton
+          label="E2"
+          variant={(pasteMask & MASK_EFFECT2) ? 'primary' : 'ghost'}
+          size="sm"
+          active={!!(pasteMask & MASK_EFFECT2)}
+          onClick={() => toggleMaskBit('paste', MASK_EFFECT2)}
+        />
+      </pixiContainer>
 
       {/* Auto — opens automation editor (tracker view only) */}
       <PixiButton
