@@ -130,7 +130,7 @@ int v2synth_load_patch(int channel, const uint8_t* patchData, int size) {
     uint32_t patchOffset = offsets[channel];
     int copySize = size < 1024 ? size : 1024;
     memcpy(g_patchmap + patchOffset, patchData, copySize);
-    
+
     // Re-init synth with updated patchmap.
     // synthInit zeros the entire V2Synth (memset), so we must restore globals
     // afterwards — otherwise hcfreq=0 zeroes all output (high-cut kills signal).
