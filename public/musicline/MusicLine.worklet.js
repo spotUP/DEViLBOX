@@ -54,8 +54,16 @@ class MusicLineProcessor extends AudioWorkletProcessor {
         break;
 
       case 'play':
+        // Re-init playback from the start (stop + init resets position to 0)
+        if (this.wasm && this.songLoaded) {
+          this.wasm._ml_stop();
+          this.wasm._ml_init();
+        }
         this.playing = true;
         this._resampPos = 0.0;
+        // Reset per-channel tracking
+        if (this._prevChRows) this._prevChRows.fill(-1);
+        if (this._prevChPos) this._prevChPos.fill(-1);
         break;
 
       case 'stop':
