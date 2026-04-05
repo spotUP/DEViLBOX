@@ -54,11 +54,6 @@ class MusicLineProcessor extends AudioWorkletProcessor {
         break;
 
       case 'play':
-        // Reset playback to start — _ml_stop resets position without clearing song data
-        // (unlike _ml_init which would clear the loaded module)
-        if (this.wasm && this.songLoaded && this.playing === false) {
-          this.wasm._ml_stop();
-        }
         this.playing = true;
         this._resampPos = 0.0;
         // Reset per-channel tracking
