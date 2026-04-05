@@ -47,7 +47,7 @@ import { PixiSc68View } from './sc68/PixiSc68View';
 import { useTrackerView } from '@/hooks/views/useTrackerView';
 import { useMIDIFeedback } from '@/hooks/useMIDIFeedback';
 import { AUTOMATION_LANE_WIDTH, AUTOMATION_LANE_MIN } from '@/hooks/views/usePatternEditor';
-import { useTrackerStore, useUIStore, useInstrumentStore, useEditorStore, useAutomationStore, useFormatStore } from '@stores';
+import { useTrackerStore, useUIStore, useInstrumentStore, useEditorStore, useAutomationStore } from '@stores';
 import { useEffect } from 'react';
 import { useWorkbenchStore } from '@stores/useWorkbenchStore';
 import { useSettingsStore } from '@stores/useSettingsStore';
