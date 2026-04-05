@@ -16,7 +16,7 @@
  * - Supports Sampler, Player, and GranularSynth instruments
  */
 
-import React, { useRef, useCallback, useEffect } from 'react';
+import React, { useRef, useCallback, useEffect, useMemo } from 'react';
 import {
   Upload, Trash2, Music, Play, Square, AlertCircle,
   ZoomIn, ZoomOut, Sparkles, Wand2, RefreshCcw, Zap,
@@ -25,7 +25,8 @@ import {
   ArrowLeft, ArrowRight, Maximize2, FlipHorizontal,
   Activity, Waves
 } from 'lucide-react';
-import { useInstrumentStore } from '../../stores';
+import { useInstrumentStore, useTrackerStore } from '../../stores';
+import { scan9xxOffsets } from '@/lib/analysis/scan9xxOffsets';
 import type { InstrumentConfig, DeepPartial } from '../../types/instrument';
 import { DEFAULT_GRANULAR } from '../../types/instrument';
 import * as Tone from 'tone';
@@ -322,6 +323,20 @@ export const SampleEditor: React.FC<SampleEditorProps> = ({ instrument, onChange
     }
   }, [loopEnabled, loopStart, loopEnd, loopType, audioBuffer, instrument.id, instrument.sample, updateInstrument]);
 
+  // ─── Scan current pattern for 9xx offset markers ─────────────────
+  const offsetMarkers = useMemo(() => {
+    const patterns = useTrackerStore.getState().patterns;
+    const patIdx = useTrackerStore.getState().currentPatternIndex;
+    const pattern = patterns[patIdx];
+    if (!pattern || !audioBuffer) return undefined;
+    // Find the index of this instrument in the instruments array
+    const instruments = useInstrumentStore.getState().instruments;
+    const instIdx = instruments.indexOf(instrument);
+    if (instIdx < 0) return undefined;
+    const offsets = scan9xxOffsets(pattern, instIdx + 1); // 1-indexed in pattern data
+    return offsets.length > 0 ? offsets : undefined;
+  }, [instrument, audioBuffer]);
+
   // ─── Load audio buffer when URL changes ──────────────────────────
   useEffect(() => {
     if (!sampleUrl) {
@@ -426,13 +441,14 @@ export const SampleEditor: React.FC<SampleEditorProps> = ({ instrument, onChange
       showSpectrum,
       slices: instrument.sample?.slices,
       selectedSliceId: showBeatSlicer ? selectedSliceId : null,
+      offsetMarkers,
     };
     drawSampleWaveform(ctx, CANVAS_W, CANVAS_H, opts);
   }, [
     audioBuffer, viewStart, viewEnd, startTime, endTime,
     selectionStart, selectionEnd, loopEnabled, loopStart, loopEnd, loopType,
     playbackPosition, isGranular, granular, dragTarget, showSpectrum,
-    showBeatSlicer, instrument.sample?.slices, selectedSliceId,
+    showBeatSlicer, instrument.sample?.slices, selectedSliceId, offsetMarkers,
   ]);
 
   // ─── Canvas draw: minimap ────────────────────────────────────────
