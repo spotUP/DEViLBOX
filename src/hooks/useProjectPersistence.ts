@@ -110,8 +110,11 @@ const safeCancelIdleCallback = cancelIdleCallbackPolyfill;
  *       Previous values caused harsh/clicky accent sound.
  * - 17: Added speed, trackerFormat, linearPeriods, restartPosition to saved project.
  *       XM files saved as .dbx now preserve playback parameters for accurate reload.
+ * - 18: Added replacedInstruments for hybrid WASM/ToneEngine synth playback.
+ *       When a sample instrument is replaced with a synth, its ID is saved so
+ *       hybrid playback state persists across save/reload.
  */
-const SCHEMA_VERSION = 17;
+const SCHEMA_VERSION = 18;
 
 interface SavedProject {
   version: string;
@@ -130,6 +133,7 @@ interface SavedProject {
   trackerFormat?: string;
   linearPeriods?: boolean;
   restartPosition?: number;
+  replacedInstruments?: number[];
   originalModuleData?: { base64: string; format: string; sourceFile?: string };
   nativeEngineData?: Record<string, string>;
   nativeEngineMeta?: Record<string, unknown>;
@@ -375,6 +379,18 @@ function buildSavedProject(): SavedProject {
       const nem = getNativeEngineMetaForExport();
       return nem ? { nativeEngineMeta: nem } : {};
     })(),
+    // Save replaced instrument IDs for hybrid playback persistence
+    ...(() => {
+      try {
+        // eslint-disable-next-line @typescript-eslint/no-var-requires
+        const { getTrackerReplayer } = require('@engine/TrackerReplayer');
+        const replayer = getTrackerReplayer();
+        if (replayer.hasReplacedInstruments) {
+          return { replacedInstruments: replayer.replacedInstrumentIds };
+        }
+      } catch { /* replayer not initialized */ }
+      return {};
+    })(),
   };
 }
 
@@ -514,6 +530,21 @@ export async function loadProjectFromStorage(): Promise<boolean> {
     }
 
     instrumentStore.autoBakeInstruments();
+
+    // Restore replaced instruments for hybrid playback
+    if (project.replacedInstruments?.length) {
+      setTimeout(() => {
+        try {
+          // eslint-disable-next-line @typescript-eslint/no-var-requires
+          const { getTrackerReplayer } = require('@engine/TrackerReplayer');
+          const replayer = getTrackerReplayer();
+          replayer.restoreReplacedInstruments(project.replacedInstruments!);
+        } catch (e) {
+          console.warn('[Persistence] Failed to restore replaced instruments:', e);
+        }
+      }, 500);
+    }
+
     projectStore.markAsSaved();
     // Restoring user's own saved project — auto-save is safe
     explicitlySaved = true;
@@ -622,6 +653,21 @@ export async function loadProjectFromObject(data: unknown): Promise<boolean> {
     }
 
     instrumentStore.autoBakeInstruments();
+
+    // Restore replaced instruments for hybrid playback
+    if (project.replacedInstruments?.length) {
+      setTimeout(() => {
+        try {
+          // eslint-disable-next-line @typescript-eslint/no-var-requires
+          const { getTrackerReplayer } = require('@engine/TrackerReplayer');
+          const replayer = getTrackerReplayer();
+          replayer.restoreReplacedInstruments(project.replacedInstruments!);
+        } catch (e) {
+          console.warn('[Persistence] Failed to restore replaced instruments:', e);
+        }
+      }, 500);
+    }
+
     projectStore.markAsSaved();
     return true;
   } catch (err) {
@@ -703,6 +749,21 @@ export async function loadLocalRevision(key: number): Promise<boolean> {
     }
 
     instrumentStore.autoBakeInstruments();
+
+    // Restore replaced instruments for hybrid playback
+    if (project.replacedInstruments?.length) {
+      setTimeout(() => {
+        try {
+          // eslint-disable-next-line @typescript-eslint/no-var-requires
+          const { getTrackerReplayer } = require('@engine/TrackerReplayer');
+          const replayer = getTrackerReplayer();
+          replayer.restoreReplacedInstruments(project.replacedInstruments!);
+        } catch (e) {
+          console.warn('[Persistence] Failed to restore replaced instruments:', e);
+        }
+      }, 500);
+    }
+
     projectStore.markAsSaved();
     // Restoring user's own revision — auto-save is safe
     explicitlySaved = true;

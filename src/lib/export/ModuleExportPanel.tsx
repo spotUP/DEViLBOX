@@ -42,6 +42,16 @@ export const ModuleExportPanel: React.FC<ModuleExportPanelProps> = ({
   );
   const maxChannels = CHANNEL_MAX[exportMode] ?? 32;
 
+  // Check for synth-replaced instruments
+  const replacedIds: number[] = (() => {
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-var-requires
+      const { getTrackerReplayer } = require('@engine/TrackerReplayer');
+      return getTrackerReplayer().replacedInstrumentIds;
+    } catch { return []; }
+  })();
+  const hasReplacedInstruments = replacedIds.length > 0;
+
   useEffect(() => {
     setExportWarnings([]);
     setChannelCount(exportMode === 'mod' ? 4 : 8);
@@ -96,6 +106,16 @@ export const ModuleExportPanel: React.FC<ModuleExportPanelProps> = ({
         </div>
       ) : (
         <div className="space-y-3">
+          {hasReplacedInstruments && (
+            <div className="bg-accent-warning/10 border border-accent-warning/30 rounded-lg p-3">
+              <p className="text-xs font-mono text-text-muted">
+                <span className="text-accent-warning font-bold">WARNING:</span> Instruments{' '}
+                {replacedIds.join(', ')} are synth-replaced. They will export as silence in{' '}
+                {exportMode.toUpperCase()} format. Save as .dbx to preserve synth assignments.
+              </p>
+            </div>
+          )}
+
           <div>
             <label className="block text-xs font-mono text-text-muted mb-1">
               Channel Count (max {maxChannels})

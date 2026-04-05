@@ -101,6 +101,17 @@ export const PixiExportDialog: React.FC<PixiExportDialogProps> = ({ isOpen, onCl
   // XM/MOD export warnings
   const [exportWarnings, setExportWarnings] = useState<string[]>([]);
 
+  // Check for synth-replaced instruments
+  const replacedIds: number[] = useMemo(() => {
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-var-requires
+      const { getTrackerReplayer } = require('@engine/TrackerReplayer');
+      return getTrackerReplayer().replacedInstrumentIds;
+    } catch { return []; }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen]);
+  const hasReplacedInstruments = replacedIds.length > 0;
+
   // Chip extended state
   const [chipRecordingTime, setChipRecordingTime] = useState(0);
   const [chipLoopPoint, setChipLoopPoint] = useState(0);
@@ -737,6 +748,13 @@ export const PixiExportDialog: React.FC<PixiExportDialogProps> = ({ isOpen, onCl
                 {/* Metadata display */}
                 <PixiLabel text={`Format: FastTracker II · Patterns: ${ex.patterns.length} · Channels: ${xmChannels} · Max Instruments: 128`} size="xs" font="mono" color="textMuted" />
 
+                {/* Synth-replaced instrument warning */}
+                {hasReplacedInstruments && (
+                  <layoutContainer layout={{ flexDirection: 'column', gap: 4, padding: 8, borderRadius: 4, borderWidth: 1, borderColor: theme.warning.color, backgroundColor: tintBg(theme.warning.color), width: CONTENT_W - 24 }}>
+                    <PixiLabel text={`WARNING: Instruments ${replacedIds.join(', ')} are synth-replaced. They will export as silence in XM format. Save as .dbx to preserve synth assignments.`} size="xs" color="warning" layout={{ maxWidth: CONTENT_W - 44 }} />
+                  </layoutContainer>
+                )}
+
                 {/* Warnings display */}
                 {exportWarnings.length > 0 && (
                   <layoutContainer layout={{ flexDirection: 'column', gap: 4, padding: 8, borderRadius: 4, borderWidth: 1, borderColor: 0xff8800, backgroundColor: 0x332200, width: CONTENT_W - 24, maxHeight: 100 }}>
@@ -795,6 +813,13 @@ export const PixiExportDialog: React.FC<PixiExportDialogProps> = ({ isOpen, onCl
                 {/* Metadata display */}
                 <PixiLabel text={`Format: ProTracker (${modChannels === 4 ? 'M.K.' : modChannels === 6 ? '6CHN' : '8CHN'}) · Max Samples: 31 · Max Rows: 64 · Notes: C-0 to B-3`} size="xs" font="mono" color="textMuted" />
 
+                {/* Synth-replaced instrument warning */}
+                {hasReplacedInstruments && (
+                  <layoutContainer layout={{ flexDirection: 'column', gap: 4, padding: 8, borderRadius: 4, borderWidth: 1, borderColor: theme.warning.color, backgroundColor: tintBg(theme.warning.color), width: CONTENT_W - 24 }}>
+                    <PixiLabel text={`WARNING: Instruments ${replacedIds.join(', ')} are synth-replaced. They will export as silence in MOD format. Save as .dbx to preserve synth assignments.`} size="xs" color="warning" layout={{ maxWidth: CONTENT_W - 44 }} />
+                  </layoutContainer>
+                )}
+
                 {/* Warnings display */}
                 {exportWarnings.length > 0 && (
                   <layoutContainer layout={{ flexDirection: 'column', gap: 4, padding: 8, borderRadius: 4, borderWidth: 1, borderColor: 0xff8800, backgroundColor: 0x332200, width: CONTENT_W - 24, maxHeight: 100 }}>
@@ -835,6 +860,13 @@ export const PixiExportDialog: React.FC<PixiExportDialogProps> = ({ isOpen, onCl
                 </layoutContainer>
 
                 <PixiLabel text={`Format: ${ex.exportMode === 'it' ? 'Impulse Tracker' : 'ScreamTracker 3'} · Engine: OpenMPT CSoundFile (WASM) · ${ex.patterns.length} patterns · ${ex.instruments.length} instruments`} size="xs" font="mono" color="textMuted" />
+
+                {/* Synth-replaced instrument warning */}
+                {hasReplacedInstruments && (
+                  <layoutContainer layout={{ flexDirection: 'column', gap: 4, padding: 8, borderRadius: 4, borderWidth: 1, borderColor: theme.warning.color, backgroundColor: tintBg(theme.warning.color), width: CONTENT_W - 24 }}>
+                    <PixiLabel text={`WARNING: Instruments ${replacedIds.join(', ')} are synth-replaced. They will export as silence in ${ex.exportMode.toUpperCase()} format. Save as .dbx to preserve synth assignments.`} size="xs" color="warning" layout={{ maxWidth: CONTENT_W - 44 }} />
+                  </layoutContainer>
+                )}
 
                 {exportWarnings.length > 0 && (
                   <layoutContainer layout={{ flexDirection: 'column', gap: 4, padding: 8, borderRadius: 4, borderWidth: 1, borderColor: 0xff8800, backgroundColor: 0x332200, width: CONTENT_W - 24, maxHeight: 100 }}>
