@@ -4,10 +4,11 @@
  * Supports min/max, step, arrow key increment.
  */
 
-import { useCallback, useRef, useEffect } from 'react';
+import { useCallback, useRef, useEffect, useState } from 'react';
 import type { Graphics as GraphicsType } from 'pixi.js';
 import { PIXI_FONTS } from '../fonts';
 import { usePixiTheme } from '../theme';
+import { PixiPureTextInput } from '../input/PixiPureTextInput';
 
 interface PixiNumericInputProps {
   value: number;
@@ -49,6 +50,29 @@ export const PixiNumericInput: React.FC<PixiNumericInputProps> = ({
   const theme = usePixiTheme();
   const onChangeRef = useRef(onChange);
   useEffect(() => { onChangeRef.current = onChange; }, [onChange]);
+
+  // ─── Inline text editing state ──────────────────────────────────────────
+  const [editing, setEditing] = useState(false);
+  const [editText, setEditText] = useState('');
+
+  const startEditing = useCallback(() => {
+    if (disabled) return;
+    setEditText(String(value));
+    setEditing(true);
+  }, [disabled, value]);
+
+  const commitEdit = useCallback((text: string) => {
+    const parsed = parseFloat(text);
+    if (!isNaN(parsed)) {
+      const clamped = Math.min(max, Math.max(min, parsed));
+      onChangeRef.current(clamped);
+    }
+    setEditing(false);
+  }, [min, max]);
+
+  const cancelEdit = useCallback(() => {
+    setEditing(false);
+  }, []);
 
   // Refs for hold-to-repeat (current value tracked via ref to avoid stale closures)
   const valueRef = useRef(value);
@@ -137,25 +161,49 @@ export const PixiNumericInput: React.FC<PixiNumericInputProps> = ({
         />
       )}
 
-      {/* Value display — native bg via layoutContainer */}
-      <layoutContainer layout={{
-        width,
-        height: INPUT_HEIGHT,
-        justifyContent: 'center',
-        alignItems: 'center',
-        backgroundColor: theme.bg.color,
-        borderWidth: 1,
-        borderColor: theme.border.color,
-        borderRadius: 4,
-      }}>
-        <pixiBitmapText
-          eventMode="none"
-          text={displayText}
-          style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 14, fill: 0xffffff }}
-          tint={theme.accent.color}
+      {/* Value display — native bg via layoutContainer, double-click to edit */}
+      {editing ? (
+        <PixiPureTextInput
+          value={editText}
+          onChange={setEditText}
+          onSubmit={commitEdit}
+          onCancel={cancelEdit}
+          onBlur={commitEdit}
+          numeric
+          min={min}
+          max={max}
+          width={width}
+          height={INPUT_HEIGHT}
+          fontSize={14}
+          font="mono"
+          autoFocus
           layout={{}}
         />
-      </layoutContainer>
+      ) : (
+        <layoutContainer
+          eventMode={disabled ? 'none' : 'static'}
+          cursor="text"
+          onDoubleClick={startEditing}
+          layout={{
+            width,
+            height: INPUT_HEIGHT,
+            justifyContent: 'center',
+            alignItems: 'center',
+            backgroundColor: theme.bg.color,
+            borderWidth: 1,
+            borderColor: theme.border.color,
+            borderRadius: 4,
+          }}
+        >
+          <pixiBitmapText
+            eventMode="none"
+            text={displayText}
+            style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 14, fill: 0xffffff }}
+            tint={theme.accent.color}
+            layout={{}}
+          />
+        </layoutContainer>
+      )}
 
       {/* Arrow buttons */}
       {showButtons && (
