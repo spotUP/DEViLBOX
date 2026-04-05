@@ -35,7 +35,9 @@ import { getParamsForFormat, groupParams, type AutomationFormat } from '@/engine
 import {
   CHORD_TYPES, ARP_PRESETS_UNIQUE,
   chordNotes, invertChord, chordLabel, arpLabel,
+  xmNoteShortName,
 } from '@/lib/chordDefinitions';
+import { Layers } from 'lucide-react';
 
 interface CellContextMenuProps {
   isOpen?: boolean;
@@ -543,6 +545,7 @@ export const CellContextMenu: React.FC<CellContextMenuProps> = ({
       const hasNote = cell && cell.note >= 1 && cell.note <= 96;
       if (!hasNote || !cell) return [
         { id: 'insert-chord', label: 'Insert Chord', icon: <Music size={14} />, disabled: true },
+        { id: 'bake-chord', label: 'Bake Chord (1 channel)', icon: <Layers size={14} />, disabled: true },
         { id: 'insert-arp', label: 'Insert Arpeggio', icon: <Zap size={14} />, disabled: true },
       ] as MenuItemType[];
 
@@ -575,6 +578,87 @@ export const CellContextMenu: React.FC<CellContextMenuProps> = ({
         })) },
         { id: 'inv-2nd', label: '2nd Inversion', submenu: CHORD_TYPES.filter(c => c.category === 'triad').map(chord => ({
           id: `inv2-${chord.short || 'maj'}`, label: chordLabel(chord, rootNote), onClick: makeChordAction(chord.intervals, 2),
+        })) },
+      ];
+
+      // ── Bake Chord: render chord notes to a single mixed sample ──
+      const makeBakeChordAction = (intervals: readonly number[], inversion: number, chordShort: string) => async () => {
+        let notes = chordNotes(rootNote, intervals);
+        if (inversion > 0) notes = invertChord(notes, inversion);
+
+        // Get instrument config
+        const instConfig = useInstrumentStore.getState().instruments.find(i => i.id === rootInst);
+        if (!instConfig) { onClose(); return; }
+
+        // Convert XM note numbers to note strings for SynthBaker
+        const noteStrings = notes.map(n => {
+          const name = xmNoteShortName(n);
+          // xmNoteShortName returns "C4" but Tone.js wants "C4" — compatible
+          return name;
+        });
+
+        onClose();
+        useUIStore.getState().setStatusMessage('Baking chord...');
+
+        try {
+          const { SynthBaker } = await import('@/lib/audio/SynthBaker');
+          const buffer = await SynthBaker.bakeChord(instConfig, noteStrings);
+
+          // Convert AudioBuffer to ArrayBuffer (WAV-like PCM for storage)
+          const pcmData = buffer.getChannelData(0);
+          const arrayBuffer = pcmData.buffer.slice(
+            pcmData.byteOffset,
+            pcmData.byteOffset + pcmData.byteLength
+          );
+
+          // Build instrument name: "SourceName C5Maj" truncated to 22 chars
+          const rootName = xmNoteShortName(rootNote);
+          const chordSuffix = `${rootName}${chordShort}`;
+          const srcName = instConfig.name || 'Synth';
+          const fullName = `${srcName} ${chordSuffix}`.slice(0, 22);
+
+          // Create new sampler instrument with the baked chord
+          const createInstrument = useInstrumentStore.getState().createInstrument;
+          const blobUrl = URL.createObjectURL(new Blob([arrayBuffer], { type: 'audio/pcm' }));
+          const newId = createInstrument({
+            name: fullName,
+            synthType: 'Sampler',
+            sample: {
+              audioBuffer: arrayBuffer,
+              url: blobUrl,
+              baseNote: 'C-4',
+              loop: false,
+              loopStart: 0,
+              loopEnd: 0,
+              detune: 0,
+              reverse: false,
+              playbackRate: 1,
+              sampleRate: buffer.sampleRate,
+            },
+          });
+
+          // Replace cell with C-4 + new baked instrument
+          // XM note for C-4 = 49 (C-0=1, each octave +12)
+          setCell(channelIndex, rowIndex, { note: 49, instrument: newId });
+          useUIStore.getState().setStatusMessage(`Baked: ${fullName}`);
+        } catch (err) {
+          console.error('[BakeChord] Failed:', err);
+          useUIStore.getState().setStatusMessage('Bake chord failed');
+        }
+      };
+
+      const bakeTriadItems: MenuItemType[] = CHORD_TYPES
+        .filter(c => c.category === 'triad')
+        .map(chord => ({ id: `bake-${chord.short || 'maj'}`, label: chordLabel(chord, rootNote), onClick: makeBakeChordAction(chord.intervals, 0, chord.short || 'Maj') }));
+      const bakeSeventhItems: MenuItemType[] = CHORD_TYPES
+        .filter(c => c.category === 'seventh')
+        .map(chord => ({ id: `bake-${chord.short}`, label: chordLabel(chord, rootNote), onClick: makeBakeChordAction(chord.intervals, 0, chord.short) }));
+      const bakeInversionItems: MenuItemType[] = [
+        { id: 'bake-inv-1st', label: '1st Inversion', submenu: CHORD_TYPES.filter(c => c.category === 'triad').map(chord => ({
+          id: `bake-inv1-${chord.short || 'maj'}`, label: chordLabel(chord, rootNote), onClick: makeBakeChordAction(chord.intervals, 1, chord.short || 'Maj'),
+        })) },
+        { id: 'bake-inv-2nd', label: '2nd Inversion', submenu: CHORD_TYPES.filter(c => c.category === 'triad').map(chord => ({
+          id: `bake-inv2-${chord.short || 'maj'}`, label: chordLabel(chord, rootNote), onClick: makeBakeChordAction(chord.intervals, 2, chord.short || 'Maj'),
         })) },
       ];
 
@@ -612,6 +696,18 @@ export const CellContextMenu: React.FC<CellContextMenuProps> = ({
             ...seventhItems,
             { type: 'divider' as const },
             ...inversionItems,
+          ],
+        },
+        {
+          id: 'bake-chord',
+          label: 'Bake Chord (1 channel)',
+          icon: <Layers size={14} />,
+          submenu: [
+            ...bakeTriadItems,
+            { type: 'divider' as const },
+            ...bakeSeventhItems,
+            { type: 'divider' as const },
+            ...bakeInversionItems,
           ],
         },
         {
