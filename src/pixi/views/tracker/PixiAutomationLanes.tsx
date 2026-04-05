@@ -371,10 +371,6 @@ export const PixiAutomationLanes: React.FC<PixiAutomationLanesProps> = ({
     g.clear();
     if (!hasAnyData) return;
 
-    // Pattern extent in scroll-adjusted coordinates
-    const patTop = -scrollOffset;
-    const patBot = patternLength * rowHeight - scrollOffset;
-
     const prevLen = prevPatternId ? (prevPatternLength || patternLength) : 0;
 
     // Ghost: previous pattern curves

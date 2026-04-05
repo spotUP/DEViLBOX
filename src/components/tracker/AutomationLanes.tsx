@@ -82,7 +82,6 @@ export const AutomationLanes: React.FC<AutomationLanesProps> = ({
   const addPoint = useAutomationStore((state) => state.addPoint);
   const removePoint = useAutomationStore((state) => state.removePoint);
   const channelLanes = useAutomationStore((state) => state.channelLanes);
-  const activeChannelIndex = useCursorStore((s) => s.cursor.channelIndex);
 
   // Drag state
   const [dragState, setDragState] = useState<{
