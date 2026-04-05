@@ -600,6 +600,15 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = React.memo(({
     setIsLooping(false);
     setCurrentRow(0);
     await engine.init();
+
+    // WASM singleton engines (MusicLine, JamCracker): skip engine.stop()+delay.
+    // The stop() mute/unmute cycle interferes with WASM audio output routing.
+    // The WASM engine handles its own init/load via startNativeEngines.
+    if (editorMode === 'musicline' || editorMode === 'jamcracker') {
+      await play();
+      return;
+    }
+
     // Reset ToneEngine state before first play — matches what playStopToggle does.
     // Without this, native synth audio routing is broken on first play.
     engine.stop();
