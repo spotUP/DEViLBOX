@@ -41,6 +41,9 @@ export interface WaveformDrawOptions {
   slices?: Array<{ id: string; startFrame: number; endFrame: number; confidence?: number }>;
   selectedSliceId?: string | null;
 
+  /** 9xx sample offset markers — hex values (0x01-0xFF) to draw as vertical ticks */
+  offsetMarkers?: number[];
+
   // Display mode
   showSpectrum?: boolean;
   
@@ -378,6 +381,42 @@ function drawOverlays(
     ctx.fillStyle = COLORS.granular;
     ctx.font = '10px sans-serif';
     ctx.fillText('G', scanX + 3, height - 4);
+  }
+
+  // ─── 9xx offset markers ───────────────
+  if (opts.offsetMarkers && opts.offsetMarkers.length > 0 && opts.audioBuffer) {
+    const totalSamples = opts.audioBuffer.length;
+    const viewStartSample = Math.floor(opts.viewStart * totalSamples);
+    const viewEndSample = Math.floor(opts.viewEnd * totalSamples);
+    const visibleSamples = viewEndSample - viewStartSample;
+
+    ctx.save();
+    const markerColor = 'rgba(0, 210, 210, 0.7)';
+    const labelColor = 'rgba(0, 210, 210, 0.9)';
+
+    for (const val of opts.offsetMarkers) {
+      const samplePos = val * 128; // 9xx → sample index
+      if (samplePos < viewStartSample || samplePos > viewEndSample) continue;
+
+      const px = ((samplePos - viewStartSample) / visibleSamples) * width;
+
+      // Vertical tick line (dashed)
+      ctx.strokeStyle = markerColor;
+      ctx.lineWidth = 1;
+      ctx.setLineDash([3, 3]);
+      ctx.beginPath();
+      ctx.moveTo(px, 0);
+      ctx.lineTo(px, height);
+      ctx.stroke();
+      ctx.setLineDash([]);
+
+      // Label
+      ctx.fillStyle = labelColor;
+      ctx.font = '9px monospace';
+      ctx.textAlign = 'center';
+      ctx.fillText(`9${val.toString(16).toUpperCase().padStart(2, '0')}`, px, 10);
+    }
+    ctx.restore();
   }
 
   // ─── Playback position ───────────────
