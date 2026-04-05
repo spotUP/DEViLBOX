@@ -16,17 +16,16 @@
  * - Supports Sampler, Player, and GranularSynth instruments
  */
 
-import React, { useRef, useCallback, useEffect, useMemo } from 'react';
+import React, { useRef, useCallback, useEffect } from 'react';
 import {
   Upload, Trash2, Music, Play, Square, AlertCircle,
   ZoomIn, ZoomOut, Sparkles, Wand2, RefreshCcw, Zap,
   Scissors, Copy, ClipboardPaste, Crop, VolumeX, Volume2, Volume1,
   Undo2, Redo2, Eye, Download,
   ArrowLeft, ArrowRight, Maximize2, FlipHorizontal,
-  Activity, Waves, Clock, Filter
+  Activity, Waves
 } from 'lucide-react';
-import { useInstrumentStore, useTrackerStore } from '../../stores';
-import { scan9xxOffsets } from '@/lib/analysis/scan9xxOffsets';
+import { useInstrumentStore } from '../../stores';
 import type { InstrumentConfig, DeepPartial } from '../../types/instrument';
 import { DEFAULT_GRANULAR } from '../../types/instrument';
 import * as Tone from 'tone';
@@ -35,9 +34,7 @@ import { AmiResamplerModal } from './AmiResamplerModal';
 import { MpcResamplerModal } from './MpcResamplerModal';
 import { AudioToMidiModal } from './AudioToMidiModal';
 import { AmigaPalModal } from './AmigaPalModal';
-import { BeatSyncDialog } from './BeatSyncDialog';
 import { BeatSlicerPanel } from './BeatSlicerPanel';
-import { SampleSpectrumFilter } from './SampleSpectrumFilter';
 import type { ProcessedResult } from '../../utils/audio/SampleProcessing';
 import { bufferToDataUrl } from '../../utils/audio/SampleProcessing';
 import { drawSampleWaveform } from '../../utils/audio/drawSampleWaveform';
@@ -235,12 +232,8 @@ export const SampleEditor: React.FC<SampleEditorProps> = ({ instrument, onChange
     setShowAudioToMidiModal,
     showBeatSlicer,
     setShowBeatSlicer,
-    showBeatSync,
-    setShowBeatSync,
     showAmigaPal,
     setShowAmigaPal,
-    showSpectrumFilter,
-    setShowSpectrumFilter,
     isPlaying,
     setIsPlaying,
     playbackPosition,
@@ -328,15 +321,6 @@ export const SampleEditor: React.FC<SampleEditorProps> = ({ instrument, onChange
       });
     }
   }, [loopEnabled, loopStart, loopEnd, loopType, audioBuffer, instrument.id, instrument.sample, updateInstrument]);
-
-  // ─── Scan current pattern for 9xx offset markers ─────────────────
-  // Subscribe to pattern data so we re-scan when cells change
-  const currentPattern = useTrackerStore((s) => s.patterns[s.currentPatternIndex]);
-  const offsetMarkers = useMemo(() => {
-    if (!currentPattern || !audioBuffer || !instrument.id) return undefined;
-    const offsets = scan9xxOffsets(currentPattern, instrument.id);
-    return offsets.length > 0 ? offsets : undefined;
-  }, [currentPattern, audioBuffer, instrument.id]);
 
   // ─── Load audio buffer when URL changes ──────────────────────────
   useEffect(() => {
@@ -442,14 +426,13 @@ export const SampleEditor: React.FC<SampleEditorProps> = ({ instrument, onChange
       showSpectrum,
       slices: instrument.sample?.slices,
       selectedSliceId: showBeatSlicer ? selectedSliceId : null,
-      offsetMarkers,
     };
     drawSampleWaveform(ctx, CANVAS_W, CANVAS_H, opts);
   }, [
     audioBuffer, viewStart, viewEnd, startTime, endTime,
     selectionStart, selectionEnd, loopEnabled, loopStart, loopEnd, loopType,
     playbackPosition, isGranular, granular, dragTarget, showSpectrum,
-    showBeatSlicer, instrument.sample?.slices, selectedSliceId, offsetMarkers,
+    showBeatSlicer, instrument.sample?.slices, selectedSliceId,
   ]);
 
   // ─── Canvas draw: minimap ────────────────────────────────────────
@@ -886,7 +869,7 @@ export const SampleEditor: React.FC<SampleEditorProps> = ({ instrument, onChange
     });
   }, [isPlaying, setIsPlaying, setAudioBuffer, clearSelection, instrument, updateInstrument, isGranular]);
 
-  // ─── Buffer processed (enhancer / resampler / beat sync / filter) ─
+  // ─── Buffer processed (enhancer / resampler) ─────────────────────
   const handleBufferProcessed = useCallback(
     async (result: ProcessedResult, prefix: string) => {
       const { buffer: newBuf, dataUrl } = result;
@@ -908,11 +891,6 @@ export const SampleEditor: React.FC<SampleEditorProps> = ({ instrument, onChange
           },
         },
       });
-      // Force ToneEngine to recreate its Player with the new buffer
-      try {
-        const { getToneEngine } = await import('@engine/ToneEngine');
-        getToneEngine().invalidateInstrument(instrument.id);
-      } catch { /* ToneEngine not active */ }
     },
     [instrument.id, instrument.parameters, sampleInfo, updateInstrument, setAudioBuffer],
   );
@@ -963,25 +941,6 @@ export const SampleEditor: React.FC<SampleEditorProps> = ({ instrument, onChange
                 Slicer
               </button>
               <button
-                onClick={() => setShowBeatSync(true)}
-                className="flex items-center gap-1 px-2 py-1 rounded text-[10px] font-bold uppercase transition-colors bg-cyan-500/10 text-cyan-400 border border-cyan-500/30 hover:bg-cyan-500/20"
-              >
-                <Clock size={11} />
-                Beat Sync
-              </button>
-              <button
-                onClick={() => setShowSpectrumFilter(!showSpectrumFilter)}
-                className={
-                  'flex items-center gap-1 px-2 py-1 rounded text-[10px] font-bold uppercase transition-colors ' +
-                  (showSpectrumFilter
-                    ? 'bg-blue-500 text-text-primary'
-                    : 'bg-blue-500/10 text-blue-400 border border-blue-500/30 hover:bg-blue-500/20')
-                }
-              >
-                <Filter size={11} />
-                Filter
-              </button>
-              <button
                 onClick={() => setShowResampleModal(true)}
                 className="flex items-center gap-1 px-2 py-1 rounded text-[10px] font-bold uppercase transition-colors bg-orange-500/10 text-orange-400 border border-orange-500/30 hover:bg-orange-500/20"
               >
@@ -1023,21 +982,6 @@ export const SampleEditor: React.FC<SampleEditorProps> = ({ instrument, onChange
           )}
         </div>
       </div>
-
-      {/* ─── Spectrum Filter Panel ───────────────────────────────── */}
-      {showSpectrumFilter && (
-        <SampleSpectrumFilter
-          audioBuffer={audioBuffer}
-          selectionStart={selectionStart}
-          selectionEnd={selectionEnd}
-          onApply={async (buf) => {
-            const dataUrl = await bufferToDataUrl(buf);
-            handleBufferProcessed({ buffer: buf, dataUrl }, 'Filter');
-            setShowSpectrumFilter(false);
-          }}
-          onClose={() => setShowSpectrumFilter(false)}
-        />
-      )}
 
       {/* ─── Enhancement Panel ───────────────────────────────────── */}
       {showEnhancer && audioBuffer && (
@@ -1469,18 +1413,6 @@ export const SampleEditor: React.FC<SampleEditorProps> = ({ instrument, onChange
         onApply={(r: ProcessedResult) => {
           setShowAmigaPal(false);
           handleBufferProcessed(r, 'AmigaPal');
-        }}
-      />
-
-      {/* ─── BeatSyncDialog ────────────────────────────────────────── */}
-      <BeatSyncDialog
-        isOpen={showBeatSync}
-        onClose={() => setShowBeatSync(false)}
-        audioBuffer={audioBuffer}
-        onApply={async (buf) => {
-          setShowBeatSync(false);
-          const dataUrl = await bufferToDataUrl(buf);
-          handleBufferProcessed({ buffer: buf, dataUrl }, 'BeatSync');
         }}
       />
     </div>

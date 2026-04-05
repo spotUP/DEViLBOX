@@ -94,12 +94,12 @@ class V2SynthProcessor extends AudioWorkletProcessor {
   
   loadPatch(channel, patchData) {
     if (!this.initialized) return;
-
+    
     try {
       // Allocate memory for patch data
       const ptr = this.module._v2synth_alloc(patchData.length);
       this.module.HEAPU8.set(patchData, ptr);
-
+      
       // Load the patch
       const result = this.module._v2synth_load_patch(channel, ptr, patchData.length);
       

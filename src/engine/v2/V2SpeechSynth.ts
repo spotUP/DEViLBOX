@@ -42,11 +42,11 @@ export class V2SpeechSynth implements DevilboxSynth {
     this._playerGain = this.audioContext.createGain();
     this._playerGain.connect(this.output);
     this._config = {
-      text: 'HELLO WORLD',
+      text: '!kwIH_k !fAA_ks',
       speed: 64,
       pitch: 64,
       formantShift: 64,
-      singMode: false,
+      singMode: true,
       ...config
     };
 
