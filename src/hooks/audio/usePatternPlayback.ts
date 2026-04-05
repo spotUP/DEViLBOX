@@ -670,6 +670,14 @@ export const usePatternPlayback = () => {
         return;
       }
 
+      // MusicLine: same pattern as JamCracker — reset immediately and return.
+      // Without this, the generic stop path's replayer.stop() + async cleanup
+      // can cause the effect to re-fire with isPlaying=true, restarting the engine.
+      if (musiclineFileData && channelTrackTables && channelTrackTables.length > 0) {
+        hasStartedRef.current = false;
+        return;
+      }
+
       // Stop playback — keep current position (don't reset row/position)
       if ((window as any).PLAYBACK_DEBUG) console.log('[Playback] Stopping playback');
       hasStartedRef.current = false;
