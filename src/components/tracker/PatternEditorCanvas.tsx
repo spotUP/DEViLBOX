@@ -506,13 +506,11 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
     const hasAcid = cell?.flag1 !== undefined || cell?.flag2 !== undefined;
     const hasProb = cell?.probability !== undefined;
     const effectCols = channel?.channelMeta?.effectCols ?? 2;
-    const showAcidHit = hasAcid;
-    const showProbHit = hasProb;
-    const paramWidth = CHAR_WIDTH * 4 + 8
-      + (showAcidHit ? CHAR_WIDTH * 2 + 8 : 0)
-      + (showProbHit ? CHAR_WIDTH * 2 + 4 : 0);
-    const contentWidthBase = noteWidth + 4 + paramWidth;
-    const chContentWidth = contentWidthBase + effectCols * (CHAR_WIDTH * 3 + 4);
+    const totalNoteCols = channel?.channelMeta?.noteCols ?? 1;
+    // For multi-note cols: each group = note+inst+vol+gaps
+    const NOTE_COL_GROUP_W = noteWidth + 4 + CHAR_WIDTH * 2 + 4 + CHAR_WIDTH * 2 + 4;
+    const chContentWidth = NOTE_COL_GROUP_W * totalNoteCols + effectCols * (CHAR_WIDTH * 3 + 4)
+      + (hasAcid ? CHAR_WIDTH * 2 + 8 : 0) + (hasProb ? CHAR_WIDTH * 2 + 4 : 0);
     const chW = channelWidths[channelIndex] ?? 0;
     const centeringOffset = Math.floor((chW - chContentWidth) / 2);
     const localX = Math.max(0, relativeX - (channelOffsets[channelIndex] ?? 0) - centeringOffset);
@@ -520,9 +518,6 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
     // Column boundaries matching the GL renderer's layout:
     // note(noteWidth) → 4px gap → inst(CW*2) → 4px gap → vol(CW*2) → 4px gap → effects...
     const paramBase = noteWidth + 4; // where inst starts
-    const totalNoteCols = channel?.channelMeta?.noteCols ?? 1;
-    // For multi-note cols: each group = note+inst+vol+gaps
-    const NOTE_COL_GROUP_W = noteWidth + 4 + CHAR_WIDTH * 2 + 4 + CHAR_WIDTH * 2 + 4;
     const allNoteColsEnd = NOTE_COL_GROUP_W * totalNoteCols;
 
     if (localX < allNoteColsEnd) {
@@ -1841,12 +1836,13 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
           patterns:           isFormatMode ? snapshotFormatPatterns() : snapshotPatterns(),
           currentPatternIndex: isFormatMode ? 0 : state.currentPatternIndex,
           cursor: isFormatMode ? {
-            rowIndex: 0, channelIndex: 0, columnType: '0', digitIndex: 0,
+            rowIndex: 0, channelIndex: 0, columnType: '0', digitIndex: 0, noteColumnIndex: 0,
           } : {
             rowIndex:    cursorState.cursor.rowIndex,
             channelIndex: cursorState.cursor.channelIndex,
             columnType:  cursorState.cursor.columnType,
             digitIndex:  cursorState.cursor.digitIndex,
+            noteColumnIndex: cursorState.cursor.noteColumnIndex ?? 0,
           },
           selection: isFormatMode ? (formatSelection ? {
             startChannel: formatCursor.channelIndex,
@@ -2154,9 +2150,10 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
 
       // ── Read cursor/selection ──────────────────────────────────────
       const cursor = isFormatModeRef.current
-        ? { rowIndex: formatCurrentRowRef.current, channelIndex: 0, columnType: '0', digitIndex: 0 }
+        ? { rowIndex: formatCurrentRowRef.current, channelIndex: 0, columnType: '0', digitIndex: 0, noteColumnIndex: 0 }
         : { rowIndex: cs.cursor.rowIndex, channelIndex: cs.cursor.channelIndex,
-            columnType: cs.cursor.columnType, digitIndex: cs.cursor.digitIndex };
+            columnType: cs.cursor.columnType, digitIndex: cs.cursor.digitIndex,
+            noteColumnIndex: cs.cursor.noteColumnIndex ?? 0 };
 
       const patIdx = isFormatModeRef.current ? 0 : trackerState.currentPatternIndex;
 

@@ -444,10 +444,6 @@ export class TrackerGLRenderer {
     const noteWidth = CHAR_WIDTH * 3 + 4;
     const showAcid = ui.columnVisibility.flag1 || ui.columnVisibility.flag2;
     const showProb = ui.columnVisibility.probability;
-    const paramWidth = CHAR_WIDTH * 4 + 8
-      + (showAcid ? CHAR_WIDTH * 2 + 8 : 0)
-      + (showProb ? CHAR_WIDTH * 2 + 4 : 0);
-    const contentWidth = noteWidth + 4 + paramWidth;
 
     // Visible rows
     const rowH = ui.rowHeight ?? 24;
@@ -595,27 +591,35 @@ export class TrackerGLRenderer {
       } else {
         // FIXED-COLUMN CURSOR
         const cursorEffectCols = chData?.effectCols ?? 2;
-        const cursorContentWidth = contentWidth + cursorEffectCols * (CHAR_WIDTH * 3 + 4);
+        const cursorNoteCols = chData?.noteCols ?? 1;
+        const CURSOR_NOTE_COL_GROUP_W = noteWidth + 4 + CHAR_WIDTH * 2 + 4 + CHAR_WIDTH * 2 + 4;
+        const cursorContentWidth = CURSOR_NOTE_COL_GROUP_W * cursorNoteCols + cursorEffectCols * (CHAR_WIDTH * 3 + 4)
+          + (showAcid ? CHAR_WIDTH * 2 + 8 : 0) + (showProb ? CHAR_WIDTH * 2 + 4 : 0);
         cursorX = colX + Math.floor((chW - cursorContentWidth) / 2);
 
+        // Cursor noteColumnIndex determines which note group the cursor is in
+        const cursorNoteCol = cursor.noteColumnIndex ?? 0;
+        const noteColOffset = cursorNoteCol * CURSOR_NOTE_COL_GROUP_W;
         const paramBase = noteWidth + 4;
         const hasAcidC  = chData?.rows[0]?.flag1 !== undefined
                        || chData?.rows[0]?.flag2 !== undefined;
-        const acidOff = CHAR_WIDTH * 10 + 16;
+        // Effects base offset — after all note column groups
+        const effBase = cursorNoteCols * CURSOR_NOTE_COL_GROUP_W;
+        const acidOff = effBase + cursorEffectCols * (CHAR_WIDTH * 3 + 4);
         const probOff = acidOff + (hasAcidC ? CHAR_WIDTH * 2 + 8 : 0);
 
         switch (cursor.columnType) {
-          case 'note':       caretOffX = 0;                                                               caretW = noteWidth; break;
-          case 'instrument': caretOffX = paramBase + cursor.digitIndex * CHAR_WIDTH;                      break;
-          case 'volume':     caretOffX = paramBase + (CHAR_WIDTH * 2 + 4) + cursor.digitIndex * CHAR_WIDTH; break;
-          case 'effTyp':     caretOffX = paramBase + CHAR_WIDTH * 4 + 8;                                  break;
-          case 'effParam':   caretOffX = paramBase + CHAR_WIDTH * 4 + 8 + CHAR_WIDTH + cursor.digitIndex * CHAR_WIDTH; break;
-          case 'effTyp2':    caretOffX = paramBase + CHAR_WIDTH * 7 + 12;                                 break;
-          case 'effParam2':  caretOffX = paramBase + CHAR_WIDTH * 7 + 12 + CHAR_WIDTH + cursor.digitIndex * CHAR_WIDTH; break;
-          case 'flag1':      caretOffX = paramBase + acidOff;                                             break;
-          case 'flag2':      caretOffX = paramBase + acidOff + CHAR_WIDTH + 4;                            break;
-          case 'probability':caretOffX = paramBase + probOff + cursor.digitIndex * CHAR_WIDTH;            break;
-          default:           caretOffX = paramBase + CHAR_WIDTH * 4 + 8;                                  break;
+          case 'note':       caretOffX = noteColOffset;                                                    caretW = noteWidth; break;
+          case 'instrument': caretOffX = noteColOffset + paramBase + cursor.digitIndex * CHAR_WIDTH;       break;
+          case 'volume':     caretOffX = noteColOffset + paramBase + (CHAR_WIDTH * 2 + 4) + cursor.digitIndex * CHAR_WIDTH; break;
+          case 'effTyp':     caretOffX = effBase;                                                          break;
+          case 'effParam':   caretOffX = effBase + CHAR_WIDTH + cursor.digitIndex * CHAR_WIDTH;            break;
+          case 'effTyp2':    caretOffX = effBase + (CHAR_WIDTH * 3 + 4);                                   break;
+          case 'effParam2':  caretOffX = effBase + (CHAR_WIDTH * 3 + 4) + CHAR_WIDTH + cursor.digitIndex * CHAR_WIDTH; break;
+          case 'flag1':      caretOffX = acidOff;                                                          break;
+          case 'flag2':      caretOffX = acidOff + CHAR_WIDTH + 4;                                         break;
+          case 'probability':caretOffX = probOff + cursor.digitIndex * CHAR_WIDTH;                         break;
+          default:           caretOffX = effBase;                                                           break;
         }
       }
 
@@ -772,47 +776,58 @@ export class TrackerGLRenderer {
             px += col.charWidth * CHAR_WIDTH + COL_GAP;
           }
         } else {
-          // EXISTING FIXED-COLUMN PATH (note/inst/vol/eff) — UNCHANGED
-          const chContentWidth = contentWidth + effectCols * (CHAR_WIDTH * 3 + 4);
+          // FIXED-COLUMN PATH (note/inst/vol/eff) — supports multi-note columns
+          const totalNoteCols = chData.noteCols ?? 1;
+          const NOTE_COL_GROUP_W = noteWidth + 4 + CHAR_WIDTH * 2 + 4 + CHAR_WIDTH * 2 + 4;
+          const chContentWidth = NOTE_COL_GROUP_W * totalNoteCols + effectCols * (CHAR_WIDTH * 3 + 4)
+            + (showAcid ? CHAR_WIDTH * 2 + 8 : 0) + (showProb ? CHAR_WIDTH * 2 + 4 : 0);
           const x = colX + Math.floor((chW - chContentWidth) / 2);
 
-          // Note — use pre-computed note table
-          const cellNote = cell.note ?? 0;
-          if (!ui.blankEmpty || cellNote !== 0) {
-            const noteHas = cellNote > 0;
-            const nc = lerpWhiteRGBA(
-                     cellNote === 0 ? colors.textMuted
-                     : cellNote === 97 ? colors.textEffect
-                     : colors.textNote, noteHas ? glow : 0);
-            this.setTmpColor(nc, cellAlpha);
-            this.addGlyphString(noteTable[cellNote] ?? '---', x, gy, atlas, this.tmpColor, noteHas && bold);
+          // Render each note column group (note + inst + vol)
+          for (let nc = 0; nc < totalNoteCols; nc++) {
+            const ncX = x + nc * NOTE_COL_GROUP_W;
+            const cellNote = nc === 0 ? (cell.note ?? 0)
+              : nc === 1 ? (cell.note2 ?? 0)
+              : nc === 2 ? (cell.note3 ?? 0) : (cell.note4 ?? 0);
+            if (!ui.blankEmpty || cellNote !== 0) {
+              const noteHas = cellNote > 0;
+              const noteColor = lerpWhiteRGBA(
+                cellNote === 0 ? colors.textMuted
+                : cellNote === 97 ? colors.textEffect
+                : colors.textNote, noteHas ? glow : 0);
+              this.setTmpColor(noteColor, cellAlpha);
+              this.addGlyphString(noteTable[cellNote] ?? '---', ncX, gy, atlas, this.tmpColor, noteHas && bold);
+            }
+
+            let px = ncX + noteWidth + 4;
+
+            const inst = nc === 0 ? (cell.instrument ?? 0)
+              : nc === 1 ? (cell.instrument2 ?? 0)
+              : nc === 2 ? (cell.instrument3 ?? 0) : (cell.instrument4 ?? 0);
+            if (inst !== 0) {
+              this.setTmpColor(lerpWhiteRGBA(colors.textInstrument, glow), cellAlpha);
+              this.addGlyphString(HEX_TABLE[inst & 0xFF], px, gy, atlas, this.tmpColor, bold);
+            } else if (!ui.blankEmpty) {
+              this.setTmpColor(lerpWhiteRGBA(colors.textMuted, 0), cellAlpha);
+              this.addGlyphString('..', px, gy, atlas, this.tmpColor, false);
+            }
+            px += CHAR_WIDTH * 2 + 4;
+
+            const vol = nc === 0 ? (cell.volume ?? 0)
+              : nc === 1 ? (cell.volume2 ?? 0)
+              : nc === 2 ? (cell.volume3 ?? 0) : (cell.volume4 ?? 0);
+            const hasVol = vol >= 0x10 && vol <= 0x50;
+            if (hasVol) {
+              this.setTmpColor(lerpWhiteRGBA(colors.textVolume, glow), cellAlpha);
+              this.addGlyphString(HEX_TABLE[vol & 0xFF], px, gy, atlas, this.tmpColor, bold);
+            } else if (!ui.blankEmpty) {
+              this.setTmpColor(lerpWhiteRGBA(colors.textMuted, 0), cellAlpha);
+              this.addGlyphString('..', px, gy, atlas, this.tmpColor, false);
+            }
           }
 
-          // Parameters
-          let px = x + noteWidth + 4;
-
-          // Instrument — use HEX_TABLE lookup
-          const inst = cell.instrument ?? 0;
-          if (inst !== 0) {
-            this.setTmpColor(lerpWhiteRGBA(colors.textInstrument, glow), cellAlpha);
-            this.addGlyphString(HEX_TABLE[inst & 0xFF], px, gy, atlas, this.tmpColor, bold);
-          } else if (!ui.blankEmpty) {
-            this.setTmpColor(lerpWhiteRGBA(colors.textMuted, 0), cellAlpha);
-            this.addGlyphString('..', px, gy, atlas, this.tmpColor, false);
-          }
-          px += CHAR_WIDTH * 2 + 4;
-
-          // Volume — use HEX_TABLE lookup
-          const vol = cell.volume ?? 0;
-          const hasVol = vol >= 0x10 && vol <= 0x50;
-          if (hasVol) {
-            this.setTmpColor(lerpWhiteRGBA(colors.textVolume, glow), cellAlpha);
-            this.addGlyphString(HEX_TABLE[vol & 0xFF], px, gy, atlas, this.tmpColor, bold);
-          } else if (!ui.blankEmpty) {
-            this.setTmpColor(lerpWhiteRGBA(colors.textMuted, 0), cellAlpha);
-            this.addGlyphString('..', px, gy, atlas, this.tmpColor, false);
-          }
-          px += CHAR_WIDTH * 2 + 4;
+          // Effects start after all note column groups
+          let px = x + totalNoteCols * NOTE_COL_GROUP_W;
 
           // Effect columns (variable) — use EFFECT_CHARS and HEX_TABLE lookups
           for (let ecol = 0; ecol < effectCols; ecol++) {
