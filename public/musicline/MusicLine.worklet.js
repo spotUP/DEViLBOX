@@ -54,7 +54,6 @@ class MusicLineProcessor extends AudioWorkletProcessor {
         break;
 
       case 'play':
-        console.log(`[MusicLine Worklet] play: songLoaded=${this.songLoaded}, wasPlaying=${this.playing}`);
         this.playing = true;
         this._resampPos = 0.0;
         // Reset per-channel tracking
@@ -348,7 +347,6 @@ class MusicLineProcessor extends AudioWorkletProcessor {
 
     const ok = this.wasm._ml_load(ptr, data.length);
     this.wasm._free(ptr);
-    console.log(`[MusicLine Worklet] loadSong: ok=${ok}, dataLen=${data.length}, initialized=${this.initialized}`);
 
     if (ok) {
       this.songLoaded = true;

@@ -21,8 +21,6 @@ import { pickFiles } from '../services/glFilePicker';
 import { tintBg } from '../colors';
 import {
   loadModuleFile,
-  previewModule,
-  stopPreview,
   getSupportedExtensions,
   isSupportedModule,
   type ModuleInfo,
@@ -30,7 +28,7 @@ import {
 import { isUADEFormat } from '@/lib/import/formats/UADEParser';
 import { getNativeFormatMetadata } from '@/lib/import/NativeFormatMetadata';
 import { useSettingsStore, type FormatEnginePreferences } from '@/stores/useSettingsStore';
-import { detectFormat, getLibopenmptPlayableKeys, type FormatDefinition } from '@/lib/import/FormatRegistry';
+import { detectFormat, type FormatDefinition } from '@/lib/import/FormatRegistry';
 import { getFormatCapabilities, type FormatCapabilityInfo } from '@/lib/import/FormatCapabilities';
 import type { UADEMetadata } from '@/engine/uade/UADEEngine';
 import { computeSongDBHash, lookupSongDB, type SongDBResult } from '@/lib/songdb';
@@ -135,7 +133,6 @@ export const PixiImportModuleDialog: React.FC<PixiImportModuleDialogProps> = ({
   const [uadeInitProgress, setUadeInitProgress] = useState(0);
   const [uadeInitPhase, setUadeInitPhase] = useState('');
   const [error, setError] = useState<string | null>(null);
-  const [isPlaying, setIsPlaying] = useState(false);
   const [uadeMetadata, setUadeMetadata] = useState<UADEMetadata | null>(null);
   const [selectedSubsong, setSelectedSubsong] = useState(0);
   const [songDBInfo, setSongDBInfo] = useState<SongDBResult | null>(null);
@@ -143,7 +140,6 @@ export const PixiImportModuleDialog: React.FC<PixiImportModuleDialogProps> = ({
   const [activeCompanions, setActiveCompanions] = useState<File[]>([]);
 
   const uadeScanActiveRef = useRef(false);
-  const mlPreviewRef = useRef<{ stop: () => void; output: GainNode } | null>(null);
   const companionFilesRef = useRef<File[]>(companionFiles ?? []);
   useEffect(() => { companionFilesRef.current = companionFiles ?? []; }, [companionFiles]);
 
@@ -330,73 +326,10 @@ export const PixiImportModuleDialog: React.FC<PixiImportModuleDialogProps> = ({
     }
   }, [initialFile, isOpen, handleFileSelect]);
 
-  // ── Preview controls ───────────────────────────────────────────────────────
-
-  const LIBOPENMPT_PLAYABLE_NATIVE_KEYS = getLibopenmptPlayableKeys();
-  const isMusicLine = nativeFmt?.key === 'musicLine';
-  const isHively = nativeFmt?.key === 'hvl';
-  const canPreview = !uadeMetadata && (
-    !nativeFmt || isMusicLine || isHively || LIBOPENMPT_PLAYABLE_NATIVE_KEYS.has(nativeFmt.key)
-  );
-
-  const stopEnginePreview = useCallback(() => {
-    if (mlPreviewRef.current) {
-      mlPreviewRef.current.stop();
-      try { mlPreviewRef.current.output.disconnect(); } catch { /* already disconnected */ }
-      mlPreviewRef.current = null;
-    }
-  }, []);
-
-  const handlePreview = useCallback(async () => {
-    if (!moduleInfo) return;
-    if (isMusicLine || isHively) {
-      if (isPlaying) {
-        stopEnginePreview();
-        setIsPlaying(false);
-      } else {
-        try {
-          if (isMusicLine) {
-            const { MusicLineEngine } = await import('@/engine/musicline/MusicLineEngine');
-            const engine = MusicLineEngine.getInstance();
-            await engine.ready();
-            await engine.loadSong(new Uint8Array(moduleInfo.arrayBuffer));
-            engine.output.connect(engine.output.context.destination);
-            mlPreviewRef.current = { stop: () => engine.stop(), output: engine.output };
-            engine.play();
-          } else {
-            const { HivelyEngine } = await import('@/engine/hively/HivelyEngine');
-            const engine = HivelyEngine.getInstance();
-            await engine.ready();
-            await engine.loadTune(moduleInfo.arrayBuffer.slice(0));
-            engine.output.connect(engine.output.context.destination);
-            mlPreviewRef.current = { stop: () => engine.stop(), output: engine.output };
-            engine.play();
-          }
-          setIsPlaying(true);
-        } catch (err) {
-          console.error('[PixiImportModuleDialog] Engine preview failed:', err);
-        }
-      }
-      return;
-    }
-    if (isPlaying) {
-      stopPreview(moduleInfo);
-      setIsPlaying(false);
-    } else {
-      previewModule(moduleInfo);
-      setIsPlaying(true);
-    }
-  }, [moduleInfo, isPlaying, isMusicLine, isHively, stopEnginePreview]);
-
   // ── Import handler ─────────────────────────────────────────────────────────
 
   const handleImport = useCallback(async () => {
     if (!moduleInfo) return;
-    if (isPlaying) {
-      if (isMusicLine || isHively) stopEnginePreview();
-      else stopPreview(moduleInfo);
-      setIsPlaying(false);
-    }
     if (nativeFmt && !isNativeOnly) {
       setFormatEngine(nativeFmt.key as keyof FormatEnginePreferences, 'native');
     }
@@ -421,15 +354,11 @@ export const PixiImportModuleDialog: React.FC<PixiImportModuleDialogProps> = ({
       setIsImporting(false);
     }
     onClose();
-  }, [moduleInfo, isPlaying, isMusicLine, isHively, stopEnginePreview, nativeFmt, isNativeOnly, setFormatEngine, onImport, onClose, selectedSubsong, activeCompanions, uadeMetadata]);
+  }, [moduleInfo, nativeFmt, isNativeOnly, setFormatEngine, onImport, onClose, selectedSubsong, activeCompanions, uadeMetadata]);
 
   // ── Close handler ──────────────────────────────────────────────────────────
 
   const handleClose = useCallback(() => {
-    if (isPlaying) {
-      if (isMusicLine || isHively) stopEnginePreview();
-      else if (moduleInfo) stopPreview(moduleInfo);
-    }
     if (uadeScanActiveRef.current) {
       import('@/engine/uade/UADEEngine').then(({ UADEEngine }) => {
         if (UADEEngine.hasInstance()) UADEEngine.getInstance().cancelLoad();
@@ -438,13 +367,12 @@ export const PixiImportModuleDialog: React.FC<PixiImportModuleDialogProps> = ({
     setModuleInfo(null);
     setLoadedFileName('');
     setError(null);
-    setIsPlaying(false);
     setUadeMetadata(null);
     setSidHeader(null);
     setSelectedSubsong(0);
     setActiveCompanions([]);
     onClose();
-  }, [moduleInfo, isPlaying, isMusicLine, isHively, stopEnginePreview, onClose]);
+  }, [onClose]);
 
   // ── File picker handlers ───────────────────────────────────────────────────
 
@@ -779,17 +707,7 @@ export const PixiImportModuleDialog: React.FC<PixiImportModuleDialogProps> = ({
               </layoutContainer>
             )}
 
-            {/* Preview button */}
-            {canPreview && (
-              <layoutContainer layout={{ marginTop: 4 }}>
-                <PixiButton
-                  label={isPlaying ? 'Stop Preview' : 'Preview'}
-                  variant="ghost"
-                  onClick={handlePreview}
-                  icon={isPlaying ? 'stop' : 'play'}
-                />
-              </layoutContainer>
-            )}
+
           </layoutContainer>
         )}
       </layoutContainer>
