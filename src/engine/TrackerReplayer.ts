@@ -511,10 +511,15 @@ export class TrackerReplayer {
   // still allowing the pattern view to follow the scratch position.
   private _suppressNotes = false;
 
-  // Instrument IDs replaced with synths during libopenmpt playback.
+  // Instrument IDs replaced with synths during ANY WASM engine playback.
   // When _suppressNotes is true, notes for channels playing these instruments
-  // are still fired via ToneEngine (hybrid libopenmpt + ToneEngine playback).
+  // are still fired via ToneEngine (hybrid WASM + ToneEngine playback).
   private _replacedInstruments = new Set<number>();
+
+  // Reference to the active WASM engine that supports setMuteMask().
+  // Set during startNativeEngines(), cleared on loadSong().
+  // Used by updateWasmMuteMask() to mute channels playing replaced instruments.
+  private _activeWasmEngine: { setMuteMask(mask: number): void } | null = null;
 
   // SonicArranger dynamic track length (effect 0x9): overrides pattern length
   // Reset to 0 on each pattern advance; 0 = use normal pattern length
@@ -830,6 +835,41 @@ export class TrackerReplayer {
     return this._replacedInstruments.size > 0;
   }
 
+  /** Get the list of replaced instrument IDs (for DBX persistence). */
+  get replacedInstrumentIds(): number[] {
+    return Array.from(this._replacedInstruments);
+  }
+
+  /** Restore replaced instruments from saved state (DBX load). */
+  restoreReplacedInstruments(ids: number[]): void {
+    this._replacedInstruments.clear();
+    for (const id of ids) this._replacedInstruments.add(id);
+  }
+
+  /** Set the active WASM engine for dynamic mute mask updates.
+   *  Called from startNativeEngines() when a WASM engine starts. */
+  setActiveWasmEngine(engine: { setMuteMask(mask: number): void } | null): void {
+    this._activeWasmEngine = engine;
+  }
+
+  /** Compute and apply a mute mask to the active WASM engine.
+   *  Channels playing replaced instruments are muted in the WASM engine
+   *  so ToneEngine can play the synth replacements without doubling. */
+  updateWasmMuteMask(): void {
+    if (!this._activeWasmEngine || !this.song) return;
+    let mask = 0xFFFFFFFF; // all channels active
+    for (let ch = 0; ch < this.channels.length; ch++) {
+      const raw = this.channels[ch].instrument;
+      const chanInst = typeof raw === 'number' ? raw
+        : raw != null && typeof raw === 'object' && 'id' in raw ? (raw as { id: number }).id
+        : 0;
+      if (chanInst && this._replacedInstruments.has(chanInst)) {
+        mask &= ~(1 << ch); // mute this channel in WASM
+      }
+    }
+    this._activeWasmEngine.setMuteMask(mask);
+  }
+
   // ==========================================================================
   // WASM SEQUENCER CELL SYNC
   // ==========================================================================
@@ -1040,6 +1080,8 @@ export class TrackerReplayer {
     // them here destroys WASM state that the subsequent play() needs.
     this.stop(false, true);
     this._hasPlayedOnce = false;
+    this._replacedInstruments.clear();
+    this._activeWasmEngine = null;
 
     // Restore any native engines rerouted to separation chain (UADE/Hively)
     restoreNativeRouting(this.routedNativeEngines);
@@ -1396,7 +1438,8 @@ export class TrackerReplayer {
 
     // Reset note suppression — startNativeEngines will re-enable if needed for this song
     this._suppressNotes = false;
-    this._replacedInstruments.clear();
+    // NOTE: _replacedInstruments is NOT cleared here — it persists across play/stop.
+    // It's only cleared in loadSong() when a genuinely new song is loaded.
 
     await unlockIOSAudio(); // Play silent MP3 + pump AudioContext for iOS
     _playLog('unlockIOSAudio');
@@ -2325,9 +2368,10 @@ export class TrackerReplayer {
       }
     }
 
-    // Hybrid playback: when libopenmpt handles audio (_suppressNotes = true)
+    // Hybrid playback: when ANY WASM engine handles audio (_suppressNotes = true)
     // but some instruments have been replaced with synths, fire notes for
-    // channels whose current instrument is in the replaced set via ToneEngine.
+    // channels whose current instrument is in the replaced set via ToneEngine,
+    // and mute those channels in the WASM engine to prevent doubling.
     if (this._suppressNotes && this._replacedInstruments.size > 0) {
       for (let ch = 0; ch < this.channels.length; ch++) {
         const channel = this.channels[ch];
@@ -2348,6 +2392,10 @@ export class TrackerReplayer {
           this.processEffectTick(ch, channel, row, safeTime + (this.currentTick * tickInterval));
         }
         this.processEnvelopesAndVibrato(channel, safeTime + (this.currentTick * tickInterval));
+      }
+      // Update the WASM engine's mute mask so replaced channels are silenced
+      if (readNewNote) {
+        this.updateWasmMuteMask();
       }
     }
 
