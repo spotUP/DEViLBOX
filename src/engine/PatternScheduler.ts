@@ -585,9 +585,11 @@ export class PatternScheduler {
               if (cell.note === 97 || effectResult.keyOff) {
                 engine.setChannelKeyOff(channelIndex);
                 const activeNotes = this.channelNotes.get(channelIndex);
-                if (activeNotes && instrumentId !== 0) {
+                // Use channelActiveInstruments fallback when OFF row has no instrument
+                const releaseInstId = instrumentId !== 0 ? instrumentId : (this.channelActiveInstruments.get(channelIndex) ?? 0);
+                if (activeNotes && releaseInstId !== 0) {
                   activeNotes.forEach((activeNote) => {
-                    engine.releaseNote(instrumentId, activeNote, time, channelIndex);
+                    engine.releaseNote(releaseInstId, activeNote, time, channelIndex);
                   });
                   activeNotes.clear();
                 }
