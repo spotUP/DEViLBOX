@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-04-03T23:45:23.949Z
+ * Generated: 2026-04-05T11:35:13.609Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -19,10 +19,10 @@ export interface ChangelogEntry {
 }
 
 // Build info
-export const BUILD_VERSION = '1.0.3990';
-export const BUILD_NUMBER = '3990';
-export const BUILD_HASH = 'dd47e18d8';
-export const BUILD_DATE = '2026-04-03';
+export const BUILD_VERSION = '1.0.4213';
+export const BUILD_NUMBER = '4213';
+export const BUILD_HASH = 'a31dc183b';
+export const BUILD_DATE = '2026-04-05';
 
 // Full version (patch IS the build number, so no need to append)
 export const FULL_VERSION = BUILD_VERSION;
@@ -30,214 +30,200 @@ export const FULL_VERSION = BUILD_VERSION;
 // Auto-generated changelog
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: '1.0.3990',
-    date: '2026-04-04',
+    version: '1.0.4213',
+    date: '2026-04-05',
     changes: [
       {
         type: 'fix',
-        "description": "Native presets load on running synth instead of recreating"
-      },
-      {
-        type: 'fix',
-        "description": "SelectVoiceInBank always loads bank sysex before selecting voice"
-      },
-      {
-        type: 'fix',
-        "description": "Prevent context menu on test keyboard + accumulated session changes"
-      },
-      {
-        type: 'fix',
-        "description": "Restore selectVoice delay + add loadPatchBank debug log"
-      },
-      {
-        type: 'fix',
-        "description": "Add EditorHeader with PresetDropdown to layout mode"
-      },
-      {
-        type: 'fix',
-        "description": "Strip all redundant voice loading — let bridge handle everything"
+        "description": "Encode baked chord sample as WAV instead of raw PCM"
       },
       {
         type: 'feature',
-        "description": "Add 10 more factory presets (25 total)"
+        "description": "Bake chord — render chord notes into a single sample instrument"
       },
       {
         type: 'fix',
-        "description": "SetBfree — 2 tabs: MAIN (upper drawbars, perc, leslie, fx) and DETAIL (lower/pedal drawbars, vibrato, leslie detail, master)"
-      },
-      {
-        type: 'fix',
-        "description": "Raffo — single screen layout, no tabs for 32 params"
-      },
-      {
-        type: 'fix',
-        "description": "Don't send program change after single-voice sysex"
-      },
-      {
-        type: 'fix',
-        "description": "VCED presets use single-voice sysex (don't wipe entire bank)"
-      },
-      {
-        type: 'fix',
-        "description": "Remove HEAP*/wasmExports/wasmTable from unexported abort list"
-      },
-      {
-        type: 'fix',
-        "description": "Proper cartridge sync — loadVoices called alongside loadSysex"
-      },
-      {
-        type: 'fix',
-        "description": "Remove wasmMemory from unexportedSymbols abort getter list"
-      },
-      {
-        type: 'fix',
-        "description": "Patch banks — load voice data as cartridge in worklet"
-      },
-      {
-        type: 'fix',
-        "description": "Remove wasmMemory assert that blocked module init"
-      },
-      {
-        type: 'fix',
-        "description": "Remove wasmMemory early-access guard that aborted on init"
-      },
-      {
-        type: 'fix',
-        "description": "Patch banks silent — remove loadVoices init (cartridge conflict)"
+        "description": "LoadSong skips stopNativeEngines — root cause of WASM replay bug"
       },
       {
         type: 'feature',
-        "description": "Smart hardware UI popout + theme fixes"
+        "description": "Multi-note-column rendering in GL renderer for chord display"
       },
       {
         type: 'fix',
-        "description": "Make applyConfig public on 7 WASM synths"
+        "description": "Pattern editor context menu — wrong column/channel on click, native menu leak"
       },
       {
         type: 'fix',
-        "description": "All WASM synths use layout mode — no more slider fallbacks"
+        "description": "Only loadSong on first play, not on replay"
       },
       {
         type: 'fix',
-        "description": "Add to NATIVE_POLY_TYPES so note-off reaches the right instance"
+        "description": "Skip engine.stop()+delay for WASM singleton engines"
       },
       {
         type: 'fix',
-        "description": "MdaDX10 — single screen layout, no tabs for 16 params"
+        "description": "Remove loadSong skip — let _runningEngineKeys guard handle it"
       },
       {
         type: 'fix',
-        "description": "MdaJX10 — single screen layout, no tabs for 24 params"
+        "description": "Skip redundant loadSong to prevent WASM state corruption"
       },
       {
         type: 'fix',
-        "description": "MdaEPiano — single screen layout, no tabs needed for 12 params"
+        "description": "Prevent double-start of WASM engines in startNativeEngines"
       },
       {
         type: 'fix',
-        "description": "Knob preventDefault only for mouse, skip for passive touch events"
+        "description": "Use onContextMenuCapture to intercept right-click before browser native menu"
       },
       {
         type: 'fix',
-        "description": "Velocity slider — fixed 96px width instead of full-width stretch"
+        "description": "Remove unused useFormatStore import from PixiTrackerView"
       },
       {
         type: 'fix',
-        "description": "Guard worklet cartridge update — check function exists + try/catch"
+        "description": "Prevent browser context menu on canvas element itself — blocks native menu on first right-click"
       },
       {
         type: 'fix',
-        "description": "Suppress passive event listener warning in Knob component"
+        "description": "Dedicated play handler prevents double startNativeEngines"
       },
       {
         type: 'fix',
-        "description": "Hide filter curve + ADSR visualizer for WASM synths"
+        "description": "Debug: show actual offset and width values in hit-test log"
       },
       {
         type: 'fix',
-        "description": "MdaEPiano/JX10/DX10 — remove synthType fallback to slider controls"
+        "description": "Revert play handler to simple — load handles reset"
       },
       {
         type: 'fix',
-        "description": "Patch banks silent — update cartridge on sysex load"
+        "description": "Debug: log getCellFromCoords hit-test values"
       },
       {
         type: 'fix',
-        "description": "MdaEPiano knobs instead of sliders, add Odin2/Surge/Helm hw UIs"
-      }
-    ]
-  },
-  {
-    version: '2026-04-03',
-    date: '2026-04-03',
-    changes: [
+        "description": "Remove _ml_init from play handler — was clearing song"
+      },
+      {
+        type: 'fix',
+        "description": "Throttle param changes to avoid audio worklet flooding"
+      },
+      {
+        type: 'fix',
+        "description": "Fall back to store instrumentId when prop is undefined"
+      },
+      {
+        type: 'fix',
+        "description": "Guard pattern?.length in useCallback dep to prevent crash on reload"
+      },
+      {
+        type: 'fix',
+        "description": "Right-click context menu always opens — no left-click required first"
+      },
+      {
+        type: 'fix',
+        "description": "Debug: log context menu position for troubleshooting"
+      },
+      {
+        type: 'fix',
+        "description": "Chore: PreTracker wrapper update + Monique UI fix"
+      },
+      {
+        type: 'feature',
+        "description": "Unify DOM and Pixi channel context menus — same items in both"
+      },
+      {
+        type: 'fix',
+        "description": "Reinit WASM on play to fix silence-on-replay"
+      },
+      {
+        type: 'fix',
+        "description": "Save WASM position on stop (button + spacebar)"
+      },
+      {
+        type: 'feature',
+        "description": "Add Automation submenu to cell right-click context menu"
+      },
+      {
+        type: 'fix',
+        "description": "Add dedicated stop handler to prevent play-once bug"
+      },
+      {
+        type: 'fix',
+        "description": "Merge Pixi channel context menu to match DOM — unified Automation submenu"
+      },
+      {
+        type: 'fix',
+        "description": "Use ref for instrumentId in hardware UI callbacks"
+      },
+      {
+        type: 'feature',
+        "description": "Wire register capture → automation store sync"
+      },
+      {
+        type: 'fix',
+        "description": "Enable global showAutomationLanes toggle when selecting register params from context menu"
+      },
+      {
+        type: 'fix',
+        "description": "Revert automation overlay to style.top — transform broke scrolling"
+      },
+      {
+        type: 'fix',
+        "description": "Automation overlay uses GPU-accelerated transform for perfect scroll sync"
+      },
       {
         type: 'improvement',
-        "description": "Chore: track DX7 WASM build artifacts in git (prevent accidental loss)"
+        "description": "Chore: remove unused useCursorStore import"
+      },
+      {
+        type: 'improvement',
+        "description": "Chore: remove unused variables from automation lane cleanup"
       },
       {
         type: 'fix',
-        "description": "Complete parameter coverage — all synth layouts now 100%"
+        "description": "Remove automation lane backgrounds and fill areas — curves only, no clutter"
       },
       {
         type: 'fix',
-        "description": "Playlist hover — always-rendered buttons with opacity toggle, subtle hover bg"
+        "description": "Hide automation lanes in all sub-editors (order matrices, instrument tables, etc.)"
       },
       {
         type: 'fix',
-        "description": "VCED operator order — config[0]=OP1 maps to VCED slot 5, not 0"
+        "description": "Prevent parent scroll when dragging hardware UI knobs"
       },
       {
         type: 'fix',
-        "description": "DOM playlist hover — JS-based onPointerEnter/Leave, not CSS :hover"
+        "description": "Automation lanes work in per-channel format mode"
       },
       {
         type: 'fix',
-        "description": "DOM playlist hover — 20% white on all rows, always applied"
+        "description": "Automation modal uses 95vh max height with scrollbar instead of clipping content"
       },
       {
-        type: 'fix',
-        "description": "PixiList crash — bufferItems should be buffer (prop name)"
-      },
-      {
-        type: 'fix',
-        "description": "DOM playlist — make 1/2/X buttons always visible, brighter on hover"
-      },
-      {
-        type: 'fix',
-        "description": "PixiList hover — track from parent pointermove instead of per-row events"
-      },
-      {
-        type: 'fix',
-        "description": "Replace hardcoded Tailwind colors with design token classes"
-      },
-      {
-        type: 'fix',
-        "description": "PixiList rows — add explicit hitArea for click and hover"
-      },
-      {
-        type: 'fix',
-        "description": "PixiList hover — use tint+alpha (reactive) on pixiGraphics background"
-      },
-      {
-        type: 'fix',
-        "description": "PixiList hover — use reactive backgroundColor instead of draw callback"
+        type: 'improvement',
+        "description": "Remove separate lane strip — register params use standard per-channel automation"
       },
       {
         type: 'feature',
-        "description": "GL/DOM UI parity — design system tokens, dialog conversions, feature gaps"
-      },
-      {
-        type: 'fix',
-        "description": "Crate/playlist panels need eventMode=\"static\" on all containers"
+        "description": "Add block mark/copy/cut/paste to arpeggio and track table editors"
       },
       {
         type: 'feature',
-        "description": "Hover-revealed action buttons on playlist track rows"
+        "description": "Parse INFO chunk metadata and expose on TrackerSong"
       },
       {
         type: 'feature',
-        "description": "Add hover state to PixiList rows"
+        "description": "Add mono/poly keyboard mode toggle and removeUnusedParts"
+      },
+      {
+        type: 'feature',
+        "description": "Add real-time waveform visualizer to instrument editor"
+      },
+      {
+        type: 'feature',
+        "description": "Add dropdown selectors and Copy/Swap/Cut to instrument editor"
       }
     ]
   }
