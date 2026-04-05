@@ -592,6 +592,15 @@ export const PixiEditorControlsBar: React.FC<PixiEditorControlsBarProps> = ({
         layout={{ display: viewMode === 'tracker' ? 'flex' : 'none' }}
       />
 
+      {/* Cleanup — tracker view only */}
+      <PixiButton
+        label="Cleanup"
+        variant="ghost"
+        size="sm"
+        onClick={() => useUIStore.getState().openModal('cleanup')}
+        layout={{ display: viewMode === 'tracker' ? 'flex' : 'none' }}
+      />
+
       {/* Paste mode dropdown — tracker view only */}
       <PixiSelect
         options={PASTE_MODE_OPTIONS}
