@@ -1757,10 +1757,10 @@ export class ToneEngine {
         // Check if we have an edited buffer stored (takes priority over URL)
         const storedBuffer = config.sample?.audioBuffer;
 
-        // CRITICAL: Detect and reject stale blob URLs
-        // Blob URLs don't survive page refreshes - they're session-specific
-        // Data URLs (base64) and regular URLs survive, so those are fine
-        if (sampleUrl && sampleUrl.startsWith('blob:')) {
+        // Detect potentially stale blob URLs — blob URLs don't survive page
+        // refreshes. But if audioBuffer exists alongside the blob URL, the URL
+        // was likely created this session (e.g., baked chord) and is still valid.
+        if (sampleUrl && sampleUrl.startsWith('blob:') && !storedBuffer) {
           console.warn(`[ToneEngine] Sampler ${instrumentId} has stale blob URL (won't survive page refresh). Re-import the module to fix.`);
           sampleUrl = undefined; // Clear invalid URL
         }
