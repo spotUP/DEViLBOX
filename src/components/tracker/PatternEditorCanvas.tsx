@@ -459,7 +459,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
 
     const rect = containerRef.current.getBoundingClientRect();
     const relativeX = clientX - rect.left + scrollLeft;
-    console.log('[getCellFromCoords] clientX:', clientX, 'rect.left:', rect.left, 'scrollLeft:', scrollLeft, 'relativeX:', relativeX, 'offsets:', channelOffsets.slice(0, 4));
+    console.log('[getCellFromCoords] relX:', Math.round(relativeX), 'offsets:', channelOffsets.map(o => Math.round(o)), 'widths:', channelWidths.map(w => Math.round(w)));
     const relativeY = clientY - rect.top;
 
     // Adjust for scrollY (which is baseY in render)
