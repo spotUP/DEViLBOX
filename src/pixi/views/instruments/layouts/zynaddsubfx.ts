@@ -112,8 +112,6 @@ export const ZYNADDSUBFX_LAYOUT: SynthPanelLayout = {
             ]},
             { type: 'knob', key: 'padPanning', label: 'PAN', color: '#66ccff', min: -1, max: 1, defaultValue: 0, bipolar: true, formatValue: (v) => `${Math.round(v * 100)}%` },
             { type: 'knob', key: 'padBandwidthScale', label: 'BW SCL', color: '#cc66ff', min: 0, max: 1, defaultValue: 0.5, formatValue: fmtPct },
-            { type: 'knob', key: 'padProfileWidth', label: 'P WIDTH', color: '#cc66ff', min: 0, max: 1, defaultValue: 0.5, formatValue: fmtPct },
-            { type: 'knob', key: 'padProfileStretch', label: 'P STRCH', color: '#cc66ff', min: 0, max: 1, defaultValue: 0, formatValue: fmtPct },
             { type: 'knob', key: 'padOctave', label: 'OCT', color: '#66ccff', min: -4, max: 4, defaultValue: 0, bipolar: true, formatValue: fmtOct },
             { type: 'knob', key: 'padDetune', label: 'DETUNE', color: '#ffcc00', min: -1, max: 1, defaultValue: 0, bipolar: true, formatValue: (v) => `${Math.round(v * 100)}%` },
           ],
@@ -164,7 +162,6 @@ export const ZYNADDSUBFX_LAYOUT: SynthPanelLayout = {
           controls: [
             { type: 'knob', key: 'reverbWet', label: 'WET', color: '#cc66ff', min: 0, max: 1, defaultValue: 0, formatValue: fmtPct },
             { type: 'knob', key: 'reverbSize', label: 'SIZE', color: '#cc66ff', min: 0, max: 1, defaultValue: 0.5, formatValue: fmtPct },
-            { type: 'knob', key: 'reverbDamp', label: 'DAMP', color: '#cc66ff', min: 0, max: 1, defaultValue: 0.5, formatValue: fmtPct },
           ],
         },
         {
@@ -172,25 +169,13 @@ export const ZYNADDSUBFX_LAYOUT: SynthPanelLayout = {
           controls: [
             { type: 'knob', key: 'chorusWet', label: 'WET', color: '#33ccff', min: 0, max: 1, defaultValue: 0, formatValue: fmtPct },
             { type: 'knob', key: 'chorusRate', label: 'RATE', color: '#33ccff', min: 0, max: 1, defaultValue: 0.3, formatValue: fmtPct },
-            { type: 'knob', key: 'chorusDepth', label: 'DEPTH', color: '#33ccff', min: 0, max: 1, defaultValue: 0.3, formatValue: fmtPct },
           ],
         },
         {
           label: 'DISTORTION',
           controls: [
             { type: 'knob', key: 'distortionWet', label: 'WET', color: '#ff3366', min: 0, max: 1, defaultValue: 0, formatValue: fmtPct },
-            { type: 'knob', key: 'distortionDrive', label: 'DRIVE', color: '#ff3366', min: 0, max: 1, defaultValue: 0.3, formatValue: fmtPct },
-            { type: 'select', key: 'distortionType', label: 'TYPE', options: [
-              { value: '0', label: 'Atan' }, { value: '1', label: 'Asym' },
-              { value: '2', label: 'Pow' }, { value: '3', label: 'Sine' }, { value: '4', label: 'Quant' },
-            ]},
-          ],
-        },
-        {
-          label: 'EQ',
-          controls: [
-            { type: 'knob', key: 'eqLow', label: 'LOW', color: '#ff9900', min: 0, max: 1, defaultValue: 0.5, formatValue: fmtPct },
-            { type: 'knob', key: 'eqHigh', label: 'HIGH', color: '#ffcc00', min: 0, max: 1, defaultValue: 0.5, formatValue: fmtPct },
+            { type: 'knob', key: 'distortionDrive', label: 'PRESET', color: '#ff3366', min: 0, max: 7, defaultValue: 0, formatValue: (v: number) => `${Math.round(v)}` },
           ],
         },
       ],
