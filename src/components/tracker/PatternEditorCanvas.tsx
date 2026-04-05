@@ -732,17 +732,40 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
 
   const handleContextMenu = useCallback((e: React.MouseEvent) => {
     e.preventDefault();
+
+    // Format mode: use same hit-test as handleMouseDown (no scrollLeft)
+    if (isFormatMode && formatChannels && containerRef.current) {
+      const rect = containerRef.current.getBoundingClientRect();
+      const relX = e.clientX - rect.left;
+      const relY = e.clientY - rect.top;
+      let chIdx = -1;
+      for (let ch = 0; ch < channelOffsets.length; ch++) {
+        if (relX >= channelOffsets[ch] && relX < channelOffsets[ch] + (channelWidths[ch] ?? 0)) {
+          chIdx = ch;
+          break;
+        }
+      }
+      const ROW_H = rowHeightRef.current;
+      const centerLineTop = Math.floor(containerRef.current.clientHeight / 2) - ROW_H / 2;
+      const currentDisplayRow = formatIsPlayingRef.current ? formatCurrentRowRef.current : formatCursor.rowIndex;
+      const rowOffset = Math.floor((relY - centerLineTop) / ROW_H);
+      const rowIndex = Math.max(0, currentDisplayRow + rowOffset);
+      const channelIndex = chIdx >= 0 ? chIdx : 0;
+      cellContextMenu.openMenu(e, rowIndex, channelIndex);
+      return;
+    }
+
+    // Standard mode
     const cell = getCellFromCoords(e.clientX, e.clientY);
     const rowIndex = cell?.rowIndex ?? cursorRef.current.rowIndex;
     const channelIndex = cell?.channelIndex ?? cursorRef.current.channelIndex;
     if (cell) {
-      // Move cursor to the right-clicked cell so context menu actions target the visible cell
       const cursorStore = useCursorStore.getState();
       cursorStore.moveCursorToRow(cell.rowIndex);
       cursorStore.moveCursorToChannelAndColumn(cell.channelIndex, cell.columnType as any, cell.noteColumnIndex);
     }
     cellContextMenu.openMenu(e, rowIndex, channelIndex);
-  }, [getCellFromCoords, cellContextMenu]);
+  }, [getCellFromCoords, cellContextMenu, isFormatMode, formatChannels, channelOffsets, channelWidths]);
 
   // ── Format mode: copy rows from selection (or current row) to clipboard ──
   const formatCopySelection = useCallback(() => {
@@ -1159,7 +1182,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
         useCursorStore.getState().moveCursorToRow(newRow);
       }
     }
-  }, [pattern.length]);
+  }, [pattern?.length]);
 
   // Mobile swipe handlers for pattern data (column navigation)
   const handleDataSwipeLeft = useCallback(() => {
