@@ -89,6 +89,8 @@ interface PatternEditorCanvasProps {
   onFormatCellChange?: OnCellChange;
   /** Hide VU meters (for sub-editors like perf list that aren't main song views) */
   hideVUMeters?: boolean;
+  /** Hide automation lanes overlay (for order matrices that reuse PatternEditorCanvas) */
+  hideAutomationLanes?: boolean;
   /** Channel index offset for automation lanes in per-channel format mode.
    *  When MusicLine renders each channel as a separate instance, this tells
    *  the automation system which real channel this instance represents. */
@@ -111,6 +113,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
   formatIsPlaying,
   onFormatCellChange,
   hideVUMeters = false,
+  hideAutomationLanes: hideAutoLanesProp = false,
   formatChannelOffset = 0,
 }) => {
   const { isMobile } = useResponsiveSafe();
@@ -3143,7 +3146,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
         {/* Automation Lanes Overlay — positioned imperatively by RAF loop */}
         {pattern && (
           <>
-            {showAutomationLanes && (
+            {showAutomationLanes && !hideAutoLanesProp && !hideVUMeters && (
               <>
               {/* Per-channel automation parameter pickers */}
               {pattern.channels.map((_, chIdx) => (
