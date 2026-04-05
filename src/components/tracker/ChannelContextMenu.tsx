@@ -37,6 +37,7 @@ import { useLiveModeStore } from '@stores/useLiveModeStore';
 import { useTrackerStore } from '@stores/useTrackerStore';
 import { useAutomationStore } from '@stores/useAutomationStore';
 import { useInstrumentStore } from '@stores/useInstrumentStore';
+import { useUIStore } from '@stores/useUIStore';
 import { GENERATORS, type GeneratorType } from '@utils/patternGenerators';
 import type { ChannelData } from '@typedefs/tracker';
 import { useChannelAutomationParams } from '@hooks/useChannelAutomationParams';
@@ -187,6 +188,9 @@ export const ChannelContextMenu: React.FC<ChannelContextMenuProps> = ({
         onClick: () => {
           setActiveParameter(channelIndex, p.id);
           setShowLane(channelIndex, true);
+          // Ensure the global automation lanes toggle is on
+          const uiState = useUIStore.getState();
+          if (!uiState.showAutomationLanes) uiState.toggleAutomationLanes();
         },
       })),
     }));
