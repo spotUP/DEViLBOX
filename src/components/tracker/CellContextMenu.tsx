@@ -643,6 +643,7 @@ export const CellContextMenu: React.FC<CellContextMenuProps> = ({
               playbackRate: 1,
               sampleRate: buffer.sampleRate,
             },
+            envelope: { attack: 0, decay: 0, sustain: 100, release: 50 },
           });
 
           // Replace cell with C-4 + new baked instrument
