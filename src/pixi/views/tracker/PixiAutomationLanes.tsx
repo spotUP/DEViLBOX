@@ -350,15 +350,6 @@ export const PixiAutomationLanes: React.FC<PixiAutomationLanesProps> = ({
     }
     if (points.length < 2) return;
 
-    // Fill
-    const rightX = laneLeft + laneWidth;
-    g.moveTo(rightX, points[0].y);
-    g.lineTo(points[0].x, points[0].y);
-    for (let i = 1; i < points.length; i++) g.lineTo(points[i].x, points[i].y);
-    g.lineTo(rightX, points[points.length - 1].y);
-    g.closePath();
-    g.fill({ color, alpha: 0.08 * alpha });
-
     // Stroke
     g.moveTo(points[0].x, points[0].y);
     for (let i = 1; i < points.length; i++) g.lineTo(points[i].x, points[i].y);
@@ -383,18 +374,6 @@ export const PixiAutomationLanes: React.FC<PixiAutomationLanesProps> = ({
     // Pattern extent in scroll-adjusted coordinates
     const patTop = -scrollOffset;
     const patBot = patternLength * rowHeight - scrollOffset;
-
-    // Draw lane background strips spanning the full pattern height
-    for (let ch = 0; ch < channelCount; ch++) {
-      const autoArea = getAutoArea(ch);
-      const areaLeft = (channelOffsets[ch] ?? 0) + (channelWidths[ch] ?? 0) - autoArea - scrollLeft;
-      if (areaLeft + autoArea < 0 || areaLeft > width) continue;
-      g.rect(areaLeft, patTop, autoArea, patBot - patTop);
-      g.fill({ color: theme.accent.color, alpha: 0.04 });
-      g.moveTo(areaLeft, patTop);
-      g.lineTo(areaLeft, patBot);
-      g.stroke({ color: theme.accent.color, alpha: 0.12, width: 1 });
-    }
 
     const prevLen = prevPatternId ? (prevPatternLength || patternLength) : 0;
 
