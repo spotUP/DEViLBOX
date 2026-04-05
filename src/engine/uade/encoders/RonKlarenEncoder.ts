@@ -27,7 +27,6 @@
 
 import type { TrackerCell } from '@/types';
 import { registerPatternEncoder } from '../UADEPatternEncoder';
-import { registerGenericInstrumentLayout } from '../GenericInstrumentLayoutFactory';
 
 const XM_REFERENCE_NOTE = 13;
 const RK_REFERENCE_IDX = 36;
@@ -55,6 +54,3 @@ export function encodeRonKlarenCell(cell: TrackerCell): Uint8Array {
 }
 
 registerPatternEncoder('ronKlaren', () => encodeRonKlarenCell);
-
-// ─── Instrument Layout Registration ──────────────────────────────────────────
-registerGenericInstrumentLayout('ronKlaren', { kind: 'stub' });

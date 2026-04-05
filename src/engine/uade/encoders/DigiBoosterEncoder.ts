@@ -12,7 +12,6 @@
 
 import type { TrackerCell } from '@/types';
 import { registerPatternEncoder } from '../UADEPatternEncoder';
-import { registerGenericInstrumentLayout } from '../GenericInstrumentLayoutFactory';
 
 function encodeDigiBoosterCell(cell: TrackerCell): Uint8Array {
   const out = new Uint8Array(4);
@@ -39,6 +38,3 @@ function encodeDigiBoosterCell(cell: TrackerCell): Uint8Array {
 registerPatternEncoder('digiBooster', () => encodeDigiBoosterCell);
 
 export { encodeDigiBoosterCell };
-
-// ─── Instrument Layout Registration ──────────────────────────────────────────
-registerGenericInstrumentLayout('digiBooster', { kind: 'protracker' });

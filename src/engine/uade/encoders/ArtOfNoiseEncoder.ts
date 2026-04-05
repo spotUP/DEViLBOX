@@ -19,7 +19,6 @@
 
 import type { TrackerCell } from '@/types';
 import { registerPatternEncoder } from '../UADEPatternEncoder';
-import { registerGenericInstrumentLayout } from '../GenericInstrumentLayoutFactory';
 
 /**
  * Reverse-translate XM effect → AON effect.
@@ -75,6 +74,3 @@ function encodeAONCell(cell: TrackerCell): Uint8Array {
 registerPatternEncoder('aon', () => encodeAONCell);
 
 export { encodeAONCell };
-
-// ─── Instrument Layout Registration ──────────────────────────────────────────
-registerGenericInstrumentLayout('aon', { kind: 'stub' });

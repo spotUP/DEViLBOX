@@ -22,7 +22,6 @@
 import type { TrackerCell } from '@/types';
 import type { VariableLengthEncoder } from '../UADEPatternEncoder';
 import { registerVariableEncoder } from '../UADEPatternEncoder';
-import { registerGenericInstrumentLayout } from '../GenericInstrumentLayoutFactory';
 
 /**
  * Convert XM note (13-84) back to Fred Editor note (1-72).
@@ -146,6 +145,3 @@ export const fredEditorEncoder: VariableLengthEncoder = {
 };
 
 registerVariableEncoder(fredEditorEncoder);
-
-// ─── Instrument Layout Registration ──────────────────────────────────────────
-registerGenericInstrumentLayout('fredEditor', { kind: 'stub' });

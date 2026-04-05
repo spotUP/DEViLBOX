@@ -23,7 +23,6 @@
 import type { TrackerCell } from '@/types';
 import type { VariableLengthEncoder } from '../UADEPatternEncoder';
 import { registerVariableEncoder } from '../UADEPatternEncoder';
-import { registerGenericInstrumentLayout } from '../GenericInstrumentLayoutFactory';
 
 const XM_KEYOFF_NOTE = 97;
 
@@ -150,6 +149,3 @@ export const ultEncoder: VariableLengthEncoder = {
 };
 
 registerVariableEncoder(ultEncoder);
-
-// ─── Instrument Layout Registration ──────────────────────────────────────────
-registerGenericInstrumentLayout('ult', { kind: 'stub' });

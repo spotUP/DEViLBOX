@@ -23,7 +23,6 @@
 
 import type { TrackerCell } from '@/types';
 import { registerPatternEncoder } from '../UADEPatternEncoder';
-import { registerGenericInstrumentLayout } from '../GenericInstrumentLayoutFactory';
 
 function encodeZoundMonitorCell(cell: TrackerCell): Uint8Array {
   const out = new Uint8Array(4);
@@ -95,6 +94,3 @@ function encodeZoundMonitorCell(cell: TrackerCell): Uint8Array {
 registerPatternEncoder('zoundMonitor', () => encodeZoundMonitorCell);
 
 export { encodeZoundMonitorCell };
-
-// ─── Instrument Layout Registration ──────────────────────────────────────────
-registerGenericInstrumentLayout('zoundMonitor', { kind: 'stub' });

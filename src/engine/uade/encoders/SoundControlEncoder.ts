@@ -19,7 +19,6 @@
 
 import type { TrackerCell } from '@/types';
 import { registerPatternEncoder } from '../UADEPatternEncoder';
-import { registerGenericInstrumentLayout } from '../GenericInstrumentLayoutFactory';
 
 /**
  * Reverse of sc40NoteToXm: XM note → SC 4.0+ period table index (1-based).
@@ -77,6 +76,3 @@ function encodeSoundControl3xCell(cell: TrackerCell): Uint8Array {
 registerPatternEncoder('soundControl', () => encodeSoundControl40Cell);
 
 export { encodeSoundControl40Cell, encodeSoundControl3xCell, xmToSc40Note, xmToSc3xNote };
-
-// ─── Instrument Layout Registration ──────────────────────────────────────────
-registerGenericInstrumentLayout('soundControl', { kind: 'stub' });

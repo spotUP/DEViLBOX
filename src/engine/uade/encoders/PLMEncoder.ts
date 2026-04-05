@@ -16,7 +16,6 @@
 
 import type { TrackerCell } from '@/types';
 import { registerPatternEncoder } from '../UADEPatternEncoder';
-import { registerGenericInstrumentLayout } from '../GenericInstrumentLayoutFactory';
 
 // Reverse of EFF_TRANS[] lookup. Parser maps cmd → XM effTyp.
 // We need XM effTyp → PLM cmd.
@@ -72,6 +71,3 @@ function encodePLMCell(cell: TrackerCell): Uint8Array {
 registerPatternEncoder('plm', () => encodePLMCell);
 
 export { encodePLMCell };
-
-// ─── Instrument Layout Registration ──────────────────────────────────────────
-registerGenericInstrumentLayout('plm', { kind: 'stub' });

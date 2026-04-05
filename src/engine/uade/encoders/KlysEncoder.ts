@@ -28,7 +28,6 @@
 
 import type { TrackerCell } from '@/types';
 import { registerPatternEncoder } from '../UADEPatternEncoder';
-import { registerGenericInstrumentLayout } from '../GenericInstrumentLayoutFactory';
 
 export function encodeKlysCell(cell: TrackerCell): Uint8Array {
   const out = new Uint8Array(6);
@@ -58,6 +57,3 @@ export function encodeKlysCell(cell: TrackerCell): Uint8Array {
 }
 
 registerPatternEncoder('klystrack', () => encodeKlysCell);
-
-// ─── Instrument Layout Registration ──────────────────────────────────────────
-registerGenericInstrumentLayout('klystrack', { kind: 'stub' });

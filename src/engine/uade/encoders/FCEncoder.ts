@@ -19,7 +19,6 @@
 
 import type { TrackerCell } from '@/types';
 import { registerPatternEncoder } from '../UADEPatternEncoder';
-import { registerGenericInstrumentLayout } from '../GenericInstrumentLayoutFactory';
 
 /**
  * Create an FC cell encoder with the given instrument reverse map.
@@ -54,6 +53,3 @@ export function createFCEncoder(instrReverseMap: Map<number, number>): (cell: Tr
 }
 
 registerPatternEncoder('futureComposer', () => createFCEncoder(new Map()));
-
-// ─── Instrument Layout Registration ──────────────────────────────────────────
-registerGenericInstrumentLayout('futureComposer', { kind: 'stub' });

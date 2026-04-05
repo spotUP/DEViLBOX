@@ -22,7 +22,6 @@
 
 import type { TrackerCell } from '@/types';
 import { registerPatternEncoder } from '../UADEPatternEncoder';
-import { registerGenericInstrumentLayout } from '../GenericInstrumentLayoutFactory';
 
 const STP_NOTE_OFFSET = 25;
 
@@ -69,6 +68,3 @@ function encodeSTPCell(cell: TrackerCell): Uint8Array {
 registerPatternEncoder('stp', () => encodeSTPCell);
 
 export { encodeSTPCell };
-
-// ─── Instrument Layout Registration ──────────────────────────────────────────
-registerGenericInstrumentLayout('stp', { kind: 'protracker' });

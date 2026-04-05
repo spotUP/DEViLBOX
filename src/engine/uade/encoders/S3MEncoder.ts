@@ -23,7 +23,6 @@
 import type { TrackerCell } from '@/types';
 import type { VariableLengthEncoder } from '../UADEPatternEncoder';
 import { registerVariableEncoder } from '../UADEPatternEncoder';
-import { registerGenericInstrumentLayout } from '../GenericInstrumentLayoutFactory';
 
 const XM_NOTE_OFF = 97;
 const S3M_NOTE_OFF = 0xFE;
@@ -172,6 +171,3 @@ export const s3mEncoder: VariableLengthEncoder = {
 };
 
 registerVariableEncoder(s3mEncoder);
-
-// ─── Instrument Layout Registration ──────────────────────────────────────────
-registerGenericInstrumentLayout('s3m', { kind: 'stub' });

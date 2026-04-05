@@ -20,7 +20,6 @@
 
 import type { TrackerCell } from '@/types';
 import { registerPatternEncoder } from '../UADEPatternEncoder';
-import { registerGenericInstrumentLayout } from '../GenericInstrumentLayoutFactory';
 
 function reverseFAREffect(effTyp: number, eff: number): number {
   if (effTyp === 0 && eff === 0) return 0;
@@ -77,6 +76,3 @@ function encodeFARCell(cell: TrackerCell): Uint8Array {
 registerPatternEncoder('far', () => encodeFARCell);
 
 export { encodeFARCell };
-
-// ─── Instrument Layout Registration ──────────────────────────────────────────
-registerGenericInstrumentLayout('far', { kind: 'stub' });

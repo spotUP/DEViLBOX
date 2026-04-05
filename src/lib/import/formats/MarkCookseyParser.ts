@@ -35,6 +35,7 @@
 
 import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
 import type { InstrumentConfig } from '@/types';
+import { createSamplerInstrument } from './AmigaUtils';
 
 // ── Binary helpers ─────────────────────────────────────────────────────────
 
@@ -301,29 +302,100 @@ export async function parseMarkCookseyFile(
     variant === 'old-player' ? 'Old Player (mco)' :
                                'New (mc)';
 
-  // ── Instrument placeholders ──────────────────────────────────────────────
+  // ── Extract samples via 0x43FA opcode scanning ──────────────────────────
   //
-  // The format supports up to 64 samples. The exact count requires emulating
-  // the 68k InitPlayer routine to walk internal data structures, which is
-  // outside the scope of a metadata-only parser. We create 64 placeholders
-  // to ensure the TrackerSong can represent any module in the format family.
-  //
-  // Reference: Mark Cooksey_v2.asm EP_SampleInit, which iterates D5 = Samples - 1
-  // where Samples is populated by InitPlayer scanning the binary.
+  // The format embeds sample info and data at locations found by scanning for
+  // LEA d16(PC),An instructions (opcodes 0x43FA / 0x41FA). The first 0x43FA
+  // points to SampleInfoPtr, the second to SamplesPtr (raw PCM base).
+  // This mirrors the 68k InitPlayer routine in Mark Cooksey_v2.asm lines 862–892.
 
-  const NUM_PLACEHOLDER_INSTRUMENTS = 64;
   const instruments: InstrumentConfig[] = [];
+  const leaPositions: number[] = [];
 
-  for (let i = 0; i < NUM_PLACEHOLDER_INSTRUMENTS; i++) {
-    instruments.push({
-      id: i + 1,
-      name: `Sample ${i + 1}`,
-      type: 'synth' as const,
-      synthType: 'Synth' as const,
-      effects: [],
-      volume: 0,
-      pan: 0,
-    } as InstrumentConfig);
+  // Scan for 0x43FA (LEA d16(PC),A1) or 0x41FA (LEA d16(PC),A0)
+  for (let i = 0; i < Math.min(buf.length - 4, 0x1000); i += 2) {
+    const op = u16BE(buf, i);
+    if (op === 0x43FA || op === 0x41FA) {
+      const disp = ((buf[i + 2] << 8) | buf[i + 3]);
+      const signedDisp = disp < 0x8000 ? disp : disp - 0x10000;
+      const target = i + 2 + signedDisp; // PC + displacement
+      if (target > 0 && target < buf.length) {
+        leaPositions.push(target);
+      }
+    }
+  }
+
+  let samplesExtracted = false;
+  if (leaPositions.length >= 2) {
+    // First LEA target = SampleInfoPtr, second = SamplesPtr (PCM data base)
+    const sampleInfoOff = leaPositions[0];
+    const samplesBaseOff = leaPositions.length >= 2 ? leaPositions[1] : -1;
+
+    // Try to extract samples from the SampleInfoPtr table
+    // Old format: entries are 4-byte offsets from sampleInfoOff
+    // We attempt to read entries and extract PCM data
+    if (samplesBaseOff > 0 && samplesBaseOff < buf.length) {
+      // Count entries: each is a 2-byte word index, terminated when we hit
+      // something that doesn't look like a valid offset
+      const maxSamples = Math.min(64, Math.floor((samplesBaseOff - sampleInfoOff) / 2));
+
+      // Try reading as word-offset table (common in new format)
+      for (let i = 0; i < maxSamples; i++) {
+        const entryOff = sampleInfoOff + i * 2;
+        if (entryOff + 2 > buf.length) break;
+        const wordVal = u16BE(buf, entryOff);
+        if (wordVal === 0 && i > 0) break; // null terminator
+
+        // Resolve sample info at sampleInfoOff + wordVal
+        const infoOff = sampleInfoOff + wordVal;
+        if (infoOff < 0 || infoOff + 20 > buf.length) break;
+
+        // Try to find sample length at infoOff + 16 (word, in words)
+        const sampleLenWords = u16BE(buf, infoOff + 16);
+        if (sampleLenWords === 0 || sampleLenWords > 0x8000) continue;
+
+        const sampleLenBytes = sampleLenWords * 2;
+        // Sample data at samplesBaseOff + some offset
+        // For old format, sample data pointer is at infoOff (first longword)
+        const sampleDataPtr = u32BE(buf, infoOff);
+        let pcmOff = -1;
+
+        if (sampleDataPtr === 0) {
+          // Zero first long — try infoOff + 4
+          const altPtr = u32BE(buf, infoOff + 4);
+          if (altPtr > 0 && altPtr < buf.length) pcmOff = altPtr;
+        } else if (sampleDataPtr < buf.length) {
+          pcmOff = sampleDataPtr;
+        } else {
+          // May be relative to samplesBase
+          pcmOff = samplesBaseOff;
+          // Skip to next sample by accumulating lengths
+        }
+
+        if (pcmOff >= 0 && pcmOff + sampleLenBytes <= buf.length) {
+          const pcm = new Uint8Array(sampleLenBytes);
+          for (let j = 0; j < sampleLenBytes; j++) pcm[j] = buf[pcmOff + j];
+          instruments.push(createSamplerInstrument(i + 1, `MC Sample ${i + 1}`, pcm, 64, 8287, 0, 0));
+          samplesExtracted = true;
+        }
+      }
+    }
+  }
+
+  // Fallback: if sample extraction failed, create placeholders
+  if (!samplesExtracted || instruments.length === 0) {
+    instruments.length = 0;
+    for (let i = 0; i < 8; i++) {
+      instruments.push({
+        id: i + 1,
+        name: `MC Sample ${i + 1}`,
+        type: 'synth' as const,
+        synthType: 'Synth' as const,
+        effects: [],
+        volume: 0,
+        pan: 0,
+      } as InstrumentConfig);
+    }
   }
 
   // ── Empty pattern (placeholder — UADE handles actual audio) ──────────────
@@ -360,7 +432,7 @@ export async function parseMarkCookseyFile(
       importedAt: new Date().toISOString(),
       originalChannelCount: 4,
       originalPatternCount: 1,
-      originalInstrumentCount: NUM_PLACEHOLDER_INSTRUMENTS,
+      originalInstrumentCount: instruments.length,
     },
   };
 
@@ -376,5 +448,7 @@ export async function parseMarkCookseyFile(
     initialSpeed: 6,
     initialBPM: 125,
     linearPeriods: false,
+    uadeEditableFileData: buffer.slice(0) as ArrayBuffer,
+    uadeEditableFileName: filename,
   };
 }

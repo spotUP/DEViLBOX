@@ -16,7 +16,6 @@
 
 import type { TrackerCell } from '@/types';
 import { registerPatternEncoder } from '../UADEPatternEncoder';
-import { registerGenericInstrumentLayout } from '../GenericInstrumentLayoutFactory';
 
 function reverseNRUEffect(effTyp: number, eff: number): { d0: number; d1: number } {
   if (effTyp === 0 && eff === 0) return { d0: 0, d1: 0 };
@@ -55,6 +54,3 @@ function encodeNRUCell(cell: TrackerCell): Uint8Array {
 registerPatternEncoder('nru', () => encodeNRUCell);
 
 export { encodeNRUCell };
-
-// ─── Instrument Layout Registration ──────────────────────────────────────────
-registerGenericInstrumentLayout('nru', { kind: 'stub' });

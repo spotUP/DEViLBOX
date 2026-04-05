@@ -18,7 +18,6 @@
 
 import type { TrackerCell } from '@/types';
 import { registerPatternEncoder } from '../UADEPatternEncoder';
-import { registerGenericInstrumentLayout } from '../GenericInstrumentLayoutFactory';
 
 function encodeDeltaMusic2Cell(cell: TrackerCell): Uint8Array {
   const out = new Uint8Array(4);
@@ -99,6 +98,3 @@ function encodeDeltaMusic2Cell(cell: TrackerCell): Uint8Array {
 registerPatternEncoder('deltaMusic2', () => encodeDeltaMusic2Cell);
 
 export { encodeDeltaMusic2Cell };
-
-// ─── Instrument Layout Registration ──────────────────────────────────────────
-registerGenericInstrumentLayout('deltaMusic2', { kind: 'stub' });

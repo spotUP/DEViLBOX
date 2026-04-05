@@ -13,7 +13,6 @@
 
 import type { TrackerCell } from '@/types';
 import { registerPatternEncoder } from '../UADEPatternEncoder';
-import { registerGenericInstrumentLayout } from '../GenericInstrumentLayoutFactory';
 
 // Constants matching ChuckBiscuitsParser
 const CMD_NOTE_CUT = 254;    // DEViLBOX internal note-cut value
@@ -104,6 +103,3 @@ function encodeCBACell(cell: TrackerCell): Uint8Array {
 registerPatternEncoder('chuckBiscuits', () => encodeCBACell);
 
 export { encodeCBACell };
-
-// ─── Instrument Layout Registration ──────────────────────────────────────────
-registerGenericInstrumentLayout('chuckBiscuits', { kind: 'stub' });

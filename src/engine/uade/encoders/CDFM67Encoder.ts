@@ -18,7 +18,6 @@
 import type { TrackerCell } from '@/types';
 import type { VariableLengthEncoder } from '../UADEPatternEncoder';
 import { registerVariableEncoder } from '../UADEPatternEncoder';
-import { registerGenericInstrumentLayout } from '../GenericInstrumentLayoutFactory';
 
 const NUM_PCM_CHANNELS = 4;
 const NUM_FM_INSTRS = 32;
@@ -173,6 +172,3 @@ function encodeC67SingleChannel(rows: TrackerCell[], channel: number): Uint8Arra
 registerVariableEncoder(cdfm67Encoder);
 
 export { cdfm67Encoder, encodeC67Pattern, encodeC67SingleChannel };
-
-// ─── Instrument Layout Registration ──────────────────────────────────────────
-registerGenericInstrumentLayout('c67', { kind: 'stub' });

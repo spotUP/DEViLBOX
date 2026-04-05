@@ -30,7 +30,6 @@
 
 import type { TrackerCell } from '@/types';
 import { registerPatternEncoder } from '../UADEPatternEncoder';
-import { registerGenericInstrumentLayout } from '../GenericInstrumentLayoutFactory';
 
 /**
  * Reverse XM effect to Graoumf Tracker effect byte + param.
@@ -176,6 +175,3 @@ registerPatternEncoder('graoumfTracker2_gtk5', () => encodeGTK5Cell);
 registerPatternEncoder('graoumfTracker2_gt2', () => encodeGT2Cell);
 
 export { reverseEffect };
-
-// ─── Instrument Layout Registration ──────────────────────────────────────────
-registerGenericInstrumentLayout('graoumfTracker2_gtk4', { kind: 'stub' }, ['graoumfTracker2_gtk5', 'graoumfTracker2_gt2']);

@@ -27,7 +27,6 @@
 import type { TrackerCell } from '@/types';
 import type { VariableLengthEncoder } from '../UADEPatternEncoder';
 import { registerVariableEncoder } from '../UADEPatternEncoder';
-import { registerGenericInstrumentLayout } from '../GenericInstrumentLayoutFactory';
 
 /**
  * Encode a single channel's pattern rows back to an SNX voice event stream.
@@ -132,6 +131,3 @@ const sonixEncoder: VariableLengthEncoder = {
 registerVariableEncoder(sonixEncoder);
 
 export { encodeSnxVoiceStream, sonixEncoder };
-
-// ─── Instrument Layout Registration ──────────────────────────────────────────
-registerGenericInstrumentLayout('sonixMusicDriver', { kind: 'stub' });

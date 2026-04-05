@@ -20,7 +20,6 @@
 
 import type { TrackerCell } from '@/types';
 import { registerPatternEncoder } from '../UADEPatternEncoder';
-import { registerGenericInstrumentLayout } from '../GenericInstrumentLayoutFactory';
 
 // Standard ProTracker period table (finetune 0), 36 entries: C-1 to B-3
 const MOD_PERIODS = [
@@ -68,8 +67,3 @@ registerPatternEncoder('mikeDavies', () => encodeSimpleAmigaStubCell);
 registerPatternEncoder('markII', () => encodeSimpleAmigaStubCell);
 registerPatternEncoder('aProSys', () => encodeSimpleAmigaStubCell);
 registerPatternEncoder('artAndMagic', () => encodeSimpleAmigaStubCell);
-
-// ─── Instrument Layout Registration ──────────────────────────────────────────
-for (const fmt of ['sonicArrangerSas', 'soundFactoryStub', 'leggless', 'mikeDavies', 'markII', 'aProSys', 'artAndMagic']) {
-  registerGenericInstrumentLayout(fmt, { kind: 'stub' });
-}

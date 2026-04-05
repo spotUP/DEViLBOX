@@ -12,7 +12,6 @@
 
 import type { TrackerCell } from '@/types';
 import { registerPatternEncoder } from '../UADEPatternEncoder';
-import { registerGenericInstrumentLayout } from '../GenericInstrumentLayoutFactory';
 
 function encodeSoundMonCell(cell: TrackerCell): Uint8Array {
   const out = new Uint8Array(3);
@@ -40,6 +39,3 @@ function encodeSoundMonCell(cell: TrackerCell): Uint8Array {
 registerPatternEncoder('soundMon', () => encodeSoundMonCell);
 
 export { encodeSoundMonCell };
-
-// ─── Instrument Layout Registration ──────────────────────────────────────────
-registerGenericInstrumentLayout('soundMon', { kind: 'stub' });

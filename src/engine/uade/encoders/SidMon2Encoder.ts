@@ -26,7 +26,6 @@
 import type { TrackerCell } from '@/types';
 import type { VariableLengthEncoder } from '../UADEPatternEncoder';
 import { registerVariableEncoder } from '../UADEPatternEncoder';
-import { registerGenericInstrumentLayout } from '../GenericInstrumentLayoutFactory';
 
 /** Convert XM note (1-96) back to SidMon2 note index (1-72). */
 function xmNoteToS2(xmNote: number): number {
@@ -130,6 +129,3 @@ export const sidMon2Encoder: VariableLengthEncoder = {
 };
 
 registerVariableEncoder(sidMon2Encoder);
-
-// ─── Instrument Layout Registration ──────────────────────────────────────────
-registerGenericInstrumentLayout('sidMon2', { kind: 'stub' });

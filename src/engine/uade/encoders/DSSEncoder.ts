@@ -16,7 +16,6 @@
 
 import type { TrackerCell } from '@/types';
 import { registerPatternEncoder } from '../UADEPatternEncoder';
-import { registerGenericInstrumentLayout } from '../GenericInstrumentLayoutFactory';
 
 // DSS period table (finetune 0) — 48 entries covering 4 octaves
 // Index 0 = lowest pitch (highest period), corresponds to XM note 37 (C-3)
@@ -87,6 +86,3 @@ function encodeDSSCell(cell: TrackerCell): Uint8Array {
 registerPatternEncoder('dss', () => encodeDSSCell);
 
 export { encodeDSSCell };
-
-// ─── Instrument Layout Registration ──────────────────────────────────────────
-registerGenericInstrumentLayout('dss', { kind: 'stub' });

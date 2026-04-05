@@ -28,7 +28,6 @@
 import type { TrackerCell } from '@/types';
 import type { VariableLengthEncoder } from '../UADEPatternEncoder';
 import { registerVariableEncoder } from '../UADEPatternEncoder';
-import { registerGenericInstrumentLayout } from '../GenericInstrumentLayoutFactory';
 
 const XM_REFERENCE_NOTE = 13;
 const MA_REFERENCE_IDX = 12;
@@ -108,6 +107,3 @@ export const musicAssemblerEncoder: VariableLengthEncoder = {
 };
 
 registerVariableEncoder(musicAssemblerEncoder);
-
-// ─── Instrument Layout Registration ──────────────────────────────────────────
-registerGenericInstrumentLayout('musicAssembler', { kind: 'stub' });

@@ -36,7 +36,6 @@
 import type { TrackerCell } from '@/types';
 import type { VariableLengthEncoder } from '../UADEPatternEncoder';
 import { registerVariableEncoder } from '../UADEPatternEncoder';
-import { registerGenericInstrumentLayout } from '../GenericInstrumentLayoutFactory';
 
 const PART_ROWS = 128;
 const PART_ROW_BYTES = 12;
@@ -117,6 +116,3 @@ export const musicLineEncoder: VariableLengthEncoder = {
 };
 
 registerVariableEncoder(musicLineEncoder);
-
-// ─── Instrument Layout Registration ──────────────────────────────────────────
-registerGenericInstrumentLayout('musicLine', { kind: 'stub' });

@@ -19,7 +19,6 @@
 
 import type { TrackerCell } from '@/types';
 import { registerVariableEncoder, type VariableLengthEncoder } from '../UADEPatternEncoder';
-import { registerGenericInstrumentLayout } from '../GenericInstrumentLayoutFactory';
 
 /**
  * Encode a channel's rows back to Sawteeth Part step bytes.
@@ -59,6 +58,3 @@ const sawteethEncoder: VariableLengthEncoder = {
 registerVariableEncoder(sawteethEncoder);
 
 export { encodeSawteethPattern };
-
-// ─── Instrument Layout Registration ──────────────────────────────────────────
-registerGenericInstrumentLayout('sawteeth', { kind: 'stub' });

@@ -16,7 +16,6 @@
 
 import type { TrackerCell } from '@/types';
 import { registerPatternEncoder } from '../UADEPatternEncoder';
-import { registerGenericInstrumentLayout } from '../GenericInstrumentLayoutFactory';
 
 // Standard ProTracker period table (finetune 0), 36 entries: C-1 to B-3
 const MOD_PERIODS = [
@@ -56,6 +55,3 @@ export function encodeEarAcheCell(cell: TrackerCell): Uint8Array {
 }
 
 registerPatternEncoder('earAche', () => encodeEarAcheCell);
-
-// ─── Instrument Layout Registration ──────────────────────────────────────────
-registerGenericInstrumentLayout('earAche', { kind: 'stub' });

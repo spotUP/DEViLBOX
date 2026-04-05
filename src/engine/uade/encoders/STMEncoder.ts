@@ -32,7 +32,6 @@
 
 import type { TrackerCell } from '@/types';
 import { registerPatternEncoder } from '../UADEPatternEncoder';
-import { registerGenericInstrumentLayout } from '../GenericInstrumentLayoutFactory';
 
 const XM_NOTE_CUT = 97;
 
@@ -104,6 +103,3 @@ function encodeSTMCell(cell: TrackerCell): Uint8Array {
 registerPatternEncoder('stm', () => encodeSTMCell);
 
 export { encodeSTMCell };
-
-// ─── Instrument Layout Registration ──────────────────────────────────────────
-registerGenericInstrumentLayout('stm', { kind: 'stub' });

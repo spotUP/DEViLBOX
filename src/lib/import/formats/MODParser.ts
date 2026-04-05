@@ -14,7 +14,6 @@ import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
 import type { Pattern, ChannelData, TrackerCell } from '@/types';
 import type { InstrumentConfig } from '@/types/instrument';
 import type { UADEPatternLayout } from '@/engine/uade/UADEPatternEncoder';
-import { getInstrumentLayout } from '@/engine/uade/UADEInstrumentLayout';
 import { convertToInstrument } from '../InstrumentConverter';
 import { encodeMODCell } from '@/engine/uade/encoders/MODEncoder';
 
@@ -613,6 +612,5 @@ export async function parseMODFile(buffer: ArrayBuffer, filename: string): Promi
     initialBPM,
     linearPeriods:   false, // MOD always uses Amiga periods
     uadePatternLayout,
-    uadeInstrumentLayout: getInstrumentLayout('mod'),
   };
 }

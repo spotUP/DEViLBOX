@@ -24,7 +24,6 @@
 
 import type { TrackerCell } from '@/types';
 import { registerPatternEncoder } from '../UADEPatternEncoder';
-import { registerGenericInstrumentLayout } from '../GenericInstrumentLayoutFactory';
 
 const NOTE_KEYOFF = 121;
 
@@ -92,6 +91,3 @@ function encodeMT2Cell(cell: TrackerCell): Uint8Array {
 registerPatternEncoder('mt2', () => encodeMT2Cell);
 
 export { encodeMT2Cell };
-
-// ─── Instrument Layout Registration ──────────────────────────────────────────
-registerGenericInstrumentLayout('mt2', { kind: 'stub' });

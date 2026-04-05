@@ -20,7 +20,6 @@
 
 import type { TrackerCell } from '@/types';
 import { registerPatternEncoder } from '../UADEPatternEncoder';
-import { registerGenericInstrumentLayout } from '../GenericInstrumentLayoutFactory';
 
 export function encodeSoundFactoryCell(cell: TrackerCell): Uint8Array {
   const out = new Uint8Array(3);
@@ -48,6 +47,3 @@ export function encodeSoundFactoryCell(cell: TrackerCell): Uint8Array {
 }
 
 registerPatternEncoder('soundFactory', () => encodeSoundFactoryCell);
-
-// ─── Instrument Layout Registration ──────────────────────────────────────────
-registerGenericInstrumentLayout('soundFactory', { kind: 'stub' });

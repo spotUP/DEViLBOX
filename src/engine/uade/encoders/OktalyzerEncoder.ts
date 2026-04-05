@@ -22,7 +22,6 @@
 
 import type { TrackerCell } from '@/types';
 import { registerPatternEncoder } from '../UADEPatternEncoder';
-import { registerGenericInstrumentLayout } from '../GenericInstrumentLayoutFactory';
 
 function reverseOKTEffect(effTyp: number, eff: number): { cmd: number; data: number } {
   if (effTyp === 0 && eff === 0) return { cmd: 0, data: 0 };
@@ -68,6 +67,3 @@ function encodeOktalyzerCell(cell: TrackerCell): Uint8Array {
 registerPatternEncoder('oktalyzer', () => encodeOktalyzerCell);
 
 export { encodeOktalyzerCell };
-
-// ─── Instrument Layout Registration ──────────────────────────────────────────
-registerGenericInstrumentLayout('oktalyzer', { kind: 'protracker' });

@@ -23,7 +23,6 @@
 
 import type { TrackerCell } from '@/types';
 import { registerVariableEncoder, type VariableLengthEncoder } from '../UADEPatternEncoder';
-import { registerGenericInstrumentLayout } from '../GenericInstrumentLayoutFactory';
 
 /**
  * Encode a channel's rows back to FP byte stream.
@@ -92,6 +91,3 @@ const futurePlayerEncoder: VariableLengthEncoder = {
 registerVariableEncoder(futurePlayerEncoder);
 
 export { encodeFuturePlayerPattern };
-
-// ─── Instrument Layout Registration ──────────────────────────────────────────
-registerGenericInstrumentLayout('futurePlayer', { kind: 'stub' });

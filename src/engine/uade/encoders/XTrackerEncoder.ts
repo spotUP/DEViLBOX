@@ -17,7 +17,6 @@
 import type { TrackerCell } from '@/types';
 import type { VariableLengthEncoder } from '../UADEPatternEncoder';
 import { registerVariableEncoder } from '../UADEPatternEncoder';
-import { registerGenericInstrumentLayout } from '../GenericInstrumentLayoutFactory';
 
 // DMF note effect commands (InsEff / NoteEff / VolEff)
 // These are simplified reverse mappings from XM effects
@@ -100,6 +99,3 @@ const xTrackerEncoder: VariableLengthEncoder = {
 registerVariableEncoder(xTrackerEncoder);
 
 export { xTrackerEncoder, encodeDMFChannel };
-
-// ─── Instrument Layout Registration ──────────────────────────────────────────
-registerGenericInstrumentLayout('dmf', { kind: 'stub' });

@@ -20,7 +20,6 @@
 
 import type { TrackerCell } from '@/types';
 import { registerPatternEncoder } from '../UADEPatternEncoder';
-import { registerGenericInstrumentLayout } from '../GenericInstrumentLayoutFactory';
 
 export function encodeTCBTrackerCell(cell: TrackerCell): Uint8Array {
   const out = new Uint8Array(2);
@@ -57,6 +56,3 @@ export function encodeTCBTrackerCell(cell: TrackerCell): Uint8Array {
 }
 
 registerPatternEncoder('tcbTracker', () => encodeTCBTrackerCell);
-
-// ─── Instrument Layout Registration ──────────────────────────────────────────
-registerGenericInstrumentLayout('tcbTracker', { kind: 'protracker' });

@@ -40,7 +40,6 @@
 import type { TrackerCell } from '@/types';
 import type { VariableLengthEncoder } from '../UADEPatternEncoder';
 import { registerVariableEncoder } from '../UADEPatternEncoder';
-import { registerGenericInstrumentLayout } from '../GenericInstrumentLayoutFactory';
 
 const KM_NOTE_OFFSET = 36; // XM note = kmNote + 36
 
@@ -141,6 +140,3 @@ export const karlMortonEncoder: VariableLengthEncoder = {
 };
 
 registerVariableEncoder(karlMortonEncoder);
-
-// ─── Instrument Layout Registration ──────────────────────────────────────────
-registerGenericInstrumentLayout('karlMorton', { kind: 'stub' });

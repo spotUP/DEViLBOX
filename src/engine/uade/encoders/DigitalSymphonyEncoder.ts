@@ -23,7 +23,6 @@
 import type { TrackerCell } from '@/types';
 import type { VariableLengthEncoder } from '../UADEPatternEncoder';
 import { registerVariableEncoder } from '../UADEPatternEncoder';
-import { registerGenericInstrumentLayout } from '../GenericInstrumentLayoutFactory';
 
 /**
  * Reverse-map XM effects back to DSym command + param.
@@ -176,6 +175,3 @@ export const digitalSymphonyEncoder: VariableLengthEncoder = {
 };
 
 registerVariableEncoder(digitalSymphonyEncoder);
-
-// ─── Instrument Layout Registration ──────────────────────────────────────────
-registerGenericInstrumentLayout('digitalSymphony', { kind: 'stub' });
