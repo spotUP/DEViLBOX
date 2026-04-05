@@ -330,18 +330,13 @@ export const SampleEditor: React.FC<SampleEditorProps> = ({ instrument, onChange
   }, [loopEnabled, loopStart, loopEnd, loopType, audioBuffer, instrument.id, instrument.sample, updateInstrument]);
 
   // ─── Scan current pattern for 9xx offset markers ─────────────────
+  // Subscribe to pattern data so we re-scan when cells change
+  const currentPattern = useTrackerStore((s) => s.patterns[s.currentPatternIndex]);
   const offsetMarkers = useMemo(() => {
-    const patterns = useTrackerStore.getState().patterns;
-    const patIdx = useTrackerStore.getState().currentPatternIndex;
-    const pattern = patterns[patIdx];
-    if (!pattern || !audioBuffer) return undefined;
-    // Find the index of this instrument in the instruments array
-    const instruments = useInstrumentStore.getState().instruments;
-    const instIdx = instruments.indexOf(instrument);
-    if (instIdx < 0) return undefined;
-    const offsets = scan9xxOffsets(pattern, instIdx + 1); // 1-indexed in pattern data
+    if (!currentPattern || !audioBuffer || !instrument.id) return undefined;
+    const offsets = scan9xxOffsets(currentPattern, instrument.id);
     return offsets.length > 0 ? offsets : undefined;
-  }, [instrument, audioBuffer]);
+  }, [currentPattern, audioBuffer, instrument.id]);
 
   // ─── Load audio buffer when URL changes ──────────────────────────
   useEffect(() => {

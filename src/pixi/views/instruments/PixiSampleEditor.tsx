@@ -89,17 +89,12 @@ export const PixiSampleEditor: React.FC<PixiSampleEditorProps> = ({
   const loopType: LoopType = (params.loopType as LoopType) ?? 'forward';
 
   // Scan current pattern for 9xx offsets referencing this instrument
+  const currentPattern = useTrackerStore((s) => s.patterns[s.currentPatternIndex]);
   const offsetMarkers = useMemo(() => {
-    const patterns = useTrackerStore.getState().patterns;
-    const patIdx = useTrackerStore.getState().currentPatternIndex;
-    const pattern = patterns[patIdx];
-    if (!pattern || !audioBuffer) return undefined;
-    const instruments = useInstrumentStore.getState().instruments;
-    const instIdx = instruments.indexOf(instrument);
-    if (instIdx < 0) return undefined;
-    const offsets = scan9xxOffsets(pattern, instIdx + 1);
+    if (!currentPattern || !audioBuffer || !instrument.id) return undefined;
+    const offsets = scan9xxOffsets(currentPattern, instrument.id);
     return offsets.length > 0 ? offsets : undefined;
-  }, [instrument, audioBuffer]);
+  }, [currentPattern, audioBuffer, instrument.id]);
 
   // ── Dragging ────────────────────────────────────────────────────────
   const [dragTarget, setDragTarget] = useState<'loopStart' | 'loopEnd' | null>(null);
