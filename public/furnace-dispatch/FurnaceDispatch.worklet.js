@@ -1000,7 +1000,36 @@ class FurnaceDispatchProcessor extends AudioWorkletProcessor {
         this.tickAccumulator -= this.samplesPerTick;
       }
 
-      // Render each chip and mix into output
+      // Drain command log periodically and post to main thread
+      if (this._cmdLogEnabled && this.wasm.cmdLogCount) {
+        this._cmdLogPollCounter++;
+        if (this._cmdLogPollCounter >= 10) {
+          this._cmdLogPollCounter = 0;
+          const count = this.wasm.cmdLogCount();
+          if (count > 0) {
+            const ptr = this.wasm.cmdLogGet();
+            const heapBuf = this.getHeapBuffer();
+            if (heapBuf) {
+              const heap32 = new Int32Array(heapBuf);
+              const entries = [];
+              for (let i = 0; i < count; i++) {
+                const base = ptr / 4 + i * 6;
+                entries.push({
+                  tick: heap32[base],
+                  cmd: heap32[base + 1],
+                  channel: heap32[base + 2],
+                  value1: heap32[base + 3],
+                  value2: heap32[base + 4],
+                });
+              }
+              this.port.postMessage({ type: 'cmdLog', entries });
+            }
+            this.module._free(ptr);
+          }
+        }
+      }
+
+      // Render each chip and mix into output with postAmp scaling
       for (const chip of this.chips.values()) {
         try {
           this.wasm.render(chip.handle, this.outputPtrL, this.outputPtrR, numSamples);
@@ -1011,32 +1040,28 @@ class FurnaceDispatchProcessor extends AudioWorkletProcessor {
             outputL[i] += this.outputBufferL[i] * amp;
             outputR[i] += this.outputBufferR[i] * amp;
           }
-
-      // Drain command log periodically
-      if (this._cmdLogEnabled && this.wasm.cmdLogCount) {
-        this._cmdLogPollCounter++;
-        if (this._cmdLogPollCounter >= 10) {
-          this._cmdLogPollCounter = 0;
-          const count = this.wasm.cmdLogCount();
-          if (count > 0) {
-            const ptr = this.wasm.cmdLogGet();
-            const entries = [];
-            for (let i = 0; i < count; i++) {
-              const base = ptr / 4 + i * 6;
-              entries.push({
-                tick: this.module.HEAP32[base],
-                cmd: this.module.HEAP32[base + 1],
-                channel: this.module.HEAP32[base + 2],
-                value1: this.module.HEAP32[base + 3],
-                value2: this.module.HEAP32[base + 4],
-              });
-            }
-            this.module._free(ptr);
-            this.port.postMessage({ type: 'cmdLog', entries });
+        } catch (chipErr) {
+          if (!this._badChips) this._badChips = new Set();
+          if (!this._badChips.has(chip.platformType)) {
+            this._badChips.add(chip.platformType);
+            const msg = `WASM render error for platform ${chip.platformType}: ${chipErr.message || chipErr}`;
+            this.port.postMessage({ type: 'error', message: msg });
           }
         }
       }
 
+
+    } catch (e) {
+      if (!this._errorReported) {
+        this._errorReported = true;
+        const msg = `WASM error in process (chips=${this.chips.size}): ${e.message || e}`;
+        this.port.postMessage({ type: 'error', message: msg });
+        console.error('[FurnaceDispatch Worklet]', msg);
+      }
+    }
+
+    // Non-audio-critical: oscilloscope + position reporting (isolated from render)
+    try {
       // Periodically send oscilloscope data (~30fps)
       this.oscSendCounter++;
       if (this.oscSendCounter >= this.oscSendInterval) {
@@ -1058,11 +1083,10 @@ class FurnaceDispatchProcessor extends AudioWorkletProcessor {
         }
       }
     } catch (e) {
-      if (!this._errorReported) {
-        this._errorReported = true;
-        const msg = `WASM error in process (chips=${this.chips.size}): ${e.message || e}`;
-        this.port.postMessage({ type: 'error', message: msg });
-        console.error('[FurnaceDispatch Worklet]', msg);
+      // Non-critical — don't kill audio over oscilloscope/position errors
+      if (!this._nonAudioErrLogged) {
+        this._nonAudioErrLogged = true;
+        console.warn('[FurnaceDispatch Worklet] Non-audio error:', e.message || e);
       }
     }
 
