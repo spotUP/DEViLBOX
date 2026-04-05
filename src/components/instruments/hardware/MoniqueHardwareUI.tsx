@@ -231,23 +231,36 @@ export const MoniqueHardwareUI: React.FC<MoniqueHardwareUIProps> = (props) => {
         };
 
         // Parameter change callback: UI knob changes → real audio engine
-        // The C++ bridge polls synth_data fields in MoniqueParams enum order,
-        // so the index matches the audio WASM's setParam directly.
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (window as any)._moniqueUIParamCallback = (index: number, value: number) => {
-          console.log(`[MoniqueHW] param ${index} = ${value}, instrumentId=${instrumentIdRef.current}`);
-          if (!instrumentIdRef.current) return;
+        // Batch param changes per frame to avoid flooding the audio worklet.
+        // C++ bridge fires multiple callbacks per tick — collect and flush once per rAF.
+        const pendingParams: Map<number, number> = new Map();
+        let paramFlushScheduled = false;
+
+        const flushParams = () => {
+          paramFlushScheduled = false;
+          if (pendingParams.size === 0 || !instrumentIdRef.current) return;
           try {
             const engine = getToneEngine();
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             const instruments = (engine as any).instruments as Map<number, any>;
             const key = (instrumentIdRef.current << 16) | 0xFFFF;
             const synth = instruments?.get(key);
-            console.log(`[MoniqueHW] synth found:`, !!synth, 'worklet:', !!synth?._worklet);
             if (synth?._worklet) {
-              synth._worklet.port.postMessage({ type: 'setParam', index, value });
+              for (const [idx, val] of pendingParams) {
+                synth._worklet.port.postMessage({ type: 'setParam', index: idx, value: val });
+              }
             }
-          } catch (e) { console.error('[MoniqueHW] error:', e); }
+          } catch { /* engine not ready */ }
+          pendingParams.clear();
+        };
+
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (window as any)._moniqueUIParamCallback = (index: number, value: number) => {
+          pendingParams.set(index, value);
+          if (!paramFlushScheduled) {
+            paramFlushScheduled = true;
+            requestAnimationFrame(flushParams);
+          }
         };
 
         eventCleanups.push(() => {

@@ -251,16 +251,32 @@ void monique_ui_tick()
     if (g_processor->ui_refresher)
         g_processor->ui_refresher->timerCallback();
 
-    // Poll synth_data parameters and forward changes to audio engine
-    for (int i = 0; i < AUDIO_PARAM_COUNT; i++) {
-        if (!g_audioParams[i]) continue;
-        float val = g_audioParams[i]->get_value();
-        if (val != g_audioSnapshot[i]) {
-            g_audioSnapshot[i] = val;
+    // Poll synth_data parameters and forward changes to audio engine.
+    // Use tolerance to avoid flooding from smoother micro-changes.
+    // Batch all changes into a single JS call to reduce postMessage overhead.
+    {
+        static int changedIndices[AUDIO_PARAM_COUNT];
+        static float changedValues[AUDIO_PARAM_COUNT];
+        int numChanged = 0;
+
+        for (int i = 0; i < AUDIO_PARAM_COUNT; i++) {
+            if (!g_audioParams[i]) continue;
+            float val = g_audioParams[i]->get_value();
+            float diff = val - g_audioSnapshot[i];
+            if (diff > 0.001f || diff < -0.001f) {
+                g_audioSnapshot[i] = val;
+                changedIndices[numChanged] = i;
+                changedValues[numChanged] = val;
+                numChanged++;
+            }
+        }
+
+        // Send changes one at a time (EM_ASM doesn't support arrays easily)
+        for (int j = 0; j < numChanged; j++) {
             EM_ASM({
                 if (window._moniqueUIParamCallback)
                     window._moniqueUIParamCallback($0, $1);
-            }, i, val);
+            }, changedIndices[j], changedValues[j]);
         }
     }
 
