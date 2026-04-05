@@ -159,6 +159,7 @@ export class UADEEngine {
   // Pending readMemory requests: Map<requestId, {resolve, reject}>
   private _readMemoryPending = new Map<number, { resolve: (v: Uint8Array) => void; reject: (e: Error) => void }>();
   private _readMemoryNextId = 0;
+  private lastPosition: { order: number; row: number; tick: number } = { order: 0, row: 0, tick: 0 };
   // Pending writeMemory requests: Map<requestId, {resolve, reject}>
   private _writeMemoryPending = new Map<number, { resolve: () => void; reject: (e: Error) => void }>();
   private _writeMemoryNextId = 0;
@@ -321,6 +322,7 @@ export class UADEEngine {
           break;
 
         case 'position':
+          this.lastPosition = { order: data.position ?? 0, row: 0, tick: data.tickCount ?? 0 };
           for (const cb of this._positionCallbacks) {
             cb({
               subsong: data.subsong ?? 0,
@@ -640,6 +642,20 @@ export class UADEEngine {
   onPositionUpdate(cb: PositionCallback): () => void {
     this._positionCallbacks.add(cb);
     return () => this._positionCallbacks.delete(cb);
+  }
+
+  /** Get the last reported playback position (order, row, tick) */
+  getCurrentPosition(): { order: number; row: number; tick: number } {
+    return { ...this.lastPosition };
+  }
+
+  /**
+   * Load a module binary and start playback.
+   * Used by the instrument rebuild+reload path.
+   */
+  async loadAndPlay(data: ArrayBuffer, filenameHint: string): Promise<void> {
+    await this.load(data, filenameHint, true /* skipScan */);
+    this.play();
   }
 
   /** Subscribe to live Paula channel data (~20Hz). Returns unsubscribe function. */
