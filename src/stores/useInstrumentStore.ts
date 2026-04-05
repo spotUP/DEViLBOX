@@ -821,14 +821,6 @@ export const useInstrumentStore = create<InstrumentStore>()(
             const { getTrackerReplayer } = require('@engine/TrackerReplayer');
             getTrackerReplayer().updateInstrument(updatedConfig);
           } catch { /* replayer not initialized yet */ }
-
-          // Sync Furnace instrument changes to running WASM sequencer
-          if (updatedConfig.furnace) {
-            try {
-              const { syncInstrumentToWasm } = require('@engine/furnace-dispatch/FurnaceInstrumentSync');
-              syncInstrumentToWasm(id - 1, updatedConfig); // Furnace uses 0-based indices
-            } catch { /* Furnace engine not active */ }
-          }
         }
       }
     },
