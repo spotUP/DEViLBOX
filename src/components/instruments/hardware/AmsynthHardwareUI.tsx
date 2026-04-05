@@ -181,20 +181,29 @@ export const AmsynthHardwareUI: React.FC<AmsynthHardwareUIProps> = ({
         if (!ctx) return;
         const imgData = ctx.createImageData(w, h);
 
-        // Mouse event handlers
+        // Mouse event handlers — track drag state to prevent parent scroll
+        let isDragging = false;
+
         const onMouseDown = (e: MouseEvent) => {
           e.preventDefault();
+          e.stopPropagation();
+          isDragging = true;
           canvas.focus();
           const [cx, cy] = canvasCoords(canvas, e);
           m._amsynth_ui_on_mouse_down(cx, cy, getModifiers(e));
         };
 
         const onMouseUp = (e: MouseEvent) => {
+          isDragging = false;
           const [cx, cy] = canvasCoords(canvas, e);
           m._amsynth_ui_on_mouse_up(cx, cy, getModifiers(e));
         };
 
         const onMouseMove = (e: MouseEvent) => {
+          if (isDragging) {
+            e.preventDefault();
+            e.stopPropagation();
+          }
           const [cx, cy] = canvasCoords(canvas, e);
           m._amsynth_ui_on_mouse_move(cx, cy, getModifiers(e));
         };
@@ -291,8 +300,10 @@ export const AmsynthHardwareUI: React.FC<AmsynthHardwareUIProps> = ({
         justifyContent: 'center',
         background: '#1a1a1a',
         width: '100%',
-        height: '100%',
-        overflow: 'hidden',
+        flex: 1,
+        minHeight: 0,
+        overflow: 'auto',
+        position: 'relative',
       }}
     >
       {!loaded && (
@@ -306,6 +317,8 @@ export const AmsynthHardwareUI: React.FC<AmsynthHardwareUIProps> = ({
         style={{
           display: loaded ? 'block' : 'none',
           cursor: 'default',
+          touchAction: 'none',
+          userSelect: 'none',
         }}
       />
     </div>

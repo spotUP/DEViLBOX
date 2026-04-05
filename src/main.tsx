@@ -11,6 +11,12 @@ import { ResponsiveProvider } from './contexts/ResponsiveContext.tsx'
 // Enable Immer support for Map and Set (required for stores using these)
 enableMapSet();
 
+// Auto-blur <select> elements after change so keyboard focus returns to the app.
+// Without this, dropdown selections steal focus and swallow tracker keypresses.
+document.addEventListener('change', (e) => {
+  if (e.target instanceof HTMLSelectElement) e.target.blur();
+}, true);
+
 // Register synth descriptors with SynthRegistry
 // Built-in synths (Tone.js, Sampler, TB-303, Furnace) — eager registration
 import './engine/registry/builtin'
