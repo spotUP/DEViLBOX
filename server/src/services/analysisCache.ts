@@ -122,39 +122,48 @@ function unpackFrequencyPeaks(buf: Buffer): number[][] {
   return result;
 }
 
-// ── Database operations ─────────────────────────────────────────────────────
+// ── Database operations (lazy-init to avoid crash before initDatabase()) ─────
 
-const lookupStmt = db.prepare('SELECT * FROM song_analysis WHERE hash = ?');
+let lookupStmt: ReturnType<typeof db.prepare>;
+let insertStmt: ReturnType<typeof db.prepare>;
+let countStmt: ReturnType<typeof db.prepare>;
+let sizeStmt: ReturnType<typeof db.prepare>;
+let _stmtsReady = false;
 
-const insertStmt = db.prepare(`
-  INSERT OR REPLACE INTO song_analysis (
-    hash, bpm, bpm_confidence, time_signature,
-    musical_key, key_confidence, rms_db, peak_db,
-    genre_primary, genre_subgenre, genre_confidence,
-    mood, energy, danceability, duration,
-    beats, downbeats, waveform_peaks, frequency_peaks,
-    analysis_version, created_at
-  ) VALUES (
-    @hash, @bpm, @bpm_confidence, @time_signature,
-    @musical_key, @key_confidence, @rms_db, @peak_db,
-    @genre_primary, @genre_subgenre, @genre_confidence,
-    @mood, @energy, @danceability, @duration,
-    @beats, @downbeats, @waveform_peaks, @frequency_peaks,
-    @analysis_version, @created_at
-  )
-`);
-
-const countStmt = db.prepare('SELECT COUNT(*) as count FROM song_analysis');
-const sizeStmt = db.prepare(`
-  SELECT SUM(LENGTH(beats) + LENGTH(downbeats) + LENGTH(waveform_peaks) + LENGTH(frequency_peaks)) as bytes
-  FROM song_analysis
-`);
+function ensureStatements() {
+  if (_stmtsReady) return;
+  lookupStmt = db.prepare('SELECT * FROM song_analysis WHERE hash = ?');
+  insertStmt = db.prepare(`
+    INSERT OR REPLACE INTO song_analysis (
+      hash, bpm, bpm_confidence, time_signature,
+      musical_key, key_confidence, rms_db, peak_db,
+      genre_primary, genre_subgenre, genre_confidence,
+      mood, energy, danceability, duration,
+      beats, downbeats, waveform_peaks, frequency_peaks,
+      analysis_version, created_at
+    ) VALUES (
+      @hash, @bpm, @bpm_confidence, @time_signature,
+      @musical_key, @key_confidence, @rms_db, @peak_db,
+      @genre_primary, @genre_subgenre, @genre_confidence,
+      @mood, @energy, @danceability, @duration,
+      @beats, @downbeats, @waveform_peaks, @frequency_peaks,
+      @analysis_version, @created_at
+    )
+  `);
+  countStmt = db.prepare('SELECT COUNT(*) as count FROM song_analysis');
+  sizeStmt = db.prepare(`
+    SELECT SUM(LENGTH(beats) + LENGTH(downbeats) + LENGTH(waveform_peaks) + LENGTH(frequency_peaks)) as bytes
+    FROM song_analysis
+  `);
+  _stmtsReady = true;
+}
 
 /**
  * Look up cached analysis by SHA-256 hash.
  * Returns null if not found.
  */
 export function lookupAnalysis(hash: string): SongAnalysis | null {
+  ensureStatements();
   const row = lookupStmt.get(hash) as Record<string, unknown> | undefined;
   if (!row) return null;
 
@@ -186,6 +195,7 @@ export function lookupAnalysis(hash: string): SongAnalysis | null {
  * Store analysis results for a file hash.
  */
 export function storeAnalysis(data: SongAnalysis): void {
+  ensureStatements();
   insertStmt.run({
     hash: data.hash,
     bpm: data.bpm,
@@ -215,6 +225,7 @@ export function storeAnalysis(data: SongAnalysis): void {
  * Cache statistics.
  */
 export function getAnalysisCacheStats(): { count: number; sizeBytes: number } {
+  ensureStatements();
   const count = (countStmt.get() as { count: number }).count;
   const size = (sizeStmt.get() as { bytes: number | null }).bytes || 0;
   return { count, sizeBytes: size };
