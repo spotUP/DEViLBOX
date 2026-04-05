@@ -11,6 +11,7 @@ class StartrekkerAMProcessor extends AudioWorkletProcessor {
         this._ready     = false;
         this._outPtr    = 0;
         this._FRAMES    = 128;
+        this.muteMask   = 0xFFFFFFFF;
 
         this.port.onmessage = (e) => this._handleMessage(e.data);
     }
@@ -80,6 +81,9 @@ class StartrekkerAMProcessor extends AudioWorkletProcessor {
             if (this._wasm && this._wasm._player_set_pattern_cell) {
                 this._wasm._player_set_pattern_cell(msg.pattern, msg.row, msg.channel, msg.b0, msg.b1, msg.b2, msg.b3);
             }
+            break;
+        case 'setMuteMask':
+            this.muteMask = msg.mask;
             break;
         default:
             break;

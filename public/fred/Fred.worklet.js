@@ -23,6 +23,7 @@ class FredProcessor extends AudioWorkletProcessor {
     this._module   = null;
     this._players  = new Map();   // handle → { ctx: ptr, outPtrL, outPtrR }
     this._ready    = false;
+    this.muteMask  = 0xFFFFFFFF;
     this._initQueue = [];
 
     this.port.onmessage = (event) => this._onMessage(event.data);
@@ -58,6 +59,9 @@ class FredProcessor extends AudioWorkletProcessor {
       case 'setParam':
         if (!this._ready) break;
         this._module._fred_set_param(data.handle, data.paramId, data.value);
+        break;
+      case 'setMuteMask':
+        this.muteMask = data.mask;
         break;
       case 'dispose':
         if (this._module) this._module._fred_dispose();
@@ -147,6 +151,7 @@ class FredProcessor extends AudioWorkletProcessor {
     const mixR = new Float32Array(frames);
 
     for (const [handle, p] of this._players) {
+      if (!(this.muteMask & (1 << handle))) continue;
       m._fred_render(handle, p.outPtrL, p.outPtrR, frames);
 
       const srcL = m.HEAPF32.subarray(p.outPtrL >> 2, (p.outPtrL >> 2) + frames);

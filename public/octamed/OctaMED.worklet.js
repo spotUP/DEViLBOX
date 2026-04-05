@@ -11,6 +11,7 @@ class OctaMEDProcessor extends AudioWorkletProcessor {
     this.wasm = null;
     this.initialized = false;
     this.playerOutPtrs = {};
+    this.muteMask = 0xFFFFFFFF;
 
     this.port.onmessage = (event) => {
       this.handleMessage(event.data);
@@ -70,6 +71,10 @@ class OctaMEDProcessor extends AudioWorkletProcessor {
         if (this.wasm) {
           this.wasm._octamed_player_note_off(data.handle);
         }
+        break;
+
+      case 'setMuteMask':
+        this.muteMask = data.mask;
         break;
 
       case 'dispose':
@@ -163,6 +168,7 @@ class OctaMEDProcessor extends AudioWorkletProcessor {
       const heapF32 = this.wasm.HEAPF32;
       for (const h of Object.keys(this.playerOutPtrs)) {
         const hi = parseInt(h);
+        if (!(this.muteMask & (1 << hi))) continue;
         const ptrs = this.playerOutPtrs[hi];
         if (!ptrs) continue;
 
