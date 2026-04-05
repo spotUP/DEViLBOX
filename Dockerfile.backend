@@ -21,8 +21,9 @@ RUN npm install typescript tsx --save-dev && \
     npm run build && \
     npm prune --production
 
-# Create data directory
+# Create data directory and seed with demo content
 RUN mkdir -p /data/public/songs /data/public/instruments /data/users
+COPY server/data/public/ /data/public/
 
 # Set permissions
 RUN chown -R node:node /app /data
