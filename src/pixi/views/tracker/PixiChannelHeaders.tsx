@@ -26,6 +26,8 @@ import { useTrackerStore } from '@stores/useTrackerStore';
 import { useFormatStore } from '@stores/useFormatStore';
 import { useAutomationStore } from '@stores/useAutomationStore';
 import { getParamsForFormat, groupParams, type AutomationFormat } from '@/engine/automation/AutomationParams';
+import { getNKSParametersForSynth } from '@/midi/performance/synthParameterMaps';
+import type { SynthType } from '@typedefs/instrument';
 import { GENERATORS, type GeneratorType } from '@utils/patternGenerators';
 import type { ChannelData } from '@typedefs/tracker';
 import type { ContextMenuItem } from '../../input/PixiContextMenu';
@@ -468,8 +470,30 @@ const PixiChannelHeadersInner: React.FC<PixiChannelHeadersProps> = ({
           }));
         })()},
         { label: 'Delete Channel', action: () => removeChannel(ch), disabled: patterns[0]?.channels.length <= 1 },
-        // Register automation lanes
+        // Automation submenu (NKS synth params + register params)
         ...(() => {
+          const { setActiveParameter, setShowLane, getShowLane, getCurvesForPattern, removeCurve } = useAutomationStore.getState();
+          const showLane = getShowLane(ch);
+
+          // NKS synth params for this channel's instrument
+          const chInst = channel.instrumentId != null ? instruments[channel.instrumentId] : null;
+          const nksItems: ContextMenuItem[] = [];
+          if (chInst) {
+            const nksParams = getNKSParametersForSynth(chInst.synthType as SynthType);
+            const automatable = nksParams.filter((p: any) => p.isAutomatable).slice(0, 8);
+            for (const p of automatable) {
+              nksItems.push({
+                label: p.name,
+                action: () => {
+                  setActiveParameter(ch, p.id);
+                  setShowLane(ch, true);
+                  if (!useUIStore.getState().showAutomationLanes) useUIStore.getState().toggleAutomationLanes();
+                },
+              });
+            }
+          }
+
+          // Register params (SID/Paula/Furnace)
           const { editorMode, furnaceNative } = useFormatStore.getState();
           const fmt: AutomationFormat | null =
             editorMode === 'goattracker' ? 'gtultra' :
@@ -478,27 +502,50 @@ const PixiChannelHeadersInner: React.FC<PixiChannelHeadersProps> = ({
             editorMode === 'klystrack' ? 'klystrack' :
             editorMode === 'sc68' ? 'sc68' :
             editorMode === 'classic' ? 'uade' : null;
-          if (!fmt) return [];
-          const config = fmt === 'furnace' && furnaceNative
-            ? { chipIds: furnaceNative.chipIds, channelCount: furnaceNative.subsongs[furnaceNative.activeSubsong]?.channels.length ?? 4 }
-            : undefined;
-          const params = getParamsForFormat(fmt, config);
-          const groups = groupParams(params);
-          const { setActiveParameter, setShowLane } = useAutomationStore.getState();
+
+          const registerItems: ContextMenuItem[] = [];
+          if (fmt) {
+            const config = fmt === 'furnace' && furnaceNative
+              ? { chipIds: furnaceNative.chipIds, channelCount: furnaceNative.subsongs[furnaceNative.activeSubsong]?.channels.length ?? 4 }
+              : undefined;
+            const params = getParamsForFormat(fmt, config);
+            const groups = groupParams(params);
+            for (const group of groups) {
+              registerItems.push({
+                label: group.label,
+                submenu: group.params.map(p => ({
+                  label: p.label,
+                  action: () => {
+                    setActiveParameter(ch, p.id);
+                    setShowLane(ch, true);
+                    if (!useUIStore.getState().showAutomationLanes) useUIStore.getState().toggleAutomationLanes();
+                  },
+                })),
+              });
+            }
+          }
+
+          // Get curves for clear action
+          const pat = patterns[useTrackerStore.getState().currentPatternIndex];
+          const curves = pat ? getCurvesForPattern(pat.id, ch) : [];
+          const hasCurves = curves.length > 0;
+
+          const submenu: ContextMenuItem[] = [
+            ...nksItems,
+            ...(nksItems.length > 0 && registerItems.length > 0 ? [{ label: '', separator: true }] : []),
+            ...(registerItems.length > 0 ? [{ label: 'Register Params', submenu: registerItems }] : []),
+            { label: '', separator: true },
+            { label: showLane ? 'Hide Lane' : 'Show Lane', action: () => {
+              setShowLane(ch, !showLane);
+              if (!showLane && !useUIStore.getState().showAutomationLanes) useUIStore.getState().toggleAutomationLanes();
+            }},
+            { label: 'Clear All Automation', action: () => { curves.forEach(c => removeCurve(c.id)); }, disabled: !hasCurves },
+          ];
+
+          if (submenu.length === 0) return [];
           return [
             { label: '', separator: true },
-            { label: 'Register Lanes', submenu: groups.map(group => ({
-              label: group.label,
-              submenu: group.params.map(p => ({
-                label: p.label,
-                action: () => {
-                  setActiveParameter(ch, p.id);
-                  setShowLane(ch, true);
-                  const uiState = useUIStore.getState();
-                  if (!uiState.showAutomationLanes) uiState.toggleAutomationLanes();
-                },
-              })),
-            }))},
+            { label: 'Automation', submenu },
           ];
         })(),
       ];
