@@ -23,13 +23,17 @@ export const SynthTypeSelector: React.FC<SynthTypeSelectorProps> = ({ instrument
     if (!searchQuery.trim()) return ALL_SYNTH_TYPES;
 
     const query = searchQuery.toLowerCase();
+    const queryNoSpaces = query.replace(/\s+/g, '');
     return ALL_SYNTH_TYPES.filter((synthType) => {
       const synth = SYNTH_INFO[synthType];
+      const name = synth.name.toLowerCase();
+      const shortName = synth.shortName.toLowerCase();
       return (
-        synth.name.toLowerCase().includes(query) ||
-        synth.shortName.toLowerCase().includes(query) ||
+        name.includes(query) || name.replace(/\s+/g, '').includes(queryNoSpaces) ||
+        shortName.includes(query) || shortName.replace(/\s+/g, '').includes(queryNoSpaces) ||
         synth.description.toLowerCase().includes(query) ||
-        synth.bestFor.some((tag) => tag.toLowerCase().includes(query))
+        synth.bestFor.some((tag) => tag.toLowerCase().includes(query)) ||
+        synthType.toLowerCase().includes(queryNoSpaces)
       );
     });
   }, [searchQuery]);

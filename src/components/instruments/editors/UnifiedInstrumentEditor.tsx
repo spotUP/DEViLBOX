@@ -152,8 +152,13 @@ function getEditorMode(synthType: SynthType): EditorMode {
   // MdaEPiano/JX10/DX10 — fall through to 'layout' mode (knobs via DOMSynthPanel)
   if (synthType === 'DX7') return 'dexed';
   if (synthType === 'Sfizz') return 'sfizz';
-  // ToneAM, Raffo, CalfMono, SetBfree, SynthV1, Monique, VL1, TalNoizeMaker,
-  // Aeolus, FluidSynth, ZynAddSubFX — all fall through to 'layout' mode
+  // Zynthian synths with dedicated editors — must be above SYNTH_REGISTRY catch-all
+  if (synthType === 'Monique') return 'moniqueSynth';
+  if (synthType === 'VL1') return 'vl1Synth';
+  // Amsynth: hardware UI WASM knobs don't respond (C++ rebuild needed), use layout mode
+  // if (synthType === 'Amsynth') return 'amsynth' as EditorMode;
+  // MdaEPiano/JX10/DX10, ToneAM, Raffo, CalfMono, SetBfree, SynthV1,
+  // TalNoizeMaker, Aeolus, FluidSynth, ZynAddSubFX — fall through to 'layout' mode
   if (isHivelyType(synthType)) return 'hively';
   if (isGTUltraType(synthType)) return 'gtultra';
   if (synthType === 'JamCrackerSynth') return 'jamcracker';
