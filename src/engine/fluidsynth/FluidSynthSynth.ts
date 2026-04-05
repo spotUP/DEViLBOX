@@ -239,8 +239,10 @@ export class FluidSynthSynthEngine implements DevilboxSynth {
   private sendConfig(config: FluidSynthConfig): void {
     if (!this._worklet || !this.isInitialized) return;
     for (let i = 0; i < CONFIG_KEYS.length; i++) {
-      const value = config[CONFIG_KEYS[i]];
-      if (value !== undefined) {
+      const key = CONFIG_KEYS[i];
+      const value = config[key];
+      if (value !== undefined && value !== this.config[key]) {
+        this.config[key] = value;
         this._worklet.port.postMessage({ type: 'setParam', index: i, value });
       }
     }
@@ -282,7 +284,16 @@ export class FluidSynthSynthEngine implements DevilboxSynth {
   }
 
   triggerRelease(frequency?: number | string, _time?: number): this {
-    if (!this._worklet || !this.isInitialized) return this;
+    if (!this._worklet || !this.isInitialized) {
+      // Clear pending notes to prevent stuck notes when noteOff arrives before init
+      if (frequency !== undefined) {
+        const note = typeof frequency === 'string' ? noteToMidi(frequency) : Math.round(12 * Math.log2(frequency / 440) + 69);
+        this.pendingNotes = this.pendingNotes.filter(p => p.note !== note);
+      } else {
+        this.pendingNotes = [];
+      }
+      return this;
+    }
     if (frequency !== undefined) {
       const key = typeof frequency === 'string' ? noteToMidi(frequency) : Math.round(12 * Math.log2(frequency / 440) + 69);
       this._worklet.port.postMessage({ type: 'noteOff', channel: 0, key });
@@ -330,8 +341,9 @@ export class FluidSynthSynthImpl extends FluidSynthSynthEngine {
   }
 
   applyConfig(config: Partial<FluidSynthConfig>): void {
+    const prev = (this as any).config as Record<string, number | undefined>;
     for (const [key, value] of Object.entries(config)) {
-      if (typeof value === 'number') {
+      if (typeof value === 'number' && value !== prev[key]) {
         this.set(key, value);
       }
     }

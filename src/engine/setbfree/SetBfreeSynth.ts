@@ -430,7 +430,16 @@ export class SetBfreeSynthEngine implements DevilboxSynth {
   }
 
   triggerRelease(frequency?: number | string, _time?: number): this {
-    if (!this._worklet || !this.isInitialized) return this;
+    if (!this._worklet || !this.isInitialized) {
+      // Clear pending notes to prevent stuck notes when noteOff arrives before init
+      if (frequency !== undefined) {
+        const note = typeof frequency === 'string' ? noteToMidi(frequency) : Math.round(12 * Math.log2(frequency / 440) + 69);
+        this.pendingNotes = this.pendingNotes.filter(p => p.note !== note);
+      } else {
+        this.pendingNotes = [];
+      }
+      return this;
+    }
     if (frequency !== undefined) {
       const note = typeof frequency === 'string' ? noteToMidi(frequency) : Math.round(12 * Math.log2(frequency / 440) + 69);
       this._worklet.port.postMessage({ type: 'noteOff', note });

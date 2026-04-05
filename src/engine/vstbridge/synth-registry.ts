@@ -148,7 +148,7 @@ registerVSTBridge({
     osc1Wave: 5, osc1Octave: 6, osc1FmPower: 7, osc1Sync: 8,
     osc2Wave: 9, osc2Octave: 10, osc2FmPower: 11, osc2Sync: 12,
     osc3Wave: 13, osc3Octave: 14, osc3FmPower: 15, osc3Sync: 16,
-    fmMulti: 17, fmPhase: 18, fmSwing: 19, masterShift: 20,
+    fmFreq: 17, fmShape: 18, fmSwing: 19, masterShift: 20,
     // Filter 1 (21-27)
     filter1Type: 21, filter1Cutoff: 22, filter1Resonance: 23,
     filter1Distortion: 24, filter1Output: 25, filter1Pan: 26, filter1ModMix: 27,
@@ -160,16 +160,16 @@ registerVSTBridge({
     filter3Distortion: 38, filter3Output: 39, filter3Pan: 40, filter3ModMix: 41,
     // Envelope 1 — Filter 1 (42-47)
     env1Attack: 42, env1Decay: 43, env1Sustain: 44,
-    env1Retrigger: 45, env1Release: 46, env1Shape: 47,
+    env1SusTime: 45, env1Release: 46, env1Shape: 47,
     // Envelope 2 — Filter 2 (48-53)
     env2Attack: 48, env2Decay: 49, env2Sustain: 50,
-    env2Retrigger: 51, env2Release: 52, env2Shape: 53,
+    env2SusTime: 51, env2Release: 52, env2Shape: 53,
     // Envelope 3 — Filter 3 (54-59)
     env3Attack: 54, env3Decay: 55, env3Sustain: 56,
-    env3Retrigger: 57, env3Release: 58, env3Shape: 59,
+    env3SusTime: 57, env3Release: 58, env3Shape: 59,
     // Envelope 4 — Main (60-65)
     env4Attack: 60, env4Decay: 61, env4Sustain: 62,
-    env4Retrigger: 63, env4Release: 64, env4Shape: 65,
+    env4SusTime: 63, env4Release: 64, env4Shape: 65,
     // LFOs (66-74)
     lfo1Speed: 66, lfo1Wave: 67, lfo1Phase: 68,
     lfo2Speed: 69, lfo2Wave: 70, lfo2Phase: 71,
