@@ -597,6 +597,22 @@ export const CellContextMenu: React.FC<CellContextMenuProps> = ({
           return name;
         });
 
+        // WASM synths can't be baked (they can't run in OfflineAudioContext)
+        const wasmSynthTypes = new Set([
+          'ZynAddSubFX', 'Monique', 'Amsynth', 'RaffoSynth', 'CalfMono',
+          'SetBfree', 'SynthV1', 'TalNoizeMaker', 'Aeolus', 'FluidSynth', 'Sfizz',
+          'MdaEPiano', 'MdaJX10', 'MdaDX10', 'DX7', 'OPL3', 'OpenWurli', 'VL1',
+          'TB303', 'Buzz3o3', 'DB303', 'V2', 'V2Speech',
+        ]);
+        const isWAMSynth = instConfig.synthType?.startsWith('WAM');
+        const isMAMESynth = instConfig.synthType?.startsWith('MAME');
+        const isFurnaceSynth = instConfig.synthType?.startsWith('Furnace');
+        if (wasmSynthTypes.has(instConfig.synthType || '') || isWAMSynth || isMAMESynth || isFurnaceSynth) {
+          onClose();
+          useUIStore.getState().setStatusMessage(`Cannot bake ${instConfig.synthType} — use a Tone.js synth (FM, AM, Synth)`);
+          return;
+        }
+
         onClose();
         useUIStore.getState().setStatusMessage('Baking chord...');
 
