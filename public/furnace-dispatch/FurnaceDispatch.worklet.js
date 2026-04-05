@@ -1033,6 +1033,9 @@ class FurnaceDispatchProcessor extends AudioWorkletProcessor {
       for (const chip of this.chips.values()) {
         try {
           this.wasm.render(chip.handle, this.outputPtrL, this.outputPtrR, numSamples);
+          // Re-acquire buffer views — WASM heap may have grown during render,
+          // detaching the old Float32Array views and causing distortion/gaps.
+          this.updateBufferViews();
           const amp = POST_AMP[chip.platformType] || 1.0;
           // Mix this chip's output into the main output
           for (let i = 0; i < numSamples; i++) {
