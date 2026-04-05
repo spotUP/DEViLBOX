@@ -18,6 +18,7 @@ class MaProcessor extends AudioWorkletProcessor {
     this.levelsPtr = 0;
     this.processCount = 0;
     this.previewActive = false;
+    this.muteMask = 0xFFFFFFFF;
 
     this.port.onmessage = (event) => {
       this.handleMessage(event.data);
@@ -172,6 +173,10 @@ class MaProcessor extends AudioWorkletProcessor {
             this.port.postMessage({ type: 'save-data', requestId: data.requestId, data: null });
           }
         }
+        break;
+
+      case 'setMuteMask':
+        this.muteMask = data.mask;
         break;
 
       case 'dispose':

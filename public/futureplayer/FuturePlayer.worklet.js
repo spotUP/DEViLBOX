@@ -31,6 +31,7 @@ class FuturePlayerProcessor extends AudioWorkletProcessor {
     this.resamplePos = 0.0;
 
     this.previewActive = false;
+    this.muteMask = 0xFFFFFFFF;
 
     // Channel levels
     this.levelsPtr = 0;
@@ -61,6 +62,9 @@ class FuturePlayerProcessor extends AudioWorkletProcessor {
         if (this.wasm && this.tuneLoaded) {
           this.wasm._fp_wasm_set_subsong(data.subsong);
         }
+        break;
+      case 'setMuteMask':
+        this.muteMask = data.mask;
         break;
       case 'dispose':
         if (this.tuneLoaded && this.wasm) {

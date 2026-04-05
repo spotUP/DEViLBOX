@@ -38,6 +38,7 @@ class JamCrackerProcessor extends AudioWorkletProcessor {
     // Channel levels
     this.levelsPtr = 0;
     this.levelsCounter = 0;
+    this.muteMask = 0xFFFFFFFF;
 
     this.port.onmessage = (event) => this.handleMessage(event.data);
   }
@@ -59,6 +60,9 @@ class JamCrackerProcessor extends AudioWorkletProcessor {
         break;
       case 'pause':
         this.playing = false;
+        break;
+      case 'setMuteMask':
+        this.muteMask = data.mask;
         break;
       case 'dispose':
         if (this.tuneLoaded && this.wasm) {

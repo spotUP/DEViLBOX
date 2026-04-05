@@ -212,6 +212,12 @@ export class MaEngine {
     await this._sendRequest({ type: 'setCell', trackIdx, eventIdx, note, instrument, release, delay });
   }
 
+  /** Set per-channel mute mask. Bit N=1 means channel N is active, 0=muted. */
+  setMuteMask(mask: number): void {
+    if (!this.workletNode) return;
+    this.workletNode.port.postMessage({ type: 'setMuteMask', mask });
+  }
+
   dispose(): void {
     this._disposed = true;
     this.workletNode?.port.postMessage({ type: 'dispose' });
