@@ -472,7 +472,6 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
     const rowIndex = currentRow + rowOffset;
 
     let channelIndex = 0;
-    let localX = -1;
     let foundChannel = false;
 
     for (let ch = 0; ch < numChannels; ch++) {
@@ -480,7 +479,6 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
       const w = channelWidths[ch];
       if (relativeX >= off && relativeX < off + w) {
         channelIndex = ch;
-        localX = relativeX - off - 8; // Adjust for internal padding
         foundChannel = true;
         break;
       }
@@ -489,7 +487,6 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
     if (!foundChannel) {
       if (relativeX < LNW) {
         channelIndex = 0;
-        localX = -1;
       } else {
         return null;
       }
@@ -501,27 +498,43 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
 
     let columnType: CursorPosition['columnType'] = 'note';
     let noteColumnIndex = 0;
-    // Calculate widths for the current channel's schema (same as getParamCanvas)
+
+    // Match the GL renderer's centering: content is centered within channel width
     const noteWidth = CHAR_WIDTH * 3 + 4;
     const cell = pattern.channels[channelIndex]?.rows[0];
     const channel = pattern.channels[channelIndex];
     const hasAcid = cell?.flag1 !== undefined || cell?.flag2 !== undefined;
     const hasProb = cell?.probability !== undefined;
+    const effectCols = channel?.channelMeta?.effectCols ?? 2;
+    const showAcidHit = hasAcid;
+    const showProbHit = hasProb;
+    const paramWidth = CHAR_WIDTH * 4 + 8
+      + (showAcidHit ? CHAR_WIDTH * 2 + 8 : 0)
+      + (showProbHit ? CHAR_WIDTH * 2 + 4 : 0);
+    const contentWidthBase = noteWidth + 4 + paramWidth;
+    const chContentWidth = contentWidthBase + effectCols * (CHAR_WIDTH * 3 + 4);
+    const chW = channelWidths[channelIndex] ?? 0;
+    const centeringOffset = Math.floor((chW - chContentWidth) / 2);
+    const localX = Math.max(0, relativeX - (channelOffsets[channelIndex] ?? 0) - centeringOffset);
+
+    // Column boundaries matching the GL renderer's layout:
+    // note(noteWidth) → 4px gap → inst(CW*2) → 4px gap → vol(CW*2) → 4px gap → effects...
+    const paramBase = noteWidth + 4; // where inst starts
     const totalNoteCols = channel?.channelMeta?.noteCols ?? 1;
-    const NOTE_COL_GROUP_W = noteWidth + 4 + CHAR_WIDTH * 2 + 4 + CHAR_WIDTH * 2 + 4; // note+inst+vol+gaps
+    // For multi-note cols: each group = note+inst+vol+gaps
+    const NOTE_COL_GROUP_W = noteWidth + 4 + CHAR_WIDTH * 2 + 4 + CHAR_WIDTH * 2 + 4;
     const allNoteColsEnd = NOTE_COL_GROUP_W * totalNoteCols;
 
     if (localX < allNoteColsEnd) {
       // Inside a note column group
-      noteColumnIndex = Math.min(totalNoteCols - 1, Math.floor(localX / NOTE_COL_GROUP_W));
+      noteColumnIndex = Math.min(totalNoteCols - 1, Math.max(0, Math.floor(localX / NOTE_COL_GROUP_W)));
       const xInGroup = localX - noteColumnIndex * NOTE_COL_GROUP_W;
-      if (xInGroup < noteWidth) columnType = 'note';
-      else if (xInGroup < noteWidth + 4 + CHAR_WIDTH * 2) columnType = 'instrument';
+      if (xInGroup < paramBase) columnType = 'note';
+      else if (xInGroup < paramBase + CHAR_WIDTH * 2 + 4) columnType = 'instrument';
       else columnType = 'volume';
     } else {
       // After all note columns — effects, flags, probability
       const xInParams = localX - allNoteColsEnd;
-      const effectCols = channel?.channelMeta?.effectCols ?? 2;
       const effectWidth = effectCols * (CHAR_WIDTH * 3 + 4);
       if (xInParams < effectWidth) {
         const effCol = Math.floor(xInParams / (CHAR_WIDTH * 3 + 4));
@@ -732,6 +745,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
 
   const handleContextMenu = useCallback((e: React.MouseEvent) => {
     e.preventDefault();
+    containerRef.current?.focus();
 
     // Format mode: use same hit-test as handleMouseDown (no scrollLeft)
     if (isFormatMode && formatChannels && containerRef.current) {
@@ -2186,6 +2200,16 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [webglUnsupported]);
 
+  // Native contextmenu listener — reliably prevents browser native menu on all elements
+  // including imperatively-created canvas elements that React synthetic events may miss
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+    const handler = (e: Event) => { e.preventDefault(); };
+    container.addEventListener('contextmenu', handler, true);
+    return () => container.removeEventListener('contextmenu', handler, true);
+  }, []);
+
   // Forward layout changes to worker when channel widths/offsets change
   useEffect(() => {
     bridgeRef.current?.post({ type: 'channelLayout', channelLayout: snapshotLayout() });
@@ -2681,7 +2705,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
   const mobileTrigger = { level: 0, triggered: false };
 
   return (
-    <div className="flex flex-col h-full" onContextMenuCapture={(e) => { e.preventDefault(); containerRef.current?.focus(); handleContextMenu(e); }}>
+    <div className="flex flex-col h-full" onContextMenuCapture={(e) => { e.preventDefault(); }}>
       {/* Mobile Channel Header */}
       {isMobile && (
         <div className="flex-shrink-0 bg-dark-bgTertiary border-b border-dark-border relative touch-none" {...channelHeaderGestures}>
