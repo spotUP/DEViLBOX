@@ -732,6 +732,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
 
   const handleContextMenu = useCallback((e: React.MouseEvent) => {
     e.preventDefault();
+    console.log('[ContextMenu] clientX:', e.clientX, 'clientY:', e.clientY);
     const cell = getCellFromCoords(e.clientX, e.clientY);
     if (cell) {
       // Move cursor to the right-clicked cell so context menu actions target the visible cell
