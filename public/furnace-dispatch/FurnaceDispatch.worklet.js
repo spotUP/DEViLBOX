@@ -356,7 +356,7 @@ class FurnaceDispatchProcessor extends AudioWorkletProcessor {
             }
             const dataPtr = this.module._malloc(encoded.length + 1);
             const heap = new Uint8Array(heapBuffer, dataPtr, encoded.length + 1);
-            for (let bi = 0; bi < encoded.length; bi++) heap[bi] = encoded[bi];
+            heap.set(encoded);
             heap[encoded.length] = 0; // null terminate
             this.wasm.setFlags(chip.handle, dataPtr, encoded.length);
             this.module._free(dataPtr);
@@ -768,12 +768,10 @@ class FurnaceDispatchProcessor extends AudioWorkletProcessor {
   }
 
   getHeapBuffer() {
-    // Prefer wasmMemory.buffer — it's always current after heap growth.
-    // HEAPU8/HEAPF32 typed array views may be detached/stale in AudioWorklet
-    // because Emscripten's updateMemoryViews() may not run in this scope.
-    if (this.module.wasmMemory) return this.module.wasmMemory.buffer;
+    // Get WASM memory buffer from multiple sources
     if (this.module.HEAPU8) return this.module.HEAPU8.buffer;
     if (this.module.HEAPF32) return this.module.HEAPF32.buffer;
+    if (this.module.wasmMemory) return this.module.wasmMemory.buffer;
     return null;
   }
 
@@ -838,25 +836,17 @@ class FurnaceDispatchProcessor extends AudioWorkletProcessor {
   updateBufferViews() {
     if (!this.module || !this.outputPtrL) return;
 
-    // Get the CURRENT WASM memory buffer — must use wasmMemory.buffer directly
-    // because module.HEAPF32.buffer can be stale after heap growth (the typed
-    // array view gets detached but the reference isn't updated until Emscripten
-    // patches it, which may not happen inside an AudioWorklet).
+    // Try multiple sources for WASM memory buffer
     const wasmMem = this.module.wasmMemory;
-    const heapBuffer = wasmMem ? wasmMem.buffer : (this.module.HEAPF32 ? this.module.HEAPF32.buffer : null);
+    const heapBuffer = this.module.HEAPF32
+      ? this.module.HEAPF32.buffer
+      : (wasmMem ? wasmMem.buffer : null);
     if (!heapBuffer) return;
 
-    // Detect detached buffers or heap growth — recreate typed array views
-    const needsUpdate = this.lastHeapBuffer !== heapBuffer
-      || !this.outputBufferL
-      || this.outputBufferL.buffer !== heapBuffer;
-
-    if (needsUpdate) {
+    if (this.lastHeapBuffer !== heapBuffer) {
       this.outputBufferL = new Float32Array(heapBuffer, this.outputPtrL, this.bufferSize);
       this.outputBufferR = new Float32Array(heapBuffer, this.outputPtrR, this.bufferSize);
       this.lastHeapBuffer = heapBuffer;
-      // Reset error flag so process() can recover after heap growth
-      this._errorReported = false;
     }
   }
 
@@ -974,73 +964,42 @@ class FurnaceDispatchProcessor extends AudioWorkletProcessor {
         }
       }
 
-      // Interleaved tick/render — render audio in chunks between tick boundaries.
-      // This matches Furnace's nextBuf() which ticks then renders samplesPerTick
-      // samples, ensuring macro/envelope changes apply at sample-accurate positions
-      // instead of all at once (which causes clicks/pops).
-      let remaining = numSamples;
-      let outOffset = 0;
-
-      while (remaining > 0) {
-        // How many samples until the next tick?
-        const samplesUntilTick = Math.max(1, Math.ceil(this.samplesPerTick - this.tickAccumulator));
-        const chunk = Math.min(remaining, samplesUntilTick);
-
-        // Render this chunk from each chip
-        for (const chip of this.chips.values()) {
+      // Advance tick accumulator — tick ALL chips in lock-step
+      // (Furnace pattern: for (i=0; i<systemLen; i++) disCont[i].dispatch->tick())
+      this.tickAccumulator += numSamples;
+      while (this.tickAccumulator >= this.samplesPerTick) {
+        if (this.sequencerActive && this.wasm.seqIsPlaying && this.wasm.seqIsPlaying()) {
+          // WASM sequencer drives everything — calls dispatch_cmd() internally
           try {
-            this.wasm.render(chip.handle, this.outputPtrL, this.outputPtrR, chunk);
-            // Re-acquire buffer views (WASM heap may have grown during render)
-            this.updateBufferViews();
-            const amp = POST_AMP[chip.platformType] || 1.0;
-            for (let i = 0; i < chunk; i++) {
-              outputL[outOffset + i] += this.outputBufferL[i] * amp;
-              outputR[outOffset + i] += this.outputBufferR[i] * amp;
+            const pos = this.wasm.seqTick();
+            this._lastSeqOrder = (pos >> 16) & 0xFFFF;
+            this._lastSeqRow = pos & 0xFFFF;
+            // Update tick rate if sequencer divider changed (effects 0xC0-0xC3/0xF0)
+            if (this.wasm.seqGetDivider) {
+              const newDiv = this.wasm.seqGetDivider();
+              if (newDiv > 0 && newDiv !== this.tickRate) {
+                this.tickRate = newDiv;
+                this.samplesPerTick = sampleRate / this.tickRate;
+              }
             }
-          } catch (chipErr) {
-            if (!this._badChips) this._badChips = new Set();
-            if (!this._badChips.has(chip.platformType)) {
-              this._badChips.add(chip.platformType);
-              const msg = `WASM render error for platform ${chip.platformType}: ${chipErr.message || chipErr}`;
-              this.port.postMessage({ type: 'error', message: msg });
+          } catch (e) {
+            console.error('[FurnaceDispatch] seqTick WASM trap:', e);
+            this.sequencerActive = false;
+            this.wasmCrashed = true;
+            // WASM state is corrupted after a trap — destroy all chips to prevent
+            // cascading crashes in tick/render calls.
+            for (const chip of this.chips.values()) {
+              try { this.wasm.destroy(chip.handle); } catch { /* already broken */ }
             }
+            this.chips.clear();
+            this.port.postMessage({ type: 'error', message: 'WASM sequencer crashed: ' + (e.message || e) });
           }
         }
-
-        this.tickAccumulator += chunk;
-        outOffset += chunk;
-        remaining -= chunk;
-
-        // Tick if we've reached the tick boundary
-        while (this.tickAccumulator >= this.samplesPerTick) {
-          if (this.sequencerActive && this.wasm.seqIsPlaying && this.wasm.seqIsPlaying()) {
-            try {
-              const pos = this.wasm.seqTick();
-              this._lastSeqOrder = (pos >> 16) & 0xFFFF;
-              this._lastSeqRow = pos & 0xFFFF;
-              if (this.wasm.seqGetDivider) {
-                const newDiv = this.wasm.seqGetDivider();
-                if (newDiv > 0 && newDiv !== this.tickRate) {
-                  this.tickRate = newDiv;
-                  this.samplesPerTick = sampleRate / this.tickRate;
-                }
-              }
-            } catch (e) {
-              console.error('[FurnaceDispatch] seqTick WASM trap:', e);
-              this.sequencerActive = false;
-              this.wasmCrashed = true;
-              for (const chip of this.chips.values()) {
-                try { this.wasm.destroy(chip.handle); } catch { /* already broken */ }
-              }
-              this.chips.clear();
-              this.port.postMessage({ type: 'error', message: 'WASM sequencer crashed: ' + (e.message || e) });
-            }
-          }
-          for (const chip of this.chips.values()) {
-            try { this.wasm.tick(chip.handle); } catch { /* skip bad chip */ }
-          }
-          this.tickAccumulator -= this.samplesPerTick;
+        // Always tick chips for macro processing and audio generation
+        for (const chip of this.chips.values()) {
+          try { this.wasm.tick(chip.handle); } catch { /* skip bad chip */ }
         }
+        this.tickAccumulator -= this.samplesPerTick;
       }
 
       // Drain command log periodically and post to main thread
@@ -1064,6 +1023,29 @@ class FurnaceDispatchProcessor extends AudioWorkletProcessor {
             }
             this.module._free(ptr);
             this.port.postMessage({ type: 'cmdLog', entries });
+          }
+        }
+      }
+
+      // Render each chip and mix into output with postAmp scaling
+      // (Furnace pattern: each disCont[] renders to its own buffer, scaled by getPostAmp(), then mixed)
+      // Per-chip try-catch: a WASM trap in one chip must not silence all others.
+      for (const chip of this.chips.values()) {
+        try {
+          this.wasm.render(chip.handle, this.outputPtrL, this.outputPtrR, numSamples);
+          const amp = POST_AMP[chip.platformType] || 1.0;
+          // Mix this chip's output into the main output
+          for (let i = 0; i < numSamples; i++) {
+            outputL[i] += this.outputBufferL[i] * amp;
+            outputR[i] += this.outputBufferR[i] * amp;
+          }
+        } catch (chipErr) {
+          // Report each bad chip once, then skip it silently
+          if (!this._badChips) this._badChips = new Set();
+          if (!this._badChips.has(chip.platformType)) {
+            this._badChips.add(chip.platformType);
+            const msg = `WASM render error for platform ${chip.platformType}: ${chipErr.message || chipErr}`;
+            this.port.postMessage({ type: 'error', message: msg });
           }
         }
       }
