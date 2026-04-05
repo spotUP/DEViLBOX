@@ -63,8 +63,8 @@ const PARAM_MAP = [
   [62, 'bi'],      // 37: PAD_PANNING
   [65, 'uni'],     // 38: PAD_BANDWIDTH
   [66, 'uni'],     // 39: PAD_BANDWIDTH_SCALE
-  [67, 'uni'],     // 40: PAD_PROFILE_WIDTH -> PAD_QUALITY
-  [67, 'uni'],     // 41: PAD_PROFILE_STRETCH -> PAD_QUALITY
+  null,            // 40: PAD_PROFILE_WIDTH (no separate WASM param — use padQuality)
+  null,            // 41: PAD_PROFILE_STRETCH (no separate WASM param — use padQuality)
   [64, 'oct'],     // 42: PAD_OCTAVE -> P_PAD_COARSE_DETUNE
   [63, 'detune'],  // 43: PAD_DETUNE
   [67, 'raw4'],    // 44: PAD_QUALITY
@@ -74,28 +74,30 @@ const PARAM_MAP = [
   [73, 'uni'],     // 47: FILTER_RESONANCE
   [94, 'uni'],     // 48: FILTER_ENV_AMOUNT -> P_FILTENV_DEPTH
   [78, 'uni'],     // 49: FILTER_VELOCITY -> P_FILTER_VELSCALE
-  null,            // 50: FILTER_ATTACK (use WASM defaults)
-  null,            // 51: FILTER_DECAY
-  null,            // 52: FILTER_SUSTAIN
-  null,            // 53: FILTER_RELEASE
+  [90, 'uni'],     // 50: FILTER_ATTACK -> P_FILTENV_ATTACK
+  [91, 'uni'],     // 51: FILTER_DECAY -> P_FILTENV_DECAY
+  [92, 'uni'],     // 52: FILTER_SUSTAIN -> P_FILTENV_SUSTAIN
+  [93, 'uni'],     // 53: FILTER_RELEASE -> P_FILTENV_RELEASE
   [76, 'uni'],     // 54: FILTER_KEY_TRACK -> P_FILTER_TRACKING
-  // Amp envelope (TS 55-58) — SKIP: setting raw ints into float fields corrupts state
-  null,              // 55: AMP_ATTACK (use WASM defaults)
-  null,              // 56: AMP_DECAY
-  null,              // 57: AMP_SUSTAIN
-  null,              // 58: AMP_RELEASE
+  // Amp envelope (TS 55-58)
+  [80, 'uni'],     // 55: AMP_ATTACK -> P_AMPENV_ATTACK
+  [81, 'uni'],     // 56: AMP_DECAY -> P_AMPENV_DECAY
+  [82, 'uni'],     // 57: AMP_SUSTAIN -> P_AMPENV_SUSTAIN
+  [83, 'uni'],     // 58: AMP_RELEASE -> P_AMPENV_RELEASE
   // Effects (TS 59-69)
+  // ZynAddSubFX effects are preset-based: type selects the effect, preset selects variant.
+  // Individual params (size, damp, rate, depth) don't have separate WASM indices.
   [126, 'uni'],    // 59: REVERB_WET -> P_REVERB_MIX
-  [121, 'uni'],    // 60: REVERB_SIZE -> P_EFX1_PRESET (mapped as preset)
-  [121, 'uni'],    // 61: REVERB_DAMP
-  [122, 'uni'],    // 62: CHORUS_WET -> P_EFX2_TYPE
-  [123, 'uni'],    // 63: CHORUS_RATE -> P_EFX2_PRESET
-  [123, 'uni'],    // 64: CHORUS_DEPTH
-  [124, 'uni'],    // 65: DISTORTION_WET -> P_EFX3_TYPE
-  [125, 'uni'],    // 66: DISTORTION_DRIVE -> P_EFX3_PRESET
-  [125, 'raw8'],   // 67: DISTORTION_TYPE
-  [125, 'uni'],    // 68: EQ_LOW
-  [125, 'uni'],    // 69: EQ_HIGH
+  [121, 'raw8'],   // 60: REVERB_SIZE -> P_EFX1_PRESET (selects reverb variant 0-7)
+  null,            // 61: REVERB_DAMP (no separate WASM param — baked into preset)
+  [120, 'raw8'],   // 62: CHORUS_WET -> P_EFX1_TYPE (effect slot 1 type: 0=off,1=rev,2=echo,3=chorus...)
+  [123, 'raw8'],   // 63: CHORUS_RATE -> P_EFX2_PRESET (selects chorus variant)
+  null,            // 64: CHORUS_DEPTH (no separate WASM param)
+  [124, 'raw8'],   // 65: DISTORTION_WET -> P_EFX3_TYPE (effect slot 3 type)
+  [125, 'raw8'],   // 66: DISTORTION_DRIVE -> P_EFX3_PRESET (selects distortion variant)
+  null,            // 67: DISTORTION_TYPE (no separate WASM param)
+  null,            // 68: EQ_LOW (no separate WASM param)
+  null,            // 69: EQ_HIGH (no separate WASM param)
 ];
 
 function transformValue(value, type) {
