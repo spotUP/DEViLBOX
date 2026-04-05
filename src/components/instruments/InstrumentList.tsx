@@ -561,6 +561,7 @@ export const InstrumentList: React.FC<InstrumentListProps> = memo(({
                 key={instrument.id}
                 ref={isSelected ? selectedRef : undefined}
                 onClick={() => handleSelect(instrument.id, instrument)}
+                onContextMenu={(e) => e.preventDefault()}
                 draggable="true"
                 onDragStart={(e) => handleDragStart(e, instrument.id)}
                 className={`
@@ -686,6 +687,7 @@ export const InstrumentList: React.FC<InstrumentListProps> = memo(({
               <div
                 ref={isSelected ? selectedRef : undefined}
                 onClick={() => handleSelect(instrument.id, instrument)}
+                onContextMenu={(e) => e.preventDefault()}
                 draggable="true"
                 onDragStart={(e) => handleDragStart(e, instrument.id)}
                 className={`
