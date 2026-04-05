@@ -93,10 +93,12 @@ export class SynthBaker {
   ): Promise<AudioBuffer> {
     const duration = SynthBaker.getSmartDuration(config);
 
-    // Render each note separately
-    const buffers = await Promise.all(
-      notes.map(note => SynthBaker.bakeToSample(config, duration, note))
-    );
+    // Render each note sequentially — bakeToSample switches Tone.js to an
+    // OfflineAudioContext and back, so parallel calls would corrupt the context.
+    const buffers: AudioBuffer[] = [];
+    for (const note of notes) {
+      buffers.push(await SynthBaker.bakeToSample(config, duration, note));
+    }
 
     // Mix all buffers by summing sample-by-sample
     const sampleRate = buffers[0].sampleRate;
