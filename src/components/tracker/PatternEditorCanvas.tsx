@@ -732,15 +732,16 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
 
   const handleContextMenu = useCallback((e: React.MouseEvent) => {
     e.preventDefault();
-    console.log('[ContextMenu] clientX:', e.clientX, 'clientY:', e.clientY);
     const cell = getCellFromCoords(e.clientX, e.clientY);
+    const rowIndex = cell?.rowIndex ?? cursorRef.current.rowIndex;
+    const channelIndex = cell?.channelIndex ?? cursorRef.current.channelIndex;
     if (cell) {
       // Move cursor to the right-clicked cell so context menu actions target the visible cell
       const cursorStore = useCursorStore.getState();
       cursorStore.moveCursorToRow(cell.rowIndex);
       cursorStore.moveCursorToChannelAndColumn(cell.channelIndex, cell.columnType as any, cell.noteColumnIndex);
-      cellContextMenu.openMenu(e, cell.rowIndex, cell.channelIndex);
     }
+    cellContextMenu.openMenu(e, rowIndex, channelIndex);
   }, [getCellFromCoords, cellContextMenu]);
 
   // ── Format mode: copy rows from selection (or current row) to clipboard ──
