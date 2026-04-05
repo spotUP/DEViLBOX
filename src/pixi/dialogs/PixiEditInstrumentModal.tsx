@@ -50,7 +50,12 @@ import { PixiDynamicParamPanel } from '../views/instruments/PixiDynamicParamPane
 import { PixiHardwareUI, hasPixiHardwareUI } from '../views/instruments/PixiHardwareUI';
 import { PixiFilterCurve } from '../views/instruments/PixiFilterCurve';
 import { PixiADSRVisualizer } from '../views/instruments/PixiADSRVisualizer';
+import { PixiArpeggioEditor } from '../views/instruments/PixiArpeggioEditor';
+import { PixiMacroListEditor } from '../views/instruments/PixiMacroCurveEditor';
 import { getSynthLayout } from '../views/instruments/layouts';
+import { PixiSampleEditor } from '../views/instruments/PixiSampleEditor';
+import { PixiWavetableEditor } from '../views/instruments/PixiWavetableEditor';
+import type { WavetableData } from '../views/instruments/PixiWavetableEditor';
 
 // ── Layout constants ────────────────────────────────────────────────────────
 
@@ -86,7 +91,7 @@ function twColor(tw: string): number {
 
 // ── Types ───────────────────────────────────────────────────────────────────
 
-type ActiveTab = 'sound' | 'effects' | 'script' | 'controls';
+type ActiveTab = 'sound' | 'effects' | 'script' | 'controls' | 'arpeggio' | 'macros' | 'sample' | 'wavetable';
 
 interface PixiEditInstrumentModalProps {
   isOpen: boolean;
@@ -573,6 +578,20 @@ export const PixiEditInstrumentModal: React.FC<PixiEditInstrumentModalProps> = (
           ) : (
             <>
               <HeaderTab label="Sound" active={activeTab === 'sound'} onSelect={() => setActiveTab('sound')} />
+              {/* Sample tab — shown for instruments with sample data */}
+              {(currentInstrument.synthType === 'Sampler' || currentInstrument.synthType === 'Player' || currentInstrument.synthType === 'GranularSynth' || currentInstrument.sample?.url || (currentInstrument.parameters as Record<string, unknown>)?.sampleUrl) && (
+                <HeaderTab label="Sample" active={activeTab === 'sample'} onSelect={() => setActiveTab('sample')} />
+              )}
+              {/* Wavetable tab — shown for Furnace instruments with wavetable data */}
+              {currentInstrument.furnace?.wavetables && currentInstrument.furnace.wavetables.length > 0 && (
+                <HeaderTab label="Wavetable" active={activeTab === 'wavetable'} onSelect={() => setActiveTab('wavetable')} />
+              )}
+              {currentInstrument?.chipSynth?.arpeggio && (
+                <HeaderTab label="Arpeggio" active={activeTab === 'arpeggio'} onSelect={() => setActiveTab('arpeggio')} />
+              )}
+              {currentInstrument?.furnace?.macros && currentInstrument.furnace.macros.length > 0 && (
+                <HeaderTab label="Macros" active={activeTab === 'macros'} onSelect={() => setActiveTab('macros')} />
+              )}
               <HeaderTab label="Effects" active={activeTab === 'effects'} onSelect={() => setActiveTab('effects')} />
             </>
           )}
@@ -1503,6 +1522,67 @@ export const PixiEditInstrumentModal: React.FC<PixiEditInstrumentModalProps> = (
             {/* Test Keyboard — shown at bottom of sound tab for all non-modular synths */}
             {activeTab === 'sound' && currentInstrument && !isNativeWASMSynth(currentInstrument.synthType) && currentInstrument.synthType !== 'ModularSynth' && currentInstrument.synthType !== 'SunVoxModular' && (
               <PixiTestKeyboard instrument={currentInstrument} width={RIGHT_PANEL_W - PAD * 2} />
+            )}
+            {/* Arpeggio tab — shown when instrument has chipSynth arpeggio config */}
+            {activeTab === 'arpeggio' && currentInstrument?.chipSynth?.arpeggio && (
+              <PixiArpeggioEditor
+                config={currentInstrument.chipSynth.arpeggio}
+                onChange={(arpConfig) => {
+                  const inst = instRef.current;
+                  if (!inst || !inst.chipSynth) return;
+                  updateInstrument(inst.id, { chipSynth: { ...inst.chipSynth, arpeggio: arpConfig } });
+                }}
+                width={RIGHT_PANEL_W - PAD * 2}
+                height={140}
+              />
+            )}
+            {/* Macros tab — shown when instrument has Furnace macros */}
+            {activeTab === 'macros' && currentInstrument?.furnace?.macros && (
+              <PixiMacroListEditor
+                macros={currentInstrument.furnace.macros}
+                onChange={(macros) => {
+                  const inst = instRef.current;
+                  if (!inst || !inst.furnace) return;
+                  updateInstrument(inst.id, { furnace: { ...inst.furnace, macros } });
+                }}
+                width={RIGHT_PANEL_W - PAD * 2}
+              />
+            )}
+            {/* Sample tab — GL-native sample editor */}
+            {activeTab === 'sample' && currentInstrument && (
+              <PixiSampleEditor
+                instrument={currentInstrument}
+                width={RIGHT_PANEL_W - PAD * 2}
+                height={CONTENT_H - PAD * 2}
+              />
+            )}
+            {/* Wavetable tab ��� GL-native wavetable editor */}
+            {activeTab === 'wavetable' && currentInstrument?.furnace?.wavetables && (
+              <PixiWavetableEditor
+                wavetables={currentInstrument.furnace.wavetables.map((wt, i) => ({
+                  id: wt.id ?? i,
+                  data: [...(wt.data ?? [])],
+                  len: wt.len ?? wt.data?.length ?? 32,
+                  max: wt.max ?? 15,
+                }))}
+                onChange={(updatedWaves: WavetableData[]) => {
+                  const inst = instRef.current;
+                  if (!inst || !inst.furnace) return;
+                  updateInstrument(inst.id, {
+                    furnace: {
+                      ...inst.furnace,
+                      wavetables: updatedWaves.map(w => ({
+                        id: w.id,
+                        data: w.data,
+                        len: w.len,
+                        max: w.max,
+                      })),
+                    },
+                  });
+                }}
+                width={RIGHT_PANEL_W - PAD * 2}
+                height={CONTENT_H - PAD * 2}
+              />
             )}
             {activeTab === 'effects' && currentInstrument && (
               <EffectsPanel instrumentId={currentInstrument.id} effects={currentInstrument.effects} />
