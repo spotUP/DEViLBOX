@@ -58,10 +58,9 @@ interface MoniqueHardwareUIProps {
   instrumentId?: number;
 }
 
-export const MoniqueHardwareUI: React.FC<MoniqueHardwareUIProps> = ({
-  onParamChange: _onParamChange,
-  instrumentId,
-}) => {
+export const MoniqueHardwareUI: React.FC<MoniqueHardwareUIProps> = (props) => {
+  const { onParamChange: _onParamChange, instrumentId } = props;
+  console.log('[MoniqueHW] render, instrumentId=', instrumentId, 'all props:', Object.keys(props));
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const instrumentIdRef = useRef(instrumentId);
   instrumentIdRef.current = instrumentId;
