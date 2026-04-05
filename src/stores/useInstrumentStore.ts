@@ -665,7 +665,7 @@ export const useInstrumentStore = create<InstrumentStore>()(
             // Zynthian WASM synths — all use DevilboxSynth.applyConfig() pattern
             const zynthianConfigMap: Record<string, string> = {
               MdaEPiano: 'mdaEPiano', MdaJX10: 'mdaJX10', MdaDX10: 'mdaDX10',
-              AMSynth: 'amsynth', RaffoSynth: 'raffo', CalfMono: 'calfMono',
+              Amsynth: 'amsynth', RaffoSynth: 'raffo', CalfMono: 'calfMono',
               SetBfree: 'setbfree', SynthV1: 'synthv1', Monique: 'monique', VL1: 'vl1',
               TalNoizeMaker: 'talNoizeMaker', Aeolus: 'aeolus', FluidSynth: 'fluidsynth',
               Sfizz: 'sfizz', ZynAddSubFX: 'zynaddsubfx',
@@ -789,11 +789,29 @@ export const useInstrumentStore = create<InstrumentStore>()(
       // Invalidate the cached Tone.js instrument for any sound-affecting changes
       // (only if not handled by real-time update path above)
       if (synthTypeChanging || isPresetLoad || soundParamsChanging) {
-        try {
-          const engine = getToneEngine();
-          engine.invalidateInstrument(id);
-        } catch (error) {
-          console.warn('[InstrumentStore] Could not invalidate instrument:', error);
+        // SAFETY: Zynthian/WASM synths that use applyConfig() must NEVER be invalidated
+        // for config-only changes — invalidation kills the audio worklet and forces a
+        // full WASM rebuild. Only invalidate when synthType actually changes or preset loads.
+        const updatedInst = get().instruments.find((inst) => inst.id === id);
+        const applyConfigSynthTypes = [
+          'MdaEPiano', 'MdaJX10', 'MdaDX10', 'Amsynth', 'RaffoSynth', 'CalfMono',
+          'SetBfree', 'SynthV1', 'Monique', 'VL1', 'TalNoizeMaker', 'Aeolus',
+          'FluidSynth', 'Sfizz',
+          'TunefishSynth', 'OidosSynth', 'WaveSabreSynth', 'OpenWurli', 'OPL3', 'DX7',
+          'PinkTrombone', 'DECtalk', 'Sam', 'V2', 'V2Speech', 'Synare',
+          'TB303', 'Buzz3o3', 'DubSiren', 'SpaceLaser',
+        ];
+        if (updatedInst && applyConfigSynthTypes.includes(updatedInst.synthType) && !synthTypeChanging && !isPresetLoad) {
+          // Config-only change for an applyConfig synth — the real-time update path above
+          // should have handled this. If it didn't (error/race), log and skip invalidation.
+          console.warn(`[InstrumentStore] Skipping invalidation for ${updatedInst.synthType} id=${id} — applyConfig synth, config-only change`);
+        } else {
+          try {
+            const engine = getToneEngine();
+            engine.invalidateInstrument(id);
+          } catch (error) {
+            console.warn('[InstrumentStore] Could not invalidate instrument:', error);
+          }
         }
       }
     },

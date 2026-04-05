@@ -3196,19 +3196,31 @@ export const SynthTypeDispatcher: React.FC<SynthTypeDispatcherProps> = ({
           const declLayout = getSynthLayout(instrument.synthType);
           if (declLayout) {
             const configKey = declLayout.configKey;
+            // Use dedicated config property if available (e.g. instrument.monique, instrument.amsynth),
+            // falling back to instrument.parameters for synths without a dedicated config
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const instAny = instrument as any;
+            const configSource = configKey && instAny[configKey]
+              ? instAny[configKey]
+              : instrument.parameters ?? {};
             const config = configKey
-              ? { [configKey]: instrument.parameters ?? {} }
-              : (instrument.parameters ?? {}) as Record<string, unknown>;
+              ? { [configKey]: configSource }
+              : configSource as Record<string, unknown>;
             return (
               <div className="synth-editor-content overflow-y-auto">
                 <DOMSynthPanel
                   layout={declLayout}
                   config={config as Record<string, unknown>}
                   onChange={(updates) => {
-                    const params = configKey
-                      ? (updates[configKey] as Record<string, unknown>)
-                      : updates;
-                    handleChange({ parameters: params as Record<string, unknown> });
+                    if (configKey && instAny[configKey]) {
+                      // Write to the dedicated config key (e.g. { monique: {...} })
+                      handleChange({ [configKey]: updates[configKey] as Record<string, unknown> });
+                    } else {
+                      const params = configKey
+                        ? (updates[configKey] as Record<string, unknown>)
+                        : updates;
+                      handleChange({ parameters: params as Record<string, unknown> });
+                    }
                   }}
                 />
               </div>

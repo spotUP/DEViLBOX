@@ -165,12 +165,17 @@ export const CategorizedSynthSelector: React.FC<CategorizedSynthSelectorProps> =
         synths: cat.synths.filter(synth => {
           if (!synth || !synth.icon) return false;
           if (!query) return true;
-          // Search in name, shortName, description, and bestFor tags
+          // Search in name, shortName, description, bestFor tags, and synthType
+          // Also match with spaces removed so "am synth" finds "amsynth"
+          const queryNoSpaces = query.replace(/\s+/g, '');
+          const name = synth.name.toLowerCase();
+          const shortName = synth.shortName.toLowerCase();
           return (
-            synth.name.toLowerCase().includes(query) ||
-            synth.shortName.toLowerCase().includes(query) ||
+            name.includes(query) || name.replace(/\s+/g, '').includes(queryNoSpaces) ||
+            shortName.includes(query) || shortName.replace(/\s+/g, '').includes(queryNoSpaces) ||
             synth.description.toLowerCase().includes(query) ||
-            synth.bestFor.some(tag => tag.toLowerCase().includes(query))
+            synth.bestFor.some(tag => tag.toLowerCase().includes(query)) ||
+            synth.type.toLowerCase().includes(queryNoSpaces)
           );
         })
       }))
