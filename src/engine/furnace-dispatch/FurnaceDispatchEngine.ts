@@ -1311,6 +1311,12 @@ export class FurnaceDispatchEngine {
       return; // waitForChipCreated will use the shared promise
     }
 
+    // Set up per-platform chip created promise BEFORE any await — prevents race
+    // where multiple synths pass the check above before the first sets the promise.
+    let resolve!: () => void;
+    const promise = new Promise<void>((r) => { resolve = r; });
+    this._chipCreatedPromises.set(platformType, { promise, resolve });
+
     // Ensure the worklet module is loaded first
     if (this._nativeCtx) {
       await FurnaceDispatchEngine.ensureModuleLoaded(this._nativeCtx);
@@ -1318,13 +1324,9 @@ export class FurnaceDispatchEngine {
 
     if (!this.workletNode) {
       console.error(`[FurnaceDispatch] createChip(${platformType}): workletNode is NULL!`);
+      this._chipCreatedPromises.delete(platformType);
       return;
     }
-
-    // Set up per-platform chip created promise before sending message
-    let resolve!: () => void;
-    const promise = new Promise<void>((r) => { resolve = r; });
-    this._chipCreatedPromises.set(platformType, { promise, resolve });
 
     this.workletNode.port.postMessage({
       type: 'createChip',
