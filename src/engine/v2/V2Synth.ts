@@ -215,6 +215,7 @@ export class V2Synth implements DevilboxSynth {
     // Convert V2Config (UI/preset format) to V2InstrumentConfig (binary format)
     const inst = v2ConfigToInstrument(config);
     const patchData = v2ConfigToBytes(inst);
+    console.log('[V2Synth] _applyV2Config sending loadPatch, patchData[0..5]:', Array.from(patchData.slice(0, 6)));
     this._worklet.port.postMessage({ type: 'loadPatch', channel: 0, patchData });
   }
 
