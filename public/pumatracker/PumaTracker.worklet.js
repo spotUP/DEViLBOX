@@ -18,6 +18,7 @@ class PumaTrackerProcessor extends AudioWorkletProcessor {
     this.levelsPtr = 0;
     this.levelsBuf = null;
     this.processCount = 0;
+    this.muteMask = 0xFFFFFFFF;
 
     this.port.onmessage = (event) => {
       this.handleMessage(event.data);
@@ -155,6 +156,10 @@ class PumaTrackerProcessor extends AudioWorkletProcessor {
             });
           }
         }
+        break;
+
+      case 'setMuteMask':
+        this.muteMask = data.mask;
         break;
 
       case 'dispose':

@@ -16,6 +16,7 @@ class SonixProcessor extends AudioWorkletProcessor {
     this.bufferSize = 128;
     this.lastHeapBuffer = null;
     this.initializing = false;
+    this.muteMask = 0xFFFFFFFF;
 
     this.port.onmessage = (event) => {
       this.handleMessage(event.data);
@@ -123,6 +124,10 @@ class SonixProcessor extends AudioWorkletProcessor {
         if (this.module && typeof this.module._sonix_set_stereo_mix === 'function') {
           this.module._sonix_set_stereo_mix(data.mix);
         }
+        break;
+
+      case 'setMuteMask':
+        this.muteMask = data.mask;
         break;
 
       case 'dispose':

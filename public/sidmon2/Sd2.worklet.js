@@ -16,6 +16,7 @@ class Sd2Processor extends AudioWorkletProcessor {
     this.lastHeapBuffer = null;
     this.initializing = false;
     this.previewActive = false;
+    this.muteMask = 0xFFFFFFFF;
 
     this.port.onmessage = (event) => {
       this.handleMessage(event.data);
@@ -179,6 +180,10 @@ class Sd2Processor extends AudioWorkletProcessor {
         }
         break;
       }
+
+      case 'setMuteMask':
+        this.muteMask = data.mask;
+        break;
 
       case 'dispose':
         this.cleanup();

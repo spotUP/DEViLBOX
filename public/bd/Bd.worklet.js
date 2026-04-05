@@ -16,6 +16,7 @@ class BdProcessor extends AudioWorkletProcessor {
     this.lastHeapBuffer = null;
     this.initializing = false;
     this.processCount = 0;
+    this.muteMask = 0xFFFFFFFF;
 
     this.port.onmessage = (event) => {
       this.handleMessage(event.data);
@@ -85,6 +86,10 @@ class BdProcessor extends AudioWorkletProcessor {
         if (this.module && typeof this.module._player_set_channel_gain === 'function') {
           this.module._player_set_channel_gain(data.channel, data.gain);
         }
+        break;
+
+      case 'setMuteMask':
+        this.muteMask = data.mask;
         break;
 
       case 'dispose':

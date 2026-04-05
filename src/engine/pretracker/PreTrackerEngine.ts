@@ -179,6 +179,12 @@ export class PreTrackerEngine {
     this.workletNode?.port.postMessage({ type: 'setSubsong', subsong: index });
   }
 
+  /** Set per-channel mute mask. Bit N=1 means channel N is active, 0=muted. */
+  setMuteMask(mask: number): void {
+    if (!this.workletNode) return;
+    this.workletNode.port.postMessage({ type: 'setMuteMask', mask });
+  }
+
   dispose(): void {
     this._disposed = true;
     this.workletNode?.port.postMessage({ type: 'dispose' });
