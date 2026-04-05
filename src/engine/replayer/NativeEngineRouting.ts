@@ -499,6 +499,15 @@ export async function startNativeEngines(
   for (const desc of WASM_ENGINES) {
     if (!shouldActivate(desc, song)) continue;
 
+    // Skip engines already running — prevents double-start when startNativeEngines
+    // is called twice in quick succession (e.g. FT2Toolbar play + usePatternPlayback
+    // effect both triggering it). The second loadSong would reinitialize the WASM
+    // backend, killing audio from the first start.
+    if (_runningEngineKeys.has(desc.key)) {
+      startedEngineKeys.add(desc.key);
+      continue;
+    }
+
     // Skip wildcard engines (formats: null) when a format-specific engine
     // already handles this song — prevents dual audio (e.g. Hively + UADE).
     if (desc.formats === null && startedEngineKeys.size > 0) continue;
