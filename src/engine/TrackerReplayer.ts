@@ -511,6 +511,11 @@ export class TrackerReplayer {
   // still allowing the pattern view to follow the scratch position.
   private _suppressNotes = false;
 
+  // Instrument IDs replaced with synths during libopenmpt playback.
+  // When _suppressNotes is true, notes for channels playing these instruments
+  // are still fired via ToneEngine (hybrid libopenmpt + ToneEngine playback).
+  private _replacedInstruments = new Set<number>();
+
   // SonicArranger dynamic track length (effect 0x9): overrides pattern length
   // Reset to 0 on each pattern advance; 0 = use normal pattern length
   private _saTrackLen = 0;
@@ -807,6 +812,22 @@ export class TrackerReplayer {
    */
   setSuppressNotes(suppress: boolean): void {
     this._suppressNotes = suppress;
+  }
+
+  /** Mark an instrument as replaced — its notes will be fired via ToneEngine
+   *  even when libopenmpt handles overall playback (_suppressNotes = true). */
+  markInstrumentReplaced(instrumentId: number): void {
+    this._replacedInstruments.add(instrumentId);
+  }
+
+  /** Unmark an instrument as replaced (revert to libopenmpt playback). */
+  unmarkInstrumentReplaced(instrumentId: number): void {
+    this._replacedInstruments.delete(instrumentId);
+  }
+
+  /** Whether any instruments are replaced with synths. */
+  get hasReplacedInstruments(): boolean {
+    return this._replacedInstruments.size > 0;
   }
 
   // ==========================================================================
@@ -1375,6 +1396,7 @@ export class TrackerReplayer {
 
     // Reset note suppression — startNativeEngines will re-enable if needed for this song
     this._suppressNotes = false;
+    this._replacedInstruments.clear();
 
     await unlockIOSAudio(); // Play silent MP3 + pump AudioContext for iOS
     _playLog('unlockIOSAudio');
@@ -2300,6 +2322,32 @@ export class TrackerReplayer {
           const fractionalRow = this.pattPos + (this.currentTick / this.speed);
           ap.processPatternRow(fractionalRow);
         }
+      }
+    }
+
+    // Hybrid playback: when libopenmpt handles audio (_suppressNotes = true)
+    // but some instruments have been replaced with synths, fire notes for
+    // channels whose current instrument is in the replaced set via ToneEngine.
+    if (this._suppressNotes && this._replacedInstruments.size > 0) {
+      for (let ch = 0; ch < this.channels.length; ch++) {
+        const channel = this.channels[ch];
+        const row = useNativeAccessor
+          ? this.accessor.getRow(this.songPos, this.pattPos, ch)
+          : pattern?.channels[ch]?.rows[this.pattPos];
+        if (!row) continue;
+
+        // Check if this row's instrument (or the channel's current instrument) is replaced
+        const chanInst = typeof channel.instrument === 'number' ? channel.instrument
+          : channel.instrument != null ? (channel.instrument as { id: number }).id : 0;
+        const instId = row.instrument || chanInst;
+        if (!instId || !this._replacedInstruments.has(instId)) continue;
+
+        if (readNewNote) {
+          this.processRow(ch, channel, row, safeTime);
+        } else if (this.currentTick !== 0) {
+          this.processEffectTick(ch, channel, row, safeTime + (this.currentTick * tickInterval));
+        }
+        this.processEnvelopesAndVibrato(channel, safeTime + (this.currentTick * tickInterval));
       }
     }
 
