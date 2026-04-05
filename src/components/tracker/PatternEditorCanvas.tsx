@@ -160,6 +160,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
   const visibleStartRef = useRef(0);
   const macroOverlayRef = useRef<HTMLDivElement>(null);
   const automationOverlayRef = useRef<HTMLDivElement>(null);
+  const automationPrevLenRef = useRef(0);
   const peerCursorDivRef = useRef<HTMLDivElement>(null);
   // Peer selection overlay (DOM overlay div — kept local)
   const peerSelectionDivRef = useRef<HTMLDivElement>(null);
@@ -2317,7 +2318,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
           macroOverlayRef.current.style.top = `${overlayTop}px`;
         }
         if (automationOverlayRef.current) {
-          automationOverlayRef.current.style.top = `${overlayTop}px`;
+          automationOverlayRef.current.style.transform = `translateY(${overlayTop - automationPrevLenRef.current * rowHeightRef.current}px)`;
         }
         rafId = requestAnimationFrame(tick);
         return;
@@ -3165,18 +3166,20 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
                 const nextLen = showGhostPatterns
                   ? (currentPatternIndex < patterns.length - 1 ? patterns[currentPatternIndex + 1]?.length : (patterns.length > 1 ? patterns[0]?.length : 0)) || 0
                   : 0;
+                automationPrevLenRef.current = prevLen;
                 return (
               <div
                 ref={automationOverlayRef}
                 style={{
                   position: 'absolute',
-                  top: scrollYRef.current,
+                  top: 0,
                   left: 0,
                   right: 0,
                   height: (prevLen + pattern.length + nextLen) * rowHeight,
-                  marginTop: -prevLen * rowHeight,
                   pointerEvents: 'none',
                   zIndex: 5,
+                  willChange: 'transform',
+                  transform: `translateY(${scrollYRef.current - prevLen * rowHeight}px)`,
                   clipPath: (() => {
                     const leftClip = channelOffsets[0] ?? LINE_NUMBER_WIDTH;
                     const patChCount = pattern.channels.length;
