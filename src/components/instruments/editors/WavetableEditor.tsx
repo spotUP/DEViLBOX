@@ -1,18 +1,29 @@
 /**
- * WavetableEditor - Full-featured Furnace-style wavetable editor
+ * WavetableEditor — Chip Musician Waveform Studio.
  *
- * Based on Furnace tracker's wavetable editing (waveEdit.cpp)
- * Features:
- * - Canvas-based waveform drawing
- * - Waveform generation (sine, triangle, saw, square, noise)
- * - Wavetable length/height control
- * - Multiple wavetables per instrument
- * - Preset selection
+ * Originally a simple Furnace-style wavetable editor; now a full
+ * studio with Draw / Harmonic / Math / Presets modes, drawing aids,
+ * A/B compare, chip constraint enforcement, and live spectrum.
+ *
+ * Compact layout ≈ the original small inline editor (drawing + generators).
+ * Studio layout opens the full workspace side-by-side with mode panels
+ * and the live spectrum.
+ *
+ * API compatibility: `wavetable` + `onChange` unchanged, so existing
+ * callers (Furnace instrument editor, GT Ultra modal) don't need to
+ * update. The new `initialLayout` prop lets parents open in studio mode.
  */
 
-import React, { useRef, useEffect, useState, useCallback } from 'react';
-import { Waves, Plus, RotateCcw, Trash2, Copy, Wand2, FileUp } from 'lucide-react';
+import React, { useRef, useState, useCallback, useMemo, useEffect } from 'react';
+import { Waves, Plus, Trash2, Copy, Wand2, FileUp } from 'lucide-react';
 import { WaveformThumbnail } from '@components/instruments/shared';
+import {
+  StudioToolbar, DrawCanvas, HarmonicPanel, MathPanel, PresetBrowser, LivePanels,
+  type StudioMode, type StudioLayout,
+  CHIP_TARGETS, detectChipTarget, type ChipTargetId,
+  applyChipTarget, dcRemove, normalize, invert as invertOp, reverse as reverseOp,
+  mirrorLeftToRight, quarterWaveReflect, phaseAlignToPeak,
+} from './wavetable';
 
 // ============================================================================
 // TYPES
@@ -31,6 +42,8 @@ interface WavetableEditorProps {
   onRemove?: () => void;
   height?: number;
   color?: string;
+  /** Initial layout — 'compact' (default) or 'studio' */
+  initialLayout?: StudioLayout;
 }
 
 interface WavetableListEditorProps {
@@ -40,7 +53,7 @@ interface WavetableListEditorProps {
 }
 
 // ============================================================================
-// WAVEFORM GENERATORS
+// WAVEFORM GENERATORS (used by the quick Wand2 dropdown + add-new)
 // ============================================================================
 
 type WaveformType = 'sine' | 'triangle' | 'saw' | 'square' | 'pulse25' | 'pulse12' | 'noise' | 'custom';
@@ -58,9 +71,7 @@ const generateWaveform = (type: WaveformType, length: number, maxValue: number):
         value = Math.sin(phase * 2 * Math.PI) * mid + mid;
         break;
       case 'triangle':
-        value = phase < 0.5
-          ? phase * 4 * mid
-          : (1 - phase) * 4 * mid;
+        value = phase < 0.5 ? phase * 4 * mid : (1 - phase) * 4 * mid;
         break;
       case 'saw':
         value = phase * maxValue;
@@ -87,6 +98,22 @@ const generateWaveform = (type: WaveformType, length: number, maxValue: number):
   return data;
 };
 
+// Resample helper used by file import and length changes
+const resampleData = (data: number[], targetLen: number): number[] => {
+  if (data.length === targetLen) return data;
+  const result: number[] = [];
+  const ratio = data.length / targetLen;
+  for (let i = 0; i < targetLen; i++) {
+    const srcPos = i * ratio;
+    const srcIndex = Math.floor(srcPos);
+    const frac = srcPos - srcIndex;
+    const a = data[srcIndex];
+    const b = data[(srcIndex + 1) % data.length];
+    result.push(Math.round(a + (b - a) * frac));
+  }
+  return result;
+};
+
 // ============================================================================
 // WAVETABLE EDITOR COMPONENT
 // ============================================================================
@@ -96,180 +123,75 @@ export const WavetableEditor: React.FC<WavetableEditorProps> = ({
   onChange,
   onRemove,
   height = 180,
-  color = '#06b6d4',
+  initialLayout = 'compact',
 }) => {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [isDragging, setIsDragging] = useState(false);
   const [showGenerator, setShowGenerator] = useState(false);
+
+  // Studio state
+  const [layout, setLayout] = useState<StudioLayout>(initialLayout);
+  const [mode, setMode] = useState<StudioMode>('draw');
+  const [chipTarget, setChipTarget] = useState<ChipTargetId>(() =>
+    detectChipTarget(wavetable.data.length || 32, wavetable.max ?? 15),
+  );
+  const [compareBuffer, setCompareBuffer] = useState<number[] | null>(null);
+  const [compareMax, setCompareMax] = useState<number>(wavetable.max ?? 15);
+  const [harmonics, setHarmonics] = useState<number[]>(() => {
+    const arr = new Array(32).fill(0);
+    arr[0] = 1;
+    return arr;
+  });
+  const [mathExpr, setMathExpr] = useState<string>('sin(x*TAU)');
 
   const maxValue = wavetable.max ?? 15;
   const length = wavetable.data.length || 32;
+  const targetConfig = CHIP_TARGETS[chipTarget];
+
+  // When chip target changes, resample/requantize the wavetable to match.
+  const handleChipTargetChange = useCallback(
+    (newTargetId: ChipTargetId) => {
+      const newTarget = CHIP_TARGETS[newTargetId];
+      setChipTarget(newTargetId);
+      // Only transform if the dimensions actually differ
+      if (length === newTarget.defaultLen && maxValue === newTarget.maxValue) return;
+      const result = applyChipTarget(wavetable.data, maxValue, newTarget.defaultLen, newTarget.maxValue);
+      onChange({ ...wavetable, data: result.data, len: result.len, max: result.max });
+    },
+    [length, maxValue, wavetable, onChange],
+  );
 
   // Handle file import (.wav or .h)
   const handleImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-
     try {
       if (file.name.endsWith('.h')) {
-        // Parse Makk .h format (comma separated numbers)
         const text = await file.text();
-        const values = text.split(/[\s,]+/).map(v => parseInt(v)).filter(v => !isNaN(v));
+        const values = text.split(/[\s,]+/).map((v) => parseInt(v)).filter((v) => !isNaN(v));
         if (values.length > 0) {
           const importMax = Math.max(...values);
-          // Scale to current editor height
-          const scaled = values.map(v => Math.round((v / importMax) * maxValue));
-          // Resize to current editor length
+          const scaled = values.map((v) => Math.round((v / importMax) * maxValue));
           const resampled = resampleData(scaled, length);
           onChange({ ...wavetable, data: resampled });
         }
       } else {
-        // Parse audio file
-        // Reuse the shared ToneEngine AudioContext for decoding.
-        // Creating throwaway contexts leaks them and iOS limits to ~4-6.
         const { getDevilboxAudioContext } = await import('@utils/audio-context');
         let audioCtx: AudioContext;
         try { audioCtx = getDevilboxAudioContext(); } catch { audioCtx = new AudioContext(); }
         const arrayBuffer = await file.arrayBuffer();
         const buffer = await audioCtx.decodeAudioData(arrayBuffer);
         const rawData = buffer.getChannelData(0);
-        
-        // Convert -1..1 float to 0..maxValue
-        const values = Array.from(rawData).map(v => Math.round((v + 1) / 2 * maxValue));
+        const values = Array.from(rawData).map((v) => Math.round((v + 1) / 2 * maxValue));
         const resampled = resampleData(values, length);
         onChange({ ...wavetable, data: resampled });
       }
     } catch (err) {
       console.error('Failed to import wavetable:', err);
     }
-    
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
-  const resampleData = (data: number[], targetLen: number): number[] => {
-    if (data.length === targetLen) return data;
-    const result: number[] = [];
-    const ratio = data.length / targetLen;
-    for (let i = 0; i < targetLen; i++) {
-      const srcPos = i * ratio;
-      const srcIndex = Math.floor(srcPos);
-      const frac = srcPos - srcIndex;
-      const a = data[srcIndex];
-      const b = data[(srcIndex + 1) % data.length];
-      result.push(Math.round(a + (b - a) * frac));
-    }
-    return result;
-  };
-
-  // Draw the wavetable
-  const drawWavetable = useCallback(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-
-    const dpr = window.devicePixelRatio || 1;
-    const logicalWidth = Math.max(320, length * 12);
-    const logicalHeight = height;
-    
-    // Set internal resolution for retina
-    canvas.width = logicalWidth * dpr;
-    canvas.height = logicalHeight * dpr;
-
-    // Set CSS display size (critical for retina sharpness)
-    canvas.style.width = logicalWidth + 'px';
-    canvas.style.height = logicalHeight + 'px';
-
-    ctx.scale(dpr, dpr);
-
-    const w = logicalWidth;
-    const h = logicalHeight;
-
-    // Clear
-    ctx.fillStyle = '#1a1a2e';
-    ctx.fillRect(0, 0, w, h);
-
-    // Draw grid
-    ctx.strokeStyle = '#2a2a4e';
-    ctx.lineWidth = 1;
-
-    // Horizontal grid (4 lines)
-    for (let i = 1; i < 4; i++) {
-      const y = (h / 4) * i;
-      ctx.beginPath();
-      ctx.moveTo(0, y);
-      ctx.lineTo(w, y);
-      ctx.stroke();
-    }
-
-    // Vertical grid (every 8 samples for 32-sample wave)
-    const gridStep = Math.max(1, Math.floor(length / 8));
-    for (let i = 0; i < length; i += gridStep) {
-      const x = (i / length) * w;
-      ctx.beginPath();
-      ctx.moveTo(x, 0);
-      ctx.lineTo(x, h);
-      ctx.stroke();
-    }
-
-    // Draw waveform as bars
-    const barWidth = w / length;
-    wavetable.data.forEach((value, i) => {
-      const x = i * barWidth;
-      const normalizedValue = value / maxValue;
-      const barHeight = normalizedValue * h;
-      const y = h - barHeight;
-
-      // Bar fill
-      ctx.fillStyle = color;
-      ctx.fillRect(x, y, barWidth - 1, barHeight);
-    });
-
-    // Draw waveform line on top
-    ctx.strokeStyle = 'rgba(255,255,255,0.5)';
-    ctx.lineWidth = 1;
-    ctx.beginPath();
-    wavetable.data.forEach((value, i) => {
-      const x = (i / length) * w + (barWidth / 2);
-      const y = h - (value / maxValue) * h;
-      if (i === 0) {
-        ctx.moveTo(x, y);
-      } else {
-        ctx.lineTo(x, y);
-      }
-    });
-    ctx.stroke();
-  }, [wavetable, maxValue, length, color, height]);
-
-  useEffect(() => {
-    drawWavetable();
-  }, [drawWavetable]);
-
-  // Mouse interaction
-  const handleMouseEvent = (e: React.MouseEvent, isDown: boolean = false) => {
-    if (!isDragging && !isDown) return;
-
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-
-    const rect = canvas.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
-
-    const sampleIndex = Math.floor((x / rect.width) * length);
-    const normalizedY = 1 - (y / rect.height);
-    const value = Math.round(normalizedY * maxValue);
-
-    if (sampleIndex >= 0 && sampleIndex < length) {
-      const newData = [...wavetable.data];
-      newData[sampleIndex] = Math.max(0, Math.min(maxValue, value));
-      onChange({ ...wavetable, data: newData });
-    }
-  };
-
-  // Generator functions
+  // Generator shortcuts
   const applyWaveform = (type: WaveformType) => {
     const newData = generateWaveform(type, length, maxValue);
     onChange({ ...wavetable, data: newData });
@@ -277,28 +199,28 @@ export const WavetableEditor: React.FC<WavetableEditorProps> = ({
   };
 
   const resizeWavetable = (newLength: number) => {
-    if (newLength < 4 || newLength > 256) return;
-
+    const min = targetConfig.minLen;
+    const max = targetConfig.maxLen;
+    const step = targetConfig.lenStep;
+    const snapped = Math.round(newLength / step) * step;
+    if (snapped < min || snapped > max) return;
     const newData: number[] = [];
-    for (let i = 0; i < newLength; i++) {
-      // Interpolate from old data
-      const srcIndex = (i / newLength) * wavetable.data.length;
+    for (let i = 0; i < snapped; i++) {
+      const srcIndex = (i / snapped) * wavetable.data.length;
       const srcIndexFloor = Math.floor(srcIndex);
       const srcIndexCeil = Math.min(wavetable.data.length - 1, srcIndexFloor + 1);
       const frac = srcIndex - srcIndexFloor;
-      const value = wavetable.data[srcIndexFloor] * (1 - frac) + wavetable.data[srcIndexCeil] * frac;
+      const value =
+        wavetable.data[srcIndexFloor] * (1 - frac) + wavetable.data[srcIndexCeil] * frac;
       newData.push(Math.round(value));
     }
-
-    onChange({ ...wavetable, data: newData, len: newLength });
+    onChange({ ...wavetable, data: newData, len: snapped });
   };
 
-  const setMaxValue = (newMax: number) => {
+  const setMaxValueHandler = (newMax: number) => {
     if (newMax < 1 || newMax > 255) return;
-
-    // Scale existing data
     const scale = newMax / maxValue;
-    const newData = wavetable.data.map(v => Math.round(v * scale));
+    const newData = wavetable.data.map((v) => Math.round(v * scale));
     onChange({ ...wavetable, data: newData, max: newMax });
   };
 
@@ -307,25 +229,64 @@ export const WavetableEditor: React.FC<WavetableEditorProps> = ({
     onChange({ ...wavetable, data: Array(length).fill(mid) });
   };
 
-  const invertWavetable = () => {
-    const newData = wavetable.data.map(v => maxValue - v);
-    onChange({ ...wavetable, data: newData });
-  };
+  const updateData = useCallback(
+    (newData: number[]) => {
+      onChange({ ...wavetable, data: newData });
+    },
+    [wavetable, onChange],
+  );
+
+  // ── Quick ops (toolbar) ─────────────────────────────────────
+  const opDcRemove = useCallback(() => updateData(dcRemove(wavetable.data, maxValue)), [wavetable.data, maxValue, updateData]);
+  const opNormalize = useCallback(() => updateData(normalize(wavetable.data, maxValue)), [wavetable.data, maxValue, updateData]);
+  const opInvert = useCallback(() => updateData(invertOp(wavetable.data, maxValue)), [wavetable.data, maxValue, updateData]);
+  const opReverse = useCallback(() => updateData(reverseOp(wavetable.data)), [wavetable.data, updateData]);
+  const opMirror = useCallback(() => updateData(mirrorLeftToRight(wavetable.data)), [wavetable.data, updateData]);
+  const opQuarterReflect = useCallback(() => updateData(quarterWaveReflect(wavetable.data, maxValue)), [wavetable.data, maxValue, updateData]);
+  const opPhaseAlign = useCallback(() => updateData(phaseAlignToPeak(wavetable.data)), [wavetable.data, updateData]);
+
+  // ── A/B compare ─────────────────────────────────────────────
+  const captureCompare = useCallback(() => {
+    setCompareBuffer([...wavetable.data]);
+    setCompareMax(maxValue);
+  }, [wavetable.data, maxValue]);
+
+  const clearCompare = useCallback(() => {
+    setCompareBuffer(null);
+  }, []);
+
+  const swapCompare = useCallback(() => {
+    if (!compareBuffer) return;
+    const currentData = [...wavetable.data];
+    updateData(compareBuffer);
+    setCompareBuffer(currentData);
+  }, [compareBuffer, wavetable.data, updateData]);
+
+  // ── Layout toggle effect: keep chip target synced when wavetable changes externally ──
+  useEffect(() => {
+    // Nothing to do — the detectChipTarget is only used for initial mount.
+  }, []);
+
+  const showStudioPanels = layout === 'studio';
+  const showLivePanels = layout === 'studio';
+
+  const headerBadge = useMemo(() => (
+    <div className="flex items-center gap-2">
+      <Waves size={14} className="text-accent-highlight" />
+      <span className="font-mono text-[10px] font-bold text-text-primary">
+        Wave {wavetable.id}
+      </span>
+      <span className="text-[9px] text-text-muted">
+        {length}×{maxValue + 1}
+      </span>
+    </div>
+  ), [wavetable.id, length, maxValue]);
 
   return (
     <div className="bg-dark-bgSecondary rounded-lg border border-dark-border overflow-hidden">
-      {/* Header */}
+      {/* Header — always shown */}
       <div className="flex items-center justify-between px-3 py-2 bg-dark-bg border-b border-dark-border">
-        <div className="flex items-center gap-2">
-          <Waves size={14} className="text-accent-highlight" />
-          <span className="font-mono text-[10px] font-bold text-text-primary">
-            Wave {wavetable.id}
-          </span>
-          <span className="text-[9px] text-text-muted">
-            {length}×{maxValue + 1}
-          </span>
-        </div>
-
+        {headerBadge}
         <div className="flex items-center gap-1">
           {/* Import */}
           <button
@@ -338,12 +299,11 @@ export const WavetableEditor: React.FC<WavetableEditorProps> = ({
           <input
             ref={fileInputRef}
             type="file"
-            accept=".wav,.h"
+            accept=".wav,.h,.fuw"
             onChange={handleImport}
             className="hidden"
           />
-
-          {/* Generator dropdown */}
+          {/* Generator dropdown (Compact quick access) */}
           <div className="relative">
             <button
               onClick={() => setShowGenerator(!showGenerator)}
@@ -352,45 +312,33 @@ export const WavetableEditor: React.FC<WavetableEditorProps> = ({
             >
               <Wand2 size={14} />
             </button>
-
             {showGenerator && (
               <div className="absolute top-full right-0 mt-1 bg-dark-bg border border-dark-border rounded shadow-lg z-20 min-w-[120px]">
-                {(['sine', 'triangle', 'saw', 'square', 'pulse25', 'pulse12', 'noise'] as WaveformType[]).map(type => (
-                  <button
-                    key={type}
-                    onClick={() => applyWaveform(type)}
-                    className="w-full px-3 py-1.5 text-left text-[10px] font-mono text-text-primary hover:bg-dark-bgSecondary capitalize"
-                  >
-                    {type}
-                  </button>
-                ))}
+                {(['sine', 'triangle', 'saw', 'square', 'pulse25', 'pulse12', 'noise'] as WaveformType[]).map(
+                  (type) => (
+                    <button
+                      key={type}
+                      onClick={() => applyWaveform(type)}
+                      className="w-full px-3 py-1.5 text-left text-[10px] font-mono text-text-primary hover:bg-dark-bgSecondary capitalize"
+                    >
+                      {type}
+                    </button>
+                  ),
+                )}
               </div>
             )}
           </div>
-
-          {/* Invert */}
-          <button
-            onClick={invertWavetable}
-            className="p-1 text-text-muted hover:text-text-primary hover:bg-dark-border/50 rounded"
-            title="Invert"
-          >
-            <Copy size={14} />
-          </button>
-
-          {/* Clear */}
           <button
             onClick={clearWavetable}
             className="p-1 text-text-muted hover:text-text-primary hover:bg-dark-border/50 rounded"
             title="Clear"
           >
-            <RotateCcw size={14} />
+            <Copy size={14} className="rotate-180" />
           </button>
-
-          {/* Remove */}
           {onRemove && (
             <button
               onClick={onRemove}
-              className="p-1 text-red-400 hover:text-red-300 hover:bg-red-500/20 rounded"
+              className="p-1 text-accent-error hover:text-accent-error hover:bg-accent-error/20 rounded"
               title="Remove wavetable"
             >
               <Trash2 size={14} />
@@ -399,57 +347,125 @@ export const WavetableEditor: React.FC<WavetableEditorProps> = ({
         </div>
       </div>
 
-      {/* Canvas */}
-      <div className="relative">
-        <canvas
-          ref={canvasRef}
-          width={Math.max(320, length * 12)}
-          height={height}
-          className="cursor-crosshair"
-          onMouseDown={(e) => { setIsDragging(true); handleMouseEvent(e, true); }}
-          onMouseMove={(e) => handleMouseEvent(e)}
-          onMouseUp={() => setIsDragging(false)}
-          onMouseLeave={() => setIsDragging(false)}
-        />
-      </div>
+      {/* Studio toolbar */}
+      <StudioToolbar
+        mode={mode}
+        onModeChange={setMode}
+        chipTarget={chipTarget}
+        onChipTargetChange={handleChipTargetChange}
+        layout={layout}
+        onLayoutChange={setLayout}
+        onDcRemove={opDcRemove}
+        onNormalize={opNormalize}
+        onInvert={opInvert}
+        onReverse={opReverse}
+        onMirror={opMirror}
+        onQuarterReflect={opQuarterReflect}
+        onPhaseAlign={opPhaseAlign}
+        hasCompareBuffer={compareBuffer !== null}
+        onCaptureCompare={captureCompare}
+        onClearCompare={clearCompare}
+        onSwapCompare={swapCompare}
+      />
 
-      {/* Size controls */}
-      <div className="flex items-center justify-between px-3 py-2 bg-dark-bg border-t border-dark-border text-[9px] font-mono">
-        <div className="flex items-center gap-2">
-          <span className="text-text-muted">Length:</span>
-          <button
-            onClick={() => resizeWavetable(length / 2)}
-            className="text-text-muted hover:text-text-primary"
-            disabled={length <= 4}
-          >
-            ÷2
-          </button>
-          <span className="text-text-primary">{length}</span>
-          <button
-            onClick={() => resizeWavetable(length * 2)}
-            className="text-text-muted hover:text-text-primary"
-            disabled={length >= 256}
-          >
-            ×2
-          </button>
+      {/* Main content — draw canvas always visible, optional side/bottom panels */}
+      <div className={`p-2 ${showStudioPanels ? 'grid gap-2' : 'flex flex-col gap-2'}`}
+        style={showStudioPanels ? { gridTemplateColumns: 'minmax(0, 1fr) 280px' } : undefined}>
+        {/* Left column: draw canvas + mode-specific panel */}
+        <div className="flex flex-col gap-2 min-w-0">
+          <DrawCanvas
+            data={wavetable.data}
+            maxValue={maxValue}
+            height={height}
+            chipTarget={targetConfig}
+            compareData={compareBuffer}
+            onChange={updateData}
+          />
+
+          {/* Size controls */}
+          <div className="flex items-center justify-between px-2 py-1.5 bg-dark-bg rounded border border-dark-border text-[9px] font-mono">
+            <div className="flex items-center gap-2">
+              <span className="text-text-muted">Length:</span>
+              <button
+                onClick={() => resizeWavetable(length - targetConfig.lenStep)}
+                className="text-text-muted hover:text-text-primary disabled:opacity-40"
+                disabled={targetConfig.lockedLen || length <= targetConfig.minLen}
+              >
+                ÷
+              </button>
+              <span className="text-text-primary">{length}</span>
+              <button
+                onClick={() => resizeWavetable(length + targetConfig.lenStep)}
+                className="text-text-muted hover:text-text-primary disabled:opacity-40"
+                disabled={targetConfig.lockedLen || length >= targetConfig.maxLen}
+              >
+                ×
+              </button>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-text-muted">Height:</span>
+              <select
+                value={maxValue}
+                onChange={(e) => setMaxValueHandler(parseInt(e.target.value))}
+                disabled={targetConfig.lockedDepth}
+                className="bg-dark-bgSecondary border border-dark-border rounded px-1 py-0.5 text-text-primary disabled:opacity-50"
+              >
+                <option value={3}>4</option>
+                <option value={7}>8</option>
+                <option value={15}>16</option>
+                <option value={31}>32</option>
+                <option value={63}>64</option>
+                <option value={127}>128</option>
+                <option value={255}>256</option>
+              </select>
+            </div>
+            <div className="text-text-subtle text-[9px]">
+              {targetConfig.description}
+            </div>
+          </div>
+
+          {/* Mode panel (studio layout only) */}
+          {showStudioPanels && mode === 'harmonic' && (
+            <HarmonicPanel
+              harmonics={harmonics}
+              onHarmonicsChange={setHarmonics}
+              length={length}
+              maxValue={maxValue}
+              onDataChange={updateData}
+            />
+          )}
+          {showStudioPanels && mode === 'math' && (
+            <MathPanel
+              expr={mathExpr}
+              onExprChange={setMathExpr}
+              length={length}
+              maxValue={maxValue}
+              onDataChange={updateData}
+            />
+          )}
+          {showStudioPanels && mode === 'presets' && (
+            <PresetBrowser
+              currentLen={length}
+              currentMax={maxValue}
+              currentData={wavetable.data}
+              onLoad={(data, len, max) =>
+                onChange({ ...wavetable, data, len, max })
+              }
+            />
+          )}
         </div>
 
-        <div className="flex items-center gap-2">
-          <span className="text-text-muted">Height:</span>
-          <select
-            value={maxValue}
-            onChange={(e) => setMaxValue(parseInt(e.target.value))}
-            className="bg-dark-bgSecondary border border-dark-border rounded px-1 py-0.5 text-text-primary"
-          >
-            <option value={3}>4</option>
-            <option value={7}>8</option>
-            <option value={15}>16</option>
-            <option value={31}>32</option>
-            <option value={63}>64</option>
-            <option value={127}>128</option>
-            <option value={255}>256</option>
-          </select>
-        </div>
+        {/* Right column: live spectrum (studio layout only) */}
+        {showLivePanels && (
+          <div className="flex flex-col gap-2">
+            <LivePanels
+              data={wavetable.data}
+              maxValue={maxValue}
+              compareData={compareBuffer}
+              compareMax={compareMax}
+            />
+          </div>
+        )}
       </div>
     </div>
   );
@@ -465,23 +481,19 @@ export const WavetableListEditor: React.FC<WavetableListEditorProps> = ({
   maxWavetables = 64,
 }) => {
   const [selectedWave, setSelectedWave] = useState<number | null>(
-    wavetables.length > 0 ? 0 : null
+    wavetables.length > 0 ? 0 : null,
   );
 
   const addWavetable = () => {
     if (wavetables.length >= maxWavetables) return;
-
-    const newId = wavetables.length > 0
-      ? Math.max(...wavetables.map(w => w.id)) + 1
-      : 0;
-
+    const newId =
+      wavetables.length > 0 ? Math.max(...wavetables.map((w) => w.id)) + 1 : 0;
     const newWave: WavetableData = {
       id: newId,
       data: generateWaveform('sine', 32, 15),
       len: 32,
       max: 15,
     };
-
     onChange([...wavetables, newWave]);
     setSelectedWave(wavetables.length);
   };
@@ -489,9 +501,10 @@ export const WavetableListEditor: React.FC<WavetableListEditorProps> = ({
   const removeWavetable = (index: number) => {
     const newWavetables = wavetables.filter((_, i) => i !== index);
     onChange(newWavetables);
-
     if (selectedWave === index) {
-      setSelectedWave(newWavetables.length > 0 ? Math.min(index, newWavetables.length - 1) : null);
+      setSelectedWave(
+        newWavetables.length > 0 ? Math.min(index, newWavetables.length - 1) : null,
+      );
     } else if (selectedWave !== null && selectedWave > index) {
       setSelectedWave(selectedWave - 1);
     }
@@ -505,16 +518,13 @@ export const WavetableListEditor: React.FC<WavetableListEditorProps> = ({
 
   const duplicateWavetable = (index: number) => {
     if (wavetables.length >= maxWavetables) return;
-
     const source = wavetables[index];
-    const newId = Math.max(...wavetables.map(w => w.id)) + 1;
-
+    const newId = Math.max(...wavetables.map((w) => w.id)) + 1;
     const newWave: WavetableData = {
       ...source,
       id: newId,
       data: [...source.data],
     };
-
     onChange([...wavetables, newWave]);
     setSelectedWave(wavetables.length);
   };
@@ -538,11 +548,14 @@ export const WavetableListEditor: React.FC<WavetableListEditorProps> = ({
               <WaveformThumbnail
                 data={wave.data}
                 maxValue={wave.max ?? 15}
-                width={52} height={18}
+                width={52}
+                height={18}
                 color={isSelected ? '#22d3ee' : '#4b5563'}
                 style="bar"
               />
-              <span className={`font-mono text-[9px] ${isSelected ? 'text-accent-highlight' : 'text-text-muted'}`}>
+              <span
+                className={`font-mono text-[9px] ${isSelected ? 'text-accent-highlight' : 'text-text-muted'}`}
+              >
                 Wave {wave.id}
               </span>
             </button>

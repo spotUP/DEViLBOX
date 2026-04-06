@@ -18,6 +18,11 @@ import type { FederatedPointerEvent } from 'pixi.js';
 import { usePixiTheme } from '../../theme';
 import { PixiLabel, PixiButton, PixiSlider, PixiSelect, PixiIcon } from '../../components';
 import type { SelectOption } from '../../components';
+import {
+  dcRemove, normalize as opNormalize,
+  mirrorLeftToRight, quarterWaveReflect, phaseAlignToPeak,
+  reverse as opReverse, penInterpolate,
+} from '@components/instruments/editors/wavetable';
 
 // ── Types ───────────────────────────────────────────────────────────────
 
@@ -168,6 +173,38 @@ export const PixiWavetableEditor: React.FC<PixiWavetableEditorProps> = ({
     updateCurrentWave({ ...currentWave, data: currentWave.data.map(v => maxValue - v) });
   }, [currentWave, maxValue, updateCurrentWave]);
 
+  // ── Studio ops ──────────────────────────────────────────────────────
+  const opDc = useCallback(() => {
+    if (!currentWave) return;
+    updateCurrentWave({ ...currentWave, data: dcRemove(currentWave.data, maxValue) });
+  }, [currentWave, maxValue, updateCurrentWave]);
+
+  const opNorm = useCallback(() => {
+    if (!currentWave) return;
+    updateCurrentWave({ ...currentWave, data: opNormalize(currentWave.data, maxValue) });
+  }, [currentWave, maxValue, updateCurrentWave]);
+
+  const opReverseWave = useCallback(() => {
+    if (!currentWave) return;
+    updateCurrentWave({ ...currentWave, data: opReverse(currentWave.data) });
+  }, [currentWave, updateCurrentWave]);
+
+  const opMirror = useCallback(() => {
+    if (!currentWave) return;
+    updateCurrentWave({ ...currentWave, data: mirrorLeftToRight(currentWave.data) });
+  }, [currentWave, updateCurrentWave]);
+
+  const opQuarter = useCallback(() => {
+    if (!currentWave) return;
+    updateCurrentWave({ ...currentWave, data: quarterWaveReflect(currentWave.data, maxValue) });
+  }, [currentWave, maxValue, updateCurrentWave]);
+
+  const opPhase = useCallback(() => {
+    if (!currentWave) return;
+    updateCurrentWave({ ...currentWave, data: phaseAlignToPeak(currentWave.data) });
+  }, [currentWave, updateCurrentWave]);
+
+
   // ── Resize ──────────────────────────────────────────────────────────
   const resizeWavetable = useCallback((newLength: number) => {
     if (!currentWave || newLength < 4 || newLength > 256) return;
@@ -235,21 +272,22 @@ export const PixiWavetableEditor: React.FC<PixiWavetableEditorProps> = ({
     g.stroke({ color: theme.text.color, width: 1, alpha: 0.5 });
   }, [CANVAS_W, CANVAS_H, currentWave, waveLength, maxValue, barColor, theme]);
 
-  // ── Pointer interaction for draw mode ───────────────────────────────
+  // ── Pointer interaction for draw mode (with pen interpolation) ─────
+  const lastDrawIdxRef = useRef<number | null>(null);
+
   const editSample = useCallback((e: FederatedPointerEvent) => {
     if (!currentWave) return;
     const bounds = (e.currentTarget as unknown as { getBounds(): { x: number; y: number; width: number; height: number } }).getBounds();
     const localX = e.global.x - bounds.x;
     const localY = e.global.y - bounds.y;
-    const sampleIndex = Math.floor((localX / CANVAS_W) * waveLength);
+    const sampleIndex = Math.max(0, Math.min(waveLength - 1, Math.floor((localX / CANVAS_W) * waveLength)));
     const normalizedY = 1 - (localY / CANVAS_H);
     const value = Math.round(normalizedY * maxValue);
 
-    if (sampleIndex >= 0 && sampleIndex < waveLength) {
-      const newData = [...currentWave.data];
-      newData[sampleIndex] = Math.max(0, Math.min(maxValue, value));
-      updateCurrentWave({ ...currentWave, data: newData });
-    }
+    const fromIdx = lastDrawIdxRef.current ?? sampleIndex;
+    const newData = penInterpolate(currentWave.data, fromIdx, sampleIndex, value, maxValue);
+    lastDrawIdxRef.current = sampleIndex;
+    updateCurrentWave({ ...currentWave, data: newData });
   }, [currentWave, CANVAS_W, CANVAS_H, waveLength, maxValue, updateCurrentWave]);
 
   const handlePointerDown = useCallback((e: FederatedPointerEvent) => {
@@ -266,6 +304,7 @@ export const PixiWavetableEditor: React.FC<PixiWavetableEditorProps> = ({
   const handlePointerUp = useCallback(() => {
     isDraggingRef.current = false;
     setIsDragging(false);
+    lastDrawIdxRef.current = null;
   }, []);
 
   // ── Render ──────────────────────────────────────────────────────────
@@ -302,6 +341,60 @@ export const PixiWavetableEditor: React.FC<PixiWavetableEditorProps> = ({
           onChange={(v) => applyWaveform(v as WaveformType)}
           placeholder="Generate"
           width={90}
+        />
+
+        {/* DC remove */}
+        <PixiButton
+          label="DC"
+          variant="ghost"
+          size="sm"
+          onClick={opDc}
+          tooltip="Remove DC offset"
+        />
+
+        {/* Normalize */}
+        <PixiButton
+          label="Norm"
+          variant="ghost"
+          size="sm"
+          onClick={opNorm}
+          tooltip="Normalize to full range"
+        />
+
+        {/* Mirror */}
+        <PixiButton
+          label="Mirror"
+          variant="ghost"
+          size="sm"
+          onClick={opMirror}
+          tooltip="Mirror left half to right"
+        />
+
+        {/* Quarter reflect */}
+        <PixiButton
+          label="Quart"
+          variant="ghost"
+          size="sm"
+          onClick={opQuarter}
+          tooltip="Quarter-wave reflect (symmetric)"
+        />
+
+        {/* Phase align */}
+        <PixiButton
+          label="Phase"
+          variant="ghost"
+          size="sm"
+          onClick={opPhase}
+          tooltip="Rotate peak to index 0"
+        />
+
+        {/* Reverse */}
+        <PixiButton
+          label="Rev"
+          variant="ghost"
+          size="sm"
+          onClick={opReverseWave}
+          tooltip="Reverse waveform"
         />
 
         {/* Invert */}

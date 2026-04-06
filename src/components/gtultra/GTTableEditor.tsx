@@ -13,6 +13,7 @@
 
 import React, { useRef, useEffect, useCallback, useState } from 'react';
 import { useGTUltraStore } from '../../stores/useGTUltraStore';
+import { GTUltraTableStudioModal } from './GTUltraTableStudioModal';
 
 type TableType = 'wave' | 'pulse' | 'filter' | 'speed';
 const TABLE_TYPES: TableType[] = ['wave', 'pulse', 'filter', 'speed'];
@@ -39,6 +40,7 @@ export const GTTableEditor: React.FC<{ width: number; height: number }> = ({ wid
   const [hexDigit, setHexDigit] = useState<number | null>(null);
   const [drawing, setDrawing] = useState(false);
   const [hoverInfo, setHoverInfo] = useState<{ idx: number; x: number; y: number } | null>(null);
+  const [studioOpen, setStudioOpen] = useState(false);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const tableData = useGTUltraStore((s) => s.tableData);
   const tableCursor = useGTUltraStore((s) => s.tableCursor);
@@ -294,6 +296,24 @@ export const GTTableEditor: React.FC<{ width: number; height: number }> = ({ wid
             {t}
           </button>
         ))}
+        <button
+          onClick={() => setStudioOpen(true)}
+          title="Open Waveform Studio (draw, harmonic, math, presets)"
+          style={{
+            padding: '0 10px',
+            background: 'transparent',
+            color: '#22d3ee',
+            border: 'none',
+            borderLeft: '1px solid var(--color-border)',
+            cursor: 'pointer',
+            fontFamily: '"JetBrains Mono", monospace',
+            fontSize: 10,
+            fontWeight: 'bold',
+            textTransform: 'uppercase',
+          }}
+        >
+          Studio
+        </button>
       </div>
 
       {/* Table content */}
@@ -331,6 +351,14 @@ export const GTTableEditor: React.FC<{ width: number; height: number }> = ({ wid
           </div>
         )}
       </div>
+
+      {/* Waveform Studio modal */}
+      <GTUltraTableStudioModal
+        isOpen={studioOpen}
+        onClose={() => setStudioOpen(false)}
+        tableType={activeTable}
+        column={activeCol}
+      />
     </div>
   );
 };
