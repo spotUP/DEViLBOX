@@ -73,6 +73,7 @@ class GTUltraProcessor extends AudioWorkletProcessor {
           this._undo = this.module.cwrap('gt_undo', null, []);
           this._redo = this.module.cwrap('gt_redo', null, []);
           this._canUndo = this.module.cwrap('gt_can_undo', 'number', []);
+          this._canRedo = this.module.cwrap('gt_can_redo', 'number', []);
           this._checkpointUndo = this.module.cwrap('gt_checkpoint_undo', null, []);
           this._markEdited = this.module.cwrap('gt_mark_edited', null, ['number', 'number']);
 
