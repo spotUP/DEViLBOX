@@ -100,6 +100,15 @@ function forwardReplayerMuteMask(channels: MixerChannelState[], isSoloing: boole
       for (let ch = 0; ch < 8; ch++) ml.setChannelOn(ch, (mask & (1 << ch)) !== 0);
     }
   }).catch(() => {});
+
+  // C64 SID: instance-based (not singleton), access via replayer
+  try {
+    const { getTrackerReplayer } = require('../engine/TrackerReplayer');
+    const sidEngine = getTrackerReplayer().getC64SIDEngine();
+    if (sidEngine) {
+      sidEngine.setMuteMask(mask & 0x07); // 3 SID voices
+    }
+  } catch { /* replayer not initialized */ }
 }
 
 // ── SunVox mute bridge ─────────────────────────────────────────────────────
