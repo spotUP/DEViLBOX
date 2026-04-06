@@ -33,6 +33,7 @@
 import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
 import type { Pattern, ChannelData, TrackerCell } from '@/types';
 import type { InstrumentConfig } from '@/types/instrument';
+import type { UADEPatternLayout } from '@/engine/uade/UADEPatternEncoder';
 import { createSamplerInstrument, amigaNoteToXM } from './AmigaUtils';
 
 // ── Binary helpers ────────────────────────────────────────────────────────────
@@ -132,14 +133,22 @@ function readSongPtr(buf: Uint8Array, origin: number, songsOff: number, idx: num
 
 // ── Decode phrase data into tracker rows ──────────────────────────────────────
 
-function decodePhraseToRows(buf: Uint8Array, phraseOff: number): TrackerCell[] {
+interface PhraseDecodeResult {
+  rows: TrackerCell[];
+  /** File byte offset of each row's note/rest byte */
+  offsets: number[];
+}
+
+function decodePhraseToRows(buf: Uint8Array, phraseOff: number): PhraseDecodeResult {
   const rows: TrackerCell[] = [];
-  if (phraseOff < 0 || phraseOff >= buf.length) return rows;
+  const offsets: number[] = [];
+  if (phraseOff < 0 || phraseOff >= buf.length) return { rows, offsets };
 
   let pos = phraseOff;
   let currentInstr = 0;
 
   for (let i = 0; i < 256 && pos < buf.length; i++) {
+    const byteOff = pos;
     const b = buf[pos++];
 
     if (b === 0xFF) break;
@@ -151,6 +160,7 @@ function decodePhraseToRows(buf: Uint8Array, phraseOff: number): TrackerCell[] {
         note: xmNote, instrument: currentInstr,
         volume: 0, effTyp: 0, eff: 0, effTyp2: 0, eff2: 0,
       });
+      offsets.push(byteOff);
     } else if (b >= 0xE0 && b <= 0xEF) {
       // Set instrument (0xE0 = inst 1, 0xE1 = inst 2, etc.)
       currentInstr = (b & 0x0F) + 1;
@@ -164,10 +174,11 @@ function decodePhraseToRows(buf: Uint8Array, phraseOff: number): TrackerCell[] {
       rows.push({
         note: 0, instrument: 0, volume: 0, effTyp: 0, eff: 0, effTyp2: 0, eff2: 0,
       });
+      offsets.push(byteOff);
     }
   }
 
-  return rows;
+  return { rows, offsets };
 }
 
 // ── Main parser ───────────────────────────────────────────────────────────────
@@ -259,6 +270,8 @@ export function parseWallyBebenFile(buffer: ArrayBuffer, filename: string): Trac
   // ── Parse voice sequences and build patterns ────────────────────────────
   const patterns: Pattern[] = [];
   const songPositions: number[] = [];
+  // cellOffsetMap: keyed by "patIdx-channel-row" → file byte offset
+  const cellOffsetMap = new Map<string, number>();
 
   if (songsOff >= 0 && phraseOffsets.length > 0) {
     // Read voice sequences for subsong 1
@@ -281,21 +294,27 @@ export function parseWallyBebenFile(buffer: ArrayBuffer, filename: string): Trac
 
     for (let step = 0; step < numSteps; step++) {
       const channelRows: TrackerCell[][] = [];
+      const channelOffsets: number[][] = [];
       let maxRows = 1;
 
       for (let v = 0; v < 4; v++) {
         const phraseIdx = step < voiceSeqs[v].length ? voiceSeqs[v][step] : -1;
         let rows: TrackerCell[] = [];
+        let offsets: number[] = [];
 
         if (phraseIdx >= 0 && phraseIdx < phraseOffsets.length) {
-          rows = decodePhraseToRows(buf, phraseOffsets[phraseIdx]);
+          const result = decodePhraseToRows(buf, phraseOffsets[phraseIdx]);
+          rows = result.rows;
+          offsets = result.offsets;
         }
 
         if (rows.length === 0) {
           rows = [{ note: 0, instrument: 0, volume: 0, effTyp: 0, eff: 0, effTyp2: 0, eff2: 0 }];
+          offsets = [-1];
         }
 
         channelRows.push(rows);
+        channelOffsets.push(offsets);
         maxRows = Math.max(maxRows, rows.length);
       }
 
@@ -304,10 +323,16 @@ export function parseWallyBebenFile(buffer: ArrayBuffer, filename: string): Trac
       const channels: ChannelData[] = [];
       for (let v = 0; v < 4; v++) {
         const rows = channelRows[v];
+        const offsets = channelOffsets[v];
         const trackerRows: TrackerCell[] = [];
         for (let r = 0; r < maxRows; r++) {
           trackerRows.push(r < rows.length ? rows[r]
             : { note: 0, instrument: 0, volume: 0, effTyp: 0, eff: 0, effTyp2: 0, eff2: 0 });
+          // Record file offset for cells that have one
+          const off = r < offsets.length ? offsets[r] : -1;
+          if (off >= 0) {
+            cellOffsetMap.set(`${step}-${v}-${r}`, off);
+          }
         }
         channels.push({
           id: `channel-${v}`, name: `Channel ${v + 1}`,
@@ -351,6 +376,31 @@ export function parseWallyBebenFile(buffer: ArrayBuffer, filename: string): Trac
     songPositions.push(0);
   }
 
+  // ── Build UADEPatternLayout for live editing ────────────────────────────
+  const wallyBebenLayout: UADEPatternLayout = {
+    formatId: 'wallyBeben',
+    patternDataFileOffset: 0, // not used — getCellFileOffset is custom
+    bytesPerCell: 1,
+    rowsPerPattern: patterns.length > 0 ? patterns[0].length : 64,
+    numChannels: 4,
+    numPatterns: patterns.length,
+    moduleSize: buf.byteLength,
+    encodeCell: (cell: TrackerCell): Uint8Array => {
+      const out = new Uint8Array(1);
+      if (cell.note > 0) {
+        // XM note back to WB note index: amigaNoteToXM adds 12, undo that, then -1 for 0-based
+        const wbIdx = cell.note - 12 - 1;
+        out[0] = (wbIdx >= 0 && wbIdx <= 0x23) ? wbIdx : 0x24;
+      } else {
+        out[0] = 0x24; // rest
+      }
+      return out;
+    },
+    getCellFileOffset: (pattern: number, row: number, channel: number): number => {
+      return cellOffsetMap.get(`${pattern}-${channel}-${row}`) ?? -1;
+    },
+  };
+
   return {
     name: `${moduleName} [Wally Beben]`,
     format: 'MOD' as TrackerFormat,
@@ -365,5 +415,6 @@ export function parseWallyBebenFile(buffer: ArrayBuffer, filename: string): Trac
     linearPeriods: false,
     uadeEditableFileData: buffer.slice(0) as ArrayBuffer,
     uadeEditableFileName: filename,
+    uadePatternLayout: wallyBebenLayout,
   };
 }

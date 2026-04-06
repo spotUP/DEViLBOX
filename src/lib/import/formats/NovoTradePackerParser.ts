@@ -26,6 +26,7 @@
 
 import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
 import type { InstrumentConfig } from '@/types';
+import { createSamplerInstrument } from './AmigaUtils';
 
 // ── Constants ─────────────────────────────────────────────────────────────
 
@@ -114,6 +115,7 @@ export function isNovoTradePackerFormat(buffer: ArrayBuffer | Uint8Array): boole
  * Parse a NovoTrade Packer module file into a TrackerSong.
  *
  * Extracts sample count, song length, and pattern count from the binary header.
+ * Extracts PCM samples from the SAMP chunk using descriptor table at offset 32.
  * Actual audio playback is always delegated to UADE.
  *
  * @param buffer   Raw file bytes (ArrayBuffer)
@@ -149,23 +151,63 @@ export function parseNovoTradePackerFile(buffer: ArrayBuffer, filename: string):
     patternCount = u16BE(buf, 26);
   }
 
-  // ── Instrument placeholders ───────────────────────────────────────────────
+  // ── Sample extraction ─────────────────────────────────────────────────────
+  //
+  // From InitPlayer:
+  //   SamplesPtr = module + songSize, where songSize = 12 + u16(20) + u16(28)
+  // From SampleInit:
+  //   Descriptors at module+32, 8 bytes each (count = sampleCount):
+  //     +0: u16 length in words (sample length = value * 2)
+  //     +2..+7: other fields
+  //   SamplesPtr points to start of sequential PCM data.
+  //   Each sample's PCM follows the previous one sequentially.
 
-  const instrumentCount = Math.min(Math.max(sampleCount, 1), MAX_INSTRUMENTS);
+  const instruments: InstrumentConfig[] = [];
+  let samplesExtracted = false;
 
-  const instruments: InstrumentConfig[] = Array.from(
-    { length: instrumentCount },
-    (_, i) =>
-      ({
-        id: i + 1,
-        name: `Sample ${i + 1}`,
-        type: 'synth' as const,
-        synthType: 'Synth' as const,
-        effects: [],
-        volume: 0,
-        pan: 0,
-      }) as InstrumentConfig,
-  );
+  if (sampleCount > 0 && buf.length >= MIN_FILE_SIZE) {
+    // Compute samplesPtr: file offset where sequential PCM data begins
+    // songSize = 12 + u16BE(buf, 20) + u16BE(buf, 28)
+    const songSize = 12 + u16BE(buf, 20) + u16BE(buf, 28);
+    const samplesFileOff = songSize;
+
+    // Descriptor table starts at offset 32, 8 bytes per entry
+    const descBase = 32;
+    let pcmCursor = samplesFileOff;
+
+    const count = Math.min(sampleCount, MAX_INSTRUMENTS);
+    for (let i = 0; i < count; i++) {
+      const descOff = descBase + i * 8;
+      if (descOff + 8 > buf.length) break;
+
+      // SampleInit reads: move.w (A2),D0 → length in words; add.l D0,D0 → bytes
+      const lengthWords = u16BE(buf, descOff);
+      const lengthBytes = lengthWords * 2;
+
+      if (lengthBytes > 0 && pcmCursor + lengthBytes <= buf.length) {
+        const pcm = buf.slice(pcmCursor, pcmCursor + lengthBytes);
+        instruments.push(createSamplerInstrument(
+          i + 1, `NTP Sample ${i + 1}`, pcm, 64, 8287, 0, 0,
+        ));
+        samplesExtracted = true;
+      } else {
+        instruments.push({
+          id: i + 1, name: `NTP Sample ${i + 1}`,
+          type: 'synth' as const, synthType: 'Synth' as const,
+          effects: [], volume: 0, pan: 0,
+        } as InstrumentConfig);
+      }
+      pcmCursor += lengthBytes;
+    }
+  }
+
+  if (instruments.length === 0) {
+    instruments.push({
+      id: 1, name: 'Sample 1',
+      type: 'synth' as const, synthType: 'Synth' as const,
+      effects: [], volume: 0, pan: 0,
+    } as InstrumentConfig);
+  }
 
   // ── Empty pattern (placeholder — UADE handles actual audio) ──────────────
 
@@ -209,6 +251,7 @@ export function parseNovoTradePackerFile(buffer: ArrayBuffer, filename: string):
 
   const nameParts: string[] = [`${moduleName} [NovoTrade]`];
   if (patternCount > 0) nameParts.push(`(${patternCount} patt)`);
+  if (samplesExtracted) nameParts.push(`(${instruments.length} smp)`);
 
   return {
     name: nameParts.join(' '),
@@ -222,5 +265,7 @@ export function parseNovoTradePackerFile(buffer: ArrayBuffer, filename: string):
     initialSpeed: 6,
     initialBPM: 125,
     linearPeriods: false,
+    uadeEditableFileData: buffer.slice(0) as ArrayBuffer,
+    uadeEditableFileName: filename,
   };
 }

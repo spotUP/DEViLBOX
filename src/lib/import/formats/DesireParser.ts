@@ -30,13 +30,14 @@
 
 import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
 import type { InstrumentConfig } from '@/types';
+import { createSamplerInstrument } from './AmigaUtils';
 
 // ── Constants ───────────────────────────────────────────────────────────────
 
 /** Minimum file size enforced by the Check2 routine (ble.b Return if <= 2500). */
 const MIN_FILE_SIZE = 2501;
 
-/** Number of sample placeholder instruments to create. */
+/** Number of fallback placeholder instruments if opcode scan fails. */
 const NUM_PLACEHOLDER_INSTRUMENTS = 8;
 
 // ── Binary helpers ──────────────────────────────────────────────────────────
@@ -52,6 +53,68 @@ function s16BE(buf: Uint8Array, off: number): number {
 
 function u32BE(buf: Uint8Array, off: number): number {
   return (((buf[off] << 24) | (buf[off + 1] << 16) | (buf[off + 2] << 8) | buf[off + 3]) >>> 0);
+}
+
+/**
+ * Scan for Desire opcode chain to locate sample lengths, offsets, and shift factor.
+ *
+ * Opcode chain:
+ *   0xE341 → anchor
+ *   3 sequential 0x47FA matches:
+ *     1st 47FA → SamplesLengths (PC-relative displacement)
+ *     2nd 47FA → SamplesOffsets (PC-relative displacement)
+ *     3rd+4 → Ruch shift factor: ((word & 0xE00) ? (val >> 8) >> 1 : 8)
+ *
+ * Returns { lengthsOff, offsetsOff, ruch, count } or null.
+ */
+function scanDesireSamplePointers(buf: Uint8Array): {
+  lengthsOff: number; offsetsOff: number; ruch: number; count: number;
+} | null {
+  const len = buf.length;
+
+  // Find 0xE341 in the code area
+  let e341Pos = -1;
+  for (let pos = 72; pos + 1 < len && pos < 2000; pos += 2) {
+    if (u16BE(buf, pos) === 0xE341) {
+      e341Pos = pos;
+      break;
+    }
+  }
+  if (e341Pos < 0) return null;
+
+  // Find 3 sequential 0x47FA (lea xx(PC),An) after E341
+  const matches47FA: number[] = [];
+  for (let pos = e341Pos + 2; pos + 3 < len && matches47FA.length < 3; pos += 2) {
+    if (u16BE(buf, pos) === 0x47FA) {
+      matches47FA.push(pos);
+    }
+  }
+  if (matches47FA.length < 3) return null;
+
+  // 1st 47FA → SamplesLengths: PC-relative displacement at +2
+  const disp1 = s16BE(buf, matches47FA[0] + 2);
+  const lengthsOff = matches47FA[0] + 2 + disp1;
+
+  // 2nd 47FA → SamplesOffsets: PC-relative displacement at +2
+  const disp2 = s16BE(buf, matches47FA[1] + 2);
+  const offsetsOff = matches47FA[1] + 2 + disp2;
+
+  // 3rd 47FA + 4 → Ruch shift factor word
+  const ruchWordPos = matches47FA[2] + 4;
+  if (ruchWordPos + 1 >= len) return null;
+  const ruchWord = u16BE(buf, ruchWordPos);
+  const ruch = (ruchWord & 0xE00) ? ((ruchWord >> 8) >> 1) : 8;
+
+  // Determine count: scan lengths table for non-zero entries
+  let count = 0;
+  for (let off = lengthsOff; off + 1 < len; off += 2) {
+    const val = u16BE(buf, off);
+    if (val === 0) break;
+    count++;
+  }
+
+  if (count === 0 || lengthsOff < 0 || offsetsOff < 0) return null;
+  return { lengthsOff, offsetsOff, ruch, count };
 }
 
 // ── Format detection ────────────────────────────────────────────────────────
@@ -153,20 +216,40 @@ export function parseDesireFile(buffer: ArrayBuffer, filename: string): TrackerS
   // Strip "DSR." prefix (case-insensitive)
   const moduleName = baseName.replace(/^dsr\./i, '').replace(/\.dsr$/i, '') || baseName;
 
-  // ── Instrument placeholders ──────────────────────────────────────────────
+  // ── Extract samples via opcode scanning ──────────────────────────────────
 
   const instruments: InstrumentConfig[] = [];
+  const ptrs = scanDesireSamplePointers(buf);
 
-  for (let i = 0; i < NUM_PLACEHOLDER_INSTRUMENTS; i++) {
-    instruments.push({
-      id: i + 1,
-      name: `Sample ${i + 1}`,
-      type: 'synth' as const,
-      synthType: 'Synth' as const,
-      effects: [],
-      volume: 0,
-      pan: 0,
-    } as InstrumentConfig);
+  if (ptrs) {
+    const { lengthsOff, offsetsOff, ruch, count } = ptrs;
+    for (let i = 0; i < count; i++) {
+      const lengthWord = u16BE(buf, lengthsOff + i * 2);
+      const offsetWord = u16BE(buf, offsetsOff + i * 2);
+      const pcmOffset = offsetWord << ruch;
+      const pcmLength = lengthWord * 2;
+
+      if (pcmOffset + pcmLength <= buf.length && pcmLength > 0) {
+        const pcm = buf.slice(pcmOffset, pcmOffset + pcmLength);
+        instruments.push(createSamplerInstrument(
+          i + 1, `DSR Sample ${i + 1}`, pcm, 64, 8287, 0, 0,
+        ));
+      } else {
+        instruments.push({
+          id: i + 1, name: `DSR Sample ${i + 1}`, type: 'synth' as const,
+          synthType: 'Synth' as const, effects: [], volume: 0, pan: 0,
+        } as InstrumentConfig);
+      }
+    }
+  }
+
+  if (instruments.length === 0) {
+    for (let i = 0; i < NUM_PLACEHOLDER_INSTRUMENTS; i++) {
+      instruments.push({
+        id: i + 1, name: `Sample ${i + 1}`, type: 'synth' as const,
+        synthType: 'Synth' as const, effects: [], volume: 0, pan: 0,
+      } as InstrumentConfig);
+    }
   }
 
   // ── Empty pattern (placeholder — UADE handles actual audio) ──────────────
@@ -203,7 +286,7 @@ export function parseDesireFile(buffer: ArrayBuffer, filename: string): TrackerS
       importedAt: new Date().toISOString(),
       originalChannelCount: 4,
       originalPatternCount: 1,
-      originalInstrumentCount: NUM_PLACEHOLDER_INSTRUMENTS,
+      originalInstrumentCount: instruments.length,
     },
   };
 
@@ -219,5 +302,7 @@ export function parseDesireFile(buffer: ArrayBuffer, filename: string): TrackerS
     initialSpeed: 6,
     initialBPM: 125,
     linearPeriods: false,
+    uadeEditableFileData: buffer.slice(0) as ArrayBuffer,
+    uadeEditableFileName: filename,
   };
 }

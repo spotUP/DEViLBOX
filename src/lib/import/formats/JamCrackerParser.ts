@@ -438,6 +438,8 @@ export async function parseJamCrackerFile(
     initialSpeed,
     initialBPM: 125,
     linearPeriods: false,
+    uadeEditableFileData: buffer.slice(0) as ArrayBuffer,
+    uadeEditableFileName: filename,
     jamCrackerFileData: buffer.slice(0),
     uadePatternLayout,
   };

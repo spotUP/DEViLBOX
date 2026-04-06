@@ -33,12 +33,12 @@
 
 import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
 import type { InstrumentConfig } from '@/types';
+// SID synthesis format — no PCM samples to extract
+// createSamplerInstrument not needed for this format
 
 // ── Constants ───────────────────────────────────────────────────────────────
 
 const MIN_FILE_SIZE = 60; // need at least through offset 56+4
-
-const DEFAULT_INSTRUMENTS = 8;
 
 // ── Binary helpers ──────────────────────────────────────────────────────────
 
@@ -120,6 +120,8 @@ export async function parseBenDaglishSIDFile(
   buffer: ArrayBuffer,
   filename: string,
 ): Promise<TrackerSong> {
+  const buf = new Uint8Array(buffer);
+
   if (!isBenDaglishSIDFormat(buffer, filename)) {
     throw new Error('Not a Ben Daglish SID module');
   }
@@ -128,16 +130,22 @@ export async function parseBenDaglishSIDFile(
 
   const baseName = filename.split('/').pop() ?? filename;
   // Strip ".bds" suffix (case-insensitive)
-  const moduleName = baseName.replace(/\.bds$/i, '') || baseName;
+  let moduleName = baseName.replace(/\.bds$/i, '') || baseName;
 
-  // ── Instrument placeholders ───────────────────────────────────────────────
+  // ── Subsong count from header ─────────────────────────────────────────────
+
+  const subsongCount = u32BE(buf, 56);
+  if (subsongCount > 1) {
+    moduleName += ` (${subsongCount} subsongs)`;
+  }
+
+  // ── 3 SID voice instruments (synthesis, no PCM) ───────────────────────────
 
   const instruments: InstrumentConfig[] = [];
-
-  for (let i = 0; i < DEFAULT_INSTRUMENTS; i++) {
+  for (let i = 0; i < 3; i++) {
     instruments.push({
       id: i + 1,
-      name: `Sample ${i + 1}`,
+      name: `SID Voice ${i + 1}`,
       type: 'synth' as const,
       synthType: 'Synth' as const,
       effects: [],
@@ -180,7 +188,7 @@ export async function parseBenDaglishSIDFile(
       importedAt: new Date().toISOString(),
       originalChannelCount: 3,
       originalPatternCount: 1,
-      originalInstrumentCount: DEFAULT_INSTRUMENTS,
+      originalInstrumentCount: 3,
     },
   };
 
@@ -196,5 +204,7 @@ export async function parseBenDaglishSIDFile(
     initialSpeed: 6,
     initialBPM: 125,
     linearPeriods: false,
+    uadeEditableFileData: buffer.slice(0) as ArrayBuffer,
+    uadeEditableFileName: filename,
   };
 }

@@ -950,6 +950,8 @@ export async function parseUADEFile(
         const nativeSong = await route();
         if (nativeSong) {
           console.log(`[UADEParser] '${fmt}' → native parser`);
+          nativeSong.uadeEditableFileData ??= buffer.slice(0) as ArrayBuffer;
+          nativeSong.uadeEditableFileName ??= filename;
           return nativeSong;
         }
       } catch (err) {
@@ -1246,15 +1248,20 @@ export async function parseUADEFile(
         console.warn('[UADEParser] Scan warnings:', warnings);
         song.name = `${song.name} [${warnings.join('; ')}]`;
       }
+      song.uadeEditableFileData ??= buffer.slice(0) as ArrayBuffer;
+      song.uadeEditableFileName ??= filename;
       return song;
     }
     console.warn('[UADEParser] Enhanced scan yielded no playable instruments, falling back to classic');
   }
 
   // Classic mode: UADESynth playback with display-only patterns
-  return buildClassicSong(
+  const classicResult = buildClassicSong(
     songName, ext, filename, buffer, metadata, activeScanRows, periodToNoteIndex,
   );
+  classicResult.uadeEditableFileData ??= buffer.slice(0) as ArrayBuffer;
+  classicResult.uadeEditableFileName ??= filename;
+  return classicResult;
 }
 
 /**

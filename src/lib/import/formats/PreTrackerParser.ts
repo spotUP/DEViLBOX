@@ -342,6 +342,8 @@ export async function parsePreTrackerFile(
     initialSpeed: 6,
     initialBPM: 125,
     linearPeriods: false,
+    uadeEditableFileData: buffer.slice(0) as ArrayBuffer,
+    uadeEditableFileName: filename,
     preTrackerFileData: buffer.slice(0),
   };
 }
