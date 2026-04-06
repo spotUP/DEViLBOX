@@ -828,6 +828,21 @@ void gt_jam_note_off(int channel) {
     gtObject.chn[channel].gate = 0;
 }
 
+EMSCRIPTEN_KEEPALIVE
+void gt_play_test_note(int channel, int note, int instrNum) {
+    // If song is in PLAY_STOP state, force transition to PLAY_STOPPED first
+    // so the playroutine init block doesn't clear our test note
+    if (gtObject.songinit == PLAY_STOP) {
+        playroutine(&gtObject);  // Process the stop → PLAY_STOPPED
+    }
+    playtestnote(note, instrNum, channel, &gtObject);
+}
+
+EMSCRIPTEN_KEEPALIVE
+void gt_release_note(int channel) {
+    releasenote(channel, &gtObject);
+}
+
 /* --- Undo --- */
 
 EMSCRIPTEN_KEEPALIVE
