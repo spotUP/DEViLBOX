@@ -961,9 +961,12 @@ export class TrackerReplayer {
         : channel.instrument != null && typeof channel.instrument === 'object' && 'id' in channel.instrument
           ? (channel.instrument as { id: number }).id : 0;
 
-      // Skip if this channel's current instrument is not replaced
-      if (!cs.instrument || !this._replacedInstruments.has(cs.instrument)) {
-        // If channel WAS playing a replaced instrument, cut it
+      // Determine effective instrument: if the row specifies one use it,
+      // otherwise the channel continues with whatever was playing
+      const effectiveInst = cs.instrument || chanInst;
+
+      // If this row has a NEW non-replaced instrument with a note → cut the synth
+      if (cs.instrument && cs.note > 0 && !this._replacedInstruments.has(cs.instrument)) {
         if (chanInst && this._replacedInstruments.has(chanInst)) {
           if (channel.player) {
             try { channel.player.stop(time); } catch { /* already stopped */ }
@@ -973,8 +976,21 @@ export class TrackerReplayer {
         continue;
       }
 
-      // Channel is playing a replaced instrument
-      if (!cs.active || cs.frequency <= 0) continue;
+      // Note-off (note 255 in OpenMPT = key off)
+      if (cs.note === 255 || cs.note === 254) {
+        if (chanInst && this._replacedInstruments.has(chanInst)) {
+          if (channel.player) {
+            try { channel.player.stop(time); } catch { /* already stopped */ }
+          }
+        }
+        continue;
+      }
+
+      // Skip if the effective instrument is not replaced
+      if (!effectiveInst || !this._replacedInstruments.has(effectiveInst)) continue;
+
+      // Only trigger on rows with actual notes
+      if (cs.note <= 0 || cs.note >= 120) continue;
 
       // Update channel instrument config from instrumentMap
       const config = this.instrumentMap.get(cs.instrument);
