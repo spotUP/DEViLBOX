@@ -107,6 +107,16 @@ class KlystrackProcessor extends AudioWorkletProcessor {
         }
         break;
 
+      case 'setMuteMask':
+        this.muteMask = data.mask;
+        if (this.wasm && typeof this.wasm._klys_set_channel_gain === 'function') {
+          for (let ch = 0; ch < 32; ch++) {
+            const active = (data.mask & (1 << ch)) !== 0;
+            this.wasm._klys_set_channel_gain(ch, active ? 1.0 : 0.0);
+          }
+        }
+        break;
+
       case 'serializeSong': {
         if (!this.wasm) {
           this.port.postMessage({ type: 'serializeSongResult', error: 'WASM not loaded' });
