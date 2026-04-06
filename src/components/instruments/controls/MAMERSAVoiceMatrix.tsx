@@ -7,12 +7,14 @@ interface MAMERSAVoiceMatrixProps {
   handle: number;
   knobColor: string;
   panelBg: string;
+  panelStyle: React.CSSProperties;
 }
 
 export const MAMERSAVoiceMatrix: React.FC<MAMERSAVoiceMatrixProps> = ({
   handle,
   knobColor,
-  panelBg
+  panelBg,
+  panelStyle
 }) => {
   const engine = MAMEEngine.getInstance();
   const [selectedVoice, setSelectedVoice] = useState(0);
@@ -71,7 +73,7 @@ export const MAMERSAVoiceMatrix: React.FC<MAMERSAVoiceMatrixProps> = ({
   return (
     <div className="space-y-4">
       {/* Roland SA ROM Loader */}
-      <div className={`p-4 border rounded ${panelBg} space-y-3`}>
+      <div className={`p-4 border rounded ${panelBg} space-y-3`} style={panelStyle}>
         <div className="flex items-center gap-2 text-text-secondary">
           <HardDrive size={16} />
           <span className="text-xs font-bold uppercase text-text-primary">Roland SA Sample ROMs</span>
@@ -102,7 +104,7 @@ export const MAMERSAVoiceMatrix: React.FC<MAMERSAVoiceMatrixProps> = ({
       </div>
 
       {/* Grid of 16 voices */}
-      <div className={`grid grid-cols-8 gap-1 p-2 rounded border border-dark-border ${panelBg}`}>
+      <div className={`grid grid-cols-8 gap-1 p-2 rounded border ${panelBg}`} style={panelStyle}>
         {Array.from({ length: 16 }).map((_, i) => (
           <button
             key={i}
@@ -144,7 +146,7 @@ export const MAMERSAVoiceMatrix: React.FC<MAMERSAVoiceMatrixProps> = ({
       </div>
 
       {/* Selected Part Editor */}
-      <div className={`p-4 rounded border border-dark-border ${panelBg} space-y-4 shadow-inner-dark`}>
+      <div className={`p-4 rounded border ${panelBg} space-y-4 shadow-inner-dark`} style={panelStyle}>
         <div className="flex items-center justify-between border-b border-border pb-2">
           <div className="flex items-center gap-2">
             <Settings size={14} className="text-text-muted" />

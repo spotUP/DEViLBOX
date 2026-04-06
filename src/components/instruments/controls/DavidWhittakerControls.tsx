@@ -67,7 +67,7 @@ export const DavidWhittakerControls: React.FC<DavidWhittakerControlsProps> = ({
     return chipEditorRef.current;
   }, []);
 
-  const { isCyan, accent, knob, dim, panelBg } = useInstrumentColors('#44aaff', { knob: '#66bbff', dim: '#001833' });
+  const { isCyan, accent, knob, dim, panelBg, panelStyle } = useInstrumentColors('#44aaff', { knob: '#66bbff', dim: '#001833' });
 
   const upd = useCallback(<K extends keyof DavidWhittakerConfig>(key: K, value: DavidWhittakerConfig[K]) => {
     onChange({ [key]: value } as Partial<DavidWhittakerConfig>);
@@ -81,7 +81,7 @@ export const DavidWhittakerControls: React.FC<DavidWhittakerControlsProps> = ({
     return (
       <div className="flex flex-col gap-3 p-3 overflow-y-auto" style={{ maxHeight: 'calc(100vh - 280px)' }}>
         {/* Volume & Tuning */}
-        <div className={`rounded-lg border p-3 ${panelBg}`}>
+        <div className={`rounded-lg border p-3 ${panelBg}`} style={panelStyle}>
           <SectionLabel color={accent} label="Volume & Tuning" />
           <div className="flex items-start gap-3">
             <Knob
@@ -115,7 +115,7 @@ export const DavidWhittakerControls: React.FC<DavidWhittakerControlsProps> = ({
         </div>
 
         {/* Vibrato */}
-        <div className={`rounded-lg border p-3 ${panelBg}`}>
+        <div className={`rounded-lg border p-3 ${panelBg}`} style={panelStyle}>
           <SectionLabel color={accent} label="Vibrato" />
           <div className="flex gap-4">
             <Knob
@@ -147,7 +147,7 @@ export const DavidWhittakerControls: React.FC<DavidWhittakerControlsProps> = ({
       <div className="flex flex-col gap-3 p-3 overflow-y-auto" style={{ maxHeight: 'calc(100vh - 280px)' }}>
 
         {/* Volume Sequence — 0-64 volume levels */}
-        <div className={`rounded-lg border p-3 ${panelBg}`}>
+        <div className={`rounded-lg border p-3 ${panelBg}`} style={panelStyle}>
           <SectionLabel color={accent} label="Volume Sequence" />
           <SequenceEditor
             label="volseq"
@@ -165,7 +165,7 @@ export const DavidWhittakerControls: React.FC<DavidWhittakerControlsProps> = ({
         </div>
 
         {/* Frequency Sequence — semitone offsets */}
-        <div className={`rounded-lg border p-3 ${panelBg}`}>
+        <div className={`rounded-lg border p-3 ${panelBg}`} style={panelStyle}>
           <SectionLabel color={accent} label="Frequency Sequence" />
           <SequenceEditor
             label="frqseq"

@@ -9,13 +9,15 @@ interface MAMEVFXVoiceMatrixProps {
   accentColor: string;
   knobColor: string;
   panelBg: string;
+  panelStyle: React.CSSProperties;
 }
 
 export const MAMEVFXVoiceMatrix: React.FC<MAMEVFXVoiceMatrixProps> = ({
   handle,
   accentColor,
   knobColor,
-  panelBg
+  panelBg,
+  panelStyle
 }) => {
   const engine = MAMEEngine.getInstance();
   const [selectedVoice, setSelectedVoice] = useState(0);
@@ -74,7 +76,7 @@ export const MAMEVFXVoiceMatrix: React.FC<MAMEVFXVoiceMatrixProps> = ({
   return (
     <div className="space-y-4">
       {/* SysEx / Bank Loader */}
-      <div className={`p-3 rounded border border-dark-border ${panelBg} flex items-center justify-between`}>
+      <div className={`p-3 rounded border ${panelBg} flex items-center justify-between`} style={panelStyle}>
         <div className="flex items-center gap-3">
           <div className="p-2 bg-purple-500/20 rounded">
             <FileUp className="text-purple-400" size={18} />
@@ -96,7 +98,7 @@ export const MAMEVFXVoiceMatrix: React.FC<MAMEVFXVoiceMatrixProps> = ({
       </div>
 
       {/* Grid of 32 voices */}
-      <div className={`grid grid-cols-8 gap-1 p-2 rounded border border-dark-border ${panelBg}`}>
+      <div className={`grid grid-cols-8 gap-1 p-2 rounded border ${panelBg}`} style={panelStyle}>
         {Array.from({ length: 32 }).map((_, i) => (
           <button
             key={i}
@@ -121,7 +123,7 @@ export const MAMEVFXVoiceMatrix: React.FC<MAMEVFXVoiceMatrixProps> = ({
       </div>
 
       {/* Selected Voice Editor */}
-      <div className={`p-4 rounded border border-dark-border ${panelBg} space-y-4 shadow-inner-dark`}>
+      <div className={`p-4 rounded border ${panelBg} space-y-4 shadow-inner-dark`} style={panelStyle}>
         <div className="flex items-center justify-between border-b border-border pb-2">
           <div className="flex items-center gap-2">
             <Settings size={14} className="text-text-muted" />

@@ -108,7 +108,7 @@ export const DigMugControls: React.FC<DigMugControlsProps> = ({
     return chipEditorRef.current;
   }, []);
 
-  const { isCyan, accent, knob, dim, panelBg } = useInstrumentColors('#aaff44', { knob: '#bbff66', dim: '#1a3300' });
+  const { isCyan, accent, knob, dim, panelBg, panelStyle } = useInstrumentColors('#aaff44', { knob: '#bbff66', dim: '#1a3300' });
 
   const upd = useCallback(<K extends keyof DigMugConfig>(key: K, value: DigMugConfig[K]) => {
     onChange({ [key]: value } as Partial<DigMugConfig>);
@@ -151,7 +151,7 @@ export const DigMugControls: React.FC<DigMugControlsProps> = ({
   // -- MAIN TAB ---
   const renderMain = () => (
     <div className="flex flex-col gap-3 p-3 overflow-y-auto" style={{ maxHeight: 'calc(100vh - 280px)' }}>
-      <div className={`rounded-lg border p-3 ${panelBg}`}>
+      <div className={`rounded-lg border p-3 ${panelBg}`} style={panelStyle}>
         <SectionLabel color={accent} label="Wavetable Slots (4 waves)" />
         <div className="grid grid-cols-4 gap-2 mb-3">
           {([0, 1, 2, 3] as const).map((slot) => {
@@ -196,7 +196,7 @@ export const DigMugControls: React.FC<DigMugControlsProps> = ({
           <span>W1</span><span>W2</span><span>W3</span><span>W4</span>
         </div>
       </div>
-      <div className={`rounded-lg border p-3 ${panelBg}`}>
+      <div className={`rounded-lg border p-3 ${panelBg}`} style={panelStyle}>
         <SectionLabel color={accent} label="Volume & Vibrato" />
         <div className="flex gap-4">
           <Knob value={config.volume} min={0} max={64} step={1}
@@ -222,7 +222,7 @@ export const DigMugControls: React.FC<DigMugControlsProps> = ({
 
   const renderArpeggio = () => (
     <div className="flex flex-col gap-3 p-3" style={{ height: 'calc(100vh - 280px)' }}>
-      <div className={`rounded-lg border p-3 ${panelBg} flex flex-col`} style={{ flex: 1, minHeight: 0 }}>
+      <div className={`rounded-lg border p-3 ${panelBg} flex flex-col`} style={{ ...panelStyle, flex: 1, minHeight: 0 }}>
         <div className="flex items-center justify-between mb-3">
           <SectionLabel color={accent} label="Arpeggio Speed" />
           <Knob value={config.arpSpeed} min={0} max={15} step={1}

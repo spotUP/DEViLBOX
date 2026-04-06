@@ -79,7 +79,7 @@ export const HippelCoSoControls: React.FC<HippelCoSoControlsProps> = ({
     return chipEditorRef.current;
   }
 
-  const { isCyan, accent, knob, dim, panelBg } = useInstrumentColors('#44aaff', { knob: '#66bbff', dim: '#001833' });
+  const { isCyan, accent, knob, dim, panelBg, panelStyle } = useInstrumentColors('#44aaff', { knob: '#66bbff', dim: '#001833' });
 
   /**
    * Like `upd`, but also writes a single byte to chip RAM when a UADE context is
@@ -124,7 +124,7 @@ export const HippelCoSoControls: React.FC<HippelCoSoControlsProps> = ({
   const renderMain = () => (
     <div className="flex flex-col gap-3 p-3 overflow-y-auto" style={{ maxHeight: 'calc(100vh - 280px)' }}>
       {/* Timing */}
-      <div className={`rounded-lg border p-3 ${panelBg}`}>
+      <div className={`rounded-lg border p-3 ${panelBg}`} style={panelStyle}>
         <SectionLabel color={accent} label="Timing" />
         <div className="flex gap-4">
           <Knob
@@ -139,7 +139,7 @@ export const HippelCoSoControls: React.FC<HippelCoSoControlsProps> = ({
       </div>
 
       {/* Vibrato */}
-      <div className={`rounded-lg border p-3 ${panelBg}`}>
+      <div className={`rounded-lg border p-3 ${panelBg}`} style={panelStyle}>
         <SectionLabel color={accent} label="Vibrato" />
         <div className="flex gap-4">
           <Knob
@@ -173,7 +173,7 @@ export const HippelCoSoControls: React.FC<HippelCoSoControlsProps> = ({
     <div className="flex flex-col gap-3 p-3 overflow-y-auto" style={{ maxHeight: 'calc(100vh - 280px)' }}>
 
       {/* Frequency Sequence — relative pitch offsets (semitones) */}
-      <div className={`rounded-lg border p-3 ${panelBg}`}>
+      <div className={`rounded-lg border p-3 ${panelBg}`} style={panelStyle}>
         <SectionLabel color={accent} label="Frequency Sequence" />
         <SequenceEditor
           label="fseq"
@@ -193,7 +193,7 @@ export const HippelCoSoControls: React.FC<HippelCoSoControlsProps> = ({
       </div>
 
       {/* Volume Sequence — 0-63 volume levels */}
-      <div className={`rounded-lg border p-3 ${panelBg}`}>
+      <div className={`rounded-lg border p-3 ${panelBg}`} style={panelStyle}>
         <SectionLabel color={accent} label="Volume Sequence" />
         <SequenceEditor
           label="vseq"
@@ -238,7 +238,7 @@ export const HippelCoSoControls: React.FC<HippelCoSoControlsProps> = ({
                   .catch(console.error);
               }
             }}
-            className="ml-auto flex items-center gap-1 px-2 py-1 mr-2 text-[10px] font-mono bg-dark-bgSecondary hover:bg-dark-bg border border-dark-border rounded transition-colors"
+            className="ml-auto flex items-center gap-1 px-2 py-1 mr-2 text-[10px] font-mono bg-dark-bgSecondary hover:bg-dark-bg border rounded transition-colors"
             title="Export module with current edits"
             style={{ color: accent }}
           >

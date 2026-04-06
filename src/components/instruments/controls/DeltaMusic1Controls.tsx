@@ -139,7 +139,7 @@ export const DeltaMusic1Controls: React.FC<DeltaMusic1ControlsProps> = ({
     return chipEditorRef.current;
   }, []);
 
-  const { isCyan, accent, knob, dim, panelBg } = useInstrumentColors('#ff9944', { knob: '#ffbb66', dim: '#331800' });
+  const { isCyan, accent, knob, dim, panelBg, panelStyle } = useInstrumentColors('#ff9944', { knob: '#ffbb66', dim: '#331800' });
 
   // Basic updater — just calls onChange with the partial config
   const upd = useCallback(<K extends keyof DeltaMusic1Config>(key: K, value: DeltaMusic1Config[K]) => {
@@ -206,7 +206,7 @@ export const DeltaMusic1Controls: React.FC<DeltaMusic1ControlsProps> = ({
     <div className="flex flex-col gap-3 p-3 overflow-y-auto" style={{ maxHeight: 'calc(100vh - 280px)' }}>
 
       {/* Volume */}
-      <div className={`rounded-lg border p-3 ${panelBg}`}>
+      <div className={`rounded-lg border p-3 ${panelBg}`} style={panelStyle}>
         <SectionLabel color={accent} label="Volume" />
         <div className="flex items-center gap-4">
           <Knob
@@ -220,7 +220,7 @@ export const DeltaMusic1Controls: React.FC<DeltaMusic1ControlsProps> = ({
       </div>
 
       {/* ADSR Envelope */}
-      <div className={`rounded-lg border p-3 ${panelBg}`}>
+      <div className={`rounded-lg border p-3 ${panelBg}`} style={panelStyle}>
         <SectionLabel color={accent} label="Volume Envelope" />
 
         {/* Attack */}
@@ -315,7 +315,7 @@ export const DeltaMusic1Controls: React.FC<DeltaMusic1ControlsProps> = ({
     <div className="flex flex-col gap-3 p-3 overflow-y-auto" style={{ maxHeight: 'calc(100vh - 280px)' }}>
 
       {/* Vibrato */}
-      <div className={`rounded-lg border p-3 ${panelBg}`}>
+      <div className={`rounded-lg border p-3 ${panelBg}`} style={panelStyle}>
         <SectionLabel color={accent} label="Vibrato" />
         <div className="flex gap-4">
           <Knob
@@ -341,7 +341,7 @@ export const DeltaMusic1Controls: React.FC<DeltaMusic1ControlsProps> = ({
       </div>
 
       {/* Bend Rate */}
-      <div className={`rounded-lg border p-3 ${panelBg}`}>
+      <div className={`rounded-lg border p-3 ${panelBg}`} style={panelStyle}>
         <SectionLabel color={accent} label="Pitch Bend" />
         <div className="flex items-center gap-4">
           <Knob
@@ -355,7 +355,7 @@ export const DeltaMusic1Controls: React.FC<DeltaMusic1ControlsProps> = ({
       </div>
 
       {/* Portamento */}
-      <div className={`rounded-lg border p-3 ${panelBg}`}>
+      <div className={`rounded-lg border p-3 ${panelBg}`} style={panelStyle}>
         <SectionLabel color={accent} label="Portamento" />
         <div className="flex items-center gap-4">
           <Knob
@@ -370,7 +370,7 @@ export const DeltaMusic1Controls: React.FC<DeltaMusic1ControlsProps> = ({
 
       {/* Table Delay (synth instruments only) */}
       {!config.isSample && (
-        <div className={`rounded-lg border p-3 ${panelBg}`}>
+        <div className={`rounded-lg border p-3 ${panelBg}`} style={panelStyle}>
           <SectionLabel color={accent} label="Synth Table Delay" />
           <div className="flex items-center gap-4">
             <Knob
@@ -413,7 +413,7 @@ export const DeltaMusic1Controls: React.FC<DeltaMusic1ControlsProps> = ({
 
   const renderArpeggio = () => (
     <div className="flex flex-col gap-3 p-3" style={{ height: 'calc(100vh - 280px)' }}>
-      <div className={`rounded-lg border p-3 ${panelBg} flex flex-col`} style={{ flex: 1, minHeight: 0 }}>
+      <div className={`rounded-lg border p-3 ${panelBg} flex flex-col`} style={{ ...panelStyle, flex: 1, minHeight: 0 }}>
         <SectionLabel color={accent} label="Arpeggio Table (8 steps)" />
         <div className="text-[10px] text-text-muted mb-2">
           8 semitone offsets played in sequence. 0 = no arpeggio.
@@ -457,7 +457,7 @@ export const DeltaMusic1Controls: React.FC<DeltaMusic1ControlsProps> = ({
 
     return (
       <div className="flex flex-col gap-3 p-3" style={{ height: 'calc(100vh - 280px)' }}>
-        <div className={`rounded-lg border p-3 ${panelBg} flex flex-col`} style={{ flex: 1, minHeight: 0 }}>
+        <div className={`rounded-lg border p-3 ${panelBg} flex flex-col`} style={{ ...panelStyle, flex: 1, minHeight: 0 }}>
           <SectionLabel color={accent} label="Sound Table (48-byte sequence)" />
           <div className="text-[10px] text-text-muted mb-2">
             W## = waveform segment (0-7F), D## = delay (80-FE), FF = loop

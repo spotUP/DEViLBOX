@@ -19,7 +19,7 @@ export const DECtalkControls: React.FC<DECtalkControlsProps> = ({
   const configRef = useRef(config);
   useEffect(() => { configRef.current = config; }, [config]);
 
-  const { accent: accentColor, panelBg } = useInstrumentColors('#00ff88');
+  const { accent: accentColor, panelBg, panelStyle } = useInstrumentColors('#00ff88');
 
   // Find active DECtalk synth instance for speak button
   const synthRef = useRef<DECtalkSynth | null>(null);
@@ -74,7 +74,7 @@ export const DECtalkControls: React.FC<DECtalkControlsProps> = ({
       <div className="max-w-3xl mx-auto space-y-4">
 
         {/* Text input + Speak */}
-        <div className={`rounded-lg border p-3 ${panelBg}`}>
+        <div className={`rounded-lg border p-3 ${panelBg}`} style={panelStyle}>
           <div className="flex items-center gap-2 mb-2">
             <span className="text-xs font-bold uppercase tracking-wider" style={{ color: accentColor }}>
               DECtalk Text-to-Speech
@@ -101,7 +101,7 @@ export const DECtalkControls: React.FC<DECtalkControlsProps> = ({
         </div>
 
         {/* Voice selector */}
-        <div className={`rounded-lg border p-3 ${panelBg}`}>
+        <div className={`rounded-lg border p-3 ${panelBg}`} style={panelStyle}>
           <div className="flex items-center gap-2 mb-2">
             <span className="text-xs font-bold uppercase tracking-wider" style={{ color: accentColor }}>
               Voice
@@ -126,7 +126,7 @@ export const DECtalkControls: React.FC<DECtalkControlsProps> = ({
         </div>
 
         {/* Rate + Pitch */}
-        <div className={`rounded-lg border p-3 ${panelBg}`}>
+        <div className={`rounded-lg border p-3 ${panelBg}`} style={panelStyle}>
           <div className="flex items-center gap-2 mb-3">
             <span className="text-xs font-bold uppercase tracking-wider" style={{ color: accentColor }}>
               Parameters
@@ -173,7 +173,7 @@ export const DECtalkControls: React.FC<DECtalkControlsProps> = ({
         </div>
 
         {/* Quick phrases */}
-        <div className={`rounded-lg border p-3 ${panelBg}`}>
+        <div className={`rounded-lg border p-3 ${panelBg}`} style={panelStyle}>
           <div className="flex items-center gap-2 mb-2">
             <span className="text-xs font-bold uppercase tracking-wider" style={{ color: accentColor }}>
               Quick Phrases

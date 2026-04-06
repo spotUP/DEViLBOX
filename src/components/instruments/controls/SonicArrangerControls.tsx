@@ -184,7 +184,7 @@ export const SonicArrangerControls: React.FC<SonicArrangerControlsProps> = ({
   const configRef = useRef(config);
   useEffect(() => { configRef.current = config; }, [config]);
 
-  const { isCyan, accent, knob, dim, panelBg } = useInstrumentColors('#ff8844', { knob: '#ffaa66', dim: '#331a00' });
+  const { isCyan, accent, knob, dim, panelBg, panelStyle } = useInstrumentColors('#ff8844', { knob: '#ffaa66', dim: '#331a00' });
 
   const updateParam = useCallback((key: keyof SonicArrangerConfig, value: number) => {
     onChange({ ...configRef.current, [key]: value });
@@ -225,7 +225,7 @@ export const SonicArrangerControls: React.FC<SonicArrangerControlsProps> = ({
 
   const renderSynthesis = () => (
     <div className="flex flex-col gap-3 p-3 overflow-y-auto" style={{ maxHeight: 'calc(100vh - 280px)' }}>
-      <div className={`rounded-lg border p-3 ${panelBg}`}>
+      <div className={`rounded-lg border p-3 ${panelBg}`} style={panelStyle}>
         <SectionLabel color={accent} label="Synthesis Effect" />
         <div className="flex gap-3 flex-wrap">
           <Knob value={config.effectArg1} min={0} max={127} step={1}
@@ -258,7 +258,7 @@ export const SonicArrangerControls: React.FC<SonicArrangerControlsProps> = ({
           ))}
         </select>
       </div>
-      <div className={`rounded-lg border p-3 ${panelBg}`}>
+      <div className={`rounded-lg border p-3 ${panelBg}`} style={panelStyle}>
         <SectionLabel color={accent} label="Waveform" />
         <WaveformLineCanvas data={config.waveformData} width={320} height={72} color={accent} maxSamples={128} />
         <div className="flex items-center gap-3 mt-2 text-[10px] text-text-muted">
@@ -273,7 +273,7 @@ export const SonicArrangerControls: React.FC<SonicArrangerControlsProps> = ({
 
   const renderEnvelope = () => (
     <div className="flex flex-col gap-3 p-3 overflow-y-auto" style={{ maxHeight: 'calc(100vh - 280px)' }}>
-      <div className={`rounded-lg border p-3 ${panelBg}`}>
+      <div className={`rounded-lg border p-3 ${panelBg}`} style={panelStyle}>
         <SectionLabel color={accent} label="Volume & Tuning" />
         <div className="flex gap-4">
           <Knob value={config.volume} min={0} max={64} step={1}
@@ -286,7 +286,7 @@ export const SonicArrangerControls: React.FC<SonicArrangerControlsProps> = ({
             formatValue={(v) => Math.round(v).toString()} />
         </div>
       </div>
-      <div className={`rounded-lg border p-3 ${panelBg}`}>
+      <div className={`rounded-lg border p-3 ${panelBg}`} style={panelStyle}>
         <SectionLabel color={accent} label="ADSR Envelope" />
         <BarChart data={config.adsrTable} width={320} height={56} color={accent} />
         <div className="flex gap-3 flex-wrap mt-3">
@@ -322,7 +322,7 @@ export const SonicArrangerControls: React.FC<SonicArrangerControlsProps> = ({
           />
         </div>
       </div>
-      <div className={`rounded-lg border p-3 ${panelBg}`}>
+      <div className={`rounded-lg border p-3 ${panelBg}`} style={panelStyle}>
         <SectionLabel color={accent} label="AMF (Pitch Modulation)" />
         <BarChart data={config.amfTable} width={320} height={56} color={accent} signed />
         <div className="flex gap-3 mt-3">
@@ -367,7 +367,7 @@ export const SonicArrangerControls: React.FC<SonicArrangerControlsProps> = ({
 
   const renderModulation = () => (
     <div className="flex flex-col gap-3 p-3 overflow-y-auto" style={{ maxHeight: 'calc(100vh - 280px)' }}>
-      <div className={`rounded-lg border p-3 ${panelBg}`}>
+      <div className={`rounded-lg border p-3 ${panelBg}`} style={panelStyle}>
         <SectionLabel color={accent} label="Vibrato" />
         <div className="flex gap-3">
           <Knob value={config.vibratoDelay} min={0} max={255} step={1}
@@ -384,7 +384,7 @@ export const SonicArrangerControls: React.FC<SonicArrangerControlsProps> = ({
             formatValue={(v) => Math.round(v).toString()} />
         </div>
       </div>
-      <div className={`rounded-lg border p-3 ${panelBg}`}>
+      <div className={`rounded-lg border p-3 ${panelBg}`} style={panelStyle}>
         <SectionLabel color={accent} label="Portamento" />
         <div className="flex items-center gap-4">
           <Knob value={config.portamentoSpeed} min={0} max={65535} step={1}
@@ -394,7 +394,7 @@ export const SonicArrangerControls: React.FC<SonicArrangerControlsProps> = ({
           <span className="text-[10px] text-text-muted">0 = disabled</span>
         </div>
       </div>
-      <div className={`rounded-lg border p-3 ${panelBg}`}>
+      <div className={`rounded-lg border p-3 ${panelBg}`} style={panelStyle}>
         <SectionLabel color={accent} label="Arpeggio Tables" />
         <div className="flex flex-col gap-3">
           {([0, 1, 2] as const).map((tIdx) => {

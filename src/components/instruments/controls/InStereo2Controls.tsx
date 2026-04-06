@@ -96,7 +96,7 @@ export const InStereo2Controls: React.FC<InStereo2ControlsProps> = ({
   const configRef = useRef(config);
   useEffect(() => { configRef.current = config; }, [config]);
 
-  const { isCyan, accent, knob, dim, panelBg } = useInstrumentColors('#ff8844', { knob: '#ffaa66', dim: '#331a00' });
+  const { isCyan, accent, knob, dim, panelBg, panelStyle } = useInstrumentColors('#ff8844', { knob: '#ffaa66', dim: '#331a00' });
 
   const updateParam = useCallback((key: keyof InStereo2Config, value: number) => {
     onChange({ ...configRef.current, [key]: value });
@@ -108,7 +108,7 @@ export const InStereo2Controls: React.FC<InStereo2ControlsProps> = ({
     <div className="flex flex-col gap-3 p-3 overflow-y-auto" style={{ maxHeight: 'calc(100vh - 280px)' }}>
 
       {/* Volume + Waveform Length */}
-      <div className={`rounded-lg border p-3 ${panelBg}`}>
+      <div className={`rounded-lg border p-3 ${panelBg}`} style={panelStyle}>
         <SectionLabel color={accent} label="Volume & Waveform" />
         <div className="flex gap-4">
           <Knob value={config.volume} min={0} max={64} step={1}
@@ -123,7 +123,7 @@ export const InStereo2Controls: React.FC<InStereo2ControlsProps> = ({
       </div>
 
       {/* Waveform 1 display */}
-      <div className={`rounded-lg border p-3 ${panelBg}`}>
+      <div className={`rounded-lg border p-3 ${panelBg}`} style={panelStyle}>
         <SectionLabel color={accent} label="Waveform 1" />
         <WaveformLineCanvas
           data={config.waveform1}
@@ -134,7 +134,7 @@ export const InStereo2Controls: React.FC<InStereo2ControlsProps> = ({
       </div>
 
       {/* Waveform 2 display */}
-      <div className={`rounded-lg border p-3 ${panelBg}`}>
+      <div className={`rounded-lg border p-3 ${panelBg}`} style={panelStyle}>
         <SectionLabel color={accent} label="Waveform 2" />
         <WaveformLineCanvas
           data={config.waveform2}
@@ -166,7 +166,7 @@ export const InStereo2Controls: React.FC<InStereo2ControlsProps> = ({
     <div className="flex flex-col gap-3 p-3 overflow-y-auto" style={{ maxHeight: 'calc(100vh - 280px)' }}>
 
       {/* ADSR Section */}
-      <div className={`rounded-lg border p-3 ${panelBg}`}>
+      <div className={`rounded-lg border p-3 ${panelBg}`} style={panelStyle}>
         <SectionLabel color={accent} label="ADSR Envelope" />
         <div className="flex gap-3 flex-wrap">
           <Knob value={config.adsrLength} min={0} max={127} step={1}
@@ -197,7 +197,7 @@ export const InStereo2Controls: React.FC<InStereo2ControlsProps> = ({
       </div>
 
       {/* Envelope Generator Section */}
-      <div className={`rounded-lg border p-3 ${panelBg}`}>
+      <div className={`rounded-lg border p-3 ${panelBg}`} style={panelStyle}>
         <SectionLabel color={accent} label="Envelope Generator (EG)" />
         <select
           value={config.egMode}
@@ -266,7 +266,7 @@ export const InStereo2Controls: React.FC<InStereo2ControlsProps> = ({
     <div className="flex flex-col gap-3 p-3 overflow-y-auto" style={{ maxHeight: 'calc(100vh - 280px)' }}>
 
       {/* Vibrato */}
-      <div className={`rounded-lg border p-3 ${panelBg}`}>
+      <div className={`rounded-lg border p-3 ${panelBg}`} style={panelStyle}>
         <SectionLabel color={accent} label="Vibrato" />
         <div className="flex gap-3">
           <Knob value={config.vibratoDelay} min={0} max={255} step={1}
@@ -285,7 +285,7 @@ export const InStereo2Controls: React.FC<InStereo2ControlsProps> = ({
       </div>
 
       {/* Portamento */}
-      <div className={`rounded-lg border p-3 ${panelBg}`}>
+      <div className={`rounded-lg border p-3 ${panelBg}`} style={panelStyle}>
         <SectionLabel color={accent} label="Portamento" />
         <div className="flex items-center gap-4">
           <Knob value={config.portamentoSpeed} min={0} max={255} step={1}
@@ -297,7 +297,7 @@ export const InStereo2Controls: React.FC<InStereo2ControlsProps> = ({
       </div>
 
       {/* LFO Table */}
-      <div className={`rounded-lg border p-3 ${panelBg}`}>
+      <div className={`rounded-lg border p-3 ${panelBg}`} style={panelStyle}>
         <SectionLabel color={accent} label="LFO (Pitch Modulation)" />
         <div className="flex gap-3">
           <Knob value={config.amfLength} min={0} max={127} step={1}
@@ -350,7 +350,7 @@ export const InStereo2Controls: React.FC<InStereo2ControlsProps> = ({
 
   const renderArpeggio = () => (
     <div className="flex flex-col gap-3 p-3 overflow-y-auto" style={{ maxHeight: 'calc(100vh - 280px)' }}>
-      <div className={`rounded-lg border p-3 ${panelBg}`}>
+      <div className={`rounded-lg border p-3 ${panelBg}`} style={panelStyle}>
         <SectionLabel color={accent} label="Arpeggio Tables" />
         <div className="flex flex-col gap-3">
           {([0, 1, 2] as const).map((tIdx) => {
