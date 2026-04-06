@@ -1,10 +1,41 @@
 /**
- * TFMXControls.tsx — TFMX (Jochen Hippel) instrument viewer/editor
+ * TFMXControls.tsx — TFMX (Jochen Hippel TFMX-7V) instrument viewer/editor
+ *
+ * ─── Format split ─────────────────────────────────────────────────────────────
+ *
+ * There are TWO TFMX lineages and they use SEPARATE editors:
+ *
+ *   1. Chris Huelsbeck (mdat.* files): 4-byte command streams for instrument
+ *      macros. Edited via TFMXMacroEditor (src/components/tfmx/TFMXMacroEditor.tsx),
+ *      routed in SynthTypeDispatcher when the instrument carries
+ *      metadata.tfmxMacroIndex.
+ *
+ *   2. Jochen Hippel TFMX-7V (hip7.*, s7g.* files): 64-byte VolModSeq
+ *      (envelope + vibrato header + volume data) plus 64-byte SndModSeq
+ *      (notes, set_wave, vibrato, sustain, sample-pack lookups, etc.).
+ *      THIS COMPONENT handles the 7V format.
+ *
+ * Edit-write-back: setVolByte / setSndByte both call onChange AND patch the
+ * UADE chip RAM via UADEChipEditor when uadeChipRam is present, so live
+ * playback picks up the change on the next instrument re-trigger. The chip
+ * RAM layout is: instrBase + 0..63 = VolModSeq, instrBase + 64.. = SndModSeq.
+ *
+ * ─── Known gap ────────────────────────────────────────────────────────────────
+ *
+ * As of 2026-04, JochenHippel7VParser.ts is a stub that detects 7V files but
+ * produces a single empty 'Synth' instrument with no real VolMod/SndMod data.
+ * This editor is therefore mostly inert until a real 7V binary parser lands
+ * that populates TFMXConfig.volModSeqData / sndModSeqData / sampleHeaders /
+ * sampleData and tags instruments with synthType 'TFMXSynth'. The edit
+ * surface is in place ahead of time so adding the parser is the only
+ * remaining step.
  *
  * Displays and edits TFMX instrument data structured into three tabs:
  *   • Summary: stats + sample bank info
  *   • VolModSeq: parsed envelope/vibrato header + volume data bytes
  *   • SndModSeqs: decoded command stream for each sound macro sequence
+ *     (note pitch, set_wave sample index, vibrato args, sustain ticks,
+ *     setseq target, randomize threshold — all editable via inline inputs)
  *
  * Binary format (from libtfmxaudiodecoder Instrument.cpp + Envelope.cpp):
  *
@@ -306,6 +337,27 @@ export const TFMXControls: React.FC<TFMXControlsProps> = ({ config, onChange, ua
     onChange({ ...cur, volModSeqData: next });
     if (uadeChipRam) {
       void getEditor().writeU8(uadeChipRam.instrBase + byteIdx, next[byteIdx]);
+    }
+  }, [onChange, uadeChipRam, getEditor]);
+
+  /**
+   * Write a single byte into sndModSeqData, call onChange, and mirror the
+   * change to chip RAM when a UADE context is active.
+   *
+   * The SndModSeq block sits immediately after the 64-byte VolModSeq in chip
+   * RAM, so the absolute address is `instrBase + 64 + byteIdx`. byteIdx is
+   * the absolute offset into the entire sndModSeqData buffer (sequence index
+   * × 64 + position within that sequence).
+   */
+  const setSndByte = useCallback((byteIdx: number, value: number) => {
+    if (!onChange) return;
+    const cur = configRef.current;
+    const next = new Uint8Array(cur.sndModSeqData);
+    next[byteIdx] = Math.max(0, Math.min(255, value));
+    onChange({ ...cur, sndModSeqData: next });
+    if (uadeChipRam) {
+      // VolModSeq is 64 bytes; SndModSeq blocks follow immediately after.
+      void getEditor().writeU8(uadeChipRam.instrBase + 64 + byteIdx, next[byteIdx]);
     }
   }, [onChange, uadeChipRam, getEditor]);
 
@@ -615,23 +667,56 @@ export const TFMXControls: React.FC<TFMXControlsProps> = ({ config, onChange, ua
                     <span className="w-8 text-center">Hex</span>
                     <span className="w-24 text-center">Cmd</span>
                     <span className="flex-1">Detail</span>
+                    {!readonly && <span className="w-14 text-right">Arg</span>}
                   </div>
                   <div className="overflow-y-auto" style={{ maxHeight: '260px' }}>
                     {entries.length === 0 ? (
                       <div className="text-[9px] text-text-muted py-2">Empty sequence</div>
                     ) : (
-                      entries.map((e, i) => (
-                        <div key={i} className="flex items-center font-mono text-[9px] py-0.5">
-                          <span className="w-6 text-center text-text-muted">{e.pos}</span>
-                          <span className="w-8 text-center text-text-muted">
-                            {e.raw.toString(16).padStart(2,'0')}
-                          </span>
-                          <span className="w-24 text-center font-bold" style={{ color: kindColor(e.kind) }}>
-                            {e.label}
-                          </span>
-                          <span className="flex-1 text-text-secondary">{e.detail}</span>
-                        </div>
-                      ))
+                      entries.map((e, i) => {
+                        // Absolute byteIdx of the FIRST argument byte for this entry,
+                        // measured from the start of sndModSeqData.
+                        const baseByte = clampedSeq * 64 + e.pos;
+                        const argByte = baseByte + 1; // most commands' arg is at +1
+                        const showArgInput = !readonly && (
+                          e.kind === 'note' || e.kind === 'setwave' || e.kind === 'newwave'
+                          || e.kind === 'sustain' || e.kind === 'vibrato' || e.kind === 'setseq'
+                          || e.kind === 'random'
+                        );
+                        return (
+                          <div key={i} className="flex items-center font-mono text-[9px] py-0.5">
+                            <span className="w-6 text-center text-text-muted">{e.pos}</span>
+                            <span className="w-8 text-center text-text-muted">
+                              {e.raw.toString(16).padStart(2,'0')}
+                            </span>
+                            <span className="w-24 text-center font-bold" style={{ color: kindColor(e.kind) }}>
+                              {e.label}
+                            </span>
+                            <span className="flex-1 text-text-secondary">{e.detail}</span>
+                            {showArgInput ? (
+                              <input
+                                type="number"
+                                min={0} max={255}
+                                value={config.sndModSeqData[argByte] ?? 0}
+                                onChange={(ev) => {
+                                  const v = parseInt(ev.target.value);
+                                  if (!isNaN(v)) setSndByte(argByte, v);
+                                }}
+                                className="text-[9px] font-mono text-center border rounded py-0"
+                                style={{
+                                  width: '52px',
+                                  background: inputBg,
+                                  borderColor: dim,
+                                  color: accent,
+                                }}
+                                title={`SndModSeq[${baseByte + 1}] — first argument byte`}
+                              />
+                            ) : !readonly ? (
+                              <span className="w-14" />
+                            ) : null}
+                          </div>
+                        );
+                      })
                     )}
                   </div>
                   <div className="mt-2 text-[9px] text-text-muted">

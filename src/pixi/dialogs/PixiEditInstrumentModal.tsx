@@ -1931,6 +1931,47 @@ const JamCrackerPanel: React.FC<{
           >
             <pixiGraphics draw={drawWaveform} layout={{ width: 320, height: 100 }} />
           </layoutContainer>
+          {/* Quick fill presets — same store mutation as the DOM editor */}
+          <layoutContainer layout={{ flexDirection: 'row', gap: 4, paddingTop: 4 }}>
+            {(['sine', 'triangle', 'square', 'saw', 'noise', 'clear'] as const).map((kind) => (
+              <layoutContainer
+                key={kind}
+                eventMode="static"
+                cursor="pointer"
+                onPointerTap={() => {
+                  // Inline preset generator (same logic as JamCrackerControls.generateWaveformPreset)
+                  const size = Math.max(64, jc.waveformData?.length ?? 64);
+                  const buf = new Uint8Array(size);
+                  for (let i = 0; i < size; i++) {
+                    let s = 0;
+                    if (kind === 'sine')     s = Math.round(Math.sin((i / size) * Math.PI * 2) * 120);
+                    else if (kind === 'triangle') {
+                      const half = size / 2;
+                      const phase = i < half ? i / half : 1 - (i - half) / half;
+                      s = Math.round((phase * 2 - 1) * 120);
+                    }
+                    else if (kind === 'square')   s = i < size / 2 ? 120 : -120;
+                    else if (kind === 'saw')      s = Math.round(((i / size) * 2 - 1) * 120);
+                    else if (kind === 'noise')    s = Math.round((Math.random() * 2 - 1) * 120);
+                    buf[i] = s < 0 ? s + 256 : s;
+                  }
+                  onUpdate(instrument.id, { jamCracker: { ...instrument.jamCracker!, waveformData: buf } });
+                }}
+                layout={{
+                  paddingLeft: 8, paddingRight: 8, height: 20, borderRadius: 3,
+                  alignItems: 'center', justifyContent: 'center',
+                  backgroundColor: theme.bgTertiary.color,
+                  borderWidth: 1, borderColor: theme.border.color,
+                }}
+              >
+                <pixiBitmapText
+                  text={kind}
+                  style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 9, fill: theme.textSecondary.color }}
+                  layout={{}}
+                />
+              </layoutContainer>
+            ))}
+          </layoutContainer>
         </>
       )}
 
