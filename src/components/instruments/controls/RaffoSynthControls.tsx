@@ -49,7 +49,7 @@ const OscGroup: React.FC<{
       </div>
       <div className="grid grid-cols-3 gap-2">
         <div className="flex flex-col gap-1">
-          <label className="text-gray-500 text-[10px]">Waveform</label>
+          <label className="text-text-muted text-[10px]">Waveform</label>
           <select className="bg-dark-bgSecondary text-text-primary border border-dark-border rounded px-1 py-0.5 text-[10px]"
             value={Math.round(merged[waveKey] as number ?? 0)}
             onChange={(e) => update(waveKey, parseInt(e.target.value))}>
@@ -57,7 +57,7 @@ const OscGroup: React.FC<{
           </select>
         </div>
         <div className="flex flex-col gap-1">
-          <label className="text-gray-500 text-[10px]">Range</label>
+          <label className="text-text-muted text-[10px]">Range</label>
           <select className="bg-dark-bgSecondary text-text-primary border border-dark-border rounded px-1 py-0.5 text-[10px]"
             value={Math.round(merged[rangeKey] as number ?? 2)}
             onChange={(e) => update(rangeKey, parseInt(e.target.value))}>
@@ -65,18 +65,18 @@ const OscGroup: React.FC<{
           </select>
         </div>
         <div className="flex flex-col gap-1">
-          <label className="text-gray-500 text-[10px]">Volume</label>
+          <label className="text-text-muted text-[10px]">Volume</label>
           <input type="range" min={0} max={10} step={0.1} value={merged[volKey] as number ?? 5}
             onChange={(e) => update(volKey, parseFloat(e.target.value))}
             className="w-full accent-green-500 h-2" />
         </div>
       </div>
       <div className="mt-1">
-        <label className="text-gray-500 text-[10px]">Tuning</label>
+        <label className="text-text-muted text-[10px]">Tuning</label>
         <input type="range" min={-12} max={12} step={0.01} value={merged[tuneKey] as number ?? 0}
           onChange={(e) => update(tuneKey, parseFloat(e.target.value))}
           className="w-full accent-yellow-500 h-2" />
-        <span className="text-gray-600 text-[10px]">{((merged[tuneKey] as number) ?? 0).toFixed(2)} semi</span>
+        <span className="text-text-muted text-[10px]">{((merged[tuneKey] as number) ?? 0).toFixed(2)} semi</span>
       </div>
     </div>
   );
@@ -107,13 +107,13 @@ export const RaffoSynthControls: React.FC<RaffoSynthControlsProps> = ({ config, 
         <h3 className="text-text-muted font-semibold mb-2 border-b border-dark-border pb-1">Master</h3>
         <div className="grid grid-cols-2 gap-2">
           <div className="flex flex-col gap-1">
-            <label className="text-gray-500 text-[10px]">Volume</label>
+            <label className="text-text-muted text-[10px]">Volume</label>
             <input type="range" min={0} max={10} step={0.1} value={merged.volume ?? 7}
               onChange={(e) => updateParam('volume', parseFloat(e.target.value))}
               className="w-full accent-green-500 h-2" />
           </div>
           <div className="flex flex-col gap-1">
-            <label className="text-gray-500 text-[10px]">Glide</label>
+            <label className="text-text-muted text-[10px]">Glide</label>
             <input type="range" min={0} max={10} step={0.1} value={merged.glide ?? 1}
               onChange={(e) => updateParam('glide', parseFloat(e.target.value))}
               className="w-full accent-blue-500 h-2" />
@@ -127,7 +127,7 @@ export const RaffoSynthControls: React.FC<RaffoSynthControlsProps> = ({ config, 
         <div className="grid grid-cols-4 gap-2">
           {(['attack', 'decay', 'sustain', 'release'] as (keyof RaffoSynthConfig)[]).map(k => (
             <div key={k} className="flex flex-col gap-1">
-              <label className="text-gray-500 text-[10px]">{RAFFO_PARAM_NAMES[CONFIG_KEYS.indexOf(k)]}</label>
+              <label className="text-text-muted text-[10px]">{RAFFO_PARAM_NAMES[CONFIG_KEYS.indexOf(k)]}</label>
               <input type="range" min={k === 'sustain' || k === 'release' ? 0 : 0} max={k === 'sustain' || k === 'release' ? 1 : 1000}
                 step={k === 'sustain' || k === 'release' ? 0.01 : 1} value={merged[k] as number ?? 0}
                 onChange={(e) => updateParam(k, parseFloat(e.target.value))}
@@ -142,20 +142,20 @@ export const RaffoSynthControls: React.FC<RaffoSynthControlsProps> = ({ config, 
         <h3 className="text-text-muted font-semibold mb-2 border-b border-dark-border pb-1">Filter</h3>
         <div className="grid grid-cols-3 gap-2">
           <div className="flex flex-col gap-1">
-            <label className="text-gray-500 text-[10px]">Cutoff</label>
+            <label className="text-text-muted text-[10px]">Cutoff</label>
             <input type="range" min={500} max={10000} step={10} value={merged.filterCutoff ?? 3000}
               onChange={(e) => updateParam('filterCutoff', parseFloat(e.target.value))}
               className="w-full accent-purple-500 h-2" />
-            <span className="text-gray-600 text-[10px]">{Math.round(merged.filterCutoff ?? 3000)} Hz</span>
+            <span className="text-text-muted text-[10px]">{Math.round(merged.filterCutoff ?? 3000)} Hz</span>
           </div>
           <div className="flex flex-col gap-1">
-            <label className="text-gray-500 text-[10px]">Resonance</label>
+            <label className="text-text-muted text-[10px]">Resonance</label>
             <input type="range" min={0} max={10} step={0.1} value={merged.filterResonance ?? 3}
               onChange={(e) => updateParam('filterResonance', parseFloat(e.target.value))}
               className="w-full accent-purple-500 h-2" />
           </div>
           <div className="flex flex-col gap-1">
-            <label className="text-gray-500 text-[10px]">Filter Release</label>
+            <label className="text-text-muted text-[10px]">Filter Release</label>
             <input type="range" min={0} max={1} step={0.01} value={merged.filterRelease ?? 0.5}
               onChange={(e) => updateParam('filterRelease', parseFloat(e.target.value))}
               className="w-full accent-purple-500 h-2" />
@@ -164,7 +164,7 @@ export const RaffoSynthControls: React.FC<RaffoSynthControlsProps> = ({ config, 
         <div className="grid grid-cols-4 gap-2 mt-2">
           {(['filterAttack', 'filterDecay', 'filterSustain'] as (keyof RaffoSynthConfig)[]).map(k => (
             <div key={k} className="flex flex-col gap-1">
-              <label className="text-gray-500 text-[10px]">{RAFFO_PARAM_NAMES[CONFIG_KEYS.indexOf(k)]}</label>
+              <label className="text-text-muted text-[10px]">{RAFFO_PARAM_NAMES[CONFIG_KEYS.indexOf(k)]}</label>
               <input type="range" min={k === 'filterSustain' ? 0 : 0} max={k === 'filterSustain' ? 1 : 1000}
                 step={k === 'filterSustain' ? 0.01 : 1} value={merged[k] as number ?? 0}
                 onChange={(e) => updateParam(k, parseFloat(e.target.value))}

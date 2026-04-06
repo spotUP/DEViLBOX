@@ -1263,7 +1263,7 @@ const C64Panel: React.FC<{ config: FurnaceConfig; onChange: (u: Partial<FurnaceC
       {/* Advanced Options */}
       <div className="bg-dark-bgSecondary p-4 rounded-lg border border-dark-border">
         <div className="flex items-center gap-2 mb-4">
-          <Settings size={16} className="text-gray-400" />
+          <Settings size={16} className="text-text-muted" />
           <h3 className="font-mono text-xs font-bold text-text-primary uppercase">Options</h3>
         </div>
         <div className="flex flex-wrap gap-2">

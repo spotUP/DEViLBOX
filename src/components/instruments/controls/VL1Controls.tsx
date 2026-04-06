@@ -90,7 +90,7 @@ export const VL1Controls: React.FC<VL1ControlsProps> = ({ config, onChange }) =>
         </div>
         <div className="flex gap-3 flex-wrap items-end mt-2">
           <div className="flex flex-col gap-1">
-            <label className="text-gray-500 text-[10px]">Octave</label>
+            <label className="text-text-muted text-[10px]">Octave</label>
             <div className="flex gap-1">
               {['Low', 'Mid', 'High'].map((label, i) => (
                 <button

@@ -71,10 +71,10 @@ export const HWKnob: React.FC<HWKnobProps> = ({
       >
         {Math.round(((value - min) / (max - min)) * 100)}
       </div>
-      <div className="text-[8px] text-gray-400 text-center leading-tight truncate w-full">
+      <div className="text-[8px] text-text-muted text-center leading-tight truncate w-full">
         {label}
       </div>
-      <div className="text-[7px] text-gray-500 text-center">
+      <div className="text-[7px] text-text-muted text-center">
         {displayVal}
       </div>
     </div>

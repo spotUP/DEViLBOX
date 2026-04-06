@@ -35,11 +35,11 @@ const Sl: React.FC<{
   onChange: (v: number) => void; cls: string; fmt?: (v: number) => string;
 }> = ({ label, value, min, max, step, onChange, cls, fmt }) => (
   <div className="flex flex-col gap-1">
-    <label className="text-gray-500 text-[10px]">{label}</label>
+    <label className="text-text-muted text-[10px]">{label}</label>
     <input type="range" min={min} max={max} step={step} value={value}
       onChange={(e) => onChange(parseFloat(e.target.value))}
       className={`w-full h-2 ${cls}`} />
-    {fmt && <span className="text-gray-600 text-[10px]">{fmt(value)}</span>}
+    {fmt && <span className="text-text-muted text-[10px]">{fmt(value)}</span>}
   </div>
 );
 
@@ -47,7 +47,7 @@ const Sel: React.FC<{
   label: string; value: number; options: string[]; onChange: (v: number) => void;
 }> = ({ label, value, options, onChange }) => (
   <div className="flex flex-col gap-1">
-    <label className="text-gray-500 text-[10px]">{label}</label>
+    <label className="text-text-muted text-[10px]">{label}</label>
     <select className="bg-dark-bgSecondary text-text-primary border border-dark-border rounded px-1 py-0.5 text-[10px]"
       value={Math.round(value)} onChange={(e) => onChange(parseInt(e.target.value))}>
       {options.map((n, i) => <option key={i} value={i}>{n}</option>)}
@@ -59,7 +59,7 @@ const Tog: React.FC<{
   label: string; value: number; onChange: (v: number) => void;
 }> = ({ label, value, onChange }) => (
   <div className="flex flex-col gap-1">
-    <label className="text-gray-500 text-[10px]">{label}</label>
+    <label className="text-text-muted text-[10px]">{label}</label>
     <button
       className={`px-2 py-0.5 rounded text-[10px] ${value ? 'bg-green-700 text-white' : 'bg-gray-700 text-text-muted'}`}
       onClick={() => onChange(value ? 0 : 1)}
