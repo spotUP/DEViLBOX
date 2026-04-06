@@ -60,6 +60,7 @@ import { useCollaborationStore } from '@stores/useCollaborationStore';
 import { PeerMouseCursor } from '@components/collaboration/PeerMouseCursor';
 import { PeerVideoWindow } from '@components/collaboration/PeerVideoWindow';
 import { ExposeOverlay } from '@components/ui/ExposeOverlay';
+import { GlobalConfirmDialog } from '@components/common/GlobalConfirmDialog';
 import { DJErrorBoundary } from './components/dj/DJErrorBoundary';
 
 // Lazy-loaded components for better startup performance
@@ -1589,6 +1590,9 @@ function App() {
 
       {/* DOM Expose Overlay — view switcher (Mission Control style) */}
       <ExposeOverlay />
+
+      {/* Global confirmation dialog — triggered by showConfirm() from any store */}
+      <GlobalConfirmDialog />
     </AppLayout>
     </GlobalDragDropHandler>
   );
