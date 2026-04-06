@@ -951,8 +951,12 @@ export class TrackerReplayer {
       } catch { /* ToneEngine not ready */ }
     }
 
-    // Update WASM mute mask
-    this.updateWasmMuteMask();
+    // NOTE: We intentionally do NOT call updateWasmMuteMask() here.
+    // Muting channels in libopenmpt prevents subsequent non-replaced instrument
+    // notes from playing (the unmute arrives too late — the row already rendered
+    // as silence). The synth plays on top of the original sample. This is
+    // acceptable until the OpenMPT core engine migration (Phase 2+) where
+    // libopenmpt becomes the soundlib and we can silence samples directly.
   }
 
   // fireHybridNotesFromChannelState removed — channel state from worklet
