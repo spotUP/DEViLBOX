@@ -132,6 +132,10 @@ interface FormatStore {
   deleteTFMXTrackstep: (idx: number) => void;
   /** Update a pattern command in the TFMX pattern pool */
   setTFMXPatternCommand: (patIdx: number, rowIdx: number, field: 'note' | 'macro' | 'wait' | 'detune', value: number) => void;
+  /** Update a single byte (0-3) in a TFMX macro command and patch tfmxFileData */
+  setTFMXMacroByte: (macroIdx: number, stepIdx: number, byteIdx: 0 | 1 | 2 | 3, value: number) => void;
+  /** Replace an entire TFMX macro command (all 4 bytes) and patch tfmxFileData */
+  setTFMXMacroCommand: (macroIdx: number, stepIdx: number, b0: number, b1: number, b2: number, b3: number) => void;
   /** Update a Klystrack sequence entry field (pattern or noteOffset) */
   setKlysSequenceEntry: (channel: number, position: number, field: 'pattern' | 'noteOffset', value: number) => void;
   /** Insert a new Klystrack sequence entry (copy of current or blank) at the given position */
@@ -736,6 +740,53 @@ export const useFormatStore = create<FormatStore>()(
       else if (field === 'macro') cmd.macro = value;
       else if (field === 'wait') cmd.wait = value;
       else if (field === 'detune') cmd.detune = value;
+    }),
+
+    setTFMXMacroByte: (macroIdx, stepIdx, byteIdx, value) => set((state) => {
+      if (!state.tfmxNative) return;
+      const macro = state.tfmxNative.macros[macroIdx];
+      if (!macro) return;
+      const cmd = macro.commands[stepIdx];
+      if (!cmd) return;
+      const v = value & 0xFF;
+      if (byteIdx === 0) cmd.byte0 = v;
+      else if (byteIdx === 1) cmd.byte1 = v;
+      else if (byteIdx === 2) cmd.byte2 = v;
+      else cmd.byte3 = v;
+      cmd.raw = ((cmd.byte0 << 24) | (cmd.byte1 << 16) | (cmd.byte2 << 8) | cmd.byte3) >>> 0;
+      cmd.opcode = cmd.byte0 & 0x3F;
+      cmd.flags = cmd.byte0 & 0xC0;
+      // Patch tfmxFileData buffer in place
+      if (state.tfmxFileData) {
+        const view = new Uint8Array(state.tfmxFileData);
+        const off = cmd.fileOffset + byteIdx;
+        if (off >= 0 && off < view.length) view[off] = v;
+      }
+    }),
+
+    setTFMXMacroCommand: (macroIdx, stepIdx, b0, b1, b2, b3) => set((state) => {
+      if (!state.tfmxNative) return;
+      const macro = state.tfmxNative.macros[macroIdx];
+      if (!macro) return;
+      const cmd = macro.commands[stepIdx];
+      if (!cmd) return;
+      cmd.byte0 = b0 & 0xFF;
+      cmd.byte1 = b1 & 0xFF;
+      cmd.byte2 = b2 & 0xFF;
+      cmd.byte3 = b3 & 0xFF;
+      cmd.raw = ((cmd.byte0 << 24) | (cmd.byte1 << 16) | (cmd.byte2 << 8) | cmd.byte3) >>> 0;
+      cmd.opcode = cmd.byte0 & 0x3F;
+      cmd.flags = cmd.byte0 & 0xC0;
+      if (state.tfmxFileData) {
+        const view = new Uint8Array(state.tfmxFileData);
+        const off = cmd.fileOffset;
+        if (off >= 0 && off + 4 <= view.length) {
+          view[off] = cmd.byte0;
+          view[off + 1] = cmd.byte1;
+          view[off + 2] = cmd.byte2;
+          view[off + 3] = cmd.byte3;
+        }
+      }
     }),
 
     reset: () => set((state) => {
