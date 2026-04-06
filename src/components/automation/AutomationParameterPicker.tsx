@@ -133,7 +133,7 @@ export const AutomationParameterPicker: React.FC<AutomationParameterPickerProps>
                             curveId = addCurve(patternId, channelIndex, param.key);
                           }
                           if (curveId && (!existing || existing.points.length === 0)) {
-                            addPoint(curveId, 0, 0.5);
+                            addPoint(curveId, 0, 1);
                           }
                         }
                       }

@@ -155,8 +155,8 @@ export const ChannelContextMenu: React.FC<ChannelContextMenuProps> = ({
       curveId = addCurve(patternId, channelIndex, paramId);
       if (!curveId) return; // addCurve refused (format compat dialog cancelled)
     }
-    // Seed a single centered point at row 0 so the lane has something to render
-    addPoint(curveId, 0, 0.5);
+    // Seed a single point at row 0 with full value (1.0 → vol 64 / C40)
+    addPoint(curveId, 0, 1);
   }, [curves, addCurve, addPoint, patternId, channelIndex]);
 
   // Dynamic automation parameters from channel's instrument
