@@ -41,7 +41,6 @@ import { FurnaceParser } from '@/lib/import/formats/FurnaceParser';
 import { DefleMaskParser } from '@/lib/import/formats/DefleMaskParser';
 import { deepMerge, ensureCompleteInstrumentConfig } from '@/lib/migration';
 import { WaveformProcessor } from '@/lib/audio/WaveformProcessor';
-import { useUIStore } from '@/stores/useUIStore';
 
 // Extracted helper modules
 import {
@@ -846,11 +845,22 @@ export const useInstrumentStore = create<InstrumentStore>()(
               );
 
               if (hasWasmEngine && isNowSynth) {
-                // Warn about format incompatibility (but never prevent it)
                 const fmt = song.format?.toUpperCase() || 'native';
-                useUIStore.getState().setStatusMessage(
-                  `SYNTH REPLACEMENT BREAKS ${fmt} COMPAT — SAVE AS .DBX`, false, 4000,
+                const confirmed = window.confirm(
+                  `Replacing this sample with a synth breaks ${fmt} format compatibility.\n\n` +
+                  `The song can no longer be saved as ${fmt} — save as .dbx instead.\n\n` +
+                  `Continue?`
                 );
+                if (!confirmed) {
+                  // Revert the synthType change
+                  set((state) => {
+                    const inst = state.instruments.find(i => i.id === id);
+                    if (inst && currentInstrument) {
+                      inst.synthType = currentInstrument.synthType;
+                    }
+                  });
+                  return;
+                }
                 replayer.markInstrumentReplaced(id);
 
                 // Engine-specific silencing
@@ -935,23 +945,7 @@ export const useInstrumentStore = create<InstrumentStore>()(
         state.currentInstrumentId = newId;
       });
 
-      // Warn if creating a synth instrument in a WASM-engine-backed song
-      const newInst = get().instruments.find(i => i.id === newId);
-      if (newInst && newInst.synthType !== 'Sampler' && newInst.synthType !== 'Player') {
-        try {
-          const { getTrackerReplayer } = require('@engine/TrackerReplayer');
-          const song = getTrackerReplayer().getSong();
-          if (song) {
-            const fmt = song.format?.toUpperCase() || 'native';
-            console.warn(`[InstrumentStore] Synth instrument created on ${fmt} song — format compat warning`);
-            useUIStore.getState().setStatusMessage(
-              `SYNTH INSTRUMENT BREAKS ${fmt} COMPAT — SAVE AS .DBX`, false, 4000,
-            );
-          }
-        } catch (e) {
-          console.warn('[InstrumentStore] Warning check failed:', e);
-        }
-      }
+      // Format compat warning is handled by updateInstrument (handleSaveNew calls it next)
 
       return newId;
     },
