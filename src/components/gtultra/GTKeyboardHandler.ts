@@ -426,7 +426,7 @@ export function useGTKeyboardHandler(active: boolean) {
       const clip = state.orderClipboard;
       if (clip && engine) {
         for (let i = 0; i < clip.length; i++) {
-          engine.setOrderEntry(state.currentSong, cursor.channel, i, clip[i]);
+          engine.setOrderEntry(cursor.channel, i, clip[i]);
         }
         engine.checkpointUndo();
       }
