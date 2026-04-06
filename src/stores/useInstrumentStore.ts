@@ -830,6 +830,7 @@ export const useInstrumentStore = create<InstrumentStore>()(
             // ToneEngine fires notes and the WASM engine mutes those channels.
             // Works for ALL engines: libopenmpt, UADE, Klystrack, SID, Hively, etc.
             const song = replayer.getSong();
+            console.warn('[HYBRID-DEBUG] synthTypeChanging=', synthTypeChanging, 'song=', !!song, 'libopenmptFileData=', !!song?.libopenmptFileData, 'synthType=', updatedConfig.synthType);
             if (synthTypeChanging && song) {
               const isNowSynth = updatedConfig.synthType !== 'Sampler' && updatedConfig.synthType !== 'Player';
               const hasWasmEngine = !!(
@@ -844,12 +845,14 @@ export const useInstrumentStore = create<InstrumentStore>()(
                 song.startrekkerAMFileData || song.symphonieFileData
               );
 
+              console.warn('[HYBRID-DEBUG] hasWasmEngine=', hasWasmEngine, 'isNowSynth=', isNowSynth, 'id=', id);
               if (hasWasmEngine && isNowSynth) {
                 // Warn about format incompatibility (but never prevent it)
                 const fmt = song.format?.toUpperCase() || 'native';
                 useUIStore.getState().setStatusMessage(
                   `SYNTH REPLACEMENT BREAKS ${fmt} COMPAT — SAVE AS .DBX`, false, 4000,
                 );
+                console.warn('[HYBRID-DEBUG] markInstrumentReplaced(', id, ')');
                 replayer.markInstrumentReplaced(id);
 
                 // Engine-specific silencing
