@@ -47,6 +47,11 @@ static IXS::PlayerIXS *g_player = nullptr;
 static uint8_t *g_file_data = nullptr;
 static bool g_playing = false;
 
+/* Per-channel gain array (up to 64 channels). 1.0 = full, 0.0 = muted. */
+#define IXS_MAX_CHANNELS 64
+static float g_channel_gain[IXS_MAX_CHANNELS];
+static bool g_gain_initialized = false;
+
 /* ---- Public API ---- */
 
 EXPORT int ixalance_init(const uint8_t *data, uint32_t size) {
@@ -142,4 +147,22 @@ EXPORT int ixalance_render(float *buf, int frames) {
 
 EXPORT int ixalance_get_sample_rate(void) {
     return IXS_SAMPLE_RATE;
+}
+
+EXPORT void ixalance_set_channel_gain(int channel, float gain) {
+    if (!g_gain_initialized) {
+        for (int i = 0; i < IXS_MAX_CHANNELS; i++) g_channel_gain[i] = 1.0f;
+        g_gain_initialized = true;
+    }
+    if (channel >= 0 && channel < IXS_MAX_CHANNELS) {
+        g_channel_gain[channel] = gain;
+    }
+}
+
+EXPORT float ixalance_get_channel_gain(int channel) {
+    if (!g_gain_initialized) return 1.0f;
+    if (channel >= 0 && channel < IXS_MAX_CHANNELS) {
+        return g_channel_gain[channel];
+    }
+    return 1.0f;
 }

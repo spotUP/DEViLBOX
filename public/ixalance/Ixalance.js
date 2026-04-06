@@ -1671,6 +1671,8 @@ var _malloc = Module['_malloc'] = makeInvalidEarlyAccess('_malloc');
 var _ixalance_stop = Module['_ixalance_stop'] = makeInvalidEarlyAccess('_ixalance_stop');
 var _ixalance_render = Module['_ixalance_render'] = makeInvalidEarlyAccess('_ixalance_render');
 var _ixalance_get_sample_rate = Module['_ixalance_get_sample_rate'] = makeInvalidEarlyAccess('_ixalance_get_sample_rate');
+var _ixalance_set_channel_gain = Module['_ixalance_set_channel_gain'] = makeInvalidEarlyAccess('_ixalance_set_channel_gain');
+var _ixalance_get_channel_gain = Module['_ixalance_get_channel_gain'] = makeInvalidEarlyAccess('_ixalance_get_channel_gain');
 var _fflush = makeInvalidEarlyAccess('_fflush');
 var _emscripten_builtin_memalign = makeInvalidEarlyAccess('_emscripten_builtin_memalign');
 var _strerror = makeInvalidEarlyAccess('_strerror');
@@ -1691,6 +1693,8 @@ function assignWasmExports(wasmExports) {
   _ixalance_stop = Module['_ixalance_stop'] = createExportWrapper('ixalance_stop', 0);
   _ixalance_render = Module['_ixalance_render'] = createExportWrapper('ixalance_render', 2);
   _ixalance_get_sample_rate = Module['_ixalance_get_sample_rate'] = createExportWrapper('ixalance_get_sample_rate', 0);
+  _ixalance_set_channel_gain = Module['_ixalance_set_channel_gain'] = createExportWrapper('ixalance_set_channel_gain', 2);
+  _ixalance_get_channel_gain = Module['_ixalance_get_channel_gain'] = createExportWrapper('ixalance_get_channel_gain', 1);
   _fflush = createExportWrapper('fflush', 1);
   _emscripten_builtin_memalign = createExportWrapper('emscripten_builtin_memalign', 2);
   _strerror = createExportWrapper('strerror', 1);

@@ -84,6 +84,19 @@ class Sc68Processor extends AudioWorkletProcessor {
         }
         break;
 
+      case 'setMuteMask':
+        // SC68: YM2149 has 3 channels. Mute mask bit 0=ch0, bit 1=ch1, bit 2=ch2.
+        // Since SC68 renders mixed stereo, we store gains in WASM for future
+        // per-channel separation. For now this stores the state consistently.
+        if (this.module && typeof this.module._sc68_wasm_set_channel_gain === 'function') {
+          const mask = data.mask || 0;
+          for (let ch = 0; ch < 3; ch++) {
+            const muted = (mask & (1 << ch)) !== 0;
+            this.module._sc68_wasm_set_channel_gain(ch, muted ? 0.0 : 1.0);
+          }
+        }
+        break;
+
       case 'dispose':
         this.cleanup();
         break;

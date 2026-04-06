@@ -80,8 +80,19 @@ class IxalanceProcessor extends AudioWorkletProcessor {
         break;
 
       case 'setChannelGain':
-        if (this.module && typeof this.module._player_set_channel_gain === 'function') {
-          this.module._player_set_channel_gain(data.channel, data.gain);
+        if (this.module && typeof this.module._ixalance_set_channel_gain === 'function') {
+          this.module._ixalance_set_channel_gain(data.channel, data.gain);
+        }
+        break;
+
+      case 'setMuteMask':
+        // Ixalance renders mixed stereo — store gains in WASM for consistency.
+        if (this.module && typeof this.module._ixalance_set_channel_gain === 'function') {
+          const mask = data.mask || 0;
+          for (let ch = 0; ch < 64; ch++) {
+            const muted = (mask & (1 << ch)) !== 0;
+            this.module._ixalance_set_channel_gain(ch, muted ? 0.0 : 1.0);
+          }
         }
         break;
 

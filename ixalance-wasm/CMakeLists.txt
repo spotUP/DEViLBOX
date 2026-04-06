@@ -48,7 +48,7 @@ set_target_properties(Ixalance PROPERTIES
 target_link_options(Ixalance PRIVATE
     "SHELL:-s MODULARIZE=1"
     "SHELL:-s EXPORT_NAME='createIxalance'"
-    "SHELL:-s EXPORTED_FUNCTIONS=['_malloc','_free','_ixalance_init','_ixalance_stop','_ixalance_render','_ixalance_get_sample_rate']"
+    "SHELL:-s EXPORTED_FUNCTIONS=['_malloc','_free','_ixalance_init','_ixalance_stop','_ixalance_render','_ixalance_get_sample_rate','_ixalance_set_channel_gain','_ixalance_get_channel_gain']"
     "SHELL:-s EXPORTED_RUNTIME_METHODS=['ccall','cwrap','HEAPF32','HEAPU8','wasmMemory']"
     "SHELL:-s ALLOW_MEMORY_GROWTH=1"
     "SHELL:-s INITIAL_MEMORY=16777216"
