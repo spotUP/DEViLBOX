@@ -89,6 +89,8 @@ const bakingInstruments = new Set<number>();
  * Called from ALL store entry points that can change synthType.
  */
 let _formatCompatConfirmed = false;
+let _currentSongFormat: string | null = null;
+
 function checkFormatCompatibility(newSynthType: string | undefined, oldSynthType?: string): boolean {
   // No warning needed for Sampler/Player
   if (!newSynthType || newSynthType === 'Sampler' || newSynthType === 'Player') return true;
@@ -96,32 +98,24 @@ function checkFormatCompatibility(newSynthType: string | undefined, oldSynthType
   if (oldSynthType && newSynthType === oldSynthType) return true;
   // Already confirmed this session (reset on song load)
   if (_formatCompatConfirmed) return true;
+  // No song loaded or no format tracked
+  if (!_currentSongFormat) return true;
 
-  try {
-    const { getTrackerReplayer } = require('@engine/TrackerReplayer');
-    const song = getTrackerReplayer().getSong();
-    console.error('[FormatCompat] song=', !!song, 'format=', song?.format, 'synthType=', newSynthType, 'old=', oldSynthType);
-    if (!song) return true; // no song loaded
-
-    const fmt = song.format?.toUpperCase() || 'native';
-    console.error('[FormatCompat] SHOWING CONFIRM for', fmt);
-    const confirmed = window.confirm(
-      `This breaks ${fmt} format compatibility.\n\n` +
-      `The song can no longer be saved as ${fmt} — save as .dbx instead.\n\n` +
-      `Continue?`
-    );
-    if (confirmed) {
-      _formatCompatConfirmed = true; // don't ask again for this song
-    }
-    return confirmed;
-  } catch (e) {
-    console.error('[FormatCompat] Error:', e);
-    return true; // replayer not initialized
+  const fmt = _currentSongFormat.toUpperCase();
+  const confirmed = window.confirm(
+    `This breaks ${fmt} format compatibility.\n\n` +
+    `The song can no longer be saved as ${fmt} — save as .dbx instead.\n\n` +
+    `Continue?`
+  );
+  if (confirmed) {
+    _formatCompatConfirmed = true; // don't ask again for this song
   }
+  return confirmed;
 }
 
-/** Reset format compat flag (called on song load) */
-export function resetFormatCompatFlag(): void {
+/** Set the current song format (called on song load) */
+export function setCurrentSongFormat(format: string | null): void {
+  _currentSongFormat = format;
   _formatCompatConfirmed = false;
 }
 
