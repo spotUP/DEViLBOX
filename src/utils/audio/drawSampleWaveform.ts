@@ -104,6 +104,9 @@ export function drawSampleWaveform(
   const bgColor = cs.getPropertyValue('--color-bg').trim() || COLORS.bg;
   const gridColor = cs.getPropertyValue('--color-bg-secondary').trim() || COLORS.grid;
   const centerColor = cs.getPropertyValue('--color-border').trim() || COLORS.center;
+  const textMuted = cs.getPropertyValue('--color-text-muted').trim() || COLORS.placeholder;
+  const textSubtle = cs.getPropertyValue('--color-text-subtle').trim() || COLORS.placeholderSub;
+  const accentColor = cs.getPropertyValue('--color-accent-primary').trim() || '#10b981';
 
   // Background
   ctx.fillStyle = bgColor;
@@ -130,13 +133,19 @@ export function drawSampleWaveform(
   ctx.stroke();
 
   if (!opts.audioBuffer) {
-    ctx.fillStyle = COLORS.placeholder;
-    ctx.font = 'bold 24px "JetBrains Mono", "Consolas", monospace';
     ctx.textAlign = 'center';
-    ctx.fillText('Drop audio file here or click to upload', width / 2, midY - 15);
-    ctx.fillStyle = COLORS.placeholderSub;
-    ctx.font = '18px "JetBrains Mono", "Consolas", monospace';
-    ctx.fillText('WAV, MP3, OGG, FLAC supported', width / 2, midY + 25);
+    // Main heading — uses muted text token
+    ctx.fillStyle = textMuted;
+    ctx.font = 'bold 18px "JetBrains Mono", "Consolas", monospace';
+    ctx.fillText('EMPTY SAMPLE', width / 2, midY - 22);
+    // Subtitle — list the ways to load audio
+    ctx.fillStyle = textSubtle;
+    ctx.font = '12px "JetBrains Mono", "Consolas", monospace';
+    ctx.fillText('Drag & drop a file, use Replace, or Record from mic', width / 2, midY + 4);
+    // Hint — accent color for the record action
+    ctx.fillStyle = accentColor;
+    ctx.font = 'bold 11px "JetBrains Mono", "Consolas", monospace';
+    ctx.fillText('WAV · MP3 · OGG · FLAC · AIFF · M4A', width / 2, midY + 26);
     return;
   }
 
