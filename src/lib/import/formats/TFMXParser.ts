@@ -46,7 +46,7 @@ import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
 import type { Pattern, TrackerCell, InstrumentConfig } from '@/types';
 import type { TFMXConfig, UADEChipRamInfo } from '@/types/instrument';
 import type { UADEPatternLayout } from '@/engine/uade/UADEPatternEncoder';
-import type { TFMXNativeData, TFMXTrackstepEntry, TFMXPatternCommand, TFMXCommandType, TFMXVoiceAssignment } from '@/types/tfmxNative';
+import type { TFMXNativeData, TFMXTrackstepEntry, TFMXPatternCommand, TFMXCommandType, TFMXVoiceAssignment, TFMXMacro, TFMXMacroCommand } from '@/types/tfmxNative';
 import { encodeTFMXCell } from '@/engine/uade/encoders/TFMXEncoder';
 
 // ── Constants ─────────────────────────────────────────────────────────────────
@@ -131,6 +131,56 @@ export function isTFMXFile(buffer: ArrayBuffer): boolean {
  */
 function tfmxNoteToXM(noteIdx: number): number {
   return Math.max(1, Math.min(96, (noteIdx & 0x3F) + 13));
+}
+
+// ── Macro command decoding (Huelsbeck 4-byte command stream) ─────────────────
+
+const MAX_MACRO_COMMANDS = 256;
+
+/**
+ * Decode a TFMX macro starting at the given file offset.
+ * Reads 4-byte command longwords until a Stop command (0x07) or end-of-data.
+ */
+function decodeTFMXMacro(buf: Uint8Array, macroOffset: number, macroIndex: number): TFMXMacro {
+  const commands: TFMXMacroCommand[] = [];
+  let pos = macroOffset;
+
+  for (let step = 0; step < MAX_MACRO_COMMANDS; step++) {
+    if (pos + 4 > buf.length) break;
+
+    const b0 = buf[pos];
+    const b1 = buf[pos + 1];
+    const b2 = buf[pos + 2];
+    const b3 = buf[pos + 3];
+    const opcode = b0 & 0x3F;
+    const flags = b0 & 0xC0;
+    const raw = (b0 << 24) | (b1 << 16) | (b2 << 8) | b3;
+
+    commands.push({
+      step,
+      raw: raw >>> 0,
+      fileOffset: pos,
+      byte0: b0,
+      byte1: b1,
+      byte2: b2,
+      byte3: b3,
+      opcode,
+      flags,
+    });
+
+    pos += 4;
+
+    // Stop command (0x07) terminates the macro
+    if (opcode === 0x07) break;
+  }
+
+  return {
+    index: macroIndex,
+    fileOffset: macroOffset,
+    length: commands.length,
+    commands,
+    name: `Macro ${macroIndex + 1}`,
+  };
 }
 
 // ── Pattern command decoding ──────────────────────────────────────────────────
@@ -665,6 +715,7 @@ export function parseTFMXFile(
 
   // 9. Extract instrument data from the macro table
   const instruments: InstrumentConfig[] = [];
+  const macros: TFMXMacro[] = [];
   const MAX_INSTRUMENTS = 128;
   const MACRO_ENTRY_SIZE = 4; // macro pointer table has u32BE entries
 
@@ -691,6 +742,9 @@ export function parseTFMXFile(
       if (volModSeqData[b] !== 0) { nonZero = true; break; }
     }
     if (!nonZero) continue;
+
+    // Decode the full 4-byte command stream for the macro editor
+    macros.push(decodeTFMXMacro(buf, macroAddr, i));
 
     const tfmxConfig: TFMXConfig = {
       sndSeqsCount: 1,
@@ -768,6 +822,8 @@ export function parseTFMXFile(
     activeSubsong: clampedSong,
     firstStep,
     lastStep,
+    macros,
+    macroPointerTableOffset: macroPtrTable,
   };
 
   return {
