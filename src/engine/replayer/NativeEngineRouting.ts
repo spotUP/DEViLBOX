@@ -577,23 +577,26 @@ export async function startNativeEngines(
           musicLineEngine = instance as unknown as MusicLineEngine;
         }
 
-        // TFMX module position sync: convert samplesRendered → row/position
+        // TFMX module position sync: use elapsed ms / duration for proportional position
         if (desc.key === 'TFMXModule' && 'onPositionUpdate' in instance) {
-          const tfmxSpeed = song.initialSpeed || 6;
-          const tfmxBpm = song.initialBPM || 125;
-          const sr = Tone.context.sampleRate || 44100;
-          const samplesPerTick = Math.round((sr * 2.5) / tfmxBpm);
-          const samplesPerRow = samplesPerTick * tfmxSpeed;
           const patLens = song.patterns.map(p => p.length);
           const order = song.songPositions;
+          // Total rows across all pattern positions
+          const totalRows = order.reduce((sum, idx) => sum + (patLens[idx] || 64), 0);
 
           // Also drive FormatPlaybackState so TFMX format-mode rendering scrolls
           const { setFormatPlaybackRow, setFormatPlaybackPlaying } = await import('@/engine/FormatPlaybackState');
           setFormatPlaybackPlaying(true);
 
-          (instance as any).onPositionUpdate((update: { samplesRendered: number; songEnd: boolean }) => {
-            if (update.samplesRendered == null || samplesPerRow <= 0) return;
-            const absoluteRow = Math.floor(update.samplesRendered / samplesPerRow);
+          (instance as any).onPositionUpdate((update: { samplesRendered: number; elapsedMs?: number; durationMs?: number; songEnd: boolean }) => {
+            const elapsed = update.elapsedMs ?? 0;
+            const duration = update.durationMs ?? 0;
+            if (duration <= 0 || totalRows <= 0) return;
+
+            // Proportional: elapsed/duration → absolute row within total rows
+            const fraction = Math.min(elapsed / duration, 1.0);
+            const absoluteRow = Math.floor(fraction * totalRows);
+
             let row = absoluteRow;
             let position = 0;
             for (let i = 0; i < order.length; i++) {

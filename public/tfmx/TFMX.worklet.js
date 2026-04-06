@@ -106,9 +106,11 @@ class TFMXProcessor extends AudioWorkletProcessor {
         if (ret === 0) {
           this._moduleMode = true;
           this._modulePlaying = false;
+          this._sampleRate = sampleRate;
           const voices = this.wasm._tfmx_module_voices(this.ctx);
           const songs = this.wasm._tfmx_module_songs(this.ctx);
           const duration = this.wasm._tfmx_module_duration(this.ctx);
+          this._moduleDuration = duration;
           this.port.postMessage({ type: 'moduleLoaded', voices, songs, duration });
         } else {
           this.port.postMessage({ type: 'error', message: 'tfmx_load_module failed: ' + ret });
@@ -247,7 +249,11 @@ class TFMXProcessor extends AudioWorkletProcessor {
         this._positionCounter -= 4410;
         const samplesRendered = this.wasm._tfmx_get_samples_rendered(this.ctx);
         const songEnd = this.wasm._tfmx_module_song_end(this.ctx);
-        this.port.postMessage({ type: 'modulePosition', samplesRendered, songEnd: songEnd !== 0 });
+        // Send elapsed ms for position tracking (more reliable than BPM-based estimation)
+        const sampleRate = this._sampleRate || 44100;
+        const elapsedMs = Math.round((samplesRendered / sampleRate) * 1000);
+        const durationMs = this._moduleDuration || 0;
+        this.port.postMessage({ type: 'modulePosition', samplesRendered, elapsedMs, durationMs, songEnd: songEnd !== 0 });
       }
       return true;
     }
