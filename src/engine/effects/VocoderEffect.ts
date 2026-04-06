@@ -26,17 +26,30 @@
  */
 
 import * as Tone from 'tone';
+import { VOCODER_PRESETS, type CarrierType as StoreCarrierType } from '@/stores/useVocoderStore';
 
 const PARAM_CARRIER_TYPE = 'carrierType';
 const PARAM_CARRIER_FREQ = 'carrierFreq';
 const PARAM_FORMANT = 'formantShift';
 const PARAM_REACTION = 'reactionTime';
 
-export type VocoderCarrierType = 0 | 1 | 2 | 3;
+export type VocoderCarrierType = 0 | 1 | 2 | 3; // 0 saw, 1 square, 2 noise, 3 chord
 export type VocoderSource = 'self' | 'mic';
+
+const CARRIER_NAME_TO_INT: Record<StoreCarrierType, VocoderCarrierType> = {
+  saw: 0,
+  square: 1,
+  noise: 2,
+  chord: 3,
+};
+
+/** Re-exported preset list — same source of truth as the DJ view vocoder. */
+export const VOCODER_EFFECT_PRESETS = VOCODER_PRESETS;
 
 export interface VocoderEffectOptions {
   source?: VocoderSource;
+  bands?: number;            // 12-64 (requires worklet reinit when changed)
+  filtersPerBand?: number;   // 1-8 (requires worklet reinit when changed)
   carrierType?: VocoderCarrierType;
   carrierFreq?: number;
   formantShift?: number;
@@ -87,6 +100,8 @@ export class VocoderEffect extends Tone.ToneAudioNode {
 
     this._options = {
       source: options.source ?? 'self',
+      bands: options.bands ?? 32,
+      filtersPerBand: options.filtersPerBand ?? 6,
       carrierType: options.carrierType ?? 3, // chord
       carrierFreq: options.carrierFreq ?? 130.81, // C3
       formantShift: options.formantShift ?? 1.0,
@@ -138,8 +153,67 @@ export class VocoderEffect extends Tone.ToneAudioNode {
   }
 
   setReactionTime(t: number): void {
-    this._options.reactionTime = Math.max(0, Math.min(0.5, t));
+    this._options.reactionTime = Math.max(0, Math.min(2.0, t));
     this.sendParam(PARAM_REACTION, this._options.reactionTime);
+  }
+
+  setBands(b: number): void {
+    const clamped = Math.max(12, Math.min(64, Math.round(b)));
+    if (clamped === this._options.bands) return;
+    this._options.bands = clamped;
+    this.reinitWorklet();
+  }
+
+  setFiltersPerBand(f: number): void {
+    const clamped = Math.max(1, Math.min(8, Math.round(f)));
+    if (clamped === this._options.filtersPerBand) return;
+    this._options.filtersPerBand = clamped;
+    this.reinitWorklet();
+  }
+
+  /** Load one of the named voice presets (Kraftwerk, Daft Punk, etc.) */
+  loadPreset(name: string): void {
+    const preset = VOCODER_EFFECT_PRESETS.find((p) => p.name === name);
+    if (!preset) return;
+    const p = preset.params;
+    const newBands = p.bands;
+    const newFilters = p.filtersPerBand;
+    const reinitNeeded =
+      newBands !== this._options.bands || newFilters !== this._options.filtersPerBand;
+
+    this._options.bands = newBands;
+    this._options.filtersPerBand = newFilters;
+    this._options.carrierType = CARRIER_NAME_TO_INT[p.carrierType];
+    this._options.carrierFreq = p.carrierFreq;
+    this._options.formantShift = p.formantShift;
+    this._options.reactionTime = p.reactionTime;
+
+    if (reinitNeeded) {
+      this.reinitWorklet();
+    } else {
+      this.sendParam(PARAM_CARRIER_TYPE, this._options.carrierType);
+      this.sendParam(PARAM_CARRIER_FREQ, this._options.carrierFreq);
+      this.sendParam(PARAM_FORMANT, this._options.formantShift);
+      this.sendParam(PARAM_REACTION, this._options.reactionTime);
+    }
+  }
+
+  /** Re-create the WASM vocoder with current bands/filtersPerBand. */
+  private reinitWorklet(): void {
+    if (!this.workletNode || !this.isWasmReady) return;
+    const rawContext = Tone.getContext().rawContext as AudioContext;
+    this.workletNode.port.postMessage({
+      type: 'reinit',
+      sampleRate: rawContext.sampleRate,
+      bands: this._options.bands,
+      filtersPerBand: this._options.filtersPerBand,
+    });
+    // After reinit re-send all runtime params
+    this.workletNode.port.postMessage({ type: 'setCarrierType', value: this._options.carrierType });
+    this.workletNode.port.postMessage({ type: 'setCarrierFreq', value: this._options.carrierFreq });
+    this.workletNode.port.postMessage({ type: 'setFormantShift', value: this._options.formantShift });
+    this.workletNode.port.postMessage({ type: 'setReactionTime', value: this._options.reactionTime });
+    this.workletNode.port.postMessage({ type: 'setWet', value: 1.0 });
   }
 
   get wet(): number {
@@ -194,8 +268,8 @@ export class VocoderEffect extends Tone.ToneAudioNode {
       type: 'init',
       wasmBinary: VocoderEffect.wasmBinary,
       sampleRate: rawContext.sampleRate,
-      bands: 32,
-      filtersPerBand: 6,
+      bands: this._options.bands,
+      filtersPerBand: this._options.filtersPerBand,
     });
 
     // Keepalive — make sure the worklet keeps processing even if its
