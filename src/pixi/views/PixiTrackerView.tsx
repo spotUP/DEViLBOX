@@ -389,6 +389,7 @@ export const PixiTrackerView: React.FC = () => {
               <PixiAutomationParamPicker
                 key={`auto-pick-${i}`}
                 channelIndex={i}
+                patternId={patternId}
                 channelWidth={Math.floor(Math.max(100, editorWidth) / channelCount)}
               />
             ))}
