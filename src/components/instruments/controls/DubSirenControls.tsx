@@ -73,7 +73,7 @@ export const DubSirenControls: React.FC<DubSirenControlsProps> = ({
             className={`
               w-10 h-10 rounded border transition-all flex items-center justify-center
               ${currentType === type
-                ? `bg-[#2a2a2a]`
+                ? `bg-dark-bgSecondary`
                 : 'bg-[#1a1a1a] border-dark-borderLight hover:border-dark-borderLight'
               }
             `}
@@ -263,7 +263,7 @@ export const DubSirenControls: React.FC<DubSirenControlsProps> = ({
                 className={`
                   px-3 py-1 text-xs font-bold rounded border uppercase
                   ${config.filter.type === type
-                    ? `bg-[#2a2a2a]`
+                    ? `bg-dark-bgSecondary`
                     : 'bg-[#1a1a1a] border-dark-borderLight text-text-muted hover:border-dark-borderLight'
                   }
                 `}
@@ -283,7 +283,7 @@ export const DubSirenControls: React.FC<DubSirenControlsProps> = ({
                 className={`
                   px-3 py-1 text-xs font-bold rounded border
                   ${config.filter.rolloff === roll
-                    ? `bg-[#2a2a2a]`
+                    ? `bg-dark-bgSecondary`
                     : 'bg-[#1a1a1a] border-dark-borderLight text-text-muted hover:border-dark-borderLight'
                   }
                 `}
@@ -360,7 +360,7 @@ export const DubSirenControls: React.FC<DubSirenControlsProps> = ({
   return (
     <div className="flex flex-col h-full">
       {/* Tabs */}
-      <div className="flex border-b border-dark-border bg-[#151515]">
+      <div className="flex border-b border-dark-border bg-dark-bg">
         <button
           onClick={() => setActiveTab('main')}
           className={`

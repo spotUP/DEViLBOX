@@ -33,16 +33,16 @@ const OscPanel: React.FC<{
   return (
     <div className="p-2 rounded bg-[#1a2a1a]">
       <div className="flex items-center gap-2 mb-2">
-        <span className="text-gray-400 font-semibold text-[11px]">OSC {n}</span>
+        <span className="text-text-muted font-semibold text-[11px]">OSC {n}</span>
         <button
-          className={`px-2 py-0.5 rounded text-[10px] ${isSync ? 'bg-cyan-700 text-white' : 'bg-gray-700 text-gray-400'}`}
+          className={`px-2 py-0.5 rounded text-[10px] ${isSync ? 'bg-cyan-700 text-white' : 'bg-gray-700 text-text-muted'}`}
           onClick={() => update(syncKey, isSync ? 0 : 1)}
         >{isSync ? 'SYNC' : 'FREE'}</button>
       </div>
       <div className="flex gap-3 items-end">
         <div className="flex flex-col gap-1">
           <label className="text-gray-500 text-[10px]">Wave</label>
-          <select className="bg-[#2a2a2a] text-gray-200 border border-gray-600 rounded px-1 py-0.5 text-[10px]"
+          <select className="bg-dark-bgSecondary text-text-primary border border-dark-border rounded px-1 py-0.5 text-[10px]"
             value={Math.round((merged[waveKey] as number) ?? 0)}
             onChange={(e) => update(waveKey, parseInt(e.target.value))}>
             {WAVE_NAMES.map((name, i) => <option key={i} value={i}>{name}</option>)}
@@ -69,8 +69,8 @@ const FilterPanel: React.FC<{
   return (
     <div className="p-2 rounded bg-[#1a1a2a]">
       <div className="flex items-center gap-2 mb-2">
-        <span className="text-gray-400 font-semibold text-[11px]">FILTER {n}</span>
-        <select className="bg-[#2a2a2a] text-gray-200 border border-gray-600 rounded px-1 py-0.5 text-[10px]"
+        <span className="text-text-muted font-semibold text-[11px]">FILTER {n}</span>
+        <select className="bg-dark-bgSecondary text-text-primary border border-dark-border rounded px-1 py-0.5 text-[10px]"
           value={Math.round((merged[k('Type')] as number) ?? 1)}
           onChange={(e) => update(k('Type'), parseInt(e.target.value))}>
           {Object.entries(FILTER_TYPE_NAMES).map(([v, label]) => (
@@ -113,7 +113,7 @@ const EnvPanel: React.FC<{
 
   return (
     <div className="p-2 rounded bg-[#1a1a1a]">
-      <span className="text-gray-400 font-semibold text-[11px] mb-1 block">{label}</span>
+      <span className="text-text-muted font-semibold text-[11px] mb-1 block">{label}</span>
       <div className="flex gap-2 flex-wrap items-end">
         <Knob value={(merged[k('Attack')] as number) ?? 0.05} min={0} max={1}
           onChange={(v) => update(k('Attack'), v)} label="A" color="#ef4444" />
@@ -143,7 +143,7 @@ const LfoPanel: React.FC<{
 
   return (
     <div className="p-2 rounded bg-[#1a1a1a]">
-      <span className="text-gray-400 font-semibold text-[11px] mb-1 block">{prefix.toUpperCase()} {n}</span>
+      <span className="text-text-muted font-semibold text-[11px] mb-1 block">{prefix.toUpperCase()} {n}</span>
       <div className="flex gap-2 items-end">
         <Knob value={(merged[k('Speed')] as number) ?? 4} min={0} max={16}
           onChange={(v) => update(k('Speed'), Math.round(v))} label="Spd" color="#f97316" />
@@ -171,7 +171,7 @@ export const MoniqueControls: React.FC<MoniqueControlsProps> = ({ config, onChan
     <div className="p-4 space-y-4 text-xs">
       {/* Oscillators */}
       <div>
-        <h3 className="text-gray-400 font-semibold mb-2 border-b border-gray-700 pb-1">Oscillators</h3>
+        <h3 className="text-text-muted font-semibold mb-2 border-b border-dark-border pb-1">Oscillators</h3>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
           {[0, 1, 2].map(i => <OscPanel key={i} idx={i} merged={merged} update={updateParam} />)}
         </div>
@@ -189,7 +189,7 @@ export const MoniqueControls: React.FC<MoniqueControlsProps> = ({ config, onChan
 
       {/* Filters */}
       <div>
-        <h3 className="text-gray-400 font-semibold mb-2 border-b border-gray-700 pb-1">Filters</h3>
+        <h3 className="text-text-muted font-semibold mb-2 border-b border-dark-border pb-1">Filters</h3>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
           {[0, 1, 2].map(i => <FilterPanel key={i} idx={i} merged={merged} update={updateParam} />)}
         </div>
@@ -197,7 +197,7 @@ export const MoniqueControls: React.FC<MoniqueControlsProps> = ({ config, onChan
 
       {/* Envelopes */}
       <div>
-        <h3 className="text-gray-400 font-semibold mb-2 border-b border-gray-700 pb-1">Envelopes</h3>
+        <h3 className="text-text-muted font-semibold mb-2 border-b border-dark-border pb-1">Envelopes</h3>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
           <EnvPanel idx={0} label="ENV 1 (Filter 1)" merged={merged} update={updateParam} />
           <EnvPanel idx={1} label="ENV 2 (Filter 2)" merged={merged} update={updateParam} />
@@ -208,7 +208,7 @@ export const MoniqueControls: React.FC<MoniqueControlsProps> = ({ config, onChan
 
       {/* LFOs */}
       <div>
-        <h3 className="text-gray-400 font-semibold mb-2 border-b border-gray-700 pb-1">LFOs</h3>
+        <h3 className="text-text-muted font-semibold mb-2 border-b border-dark-border pb-1">LFOs</h3>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
           {[0, 1, 2].map(i => <LfoPanel key={i} idx={i} prefix="lfo" merged={merged} update={updateParam} />)}
         </div>
@@ -216,7 +216,7 @@ export const MoniqueControls: React.FC<MoniqueControlsProps> = ({ config, onChan
 
       {/* MFOs */}
       <div>
-        <h3 className="text-gray-400 font-semibold mb-2 border-b border-gray-700 pb-1">MFOs</h3>
+        <h3 className="text-text-muted font-semibold mb-2 border-b border-dark-border pb-1">MFOs</h3>
         <div className="grid grid-cols-1 sm:grid-cols-4 gap-2">
           {[0, 1, 2, 3].map(i => <LfoPanel key={i} idx={i} prefix="mfo" merged={merged} update={updateParam} />)}
         </div>
@@ -224,7 +224,7 @@ export const MoniqueControls: React.FC<MoniqueControlsProps> = ({ config, onChan
 
       {/* Effects */}
       <div>
-        <h3 className="text-gray-400 font-semibold mb-2 border-b border-gray-700 pb-1">Effects</h3>
+        <h3 className="text-text-muted font-semibold mb-2 border-b border-dark-border pb-1">Effects</h3>
         <div className="flex gap-3 flex-wrap items-end">
           <Knob value={merged.distortion ?? 0} min={0} max={1}
             onChange={(v) => updateParam('distortion', v)} label="Dist" color="#ef4444" />
@@ -253,7 +253,7 @@ export const MoniqueControls: React.FC<MoniqueControlsProps> = ({ config, onChan
 
       {/* Master */}
       <div>
-        <h3 className="text-gray-400 font-semibold mb-2 border-b border-gray-700 pb-1">Master</h3>
+        <h3 className="text-text-muted font-semibold mb-2 border-b border-dark-border pb-1">Master</h3>
         <div className="flex gap-3 flex-wrap items-end">
           <Knob value={merged.volume ?? 0.9} min={0} max={1}
             onChange={(v) => updateParam('volume', v)} label="Volume" color="#22c55e" />
@@ -264,7 +264,7 @@ export const MoniqueControls: React.FC<MoniqueControlsProps> = ({ config, onChan
           <Knob value={merged.noteOffset ?? 0} min={0} max={12}
             onChange={(v) => updateParam('noteOffset', Math.round(v))} label="Note" color="#a78bfa" />
           <button
-            className={`px-2 py-1 rounded text-[10px] ${(merged.sync ?? 1) > 0.5 ? 'bg-cyan-700 text-white' : 'bg-gray-700 text-gray-400'}`}
+            className={`px-2 py-1 rounded text-[10px] ${(merged.sync ?? 1) > 0.5 ? 'bg-cyan-700 text-white' : 'bg-gray-700 text-text-muted'}`}
             onClick={() => updateParam('sync', (merged.sync ?? 1) > 0.5 ? 0 : 1)}
           >{(merged.sync ?? 1) > 0.5 ? 'SYNC ON' : 'SYNC OFF'}</button>
         </div>

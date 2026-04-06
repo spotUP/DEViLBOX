@@ -63,9 +63,9 @@ export const FluidSynthControls: React.FC<FluidSynthControlsProps> = ({ config, 
         <h3 className="font-bold uppercase tracking-tight text-sm mb-3 text-amber-500">Program</h3>
         <div className="flex flex-wrap items-center gap-4">
           <div className="flex flex-col gap-1">
-            <label className="text-gray-400 text-[10px]">Instrument</label>
+            <label className="text-text-muted text-[10px]">Instrument</label>
             <select
-              className="bg-[#2a2a2a] text-gray-200 border border-gray-600 rounded px-2 py-1 text-xs w-52"
+              className="bg-dark-bgSecondary text-text-primary border border-dark-border rounded px-2 py-1 text-xs w-52"
               value={merged.program}
               onChange={(e) => updateParam('program', parseInt(e.target.value, 10))}
             >

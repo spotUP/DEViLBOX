@@ -22,7 +22,7 @@ const LFO_DEST_NAMES = ['Filter', 'Osc', 'PW', 'Pan'];
 const FREE_AD_DEST_NAMES = ['Filter', 'Osc', 'PW', 'Pan'];
 
 const SectionHeader: React.FC<{ title: string }> = ({ title }) => (
-  <h3 className="text-gray-400 font-semibold mb-2 border-b border-gray-700 pb-1">{title}</h3>
+  <h3 className="text-text-muted font-semibold mb-2 border-b border-dark-border pb-1">{title}</h3>
 );
 
 const ToggleButton: React.FC<{
@@ -30,7 +30,7 @@ const ToggleButton: React.FC<{
   onChange: (v: number) => void;
 }> = ({ label, value, onChange }) => (
   <button
-    className={`px-2 py-0.5 rounded text-[10px] ${value > 0.5 ? 'bg-green-700 text-white' : 'bg-gray-700 text-gray-400'}`}
+    className={`px-2 py-0.5 rounded text-[10px] ${value > 0.5 ? 'bg-green-700 text-white' : 'bg-gray-700 text-text-muted'}`}
     onClick={() => onChange(value > 0.5 ? 0 : 1)}
   >{label}: {value > 0.5 ? 'ON' : 'OFF'}</button>
 );
@@ -54,7 +54,7 @@ export const TalNoizeMakerControls: React.FC<TalNoizeMakerControlsProps> = ({ co
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           {/* Osc 1 */}
           <div className="p-2 rounded bg-[#1a2a1a]">
-            <span className="text-gray-400 font-semibold text-[11px]">OSC 1</span>
+            <span className="text-text-muted font-semibold text-[11px]">OSC 1</span>
             <div className="flex flex-wrap gap-2 mt-1 items-end">
               <Knob label="Volume" value={m.osc1Volume} min={0} max={1} color="#4ade80" onChange={(v) => update('osc1Volume', v)} />
               <Knob label="Tune" value={m.osc1Tune} min={0} max={1} color="#facc15" bipolar onChange={(v) => update('osc1Tune', v)} />
@@ -68,7 +68,7 @@ export const TalNoizeMakerControls: React.FC<TalNoizeMakerControlsProps> = ({ co
 
           {/* Osc 2 */}
           <div className="p-2 rounded bg-[#1a2a1a]">
-            <span className="text-gray-400 font-semibold text-[11px]">OSC 2</span>
+            <span className="text-text-muted font-semibold text-[11px]">OSC 2</span>
             <div className="flex flex-wrap gap-2 mt-1 items-end">
               <Knob label="Volume" value={m.osc2Volume} min={0} max={1} color="#4ade80" onChange={(v) => update('osc2Volume', v)} />
               <Knob label="Tune" value={m.osc2Tune} min={0} max={1} color="#facc15" bipolar onChange={(v) => update('osc2Tune', v)} />
@@ -111,7 +111,7 @@ export const TalNoizeMakerControls: React.FC<TalNoizeMakerControlsProps> = ({ co
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           {/* Amp Envelope */}
           <div className="p-2 rounded bg-[#1a1a2a]">
-            <span className="text-gray-400 font-semibold text-[11px]">AMP</span>
+            <span className="text-text-muted font-semibold text-[11px]">AMP</span>
             <div className="flex flex-wrap gap-2 mt-1 items-end">
               <Knob label="A" value={m.ampAttack} min={0} max={1} color="#ef4444" onChange={(v) => update('ampAttack', v)} />
               <Knob label="D" value={m.ampDecay} min={0} max={1} color="#ef4444" onChange={(v) => update('ampDecay', v)} />
@@ -123,7 +123,7 @@ export const TalNoizeMakerControls: React.FC<TalNoizeMakerControlsProps> = ({ co
 
           {/* Filter Envelope */}
           <div className="p-2 rounded bg-[#2a1a2a]">
-            <span className="text-gray-400 font-semibold text-[11px]">FILTER</span>
+            <span className="text-text-muted font-semibold text-[11px]">FILTER</span>
             <div className="flex flex-wrap gap-2 mt-1 items-end">
               <Knob label="A" value={m.filterAttack} min={0} max={1} color="#a855f7" onChange={(v) => update('filterAttack', v)} />
               <Knob label="D" value={m.filterDecay} min={0} max={1} color="#a855f7" onChange={(v) => update('filterDecay', v)} />
@@ -136,7 +136,7 @@ export const TalNoizeMakerControls: React.FC<TalNoizeMakerControlsProps> = ({ co
 
         {/* Free AD Envelope */}
         <div className="p-2 rounded bg-[#2a1a1a] mt-3">
-          <span className="text-gray-400 font-semibold text-[11px]">FREE AD</span>
+          <span className="text-text-muted font-semibold text-[11px]">FREE AD</span>
           <div className="flex flex-wrap gap-2 mt-1 items-end">
             <Knob label="A" value={m.freeAdAttack} min={0} max={1} color="#f97316" onChange={(v) => update('freeAdAttack', v)} />
             <Knob label="D" value={m.freeAdDecay} min={0} max={1} color="#f97316" onChange={(v) => update('freeAdDecay', v)} />
@@ -152,7 +152,7 @@ export const TalNoizeMakerControls: React.FC<TalNoizeMakerControlsProps> = ({ co
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           {/* LFO 1 */}
           <div className="p-2 rounded bg-[#1a2a2a]">
-            <span className="text-gray-400 font-semibold text-[11px]">LFO 1</span>
+            <span className="text-text-muted font-semibold text-[11px]">LFO 1</span>
             <div className="flex flex-wrap gap-2 mt-1 items-end">
               <Knob label="Rate" value={m.lfo1Rate} min={0} max={1} color="#22d3ee" onChange={(v) => update('lfo1Rate', v)} />
               <SelectControl label="Wave" value={m.lfo1Waveform} options={LFO_WAVE_NAMES} onChange={(v) => update('lfo1Waveform', v)} />
@@ -166,7 +166,7 @@ export const TalNoizeMakerControls: React.FC<TalNoizeMakerControlsProps> = ({ co
 
           {/* LFO 2 */}
           <div className="p-2 rounded bg-[#1a2a2a]">
-            <span className="text-gray-400 font-semibold text-[11px]">LFO 2</span>
+            <span className="text-text-muted font-semibold text-[11px]">LFO 2</span>
             <div className="flex flex-wrap gap-2 mt-1 items-end">
               <Knob label="Rate" value={m.lfo2Rate} min={0} max={1} color="#2dd4bf" onChange={(v) => update('lfo2Rate', v)} />
               <SelectControl label="Wave" value={m.lfo2Waveform} options={LFO_WAVE_NAMES} onChange={(v) => update('lfo2Waveform', v)} />
@@ -186,7 +186,7 @@ export const TalNoizeMakerControls: React.FC<TalNoizeMakerControlsProps> = ({ co
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           {/* Chorus */}
           <div className="p-2 rounded bg-[#1a1a2a]">
-            <span className="text-gray-400 font-semibold text-[11px]">CHORUS</span>
+            <span className="text-text-muted font-semibold text-[11px]">CHORUS</span>
             <div className="flex flex-wrap gap-2 mt-1 items-end">
               <ToggleButton label="Chorus 1" value={m.chorus1Enable} onChange={(v) => update('chorus1Enable', v)} />
               <ToggleButton label="Chorus 2" value={m.chorus2Enable} onChange={(v) => update('chorus2Enable', v)} />
@@ -195,7 +195,7 @@ export const TalNoizeMakerControls: React.FC<TalNoizeMakerControlsProps> = ({ co
 
           {/* Reverb */}
           <div className="p-2 rounded bg-[#1a1a2a]">
-            <span className="text-gray-400 font-semibold text-[11px]">REVERB</span>
+            <span className="text-text-muted font-semibold text-[11px]">REVERB</span>
             <div className="flex flex-wrap gap-2 mt-1 items-end">
               <Knob label="Wet" value={m.reverbWet} min={0} max={1} color="#c084fc" onChange={(v) => update('reverbWet', v)} />
               <Knob label="Decay" value={m.reverbDecay} min={0} max={1} color="#c084fc" onChange={(v) => update('reverbDecay', v)} />
@@ -207,7 +207,7 @@ export const TalNoizeMakerControls: React.FC<TalNoizeMakerControlsProps> = ({ co
 
           {/* Delay */}
           <div className="p-2 rounded bg-[#1a1a2a]">
-            <span className="text-gray-400 font-semibold text-[11px]">DELAY</span>
+            <span className="text-text-muted font-semibold text-[11px]">DELAY</span>
             <div className="flex flex-wrap gap-2 mt-1 items-end">
               <Knob label="Wet" value={m.delayWet} min={0} max={1} color="#fb923c" onChange={(v) => update('delayWet', v)} />
               <Knob label="Time" value={m.delayTime} min={0} max={1} color="#fb923c" onChange={(v) => update('delayTime', v)} />

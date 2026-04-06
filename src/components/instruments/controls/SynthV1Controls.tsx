@@ -31,7 +31,7 @@ const pk = (section: string, field: string, page: 1 | 2): keyof SynthV1Config =>
 
 /** Reusable section header */
 const SectionHeader: React.FC<{ title: string }> = ({ title }) => (
-  <h3 className="text-gray-400 font-semibold mb-2 border-b border-gray-700 pb-1 text-xs uppercase tracking-wider">
+  <h3 className="text-text-muted font-semibold mb-2 border-b border-dark-border pb-1 text-xs uppercase tracking-wider">
     {title}
   </h3>
 );
@@ -111,7 +111,7 @@ export const SynthV1Controls: React.FC<SynthV1ControlsProps> = ({ config, onChan
           <div className="flex flex-col gap-1">
             <label className="text-gray-500 text-[10px]">Octave</label>
             <select
-              className="bg-[#2a2a2a] text-gray-200 border border-gray-600 rounded px-1 py-0.5 text-[10px]"
+              className="bg-dark-bgSecondary text-text-primary border border-dark-border rounded px-1 py-0.5 text-[10px]"
               value={Math.round(merged[dcoK('Octave', page)] as number)}
               onChange={(e) => update(dcoK('Octave', page), parseInt(e.target.value))}
             >
@@ -137,7 +137,7 @@ export const SynthV1Controls: React.FC<SynthV1ControlsProps> = ({ config, onChan
           <div className="flex items-center gap-2">
             <label className="text-gray-500 text-[10px]">Sync</label>
             <button
-              className={`px-2 py-0.5 rounded text-[10px] ${(merged[dcoK('Sync', page)] as number) > 0.5 ? 'bg-green-700 text-white' : 'bg-gray-700 text-gray-400'}`}
+              className={`px-2 py-0.5 rounded text-[10px] ${(merged[dcoK('Sync', page)] as number) > 0.5 ? 'bg-green-700 text-white' : 'bg-gray-700 text-text-muted'}`}
               onClick={() => update(dcoK('Sync', page), (merged[dcoK('Sync', page)] as number) > 0.5 ? 0 : 1)}
             >{(merged[dcoK('Sync', page)] as number) > 0.5 ? 'ON' : 'OFF'}</button>
           </div>
@@ -169,7 +169,7 @@ export const SynthV1Controls: React.FC<SynthV1ControlsProps> = ({ config, onChan
           <div className="flex flex-col gap-1">
             <label className="text-gray-500 text-[10px]">Slope</label>
             <select
-              className="bg-[#2a2a2a] text-gray-200 border border-gray-600 rounded px-1 py-0.5 text-[10px]"
+              className="bg-dark-bgSecondary text-text-primary border border-dark-border rounded px-1 py-0.5 text-[10px]"
               value={Math.round(merged[dcfK('Slope', page)] as number)}
               onChange={(e) => update(dcfK('Slope', page), parseInt(e.target.value))}
             >
@@ -245,7 +245,7 @@ export const SynthV1Controls: React.FC<SynthV1ControlsProps> = ({ config, onChan
         <div className="flex items-center gap-2 mt-2">
           <label className="text-gray-500 text-[10px]">Sync</label>
           <button
-            className={`px-2 py-0.5 rounded text-[10px] ${(merged[lfoK('Sync', page)] as number) > 0.5 ? 'bg-green-700 text-white' : 'bg-gray-700 text-gray-400'}`}
+            className={`px-2 py-0.5 rounded text-[10px] ${(merged[lfoK('Sync', page)] as number) > 0.5 ? 'bg-green-700 text-white' : 'bg-gray-700 text-text-muted'}`}
             onClick={() => update(lfoK('Sync', page), (merged[lfoK('Sync', page)] as number) > 0.5 ? 0 : 1)}
           >{(merged[lfoK('Sync', page)] as number) > 0.5 ? 'ON' : 'OFF'}</button>
         </div>
@@ -350,7 +350,7 @@ export const SynthV1Controls: React.FC<SynthV1ControlsProps> = ({ config, onChan
   return (
     <div className="flex flex-col h-full text-xs">
       {/* Tabs */}
-      <div className="flex border-b border-gray-700 bg-[#151515]">
+      <div className="flex border-b border-dark-border bg-dark-bg">
         {TABS.map((tab) => (
           <button
             key={tab.id}

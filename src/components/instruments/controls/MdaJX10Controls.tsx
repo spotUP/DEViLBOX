@@ -67,7 +67,7 @@ export const MdaJX10Controls: React.FC<MdaJX10ControlsProps> = ({ config, onChan
       {/* Parameter groups */}
       {GROUPS.map((group) => (
         <div key={group.label}>
-          <h3 className="text-gray-400 font-semibold mb-2 border-b border-gray-700 pb-1">{group.label}</h3>
+          <h3 className="text-text-muted font-semibold mb-2 border-b border-dark-border pb-1">{group.label}</h3>
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
             {group.keys.map((key) => {
               const idx = PARAM_KEYS.indexOf(key);
