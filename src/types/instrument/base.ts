@@ -58,9 +58,10 @@ export type SynthType =
   | 'FurnaceFDS'      // Famicom Disk System
   | 'FurnaceMMC5'     // MMC5 (Castlevania 3 US)
   // Computer Chips
-  | 'FurnaceC64'      // Commodore 64 (SID3 - enhanced)
+  | 'FurnaceC64'      // Commodore 64 (SID)
   | 'FurnaceSID6581'  // Classic SID 6581 (warm/gritty)
   | 'FurnaceSID8580'  // Classic SID 8580 (cleaner)
+  | 'FurnaceSID3'     // SID3 (enhanced, 7 channels)
   | 'FurnaceAY'       // AY-3-8910 (ZX Spectrum, MSX)
   | 'FurnaceVIC'      // VIC-20
   | 'FurnaceSAA'      // Philips SAA1099

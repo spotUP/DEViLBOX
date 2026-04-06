@@ -18,7 +18,7 @@ import {
   METAL_SYNTH_LAYOUT, MEMBRANE_SYNTH_LAYOUT, NOISE_SYNTH_LAYOUT,
 } from './toneSynths';
 import { GRANULAR_SYNTH_LAYOUT } from './granularSynth';
-import { FURNACE_LAYOUT } from './furnace';
+import { FURNACE_LAYOUT, FURNACE_GB_HWSEQ_LAYOUT, FURNACE_WAVESYNTH_LAYOUT, FURNACE_SID3_LAYOUT, FURNACE_OPL_DRUMS_LAYOUT } from './furnace';
 import { SUPER_SAW_LAYOUT } from './superSaw';
 import { WAVETABLE_LAYOUT } from './wavetable';
 import { PWM_SYNTH_LAYOUT } from './pwmSynth';
@@ -160,6 +160,12 @@ export const SYNTH_LAYOUTS: Record<string, SynthPanelLayout> = {
   PinkTrombone: PINK_TROMBONE_LAYOUT,
   DECtalk: DECTALK_LAYOUT,
   Sam: SAM_LAYOUT,
+
+  // Furnace chip-specific panels
+  FurnaceGBHWSeq: FURNACE_GB_HWSEQ_LAYOUT,
+  FurnaceWaveSynth: FURNACE_WAVESYNTH_LAYOUT,
+  FurnaceSID3: FURNACE_SID3_LAYOUT,
+  FurnaceOPLDrums: FURNACE_OPL_DRUMS_LAYOUT,
 
   // Furnace chip emulation (all share a minimal AMP layout)
   Furnace: FURNACE_LAYOUT,

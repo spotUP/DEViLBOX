@@ -172,6 +172,15 @@ export const furnaceChipEntries: Record<string, SynthInfo> = {
     icon: 'Save',
     color: 'text-violet-600',
   },
+  FurnaceSID3: {
+    type: 'FurnaceSID3',
+    name: 'SID3 (Enhanced)',
+    shortName: 'SID3',
+    description: 'Enhanced SID - 7 voices, per-voice filters, wavetable',
+    bestFor: ['Enhanced SID', 'Modern C64', 'Complex filters', '7-voice SID'],
+    icon: 'Save',
+    color: 'text-violet-300',
+  },
   FurnaceOPNA: {
     type: 'FurnaceOPNA',
     name: 'NEC PC-98 (OPNA)',

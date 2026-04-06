@@ -93,6 +93,7 @@ const PLATFORM_CHANNELS: Record<number, string[]> = {
   [FurnaceDispatchPlatform.N163]: ['CH1', 'CH2', 'CH3', 'CH4', 'CH5', 'CH6', 'CH7', 'CH8'],
   [FurnaceDispatchPlatform.C64_6581]: ['V1', 'V2', 'V3'],
   [FurnaceDispatchPlatform.C64_8580]: ['V1', 'V2', 'V3'],
+  [FurnaceDispatchPlatform.SID3]: ['V1', 'V2', 'V3', 'V4', 'V5', 'V6', 'WAV'],
   [FurnaceDispatchPlatform.VIC20]: ['BASS', 'ALT', 'SOP', 'NOI'],
   [FurnaceDispatchPlatform.SAA1099]: ['CH1', 'CH2', 'CH3', 'CH4', 'CH5', 'CH6'],
   [FurnaceDispatchPlatform.TIA]: ['AUD0', 'AUD1'],
