@@ -519,14 +519,12 @@ export const useGTUltraStore = create<GTUltraState>()((set, get) => ({
     for (let i = 1; i <= 63; i++) {
       const inst = instrumentData[i];
       if (!inst) continue;
-      // Skip empty instruments — need ADSR envelope AND a waveform to produce real sound.
-      // Instruments with only firstwave but no ADSR just click.
+      // Skip empty instruments — keep if ANY meaningful data is present
       const hasEnvelope = inst.ad !== 0 || inst.sr !== 0;
       const hasWave = inst.firstwave !== 0 || inst.wavePtr !== 0;
+      const hasTables = inst.pulsePtr !== 0 || inst.filterPtr !== 0 || inst.speedPtr !== 0;
       const hasName = inst.name && inst.name.trim() !== '' && !inst.name.startsWith('Instrument ');
-      if (!hasEnvelope && !hasWave && !hasName) continue;
-      // Even with a waveform, no ADSR = click — skip unless it has a named purpose
-      if (hasWave && !hasEnvelope && !hasName) continue;
+      if (!hasEnvelope && !hasWave && !hasTables && !hasName) continue;
 
       configs.push({
         id: i,

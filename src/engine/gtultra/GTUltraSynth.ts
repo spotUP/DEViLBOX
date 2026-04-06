@@ -5,19 +5,23 @@ import * as Tone from 'tone';
 
 const GT_NOTE_NAMES = ['C-', 'C#', 'D-', 'D#', 'E-', 'F-', 'F#', 'G-', 'G#', 'A-', 'A#', 'B-'];
 
-/** Convert a note string ("C-4", "F#3") or MIDI number to GT note number (1-based). */
+/** GT note base offset — playroutine subtracts this to get the actual note index */
+const FIRSTNOTE = 0x60; // 96
+
+/** Convert a note string ("C-4", "F#3") or MIDI number to GT note number.
+ *  GT expects: FIRSTNOTE + octave*12 + semitone (range 0x60-0xBC) */
 function toGTNote(note: string | number): number {
   if (typeof note === 'number') {
-    // MIDI note number — GT notes are 1-based, MIDI C-0 = 0 maps to GT 1
-    return Math.max(1, Math.min(note + 1, 0xBC));
+    // MIDI note number — MIDI C-4 = 60, GT C-0 = FIRSTNOTE
+    return Math.max(FIRSTNOTE, Math.min(note + FIRSTNOTE, 0xBC));
   }
   // String like "C-4" or "C#4"
   const match = note.match(/^([A-G][#-]?)(\d)$/);
-  if (!match) return 1;
+  if (!match) return FIRSTNOTE;
   const idx = GT_NOTE_NAMES.indexOf(match[1]);
-  if (idx < 0) return 1;
+  if (idx < 0) return FIRSTNOTE;
   const octave = parseInt(match[2], 10);
-  return octave * 12 + idx + 1;
+  return FIRSTNOTE + octave * 12 + idx;
 }
 
 const MAX_CHANNELS_1SID = 3;
