@@ -975,23 +975,132 @@ void gt_release_note(int channel) {
     releasenote(channel, &gtObject);
 }
 
-/* --- Undo --- */
+/* --- Undo / Redo --- */
 
 static GTUNDO_OBJECT *undoEditorBackup = NULL;
 
+/* Simple redo stack: save snapshots of undo entries before they're consumed.
+ * Each redo entry = { dest pointer, offset, size, saved data }.
+ * Grouped by counter (negative = editor info). */
+#define MAX_REDO_ENTRIES 4096
+#define MAX_REDO_STEPS 20
+
+struct RedoEntry {
+    char *dest;
+    int offset;
+    int size;
+    char *data;  /* malloc'd copy of current state before undo */
+    int counter;
+    GTUNDO_AREA *parentArea;
+};
+
+static struct RedoEntry redoStack[MAX_REDO_ENTRIES];
+static int redoStepBounds[MAX_REDO_STEPS]; /* end index of each step in redoStack */
+static int redoStepCount = 0;
+static int redoEntryCount = 0;
+
+static void redoClear(void) {
+    for (int i = 0; i < redoEntryCount; i++) {
+        free(redoStack[i].data);
+        redoStack[i].data = NULL;
+    }
+    redoEntryCount = 0;
+    redoStepCount = 0;
+}
+
+/* Capture current state of undo entries before undoPerform consumes them */
+static void redoCaptureBeforeUndo(void) {
+    if (currentUndoPosition == 0) return;
+    if (redoStepCount >= MAX_REDO_STEPS) {
+        /* Evict oldest redo step */
+        int oldest = redoStepCount > 0 ? 0 : -1;
+        if (oldest >= 0) {
+            int end = redoStepBounds[0];
+            for (int i = 0; i < end; i++) { free(redoStack[i].data); }
+            memmove(redoStack, redoStack + end, (redoEntryCount - end) * sizeof(struct RedoEntry));
+            redoEntryCount -= end;
+            memmove(redoStepBounds, redoStepBounds + 1, (redoStepCount - 1) * sizeof(int));
+            redoStepCount--;
+            for (int i = 0; i < redoStepCount; i++) redoStepBounds[i] -= end;
+        }
+    }
+
+    /* Walk the undo list the same way undoPerform does, but save current state */
+    int pos = currentUndoPosition - 1;
+    GTUNDO_OBJECT *gu = &undoList[pos];
+    int counter;
+    do {
+        gu = &undoList[pos];
+        counter = gu->counter;
+
+        if (redoEntryCount < MAX_REDO_ENTRIES) {
+            struct RedoEntry *re = &redoStack[redoEntryCount];
+            re->dest = gu->dest;
+            re->offset = gu->offset;
+            re->size = gu->size;
+            re->counter = gu->counter;
+            re->parentArea = gu->parentArea;
+            re->data = (char*)malloc(gu->size);
+            if (re->data) {
+                /* Save CURRENT state of the memory that undo will overwrite */
+                memcpy(re->data, gu->dest + gu->offset, gu->size);
+            }
+            redoEntryCount++;
+        }
+        pos--;
+    } while (counter > 0 && pos >= 0);
+
+    redoStepBounds[redoStepCount++] = redoEntryCount;
+}
+
 EMSCRIPTEN_KEEPALIVE
 void gt_undo(void) {
+    redoCaptureBeforeUndo();
     undoPerform(&gtObject);
 }
 
 EMSCRIPTEN_KEEPALIVE
 void gt_redo(void) {
-    /* GoatTracker has undo-only — no redo stack in the original code */
+    if (redoStepCount == 0) return;
+
+    /* Replay the most recent redo step (in reverse order to match undo symmetry) */
+    int stepEnd = redoStepBounds[redoStepCount - 1];
+    int stepStart = redoStepCount >= 2 ? redoStepBounds[redoStepCount - 2] : 0;
+
+    for (int i = stepEnd - 1; i >= stepStart; i--) {
+        struct RedoEntry *re = &redoStack[i];
+        if (re->data && re->dest) {
+            /* Before redo-overwrite, push current state back onto the GT undo list
+             * so that the next Ctrl+Z can undo this redo */
+            char *destPtr = re->dest + re->offset;
+
+            /* Restore the redo snapshot */
+            memcpy(destPtr, re->data, re->size);
+
+            /* Also update the undo area's baseline copy if applicable */
+            if (re->parentArea && re->parentArea->undoObject) {
+                char *areaPtr = re->parentArea->undoObject->dest + re->offset;
+                memcpy(areaPtr, re->data, re->size);
+            }
+        }
+        free(re->data);
+        re->data = NULL;
+    }
+
+    redoEntryCount = stepStart;
+    redoStepCount--;
+
+    refreshVariables();
 }
 
 EMSCRIPTEN_KEEPALIVE
 int gt_can_undo(void) {
     return currentUndoPosition > 0 ? 1 : 0;
+}
+
+EMSCRIPTEN_KEEPALIVE
+int gt_can_redo(void) {
+    return redoStepCount > 0 ? 1 : 0;
 }
 
 /** Call after each edit to mark an area dirty and checkpoint undo state.
@@ -1011,6 +1120,8 @@ void gt_checkpoint_undo(void) {
     undoValidateUndoAreas(undoEditorBackup);
     undoFinalizeUndoPackage(undoEditorBackup);
     undoCreateEditorInfoBackup();
+    /* New edit invalidates redo history (standard undo/redo behavior) */
+    redoClear();
 }
 
 /* --- ASID hardware --- */
