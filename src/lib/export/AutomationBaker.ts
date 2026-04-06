@@ -132,228 +132,314 @@ function writePanToVolumeColumn(cell: TrackerCell, panNorm: number): boolean {
 
 // ── Chip-Specific Effect Mappings ────────────────────────────────────────────
 
-/**
- * C64/SID chip-specific Furnace effects.
- *
- * Effect numbers are Furnace-specific (not XM/IT):
- *   0x10 = Set Waveform       0x11 = Coarse Cutoff     0x12 = Coarse Pulse Width
- *   0x13 = Set Resonance      0x14 = Filter Mode       0x15 = Envelope Reset Time
- *   0x20 = Attack/Decay       0x21 = Sustain/Release
- *   0x22 = Pulse Width Slide Up   0x23 = Pulse Width Slide Down
- *   0x24 = Cutoff Slide Up        0x25 = Cutoff Slide Down
- *   0x30-0x3F = Fine Pulse Width (12-bit, spread across 16 effect values)
- *   0x40-0x47 = Fine Cutoff (11-bit, spread across 8 effect values)
- */
-function getC64EffectMapping(p: string, _format: FormatConstraints): EffectMapping | null {
+// Helper: simple absolute value effect (most common pattern)
+function absEffect(effNum: number, maxVal: number): EffectMapping {
+  return {
+    write: (cell, v, prevValue, fmt) => {
+      const val = norm(v, maxVal);
+      if (prevValue !== null && norm(prevValue, maxVal) === val) return true;
+      return writeEffect(cell, effNum, val, fmt);
+    },
+  };
+}
 
-  // ── Pulse Width / Duty Cycle ──────────────────────────────────────────
-  // C64's signature parameter — normally unbakeable in generic formats!
-  if (p.includes('pulse') || p.includes('duty') || p.includes('fineduty') || p.includes('fine_duty')) {
+// Helper: delta-based slide effect (up/down pair)
+function slideEffect(upEff: number, downEff: number): EffectMapping {
+  return {
+    write: (cell, v, prevValue, fmt) => {
+      if (prevValue === null) return true;
+      const delta = v - prevValue;
+      if (Math.abs(delta) < 0.002) return true;
+      const speed = Math.min(255, Math.round(Math.abs(delta) * 255));
+      if (speed === 0) return true;
+      return writeEffect(cell, delta > 0 ? upEff : downEff, speed, fmt);
+    },
+  };
+}
+
+// Helper: nibble-packed operator parameter (x=op, y=value)
+function opNibbleEffect(effNum: number, maxPerOp: number): EffectMapping {
+  return {
+    write: (cell, v, prevValue, fmt) => {
+      // v maps to param byte directly (caller splits op+value if needed)
+      const val = norm(v, maxPerOp);
+      if (prevValue !== null && norm(prevValue, maxPerOp) === val) return true;
+      return writeEffect(cell, effNum, val, fmt);
+    },
+  };
+}
+
+// ── C64/SID ─────────────────────────────────────────────────────────────────
+
+function getC64EffectMapping(p: string): EffectMapping | null {
+  // Pulse width (12-bit via 0x30-0x3F)
+  if (p.includes('pulse') || p.includes('duty') || p.includes('fineduty')) {
     return {
       write: (cell, v, prevValue, fmt) => {
-        // 12-bit pulse width: 0-4095
-        // Use fine duty (0x30-0x3F): effect = 0x30 + high nibble, param = low byte
         const pw = norm(v, 4095);
-
         if (prevValue !== null && norm(prevValue, 4095) === pw) return true;
-
-        // Fine pulse width: 0x30 + ((pw >> 8) & 0x0F), param = pw & 0xFF
-        const hi = (pw >> 8) & 0x0F;
-        const lo = pw & 0xFF;
-        return writeEffect(cell, 0x30 + hi, lo, fmt);
+        return writeEffect(cell, 0x30 + ((pw >> 8) & 0x0F), pw & 0xFF, fmt);
       },
     };
   }
-
-  // ── Filter Cutoff ─────────────────────────────────────────────────────
-  // C64 has 11-bit cutoff (0-2047)
+  // Filter cutoff (11-bit via 0x40-0x47)
   if (p.includes('cutoff') || (p.includes('filter') && !p.includes('filterselect') && !p.includes('filtermode'))) {
     return {
       write: (cell, v, prevValue, fmt) => {
-        // 11-bit cutoff: 0-2047
-        // Use fine cutoff (0x40-0x47): effect = 0x40 + ((cutoff >> 8) & 0x07), param = cutoff & 0xFF
         const cutoff = norm(v, 2047);
-
         if (prevValue !== null && norm(prevValue, 2047) === cutoff) return true;
-
-        const hi = (cutoff >> 8) & 0x07;
-        const lo = cutoff & 0xFF;
-        return writeEffect(cell, 0x40 + hi, lo, fmt);
+        return writeEffect(cell, 0x40 + ((cutoff >> 8) & 0x07), cutoff & 0xFF, fmt);
       },
     };
   }
-
-  // ── Filter Resonance ──────────────────────────────────────────────────
-  // C64 resonance: 0-15 (4-bit), effect 0x13
-  if (p.includes('resonance') || p.includes('reso')) {
-    return {
-      write: (cell, v, prevValue, fmt) => {
-        const reso = norm(v, 15);
-
-        if (prevValue !== null && norm(prevValue, 15) === reso) return true;
-
-        // 0x13 = Set Resonance
-        return writeEffect(cell, 0x13, reso, fmt);
-      },
-    };
-  }
-
-  // ── Filter Mode ───────────────────────────────────────────────────────
-  // C64 filter mode bits: LP=1, BP=2, HP=4 (combinable), effect 0x14
-  if (p.includes('filtermode') || p.includes('filter_mode')) {
-    return {
-      write: (cell, v, prevValue, fmt) => {
-        // Map 0-1 to mode bits: 0=off, 1=LP, 2=BP, 3=LP+BP, 4=HP, 5=HP+LP, 6=HP+BP, 7=all
-        const mode = norm(v, 7);
-
-        if (prevValue !== null && norm(prevValue, 7) === mode) return true;
-
-        return writeEffect(cell, 0x14, mode, fmt);
-      },
-    };
-  }
-
-  // ── Waveform ──────────────────────────────────────────────────────────
-  // SID waveform bits: 0x10=TRI, 0x20=SAW, 0x40=PUL, 0x80=NOI, effect 0x10
-  if (p.includes('waveform') || p.includes('wave') || (p === 'furnace.duty' || p.endsWith('.duty'))) {
-    return {
-      write: (cell, v, prevValue, fmt) => {
-        // Map 0-1 to waveform bits (0-255)
-        const wave = norm(v, 255);
-
-        if (prevValue !== null && norm(prevValue, 255) === wave) return true;
-
-        // 0x10 = Set Waveform
-        return writeEffect(cell, 0x10, wave, fmt);
-      },
-    };
-  }
-
-  // ── Attack/Decay ──────────────────────────────────────────────────────
-  // ADSR upper byte: attack (high nibble) + decay (low nibble), effect 0x20
-  if (p.includes('attack') && p.includes('decay') || p === 'ad' || p.endsWith('.ad')) {
-    return {
-      write: (cell, v, prevValue, fmt) => {
-        const ad = norm(v, 255);
-        if (prevValue !== null && norm(prevValue, 255) === ad) return true;
-        return writeEffect(cell, 0x20, ad, fmt);
-      },
-    };
-  }
-
-  // ── Sustain/Release ───────────────────────────────────────────────────
-  // ADSR lower byte: sustain (high nibble) + release (low nibble), effect 0x21
-  if (p.includes('sustain') && p.includes('release') || p === 'sr' || p.endsWith('.sr')) {
-    return {
-      write: (cell, v, prevValue, fmt) => {
-        const sr = norm(v, 255);
-        if (prevValue !== null && norm(prevValue, 255) === sr) return true;
-        return writeEffect(cell, 0x21, sr, fmt);
-      },
-    };
-  }
-
-  // ── Pulse Width Slide ─────────────────────────────────────────────────
-  // Delta-based: 0x22 = slide up, 0x23 = slide down
-  if (p.includes('pwslide') || p.includes('pulse_slide') || p.includes('pulsewidthslide')) {
-    return {
-      write: (cell, v, prevValue, fmt) => {
-        if (prevValue === null) return true;
-        const delta = v - prevValue;
-        if (Math.abs(delta) < 0.002) return true;
-
-        const speed = Math.min(255, Math.round(Math.abs(delta) * 255));
-        if (speed === 0) return true;
-
-        return writeEffect(cell, delta > 0 ? 0x22 : 0x23, speed, fmt);
-      },
-    };
-  }
-
-  // ── Cutoff Slide ──────────────────────────────────────────────────────
-  // Delta-based: 0x24 = slide up, 0x25 = slide down
-  if (p.includes('cutoffslide') || p.includes('cutoff_slide') || p.includes('filterslide')) {
-    return {
-      write: (cell, v, prevValue, fmt) => {
-        if (prevValue === null) return true;
-        const delta = v - prevValue;
-        if (Math.abs(delta) < 0.002) return true;
-
-        const speed = Math.min(255, Math.round(Math.abs(delta) * 255));
-        if (speed === 0) return true;
-
-        return writeEffect(cell, delta > 0 ? 0x24 : 0x25, speed, fmt);
-      },
-    };
-  }
-
-  // ── Envelope Reset Time ───────────────────────────────────────────────
-  // Effect 0x15
-  if (p.includes('envreset') || p.includes('envelope_reset') || p.includes('resettime')) {
-    return {
-      write: (cell, v, prevValue, fmt) => {
-        const val = norm(v, 255);
-        if (prevValue !== null && norm(prevValue, 255) === val) return true;
-        return writeEffect(cell, 0x15, val, fmt);
-      },
-    };
-  }
-
-  return null; // fall through to generic mappings
+  if (p.includes('resonance') || p.includes('reso')) return absEffect(0x13, 15);
+  if (p.includes('filtermode') || p.includes('filter_mode')) return absEffect(0x14, 7);
+  if (p.includes('waveform') || p.includes('wave')) return absEffect(0x10, 255);
+  if ((p.includes('attack') && p.includes('decay')) || p === 'ad' || p.endsWith('.ad')) return absEffect(0x20, 255);
+  if ((p.includes('sustain') && p.includes('release')) || p === 'sr' || p.endsWith('.sr')) return absEffect(0x21, 255);
+  if (p.includes('pwslide') || p.includes('pulse_slide')) return slideEffect(0x22, 0x23);
+  if (p.includes('cutoffslide') || p.includes('cutoff_slide') || p.includes('filterslide')) return slideEffect(0x24, 0x25);
+  if (p.includes('envreset') || p.includes('resettime')) return absEffect(0x15, 255);
+  return null;
 }
 
-/**
- * AY-3-8910 / YM2149 chip-specific Furnace effects.
- *
- * Effect numbers:
- *   0x12 = Set Duty (noise frequency)
- *   0x20 = Set Envelope shape
- *   0x21 = Set Envelope period low
- *   0x22 = Set Envelope period high
- *   0x23 = Set Envelope slide up
- *   0x24 = Set Envelope slide down
- */
-function getAYEffectMapping(p: string, _format: FormatConstraints): EffectMapping | null {
+// ── AY-3-8910 / YM2149 / SAA1099 ───────────────────────────────────────────
 
-  // ── Noise Frequency / Duty ────────────────────────────────────────────
-  if (p.includes('noise') || p.includes('duty')) {
-    return {
-      write: (cell, v, prevValue, fmt) => {
-        const noise = norm(v, 31); // AY noise period 0-31
-        if (prevValue !== null && norm(prevValue, 31) === noise) return true;
-        return writeEffect(cell, 0x12, noise, fmt);
-      },
-    };
-  }
-
-  // ── Envelope Shape ────────────────────────────────────────────────────
-  if (p.includes('envshape') || p.includes('envelope_shape')) {
-    return {
-      write: (cell, v, prevValue, fmt) => {
-        const shape = norm(v, 15); // AY envelope shapes 0-15
-        if (prevValue !== null && norm(prevValue, 15) === shape) return true;
-        return writeEffect(cell, 0x20, shape, fmt);
-      },
-    };
-  }
-
-  // ── Envelope Period ───────────────────────────────────────────────────
+function getAYEffectMapping(p: string): EffectMapping | null {
+  if (p.includes('noise') || p.includes('duty')) return absEffect(0x12, 31);
+  if (p.includes('channelmode') || p.includes('noisemode')) return absEffect(0x20, 7); // bits: tone+noise+env
+  if (p.includes('envshape') || p.includes('envelope_shape')) return absEffect(0x22, 255); // x=shape, y=enable
+  // Envelope period (16-bit split)
   if (p.includes('envperiod') || p.includes('envelope_period')) {
     return {
       write: (cell, v, prevValue, fmt) => {
-        // 16-bit period split into two effects: 0x21 (low byte), 0x22 (high byte)
         const period = norm(v, 65535);
         if (prevValue !== null && norm(prevValue, 65535) === period) return true;
-        const lo = period & 0xFF;
-        const hi = (period >> 8) & 0xFF;
-        // Write both — low byte first
-        const wroteLo = writeEffect(cell, 0x21, lo, fmt);
-        const wroteHi = writeEffect(cell, 0x22, hi, fmt);
+        const wroteLo = writeEffect(cell, 0x23, period & 0xFF, fmt);
+        const wroteHi = writeEffect(cell, 0x24, (period >> 8) & 0xFF, fmt);
         return wroteLo || wroteHi;
       },
     };
   }
+  if (p.includes('envslide') || p.includes('envelope_slide')) return slideEffect(0x25, 0x26);
+  if (p.includes('autopwm') || p.includes('auto_pwm')) return absEffect(0x2C, 255);
+  return null;
+}
 
+// ── FM (shared: OPN/OPN2/OPM/OPL/OPLL/OPZ/ESFM) ───────────────────────────
+
+function getFMEffectMapping(p: string, chipType: string): EffectMapping | null {
+  // Feedback (0-7)
+  if (p.includes('feedback') || p.includes('.fb')) return absEffect(0x11, 7);
+  // Algorithm (0-7)
+  if (p.includes('algorithm') || p.includes('.alg')) return absEffect(0x61, 7);
+  // Total Level per operator (0x12-0x15 = op1-4, 0-127)
+  if (p.includes('tl1') || p.includes('totallevel1') || p.includes('op1level')) return absEffect(0x12, 127);
+  if (p.includes('tl2') || p.includes('totallevel2') || p.includes('op2level')) return absEffect(0x13, 127);
+  if (p.includes('tl3') || p.includes('totallevel3') || p.includes('op3level')) return absEffect(0x14, 127);
+  if (p.includes('tl4') || p.includes('totallevel4') || p.includes('op4level')) return absEffect(0x15, 127);
+  // Multiplier (nibble: op in high, value 0-15 in low)
+  if (p.includes('mult') || p.includes('multiplier')) return opNibbleEffect(0x16, 255);
+  // Attack rate per op (0x19=all, 0x1A-0x1D=op1-4)
+  if (p.includes('attackrate') || p.includes('ar')) return absEffect(0x19, 31);
+  // Decay rate (0x56=all, 0x57-0x5A=op1-4)
+  if (p.includes('decayrate') || p.includes('.dr')) return absEffect(0x56, 31);
+  // Sustain level (nibble: 0x51, x=op, y=0-15)
+  if (p.includes('sustainlevel') || p.includes('.sl')) return opNibbleEffect(0x51, 255);
+  // Release rate (nibble: 0x52, x=op, y=0-15)
+  if (p.includes('releaserate') || p.includes('.rr')) return opNibbleEffect(0x52, 255);
+  // Secondary decay / D2R (0x5B=all, 0x5C-0x5F=op1-4)
+  if (p.includes('d2r') || p.includes('secondarydecay')) return absEffect(0x5B, 31);
+  // Detune (nibble: 0x53, x=op, y=0-7)
+  if (p.includes('detune') && !p.includes('detune2')) return opNibbleEffect(0x53, 255);
+  // Rate scaling (nibble: 0x54, x=op, y=0-3)
+  if (p.includes('ratescal') || p.includes('.rs') || p.includes('keyscal')) return opNibbleEffect(0x54, 255);
+  // AM enable (nibble: 0x50, x=op, y=0/1)
+  if (p.includes('amenable') || p.includes('ampmod')) return opNibbleEffect(0x50, 255);
+  // LFO FM sensitivity / depth (0-7)
+  if (p.includes('fms') || p.includes('fmdepth') || p.includes('fm_sensitivity')) return absEffect(0x62, 7);
+  // LFO AM sensitivity / depth (0-3)
+  if (p.includes('ams') || p.includes('amdepth') || p.includes('am_sensitivity')) return absEffect(0x63, 3);
+
+  // ── OPM-specific ────────────────────────────────────────────────────
+  if (chipType === 'opm' || chipType === 'arcade') {
+    if (p.includes('lfospeed') || p.includes('lfo_speed')) return absEffect(0x17, 255);
+    if (p.includes('lfowave') || p.includes('lfo_wave')) return absEffect(0x18, 3); // saw/sq/tri/noise
+    if (p.includes('pmdepth') || p.includes('pm_depth') || p.includes('vibratodepth')) return absEffect(0x1F, 127);
+    if (p.includes('amlfo') || p.includes('am_depth')) return absEffect(0x1E, 127);
+    if (p.includes('detune2') || p.includes('dt2')) return opNibbleEffect(0x55, 255);
+  }
+
+  // ── OPL-specific ────────────────────────────────────────────────────
+  if (chipType === 'opl' || chipType === 'opl2' || chipType === 'opl3') {
+    if (p.includes('waveselect') || p.includes('waveform')) return opNibbleEffect(0x2A, 255); // x=op, y=0-7
+  }
+
+  // ── ESFM-specific ───────────────────────────────────────────────────
+  if (chipType === 'esfm') {
+    if (p.includes('waveselect') || p.includes('waveform')) return opNibbleEffect(0x2A, 255);
+    if (p.includes('oppan') || p.includes('op_pan') || p.includes('operatorpan')) return absEffect(0x20, 255); // 0x20-0x23
+    if (p.includes('outlevel') || p.includes('outputlevel')) return opNibbleEffect(0x24, 255);
+    if (p.includes('modinput') || p.includes('modin')) return opNibbleEffect(0x25, 255);
+    if (p.includes('envdelay') || p.includes('envelope_delay')) return opNibbleEffect(0x26, 255);
+  }
+
+  // ── OPLL-specific ───────────────────────────────────────────────────
+  if (chipType === 'opll' || chipType === 'vrc7') {
+    if (p.includes('patch') || p.includes('waveform')) return absEffect(0x10, 15);
+  }
+
+  return null;
+}
+
+// ── Game Boy ────────────────────────────────────────────────────────────────
+
+function getGBEffectMapping(p: string): EffectMapping | null {
+  if (p.includes('waveform') || p.includes('wave')) return absEffect(0x10, 3);
+  if (p.includes('duty') || p.includes('pulse')) return absEffect(0x12, 3);
+  if (p.includes('sweeptime') || p.includes('sweep_time')) return absEffect(0x13, 7);
+  if (p.includes('sweepdir') || p.includes('sweep_dir')) return absEffect(0x14, 1);
+  if (p.includes('noisemode') || p.includes('noise')) return absEffect(0x11, 255);
+  return null;
+}
+
+// ── NES APU ─────────────────────────────────────────────────────────────────
+
+function getNESEffectMapping(p: string): EffectMapping | null {
+  if (p.includes('duty') || p.includes('noisemode') || p.includes('noise_mode')) return absEffect(0x12, 3);
+  if (p.includes('envmode') || p.includes('envelope_mode')) return absEffect(0x15, 255);
+  if (p.includes('lengthcounter') || p.includes('length')) return absEffect(0x16, 255);
+  if (p.includes('linearcounter') || p.includes('linear')) return absEffect(0x19, 255);
+  return null;
+}
+
+// ── FDS (Famicom Disk System) ───────────────────────────────────────────────
+
+function getFDSEffectMapping(p: string): EffectMapping | null {
+  if (p.includes('waveform') || p.includes('wave')) return absEffect(0x10, 255);
+  if (p.includes('moddepth') || p.includes('mod_depth') || p.includes('fmdepth')) return absEffect(0x11, 255);
+  if (p.includes('modspeed') || p.includes('mod_speed')) {
+    // 16-bit split: 0x12 = high, 0x13 = low
+    return {
+      write: (cell, v, prevValue, fmt) => {
+        const speed = norm(v, 65535);
+        if (prevValue !== null && norm(prevValue, 65535) === speed) return true;
+        const wroteHi = writeEffect(cell, 0x12, (speed >> 8) & 0xFF, fmt);
+        const wroteLo = writeEffect(cell, 0x13, speed & 0xFF, fmt);
+        return wroteHi || wroteLo;
+      },
+    };
+  }
+  if (p.includes('modpos') || p.includes('mod_pos')) return absEffect(0x14, 255);
+  if (p.includes('modwave') || p.includes('mod_wave')) return absEffect(0x15, 255);
+  return null;
+}
+
+// ── PC Engine / HuC6280 ─────────────────────────────────────────────────────
+
+function getPCEEffectMapping(p: string): EffectMapping | null {
+  if (p.includes('waveform') || p.includes('wave')) return absEffect(0x10, 255);
+  if (p.includes('noise') || p.includes('duty')) return absEffect(0x11, 255);
+  if (p.includes('lfomode') || p.includes('lfo_mode')) return absEffect(0x12, 255);
+  if (p.includes('lfospeed') || p.includes('lfo_speed')) return absEffect(0x13, 255);
+  return null;
+}
+
+// ── SNES S-DSP ──────────────────────────────────────────────────────────────
+
+function getSNESEffectMapping(p: string): EffectMapping | null {
+  // Per-channel
+  if (p.includes('waveform') || p.includes('wave') || p.includes('sample')) return absEffect(0x10, 255);
+  if (p.includes('noise') || p.includes('noisemode')) return absEffect(0x11, 255);
+  if (p.includes('echo') && !p.includes('delay') && !p.includes('feedback') && !p.includes('vol') && !p.includes('fir')) return absEffect(0x12, 1);
+  if (p.includes('pitchmod') || p.includes('pitch_mod')) return absEffect(0x13, 1);
+  if (p.includes('invert')) return absEffect(0x14, 1);
+  if (p.includes('gainmode') || p.includes('gain_mode')) return absEffect(0x15, 255);
+  if (p.includes('gain') && !p.includes('gainmode')) return absEffect(0x16, 255);
+  if (p.includes('noisefreq') || p.includes('noise_freq')) return absEffect(0x1D, 255);
+  // Per-channel ADSR
+  if (p.includes('attackrate') || p.includes('.ar')) return absEffect(0x20, 15);
+  if (p.includes('decayrate') || p.includes('.dr')) return absEffect(0x21, 7);
+  if (p.includes('sustainlevel') || p.includes('.sl')) return absEffect(0x22, 7);
+  if (p.includes('releaserate') || p.includes('.rr')) return absEffect(0x23, 31);
+  // Global echo/reverb
+  if (p.includes('echoenable') || p.includes('echo_enable')) return absEffect(0x18, 1);
+  if (p.includes('echodelay') || p.includes('echo_delay')) return absEffect(0x19, 7);
+  if (p.includes('echovoll') || p.includes('echo_vol_l') || p.includes('echo_left')) return absEffect(0x1A, 255);
+  if (p.includes('echovolr') || p.includes('echo_vol_r') || p.includes('echo_right')) return absEffect(0x1B, 255);
+  if (p.includes('echofeedback') || p.includes('echo_feedback')) return absEffect(0x1C, 255);
+  // Global volume
+  if (p.includes('globalvoll') || p.includes('global_vol_l') || p.includes('mastervoll')) return absEffect(0x1E, 255);
+  if (p.includes('globalvolr') || p.includes('global_vol_r') || p.includes('mastervolr')) return absEffect(0x1F, 255);
+  // FIR filter coefficients (0x30-0x37)
+  for (let i = 0; i < 8; i++) {
+    if (p === `fir${i}` || p === `fir_${i}` || p === `echocoef${i}`) return absEffect(0x30 + i, 255);
+  }
+  return null;
+}
+
+// ── Amiga Paula ─────────────────────────────────────────────────────────────
+
+function getAmigaEffectMapping(p: string): EffectMapping | null {
+  if (p.includes('ledfilter') || p.includes('amigafilter') || (p.includes('filter') && !p.includes('filtermode'))) return absEffect(0x10, 1);
+  if (p.includes('ampmod') || p.includes('am')) return absEffect(0x11, 255);
+  if (p.includes('pitchmod') || p.includes('pm')) return absEffect(0x12, 255);
+  return null;
+}
+
+// ── SMS / SN76489 ───────────────────────────────────────────────────────────
+
+function getSMSEffectMapping(p: string): EffectMapping | null {
+  if (p.includes('noisemode') || p.includes('noise') || p.includes('duty')) return absEffect(0x20, 3);
+  return null;
+}
+
+// ── VRC6 ────────────────────────────────────────────────────────────────────
+
+function getVRC6EffectMapping(p: string): EffectMapping | null {
+  if (p.includes('duty') || p.includes('pulse')) return absEffect(0x12, 7);
+  return null;
+}
+
+// ── POKEY (Atari) ───────────────────────────────────────────────────────────
+
+function getPOKEYEffectMapping(p: string): EffectMapping | null {
+  if (p.includes('audctl') || p.includes('noisemode') || p.includes('noise')) return absEffect(0x20, 255);
+  return null;
+}
+
+// ── TIA (Atari 2600) ────────────────────────────────────────────────────────
+
+function getTIAEffectMapping(p: string): EffectMapping | null {
+  if (p.includes('audc') || p.includes('noisemode') || p.includes('noise')) return absEffect(0x20, 255);
+  return null;
+}
+
+// ── N163 (Namco) ────────────────────────────────────────────────────────────
+
+function getN163EffectMapping(p: string): EffectMapping | null {
+  if (p.includes('waveform') || p.includes('wave')) return absEffect(0x10, 255);
+  if (p.includes('wavepos') || p.includes('wave_pos')) return absEffect(0x11, 255);
+  if (p.includes('wavelen') || p.includes('wave_len')) return absEffect(0x12, 255);
+  if (p.includes('channellimit') || p.includes('channel_limit')) return absEffect(0x18, 7);
+  return null;
+}
+
+// ── ES5506 ──────────────────────────────────────────────────────────────────
+
+function getES5506EffectMapping(p: string): EffectMapping | null {
+  if (p.includes('filtermode') || p.includes('filter_mode')) return absEffect(0x14, 255);
+  if (p.includes('filterk1') || p.includes('filter_k1') || p.includes('cutoff')) return absEffect(0x15, 255);
+  if (p.includes('filterk2') || p.includes('filter_k2') || p.includes('resonance')) return absEffect(0x16, 255);
+  return null;
+}
+
+// ── QSound ──────────────────────────────────────────────────────────────────
+
+function getQSoundEffectMapping(p: string): EffectMapping | null {
+  if (p.includes('echofeedback') || p.includes('echo_feedback')) return absEffect(0x17, 255);
+  if (p.includes('echolevel') || p.includes('echo_level') || p.includes('echo')) return absEffect(0x18, 255);
+  if (p.includes('surround')) return absEffect(0x19, 255);
   return null;
 }
 
@@ -361,20 +447,48 @@ function getAYEffectMapping(p: string, _format: FormatConstraints): EffectMappin
 
 function getEffectMapping(param: string, format: FormatConstraints): EffectMapping | null {
   const p = param.toLowerCase();
+  const chip = format.chipType;
 
-  // ── C64/SID-specific effects (Furnace format) ────────────────────────
-  // These use Furnace's chip-specific effect numbers (0x10-0x47 range).
-  // They take priority over generic mappings when chipType is 'c64'.
-  if (format.chipType === 'c64') {
-    const c64 = getC64EffectMapping(p, format);
-    if (c64) return c64;
-    // Fall through to generic mappings for volume/panning/tempo/etc.
-  }
+  // ── Chip-specific effects (Furnace format) ────────────────────────────
+  if (chip) {
+    let mapping: EffectMapping | null = null;
 
-  // ── AY/PSG-specific effects (Furnace format) ─────────────────────────
-  if (format.chipType === 'ay') {
-    const ay = getAYEffectMapping(p, format);
-    if (ay) return ay;
+    // C64/SID
+    if (chip === 'c64') mapping = getC64EffectMapping(p);
+    // AY/PSG family
+    else if (chip === 'ay' || chip === 'saa') mapping = getAYEffectMapping(p);
+    // FM family (shared base + chip-specific extensions)
+    else if (['opn', 'opn2', 'opm', 'arcade', 'opl', 'opl2', 'opl3', 'opll', 'vrc7', 'opz', 'esfm'].includes(chip))
+      mapping = getFMEffectMapping(p, chip);
+    // Game Boy
+    else if (chip === 'gb') mapping = getGBEffectMapping(p);
+    // NES
+    else if (chip === 'nes') mapping = getNESEffectMapping(p);
+    // FDS
+    else if (chip === 'fds') mapping = getFDSEffectMapping(p);
+    // PC Engine
+    else if (chip === 'pce') mapping = getPCEEffectMapping(p);
+    // SNES
+    else if (chip === 'snes') mapping = getSNESEffectMapping(p);
+    // Amiga
+    else if (chip === 'amiga') mapping = getAmigaEffectMapping(p);
+    // SMS / SN76489
+    else if (chip === 'sms' || chip === 'sn76489') mapping = getSMSEffectMapping(p);
+    // VRC6
+    else if (chip === 'vrc6') mapping = getVRC6EffectMapping(p);
+    // POKEY
+    else if (chip === 'pokey') mapping = getPOKEYEffectMapping(p);
+    // TIA
+    else if (chip === 'tia') mapping = getTIAEffectMapping(p);
+    // N163
+    else if (chip === 'n163') mapping = getN163EffectMapping(p);
+    // ES5506
+    else if (chip === 'es5506') mapping = getES5506EffectMapping(p);
+    // QSound
+    else if (chip === 'qsound') mapping = getQSoundEffectMapping(p);
+
+    if (mapping) return mapping;
+    // Fall through to generic XM/IT/MOD mappings
   }
 
   // ── Volume ────────────────────────────────────────────────────────────

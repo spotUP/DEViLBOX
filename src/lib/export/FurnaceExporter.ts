@@ -253,9 +253,8 @@ export async function bakeAutomationForFurnace(
     return { patterns, bakedCount: 0, overflowRows: 0, warnings: [] };
   }
 
-  const formatKey = primaryChip === 'c64' ? 'FUR_C64'
-    : primaryChip === 'ay' ? 'FUR_AY'
-    : 'FUR_GENERIC';
+  // Look up chip-specific format: FUR_C64, FUR_OPN2, FUR_SNES, etc.
+  const formatKey = `FUR_${primaryChip.toUpperCase()}`;
   const format = FORMAT_LIMITS[formatKey] || FORMAT_LIMITS['FUR_GENERIC'];
   return bakeAutomationForExport(patterns, curves, format);
 }

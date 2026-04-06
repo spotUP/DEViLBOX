@@ -32,6 +32,52 @@ export interface FormatConstraints {
   chipType?: string;
 }
 
+/** Generate Furnace chip format entries. All share the same base constraints. */
+function makeFurnaceChipFormats(): Record<string, FormatConstraints> {
+  const base: Omit<FormatConstraints, 'name' | 'chipType' | 'maxChannels' | 'supportsPanning'> = {
+    maxPatterns: 256, maxPatternLength: 256, maxInstruments: 256,
+    maxPositions: 256, maxSampleSize: Infinity, sampleBitDepth: [8, 16],
+    supportsEnvelopes: true, supportsGroove: true, bpmRange: [1, 255], speedRange: [1, 255],
+  };
+  const chips: Array<[string, string, number, boolean]> = [
+    // [key suffix, chipType, maxChannels, supportsPanning]
+    ['C64',     'c64',     3,  false],
+    ['AY',      'ay',      3,  false],
+    ['SAA',     'saa',     6,  false],
+    ['SMS',     'sms',     4,  false],
+    ['GB',      'gb',      4,  false],
+    ['NES',     'nes',     5,  false],
+    ['FDS',     'fds',     1,  false],
+    ['PCE',     'pce',     6,  true],
+    ['VRC6',    'vrc6',    3,  false],
+    ['OPN',     'opn',     6,  true],
+    ['OPN2',    'opn2',    10, true],
+    ['OPM',     'opm',     8,  true],
+    ['OPL',     'opl',     9,  false],
+    ['OPL2',    'opl2',    9,  false],
+    ['OPL3',    'opl3',    18, true],
+    ['OPLL',    'opll',    9,  false],
+    ['VRC7',    'vrc7',    6,  false],
+    ['OPZ',     'opz',     8,  true],
+    ['ESFM',    'esfm',    18, true],
+    ['SNES',    'snes',    8,  true],
+    ['AMIGA',   'amiga',   4,  true],
+    ['POKEY',   'pokey',   4,  false],
+    ['TIA',     'tia',     2,  false],
+    ['N163',    'n163',    8,  false],
+    ['ES5506',  'es5506',  32, true],
+    ['QSOUND',  'qsound',  16, true],
+    ['ARCADE',  'arcade',  8,  true],
+  ];
+  const result: Record<string, FormatConstraints> = {};
+  for (const [key, chipType, maxChannels, supportsPanning] of chips) {
+    result[`FUR_${key}`] = { ...base, name: `FUR_${key}`, chipType, maxChannels, supportsPanning };
+  }
+  // Generic fallback for unknown chips
+  result['FUR_GENERIC'] = { ...base, name: 'FUR_GENERIC', maxChannels: 64, supportsPanning: true };
+  return result;
+}
+
 export const FORMAT_LIMITS: Record<string, FormatConstraints> = {
   MOD: {
     name: 'MOD',
@@ -139,53 +185,8 @@ export const FORMAT_LIMITS: Record<string, FormatConstraints> = {
     speedRange: [1, 255],
   },
   // ── Furnace chip-specific formats ──────────────────────────────────────
-  FUR_C64: {
-    name: 'FUR_C64',
-    chipType: 'c64',
-    maxChannels: 3,
-    maxPatterns: 256,
-    maxPatternLength: 256,
-    maxInstruments: 256,
-    maxPositions: 256,
-    maxSampleSize: 0,
-    sampleBitDepth: [],
-    supportsPanning: false,
-    supportsEnvelopes: true,
-    supportsGroove: true,
-    bpmRange: [1, 255],
-    speedRange: [1, 255],
-  },
-  FUR_AY: {
-    name: 'FUR_AY',
-    chipType: 'ay',
-    maxChannels: 3,
-    maxPatterns: 256,
-    maxPatternLength: 256,
-    maxInstruments: 256,
-    maxPositions: 256,
-    maxSampleSize: 0,
-    sampleBitDepth: [],
-    supportsPanning: false,
-    supportsEnvelopes: true,
-    supportsGroove: true,
-    bpmRange: [1, 255],
-    speedRange: [1, 255],
-  },
-  FUR_GENERIC: {
-    name: 'FUR_GENERIC',
-    maxChannels: 64,
-    maxPatterns: 256,
-    maxPatternLength: 256,
-    maxInstruments: 256,
-    maxPositions: 256,
-    maxSampleSize: Infinity,
-    sampleBitDepth: [8, 16],
-    supportsPanning: true,
-    supportsEnvelopes: true,
-    supportsGroove: true,
-    bpmRange: [1, 255],
-    speedRange: [1, 255],
-  },
+  // All share base Furnace constraints, differ by chipType and channel count
+  ...makeFurnaceChipFormats(),
 };
 
 // ── Violation Tracking ──────────────────────────────────────────────────────
