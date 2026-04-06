@@ -1110,6 +1110,60 @@ float openmpt_module_get_current_channel_vu_rear_right( openmpt_module * mod, in
 	}
 	return 0.0;
 }
+int32_t openmpt_module_get_current_channel_note( openmpt_module * mod, int32_t channel ) {
+	try {
+		openmpt::interface::check_soundfile( mod );
+		return mod->impl->get_current_channel_note( channel );
+	} catch ( ... ) {
+		openmpt::report_exception( __func__, mod );
+	}
+	return 0;
+}
+int32_t openmpt_module_get_current_channel_instrument( openmpt_module * mod, int32_t channel ) {
+	try {
+		openmpt::interface::check_soundfile( mod );
+		return mod->impl->get_current_channel_instrument( channel );
+	} catch ( ... ) {
+		openmpt::report_exception( __func__, mod );
+	}
+	return 0;
+}
+int32_t openmpt_module_get_current_channel_volume( openmpt_module * mod, int32_t channel ) {
+	try {
+		openmpt::interface::check_soundfile( mod );
+		return mod->impl->get_current_channel_volume( channel );
+	} catch ( ... ) {
+		openmpt::report_exception( __func__, mod );
+	}
+	return 0;
+}
+double openmpt_module_get_current_channel_frequency( openmpt_module * mod, int32_t channel ) {
+	try {
+		openmpt::interface::check_soundfile( mod );
+		return mod->impl->get_current_channel_frequency( channel );
+	} catch ( ... ) {
+		openmpt::report_exception( __func__, mod );
+	}
+	return 0.0;
+}
+int32_t openmpt_module_get_current_channel_panning( openmpt_module * mod, int32_t channel ) {
+	try {
+		openmpt::interface::check_soundfile( mod );
+		return mod->impl->get_current_channel_panning( channel );
+	} catch ( ... ) {
+		openmpt::report_exception( __func__, mod );
+	}
+	return 128;
+}
+int openmpt_module_get_current_channel_active( openmpt_module * mod, int32_t channel ) {
+	try {
+		openmpt::interface::check_soundfile( mod );
+		return mod->impl->get_current_channel_active( channel ) ? 1 : 0;
+	} catch ( ... ) {
+		openmpt::report_exception( __func__, mod );
+	}
+	return 0;
+}
 
 int32_t openmpt_module_get_num_subsongs( openmpt_module * mod ) {
 	try {

@@ -1408,6 +1408,55 @@ float module_impl::get_current_channel_vu_rear_right( std::int32_t channel ) con
 	return m_sndFile->m_PlayState.Chn[channel].dwFlags[OpenMPT::CHN_SURROUND] ? m_sndFile->m_PlayState.Chn[channel].nRightVU * (1.0f/128.0f) : 0.0f;
 }
 
+std::int32_t module_impl::get_current_channel_note( std::int32_t channel ) const {
+	if ( channel < 0 || channel >= m_sndFile->GetNumChannels() ) {
+		return 0;
+	}
+	const auto & chn = m_sndFile->m_PlayState.Chn[channel];
+	return static_cast<std::int32_t>( chn.nNote );
+}
+std::int32_t module_impl::get_current_channel_instrument( std::int32_t channel ) const {
+	if ( channel < 0 || channel >= m_sndFile->GetNumChannels() ) {
+		return 0;
+	}
+	const auto & chn = m_sndFile->m_PlayState.Chn[channel];
+	return static_cast<std::int32_t>( chn.nNewIns ? chn.nNewIns : chn.nOldIns );
+}
+std::int32_t module_impl::get_current_channel_volume( std::int32_t channel ) const {
+	if ( channel < 0 || channel >= m_sndFile->GetNumChannels() ) {
+		return 0;
+	}
+	const auto & chn = m_sndFile->m_PlayState.Chn[channel];
+	return static_cast<std::int32_t>( chn.nRealVolume );
+}
+double module_impl::get_current_channel_frequency( std::int32_t channel ) const {
+	if ( channel < 0 || channel >= m_sndFile->GetNumChannels() ) {
+		return 0.0;
+	}
+	const auto & chn = m_sndFile->m_PlayState.Chn[channel];
+	if ( chn.nPeriod == 0 ) {
+		return 0.0;
+	}
+	if ( m_sndFile->PeriodsAreFrequencies() ) {
+		return static_cast<double>( chn.nPeriod );
+	}
+	return static_cast<double>( m_sndFile->GetFreqFromPeriod( static_cast<uint32>( chn.nPeriod ), static_cast<uint32>( chn.nC5Speed ), 0 ) ) / 16.0;
+}
+std::int32_t module_impl::get_current_channel_panning( std::int32_t channel ) const {
+	if ( channel < 0 || channel >= m_sndFile->GetNumChannels() ) {
+		return 128;
+	}
+	const auto & chn = m_sndFile->m_PlayState.Chn[channel];
+	return static_cast<std::int32_t>( chn.nRealPan );
+}
+bool module_impl::get_current_channel_active( std::int32_t channel ) const {
+	if ( channel < 0 || channel >= m_sndFile->GetNumChannels() ) {
+		return false;
+	}
+	const auto & chn = m_sndFile->m_PlayState.Chn[channel];
+	return chn.nLength > 0;
+}
+
 std::int32_t module_impl::get_num_subsongs() const {
 	std::unique_ptr<subsongs_type> subsongs_temp = has_subsongs_inited() ? std::unique_ptr<subsongs_type>() : std::make_unique<subsongs_type>( get_subsongs() );
 	const subsongs_type & subsongs = has_subsongs_inited() ? m_subsongs : *subsongs_temp;

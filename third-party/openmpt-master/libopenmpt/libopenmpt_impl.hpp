@@ -239,6 +239,12 @@ public:
 	float get_current_channel_vu_right( std::int32_t channel ) const;
 	float get_current_channel_vu_rear_left( std::int32_t channel ) const;
 	float get_current_channel_vu_rear_right( std::int32_t channel ) const;
+	std::int32_t get_current_channel_note( std::int32_t channel ) const;
+	std::int32_t get_current_channel_instrument( std::int32_t channel ) const;
+	std::int32_t get_current_channel_volume( std::int32_t channel ) const;
+	double get_current_channel_frequency( std::int32_t channel ) const;
+	std::int32_t get_current_channel_panning( std::int32_t channel ) const;
+	bool get_current_channel_active( std::int32_t channel ) const;
 	std::int32_t get_num_subsongs() const;
 	std::int32_t get_num_channels() const;
 	std::int32_t get_num_orders() const;
