@@ -628,13 +628,13 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
     if (e.button !== 0) return; // Only left click / primary pointer
 
-    // Ignore clicks that originated inside a context menu (or any
-    // portal-rendered floating UI). Menus are rendered via createPortal
-    // to document.body but their events still propagate to the canvas
-    // sibling — without this guard, clicking "Copy Cell" would also be
-    // interpreted as a click on whichever pattern row sits behind the menu.
+    // Ignore clicks that originated inside a context menu, automation lane,
+    // or any other floating overlay. Without this, clicking "Copy Cell" would
+    // also be interpreted as a click on whichever pattern row sits behind the
+    // menu, and dragging in an automation lane would scratch-scroll the
+    // pattern instead of drawing the curve.
     const target = e.target as Element | null;
-    if (target?.closest?.('[data-context-menu]')) return;
+    if (target?.closest?.('[data-context-menu], [data-automation-lane]')) return;
 
     // FORMAT MODE: own hit-test (pattern may be undefined)
     if (!isMobile && isFormatMode && formatChannels && formatColumns) {
