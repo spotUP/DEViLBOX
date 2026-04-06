@@ -92,6 +92,16 @@ class ZxtuneProcessor extends AudioWorkletProcessor {
         }
         break;
 
+      case 'setMuteMask':
+        this.muteMask = data.mask;
+        if (this.module && typeof this.module._player_set_channel_gain === 'function') {
+          for (let ch = 0; ch < 8; ch++) {
+            const active = (data.mask & (1 << ch)) !== 0;
+            this.module._player_set_channel_gain(ch, active ? 1.0 : 0.0);
+          }
+        }
+        break;
+
       case 'dispose':
         this.cleanup();
         break;

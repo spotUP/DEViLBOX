@@ -242,6 +242,16 @@ class MusicLineProcessor extends AudioWorkletProcessor {
         break;
       }
 
+      case 'setMuteMask':
+        this.muteMask = data.mask;
+        if (this.wasm && typeof this.wasm._ml_set_channel_on === 'function') {
+          for (let ch = 0; ch < 8; ch++) {
+            const active = (data.mask & (1 << ch)) !== 0;
+            this.wasm._ml_set_channel_on(ch, active ? 1 : 0);
+          }
+        }
+        break;
+
       case 'get-channels-on': {
         if (!this.wasm || !this.songLoaded) break;
         const mask = this.wasm._ml_get_channels_on();
