@@ -93,6 +93,53 @@ const wasmEffects: EffectDescriptor[] = [
     getDefaultParameters: () => ({ decay: 70, shimmer: 50, pitch: 12, damping: 50, size: 70, predelay: 40, modRate: 30, modDepth: 20 }),
   },
   {
+    id: 'Vocoder', name: 'Vocoder', category: 'wasm', group: 'Voice',
+    loadMode: 'eager',
+    create: async (c: EffectConfig) => {
+      const { VocoderEffect } = await import('@engine/effects/VocoderEffect');
+      const p = c.parameters;
+      const sourceStr = (typeof p.source === 'string' ? p.source : 'self') as 'self' | 'mic';
+      return new VocoderEffect({
+        source: sourceStr,
+        carrierType: (Number(p.carrierType) || 3) as 0 | 1 | 2 | 3,
+        carrierFreq: Number(p.carrierFreq) || 130.81,
+        formantShift: Number(p.formantShift) || 1.0,
+        reactionTime: (Number(p.reactionTime) || 30) / 1000,
+        wet: c.wet / 100,
+      });
+    },
+    getDefaultParameters: () => ({
+      source: 'self',
+      carrierType: 3,       // chord
+      carrierFreq: 130.81,  // C3
+      formantShift: 1.0,
+      reactionTime: 30,     // ms (stored as ms, divided by 1000 in create)
+    }),
+  },
+  {
+    id: 'AutoTune', name: 'Auto-Tune', category: 'wasm', group: 'Voice',
+    loadMode: 'eager',
+    create: async (c: EffectConfig) => {
+      const { AutoTuneEffect } = await import('@engine/effects/AutoTuneEffect');
+      const p = c.parameters;
+      const scaleStr = (typeof p.scale === 'string' ? p.scale : 'major') as
+        'major' | 'minor' | 'chromatic' | 'pentatonic' | 'blues';
+      return new AutoTuneEffect({
+        key: Number(p.key) || 0,
+        scale: scaleStr,
+        strength: (Number(p.strength) ?? 100) / 100,
+        speed: (Number(p.speed) ?? 70) / 100,
+        wet: c.wet / 100,
+      });
+    },
+    getDefaultParameters: () => ({
+      key: 0,            // C
+      scale: 'major',
+      strength: 100,     // full snap
+      speed: 70,         // fairly fast
+    }),
+  },
+  {
     id: 'GranularFreeze', name: 'Granular Freeze', category: 'wasm', group: 'Granular',
     loadMode: 'eager',
     create: async (c: EffectConfig) => {

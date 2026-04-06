@@ -70,6 +70,8 @@ export type AudioEffectType =
   | 'GranularFreeze'  // Live-capture granular freeze effect (WASM)
   | 'TapeDegradation' // Tape wow/flutter/hiss degradation
   | 'AmbientDelay'    // Modulated multi-tap delay with feedback filter
+  | 'Vocoder'         // Channel vocoder (WASM voclib) — chain or mic modulator
+  | 'AutoTune'        // Real-time pitch correction (YIN detection + PitchShift)
   // WAM 2.0 effects (external Web Audio Module plugins)
   | 'WAMBigMuff'        // Big Muff Pi fuzz
   | 'WAMTS9'            // TS-9 Overdrive
