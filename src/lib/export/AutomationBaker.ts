@@ -730,9 +730,13 @@ export function bakeAutomationForExport(
   }
 
   // Post-process: optimize linear volume ramps into fine slide commands
-  const slideRows = optimizeVolumeSlides(baked, format);
-  if (slideRows > 0) {
-    warnings.push(`Optimized ${slideRows} volume row(s) into fine slide commands.`);
+  // Volume column optimization (XM/IT/S3M)
+  const volColSlides = optimizeVolumeSlides(baked, format);
+  // Effect column Cxx optimization (all formats including MOD)
+  const effColSlides = optimizeEffectColumnVolumeSlides(baked);
+  const totalSlides = volColSlides + effColSlides;
+  if (totalSlides > 0) {
+    warnings.push(`Optimized ${totalSlides} volume row(s) into fine slide commands.`);
   }
 
   return { patterns: baked, bakedCount, overflowRows, warnings };
@@ -815,6 +819,85 @@ function optimizeVolumeSlides(patterns: Pattern[], format: FormatConstraints): n
     }
   }
   return optimized;
+}
+
+/**
+ * Detect consecutive Cxx (set volume) effect commands and replace with EAx/EBx
+ * fine volume slides. Works for ALL formats including MOD which has no volume
+ * column. Same logic as optimizeVolumeSlides but operates on the effect column.
+ *
+ * Effect encoding (XM/IT numbering):
+ *   Cxx = effect type 12, param 0-64 (set volume)
+ *   E (effect type 14) with param:
+ *     0xA0-0xAF = Fine Vol Slide Up   (1-15 per row, tick 0)
+ *     0xB0-0xBF = Fine Vol Slide Down (1-15 per row, tick 0)
+ */
+function optimizeEffectColumnVolumeSlides(patterns: Pattern[]): number {
+  let optimized = 0;
+
+  for (const pattern of patterns) {
+    for (const channel of pattern.channels) {
+      const rows = channel.rows;
+      let runStart = -1;
+      let runDelta = 0;
+      let runStartVol = 0;
+
+      const isSetVolEffect = (cell: TrackerCell | undefined): boolean =>
+        !!cell && cell.effTyp === 12 && cell.eff >= 0 && cell.eff <= 64;
+
+      for (let r = 0; r <= rows.length; r++) {
+        const cell = r < rows.length ? rows[r] : undefined;
+
+        if (isSetVolEffect(cell) && !cell!.note && !cell!.instrument) {
+          const setVal = cell!.eff;
+          if (runStart < 0) {
+            runStart = r;
+            runStartVol = setVal;
+            runDelta = 0;
+          } else if (runStart === r - 1) {
+            runDelta = setVal - runStartVol;
+            if (Math.abs(runDelta) < 1 || Math.abs(runDelta) > 15) {
+              runStart = r;
+              runStartVol = setVal;
+              runDelta = 0;
+            }
+          } else {
+            const expected = runStartVol + runDelta * (r - runStart);
+            if (setVal !== expected) {
+              applyEffectSlideRun(rows, runStart, r - 1, runDelta);
+              if (r - runStart - 1 > 0) optimized += r - runStart - 1;
+              runStart = r;
+              runStartVol = setVal;
+              runDelta = 0;
+            }
+          }
+        } else {
+          if (runStart >= 0 && r - runStart >= 2 && runDelta !== 0) {
+            applyEffectSlideRun(rows, runStart, r - 1, runDelta);
+            optimized += r - runStart - 1;
+          }
+          runStart = -1;
+          runDelta = 0;
+        }
+      }
+    }
+  }
+  return optimized;
+}
+
+/**
+ * Replace effect column Cxx entries from [start+1, end] with EAx/EBx fine slides.
+ */
+function applyEffectSlideRun(rows: TrackerCell[], start: number, end: number, delta: number): void {
+  if (delta === 0) return;
+  // E command: effect type 14, param = 0xA0+n (up) or 0xB0+n (down), n=1-15
+  const slideParam = delta > 0 ? (0xA0 + delta) : (0xB0 + (-delta));
+  for (let r = start + 1; r <= end; r++) {
+    if (rows[r]) {
+      rows[r].effTyp = 14;
+      rows[r].eff = slideParam;
+    }
+  }
 }
 
 /**
