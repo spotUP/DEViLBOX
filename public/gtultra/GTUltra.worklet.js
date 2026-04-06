@@ -383,13 +383,13 @@ class GTUltraProcessor extends AudioWorkletProcessor {
 
       case 'insertTableRow': {
         if (!this.ready) return;
-        this._insertTableRow(msg.type, msg.pos);
+        this._insertTableRow(msg.tableType, msg.pos);
         break;
       }
 
       case 'deleteTableRow': {
         if (!this.ready) return;
-        this._deleteTableRow(msg.type, msg.pos);
+        this._deleteTableRow(msg.tableType, msg.pos);
         break;
       }
 

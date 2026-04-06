@@ -276,6 +276,103 @@ export function useGTKeyboardHandler(active: boolean) {
       gtDeleteRow();
       return;
     }
+
+    // Delete key in non-note columns: clear the cell value
+    if (e.key === 'Delete' && cursor.column >= 1) {
+      e.preventDefault();
+      if (recordMode) {
+        const orderData = state.orderData[cursor.channel];
+        const patIdx = orderData ? orderData[state.playbackPos.position] : 0;
+        engine?.setPatternCell(patIdx, cursor.row, cursor.column, 0);
+        engine?.checkpointUndo();
+        state.refreshPatternData(patIdx);
+        state.setCursor({ row: Math.min(cursor.row + editStep, state.patternLength) });
+      }
+      return;
+    }
+
+    // Escape: toggle record mode
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      state.setRecordMode(!recordMode);
+      return;
+    }
+
+    // +/- keys: change current instrument number
+    if (e.key === '+' || e.key === '=') {
+      e.preventDefault();
+      state.setCurrentInstrument(Math.min(63, currentInstrument + 1));
+      return;
+    }
+    if (e.key === '-' || e.key === '_') {
+      e.preventDefault();
+      state.setCurrentInstrument(Math.max(1, currentInstrument - 1));
+      return;
+    }
+
+    // F5-F8: set edit step (0, 1, 2, 4)
+    if (e.key === 'F5') { e.preventDefault(); state.setEditStep(0); return; }
+    if (e.key === 'F6') { e.preventDefault(); state.setEditStep(1); return; }
+    if (e.key === 'F7') { e.preventDefault(); state.setEditStep(2); return; }
+    if (e.key === 'F8') { e.preventDefault(); state.setEditStep(4); return; }
+
+    // Shift+O/P: expand/shrink current pattern
+    if (e.shiftKey && e.key === 'O') {
+      e.preventDefault();
+      const orderData = state.orderData[cursor.channel];
+      const patIdx = orderData ? orderData[state.playbackPos.position] : 0;
+      engine?.shrinkPattern(patIdx);
+      engine?.checkpointUndo();
+      state.refreshPatternData(patIdx);
+      return;
+    }
+    if (e.shiftKey && e.key === 'P') {
+      e.preventDefault();
+      const orderData = state.orderData[cursor.channel];
+      const patIdx = orderData ? orderData[state.playbackPos.position] : 0;
+      engine?.expandPattern(patIdx);
+      engine?.checkpointUndo();
+      state.refreshPatternData(patIdx);
+      return;
+    }
+
+    // Shift+C/V: copy/paste instrument
+    if (e.shiftKey && e.key === 'C') {
+      e.preventDefault();
+      state.setClipboardInstrument(currentInstrument);
+      return;
+    }
+    if (e.shiftKey && e.key === 'V') {
+      e.preventDefault();
+      const clipInst = state.clipboardInstrument;
+      if (clipInst > 0 && clipInst !== currentInstrument) {
+        engine?.copyInstrument(clipInst, currentInstrument);
+        engine?.checkpointUndo();
+      }
+      return;
+    }
+
+    // Shift+S: swap current instrument with clipboard
+    if (e.shiftKey && e.key === 'S') {
+      e.preventDefault();
+      const clipInst = state.clipboardInstrument;
+      if (clipInst > 0 && clipInst !== currentInstrument) {
+        engine?.swapInstruments(clipInst, currentInstrument);
+        engine?.checkpointUndo();
+      }
+      return;
+    }
+
+    // Note-off release: release jamming note on key-up handled elsewhere
+    // Channel mute: Shift+1-6
+    if (e.shiftKey && e.key >= '1' && e.key <= '6') {
+      e.preventDefault();
+      const ch = parseInt(e.key) - 1;
+      if (ch < state.sidCount * 3) {
+        state.toggleChannelMute(ch);
+      }
+      return;
+    }
   }, [active]);
 
   useEffect(() => {
