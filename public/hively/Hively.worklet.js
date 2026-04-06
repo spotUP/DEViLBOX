@@ -144,6 +144,16 @@ class HivelyProcessor extends AudioWorkletProcessor {
         }
         break;
 
+      case 'setMuteMask':
+        this.muteMask = data.mask;
+        if (this.wasm && typeof this.wasm._hively_set_channel_gain === 'function') {
+          for (let ch = 0; ch < 16; ch++) {
+            const active = (data.mask & (1 << ch)) !== 0;
+            this.wasm._hively_set_channel_gain(ch, active ? 1.0 : 0.0);
+          }
+        }
+        break;
+
       case 'setTrackStep':
         if (this.wasm) {
           this.wasm._hively_set_track_step(
