@@ -2374,9 +2374,11 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
       let smoothOffset = 0;
 
       // WASM engine position — check FIRST (bypasses replayer which returns stale state)
-      // Skip for format mode — format mode already handled position via FormatPlaybackState.
+      // In format mode, allow wasmPos only when FormatPlaybackState is NOT driving scroll
+      // (TFMX WASM playback uses wasmPos; UADE streaming uses FormatPlaybackState).
       const wasmPos = wasmPosEarly;
-      if (wasmPos.active && !isFormatModeRef.current) {
+      const fpsIsActive = isFormatModeRef.current && formatIsPlayingRef.current;
+      if (wasmPos.active && !fpsIsActive) {
         currentRow = wasmPos.row;
         // Use songPos to determine active pattern (multi-pattern WASM songs)
         const patternOrder = trackerState.patternOrder;
