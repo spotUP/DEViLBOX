@@ -14,7 +14,8 @@ import React, { useState, useCallback, useEffect } from 'react';
 import { useInstrumentStore } from '@stores/useInstrumentStore';
 import { SYNTH_INFO, ALL_SYNTH_TYPES, getSynthInfo } from '@constants/synthCategories';
 import { UnifiedInstrumentEditor } from './editors';
-import { EffectChain, TestKeyboard, CategorizedSynthSelector } from './shared';
+import { TestKeyboard, CategorizedSynthSelector } from './shared';
+import { InstrumentEffectsPanel } from '@components/effects/InstrumentEffectsPanel';
 import { hasBuiltInInput, hasHardwareUI } from './hardware/HardwareUIWrapper';
 import { SavePresetDialog } from './presets';
 import { InstrumentList } from './InstrumentList';
@@ -596,8 +597,13 @@ export const EditInstrumentModal: React.FC<EditInstrumentModalProps> = ({
                   )}
 
                   {activeTab === 'effects' && (
-                    <div className="p-4">
-                      <EffectChain instrumentId={currentInstrument.id} effects={currentInstrument.effects || []} />
+                    <div className="p-2">
+                      <InstrumentEffectsPanel
+                        instrumentId={currentInstrument.id}
+                        instrumentName={currentInstrument.name}
+                        effects={currentInstrument.effects || []}
+                        hideHeader
+                      />
                     </div>
                   )}
                 </div>

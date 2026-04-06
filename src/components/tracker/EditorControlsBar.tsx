@@ -24,11 +24,12 @@ import { GrooveSettingsModal } from '@components/dialogs/GrooveSettingsModal';
 import { GROOVE_TEMPLATES } from '@typedefs/audio';
 import {
   Eye, EyeOff,
-  Activity, LayoutGrid, Cpu, SlidersHorizontal, Zap, Trash2,
+  Activity, Cpu, SlidersHorizontal, Zap, Trash2,
 } from 'lucide-react';
 
 import { type TrackerViewMode } from '@stores/useUIStore';
-import { useEditorStore, type PasteMode, MASK_NOTE, MASK_INSTRUMENT, MASK_VOLUME, MASK_EFFECT, MASK_EFFECT2 } from '@stores/useEditorStore';
+import { useEditorStore, MASK_NOTE, MASK_INSTRUMENT, MASK_VOLUME, MASK_EFFECT, MASK_EFFECT2 } from '@stores/useEditorStore';
+import { DropdownButton, type MenuItemType } from '@components/common/ContextMenu';
 
 export interface EditorControlsBarProps {
   viewMode: TrackerViewMode;
@@ -196,16 +197,6 @@ export const EditorControlsBar: React.FC<EditorControlsBarProps> = React.memo(({
           </button>
         )}
 
-        {/* Drumpad Editor Toggle */}
-        <button
-          onClick={c.handleShowDrumpads}
-          className="flex items-center gap-1 px-2 py-1 text-xs rounded transition-colors bg-dark-bgSecondary text-text-secondary hover:text-text-primary"
-          title="Open Drumpad Editor"
-        >
-          <LayoutGrid size={12} />
-          <span>Pads</span>
-        </button>
-
         {/* Rec Button (with settings access) */}
         <div className="flex items-center gap-1">
           <button
@@ -254,17 +245,17 @@ export const EditorControlsBar: React.FC<EditorControlsBarProps> = React.memo(({
 
         {/* Paste Mode & Mask */}
         <div className="flex items-center gap-1">
-          <select
-            value={pasteMode}
-            onChange={(e) => setPasteMode(e.target.value as PasteMode)}
-            className="h-5 bg-dark-bgSecondary text-text-secondary text-[10px] border border-dark-border rounded px-1 cursor-pointer hover:text-text-primary focus:outline-none"
-            title="Paste mode"
+          <DropdownButton
+            items={([
+              { id: 'overwrite', label: 'Overwrite', radio: true, checked: pasteMode === 'overwrite', onClick: () => setPasteMode('overwrite') },
+              { id: 'mix', label: 'Mix paste', radio: true, checked: pasteMode === 'mix', onClick: () => setPasteMode('mix') },
+              { id: 'flood', label: 'Flood fill', radio: true, checked: pasteMode === 'flood', onClick: () => setPasteMode('flood') },
+              { id: 'insert', label: 'Insert rows', radio: true, checked: pasteMode === 'insert', onClick: () => setPasteMode('insert') },
+            ] as MenuItemType[])}
+            className="h-6 px-2 bg-dark-bgSecondary text-text-secondary text-[10px] font-mono border border-dark-border rounded cursor-pointer hover:text-text-primary hover:border-accent-highlight/50 transition-colors"
           >
-            <option value="overwrite">Paste</option>
-            <option value="mix">Mix</option>
-            <option value="flood">Flood</option>
-            <option value="insert">Insert</option>
-          </select>
+            {pasteMode === 'overwrite' ? 'Paste' : pasteMode === 'mix' ? 'Mix' : pasteMode === 'flood' ? 'Flood' : 'Insert'} ▾
+          </DropdownButton>
           <div className="flex gap-px" title="Paste mask — toggle columns">
             {([
               ['N', MASK_NOTE],

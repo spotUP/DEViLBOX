@@ -2152,6 +2152,10 @@
   transition: all 0.1s ease;
 }
 
+.ft2-arrow:focus {
+  outline: none;
+}
+
 .ft2-arrow:hover {
   background: var(--color-bg-hover);
   border-color: var(--color-accent);
