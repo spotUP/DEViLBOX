@@ -39,6 +39,7 @@ import type { SynthType } from '@typedefs/instrument';
 import type { InstrumentConfig, EffectConfig } from '@typedefs/instrument';
 import { PixiModularSynthEditor } from '../views/instruments/PixiModularSynthEditor';
 import { PixiAmigaSynthPanel } from '../views/instruments/PixiAmigaSynthPanel';
+import { PixiTFMXMacroPanel } from '../views/instruments/PixiTFMXMacroPanel';
 import { AMIGA_SYNTH_LAYOUTS } from '../views/instruments/amigaSynthLayouts';
 import type { ModularPatchConfig } from '@typedefs/modular';
 import { MODULAR_INIT_PATCH } from '@constants/modularPresets';
@@ -1811,6 +1812,11 @@ const NativeInstrumentPanel: React.FC<{
   }
   if (instrument.synthType === 'FuturePlayerSynth') {
     return <FuturePlayerPanel instrument={instrument} />;
+  }
+  // TFMX (Huelsbeck mdat) — full macro editor for instruments tagged with tfmxMacroIndex
+  if (instrument.synthType === 'TFMXSynth'
+      && (instrument.metadata as { tfmxMacroIndex?: number } | undefined)?.tfmxMacroIndex !== undefined) {
+    return <PixiTFMXMacroPanel instrument={instrument} />;
   }
   // Generic Amiga synth panel for all formats with layout descriptors
   const amigaLayout = instrument.synthType ? AMIGA_SYNTH_LAYOUTS[instrument.synthType] : undefined;
