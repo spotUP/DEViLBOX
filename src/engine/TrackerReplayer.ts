@@ -361,6 +361,11 @@ export interface TrackerSong {
    *  During playback, row = floor((tickCount - uadeFirstTick) / initialSpeed). */
   uadeFirstTick?: number;
 
+  /** When true, the UADE playback engine should capture tick snapshots + Paula log
+   *  during normal-speed playback and reconstruct patterns after one song loop.
+   *  Used for SKIP_SCAN formats where enhanced scan crashes but playback works. */
+  uadeDeferredCapture?: boolean;
+
   /** TFMX timing table: cumulative jiffies at each (patternIndex, row) for position sync */
   tfmxTimingTable?: { patternIndex: number; row: number; cumulativeJiffies: number }[];
 
@@ -1608,6 +1613,45 @@ export class TrackerReplayer {
         }, 100); // Poll 10x/sec
       }
 
+      // Deferred pattern capture for SKIP_SCAN formats: enable tick snapshots
+      // during normal-speed playback and reconstruct patterns after 15 seconds.
+      if (this.song.uadeDeferredCapture && result.uadeEngine) {
+        result.uadeEngine.enableTickSnapshots(true);
+        const captureEngine = result.uadeEngine;
+        const captureSong = this.song;
+        setTimeout(async () => {
+          try {
+            const tickSnapshots = await captureEngine.getTickSnapshots();
+            captureEngine.enableTickSnapshots(false);
+            if (tickSnapshots.length < 10) return;
+
+            const { reconstructPatterns } = await import('./uade/UADEPatternReconstructor');
+            const samplePtrToInstrIndex = new Map<number, number>();
+            captureSong.instruments.forEach((inst, idx) => {
+              const ptr = inst.sample?.uadeSamplePtr;
+              if (ptr != null) samplePtrToInstrIndex.set(ptr, idx + 1);
+            });
+
+            const reconstructed = reconstructPatterns(
+              tickSnapshots, samplePtrToInstrIndex, captureSong.numChannels, 6,
+            );
+
+            if (reconstructed.patterns.length > 0) {
+              // Update song in-place (store will pick up the changes)
+              captureSong.patterns = reconstructed.patterns;
+              captureSong.songPositions = reconstructed.patterns.map((_, i) => i);
+              captureSong.songLength = reconstructed.patterns.length;
+              captureSong.initialSpeed = reconstructed.speed;
+              captureSong.uadeFirstTick = reconstructed.firstTick;
+              captureSong.uadeDeferredCapture = false;
+              console.log(`[TrackerReplayer] Deferred capture: ${reconstructed.patterns.length} patterns reconstructed`);
+            }
+          } catch (e) {
+            console.warn('[TrackerReplayer] Deferred pattern capture failed:', e);
+          }
+        }, 15000); // Capture after 15 seconds of playback
+      }
+
       // TFMX: use timing table + onChannelData for position sync
       if (result.uadeEngine && this.song.tfmxTimingTable && this.song.tfmxTimingTable.length > 0) {
         const tt = this.song.tfmxTimingTable;
@@ -1861,20 +1905,26 @@ export class TrackerReplayer {
 
         _log('[TrackerReplayer] libopenmpt available:', mptEngine.isAvailable());
         if (mptEngine.isAvailable()) {
+          // Rebuild _replacedInstruments from current instrument store state.
+          // The store's markInstrumentReplaced() may not have fired (HMR, race, etc.)
+          // so we do an authoritative check here: any instrument that's now a synth
+          // (not Sampler/Player) in a libopenmpt-backed song is "replaced".
+          {
+            const { useInstrumentStore } = await import('@stores/useInstrumentStore');
+            const instruments = useInstrumentStore.getState().instruments;
+            for (const inst of instruments) {
+              if (inst.synthType !== 'Sampler' && inst.synthType !== 'Player') {
+                this._replacedInstruments.add(inst.id);
+              }
+            }
+            if (this._replacedInstruments.size > 0) {
+              console.log('[HybridPlayback] Replaced instruments:', Array.from(this._replacedInstruments));
+            }
+          }
+
           // If edits have been made, re-serialize from the soundlib to get updated module data
           let tuneData = this.song.libopenmptFileData;
           const bridge = await import('@engine/libopenmpt/OpenMPTEditBridge');
-
-          // Silence samples for replaced instruments (hybrid playback)
-          // Must happen BEFORE serialize so the silenced data gets baked into the module
-          if (this._replacedInstruments.size > 0 && bridge.isActive()) {
-            const osl = await import('@lib/import/wasm/OpenMPTSoundlib');
-            for (const instId of this._replacedInstruments) {
-              await osl.setSampleData(instId - 1, new Int8Array(4), 8363);
-            }
-            // Force dirty so serialize() picks up the silenced samples
-            bridge.markDirty();
-          }
 
           if (bridge.isActive() && bridge.isDirty()) {
             const serialized = await bridge.serialize();
@@ -2394,6 +2444,10 @@ export class TrackerReplayer {
     // channels whose current instrument is in the replaced set via ToneEngine,
     // and mute those channels in the WASM engine to prevent doubling.
     if (this._suppressNotes && this._replacedInstruments.size > 0) {
+      // Log once per pattern
+      if (readNewNote && this.pattPos === 0) {
+        console.warn('[HYBRID-TICK] suppressNotes=true, replacedInstruments=', Array.from(this._replacedInstruments), 'pos=', this.songPos, ':', this.pattPos, 'channels=', this.channels.length);
+      }
       for (let ch = 0; ch < this.channels.length; ch++) {
         const channel = this.channels[ch];
         const row = useNativeAccessor
@@ -2406,6 +2460,14 @@ export class TrackerReplayer {
           : channel.instrument != null ? (channel.instrument as { id: number }).id : 0;
         const instId = row.instrument || chanInst;
         if (!instId || !this._replacedInstruments.has(instId)) continue;
+
+        // Ensure channel has the UPDATED instrument config from the instrumentMap
+        // (during libopenmpt playback, processRow was never called so ch.instrument
+        // may still hold the old Sampler config from song load)
+        const updatedInst = this.instrumentMap.get(instId);
+        if (updatedInst) {
+          channel.instrument = updatedInst;
+        }
 
         if (readNewNote) {
           this.processRow(ch, channel, row, safeTime);
