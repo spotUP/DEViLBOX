@@ -52,6 +52,8 @@ class MPT extends AudioWorkletProcessor {
 			interpolationFilter: 0,	// https://lib.openmpt.org/doc/group__openmpt__module__render__param.html
 		}
 		this.channels = 0
+		this.lastStateRow = -1
+		this.lastStateOrder = -1
 	}
 
 	process(inputList, outputList, parameters) {
@@ -98,6 +100,28 @@ class MPT extends AudioWorkletProcessor {
 				chLevels[i] = Math.max(l, r)
 			}
 			msg.chLevels = chLevels
+		}
+
+		// Per-channel state (note, instrument, volume, frequency, panning, active) — once per row
+		const curRow = msg.row
+		const curOrder = msg.order
+		if (curRow !== this.lastStateRow || curOrder !== this.lastStateOrder) {
+			this.lastStateRow = curRow
+			this.lastStateOrder = curOrder
+
+			if (this.channels > 0 && libopenmpt._openmpt_module_get_current_channel_note) {
+				const chState = new Float64Array(this.channels * 6)
+				for (let i = 0; i < this.channels; i++) {
+					const base = i * 6
+					chState[base + 0] = libopenmpt._openmpt_module_get_current_channel_note(this.modulePtr, i)
+					chState[base + 1] = libopenmpt._openmpt_module_get_current_channel_instrument(this.modulePtr, i)
+					chState[base + 2] = libopenmpt._openmpt_module_get_current_channel_volume(this.modulePtr, i)
+					chState[base + 3] = libopenmpt._openmpt_module_get_current_channel_frequency(this.modulePtr, i)
+					chState[base + 4] = libopenmpt._openmpt_module_get_current_channel_panning(this.modulePtr, i)
+					chState[base + 5] = libopenmpt._openmpt_module_get_current_channel_active(this.modulePtr, i)
+				}
+				msg.chState = chState
+			}
 		}
 
 		this.port.postMessage( msg )
@@ -226,7 +250,9 @@ class MPT extends AudioWorkletProcessor {
 
 	play(buffer, paused = false) {
 		this.stop()
-		
+		this.lastStateRow = -1
+		this.lastStateOrder = -1
+
 		const maxFramesPerChunk = 128	// thats what worklet is using
 		const byteArray = new Int8Array(buffer)
 		const ptrToFile = libopenmpt._malloc(byteArray.byteLength)
@@ -275,6 +301,8 @@ class MPT extends AudioWorkletProcessor {
 			this.rightBufferPtr = 0
 		}
 		this.channels = 0
+		this.lastStateRow = -1
+		this.lastStateOrder = -1
 	}
 	meta() {
 		this.port.postMessage({cmd: 'meta', meta: this.getMeta()})

@@ -19,6 +19,19 @@ import { getToneEngine } from '@engine/ToneEngine';
 export type LibopenmptPositionCallback = (order: number, pattern: number, row: number, audioTime?: number) => void;
 
 // ---------------------------------------------------------------------------
+// Channel state types
+// ---------------------------------------------------------------------------
+
+export interface LibopenmptChannelState {
+  note: number;
+  instrument: number;
+  volume: number;       // 0-16384 (nRealVolume, post-processing)
+  frequency: number;    // Hz, after portamento/vibrato/arpeggio
+  panning: number;      // 0-256 (nRealPan)
+  active: boolean;
+}
+
+// ---------------------------------------------------------------------------
 // Engine
 // ---------------------------------------------------------------------------
 
@@ -34,6 +47,7 @@ export class LibopenmptEngine {
   private _playing = false;
   private _onPosition: LibopenmptPositionCallback | null = null;
   private _onEnded: (() => void) | null = null;
+  private _onChannelState: ((state: LibopenmptChannelState[], time: number) => void) | null = null;
   private _durationSeconds: number = 0;
 
   /** The raw Web Audio output node for routing into the stereo separation chain */
@@ -112,7 +126,7 @@ export class LibopenmptEngine {
   }
 
   private handleMessage(msg: MessageEvent): void {
-    const { cmd, order, pattern, row, chLevels, audioTime } = msg.data;
+    const { cmd, order, pattern, row, chLevels, chState, audioTime } = msg.data;
     switch (cmd) {
       case 'pos':
         if (this._playing) this._onPosition?.(order, pattern, row, audioTime);
@@ -130,6 +144,28 @@ export class LibopenmptEngine {
             // Always update realtime levels for realtime VU mode
             engine.updateRealtimeChannelLevels(chLevels);
           } catch { /* ToneEngine not ready */ }
+        }
+        if (chState && this._onChannelState) {
+          const arr = chState as Float64Array;
+          const numChannels = arr.length / 6;
+          const state: LibopenmptChannelState[] = [];
+          for (let i = 0; i < numChannels; i++) {
+            const base = i * 6;
+            state.push({
+              note: arr[base + 0],
+              instrument: arr[base + 1],
+              volume: arr[base + 2],
+              frequency: arr[base + 3],
+              panning: arr[base + 4],
+              active: arr[base + 5] !== 0,
+            });
+          }
+          const rawCtx = this.output.context as AudioContext;
+          const latency = (rawCtx as unknown as { outputLatency?: number; baseLatency?: number }).outputLatency
+            ?? (rawCtx as unknown as { baseLatency?: number }).baseLatency
+            ?? 0;
+          const time = rawCtx.currentTime + latency;
+          this._onChannelState(state, time);
         }
         break;
       case 'meta':
@@ -156,6 +192,11 @@ export class LibopenmptEngine {
   /** Set callback for song end. */
   set onEnded(cb: (() => void) | null) {
     this._onEnded = cb;
+  }
+
+  /** Set callback for per-row channel state updates (note, instrument, volume, frequency, panning, active). */
+  set onChannelState(cb: ((state: LibopenmptChannelState[], time: number) => void) | null) {
+    this._onChannelState = cb;
   }
 
   /** Duration of the loaded module in seconds (0 if unknown). */
