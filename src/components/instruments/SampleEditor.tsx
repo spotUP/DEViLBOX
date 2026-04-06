@@ -415,6 +415,23 @@ export const SampleEditor: React.FC<SampleEditorProps> = ({ instrument, onChange
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sampleUrl]);
 
+  // ─── Keep Tone.Player buffer in sync with audioBuffer ────────────
+  // After in-place edits (cut/delete/paste/reverse/normalize/etc.) the
+  // hook updates `audioBuffer` synchronously and persists a new dataUrl
+  // asynchronously. The dataUrl roundtrip can take a moment, and during
+  // that window the player would still hold the OLD buffer — meaning
+  // Play would use new offsets (audioBuffer.duration) but play old audio.
+  // Push the edited buffer straight into the existing player so playback
+  // is always in sync with the visible waveform.
+  useEffect(() => {
+    if (!audioBuffer || !playerRef.current) return;
+    try {
+      playerRef.current.buffer = new Tone.ToneAudioBuffer(audioBuffer);
+    } catch (err) {
+      console.warn('[SampleEditor] failed to sync player buffer:', err);
+    }
+  }, [audioBuffer]);
+
   // ─── Canvas draw: main waveform ──────────────────────────────────
   useEffect(() => {
     const canvas = canvasRef.current;
