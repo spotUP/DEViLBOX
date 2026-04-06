@@ -268,9 +268,20 @@ export interface FurnaceInstrumentData {
     feedback: number;
     fms?: number;
     ams?: number;
+    fms2?: number;
+    ams2?: number;
     ops?: number;
     opllPreset?: number;
     block?: number;
+    fixedDrums?: boolean;
+    kickFreq?: number;
+    snareHatFreq?: number;
+    tomTopFreq?: number;
+    x1BankSlot?: number;
+    powerNoiseOctave?: number;
+    ws?: unknown;
+    sid3?: unknown;
+    nes?: unknown;
     operators: Array<{
       enabled: boolean;
       mult: number;
@@ -290,6 +301,10 @@ export interface FurnaceInstrumentData {
       vib?: boolean;
       ws?: number;
       ssg?: number;
+      egt?: boolean;
+      kvs?: number;
+      dvb?: number;
+      dam?: number;
     }>;
   };
 

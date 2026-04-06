@@ -9,9 +9,9 @@
  */
 
 import React, { useState, useCallback, useMemo, useRef, useEffect } from 'react';
-import type { FurnaceConfig, FurnaceOperatorConfig, FurnaceMacro, FurnaceAmigaConfig, FurnaceN163Config, FurnaceFDSConfig, FurnaceESFMConfig, FurnaceESFMOperatorConfig, FurnaceMultiPCMConfig, FurnaceSoundUnitConfig, FurnaceSID2Config, FurnaceES5506Config } from '@typedefs/instrument';
+import type { FurnaceConfig, FurnaceOperatorConfig, FurnaceMacro, FurnaceAmigaConfig, FurnaceN163Config, FurnaceFDSConfig, FurnaceESFMConfig, FurnaceESFMOperatorConfig, FurnaceMultiPCMConfig, FurnaceSoundUnitConfig, FurnaceSID2Config, FurnaceES5506Config, FurnaceWaveSynthConfig, FurnaceSID3Config, FurnaceSID3Filter } from '@typedefs/instrument';
 import { Knob } from '@components/controls/Knob';
-import { Cpu, Activity, Zap, Waves, Volume2, Music, Settings, FileUp } from 'lucide-react';
+import { Cpu, Activity, Zap, Waves, Volume2, Music, Settings, FileUp, Plus, Trash2, ChevronUp, ChevronDown } from 'lucide-react';
 import { InstrumentOscilloscope } from '@components/visualization';
 import { VisualizerFrame } from '@components/visualization/VisualizerFrame';
 import { MacroListEditor } from './MacroEditor';
@@ -535,6 +535,9 @@ export const FurnaceEditor: React.FC<FurnaceEditorProps> = ({ config, instrument
         <SID2Panel config={config} onChange={pushLiveUpdate} />
       )}
 
+      {config.sid3 && (<SID3Panel config={config} onChange={pushLiveUpdate} />)}
+      {config.fixedDrums != null && (<OPLDrumPanel config={config} onChange={pushLiveUpdate} />)}
+
       {/* PSG / PULSE PANEL (for other PSG chips) */}
       {category === "PSG" && ![5, 10, 24].includes(config.chipType) && (
         <PSGPanel config={config} onChange={pushLiveUpdate} />
@@ -570,6 +573,10 @@ export const FurnaceEditor: React.FC<FurnaceEditorProps> = ({ config, instrument
             onChange={(wavetables) => onChange({ wavetables })}
           />
         </div>
+      )}
+
+      {(category === "Wavetable" || config.wavetables.length > 0 || config.ws) && (
+        <WaveSynthPanel config={config} onChange={pushLiveUpdate} />
       )}
 
       {/* MACROS PANEL (for non-FM categories) */}
@@ -972,6 +979,214 @@ const GBPanel: React.FC<{ config: FurnaceConfig; onChange: (u: Partial<FurnaceCo
           envDir={gb.envDir}
         />
       </div>
+
+      {/* HW Sequence Editor */}
+      {gb.hwSeqEnabled && (
+        <div className="col-span-1 md:col-span-2 bg-dark-bgSecondary p-4 rounded-lg border border-emerald-500/30">
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-2">
+              <Activity size={16} className="text-emerald-400" />
+              <h3 className="font-mono text-xs font-bold text-text-primary uppercase">HW Sequence Commands</h3>
+              <span className="text-[9px] text-text-muted font-mono">({(gb.hwSeq ?? []).length}/64)</span>
+            </div>
+            <button
+              onClick={() => {
+                const seq = [...(gb.hwSeq ?? [])];
+                if (seq.length < 64) {
+                  seq.push({ cmd: 0, data: 0 });
+                  updateGB({ hwSeq: seq, hwSeqLen: seq.length });
+                }
+              }}
+              disabled={(gb.hwSeq ?? []).length >= 64}
+              className="p-1 text-emerald-400 hover:text-emerald-300 disabled:text-text-muted disabled:opacity-50 transition-colors"
+              title="Add command"
+            >
+              <Plus size={14} />
+            </button>
+          </div>
+
+          {(gb.hwSeq ?? []).length === 0 ? (
+            <span className="text-[9px] text-text-muted font-mono">No commands. Click + to add.</span>
+          ) : (
+            <div className="space-y-1 max-h-64 overflow-y-auto">
+              {(gb.hwSeq ?? []).map((entry, i) => (
+                <GBHWSeqRow
+                  key={i}
+                  index={i}
+                  cmd={entry.cmd}
+                  data={entry.data}
+                  totalCount={(gb.hwSeq ?? []).length}
+                  onChange={(cmd, data) => {
+                    const seq = [...(gb.hwSeq ?? [])];
+                    seq[i] = { cmd, data };
+                    updateGB({ hwSeq: seq });
+                  }}
+                  onMoveUp={() => {
+                    if (i <= 0) return;
+                    const seq = [...(gb.hwSeq ?? [])];
+                    [seq[i - 1], seq[i]] = [seq[i], seq[i - 1]];
+                    updateGB({ hwSeq: seq });
+                  }}
+                  onMoveDown={() => {
+                    const seq = gb.hwSeq ?? [];
+                    if (i >= seq.length - 1) return;
+                    const newSeq = [...seq];
+                    [newSeq[i], newSeq[i + 1]] = [newSeq[i + 1], newSeq[i]];
+                    updateGB({ hwSeq: newSeq });
+                  }}
+                  onRemove={() => {
+                    const seq = [...(gb.hwSeq ?? [])];
+                    seq.splice(i, 1);
+                    updateGB({ hwSeq: seq, hwSeqLen: seq.length });
+                  }}
+                />
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+};
+
+// Compact numeric input helper
+const NumInput: React.FC<{
+  label: string;
+  value: number;
+  min: number;
+  max: number;
+  onChange: (v: number) => void;
+}> = ({ label, value, min, max, onChange }) => (
+  <div className="flex items-center gap-1">
+    <span className="text-[8px] text-text-muted font-mono w-8 text-right">{label}</span>
+    <input
+      type="number"
+      value={value}
+      min={min}
+      max={max}
+      onChange={(e) => onChange(Math.max(min, Math.min(max, parseInt(e.target.value) || 0)))}
+      className="w-12 bg-dark-bg border border-dark-border text-[9px] text-text-primary rounded px-1 py-0.5 text-center font-mono"
+    />
+  </div>
+);
+
+// GB HW Sequence Row — bitpacking per Furnace insEdit.cpp
+const GB_HWSEQ_CMD_NAMES = ['Envelope', 'Sweep', 'Wait', 'Wait for Release', 'Loop', 'Loop until Release'];
+
+const GBHWSeqRow: React.FC<{
+  index: number;
+  cmd: number;
+  data: number;
+  totalCount: number;
+  onChange: (cmd: number, data: number) => void;
+  onMoveUp: () => void;
+  onMoveDown: () => void;
+  onRemove: () => void;
+}> = ({ index, cmd, data, totalCount, onChange, onMoveUp, onMoveDown, onRemove }) => {
+  // Bitpacking helpers per insEdit.cpp
+  // Envelope (cmd 0): data = (len&7)|(dir?8:0)|(vol<<4)|(soundLen<<8)
+  // Sweep (cmd 1): data = (shift&7)|(dir?8:0)|(speed<<4)
+  // Wait (cmd 2): data = ticks-1
+  // Wait for Release (cmd 3): no params
+  // Loop (cmd 4): data = position
+  // Loop until Release (cmd 5): data = position
+
+  const renderParams = () => {
+    switch (cmd) {
+      case 0: { // Envelope
+        const len = data & 7;
+        const dir = (data & 8) !== 0;
+        const vol = (data >> 4) & 0xF;
+        const soundLen = (data >> 8) & 0xFF;
+        const pack = (v: number, d: boolean, l: number, s: number) =>
+          (l & 7) | (d ? 8 : 0) | ((v & 0xF) << 4) | ((s & 0xFF) << 8);
+        return (
+          <>
+            <NumInput label="Vol" value={vol} min={0} max={15}
+              onChange={(v) => onChange(cmd, pack(v, dir, len, soundLen))} />
+            <button
+              onClick={() => onChange(cmd, pack(vol, !dir, len, soundLen))}
+              className={`px-1.5 py-0.5 text-[8px] font-mono rounded border transition-colors ${
+                dir ? 'bg-emerald-600/20 border-emerald-500/50 text-emerald-400' : 'bg-rose-600/20 border-rose-500/50 text-rose-400'
+              }`}
+            >
+              {dir ? '\u2191' : '\u2193'}
+            </button>
+            <NumInput label="Len" value={len} min={0} max={7}
+              onChange={(v) => onChange(cmd, pack(vol, dir, v, soundLen))} />
+            <NumInput label="Snd" value={soundLen} min={0} max={64}
+              onChange={(v) => onChange(cmd, pack(vol, dir, len, v))} />
+          </>
+        );
+      }
+      case 1: { // Sweep
+        const shift = data & 7;
+        const dir = (data & 8) !== 0;
+        const speed = (data >> 4) & 7;
+        const pack = (sh: number, d: boolean, sp: number) =>
+          (sh & 7) | (d ? 8 : 0) | ((sp & 7) << 4);
+        return (
+          <>
+            <NumInput label="Shift" value={shift} min={0} max={7}
+              onChange={(v) => onChange(cmd, pack(v, dir, speed))} />
+            <button
+              onClick={() => onChange(cmd, pack(shift, !dir, speed))}
+              className={`px-1.5 py-0.5 text-[8px] font-mono rounded border transition-colors ${
+                dir ? 'bg-emerald-600/20 border-emerald-500/50 text-emerald-400' : 'bg-rose-600/20 border-rose-500/50 text-rose-400'
+              }`}
+            >
+              {dir ? '\u2191' : '\u2193'}
+            </button>
+            <NumInput label="Speed" value={speed} min={0} max={7}
+              onChange={(v) => onChange(cmd, pack(shift, dir, v))} />
+          </>
+        );
+      }
+      case 2: // Wait
+        return (
+          <NumInput label="Ticks" value={(data & 0xFF) + 1} min={1} max={255}
+            onChange={(v) => onChange(cmd, Math.max(0, v - 1))} />
+        );
+      case 3: // Wait for Release
+        return <span className="text-[8px] text-text-muted font-mono italic">no params</span>;
+      case 4: // Loop
+      case 5: // Loop until Release
+        return (
+          <NumInput label="Pos" value={data & 0xFF} min={0} max={totalCount - 1}
+            onChange={(v) => onChange(cmd, v)} />
+        );
+      default:
+        return null;
+    }
+  };
+
+  return (
+    <div className="flex items-center gap-1 py-0.5 px-1 rounded bg-dark-bg/50 border border-dark-border/50">
+      <span className="text-[8px] text-emerald-400 font-mono w-4 text-right">{index}</span>
+      <select
+        value={cmd}
+        onChange={(e) => onChange(parseInt(e.target.value), 0)}
+        className="bg-dark-bg border border-dark-border rounded px-1 py-0.5 text-[9px] text-text-primary font-mono"
+      >
+        {GB_HWSEQ_CMD_NAMES.map((name, i) => (
+          <option key={i} value={i}>{name}</option>
+        ))}
+      </select>
+      <div className="flex items-center gap-1 flex-1">
+        {renderParams()}
+      </div>
+      <button onClick={onMoveUp} disabled={index === 0}
+        className="p-0.5 text-text-muted hover:text-text-primary disabled:opacity-30 transition-colors">
+        <ChevronUp size={10} />
+      </button>
+      <button onClick={onMoveDown} disabled={index >= totalCount - 1}
+        className="p-0.5 text-text-muted hover:text-text-primary disabled:opacity-30 transition-colors">
+        <ChevronDown size={10} />
+      </button>
+      <button onClick={onRemove}
+        className="p-0.5 text-text-muted hover:text-rose-400 transition-colors">
+        <Trash2 size={10} />
+      </button>
     </div>
   );
 };
@@ -1061,6 +1276,389 @@ const GBEnvelopeVisualization: React.FC<{
       className="w-full rounded border border-dark-border"
       style={{ height }}
     />
+  );
+};
+
+// ============================================================================
+// WAVE SYNTH PANEL
+// ============================================================================
+
+const WAVE_SYNTH_DEFAULTS: FurnaceWaveSynthConfig = {
+  enabled: false, wave1: 0, wave2: 0, rateDivider: 1, effect: 0,
+  oneShot: false, global: true, speed: 0, param1: 0, param2: 0, param3: 0, param4: 0,
+};
+
+const WAVE_SYNTH_SINGLE_EFFECTS = ['None', 'Invert', 'Add', 'Subtract', 'Average', 'Phase', 'Chorus'];
+const WAVE_SYNTH_DUAL_EFFECTS = ['None (dual)', 'Wipe', 'Fade', 'Fade (ping-pong)', 'Overlay', 'Negative Overlay', 'Slide', 'Mix Chorus', 'Phase Modulation'];
+
+const WaveSynthPanel: React.FC<{ config: FurnaceConfig; onChange: (u: Partial<FurnaceConfig>) => void }> = ({ config, onChange }) => {
+  const ws = useMemo(() => ({ ...WAVE_SYNTH_DEFAULTS, ...config.ws }), [config.ws]);
+
+  const updateWS = useCallback((updates: Partial<FurnaceWaveSynthConfig>) => {
+    onChange({ ws: { ...config.ws, ...WAVE_SYNTH_DEFAULTS, ...updates } });
+  }, [config.ws, onChange]);
+
+  const isDual = ws.effect >= 128;
+  const effectIndex = isDual ? ws.effect - 128 : ws.effect;
+  const effectNames = isDual ? WAVE_SYNTH_DUAL_EFFECTS : WAVE_SYNTH_SINGLE_EFFECTS;
+
+  return (
+    <div className="bg-dark-bgSecondary p-4 rounded-lg border border-cyan-500/30 animate-in fade-in slide-in-from-top-2">
+      <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center gap-2">
+          <Waves size={16} className="text-cyan-400" />
+          <h3 className="font-mono text-xs font-bold text-text-primary uppercase">Wave Synth</h3>
+        </div>
+        <button
+          onClick={() => updateWS({ enabled: !ws.enabled })}
+          className={`text-[9px] font-mono px-2 py-0.5 rounded border transition-colors ${
+            ws.enabled
+              ? 'bg-cyan-600/20 border-cyan-500/50 text-cyan-400'
+              : 'bg-dark-bg border-dark-border text-text-muted'
+          }`}
+        >
+          {ws.enabled ? 'ON' : 'OFF'}
+        </button>
+      </div>
+
+      {ws.enabled && (
+        <div className="space-y-4">
+          {/* Single / Dual mode */}
+          <div className="flex items-center gap-2">
+            <span className="text-[10px] text-text-muted font-mono">Mode:</span>
+            <button
+              onClick={() => updateWS({ effect: effectIndex })}
+              className={`px-3 py-1 text-[10px] font-mono rounded border transition-colors ${
+                !isDual
+                  ? 'bg-cyan-600/20 border-cyan-500/50 text-cyan-400'
+                  : 'bg-dark-bg border-dark-border text-text-muted hover:text-text-primary'
+              }`}
+            >
+              Single
+            </button>
+            <button
+              onClick={() => updateWS({ effect: 128 + Math.min(effectIndex, WAVE_SYNTH_DUAL_EFFECTS.length - 1) })}
+              className={`px-3 py-1 text-[10px] font-mono rounded border transition-colors ${
+                isDual
+                  ? 'bg-cyan-600/20 border-cyan-500/50 text-cyan-400'
+                  : 'bg-dark-bg border-dark-border text-text-muted hover:text-text-primary'
+              }`}
+            >
+              Dual
+            </button>
+          </div>
+
+          {/* Effect selector */}
+          <div>
+            <label className="text-[10px] text-text-muted font-mono block mb-1">Effect</label>
+            <select
+              value={effectIndex}
+              onChange={(e) => {
+                const idx = parseInt(e.target.value);
+                updateWS({ effect: isDual ? 128 + idx : idx });
+              }}
+              className="bg-dark-bg border border-dark-border rounded px-2 py-1 text-xs text-text-primary w-full"
+            >
+              {effectNames.map((name, i) => (
+                <option key={i} value={i}>{name}</option>
+              ))}
+            </select>
+          </div>
+
+          {/* Wave selectors and knobs */}
+          <div className="flex flex-wrap gap-3">
+            <Knob label="WAVE 1" value={ws.wave1} min={0} max={255}
+              onChange={(v) => updateWS({ wave1: Math.round(v) })}
+              size="sm" color="#06b6d4" formatValue={(v) => String(Math.round(v))} />
+            {isDual && (
+              <Knob label="WAVE 2" value={ws.wave2} min={0} max={255}
+                onChange={(v) => updateWS({ wave2: Math.round(v) })}
+                size="sm" color="#22d3ee" formatValue={(v) => String(Math.round(v))} />
+            )}
+            <Knob label="SPEED" value={ws.speed} min={0} max={255}
+              onChange={(v) => updateWS({ speed: Math.round(v) })}
+              size="sm" color="#67e8f9" formatValue={(v) => String(Math.round(v))} />
+            <Knob label="RATE" value={ws.rateDivider} min={1} max={255}
+              onChange={(v) => updateWS({ rateDivider: Math.round(v) })}
+              size="sm" color="#a5f3fc" formatValue={(v) => String(Math.round(v))} />
+            <Knob label="AMOUNT" value={ws.param1} min={0} max={255}
+              onChange={(v) => updateWS({ param1: Math.round(v) })}
+              size="sm" color="#0891b2" formatValue={(v) => String(Math.round(v))} />
+            {isDual && ws.effect === 136 && (
+              <Knob label="POWER" value={ws.param2} min={0} max={255}
+                onChange={(v) => updateWS({ param2: Math.round(v) })}
+                size="sm" color="#0e7490" formatValue={(v) => String(Math.round(v))} />
+            )}
+          </div>
+
+          {/* Global / One-Shot */}
+          <div className="flex gap-2 pt-2 border-t border-dark-border">
+            <button
+              onClick={() => updateWS({ global: !ws.global })}
+              className={`px-2 py-1 text-[9px] font-mono rounded border transition-colors ${
+                ws.global
+                  ? 'bg-cyan-600/20 border-cyan-500/50 text-cyan-400'
+                  : 'bg-dark-bg border-dark-border text-text-muted'
+              }`}
+            >
+              Global
+            </button>
+            <button
+              onClick={() => updateWS({ oneShot: !ws.oneShot })}
+              className={`px-2 py-1 text-[9px] font-mono rounded border transition-colors ${
+                ws.oneShot
+                  ? 'bg-cyan-600/20 border-cyan-500/50 text-cyan-400'
+                  : 'bg-dark-bg border-dark-border text-text-muted'
+              }`}
+            >
+              One-Shot
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+// ============================================================================
+// SID3 PANEL
+// ============================================================================
+
+const SID3_DEFAULTS: FurnaceSID3Config = {
+  triOn: false, sawOn: false, pulseOn: false, noiseOn: false,
+  dutyIsAbs: false, a: 0, d: 0, s: 0, sr: 0, r: 0,
+  mixMode: 0, duty: 0, ringMod: false, oscSync: false, phaseMod: false,
+  specialWaveOn: false, oneBitNoise: false, separateNoisePitch: false,
+  doWavetable: false, resetDuty: false,
+  phaseModSource: 0, ringModSource: 0, syncSource: 0, specialWave: 0,
+  phaseInv: 0, feedback: 0, filters: [],
+};
+
+const SID3_FILTER_DEFAULTS: FurnaceSID3Filter = {
+  enabled: false, init: false, absoluteCutoff: false,
+  bindCutoffToNote: false, bindCutoffToNoteDir: false, bindCutoffOnNote: false,
+  bindResonanceToNote: false, bindResonanceToNoteDir: false, bindResonanceOnNote: false,
+  cutoff: 0, resonance: 0, outputVolume: 0, distortion: 0, mode: 0, filterMatrix: 0,
+  bindCutoffToNoteStrength: 0, bindCutoffToNoteCenter: 0,
+  bindResonanceToNoteStrength: 0, bindResonanceToNoteCenter: 0,
+};
+
+const SID3Panel: React.FC<{ config: FurnaceConfig; onChange: (u: Partial<FurnaceConfig>) => void }> = ({ config, onChange }) => {
+  const sid3 = useMemo(() => ({ ...SID3_DEFAULTS, ...config.sid3, filters: config.sid3?.filters ?? [] }), [config.sid3]);
+
+  const updateSID3 = useCallback((updates: Partial<FurnaceSID3Config>) => {
+    onChange({ sid3: { ...SID3_DEFAULTS, ...config.sid3, ...updates } });
+  }, [config.sid3, onChange]);
+
+  const updateFilter = useCallback((idx: number, updates: Partial<FurnaceSID3Filter>) => {
+    const filters = [...(config.sid3?.filters ?? [])];
+    filters[idx] = { ...SID3_FILTER_DEFAULTS, ...filters[idx], ...updates };
+    updateSID3({ filters });
+  }, [config.sid3, updateSID3]);
+
+  return (
+    <div className="space-y-4 animate-in fade-in slide-in-from-top-2">
+      {/* Waveform & Modulation */}
+      <div className="bg-dark-bgSecondary p-4 rounded-lg border border-violet-500/30">
+        <div className="flex items-center gap-2 mb-4">
+          <Waves size={16} className="text-violet-400" />
+          <h3 className="font-mono text-xs font-bold text-text-primary uppercase">SID3 Waveform</h3>
+        </div>
+
+        <div className="flex flex-wrap gap-2 mb-3">
+          {([
+            { key: 'triOn', label: 'TRI' },
+            { key: 'sawOn', label: 'SAW' },
+            { key: 'pulseOn', label: 'PULSE' },
+            { key: 'noiseOn', label: 'NOISE' },
+          ] as const).map(({ key, label }) => (
+            <button
+              key={key}
+              onClick={() => updateSID3({ [key]: !sid3[key] })}
+              className={`px-3 py-1 text-[10px] font-mono rounded border transition-colors ${
+                sid3[key]
+                  ? 'bg-violet-600/20 border-violet-500/50 text-violet-400'
+                  : 'bg-dark-bg border-dark-border text-text-muted hover:text-text-primary'
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+
+        <div className="flex flex-wrap gap-2">
+          {([
+            { key: 'ringMod', label: 'RING' },
+            { key: 'oscSync', label: 'SYNC' },
+            { key: 'phaseMod', label: 'PHASE MOD' },
+            { key: 'specialWaveOn', label: 'SPECIAL WAVE' },
+            { key: 'resetDuty', label: 'RESET DUTY' },
+            { key: 'oneBitNoise', label: '1-BIT NOISE' },
+            { key: 'doWavetable', label: 'WAVETABLE' },
+          ] as const).map(({ key, label }) => (
+            <button
+              key={key}
+              onClick={() => updateSID3({ [key]: !sid3[key] })}
+              className={`px-2 py-1 text-[9px] font-mono rounded border transition-colors ${
+                sid3[key]
+                  ? 'bg-violet-600/20 border-violet-500/50 text-violet-400'
+                  : 'bg-dark-bg border-dark-border text-text-muted'
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* ADSR + SR */}
+      <div className="bg-dark-bgSecondary p-4 rounded-lg border border-violet-500/30">
+        <div className="flex items-center gap-2 mb-4">
+          <Activity size={16} className="text-violet-400" />
+          <h3 className="font-mono text-xs font-bold text-text-primary uppercase">SID3 Envelope</h3>
+        </div>
+        <div className="flex flex-wrap justify-between gap-3">
+          <Knob label="A" value={sid3.a} min={0} max={255}
+            onChange={(v) => updateSID3({ a: Math.round(v) })}
+            size="md" color="#8b5cf6" formatValue={(v) => String(Math.round(v))} />
+          <Knob label="D" value={sid3.d} min={0} max={255}
+            onChange={(v) => updateSID3({ d: Math.round(v) })}
+            size="md" color="#7c3aed" formatValue={(v) => String(Math.round(v))} />
+          <Knob label="S" value={sid3.s} min={0} max={255}
+            onChange={(v) => updateSID3({ s: Math.round(v) })}
+            size="md" color="#6d28d9" formatValue={(v) => String(Math.round(v))} />
+          <Knob label="SR" value={sid3.sr} min={0} max={255}
+            onChange={(v) => updateSID3({ sr: Math.round(v) })}
+            size="md" color="#5b21b6" formatValue={(v) => String(Math.round(v))} />
+          <Knob label="R" value={sid3.r} min={0} max={255}
+            onChange={(v) => updateSID3({ r: Math.round(v) })}
+            size="md" color="#4c1d95" formatValue={(v) => String(Math.round(v))} />
+        </div>
+      </div>
+
+      {/* Duty, Mix, Feedback, Phase */}
+      <div className="bg-dark-bgSecondary p-4 rounded-lg border border-violet-500/30">
+        <div className="flex items-center gap-2 mb-4">
+          <Settings size={16} className="text-violet-400" />
+          <h3 className="font-mono text-xs font-bold text-text-primary uppercase">SID3 Controls</h3>
+        </div>
+        <div className="flex flex-wrap gap-3 mb-3">
+          <Knob label="DUTY" value={sid3.duty} min={0} max={4095}
+            onChange={(v) => updateSID3({ duty: Math.round(v) })}
+            size="sm" color="#a78bfa" formatValue={(v) => String(Math.round(v))} />
+          <Knob label="MIX" value={sid3.mixMode} min={0} max={3}
+            onChange={(v) => updateSID3({ mixMode: Math.round(v) })}
+            size="sm" color="#c4b5fd" formatValue={(v) => String(Math.round(v))} />
+          <Knob label="FB" value={sid3.feedback} min={0} max={255}
+            onChange={(v) => updateSID3({ feedback: Math.round(v) })}
+            size="sm" color="#ddd6fe" formatValue={(v) => String(Math.round(v))} />
+          <Knob label="PH INV" value={sid3.phaseInv} min={0} max={15}
+            onChange={(v) => updateSID3({ phaseInv: Math.round(v) })}
+            size="sm" color="#ede9fe" formatValue={(v) => String(Math.round(v))} />
+        </div>
+
+        {/* Modulation Sources */}
+        <div className="flex flex-wrap gap-3 pt-2 border-t border-dark-border">
+          <Knob label="PM SRC" value={sid3.phaseModSource} min={0} max={7}
+            onChange={(v) => updateSID3({ phaseModSource: Math.round(v) })}
+            size="sm" color="#8b5cf6" formatValue={(v) => String(Math.round(v))} />
+          <Knob label="RM SRC" value={sid3.ringModSource} min={0} max={7}
+            onChange={(v) => updateSID3({ ringModSource: Math.round(v) })}
+            size="sm" color="#7c3aed" formatValue={(v) => String(Math.round(v))} />
+          <Knob label="SYNC SRC" value={sid3.syncSource} min={0} max={7}
+            onChange={(v) => updateSID3({ syncSource: Math.round(v) })}
+            size="sm" color="#6d28d9" formatValue={(v) => String(Math.round(v))} />
+          <Knob label="SPCL WAVE" value={sid3.specialWave} min={0} max={255}
+            onChange={(v) => updateSID3({ specialWave: Math.round(v) })}
+            size="sm" color="#5b21b6" formatValue={(v) => String(Math.round(v))} />
+        </div>
+      </div>
+
+      {/* Filters */}
+      {sid3.filters.map((filt, idx) => {
+        const f = { ...SID3_FILTER_DEFAULTS, ...filt };
+        return (
+          <div key={idx} className="bg-dark-bgSecondary p-4 rounded-lg border border-violet-500/30">
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-2">
+                <Volume2 size={16} className="text-violet-400" />
+                <h3 className="font-mono text-xs font-bold text-text-primary uppercase">Filter {idx + 1}</h3>
+              </div>
+              <button
+                onClick={() => updateFilter(idx, { enabled: !f.enabled })}
+                className={`text-[9px] font-mono px-2 py-0.5 rounded border transition-colors ${
+                  f.enabled
+                    ? 'bg-violet-600/20 border-violet-500/50 text-violet-400'
+                    : 'bg-dark-bg border-dark-border text-text-muted'
+                }`}
+              >
+                {f.enabled ? 'ON' : 'OFF'}
+              </button>
+            </div>
+            {f.enabled && (
+              <div className="flex flex-wrap gap-3">
+                <Knob label="CUT" value={f.cutoff} min={0} max={65535}
+                  onChange={(v) => updateFilter(idx, { cutoff: Math.round(v) })}
+                  size="sm" color="#a78bfa" formatValue={(v) => String(Math.round(v))} />
+                <Knob label="RES" value={f.resonance} min={0} max={255}
+                  onChange={(v) => updateFilter(idx, { resonance: Math.round(v) })}
+                  size="sm" color="#8b5cf6" formatValue={(v) => String(Math.round(v))} />
+                <Knob label="VOL" value={f.outputVolume} min={0} max={255}
+                  onChange={(v) => updateFilter(idx, { outputVolume: Math.round(v) })}
+                  size="sm" color="#7c3aed" formatValue={(v) => String(Math.round(v))} />
+                <Knob label="DIST" value={f.distortion} min={0} max={255}
+                  onChange={(v) => updateFilter(idx, { distortion: Math.round(v) })}
+                  size="sm" color="#6d28d9" formatValue={(v) => String(Math.round(v))} />
+                <Knob label="MODE" value={f.mode} min={0} max={15}
+                  onChange={(v) => updateFilter(idx, { mode: Math.round(v) })}
+                  size="sm" color="#5b21b6" formatValue={(v) => String(Math.round(v))} />
+              </div>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+};
+
+// ============================================================================
+// OPL DRUM PANEL
+// ============================================================================
+
+const OPLDrumPanel: React.FC<{ config: FurnaceConfig; onChange: (u: Partial<FurnaceConfig>) => void }> = ({ config, onChange }) => {
+  return (
+    <div className="bg-dark-bgSecondary p-4 rounded-lg border border-amber-500/30 animate-in fade-in slide-in-from-top-2">
+      <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center gap-2">
+          <Music size={16} className="text-amber-400" />
+          <h3 className="font-mono text-xs font-bold text-text-primary uppercase">OPL Drums</h3>
+        </div>
+        <button
+          onClick={() => onChange({ fixedDrums: !config.fixedDrums })}
+          className={`text-[9px] font-mono px-2 py-0.5 rounded border transition-colors ${
+            config.fixedDrums
+              ? 'bg-amber-600/20 border-amber-500/50 text-amber-400'
+              : 'bg-dark-bg border-dark-border text-text-muted'
+          }`}
+        >
+          {config.fixedDrums ? 'FIXED ON' : 'FIXED OFF'}
+        </button>
+      </div>
+
+      {config.fixedDrums && (
+        <div className="flex flex-wrap gap-3">
+          <Knob label="KICK" value={config.kickFreq ?? 0} min={0} max={65535}
+            onChange={(v) => onChange({ kickFreq: Math.round(v) })}
+            size="md" color="#f59e0b" formatValue={(v) => String(Math.round(v))} />
+          <Knob label="SNARE/HAT" value={config.snareHatFreq ?? 0} min={0} max={65535}
+            onChange={(v) => onChange({ snareHatFreq: Math.round(v) })}
+            size="md" color="#fbbf24" formatValue={(v) => String(Math.round(v))} />
+          <Knob label="TOM/TOP" value={config.tomTopFreq ?? 0} min={0} max={65535}
+            onChange={(v) => onChange({ tomTopFreq: Math.round(v) })}
+            size="md" color="#d97706" formatValue={(v) => String(Math.round(v))} />
+        </div>
+      )}
+    </div>
   );
 };
 
