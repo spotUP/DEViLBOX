@@ -587,6 +587,10 @@ export async function startNativeEngines(
           const patLens = song.patterns.map(p => p.length);
           const order = song.songPositions;
 
+          // Also drive FormatPlaybackState so TFMX format-mode rendering scrolls
+          const { setFormatPlaybackRow, setFormatPlaybackPlaying } = await import('@/engine/FormatPlaybackState');
+          setFormatPlaybackPlaying(true);
+
           (instance as any).onPositionUpdate((update: { samplesRendered: number; songEnd: boolean }) => {
             if (update.samplesRendered == null || samplesPerRow <= 0) return;
             const absoluteRow = Math.floor(update.samplesRendered / samplesPerRow);
@@ -600,6 +604,7 @@ export async function startNativeEngines(
             }
             if (Number.isFinite(row) && Number.isFinite(position)) {
               useWasmPositionStore.getState().setPosition(row, position);
+              setFormatPlaybackRow(row);
             }
           });
           console.log(`[NativeEngineRouting] TFMXModule position sync wired`);
