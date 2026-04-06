@@ -44,6 +44,7 @@
 
 import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
 import type { InstrumentConfig } from '@/types';
+import { createSamplerInstrument } from './AmigaUtils';
 
 // ── Constants ───────────────────────────────────────────────────────────────
 
@@ -317,6 +318,7 @@ export function isJasonPageFormat(buffer: ArrayBuffer, filename?: string): boole
 export async function parseJasonPageFile(
   buffer: ArrayBuffer,
   filename: string,
+  companionFiles?: Map<string, ArrayBuffer>,
 ): Promise<TrackerSong> {
   const buf = new Uint8Array(buffer);
   const variant = detectVariant(buf);
@@ -338,25 +340,95 @@ export async function parseJasonPageFile(
     variant === 3 ? 'Raw (Format 3)' :
                     'Steve Turner (JPO)';
 
-  // ── Instrument placeholders ───────────────────────────────────────────────
-  //
-  // MI_MaxSamples = 32 (declared in InfoBuffer, line 282 of the assembly).
-  // The exact count requires emulating the 68k player init routine to walk
-  // internal data structures; we use the documented maximum as placeholders
-  // so that the TrackerSong can represent any module in this format family.
+  // ── Find companion SMP file ──────────────────────────────────────────────
+
+  let smpBuf: Uint8Array | null = null;
+  if (companionFiles) {
+    const songBase = base
+      .replace(/^jpn\./i, '').replace(/^jpnd\./i, '').replace(/^jp\./i, '')
+      .replace(/^jpo\./i, '').replace(/^jpold\./i, '')
+      .replace(/\.(jpo|jpold)$/i, '');
+    const candidates = [
+      `SMP.${songBase}`, `smp.${songBase}`,
+      `${songBase}.ins`, `${songBase}.INS`,
+    ];
+    for (const cand of candidates) {
+      for (const [key, val] of companionFiles) {
+        const keyBase = key.split('/').pop() ?? key;
+        if (keyBase.toLowerCase() === cand.toLowerCase()) {
+          smpBuf = new Uint8Array(val);
+          break;
+        }
+      }
+      if (smpBuf) break;
+    }
+  }
+
+  // ── Sample extraction (Formats 1/2: sample length table in header) ───────
 
   const instruments: InstrumentConfig[] = [];
 
-  for (let i = 0; i < MAX_SAMPLES; i++) {
-    instruments.push({
-      id: i + 1,
-      name: `Sample ${i + 1}`,
-      type: 'synth' as const,
-      synthType: 'Synth' as const,
-      effects: [],
-      volume: 0,
-      pan: 0,
-    } as InstrumentConfig);
+  if ((variant === 1 || variant === 2) && buf.length >= 0x32) {
+    // Sample table: starts at base + word[2], extends to base + word[0x30]
+    const smpTableOff = u16BE(buf, 2);
+    const songSize = u16BE(buf, 0x30);
+    const smpTableEnd = songSize;
+    const numSmpEntries = Math.min((smpTableEnd - smpTableOff) >>> 2, MAX_SAMPLES);
+
+    let smpFileOff = 0; // running offset into companion SMP file
+
+    for (let i = 0; i < numSmpEntries; i++) {
+      const entryOff = smpTableOff + i * 4;
+      if (entryOff + 4 > buf.length) break;
+      const smpLen = u32BE(buf, entryOff);
+      if (smpLen === 0) break;
+
+      // Round odd lengths up
+      const alignedLen = smpLen + (smpLen & 1);
+
+      if (smpBuf && smpFileOff + alignedLen <= smpBuf.length && alignedLen > 2) {
+        const pcm = smpBuf.slice(smpFileOff, smpFileOff + alignedLen);
+        instruments.push(
+          createSamplerInstrument(
+            i + 1,
+            `Sample ${i + 1}`,
+            pcm,
+            64,
+            8287,
+            0,     // no loop info in the sample table (player handles loops internally)
+            0,
+          ),
+        );
+      } else {
+        instruments.push({
+          id: i + 1,
+          name: `Sample ${i + 1}`,
+          type: 'synth' as const,
+          synthType: 'Synth' as const,
+          effects: [],
+          volume: 0,
+          pan: 0,
+        } as InstrumentConfig);
+      }
+
+      smpFileOff += alignedLen;
+    }
+  }
+
+  // ── Fallback: placeholder instruments ────────────────────────────────────
+
+  if (instruments.length === 0) {
+    for (let i = 0; i < MAX_SAMPLES; i++) {
+      instruments.push({
+        id: i + 1,
+        name: `Sample ${i + 1}`,
+        type: 'synth' as const,
+        synthType: 'Synth' as const,
+        effects: [],
+        volume: 0,
+        pan: 0,
+      } as InstrumentConfig);
+    }
   }
 
   // ── Empty pattern (placeholder — UADE handles actual audio) ───────────────

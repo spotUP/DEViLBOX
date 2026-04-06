@@ -425,11 +425,17 @@ export async function tryRouteFormat(
   }
 
   // ── Rob Hubbard ───────────────────────────────────────────────────────────
-  // RobHubbardParser is metadata-only (compiled 68k executable, no parseable
-  // instrument data). UADE always handles audio; native parse is not used.
+  // Compiled 68k executable. Native parser provides detection/metadata;
+  // UADE enhanced scan captures patterns from Paula DMA writes.
   if (matchesExt(filename, ['rh', 'rhp'])) {
-    const { parseUADEFile } = await import('@lib/import/formats/UADEParser');
-    return parseUADEFile(buffer, originalFileName, prefs.uade ?? 'enhanced', subsong, preScannedMeta);
+    const { isRobHubbardFormat, parseRobHubbardFile } = await import('@lib/import/formats/RobHubbardParser');
+    return withNativeThenUADE('robHubbard', ctx,
+      (buf: Uint8Array | ArrayBuffer, name: string) => {
+        const ab = buf instanceof Uint8Array ? buf.buffer as ArrayBuffer : buf as ArrayBuffer;
+        if (isRobHubbardFormat(ab, name)) return parseRobHubbardFile(ab, name);
+        return null;
+      },
+      'RobHubbardParser', { injectUADE: true });
   }
 
   // ── TFMX (Jochen Hippel) ─────────────────────────────────────────────────
@@ -677,16 +683,17 @@ export async function tryRouteFormat(
   }
 
   // ── Ben Daglish (bd.* prefix or .bd extension) ─────────────────────────
-  // Compiled 68k Amiga executable with embedded replayer. UADE plays these
-  // via the BennDaglish eagleplayer. Enhanced scan captures tick snapshots
-  // and reconstructs patterns from Paula register writes.
+  // Compiled 68k Amiga executable with embedded replayer. Native parser extracts
+  // real PCM samples; UADE enhanced scan captures patterns from Paula DMA writes.
   if (matchesExt(filename, ['bd'])) {
-    const { parseUADEFile } = await import('@lib/import/formats/UADEParser');
-    const bdFile = toUADEPrefixName(originalFileName, ['bd']);
-    const song = await parseUADEFile(buffer, bdFile, 'enhanced', subsong, preScannedMeta);
-    song.uadeEditableFileData = buffer.slice(0);
-    song.uadeEditableFileName = bdFile;
-    return song;
+    const { isBenDaglishFormat, parseBenDaglishFile } = await import('@lib/import/formats/BenDaglishParser');
+    return withNativeThenUADE('benDaglish', ctx,
+      (buf: Uint8Array | ArrayBuffer, name: string) => {
+        const ab = buf instanceof Uint8Array ? buf.buffer as ArrayBuffer : buf as ArrayBuffer;
+        if (isBenDaglishFormat(ab, name)) return parseBenDaglishFile(ab, name);
+        return null;
+      },
+      'BenDaglishParser', { injectUADE: true });
   }
 
   // ── Images Music System (.ims) ────────────────────────────────────────────
@@ -1237,8 +1244,8 @@ export async function tryRouteFormat(
 
   // ── Richard Joseph Player (.rjp, RJP.*, .sng with RJP magic) ─────────────
   // Two-file format: song data (RJP.* / *.SNG) + samples (SMP.* / *.INS).
-  // Magic: bytes[0..2]="RJP", bytes[4..7]="SMOD", bytes[12..15]=0.
-  // UADE enhanced scan reconstructs patterns from Paula register captures.
+  // Magic: bytes[0..2]="RJP", bytes[4..7]="SMOD".
+  // Native parser decodes patterns + samples; UADE handles audio.
   if (
     matchesExt(filename, ['rjp']) ||
     (matchesExt(filename, ['sng']) && buffer.byteLength >= 16 &&
@@ -1246,11 +1253,15 @@ export async function tryRouteFormat(
       new Uint8Array(buffer)[1] === 0x4a &&   // 'J'
       new Uint8Array(buffer)[2] === 0x50)     // 'P'
   ) {
-    const { parseUADEFile } = await import('@lib/import/formats/UADEParser');
-    const song = await parseUADEFile(buffer, originalFileName, 'enhanced', subsong, preScannedMeta, companionFiles);
-    song.uadeEditableFileData = buffer.slice(0);
-    song.uadeEditableFileName = originalFileName;
-    return song;
+    const { isRJPFormat, parseRJPFile } = await import('@lib/import/formats/RichardJosephParser');
+    return withNativeThenUADE('richardJoseph', ctx,
+      (buf: Uint8Array | ArrayBuffer, name: string) => {
+        if (isRJPFormat(buf instanceof Uint8Array ? buf : new Uint8Array(buf))) {
+          return parseRJPFile(buf instanceof Uint8Array ? buf.buffer as ArrayBuffer : buf as ArrayBuffer, name, companionFiles);
+        }
+        return null;
+      },
+      'RichardJosephParser', { injectUADE: true });
   }
 
   // ── ProTracker 3.6 IFF wrapper (FORM/MODL magic) ──────────────────────────
@@ -1386,14 +1397,17 @@ export async function tryRouteFormat(
   }
 
   // ── Sound Master (sm.* / sm1.* / sm2.* / sm3.* / smpro.* prefix) ───────────
-  // UADE enhanced scan reconstructs patterns from Paula register captures.
+  // Compiled 68k executable with embedded replayer. Native parser provides detection;
+  // UADE enhanced scan captures patterns from Paula DMA writes.
   if (matchesExt(filename, ['sm', 'sm1', 'sm2', 'sm3', 'smpro'])) {
-    const { parseUADEFile } = await import('@lib/import/formats/UADEParser');
-    const smFile = toUADEPrefixName(originalFileName, ['sm', 'sm1', 'sm2', 'sm3', 'smpro']);
-    const song = await parseUADEFile(buffer, smFile, 'enhanced', subsong, preScannedMeta);
-    song.uadeEditableFileData = buffer.slice(0);
-    song.uadeEditableFileName = smFile;
-    return song;
+    const { isSoundMasterFormat, parseSoundMasterFile } = await import('@lib/import/formats/SoundMasterParser');
+    return withNativeThenUADE('soundMaster', ctx,
+      (buf: Uint8Array | ArrayBuffer, name: string) => {
+        const ab = buf instanceof Uint8Array ? buf.buffer as ArrayBuffer : buf as ArrayBuffer;
+        if (isSoundMasterFormat(ab, name)) return parseSoundMasterFile(ab, name);
+        return null;
+      },
+      'SoundMasterParser', { injectUADE: true });
   }
 
   // ── ZoundMonitor (sng.* prefix OR *.sng extension) ──────────────────────────
@@ -1425,15 +1439,18 @@ export async function tryRouteFormat(
       'TCBTrackerParser', { injectUADE: true });
   }
 
-  // ── Jason Page (jpn.* / jpnd.* / jp.*) ──────────────────────────────────────
-  // Amiga 4-channel format. UADE enhanced scan reconstructs patterns.
-  if (matchesExt(filename, ['jpn', 'jpnd', 'jp'])) {
-    const { parseUADEFile } = await import('@lib/import/formats/UADEParser');
-    const jpFile = toUADEPrefixName(originalFileName, ['jpn', 'jpnd', 'jp']);
-    const song = await parseUADEFile(buffer, jpFile, 'enhanced', subsong, preScannedMeta);
-    song.uadeEditableFileData = buffer.slice(0);
-    song.uadeEditableFileName = jpFile;
-    return song;
+  // ── Jason Page (jpn.* / jpnd.* / jp.* / jpo.* / jpold.*) ──────────────────
+  // Two-file format: song data (JPN.*) + samples (SMP.*). Native parser extracts
+  // real PCM samples from companion file; UADE enhanced scan captures patterns.
+  if (matchesExt(filename, ['jpn', 'jpnd', 'jp', 'jpo', 'jpold'])) {
+    const { isJasonPageFormat, parseJasonPageFile } = await import('@lib/import/formats/JasonPageParser');
+    return withNativeThenUADE('jasonPage', ctx,
+      (buf: Uint8Array | ArrayBuffer, name: string) => {
+        const ab = buf instanceof Uint8Array ? buf.buffer as ArrayBuffer : buf as ArrayBuffer;
+        if (isJasonPageFormat(ab, name)) return parseJasonPageFile(ab, name, companionFiles);
+        return null;
+      },
+      'JasonPageParser', { injectUADE: true });
   }
 
 
@@ -1581,14 +1598,18 @@ export async function tryRouteFormat(
   }
 
   // ── Sean Conran (SCR.* prefix) ───────────────────────────────────────────
-  // Compiled 68k Amiga music. UADE enhanced scan reconstructs patterns.
+  // Compiled 68k Amiga music. Native parser provides detection/metadata;
+  // UADE enhanced scan captures patterns from Paula DMA writes.
   if (matchesExt(filename, ['scr'])) {
-    const { parseUADEFile } = await import('@lib/import/formats/UADEParser');
-    const scrFile = toUADEPrefixName(originalFileName, ['scr']);
-    const song = await parseUADEFile(buffer, scrFile, 'enhanced', subsong, preScannedMeta);
-    song.uadeEditableFileData = buffer.slice(0);
-    song.uadeEditableFileName = scrFile;
-    return song;
+    const { isSeanConranFormat, parseSeanConranFile } = await import('@lib/import/formats/SeanConranParser');
+    return withNativeThenUADE('seanConran', ctx,
+      (buf: Uint8Array | ArrayBuffer, name: string) => {
+        const u8 = buf instanceof Uint8Array ? buf : new Uint8Array(buf);
+        const ab = buf instanceof Uint8Array ? buf.buffer as ArrayBuffer : buf as ArrayBuffer;
+        if (isSeanConranFormat(u8)) return parseSeanConranFile(ab, name);
+        return null;
+      },
+      'SeanConranParser', { injectUADE: true });
   }
 
   // ── Thomas Hermann (THM.* prefix) ────────────────────────────────────────
@@ -2177,12 +2198,16 @@ export async function tryRouteFormat(
   }
 
   // ── Fred Gray (gray.* prefix) ────────────────────────────────────────────
-  // eagleplayer.conf: FredGray  prefixes=gray
-  // Magic: "FREDGRAY" at byte offset 0x24.
-  // Use UADE enhanced scan for pattern/instrument extraction + audio.
+  // HUNK executable with "FREDGRAY" magic. Native parser provides detection;
+  // UADE enhanced scan captures patterns from Paula DMA writes.
   if (matchesExt(filename, ['gray'])) {
-    const { parseUADEFile } = await import('@lib/import/formats/UADEParser');
-    return parseUADEFile(buffer, toUADEPrefixName(originalFileName, ['gray']), prefs.uade ?? 'enhanced', subsong, preScannedMeta);
+    const { isFredGrayFormat, parseFredGrayFile } = await import('@lib/import/formats/FredGrayParser');
+    return withNativeThenUADE('fredGray', ctx,
+      (buf: Uint8Array | ArrayBuffer, name: string) => {
+        if (isFredGrayFormat(buf, name)) return parseFredGrayFile(buf instanceof Uint8Array ? buf.buffer as ArrayBuffer : buf as ArrayBuffer, name);
+        return null;
+      },
+      'FredGrayParser', { injectUADE: true });
   }
 
   // ── Jason Brooke (jcbo.* / jcb.* / jb.* prefix) ─────────────────────────
