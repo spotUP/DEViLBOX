@@ -81,14 +81,14 @@ set_target_properties(TFMX PROPERTIES
 
 target_link_options(TFMX PRIVATE
   -sWASM=1
-  -sEXPORTED_FUNCTIONS=['_tfmx_init','_tfmx_dispose','_tfmx_create_player','_tfmx_destroy_player','_tfmx_load_instrument','_tfmx_note_on','_tfmx_note_off','_tfmx_render','_tfmx_set_param','_tfmx_get_param','_malloc','_free']
-  -sEXPORTED_RUNTIME_METHODS=['cwrap','getValue','HEAPF32','HEAPU8']
+  -sEXPORTED_FUNCTIONS=['_tfmx_init','_tfmx_dispose','_tfmx_create_player','_tfmx_destroy_player','_tfmx_load_instrument','_tfmx_note_on','_tfmx_note_off','_tfmx_render','_tfmx_set_param','_tfmx_get_param','_tfmx_load_module','_tfmx_module_render','_tfmx_module_stop','_tfmx_module_songs','_tfmx_module_duration','_tfmx_module_voice_volume','_tfmx_module_voices','_tfmx_module_mute_voice','_tfmx_module_song_end','_tfmx_get_samples_rendered','_malloc','_free']
+  -sEXPORTED_RUNTIME_METHODS=['cwrap','getValue','HEAPF32','HEAPU8','stringToUTF8']
   -sMODULARIZE=1
   -sEXPORT_NAME='createTFMX'
   -sALLOW_MEMORY_GROWTH=1
   -sINITIAL_MEMORY=16777216
   -sSINGLE_FILE=0
-  -sNO_FILESYSTEM=1
+  -sFORCE_FILESYSTEM=1
   -sENVIRONMENT=web,worker
   -sASSERTIONS=0
 )
