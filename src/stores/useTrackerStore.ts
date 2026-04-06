@@ -17,6 +17,7 @@ import { getTrackerReplayer } from '@engine/TrackerReplayer';
 import { useTransportStore } from './useTransportStore';
 import { idGenerator } from '../utils/idGenerator';
 import { DEFAULT_PATTERN_LENGTH, DEFAULT_NUM_CHANNELS, MAX_PATTERN_LENGTH, MAX_CHANNELS, MIN_CHANNELS, MIN_PATTERN_LENGTH } from '../constants/trackerConstants';
+import { checkFormatViolation, getActiveFormatLimits } from '@/lib/formatCompatibility';
 import { SYSTEM_PRESETS, DivChanType } from '../constants/systemPresets';
 import { useHistoryStore } from './useHistoryStore';
 import { useCursorStore } from './useCursorStore';
@@ -1225,7 +1226,15 @@ export const useTrackerStore = create<TrackerStore>()(
       useHistoryStore.getState().pushAction('JOIN_PATTERNS', 'Join patterns', currentPatternIndex, beforeCurrent, get().patterns[currentPatternIndex]);
     },
 
-    addPattern: (length = DEFAULT_PATTERN_LENGTH) =>
+    addPattern: (length = DEFAULT_PATTERN_LENGTH) => {
+      const patCount = get().patterns.length;
+      const limits = getActiveFormatLimits();
+      if (limits && patCount >= limits.maxPatterns) {
+        void checkFormatViolation('patternCount',
+          `Adding pattern ${patCount + 1} exceeds ${limits.name} limit of ${limits.maxPatterns} patterns.`,
+        ).then((ok) => { if (ok) get().addPattern(length); });
+        return;
+      }
       set((state) => {
         const numChannels = state.patterns[0]?.channels.length || DEFAULT_NUM_CHANNELS;
         state.patterns.push(createEmptyPattern(length, numChannels));
@@ -1235,7 +1244,8 @@ export const useTrackerStore = create<TrackerStore>()(
             useUIStore.getState().setStatusMessage('PATTERN ADDED');
           });
         }
-      }),
+      });
+    },
 
     deletePattern: (index) =>
       set((state) => {
@@ -1280,7 +1290,14 @@ export const useTrackerStore = create<TrackerStore>()(
         }
       }),
 
-    resizePattern: (index, newLength) =>
+    resizePattern: (index, newLength) => {
+      const limits = getActiveFormatLimits();
+      if (limits && newLength > limits.maxPatternLength) {
+        void checkFormatViolation('patternLength',
+          `Resizing to ${newLength} rows exceeds ${limits.name} limit of ${limits.maxPatternLength} rows.`,
+        ).then((ok) => { if (ok) get().resizePattern(index, newLength); });
+        return;
+      }
       set((state) => {
         if (index >= 0 && index < state.patterns.length && newLength > 0) {
           const pattern = state.patterns[index];
@@ -1299,7 +1316,8 @@ export const useTrackerStore = create<TrackerStore>()(
             }
           });
         }
-      }),
+      });
+    },
 
     resizeAllPatterns: (newLength) =>
       set((state) => {
@@ -1436,7 +1454,16 @@ export const useTrackerStore = create<TrackerStore>()(
     //   }),
 
     // Channel management
-    addChannel: () =>
+    addChannel: () => {
+      // Format compat: check channel count
+      const currentChannels = get().patterns[0]?.channels.length ?? 0;
+      const limits = getActiveFormatLimits();
+      if (limits && currentChannels >= limits.maxChannels) {
+        void checkFormatViolation('channelCount',
+          `Adding channel ${currentChannels + 1} exceeds ${limits.name} limit of ${limits.maxChannels} channels.`,
+        ).then((ok) => { if (ok) get().addChannel(); });
+        return;
+      }
       set((state) => {
         // Use the scheme-specific maxChannels, falling back to global MAX_CHANNELS
         const behaviorMax = useEditorStore.getState().activeBehavior.maxChannels;
@@ -1480,7 +1507,8 @@ export const useTrackerStore = create<TrackerStore>()(
             useUIStore.getState().setStatusMessage('CHANNEL ADDED');
           });
         }
-      }),
+      });
+    },
 
     removeChannel: (channelIndex) =>
       set((state) => {
@@ -1878,7 +1906,15 @@ export const useTrackerStore = create<TrackerStore>()(
       }),
 
     // FT2: Pattern Order List management
-    addToOrder: (patternIndex, position) =>
+    addToOrder: (patternIndex, position) => {
+      const orderLen = get().patternOrder.length;
+      const limits = getActiveFormatLimits();
+      if (limits && orderLen >= limits.maxPositions) {
+        void checkFormatViolation('positionCount',
+          `Adding position ${orderLen + 1} exceeds ${limits.name} limit of ${limits.maxPositions} positions.`,
+        ).then((ok) => { if (ok) get().addToOrder(patternIndex, position); });
+        return;
+      }
       set((state) => {
         if (patternIndex >= 0 && patternIndex < state.patterns.length) {
           if (position !== undefined && position >= 0 && position <= state.patternOrder.length) {
@@ -1887,7 +1923,8 @@ export const useTrackerStore = create<TrackerStore>()(
             state.patternOrder.push(patternIndex);
           }
         }
-      }),
+      });
+    },
 
     removeFromOrder: (positionIndex) =>
       set((state) => {
