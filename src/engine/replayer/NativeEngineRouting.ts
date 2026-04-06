@@ -818,6 +818,8 @@ export function stopNativeEngines(
   routedNativeEngines: Set<string>,
   c64SidEngine: C64SIDEngine | null,
 ): C64SIDEngine | null {
+  // Save running keys before clearing (needed for async engine stop below)
+  const wasRunning = new Set(_runningEngineKeys);
   // Clear the running engine guard so next play() can start fresh
   _runningEngineKeys.clear();
 
@@ -846,9 +848,13 @@ export function stopNativeEngines(
       if (ref) {
         try { if (ref.hasInstance()) ref.getInstance().stop(); } catch { /* ignored */ }
       }
-      // If not synchronously resolvable, skip — startNativeEngines' loadTune()
-      // calls _jc_stop() internally, and an async stop() here would race with
-      // the subsequent play(), killing the engine after it's already restarted.
+      // If not synchronously resolvable but was started this session, stop via
+      // cached dynamic resolver. This handles TFMXModule and other dynamicResolver engines.
+      if (!ref && desc.dynamicResolver && wasRunning.has(desc.key)) {
+        desc.dynamicResolver().then(cls => {
+          try { if (cls.hasInstance()) cls.getInstance().stop(); } catch { /* ignored */ }
+        }).catch(() => {});
+      }
     }
   }
 
