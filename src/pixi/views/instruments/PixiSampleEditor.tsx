@@ -55,6 +55,53 @@ export const PixiSampleEditor: React.FC<PixiSampleEditorProps> = ({
   // ── Spectrum Filter panel ─────────────────────────────────────────────
   const [showSpectrumFilter, setShowSpectrumFilter] = useState(false);
 
+  // ── Mic recording ─────────────────────────────────────────────────────
+  const [isRecordingMic, setIsRecordingMic] = useState(false);
+  const [micElapsed, setMicElapsed] = useState(0);
+  const micTimerRef = useRef<number | null>(null);
+
+  const handleToggleRecord = useCallback(async () => {
+    const { getAudioInputManager } = await import('@engine/AudioInputManager');
+    const mgr = getAudioInputManager();
+
+    if (isRecordingMic) {
+      // Stop
+      if (micTimerRef.current) { clearInterval(micTimerRef.current); micTimerRef.current = null; }
+      setIsRecordingMic(false);
+      mgr.setMonitoring(false);
+      const buf = await mgr.stopRecording();
+      if (buf) {
+        const dataUrl = await bufferToDataUrl(buf);
+        setAudioBuffer(buf);
+        updateInstrument(instrument.id, {
+          parameters: {
+            ...(instrument.parameters as Record<string, unknown>),
+            sampleUrl: dataUrl,
+            sampleInfo: { name: 'Recording', duration: buf.duration, size: 0 },
+            startTime: 0, endTime: 1, loopStart: 0, loopEnd: 1,
+          },
+          sample: instrument.sample ? { ...instrument.sample, url: dataUrl } : undefined,
+        });
+      }
+    } else {
+      // Start
+      if (!mgr.isConnected()) {
+        const ok = await mgr.selectDevice();
+        if (!ok) return;
+      }
+      mgr.setMonitoring(true);
+      mgr.startRecording();
+      setIsRecordingMic(true);
+      setMicElapsed(0);
+      const start = Date.now();
+      micTimerRef.current = window.setInterval(() => setMicElapsed((Date.now() - start) / 1000), 100);
+    }
+  }, [isRecordingMic, instrument, updateInstrument]);
+
+  useEffect(() => {
+    return () => { if (micTimerRef.current) clearInterval(micTimerRef.current); };
+  }, []);
+
   // ── Persist processed buffer to instrument store ─────────────────────
   const handleBufferProcessed = useCallback(async (buf: AudioBuffer, prefix: string) => {
     setAudioBuffer(buf);
@@ -391,6 +438,15 @@ export const PixiSampleEditor: React.FC<PixiSampleEditorProps> = ({
           disabled={!audioBuffer}
           onClick={() => setShowBeatSync(true)}
           tooltip="Fit sample to tracker rows"
+        />
+
+        {/* Record from mic */}
+        <PixiButton
+          label={isRecordingMic ? `REC ${micElapsed.toFixed(1)}s` : 'Rec'}
+          variant={isRecordingMic ? 'danger' : 'ghost'}
+          size="sm"
+          onClick={handleToggleRecord}
+          tooltip={isRecordingMic ? 'Stop recording' : 'Record from microphone'}
         />
 
         {/* Spectrum Filter button */}
