@@ -16,14 +16,14 @@
  * - Supports Sampler, Player, and GranularSynth instruments
  */
 
-import React, { useRef, useCallback, useEffect, useMemo } from 'react';
+import React, { useRef, useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Upload, Trash2, Music, Play, Square, AlertCircle,
   ZoomIn, ZoomOut, Sparkles, Wand2, RefreshCcw, Zap,
   Scissors, Copy, ClipboardPaste, Crop, VolumeX, Volume2, Volume1,
   Undo2, Redo2, Eye, Download,
   ArrowLeft, ArrowRight, Maximize2, FlipHorizontal,
-  Activity, Waves, Clock, Filter
+  Activity, Waves, Clock, Filter, Mic, CircleDot
 } from 'lucide-react';
 import { useInstrumentStore, useTrackerStore } from '../../stores';
 import { scan9xxOffsets } from '@/lib/analysis/scan9xxOffsets';
@@ -1177,6 +1177,20 @@ export const SampleEditor: React.FC<SampleEditorProps> = ({ instrument, onChange
             >
               <Trash2 size={14} />
             </button>
+            <RecordButton instrumentId={instrument.id} onRecorded={(dataUrl, duration) => {
+              const updates: Partial<InstrumentConfig> = {
+                parameters: {
+                  ...instrument.parameters,
+                  sampleUrl: dataUrl,
+                  sampleInfo: { name: 'Recording', duration, size: 0 },
+                  startTime: 0, endTime: 1, loopStart: 0, loopEnd: 1,
+                },
+              };
+              if (instrument.sample) updates.sample = { ...instrument.sample, url: dataUrl };
+              updateInstrument(instrument.id, updates);
+              clearSelection();
+              showAll();
+            }} />
 
             <div className="w-px h-6 bg-dark-border mx-1" />
 
@@ -1484,5 +1498,92 @@ export const SampleEditor: React.FC<SampleEditorProps> = ({ instrument, onChange
         }}
       />
     </div>
+  );
+};
+
+/** Compact mic recording button with level meter and device selector */
+const RecordButton: React.FC<{
+  instrumentId: number;
+  onRecorded: (dataUrl: string, duration: number) => void;
+}> = ({ onRecorded }) => {
+  const [recording, setRecording] = useState(false);
+  const [connected, setConnected] = useState(false);
+  const [level, setLevel] = useState(0);
+  const [elapsed, setElapsed] = useState(0);
+  const timerRef = useRef<number | null>(null);
+  const meterRef = useRef<number | null>(null);
+
+  const startRecording = useCallback(async () => {
+    const { getAudioInputManager } = await import('@engine/AudioInputManager');
+    const mgr = getAudioInputManager();
+    if (!mgr.isConnected()) {
+      const ok = await mgr.selectDevice();
+      if (!ok) return;
+      setConnected(true);
+    }
+    mgr.setMonitoring(true);
+    mgr.startRecording();
+    setRecording(true);
+    setElapsed(0);
+    const start = Date.now();
+    timerRef.current = window.setInterval(() => setElapsed((Date.now() - start) / 1000), 100);
+    meterRef.current = window.setInterval(() => setLevel(mgr.getInputLevel()), 50);
+  }, []);
+
+  const stopRecording = useCallback(async () => {
+    if (timerRef.current) { clearInterval(timerRef.current); timerRef.current = null; }
+    if (meterRef.current) { clearInterval(meterRef.current); meterRef.current = null; }
+    setRecording(false);
+    setLevel(0);
+
+    const { getAudioInputManager } = await import('@engine/AudioInputManager');
+    const mgr = getAudioInputManager();
+    mgr.setMonitoring(false);
+    const buffer = await mgr.stopRecording();
+    if (buffer) {
+      const { bufferToDataUrl } = await import('@utils/audio/SampleProcessing');
+      const dataUrl = await bufferToDataUrl(buffer);
+      onRecorded(dataUrl, buffer.duration);
+    }
+  }, [onRecorded]);
+
+  useEffect(() => {
+    return () => {
+      if (timerRef.current) clearInterval(timerRef.current);
+      if (meterRef.current) clearInterval(meterRef.current);
+    };
+  }, []);
+
+  if (recording) {
+    return (
+      <div className="flex items-center gap-1.5">
+        <button
+          onClick={stopRecording}
+          className="flex items-center gap-1 px-2 py-1.5 bg-accent-error/30 text-accent-error rounded hover:bg-accent-error/40 transition-colors text-xs animate-pulse"
+          title="Stop recording"
+        >
+          <CircleDot size={12} />
+          {elapsed.toFixed(1)}s
+        </button>
+        <div className="w-12 h-3 bg-dark-bg rounded overflow-hidden border border-dark-border">
+          <div
+            className="h-full bg-accent-error transition-all"
+            style={{ width: `${Math.min(100, level * 300)}%` }}
+          />
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <button
+      onClick={startRecording}
+      className={`p-1.5 rounded transition-colors ${
+        connected ? 'bg-accent-error/20 text-accent-error' : 'bg-dark-bgSecondary text-text-muted hover:text-accent-error'
+      }`}
+      title="Record from microphone"
+    >
+      <Mic size={14} />
+    </button>
   );
 };
