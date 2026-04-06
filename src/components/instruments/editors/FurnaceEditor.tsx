@@ -2254,8 +2254,4 @@ function isOperatorCarrier(algorithm: number, opIndex: number): boolean {
   return carrierMap[algorithm]?.includes(opIndex) ?? false;
 }
 
-const OPLL_PRESETS = [
-  'Custom', 'Violin', 'Guitar', 'Piano', 'Flute',
-  'Clarinet', 'Oboe', 'Trumpet', 'Organ', 'Horn',
-  'Synth', 'Harpsichord', 'Vibraphone', 'Synth Bass', 'Wood Bass', 'Electric Bass'
-];
+// OPLL hardware presets moved to factory presets (src/constants/furnacePresets.ts)
