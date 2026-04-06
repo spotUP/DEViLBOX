@@ -40,8 +40,8 @@ import type { CursorPosition, BlockSelection } from '@typedefs';
 // ─── Layout constants (must match PatternEditorCanvas + PixiPatternEditor) ───
 const CHAR_WIDTH = 10;
 const LINE_NUMBER_WIDTH = 40;
-export const AUTOMATION_LANE_WIDTH = 28; // base width for a single automation lane
-export const AUTOMATION_LANE_MIN = 12; // minimum per-lane width when multiple lanes share space
+export const AUTOMATION_LANE_WIDTH = 56; // base width for a single automation lane
+export const AUTOMATION_LANE_MIN = 24; // minimum per-lane width when multiple lanes share space
 
 // ─── Hook ─────────────────────────────────────────────────────────────────────
 

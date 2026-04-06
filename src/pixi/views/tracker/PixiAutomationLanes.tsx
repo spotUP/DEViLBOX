@@ -16,7 +16,7 @@ import type { SynthType } from '@typedefs/instrument';
 
 import { AUTOMATION_LANE_WIDTH, AUTOMATION_LANE_MIN } from '@hooks/views/usePatternEditor';
 
-const LANE_WIDTH = 24;
+const LANE_WIDTH = 48;
 
 /** Map NKS section to a hex color for Pixi rendering */
 function sectionToHex(section: string): number {
