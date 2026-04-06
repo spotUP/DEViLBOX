@@ -120,6 +120,8 @@ export interface GTUltraState {
   jamMode: boolean;
   clipboardInstrument: number; // for instrument copy/paste
   mutedChannels: Set<number>;  // muted channel indices
+  orderClipboard: Uint8Array | null; // for order list track copy/paste
+  autoAdvanceMode: 'note' | 'all' | 'off'; // advance mode after entry
 
   // Instrument data (read from WASM or default)
   instrumentData: GTInstrumentView[];
@@ -176,6 +178,8 @@ export interface GTUltraState {
   setJamMode: (jam: boolean) => void;
   setClipboardInstrument: (inst: number) => void;
   toggleChannelMute: (ch: number) => void;
+  setOrderClipboard: (data: Uint8Array | null) => void;
+  cycleAutoAdvanceMode: () => void;
   setCurrentSong: (song: number) => void;
   setOrderCursor: (idx: number) => void;
   setOrderChannelCol: (col: number) => void;
@@ -271,6 +275,8 @@ export const useGTUltraStore = create<GTUltraState>()((set, get) => ({
   jamMode: false,
   clipboardInstrument: 0,
   mutedChannels: new Set<number>(),
+  orderClipboard: null,
+  autoAdvanceMode: 'all' as const,
 
   // Data
   instrumentData: defaultInstruments,
@@ -400,6 +406,12 @@ export const useGTUltraStore = create<GTUltraState>()((set, get) => ({
     const mutedChannels = new Set(s.mutedChannels);
     if (mutedChannels.has(ch)) mutedChannels.delete(ch); else mutedChannels.add(ch);
     return { mutedChannels };
+  }),
+  setOrderClipboard: (orderClipboard) => set({ orderClipboard }),
+  cycleAutoAdvanceMode: () => set((s) => {
+    const modes: Array<'note' | 'all' | 'off'> = ['note', 'all', 'off'];
+    const idx = modes.indexOf(s.autoAdvanceMode);
+    return { autoAdvanceMode: modes[(idx + 1) % 3] };
   }),
   setCurrentSong: (currentSong) => set({ currentSong: Math.max(0, Math.min(31, currentSong)) }),
   setOrderCursor: (orderCursor) => set({ orderCursor }),
