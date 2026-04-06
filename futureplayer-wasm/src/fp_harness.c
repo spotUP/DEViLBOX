@@ -20,6 +20,7 @@
 #endif
 
 static uint8_t* module_copy = NULL;
+static uint32_t module_size = 0;
 static int initialized = 0;
 
 /* Forward declarations for shadow array */
@@ -37,11 +38,12 @@ static int frames_per_tick = 563;
 static int frame_counter = 0;
 
 EXPORT int fp_wasm_init(const uint8_t* data, uint32_t size) {
-    if (module_copy) { free(module_copy); module_copy = NULL; }
+    if (module_copy) { free(module_copy); module_copy = NULL; module_size = 0; }
 
     module_copy = (uint8_t*)malloc(size);
     if (!module_copy) return -1;
     memcpy(module_copy, data, size);
+    module_size = size;
 
     paula_reset();
 
@@ -49,6 +51,7 @@ EXPORT int fp_wasm_init(const uint8_t* data, uint32_t size) {
     if (ret != 0) {
         free(module_copy);
         module_copy = NULL;
+        module_size = 0;
         return -1;
     }
 
@@ -91,7 +94,7 @@ EXPORT int fp_wasm_render(float* buffer, int frames) {
 EXPORT void fp_wasm_stop(void) {
     fp_stop();
     initialized = 0;
-    if (module_copy) { free(module_copy); module_copy = NULL; }
+    if (module_copy) { free(module_copy); module_copy = NULL; module_size = 0; }
 }
 
 EXPORT void fp_wasm_get_channel_levels(float *out4) {
@@ -452,4 +455,39 @@ EXPORT void fp_wasm_set_cell(int voice, int row, int note, int instrument, int e
     shadow[voice][row].instrument = (uint8_t)instrument;
     shadow[voice][row].effect = (uint8_t)effect;
     shadow[voice][row].param = (uint8_t)param;
+}
+
+/* ── Live module byte read/write ───────────────────────────────────────────
+ *
+ * The Future Player engine doesn't have a chip-RAM-style memory window, but
+ * `module_copy` (the writable buffer fp_init runs against) IS the module's
+ * working storage. Patching a byte here takes effect on the next instrument
+ * trigger because update_audio() reads parameters fresh from the detail
+ * struct via mod_base[detailPtr + offset] every tick.
+ *
+ * Used by FuturePlayerControls to live-edit instrument envelope/modulation
+ * parameters from the editor — same UX as the TFMX/SonicArranger editors.
+ */
+
+EXPORT uint32_t fp_wasm_get_module_size(void) {
+    return module_size;
+}
+
+EXPORT int fp_wasm_read_byte(uint32_t addr) {
+    if (!module_copy || addr >= module_size) return -1;
+    return module_copy[addr];
+}
+
+EXPORT int fp_wasm_write_byte(uint32_t addr, int value) {
+    if (!module_copy || addr >= module_size) return -1;
+    module_copy[addr] = (uint8_t)(value & 0xFF);
+    return 0;
+}
+
+/* Bulk byte write — fewer cwrap roundtrips for blocks of params */
+EXPORT int fp_wasm_write_bytes(uint32_t addr, const uint8_t* data, uint32_t length) {
+    if (!module_copy || addr >= module_size) return -1;
+    if (addr + length > module_size) length = module_size - addr;
+    memcpy(module_copy + addr, data, length);
+    return (int)length;
 }

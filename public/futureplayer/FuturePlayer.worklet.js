@@ -132,6 +132,26 @@ class FuturePlayerProcessor extends AudioWorkletProcessor {
         break;
       }
 
+      case 'write-byte': {
+        // Live edit a single byte in the loaded module buffer. Used by
+        // FuturePlayerControls to push instrument parameter changes to the
+        // running WASM. fp_wasm_write_byte returns -1 on out-of-range.
+        if (!this.wasm || !this.tuneLoaded) break;
+        this.wasm._fp_wasm_write_byte(data.addr | 0, data.value & 0xFF);
+        break;
+      }
+
+      case 'write-bytes': {
+        // Bulk variant — copies a Uint8Array via heap malloc/free.
+        if (!this.wasm || !this.tuneLoaded || !data.bytes) break;
+        const bytes = data.bytes instanceof Uint8Array ? data.bytes : new Uint8Array(data.bytes);
+        const ptr = this.wasm._malloc(bytes.byteLength);
+        this.wasm.HEAPU8.set(bytes, ptr);
+        this.wasm._fp_wasm_write_bytes(data.addr | 0, ptr, bytes.byteLength);
+        this.wasm._free(ptr);
+        break;
+      }
+
       case 'get-voice-lengths': {
         if (!this.wasm || !this.tuneLoaded) break;
         const lengths = [];

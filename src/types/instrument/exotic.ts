@@ -583,6 +583,15 @@ export interface FuturePlayerConfig {
   hasSampleMod2: boolean;
   /** PCM sample size in bytes (0 for wavetable instruments) */
   sampleSize: number;
+  /**
+   * Absolute byte offset of this instrument's "detail" struct inside the
+   * loaded module buffer. The editor uses this to compute write addresses
+   * (detailPtr + 0x12 = attackRate, detailPtr + 0x13 = attackPeak, etc.)
+   * for `FuturePlayerEngine.writeByte()` so knob changes take effect on
+   * the next note trigger. Undefined if the parser couldn't locate the
+   * detail struct (returns the basic-config fallback path).
+   */
+  detailPtr?: number;
 }
 
 /**
