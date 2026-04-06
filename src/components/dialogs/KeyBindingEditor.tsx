@@ -218,7 +218,7 @@ export const KeyBindingEditor: React.FC<KeyBindingEditorProps> = ({ platform }) 
             {filtered.map(([combo, cmd]) => (
               <tr
                 key={combo}
-                className={`border-b border-ft2-border/30 hover:bg-ft2-header/30 ${
+                className={`border-b border-ft2-border hover:bg-ft2-header/30 ${
                   rebindingCommand === cmd ? 'bg-ft2-cursor/20' : ''
                 }`}
               >
