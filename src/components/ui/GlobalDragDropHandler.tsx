@@ -142,9 +142,17 @@ export const GlobalDragDropHandler: React.FC<GlobalDragDropHandlerProps> = ({
         return;
       }
 
-      // For multi-file formats (e.g. TFMX mdat.* + smpl.*), load without companion.
-      // Companion auto-discovery happens server-side (MCP) or via folder/multi-file drop.
-      // No native file picker — it breaks server-loaded content.
+      // Multi-file formats: if companion files were dropped together, pass them along.
+      // e.g. mdat.songname + smpl.songname dropped together → use smpl as companion.
+      const companions = files.filter(f => f !== file);
+      if (companions.length > 0 && onFolderLoadedRef.current) {
+        try {
+          await onFolderLoadedRef.current(file, companions);
+          return;
+        } catch (err) {
+          console.error('[DragDrop] Failed to load with companions:', err);
+        }
+      }
 
       try {
         await onFileLoadedRef.current(file);
