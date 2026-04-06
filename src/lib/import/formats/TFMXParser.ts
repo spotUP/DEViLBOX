@@ -63,7 +63,7 @@ const TFMX_MACRO_PTR_UNPACKED = 0x600;
 const TFMX_TRACKSTEP_ENTRY_SIZE = 16;
 const TFMX_TRACK_END = 0xFF;
 const TFMX_TRACK_HOLD = 0x80;
-const NUM_CHANNELS = 4;
+const NUM_CHANNELS = 8;
 const MAX_PATTERN_POINTERS = 128;
 const MAX_COMMANDS_PER_PATTERN = 512;
 
@@ -563,7 +563,7 @@ export function parseTFMXFile(
         solo:         false,
         collapsed:    false,
         volume:       100,
-        pan:          (ch === 0 || ch === 3) ? -50 : 50,
+        pan:          [-50, 50, 50, -50, -50, 50, 50, -50][ch] ?? 0,
         instrumentId: null,
         color:        null,
         rows,
@@ -596,7 +596,7 @@ export function parseTFMXFile(
         solo:         false,
         collapsed:    false,
         volume:       100,
-        pan:          (ch === 0 || ch === 3) ? -50 : 50,
+        pan:          [-50, 50, 50, -50, -50, 50, 50, -50][ch] ?? 0,
         instrumentId: null,
         color:        null,
         rows:         [...emptyRows],
