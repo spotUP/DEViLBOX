@@ -136,6 +136,7 @@ const DigMugControls = lazy(() => import('../controls/DigMugControls').then(m =>
 const FCControls = lazy(() => import('../controls/FCControls').then(m => ({ default: m.FCControls })));
 const FredControls = lazy(() => import('../controls/FredControls').then(m => ({ default: m.FredControls })));
 const TFMXControls = lazy(() => import('../controls/TFMXControls').then(m => ({ default: m.TFMXControls })));
+const TFMXMacroEditor = lazy(() => import('../../tfmx/TFMXMacroEditor').then(m => ({ default: m.TFMXMacroEditor })));
 const OctaMEDControls = lazy(() => import('../controls/OctaMEDControls').then(m => ({ default: m.OctaMEDControls })));
 const SidMon1Controls = lazy(() => import('../controls/SidMon1Controls').then(m => ({ default: m.SidMon1Controls })));
 const HippelCoSoControls = lazy(() => import('../controls/HippelCoSoControls').then(m => ({ default: m.HippelCoSoControls })));
@@ -1149,6 +1150,11 @@ export const SynthTypeDispatcher: React.FC<SynthTypeDispatcherProps> = ({
   // ============================================================================
   if (editorMode === 'tfmx') {
     const tfmxConfig = instrument.tfmx || DEFAULT_TFMX;
+    // Huelsbeck mdat-format instruments carry tfmxMacroIndex in metadata.
+    // For these we show the full 42-command macro editor instead of the legacy
+    // VolMod/SndMod viewer used by the Hippel TFMX-7V format.
+    const macroIdx = (instrument.metadata as { tfmxMacroIndex?: number } | undefined)?.tfmxMacroIndex;
+    const isHuelsbeckMacro = typeof macroIdx === 'number';
     return (
       <div className="synth-editor-container bg-gradient-to-b from-[#1a0800] to-[#080300]">
         <EditorHeader
@@ -1158,11 +1164,15 @@ export const SynthTypeDispatcher: React.FC<SynthTypeDispatcherProps> = ({
           onVizModeChange={setVizMode}
         />
         <Suspense fallback={<LoadingControls />}>
-          <TFMXControls
-            config={tfmxConfig}
-            onChange={(cfg) => handleChange({ tfmx: cfg })}
-            uadeChipRam={instrument.uadeChipRam}
-          />
+          {isHuelsbeckMacro ? (
+            <TFMXMacroEditor height={520} initialMacroIndex={macroIdx} />
+          ) : (
+            <TFMXControls
+              config={tfmxConfig}
+              onChange={(cfg) => handleChange({ tfmx: cfg })}
+              uadeChipRam={instrument.uadeChipRam}
+            />
+          )}
         </Suspense>
       </div>
     );

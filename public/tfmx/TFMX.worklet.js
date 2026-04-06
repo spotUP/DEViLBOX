@@ -118,6 +118,34 @@ class TFMXProcessor extends AudioWorkletProcessor {
         break;
       }
 
+      case 'reloadModule': {
+        // Re-runs tfmx_load_module with patched bytes — used by macro editor
+        // for live preview after instrument edits.
+        if (!this.wasm || !this.ctx) break;
+        const wasPlaying = this._modulePlaying;
+        this._modulePlaying = false;
+        this.wasm._tfmx_module_stop(this.ctx);
+        const mdat = new Uint8Array(data.mdatBuffer);
+        const smpl = data.smplBuffer ? new Uint8Array(data.smplBuffer) : null;
+        const mdatPtr = this.wasm._malloc(mdat.byteLength);
+        this.wasm.HEAPU8.set(mdat, mdatPtr);
+        let smplPtr = 0, smplLen = 0;
+        if (smpl && smpl.byteLength > 0) {
+          smplLen = smpl.byteLength;
+          smplPtr = this.wasm._malloc(smplLen);
+          this.wasm.HEAPU8.set(smpl, smplPtr);
+        }
+        const ret = this.wasm._tfmx_load_module(this.ctx, mdatPtr, mdat.byteLength,
+          smplPtr, smplLen, data.subsong || 0);
+        this.wasm._free(mdatPtr);
+        if (smplPtr) this.wasm._free(smplPtr);
+        if (ret === 0 && wasPlaying) {
+          this._modulePlaying = true;
+        }
+        this.port.postMessage({ type: 'moduleReloaded', ok: ret === 0 });
+        break;
+      }
+
       case 'modulePlay':
         this._modulePlaying = true;
         break;

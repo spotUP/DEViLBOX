@@ -22,7 +22,6 @@ import { useWasmPositionStore } from '@stores/useWasmPositionStore';
 import { PatternEditorCanvas } from '@/components/tracker/PatternEditorCanvas';
 // tfmxAdapter used for format-mode single-pattern view (reserved for future per-pattern editing)
 import { TFMXTrackstepMatrix, TFMX_MATRIX_HEIGHT, TFMX_MATRIX_COLLAPSED_HEIGHT } from './TFMXTrackstepMatrix';
-import { TFMXMacroEditor } from './TFMXMacroEditor';
 import { useResponsiveSafe } from '@/contexts/ResponsiveContext';
 import { getTrackerReplayer } from '@engine/TrackerReplayer';
 
@@ -44,7 +43,6 @@ export const TFMXView: React.FC<{ width?: number; height?: number }> = () => {
 
   const [activeStepIdx, setActiveStepIdx] = useState(0);
   const [matrixCollapsed, setMatrixCollapsed] = useState(isMobile);
-  const [macroEditorOpen, setMacroEditorOpen] = useState(false);
 
   const matrixH = matrixCollapsed ? TFMX_MATRIX_COLLAPSED_HEIGHT : TFMX_MATRIX_HEIGHT;
 
@@ -103,7 +101,26 @@ export const TFMXView: React.FC<{ width?: number; height?: number }> = () => {
   // via useTrackerStore's setCell, which patches tfmxFileData directly.
 
   // Export TFMX
+  // The macro editor patches tfmxFileData in place at the original chip RAM
+  // offsets, so the easiest correct export is to download that buffer directly
+  // — it is byte-identical to the original mdat with all edits applied.
+  // Falls back to TFMXExporter rebuild only if no in-memory buffer is present.
   const handleExport = useCallback(async () => {
+    const fileData = useFormatStore.getState().tfmxFileData;
+    const fileName = useFormatStore.getState().uadeEditableFileName ?? 'mdat.export';
+    if (fileData && fileData.byteLength > 0) {
+      const blob = new Blob([fileData as ArrayBuffer], { type: 'application/octet-stream' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = fileName.split('/').pop() ?? 'mdat.export';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      return;
+    }
+    // Fallback for TFMX songs created from scratch (no in-memory mdat buffer)
     const song = getTrackerReplayer().getSong();
     if (!song) return;
     const { exportTFMX } = await import('@lib/export/TFMXExporter');
@@ -213,11 +230,6 @@ export const TFMXView: React.FC<{ width?: number; height?: number }> = () => {
         <span style={{ color: 'var(--color-text-muted)' }}>|</span>
         <span style={{ fontSize: '11px', color: 'var(--color-text-muted)', flex: 1 }}>{toolbarInfo}</span>
         <button
-          className="px-2 py-0.5 text-xs bg-purple-800 hover:bg-purple-700 text-purple-100 rounded border border-purple-600"
-          onClick={() => setMacroEditorOpen(o => !o)}
-          title="Toggle TFMX macro instrument editor"
-        >{macroEditorOpen ? 'Hide Macros' : 'Edit Macros'}</button>
-        <button
           className="px-2 py-0.5 text-xs bg-amber-800 hover:bg-amber-700 text-amber-100 rounded border border-amber-600"
           onClick={handleExport}
         >Export MDAT</button>
@@ -250,13 +262,6 @@ export const TFMXView: React.FC<{ width?: number; height?: number }> = () => {
       <div style={{ flex: 1, minHeight: 0, overflow: 'hidden' }}>
         <PatternEditorCanvas />
       </div>
-
-      {/* Macro Instrument Editor (collapsible bottom pane) */}
-      {macroEditorOpen && !editorFullscreen && (
-        <div style={{ flexShrink: 0, overflow: 'hidden' }}>
-          <TFMXMacroEditor height={360} />
-        </div>
-      )}
     </div>
   );
 };
