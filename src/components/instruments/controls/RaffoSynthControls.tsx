@@ -42,15 +42,15 @@ const OscGroup: React.FC<{
     <div className={`p-2 rounded ${isOn ? 'bg-[#1a2a1a]' : 'bg-[#1a1a1a] opacity-50'}`}>
       <div className="flex items-center gap-2 mb-2">
         <button
-          className={`px-2 py-0.5 rounded text-[10px] ${isOn ? 'bg-green-700 text-white' : 'bg-gray-700 text-gray-400'}`}
+          className={`px-2 py-0.5 rounded text-[10px] ${isOn ? 'bg-green-700 text-white' : 'bg-gray-700 text-text-muted'}`}
           onClick={() => update(btnKey, isOn ? 0 : 1)}
         >{isOn ? 'ON' : 'OFF'}</button>
-        <span className="text-gray-400 font-semibold">OSC {idx + 1}</span>
+        <span className="text-text-muted font-semibold">OSC {idx + 1}</span>
       </div>
       <div className="grid grid-cols-3 gap-2">
         <div className="flex flex-col gap-1">
           <label className="text-gray-500 text-[10px]">Waveform</label>
-          <select className="bg-[#2a2a2a] text-gray-200 border border-gray-600 rounded px-1 py-0.5 text-[10px]"
+          <select className="bg-dark-bgSecondary text-text-primary border border-dark-border rounded px-1 py-0.5 text-[10px]"
             value={Math.round(merged[waveKey] as number ?? 0)}
             onChange={(e) => update(waveKey, parseInt(e.target.value))}>
             {WAVEFORM_NAMES.map((n, i) => <option key={i} value={i}>{n}</option>)}
@@ -58,7 +58,7 @@ const OscGroup: React.FC<{
         </div>
         <div className="flex flex-col gap-1">
           <label className="text-gray-500 text-[10px]">Range</label>
-          <select className="bg-[#2a2a2a] text-gray-200 border border-gray-600 rounded px-1 py-0.5 text-[10px]"
+          <select className="bg-dark-bgSecondary text-text-primary border border-dark-border rounded px-1 py-0.5 text-[10px]"
             value={Math.round(merged[rangeKey] as number ?? 2)}
             onChange={(e) => update(rangeKey, parseInt(e.target.value))}>
             {[1, 2, 3, 4, 5, 6].map(r => <option key={r} value={r}>{RANGE_NAMES[r]}</option>)}
@@ -96,7 +96,7 @@ export const RaffoSynthControls: React.FC<RaffoSynthControlsProps> = ({ config, 
     <div className="p-4 space-y-4 text-xs">
       {/* Oscillators */}
       <div>
-        <h3 className="text-gray-400 font-semibold mb-2 border-b border-gray-700 pb-1">Oscillators</h3>
+        <h3 className="text-text-muted font-semibold mb-2 border-b border-dark-border pb-1">Oscillators</h3>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
           {[0, 1, 2, 3].map(i => <OscGroup key={i} idx={i} merged={merged} update={updateParam} />)}
         </div>
@@ -104,7 +104,7 @@ export const RaffoSynthControls: React.FC<RaffoSynthControlsProps> = ({ config, 
 
       {/* Master */}
       <div>
-        <h3 className="text-gray-400 font-semibold mb-2 border-b border-gray-700 pb-1">Master</h3>
+        <h3 className="text-text-muted font-semibold mb-2 border-b border-dark-border pb-1">Master</h3>
         <div className="grid grid-cols-2 gap-2">
           <div className="flex flex-col gap-1">
             <label className="text-gray-500 text-[10px]">Volume</label>
@@ -123,7 +123,7 @@ export const RaffoSynthControls: React.FC<RaffoSynthControlsProps> = ({ config, 
 
       {/* Amp Envelope */}
       <div>
-        <h3 className="text-gray-400 font-semibold mb-2 border-b border-gray-700 pb-1">Amp Envelope</h3>
+        <h3 className="text-text-muted font-semibold mb-2 border-b border-dark-border pb-1">Amp Envelope</h3>
         <div className="grid grid-cols-4 gap-2">
           {(['attack', 'decay', 'sustain', 'release'] as (keyof RaffoSynthConfig)[]).map(k => (
             <div key={k} className="flex flex-col gap-1">
@@ -139,7 +139,7 @@ export const RaffoSynthControls: React.FC<RaffoSynthControlsProps> = ({ config, 
 
       {/* Filter */}
       <div>
-        <h3 className="text-gray-400 font-semibold mb-2 border-b border-gray-700 pb-1">Filter</h3>
+        <h3 className="text-text-muted font-semibold mb-2 border-b border-dark-border pb-1">Filter</h3>
         <div className="grid grid-cols-3 gap-2">
           <div className="flex flex-col gap-1">
             <label className="text-gray-500 text-[10px]">Cutoff</label>

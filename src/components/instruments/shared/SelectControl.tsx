@@ -16,7 +16,7 @@ export const SelectControl: React.FC<SelectControlProps> = ({ label, value, opti
   <div className="flex flex-col gap-1">
     <label className="text-gray-500 text-[10px]">{label}</label>
     <select
-      className="bg-[#2a2a2a] text-gray-200 border border-gray-600 rounded px-1 py-0.5 text-[10px]"
+      className="bg-dark-bgSecondary text-text-primary border border-dark-border rounded px-1 py-0.5 text-[10px]"
       value={Math.round(value)}
       onChange={(e) => onChange(parseInt(e.target.value))}
     >

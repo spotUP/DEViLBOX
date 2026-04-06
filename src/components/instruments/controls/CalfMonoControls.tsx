@@ -48,7 +48,7 @@ const Sel: React.FC<{
 }> = ({ label, value, options, onChange }) => (
   <div className="flex flex-col gap-1">
     <label className="text-gray-500 text-[10px]">{label}</label>
-    <select className="bg-[#2a2a2a] text-gray-200 border border-gray-600 rounded px-1 py-0.5 text-[10px]"
+    <select className="bg-dark-bgSecondary text-text-primary border border-dark-border rounded px-1 py-0.5 text-[10px]"
       value={Math.round(value)} onChange={(e) => onChange(parseInt(e.target.value))}>
       {options.map((n, i) => <option key={i} value={i}>{n}</option>)}
     </select>
@@ -61,7 +61,7 @@ const Tog: React.FC<{
   <div className="flex flex-col gap-1">
     <label className="text-gray-500 text-[10px]">{label}</label>
     <button
-      className={`px-2 py-0.5 rounded text-[10px] ${value ? 'bg-green-700 text-white' : 'bg-gray-700 text-gray-400'}`}
+      className={`px-2 py-0.5 rounded text-[10px] ${value ? 'bg-green-700 text-white' : 'bg-gray-700 text-text-muted'}`}
       onClick={() => onChange(value ? 0 : 1)}
     >{value ? 'ON' : 'OFF'}</button>
   </div>
@@ -69,7 +69,7 @@ const Tog: React.FC<{
 
 const Section: React.FC<{ title: string; children: React.ReactNode }> = ({ title, children }) => (
   <div>
-    <h3 className="text-gray-400 font-semibold mb-2 border-b border-gray-700 pb-1">{title}</h3>
+    <h3 className="text-text-muted font-semibold mb-2 border-b border-dark-border pb-1">{title}</h3>
     {children}
   </div>
 );

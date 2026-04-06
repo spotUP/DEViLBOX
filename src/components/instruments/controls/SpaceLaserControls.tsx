@@ -99,7 +99,7 @@ export const SpaceLaserControls: React.FC<SpaceLaserControlsProps> = ({
                 className={`
                   px-2 py-1 text-[10px] font-bold rounded border uppercase
                   ${config.laser.sweepCurve === curve
-                    ? `bg-[#2a2a2a]`
+                    ? `bg-dark-bgSecondary`
                     : 'bg-[#1a1a1a] border-dark-borderLight text-text-muted hover:border-dark-borderLight'
                   }
                 `}
@@ -141,7 +141,7 @@ export const SpaceLaserControls: React.FC<SpaceLaserControlsProps> = ({
                 className={`
                   px-2 py-1 text-[10px] font-bold rounded border uppercase
                   ${config.noise.type === type
-                    ? `bg-[#2a2a2a]`
+                    ? `bg-dark-bgSecondary`
                     : 'bg-[#1a1a1a] border-dark-borderLight text-text-muted hover:border-dark-borderLight'
                   }
                 `}
@@ -231,7 +231,7 @@ export const SpaceLaserControls: React.FC<SpaceLaserControlsProps> = ({
                 className={`
                   px-3 py-1 text-xs font-bold rounded border uppercase
                   ${config.filter.type === type
-                    ? `bg-[#2a2a2a]`
+                    ? `bg-dark-bgSecondary`
                     : 'bg-[#1a1a1a] border-dark-borderLight text-text-muted hover:border-dark-borderLight'
                   }
                 `}
@@ -342,7 +342,7 @@ export const SpaceLaserControls: React.FC<SpaceLaserControlsProps> = ({
   return (
     <div className="flex flex-col h-full">
       {/* Tabs */}
-      <div className="flex border-b border-dark-border bg-[#151515]">
+      <div className="flex border-b border-dark-border bg-dark-bg">
         <button
           onClick={() => setActiveTab('laser')}
           className={`
