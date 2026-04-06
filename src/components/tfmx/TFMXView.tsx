@@ -18,6 +18,7 @@ import React, { useRef, useEffect, useState, useCallback, useMemo } from 'react'
 import { useFormatStore, useUIStore } from '@stores';
 import { useTrackerStore } from '@stores';
 import { useTransportStore } from '@stores/useTransportStore';
+import { useWasmPositionStore } from '@stores/useWasmPositionStore';
 import { PatternEditorCanvas } from '@/components/tracker/PatternEditorCanvas';
 import { TFMX_PATTERN_COLUMNS, tfmxPatternToChannels } from './tfmxAdapter';
 import { TFMXTrackstepMatrix, TFMX_MATRIX_HEIGHT, TFMX_MATRIX_COLLAPSED_HEIGHT } from './TFMXTrackstepMatrix';
@@ -31,9 +32,16 @@ export const TFMXView: React.FC<{ width?: number; height?: number }> = () => {
   const native = useFormatStore(s => s.tfmxNative);
   const selectedPattern = useFormatStore(s => s.tfmxSelectedPattern);
   const setSelectedPattern = useFormatStore(s => s.setTFMXSelectedPattern);
-  const isPlaying = useTransportStore(s => s.isPlaying);
-  const currentRow = useTransportStore(s => s.currentRow);
+  const transportPlaying = useTransportStore(s => s.isPlaying);
+  const transportRow = useTransportStore(s => s.currentRow);
   const currentPositionIndex = useTrackerStore(s => s.currentPositionIndex);
+  const wasmActive = useWasmPositionStore(s => s.active);
+  const wasmRow = useWasmPositionStore(s => s.row);
+  const wasmSongPos = useWasmPositionStore(s => s.songPos);
+
+  // Use WASM position when available (TFMXModule engine), fall back to transport store
+  const isPlaying = transportPlaying || wasmActive;
+  const currentRow = wasmActive ? wasmRow : transportRow;
   const editorFullscreen = useUIStore(s => s.editorFullscreen);
 
   const [activeStepIdx, setActiveStepIdx] = useState(0);
@@ -49,10 +57,11 @@ export const TFMXView: React.FC<{ width?: number; height?: number }> = () => {
       .filter(({ step }) => !step.isEFFE);
   }, [native]);
 
-  // Auto-follow playback: map flattened position → trackstep → voice pattern
+  // Auto-follow playback: map position → trackstep → voice pattern
+  const effectivePosition = wasmActive ? wasmSongPos : currentPositionIndex;
   useEffect(() => {
     if (!isPlaying || !native) return;
-    const mapping = flatToTrackstep[currentPositionIndex];
+    const mapping = flatToTrackstep[effectivePosition];
     if (!mapping) return;
 
     setActiveStepIdx(mapping.idx);
@@ -66,7 +75,7 @@ export const TFMXView: React.FC<{ width?: number; height?: number }> = () => {
         }
       }
     }
-  }, [isPlaying, currentPositionIndex, native, flatToTrackstep, setSelectedPattern]);
+  }, [isPlaying, effectivePosition, native, flatToTrackstep, setSelectedPattern]);
 
   // Measure container width
   const containerRef = useRef<HTMLDivElement>(null);
