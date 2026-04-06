@@ -77,7 +77,8 @@ interface FT2ToolbarProps {
   onShowInstrumentFX?: () => void;
   onShowInstruments?: () => void;
   onShowPatternOrder?: () => void;
-  onShowDrumpads?: () => void;
+  onShowFindReplace?: () => void;
+  showFindReplace?: boolean;
   showPatterns?: boolean;
   showMasterFX?: boolean;
   showInstrumentFX?: boolean;
@@ -90,7 +91,8 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = React.memo(({
   onShowMasterFX,
   onShowInstruments,
   onShowPatternOrder,
-  onShowDrumpads,
+  onShowFindReplace,
+  showFindReplace,
   showMasterFX,
 }) => {
   const {
@@ -192,10 +194,9 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = React.memo(({
   const { masterEffects } = useAudioStore(useShallow((s) => ({
     masterEffects: s.masterEffects,
   })));
-  const { oscilloscopeVisible, modalOpen, jingleActive } = useUIStore(useShallow((s) => ({
+  const { oscilloscopeVisible, jingleActive } = useUIStore(useShallow((s) => ({
     oscilloscopeVisible: s.oscilloscopeVisible,
     jingleActive: s.jingleActive,
-    modalOpen: s.modalOpen,
   })));
   const { curves, reset: resetAutomation } = useAutomationStore(useShallow((s) => ({
     curves: s.curves,
@@ -317,20 +318,10 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = React.memo(({
 
   const handleSave = async () => {
     try {
+      // Save to browser storage
       const saved = await saveProjectToStorage({ explicit: true });
-      if (saved) {
-        notify.success('Project saved!', 2000);
-      } else {
-        notify.error('Failed to save project');
-      }
-    } catch (error) {
-      console.error('Failed to save project:', error);
-      notify.error('Failed to save project');
-    }
-  };
 
-  const handleDownload = () => {
-    try {
+      // Also download as .dbx file
       const { patternOrder } = useTrackerStore.getState();
       const sequence = patternOrder.map(idx => patterns[idx]?.id).filter(Boolean);
       const automationData: Record<string, Record<number, Record<string, unknown>>> = {};
@@ -371,10 +362,11 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = React.memo(({
         patternOrder,
         getOriginalModuleDataForExport(),
       );
-      notify.success('Song downloaded!', 2000);
+
+      notify.success(saved ? 'Saved & downloaded!' : 'Downloaded!', 2000);
     } catch (error) {
-      console.error('Failed to download file:', error);
-      notify.error('Failed to download file');
+      console.error('Failed to save:', error);
+      notify.error('Failed to save');
     }
   };
 
@@ -598,6 +590,7 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = React.memo(({
     }
 
     setIsLooping(false);
+    const startPos = currentPositionIndex;
     setCurrentRow(0);
     await engine.init();
 
@@ -606,6 +599,8 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = React.memo(({
     // The WASM engine handles its own init/load via startNativeEngines.
     if (editorMode === 'musicline' || editorMode === 'jamcracker') {
       await play();
+      // Seek to current position after play starts
+      if (startPos > 0) getTrackerReplayer().forcePosition(startPos, 0);
       return;
     }
 
@@ -614,6 +609,8 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = React.memo(({
     engine.stop();
     await new Promise(r => setTimeout(r, 60)); // Wait for mute/unmute cycle (50ms)
     await play();
+    // Seek to current position — loadSong resets to 0, so we must restore it
+    if (startPos > 0) getTrackerReplayer().seekTo(startPos, 0);
   };
 
   const handlePlayPattern = async () => {
@@ -655,6 +652,7 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = React.memo(({
       return;
     }
     setIsLooping(true);
+    const startPos2 = currentPositionIndex;
     setCurrentRow(0);
     await engine.init();
     // Reset ToneEngine state before first play — matches what playStopToggle does.
@@ -662,6 +660,8 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = React.memo(({
     engine.stop();
     await new Promise(r => setTimeout(r, 60));
     await play();
+    // Seek to current position — loadSong resets to 0, so we must restore it
+    if (startPos2 > 0) getTrackerReplayer().seekTo(startPos2, 0);
   };
 
   const isPlayingSong = isGT ? gtPlaying : (isPlaying && !isLooping);
@@ -894,30 +894,17 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = React.memo(({
           className="hidden"
         />
         <Button variant="ghost" size="sm" onClick={() => setShowFileBrowser(true)} disabled={isLoading} loading={isLoading}>Load</Button>
-        <Button variant="ghost" size="sm" onClick={handleSave}>{isDirty ? 'Save*' : 'Save'}</Button>
+        <Button variant="ghost" size="sm" onClick={handleSave} title="Save to browser & download .dbx (Ctrl+S)">{isDirty ? 'Save*' : 'Save'}</Button>
         <Button variant="ghost" size="sm" onClick={handleUndo} disabled={!canUndo()} title="Undo (Ctrl+Z)">Undo</Button>
         <Button variant="ghost" size="sm" onClick={handleRedo} disabled={!canRedo()} title="Redo (Ctrl+Shift+Z)">Redo</Button>
-        <Button variant="ghost" size="sm" onClick={handleDownload} title="Download as .dbx file">Download</Button>
         <Button variant="ghost" size="sm" onClick={onShowExport} title="Export (Ctrl+Shift+E)">Export</Button>
         <Button variant="ghost" size="sm" onClick={() => useUIStore.getState().openNewSongWizard()} title="New song">New</Button>
         <Button variant="ghost" size="sm" onClick={() => setShowClearModal(true)} title="Clear all patterns">Clear</Button>
         <Button variant="ghost" size="sm" onClick={() => fileInputRef.current?.click()} title="Import module file">Import</Button>
         <Button variant="ghost" size="sm" onClick={onShowPatternOrder} title="Pattern order list">Order</Button>
-        <Button
-          variant={modalOpen === 'findReplace' ? 'primary' : 'ghost'}
-          size="sm"
-          onClick={() => { const s = useUIStore.getState(); if (s.modalOpen === 'findReplace') { s.closeModal(); } else { s.openModal('findReplace'); } }}
-          title="Effect search & replace"
-        >FX Search</Button>
+        <Button variant={showFindReplace ? 'primary' : 'ghost'} size="sm" onClick={onShowFindReplace} title="Find & replace (Ctrl+F)">Find</Button>
         <Button variant="ghost" size="sm" onClick={onShowInstruments} title="Instrument editor">Instruments</Button>
-        <Button variant="ghost" size="sm" onClick={onShowDrumpads} title="Drum pads">Pads</Button>
         <Button variant={showMasterFX ? 'primary' : 'ghost'} size="sm" onClick={onShowMasterFX} title="Master effects chain">Master FX</Button>
-        <Button
-          variant={modalOpen === 'instrumentFx' ? 'primary' : 'ghost'}
-          size="sm"
-          onClick={() => { const s = useUIStore.getState(); if (s.modalOpen === 'instrumentFx') { s.closeModal(); } else { s.openModal('instrumentFx'); } }}
-          title="Per-instrument effects"
-        >Inst FX</Button>
         <Button variant={aiOpen ? 'primary' : 'ghost'} size="sm" onClick={toggleAI} title="AI composition tools">AI</Button>
         <Button variant="ghost" size="sm" onClick={() => onShowHelp?.()} title="Help & keyboard shortcuts (?)">Help</Button>
 

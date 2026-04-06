@@ -47,10 +47,9 @@ export const FT2NumericInput: React.FC<FT2NumericInputProps> = ({
   const [showPresets, setShowPresets] = useState(false);
   const [presetMenuPos, setPresetMenuPos] = useState({ x: 0, y: 0 });
 
-  // Keep valueRef in sync
-  useEffect(() => {
-    valueRef.current = value;
-  }, [value]);
+  // Keep valueRef in sync — must be synchronous (not in useEffect)
+  // to avoid stale reads when the prop changes between render and click
+  valueRef.current = value;
 
   // Cleanup on unmount
   useEffect(() => {
@@ -153,22 +152,18 @@ export const FT2NumericInput: React.FC<FT2NumericInputProps> = ({
       <div className="ft2-numeric-arrows">
         <button
           className="ft2-arrow ft2-arrow-up"
-          onMouseDown={() => startRepeat(handleIncrement)}
-          onMouseUp={stopRepeat}
-          onMouseLeave={stopRepeat}
-          onTouchStart={() => startRepeat(handleIncrement)}
-          onTouchEnd={stopRepeat}
+          onPointerDown={(e) => { e.preventDefault(); startRepeat(handleIncrement); }}
+          onPointerUp={stopRepeat}
+          onPointerLeave={stopRepeat}
           title={`Increase ${label}`}
         >
           <span className="ft2-arrow-icon">&#9650;</span>
         </button>
         <button
           className="ft2-arrow ft2-arrow-down"
-          onMouseDown={() => startRepeat(handleDecrement)}
-          onMouseUp={stopRepeat}
-          onMouseLeave={stopRepeat}
-          onTouchStart={() => startRepeat(handleDecrement)}
-          onTouchEnd={stopRepeat}
+          onPointerDown={(e) => { e.preventDefault(); startRepeat(handleDecrement); }}
+          onPointerUp={stopRepeat}
+          onPointerLeave={stopRepeat}
           title={`Decrease ${label}`}
         >
           <span className="ft2-arrow-icon">&#9660;</span>
