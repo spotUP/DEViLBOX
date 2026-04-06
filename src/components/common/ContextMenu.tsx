@@ -165,8 +165,12 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({
         top: adjustedPosition?.y ?? position.y,
         maxHeight: maxHeight ?? undefined,
         overflowY: maxHeight !== null ? 'auto' : undefined,
+        // Prevent wheel from leaking through to the pattern editor below
+        overscrollBehavior: 'contain',
       }}
       onMouseEnter={handleMouseEnterSubmenu}
+      // Stop wheel propagation so scrolling inside the menu doesn't scroll the pattern
+      onWheelCapture={(e) => e.stopPropagation()}
     >
       {items.length === 0 ? (
         <div className="px-4 py-2 text-xs text-text-muted italic">Empty</div>
