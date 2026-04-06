@@ -1275,6 +1275,49 @@ LIBOPENMPT_API float openmpt_module_get_current_channel_vu_rear_left( openmpt_mo
  */
 LIBOPENMPT_API float openmpt_module_get_current_channel_vu_rear_right( openmpt_module * mod, int32_t channel );
 
+/*! \brief Get the current note for a channel
+ *
+ * \param mod The module handle to work on.
+ * \param channel The channel whose note should be retrieved.
+ * \return The current note value (0 = no note, 1-120 = C-0 to B-9).
+ */
+LIBOPENMPT_API int32_t openmpt_module_get_current_channel_note( openmpt_module * mod, int32_t channel );
+/*! \brief Get the current instrument for a channel
+ *
+ * \param mod The module handle to work on.
+ * \param channel The channel whose instrument should be retrieved.
+ * \return The current instrument index (1-based), or 0 if none.
+ */
+LIBOPENMPT_API int32_t openmpt_module_get_current_channel_instrument( openmpt_module * mod, int32_t channel );
+/*! \brief Get the current processed volume for a channel
+ *
+ * \param mod The module handle to work on.
+ * \param channel The channel whose volume should be retrieved.
+ * \return The current real volume (0-16384) after all processing (volume slides, envelopes, etc.).
+ */
+LIBOPENMPT_API int32_t openmpt_module_get_current_channel_volume( openmpt_module * mod, int32_t channel );
+/*! \brief Get the current processed frequency for a channel
+ *
+ * \param mod The module handle to work on.
+ * \param channel The channel whose frequency should be retrieved.
+ * \return The current frequency in Hz after all processing (portamento, vibrato, arpeggio, etc.), or 0.0 if silent.
+ */
+LIBOPENMPT_API double openmpt_module_get_current_channel_frequency( openmpt_module * mod, int32_t channel );
+/*! \brief Get the current panning for a channel
+ *
+ * \param mod The module handle to work on.
+ * \param channel The channel whose panning should be retrieved.
+ * \return The current real panning (0-256, 128 = center).
+ */
+LIBOPENMPT_API int32_t openmpt_module_get_current_channel_panning( openmpt_module * mod, int32_t channel );
+/*! \brief Get whether a channel is currently active (playing a sample)
+ *
+ * \param mod The module handle to work on.
+ * \param channel The channel to check.
+ * \return 1 if the channel is active, 0 otherwise.
+ */
+LIBOPENMPT_API int openmpt_module_get_current_channel_active( openmpt_module * mod, int32_t channel );
+
 /*! \brief Get the number of sub-songs
  *
  * \param mod The module handle to work on.
