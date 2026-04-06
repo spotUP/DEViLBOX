@@ -218,23 +218,67 @@ export function useGTKeyboardHandler(active: boolean) {
       return;
     }
 
-    // --- Navigation ---
+    // --- Navigation + Block Selection ---
     if (!e.ctrlKey && !e.metaKey) {
+      // Shift+arrows: extend block selection
+      if (e.shiftKey && (e.key === 'ArrowUp' || e.key === 'ArrowDown' || e.key === 'ArrowLeft' || e.key === 'ArrowRight')) {
+        e.preventDefault();
+        const sel = state.selection;
+        if (!sel.active) {
+          // Start new selection from cursor
+          state.setSelection({
+            active: true,
+            startChannel: cursor.channel,
+            startRow: cursor.row,
+            endChannel: cursor.channel,
+            endRow: cursor.row,
+          });
+        }
+        // Extend selection by moving the end point
+        const s = state.selection.active ? state.selection : { ...state.selection, startChannel: cursor.channel, startRow: cursor.row, endChannel: cursor.channel, endRow: cursor.row };
+        switch (e.key) {
+          case 'ArrowUp':
+            state.setSelection({ endRow: Math.max(0, s.endRow - 1) });
+            state.setCursor({ row: Math.max(0, cursor.row - 1) });
+            break;
+          case 'ArrowDown':
+            state.setSelection({ endRow: Math.min(state.patternLength, s.endRow + 1) });
+            state.setCursor({ row: Math.min(state.patternLength, cursor.row + 1) });
+            break;
+          case 'ArrowLeft':
+            state.setSelection({ endChannel: Math.max(0, s.endChannel - 1) });
+            state.setCursor({ channel: Math.max(0, cursor.channel - 1), column: 0, digit: 0 });
+            break;
+          case 'ArrowRight': {
+            const maxCh = state.sidCount * 3 - 1;
+            state.setSelection({ endChannel: Math.min(maxCh, s.endChannel + 1) });
+            state.setCursor({ channel: Math.min(maxCh, cursor.channel + 1), column: 0, digit: 0 });
+            break;
+          }
+        }
+        return;
+      }
+
+      // Normal arrows (no shift): navigate and clear selection
       switch (e.key) {
         case 'ArrowUp':
           e.preventDefault();
+          if (state.selection.active) state.clearSelection();
           state.moveCursor('up');
           return;
         case 'ArrowDown':
           e.preventDefault();
+          if (state.selection.active) state.clearSelection();
           state.moveCursor('down');
           return;
         case 'ArrowLeft':
           e.preventDefault();
+          if (state.selection.active) state.clearSelection();
           state.moveCursor('left');
           return;
         case 'ArrowRight':
           e.preventDefault();
+          if (state.selection.active) state.clearSelection();
           state.moveCursor('right');
           return;
         case 'PageUp':
@@ -316,6 +360,13 @@ export function useGTKeyboardHandler(active: boolean) {
     if (e.key === 'F7') { e.preventDefault(); state.setEditStep(2); return; }
     if (e.key === 'F8') { e.preventDefault(); state.setEditStep(4); return; }
 
+    // Shift+Z: cycle auto-advance mode (note → all → off)
+    if (e.shiftKey && e.key === 'Z') {
+      e.preventDefault();
+      state.cycleAutoAdvanceMode();
+      return;
+    }
+
     // Shift+O/P: expand/shrink current pattern
     if (e.shiftKey && e.key === 'O') {
       e.preventDefault();
@@ -363,7 +414,25 @@ export function useGTKeyboardHandler(active: boolean) {
       return;
     }
 
-    // Note-off release: release jamming note on key-up handled elsewhere
+    // Shift+F5/F6: order list track copy/paste (copy current channel's order, paste to current channel)
+    if (e.shiftKey && e.key === 'F5') {
+      e.preventDefault();
+      const orderData = state.orderData[cursor.channel];
+      if (orderData) state.setOrderClipboard(new Uint8Array(orderData));
+      return;
+    }
+    if (e.shiftKey && e.key === 'F6') {
+      e.preventDefault();
+      const clip = state.orderClipboard;
+      if (clip && engine) {
+        for (let i = 0; i < clip.length; i++) {
+          engine.setOrderEntry(state.currentSong, cursor.channel, i, clip[i]);
+        }
+        engine.checkpointUndo();
+      }
+      return;
+    }
+
     // Channel mute: Shift+1-6
     if (e.shiftKey && e.key >= '1' && e.key <= '6') {
       e.preventDefault();
