@@ -58,11 +58,9 @@ export const VSTBridgePanel: React.FC<VSTBridgePanelProps> = ({
   const [isLoading, setIsLoading] = useState(true);
   const synthRef = useRef<VSTBridgeSynth | null>(null);
 
-  const { isCyan: isCyanTheme, accent: accentColor, knob: knobColor } = useInstrumentColors('#a78bfa');
+  const { accent: accentColor, knob: knobColor, panelBg, panelStyle } = useInstrumentColors('#a78bfa');
 
-  const panelBg = isCyanTheme
-    ? 'bg-[#051515] border-accent-highlight/20'
-    : 'bg-[#1a1a1a] border-purple-900/50';
+
 
   // Load params from the synth after WASM init
   useEffect(() => {
@@ -146,7 +144,7 @@ export const VSTBridgePanel: React.FC<VSTBridgePanelProps> = ({
   return (
     <div className="synth-controls-flow grid grid-cols-4 gap-2 p-2 overflow-y-auto">
       {groups.map((group) => (
-        <div key={group.name} className={`p-2 rounded-lg border border-dark-border ${panelBg}`}>
+        <div key={group.name} className={`p-2 rounded-lg border ${panelBg}`} style={panelStyle}>
           <div className="flex items-center gap-2 mb-2">
             <Sliders size={16} style={{ color: accentColor }} />
             <h3

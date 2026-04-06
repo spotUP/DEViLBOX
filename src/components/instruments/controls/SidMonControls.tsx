@@ -140,7 +140,7 @@ export const SidMonControls: React.FC<SidMonControlsProps> = ({
     return chipEditorRef.current;
   }, [uadeChipRam]);
 
-  const { isCyan, accent, knob, dim, panelBg } = useInstrumentColors('#ff66aa', { knob: '#ff88bb', dim: '#330022' });
+  const { isCyan, accent, knob, dim, panelBg, panelStyle } = useInstrumentColors('#ff66aa', { knob: '#ff88bb', dim: '#330022' });
 
   const upd = useCallback(<K extends keyof SidMonConfig>(key: K, value: SidMonConfig[K]) => {
     onChange({ [key]: value } as Partial<SidMonConfig>);
@@ -161,7 +161,7 @@ export const SidMonControls: React.FC<SidMonControlsProps> = ({
   // -- MAIN TAB ---
   const renderMain = () => (
     <div className="flex flex-col gap-3 p-3 overflow-y-auto" style={{ maxHeight: 'calc(100vh - 280px)' }}>
-      <div className={`rounded-lg border p-3 ${panelBg}`}>
+      <div className={`rounded-lg border p-3 ${panelBg}`} style={panelStyle}>
         <SectionLabel color={accent} label="Waveform" />
         <div className="grid grid-cols-4 gap-2 mb-3">
           {WAVEFORMS.map((wf, i) => {
@@ -190,7 +190,7 @@ export const SidMonControls: React.FC<SidMonControlsProps> = ({
           </div>
         )}
       </div>
-      <div className={`rounded-lg border p-3 ${panelBg}`}>
+      <div className={`rounded-lg border p-3 ${panelBg}`} style={panelStyle}>
         <SectionLabel color={accent} label="ADSR (SID format, 0-15)" />
         <div className="flex gap-4">
           <Knob value={config.attack} min={0} max={15} step={1}
@@ -226,7 +226,7 @@ export const SidMonControls: React.FC<SidMonControlsProps> = ({
           <EnvelopeVisualization mode="adsr" ar={config.attack} dr={config.decay} rr={config.release} sl={config.sustain} tl={0} maxRate={15} maxTl={1} width={320} height={64} color={accent} />
         </div>
       </div>
-      <div className={`rounded-lg border p-3 ${panelBg}`}>
+      <div className={`rounded-lg border p-3 ${panelBg}`} style={panelStyle}>
         <SectionLabel color={accent} label="Vibrato" />
         <div className="flex gap-4">
           <Knob value={config.vibDelay} min={0} max={255} step={1}
@@ -246,7 +246,7 @@ export const SidMonControls: React.FC<SidMonControlsProps> = ({
   // -- FILTER TAB ---
   const renderFilter = () => (
     <div className="flex flex-col gap-3 p-3 overflow-y-auto" style={{ maxHeight: 'calc(100vh - 280px)' }}>
-      <div className={`rounded-lg border p-3 ${panelBg}`}>
+      <div className={`rounded-lg border p-3 ${panelBg}`} style={panelStyle}>
         <SectionLabel color={accent} label="Filter Mode" />
         <div className="flex gap-2 mb-2">
           {FILTER_MODE_NAMES.map((name, i) => (
@@ -286,7 +286,7 @@ export const SidMonControls: React.FC<SidMonControlsProps> = ({
 
   const renderArpeggio = () => (
     <div className="flex flex-col gap-3 p-3" style={{ height: 'calc(100vh - 280px)' }}>
-      <div className={`rounded-lg border p-3 ${panelBg} flex flex-col`} style={{ flex: 1, minHeight: 0 }}>
+      <div className={`rounded-lg border p-3 ${panelBg} flex flex-col`} style={{ ...panelStyle, flex: 1, minHeight: 0 }}>
         <div className="flex items-center justify-between mb-3">
           <SectionLabel color={accent} label="Arpeggio Speed" />
           <Knob value={config.arpSpeed} min={0} max={15} step={1}
@@ -339,7 +339,7 @@ export const SidMonControls: React.FC<SidMonControlsProps> = ({
                   .catch(console.error);
               }
             }}
-            className="ml-auto flex items-center gap-1 px-2 py-1 text-[10px] font-mono bg-dark-bgSecondary hover:bg-dark-bg border border-dark-border rounded transition-colors"
+            className="ml-auto flex items-center gap-1 px-2 py-1 text-[10px] font-mono bg-dark-bgSecondary hover:bg-dark-bg border rounded transition-colors"
             title="Export module with current edits"
           >
             <Download size={10} />

@@ -282,7 +282,7 @@ export const TFMXControls: React.FC<TFMXControlsProps> = ({ config, onChange, ua
     return chipEditorRef.current;
   }, []);
 
-  const { isCyan, accent, dim, panelBg } = useInstrumentColors('#ff6644', { dim: '#331100' });
+  const { isCyan, accent, dim, panelBg, panelStyle } = useInstrumentColors('#ff6644', { dim: '#331100' });
   const accentDim = isCyan ? '#009999' : '#cc4422';
   const panelBg2 = isCyan ? '#041510' : '#1a0800';
   const inputBg  = isCyan ? '#020e0a' : '#0e0500';
@@ -325,7 +325,7 @@ export const TFMXControls: React.FC<TFMXControlsProps> = ({ config, onChange, ua
     return (
       <div className="flex flex-col gap-3 p-3 overflow-y-auto" style={{ maxHeight: 'calc(100vh - 280px)' }}>
         {/* Overview stats */}
-        <div className={`rounded-lg border p-3 ${panelBg}`}>
+        <div className={`rounded-lg border p-3 ${panelBg}`} style={panelStyle}>
           <SectionLabel color={accent} label="TFMX Instrument Data" />
           <StatRow label="SndModSeq count"  value={config.sndSeqsCount.toString()} />
           <StatRow label="SndModSeq bytes"  value={`${config.sndModSeqData.byteLength} B`} />
@@ -340,7 +340,7 @@ export const TFMXControls: React.FC<TFMXControlsProps> = ({ config, onChange, ua
 
         {/* Sample bank */}
         {samples.length > 0 && (
-          <div className={`rounded-lg border p-3 ${panelBg}`}>
+          <div className={`rounded-lg border p-3 ${panelBg}`} style={panelStyle}>
             <SectionLabel color={accent} label="Sample Bank" />
             <div className="font-mono text-[9px] flex border-b mb-1 pb-0.5"
               style={{ borderColor: dim, color: 'var(--color-text-muted)' }}>
@@ -372,7 +372,7 @@ export const TFMXControls: React.FC<TFMXControlsProps> = ({ config, onChange, ua
 
         {/* Export .mdat — only shown when chip RAM context is available */}
         {uadeChipRam && (
-          <div className={`rounded-lg border p-3 ${panelBg}`}>
+          <div className={`rounded-lg border p-3 ${panelBg}`} style={panelStyle}>
             <SectionLabel color={accent} label="Export" />
             <button
               onClick={() => {
@@ -417,7 +417,7 @@ export const TFMXControls: React.FC<TFMXControlsProps> = ({ config, onChange, ua
     return (
       <div className="flex flex-col gap-3 p-3 overflow-y-auto" style={{ maxHeight: 'calc(100vh - 280px)' }}>
         {/* Header fields */}
-        <div className={`rounded-lg border p-3 ${panelBg}`}>
+        <div className={`rounded-lg border p-3 ${panelBg}`} style={panelStyle}>
           <SectionLabel color={accent} label="VolModSeq Header (bytes 0–4)" />
           <div className="grid grid-cols-2 gap-x-4 gap-y-1">
             {([
@@ -458,7 +458,7 @@ export const TFMXControls: React.FC<TFMXControlsProps> = ({ config, onChange, ua
         </div>
 
         {/* Volume envelope data */}
-        <div className={`rounded-lg border p-3 ${panelBg}`}>
+        <div className={`rounded-lg border p-3 ${panelBg}`} style={panelStyle}>
           <div className="flex items-center justify-between mb-2">
             <SectionLabel color={accent} label="Volume Envelope (bytes 5–63)" />
             <button
@@ -564,13 +564,13 @@ export const TFMXControls: React.FC<TFMXControlsProps> = ({ config, onChange, ua
     return (
       <div className="flex flex-col gap-3 p-3 overflow-y-auto" style={{ maxHeight: 'calc(100vh - 280px)' }}>
         {seqCount === 0 ? (
-          <div className={`rounded-lg border p-3 ${panelBg}`}>
+          <div className={`rounded-lg border p-3 ${panelBg}`} style={panelStyle}>
             <div className="text-[9px] text-text-muted">No SndModSeq data</div>
           </div>
         ) : (
           <>
             {/* Sequence selector */}
-            <div className={`rounded-lg border p-3 ${panelBg}`}>
+            <div className={`rounded-lg border p-3 ${panelBg}`} style={panelStyle}>
               <SectionLabel color={accent} label="Sound Modulation Sequences" />
               <div className="flex items-center gap-2 flex-wrap">
                 {Array.from({ length: seqCount }, (_, i) => (
@@ -590,7 +590,7 @@ export const TFMXControls: React.FC<TFMXControlsProps> = ({ config, onChange, ua
             </div>
 
             {/* Sequence entries */}
-            <div className={`rounded-lg border p-3 ${panelBg}`}>
+            <div className={`rounded-lg border p-3 ${panelBg}`} style={panelStyle}>
               <div className="flex items-center justify-between mb-2">
                 <SectionLabel color={accent} label={`SndModSeq #${clampedSeq}`} />
                 <button

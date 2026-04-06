@@ -19,7 +19,7 @@ export const PinkTromboneControls: React.FC<PinkTromboneControlsProps> = ({
   const configRef = useRef(config);
   useEffect(() => { configRef.current = config; }, [config]);
 
-  const { accent: accentColor, knob: knobColor, panelBg } = useInstrumentColors('#ff6699');
+  const { accent: accentColor, knob: knobColor, panelBg, panelStyle } = useInstrumentColors('#ff6699');
 
   /** Push config updates to both the store AND the live synth */
   const pushConfig = useCallback((updates: Partial<PinkTromboneConfig>) => {
@@ -76,7 +76,7 @@ export const PinkTromboneControls: React.FC<PinkTromboneControlsProps> = ({
       <div className="max-w-3xl mx-auto space-y-4">
 
         {/* Text-to-Speech input */}
-        <div className={`rounded-lg border p-3 ${panelBg}`}>
+        <div className={`rounded-lg border p-3 ${panelBg}`} style={panelStyle}>
           <div className="flex items-center gap-2 mb-2">
             <span className="text-xs font-bold uppercase tracking-wider" style={{ color: accentColor }}>
               Text to Speech
@@ -125,7 +125,7 @@ export const PinkTromboneControls: React.FC<PinkTromboneControlsProps> = ({
         </div>
 
         {/* Preset selector */}
-        <div className={`rounded-lg border p-3 ${panelBg}`}>
+        <div className={`rounded-lg border p-3 ${panelBg}`} style={panelStyle}>
           <div className="flex items-center gap-2 mb-2">
             <span className="text-xs font-bold uppercase tracking-wider" style={{ color: accentColor }}>
               Vowel Preset
@@ -150,7 +150,7 @@ export const PinkTromboneControls: React.FC<PinkTromboneControlsProps> = ({
         </div>
 
         {/* Glottis controls */}
-        <div className={`rounded-lg border p-3 ${panelBg}`}>
+        <div className={`rounded-lg border p-3 ${panelBg}`} style={panelStyle}>
           <div className="flex items-center gap-2 mb-3">
             <span className="text-xs font-bold uppercase tracking-wider" style={{ color: accentColor }}>
               Glottis (Voice Source)
@@ -177,7 +177,7 @@ export const PinkTromboneControls: React.FC<PinkTromboneControlsProps> = ({
         </div>
 
         {/* Tongue controls */}
-        <div className={`rounded-lg border p-3 ${panelBg}`}>
+        <div className={`rounded-lg border p-3 ${panelBg}`} style={panelStyle}>
           <div className="flex items-center gap-2 mb-3">
             <span className="text-xs font-bold uppercase tracking-wider" style={{ color: accentColor }}>
               Tongue Shape
@@ -204,7 +204,7 @@ export const PinkTromboneControls: React.FC<PinkTromboneControlsProps> = ({
         </div>
 
         {/* Lip & Nasal controls */}
-        <div className={`rounded-lg border p-3 ${panelBg}`}>
+        <div className={`rounded-lg border p-3 ${panelBg}`} style={panelStyle}>
           <div className="flex items-center gap-2 mb-3">
             <span className="text-xs font-bold uppercase tracking-wider" style={{ color: accentColor }}>
               Lip & Nasal
@@ -231,7 +231,7 @@ export const PinkTromboneControls: React.FC<PinkTromboneControlsProps> = ({
         </div>
 
         {/* Constriction controls */}
-        <div className={`rounded-lg border p-3 ${panelBg}`}>
+        <div className={`rounded-lg border p-3 ${panelBg}`} style={panelStyle}>
           <div className="flex items-center gap-2 mb-3">
             <span className="text-xs font-bold uppercase tracking-wider" style={{ color: accentColor }}>
               Constriction

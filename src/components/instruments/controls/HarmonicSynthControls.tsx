@@ -65,7 +65,7 @@ export const HarmonicSynthControls: React.FC<HarmonicSynthControlsProps> = ({
 }) => {
   const [_isDragging, setIsDragging] = useState(false);
 
-  const { isCyan: isCyanTheme, knob: knobColor, panelBg } = useInstrumentColors('#4ade80');
+  const { isCyan: isCyanTheme, knob: knobColor, panelBg, panelStyle } = useInstrumentColors('#4ade80');
   const barColor = isCyanTheme ? 'rgba(0, 255, 255, 0.7)' : 'rgba(74, 222, 128, 0.7)';
   const barHighlight = isCyanTheme ? 'rgba(0, 255, 255, 1)' : 'rgba(74, 222, 128, 1)';
 
@@ -96,7 +96,7 @@ export const HarmonicSynthControls: React.FC<HarmonicSynthControlsProps> = ({
   return (
     <div className="space-y-3">
       {/* Harmonic Bar Graph */}
-      <div className={`rounded-lg border border-dark-border ${panelBg} overflow-hidden`}>
+      <div className={`rounded-lg border ${panelBg} overflow-hidden`} style={panelStyle}>
         <div className="flex items-center justify-between px-3 py-1.5 border-b border-dark-border">
           <span className="font-mono text-[10px] font-bold text-text-primary tracking-wider">HARMONICS</span>
           <div className="flex items-center gap-1">
@@ -104,7 +104,7 @@ export const HarmonicSynthControls: React.FC<HarmonicSynthControlsProps> = ({
               <button
                 key={name}
                 onClick={() => onChange({ harmonics: [...SPECTRAL_PRESETS[name]] })}
-                className="px-2 py-0.5 text-[9px] font-mono rounded border border-dark-border hover:border-accent text-text-muted hover:text-text-primary transition-colors"
+                className="px-2 py-0.5 text-[9px] font-mono rounded border hover:border-accent text-text-muted hover:text-text-primary transition-colors"
               >
                 {name}
               </button>
@@ -133,7 +133,7 @@ export const HarmonicSynthControls: React.FC<HarmonicSynthControlsProps> = ({
       {/* Controls Grid */}
       <div className="grid grid-cols-4 gap-3">
         {/* Spectral */}
-        <div className={`rounded-lg border p-3 ${panelBg}`}>
+        <div className={`rounded-lg border p-3 ${panelBg}`} style={panelStyle}>
           <div className="font-mono text-[10px] font-bold text-text-muted mb-2 tracking-wider">SPECTRAL</div>
           <div className="flex gap-4 justify-center">
             <Knob
@@ -153,13 +153,13 @@ export const HarmonicSynthControls: React.FC<HarmonicSynthControlsProps> = ({
         </div>
 
         {/* Filter */}
-        <div className={`rounded-lg border p-3 ${panelBg}`}>
+        <div className={`rounded-lg border p-3 ${panelBg}`} style={panelStyle}>
           <div className="flex items-center justify-between mb-2">
             <span className="font-mono text-[10px] font-bold text-text-muted tracking-wider">FILTER</span>
             <select
               value={config.filter.type}
               onChange={(e) => updateFilter({ type: e.target.value as 'lowpass' | 'highpass' | 'bandpass' })}
-              className="bg-transparent border border-dark-border rounded px-1.5 py-0.5 text-[9px] font-mono text-text-primary"
+              className="bg-transparent border rounded px-1.5 py-0.5 text-[9px] font-mono text-text-primary"
             >
               <option value="lowpass">LP</option>
               <option value="highpass">HP</option>
@@ -187,7 +187,7 @@ export const HarmonicSynthControls: React.FC<HarmonicSynthControlsProps> = ({
         </div>
 
         {/* Envelope */}
-        <div className={`rounded-lg border p-3 ${panelBg}`}>
+        <div className={`rounded-lg border p-3 ${panelBg}`} style={panelStyle}>
           <div className="font-mono text-[10px] font-bold text-text-muted mb-2 tracking-wider">ENVELOPE</div>
           <div className="flex gap-3 justify-center">
             <Knob
@@ -221,13 +221,13 @@ export const HarmonicSynthControls: React.FC<HarmonicSynthControlsProps> = ({
         </div>
 
         {/* LFO */}
-        <div className={`rounded-lg border p-3 ${panelBg}`}>
+        <div className={`rounded-lg border p-3 ${panelBg}`} style={panelStyle}>
           <div className="flex items-center justify-between mb-2">
             <span className="font-mono text-[10px] font-bold text-text-muted tracking-wider">LFO</span>
             <select
               value={config.lfo.target}
               onChange={(e) => updateLFO({ target: e.target.value as 'pitch' | 'filter' | 'spectral' })}
-              className="bg-transparent border border-dark-border rounded px-1.5 py-0.5 text-[9px] font-mono text-text-primary"
+              className="bg-transparent border rounded px-1.5 py-0.5 text-[9px] font-mono text-text-primary"
             >
               <option value="pitch">Pitch</option>
               <option value="filter">Filter</option>

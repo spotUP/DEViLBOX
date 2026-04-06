@@ -46,7 +46,7 @@ export const HivelyControls: React.FC<HivelyControlsProps> = ({
   const configRef = useRef(config);
   useEffect(() => { configRef.current = config; }, [config]);
 
-  const { isCyan: isCyanTheme, accent: accentColor, knob: knobColor, dim: dimColor, panelBg } = useInstrumentColors('#44ff88', { knob: '#66ddaa', dim: '#1a3328' });
+  const { isCyan: isCyanTheme, accent: accentColor, knob: knobColor, dim: dimColor, panelBg, panelStyle } = useInstrumentColors('#44ff88', { knob: '#66ddaa', dim: '#1a3328' });
   // Update helpers using refs to avoid stale state
   const updateParam = useCallback(<K extends keyof HivelyConfig>(key: K, value: HivelyConfig[K]) => {
     onChange({ [key]: value } as Partial<HivelyConfig>);
@@ -108,7 +108,7 @@ export const HivelyControls: React.FC<HivelyControlsProps> = ({
   const renderMainTab = () => (
     <div className="flex flex-col gap-4 p-3 overflow-y-auto synth-controls-flow" style={{ maxHeight: 'calc(100vh - 280px)' }}>
       {/* Volume & Wave Length */}
-      <div className={`rounded-lg border p-3 ${panelBg}`}>
+      <div className={`rounded-lg border p-3 ${panelBg}`} style={panelStyle}>
         <SectionLabel color={accentColor} label="Volume & Wave" />
         <div className="flex items-center gap-3">
           <Knob value={config.volume} min={0} max={64} step={1}
@@ -136,7 +136,7 @@ export const HivelyControls: React.FC<HivelyControlsProps> = ({
       </div>
 
       {/* Envelope ADSR */}
-      <div className={`rounded-lg border p-3 ${panelBg}`}>
+      <div className={`rounded-lg border p-3 ${panelBg}`} style={panelStyle}>
         <SectionLabel color={accentColor} label="Envelope" />
         <div className="grid grid-cols-4 gap-3">
           <div className="flex flex-col items-center gap-2">
@@ -196,7 +196,7 @@ export const HivelyControls: React.FC<HivelyControlsProps> = ({
       </div>
 
       {/* Vibrato */}
-      <div className={`rounded-lg border p-3 ${panelBg}`}>
+      <div className={`rounded-lg border p-3 ${panelBg}`} style={panelStyle}>
         <SectionLabel color={accentColor} label="Vibrato" />
         <div className="flex items-center gap-4">
           <Knob value={config.vibratoDelay} min={0} max={255} step={1}
@@ -215,7 +215,7 @@ export const HivelyControls: React.FC<HivelyControlsProps> = ({
       </div>
 
       {/* Square Wave Modulation */}
-      <div className={`rounded-lg border p-3 ${panelBg}`}>
+      <div className={`rounded-lg border p-3 ${panelBg}`} style={panelStyle}>
         <SectionLabel color={accentColor} label="Square Modulation" />
         <div className="flex items-center gap-4">
           <Knob value={config.squareLowerLimit} min={0} max={255} step={1}
@@ -234,7 +234,7 @@ export const HivelyControls: React.FC<HivelyControlsProps> = ({
       </div>
 
       {/* Filter Modulation */}
-      <div className={`rounded-lg border p-3 ${panelBg}`}>
+      <div className={`rounded-lg border p-3 ${panelBg}`} style={panelStyle}>
         <SectionLabel color={accentColor} label="Filter Modulation" />
         <div className="flex items-center gap-4">
           <Knob value={config.filterLowerLimit} min={0} max={127} step={1}
@@ -253,7 +253,7 @@ export const HivelyControls: React.FC<HivelyControlsProps> = ({
       </div>
 
       {/* Hard Cut */}
-      <div className={`rounded-lg border p-3 ${panelBg}`}>
+      <div className={`rounded-lg border p-3 ${panelBg}`} style={panelStyle}>
         <SectionLabel color={accentColor} label="Hard Cut" />
         <div className="flex items-center gap-4">
           <button

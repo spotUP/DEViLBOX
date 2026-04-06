@@ -36,7 +36,7 @@ export const RobHubbardControls: React.FC<RobHubbardControlsProps> = ({ config, 
     return chipEditorRef.current;
   }, []);
 
-  const { isCyan, accent, knob, dim, panelBg } = useInstrumentColors('#44aaff', { knob: '#66bbff', dim: '#001833' });
+  const { isCyan, accent, knob, dim, panelBg, panelStyle } = useInstrumentColors('#44aaff', { knob: '#66bbff', dim: '#001833' });
 
   const upd = useCallback(<K extends keyof RobHubbardConfig>(key: K, value: RobHubbardConfig[K]) => {
     onChange({ [key]: value } as Partial<RobHubbardConfig>);
@@ -62,7 +62,7 @@ export const RobHubbardControls: React.FC<RobHubbardControlsProps> = ({ config, 
     <div className="flex flex-col gap-3 p-3 overflow-y-auto" style={{ maxHeight: 'calc(100vh - 280px)' }}>
 
       {/* Sample */}
-      <div className={`rounded-lg border p-3 ${panelBg}`}>
+      <div className={`rounded-lg border p-3 ${panelBg}`} style={panelStyle}>
         <SectionLabel color={accent} label="Sample" />
         <div className="flex gap-3 items-start flex-wrap">
           <Knob value={config.sampleVolume} min={0} max={64} step={1}
@@ -83,7 +83,7 @@ export const RobHubbardControls: React.FC<RobHubbardControlsProps> = ({ config, 
       </div>
 
       {/* Vibrato */}
-      <div className={`rounded-lg border p-3 ${panelBg}`}>
+      <div className={`rounded-lg border p-3 ${panelBg}`} style={panelStyle}>
         <SectionLabel color={accent} label="Vibrato" />
         <div className="flex gap-4 items-center">
           <Knob value={config.divider} min={0} max={255} step={1}
@@ -99,7 +99,7 @@ export const RobHubbardControls: React.FC<RobHubbardControlsProps> = ({ config, 
       </div>
 
       {/* Wobble */}
-      <div className={`rounded-lg border p-3 ${panelBg}`}>
+      <div className={`rounded-lg border p-3 ${panelBg}`} style={panelStyle}>
         <SectionLabel color={accent} label="Wobble" />
         <div className="flex gap-4 items-center">
           <Knob value={config.hiPos} min={0} max={255} step={1}
@@ -115,7 +115,7 @@ export const RobHubbardControls: React.FC<RobHubbardControlsProps> = ({ config, 
       </div>
 
       {/* Tuning */}
-      <div className={`rounded-lg border p-3 ${panelBg}`}>
+      <div className={`rounded-lg border p-3 ${panelBg}`} style={panelStyle}>
         <SectionLabel color={accent} label="Tuning" />
         <div className="flex gap-4 items-center flex-wrap">
           <div className="flex flex-col gap-1">
@@ -157,7 +157,7 @@ export const RobHubbardControls: React.FC<RobHubbardControlsProps> = ({ config, 
 
     return (
       <div className="flex flex-col gap-3 p-3 overflow-y-auto" style={{ maxHeight: 'calc(100vh - 280px)' }}>
-        <div className={`rounded-lg border p-3 ${panelBg}`}>
+        <div className={`rounded-lg border p-3 ${panelBg}`} style={panelStyle}>
           <SectionLabel color={accent} label="Vibrato Wave Table" />
           {hasData ? (
             <>
@@ -201,7 +201,7 @@ export const RobHubbardControls: React.FC<RobHubbardControlsProps> = ({ config, 
 
     return (
       <div className="flex flex-col gap-3 p-3 overflow-y-auto" style={{ maxHeight: 'calc(100vh - 280px)' }}>
-        <div className={`rounded-lg border p-3 ${panelBg}`}>
+        <div className={`rounded-lg border p-3 ${panelBg}`} style={panelStyle}>
           <SectionLabel color={accent} label="Sample Waveform" />
           {hasData ? (
             <>

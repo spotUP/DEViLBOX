@@ -39,7 +39,7 @@ export const FuturePlayerControls: React.FC<FuturePlayerControlsProps> = ({
   const configRef = useRef(config);
   useEffect(() => { configRef.current = config; }, [config]);
 
-  const { isCyan, knob, panelBg } = useInstrumentColors('#ffbb66');
+  const { isCyan, knob, panelBg, panelStyle } = useInstrumentColors('#ffbb66');
 
   const upd = useCallback(<K extends keyof FuturePlayerConfig>(key: K, value: FuturePlayerConfig[K]) => {
     onChange({ [key]: value } as Partial<FuturePlayerConfig>);
@@ -86,7 +86,7 @@ export const FuturePlayerControls: React.FC<FuturePlayerControlsProps> = ({
       {activeTab === 'envelope' && (
         <div className="space-y-3">
           {/* Volume */}
-          <div className={`rounded border p-3 ${panelBg}`}>
+          <div className={`rounded border p-3 ${panelBg}`} style={panelStyle}>
             <div className="text-xs font-semibold text-text-secondary mb-2">Volume</div>
             <div className="flex justify-center">
               <Knob
@@ -101,7 +101,7 @@ export const FuturePlayerControls: React.FC<FuturePlayerControlsProps> = ({
           </div>
 
           {/* ADSR */}
-          <div className={`rounded border p-3 ${panelBg}`}>
+          <div className={`rounded border p-3 ${panelBg}`} style={panelStyle}>
             <div className="text-xs font-semibold text-text-secondary mb-2">Envelope</div>
             <div className="grid grid-cols-4 gap-3">
               <Knob label="Atk Rate" value={config.attackRate} min={0} max={255} step={1}
@@ -137,7 +137,7 @@ export const FuturePlayerControls: React.FC<FuturePlayerControlsProps> = ({
           </div>
 
           {/* Envelope visualization */}
-          <div className={`rounded border p-2 ${panelBg}`} style={{ height: 96 }}>
+          <div className={`rounded border p-2 ${panelBg}`} style={{ ...panelStyle, height: 96 }}>
             <EnvelopeVisualization
               mode="steps"
               attackVol={config.attackPeak}
@@ -160,7 +160,7 @@ export const FuturePlayerControls: React.FC<FuturePlayerControlsProps> = ({
       {activeTab === 'pitchMod' && (
         <div className="space-y-3">
           {/* Pitch Mod 1 */}
-          <div className={`rounded border p-3 ${panelBg}`}>
+          <div className={`rounded border p-3 ${panelBg}`} style={panelStyle}>
             <div className="flex items-center gap-2 mb-2">
               <div className="text-xs font-semibold text-text-secondary">Pitch Mod 1</div>
               <span className={`text-[9px] px-1.5 py-0.5 rounded ${
@@ -194,7 +194,7 @@ export const FuturePlayerControls: React.FC<FuturePlayerControlsProps> = ({
           </div>
 
           {/* Pitch Mod 2 */}
-          <div className={`rounded border p-3 ${panelBg}`}>
+          <div className={`rounded border p-3 ${panelBg}`} style={panelStyle}>
             <div className="flex items-center gap-2 mb-2">
               <div className="text-xs font-semibold text-text-secondary">Pitch Mod 2</div>
               <span className={`text-[9px] px-1.5 py-0.5 rounded ${
@@ -233,7 +233,7 @@ export const FuturePlayerControls: React.FC<FuturePlayerControlsProps> = ({
       {activeTab === 'sampleMod' && (
         <div className="space-y-3">
           {/* Sample Mod 1 */}
-          <div className={`rounded border p-3 ${panelBg}`}>
+          <div className={`rounded border p-3 ${panelBg}`} style={panelStyle}>
             <div className="flex items-center gap-2 mb-2">
               <div className="text-xs font-semibold text-text-secondary">Sample Mod 1</div>
               <span className={`text-[9px] px-1.5 py-0.5 rounded ${
@@ -261,7 +261,7 @@ export const FuturePlayerControls: React.FC<FuturePlayerControlsProps> = ({
           </div>
 
           {/* Sample Mod 2 */}
-          <div className={`rounded border p-3 ${panelBg}`}>
+          <div className={`rounded border p-3 ${panelBg}`} style={panelStyle}>
             <div className="flex items-center gap-2 mb-2">
               <div className="text-xs font-semibold text-text-secondary">Sample Mod 2</div>
               <span className={`text-[9px] px-1.5 py-0.5 rounded ${

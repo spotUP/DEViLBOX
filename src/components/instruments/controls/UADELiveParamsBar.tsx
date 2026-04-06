@@ -50,7 +50,7 @@ export const UADELiveParamsBar: React.FC<UADELiveParamsBarProps> = ({ instrument
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [instrument.id]);
 
-  const { accent, knob, dim, panelBg } = useInstrumentColors('#44aaff', { knob: '#66bbff', dim: '#001833' });
+  const { accent, knob, dim, panelBg, panelStyle } = useInstrumentColors('#44aaff', { knob: '#66bbff', dim: '#001833' });
 
   const handleVolumeChange = useCallback((v: number) => {
     const rounded = Math.round(v);
@@ -71,7 +71,7 @@ export const UADELiveParamsBar: React.FC<UADELiveParamsBarProps> = ({ instrument
   if (!sections || (sections['volume'] == null && sections['period'] == null)) return null;
 
   return (
-    <div className={`rounded-lg border p-3 ${panelBg} flex items-center gap-3`}>
+    <div className={`rounded-lg border p-3 ${panelBg} flex items-center gap-3`} style={panelStyle}>
       <div className="text-[10px] font-bold uppercase tracking-widest"
         style={{ color: accent, opacity: 0.7, minWidth: 60 }}>
         Live Params

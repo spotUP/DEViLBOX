@@ -37,7 +37,7 @@ export const MAMEControls: React.FC<MAMEControlsProps> = ({
   useEffect(() => { configRef.current = config; }, [config]);
 
   // Theme-aware styling
-  const { accent: accentColor, knob: knobColor, panelBg } = useInstrumentColors('#ff4444', { knob: '#ff8888' });
+  const { accent: accentColor, knob: knobColor, panelBg, panelStyle } = useInstrumentColors('#ff4444', { knob: '#ff8888' });
 
   const handleFileUpload = useCallback(async (e: React.ChangeEvent<HTMLInputElement>, bank: number) => {
     const file = e.target.files?.[0];
@@ -91,7 +91,7 @@ export const MAMEControls: React.FC<MAMEControlsProps> = ({
   return (
     <div className="space-y-6">
       {/* Header Info */}
-      <div className={`flex items-center justify-between p-3 rounded border border-dark-border ${panelBg}`}>
+      <div className={`flex items-center justify-between p-3 rounded border ${panelBg}`} style={panelStyle}>
         <div className="flex items-center gap-3">
           <div className="p-2 bg-accent-primary/20 rounded">
             <Cpu style={{ color: accentColor }} size={20} />
@@ -116,7 +116,7 @@ export const MAMEControls: React.FC<MAMEControlsProps> = ({
 
       {/* ROM Management Section */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div className={`p-4 border rounded ${panelBg}`}>
+        <div className={`p-4 border rounded ${panelBg}`} style={panelStyle}>
           <div className="flex items-center justify-between mb-1 text-text-secondary">
             <div className="flex items-center gap-2">
               <HardDrive size={16} />
@@ -154,7 +154,7 @@ export const MAMEControls: React.FC<MAMEControlsProps> = ({
         </div>
 
         {/* Status / Activity */}
-        <div className={`p-4 border rounded ${panelBg}`}>
+        <div className={`p-4 border rounded ${panelBg}`} style={panelStyle}>
           <div className="flex items-center gap-2 mb-3 text-text-secondary">
             <Activity size={16} />
             <span className="text-xs font-bold uppercase">Status</span>
@@ -217,29 +217,32 @@ export const MAMEControls: React.FC<MAMEControlsProps> = ({
 
       {/* Voice Matrix (VFX Specific) */}
       {config.type === 'vfx' && handle !== 0 && (
-        <MAMEVFXVoiceMatrix 
+        <MAMEVFXVoiceMatrix
           handle={handle}
           accentColor={accentColor}
           knobColor={knobColor}
           panelBg={panelBg}
+          panelStyle={panelStyle}
         />
       )}
 
       {/* Oscillator Matrix (DOC Specific) */}
       {config.type === 'doc' && handle !== 0 && (
-        <MAMEDOCVoiceMatrix 
+        <MAMEDOCVoiceMatrix
           handle={handle}
           knobColor={knobColor}
           panelBg={panelBg}
+          panelStyle={panelStyle}
         />
       )}
 
       {/* Voice Matrix (RSA Specific) */}
       {config.type === 'rsa' && handle !== 0 && (
-        <MAMERSAVoiceMatrix 
+        <MAMERSAVoiceMatrix
           handle={handle}
           knobColor={knobColor}
           panelBg={panelBg}
+          panelStyle={panelStyle}
         />
       )}
 
@@ -249,7 +252,7 @@ export const MAMEControls: React.FC<MAMEControlsProps> = ({
           <Activity size={16} />
           <span className="text-xs font-bold uppercase">Register Live View (HEX)</span>
         </div>
-        <div className="grid grid-cols-8 md:grid-cols-16 gap-1 p-2 bg-black/40 rounded border border-dark-border font-mono text-[9px]">
+        <div className="grid grid-cols-8 md:grid-cols-16 gap-1 p-2 bg-black/40 rounded border font-mono text-[9px]">
           {Array.from({ length: 32 }).map((_, i) => {
             const val = handle !== 0 ? engine.read(handle, i) : 0;
             return (

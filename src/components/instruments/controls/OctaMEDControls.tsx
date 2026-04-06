@@ -103,7 +103,7 @@ export const OctaMEDControls: React.FC<OctaMEDControlsProps> = ({ config, onChan
   }, []);
 
   const numChannels = useTrackerStore((s) => s.patterns[0]?.channels.length ?? 4);
-  const { isCyan, accent, knob, dim, panelBg } = useInstrumentColors('#44aaff', { knob: '#66bbff', dim: '#001833' });
+  const { isCyan, accent, knob, dim, panelBg, panelStyle } = useInstrumentColors('#44aaff', { knob: '#66bbff', dim: '#001833' });
 
   const upd = useCallback(<K extends keyof OctaMEDConfig>(key: K, value: OctaMEDConfig[K]) => {
     onChange({ [key]: value } as Partial<OctaMEDConfig>);
@@ -135,7 +135,7 @@ export const OctaMEDControls: React.FC<OctaMEDControlsProps> = ({ config, onChan
   const renderParams = () => (
     <div className="flex flex-col gap-3 p-3 overflow-y-auto" style={{ maxHeight: 'calc(100vh - 280px)' }}>
       {/* Playback section */}
-      <div className={`rounded-lg border p-3 ${panelBg}`}>
+      <div className={`rounded-lg border p-3 ${panelBg}`} style={panelStyle}>
         <SectionLabel color={accent} label="Playback" />
         <div className="flex flex-wrap gap-4">
           <Knob
@@ -186,7 +186,7 @@ export const OctaMEDControls: React.FC<OctaMEDControlsProps> = ({ config, onChan
       </div>
 
       {/* Loop reference section */}
-      <div className={`rounded-lg border p-3 ${panelBg}`}>
+      <div className={`rounded-lg border p-3 ${panelBg}`} style={panelStyle}>
         <SectionLabel color={accent} label="Loop (read-only reference)" />
         <div className="flex gap-3">
           <div className="flex flex-col gap-1">
@@ -213,7 +213,7 @@ export const OctaMEDControls: React.FC<OctaMEDControlsProps> = ({ config, onChan
   // ── VOL TABLE TAB ──
   const renderVoltbl = () => (
     <div className="flex flex-col gap-3 p-3 overflow-y-auto" style={{ maxHeight: 'calc(100vh - 280px)' }}>
-      <div className={`rounded-lg border p-3 ${panelBg}`}>
+      <div className={`rounded-lg border p-3 ${panelBg}`} style={panelStyle}>
         <SectionLabel color={accent} label="Vol Command Table (128 bytes)" />
 
         {/* Legend */}
@@ -273,7 +273,7 @@ export const OctaMEDControls: React.FC<OctaMEDControlsProps> = ({ config, onChan
   // ── WF TABLE TAB ──
   const renderWftbl = () => (
     <div className="flex flex-col gap-3 p-3 overflow-y-auto" style={{ maxHeight: 'calc(100vh - 280px)' }}>
-      <div className={`rounded-lg border p-3 ${panelBg}`}>
+      <div className={`rounded-lg border p-3 ${panelBg}`} style={panelStyle}>
         <SectionLabel color={accent} label="WF Command Table (128 bytes)" />
 
         {/* Legend */}
@@ -334,7 +334,7 @@ export const OctaMEDControls: React.FC<OctaMEDControlsProps> = ({ config, onChan
   const renderWaveform = () => (
     <div className="flex flex-col gap-3 p-3 overflow-y-auto" style={{ maxHeight: 'calc(100vh - 280px)' }}>
       {config.waveforms.map((wf, idx) => (
-        <div key={idx} className={`rounded-lg border p-3 ${panelBg}`}>
+        <div key={idx} className={`rounded-lg border p-3 ${panelBg}`} style={panelStyle}>
           <SectionLabel color={accent} label={`Wave ${idx + 1}`} />
           <SequenceEditor
             label={`Wave ${idx + 1}`}

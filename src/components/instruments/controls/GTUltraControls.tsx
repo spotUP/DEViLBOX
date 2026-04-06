@@ -96,7 +96,7 @@ export const GTUltraControls: React.FC<GTUltraControlsProps> = ({
   const [showEffectRef, setShowEffectRef] = useState(false);
   const [showTableRef, setShowTableRef] = useState(false);
 
-  const { isCyan: isCyanTheme, accent: accentColor, dim: dimColor, panelBg } = useInstrumentColors('#44ff88', { dim: '#1a3328' });
+  const { isCyan: isCyanTheme, accent: accentColor, dim: dimColor, panelBg, panelStyle } = useInstrumentColors('#44ff88', { dim: '#1a3328' });
 
   // Read live instrument data from GT store (updates when switching instruments)
   const currentInstrument = useGTUltraStore((s) => s.currentInstrument);
@@ -191,7 +191,7 @@ export const GTUltraControls: React.FC<GTUltraControlsProps> = ({
       style={{ maxHeight: 'calc(100vh - 280px)', gridTemplateColumns: 'repeat(3, 1fr)' }}>
 
       {/* ADSR */}
-      <div className={`rounded-lg border p-3 ${panelBg}`}>
+      <div className={`rounded-lg border p-3 ${panelBg}`} style={panelStyle}>
         <SectionLabel color={accentColor} label="ADSR Envelope" />
         <EnvelopeVisualization
           mode="sid"
@@ -217,7 +217,7 @@ export const GTUltraControls: React.FC<GTUltraControlsProps> = ({
       </div>
 
       {/* Column 1: Waveform */}
-      <div className={`rounded-lg border p-3 ${panelBg}`}>
+      <div className={`rounded-lg border p-3 ${panelBg}`} style={panelStyle}>
         <SectionLabel color={accentColor} label="Waveform" />
         <div className="flex flex-wrap gap-1.5 mb-2">
           {WAVEFORM_BITS.map(({ bit, label }) => {
@@ -252,7 +252,7 @@ export const GTUltraControls: React.FC<GTUltraControlsProps> = ({
 
       {/* Column 2: Timing + Panning */}
       <div className="flex flex-col gap-3">
-        <div className={`rounded-lg border p-3 ${panelBg}`}>
+        <div className={`rounded-lg border p-3 ${panelBg}`} style={panelStyle}>
           <SectionLabel color={accentColor} label="Timing" />
           <div className="flex flex-col gap-2">
             <NumBox label="Gate Timer" value={gateTimerValue} min={0} max={63} hex
@@ -276,7 +276,7 @@ export const GTUltraControls: React.FC<GTUltraControlsProps> = ({
           </div>
         </div>
 
-        <div className={`rounded-lg border p-3 ${panelBg}`}>
+        <div className={`rounded-lg border p-3 ${panelBg}`} style={panelStyle}>
           <SectionLabel color={accentColor} label="Panning" />
           <div className="flex flex-col gap-1">
             <div className="flex items-center gap-2">
@@ -300,7 +300,7 @@ export const GTUltraControls: React.FC<GTUltraControlsProps> = ({
 
       {/* Column 3: Table Pointers + Effects */}
       <div className="flex flex-col gap-3">
-        <div className={`rounded-lg border p-3 ${panelBg}`}>
+        <div className={`rounded-lg border p-3 ${panelBg}`} style={panelStyle}>
           <SectionLabel color={accentColor} label="Table Pointers" />
           <div className="flex flex-col gap-2">
             <NumBox label="Wave Table" value={config.wavePtr} min={0} max={255} hex color={accentColor} borderColor={dimColor} background="#0a0f0c" onValueChange={(v) => onChange({ wavePtr: v })} />
@@ -311,7 +311,7 @@ export const GTUltraControls: React.FC<GTUltraControlsProps> = ({
           <div className="text-[8px] text-text-secondary mt-1.5 opacity-60">0 = disabled. Edit in Tables tab.</div>
         </div>
 
-        <div className={`rounded-lg border p-3 ${panelBg}`}>
+        <div className={`rounded-lg border p-3 ${panelBg}`} style={panelStyle}>
           <button className="text-[10px] font-bold uppercase tracking-widest w-full text-left"
             style={{ color: accentColor, opacity: 0.7 }} onClick={() => setShowEffectRef(!showEffectRef)}>
             {showEffectRef ? '[-]' : '[+]'} Pattern Effects
@@ -432,7 +432,7 @@ export const GTUltraControls: React.FC<GTUltraControlsProps> = ({
     return (
       <div className="flex flex-col gap-3 p-3 overflow-y-auto synth-controls-flow" style={{ maxHeight: 'calc(100vh - 280px)' }}>
         {Array.from({ length: chipCount }, (_, chipIdx) => (
-          <div key={chipIdx} className={`rounded-lg border p-3 ${panelBg}`}>
+          <div key={chipIdx} className={`rounded-lg border p-3 ${panelBg}`} style={panelStyle}>
             {chipCount > 1 && <SectionLabel color={accentColor} label={`SID ${chipIdx + 1}`} />}
             <div className="font-mono text-xs" style={{ lineHeight: '1.6' }}>
               {/* Voices + Filter side by side */}

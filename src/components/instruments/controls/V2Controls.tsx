@@ -36,7 +36,7 @@ export const V2Controls: React.FC<V2ControlsProps> = ({
   useEffect(() => { configRef.current = config; }, [config]);
 
   // Theme-aware styling
-  const { accent: accentColor, knob: knobColor, panelBg } = useInstrumentColors('#ffaa00', { knob: '#ffcc33' });
+  const { accent: accentColor, knob: knobColor, panelBg, panelStyle } = useInstrumentColors('#ffaa00', { knob: '#ffcc33' });
 
   // Helpers to update nested configs
   const updateOsc1 = (updates: Partial<typeof config.osc1>) => {
@@ -107,7 +107,7 @@ export const V2Controls: React.FC<V2ControlsProps> = ({
   const renderOscTab = () => (
     <div className="grid grid-cols-4 gap-2 p-2">
       {/* Osc 1 Section */}
-      <div className={`p-2 rounded-lg border border-dark-border ${panelBg}`}>
+      <div className={`p-2 rounded-lg border ${panelBg}`} style={panelStyle}>
         <div className="flex items-center justify-between mb-2">
           <div className="flex items-center gap-2">
             <Activity size={16} className="text-amber-500" />
@@ -116,7 +116,7 @@ export const V2Controls: React.FC<V2ControlsProps> = ({
           <select
             value={config.osc1.mode}
             onChange={(e) => updateOsc1({ mode: parseInt(e.target.value) })}
-            className="bg-dark-bgSecondary border border-dark-borderLight text-xs text-amber-400 rounded px-2 py-1"
+            className="bg-dark-bgSecondary borderLight text-xs text-amber-400 rounded px-2 py-1"
           >
             {OSC_MODES.map((mode, i) => (
               <option key={mode} value={i}>{mode}</option>
@@ -163,7 +163,7 @@ export const V2Controls: React.FC<V2ControlsProps> = ({
       </div>
 
       {/* Osc 2 Section */}
-      <div className={`p-2 rounded-lg border border-dark-border ${panelBg}`}>
+      <div className={`p-2 rounded-lg border ${panelBg}`} style={panelStyle}>
         <div className="flex items-center justify-between mb-2">
           <div className="flex items-center gap-2">
             <Activity size={16} className="text-amber-500" />
@@ -182,7 +182,7 @@ export const V2Controls: React.FC<V2ControlsProps> = ({
             <select
               value={config.osc2.mode}
               onChange={(e) => updateOsc2({ mode: parseInt(e.target.value) })}
-              className="bg-dark-bgSecondary border border-dark-borderLight text-xs text-amber-400 rounded px-2 py-1"
+              className="bg-dark-bgSecondary borderLight text-xs text-amber-400 rounded px-2 py-1"
             >
               {OSC23_MODES.map((mode, i) => (
                 <option key={mode} value={i}>{mode}</option>
@@ -230,7 +230,7 @@ export const V2Controls: React.FC<V2ControlsProps> = ({
       </div>
 
       {/* Osc 3 Section */}
-      <div className={`p-2 rounded-lg border border-dark-border ${panelBg}`}>
+      <div className={`p-2 rounded-lg border ${panelBg}`} style={panelStyle}>
         <div className="flex items-center justify-between mb-2">
           <div className="flex items-center gap-2">
             <Activity size={16} className="text-amber-500" />
@@ -249,7 +249,7 @@ export const V2Controls: React.FC<V2ControlsProps> = ({
             <select
               value={config.osc3.mode}
               onChange={(e) => updateOsc3({ mode: parseInt(e.target.value) })}
-              className="bg-dark-bgSecondary border border-dark-borderLight text-xs text-amber-400 rounded px-2 py-1"
+              className="bg-dark-bgSecondary borderLight text-xs text-amber-400 rounded px-2 py-1"
             >
               {OSC23_MODES.map((mode, i) => (
                 <option key={mode} value={i}>{mode}</option>
@@ -301,7 +301,7 @@ export const V2Controls: React.FC<V2ControlsProps> = ({
   const renderFilterTab = () => (
     <div className="grid grid-cols-4 gap-2 p-2">
       {/* Filter 1 */}
-      <div className={`p-2 rounded-lg border border-dark-border ${panelBg}`}>
+      <div className={`p-2 rounded-lg border ${panelBg}`} style={panelStyle}>
         <div className="flex items-center gap-2 mb-2">
           <Filter size={16} className="text-amber-500" />
           <h3 className="font-bold text-amber-400 uppercase tracking-tight">VCF 1</h3>
@@ -341,7 +341,7 @@ export const V2Controls: React.FC<V2ControlsProps> = ({
           <select
             value={config.filter1.mode}
             onChange={(e) => updateFilter1({ mode: parseInt(e.target.value) })}
-            className="bg-dark-bgSecondary border border-dark-borderLight text-xs text-amber-400 rounded px-2 py-1"
+            className="bg-dark-bgSecondary borderLight text-xs text-amber-400 rounded px-2 py-1"
           >
             {FILTER_MODES.map((mode, i) => (
               <option key={mode} value={i}>{mode}</option>
@@ -351,7 +351,7 @@ export const V2Controls: React.FC<V2ControlsProps> = ({
       </div>
 
       {/* Filter 2 */}
-      <div className={`p-2 rounded-lg border border-dark-border ${panelBg}`}>
+      <div className={`p-2 rounded-lg border ${panelBg}`} style={panelStyle}>
         <div className="flex items-center gap-2 mb-2">
           <Filter size={16} className="text-amber-500" />
           <h3 className="font-bold text-amber-400 uppercase tracking-tight">VCF 2</h3>
@@ -391,7 +391,7 @@ export const V2Controls: React.FC<V2ControlsProps> = ({
           <select
             value={config.filter2.mode}
             onChange={(e) => updateFilter2({ mode: parseInt(e.target.value) })}
-            className="bg-dark-bgSecondary border border-dark-borderLight text-xs text-amber-400 rounded px-2 py-1"
+            className="bg-dark-bgSecondary borderLight text-xs text-amber-400 rounded px-2 py-1"
           >
             {FILTER_MODES.map((mode, i) => (
               <option key={mode} value={i}>{mode}</option>
@@ -401,7 +401,7 @@ export const V2Controls: React.FC<V2ControlsProps> = ({
       </div>
 
       {/* Routing */}
-      <div className={`p-2 rounded-lg border border-dark-border ${panelBg}`}>
+      <div className={`p-2 rounded-lg border ${panelBg}`} style={panelStyle}>
         <div className="flex items-center justify-between mb-2">
           <div className="flex items-center gap-2">
             <Zap size={16} className="text-amber-500" />
@@ -410,7 +410,7 @@ export const V2Controls: React.FC<V2ControlsProps> = ({
           <select
             value={config.routing.mode}
             onChange={(e) => updateRouting({ mode: parseInt(e.target.value) })}
-            className="bg-dark-bgSecondary border border-dark-borderLight text-xs text-amber-400 rounded px-2 py-1"
+            className="bg-dark-bgSecondary borderLight text-xs text-amber-400 rounded px-2 py-1"
           >
             {ROUTING_MODES.map((mode, i) => (
               <option key={mode} value={i}>{mode}</option>
@@ -436,7 +436,7 @@ export const V2Controls: React.FC<V2ControlsProps> = ({
   const renderEnvTab = () => (
     <div className="grid grid-cols-4 gap-2 p-2">
       {/* Amp Env */}
-      <div className={`p-2 rounded-lg border border-dark-border ${panelBg}`}>
+      <div className={`p-2 rounded-lg border ${panelBg}`} style={panelStyle}>
         <div className="flex items-center gap-2 mb-2">
           <Zap size={16} className="text-amber-500" />
           <h3 className="font-bold text-amber-400 uppercase tracking-tight">AMP ENVELOPE (EG 1)</h3>
@@ -491,7 +491,7 @@ export const V2Controls: React.FC<V2ControlsProps> = ({
       </div>
 
       {/* Env 2 */}
-      <div className={`p-2 rounded-lg border border-dark-border ${panelBg}`}>
+      <div className={`p-2 rounded-lg border ${panelBg}`} style={panelStyle}>
         <div className="flex items-center gap-2 mb-2">
           <Zap size={16} className="text-amber-500" />
           <h3 className="font-bold text-amber-400 uppercase tracking-tight">MOD ENVELOPE (EG 2)</h3>
@@ -523,7 +523,7 @@ export const V2Controls: React.FC<V2ControlsProps> = ({
     const lfo2 = config.lfo2 ?? { mode: 1, keySync: true, envMode: false, rate: 64, phase: 2, polarity: 0, amplify: 127 };
     return (
       <div className="grid grid-cols-4 gap-2 p-2">
-        <div className={`p-2 rounded-lg border border-dark-border ${panelBg}`}>
+        <div className={`p-2 rounded-lg border ${panelBg}`} style={panelStyle}>
           <div className="flex items-center gap-2 mb-2">
             <Activity size={16} className="text-amber-500" />
             <h3 className="font-bold text-amber-400 uppercase tracking-tight">LFO 1</h3>
@@ -550,7 +550,7 @@ export const V2Controls: React.FC<V2ControlsProps> = ({
         </div>
 
         {/* LFO 2 */}
-        <div className={`p-2 rounded-lg border border-dark-border ${panelBg}`}>
+        <div className={`p-2 rounded-lg border ${panelBg}`} style={panelStyle}>
           <div className="flex items-center justify-between mb-2">
             <div className="flex items-center gap-2">
               <Activity size={16} className="text-amber-500" />
@@ -560,7 +560,7 @@ export const V2Controls: React.FC<V2ControlsProps> = ({
               <select
                 value={lfo2.mode}
                 onChange={(e) => updateLFO2({ mode: parseInt(e.target.value) })}
-                className="bg-dark-bgSecondary border border-dark-borderLight text-xs text-amber-400 rounded px-2 py-1"
+                className="bg-dark-bgSecondary borderLight text-xs text-amber-400 rounded px-2 py-1"
               >
                 {LFO_MODES.map((mode, i) => (
                   <option key={mode} value={i}>{mode}</option>
@@ -569,7 +569,7 @@ export const V2Controls: React.FC<V2ControlsProps> = ({
               <select
                 value={lfo2.polarity}
                 onChange={(e) => updateLFO2({ polarity: parseInt(e.target.value) })}
-                className="bg-dark-bgSecondary border border-dark-borderLight text-xs text-amber-400 rounded px-2 py-1"
+                className="bg-dark-bgSecondary borderLight text-xs text-amber-400 rounded px-2 py-1"
               >
                 {LFO_POLARITY.map((p, i) => (
                   <option key={p} value={i}>{p}</option>
@@ -638,7 +638,7 @@ export const V2Controls: React.FC<V2ControlsProps> = ({
     return (
       <div className="grid grid-cols-4 gap-2 p-2">
         {/* Voice Distortion */}
-        <div className={`p-2 rounded-lg border border-dark-border ${panelBg}`}>
+        <div className={`p-2 rounded-lg border ${panelBg}`} style={panelStyle}>
           <div className="flex items-center justify-between mb-2">
             <div className="flex items-center gap-2">
               <Zap size={16} className="text-amber-500" />
@@ -647,7 +647,7 @@ export const V2Controls: React.FC<V2ControlsProps> = ({
             <select
               value={vDist.mode}
               onChange={(e) => updateVoiceDist({ mode: parseInt(e.target.value) })}
-              className="bg-dark-bgSecondary border border-dark-borderLight text-xs text-amber-400 rounded px-2 py-1"
+              className="bg-dark-bgSecondary borderLight text-xs text-amber-400 rounded px-2 py-1"
             >
               {DIST_MODES.map((mode, i) => (
                 <option key={mode} value={i}>{mode}</option>
@@ -683,7 +683,7 @@ export const V2Controls: React.FC<V2ControlsProps> = ({
         </div>
 
         {/* Channel Distortion */}
-        <div className={`p-2 rounded-lg border border-dark-border ${panelBg}`}>
+        <div className={`p-2 rounded-lg border ${panelBg}`} style={panelStyle}>
           <div className="flex items-center justify-between mb-2">
             <div className="flex items-center gap-2">
               <Zap size={16} className="text-amber-500" />
@@ -692,7 +692,7 @@ export const V2Controls: React.FC<V2ControlsProps> = ({
             <select
               value={cDist.mode}
               onChange={(e) => updateChanDist({ mode: parseInt(e.target.value) })}
-              className="bg-dark-bgSecondary border border-dark-borderLight text-xs text-amber-400 rounded px-2 py-1"
+              className="bg-dark-bgSecondary borderLight text-xs text-amber-400 rounded px-2 py-1"
             >
               {DIST_MODES.map((mode, i) => (
                 <option key={mode} value={i}>{mode}</option>
@@ -728,7 +728,7 @@ export const V2Controls: React.FC<V2ControlsProps> = ({
         </div>
 
         {/* Chorus/Flanger */}
-        <div className={`p-2 rounded-lg border border-dark-border ${panelBg}`}>
+        <div className={`p-2 rounded-lg border ${panelBg}`} style={panelStyle}>
           <div className="flex items-center gap-2 mb-2">
             <Activity size={16} className="text-amber-500" />
             <h3 className="font-bold text-amber-400 uppercase tracking-tight">CHORUS / FLANGER</h3>
@@ -796,7 +796,7 @@ export const V2Controls: React.FC<V2ControlsProps> = ({
         </div>
 
         {/* Compressor */}
-        <div className={`p-2 rounded-lg border border-dark-border ${panelBg}`}>
+        <div className={`p-2 rounded-lg border ${panelBg}`} style={panelStyle}>
           <div className="flex items-center justify-between mb-2">
             <div className="flex items-center gap-2">
               <Zap size={16} className="text-amber-500" />
@@ -805,7 +805,7 @@ export const V2Controls: React.FC<V2ControlsProps> = ({
             <select
               value={comp.mode}
               onChange={(e) => updateCompressor({ mode: parseInt(e.target.value) })}
-              className="bg-dark-bgSecondary border border-dark-borderLight text-xs text-amber-400 rounded px-2 py-1"
+              className="bg-dark-bgSecondary borderLight text-xs text-amber-400 rounded px-2 py-1"
             >
               {COMP_MODES.map((mode, i) => (
                 <option key={mode} value={i}>{mode}</option>

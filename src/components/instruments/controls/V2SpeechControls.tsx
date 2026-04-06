@@ -24,7 +24,7 @@ export const V2SpeechControls: React.FC<V2SpeechControlsProps> = ({
   useEffect(() => { configRef.current = config; });
 
   // Theme-aware styling
-  const { knob: knobColor, panelBg } = useInstrumentColors('#ffcc33');
+  const { knob: knobColor, panelBg, panelStyle } = useInstrumentColors('#ffcc33');
 
   // Convert plain text to SAM phonemes
   const handleConvertToPhonemes = () => {
@@ -53,7 +53,7 @@ export const V2SpeechControls: React.FC<V2SpeechControlsProps> = ({
     <ScrollLockContainer>
       <div className="synth-controls-flow grid grid-cols-4 gap-2 p-2 h-full overflow-y-auto scrollbar-modern">
       {/* Speech Text Section */}
-      <div className={`p-2 rounded-lg border border-dark-border ${panelBg}`}>
+      <div className={`p-2 rounded-lg border ${panelBg}`} style={panelStyle}>
         <div className="flex items-center justify-between mb-2">
           <div className="flex items-center gap-2">
             <MessageSquare size={16} className="text-amber-500" />
@@ -75,7 +75,7 @@ export const V2SpeechControls: React.FC<V2SpeechControlsProps> = ({
             type="text"
             value={config.text}
             onChange={(e) => onChange({ text: e.target.value })}
-            className="flex-1 bg-black/40 border border-dark-borderLight rounded-lg px-4 py-3 font-mono text-amber-500 focus:border-amber-500/50 outline-none"
+            className="flex-1 bg-black/40 borderLight rounded-lg px-4 py-3 font-mono text-amber-500 focus:border-amber-500/50 outline-none"
             placeholder="HELLO WORLD"
           />
           <button
@@ -104,7 +104,7 @@ export const V2SpeechControls: React.FC<V2SpeechControlsProps> = ({
       )}
 
       {/* Voice Parameters */}
-      <div className={`p-2 rounded-lg border border-dark-border ${panelBg}`}>
+      <div className={`p-2 rounded-lg border ${panelBg}`} style={panelStyle}>
         <div className="flex items-center gap-2 mb-2">
           <Activity size={16} className="text-amber-500" />
           <h3 className="font-bold text-amber-400 uppercase tracking-tight">VOICE PARAMETERS</h3>
@@ -139,7 +139,7 @@ export const V2SpeechControls: React.FC<V2SpeechControlsProps> = ({
       </div>
 
       {/* Phoneme Cheat Sheet */}
-      <div className={`rounded-xl border border-dark-border ${panelBg} overflow-hidden transition-all`}>
+      <div className={`rounded-xl border ${panelBg} overflow-hidden transition-all`} style={panelStyle}>
         <button
           onClick={() => setShowPhonemes(!showPhonemes)}
           className="w-full p-3 flex items-center justify-between hover:bg-white/5 transition-colors"
@@ -154,7 +154,7 @@ export const V2SpeechControls: React.FC<V2SpeechControlsProps> = ({
         {showPhonemes && (
           <div className="p-4 grid grid-cols-2 sm:grid-cols-4 gap-2 border-t border-dark-border bg-black/20">
             {PHONEMES.map(p => (
-              <div key={p.code} className="flex flex-col p-1.5 rounded bg-dark-bgSecondary/50 border border-dark-border">
+              <div key={p.code} className="flex flex-col p-1.5 rounded bg-dark-bgSecondary/50 border">
                 <span className="text-[10px] font-bold text-amber-500 font-mono">{p.code}</span>
                 <span className="text-[8px] text-text-muted uppercase">{p.example}</span>
               </div>
