@@ -115,6 +115,11 @@ export function isDirty(): boolean {
   return _dirty;
 }
 
+/** Mark the bridge as dirty (forces re-serialization on next play). */
+export function markDirty(): void {
+  _dirty = true;
+}
+
 /** Get the current format for serialization. */
 export function getFormat(): SaveFormat {
   return _format;
