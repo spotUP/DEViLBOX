@@ -80,6 +80,23 @@ class EupminiProcessor extends AudioWorkletProcessor {
         }
         break;
 
+      case 'setChannelMute':
+        if (this.module && typeof this.module._eupmini_set_channel_mute === 'function') {
+          this.module._eupmini_set_channel_mute(data.channel, data.muted);
+        }
+        break;
+
+      case 'setMuteMask':
+        // EUP has up to 32 tracks. Mute mask bit N = track N muted.
+        if (this.module && typeof this.module._eupmini_set_channel_mute === 'function') {
+          const mask = data.mask || 0;
+          for (let ch = 0; ch < 32; ch++) {
+            const muted = (mask & (1 << ch)) !== 0;
+            this.module._eupmini_set_channel_mute(ch, muted ? 1 : 0);
+          }
+        }
+        break;
+
       case 'dispose':
         this.cleanup();
         break;

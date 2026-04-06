@@ -43,6 +43,10 @@ export class Sc68Engine {
     this.workletNode?.port.postMessage({ type: 'setChannelGain', channel, gain });
   }
 
+  setMuteMask(mask: number): void {
+    this.workletNode?.port.postMessage({ type: 'setMuteMask', mask });
+  }
+
   private async initialize(): Promise<void> {
     try {
       await Sc68Engine.ensureInitialized(this.audioContext);

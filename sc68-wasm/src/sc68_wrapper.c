@@ -31,6 +31,9 @@ static api68_init_t g_init;
 static int g_playing = 0;
 static int g_first_init = 1;
 
+/* Per-channel gain for YM2149 (3 channels). 1.0 = full, 0.0 = muted. */
+static float g_channel_gain[3] = {1.0f, 1.0f, 1.0f};
+
 /* SC68 renders signed 16-bit stereo PCM (interleaved). We convert to float. */
 static int g_pcm_buf[1024]; /* 256 frames * 2 channels * 2 bytes fits in 256 ints */
 
@@ -122,7 +125,16 @@ void sc68_wasm_stop(void) {
 
 EMSCRIPTEN_KEEPALIVE
 void sc68_wasm_set_channel_gain(int channel, float gain) {
-    /* YM2149 has 3 channels — per-channel gain not supported in sc68 2.2.1 */
-    (void)channel;
-    (void)gain;
+    /* YM2149 has 3 channels. Store gain for worklet-side muting. */
+    if (channel >= 0 && channel < 3) {
+        g_channel_gain[channel] = gain;
+    }
+}
+
+EMSCRIPTEN_KEEPALIVE
+float sc68_wasm_get_channel_gain(int channel) {
+    if (channel >= 0 && channel < 3) {
+        return g_channel_gain[channel];
+    }
+    return 1.0f;
 }
