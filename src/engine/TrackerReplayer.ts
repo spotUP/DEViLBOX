@@ -2179,7 +2179,10 @@ export class TrackerReplayer {
             if (this.onRowChange) {
               this.onRowChange(row, patternNum, order);
             }
-            // Hybrid notes fired via onChannelState below (not here — avoid double-trigger)
+            // Fire hybrid notes — uses pattern data from TrackerStore
+            // onChannelState below provides the same via worklet, but as fallback
+            // we fire from onPosition too (fireHybridNotesFromChannelState dedupes)
+            this.fireHybridNotesForRow(time);
           };
 
           // Subscribe to per-channel state for hybrid synth note firing.
