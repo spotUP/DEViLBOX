@@ -836,20 +836,23 @@ export const SynthTypeDispatcher: React.FC<SynthTypeDispatcherProps> = ({
           hideVisualization={true}
           showHelpButton={false}
           customHeaderControls={
-            <button
-              className={`px-2 py-1 text-xs rounded flex items-center gap-1 ${
-                uiMode === 'hardware'
-                  ? 'bg-blue-600 text-text-primary'
-                  : 'bg-dark-bgHover text-text-secondary hover:bg-dark-bgHover'
-              }`}
-              onClick={() => setUIMode(uiMode === 'simple' ? 'hardware' : 'simple')}
-              title={uiMode === 'hardware' ? 'Switch to Simple Controls' : 'Switch to Hardware UI'}
-            >
-              {uiMode === 'hardware' ? <Cpu size={14} /> : <Monitor size={14} />}
-              <span className="hidden sm:inline">
-                {uiMode === 'hardware' ? 'Hardware UI' : 'Simple UI'}
-              </span>
-            </button>
+            <div className="flex items-center gap-2">
+              <SampleRecordButton instrumentId={instrument.id} onChange={handleChange} instrument={instrument} />
+              <button
+                className={`px-2 py-1 text-xs rounded flex items-center gap-1 ${
+                  uiMode === 'hardware'
+                    ? 'bg-blue-600 text-text-primary'
+                    : 'bg-dark-bgHover text-text-secondary hover:bg-dark-bgHover'
+                }`}
+                onClick={() => setUIMode(uiMode === 'simple' ? 'hardware' : 'simple')}
+                title={uiMode === 'hardware' ? 'Switch to Simple Controls' : 'Switch to Hardware UI'}
+              >
+                {uiMode === 'hardware' ? <Cpu size={14} /> : <Monitor size={14} />}
+                <span className="hidden sm:inline">
+                  {uiMode === 'hardware' ? 'Hardware UI' : 'Simple UI'}
+                </span>
+              </button>
+            </div>
           }
         />
 
@@ -1380,20 +1383,23 @@ export const SynthTypeDispatcher: React.FC<SynthTypeDispatcherProps> = ({
           vizMode={vizMode}
           onVizModeChange={setVizMode}
           customHeaderControls={
-            <button
-              className={`px-2 py-1 text-xs rounded flex items-center gap-1 ${
-                uiMode === 'hardware'
-                  ? 'bg-blue-600 text-text-primary'
-                  : 'bg-dark-bgHover text-text-secondary hover:bg-dark-bgHover'
-              }`}
-              onClick={() => setUIMode(uiMode === 'simple' ? 'hardware' : 'simple')}
-              title={uiMode === 'hardware' ? 'Switch to Simple Controls' : 'Switch to Hardware UI'}
-            >
-              {uiMode === 'hardware' ? <Cpu size={14} /> : <Monitor size={14} />}
-              <span className="hidden sm:inline">
-                {uiMode === 'hardware' ? 'Hardware UI' : 'Simple UI'}
-              </span>
-            </button>
+            <div className="flex items-center gap-2">
+              <SampleRecordButton instrumentId={instrument.id} onChange={handleChange} instrument={instrument} />
+              <button
+                className={`px-2 py-1 text-xs rounded flex items-center gap-1 ${
+                  uiMode === 'hardware'
+                    ? 'bg-blue-600 text-text-primary'
+                    : 'bg-dark-bgHover text-text-secondary hover:bg-dark-bgHover'
+                }`}
+                onClick={() => setUIMode(uiMode === 'simple' ? 'hardware' : 'simple')}
+                title={uiMode === 'hardware' ? 'Switch to Simple Controls' : 'Switch to Hardware UI'}
+              >
+                {uiMode === 'hardware' ? <Cpu size={14} /> : <Monitor size={14} />}
+                <span className="hidden sm:inline">
+                  {uiMode === 'hardware' ? 'Hardware UI' : 'Simple UI'}
+                </span>
+              </button>
+            </div>
           }
         />
         {uiMode === 'hardware' ? (
@@ -2515,20 +2521,23 @@ export const SynthTypeDispatcher: React.FC<SynthTypeDispatcherProps> = ({
           isBaked={isBaked}
           isBaking={isBaking}
           customHeaderControls={
-            <button
-              className={`px-2 py-1 text-xs rounded flex items-center gap-1 ${
-                uiMode === 'hardware'
-                  ? 'bg-blue-600 text-text-primary'
-                  : 'bg-dark-bgHover text-text-secondary hover:bg-dark-bgHover'
-              }`}
-              onClick={() => setUIMode(uiMode === 'simple' ? 'hardware' : 'simple')}
-              title={uiMode === 'hardware' ? 'Switch to Simple Controls' : 'Switch to Hardware UI'}
-            >
-              {uiMode === 'hardware' ? <Cpu size={14} /> : <Monitor size={14} />}
-              <span className="hidden sm:inline">
-                {uiMode === 'hardware' ? 'Hardware UI' : 'Simple UI'}
-              </span>
-            </button>
+            <div className="flex items-center gap-2">
+              <SampleRecordButton instrumentId={instrument.id} onChange={handleChange} instrument={instrument} />
+              <button
+                className={`px-2 py-1 text-xs rounded flex items-center gap-1 ${
+                  uiMode === 'hardware'
+                    ? 'bg-blue-600 text-text-primary'
+                    : 'bg-dark-bgHover text-text-secondary hover:bg-dark-bgHover'
+                }`}
+                onClick={() => setUIMode(uiMode === 'simple' ? 'hardware' : 'simple')}
+                title={uiMode === 'hardware' ? 'Switch to Simple Controls' : 'Switch to Hardware UI'}
+              >
+                {uiMode === 'hardware' ? <Cpu size={14} /> : <Monitor size={14} />}
+                <span className="hidden sm:inline">
+                  {uiMode === 'hardware' ? 'Hardware UI' : 'Simple UI'}
+                </span>
+              </button>
+            </div>
           }
         />
         {uiMode === 'hardware' ? (
@@ -2589,20 +2598,23 @@ export const SynthTypeDispatcher: React.FC<SynthTypeDispatcherProps> = ({
           isBaked={isBaked}
           isBaking={isBaking}
           customHeaderControls={
-            <button
-              className={`px-2 py-1 text-xs rounded flex items-center gap-1 ${
-                uiMode === 'hardware'
-                  ? 'bg-blue-600 text-text-primary'
-                  : 'bg-dark-bgHover text-text-secondary hover:bg-dark-bgHover'
-              }`}
-              onClick={() => setUIMode(uiMode === 'simple' ? 'hardware' : 'simple')}
-              title={uiMode === 'hardware' ? 'Switch to Simple Controls' : 'Switch to Hardware UI'}
-            >
-              {uiMode === 'hardware' ? <Cpu size={14} /> : <Monitor size={14} />}
-              <span className="hidden sm:inline">
-                {uiMode === 'hardware' ? 'Hardware UI' : 'Simple UI'}
-              </span>
-            </button>
+            <div className="flex items-center gap-2">
+              <SampleRecordButton instrumentId={instrument.id} onChange={handleChange} instrument={instrument} />
+              <button
+                className={`px-2 py-1 text-xs rounded flex items-center gap-1 ${
+                  uiMode === 'hardware'
+                    ? 'bg-blue-600 text-text-primary'
+                    : 'bg-dark-bgHover text-text-secondary hover:bg-dark-bgHover'
+                }`}
+                onClick={() => setUIMode(uiMode === 'simple' ? 'hardware' : 'simple')}
+                title={uiMode === 'hardware' ? 'Switch to Simple Controls' : 'Switch to Hardware UI'}
+              >
+                {uiMode === 'hardware' ? <Cpu size={14} /> : <Monitor size={14} />}
+                <span className="hidden sm:inline">
+                  {uiMode === 'hardware' ? 'Hardware UI' : 'Simple UI'}
+                </span>
+              </button>
+            </div>
           }
         />
         {uiMode === 'hardware' ? (
@@ -3490,4 +3502,81 @@ export const SynthTypeDispatcher: React.FC<SynthTypeDispatcherProps> = ({
   }
 
   return null;
+};
+
+/** Compact mic record button for sample instrument headers (visible in both hardware and simple mode) */
+const SampleRecordButton: React.FC<{
+  instrumentId: number;
+  instrument: InstrumentConfig;
+  onChange: (updates: Partial<InstrumentConfig>) => void;
+}> = ({ instrument, onChange }) => {
+  const [recording, setRecording] = React.useState(false);
+  const [withFx, setWithFx] = React.useState(false);
+  const [elapsed, setElapsed] = React.useState(0);
+  const timerRef = React.useRef<number | null>(null);
+
+  const toggle = React.useCallback(async () => {
+    const { getAudioInputManager } = await import('@engine/AudioInputManager');
+    const mgr = getAudioInputManager();
+
+    if (recording) {
+      if (timerRef.current) { clearInterval(timerRef.current); timerRef.current = null; }
+      setRecording(false);
+      mgr.setMonitoring(false);
+      const buf = await mgr.stopRecording();
+      if (mgr.isEffectsRouted()) await mgr.disableEffectsRouting();
+      if (buf) {
+        const { bufferToDataUrl } = await import('@utils/audio/SampleProcessing');
+        const dataUrl = await bufferToDataUrl(buf);
+        onChange({
+          parameters: {
+            sampleUrl: dataUrl,
+            sampleInfo: { name: 'Recording', duration: buf.duration, size: 0 },
+            startTime: 0, endTime: 1, loopStart: 0, loopEnd: 1,
+          },
+          sample: instrument.sample ? { ...instrument.sample, url: dataUrl } : undefined,
+        } as Partial<InstrumentConfig>);
+      }
+    } else {
+      if (!mgr.isConnected()) {
+        const ok = await mgr.selectDevice();
+        if (!ok) return;
+      }
+      if (withFx) await mgr.enableEffectsRouting();
+      mgr.setMonitoring(true);
+      mgr.startRecording(withFx);
+      setRecording(true);
+      setElapsed(0);
+      const start = Date.now();
+      timerRef.current = window.setInterval(() => setElapsed((Date.now() - start) / 1000), 100);
+    }
+  }, [recording, withFx, instrument, onChange]);
+
+  React.useEffect(() => {
+    return () => { if (timerRef.current) clearInterval(timerRef.current); };
+  }, []);
+
+  return (
+    <div className="flex items-center gap-0.5">
+      <button
+        onClick={toggle}
+        className={`px-2 py-1 text-xs rounded-l flex items-center gap-1 transition-colors ${
+          recording ? 'bg-accent-error/30 text-accent-error animate-pulse' : 'bg-dark-bgHover text-text-secondary hover:text-accent-error'
+        }`}
+        title={recording ? `Stop recording (${elapsed.toFixed(1)}s)` : 'Record from microphone'}
+      >
+        <Mic size={12} />
+        {recording ? `${elapsed.toFixed(1)}s` : 'Rec'}
+      </button>
+      <button
+        onClick={() => setWithFx(!withFx)}
+        className={`px-1.5 py-1 text-[9px] font-mono rounded-r border-l border-dark-border transition-colors ${
+          withFx ? 'bg-violet-600/30 text-violet-400' : 'bg-dark-bgHover text-text-muted hover:text-violet-400'
+        }`}
+        title={withFx ? 'Recording with master effects' : 'Record dry'}
+      >
+        FX
+      </button>
+    </div>
+  );
 };
