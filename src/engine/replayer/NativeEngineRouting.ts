@@ -588,6 +588,7 @@ export async function startNativeEngines(
           const order = song.songPositions;
 
           (instance as any).onPositionUpdate((update: { samplesRendered: number; songEnd: boolean }) => {
+            if (!update.samplesRendered || samplesPerRow <= 0) return;
             const absoluteRow = Math.floor(update.samplesRendered / samplesPerRow);
             let row = absoluteRow;
             let position = 0;
@@ -595,9 +596,11 @@ export async function startNativeEngines(
               const patLen = patLens[order[i]] || 64;
               if (row < patLen) { position = i; break; }
               row -= patLen;
-              if (i === order.length - 1) { position = i; row = row % patLen; }
+              if (i === order.length - 1) { position = i; row = Math.max(0, row % patLen); }
             }
-            useWasmPositionStore.getState().setPosition(row, position);
+            if (Number.isFinite(row) && Number.isFinite(position)) {
+              useWasmPositionStore.getState().setPosition(row, position);
+            }
           });
           console.log(`[NativeEngineRouting] TFMXModule position sync wired`);
         }
@@ -607,7 +610,7 @@ export async function startNativeEngines(
         // usePatternPlayback reload effect → startNativeEngines() → infinite respawn loop.
         // The TrackerReplayer.play() already sets isPlaying via the normal flow.
         // We only update currentRow so the pattern editor scrolls.
-        if ('onPositionUpdate' in instance && typeof (instance as any).onPositionUpdate === 'function' && desc.key !== 'Hively' && desc.key !== 'UADEEditable') {
+        if ('onPositionUpdate' in instance && typeof (instance as any).onPositionUpdate === 'function' && desc.key !== 'Hively' && desc.key !== 'UADEEditable' && desc.key !== 'TFMXModule') {
           // Wire position updates to the lightweight WASM position store.
           // This bypasses useTransportStore entirely to avoid triggering
           // the usePatternPlayback effect chain (which causes recursive engine spawns).
