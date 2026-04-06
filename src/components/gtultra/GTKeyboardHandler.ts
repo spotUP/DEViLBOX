@@ -105,6 +105,7 @@ export function useGTKeyboardHandler(active: boolean) {
             const patIdx = orderData ? orderData[state.playbackPos.position] : 0;
             engine?.setPatternCell(patIdx, cursor.row, 0, noteVal);
             engine?.setPatternCell(patIdx, cursor.row, 1, currentInstrument);
+            engine?.checkpointUndo(); // Finalize undo step
             // Refresh pattern data after edit
             state.refreshPatternData(patIdx);
             state.setCursor({ row: Math.min(cursor.row + editStep, state.patternLength) });
