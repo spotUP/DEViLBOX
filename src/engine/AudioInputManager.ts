@@ -39,6 +39,7 @@ class AudioInputManager {
   private audioContext: AudioContext;
   private effectsDestination: MediaStreamAudioDestinationNode | null = null;
   private effectsConnected = false;
+  private currentDeviceId: string | null = null;
 
   constructor() {
     this.audioContext = getDevilboxAudioContext();
@@ -103,8 +104,20 @@ class AudioInputManager {
       this.stream = await navigator.mediaDevices.getUserMedia(constraints);
       this.sourceNode = this.audioContext.createMediaStreamSource(this.stream);
       this.sourceNode.connect(this.inputGain);
+      this.currentDeviceId = deviceId ?? null;
 
-      console.log('[AudioInputManager] Connected to input device');
+      // Resume the AudioContext if it's suspended (iOS, autoplay policies).
+      if (this.audioContext.state === 'suspended') {
+        try { await this.audioContext.resume(); } catch { /* ok */ }
+      }
+
+      const tracks = this.stream.getAudioTracks();
+      const trackInfo = tracks[0]?.getSettings?.();
+      console.log(
+        '[AudioInputManager] Connected to input device:',
+        tracks[0]?.label ?? deviceId ?? 'default',
+        trackInfo,
+      );
       return true;
     } catch (err) {
       console.error('[AudioInputManager] Failed to connect device:', err);
@@ -195,11 +208,36 @@ class AudioInputManager {
   }
 
   /**
+   * Pick a MediaRecorder mimeType supported by the current browser.
+   * Falls back through several common formats so Safari/Firefox/Chrome
+   * all work.
+   */
+  private pickRecorderMimeType(): string {
+    const candidates = [
+      'audio/webm;codecs=opus',
+      'audio/webm',
+      'audio/mp4',
+      'audio/mp4;codecs=mp4a.40.2',
+      'audio/ogg;codecs=opus',
+      'audio/ogg',
+    ];
+    for (const mt of candidates) {
+      try {
+        if (typeof MediaRecorder !== 'undefined' && MediaRecorder.isTypeSupported(mt)) return mt;
+      } catch { /* ok */ }
+    }
+    return ''; // let the browser choose
+  }
+
+  /**
    * Start recording audio input.
    * @param withEffects If true, records from the effects chain output instead of raw mic
    */
   startRecording(withEffects = false): void {
-    if (!this.stream || this.isRecording) return;
+    if (!this.stream || this.isRecording) {
+      console.warn('[AudioInputManager] startRecording: not connected or already recording');
+      return;
+    }
 
     this.recordedChunks = [];
 
@@ -208,9 +246,15 @@ class AudioInputManager {
       ? this.effectsDestination.stream
       : this.stream;
 
-    this.recorder = new MediaRecorder(recordStream, {
-      mimeType: 'audio/webm;codecs=opus',
-    });
+    const mimeType = this.pickRecorderMimeType();
+    try {
+      this.recorder = mimeType
+        ? new MediaRecorder(recordStream, { mimeType })
+        : new MediaRecorder(recordStream);
+    } catch (err) {
+      console.error('[AudioInputManager] MediaRecorder construction failed:', err);
+      throw err;
+    }
 
     this.recorder.ondataavailable = (e) => {
       if (e.data.size > 0) {
@@ -220,7 +264,9 @@ class AudioInputManager {
 
     this.recorder.start(100); // Collect data every 100ms
     this.isRecording = true;
-    console.log(`[AudioInputManager] Recording started ${withEffects ? '(with effects)' : '(dry)'}`);
+    console.log(
+      `[AudioInputManager] Recording started ${withEffects ? '(with effects)' : '(dry)'} mimeType=${this.recorder.mimeType}`,
+    );
   }
 
   /**
@@ -228,19 +274,27 @@ class AudioInputManager {
    */
   async stopRecording(): Promise<AudioBuffer | null> {
     if (!this.recorder || !this.isRecording) return null;
+    const recorderRef = this.recorder;
 
     return new Promise((resolve) => {
-      this.recorder!.onstop = async () => {
+      recorderRef.onstop = async () => {
         this.isRecording = false;
 
         if (this.recordedChunks.length === 0) {
+          console.warn('[AudioInputManager] stopRecording: no chunks captured');
           resolve(null);
           return;
         }
 
         try {
-          const blob = new Blob(this.recordedChunks, { type: 'audio/webm' });
+          // Use the recorder's actual mime type for the blob — webm with the
+          // wrong type can fail to decode in some browsers.
+          const blobType = recorderRef.mimeType || 'audio/webm';
+          const blob = new Blob(this.recordedChunks, { type: blobType });
           const arrayBuffer = await blob.arrayBuffer();
+          console.log(
+            `[AudioInputManager] stopRecording: ${this.recordedChunks.length} chunks, ${blob.size} bytes, type=${blobType}`,
+          );
           const audioBuffer = await this.audioContext.decodeAudioData(arrayBuffer);
           console.log(`[AudioInputManager] Recorded ${audioBuffer.duration.toFixed(1)}s, ${audioBuffer.numberOfChannels}ch`);
           resolve(audioBuffer);
@@ -269,6 +323,13 @@ class AudioInputManager {
   }
 
   /**
+   * Get the deviceId of the currently selected input (null if none / default).
+   */
+  getCurrentDeviceId(): string | null {
+    return this.currentDeviceId;
+  }
+
+  /**
    * Disconnect current input device.
    */
   disconnect(): void {
@@ -288,6 +349,7 @@ class AudioInputManager {
       this.stream.getTracks().forEach(t => t.stop());
       this.stream = null;
     }
+    this.currentDeviceId = null;
     this.setMonitoring(false);
   }
 
