@@ -26,26 +26,25 @@
  * the tfmxFileData ArrayBuffer for export. The Reload Audio button pushes the
  * patched buffer to the running TFMX WASM via TFMXEngine.reloadModule().
  *
- * ─── Deferred (not yet implemented) ──────────────────────────────────────────
+ * ─── Audition options ────────────────────────────────────────────────────────
  *
- * 1. Per-macro audition (play one macro in isolation) — would need a new C
- *    export inside libtfmxaudiodecoder (third-party/libtfmxaudiodecoder-main)
- *    that wraps `TFMXDecoder::noteCmd()` so it can be triggered with an
- *    arbitrary (macroIdx, note, volume, channel) without going through the
- *    sequencer. The function exists internally (Macro.cpp:525, the
- *    `macroFunc_PlayMacro` opcode handler) but is private and the proxy
- *    layer doesn't expose it.
+ * The editor exposes TWO ways to hear a macro:
  *
- *    Since CLAUDE.md forbids modifying `third-party/`, the practical
- *    workaround is the **Find Usage** button — it locates a real song
- *    position where this macro is referenced and seeks playback there, so
- *    the user hears the macro in its natural musical context. This covers
- *    most of the audition UX without library changes.
+ * 1. **Preview button** — triggers the selected macro on voice 0 at the
+ *    note you set in the spinner next to the button. Hits the C export
+ *    `tfmx_module_preview_macro` (added to our forked copy of
+ *    libtfmxaudiodecoder under tfmx-wasm/lib/) which sets up the
+ *    sequencer's `cmd` struct and runs the regular noteCmd path; the next
+ *    render tick produces audio. Requires playback to be RUNNING because
+ *    the worklet only renders while `_modulePlaying` is true. The preview
+ *    note plays on top of the song; if voice 0 is also being used by the
+ *    song, the next pattern step will overwrite it after a few ticks.
  *
- *    If a true preview is ever needed, the right path is to upstream the
- *    new C export to libtfmxaudiodecoder, then bump the submodule. The
- *    full TFMXEngine + worklet plumbing for it (`reloadModule` already
- *    follows the same shape) is straightforward once the C call exists.
+ * 2. **Find Usage button** — locates a real song position where this macro
+ *    is referenced and seeks playback there, so you hear the macro in its
+ *    natural musical context with all the surrounding notes/effects.
+ *    Useful for "what does this sound like in the song" rather than the
+ *    isolated note that Preview gives you.
  */
 
 import React, { useMemo, useState, useCallback } from 'react';
@@ -276,6 +275,16 @@ export const TFMXMacroEditor: React.FC<Props> = ({ height = 360, initialMacroInd
     if (!tfmxFileData || !TFMXEngine.hasInstance()) return;
     TFMXEngine.getInstance().reloadModule(tfmxFileData, tfmxSmplData);
   }, [tfmxFileData, tfmxSmplData]);
+
+  // Preview the currently selected macro on voice 0 at note C-3 / vol 15.
+  // Hits the C export tfmx_module_preview_macro added to the forked
+  // libtfmxaudiodecoder. Requires the song to be playing for audio to render
+  // (the worklet only renders while _modulePlaying is true).
+  const [previewNote, setPreviewNote] = useState(24); // ~C-3 in TFMX note range
+  const previewMacro = useCallback((macroTableIdx: number) => {
+    if (!TFMXEngine.hasInstance()) return;
+    TFMXEngine.getInstance().previewMacro(macroTableIdx, previewNote, 15, 0);
+  }, [previewNote]);
 
   // Seek the song player to the first trackstep that contains a pattern that
   // references the currently selected macro. This is the "audition" path —
@@ -623,7 +632,33 @@ export const TFMXMacroEditor: React.FC<Props> = ({ height = 360, initialMacroInd
                 </div>
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', alignItems: 'flex-end' }}>
-                <div style={{ display: 'flex', gap: '4px' }}>
+                <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
+                  <input
+                    type="number"
+                    min={0}
+                    max={63}
+                    value={previewNote}
+                    onChange={(e) => setPreviewNote(Math.max(0, Math.min(63, parseInt(e.target.value) || 0)))}
+                    title="Note value (0-63) for preview audition"
+                    style={{
+                      width: '40px', fontSize: '10px', padding: '3px 4px',
+                      background: 'var(--color-bg)', color: '#c084fc',
+                      border: '1px solid #c084fc', borderRadius: '3px',
+                      fontFamily: 'inherit', textAlign: 'center',
+                    }}
+                  />
+                  <button
+                    onClick={() => previewMacro(macro!.index)}
+                    title="Trigger this macro on voice 0 at the chosen note. Requires playback to be running so the WASM renders audio."
+                    style={{
+                      fontSize: '10px', padding: '4px 8px', cursor: 'pointer',
+                      background: 'rgba(192,132,252,0.15)', color: '#c084fc',
+                      border: '1px solid #c084fc', borderRadius: '3px',
+                      fontFamily: 'inherit', whiteSpace: 'nowrap',
+                    }}
+                  >
+                    ♪ Preview
+                  </button>
                   <button
                     onClick={() => {
                       const ok = seekToUsage(macro!.index);

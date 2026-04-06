@@ -533,4 +533,25 @@ void tfmx_module_mute_voice(void* /*ctx*/, int voice, int mute) {
   tfmxdec_mute_voice(p.decoder, mute != 0, (unsigned int)voice);
 }
 
+/**
+ * DEViLBOX extension: trigger a single instrument macro on a chosen voice
+ * for editor preview/audition. The macro is set up via the same path the
+ * sequencer uses for a "note" command, then processed on the next render
+ * tick. Returns 0 on success, -1 if no module is loaded.
+ *
+ * Typical use: while a song is playing, the user clicks "Preview" in the
+ * macro editor → JS calls this with (macroIdx, note=24, volume=15,
+ * channel=0). The preview note overlaps the song briefly until the song's
+ * next pattern row writes to that voice. For a longer audition, stop
+ * playback first or pick a voice the song doesn't use.
+ */
+EMSCRIPTEN_KEEPALIVE
+int tfmx_module_preview_macro(void* /*ctx*/, int macroIdx, int note,
+                              int volume, int channel) {
+  TFMXPlayer& p = gPlayers[0];
+  if (!p.decoder || !p.active) return -1;
+  tfmxdec_preview_macro(p.decoder, macroIdx, note, volume, channel);
+  return 0;
+}
+
 } // extern "C"

@@ -3752,6 +3752,7 @@ var _tfmx_init,
   _tfmx_module_voice_volume,
   _tfmx_module_voices,
   _tfmx_module_mute_voice,
+  _tfmx_module_preview_macro,
   __emscripten_stack_restore,
   __emscripten_stack_alloc,
   _emscripten_stack_get_current,
@@ -3782,6 +3783,7 @@ function assignWasmExports(wasmExports) {
   _tfmx_module_voice_volume = Module['_tfmx_module_voice_volume'] = wasmExports['tfmx_module_voice_volume'];
   _tfmx_module_voices = Module['_tfmx_module_voices'] = wasmExports['tfmx_module_voices'];
   _tfmx_module_mute_voice = Module['_tfmx_module_mute_voice'] = wasmExports['tfmx_module_mute_voice'];
+  _tfmx_module_preview_macro = Module['_tfmx_module_preview_macro'] = wasmExports['tfmx_module_preview_macro'];
   __emscripten_stack_restore = wasmExports['_emscripten_stack_restore'];
   __emscripten_stack_alloc = wasmExports['_emscripten_stack_alloc'];
   _emscripten_stack_get_current = wasmExports['emscripten_stack_get_current'];

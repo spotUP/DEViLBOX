@@ -4,17 +4,11 @@ project(tfmx_synth CXX)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-# Find git root so the path works in both main tree and worktrees.
-# --git-common-dir returns the .git dir of the main repo (not the worktree link).
-# We strip the trailing /.git to get the repo root.
-execute_process(
-  COMMAND git rev-parse --git-common-dir
-  WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
-  OUTPUT_VARIABLE GIT_COMMON_DIR
-  OUTPUT_STRIP_TRAILING_WHITESPACE
-)
-cmake_path(GET GIT_COMMON_DIR PARENT_PATH GIT_ROOT)
-set(TFMXLIB_ROOT "${GIT_ROOT}/third-party/libtfmxaudiodecoder-main/src")
+# Use our LOCAL copy of libtfmxaudiodecoder, not the third-party submodule.
+# We forked the library into tfmx-wasm/lib/libtfmxaudiodecoder/src so we can
+# add new public APIs (e.g. preview-macro) without modifying third-party
+# code, which CLAUDE.md forbids.
+set(TFMXLIB_ROOT "${CMAKE_SOURCE_DIR}/lib/libtfmxaudiodecoder/src")
 
 set(TFMXLIB_SOURCES
   "${TFMXLIB_ROOT}/tfmxaudiodecoder.cpp"
@@ -81,7 +75,7 @@ set_target_properties(TFMX PROPERTIES
 
 target_link_options(TFMX PRIVATE
   -sWASM=1
-  -sEXPORTED_FUNCTIONS=['_tfmx_init','_tfmx_dispose','_tfmx_create_player','_tfmx_destroy_player','_tfmx_load_instrument','_tfmx_note_on','_tfmx_note_off','_tfmx_render','_tfmx_set_param','_tfmx_get_param','_tfmx_load_module','_tfmx_module_render','_tfmx_module_stop','_tfmx_module_songs','_tfmx_module_duration','_tfmx_module_voice_volume','_tfmx_module_voices','_tfmx_module_mute_voice','_tfmx_module_song_end','_tfmx_get_samples_rendered','_malloc','_free']
+  -sEXPORTED_FUNCTIONS=['_tfmx_init','_tfmx_dispose','_tfmx_create_player','_tfmx_destroy_player','_tfmx_load_instrument','_tfmx_note_on','_tfmx_note_off','_tfmx_render','_tfmx_set_param','_tfmx_get_param','_tfmx_load_module','_tfmx_module_render','_tfmx_module_stop','_tfmx_module_songs','_tfmx_module_duration','_tfmx_module_voice_volume','_tfmx_module_voices','_tfmx_module_mute_voice','_tfmx_module_song_end','_tfmx_module_preview_macro','_tfmx_get_samples_rendered','_malloc','_free']
   -sEXPORTED_RUNTIME_METHODS=['cwrap','getValue','HEAPF32','HEAPU8','stringToUTF8']
   -sMODULARIZE=1
   -sEXPORT_NAME='createTFMX'
