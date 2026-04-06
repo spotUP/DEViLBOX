@@ -8,6 +8,7 @@ import { immer } from 'zustand/middleware/immer';
 import type * as Tone from 'tone';
 import type { EffectConfig, AudioEffectType as EffectType } from '@typedefs/instrument';
 import type { ToneEngine } from '@engine/ToneEngine';
+import { checkFormatViolation, getActiveFormatLimits } from '@/lib/formatCompatibility';
 import { getDefaultEffectParameters } from '@engine/InstrumentFactory';
 
 interface AudioStore {
@@ -145,7 +146,14 @@ export const useAudioStore = create<AudioStore>()(
       }),
 
     // Master Effects Actions
-    addMasterEffect: (effectType) =>
+    addMasterEffect: (effectType) => {
+      const limits = getActiveFormatLimits();
+      if (limits) {
+        void checkFormatViolation('masterEffects',
+          `Master effects are not supported in ${limits.name} format.`,
+        ).then((ok) => { if (ok) get().addMasterEffect(effectType); });
+        return;
+      }
       set((state) => {
         const newEffect: EffectConfig = {
           id: `master-fx-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
@@ -157,7 +165,8 @@ export const useAudioStore = create<AudioStore>()(
         };
         state.masterEffects.push(newEffect);
         // Engine rebuild handled by usePatternPlayback's useEffect on masterEffectsKey
-      }),
+      });
+    },
 
     // Add master effect with full configuration (for unified effects system)
     addMasterEffectConfig: (effect) =>
