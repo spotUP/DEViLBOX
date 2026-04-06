@@ -172,5 +172,7 @@ export function parseMultiMediaSoundFile(buffer: ArrayBuffer, filename: string):
     initialSpeed: 6,
     initialBPM: 125,
     linearPeriods: false,
+    uadeEditableFileData: buffer.slice(0) as ArrayBuffer,
+    uadeEditableFileName: filename,
   };
 }

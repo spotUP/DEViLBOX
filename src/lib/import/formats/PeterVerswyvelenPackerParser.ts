@@ -153,5 +153,7 @@ export function parsePeterVerswyvelenPackerFile(buffer: ArrayBuffer, filename: s
     initialSpeed: 6,
     initialBPM: 125,
     linearPeriods: false,
+    uadeEditableFileData: buffer.slice(0) as ArrayBuffer,
+    uadeEditableFileName: filename,
   };
 }

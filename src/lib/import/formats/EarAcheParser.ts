@@ -20,7 +20,7 @@ export function isEarAcheFormat(buffer: ArrayBuffer | Uint8Array): boolean {
   return data[0] === 0x45 && data[1] === 0x41 && data[2] === 0x53 && data[3] === 0x4F;
 }
 
-export function parseEarAcheFile(_buffer: ArrayBuffer, filename: string): TrackerSong {
+export function parseEarAcheFile(buffer: ArrayBuffer, filename: string): TrackerSong {
   const name = filename.replace(/\.[^.]+$/, '').replace(/^[^.]+\./, '');
   const NUM_CHANNELS = 4;
   const ROWS = 64;
@@ -60,7 +60,7 @@ export function parseEarAcheFile(_buffer: ArrayBuffer, filename: string): Tracke
     rowsPerPattern: ROWS,
     numChannels: NUM_CHANNELS,
     numPatterns: 1,
-    moduleSize: _buffer.byteLength,
+    moduleSize: buffer.byteLength,
     encodeCell: encodeEarAcheCell,
     getCellFileOffset: (pat: number, row: number, channel: number): number => {
       const patternByteSize = ROWS * NUM_CHANNELS * 4;
@@ -80,5 +80,7 @@ export function parseEarAcheFile(_buffer: ArrayBuffer, filename: string): Tracke
     initialSpeed: 6,
     initialBPM: 125,
     uadePatternLayout,
+    uadeEditableFileData: buffer.slice(0) as ArrayBuffer,
+    uadeEditableFileName: filename,
   };
 }

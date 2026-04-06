@@ -546,6 +546,8 @@ export async function parseAMOSMusicBankFile(
     initialSpeed: amosSpeed,
     initialBPM: 125,
     linearPeriods: false,
+    uadeEditableFileData: buffer.slice(0) as ArrayBuffer,
+    uadeEditableFileName: filename,
     uadeVariableLayout: variableLayout,
   };
 }

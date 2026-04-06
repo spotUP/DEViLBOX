@@ -439,5 +439,7 @@ export async function parseTCBTrackerFile(
     initialBPM:      125,
     linearPeriods:   false,
     uadePatternLayout,
+    uadeEditableFileData: buffer.slice(0) as ArrayBuffer,
+    uadeEditableFileName: filename,
   };
 }

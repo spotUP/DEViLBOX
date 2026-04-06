@@ -621,6 +621,8 @@ export function parseFuturePlayerFile(buffer: ArrayBuffer, filename: string): Tr
     initialSpeed,
     initialBPM,
     linearPeriods: false,
+    uadeEditableFileData: buffer.slice(0) as ArrayBuffer,
+    uadeEditableFileName: filename,
     futurePlayerFileData: buffer.slice(0),
     uadeVariableLayout,
   };

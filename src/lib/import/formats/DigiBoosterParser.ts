@@ -349,6 +349,8 @@ export function parseDigiBoosterFile(buffer: ArrayBuffer, filename: string): Tra
     initialSpeed: speed,
     initialBPM: bpm,
     linearPeriods: false,
+    uadeEditableFileData: buffer.slice(0) as ArrayBuffer,
+    uadeEditableFileName: filename,
     uadePatternLayout,
   };
 }
@@ -624,5 +626,7 @@ function parseOriginalDigiBooster(buf: Uint8Array, filename: string): TrackerSon
     initialSpeed: 6,
     initialBPM: 125,
     linearPeriods: false,
+    uadeEditableFileData: buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength) as ArrayBuffer,
+    uadeEditableFileName: filename,
   };
 }

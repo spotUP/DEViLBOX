@@ -248,5 +248,7 @@ export function parseMartinWalkerFile(buffer: ArrayBuffer, filename: string): Tr
     patterns: [pattern], instruments, songPositions: [0],
     songLength: 1, restartPosition: 0, numChannels: 4,
     initialSpeed: 6, initialBPM: 125, linearPeriods: false,
+    uadeEditableFileData: buffer.slice(0) as ArrayBuffer,
+    uadeEditableFileName: filename,
   };
 }
