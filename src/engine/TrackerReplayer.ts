@@ -1489,6 +1489,14 @@ export class TrackerReplayer {
       if (gen !== this._playGeneration) return;
       if (result.suppressNotes) this._suppressNotes = true;
       if (result.c64SidEngine) this.c64SidEngine = result.c64SidEngine;
+      // Wire the active WASM engine for hybrid playback mute mask updates
+      if (result.uadeEngine && 'setMuteMask' in result.uadeEngine) {
+        this._activeWasmEngine = result.uadeEngine;
+      } else if (result.musicLineEngine && 'setMuteMask' in result.musicLineEngine) {
+        this._activeWasmEngine = result.musicLineEngine as unknown as { setMuteMask(mask: number): void };
+      } else if (result.hivelyEngine && 'setMuteMask' in result.hivelyEngine) {
+        this._activeWasmEngine = result.hivelyEngine as unknown as { setMuteMask(mask: number): void };
+      }
 
       // Subscribe to HivelyEngine position updates (~15fps from WASM)
       // This replaces the TS scheduler as the authoritative position source
@@ -1856,6 +1864,18 @@ export class TrackerReplayer {
           // If edits have been made, re-serialize from the soundlib to get updated module data
           let tuneData = this.song.libopenmptFileData;
           const bridge = await import('@engine/libopenmpt/OpenMPTEditBridge');
+
+          // Silence samples for replaced instruments (hybrid playback)
+          // Must happen BEFORE serialize so the silenced data gets baked into the module
+          if (this._replacedInstruments.size > 0 && bridge.isActive()) {
+            const osl = await import('@lib/import/wasm/OpenMPTSoundlib');
+            for (const instId of this._replacedInstruments) {
+              await osl.setSampleData(instId - 1, new Int8Array(4), 8363);
+            }
+            // Force dirty so serialize() picks up the silenced samples
+            bridge.markDirty();
+          }
+
           if (bridge.isActive() && bridge.isDirty()) {
             const serialized = await bridge.serialize();
             if (serialized) {
@@ -1921,6 +1941,7 @@ export class TrackerReplayer {
 
           this.useLibopenmptPlayback = true;
           this._suppressNotes = true;
+          this._activeWasmEngine = mptEngine; // for updateWasmMuteMask()
 
           if (!this._muted) {
             _log('[TrackerReplayer] libopenmpt: calling play(), muted =', this._muted);
