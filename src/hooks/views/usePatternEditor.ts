@@ -41,7 +41,10 @@ import type { CursorPosition, BlockSelection } from '@typedefs';
 const CHAR_WIDTH = 10;
 const LINE_NUMBER_WIDTH = 40;
 export const AUTOMATION_LANE_WIDTH = 56; // base width for a single automation lane
-export const AUTOMATION_LANE_MIN = 24; // minimum per-lane width when multiple lanes share space
+// Minimum per-lane width when multiple lanes share space.
+// Set to ~LANE_WIDTH so each lane in a multi-lane channel gets its own full
+// dedicated draw width instead of being squeezed into the single-lane area.
+export const AUTOMATION_LANE_MIN = 52;
 
 // ─── Hook ─────────────────────────────────────────────────────────────────────
 
