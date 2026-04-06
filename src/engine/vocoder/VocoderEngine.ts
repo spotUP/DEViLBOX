@@ -17,6 +17,14 @@
 import * as Tone from 'tone';
 import { useVocoderStore, type CarrierType, type VocoderFXParams } from '@/stores/useVocoderStore';
 import { VocoderCore, CARRIER_NAME_TO_INT } from './VocoderCore';
+import { AutoTuneEffect, type AutoTuneScale } from '@/engine/effects/AutoTuneEffect';
+
+export interface RealAutoTuneOptions {
+  key?: number;          // 0..11 (C..B)
+  scale?: AutoTuneScale;
+  strength?: number;     // 0..1
+  speed?: number;        // 0..1
+}
 
 export class VocoderEngine {
   /** Cached mic stream — kept alive across toggle cycles to avoid
@@ -43,6 +51,10 @@ export class VocoderEngine {
   private sourceNode: MediaStreamAudioSourceNode | null = null;
   private micPreamp: GainNode;
   private core: VocoderCore | null = null;
+  /** Insertion point that sits between (preamp|core) and outputGain.
+   *  Real autotune is spliced in here when enabled. */
+  private autoTuneInsert: GainNode;
+  private autoTune: AutoTuneEffect | null = null;
   private outputGain: GainNode;
   private active = false;
   private vocoderBypassed = false;
@@ -68,8 +80,14 @@ export class VocoderEngine {
     this.micPreamp = this.audioContext.createGain();
     this.micPreamp.gain.value = 2.0;
 
+    this.autoTuneInsert = this.audioContext.createGain();
+    this.autoTuneInsert.gain.value = 1.0;
+
     this.outputGain = this.audioContext.createGain();
     this.outputGain.gain.value = 1.0;
+
+    // Default routing: autoTuneInsert → outputGain (no autotune yet)
+    this.autoTuneInsert.connect(this.outputGain);
 
     // Initialize effects from store
     const fx = useVocoderStore.getState().fx;
@@ -140,7 +158,7 @@ export class VocoderEngine {
 
     this.micPreamp.disconnect();
     if (bypass) {
-      this.micPreamp.connect(this.outputGain);
+      this.micPreamp.connect(this.autoTuneInsert);
       console.log('[VocoderEngine] Vocoder bypassed — clean mic + FX');
     } else if (this.core?.node) {
       this.micPreamp.connect(this.core.node);
@@ -206,11 +224,11 @@ export class VocoderEngine {
     // Apply the wet param from the store (core init seeds wet=1.0)
     this.core.setWet(params.wet);
 
-    // Connect: mic → preamp(2x) → core.node → output gain
+    // Connect: mic → preamp(2x) → core.node → autoTuneInsert → outputGain
     this.sourceNode.connect(this.micPreamp);
     this.micPreamp.connect(this.core.node!);
-    this.core.node!.connect(this.outputGain);
-    console.log('[VocoderEngine] Audio chain connected: mic → preamp(2x) → core → gain → dest',
+    this.core.node!.connect(this.autoTuneInsert);
+    console.log('[VocoderEngine] Audio chain connected: mic → preamp(2x) → core → autotune-insert → gain → dest',
       'contextState:', this.audioContext.state);
 
     this.active = true;
@@ -225,7 +243,11 @@ export class VocoderEngine {
     this.sourceNode?.disconnect();
     this.micPreamp.disconnect();
     this.core?.dispose();
+    this.autoTuneInsert.disconnect();
     this.outputGain.disconnect();
+    // Re-establish the default autoTuneInsert → outputGain link so the
+    // engine is ready to start() again without losing the wiring.
+    this.autoTuneInsert.connect(this.outputGain);
 
     // Disable mic tracks (don't stop — keep stream alive for glitch-free re-enable)
     this.stream?.getAudioTracks().forEach(t => { t.enabled = false; });
@@ -277,6 +299,61 @@ export class VocoderEngine {
     // Apply the wet param from the store (loadPreset on core doesn't change wet)
     const wet = useVocoderStore.getState().params.wet;
     this.core?.setWet(wet);
+  }
+
+  // ── Real autotune (pitch correction on the output) ────────────────────
+
+  /**
+   * Enable or disable real pitch-correction autotune on the vocoder
+   * output. When enabled, an AutoTuneEffect is spliced between the
+   * autoTuneInsert tap and outputGain. When disabled, autoTuneInsert
+   * connects straight to outputGain.
+   *
+   * Independent from the existing "follow melody" feature
+   * (VocoderAutoTune), which drives the carrier oscillator from the
+   * active deck's pattern data — both can be on simultaneously.
+   */
+  setRealAutoTuneEnabled(enabled: boolean, opts: RealAutoTuneOptions = {}): void {
+    if (enabled && !this.autoTune) {
+      this.autoTune = new AutoTuneEffect({
+        key: opts.key ?? 0,
+        scale: opts.scale ?? 'major',
+        strength: opts.strength ?? 1.0,
+        speed: opts.speed ?? 0.7,
+        wet: 1.0,
+      });
+      // Re-route: autoTuneInsert → autoTune → outputGain
+      try { this.autoTuneInsert.disconnect(this.outputGain); } catch { /* ok */ }
+      Tone.connect(this.autoTuneInsert, this.autoTune.input as unknown as Tone.InputNode);
+      Tone.connect(this.autoTune.output, this.outputGain as unknown as Tone.InputNode);
+      console.log('[VocoderEngine] Real autotune ENABLED');
+    } else if (!enabled && this.autoTune) {
+      try { this.autoTuneInsert.disconnect(); } catch { /* ok */ }
+      this.autoTune.dispose();
+      this.autoTune = null;
+      this.autoTuneInsert.connect(this.outputGain);
+      console.log('[VocoderEngine] Real autotune DISABLED');
+    }
+  }
+
+  setAutoTuneKey(key: number): void {
+    this.autoTune?.setKey(key);
+  }
+
+  setAutoTuneScale(scale: AutoTuneScale): void {
+    this.autoTune?.setScale(scale);
+  }
+
+  setAutoTuneStrength(s: number): void {
+    this.autoTune?.setStrength(s);
+  }
+
+  setAutoTuneSpeed(s: number): void {
+    this.autoTune?.setSpeed(s);
+  }
+
+  get isRealAutoTuneActive(): boolean {
+    return this.autoTune !== null;
   }
 
   setOutputGain(gain: number): void {
@@ -382,6 +459,9 @@ export class VocoderEngine {
       this.recorder?.stop();
       this._isRecording = false;
     }
+    this.autoTune?.dispose();
+    this.autoTune = null;
+    this.autoTuneInsert.disconnect();
     this.micPreamp.disconnect();
     this.outputGain.disconnect();
   }
