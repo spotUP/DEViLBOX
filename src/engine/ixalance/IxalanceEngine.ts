@@ -164,6 +164,10 @@ export class IxalanceEngine {
     this.workletNode?.port.postMessage({ type: 'setChannelGain', channel, gain });
   }
 
+  setMuteMask(mask: number): void {
+    this.workletNode?.port.postMessage({ type: 'setMuteMask', mask });
+  }
+
   dispose(): void {
     this._disposed = true;
     this.workletNode?.port.postMessage({ type: 'dispose' });

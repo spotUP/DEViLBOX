@@ -169,3 +169,9 @@ EXPORT int eupmini_render(float *buf, int frames) {
 EXPORT int eupmini_get_sample_rate(void) {
     return EUP_SAMPLE_RATE;
 }
+
+EXPORT void eupmini_set_channel_mute(int channel, int muted) {
+    if (!g_device || channel < 0 || channel >= 32) return;
+    /* enable(ch, true) = unmuted, enable(ch, false) = muted */
+    g_device->enable(channel, muted ? false : true);
+}

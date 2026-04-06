@@ -213,6 +213,9 @@ export function getActiveGainEngine(): { setChannelGain(ch: number, gain: number
     } else if (fmt.hippelFileData) {
       const { HippelEngine } = require('../engine/hippel/HippelEngine');
       if (HippelEngine.hasInstance()) return HippelEngine.getInstance();
+    } else if (fmt.eupFileData) {
+      const { EupminiEngine } = require('../engine/eupmini/EupminiEngine');
+      if (EupminiEngine.hasInstance()) return EupminiEngine.getInstance();
     } else if (fmt.ixsFileData) {
       const { IxalanceEngine } = require('../engine/ixalance/IxalanceEngine');
       if (IxalanceEngine.hasInstance()) return IxalanceEngine.getInstance();

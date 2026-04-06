@@ -637,6 +637,11 @@ export class SunVoxEngine {
     this.sendMessage({ type: 'setModuleMuteState', handle, unmutedRoots, mutedRoots });
   }
 
+  /** Bitmask muting: bit N = generator module N muted. Delegates to chain-aware muting. */
+  setMuteMask(handle: number, mask: number): void {
+    this.sendMessage({ type: 'setMuteMask', handle, mask });
+  }
+
   play(handle: number, fromBeginning = false): void {
     this.sendMessage({ type: 'play', handle, fromBeginning });
   }

@@ -160,6 +160,15 @@ export class EupminiEngine {
     this.workletNode?.port.postMessage({ type: 'stop' });
   }
 
+  setChannelGain(channel: number, gain: number): void {
+    // EUPMini uses binary enable/disable per channel
+    this.workletNode?.port.postMessage({ type: 'setChannelMute', channel, muted: gain <= 0 ? 1 : 0 });
+  }
+
+  setMuteMask(mask: number): void {
+    this.workletNode?.port.postMessage({ type: 'setMuteMask', mask });
+  }
+
   dispose(): void {
     this._disposed = true;
     this.workletNode?.port.postMessage({ type: 'dispose' });

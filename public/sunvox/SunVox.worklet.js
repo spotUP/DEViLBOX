@@ -443,6 +443,52 @@ class SunVoxProcessor extends AudioWorkletProcessor {
         break;
       }
 
+      case 'setMuteMask': {
+        // Per-channel muting via bitmask. In SunVox, "channels" correspond to
+        // generator modules (modules with SV_MODULE_FLAG_GENERATOR set),
+        // excluding module 0 (Output). Bit N = generator N muted.
+        if (!m) break;
+        const h = data.handle;
+        const mask = data.mask || 0;
+        // Collect generator module IDs (skip module 0 = Output)
+        const modCount = m._sv_get_number_of_modules(h);
+        const generators = [];
+        for (let i = 1; i < modCount; i++) {
+          const flags = m._sv_get_module_flags(h, i);
+          if ((flags & SV_MODULE_FLAG_EXISTS) && (flags & SV_MODULE_FLAG_GENERATOR)) {
+            generators.push(i);
+          }
+        }
+        // Apply mute/unmute per generator
+        const mutedRoots = [];
+        const unmutedRoots = [];
+        for (let ch = 0; ch < generators.length; ch++) {
+          if (mask & (1 << ch)) {
+            mutedRoots.push(generators[ch]);
+          } else {
+            unmutedRoots.push(generators[ch]);
+          }
+        }
+        // Delegate to chain-aware muting
+        // Collect all modules that should be unmuted (in any active chain)
+        const shouldBeUnmuted = new Set();
+        for (const rootId of unmutedRoots) {
+          for (const modId of this._getDownstreamModules(h, rootId)) {
+            shouldBeUnmuted.add(modId);
+          }
+        }
+        // Collect all modules that should be muted
+        const shouldBeMuted = new Set();
+        for (const rootId of mutedRoots) {
+          for (const modId of this._getDownstreamModules(h, rootId)) {
+            if (!shouldBeUnmuted.has(modId)) shouldBeMuted.add(modId);
+          }
+        }
+        for (const modId of shouldBeUnmuted) this._unmuteOneModule(h, modId);
+        for (const modId of shouldBeMuted) this._muteOneModule(h, modId);
+        break;
+      }
+
       case 'setModuleMuteState': {
         // Chain-aware muting: walks the module graph from each root module to Output,
         // muting/unmuting entire signal chains. Shared modules stay unmuted if ANY
