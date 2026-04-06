@@ -940,6 +940,81 @@ export class TrackerReplayer {
     this.updateWasmMuteMask();
   }
 
+  /**
+   * Fire ToneEngine notes for replaced instruments using PROCESSED channel state
+   * from libopenmpt. Uses actual pitch/volume after all effect processing
+   * (portamento, vibrato, volume slides, etc.) rather than raw pattern data.
+   * Called from LibopenmptEngine.onChannelState callback.
+   */
+  private fireHybridNotesFromChannelState(
+    channelState: import('./libopenmpt/LibopenmptEngine').LibopenmptChannelState[],
+    time: number,
+  ): void {
+    if (!this.song) return;
+
+    for (let ch = 0; ch < Math.min(channelState.length, this.channels.length); ch++) {
+      const cs = channelState[ch];
+      const channel = this.channels[ch];
+
+      // Determine what this channel was previously playing
+      const chanInst = typeof channel.instrument === 'number' ? channel.instrument
+        : channel.instrument != null && typeof channel.instrument === 'object' && 'id' in channel.instrument
+          ? (channel.instrument as { id: number }).id : 0;
+
+      // Skip if this channel's current instrument is not replaced
+      if (!cs.instrument || !this._replacedInstruments.has(cs.instrument)) {
+        // If channel WAS playing a replaced instrument, cut it
+        if (chanInst && this._replacedInstruments.has(chanInst)) {
+          if (channel.player) {
+            try { channel.player.stop(time); } catch { /* already stopped */ }
+          }
+          channel.instrument = null;
+        }
+        continue;
+      }
+
+      // Channel is playing a replaced instrument
+      if (!cs.active || cs.frequency <= 0) continue;
+
+      // Update channel instrument config from instrumentMap
+      const config = this.instrumentMap.get(cs.instrument);
+      if (config) {
+        channel.instrument = config;
+      }
+
+      // Convert processed frequency to note name
+      const midiNote = Math.round(12 * Math.log2(cs.frequency / 440) + 69);
+      const noteNames = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+      const clampedMidi = Math.max(0, Math.min(127, midiNote));
+      const octave = Math.floor(clampedMidi / 12) - 1;
+      const noteName = noteNames[clampedMidi % 12] + octave;
+
+      // Normalize volume (nRealVolume is 0-16384, we need 0-1)
+      const velocity = Math.min(1, cs.volume / 16384);
+      if (velocity <= 0) continue;
+
+      const engine = getToneEngine();
+      const rowDuration = (2.5 / this.bpm) * this.speed;
+
+      if (config) {
+        engine.triggerNote(
+          cs.instrument,
+          noteName,
+          rowDuration,
+          time,
+          velocity,
+          config,
+          false,  // accent
+          false,  // slide
+          ch,     // channelIndex
+        );
+      }
+    }
+
+    // Update mute mask so libopenmpt mutes channels with replaced instruments
+    this.updateWasmMuteMask();
+  }
+
   // ==========================================================================
   // WASM SEQUENCER CELL SYNC
   // ==========================================================================
@@ -2065,6 +2140,12 @@ export class TrackerReplayer {
             }
             // Fire ToneEngine notes for replaced instruments (hybrid playback)
             this.fireHybridNotesForRow(time);
+          };
+
+          // Subscribe to per-channel state for hybrid synth note firing with processed pitch/volume
+          mptEngine.onChannelState = (channelState, stateTime) => {
+            if (!this.playing || !this.song || this._replacedInstruments.size === 0) return;
+            this.fireHybridNotesFromChannelState(channelState, stateTime);
           };
 
           mptEngine.onEnded = () => {
