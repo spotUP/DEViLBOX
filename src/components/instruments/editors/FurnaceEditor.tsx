@@ -355,10 +355,10 @@ export const FurnaceEditor: React.FC<FurnaceEditorProps> = ({ config, instrument
       {/* Tab Navigation */}
       {category === "FM" && (
         <div className="flex gap-1 bg-dark-bg p-1 rounded-lg border border-dark-border">
-          {(['fm', 'macros', 'chip'] as const).map(tab => (
+          {(['fm', 'macros', ...(paramRanges.hasDT2 ? ['chip' as const] : [])] as const).map(tab => (
             <button
               key={tab}
-              onClick={() => setActiveTab(tab)}
+              onClick={() => setActiveTab(tab as 'fm' | 'macros' | 'chip')}
               className={`flex-1 py-1.5 px-3 rounded text-xs font-mono uppercase transition-colors ${
                 activeTab === tab
                   ? 'bg-amber-600 text-text-primary'
@@ -461,21 +461,6 @@ export const FurnaceEditor: React.FC<FurnaceEditorProps> = ({ config, instrument
           </div>
 
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            {config.opllPreset !== undefined && (
-              <div>
-                <label className="text-[10px] text-text-muted font-mono block mb-1">OPLL Preset</label>
-                <select
-                  value={config.opllPreset}
-                  onChange={(e) => pushLiveUpdate({ opllPreset: parseInt(e.target.value) })}
-                  className="w-full bg-dark-bg border border-dark-border rounded px-2 py-1 text-xs text-text-primary"
-                >
-                  {OPLL_PRESETS.map((name, i) => (
-                    <option key={i} value={i}>{i}: {name}</option>
-                  ))}
-                </select>
-              </div>
-            )}
-
             {paramRanges.hasDT2 && (
               <div className="flex justify-center">
                 <Knob
