@@ -830,7 +830,8 @@ export const useInstrumentStore = create<InstrumentStore>()(
             // ToneEngine fires notes and the WASM engine mutes those channels.
             // Works for ALL engines: libopenmpt, UADE, Klystrack, SID, Hively, etc.
             const song = replayer.getSong();
-            if (synthTypeChanging && song) {
+            const typeActuallyChanged = updatedConfig.synthType !== currentInstrument?.synthType;
+            if (typeActuallyChanged && song) {
               const isNowSynth = updatedConfig.synthType !== 'Sampler' && updatedConfig.synthType !== 'Player';
               const hasWasmEngine = !!(
                 song.libopenmptFileData || song.uadeEditableFileData ||
