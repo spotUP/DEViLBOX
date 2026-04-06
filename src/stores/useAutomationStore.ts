@@ -20,6 +20,27 @@ import { AUTOMATION_PRESETS, interpolateAutomationValue } from '@typedefs/automa
 function canBakeParameter(param: string, format: FormatConstraints): boolean {
   const p = param.toLowerCase();
 
+  // ── C64/SID chip-specific parameters ──────────────────────────────────
+  if (format.chipType === 'c64') {
+    if (p.includes('pulse') || p.includes('duty') || p.includes('fineduty')) return true;
+    if (p.includes('cutoff') || (p.includes('filter') && !p.includes('filterselect') && !p.includes('filtermode'))) return true;
+    if (p.includes('resonance') || p.includes('reso')) return true;
+    if (p.includes('filtermode') || p.includes('filter_mode')) return true;
+    if (p.includes('waveform') || p.includes('wave') || p.endsWith('.duty')) return true;
+    if (p.includes('attack') && p.includes('decay') || p === 'ad' || p.endsWith('.ad')) return true;
+    if (p.includes('sustain') && p.includes('release') || p === 'sr' || p.endsWith('.sr')) return true;
+    if (p.includes('pwslide') || p.includes('pulse_slide') || p.includes('cutoffslide') || p.includes('cutoff_slide')) return true;
+    if (p.includes('envreset') || p.includes('envelope_reset') || p.includes('resettime')) return true;
+  }
+
+  // ── AY/PSG chip-specific parameters ───────────────────────────────────
+  if (format.chipType === 'ay') {
+    if (p.includes('noise') || p.includes('duty')) return true;
+    if (p.includes('envshape') || p.includes('envelope_shape')) return true;
+    if (p.includes('envperiod') || p.includes('envelope_period')) return true;
+  }
+
+  // ── Generic (all formats) ─────────────────────────────────────────────
   // Volume — all formats
   if (p.includes('volume') || p.includes('.vol') || p === 'gain' || p.includes('level') || p.includes('amplitude')) return true;
   // Global volume — XM/IT/S3M
