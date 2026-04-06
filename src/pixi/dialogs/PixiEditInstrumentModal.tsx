@@ -472,6 +472,24 @@ export const PixiEditInstrumentModal: React.FC<PixiEditInstrumentModalProps> = (
     (synthType: SynthType) => {
       const inst = instRef.current;
       if (!inst) return;
+
+      // Warn if replacing a sample with a synth on a native format song
+      if (inst.synthType === 'Sampler' || inst.synthType === 'Player') {
+        try {
+          const { getTrackerReplayer } = require('@engine/TrackerReplayer');
+          const song = getTrackerReplayer().getSong();
+          if (song) {
+            const fmt = song.format?.toUpperCase() || 'native';
+            const confirmed = window.confirm(
+              `Replacing this sample with a synth breaks ${fmt} format compatibility.\n\n` +
+              `The song can no longer be saved as ${fmt} — save as .dbx instead.\n\n` +
+              `Continue?`
+            );
+            if (!confirmed) return;
+          }
+        } catch { /* replayer not initialized */ }
+      }
+
       updateInstrument(inst.id, { synthType });
       setShowSynthBrowser(false);
     },
