@@ -1,55 +1,39 @@
 /**
  * VocoderEffect — Channel vocoder as a drop-in Tone.js effect.
  *
- * Wraps the existing voclib WASM channel vocoder (public/vocoder/Vocoder.worklet.js
- * + Vocoder.wasm) so it can live on master + instrument effect chains alongside
- * Reverb, Delay, Distortion, etc.
+ * Thin wrapper around VocoderCore that adds the Tone.ToneAudioNode
+ * interface (input/output gains, dry/wet mixing) and source switching
+ * between the chain audio and a microphone stream.
  *
- * The WASM has a single-input/single-output design: it receives a modulator
- * signal and shapes an internally-generated carrier (saw / square / noise /
- * chord) by the modulator's spectral envelope.
+ * The actual WASM vocoder, parameter routing, and preset list all live
+ * in VocoderCore — the same core class is used by VocoderEngine in the
+ * DJ view, so behavior is identical.
  *
  * Two source modes:
  *   - 'self' (default): chain audio is the modulator. The effect output
  *     replaces the chain audio with its vocoded version. No mic needed.
- *   - 'mic': a microphone stream is the modulator. The chain audio is
- *     mixed into the dry path so you hear "synth + your-voice-shaped vocoder
- *     layered on top". Mic permission required on first use.
- *
- * Parameters (matching the existing VocoderEngine surface):
- *   - source        'self' | 'mic'
- *   - carrierType   0 saw | 1 square | 2 noise | 3 chord
- *   - carrierFreq   65-1000 Hz
- *   - formantShift  0.5-2.0 (1 = neutral)
- *   - reactionTime  0-0.2 s (envelope smoothing)
- *   - wet           0-1 (handled by TS gain nodes; WASM stays at 100 wet)
+ *   - 'mic': a microphone stream is the modulator. The chain audio still
+ *     passes through the dry path, so you hear "synth + your-voice-shaped
+ *     vocoder layered on top". Mic permission required on first use.
  */
 
 import * as Tone from 'tone';
-import { VOCODER_PRESETS, type CarrierType as StoreCarrierType } from '@/stores/useVocoderStore';
+import {
+  VocoderCore,
+  VOCODER_CORE_PRESETS,
+  type VocoderCarrierType,
+} from '@/engine/vocoder/VocoderCore';
 
-const PARAM_CARRIER_TYPE = 'carrierType';
-const PARAM_CARRIER_FREQ = 'carrierFreq';
-const PARAM_FORMANT = 'formantShift';
-const PARAM_REACTION = 'reactionTime';
-
-export type VocoderCarrierType = 0 | 1 | 2 | 3; // 0 saw, 1 square, 2 noise, 3 chord
+export type { VocoderCarrierType };
 export type VocoderSource = 'self' | 'mic';
 
-const CARRIER_NAME_TO_INT: Record<StoreCarrierType, VocoderCarrierType> = {
-  saw: 0,
-  square: 1,
-  noise: 2,
-  chord: 3,
-};
-
 /** Re-exported preset list — same source of truth as the DJ view vocoder. */
-export const VOCODER_EFFECT_PRESETS = VOCODER_PRESETS;
+export const VOCODER_EFFECT_PRESETS = VOCODER_CORE_PRESETS;
 
 export interface VocoderEffectOptions {
   source?: VocoderSource;
-  bands?: number;            // 12-64 (requires worklet reinit when changed)
-  filtersPerBand?: number;   // 1-8 (requires worklet reinit when changed)
+  bands?: number;
+  filtersPerBand?: number;
   carrierType?: VocoderCarrierType;
   carrierFreq?: number;
   formantShift?: number;
@@ -57,7 +41,7 @@ export interface VocoderEffectOptions {
   wet?: number;
 }
 
-/** Extract the underlying native GainNode from a Tone.js Gain wrapper */
+/** Extract the underlying native GainNode from a Tone.js Gain wrapper. */
 function getRawGainNode(node: Tone.Gain): GainNode {
   const n = node as unknown as Record<string, GainNode | undefined>;
   return n._gainNode ?? n._nativeAudioNode ?? n._node ?? (node as unknown as GainNode);
@@ -70,14 +54,12 @@ export class VocoderEffect extends Tone.ToneAudioNode {
   readonly input: Tone.Gain;
   readonly output: Tone.Gain;
 
-  // Wet/dry split
+  // Wet/dry split (TS gain nodes — VocoderCore stays at 100% wet internally)
   private dryGain: Tone.Gain;
   private wetGain: Tone.Gain;
 
-  // WASM worklet
-  private workletNode: AudioWorkletNode | null = null;
-  private isWasmReady = false;
-  private pendingParams: Array<{ key: string; value: number }> = [];
+  // Shared core (owns the worklet + WASM + parameter state)
+  private core: VocoderCore;
 
   // Mic source (only used when source === 'mic')
   private micStream: MediaStream | null = null;
@@ -86,278 +68,131 @@ export class VocoderEffect extends Tone.ToneAudioNode {
 
   // Connection state
   private workletConnectedToInput = false;
+  private workletConnectedToWet = false;
 
-  // State
-  private _options: Required<VocoderEffectOptions>;
-
-  // Static cached WASM binary (shared across instances + contexts)
-  private static wasmBinary: ArrayBuffer | null = null;
-  private static loadedContexts = new WeakSet<BaseAudioContext>();
-  private static initPromises = new Map<BaseAudioContext, Promise<void>>();
+  private _source: VocoderSource;
+  private _wet: number;
 
   constructor(options: Partial<VocoderEffectOptions> = {}) {
     super();
 
-    this._options = {
-      source: options.source ?? 'self',
-      bands: options.bands ?? 32,
-      filtersPerBand: options.filtersPerBand ?? 6,
-      carrierType: options.carrierType ?? 3, // chord
-      carrierFreq: options.carrierFreq ?? 130.81, // C3
-      formantShift: options.formantShift ?? 1.0,
-      reactionTime: options.reactionTime ?? 0.03,
-      wet: options.wet ?? 1.0,
-    };
+    this._source = options.source ?? 'self';
+    this._wet = options.wet ?? 1.0;
 
     this.input = new Tone.Gain(1);
     this.output = new Tone.Gain(1);
-
-    this.dryGain = new Tone.Gain(1 - this._options.wet);
-    this.wetGain = new Tone.Gain(this._options.wet);
+    this.dryGain = new Tone.Gain(1 - this._wet);
+    this.wetGain = new Tone.Gain(this._wet);
 
     // Dry: input → dryGain → output
     this.input.connect(this.dryGain);
     this.dryGain.connect(this.output);
-
-    // Wet: workletNode (inserted by initWasm) → wetGain → output
+    // Wet: core.node (inserted by initCore) → wetGain → output
     this.wetGain.connect(this.output);
 
-    this.initWasm().catch((err) => {
+    const rawContext = Tone.getContext().rawContext as AudioContext;
+    this.core = new VocoderCore(rawContext, {
+      bands: options.bands,
+      filtersPerBand: options.filtersPerBand,
+      carrierType: options.carrierType,
+      carrierFreq: options.carrierFreq,
+      formantShift: options.formantShift,
+      reactionTime: options.reactionTime,
+    });
+
+    this.initCore().catch((err) => {
       console.warn('[VocoderEffect] init failed:', err);
     });
   }
 
-  // ── Parameter setters ──────────────────────────────────────────────────
+  // ── Parameter setters (delegate to core) ───────────────────────────────
 
   setSource(source: VocoderSource): void {
-    if (this._options.source === source) return;
-    this._options.source = source;
-    if (this.isWasmReady) {
-      this.rewireSource();
-    }
+    if (this._source === source) return;
+    this._source = source;
+    if (this.core.isReady) this.rewireSource();
   }
 
-  setCarrierType(type: VocoderCarrierType): void {
-    this._options.carrierType = type;
-    this.sendParam(PARAM_CARRIER_TYPE, type);
-  }
-
-  setCarrierFreq(hz: number): void {
-    this._options.carrierFreq = Math.max(20, Math.min(2000, hz));
-    this.sendParam(PARAM_CARRIER_FREQ, this._options.carrierFreq);
-  }
-
-  setFormantShift(s: number): void {
-    this._options.formantShift = Math.max(0.5, Math.min(2.0, s));
-    this.sendParam(PARAM_FORMANT, this._options.formantShift);
-  }
-
-  setReactionTime(t: number): void {
-    this._options.reactionTime = Math.max(0, Math.min(2.0, t));
-    this.sendParam(PARAM_REACTION, this._options.reactionTime);
-  }
-
-  setBands(b: number): void {
-    const clamped = Math.max(12, Math.min(64, Math.round(b)));
-    if (clamped === this._options.bands) return;
-    this._options.bands = clamped;
-    this.reinitWorklet();
-  }
-
-  setFiltersPerBand(f: number): void {
-    const clamped = Math.max(1, Math.min(8, Math.round(f)));
-    if (clamped === this._options.filtersPerBand) return;
-    this._options.filtersPerBand = clamped;
-    this.reinitWorklet();
-  }
-
-  /** Load one of the named voice presets (Kraftwerk, Daft Punk, etc.) */
-  loadPreset(name: string): void {
-    const preset = VOCODER_EFFECT_PRESETS.find((p) => p.name === name);
-    if (!preset) return;
-    const p = preset.params;
-    const newBands = p.bands;
-    const newFilters = p.filtersPerBand;
-    const reinitNeeded =
-      newBands !== this._options.bands || newFilters !== this._options.filtersPerBand;
-
-    this._options.bands = newBands;
-    this._options.filtersPerBand = newFilters;
-    this._options.carrierType = CARRIER_NAME_TO_INT[p.carrierType];
-    this._options.carrierFreq = p.carrierFreq;
-    this._options.formantShift = p.formantShift;
-    this._options.reactionTime = p.reactionTime;
-
-    if (reinitNeeded) {
-      this.reinitWorklet();
-    } else {
-      this.sendParam(PARAM_CARRIER_TYPE, this._options.carrierType);
-      this.sendParam(PARAM_CARRIER_FREQ, this._options.carrierFreq);
-      this.sendParam(PARAM_FORMANT, this._options.formantShift);
-      this.sendParam(PARAM_REACTION, this._options.reactionTime);
-    }
-  }
-
-  /** Re-create the WASM vocoder with current bands/filtersPerBand. */
-  private reinitWorklet(): void {
-    if (!this.workletNode || !this.isWasmReady) return;
-    const rawContext = Tone.getContext().rawContext as AudioContext;
-    this.workletNode.port.postMessage({
-      type: 'reinit',
-      sampleRate: rawContext.sampleRate,
-      bands: this._options.bands,
-      filtersPerBand: this._options.filtersPerBand,
-    });
-    // After reinit re-send all runtime params
-    this.workletNode.port.postMessage({ type: 'setCarrierType', value: this._options.carrierType });
-    this.workletNode.port.postMessage({ type: 'setCarrierFreq', value: this._options.carrierFreq });
-    this.workletNode.port.postMessage({ type: 'setFormantShift', value: this._options.formantShift });
-    this.workletNode.port.postMessage({ type: 'setReactionTime', value: this._options.reactionTime });
-    this.workletNode.port.postMessage({ type: 'setWet', value: 1.0 });
-  }
+  setCarrierType(type: VocoderCarrierType): void { this.core.setCarrierType(type); }
+  setCarrierFreq(hz: number): void { this.core.setCarrierFreq(hz); }
+  setFormantShift(s: number): void { this.core.setFormantShift(s); }
+  setReactionTime(t: number): void { this.core.setReactionTime(t); }
+  setBands(b: number): void { this.core.setBands(b); }
+  setFiltersPerBand(f: number): void { this.core.setFiltersPerBand(f); }
+  loadPreset(name: string): void { this.core.loadPreset(name); }
 
   get wet(): number {
-    return this._options.wet;
+    return this._wet;
   }
 
   set wet(value: number) {
-    this._options.wet = Math.max(0, Math.min(1, value));
-    this.wetGain.gain.value = this._options.wet;
-    this.dryGain.gain.value = 1 - this._options.wet;
+    this._wet = Math.max(0, Math.min(1, value));
+    this.wetGain.gain.value = this._wet;
+    this.dryGain.gain.value = 1 - this._wet;
   }
 
-  // ── WASM init ──────────────────────────────────────────────────────────
+  // ── Init ───────────────────────────────────────────────────────────────
 
-  private async initWasm(): Promise<void> {
-    const rawContext = Tone.getContext().rawContext as AudioContext;
-    await VocoderEffect.ensureInitialized(rawContext);
+  private async initCore(): Promise<void> {
+    await this.core.init();
+    if (!this.core.node) return;
 
-    if (!VocoderEffect.wasmBinary) {
-      console.warn('[VocoderEffect] WASM binary unavailable, vocoder will be silent');
-      return;
-    }
-
-    this.workletNode = new AudioWorkletNode(rawContext, 'vocoder-processor', {
-      numberOfInputs: 1,
-      numberOfOutputs: 1,
-      outputChannelCount: [1],
-    });
-
-    this.workletNode.port.onmessage = (e) => {
-      const data = e.data;
-      if (data.type === 'ready') {
-        this.isWasmReady = true;
-        this.sendParam(PARAM_CARRIER_TYPE, this._options.carrierType);
-        this.sendParam(PARAM_CARRIER_FREQ, this._options.carrierFreq);
-        this.sendParam(PARAM_FORMANT, this._options.formantShift);
-        this.sendParam(PARAM_REACTION, this._options.reactionTime);
-        // WASM always 100% wet — TS gains handle dry/wet
-        this.workletNode!.port.postMessage({ type: 'setWet', value: 1.0 });
-        for (const { key, value } of this.pendingParams) {
-          this.workletNode!.port.postMessage({ type: this.paramTypeFor(key), value });
-        }
-        this.pendingParams = [];
-        this.connectWorklet();
-      } else if (data.type === 'error') {
-        console.error('[VocoderEffect] worklet error:', data.message);
-      }
-    };
-
-    // Send init with WASM binary
-    this.workletNode.port.postMessage({
-      type: 'init',
-      wasmBinary: VocoderEffect.wasmBinary,
-      sampleRate: rawContext.sampleRate,
-      bands: this._options.bands,
-      filtersPerBand: this._options.filtersPerBand,
-    });
-
-    // Keepalive — make sure the worklet keeps processing even if its
-    // output isn't currently routed (e.g., wet=0).
-    const keepalive = rawContext.createGain();
-    keepalive.gain.value = 0;
-    this.workletNode.connect(keepalive);
-    keepalive.connect(rawContext.destination);
-  }
-
-  private static async ensureInitialized(context: AudioContext): Promise<void> {
-    if (VocoderEffect.loadedContexts.has(context)) return;
-    const existing = VocoderEffect.initPromises.get(context);
-    if (existing) return existing;
-
-    const p = (async () => {
-      const baseUrl = import.meta.env.BASE_URL || '/';
-      try {
-        await context.audioWorklet.addModule(`${baseUrl}vocoder/Vocoder.worklet.js?v=1`);
-      } catch { /* may already be registered */ }
-
-      if (!VocoderEffect.wasmBinary) {
-        const resp = await fetch(`${baseUrl}vocoder/Vocoder.wasm`);
-        if (resp.ok) {
-          VocoderEffect.wasmBinary = await resp.arrayBuffer();
-        }
-      }
-      VocoderEffect.loadedContexts.add(context);
-    })();
-
-    VocoderEffect.initPromises.set(context, p);
-    return p;
-  }
-
-  // ── Connection management ──────────────────────────────────────────────
-
-  /**
-   * Wire up the worklet's input depending on the current source mode.
-   * Self mode: chain audio → worklet → wetGain
-   * Mic mode:  mic stream → worklet → wetGain (chain audio still goes through dry path)
-   */
-  private connectWorklet(): void {
-    if (!this.workletNode) return;
     const rawContext = Tone.getContext().rawContext as AudioContext;
     const rawWet = getRawGainNode(this.wetGain);
 
-    // Always connect worklet output to wet gain
-    try { this.workletNode.connect(rawWet); } catch { /* may already be connected */ }
+    // Wire core output → wet gain
+    try { this.core.node.connect(rawWet); this.workletConnectedToWet = true; } catch (err) {
+      console.warn('[VocoderEffect] failed to connect core to wet gain:', err);
+    }
 
     this.rewireSource();
-    void rawContext;
+
+    // Keepalive — ensure the worklet keeps processing even if its
+    // output isn't currently routed (e.g., wet=0 or graph trimming).
+    const keepalive = rawContext.createGain();
+    keepalive.gain.value = 0;
+    this.core.node.connect(keepalive);
+    keepalive.connect(rawContext.destination);
   }
 
+  // ── Source routing ─────────────────────────────────────────────────────
+
+  /**
+   * Wire up the worklet's input depending on the current source mode.
+   * Self mode: chain audio → worklet
+   * Mic mode:  mic stream → worklet (chain audio still flows through dry path)
+   */
   private rewireSource(): void {
-    if (!this.workletNode) return;
+    if (!this.core.node) return;
     const rawInput = getRawGainNode(this.input);
 
-    // Tear down any existing source connections to the worklet
-    this.disconnectWorkletInput();
+    // Tear down existing source connections
+    if (this.workletConnectedToInput) {
+      try { rawInput.disconnect(this.core.node); } catch { /* ok */ }
+      this.workletConnectedToInput = false;
+    }
+    if (this.micPreamp) {
+      try { this.micPreamp.disconnect(this.core.node); } catch { /* ok */ }
+    }
 
-    if (this._options.source === 'self') {
-      // Chain audio → worklet
-      try { rawInput.connect(this.workletNode); this.workletConnectedToInput = true; } catch (err) {
-        console.warn('[VocoderEffect] failed to connect chain audio to worklet:', err);
+    if (this._source === 'self') {
+      try {
+        rawInput.connect(this.core.node);
+        this.workletConnectedToInput = true;
+      } catch (err) {
+        console.warn('[VocoderEffect] failed to connect chain audio to core:', err);
       }
     } else {
-      // Mic → worklet (acquired lazily)
       this.acquireMic().catch((err) => {
         console.warn('[VocoderEffect] mic acquisition failed, falling back to self mode:', err);
-        this._options.source = 'self';
+        this._source = 'self';
         this.rewireSource();
       });
     }
   }
 
-  private disconnectWorkletInput(): void {
-    const rawInput = getRawGainNode(this.input);
-    if (this.workletConnectedToInput && this.workletNode) {
-      try { rawInput.disconnect(this.workletNode); } catch { /* ok */ }
-      this.workletConnectedToInput = false;
-    }
-    if (this.micSource && this.workletNode) {
-      try { this.micSource.disconnect(this.workletNode); } catch { /* ok */ }
-    }
-  }
-
   private async acquireMic(): Promise<void> {
-    if (!this.workletNode) return;
+    if (!this.core.node) return;
     const rawContext = Tone.getContext().rawContext as AudioContext;
 
     if (!this.micStream) {
@@ -369,7 +204,6 @@ export class VocoderEffect extends Tone.ToneAudioNode {
         },
       });
     }
-
     if (!this.micSource) {
       this.micSource = rawContext.createMediaStreamSource(this.micStream);
     }
@@ -379,37 +213,15 @@ export class VocoderEffect extends Tone.ToneAudioNode {
       this.micSource.connect(this.micPreamp);
     }
     try {
-      this.micPreamp.connect(this.workletNode);
+      this.micPreamp.connect(this.core.node);
     } catch { /* may already be connected */ }
   }
 
-  // ── Helpers ────────────────────────────────────────────────────────────
-
-  private paramTypeFor(key: string): string {
-    switch (key) {
-      case PARAM_CARRIER_TYPE: return 'setCarrierType';
-      case PARAM_CARRIER_FREQ: return 'setCarrierFreq';
-      case PARAM_FORMANT: return 'setFormantShift';
-      case PARAM_REACTION: return 'setReactionTime';
-      default: return key;
-    }
-  }
-
-  private sendParam(key: string, value: number): void {
-    if (this.workletNode && this.isWasmReady) {
-      this.workletNode.port.postMessage({ type: this.paramTypeFor(key), value });
-    } else {
-      this.pendingParams = this.pendingParams.filter((p) => p.key !== key);
-      this.pendingParams.push({ key, value });
-    }
-  }
+  // ── Cleanup ────────────────────────────────────────────────────────────
 
   dispose(): this {
-    if (this.workletNode) {
-      try { this.workletNode.port.postMessage({ type: 'dispose' }); } catch { /* ok */ }
-      try { this.workletNode.disconnect(); } catch { /* ok */ }
-      this.workletNode = null;
-    }
+    void this.workletConnectedToWet;
+    this.core.dispose();
     if (this.micPreamp) {
       try { this.micPreamp.disconnect(); } catch { /* ok */ }
       this.micPreamp = null;
