@@ -20,11 +20,123 @@
 
 import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
 import type { InstrumentConfig } from '@/types';
+import { createSamplerInstrument } from './AmigaUtils';
 
 const MIN_FILE_SIZE = 1800;
 
 function u16BE(buf: Uint8Array, off: number): number {
   return ((buf[off] << 8) | buf[off + 1]) >>> 0;
+}
+
+function u32BE(buf: Uint8Array, off: number): number {
+  return (((buf[off] << 24) | (buf[off + 1] << 16) | (buf[off + 2] << 8) | buf[off + 3]) >>> 0);
+}
+
+/**
+ * Scan for opcode patterns in the Kim Christensen binary to locate sample data pointers.
+ *
+ * Opcode chain:
+ *   0x207C → D0 (movea.l #imm,a0)
+ *   0x0680 → D1 (addi.l)
+ *   0xE341 → D7 (at -6 from the E341 match position)
+ *   0x227C → D2 (movea.l #imm,a1)
+ *   0x0680 → D3 (addi.l)
+ *   0x0087 → origin computed from D7
+ *
+ * Returns { origin, sampleTableFileOff, sampleCount } or null if not found.
+ */
+function scanKimDataPointers(buf: Uint8Array): {
+  origin: number; sampleTableFileOff: number; sampleCount: number;
+} | null {
+  const len = buf.length;
+
+  // Step 1: find 0x207C in first 100 words → D0
+  let pos = 0;
+  let d0Pos = -1;
+  for (let i = 0; i < 100 && pos + 5 < len; i++, pos += 2) {
+    if (u16BE(buf, pos) === 0x207C) {
+      d0Pos = pos;
+      // D0 = u32BE at pos+2
+      pos += 6; // skip opcode(2) + immediate(4)
+      break;
+    }
+  }
+  if (d0Pos < 0) return null;
+
+  // Step 2: find 0x0680 → D1 (addi.l #imm, ...)
+  let d1Pos = -1;
+  for (let i = 0; i < 800 && pos + 5 < len; i++, pos += 2) {
+    if (u16BE(buf, pos) === 0x0680) {
+      d1Pos = pos;
+      pos += 2;
+      break;
+    }
+  }
+  if (d1Pos < 0) return null;
+
+  // Step 3: find 0xE341 → D7 is at pos-6 (the long before the E341)
+  let e341Pos = -1;
+  for (let i = 0; i < 800 && pos + 1 < len; i++, pos += 2) {
+    if (u16BE(buf, pos) === 0xE341) {
+      e341Pos = pos;
+      pos += 2;
+      break;
+    }
+  }
+  if (e341Pos < 0 || e341Pos < 6) return null;
+  const d7 = u32BE(buf, e341Pos - 4); // D7 from 4 bytes before E341
+
+  // Step 4: find 0x227C → D2
+  let d2Pos = -1;
+  for (let i = 0; i < 800 && pos + 5 < len; i++, pos += 2) {
+    if (u16BE(buf, pos) === 0x227C) {
+      d2Pos = pos;
+      pos += 2;
+      break;
+    }
+  }
+  if (d2Pos < 0) return null;
+  pos = d2Pos + 6; // skip opcode(2) + immediate(4)
+
+  // Step 5: find 0x0680 → D3
+  let d3Pos = -1;
+  for (let i = 0; i < 800 && pos + 5 < len; i++, pos += 2) {
+    if (u16BE(buf, pos) === 0x0680) {
+      d3Pos = pos;
+      pos += 2;
+      break;
+    }
+  }
+  if (d3Pos < 0) return null;
+  const d3Val = u32BE(buf, d3Pos + 2); // immediate after 0680
+  pos = d3Pos + 6;
+
+  // Step 6: find 0x0087 → origin
+  let pos0087 = -1;
+  for (let i = 0; i < 800 && pos + 1 < len; i++, pos += 2) {
+    if (u16BE(buf, pos) === 0x0087) {
+      pos0087 = pos;
+      break;
+    }
+  }
+  if (pos0087 < 0) return null;
+
+  // origin = D7 - (0x0087_pos - 4)
+  const origin = (d7 - (pos0087 - 4)) >>> 0;
+
+  // Sample table at file offset (D3 - origin)
+  const sampleTableFileOff = (d3Val - origin) >>> 0;
+  if (sampleTableFileOff + 4 > buf.length) return null;
+
+  // First DWORD at sample table = end pointer
+  const firstDword = u32BE(buf, sampleTableFileOff);
+  // Count = (firstDword - D3_absolute) / 6
+  const d3Absolute = d3Val;
+  const tableBytes = (firstDword - d3Absolute) >>> 0;
+  if (tableBytes === 0 || tableBytes % 6 !== 0) return null;
+  const sampleCount = tableBytes / 6;
+
+  return { origin, sampleTableFileOff, sampleCount };
 }
 
 
@@ -126,10 +238,39 @@ export function parseKimChristensenFile(buffer: ArrayBuffer, filename: string): 
   const baseName = filename.split('/').pop() ?? filename;
   const moduleName = baseName.replace(/^kim\./i, '') || baseName;
 
-  const instruments: InstrumentConfig[] = [{
-    id: 1, name: 'Sample 1', type: 'synth' as const,
-    synthType: 'Synth' as const, effects: [], volume: 0, pan: 0,
-  } as InstrumentConfig];
+  // ── Extract samples via opcode scanning ───────────────────────────────
+  const instruments: InstrumentConfig[] = [];
+  const ptrs = scanKimDataPointers(buf);
+
+  if (ptrs) {
+    const { origin, sampleTableFileOff, sampleCount } = ptrs;
+    for (let i = 0; i < sampleCount; i++) {
+      const descOff = sampleTableFileOff + i * 6;
+      if (descOff + 6 > buf.length) break;
+      const addr = u32BE(buf, descOff);
+      const length = u16BE(buf, descOff + 4) * 2; // word count → byte count
+      const fileOff = (addr - origin) >>> 0;
+
+      if (fileOff + length <= buf.length && length > 0) {
+        const pcm = buf.slice(fileOff, fileOff + length);
+        instruments.push(createSamplerInstrument(
+          i + 1, `KIM Sample ${i + 1}`, pcm, 64, 8287, 0, 0,
+        ));
+      } else {
+        instruments.push({
+          id: i + 1, name: `KIM Sample ${i + 1}`, type: 'synth' as const,
+          synthType: 'Synth' as const, effects: [], volume: 0, pan: 0,
+        } as InstrumentConfig);
+      }
+    }
+  }
+
+  if (instruments.length === 0) {
+    instruments.push({
+      id: 1, name: 'Sample 1', type: 'synth' as const,
+      synthType: 'Synth' as const, effects: [], volume: 0, pan: 0,
+    } as InstrumentConfig);
+  }
 
   const emptyRows = Array.from({ length: 64 }, () => ({
     note: 0, instrument: 0, volume: 0, effTyp: 0, eff: 0, effTyp2: 0, eff2: 0,
@@ -146,7 +287,8 @@ export function parseKimChristensenFile(buffer: ArrayBuffer, filename: string): 
     importMetadata: {
       sourceFormat: 'MOD' as const, sourceFile: filename,
       importedAt: new Date().toISOString(),
-      originalChannelCount: 4, originalPatternCount: 1, originalInstrumentCount: 0,
+      originalChannelCount: 4, originalPatternCount: 1,
+      originalInstrumentCount: instruments.length,
     },
   };
 
@@ -155,5 +297,7 @@ export function parseKimChristensenFile(buffer: ArrayBuffer, filename: string): 
     patterns: [pattern], instruments, songPositions: [0],
     songLength: 1, restartPosition: 0, numChannels: 4,
     initialSpeed: 6, initialBPM: 125, linearPeriods: false,
+    uadeEditableFileData: buffer.slice(0) as ArrayBuffer,
+    uadeEditableFileName: filename,
   };
 }

@@ -14,6 +14,13 @@
  * These are specific 68k instruction sequences at fixed byte offsets in the
  * compiled executable, unique to this format.
  *
+ * Binary layout:
+ *   0x0000-0x0293: Player code (68k executable)
+ *   0x0294-0x02D3: Song order table (128 bytes, one byte per position = pattern index)
+ *   0x02D4+:       Pattern data (1024 bytes per pattern, standard MOD cell encoding:
+ *                   4 bytes/cell × 4 channels × 64 rows)
+ *   After patterns: Sample PCM data
+ *
  * File prefix: "EX."  (e.g. "EX.songname")
  *
  * Single-file format: compiled 68k executable.
@@ -23,12 +30,37 @@
  */
 
 import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
-import type { InstrumentConfig } from '@/types';
+import type { Pattern, ChannelData, TrackerCell } from '@/types';
+import type { InstrumentConfig } from '@/types/instrument';
+import type { UADEPatternLayout } from '@/engine/uade/UADEPatternEncoder';
+import { encodeMODCell } from '@/engine/uade/encoders/MODEncoder';
+import { periodToNoteIndex, amigaNoteToXM } from './AmigaUtils';
 
 // ── Constants ─────────────────────────────────────────────────────────────
 
 /** Minimum file size: needs bytes through offset 25 (22 + 4 bytes = 26). */
 const MIN_FILE_SIZE = 26;
+
+/** Offset of the 128-byte song order table */
+const SONG_ORDER_OFF = 0x0294;
+
+/** Length of the song order table in bytes */
+const SONG_ORDER_LEN = 128;
+
+/** Offset where pattern data begins (immediately after order table) */
+const PATTERN_DATA_OFF = SONG_ORDER_OFF + SONG_ORDER_LEN; // 0x0314
+
+/** Rows per pattern */
+const ROWS_PER_PATTERN = 64;
+
+/** Number of channels */
+const NUM_CHANNELS = 4;
+
+/** Bytes per row (4 channels × 4 bytes/cell) */
+const BYTES_PER_ROW = NUM_CHANNELS * 4;
+
+/** Bytes per pattern (64 rows × 16 bytes/row) */
+const PATTERN_SIZE = ROWS_PER_PATTERN * BYTES_PER_ROW; // 1024
 
 // ── Binary helpers ─────────────────────────────────────────────────────────
 
@@ -40,6 +72,44 @@ function u32BE(buf: Uint8Array, off: number): number {
   return (
     ((buf[off] << 24) | (buf[off + 1] << 16) | (buf[off + 2] << 8) | buf[off + 3]) >>> 0
   );
+}
+
+// ── MOD cell decoder ───────────────────────────────────────────────────────
+
+/**
+ * Decode a standard 4-byte ProTracker MOD cell.
+ *
+ * Cell encoding:
+ *   byte[0] = (instrHi & 0xF0) | ((period >> 8) & 0x0F)
+ *   byte[1] = period & 0xFF
+ *   byte[2] = ((instrLo & 0x0F) << 4) | (effTyp & 0x0F)
+ *   byte[3] = eff & 0xFF
+ */
+function decodeMODCell(buf: Uint8Array, off: number): TrackerCell {
+  const b0 = buf[off];
+  const b1 = buf[off + 1];
+  const b2 = buf[off + 2];
+  const b3 = buf[off + 3];
+
+  const instrHi = b0 & 0xF0;
+  const period  = ((b0 & 0x0F) << 8) | b1;
+  const instrLo = (b2 >> 4) & 0x0F;
+  const effTyp  = b2 & 0x0F;
+  const eff     = b3;
+
+  const instrument = instrHi | instrLo; // 0-31
+  const amigaIdx   = periodToNoteIndex(period);
+  const note       = amigaNoteToXM(amigaIdx);
+
+  return {
+    note,
+    instrument,
+    volume: 0,
+    effTyp: (effTyp !== 0 || eff !== 0) ? effTyp : 0,
+    eff:    (effTyp !== 0 || eff !== 0) ? eff : 0,
+    effTyp2: 0,
+    eff2: 0,
+  };
 }
 
 // ── Format detection ───────────────────────────────────────────────────────
@@ -72,8 +142,10 @@ export function isFashionTrackerFormat(buffer: ArrayBuffer | Uint8Array): boolea
 /**
  * Parse a Fashion Tracker module file into a TrackerSong.
  *
- * Fashion Tracker modules are compiled 68k executables. This parser creates a
- * metadata-only TrackerSong. Actual audio playback is always delegated to UADE.
+ * Fashion Tracker modules are compiled 68k executables with embedded pattern
+ * data in standard ProTracker MOD cell format. This parser extracts the song
+ * order table, decodes all patterns, and creates placeholder instruments for
+ * any sample indices referenced in pattern data.
  *
  * @param buffer   Raw file bytes (ArrayBuffer)
  * @param filename Original filename (used to derive the module name)
@@ -91,69 +163,145 @@ export function parseFashionTrackerFile(buffer: ArrayBuffer, filename: string): 
   // Strip "EX." prefix (case-insensitive) or .ex extension
   const moduleName = baseName.replace(/^ex\./i, '').replace(/\.ex$/i, '') || baseName;
 
-  // ── Instrument placeholder ────────────────────────────────────────────────
+  // ── Song order table ──────────────────────────────────────────────────────
 
-  const instruments: InstrumentConfig[] = [
-    {
-      id: 1,
-      name: 'Sample 1',
+  const songOrders: number[] = [];
+  let maxPatIdx = 0;
+
+  for (let i = 0; i < SONG_ORDER_LEN; i++) {
+    const patIdx = buf[SONG_ORDER_OFF + i];
+    songOrders.push(patIdx);
+    if (patIdx > maxPatIdx) maxPatIdx = patIdx;
+  }
+
+  // Trim trailing zero entries to find actual song length.
+  // Find the last non-zero entry (or keep at least 1 position).
+  let songLength = SONG_ORDER_LEN;
+  while (songLength > 1 && songOrders[songLength - 1] === 0) {
+    songLength--;
+  }
+  const usedOrders = songOrders.slice(0, songLength);
+
+  const numPatterns = maxPatIdx + 1;
+
+  // Clamp to patterns that actually fit in the file
+  const availablePatterns = Math.min(
+    numPatterns,
+    Math.floor((buf.length - PATTERN_DATA_OFF) / PATTERN_SIZE),
+  );
+
+  // ── Parse patterns ────────────────────────────────────────────────────────
+
+  let maxSampleIdx = 0;
+  const patterns: Pattern[] = [];
+
+  for (let patIdx = 0; patIdx < availablePatterns; patIdx++) {
+    const patOff = PATTERN_DATA_OFF + patIdx * PATTERN_SIZE;
+    const channels: ChannelData[] = [];
+
+    for (let ch = 0; ch < NUM_CHANNELS; ch++) {
+      const rows: TrackerCell[] = [];
+
+      for (let row = 0; row < ROWS_PER_PATTERN; row++) {
+        const cellOff = patOff + row * BYTES_PER_ROW + ch * 4;
+        const cell = decodeMODCell(buf, cellOff);
+        rows.push(cell);
+
+        if (cell.instrument > maxSampleIdx) {
+          maxSampleIdx = cell.instrument;
+        }
+      }
+
+      channels.push({
+        id: `channel-${ch}`,
+        name: `Channel ${ch + 1}`,
+        muted: false,
+        solo: false,
+        collapsed: false,
+        volume: 100,
+        pan: (ch === 0 || ch === 3) ? -50 : 50, // Amiga LRRL panning
+        instrumentId: null,
+        color: null,
+        rows,
+      });
+    }
+
+    patterns.push({
+      id: `pattern-${patIdx}`,
+      name: `Pattern ${patIdx}`,
+      length: ROWS_PER_PATTERN,
+      channels,
+      importMetadata: {
+        sourceFormat: 'MOD' as const,
+        sourceFile: filename,
+        importedAt: new Date().toISOString(),
+        originalChannelCount: NUM_CHANNELS,
+        originalPatternCount: availablePatterns,
+        originalInstrumentCount: maxSampleIdx,
+      },
+    });
+  }
+
+  // ── Build song positions ──────────────────────────────────────────────────
+
+  const songPositions: number[] = [];
+  for (const patIdx of usedOrders) {
+    if (patIdx < availablePatterns) {
+      songPositions.push(patIdx);
+    }
+  }
+  if (songPositions.length === 0) songPositions.push(0);
+
+  // ── Instrument placeholders ───────────────────────────────────────────────
+  // Sample PCM data follows pattern data; since Fashion Tracker is a compiled
+  // 68k executable played by UADE, we create placeholder instruments for any
+  // sample indices found in the pattern data. UADE handles actual sample playback.
+
+  const numInstruments = Math.max(1, maxSampleIdx);
+  const instruments: InstrumentConfig[] = [];
+
+  for (let i = 1; i <= numInstruments; i++) {
+    instruments.push({
+      id: i,
+      name: `Sample ${i}`,
       type: 'synth' as const,
       synthType: 'Synth' as const,
       effects: [],
       volume: 0,
       pan: 0,
-    } as InstrumentConfig,
-  ];
+    } as InstrumentConfig);
+  }
 
-  // ── Empty pattern (placeholder — UADE handles actual audio) ──────────────
+  // ── UADE pattern layout for chip RAM editing ──────────────────────────────
 
-  const emptyRows = Array.from({ length: 64 }, () => ({
-    note: 0,
-    instrument: 0,
-    volume: 0,
-    effTyp: 0,
-    eff: 0,
-    effTyp2: 0,
-    eff2: 0,
-  }));
-
-  const pattern = {
-    id: 'pattern-0',
-    name: 'Pattern 0',
-    length: 64,
-    channels: Array.from({ length: 4 }, (_, ch) => ({
-      id: `channel-${ch}`,
-      name: `Channel ${ch + 1}`,
-      muted: false,
-      solo: false,
-      collapsed: false,
-      volume: 100,
-      pan: ch === 0 || ch === 3 ? -50 : 50,
-      instrumentId: null,
-      color: null,
-      rows: emptyRows,
-    })),
-    importMetadata: {
-      sourceFormat: 'MOD' as const,
-      sourceFile: filename,
-      importedAt: new Date().toISOString(),
-      originalChannelCount: 4,
-      originalPatternCount: 1,
-      originalInstrumentCount: 0,
+  const uadePatternLayout: UADEPatternLayout = {
+    formatId: 'fashionTracker',
+    patternDataFileOffset: PATTERN_DATA_OFF,
+    bytesPerCell: 4,
+    rowsPerPattern: ROWS_PER_PATTERN,
+    numChannels: NUM_CHANNELS,
+    numPatterns: availablePatterns,
+    moduleSize: buf.length,
+    encodeCell: encodeMODCell,
+    getCellFileOffset: (pattern: number, row: number, channel: number): number => {
+      return PATTERN_DATA_OFF + pattern * PATTERN_SIZE + row * BYTES_PER_ROW + channel * 4;
     },
   };
 
   return {
     name: `${moduleName} [Fashion Tracker]`,
     format: 'MOD' as TrackerFormat,
-    patterns: [pattern],
+    patterns,
     instruments,
-    songPositions: [0],
-    songLength: 1,
+    songPositions,
+    songLength: songPositions.length,
     restartPosition: 0,
-    numChannels: 4,
+    numChannels: NUM_CHANNELS,
     initialSpeed: 6,
     initialBPM: 125,
     linearPeriods: false,
+    uadePatternLayout,
+    uadeEditableFileData: buffer.slice(0) as ArrayBuffer,
+    uadeEditableFileName: filename,
   };
 }

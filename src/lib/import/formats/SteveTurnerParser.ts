@@ -653,6 +653,8 @@ export function parseSteveTurnerFile(buffer: ArrayBuffer, filename: string): Tra
     // BPM 250 gives 250*2/5 = 100 ticks/sec, matching the engine.
     initialBPM: 250,
     linearPeriods: false,
+    uadeEditableFileData: buffer.slice(0) as ArrayBuffer,
+    uadeEditableFileName: filename,
     // WASM engine playback (replaces UADE)
     steveTurnerFileData: buffer.slice(0),
     uadeVariableLayout,

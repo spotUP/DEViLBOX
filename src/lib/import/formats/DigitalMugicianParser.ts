@@ -899,6 +899,8 @@ export async function parseDigitalMugicianFile(
     initialSpeed: songSpeed > 0 ? songSpeed : 6,
     initialBPM: 125,
     linearPeriods: false,
+    uadeEditableFileData: buffer.slice(0) as ArrayBuffer,
+    uadeEditableFileName: filename,
     uadePatternLayout,
   };
 }

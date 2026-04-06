@@ -27,7 +27,7 @@
  * Prefix: bye
  * UADE eagleplayer.conf: AndrewParton  prefixes=bye
  *
- * UADE handles actual audio playback. This parser extracts metadata only.
+ * UADE handles actual audio playback. This parser extracts metadata and samples.
  *
  * Reference:
  *   third-party/uade-3.05/amigasrc/players/wanted_team/Andrew Parton/SRC_AndrewParton/Andrew Parton_v2.asm
@@ -36,13 +36,16 @@
 
 import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
 import type { InstrumentConfig } from '@/types';
+import { createSamplerInstrument } from './AmigaUtils';
 
 // ── Constants ───────────────────────────────────────────────────────────────
 
 // 4 (magic) + 20×4 (chip-RAM offsets) + 40×4 (sample lengths) = 244 bytes minimum
 const MIN_FILE_SIZE = 244;
 
-const DEFAULT_INSTRUMENTS = 8;
+const NUM_SAMPLES = 20;
+const SAMPLE_DATA_OFFSET = 484;  // InitPlayer: lea 484(A0),A2
+const SAMPLE_NAME_LEN = 16;      // StartMusic: lea 16(A0),A0 per sample
 
 // ── Binary helpers ──────────────────────────────────────────────────────────
 
@@ -99,9 +102,12 @@ export function isAndrewPartonFormat(buffer: ArrayBuffer, filename?: string): bo
 /**
  * Parse an Andrew Parton module file into a TrackerSong.
  *
- * The format contains tables of chip-RAM pointers and sample lengths. This
- * parser creates a metadata-only TrackerSong with placeholder instruments.
- * Actual audio playback is always delegated to UADE.
+ * Layout (from Andrew Parton_v2.asm InitPlayer + StartMusic + SampleInit):
+ *   Offset 0:    'BANK' magic (4 bytes)
+ *   Offset 4:    20 u32BE sample pointers (absolute Amiga addresses; non-zero = sample present)
+ *   Offset 84:   20 u32BE sample lengths in bytes
+ *   Offset 164:  more header data (320 bytes)
+ *   Offset 484:  sequential sample data: [16-byte name | length-byte PCM] per non-zero sample
  *
  * @param buffer   Raw file bytes (ArrayBuffer)
  * @param filename Original filename (used to derive module name)
@@ -120,20 +126,67 @@ export async function parseAndrewPartonFile(
   // Strip "bye." prefix (case-insensitive)
   const moduleName = baseName.replace(/^bye\./i, '') || baseName;
 
-  // ── Instrument placeholders ───────────────────────────────────────────────
+  // ── Sample extraction ──────────────────────────────────────────────────────
 
+  const buf = new Uint8Array(buffer);
   const instruments: InstrumentConfig[] = [];
+  let dataPos = SAMPLE_DATA_OFFSET;
 
-  for (let i = 0; i < DEFAULT_INSTRUMENTS; i++) {
-    instruments.push({
-      id: i + 1,
-      name: `Sample ${i + 1}`,
-      type: 'synth' as const,
-      synthType: 'Synth' as const,
-      effects: [],
-      volume: 0,
-      pan: 0,
-    } as InstrumentConfig);
+  for (let i = 0; i < NUM_SAMPLES; i++) {
+    const ptr = u32BE(buf, 4 + i * 4);        // sample pointer (non-zero = present)
+    const len = u32BE(buf, 84 + i * 4);        // sample length in bytes
+
+    if (ptr === 0 || len === 0) {
+      // Empty sample slot — push placeholder
+      instruments.push({
+        id: i + 1, name: `Sample ${i + 1}`, type: 'synth' as const,
+        synthType: 'Synth' as const, effects: [], volume: 0, pan: 0,
+      } as InstrumentConfig);
+      continue;
+    }
+
+    // Read 16-byte sample name preceding the PCM data
+    const nameOff = dataPos;
+    const nameEnd = Math.min(nameOff + SAMPLE_NAME_LEN, buf.length);
+    let name = '';
+    for (let j = nameOff; j < nameEnd; j++) {
+      const c = buf[j];
+      if (c === 0) break;
+      if (c >= 0x20 && c < 0x7f) name += String.fromCharCode(c);
+    }
+    dataPos += SAMPLE_NAME_LEN;
+
+    // Extract raw 8-bit signed PCM
+    const pcmOff = dataPos;
+    const safeLen = Math.min(len, buf.length - pcmOff);
+    if (safeLen > 0 && pcmOff < buf.length) {
+      const pcm = buf.slice(pcmOff, pcmOff + safeLen);
+      instruments.push(createSamplerInstrument(
+        i + 1,
+        name || `Sample ${i + 1}`,
+        pcm,
+        64,     // volume (EPS_Volume = 64)
+        8287,   // Amiga PAL ~8287 Hz base sample rate
+        0,      // no loop info in this format
+        0,
+      ));
+    } else {
+      instruments.push({
+        id: i + 1, name: name || `Sample ${i + 1}`, type: 'synth' as const,
+        synthType: 'Synth' as const, effects: [], volume: 0, pan: 0,
+      } as InstrumentConfig);
+    }
+    dataPos += len;
+  }
+
+  // Fallback if no samples were extracted at all
+  if (instruments.length === 0) {
+    for (let i = 0; i < 8; i++) {
+      instruments.push({
+        id: i + 1, name: `Sample ${i + 1}`, type: 'synth' as const,
+        synthType: 'Synth' as const, effects: [], volume: 0, pan: 0,
+      } as InstrumentConfig);
+    }
   }
 
   // ── Empty pattern (placeholder — UADE handles actual audio) ───────────────
@@ -170,7 +223,7 @@ export async function parseAndrewPartonFile(
       importedAt: new Date().toISOString(),
       originalChannelCount: 4,
       originalPatternCount: 1,
-      originalInstrumentCount: DEFAULT_INSTRUMENTS,
+      originalInstrumentCount: instruments.length,
     },
   };
 
@@ -186,5 +239,7 @@ export async function parseAndrewPartonFile(
     initialSpeed: 6,
     initialBPM: 125,
     linearPeriods: false,
+    uadeEditableFileData: buffer.slice(0) as ArrayBuffer,
+    uadeEditableFileName: filename,
   };
 }

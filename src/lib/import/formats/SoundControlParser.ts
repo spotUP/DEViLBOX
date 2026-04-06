@@ -536,6 +536,8 @@ export function parseSoundControlFile(bytes: Uint8Array, filename: string): Trac
     initialSpeed: speed,
     initialBPM: 125,
     linearPeriods: false,
+    uadeEditableFileData: bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer,
+    uadeEditableFileName: filename,
     uadePatternLayout,
   };
 }

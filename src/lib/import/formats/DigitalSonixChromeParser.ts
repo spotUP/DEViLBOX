@@ -26,6 +26,7 @@
 
 import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
 import type { InstrumentConfig } from '@/types';
+import { createSamplerInstrument } from './AmigaUtils';
 
 // ── Constants ─────────────────────────────────────────────────────────────
 
@@ -209,10 +210,38 @@ export function parseDscFile(buffer: ArrayBuffer, filename: string): TrackerSong
   const baseName = filename.split('/').pop() ?? filename;
   const moduleName = baseName.replace(/^dsc\./i, '').replace(/\.dsc$/i, '') || baseName;
 
-  const instruments: InstrumentConfig[] = [{
-    id: 1, name: 'Sample 1', type: 'synth' as const,
-    synthType: 'Synth' as const, effects: [], volume: 0, pan: 0,
-  } as InstrumentConfig];
+  // ── Parse binary header ─────────────────────────────────────────────────
+  const nLengths = buf[2];
+  const nSamples = buf[3];
+  const seqCount = u32BE(buf, 8);
+
+  // Section offsets
+  const instrEntriesOff = 12;
+  const seqTableOff = instrEntriesOff + (nSamples - 1) * 6 + 6; // (nSamples-1) entries + 6 zero bytes
+  const sampleInfoOff = seqTableOff + seqCount * 4;
+  const pcmDataOff = sampleInfoOff + nLengths * 18;
+
+  // ── Extract samples ─────────────────────────────────────────────────────
+  const instruments: InstrumentConfig[] = [];
+
+  for (let i = 0; i < nLengths; i++) {
+    const recOff = sampleInfoOff + i * 18;
+    const sampleLen = u32BE(buf, recOff + 2);
+    const sampleOffset = u32BE(buf, recOff + 12);
+    const pcmFileOff = pcmDataOff + sampleOffset;
+
+    if (pcmFileOff + sampleLen <= buf.length && sampleLen > 0) {
+      const pcm = buf.slice(pcmFileOff, pcmFileOff + sampleLen);
+      instruments.push(createSamplerInstrument(
+        i + 1, `DSC Sample ${i + 1}`, pcm, 64, 8287, 0, 0,
+      ));
+    } else {
+      instruments.push({
+        id: i + 1, name: `DSC Sample ${i + 1}`, type: 'synth' as const,
+        synthType: 'Synth' as const, effects: [], volume: 0, pan: 0,
+      } as InstrumentConfig);
+    }
+  }
 
   const emptyRows = Array.from({ length: 64 }, () => ({
     note: 0, instrument: 0, volume: 0, effTyp: 0, eff: 0, effTyp2: 0, eff2: 0,
@@ -229,7 +258,7 @@ export function parseDscFile(buffer: ArrayBuffer, filename: string): TrackerSong
     importMetadata: {
       sourceFormat: 'MOD' as const, sourceFile: filename,
       importedAt: new Date().toISOString(),
-      originalChannelCount: 4, originalPatternCount: 1, originalInstrumentCount: 0,
+      originalChannelCount: 4, originalPatternCount: 1, originalInstrumentCount: nLengths,
     },
   };
 
@@ -238,5 +267,7 @@ export function parseDscFile(buffer: ArrayBuffer, filename: string): TrackerSong
     patterns: [pattern], instruments, songPositions: [0],
     songLength: 1, restartPosition: 0, numChannels: 4,
     initialSpeed: 6, initialBPM: 125, linearPeriods: false,
+    uadeEditableFileData: buffer.slice(0) as ArrayBuffer,
+    uadeEditableFileName: filename,
   };
 }

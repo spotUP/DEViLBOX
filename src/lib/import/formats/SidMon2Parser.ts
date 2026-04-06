@@ -918,6 +918,8 @@ export async function parseSidMon2File(
     initialSpeed: speedDef || 6,
     initialBPM: 125,
     linearPeriods: false,
+    uadeEditableFileData: buffer.slice(0) as ArrayBuffer,
+    uadeEditableFileName: filename,
     sd2FileData: buffer.slice(0),
     uadeVariableLayout: variableLayout,
   };

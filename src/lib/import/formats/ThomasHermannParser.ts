@@ -35,6 +35,7 @@
 
 import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
 import type { InstrumentConfig } from '@/types';
+import { createSamplerInstrument } from './AmigaUtils';
 
 // ── Binary helpers ─────────────────────────────────────────────────────────
 
@@ -42,6 +43,16 @@ function u32BE(buf: Uint8Array, off: number): number {
   return (
     ((buf[off] << 24) | (buf[off + 1] << 16) | (buf[off + 2] << 8) | buf[off + 3]) >>> 0
   );
+}
+
+/** Read a null-terminated ASCII string from buf at off, up to maxLen bytes. */
+function readString(buf: Uint8Array, off: number, maxLen: number): string {
+  let s = '';
+  for (let i = 0; i < maxLen && off + i < buf.length; i++) {
+    if (buf[off + i] === 0) break;
+    s += String.fromCharCode(buf[off + i]);
+  }
+  return s;
 }
 
 // ── Constants ──────────────────────────────────────────────────────────────
@@ -130,20 +141,48 @@ export async function parseThomasHermannFile(
   // Strip "THM." / "TW." prefix and ".thm" / ".tw" suffix (case-insensitive)
   const moduleName = baseName.replace(/^thm\./i, '').replace(/^tw\./i, '').replace(/\.(thm|tw)$/i, '') || baseName;
 
-  // ── Instrument placeholders ──────────────────────────────────────────────
+  // ── Extract samples from descriptor table ────────────────────────────────
 
-  const NUM_PLACEHOLDER_INSTRUMENTS = 8;
+  const sampleCount = buf[35]; // sample count at byte offset 35
+  const SAMPLE_TABLE_OFF = 5358; // fixed offset for sample table
+  const DESCRIPTOR_SIZE = 48; // each descriptor is 48 bytes
+
   const instruments: InstrumentConfig[] = [];
 
-  for (let i = 0; i < NUM_PLACEHOLDER_INSTRUMENTS; i++) {
+  for (let i = 0; i < sampleCount; i++) {
+    const descOff = SAMPLE_TABLE_OFF + i * DESCRIPTOR_SIZE;
+    if (descOff + DESCRIPTOR_SIZE > buf.length) break;
+
+    const sampleLen = u32BE(buf, descOff); // +0: u32 length
+    const name = readString(buf, descOff + 16, 22); // +16: name (22 bytes null-terminated)
+
+    // PCM data follows the descriptor table
+    // Compute PCM start by summing lengths of previous samples
+    let pcmStart = SAMPLE_TABLE_OFF + sampleCount * DESCRIPTOR_SIZE;
+    for (let j = 0; j < i; j++) {
+      const prevDescOff = SAMPLE_TABLE_OFF + j * DESCRIPTOR_SIZE;
+      if (prevDescOff + 4 <= buf.length) {
+        pcmStart += u32BE(buf, prevDescOff);
+      }
+    }
+
+    if (sampleLen > 0 && pcmStart + sampleLen <= buf.length) {
+      const pcm = buf.slice(pcmStart, pcmStart + sampleLen);
+      instruments.push(createSamplerInstrument(
+        i + 1, name || `THM Sample ${i + 1}`, pcm, 64, 8287, 0, 0,
+      ));
+    } else {
+      instruments.push({
+        id: i + 1, name: name || `THM Sample ${i + 1}`, type: 'synth' as const,
+        synthType: 'Synth' as const, effects: [], volume: 0, pan: 0,
+      } as InstrumentConfig);
+    }
+  }
+
+  if (instruments.length === 0) {
     instruments.push({
-      id: i + 1,
-      name: `Sample ${i + 1}`,
-      type: 'synth' as const,
-      synthType: 'Synth' as const,
-      effects: [],
-      volume: 0,
-      pan: 0,
+      id: 1, name: 'Sample 1', type: 'synth' as const,
+      synthType: 'Synth' as const, effects: [], volume: 0, pan: 0,
     } as InstrumentConfig);
   }
 
@@ -181,7 +220,7 @@ export async function parseThomasHermannFile(
       importedAt: new Date().toISOString(),
       originalChannelCount: 4,
       originalPatternCount: 1,
-      originalInstrumentCount: NUM_PLACEHOLDER_INSTRUMENTS,
+      originalInstrumentCount: instruments.length,
     },
   };
 
@@ -197,5 +236,7 @@ export async function parseThomasHermannFile(
     initialSpeed: 6,
     initialBPM: 125,
     linearPeriods: false,
+    uadeEditableFileData: buffer.slice(0) as ArrayBuffer,
+    uadeEditableFileName: filename,
   };
 }

@@ -938,6 +938,8 @@ function parseInternal(bytes: Uint8Array, filename: string): TrackerSong | null 
     initialSpeed: 6,
     initialBPM: Math.max(32, Math.min(255, bpm)),
     linearPeriods: false,
+    uadeEditableFileData: bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer,
+    uadeEditableFileName: filename,
     uadePatternLayout,
   };
 }

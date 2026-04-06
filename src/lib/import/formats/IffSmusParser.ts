@@ -606,6 +606,8 @@ export async function parseIffSmusFile(
     initialSpeed: speed,
     initialBPM: bpm,
     linearPeriods: false,
+    uadeEditableFileData: buffer.slice(0) as ArrayBuffer,
+    uadeEditableFileName: filename,
     uadeVariableLayout,
   };
 }
