@@ -3234,11 +3234,15 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
                 />
               ))}
               {(() => {
+                // Use `>= 1` so 1-pattern songs still allocate prev/next space.
+                // The ghost wraps around to the same pattern; AutomationLanes
+                // does the same internally — they must match or the inner
+                // ghost curves get clipped out of the outer container.
                 const prevLen = showGhostPatterns
-                  ? (currentPatternIndex > 0 ? patterns[currentPatternIndex - 1]?.length : (patterns.length > 1 ? patterns[patterns.length - 1]?.length : 0)) || 0
+                  ? (currentPatternIndex > 0 ? patterns[currentPatternIndex - 1]?.length : (patterns.length >= 1 ? patterns[patterns.length - 1]?.length : 0)) || 0
                   : 0;
                 const nextLen = showGhostPatterns
-                  ? (currentPatternIndex < patterns.length - 1 ? patterns[currentPatternIndex + 1]?.length : (patterns.length > 1 ? patterns[0]?.length : 0)) || 0
+                  ? (currentPatternIndex < patterns.length - 1 ? patterns[currentPatternIndex + 1]?.length : (patterns.length >= 1 ? patterns[0]?.length : 0)) || 0
                   : 0;
                 automationPrevLenRef.current = prevLen;
                 return (
