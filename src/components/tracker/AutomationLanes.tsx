@@ -12,6 +12,42 @@ import { getNKSParametersForSynth } from '@/midi/performance/synthParameterMaps'
 import { AUTOMATION_LANE_WIDTH, AUTOMATION_LANE_MIN } from '@hooks/views/usePatternEditor';
 import type { SynthType } from '@typedefs/instrument';
 
+/**
+ * Resolve a human-readable label for an automation parameter id.
+ * Handles NKS params (e.g. 'sampler.volume' → 'Volume') and register params
+ * (e.g. 'paula.0.volume' → 'Paula Ch 1 — Volume').
+ */
+function resolveParamLabel(paramId: string, channelIndex: number): string {
+  // Try NKS params first via the channel's instrument
+  try {
+    const pat = useTrackerStore.getState().patterns[useTrackerStore.getState().currentPatternIndex];
+    const inst = pat?.channels[channelIndex]?.instrumentId != null
+      ? useInstrumentStore.getState().instruments.find(i => i.id === pat.channels[channelIndex].instrumentId)
+      : null;
+    if (inst) {
+      const nksParam = getNKSParametersForSynth(inst.synthType as SynthType).find(p => p.id === paramId);
+      if (nksParam) return nksParam.name;
+    }
+  } catch { /* fall through */ }
+
+  // Register-format param (paula.N.X, fur.N.X, sid.N.X, etc.)
+  // Format: <chip>.<channel>.<param>
+  const parts = paramId.split('.');
+  if (parts.length >= 3) {
+    const [chip, ch, ...rest] = parts;
+    const chipName = chip.charAt(0).toUpperCase() + chip.slice(1);
+    const paramName = rest.join('.').replace(/([A-Z])/g, ' $1').replace(/^./, c => c.toUpperCase());
+    const chNum = (parseInt(ch, 10) || 0) + 1;
+    return `${chipName} Ch ${chNum} — ${paramName}`;
+  }
+  // <chip>.<param>
+  if (parts.length === 2) {
+    const [chip, name] = parts;
+    return `${chip.charAt(0).toUpperCase()}${chip.slice(1)} — ${name.charAt(0).toUpperCase()}${name.slice(1)}`;
+  }
+  return paramId;
+}
+
 interface AutomationLanesProps {
   patternId: string;
   patternLength: number;
@@ -391,6 +427,7 @@ export const AutomationLanes: React.FC<AutomationLanesProps> = ({
         return (
           <div
             key={`${keyPrefix}-multi-${channelIndex}-${laneIdx}`}
+            title={`CH ${(channelIndex + 1).toString().padStart(2, '0')} — ${resolveParamLabel(param, channelIndex)}`}
             style={{
               position: 'absolute',
               left: laneLeft,
@@ -506,6 +543,7 @@ export const AutomationLanes: React.FC<AutomationLanesProps> = ({
       return (
         <div
           key={`${keyPrefix}-${channelIndex}`}
+          title={`CH ${(channelIndex + 1).toString().padStart(2, '0')} — ${resolveParamLabel(curve.parameter, channelIndex)}`}
           style={{
             position: 'absolute',
             left: laneLeft,
