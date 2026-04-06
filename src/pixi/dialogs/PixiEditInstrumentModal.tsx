@@ -616,6 +616,7 @@ export const PixiEditInstrumentModal: React.FC<PixiEditInstrumentModalProps> = (
           {currentInstrument && (
             <PixiPresetDropdown
               synthType={currentInstrument.synthType as SynthType}
+              currentPresetName={currentInstrument.name}
               onChange={(updates) => {
                 const inst = instRef.current;
                 if (inst) updateInstrument(inst.id, updates);

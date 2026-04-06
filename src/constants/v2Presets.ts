@@ -31,14 +31,14 @@ export const V2_PZERO_FM_TONE: InstrumentPreset['config'] = {
     ],
   },
   effects: [],
-  volume: -6,
+  volume: -8,
   pan: 0,
 };
 
 // saw +saw low@84 dist:lpf
-export const V2_PZERO_SAW_SWEEP: InstrumentPreset['config'] = {
+export const V2_PZERO_CHORUS_SAW: InstrumentPreset['config'] = {
   type: 'synth',
-  name: 'PZero Saw Sweep',
+  name: 'PZero Chorus Saw',
   synthType: 'V2',
   v2: {
     ...DEFAULT_V2,
@@ -64,7 +64,7 @@ export const V2_PZERO_SAW_SWEEP: InstrumentPreset['config'] = {
     ],
   },
   effects: [],
-  volume: -6,
+  volume: -4,
   pan: 0,
 };
 
@@ -100,7 +100,7 @@ export const V2_PZERO_SAW_PAD: InstrumentPreset['config'] = {
     ],
   },
   effects: [],
-  volume: -6,
+  volume: -10,
   pan: 0,
 };
 
@@ -129,7 +129,7 @@ export const V2_PZERO_PULSE_SYNTH: InstrumentPreset['config'] = {
     ],
   },
   effects: [],
-  volume: -6,
+  volume: -8,
   pan: 0,
 };
 
@@ -166,14 +166,14 @@ export const V2_PZERO_DIST_LEAD: InstrumentPreset['config'] = {
     ],
   },
   effects: [],
-  volume: -6,
+  volume: -14,
   pan: 0,
 };
 
 // saw +sin +noise low@21
-export const V2_PZERO_ZAP: InstrumentPreset['config'] = {
+export const V2_PZERO_KICK: InstrumentPreset['config'] = {
   type: 'synth',
-  name: 'PZero Zap',
+  name: 'PZero Kick',
   synthType: 'V2',
   v2: {
     ...DEFAULT_V2,
@@ -197,14 +197,14 @@ export const V2_PZERO_ZAP: InstrumentPreset['config'] = {
     ],
   },
   effects: [],
-  volume: -6,
+  volume: -14,
   pan: 0,
 };
 
 // sin +noise +noise low@30 dist:bitcrush
-export const V2_PZERO_SUB_BASS: InstrumentPreset['config'] = {
+export const V2_PZERO_DIST_BASS: InstrumentPreset['config'] = {
   type: 'synth',
-  name: 'PZero Sub Bass',
+  name: 'PZero Dist Bass',
   synthType: 'V2',
   v2: {
     ...DEFAULT_V2,
@@ -233,14 +233,14 @@ export const V2_PZERO_SUB_BASS: InstrumentPreset['config'] = {
     ],
   },
   effects: [],
-  volume: -6,
+  volume: -12,
   pan: 0,
 };
 
 // pulse +pulse +noise high@126
-export const V2_PZERO_PULSE_STAB: InstrumentPreset['config'] = {
+export const V2_PZERO_HIHAT: InstrumentPreset['config'] = {
   type: 'synth',
-  name: 'PZero Pulse Stab',
+  name: 'PZero Hihat',
   synthType: 'V2',
   v2: {
     ...DEFAULT_V2,
@@ -263,7 +263,7 @@ export const V2_PZERO_PULSE_STAB: InstrumentPreset['config'] = {
     ],
   },
   effects: [],
-  volume: -6,
+  volume: -14,
   pan: 0,
 };
 
@@ -295,7 +295,7 @@ export const V2_PZERO_FM_DIST: InstrumentPreset['config'] = {
     ],
   },
   effects: [],
-  volume: -6,
+  volume: -12,
   pan: 0,
 };
 
@@ -319,14 +319,14 @@ export const V2_PZERO_NOISE: InstrumentPreset['config'] = {
     ],
   },
   effects: [],
-  volume: -6,
+  volume: -10,
   pan: 0,
 };
 
 // saw +saw band@67 dist:hpf
-export const V2_PZERO_SAW_PAD_2: InstrumentPreset['config'] = {
+export const V2_PZERO_CHORUS_PAD: InstrumentPreset['config'] = {
   type: 'synth',
-  name: 'PZero Saw Pad 2',
+  name: 'PZero Chorus Pad',
   synthType: 'V2',
   v2: {
     ...DEFAULT_V2,
@@ -357,7 +357,7 @@ export const V2_PZERO_SAW_PAD_2: InstrumentPreset['config'] = {
     ],
   },
   effects: [],
-  volume: -6,
+  volume: -12,
   pan: 0,
 };
 
@@ -389,14 +389,14 @@ export const V2_PZERO_NOISE_PAD: InstrumentPreset['config'] = {
     ],
   },
   effects: [],
-  volume: -6,
+  volume: -3,
   pan: 0,
 };
 
 // sin +noise low@38
-export const V2_ZEIT_SUB_BASS: InstrumentPreset['config'] = {
+export const V2_ZEIT_NOISE_BASS: InstrumentPreset['config'] = {
   type: 'synth',
-  name: 'Zeit Sub Bass',
+  name: 'Zeit Noise Bass',
   synthType: 'V2',
   v2: {
     ...DEFAULT_V2,
@@ -418,14 +418,14 @@ export const V2_ZEIT_SUB_BASS: InstrumentPreset['config'] = {
     ],
   },
   effects: [],
-  volume: -6,
+  volume: -3,
   pan: 0,
 };
 
 // sin +noise +sin band@83
-export const V2_ZEIT_KICK: InstrumentPreset['config'] = {
+export const V2_ZEIT_RIM_SHOT: InstrumentPreset['config'] = {
   type: 'synth',
-  name: 'Zeit Kick',
+  name: 'Zeit Rim Shot',
   synthType: 'V2',
   v2: {
     ...DEFAULT_V2,
@@ -450,7 +450,7 @@ export const V2_ZEIT_KICK: InstrumentPreset['config'] = {
     ],
   },
   effects: [],
-  volume: -6,
+  volume: -10,
   pan: 0,
 };
 
@@ -481,14 +481,14 @@ export const V2_ZEIT_PULSE_SWEEP: InstrumentPreset['config'] = {
     ],
   },
   effects: [],
-  volume: -6,
+  volume: -14,
   pan: 0,
 };
 
 // noise +sin low@114 dist:clip
-export const V2_ZEIT_DIST_STAB: InstrumentPreset['config'] = {
+export const V2_ZEIT_HIHAT: InstrumentPreset['config'] = {
   type: 'synth',
-  name: 'Zeit Dist Stab',
+  name: 'Zeit Hihat',
   synthType: 'V2',
   v2: {
     ...DEFAULT_V2,
@@ -511,14 +511,14 @@ export const V2_ZEIT_DIST_STAB: InstrumentPreset['config'] = {
     ],
   },
   effects: [],
-  volume: -6,
+  volume: -10,
   pan: 0,
 };
 
 // noise high@114 dist:clip
-export const V2_ZEIT_NOISE_HIT: InstrumentPreset['config'] = {
+export const V2_ZEIT_CYMBAL: InstrumentPreset['config'] = {
   type: 'synth',
-  name: 'Zeit Noise Hit',
+  name: 'Zeit Cymbal',
   synthType: 'V2',
   v2: {
     ...DEFAULT_V2,
@@ -541,7 +541,7 @@ export const V2_ZEIT_NOISE_HIT: InstrumentPreset['config'] = {
     ],
   },
   effects: [],
-  volume: -6,
+  volume: -10,
   pan: 0,
 };
 
@@ -606,7 +606,7 @@ export const V2_ZEIT_SWEEP_BASS: InstrumentPreset['config'] = {
     ],
   },
   effects: [],
-  volume: -6,
+  volume: -10,
   pan: 0,
 };
 
@@ -642,7 +642,7 @@ export const V2_ZEIT_RESO_SAW: InstrumentPreset['config'] = {
     ],
   },
   effects: [],
-  volume: -6,
+  volume: -8,
   pan: 0,
 };
 
@@ -670,14 +670,14 @@ export const V2_ZEIT_SAW_STAB: InstrumentPreset['config'] = {
     ],
   },
   effects: [],
-  volume: -6,
+  volume: -12,
   pan: 0,
 };
 
 // saw low@127
-export const V2_ZEIT_SAW_PAD: InstrumentPreset['config'] = {
+export const V2_ZEIT_CHORUS_PAD: InstrumentPreset['config'] = {
   type: 'synth',
-  name: 'Zeit Saw Pad',
+  name: 'Zeit Chorus Pad',
   synthType: 'V2',
   v2: {
     ...DEFAULT_V2,
@@ -698,14 +698,14 @@ export const V2_ZEIT_SAW_PAD: InstrumentPreset['config'] = {
     ],
   },
   effects: [],
-  volume: -6,
+  volume: -10,
   pan: 0,
 };
 
 // noise +noise +noise low@6 dist:bitcrush
-export const V2_ZEIT_BASS: InstrumentPreset['config'] = {
+export const V2_ZEIT_DIST_BASS: InstrumentPreset['config'] = {
   type: 'synth',
-  name: 'Zeit Bass',
+  name: 'Zeit Dist Bass',
   synthType: 'V2',
   v2: {
     ...DEFAULT_V2,
@@ -734,14 +734,14 @@ export const V2_ZEIT_BASS: InstrumentPreset['config'] = {
     ],
   },
   effects: [],
-  volume: -6,
+  volume: -12,
   pan: 0,
 };
 
 // sin +sin +noise high@46 dist:clip
-export const V2_ZEIT_SUB_BASS_2: InstrumentPreset['config'] = {
+export const V2_ZEIT_DIST_BASS_2: InstrumentPreset['config'] = {
   type: 'synth',
-  name: 'Zeit Sub Bass 2',
+  name: 'Zeit Dist Bass 2',
   synthType: 'V2',
   v2: {
     ...DEFAULT_V2,
@@ -765,7 +765,7 @@ export const V2_ZEIT_SUB_BASS_2: InstrumentPreset['config'] = {
     ],
   },
   effects: [],
-  volume: -6,
+  volume: -10,
   pan: 0,
 };
 
@@ -826,40 +826,47 @@ export const V2_ZEIT_CHORUS_LEAD: InstrumentPreset['config'] = {
     ],
   },
   effects: [],
-  volume: -6,
+  volume: -10,
   pan: 0,
 };
 
-export const V2_PRESET_KICK = V2_ZEIT_KICK;
-export const V2_PRESET_SNARE = V2_ZEIT_NOISE_HIT;
-export const V2_PRESET_HAT = V2_PZERO_PULSE_STAB;
+// Drum preset exports for factoryPresets/drum.ts
+export const V2_PRESET_KICK = V2_PZERO_KICK;
+export const V2_PRESET_SNARE = V2_ZEIT_RIM_SHOT;
+export const V2_PRESET_HAT = V2_PZERO_HIHAT;
 
+// Ordered: leads/synths first, pads, bass, drums/percussion last
 export const V2_PRESETS: InstrumentPreset['config'][] = [
-  V2_PZERO_FM_TONE,
-  V2_PZERO_SAW_SWEEP,
-  V2_PZERO_SAW_PAD,
-  V2_PZERO_PULSE_SYNTH,
-  V2_PZERO_DIST_LEAD,
-  V2_PZERO_ZAP,
-  V2_PZERO_SUB_BASS,
-  V2_PZERO_PULSE_STAB,
-  V2_PZERO_FM_DIST,
-  V2_PZERO_NOISE,
-  V2_PZERO_SAW_PAD_2,
-  V2_PZERO_NOISE_PAD,
-  V2_ZEIT_SUB_BASS,
-  V2_ZEIT_KICK,
-  V2_ZEIT_PULSE_SWEEP,
-  V2_ZEIT_DIST_STAB,
-  V2_ZEIT_NOISE_HIT,
-  V2_ZEIT_SAW_BASS,
-  V2_ZEIT_SWEEP_BASS,
-  V2_ZEIT_RESO_SAW,
-  V2_ZEIT_SAW_STAB,
-  V2_ZEIT_SAW_PAD,
-  V2_ZEIT_BASS,
-  V2_ZEIT_SUB_BASS_2,
-  V2_ZEIT_RESO_SAW_2,
+  // Leads & Synths
   V2_ZEIT_CHORUS_LEAD,
+  V2_PZERO_DIST_LEAD,
+  V2_PZERO_CHORUS_SAW,
+  V2_ZEIT_RESO_SAW,
+  V2_ZEIT_RESO_SAW_2,
+  V2_PZERO_PULSE_SYNTH,
+  V2_PZERO_FM_TONE,
+  V2_PZERO_FM_DIST,
+  // Pads
+  V2_PZERO_SAW_PAD,
+  V2_PZERO_CHORUS_PAD,
+  V2_ZEIT_CHORUS_PAD,
+  V2_PZERO_NOISE_PAD,
+  // Bass
+  V2_ZEIT_SWEEP_BASS,
+  V2_ZEIT_SAW_BASS,
+  V2_PZERO_DIST_BASS,
+  V2_ZEIT_DIST_BASS,
+  V2_ZEIT_NOISE_BASS,
+  V2_ZEIT_DIST_BASS_2,
+  V2_ZEIT_PULSE_SWEEP,
+  // Drums & Percussion
+  V2_ZEIT_RIM_SHOT,
+  V2_PZERO_KICK,
+  V2_ZEIT_HIHAT,
+  V2_PZERO_HIHAT,
+  V2_ZEIT_CYMBAL,
+  V2_ZEIT_SAW_STAB,
+  V2_PZERO_NOISE,
+  // Speech
   { name: 'V2 Speech', type: 'synth' as const, synthType: 'V2Speech' as const, volume: -6, pan: 0, effects: [], parameters: { text: 'Ready' } },
 ];
