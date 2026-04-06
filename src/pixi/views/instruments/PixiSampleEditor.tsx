@@ -58,6 +58,7 @@ export const PixiSampleEditor: React.FC<PixiSampleEditorProps> = ({
   // ── Mic recording ─────────────────────────────────────────────────────
   const [isRecordingMic, setIsRecordingMic] = useState(false);
   const [micElapsed, setMicElapsed] = useState(0);
+  const [micWithEffects, setMicWithEffects] = useState(false);
   const micTimerRef = useRef<number | null>(null);
 
   const handleToggleRecord = useCallback(async () => {
@@ -70,6 +71,7 @@ export const PixiSampleEditor: React.FC<PixiSampleEditorProps> = ({
       setIsRecordingMic(false);
       mgr.setMonitoring(false);
       const buf = await mgr.stopRecording();
+      if (mgr.isEffectsRouted()) await mgr.disableEffectsRouting();
       if (buf) {
         const dataUrl = await bufferToDataUrl(buf);
         setAudioBuffer(buf);
@@ -89,8 +91,9 @@ export const PixiSampleEditor: React.FC<PixiSampleEditorProps> = ({
         const ok = await mgr.selectDevice();
         if (!ok) return;
       }
+      if (micWithEffects) await mgr.enableEffectsRouting();
       mgr.setMonitoring(true);
-      mgr.startRecording();
+      mgr.startRecording(micWithEffects);
       setIsRecordingMic(true);
       setMicElapsed(0);
       const start = Date.now();
@@ -447,6 +450,13 @@ export const PixiSampleEditor: React.FC<PixiSampleEditorProps> = ({
           size="sm"
           onClick={handleToggleRecord}
           tooltip={isRecordingMic ? 'Stop recording' : 'Record from microphone'}
+        />
+        <PixiButton
+          label="FX"
+          variant={micWithEffects ? 'primary' : 'ghost'}
+          size="sm"
+          onClick={() => setMicWithEffects(!micWithEffects)}
+          tooltip={micWithEffects ? 'Recording with master effects' : 'Record dry (no effects)'}
         />
 
         {/* Spectrum Filter button */}
