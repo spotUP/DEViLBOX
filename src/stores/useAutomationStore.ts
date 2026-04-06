@@ -5,12 +5,42 @@
 import { create } from 'zustand';
 import { immer } from 'zustand/middleware/immer';
 import { checkFormatViolation, getActiveFormatLimits } from '@/lib/formatCompatibility';
+import type { FormatConstraints } from '@/lib/formatCompatibility';
 import type {
   AutomationCurve,
   AutomationPreset,
   AutomationParameter,
 } from '@typedefs/automation';
 import { AUTOMATION_PRESETS, interpolateAutomationValue } from '@typedefs/automation';
+
+/**
+ * Check if a parameter can be baked into native effect commands for a format.
+ * Mirrors the getEffectMapping logic in AutomationBaker.ts — kept in sync manually.
+ */
+function canBakeParameter(param: string, format: FormatConstraints): boolean {
+  const p = param.toLowerCase();
+
+  // Volume — all formats
+  if (p.includes('volume') || p.includes('.vol') || p === 'gain' || p.includes('level') || p.includes('amplitude')) return true;
+  // Global volume — XM/IT/S3M
+  if ((p.includes('globalvol') || p.includes('global_vol') || p.includes('mastervol') || p.includes('master_vol')) && format.name !== 'MOD') return true;
+  // Panning — formats with panning support
+  if (p.includes('pan') && format.supportsPanning) return true;
+  // Filter cutoff — IT/S3M
+  if ((p.includes('cutoff') || (p.includes('filter') && !p.includes('filterselect') && !p.includes('filtermode'))) && (format.name === 'IT' || format.name === 'S3M')) return true;
+  // Resonance — IT/S3M
+  if ((p.includes('resonance') || p.includes('reso')) && (format.name === 'IT' || format.name === 'S3M')) return true;
+  // Pitch — all formats (via portamento)
+  if (p.includes('pitch') || p.includes('frequency') || p.includes('period') || p.includes('detune') || p.includes('finetune')) return true;
+  // Vibrato/tremolo — all formats
+  if (p.includes('vibrato') || p.includes('tremolo')) return true;
+  // Tempo/BPM/speed — all formats
+  if (p.includes('tempo') || p.includes('bpm') || (p.includes('speed') && !p.includes('portamento'))) return true;
+  // Retrigger — all formats
+  if (p.includes('retrig')) return true;
+
+  return false;
+}
 
 interface AutomationData {
   [patternId: string]: {
@@ -123,18 +153,17 @@ export const useAutomationStore = create<AutomationStore>()(
     // Actions
     addCurve: (patternId, channelIndex, parameter) => {
       // Check if this parameter can be baked into native effects on export.
-      // Volume and panning CAN be baked; others may not be.
+      // Inline check mirrors getEffectMapping logic from AutomationBaker.
       const limits = getActiveFormatLimits();
       if (limits) {
-        const p = parameter.toLowerCase();
-        const canBake = p.includes('volume') || p.includes('vol') || p.includes('pan');
+        const canBake = canBakeParameter(parameter, limits);
         if (!canBake) {
           void checkFormatViolation('automation',
-            `"${parameter}" automation cannot be exported to ${limits.name} format. It will be baked into effect commands where possible, but this parameter has no equivalent effect.`,
+            `"${parameter}" automation cannot be exported to ${limits.name} format — no equivalent effect command exists.`,
           ).then((ok) => { if (ok) get().addCurve(patternId, channelIndex, parameter); });
           return '';
         }
-        // Volume/panning curves WILL be baked on export — no warning needed
+        // Parameter CAN be baked on export — no warning needed
       }
       const newCurve: AutomationCurve = {
         id: `curve-${Date.now()}`,
