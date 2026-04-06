@@ -1440,7 +1440,7 @@ double module_impl::get_current_channel_frequency( std::int32_t channel ) const 
 	if ( m_sndFile->PeriodsAreFrequencies() ) {
 		return static_cast<double>( chn.nPeriod );
 	}
-	return static_cast<double>( m_sndFile->GetFreqFromPeriod( static_cast<uint32>( chn.nPeriod ), static_cast<uint32>( chn.nC5Speed ), 0 ) ) / 16.0;
+	return static_cast<double>( m_sndFile->GetFreqFromPeriod( static_cast<std::uint32_t>( chn.nPeriod ), static_cast<std::uint32_t>( chn.nC5Speed ), 0 ) ) / 16.0;
 }
 std::int32_t module_impl::get_current_channel_panning( std::int32_t channel ) const {
 	if ( channel < 0 || channel >= m_sndFile->GetNumChannels() ) {
