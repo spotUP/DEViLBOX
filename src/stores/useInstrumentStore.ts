@@ -38,6 +38,7 @@ import { getFirstPresetForSynthType } from '@constants/factoryPresets';
 import { getDefaultFurnaceConfig } from '@engine/InstrumentFactory';
 import { getToneEngine } from '@engine/ToneEngine';
 import { useFormatStore } from '@stores/useFormatStore';
+import { showConfirm } from '@stores/useConfirmStore';
 import { FurnaceParser } from '@/lib/import/formats/FurnaceParser';
 import { DefleMaskParser } from '@/lib/import/formats/DefleMaskParser';
 import { deepMerge, ensureCompleteInstrumentConfig } from '@/lib/migration';
@@ -91,15 +92,16 @@ const bakingInstruments = new Set<number>();
  */
 let _formatCompatConfirmed = false;
 
-function checkFormatCompatibility(newSynthType: string | undefined, oldSynthType?: string): boolean {
-  // No warning needed for Sampler/Player
-  if (!newSynthType || newSynthType === 'Sampler' || newSynthType === 'Player') return true;
-  // No warning if type didn't actually change
-  if (oldSynthType && newSynthType === oldSynthType) return true;
-  // Already confirmed this session (reset on song load)
-  if (_formatCompatConfirmed) return true;
+/**
+ * Check if a native format song is loaded and warn about synth compatibility.
+ * Returns true if OK to proceed, false if needs confirmation.
+ * If confirmation needed, shows the dialog and calls onConfirm when user accepts.
+ */
+function needsFormatCompatWarning(newSynthType: string | undefined, oldSynthType?: string): string | null {
+  if (!newSynthType || newSynthType === 'Sampler' || newSynthType === 'Player') return null;
+  if (oldSynthType && newSynthType === oldSynthType) return null;
+  if (_formatCompatConfirmed) return null;
 
-  // Check if a native format is loaded by reading the format store
   try {
     const fmt = useFormatStore.getState();
     const hasNativeFormat = !!(
@@ -109,21 +111,23 @@ function checkFormatCompatibility(newSynthType: string | undefined, oldSynthType
       fmt.maFileData || fmt.hippelFileData || fmt.sonixFileData || fmt.pxtoneFileData ||
       fmt.organyaFileData || fmt.eupFileData || fmt.sc68FileData || fmt.zxtuneFileData
     );
-    if (!hasNativeFormat) return true;
-
-    const formatName = fmt.editorMode !== 'classic' ? fmt.editorMode.toUpperCase() : 'MOD';
-    const confirmed = window.confirm(
-      `This breaks ${formatName} format compatibility.\n\n` +
-      `The song can no longer be saved as ${formatName} — save as .dbx instead.\n\n` +
-      `Continue?`
-    );
-    if (confirmed) {
-      _formatCompatConfirmed = true;
-    }
-    return confirmed;
+    if (!hasNativeFormat) return null;
+    return fmt.editorMode !== 'classic' ? fmt.editorMode.toUpperCase() : 'MOD';
   } catch {
-    return true; // store not available
+    return null;
   }
+}
+
+/** Show the format compat dialog and return whether user confirmed */
+async function confirmFormatCompat(formatName: string): Promise<boolean> {
+  const confirmed = await showConfirm({
+    title: 'Format Compatibility Warning',
+    message: `This breaks ${formatName} format compatibility. The song can no longer be saved as ${formatName} — save as .dbx instead.`,
+    confirmLabel: 'Continue',
+    danger: true,
+  });
+  if (confirmed) _formatCompatConfirmed = true;
+  return confirmed;
 }
 
 /** Reset format compat flag (called on song load) */
@@ -285,10 +289,16 @@ export const useInstrumentStore = create<InstrumentStore>()(
     updateInstrument: (id, updates) => {
       const currentInstrument = get().instruments.find((inst) => inst.id === id);
 
-      // Format compat check — fires BEFORE mutation
+      // Format compat: check synchronously, show dialog async if needed
       if (updates.synthType && currentInstrument &&
           updates.synthType !== currentInstrument.synthType) {
-        if (!checkFormatCompatibility(updates.synthType, currentInstrument.synthType)) return;
+        const formatName = needsFormatCompatWarning(updates.synthType, currentInstrument.synthType);
+        if (formatName) {
+          void confirmFormatCompat(formatName).then((confirmed) => {
+            if (confirmed) get().updateInstrument(id, updates);
+          });
+          return;
+        }
       }
 
       // Check what's changing
@@ -893,9 +903,19 @@ export const useInstrumentStore = create<InstrumentStore>()(
     },
 
     createInstrument: (config) => {
-      // Format compatibility check — warn if adding synth to native format song
+      // Format compat: check synchronously, show dialog async if needed
       const synthType = (config as Partial<InstrumentConfig>)?.synthType;
-      if (!checkFormatCompatibility(synthType)) return -1;
+      const formatName = needsFormatCompatWarning(synthType);
+      if (formatName) {
+        // Show dialog async, then retry createInstrument after confirmation
+        void confirmFormatCompat(formatName).then((confirmed) => {
+          if (confirmed) {
+            _formatCompatConfirmed = true; // skip check on retry
+            get().createInstrument(config);
+          }
+        });
+        return -1; // cancelled for now — retry happens async
+      }
 
       const existingIds = get().instruments.map((i) => i.id);
       const newId = findNextId(existingIds);
@@ -954,7 +974,13 @@ export const useInstrumentStore = create<InstrumentStore>()(
     },
 
     addInstrument: (config) => {
-      if (!checkFormatCompatibility(config.synthType)) return;
+      const formatName = needsFormatCompatWarning(config.synthType);
+      if (formatName) {
+        void confirmFormatCompat(formatName).then((confirmed) => {
+          if (confirmed) get().addInstrument(config);
+        });
+        return;
+      }
       set((state) => {
         // Auto-set monophonic flag for inherently monophonic synths (same as createInstrument)
         const finalConfig = { ...config };
