@@ -536,6 +536,10 @@ class VoiceExpander {
     this._orderPos    = 0;
     this._rowPos      = 0;
 
+    // Per-channel gain (indexed by pattern channel = voice index / MixChannels)
+    this.channelGains = new Float32Array(32);
+    this.channelGains.fill(1.0);
+
     // Initialise voices array and frequency table
     this.Voices = new Array(this.NumbOfVoices);
     for (let i = 0; i < this.NumbOfVoices; i++) {
@@ -1127,7 +1131,14 @@ class VoiceExpander {
     for (let i = 0; i < this.NumbOfVoices; i += ChannelStep) {
       const idx = i + ChannelNr;
       if (this.isVoicePlaying(idx) === true && this.isVoicePausing(idx) === false) {
-        SampleMix += this.getNextVoiceSample(idx);
+        const patternCh = Math.floor(i / ChannelStep);
+        const gain = patternCh < this.channelGains.length ? this.channelGains[patternCh] : 1.0;
+        if (gain > 0.0) {
+          SampleMix += this.getNextVoiceSample(idx) * gain;
+        } else {
+          // Still advance voice state even when muted to keep sequencer in sync
+          this.getNextVoiceSample(idx);
+        }
       }
     }
     return SampleMix;
@@ -1251,6 +1262,22 @@ class SymphonieProcessor extends AudioWorkletProcessor {
 
         case 'volume':
           this._masterVolume = msg.value;
+          break;
+
+        case 'setMuteMask': {
+          const mask = msg.mask || 0;
+          const numCh = this._expander.channelGains.length;
+          for (let ch = 0; ch < numCh; ch++) {
+            const muted = (mask & (1 << ch)) !== 0;
+            this._expander.channelGains[ch] = muted ? 0.0 : 1.0;
+          }
+          break;
+        }
+
+        case 'setChannelGain':
+          if (msg.channel >= 0 && msg.channel < this._expander.channelGains.length) {
+            this._expander.channelGains[msg.channel] = msg.gain;
+          }
           break;
 
         default:

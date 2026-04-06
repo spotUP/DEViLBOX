@@ -72,6 +72,45 @@ static bool g_playing = false;
 #define CONV_BUF_FRAMES 512
 static int16_t g_s16buf[CONV_BUF_FRAMES * PXTONE_CHANNELS];
 
+/* ---- Per-channel muting ---- */
+
+/*
+ * PxTone has built-in per-unit muting via pxtnUnit::set_played(bool).
+ * We enable moo_set_mute_by_unit(true) so the Moo() function respects
+ * per-unit played flags. Then set_channel_gain() toggles individual units.
+ *
+ * gain == 0 → muted (set_played(false))
+ * gain >  0 → active (set_played(true))
+ */
+
+#define PXTONE_MAX_UNITS 64
+static float g_channel_gain[PXTONE_MAX_UNITS];
+static bool  g_gain_initialized = false;
+
+static void init_gains() {
+    for (int i = 0; i < PXTONE_MAX_UNITS; i++) g_channel_gain[i] = 1.0f;
+    g_gain_initialized = true;
+}
+
+EXPORT void pxtone_set_channel_gain(int ch, float gain) {
+    if (ch < 0 || ch >= PXTONE_MAX_UNITS) return;
+    g_channel_gain[ch] = gain;
+    if (g_pxtn) {
+        /* Enable per-unit muting in the Moo engine */
+        g_pxtn->moo_set_mute_by_unit(true);
+        int unit_num = g_pxtn->Unit_Num();
+        if (ch < unit_num) {
+            pxtnUnit *unit = g_pxtn->Unit_Get_variable(ch);
+            if (unit) unit->set_played(gain > 0.0f);
+        }
+    }
+}
+
+EXPORT int pxtone_get_num_units(void) {
+    if (!g_pxtn) return 0;
+    return g_pxtn->Unit_Num();
+}
+
 /* ---- Public API ---- */
 
 EXPORT int pxtone_init(const uint8_t *data, uint32_t size) {
@@ -137,6 +176,10 @@ EXPORT int pxtone_init(const uint8_t *data, uint32_t size) {
         g_pxtn = nullptr;
         return -7;
     }
+
+    /* Enable per-unit muting and reset all gains */
+    g_pxtn->moo_set_mute_by_unit(true);
+    init_gains();
 
     g_playing = true;
     return 0;
