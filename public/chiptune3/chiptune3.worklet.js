@@ -109,16 +109,25 @@ class MPT extends AudioWorkletProcessor {
 			this.lastStateRow = curRow
 			this.lastStateOrder = curOrder
 
-			if (this.channels > 0 && libopenmpt._openmpt_module_get_current_channel_note) {
+			// Extract per-channel pattern data at current position using existing API
+			// get_pattern_row_channel_command(pattern, row, channel, command_index):
+			//   0=note, 1=instrument, 2=volcmd, 3=vol, 4=effect, 5=param
+			if (this.channels > 0 && libopenmpt._openmpt_module_get_pattern_row_channel_command) {
+				const pat = msg.pattern
+				const row = msg.row
 				const chState = new Float64Array(this.channels * 6)
 				for (let i = 0; i < this.channels; i++) {
 					const base = i * 6
-					chState[base + 0] = libopenmpt._openmpt_module_get_current_channel_note(this.modulePtr, i)
-					chState[base + 1] = libopenmpt._openmpt_module_get_current_channel_instrument(this.modulePtr, i)
-					chState[base + 2] = libopenmpt._openmpt_module_get_current_channel_volume(this.modulePtr, i)
-					chState[base + 3] = libopenmpt._openmpt_module_get_current_channel_frequency(this.modulePtr, i)
-					chState[base + 4] = libopenmpt._openmpt_module_get_current_channel_panning(this.modulePtr, i)
-					chState[base + 5] = libopenmpt._openmpt_module_get_current_channel_active(this.modulePtr, i)
+					chState[base + 0] = libopenmpt._openmpt_module_get_pattern_row_channel_command(this.modulePtr, pat, row, i, 0) // note
+					chState[base + 1] = libopenmpt._openmpt_module_get_pattern_row_channel_command(this.modulePtr, pat, row, i, 1) // instrument
+					chState[base + 2] = libopenmpt._openmpt_module_get_pattern_row_channel_command(this.modulePtr, pat, row, i, 3) // vol
+					chState[base + 3] = 0 // frequency not available without new API
+					chState[base + 4] = 0 // panning not available without new API
+					const vu = Math.max(
+						libopenmpt._openmpt_module_get_current_channel_vu_left(this.modulePtr, i),
+						libopenmpt._openmpt_module_get_current_channel_vu_right(this.modulePtr, i)
+					)
+					chState[base + 5] = vu > 0 ? 1 : 0 // active = has VU output
 				}
 				msg.chState = chState
 			}
