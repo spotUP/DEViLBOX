@@ -678,11 +678,16 @@ export async function tryRouteFormat(
   }
 
   // ── Ben Daglish (bd.* prefix or .bd extension) ─────────────────────────
-  // Dedicated BD WASM engine — always use native parser (UADE can't play BD).
-  // Native parser sets bdFileData which triggers BdEngine via NativeEngineRouting.
+  // Compiled 68k Amiga executable with embedded replayer. UADE plays these
+  // via the BennDaglish eagleplayer. Enhanced scan captures tick snapshots
+  // and reconstructs patterns from Paula register writes.
   if (matchesExt(filename, ['bd'])) {
-    const { parseBenDaglishFile } = await import('@lib/import/formats/BenDaglishParser');
-    return await parseBenDaglishFile(buffer, originalFileName);
+    const { parseUADEFile } = await import('@lib/import/formats/UADEParser');
+    const bdFile = toUADEPrefixName(originalFileName, ['bd']);
+    const song = await parseUADEFile(buffer, bdFile, 'enhanced', subsong, preScannedMeta);
+    song.uadeEditableFileData = buffer.slice(0);
+    song.uadeEditableFileName = bdFile;
+    return song;
   }
 
   // ── Images Music System (.ims) ────────────────────────────────────────────
@@ -1360,14 +1365,16 @@ export async function tryRouteFormat(
   }
 
   // ── Jeroen Tel (jt.* / mon_old.* prefix) ────────────────────────────────────
-  // Compiled 68k Amiga music format (Maniacs of Noise / Jeroen Tel).
-  // Detection: scan first 40 bytes for 0x02390001 + structural checks.
+  // Compiled 68k Amiga executable (Maniacs of Noise / Jeroen Tel).
+  // UADE enhanced scan captures tick snapshots and reconstructs patterns
+  // from Paula register writes — the embedded 68k replayer has no fixed format.
   if (matchesExt(filename, ['jt', 'mon_old'])) {
-    const { isJeroenTelFormat, parseJeroenTelFile } = await import('@lib/import/formats/JeroenTelParser');
-    const jtCtx = { ...ctx, originalFileName: toUADEPrefixName(originalFileName, ['jt', 'mon_old']) };
-    return withNativeThenUADE('jeroenTel', jtCtx,
-      (buf: Uint8Array | ArrayBuffer, name: string) => { if (isJeroenTelFormat(buf as ArrayBuffer, name)) return parseJeroenTelFile(buf as ArrayBuffer, name); return null; },
-      'JeroenTelParser', { injectUADE: true });
+    const { parseUADEFile } = await import('@lib/import/formats/UADEParser');
+    const jtFile = toUADEPrefixName(originalFileName, ['jt', 'mon_old']);
+    const song = await parseUADEFile(buffer, jtFile, 'enhanced', subsong, preScannedMeta);
+    song.uadeEditableFileData = buffer.slice(0);
+    song.uadeEditableFileName = jtFile;
+    return song;
   }
 
   // ── Quartet / Quartet PSG / Quartet ST (qpa.* / sqt.* / qts.* prefix) ──────
