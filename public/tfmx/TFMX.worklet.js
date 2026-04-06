@@ -244,7 +244,7 @@ class TFMXProcessor extends AudioWorkletProcessor {
       // Send position update every ~100ms (4410 samples at 44100Hz)
       this._positionCounter = (this._positionCounter || 0) + numSamples;
       if (this._positionCounter >= 4410) {
-        this._positionCounter = 0;
+        this._positionCounter -= 4410;
         const samplesRendered = this.wasm._tfmx_get_samples_rendered(this.ctx);
         const songEnd = this.wasm._tfmx_module_song_end(this.ctx);
         this.port.postMessage({ type: 'modulePosition', samplesRendered, songEnd: songEnd !== 0 });
