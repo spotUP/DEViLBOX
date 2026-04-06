@@ -1,13 +1,24 @@
 /**
- * JamCrackerControls.tsx — JamCracker Pro instrument editor
+ * JamCrackerControls.tsx — JamCracker Pro full AM instrument editor
  *
- * Displays instrument info and AM synthesis parameters:
- * - Instrument name, flags (loop, AM synth)
- * - AM waveform visualization (64-byte waveform display)
- * - Phase delta control (modulation speed)
- * - Volume control
+ * Provides edit access to every AM synthesis parameter on a JamCracker
+ * instrument:
+ *   • Click-and-drag waveform editor (writes signed bytes 0..63 of the
+ *     64-byte AM waveformData buffer in place)
+ *   • Quick-fill presets: sine / triangle / square / saw / noise / clear
+ *   • Phase delta knob (modulation speed)
+ *   • Volume knob
+ *   • Loop and AM flags toggles
  *
- * PCM instruments show sample info. AM instruments show the waveform editor.
+ * Edits go through onChange and replace `waveformData` with a fresh
+ * Uint8Array so React detects the change and the on-screen waveform redraws.
+ *
+ * PCM (non-AM) instruments still show their sample info but no waveform
+ * editor — only AM instruments have a programmable waveform.
+ *
+ * Pattern reference for other Amiga synth formats: this component is the
+ * template for adding full editor support to Hippel CoSo, Sonic Arranger,
+ * and Future Composer (each has a similar AM waveform + parameter model).
  */
 
 import React, { useRef, useEffect, useCallback } from 'react';
@@ -17,6 +28,33 @@ import { Knob } from '@components/controls/Knob';
 interface JamCrackerControlsProps {
   config: JamCrackerConfig;
   onChange: (updates: Partial<JamCrackerConfig>) => void;
+}
+
+/** Fill the first WAVE_SIZE bytes of a JamCracker waveform with a preset shape. */
+function generateWaveformPreset(
+  kind: 'sine' | 'triangle' | 'square' | 'saw' | 'noise' | 'clear',
+  size = 64,
+): Uint8Array {
+  const buf = new Uint8Array(size);
+  for (let i = 0; i < size; i++) {
+    let s = 0; // signed -127..127
+    switch (kind) {
+      case 'sine':     s = Math.round(Math.sin((i / size) * Math.PI * 2) * 120); break;
+      case 'triangle': {
+        const half = size / 2;
+        const phase = i < half ? i / half : 1 - (i - half) / half;
+        s = Math.round((phase * 2 - 1) * 120);
+        break;
+      }
+      case 'square':   s = i < size / 2 ? 120 : -120; break;
+      case 'saw':      s = Math.round(((i / size) * 2 - 1) * 120); break;
+      case 'noise':    s = Math.round((Math.random() * 2 - 1) * 120); break;
+      case 'clear':    s = 0; break;
+    }
+    // Store as two's-complement byte
+    buf[i] = s < 0 ? s + 256 : s;
+  }
+  return buf;
 }
 
 /** Draw the AM waveform into a canvas (DPR-aware) */
@@ -135,6 +173,74 @@ export const JamCrackerControls: React.FC<JamCrackerControlsProps> = ({
     onChange({ ...configRef.current, [key]: value });
   }, [onChange]);
 
+  // ── Waveform draw editor ─────────────────────────────────────────────────
+  // Click+drag on the canvas to set bytes 0..63 of the AM waveform.
+  // Each x position maps to a byte index; vertical position becomes a signed
+  // 8-bit value (-127..127, stored as two's complement).
+  const isDrawingRef = useRef(false);
+  const lastIdxRef = useRef(-1);
+
+  const writeWaveformByteFromEvent = useCallback((e: React.PointerEvent<HTMLCanvasElement>) => {
+    const cur = configRef.current;
+    if (!cur.isAM || !cur.waveformData) return;
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const rect = canvas.getBoundingClientRect();
+    const x = Math.max(0, Math.min(rect.width, e.clientX - rect.left));
+    const y = Math.max(0, Math.min(rect.height, e.clientY - rect.top));
+    const WAVE_SIZE = Math.max(1, cur.waveformData.length);
+    const idx = Math.min(WAVE_SIZE - 1, Math.floor((x / rect.width) * WAVE_SIZE));
+    const mid = rect.height / 2;
+    const signed = Math.round(((mid - y) / (mid - 4)) * 127);
+    const clamped = Math.max(-127, Math.min(127, signed));
+    const byte = clamped < 0 ? clamped + 256 : clamped;
+
+    const next = new Uint8Array(cur.waveformData);
+    // Linear interpolate between this idx and the previous one to avoid
+    // gaps on fast drags
+    const prevIdx = lastIdxRef.current;
+    if (prevIdx >= 0 && Math.abs(idx - prevIdx) > 1) {
+      const prevVal = next[prevIdx];
+      const lo = Math.min(prevIdx, idx);
+      const hi = Math.max(prevIdx, idx);
+      for (let i = lo; i <= hi; i++) {
+        const t = (i - lo) / (hi - lo);
+        const interp = idx > prevIdx ? Math.round(prevVal + (byte - prevVal) * t)
+                                     : Math.round(byte + (prevVal - byte) * t);
+        next[i] = interp & 0xFF;
+      }
+    } else {
+      next[idx] = byte;
+    }
+    lastIdxRef.current = idx;
+    onChange({ ...cur, waveformData: next });
+  }, [onChange]);
+
+  const handlePointerDown = useCallback((e: React.PointerEvent<HTMLCanvasElement>) => {
+    if (!configRef.current.isAM) return;
+    e.currentTarget.setPointerCapture(e.pointerId);
+    isDrawingRef.current = true;
+    lastIdxRef.current = -1;
+    writeWaveformByteFromEvent(e);
+  }, [writeWaveformByteFromEvent]);
+
+  const handlePointerMove = useCallback((e: React.PointerEvent<HTMLCanvasElement>) => {
+    if (!isDrawingRef.current) return;
+    writeWaveformByteFromEvent(e);
+  }, [writeWaveformByteFromEvent]);
+
+  const handlePointerUp = useCallback((e: React.PointerEvent<HTMLCanvasElement>) => {
+    isDrawingRef.current = false;
+    lastIdxRef.current = -1;
+    try { e.currentTarget.releasePointerCapture(e.pointerId); } catch { /* noop */ }
+  }, []);
+
+  const applyPreset = useCallback((kind: 'sine' | 'triangle' | 'square' | 'saw' | 'noise' | 'clear') => {
+    const cur = configRef.current;
+    const size = Math.max(64, cur.waveformData?.length ?? 64);
+    onChange({ ...cur, waveformData: generateWaveformPreset(kind, size) });
+  }, [onChange]);
+
   return (
     <div className="p-4 space-y-4 synth-controls-flow">
       {/* Header */}
@@ -161,16 +267,34 @@ export const JamCrackerControls: React.FC<JamCrackerControlsProps> = ({
         </div>
       </div>
 
-      {/* AM Waveform Display */}
+      {/* AM Waveform Editor (click+drag to draw) */}
       {config.isAM && (
         <div className="space-y-2">
-          <div className="text-xs text-text-muted font-mono uppercase tracking-wider">
-            AM Waveform (64-byte phase modulation)
+          <div className="flex items-center justify-between">
+            <div className="text-xs text-text-muted font-mono uppercase tracking-wider">
+              AM Waveform — click + drag to draw
+            </div>
+            <div className="flex gap-1">
+              {(['sine', 'triangle', 'square', 'saw', 'noise', 'clear'] as const).map((k) => (
+                <button
+                  key={k}
+                  onClick={() => applyPreset(k)}
+                  className="text-[9px] font-mono px-1.5 py-0.5 rounded border border-dark-border text-text-secondary hover:text-accent-primary hover:border-accent-primary/50 uppercase"
+                  title={`Fill waveform with ${k}`}
+                >
+                  {k}
+                </button>
+              ))}
+            </div>
           </div>
           <canvas
             ref={canvasRef}
-            className="w-full rounded border border-dark-border bg-[#0a0e14]"
-            style={{ height: 120 }}
+            className="w-full rounded border border-dark-border bg-[#0a0e14] cursor-crosshair"
+            style={{ height: 120, touchAction: 'none' }}
+            onPointerDown={handlePointerDown}
+            onPointerMove={handlePointerMove}
+            onPointerUp={handlePointerUp}
+            onPointerCancel={handlePointerUp}
           />
         </div>
       )}

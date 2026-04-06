@@ -49,6 +49,7 @@ import type {
   TFMXMacroParamLayout,
 } from '@/types/tfmxNative';
 import { TFMXEngine } from '@/engine/tfmx/TFMXEngine';
+import { useTrackerStore } from '@stores';
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -267,6 +268,37 @@ export const TFMXMacroEditor: React.FC<Props> = ({ height = 360, initialMacroInd
     if (!tfmxFileData || !TFMXEngine.hasInstance()) return;
     TFMXEngine.getInstance().reloadModule(tfmxFileData, tfmxSmplData);
   }, [tfmxFileData, tfmxSmplData]);
+
+  // Seek the song player to the first trackstep that contains a pattern that
+  // references the currently selected macro. This is the "audition" path —
+  // since libtfmxaudiodecoder has no per-macro preview API, we instead jump
+  // playback to a real song position where this macro is heard naturally.
+  const seekToUsage = useCallback((macroTableIdx: number) => {
+    if (!native) return false;
+    // Build pattern → uses-this-macro lookup
+    const patternsUsing = new Set<number>();
+    for (let p = 0; p < native.patterns.length; p++) {
+      if (native.patterns[p].some(c => c.macro === macroTableIdx)) {
+        patternsUsing.add(p);
+      }
+    }
+    if (patternsUsing.size === 0) return false;
+    // Walk visible (non-EFFE) tracksteps for the active subsong, find one whose
+    // voice references one of those patterns
+    const activeSteps = native.tracksteps
+      .filter(s => !s.isEFFE && s.stepIndex >= native.firstStep && s.stepIndex <= native.lastStep);
+    for (let i = 0; i < activeSteps.length; i++) {
+      const step = activeSteps[i];
+      for (const v of step.voices) {
+        if (v.patternNum >= 0 && !v.isStop && patternsUsing.has(v.patternNum)) {
+          // i is the song position index relative to subsong start
+          useTrackerStore.getState().setCurrentPosition(i, false);
+          return true;
+        }
+      }
+    }
+    return false;
+  }, [native]);
 
   // Resolve a real macro array index from a TFMX pointer-table index (instrument id - 1)
   const resolveArrayIdx = useCallback((tableIdx: number | undefined): number => {
@@ -583,18 +615,35 @@ export const TFMXMacroEditor: React.FC<Props> = ({ height = 360, initialMacroInd
                 </div>
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', alignItems: 'flex-end' }}>
-                <button
-                  onClick={reloadAudio}
-                  title="Reload the running TFMX WASM with edited mdat — applies all macro edits to live playback"
-                  style={{
-                    fontSize: '10px', padding: '4px 8px', cursor: 'pointer',
-                    background: 'rgba(224,160,80,0.15)', color: '#e0a050',
-                    border: '1px solid #e0a050', borderRadius: '3px',
-                    fontFamily: 'inherit', whiteSpace: 'nowrap',
-                  }}
-                >
-                  ⟳ Reload Audio
-                </button>
+                <div style={{ display: 'flex', gap: '4px' }}>
+                  <button
+                    onClick={() => {
+                      const ok = seekToUsage(macro!.index);
+                      if (!ok) console.warn('[TFMX] selected macro is unused — nothing to seek to');
+                    }}
+                    title="Find a song position where this macro is used and seek the player there"
+                    style={{
+                      fontSize: '10px', padding: '4px 8px', cursor: 'pointer',
+                      background: 'rgba(136,192,192,0.15)', color: '#88c0c0',
+                      border: '1px solid #88c0c0', borderRadius: '3px',
+                      fontFamily: 'inherit', whiteSpace: 'nowrap',
+                    }}
+                  >
+                    ▶ Find Usage
+                  </button>
+                  <button
+                    onClick={reloadAudio}
+                    title="Reload the running TFMX WASM with edited mdat — applies all macro edits to live playback"
+                    style={{
+                      fontSize: '10px', padding: '4px 8px', cursor: 'pointer',
+                      background: 'rgba(224,160,80,0.15)', color: '#e0a050',
+                      border: '1px solid #e0a050', borderRadius: '3px',
+                      fontFamily: 'inherit', whiteSpace: 'nowrap',
+                    }}
+                  >
+                    ⟳ Reload Audio
+                  </button>
+                </div>
                 <label
                   style={{
                     fontSize: '9px', color: 'var(--color-text-muted)',
