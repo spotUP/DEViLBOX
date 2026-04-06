@@ -1501,13 +1501,14 @@ export const SampleEditor: React.FC<SampleEditorProps> = ({ instrument, onChange
   );
 };
 
-/** Compact mic recording button with level meter and device selector */
+/** Compact mic recording button with level meter, effects toggle, and device selector */
 const RecordButton: React.FC<{
   instrumentId: number;
   onRecorded: (dataUrl: string, duration: number) => void;
 }> = ({ onRecorded }) => {
   const [recording, setRecording] = useState(false);
   const [connected, setConnected] = useState(false);
+  const [withEffects, setWithEffects] = useState(false);
   const [level, setLevel] = useState(0);
   const [elapsed, setElapsed] = useState(0);
   const timerRef = useRef<number | null>(null);
@@ -1521,14 +1522,18 @@ const RecordButton: React.FC<{
       if (!ok) return;
       setConnected(true);
     }
+    // Enable effects routing if toggle is on
+    if (withEffects) {
+      await mgr.enableEffectsRouting();
+    }
     mgr.setMonitoring(true);
-    mgr.startRecording();
+    mgr.startRecording(withEffects);
     setRecording(true);
     setElapsed(0);
     const start = Date.now();
     timerRef.current = window.setInterval(() => setElapsed((Date.now() - start) / 1000), 100);
     meterRef.current = window.setInterval(() => setLevel(mgr.getInputLevel()), 50);
-  }, []);
+  }, [withEffects]);
 
   const stopRecording = useCallback(async () => {
     if (timerRef.current) { clearInterval(timerRef.current); timerRef.current = null; }
@@ -1540,6 +1545,8 @@ const RecordButton: React.FC<{
     const mgr = getAudioInputManager();
     mgr.setMonitoring(false);
     const buffer = await mgr.stopRecording();
+    // Clean up effects routing after recording
+    if (mgr.isEffectsRouted()) await mgr.disableEffectsRouting();
     if (buffer) {
       const { bufferToDataUrl } = await import('@utils/audio/SampleProcessing');
       const dataUrl = await bufferToDataUrl(buffer);
@@ -1576,14 +1583,27 @@ const RecordButton: React.FC<{
   }
 
   return (
-    <button
-      onClick={startRecording}
-      className={`p-1.5 rounded transition-colors ${
-        connected ? 'bg-accent-error/20 text-accent-error' : 'bg-dark-bgSecondary text-text-muted hover:text-accent-error'
-      }`}
-      title="Record from microphone"
-    >
-      <Mic size={14} />
-    </button>
+    <div className="flex items-center gap-0.5">
+      <button
+        onClick={startRecording}
+        className={`p-1.5 rounded-l transition-colors ${
+          connected ? 'bg-accent-error/20 text-accent-error' : 'bg-dark-bgSecondary text-text-muted hover:text-accent-error'
+        }`}
+        title="Record from microphone"
+      >
+        <Mic size={14} />
+      </button>
+      <button
+        onClick={() => setWithEffects(!withEffects)}
+        className={`px-1.5 py-1.5 rounded-r text-[9px] font-mono transition-colors border-l border-dark-border ${
+          withEffects
+            ? 'bg-violet-600/30 text-violet-400'
+            : 'bg-dark-bgSecondary text-text-muted hover:text-violet-400'
+        }`}
+        title={withEffects ? 'Recording with master effects (vocoder, autotune, etc.)' : 'Recording dry (no effects)'}
+      >
+        FX
+      </button>
+    </div>
   );
 };

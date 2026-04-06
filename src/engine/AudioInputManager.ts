@@ -37,6 +37,8 @@ class AudioInputManager {
   private recorder: MediaRecorder | null = null;
   private recordedChunks: Blob[] = [];
   private audioContext: AudioContext;
+  private effectsDestination: MediaStreamAudioDestinationNode | null = null;
+  private effectsConnected = false;
 
   constructor() {
     this.audioContext = getDevilboxAudioContext();
@@ -51,6 +53,13 @@ class AudioInputManager {
     //        inputGain → monitorGain → destination (when monitoring on)
     this.inputGain.connect(this.analyser);
     this.inputGain.connect(this.monitorGain);
+  }
+
+  /**
+   * Get the input gain node for external routing (e.g., to effects chain).
+   */
+  getInputNode(): GainNode {
+    return this.inputGain;
   }
 
   /**
@@ -141,13 +150,65 @@ class AudioInputManager {
   }
 
   /**
-   * Start recording audio input.
+   * Route mic input through ToneEngine's master effects chain.
+   * Call before startRecording() to record with effects.
    */
-  startRecording(): void {
+  async enableEffectsRouting(): Promise<void> {
+    if (this.effectsConnected) return;
+    try {
+      const { getToneEngine } = await import('./ToneEngine');
+      const engine = getToneEngine();
+      // Route mic → master effects input (same path as synth audio)
+      this.inputGain.connect(engine.masterEffectsInput.input as unknown as AudioNode);
+      // Create a destination node after the master channel to capture processed audio
+      this.effectsDestination = this.audioContext.createMediaStreamDestination();
+      // Tap the master channel output for recording
+      engine.masterChannel.connect(this.effectsDestination);
+      this.effectsConnected = true;
+      console.log('[AudioInputManager] Effects routing enabled');
+    } catch (err) {
+      console.error('[AudioInputManager] Failed to enable effects routing:', err);
+    }
+  }
+
+  /**
+   * Disconnect mic from effects chain.
+   */
+  async disableEffectsRouting(): Promise<void> {
+    if (!this.effectsConnected) return;
+    try {
+      const { getToneEngine } = await import('./ToneEngine');
+      const engine = getToneEngine();
+      this.inputGain.disconnect(engine.masterEffectsInput.input as unknown as AudioNode);
+      if (this.effectsDestination) {
+        try { engine.masterChannel.disconnect(this.effectsDestination); } catch { /* ok */ }
+        this.effectsDestination = null;
+      }
+      this.effectsConnected = false;
+      console.log('[AudioInputManager] Effects routing disabled');
+    } catch { /* ok */ }
+  }
+
+  /** Whether effects routing is active */
+  isEffectsRouted(): boolean {
+    return this.effectsConnected;
+  }
+
+  /**
+   * Start recording audio input.
+   * @param withEffects If true, records from the effects chain output instead of raw mic
+   */
+  startRecording(withEffects = false): void {
     if (!this.stream || this.isRecording) return;
 
     this.recordedChunks = [];
-    this.recorder = new MediaRecorder(this.stream, {
+
+    // Choose recording source: raw mic stream or effects-processed stream
+    const recordStream = (withEffects && this.effectsDestination)
+      ? this.effectsDestination.stream
+      : this.stream;
+
+    this.recorder = new MediaRecorder(recordStream, {
       mimeType: 'audio/webm;codecs=opus',
     });
 
@@ -159,7 +220,7 @@ class AudioInputManager {
 
     this.recorder.start(100); // Collect data every 100ms
     this.isRecording = true;
-    console.log('[AudioInputManager] Recording started');
+    console.log(`[AudioInputManager] Recording started ${withEffects ? '(with effects)' : '(dry)'}`);
   }
 
   /**
@@ -214,6 +275,10 @@ class AudioInputManager {
     if (this.recorder && this.isRecording) {
       this.recorder.stop();
       this.isRecording = false;
+    }
+    // Clean up effects routing
+    if (this.effectsConnected) {
+      this.disableEffectsRouting();
     }
     if (this.sourceNode) {
       this.sourceNode.disconnect();
