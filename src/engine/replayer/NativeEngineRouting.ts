@@ -588,7 +588,7 @@ export async function startNativeEngines(
           const order = song.songPositions;
 
           (instance as any).onPositionUpdate((update: { samplesRendered: number; songEnd: boolean }) => {
-            if (!update.samplesRendered || samplesPerRow <= 0) return;
+            if (update.samplesRendered == null || samplesPerRow <= 0) return;
             const absoluteRow = Math.floor(update.samplesRendered / samplesPerRow);
             let row = absoluteRow;
             let position = 0;

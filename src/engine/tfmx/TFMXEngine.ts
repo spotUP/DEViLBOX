@@ -129,6 +129,11 @@ export class TFMXEngine {
             const resolve = this._playerHandleResolvers.shift()!;
             resolve(-1);
           }
+          // Unblock any pending loadTune() callers on module load failure
+          if (this._moduleLoadedResolvers.length > 0) {
+            const resolve = this._moduleLoadedResolvers.shift()!;
+            resolve({ voices: 0, songs: 0, duration: 0 });
+          }
           break;
 
         case 'playerCreated':
@@ -213,6 +218,11 @@ export class TFMXEngine {
 
   play(): void {
     this.sendMessage({ type: 'modulePlay' });
+  }
+
+  pause(): void {
+    // TFMX doesn't support true pause — stop the module
+    this.sendMessage({ type: 'moduleStop' });
   }
 
   stop(): void {
