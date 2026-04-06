@@ -382,17 +382,18 @@ int tfmx_load_module(void* /*ctx*/, const uint8_t* mdatData, uint32_t mdatLen,
   void* dec = tfmxdec_new();
   if (!dec) return -2;
 
-  // For multi-file TFMX, we need to write the smpl data to a temp path.
-  // libtfmxaudiodecoder's set_path + init sequence handles mdat+smpl pairing.
-  // Since we're in WASM (no filesystem), we concatenate mdat+smpl into one buffer
-  // as the library supports single-buffer init for merged formats.
+  // Write both mdat and smpl to MEMFS with matching names so the library
+  // can find the companion sample file via its internal path derivation.
+  // The library's set_path() + init() or load() handles mdat→smpl pairing.
 
-  // Actually, the library's init() takes a single buffer.
-  // For TFMX Professional format, the mdat contains all music data and the smpl
-  // contains PCM samples. The library expects the smpl to be accessible via
-  // set_path(). In WASM, we can write the smpl to MEMFS first.
+  // Write mdat to MEMFS
+  FILE* fm = fopen("/tmp/mdat.song", "wb");
+  if (fm) {
+    fwrite(mdatData, 1, mdatLen, fm);
+    fclose(fm);
+  }
 
-  // Write smpl data to Emscripten MEMFS so the library can find it
+  // Write smpl to MEMFS (library derives "smpl.song" from "mdat.song")
   if (smplData && smplLen > 0) {
     gModuleSmpl = (uint8_t*)malloc(smplLen);
     if (gModuleSmpl) {
@@ -400,19 +401,21 @@ int tfmx_load_module(void* /*ctx*/, const uint8_t* mdatData, uint32_t mdatLen,
       gModuleSmplLen = smplLen;
     }
 
-    // Write to MEMFS via Emscripten FS
-    FILE* f = fopen("/tmp/smpl.tfmx", "wb");
-    if (f) {
-      fwrite(smplData, 1, smplLen, f);
-      fclose(f);
-      tfmxdec_set_path(dec, "/tmp/smpl.tfmx");
+    FILE* fs = fopen("/tmp/smpl.song", "wb");
+    if (fs) {
+      fwrite(smplData, 1, smplLen, fs);
+      fclose(fs);
     }
   }
 
-  // Initialize decoder with mdat data
-  if (!tfmxdec_init(dec, (void*)mdatData, mdatLen, subsong)) {
-    tfmxdec_delete(dec);
-    return -3;
+  // Load from MEMFS path — library handles mdat+smpl pairing internally
+  if (!tfmxdec_load(dec, "/tmp/mdat.song", subsong)) {
+    // Fallback: try buffer-based init (works for merged/single-file formats)
+    tfmxdec_set_path(dec, "/tmp/mdat.song");
+    if (!tfmxdec_init(dec, (void*)mdatData, mdatLen, subsong)) {
+      tfmxdec_delete(dec);
+      return -3;
+    }
   }
 
   // Configure mixer: signed 16-bit stereo
