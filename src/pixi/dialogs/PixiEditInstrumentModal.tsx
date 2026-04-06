@@ -12,6 +12,7 @@
  */
 
 import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react';
+import { ConfirmDialog } from '@/components/common/ConfirmDialog';
 import {
   PixiModal,
   PixiModalHeader,
@@ -468,27 +469,28 @@ export const PixiEditInstrumentModal: React.FC<PixiEditInstrumentModalProps> = (
     onClose();
   }, [onClose]);
 
+  const [compatWarning, setCompatWarning] = useState<{ synthType: SynthType; format: string } | null>(null);
+  const compatConfirmedRef = useRef(false);
+
   const handleChangeSynthType = useCallback(
     (synthType: SynthType) => {
       const inst = instRef.current;
       if (!inst) return;
 
       // Warn if replacing a sample with a synth on a native format song
-      if (inst.synthType === 'Sampler' || inst.synthType === 'Player') {
+      if (!compatConfirmedRef.current &&
+          (inst.synthType === 'Sampler' || inst.synthType === 'Player')) {
         try {
           const { getTrackerReplayer } = require('@engine/TrackerReplayer');
           const song = getTrackerReplayer().getSong();
           if (song) {
             const fmt = song.format?.toUpperCase() || 'native';
-            const confirmed = window.confirm(
-              `Replacing this sample with a synth breaks ${fmt} format compatibility.\n\n` +
-              `The song can no longer be saved as ${fmt} — save as .dbx instead.\n\n` +
-              `Continue?`
-            );
-            if (!confirmed) return;
+            setCompatWarning({ synthType, format: fmt });
+            return;
           }
         } catch { /* replayer not initialized */ }
       }
+      compatConfirmedRef.current = false;
 
       updateInstrument(inst.id, { synthType });
       setShowSynthBrowser(false);
@@ -1628,6 +1630,24 @@ export const PixiEditInstrumentModal: React.FC<PixiEditInstrumentModalProps> = (
       )}
 
       {/* Footer removed — close button is in the unified header */}
+
+      {/* Format compatibility confirmation dialog */}
+      <ConfirmDialog
+        isOpen={!!compatWarning}
+        title="Format Compatibility Warning"
+        message={compatWarning
+          ? `Replacing this sample with a synth breaks ${compatWarning.format} format compatibility. The song can no longer be saved as ${compatWarning.format} — save as .dbx instead.`
+          : ''}
+        confirmLabel="Continue"
+        danger
+        onConfirm={() => {
+          if (compatWarning) {
+            compatConfirmedRef.current = true;
+            handleChangeSynthType(compatWarning.synthType);
+          }
+        }}
+        onClose={() => setCompatWarning(null)}
+      />
     </PixiModal>
   );
 };
