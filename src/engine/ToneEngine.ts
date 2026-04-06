@@ -1504,6 +1504,12 @@ export class ToneEngine {
    * Create or get instrument (per-channel to avoid automation conflicts)
    */
   public getInstrument(instrumentId: number, config: InstrumentConfig, channelIndex?: number): Tone.ToneAudioNode | DevilboxSynth | null {
+    // Ensure Tone.js context matches our native context — prevents cross-context
+    // AudioNode errors when creating instruments after libopenmpt/UADE playback
+    if (this._nativeContext && Tone.getContext().rawContext !== this._nativeContext) {
+      Tone.setContext(this._nativeContext);
+    }
+
     // CRITICAL FIX: Many synth types don't need per-channel instances
     // They're already polyphonic and don't have per-channel automation
     // Creating new instances causes them to reload samples/ROMs/WASM, causing silence and performance issues
