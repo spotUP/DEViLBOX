@@ -125,6 +125,22 @@ export interface FurnaceGBConfig {
   doubleWave?: boolean;   // Double wave length (GBA only)
 }
 
+// Wavetable Synthesizer (from DivInstrumentWaveSynth in instrument.h)
+export interface FurnaceWaveSynthConfig {
+  enabled: boolean;
+  wave1: number;
+  wave2: number;
+  rateDivider: number;
+  effect: number;
+  oneShot: boolean;
+  global: boolean;
+  speed: number;
+  param1: number;
+  param2: number;
+  param3: number;
+  param4: number;
+}
+
 // C64 SID (DIV_INS_C64)
 export interface FurnaceC64Config {
   triOn: boolean;        // Triangle waveform
@@ -257,6 +273,59 @@ export interface FurnaceSID2Config {
   noiseMode: number;     // 0-3
 }
 
+// SID3 (DIV_INS_SID3)
+export interface FurnaceSID3Filter {
+  enabled: boolean;
+  init: boolean;
+  absoluteCutoff: boolean;
+  bindCutoffToNote: boolean;
+  bindCutoffToNoteDir: boolean;
+  bindCutoffOnNote: boolean;
+  bindResonanceToNote: boolean;
+  bindResonanceToNoteDir: boolean;
+  bindResonanceOnNote: boolean;
+  cutoff: number;
+  resonance: number;
+  outputVolume: number;
+  distortion: number;
+  mode: number;
+  filterMatrix: number;
+  bindCutoffToNoteStrength: number;
+  bindCutoffToNoteCenter: number;
+  bindResonanceToNoteStrength: number;
+  bindResonanceToNoteCenter: number;
+}
+
+export interface FurnaceSID3Config {
+  triOn: boolean;
+  sawOn: boolean;
+  pulseOn: boolean;
+  noiseOn: boolean;
+  dutyIsAbs: boolean;
+  a: number;
+  d: number;
+  s: number;
+  sr: number;
+  r: number;
+  mixMode: number;
+  duty: number;
+  ringMod: boolean;
+  oscSync: boolean;
+  phaseMod: boolean;
+  specialWaveOn: boolean;
+  oneBitNoise: boolean;
+  separateNoisePitch: boolean;
+  doWavetable: boolean;
+  resetDuty: boolean;
+  phaseModSource: number;
+  ringModSource: number;
+  syncSource: number;
+  specialWave: number;
+  phaseInv: number;
+  feedback: number;
+  filters: FurnaceSID3Filter[];
+}
+
 // ES5506 (DIV_INS_ES5506)
 export interface FurnaceES5506Config {
   filter: {
@@ -326,6 +395,8 @@ export interface FurnaceConfig {
   multipcm?: FurnaceMultiPCMConfig;
   soundUnit?: FurnaceSoundUnitConfig;
   sid2?: FurnaceSID2Config;
+  sid3?: FurnaceSID3Config;
+  ws?: FurnaceWaveSynthConfig;
 
   // Simple chip-specific fields (from feature blocks)
   x1BankSlot?: number;     // X1-010 bank slot
@@ -340,6 +411,8 @@ export interface FurnaceConfig {
     sweepPeriod: number;
     sweepNegate: boolean;
     sweepShift: number;
+    dpcmNoteMap?: boolean;
+    dpcmMap?: Array<{ freq: number; delta: number }>;
   };
   psg?: {
     duty: number;
