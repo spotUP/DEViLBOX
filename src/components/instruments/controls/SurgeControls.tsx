@@ -78,7 +78,7 @@ export const SurgeControls: React.FC<SurgeControlsProps> = ({
   const [synthReady, setSynthReady] = useState(false);
   const synthRef = useRef<VSTBridgeSynth | null>(null);
 
-  const { isCyan: isCyanTheme, accent: accentColor, knob: knobColor } = useInstrumentColors('#ff8c00');
+  const { isCyan: isCyanTheme, accent: accentColor, knob: knobColor, panelBg, panelStyle } = useInstrumentColors('#ff8c00');
 
   // Connect to the VSTBridge synth
   useEffect(() => {
@@ -183,9 +183,6 @@ export const SurgeControls: React.FC<SurgeControlsProps> = ({
     );
   }
 
-  const panelBg = isCyanTheme
-    ? 'bg-[#051515] border-accent-highlight/20'
-    : 'bg-[#1a1a1a] border-orange-900/30';  // custom border, not using hook panelBg
 
   const tabBarBg = isCyanTheme ? 'bg-[#061818]' : 'bg-[#111]';
 
@@ -241,7 +238,7 @@ export const SurgeControls: React.FC<SurgeControlsProps> = ({
               if (oscParams.length === 0) return null;
 
               return (
-                <div key={n} className={`p-2 rounded-lg border border-dark-border ${panelBg}`}>
+                <div key={n} className={`p-2 rounded-lg border ${panelBg}`} style={panelStyle}>
                   <h3 className="font-bold uppercase tracking-tight text-sm mb-3" style={{ color: accentColor }}>
                     {activeScene} - Oscillator {n}
                   </h3>
@@ -279,7 +276,7 @@ export const SurgeControls: React.FC<SurgeControlsProps> = ({
               if (filParams.length === 0) return null;
 
               return (
-                <div key={n} className={`p-2 rounded-lg border border-dark-border ${panelBg}`}>
+                <div key={n} className={`p-2 rounded-lg border ${panelBg}`} style={panelStyle}>
                   <h3 className="font-bold uppercase tracking-tight text-sm mb-3" style={{ color: accentColor }}>
                     {activeScene} - Filter {n}
                   </h3>
@@ -319,7 +316,7 @@ export const SurgeControls: React.FC<SurgeControlsProps> = ({
         {activeTab === 'env' && (
           <>
             {['Amp EG', 'Filter EG'].map(egName => (
-              <div key={egName} className={`p-2 rounded-lg border border-dark-border ${panelBg}`}>
+              <div key={egName} className={`p-2 rounded-lg border ${panelBg}`} style={panelStyle}>
                 <h3 className="font-bold uppercase tracking-tight text-sm mb-3" style={{ color: accentColor }}>
                   {activeScene} - {egName}
                 </h3>
@@ -349,6 +346,7 @@ export const SurgeControls: React.FC<SurgeControlsProps> = ({
             knobColor={knobColor}
             accentColor={accentColor}
             panelBg={panelBg}
+            panelStyle={panelStyle}
             allParams={allParams}
           />
         )}
@@ -361,11 +359,12 @@ export const SurgeControls: React.FC<SurgeControlsProps> = ({
             knobColor={knobColor}
             accentColor={accentColor}
             panelBg={panelBg}
+            panelStyle={panelStyle}
           />
         )}
 
         {activeTab === 'global' && (
-          <div className={`p-2 rounded-lg border border-dark-border ${panelBg}`}>
+          <div className={`p-2 rounded-lg border ${panelBg}`} style={panelStyle}>
             <h3 className="font-bold uppercase tracking-tight text-sm mb-3" style={{ color: accentColor }}>
               Global
             </h3>
@@ -393,6 +392,7 @@ export const SurgeControls: React.FC<SurgeControlsProps> = ({
             knobColor={knobColor}
             accentColor={accentColor}
             panelBg={panelBg}
+            panelStyle={panelStyle}
           />
         )}
       </div>
@@ -411,11 +411,12 @@ interface SurgeLfoTabProps {
   knobColor: string;
   accentColor: string;
   panelBg: string;
+  panelStyle: React.CSSProperties;
   allParams: VSTBridgeParam[];
 }
 
 const SurgeLfoTab: React.FC<SurgeLfoTabProps> = ({
-  activeScene, paramValues, setParam, knobColor, accentColor, panelBg, allParams,
+  activeScene, paramValues, setParam, knobColor, accentColor, panelBg, panelStyle, allParams,
 }) => {
   const [activeLfo, setActiveLfo] = useState(1);
 
@@ -445,7 +446,7 @@ const SurgeLfoTab: React.FC<SurgeLfoTabProps> = ({
         ))}
       </div>
 
-      <div className={`p-2 rounded-lg border border-dark-border ${panelBg}`}>
+      <div className={`p-2 rounded-lg border ${panelBg}`} style={panelStyle}>
         <h3 className="font-bold uppercase tracking-tight text-sm mb-3" style={{ color: accentColor }}>
           {activeScene} - {currentLfoName}
         </h3>
@@ -482,10 +483,11 @@ interface SurgeFxTabProps {
   knobColor: string;
   accentColor: string;
   panelBg: string;
+  panelStyle: React.CSSProperties;
 }
 
 const SurgeFxTab: React.FC<SurgeFxTabProps> = ({
-  allParams, paramValues, setParam, knobColor, accentColor, panelBg,
+  allParams, paramValues, setParam, knobColor, accentColor, panelBg, panelStyle,
 }) => {
   // Group FX params by slot prefix: FX A1, FX A2, etc.
   const fxSlots = ['A1', 'A2', 'A3', 'A4', 'B1', 'B2', 'B3', 'B4', 'S1', 'S2', 'S3', 'S4', 'G1', 'G2', 'G3', 'G4'];
@@ -500,14 +502,14 @@ const SurgeFxTab: React.FC<SurgeFxTabProps> = ({
     const fxParams = allParams.filter(p => p.name.startsWith('FX'));
     if (fxParams.length === 0) {
       return (
-        <div className={`p-2 rounded-lg border border-dark-border ${panelBg}`}>
+        <div className={`p-2 rounded-lg border ${panelBg}`} style={panelStyle}>
           <p className="text-sm text-text-muted">No FX parameters available.</p>
         </div>
       );
     }
 
     return (
-      <div className={`p-2 rounded-lg border border-dark-border ${panelBg}`}>
+      <div className={`p-2 rounded-lg border ${panelBg}`} style={panelStyle}>
         <h3 className="font-bold uppercase tracking-tight text-sm mb-3" style={{ color: accentColor }}>
           Effects
         </h3>
@@ -532,7 +534,7 @@ const SurgeFxTab: React.FC<SurgeFxTabProps> = ({
   return (
     <>
       {fxGroups.map(({ slot, prefix, params }) => (
-        <div key={slot} className={`p-2 rounded-lg border border-dark-border ${panelBg}`}>
+        <div key={slot} className={`p-2 rounded-lg border ${panelBg}`} style={panelStyle}>
           <h3 className="font-bold uppercase tracking-tight text-sm mb-3" style={{ color: accentColor }}>
             FX {slot}
           </h3>
@@ -570,16 +572,17 @@ interface SurgeOtherTabProps {
   knobColor: string;
   accentColor: string;
   panelBg: string;
+  panelStyle: React.CSSProperties;
 }
 
 const SurgeOtherTab: React.FC<SurgeOtherTabProps> = ({
-  allParams, paramValues, setParam, knobColor, accentColor, panelBg,
+  allParams, paramValues, setParam, knobColor, accentColor, panelBg, panelStyle,
 }) => {
   const uncategorized = allParams.filter(p => !isSurgeParamCategorized(p.name));
 
   if (uncategorized.length === 0) {
     return (
-      <div className={`p-2 rounded-lg border border-dark-border ${panelBg}`}>
+      <div className={`p-2 rounded-lg border ${panelBg}`} style={panelStyle}>
         <p className="text-sm text-text-muted">All parameters are shown in the categorized tabs.</p>
       </div>
     );
@@ -596,13 +599,13 @@ const SurgeOtherTab: React.FC<SurgeOtherTabProps> = ({
 
   return (
     <>
-      <div className={`p-3 rounded-lg border border-dark-border ${panelBg}`}>
+      <div className={`p-3 rounded-lg border ${panelBg}`} style={panelStyle}>
         <p className="text-xs text-text-muted mb-1">
           {uncategorized.length} additional parameters not shown in other tabs
         </p>
       </div>
       {Array.from(groups.entries()).map(([prefix, params]) => (
-        <div key={prefix} className={`p-2 rounded-lg border border-dark-border ${panelBg}`}>
+        <div key={prefix} className={`p-2 rounded-lg border ${panelBg}`} style={panelStyle}>
           <h3 className="font-bold uppercase tracking-tight text-sm mb-3" style={{ color: accentColor }}>
             {prefix}
           </h3>

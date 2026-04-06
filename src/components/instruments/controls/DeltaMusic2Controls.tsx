@@ -79,7 +79,7 @@ export const DeltaMusic2Controls: React.FC<DeltaMusic2ControlsProps> = ({
     return chipEditorRef.current;
   }, []);
 
-  const { isCyan, accent, knob, dim, panelBg } = useInstrumentColors('#ff9944', { knob: '#ffbb66', dim: '#331800' });
+  const { isCyan, accent, knob, dim, panelBg, panelStyle } = useInstrumentColors('#ff9944', { knob: '#ffbb66', dim: '#331800' });
 
   // ── Volume table updater ──────────────────────────────────────────────────
 
@@ -166,7 +166,7 @@ export const DeltaMusic2Controls: React.FC<DeltaMusic2ControlsProps> = ({
 
   const renderEnvelope = () => (
     <div className="flex flex-col gap-3 p-3 overflow-y-auto" style={{ maxHeight: 'calc(100vh - 280px)' }}>
-      <div className={`rounded-lg border p-3 ${panelBg}`}>
+      <div className={`rounded-lg border p-3 ${panelBg}`} style={panelStyle}>
         <SectionLabel color={accent} label="Volume Table (5 entries)" />
         <div className="text-[10px] text-text-muted mb-2">
           Each entry: Speed (step rate), Level (0-255), Sustain (ticks at this level).
@@ -208,7 +208,7 @@ export const DeltaMusic2Controls: React.FC<DeltaMusic2ControlsProps> = ({
     <div className="flex flex-col gap-3 p-3 overflow-y-auto" style={{ maxHeight: 'calc(100vh - 280px)' }}>
 
       {/* Vibrato table */}
-      <div className={`rounded-lg border p-3 ${panelBg}`}>
+      <div className={`rounded-lg border p-3 ${panelBg}`} style={panelStyle}>
         <SectionLabel color={accent} label="Vibrato Table (5 entries)" />
         <div className="text-[10px] text-text-muted mb-2">
           Each entry: Speed (LFO rate), Delay (ticks before start), Sustain (ticks at this vibrato).
@@ -243,7 +243,7 @@ export const DeltaMusic2Controls: React.FC<DeltaMusic2ControlsProps> = ({
       </div>
 
       {/* Pitch bend */}
-      <div className={`rounded-lg border p-3 ${panelBg}`}>
+      <div className={`rounded-lg border p-3 ${panelBg}`} style={panelStyle}>
         <SectionLabel color={accent} label="Pitch Bend" />
         <div className="flex items-center gap-4">
           <Knob
@@ -273,7 +273,7 @@ export const DeltaMusic2Controls: React.FC<DeltaMusic2ControlsProps> = ({
 
     return (
       <div className="flex flex-col gap-3 p-3 overflow-y-auto" style={{ maxHeight: 'calc(100vh - 280px)' }}>
-        <div className={`rounded-lg border p-3 ${panelBg}`}>
+        <div className={`rounded-lg border p-3 ${panelBg}`} style={panelStyle}>
           <SectionLabel color={accent} label="Wavetable Sequence (48 bytes)" />
           <div className="grid grid-cols-8 gap-1">
             {Array.from(table).map((entry, idx) => {

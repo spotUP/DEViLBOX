@@ -44,7 +44,7 @@ export const MelodicaControls: React.FC<MelodicaControlsProps> = ({
   const [synthReady, setSynthReady] = useState(false);
   const synthRef = useRef<VSTBridgeSynth | null>(null);
 
-  const { isCyan: isCyanTheme, accent: accentColor, knob: knobColor } = useInstrumentColors('#2dd4bf');
+  const { accent: accentColor, knob: knobColor, panelBg, panelStyle } = useInstrumentColors('#2dd4bf');
 
   // Connect to the VSTBridge synth
   useEffect(() => {
@@ -107,14 +107,11 @@ export const MelodicaControls: React.FC<MelodicaControlsProps> = ({
     );
   }
 
-  const panelBg = isCyanTheme
-    ? 'bg-[#051515] border-accent-highlight/20'
-    : 'bg-[#1a1a1a] border-teal-900/30';  // custom border
 
   return (
     <div className="synth-controls-flow grid grid-cols-4 gap-2 p-2 overflow-y-auto">
       {/* ═══ BREATH & DYNAMICS ═══ */}
-      <div className={`p-2 rounded-lg border border-dark-border ${panelBg}`}>
+      <div className={`p-2 rounded-lg border ${panelBg}`} style={panelStyle}>
         <h3
           className="font-bold uppercase tracking-tight text-sm mb-3"
           style={{ color: accentColor }}
@@ -158,7 +155,7 @@ export const MelodicaControls: React.FC<MelodicaControlsProps> = ({
       </div>
 
       {/* ═══ TONE ═══ */}
-      <div className={`p-2 rounded-lg border border-dark-border ${panelBg}`}>
+      <div className={`p-2 rounded-lg border ${panelBg}`} style={panelStyle}>
         <h3
           className="font-bold uppercase tracking-tight text-sm mb-3"
           style={{ color: accentColor }}
@@ -203,7 +200,7 @@ export const MelodicaControls: React.FC<MelodicaControlsProps> = ({
       </div>
 
       {/* ═══ VIBRATO ═══ */}
-      <div className={`p-2 rounded-lg border border-dark-border ${panelBg}`}>
+      <div className={`p-2 rounded-lg border ${panelBg}`} style={panelStyle}>
         <h3
           className="font-bold uppercase tracking-tight text-sm mb-3"
           style={{ color: accentColor }}
@@ -236,7 +233,7 @@ export const MelodicaControls: React.FC<MelodicaControlsProps> = ({
       </div>
 
       {/* ═══ PLAYING & OUTPUT ═══ */}
-      <div className={`p-2 rounded-lg border border-dark-border ${panelBg}`}>
+      <div className={`p-2 rounded-lg border ${panelBg}`} style={panelStyle}>
         <h3
           className="font-bold uppercase tracking-tight text-sm mb-3"
           style={{ color: accentColor }}

@@ -60,7 +60,7 @@ export const SymphonieControls: React.FC<SymphonieControlsProps> = ({
   const configRef = useRef(config);
   useEffect(() => { configRef.current = config; }, [config]);
 
-  const { isCyan, accent, knob, dim, panelBg } = useInstrumentColors('#bb88ff', { knob: '#cc99ff', dim: '#1a0033' });
+  const { isCyan, accent, knob, dim, panelBg, panelStyle } = useInstrumentColors('#bb88ff', { knob: '#cc99ff', dim: '#1a0033' });
 
   const upd = useCallback(<K extends keyof SymphonieConfig>(key: K, value: SymphonieConfig[K]) => {
     onChange({ [key]: value } as Partial<SymphonieConfig>);
@@ -72,7 +72,7 @@ export const SymphonieControls: React.FC<SymphonieControlsProps> = ({
     <div className="flex flex-col gap-3 p-3 overflow-y-auto" style={{ maxHeight: 'calc(100vh - 280px)' }}>
 
       {/* Type indicator */}
-      <div className={`rounded-lg border p-3 ${panelBg}`}>
+      <div className={`rounded-lg border p-3 ${panelBg}`} style={panelStyle}>
         <SectionLabel color={accent} label="Instrument Type" />
         <div className="flex items-center gap-3">
           <select
@@ -92,7 +92,7 @@ export const SymphonieControls: React.FC<SymphonieControlsProps> = ({
       </div>
 
       {/* Volume */}
-      <div className={`rounded-lg border p-3 ${panelBg}`}>
+      <div className={`rounded-lg border p-3 ${panelBg}`} style={panelStyle}>
         <SectionLabel color={accent} label="Volume" />
         <div className="flex items-center gap-4">
           <Knob
@@ -106,7 +106,7 @@ export const SymphonieControls: React.FC<SymphonieControlsProps> = ({
       </div>
 
       {/* Tuning */}
-      <div className={`rounded-lg border p-3 ${panelBg}`}>
+      <div className={`rounded-lg border p-3 ${panelBg}`} style={panelStyle}>
         <SectionLabel color={accent} label="Tuning" />
         <div className="flex gap-4">
           <Knob
@@ -134,7 +134,7 @@ export const SymphonieControls: React.FC<SymphonieControlsProps> = ({
       </div>
 
       {/* Sample Rate */}
-      <div className={`rounded-lg border p-3 ${panelBg}`}>
+      <div className={`rounded-lg border p-3 ${panelBg}`} style={panelStyle}>
         <SectionLabel color={accent} label="Sample Rate" />
         <div className="flex items-center gap-4">
           <Knob
@@ -157,7 +157,7 @@ export const SymphonieControls: React.FC<SymphonieControlsProps> = ({
 
     return (
       <div className="flex flex-col gap-3 p-3 overflow-y-auto" style={{ maxHeight: 'calc(100vh - 280px)' }}>
-        <div className={`rounded-lg border p-3 ${panelBg}`}>
+        <div className={`rounded-lg border p-3 ${panelBg}`} style={panelStyle}>
           <SectionLabel color={accent} label="Loop Settings" />
 
           {/* Loop visual bar */}
@@ -225,7 +225,7 @@ export const SymphonieControls: React.FC<SymphonieControlsProps> = ({
     <div className="flex flex-col gap-3 p-3 overflow-y-auto" style={{ maxHeight: 'calc(100vh - 280px)' }}>
 
       {/* Multi-Channel */}
-      <div className={`rounded-lg border p-3 ${panelBg}`}>
+      <div className={`rounded-lg border p-3 ${panelBg}`} style={panelStyle}>
         <SectionLabel color={accent} label="Channel Routing" />
         <div className="flex items-center gap-3">
           <select
@@ -246,7 +246,7 @@ export const SymphonieControls: React.FC<SymphonieControlsProps> = ({
       </div>
 
       {/* DSP Bypass */}
-      <div className={`rounded-lg border p-3 ${panelBg}`}>
+      <div className={`rounded-lg border p-3 ${panelBg}`} style={panelStyle}>
         <SectionLabel color={accent} label="DSP Processing" />
         <label className="flex items-center gap-2 text-[11px] cursor-pointer" style={{ color: accent }}>
           <input

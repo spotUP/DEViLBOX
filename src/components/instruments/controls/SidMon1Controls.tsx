@@ -106,7 +106,7 @@ export const SidMon1Controls: React.FC<SidMon1ControlsProps> = ({ config, onChan
     return chipEditorRef.current;
   }, []);
 
-  const { isCyan, accent, knob, dim, panelBg } = useInstrumentColors('#44aaff', { knob: '#66bbff', dim: '#001833' });
+  const { isCyan, accent, knob, dim, panelBg, panelStyle } = useInstrumentColors('#44aaff', { knob: '#66bbff', dim: '#001833' });
 
   const upd = useCallback(<K extends keyof SidMon1Config>(key: K, value: SidMon1Config[K]) => {
     onChange({ [key]: value } as Partial<SidMon1Config>);
@@ -131,7 +131,7 @@ export const SidMon1Controls: React.FC<SidMon1ControlsProps> = ({ config, onChan
     <div className="flex flex-col gap-3 p-3 overflow-y-auto" style={{ maxHeight: 'calc(100vh - 280px)' }}>
 
       {/* ADSR Envelope */}
-      <div className={`rounded-lg border p-3 ${panelBg}`}>
+      <div className={`rounded-lg border p-3 ${panelBg}`} style={panelStyle}>
         <SectionLabel color={accent} label="ADSR Envelope" />
         <div className="mb-3">
           <EnvelopeVisualization
@@ -179,7 +179,7 @@ export const SidMon1Controls: React.FC<SidMon1ControlsProps> = ({ config, onChan
       </div>
 
       {/* Phase Oscillator */}
-      <div className={`rounded-lg border p-3 ${panelBg}`}>
+      <div className={`rounded-lg border p-3 ${panelBg}`} style={panelStyle}>
         <SectionLabel color={accent} label="Phase Oscillator" />
         <div className="flex gap-4 items-center">
           <Knob value={config.phaseShift ?? 0} min={0} max={255} step={1}
@@ -195,7 +195,7 @@ export const SidMon1Controls: React.FC<SidMon1ControlsProps> = ({ config, onChan
       </div>
 
       {/* Tuning */}
-      <div className={`rounded-lg border p-3 ${panelBg}`}>
+      <div className={`rounded-lg border p-3 ${panelBg}`} style={panelStyle}>
         <SectionLabel color={accent} label="Tuning" />
         <div className="flex gap-4 items-center">
           <Knob value={config.finetune ?? 0} min={0} max={1005} step={67}
@@ -247,7 +247,7 @@ export const SidMon1Controls: React.FC<SidMon1ControlsProps> = ({ config, onChan
 
   const renderArpeggio = () => (
     <div className="flex flex-col gap-3 p-3" style={{ height: 'calc(100vh - 280px)' }}>
-      <div className={`rounded-lg border p-3 ${panelBg} flex flex-col`} style={{ flex: 1, minHeight: 0 }}>
+      <div className={`rounded-lg border p-3 ${panelBg} flex flex-col`} style={{ ...panelStyle, flex: 1, minHeight: 0 }}>
         <SectionLabel color={accent} label="Arpeggio (16 steps, unsigned byte)" />
         <div style={{ flex: 1, minHeight: 120 }}>
           <PatternEditorCanvas
@@ -315,7 +315,7 @@ export const SidMon1Controls: React.FC<SidMon1ControlsProps> = ({ config, onChan
     <div className="flex flex-col gap-3 p-3" style={{ height: 'calc(100vh - 280px)' }}>
 
       {/* Main Wave */}
-      <div className={`rounded-lg border p-3 ${panelBg} flex flex-col`} style={{ flex: 1, minHeight: 0 }}>
+      <div className={`rounded-lg border p-3 ${panelBg} flex flex-col`} style={{ ...panelStyle, flex: 1, minHeight: 0 }}>
         <SectionLabel color={accent} label="Main Wave (32 bytes, signed)" />
         <div style={{ flex: 1, minHeight: 120 }}>
           <PatternEditorCanvas
@@ -330,7 +330,7 @@ export const SidMon1Controls: React.FC<SidMon1ControlsProps> = ({ config, onChan
       </div>
 
       {/* Phase Wave */}
-      <div className={`rounded-lg border p-3 ${panelBg} flex flex-col`} style={{ flex: 1, minHeight: 0 }}>
+      <div className={`rounded-lg border p-3 ${panelBg} flex flex-col`} style={{ ...panelStyle, flex: 1, minHeight: 0 }}>
         <SectionLabel color={accent} label="Phase Wave (32 bytes, signed)" />
         <div style={{ flex: 1, minHeight: 120 }}>
           <PatternEditorCanvas

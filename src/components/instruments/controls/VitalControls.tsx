@@ -107,7 +107,7 @@ export const VitalControls: React.FC<VitalControlsProps> = ({
   const [synthReady, setSynthReady] = useState(false);
   const synthRef = useRef<VSTBridgeSynth | null>(null);
 
-  const { isCyan: isCyanTheme, accent: accentColor, knob: knobColor } = useInstrumentColors('#b84eff');
+  const { isCyan: isCyanTheme, accent: accentColor, knob: knobColor, panelBg, panelStyle } = useInstrumentColors('#b84eff');
 
   // Connect to the VSTBridge synth
   useEffect(() => {
@@ -178,9 +178,6 @@ export const VitalControls: React.FC<VitalControlsProps> = ({
     );
   }
 
-  const panelBg = isCyanTheme
-    ? 'bg-[#051515] border-accent-highlight/20'
-    : 'bg-[#1a1a1a] border-purple-900/30';  // custom border, not using hook panelBg
 
   const tabBarBg = isCyanTheme ? 'bg-[#061818]' : 'bg-[#111]';
 
@@ -209,7 +206,7 @@ export const VitalControls: React.FC<VitalControlsProps> = ({
         {activeTab === 'osc' && (
           <>
             {[1, 2, 3].map(n => (
-              <div key={n} className={`p-2 rounded-lg border border-dark-border ${panelBg}`}>
+              <div key={n} className={`p-2 rounded-lg border ${panelBg}`} style={panelStyle}>
                 <h3 className="font-bold uppercase tracking-tight text-sm mb-3" style={{ color: accentColor }}>
                   Oscillator {n}
                 </h3>
@@ -236,7 +233,7 @@ export const VitalControls: React.FC<VitalControlsProps> = ({
         {activeTab === 'filter' && (
           <>
             {[1, 2].map(n => (
-              <div key={n} className={`p-2 rounded-lg border border-dark-border ${panelBg}`}>
+              <div key={n} className={`p-2 rounded-lg border ${panelBg}`} style={panelStyle}>
                 <h3 className="font-bold uppercase tracking-tight text-sm mb-3" style={{ color: accentColor }}>
                   Filter {n}
                 </h3>
@@ -254,7 +251,7 @@ export const VitalControls: React.FC<VitalControlsProps> = ({
                 </div>
               </div>
             ))}
-            <div className={`p-2 rounded-lg border border-dark-border ${panelBg}`}>
+            <div className={`p-2 rounded-lg border ${panelBg}`} style={panelStyle}>
               <h3 className="font-bold uppercase tracking-tight text-sm mb-3" style={{ color: accentColor }}>
                 FX Filter
               </h3>
@@ -272,7 +269,7 @@ export const VitalControls: React.FC<VitalControlsProps> = ({
         {activeTab === 'env' && (
           <>
             {[1, 2, 3, 4, 5, 6].map(n => (
-              <div key={n} className={`p-2 rounded-lg border border-dark-border ${panelBg}`}>
+              <div key={n} className={`p-2 rounded-lg border ${panelBg}`} style={panelStyle}>
                 <h3 className="font-bold uppercase tracking-tight text-sm mb-3" style={{ color: accentColor }}>
                   Envelope {n} {n === 1 ? '(Amp)' : n === 2 ? '(Filter)' : ''}
                 </h3>
@@ -306,6 +303,7 @@ export const VitalControls: React.FC<VitalControlsProps> = ({
             knobColor={knobColor}
             accentColor={accentColor}
             panelBg={panelBg}
+            panelStyle={panelStyle}
           />
         )}
 
@@ -321,7 +319,7 @@ export const VitalControls: React.FC<VitalControlsProps> = ({
               { name: 'phaser', label: 'Phaser', params: ['phaser_frequency', 'phaser_feedback', 'phaser_center', 'phaser_dry_wet', 'phaser_mod_depth'] },
               { name: 'eq', label: 'EQ', params: ['eq_low_cutoff', 'eq_low_gain', 'eq_band_cutoff', 'eq_band_gain', 'eq_high_cutoff', 'eq_high_gain'] },
             ].map(fx => (
-              <div key={fx.name} className={`p-2 rounded-lg border border-dark-border ${panelBg}`}>
+              <div key={fx.name} className={`p-2 rounded-lg border ${panelBg}`} style={panelStyle}>
                 <div className="flex items-center gap-3 mb-3">
                   <ToggleButton
                     name={`${fx.name}_on`}
@@ -359,7 +357,7 @@ export const VitalControls: React.FC<VitalControlsProps> = ({
         )}
 
         {activeTab === 'master' && (
-          <div className={`p-2 rounded-lg border border-dark-border ${panelBg}`}>
+          <div className={`p-2 rounded-lg border ${panelBg}`} style={panelStyle}>
             <h3 className="font-bold uppercase tracking-tight text-sm mb-3" style={{ color: accentColor }}>
               Master
             </h3>
@@ -394,6 +392,7 @@ export const VitalControls: React.FC<VitalControlsProps> = ({
             knobColor={knobColor}
             accentColor={accentColor}
             panelBg={panelBg}
+            panelStyle={panelStyle}
           />
         )}
       </div>
@@ -412,10 +411,11 @@ interface LfoTabContentProps {
   knobColor: string;
   accentColor: string;
   panelBg: string;
+  panelStyle: React.CSSProperties;
 }
 
 const LfoTabContent: React.FC<LfoTabContentProps> = ({
-  paramByName, paramValues, setParam, knobColor, accentColor, panelBg,
+  paramByName, paramValues, setParam, knobColor, accentColor, panelBg, panelStyle,
 }) => {
   const [activeLfo, setActiveLfo] = useState(1);
 
@@ -444,7 +444,7 @@ const LfoTabContent: React.FC<LfoTabContentProps> = ({
         ))}
       </div>
 
-      <div className={`p-2 rounded-lg border border-dark-border ${panelBg}`}>
+      <div className={`p-2 rounded-lg border ${panelBg}`} style={panelStyle}>
         <h3 className="font-bold uppercase tracking-tight text-sm mb-3" style={{ color: accentColor }}>
           LFO {activeLfo}
         </h3>
@@ -517,16 +517,17 @@ interface OtherParamsTabProps {
   knobColor: string;
   accentColor: string;
   panelBg: string;
+  panelStyle: React.CSSProperties;
 }
 
 const OtherParamsTab: React.FC<OtherParamsTabProps> = ({
-  allParams, paramValues, setParam, knobColor, accentColor, panelBg,
+  allParams, paramValues, setParam, knobColor, accentColor, panelBg, panelStyle,
 }) => {
   const uncategorized = allParams.filter(p => !isParamCategorized(p.name));
 
   if (uncategorized.length === 0) {
     return (
-      <div className={`p-2 rounded-lg border border-dark-border ${panelBg}`}>
+      <div className={`p-2 rounded-lg border ${panelBg}`} style={panelStyle}>
         <p className="text-sm text-text-muted">All parameters are shown in the categorized tabs.</p>
       </div>
     );
@@ -542,13 +543,13 @@ const OtherParamsTab: React.FC<OtherParamsTabProps> = ({
 
   return (
     <>
-      <div className={`p-3 rounded-lg border border-dark-border ${panelBg}`}>
+      <div className={`p-3 rounded-lg border ${panelBg}`} style={panelStyle}>
         <p className="text-xs text-text-muted mb-1">
           {uncategorized.length} additional parameters not shown in other tabs
         </p>
       </div>
       {Array.from(groups.entries()).map(([prefix, params]) => (
-        <div key={prefix} className={`p-2 rounded-lg border border-dark-border ${panelBg}`}>
+        <div key={prefix} className={`p-2 rounded-lg border ${panelBg}`} style={panelStyle}>
           <h3 className="font-bold uppercase tracking-tight text-sm mb-3" style={{ color: accentColor }}>
             {prefix.replace(/_/g, ' ')}
           </h3>

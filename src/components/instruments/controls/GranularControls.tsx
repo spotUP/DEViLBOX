@@ -15,7 +15,7 @@ export const GranularControls: React.FC<GranularControlsProps> = ({
   const configRef = useRef(config);
   useEffect(() => { configRef.current = config; }, [config]);
 
-  const { isCyan: isCyanTheme, accent: accentColor, knob: knobColor, panelBg } = useInstrumentColors('#a78bfa');
+  const { isCyan: isCyanTheme, accent: accentColor, knob: knobColor, panelBg, panelStyle } = useInstrumentColors('#a78bfa');
   const knobColor2 = isCyanTheme ? '#00cccc' : '#8b5cf6';
   const knobColor3 = isCyanTheme ? '#009999' : '#7c3aed';
   const knobColorEnv = isCyanTheme ? '#00aaaa' : '#c4b5fd';
@@ -36,7 +36,7 @@ export const GranularControls: React.FC<GranularControlsProps> = ({
   return (
     <div className="synth-controls-flow flex-1 overflow-y-auto p-4 flex flex-col gap-4">
       {/* Sample URL display */}
-      <div className={`p-3 rounded-xl border border-dark-border ${panelBg}`}>
+      <div className={`p-3 rounded-xl border ${panelBg}`} style={panelStyle}>
         <p className="text-[10px] font-bold text-text-muted uppercase tracking-wide mb-1">Sample</p>
         <div className="text-xs text-text-secondary truncate font-mono">
           {config.sampleUrl || '(no sample loaded)'}
@@ -44,7 +44,7 @@ export const GranularControls: React.FC<GranularControlsProps> = ({
       </div>
 
       {/* Grain Section */}
-      <div className={`p-2 rounded-lg border border-dark-border ${panelBg}`}>
+      <div className={`p-2 rounded-lg border ${panelBg}`} style={panelStyle}>
         <p className="text-xs font-bold uppercase tracking-wide mb-3" style={{ color: accentColor }}>Grain</p>
         <div className="flex flex-wrap items-end gap-4">
           <Knob
@@ -70,7 +70,7 @@ export const GranularControls: React.FC<GranularControlsProps> = ({
             className={`px-3 py-2 rounded text-xs font-bold transition-all ${
               config.reverse
                 ? 'bg-purple-500/20 border border-purple-500 text-purple-400'
-                : 'bg-dark-bgTertiary border border-dark-borderLight text-text-secondary hover:border-dark-borderLight'
+                : 'bg-dark-bgTertiary borderLight text-text-secondary hover:border-dark-borderLight'
             }`}
           >
             REV
@@ -79,7 +79,7 @@ export const GranularControls: React.FC<GranularControlsProps> = ({
       </div>
 
       {/* Playback Section */}
-      <div className={`p-2 rounded-lg border border-dark-border ${panelBg}`}>
+      <div className={`p-2 rounded-lg border ${panelBg}`} style={panelStyle}>
         <p className="text-xs font-bold uppercase tracking-wide mb-3" style={{ color: accentColor }}>Playback</p>
         <div className="flex flex-wrap items-end gap-4">
           <Knob
@@ -110,7 +110,7 @@ export const GranularControls: React.FC<GranularControlsProps> = ({
       </div>
 
       {/* Random Section */}
-      <div className={`p-2 rounded-lg border border-dark-border ${panelBg}`}>
+      <div className={`p-2 rounded-lg border ${panelBg}`} style={panelStyle}>
         <p className="text-xs font-bold uppercase tracking-wide mb-3" style={{ color: accentColor }}>Random</p>
         <div className="flex flex-wrap items-end gap-4">
           <Knob
@@ -129,7 +129,7 @@ export const GranularControls: React.FC<GranularControlsProps> = ({
       </div>
 
       {/* Grain Envelope Section */}
-      <div className={`p-2 rounded-lg border border-dark-border ${panelBg}`}>
+      <div className={`p-2 rounded-lg border ${panelBg}`} style={panelStyle}>
         <p className="text-xs font-bold uppercase tracking-wide mb-3" style={{ color: accentColor }}>Grain Envelope</p>
         <div className="flex flex-wrap items-end gap-4">
           <Knob
@@ -148,7 +148,7 @@ export const GranularControls: React.FC<GranularControlsProps> = ({
       </div>
 
       {/* Filter Section */}
-      <div className={`p-2 rounded-lg border border-dark-border ${panelBg}`}>
+      <div className={`p-2 rounded-lg border ${panelBg}`} style={panelStyle}>
         <p className="text-xs font-bold uppercase tracking-wide mb-3" style={{ color: accentColor }}>Filter</p>
         <div className="flex flex-col gap-3">
           <div className="flex gap-2">
