@@ -1082,10 +1082,37 @@ export const FURNACE_PRESETS: InstrumentPreset['config'][] = [
   },
 
   // ============================================
-  // OPLL (MSX, VRC7)
+  // OPLL (MSX, VRC7) — hardware built-in instrument presets
   // ============================================
+  ...[
+    'OPLL Violin', 'OPLL Guitar', 'OPLL Piano', 'OPLL Flute',
+    'OPLL Clarinet', 'OPLL Oboe', 'OPLL Trumpet', 'OPLL Organ',
+    'OPLL Horn', 'OPLL Synth', 'OPLL Harpsichord', 'OPLL Vibraphone',
+    'OPLL Synth Bass', 'OPLL Wood Bass', 'OPLL Electric Bass',
+  ].map((name, i) => ({
+    name,
+    type: 'synth' as const,
+    synthType: 'FurnaceOPLL' as const,
+    volume: -10,
+    pan: 0,
+    effects: [] as never[],
+    furnace: {
+      chipType: 9,
+      opllPreset: i + 1, // 1-15 (0 = custom)
+      algorithm: 0,
+      feedback: 0,
+      operators: [
+        op({ mult: 1, tl: 0, ar: 15, dr: 5, sl: 5, rr: 5 }),
+        op({ mult: 1, tl: 0, ar: 15, dr: 5, sl: 5, rr: 5 }),
+        disabledOp(),
+        disabledOp(),
+      ],
+      macros: [] as never[], opMacros: [] as never[], wavetables: [] as never[],
+    },
+  })),
+  // OPLL Custom (user-defined FM operators)
   {
-    name: 'OPLL Piano',
+    name: 'OPLL Custom FM',
     type: 'synth',
     synthType: 'FurnaceOPLL',
     volume: -10,
@@ -1093,6 +1120,7 @@ export const FURNACE_PRESETS: InstrumentPreset['config'][] = [
     effects: [],
     furnace: {
       chipType: 9,
+      opllPreset: 0,
       algorithm: 0,
       feedback: 2,
       operators: [
