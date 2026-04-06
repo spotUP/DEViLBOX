@@ -89,8 +89,11 @@ export const FCControls: React.FC<FCControlsProps> = ({ config, onChange, uadeCh
    * are encoded as FC vol-envelope opcodes and written as a block to byte[5..63]
    * via updADSRWithChipRam(). See encodeFCVolEnvelope() in chipRamEncoders.ts.
    *
-   * Note: arpTable/synthTable changes require writing separate arp/synth macro
-   * regions (not part of the 64-byte vol macro) — not yet implemented.
+   * Note: arpTable/synthTable changes are written to a separate freq macro
+   * region (sections.freqMacros + freqMacroIdx*64) via writeFreqMacroToChipRam
+   * below — they are NOT part of the 64-byte vol macro. The freqMacroIdx is
+   * read from vol macro byte[1] at write time so we always target the
+   * instrument's actual freq macro.
    */
   const updWithChipRam = useCallback(
     (key: keyof FCConfig, value: FCConfig[keyof FCConfig], byteOffset: number) => {

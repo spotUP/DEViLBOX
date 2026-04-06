@@ -8,12 +8,40 @@
  */
 
 import React, { useRef, useEffect, useCallback, useState, useMemo } from 'react';
-import type { SonicArrangerConfig } from '@/types/instrument';
+import type { SonicArrangerConfig, UADEChipRamInfo } from '@/types/instrument';
 import type { ColumnDef, FormatChannel, FormatCell, OnCellChange } from '@/components/shared/format-editor-types';
 import { PatternEditorCanvas } from '@/components/tracker/PatternEditorCanvas';
 import { Knob } from '@components/controls/Knob';
 import { useInstrumentColors } from '@/hooks/useInstrumentColors';
 import { SectionLabel, WaveformLineCanvas, BarChart } from '@components/instruments/shared';
+import { UADEChipEditor } from '@/engine/uade/UADEChipEditor';
+import { UADEEngine } from '@/engine/uade/UADEEngine';
+
+// SA instrument struct byte offsets (from SonicArrangerParser.ts file header).
+// All multi-byte fields are uint16 big-endian unless noted.
+const SA_OFFSET: Record<string, number> = {
+  volume:         16,  // u16
+  fineTuning:     18,  // i16
+  portamentoSpeed:20,
+  vibratoDelay:   22,
+  vibratoSpeed:   24,
+  vibratoLevel:   26,
+  amfNumber:      28,
+  amfDelay:       30,
+  amfLength:      32,
+  amfRepeat:      34,
+  adsrNumber:     36,
+  adsrDelay:      38,
+  adsrLength:     40,
+  adsrRepeat:     42,
+  sustainPoint:   44,
+  sustainDelay:   46,
+  effectArg1:     64,
+  effect:         66,
+  effectArg2:     68,
+  effectArg3:     70,
+  effectDelay:    72,
+};
 
 // ── Adapter helpers ─────────────────────────────────────────────────────────
 
@@ -128,6 +156,8 @@ function makeTableCellChange(
 interface SonicArrangerControlsProps {
   config: SonicArrangerConfig;
   onChange: (updates: Partial<SonicArrangerConfig>) => void;
+  /** Present when this instrument was loaded via UADE's native SA parser. */
+  uadeChipRam?: UADEChipRamInfo;
 }
 
 type SATab = 'synthesis' | 'envelope' | 'modulation';
@@ -178,17 +208,36 @@ function arg3Label(mode: number): string {
 export const SonicArrangerControls: React.FC<SonicArrangerControlsProps> = ({
   config,
   onChange,
+  uadeChipRam,
 }) => {
   const [activeTab, setActiveTab] = useState<SATab>('synthesis');
 
   const configRef = useRef(config);
   useEffect(() => { configRef.current = config; }, [config]);
 
+  const chipEditorRef = useRef<UADEChipEditor | null>(null);
+  const getEditor = useCallback(() => {
+    if (!chipEditorRef.current) {
+      chipEditorRef.current = new UADEChipEditor(UADEEngine.getInstance());
+    }
+    return chipEditorRef.current;
+  }, []);
+
   const { isCyan, accent, knob, dim, panelBg, panelStyle } = useInstrumentColors('#ff8844', { knob: '#ffaa66', dim: '#331a00' });
 
   const updateParam = useCallback((key: keyof SonicArrangerConfig, value: number) => {
     onChange({ ...configRef.current, [key]: value });
-  }, [onChange]);
+    // Mirror to UADE chip RAM as a u16BE write at the SA instrument struct offset
+    // for this parameter, when an SA instrument was loaded via UADE.
+    if (uadeChipRam && SA_OFFSET[key as string] !== undefined && UADEEngine.hasInstance()) {
+      const off = SA_OFFSET[key as string];
+      const addr = uadeChipRam.instrBase + off;
+      // fineTuning is signed; the rest are unsigned. writeU16 stores both correctly
+      // because we mask to & 0xFFFF before splitting into bytes.
+      const u = (value < 0 ? value + 0x10000 : value) & 0xFFFF;
+      void getEditor().writeU16(addr, u).catch((err) => console.warn('SA chip RAM write failed:', err));
+    }
+  }, [onChange, uadeChipRam, getEditor]);
 
   // ── Memoized format channels + cell-change handlers ────────────────────────
 
