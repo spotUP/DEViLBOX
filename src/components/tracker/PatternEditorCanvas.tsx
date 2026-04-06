@@ -234,6 +234,8 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
   } = usePatternEditor();
 
   const moveCursorToChannelAndColumn = useCursorStore((s) => s.moveCursorToChannelAndColumn);
+  // Subscribe to active channel index so headers re-render when cursor moves channels
+  const activeChannelIndex = useCursorStore((s) => s.cursor.channelIndex);
   const mobileChannelIndex = cursorRef.current.channelIndex;
 
   const { instruments } = useInstrumentStore(useShallow((state) => ({
@@ -2800,6 +2802,12 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
                       const channel = ch.isPatternChannel ? pattern?.channels[idx] : undefined;
                       const isCollapsed = channel?.collapsed;
                       const channelWidth = channelWidths[idx];
+                      const isActive = idx === activeChannelIndex;
+                      const accentColor = channel?.color || 'var(--color-accent)';
+                      // Stack box-shadows: left stripe (existing) + bottom border when active
+                      const shadowParts: string[] = [];
+                      if (channel?.color) shadowParts.push(`inset 2px 0 0 ${channel.color}`);
+                      if (isActive) shadowParts.push(`inset 0 -3px 0 ${accentColor}`);
 
                       return (
                         <div
@@ -2811,7 +2819,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
                           style={{
                             width: channelWidth,
                             backgroundColor: channel?.color ? `${channel.color}15` : undefined,
-                            boxShadow: channel?.color ? `inset 2px 0 0 ${channel.color}` : undefined,
+                            boxShadow: shadowParts.length > 0 ? shadowParts.join(', ') : undefined,
                           }}
                         >
                           {/* Pattern channel: full controls */}
@@ -2999,6 +3007,12 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
                     const channelWidth = channelWidths[idx];
 
                     const isCollapsed = channel.collapsed;
+                    const isActive = idx === activeChannelIndex;
+                    const accentColor = channel.color || 'var(--color-accent)';
+                    // Stack box-shadows: left stripe (existing) + bottom border when active
+                    const shadowParts: string[] = [];
+                    if (channel.color) shadowParts.push(`inset 2px 0 0 ${channel.color}`);
+                    if (isActive) shadowParts.push(`inset 0 -3px 0 ${accentColor}`);
 
                     return (
                       <div
@@ -3010,7 +3024,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
                         style={{
                           width: channelWidth,
                           backgroundColor: channel.color ? `${channel.color}15` : undefined,
-                          boxShadow: channel.color ? `inset 2px 0 0 ${channel.color}` : undefined,
+                          boxShadow: shadowParts.length > 0 ? shadowParts.join(', ') : undefined,
                         }}
                       >
                         {!isCollapsed && (
