@@ -2,13 +2,6 @@
 	AudioWorklet: DrSnuggles
 */
 
-// Polyfill TextDecoder/TextEncoder for AudioWorklet context
-// (missing in worklet scope but required by newer Emscripten builds)
-if (typeof TextDecoder === 'undefined') {
-	globalThis.TextDecoder = class { decode(b) { return String.fromCharCode(...new Uint8Array(b)); } };
-	globalThis.TextEncoder = class { encode(s) { return new Uint8Array([...s].map(c => c.charCodeAt(0))); } };
-}
-
 import libopenmptPromise from './libopenmpt.worklet.js'
 
 // consts
