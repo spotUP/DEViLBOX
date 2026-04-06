@@ -779,100 +779,50 @@ export interface WAMConfig {
 }
 
 export interface V2Config {
+  voice?: {
+    panning?: number; transpose?: number; maxPoly?: number; boost?: number;
+    reverb?: number; delay?: number; auxASend?: number; auxBSend?: number;
+    auxARecv?: number; auxBRecv?: number; keySync?: number; fxRoute?: number;
+  };
   osc1: {
-    mode: number; // Off, Saw/Tri, Pulse, Sin, Noise, XX, AuxA, AuxB
-    transpose: number; // -64 to +63 (maps to 0-127)
-    detune: number;    // -64 to +63 (maps to 0-127)
-    color: number;     // 0-127
-    level: number;     // 0-127
+    mode: number; ringMod?: boolean;
+    transpose: number; detune: number; color: number; level: number;
   };
   osc2: {
-    mode: number; // !Off, Tri, Pul, Sin, Noi, FM, AuxA, AuxB
-    ringMod: boolean;
-    transpose: number;
-    detune: number;
-    color: number;
-    level: number;
+    mode: number; ringMod: boolean;
+    transpose: number; detune: number; color: number; level: number;
   };
   osc3: {
-    mode: number; // !Off, Tri, Pul, Sin, Noi, FM, AuxA, AuxB
-    ringMod: boolean;
-    transpose: number;
-    detune: number;
-    color: number;
-    level: number;
+    mode: number; ringMod: boolean;
+    transpose: number; detune: number; color: number; level: number;
   };
-  filter1: {
-    mode: number; // Off, Low, Band, High, Notch, All, MoogL, MoogH
-    cutoff: number; // 0-127
-    resonance: number; // 0-127
-  };
-  filter2: {
-    mode: number; // Off, Low, Band, High, Notch, All, MoogL, MoogH
-    cutoff: number; // 0-127
-    resonance: number; // 0-127
-  };
-  routing: {
-    mode: number; // single, serial, parallel
-    balance: number; // 0-127 (Filter 1 vs Filter 2)
-  };
+  filter1: { mode: number; cutoff: number; resonance: number };
+  filter2: { mode: number; cutoff: number; resonance: number };
+  routing: { mode: number; balance: number };
   envelope: {
-    attack: number; // 0-127
-    decay: number;  // 0-127
-    sustain: number; // 0-127
-    release: number; // 0-127
+    attack: number; decay: number; sustain: number; release: number;
+    sustainTime?: number; amplify?: number;
   };
   envelope2: {
-    attack: number;
-    decay: number;
-    sustain: number;
-    release: number;
+    attack: number; decay: number; sustain: number; release: number;
+    sustainTime?: number; amplify?: number;
   };
-  lfo1: {
-    rate: number;
-    depth: number;
-  };
-  voiceDistortion?: {
-    mode: number;    // 0-10: Off, Overdrive, Clip, Bitcrush, Decimate, LPF, BPF, HPF, Notch, Allpass, MoogL
-    inGain: number;  // 0-127
-    param1: number;  // 0-127 mode-specific
-    param2: number;  // 0-127 mode-specific
-  };
-  channelDistortion?: {
-    mode: number;    // 0-10
-    inGain: number;  // 0-127
-    param1: number;  // 0-127
-    param2: number;  // 0-127
-  };
+  lfo1: { rate: number; depth: number };
+  voiceDistortion?: { mode: number; inGain: number; param1: number; param2: number };
+  channelDistortion?: { mode: number; inGain: number; param1: number; param2: number };
   chorusFlanger?: {
-    amount: number;    // 0-127 wet/dry
-    feedback: number;  // 0-127
-    delayL: number;    // 1-127
-    delayR: number;    // 1-127
-    modRate: number;   // 0-127
-    modDepth: number;  // 0-127
-    modPhase: number;  // 0-127 stereo phase offset
+    amount: number; feedback: number; delayL: number; delayR: number;
+    modRate: number; modDepth: number; modPhase: number;
   };
   compressor?: {
-    mode: number;       // 0=Off, 1=Peak, 2=RMS
-    stereoLink: boolean;
-    autoGain: boolean;
-    lookahead: number;  // 0-10
-    threshold: number;  // 0-127
-    ratio: number;      // 0-127
-    attack: number;     // 0-127
-    release: number;    // 0-127
-    outGain: number;    // 0-127
+    mode: number; stereoLink: boolean; autoGain: boolean; lookahead: number;
+    threshold: number; ratio: number; attack: number; release: number; outGain: number;
   };
   lfo2?: {
-    mode: number;     // 0-4: Saw, Tri, Pulse, Sin, S&H
-    keySync: boolean;
-    envMode: boolean;
-    rate: number;     // 0-127
-    phase: number;    // 0-127
-    polarity: number; // 0-2: Pos, Neg, Bipolar
-    amplify: number;  // 0-127
+    mode: number; keySync: boolean; envMode: boolean; rate: number;
+    phase: number; polarity: number; amplify: number;
   };
+  modMatrix?: Array<{ source: number; amount: number; dest: number }>;
 }
 
 /**

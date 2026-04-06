@@ -711,20 +711,22 @@ function modSourceToNumber(source: V2ModSource): number {
 // Import types from tonejs — we can't import directly due to circular deps,
 // so we use a structural type for the input
 type V2ConfigInput = {
-  osc1?: { mode?: number; transpose?: number; detune?: number; color?: number; level?: number };
+  voice?: { panning?: number; transpose?: number; maxPoly?: number; boost?: number; reverb?: number; delay?: number; auxASend?: number; auxBSend?: number; auxARecv?: number; auxBRecv?: number; keySync?: number; fxRoute?: number };
+  osc1?: { mode?: number; ringMod?: boolean; transpose?: number; detune?: number; color?: number; level?: number };
   osc2?: { mode?: number; ringMod?: boolean; transpose?: number; detune?: number; color?: number; level?: number };
   osc3?: { mode?: number; ringMod?: boolean; transpose?: number; detune?: number; color?: number; level?: number };
   filter1?: { mode?: number; cutoff?: number; resonance?: number };
   filter2?: { mode?: number; cutoff?: number; resonance?: number };
   routing?: { mode?: number; balance?: number };
-  envelope?: { attack?: number; decay?: number; sustain?: number; release?: number };
-  envelope2?: { attack?: number; decay?: number; sustain?: number; release?: number };
+  envelope?: { attack?: number; decay?: number; sustain?: number; release?: number; sustainTime?: number; amplify?: number };
+  envelope2?: { attack?: number; decay?: number; sustain?: number; release?: number; sustainTime?: number; amplify?: number };
   lfo1?: { rate?: number; depth?: number; mode?: number; keySync?: boolean; envMode?: boolean; phase?: number; polarity?: number; amplify?: number };
   lfo2?: { mode?: number; keySync?: boolean; envMode?: boolean; rate?: number; phase?: number; polarity?: number; amplify?: number };
   voiceDistortion?: { mode?: number; inGain?: number; param1?: number; param2?: number };
   channelDistortion?: { mode?: number; inGain?: number; param1?: number; param2?: number };
   chorusFlanger?: { amount?: number; feedback?: number; delayL?: number; delayR?: number; modRate?: number; modDepth?: number; modPhase?: number };
   compressor?: { mode?: number; stereoLink?: boolean; autoGain?: boolean; lookahead?: number; threshold?: number; ratio?: number; attack?: number; release?: number; outGain?: number };
+  modMatrix?: Array<{ source: number; amount: number; dest: number }>;
 };
 
 const OSC_MODES: V2OscMode[] = ['off', 'saw', 'pulse', 'sin', 'noise', 'fm', 'auxA', 'auxB'];
@@ -734,6 +736,7 @@ const DIST_MODES: V2DistMode[] = ['off', 'overdrive', 'clip', 'bitcrush', 'decim
 const LFO_MODES: V2LFOMode[] = ['saw', 'tri', 'pulse', 'sin', 'sampleHold'];
 const LFO_POLARITIES: V2LFOPolarity[] = ['positive', 'negative', 'bipolar'];
 const COMP_MODES: Array<'off' | 'peak' | 'rms'> = ['off', 'peak', 'rms'];
+const MOD_SOURCES: V2ModSource[] = ['velocity', 'modulation', 'breath', 'ctl3', 'ctl4', 'ctl5', 'ctl6', 'volume', 'ampEG', 'eg2', 'lfo1', 'lfo2', 'note'];
 
 /**
  * Convert V2Config (UI/preset numeric format) to V2InstrumentConfig (full typed format).
@@ -751,14 +754,28 @@ export function v2ConfigToInstrument(cfg: V2ConfigInput): V2InstrumentConfig {
     return Math.max(0, Math.min(127, v + 64));
   };
 
+  const KEY_SYNCS: V2KeySync[] = ['none', 'osc', 'full'];
+
   return {
     voice: {
       ...d.voice,
+      panning: cfg.voice?.panning !== undefined ? toUnsigned(cfg.voice.panning, d.voice.panning) : d.voice.panning,
+      transpose: cfg.voice?.transpose !== undefined ? toUnsigned(cfg.voice.transpose, d.voice.transpose) : d.voice.transpose,
       channelVolume: 127,
+      maxPoly: cfg.voice?.maxPoly ?? d.voice.maxPoly,
+      boost: cfg.voice?.boost ?? d.voice.boost,
+      reverb: cfg.voice?.reverb ?? d.voice.reverb,
+      delay: cfg.voice?.delay ?? d.voice.delay,
+      auxASend: cfg.voice?.auxASend ?? d.voice.auxASend,
+      auxBSend: cfg.voice?.auxBSend ?? d.voice.auxBSend,
+      auxARecv: cfg.voice?.auxARecv ?? d.voice.auxARecv,
+      auxBRecv: cfg.voice?.auxBRecv ?? d.voice.auxBRecv,
+      keySync: KEY_SYNCS[cfg.voice?.keySync ?? 0] ?? d.voice.keySync,
+      fxRoute: cfg.voice?.fxRoute === 1 ? 'chorusThenDist' as const : d.voice.fxRoute,
     },
     osc1: {
       mode: OSC_MODES[cfg.osc1?.mode ?? 1] ?? d.osc1.mode,
-      ringmod: false,
+      ringmod: cfg.osc1?.ringMod ?? false,
       transpose: toUnsigned(cfg.osc1?.transpose, d.osc1.transpose),
       detune: toUnsigned(cfg.osc1?.detune, d.osc1.detune),
       color: cfg.osc1?.color ?? d.osc1.color,
@@ -802,17 +819,17 @@ export function v2ConfigToInstrument(cfg: V2ConfigInput): V2InstrumentConfig {
       attack: cfg.envelope?.attack ?? d.ampEnvelope.attack,
       decay: cfg.envelope?.decay ?? d.ampEnvelope.decay,
       sustain: cfg.envelope?.sustain ?? d.ampEnvelope.sustain,
-      sustainTime: 64, // infinite
+      sustainTime: cfg.envelope?.sustainTime ?? 64,
       release: cfg.envelope?.release ?? d.ampEnvelope.release,
-      amplify: 0,
+      amplify: cfg.envelope?.amplify ?? 0,
     },
     modEnvelope: {
       attack: cfg.envelope2?.attack ?? d.modEnvelope.attack,
       decay: cfg.envelope2?.decay ?? d.modEnvelope.decay,
       sustain: cfg.envelope2?.sustain ?? d.modEnvelope.sustain,
-      sustainTime: 64,
+      sustainTime: cfg.envelope2?.sustainTime ?? 64,
       release: cfg.envelope2?.release ?? d.modEnvelope.release,
-      amplify: 64,
+      amplify: cfg.envelope2?.amplify ?? 64,
     },
     lfo1: {
       mode: LFO_MODES[cfg.lfo1?.mode ?? 1] ?? d.lfo1.mode,
@@ -858,8 +875,12 @@ export function v2ConfigToInstrument(cfg: V2ConfigInput): V2InstrumentConfig {
       release: cfg.compressor?.release ?? d.compressor.release,
       outGain: cfg.compressor?.outGain ?? d.compressor.outGain,
     },
-    modMatrix: [
-      ...d.modMatrix, // Keep default velocity/modwheel/volume routing
-    ],
+    modMatrix: cfg.modMatrix
+      ? cfg.modMatrix.map(m => ({
+          source: MOD_SOURCES[m.source] ?? 'velocity',
+          amount: m.amount,
+          dest: m.dest,
+        }))
+      : [...d.modMatrix],
   };
 }
