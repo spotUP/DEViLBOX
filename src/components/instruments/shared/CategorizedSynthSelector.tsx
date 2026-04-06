@@ -7,6 +7,7 @@ import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react'
 import { useInstrumentStore } from '@stores/useInstrumentStore';
 import { SYNTH_CATEGORIES, getSynthInfo, type SynthInfo } from '@constants/synthCategories';
 import type { SynthType, InstrumentConfig } from '@typedefs/instrument';
+import { ConfirmDialog } from '@/components/common/ConfirmDialog';
 
 // localStorage keys for persisting UI state
 const STORAGE_KEY_CATEGORY = 'devilbox-synth-selector-category';
@@ -56,6 +57,8 @@ export const CategorizedSynthSelector: React.FC<CategorizedSynthSelectorProps> =
   const currentInstrument = instruments.find(inst => inst.id === currentInstrumentId) || null;
   const [expandedCategory, setExpandedCategory] = useState<string | null>(null);
   const [hoveredSynth, setHoveredSynth] = useState<SynthType | null>(null);
+  const [compatWarning, setCompatWarning] = useState<{ synthType: SynthType; format: string } | null>(null);
+  const compatConfirmedRef = useRef(false);
 
   // Initialize state from localStorage for persistence
   const [searchQuery, setSearchQuery] = useState(() => {
@@ -212,21 +215,19 @@ export const CategorizedSynthSelector: React.FC<CategorizedSynthSelectorProps> =
     if (!currentInstrument) return;
 
     // Warn if replacing a sample with a synth on a native format song
-    if (currentInstrument.synthType === 'Sampler' || currentInstrument.synthType === 'Player') {
+    if (!compatConfirmedRef.current &&
+        (currentInstrument.synthType === 'Sampler' || currentInstrument.synthType === 'Player')) {
       try {
         const { getTrackerReplayer } = require('@engine/TrackerReplayer');
         const song = getTrackerReplayer().getSong();
         if (song) {
           const fmt = song.format?.toUpperCase() || 'native';
-          const confirmed = window.confirm(
-            `Replacing this sample with a synth breaks ${fmt} format compatibility.\n\n` +
-            `The song can no longer be saved as ${fmt} — save as .dbx instead.\n\n` +
-            `Continue?`
-          );
-          if (!confirmed) return;
+          setCompatWarning({ synthType, format: fmt });
+          return; // wait for user confirmation via ConfirmDialog
         }
       } catch { /* replayer not initialized */ }
     }
+    compatConfirmedRef.current = false;
 
     // Invalidate cached instrument so ToneEngine recreates it
     ToneEngine.getInstance().invalidateInstrument(currentInstrument.id);
@@ -578,6 +579,23 @@ export const CategorizedSynthSelector: React.FC<CategorizedSynthSelectorProps> =
           })()}
         </div>
       )}
+      {/* Format compatibility confirmation dialog */}
+      <ConfirmDialog
+        isOpen={!!compatWarning}
+        title="Format Compatibility Warning"
+        message={compatWarning
+          ? `Replacing this sample with a synth breaks ${compatWarning.format} format compatibility. The song can no longer be saved as ${compatWarning.format} — save as .dbx instead.`
+          : ''}
+        confirmLabel="Continue"
+        danger
+        onConfirm={() => {
+          if (compatWarning) {
+            compatConfirmedRef.current = true;
+            handleSelectSynth(compatWarning.synthType);
+          }
+        }}
+        onClose={() => setCompatWarning(null)}
+      />
     </div>
   );
 };
