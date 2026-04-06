@@ -24,44 +24,52 @@ function forwardReplayerMuteMask(channels: MixerChannelState[], isSoloing: boole
     const effectiveMute = isSoloing ? !channels[i].soloed : channels[i].muted;
     if (!effectiveMute) mask |= (1 << i);
   }
+  // Forward to TrackerReplayer (affects ToneEngine note triggering)
   try {
-    // Forward to TrackerReplayer (affects ToneEngine note triggering)
     const { getTrackerReplayer } = require('../engine/TrackerReplayer');
-    const replayer = getTrackerReplayer();
-    replayer.setChannelMuteMask(mask);
-  } catch {
-    // Replayer not initialized yet
-  }
-  try {
-    // Forward to UADE engine if active (uses Paula hardware mute mask)
-    const { UADEEngine } = require('../engine/uade/UADEEngine');
+    getTrackerReplayer().setChannelMuteMask(mask);
+  } catch { /* Replayer not initialized */ }
+  // Forward to UADE engine if active (uses Paula hardware mute mask)
+  import('../engine/uade/UADEEngine').then(({ UADEEngine }) => {
     if (UADEEngine.hasInstance()) {
       UADEEngine.getInstance().setMuteMask(mask & 0x0F);
     }
-  } catch {
-    // UADE not active
-  }
-  try {
-    // Forward to libopenmpt engine if active (DigiBooster, Symphonie, etc.)
-    const { LibopenmptEngine } = require('../engine/libopenmpt/LibopenmptEngine');
+  }).catch(() => {});
+  // Forward to libopenmpt engine if active (MOD/XM/IT/S3M)
+  // Use dynamic import() instead of require() — Vite ESM can return different
+  // module instances via require(), causing hasInstance() to check the wrong singleton.
+  import('../engine/libopenmpt/LibopenmptEngine').then(({ LibopenmptEngine }) => {
     if (LibopenmptEngine.hasInstance()) {
       LibopenmptEngine.getInstance().setMuteMask(mask);
     }
-  } catch {
-    // LibopenmptEngine not active
-  }
-  try {
-    // Forward to MusicLine engine if active (uses m_ChannelsOn bitfield)
-    const { MusicLineEngine } = require('../engine/musicline/MusicLineEngine');
+  }).catch(() => {});
+  // Forward to MusicLine engine if active (uses m_ChannelsOn bitfield)
+  import('../engine/musicline/MusicLineEngine').then(({ MusicLineEngine }) => {
     if (MusicLineEngine.hasInstance()) {
       const ml = MusicLineEngine.getInstance();
       for (let ch = 0; ch < 8; ch++) {
         ml.setChannelOn(ch, (mask & (1 << ch)) !== 0);
       }
     }
-  } catch {
-    // MusicLineEngine not active
-  }
+  }).catch(() => {});
+  // Forward to Hively engine if active (per-channel gain)
+  import('../engine/hively/HivelyEngine').then(({ HivelyEngine }) => {
+    if (HivelyEngine.hasInstance()) {
+      const hv = HivelyEngine.getInstance();
+      for (let ch = 0; ch < 16; ch++) {
+        hv.setChannelGain(ch, (mask & (1 << ch)) !== 0 ? 1.0 : 0.0);
+      }
+    }
+  }).catch(() => {});
+  // Forward to Klystrack engine if active (per-channel gain)
+  import('../engine/klystrack/KlysEngine').then(({ KlysEngine }) => {
+    if (KlysEngine.hasInstance()) {
+      const kl = KlysEngine.getInstance();
+      for (let ch = 0; ch < 32; ch++) {
+        kl.setChannelGain(ch, (mask & (1 << ch)) !== 0 ? 1.0 : 0.0);
+      }
+    }
+  }).catch(() => {});
 }
 
 // ── SunVox mute bridge ─────────────────────────────────────────────────────
