@@ -43,6 +43,7 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({
 }) => {
   const menuRef = useRef<HTMLDivElement>(null);
   const [adjustedPosition, setAdjustedPosition] = useState(position);
+  const [maxHeight, setMaxHeight] = useState<number | null>(null);
   const [activeSubmenu, setActiveSubmenu] = useState<string | null>(null);
   const [submenuPosition, setSubmenuPosition] = useState<{ x: number; y: number } | null>(null);
   const submenuTimerRef = useRef<NodeJS.Timeout | null>(null);
@@ -55,25 +56,33 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({
     const rect = menu.getBoundingClientRect();
     const viewportWidth = window.innerWidth;
     const viewportHeight = window.innerHeight;
+    const VIEWPORT_PADDING = 10;
+    const availableHeight = viewportHeight - VIEWPORT_PADDING * 2;
 
     let x = position.x;
     let y = position.y;
 
     // Adjust horizontal position
-    if (x + rect.width > viewportWidth - 10) {
-      x = viewportWidth - rect.width - 10;
+    if (x + rect.width > viewportWidth - VIEWPORT_PADDING) {
+      x = viewportWidth - rect.width - VIEWPORT_PADDING;
     }
-    if (x < 10) x = 10;
+    if (x < VIEWPORT_PADDING) x = VIEWPORT_PADDING;
 
-    // Adjust vertical position
-    if (y + rect.height > viewportHeight - 10) {
-      y = viewportHeight - rect.height - 10;
+    // If menu is taller than the viewport, cap its height and let it scroll;
+    // otherwise just shift it up so the bottom fits.
+    let cappedMaxHeight: number | null = null;
+    if (rect.height > availableHeight) {
+      cappedMaxHeight = availableHeight;
+      y = VIEWPORT_PADDING;
+    } else if (y + rect.height > viewportHeight - VIEWPORT_PADDING) {
+      y = viewportHeight - rect.height - VIEWPORT_PADDING;
     }
-    if (y < 10) y = 10;
+    if (y < VIEWPORT_PADDING) y = VIEWPORT_PADDING;
 
     // Deferred to avoid cascading renders in effect
     const frame = requestAnimationFrame(() => {
       setAdjustedPosition({ x, y });
+      setMaxHeight(cappedMaxHeight);
     });
     return () => cancelAnimationFrame(frame);
   }, [position]);
@@ -154,6 +163,8 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({
       style={{
         left: adjustedPosition?.x ?? position.x,
         top: adjustedPosition?.y ?? position.y,
+        maxHeight: maxHeight ?? undefined,
+        overflowY: maxHeight !== null ? 'auto' : undefined,
       }}
       onMouseEnter={handleMouseEnterSubmenu}
     >
