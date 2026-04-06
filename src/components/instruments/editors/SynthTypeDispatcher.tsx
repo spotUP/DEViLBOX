@@ -1648,6 +1648,7 @@ export const SynthTypeDispatcher: React.FC<SynthTypeDispatcherProps> = ({
 
                     <PresetDropdown
                       synthType={instrument.synthType}
+                      currentPresetName={instrument.name}
                       onChange={handleChange}
                     />
                   </div>
@@ -1729,6 +1730,7 @@ export const SynthTypeDispatcher: React.FC<SynthTypeDispatcherProps> = ({
 
                   <PresetDropdown
                     synthType={instrument.synthType}
+                    currentPresetName={instrument.name}
                     onChange={handleChange}
                   />
                 </div>
@@ -1796,6 +1798,7 @@ export const SynthTypeDispatcher: React.FC<SynthTypeDispatcherProps> = ({
 
                   <PresetDropdown
                     synthType={instrument.synthType}
+                    currentPresetName={instrument.name}
                     onChange={handleChange}
                   />
                 </div>
@@ -1863,6 +1866,7 @@ export const SynthTypeDispatcher: React.FC<SynthTypeDispatcherProps> = ({
 
                   <PresetDropdown
                     synthType={instrument.synthType}
+                    currentPresetName={instrument.name}
                     onChange={handleChange}
                   />
                 </div>
@@ -2227,6 +2231,7 @@ export const SynthTypeDispatcher: React.FC<SynthTypeDispatcherProps> = ({
 
                   <PresetDropdown
                     synthType={instrument.synthType}
+                    currentPresetName={instrument.name}
                     onChange={handleChange}
                   />
                 </div>
@@ -2758,6 +2763,7 @@ export const SynthTypeDispatcher: React.FC<SynthTypeDispatcherProps> = ({
 
                   <PresetDropdown
                     synthType={instrument.synthType}
+                    currentPresetName={instrument.name}
                     onChange={handleChange}
                   />
                 </div>
@@ -2849,6 +2855,7 @@ export const SynthTypeDispatcher: React.FC<SynthTypeDispatcherProps> = ({
 
                   <PresetDropdown
                     synthType={instrument.synthType}
+                    currentPresetName={instrument.name}
                     onChange={handleChange}
                   />
                 </div>
@@ -2939,6 +2946,7 @@ export const SynthTypeDispatcher: React.FC<SynthTypeDispatcherProps> = ({
 
                   <PresetDropdown
                     synthType={instrument.synthType}
+                    currentPresetName={instrument.name}
                     onChange={handleChange}
                   />
                 </div>
@@ -3029,6 +3037,7 @@ export const SynthTypeDispatcher: React.FC<SynthTypeDispatcherProps> = ({
 
                   <PresetDropdown
                     synthType={instrument.synthType}
+                    currentPresetName={instrument.name}
                     onChange={handleChange}
                   />
                 </div>
@@ -3119,6 +3128,7 @@ export const SynthTypeDispatcher: React.FC<SynthTypeDispatcherProps> = ({
 
                   <PresetDropdown
                     synthType={instrument.synthType}
+                    currentPresetName={instrument.name}
                     onChange={handleChange}
                   />
                 </div>
