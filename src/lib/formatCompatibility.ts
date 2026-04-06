@@ -28,6 +28,8 @@ export interface FormatConstraints {
   supportsGroove: boolean;
   bpmRange: [number, number];
   speedRange: [number, number];
+  /** Chip type for format-specific effect mappings (e.g., 'c64', 'ay', 'opn') */
+  chipType?: string;
 }
 
 export const FORMAT_LIMITS: Record<string, FormatConstraints> = {
@@ -133,6 +135,54 @@ export const FORMAT_LIMITS: Record<string, FormatConstraints> = {
     supportsPanning: false,
     supportsEnvelopes: false,
     supportsGroove: false,
+    bpmRange: [1, 255],
+    speedRange: [1, 255],
+  },
+  // ── Furnace chip-specific formats ──────────────────────────────────────
+  FUR_C64: {
+    name: 'FUR_C64',
+    chipType: 'c64',
+    maxChannels: 3,
+    maxPatterns: 256,
+    maxPatternLength: 256,
+    maxInstruments: 256,
+    maxPositions: 256,
+    maxSampleSize: 0,
+    sampleBitDepth: [],
+    supportsPanning: false,
+    supportsEnvelopes: true,
+    supportsGroove: true,
+    bpmRange: [1, 255],
+    speedRange: [1, 255],
+  },
+  FUR_AY: {
+    name: 'FUR_AY',
+    chipType: 'ay',
+    maxChannels: 3,
+    maxPatterns: 256,
+    maxPatternLength: 256,
+    maxInstruments: 256,
+    maxPositions: 256,
+    maxSampleSize: 0,
+    sampleBitDepth: [],
+    supportsPanning: false,
+    supportsEnvelopes: true,
+    supportsGroove: true,
+    bpmRange: [1, 255],
+    speedRange: [1, 255],
+  },
+  FUR_GENERIC: {
+    name: 'FUR_GENERIC',
+    maxChannels: 64,
+    maxPatterns: 256,
+    maxPatternLength: 256,
+    maxInstruments: 256,
+    maxPositions: 256,
+    maxSampleSize: Infinity,
+    sampleBitDepth: [8, 16],
+    supportsPanning: true,
+    supportsEnvelopes: true,
+    supportsGroove: true,
     bpmRange: [1, 255],
     speedRange: [1, 255],
   },

@@ -130,10 +130,252 @@ function writePanToVolumeColumn(cell: TrackerCell, panNorm: number): boolean {
   return true;
 }
 
+// ── Chip-Specific Effect Mappings ────────────────────────────────────────────
+
+/**
+ * C64/SID chip-specific Furnace effects.
+ *
+ * Effect numbers are Furnace-specific (not XM/IT):
+ *   0x10 = Set Waveform       0x11 = Coarse Cutoff     0x12 = Coarse Pulse Width
+ *   0x13 = Set Resonance      0x14 = Filter Mode       0x15 = Envelope Reset Time
+ *   0x20 = Attack/Decay       0x21 = Sustain/Release
+ *   0x22 = Pulse Width Slide Up   0x23 = Pulse Width Slide Down
+ *   0x24 = Cutoff Slide Up        0x25 = Cutoff Slide Down
+ *   0x30-0x3F = Fine Pulse Width (12-bit, spread across 16 effect values)
+ *   0x40-0x47 = Fine Cutoff (11-bit, spread across 8 effect values)
+ */
+function getC64EffectMapping(p: string, _format: FormatConstraints): EffectMapping | null {
+
+  // ── Pulse Width / Duty Cycle ──────────────────────────────────────────
+  // C64's signature parameter — normally unbakeable in generic formats!
+  if (p.includes('pulse') || p.includes('duty') || p.includes('fineduty') || p.includes('fine_duty')) {
+    return {
+      write: (cell, v, prevValue, fmt) => {
+        // 12-bit pulse width: 0-4095
+        // Use fine duty (0x30-0x3F): effect = 0x30 + high nibble, param = low byte
+        const pw = norm(v, 4095);
+
+        if (prevValue !== null && norm(prevValue, 4095) === pw) return true;
+
+        // Fine pulse width: 0x30 + ((pw >> 8) & 0x0F), param = pw & 0xFF
+        const hi = (pw >> 8) & 0x0F;
+        const lo = pw & 0xFF;
+        return writeEffect(cell, 0x30 + hi, lo, fmt);
+      },
+    };
+  }
+
+  // ── Filter Cutoff ─────────────────────────────────────────────────────
+  // C64 has 11-bit cutoff (0-2047)
+  if (p.includes('cutoff') || (p.includes('filter') && !p.includes('filterselect') && !p.includes('filtermode'))) {
+    return {
+      write: (cell, v, prevValue, fmt) => {
+        // 11-bit cutoff: 0-2047
+        // Use fine cutoff (0x40-0x47): effect = 0x40 + ((cutoff >> 8) & 0x07), param = cutoff & 0xFF
+        const cutoff = norm(v, 2047);
+
+        if (prevValue !== null && norm(prevValue, 2047) === cutoff) return true;
+
+        const hi = (cutoff >> 8) & 0x07;
+        const lo = cutoff & 0xFF;
+        return writeEffect(cell, 0x40 + hi, lo, fmt);
+      },
+    };
+  }
+
+  // ── Filter Resonance ──────────────────────────────────────────────────
+  // C64 resonance: 0-15 (4-bit), effect 0x13
+  if (p.includes('resonance') || p.includes('reso')) {
+    return {
+      write: (cell, v, prevValue, fmt) => {
+        const reso = norm(v, 15);
+
+        if (prevValue !== null && norm(prevValue, 15) === reso) return true;
+
+        // 0x13 = Set Resonance
+        return writeEffect(cell, 0x13, reso, fmt);
+      },
+    };
+  }
+
+  // ── Filter Mode ───────────────────────────────────────────────────────
+  // C64 filter mode bits: LP=1, BP=2, HP=4 (combinable), effect 0x14
+  if (p.includes('filtermode') || p.includes('filter_mode')) {
+    return {
+      write: (cell, v, prevValue, fmt) => {
+        // Map 0-1 to mode bits: 0=off, 1=LP, 2=BP, 3=LP+BP, 4=HP, 5=HP+LP, 6=HP+BP, 7=all
+        const mode = norm(v, 7);
+
+        if (prevValue !== null && norm(prevValue, 7) === mode) return true;
+
+        return writeEffect(cell, 0x14, mode, fmt);
+      },
+    };
+  }
+
+  // ── Waveform ──────────────────────────────────────────────────────────
+  // SID waveform bits: 0x10=TRI, 0x20=SAW, 0x40=PUL, 0x80=NOI, effect 0x10
+  if (p.includes('waveform') || p.includes('wave') || (p === 'furnace.duty' || p.endsWith('.duty'))) {
+    return {
+      write: (cell, v, prevValue, fmt) => {
+        // Map 0-1 to waveform bits (0-255)
+        const wave = norm(v, 255);
+
+        if (prevValue !== null && norm(prevValue, 255) === wave) return true;
+
+        // 0x10 = Set Waveform
+        return writeEffect(cell, 0x10, wave, fmt);
+      },
+    };
+  }
+
+  // ── Attack/Decay ──────────────────────────────────────────────────────
+  // ADSR upper byte: attack (high nibble) + decay (low nibble), effect 0x20
+  if (p.includes('attack') && p.includes('decay') || p === 'ad' || p.endsWith('.ad')) {
+    return {
+      write: (cell, v, prevValue, fmt) => {
+        const ad = norm(v, 255);
+        if (prevValue !== null && norm(prevValue, 255) === ad) return true;
+        return writeEffect(cell, 0x20, ad, fmt);
+      },
+    };
+  }
+
+  // ── Sustain/Release ───────────────────────────────────────────────────
+  // ADSR lower byte: sustain (high nibble) + release (low nibble), effect 0x21
+  if (p.includes('sustain') && p.includes('release') || p === 'sr' || p.endsWith('.sr')) {
+    return {
+      write: (cell, v, prevValue, fmt) => {
+        const sr = norm(v, 255);
+        if (prevValue !== null && norm(prevValue, 255) === sr) return true;
+        return writeEffect(cell, 0x21, sr, fmt);
+      },
+    };
+  }
+
+  // ── Pulse Width Slide ─────────────────────────────────────────────────
+  // Delta-based: 0x22 = slide up, 0x23 = slide down
+  if (p.includes('pwslide') || p.includes('pulse_slide') || p.includes('pulsewidthslide')) {
+    return {
+      write: (cell, v, prevValue, fmt) => {
+        if (prevValue === null) return true;
+        const delta = v - prevValue;
+        if (Math.abs(delta) < 0.002) return true;
+
+        const speed = Math.min(255, Math.round(Math.abs(delta) * 255));
+        if (speed === 0) return true;
+
+        return writeEffect(cell, delta > 0 ? 0x22 : 0x23, speed, fmt);
+      },
+    };
+  }
+
+  // ── Cutoff Slide ──────────────────────────────────────────────────────
+  // Delta-based: 0x24 = slide up, 0x25 = slide down
+  if (p.includes('cutoffslide') || p.includes('cutoff_slide') || p.includes('filterslide')) {
+    return {
+      write: (cell, v, prevValue, fmt) => {
+        if (prevValue === null) return true;
+        const delta = v - prevValue;
+        if (Math.abs(delta) < 0.002) return true;
+
+        const speed = Math.min(255, Math.round(Math.abs(delta) * 255));
+        if (speed === 0) return true;
+
+        return writeEffect(cell, delta > 0 ? 0x24 : 0x25, speed, fmt);
+      },
+    };
+  }
+
+  // ── Envelope Reset Time ───────────────────────────────────────────────
+  // Effect 0x15
+  if (p.includes('envreset') || p.includes('envelope_reset') || p.includes('resettime')) {
+    return {
+      write: (cell, v, prevValue, fmt) => {
+        const val = norm(v, 255);
+        if (prevValue !== null && norm(prevValue, 255) === val) return true;
+        return writeEffect(cell, 0x15, val, fmt);
+      },
+    };
+  }
+
+  return null; // fall through to generic mappings
+}
+
+/**
+ * AY-3-8910 / YM2149 chip-specific Furnace effects.
+ *
+ * Effect numbers:
+ *   0x12 = Set Duty (noise frequency)
+ *   0x20 = Set Envelope shape
+ *   0x21 = Set Envelope period low
+ *   0x22 = Set Envelope period high
+ *   0x23 = Set Envelope slide up
+ *   0x24 = Set Envelope slide down
+ */
+function getAYEffectMapping(p: string, _format: FormatConstraints): EffectMapping | null {
+
+  // ── Noise Frequency / Duty ────────────────────────────────────────────
+  if (p.includes('noise') || p.includes('duty')) {
+    return {
+      write: (cell, v, prevValue, fmt) => {
+        const noise = norm(v, 31); // AY noise period 0-31
+        if (prevValue !== null && norm(prevValue, 31) === noise) return true;
+        return writeEffect(cell, 0x12, noise, fmt);
+      },
+    };
+  }
+
+  // ── Envelope Shape ────────────────────────────────────────────────────
+  if (p.includes('envshape') || p.includes('envelope_shape')) {
+    return {
+      write: (cell, v, prevValue, fmt) => {
+        const shape = norm(v, 15); // AY envelope shapes 0-15
+        if (prevValue !== null && norm(prevValue, 15) === shape) return true;
+        return writeEffect(cell, 0x20, shape, fmt);
+      },
+    };
+  }
+
+  // ── Envelope Period ───────────────────────────────────────────────────
+  if (p.includes('envperiod') || p.includes('envelope_period')) {
+    return {
+      write: (cell, v, prevValue, fmt) => {
+        // 16-bit period split into two effects: 0x21 (low byte), 0x22 (high byte)
+        const period = norm(v, 65535);
+        if (prevValue !== null && norm(prevValue, 65535) === period) return true;
+        const lo = period & 0xFF;
+        const hi = (period >> 8) & 0xFF;
+        // Write both — low byte first
+        const wroteLo = writeEffect(cell, 0x21, lo, fmt);
+        const wroteHi = writeEffect(cell, 0x22, hi, fmt);
+        return wroteLo || wroteHi;
+      },
+    };
+  }
+
+  return null;
+}
+
 // ── Effect Mappings ─────────────────────────────────────────────────────────
 
 function getEffectMapping(param: string, format: FormatConstraints): EffectMapping | null {
   const p = param.toLowerCase();
+
+  // ── C64/SID-specific effects (Furnace format) ────────────────────────
+  // These use Furnace's chip-specific effect numbers (0x10-0x47 range).
+  // They take priority over generic mappings when chipType is 'c64'.
+  if (format.chipType === 'c64') {
+    const c64 = getC64EffectMapping(p, format);
+    if (c64) return c64;
+    // Fall through to generic mappings for volume/panning/tempo/etc.
+  }
+
+  // ── AY/PSG-specific effects (Furnace format) ─────────────────────────
+  if (format.chipType === 'ay') {
+    const ay = getAYEffectMapping(p, format);
+    if (ay) return ay;
+  }
 
   // ── Volume ────────────────────────────────────────────────────────────
   // Parameters: volume, vol, gain, level, amplitude
