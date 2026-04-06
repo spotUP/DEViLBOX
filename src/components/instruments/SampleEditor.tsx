@@ -23,8 +23,9 @@ import {
   Scissors, Copy, ClipboardPaste, Crop, VolumeX, Volume2, Volume1,
   Undo2, Redo2, Eye, Download,
   ArrowLeft, ArrowRight, Maximize2, FlipHorizontal,
-  Activity, Waves, Clock, Filter, Mic, CircleDot, ChevronDown, Settings
+  Activity, Waves, Clock, Filter, Mic, CircleDot, ChevronDown, Settings, X
 } from 'lucide-react';
+import { WavetableEditor } from './editors/WavetableEditor';
 import { useInstrumentStore, useTrackerStore } from '../../stores';
 import { scan9xxOffsets } from '@/lib/analysis/scan9xxOffsets';
 import type { InstrumentConfig, DeepPartial } from '../../types/instrument';
@@ -140,6 +141,9 @@ export const SampleEditor: React.FC<SampleEditorProps> = ({ instrument, onChange
 
   // ─── Beat slicer state ──────────────────────────────────────────
   const [selectedSliceId, setSelectedSliceId] = React.useState<string | null>(null);
+
+  // ─── Waveform Studio modal state ────────────────────────────────
+  const [showWaveformStudio, setShowWaveformStudio] = React.useState(false);
 
   // ─── Persist callbacks for the state hook ────────────────────────
   const onPersistBuffer = useCallback(
@@ -1195,6 +1199,16 @@ export const SampleEditor: React.FC<SampleEditorProps> = ({ instrument, onChange
               showAll();
             }} />
 
+            {/* Open Waveform Studio (chip-style cycle drawing) */}
+            <button
+              onClick={() => setShowWaveformStudio(true)}
+              className="flex items-center gap-1.5 px-2 py-1.5 bg-cyan-600/20 text-cyan-400 rounded hover:bg-cyan-600/30 transition-colors text-xs"
+              title="Open Waveform Studio — draw single-cycle chip waveforms (Protracker, AHX, etc.)"
+            >
+              <Waves size={12} />
+              Studio
+            </button>
+
             <div className="w-px h-6 bg-dark-border mx-1" />
 
             {/* Undo / Redo */}
@@ -1499,6 +1513,19 @@ export const SampleEditor: React.FC<SampleEditorProps> = ({ instrument, onChange
           handleBufferProcessed({ buffer: buf, dataUrl }, 'BeatSync');
         }}
       />
+
+      {/* ─── Waveform Studio modal ───────────────────────────────── */}
+      {showWaveformStudio && (
+        <SampleWaveformStudioModal
+          audioBuffer={audioBuffer}
+          onClose={() => setShowWaveformStudio(false)}
+          onCommit={async (buf, label) => {
+            const dataUrl = await bufferToDataUrl(buf);
+            handleBufferProcessed({ buffer: buf, dataUrl }, label);
+            setShowWaveformStudio(false);
+          }}
+        />
+      )}
     </div>
   );
 };
@@ -1790,4 +1817,139 @@ const RecordingEffectsDialog: React.FC<{ onClose: () => void }> = ({ onClose }) 
   }, []);
   if (!Modal) return null;
   return <Modal isOpen={true} onClose={onClose} />;
+};
+
+/**
+ * SampleWaveformStudioModal — opens the Waveform Studio for a sample.
+ *
+ * Adapts the sample's AudioBuffer (Float32 -1..+1) to the studio's int
+ * array format (0..maxValue). On commit, renders the studio waveform
+ * back to a one-cycle AudioBuffer that can be used as a Protracker /
+ * AHX / chip-music sample. The cycle gets played back at the sampler's
+ * base note as a tonal source.
+ *
+ * If the sample is empty, opens at default 32 samples × 8-bit (a good
+ * Amiga MOD starting point).
+ */
+const SampleWaveformStudioModal: React.FC<{
+  audioBuffer: AudioBuffer | null;
+  onClose: () => void;
+  onCommit: (buf: AudioBuffer, label: string) => Promise<void>;
+}> = ({ audioBuffer, onClose, onCommit }) => {
+  // Build initial WavetableData from the existing sample (resampled to one cycle)
+  // or default if there's no sample.
+  const buildInitial = useCallback((): { id: number; data: number[]; len: number; max: number } => {
+    const maxValue = 255; // 8-bit, matches Amiga sample resolution
+    const len = 64; // single-cycle default — tweakable in the studio toolbar
+
+    if (audioBuffer && audioBuffer.length > 0) {
+      const channel = audioBuffer.getChannelData(0);
+      // Resample down to `len` samples by taking every Nth sample (or interp)
+      const out: number[] = [];
+      const ratio = channel.length / len;
+      const mid = maxValue / 2;
+      // Find peak for normalization
+      let peak = 0;
+      for (let i = 0; i < channel.length; i++) {
+        const a = Math.abs(channel[i]);
+        if (a > peak) peak = a;
+      }
+      const gain = peak > 0 ? 1 / peak : 1;
+      for (let i = 0; i < len; i++) {
+        const srcPos = i * ratio;
+        const idx = Math.floor(srcPos);
+        const frac = srcPos - idx;
+        const a = channel[idx] ?? 0;
+        const b = channel[Math.min(channel.length - 1, idx + 1)] ?? 0;
+        const v = (a + (b - a) * frac) * gain;
+        out.push(Math.max(0, Math.min(maxValue, Math.round(v * mid + mid))));
+      }
+      return { id: 0, data: out, len, max: maxValue };
+    }
+
+    // Empty: a sine wave is a friendlier starting point than silence
+    const out: number[] = [];
+    const mid = maxValue / 2;
+    for (let i = 0; i < len; i++) {
+      out.push(Math.round(Math.sin((i / len) * Math.PI * 2) * mid + mid));
+    }
+    return { id: 0, data: out, len, max: maxValue };
+  }, [audioBuffer]);
+
+  const [wavetable, setWavetable] = React.useState<{ id: number; data: number[]; len?: number; max?: number }>(buildInitial);
+
+  // Convert the int array back to a Float32 AudioBuffer at the audio context's
+  // sample rate. The cycle is repeated enough times to be a usable sample
+  // (the user can loop it in the sample editor for sustain).
+  const handleCommit = useCallback(async () => {
+    const { getDevilboxAudioContext } = await import('@utils/audio-context');
+    let ctx: AudioContext;
+    try { ctx = getDevilboxAudioContext(); }
+    catch { ctx = new AudioContext(); }
+
+    const max = wavetable.max ?? 255;
+    const mid = max / 2;
+    const cycle = wavetable.data.map((v) => (v - mid) / mid);
+
+    // Render N cycles of the waveform so it's a usable note-length sample.
+    // 16 cycles at 64-sample length = 1024 samples ≈ 21ms at 44.1kHz which
+    // is a perfect tonal source. The sampler will pitch it across notes.
+    const cyclesToRender = Math.max(8, Math.ceil(2048 / cycle.length));
+    const totalSamples = cycle.length * cyclesToRender;
+
+    const buf = ctx.createBuffer(1, totalSamples, ctx.sampleRate);
+    const out = buf.getChannelData(0);
+    for (let i = 0; i < totalSamples; i++) {
+      out[i] = cycle[i % cycle.length];
+    }
+
+    await onCommit(buf, 'Waveform Studio');
+  }, [wavetable, onCommit]);
+
+  return (
+    <div className="fixed inset-0 z-[9999] bg-black/70 flex items-center justify-center p-4">
+      <div className="bg-dark-bg border border-dark-border rounded-lg shadow-2xl w-full max-w-[1100px] max-h-[90vh] flex flex-col">
+        <div className="flex items-center justify-between px-4 py-2 border-b border-dark-border">
+          <div>
+            <h2 className="text-sm font-mono font-bold text-text-primary uppercase tracking-wider">
+              Waveform Studio — single-cycle sample
+            </h2>
+            <p className="text-[10px] font-mono text-text-muted">
+              Draw a chip-style waveform. On save, it's rendered as a looped sample for Protracker / AHX / etc.
+            </p>
+          </div>
+          <button
+            onClick={onClose}
+            title="Close"
+            className="p-1.5 rounded text-text-muted hover:text-text-primary border border-dark-border"
+          >
+            <X size={16} />
+          </button>
+        </div>
+
+        <div className="flex-1 overflow-y-auto p-3">
+          <WavetableEditor
+            wavetable={wavetable}
+            onChange={setWavetable}
+            initialLayout="studio"
+          />
+        </div>
+
+        <div className="flex items-center justify-end gap-2 px-4 py-2 border-t border-dark-border">
+          <button
+            onClick={onClose}
+            className="px-3 py-1.5 rounded text-[10px] font-mono font-bold uppercase bg-dark-bgSecondary text-text-muted hover:text-text-primary border border-dark-border"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={handleCommit}
+            className="px-3 py-1.5 rounded text-[10px] font-mono font-bold uppercase bg-accent-highlight/20 text-accent-highlight hover:bg-accent-highlight/30 border border-accent-highlight/50"
+          >
+            Save as sample
+          </button>
+        </div>
+      </div>
+    </div>
+  );
 };
