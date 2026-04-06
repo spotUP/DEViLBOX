@@ -890,7 +890,7 @@ export const V2Controls: React.FC<V2ControlsProps> = ({
   return (
     <div className="flex flex-col h-full">
       {/* Tabs */}
-      <div className="flex border-b border-dark-border bg-[#151515]">
+      <div className="flex border-b border-dark-border bg-dark-bg">
         {[
           { id: 'osc' as V2Tab, label: 'Oscillators', icon: Activity },
           { id: 'filter' as V2Tab, label: 'Filters', icon: Filter },

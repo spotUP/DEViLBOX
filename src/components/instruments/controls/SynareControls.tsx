@@ -89,7 +89,7 @@ export const SynareControls: React.FC<SynareControlsProps> = ({
                   className={`
                     px-2 py-1 text-[10px] font-bold rounded border uppercase
                     ${config.oscillator.type === type
-                      ? `bg-[#2a2a2a]`
+                      ? `bg-dark-bgSecondary`
                       : 'bg-[#1a1a1a] border-dark-borderLight text-text-muted hover:border-dark-borderLight'
                     }
                   `}
@@ -191,7 +191,7 @@ export const SynareControls: React.FC<SynareControlsProps> = ({
                   className={`
                     px-2 py-1 text-[10px] font-bold rounded border uppercase
                     ${config.noise.type === type
-                      ? `bg-[#2a2a2a]`
+                      ? `bg-dark-bgSecondary`
                       : 'bg-[#1a1a1a] border-dark-borderLight text-text-muted hover:border-dark-borderLight'
                     }
                   `}
@@ -365,7 +365,7 @@ export const SynareControls: React.FC<SynareControlsProps> = ({
             <select
               value={config.lfo.target}
               onChange={(e) => onChange({ lfo: { ...config.lfo, target: e.target.value as 'pitch' | 'filter' | 'both' } })}
-              className="bg-[#151515] border border-dark-borderLight text-xs text-text-primary rounded px-1 py-0.5"
+              className="bg-dark-bg border border-dark-borderLight text-xs text-text-primary rounded px-1 py-0.5"
             >
               <option value="pitch">Pitch</option>
               <option value="filter">Filter</option>
@@ -415,7 +415,7 @@ export const SynareControls: React.FC<SynareControlsProps> = ({
       </div>
 
       {/* Tabs */}
-      <div className="flex border-b border-dark-border bg-[#151515]">
+      <div className="flex border-b border-dark-border bg-dark-bg">
         {['main', 'mod'].map((tab) => (
           <button
             key={tab}

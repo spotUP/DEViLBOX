@@ -489,7 +489,7 @@ export const SIDInfoModal: React.FC<SIDInfoModalProps> = ({ onClose }) => {
                     key={tune.id}
                     onClick={() => handleLoadTune(tune)}
                     disabled={loadingTuneId !== null}
-                    className="flex items-center gap-2 py-1 text-xs border-b border-dark-border/20 last:border-0 hover:bg-blue-900/20 rounded px-1 transition-colors text-left w-full group"
+                    className="flex items-center gap-2 py-1 text-xs hover:bg-blue-900/20 rounded px-1 transition-colors text-left w-full group"
                   >
                     {loadingTuneId === tune.id ? (
                       <Loader2 className="w-3 h-3 animate-spin text-blue-400 shrink-0" />

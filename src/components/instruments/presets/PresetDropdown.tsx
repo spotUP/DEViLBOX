@@ -87,7 +87,7 @@ export const PresetDropdown: React.FC<PresetDropdownProps> = ({
               <button
                 key={`${preset.name}-${idx}`}
                 onClick={() => applyPreset(preset)}
-                className="w-full px-3 py-2 text-left hover:bg-dark-bgTertiary transition-colors border-b border-dark-border/50 last:border-b-0 flex flex-col gap-0.5"
+                className="w-full px-3 py-2 text-left hover:bg-dark-bgTertiary transition-colors flex flex-col gap-0.5"
               >
                 <div className="flex items-center gap-2">
                   <span className="text-sm font-bold text-text-primary truncate">
