@@ -55,10 +55,6 @@ function canBakeParameter(param: string, format: FormatConstraints): boolean {
   if (p.includes('pitch') || p.includes('frequency') || p.includes('period') || p.includes('detune') || p.includes('finetune')) return true;
   // Vibrato/tremolo — all formats
   if (p.includes('vibrato') || p.includes('tremolo')) return true;
-  // Tempo/BPM/speed — all formats
-  if (p.includes('tempo') || p.includes('bpm') || (p.includes('speed') && !p.includes('portamento'))) return true;
-  // Retrigger — all formats
-  if (p.includes('retrig')) return true;
 
   return false;
 }

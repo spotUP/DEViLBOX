@@ -537,63 +537,6 @@ function getEffectMapping(param: string, format: FormatConstraints): EffectMappi
     };
   }
 
-  // ── Tempo / BPM ───────────────────────────────────────────────────────
-  // Fxx: 01-1F = speed (ticks/row), 20-FF = BPM
-  if (p.includes('tempo') || p.includes('bpm')) {
-    return {
-      write: (cell, v, prevValue, fmt) => {
-        const [lo, hi] = fmt.bpmRange;
-        const bpm = Math.round(lo + Math.max(0, Math.min(1, v)) * (hi - lo));
-        const clampedBpm = Math.max(0x20, Math.min(0xFF, bpm)); // BPM range: 0x20-0xFF
-
-        if (prevValue !== null) {
-          const prevBpm = Math.round(lo + Math.max(0, Math.min(1, prevValue)) * (hi - lo));
-          if (Math.max(0x20, Math.min(0xFF, prevBpm)) === clampedBpm) return true;
-        }
-
-        // Fxx = effect type 15
-        return writeEffect(cell, 15, clampedBpm, fmt);
-      },
-    };
-  }
-
-  // ── Speed (ticks per row) ─────────────────────────────────────────────
-  if (p.includes('speed') && !p.includes('portamento')) {
-    return {
-      write: (cell, v, prevValue, fmt) => {
-        const [lo, hi] = fmt.speedRange;
-        const speed = Math.round(lo + Math.max(0, Math.min(1, v)) * (hi - lo));
-        const clampedSpeed = Math.max(1, Math.min(0x1F, speed)); // Speed range: 0x01-0x1F
-
-        if (prevValue !== null) {
-          const prevSpeed = Math.round(lo + Math.max(0, Math.min(1, prevValue)) * (hi - lo));
-          if (Math.max(1, Math.min(0x1F, prevSpeed)) === clampedSpeed) return true;
-        }
-
-        // Fxx = effect type 15 (speed when < 0x20)
-        return writeEffect(cell, 15, clampedSpeed, fmt);
-      },
-    };
-  }
-
-  // ── Retrigger ─────────────────────────────────────────────────────────
-  // E9x / Rxx — periodic retriggering
-  if (p.includes('retrig')) {
-    return {
-      write: (cell, v, _prevValue, fmt) => {
-        const interval = norm(v, 15);
-        if (interval === 0) return true;
-
-        if (hasExtendedEffects(fmt)) {
-          // Rxy (effect type 27 for XM): x=volume change, y=interval
-          return writeEffect(cell, 27, interval, fmt);
-        }
-        // MOD: E9x via effect type 14, param = 0x90 + interval
-        return writeEffect(cell, 14, 0x90 + interval, fmt);
-      },
-    };
-  }
-
   // ── Pulse width (SID/C64 specific — no standard tracker effect) ───────
   if (p.includes('pulse') || p.includes('duty')) {
     return null;
