@@ -30,6 +30,7 @@ import { decodePaulaRegister } from './automation/decoders/PaulaRegisterDecoder'
 import { decodeFurnaceCommand } from './automation/decoders/FurnaceCommandDecoder';
 import { syncCaptureToStore, resetCaptureSync } from './automation/AutomationCaptureSync';
 import { useTransportStore, cancelPendingRowUpdate } from '@/stores/useTransportStore';
+import { useTrackerStore } from '@/stores/useTrackerStore';
 import { useAutomationStore } from '@/stores/useAutomationStore';
 import { useCursorStore } from '@/stores/useCursorStore';
 import { useWasmPositionStore } from '@/stores/useWasmPositionStore';
@@ -2454,15 +2455,14 @@ export class TrackerReplayer {
     // channels whose current instrument is in the replaced set via ToneEngine,
     // and mute those channels in the WASM engine to prevent doubling.
     if (this._suppressNotes && this._replacedInstruments.size > 0) {
-      // Log once per pattern
-      if (readNewNote && this.pattPos === 0) {
-        console.warn('[HYBRID-TICK] suppressNotes=true, replacedInstruments=', Array.from(this._replacedInstruments), 'pos=', this.songPos, ':', this.pattPos, 'channels=', this.channels.length);
-      }
+      // Read LIVE pattern data from the tracker store (not this.song.patterns which
+      // is a stale snapshot from the original import). User edits go to the store,
+      // not to this.song.patterns.
+      const storePatterns = useTrackerStore.getState().patterns;
+      const livePattern = storePatterns[patternNum];
       for (let ch = 0; ch < this.channels.length; ch++) {
         const channel = this.channels[ch];
-        const row = useNativeAccessor
-          ? this.accessor.getRow(this.songPos, this.pattPos, ch)
-          : pattern?.channels[ch]?.rows[this.pattPos];
+        const row = livePattern?.channels[ch]?.rows[this.pattPos];
         if (!row) continue;
 
         // Check if this row's instrument (or the channel's current instrument) is replaced
