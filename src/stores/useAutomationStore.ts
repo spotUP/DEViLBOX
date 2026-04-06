@@ -20,40 +20,39 @@ import { AUTOMATION_PRESETS, interpolateAutomationValue } from '@typedefs/automa
 function canBakeParameter(param: string, format: FormatConstraints): boolean {
   const p = param.toLowerCase();
 
-  // ── C64/SID chip-specific parameters ──────────────────────────────────
-  if (format.chipType === 'c64') {
-    if (p.includes('pulse') || p.includes('duty') || p.includes('fineduty')) return true;
-    if (p.includes('cutoff') || (p.includes('filter') && !p.includes('filterselect') && !p.includes('filtermode'))) return true;
+  // ── Furnace chip-specific formats ─────────────────────────────────────
+  // If we have a chipType, the AutomationBaker has dedicated per-chip mappers
+  // for all known parameters. Common chip params are always bakeable.
+  if (format.chipType) {
+    // Parameters bakeable on ALL Furnace chips (via generic or chip-specific mapping)
+    if (p.includes('volume') || p.includes('.vol') || p.includes('level')) return true;
+    if (p.includes('waveform') || p.includes('wave')) return true;
+    if (p.includes('duty') || p.includes('pulse')) return true;
+    if (p.includes('noise')) return true;
+    if (p.includes('cutoff') || p.includes('filter')) return true;
     if (p.includes('resonance') || p.includes('reso')) return true;
-    if (p.includes('filtermode') || p.includes('filter_mode')) return true;
-    if (p.includes('waveform') || p.includes('wave') || p.endsWith('.duty')) return true;
-    if (p.includes('attack') && p.includes('decay') || p === 'ad' || p.endsWith('.ad')) return true;
-    if (p.includes('sustain') && p.includes('release') || p === 'sr' || p.endsWith('.sr')) return true;
-    if (p.includes('pwslide') || p.includes('pulse_slide') || p.includes('cutoffslide') || p.includes('cutoff_slide')) return true;
-    if (p.includes('envreset') || p.includes('envelope_reset') || p.includes('resettime')) return true;
+    if (p.includes('feedback') || p.includes('.fb')) return true;
+    if (p.includes('algorithm') || p.includes('.alg')) return true;
+    if (p.includes('tl') || p.includes('totallevel') || p.includes('oplevel')) return true;
+    if (p.includes('mult') || p.includes('multiplier')) return true;
+    if (p.includes('attack') || p.includes('decay') || p.includes('sustain') || p.includes('release')) return true;
+    if (p.includes('detune') || p.includes('.dt')) return true;
+    if (p.includes('lfo') || p.includes('vibrato') || p.includes('tremolo')) return true;
+    if (p.includes('env') || p.includes('envelope')) return true;
+    if (p.includes('gain') || p.includes('echo') || p.includes('surround')) return true;
+    if (p.includes('mod') || p.includes('pitch')) return true;
+    if (p.includes('slide')) return true;
+    // If it's a known NKS parameter for this chip, the baker likely handles it
+    if (p.startsWith('furnace.')) return true;
   }
 
-  // ── AY/PSG chip-specific parameters ───────────────────────────────────
-  if (format.chipType === 'ay') {
-    if (p.includes('noise') || p.includes('duty')) return true;
-    if (p.includes('envshape') || p.includes('envelope_shape')) return true;
-    if (p.includes('envperiod') || p.includes('envelope_period')) return true;
-  }
-
-  // ── Generic (all formats) ─────────────────────────────────────────────
-  // Volume — all formats
+  // ── Generic tracker formats (MOD/XM/IT/S3M) ──────────────────────────
   if (p.includes('volume') || p.includes('.vol') || p === 'gain' || p.includes('level') || p.includes('amplitude')) return true;
-  // Global volume — XM/IT/S3M
   if ((p.includes('globalvol') || p.includes('global_vol') || p.includes('mastervol') || p.includes('master_vol')) && format.name !== 'MOD') return true;
-  // Panning — formats with panning support
   if (p.includes('pan') && format.supportsPanning) return true;
-  // Filter cutoff — IT/S3M
   if ((p.includes('cutoff') || (p.includes('filter') && !p.includes('filterselect') && !p.includes('filtermode'))) && (format.name === 'IT' || format.name === 'S3M')) return true;
-  // Resonance — IT/S3M
   if ((p.includes('resonance') || p.includes('reso')) && (format.name === 'IT' || format.name === 'S3M')) return true;
-  // Pitch — all formats (via portamento)
   if (p.includes('pitch') || p.includes('frequency') || p.includes('period') || p.includes('detune') || p.includes('finetune')) return true;
-  // Vibrato/tremolo — all formats
   if (p.includes('vibrato') || p.includes('tremolo')) return true;
 
   return false;
