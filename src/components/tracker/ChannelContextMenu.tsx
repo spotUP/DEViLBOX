@@ -212,10 +212,36 @@ export const ChannelContextMenu: React.FC<ChannelContextMenuProps> = ({
         },
       })),
     }));
-  }, [editorMode, setActiveParameter, setShowLane, channelIndex, furnaceNative, gtSidCount]);
+  }, [editorMode, setActiveParameter, setShowLane, channelIndex, furnaceNative, gtSidCount, ensureAutomationCurve]);
+
+  // Wrap every menu item's onClick with a status message so the user gets
+  // visual confirmation in the status bar that the action ran. Recurses
+  // into submenus.
+  const withStatusMessages = useCallback((items: MenuItemType[]): MenuItemType[] => {
+    const chLabel = `CH ${(channelIndex + 1).toString().padStart(2, '0')}`;
+    return items.map((item) => {
+      if (!item || (item as { type?: string }).type === 'divider') return item;
+      const wrapped: MenuItemType = { ...item } as MenuItemType;
+      const m = wrapped as { onClick?: () => void; label?: string; submenu?: MenuItemType[] };
+      if (m.onClick) {
+        const originalOnClick = m.onClick;
+        const labelText = typeof m.label === 'string' ? m.label : '';
+        m.onClick = () => {
+          originalOnClick();
+          if (labelText) {
+            useUIStore.getState().setStatusMessage(`${labelText.toUpperCase()} — ${chLabel}`);
+          }
+        };
+      }
+      if (m.submenu && Array.isArray(m.submenu)) {
+        m.submenu = withStatusMessages(m.submenu);
+      }
+      return wrapped;
+    });
+  }, [channelIndex]);
 
   // Build menu items based on mode
-  const menuItems = useMemo((): MenuItemType[] => {
+  const menuItemsRaw = useMemo((): MenuItemType[] => {
     if (isLiveMode) {
       // Live mode menu - focused on real-time performance
       return [
@@ -784,6 +810,12 @@ export const ChannelContextMenu: React.FC<ChannelContextMenuProps> = ({
     automationParams,
     registerParamMenuItems,
   ]);
+
+  // Apply status-message wrapping to the whole menu tree
+  const menuItems = useMemo(
+    () => withStatusMessages(menuItemsRaw),
+    [menuItemsRaw, withStatusMessages],
+  );
 
   return (
     <DropdownButton
