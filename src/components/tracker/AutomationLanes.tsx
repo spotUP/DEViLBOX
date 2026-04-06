@@ -424,6 +424,24 @@ export const AutomationLanes: React.FC<AutomationLanesProps> = ({
           pathPoints.push(`L ${lastX} ${pHeight}`);
         }
 
+        // Build fill polygon: left edge → curve → back to left edge
+        const fillPoints: string[] = [];
+        if (firstX !== null && lastX !== null) {
+          fillPoints.push(`M 0 0`);
+          fillPoints.push(`L 0 ${pHeight}`);
+          fillPoints.push(`L ${lastX} ${pHeight}`);
+          for (let row = pLength - 1; row >= 0; row--) {
+            const value = interpolateAutomationValue(curve.points, row, curve.interpolation, curve.mode);
+            if (value !== null) {
+              const x = value * (laneWidth - 2) + 1;
+              const y = row * rowHeight + rowHeight / 2;
+              fillPoints.push(`L ${x} ${y}`);
+            }
+          }
+          fillPoints.push(`L ${firstX} 0`);
+          fillPoints.push(`Z`);
+        }
+
         return (
           <div
             key={`${keyPrefix}-multi-${channelIndex}-${laneIdx}`}
@@ -443,12 +461,20 @@ export const AutomationLanes: React.FC<AutomationLanesProps> = ({
             onDoubleClick={isInteractive ? (e) => handleDoubleClick(e, curve, yOffset) : undefined}
           >
             <svg width={laneWidth} height={pHeight}>
+              {fillPoints.length > 0 && (
+                <path
+                  d={fillPoints.join(' ')}
+                  fill={paramColor}
+                  fillOpacity={0.18 * opacity}
+                  stroke="none"
+                />
+              )}
               <path
                 d={pathPoints.join(' ')}
                 fill="none"
                 stroke={paramColor}
                 strokeWidth={1.5}
-                strokeOpacity={0.6 * opacity}
+                strokeOpacity={0.8 * opacity}
                 strokeLinecap="round"
                 strokeLinejoin="round"
               />
@@ -506,7 +532,6 @@ export const AutomationLanes: React.FC<AutomationLanesProps> = ({
       // visually with no gap between them.
       const lw = effectiveLaneWidth;
       const pathPoints: string[] = [];
-      const fillPoints: string[] = [`M ${lw} ${pHeight}`];
 
       let firstX: number | null = null;
       let lastX: number | null = null;
@@ -529,16 +554,25 @@ export const AutomationLanes: React.FC<AutomationLanesProps> = ({
         pathPoints.push(`L ${lastX} ${pHeight}`);
       }
 
-      // Build fill path (going backwards)
-      for (let row = pLength - 1; row >= 0; row--) {
-        const value = interpolateAutomationValue(curve.points, row, curve.interpolation, curve.mode);
-        if (value !== null) {
-          const x = value * (lw - 2) + 1;
-          const y = row * rowHeight + rowHeight / 2;
-          fillPoints.push(`L ${x} ${y}`);
+      // Build fill path: filled area between the LEFT edge and the curve.
+      // (left edge) M 0 0 → L 0 pHeight → up the curve → L firstX 0 → Z
+      const fillPoints: string[] = [];
+      if (firstX !== null && lastX !== null) {
+        fillPoints.push(`M 0 0`);
+        fillPoints.push(`L 0 ${pHeight}`);
+        fillPoints.push(`L ${lastX} ${pHeight}`);
+        // Walk curve points in reverse so we close back toward y=0
+        for (let row = pLength - 1; row >= 0; row--) {
+          const value = interpolateAutomationValue(curve.points, row, curve.interpolation, curve.mode);
+          if (value !== null) {
+            const x = value * (lw - 2) + 1;
+            const y = row * rowHeight + rowHeight / 2;
+            fillPoints.push(`L ${x} ${y}`);
+          }
         }
+        fillPoints.push(`L ${firstX} 0`);
+        fillPoints.push(`Z`);
       }
-      fillPoints.push(`L ${lw} 0 Z`);
 
       return (
         <div
@@ -560,13 +594,22 @@ export const AutomationLanes: React.FC<AutomationLanesProps> = ({
           onDoubleClick={isCurrentPattern ? (e) => handleDoubleClick(e, curve, yOffset) : undefined}
         >
           <svg width={lw} height={pHeight}>
+            {/* Filled area between the left edge and the curve */}
+            {fillPoints.length > 0 && (
+              <path
+                d={fillPoints.join(' ')}
+                fill={color}
+                fillOpacity={0.18 * opacity}
+                stroke="none"
+              />
+            )}
             {/* Line */}
             <path
               d={pathPoints.join(' ')}
               fill="none"
               stroke={color}
               strokeWidth={1.5}
-              strokeOpacity={0.6 * opacity}
+              strokeOpacity={0.8 * opacity}
               strokeLinecap="round"
               strokeLinejoin="round"
             />
