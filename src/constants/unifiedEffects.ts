@@ -207,6 +207,20 @@ export const AVAILABLE_EFFECTS: AvailableEffect[] = [
   },
   {
     category: 'wasm',
+    type: 'Vocoder',
+    label: 'Vocoder',
+    group: 'Voice',
+    description: 'Channel vocoder (32-band voclib WASM) — chain audio or mic as modulator, internal saw/square/noise/chord carrier, formant shift',
+  },
+  {
+    category: 'wasm',
+    type: 'AutoTune',
+    label: 'Auto-Tune',
+    group: 'Voice',
+    description: 'Real-time pitch correction — YIN pitch detection + scale snap (key/scale/strength/speed)',
+  },
+  {
+    category: 'wasm',
     type: 'MVerb',
     label: 'MVerb Plate',
     group: 'Reverb & Delay',
