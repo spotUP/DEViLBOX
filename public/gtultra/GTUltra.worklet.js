@@ -9,6 +9,7 @@ class GTUltraProcessor extends AudioWorkletProcessor {
     this.module = null;
     this.ready = false;
     this.playing = false;
+    this.jamActive = false; // True when jam notes need audio processing
     this.posCounter = 0;
 
     // Wrapped WASM functions
@@ -44,6 +45,8 @@ class GTUltraProcessor extends AudioWorkletProcessor {
           this._setSidCount = this.module.cwrap('gt_set_sid_count', null, ['number']);
           this._jamNoteOn = this.module.cwrap('gt_jam_note_on', null, ['number', 'number', 'number']);
           this._jamNoteOff = this.module.cwrap('gt_jam_note_off', null, ['number']);
+          this._playTestNote = this.module.cwrap('gt_play_test_note', null, ['number', 'number', 'number']);
+          this._releaseNote = this.module.cwrap('gt_release_note', null, ['number']);
 
           // Pattern/song data access
           this._getPatternPtr = this.module.cwrap('gt_get_pattern_ptr', 'number', ['number']);
@@ -160,12 +163,29 @@ class GTUltraProcessor extends AudioWorkletProcessor {
       case 'jamNoteOn': {
         if (!this.ready) return;
         this._jamNoteOn(msg.channel, msg.note, msg.instrument);
+        this.jamActive = true;
         break;
       }
 
       case 'jamNoteOff': {
         if (!this.ready) return;
         this._jamNoteOff(msg.channel);
+        // Keep jamActive for ~500ms so the release envelope plays out (44100 * 0.5 / 128 ≈ 172 blocks)
+        this.jamReleaseCountdown = 172;
+        break;
+      }
+
+      case 'playTestNote': {
+        if (!this.ready) return;
+        this._playTestNote(msg.channel, msg.note, msg.instrument);
+        this.jamActive = true;
+        break;
+      }
+
+      case 'releaseNote': {
+        if (!this.ready) return;
+        this._releaseNote(msg.channel);
+        this.jamReleaseCountdown = 172;
         break;
       }
 
@@ -437,7 +457,15 @@ class GTUltraProcessor extends AudioWorkletProcessor {
   }
 
   process(inputs, outputs) {
-    if (!this.ready || !this.playing) return true;
+    if (!this.ready) return true;
+
+    // Count down jam release and deactivate when done
+    if (this.jamReleaseCountdown > 0) {
+      this.jamReleaseCountdown--;
+      if (this.jamReleaseCountdown === 0) this.jamActive = false;
+    }
+
+    if (!this.playing && !this.jamActive) return true;
 
     const outL = outputs[0][0];
     const outR = outputs[0][1] || outL;
