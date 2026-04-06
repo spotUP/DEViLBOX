@@ -941,14 +941,16 @@ export const useInstrumentStore = create<InstrumentStore>()(
         try {
           const { getTrackerReplayer } = require('@engine/TrackerReplayer');
           const song = getTrackerReplayer().getSong();
-          if (song?.libopenmptFileData || song?.uadeEditableFileData || song?.hivelyFileData ||
-              song?.klysFileData || song?.c64SidFileData || song?.musiclineFileData) {
+          if (song) {
             const fmt = song.format?.toUpperCase() || 'native';
+            console.warn(`[InstrumentStore] Synth instrument created on ${fmt} song — format compat warning`);
             useUIStore.getState().setStatusMessage(
               `SYNTH INSTRUMENT BREAKS ${fmt} COMPAT — SAVE AS .DBX`, false, 4000,
             );
           }
-        } catch { /* replayer not initialized */ }
+        } catch (e) {
+          console.warn('[InstrumentStore] Warning check failed:', e);
+        }
       }
 
       return newId;
