@@ -152,7 +152,7 @@ export class TFMXEngine {
 
         case 'modulePosition':
           for (const cb of this._positionCallbacks) {
-            cb({ samplesRendered: data.samplesRendered, songEnd: data.songEnd });
+            cb({ samplesRendered: data.samplesRendered, elapsedMs: data.elapsedMs, durationMs: data.durationMs, songEnd: data.songEnd });
           }
           break;
       }
