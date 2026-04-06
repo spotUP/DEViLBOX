@@ -80,6 +80,25 @@ class PxtoneProcessor extends AudioWorkletProcessor {
         }
         break;
 
+      case 'setMuteMask': {
+        if (this.module && typeof this.module._pxtone_set_channel_gain === 'function') {
+          const mask = data.mask || 0;
+          const numUnits = typeof this.module._pxtone_get_num_units === 'function'
+            ? this.module._pxtone_get_num_units() : 64;
+          for (let ch = 0; ch < numUnits; ch++) {
+            const muted = (mask & (1 << ch)) !== 0;
+            this.module._pxtone_set_channel_gain(ch, muted ? 0.0 : 1.0);
+          }
+        }
+        break;
+      }
+
+      case 'setChannelGain':
+        if (this.module && typeof this.module._pxtone_set_channel_gain === 'function') {
+          this.module._pxtone_set_channel_gain(data.channel, data.gain);
+        }
+        break;
+
       case 'dispose':
         this.cleanup();
         break;

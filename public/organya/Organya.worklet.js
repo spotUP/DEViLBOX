@@ -89,6 +89,25 @@ class OrganyaProcessor extends AudioWorkletProcessor {
         }
         break;
 
+      case 'setMuteMask': {
+        if (this.module && typeof this.module._organya_set_channel_gain === 'function') {
+          const mask = data.mask || 0;
+          const numCh = typeof this.module._organya_get_num_channels === 'function'
+            ? this.module._organya_get_num_channels() : 16;
+          for (let ch = 0; ch < numCh; ch++) {
+            const muted = (mask & (1 << ch)) !== 0;
+            this.module._organya_set_channel_gain(ch, muted ? 0.0 : 1.0);
+          }
+        }
+        break;
+      }
+
+      case 'setChannelGain':
+        if (this.module && typeof this.module._organya_set_channel_gain === 'function') {
+          this.module._organya_set_channel_gain(data.channel, data.gain);
+        }
+        break;
+
       case 'dispose':
         this.cleanup();
         break;
