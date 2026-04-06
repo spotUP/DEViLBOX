@@ -115,12 +115,14 @@ export const ChannelContextMenu: React.FC<ChannelContextMenuProps> = ({
     toggleChannelCollapse: s.toggleChannelCollapse,
     patterns: s.patterns,
   })));
-  const { setActiveParameter, setShowLane, getShowLane, removeCurve, getCurvesForPattern } = useAutomationStore(useShallow((s) => ({
+  const { setActiveParameter, setShowLane, getShowLane, removeCurve, getCurvesForPattern, addCurve, addPoint } = useAutomationStore(useShallow((s) => ({
     setActiveParameter: s.setActiveParameter,
     setShowLane: s.setShowLane,
     getShowLane: s.getShowLane,
     removeCurve: s.removeCurve,
     getCurvesForPattern: s.getCurvesForPattern,
+    addCurve: s.addCurve,
+    addPoint: s.addPoint,
   })));
   const { updateInstrument } = useInstrumentStore(useShallow((s) => ({
     updateInstrument: s.updateInstrument,
@@ -142,6 +144,20 @@ export const ChannelContextMenu: React.FC<ChannelContextMenuProps> = ({
   const showLane = getShowLane(channelIndex);
   const curves = getCurvesForPattern(patternId, channelIndex);
   const hasCurves = curves.length > 0;
+
+  // Register an automation parameter on this channel: ensure a curve exists
+  // with at least one seed point so the lane is immediately visible to the user.
+  const ensureAutomationCurve = useCallback((paramId: string) => {
+    const existing = curves.find((c) => c.parameter === paramId);
+    if (existing && existing.points.length > 0) return; // already drawable
+    let curveId = existing?.id;
+    if (!curveId) {
+      curveId = addCurve(patternId, channelIndex, paramId);
+      if (!curveId) return; // addCurve refused (format compat dialog cancelled)
+    }
+    // Seed a single centered point at row 0 so the lane has something to render
+    addPoint(curveId, 0, 0.5);
+  }, [curves, addCurve, addPoint, patternId, channelIndex]);
 
   // Dynamic automation parameters from channel's instrument
   const { params: nksParams } = useChannelAutomationParams(channelIndex);
@@ -191,6 +207,8 @@ export const ChannelContextMenu: React.FC<ChannelContextMenuProps> = ({
           // Ensure the global automation lanes toggle is on
           const uiState = useUIStore.getState();
           if (!uiState.showAutomationLanes) uiState.toggleAutomationLanes();
+          // Create the curve + seed point so the lane is immediately visible
+          ensureAutomationCurve(p.id);
         },
       })),
     }));
@@ -626,6 +644,11 @@ export const ChannelContextMenu: React.FC<ChannelContextMenuProps> = ({
             onClick: () => {
               setActiveParameter(channelIndex, param.id);
               setShowLane(channelIndex, true);
+              // Ensure the global automation lanes toggle is on
+              const uiState = useUIStore.getState();
+              if (!uiState.showAutomationLanes) uiState.toggleAutomationLanes();
+              // Create the curve + seed point so the lane is immediately visible
+              ensureAutomationCurve(param.id);
             },
           })),
           // Register-capture lanes (SID/Paula/Furnace)
