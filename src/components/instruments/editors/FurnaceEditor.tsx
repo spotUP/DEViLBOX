@@ -760,7 +760,22 @@ const OperatorCard: React.FC<OperatorCardProps> = ({
           <div className="flex justify-center gap-2">
             <ToggleButton label="AM" value={op.am ?? false} onChange={(v) => onUpdate({ am: v })} />
             {ranges.hasSSG && (
-              <ToggleButton label="SSG" value={(op.ssg ?? 0) > 0} onChange={(v) => onUpdate({ ssg: v ? 8 : 0 })} />
+              <select
+                value={op.ssg ?? 0}
+                onChange={(e) => onUpdate({ ssg: parseInt(e.target.value) })}
+                className="text-[9px] font-mono px-1 py-0.5 rounded border bg-dark-bg border-dark-border text-text-primary"
+                title="SSG-EG Mode"
+              >
+                <option value={0}>SSG Off</option>
+                <option value={8}>SSG \\\\</option>
+                <option value={9}>SSG \\‾‾</option>
+                <option value={10}>SSG \\/\\/</option>
+                <option value={11}>SSG \\‾</option>
+                <option value={12}>SSG ////</option>
+                <option value={13}>SSG /‾‾</option>
+                <option value={14}>SSG /\\/\\</option>
+                <option value={15}>SSG /‾</option>
+              </select>
             )}
             {ranges.hasWS && (
               <>
@@ -906,6 +921,17 @@ const GBPanel: React.FC<{ config: FurnaceConfig; onChange: (u: Partial<FurnaceCo
               }`}
             >
               HW Sequence
+            </button>
+            <button
+              onClick={() => updateGB({ doubleWave: !gb.doubleWave })}
+              className={`px-2 py-1 text-[9px] font-mono rounded border transition-colors ${
+                gb.doubleWave
+                  ? 'bg-emerald-600/20 border-emerald-500/50 text-emerald-400'
+                  : 'bg-dark-bg border-dark-border text-text-muted'
+              }`}
+              title="Double wave length (GBA only)"
+            >
+              Double Wave (GBA)
             </button>
           </div>
 
@@ -1678,6 +1704,48 @@ const N163Panel: React.FC<{ config: FurnaceConfig; onChange: (u: Partial<Furnace
               Per-Channel Position
             </button>
           </div>
+
+          {/* Per-Channel Position/Length Tables */}
+          {n163.perChPos && (
+            <div className="pt-2 border-t border-dark-border">
+              <span className="text-[9px] text-text-muted font-mono block mb-2">Per-Channel Wave Position / Length</span>
+              <div className="grid grid-cols-8 gap-1">
+                {Array.from({ length: 8 }, (_, ch) => {
+                  const pos = n163.chPos?.[ch] ?? 0;
+                  const len = n163.chLen?.[ch] ?? 0;
+                  return (
+                    <div key={ch} className="flex flex-col items-center gap-1 p-1 rounded bg-dark-bg border border-dark-border">
+                      <span className="text-[8px] text-teal-400 font-mono">CH{ch + 1}</span>
+                      <input
+                        type="number" value={pos} min={0} max={255}
+                        onChange={(e) => {
+                          const arr = [...(n163.chPos ?? [0,0,0,0,0,0,0,0])];
+                          arr[ch] = Math.max(0, Math.min(255, parseInt(e.target.value) || 0));
+                          updateN163({ chPos: arr });
+                        }}
+                        className="w-full bg-dark-bgSecondary border border-dark-border text-[9px] text-text-primary rounded px-1 py-0.5 text-center"
+                        title={`Position CH${ch + 1}`}
+                      />
+                      <input
+                        type="number" value={len} min={0} max={252} step={4}
+                        onChange={(e) => {
+                          const arr = [...(n163.chLen ?? [0,0,0,0,0,0,0,0])];
+                          arr[ch] = Math.max(0, Math.min(252, (parseInt(e.target.value) || 0) & ~3));
+                          updateN163({ chLen: arr });
+                        }}
+                        className="w-full bg-dark-bgSecondary border border-dark-border text-[9px] text-text-primary rounded px-1 py-0.5 text-center"
+                        title={`Length CH${ch + 1}`}
+                      />
+                    </div>
+                  );
+                })}
+              </div>
+              <div className="flex justify-between text-[8px] text-text-muted font-mono mt-1">
+                <span>Position (0-255)</span>
+                <span>Length (0-252, 4-aligned)</span>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>
@@ -1718,16 +1786,28 @@ const FDSPanel: React.FC<{ config: FurnaceConfig; onChange: (u: Partial<FurnaceC
           </div>
 
           <div className="pt-2 border-t border-dark-border">
-            <button
-              onClick={() => updateFDS({ initModTableWithFirstWave: !fds.initModTableWithFirstWave })}
-              className={`px-2 py-1 text-[9px] font-mono rounded border transition-colors ${
-                fds.initModTableWithFirstWave
-                  ? 'bg-red-600/20 border-red-500/50 text-red-400'
-                  : 'bg-dark-bg border-dark-border text-text-muted'
-              }`}
-            >
-              Init Mod Table from Wave
-            </button>
+            <div className="flex gap-2">
+              <button
+                onClick={() => updateFDS({ initModTableWithFirstWave: !fds.initModTableWithFirstWave })}
+                className={`px-2 py-1 text-[9px] font-mono rounded border transition-colors ${
+                  fds.initModTableWithFirstWave
+                    ? 'bg-red-600/20 border-red-500/50 text-red-400'
+                    : 'bg-dark-bg border-dark-border text-text-muted'
+                }`}
+              >
+                Init Mod Table from Wave
+              </button>
+              <button
+                onClick={() => updateFDS({ compat: !fds.compat })}
+                className={`px-2 py-1 text-[9px] font-mono rounded border transition-colors ${
+                  fds.compat
+                    ? 'bg-red-600/20 border-red-500/50 text-red-400'
+                    : 'bg-dark-bg border-dark-border text-text-muted'
+                }`}
+              >
+                Compat Mode
+              </button>
+            </div>
           </div>
 
           {/* Mod Table Visualization */}
