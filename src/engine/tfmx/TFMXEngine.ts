@@ -220,6 +220,26 @@ export class TFMXEngine {
     return promise;
   }
 
+  /**
+   * Re-load a TFMX module without resetting the engine — used by the macro
+   * editor for live preview after editing instruments. The patched mdat
+   * buffer is shipped to the worklet which runs `_tfmx_load_module` again.
+   * If playback was active before reload it resumes automatically.
+   */
+  reloadModule(mdatData: ArrayBuffer, smplData?: ArrayBuffer | null): void {
+    if (!this.workletNode) return;
+    const mdatCopy = mdatData.slice(0);
+    const smplCopy = smplData ? smplData.slice(0) : null;
+    const transfers: Transferable[] = [mdatCopy];
+    if (smplCopy) transfers.push(smplCopy);
+    this.workletNode.port.postMessage({
+      type: 'reloadModule',
+      mdatBuffer: mdatCopy,
+      smplBuffer: smplCopy,
+      subsong: 0,
+    }, transfers);
+  }
+
   play(): void {
     this.sendMessage({ type: 'modulePlay' });
   }

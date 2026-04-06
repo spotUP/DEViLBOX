@@ -24,6 +24,7 @@ import type {
   TFMXMacroCommandDef,
   TFMXMacroParamLayout,
 } from '@/types/tfmxNative';
+import { TFMXEngine } from '@/engine/tfmx/TFMXEngine';
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -214,15 +215,41 @@ function buildParamFields(cmd: TFMXMacroCommand, layout: TFMXMacroParamLayout): 
 interface Props {
   width?: number;
   height?: number;
+  /** When set, the editor opens with this macro pre-selected (used by EditInstrumentModal). */
+  initialMacroIndex?: number;
 }
 
-export const TFMXMacroEditor: React.FC<Props> = ({ height = 360 }) => {
+export const TFMXMacroEditor: React.FC<Props> = ({ height = 360, initialMacroIndex }) => {
   const native = useFormatStore(s => s.tfmxNative);
   const setMacroCommand = useFormatStore(s => s.setTFMXMacroCommand);
+  const tfmxFileData = useFormatStore(s => s.tfmxFileData);
+  const tfmxSmplData = useFormatStore(s => s.tfmxSmplData);
 
-  const [selectedMacroIdx, setSelectedMacroIdx] = useState(0);
+  // Reload the running TFMX WASM with the patched mdat so edits are audible.
+  // Called manually via the Reload button (avoids restarting playback on every keystroke).
+  const reloadAudio = useCallback(() => {
+    if (!tfmxFileData || !TFMXEngine.hasInstance()) return;
+    TFMXEngine.getInstance().reloadModule(tfmxFileData, tfmxSmplData);
+  }, [tfmxFileData, tfmxSmplData]);
+
+  // Resolve a real macro array index from a TFMX pointer-table index (instrument id - 1)
+  const resolveArrayIdx = useCallback((tableIdx: number | undefined): number => {
+    if (tableIdx === undefined || !native) return 0;
+    const found = native.macros.findIndex(m => m.index === tableIdx);
+    return found >= 0 ? found : 0;
+  }, [native]);
+
+  const [selectedMacroIdx, setSelectedMacroIdx] = useState(() => resolveArrayIdx(initialMacroIndex));
   const [selectedStepIdx, setSelectedStepIdx] = useState(0);
   const [showRaw, setShowRaw] = useState(false);
+
+  // Sync selection when the host (e.g. instrument modal) changes which instrument is open
+  React.useEffect(() => {
+    if (initialMacroIndex === undefined) return;
+    const idx = resolveArrayIdx(initialMacroIndex);
+    setSelectedMacroIdx(idx);
+    setSelectedStepIdx(0);
+  }, [initialMacroIndex, resolveArrayIdx]);
 
   const macros = native?.macros ?? [];
   const macro = macros[selectedMacroIdx];
@@ -368,16 +395,33 @@ export const TFMXMacroEditor: React.FC<Props> = ({ height = 360 }) => {
       }}>
         {cmd && cmdDef && (
           <>
-            <div style={{ marginBottom: '10px' }}>
-              <div style={{ fontSize: '10px', color: 'var(--color-text-muted)', marginBottom: '2px' }}>
-                MACRO {hex2(macro!.index)} · STEP {selectedStepIdx} · @{hex8(cmd.fileOffset)}
+            <div style={{
+              marginBottom: '10px', display: 'flex',
+              alignItems: 'flex-start', justifyContent: 'space-between', gap: '8px',
+            }}>
+              <div>
+                <div style={{ fontSize: '10px', color: 'var(--color-text-muted)', marginBottom: '2px' }}>
+                  MACRO {hex2(macro!.index)} · STEP {selectedStepIdx} · @{hex8(cmd.fileOffset)}
+                </div>
+                <div style={{ fontSize: '13px', fontWeight: 'bold', color: '#e0a050' }}>
+                  {cmdDef.mnemonic}
+                </div>
+                <div style={{ fontSize: '10px', color: 'var(--color-text-muted)', marginTop: '2px' }}>
+                  {cmdDef.description}
+                </div>
               </div>
-              <div style={{ fontSize: '13px', fontWeight: 'bold', color: '#e0a050' }}>
-                {cmdDef.mnemonic}
-              </div>
-              <div style={{ fontSize: '10px', color: 'var(--color-text-muted)', marginTop: '2px' }}>
-                {cmdDef.description}
-              </div>
+              <button
+                onClick={reloadAudio}
+                title="Reload the running TFMX WASM with edited mdat — applies all macro edits to live playback"
+                style={{
+                  fontSize: '10px', padding: '4px 8px', cursor: 'pointer',
+                  background: 'rgba(224,160,80,0.15)', color: '#e0a050',
+                  border: '1px solid #e0a050', borderRadius: '3px',
+                  fontFamily: 'inherit', whiteSpace: 'nowrap',
+                }}
+              >
+                ⟳ Reload Audio
+              </button>
             </div>
 
             {/* Opcode selector */}

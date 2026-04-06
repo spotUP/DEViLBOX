@@ -770,12 +770,14 @@ export function parseTFMXFile(
       id: i + 1,
       name: `Macro ${i + 1}`,
       type: 'synth' as const,
-      synthType: 'Sampler' as const,
+      synthType: 'TFMXSynth' as const,
       tfmx: tfmxConfig,
       uadeChipRam,
       effects: [],
       volume: 64,
       pan: 0,
+      // Index into tfmxNative.macros for the macro editor
+      metadata: { tfmxMacroIndex: i },
     } as InstrumentConfig);
   }
 
