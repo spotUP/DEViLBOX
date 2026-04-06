@@ -174,13 +174,47 @@ export const PRESET_CATEGORIES = {
 
 export type PresetCategory = keyof typeof PRESET_CATEGORIES;
 
+// Curated "showcase" presets — the most impressive sound for each synth type.
+// These are picked to immediately demonstrate each synth's character when browsed.
+const SHOWCASE_PRESETS: Record<string, string> = {
+  Synth: 'Supersaw Lead',
+  MonoSynth: 'Acid Lead',
+  FMSynth: 'FM Electric Piano',
+  DuoSynth: 'Duo Saw Lead',
+  PluckSynth: 'Trance Pluck',
+  NoiseSynth: 'Riser',
+  HarmonicSynth: 'Spectral Bell',
+  SpaceLaser: 'Cosmic Burst',
+  DubSiren: 'Code Red',
+  PolySynth: 'Poly Brass',
+  SuperSaw: 'Supersaw Lead',
+  PWMSynth: 'PWM Solo Lead',
+  StringMachine: 'Solina Ensemble',
+  GranularSynth: 'Granular Cloud',
+  FormantSynth: 'Robot Talk',
+  Wavetable: 'Wavetable Evolving Pad',
+  FurnaceOPN: 'Genesis Lead',
+  FurnaceOPM: 'OPM Synth Lead',
+  FurnaceNES: 'NES Pulse Lead',
+  FurnaceSID6581: '6581 Pulse Lead',
+  FurnaceGB: 'GB Pulse',
+  ChipSynth: 'C64 Minor Arp',
+};
+
 /**
  * Get the first available factory preset for a given synth type.
  * Used to auto-initialize new instruments with musically useful settings
  * so they produce sound immediately (e.g. V2 needs patch data, MAME chips need _program).
  */
 export function getFirstPresetForSynthType(synthType: string): InstrumentPreset['config'] | null {
-  // Search category-specific collections first (preferred: sustaining/melodic presets)
+  // Check curated showcase presets first — hand-picked to make each synth shine
+  const showcaseName = SHOWCASE_PRESETS[synthType];
+  if (showcaseName) {
+    const showcase = FACTORY_PRESETS.find(p => p.synthType === synthType && p.name === showcaseName);
+    if (showcase) return showcase;
+  }
+
+  // Search category-specific collections (preferred: sustaining/melodic presets)
   const categoryPresets = PRESET_CATEGORIES[synthType as keyof typeof PRESET_CATEGORIES];
   if (categoryPresets && categoryPresets.length > 0) {
     return categoryPresets[0];

@@ -77,6 +77,7 @@ export const SpaceLaserHeader: React.FC<SynthHeaderProps> = ({
 
               <PresetDropdown
                 synthType={instrument.synthType}
+                currentPresetName={instrument.name}
                 onChange={handleChange}
               />
             </div>
@@ -153,6 +154,7 @@ export const V2Header: React.FC<SynthHeaderProps> = ({
 
               <PresetDropdown
                 synthType={instrument.synthType}
+                currentPresetName={instrument.name}
                 onChange={handleChange}
               />
             </div>
@@ -215,6 +217,7 @@ export const DubSirenHeader: React.FC<SynthHeaderProps> = ({
 
               <PresetDropdown
                 synthType={instrument.synthType}
+                currentPresetName={instrument.name}
                 onChange={handleChange}
               />
             </div>
@@ -277,6 +280,7 @@ export const SynareHeader: React.FC<SynthHeaderProps> = ({
 
               <PresetDropdown
                 synthType={instrument.synthType}
+                currentPresetName={instrument.name}
                 onChange={handleChange}
               />
             </div>

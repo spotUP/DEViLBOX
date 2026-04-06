@@ -10,11 +10,12 @@ import type { SynthType, InstrumentConfig, InstrumentPreset } from '../../../typ
 
 interface PixiPresetDropdownProps {
   synthType: SynthType;
+  currentPresetName?: string;
   onChange: (updates: Partial<InstrumentConfig>) => void;
   width?: number;
 }
 
-export const PixiPresetDropdown: React.FC<PixiPresetDropdownProps> = ({ synthType, onChange, width = 160 }) => {
+export const PixiPresetDropdown: React.FC<PixiPresetDropdownProps> = ({ synthType, currentPresetName, onChange, width = 160 }) => {
   const presets = useMemo(() => {
     return FACTORY_PRESETS.filter(p => p.synthType === synthType);
   }, [synthType]);
@@ -27,14 +28,20 @@ export const PixiPresetDropdown: React.FC<PixiPresetDropdownProps> = ({ synthTyp
     }));
   }, [presets]);
 
+  // Find currently selected index by matching preset name
+  const selectedValue = useMemo(() => {
+    if (!currentPresetName) return '';
+    const idx = presets.findIndex(p => p.name === currentPresetName);
+    return idx >= 0 ? String(idx) : '';
+  }, [presets, currentPresetName]);
+
   const handleChange = useCallback((val: string) => {
     if (val === '__none') return;
     const idx = Number(val);
     const preset = presets[idx];
     if (!preset) return;
-    // Strip metadata, merge config
-    const { name: _n, type: _t, synthType: _st, ...config } = preset as InstrumentPreset['config'] & { name?: string; type?: string; synthType?: string };
-    void _n; void _t; void _st;
+    const { type: _t, synthType: _st, ...config } = preset as InstrumentPreset['config'] & { type?: string; synthType?: string };
+    void _t; void _st;
     onChange(config as Partial<InstrumentConfig>);
   }, [presets, onChange]);
 
@@ -43,7 +50,7 @@ export const PixiPresetDropdown: React.FC<PixiPresetDropdownProps> = ({ synthTyp
   return (
     <PixiSelect
       options={options}
-      value=""
+      value={selectedValue}
       placeholder={`Presets (${presets.length})`}
       onChange={handleChange}
       width={width}
