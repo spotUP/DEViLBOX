@@ -82,7 +82,24 @@ export async function exportAsXM(
   }
 
   // Convert patterns
-  const xmPatterns: XMPatternData[] = patterns.map((pattern) =>
+  // Bake automation curves into effect commands before pattern conversion
+  let exportPatterns = patterns;
+  try {
+    const { useAutomationStore } = await import('@stores/useAutomationStore');
+    const { bakeAutomationForExport } = await import('./AutomationBaker');
+    const { FORMAT_LIMITS } = await import('@/lib/formatCompatibility');
+    const curves = useAutomationStore.getState().curves;
+    if (curves.length > 0) {
+      const bakeResult = bakeAutomationForExport(patterns, curves, FORMAT_LIMITS.XM);
+      exportPatterns = bakeResult.patterns;
+      if (bakeResult.bakedCount > 0) {
+        warnings.push(`${bakeResult.bakedCount} automation curve(s) baked into effect commands.`);
+      }
+      for (const w of bakeResult.warnings) warnings.push(w);
+    }
+  } catch { /* automation store not available */ }
+
+  const xmPatterns: XMPatternData[] = exportPatterns.map((pattern) =>
     convertPatternToXM(pattern, effectiveChannels)
   );
 

@@ -99,7 +99,24 @@ export async function exportAsMOD(
   }
 
   // Convert patterns
-  const modPatterns: MODPatternData[] = patterns.map((pattern, idx) =>
+  // Bake automation curves into effect commands before pattern conversion
+  let exportPatterns = patterns;
+  try {
+    const { useAutomationStore } = await import('@stores/useAutomationStore');
+    const { bakeAutomationForExport } = await import('./AutomationBaker');
+    const { FORMAT_LIMITS } = await import('@/lib/formatCompatibility');
+    const curves = useAutomationStore.getState().curves;
+    if (curves.length > 0) {
+      const bakeResult = bakeAutomationForExport(patterns, curves, FORMAT_LIMITS.MOD);
+      exportPatterns = bakeResult.patterns;
+      if (bakeResult.bakedCount > 0) {
+        warnings.push(`${bakeResult.bakedCount} automation curve(s) baked into effect commands.`);
+      }
+      for (const w of bakeResult.warnings) warnings.push(w);
+    }
+  } catch { /* automation store not available */ }
+
+  const modPatterns: MODPatternData[] = exportPatterns.map((pattern, idx) =>
     convertPatternToMOD(pattern, channelCount, idx, warnings)
   );
 
