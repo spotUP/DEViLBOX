@@ -690,6 +690,7 @@ EMSCRIPTEN_KEEPALIVE
 void gt_set_pattern_cell(int pat, int row, int note, int instr_val,
                           int cmd, int data) {
     if (pat < 0 || pat >= MAX_PATT || row < 0 || row >= MAX_PATTROWS) return;
+    undoAreaSetCheckForChange(UNDO_AREA_PATTERN, pat, 1);
     pattern[pat][row * 4 + 0] = note;
     pattern[pat][row * 4 + 1] = instr_val;
     pattern[pat][row * 4 + 2] = cmd;
@@ -707,48 +708,56 @@ void gt_set_pattern_length(int patNum, int len) {
     if (patNum < 0 || patNum >= MAX_PATT) return;
     if (len < 1) len = 1;
     if (len > MAX_PATTROWS) len = MAX_PATTROWS;
+    undoAreaSetCheckForChange(UNDO_AREA_PATTERN_LEN, patNum, 1);
     pattlen[patNum] = len;
 }
 
 EMSCRIPTEN_KEEPALIVE
 void gt_set_instrument_ad(int inst, int attack, int decay) {
     if (inst < 0 || inst >= MAX_INSTR) return;
+    undoAreaSetCheckForChange(UNDO_AREA_INSTRUMENTS, inst, 1);
     instr[inst].ad = ((attack & 0xF) << 4) | (decay & 0xF);
 }
 
 EMSCRIPTEN_KEEPALIVE
 void gt_set_instrument_sr(int inst, int sustain, int release) {
     if (inst < 0 || inst >= MAX_INSTR) return;
+    undoAreaSetCheckForChange(UNDO_AREA_INSTRUMENTS, inst, 1);
     instr[inst].sr = ((sustain & 0xF) << 4) | (release & 0xF);
 }
 
 EMSCRIPTEN_KEEPALIVE
 void gt_set_instrument_table_ptr(int inst, int table, int ptr) {
     if (inst < 0 || inst >= MAX_INSTR || table < 0 || table >= MAX_TABLES) return;
+    undoAreaSetCheckForChange(UNDO_AREA_INSTRUMENTS, inst, 1);
     instr[inst].ptr[table] = ptr;
 }
 
 EMSCRIPTEN_KEEPALIVE
 void gt_set_instrument_vibdelay(int inst, int val) {
     if (inst < 0 || inst >= MAX_INSTR) return;
+    undoAreaSetCheckForChange(UNDO_AREA_INSTRUMENTS, inst, 1);
     instr[inst].vibdelay = val;
 }
 
 EMSCRIPTEN_KEEPALIVE
 void gt_set_instrument_gatetimer(int inst, int val) {
     if (inst < 0 || inst >= MAX_INSTR) return;
+    undoAreaSetCheckForChange(UNDO_AREA_INSTRUMENTS, inst, 1);
     instr[inst].gatetimer = val;
 }
 
 EMSCRIPTEN_KEEPALIVE
 void gt_set_instrument_firstwave(int inst, int val) {
     if (inst < 0 || inst >= MAX_INSTR) return;
+    undoAreaSetCheckForChange(UNDO_AREA_INSTRUMENTS, inst, 1);
     instr[inst].firstwave = val;
 }
 
 EMSCRIPTEN_KEEPALIVE
 void gt_set_instrument_name(int inst, const char* name) {
     if (inst < 0 || inst >= MAX_INSTR) return;
+    undoAreaSetCheckForChange(UNDO_AREA_INSTRUMENTS, inst, 1);
     strncpy(instr[inst].name, name, MAX_INSTRNAMELEN);
     instr[inst].name[MAX_INSTRNAMELEN - 1] = 0;
 }
@@ -756,6 +765,7 @@ void gt_set_instrument_name(int inst, const char* name) {
 EMSCRIPTEN_KEEPALIVE
 void gt_set_table_entry(int type, int row, int left, int right) {
     if (type < 0 || type >= MAX_TABLES || row < 0 || row >= MAX_TABLELEN) return;
+    undoAreaSetCheckForChange(UNDO_AREA_TABLES + type, 0, 1);
     ltable[type][row] = left;
     rtable[type][row] = right;
 }
@@ -764,6 +774,7 @@ EMSCRIPTEN_KEEPALIVE
 void gt_set_order_entry(int song, int ch, int pos, int val) {
     if (song < 0 || song >= MAX_SONGS || ch < 0 || ch >= MAX_CHN
         || pos < 0 || pos >= MAX_SONGLEN) return;
+    undoAreaSetCheckForChange(UNDO_AREA_ORDERLIST, ch, 1);
     songorder[song][ch][pos] = val;
 }
 
@@ -845,19 +856,40 @@ void gt_release_note(int channel) {
 
 /* --- Undo --- */
 
+static GTUNDO_OBJECT *undoEditorBackup = NULL;
+
 EMSCRIPTEN_KEEPALIVE
 void gt_undo(void) {
-    /* TODO: integrate with gundo.c */
+    undoPerform(&gtObject);
 }
 
 EMSCRIPTEN_KEEPALIVE
 void gt_redo(void) {
-    /* TODO: integrate with gundo.c */
+    /* GoatTracker has undo-only — no redo stack in the original code */
 }
 
 EMSCRIPTEN_KEEPALIVE
 int gt_can_undo(void) {
-    return 0; /* TODO */
+    return currentUndoPosition > 0 ? 1 : 0;
+}
+
+/** Call after each edit to mark an area dirty and checkpoint undo state.
+ *  areaType: 0=pattern, 1=instrument, 2=order, 3=table
+ *  areaIndex: which pattern/instrument/channel/table */
+EMSCRIPTEN_KEEPALIVE
+void gt_mark_edited(int areaType, int areaIndex) {
+    undoAreaSetCheckForChange(areaType, areaIndex, 1);
+}
+
+/** Finalize pending edits into one undo step (call after a batch of edits). */
+EMSCRIPTEN_KEEPALIVE
+void gt_checkpoint_undo(void) {
+    if (!undoEditorBackup) {
+        undoEditorBackup = undoCreateEditorInfo();
+    }
+    undoValidateUndoAreas(undoEditorBackup);
+    undoFinalizeUndoPackage(undoEditorBackup);
+    undoCreateEditorInfoBackup();
 }
 
 /* --- ASID hardware --- */

@@ -72,6 +72,9 @@ class GTUltraProcessor extends AudioWorkletProcessor {
           this._setTableEntry = this.module.cwrap('gt_set_table_entry', null, ['number', 'number', 'number', 'number']);
           this._undo = this.module.cwrap('gt_undo', null, []);
           this._redo = this.module.cwrap('gt_redo', null, []);
+          this._canUndo = this.module.cwrap('gt_can_undo', 'number', []);
+          this._checkpointUndo = this.module.cwrap('gt_checkpoint_undo', null, []);
+          this._markEdited = this.module.cwrap('gt_mark_edited', null, ['number', 'number']);
 
           // Save/Export
           this._saveSng = this.module.cwrap('gt_save_sng', 'number', ['number', 'number']);
@@ -337,7 +340,14 @@ class GTUltraProcessor extends AudioWorkletProcessor {
 
       case 'undo': {
         if (!this.ready) return;
+        this._checkpointUndo(); // Finalize any pending edits first
         this._undo();
+        break;
+      }
+
+      case 'checkpointUndo': {
+        if (!this.ready) return;
+        this._checkpointUndo();
         break;
       }
 

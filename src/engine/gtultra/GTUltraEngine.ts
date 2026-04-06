@@ -306,6 +306,11 @@ export class GTUltraEngine {
     this.post({ type: 'redo' });
   }
 
+  /** Finalize pending edits into one undo step */
+  checkpointUndo(): void {
+    this.post({ type: 'checkpointUndo' });
+  }
+
   // --- Save/Export ---
 
   saveSng(): void {
