@@ -83,6 +83,45 @@ function revokeInstrumentSampleUrls(sample: InstrumentConfig['sample']) {
  */
 const bakingInstruments = new Set<number>();
 
+/**
+ * Check if adding/changing to a synth instrument breaks native format compatibility.
+ * Returns true if the user confirmed (or no warning needed), false if cancelled.
+ * Called from ALL store entry points that can change synthType.
+ */
+let _formatCompatConfirmed = false;
+function checkFormatCompatibility(newSynthType: string | undefined, oldSynthType?: string): boolean {
+  // No warning needed for Sampler/Player
+  if (!newSynthType || newSynthType === 'Sampler' || newSynthType === 'Player') return true;
+  // No warning if type didn't actually change
+  if (oldSynthType && newSynthType === oldSynthType) return true;
+  // Already confirmed this session (reset on song load)
+  if (_formatCompatConfirmed) return true;
+
+  try {
+    const { getTrackerReplayer } = require('@engine/TrackerReplayer');
+    const song = getTrackerReplayer().getSong();
+    if (!song) return true; // no song loaded
+
+    const fmt = song.format?.toUpperCase() || 'native';
+    const confirmed = window.confirm(
+      `This breaks ${fmt} format compatibility.\n\n` +
+      `The song can no longer be saved as ${fmt} — save as .dbx instead.\n\n` +
+      `Continue?`
+    );
+    if (confirmed) {
+      _formatCompatConfirmed = true; // don't ask again for this song
+    }
+    return confirmed;
+  } catch {
+    return true; // replayer not initialized
+  }
+}
+
+/** Reset format compat flag (called on song load) */
+export function resetFormatCompatFlag(): void {
+  _formatCompatConfirmed = false;
+}
+
 
 interface InstrumentStore {
   // State
@@ -236,6 +275,12 @@ export const useInstrumentStore = create<InstrumentStore>()(
 
     updateInstrument: (id, updates) => {
       const currentInstrument = get().instruments.find((inst) => inst.id === id);
+
+      // Format compat check — fires BEFORE mutation
+      if (updates.synthType && currentInstrument &&
+          updates.synthType !== currentInstrument.synthType) {
+        if (!checkFormatCompatibility(updates.synthType, currentInstrument.synthType)) return;
+      }
 
       // Check what's changing
       const synthTypeChanging = currentInstrument && updates.synthType && updates.synthType !== currentInstrument.synthType;
@@ -824,67 +869,12 @@ export const useInstrumentStore = create<InstrumentStore>()(
             const replayer = getTrackerReplayer();
             replayer.updateInstrument(updatedConfig);
 
-            // Universal hybrid playback: when ANY WASM engine handles audio and
-            // the user replaces a sample instrument with a synth, mark it so
-            // ToneEngine fires notes and the WASM engine mutes those channels.
-            // Works for ALL engines: libopenmpt, UADE, Klystrack, SID, Hively, etc.
-            const song = replayer.getSong();
-            const typeActuallyChanged = updatedConfig.synthType !== currentInstrument?.synthType;
-            if (typeActuallyChanged && song) {
+            // Mark/unmark replaced instruments for hybrid playback
+            if (updatedConfig.synthType !== currentInstrument?.synthType) {
               const isNowSynth = updatedConfig.synthType !== 'Sampler' && updatedConfig.synthType !== 'Player';
-              const hasWasmEngine = !!(
-                song.libopenmptFileData || song.uadeEditableFileData ||
-                song.hivelyFileData || song.klysFileData || song.musiclineFileData ||
-                song.c64SidFileData || song.jamCrackerFileData || song.futurePlayerFileData ||
-                song.preTrackerFileData || song.maFileData || song.hippelFileData ||
-                song.sonixFileData || song.pxtoneFileData || song.organyaFileData ||
-                song.eupFileData || song.ixsFileData || song.psycleFileData ||
-                song.sc68FileData || song.zxtuneFileData || song.pumaTrackerFileData ||
-                song.artOfNoiseFileData || song.bdFileData || song.sd2FileData ||
-                song.startrekkerAMFileData || song.symphonieFileData
-              );
-
-              if (hasWasmEngine && isNowSynth) {
-                const fmt = song.format?.toUpperCase() || 'native';
-                const confirmed = window.confirm(
-                  `Replacing this sample with a synth breaks ${fmt} format compatibility.\n\n` +
-                  `The song can no longer be saved as ${fmt} — save as .dbx instead.\n\n` +
-                  `Continue?`
-                );
-                if (!confirmed) {
-                  // Revert the synthType change
-                  set((state) => {
-                    const inst = state.instruments.find(i => i.id === id);
-                    if (inst && currentInstrument) {
-                      inst.synthType = currentInstrument.synthType;
-                    }
-                  });
-                  return;
-                }
+              if (isNowSynth) {
                 replayer.markInstrumentReplaced(id);
-
-                // Engine-specific silencing
-                if (song.libopenmptFileData) {
-                  // libopenmpt: silence the sample in soundlib + hot-reload
-                  void (async () => {
-                    try {
-                      const osl = await import('@lib/import/wasm/OpenMPTSoundlib');
-                      await osl.setSampleData(id - 1, new Int8Array(4), 8363);
-                      const editBridge = await import('@engine/libopenmpt/OpenMPTEditBridge');
-                      const { LibopenmptEngine } = await import('@engine/libopenmpt/LibopenmptEngine');
-                      if (LibopenmptEngine.hasInstance()) {
-                        const data = await osl.saveModule(editBridge.getFormat());
-                        if (data) LibopenmptEngine.getInstance().hotReload(data);
-                      }
-                    } catch (e) {
-                      console.error('[InstrumentStore] Failed to silence sample in libopenmpt:', e);
-                    }
-                  })();
-                }
-                // For all other WASM engines: the dynamic mute mask in the sequencer
-                // (updateWasmMuteMask) handles muting channels on each row tick.
-              } else if (hasWasmEngine && !isNowSynth) {
-                // Reverted back to Sampler — remove from replaced set
+              } else {
                 replayer.unmarkInstrumentReplaced(id);
               }
             }
@@ -894,23 +884,9 @@ export const useInstrumentStore = create<InstrumentStore>()(
     },
 
     createInstrument: (config) => {
-      // Check if creating a synth instrument on a native format song
+      // Format compatibility check — warn if adding synth to native format song
       const synthType = (config as Partial<InstrumentConfig>)?.synthType;
-      if (synthType && synthType !== 'Sampler' && synthType !== 'Player') {
-        try {
-          const { getTrackerReplayer } = require('@engine/TrackerReplayer');
-          const song = getTrackerReplayer().getSong();
-          if (song) {
-            const fmt = song.format?.toUpperCase() || 'native';
-            const confirmed = window.confirm(
-              `Adding a synth instrument breaks ${fmt} format compatibility.\n\n` +
-              `The song can no longer be saved as ${fmt} — save as .dbx instead.\n\n` +
-              `Continue?`
-            );
-            if (!confirmed) return -1; // cancelled
-          }
-        } catch { /* replayer not initialized */ }
-      }
+      if (!checkFormatCompatibility(synthType)) return -1;
 
       const existingIds = get().instruments.map((i) => i.id);
       const newId = findNextId(existingIds);
@@ -969,6 +945,7 @@ export const useInstrumentStore = create<InstrumentStore>()(
     },
 
     addInstrument: (config) => {
+      if (!checkFormatCompatibility(config.synthType)) return;
       set((state) => {
         // Auto-set monophonic flag for inherently monophonic synths (same as createInstrument)
         const finalConfig = { ...config };
