@@ -982,15 +982,31 @@ export class TrackerReplayer {
         channel.instrument = config;
       }
 
-      // Convert processed frequency to note name
-      const midiNote = Math.round(12 * Math.log2(cs.frequency / 440) + 69);
+      // Convert to note name:
+      // If frequency is available (new WASM API), use it for processed pitch.
+      // Otherwise use the note value from pattern data (OpenMPT note: 1=C-1, 97=C#9).
       const noteNames = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
-      const clampedMidi = Math.max(0, Math.min(127, midiNote));
-      const octave = Math.floor(clampedMidi / 12) - 1;
-      const noteName = noteNames[clampedMidi % 12] + octave;
+      let noteName: string;
+      if (cs.frequency > 0) {
+        const midiNote = Math.round(12 * Math.log2(cs.frequency / 440) + 69);
+        const clampedMidi = Math.max(0, Math.min(127, midiNote));
+        const octave = Math.floor(clampedMidi / 12) - 1;
+        noteName = noteNames[clampedMidi % 12] + octave;
+      } else if (cs.note > 0 && cs.note < 120) {
+        // OpenMPT note value: note 1 = C-1, subtract 1 and convert
+        const midiNote = cs.note - 1;
+        const octave = Math.floor(midiNote / 12) - 1;
+        noteName = noteNames[midiNote % 12] + octave;
+      } else {
+        continue; // no note to play
+      }
 
-      // Normalize volume (nRealVolume is 0-16384, we need 0-1)
-      const velocity = Math.min(1, cs.volume / 16384);
+      // Normalize volume:
+      // If from new API: nRealVolume is 0-16384
+      // If from pattern data: vol is 0-64
+      const velocity = cs.volume > 64
+        ? Math.min(1, cs.volume / 16384)   // new API: nRealVolume scale
+        : Math.min(1, cs.volume / 64);     // pattern data: 0-64 scale
       if (velocity <= 0) continue;
 
       const engine = getToneEngine();
