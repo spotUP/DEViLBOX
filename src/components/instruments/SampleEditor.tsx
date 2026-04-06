@@ -23,7 +23,7 @@ import {
   Scissors, Copy, ClipboardPaste, Crop, VolumeX, Volume2, Volume1,
   Undo2, Redo2, Eye, Download,
   ArrowLeft, ArrowRight, Maximize2, FlipHorizontal,
-  Activity, Waves, Clock, Filter, Mic, CircleDot
+  Activity, Waves, Clock, Filter, Mic, CircleDot, ChevronDown, Settings
 } from 'lucide-react';
 import { useInstrumentStore, useTrackerStore } from '../../stores';
 import { scan9xxOffsets } from '@/lib/analysis/scan9xxOffsets';
@@ -1503,7 +1503,10 @@ export const SampleEditor: React.FC<SampleEditorProps> = ({ instrument, onChange
   );
 };
 
-/** Compact mic recording button with level meter, effects toggle, and device selector */
+/**
+ * RecordButton — mic recording with input device dropdown, live level meter,
+ * effects toggle (opens master effects dialog), and proper diagnostics.
+ */
 const RecordButton: React.FC<{
   instrumentId: number;
   onRecorded: (dataUrl: string, duration: number) => void;
@@ -1513,48 +1516,150 @@ const RecordButton: React.FC<{
   const [withEffects, setWithEffects] = useState(false);
   const [level, setLevel] = useState(0);
   const [elapsed, setElapsed] = useState(0);
+  const [error, setError] = useState<string | null>(null);
+  const [devices, setDevices] = useState<Array<{ deviceId: string; label: string }>>([]);
+  const [deviceId, setDeviceId] = useState<string>('');
+  const [showDeviceMenu, setShowDeviceMenu] = useState(false);
+  const [showMasterFx, setShowMasterFx] = useState(false);
   const timerRef = useRef<number | null>(null);
   const meterRef = useRef<number | null>(null);
 
+  // ── Always-on level meter (helps verify mic before recording) ──────
+  useEffect(() => {
+    let mounted = true;
+    const tick = async () => {
+      try {
+        const { getAudioInputManager } = await import('@engine/AudioInputManager');
+        const mgr = getAudioInputManager();
+        if (mounted && mgr.isConnected()) {
+          setLevel(mgr.getInputLevel());
+        }
+      } catch { /* ignore */ }
+    };
+    const id = window.setInterval(tick, 80);
+    return () => { mounted = false; clearInterval(id); };
+  }, []);
+
+  // ── Enumerate input devices on mount ────────────────────────────────
+  const refreshDevices = useCallback(async () => {
+    try {
+      const { getAudioInputManager } = await import('@engine/AudioInputManager');
+      const mgr = getAudioInputManager();
+      const list = await mgr.getInputDevices();
+      setDevices(list.map((d) => ({ deviceId: d.deviceId, label: d.label })));
+      if (list.length > 0 && !deviceId) {
+        setDeviceId(list[0].deviceId);
+      }
+    } catch (err) {
+      console.error('[RecordButton] Failed to enumerate devices:', err);
+    }
+  }, [deviceId]);
+
+  const ensureConnected = useCallback(async (): Promise<boolean> => {
+    try {
+      const { getAudioInputManager } = await import('@engine/AudioInputManager');
+      const mgr = getAudioInputManager();
+      // Resume audio context if suspended (iOS, autoplay policies)
+      try {
+        const Tone = await import('tone');
+        await Tone.start();
+        const ctx = Tone.getContext().rawContext as AudioContext;
+        if (ctx.state === 'suspended') await ctx.resume();
+      } catch { /* ok */ }
+
+      if (!mgr.isConnected() || (deviceId && mgr.getCurrentDeviceId() !== deviceId)) {
+        const ok = await mgr.selectDevice(deviceId || undefined);
+        if (!ok) {
+          setError('Failed to access microphone. Check browser permissions.');
+          return false;
+        }
+        setConnected(true);
+        // Refresh device list now that we have permission (so labels show)
+        await refreshDevices();
+      }
+      return true;
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+      return false;
+    }
+  }, [deviceId, refreshDevices]);
+
+  const handleSelectDevice = useCallback(async (id: string) => {
+    setDeviceId(id);
+    setShowDeviceMenu(false);
+    setError(null);
+    try {
+      const { getAudioInputManager } = await import('@engine/AudioInputManager');
+      const mgr = getAudioInputManager();
+      const ok = await mgr.selectDevice(id);
+      setConnected(ok);
+      if (!ok) setError('Failed to switch device.');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    }
+  }, []);
+
   const startRecording = useCallback(async () => {
+    setError(null);
+    const ok = await ensureConnected();
+    if (!ok) return;
+
     const { getAudioInputManager } = await import('@engine/AudioInputManager');
     const mgr = getAudioInputManager();
-    if (!mgr.isConnected()) {
-      const ok = await mgr.selectDevice();
-      if (!ok) return;
-      setConnected(true);
-    }
-    // Enable effects routing if toggle is on
+
     if (withEffects) {
       await mgr.enableEffectsRouting();
     }
     mgr.setMonitoring(true);
-    mgr.startRecording(withEffects);
+    try {
+      mgr.startRecording(withEffects);
+    } catch (err) {
+      setError('startRecording failed: ' + (err instanceof Error ? err.message : String(err)));
+      return;
+    }
     setRecording(true);
     setElapsed(0);
     const start = Date.now();
     timerRef.current = window.setInterval(() => setElapsed((Date.now() - start) / 1000), 100);
     meterRef.current = window.setInterval(() => setLevel(mgr.getInputLevel()), 50);
-  }, [withEffects]);
+  }, [withEffects, ensureConnected]);
 
   const stopRecording = useCallback(async () => {
     if (timerRef.current) { clearInterval(timerRef.current); timerRef.current = null; }
     if (meterRef.current) { clearInterval(meterRef.current); meterRef.current = null; }
     setRecording(false);
-    setLevel(0);
 
     const { getAudioInputManager } = await import('@engine/AudioInputManager');
     const mgr = getAudioInputManager();
     mgr.setMonitoring(false);
-    const buffer = await mgr.stopRecording();
-    // Clean up effects routing after recording
+    let buffer: AudioBuffer | null = null;
+    try {
+      buffer = await mgr.stopRecording();
+    } catch (err) {
+      setError('stopRecording failed: ' + (err instanceof Error ? err.message : String(err)));
+    }
     if (mgr.isEffectsRouted()) await mgr.disableEffectsRouting();
-    if (buffer) {
+
+    if (!buffer || buffer.length === 0) {
+      setError('Recording was empty. Check your input device and mic level.');
+      return;
+    }
+
+    try {
       const { bufferToDataUrl } = await import('@utils/audio/SampleProcessing');
       const dataUrl = await bufferToDataUrl(buffer);
       onRecorded(dataUrl, buffer.duration);
+    } catch (err) {
+      setError('Encode failed: ' + (err instanceof Error ? err.message : String(err)));
     }
   }, [onRecorded]);
+
+  const toggleDeviceMenu = useCallback(async () => {
+    if (!showDeviceMenu) {
+      await refreshDevices();
+    }
+    setShowDeviceMenu(!showDeviceMenu);
+  }, [showDeviceMenu, refreshDevices]);
 
   useEffect(() => {
     return () => {
@@ -1563,51 +1668,126 @@ const RecordButton: React.FC<{
     };
   }, []);
 
-  if (recording) {
-    return (
-      <div className="flex items-center gap-1.5">
+  return (
+    <div className="flex items-center gap-1 relative">
+      {/* Record / Stop button */}
+      {recording ? (
         <button
           onClick={stopRecording}
-          className="flex items-center gap-1 px-2 py-1.5 bg-accent-error/30 text-accent-error rounded hover:bg-accent-error/40 transition-colors text-xs animate-pulse"
+          className="flex items-center gap-1.5 px-2 py-1.5 bg-accent-error/30 text-accent-error rounded hover:bg-accent-error/40 transition-colors text-xs animate-pulse"
           title="Stop recording"
         >
           <CircleDot size={12} />
           {elapsed.toFixed(1)}s
         </button>
-        <div className="w-12 h-3 bg-dark-bg rounded overflow-hidden border border-dark-border">
-          <div
-            className="h-full bg-accent-error transition-all"
-            style={{ width: `${Math.min(100, level * 300)}%` }}
-          />
-        </div>
-      </div>
-    );
-  }
+      ) : (
+        <button
+          onClick={startRecording}
+          className={`flex items-center gap-1.5 px-2 py-1.5 rounded transition-colors text-xs ${
+            connected
+              ? 'bg-accent-error/20 text-accent-error hover:bg-accent-error/30'
+              : 'bg-dark-bgSecondary text-text-muted hover:text-accent-error'
+          }`}
+          title="Record from microphone"
+        >
+          <Mic size={12} />
+          Record
+        </button>
+      )}
 
-  return (
-    <div className="flex items-center gap-1">
-      <button
-        onClick={startRecording}
-        className={`flex items-center gap-1.5 px-2 py-1.5 rounded transition-colors text-xs ${
-          connected ? 'bg-accent-error/20 text-accent-error' : 'bg-dark-bgSecondary text-text-muted hover:text-accent-error'
-        }`}
-        title="Record from microphone"
+      {/* Live level meter (always visible) */}
+      <div
+        className="w-14 h-3 bg-dark-bg rounded overflow-hidden border border-dark-border"
+        title={`Input level: ${(level * 100).toFixed(0)}%`}
       >
-        <Mic size={12} />
-        Record
-      </button>
+        <div
+          className={`h-full transition-all ${level > 0.85 ? 'bg-accent-error' : 'bg-accent-success'}`}
+          style={{ width: `${Math.min(100, level * 300)}%` }}
+        />
+      </div>
+
+      {/* Input device dropdown */}
       <button
-        onClick={() => setWithEffects(!withEffects)}
-        className={`flex items-center gap-1.5 px-2 py-1.5 rounded transition-colors text-xs ${
-          withEffects
-            ? 'bg-violet-600/20 text-violet-400'
-            : 'bg-dark-bgSecondary text-text-muted hover:text-violet-400'
-        }`}
-        title={withEffects ? 'Recording with master effects (vocoder, autotune, etc.)' : 'Recording dry (no effects)'}
+        onClick={toggleDeviceMenu}
+        title="Select input device"
+        className="flex items-center gap-0.5 px-1.5 py-1.5 rounded text-xs bg-dark-bgSecondary text-text-muted hover:text-text-primary border border-dark-border"
       >
-        <Sparkles size={12} />
-        Effects
+        <Music size={12} />
+        <ChevronDown size={10} />
       </button>
+      {showDeviceMenu && (
+        <div className="absolute top-full left-0 mt-1 z-50 bg-dark-bg border border-dark-border rounded shadow-xl min-w-[200px] py-1">
+          {devices.length === 0 ? (
+            <div className="px-3 py-2 text-[10px] font-mono text-text-muted">
+              No input devices found.
+              <br />
+              Grant mic permission first.
+            </div>
+          ) : (
+            devices.map((d) => (
+              <button
+                key={d.deviceId}
+                onClick={() => handleSelectDevice(d.deviceId)}
+                className={`w-full text-left px-3 py-1.5 text-[10px] font-mono hover:bg-dark-bgSecondary ${
+                  d.deviceId === deviceId ? 'text-accent-highlight' : 'text-text-primary'
+                }`}
+              >
+                {d.label}
+              </button>
+            ))
+          )}
+        </div>
+      )}
+
+      {/* Effects toggle + dialog opener */}
+      <div className="flex items-center">
+        <button
+          onClick={() => setWithEffects(!withEffects)}
+          className={`flex items-center gap-1 px-2 py-1.5 rounded-l transition-colors text-xs border-r-0 ${
+            withEffects
+              ? 'bg-violet-600/20 text-violet-400'
+              : 'bg-dark-bgSecondary text-text-muted hover:text-violet-400'
+          }`}
+          title={withEffects ? 'Recording WITH master effects' : 'Recording dry (click to enable effects)'}
+        >
+          <Sparkles size={12} />
+          Effects
+        </button>
+        <button
+          onClick={() => setShowMasterFx(true)}
+          title="Configure master effects chain"
+          className="px-1.5 py-1.5 rounded-r border-l border-dark-border bg-dark-bgSecondary text-text-muted hover:text-violet-400"
+        >
+          <Settings size={11} />
+        </button>
+      </div>
+
+      {/* Error toast */}
+      {error && (
+        <div className="absolute top-full left-0 mt-1 z-50 px-2 py-1 bg-accent-error/20 border border-accent-error/50 rounded text-[9px] font-mono text-accent-error max-w-[300px]">
+          {error}
+          <button onClick={() => setError(null)} className="ml-2 underline">dismiss</button>
+        </div>
+      )}
+
+      {/* Master Effects modal portal */}
+      {showMasterFx && (
+        <RecordingEffectsDialog onClose={() => setShowMasterFx(false)} />
+      )}
     </div>
   );
+};
+
+/** Lazy-loaded MasterEffectsModal so we don't pull it into every Sample Editor */
+const RecordingEffectsDialog: React.FC<{ onClose: () => void }> = ({ onClose }) => {
+  const [Modal, setModal] = useState<React.ComponentType<{ isOpen: boolean; onClose: () => void }> | null>(null);
+  useEffect(() => {
+    let mounted = true;
+    import('@components/effects/MasterEffectsModal').then((m) => {
+      if (mounted) setModal(() => m.MasterEffectsModal);
+    });
+    return () => { mounted = false; };
+  }, []);
+  if (!Modal) return null;
+  return <Modal isOpen={true} onClose={onClose} />;
 };

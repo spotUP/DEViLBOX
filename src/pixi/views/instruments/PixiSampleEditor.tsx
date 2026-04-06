@@ -86,14 +86,26 @@ export const PixiSampleEditor: React.FC<PixiSampleEditorProps> = ({
         });
       }
     } else {
-      // Start
+      // Start — ensure audio context is running first
+      try {
+        const Tone = await import('tone');
+        await Tone.start();
+        const ctx = Tone.getContext().rawContext as AudioContext;
+        if (ctx.state === 'suspended') await ctx.resume();
+      } catch { /* ok */ }
+
       if (!mgr.isConnected()) {
         const ok = await mgr.selectDevice();
         if (!ok) return;
       }
       if (micWithEffects) await mgr.enableEffectsRouting();
       mgr.setMonitoring(true);
-      mgr.startRecording(micWithEffects);
+      try {
+        mgr.startRecording(micWithEffects);
+      } catch (err) {
+        console.error('[PixiSampleEditor] Failed to start recording:', err);
+        return;
+      }
       setIsRecordingMic(true);
       setMicElapsed(0);
       const start = Date.now();
