@@ -10,8 +10,12 @@ import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { useVocoderStore, VOCODER_PRESETS, VOCODER_FX_PRESETS, type VocoderFXPreset } from '@/stores/useVocoderStore';
 import { VocoderEngine } from '@/engine/vocoder/VocoderEngine';
 import { VocoderAutoTune } from '@/engine/vocoder/VocoderAutoTune';
+import type { AutoTuneScale } from '@/engine/effects/AutoTuneEffect';
 import { getDJEngineIfActive } from '@/engine/dj/DJEngine';
 import { registerPTTHandlers, unregisterPTTHandlers } from '@/hooks/useGlobalPTT';
+
+const KEY_NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+const SCALE_OPTIONS: AutoTuneScale[] = ['major', 'minor', 'chromatic', 'pentatonic', 'blues'];
 
 interface AudioInputDevice {
   deviceId: string;
@@ -29,8 +33,13 @@ export const DJVocoderControl: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [muted, setMuted] = useState(false);
   const [duckingEnabled, setDuckingEnabled] = useState(true);
-  const [autoTuneEnabled, setAutoTuneEnabled] = useState(true);
-  const autoTuneRef = useRef<VocoderAutoTune | null>(null);
+  /** Real pitch-correction autotune (YIN + scale snap) on the vocoder output. */
+  const [realTuneEnabled, setRealTuneEnabled] = useState(false);
+  const [tuneKey, setTuneKey] = useState(0);            // 0..11
+  const [tuneScale, setTuneScale] = useState<AutoTuneScale>('major');
+  /** Legacy "follow melody" — drives the vocoder carrier from the active deck's pattern data. */
+  const [followMelodyEnabled, setFollowMelodyEnabled] = useState(true);
+  const followMelodyRef = useRef<VocoderAutoTune | null>(null);
   const [devices, setDevices] = useState<AudioInputDevice[]>([]);
   const [selectedDeviceId, setSelectedDeviceId] = useState<string>('');
   const engineRef = useRef<VocoderEngine | null>(null);
@@ -95,10 +104,16 @@ export const DJVocoderControl: React.FC = () => {
       setMuted(true);
       engine.setMuted(true);
 
-      // Start autotune if it was enabled before engine was created
-      if (autoTuneEnabled) {
-        autoTuneRef.current = new VocoderAutoTune(engine);
-        autoTuneRef.current.start();
+      // Start "follow melody" if it was enabled before the engine was created
+      if (followMelodyEnabled) {
+        followMelodyRef.current = new VocoderAutoTune(engine);
+        followMelodyRef.current.start();
+      }
+      // Apply real autotune if it was enabled before the engine was created
+      if (realTuneEnabled) {
+        engine.setRealAutoTuneEnabled(true, {
+          key: tuneKey, scale: tuneScale, strength: 1.0, speed: 0.7,
+        });
       }
 
       // Re-enumerate after permission grant
@@ -219,18 +234,38 @@ export const DJVocoderControl: React.FC = () => {
     }
   }, []);
 
-  const handleAutoTuneToggle = useCallback(() => {
-    const next = !autoTuneEnabled;
-    setAutoTuneEnabled(next);
+  const handleFollowMelodyToggle = useCallback(() => {
+    const next = !followMelodyEnabled;
+    setFollowMelodyEnabled(next);
     if (next && engineRef.current) {
-      if (!autoTuneRef.current) {
-        autoTuneRef.current = new VocoderAutoTune(engineRef.current);
+      if (!followMelodyRef.current) {
+        followMelodyRef.current = new VocoderAutoTune(engineRef.current);
       }
-      autoTuneRef.current.start();
+      followMelodyRef.current.start();
     } else {
-      autoTuneRef.current?.stop();
+      followMelodyRef.current?.stop();
     }
-  }, [autoTuneEnabled]);
+  }, [followMelodyEnabled]);
+
+  const handleRealTuneToggle = useCallback(() => {
+    const next = !realTuneEnabled;
+    setRealTuneEnabled(next);
+    engineRef.current?.setRealAutoTuneEnabled(next, {
+      key: tuneKey, scale: tuneScale, strength: 1.0, speed: 0.7,
+    });
+  }, [realTuneEnabled, tuneKey, tuneScale]);
+
+  const handleTuneKeyChange = useCallback((e: React.ChangeEvent<HTMLSelectElement>) => {
+    const k = parseInt(e.target.value, 10);
+    setTuneKey(k);
+    engineRef.current?.setAutoTuneKey(k);
+  }, []);
+
+  const handleTuneScaleChange = useCallback((e: React.ChangeEvent<HTMLSelectElement>) => {
+    const s = e.target.value as AutoTuneScale;
+    setTuneScale(s);
+    engineRef.current?.setAutoTuneScale(s);
+  }, []);
 
   const handleFXToggle = useCallback(() => {
     const next = !fxEnabled;
@@ -325,14 +360,47 @@ export const DJVocoderControl: React.FC = () => {
           />
           <span className="text-[9px] text-text-muted">Duck</span>
         </label>
-        <label className="flex items-center gap-0.5 cursor-pointer" title="Auto-tune voice to the melody playing on the active deck">
+        <label className="flex items-center gap-0.5 cursor-pointer" title="Real pitch-correction autotune (YIN + scale snap) on the vocoder output">
           <input
             type="checkbox"
-            checked={autoTuneEnabled}
-            onChange={handleAutoTuneToggle}
+            checked={realTuneEnabled}
+            onChange={handleRealTuneToggle}
             className="w-3 h-3 accent-pink-500"
           />
           <span className="text-[9px] text-text-muted">Tune</span>
+        </label>
+        {realTuneEnabled && (
+          <>
+            <select
+              value={tuneKey}
+              onChange={handleTuneKeyChange}
+              className="px-1 py-0.5 text-[10px] rounded border border-dark-border bg-dark-bgTertiary text-pink-400"
+              title="Autotune key"
+            >
+              {KEY_NAMES.map((name, i) => (
+                <option key={i} value={i}>{name}</option>
+              ))}
+            </select>
+            <select
+              value={tuneScale}
+              onChange={handleTuneScaleChange}
+              className="px-1 py-0.5 text-[10px] rounded border border-dark-border bg-dark-bgTertiary text-pink-400"
+              title="Autotune scale"
+            >
+              {SCALE_OPTIONS.map((s) => (
+                <option key={s} value={s}>{s}</option>
+              ))}
+            </select>
+          </>
+        )}
+        <label className="flex items-center gap-0.5 cursor-pointer" title="Follow Melody — drive the vocoder carrier from the active deck's pattern data">
+          <input
+            type="checkbox"
+            checked={followMelodyEnabled}
+            onChange={handleFollowMelodyToggle}
+            className="w-3 h-3 accent-pink-500"
+          />
+          <span className="text-[9px] text-text-muted">Melody</span>
         </label>
       </div>
       <div className="flex items-center gap-1 border-l border-dark-borderLight pl-1.5 ml-0.5">
