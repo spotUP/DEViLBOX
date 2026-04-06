@@ -163,18 +163,18 @@ function decodeTFMXPattern(buf: Uint8Array, patDataOffset: number): DecodedTFMXC
       const cmdType = b0 & 0x0F;
 
       if (cmdType === 0) {
-        // F0 = End pattern — show as pattern break, then stop
+        // F0 = End pattern — display only (no Dxx effect, WASM engine handles flow)
         commands.push({
-          cell: { note: 0, instrument: 0, volume: 0, effTyp: 0x0D, eff: 0, effTyp2: 0, eff2: 0 },
+          cell: { note: 0, instrument: 0, volume: 0, effTyp: 0, eff: 0, effTyp2: 0, eff2: 0 },
           fileOffset,
         });
         break;
       }
 
       if (cmdType === 4) {
-        // F4 = Stop — show as pattern break, then stop
+        // F4 = Stop — display only (no Dxx effect, WASM engine handles flow)
         commands.push({
-          cell: { note: 0, instrument: 0, volume: 0, effTyp: 0x0D, eff: 0, effTyp2: 0, eff2: 0 },
+          cell: { note: 0, instrument: 0, volume: 0, effTyp: 0, eff: 0, effTyp2: 0, eff2: 0 },
           fileOffset,
         });
         break;
