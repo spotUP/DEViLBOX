@@ -134,18 +134,23 @@ export function drawSampleWaveform(
 
   if (!opts.audioBuffer) {
     ctx.textAlign = 'center';
+    // Clear a band behind the text so grid lines don't cut through it
+    const textBlockTop = midY - 30;
+    const textBlockHeight = 60;
+    ctx.fillStyle = bgColor;
+    ctx.fillRect(0, textBlockTop, width, textBlockHeight);
     // Main heading — uses muted text token
     ctx.fillStyle = textMuted;
     ctx.font = 'bold 18px "JetBrains Mono", "Consolas", monospace';
-    ctx.fillText('EMPTY SAMPLE', width / 2, midY - 22);
+    ctx.fillText('EMPTY SAMPLE', width / 2, midY - 10);
     // Subtitle — list the ways to load audio
     ctx.fillStyle = textSubtle;
     ctx.font = '12px "JetBrains Mono", "Consolas", monospace';
-    ctx.fillText('Drag & drop a file, use Replace, or Record from mic', width / 2, midY + 4);
-    // Hint — accent color for the record action
+    ctx.fillText('Drag & drop a file, use Replace, or Record from mic', width / 2, midY + 8);
+    // Hint — accent color for the format list
     ctx.fillStyle = accentColor;
     ctx.font = 'bold 11px "JetBrains Mono", "Consolas", monospace';
-    ctx.fillText('WAV · MP3 · OGG · FLAC · AIFF · M4A', width / 2, midY + 26);
+    ctx.fillText('WAV · MP3 · OGG · FLAC · AIFF · M4A', width / 2, midY + 24);
     return;
   }
 
