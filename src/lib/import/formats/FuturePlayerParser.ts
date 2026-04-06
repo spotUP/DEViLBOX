@@ -471,9 +471,13 @@ export function parseFuturePlayerFile(buffer: ArrayBuffer, filename: string): Tr
       };
     }
 
-    // Extract detail fields (offsets match FuturePlayer.c update_audio)
+    // Extract detail fields (offsets match FuturePlayer.c update_audio).
+    // detailPtr is the absolute byte offset of the detail struct inside the
+    // loaded module buffer — passed through to the editor so it can write
+    // back to the running WASM via FuturePlayerEngine.writeByte.
     const config: FuturePlayerConfig = {
       isWavetable,
+      detailPtr,
       volume: rd8(code, detailPtr + 0x08),
       attackRate: rd8(code, detailPtr + 0x12),
       attackPeak: rd8(code, detailPtr + 0x13),

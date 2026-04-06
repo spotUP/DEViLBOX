@@ -5,21 +5,17 @@
  * (attack/decay/sustain/release), pitch modulation 1 & 2 settings,
  * and sample modulation 1 & 2 settings.
  *
- * ─── Known gap (not yet implemented) ─────────────────────────────────────────
+ * ─── Live edit ────────────────────────────────────────────────────────────────
  *
- * Future Player is a WASM-only synth and the FuturePlayerEngine doesn't have
- * a chip-RAM-style memory window we can patch. Parameter edits update the
- * config for display purposes only — they do NOT propagate to the running
- * WASM. Adding live edit support requires either:
+ * Every parameter knob writes through to the running FuturePlayer WASM via
+ * `FuturePlayerEngine.writeByte(detailPtr + offset, value)`. The C side
+ * (`fp_wasm_write_byte`) patches the same module_copy buffer that fp_init
+ * runs against, and update_audio() reads the new value on the next tick.
  *
- *   (a) Adding `set_param(handle, paramId, value)` exports to the FP WASM
- *       (mirrors what TFMXEngine already does for its handle-based path),
- *       OR
- *   (b) Reloading the entire module via FuturePlayerEngine.reloadModule on
- *       each edit, similar to TFMXEngine.reloadModule().
- *
- * Either approach is bounded but unimplemented. Until then, edits in this
- * panel are display-only.
+ * The address comes from FuturePlayerConfig.detailPtr (set by the parser)
+ * plus the byte offset for each parameter (FP_DETAIL_OFFSET below). These
+ * offsets match the ones the parser uses to READ the same fields, so the
+ * read/write paths can never drift apart.
  */
 
 import React, { useRef, useEffect, useCallback, useState } from 'react';
@@ -27,6 +23,34 @@ import type { FuturePlayerConfig } from '@/types/instrument/exotic';
 import { Knob } from '@components/controls/Knob';
 import { useInstrumentColors } from '@/hooks/useInstrumentColors';
 import { EnvelopeVisualization } from '@components/instruments/shared';
+import { FuturePlayerEngine } from '@/engine/futureplayer/FuturePlayerEngine';
+
+// Future Player instrument detail struct byte offsets (from FuturePlayer.c
+// update_audio() — same offsets the parser uses to read these fields).
+// Each entry is the offset INTO the detail struct; the absolute write
+// address is `detailPtr + offset`.
+const FP_DETAIL_OFFSET: Partial<Record<keyof FuturePlayerConfig, number>> = {
+  volume:          0x08,
+  attackRate:      0x12,
+  attackPeak:      0x13,
+  decayRate:       0x14,
+  sustainLevel:    0x15,
+  sustainRate:     0x16,
+  sustainTarget:   0x17,
+  releaseRate:     0x18,
+  pitchMod1Shift:  0x1E,
+  pitchMod1Delay:  0x1F,
+  pitchMod1Mode:   0x20,
+  pitchMod2Shift:  0x26,
+  pitchMod2Delay:  0x27,
+  pitchMod2Mode:   0x28,
+  sampleMod1Shift: 0x2E,
+  sampleMod1Delay: 0x2F,
+  sampleMod1Mode:  0x30,
+  sampleMod2Shift: 0x36,
+  sampleMod2Delay: 0x37,
+  sampleMod2Mode:  0x38,
+};
 
 // ── Tab type ────────────────────────────────────────────────────────────────
 
@@ -55,6 +79,27 @@ export const FuturePlayerControls: React.FC<FuturePlayerControlsProps> = ({
 
   const upd = useCallback(<K extends keyof FuturePlayerConfig>(key: K, value: FuturePlayerConfig[K]) => {
     onChange({ [key]: value } as Partial<FuturePlayerConfig>);
+
+    // Live-write to the running FuturePlayer WASM. The detail struct's byte
+    // offset for this field is in FP_DETAIL_OFFSET; the absolute write
+    // address is detailPtr + offset. detailPtr is set by the parser when
+    // the instrument was discovered. Negate is a boolean and lives next to
+    // the mode byte — encoded as 0/1.
+    const cur = configRef.current;
+    if (cur.detailPtr !== undefined && FuturePlayerEngine.hasInstance()) {
+      const offset = FP_DETAIL_OFFSET[key];
+      if (offset !== undefined && typeof value === 'number') {
+        FuturePlayerEngine.getInstance().writeByte(cur.detailPtr + offset, value & 0xFF);
+      }
+      // Negate flags don't have a single offset entry but live at known
+      // positions (pitchMod1Negate=detail+0x21, pitchMod2Negate=detail+0x29).
+      else if (key === 'pitchMod1Negate' && typeof value === 'boolean') {
+        FuturePlayerEngine.getInstance().writeByte(cur.detailPtr + 0x21, value ? 1 : 0);
+      }
+      else if (key === 'pitchMod2Negate' && typeof value === 'boolean') {
+        FuturePlayerEngine.getInstance().writeByte(cur.detailPtr + 0x29, value ? 1 : 0);
+      }
+    }
   }, [onChange]);
 
   // ── Tab buttons ─────────────────────────────────────────────────────────

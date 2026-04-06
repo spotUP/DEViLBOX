@@ -259,6 +259,27 @@ export class FuturePlayerEngine {
     this.workletNode?.port.postMessage({ type: 'noteOff' });
   }
 
+  /**
+   * Live-edit a single byte in the loaded module buffer. The C side
+   * (`fp_wasm_write_byte`) writes to the same `module_copy` buffer that
+   * `fp_init` ran against, so the FuturePlayer engine reads the new value
+   * on the next instrument re-trigger / envelope tick.
+   *
+   * Used by FuturePlayerControls to push instrument parameter changes to
+   * the running WASM. addr must be < module size or the call is a no-op.
+   */
+  writeByte(addr: number, value: number): void {
+    this.workletNode?.port.postMessage({ type: 'write-byte', addr, value });
+  }
+
+  /** Bulk variant — copies an entire byte range into the module buffer. */
+  writeBytes(addr: number, bytes: Uint8Array): void {
+    if (!this.workletNode) return;
+    // Transfer the underlying buffer for zero-copy when possible
+    const copy = new Uint8Array(bytes); // ensure detached transfer doesn't bite caller
+    this.workletNode.port.postMessage({ type: 'write-bytes', addr, bytes: copy }, [copy.buffer]);
+  }
+
   // ── Pattern editing (shadow array) ──────────────────────────────────
 
   private _patternResolves = new Map<number, (data: FPPatternData) => void>();
