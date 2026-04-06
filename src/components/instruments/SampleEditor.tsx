@@ -1084,14 +1084,12 @@ export const SampleEditor: React.FC<SampleEditorProps> = ({ instrument, onChange
           'relative rounded-lg overflow-hidden border-2 transition-colors ' +
           (isFileDraggingRef.current
             ? 'border-accent-primary border-dashed bg-accent-primary/10'
-            : 'border-dark-border') +
-          (!audioBuffer ? ' cursor-pointer hover:border-accent-primary/50' : '')
+            : 'border-dark-border')
         }
         data-sample-drop-zone="true"
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
         onDrop={handleDrop}
-        onClick={() => !audioBuffer && fileInputRef.current?.click()}
       >
         <canvas
           ref={canvasRef}
