@@ -1528,13 +1528,16 @@ export async function tryRouteFormat(
     return song;
   }
 
-  // UADE enhanced scan reconstructs patterns from Paula register captures.
+  // ── NovoTrade Packer (ntp.* prefix) ──────────────────────────────────────
+  // Native parser extracts real PCM samples; UADE handles audio.
   if (matchesExt(filename, ['ntp'])) {
-    const { parseUADEFile } = await import('@lib/import/formats/UADEParser');
-    const song = await parseUADEFile(buffer, originalFileName, 'enhanced', subsong, preScannedMeta);
-    song.uadeEditableFileData = buffer.slice(0);
-    song.uadeEditableFileName = originalFileName;
-    return song;
+    const { isNovoTradePackerFormat, parseNovoTradePackerFile } = await import('@lib/import/formats/NovoTradePackerParser');
+    return withNativeThenUADE('novoTradePacker', ctx,
+      (buf: Uint8Array | ArrayBuffer, name: string) => {
+        if (isNovoTradePackerFormat(buf)) return parseNovoTradePackerFile(buf instanceof Uint8Array ? buf.buffer as ArrayBuffer : buf as ArrayBuffer, name);
+        return null;
+      },
+      'NovoTradePackerParser', { injectUADE: true });
   }
 
   // UADE enhanced scan reconstructs patterns from Paula register captures.
@@ -1613,14 +1616,16 @@ export async function tryRouteFormat(
   }
 
   // ── Thomas Hermann (THM.* prefix) ────────────────────────────────────────
-  // Compiled 68k Amiga music. UADE enhanced scan reconstructs patterns.
+  // Native parser extracts real PCM samples + names; UADE handles audio.
   if (matchesExt(filename, ['thm'])) {
-    const { parseUADEFile } = await import('@lib/import/formats/UADEParser');
-    const thmFile = toUADEPrefixName(originalFileName, ['thm']);
-    const song = await parseUADEFile(buffer, thmFile, 'enhanced', subsong, preScannedMeta);
-    song.uadeEditableFileData = buffer.slice(0);
-    song.uadeEditableFileName = thmFile;
-    return song;
+    const { isThomasHermannFormat, parseThomasHermannFile } = await import('@lib/import/formats/ThomasHermannParser');
+    return withNativeThenUADE('thomasHermann', ctx,
+      (buf: Uint8Array | ArrayBuffer, name: string) => {
+        const u8 = buf instanceof Uint8Array ? buf : new Uint8Array(buf);
+        if (isThomasHermannFormat(u8)) return parseThomasHermannFile(buf instanceof Uint8Array ? buf.buffer as ArrayBuffer : buf as ArrayBuffer, name);
+        return null;
+      },
+      'ThomasHermannParser', { injectUADE: true });
   }
 
   // UADE enhanced scan reconstructs patterns from Paula register captures.
@@ -1754,14 +1759,15 @@ export async function tryRouteFormat(
   }
 
   // ── Desire (DSR.* prefix) ─────────────────────────────────────────────────
-  // UADE enhanced scan reconstructs patterns from Paula register captures.
+  // Native parser extracts real PCM samples via opcode scanning; UADE handles audio.
   if (matchesExt(filename, ['dsr'])) {
-    const { parseUADEFile } = await import('@lib/import/formats/UADEParser');
-    const dsrFile = toUADEPrefixName(originalFileName, ['dsr']);
-    const song = await parseUADEFile(buffer, dsrFile, 'enhanced', subsong, preScannedMeta);
-    song.uadeEditableFileData = buffer.slice(0);
-    song.uadeEditableFileName = dsrFile;
-    return song;
+    const { isDesireFormat, parseDesireFile } = await import('@lib/import/formats/DesireParser');
+    return withNativeThenUADE('desire', ctx,
+      (buf: Uint8Array | ArrayBuffer, name: string) => {
+        if (isDesireFormat(buf)) return parseDesireFile(buf instanceof Uint8Array ? buf.buffer as ArrayBuffer : buf as ArrayBuffer, name);
+        return null;
+      },
+      'DesireParser', { injectUADE: true });
   }
 
   // ── Dave Lowe New (DLN.* prefix) ──────────────────────────────────────────
@@ -1867,14 +1873,15 @@ export async function tryRouteFormat(
   }
 
   // ── Kim Christensen (KIM.* prefix) ────────────────────────────────────────
-  // UADE enhanced scan reconstructs patterns from Paula register captures.
+  // Native parser extracts real PCM samples via opcode scanning; UADE handles audio.
   if (matchesExt(filename, ['kim'])) {
-    const { parseUADEFile } = await import('@lib/import/formats/UADEParser');
-    const kimFile = toUADEPrefixName(originalFileName, ['kim']);
-    const song = await parseUADEFile(buffer, kimFile, 'enhanced', subsong, preScannedMeta);
-    song.uadeEditableFileData = buffer.slice(0);
-    song.uadeEditableFileName = kimFile;
-    return song;
+    const { isKimChristensenFormat, parseKimChristensenFile } = await import('@lib/import/formats/KimChristensenParser');
+    return withNativeThenUADE('kimChristensen', ctx,
+      (buf: Uint8Array | ArrayBuffer, name: string) => {
+        if (isKimChristensenFormat(buf)) return parseKimChristensenFile(buf instanceof Uint8Array ? buf.buffer as ArrayBuffer : buf as ArrayBuffer, name);
+        return null;
+      },
+      'KimChristensenParser', { injectUADE: true });
   }
 
   // ── Ashley Hogg (ASH.* prefix) ────────────────────────────────────────────
