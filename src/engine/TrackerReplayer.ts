@@ -2469,11 +2469,31 @@ export class TrackerReplayer {
         const chanInst = typeof channel.instrument === 'number' ? channel.instrument
           : channel.instrument != null ? (channel.instrument as { id: number }).id : 0;
         const instId = row.instrument || chanInst;
+
+        // If this row triggers a NON-replaced instrument on a channel that was
+        // previously playing a replaced synth, cut the synth note.
+        if (readNewNote && row.note > 0 && row.note < 97 && row.instrument && !this._replacedInstruments.has(row.instrument)) {
+          if (chanInst && this._replacedInstruments.has(chanInst)) {
+            // Stop the synth player on this channel
+            if (channel.player) {
+              try { channel.player.stop(safeTime); } catch { /* already stopped */ }
+            }
+            channel.instrument = null;
+          }
+          continue;
+        }
+
+        // Note-off (key-off) row: release the synth
+        if (readNewNote && row.note === 97 && chanInst && this._replacedInstruments.has(chanInst)) {
+          if (channel.player) {
+            try { channel.player.stop(safeTime); } catch { /* already stopped */ }
+          }
+          continue;
+        }
+
         if (!instId || !this._replacedInstruments.has(instId)) continue;
 
         // Ensure channel has the UPDATED instrument config from the instrumentMap
-        // (during libopenmpt playback, processRow was never called so ch.instrument
-        // may still hold the old Sampler config from song load)
         const updatedInst = this.instrumentMap.get(instId);
         if (updatedInst) {
           channel.instrument = updatedInst;
