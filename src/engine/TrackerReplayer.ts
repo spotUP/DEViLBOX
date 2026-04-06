@@ -964,26 +964,24 @@ export class TrackerReplayer {
       // Determine effective instrument: if the row specifies one use it,
       // otherwise the channel continues with whatever was playing
       const effectiveInst = cs.instrument || chanInst;
+      const wasPlayingSynth = chanInst && this._replacedInstruments.has(chanInst);
 
-      // If this row has a NEW non-replaced instrument with a note → cut the synth
-      if (cs.instrument && cs.note > 0 && !this._replacedInstruments.has(cs.instrument)) {
-        if (chanInst && this._replacedInstruments.has(chanInst)) {
-          if (channel.player) {
-            try { channel.player.stop(time); } catch { /* already stopped */ }
-          }
-          channel.instrument = null;
-        }
+      // Always release previous synth note on this channel before doing anything.
+      // Each synth note lasts exactly one row — on the next row it's either
+      // re-triggered (new note), sustained (same note via effect), or released.
+      if (wasPlayingSynth && channel.player) {
+        try { channel.player.stop(time); } catch { /* already stopped */ }
+      }
+
+      // If this row has a non-replaced instrument → channel switches away from synth
+      if (cs.instrument && !this._replacedInstruments.has(cs.instrument)) {
+        if (wasPlayingSynth) channel.instrument = null;
         continue;
       }
 
-      // Note-off (note 255 in OpenMPT = key off)
+      // Note-off (note 254/255 in OpenMPT = key off / note cut)
       if (cs.note === 255 || cs.note === 254) {
-        if (chanInst && this._replacedInstruments.has(chanInst)) {
-          if (channel.player) {
-            try { channel.player.stop(time); } catch { /* already stopped */ }
-          }
-        }
-        continue;
+        continue; // already released above
       }
 
       // Skip if the effective instrument is not replaced
