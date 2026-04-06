@@ -33,6 +33,7 @@ class UADEProcessor extends AudioWorkletProcessor {
     this._lastData = null;       // Last loaded file bytes (for subsong re-scan)
     this._lastHint = '';
     this._currentSubsong = 0;    // Last requested subsong index (preserved across reloads)
+    this._companionFiles = new Map();  // filename → Uint8Array, survives WASM reinit
 
     // Float32 output buffers allocated in WASM heap
     this._outL = null;
@@ -591,11 +592,14 @@ class UADEProcessor extends AudioWorkletProcessor {
   }
 
   _addCompanionFile(filename, buffer) {
+    // Always cache companion files so they survive WASM reinit
+    const data = new Uint8Array(buffer);
+    this._companionFiles.set(filename, data.slice(0));
+
     if (!this._wasm || !this._ready) {
-      console.warn('[UADE.worklet] addCompanionFile called before WASM ready — ignoring');
+      console.log('[UADE.worklet] addCompanionFile cached (WASM not ready yet): ' + filename);
       return;
     }
-    const data = new Uint8Array(buffer);
     const ptr = this._wasm._malloc(data.byteLength);
     if (!ptr) {
       console.error('[UADE.worklet] malloc failed for companion file: ' + filename);
@@ -620,6 +624,26 @@ class UADEProcessor extends AudioWorkletProcessor {
       console.log('[UADE.worklet] Companion file written: ' + filename + ' (' + data.byteLength + ' bytes)');
     } else {
       console.error('[UADE.worklet] Failed to write companion file: ' + filename);
+    }
+  }
+
+  /** Re-register all cached companion files into a freshly initialized WASM instance */
+  _restoreCompanionFiles() {
+    if (!this._wasm || !this._ready || this._companionFiles.size === 0) return;
+    for (const [filename, data] of this._companionFiles) {
+      const ptr = this._wasm._malloc(data.byteLength);
+      if (!ptr) { console.error('[UADE.worklet] malloc failed restoring companion: ' + filename); continue; }
+      this._wasm.HEAPU8.set(data, ptr);
+      const nameLen = filename.length * 3 + 1;
+      const namePtr = this._wasm._malloc(nameLen);
+      if (!namePtr) { this._wasm._free(ptr); continue; }
+      this._wasm.stringToUTF8(filename, namePtr, nameLen);
+      const ret = this._wasm._uade_wasm_add_extra_file(namePtr, ptr, data.byteLength);
+      this._wasm._free(ptr);
+      this._wasm._free(namePtr);
+      if (ret === 0) {
+        console.log('[UADE.worklet] Restored companion: ' + filename + ' (' + data.byteLength + ' bytes)');
+      }
     }
   }
 
@@ -671,6 +695,8 @@ class UADEProcessor extends AudioWorkletProcessor {
             this.port.postMessage({ type: 'error', message: 'WASM reinit failed' });
             return;
           }
+          // Re-register companion files lost during reinit
+          this._restoreCompanionFiles();
         } catch (reinitErr) {
           console.error('[UADE.worklet] Reinit failed:', reinitErr.message);
           this.port.postMessage({ type: 'error', message: 'WASM reinit failed: ' + reinitErr.message });
