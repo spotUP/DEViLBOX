@@ -25,6 +25,7 @@ import { useLiveModeStore } from '@stores/useLiveModeStore';
 import { useTrackerStore } from '@stores/useTrackerStore';
 import { useFormatStore } from '@stores/useFormatStore';
 import { useAutomationStore } from '@stores/useAutomationStore';
+import { useCursorStore } from '@stores/useCursorStore';
 import { getParamsForFormat, groupParams, type AutomationFormat } from '@/engine/automation/AutomationParams';
 import { MASTER_FX_PRESETS } from '@constants/masterFxPresets';
 import { getNKSParametersForSynth } from '@/midi/performance/synthParameterMaps';
@@ -199,6 +200,8 @@ const PixiChannelHeadersInner: React.FC<PixiChannelHeadersProps> = ({
 }) => {
   const theme = usePixiTheme();
   const showChannelNames = useUIStore(s => s.showChannelNames);
+  // Active channel index for the bottom-border highlight on the focused header
+  const activeChannelIndex = useCursorStore(s => s.cursor.channelIndex);
   const [editingChannel, setEditingChannel] = useState<number | null>(null);
   const [editValue, setEditValue] = useState('');
   // Mask removed — using overflow: hidden on the container instead
@@ -285,11 +288,20 @@ const PixiChannelHeadersInner: React.FC<PixiChannelHeadersProps> = ({
         g.fill({ color: theme.accent.color, alpha: 0.1 });
       }
 
+      // Active channel bottom border (3px in channel color, fall back to accent)
+      if (ch === activeChannelIndex) {
+        const accentNum = channel.color
+          ? parseInt(channel.color.replace('#', ''), 16)
+          : theme.accent.color;
+        g.rect(colX, HEADER_ROW_HEIGHT - 3, chW, 3);
+        g.fill({ color: accentNum, alpha: 1 });
+      }
+
       // Right separator (full height)
       g.rect(colX + chW - 1, 0, 1, HEADER_HEIGHT);
       g.fill({ color: theme.border.color, alpha: 0.3 });
     }
-  }, [numChannels, channelOffsets, channelWidths, pattern.channels, theme]);
+  }, [numChannels, channelOffsets, channelWidths, pattern.channels, theme, activeChannelIndex]);
 
   // ── Button draw helpers ────────────────────────────────────────────────────
   const drawMuteBtn = useCallback((g: GraphicsType, muted: boolean) => {
