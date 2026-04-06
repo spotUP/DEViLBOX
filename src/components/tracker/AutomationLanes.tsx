@@ -365,13 +365,27 @@ export const AutomationLanes: React.FC<AutomationLanesProps> = ({
         })();
 
         const pathPoints: string[] = [];
+        let firstX: number | null = null;
+        let lastX: number | null = null;
         for (let row = 0; row < pLength; row++) {
           const value = interpolateAutomationValue(curve.points, row, curve.interpolation, curve.mode);
           if (value !== null) {
             const x = value * (laneWidth - 2) + 1;
             const y = row * rowHeight + rowHeight / 2;
-            pathPoints.push(`${pathPoints.length === 0 ? 'M' : 'L'} ${x} ${y}`);
+            if (firstX === null) {
+              // Extend the path up to y=0 so adjacent patterns visually connect
+              firstX = x;
+              pathPoints.push(`M ${x} 0`);
+              pathPoints.push(`L ${x} ${y}`);
+            } else {
+              pathPoints.push(`L ${x} ${y}`);
+            }
+            lastX = x;
           }
+        }
+        // Extend the path down to y=pHeight so adjacent patterns visually connect
+        if (lastX !== null) {
+          pathPoints.push(`L ${lastX} ${pHeight}`);
         }
 
         return (
@@ -450,18 +464,32 @@ export const AutomationLanes: React.FC<AutomationLanesProps> = ({
       const pHeight = pLength * rowHeight;
       const yOffset = startVirtualRow * rowHeight;
 
-      // Build SVG path
+      // Build SVG path. Extend first point up to y=0 and last point down to
+      // y=pHeight so adjacent patterns (prev/current/next ghost stacks) connect
+      // visually with no gap between them.
       const lw = effectiveLaneWidth;
       const pathPoints: string[] = [];
       const fillPoints: string[] = [`M ${lw} ${pHeight}`];
 
+      let firstX: number | null = null;
+      let lastX: number | null = null;
       for (let row = 0; row < pLength; row++) {
         const value = interpolateAutomationValue(curve.points, row, curve.interpolation, curve.mode);
         if (value !== null) {
           const x = value * (lw - 2) + 1;
           const y = row * rowHeight + rowHeight / 2;
-          pathPoints.push(`${pathPoints.length === 0 ? 'M' : 'L'} ${x} ${y}`);
+          if (firstX === null) {
+            firstX = x;
+            pathPoints.push(`M ${x} 0`);
+            pathPoints.push(`L ${x} ${y}`);
+          } else {
+            pathPoints.push(`L ${x} ${y}`);
+          }
+          lastX = x;
         }
+      }
+      if (lastX !== null) {
+        pathPoints.push(`L ${lastX} ${pHeight}`);
       }
 
       // Build fill path (going backwards)
