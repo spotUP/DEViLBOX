@@ -198,6 +198,7 @@ const SHOWCASE_PRESETS: Record<string, string> = {
   FurnaceNES: 'NES Pulse Lead',
   FurnaceSID6581: '6581 Pulse Lead',
   FurnaceGB: 'GB Pulse',
+  FurnaceOPLL: 'OPLL Organ',
   ChipSynth: 'C64 Minor Arp',
 };
 

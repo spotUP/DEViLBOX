@@ -64,7 +64,6 @@ const SYNTH_TYPE_GROUPS: { label: string; types: { value: SynthType; label: stri
     { value: 'ZynAddSubFX', label: 'ZynAddSubFX' },
   ]},
   { label: 'Chip / Retro', types: [
-    { value: 'C64SID', label: 'C64 SID' },
     { value: 'HarmonicSynth', label: 'Harmonic' },
     { value: 'FurnaceGB', label: 'Game Boy' },
     { value: 'FurnaceNES', label: 'NES' },

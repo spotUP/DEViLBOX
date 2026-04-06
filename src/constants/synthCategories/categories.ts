@@ -128,7 +128,6 @@ export const SYNTH_CATEGORIES: SynthCategory[] = [
       SYNTH_INFO.FurnaceFDS,
       SYNTH_INFO.FurnaceMMC5,
       // Computer Chips
-      SYNTH_INFO.FurnaceC64,
       SYNTH_INFO.FurnaceSID6581,
       SYNTH_INFO.FurnaceSID8580,
       SYNTH_INFO.FurnaceAY,
@@ -223,7 +222,6 @@ export const SYNTH_CATEGORIES: SynthCategory[] = [
     name: 'Computer Chips',
     description: 'Home computer sound chips (C64, Spectrum, etc.)',
     synths: [
-      SYNTH_INFO.FurnaceC64,
       SYNTH_INFO.FurnaceSID6581,
       SYNTH_INFO.FurnaceSID8580,
       SYNTH_INFO.FurnaceAY,
@@ -255,7 +253,7 @@ export const SYNTH_CATEGORIES: SynthCategory[] = [
       SYNTH_INFO.TFMXSynth,
       SYNTH_INFO.OctaMEDSynth,
       SYNTH_INFO.SymphonieSynth,
-      SYNTH_INFO.C64SID,
+      // C64SID is a .sid file player, not an editable synth — omitted from browser
       SYNTH_INFO.KlysSynth,
       SYNTH_INFO.Sc68Synth,
       SYNTH_INFO.StartrekkerAMSynth,
