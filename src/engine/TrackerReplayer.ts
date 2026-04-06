@@ -941,14 +941,9 @@ export class TrackerReplayer {
         channel.instrument = updatedInst;
       }
 
-      // Fire the note and schedule release after one row
+      // Fire the note — it sustains until the next note, note-off, or instrument switch.
+      // No scheduled release. This matches tracker behavior: notes ring until explicitly stopped.
       this.processRow(ch, channel, row, time);
-      const rowDuration = (2.5 / this.bpm) * this.speed;
-      try {
-        const engine = getToneEngine();
-        const config = this.instrumentMap.get(instId);
-        if (config) engine.triggerNoteRelease(instId, 'C4', time + rowDuration, config, ch);
-      } catch { /* ToneEngine not ready */ }
     }
 
     // NOTE: We intentionally do NOT call updateWasmMuteMask() here.
