@@ -210,7 +210,6 @@ export const useAutomationStore = create<AutomationStore>()(
 
     // Actions
     addCurve: (patternId, channelIndex, parameter) => {
-      console.warn('[AUTOMATION-DEBUG] addCurve called with channelIndex=', channelIndex, 'parameter=', parameter, 'patternId=', patternId);
       // Check if this parameter can be baked into native effects on export.
       // Inline check mirrors getEffectMapping logic from AutomationBaker.
       const limits = getActiveFormatLimits();
@@ -472,7 +471,6 @@ export const useAutomationStore = create<AutomationStore>()(
 
     // Multi-lane support
     addActiveParameter: (channelIndex, parameter) => {
-      console.warn('[AUTOMATION-DEBUG] addActiveParameter channelIndex=', channelIndex, 'parameter=', parameter);
       set((state) => {
         const existing = state.channelLanes.get(channelIndex) || { activeParameter: '', activeParameters: [], showLane: false, laneHeight: 48, collapsed: false };
         const params = [...(existing.activeParameters || [])];
