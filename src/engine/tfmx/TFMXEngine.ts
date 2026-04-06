@@ -25,7 +25,7 @@ export class TFMXEngine {
   private _resolveInit: (() => void) | null = null;
   private _playerHandleResolvers: Array<(handle: number) => void> = [];
   private _disposed = false;
-  private _positionCallbacks: Array<(update: { samplesRendered: number; songEnd: boolean }) => void> = [];
+  private _positionCallbacks: Array<(update: { samplesRendered: number; elapsedMs?: number; songEnd: boolean }) => void> = [];
   private _moduleLoadedResolvers: Array<(info: { voices: number; songs: number; duration: number }) => void> = [];
 
   private constructor() {
@@ -152,8 +152,12 @@ export class TFMXEngine {
 
         case 'modulePosition':
           for (const cb of this._positionCallbacks) {
-            cb({ samplesRendered: data.samplesRendered, elapsedMs: data.elapsedMs, durationMs: data.durationMs, songEnd: data.songEnd });
+            cb({ samplesRendered: data.samplesRendered, elapsedMs: data.elapsedMs, songEnd: data.songEnd });
           }
+          break;
+
+        case 'songEnd':
+          console.log('[TFMXEngine] Song ended');
           break;
       }
     };
@@ -230,7 +234,7 @@ export class TFMXEngine {
     this._positionCallbacks = [];
   }
 
-  onPositionUpdate(callback: (update: { samplesRendered: number; songEnd: boolean }) => void): () => void {
+  onPositionUpdate(callback: (update: { samplesRendered: number; elapsedMs?: number; songEnd: boolean }) => void): () => void {
     this._positionCallbacks.push(callback);
     return () => {
       const idx = this._positionCallbacks.indexOf(callback);
