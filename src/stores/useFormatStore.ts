@@ -647,16 +647,8 @@ export const useFormatStore = create<FormatStore>()(
           state.klysNative = song.klysNative;
           state.klysFileData = song.klysFileData ?? null;
         } else if (song.tfmxNative) {
-          // When TFMX WASM engine handles playback (tfmxFileData present), use
-          // the standard 4-channel tracker view for proper scroll + multi-channel display.
-          // The TFMX format view (single-pattern) is for editing, not playback follow.
-          if ((song as any).tfmxFileData) {
-            newEditorMode = 'classic';
-            state.editorMode = 'classic';
-          } else {
-            newEditorMode = 'tfmx';
-            state.editorMode = 'tfmx';
-          }
+          newEditorMode = 'tfmx';
+          state.editorMode = 'tfmx';
           clearNative(state);
           state.tfmxNative = song.tfmxNative;
           state.tfmxSelectedPattern = 0;
