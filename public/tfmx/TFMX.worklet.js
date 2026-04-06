@@ -249,11 +249,15 @@ class TFMXProcessor extends AudioWorkletProcessor {
         this._positionCounter -= 4410;
         const samplesRendered = this.wasm._tfmx_get_samples_rendered(this.ctx);
         const songEnd = this.wasm._tfmx_module_song_end(this.ctx);
-        // Send elapsed ms for position tracking (more reliable than BPM-based estimation)
         const sampleRate = this._sampleRate || 44100;
         const elapsedMs = Math.round((samplesRendered / sampleRate) * 1000);
-        const durationMs = this._moduleDuration || 0;
-        this.port.postMessage({ type: 'modulePosition', samplesRendered, elapsedMs, durationMs, songEnd: songEnd !== 0 });
+        this.port.postMessage({ type: 'modulePosition', samplesRendered, elapsedMs, songEnd: songEnd !== 0 });
+
+        // If song ended, notify main thread (even with loop_mode=1, some songs don't loop)
+        if (songEnd !== 0) {
+          this.port.postMessage({ type: 'songEnd' });
+          this._modulePlaying = false;
+        }
       }
       return true;
     }

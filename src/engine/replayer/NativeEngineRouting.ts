@@ -577,40 +577,53 @@ export async function startNativeEngines(
           musicLineEngine = instance as unknown as MusicLineEngine;
         }
 
-        // TFMX module position sync: use elapsed ms / duration for proportional position
+        // TFMX module position sync: use timing table (cumulativeJiffies → row/pattern)
         if (desc.key === 'TFMXModule' && 'onPositionUpdate' in instance) {
-          const patLens = song.patterns.map(p => p.length);
-          const order = song.songPositions;
-          // Total rows across all pattern positions
-          const totalRows = order.reduce((sum, idx) => sum + (patLens[idx] || 64), 0);
+          const timingTable = (song as any).tfmxTimingTable as
+            { patternIndex: number; row: number; cumulativeJiffies: number }[] | undefined;
+          const tfmxNative = (song as any).tfmxNative;
+          const activeSub = tfmxNative?.activeSubsong ?? 0;
+          const tempo = tfmxNative?.songTempos?.[activeSub] ?? 0;
+
+          // Compute ms per jiffy from TFMX tempo
+          // CIA mode (tempo >= 16): CIA timer A at 715909 Hz (PAL), jiffy = tempo/715909 sec
+          // VBlank mode (tempo < 16): jiffy = 1/50 sec = 20ms
+          const msPerJiffy = tempo >= 16
+            ? (tempo / 715909) * 1000
+            : 20;
 
           // Also drive FormatPlaybackState so TFMX format-mode rendering scrolls
           const { setFormatPlaybackRow, setFormatPlaybackPlaying } = await import('@/engine/FormatPlaybackState');
           setFormatPlaybackPlaying(true);
 
-          (instance as any).onPositionUpdate((update: { samplesRendered: number; elapsedMs?: number; durationMs?: number; songEnd: boolean }) => {
+          (instance as any).onPositionUpdate((update: { samplesRendered: number; elapsedMs?: number; songEnd: boolean }) => {
             const elapsed = update.elapsedMs ?? 0;
-            const duration = update.durationMs ?? 0;
-            if (duration <= 0 || totalRows <= 0) return;
+            if (!timingTable || timingTable.length === 0 || msPerJiffy <= 0) return;
 
-            // Proportional: elapsed/duration → absolute row within total rows
-            const fraction = Math.min(elapsed / duration, 1.0);
-            const absoluteRow = Math.floor(fraction * totalRows);
+            // Convert elapsed ms → jiffies, then binary search the timing table
+            const currentJiffies = elapsed / msPerJiffy;
 
-            let row = absoluteRow;
-            let position = 0;
-            for (let i = 0; i < order.length; i++) {
-              const patLen = patLens[order[i]] || 64;
-              if (row < patLen) { position = i; break; }
-              row -= patLen;
-              if (i === order.length - 1) { position = i; row = Math.max(0, row % patLen); }
+            // Binary search for the last entry where cumulativeJiffies <= currentJiffies
+            let lo = 0, hi = timingTable.length - 1;
+            while (lo < hi) {
+              const mid = (lo + hi + 1) >>> 1;
+              if (timingTable[mid].cumulativeJiffies <= currentJiffies) {
+                lo = mid;
+              } else {
+                hi = mid - 1;
+              }
             }
+
+            const entry = timingTable[lo];
+            const row = entry.row;
+            const position = entry.patternIndex;
+
             if (Number.isFinite(row) && Number.isFinite(position)) {
               useWasmPositionStore.getState().setPosition(row, position);
               setFormatPlaybackRow(row);
             }
           });
-          console.log(`[NativeEngineRouting] TFMXModule position sync wired`);
+          console.log(`[NativeEngineRouting] TFMXModule position sync wired (${timingTable?.length ?? 0} timing entries, ${msPerJiffy.toFixed(2)}ms/jiffy)`);
         }
 
         // Generic position sync for WASM engines with onPositionUpdate.
