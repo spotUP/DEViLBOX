@@ -96,24 +96,35 @@ const wasmEffects: EffectDescriptor[] = [
     id: 'Vocoder', name: 'Vocoder', category: 'wasm', group: 'Voice',
     loadMode: 'eager',
     create: async (c: EffectConfig) => {
-      const { VocoderEffect } = await import('@engine/effects/VocoderEffect');
+      const { VocoderEffect, VOCODER_EFFECT_PRESETS } = await import('@engine/effects/VocoderEffect');
       const p = c.parameters;
       const sourceStr = (typeof p.source === 'string' ? p.source : 'self') as 'self' | 'mic';
-      return new VocoderEffect({
+      const presetName = typeof p.preset === 'string' ? p.preset : '';
+      const preset = presetName ? VOCODER_EFFECT_PRESETS.find((x) => x.name === presetName) : undefined;
+
+      // If a preset is selected, its values seed the engine. Individual
+      // params still override (so the user can tweak after picking a preset).
+      const eff = new VocoderEffect({
         source: sourceStr,
-        carrierType: (Number(p.carrierType) || 3) as 0 | 1 | 2 | 3,
-        carrierFreq: Number(p.carrierFreq) || 130.81,
-        formantShift: Number(p.formantShift) || 1.0,
-        reactionTime: (Number(p.reactionTime) || 30) / 1000,
+        bands: Number(p.bands) || preset?.params.bands || 32,
+        filtersPerBand: Number(p.filtersPerBand) || preset?.params.filtersPerBand || 6,
+        carrierType: (Number(p.carrierType) ?? 3) as 0 | 1 | 2 | 3,
+        carrierFreq: Number(p.carrierFreq) || preset?.params.carrierFreq || 130.81,
+        formantShift: Number(p.formantShift) || preset?.params.formantShift || 1.0,
+        reactionTime: (Number(p.reactionTime) || (preset?.params.reactionTime ?? 0.03) * 1000) / 1000,
         wet: c.wet / 100,
       });
+      return eff;
     },
     getDefaultParameters: () => ({
+      preset: 'Kraftwerk',  // default voice
       source: 'self',
-      carrierType: 3,       // chord
-      carrierFreq: 130.81,  // C3
-      formantShift: 1.0,
-      reactionTime: 30,     // ms (stored as ms, divided by 1000 in create)
+      bands: 16,
+      filtersPerBand: 4,
+      carrierType: 0,       // saw
+      carrierFreq: 110.0,
+      formantShift: 0.7,
+      reactionTime: 25,     // ms (stored as ms, divided by 1000 in create)
     }),
   },
   {
