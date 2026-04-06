@@ -60,7 +60,7 @@ export const SAMControls: React.FC<SAMControlsProps> = ({
     <ScrollLockContainer>
       <div className="synth-controls-flow grid grid-cols-4 gap-2 p-2 h-full overflow-y-auto scrollbar-modern">
       {/* Speech Text Section */}
-      <div className={`p-2 rounded-lg border ${panelBg}`}>
+      <div className={`p-2 rounded-lg border border-dark-border ${panelBg}`}>
         <div className="flex items-center justify-between mb-2">
           <div className="flex items-center gap-2">
             <MessageSquare size={16} className="text-amber-500" />
@@ -121,7 +121,7 @@ export const SAMControls: React.FC<SAMControlsProps> = ({
       {/* Main Parameters Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {/* XY Pad for Mouth/Throat */}
-        <div className={`p-2 rounded-lg border ${panelBg} flex flex-col items-center`}>
+        <div className={`p-2 rounded-lg border border-dark-border ${panelBg} flex flex-col items-center`}>
           <div className="flex items-center gap-2 mb-2 w-full">
             <Activity size={16} className="text-amber-500" />
             <h3 className="font-bold text-amber-400 uppercase tracking-tight">VOCAL CHARACTER</h3>
@@ -196,7 +196,7 @@ export const SAMControls: React.FC<SAMControlsProps> = ({
         </div>
 
         {/* Knobs for Speed/Pitch */}
-        <div className={`p-2 rounded-lg border ${panelBg}`}>
+        <div className={`p-2 rounded-lg border border-dark-border ${panelBg}`}>
           <div className="flex items-center gap-2 mb-2">
             <Zap size={16} className="text-amber-500" />
             <h3 className="font-bold text-amber-400 uppercase tracking-tight">PERFORMANCE</h3>
@@ -223,7 +223,7 @@ export const SAMControls: React.FC<SAMControlsProps> = ({
       </div>
 
       {/* Phoneme Cheat Sheet */}
-      <div className={`rounded-xl border ${panelBg} overflow-hidden transition-all`}>
+      <div className={`rounded-xl border border-dark-border ${panelBg} overflow-hidden transition-all`}>
         <button 
           onClick={() => setShowPhonemes(!showPhonemes)}
           className="w-full p-3 flex items-center justify-between hover:bg-white/5 transition-colors"

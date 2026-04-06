@@ -91,7 +91,7 @@ export const MAMEControls: React.FC<MAMEControlsProps> = ({
   return (
     <div className="space-y-6">
       {/* Header Info */}
-      <div className={`flex items-center justify-between p-3 rounded border ${panelBg}`}>
+      <div className={`flex items-center justify-between p-3 rounded border border-dark-border ${panelBg}`}>
         <div className="flex items-center gap-3">
           <div className="p-2 bg-accent-primary/20 rounded">
             <Cpu style={{ color: accentColor }} size={20} />

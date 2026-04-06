@@ -71,7 +71,7 @@ export const SynareControls: React.FC<SynareControlsProps> = ({
   const renderMainTab = () => (
     <div className="grid grid-cols-4 gap-2 p-2">
       {/* Pitch & Tone Section */}
-      <div className={`p-2 rounded-lg border ${panelBg}`}>
+      <div className={`p-2 rounded-lg border border-dark-border ${panelBg}`}>
         <div className="flex items-center gap-2 mb-2">
           <Speaker size={16} className={isCyanTheme ? 'text-accent-highlight' : 'text-yellow-500'} />
           <h3 className={`font-bold ${isCyanTheme ? 'text-accent-highlight' : 'text-yellow-400'}`}>PITCH & TONE</h3>
@@ -162,7 +162,7 @@ export const SynareControls: React.FC<SynareControlsProps> = ({
       </div>
 
       {/* Noise Section */}
-      <div className={`p-2 rounded-lg border ${panelBg}`}>
+      <div className={`p-2 rounded-lg border border-dark-border ${panelBg}`}>
         <div className="flex items-center justify-between mb-2">
           <div className="flex items-center gap-2">
             <Wind size={16} className={isCyanTheme ? 'text-accent-highlight' : 'text-yellow-500'} />
@@ -224,7 +224,7 @@ export const SynareControls: React.FC<SynareControlsProps> = ({
       </div>
 
       {/* Sweep Section */}
-      <div className={`p-2 rounded-lg border ${panelBg}`}>
+      <div className={`p-2 rounded-lg border border-dark-border ${panelBg}`}>
         <div className="flex items-center justify-between mb-2">
           <div className="flex items-center gap-2">
             <MoveDown size={16} className={isCyanTheme ? 'text-accent-highlight' : 'text-yellow-500'} />
@@ -268,7 +268,7 @@ export const SynareControls: React.FC<SynareControlsProps> = ({
   const renderModTab = () => (
     <div className="grid grid-cols-4 gap-2 p-2">
       {/* Filter Section */}
-      <div className={`p-2 rounded-lg border ${panelBg}`}>
+      <div className={`p-2 rounded-lg border border-dark-border ${panelBg}`}>
         <div className="flex items-center gap-2 mb-2">
           <Activity size={16} className={isCyanTheme ? 'text-accent-highlight' : 'text-yellow-500'} />
           <h3 className={`font-bold ${isCyanTheme ? 'text-accent-highlight' : 'text-yellow-400'}`}>FILTER</h3>
@@ -323,7 +323,7 @@ export const SynareControls: React.FC<SynareControlsProps> = ({
       </div>
 
       {/* LFO Section */}
-      <div className={`p-2 rounded-lg border ${panelBg}`}>
+      <div className={`p-2 rounded-lg border border-dark-border ${panelBg}`}>
         <div className="flex items-center justify-between mb-2">
           <div className="flex items-center gap-2">
             <Waves size={16} className={isCyanTheme ? 'text-accent-highlight' : 'text-yellow-500'} />

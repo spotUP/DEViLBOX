@@ -53,7 +53,7 @@ export const V2SpeechControls: React.FC<V2SpeechControlsProps> = ({
     <ScrollLockContainer>
       <div className="synth-controls-flow grid grid-cols-4 gap-2 p-2 h-full overflow-y-auto scrollbar-modern">
       {/* Speech Text Section */}
-      <div className={`p-2 rounded-lg border ${panelBg}`}>
+      <div className={`p-2 rounded-lg border border-dark-border ${panelBg}`}>
         <div className="flex items-center justify-between mb-2">
           <div className="flex items-center gap-2">
             <MessageSquare size={16} className="text-amber-500" />
@@ -104,7 +104,7 @@ export const V2SpeechControls: React.FC<V2SpeechControlsProps> = ({
       )}
 
       {/* Voice Parameters */}
-      <div className={`p-2 rounded-lg border ${panelBg}`}>
+      <div className={`p-2 rounded-lg border border-dark-border ${panelBg}`}>
         <div className="flex items-center gap-2 mb-2">
           <Activity size={16} className="text-amber-500" />
           <h3 className="font-bold text-amber-400 uppercase tracking-tight">VOICE PARAMETERS</h3>
@@ -139,7 +139,7 @@ export const V2SpeechControls: React.FC<V2SpeechControlsProps> = ({
       </div>
 
       {/* Phoneme Cheat Sheet */}
-      <div className={`rounded-xl border ${panelBg} overflow-hidden transition-all`}>
+      <div className={`rounded-xl border border-dark-border ${panelBg} overflow-hidden transition-all`}>
         <button
           onClick={() => setShowPhonemes(!showPhonemes)}
           className="w-full p-3 flex items-center justify-between hover:bg-white/5 transition-colors"
