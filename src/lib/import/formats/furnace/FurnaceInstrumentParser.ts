@@ -30,6 +30,7 @@ export interface FurnaceSNESData {
 }
 export interface FurnaceN163Data {
   wave: number; wavePos: number; waveLen: number; waveMode: number; perChanPos?: boolean;
+  chPos?: number[]; chLen?: number[];
 }
 export interface FurnaceFDSData {
   modSpeed: number; modDepth: number; initModTableWithFirstWave: boolean;
@@ -240,8 +241,8 @@ export function parseInstrument(reader: BinaryReader): FurnaceInstrument {
           const c64f2 = reader.readUint8();
           const adsr1 = reader.readUint8();
           const adsr2 = reader.readUint8();
-          const duty = reader.readUint16() & 0xFFF;
-          const cutRes = reader.readUint16();
+          const duty = reader.readInt16() & 0xFFF; // Upstream readS() is signed
+          const cutRes = reader.readInt16();
           let res = cutRes >> 12;
           let resetDuty = false;
           // v199+: extra byte with high res bits and resetDuty flag
@@ -293,17 +294,16 @@ export function parseInstrument(reader: BinaryReader): FurnaceInstrument {
           const n163waveLen = reader.readUint8();
           const n163waveMode = reader.readUint8();
           let perChanPos = false;
-          // v164+: perChanPos flag and optional per-channel wave pos/len arrays
+          let n163ChPos: number[] | undefined, n163ChLen: number[] | undefined;
           if (reader.getOffset() < featEnd) {
             perChanPos = reader.readUint8() !== 0;
             if (perChanPos) {
-              // Per-channel wave positions (8 channels)
-              for (let i = 0; i < 8; i++) reader.readUint8();
-              // Per-channel wave lengths (8 channels)
-              for (let i = 0; i < 8; i++) reader.readUint8();
+              n163ChPos = []; n163ChLen = [];
+              for (let i = 0; i < 8; i++) n163ChPos.push(reader.readUint8());
+              for (let i = 0; i < 8; i++) n163ChLen.push(reader.readUint8());
             }
           }
-          inst.n163 = { wave: n163wave, wavePos: n163wavePos, waveLen: n163waveLen, waveMode: n163waveMode, perChanPos };
+          inst.n163 = { wave: n163wave, wavePos: n163wavePos, waveLen: n163waveLen, waveMode: n163waveMode, perChanPos, chPos: n163ChPos, chLen: n163ChLen };
           break;
         }
         case 'FD': {
@@ -426,13 +426,69 @@ export function parseInstrument(reader: BinaryReader): FurnaceInstrument {
           };
           break;
         }
-        case 'LD': // OPL drums (fixedDrums, kickFreq, snareHatFreq, tomTopFreq)
-        case 'WS': // WaveSynth
-        case 'X1': // X1-010 bank slot
-        case 'NE': // NES DPCM note map
-        case 'S3': // SID3 (enhanced C64 SID)
-          // Preserved in rawBinaryData; no TS parsing needed yet.
+        case 'LD': {
+          if (!inst.fm) inst.fm = { ...DEFAULT_FURNACE, operators: [], macros: [], opMacros: [], wavetables: [] };
+          inst.fm.fixedDrums = reader.readUint8() !== 0;
+          inst.fm.kickFreq = reader.readUint16();
+          inst.fm.snareHatFreq = reader.readUint16();
+          inst.fm.tomTopFreq = reader.readUint16();
           break;
+        }
+        case 'WS': {
+          if (!inst.fm) inst.fm = { ...DEFAULT_FURNACE, operators: [], macros: [], opMacros: [], wavetables: [] };
+          const wsW1 = reader.readInt32(), wsW2 = reader.readInt32();
+          const wsRd = reader.readUint8(), wsEf = reader.readUint8();
+          const wsEn = reader.readUint8() !== 0, wsGl = reader.readUint8() !== 0;
+          const wsSp = reader.readUint8(), wsP1 = reader.readUint8(), wsP2 = reader.readUint8(), wsP3 = reader.readUint8(), wsP4 = reader.readUint8();
+          inst.fm.ws = { enabled: wsEn, wave1: wsW1, wave2: wsW2, rateDivider: wsRd, effect: wsEf, oneShot: false, global: wsGl, speed: wsSp, param1: wsP1, param2: wsP2, param3: wsP3, param4: wsP4 } as any;
+          break;
+        }
+        case 'X1': {
+          if (!inst.fm) inst.fm = { ...DEFAULT_FURNACE, operators: [], macros: [], opMacros: [], wavetables: [] };
+          inst.fm.x1BankSlot = reader.readInt32();
+          break;
+        }
+        case 'NE': {
+          if (!inst.fm) inst.fm = { ...DEFAULT_FURNACE, operators: [], macros: [], opMacros: [], wavetables: [] };
+          const neUse = reader.readUint8() !== 0;
+          if (neUse) {
+            const dMap: Array<{ freq: number; delta: number }> = [];
+            for (let n = 0; n < 120; n++) dMap.push({ freq: reader.readUint8(), delta: reader.readUint8() });
+            if (!inst.fm.nes) inst.fm.nes = { dutyNoise: 0, envMode: 'env', envValue: 15, sweepEnabled: false, sweepPeriod: 0, sweepNegate: false, sweepShift: 0 };
+            inst.fm.nes.dpcmNoteMap = true;
+            inst.fm.nes.dpcmMap = dMap;
+          }
+          break;
+        }
+        case 'S3': {
+          if (!inst.fm) inst.fm = { ...DEFAULT_FURNACE, operators: [], macros: [], opMacros: [], wavetables: [] };
+          const s3of = reader.readUint8();
+          const s3a = reader.readUint8(), s3d = reader.readUint8(), s3s = reader.readUint8(), s3sr = reader.readUint8(), s3r = reader.readUint8();
+          const s3mm = reader.readUint8(), s3du = reader.readInt16(), s3of2 = reader.readUint8();
+          const s3pms = reader.readUint8(), s3rms = reader.readUint8(), s3ss = reader.readUint8(), s3sw = reader.readUint8(), s3pi = reader.readUint8(), s3fb = reader.readUint8();
+          const s3nf = reader.readUint8();
+          const s3filt: any[] = [];
+          for (let fi = 0; fi < Math.min(s3nf, 4); fi++) {
+            const ff1 = reader.readUint8(), ff2 = reader.readUint8();
+            s3filt.push({
+              enabled: !!(ff1 & 0x80), init: !!(ff1 & 0x40), absoluteCutoff: !!(ff1 & 0x20),
+              bindCutoffToNote: !!(ff1 & 0x10), bindCutoffToNoteDir: !!(ff1 & 0x08), bindCutoffOnNote: !!(ff1 & 0x04),
+              bindResonanceToNote: !!(ff1 & 0x02), bindResonanceToNoteDir: !!(ff1 & 0x01), bindResonanceOnNote: !!(ff2 & 0x80),
+              cutoff: reader.readUint16(), resonance: reader.readUint8(), outputVolume: reader.readUint8(),
+              distortion: reader.readUint8(), mode: reader.readUint8(), filterMatrix: reader.readUint8(),
+              bindCutoffToNoteStrength: reader.readUint8(), bindCutoffToNoteCenter: reader.readUint8(),
+              bindResonanceToNoteStrength: reader.readUint8(), bindResonanceToNoteCenter: reader.readUint8(),
+            });
+          }
+          inst.fm.sid3 = {
+            triOn: !!(s3of & 1), sawOn: !!(s3of & 2), pulseOn: !!(s3of & 4), noiseOn: !!(s3of & 8), dutyIsAbs: !!(s3of & 0x80),
+            a: s3a, d: s3d, s: s3s, sr: s3sr, r: s3r, mixMode: s3mm, duty: s3du,
+            ringMod: !!(s3of2 & 1), oscSync: !!(s3of2 & 2), resetDuty: !!(s3of2 & 4), doWavetable: !!(s3of2 & 8),
+            separateNoisePitch: !!(s3of2 & 0x10), oneBitNoise: !!(s3of2 & 0x20), specialWaveOn: !!(s3of2 & 0x40), phaseMod: !!(s3of2 & 0x80),
+            phaseModSource: s3pms, ringModSource: s3rms, syncSource: s3ss, specialWave: s3sw, phaseInv: s3pi, feedback: s3fb, filters: s3filt,
+          } as any;
+          break;
+        }
         default:
           // Unknown feature, skip (reader.seek(featEnd) handles it)
           break;
@@ -474,7 +530,7 @@ export function parseInstrument(reader: BinaryReader): FurnaceInstrument {
       const tl = reader.readUint8();
       const dt2 = reader.readUint8();
       const rs = reader.readUint8();
-      const dt = reader.readUint8();
+      const dt = reader.readInt8(); // Upstream readC() is signed char
       const d2r = reader.readUint8();
       const ssg = reader.readUint8();
 
@@ -545,7 +601,7 @@ export function parseInstrument(reader: BinaryReader): FurnaceInstrument {
     const c64D = reader.readUint8();
     const c64S = reader.readUint8();
     const c64R = reader.readUint8();
-    const c64Duty = reader.readUint16(); // 2 bytes
+    const c64Duty = reader.readInt16(); // Upstream readS() is signed
     const c64RingMod = reader.readUint8() !== 0;
     const c64OscSync = reader.readUint8() !== 0;
     const c64ToFilter = reader.readUint8() !== 0;
@@ -556,7 +612,7 @@ export function parseInstrument(reader: BinaryReader): FurnaceInstrument {
     const c64Bp = reader.readUint8() !== 0;
     const c64Hp = reader.readUint8() !== 0;
     const c64Ch3Off = reader.readUint8() !== 0;
-    const c64Cut = reader.readUint16(); // 2 bytes
+    const c64Cut = reader.readInt16(); // Upstream readS() is signed
     const c64DutyIsAbs = reader.readUint8() !== 0;
     const c64FilterIsAbs = reader.readUint8() !== 0;
 
@@ -1002,17 +1058,12 @@ export function parseInstrument(reader: BinaryReader): FurnaceInstrument {
     // Wave Synth (v79+) — Reference: instrument.cpp:3381-3394
     // ========================================================================
     if (instVersion >= 79) {
-      reader.readInt32();  // ws.wave1
-      reader.readInt32();  // ws.wave2
-      reader.readUint8();  // ws.rateDivider
-      reader.readUint8();  // ws.effect
-      reader.readUint8();  // ws.enabled
-      reader.readUint8();  // ws.global
-      reader.readUint8();  // ws.speed
-      reader.readUint8();  // ws.param1
-      reader.readUint8();  // ws.param2
-      reader.readUint8();  // ws.param3
-      reader.readUint8();  // ws.param4
+      const wsW1 = reader.readInt32(), wsW2 = reader.readInt32();
+      const wsRd = reader.readUint8(), wsEf = reader.readUint8();
+      const wsEn = reader.readUint8() !== 0, wsGl = reader.readUint8() !== 0;
+      const wsSp = reader.readUint8(), wsP1 = reader.readUint8(), wsP2 = reader.readUint8(), wsP3 = reader.readUint8(), wsP4 = reader.readUint8();
+      if (!inst.fm) inst.fm = { ...DEFAULT_FURNACE, operators: [], macros: [], opMacros: [], wavetables: [] };
+      inst.fm.ws = { enabled: wsEn, wave1: wsW1, wave2: wsW2, rateDivider: wsRd, effect: wsEf, oneShot: false, global: wsGl, speed: wsSp, param1: wsP1, param2: wsP2, param3: wsP3, param4: wsP4 } as any;
     }
 
     // ========================================================================
@@ -1059,8 +1110,11 @@ export function parseInstrument(reader: BinaryReader): FurnaceInstrument {
     // MultiPCM (v93+) — Reference: instrument.cpp:3424-3437
     // ========================================================================
     if (instVersion >= 93) {
-      // 9 parameter bytes + 23 reserved = 32 bytes total
-      for (let k = 0; k < 32; k++) reader.readUint8();
+      const mpAr = reader.readUint8(), mpD1r = reader.readUint8(), mpDl = reader.readUint8();
+      const mpD2r = reader.readUint8(), mpRr = reader.readUint8(), mpRc = reader.readUint8();
+      const mpLfo = reader.readUint8(), mpVib = reader.readUint8(), mpAm = reader.readUint8();
+      for (let k = 0; k < 23; k++) reader.readUint8(); // reserved
+      inst.multipcm = { ar: mpAr, d1r: mpD1r, dl: mpDl, d2r: mpD2r, rr: mpRr, rc: mpRc, lfo: mpLfo, vib: mpVib, am: mpAm, damp: false, pseudoReverb: false, lfoReset: false, levelDirect: false };
     }
 
     // ========================================================================
@@ -1068,8 +1122,9 @@ export function parseInstrument(reader: BinaryReader): FurnaceInstrument {
     // ========================================================================
     if (instVersion >= 104) {
       const useSample = reader.readUint8() !== 0;
-      reader.readUint8(); // su.switchRoles
+      const suSwitch = reader.readUint8() !== 0;
       if (inst.amiga) inst.amiga.useSample = useSample;
+      inst.soundUnit = { switchRoles: suSwitch, hwSeqLen: 0, hwSeq: [] };
     }
 
     // ========================================================================
@@ -1105,8 +1160,10 @@ export function parseInstrument(reader: BinaryReader): FurnaceInstrument {
     // ES5506 (v107+) — Reference: instrument.cpp:3460-3472
     // ========================================================================
     if (instVersion >= 107) {
-      // filter mode(1) + k1(2) + k2(2) + ecount(2) + lVRamp(1) + rVRamp(1) + k1Ramp(1) + k2Ramp(1) + k1Slow(1) + k2Slow(1) = 13 bytes
-      for (let k = 0; k < 13; k++) reader.readUint8();
+      const esFm = reader.readUint8(), esK1 = reader.readInt16(), esK2 = reader.readInt16();
+      const esEc = reader.readInt16(), esLV = reader.readInt8(), esRV = reader.readInt8();
+      const esK1R = reader.readInt8(), esK2R = reader.readInt8(), esK1S = reader.readUint8() !== 0, esK2S = reader.readUint8() !== 0;
+      inst.es5506 = { filter: { mode: esFm, k1: esK1, k2: esK2 }, envelope: { ecount: esEc, lVRamp: esLV, rVRamp: esRV, k1Ramp: esK1R, k2Ramp: esK2R, k1Slow: esK1S, k2Slow: esK2S } };
     }
 
     // ========================================================================
@@ -1511,9 +1568,9 @@ export function encodeInstrumentAsINS2(inst: FurnaceInstrument, formatVersion: n
     // Byte 3: S(7-4) + R(3-0)
     writeUint8(((c.s & 0x0F) << 4) | (c.r & 0x0F));
     // Bytes 4-5: duty (16-bit LE, masked to 12 bits)
-    writeUint16(c.duty & 0xFFF);
+    writeInt16(c.duty & 0xFFF); // Upstream writeS()
     // Bytes 6-7: cut(11-0) + res(15-12)
-    writeUint16((c.cut & 0xFFF) | ((c.res & 0x0F) << 12));
+    writeInt16((c.cut & 0xFFF) | ((c.res & 0x0F) << 12)); // Upstream writeS()
     // Extra byte (v199+): high res bits + resetDuty flag
     writeUint8(((c.res >> 4) & 0x0F) | (c.resetDuty ? 0x10 : 0));
     endFeature(lenPos);
@@ -1587,9 +1644,9 @@ export function encodeInstrumentAsINS2(inst: FurnaceInstrument, formatVersion: n
     const e = inst.es5506;
     const lenPos = startFeature('ES');
     writeUint8(e.filter.mode);
-    writeUint16(e.filter.k1);
-    writeUint16(e.filter.k2);
-    writeUint16(e.envelope.ecount);
+    writeInt16(e.filter.k1); // Upstream writeS()
+    writeInt16(e.filter.k2);
+    writeInt16(e.envelope.ecount);
     writeInt8(e.envelope.lVRamp);
     writeInt8(e.envelope.rVRamp);
     writeInt8(e.envelope.k1Ramp);
@@ -1656,10 +1713,79 @@ export function encodeInstrumentAsINS2(inst: FurnaceInstrument, formatVersion: n
     endFeature(lenPos);
   }
 
-  // ── WS: WaveSynth (encode from raw type field if present on fm) ──
-  // WaveSynth data is preserved in rawBinaryData for INS2 instruments;
-  // for INST instruments it's parsed but not stored on the FurnaceInstrument interface.
-  // If needed in the future, add ws?: FurnaceWaveSynthData to the interface.
+  // ── LS: Sample list ──
+  if (inst.samples && inst.samples.length > 0) {
+    const lenPos = startFeature('LS');
+    writeInt16(inst.samples.length);
+    for (const idx of inst.samples) writeInt16(idx);
+    endFeature(lenPos);
+  }
+
+  // ── LW: Wave list ──
+  if (inst.wavetables && inst.wavetables.length > 0) {
+    const lenPos = startFeature('LW');
+    writeInt16(inst.wavetables.length);
+    for (const idx of inst.wavetables) writeInt16(idx);
+    endFeature(lenPos);
+  }
+
+  // ── WS: WaveSynth ──
+  if (inst.fm?.ws) {
+    const ws = inst.fm.ws as any;
+    const lenPos = startFeature('WS');
+    writeInt32(ws.wave1 ?? 0); writeInt32(ws.wave2 ?? 0);
+    writeUint8(ws.rateDivider ?? 1); writeUint8(ws.effect ?? 0);
+    writeUint8(ws.enabled ? 1 : 0); writeUint8(ws.global ? 1 : 0);
+    writeUint8(ws.speed ?? 0); writeUint8(ws.param1 ?? 0); writeUint8(ws.param2 ?? 0); writeUint8(ws.param3 ?? 0); writeUint8(ws.param4 ?? 0);
+    endFeature(lenPos);
+  }
+
+  // ── LD: OPL Drums ──
+  if (inst.fm?.fixedDrums != null) {
+    const lenPos = startFeature('LD');
+    writeUint8(inst.fm.fixedDrums ? 1 : 0);
+    writeUint16(inst.fm.kickFreq ?? 0); writeUint16(inst.fm.snareHatFreq ?? 0); writeUint16(inst.fm.tomTopFreq ?? 0);
+    endFeature(lenPos);
+  }
+
+  // ── X1: X1-010 bank slot ──
+  if (inst.fm?.x1BankSlot != null) {
+    const lenPos = startFeature('X1');
+    writeInt32(inst.fm.x1BankSlot);
+    endFeature(lenPos);
+  }
+
+  // ── NE: NES DPCM ──
+  if (inst.fm?.nes?.dpcmNoteMap) {
+    const nes = inst.fm.nes as any;
+    const lenPos = startFeature('NE');
+    writeUint8(1);
+    for (let i = 0; i < 120; i++) { writeUint8(nes.dpcmMap?.[i]?.freq ?? 0); writeUint8(nes.dpcmMap?.[i]?.delta ?? 0); }
+    endFeature(lenPos);
+  }
+
+  // ── S3: SID3 ──
+  if (inst.fm?.sid3) {
+    const s3 = inst.fm.sid3 as any;
+    const lenPos = startFeature('S3');
+    writeUint8((s3.triOn?1:0)|(s3.sawOn?2:0)|(s3.pulseOn?4:0)|(s3.noiseOn?8:0)|(s3.dutyIsAbs?0x80:0));
+    writeUint8(s3.a??0); writeUint8(s3.d??0); writeUint8(s3.s??0); writeUint8(s3.sr??0); writeUint8(s3.r??0);
+    writeUint8(s3.mixMode??0); writeInt16(s3.duty??0);
+    writeUint8((s3.ringMod?1:0)|(s3.oscSync?2:0)|(s3.resetDuty?4:0)|(s3.doWavetable?8:0)|(s3.separateNoisePitch?0x10:0)|(s3.oneBitNoise?0x20:0)|(s3.specialWaveOn?0x40:0)|(s3.phaseMod?0x80:0));
+    writeUint8(s3.phaseModSource??0); writeUint8(s3.ringModSource??0); writeUint8(s3.syncSource??0);
+    writeUint8(s3.specialWave??0); writeUint8(s3.phaseInv??0); writeUint8(s3.feedback??0);
+    const filters = s3.filters ?? [];
+    writeUint8(filters.length);
+    for (const f of filters) {
+      writeUint8((f.enabled?0x80:0)|(f.init?0x40:0)|(f.absoluteCutoff?0x20:0)|(f.bindCutoffToNote?0x10:0)|(f.bindCutoffToNoteDir?0x08:0)|(f.bindCutoffOnNote?0x04:0)|(f.bindResonanceToNote?0x02:0)|(f.bindResonanceToNoteDir?0x01:0));
+      writeUint8(f.bindResonanceOnNote?0x80:0);
+      writeUint16(f.cutoff??0); writeUint8(f.resonance??0); writeUint8(f.outputVolume??0); writeUint8(f.distortion??0);
+      writeUint8(f.mode??0); writeUint8(f.filterMatrix??0);
+      writeUint8(f.bindCutoffToNoteStrength??0); writeUint8(f.bindCutoffToNoteCenter??0);
+      writeUint8(f.bindResonanceToNoteStrength??0); writeUint8(f.bindResonanceToNoteCenter??0);
+    }
+    endFeature(lenPos);
+  }
 
   // ── EN: End marker ──
   writeAscii('EN');
