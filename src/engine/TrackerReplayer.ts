@@ -1495,13 +1495,23 @@ export class TrackerReplayer {
       if (gen !== this._playGeneration) return;
       if (result.suppressNotes) this._suppressNotes = true;
       if (result.c64SidEngine) this.c64SidEngine = result.c64SidEngine;
-      // Wire the active WASM engine for hybrid playback mute mask updates
+      // Wire the active WASM engine for hybrid playback mute mask updates.
+      // Try engines returned in the result first, then probe singletons.
       if (result.uadeEngine && 'setMuteMask' in result.uadeEngine) {
         this._activeWasmEngine = result.uadeEngine;
       } else if (result.musicLineEngine && 'setMuteMask' in result.musicLineEngine) {
         this._activeWasmEngine = result.musicLineEngine as unknown as { setMuteMask(mask: number): void };
       } else if (result.hivelyEngine && 'setMuteMask' in result.hivelyEngine) {
         this._activeWasmEngine = result.hivelyEngine as unknown as { setMuteMask(mask: number): void };
+      } else if (result.suppressNotes) {
+        // A WASM engine started but wasn't in the result — probe singletons
+        // This covers JamCracker, FC, Klystrack, PxTone, Organya, etc.
+        void import('@stores/useMixerStore').then(({ getActiveGainEngine }) => {
+          const engine = getActiveGainEngine();
+          if (engine && 'setMuteMask' in engine) {
+            this._activeWasmEngine = engine as { setMuteMask(mask: number): void };
+          }
+        }).catch(() => {});
       }
 
       // Subscribe to HivelyEngine position updates (~15fps from WASM)
@@ -1697,6 +1707,23 @@ export class TrackerReplayer {
     }
 
     this.playing = true;
+
+    // ── Universal hybrid playback setup (ALL formats) ──────────────────────
+    // Rebuild _replacedInstruments from current instrument store state.
+    // Any instrument whose synthType is not Sampler/Player is "replaced" —
+    // the hybrid block will fire ToneEngine notes for it.
+    {
+      const { useInstrumentStore } = await import('@stores/useInstrumentStore');
+      const instruments = useInstrumentStore.getState().instruments;
+      for (const inst of instruments) {
+        if (inst.synthType !== 'Sampler' && inst.synthType !== 'Player') {
+          this._replacedInstruments.add(inst.id);
+        }
+      }
+      if (this._replacedInstruments.size > 0) {
+        console.log('[HybridPlayback] Replaced instruments:', Array.from(this._replacedInstruments));
+      }
+    }
 
     // Start automation capture → store sync (converts register writes to automation curves)
     resetCaptureSync();
@@ -1906,22 +1933,7 @@ export class TrackerReplayer {
 
         _log('[TrackerReplayer] libopenmpt available:', mptEngine.isAvailable());
         if (mptEngine.isAvailable()) {
-          // Rebuild _replacedInstruments from current instrument store state.
-          // The store's markInstrumentReplaced() may not have fired (HMR, race, etc.)
-          // so we do an authoritative check here: any instrument that's now a synth
-          // (not Sampler/Player) in a libopenmpt-backed song is "replaced".
-          {
-            const { useInstrumentStore } = await import('@stores/useInstrumentStore');
-            const instruments = useInstrumentStore.getState().instruments;
-            for (const inst of instruments) {
-              if (inst.synthType !== 'Sampler' && inst.synthType !== 'Player') {
-                this._replacedInstruments.add(inst.id);
-              }
-            }
-            if (this._replacedInstruments.size > 0) {
-              console.log('[HybridPlayback] Replaced instruments:', Array.from(this._replacedInstruments));
-            }
-          }
+          // _replacedInstruments already rebuilt above (universal path)
 
           // If edits have been made, re-serialize from the soundlib to get updated module data
           let tuneData = this.song.libopenmptFileData;
