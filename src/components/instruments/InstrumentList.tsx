@@ -5,6 +5,7 @@
  */
 
 import React, { useState, useRef, useEffect, useCallback, memo } from 'react';
+import { ConfirmDialog } from '@/components/common/ConfirmDialog';
 import { useInstrumentStore } from '@stores/useInstrumentStore';
 import { useUIStore } from '@stores/useUIStore';
 import { useShallow } from 'zustand/react/shallow';
@@ -198,14 +199,31 @@ export const InstrumentList: React.FC<InstrumentListProps> = memo(({
       // In both cases, fall back to a temporary oscillator for preview.
       const toneInst = engine.getInstrument(inst.id, inst);
       const isEmptySampler = toneInst && inst.synthType === 'Sampler' && !inst.sample?.url && !inst.sample?.audioBuffer;
-      const isUADESynth = inst.synthType === 'UADESynth';
-      if (!toneInst || isEmptySampler || isUADESynth) {
+
+      // GT Ultra SID: play through the WASM SID engine using playtestnote
+      // (works even when song is stopped — initializes instrument tables properly)
+      if (inst.synthType === 'GTUltraSynth') {
+        const { useGTUltraStore } = await import('@stores/useGTUltraStore');
+        const gtEngine = useGTUltraStore.getState().engine;
+        if (gtEngine) {
+          const gtInstIdx = Math.max(1, Math.min(63, inst.id));
+          gtEngine.playTestNote(0, 49, gtInstIdx); // Channel 0, GT note 49 (≈C-4)
+          previewTimeoutRef.current = window.setTimeout(() => {
+            gtEngine.releaseTestNote(0);
+          }, 500);
+        }
+        return;
+      }
+
+      // UADE: skip preview (no way to trigger individual instruments)
+      if (inst.synthType === 'UADESynth') return;
+
+      if (!toneInst || isEmptySampler) {
         // Fallback: play a short oscillator tone for WASM-only instruments
         const wfMap: Record<string, OscillatorType> = {
           StartrekkerAMSynth: 'sine',
           C64SID: 'square',
           Sc68Synth: 'square',
-          UADESynth: 'triangle',
           Sampler: 'triangle',  // empty Sampler fallback
         };
         const wf = wfMap[inst.synthType ?? ''] ?? 'triangle';
@@ -248,7 +266,23 @@ export const InstrumentList: React.FC<InstrumentListProps> = memo(({
     setShowNewInstrumentBrowser(true);
   };
 
+  const [compatWarning, setCompatWarning] = useState<{ synthType: SynthType; format: string } | null>(null);
+
   const handleCreateWithSynthType = (synthType: SynthType) => {
+    // Warn if adding a synth instrument to a native format song
+    if (synthType !== 'Sampler' && synthType !== 'Player') {
+      try {
+        const { getTrackerReplayer } = require('@engine/TrackerReplayer');
+        const song = getTrackerReplayer().getSong();
+        if (song && !compatWarning) {
+          const fmt = song.format?.toUpperCase() || 'native';
+          setCompatWarning({ synthType, format: fmt });
+          return;
+        }
+      } catch { /* replayer not initialized */ }
+    }
+    setCompatWarning(null);
+
     const synthInfo = getSynthInfo(synthType);
     const config: Partial<InstrumentConfig> = {
       synthType,
@@ -832,6 +866,25 @@ export const InstrumentList: React.FC<InstrumentListProps> = memo(({
       {showFurnaceBrowserDialog && (
         <FurnacePresetBrowser onClose={() => setShowFurnaceBrowserDialog(false)} />
       )}
+      {/* Format compatibility confirmation dialog */}
+      <ConfirmDialog
+        isOpen={!!compatWarning}
+        title="Format Compatibility Warning"
+        message={compatWarning
+          ? `Adding a synth instrument breaks ${compatWarning.format} format compatibility. The song can no longer be saved as ${compatWarning.format} — save as .dbx instead.`
+          : ''}
+        confirmLabel="Continue"
+        danger
+        onConfirm={() => {
+          if (compatWarning) {
+            const st = compatWarning.synthType;
+            setCompatWarning(null);
+            handleCreateWithSynthType(st);
+          }
+        }}
+        onClose={() => setCompatWarning(null)}
+      />
+
       {showNewInstrumentBrowser && (
         <div className="fixed inset-0 z-[99990] bg-black/80 flex items-center justify-center" onClick={() => setShowNewInstrumentBrowser(false)}>
           <div className="bg-dark-bg border border-dark-border rounded-lg shadow-2xl w-[90%] max-w-4xl max-h-[85vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
