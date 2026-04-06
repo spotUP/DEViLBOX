@@ -28,16 +28,24 @@
  *
  * ─── Deferred (not yet implemented) ──────────────────────────────────────────
  *
- * 1. Per-macro preview button — needs a new WASM C export to play an arbitrary
- *    macro on a free voice without loading a separate Hippel-format instrument
- *    blob. The existing _tfmx_load_instrument path expects a different binary
- *    layout. Tracked as a TODO until the C side grows
- *    `tfmx_module_preview_macro(ctx, macroIdx, note, velocity)`.
+ * 1. Per-macro audition (play one macro in isolation) — would need a new C
+ *    export inside libtfmxaudiodecoder (third-party/libtfmxaudiodecoder-main)
+ *    that wraps `TFMXDecoder::noteCmd()` so it can be triggered with an
+ *    arbitrary (macroIdx, note, volume, channel) without going through the
+ *    sequencer. The function exists internally (Macro.cpp:525, the
+ *    `macroFunc_PlayMacro` opcode handler) but is private and the proxy
+ *    layer doesn't expose it.
  *
- * 2. Hippel TFMX-7V edit-write-back — the legacy TFMXControls component shows
- *    VolModSeq/SndModSeq macros from the 7V format but doesn't write back.
- *    Adding edit support requires per-command encoders and a separate parser
- *    flow for the .tfx file format. Out of scope for the mdat editor here.
+ *    Since CLAUDE.md forbids modifying `third-party/`, the practical
+ *    workaround is the **Find Usage** button — it locates a real song
+ *    position where this macro is referenced and seeks playback there, so
+ *    the user hears the macro in its natural musical context. This covers
+ *    most of the audition UX without library changes.
+ *
+ *    If a true preview is ever needed, the right path is to upstream the
+ *    new C export to libtfmxaudiodecoder, then bump the submodule. The
+ *    full TFMXEngine + worklet plumbing for it (`reloadModule` already
+ *    follows the same shape) is straightforward once the C call exists.
  */
 
 import React, { useMemo, useState, useCallback } from 'react';

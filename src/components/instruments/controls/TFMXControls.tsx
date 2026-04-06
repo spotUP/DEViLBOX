@@ -344,10 +344,14 @@ export const TFMXControls: React.FC<TFMXControlsProps> = ({ config, onChange, ua
    * Write a single byte into sndModSeqData, call onChange, and mirror the
    * change to chip RAM when a UADE context is active.
    *
-   * The SndModSeq block sits immediately after the 64-byte VolModSeq in chip
-   * RAM, so the absolute address is `instrBase + 64 + byteIdx`. byteIdx is
-   * the absolute offset into the entire sndModSeqData buffer (sequence index
-   * × 64 + position within that sequence).
+   * For Hippel TFMX-7V, SndModSeq is a SHARED pool that lives at a separate
+   * file offset from this instrument's VolModSeq — `uadeChipRam.sections
+   * .sndModSeqsBase` carries the absolute address. For other formats where
+   * SndModSeq sits immediately after the 64-byte VolModSeq, we fall back to
+   * `instrBase + 64 + byteIdx`.
+   *
+   * byteIdx is the offset into the entire sndModSeqData buffer (sequence
+   * index × 64 + position within that sequence).
    */
   const setSndByte = useCallback((byteIdx: number, value: number) => {
     if (!onChange) return;
@@ -356,8 +360,9 @@ export const TFMXControls: React.FC<TFMXControlsProps> = ({ config, onChange, ua
     next[byteIdx] = Math.max(0, Math.min(255, value));
     onChange({ ...cur, sndModSeqData: next });
     if (uadeChipRam) {
-      // VolModSeq is 64 bytes; SndModSeq blocks follow immediately after.
-      void getEditor().writeU8(uadeChipRam.instrBase + 64 + byteIdx, next[byteIdx]);
+      const sndBase = (uadeChipRam.sections as { sndModSeqsBase?: number } | undefined)?.sndModSeqsBase;
+      const addr = sndBase !== undefined ? sndBase + byteIdx : uadeChipRam.instrBase + 64 + byteIdx;
+      void getEditor().writeU8(addr, next[byteIdx]);
     }
   }, [onChange, uadeChipRam, getEditor]);
 
