@@ -37,6 +37,7 @@ import { DEFAULT_WAVESABRE_INSTRUMENT } from '@typedefs/wavesabreInstrument';
 import { getFirstPresetForSynthType } from '@constants/factoryPresets';
 import { getDefaultFurnaceConfig } from '@engine/InstrumentFactory';
 import { getToneEngine } from '@engine/ToneEngine';
+import { useFormatStore } from '@stores/useFormatStore';
 import { FurnaceParser } from '@/lib/import/formats/FurnaceParser';
 import { DefleMaskParser } from '@/lib/import/formats/DefleMaskParser';
 import { deepMerge, ensureCompleteInstrumentConfig } from '@/lib/migration';
@@ -89,7 +90,6 @@ const bakingInstruments = new Set<number>();
  * Called from ALL store entry points that can change synthType.
  */
 let _formatCompatConfirmed = false;
-let _currentSongFormat: string | null = null;
 
 function checkFormatCompatibility(newSynthType: string | undefined, oldSynthType?: string): boolean {
   // No warning needed for Sampler/Player
@@ -98,24 +98,36 @@ function checkFormatCompatibility(newSynthType: string | undefined, oldSynthType
   if (oldSynthType && newSynthType === oldSynthType) return true;
   // Already confirmed this session (reset on song load)
   if (_formatCompatConfirmed) return true;
-  // No song loaded or no format tracked
-  if (!_currentSongFormat) return true;
 
-  const fmt = _currentSongFormat.toUpperCase();
-  const confirmed = window.confirm(
-    `This breaks ${fmt} format compatibility.\n\n` +
-    `The song can no longer be saved as ${fmt} — save as .dbx instead.\n\n` +
-    `Continue?`
-  );
-  if (confirmed) {
-    _formatCompatConfirmed = true; // don't ask again for this song
+  // Check if a native format is loaded by reading the format store
+  try {
+    const fmt = useFormatStore.getState();
+    const hasNativeFormat = !!(
+      fmt.libopenmptFileData || fmt.uadeEditableFileData || fmt.hivelyFileData ||
+      fmt.klysFileData || fmt.c64SidFileData || fmt.musiclineFileData ||
+      fmt.jamCrackerFileData || fmt.futurePlayerFileData || fmt.preTrackerFileData ||
+      fmt.maFileData || fmt.hippelFileData || fmt.sonixFileData || fmt.pxtoneFileData ||
+      fmt.organyaFileData || fmt.eupFileData || fmt.sc68FileData || fmt.zxtuneFileData
+    );
+    if (!hasNativeFormat) return true;
+
+    const formatName = fmt.editorMode !== 'classic' ? fmt.editorMode.toUpperCase() : 'MOD';
+    const confirmed = window.confirm(
+      `This breaks ${formatName} format compatibility.\n\n` +
+      `The song can no longer be saved as ${formatName} — save as .dbx instead.\n\n` +
+      `Continue?`
+    );
+    if (confirmed) {
+      _formatCompatConfirmed = true;
+    }
+    return confirmed;
+  } catch {
+    return true; // store not available
   }
-  return confirmed;
 }
 
-/** Set the current song format (called on song load) */
-export function setCurrentSongFormat(format: string | null): void {
-  _currentSongFormat = format;
+/** Reset format compat flag (called on song load) */
+export function resetFormatCompatFlag(): void {
   _formatCompatConfirmed = false;
 }
 
