@@ -523,6 +523,7 @@ export async function parseSonicArrangerFile(
 
   // ── SYAR — ADSR tables (128 bytes each, unsigned uint8) ──────────────────
   const adsrTables: number[][] = [];
+  let syarFileOffset = -1;
   {
     let numAdsrTables: number;
     if (useOffsetTable) {
@@ -536,6 +537,7 @@ export async function parseSonicArrangerFile(
     } else {
       numAdsrTables = 0;
     }
+    if (numAdsrTables > 0) syarFileOffset = pos;
     for (let i = 0; i < numAdsrTables; i++) {
       const table: number[] = [];
       for (let j = 0; j < 128; j++) {
@@ -548,6 +550,7 @@ export async function parseSonicArrangerFile(
 
   // ── SYAF — AMF tables (128 bytes each, signed int8) ────────────────────
   const amfTables: number[][] = [];
+  let syafFileOffset = -1;
   {
     let numAmfTables: number;
     if (useOffsetTable) {
@@ -561,6 +564,7 @@ export async function parseSonicArrangerFile(
     } else {
       numAmfTables = 0;
     }
+    if (numAmfTables > 0) syafFileOffset = pos;
     for (let i = 0; i < numAmfTables; i++) {
       const table: number[] = [];
       for (let j = 0; j < 128; j++) {
@@ -584,7 +588,11 @@ export async function parseSonicArrangerFile(
       moduleSize: bytes.length,
       instrBase,
       instrSize: 152,
-      sections: { instTable: instTableStart },
+      sections: {
+        instTable: instTableStart,
+        ...(syarFileOffset >= 0 ? { syarBase: syarFileOffset } : {}),
+        ...(syafFileOffset >= 0 ? { syafBase: syafFileOffset } : {}),
+      },
     };
 
     if (!inst.isSynth) {
