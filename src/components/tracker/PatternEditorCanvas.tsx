@@ -132,8 +132,10 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
   const formatPatternSnapshotRef = useRef<PatternSnapshot[]>([]);
 
   // Auto-focus in format mode so keyboard navigation works immediately
+  // preventScroll: true — never let the browser auto-scroll a parent container
+  // when we focus, otherwise the pattern editor jumps when the menu opens.
   useEffect(() => {
-    if (isFormatMode) containerRef.current?.focus();
+    if (isFormatMode) containerRef.current?.focus({ preventScroll: true });
   }, [isFormatMode]);
 
   // Keep refs in sync with props on every render
@@ -668,7 +670,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
       }
 
       setFormatCursor({ channelIndex: chIdx, rowIndex: rowIdx, columnIndex: colIdx });
-      containerRef.current?.focus();
+      containerRef.current?.focus({ preventScroll: true });
       return;
     }
 
@@ -742,7 +744,10 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
 
   const handleContextMenu = useCallback((e: React.MouseEvent) => {
     e.preventDefault();
-    containerRef.current?.focus();
+    // preventScroll: true — focusing the container must NEVER cause the
+    // browser to auto-scroll a parent (which makes the pattern editor
+    // appear to "jump" when the menu opens)
+    containerRef.current?.focus({ preventScroll: true });
 
     // Format mode: use same hit-test as handleMouseDown (no scrollLeft)
     if (isFormatMode && formatChannels && containerRef.current) {
