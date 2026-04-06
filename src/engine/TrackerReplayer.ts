@@ -2004,7 +2004,17 @@ export class TrackerReplayer {
             _log('[TrackerReplayer] libopenmpt: SKIPPING play() because muted');
           }
 
-          _log('[TrackerReplayer] Using libopenmpt for playback, suppressNotes =', this._suppressNotes);
+          _log('[TrackerReplayer] Using libopenmpt for playback, suppressNotes =', this._suppressNotes,
+            'replacedInstruments =', this._replacedInstruments.size);
+
+          // If instruments are replaced with synths, we need the TS scheduler running
+          // alongside libopenmpt to fire ToneEngine notes for those instruments.
+          // Without this, the scheduler never starts and the hybrid block never fires.
+          if (this._replacedInstruments.size > 0) {
+            _log('[TrackerReplayer] Hybrid mode: starting TS scheduler alongside libopenmpt');
+            this.startScheduler();
+            this._hasPlayedOnce = true;
+          }
           return;
         }
       } catch (err) {
