@@ -2348,10 +2348,9 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
       // Also check wasmPos.active — WASM engines (JamCracker etc.) don't set
       // transportStore.isPlaying (doing so causes infinite engine respawn),
       // so we must fall through to the main playback path when they're active.
-      // Exception: format mode instances with formatIsPlaying={false} (e.g. track
-      // table matrix) should idle even when wasmPos is active — they don't scroll.
+      // wasmPos.active means a WASM engine is reporting position — always allow scroll.
       const wasmPosEarly = useWasmPositionStore.getState();
-      const wasmNeedsUpdate = wasmPosEarly.active && !(isFormatModeRef.current && !formatIsPlayingRef.current);
+      const wasmNeedsUpdate = wasmPosEarly.active;
       if (!isPlaying && !prevPlaying && !wasmNeedsUpdate) {
         const cursorRow = useCursorStore.getState().cursor.rowIndex;
         const h = dimensions.height;
