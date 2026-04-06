@@ -48,7 +48,7 @@ const PEDAL_STOPS: StopDef[] = [
 const StopToggle: React.FC<{ label: string; active: boolean; onChange: (on: boolean) => void }> = ({ label, active, onChange }) => (
   <button
     className={`px-3 py-1.5 rounded text-xs font-bold uppercase transition-all ${
-      active ? 'bg-amber-600 text-white shadow-lg shadow-amber-900/40' : 'bg-[#222] text-gray-500 hover:text-gray-300'
+      active ? 'bg-amber-600 text-white shadow-lg shadow-amber-900/40' : 'bg-[#222] text-text-muted hover:text-text-secondary'
     }`}
     onClick={() => onChange(!active)}
   >

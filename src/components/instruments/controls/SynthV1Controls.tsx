@@ -77,7 +77,7 @@ export const SynthV1Controls: React.FC<SynthV1ControlsProps> = ({ config, onChan
         <div className="grid grid-cols-2 gap-4 mb-3">
           {/* Oscillator 1 */}
           <div className="flex flex-col gap-2">
-            <span className="text-gray-500 text-[10px] font-semibold">Osc A</span>
+            <span className="text-text-muted text-[10px] font-semibold">Osc A</span>
             <Knob value={merged[dcoK('Width1', page)] as number} min={0} max={1}
               onChange={(v) => update(dcoK('Width1', page), v)}
               label="Width" color="#22c55e" />
@@ -88,7 +88,7 @@ export const SynthV1Controls: React.FC<SynthV1ControlsProps> = ({ config, onChan
           </div>
           {/* Oscillator 2 */}
           <div className="flex flex-col gap-2">
-            <span className="text-gray-500 text-[10px] font-semibold">Osc B</span>
+            <span className="text-text-muted text-[10px] font-semibold">Osc B</span>
             <Knob value={merged[dcoK('Width2', page)] as number} min={0} max={1}
               onChange={(v) => update(dcoK('Width2', page), v)}
               label="Width" color="#22c55e" />
@@ -109,7 +109,7 @@ export const SynthV1Controls: React.FC<SynthV1ControlsProps> = ({ config, onChan
             onChange={(v) => update(dcoK('Detune', page), v)}
             label="Detune" color="#eab308" />
           <div className="flex flex-col gap-1">
-            <label className="text-gray-500 text-[10px]">Octave</label>
+            <label className="text-text-muted text-[10px]">Octave</label>
             <select
               className="bg-dark-bgSecondary text-text-primary border border-dark-border rounded px-1 py-0.5 text-[10px]"
               value={Math.round(merged[dcoK('Octave', page)] as number)}
@@ -135,7 +135,7 @@ export const SynthV1Controls: React.FC<SynthV1ControlsProps> = ({ config, onChan
         </div>
         <div className="grid grid-cols-4 gap-3 mt-2">
           <div className="flex items-center gap-2">
-            <label className="text-gray-500 text-[10px]">Sync</label>
+            <label className="text-text-muted text-[10px]">Sync</label>
             <button
               className={`px-2 py-0.5 rounded text-[10px] ${(merged[dcoK('Sync', page)] as number) > 0.5 ? 'bg-green-700 text-white' : 'bg-gray-700 text-text-muted'}`}
               onClick={() => update(dcoK('Sync', page), (merged[dcoK('Sync', page)] as number) > 0.5 ? 0 : 1)}
@@ -167,7 +167,7 @@ export const SynthV1Controls: React.FC<SynthV1ControlsProps> = ({ config, onChan
             options={DCF_TYPE_NAMES} onChange={(v) => update(dcfK('Type', page), v)}
           />
           <div className="flex flex-col gap-1">
-            <label className="text-gray-500 text-[10px]">Slope</label>
+            <label className="text-text-muted text-[10px]">Slope</label>
             <select
               className="bg-dark-bgSecondary text-text-primary border border-dark-border rounded px-1 py-0.5 text-[10px]"
               value={Math.round(merged[dcfK('Slope', page)] as number)}
@@ -243,7 +243,7 @@ export const SynthV1Controls: React.FC<SynthV1ControlsProps> = ({ config, onChan
             label="Volume" color="#f59e0b" />
         </div>
         <div className="flex items-center gap-2 mt-2">
-          <label className="text-gray-500 text-[10px]">Sync</label>
+          <label className="text-text-muted text-[10px]">Sync</label>
           <button
             className={`px-2 py-0.5 rounded text-[10px] ${(merged[lfoK('Sync', page)] as number) > 0.5 ? 'bg-green-700 text-white' : 'bg-gray-700 text-text-muted'}`}
             onClick={() => update(lfoK('Sync', page), (merged[lfoK('Sync', page)] as number) > 0.5 ? 0 : 1)}
@@ -359,7 +359,7 @@ export const SynthV1Controls: React.FC<SynthV1ControlsProps> = ({ config, onChan
               flex-1 py-2.5 text-xs font-bold uppercase tracking-wider transition-colors
               ${activeTab === tab.id
                 ? 'bg-[#252525] text-cyan-400 border-b-2 border-cyan-400'
-                : 'text-gray-500 hover:text-gray-300'
+                : 'text-text-muted hover:text-text-secondary'
               }
             `}
           >

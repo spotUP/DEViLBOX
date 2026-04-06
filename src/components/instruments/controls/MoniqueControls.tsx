@@ -41,7 +41,7 @@ const OscPanel: React.FC<{
       </div>
       <div className="flex gap-3 items-end">
         <div className="flex flex-col gap-1">
-          <label className="text-gray-500 text-[10px]">Wave</label>
+          <label className="text-text-muted text-[10px]">Wave</label>
           <select className="bg-dark-bgSecondary text-text-primary border border-dark-border rounded px-1 py-0.5 text-[10px]"
             value={Math.round((merged[waveKey] as number) ?? 0)}
             onChange={(e) => update(waveKey, parseInt(e.target.value))}>

@@ -14,7 +14,7 @@ interface SelectControlProps {
 
 export const SelectControl: React.FC<SelectControlProps> = ({ label, value, options, onChange }) => (
   <div className="flex flex-col gap-1">
-    <label className="text-gray-500 text-[10px]">{label}</label>
+    <label className="text-text-muted text-[10px]">{label}</label>
     <select
       className="bg-dark-bgSecondary text-text-primary border border-dark-border rounded px-1 py-0.5 text-[10px]"
       value={Math.round(value)}

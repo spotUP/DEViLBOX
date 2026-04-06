@@ -58,7 +58,7 @@ const V2Knob: React.FC<{
         />
       </div>
       <div className="text-[7px] font-bold uppercase tracking-wide text-center" style={{ color }}>{label}</div>
-      <div className="text-[7px] text-gray-500 font-mono">{Math.round(value)}</div>
+      <div className="text-[7px] text-text-muted font-mono">{Math.round(value)}</div>
     </div>
   );
 };
