@@ -20,7 +20,7 @@ import { useTrackerStore } from '@stores';
 import { useTransportStore } from '@stores/useTransportStore';
 import { useWasmPositionStore } from '@stores/useWasmPositionStore';
 import { PatternEditorCanvas } from '@/components/tracker/PatternEditorCanvas';
-import { TFMX_PATTERN_COLUMNS, tfmxPatternToChannels } from './tfmxAdapter';
+// tfmxAdapter used for format-mode single-pattern view (reserved for future per-pattern editing)
 import { TFMXTrackstepMatrix, TFMX_MATRIX_HEIGHT, TFMX_MATRIX_COLLAPSED_HEIGHT } from './TFMXTrackstepMatrix';
 import { useResponsiveSafe } from '@/contexts/ResponsiveContext';
 import { getTrackerReplayer } from '@engine/TrackerReplayer';
@@ -33,15 +33,12 @@ export const TFMXView: React.FC<{ width?: number; height?: number }> = () => {
   const selectedPattern = useFormatStore(s => s.tfmxSelectedPattern);
   const setSelectedPattern = useFormatStore(s => s.setTFMXSelectedPattern);
   const transportPlaying = useTransportStore(s => s.isPlaying);
-  const transportRow = useTransportStore(s => s.currentRow);
   const currentPositionIndex = useTrackerStore(s => s.currentPositionIndex);
   const wasmActive = useWasmPositionStore(s => s.active);
-  const wasmRow = useWasmPositionStore(s => s.row);
   const wasmSongPos = useWasmPositionStore(s => s.songPos);
 
   // Use WASM position when available (TFMXModule engine), fall back to transport store
   const isPlaying = transportPlaying || wasmActive;
-  const currentRow = wasmActive ? wasmRow : transportRow;
   const editorFullscreen = useUIStore(s => s.editorFullscreen);
 
   const [activeStepIdx, setActiveStepIdx] = useState(0);
@@ -100,19 +97,8 @@ export const TFMXView: React.FC<{ width?: number; height?: number }> = () => {
     setActiveStepIdx(idx);
   }, []);
 
-  // Pattern cell editing via PatternEditorCanvas format mode
-  const setPatternCommand = useFormatStore(s => s.setTFMXPatternCommand);
-  const handleCellChange = useCallback((
-    _chIdx: number, rowIdx: number, columnKey: string, value: number,
-  ) => {
-    const fieldMap: Record<string, 'note' | 'macro' | 'wait' | 'detune'> = {
-      note: 'note', macro: 'macro', wait: 'wait', detune: 'detune',
-    };
-    const field = fieldMap[columnKey];
-    if (field) {
-      setPatternCommand(selectedPattern, rowIdx, field, value);
-    }
-  }, [selectedPattern, setPatternCommand]);
+  // Pattern cell editing is handled by the standard PatternEditorCanvas
+  // via useTrackerStore's setCell, which patches tfmxFileData directly.
 
   // Export TFMX
   const handleExport = useCallback(async () => {
@@ -155,11 +141,6 @@ export const TFMXView: React.FC<{ width?: number; height?: number }> = () => {
     trackerStore.setCurrentPosition(0, true);
   }, []);
 
-  // Convert selected pattern to FormatChannel[] via adapter
-  const patternChannels = useMemo(() => {
-    if (!native) return [];
-    return tfmxPatternToChannels(native, selectedPattern);
-  }, [native, selectedPattern]);
 
   if (!native) {
     return (
@@ -257,15 +238,9 @@ export const TFMXView: React.FC<{ width?: number; height?: number }> = () => {
       </div>
       )}
 
-      {/* Pattern Editor */}
+      {/* Pattern Editor — standard multi-channel view from tracker store */}
       <div style={{ flex: 1, minHeight: 0, overflow: 'hidden' }}>
-        <PatternEditorCanvas
-          formatColumns={TFMX_PATTERN_COLUMNS}
-          formatChannels={patternChannels}
-          formatCurrentRow={isPlaying ? currentRow : undefined}
-          formatIsPlaying={isPlaying}
-          onFormatCellChange={handleCellChange}
-        />
+        <PatternEditorCanvas />
       </div>
     </div>
   );
