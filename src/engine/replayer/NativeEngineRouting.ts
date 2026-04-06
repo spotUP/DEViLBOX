@@ -579,29 +579,28 @@ export async function startNativeEngines(
 
         // TFMX module position sync: use timing table (cumulativeJiffies → row/pattern)
         if (desc.key === 'TFMXModule' && 'onPositionUpdate' in instance) {
-          const timingTable = (song as any).tfmxTimingTable as
+          const timingTable = song.tfmxTimingTable as
             { patternIndex: number; row: number; cumulativeJiffies: number }[] | undefined;
-          const tfmxNative = (song as any).tfmxNative;
-          const activeSub = tfmxNative?.activeSubsong ?? 0;
-          const tempo = tfmxNative?.songTempos?.[activeSub] ?? 0;
 
-          // Compute ms per jiffy from TFMX tempo
-          // CIA mode (tempo >= 16): CIA timer A at 715909 Hz (PAL), jiffy = tempo/715909 sec
-          // VBlank mode (tempo < 16): jiffy = 1/50 sec = 20ms
-          const msPerJiffy = tempo >= 16
-            ? (tempo / 715909) * 1000
-            : 20;
+          // Get tempo from the song's initialBPM/initialSpeed (set by TFMXParser from tempo value)
+          // TFMXParser: CIA mode (tempo>=16) → initialBPM = tempo*2.5/24
+          // VBlank mode (tempo<16) → initialBPM=125, initialSpeed=tempo+1
+          // For jiffy conversion: use 20ms/jiffy as default (VBlank rate)
+          // The timing table already encodes per-row jiffy durations from the actual TFMX commands
+          const msPerJiffy = 20; // VBlank: 1/50s. For CIA, the timing table jiffies are already scaled.
+          const sr = Tone.context.sampleRate || 44100;
 
           // Also drive FormatPlaybackState so TFMX format-mode rendering scrolls
           const { setFormatPlaybackRow, setFormatPlaybackPlaying } = await import('@/engine/FormatPlaybackState');
           setFormatPlaybackPlaying(true);
 
+          let _posLogCount = 0;
           (instance as any).onPositionUpdate((update: { samplesRendered: number; elapsedMs?: number; songEnd: boolean }) => {
-            const elapsed = update.elapsedMs ?? 0;
-            if (!timingTable || timingTable.length === 0 || msPerJiffy <= 0) return;
+            if (!timingTable || timingTable.length === 0) return;
 
-            // Convert elapsed ms → jiffies, then binary search the timing table
-            const currentJiffies = elapsed / msPerJiffy;
+            // Compute elapsed ms from samplesRendered (more reliable than worklet's elapsedMs)
+            const elapsedMs = (update.samplesRendered / sr) * 1000;
+            const currentJiffies = elapsedMs / msPerJiffy;
 
             // Binary search for the last entry where cumulativeJiffies <= currentJiffies
             let lo = 0, hi = timingTable.length - 1;
@@ -618,25 +617,17 @@ export async function startNativeEngines(
             const row = entry.row;
             const position = entry.patternIndex;
 
+            if (_posLogCount < 3) {
+              _posLogCount++;
+              console.log(`[TFMXModule] pos #${_posLogCount}: elapsed=${elapsedMs.toFixed(0)}ms jiffies=${currentJiffies.toFixed(1)} → pat=${position} row=${row} (of ${timingTable.length} entries)`);
+            }
+
             if (Number.isFinite(row) && Number.isFinite(position)) {
               useWasmPositionStore.getState().setPosition(row, position);
               setFormatPlaybackRow(row);
             }
           });
-          let _posLogCount = 0;
-          console.log(`[NativeEngineRouting] TFMXModule position sync wired (${timingTable?.length ?? 0} timing entries, tempo=${tempo}, msPerJiffy=${msPerJiffy.toFixed(2)}, tfmxNative=${!!tfmxNative})`);
-
-          // Log first few position updates for debugging
-          const _origCb = (instance as any)._positionCallbacks[(instance as any)._positionCallbacks.length - 1];
-          if (_origCb && _posLogCount < 5) {
-            // Can't wrap easily — just add a second diagnostic callback
-          }
-          (instance as any).onPositionUpdate((update: { samplesRendered: number; elapsedMs?: number; songEnd: boolean }) => {
-            if (_posLogCount < 3) {
-              _posLogCount++;
-              console.log(`[TFMXModule] position update #${_posLogCount}: elapsed=${update.elapsedMs}ms, samplesRendered=${update.samplesRendered}, timingTable=${timingTable?.length}, msPerJiffy=${msPerJiffy}`);
-            }
-          });
+          console.log(`[NativeEngineRouting] TFMXModule position sync wired (${timingTable?.length ?? 0} entries, msPerJiffy=${msPerJiffy})`);
         }
 
         // Generic position sync for WASM engines with onPositionUpdate.
