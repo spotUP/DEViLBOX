@@ -160,6 +160,11 @@ export class PxtoneEngine {
     this.workletNode?.port.postMessage({ type: 'stop' });
   }
 
+  setMuteMask(mask: number): void {
+    if (!this.workletNode) return;
+    this.workletNode.port.postMessage({ type: 'setMuteMask', mask });
+  }
+
   dispose(): void {
     this._disposed = true;
     this.workletNode?.port.postMessage({ type: 'dispose' });

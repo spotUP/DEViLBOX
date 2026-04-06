@@ -130,6 +130,11 @@ export class CoreDesignEngine {
     this.workletNode?.port.postMessage({ type: 'setChannelGain', channel, gain });
   }
 
+  setMuteMask(mask: number): void {
+    if (!this.workletNode) return;
+    this.workletNode.port.postMessage({ type: 'setMuteMask', mask });
+  }
+
   dispose(): void {
     this._disposed = true;
     this.workletNode?.port.postMessage({ type: 'stop' });

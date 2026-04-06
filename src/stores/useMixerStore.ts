@@ -62,6 +62,11 @@ function forwardReplayerMuteMask(channels: MixerChannelState[], isSoloing: boole
     ['../engine/eupmini/EupminiEngine', 'EupminiEngine'],
     ['../engine/ixalance/IxalanceEngine', 'IxalanceEngine'],
     ['../engine/cpsycle/CpsycleEngine', 'CpsycleEngine'],
+    ['../engine/organya/OrganyaEngine', 'OrganyaEngine'],
+    ['../engine/pxtone/PxtoneEngine', 'PxtoneEngine'],
+    ['../engine/symphonie/SymphonieEngine', 'SymphonieEngine'],
+    ['../engine/zxtune/ZxtuneEngine', 'ZxtuneEngine'],
+    ['../engine/coredesign/CoreDesignEngine', 'CoreDesignEngine'],
   ];
 
   for (const [path, name, chLimit] of muteEngines) {
