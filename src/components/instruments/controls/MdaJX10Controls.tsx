@@ -74,7 +74,7 @@ export const MdaJX10Controls: React.FC<MdaJX10ControlsProps> = ({ config, onChan
               const val = merged[key] ?? 0.5;
               return (
                 <div key={key} className="flex flex-col gap-1">
-                  <label className="text-gray-500 truncate" title={JX10_PARAM_NAMES[idx]}>
+                  <label className="text-text-muted truncate" title={JX10_PARAM_NAMES[idx]}>
                     {JX10_PARAM_NAMES[idx]}
                   </label>
                   <input
@@ -86,7 +86,7 @@ export const MdaJX10Controls: React.FC<MdaJX10ControlsProps> = ({ config, onChan
                     onChange={(e) => updateParam(key, parseFloat(e.target.value))}
                     className="w-full accent-blue-500 h-2"
                   />
-                  <span className="text-gray-600 text-[10px]">{formatValue(key, val)}</span>
+                  <span className="text-text-muted text-[10px]">{formatValue(key, val)}</span>
                 </div>
               );
             })}
