@@ -966,28 +966,33 @@ export class TrackerReplayer {
       const effectiveInst = cs.instrument || chanInst;
       const wasPlayingSynth = chanInst && this._replacedInstruments.has(chanInst);
 
-      // Always release previous synth note on this channel before doing anything.
-      // Each synth note lasts exactly one row — on the next row it's either
-      // re-triggered (new note), sustained (same note via effect), or released.
-      if (wasPlayingSynth && channel.player) {
-        try { channel.player.stop(time); } catch { /* already stopped */ }
-      }
-
-      // If this row has a non-replaced instrument → channel switches away from synth
-      if (cs.instrument && !this._replacedInstruments.has(cs.instrument)) {
-        if (wasPlayingSynth) channel.instrument = null;
+      // If this row has a non-replaced instrument with a note → release synth, switch away
+      if (cs.note > 0 && cs.instrument && !this._replacedInstruments.has(cs.instrument)) {
+        if (wasPlayingSynth) {
+          try {
+            const engine = getToneEngine();
+            engine.triggerNoteRelease(chanInst, 'C4', time, this.instrumentMap.get(chanInst)!, ch);
+          } catch { /* ToneEngine not ready */ }
+          channel.instrument = null;
+        }
         continue;
       }
 
-      // Note-off (note 254/255 in OpenMPT = key off / note cut)
+      // Note-off (note 254/255 in OpenMPT = key off / note cut) → release synth
       if (cs.note === 255 || cs.note === 254) {
-        continue; // already released above
+        if (wasPlayingSynth) {
+          try {
+            const engine = getToneEngine();
+            engine.triggerNoteRelease(chanInst, 'C4', time, this.instrumentMap.get(chanInst)!, ch);
+          } catch { /* ToneEngine not ready */ }
+        }
+        continue;
       }
 
       // Skip if the effective instrument is not replaced
       if (!effectiveInst || !this._replacedInstruments.has(effectiveInst)) continue;
 
-      // Only trigger on rows with actual notes
+      // Only trigger on rows with actual notes — empty rows sustain the current note
       if (cs.note <= 0 || cs.note >= 120) continue;
 
       // Update channel instrument config from instrumentMap
