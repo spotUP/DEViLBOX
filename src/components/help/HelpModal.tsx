@@ -134,12 +134,12 @@ export const HelpModal: React.FC<HelpModalProps> = ({ isOpen, onClose, initialTa
       onKeyDown={handleKeyDown}
     >
       <div
-        className="bg-ft2-bg border-2 border-ft2-border shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col"
+        className="bg-ft2-bg border-2 border-ft2-border shadow-2xl w-full h-full flex flex-col"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
         <div className="bg-ft2-header border-b-2 border-ft2-border px-4 py-3 flex items-center justify-between">
-          <h2 className="font-mono text-lg font-bold text-ft2-text">
+          <h2 className="font-mono text-2xl font-bold text-ft2-text">
             HELP & DOCUMENTATION
           </h2>
           <button
@@ -156,7 +156,7 @@ export const HelpModal: React.FC<HelpModalProps> = ({ isOpen, onClose, initialTa
           <button
             onClick={() => h.setActiveTab('manual')}
             className={`
-              flex-1 px-4 py-3 font-mono text-sm transition-colors border-r border-ft2-border
+              flex-1 px-4 py-3 font-mono text-base transition-colors border-r border-ft2-border
               ${h.activeTab === 'manual'
                 ? 'bg-ft2-cursor text-ft2-bg font-bold'
                 : 'text-ft2-text hover:bg-ft2-bg'
@@ -169,7 +169,7 @@ export const HelpModal: React.FC<HelpModalProps> = ({ isOpen, onClose, initialTa
           <button
             onClick={() => h.setActiveTab('shortcuts')}
             className={`
-              flex-1 px-4 py-3 font-mono text-sm transition-colors border-r border-ft2-border
+              flex-1 px-4 py-3 font-mono text-base transition-colors border-r border-ft2-border
               ${h.activeTab === 'shortcuts'
                 ? 'bg-ft2-cursor text-ft2-bg font-bold'
                 : 'text-ft2-text hover:bg-ft2-bg'
@@ -182,7 +182,7 @@ export const HelpModal: React.FC<HelpModalProps> = ({ isOpen, onClose, initialTa
           <button
             onClick={() => h.setActiveTab('effects')}
             className={`
-              flex-1 px-4 py-3 font-mono text-sm transition-colors border-r border-ft2-border
+              flex-1 px-4 py-3 font-mono text-base transition-colors border-r border-ft2-border
               ${h.activeTab === 'effects'
                 ? 'bg-ft2-cursor text-ft2-bg font-bold'
                 : 'text-ft2-text hover:bg-ft2-bg'
@@ -195,7 +195,7 @@ export const HelpModal: React.FC<HelpModalProps> = ({ isOpen, onClose, initialTa
           <button
             onClick={() => h.setActiveTab('chip-effects')}
             className={`
-              flex-1 px-4 py-3 font-mono text-sm transition-colors border-r border-ft2-border
+              flex-1 px-4 py-3 font-mono text-base transition-colors border-r border-ft2-border
               ${h.activeTab === 'chip-effects'
                 ? 'bg-ft2-cursor text-ft2-bg font-bold'
                 : 'text-ft2-text hover:bg-ft2-bg'
@@ -208,7 +208,7 @@ export const HelpModal: React.FC<HelpModalProps> = ({ isOpen, onClose, initialTa
           <button
             onClick={() => h.setActiveTab('tutorial')}
             className={`
-              flex-1 px-4 py-3 font-mono text-sm transition-colors
+              flex-1 px-4 py-3 font-mono text-base transition-colors
               ${h.activeTab === 'tutorial'
                 ? 'bg-ft2-cursor text-ft2-bg font-bold'
                 : 'text-ft2-text hover:bg-ft2-bg'
@@ -221,7 +221,7 @@ export const HelpModal: React.FC<HelpModalProps> = ({ isOpen, onClose, initialTa
         </div>
 
         {/* Content */}
-        <div className="flex-1 overflow-y-auto scrollbar-ft2 p-6">
+        <div className="flex-1 overflow-y-auto scrollbar-ft2 p-8">
           {/* Manual Tab */}
           {h.activeTab === 'manual' && (
             <ManualTab
@@ -239,19 +239,19 @@ export const HelpModal: React.FC<HelpModalProps> = ({ isOpen, onClose, initialTa
           {/* Keyboard Shortcuts Tab */}
           {h.activeTab === 'shortcuts' && (
             <div className="space-y-6">
-              <div className="text-xs font-mono text-ft2-textDim mb-2">
+              <div className="text-sm font-mono text-ft2-textDim mb-2">
                 Active scheme: <span className="text-ft2-highlight">{activeScheme}</span>
               </div>
               {shortcutGroups.map((group, idx) => (
                 <div key={idx} className="bg-ft2-panel border border-ft2-border p-4">
-                  <h3 className="text-sm font-mono font-bold text-ft2-highlight mb-3">
+                  <h3 className="text-base font-mono font-bold text-ft2-highlight mb-3">
                     {group.title.toUpperCase()}
                   </h3>
                   <div className="space-y-2">
                     {group.shortcuts.map((shortcut, sidx) => (
                       <div
                         key={sidx}
-                        className="flex items-start gap-4 text-xs font-mono"
+                        className="flex items-start gap-4 text-sm font-mono"
                       >
                         <div className="flex-shrink-0 w-32 px-2 py-1 bg-ft2-bg border border-ft2-border text-ft2-highlight font-bold text-center">
                           {shortcut.keys}
@@ -271,7 +271,7 @@ export const HelpModal: React.FC<HelpModalProps> = ({ isOpen, onClose, initialTa
           {h.activeTab === 'effects' && (
             <div className="space-y-4">
               <div className="bg-ft2-panel border border-ft2-border p-4 mb-4">
-                <p className="text-xs font-mono text-ft2-text leading-relaxed">
+                <p className="text-base font-mono text-ft2-text leading-relaxed">
                   Effect commands follow the FastTracker 2 format: 3 hex characters (0xy-Fxx).
                   Enter effects in the EFFECT column. Multiple effects can be chained across rows.
                 </p>
@@ -284,21 +284,21 @@ export const HelpModal: React.FC<HelpModalProps> = ({ isOpen, onClose, initialTa
                     className="bg-ft2-panel border border-ft2-border p-3 hover:border-ft2-highlight transition-colors"
                   >
                     <div className="flex items-start gap-3 mb-2">
-                      <div className="flex-shrink-0 w-12 px-2 py-1 bg-ft2-bg border border-ft2-cursor text-ft2-highlight font-bold text-xs font-mono text-center">
+                      <div className="flex-shrink-0 w-12 px-2 py-1 bg-ft2-bg border border-ft2-cursor text-ft2-highlight font-bold text-sm font-mono text-center">
                         {effect.code}
                       </div>
                       <div className="flex-1">
-                        <div className="font-mono text-sm font-bold text-ft2-text mb-1">
+                        <div className="font-mono text-base font-bold text-ft2-text mb-1">
                           {effect.name}
                         </div>
-                        <div className="text-xs font-mono text-ft2-textDim mb-1">
+                        <div className="text-sm font-mono text-ft2-textDim mb-1">
                           {effect.description}
                         </div>
-                        <div className="text-xs font-mono text-ft2-text">
+                        <div className="text-sm font-mono text-ft2-text">
                           <span className="text-ft2-highlight">Range:</span> {effect.paramRange}
                         </div>
                         {effect.example && (
-                          <div className="text-xs font-mono text-ft2-text mt-1">
+                          <div className="text-sm font-mono text-ft2-text mt-1">
                             <span className="text-ft2-highlight">Example:</span> {effect.example}
                           </div>
                         )}
@@ -314,10 +314,10 @@ export const HelpModal: React.FC<HelpModalProps> = ({ isOpen, onClose, initialTa
           {h.activeTab === 'chip-effects' && (
             <div className="space-y-4">
               <div className="bg-ft2-panel border border-ft2-border p-4 mb-4">
-                <h3 className="text-sm font-mono font-bold text-ft2-highlight mb-2">
+                <h3 className="text-base font-mono font-bold text-ft2-highlight mb-2">
                   {h.currentChip !== null ? `CHIP EFFECTS: ${h.chipName}` : 'CHIP EFFECTS'}
                 </h3>
-                <p className="text-xs font-mono text-ft2-text leading-relaxed">
+                <p className="text-base font-mono text-ft2-text leading-relaxed">
                   {h.currentChip !== null
                     ? `These effects are specific to the ${h.chipName} sound chip used by the current instrument. They use effect codes 10xx and above.`
                     : 'Select a chip-based instrument (Furnace) in the tracker to see its specific effect commands here.'
@@ -333,14 +333,14 @@ export const HelpModal: React.FC<HelpModalProps> = ({ isOpen, onClose, initialTa
                       className="bg-ft2-panel border border-ft2-border p-3 hover:border-ft2-highlight transition-colors"
                     >
                       <div className="flex items-start gap-3 mb-2">
-                        <div className="flex-shrink-0 w-12 px-2 py-1 bg-ft2-bg border border-ft2-cursor text-ft2-highlight font-bold text-xs font-mono text-center">
+                        <div className="flex-shrink-0 w-12 px-2 py-1 bg-ft2-bg border border-ft2-cursor text-ft2-highlight font-bold text-sm font-mono text-center">
                           {effect.command}
                         </div>
                         <div className="flex-1">
-                          <div className="font-mono text-sm font-bold text-ft2-text mb-1">
+                          <div className="font-mono text-base font-bold text-ft2-text mb-1">
                             {effect.name}
                           </div>
-                          <div className="text-xs font-mono text-ft2-textDim">
+                          <div className="text-sm font-mono text-ft2-textDim">
                             {effect.desc}
                           </div>
                         </div>
@@ -365,21 +365,21 @@ export const HelpModal: React.FC<HelpModalProps> = ({ isOpen, onClose, initialTa
             <div className="space-y-4">
               <div className="bg-ft2-panel border-2 border-ft2-cursor p-6">
                 <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-lg font-mono font-bold text-ft2-highlight">
+                  <h3 className="text-xl font-mono font-bold text-ft2-highlight">
                     STEP {TUTORIAL_STEPS[h.tutorialStep].step} OF {TUTORIAL_STEPS.length}
                   </h3>
-                  <div className="text-xs font-mono text-ft2-textDim">
+                  <div className="text-sm font-mono text-ft2-textDim">
                     {h.tutorialProgress}% Complete
                   </div>
                 </div>
 
-                <h4 className="text-xl font-mono font-bold text-ft2-text mb-4">
+                <h4 className="text-2xl font-mono font-bold text-ft2-text mb-4">
                   {TUTORIAL_STEPS[h.tutorialStep].title}
                 </h4>
 
                 <div className="space-y-3">
                   {TUTORIAL_STEPS[h.tutorialStep].content.map((paragraph, idx) => (
-                    <p key={idx} className="text-sm font-mono text-ft2-text leading-relaxed">
+                    <p key={idx} className="text-base font-mono text-ft2-text leading-relaxed">
                       {paragraph}
                     </p>
                   ))}
@@ -408,7 +408,7 @@ export const HelpModal: React.FC<HelpModalProps> = ({ isOpen, onClose, initialTa
                       key={idx}
                       onClick={() => h.setTutorialStep(idx)}
                       className={`
-                        w-8 h-8 text-xs font-mono border transition-colors
+                        w-8 h-8 text-sm font-mono border transition-colors
                         ${idx === h.tutorialStep
                           ? 'bg-ft2-cursor text-ft2-bg border-ft2-cursor font-bold'
                           : 'bg-ft2-bg text-ft2-text border-ft2-border hover:border-ft2-highlight'
@@ -440,7 +440,7 @@ export const HelpModal: React.FC<HelpModalProps> = ({ isOpen, onClose, initialTa
 
         {/* Footer */}
         <div className="bg-ft2-panel border-t-2 border-ft2-border px-4 py-3 flex items-center justify-between">
-          <div className="text-xs font-mono text-ft2-textDim">
+          <div className="text-sm font-mono text-ft2-textDim">
             Press <span className="text-ft2-highlight">?</span> anytime to open this help
           </div>
           <button

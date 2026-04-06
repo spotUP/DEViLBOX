@@ -13,6 +13,7 @@ import { PIXI_FONTS } from '../fonts';
 import { EFFECT_COMMANDS, TUTORIAL_STEPS, HELP_TABS, type HelpTab, type EffectCommand } from '@/data/helpContent';
 import { useHelpDialog } from '@hooks/dialogs/useHelpDialog';
 import { useKeyboardStore } from '@stores/useKeyboardStore';
+import { useApplication } from '@pixi/react';
 
 // ── Types ───────────────────────────────────────────────────────────────────
 
@@ -29,10 +30,6 @@ interface ShortcutGroup {
 
 // ── Constants ───────────────────────────────────────────────────────────────
 
-const W = 800;
-const H = 560;
-const CONTENT_W = W - 24;
-const CONTENT_H = H - 36 - 36 - 44; // header, tabs, footer
 const HIGHLIGHT = 0xFDE047;
 
 /** Build shortcut groups dynamically from active keyboard scheme JSON (matches DOM HelpModal) */
@@ -218,7 +215,7 @@ const MarkdownContent: React.FC<{ lines: MdLine[]; maxWidth: number; shortcutGro
               <pixiBitmapText
                 key={i}
                 text={line.text}
-                style={{ fontFamily: PIXI_FONTS.SANS_BOLD, fontSize: 14, fill: 0xffffff }}
+                style={{ fontFamily: PIXI_FONTS.SANS_BOLD, fontSize: 18, fill: 0xffffff }}
                 tint={theme.text.color}
                 layout={{ marginTop: 6, marginBottom: 3, maxWidth }}
               />
@@ -228,7 +225,7 @@ const MarkdownContent: React.FC<{ lines: MdLine[]; maxWidth: number; shortcutGro
               <pixiBitmapText
                 key={i}
                 text={line.text}
-                style={{ fontFamily: PIXI_FONTS.SANS_SEMIBOLD, fontSize: 12, fill: 0xffffff }}
+                style={{ fontFamily: PIXI_FONTS.SANS_SEMIBOLD, fontSize: 16, fill: 0xffffff }}
                 tint={theme.text.color}
                 layout={{ marginTop: 4, marginBottom: 2, maxWidth }}
               />
@@ -238,13 +235,13 @@ const MarkdownContent: React.FC<{ lines: MdLine[]; maxWidth: number; shortcutGro
               <layoutContainer key={i} layout={{ flexDirection: 'row', gap: 4, paddingLeft: 8, maxWidth }}>
                 <pixiBitmapText
                   text={'\u2022'}
-                  style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 12, fill: 0xffffff }}
+                  style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 16, fill: 0xffffff }}
                   tint={theme.textSecondary.color}
                   layout={{}}
                 />
                 <pixiBitmapText
                   text={line.text}
-                  style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 12, fill: 0xffffff }}
+                  style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 16, fill: 0xffffff }}
                   tint={theme.textSecondary.color}
                   layout={{ maxWidth: maxWidth - 20 }}
                 />
@@ -255,7 +252,7 @@ const MarkdownContent: React.FC<{ lines: MdLine[]; maxWidth: number; shortcutGro
               <pixiBitmapText
                 key={i}
                 text={line.text}
-                style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 11, fill: 0xffffff }}
+                style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 15, fill: 0xffffff }}
                 tint={theme.accent.color}
                 layout={{ paddingLeft: 8, maxWidth }}
               />
@@ -270,7 +267,7 @@ const MarkdownContent: React.FC<{ lines: MdLine[]; maxWidth: number; shortcutGro
                 ) : (
                   <pixiBitmapText
                     text="No keyboard scheme loaded. Shortcuts will appear here when a scheme is active."
-                    style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 11, fill: 0xffffff }}
+                    style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 15, fill: 0xffffff }}
                     tint={theme.textMuted.color}
                     layout={{ maxWidth }}
                   />
@@ -282,7 +279,7 @@ const MarkdownContent: React.FC<{ lines: MdLine[]; maxWidth: number; shortcutGro
               <pixiBitmapText
                 key={i}
                 text={line.text}
-                style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 11, fill: 0xffffff }}
+                style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 15, fill: 0xffffff }}
                 tint={theme.textMuted.color}
                 layout={{ paddingLeft: 4, marginTop: 4, marginBottom: 4, maxWidth }}
               />
@@ -295,7 +292,7 @@ const MarkdownContent: React.FC<{ lines: MdLine[]; maxWidth: number; shortcutGro
               <pixiBitmapText
                 key={i}
                 text={line.text}
-                style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 12, fill: 0xffffff }}
+                style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 16, fill: 0xffffff }}
                 tint={theme.textSecondary.color}
                 layout={{ maxWidth }}
               />
@@ -326,7 +323,7 @@ const ShortcutSection: React.FC<{ group: ShortcutGroup; width: number }> = ({ gr
     >
       <pixiBitmapText
         text={group.title.toUpperCase()}
-        style={{ fontFamily: PIXI_FONTS.SANS_BOLD, fontSize: 12, fill: 0xffffff }}
+        style={{ fontFamily: PIXI_FONTS.SANS_BOLD, fontSize: 16, fill: 0xffffff }}
         tint={theme.accentHighlight.color}
         layout={{ marginBottom: 4 }}
       />
@@ -357,14 +354,14 @@ const ShortcutSection: React.FC<{ group: ShortcutGroup; width: number }> = ({ gr
           >
             <pixiBitmapText
               text={s.keys}
-              style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 12, fill: 0xffffff }}
+              style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 16, fill: 0xffffff }}
               tint={HIGHLIGHT}
               layout={{}}
             />
           </layoutContainer>
           <pixiBitmapText
             text={s.description}
-            style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 12, fill: 0xffffff }}
+            style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 16, fill: 0xffffff }}
             tint={theme.text.color}
             layout={{}}
           />
@@ -405,7 +402,7 @@ const EffectCard: React.FC<{ effect: EffectCommand; width: number }> = ({ effect
       >
         <pixiBitmapText
           text={effect.code}
-          style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 12, fill: 0xffffff }}
+          style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 16, fill: 0xffffff }}
           tint={HIGHLIGHT}
           layout={{}}
         />
@@ -413,26 +410,26 @@ const EffectCard: React.FC<{ effect: EffectCommand; width: number }> = ({ effect
       <layoutContainer layout={{ flex: 1, flexDirection: 'column', gap: 2 }}>
         <pixiBitmapText
           text={effect.name}
-          style={{ fontFamily: PIXI_FONTS.SANS_SEMIBOLD, fontSize: 12, fill: 0xffffff }}
+          style={{ fontFamily: PIXI_FONTS.SANS_SEMIBOLD, fontSize: 16, fill: 0xffffff }}
           tint={theme.text.color}
           layout={{}}
         />
         <pixiBitmapText
           text={effect.description}
-          style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 11, fill: 0xffffff }}
+          style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 15, fill: 0xffffff }}
           tint={theme.textMuted.color}
           layout={{}}
         />
         <pixiBitmapText
           text={`Range: ${effect.paramRange}`}
-          style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 11, fill: 0xffffff }}
+          style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 15, fill: 0xffffff }}
           tint={theme.textSecondary.color}
           layout={{}}
         />
         {effect.example && (
           <pixiBitmapText
             text={`Example: ${effect.example}`}
-            style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 11, fill: 0xffffff }}
+            style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 15, fill: 0xffffff }}
             tint={theme.textSecondary.color}
             layout={{}}
           />
@@ -450,8 +447,15 @@ export const PixiHelpModal: React.FC<PixiHelpModalProps> = ({
   initialTab = 'shortcuts',
 }) => {
   const theme = usePixiTheme();
+  const { app } = useApplication();
   const h = useHelpDialog({ isOpen, initialTab });
   const activeScheme = useKeyboardStore((s) => s.activeScheme);
+
+  // Fullscreen: fill the entire Pixi canvas
+  let W = 800, H = 560;
+  try { W = app.screen.width ?? 800; H = app.screen.height ?? 560; } catch { /* renderer not ready */ }
+  const CONTENT_W = W - 24;
+  const CONTENT_H = H - 36 - 36 - 44; // header, tabs, footer
 
   // Dynamically load keyboard scheme JSON (matches DOM HelpModal)
   const [schemeData, setSchemeData] = useState<Record<string, string> | null>(null);
@@ -474,7 +478,7 @@ export const PixiHelpModal: React.FC<PixiHelpModalProps> = ({
   const shortcutsContentHeight = useMemo(() => {
     let height = 0;
     for (const g of shortcutGroups) {
-      height += 24 + g.shortcuts.length * 18 + 16;
+      height += 32 + g.shortcuts.length * 24 + 20;
     }
     return height + 40;
   }, [shortcutGroups]);
@@ -503,21 +507,21 @@ export const PixiHelpModal: React.FC<PixiHelpModalProps> = ({
     let height = 60; // chapter title + part subtitle
     for (const line of parsedManualLines) {
       switch (line.type) {
-        case 'h1': height += 28; break;
-        case 'h2': height += 24; break;
-        case 'h3': height += 20; break;
-        case 'gap': height += 8; break;
-        case 'bullet': height += 18; break;
-        case 'code': height += 16; break;
-        case 'image-alt': height += 22; break;
+        case 'h1': height += 36; break;
+        case 'h2': height += 30; break;
+        case 'h3': height += 26; break;
+        case 'gap': height += 10; break;
+        case 'bullet': height += 24; break;
+        case 'code': height += 22; break;
+        case 'image-alt': height += 28; break;
         case 'shortcuts': {
           // Estimate height for embedded shortcut groups
           for (const g of shortcutGroups) {
-            height += 24 + g.shortcuts.length * 18 + 24;
+            height += 32 + g.shortcuts.length * 24 + 28;
           }
           break;
         }
-        default: height += 16; break;
+        default: height += 22; break;
       }
     }
     return Math.max(200, height + 80); // extra for nav buttons
@@ -526,7 +530,7 @@ export const PixiHelpModal: React.FC<PixiHelpModalProps> = ({
   const manualSidebarHeight = useMemo(() => {
     let height = 0;
     for (const part of h.manualParts) {
-      height += 24; // part header
+      height += 30; // part header
       const partChapters = h.filteredChapters.filter(c => c.partNumber === part.number);
       height += partChapters.length * 22;
       height += 4; // gap
@@ -557,7 +561,7 @@ export const PixiHelpModal: React.FC<PixiHelpModalProps> = ({
       >
         <pixiBitmapText
           text="HELP & DOCUMENTATION"
-          style={{ fontFamily: PIXI_FONTS.SANS_BOLD, fontSize: 14, fill: 0xffffff }}
+          style={{ fontFamily: PIXI_FONTS.SANS_BOLD, fontSize: 18, fill: 0xffffff }}
           tint={theme.text.color}
           layout={{}}
         />
@@ -604,7 +608,7 @@ export const PixiHelpModal: React.FC<PixiHelpModalProps> = ({
             >
               <pixiBitmapText
                 text={tab.label}
-                style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 11, fill: 0xffffff }}
+                style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 15, fill: 0xffffff }}
                 tint={isActive ? theme.bg.color : theme.text.color}
                 layout={{}}
               />
@@ -651,7 +655,7 @@ export const PixiHelpModal: React.FC<PixiHelpModalProps> = ({
               >
                 <pixiBitmapText
                   text="Effect commands follow the FastTracker 2 format: 3 hex characters (0xy-Fxx). Enter effects in the EFFECT column. Multiple effects can be chained across rows."
-                  style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 11, fill: 0xffffff }}
+                  style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 15, fill: 0xffffff }}
                   tint={theme.text.color}
                   layout={{ maxWidth: CONTENT_W - 40 }}
                 />
@@ -686,7 +690,7 @@ export const PixiHelpModal: React.FC<PixiHelpModalProps> = ({
               >
                 <pixiBitmapText
                   text={h.currentChip !== null ? `CHIP EFFECTS: ${h.chipName}` : 'CHIP EFFECTS'}
-                  style={{ fontFamily: PIXI_FONTS.SANS_BOLD, fontSize: 12, fill: 0xffffff }}
+                  style={{ fontFamily: PIXI_FONTS.SANS_BOLD, fontSize: 16, fill: 0xffffff }}
                   tint={HIGHLIGHT}
                   layout={{}}
                 />
@@ -696,7 +700,7 @@ export const PixiHelpModal: React.FC<PixiHelpModalProps> = ({
                       ? `These effects are specific to the ${h.chipName} sound chip used by the current instrument. They use effect codes 10xx and above.`
                       : 'Select a chip-based instrument (Furnace) in the tracker to see its specific effect commands here.'
                   }
-                  style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 11, fill: 0xffffff }}
+                  style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 15, fill: 0xffffff }}
                   tint={theme.text.color}
                   layout={{ maxWidth: CONTENT_W - 40 }}
                 />
@@ -732,7 +736,7 @@ export const PixiHelpModal: React.FC<PixiHelpModalProps> = ({
                     >
                       <pixiBitmapText
                         text={effect.command}
-                        style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 12, fill: 0xffffff }}
+                        style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 16, fill: 0xffffff }}
                         tint={HIGHLIGHT}
                         layout={{}}
                       />
@@ -740,13 +744,13 @@ export const PixiHelpModal: React.FC<PixiHelpModalProps> = ({
                     <layoutContainer layout={{ flex: 1, flexDirection: 'column', gap: 2 }}>
                       <pixiBitmapText
                         text={effect.name}
-                        style={{ fontFamily: PIXI_FONTS.SANS_SEMIBOLD, fontSize: 12, fill: 0xffffff }}
+                        style={{ fontFamily: PIXI_FONTS.SANS_SEMIBOLD, fontSize: 16, fill: 0xffffff }}
                         tint={theme.text.color}
                         layout={{}}
                       />
                       <pixiBitmapText
                         text={effect.desc}
-                        style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 11, fill: 0xffffff }}
+                        style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 15, fill: 0xffffff }}
                         tint={theme.textMuted.color}
                         layout={{}}
                       />
@@ -756,14 +760,14 @@ export const PixiHelpModal: React.FC<PixiHelpModalProps> = ({
               ) : h.currentChip !== null ? (
                 <pixiBitmapText
                   text={`No specific chip effects defined for ${h.chipName} yet.`}
-                  style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 12, fill: 0xffffff }}
+                  style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 16, fill: 0xffffff }}
                   tint={theme.textMuted.color}
                   layout={{ marginTop: 40, alignSelf: 'center' }}
                 />
               ) : (
                 <pixiBitmapText
                   text="No chip-based instrument selected."
-                  style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 12, fill: 0xffffff }}
+                  style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 16, fill: 0xffffff }}
                   tint={theme.textMuted.color}
                   layout={{ marginTop: 40, alignSelf: 'center' }}
                 />
@@ -778,7 +782,7 @@ export const PixiHelpModal: React.FC<PixiHelpModalProps> = ({
             <layoutContainer layout={{ width: CONTENT_W, height: CONTENT_H, justifyContent: 'center', alignItems: 'center', flexDirection: 'column', gap: 8 }}>
               <pixiBitmapText
                 text={h.manualSearchQuery ? 'No chapters match your search.' : 'Manual not yet generated.'}
-                style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 13, fill: 0xffffff }}
+                style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 17, fill: 0xffffff }}
                 tint={theme.textMuted.color}
                 layout={{}}
               />
@@ -789,7 +793,7 @@ export const PixiHelpModal: React.FC<PixiHelpModalProps> = ({
                   placeholder="Search manual..."
                   width={200}
                   height={22}
-                  fontSize={11}
+                  fontSize={15}
                 />
               )}
             </layoutContainer>
@@ -815,7 +819,7 @@ export const PixiHelpModal: React.FC<PixiHelpModalProps> = ({
                     placeholder="Search manual..."
                     width={176}
                     height={22}
-                    fontSize={11}
+                    fontSize={15}
                   />
                 </layoutContainer>
                 {/* Chapter tree */}
@@ -865,7 +869,7 @@ export const PixiHelpModal: React.FC<PixiHelpModalProps> = ({
                               >
                                 <pixiBitmapText
                                   text={`${chapter.number}. ${chapter.title}`}
-                                  style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 10, fill: 0xffffff }}
+                                  style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 18, fill: 0xffffff }}
                                   tint={isActive ? theme.bg.color : theme.text.color}
                                   layout={{ maxWidth: 164 }}
                                 />
@@ -887,14 +891,14 @@ export const PixiHelpModal: React.FC<PixiHelpModalProps> = ({
                       {/* Chapter title */}
                       <pixiBitmapText
                         text={`${currentManualChapter.number}. ${currentManualChapter.title}`}
-                        style={{ fontFamily: PIXI_FONTS.SANS_BOLD, fontSize: 14, fill: 0xffffff }}
+                        style={{ fontFamily: PIXI_FONTS.SANS_BOLD, fontSize: 18, fill: 0xffffff }}
                         tint={HIGHLIGHT}
                         layout={{ marginBottom: 2 }}
                       />
                       {/* Part subtitle */}
                       <pixiBitmapText
                         text={`Part ${currentManualChapter.partNumber}: ${currentManualChapter.part}`}
-                        style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 11, fill: 0xffffff }}
+                        style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 15, fill: 0xffffff }}
                         tint={theme.textMuted.color}
                         layout={{ marginBottom: 8 }}
                       />
@@ -923,7 +927,7 @@ export const PixiHelpModal: React.FC<PixiHelpModalProps> = ({
                         />
                         <pixiBitmapText
                           text={`${h.manualChapterIndex + 1} / ${h.filteredChapters.length}`}
-                          style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 10, fill: 0xffffff }}
+                          style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 18, fill: 0xffffff }}
                           tint={theme.textMuted.color}
                           layout={{}}
                         />
@@ -965,13 +969,13 @@ export const PixiHelpModal: React.FC<PixiHelpModalProps> = ({
               >
                 <pixiBitmapText
                   text={`STEP ${step.step} OF ${TUTORIAL_STEPS.length}`}
-                  style={{ fontFamily: PIXI_FONTS.SANS_BOLD, fontSize: 14, fill: 0xffffff }}
+                  style={{ fontFamily: PIXI_FONTS.SANS_BOLD, fontSize: 18, fill: 0xffffff }}
                   tint={HIGHLIGHT}
                   layout={{}}
                 />
                 <pixiBitmapText
                   text={`${h.tutorialProgress}% Complete`}
-                  style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 11, fill: 0xffffff }}
+                  style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 15, fill: 0xffffff }}
                   tint={theme.textMuted.color}
                   layout={{}}
                 />
@@ -990,7 +994,7 @@ export const PixiHelpModal: React.FC<PixiHelpModalProps> = ({
                 <pixiBitmapText
                   key={idx}
                   text={paragraph}
-                  style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 12, fill: 0xffffff }}
+                  style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 16, fill: 0xffffff }}
                   tint={theme.text.color}
                   layout={{ maxWidth: CONTENT_W - 40 }}
                 />
@@ -1036,7 +1040,7 @@ export const PixiHelpModal: React.FC<PixiHelpModalProps> = ({
                     >
                       <pixiBitmapText
                         text={String(idx + 1)}
-                        style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 12, fill: 0xffffff }}
+                        style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 16, fill: 0xffffff }}
                         tint={isCurrent ? theme.bg.color : theme.text.color}
                         layout={{}}
                       />
@@ -1061,7 +1065,7 @@ export const PixiHelpModal: React.FC<PixiHelpModalProps> = ({
       <PixiModalFooter width={W}>
         <pixiBitmapText
           text="Press ? anytime to open this help"
-          style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 11, fill: 0xffffff }}
+          style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 15, fill: 0xffffff }}
           tint={theme.textMuted.color}
           layout={{ flex: 1 }}
         />
