@@ -28,6 +28,7 @@ import { AutoFilterEditor, CompressorEditor, EQ3Editor, FilterEditor, DubFilterE
 import { BiPhaseEditor, TapeSaturationEditor, VinylNoiseEditor, MVerbEditor, LeslieEditor, SpringReverbEditor, KissOfShameEditor } from './VintageEffectEditors';
 import { SpaceyDelayerEditor, RETapeEchoEditor, SpaceEchoEditor, ToneArmEditor, TumultEditor } from './DelayVariantEditors';
 import { AutoPannerEditor, AutoWahEditor, BitCrusherEditor, ChebyshevEditor, FrequencyShifterEditor, PitchShiftEditor, JCReverbEditor, StereoWidenerEditor } from './SpecializedEffectEditors';
+import { VocoderEditor, AutoTuneEditor } from './VoiceEffectEditors';
 import { GenericEffectEditor, WAMEffectEditor } from './WAMEffectEditor';
 
 // Re-export all editors
@@ -36,6 +37,7 @@ export { AutoFilterEditor, CompressorEditor, EQ3Editor, FilterEditor, DubFilterE
 export { BiPhaseEditor, TapeSaturationEditor, VinylNoiseEditor, MVerbEditor, LeslieEditor, SpringReverbEditor, KissOfShameEditor } from './VintageEffectEditors';
 export { SpaceyDelayerEditor, RETapeEchoEditor, SpaceEchoEditor, ToneArmEditor, TumultEditor } from './DelayVariantEditors';
 export { AutoPannerEditor, AutoWahEditor, BitCrusherEditor, ChebyshevEditor, FrequencyShifterEditor, PitchShiftEditor, JCReverbEditor, StereoWidenerEditor } from './SpecializedEffectEditors';
+export { VocoderEditor, AutoTuneEditor } from './VoiceEffectEditors';
 export { GenericEffectEditor, WAMEffectEditor } from './WAMEffectEditor';
 
 // ============================================================================
@@ -82,6 +84,8 @@ const EFFECT_EDITORS: Record<string, React.FC<VisualEffectEditorProps>> = {
   SpaceyDelayer: SpaceyDelayerEditor,
   RETapeEcho: RETapeEchoEditor,
   MoogFilter: MoogFilterEditor,
+  Vocoder: VocoderEditor,
+  AutoTune: AutoTuneEditor,
   MVerb: MVerbEditor,
   Leslie: LeslieEditor,
   SpringReverb: SpringReverbEditor,
@@ -154,6 +158,8 @@ export const ENCLOSURE_COLORS: Record<string, { bg: string; bgEnd: string; accen
   RETapeEcho:          { bg: '#2a0808', bgEnd: '#1a0404', accent: '#dc2626', border: '#3a1010' },
   TapeSimulator:       { bg: '#1a1208', bgEnd: '#120e04', accent: '#b45309', border: '#2a1e08' },
   MoogFilter:          { bg: '#1a1508', bgEnd: '#120e04', accent: '#f59e0b', border: '#2a2008' },
+  Vocoder:             { bg: '#1a0a22', bgEnd: '#100618', accent: '#a855f7', border: '#2a1430' },
+  AutoTune:            { bg: '#220a18', bgEnd: '#180614', accent: '#ec4899', border: '#321428' },
   MVerb:               { bg: '#140a22', bgEnd: '#0c061a', accent: '#7c3aed', border: '#201432' },
   Leslie:              { bg: '#201408', bgEnd: '#180e04', accent: '#f97316', border: '#301e0a' },
   SpringReverb:        { bg: '#081a0a', bgEnd: '#041204', accent: '#059669', border: '#0a2a0e' },
