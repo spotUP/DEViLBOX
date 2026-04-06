@@ -56,7 +56,7 @@ function useParameterColor(parameter: string): string {
   }, [parameter, patterns, currentPatternIndex, instruments]);
 }
 
-const LANE_WIDTH = 24;
+const LANE_WIDTH = 48;
 
 export const AutomationLanes: React.FC<AutomationLanesProps> = ({
   patternId,
