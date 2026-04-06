@@ -497,7 +497,7 @@ export class TrackerGLRenderer {
 
       // Active channel highlight
       if (ch === cursor.channelIndex) {
-        this.addRect(colX, 0, chW, height, [1,1,1, 0.06]);
+        this.addRect(colX, 0, chW, height, [1,1,1, 0.02]);
       }
       // Channel color tint
       if (chData.color) {
