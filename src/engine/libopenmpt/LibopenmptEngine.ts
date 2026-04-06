@@ -145,6 +145,7 @@ export class LibopenmptEngine {
             engine.updateRealtimeChannelLevels(chLevels);
           } catch { /* ToneEngine not ready */ }
         }
+        if (chState) console.log('[LibopenmptEngine] chState received, callback:', !!this._onChannelState, 'len:', chState?.length);
         if (chState && this._onChannelState) {
           const arr = chState as Float64Array;
           const numChannels = arr.length / 6;
