@@ -1583,26 +1583,28 @@ const RecordButton: React.FC<{
   }
 
   return (
-    <div className="flex items-center gap-0.5">
+    <div className="flex items-center gap-1">
       <button
         onClick={startRecording}
-        className={`p-1.5 rounded-l transition-colors ${
+        className={`flex items-center gap-1.5 px-2 py-1.5 rounded transition-colors text-xs ${
           connected ? 'bg-accent-error/20 text-accent-error' : 'bg-dark-bgSecondary text-text-muted hover:text-accent-error'
         }`}
         title="Record from microphone"
       >
-        <Mic size={14} />
+        <Mic size={12} />
+        Record
       </button>
       <button
         onClick={() => setWithEffects(!withEffects)}
-        className={`px-1.5 py-1.5 rounded-r text-[9px] font-mono transition-colors border-l border-dark-border ${
+        className={`flex items-center gap-1.5 px-2 py-1.5 rounded transition-colors text-xs ${
           withEffects
-            ? 'bg-violet-600/30 text-violet-400'
+            ? 'bg-violet-600/20 text-violet-400'
             : 'bg-dark-bgSecondary text-text-muted hover:text-violet-400'
         }`}
         title={withEffects ? 'Recording with master effects (vocoder, autotune, etc.)' : 'Recording dry (no effects)'}
       >
-        FX
+        <Sparkles size={12} />
+        Effects
       </button>
     </div>
   );

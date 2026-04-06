@@ -837,7 +837,6 @@ export const SynthTypeDispatcher: React.FC<SynthTypeDispatcherProps> = ({
           showHelpButton={false}
           customHeaderControls={
             <div className="flex items-center gap-2">
-              <SampleRecordButton instrumentId={instrument.id} onChange={handleChange} instrument={instrument} />
               <button
                 className={`p-1.5 rounded transition-all flex items-center gap-1.5 px-2 ${
                   uiMode === 'hardware'
@@ -1384,7 +1383,6 @@ export const SynthTypeDispatcher: React.FC<SynthTypeDispatcherProps> = ({
           onVizModeChange={setVizMode}
           customHeaderControls={
             <div className="flex items-center gap-2">
-              <SampleRecordButton instrumentId={instrument.id} onChange={handleChange} instrument={instrument} />
               <button
                 className={`p-1.5 rounded transition-all flex items-center gap-1.5 px-2 ${
                   uiMode === 'hardware'
@@ -2522,7 +2520,6 @@ export const SynthTypeDispatcher: React.FC<SynthTypeDispatcherProps> = ({
           isBaking={isBaking}
           customHeaderControls={
             <div className="flex items-center gap-2">
-              <SampleRecordButton instrumentId={instrument.id} onChange={handleChange} instrument={instrument} />
               <button
                 className={`p-1.5 rounded transition-all flex items-center gap-1.5 px-2 ${
                   uiMode === 'hardware'
@@ -2599,7 +2596,6 @@ export const SynthTypeDispatcher: React.FC<SynthTypeDispatcherProps> = ({
           isBaking={isBaking}
           customHeaderControls={
             <div className="flex items-center gap-2">
-              <SampleRecordButton instrumentId={instrument.id} onChange={handleChange} instrument={instrument} />
               <button
                 className={`p-1.5 rounded transition-all flex items-center gap-1.5 px-2 ${
                   uiMode === 'hardware'
@@ -3504,85 +3500,3 @@ export const SynthTypeDispatcher: React.FC<SynthTypeDispatcherProps> = ({
   return null;
 };
 
-/** Compact mic record button for sample instrument headers (visible in both hardware and simple mode) */
-const SampleRecordButton: React.FC<{
-  instrumentId: number;
-  instrument: InstrumentConfig;
-  onChange: (updates: Partial<InstrumentConfig>) => void;
-}> = ({ instrument, onChange }) => {
-  const [recording, setRecording] = React.useState(false);
-  const [withFx, setWithFx] = React.useState(false);
-  const [elapsed, setElapsed] = React.useState(0);
-  const timerRef = React.useRef<number | null>(null);
-
-  const toggle = React.useCallback(async () => {
-    const { getAudioInputManager } = await import('@engine/AudioInputManager');
-    const mgr = getAudioInputManager();
-
-    if (recording) {
-      if (timerRef.current) { clearInterval(timerRef.current); timerRef.current = null; }
-      setRecording(false);
-      mgr.setMonitoring(false);
-      const buf = await mgr.stopRecording();
-      if (mgr.isEffectsRouted()) await mgr.disableEffectsRouting();
-      if (buf) {
-        const { bufferToDataUrl } = await import('@utils/audio/SampleProcessing');
-        const dataUrl = await bufferToDataUrl(buf);
-        onChange({
-          parameters: {
-            sampleUrl: dataUrl,
-            sampleInfo: { name: 'Recording', duration: buf.duration, size: 0 },
-            startTime: 0, endTime: 1, loopStart: 0, loopEnd: 1,
-          },
-          sample: instrument.sample ? { ...instrument.sample, url: dataUrl } : undefined,
-        } as Partial<InstrumentConfig>);
-      }
-    } else {
-      if (!mgr.isConnected()) {
-        const ok = await mgr.selectDevice();
-        if (!ok) return;
-      }
-      if (withFx) await mgr.enableEffectsRouting();
-      mgr.setMonitoring(true);
-      mgr.startRecording(withFx);
-      setRecording(true);
-      setElapsed(0);
-      const start = Date.now();
-      timerRef.current = window.setInterval(() => setElapsed((Date.now() - start) / 1000), 100);
-    }
-  }, [recording, withFx, instrument, onChange]);
-
-  React.useEffect(() => {
-    return () => { if (timerRef.current) clearInterval(timerRef.current); };
-  }, []);
-
-  return (
-    <div className="flex items-center gap-1">
-      <button
-        onClick={toggle}
-        className={`p-1.5 rounded transition-all flex items-center gap-1.5 px-2 ${
-          recording
-            ? 'bg-accent-error/20 text-accent-error ring-1 ring-accent-error/50 animate-pulse'
-            : 'bg-dark-bgTertiary text-text-secondary hover:text-text-primary hover:bg-dark-bgHover border border-dark-borderLight'
-        }`}
-        title={recording ? `Stop recording (${elapsed.toFixed(1)}s)` : 'Record from microphone'}
-      >
-        <Mic size={14} />
-        <span className="text-[10px] font-bold uppercase tracking-tight">
-          {recording ? elapsed.toFixed(1) + 's' : 'REC'}
-        </span>
-      </button>
-      <button
-        onClick={() => setWithFx(!withFx)}
-        className={`p-1.5 rounded transition-all flex items-center gap-1.5 px-2 ${
-          withFx
-            ? 'bg-violet-500/20 text-violet-400 ring-1 ring-violet-500/50'
-            : 'bg-dark-bgTertiary text-text-muted hover:text-text-secondary hover:bg-dark-bgHover border border-dark-borderLight'
-        }`}
-        title={withFx ? 'Recording with master effects (vocoder, autotune, etc.)' : 'Record dry (no effects)'}
-      >
-        <span className="text-[10px] font-bold uppercase tracking-tight">FX</span>
-      </button>
-    </div>
-  );
-};
