@@ -903,22 +903,28 @@ export class TrackerReplayer {
           ? (channel.instrument as { id: number }).id : 0;
       const rowInst = row.instrument || 0;
 
-      // Case 1: Row triggers a NON-replaced instrument on a channel playing a synth → cut synth
+      const wasPlayingSynth = chanInst && this._replacedInstruments.has(chanInst);
+
+      // Case 1: Row triggers a NON-replaced instrument → release synth, let libopenmpt play
       if (row.note > 0 && row.note < 97 && rowInst && !this._replacedInstruments.has(rowInst)) {
-        if (chanInst && this._replacedInstruments.has(chanInst)) {
-          if (channel.player) {
-            try { channel.player.stop(time); } catch { /* already stopped */ }
-          }
+        if (wasPlayingSynth) {
+          try {
+            const engine = getToneEngine();
+            const config = this.instrumentMap.get(chanInst);
+            if (config) engine.triggerNoteRelease(chanInst, 'C4', time, config, ch);
+          } catch { /* ToneEngine not ready */ }
           channel.instrument = null;
         }
         continue;
       }
 
       // Case 2: Note-off → release synth
-      if (row.note === 97 && chanInst && this._replacedInstruments.has(chanInst)) {
-        if (channel.player) {
-          try { channel.player.stop(time); } catch { /* already stopped */ }
-        }
+      if (row.note === 97 && wasPlayingSynth) {
+        try {
+          const engine = getToneEngine();
+          const config = this.instrumentMap.get(chanInst);
+          if (config) engine.triggerNoteRelease(chanInst, 'C4', time, config, ch);
+        } catch { /* ToneEngine not ready */ }
         continue;
       }
 
@@ -926,135 +932,34 @@ export class TrackerReplayer {
       const instId = rowInst || chanInst;
       if (!instId || !this._replacedInstruments.has(instId)) continue;
 
+      // Only fire on rows with actual notes — empty rows sustain current note
+      if (row.note <= 0 || row.note >= 97) continue;
+
       // Update channel instrument config from the instrumentMap
       const updatedInst = this.instrumentMap.get(instId);
       if (updatedInst) {
         channel.instrument = updatedInst;
       }
 
-      // Fire the note via the replayer's standard processRow path
+      // Fire the note and schedule release after one row
       this.processRow(ch, channel, row, time);
+      const rowDuration = (2.5 / this.bpm) * this.speed;
+      try {
+        const engine = getToneEngine();
+        const config = this.instrumentMap.get(instId);
+        if (config) engine.triggerNoteRelease(instId, 'C4', time + rowDuration, config, ch);
+      } catch { /* ToneEngine not ready */ }
     }
 
     // Update WASM mute mask
     this.updateWasmMuteMask();
   }
 
-  /**
-   * Fire ToneEngine notes for replaced instruments using PROCESSED channel state
-   * from libopenmpt. Uses actual pitch/volume after all effect processing
-   * (portamento, vibrato, volume slides, etc.) rather than raw pattern data.
-   * Called from LibopenmptEngine.onChannelState callback.
-   */
-  private fireHybridNotesFromChannelState(
-    channelState: import('./libopenmpt/LibopenmptEngine').LibopenmptChannelState[],
-    time: number,
-  ): void {
-    if (!this.song) return;
-
-    for (let ch = 0; ch < Math.min(channelState.length, this.channels.length); ch++) {
-      const cs = channelState[ch];
-      const channel = this.channels[ch];
-
-      // Determine what this channel was previously playing
-      const chanInst = typeof channel.instrument === 'number' ? channel.instrument
-        : channel.instrument != null && typeof channel.instrument === 'object' && 'id' in channel.instrument
-          ? (channel.instrument as { id: number }).id : 0;
-
-      // Determine effective instrument: if the row specifies one use it,
-      // otherwise the channel continues with whatever was playing
-      const effectiveInst = cs.instrument || chanInst;
-      const wasPlayingSynth = chanInst && this._replacedInstruments.has(chanInst);
-
-      // If this row has a non-replaced instrument with a note → release synth, switch away
-      if (cs.note > 0 && cs.instrument && !this._replacedInstruments.has(cs.instrument)) {
-        if (wasPlayingSynth) {
-          try {
-            const engine = getToneEngine();
-            engine.triggerNoteRelease(chanInst, 'C4', time, this.instrumentMap.get(chanInst)!, ch);
-          } catch { /* ToneEngine not ready */ }
-          channel.instrument = null;
-        }
-        continue;
-      }
-
-      // Note-off (note 254/255 in OpenMPT = key off / note cut) → release synth
-      if (cs.note === 255 || cs.note === 254) {
-        if (wasPlayingSynth) {
-          try {
-            const engine = getToneEngine();
-            engine.triggerNoteRelease(chanInst, 'C4', time, this.instrumentMap.get(chanInst)!, ch);
-          } catch { /* ToneEngine not ready */ }
-        }
-        continue;
-      }
-
-      // Skip if the effective instrument is not replaced
-      if (!effectiveInst || !this._replacedInstruments.has(effectiveInst)) continue;
-
-      // Only trigger on rows with actual notes — empty rows sustain the current note
-      if (cs.note <= 0 || cs.note >= 120) continue;
-
-      // Update channel instrument config from instrumentMap
-      const config = this.instrumentMap.get(cs.instrument);
-      if (config) {
-        channel.instrument = config;
-      }
-
-      // Convert to note name:
-      // If frequency is available (new WASM API), use it for processed pitch.
-      // Otherwise use the note value from pattern data (OpenMPT note: 1=C-1, 97=C#9).
-      const noteNames = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
-      let noteName: string;
-      if (cs.frequency > 0) {
-        const midiNote = Math.round(12 * Math.log2(cs.frequency / 440) + 69);
-        const clampedMidi = Math.max(0, Math.min(127, midiNote));
-        const octave = Math.floor(clampedMidi / 12) - 1;
-        noteName = noteNames[clampedMidi % 12] + octave;
-      } else if (cs.note > 0 && cs.note < 120) {
-        // OpenMPT note value: note 1 = C-1, subtract 1 and convert
-        const midiNote = cs.note - 1;
-        const octave = Math.floor(midiNote / 12) - 1;
-        noteName = noteNames[midiNote % 12] + octave;
-      } else {
-        continue; // no note to play
-      }
-
-      // Normalize volume:
-      // If from new API: nRealVolume is 0-16384
-      // If from pattern data: vol is 0-64
-      const velocity = cs.volume > 64
-        ? Math.min(1, cs.volume / 16384)   // new API: nRealVolume scale
-        : Math.min(1, cs.volume / 64);     // pattern data: 0-64 scale
-      if (velocity <= 0) continue;
-
-      const engine = getToneEngine();
-      const rowDuration = (2.5 / this.bpm) * this.speed;
-
-      if (config) {
-        console.log(`[HybridNote] ch=${ch} note=${noteName} inst=${effectiveInst} vel=${velocity.toFixed(2)} dur=${rowDuration.toFixed(3)}`);
-        engine.triggerNote(
-          effectiveInst,
-          noteName,
-          rowDuration,
-          time,
-          velocity,
-          config,
-          false,  // accent
-          false,  // slide
-          ch,     // channelIndex
-        );
-        // Schedule release after one row duration — the voice path uses
-        // triggerAttack (no auto-release), so we must explicitly release
-        try {
-          engine.triggerNoteRelease(effectiveInst, noteName, time + rowDuration, config, ch);
-        } catch { /* ToneEngine not ready */ }
-      }
-    }
-
-    // Update mute mask so libopenmpt mutes channels with replaced instruments
-    this.updateWasmMuteMask();
-  }
+  // fireHybridNotesFromChannelState removed — channel state from worklet
+  // requires a libopenmpt WASM rebuild that's currently blocked by Emscripten
+  // AudioWorklet compatibility issues. All hybrid note firing goes through
+  // fireHybridNotesForRow() via onPosition callbacks. Processed pitch/volume
+  // from libopenmpt's channel state will be added when the WASM rebuild is resolved.
 
   // ==========================================================================
   // WASM SEQUENCER CELL SYNC
@@ -2179,17 +2084,8 @@ export class TrackerReplayer {
             if (this.onRowChange) {
               this.onRowChange(row, patternNum, order);
             }
-            // Fire hybrid notes — uses pattern data from TrackerStore
-            // onChannelState below provides the same via worklet, but as fallback
-            // we fire from onPosition too (fireHybridNotesFromChannelState dedupes)
+            // Fire hybrid notes for replaced instruments using live pattern data
             this.fireHybridNotesForRow(time);
-          };
-
-          // Subscribe to per-channel state for hybrid synth note firing.
-          // Uses libopenmpt's pattern data at the current position for note/instrument/volume.
-          mptEngine.onChannelState = (channelState, stateTime) => {
-            if (!this.playing || !this.song || this._replacedInstruments.size === 0) return;
-            this.fireHybridNotesFromChannelState(channelState, stateTime);
           };
 
           mptEngine.onEnded = () => {
