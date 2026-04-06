@@ -20,54 +20,79 @@ import { getSendBusManager } from '../engine/SendBusManager';
 // bypasses per-channel Tone.Channel nodes and routes through synthBus.
 function forwardReplayerMuteMask(channels: MixerChannelState[], isSoloing: boolean): void {
   let mask = 0;
-  for (let i = 0; i < Math.min(channels.length, 16); i++) {
+  for (let i = 0; i < Math.min(channels.length, 32); i++) {
     const effectiveMute = isSoloing ? !channels[i].soloed : channels[i].muted;
     if (!effectiveMute) mask |= (1 << i);
   }
+
   // Forward to TrackerReplayer (affects ToneEngine note triggering)
   try {
     const { getTrackerReplayer } = require('../engine/TrackerReplayer');
     getTrackerReplayer().setChannelMuteMask(mask);
   } catch { /* Replayer not initialized */ }
-  // Forward to UADE engine if active (uses Paula hardware mute mask)
-  import('../engine/uade/UADEEngine').then(({ UADEEngine }) => {
-    if (UADEEngine.hasInstance()) {
-      UADEEngine.getInstance().setMuteMask(mask & 0x0F);
-    }
-  }).catch(() => {});
-  // Forward to libopenmpt engine if active (MOD/XM/IT/S3M)
-  // Use dynamic import() instead of require() — Vite ESM can return different
-  // module instances via require(), causing hasInstance() to check the wrong singleton.
-  import('../engine/libopenmpt/LibopenmptEngine').then(({ LibopenmptEngine }) => {
-    if (LibopenmptEngine.hasInstance()) {
-      LibopenmptEngine.getInstance().setMuteMask(mask);
-    }
-  }).catch(() => {});
-  // Forward to MusicLine engine if active (uses m_ChannelsOn bitfield)
-  import('../engine/musicline/MusicLineEngine').then(({ MusicLineEngine }) => {
-    if (MusicLineEngine.hasInstance()) {
-      const ml = MusicLineEngine.getInstance();
-      for (let ch = 0; ch < 8; ch++) {
-        ml.setChannelOn(ch, (mask & (1 << ch)) !== 0);
+
+  // Forward to ALL WASM engines that support setMuteMask.
+  // Uses dynamic import() — require() can return wrong module instances in Vite ESM.
+  // Each engine is a singleton; hasInstance() returns true only if actively playing.
+  const muteEngines: [string, string, number?][] = [
+    // [module path, export name, optional channel limit for mask]
+    ['../engine/libopenmpt/LibopenmptEngine', 'LibopenmptEngine'],
+    ['../engine/uade/UADEEngine', 'UADEEngine', 4],            // Paula: 4 channels
+    ['../engine/fc/FCEngine', 'FCEngine'],
+    ['../engine/soundmon/SoundMonEngine', 'SoundMonEngine'],
+    ['../engine/jamcracker/JamCrackerEngine', 'JamCrackerEngine'],
+    ['../engine/ma/MaEngine', 'MaEngine'],
+    ['../engine/hippel/HippelEngine', 'HippelEngine'],
+    ['../engine/sonix/SonixEngine', 'SonixEngine'],
+    ['../engine/pretracker/PreTrackerEngine', 'PreTrackerEngine'],
+    ['../engine/pumatracker/PumaTrackerEngine', 'PumaTrackerEngine'],
+    ['../engine/artofnoise/ArtOfNoiseEngine', 'ArtOfNoiseEngine'],
+    ['../engine/fred/FredEditorReplayerEngine', 'FredEditorReplayerEngine'],
+    ['../engine/steveturner/SteveTurnerEngine', 'SteveTurnerEngine'],
+    ['../engine/sidmon1/SidMon1ReplayerEngine', 'SidMon1ReplayerEngine'],
+    ['../engine/sidmon1/SidMon1Engine', 'SidMon1Engine'],
+    ['../engine/sidmon2/Sd2Engine', 'Sd2Engine'],
+    ['../engine/bd/BdEngine', 'BdEngine'],
+    ['../engine/futureplayer/FuturePlayerEngine', 'FuturePlayerEngine'],
+    ['../engine/robhubbard/RobHubbardEngine', 'RobHubbardEngine'],
+    ['../engine/davidwhittaker/DavidWhittakerEngine', 'DavidWhittakerEngine'],
+    ['../engine/octamed/OctaMEDEngine', 'OctaMEDEngine'],
+    ['../engine/startrekker-am/StartrekkerAMEngine', 'StartrekkerAMEngine'],
+    ['../engine/sc68/Sc68Engine', 'Sc68Engine'],
+    ['../engine/eupmini/EupminiEngine', 'EupminiEngine'],
+    ['../engine/ixalance/IxalanceEngine', 'IxalanceEngine'],
+    ['../engine/cpsycle/CpsycleEngine', 'CpsycleEngine'],
+  ];
+
+  for (const [path, name, chLimit] of muteEngines) {
+    import(/* @vite-ignore */ path).then((mod) => {
+      const Engine = mod[name];
+      if (Engine?.hasInstance?.()) {
+        const m = chLimit ? mask & ((1 << chLimit) - 1) : mask;
+        Engine.getInstance().setMuteMask(m);
       }
-    }
-  }).catch(() => {});
-  // Forward to Hively engine if active (per-channel gain)
+    }).catch(() => {});
+  }
+
+  // Engines with setChannelGain (per-channel gain instead of bitmask)
   import('../engine/hively/HivelyEngine').then(({ HivelyEngine }) => {
     if (HivelyEngine.hasInstance()) {
       const hv = HivelyEngine.getInstance();
-      for (let ch = 0; ch < 16; ch++) {
-        hv.setChannelGain(ch, (mask & (1 << ch)) !== 0 ? 1.0 : 0.0);
-      }
+      for (let ch = 0; ch < 16; ch++) hv.setChannelGain(ch, (mask & (1 << ch)) !== 0 ? 1.0 : 0.0);
     }
   }).catch(() => {});
-  // Forward to Klystrack engine if active (per-channel gain)
   import('../engine/klystrack/KlysEngine').then(({ KlysEngine }) => {
     if (KlysEngine.hasInstance()) {
       const kl = KlysEngine.getInstance();
-      for (let ch = 0; ch < 32; ch++) {
-        kl.setChannelGain(ch, (mask & (1 << ch)) !== 0 ? 1.0 : 0.0);
-      }
+      for (let ch = 0; ch < 32; ch++) kl.setChannelGain(ch, (mask & (1 << ch)) !== 0 ? 1.0 : 0.0);
+    }
+  }).catch(() => {});
+
+  // MusicLine: uses binary on/off per channel
+  import('../engine/musicline/MusicLineEngine').then(({ MusicLineEngine }) => {
+    if (MusicLineEngine.hasInstance()) {
+      const ml = MusicLineEngine.getInstance();
+      for (let ch = 0; ch < 8; ch++) ml.setChannelOn(ch, (mask & (1 << ch)) !== 0);
     }
   }).catch(() => {});
 }
