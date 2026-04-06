@@ -10,7 +10,7 @@
  */
 
 import * as Tone from 'tone';
-import type { TrackerSong } from '../TrackerReplayer';
+import type { TrackerSong, TrackerFormat } from '../TrackerReplayer';
 import { getToneEngine } from '../ToneEngine';
 import { getNativeAudioNode } from '@utils/audio-context';
 import { HivelyEngine } from '../hively/HivelyEngine';
@@ -408,6 +408,20 @@ const WASM_ENGINES: NativeEngineDescriptor[] = [
     staticRef: MusicLineEngine as unknown as WASMSingletonStatic,
   },
   {
+    key: 'TFMXModule',
+    synthType: 'TFMXModuleSynth',
+    suppressNotes: true,
+    fileDataKey: 'tfmxFileData',
+    formats: ['TFMX' as TrackerFormat],
+    loadMethod: 'loadTune',
+    supportsPause: false,
+    supportsResume: false,
+    needsDirectRouting: true,
+    staticRef: null,
+    dynamicResolver: async () => (await import('@/engine/tfmx/TFMXEngine')).TFMXEngine as unknown as WASMSingletonStatic,
+    getLoadArgs: (song: TrackerSong) => [song.tfmxSmplData],
+  },
+  {
     key: 'UADEEditable',
     synthType: 'UADEEditableSynth',
     suppressNotes: true,
@@ -561,6 +575,31 @@ export async function startNativeEngines(
         // Capture MusicLineEngine for position sync in TrackerReplayer
         if (desc.key === 'MusicLine') {
           musicLineEngine = instance as unknown as MusicLineEngine;
+        }
+
+        // TFMX module position sync: convert samplesRendered → row/position
+        if (desc.key === 'TFMXModule' && 'onPositionUpdate' in instance) {
+          const tfmxSpeed = song.initialSpeed || 6;
+          const tfmxBpm = song.initialBPM || 125;
+          const sr = Tone.context.sampleRate || 44100;
+          const samplesPerTick = Math.round((sr * 2.5) / tfmxBpm);
+          const samplesPerRow = samplesPerTick * tfmxSpeed;
+          const patLens = song.patterns.map(p => p.length);
+          const order = song.songPositions;
+
+          (instance as any).onPositionUpdate((update: { samplesRendered: number; songEnd: boolean }) => {
+            const absoluteRow = Math.floor(update.samplesRendered / samplesPerRow);
+            let row = absoluteRow;
+            let position = 0;
+            for (let i = 0; i < order.length; i++) {
+              const patLen = patLens[order[i]] || 64;
+              if (row < patLen) { position = i; break; }
+              row -= patLen;
+              if (i === order.length - 1) { position = i; row = row % patLen; }
+            }
+            useWasmPositionStore.getState().setPosition(row, position);
+          });
+          console.log(`[NativeEngineRouting] TFMXModule position sync wired`);
         }
 
         // Generic position sync for WASM engines with onPositionUpdate.
