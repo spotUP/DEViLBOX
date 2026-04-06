@@ -100,9 +100,11 @@ function checkFormatCompatibility(newSynthType: string | undefined, oldSynthType
   try {
     const { getTrackerReplayer } = require('@engine/TrackerReplayer');
     const song = getTrackerReplayer().getSong();
+    console.error('[FormatCompat] song=', !!song, 'format=', song?.format, 'synthType=', newSynthType, 'old=', oldSynthType);
     if (!song) return true; // no song loaded
 
     const fmt = song.format?.toUpperCase() || 'native';
+    console.error('[FormatCompat] SHOWING CONFIRM for', fmt);
     const confirmed = window.confirm(
       `This breaks ${fmt} format compatibility.\n\n` +
       `The song can no longer be saved as ${fmt} — save as .dbx instead.\n\n` +
@@ -112,7 +114,8 @@ function checkFormatCompatibility(newSynthType: string | undefined, oldSynthType
       _formatCompatConfirmed = true; // don't ask again for this song
     }
     return confirmed;
-  } catch {
+  } catch (e) {
+    console.error('[FormatCompat] Error:', e);
     return true; // replayer not initialized
   }
 }
