@@ -223,6 +223,7 @@ export const TFMXView: React.FC<{ width?: number; height?: number }> = () => {
         height: `${matrixH}px`,
         borderBottom: '1px solid var(--color-border)',
         flexShrink: 0,
+        overflow: 'hidden',
       }}>
         <TFMXTrackstepMatrix
           width={containerWidth}
