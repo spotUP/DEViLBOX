@@ -990,6 +990,7 @@ export const SynthTypeDispatcher: React.FC<SynthTypeDispatcherProps> = ({
           <SonicArrangerControls
             config={saConfig}
             onChange={handleSonicArrangerChange}
+            uadeChipRam={instrument.uadeChipRam}
           />
         </Suspense>
       </div>

@@ -36,9 +36,17 @@
  */
 
 import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
-import type { InstrumentConfig } from '@/types';
+import type { InstrumentConfig, TFMXConfig, UADEChipRamInfo } from '@/types';
 
 const MIN_FILE_SIZE = 32;
+
+// ── Layout constants (from libtfmxaudiodecoder Jochen/HippelDecoder.h) ───────
+const TFMX_TRACKTAB_STEP_SIZE_4V = 0x0c;   // 3 * 4 voices
+const TFMX_TRACKTAB_STEP_SIZE_7V = 0x1c;   // 4 * 7 voices
+const TFMX_SONGTAB_ENTRY_SIZE_4V = 6;
+const TFMX_SONGTAB_ENTRY_SIZE_7V = 8;
+const TFMX_SAMPLE_STRUCT_SIZE = 0x12 + 4 + 2 + 4 + 2; // 30 bytes
+const PATTERN_LENGTH = 0x40;
 
 function u16BE(buf: Uint8Array, off: number): number {
   return ((buf[off] << 8) | buf[off + 1]) >>> 0;
@@ -140,6 +148,40 @@ function checkTFMX7VSong(buf: Uint8Array, songOff: number): boolean {
 }
 
 /**
+ * Find the byte offset of the TFMX-7V song header inside `buf`. Mirrors the
+ * detection logic — returns -1 if the buffer doesn't contain a valid 7V song.
+ *
+ * The detection has two paths:
+ *   A) Loader stub at offset 0 starting with $6000; scan forward for
+ *      $308141FA, then read another distance word and add to find the song.
+ *   B) Direct TFMX-7V song at offset 0 (no stub).
+ */
+function findTFMX7VSongOffset(buf: Uint8Array): number {
+  // Path A: loader stub
+  if (buf.length >= 4 && u16BE(buf, 0) === 0x6000) {
+    if (2 + 2 > buf.length) return -1;
+    const d1 = u16BE(buf, 2);
+    if (d1 === 0 || (d1 & 0x8000) || (d1 & 1)) return -1;
+    let scanOff = 2 + d1;
+    let found = -1;
+    for (let i = 0; i <= 10; i++) {
+      if (scanOff + 4 > buf.length) break;
+      if (u32BE(buf, scanOff) === MAGIC_FIND1) { found = scanOff; break; }
+      scanOff += 2;
+    }
+    if (found < 0) return -1;
+    const afterFind = found + 4;
+    if (afterFind + 2 > buf.length) return -1;
+    const d1b = u16BE(buf, afterFind);
+    if (d1b === 0 || (d1b & 0x8000) || (d1b & 1)) return -1;
+    const songOff = afterFind + d1b;
+    return checkTFMX7VSong(buf, songOff) ? songOff : -1;
+  }
+  // Path B: direct song at offset 0
+  return checkTFMX7VSong(buf, 0) ? 0 : -1;
+}
+
+/**
  * Detect Jochen Hippel 7V format.
  *
  * Mirrors Check2 in "Jochen Hippel 7V_v2.asm":
@@ -191,6 +233,83 @@ export function isJochenHippel7VFormat(buffer: ArrayBuffer | Uint8Array): boolea
   return checkTFMX7VSong(buf, 0);
 }
 
+/**
+ * Read the TFMX-7V binary layout starting at `songOff`. Mirrors the
+ * HippelDecoder::TFMX_init + TFMX_7V_subInit C++ logic, layout reference
+ * is third-party/libtfmxaudiodecoder-main/src/Jochen/TFMX.cpp + TFMX7V.cpp.
+ *
+ * Returns absolute byte offsets into `buf` for each section.
+ */
+function readTFMX7VLayout(buf: Uint8Array, songOff: number) {
+  // Header at songOff:
+  //   +0  4  'TFMX' magic + null
+  //   +4  2  numSndSeqs - 1
+  //   +6  2  numVolSeqs - 1
+  //   +8  2  numPatterns - 1
+  //   +A  2  numTrackSteps - 1
+  //   +C  1  ???
+  //   +D  1  patternSize (must be 0x40)
+  //   +E  2  ???
+  //   +10 2  numSongs
+  //   +12 2  numSamples
+  //   +14..1F padding
+  //   +20 onward: section data
+  const h = songOff;
+  const numSndSeqs   = u16BE(buf, h + 4) + 1;
+  const numVolSeqs   = u16BE(buf, h + 6) + 1;
+  const numPatterns  = u16BE(buf, h + 8) + 1;
+  const numTrackSteps= u16BE(buf, h + 0xA) + 1;
+  const numSongs     = u16BE(buf, h + 0x10);
+  const numSamples   = Math.min(u16BE(buf, h + 0x12), 256);
+
+  // Section offsets (constant +0x20 from header)
+  let offs = h + 0x20;
+  const sndModSeqsOff = offs; offs += numSndSeqs * 64;
+  const volModSeqsOff = offs; offs += numVolSeqs * 64;
+  const patternsOff   = offs; offs += numPatterns * PATTERN_LENGTH;
+  const trackTableOff = offs;
+
+  // Decide 4V vs 7V purely from layout: try 7V step size first; if the
+  // resulting offsets push past EOF, fall back to 4V.
+  const tryStepSize = (stepSize: number, songtabSize: number) => {
+    let p = trackTableOff + numTrackSteps * stepSize;
+    const subSongTabOff = p;
+    p += (numSongs + 1) * songtabSize;
+    if (p >= buf.length) return null;
+    const sampleHeadersOff = p;
+    p += numSamples * TFMX_SAMPLE_STRUCT_SIZE;
+    if (p > buf.length) return null;
+    return { trackStepLen: stepSize, subSongTabOff, sampleHeadersOff, sampleDataOff: p };
+  };
+  const layout7V = tryStepSize(TFMX_TRACKTAB_STEP_SIZE_7V, TFMX_SONGTAB_ENTRY_SIZE_7V);
+  const layout4V = tryStepSize(TFMX_TRACKTAB_STEP_SIZE_4V, TFMX_SONGTAB_ENTRY_SIZE_4V);
+  // The detector validated the file as 7V — prefer 7V layout when both fit.
+  const chosen = layout7V ?? layout4V;
+  if (!chosen) {
+    throw new Error('TFMX-7V: layout did not fit in buffer');
+  }
+
+  return {
+    songOff,
+    numSndSeqs, numVolSeqs, numPatterns, numTrackSteps, numSongs, numSamples,
+    sndModSeqsOff, volModSeqsOff, patternsOff, trackTableOff,
+    ...chosen,
+    voices: chosen === layout7V ? 7 : 4,
+  };
+}
+
+/**
+ * Read sample headers (30 bytes each) starting at sampleHeadersOff.
+ * Returns the raw header bytes plus the sample data slice for the entire bank.
+ */
+function extractSamples(buf: Uint8Array, sampleHeadersOff: number, numSamples: number, sampleDataOff: number) {
+  const headerBlockSize = numSamples * TFMX_SAMPLE_STRUCT_SIZE;
+  const sampleHeaders = buf.slice(sampleHeadersOff, sampleHeadersOff + headerBlockSize);
+  // Sample data extends to end of file (no explicit length stored)
+  const sampleData = buf.slice(sampleDataOff);
+  return { sampleHeaders, sampleData };
+}
+
 export function parseJochenHippel7VFile(buffer: ArrayBuffer, filename: string): TrackerSong {
   const buf = new Uint8Array(buffer);
   if (!isJochenHippel7VFormat(buf)) throw new Error('Not a Jochen Hippel 7V module');
@@ -198,35 +317,117 @@ export function parseJochenHippel7VFile(buffer: ArrayBuffer, filename: string): 
   const baseName = filename.split('/').pop() ?? filename;
   const moduleName = baseName.replace(/^(hip7|s7g)\./i, '') || baseName;
 
-  const instruments: InstrumentConfig[] = [{
-    id: 1, name: 'Sample 1', type: 'synth' as const,
-    synthType: 'Synth' as const, effects: [], volume: 0, pan: 0,
-  } as InstrumentConfig];
+  // Find the song header inside the file (handles loader-stub wrapping)
+  const songOff = findTFMX7VSongOffset(buf);
+  if (songOff < 0) {
+    throw new Error('TFMX-7V: could not locate song header');
+  }
 
+  const layout = readTFMX7VLayout(buf, songOff);
+  const { sampleHeaders, sampleData } = extractSamples(
+    buf, layout.sampleHeadersOff, layout.numSamples, layout.sampleDataOff,
+  );
+
+  // Slice the entire SndModSeq pool once — every instrument exposes the
+  // full pool so the editor can browse all sequences (UI lets user pick
+  // which seq is active via a tab/dropdown).
+  const sndModPool = buf.slice(layout.sndModSeqsOff, layout.sndModSeqsOff + layout.numSndSeqs * 64);
+
+  // Build one instrument per VolModSeq entry. Each VolModSeq is 64 bytes
+  // and lives at volModSeqsOff + i*64. The first byte after the 5-byte
+  // header indexes into the SndModSeq pool (sndSeqNum).
+  const instruments: InstrumentConfig[] = [];
+  for (let i = 0; i < layout.numVolSeqs; i++) {
+    const volSeqAbsOff = layout.volModSeqsOff + i * 64;
+    const volModSeqData = buf.slice(volSeqAbsOff, volSeqAbsOff + 64);
+
+    // Skip empty volume sequences (all zeros = unused slot)
+    let nonZero = false;
+    for (let b = 0; b < volModSeqData.length; b++) {
+      if (volModSeqData[b] !== 0) { nonZero = true; break; }
+    }
+    if (!nonZero) continue;
+
+    const tfmxConfig: TFMXConfig = {
+      sndSeqsCount: layout.numSndSeqs,
+      sndModSeqData: sndModPool,
+      volModSeqData,
+      sampleCount: layout.numSamples,
+      sampleHeaders,
+      sampleData,
+    };
+
+    const uadeChipRam: UADEChipRamInfo = {
+      moduleBase: 0,
+      moduleSize: buf.length,
+      // Per-instrument chip RAM base = the absolute offset of this VolModSeq.
+      // setVolByte writes to instrBase + N (vol bytes 0..63), setSndByte writes
+      // to instrBase + 64 + N which is wrong for 7V because SndModSeq is a
+      // SHARED pool, not contiguous with VolModSeq. We expose a special
+      // metadata field below so the editor can compute the correct address.
+      instrBase: volSeqAbsOff,
+      instrSize: 64,
+      sections: {
+        volModSeqsBase: layout.volModSeqsOff,
+        sndModSeqsBase: layout.sndModSeqsOff,
+        sampleHeadersBase: layout.sampleHeadersOff,
+        sampleDataBase: layout.sampleDataOff,
+        patternsBase: layout.patternsOff,
+        trackTableBase: layout.trackTableOff,
+      },
+    };
+
+    instruments.push({
+      id: i + 1,
+      name: `Instrument ${i + 1}`,
+      type: 'synth' as const,
+      synthType: 'TFMXSynth' as const,
+      tfmx: tfmxConfig,
+      uadeChipRam,
+      effects: [],
+      volume: 64,
+      pan: 0,
+    } as InstrumentConfig);
+  }
+
+  // Build a placeholder pattern grid. Real TFMX-7V pattern → tracker-row
+  // conversion is non-trivial (note + info-byte format with portamento and
+  // sound-transpose interactions); the existing UADE playback path handles
+  // it correctly. The DOM tracker grid here is a placeholder so the song
+  // loads cleanly — playback comes from UADE via uadeEditableFileData.
   const emptyRows = Array.from({ length: 64 }, () => ({
     note: 0, instrument: 0, volume: 0, effTyp: 0, eff: 0, effTyp2: 0, eff2: 0,
   }));
 
   const pattern = {
     id: 'pattern-0', name: 'Pattern 0', length: 64,
-    channels: Array.from({ length: 4 }, (_, ch) => ({
+    channels: Array.from({ length: layout.voices }, (_, ch) => ({
       id: `channel-${ch}`, name: `Channel ${ch + 1}`, muted: false,
       solo: false, collapsed: false, volume: 100,
-      pan: ch === 0 || ch === 3 ? -50 : 50,
+      pan: [-50, 50, 50, -50, -50, 50, 50][ch] ?? 0,
       instrumentId: null, color: null, rows: emptyRows,
     })),
     importMetadata: {
       sourceFormat: 'MOD' as const, sourceFile: filename,
       importedAt: new Date().toISOString(),
-      originalChannelCount: 4, originalPatternCount: 1, originalInstrumentCount: 0,
+      originalChannelCount: layout.voices,
+      originalPatternCount: layout.numPatterns,
+      originalInstrumentCount: instruments.length,
     },
   };
 
   return {
-    name: `${moduleName} [Jochen Hippel 7V]`, format: 'MOD' as TrackerFormat,
-    patterns: [pattern], instruments, songPositions: [0],
-    songLength: 1, restartPosition: 0, numChannels: 4,
-    initialSpeed: 6, initialBPM: 125, linearPeriods: false,
+    name: `${moduleName} [Jochen Hippel 7V]`,
+    format: 'MOD' as TrackerFormat,
+    patterns: [pattern],
+    instruments,
+    songPositions: [0],
+    songLength: 1,
+    restartPosition: 0,
+    numChannels: layout.voices,
+    initialSpeed: 6,
+    initialBPM: 125,
+    linearPeriods: false,
     uadeEditableFileData: buffer.slice(0) as ArrayBuffer,
     uadeEditableFileName: filename,
   };

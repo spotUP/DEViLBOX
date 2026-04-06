@@ -5,9 +5,21 @@
  * (attack/decay/sustain/release), pitch modulation 1 & 2 settings,
  * and sample modulation 1 & 2 settings.
  *
- * Future Player is a WASM-only synth — parameter edits update the config
- * for display purposes. Live playback uses the original binary instrument
- * data via the FuturePlayerEngine WASM.
+ * ─── Known gap (not yet implemented) ─────────────────────────────────────────
+ *
+ * Future Player is a WASM-only synth and the FuturePlayerEngine doesn't have
+ * a chip-RAM-style memory window we can patch. Parameter edits update the
+ * config for display purposes only — they do NOT propagate to the running
+ * WASM. Adding live edit support requires either:
+ *
+ *   (a) Adding `set_param(handle, paramId, value)` exports to the FP WASM
+ *       (mirrors what TFMXEngine already does for its handle-based path),
+ *       OR
+ *   (b) Reloading the entire module via FuturePlayerEngine.reloadModule on
+ *       each edit, similar to TFMXEngine.reloadModule().
+ *
+ * Either approach is bounded but unimplemented. Until then, edits in this
+ * panel are display-only.
  */
 
 import React, { useRef, useEffect, useCallback, useState } from 'react';
