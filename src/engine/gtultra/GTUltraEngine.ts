@@ -322,11 +322,11 @@ export class GTUltraEngine {
   }
 
   insertTableRow(tableType: number, pos: number): void {
-    this.post({ type: 'insertTableRow', type: tableType, pos });
+    this.post({ type: 'insertTableRow', tableType, pos });
   }
 
   deleteTableRow(tableType: number, pos: number): void {
-    this.post({ type: 'deleteTableRow', type: tableType, pos });
+    this.post({ type: 'deleteTableRow', tableType, pos });
   }
 
   expandPattern(pat: number): void {

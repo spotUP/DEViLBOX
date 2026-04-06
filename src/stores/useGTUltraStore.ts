@@ -118,6 +118,8 @@ export interface GTUltraState {
   editStep: number;    // rows to advance after note entry
   recordMode: boolean;
   jamMode: boolean;
+  clipboardInstrument: number; // for instrument copy/paste
+  mutedChannels: Set<number>;  // muted channel indices
 
   // Instrument data (read from WASM or default)
   instrumentData: GTInstrumentView[];
@@ -172,6 +174,8 @@ export interface GTUltraState {
   updatePlaybackPos: (pos: Partial<GTPlaybackPosition>) => void;
   setRecordMode: (record: boolean) => void;
   setJamMode: (jam: boolean) => void;
+  setClipboardInstrument: (inst: number) => void;
+  toggleChannelMute: (ch: number) => void;
   setCurrentSong: (song: number) => void;
   setOrderCursor: (idx: number) => void;
   setOrderChannelCol: (col: number) => void;
@@ -265,6 +269,8 @@ export const useGTUltraStore = create<GTUltraState>()((set, get) => ({
   editStep: 1,
   recordMode: false,
   jamMode: false,
+  clipboardInstrument: 0,
+  mutedChannels: new Set<number>(),
 
   // Data
   instrumentData: defaultInstruments,
@@ -389,6 +395,12 @@ export const useGTUltraStore = create<GTUltraState>()((set, get) => ({
   })),
   setRecordMode: (recordMode) => set({ recordMode }),
   setJamMode: (jamMode) => set({ jamMode }),
+  setClipboardInstrument: (clipboardInstrument) => set({ clipboardInstrument }),
+  toggleChannelMute: (ch) => set((s) => {
+    const mutedChannels = new Set(s.mutedChannels);
+    if (mutedChannels.has(ch)) mutedChannels.delete(ch); else mutedChannels.add(ch);
+    return { mutedChannels };
+  }),
   setCurrentSong: (currentSong) => set({ currentSong: Math.max(0, Math.min(31, currentSong)) }),
   setOrderCursor: (orderCursor) => set({ orderCursor }),
   setOrderChannelCol: (orderChannelCol: number) => set({ orderChannelCol }),
