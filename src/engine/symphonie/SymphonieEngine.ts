@@ -150,6 +150,11 @@ export class SymphonieEngine {
     this.workletNode?.port.postMessage({ type: 'volume', value: v });
   }
 
+  setMuteMask(mask: number): void {
+    if (!this.workletNode) return;
+    this.workletNode.port.postMessage({ type: 'setMuteMask', mask });
+  }
+
   /** Set interpolation mode: 0=none (original), 1=linear, 2=cubic */
   setInterpMode(mode: number): void {
     this.workletNode?.port.postMessage({ type: 'setInterpMode', mode });
