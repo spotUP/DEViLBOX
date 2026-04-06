@@ -839,17 +839,17 @@ export const SynthTypeDispatcher: React.FC<SynthTypeDispatcherProps> = ({
             <div className="flex items-center gap-2">
               <SampleRecordButton instrumentId={instrument.id} onChange={handleChange} instrument={instrument} />
               <button
-                className={`px-2 py-1 text-xs rounded flex items-center gap-1 ${
+                className={`p-1.5 rounded transition-all flex items-center gap-1.5 px-2 ${
                   uiMode === 'hardware'
-                    ? 'bg-blue-600 text-text-primary'
-                    : 'bg-dark-bgHover text-text-secondary hover:bg-dark-bgHover'
+                    ? 'bg-blue-500/20 text-blue-400 ring-1 ring-blue-500/50'
+                    : 'bg-dark-bgTertiary text-text-secondary hover:text-text-primary hover:bg-dark-bgHover border border-dark-borderLight'
                 }`}
                 onClick={() => setUIMode(uiMode === 'simple' ? 'hardware' : 'simple')}
                 title={uiMode === 'hardware' ? 'Switch to Simple Controls' : 'Switch to Hardware UI'}
               >
                 {uiMode === 'hardware' ? <Cpu size={14} /> : <Monitor size={14} />}
-                <span className="hidden sm:inline">
-                  {uiMode === 'hardware' ? 'Hardware UI' : 'Simple UI'}
+                <span className="text-[10px] font-bold uppercase tracking-tight">
+                  {uiMode === 'hardware' ? 'HW' : 'SIMPLE'}
                 </span>
               </button>
             </div>
@@ -1386,17 +1386,17 @@ export const SynthTypeDispatcher: React.FC<SynthTypeDispatcherProps> = ({
             <div className="flex items-center gap-2">
               <SampleRecordButton instrumentId={instrument.id} onChange={handleChange} instrument={instrument} />
               <button
-                className={`px-2 py-1 text-xs rounded flex items-center gap-1 ${
+                className={`p-1.5 rounded transition-all flex items-center gap-1.5 px-2 ${
                   uiMode === 'hardware'
-                    ? 'bg-blue-600 text-text-primary'
-                    : 'bg-dark-bgHover text-text-secondary hover:bg-dark-bgHover'
+                    ? 'bg-blue-500/20 text-blue-400 ring-1 ring-blue-500/50'
+                    : 'bg-dark-bgTertiary text-text-secondary hover:text-text-primary hover:bg-dark-bgHover border border-dark-borderLight'
                 }`}
                 onClick={() => setUIMode(uiMode === 'simple' ? 'hardware' : 'simple')}
                 title={uiMode === 'hardware' ? 'Switch to Simple Controls' : 'Switch to Hardware UI'}
               >
                 {uiMode === 'hardware' ? <Cpu size={14} /> : <Monitor size={14} />}
-                <span className="hidden sm:inline">
-                  {uiMode === 'hardware' ? 'Hardware UI' : 'Simple UI'}
+                <span className="text-[10px] font-bold uppercase tracking-tight">
+                  {uiMode === 'hardware' ? 'HW' : 'SIMPLE'}
                 </span>
               </button>
             </div>
@@ -2524,17 +2524,17 @@ export const SynthTypeDispatcher: React.FC<SynthTypeDispatcherProps> = ({
             <div className="flex items-center gap-2">
               <SampleRecordButton instrumentId={instrument.id} onChange={handleChange} instrument={instrument} />
               <button
-                className={`px-2 py-1 text-xs rounded flex items-center gap-1 ${
+                className={`p-1.5 rounded transition-all flex items-center gap-1.5 px-2 ${
                   uiMode === 'hardware'
-                    ? 'bg-blue-600 text-text-primary'
-                    : 'bg-dark-bgHover text-text-secondary hover:bg-dark-bgHover'
+                    ? 'bg-blue-500/20 text-blue-400 ring-1 ring-blue-500/50'
+                    : 'bg-dark-bgTertiary text-text-secondary hover:text-text-primary hover:bg-dark-bgHover border border-dark-borderLight'
                 }`}
                 onClick={() => setUIMode(uiMode === 'simple' ? 'hardware' : 'simple')}
                 title={uiMode === 'hardware' ? 'Switch to Simple Controls' : 'Switch to Hardware UI'}
               >
                 {uiMode === 'hardware' ? <Cpu size={14} /> : <Monitor size={14} />}
-                <span className="hidden sm:inline">
-                  {uiMode === 'hardware' ? 'Hardware UI' : 'Simple UI'}
+                <span className="text-[10px] font-bold uppercase tracking-tight">
+                  {uiMode === 'hardware' ? 'HW' : 'SIMPLE'}
                 </span>
               </button>
             </div>
@@ -2601,17 +2601,17 @@ export const SynthTypeDispatcher: React.FC<SynthTypeDispatcherProps> = ({
             <div className="flex items-center gap-2">
               <SampleRecordButton instrumentId={instrument.id} onChange={handleChange} instrument={instrument} />
               <button
-                className={`px-2 py-1 text-xs rounded flex items-center gap-1 ${
+                className={`p-1.5 rounded transition-all flex items-center gap-1.5 px-2 ${
                   uiMode === 'hardware'
-                    ? 'bg-blue-600 text-text-primary'
-                    : 'bg-dark-bgHover text-text-secondary hover:bg-dark-bgHover'
+                    ? 'bg-blue-500/20 text-blue-400 ring-1 ring-blue-500/50'
+                    : 'bg-dark-bgTertiary text-text-secondary hover:text-text-primary hover:bg-dark-bgHover border border-dark-borderLight'
                 }`}
                 onClick={() => setUIMode(uiMode === 'simple' ? 'hardware' : 'simple')}
                 title={uiMode === 'hardware' ? 'Switch to Simple Controls' : 'Switch to Hardware UI'}
               >
                 {uiMode === 'hardware' ? <Cpu size={14} /> : <Monitor size={14} />}
-                <span className="hidden sm:inline">
-                  {uiMode === 'hardware' ? 'Hardware UI' : 'Simple UI'}
+                <span className="text-[10px] font-bold uppercase tracking-tight">
+                  {uiMode === 'hardware' ? 'HW' : 'SIMPLE'}
                 </span>
               </button>
             </div>
@@ -3557,25 +3557,31 @@ const SampleRecordButton: React.FC<{
   }, []);
 
   return (
-    <div className="flex items-center gap-0.5">
+    <div className="flex items-center gap-1">
       <button
         onClick={toggle}
-        className={`px-2 py-1 text-xs rounded-l flex items-center gap-1 transition-colors ${
-          recording ? 'bg-accent-error/30 text-accent-error animate-pulse' : 'bg-dark-bgHover text-text-secondary hover:text-accent-error'
+        className={`p-1.5 rounded transition-all flex items-center gap-1.5 px-2 ${
+          recording
+            ? 'bg-accent-error/20 text-accent-error ring-1 ring-accent-error/50 animate-pulse'
+            : 'bg-dark-bgTertiary text-text-secondary hover:text-text-primary hover:bg-dark-bgHover border border-dark-borderLight'
         }`}
         title={recording ? `Stop recording (${elapsed.toFixed(1)}s)` : 'Record from microphone'}
       >
-        <Mic size={12} />
-        {recording ? `${elapsed.toFixed(1)}s` : 'Rec'}
+        <Mic size={14} />
+        <span className="text-[10px] font-bold uppercase tracking-tight">
+          {recording ? elapsed.toFixed(1) + 's' : 'REC'}
+        </span>
       </button>
       <button
         onClick={() => setWithFx(!withFx)}
-        className={`px-1.5 py-1 text-[9px] font-mono rounded-r border-l border-dark-border transition-colors ${
-          withFx ? 'bg-violet-600/30 text-violet-400' : 'bg-dark-bgHover text-text-muted hover:text-violet-400'
+        className={`p-1.5 rounded transition-all flex items-center gap-1.5 px-2 ${
+          withFx
+            ? 'bg-violet-500/20 text-violet-400 ring-1 ring-violet-500/50'
+            : 'bg-dark-bgTertiary text-text-muted hover:text-text-secondary hover:bg-dark-bgHover border border-dark-borderLight'
         }`}
-        title={withFx ? 'Recording with master effects' : 'Record dry'}
+        title={withFx ? 'Recording with master effects (vocoder, autotune, etc.)' : 'Record dry (no effects)'}
       >
-        FX
+        <span className="text-[10px] font-bold uppercase tracking-tight">FX</span>
       </button>
     </div>
   );
