@@ -234,6 +234,16 @@ export class GTUltraEngine {
     this.post({ type: 'jamNoteOff', channel });
   }
 
+  /** Play a test note with proper instrument init (works even when stopped) */
+  playTestNote(channel: number, note: number, instrument: number): void {
+    this.post({ type: 'playTestNote', channel, note, instrument });
+  }
+
+  /** Release a test note */
+  releaseTestNote(channel: number): void {
+    this.post({ type: 'releaseNote', channel });
+  }
+
   // --- Configuration ---
 
   setSidModel(model: number): void {
