@@ -935,6 +935,22 @@ export const useInstrumentStore = create<InstrumentStore>()(
         state.currentInstrumentId = newId;
       });
 
+      // Warn if creating a synth instrument in a WASM-engine-backed song
+      const newInst = get().instruments.find(i => i.id === newId);
+      if (newInst && newInst.synthType !== 'Sampler' && newInst.synthType !== 'Player') {
+        try {
+          const { getTrackerReplayer } = require('@engine/TrackerReplayer');
+          const song = getTrackerReplayer().getSong();
+          if (song?.libopenmptFileData || song?.uadeEditableFileData || song?.hivelyFileData ||
+              song?.klysFileData || song?.c64SidFileData || song?.musiclineFileData) {
+            const fmt = song.format?.toUpperCase() || 'native';
+            useUIStore.getState().setStatusMessage(
+              `SYNTH INSTRUMENT BREAKS ${fmt} COMPAT — SAVE AS .DBX`, false, 4000,
+            );
+          }
+        } catch { /* replayer not initialized */ }
+      }
+
       return newId;
     },
 
