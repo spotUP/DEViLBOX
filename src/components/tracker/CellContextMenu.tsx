@@ -292,9 +292,28 @@ export const CellContextMenu: React.FC<CellContextMenuProps> = ({
 
   // Automation submenu items (NKS + register params)
   const automationMenuItems = useMemo((): MenuItemType[] => {
-    const { setActiveParameter, setShowLane, getShowLane, getCurvesForPattern, removeCurve } = useAutomationStore.getState();
+    const { setActiveParameter, setShowLane, getShowLane, getCurvesForPattern, removeCurve, addCurve, addPoint } = useAutomationStore.getState();
     const showLane = getShowLane(channelIndex);
     const items: MenuItemType[] = [];
+
+    // Helper: register a parameter, create the curve and seed a point at row 0
+    // so the lane is immediately visible with a value at full level (C40 / vol 64).
+    const pat = patterns[currentPatternIndex];
+    const ensureAutomationCurve = (paramId: string) => {
+      setActiveParameter(channelIndex, paramId);
+      setShowLane(channelIndex, true);
+      if (!useUIStore.getState().showAutomationLanes) useUIStore.getState().toggleAutomationLanes();
+      if (!pat) return;
+      const existing = getCurvesForPattern(pat.id, channelIndex).find((c) => c.parameter === paramId);
+      let curveId = existing?.id;
+      if (!curveId) {
+        curveId = addCurve(pat.id, channelIndex, paramId);
+        if (!curveId) return;
+      }
+      if (!existing || existing.points.length === 0) {
+        addPoint(curveId, 0, 1);
+      }
+    };
 
     // NKS synth params
     const channel = patterns[currentPatternIndex]?.channels[channelIndex];
@@ -307,11 +326,7 @@ export const CellContextMenu: React.FC<CellContextMenuProps> = ({
           items.push({
             id: `auto-nks-${p.id}`,
             label: p.name,
-            onClick: () => {
-              setActiveParameter(channelIndex, p.id);
-              setShowLane(channelIndex, true);
-              if (!useUIStore.getState().showAutomationLanes) useUIStore.getState().toggleAutomationLanes();
-            },
+            onClick: () => ensureAutomationCurve(p.id),
           });
         }
       }
@@ -341,11 +356,7 @@ export const CellContextMenu: React.FC<CellContextMenuProps> = ({
             submenu: g.params.map(p => ({
               id: `reg-${p.id}`,
               label: p.label,
-              onClick: () => {
-                setActiveParameter(channelIndex, p.id);
-                setShowLane(channelIndex, true);
-                if (!useUIStore.getState().showAutomationLanes) useUIStore.getState().toggleAutomationLanes();
-              },
+              onClick: () => ensureAutomationCurve(p.id),
             })),
           })),
         });
@@ -362,7 +373,6 @@ export const CellContextMenu: React.FC<CellContextMenuProps> = ({
         if (!showLane && !useUIStore.getState().showAutomationLanes) useUIStore.getState().toggleAutomationLanes();
       },
     });
-    const pat = patterns[currentPatternIndex];
     const curves = pat ? getCurvesForPattern(pat.id, channelIndex) : [];
     if (curves.length > 0) {
       items.push({
