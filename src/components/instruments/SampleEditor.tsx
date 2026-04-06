@@ -23,7 +23,7 @@ import {
   Scissors, Copy, ClipboardPaste, Crop, VolumeX, Volume2, Volume1,
   Undo2, Redo2, Eye, Download,
   ArrowLeft, ArrowRight, Maximize2, FlipHorizontal,
-  Activity, Waves, Clock, Filter, Mic, CircleDot, ChevronDown, Settings, X
+  Activity, Waves, Clock, Filter, Mic, CircleDot, ChevronDown, X
 } from 'lucide-react';
 import { WavetableEditor } from './editors/WavetableEditor';
 import { Button } from '@components/ui/Button';
@@ -1159,7 +1159,7 @@ export const SampleEditor: React.FC<SampleEditorProps> = ({ instrument, onChange
           )}
 
           {/* ─── Main toolbar ────────────────────────────────────── */}
-          <div className="flex items-center gap-1 flex-wrap">
+          <div className="flex items-center gap-2 flex-wrap">
             {/* File & playback */}
             <Button
               variant="primary"
@@ -1697,7 +1697,7 @@ const RecordButton: React.FC<{
   }, []);
 
   return (
-    <div className="flex items-center gap-1 relative">
+    <div className="flex items-center gap-2 relative">
       {/* Record / Stop button */}
       {recording ? (
         <Button
@@ -1767,23 +1767,18 @@ const RecordButton: React.FC<{
         </div>
       )}
 
-      {/* Effects toggle + dialog opener */}
+      {/* Effects: opens master effects dialog and enables effects routing */}
       <Button
         variant={withEffects ? 'primary' : 'default'}
         size="sm"
         icon={<Sparkles size={12} />}
-        onClick={() => setWithEffects(!withEffects)}
-        title={withEffects ? 'Recording WITH master effects' : 'Recording dry (click to enable effects)'}
+        onClick={() => {
+          setWithEffects(true);
+          setShowMasterFx(true);
+        }}
+        title="Configure master effects applied to recording"
       >
         Effects
-      </Button>
-      <Button
-        variant="default"
-        size="sm"
-        onClick={() => setShowMasterFx(true)}
-        title="Configure master effects chain"
-      >
-        <Settings size={11} />
       </Button>
 
       {/* Error toast */}
