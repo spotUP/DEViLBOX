@@ -453,36 +453,34 @@ export async function tryRouteFormat(
   }
 
   // ── TFMX (Jochen Hippel) ─────────────────────────────────────────────────
-  // TFMX requires UADE for audio (complex macro/trackstep system).
-  // The enhanced UADE scan calls TFMXParser internally for pattern data.
-  // Companion files (smpl.*) must be registered with UADE before loading.
-  // If UADE fails (e.g. missing smpl.* companion), fall back to native parser
-  // for pattern display + editing only (no audio).
+  // Native TFMXParser provides patterns; TFMXEngine WASM handles audio playback.
+  // Companion smpl.* file is passed to the WASM engine for sample data.
   if (matchesExt(filename, ['tfmx', 'mdat', 'tfx'])) {
-    // Parse pattern/macro data with the native TFMX parser, then augment with
-    // UADE for audio playback.  This avoids relying on UADE's format detection
-    // (which can report 'Unknown' for some TFMX files) and the enhanced scan
-    // (which produces wrong Sampler instruments + CIA warnings for TFMX).
     try {
       const { parseTFMXFile } = await import('@lib/import/formats/TFMXParser');
-      const { parseUADEFile } = await import('@lib/import/formats/UADEParser');
       const nativeSong = parseTFMXFile(buffer, originalFileName, subsong);
-      // Load into UADE for streaming audio (classic mode — no enhanced scan)
-      const uadeSong = await parseUADEFile(buffer, originalFileName, 'classic', subsong, preScannedMeta, companionFiles);
-      // Merge: native patterns + instruments, UADE streaming audio config
-      const uadeInstr = uadeSong.instruments.find(i => i.synthType === 'UADESynth');
+
+      // Find companion smpl.* file
+      let smplData: ArrayBuffer | undefined;
+      if (companionFiles) {
+        for (const [key, val] of companionFiles) {
+          const base = key.split('/').pop()?.toLowerCase() ?? '';
+          if (base.startsWith('smpl.')) {
+            smplData = val;
+            break;
+          }
+        }
+      }
+
       return {
         ...nativeSong,
-        format: 'UADE' as TrackerFormat,
-        // uadeEditableFileData triggers UADE streaming playback (suppressNotes=true)
-        uadeEditableFileData: buffer.slice(0),
-        uadeEditableFileName: originalFileName,
-        instruments: uadeInstr
-          ? [uadeInstr, ...nativeSong.instruments]
-          : nativeSong.instruments,
+        format: 'TFMX' as TrackerFormat,
+        // tfmxFileData triggers TFMXEngine WASM module playback (suppressNotes=true)
+        tfmxFileData: buffer.slice(0),
+        tfmxSmplData: smplData?.slice(0),
       };
     } catch (err) {
-      console.warn(`[TFMX] Native+UADE failed, falling back to pure UADE:`, err);
+      console.warn(`[TFMX] Native parse failed, falling back to UADE:`, err);
       const { parseUADEFile } = await import('@lib/import/formats/UADEParser');
       return await parseUADEFile(buffer, originalFileName, prefs.uade ?? 'enhanced', subsong, preScannedMeta, companionFiles);
     }

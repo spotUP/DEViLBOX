@@ -25,6 +25,8 @@ export class TFMXEngine {
   private _resolveInit: (() => void) | null = null;
   private _playerHandleResolvers: Array<(handle: number) => void> = [];
   private _disposed = false;
+  private _positionCallbacks: Array<(update: { samplesRendered: number; songEnd: boolean }) => void> = [];
+  private _moduleLoadedResolvers: Array<(info: { voices: number; songs: number; duration: number }) => void> = [];
 
   private constructor() {
     this.audioContext = getDevilboxAudioContext();
@@ -135,6 +137,19 @@ export class TFMXEngine {
             resolve(data.handle);
           }
           break;
+
+        case 'moduleLoaded':
+          if (this._moduleLoadedResolvers.length > 0) {
+            const resolve = this._moduleLoadedResolvers.shift()!;
+            resolve({ voices: data.voices, songs: data.songs, duration: data.duration });
+          }
+          break;
+
+        case 'modulePosition':
+          for (const cb of this._positionCallbacks) {
+            cb({ samplesRendered: data.samplesRendered, songEnd: data.songEnd });
+          }
+          break;
       }
     };
 
@@ -167,8 +182,62 @@ export class TFMXEngine {
     });
   }
 
+  // ── Full-module playback API (singleton engine pattern) ──────────────────
+
+  /**
+   * Load a full TFMX module (mdat + optional smpl companion) for playback.
+   * Returns module info: { voices, songs, duration }.
+   */
+  async loadTune(mdatData: ArrayBuffer, smplData?: ArrayBuffer): Promise<{ voices: number; songs: number; duration: number }> {
+    await this._initPromise;
+    if (!this.workletNode) throw new Error('TFMXEngine not initialized');
+
+    const mdatCopy = mdatData.slice(0);
+    const smplCopy = smplData ? smplData.slice(0) : null;
+    const transfers: Transferable[] = [mdatCopy];
+    if (smplCopy) transfers.push(smplCopy);
+
+    const promise = new Promise<{ voices: number; songs: number; duration: number }>((resolve) => {
+      this._moduleLoadedResolvers.push(resolve);
+    });
+
+    this.workletNode.port.postMessage({
+      type: 'loadModule',
+      mdatBuffer: mdatCopy,
+      smplBuffer: smplCopy,
+      subsong: 0,
+    }, transfers);
+
+    return promise;
+  }
+
+  play(): void {
+    this.sendMessage({ type: 'modulePlay' });
+  }
+
+  stop(): void {
+    this.sendMessage({ type: 'moduleStop' });
+    this._positionCallbacks = [];
+  }
+
+  onPositionUpdate(callback: (update: { samplesRendered: number; songEnd: boolean }) => void): () => void {
+    this._positionCallbacks.push(callback);
+    return () => {
+      const idx = this._positionCallbacks.indexOf(callback);
+      if (idx >= 0) this._positionCallbacks.splice(idx, 1);
+    };
+  }
+
+  setMuteMask(mask: number): void {
+    // mask: bit N = 1 means voice N is muted
+    for (let v = 0; v < 7; v++) {
+      this.sendMessage({ type: 'moduleMuteVoice', voice: v, mute: (mask & (1 << v)) !== 0 });
+    }
+  }
+
   dispose(): void {
     this._disposed = true;
+    this._positionCallbacks = [];
     this.workletNode?.port.postMessage({ type: 'dispose' });
     this.workletNode?.disconnect();
     this.workletNode = null;

@@ -1093,7 +1093,17 @@ var _tfmx_init,
   _tfmx_render,
   _tfmx_set_param,
   _tfmx_get_param,
+  _tfmx_load_module,
   _malloc,
+  _tfmx_get_samples_rendered,
+  _tfmx_module_song_end,
+  _tfmx_module_render,
+  _tfmx_module_stop,
+  _tfmx_module_songs,
+  _tfmx_module_duration,
+  _tfmx_module_voice_volume,
+  _tfmx_module_voices,
+  _tfmx_module_mute_voice,
   __emscripten_stack_restore,
   __emscripten_stack_alloc,
   _emscripten_stack_get_current,
@@ -1113,7 +1123,17 @@ function assignWasmExports(wasmExports) {
   _tfmx_render = Module['_tfmx_render'] = wasmExports['tfmx_render'];
   _tfmx_set_param = Module['_tfmx_set_param'] = wasmExports['tfmx_set_param'];
   _tfmx_get_param = Module['_tfmx_get_param'] = wasmExports['tfmx_get_param'];
+  _tfmx_load_module = Module['_tfmx_load_module'] = wasmExports['tfmx_load_module'];
   _malloc = Module['_malloc'] = wasmExports['malloc'];
+  _tfmx_get_samples_rendered = Module['_tfmx_get_samples_rendered'] = wasmExports['tfmx_get_samples_rendered'];
+  _tfmx_module_song_end = Module['_tfmx_module_song_end'] = wasmExports['tfmx_module_song_end'];
+  _tfmx_module_render = Module['_tfmx_module_render'] = wasmExports['tfmx_module_render'];
+  _tfmx_module_stop = Module['_tfmx_module_stop'] = wasmExports['tfmx_module_stop'];
+  _tfmx_module_songs = Module['_tfmx_module_songs'] = wasmExports['tfmx_module_songs'];
+  _tfmx_module_duration = Module['_tfmx_module_duration'] = wasmExports['tfmx_module_duration'];
+  _tfmx_module_voice_volume = Module['_tfmx_module_voice_volume'] = wasmExports['tfmx_module_voice_volume'];
+  _tfmx_module_voices = Module['_tfmx_module_voices'] = wasmExports['tfmx_module_voices'];
+  _tfmx_module_mute_voice = Module['_tfmx_module_mute_voice'] = wasmExports['tfmx_module_mute_voice'];
   __emscripten_stack_restore = wasmExports['_emscripten_stack_restore'];
   __emscripten_stack_alloc = wasmExports['_emscripten_stack_alloc'];
   _emscripten_stack_get_current = wasmExports['emscripten_stack_get_current'];
