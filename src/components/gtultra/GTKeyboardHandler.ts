@@ -93,9 +93,10 @@ export function useGTKeyboardHandler(active: boolean) {
       const noteOffset = PIANO_MAP[e.key.toLowerCase()];
       if (noteOffset !== undefined) {
         e.preventDefault();
-        const noteVal = currentOctave * 12 + noteOffset + 1; // 1-based notes
-        if (noteVal >= 1 && noteVal <= 95) {
-          // Jam: always play the note
+        const FIRSTNOTE = 0x60; // GT note base offset (96)
+        const noteVal = FIRSTNOTE + currentOctave * 12 + noteOffset;
+        if (noteVal >= FIRSTNOTE && noteVal <= 0xBC) {
+          // Jam: play the note through the SID engine
           engine?.jamNoteOn(cursor.channel, noteVal, currentInstrument);
 
           // Record: write to pattern via WASM
