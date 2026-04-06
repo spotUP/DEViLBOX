@@ -4,6 +4,7 @@
 
 import * as Tone from 'tone';
 import { useTransportStore } from '@stores/useTransportStore';
+import { useTrackerStore } from '@stores/useTrackerStore';
 import { getToneEngine } from '@engine/ToneEngine';
 import { getTrackerReplayer } from '@engine/TrackerReplayer';
 import { unlockIOSAudio } from '@utils/ios-audio-unlock';
@@ -49,17 +50,17 @@ export function playStopToggle(): boolean {
 export function playPattern(): boolean {
   const replayer = getTrackerReplayer();
   const store = useTransportStore.getState();
+  const trackerStore = useTrackerStore.getState();
+  const startPos = trackerStore.currentPositionIndex;
   const playing = replayer.isPlaying() || store.isPlaying;
 
   if (playing) {
     if (replayer.isSuppressNotes) {
-      // WASM engines handle their own playback — forcePosition is meaningless.
-      // Stop and restart cleanly so usePatternPlayback relaunches the engine.
       replayer.stop();
       store.stop();
       getToneEngine().stop();
     } else {
-      replayer.forcePosition(replayer.getSongPos(), 0);
+      replayer.forcePosition(startPos, 0);
       return true;
     }
   }
@@ -80,29 +81,28 @@ export function playPattern(): boolean {
 }
 
 /**
- * Play song from pattern 0 / row 0.
+ * Play song from current position / row 0.
  */
 export function playSong(): boolean {
   const replayer = getTrackerReplayer();
   const store = useTransportStore.getState();
+  const trackerStore = useTrackerStore.getState();
+  const startPos = trackerStore.currentPositionIndex;
   const playing = replayer.isPlaying() || store.isPlaying;
 
   if (playing) {
     if (replayer.isSuppressNotes) {
-      // WASM engines handle their own playback — forcePosition is meaningless.
-      // Stop and restart cleanly so usePatternPlayback relaunches the engine.
       replayer.stop();
       store.stop();
       getToneEngine().stop();
     } else {
-      replayer.forcePosition(0, 0);
+      replayer.forcePosition(startPos, 0);
       return true;
     }
   }
   unlockIOSAudio();
   Tone.start();
   store.setIsLooping(false);
-  store.setCurrentPattern(0);
   store.setCurrentRow(0);
   // Fast path: if AudioContext is already running, skip async init
   const ctx = Tone.getContext().rawContext as AudioContext;
