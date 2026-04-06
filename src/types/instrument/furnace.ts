@@ -122,6 +122,7 @@ export interface FurnaceGBConfig {
   }>;
   softEnv?: boolean;      // Use software envelope
   alwaysInit?: boolean;   // Always initialize
+  doubleWave?: boolean;   // Double wave length (GBA only)
 }
 
 // C64 SID (DIV_INS_C64)
@@ -175,6 +176,8 @@ export interface FurnaceN163Config {
   waveLen: number;       // Wave length
   waveMode: number;      // Wave mode
   perChPos: boolean;     // Per-channel position
+  chPos?: number[];      // Per-channel wave positions (8 entries, 0-255)
+  chLen?: number[];      // Per-channel wave lengths (8 entries, 0-252, 4-aligned)
 }
 
 // FDS (DIV_INS_FDS)
@@ -183,6 +186,7 @@ export interface FurnaceFDSConfig {
   modDepth: number;      // Modulation depth 0-63
   modTable: number[];    // 32-step modulation table (-4 to +3)
   initModTableWithFirstWave: boolean;
+  compat?: boolean;      // FDS compatibility mode
 }
 
 // SNES (DIV_INS_SNES)
