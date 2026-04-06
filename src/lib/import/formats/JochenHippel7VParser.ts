@@ -1,5 +1,5 @@
 /**
- * JochenHippel7VParser.ts — Jochen Hippel 7V (TFMX-7V) format detection and stub parser
+ * JochenHippel7VParser.ts — Jochen Hippel 7V (TFMX-7V) format parser
  *
  * Detection (from "Jochen Hippel 7V_v2.asm", DTP_Check2):
  *
