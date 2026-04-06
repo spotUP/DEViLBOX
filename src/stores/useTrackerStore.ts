@@ -546,6 +546,24 @@ export const useTrackerStore = create<TrackerStore>()(
           }
         }
       } catch { /* UADE not active */ }
+      // Sync edit to TFMX mdat buffer (direct binary patch for WASM playback)
+      try {
+        const fmt = require('./useFormatStore').useFormatStore.getState();
+        if (fmt.tfmxFileData && fmt.uadePatternLayout) {
+          const fullCell = get().patterns[patternIndex]?.channels[channelIndex]?.rows[rowIndex];
+          if (fullCell) {
+            const { getCellFileOffset } = require('@engine/uade/UADEPatternEncoder');
+            const offset = getCellFileOffset(fmt.uadePatternLayout, patternIndex, rowIndex, channelIndex);
+            if (offset >= 0) {
+              const encoded = fmt.uadePatternLayout.encodeCell(fullCell);
+              const buf = new Uint8Array(fmt.tfmxFileData);
+              for (let i = 0; i < encoded.length && offset + i < buf.length; i++) {
+                buf[offset + i] = encoded[i];
+              }
+            }
+          }
+        }
+      } catch { /* TFMX not active */ }
       // Sync edit to StarTrekker AM WASM engine (direct MOD pattern cell write)
       try {
         const fmt = require('./useFormatStore').useFormatStore.getState();

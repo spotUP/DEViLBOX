@@ -66,6 +66,7 @@ interface FormatStore {
   symphonieFileData: ArrayBuffer | null;
   uadeEditableFileData: ArrayBuffer | null;
   uadeEditableFileName: string | null;
+  uadePatternLayout: import('@/engine/uade/UADEPatternEncoder').UADEPatternLayout | null;
   tfmxFileData: ArrayBuffer | null;
   tfmxSmplData: ArrayBuffer | null;
   tfmxTimingTable: { patternIndex: number; row: number; cumulativeJiffies: number }[] | null;
@@ -216,6 +217,7 @@ export const useFormatStore = create<FormatStore>()(
     sd2FileData: null,
     symphonieFileData: null,
     uadeEditableFileData: null,
+    uadePatternLayout: null,
     tfmxFileData: null,
     tfmxSmplData: null,
     uadeEditableFileName: null,
@@ -617,6 +619,7 @@ export const useFormatStore = create<FormatStore>()(
         state.symphonieFileData = (song as any).symphonieFileData ?? null;
         state.uadeEditableFileData = (song as any).uadeEditableFileData ?? null;
         state.uadeEditableFileName = (song as any).uadeEditableFileName ?? null;
+        state.uadePatternLayout = (song as any).uadePatternLayout ?? null;
         state.tfmxFileData = (song as any).tfmxFileData ?? null;
         state.tfmxSmplData = (song as any).tfmxSmplData ?? null;
         state.tfmxTimingTable = (song as any).tfmxTimingTable ?? null;
@@ -772,6 +775,7 @@ export const useFormatStore = create<FormatStore>()(
       state.symphonieFileData = null;
       state.uadeEditableFileData = null;
       state.uadeEditableFileName = null;
+      state.uadePatternLayout = null;
       state.tfmxFileData = null;
       state.tfmxSmplData = null;
       state.tfmxTimingTable = null;
