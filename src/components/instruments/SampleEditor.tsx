@@ -1131,24 +1131,29 @@ export const SampleEditor: React.FC<SampleEditorProps> = ({ instrument, onChange
         className="hidden"
       />
 
-      {/* ═══════════════ Controls (when sample loaded) ═══════════════ */}
-      {audioBuffer && sampleInfo && (
-        <>
+      {/* ═══════════════ Controls (always shown, disabled when empty) ═══════════════ */}
+      <>
           {/* ─── Info bar ────────────────────────────────────────── */}
-          <div className="flex items-center justify-between text-[10px] font-mono text-text-muted px-1">
-            <span>{formatDuration(sampleInfo.duration)} | {formatSize(sampleInfo.size)}</span>
-            <span>
-              {sampleInfo.sampleRate ? (sampleInfo.sampleRate / 1000).toFixed(1) + 'kHz' : ''}
-              {sampleInfo.channels === 1 ? ' Mono' : sampleInfo.channels === 2 ? ' Stereo' : ''}
-              {' | '}{audioBuffer.length.toLocaleString()} samples
-            </span>
-            {hasSelection && (
-              <span className="text-blue-400">
-                Sel: {formatSamples(selectionLength)} ({((selectionLength / audioBuffer.length) * 100).toFixed(1)}%)
+          {audioBuffer && sampleInfo ? (
+            <div className="flex items-center justify-between text-[10px] font-mono text-text-muted px-1">
+              <span>{formatDuration(sampleInfo.duration)} | {formatSize(sampleInfo.size)}</span>
+              <span>
+                {sampleInfo.sampleRate ? (sampleInfo.sampleRate / 1000).toFixed(1) + 'kHz' : ''}
+                {sampleInfo.channels === 1 ? ' Mono' : sampleInfo.channels === 2 ? ' Stereo' : ''}
+                {' | '}{audioBuffer.length.toLocaleString()} samples
               </span>
-            )}
-            <span>Zoom: {zoomLevel.toFixed(1)}x</span>
-          </div>
+              {hasSelection && (
+                <span className="text-blue-400">
+                  Sel: {formatSamples(selectionLength)} ({((selectionLength / audioBuffer.length) * 100).toFixed(1)}%)
+                </span>
+              )}
+              <span>Zoom: {zoomLevel.toFixed(1)}x</span>
+            </div>
+          ) : (
+            <div className="flex items-center justify-center text-[10px] font-mono text-text-muted px-1">
+              <span>No sample — click the waveform, upload a file, or record from mic</span>
+            </div>
+          )}
 
           {/* ─── Main toolbar ────────────────────────────────────── */}
           <div className="flex items-center gap-1 flex-wrap">
@@ -1433,8 +1438,7 @@ export const SampleEditor: React.FC<SampleEditorProps> = ({ instrument, onChange
               <>{' \u2022 '}<span className="text-text-secondary">Ctrl+Click</span>{' granular pos'}</>
             )}
           </div>
-        </>
-      )}
+      </>
 
       {/* ─── Empty state ─────────────────────────────────────────── */}
       {!audioBuffer && (
