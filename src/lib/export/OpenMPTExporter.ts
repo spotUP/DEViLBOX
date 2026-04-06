@@ -93,6 +93,29 @@ export async function exportWithOpenMPT(
   const format = options.format;
   const numChannels = options.channelLimit || patterns[0]?.channels.length || 4;
 
+  // Bake automation curves into pattern effects before writing to OpenMPT
+  try {
+    const { useAutomationStore } = await import('@stores/useAutomationStore');
+    const { bakeAutomationForExport } = await import('./AutomationBaker');
+    const { FORMAT_LIMITS } = await import('@/lib/formatCompatibility');
+    const curves = useAutomationStore.getState().curves;
+    if (curves.length > 0) {
+      const formatKey = format.toUpperCase(); // 'MOD' | 'XM' | 'IT' | 'S3M'
+      const fmt = FORMAT_LIMITS[formatKey];
+      if (fmt) {
+        const bakeResult = bakeAutomationForExport(patterns, curves, fmt);
+        patterns = bakeResult.patterns;
+        if (bakeResult.bakedCount > 0) {
+          warnings.push(`${bakeResult.bakedCount} automation curve(s) baked into ${formatKey} effects.`);
+        }
+        if (bakeResult.overflowRows > 0) {
+          warnings.push(`${bakeResult.overflowRows} row(s) had no free effect slot — automation data lost on those rows.`);
+        }
+        for (const w of bakeResult.warnings) warnings.push(w);
+      }
+    }
+  } catch { /* automation store not available */ }
+
   // Map format to CSoundFile type enum
   const formatMap: Record<SaveFormat, number> = { mod: 0, xm: 1, it: 2, s3m: 3 };
   const formatType = formatMap[format];
