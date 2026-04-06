@@ -79,9 +79,21 @@ class CpsycleProcessor extends AudioWorkletProcessor {
         }
         break;
 
+      case 'setMuteMask': {
+        if (this.module && typeof this.module._cpsycle_set_channel_gain === 'function') {
+          const mask = data.mask || 0;
+          const numCh = data.numChannels || 32;
+          for (let ch = 0; ch < numCh; ch++) {
+            const muted = (mask & (1 << ch)) !== 0;
+            this.module._cpsycle_set_channel_gain(ch, muted ? 0.0 : 1.0);
+          }
+        }
+        break;
+      }
+
       case 'setChannelGain':
-        if (this.module && typeof this.module._player_set_channel_gain === 'function') {
-          this.module._player_set_channel_gain(data.channel, data.gain);
+        if (this.module && typeof this.module._cpsycle_set_channel_gain === 'function') {
+          this.module._cpsycle_set_channel_gain(data.channel, data.gain);
         }
         break;
 

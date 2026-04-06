@@ -191,3 +191,24 @@ int EXPORT cpsycle_render(float *buf, int frames) {
 int EXPORT cpsycle_get_sample_rate(void) {
     return CPSYCLE_SAMPLE_RATE;
 }
+
+/* ---- Per-channel muting ---- */
+
+/*
+ * Psycle uses a machine-based architecture. Tracks map to pattern tracks.
+ * We use psy_audio_patterns_mutetrack/unmutetrack for built-in track muting.
+ *
+ * gain == 0 → muted
+ * gain >  0 → unmuted
+ */
+
+void EXPORT cpsycle_set_channel_gain(int ch, float gain) {
+    if (!g_initialized || !g_song) return;
+    if (ch < 0) return;
+
+    if (gain <= 0.0f) {
+        psy_audio_patterns_mutetrack(&g_song->patterns, (uintptr_t)ch);
+    } else {
+        psy_audio_patterns_unmutetrack(&g_song->patterns, (uintptr_t)ch);
+    }
+}

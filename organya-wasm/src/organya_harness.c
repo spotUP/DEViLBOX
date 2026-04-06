@@ -97,6 +97,7 @@ EXPORT int organya_init(const uint8_t *data, uint32_t size) {
     g_song_loaded = 1;
 
     organya_context_seek(&g_ctx, 0);
+    organya_init_gains();
     return 0;
 }
 
@@ -133,4 +134,29 @@ EXPORT int organya_get_tempo(void) {
 
 EXPORT int organya_get_num_channels(void) {
     return 16; /* 8 melody + 8 percussion */
+}
+
+/* ---- Per-channel muting ---- */
+
+/*
+ * Organya has built-in per-channel muting via organya_context_set_mute().
+ * 8 melody channels (0-7) + 8 percussion channels (8-15) = 16 total.
+ *
+ * gain == 0 → muted
+ * gain >  0 → unmuted
+ */
+
+#define ORGANYA_MAX_CHANNELS 16
+static float g_channel_gain[ORGANYA_MAX_CHANNELS];
+
+static void organya_init_gains(void) {
+    for (int i = 0; i < ORGANYA_MAX_CHANNELS; i++) g_channel_gain[i] = 1.0f;
+}
+
+EXPORT void organya_set_channel_gain(int ch, float gain) {
+    if (ch < 0 || ch >= ORGANYA_MAX_CHANNELS) return;
+    g_channel_gain[ch] = gain;
+    if (g_initialized && g_song_loaded) {
+        organya_context_set_mute(&g_ctx, (size_t)ch, gain <= 0.0f ? ORG_TRUE : ORG_FALSE);
+    }
 }
