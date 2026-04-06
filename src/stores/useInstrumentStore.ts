@@ -894,6 +894,24 @@ export const useInstrumentStore = create<InstrumentStore>()(
     },
 
     createInstrument: (config) => {
+      // Check if creating a synth instrument on a native format song
+      const synthType = (config as Partial<InstrumentConfig>)?.synthType;
+      if (synthType && synthType !== 'Sampler' && synthType !== 'Player') {
+        try {
+          const { getTrackerReplayer } = require('@engine/TrackerReplayer');
+          const song = getTrackerReplayer().getSong();
+          if (song) {
+            const fmt = song.format?.toUpperCase() || 'native';
+            const confirmed = window.confirm(
+              `Adding a synth instrument breaks ${fmt} format compatibility.\n\n` +
+              `The song can no longer be saved as ${fmt} — save as .dbx instead.\n\n` +
+              `Continue?`
+            );
+            if (!confirmed) return -1; // cancelled
+          }
+        } catch { /* replayer not initialized */ }
+      }
+
       const existingIds = get().instruments.map((i) => i.id);
       const newId = findNextId(existingIds);
 
