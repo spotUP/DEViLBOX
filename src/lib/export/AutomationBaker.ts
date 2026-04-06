@@ -729,7 +729,108 @@ export function bakeAutomationForExport(
     }
   }
 
+  // Post-process: optimize linear volume ramps into fine slide commands
+  const slideRows = optimizeVolumeSlides(baked, format);
+  if (slideRows > 0) {
+    warnings.push(`Optimized ${slideRows} volume row(s) into fine slide commands.`);
+  }
+
   return { patterns: baked, bakedCount, overflowRows, warnings };
+}
+
+// ── Slide Optimization (Post-Process) ───────────────────────────────────────
+
+/**
+ * Detect consecutive volume column "set volume" entries that form a linear ramp,
+ * and replace them with fine volume slides (frees nothing column-wise, but is
+ * more authentic and efficient at the player level — single tick-0 write vs N).
+ *
+ * Volume column encoding:
+ *   0x10-0x50 = Set Volume (0-64)
+ *   0x80-0x8F = Fine Volume Down (1-15 per row, tick 0 only)
+ *   0x90-0x9F = Fine Volume Up   (1-15 per row, tick 0 only)
+ *
+ * MOD has no volume column — skip.
+ *
+ * @returns number of rows replaced with slides
+ */
+function optimizeVolumeSlides(patterns: Pattern[], format: FormatConstraints): number {
+  if (!hasVolumeColumn(format)) return 0;
+  let optimized = 0;
+
+  for (const pattern of patterns) {
+    for (const channel of pattern.channels) {
+      const rows = channel.rows;
+      let runStart = -1;
+      let runDelta = 0;
+      let runStartVol = 0;
+
+      const isSetVol = (vol: number | undefined): boolean =>
+        vol !== undefined && vol >= 0x10 && vol <= 0x50;
+
+      for (let r = 0; r <= rows.length; r++) {
+        const cell = r < rows.length ? rows[r] : undefined;
+        const vol = cell?.volume;
+
+        if (cell && isSetVol(vol) && !cell.note && !cell.instrument) {
+          // Continuation candidate (no note/instrument that would reset volume)
+          const setVal = vol! - 0x10; // 0-64 actual volume
+          if (runStart < 0) {
+            // Start a new run
+            runStart = r;
+            runStartVol = setVal;
+            runDelta = 0;
+          } else if (runStart === r - 1) {
+            // Second row — establish delta
+            runDelta = setVal - runStartVol;
+            // Delta must be in [-15, 15] and non-zero for slides
+            if (Math.abs(runDelta) < 1 || Math.abs(runDelta) > 15) {
+              // Delta out of range — restart from this row
+              runStart = r;
+              runStartVol = setVal;
+              runDelta = 0;
+            }
+          } else {
+            // Continuation — check delta still matches
+            const expected = runStartVol + runDelta * (r - runStart);
+            if (setVal !== expected) {
+              // Delta broke — emit slides for the previous run, restart
+              applySlideRun(rows, runStart, r - 1, runDelta);
+              if (r - runStart - 1 > 0) optimized += r - runStart - 1;
+              runStart = r;
+              runStartVol = setVal;
+              runDelta = 0;
+            }
+          }
+        } else {
+          // Row breaks the run (cell missing, has note/instrument, or no set vol)
+          if (runStart >= 0 && r - runStart >= 2 && runDelta !== 0) {
+            applySlideRun(rows, runStart, r - 1, runDelta);
+            optimized += r - runStart - 1;
+          }
+          runStart = -1;
+          runDelta = 0;
+        }
+      }
+    }
+  }
+  return optimized;
+}
+
+/**
+ * Replace volume column entries from row [start+1, end] with fine slide commands.
+ * Row `start` keeps its set volume (the initial value).
+ * delta must be in [-15, 15] and non-zero.
+ */
+function applySlideRun(rows: TrackerCell[], start: number, end: number, delta: number): void {
+  if (delta === 0) return;
+  // Volume column fine slide: 0x90 + n = up by n, 0x80 + n = down by n
+  const slideByte = delta > 0 ? (0x90 + delta) : (0x80 + (-delta));
+  for (let r = start + 1; r <= end; r++) {
+    if (rows[r]) {
+      rows[r].volume = slideByte;
+    }
+  }
 }
 
 /**
