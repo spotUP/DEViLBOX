@@ -191,6 +191,7 @@ interface FurnaceEditorProps {
 
 export const FurnaceEditor: React.FC<FurnaceEditorProps> = ({ config, instrumentId, onChange }) => {
   const [activeTab, setActiveTab] = useState<'fm' | 'macros' | 'chip'>('fm');
+  const [macroSubTab, setMacroSubTab] = useState<'global' | 'op1' | 'op2' | 'op3' | 'op4'>('global');
   // selectedOp: 1-indexed op number matching FMAlgorithmDiagram convention (null = none)
   const [selectedOp, setSelectedOp] = useState<number | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -284,6 +285,7 @@ export const FurnaceEditor: React.FC<FurnaceEditorProps> = ({ config, instrument
   const chipName = getChipName(config.chipType);
   const category = getChipCategory(config.chipType);
   const paramRanges = useMemo(() => getChipParameterRanges(config.chipType), [config.chipType]);
+  const hasOpMacros = config.opMacroArrays?.some(arr => arr && arr.length > 0) ?? false;
 
   // Determine operator order (Furnace uses different order for visualization)
   const opOrder = useMemo(() => {
@@ -444,11 +446,42 @@ export const FurnaceEditor: React.FC<FurnaceEditorProps> = ({ config, instrument
             <span className="text-[9px] text-text-muted">Draw to edit • Loop (blue) • Release (red)</span>
           </div>
 
-          <MacroListEditor
-            macros={config.macros}
-            onChange={(macros) => onChange({ macros: macros as FurnaceMacro[] })}
-            chipType={config.chipType}
-          />
+          {hasOpMacros && (
+            <div className="flex gap-0.5 mb-3 bg-dark-bg p-0.5 rounded border border-dark-border">
+              {(['global', 'op1', 'op2', 'op3', 'op4'] as const).map(sub => (
+                <button
+                  key={sub}
+                  onClick={() => setMacroSubTab(sub)}
+                  className={`flex-1 py-1 px-2 rounded text-[10px] font-mono uppercase transition-colors ${
+                    macroSubTab === sub
+                      ? 'bg-violet-600 text-text-primary'
+                      : 'text-text-muted hover:text-text-primary hover:bg-dark-bgSecondary'
+                  }`}
+                >
+                  {sub === 'global' ? 'Global' : sub.toUpperCase()}
+                </button>
+              ))}
+            </div>
+          )}
+
+          {macroSubTab === 'global' || !hasOpMacros ? (
+            <MacroListEditor
+              macros={config.macros}
+              onChange={(macros) => onChange({ macros: macros as FurnaceMacro[] })}
+              chipType={config.chipType}
+            />
+          ) : (
+            <MacroListEditor
+              macros={(config.opMacroArrays ?? [[], [], [], []])[parseInt(macroSubTab.slice(2)) - 1] ?? []}
+              onChange={(macros) => {
+                const opIdx = parseInt(macroSubTab.slice(2)) - 1;
+                const newOpArrays = [...(config.opMacroArrays ?? [[], [], [], []])];
+                newOpArrays[opIdx] = macros as FurnaceMacro[];
+                onChange({ opMacroArrays: newOpArrays });
+              }}
+              chipType={config.chipType}
+            />
+          )}
         </div>
       )}
 
@@ -543,6 +576,43 @@ export const FurnaceEditor: React.FC<FurnaceEditorProps> = ({ config, instrument
         <PSGPanel config={config} onChange={pushLiveUpdate} />
       )}
 
+      {/* NES DPCM NOTE MAP */}
+      {config.nes?.dpcmNoteMap && config.nes.dpcmMap && config.nes.dpcmMap.length > 0 && (
+        <div className="bg-dark-bgSecondary p-4 rounded-lg border border-dark-border animate-in fade-in slide-in-from-top-2">
+          <div className="flex items-center gap-2 mb-3">
+            <Music size={16} className="text-accent-highlight" />
+            <h3 className="font-mono text-xs font-bold text-text-primary uppercase tracking-wider">
+              DPCM Note Map ({config.nes.dpcmMap.length} entries)
+            </h3>
+          </div>
+          <div className="max-h-48 overflow-y-auto rounded border border-dark-border">
+            <table className="w-full text-[10px] font-mono">
+              <thead className="sticky top-0 bg-dark-bg">
+                <tr className="text-text-muted">
+                  <th className="px-2 py-1 text-left">Note</th>
+                  <th className="px-2 py-1 text-right">Freq</th>
+                  <th className="px-2 py-1 text-right">Delta</th>
+                </tr>
+              </thead>
+              <tbody>
+                {config.nes.dpcmMap.map((entry, i) => {
+                  if (entry.freq === 0 && entry.delta === 0) return null;
+                  const noteNames = ['C-', 'C#', 'D-', 'D#', 'E-', 'F-', 'F#', 'G-', 'G#', 'A-', 'A#', 'B-'];
+                  const noteName = `${noteNames[i % 12]}${Math.floor(i / 12)}`;
+                  return (
+                    <tr key={i} className="border-t border-dark-border/50 hover:bg-dark-bg/50">
+                      <td className="px-2 py-0.5 text-text-secondary">{noteName}</td>
+                      <td className="px-2 py-0.5 text-right text-text-primary">{entry.freq}</td>
+                      <td className="px-2 py-0.5 text-right text-accent-highlight">{entry.delta}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
       {/* WAVETABLE PANEL */}
       {(category === "Wavetable" || config.wavetables.length > 0) && (
         <div className="bg-dark-bgSecondary p-4 rounded-lg border border-dark-border animate-in fade-in slide-in-from-top-2">
@@ -590,11 +660,42 @@ export const FurnaceEditor: React.FC<FurnaceEditorProps> = ({ config, instrument
             <span className="text-[9px] text-text-muted">Draw to edit • Loop (blue) • Release (red)</span>
           </div>
 
-          <MacroListEditor
-            macros={config.macros}
-            onChange={(macros) => onChange({ macros: macros as FurnaceMacro[] })}
-            chipType={config.chipType}
-          />
+          {hasOpMacros && (
+            <div className="flex gap-0.5 mb-3 bg-dark-bg p-0.5 rounded border border-dark-border">
+              {(['global', 'op1', 'op2', 'op3', 'op4'] as const).map(sub => (
+                <button
+                  key={sub}
+                  onClick={() => setMacroSubTab(sub)}
+                  className={`flex-1 py-1 px-2 rounded text-[10px] font-mono uppercase transition-colors ${
+                    macroSubTab === sub
+                      ? 'bg-violet-600 text-text-primary'
+                      : 'text-text-muted hover:text-text-primary hover:bg-dark-bgSecondary'
+                  }`}
+                >
+                  {sub === 'global' ? 'Global' : sub.toUpperCase()}
+                </button>
+              ))}
+            </div>
+          )}
+
+          {macroSubTab === 'global' || !hasOpMacros ? (
+            <MacroListEditor
+              macros={config.macros}
+              onChange={(macros) => onChange({ macros: macros as FurnaceMacro[] })}
+              chipType={config.chipType}
+            />
+          ) : (
+            <MacroListEditor
+              macros={(config.opMacroArrays ?? [[], [], [], []])[parseInt(macroSubTab.slice(2)) - 1] ?? []}
+              onChange={(macros) => {
+                const opIdx = parseInt(macroSubTab.slice(2)) - 1;
+                const newOpArrays = [...(config.opMacroArrays ?? [[], [], [], []])];
+                newOpArrays[opIdx] = macros as FurnaceMacro[];
+                onChange({ opMacroArrays: newOpArrays });
+              }}
+              chipType={config.chipType}
+            />
+          )}
         </div>
       )}
 

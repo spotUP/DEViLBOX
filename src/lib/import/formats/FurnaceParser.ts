@@ -999,6 +999,83 @@ export class FurnaceParser {
       };
     });
 
+    // --- Standard macros (vol, arp, duty, wave + v17+ pitch, ex1-3) ---
+    safe(() => {
+      const readMacroVals = (len: number): number[] => {
+        const vals: number[] = [];
+        for (let i = 0; i < len; i++) vals.push(reader.readInt32());
+        return vals;
+      };
+      const makeMacro = (code: number, len: number, loop: number, data: number[], mode = 0): FurnaceMacro => ({
+        code, type: code, data, loop: loop < 0 || loop >= len ? -1 : loop, release: -1, mode,
+      });
+
+      // Base: vol(0), arp(1), duty(2), wave(3) lengths + loops
+      const volLen = reader.readInt32(), arpLen = reader.readInt32(), dutyLen = reader.readInt32(), waveLen = reader.readInt32();
+      const volLoop = reader.readInt32(), arpLoop = reader.readInt32(), dutyLoop = reader.readInt32(), waveLoop = reader.readInt32();
+      const arpMode = reader.readUint8();
+      reader.skip(3); // deprecated heights
+
+      // v17+: pitch(4), ex1(5), ex2(6), ex3(7) lengths + loops
+      let pitchLen = 0, ex1Len = 0, ex2Len = 0, ex3Len = 0;
+      let pitchLoop = -1, ex1Loop = -1, ex2Loop = -1, ex3Loop = -1;
+      if (version >= 17) {
+        pitchLen = reader.readInt32(); ex1Len = reader.readInt32(); ex2Len = reader.readInt32(); ex3Len = reader.readInt32();
+        pitchLoop = reader.readInt32(); ex1Loop = reader.readInt32(); ex2Loop = reader.readInt32(); ex3Loop = reader.readInt32();
+      }
+
+      // Read values
+      const volData = readMacroVals(volLen), arpData = readMacroVals(arpLen);
+      const dutyData = readMacroVals(dutyLen), waveData = readMacroVals(waveLen);
+
+      config.macros = [];
+      if (volLen > 0) config.macros.push(makeMacro(0, volLen, volLoop, volData));
+      if (arpLen > 0) config.macros.push(makeMacro(1, arpLen, arpLoop, arpData, arpMode));
+      if (dutyLen > 0) config.macros.push(makeMacro(2, dutyLen, dutyLoop, dutyData));
+      if (waveLen > 0) config.macros.push(makeMacro(3, waveLen, waveLoop, waveData));
+
+      if (version >= 17) {
+        const pitchData = readMacroVals(pitchLen), ex1Data = readMacroVals(ex1Len);
+        const ex2Data = readMacroVals(ex2Len), ex3Data = readMacroVals(ex3Len);
+        if (pitchLen > 0) config.macros.push(makeMacro(4, pitchLen, pitchLoop, pitchData));
+        if (ex1Len > 0) config.macros.push(makeMacro(5, ex1Len, ex1Loop, ex1Data));
+        if (ex2Len > 0) config.macros.push(makeMacro(6, ex2Len, ex2Loop, ex2Data));
+        if (ex3Len > 0) config.macros.push(makeMacro(7, ex3Len, ex3Loop, ex3Data));
+      }
+
+      // v29+: FM macros (alg, fb, fms, ams) + open flags + operator macros
+      if (version >= 29) {
+        const algLen = reader.readInt32(), fbLen = reader.readInt32(), fmsLen = reader.readInt32(), amsLen = reader.readInt32();
+        const algLoop = reader.readInt32(), fbLoop = reader.readInt32(), fmsLoop = reader.readInt32(), amsLoop = reader.readInt32();
+        reader.skip(8); // standard open flags
+        reader.skip(4); // fm open flags
+
+        const algData = readMacroVals(algLen), fbData = readMacroVals(fbLen);
+        const fmsData = readMacroVals(fmsLen), amsData = readMacroVals(amsLen);
+        if (algLen > 0) config.macros.push(makeMacro(8, algLen, algLoop, algData));
+        if (fbLen > 0) config.macros.push(makeMacro(9, fbLen, fbLoop, fbData));
+        if (fmsLen > 0) config.macros.push(makeMacro(10, fmsLen, fmsLoop, fmsData));
+        if (amsLen > 0) config.macros.push(makeMacro(11, amsLen, amsLoop, amsData));
+
+        // Operator macros: 4 ops × 12 macros each (lengths, loops, open flags, then int8 values)
+        if (!config.opMacroArrays) config.opMacroArrays = [[], [], [], []];
+        const opCodes = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]; // am,ar,dr,mult,rr,sl,tl,dt2,rs,dt,d2r,ssg
+        for (let op = 0; op < 4; op++) {
+          const lens: number[] = [], loops: number[] = [];
+          for (let m = 0; m < 12; m++) lens.push(reader.readInt32());
+          for (let m = 0; m < 12; m++) loops.push(reader.readInt32());
+          reader.skip(12); // open flags
+          for (let m = 0; m < 12; m++) {
+            const data: number[] = [];
+            for (let v = 0; v < lens[m]; v++) data.push(reader.readUint8());
+            if (lens[m] > 0) {
+              config.opMacroArrays[op].push(makeMacro(opCodes[m], lens[m], loops[m], data));
+            }
+          }
+        }
+      }
+    });
+
     if (config.operators.length === 0) {
       config.operators = Array.from({ length: 4 }, () => ({ ...DEFAULT_FURNACE.operators[0] }));
     }
