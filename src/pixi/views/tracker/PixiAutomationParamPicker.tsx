@@ -50,7 +50,7 @@ export const PixiAutomationParamPicker: React.FC<PixiAutomationParamPickerProps>
         curveId = addCurve(patternId, channelIndex, paramKey);
       }
       if (curveId && (!existing || existing.points.length === 0)) {
-        addPoint(curveId, 0, 0.5);
+        addPoint(curveId, 0, 1);
       }
     }
   }, [params, activeParams, channelIndex, patternId, addActiveParameter, setShowLane, addCurve, addPoint, getCurvesForPattern]);
