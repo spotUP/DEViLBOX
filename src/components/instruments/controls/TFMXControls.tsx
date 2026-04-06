@@ -20,15 +20,16 @@
  * playback picks up the change on the next instrument re-trigger. The chip
  * RAM layout is: instrBase + 0..63 = VolModSeq, instrBase + 64.. = SndModSeq.
  *
- * ─── Known gap ────────────────────────────────────────────────────────────────
+ * ─── Status ──────────────────────────────────────────────────────────────────
  *
- * As of 2026-04, JochenHippel7VParser.ts is a stub that detects 7V files but
- * produces a single empty 'Synth' instrument with no real VolMod/SndMod data.
- * This editor is therefore mostly inert until a real 7V binary parser lands
- * that populates TFMXConfig.volModSeqData / sndModSeqData / sampleHeaders /
- * sampleData and tags instruments with synthType 'TFMXSynth'. The edit
- * surface is in place ahead of time so adding the parser is the only
- * remaining step.
+ * JochenHippel7VParser.ts now produces real instruments with populated
+ * volModSeqData + a shared sndModSeqData pool + sample headers, tagged with
+ * synthType 'TFMXSynth' so they route here through the dispatcher.
+ * Both VolModSeq header bytes and SndModSeq command argument bytes are
+ * write-back live via UADE chip RAM (setVolByte / setSndByte). The Hippel
+ * 7V tracker pattern → DOM-grid conversion is still a placeholder; playback
+ * comes from UADE via uadeEditableFileData and the instrument editor here
+ * works against chip RAM directly so the editing path is unaffected.
  *
  * Displays and edits TFMX instrument data structured into three tabs:
  *   • Summary: stats + sample bank info
