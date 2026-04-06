@@ -876,6 +876,70 @@ export class TrackerReplayer {
     this._activeWasmEngine.setMuteMask(mask);
   }
 
+  /**
+   * Fire ToneEngine notes for replaced instruments on the current row.
+   * Called from WASM engine position callbacks (libopenmpt, UADE, Hively, etc.)
+   * so the WASM engine drives timing — no parallel TS scheduler needed.
+   *
+   * @param time  Audio-accurate timestamp for note scheduling
+   */
+  private fireHybridNotesForRow(time: number): void {
+    if (!this.song || this._replacedInstruments.size === 0) return;
+
+    // Read LIVE pattern data from the tracker store (user edits go here)
+    const storePatterns = useTrackerStore.getState().patterns;
+    const patternNum = this.song.songPositions[this.songPos];
+    const livePattern = storePatterns[patternNum];
+    if (!livePattern) return;
+
+    for (let ch = 0; ch < Math.min(this.channels.length, livePattern.channels.length); ch++) {
+      const channel = this.channels[ch];
+      const row = livePattern.channels[ch]?.rows[this.pattPos];
+      if (!row) continue;
+
+      // Determine instrument ID: row's explicit instrument or channel's current
+      const chanInst = typeof channel.instrument === 'number' ? channel.instrument
+        : channel.instrument != null && typeof channel.instrument === 'object' && 'id' in channel.instrument
+          ? (channel.instrument as { id: number }).id : 0;
+      const rowInst = row.instrument || 0;
+
+      // Case 1: Row triggers a NON-replaced instrument on a channel playing a synth → cut synth
+      if (row.note > 0 && row.note < 97 && rowInst && !this._replacedInstruments.has(rowInst)) {
+        if (chanInst && this._replacedInstruments.has(chanInst)) {
+          if (channel.player) {
+            try { channel.player.stop(time); } catch { /* already stopped */ }
+          }
+          channel.instrument = null;
+        }
+        continue;
+      }
+
+      // Case 2: Note-off → release synth
+      if (row.note === 97 && chanInst && this._replacedInstruments.has(chanInst)) {
+        if (channel.player) {
+          try { channel.player.stop(time); } catch { /* already stopped */ }
+        }
+        continue;
+      }
+
+      // Case 3: Replaced instrument note → fire via ToneEngine
+      const instId = rowInst || chanInst;
+      if (!instId || !this._replacedInstruments.has(instId)) continue;
+
+      // Update channel instrument config from the instrumentMap
+      const updatedInst = this.instrumentMap.get(instId);
+      if (updatedInst) {
+        channel.instrument = updatedInst;
+      }
+
+      // Fire the note via the replayer's standard processRow path
+      this.processRow(ch, channel, row, time);
+    }
+
+    // Update WASM mute mask
+    this.updateWasmMuteMask();
+  }
+
   // ==========================================================================
   // WASM SEQUENCER CELL SYNC
   // ==========================================================================
@@ -1533,6 +1597,7 @@ export class TrackerReplayer {
           if (this.onRowChange) {
             this.onRowChange(update.row, patternNum, update.position);
           }
+          this.fireHybridNotesForRow(time);
         });
         _playLog('HVL position subscription active');
       }
@@ -1554,6 +1619,7 @@ export class TrackerReplayer {
           if (this.onRowChange) {
             this.onRowChange(update.row, patternNum, update.position);
           }
+          this.fireHybridNotesForRow(time);
         });
       }
 
@@ -1599,6 +1665,7 @@ export class TrackerReplayer {
           if (this.onRowChange) {
             this.onRowChange(row, patternNum, position);
           }
+          this.fireHybridNotesForRow(time);
         });
         _playLog('UADE position subscription active');
 
@@ -1996,6 +2063,8 @@ export class TrackerReplayer {
             if (this.onRowChange) {
               this.onRowChange(row, patternNum, order);
             }
+            // Fire ToneEngine notes for replaced instruments (hybrid playback)
+            this.fireHybridNotesForRow(time);
           };
 
           mptEngine.onEnded = () => {
@@ -2020,14 +2089,8 @@ export class TrackerReplayer {
           _log('[TrackerReplayer] Using libopenmpt for playback, suppressNotes =', this._suppressNotes,
             'replacedInstruments =', this._replacedInstruments.size);
 
-          // If instruments are replaced with synths, we need the TS scheduler running
-          // alongside libopenmpt to fire ToneEngine notes for those instruments.
-          // Without this, the scheduler never starts and the hybrid block never fires.
-          if (this._replacedInstruments.size > 0) {
-            _log('[TrackerReplayer] Hybrid mode: starting TS scheduler alongside libopenmpt');
-            this.startScheduler();
-            this._hasPlayedOnce = true;
-          }
+          // Hybrid notes are now fired from the onPosition callback above —
+          // no parallel TS scheduler needed.
           return;
         }
       } catch (err) {
@@ -2462,67 +2525,10 @@ export class TrackerReplayer {
       }
     }
 
-    // Hybrid playback: when ANY WASM engine handles audio (_suppressNotes = true)
-    // but some instruments have been replaced with synths, fire notes for
-    // channels whose current instrument is in the replaced set via ToneEngine,
-    // and mute those channels in the WASM engine to prevent doubling.
-    if (this._suppressNotes && this._replacedInstruments.size > 0) {
-      // Read LIVE pattern data from the tracker store (not this.song.patterns which
-      // is a stale snapshot from the original import). User edits go to the store,
-      // not to this.song.patterns.
-      const storePatterns = useTrackerStore.getState().patterns;
-      const livePattern = storePatterns[patternNum];
-      for (let ch = 0; ch < this.channels.length; ch++) {
-        const channel = this.channels[ch];
-        const row = livePattern?.channels[ch]?.rows[this.pattPos];
-        if (!row) continue;
-
-        // Check if this row's instrument (or the channel's current instrument) is replaced
-        const chanInst = typeof channel.instrument === 'number' ? channel.instrument
-          : channel.instrument != null ? (channel.instrument as { id: number }).id : 0;
-        const instId = row.instrument || chanInst;
-
-        // If this row triggers a NON-replaced instrument on a channel that was
-        // previously playing a replaced synth, cut the synth note.
-        if (readNewNote && row.note > 0 && row.note < 97 && row.instrument && !this._replacedInstruments.has(row.instrument)) {
-          if (chanInst && this._replacedInstruments.has(chanInst)) {
-            // Stop the synth player on this channel
-            if (channel.player) {
-              try { channel.player.stop(safeTime); } catch { /* already stopped */ }
-            }
-            channel.instrument = null;
-          }
-          continue;
-        }
-
-        // Note-off (key-off) row: release the synth
-        if (readNewNote && row.note === 97 && chanInst && this._replacedInstruments.has(chanInst)) {
-          if (channel.player) {
-            try { channel.player.stop(safeTime); } catch { /* already stopped */ }
-          }
-          continue;
-        }
-
-        if (!instId || !this._replacedInstruments.has(instId)) continue;
-
-        // Ensure channel has the UPDATED instrument config from the instrumentMap
-        const updatedInst = this.instrumentMap.get(instId);
-        if (updatedInst) {
-          channel.instrument = updatedInst;
-        }
-
-        if (readNewNote) {
-          this.processRow(ch, channel, row, safeTime);
-        } else if (this.currentTick !== 0) {
-          this.processEffectTick(ch, channel, row, safeTime + (this.currentTick * tickInterval));
-        }
-        this.processEnvelopesAndVibrato(channel, safeTime + (this.currentTick * tickInterval));
-      }
-      // Update the WASM engine's mute mask so replaced channels are silenced
-      if (readNewNote) {
-        this.updateWasmMuteMask();
-      }
-    }
+    // Hybrid playback for replaced instruments is now handled by
+    // fireHybridNotesForRow() called from WASM engine position callbacks
+    // (libopenmpt onPosition, UADE onPositionUpdate, Hively onPositionUpdate, etc.)
+    // No parallel scheduler or processTick-based hybrid block needed.
 
     // VU meters for native-engine formats (SID, HVL, MusicLine, JamCracker):
     // When _suppressNotes is true, processRow/triggerNote are skipped so no
