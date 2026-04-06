@@ -98,7 +98,7 @@ function renderDynamicShortcuts(schemeData: Record<string, string> | null, schem
 
   for (const group of groups) {
     nodes.push(
-      <div key={`grp-${group.title}`} className="text-sm font-bold text-ft2-highlight mt-5 mb-2 font-mono">
+      <div key={`grp-${group.title}`} className="text-base font-bold text-ft2-highlight mt-5 mb-2 font-mono">
         {group.title}
       </div>
     );
@@ -148,10 +148,10 @@ function renderMarkdown(
       nodes.push(
         <pre
           key={nodes.length}
-          className="bg-black/40 border border-ft2-border p-3 my-2 overflow-x-auto text-xs font-mono text-ft2-text"
+          className="bg-black/40 border border-ft2-border p-3 my-2 overflow-x-auto text-sm font-mono text-ft2-text"
         >
           {lang && (
-            <div className="text-ft2-textDim text-[10px] mb-1">{lang}</div>
+            <div className="text-ft2-textDim text-xs mb-1">{lang}</div>
           )}
           <code>{codeLines.join('\n')}</code>
         </pre>
@@ -174,12 +174,12 @@ function renderMarkdown(
       const level = headingMatch[1].length;
       const text = headingMatch[2];
       const headingClasses: Record<number, string> = {
-        1: 'text-lg font-bold text-ft2-highlight mt-6 mb-3',
-        2: 'text-base font-bold text-ft2-highlight mt-5 mb-2',
-        3: 'text-sm font-bold text-ft2-text mt-4 mb-2',
-        4: 'text-sm font-bold text-ft2-textDim mt-3 mb-1',
-        5: 'text-xs font-bold text-ft2-textDim mt-2 mb-1',
-        6: 'text-xs font-bold text-ft2-textDim mt-2 mb-1',
+        1: 'text-2xl font-bold text-ft2-highlight mt-6 mb-3',
+        2: 'text-xl font-bold text-ft2-highlight mt-5 mb-2',
+        3: 'text-lg font-bold text-ft2-text mt-4 mb-2',
+        4: 'text-base font-bold text-ft2-textDim mt-3 mb-1',
+        5: 'text-sm font-bold text-ft2-textDim mt-2 mb-1',
+        6: 'text-sm font-bold text-ft2-textDim mt-2 mb-1',
       };
       nodes.push(
         <div key={nodes.length} className={`font-mono ${headingClasses[level]}`}>
@@ -202,7 +202,7 @@ function renderMarkdown(
             loading="lazy"
           />
           {imgMatch[1] && (
-            <div className="text-[10px] font-mono text-ft2-textDim mt-1">
+            <div className="text-xs font-mono text-ft2-textDim mt-1">
               {imgMatch[1]}
             </div>
           )}
@@ -233,7 +233,7 @@ function renderMarkdown(
       nodes.push(
         <ul key={nodes.length} className="list-disc list-inside my-2 space-y-1">
           {listItems.map((item, idx) => (
-            <li key={idx} className="text-xs font-mono text-ft2-text">
+            <li key={idx} className="text-sm font-mono text-ft2-text">
               {renderInline(item)}
             </li>
           ))}
@@ -252,7 +252,7 @@ function renderMarkdown(
       nodes.push(
         <ol key={nodes.length} className="list-decimal list-inside my-2 space-y-1">
           {listItems.map((item, idx) => (
-            <li key={idx} className="text-xs font-mono text-ft2-text">
+            <li key={idx} className="text-sm font-mono text-ft2-text">
               {renderInline(item)}
             </li>
           ))}
@@ -284,7 +284,7 @@ function renderMarkdown(
       i++;
     }
     nodes.push(
-      <p key={nodes.length} className="text-xs font-mono text-ft2-text leading-relaxed my-2">
+      <p key={nodes.length} className="text-sm font-mono text-ft2-text leading-relaxed my-2">
         {renderInline(paraLines.join(' '))}
       </p>
     );
@@ -317,7 +317,7 @@ function renderInline(text: string): React.ReactNode {
       parts.push(
         <code
           key={parts.length}
-          className="bg-black/30 px-1 py-0.5 text-ft2-highlight border border-ft2-border text-[11px]"
+          className="bg-black/30 px-1 py-0.5 text-ft2-highlight border border-ft2-border text-sm"
         >
           {match[4]}
         </code>
@@ -374,7 +374,7 @@ function renderTable(tableLines: string[], key: number): React.ReactNode {
 
   return (
     <div key={key} className="my-3 overflow-x-auto">
-      <table className="w-full border-collapse text-xs font-mono">
+      <table className="w-full border-collapse text-sm font-mono">
         <thead>
           <tr>
             {header.map((cell, idx) => (
@@ -488,7 +488,7 @@ export const ManualTab: React.FC<ManualTabProps> = ({
   const currentChapter = chapters[currentIndex] || chapters[0];
 
   return (
-    <div className="flex h-[60vh]">
+    <div className="flex h-full">
       {/* Sidebar */}
       <div className="w-56 flex-shrink-0 border-r border-ft2-border bg-ft2-panel flex flex-col">
         {/* Search */}
@@ -514,7 +514,7 @@ export const ManualTab: React.FC<ManualTabProps> = ({
                 {/* Part header */}
                 <button
                   onClick={() => togglePart(part.number)}
-                  className="w-full text-left px-2 py-1.5 text-[10px] font-mono font-bold text-ft2-highlight bg-ft2-bg border-b border-ft2-border hover:bg-ft2-panel flex items-center gap-1"
+                  className="w-full text-left px-2 py-1.5 text-xs font-mono font-bold text-ft2-highlight bg-ft2-bg border-b border-ft2-border hover:bg-ft2-panel flex items-center gap-1"
                 >
                   <span className="text-ft2-textDim">{isCollapsed ? '+' : '-'}</span>
                   <span className="uppercase truncate">
@@ -531,7 +531,7 @@ export const ManualTab: React.FC<ManualTabProps> = ({
                       key={ch.id}
                       onClick={() => onSelectChapter(chapterIdx)}
                       className={`
-                        w-full text-left px-3 py-1 text-[11px] font-mono border-b border-ft2-border/50 truncate
+                        w-full text-left px-3 py-1 text-sm font-mono border-b border-ft2-border/50 truncate
                         ${isActive
                           ? 'bg-ft2-cursor text-ft2-bg font-bold'
                           : 'text-ft2-text hover:bg-ft2-bg'
@@ -559,7 +559,7 @@ export const ManualTab: React.FC<ManualTabProps> = ({
                   key={ch.id}
                   onClick={() => onSelectChapter(chapterIdx)}
                   className={`
-                    w-full text-left px-3 py-1 text-[11px] font-mono border-b border-ft2-border/50 truncate
+                    w-full text-left px-3 py-1 text-sm font-mono border-b border-ft2-border/50 truncate
                     ${isActive
                       ? 'bg-ft2-cursor text-ft2-bg font-bold'
                       : 'text-ft2-text hover:bg-ft2-bg'
@@ -579,10 +579,10 @@ export const ManualTab: React.FC<ManualTabProps> = ({
       <div ref={contentRef} className="flex-1 overflow-y-auto scrollbar-ft2 p-6">
         {/* Chapter heading */}
         <div className="mb-4 pb-3 border-b border-ft2-border">
-          <div className="text-[10px] font-mono text-ft2-textDim uppercase mb-1">
+          <div className="text-xs font-mono text-ft2-textDim uppercase mb-1">
             {currentChapter.part}
           </div>
-          <h2 className="text-lg font-mono font-bold text-ft2-highlight">
+          <h2 className="text-2xl font-mono font-bold text-ft2-highlight">
             {currentChapter.number}. {currentChapter.title}
           </h2>
         </div>
@@ -596,7 +596,7 @@ export const ManualTab: React.FC<ManualTabProps> = ({
             onClick={() => onSelectChapter(Math.max(0, currentIndex - 1))}
             disabled={currentIndex === 0}
             className={`
-              px-3 py-1.5 font-mono text-xs border transition-colors
+              px-3 py-1.5 font-mono text-sm border transition-colors
               ${currentIndex === 0
                 ? 'bg-ft2-panel text-ft2-textDim border-ft2-border cursor-not-allowed'
                 : 'bg-ft2-bg text-ft2-text border-ft2-border hover:border-ft2-highlight'
@@ -605,14 +605,14 @@ export const ManualTab: React.FC<ManualTabProps> = ({
           >
             PREV
           </button>
-          <span className="text-[10px] font-mono text-ft2-textDim">
+          <span className="text-xs font-mono text-ft2-textDim">
             {currentIndex + 1} / {chapters.length}
           </span>
           <button
             onClick={() => onSelectChapter(Math.min(chapters.length - 1, currentIndex + 1))}
             disabled={currentIndex === chapters.length - 1}
             className={`
-              px-3 py-1.5 font-mono text-xs border transition-colors
+              px-3 py-1.5 font-mono text-sm border transition-colors
               ${currentIndex === chapters.length - 1
                 ? 'bg-ft2-panel text-ft2-textDim border-ft2-border cursor-not-allowed'
                 : 'bg-ft2-bg text-ft2-text border-ft2-border hover:border-ft2-highlight'
