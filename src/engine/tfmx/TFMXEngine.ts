@@ -262,6 +262,27 @@ export class TFMXEngine {
     };
   }
 
+  /**
+   * DEViLBOX extension: trigger a single instrument macro on a chosen voice
+   * for editor preview/audition. Hits the new C export
+   * `tfmx_module_preview_macro` which sets up the sequencer's `cmd` struct
+   * and runs the regular noteCmd path; the next render tick produces audio.
+   *
+   * @param macroIdx 0..127  TFMX macro pointer-table index
+   * @param note     0..63   TFMX note value (matches the editor's note range)
+   * @param volume   0..15   relative volume (high nibble of cmd.cd)
+   * @param channel  0..7    voice index — defaults to 0
+   */
+  previewMacro(macroIdx: number, note: number, volume: number, channel: number = 0): void {
+    this.sendMessage({
+      type: 'modulePreviewMacro',
+      macroIdx,
+      note,
+      volume,
+      channel,
+    });
+  }
+
   setMuteMask(mask: number): void {
     // mask: bit N = 1 means voice N is muted
     for (let v = 0; v < 7; v++) {

@@ -163,6 +163,22 @@ class TFMXProcessor extends AudioWorkletProcessor {
         }
         break;
 
+      case 'modulePreviewMacro':
+        // DEViLBOX extension — trigger an instrument macro on a chosen voice
+        // for editor audition. The C side calls TFMXDecoder::previewMacro
+        // which sets up the cmd struct and runs the regular noteCmd path,
+        // so the next render tick produces audio for that voice.
+        if (this.wasm && this.ctx && this.wasm._tfmx_module_preview_macro) {
+          this.wasm._tfmx_module_preview_macro(
+            this.ctx,
+            data.macroIdx | 0,
+            data.note | 0,
+            data.volume | 0,
+            data.channel | 0,
+          );
+        }
+        break;
+
       case 'setParam':
         if (this.wasm && this.ctx) {
           this.wasm._tfmx_set_param(this.ctx, data.handle, data.paramId, data.value);

@@ -216,6 +216,14 @@ export const PixiTFMXMacroPanel: React.FC<Props> = ({ instrument }) => {
     TFMXEngine.getInstance().reloadModule(tfmxFileData, tfmxSmplData);
   }, [tfmxFileData, tfmxSmplData]);
 
+  // Per-macro preview via the new C export. Defaults to note 24 / vol 15 /
+  // voice 0; the DOM editor exposes a note spinner — the Pixi panel uses a
+  // fixed default for now.
+  const previewMacro = useCallback((macroTableIdx: number) => {
+    if (!TFMXEngine.hasInstance()) return;
+    TFMXEngine.getInstance().previewMacro(macroTableIdx, 24, 15, 0);
+  }, []);
+
   const opcodeOptions: SelectOption[] = useMemo(
     () => TFMX_MACRO_COMMANDS.map(d => ({ value: String(d.opcode), label: `${hex2(d.opcode)} — ${d.mnemonic}` })),
     [],
@@ -251,6 +259,11 @@ export const PixiTFMXMacroPanel: React.FC<Props> = ({ instrument }) => {
         <PixiLabel text="TFMX MACRO" size="sm" weight="bold" color="custom" customColor={theme.accent.color} />
         <PixiLabel text={`${macros.length} macros`} size="xs" color="textMuted" />
         <layoutContainer layout={{ flex: 1 }} />
+        <PixiButton
+          label="Preview"
+          variant="ghost"
+          onClick={() => macro && previewMacro(macro.index)}
+        />
         <PixiButton
           label={autoReload ? 'auto-reload ✓' : 'auto-reload'}
           variant={autoReload ? 'primary' : 'ghost'}
