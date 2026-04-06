@@ -39,6 +39,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>
+#include <stdio.h>
 
 // libtfmxaudiodecoder C API
 #include "tfmxaudiodecoder.h"
@@ -341,6 +342,192 @@ void tfmx_set_param(void* /*ctx*/, int /*handle*/, int /*paramId*/, float /*valu
 EMSCRIPTEN_KEEPALIVE
 float tfmx_get_param(void* /*ctx*/, int /*handle*/, int /*paramId*/) {
   return 0.0f;
+}
+
+// ── Full-module playback (uses player handle 0 as dedicated module player) ──
+
+static uint8_t* gModuleSmpl = nullptr;
+static uint32_t gModuleSmplLen = 0;
+static uint64_t gSamplesRendered = 0;
+
+/**
+ * Load a full TFMX module (mdat + smpl) for streaming playback.
+ * Uses player slot 0 as the dedicated module player.
+ * Returns 0 on success, negative on error.
+ */
+EMSCRIPTEN_KEEPALIVE
+int tfmx_load_module(void* /*ctx*/, const uint8_t* mdatData, uint32_t mdatLen,
+                     const uint8_t* smplData, uint32_t smplLen, int subsong) {
+  if (!gInit) return -1;
+
+  TFMXPlayer& p = gPlayers[0];
+
+  // Clean up any previous module player state
+  if (p.decoder) {
+    tfmxdec_delete(p.decoder);
+    p.decoder = nullptr;
+  }
+  free(p.miniMod);
+  p.miniMod = nullptr;
+  p.active = false;
+  p.loaded = false;
+
+  // Free previous smpl data
+  free(gModuleSmpl);
+  gModuleSmpl = nullptr;
+  gModuleSmplLen = 0;
+  gSamplesRendered = 0;
+
+  // Create a new decoder
+  void* dec = tfmxdec_new();
+  if (!dec) return -2;
+
+  // For multi-file TFMX, we need to write the smpl data to a temp path.
+  // libtfmxaudiodecoder's set_path + init sequence handles mdat+smpl pairing.
+  // Since we're in WASM (no filesystem), we concatenate mdat+smpl into one buffer
+  // as the library supports single-buffer init for merged formats.
+
+  // Actually, the library's init() takes a single buffer.
+  // For TFMX Professional format, the mdat contains all music data and the smpl
+  // contains PCM samples. The library expects the smpl to be accessible via
+  // set_path(). In WASM, we can write the smpl to MEMFS first.
+
+  // Write smpl data to Emscripten MEMFS so the library can find it
+  if (smplData && smplLen > 0) {
+    gModuleSmpl = (uint8_t*)malloc(smplLen);
+    if (gModuleSmpl) {
+      memcpy(gModuleSmpl, smplData, smplLen);
+      gModuleSmplLen = smplLen;
+    }
+
+    // Write to MEMFS via Emscripten FS
+    FILE* f = fopen("/tmp/smpl.tfmx", "wb");
+    if (f) {
+      fwrite(smplData, 1, smplLen, f);
+      fclose(f);
+      tfmxdec_set_path(dec, "/tmp/smpl.tfmx");
+    }
+  }
+
+  // Initialize decoder with mdat data
+  if (!tfmxdec_init(dec, (void*)mdatData, mdatLen, subsong)) {
+    tfmxdec_delete(dec);
+    return -3;
+  }
+
+  // Configure mixer: signed 16-bit stereo
+  tfmxdec_mixer_init(dec, gSampleRate, 16, 2, 0, 75);
+  tfmxdec_set_loop_mode(dec, 1);
+
+  p.decoder = dec;
+  p.loaded = true;
+  p.active = true;
+  gSamplesRendered = 0;
+
+  return 0;
+}
+
+/**
+ * Get the current playback position of the module player (slot 0).
+ * Returns the total samples rendered so far (use with sample rate to derive time).
+ */
+EMSCRIPTEN_KEEPALIVE
+uint32_t tfmx_get_samples_rendered(void* /*ctx*/) {
+  return (uint32_t)(gSamplesRendered & 0xFFFFFFFF);
+}
+
+/**
+ * Check if the module has reached its end.
+ */
+EMSCRIPTEN_KEEPALIVE
+int tfmx_module_song_end(void* /*ctx*/) {
+  TFMXPlayer& p = gPlayers[0];
+  if (!p.decoder || !p.active) return 1;
+  return tfmxdec_song_end(p.decoder) ? 1 : 0;
+}
+
+/**
+ * Render audio from the full-module player (slot 0).
+ * This also updates the samples-rendered counter.
+ */
+EMSCRIPTEN_KEEPALIVE
+void tfmx_module_render(void* /*ctx*/, float* outL, float* outR, int numSamples) {
+  TFMXPlayer& p = gPlayers[0];
+  if (!p.decoder || !p.active) {
+    memset(outL, 0, (size_t)numSamples * sizeof(float));
+    memset(outR, 0, (size_t)numSamples * sizeof(float));
+    return;
+  }
+
+  int16_t tmp[256]; // max 128 stereo pairs
+  const int byteLen = numSamples * 2 * (int)sizeof(int16_t);
+  tfmxdec_buffer_fill(p.decoder, tmp, (uint32_t)byteLen);
+
+  for (int i = 0; i < numSamples; i++) {
+    outL[i] = tmp[i * 2 + 0] * (1.0f / 32768.0f);
+    outR[i] = tmp[i * 2 + 1] * (1.0f / 32768.0f);
+  }
+
+  gSamplesRendered += (uint64_t)numSamples;
+}
+
+/**
+ * Stop the module player.
+ */
+EMSCRIPTEN_KEEPALIVE
+void tfmx_module_stop(void* /*ctx*/) {
+  TFMXPlayer& p = gPlayers[0];
+  p.active = false;
+}
+
+/**
+ * Get number of subsongs in the loaded module.
+ */
+EMSCRIPTEN_KEEPALIVE
+int tfmx_module_songs(void* /*ctx*/) {
+  TFMXPlayer& p = gPlayers[0];
+  if (!p.decoder) return 0;
+  return tfmxdec_songs(p.decoder);
+}
+
+/**
+ * Get duration of current subsong in milliseconds.
+ */
+EMSCRIPTEN_KEEPALIVE
+uint32_t tfmx_module_duration(void* /*ctx*/) {
+  TFMXPlayer& p = gPlayers[0];
+  if (!p.decoder) return 0;
+  return tfmxdec_duration(p.decoder);
+}
+
+/**
+ * Get per-voice volume (0-100) for VU meters.
+ */
+EMSCRIPTEN_KEEPALIVE
+int tfmx_module_voice_volume(void* /*ctx*/, int voice) {
+  TFMXPlayer& p = gPlayers[0];
+  if (!p.decoder) return 0;
+  return (int)tfmxdec_get_voice_volume(p.decoder, (unsigned int)voice);
+}
+
+/**
+ * Get number of voices.
+ */
+EMSCRIPTEN_KEEPALIVE
+int tfmx_module_voices(void* /*ctx*/) {
+  TFMXPlayer& p = gPlayers[0];
+  if (!p.decoder) return 0;
+  return tfmxdec_voices(p.decoder);
+}
+
+/**
+ * Mute/unmute a voice.
+ */
+EMSCRIPTEN_KEEPALIVE
+void tfmx_module_mute_voice(void* /*ctx*/, int voice, int mute) {
+  TFMXPlayer& p = gPlayers[0];
+  if (!p.decoder) return;
+  tfmxdec_mute_voice(p.decoder, mute != 0, (unsigned int)voice);
 }
 
 } // extern "C"

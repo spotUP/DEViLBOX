@@ -117,7 +117,8 @@ export type TrackerFormat =
   | 'Organya'         // Cave Story / Organya (.org)
   | 'PxTone'          // PxTone Collage (.ptcop, .pttune)
   | 'SteveTurner'    // Steve Turner (.jpo) — Amiga 4-voice with 7-phase envelope
-  | 'PreTracker';    // PreTracker (.prt) — Amiga 4-channel by Ratt/Abyss
+  | 'PreTracker'    // PreTracker (.prt) — Amiga 4-channel by Ratt/Abyss
+  | 'TFMX';         // TFMX Professional (Jochen Hippel, libtfmxaudiodecoder WASM)
 
 /**
  * Channel state - all the per-channel data needed for playback
@@ -345,6 +346,10 @@ export interface TrackerSong {
   tfmxNative?: TFMXNativeData;
   /** Raw klystrack .kt binary for loading into the KlysEngine WASM */
   klysFileData?: ArrayBuffer;
+  /** Raw TFMX mdat binary for loading into TFMXEngine WASM module player */
+  tfmxFileData?: ArrayBuffer;
+  /** Raw TFMX smpl binary (companion sample data) */
+  tfmxSmplData?: ArrayBuffer;
   // Pre-converted subsong data for in-editor subsong switching
   furnaceSubsongs?: FurnaceSubsongPlayback[];
   furnaceActiveSubsong?: number;
