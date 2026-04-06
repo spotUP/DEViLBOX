@@ -1177,6 +1177,10 @@ export class TrackerReplayer {
     this._hasPlayedOnce = false;
     this._replacedInstruments.clear();
     this._activeWasmEngine = null;
+    // Reset format compat flag so the warning fires again for the new song
+    import('@stores/useInstrumentStore').then(({ resetFormatCompatFlag }) => {
+      resetFormatCompatFlag();
+    }).catch(() => {});
 
     // Restore any native engines rerouted to separation chain (UADE/Hively)
     restoreNativeRouting(this.routedNativeEngines);
