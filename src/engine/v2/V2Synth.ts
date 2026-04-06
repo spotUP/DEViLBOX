@@ -12,6 +12,7 @@ export class V2Synth implements DevilboxSynth {
   private _initialized: boolean = false;
   private _initPromise: Promise<void>;
   private _pendingNotes: Array<{note: number, vel: number}> = [];
+  private _activeNotes: Map<number, number> = new Map(); // note → velocity
   private _releaseTimers: Set<ReturnType<typeof setTimeout>> = new Set();
   private _config: V2Config;
 
@@ -167,21 +168,19 @@ export class V2Synth implements DevilboxSynth {
 
   public triggerRelease(noteOrTime?: string | number) {
     if (!this._initialized || !this._worklet) return;
-    // V2 is in ToneEngine's mono-style list, so triggerRelease receives safeTime
-    // (a small float) not a note string. Always send allNotesOff.
     if (typeof noteOrTime === 'string') {
       const midiNote = noteToMidi(noteOrTime);
+      this._activeNotes.delete(midiNote);
       this._noteOff(0, midiNote);
     } else {
+      this._activeNotes.clear();
       this._worklet!.port.postMessage({ type: 'allNotesOff', channel: 0 });
     }
   }
 
-  /**
-   * Release all voices (panic button, song stop, etc.)
-   */
   public releaseAll(): void {
     if (!this._initialized || !this._worklet) return;
+    this._activeNotes.clear();
     this._worklet.port.postMessage({ type: 'allNotesOff', channel: 0 });
   }
 
@@ -192,7 +191,8 @@ export class V2Synth implements DevilboxSynth {
     const timer = setTimeout(() => {
       this._releaseTimers.delete(timer);
       if (this._initialized && this._worklet) {
-        this._noteOff(0, midiNote);
+        this._activeNotes.delete(midiNote);
+        this._worklet.port.postMessage({ type: 'noteOff', channel: 0, note: midiNote });
       }
     }, d * 1000);
     this._releaseTimers.add(timer);
@@ -212,21 +212,28 @@ export class V2Synth implements DevilboxSynth {
 
   private _applyV2Config(config: V2Config) {
     if (!this._worklet) return;
-    // Convert V2Config (UI/preset format) to V2InstrumentConfig (binary format)
     const inst = v2ConfigToInstrument(config);
     const patchData = v2ConfigToBytes(inst);
-    console.log('[V2Synth] _applyV2Config sending loadPatch, patchData[0..5]:', Array.from(patchData.slice(0, 6)));
     this._worklet.port.postMessage({ type: 'loadPatch', channel: 0, patchData });
+    // V2 reads patch data at noteOn — retrigger active notes so knob changes are immediate
+    if (this._activeNotes.size > 0) {
+      this._worklet.port.postMessage({ type: 'allNotesOff', channel: 0 });
+      for (const [note, velocity] of this._activeNotes) {
+        this._worklet.port.postMessage({ type: 'noteOn', channel: 0, note, velocity });
+      }
+    }
   }
 
   private _noteOn(channel: number, note: number, velocity: number) {
     if (this._worklet && this._initialized) {
+      this._activeNotes.set(note, velocity);
       this._worklet.port.postMessage({ type: 'noteOn', channel, note, velocity });
     }
   }
 
   private _noteOff(channel: number, note: number) {
     if (this._worklet && this._initialized) {
+      this._activeNotes.delete(note);
       this._worklet.port.postMessage({ type: 'noteOff', channel, note });
     }
   }
