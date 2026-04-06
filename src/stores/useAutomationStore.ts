@@ -4,6 +4,7 @@
 
 import { create } from 'zustand';
 import { immer } from 'zustand/middleware/immer';
+import { checkFormatViolation, getActiveFormatLimits } from '@/lib/formatCompatibility';
 import type {
   AutomationCurve,
   AutomationPreset,
@@ -121,6 +122,13 @@ export const useAutomationStore = create<AutomationStore>()(
 
     // Actions
     addCurve: (patternId, channelIndex, parameter) => {
+      const limits = getActiveFormatLimits();
+      if (limits) {
+        void checkFormatViolation('automation',
+          `Automation curves are not supported in ${limits.name} format.`,
+        ).then((ok) => { if (ok) get().addCurve(patternId, channelIndex, parameter); });
+        return ''; // cancelled — retry happens async
+      }
       const newCurve: AutomationCurve = {
         id: `curve-${Date.now()}`,
         patternId,
