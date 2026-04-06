@@ -11,6 +11,7 @@ import { useChannelAutomationParams } from '@hooks/useChannelAutomationParams';
 
 interface PixiAutomationParamPickerProps {
   channelIndex: number;
+  patternId?: string;
   channelWidth: number;
 }
 
@@ -18,6 +19,7 @@ const PILL_H = 14;
 
 export const PixiAutomationParamPicker: React.FC<PixiAutomationParamPickerProps> = ({
   channelIndex,
+  patternId,
   channelWidth,
 }) => {
   const { params } = useChannelAutomationParams(channelIndex);
@@ -26,6 +28,9 @@ export const PixiAutomationParamPicker: React.FC<PixiAutomationParamPickerProps>
   const removeActiveParameter = useAutomationStore(s => s.removeActiveParameter);
   const getActiveParameters = useAutomationStore(s => s.getActiveParameters);
   const setShowLane = useAutomationStore(s => s.setShowLane);
+  const addCurve = useAutomationStore(s => s.addCurve);
+  const addPoint = useAutomationStore(s => s.addPoint);
+  const getCurvesForPattern = useAutomationStore(s => s.getCurvesForPattern);
 
   const activeParams = getActiveParameters(channelIndex);
 
@@ -33,9 +38,23 @@ export const PixiAutomationParamPicker: React.FC<PixiAutomationParamPickerProps>
   const handleAddClick = useCallback(() => {
     const available = params.filter(p => !activeParams.includes(p.key));
     if (available.length === 0) return;
-    addActiveParameter(channelIndex, available[0].key);
+    const paramKey = available[0].key;
+    console.warn('[AUTOMATION-DEBUG] PixiPicker click — channelIndex=', channelIndex, 'param=', paramKey, 'patternId=', patternId);
+    addActiveParameter(channelIndex, paramKey);
     setShowLane(channelIndex, true);
-  }, [params, activeParams, channelIndex, addActiveParameter, setShowLane]);
+    // Seed a curve point so the lane is immediately visible
+    if (patternId) {
+      const curves = getCurvesForPattern(patternId, channelIndex);
+      const existing = curves.find((c) => c.parameter === paramKey);
+      let curveId = existing?.id;
+      if (!curveId) {
+        curveId = addCurve(patternId, channelIndex, paramKey);
+      }
+      if (curveId && (!existing || existing.points.length === 0)) {
+        addPoint(curveId, 0, 0.5);
+      }
+    }
+  }, [params, activeParams, channelIndex, patternId, addActiveParameter, setShowLane, addCurve, addPoint, getCurvesForPattern]);
 
   if (params.length === 0 || channelWidth < 30) return null;
 

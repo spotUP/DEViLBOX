@@ -10,6 +10,7 @@ import { useResponsiveSafe } from '@/contexts/ResponsiveContext';
 
 interface AutomationParameterPickerProps {
   channelIndex: number;
+  patternId?: string;
   left: number;
   width: number;
   top: number;
@@ -17,6 +18,7 @@ interface AutomationParameterPickerProps {
 
 export const AutomationParameterPicker: React.FC<AutomationParameterPickerProps> = ({
   channelIndex,
+  patternId,
   left,
   width,
   top,
@@ -35,6 +37,9 @@ export const AutomationParameterPicker: React.FC<AutomationParameterPickerProps>
   const removeActiveParameter = useAutomationStore(s => s.removeActiveParameter);
   const getActiveParameters = useAutomationStore(s => s.getActiveParameters);
   const setShowLane = useAutomationStore(s => s.setShowLane);
+  const addCurve = useAutomationStore(s => s.addCurve);
+  const addPoint = useAutomationStore(s => s.addPoint);
+  const getCurvesForPattern = useAutomationStore(s => s.getCurvesForPattern);
 
   const activeParams = getActiveParameters(channelIndex);
 
@@ -113,12 +118,25 @@ export const AutomationParameterPicker: React.FC<AutomationParameterPickerProps>
                   <button
                     key={param.key}
                     onClick={() => {
-                      console.warn('[AUTOMATION-DEBUG] Picker click — channelIndex prop=', channelIndex, 'param=', param.key);
+                      console.warn('[AUTOMATION-DEBUG] Picker click — channelIndex prop=', channelIndex, 'param=', param.key, 'patternId=', patternId);
                       if (isActive) {
                         removeActiveParameter(channelIndex, param.key);
                       } else {
                         addActiveParameter(channelIndex, param.key);
                         setShowLane(channelIndex, true);
+                        // Seed a curve point so the lane is immediately visible.
+                        // Without this, the lane renderer filters out empty curves.
+                        if (patternId) {
+                          const curves = getCurvesForPattern(patternId, channelIndex);
+                          const existing = curves.find((c) => c.parameter === param.key);
+                          let curveId = existing?.id;
+                          if (!curveId) {
+                            curveId = addCurve(patternId, channelIndex, param.key);
+                          }
+                          if (curveId && (!existing || existing.points.length === 0)) {
+                            addPoint(curveId, 0, 0.5);
+                          }
+                        }
                       }
                     }}
                     className={`w-full text-left ${dropdownItemPad} text-xs flex items-center gap-1.5 transition-colors ${

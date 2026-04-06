@@ -3219,6 +3219,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
                 <AutomationParameterPicker
                   key={`auto-picker-${chIdx}`}
                   channelIndex={chIdx + formatChannelOffset}
+                  patternId={pattern.id}
                   left={channelOffsets[chIdx] || 0}
                   width={channelWidths[chIdx] || 80}
                   top={-20}
