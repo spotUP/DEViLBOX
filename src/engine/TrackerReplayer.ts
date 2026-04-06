@@ -1032,8 +1032,9 @@ export class TrackerReplayer {
       const rowDuration = (2.5 / this.bpm) * this.speed;
 
       if (config) {
+        console.log(`[HybridNote] ch=${ch} note=${noteName} inst=${effectiveInst} vel=${velocity.toFixed(2)} dur=${rowDuration.toFixed(3)}`);
         engine.triggerNote(
-          cs.instrument,
+          effectiveInst,
           noteName,
           rowDuration,
           time,
@@ -1043,6 +1044,11 @@ export class TrackerReplayer {
           false,  // slide
           ch,     // channelIndex
         );
+        // Schedule release after one row duration — the voice path uses
+        // triggerAttack (no auto-release), so we must explicitly release
+        try {
+          engine.triggerNoteRelease(effectiveInst, noteName, time + rowDuration, config, ch);
+        } catch { /* ToneEngine not ready */ }
       }
     }
 
