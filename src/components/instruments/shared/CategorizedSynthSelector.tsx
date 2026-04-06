@@ -211,6 +211,23 @@ export const CategorizedSynthSelector: React.FC<CategorizedSynthSelectorProps> =
 
     if (!currentInstrument) return;
 
+    // Warn if replacing a sample with a synth on a native format song
+    if (currentInstrument.synthType === 'Sampler' || currentInstrument.synthType === 'Player') {
+      try {
+        const { getTrackerReplayer } = require('@engine/TrackerReplayer');
+        const song = getTrackerReplayer().getSong();
+        if (song) {
+          const fmt = song.format?.toUpperCase() || 'native';
+          const confirmed = window.confirm(
+            `Replacing this sample with a synth breaks ${fmt} format compatibility.\n\n` +
+            `The song can no longer be saved as ${fmt} — save as .dbx instead.\n\n` +
+            `Continue?`
+          );
+          if (!confirmed) return;
+        }
+      } catch { /* replayer not initialized */ }
+    }
+
     // Invalidate cached instrument so ToneEngine recreates it
     ToneEngine.getInstance().invalidateInstrument(currentInstrument.id);
 
