@@ -112,6 +112,9 @@ export async function exportAsMOD(
       if (bakeResult.bakedCount > 0) {
         warnings.push(`${bakeResult.bakedCount} automation curve(s) baked into effect commands.`);
       }
+      if (bakeResult.overflowRows > 0) {
+        warnings.push(`${bakeResult.overflowRows} row(s) had no free effect slot — automation data lost on those rows.`);
+      }
       for (const w of bakeResult.warnings) warnings.push(w);
     }
   } catch { /* automation store not available */ }
