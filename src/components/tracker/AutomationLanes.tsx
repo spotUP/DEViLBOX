@@ -119,11 +119,15 @@ export const AutomationLanes: React.FC<AutomationLanesProps> = ({
   const removePoint = useAutomationStore((state) => state.removePoint);
   const channelLanes = useAutomationStore((state) => state.channelLanes);
 
-  // Drag state
+  // Drag state — captures the lane geometry at mousedown so we don't have to
+  // recompute (and possibly miscompute, for multi-lane) on every mousemove.
   const [dragState, setDragState] = useState<{
     curveId: string;
     row: number;
     channelIndex: number;
+    laneLeft: number;
+    laneWidth: number;
+    yOffset: number;
   } | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -275,7 +279,8 @@ export const AutomationLanes: React.FC<AutomationLanesProps> = ({
     curve: AutomationCurve,
     channelIndex: number,
     laneLeft: number,
-    yOffset: number
+    yOffset: number,
+    laneWidth: number = LANE_WIDTH,
   ) => {
     if (e.button !== 0) return; // Only left click
 
@@ -292,40 +297,41 @@ export const AutomationLanes: React.FC<AutomationLanesProps> = ({
     if (row < 0 || row >= patternLength) return;
 
     const mouseX = e.clientX - rect.left - laneLeft;
-    const value = Math.max(0, Math.min(1, (mouseX - 1) / (LANE_WIDTH - 2)));
+    const value = Math.max(0, Math.min(1, (mouseX - 1) / (laneWidth - 2)));
 
     // Add or update point
     addPoint(curve.id, row, value);
-    setDragState({ curveId: curve.id, row, channelIndex });
+    setDragState({ curveId: curve.id, row, channelIndex, laneLeft, laneWidth, yOffset });
   }, [patternLength, rowHeight, addPoint]);
 
-  const handleMouseMove = useCallback((e: React.MouseEvent) => {
-    if (!dragState || !containerRef.current) return;
+  // Document-level mouse move/up so the drag continues even when the cursor
+  // strays outside the lane and back in. Without this, the lane's onMouseMove
+  // stops firing the moment the cursor leaves its bounding box.
+  React.useEffect(() => {
+    if (!dragState) return;
+    const handleDocMove = (e: MouseEvent) => {
+      const rect = containerRef.current?.getBoundingClientRect();
+      if (!rect) return;
+      const mouseY = e.clientY - rect.top - dragState.yOffset;
+      const row = Math.floor(mouseY / rowHeight);
+      if (row < 0 || row >= patternLength) return;
+      const mouseX = e.clientX - rect.left - dragState.laneLeft;
+      const value = Math.max(0, Math.min(1, (mouseX - 1) / (dragState.laneWidth - 2)));
+      addPoint(dragState.curveId, row, value);
+    };
+    const handleDocUp = () => setDragState(null);
+    document.addEventListener('mousemove', handleDocMove);
+    document.addEventListener('mouseup', handleDocUp);
+    return () => {
+      document.removeEventListener('mousemove', handleDocMove);
+      document.removeEventListener('mouseup', handleDocUp);
+    };
+  }, [dragState, rowHeight, patternLength, addPoint]);
 
-    const rect = containerRef.current.getBoundingClientRect();
-    const curve = curves[dragState.channelIndex];
-    if (!curve) return;
-
-    const chOffset = channelOffsets[dragState.channelIndex] - rowNumWidth;
-    const chWidth = channelWidths[dragState.channelIndex];
-    const laneLeft = chOffset + chWidth - LANE_WIDTH - 4;
-    const yOffset = prevLen * rowHeight;
-
-    const mouseY = e.clientY - rect.top - yOffset;
-    const row = Math.floor(mouseY / rowHeight);
-
-    if (row < 0 || row >= patternLength) return;
-
-    const mouseX = e.clientX - rect.left - laneLeft;
-    const value = Math.max(0, Math.min(1, (mouseX - 1) / (LANE_WIDTH - 2)));
-
-    // Update point
-    addPoint(curve.id, row, value);
-  }, [dragState, curves, channelWidths, rowNumWidth, prevLen, rowHeight, patternLength, addPoint]);
-
-  const handleMouseUp = useCallback(() => {
-    setDragState(null);
-  }, []);
+  // Legacy no-op stubs (lane divs still spread these but the document
+  // listeners above do the actual work).
+  const handleMouseMove = useCallback(() => {}, []);
+  const handleMouseUp = useCallback(() => {}, []);
 
   const handleDoubleClick = useCallback((
     e: React.MouseEvent,
@@ -455,7 +461,7 @@ export const AutomationLanes: React.FC<AutomationLanesProps> = ({
               cursor: isInteractive ? 'crosshair' : 'default',
               pointerEvents: isInteractive ? 'auto' : 'none',
             }}
-            onMouseDown={isInteractive ? (e) => handleMouseDown(e, curve, channelIndex, laneLeft, yOffset) : undefined}
+            onMouseDown={isInteractive ? (e) => handleMouseDown(e, curve, channelIndex, laneLeft, yOffset, laneWidth) : undefined}
             onMouseMove={isInteractive ? handleMouseMove : undefined}
             onMouseUp={isInteractive ? handleMouseUp : undefined}
             onDoubleClick={isInteractive ? (e) => handleDoubleClick(e, curve, yOffset) : undefined}
@@ -587,10 +593,9 @@ export const AutomationLanes: React.FC<AutomationLanesProps> = ({
             cursor: isCurrentPattern ? 'crosshair' : 'default',
             pointerEvents: 'auto',
           }}
-          onMouseDown={isCurrentPattern ? (e) => handleMouseDown(e, curve, channelIndex, laneLeft, yOffset) : undefined}
+          onMouseDown={isCurrentPattern ? (e) => handleMouseDown(e, curve, channelIndex, laneLeft, yOffset, lw) : undefined}
           onMouseMove={isCurrentPattern ? handleMouseMove : undefined}
           onMouseUp={isCurrentPattern ? handleMouseUp : undefined}
-          onMouseLeave={isCurrentPattern ? handleMouseUp : undefined}
           onDoubleClick={isCurrentPattern ? (e) => handleDoubleClick(e, curve, yOffset) : undefined}
         >
           <svg width={lw} height={pHeight}>
