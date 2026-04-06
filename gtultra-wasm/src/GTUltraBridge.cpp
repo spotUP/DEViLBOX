@@ -778,6 +778,127 @@ void gt_set_order_entry(int song, int ch, int pos, int val) {
     songorder[song][ch][pos] = val;
 }
 
+/* --- Order List Structure Operations --- */
+
+EMSCRIPTEN_KEEPALIVE
+void gt_insert_order(int song, int ch, int pos, unsigned char val) {
+    if (song < 0 || song >= MAX_SONGS || ch < 0 || ch >= MAX_CHN || pos < 0) return;
+    undoAreaSetCheckForChange(UNDO_AREA_ORDERLIST, ch, 1);
+    // Set editor state so insertorder() uses the right context
+    int prevSong = editorInfo.esnum, prevChn = editorInfo.eschn, prevPos = editorInfo.eseditpos;
+    editorInfo.esnum = song;
+    editorInfo.eschn = ch;
+    editorInfo.eseditpos = pos;
+    insertorder(val, &gtObject);
+    editorInfo.esnum = prevSong;
+    editorInfo.eschn = prevChn;
+    editorInfo.eseditpos = prevPos;
+}
+
+EMSCRIPTEN_KEEPALIVE
+void gt_delete_order(int song, int ch, int pos) {
+    if (song < 0 || song >= MAX_SONGS || ch < 0 || ch >= MAX_CHN || pos < 0) return;
+    undoAreaSetCheckForChange(UNDO_AREA_ORDERLIST, ch, 1);
+    int prevSong = editorInfo.esnum, prevChn = editorInfo.eschn, prevPos = editorInfo.eseditpos;
+    editorInfo.esnum = song;
+    editorInfo.eschn = ch;
+    editorInfo.eseditpos = pos;
+    deleteorder(&gtObject);
+    editorInfo.esnum = prevSong;
+    editorInfo.eschn = prevChn;
+    editorInfo.eseditpos = prevPos;
+}
+
+EMSCRIPTEN_KEEPALIVE
+int gt_get_order_length(int song, int ch) {
+    if (song < 0 || song >= MAX_SONGS || ch < 0 || ch >= MAX_CHN) return 0;
+    return songlen[song][ch];
+}
+
+/* --- Table Structure Operations --- */
+
+EMSCRIPTEN_KEEPALIVE
+void gt_insert_table_row(int type, int pos) {
+    if (type < 0 || type >= MAX_TABLES || pos < 0 || pos >= MAX_TABLELEN) return;
+    undoAreaSetCheckForChange(UNDO_AREA_TABLES + type, 0, 1);
+    inserttable(type, pos, 0);
+}
+
+EMSCRIPTEN_KEEPALIVE
+void gt_delete_table_row(int type, int pos) {
+    if (type < 0 || type >= MAX_TABLES || pos < 0 || pos >= MAX_TABLELEN) return;
+    undoAreaSetCheckForChange(UNDO_AREA_TABLES + type, 0, 1);
+    deletetable(type, pos);
+}
+
+/* --- Pattern Structure Operations --- */
+
+EMSCRIPTEN_KEEPALIVE
+void gt_expand_pattern(int pat) {
+    if (pat < 0 || pat >= MAX_PATT) return;
+    int oldLen = pattlen[pat];
+    if (oldLen * 2 > MAX_PATTROWS) return;
+    undoAreaSetCheckForChange(UNDO_AREA_PATTERN, pat, 1);
+    undoAreaSetCheckForChange(UNDO_AREA_PATTERN_LEN, pat, 1);
+    // Double pattern: duplicate each row
+    for (int r = oldLen - 1; r >= 0; r--) {
+        int dst = r * 2;
+        for (int c = 0; c < 4; c++) {
+            pattern[pat][dst * 4 + c] = pattern[pat][r * 4 + c];
+            pattern[pat][(dst + 1) * 4 + c] = 0; // Empty row between
+        }
+    }
+    pattlen[pat] = oldLen * 2;
+}
+
+EMSCRIPTEN_KEEPALIVE
+void gt_shrink_pattern(int pat) {
+    if (pat < 0 || pat >= MAX_PATT) return;
+    int oldLen = pattlen[pat];
+    if (oldLen < 2) return;
+    undoAreaSetCheckForChange(UNDO_AREA_PATTERN, pat, 1);
+    undoAreaSetCheckForChange(UNDO_AREA_PATTERN_LEN, pat, 1);
+    // Halve pattern: keep every other row
+    int newLen = oldLen / 2;
+    for (int r = 0; r < newLen; r++) {
+        for (int c = 0; c < 4; c++) {
+            pattern[pat][r * 4 + c] = pattern[pat][r * 2 * 4 + c];
+        }
+    }
+    // Clear remainder
+    for (int r = newLen; r < oldLen; r++) {
+        for (int c = 0; c < 4; c++) pattern[pat][r * 4 + c] = 0;
+    }
+    pattlen[pat] = newLen;
+}
+
+/* --- Instrument Operations --- */
+
+EMSCRIPTEN_KEEPALIVE
+void gt_copy_instrument(int src, int dst) {
+    if (src < 0 || src >= MAX_INSTR || dst < 0 || dst >= MAX_INSTR) return;
+    undoAreaSetCheckForChange(UNDO_AREA_INSTRUMENTS, dst, 1);
+    memcpy(&instr[dst], &instr[src], sizeof(INSTR));
+}
+
+EMSCRIPTEN_KEEPALIVE
+void gt_swap_instruments(int a, int b) {
+    if (a < 0 || a >= MAX_INSTR || b < 0 || b >= MAX_INSTR) return;
+    undoAreaSetCheckForChange(UNDO_AREA_INSTRUMENTS, a, 1);
+    undoAreaSetCheckForChange(UNDO_AREA_INSTRUMENTS, b, 1);
+    INSTR tmp;
+    memcpy(&tmp, &instr[a], sizeof(INSTR));
+    memcpy(&instr[a], &instr[b], sizeof(INSTR));
+    memcpy(&instr[b], &tmp, sizeof(INSTR));
+}
+
+EMSCRIPTEN_KEEPALIVE
+void gt_clear_instrument(int inst_idx) {
+    if (inst_idx < 0 || inst_idx >= MAX_INSTR) return;
+    undoAreaSetCheckForChange(UNDO_AREA_INSTRUMENTS, inst_idx, 1);
+    clearinstr(inst_idx);
+}
+
 /* --- Configuration --- */
 
 EMSCRIPTEN_KEEPALIVE
