@@ -8,6 +8,7 @@ import * as Tone from 'tone';
 import type { TransportState, GrooveTemplate } from '@typedefs/audio';
 import { GROOVE_TEMPLATES } from '@typedefs/audio';
 import { useInstrumentStore } from './useInstrumentStore';
+import { checkFormatViolation, getActiveFormatLimits } from '@/lib/formatCompatibility';
 import { unlockIOSAudio } from '@utils/ios-audio-unlock';
 import { useUIStore } from './useUIStore';
 import { getToneEngine } from '@engine/ToneEngine';
@@ -152,7 +153,14 @@ export const useTransportStore = create<TransportStore>()(
     globalPitch: 0, // Default to no pitch shift
 
     // Actions
-    setBPM: (bpm) =>
+    setBPM: (bpm) => {
+      const limits = getActiveFormatLimits();
+      if (limits && (bpm < limits.bpmRange[0] || bpm > limits.bpmRange[1])) {
+        void checkFormatViolation('bpmRange',
+          `BPM ${bpm} is outside ${limits.name} range of ${limits.bpmRange[0]}-${limits.bpmRange[1]}.`,
+        ).then((ok) => { if (ok) useTransportStore.getState().setBPM(bpm); });
+        return;
+      }
       set((state) => {
         // Clamp BPM between MIN and MAX
         state.bpm = Math.max(20, Math.min(999, bpm));
@@ -162,7 +170,8 @@ export const useTransportStore = create<TransportStore>()(
         } catch {
           // Ignore errors if store is being cleaned up
         }
-      }),
+      });
+    },
 
     setGlobalPitch: (pitch) =>
       set((state) => {
@@ -416,7 +425,16 @@ export const useTransportStore = create<TransportStore>()(
         state.loopStartRow = Math.max(0, row);
       }),
 
-    setGrooveTemplate: (templateId) =>
+    setGrooveTemplate: (templateId) => {
+      if (templateId !== 'straight') {
+        const limits = getActiveFormatLimits();
+        if (limits && !limits.supportsGroove) {
+          void checkFormatViolation('groove',
+            `Groove templates are not supported in ${limits.name} format.`,
+          ).then((ok) => { if (ok) useTransportStore.getState().setGrooveTemplate(templateId); });
+          return;
+        }
+      }
       set((state) => {
         // Verify template exists
         const template = GROOVE_TEMPLATES.find(t => t.id === templateId);
@@ -427,7 +445,8 @@ export const useTransportStore = create<TransportStore>()(
             state.swing = 0;
           }
         }
-      }),
+      });
+    },
 
     setGrooveSteps: (steps) =>
       set((state) => {
