@@ -533,6 +533,7 @@ export const AutomationLanes: React.FC<AutomationLanesProps> = ({
     <div
       ref={containerRef}
       className="automation-lanes"
+      data-automation-lane
       style={{
         position: 'relative',
         left: rowNumWidth,
