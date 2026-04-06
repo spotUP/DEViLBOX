@@ -139,7 +139,7 @@ export const TonewheelOrganControls: React.FC<TonewheelOrganControlsProps> = ({
   return (
     <div className="synth-controls-flow grid grid-cols-4 gap-2 p-2 overflow-y-auto">
       {/* ═══ DRAWBARS ═══ */}
-      <div className={`p-2 rounded-lg border ${panelBg}`}>
+      <div className={`p-2 rounded-lg border border-dark-border ${panelBg}`}>
         <h3
           className="font-bold uppercase tracking-tight text-sm mb-2"
           style={{ color: accentColor }}
@@ -161,7 +161,7 @@ export const TonewheelOrganControls: React.FC<TonewheelOrganControlsProps> = ({
       </div>
 
       {/* ═══ PERCUSSION ═══ */}
-      <div className={`p-2 rounded-lg border ${panelBg}`}>
+      <div className={`p-2 rounded-lg border border-dark-border ${panelBg}`}>
         <h3
           className="font-bold uppercase tracking-tight text-sm mb-3"
           style={{ color: accentColor }}
@@ -230,7 +230,7 @@ export const TonewheelOrganControls: React.FC<TonewheelOrganControlsProps> = ({
       </div>
 
       {/* ═══ VIBRATO / CHORUS + CONTROLS ═══ */}
-      <div className={`p-2 rounded-lg border ${panelBg}`}>
+      <div className={`p-2 rounded-lg border border-dark-border ${panelBg}`}>
         <h3
           className="font-bold uppercase tracking-tight text-sm mb-3"
           style={{ color: accentColor }}
@@ -269,7 +269,7 @@ export const TonewheelOrganControls: React.FC<TonewheelOrganControlsProps> = ({
       </div>
 
       {/* ═══ TONE & OUTPUT ═══ */}
-      <div className={`p-2 rounded-lg border ${panelBg}`}>
+      <div className={`p-2 rounded-lg border border-dark-border ${panelBg}`}>
         <h3
           className="font-bold uppercase tracking-tight text-sm mb-3"
           style={{ color: accentColor }}

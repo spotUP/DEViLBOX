@@ -114,7 +114,7 @@ export const MelodicaControls: React.FC<MelodicaControlsProps> = ({
   return (
     <div className="synth-controls-flow grid grid-cols-4 gap-2 p-2 overflow-y-auto">
       {/* ═══ BREATH & DYNAMICS ═══ */}
-      <div className={`p-2 rounded-lg border ${panelBg}`}>
+      <div className={`p-2 rounded-lg border border-dark-border ${panelBg}`}>
         <h3
           className="font-bold uppercase tracking-tight text-sm mb-3"
           style={{ color: accentColor }}
@@ -158,7 +158,7 @@ export const MelodicaControls: React.FC<MelodicaControlsProps> = ({
       </div>
 
       {/* ═══ TONE ═══ */}
-      <div className={`p-2 rounded-lg border ${panelBg}`}>
+      <div className={`p-2 rounded-lg border border-dark-border ${panelBg}`}>
         <h3
           className="font-bold uppercase tracking-tight text-sm mb-3"
           style={{ color: accentColor }}
@@ -203,7 +203,7 @@ export const MelodicaControls: React.FC<MelodicaControlsProps> = ({
       </div>
 
       {/* ═══ VIBRATO ═══ */}
-      <div className={`p-2 rounded-lg border ${panelBg}`}>
+      <div className={`p-2 rounded-lg border border-dark-border ${panelBg}`}>
         <h3
           className="font-bold uppercase tracking-tight text-sm mb-3"
           style={{ color: accentColor }}
@@ -236,7 +236,7 @@ export const MelodicaControls: React.FC<MelodicaControlsProps> = ({
       </div>
 
       {/* ═══ PLAYING & OUTPUT ═══ */}
-      <div className={`p-2 rounded-lg border ${panelBg}`}>
+      <div className={`p-2 rounded-lg border border-dark-border ${panelBg}`}>
         <h3
           className="font-bold uppercase tracking-tight text-sm mb-3"
           style={{ color: accentColor }}

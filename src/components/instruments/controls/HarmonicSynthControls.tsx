@@ -96,7 +96,7 @@ export const HarmonicSynthControls: React.FC<HarmonicSynthControlsProps> = ({
   return (
     <div className="space-y-3">
       {/* Harmonic Bar Graph */}
-      <div className={`rounded-lg border ${panelBg} overflow-hidden`}>
+      <div className={`rounded-lg border border-dark-border ${panelBg} overflow-hidden`}>
         <div className="flex items-center justify-between px-3 py-1.5 border-b border-dark-border">
           <span className="font-mono text-[10px] font-bold text-text-primary tracking-wider">HARMONICS</span>
           <div className="flex items-center gap-1">

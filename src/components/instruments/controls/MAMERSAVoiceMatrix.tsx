@@ -102,7 +102,7 @@ export const MAMERSAVoiceMatrix: React.FC<MAMERSAVoiceMatrixProps> = ({
       </div>
 
       {/* Grid of 16 voices */}
-      <div className={`grid grid-cols-8 gap-1 p-2 rounded border ${panelBg}`}>
+      <div className={`grid grid-cols-8 gap-1 p-2 rounded border border-dark-border ${panelBg}`}>
         {Array.from({ length: 16 }).map((_, i) => (
           <button
             key={i}
@@ -144,7 +144,7 @@ export const MAMERSAVoiceMatrix: React.FC<MAMERSAVoiceMatrixProps> = ({
       </div>
 
       {/* Selected Part Editor */}
-      <div className={`p-4 rounded border ${panelBg} space-y-4 shadow-inner-dark`}>
+      <div className={`p-4 rounded border border-dark-border ${panelBg} space-y-4 shadow-inner-dark`}>
         <div className="flex items-center justify-between border-b border-border pb-2">
           <div className="flex items-center gap-2">
             <Settings size={14} className="text-text-muted" />
