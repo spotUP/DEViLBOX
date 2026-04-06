@@ -745,175 +745,130 @@ export function bakeAutomationForExport(
 // ── Slide Optimization (Post-Process) ───────────────────────────────────────
 
 /**
- * Detect consecutive volume column "set volume" entries that form a linear ramp,
- * and replace them with fine volume slides (frees nothing column-wise, but is
- * more authentic and efficient at the player level — single tick-0 write vs N).
+ * Generic linear-run detector + replacer.
+ *
+ * Scans a channel's cells for consecutive entries that form a linear ramp
+ * (constant delta in [-15, 15]) and replaces row [start+1, end] with fine
+ * slide commands. Used for both volume column (0x80-0x9F) and effect column
+ * Cxx → EAx/EBx optimization.
+ *
+ * @param patterns      Patterns to process (mutated in place)
+ * @param readValue     Extract the value from a cell, or null if not eligible
+ * @param writeSlide    Write the slide command for delta into a cell
+ * @returns number of rows replaced with slides
+ */
+interface SlideStrategy {
+  readValue: (cell: TrackerCell) => number | null;
+  writeSlide: (cell: TrackerCell, delta: number) => void;
+}
+
+function optimizeSlides(patterns: Pattern[], strategy: SlideStrategy): number {
+  let optimized = 0;
+
+  for (const pattern of patterns) {
+    for (const channel of pattern.channels) {
+      const rows = channel.rows;
+      let runStart = -1;
+      let runDelta = 0;
+      let runStartVal = 0;
+
+      const finalize = (endRow: number): void => {
+        if (runStart >= 0 && endRow - runStart >= 1 && runDelta !== 0) {
+          for (let r = runStart + 1; r <= endRow; r++) {
+            if (rows[r]) strategy.writeSlide(rows[r], runDelta);
+          }
+          optimized += endRow - runStart;
+        }
+      };
+
+      for (let r = 0; r <= rows.length; r++) {
+        const cell = r < rows.length ? rows[r] : undefined;
+        // Notes/instruments break the run (would reset volume on the chip)
+        const eligible = cell && !cell.note && !cell.instrument;
+        const value = eligible ? strategy.readValue(cell!) : null;
+
+        if (value === null) {
+          finalize(r - 1);
+          runStart = -1;
+          runDelta = 0;
+          continue;
+        }
+
+        if (runStart < 0) {
+          // Start a new run
+          runStart = r;
+          runStartVal = value;
+          runDelta = 0;
+        } else if (runStart === r - 1) {
+          // Second row — establish delta
+          runDelta = value - runStartVal;
+          if (Math.abs(runDelta) < 1 || Math.abs(runDelta) > 15) {
+            // Delta out of range — restart from this row
+            runStart = r;
+            runStartVal = value;
+            runDelta = 0;
+          }
+        } else {
+          // Continuation — check delta still matches
+          const expected = runStartVal + runDelta * (r - runStart);
+          if (value !== expected) {
+            // Delta broke — emit slides for the previous run, restart
+            finalize(r - 1);
+            runStart = r;
+            runStartVal = value;
+            runDelta = 0;
+          }
+        }
+      }
+      finalize(rows.length - 1);
+    }
+  }
+  return optimized;
+}
+
+/**
+ * Volume column slide strategy (XM/IT/S3M only).
  *
  * Volume column encoding:
  *   0x10-0x50 = Set Volume (0-64)
  *   0x80-0x8F = Fine Volume Down (1-15 per row, tick 0 only)
  *   0x90-0x9F = Fine Volume Up   (1-15 per row, tick 0 only)
- *
- * MOD has no volume column — skip.
- *
- * @returns number of rows replaced with slides
  */
+const VOL_COLUMN_SLIDE: SlideStrategy = {
+  readValue: (cell) => {
+    const v = cell.volume;
+    if (v === undefined || v < 0x10 || v > 0x50) return null;
+    return v - 0x10;
+  },
+  writeSlide: (cell, delta) => {
+    cell.volume = delta > 0 ? (0x90 + delta) : (0x80 + (-delta));
+  },
+};
+
+/**
+ * Effect column Cxx → EAx/EBx slide strategy (all formats including MOD).
+ *
+ * Cxx = effect type 12, param 0-64 (set volume)
+ * Exx = effect type 14, param 0xA0-0xAF up / 0xB0-0xBF down (fine vol slide)
+ */
+const EFFECT_COLUMN_SLIDE: SlideStrategy = {
+  readValue: (cell) => {
+    if (cell.effTyp !== 12 || cell.eff < 0 || cell.eff > 64) return null;
+    return cell.eff;
+  },
+  writeSlide: (cell, delta) => {
+    cell.effTyp = 14;
+    cell.eff = delta > 0 ? (0xA0 + delta) : (0xB0 + (-delta));
+  },
+};
+
 function optimizeVolumeSlides(patterns: Pattern[], format: FormatConstraints): number {
   if (!hasVolumeColumn(format)) return 0;
-  let optimized = 0;
-
-  for (const pattern of patterns) {
-    for (const channel of pattern.channels) {
-      const rows = channel.rows;
-      let runStart = -1;
-      let runDelta = 0;
-      let runStartVol = 0;
-
-      const isSetVol = (vol: number | undefined): boolean =>
-        vol !== undefined && vol >= 0x10 && vol <= 0x50;
-
-      for (let r = 0; r <= rows.length; r++) {
-        const cell = r < rows.length ? rows[r] : undefined;
-        const vol = cell?.volume;
-
-        if (cell && isSetVol(vol) && !cell.note && !cell.instrument) {
-          // Continuation candidate (no note/instrument that would reset volume)
-          const setVal = vol! - 0x10; // 0-64 actual volume
-          if (runStart < 0) {
-            // Start a new run
-            runStart = r;
-            runStartVol = setVal;
-            runDelta = 0;
-          } else if (runStart === r - 1) {
-            // Second row — establish delta
-            runDelta = setVal - runStartVol;
-            // Delta must be in [-15, 15] and non-zero for slides
-            if (Math.abs(runDelta) < 1 || Math.abs(runDelta) > 15) {
-              // Delta out of range — restart from this row
-              runStart = r;
-              runStartVol = setVal;
-              runDelta = 0;
-            }
-          } else {
-            // Continuation — check delta still matches
-            const expected = runStartVol + runDelta * (r - runStart);
-            if (setVal !== expected) {
-              // Delta broke — emit slides for the previous run, restart
-              applySlideRun(rows, runStart, r - 1, runDelta);
-              if (r - runStart - 1 > 0) optimized += r - runStart - 1;
-              runStart = r;
-              runStartVol = setVal;
-              runDelta = 0;
-            }
-          }
-        } else {
-          // Row breaks the run (cell missing, has note/instrument, or no set vol)
-          if (runStart >= 0 && r - runStart >= 2 && runDelta !== 0) {
-            applySlideRun(rows, runStart, r - 1, runDelta);
-            optimized += r - runStart - 1;
-          }
-          runStart = -1;
-          runDelta = 0;
-        }
-      }
-    }
-  }
-  return optimized;
+  return optimizeSlides(patterns, VOL_COLUMN_SLIDE);
 }
 
-/**
- * Detect consecutive Cxx (set volume) effect commands and replace with EAx/EBx
- * fine volume slides. Works for ALL formats including MOD which has no volume
- * column. Same logic as optimizeVolumeSlides but operates on the effect column.
- *
- * Effect encoding (XM/IT numbering):
- *   Cxx = effect type 12, param 0-64 (set volume)
- *   E (effect type 14) with param:
- *     0xA0-0xAF = Fine Vol Slide Up   (1-15 per row, tick 0)
- *     0xB0-0xBF = Fine Vol Slide Down (1-15 per row, tick 0)
- */
 function optimizeEffectColumnVolumeSlides(patterns: Pattern[]): number {
-  let optimized = 0;
-
-  for (const pattern of patterns) {
-    for (const channel of pattern.channels) {
-      const rows = channel.rows;
-      let runStart = -1;
-      let runDelta = 0;
-      let runStartVol = 0;
-
-      const isSetVolEffect = (cell: TrackerCell | undefined): boolean =>
-        !!cell && cell.effTyp === 12 && cell.eff >= 0 && cell.eff <= 64;
-
-      for (let r = 0; r <= rows.length; r++) {
-        const cell = r < rows.length ? rows[r] : undefined;
-
-        if (isSetVolEffect(cell) && !cell!.note && !cell!.instrument) {
-          const setVal = cell!.eff;
-          if (runStart < 0) {
-            runStart = r;
-            runStartVol = setVal;
-            runDelta = 0;
-          } else if (runStart === r - 1) {
-            runDelta = setVal - runStartVol;
-            if (Math.abs(runDelta) < 1 || Math.abs(runDelta) > 15) {
-              runStart = r;
-              runStartVol = setVal;
-              runDelta = 0;
-            }
-          } else {
-            const expected = runStartVol + runDelta * (r - runStart);
-            if (setVal !== expected) {
-              applyEffectSlideRun(rows, runStart, r - 1, runDelta);
-              if (r - runStart - 1 > 0) optimized += r - runStart - 1;
-              runStart = r;
-              runStartVol = setVal;
-              runDelta = 0;
-            }
-          }
-        } else {
-          if (runStart >= 0 && r - runStart >= 2 && runDelta !== 0) {
-            applyEffectSlideRun(rows, runStart, r - 1, runDelta);
-            optimized += r - runStart - 1;
-          }
-          runStart = -1;
-          runDelta = 0;
-        }
-      }
-    }
-  }
-  return optimized;
-}
-
-/**
- * Replace effect column Cxx entries from [start+1, end] with EAx/EBx fine slides.
- */
-function applyEffectSlideRun(rows: TrackerCell[], start: number, end: number, delta: number): void {
-  if (delta === 0) return;
-  // E command: effect type 14, param = 0xA0+n (up) or 0xB0+n (down), n=1-15
-  const slideParam = delta > 0 ? (0xA0 + delta) : (0xB0 + (-delta));
-  for (let r = start + 1; r <= end; r++) {
-    if (rows[r]) {
-      rows[r].effTyp = 14;
-      rows[r].eff = slideParam;
-    }
-  }
-}
-
-/**
- * Replace volume column entries from row [start+1, end] with fine slide commands.
- * Row `start` keeps its set volume (the initial value).
- * delta must be in [-15, 15] and non-zero.
- */
-function applySlideRun(rows: TrackerCell[], start: number, end: number, delta: number): void {
-  if (delta === 0) return;
-  // Volume column fine slide: 0x90 + n = up by n, 0x80 + n = down by n
-  const slideByte = delta > 0 ? (0x90 + delta) : (0x80 + (-delta));
-  for (let r = start + 1; r <= end; r++) {
-    if (rows[r]) {
-      rows[r].volume = slideByte;
-    }
-  }
+  return optimizeSlides(patterns, EFFECT_COLUMN_SLIDE);
 }
 
 /**
