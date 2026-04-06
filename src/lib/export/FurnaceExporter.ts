@@ -224,11 +224,40 @@ export interface FurnaceExportData {
 }
 
 /**
- * Export a song to Furnace .fur format
+ * Export a song to Furnace .fur format.
+ * Call bakeAutomationForFurnace() first to bake automation curves into patterns.
  */
 export function exportToFurnace(data: FurnaceExportData, options: FurnaceExportOptions = {}): Uint8Array {
   const exporter = new FurnaceExporter(data, options);
   return exporter.export();
+}
+
+/**
+ * Bake automation curves into Furnace chip-specific effect commands.
+ * Call before exportToFurnace() to embed automation as native effects.
+ *
+ * @param patterns  Original patterns
+ * @param primaryChip  Primary chip type ('c64', 'ay', 'gb', etc.)
+ * @returns Baked patterns + stats (import BakeResult from AutomationBaker)
+ */
+export async function bakeAutomationForFurnace(
+  patterns: Pattern[],
+  primaryChip: string,
+): Promise<{ patterns: Pattern[]; bakedCount: number; overflowRows: number; warnings: string[] }> {
+  const { useAutomationStore } = await import('@stores/useAutomationStore');
+  const { bakeAutomationForExport } = await import('./AutomationBaker');
+  const { FORMAT_LIMITS } = await import('@/lib/formatCompatibility');
+
+  const curves = useAutomationStore.getState().curves;
+  if (curves.length === 0) {
+    return { patterns, bakedCount: 0, overflowRows: 0, warnings: [] };
+  }
+
+  const formatKey = primaryChip === 'c64' ? 'FUR_C64'
+    : primaryChip === 'ay' ? 'FUR_AY'
+    : 'FUR_GENERIC';
+  const format = FORMAT_LIMITS[formatKey] || FORMAT_LIMITS['FUR_GENERIC'];
+  return bakeAutomationForExport(patterns, curves, format);
 }
 
 class FurnaceExporter {
