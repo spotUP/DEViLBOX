@@ -39,7 +39,6 @@ export const PixiAutomationParamPicker: React.FC<PixiAutomationParamPickerProps>
     const available = params.filter(p => !activeParams.includes(p.key));
     if (available.length === 0) return;
     const paramKey = available[0].key;
-    console.warn('[AUTOMATION-DEBUG] PixiPicker click — channelIndex=', channelIndex, 'param=', paramKey, 'patternId=', patternId);
     addActiveParameter(channelIndex, paramKey);
     setShowLane(channelIndex, true);
     // Seed a curve point so the lane is immediately visible

@@ -319,10 +319,6 @@ export const useTransportStore = create<TransportStore>()(
             if (useEditorStore.getState().followPlayback) {
               const cursor = useCursorStore.getState().cursor;
               if (cursor.rowIndex !== row) {
-                if (row === 0) {
-                  console.warn('[CURSOR-DEBUG] Transport followPlayback set cursor to 0 — was', cursor.rowIndex);
-                  console.trace();
-                }
                 useCursorStore.setState({ cursor: { ...cursor, rowIndex: row } });
               }
             }

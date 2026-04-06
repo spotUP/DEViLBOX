@@ -228,11 +228,6 @@ export const useCursorStore = create<CursorStore>()((set, get) => ({
     const ts = getTrackerState();
     const pattern = ts.patterns[ts.currentPatternIndex];
     if (row >= 0 && row < pattern.length) {
-      // DEBUG: trace what moves the cursor (especially to row 0)
-      if (row === 0) {
-        console.warn('[CURSOR-DEBUG] moveCursorToRow(0) — stack:');
-        console.trace();
-      }
       notifyScrollEvent();
       set({ cursor: { ...get().cursor, rowIndex: row } });
       const replayer = getTrackerReplayer();

@@ -148,7 +148,6 @@ export const ChannelContextMenu: React.FC<ChannelContextMenuProps> = ({
   // Register an automation parameter on this channel: ensure a curve exists
   // with at least one seed point so the lane is immediately visible to the user.
   const ensureAutomationCurve = useCallback((paramId: string) => {
-    console.warn('[AUTOMATION-DEBUG] ensureAutomationCurve channelIndex=', channelIndex, 'paramId=', paramId);
     const existing = curves.find((c) => c.parameter === paramId);
     if (existing && existing.points.length > 0) return; // already drawable
     let curveId = existing?.id;
