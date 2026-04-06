@@ -531,7 +531,7 @@ export const ManualTab: React.FC<ManualTabProps> = ({
                       key={ch.id}
                       onClick={() => onSelectChapter(chapterIdx)}
                       className={`
-                        w-full text-left px-3 py-1 text-sm font-mono border-b border-ft2-border/50 truncate
+                        w-full text-left px-3 py-1.5 text-sm font-mono truncate
                         ${isActive
                           ? 'bg-ft2-cursor text-ft2-bg font-bold'
                           : 'text-ft2-text hover:bg-ft2-bg'
@@ -559,7 +559,7 @@ export const ManualTab: React.FC<ManualTabProps> = ({
                   key={ch.id}
                   onClick={() => onSelectChapter(chapterIdx)}
                   className={`
-                    w-full text-left px-3 py-1 text-sm font-mono border-b border-ft2-border/50 truncate
+                    w-full text-left px-3 py-1.5 text-sm font-mono truncate
                     ${isActive
                       ? 'bg-ft2-cursor text-ft2-bg font-bold'
                       : 'text-ft2-text hover:bg-ft2-bg'
