@@ -76,6 +76,18 @@ class GTUltraProcessor extends AudioWorkletProcessor {
           this._checkpointUndo = this.module.cwrap('gt_checkpoint_undo', null, []);
           this._markEdited = this.module.cwrap('gt_mark_edited', null, ['number', 'number']);
 
+          // Structure operations
+          this._insertOrder = this.module.cwrap('gt_insert_order', null, ['number', 'number', 'number', 'number']);
+          this._deleteOrder = this.module.cwrap('gt_delete_order', null, ['number', 'number', 'number']);
+          this._getOrderLength = this.module.cwrap('gt_get_order_length', 'number', ['number', 'number']);
+          this._insertTableRow = this.module.cwrap('gt_insert_table_row', null, ['number', 'number']);
+          this._deleteTableRow = this.module.cwrap('gt_delete_table_row', null, ['number', 'number']);
+          this._expandPattern = this.module.cwrap('gt_expand_pattern', null, ['number']);
+          this._shrinkPattern = this.module.cwrap('gt_shrink_pattern', null, ['number']);
+          this._copyInstrument = this.module.cwrap('gt_copy_instrument', null, ['number', 'number']);
+          this._swapInstruments = this.module.cwrap('gt_swap_instruments', null, ['number', 'number']);
+          this._clearInstrument = this.module.cwrap('gt_clear_instrument', null, ['number']);
+
           // Save/Export
           this._saveSng = this.module.cwrap('gt_save_sng', 'number', ['number', 'number']);
           this._exportPrg = this.module.cwrap('gt_export_prg', 'number', ['number', 'number']);
@@ -354,6 +366,60 @@ class GTUltraProcessor extends AudioWorkletProcessor {
       case 'redo': {
         if (!this.ready) return;
         this._redo();
+        break;
+      }
+
+      case 'insertOrder': {
+        if (!this.ready) return;
+        this._insertOrder(msg.song, msg.ch, msg.pos, msg.val);
+        break;
+      }
+
+      case 'deleteOrder': {
+        if (!this.ready) return;
+        this._deleteOrder(msg.song, msg.ch, msg.pos);
+        break;
+      }
+
+      case 'insertTableRow': {
+        if (!this.ready) return;
+        this._insertTableRow(msg.type, msg.pos);
+        break;
+      }
+
+      case 'deleteTableRow': {
+        if (!this.ready) return;
+        this._deleteTableRow(msg.type, msg.pos);
+        break;
+      }
+
+      case 'expandPattern': {
+        if (!this.ready) return;
+        this._expandPattern(msg.pat);
+        break;
+      }
+
+      case 'shrinkPattern': {
+        if (!this.ready) return;
+        this._shrinkPattern(msg.pat);
+        break;
+      }
+
+      case 'copyInstrument': {
+        if (!this.ready) return;
+        this._copyInstrument(msg.src, msg.dst);
+        break;
+      }
+
+      case 'swapInstruments': {
+        if (!this.ready) return;
+        this._swapInstruments(msg.a, msg.b);
+        break;
+      }
+
+      case 'clearInstrument': {
+        if (!this.ready) return;
+        this._clearInstrument(msg.inst);
         break;
       }
 

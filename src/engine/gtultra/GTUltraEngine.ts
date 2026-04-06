@@ -311,6 +311,44 @@ export class GTUltraEngine {
     this.post({ type: 'checkpointUndo' });
   }
 
+  // --- Structure Operations ---
+
+  insertOrder(song: number, ch: number, pos: number, val: number): void {
+    this.post({ type: 'insertOrder', song, ch, pos, val });
+  }
+
+  deleteOrder(song: number, ch: number, pos: number): void {
+    this.post({ type: 'deleteOrder', song, ch, pos });
+  }
+
+  insertTableRow(tableType: number, pos: number): void {
+    this.post({ type: 'insertTableRow', type: tableType, pos });
+  }
+
+  deleteTableRow(tableType: number, pos: number): void {
+    this.post({ type: 'deleteTableRow', type: tableType, pos });
+  }
+
+  expandPattern(pat: number): void {
+    this.post({ type: 'expandPattern', pat });
+  }
+
+  shrinkPattern(pat: number): void {
+    this.post({ type: 'shrinkPattern', pat });
+  }
+
+  copyInstrument(src: number, dst: number): void {
+    this.post({ type: 'copyInstrument', src, dst });
+  }
+
+  swapInstruments(a: number, b: number): void {
+    this.post({ type: 'swapInstruments', a, b });
+  }
+
+  clearInstrument(inst: number): void {
+    this.post({ type: 'clearInstrument', inst });
+  }
+
   // --- Save/Export ---
 
   saveSng(): void {
