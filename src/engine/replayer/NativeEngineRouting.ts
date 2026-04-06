@@ -623,7 +623,20 @@ export async function startNativeEngines(
               setFormatPlaybackRow(row);
             }
           });
-          console.log(`[NativeEngineRouting] TFMXModule position sync wired (${timingTable?.length ?? 0} timing entries, ${msPerJiffy.toFixed(2)}ms/jiffy)`);
+          let _posLogCount = 0;
+          console.log(`[NativeEngineRouting] TFMXModule position sync wired (${timingTable?.length ?? 0} timing entries, tempo=${tempo}, msPerJiffy=${msPerJiffy.toFixed(2)}, tfmxNative=${!!tfmxNative})`);
+
+          // Log first few position updates for debugging
+          const _origCb = (instance as any)._positionCallbacks[(instance as any)._positionCallbacks.length - 1];
+          if (_origCb && _posLogCount < 5) {
+            // Can't wrap easily — just add a second diagnostic callback
+          }
+          (instance as any).onPositionUpdate((update: { samplesRendered: number; elapsedMs?: number; songEnd: boolean }) => {
+            if (_posLogCount < 3) {
+              _posLogCount++;
+              console.log(`[TFMXModule] position update #${_posLogCount}: elapsed=${update.elapsedMs}ms, samplesRendered=${update.samplesRendered}, timingTable=${timingTable?.length}, msPerJiffy=${msPerJiffy}`);
+            }
+          });
         }
 
         // Generic position sync for WASM engines with onPositionUpdate.
