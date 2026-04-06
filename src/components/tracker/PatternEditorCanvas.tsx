@@ -2480,7 +2480,10 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
         macroOverlayRef.current.style.top = `${overlayTop}px`;
       }
       if (automationOverlayRef.current) {
-        automationOverlayRef.current.style.top = `${overlayTop}px`;
+        // Subtract prevLen so AutomationLanes' internal top:prevLen*rh
+        // lands exactly on the current pattern's row 0 — keeping the
+        // ghost prev/next sections aligned with the cell ghost regions.
+        automationOverlayRef.current.style.top = `${overlayTop - automationPrevLenRef.current * rh}px`;
       }
 
       // Peer cursor overlay — thin caret at peer's channel + row
