@@ -547,7 +547,7 @@ export const InstrumentList: React.FC<InstrumentListProps> = memo(({
         className={`flex-1 overflow-y-auto ${isFT2 ? 'scrollbar-ft2 min-h-0' : 'scrollbar-modern'}`}
         style={!isFT2 ? { maxHeight } : undefined}
       >
-        <div className="flex flex-col divide-y divide-ft2-border/30">
+        <div className="flex flex-col">
         {visibleInstruments.map((instrument, index) => {
           const displayNum = index + 1; // 1-based display number
           const synthInfo = getSynthInfo(instrument.synthType);
@@ -565,7 +565,7 @@ export const InstrumentList: React.FC<InstrumentListProps> = memo(({
                 onDragStart={(e) => handleDragStart(e, instrument.id)}
                 className={`
                   instrument-list-item
-                  flex items-center gap-2 px-2 py-1.5 cursor-pointer border-b border-ft2-border
+                  flex items-center gap-2 px-2 py-1.5 cursor-pointer
                   transition-colors group
                   ${isSelected
                     ? 'bg-ft2-cursor text-ft2-bg'
