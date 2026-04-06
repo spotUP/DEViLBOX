@@ -136,6 +136,12 @@ interface FormatStore {
   setTFMXMacroByte: (macroIdx: number, stepIdx: number, byteIdx: 0 | 1 | 2 | 3, value: number) => void;
   /** Replace an entire TFMX macro command (all 4 bytes) and patch tfmxFileData */
   setTFMXMacroCommand: (macroIdx: number, stepIdx: number, b0: number, b1: number, b2: number, b3: number) => void;
+  /** Insert a NOP command at the given step in a TFMX macro (within capacity). Returns true on success. */
+  insertTFMXMacroStep: (macroIdx: number, stepIdx: number) => boolean;
+  /** Delete the command at the given step, shifting subsequent commands up. */
+  deleteTFMXMacroStep: (macroIdx: number, stepIdx: number) => boolean;
+  /** Duplicate the command at the given step (insert + copy). */
+  duplicateTFMXMacroStep: (macroIdx: number, stepIdx: number) => boolean;
   /** Update a Klystrack sequence entry field (pattern or noteOffset) */
   setKlysSequenceEntry: (channel: number, position: number, field: 'pattern' | 'noteOffset', value: number) => void;
   /** Insert a new Klystrack sequence entry (copy of current or blank) at the given position */
@@ -166,6 +172,95 @@ interface FormatStore {
   applyEditorMode: (song: { linearPeriods?: boolean; furnaceNative?: FurnaceNativeData; hivelyNative?: HivelyNativeData; hivelyFileData?: ArrayBuffer; klysNative?: KlysNativeData; klysFileData?: ArrayBuffer; musiclineFileData?: Uint8Array; c64SidFileData?: Uint8Array; jamCrackerFileData?: ArrayBuffer; futurePlayerFileData?: ArrayBuffer; preTrackerFileData?: ArrayBuffer; maFileData?: ArrayBuffer; hippelFileData?: ArrayBuffer; sonixFileData?: ArrayBuffer; pxtoneFileData?: ArrayBuffer; organyaFileData?: ArrayBuffer; eupFileData?: ArrayBuffer; ixsFileData?: ArrayBuffer; psycleFileData?: ArrayBuffer; sc68FileData?: ArrayBuffer; zxtuneFileData?: ArrayBuffer; pumaTrackerFileData?: ArrayBuffer; steveTurnerFileData?: ArrayBuffer; sidmon1WasmFileData?: ArrayBuffer; artOfNoiseFileData?: ArrayBuffer; bdFileData?: ArrayBuffer; sd2FileData?: ArrayBuffer; symphonieFileData?: ArrayBuffer; uadeEditableFileData?: ArrayBuffer; uadeEditableFileName?: string; libopenmptFileData?: ArrayBuffer; hivelyMeta?: { stereoMode: number; mixGain: number; speedMultiplier: number; version: number }; furnaceSubsongs?: FurnaceSubsongPlayback[]; furnaceActiveSubsong?: number; channelTrackTables?: number[][]; channelSpeeds?: number[]; channelGrooves?: number[]; musiclineMetadata?: { title: string; author: string; date: string; duration: string; infoText: string[] }; goatTrackerData?: Uint8Array; tfmxNative?: TFMXNativeData }) => void;
   setFurnaceActiveSubsong: (index: number) => void;
   reset: () => void;
+}
+
+/**
+ * Restructure a TFMX macro by inserting, deleting, or duplicating a 4-byte
+ * command at `stepIdx`. Operates within the macro's in-file capacity:
+ * the bytes between this macro's offset and the next macro's offset (or
+ * end of file for the last macro). Returns false if there's no room.
+ *
+ * Mutates state.tfmxNative.macros[macroIdx].commands AND state.tfmxFileData
+ * in place; the existing reloadModule() path will pick up the new bytes.
+ */
+function restructureTFMXMacro(
+  state: any,
+  macroIdx: number,
+  stepIdx: number,
+  op: 'insert' | 'delete' | 'duplicate',
+): boolean {
+  if (!state.tfmxNative || !state.tfmxFileData) return false;
+  const macros = state.tfmxNative.macros as Array<{
+    index: number; fileOffset: number; length: number;
+    commands: Array<{
+      step: number; raw: number; fileOffset: number;
+      byte0: number; byte1: number; byte2: number; byte3: number;
+      opcode: number; flags: number;
+    }>;
+  }>;
+  const macro = macros[macroIdx];
+  if (!macro) return false;
+  if (stepIdx < 0 || stepIdx >= macro.commands.length) return false;
+
+  // Compute capacity = bytes available from macro start until next macro
+  // (or end of file). Use the smallest fileOffset > macro.fileOffset across
+  // all macros — neighbors aren't necessarily sorted by index.
+  let capacityEnd = state.tfmxFileData.byteLength;
+  for (const m of macros) {
+    if (m.fileOffset > macro.fileOffset && m.fileOffset < capacityEnd) {
+      capacityEnd = m.fileOffset;
+    }
+  }
+  const capacityBytes = capacityEnd - macro.fileOffset;
+  const capacitySteps = Math.floor(capacityBytes / 4);
+
+  // Build the new command byte sequence
+  const oldCmds = macro.commands.map(c => [c.byte0, c.byte1, c.byte2, c.byte3]);
+  let newCmds: number[][];
+  if (op === 'insert') {
+    if (oldCmds.length + 1 > capacitySteps) return false;
+    const NOP = [0x20, 0x00, 0x00, 0x00]; // opcode 0x20 = NOP
+    newCmds = [...oldCmds.slice(0, stepIdx), NOP, ...oldCmds.slice(stepIdx)];
+  } else if (op === 'duplicate') {
+    if (oldCmds.length + 1 > capacitySteps) return false;
+    const dup = oldCmds[stepIdx].slice();
+    newCmds = [...oldCmds.slice(0, stepIdx + 1), dup, ...oldCmds.slice(stepIdx + 1)];
+  } else {
+    // delete — keep at least one command
+    if (oldCmds.length <= 1) return false;
+    newCmds = [...oldCmds.slice(0, stepIdx), ...oldCmds.slice(stepIdx + 1)];
+  }
+
+  // Write new bytes into tfmxFileData starting at macro.fileOffset.
+  // Pad the unused trailing capacity with zeros so old data can't sneak in.
+  const view = new Uint8Array(state.tfmxFileData);
+  for (let i = 0; i < newCmds.length; i++) {
+    const off = macro.fileOffset + i * 4;
+    view[off]     = newCmds[i][0];
+    view[off + 1] = newCmds[i][1];
+    view[off + 2] = newCmds[i][2];
+    view[off + 3] = newCmds[i][3];
+  }
+  // Zero out the bytes between the new end and the original end (or capacity end)
+  const newEnd = macro.fileOffset + newCmds.length * 4;
+  const oldEnd = macro.fileOffset + oldCmds.length * 4;
+  const wipeEnd = Math.max(oldEnd, newEnd);
+  for (let off = newEnd; off < wipeEnd; off++) view[off] = 0;
+
+  // Rebuild the in-memory commands[] array from the new bytes
+  macro.commands = newCmds.map((bytes, i) => {
+    const [b0, b1, b2, b3] = bytes;
+    return {
+      step: i,
+      raw: ((b0 << 24) | (b1 << 16) | (b2 << 8) | b3) >>> 0,
+      fileOffset: macro.fileOffset + i * 4,
+      byte0: b0, byte1: b1, byte2: b2, byte3: b3,
+      opcode: b0 & 0x3F,
+      flags: b0 & 0xC0,
+    };
+  });
+  macro.length = macro.commands.length;
+  return true;
 }
 
 const clearNative = (state: any) => {
@@ -788,6 +883,38 @@ export const useFormatStore = create<FormatStore>()(
         }
       }
     }),
+
+    // ── Macro structural mutations (insert / delete / duplicate) ─────────────
+    //
+    // These operate within the macro's existing in-file capacity (the bytes
+    // between this macro's start and the next macro's start). For insert &
+    // duplicate the macro grows by 1 command — we refuse if there's no room.
+    // For delete we shrink by 1 and pad the trailing slot with a NOP/Stop.
+    //
+    // The bytes are written directly into tfmxFileData so the existing
+    // reloadModule() path picks them up; the in-memory commands[] array is
+    // rebuilt from the patched bytes to keep fileOffsets correct.
+    insertTFMXMacroStep: (macroIdx, stepIdx) => {
+      let ok = false;
+      set((state) => {
+        ok = restructureTFMXMacro(state, macroIdx, stepIdx, 'insert');
+      });
+      return ok;
+    },
+    deleteTFMXMacroStep: (macroIdx, stepIdx) => {
+      let ok = false;
+      set((state) => {
+        ok = restructureTFMXMacro(state, macroIdx, stepIdx, 'delete');
+      });
+      return ok;
+    },
+    duplicateTFMXMacroStep: (macroIdx, stepIdx) => {
+      let ok = false;
+      set((state) => {
+        ok = restructureTFMXMacro(state, macroIdx, stepIdx, 'duplicate');
+      });
+      return ok;
+    },
 
     reset: () => set((state) => {
       state.editorMode = 'classic';

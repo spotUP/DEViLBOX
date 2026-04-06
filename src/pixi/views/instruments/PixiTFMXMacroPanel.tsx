@@ -115,8 +115,22 @@ export const PixiTFMXMacroPanel: React.FC<Props> = ({ instrument }) => {
   const theme = usePixiTheme();
   const native = useFormatStore(s => s.tfmxNative);
   const setMacroCommand = useFormatStore(s => s.setTFMXMacroCommand);
+  const insertStep = useFormatStore(s => s.insertTFMXMacroStep);
+  const deleteStep = useFormatStore(s => s.deleteTFMXMacroStep);
+  const duplicateStep = useFormatStore(s => s.duplicateTFMXMacroStep);
   const tfmxFileData = useFormatStore(s => s.tfmxFileData);
   const tfmxSmplData = useFormatStore(s => s.tfmxSmplData);
+  const [autoReload, setAutoReload] = useState(false);
+
+  // Auto-reload (debounced) — same logic as the DOM editor
+  useEffect(() => {
+    if (!autoReload) return;
+    if (!tfmxFileData || !TFMXEngine.hasInstance()) return;
+    const handle = window.setTimeout(() => {
+      TFMXEngine.getInstance().reloadModule(tfmxFileData, tfmxSmplData);
+    }, 200);
+    return () => window.clearTimeout(handle);
+  }, [autoReload, tfmxFileData, tfmxSmplData, native?.macros]);
 
   const initialMacroIndex = (instrument.metadata as { tfmxMacroIndex?: number } | undefined)?.tfmxMacroIndex;
 
@@ -237,6 +251,11 @@ export const PixiTFMXMacroPanel: React.FC<Props> = ({ instrument }) => {
         <PixiLabel text="TFMX MACRO" size="sm" weight="bold" color="custom" customColor={theme.accent.color} />
         <PixiLabel text={`${macros.length} macros`} size="xs" color="textMuted" />
         <layoutContainer layout={{ flex: 1 }} />
+        <PixiButton
+          label={autoReload ? 'auto-reload ✓' : 'auto-reload'}
+          variant={autoReload ? 'primary' : 'ghost'}
+          onClick={() => setAutoReload(!autoReload)}
+        />
         <PixiButton label="Reload Audio" variant="ghost" onClick={reloadAudio} />
       </layoutContainer>
 
@@ -268,7 +287,17 @@ export const PixiTFMXMacroPanel: React.FC<Props> = ({ instrument }) => {
           padding: 4, borderWidth: 1, borderColor: theme.border.color, borderRadius: 4,
           backgroundColor: theme.bgSecondary.color,
         }}>
-          <PixiLabel text={`STEPS @ ${hex8(macro?.fileOffset ?? 0)}`} size="xs" weight="bold" color="textMuted" />
+          <layoutContainer layout={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+            <PixiLabel text={`STEPS @ ${hex8(macro?.fileOffset ?? 0)}`} size="xs" weight="bold" color="textMuted" />
+            <layoutContainer layout={{ flex: 1 }} />
+            <PixiButton label="+" variant="ghost" onClick={() => insertStep(selectedMacroIdx, selectedStepIdx)} />
+            <PixiButton label="×2" variant="ghost" onClick={() => duplicateStep(selectedMacroIdx, selectedStepIdx)} />
+            <PixiButton label="−" variant="ghost" onClick={() => {
+              if (deleteStep(selectedMacroIdx, selectedStepIdx)) {
+                setSelectedStepIdx(Math.max(0, selectedStepIdx - 1));
+              }
+            }} />
+          </layoutContainer>
           <PixiList
             items={stepItems}
             width={250}

@@ -7,13 +7,37 @@
  * matching the command's parameter layout (TFMXMacroParamLayout).
  *
  * Layout:
- *   ┌───────────────────────────────────────────────────────┐
- *   │  Macro selector (sidebar)  │  Command list + editor   │
- *   └───────────────────────────────────────────────────────┘
+ *   ┌──────────┬──────────┬──────────────────┬─────────────┐
+ *   │ Macros   │ Steps    │ Detail editor    │ Samples     │
+ *   │ (list)   │ (list)   │ (opcode + params)│ (toggleable)│
+ *   └──────────┴──────────┴──────────────────┴─────────────┘
  *
- * Edits write through the store (setTFMXMacroByte / setTFMXMacroCommand) which
- * patches both the in-memory native data AND the tfmxFileData ArrayBuffer for
- * export. To take effect during playback the file must be reloaded.
+ * Features:
+ *   • All 42 Huelsbeck command opcodes (0x00-0x29) selectable per step
+ *   • Named parameter fields per layout (addr24, env, vibrato, note_detune, …)
+ *   • Raw byte editing fallback for any non-standard cases
+ *   • Insert / delete / duplicate steps within macro capacity
+ *   • Macro usage labels (bass / mid / lead / fx, derived from pattern scan)
+ *   • Sample browser pane (SetBegin/SetLen pair scanning across all macros)
+ *   • Reload Audio button + auto-reload toggle for live preview
+ *
+ * Edits write through the store (setTFMXMacroByte / setTFMXMacroCommand /
+ * insertTFMXMacroStep etc.) which patches BOTH the in-memory native data AND
+ * the tfmxFileData ArrayBuffer for export. The Reload Audio button pushes the
+ * patched buffer to the running TFMX WASM via TFMXEngine.reloadModule().
+ *
+ * ─── Deferred (not yet implemented) ──────────────────────────────────────────
+ *
+ * 1. Per-macro preview button — needs a new WASM C export to play an arbitrary
+ *    macro on a free voice without loading a separate Hippel-format instrument
+ *    blob. The existing _tfmx_load_instrument path expects a different binary
+ *    layout. Tracked as a TODO until the C side grows
+ *    `tfmx_module_preview_macro(ctx, macroIdx, note, velocity)`.
+ *
+ * 2. Hippel TFMX-7V edit-write-back — the legacy TFMXControls component shows
+ *    VolModSeq/SndModSeq macros from the 7V format but doesn't write back.
+ *    Adding edit support requires per-command encoders and a separate parser
+ *    flow for the .tfx file format. Out of scope for the mdat editor here.
  */
 
 import React, { useMemo, useState, useCallback } from 'react';
@@ -210,6 +234,15 @@ function buildParamFields(cmd: TFMXMacroCommand, layout: TFMXMacroParamLayout): 
   return [];
 }
 
+// ── Style helpers ────────────────────────────────────────────────────────────
+
+const macroBtn: React.CSSProperties = {
+  fontSize: '10px', padding: '1px 6px', cursor: 'pointer',
+  background: 'var(--color-bg)', color: '#88c0c0',
+  border: '1px solid #88c0c0', borderRadius: '2px',
+  fontFamily: 'inherit', minWidth: '16px',
+};
+
 // ── Component ────────────────────────────────────────────────────────────────
 
 interface Props {
@@ -222,6 +255,9 @@ interface Props {
 export const TFMXMacroEditor: React.FC<Props> = ({ height = 360, initialMacroIndex }) => {
   const native = useFormatStore(s => s.tfmxNative);
   const setMacroCommand = useFormatStore(s => s.setTFMXMacroCommand);
+  const insertStep = useFormatStore(s => s.insertTFMXMacroStep);
+  const deleteStep = useFormatStore(s => s.deleteTFMXMacroStep);
+  const duplicateStep = useFormatStore(s => s.duplicateTFMXMacroStep);
   const tfmxFileData = useFormatStore(s => s.tfmxFileData);
   const tfmxSmplData = useFormatStore(s => s.tfmxSmplData);
 
@@ -242,6 +278,20 @@ export const TFMXMacroEditor: React.FC<Props> = ({ height = 360, initialMacroInd
   const [selectedMacroIdx, setSelectedMacroIdx] = useState(() => resolveArrayIdx(initialMacroIndex));
   const [selectedStepIdx, setSelectedStepIdx] = useState(0);
   const [showRaw, setShowRaw] = useState(false);
+  const [autoReload, setAutoReload] = useState(false);
+
+  // When auto-reload is on, debounce-push the patched buffer to the running WASM.
+  // 200ms gives the user a moment to keep typing without thrashing the worklet.
+  React.useEffect(() => {
+    if (!autoReload) return;
+    if (!tfmxFileData || !TFMXEngine.hasInstance()) return;
+    const handle = window.setTimeout(() => {
+      TFMXEngine.getInstance().reloadModule(tfmxFileData, tfmxSmplData);
+    }, 200);
+    return () => window.clearTimeout(handle);
+    // tfmxFileData identity changes only when the file is replaced — to detect
+    // edits we also depend on the macros array content. Read it once for that.
+  }, [autoReload, tfmxFileData, tfmxSmplData, native?.macros]);
 
   // Sync selection when the host (e.g. instrument modal) changes which instrument is open
   React.useEffect(() => {
@@ -255,6 +305,82 @@ export const TFMXMacroEditor: React.FC<Props> = ({ height = 360, initialMacroInd
   const macro = macros[selectedMacroIdx];
   const cmd = macro?.commands[selectedStepIdx];
   const cmdDef = cmd ? findCmdDef(cmd.opcode) : undefined;
+
+  // Build a macroIndex → usage info map by scanning all pattern commands.
+  // TFMX pattern commands carry an embedded macro reference for note/noteWait/
+  // portamento. Counting references gives a quick "how often used" hint and
+  // collecting the highest pattern lets us label what each macro is for.
+  const macroUsage = useMemo(() => {
+    const map = new Map<number, { count: number; patterns: Set<number>; notes: Set<number> }>();
+    if (!native) return map;
+    for (let p = 0; p < native.patterns.length; p++) {
+      for (const c of native.patterns[p]) {
+        if (c.macro === undefined) continue;
+        let entry = map.get(c.macro);
+        if (!entry) {
+          entry = { count: 0, patterns: new Set(), notes: new Set() };
+          map.set(c.macro, entry);
+        }
+        entry.count++;
+        entry.patterns.add(p);
+        if (c.note !== undefined) entry.notes.add(c.note);
+      }
+    }
+    return map;
+  }, [native]);
+
+  // Sample reference table — every TFMX macro can call SetBegin (0x02) to set
+  // the sample chip-RAM start address and SetLen (0x03) to set the length in
+  // words. Walking each macro pairs the most recent SetBegin with the next
+  // SetLen, giving a list of unique (addr, lenWords) sample references and
+  // which macros use them. There is no central sample directory in the mdat
+  // format — this scan IS the sample browser.
+  const sampleRefs = useMemo(() => {
+    const seen = new Map<string, { addr: number; lenWords: number; macros: Set<number> }>();
+    if (!native) return [] as Array<{ addr: number; lenWords: number; macros: number[] }>;
+    for (const m of native.macros) {
+      let pendingAddr: number | null = null;
+      for (const c of m.commands) {
+        if (c.opcode === 0x02) {
+          // SetBegin: bb:cd:ee = 24-bit chip RAM address
+          pendingAddr = ((c.byte1 << 16) | (c.byte2 << 8) | c.byte3) >>> 0;
+        } else if (c.opcode === 0x03 && pendingAddr !== null) {
+          // SetLen: cd:ee = 16-bit length in words
+          const lenWords = (c.byte2 << 8) | c.byte3;
+          const key = `${pendingAddr.toString(16)}:${lenWords}`;
+          let entry = seen.get(key);
+          if (!entry) {
+            entry = { addr: pendingAddr, lenWords, macros: new Set() };
+            seen.set(key, entry);
+          }
+          entry.macros.add(m.index);
+          pendingAddr = null;
+        }
+      }
+    }
+    return Array.from(seen.values())
+      .map(e => ({ addr: e.addr, lenWords: e.lenWords, macros: Array.from(e.macros).sort((a, b) => a - b) }))
+      .sort((a, b) => a.addr - b.addr);
+  }, [native]);
+
+  const [showSamplePane, setShowSamplePane] = useState(false);
+
+  // Heuristic label from note range — bass / mid / lead / fx, plus a unique
+  // indicator if the macro is referenced in only one pattern.
+  const labelForMacro = useCallback((macroTableIndex: number): string => {
+    const usage = macroUsage.get(macroTableIndex);
+    if (!usage || usage.count === 0) return '';
+    const noteValues = Array.from(usage.notes);
+    const minNote = Math.min(...noteValues);
+    const maxNote = Math.max(...noteValues);
+    // TFMX notes are 0..63 mapping ~3 octaves; treat <16 as bass, >40 as lead
+    let category: string;
+    if (maxNote < 16) category = 'bass';
+    else if (minNote > 40) category = 'lead';
+    else if (usage.notes.size <= 2) category = 'fx';
+    else category = 'mid';
+    return `${category}·×${usage.count}`;
+  }, [macroUsage]);
 
   const paramFields = useMemo<ParamField[]>(() => {
     if (!cmd || !cmdDef) return [];
@@ -327,23 +453,42 @@ export const TFMXMacroEditor: React.FC<Props> = ({ height = 360, initialMacroInd
           padding: '4px 8px', fontWeight: 'bold', color: '#e0a050',
           borderBottom: '1px solid var(--color-border)', position: 'sticky', top: 0,
           backgroundColor: 'var(--color-bg-tertiary)',
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
         }}>
-          MACROS ({macros.length})
-        </div>
-        {macros.map((m, i) => (
-          <div
-            key={m.index}
-            onClick={() => { setSelectedMacroIdx(i); setSelectedStepIdx(0); }}
+          <span>MACROS ({macros.length})</span>
+          <button
+            onClick={() => setShowSamplePane(!showSamplePane)}
+            title={`${showSamplePane ? 'Hide' : 'Show'} sample browser`}
             style={{
-              padding: '3px 8px', cursor: 'pointer',
-              backgroundColor: i === selectedMacroIdx ? 'rgba(224,160,80,0.2)' : 'transparent',
-              color: i === selectedMacroIdx ? '#e0a050' : 'var(--color-text-secondary)',
-              borderLeft: i === selectedMacroIdx ? '2px solid #e0a050' : '2px solid transparent',
+              fontSize: '9px', padding: '1px 4px', cursor: 'pointer',
+              background: showSamplePane ? 'rgba(136,192,192,0.2)' : 'var(--color-bg)',
+              color: '#88c0c0', border: '1px solid #88c0c0', borderRadius: '2px',
             }}
-          >
-            {hex2(m.index)} : {m.length}st
-          </div>
-        ))}
+          >SMP</button>
+        </div>
+        {macros.map((m, i) => {
+          const usageLabel = labelForMacro(m.index);
+          return (
+            <div
+              key={m.index}
+              onClick={() => { setSelectedMacroIdx(i); setSelectedStepIdx(0); }}
+              style={{
+                padding: '3px 8px', cursor: 'pointer',
+                backgroundColor: i === selectedMacroIdx ? 'rgba(224,160,80,0.2)' : 'transparent',
+                color: i === selectedMacroIdx ? '#e0a050' : 'var(--color-text-secondary)',
+                borderLeft: i === selectedMacroIdx ? '2px solid #e0a050' : '2px solid transparent',
+              }}
+              title={usageLabel ? `Used ${usageLabel.split('·')[1]}` : 'Unused in any pattern'}
+            >
+              <div>{hex2(m.index)} : {m.length}st</div>
+              {usageLabel && (
+                <div style={{ fontSize: '9px', color: '#88c0c0', marginTop: '1px' }}>
+                  {usageLabel}
+                </div>
+              )}
+            </div>
+          );
+        })}
       </div>
 
       {/* Command list */}
@@ -355,9 +500,36 @@ export const TFMXMacroEditor: React.FC<Props> = ({ height = 360, initialMacroInd
           padding: '4px 8px', fontWeight: 'bold', color: '#88c0c0',
           borderBottom: '1px solid var(--color-border)', position: 'sticky', top: 0,
           backgroundColor: 'var(--color-bg-secondary)',
-          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '4px',
         }}>
           <span>STEPS</span>
+          <div style={{ display: 'flex', gap: '2px' }}>
+            <button
+              onClick={() => {
+                const ok = insertStep(selectedMacroIdx, selectedStepIdx);
+                if (!ok) console.warn('[TFMX] insert refused — macro is full');
+              }}
+              title="Insert NOP at selected step"
+              style={macroBtn}
+            >+</button>
+            <button
+              onClick={() => {
+                const ok = duplicateStep(selectedMacroIdx, selectedStepIdx);
+                if (!ok) console.warn('[TFMX] duplicate refused — macro is full');
+              }}
+              title="Duplicate selected step"
+              style={macroBtn}
+            >×2</button>
+            <button
+              onClick={() => {
+                const ok = deleteStep(selectedMacroIdx, selectedStepIdx);
+                if (!ok) console.warn('[TFMX] delete refused — last step');
+                else setSelectedStepIdx(Math.max(0, selectedStepIdx - 1));
+              }}
+              title="Delete selected step"
+              style={macroBtn}
+            >−</button>
+          </div>
           <span style={{ color: 'var(--color-text-muted)', fontWeight: 'normal' }}>
             @{hex8(macro?.fileOffset ?? 0)}
           </span>
@@ -410,18 +582,36 @@ export const TFMXMacroEditor: React.FC<Props> = ({ height = 360, initialMacroInd
                   {cmdDef.description}
                 </div>
               </div>
-              <button
-                onClick={reloadAudio}
-                title="Reload the running TFMX WASM with edited mdat — applies all macro edits to live playback"
-                style={{
-                  fontSize: '10px', padding: '4px 8px', cursor: 'pointer',
-                  background: 'rgba(224,160,80,0.15)', color: '#e0a050',
-                  border: '1px solid #e0a050', borderRadius: '3px',
-                  fontFamily: 'inherit', whiteSpace: 'nowrap',
-                }}
-              >
-                ⟳ Reload Audio
-              </button>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', alignItems: 'flex-end' }}>
+                <button
+                  onClick={reloadAudio}
+                  title="Reload the running TFMX WASM with edited mdat — applies all macro edits to live playback"
+                  style={{
+                    fontSize: '10px', padding: '4px 8px', cursor: 'pointer',
+                    background: 'rgba(224,160,80,0.15)', color: '#e0a050',
+                    border: '1px solid #e0a050', borderRadius: '3px',
+                    fontFamily: 'inherit', whiteSpace: 'nowrap',
+                  }}
+                >
+                  ⟳ Reload Audio
+                </button>
+                <label
+                  style={{
+                    fontSize: '9px', color: 'var(--color-text-muted)',
+                    display: 'flex', alignItems: 'center', gap: '4px', cursor: 'pointer',
+                    userSelect: 'none',
+                  }}
+                  title="Push every edit to the running WASM after a 200ms debounce"
+                >
+                  <input
+                    type="checkbox"
+                    checked={autoReload}
+                    onChange={(e) => setAutoReload(e.target.checked)}
+                    style={{ margin: 0 }}
+                  />
+                  auto-reload
+                </label>
+              </div>
             </div>
 
             {/* Opcode selector */}
@@ -540,6 +730,49 @@ export const TFMXMacroEditor: React.FC<Props> = ({ height = 360, initialMacroInd
           </>
         )}
       </div>
+
+      {/* Sample browser pane (4th column, toggle via SMP button) */}
+      {showSamplePane && (
+        <div style={{
+          width: '220px', borderLeft: '1px solid var(--color-border)',
+          overflowY: 'auto', backgroundColor: 'var(--color-bg-tertiary)',
+          flexShrink: 0,
+        }}>
+          <div style={{
+            padding: '4px 8px', fontWeight: 'bold', color: '#88c0c0',
+            borderBottom: '1px solid var(--color-border)', position: 'sticky', top: 0,
+            backgroundColor: 'var(--color-bg-tertiary)',
+          }}>
+            SAMPLES ({sampleRefs.length})
+          </div>
+          {sampleRefs.length === 0 && (
+            <div style={{ padding: '8px', fontSize: '10px', color: 'var(--color-text-muted)', fontStyle: 'italic' }}>
+              No SetBegin/SetLen pairs found in any macro.
+            </div>
+          )}
+          {sampleRefs.map((s, i) => (
+            <div
+              key={i}
+              style={{
+                padding: '4px 8px', borderBottom: '1px solid var(--color-border)',
+                fontSize: '10px',
+              }}
+              title={`Used by macros: ${s.macros.map(m => hex2(m)).join(', ')}`}
+            >
+              <div style={{ color: '#e0e0e0', fontFamily: 'inherit' }}>
+                ${hex8(s.addr)}
+              </div>
+              <div style={{ color: 'var(--color-text-muted)', marginTop: '1px' }}>
+                {s.lenWords * 2} bytes ({s.lenWords}w)
+              </div>
+              <div style={{ color: '#88c0c0', marginTop: '2px', fontSize: '9px' }}>
+                {s.macros.length} macro{s.macros.length === 1 ? '' : 's'}: {s.macros.slice(0, 6).map(m => hex2(m)).join(' ')}
+                {s.macros.length > 6 && '…'}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 };
