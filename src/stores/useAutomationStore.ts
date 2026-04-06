@@ -156,6 +156,48 @@ function rebuildAutomationIndex(state: { automation: AutomationData; curves: Aut
   });
 }
 
+/**
+ * Sync a curve to its pattern cells (live bake).
+ * Looks up the pattern in the tracker store, runs syncCurveToCells, and
+ * notifies the tracker store that the pattern changed.
+ *
+ * Lazy import to avoid circular dependency at module load time.
+ */
+function syncCurveToTracker(curveId: string): void {
+  // Use dynamic import to avoid circular dependency
+  void (async () => {
+    try {
+      const [
+        { syncCurveToCells, forgetCurveBake },
+        { useTrackerStore },
+        { getActiveFormatLimits },
+      ] = await Promise.all([
+        import('@/lib/automation/syncCurveToCells'),
+        import('@stores/useTrackerStore'),
+        import('@/lib/formatCompatibility'),
+      ]);
+
+      const curve = useAutomationStore.getState().curves.find(c => c.id === curveId);
+      if (!curve) {
+        forgetCurveBake(curveId);
+        return;
+      }
+
+      const limits = getActiveFormatLimits();
+      if (!limits) return; // No native format active — nothing to bake into
+
+      // Mutate the pattern via immer producer so subscribers get notified
+      useTrackerStore.setState((state) => {
+        const pattern = state.patterns.find((p) => p.id === curve.patternId);
+        if (!pattern) return;
+        syncCurveToCells(curve, pattern, limits);
+      });
+    } catch (e) {
+      console.error('[automation] syncCurveToTracker failed:', e);
+    }
+  })();
+}
+
 export const useAutomationStore = create<AutomationStore>()(
   immer((set, get) => ({
     // Initial state
@@ -200,7 +242,7 @@ export const useAutomationStore = create<AutomationStore>()(
       return newCurve.id;
     },
 
-    removeCurve: (curveId) =>
+    removeCurve: (curveId) => {
       set((state) => {
         const index = state.curves.findIndex((c) => c.id === curveId);
         if (index !== -1) {
@@ -210,16 +252,21 @@ export const useAutomationStore = create<AutomationStore>()(
           }
           rebuildAutomationIndex(state);
         }
-      }),
+      });
+      // Sync (curve no longer exists, will clear cells and forget)
+      syncCurveToTracker(curveId);
+    },
 
-    updateCurve: (curveId, updates) =>
+    updateCurve: (curveId, updates) => {
       set((state) => {
         const curve = state.curves.find((c) => c.id === curveId);
         if (curve) {
           Object.assign(curve, updates);
           rebuildAutomationIndex(state);
         }
-      }),
+      });
+      syncCurveToTracker(curveId);
+    },
 
     setSelectedCurve: (curveId) =>
       set((state) => {
@@ -232,7 +279,7 @@ export const useAutomationStore = create<AutomationStore>()(
       }),
 
     // Point manipulation
-    addPoint: (curveId, row, value) =>
+    addPoint: (curveId, row, value) => {
       set((state) => {
         const curve = state.curves.find((c) => c.id === curveId);
         if (curve) {
@@ -248,9 +295,11 @@ export const useAutomationStore = create<AutomationStore>()(
           }
           rebuildAutomationIndex(state);
         }
-      }),
+      });
+      syncCurveToTracker(curveId);
+    },
 
-    removePoint: (curveId, row) =>
+    removePoint: (curveId, row) => {
       set((state) => {
         const curve = state.curves.find((c) => c.id === curveId);
         if (curve) {
@@ -260,9 +309,11 @@ export const useAutomationStore = create<AutomationStore>()(
             rebuildAutomationIndex(state);
           }
         }
-      }),
+      });
+      syncCurveToTracker(curveId);
+    },
 
-    updatePoint: (curveId, row, value) =>
+    updatePoint: (curveId, row, value) => {
       set((state) => {
         const curve = state.curves.find((c) => c.id === curveId);
         if (curve) {
@@ -272,26 +323,32 @@ export const useAutomationStore = create<AutomationStore>()(
             rebuildAutomationIndex(state);
           }
         }
-      }),
+      });
+      syncCurveToTracker(curveId);
+    },
 
-    clearPoints: (curveId) =>
+    clearPoints: (curveId) => {
       set((state) => {
         const curve = state.curves.find((c) => c.id === curveId);
         if (curve) {
           curve.points = [];
           rebuildAutomationIndex(state);
         }
-      }),
+      });
+      syncCurveToTracker(curveId);
+    },
 
     // Preset application
-    applyPreset: (curveId, preset) =>
+    applyPreset: (curveId, preset) => {
       set((state) => {
         const curve = state.curves.find((c) => c.id === curveId);
         if (curve) {
           curve.points = [...preset.points];
           rebuildAutomationIndex(state);
         }
-      }),
+      });
+      syncCurveToTracker(curveId);
+    },
 
     // Utility
     getCurvesForPattern: (patternId, channelIndex) => {
@@ -334,7 +391,7 @@ export const useAutomationStore = create<AutomationStore>()(
       };
     },
 
-    setAutomation: (patternId, channelIndex, parameter, curve) =>
+    setAutomation: (patternId, channelIndex, parameter, curve) => {
       set((state) => {
         // Find existing curve
         const existingIndex = state.curves.findIndex(
@@ -353,7 +410,9 @@ export const useAutomationStore = create<AutomationStore>()(
         }
 
         rebuildAutomationIndex(state);
-      }),
+      });
+      syncCurveToTracker(curve.id);
+    },
 
     buildAutomationData: () => {
       const state = get();
@@ -373,12 +432,17 @@ export const useAutomationStore = create<AutomationStore>()(
     },
 
     // Import/Export
-    loadCurves: (newCurves) =>
+    loadCurves: (newCurves) => {
+      // Forget all prior bake records — new song, fresh state
+      void import('@/lib/automation/syncCurveToCells').then(({ forgetAllCurveBakes }) => {
+        forgetAllCurveBakes();
+      });
       set((state) => {
         state.curves = newCurves;
         state.selectedCurveId = null;
         rebuildAutomationIndex(state);
-      }),
+      });
+    },
 
     getCurves: () => get().curves,
 
