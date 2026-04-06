@@ -208,6 +208,18 @@ export class C64SIDEngine {
   }
 
   /**
+   * Set per-voice mute mask (SID has 3 voices per chip, bit N=1 means voice N active).
+   * Delegates to the active DeepSID engine's setVoiceMask().
+   */
+  setMuteMask(mask: number): void {
+    if (!this.engine) return;
+    for (let v = 0; v < 3; v++) {
+      const muted = (mask & (1 << v)) === 0;
+      this.engine.setVoiceMask(v, muted);
+    }
+  }
+
+  /**
    * Stop playback
    */
   stop(): void {
