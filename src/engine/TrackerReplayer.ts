@@ -2179,11 +2179,11 @@ export class TrackerReplayer {
             if (this.onRowChange) {
               this.onRowChange(row, patternNum, order);
             }
-            // Fire ToneEngine notes for replaced instruments (hybrid playback)
-            this.fireHybridNotesForRow(time);
+            // Hybrid notes fired via onChannelState below (not here — avoid double-trigger)
           };
 
-          // Subscribe to per-channel state for hybrid synth note firing with processed pitch/volume
+          // Subscribe to per-channel state for hybrid synth note firing.
+          // Uses libopenmpt's pattern data at the current position for note/instrument/volume.
           mptEngine.onChannelState = (channelState, stateTime) => {
             if (!this.playing || !this.song || this._replacedInstruments.size === 0) return;
             this.fireHybridNotesFromChannelState(channelState, stateTime);
