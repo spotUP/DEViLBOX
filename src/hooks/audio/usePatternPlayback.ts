@@ -28,7 +28,7 @@ export const usePatternPlayback = () => {
     currentPositionIndex: s.currentPositionIndex,
     setCurrentPosition: s.setCurrentPosition,
     })));
-  const { channelTrackTables, channelSpeeds, channelGrooves, hivelyNative, hivelyFileData, hivelyMeta, musiclineFileData, c64SidFileData, jamCrackerFileData, futurePlayerFileData, preTrackerFileData, maFileData, hippelFileData, sonixFileData, pxtoneFileData, organyaFileData, eupFileData, ixsFileData, psycleFileData, sc68FileData, zxtuneFileData, pumaTrackerFileData, steveTurnerFileData, sidmon1WasmFileData, fredEditorWasmFileData, artOfNoiseFileData, bdFileData, sd2FileData, symphonieFileData, uadeEditableFileData, libopenmptFileData, furnaceNative, furnaceActiveSubsong, tfmxTimingTable } = useFormatStore(useShallow((s) => ({
+  const { channelTrackTables, channelSpeeds, channelGrooves, hivelyNative, hivelyFileData, hivelyMeta, musiclineFileData, c64SidFileData, jamCrackerFileData, futurePlayerFileData, preTrackerFileData, maFileData, hippelFileData, sonixFileData, pxtoneFileData, organyaFileData, eupFileData, ixsFileData, psycleFileData, sc68FileData, zxtuneFileData, pumaTrackerFileData, steveTurnerFileData, sidmon1WasmFileData, fredEditorWasmFileData, artOfNoiseFileData, bdFileData, sd2FileData, symphonieFileData, uadeEditableFileData, libopenmptFileData, tfmxFileData, tfmxSmplData, furnaceNative, furnaceActiveSubsong, tfmxTimingTable } = useFormatStore(useShallow((s) => ({
     channelTrackTables: s.channelTrackTables,
     channelSpeeds: s.channelSpeeds,
     channelGrooves: s.channelGrooves,
@@ -59,6 +59,8 @@ export const usePatternPlayback = () => {
     sd2FileData: s.sd2FileData,
     symphonieFileData: s.symphonieFileData,
     uadeEditableFileData: s.uadeEditableFileData,
+    tfmxFileData: s.tfmxFileData,
+    tfmxSmplData: s.tfmxSmplData,
     libopenmptFileData: s.libopenmptFileData,
     furnaceNative: s.furnaceNative,
     furnaceActiveSubsong: s.furnaceActiveSubsong,
@@ -535,6 +537,8 @@ export const usePatternPlayback = () => {
           sd2FileData: sd2FileData ?? undefined,
           symphonieFileData: symphonieFileData ?? undefined,
           uadeEditableFileData: uadeEditableFileData ?? undefined,
+          tfmxFileData: tfmxFileData ?? undefined,
+          tfmxSmplData: tfmxSmplData ?? undefined,
           libopenmptFileData: libopenmptFileData ?? undefined,
           // Furnace-specific timing data (only set for .fur imports)
           speed2: furnaceData?.speed2,
