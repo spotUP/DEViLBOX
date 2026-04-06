@@ -190,15 +190,17 @@ class MPT extends AudioWorkletProcessor {
 				libopenmpt._openmpt_module_set_position_order_row(this.modulePtr, v.o, v.r)
 				break
 			case 'hotReload':
-				// Reload module data while preserving playback position
-				if (!this.modulePtr) { this.play(v, false); break }
+				// Reload module data while preserving playback position.
+				// If no module is loaded yet, load PAUSED so we don't accidentally
+				// start playback (which would emit position=0 and steal the cursor).
+				if (!this.modulePtr) { this.play(v, true); break }
 				{
 					const stack = libopenmpt.stackSave ? libopenmpt.stackSave() : 0
 					// Save current position
 					const curOrder = libopenmpt._openmpt_module_get_current_order(this.modulePtr)
 					const curRow = libopenmpt._openmpt_module_get_current_row(this.modulePtr)
 					const wasPaused = this.paused
-					// Reload
+					// Reload (preserve paused/playing state)
 					this.play(v, wasPaused)
 					// Restore position
 					if (this.modulePtr) {

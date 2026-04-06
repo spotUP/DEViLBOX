@@ -113,6 +113,7 @@ export const AutomationParameterPicker: React.FC<AutomationParameterPickerProps>
                   <button
                     key={param.key}
                     onClick={() => {
+                      console.warn('[AUTOMATION-DEBUG] Picker click — channelIndex prop=', channelIndex, 'param=', param.key);
                       if (isActive) {
                         removeActiveParameter(channelIndex, param.key);
                       } else {
