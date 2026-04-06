@@ -1184,17 +1184,15 @@ export const SampleEditor: React.FC<SampleEditorProps> = ({ instrument, onChange
             >
               <Trash2 size={14} />
             </button>
-            <RecordButton instrumentId={instrument.id} onRecorded={(dataUrl, duration) => {
-              const updates: Partial<InstrumentConfig> = {
-                parameters: {
-                  ...instrument.parameters,
-                  sampleUrl: dataUrl,
-                  sampleInfo: { name: 'Recording', duration, size: 0 },
-                  startTime: 0, endTime: 1, loopStart: 0, loopEnd: 1,
-                },
-              };
-              if (instrument.sample) updates.sample = { ...instrument.sample, url: dataUrl };
-              updateInstrument(instrument.id, updates);
+            <RecordButton instrumentId={instrument.id} onRecorded={async (dataUrl, _duration, buffer) => {
+              // Route through handleBufferProcessed so ToneEngine invalidates
+              // its cached Player — otherwise the test keyboard plays the
+              // stale sample while only our local Tone.Player has the new audio.
+              await handleBufferProcessed({ buffer, dataUrl }, 'Recording');
+              // Also update sample.url if the instrument has a sample object
+              if (instrument.sample) {
+                updateInstrument(instrument.id, { sample: { ...instrument.sample, url: dataUrl } });
+              }
               clearSelection();
               showAll();
             }} />
@@ -1536,7 +1534,7 @@ export const SampleEditor: React.FC<SampleEditorProps> = ({ instrument, onChange
  */
 const RecordButton: React.FC<{
   instrumentId: number;
-  onRecorded: (dataUrl: string, duration: number) => void;
+  onRecorded: (dataUrl: string, duration: number, buffer: AudioBuffer) => void | Promise<void>;
 }> = ({ onRecorded }) => {
   const [recording, setRecording] = useState(false);
   const [connected, setConnected] = useState(false);
@@ -1675,7 +1673,7 @@ const RecordButton: React.FC<{
     try {
       const { bufferToDataUrl } = await import('@utils/audio/SampleProcessing');
       const dataUrl = await bufferToDataUrl(buffer);
-      onRecorded(dataUrl, buffer.duration);
+      await onRecorded(dataUrl, buffer.duration, buffer);
     } catch (err) {
       setError('Encode failed: ' + (err instanceof Error ? err.message : String(err)));
     }
