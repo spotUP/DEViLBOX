@@ -26,6 +26,7 @@ import {
   Activity, Waves, Clock, Filter, Mic, CircleDot, ChevronDown, Settings, X
 } from 'lucide-react';
 import { WavetableEditor } from './editors/WavetableEditor';
+import { Button } from '@components/ui/Button';
 import { useInstrumentStore, useTrackerStore } from '../../stores';
 import { scan9xxOffsets } from '@/lib/analysis/scan9xxOffsets';
 import type { InstrumentConfig, DeepPartial } from '../../types/instrument';
@@ -1160,30 +1161,31 @@ export const SampleEditor: React.FC<SampleEditorProps> = ({ instrument, onChange
           {/* ─── Main toolbar ────────────────────────────────────── */}
           <div className="flex items-center gap-1 flex-wrap">
             {/* File & playback */}
-            <button
+            <Button
+              variant="primary"
+              size="sm"
+              icon={<Upload size={12} />}
               onClick={() => fileInputRef.current?.click()}
-              className="flex items-center gap-1.5 px-2 py-1.5 bg-accent-primary/20 text-accent-primary rounded hover:bg-accent-primary/30 transition-colors text-xs"
+              title="Replace sample with a file"
             >
-              <Upload size={12} />
               Replace
-            </button>
-            <button
+            </Button>
+            <Button
+              variant={isPlaying ? 'danger' : 'default'}
+              size="sm"
               onClick={handlePlay}
-              className={
-                'p-1.5 rounded transition-colors ' +
-                (isPlaying ? 'bg-accent-error/20 text-accent-error' : 'bg-accent-success/20 text-accent-success')
-              }
               title={isPlaying ? 'Stop (Space)' : 'Play (Space)'}
             >
               {isPlaying ? <Square size={14} /> : <Play size={14} />}
-            </button>
-            <button
+            </Button>
+            <Button
+              variant="danger"
+              size="sm"
               onClick={handleClear}
-              className="p-1.5 bg-accent-error/20 text-accent-error rounded hover:bg-accent-error/30 transition-colors"
               title="Remove sample"
             >
               <Trash2 size={14} />
-            </button>
+            </Button>
             <RecordButton instrumentId={instrument.id} onRecorded={async (dataUrl, _duration, buffer) => {
               // Route through handleBufferProcessed so ToneEngine invalidates
               // its cached Player — otherwise the test keyboard plays the
@@ -1198,14 +1200,15 @@ export const SampleEditor: React.FC<SampleEditorProps> = ({ instrument, onChange
             }} />
 
             {/* Open Waveform Studio (chip-style cycle drawing) */}
-            <button
+            <Button
+              variant="primary"
+              size="sm"
+              icon={<Waves size={12} />}
               onClick={() => setShowWaveformStudio(true)}
-              className="flex items-center gap-1.5 px-2 py-1.5 bg-cyan-600/20 text-cyan-400 rounded hover:bg-cyan-600/30 transition-colors text-xs"
               title="Open Waveform Studio — draw single-cycle chip waveforms (Protracker, AHX, etc.)"
             >
-              <Waves size={12} />
               Studio
-            </button>
+            </Button>
 
             <div className="w-px h-6 bg-dark-border mx-1" />
 
@@ -1697,27 +1700,26 @@ const RecordButton: React.FC<{
     <div className="flex items-center gap-1 relative">
       {/* Record / Stop button */}
       {recording ? (
-        <button
+        <Button
+          variant="danger"
+          size="sm"
+          icon={<CircleDot size={12} />}
           onClick={stopRecording}
-          className="flex items-center gap-1.5 px-2 py-1.5 bg-accent-error/30 text-accent-error rounded hover:bg-accent-error/40 transition-colors text-xs animate-pulse"
           title="Stop recording"
+          className="animate-pulse"
         >
-          <CircleDot size={12} />
           {elapsed.toFixed(1)}s
-        </button>
+        </Button>
       ) : (
-        <button
+        <Button
+          variant={connected ? 'danger' : 'default'}
+          size="sm"
+          icon={<Mic size={12} />}
           onClick={startRecording}
-          className={`flex items-center gap-1.5 px-2 py-1.5 rounded transition-colors text-xs ${
-            connected
-              ? 'bg-accent-error/20 text-accent-error hover:bg-accent-error/30'
-              : 'bg-dark-bgSecondary text-text-muted hover:text-accent-error'
-          }`}
           title="Record from microphone"
         >
-          <Mic size={12} />
           Record
-        </button>
+        </Button>
       )}
 
       {/* Live level meter (always visible) */}
@@ -1732,14 +1734,15 @@ const RecordButton: React.FC<{
       </div>
 
       {/* Input device dropdown */}
-      <button
+      <Button
+        variant="default"
+        size="sm"
         onClick={toggleDeviceMenu}
         title="Select input device"
-        className="flex items-center gap-0.5 px-1.5 py-1.5 rounded text-xs bg-dark-bgSecondary text-text-muted hover:text-text-primary border border-dark-border"
       >
         <Music size={12} />
         <ChevronDown size={10} />
-      </button>
+      </Button>
       {showDeviceMenu && (
         <div className="absolute top-full left-0 mt-1 z-50 bg-dark-bg border border-dark-border rounded shadow-xl min-w-[200px] py-1">
           {devices.length === 0 ? (
@@ -1765,27 +1768,23 @@ const RecordButton: React.FC<{
       )}
 
       {/* Effects toggle + dialog opener */}
-      <div className="flex items-center">
-        <button
-          onClick={() => setWithEffects(!withEffects)}
-          className={`flex items-center gap-1 px-2 py-1.5 rounded-l transition-colors text-xs border-r-0 ${
-            withEffects
-              ? 'bg-violet-600/20 text-violet-400'
-              : 'bg-dark-bgSecondary text-text-muted hover:text-violet-400'
-          }`}
-          title={withEffects ? 'Recording WITH master effects' : 'Recording dry (click to enable effects)'}
-        >
-          <Sparkles size={12} />
-          Effects
-        </button>
-        <button
-          onClick={() => setShowMasterFx(true)}
-          title="Configure master effects chain"
-          className="px-1.5 py-1.5 rounded-r border-l border-dark-border bg-dark-bgSecondary text-text-muted hover:text-violet-400"
-        >
-          <Settings size={11} />
-        </button>
-      </div>
+      <Button
+        variant={withEffects ? 'primary' : 'default'}
+        size="sm"
+        icon={<Sparkles size={12} />}
+        onClick={() => setWithEffects(!withEffects)}
+        title={withEffects ? 'Recording WITH master effects' : 'Recording dry (click to enable effects)'}
+      >
+        Effects
+      </Button>
+      <Button
+        variant="default"
+        size="sm"
+        onClick={() => setShowMasterFx(true)}
+        title="Configure master effects chain"
+      >
+        <Settings size={11} />
+      </Button>
 
       {/* Error toast */}
       {error && (
