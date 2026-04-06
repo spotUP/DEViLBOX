@@ -125,6 +125,7 @@ function makeArpCellChange(
   configRef: React.MutableRefObject<SonicArrangerConfig>,
   tableIdx: 0 | 1 | 2,
   onChange: (updates: Partial<SonicArrangerConfig>) => void,
+  writeByte?: (subTblIdx: number, pos: number, value: number) => void,
 ): OnCellChange {
   return (_channelIdx: number, rowIdx: number, _columnKey: string, value: number) => {
     const signed = value > 127 ? value - 256 : value;
@@ -135,6 +136,7 @@ function makeArpCellChange(
       return { ...a, values: vals };
     }) as SonicArrangerConfig['arpeggios'];
     onChange({ ...configRef.current, arpeggios: arps });
+    writeByte?.(tableIdx, rowIdx, value & 0xFF);
   };
 }
 
@@ -144,12 +146,14 @@ function makeTableCellChange(
   tableKey: 'adsrTable' | 'amfTable',
   signed: boolean,
   onChange: (updates: Partial<SonicArrangerConfig>) => void,
+  writeByte?: (rowIdx: number, value: number) => void,
 ): OnCellChange {
   return (_channelIdx: number, rowIdx: number, _columnKey: string, value: number) => {
     const realValue = signed ? (value > 127 ? value - 256 : value) : value;
     const table = [...configRef.current[tableKey]];
     table[rowIdx] = realValue;
     onChange({ ...configRef.current, [tableKey]: table });
+    writeByte?.(rowIdx, value & 0xFF);
   };
 }
 
@@ -239,6 +243,42 @@ export const SonicArrangerControls: React.FC<SonicArrangerControlsProps> = ({
     }
   }, [onChange, uadeChipRam, getEditor]);
 
+  // ── Chip RAM byte writers for ADSR/AMF/arpeggio tables ───────────────────
+  // ADSR tables live in the SYAR section (128 unsigned bytes each).
+  // AMF tables live in the SYAF section (128 signed int8 — masked to & 0xFF on write).
+  // Arpeggios live INSIDE the 152-byte instrument struct at offset +74:
+  //   3 × { u8 length, u8 repeat, i8[14] values } = 16 bytes each = 48 bytes total.
+  const setAdsrByte = useCallback((tableIdx: number, pos: number, value: number) => {
+    if (!uadeChipRam || !UADEEngine.hasInstance()) return;
+    const syarBase = uadeChipRam.sections.syarBase;
+    if (syarBase === undefined) return;
+    const addr = syarBase + tableIdx * 128 + pos;
+    void getEditor().writeU8(addr, value & 0xFF).catch((err) => console.warn('SA ADSR chip RAM write failed:', err));
+  }, [uadeChipRam, getEditor]);
+
+  const setAmfByte = useCallback((tableIdx: number, pos: number, value: number) => {
+    if (!uadeChipRam || !UADEEngine.hasInstance()) return;
+    const syafBase = uadeChipRam.sections.syafBase;
+    if (syafBase === undefined) return;
+    const addr = syafBase + tableIdx * 128 + pos;
+    void getEditor().writeU8(addr, value & 0xFF).catch((err) => console.warn('SA AMF chip RAM write failed:', err));
+  }, [uadeChipRam, getEditor]);
+
+  const setArpByte = useCallback((subTblIdx: number, pos: number, value: number) => {
+    if (!uadeChipRam || !UADEEngine.hasInstance()) return;
+    // pos: 0..13 → values[pos] at instrBase + 74 + subTblIdx*16 + 2 + pos
+    const addr = uadeChipRam.instrBase + 74 + subTblIdx * 16 + 2 + pos;
+    void getEditor().writeU8(addr, value & 0xFF).catch((err) => console.warn('SA arp chip RAM write failed:', err));
+  }, [uadeChipRam, getEditor]);
+
+  const setArpHeader = useCallback((subTblIdx: number, field: 'length' | 'repeat', value: number) => {
+    if (!uadeChipRam || !UADEEngine.hasInstance()) return;
+    // length at +0, repeat at +1 within each 16-byte sub-table
+    const offset = field === 'length' ? 0 : 1;
+    const addr = uadeChipRam.instrBase + 74 + subTblIdx * 16 + offset;
+    void getEditor().writeU8(addr, value & 0xFF).catch((err) => console.warn('SA arp header chip RAM write failed:', err));
+  }, [uadeChipRam, getEditor]);
+
   // ── Memoized format channels + cell-change handlers ────────────────────────
 
   const adsrChannel = useMemo(
@@ -246,16 +286,18 @@ export const SonicArrangerControls: React.FC<SonicArrangerControlsProps> = ({
     [config.adsrTable],
   );
   const adsrCellChange = useMemo(
-    () => makeTableCellChange(configRef, 'adsrTable', false, onChange),
-    [onChange],
+    () => makeTableCellChange(configRef, 'adsrTable', false, onChange,
+      (rowIdx, value) => setAdsrByte(configRef.current.adsrNumber, rowIdx, value)),
+    [onChange, setAdsrByte],
   );
   const amfChannel = useMemo(
     () => [tableToFormatChannel(config.amfTable, 'AMF')] as FormatChannel[],
     [config.amfTable],
   );
   const amfCellChange = useMemo(
-    () => makeTableCellChange(configRef, 'amfTable', true, onChange),
-    [onChange],
+    () => makeTableCellChange(configRef, 'amfTable', true, onChange,
+      (rowIdx, value) => setAmfByte(configRef.current.amfNumber, rowIdx, value)),
+    [onChange, setAmfByte],
   );
   const arpChannels = useMemo(() =>
     ([0, 1, 2] as const).map((tIdx) =>
@@ -265,9 +307,9 @@ export const SonicArrangerControls: React.FC<SonicArrangerControlsProps> = ({
   );
   const arpCellChanges = useMemo(() =>
     ([0, 1, 2] as const).map((tIdx) =>
-      makeArpCellChange(configRef, tIdx, onChange)
+      makeArpCellChange(configRef, tIdx, onChange, setArpByte)
     ),
-    [onChange],
+    [onChange, setArpByte],
   );
 
   // ── SYNTHESIS TAB ──────────────────────────────────────────────────────────
@@ -410,8 +452,9 @@ export const SonicArrangerControls: React.FC<SonicArrangerControlsProps> = ({
         i === index ? { ...a, [field]: value } : { ...a },
       ) as SonicArrangerConfig['arpeggios'];
       onChange({ ...configRef.current, arpeggios: arps });
+      setArpHeader(index, field, value);
     },
-    [onChange],
+    [onChange, setArpHeader],
   );
 
   const renderModulation = () => (
