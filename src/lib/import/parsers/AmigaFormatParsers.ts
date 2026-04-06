@@ -314,14 +314,13 @@ export async function tryRouteFormat(
       'SonicArrangerParser', { injectUADE: true });
   }
 
-  // ── Sonic Arranger SAS (.sas — suffix-form compiled binary) ──────────────
-  // .sas files are suffix-form SonicArranger compiled replayers (sas.songname in UADE).
+  // UADE enhanced scan reconstructs patterns from Paula register captures.
   if (matchesExt(filename, ['sas'])) {
-    const sasCtx = { ...ctx, originalFileName: toUADEPrefixName(originalFileName, ['sas']) };
-    const { parseSonicArrangerSasFile } = await import('@lib/import/formats/SimpleAmigaStubParser');
-    return withNativeThenUADE('sonicArrangerSas', sasCtx,
-      (buf: Uint8Array | ArrayBuffer, name: string) => parseSonicArrangerSasFile(buf as ArrayBuffer, name),
-      'SimpleAmigaStubParser', { injectUADE: true });
+    const { parseUADEFile } = await import('@lib/import/formats/UADEParser');
+    const song = await parseUADEFile(buffer, originalFileName, 'enhanced', subsong, preScannedMeta);
+    song.uadeEditableFileData = buffer.slice(0);
+    song.uadeEditableFileName = originalFileName;
+    return song;
   }
 
   // ── InStereo! 2.0 (.is20 — unambiguous) ──────────────────────────────────
@@ -772,14 +771,13 @@ export async function tryRouteFormat(
       'SoundControlParser', { isFormat: isSoundControlFormat, usesBytes: true, injectUADE: true });
   }
 
-  // ── Sound Factory (.psf) ──────────────────────────────────────────────────
-  // Stub parser for title + UADE classic audio. Normalize suffix-form: axelf.psf → psf.axelf
+  // UADE enhanced scan reconstructs patterns from Paula register captures.
   if (matchesExt(filename, ['psf'])) {
-    const psfCtx = { ...ctx, originalFileName: toUADEPrefixName(originalFileName, ['psf']) };
-    const { parseSoundFactoryFile } = await import('@lib/import/formats/SimpleAmigaStubParser');
-    return withNativeThenUADE('soundFactory', psfCtx,
-      (buf: Uint8Array | ArrayBuffer, name: string) => parseSoundFactoryFile(buf as ArrayBuffer, name),
-      'SimpleAmigaStubParser', { injectUADE: true });
+    const { parseUADEFile } = await import('@lib/import/formats/UADEParser');
+    const song = await parseUADEFile(buffer, originalFileName, 'enhanced', subsong, preScannedMeta);
+    song.uadeEditableFileData = buffer.slice(0);
+    song.uadeEditableFileName = originalFileName;
+    return song;
   }
 
   // ── Actionamics (.act) ────────────────────────────────────────────────────
@@ -1073,14 +1071,14 @@ export async function tryRouteFormat(
     // Don't fall through to libopenmpt yet - let UFO/MicroProse handler try it
   }
 
-  // ── UFO / MicroProse (.ufo, .mus with DDAT magic) ─────────────────────────
-  // IFF-based 4-channel Amiga format from UFO: Enemy Unknown (1994).
-  // Magic: "DDAT" at offset 0 (IFF-like chunk marker).
+  // UADE enhanced scan reconstructs patterns from Paula register captures.
   if (matchesExt(filename, ['ufo', 'mus'])) {
-    const { isUFOFormat, parseUFOFile } = await import('@lib/import/formats/UFOParser');
-    return withNativeThenUADE('ufo', ctx,
-      (buf: Uint8Array | ArrayBuffer, name: string) => { if (isUFOFormat(buf as ArrayBuffer)) return parseUFOFile(buf as ArrayBuffer, name); return null; },
-      'UFOParser', { injectUADE: true });
+    const { parseUADEFile } = await import('@lib/import/formats/UADEParser');
+    const ufoFile = toUADEPrefixName(originalFileName, ['ufo', 'mus']);
+    const song = await parseUADEFile(buffer, ufoFile, 'enhanced', subsong, preScannedMeta);
+    song.uadeEditableFileData = buffer.slice(0);
+    song.uadeEditableFileName = ufoFile;
+    return song;
   }
 
   // ── Astroidea XMF / Imperium Galactica (.xmf) ────────────────────────────
@@ -1271,14 +1269,13 @@ export async function tryRouteFormat(
     }
   }
 
-  // ── SpeedySystem / SoundSmith (.ss) ───────────────────────────────────────
-  // Apple IIgs SoundSmith/MegaTracker. External DOC RAM samples required;
-  // UADE is preferred (bundles samples in module archives), but native is available.
+  // UADE enhanced scan reconstructs patterns from Paula register captures.
   if (matchesExt(filename, ['ss'])) {
-    const { isSpeedySystemFormat, parseSpeedySystemFile } = await import('@lib/import/formats/SpeedySystemParser');
-    return withNativeThenUADE('speedySystem', ctx,
-      (buf: Uint8Array | ArrayBuffer, name: string) => { if (isSpeedySystemFormat(buf as ArrayBuffer)) return parseSpeedySystemFile(buf as ArrayBuffer, name); return null; },
-      'SpeedySystemParser', { injectUADE: true });
+    const { parseUADEFile } = await import('@lib/import/formats/UADEParser');
+    const song = await parseUADEFile(buffer, originalFileName, 'enhanced', subsong, preScannedMeta);
+    song.uadeEditableFileData = buffer.slice(0);
+    song.uadeEditableFileName = originalFileName;
+    return song;
   }
 
   // ── Tronic (.trc/.dp/.tro/.tronic) ───────────────────────────────────────
@@ -1320,24 +1317,22 @@ export async function tryRouteFormat(
     return song;
   }
 
-  // ── Leggless Music Editor (.lme / LME.*) ────────────────────────────────────
-  // Stub parser for title + UADE classic audio.
+  // UADE enhanced scan reconstructs patterns from Paula register captures.
   if (matchesExt(filename, ['lme'])) {
-    const lmeCtx = { ...ctx, originalFileName: toUADEPrefixName(originalFileName, ['lme']) };
-    const { parseLegglessFile } = await import('@lib/import/formats/SimpleAmigaStubParser');
-    return withNativeThenUADE('leggless', lmeCtx,
-      (buf: Uint8Array | ArrayBuffer, name: string) => parseLegglessFile(buf as ArrayBuffer, name),
-      'SimpleAmigaStubParser', { injectUADE: true });
+    const { parseUADEFile } = await import('@lib/import/formats/UADEParser');
+    const song = await parseUADEFile(buffer, originalFileName, 'enhanced', subsong, preScannedMeta);
+    song.uadeEditableFileData = buffer.slice(0);
+    song.uadeEditableFileName = originalFileName;
+    return song;
   }
 
-  // ── Mike Davies (MD.* / .md) ─────────────────────────────────────────────
-  // Compiled 68k synthesizer. Stub parser for title + UADE classic audio.
+  // UADE enhanced scan reconstructs patterns from Paula register captures.
   if (matchesExt(filename, ['md'])) {
-    const mdCtx = { ...ctx, originalFileName: toUADEPrefixName(originalFileName, ['md']) };
-    const { parseMikeDaviesFile } = await import('@lib/import/formats/SimpleAmigaStubParser');
-    return withNativeThenUADE('mikeDavies', mdCtx,
-      (buf: Uint8Array | ArrayBuffer, name: string) => parseMikeDaviesFile(buf as ArrayBuffer, name),
-      'SimpleAmigaStubParser', { injectUADE: true });
+    const { parseUADEFile } = await import('@lib/import/formats/UADEParser');
+    const song = await parseUADEFile(buffer, originalFileName, 'enhanced', subsong, preScannedMeta);
+    song.uadeEditableFileData = buffer.slice(0);
+    song.uadeEditableFileName = originalFileName;
+    return song;
   }
 
   // ── Medley (.ml / .mso) ───────────────────────────────────────────────────
@@ -1444,42 +1439,40 @@ export async function tryRouteFormat(
 
 
 
-  // ── TME (.tme / TME.*) ───────────────────────────────────────────────────────
+  // UADE enhanced scan reconstructs patterns from Paula register captures.
   if (matchesExt(filename, ['tme'])) {
-    const { isTMEFormat, parseTMEFile } = await import('@lib/import/formats/TMEParser');
-    return withNativeThenUADE('tme', ctx,
-      (buf: Uint8Array | ArrayBuffer, name: string) => { if (isTMEFormat(buf as ArrayBuffer)) return parseTMEFile(buf as ArrayBuffer, name); return null; },
-      'TMEParser', { injectUADE: true });
+    const { parseUADEFile } = await import('@lib/import/formats/UADEParser');
+    const song = await parseUADEFile(buffer, originalFileName, 'enhanced', subsong, preScannedMeta);
+    song.uadeEditableFileData = buffer.slice(0);
+    song.uadeEditableFileName = originalFileName;
+    return song;
   }
 
-  // ── Infogrames DUM (.dum) ────────────────────────────────────────────────────
-  // Infogrames music format used in Gobliins, Ween, etc. Two-file format
-  // with external .dum.set sample data. Detection: header offset at u16BE(0).
+  // UADE enhanced scan reconstructs patterns from Paula register captures.
   if (matchesExt(filename, ['dum'])) {
-    const { isInfogramesFormat, parseInfogramesFile } = await import('@lib/import/formats/InfogramesParser');
-    return withNativeThenUADE('infogrames', ctx,
-      (buf: Uint8Array | ArrayBuffer, name: string) => { if (isInfogramesFormat(buf as ArrayBuffer)) return parseInfogramesFile(buf as ArrayBuffer, name); return null; },
-      'InfogramesParser', { injectUADE: true });
+    const { parseUADEFile } = await import('@lib/import/formats/UADEParser');
+    const song = await parseUADEFile(buffer, originalFileName, 'enhanced', subsong, preScannedMeta);
+    song.uadeEditableFileData = buffer.slice(0);
+    song.uadeEditableFileName = originalFileName;
+    return song;
   }
 
-  // ── PSA (.psa / PSA.*) ───────────────────────────────────────────────────────
-  // Professional Sound Artists format. Magic: bytes[0..3] == 0x50534100 ("PSA\0").
+  // UADE enhanced scan reconstructs patterns from Paula register captures.
   if (matchesExt(filename, ['psa'])) {
-    const { isPSAFormat, parsePSAFile } = await import('@lib/import/formats/PSAParser');
-    return withNativeThenUADE('psa', ctx,
-      (buf: Uint8Array | ArrayBuffer, name: string) => { if (isPSAFormat(buf as ArrayBuffer)) return parsePSAFile(buf as ArrayBuffer, name); return null; },
-      'PSAParser', { injectUADE: true });
+    const { parseUADEFile } = await import('@lib/import/formats/UADEParser');
+    const song = await parseUADEFile(buffer, originalFileName, 'enhanced', subsong, preScannedMeta);
+    song.uadeEditableFileData = buffer.slice(0);
+    song.uadeEditableFileName = originalFileName;
+    return song;
   }
 
-  // ── MMDC (.mmdc / MMDC.*) ────────────────────────────────────────────────────
-  // MED Packer format by Antony "Ratt" Crowther. Magic: bytes[0..3] == 'MMDC'.
-  // UADE eagleplayer expects prefix form: mmdc.songname
+  // UADE enhanced scan reconstructs patterns from Paula register captures.
   if (matchesExt(filename, ['mmdc'])) {
-    const { isMMDCFormat, parseMMDCFile } = await import('@lib/import/formats/MMDCParser');
-    const mmdcCtx = { ...ctx, originalFileName: toUADEPrefixName(originalFileName, ['mmdc']) };
-    return withNativeThenUADE('mmdc', mmdcCtx,
-      (buf: Uint8Array | ArrayBuffer, name: string) => { if (isMMDCFormat(buf as ArrayBuffer)) return parseMMDCFile(buf as ArrayBuffer, name); return null; },
-      'MMDCParser', { injectUADE: true });
+    const { parseUADEFile } = await import('@lib/import/formats/UADEParser');
+    const song = await parseUADEFile(buffer, originalFileName, 'enhanced', subsong, preScannedMeta);
+    song.uadeEditableFileData = buffer.slice(0);
+    song.uadeEditableFileName = originalFileName;
+    return song;
   }
 
   // ── Steve Turner (.jpo / .jpold / JPO.*) ────────────────────────────────────
@@ -1491,58 +1484,58 @@ export async function tryRouteFormat(
       (buf: ArrayBuffer, name: string) => parseSteveTurnerFile(buf, name));
   }
 
-  // ── TimeTracker (TMK.* prefix) ───────────────────────────────────────────
-  // Amiga format by BrainWasher & FireBlade. UADE prefix: TMK.
+  // UADE enhanced scan reconstructs patterns from Paula register captures.
   if (matchesExt(filename, ['tmk'])) {
-    const { isTimeTrackerFormat, parseTimeTrackerFile } = await import('@lib/import/formats/TimeTrackerParser');
-    return withNativeThenUADE('timeTracker', ctx,
-      (buf: Uint8Array | ArrayBuffer, name: string) => { if (isTimeTrackerFormat(buf as ArrayBuffer)) return parseTimeTrackerFile(buf as ArrayBuffer, name); return null; },
-      'TimeTrackerParser', { injectUADE: true });
+    const { parseUADEFile } = await import('@lib/import/formats/UADEParser');
+    const song = await parseUADEFile(buffer, originalFileName, 'enhanced', subsong, preScannedMeta);
+    song.uadeEditableFileData = buffer.slice(0);
+    song.uadeEditableFileName = originalFileName;
+    return song;
   }
 
-  // ── ChipTracker (KRIS.* prefix) ──────────────────────────────────────────
-  // Amiga format identified by 'KRIS' at offset 952. UADE prefix: KRIS.
+  // UADE enhanced scan reconstructs patterns from Paula register captures.
   if (matchesExt(filename, ['kris'])) {
-    const { isKRISFormat, parseKRISFile } = await import('@lib/import/formats/KRISParser');
-    return withNativeThenUADE('kris', ctx,
-      async (buf: Uint8Array | ArrayBuffer, name: string) => { if (isKRISFormat(buf as ArrayBuffer)) return await parseKRISFile(buf as ArrayBuffer, name); return null; },
-      'KRISParser', { injectUADE: true });
+    const { parseUADEFile } = await import('@lib/import/formats/UADEParser');
+    const song = await parseUADEFile(buffer, originalFileName, 'enhanced', subsong, preScannedMeta);
+    song.uadeEditableFileData = buffer.slice(0);
+    song.uadeEditableFileName = originalFileName;
+    return song;
   }
 
-  // ── Cinemaware (CIN.* prefix) ─────────────────────────────────────────────
-  // Amiga format with 'IBLK'+'ASEQ' magic. UADE prefix: CIN.
+  // UADE enhanced scan reconstructs patterns from Paula register captures.
   if (matchesExt(filename, ['cin'])) {
-    const { isCinemawareFormat, parseCinemawareFile } = await import('@lib/import/formats/CinemawareParser');
-    return withNativeThenUADE('cinemaware', ctx,
-      (buf: Uint8Array | ArrayBuffer, name: string) => { if (isCinemawareFormat(buf as ArrayBuffer)) return parseCinemawareFile(buf as ArrayBuffer, name); return null; },
-      'CinemawareParser', { injectUADE: true });
+    const { parseUADEFile } = await import('@lib/import/formats/UADEParser');
+    const song = await parseUADEFile(buffer, originalFileName, 'enhanced', subsong, preScannedMeta);
+    song.uadeEditableFileData = buffer.slice(0);
+    song.uadeEditableFileName = originalFileName;
+    return song;
   }
 
-  // ── NovoTrade Packer (NTP.* prefix) ──────────────────────────────────────
-  // Amiga chunked format: MODU/BODY/SAMP chunks. UADE prefix: NTP.
+  // UADE enhanced scan reconstructs patterns from Paula register captures.
   if (matchesExt(filename, ['ntp'])) {
-    const { isNovoTradePackerFormat, parseNovoTradePackerFile } = await import('@lib/import/formats/NovoTradePackerParser');
-    return withNativeThenUADE('novoTradePacker', ctx,
-      (buf: Uint8Array | ArrayBuffer, name: string) => { if (isNovoTradePackerFormat(buf as ArrayBuffer)) return parseNovoTradePackerFile(buf as ArrayBuffer, name); return null; },
-      'NovoTradePackerParser', { injectUADE: true });
+    const { parseUADEFile } = await import('@lib/import/formats/UADEParser');
+    const song = await parseUADEFile(buffer, originalFileName, 'enhanced', subsong, preScannedMeta);
+    song.uadeEditableFileData = buffer.slice(0);
+    song.uadeEditableFileName = originalFileName;
+    return song;
   }
 
-  // ── Alcatraz Packer (ALP.* prefix) ───────────────────────────────────────
-  // Amiga format with 'PAn\x10' magic. UADE prefix: ALP.
+  // UADE enhanced scan reconstructs patterns from Paula register captures.
   if (matchesExt(filename, ['alp'])) {
-    const { isAlcatrazPackerFormat, parseAlcatrazPackerFile } = await import('@lib/import/formats/AlcatrazPackerParser');
-    return withNativeThenUADE('alcatrazPacker', ctx,
-      (buf: Uint8Array | ArrayBuffer, name: string) => { if (isAlcatrazPackerFormat(buf as ArrayBuffer)) return parseAlcatrazPackerFile(buf as ArrayBuffer, name); return null; },
-      'AlcatrazPackerParser', { injectUADE: true });
+    const { parseUADEFile } = await import('@lib/import/formats/UADEParser');
+    const song = await parseUADEFile(buffer, originalFileName, 'enhanced', subsong, preScannedMeta);
+    song.uadeEditableFileData = buffer.slice(0);
+    song.uadeEditableFileName = originalFileName;
+    return song;
   }
 
-  // ── Blade Packer (UDS.* prefix) ──────────────────────────────────────────
-  // Amiga 8-channel format with 0x538F4E47 magic. UADE prefix: UDS.
+  // UADE enhanced scan reconstructs patterns from Paula register captures.
   if (matchesExt(filename, ['uds'])) {
-    const { isBladePackerFormat, parseBladePackerFile } = await import('@lib/import/formats/BladePackerParser');
-    return withNativeThenUADE('bladePacker', ctx,
-      (buf: Uint8Array | ArrayBuffer, name: string) => { if (isBladePackerFormat(buf as ArrayBuffer)) return parseBladePackerFile(buf as ArrayBuffer, name); return null; },
-      'BladePackerParser', { injectUADE: true });
+    const { parseUADEFile } = await import('@lib/import/formats/UADEParser');
+    const song = await parseUADEFile(buffer, originalFileName, 'enhanced', subsong, preScannedMeta);
+    song.uadeEditableFileData = buffer.slice(0);
+    song.uadeEditableFileName = originalFileName;
+    return song;
   }
 
   // ── Tomy Tracker (SG.* prefix) ────────────────────────────────────────────
@@ -1554,14 +1547,13 @@ export async function tryRouteFormat(
       'TomyTrackerParser', { injectUADE: true });
   }
 
-  // ── Images Music System (IMS.* prefix) ────────────────────────────────────
-  // Amiga format with offset-arithmetic detection. UADE prefix: IMS.
-  // Note: .ims extension files are handled earlier with native IMSParser.
+  // UADE enhanced scan reconstructs patterns from Paula register captures.
   if (matchesExt(filename, ['ims'])) {
-    const { isImagesMusicSystemFormat, parseImagesMusicSystemFile } = await import('@lib/import/formats/ImagesMusicSystemParser');
-    return withNativeThenUADE('imagesMusicSystem', ctx,
-      (buf: Uint8Array | ArrayBuffer, name: string) => { if (isImagesMusicSystemFormat(buf as ArrayBuffer)) return parseImagesMusicSystemFile(buf as ArrayBuffer, name); return null; },
-      'ImagesMusicSystemParser', { injectUADE: true });
+    const { parseUADEFile } = await import('@lib/import/formats/UADEParser');
+    const song = await parseUADEFile(buffer, originalFileName, 'enhanced', subsong, preScannedMeta);
+    song.uadeEditableFileData = buffer.slice(0);
+    song.uadeEditableFileName = originalFileName;
+    return song;
   }
 
   // ── Fashion Tracker (EX.* prefix) ────────────────────────────────────────
@@ -1610,13 +1602,13 @@ export async function tryRouteFormat(
     return song;
   }
 
-  // ── Titanics Packer (TITS.* prefix) ──────────────────────────────────────
-  // Amiga packed music format. Detection: 128 words at offset 180 (even, non-zero).
+  // UADE enhanced scan reconstructs patterns from Paula register captures.
   if (matchesExt(filename, ['tits'])) {
-    const { isTitanicsPackerFormat, parseTitanicsPackerFile } = await import('@lib/import/formats/TitanicsPackerParser');
-    return withNativeThenUADE('titanicsPacker', ctx,
-      (buf: Uint8Array | ArrayBuffer, name: string) => { if (isTitanicsPackerFormat(buf as ArrayBuffer)) return parseTitanicsPackerFile(buf as ArrayBuffer, name); return null; },
-      'TitanicsPackerParser', { injectUADE: true });
+    const { parseUADEFile } = await import('@lib/import/formats/UADEParser');
+    const song = await parseUADEFile(buffer, originalFileName, 'enhanced', subsong, preScannedMeta);
+    song.uadeEditableFileData = buffer.slice(0);
+    song.uadeEditableFileName = originalFileName;
+    return song;
   }
 
   // ── Kris Hatlelid (KH.* prefix) ──────────────────────────────────────────
@@ -1638,13 +1630,14 @@ export async function tryRouteFormat(
       'NTSPParser', { injectUADE: true });
   }
 
-  // ── UFO / MicroProse (MUS.* / UFO.* prefix) ──────────────────────────────
-  // IFF-based 4-channel Amiga format. FORM+DDAT+BODY+CHAN structure.
+  // UADE enhanced scan reconstructs patterns from Paula register captures.
   if (matchesExt(filename, ['mus', 'ufo'])) {
-    const { isUFOFormat, parseUFOFile } = await import('@lib/import/formats/UFOParser');
-    return withNativeThenUADE('ufo', ctx,
-      (buf: Uint8Array | ArrayBuffer, name: string) => { if (isUFOFormat(buf as ArrayBuffer)) return parseUFOFile(buf as ArrayBuffer, name); return null; },
-      'UFOParser', { injectUADE: true });
+    const { parseUADEFile } = await import('@lib/import/formats/UADEParser');
+    const musFile = toUADEPrefixName(originalFileName, ['mus', 'ufo']);
+    const song = await parseUADEFile(buffer, musFile, 'enhanced', subsong, preScannedMeta);
+    song.uadeEditableFileData = buffer.slice(0);
+    song.uadeEditableFileName = musFile;
+    return song;
   }
 
   // ── Mosh Packer (MOSH.* prefix) ──────────────────────────────────────────
@@ -1730,14 +1723,13 @@ export async function tryRouteFormat(
     return song;
   }
 
-  // ── Paul Summers (SNK.* prefix) ───────────────────────────────────────────
-  // Compiled Amiga format. Stub parser + UADE audio via UADEEditableSynth.
+  // UADE enhanced scan reconstructs patterns from Paula register captures.
   if (matchesExt(filename, ['snk'])) {
-    const snkCtx = { ...ctx, originalFileName: toUADEPrefixName(originalFileName, ['snk']) };
-    const { isPaulSummersFormat, parsePaulSummersFile } = await import('@lib/import/formats/PaulSummersParser');
-    return withNativeThenUADE('paulSummers', snkCtx,
-      (buf: Uint8Array | ArrayBuffer, name: string) => { if (isPaulSummersFormat(buf as ArrayBuffer)) return parsePaulSummersFile(buf as ArrayBuffer, name); return null; },
-      'PaulSummersParser', { injectUADE: true });
+    const { parseUADEFile } = await import('@lib/import/formats/UADEParser');
+    const song = await parseUADEFile(buffer, originalFileName, 'enhanced', subsong, preScannedMeta);
+    song.uadeEditableFileData = buffer.slice(0);
+    song.uadeEditableFileName = originalFileName;
+    return song;
   }
 
   // ── Desire (DSR.* prefix) ─────────────────────────────────────────────────
@@ -1844,13 +1836,13 @@ export async function tryRouteFormat(
       'DigitalSonixChromeParser', { injectUADE: true });
   }
 
-  // ── Jesper Olsen (JO.* prefix) ────────────────────────────────────────────
-  // Amiga format with jump-table detection and two sub-variants. UADE prefix: JO.
+  // UADE enhanced scan reconstructs patterns from Paula register captures.
   if (matchesExt(filename, ['jo'])) {
-    const { isJesperOlsenFormat, parseJesperOlsenFile } = await import('@lib/import/formats/JesperOlsenParser');
-    return withNativeThenUADE('jesperOlsen', ctx,
-      (buf: Uint8Array | ArrayBuffer, name: string) => { if (isJesperOlsenFormat(buf as ArrayBuffer)) return parseJesperOlsenFile(buf as ArrayBuffer, name); return null; },
-      'JesperOlsenParser', { injectUADE: true });
+    const { parseUADEFile } = await import('@lib/import/formats/UADEParser');
+    const song = await parseUADEFile(buffer, originalFileName, 'enhanced', subsong, preScannedMeta);
+    song.uadeEditableFileData = buffer.slice(0);
+    song.uadeEditableFileName = originalFileName;
+    return song;
   }
 
   // ── Kim Christensen (KIM.* prefix) ────────────────────────────────────────
