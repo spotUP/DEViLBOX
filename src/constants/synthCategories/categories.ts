@@ -130,6 +130,7 @@ export const SYNTH_CATEGORIES: SynthCategory[] = [
       // Computer Chips
       SYNTH_INFO.FurnaceSID6581,
       SYNTH_INFO.FurnaceSID8580,
+      SYNTH_INFO.FurnaceSID3,
       SYNTH_INFO.FurnaceAY,
       SYNTH_INFO.FurnaceAY8930,
       SYNTH_INFO.FurnaceVIC,
@@ -224,6 +225,7 @@ export const SYNTH_CATEGORIES: SynthCategory[] = [
     synths: [
       SYNTH_INFO.FurnaceSID6581,
       SYNTH_INFO.FurnaceSID8580,
+      SYNTH_INFO.FurnaceSID3,
       SYNTH_INFO.FurnaceAY,
       SYNTH_INFO.FurnaceAY8930,
       SYNTH_INFO.FurnaceVIC,

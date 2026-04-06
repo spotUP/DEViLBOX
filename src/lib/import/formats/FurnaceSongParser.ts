@@ -135,7 +135,7 @@ const FURNACE_TYPE_MAP: Record<number, SynthType> = {
   63: 'FurnaceC64',         // DIV_INS_SID2 - SID2
   64: 'FurnaceSUPERVISION', // DIV_INS_SUPERVISION - Watara Supervision
   65: 'FurnaceUPD1771',     // DIV_INS_UPD1771C - NEC μPD1771C
-  66: 'FurnaceC64',         // DIV_INS_SID3 - SID3
+  66: 'FurnaceSID3',         // DIV_INS_SID3 - SID3
 };
 
 /**
@@ -2635,7 +2635,7 @@ export function convertFurnaceToDevilbox(module: FurnaceModule, subsongIndex = 0
     }
 
     // Refine C64 SID variant based on chip ID (6581 vs 8580)
-    // DIV_INS_C64 (type 3), DIV_INS_SID2 (63), DIV_INS_SID3 (66) all map to FurnaceC64
+    // DIV_INS_C64 (type 3), DIV_INS_SID2 (63) map to FurnaceC64; DIV_INS_SID3 (66) maps to FurnaceSID3
     // but we can distinguish the hardware variant from the chip ID
     if (synthType === 'FurnaceC64') {
       const channels = instrumentChannels.get(idx);
