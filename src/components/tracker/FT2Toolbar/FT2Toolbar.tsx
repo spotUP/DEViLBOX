@@ -590,7 +590,6 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = React.memo(({
     }
 
     setIsLooping(false);
-    const startPos = currentPositionIndex;
     setCurrentRow(0);
     await engine.init();
 
@@ -599,8 +598,6 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = React.memo(({
     // The WASM engine handles its own init/load via startNativeEngines.
     if (editorMode === 'musicline' || editorMode === 'jamcracker') {
       await play();
-      // Seek to current position after play starts
-      if (startPos > 0) getTrackerReplayer().forcePosition(startPos, 0);
       return;
     }
 
@@ -609,8 +606,7 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = React.memo(({
     engine.stop();
     await new Promise(r => setTimeout(r, 60)); // Wait for mute/unmute cycle (50ms)
     await play();
-    // Seek to current position — loadSong resets to 0, so we must restore it
-    if (startPos > 0) getTrackerReplayer().seekTo(startPos, 0);
+    // Position restore handled by usePatternPlayback (seekTo before replayer.play)
   };
 
   const handlePlayPattern = async () => {
@@ -652,7 +648,6 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = React.memo(({
       return;
     }
     setIsLooping(true);
-    const startPos2 = currentPositionIndex;
     setCurrentRow(0);
     await engine.init();
     // Reset ToneEngine state before first play — matches what playStopToggle does.
@@ -660,8 +655,7 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = React.memo(({
     engine.stop();
     await new Promise(r => setTimeout(r, 60));
     await play();
-    // Seek to current position — loadSong resets to 0, so we must restore it
-    if (startPos2 > 0) getTrackerReplayer().seekTo(startPos2, 0);
+    // Position restore handled by usePatternPlayback (seekTo before replayer.play)
   };
 
   const isPlayingSong = isGT ? gtPlaying : (isPlaying && !isLooping);
