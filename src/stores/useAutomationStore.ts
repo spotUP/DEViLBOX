@@ -122,12 +122,19 @@ export const useAutomationStore = create<AutomationStore>()(
 
     // Actions
     addCurve: (patternId, channelIndex, parameter) => {
+      // Check if this parameter can be baked into native effects on export.
+      // Volume and panning CAN be baked; others may not be.
       const limits = getActiveFormatLimits();
       if (limits) {
-        void checkFormatViolation('automation',
-          `Automation curves are not supported in ${limits.name} format.`,
-        ).then((ok) => { if (ok) get().addCurve(patternId, channelIndex, parameter); });
-        return ''; // cancelled — retry happens async
+        const p = parameter.toLowerCase();
+        const canBake = p.includes('volume') || p.includes('vol') || p.includes('pan');
+        if (!canBake) {
+          void checkFormatViolation('automation',
+            `"${parameter}" automation cannot be exported to ${limits.name} format. It will be baked into effect commands where possible, but this parameter has no equivalent effect.`,
+          ).then((ok) => { if (ok) get().addCurve(patternId, channelIndex, parameter); });
+          return '';
+        }
+        // Volume/panning curves WILL be baked on export — no warning needed
       }
       const newCurve: AutomationCurve = {
         id: `curve-${Date.now()}`,
