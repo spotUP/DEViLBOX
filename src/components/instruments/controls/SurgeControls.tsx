@@ -241,7 +241,7 @@ export const SurgeControls: React.FC<SurgeControlsProps> = ({
               if (oscParams.length === 0) return null;
 
               return (
-                <div key={n} className={`p-2 rounded-lg border ${panelBg}`}>
+                <div key={n} className={`p-2 rounded-lg border border-dark-border ${panelBg}`}>
                   <h3 className="font-bold uppercase tracking-tight text-sm mb-3" style={{ color: accentColor }}>
                     {activeScene} - Oscillator {n}
                   </h3>
@@ -279,7 +279,7 @@ export const SurgeControls: React.FC<SurgeControlsProps> = ({
               if (filParams.length === 0) return null;
 
               return (
-                <div key={n} className={`p-2 rounded-lg border ${panelBg}`}>
+                <div key={n} className={`p-2 rounded-lg border border-dark-border ${panelBg}`}>
                   <h3 className="font-bold uppercase tracking-tight text-sm mb-3" style={{ color: accentColor }}>
                     {activeScene} - Filter {n}
                   </h3>
@@ -319,7 +319,7 @@ export const SurgeControls: React.FC<SurgeControlsProps> = ({
         {activeTab === 'env' && (
           <>
             {['Amp EG', 'Filter EG'].map(egName => (
-              <div key={egName} className={`p-2 rounded-lg border ${panelBg}`}>
+              <div key={egName} className={`p-2 rounded-lg border border-dark-border ${panelBg}`}>
                 <h3 className="font-bold uppercase tracking-tight text-sm mb-3" style={{ color: accentColor }}>
                   {activeScene} - {egName}
                 </h3>
@@ -365,7 +365,7 @@ export const SurgeControls: React.FC<SurgeControlsProps> = ({
         )}
 
         {activeTab === 'global' && (
-          <div className={`p-2 rounded-lg border ${panelBg}`}>
+          <div className={`p-2 rounded-lg border border-dark-border ${panelBg}`}>
             <h3 className="font-bold uppercase tracking-tight text-sm mb-3" style={{ color: accentColor }}>
               Global
             </h3>
@@ -445,7 +445,7 @@ const SurgeLfoTab: React.FC<SurgeLfoTabProps> = ({
         ))}
       </div>
 
-      <div className={`p-2 rounded-lg border ${panelBg}`}>
+      <div className={`p-2 rounded-lg border border-dark-border ${panelBg}`}>
         <h3 className="font-bold uppercase tracking-tight text-sm mb-3" style={{ color: accentColor }}>
           {activeScene} - {currentLfoName}
         </h3>
@@ -500,14 +500,14 @@ const SurgeFxTab: React.FC<SurgeFxTabProps> = ({
     const fxParams = allParams.filter(p => p.name.startsWith('FX'));
     if (fxParams.length === 0) {
       return (
-        <div className={`p-2 rounded-lg border ${panelBg}`}>
+        <div className={`p-2 rounded-lg border border-dark-border ${panelBg}`}>
           <p className="text-sm text-text-muted">No FX parameters available.</p>
         </div>
       );
     }
 
     return (
-      <div className={`p-2 rounded-lg border ${panelBg}`}>
+      <div className={`p-2 rounded-lg border border-dark-border ${panelBg}`}>
         <h3 className="font-bold uppercase tracking-tight text-sm mb-3" style={{ color: accentColor }}>
           Effects
         </h3>
@@ -532,7 +532,7 @@ const SurgeFxTab: React.FC<SurgeFxTabProps> = ({
   return (
     <>
       {fxGroups.map(({ slot, prefix, params }) => (
-        <div key={slot} className={`p-2 rounded-lg border ${panelBg}`}>
+        <div key={slot} className={`p-2 rounded-lg border border-dark-border ${panelBg}`}>
           <h3 className="font-bold uppercase tracking-tight text-sm mb-3" style={{ color: accentColor }}>
             FX {slot}
           </h3>
@@ -579,7 +579,7 @@ const SurgeOtherTab: React.FC<SurgeOtherTabProps> = ({
 
   if (uncategorized.length === 0) {
     return (
-      <div className={`p-2 rounded-lg border ${panelBg}`}>
+      <div className={`p-2 rounded-lg border border-dark-border ${panelBg}`}>
         <p className="text-sm text-text-muted">All parameters are shown in the categorized tabs.</p>
       </div>
     );
@@ -596,13 +596,13 @@ const SurgeOtherTab: React.FC<SurgeOtherTabProps> = ({
 
   return (
     <>
-      <div className={`p-3 rounded-lg border ${panelBg}`}>
+      <div className={`p-3 rounded-lg border border-dark-border ${panelBg}`}>
         <p className="text-xs text-text-muted mb-1">
           {uncategorized.length} additional parameters not shown in other tabs
         </p>
       </div>
       {Array.from(groups.entries()).map(([prefix, params]) => (
-        <div key={prefix} className={`p-2 rounded-lg border ${panelBg}`}>
+        <div key={prefix} className={`p-2 rounded-lg border border-dark-border ${panelBg}`}>
           <h3 className="font-bold uppercase tracking-tight text-sm mb-3" style={{ color: accentColor }}>
             {prefix}
           </h3>

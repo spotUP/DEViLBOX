@@ -94,7 +94,7 @@ export const DubSirenControls: React.FC<DubSirenControlsProps> = ({
   const renderMainTab = () => (
     <div className="grid grid-cols-4 gap-2 p-2">
       {/* Oscillator Section */}
-      <div className={`p-2 rounded-lg border ${panelBg}`}>
+      <div className={`p-2 rounded-lg border border-dark-border ${panelBg}`}>
         <div className="flex items-center gap-2 mb-2">
           <Speaker size={16} className={isCyanTheme ? 'text-accent-highlight' : 'text-red-500'} />
           <h3 className={`font-bold ${isCyanTheme ? 'text-accent-highlight' : 'text-red-400'}`}>OSCILLATOR</h3>
@@ -116,7 +116,7 @@ export const DubSirenControls: React.FC<DubSirenControlsProps> = ({
       </div>
 
       {/* LFO Section */}
-      <div className={`p-2 rounded-lg border ${panelBg}`}>
+      <div className={`p-2 rounded-lg border border-dark-border ${panelBg}`}>
         <div className="flex items-center justify-between mb-2">
           <div className="flex items-center gap-2">
             <Activity size={16} className={isCyanTheme ? 'text-accent-highlight' : 'text-red-500'} />
@@ -165,7 +165,7 @@ export const DubSirenControls: React.FC<DubSirenControlsProps> = ({
   const renderFXTab = () => (
     <div className="grid grid-cols-4 gap-2 p-2">
       {/* Delay Section */}
-      <div className={`p-2 rounded-lg border ${panelBg}`}>
+      <div className={`p-2 rounded-lg border border-dark-border ${panelBg}`}>
         <div className="flex items-center justify-between mb-2">
           <div className="flex items-center gap-2">
             <Repeat size={16} className={isCyanTheme ? 'text-accent-highlight' : 'text-red-500'} />
@@ -236,7 +236,7 @@ export const DubSirenControls: React.FC<DubSirenControlsProps> = ({
       </div>
 
       {/* Filter Section */}
-      <div className={`p-2 rounded-lg border ${panelBg}`}>
+      <div className={`p-2 rounded-lg border border-dark-border ${panelBg}`}>
         <div className="flex items-center justify-between mb-2">
           <div className="flex items-center gap-2">
             <Filter size={16} className={isCyanTheme ? 'text-accent-highlight' : 'text-red-500'} />
@@ -316,7 +316,7 @@ export const DubSirenControls: React.FC<DubSirenControlsProps> = ({
       </div>
 
       {/* Reverb Section */}
-      <div className={`p-2 rounded-lg border ${panelBg}`}>
+      <div className={`p-2 rounded-lg border border-dark-border ${panelBg}`}>
         <div className="flex items-center justify-between mb-2">
           <div className="flex items-center gap-2">
             <Waves size={16} className={isCyanTheme ? 'text-accent-highlight' : 'text-red-500'} />
