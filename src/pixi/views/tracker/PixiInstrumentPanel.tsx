@@ -13,6 +13,7 @@ import * as Tone from 'tone';
 import { useInstrumentStore } from '@stores/useInstrumentStore';
 import { useUIStore } from '@stores/useUIStore';
 import { getSynthInfo } from '@constants/synthCategories';
+import { getSynthBadge } from '@constants/channelTypeCompat';
 import { getToneEngine } from '@engine/ToneEngine';
 import { PIXI_FONTS } from '../../fonts';
 import { FAD_ICONS } from '../../fontaudioIcons';
@@ -468,22 +469,47 @@ export const PixiInstrumentPanel: React.FC<PixiInstrumentPanelProps> = ({ width,
               )}
 
               {/* Type badge — right-aligned */}
-              <pixiContainer layout={{ flexShrink: 0, marginLeft: 'auto', marginRight: 2 }}>
-                <pixiGraphics
-                  draw={(g) => {
-                    g.clear();
-                    const bw = Math.min(56, badge.length * 6 + 10);
-                    g.roundRect(0, 0, bw, 17, 3);
-                    g.fill({ color: isSelected ? theme.bgActive.color : theme.bgTertiary.color, alpha: 0.8 });
-                  }}
-                  layout={{ position: 'absolute', width: 56, height: 17 }}
-                />
-                <pixiBitmapText
-                  text={badge.length > 8 ? badge.slice(0, 7) + '…' : badge}
-                  style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 12, fill: 0xffffff }}
-                  tint={isSelected ? theme.accent.color : theme.textMuted.color}
-                  layout={{ marginLeft: 4, marginTop: 2 }}
-                />
+              <pixiContainer layout={{ flexShrink: 0, marginLeft: 'auto', marginRight: 2, flexDirection: 'row', gap: 2, alignItems: 'center' }}>
+                {/* Channel type badge (FM/PSG/PCM/WAV/NOI/OP/ANY) */}
+                {(() => {
+                  const chanBadge = getSynthBadge(inst.synthType);
+                  return (
+                    <pixiContainer layout={{ flexShrink: 0 }}>
+                      <pixiGraphics
+                        draw={(g: GraphicsType) => {
+                          g.clear();
+                          g.roundRect(0, 0, 28, 15, 3);
+                          g.fill({ color: chanBadge.color, alpha: isSelected ? 0.3 : 0.15 });
+                        }}
+                        layout={{ position: 'absolute', width: 28, height: 15 }}
+                      />
+                      <pixiBitmapText
+                        text={chanBadge.label}
+                        style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 10, fill: 0xffffff }}
+                        tint={chanBadge.color}
+                        layout={{ marginLeft: 3, marginTop: 2 }}
+                      />
+                    </pixiContainer>
+                  );
+                })()}
+                {/* Synth type badge */}
+                <pixiContainer layout={{ flexShrink: 0 }}>
+                  <pixiGraphics
+                    draw={(g: GraphicsType) => {
+                      g.clear();
+                      const bw = Math.min(56, badge.length * 6 + 10);
+                      g.roundRect(0, 0, bw, 17, 3);
+                      g.fill({ color: isSelected ? theme.bgActive.color : theme.bgTertiary.color, alpha: 0.8 });
+                    }}
+                    layout={{ position: 'absolute', width: 56, height: 17 }}
+                  />
+                  <pixiBitmapText
+                    text={badge.length > 8 ? badge.slice(0, 7) + '…' : badge}
+                    style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 12, fill: 0xffffff }}
+                    tint={isSelected ? theme.accent.color : theme.textMuted.color}
+                    layout={{ marginLeft: 4, marginTop: 2 }}
+                  />
+                </pixiContainer>
               </pixiContainer>
 
               {/* Action buttons — visible on hover and selected */}

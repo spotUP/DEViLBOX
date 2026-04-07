@@ -101,6 +101,38 @@ export const PixiExportDialog: React.FC<PixiExportDialogProps> = ({ isOpen, onCl
   // XM/MOD export warnings
   const [exportWarnings, setExportWarnings] = useState<string[]>([]);
 
+  // Pre-export validation: warn about synth instruments and master FX
+  // (these warnings were deferred from editing-time to export-time)
+  const preExportWarnings: string[] = useMemo(() => {
+    if (!isOpen) return [];
+    const isNativeFormat = ['xm', 'mod', 'it', 's3m'].includes(ex.exportMode);
+    if (!isNativeFormat) return [];
+
+    const warnings: string[] = [];
+    try {
+      const { useInstrumentStore } = require('@stores/useInstrumentStore');
+      const { useAudioStore } = require('@stores/useAudioStore');
+      const instruments = useInstrumentStore.getState().instruments;
+      const masterEffects = useAudioStore.getState().masterEffects;
+
+      const synthInsts = instruments.filter(
+        (i: any) => i.synthType && i.synthType !== 'Sampler' && i.synthType !== 'Player'
+      );
+      if (synthInsts.length > 0) {
+        const names = synthInsts.slice(0, 5).map((i: any) => `${i.id}: ${i.name || i.synthType}`).join(', ');
+        const extra = synthInsts.length > 5 ? ` (+${synthInsts.length - 5} more)` : '';
+        warnings.push(`${synthInsts.length} synth instrument(s) will export as silence (${names}${extra}). Convert to samples or save as .dbx.`);
+      }
+
+      const activeFx = (masterEffects || []).filter((fx: any) => fx.enabled);
+      if (activeFx.length > 0) {
+        warnings.push(`${activeFx.length} master effect(s) active — not supported in ${ex.exportMode.toUpperCase()} format. Remove or disable before export.`);
+      }
+    } catch { /* stores not available */ }
+    return warnings;
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen, ex.exportMode]);
+
   // Check for synth-replaced instruments
   const replacedIds: number[] = useMemo(() => {
     try {
@@ -748,6 +780,15 @@ export const PixiExportDialog: React.FC<PixiExportDialogProps> = ({ isOpen, onCl
                 {/* Metadata display */}
                 <PixiLabel text={`Format: FastTracker II · Patterns: ${ex.patterns.length} · Channels: ${xmChannels} · Max Instruments: 128`} size="xs" font="mono" color="textMuted" />
 
+                {/* Pre-export compatibility warnings (deferred from editing-time) */}
+                {preExportWarnings.length > 0 && (
+                  <layoutContainer layout={{ flexDirection: 'column', gap: 4, padding: 8, borderRadius: 4, borderWidth: 1, borderColor: theme.warning.color, backgroundColor: tintBg(theme.warning.color), width: CONTENT_W - 24 }}>
+                    {preExportWarnings.map((w, i) => (
+                      <PixiLabel key={`pre-${i}`} text={`⚠ ${w}`} size="xs" color="warning" layout={{ maxWidth: CONTENT_W - 44 }} />
+                    ))}
+                  </layoutContainer>
+                )}
+
                 {/* Synth-replaced instrument warning */}
                 {hasReplacedInstruments && (
                   <layoutContainer layout={{ flexDirection: 'column', gap: 4, padding: 8, borderRadius: 4, borderWidth: 1, borderColor: theme.warning.color, backgroundColor: tintBg(theme.warning.color), width: CONTENT_W - 24 }}>
@@ -813,6 +854,15 @@ export const PixiExportDialog: React.FC<PixiExportDialogProps> = ({ isOpen, onCl
                 {/* Metadata display */}
                 <PixiLabel text={`Format: ProTracker (${modChannels === 4 ? 'M.K.' : modChannels === 6 ? '6CHN' : '8CHN'}) · Max Samples: 31 · Max Rows: 64 · Notes: C-0 to B-3`} size="xs" font="mono" color="textMuted" />
 
+                {/* Pre-export compatibility warnings (deferred from editing-time) */}
+                {preExportWarnings.length > 0 && (
+                  <layoutContainer layout={{ flexDirection: 'column', gap: 4, padding: 8, borderRadius: 4, borderWidth: 1, borderColor: theme.warning.color, backgroundColor: tintBg(theme.warning.color), width: CONTENT_W - 24 }}>
+                    {preExportWarnings.map((w, i) => (
+                      <PixiLabel key={`pre-${i}`} text={`⚠ ${w}`} size="xs" color="warning" layout={{ maxWidth: CONTENT_W - 44 }} />
+                    ))}
+                  </layoutContainer>
+                )}
+
                 {/* Synth-replaced instrument warning */}
                 {hasReplacedInstruments && (
                   <layoutContainer layout={{ flexDirection: 'column', gap: 4, padding: 8, borderRadius: 4, borderWidth: 1, borderColor: theme.warning.color, backgroundColor: tintBg(theme.warning.color), width: CONTENT_W - 24 }}>
@@ -860,6 +910,15 @@ export const PixiExportDialog: React.FC<PixiExportDialogProps> = ({ isOpen, onCl
                 </layoutContainer>
 
                 <PixiLabel text={`Format: ${ex.exportMode === 'it' ? 'Impulse Tracker' : 'ScreamTracker 3'} · Engine: OpenMPT CSoundFile (WASM) · ${ex.patterns.length} patterns · ${ex.instruments.length} instruments`} size="xs" font="mono" color="textMuted" />
+
+                {/* Pre-export compatibility warnings (deferred from editing-time) */}
+                {preExportWarnings.length > 0 && (
+                  <layoutContainer layout={{ flexDirection: 'column', gap: 4, padding: 8, borderRadius: 4, borderWidth: 1, borderColor: theme.warning.color, backgroundColor: tintBg(theme.warning.color), width: CONTENT_W - 24 }}>
+                    {preExportWarnings.map((w, i) => (
+                      <PixiLabel key={`pre-${i}`} text={`⚠ ${w}`} size="xs" color="warning" layout={{ maxWidth: CONTENT_W - 44 }} />
+                    ))}
+                  </layoutContainer>
+                )}
 
                 {/* Synth-replaced instrument warning */}
                 {hasReplacedInstruments && (

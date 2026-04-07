@@ -116,8 +116,12 @@ export function useEditorControls(opts?: {
     (presetId: string) => {
       if (presetId === 'none' || presetId === '__group__') return;
       applySystemPreset(presetId);
-      // Auto-show channel names so hardware labels are visible
+      // Track active preset for channel-type validation
       const uiState = useUIStore.getState();
+      uiState.setActiveSystemPreset(presetId);
+      // Reset mismatch warnings for new preset
+      import('@stores/useTrackerStore').then(m => m.resetChannelMismatchWarnings());
+      // Auto-show channel names so hardware labels are visible
       if (!uiState.showChannelNames) {
         uiState.toggleChannelNames();
       }

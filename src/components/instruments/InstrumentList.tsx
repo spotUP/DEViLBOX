@@ -9,6 +9,7 @@ import { useInstrumentStore } from '@stores/useInstrumentStore';
 import { useUIStore } from '@stores/useUIStore';
 import { useShallow } from 'zustand/react/shallow';
 import { getSynthInfo } from '@constants/synthCategories';
+import { getSynthBadge } from '@constants/channelTypeCompat';
 import { Plus, Trash2, Copy, Repeat, Repeat1, FolderOpen, Pencil, Package, ExternalLink, Download, Upload, Cpu, X, Music2 } from 'lucide-react';
 import * as LucideIcons from 'lucide-react';
 
@@ -630,6 +631,22 @@ export const InstrumentList: React.FC<InstrumentListProps> = memo(({
                   {instrument.metadata?.displayType || synthInfo?.shortName || instrument.synthType}
                 </span>
 
+                {/* Channel Type Badge (hardware affinity) */}
+                {(() => {
+                  const badge = getSynthBadge(instrument.synthType);
+                  return (
+                    <span
+                      className="text-[8px] px-1 rounded font-bold"
+                      style={{
+                        backgroundColor: isSelected ? 'rgba(0,0,0,0.2)' : `${badge.cssColor}20`,
+                        color: isSelected ? 'var(--color-ft2-bg)' : badge.cssColor,
+                      }}
+                    >
+                      {badge.label}
+                    </span>
+                  );
+                })()}
+
                 {/* Actions (visible on hover, always visible when selected) */}
                 {showActions && (
                   <div className={`instrument-action-buttons flex gap-0.5 ${isSelected ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'} transition-opacity`}>
@@ -762,6 +779,22 @@ export const InstrumentList: React.FC<InstrumentListProps> = memo(({
                     {instrument.metadata?.displayType || synthInfo?.shortName || instrument.synthType}
                   </span>
                 )}
+
+                {/* Channel Type Badge (non-compact only) */}
+                {!compact && (() => {
+                  const badge = getSynthBadge(instrument.synthType);
+                  return (
+                    <span
+                      className="text-[9px] px-1 rounded font-bold"
+                      style={{
+                        backgroundColor: `${badge.cssColor}20`,
+                        color: badge.cssColor,
+                      }}
+                    >
+                      {badge.label}
+                    </span>
+                  );
+                })()}
 
                 {/* Sample loop indicator - enhanced visibility */}
                 {instrument.sample?.loop && (
