@@ -12,14 +12,71 @@ import { SectionHeader, type VisualEffectEditorProps } from './shared';
 // GENERIC FALLBACK EDITOR
 // ============================================================================
 
+/** Convert camelCase key to a human-readable label */
+function formatParamName(key: string): string {
+  return key
+    .replace(/([A-Z])/g, ' $1')
+    .replace(/^./, (s) => s.toUpperCase())
+    .trim();
+}
+
+/** Infer parameter range heuristics (matches PixiEffectParameterEditor logic) */
+function inferParamRange(_key: string, value: number): { min: number; max: number; step: number; unit: string } {
+  // Negative values suggest dB range
+  if (value < 0) return { min: -60, max: 12, step: 0.5, unit: 'dB' };
+  // Values > 100 suggest ms/Hz range
+  if (value > 100) return { min: 0, max: Math.max(value * 4, 1000), step: 1, unit: '' };
+  // 0-1 normalized
+  if (value >= 0 && value <= 1) return { min: 0, max: 1, step: 0.01, unit: '' };
+  // 0-100 percentage-like
+  return { min: 0, max: 100, step: 1, unit: '%' };
+}
+
+/** Accent color for WASM effects */
+const WASM_ACCENT = '#10b981';
+
 export const GenericEffectEditor: React.FC<VisualEffectEditorProps> = ({
   effect,
+  onUpdateParameter,
   onUpdateWet,
 }) => {
+  const params = Object.entries(effect.parameters).filter(
+    ([, v]) => typeof v === 'number',
+  ) as [string, number][];
+
   return (
     <div className="space-y-4">
+      {/* Parameter knobs grid */}
+      {params.length > 0 && (
+        <section className="rounded-xl p-4 border border-dark-border bg-black/30 backdrop-blur-sm shadow-inner-dark">
+          <SectionHeader size="lg" color={WASM_ACCENT} title={effect.type} />
+          <div className="flex flex-wrap justify-around items-end gap-y-4">
+            {params.map(([key, value]) => {
+              const range = inferParamRange(key, value);
+              return (
+                <Knob
+                  key={key}
+                  value={value}
+                  min={range.min}
+                  max={range.max}
+                  step={range.step}
+                  onChange={(v) => onUpdateParameter(key, v)}
+                  label={formatParamName(key)}
+                  size="md"
+                  color={WASM_ACCENT}
+                  formatValue={(v) => {
+                    if (range.max <= 1) return v.toFixed(2);
+                    if (range.unit === 'dB') return `${v.toFixed(1)}dB`;
+                    return `${Math.round(v)}${range.unit}`;
+                  }}
+                />
+              );
+            })}
+          </div>
+        </section>
+      )}
+      {/* Mix knob */}
       <section className="rounded-xl p-4 border border-dark-border bg-black/30 backdrop-blur-sm shadow-inner-dark">
-        <SectionHeader size="lg" color="#6b7280" title={effect.type} />
         <div className="flex justify-center">
           <Knob
             value={effect.wet}
@@ -32,9 +89,6 @@ export const GenericEffectEditor: React.FC<VisualEffectEditorProps> = ({
             formatValue={(v) => `${Math.round(v)}%`}
           />
         </div>
-        <p className="text-xs text-text-muted text-center mt-4">
-          Use sliders in the expanded view for this effect type.
-        </p>
       </section>
     </div>
   );
