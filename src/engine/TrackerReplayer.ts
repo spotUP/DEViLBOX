@@ -1989,8 +1989,11 @@ export class TrackerReplayer {
       }
     }
 
-    // libopenmpt playback: if we have raw module data, use the libopenmpt WASM worklet
-    // for audio and forward position updates to the UI. Falls back to ToneEngine if unavailable.
+    // libopenmpt playback: if we have raw module data, delegate startup to
+    // LibopenmptEngine.startWithCoordinator. The engine handles bridge
+    // serialization, loadTune, audio routing, stereo separation, and the
+    // onPosition / onEnded subscriptions; we only have to mark this format
+    // as the active hybrid host so the universal mute/solo path knows.
     if (this.song.libopenmptFileData && !this.useWasmSequencer) {
       _log('[TrackerReplayer] libopenmpt path: fileData size =', this.song.libopenmptFileData.byteLength);
       try {
@@ -1998,90 +2001,35 @@ export class TrackerReplayer {
         if (gen !== this._playGeneration) return;
 
         const mptEngine = LibopenmptEngine.getInstance();
-        await mptEngine.ready();
+
+        // Resolve the destination node (stereo separation input) once. Skip
+        // for DJ decks — they manage their own routing chain.
+        let destination: AudioNode | null = null;
+        if (!this.isDJDeck && !this.routedNativeEngines.has('LibopenmptSynth')) {
+          const { getNativeAudioNode } = await import('@/utils/audio-context');
+          destination = getNativeAudioNode(this.separationNode.inputTone as any);
+          this.routedNativeEngines.add('LibopenmptSynth');
+        }
+
+        const result = await mptEngine.startWithCoordinator(this.coordinator, {
+          song: this.song,
+          destination,
+          initialSongPos: this.songPos,
+          initialPattPos: this.pattPos,
+          startMuted: this._muted,
+        });
         if (gen !== this._playGeneration) return;
 
-        _log('[TrackerReplayer] libopenmpt available:', mptEngine.isAvailable());
-        if (mptEngine.isAvailable()) {
-          // _replacedInstruments already rebuilt above (universal path)
-
-          // If edits have been made, re-serialize from the soundlib to get updated module data
-          let tuneData = this.song.libopenmptFileData;
-          const bridge = await import('@engine/libopenmpt/OpenMPTEditBridge');
-
-          if (bridge.isActive() && bridge.isDirty()) {
-            const serialized = await bridge.serialize();
-            if (serialized) {
-              tuneData = serialized;
-              // Update the stored file data so subsequent plays don't re-serialize
-              this.song.libopenmptFileData = serialized;
-            }
-          }
-
-          _log('[TrackerReplayer] libopenmpt: loading tune, size =', tuneData.byteLength);
-          await mptEngine.loadTune(tuneData);
-
-          // Route audio through stereo separation chain
-          if (!this.isDJDeck && !this.routedNativeEngines.has('LibopenmptSynth')) {
-            const { getNativeAudioNode } = await import('@/utils/audio-context');
-            const nativeInput = getNativeAudioNode(this.separationNode.inputTone as any);
-            _log('[TrackerReplayer] libopenmpt: routing audio, nativeInput =', !!nativeInput,
-              'output ctx state =', mptEngine.output.context.state);
-            if (nativeInput) {
-              mptEngine.output.connect(nativeInput);
-            } else {
-              _warn('[TrackerReplayer] libopenmpt: no native input, connecting to destination');
-              mptEngine.output.connect(mptEngine.output.context.destination);
-            }
-            this.routedNativeEngines.add('LibopenmptSynth');
-          }
-
-          // Apply stored stereo separation setting to libopenmpt
-          {
-            const settings = (await import('@stores/useSettingsStore')).useSettingsStore.getState();
-            const sep = settings.stereoSeparationMode === 'pt2'
-              ? settings.stereoSeparation * 2  // PT2 0-100 → libopenmpt 0-200
-              : settings.modplugSeparation;     // ModPlug already 0-200
-            mptEngine.setStereoSeparation(sep);
-          }
-
-          // Subscribe to position updates from libopenmpt (~344 times/sec at 44.1kHz)
-          // Throttle to only fire onRowChange when the row actually changes.
-          let lastRow = -1;
-          let lastOrder = -1;
-          mptEngine.onPosition = (order, _pattern, row, audioTime) => {
-            if (row === lastRow && order === lastOrder) return;
-            lastRow = row;
-            lastOrder = order;
-            this.dispatchEnginePosition(row, order, audioTime);
-          };
-
-          mptEngine.onEnded = () => {
-            if (this.onSongEnd) this.onSongEnd();
-          };
-
+        if (result.started) {
           this.useLibopenmptPlayback = true;
           this._suppressNotes = true;
           this._activeWasmEngine = mptEngine; // for updateWasmMuteMask()
 
-          if (!this._muted) {
-            _log('[TrackerReplayer] libopenmpt: calling play(), muted =', this._muted);
-            mptEngine.play();
-            // Seek to current position if not at start
-            if (this.songPos > 0 || this.pattPos > 0) {
-              mptEngine.seekTo(this.songPos, this.pattPos);
-            }
-          } else {
-            _log('[TrackerReplayer] libopenmpt: SKIPPING play() because muted');
-          }
-
           _log('[TrackerReplayer] Using libopenmpt for playback, suppressNotes =', this._suppressNotes,
             'replacedInstruments =', this._replacedInstruments.size);
-
-          // Hybrid notes are now fired from the onPosition callback above —
-          // no parallel TS scheduler needed.
           return;
         }
+        _warn('[TrackerReplayer] libopenmpt unavailable, falling back to ToneEngine');
       } catch (err) {
         _warn('[TrackerReplayer] libopenmpt failed, falling back to ToneEngine:', err);
         this.useLibopenmptPlayback = false;

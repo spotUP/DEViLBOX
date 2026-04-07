@@ -11,6 +11,10 @@
 
 import { getDevilboxAudioContext } from '@utils/audio-context';
 import { getToneEngine } from '@engine/ToneEngine';
+import * as Tone from 'tone';
+import type { PlaybackCoordinator } from '@engine/PlaybackCoordinator';
+import type { TrackerSong } from '@engine/TrackerReplayer';
+import { useSettingsStore } from '@stores/useSettingsStore';
 
 // ---------------------------------------------------------------------------
 // Position callback type
@@ -279,6 +283,125 @@ export class LibopenmptEngine {
     return this._playing;
   }
 
+  /**
+   * Whether this engine has already wired its output into a destination
+   * AudioNode for the active TrackerReplayer session. Reset on dispose() and
+   * stays false on every fresh getInstance() — startWithCoordinator() guards
+   * against double-routing during play() reloads.
+   */
+  private _routed = false;
+
+  /**
+   * High-level "start playing this song under the given coordinator" entry
+   * point. Replaces ~80 lines of glue that previously lived inline in
+   * TrackerReplayer.play(). Owns:
+   *
+   *   - readiness check + availability fallback
+   *   - bridge serialize (if user has unsaved soundlib edits)
+   *   - loadTune
+   *   - one-time audio routing into the destination AudioNode
+   *   - stereo separation read from settings store
+   *   - position-update subscription that dispatches through the coordinator
+   *   - song-end forwarding to coordinator.onSongEnd
+   *   - play() + initial seek (unless `startMuted`)
+   *
+   * Returns `{ started: true }` on success. Returns `{ started: false }` if
+   * the worklet failed to initialize so the caller can fall back to its TS
+   * scheduler. Throws on programming errors only — load failures are reported
+   * via the return value.
+   */
+  async startWithCoordinator(
+    coordinator: PlaybackCoordinator,
+    opts: {
+      song: TrackerSong;
+      /** AudioNode to route engine output to. Pass null to use context.destination. */
+      destination: AudioNode | null;
+      /** Initial seek position. (0, 0) skips the seek. */
+      initialSongPos: number;
+      initialPattPos: number;
+      /** If true, loadTune but don't call play() (used when the replayer is muted). */
+      startMuted: boolean;
+    },
+  ): Promise<{ started: boolean }> {
+    await this.ready();
+    if (!this.isAvailable()) return { started: false };
+
+    if (!opts.song.libopenmptFileData) {
+      throw new Error('LibopenmptEngine.startWithCoordinator: song.libopenmptFileData is null');
+    }
+
+    // If the user has unsaved soundlib edits, re-serialize from the soundlib
+    // (the canonical document model) and use that as the load buffer. The
+    // bridge clears its dirty flag and cancels any pending hot-reload timer.
+    let tuneData: ArrayBuffer = opts.song.libopenmptFileData;
+    const bridge = await import('@engine/libopenmpt/OpenMPTEditBridge');
+    if (bridge.isActive() && bridge.isDirty()) {
+      const serialized = await bridge.serialize();
+      if (serialized) {
+        tuneData = serialized;
+        // Cache the serialized buffer so subsequent plays don't re-serialize.
+        opts.song.libopenmptFileData = serialized;
+      }
+    }
+
+    await this.loadTune(tuneData);
+
+    // Route output exactly once per engine instance. The destination is
+    // typically the stereo separation chain's input node; pass null to
+    // route directly to context.destination.
+    if (!this._routed) {
+      const target = opts.destination ?? this.output.context.destination;
+      try {
+        this.output.connect(target);
+        this._routed = true;
+      } catch (err) {
+        console.warn('[LibopenmptEngine] startWithCoordinator: routing failed, falling back to context.destination:', err);
+        try {
+          this.output.connect(this.output.context.destination);
+          this._routed = true;
+        } catch { /* truly broken — return failure */ }
+      }
+    }
+
+    // Apply current stereo separation setting from the settings store.
+    {
+      const settings = useSettingsStore.getState();
+      const sep = settings.stereoSeparationMode === 'pt2'
+        ? settings.stereoSeparation * 2  // PT2 0-100 → libopenmpt 0-200
+        : settings.modplugSeparation;     // ModPlug already 0-200
+      this.setStereoSeparation(sep);
+    }
+
+    // Position subscription. The worklet posts position updates ~344 times/sec
+    // at 44.1kHz; we throttle to row-change events and dispatch through the
+    // coordinator (which handles songPos/pattPos, display state, callbacks,
+    // hybrid notes).
+    let lastRow = -1;
+    let lastOrder = -1;
+    this.onPosition = (order, _pattern, row, audioTime) => {
+      if (row === lastRow && order === lastOrder) return;
+      lastRow = row;
+      lastOrder = order;
+      coordinator.dispatchEnginePosition(row, order, audioTime, Tone.now());
+    };
+
+    // Song end → coordinator.onSongEnd. The coordinator forwards to the
+    // TrackerReplayer's debounced song-end handling.
+    this.onEnded = () => {
+      if (coordinator.onSongEnd) coordinator.onSongEnd();
+    };
+
+    // Start playback unless the replayer is muted (paused-on-load case).
+    if (!opts.startMuted) {
+      this.play();
+      if (opts.initialSongPos > 0 || opts.initialPattPos > 0) {
+        this.seekTo(opts.initialSongPos, opts.initialPattPos);
+      }
+    }
+
+    return { started: true };
+  }
+
   dispose(): void {
     this.stop();
     try { this.workletNode?.disconnect(); } catch { /* ignored */ }
@@ -288,6 +411,7 @@ export class LibopenmptEngine {
     this._ready = false;
     this._available = false;
     this._pendingData = null;
+    this._routed = false;
     LibopenmptEngine.instance = null;
   }
 }
