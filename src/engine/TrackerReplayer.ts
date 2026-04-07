@@ -1720,13 +1720,22 @@ export class TrackerReplayer {
 
     // ── Universal hybrid playback setup (ALL formats) ──────────────────────
     // Rebuild _replacedInstruments from current instrument store state.
-    // Any instrument whose synthType is not Sampler/Player is "replaced" —
-    // the hybrid block will fire ToneEngine notes for it.
+    // Any instrument whose synthType is not Sampler/Player AND not a native
+    // whole-song player type is "replaced" — the hybrid block will fire
+    // ToneEngine notes for it. Native whole-song players (HVL, TFMX, FC,
+    // SID, etc.) handle all their instruments internally via the engine
+    // singleton — they must NOT get standalone players.
     {
+      const nativeWholePlayerTypes = new Set([
+        'HivelySynth', 'UADESynth', 'UADEEditableSynth', 'SymphonieSynth',
+        'MusicLineSynth', 'JamCrackerSynth', 'PreTrackerSynth', 'FuturePlayerSynth',
+        'TFMXSynth', 'FCSynth', 'C64SID',
+      ]);
       const { useInstrumentStore } = await import('@stores/useInstrumentStore');
       const instruments = useInstrumentStore.getState().instruments;
       for (const inst of instruments) {
-        if (inst.synthType !== 'Sampler' && inst.synthType !== 'Player') {
+        if (inst.synthType !== 'Sampler' && inst.synthType !== 'Player'
+            && !nativeWholePlayerTypes.has(inst.synthType || '')) {
           this._replacedInstruments.add(inst.id);
         }
       }
