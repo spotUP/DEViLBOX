@@ -469,19 +469,16 @@ export async function parseUADEFile(
   // Compiled 68k replayer formats loop indefinitely without an end signal.
   // Skip the worklet's built-in scan for these to avoid a 600-second hang.
   // Prefix-based formats (dl.*, dln.*, rh.*) are matched by the leading component.
+  //
+  // NOTE: Only formats that genuinely CRASH, HANG, or CORRUPT the engine are listed here.
+  // Formats that merely produce "wrong audio" during scan are NOT skipped — their scan
+  // still captures valid CIA tick snapshots for pattern reconstruction, even though the
+  // extracted PCM is unusable. Those formats are handled by FORCE_CLASSIC_FORMATS instead,
+  // which routes audio to UADESynth streaming while using tick data for pattern display.
   const prefix = basename.split('.')[0]?.toLowerCase() ?? '';
   const SKIP_SCAN_EXTS = new Set(['jpo', 'jpold', 'rh', 'rhp',
     'mon',   // ManiacsOfNoise — enhanced scan crashes browser
     'sa',    // SonicArranger compiled binary variant — JSR prolog, enhanced scan hangs
-    // Suffix-form compiled replayer formats (test files use .ext suffix, not prefix.name):
-    'spl',   // SoundProgrammingLanguage — AmigaDOS hunk, enhanced scan gives wrong audio
-    'riff',  // RiffRaff — AmigaDOS hunk, enhanced scan gives wrong audio
-    'hd',    // HowieDavies — AmigaDOS hunk, enhanced scan gives wrong audio
-    'tw',    // Thomas Weber — 68k BRA code, enhanced scan gives wrong audio
-    'dz',    // DariusZendeh — 68k MOVEM prolog, enhanced scan gives wrong audio
-    'bss',   // BeathovenSynthesizer — AmigaDOS hunk, enhanced scan gives wrong audio
-    'scn',   // SeanConnolly — 68k BRA code, enhanced scan gives wrong audio
-    'scumm', // SCUMM — 68k compiled replayer, enhanced scan gives wrong audio
     'aps',   // AProSys — ADRVPACK-packed binary; scan produces garbage rows
     'sas',   // SonicArranger suffix-form compiled binary — scan crashes browser
     'mso',   // Medley — enhanced scan crashes browser
@@ -491,22 +488,12 @@ export async function parseUADEFile(
   ]);
   const SKIP_SCAN_PREFIXES = new Set(['dl_deli', 'dln', 'rh',
     'sas',   // SonicArranger prefix-form — enhanced scan crashes browser
-    'spl',   // SoundProgrammingLanguage — compiled replayer
-    'riff',  // RiffRaff — compiled replayer
-    'hd',    // HowieDavies — compiled replayer
-    'tw',    // Thomas Weber — compiled replayer (BRA code)
-    'dz',    // Darius Zendeh — compiled replayer (MOVEM prolog)
-    'bss',   // Beathoven Synthesizer — AmigaDOS hunk binary
-    'scn',   // Sean Connolly — compiled replayer (BRA code)
-    'scumm', // SCUMM music — compiled replayer
-    'dns',   // Dynamic Synthesizer — compiled replayer (BRA code)
-    'mk2', 'mkii', // MarkII — compiled 68k (MOVEM prolog); test file atron.mk2 confirmed
     'aps',   // AProSys — ADRVPACK-packed binary; scan produces garbage rows
     'ash',   // AshleyHogg — compiled 68k replayer, enhanced scan crashes browser
     'tsm',   // SunTronic/TSM — compiled 68k synth replayer, enhanced scan corrupts engine state
   ]);
   // SKIP_SCAN formats are compiled/packed binaries where the Paula register scan either
-  // hangs indefinitely or produces garbage rows. Skip scan regardless of mode.
+  // hangs indefinitely, crashes the browser, or corrupts engine state. Skip scan for these.
   const skipScan = SKIP_SCAN_EXTS.has(ext) || SKIP_SCAN_PREFIXES.has(prefix);
 
   const metadata = preScannedMeta ?? await engine.load(buffer, filename, skipScan);
@@ -2162,6 +2149,13 @@ async function reconstructClassicPatterns(
       console.log(
         `[UADEParser] Classic tick reconstructor: ${reconstructed.patterns.length} patterns, speed=${reconstructed.speed}`,
       );
+    } else {
+      // No tick data from scan — enable deferred capture during playback.
+      // This happens for SKIP_SCAN formats where the scan was skipped entirely.
+      // The UADEEngine subscribeToCoordinator() will enable live tick capture
+      // and reconstruct patterns after ~15 seconds of playback.
+      (song as any).uadeDeferredCapture = true;
+      console.log('[UADEParser] No tick data from scan — enabling deferred capture during playback');
     }
   } catch (e) {
     console.warn('[UADEParser] Classic pattern reconstruction failed (non-critical):', e);

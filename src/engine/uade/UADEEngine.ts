@@ -174,6 +174,10 @@ export class UADEEngine {
   private _wpHitsPending = new Map<number, { resolve: (v: WatchpointHit[]) => void; reject: (e: Error) => void }>();
   private _wpHitsNextId = 0;
 
+  // Live tick capture: accumulated snapshots from playback for incremental pattern reconstruction
+  private _liveTickSnapshots: UADETickSnapshot[] = [];
+  private _liveTickCallbacks: Set<(snapshots: UADETickSnapshot[]) => void> = new Set();
+
   private constructor() {
     this.audioContext = getDevilboxAudioContext();
     this.output = this.audioContext.createGain();
@@ -502,6 +506,16 @@ export class UADEEngine {
           this._wpHitsPending.delete(requestId);
           break;
         }
+        case 'liveTickBatch': {
+          const snapshots = data.snapshots as UADETickSnapshot[];
+          if (snapshots.length > 0) {
+            this._liveTickSnapshots.push(...snapshots);
+            for (const cb of this._liveTickCallbacks) {
+              cb(this._liveTickSnapshots);
+            }
+          }
+          break;
+        }
       }
     };
 
@@ -749,14 +763,19 @@ export class UADEEngine {
     }
 
     // ── 3. Deferred pattern capture for SKIP_SCAN formats ────────────────
+    // Also enables live tick capture so patterns build up during playback.
     if (song.uadeDeferredCapture) {
-      this.enableTickSnapshots(true);
+      this.enableLiveTickCapture(true);
       const captureEngine = this;
       const captureSong = song;
       const deferredTimer = window.setTimeout(async () => {
         try {
-          const tickSnapshots = await captureEngine.getTickSnapshots();
-          captureEngine.enableTickSnapshots(false);
+          // Drain accumulated live tick snapshots (or fall back to ring buffer)
+          let tickSnapshots = captureEngine.getLiveTickSnapshots();
+          if (tickSnapshots.length < 10) {
+            tickSnapshots = await captureEngine.getTickSnapshots();
+          }
+          captureEngine.enableLiveTickCapture(false);
           if (tickSnapshots.length < 10) return;
 
           const { reconstructPatterns } = await import('@engine/uade/UADEPatternReconstructor');
@@ -771,14 +790,23 @@ export class UADEEngine {
           );
 
           if (reconstructed.patterns.length > 0) {
-            // Update song in-place (store will pick up the changes)
             captureSong.patterns = reconstructed.patterns;
             captureSong.songPositions = reconstructed.patterns.map((_, i) => i);
             captureSong.songLength = reconstructed.patterns.length;
             captureSong.initialSpeed = reconstructed.speed;
             captureSong.uadeFirstTick = reconstructed.firstTick;
             captureSong.uadeDeferredCapture = false;
-            console.log(`[UADEEngine] Deferred capture: ${reconstructed.patterns.length} patterns reconstructed`);
+
+            // Update the TrackerStore so the UI reflects the new patterns
+            try {
+              const { useTrackerStore } = await import('@stores/useTrackerStore');
+              const store = useTrackerStore.getState();
+              store.loadPatterns(reconstructed.patterns);
+              store.setPatternOrder(reconstructed.patterns.map((_, i) => i));
+              console.log(`[UADEEngine] Deferred capture: ${reconstructed.patterns.length} patterns loaded into store`);
+            } catch (storeErr) {
+              console.warn('[UADEEngine] Could not update TrackerStore:', storeErr);
+            }
           }
         } catch (e) {
           console.warn('[UADEEngine] Deferred pattern capture failed:', e);
@@ -786,7 +814,7 @@ export class UADEEngine {
       }, 15000);
       cleanups.push(() => {
         clearTimeout(deferredTimer);
-        this.enableTickSnapshots(false);
+        this.enableLiveTickCapture(false);
       });
     }
 
@@ -1045,6 +1073,29 @@ export class UADEEngine {
     });
     this.workletNode.port.postMessage({ type: 'getTickSnapshots', requestId });
     return promise;
+  }
+
+  /**
+   * Enable/disable live tick capture during playback.
+   * When enabled, tick snapshots are continuously captured and sent to the main thread
+   * via liveTickBatch messages. Subscribe to updates via onLiveTickUpdate().
+   */
+  enableLiveTickCapture(enable: boolean): void {
+    if (enable) {
+      this._liveTickSnapshots = [];
+    }
+    this.workletNode?.port.postMessage({ type: 'enableLiveTickCapture', enable });
+  }
+
+  /** Subscribe to live tick batch updates. Returns unsubscribe function. */
+  onLiveTickUpdate(cb: (allSnapshots: UADETickSnapshot[]) => void): () => void {
+    this._liveTickCallbacks.add(cb);
+    return () => { this._liveTickCallbacks.delete(cb); };
+  }
+
+  /** Get all accumulated live tick snapshots. */
+  getLiveTickSnapshots(): UADETickSnapshot[] {
+    return this._liveTickSnapshots;
   }
 
   /** Set a memory watchpoint on chip RAM. mode: 1=read, 2=write, 3=both. */
