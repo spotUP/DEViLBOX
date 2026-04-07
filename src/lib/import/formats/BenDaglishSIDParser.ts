@@ -133,11 +133,20 @@ export async function parseBenDaglishSIDFile(
   let moduleName = baseName.replace(/\.bds$/i, '') || baseName;
 
   // ── Subsong count from header ─────────────────────────────────────────────
+  //
+  // u32BE at offset 56 = subsong count (validated non-zero by detection).
+  // Clamp to a sane range (1..64) as a safety measure.
 
-  const subsongCount = u32BE(buf, 56);
-  if (subsongCount > 1) {
-    moduleName += ` (${subsongCount} subsongs)`;
-  }
+  const rawSubsongs = u32BE(buf, 56);
+  const subsongCount = Math.min(Math.max(rawSubsongs, 1), 64);
+
+  // ── Extract additional header pointers for metadata ───────────────────────
+  //
+  // +44: interrupt pointer
+  // +48: audio interrupt pointer
+  // +52: InitSong pointer
+
+  const initSongPtr = u32BE(buf, 52);
 
   // ── 3 SID voice instruments (synthesis, no PCM) ───────────────────────────
 
@@ -153,6 +162,10 @@ export async function parseBenDaglishSIDFile(
       pan: 0,
     } as InstrumentConfig);
   }
+
+  // ── Song positions (one entry per subsong) ────────────────────────────────
+
+  const songPositions = Array.from({ length: Math.max(subsongCount, 1) }, (_, i) => i % 1);
 
   // ── Empty pattern (placeholder — UADE handles actual audio) ───────────────
 
@@ -172,7 +185,7 @@ export async function parseBenDaglishSIDFile(
     length: 64,
     channels: Array.from({ length: 3 }, (_, ch) => ({
       id: `channel-${ch}`,
-      name: `Channel ${ch + 1}`,
+      name: `SID Voice ${ch + 1}`,
       muted: false,
       solo: false,
       collapsed: false,
@@ -189,16 +202,25 @@ export async function parseBenDaglishSIDFile(
       originalChannelCount: 3,
       originalPatternCount: 1,
       originalInstrumentCount: 3,
+      subsongCount,
+      initSongPtr,
     },
   };
 
+  // ── Display name ──────────────────────────────────────────────────────────
+
+  let displayName = `${moduleName} [Ben Daglish SID]`;
+  if (subsongCount > 1) {
+    displayName += ` (${subsongCount} subsongs)`;
+  }
+
   return {
-    name: `${moduleName} [Ben Daglish SID]`,
+    name: displayName,
     format: 'MOD' as TrackerFormat,
     patterns: [pattern],
     instruments,
-    songPositions: [0],
-    songLength: 1,
+    songPositions,
+    songLength: songPositions.length,
     restartPosition: 0,
     numChannels: 3,
     initialSpeed: 6,

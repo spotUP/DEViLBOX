@@ -71,6 +71,23 @@ export function isCoreDesignFormat(buffer: ArrayBuffer | Uint8Array): boolean {
   return true;
 }
 
+function u16BE(buf: Uint8Array, off: number): number {
+  return ((buf[off] << 8) | buf[off + 1]) >>> 0;
+}
+
+/**
+ * Read a null-terminated ASCII string from buf starting at off, up to maxLen bytes.
+ */
+function readCString(buf: Uint8Array, off: number, maxLen: number): string {
+  let s = '';
+  for (let i = 0; i < maxLen && off + i < buf.length; i++) {
+    const ch = buf[off + i];
+    if (ch === 0) break;
+    if (ch >= 0x20 && ch < 0x7f) s += String.fromCharCode(ch);
+  }
+  return s;
+}
+
 export function parseCoreDesignFile(buffer: ArrayBuffer, filename: string): TrackerSong {
   const buf = new Uint8Array(buffer);
   if (!isCoreDesignFormat(buf)) throw new Error('Not a Core Design module');
@@ -78,10 +95,92 @@ export function parseCoreDesignFile(buffer: ArrayBuffer, filename: string): Trac
   const baseName = filename.split('/').pop() ?? filename;
   const moduleName = baseName.replace(/^core\./i, '') || baseName;
 
-  const instruments: InstrumentConfig[] = [{
-    id: 1, name: 'Sample 1', type: 'synth' as const,
-    synthType: 'Synth' as const, effects: [], volume: 0, pan: 0,
-  } as InstrumentConfig];
+  // ── Extract pointers from the module header ─────────────────────────────
+  //
+  // The HUNK-format module header has known pointer slots after the signature:
+  //   +44: Interrupt pointer
+  //   +48: AudioInterrupt pointer
+  //   +52: InitSong pointer
+  //   +56: EndSong pointer
+  //   +60: Subsongs pointer
+  //   +64: SampleInfoPtr (if present)
+  //   +68: EndSampleInfoPtr (if present)
+  //
+  // Sample info entries are 14 bytes each:
+  //   u16 offsetHi, u32 offsetLo (6 bytes offset), u8 type, u8 flags,
+  //   u16 reserved, u16 lengthWords, u16 volume
+
+  // ── Sample extraction ──────────────────────────────────────────────────
+
+  const instruments: InstrumentConfig[] = [];
+  let sampleCount = 0;
+  let songName = '';
+  let authorName = '';
+
+  try {
+    // Scan for sample-like 14-byte entries in the region after the header.
+    // A valid sample entry has: non-zero length (u16 at +10), volume 0-64 (u16 at +12)
+    const SAMPLE_ENTRY_SIZE = 14;
+    const scanStart = 64;
+    const scanEnd = Math.min(buf.length, 2048);
+
+    // Try to find a contiguous run of valid 14-byte sample entries
+    for (let base = scanStart; base < scanEnd; base += 2) {
+      const candidates: Array<{ length: number; volume: number }> = [];
+      let off = base;
+
+      for (let i = 0; i < 64 && off + SAMPLE_ENTRY_SIZE <= buf.length; i++) {
+        const lenWords = u16BE(buf, off + 10);
+        const vol = u16BE(buf, off + 12);
+        if (lenWords === 0 || lenWords > 0x8000) break;
+        if (vol > 64) break;
+        candidates.push({ length: lenWords * 2, volume: vol });
+        off += SAMPLE_ENTRY_SIZE;
+      }
+
+      if (candidates.length >= 2) {
+        for (let i = 0; i < candidates.length; i++) {
+          instruments.push({
+            id: i + 1,
+            name: `Sample ${i + 1} (${candidates[i].length} bytes)`,
+            type: 'synth' as const,
+            synthType: 'Synth' as const,
+            effects: [],
+            volume: 0,
+            pan: 0,
+          } as InstrumentConfig);
+        }
+        sampleCount = candidates.length;
+        break;
+      }
+    }
+
+    // Try extracting ASCII strings from the region around offset 64-200
+    // for song/author names (some Core Design modules embed these)
+    for (let off = 64; off < Math.min(buf.length - 32, 512); off++) {
+      const test = readCString(buf, off, 32);
+      if (test.length >= 4 && !songName) {
+        // Heuristic: first printable string of 4+ chars could be the title
+        songName = test;
+      } else if (test.length >= 4 && songName && !authorName && test !== songName) {
+        authorName = test;
+        break;
+      }
+    }
+  } catch {
+    // Binary scan failed — fall back to defaults
+  }
+
+  // Fallback: single placeholder instrument
+  if (instruments.length === 0) {
+    instruments.push({
+      id: 1, name: 'Sample 1', type: 'synth' as const,
+      synthType: 'Synth' as const, effects: [], volume: 0, pan: 0,
+    } as InstrumentConfig);
+    sampleCount = 1;
+  }
+
+  // ── Empty pattern (placeholder — UADE handles actual audio) ───────────
 
   const emptyRows = Array.from({ length: 64 }, () => ({
     note: 0, instrument: 0, volume: 0, effTyp: 0, eff: 0, effTyp2: 0, eff2: 0,
@@ -98,12 +197,19 @@ export function parseCoreDesignFile(buffer: ArrayBuffer, filename: string): Trac
     importMetadata: {
       sourceFormat: 'MOD' as const, sourceFile: filename,
       importedAt: new Date().toISOString(),
-      originalChannelCount: 4, originalPatternCount: 1, originalInstrumentCount: 0,
+      originalChannelCount: 4, originalPatternCount: 1,
+      originalInstrumentCount: sampleCount,
     },
   };
 
+  // ── Display name ─────────────────────────────────────────────────────
+
+  let displayName = songName || moduleName;
+  if (authorName) displayName += ` by ${authorName}`;
+  displayName += ' [Core Design]';
+
   return {
-    name: `${moduleName} [Core Design]`,
+    name: displayName,
     format: 'MOD' as TrackerFormat,
     patterns: [pattern], instruments,
     songPositions: [0], songLength: 1, restartPosition: 0,

@@ -40,7 +40,7 @@
  */
 
 import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
-import type { InstrumentConfig } from '@/types';
+import type { InstrumentConfig, Pattern, TrackerCell, ChannelData } from '@/types';
 
 // ── Constants ───────────────────────────────────────────────────────────────
 
@@ -48,10 +48,25 @@ import type { InstrumentConfig } from '@/types';
 const MIN_FILE_SIZE = 24;
 
 const DEFAULT_INSTRUMENTS = 8;
+const NUM_CHANNELS = 4;
+const ROWS_PER_PATTERN = 64;
+const MAX_EVENTS = 4096;
 
 // ── Binary helpers ──────────────────────────────────────────────────────────
 
+function u16BE(buf: Uint8Array, off: number): number {
+  if (off + 1 >= buf.length) return 0;
+  return ((buf[off] << 8) | buf[off + 1]) >>> 0;
+}
+
+/** Signed 16-bit big-endian read. */
+function i16BE(buf: Uint8Array, off: number): number {
+  const v = u16BE(buf, off);
+  return v < 0x8000 ? v : v - 0x10000;
+}
+
 function u32BE(buf: Uint8Array, off: number): number {
+  if (off + 3 >= buf.length) return 0;
   return (
     ((buf[off] << 24) | (buf[off + 1] << 16) | (buf[off + 2] << 8) | buf[off + 3]) >>> 0
   );
@@ -126,13 +141,343 @@ export function isAnders0landFormat(buffer: ArrayBuffer, filename?: string): boo
   return true;
 }
 
+// ── Note conversion ─────────────────────────────────────────────────────────
+
+/**
+ * Convert an Amiga period table index to an XM tracker note value.
+ * Index 0 = C-1 (Amiga) → tracker note 25 (C-3 in FT2).
+ */
+function amigaIndexToTrackerNote(idx: number): number {
+  const n = idx + 25;
+  return (n >= 1 && n <= 96) ? n : 0;
+}
+
+// ── Pattern extraction types ────────────────────────────────────────────────
+
+/** An event parsed from the pattern byte stream */
+interface A0Event {
+  tick: number;
+  note: number;       // tracker note (1-96), 0 = no note
+  instrument: number; // 1-based, 0 = no change
+}
+
+// ── Pattern byte stream parsing ─────────────────────────────────────────────
+
+/**
+ * Parse a single pattern data block for one voice channel.
+ *
+ * Pattern byte encoding (from transpiled C source, Init/Play functions):
+ *   First byte (d1):
+ *     Bit 7: has extra instrument/parameter byte following
+ *     Bit 6: command/effect byte (not a direct note trigger)
+ *     Bit 5: sustain flag (hold previous note)
+ *     Bits 0-4: duration (ticks to wait before next event)
+ *
+ *   When bit 7 or bit 6 is set:
+ *     Second byte (d2): instrument number (bit 7 set) or command param (bit 6 set)
+ *     If d2 & 0x80 == 0: third byte is the note byte, 3-byte event
+ *     If d2 & 0x80 != 0: no note byte, 2-byte event (sustain)
+ *
+ *   When bits 7,6 clear, bit 5 set: 1-byte event (sustain)
+ *   When bits 7,6,5 all clear: second byte is the note byte, 2-byte event
+ *
+ *   Note byte: bit 7 = slide flag, bits 0-6 = period table index
+ *   $FF = end of pattern data block
+ */
+function parseA0PatternBlock(
+  buf: Uint8Array,
+  off: number,
+  transpose: number,
+): A0Event[] {
+  const events: A0Event[] = [];
+  let pos = 0;
+  let tick = 0;
+  let currentInstr = 1;
+  let safety = 0;
+
+  while (safety++ < MAX_EVENTS) {
+    const absPos = off + pos;
+    if (absPos >= buf.length) break;
+
+    const d1 = buf[absPos];
+    if (d1 === 0xFF) break;  // end of pattern data block
+
+    const duration = d1 & 0x1F;
+    const hasBit7 = (d1 & 0x80) !== 0;
+    const hasBit6 = (d1 & 0x40) !== 0;
+    const hasBit5 = (d1 & 0x20) !== 0;
+
+    let advance: number;
+    let noteOff = -1;
+
+    if (hasBit7 || hasBit6) {
+      // Bit 7 or bit 6 set: read extra byte d2
+      if (absPos + 1 >= buf.length) break;
+      const d2 = buf[absPos + 1];
+
+      if (hasBit7) {
+        // Instrument change: d2 & 0x7F = instrument number
+        currentInstr = (d2 & 0x7F) + 1;
+      }
+
+      if ((d2 & 0x80) === 0) {
+        // d2 bit 7 clear: 3-byte event, note byte at byte[2]
+        advance = 3;
+        noteOff = absPos + 2;
+      } else {
+        // d2 bit 7 set: 2-byte event, sustain (no note)
+        advance = 2;
+      }
+    } else if (hasBit5) {
+      // Sustain: 1-byte event, no note
+      advance = 1;
+    } else {
+      // Normal note trigger: 2-byte event, note byte at byte[1]
+      advance = 2;
+      noteOff = absPos + 1;
+    }
+
+    if (noteOff >= 0 && noteOff < buf.length) {
+      const noteByte = buf[noteOff];
+      const noteIndex = (noteByte & 0x7F) + transpose;
+      const trackerNote = amigaIndexToTrackerNote(noteIndex);
+      if (trackerNote > 0) {
+        events.push({ tick, note: trackerNote, instrument: currentInstr });
+      }
+    }
+
+    tick += Math.max(1, duration);
+    pos += advance;
+  }
+
+  return events;
+}
+
+/**
+ * Read a per-voice position list from the binary.
+ * Each byte is a position entry until $FF (loop) or $FE (end).
+ *
+ * Returns { indices, transposes } arrays parallel to each other.
+ * Position bytes with bit 7 set encode an instrument/transpose change
+ * (bits 0-6), followed by the actual pattern index byte.
+ */
+function readA0PositionList(
+  buf: Uint8Array,
+  off: number,
+): { indices: number[]; transposes: number[] } {
+  const indices: number[] = [];
+  const transposes: number[] = [];
+  let pos = 0;
+  let currentTranspose = 0;
+
+  for (let safety = 0; safety < 512; safety++) {
+    const absPos = off + pos;
+    if (absPos >= buf.length) break;
+
+    const b = buf[absPos];
+    if (b === 0xFF || b === 0xFE) break;
+
+    if (b & 0x80) {
+      // Instrument/transpose change: bits 0-6 = new transpose
+      currentTranspose = b & 0x7F;
+      pos++;
+      // Next byte is the actual pattern index
+      if (off + pos >= buf.length) break;
+      const patIdx = buf[off + pos];
+      if (patIdx === 0xFF || patIdx === 0xFE) break;
+      indices.push(patIdx);
+      transposes.push(currentTranspose);
+      pos++;
+    } else {
+      indices.push(b);
+      transposes.push(currentTranspose);
+      pos++;
+    }
+  }
+
+  return { indices, transposes };
+}
+
+/**
+ * Extract pattern data from the mdt chunk.
+ *
+ * mdt header layout (relative to mdt data start):
+ *   i16@0:  offset to position data table (4 × u32 offsets to per-voice position lists)
+ *   i16@2:  offset to song entries table
+ *   i16@4:  offset to voice config table
+ *   i16@10: offset to pattern pointer table (u32 offsets relative to table start)
+ *   i16@12: offset to instrument table (8 bytes per instrument)
+ *
+ * The position data table at i16@0 contains 4 longword offsets (one per voice),
+ * each pointing (relative to the table itself) to a per-voice position list.
+ * Each position list is a byte array of pattern indices.
+ *
+ * The pattern pointer table at i16@10 maps pattern indices to pattern data:
+ *   patternDataAddr = patternTable + u32BE(patternTable + index * 4)
+ */
+function extractA0Patterns(
+  buf: Uint8Array,
+  mdtDataOff: number,
+  _numPatterns: number,
+): { events: A0Event[][], maxPositions: number } | null {
+  try {
+    if (mdtDataOff + 14 > buf.length) return null;
+
+    // Read mdt header offsets (signed 16-bit, relative to mdtDataOff)
+    const posTableOff = mdtDataOff + i16BE(buf, mdtDataOff + 0);
+    const patternTableOff = mdtDataOff + i16BE(buf, mdtDataOff + 10);
+
+    // Validate offsets
+    if (posTableOff < 0 || posTableOff + 16 > buf.length) return null;
+    if (patternTableOff < 0 || patternTableOff + 4 > buf.length) return null;
+
+    // Read per-voice position list pointers from posTable (4 × u32)
+    const voiceEvents: A0Event[][] = [[], [], [], []];
+    let maxPositions = 0;
+
+    for (let ch = 0; ch < NUM_CHANNELS; ch++) {
+      // Each voice's position list pointer is a u32 offset from posTable
+      const posListRelOff = u32BE(buf, posTableOff + ch * 4);
+      // Handle as signed for relative offset
+      const posListOff = posTableOff + posListRelOff;
+      if (posListOff < 0 || posListOff >= buf.length) continue;
+
+      const { indices, transposes } = readA0PositionList(buf, posListOff);
+      if (indices.length > maxPositions) maxPositions = indices.length;
+
+      // Walk position entries and parse each pattern data block
+      let globalTick = 0;
+      for (let p = 0; p < indices.length; p++) {
+        const patIdx = indices[p];
+        const transpose = transposes[p];
+
+        // Look up pattern data address from pattern pointer table
+        const patPtrOff = patternTableOff + patIdx * 4;
+        if (patPtrOff + 4 > buf.length) continue;
+
+        const patRelOff = u32BE(buf, patPtrOff);
+        const patDataOff = patternTableOff + patRelOff;
+        if (patDataOff < 0 || patDataOff >= buf.length) continue;
+
+        // Parse the pattern data block
+        const blockEvents = parseA0PatternBlock(buf, patDataOff, transpose);
+
+        // Offset events by globalTick and add to voice events
+        for (const ev of blockEvents) {
+          voiceEvents[ch].push({
+            tick: globalTick + ev.tick,
+            note: ev.note,
+            instrument: ev.instrument,
+          });
+        }
+
+        // Advance globalTick by the max tick in this block + 1
+        let maxTick = 0;
+        for (const ev of blockEvents) {
+          if (ev.tick > maxTick) maxTick = ev.tick;
+        }
+        globalTick += maxTick + 1;
+      }
+    }
+
+    // Count total notes extracted
+    let totalNotes = 0;
+    for (const events of voiceEvents) {
+      totalNotes += events.filter(e => e.note > 0).length;
+    }
+
+    if (totalNotes === 0) return null;
+    return { events: voiceEvents, maxPositions };
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Convert per-channel events into unified tracker patterns.
+ * Groups events into 64-row patterns, aligned by tick count.
+ */
+function buildA0Patterns(
+  channelEvents: A0Event[][],
+  filename: string,
+  numPatterns: number,
+  numInstruments: number,
+): Pattern[] {
+  const patterns: Pattern[] = [];
+
+  // Find total number of rows needed (max tick across channels)
+  let maxTick = 0;
+  for (const events of channelEvents) {
+    for (const ev of events) {
+      if (ev.tick > maxTick) maxTick = ev.tick;
+    }
+  }
+
+  const totalRows = maxTick + 1;
+  const patCount = Math.max(1, Math.min(256, Math.ceil(totalRows / ROWS_PER_PATTERN)));
+
+  for (let p = 0; p < patCount; p++) {
+    const startTick = p * ROWS_PER_PATTERN;
+    const channels: ChannelData[] = [];
+
+    for (let ch = 0; ch < NUM_CHANNELS; ch++) {
+      const rows: TrackerCell[] = [];
+      const events = channelEvents[ch] || [];
+
+      for (let r = 0; r < ROWS_PER_PATTERN; r++) {
+        const targetTick = startTick + r;
+        const ev = events.find(e => e.tick === targetTick);
+        rows.push({
+          note: ev?.note ?? 0,
+          instrument: ev?.instrument ?? 0,
+          volume: 0,
+          effTyp: ev?.note ? 0 : 0,
+          eff: 0,
+          effTyp2: 0,
+          eff2: 0,
+        });
+      }
+
+      channels.push({
+        id: `p${p}-ch${ch}`,
+        name: `Channel ${ch + 1}`,
+        muted: false,
+        solo: false,
+        collapsed: false,
+        volume: 100,
+        pan: (ch === 0 || ch === 3) ? -50 : 50,
+        instrumentId: null,
+        color: null,
+        rows,
+      });
+    }
+
+    patterns.push({
+      id: `pattern-${p}`,
+      name: `Pattern ${p}`,
+      length: ROWS_PER_PATTERN,
+      channels,
+      importMetadata: {
+        sourceFormat: 'MOD' as const,
+        sourceFile: filename,
+        importedAt: new Date().toISOString(),
+        originalChannelCount: NUM_CHANNELS,
+        originalPatternCount: numPatterns,
+        originalInstrumentCount: numInstruments,
+      },
+    });
+  }
+
+  return patterns;
+}
+
 // ── Main parser ─────────────────────────────────────────────────────────────
 
 /**
  * Parse an Anders 0land module file into a TrackerSong.
  *
- * The format is a structured Amiga multi-chunk binary. This parser creates a
- * metadata-only TrackerSong with placeholder instruments. Actual audio
+ * The format is a structured Amiga multi-chunk binary. This parser extracts
+ * pattern note data from the mdt chunk's byte stream encoding. Actual audio
  * playback is always delegated to UADE.
  *
  * @param buffer   Raw file bytes (ArrayBuffer)
@@ -199,40 +544,52 @@ export async function parseAnders0landFile(
     } as InstrumentConfig);
   }
 
-  // ── Empty patterns (placeholder — UADE handles actual audio) ──────────────
+  // ── Extract patterns from mdt chunk or fall back to empty ─────────────────
 
-  const patterns = [];
-  for (let p = 0; p < numPatterns; p++) {
-    const emptyRows = Array.from({ length: 64 }, () => ({
-      note: 0, instrument: 0, volume: 0,
-      effTyp: 0, eff: 0, effTyp2: 0, eff2: 0,
-    }));
+  let patterns: Pattern[];
+  let songPositions: number[];
 
-    patterns.push({
-      id: `pattern-${p}`,
-      name: `Pattern ${p}`,
-      length: 64,
-      channels: Array.from({ length: 4 }, (_, ch) => ({
-        id: `p${p}-ch${ch}`,
-        name: `Channel ${ch + 1}`,
-        muted: false,
-        solo: false,
-        collapsed: false,
-        volume: 100,
-        pan: ch === 0 || ch === 3 ? -50 : 50,
-        instrumentId: null,
-        color: null,
-        rows: emptyRows,
-      })),
-      importMetadata: {
-        sourceFormat: 'MOD' as const,
-        sourceFile: filename,
-        importedAt: new Date().toISOString(),
-        originalChannelCount: 4,
-        originalPatternCount: numPatterns,
-        originalInstrumentCount: numInstruments,
-      },
-    });
+  const extracted = extractA0Patterns(buf, mdtDataOff, numPatterns);
+
+  if (extracted && extracted.events.some(ch => ch.length > 0)) {
+    patterns = buildA0Patterns(extracted.events, filename, numPatterns, numInstruments);
+    songPositions = patterns.map((_, i) => i);
+  } else {
+    // Fallback: empty patterns
+    patterns = [];
+    for (let p = 0; p < numPatterns; p++) {
+      const emptyRows = Array.from({ length: ROWS_PER_PATTERN }, () => ({
+        note: 0, instrument: 0, volume: 0,
+        effTyp: 0, eff: 0, effTyp2: 0, eff2: 0,
+      }));
+
+      patterns.push({
+        id: `pattern-${p}`,
+        name: `Pattern ${p}`,
+        length: ROWS_PER_PATTERN,
+        channels: Array.from({ length: NUM_CHANNELS }, (_, ch) => ({
+          id: `p${p}-ch${ch}`,
+          name: `Channel ${ch + 1}`,
+          muted: false,
+          solo: false,
+          collapsed: false,
+          volume: 100,
+          pan: ch === 0 || ch === 3 ? -50 : 50,
+          instrumentId: null,
+          color: null,
+          rows: emptyRows,
+        })),
+        importMetadata: {
+          sourceFormat: 'MOD' as const,
+          sourceFile: filename,
+          importedAt: new Date().toISOString(),
+          originalChannelCount: NUM_CHANNELS,
+          originalPatternCount: numPatterns,
+          originalInstrumentCount: numInstruments,
+        },
+      });
+    }
+    songPositions = Array.from({ length: numPatterns }, (_, i) => i);
   }
 
   return {
@@ -240,10 +597,10 @@ export async function parseAnders0landFile(
     format: 'MOD' as TrackerFormat,
     patterns,
     instruments,
-    songPositions: Array.from({ length: numPatterns }, (_, i) => i),
-    songLength: numPatterns,
+    songPositions,
+    songLength: songPositions.length,
     restartPosition: 0,
-    numChannels: 4,
+    numChannels: NUM_CHANNELS,
     initialSpeed: 6,
     initialBPM: 125,
     linearPeriods: false,
