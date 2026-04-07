@@ -9,16 +9,19 @@
  * onUpdate(instrumentId, { sonicArranger: { ... } }) — the store handles any UADE
  * chip-RAM propagation downstream.
  *
- * The ADSR / AMF / waveform / arpeggio displays are read-only bar-charts for this
- * phase. Live drag-edit is a follow-up that would mirror the JamCracker AM waveform
- * drag editor.
+ * The ADSR table is drag-editable (0..64, unipolar) — the most commonly edited
+ * curve on this synth. AMF, waveform and the three arpeggio tables remain
+ * read-only for now; they use bipolar/waveform semantics that need separate
+ * drag wiring. Drag uses the shared writeUnipolarBar helper in
+ * src/lib/pixi/barChartDraw.ts.
  */
 
-import React, { useCallback } from 'react';
+import React, { useCallback, useEffect, useRef } from 'react';
 import { PixiKnob, PixiLabel } from '../../components';
 import { usePixiTheme } from '../../theme';
 import type { InstrumentConfig } from '@typedefs/instrument';
-import type { Graphics } from 'pixi.js';
+import type { Graphics, FederatedPointerEvent, Container } from 'pixi.js';
+import { writeUnipolarBar } from '@/lib/pixi/barChartDraw';
 
 const KNOB_SIZE = 'sm' as const;
 
@@ -81,6 +84,35 @@ export const PixiSonicArrangerPanel: React.FC<Props> = ({ instrument, onUpdate }
     },
     [instrument.id, instrument.sonicArranger, onUpdate],
   );
+
+  // ── Drag state for the ADSR table (mirrors the JamCracker drag pattern) ───
+  const saRef = useRef(sa);
+  useEffect(() => { saRef.current = sa; }, [sa]);
+  const instrumentIdRef = useRef(instrument.id);
+  useEffect(() => { instrumentIdRef.current = instrument.id; }, [instrument.id]);
+
+  const adsrDrawing = useRef(false);
+  const adsrLastIdx = useRef(-1);
+
+  const writeAdsrAt = useCallback((e: FederatedPointerEvent) => {
+    const cur = saRef.current;
+    const values = cur.adsrTable ?? [];
+    if (values.length === 0) return;
+    const local = e.getLocalPosition(e.currentTarget as Container);
+    const { next, idx } = writeUnipolarBar(
+      values,
+      local.x,
+      local.y,
+      DISPLAY_W,
+      DISPLAY_H,
+      64,
+      adsrLastIdx.current,
+    );
+    adsrLastIdx.current = idx;
+    onUpdate(instrumentIdRef.current, {
+      sonicArranger: { ...cur, adsrTable: next },
+    });
+  }, [onUpdate]);
 
   // ── Bar chart renderers (read-only) ────────────────────────────────────────
 
@@ -355,6 +387,24 @@ export const PixiSonicArrangerPanel: React.FC<Props> = ({ instrument, onUpdate }
           borderWidth: 1,
           borderColor: theme.border.color,
           borderRadius: 4,
+        }}
+        eventMode="static"
+        cursor="crosshair"
+        onPointerDown={(e: FederatedPointerEvent) => {
+          adsrDrawing.current = true;
+          adsrLastIdx.current = -1;
+          writeAdsrAt(e);
+        }}
+        onPointerMove={(e: FederatedPointerEvent) => {
+          if (adsrDrawing.current) writeAdsrAt(e);
+        }}
+        onPointerUp={() => {
+          adsrDrawing.current = false;
+          adsrLastIdx.current = -1;
+        }}
+        onPointerUpOutside={() => {
+          adsrDrawing.current = false;
+          adsrLastIdx.current = -1;
         }}
       >
         <pixiGraphics draw={drawAdsr} layout={{ width: DISPLAY_W, height: DISPLAY_H }} />
