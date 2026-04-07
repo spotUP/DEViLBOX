@@ -17,7 +17,7 @@
  */
 
 import * as Tone from 'tone';
-import { getNativeContext } from '@utils/audio-context';
+import { getNativeContext, getNativeAudioNode } from '@utils/audio-context';
 
 export interface TapeSimulatorOptions {
   drive?:     number;  // 0-1
@@ -43,6 +43,8 @@ export class TapeSimulatorEffect extends Tone.ToneAudioNode {
   private dryGain: Tone.Gain;
   private wetGain: Tone.Gain;
   private workletNode: AudioWorkletNode | null = null;
+  private fallbackShaper: WaveShaperNode | null = null;
+  private fallbackFilter: BiquadFilterNode | null = null;
   private _disposed = false;
   private _options: Required<TapeSimulatorOptions>;
 
@@ -62,23 +64,71 @@ export class TapeSimulatorEffect extends Tone.ToneAudioNode {
     this.input  = new Tone.Gain(1);
     this.output = new Tone.Gain(1);
 
-    // WASM outputs wet-only signal; we mix externally.
-    // Start full-dry until worklet is ready — prevents silence while WASM loads.
-    this.dryGain = new Tone.Gain(1);
-    this.wetGain = new Tone.Gain(0);
+    // Start with correct dry/wet mix (not 0!) so effect is audible immediately
+    this.dryGain = new Tone.Gain(1 - this._options.wet);
+    this.wetGain = new Tone.Gain(this._options.wet);
 
     // Dry path: input → dryGain → output
     this.input.connect(this.dryGain);
     this.dryGain.connect(this.output);
 
-    // Wet path output must be connected immediately so audio isn't silent
-    // while WASM loads (initialize() connects input → worklet → wetGain async)
+    // Wet path output connected now; wet INPUT connected by initFallback/initWasm
     this.wetGain.connect(this.output);
 
-    this.initialize();
+    this.initFallback();
+    this.initWasm();
   }
 
-  private async initialize(): Promise<void> {
+  /** JS fallback: WaveShaperNode (tape saturation) + BiquadFilter (bias/tone) */
+  private initFallback(): void {
+    try {
+      const nativeCtx = getNativeContext(this.context);
+      if (!nativeCtx) return;
+
+      // Tape saturation via soft-clipping waveshaper
+      this.fallbackShaper = nativeCtx.createWaveShaper();
+      this.updateFallbackCurve();
+
+      // Bias filter (lowpass simulating tape frequency response)
+      this.fallbackFilter = nativeCtx.createBiquadFilter();
+      this.fallbackFilter.type = 'lowpass';
+      this.updateFallbackBias();
+
+      // Connect: input → shaper → filter → wetGain
+      const rawInput = getNativeAudioNode(this.input)!;
+      const rawWet = getNativeAudioNode(this.wetGain)!;
+      rawInput.connect(this.fallbackShaper);
+      this.fallbackShaper.connect(this.fallbackFilter);
+      this.fallbackFilter.connect(rawWet);
+    } catch (err) {
+      console.warn('[TapeSimulator] JS fallback init failed:', err);
+      // Last resort: pass input directly to wetGain
+      this.input.connect(this.wetGain);
+    }
+  }
+
+  private updateFallbackCurve(): void {
+    if (!this.fallbackShaper) return;
+    const drive = this._options.drive;
+    const k = 2 + drive * 50; // soft-clip amount
+    const n = 256;
+    const curve = new Float32Array(n);
+    for (let i = 0; i < n; i++) {
+      const x = (i * 2) / n - 1;
+      curve[i] = ((1 + k) * x) / (1 + k * Math.abs(x));
+    }
+    this.fallbackShaper.curve = curve;
+    this.fallbackShaper.oversample = '2x';
+  }
+
+  private updateFallbackBias(): void {
+    if (!this.fallbackFilter) return;
+    // bias 0 → 22kHz (bright), bias 1 → 2kHz (dark)
+    const bias = this._options.bias;
+    this.fallbackFilter.frequency.value = 22000 - bias * 20000;
+  }
+
+  private async initWasm(): Promise<void> {
     try {
       const nativeCtx = getNativeContext(this.context);
       if (!nativeCtx) throw new Error('Could not get native AudioContext');
@@ -102,9 +152,8 @@ export class TapeSimulatorEffect extends Tone.ToneAudioNode {
           this.sendParam('shame',     this._options.shame);
           this.sendParam('hiss',      this._options.hiss);
           this.sendParam('speed',     this._options.speed);
-          // Worklet producing output — apply correct wet/dry mix
-          this.dryGain.gain.value = 1 - this._options.wet;
-          this.wetGain.gain.value = this._options.wet;
+          // Swap from JS fallback to WASM
+          this.swapToWasm();
         } else if (event.data.type === 'error') {
           console.error('[TapeSimulator] Worklet error:', event.data.message);
         }
@@ -117,12 +166,31 @@ export class TapeSimulatorEffect extends Tone.ToneAudioNode {
         jsCode: jsCode,
       });
 
-      // Connect wet path: input → workletNode → wetGain (already connected to output)
-      Tone.connect(this.input, this.workletNode);
-      Tone.connect(this.workletNode, this.wetGain);
-
     } catch (err) {
-      console.error('[TapeSimulator] Init failed:', err);
+      console.warn('[TapeSimulator] WASM init failed, using JS fallback:', err);
+    }
+  }
+
+  /** Hot-swap from JS fallback to WASM worklet */
+  private swapToWasm(): void {
+    if (!this.workletNode || this._disposed) return;
+    try {
+      const rawInput = getNativeAudioNode(this.input)!;
+      const rawWet = getNativeAudioNode(this.wetGain)!;
+
+      // Connect WASM path first
+      rawInput.connect(this.workletNode);
+      this.workletNode.connect(rawWet);
+
+      // Disconnect JS fallback
+      if (this.fallbackShaper) {
+        try { this.fallbackShaper.disconnect(); } catch { /* ignored */ }
+      }
+      if (this.fallbackFilter) {
+        try { this.fallbackFilter.disconnect(); } catch { /* ignored */ }
+      }
+    } catch (err) {
+      console.warn('[TapeSimulator] WASM swap failed, staying on fallback:', err);
     }
   }
 
@@ -187,6 +255,7 @@ export class TapeSimulatorEffect extends Tone.ToneAudioNode {
   setDrive(val: number): void {
     this._options.drive = Math.max(0, Math.min(val, 1));
     this.sendParam('drive', this._options.drive);
+    this.updateFallbackCurve();
   }
 
   setCharacter(val: number): void {
@@ -197,6 +266,7 @@ export class TapeSimulatorEffect extends Tone.ToneAudioNode {
   setBias(val: number): void {
     this._options.bias = Math.max(0, Math.min(val, 1));
     this.sendParam('bias', this._options.bias);
+    this.updateFallbackBias();
   }
 
   setShame(val: number): void {
@@ -227,6 +297,14 @@ export class TapeSimulatorEffect extends Tone.ToneAudioNode {
       this.workletNode.port.postMessage({ type: 'dispose' });
       this.workletNode.disconnect();
       this.workletNode = null;
+    }
+    if (this.fallbackShaper) {
+      try { this.fallbackShaper.disconnect(); } catch { /* ignored */ }
+      this.fallbackShaper = null;
+    }
+    if (this.fallbackFilter) {
+      try { this.fallbackFilter.disconnect(); } catch { /* ignored */ }
+      this.fallbackFilter = null;
     }
     this.dryGain.dispose();
     this.wetGain.dispose();

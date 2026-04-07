@@ -755,7 +755,7 @@ export const KissOfShameEditor: React.FC<VisualEffectEditorProps> = ({
   const reelBgY = -(reelFrame * 322);
 
   return (
-    <div style={{ width: '100%', overflow: 'hidden' }}>
+    <div style={{ width: 600, maxWidth: '100%', height: Math.ceil(containerH * 0.625), overflow: 'hidden', margin: '0 auto' }}>
       <div
         style={{
           position: 'relative',

@@ -10,7 +10,7 @@
  */
 
 import * as Tone from 'tone';
-import { getDevilboxAudioContext } from '@/utils/audio-context';
+import { getDevilboxAudioContext, getNativeAudioNode } from '@/utils/audio-context';
 import { WAMSynth } from './WAMSynth';
 
 /** Minimal WAM 2.0 plugin instance interface */
@@ -81,7 +81,10 @@ export class WAMEffectNode extends Tone.ToneAudioNode {
     this.input.connect(this.dryGain);
     this.dryGain.connect(this.output);
 
-    // Wet path deferred until WAM init
+    // Wet output path — connected now so wet audio flows when WAM init connects input → WAM → wetGain
+    this.wetGain.connect(this.output);
+
+    // Wet input path deferred until WAM init
     this._initPromise = this._initialize();
   }
 
@@ -145,15 +148,17 @@ export class WAMEffectNode extends Tone.ToneAudioNode {
       }
 
       // 5. Connect wet path: input → WAM → wetGain → output
-      // Use Tone.js connect for input (Tone.Gain → native AudioNode)
-      // and native connect for WAM → wetGain → output
-      const inputRaw = (this.input as unknown as { _gainNode: GainNode })._gainNode;
-      const wetRaw = (this.wetGain as unknown as { _gainNode: GainNode })._gainNode;
-      const outRaw = (this.output as unknown as { _gainNode: GainNode })._gainNode;
+      // Use getNativeAudioNode() to bridge Tone.js/SAC nodes to native WAM AudioNode
+      const inputRaw = getNativeAudioNode(this.input);
+      const wetRaw = getNativeAudioNode(this.wetGain);
+
+      if (!inputRaw || !wetRaw) {
+        throw new Error('Could not unwrap native audio nodes from Tone.js');
+      }
 
       inputRaw.connect(this._wamNode);
       this._wamNode.connect(wetRaw);
-      wetRaw.connect(outRaw);
+      // wetGain → output already connected in constructor via Tone.js connect
 
       this._isInitialized = true;
 

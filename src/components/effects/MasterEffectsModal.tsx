@@ -3,7 +3,7 @@
  * Now supports both Tone.js and Neural effects in a single unified list
  */
 
-import React, { useState, useCallback, useMemo, useEffect } from 'react';
+import React, { useState, useCallback, useMemo, useEffect, useRef, useLayoutEffect } from 'react';
 import { X, Settings, Volume2, ChevronDown, Save, Sliders, Cpu, Globe, AlertTriangle, Search, ExternalLink, Plus } from 'lucide-react';
 import { useUIStore } from '@stores/useUIStore';
 import { focusPopout } from '@components/ui/PopOutWindow';
@@ -69,6 +69,12 @@ export const MasterEffectsModal: React.FC<MasterEffectsModalProps> = ({ isOpen, 
     () => masterEffects.find(e => e.id === editingEffectId) ?? null,
     [masterEffects, editingEffectId]
   );
+
+  // Ref to track current editing effect — prevents stale closures in rapid knob callbacks
+  const editingEffectRef = useRef(editingEffect);
+  useLayoutEffect(() => {
+    editingEffectRef.current = editingEffect;
+  }, [editingEffect]);
 
   // Auto-select first effect when modal opens
   useEffect(() => {
@@ -536,7 +542,7 @@ export const MasterEffectsModal: React.FC<MasterEffectsModalProps> = ({ isOpen, 
                     effect={editingEffect}
                     onUpdateParameter={(key, value) => {
                       if (!editingEffectId) return;
-                      const current = useAudioStore.getState().masterEffects.find(e => e.id === editingEffectId);
+                      const current = editingEffectRef.current;
                       if (!current) return;
                       updateMasterEffect(editingEffectId, {
                         parameters: { ...current.parameters, [key]: value }

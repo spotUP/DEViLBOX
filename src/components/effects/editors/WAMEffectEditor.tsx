@@ -149,6 +149,16 @@ export const WAMEffectEditor: React.FC<VisualEffectEditorProps> = ({
         setHasGui(true);
         guiContainerRef.current.appendChild(gui);
 
+        // WAM plugins bundle their own SortableJS which tries to clone() the
+        // custom element on drag. The clone triggers the element's constructor
+        // which crashes without an initialized plugin. Patch cloneNode to
+        // return a shallow placeholder div instead of triggering the constructor.
+        const origClone = gui.cloneNode.bind(gui);
+        gui.cloneNode = (deep?: boolean) => {
+          try { return origClone(deep); }
+          catch { return document.createElement('div'); }
+        };
+
         // Per-effect minimum scale overrides (for zoom-in requests)
         const WAM_MIN_SCALE: Record<string, number> = {
           WAMQuadraFuzz: 1.3,
@@ -157,6 +167,9 @@ export const WAMEffectEditor: React.FC<VisualEffectEditorProps> = ({
         // Effects that should render at 1:1 and be centered (no zoom scaling)
         const WAM_NO_SCALE: Set<string> = new Set([
           'WAMBigMuff',
+          'WAMTS9',
+          'WAMQuadraFuzz',
+          'WAMPitchShifter',
         ]);
         const effectMinScale = WAM_MIN_SCALE[effect.type] ?? 0;
         const forceNoScale = WAM_NO_SCALE.has(effect.type);
