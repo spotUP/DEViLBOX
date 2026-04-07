@@ -18,6 +18,16 @@ export interface HotCue {
   name: string;        // user label
 }
 
+// Pending quantized action — purely for UI feedback while a deferred
+// transport/cue action is waiting for the next beat/bar boundary.
+export type PendingActionKind = 'play' | 'cue' | 'hotcue' | 'loop' | 'jump';
+export interface PendingAction {
+  kind: PendingActionKind;
+  mode: 'beat' | 'bar';
+  startedAt: number;   // performance.now() at scheduling
+  etaMs: number;       // total wait length in ms
+}
+
 // ============================================================================
 // TYPES
 // ============================================================================
@@ -64,6 +74,11 @@ export interface DeckState {
   // Cue
   cuePoint: number;            // Song position for cue point
   pflEnabled: boolean;
+
+  // Pending quantized action (UI feedback during a beat-quantized wait).
+  // Set by quantizeAction() while a deferred play/cue/hot-cue/loop/jump
+  // is waiting for the next beat or bar boundary. Cleared on fire/cancel.
+  pendingAction: PendingAction | null;
 
   // Hot cues (native — 8 slots, compatible with Serato format)
   hotCues: (HotCue | null)[];
@@ -162,6 +177,7 @@ const defaultDeckState: DeckState = {
   peakDb: -100,
   cuePoint: 0,
   pflEnabled: false,
+  pendingAction: null,
   hotCues: Array(8).fill(null) as (HotCue | null)[],
   loopActive: false,
   lineLoopSize: 4,
@@ -284,6 +300,7 @@ interface DJActions {
   setDeckTrimGain: (deck: DeckId, trimDb: number) => void;
   setDeckAutoGain: (deck: DeckId, enabled: boolean) => void;
   setDeckCuePoint: (deck: DeckId, songPos: number) => void;
+  setDeckPending: (deck: DeckId, pending: PendingAction | null) => void;
   setDeckPFL: (deck: DeckId, enabled: boolean) => void;
   togglePFL: (deck: DeckId) => void;
   setDeckLoop: (deck: DeckId, mode: 'line' | 'pattern' | 'off', active: boolean) => void;
@@ -491,6 +508,11 @@ export const useDJStore = create<DJStore>()(
     setDeckCuePoint: (deck, songPos) =>
       set((state) => {
         state.decks[deck].cuePoint = songPos;
+      }),
+
+    setDeckPending: (deck, pending) =>
+      set((state) => {
+        state.decks[deck].pendingAction = pending;
       }),
 
     setDeckPFL: (deck, enabled) =>

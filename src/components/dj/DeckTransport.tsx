@@ -18,18 +18,25 @@ export const DeckTransport: React.FC<DeckTransportProps> = ({ deckId }) => {
   const isPlaying = useDJStore((s) => s.decks[deckId].isPlaying);
   const cuePoint = useDJStore((s) => s.decks[deckId].cuePoint);
   const keyLockEnabled = useDJStore((s) => s.decks[deckId].keyLockEnabled);
+  const pendingAction = useDJStore((s) => s.decks[deckId].pendingAction);
   const otherDeckId = deckId === 'A' ? 'B' : 'A';
   const thisBPM = useDJStore((s) => s.decks[deckId].effectiveBPM);
   const otherBPM = useDJStore((s) => s.decks[otherDeckId].effectiveBPM);
   const isSynced = Math.abs(thisBPM - otherBPM) < 0.5;
 
   const [qMode, setQMode] = useState<QuantizeMode>(getQuantizeMode);
-  const [isPending, setIsPending] = useState(false);
+  const [isStartingPlay, setIsStartingPlay] = useState(false);
+
+  // The play button shows pending only while waiting for a deferred PLAY.
+  // The cue button shows pending only while waiting for a deferred CUE.
+  const playPending = pendingAction?.kind === 'play';
+  const cuePending = pendingAction?.kind === 'cue';
+  const isPending = isStartingPlay || playPending;
 
   const handlePlayPause = useCallback(async () => {
-    if (!isPlaying) setIsPending(true);
+    if (!isPlaying) setIsStartingPlay(true);
     await DJActions.togglePlay(deckId);
-    setIsPending(false);
+    setIsStartingPlay(false);
   }, [deckId, isPlaying]);
 
   const handleCue = useCallback(() => {
@@ -78,14 +85,16 @@ export const DeckTransport: React.FC<DeckTransportProps> = ({ deckId }) => {
       {/* Cue */}
       <button
         onClick={handleCue}
-        className="
+        className={`
           flex items-center justify-center w-10 h-10 rounded-lg
-          bg-dark-bgTertiary text-accent-warning border border-dark-border
-          hover:bg-dark-bgHover
+          border border-dark-border
           active:translate-y-[1px]
           transition-all duration-100
-        "
-        title="Cue"
+          ${cuePending
+            ? 'bg-accent-primary/30 text-accent-primary animate-pulse'
+            : 'bg-dark-bgTertiary text-accent-warning hover:bg-dark-bgHover'}
+        `}
+        title={cuePending ? 'Waiting for beat...' : 'Cue'}
       >
         <Disc3 size={18} />
       </button>

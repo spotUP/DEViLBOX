@@ -16,8 +16,8 @@ import { useDJStore, type CrossfaderCurve } from '@/stores/useDJStore';
 import { useDJSetStore } from '@/stores/useDJSetStore';
 import { getDJEngine, getDJEngineIfActive } from './DJEngine';
 import type { DJSet } from './recording/DJSetFormat';
-import { quantizedEQKill, getQuantizeMode, setTrackedFilterPosition } from './DJQuantizedFX';
-import { quantizedPlay, syncBPMToOther, phaseAlign } from './DJAutoSync';
+import { quantizedEQKill, getQuantizeMode, setTrackedFilterPosition, quantizeAction } from './DJQuantizedFX';
+import { syncBPMToOther, phaseAlign, snapPositionToBeat } from './DJAutoSync';
 import { DJBeatSync } from './DJBeatSync';
 import { getAutoDJ } from './DJAutoDJ';
 import { smartSort } from './DJPlaylistSort';
@@ -133,22 +133,33 @@ export async function togglePlay(
       getDJEngine().getDeck(deckId).setVolume(store.decks[deckId].volume);
     } catch { /* engine not ready */ }
 
-    const otherDeckId: DeckId = deckId === 'A' ? 'B' : 'A';
-    const otherIsPlaying = store.decks[otherDeckId].isPlaying;
-    const qMode = getQuantizeMode();
-
-    if (quantize && qMode !== 'off' && otherIsPlaying) {
-      // Quantized play: wait for next beat/bar boundary on the other deck
-      await quantizedPlay(deckId, qMode as 'beat' | 'bar');
-    } else {
-      // Immediate play
-      store.setDeckPlaying(deckId, true);
+    // The actual "press play now" action — runs immediately or deferred to a beat.
+    const fire = async (): Promise<void> => {
+      const s = useDJStore.getState();
+      const otherDeckId: DeckId = deckId === 'A' ? 'B' : 'A';
+      const otherIsPlaying = s.decks[otherDeckId].isPlaying;
+      // Phase-align right before starting if there's a master to lock to.
+      if (otherIsPlaying && s.decks[otherDeckId].beatGrid && s.decks[deckId].beatGrid) {
+        syncBPMToOther(deckId, otherDeckId);
+        const mode = getQuantizeMode();
+        phaseAlign(deckId, otherDeckId, mode === 'bar' ? 'bar' : 'beat');
+      }
+      s.setDeckPlaying(deckId, true);
       try {
         await getDJEngine().getDeck(deckId).play();
       } catch {
-        // Engine failed — revert store
         useDJStore.getState().setDeckPlaying(deckId, false);
       }
+    };
+
+    if (quantize === false) {
+      // Escape hatch (used by DeckVinyl3DView scrub-release).
+      await fire();
+    } else {
+      // quantizeAction handles the off-mode and the no-grid fall-through itself.
+      // Solo snap is enabled so a press while the other deck is silent still
+      // lands on this deck's own grid.
+      quantizeAction(deckId, fire, { kind: 'play', allowSolo: true });
     }
   }
 }
@@ -166,14 +177,38 @@ export function stopDeck(deckId: DeckId): void {
 /**
  * Cue a deck to a specific position.
  *
+ * If quantize is on, the jump is deferred to the next beat/bar boundary of
+ * the master (other) deck (or this deck's own grid in solo mode), so cue
+ * presses always land on the grid. For audio-mode decks, the requested
+ * position is also snapped to the nearest beat in this deck's own grid so
+ * the stored cue point is musically meaningful.
+ *
  * @param position - Song position (pattern index for tracker mode, seconds for audio mode)
  * @param pattPos - Row within pattern (tracker mode only, default 0)
  */
 export function cueDeck(deckId: DeckId, position: number, pattPos = 0): void {
-  useDJStore.getState().setDeckCuePoint(deckId, position);
+  // Snap the cue target itself for audio-mode decks (positions are seconds).
+  // Tracker-mode positions are pattern indices and don't have a meaningful
+  // beat-snap, so leave them as-is.
+  let snapped = position;
   try {
-    getDJEngine().getDeck(deckId).cue(position, pattPos);
-  } catch { /* engine not ready */ }
+    const deck = getDJEngine().getDeck(deckId);
+    if (deck.playbackMode === 'audio') {
+      snapped = snapPositionToBeat(deckId, position, 'beat');
+    }
+  } catch { /* engine not ready — use raw position */ }
+
+  useDJStore.getState().setDeckCuePoint(deckId, snapped);
+
+  quantizeAction(
+    deckId,
+    () => {
+      try {
+        getDJEngine().getDeck(deckId).cue(snapped, pattPos);
+      } catch { /* engine not ready */ }
+    },
+    { kind: 'cue', allowSolo: true },
+  );
 }
 
 /**
