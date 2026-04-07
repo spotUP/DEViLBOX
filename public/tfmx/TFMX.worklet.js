@@ -60,6 +60,21 @@ class TFMXProcessor extends AudioWorkletProcessor {
         break;
       }
 
+      case 'resetPlayers': {
+        // Free all player handles without destroying the WASM context.
+        // Called on stop() to prevent player pool exhaustion across song loads.
+        if (!this.wasm || !this.ctx) break;
+        for (const hp of Object.keys(this.players)) {
+          const hi = parseInt(hp);
+          this.wasm._free(this.players[hi].outPtrL);
+          this.wasm._free(this.players[hi].outPtrR);
+          this.wasm._tfmx_destroy_player(this.ctx, hi);
+        }
+        this.players = {};
+        this._modulePlaying = false;
+        break;
+      }
+
       case 'loadInstrument': {
         if (!this.wasm || !this.ctx) break;
         const insData = new Uint8Array(data.buffer);
@@ -89,6 +104,14 @@ class TFMXProcessor extends AudioWorkletProcessor {
       // ── Full-module playback messages ────────────────────────────────────
       case 'loadModule': {
         if (!this.wasm || !this.ctx) break;
+        // Clean up any standalone instrument players from previous loads
+        for (const hp of Object.keys(this.players)) {
+          const hi = parseInt(hp);
+          this.wasm._free(this.players[hi].outPtrL);
+          this.wasm._free(this.players[hi].outPtrR);
+          this.wasm._tfmx_destroy_player(this.ctx, hi);
+        }
+        this.players = {};
         const mdat = new Uint8Array(data.mdatBuffer);
         const smpl = data.smplBuffer ? new Uint8Array(data.smplBuffer) : null;
         const mdatPtr = this.wasm._malloc(mdat.byteLength);

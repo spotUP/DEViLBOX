@@ -98,6 +98,8 @@ class HivelyProcessor extends AudioWorkletProcessor {
             r: this.wasm._malloc(floatBytes),
           };
           this.port.postMessage({ type: 'playerCreated', handle: h });
+        } else {
+          this.port.postMessage({ type: 'error', message: 'hively_create_player failed (max players reached)' });
         }
         break;
       }
@@ -230,6 +232,9 @@ class HivelyProcessor extends AudioWorkletProcessor {
 
   loadTune(buffer, defStereo) {
     if (!this.wasm || !this.initialized) return;
+
+    // Clean up any standalone instrument players from previous loads
+    this.destroyAllPlayers();
 
     // Copy tune data to WASM heap
     const data = new Uint8Array(buffer);
