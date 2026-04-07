@@ -74,10 +74,10 @@ export class SpaceEchoEffect extends Tone.ToneAudioNode {
     this.input = new Tone.Gain(1);
     this.output = new Tone.Gain(1);
 
-    // 1. Tape Heads
-    this.head1 = new Tone.Delay(this._options.rate / 1000);
-    this.head2 = new Tone.Delay((this._options.rate * 2) / 1000);
-    this.head3 = new Tone.Delay((this._options.rate * 3) / 1000);
+    // 1. Tape Heads (maxDelay=5s to allow rate*3 at full range)
+    this.head1 = new Tone.Delay({ delayTime: this._options.rate / 1000, maxDelay: 5 });
+    this.head2 = new Tone.Delay({ delayTime: (this._options.rate * 2) / 1000, maxDelay: 5 });
+    this.head3 = new Tone.Delay({ delayTime: (this._options.rate * 3) / 1000, maxDelay: 5 });
 
     this.head1Gain = new Tone.Gain(0);
     this.head2Gain = new Tone.Gain(0);
@@ -167,10 +167,10 @@ export class SpaceEchoEffect extends Tone.ToneAudioNode {
   }
 
   setRate(ms: number) {
-    this._options.rate = ms;
-    this.head1.delayTime.rampTo(ms / 1000, 0.1);
-    this.head2.delayTime.rampTo((ms * 2) / 1000, 0.1);
-    this.head3.delayTime.rampTo((ms * 3) / 1000, 0.1);
+    this._options.rate = Math.max(10, Math.min(ms, 1500));
+    this.head1.delayTime.rampTo(this._options.rate / 1000, 0.1);
+    this.head2.delayTime.rampTo((this._options.rate * 2) / 1000, 0.1);
+    this.head3.delayTime.rampTo((this._options.rate * 3) / 1000, 0.1);
   }
 
   setIntensity(amount: number) {
