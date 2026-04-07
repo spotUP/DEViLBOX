@@ -36,7 +36,7 @@
  */
 
 import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
-import type { InstrumentConfig, TFMXConfig, UADEChipRamInfo } from '@/types';
+import type { InstrumentConfig, TFMXConfig, UADEChipRamInfo, Pattern, TrackerCell } from '@/types';
 
 const MIN_FILE_SIZE = 32;
 
@@ -310,6 +310,83 @@ function extractSamples(buf: Uint8Array, sampleHeadersOff: number, numSamples: n
   return { sampleHeaders, sampleData };
 }
 
+/** Empty TrackerCell helper. */
+function emptyCell(): TrackerCell {
+  return { note: 0, instrument: 0, volume: 0, effTyp: 0, eff: 0, effTyp2: 0, eff2: 0 };
+}
+
+/**
+ * Convert a TFMX raw note byte (after `& 0x7f`) plus per-voice transpose to an
+ * XM note index (1..96). The TFMX period table starts at TFMX note 0 = period
+ * 0x6b0 = ProTracker C-0 = XM note 1, so the mapping is simply `tfmxNote + 1`.
+ *
+ * Returns 0 (empty) if `tfmxNote` is 0 or 1 (1 is the pattern-break sentinel
+ * — see TFMX_processPattern in libtfmxaudiodecoder Jochen/TFMX.cpp:153).
+ */
+function tfmxNoteToXM(tfmxNote: number, transpose: number): number {
+  if (tfmxNote === 0 || tfmxNote === 1) return 0;
+  // sbyte transpose, signed addition
+  const t = (transpose << 24) >> 24;
+  let n = (tfmxNote + t) | 0;
+  if (n <= 1) return 0;
+  if (n > 95) n = 95;
+  return n + 1;
+}
+
+/**
+ * Decode one TFMX-7V trackstep entry into per-voice TrackerCell rows
+ * (32 rows × `numChannels` voices). Mirrors HippelDecoder::TFMX_processPattern
+ * in third-party/libtfmxaudiodecoder-main/src/Jochen/TFMX.cpp lines 201-238.
+ *
+ * For each voice the trackstep entry stores `[PT, TR(sbyte), ST(sbyte)(, CMD)]`.
+ * PT picks a 64-byte pattern (32 rows × 2 bytes); TR is added to the row's
+ * note value; ST is added to the row's `(infoByte & 0x1f)` to compute the
+ * absolute instrument index. The high bit of the note byte marks portamento
+ * (no instrument change); a row note of 0 is empty.
+ */
+function decodeTFMX7VPattern(
+  buf: Uint8Array,
+  patternsBase: number,
+  trackStepBuf: Uint8Array,
+  trackColumnSize: number,
+  numChannels: number,
+): TrackerCell[][] {
+  const rows: TrackerCell[][] = Array.from({ length: numChannels }, () => {
+    const arr: TrackerCell[] = [];
+    for (let r = 0; r < 32; r++) arr.push(emptyCell());
+    return arr;
+  });
+
+  for (let voice = 0; voice < numChannels; voice++) {
+    const colOff = voice * trackColumnSize;
+    const pt = trackStepBuf[colOff] | 0;
+    const tr = (trackStepBuf[colOff + 1] << 24) >> 24; // sbyte transpose
+    const st = (trackStepBuf[colOff + 2] << 24) >> 24; // sbyte sound transpose
+
+    const patOff = patternsBase + pt * PATTERN_LENGTH;
+    if (patOff < 0 || patOff + PATTERN_LENGTH > buf.length) continue;
+
+    for (let row = 0; row < 32; row++) {
+      const noteByte = buf[patOff + row * 2];
+      const infoByte = buf[patOff + row * 2 + 1];
+      const noteVal = noteByte & 0x7f;
+      if (noteVal === 0) continue; // empty cell — nothing to do
+
+      const cell = rows[voice][row];
+      cell.note = tfmxNoteToXM(noteVal, tr);
+
+      // High bit set = portamento / modifier — no new instrument trigger.
+      if ((noteByte & 0x80) === 0) {
+        const instr = ((infoByte & 0x1f) + st) & 0xff;
+        // TrackerCell instrument is 1-based for display; clamp into byte range.
+        cell.instrument = instr > 0 ? instr : 0;
+      }
+    }
+  }
+
+  return rows;
+}
+
 export function parseJochenHippel7VFile(buffer: ArrayBuffer, filename: string): TrackerSong {
   const buf = new Uint8Array(buffer);
   if (!isJochenHippel7VFormat(buf)) throw new Error('Not a Jochen Hippel 7V module');
@@ -390,39 +467,112 @@ export function parseJochenHippel7VFile(buffer: ArrayBuffer, filename: string): 
     } as InstrumentConfig);
   }
 
-  // Build a placeholder pattern grid. Real TFMX-7V pattern → tracker-row
-  // conversion is non-trivial (note + info-byte format with portamento and
-  // sound-transpose interactions); the existing UADE playback path handles
-  // it correctly. The DOM tracker grid here is a placeholder so the song
-  // loads cleanly — playback comes from UADE via uadeEditableFileData.
-  const emptyRows = Array.from({ length: 64 }, () => ({
-    note: 0, instrument: 0, volume: 0, effTyp: 0, eff: 0, effTyp2: 0, eff2: 0,
-  }));
+  // ── Build per-trackstep tracker patterns (Option A from the cleanup plan) ──
+  // Mirrors HippelDecoder::TFMX_nextNote / TFMX_processPattern. Each subsong's
+  // trackstep range becomes a sequence of 32-row Pattern objects, one per
+  // trackstep entry. This matches the WASM replayer's playback structure and
+  // gives click-to-seek for free.
+  //
+  // We default to subsong 0 (the first entry in the subSongTab). The 7V songtab
+  // entry stores firstStep at +0 and lastStep at +2 (TFMX_7V_startSong); the 4V
+  // entry uses the same +0/+2 layout.
+  let firstStep = 0;
+  let lastStep = layout.numTrackSteps - 1;
+  if (layout.subSongTabOff + 4 <= buf.length) {
+    firstStep = u16BE(buf, layout.subSongTabOff + 0);
+    lastStep = u16BE(buf, layout.subSongTabOff + 2);
+  }
+  if (firstStep < 0 || firstStep >= layout.numTrackSteps) firstStep = 0;
+  if (lastStep < firstStep || lastStep >= layout.numTrackSteps) {
+    lastStep = layout.numTrackSteps - 1;
+  }
 
-  const pattern = {
-    id: 'pattern-0', name: 'Pattern 0', length: 64,
-    channels: Array.from({ length: layout.voices }, (_, ch) => ({
-      id: `channel-${ch}`, name: `Channel ${ch + 1}`, muted: false,
-      solo: false, collapsed: false, volume: 100,
-      pan: [-50, 50, 50, -50, -50, 50, 50][ch] ?? 0,
-      instrumentId: null, color: null, rows: emptyRows,
-    })),
-    importMetadata: {
-      sourceFormat: 'MOD' as const, sourceFile: filename,
-      importedAt: new Date().toISOString(),
-      originalChannelCount: layout.voices,
-      originalPatternCount: layout.numPatterns,
-      originalInstrumentCount: instruments.length,
-    },
-  };
+  const trackColumnSize = (layout.trackStepLen / layout.voices) | 0; // 3 (4V) or 4 (7V)
+  const channelPan: number[] = [-50, 50, 50, -50, -50, 50, 50];
+
+  const trackerPatterns: Pattern[] = [];
+  const songPositions: number[] = [];
+
+  for (let step = firstStep; step <= lastStep; step++) {
+    const stepOff = layout.trackTableOff + step * layout.trackStepLen;
+    if (stepOff + layout.trackStepLen > buf.length) break;
+    const trackStepBuf = buf.slice(stepOff, stepOff + layout.trackStepLen);
+
+    const channelRows = decodeTFMX7VPattern(
+      buf,
+      layout.patternsOff,
+      trackStepBuf,
+      trackColumnSize,
+      layout.voices,
+    );
+
+    const patIdx = trackerPatterns.length;
+    trackerPatterns.push({
+      id: `pattern-${patIdx}`,
+      name: `Pattern ${patIdx + 1} (step ${step})`,
+      length: 32,
+      channels: Array.from({ length: layout.voices }, (_, ch) => ({
+        id: `channel-${ch}`,
+        name: `Channel ${ch + 1}`,
+        muted: false,
+        solo: false,
+        collapsed: false,
+        volume: 100,
+        pan: channelPan[ch] ?? 0,
+        instrumentId: null,
+        color: null,
+        rows: channelRows[ch],
+      })),
+      importMetadata: {
+        sourceFormat: 'MOD' as const,
+        sourceFile: filename,
+        importedAt: new Date().toISOString(),
+        originalChannelCount: layout.voices,
+        originalPatternCount: layout.numPatterns,
+        originalInstrumentCount: instruments.length,
+      },
+    });
+    songPositions.push(patIdx);
+  }
+
+  // Safety net: never return zero patterns even on degenerate input.
+  if (trackerPatterns.length === 0) {
+    const emptyRows: TrackerCell[] = Array.from({ length: 32 }, () => emptyCell());
+    trackerPatterns.push({
+      id: 'pattern-0',
+      name: 'Pattern 0',
+      length: 32,
+      channels: Array.from({ length: layout.voices }, (_, ch) => ({
+        id: `channel-${ch}`,
+        name: `Channel ${ch + 1}`,
+        muted: false,
+        solo: false,
+        collapsed: false,
+        volume: 100,
+        pan: channelPan[ch] ?? 0,
+        instrumentId: null,
+        color: null,
+        rows: emptyRows.map(c => ({ ...c })),
+      })),
+      importMetadata: {
+        sourceFormat: 'MOD' as const,
+        sourceFile: filename,
+        importedAt: new Date().toISOString(),
+        originalChannelCount: layout.voices,
+        originalPatternCount: layout.numPatterns,
+        originalInstrumentCount: instruments.length,
+      },
+    });
+    songPositions.push(0);
+  }
 
   return {
     name: `${moduleName} [Jochen Hippel 7V]`,
     format: 'MOD' as TrackerFormat,
-    patterns: [pattern],
+    patterns: trackerPatterns,
     instruments,
-    songPositions: [0],
-    songLength: 1,
+    songPositions,
+    songLength: songPositions.length,
     restartPosition: 0,
     numChannels: layout.voices,
     initialSpeed: 6,
