@@ -17,6 +17,8 @@ import { getToneEngine } from '../../engine/ToneEngine';
 import { getSendBusPresetsByCategory } from '../../constants/sendBusPresets';
 import { getChannelFxPresetsByCategory } from '../../constants/channelFxPresets';
 
+import { ChannelInsertEffectsModal } from '@components/effects/ChannelInsertEffectsModal';
+
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const NUM_CHANNELS = 16;
@@ -329,6 +331,7 @@ interface DOMStripProps {
   effects: [string | null, string | null];
   onEffectChange: (slot: 0 | 1, type: string | null) => void;
   onChannelFxPresetSelect: (presetEffects: import('@typedefs/instrument').EffectConfig[]) => void;
+  onFxClick?: () => void;
 }
 
 const DOMChannelStrip: React.FC<DOMStripProps> = ({
@@ -352,6 +355,7 @@ const DOMChannelStrip: React.FC<DOMStripProps> = ({
   effects,
   onEffectChange,
   onChannelFxPresetSelect,
+  onFxClick,
 }) => {
   const peakY = Math.min(peakLevel * VU_HEIGHT, VU_HEIGHT);
 
@@ -476,9 +480,19 @@ const DOMChannelStrip: React.FC<DOMStripProps> = ({
       <SendBars levels={sendLevels} onCycle={onSendLevelCycle} />
 
       {/* 12. Insert FX indicator */}
-      <div className="text-[7px] font-mono text-teal-400/60 leading-tight">
-        FX:{insertEffectCount}
-      </div>
+      {insertEffectCount > 0 && onFxClick ? (
+        <button
+          onClick={onFxClick}
+          className="text-[7px] font-mono text-teal-400/60 leading-tight cursor-pointer hover:text-teal-400 transition-colors"
+          title="Edit insert effects"
+        >
+          FX:{insertEffectCount}
+        </button>
+      ) : (
+        <div className="text-[7px] font-mono text-teal-400/60 leading-tight">
+          FX:{insertEffectCount}
+        </div>
+      )}
 
       {/* 13. Channel FX preset button */}
       <ChannelFxPresetDropdown onSelect={onChannelFxPresetSelect} />
@@ -656,6 +670,8 @@ const MixerContent: React.FC = () => {
   const setChannelSolo = useMixerStore(s => s.setChannelSolo);
   const setChannelEffect = useMixerStore(s => s.setChannelEffect);
 
+  const [channelFxModalIndex, setChannelFxModalIndex] = useState<number | null>(null);
+
   const instruments = useInstrumentStore(s => s.instruments);
 
   // Only show channels the current song uses
@@ -722,6 +738,7 @@ const MixerContent: React.FC = () => {
   }, []);
 
   return (
+    <>
     <div className="flex flex-row items-start overflow-x-auto pb-2 scrollbar-none">
       {/* ── Section: CHANNELS ── */}
       <div className="flex flex-col items-start">
@@ -761,6 +778,7 @@ const MixerContent: React.FC = () => {
                 effects={ch.effects}
                 onEffectChange={(slot, type) => setChannelEffect(i, slot, type)}
                 onChannelFxPresetSelect={(fx) => useMixerStore.getState().loadChannelInsertPreset(i, fx)}
+                onFxClick={() => setChannelFxModalIndex(i)}
               />
             );
           })}
@@ -802,6 +820,15 @@ const MixerContent: React.FC = () => {
         />
       </div>
     </div>
+
+    {channelFxModalIndex !== null && (
+      <ChannelInsertEffectsModal
+        isOpen={true}
+        onClose={() => setChannelFxModalIndex(null)}
+        channelIndex={channelFxModalIndex}
+      />
+    )}
+    </>
   );
 };
 
