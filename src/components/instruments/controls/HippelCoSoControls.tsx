@@ -34,6 +34,8 @@ interface HippelCoSoControlsProps {
   vseqPlaybackPosition?: number;
   /** Present when this instrument was loaded via UADE's native HippelCoSo parser. */
   uadeChipRam?: UADEChipRamInfo;
+  /** Runtime id of the instrument being edited — used by Find Usage to scan patterns. */
+  instrumentId?: number;
 }
 
 type HCSTab = 'main' | 'sequences';
