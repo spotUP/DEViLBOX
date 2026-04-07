@@ -2378,6 +2378,16 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
         }
         if (automationOverlayRef.current) {
           automationOverlayRef.current.style.top = `${overlayTop - automationPrevLenRef.current * rowHeightRef.current}px`;
+          // Live clipPath update — see playback branch for rationale
+          const offsets = channelOffsetsRef.current;
+          const widths = channelWidthsRef.current;
+          if (offsets.length > 0 && widths.length > 0) {
+            const leftClip = offsets[0] ?? LINE_NUMBER_WIDTH;
+            const lastIdx = offsets.length - 1;
+            const rightEdge = (offsets[lastIdx] ?? 0) + (widths[lastIdx] ?? 0);
+            const rightClip = Math.max(0, dimensions.width - rightEdge);
+            automationOverlayRef.current.style.clipPath = `inset(0px ${rightClip}px 0px ${leftClip}px)`;
+          }
         }
         rafId = requestAnimationFrame(tick);
         return;
@@ -2484,6 +2494,17 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
         // lands exactly on the current pattern's row 0 — keeping the
         // ghost prev/next sections aligned with the cell ghost regions.
         automationOverlayRef.current.style.top = `${overlayTop - automationPrevLenRef.current * rh}px`;
+        // Update clipPath imperatively from current refs so it always matches
+        // the live channel layout, even right after a fullscreen toggle.
+        const offsets = channelOffsetsRef.current;
+        const widths = channelWidthsRef.current;
+        if (offsets.length > 0 && widths.length > 0) {
+          const leftClip = offsets[0] ?? LINE_NUMBER_WIDTH;
+          const lastIdx = offsets.length - 1;
+          const rightEdge = (offsets[lastIdx] ?? 0) + (widths[lastIdx] ?? 0);
+          const rightClip = Math.max(0, dimensions.width - rightEdge);
+          automationOverlayRef.current.style.clipPath = `inset(0px ${rightClip}px 0px ${leftClip}px)`;
+        }
       }
 
       // Peer cursor overlay — thin caret at peer's channel + row
@@ -2534,7 +2555,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
 
     rafId = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(rafId);
-  }, [dimensions.height]); // re-run if height changes
+  }, [dimensions.height, dimensions.width]); // re-run if dimensions change
 
 
   // Handle resize
@@ -3259,13 +3280,8 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
                   height: (prevLen + pattern.length + nextLen) * rowHeight,
                   pointerEvents: 'none',
                   zIndex: 5,
-                  clipPath: (() => {
-                    const leftClip = channelOffsets[0] ?? LINE_NUMBER_WIDTH;
-                    const patChCount = pattern.channels.length;
-                    const rightEdge = patChCount > 0 ? (channelOffsets[patChCount - 1] ?? 0) + (channelWidths[patChCount - 1] ?? 0) : dimensions.width;
-                    const rightClip = Math.max(0, dimensions.width - rightEdge);
-                    return `inset(0 ${rightClip}px 0 ${leftClip}px)`;
-                  })(),
+                  // clipPath set imperatively in RAF so resize/fullscreen
+                  // changes pick up new bounds on the next frame.
                 }}
               >
               <AutomationLanes
