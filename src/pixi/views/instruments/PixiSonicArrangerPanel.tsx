@@ -9,19 +9,21 @@
  * onUpdate(instrumentId, { sonicArranger: { ... } }) — the store handles any UADE
  * chip-RAM propagation downstream.
  *
- * The ADSR table is drag-editable (0..64, unipolar) — the most commonly edited
- * curve on this synth. AMF, waveform and the three arpeggio tables remain
- * read-only for now; they use bipolar/waveform semantics that need separate
- * drag wiring. Drag uses the shared writeUnipolarBar helper in
- * src/lib/pixi/barChartDraw.ts.
+ * The ADSR table is drag-editable (0..64, unipolar) — the most commonly
+ * edited curve on this synth. The AMF (pitch modulation) table and the three
+ * arpeggio tables are also drag-editable as bipolar signed int8 charts. Only
+ * the raw waveform display remains read-only — it uses line-based semantics
+ * that need a different writer. Drag uses the shared writeUnipolarBar /
+ * writeBipolarBar helpers in src/lib/pixi/barChartDraw.ts.
  */
 
 import React, { useCallback, useEffect, useRef } from 'react';
 import { PixiKnob, PixiLabel } from '../../components';
 import { usePixiTheme } from '../../theme';
 import type { InstrumentConfig } from '@typedefs/instrument';
+import type { SonicArrangerConfig } from '@/types/instrument';
 import type { Graphics, FederatedPointerEvent, Container } from 'pixi.js';
-import { writeUnipolarBar } from '@/lib/pixi/barChartDraw';
+import { writeBipolarBar, writeUnipolarBar } from '@/lib/pixi/barChartDraw';
 
 const KNOB_SIZE = 'sm' as const;
 
@@ -94,6 +96,16 @@ export const PixiSonicArrangerPanel: React.FC<Props> = ({ instrument, onUpdate }
   const adsrDrawing = useRef(false);
   const adsrLastIdx = useRef(-1);
 
+  const amfDrawing = useRef(false);
+  const amfLastIdx = useRef(-1);
+
+  const arp0Drawing = useRef(false);
+  const arp0LastIdx = useRef(-1);
+  const arp1Drawing = useRef(false);
+  const arp1LastIdx = useRef(-1);
+  const arp2Drawing = useRef(false);
+  const arp2LastIdx = useRef(-1);
+
   const writeAdsrAt = useCallback((e: FederatedPointerEvent) => {
     const cur = saRef.current;
     const values = cur.adsrTable ?? [];
@@ -113,6 +125,75 @@ export const PixiSonicArrangerPanel: React.FC<Props> = ({ instrument, onUpdate }
       sonicArranger: { ...cur, adsrTable: next },
     });
   }, [onUpdate]);
+
+  // Compute bipolar maxMag the same way the renderer does, but clamp to a
+  // sensible floor so a nearly-empty table still has reasonable vertical
+  // headroom for dragging. Mirrors the ADSR drag's feel when values are tiny.
+  const computeBipolarMaxMag = useCallback((values: number[]): number => {
+    let actual = 1;
+    for (const v of values) {
+      const a = Math.abs(v);
+      if (a > actual) actual = a;
+    }
+    return Math.max(16, actual);
+  }, []);
+
+  const writeAmfAt = useCallback((e: FederatedPointerEvent) => {
+    const cur = saRef.current;
+    const values = cur.amfTable ?? [];
+    if (values.length === 0) return;
+    const local = e.getLocalPosition(e.currentTarget as Container);
+    const maxMag = computeBipolarMaxMag(values);
+    const { next, idx } = writeBipolarBar(
+      values,
+      local.x,
+      local.y,
+      DISPLAY_W,
+      DISPLAY_H,
+      maxMag,
+      -128,
+      127,
+      amfLastIdx.current,
+    );
+    amfLastIdx.current = idx;
+    onUpdate(instrumentIdRef.current, {
+      sonicArranger: { ...cur, amfTable: next },
+    });
+  }, [computeBipolarMaxMag, onUpdate]);
+
+  const writeArpAt = useCallback(
+    (arpIndex: 0 | 1 | 2, e: FederatedPointerEvent, lastIdxRef: React.MutableRefObject<number>) => {
+      const cur = saRef.current;
+      const arps = cur.arpeggios;
+      if (!arps || !arps[arpIndex]) return;
+      const values = arps[arpIndex].values ?? [];
+      if (values.length === 0) return;
+      const local = e.getLocalPosition(e.currentTarget as Container);
+      const maxMag = computeBipolarMaxMag(values);
+      const { next, idx } = writeBipolarBar(
+        values,
+        local.x,
+        local.y,
+        DISPLAY_W,
+        DISPLAY_H,
+        maxMag,
+        -128,
+        127,
+        lastIdxRef.current,
+      );
+      lastIdxRef.current = idx;
+      const nextArps: SonicArrangerConfig['arpeggios'] = [
+        arps[0],
+        arps[1],
+        arps[2],
+      ];
+      nextArps[arpIndex] = { ...arps[arpIndex], values: next };
+      onUpdate(instrumentIdRef.current, {
+        sonicArranger: { ...cur, arpeggios: nextArps },
+      });
+    },
+    [computeBipolarMaxMag, onUpdate],
+  );
 
   // ── Bar chart renderers (read-only) ────────────────────────────────────────
 
@@ -457,6 +538,24 @@ export const PixiSonicArrangerPanel: React.FC<Props> = ({ instrument, onUpdate }
           borderColor: theme.border.color,
           borderRadius: 4,
         }}
+        eventMode="static"
+        cursor="crosshair"
+        onPointerDown={(e: FederatedPointerEvent) => {
+          amfDrawing.current = true;
+          amfLastIdx.current = -1;
+          writeAmfAt(e);
+        }}
+        onPointerMove={(e: FederatedPointerEvent) => {
+          if (amfDrawing.current) writeAmfAt(e);
+        }}
+        onPointerUp={() => {
+          amfDrawing.current = false;
+          amfLastIdx.current = -1;
+        }}
+        onPointerUpOutside={() => {
+          amfDrawing.current = false;
+          amfLastIdx.current = -1;
+        }}
       >
         <pixiGraphics draw={drawAmf} layout={{ width: DISPLAY_W, height: DISPLAY_H }} />
       </layoutContainer>
@@ -515,6 +614,24 @@ export const PixiSonicArrangerPanel: React.FC<Props> = ({ instrument, onUpdate }
           borderColor: theme.border.color,
           borderRadius: 4,
         }}
+        eventMode="static"
+        cursor="crosshair"
+        onPointerDown={(e: FederatedPointerEvent) => {
+          arp0Drawing.current = true;
+          arp0LastIdx.current = -1;
+          writeArpAt(0, e, arp0LastIdx);
+        }}
+        onPointerMove={(e: FederatedPointerEvent) => {
+          if (arp0Drawing.current) writeArpAt(0, e, arp0LastIdx);
+        }}
+        onPointerUp={() => {
+          arp0Drawing.current = false;
+          arp0LastIdx.current = -1;
+        }}
+        onPointerUpOutside={() => {
+          arp0Drawing.current = false;
+          arp0LastIdx.current = -1;
+        }}
       >
         <pixiGraphics draw={drawArp0} layout={{ width: DISPLAY_W, height: DISPLAY_H }} />
       </layoutContainer>
@@ -528,6 +645,24 @@ export const PixiSonicArrangerPanel: React.FC<Props> = ({ instrument, onUpdate }
           borderColor: theme.border.color,
           borderRadius: 4,
         }}
+        eventMode="static"
+        cursor="crosshair"
+        onPointerDown={(e: FederatedPointerEvent) => {
+          arp1Drawing.current = true;
+          arp1LastIdx.current = -1;
+          writeArpAt(1, e, arp1LastIdx);
+        }}
+        onPointerMove={(e: FederatedPointerEvent) => {
+          if (arp1Drawing.current) writeArpAt(1, e, arp1LastIdx);
+        }}
+        onPointerUp={() => {
+          arp1Drawing.current = false;
+          arp1LastIdx.current = -1;
+        }}
+        onPointerUpOutside={() => {
+          arp1Drawing.current = false;
+          arp1LastIdx.current = -1;
+        }}
       >
         <pixiGraphics draw={drawArp1} layout={{ width: DISPLAY_W, height: DISPLAY_H }} />
       </layoutContainer>
@@ -540,6 +675,24 @@ export const PixiSonicArrangerPanel: React.FC<Props> = ({ instrument, onUpdate }
           borderWidth: 1,
           borderColor: theme.border.color,
           borderRadius: 4,
+        }}
+        eventMode="static"
+        cursor="crosshair"
+        onPointerDown={(e: FederatedPointerEvent) => {
+          arp2Drawing.current = true;
+          arp2LastIdx.current = -1;
+          writeArpAt(2, e, arp2LastIdx);
+        }}
+        onPointerMove={(e: FederatedPointerEvent) => {
+          if (arp2Drawing.current) writeArpAt(2, e, arp2LastIdx);
+        }}
+        onPointerUp={() => {
+          arp2Drawing.current = false;
+          arp2LastIdx.current = -1;
+        }}
+        onPointerUpOutside={() => {
+          arp2Drawing.current = false;
+          arp2LastIdx.current = -1;
         }}
       >
         <pixiGraphics draw={drawArp2} layout={{ width: DISPLAY_W, height: DISPLAY_H }} />
