@@ -18,7 +18,9 @@
  */
 
 import React, { useCallback, useEffect, useRef } from 'react';
-import { PixiKnob, PixiLabel } from '../../components';
+import { PixiKnob, PixiLabel, PixiSelect, PixiNumericInput } from '../../components';
+import type { SelectOption } from '../../components';
+import { PixiPureTextInput } from '../../input/PixiPureTextInput';
 import { usePixiTheme } from '../../theme';
 import type { InstrumentConfig } from '@typedefs/instrument';
 import type { SonicArrangerConfig } from '@/types/instrument';
@@ -78,8 +80,24 @@ export const PixiSonicArrangerPanel: React.FC<Props> = ({ instrument, onUpdate }
   const theme = usePixiTheme();
   const sa = instrument.sonicArranger!;
 
+  // Per-song counts exposed by SonicArrangerParser via chipRam.sections.
+  // Fall back to 16 when not available (project snapshots).
+  const numAdsrTables = instrument.uadeChipRam?.sections?.numAdsrTables ?? 16;
+  const numAmfTables  = instrument.uadeChipRam?.sections?.numAmfTables  ?? 16;
+  const numWaveforms  = (sa.allWaveforms ?? []).length;
+
+  const adsrOptions: SelectOption[] = Array.from({ length: numAdsrTables }, (_, i) => ({
+    value: String(i), label: `ADSR ${i}`,
+  }));
+  const amfOptions: SelectOption[] = Array.from({ length: numAmfTables }, (_, i) => ({
+    value: String(i), label: `AMF ${i}`,
+  }));
+  const waveOptions: SelectOption[] = Array.from({ length: Math.max(1, numWaveforms) }, (_, i) => ({
+    value: String(i), label: `Wave ${i}`,
+  }));
+
   const updSA = useCallback(
-    (key: string, value: number) => {
+    <K extends keyof SonicArrangerConfig>(key: K, value: SonicArrangerConfig[K]) => {
       onUpdate(instrument.id, {
         sonicArranger: { ...instrument.sonicArranger!, [key]: value },
       });
@@ -315,7 +333,15 @@ export const PixiSonicArrangerPanel: React.FC<Props> = ({ instrument, onUpdate }
           color="custom"
           customColor={theme.accent.color}
         />
-        <PixiLabel text={instrument.name || sa.name || ''} size="sm" color="textSecondary" />
+        <PixiLabel text="Name" size="xs" color="textMuted" />
+        <PixiPureTextInput
+          value={sa.name ?? ''}
+          onChange={(v) => updSA('name', v)}
+          placeholder="instrument name"
+          width={180}
+          height={20}
+          fontSize={11}
+        />
       </layoutContainer>
 
       {/* ── SYNTHESIS ───────────────────────────────────────────────────────── */}
@@ -369,6 +395,25 @@ export const PixiSonicArrangerPanel: React.FC<Props> = ({ instrument, onUpdate }
       </layoutContainer>
 
       <SectionHeading text="WAVEFORM" />
+      <layoutContainer layout={{ flexDirection: 'row', gap: 10, alignItems: 'center', paddingTop: 2, paddingBottom: 2 }}>
+        <PixiLabel text="Wave #" size="xs" color="textMuted" />
+        <PixiSelect
+          value={String(sa.waveformNumber)}
+          onChange={(v) => updSA('waveformNumber', parseInt(v) || 0)}
+          options={waveOptions}
+          width={100}
+          height={22}
+        />
+        <PixiLabel text="Length (words)" size="xs" color="textMuted" />
+        <PixiNumericInput
+          value={sa.waveformLength}
+          min={0}
+          max={65535}
+          step={1}
+          width={60}
+          onChange={(v) => updSA('waveformLength', Math.round(v))}
+        />
+      </layoutContainer>
       <layoutContainer
         layout={{
           width: DISPLAY_W,
@@ -405,16 +450,17 @@ export const PixiSonicArrangerPanel: React.FC<Props> = ({ instrument, onUpdate }
       </layoutContainer>
 
       <SectionHeading text="ADSR ENVELOPE" />
-      <layoutContainer layout={{ flexDirection: 'row', gap: 16, paddingTop: 4 }}>
-        <PixiKnob
-          value={sa.adsrNumber}
-          min={0}
-          max={255}
-          onChange={(v) => updSA('adsrNumber', Math.round(v))}
-          label="Number"
-          size={KNOB_SIZE}
-          defaultValue={0}
+      <layoutContainer layout={{ flexDirection: 'row', gap: 10, alignItems: 'center', paddingTop: 4 }}>
+        <PixiLabel text="Table #" size="xs" color="textMuted" />
+        <PixiSelect
+          value={String(sa.adsrNumber)}
+          onChange={(v) => updSA('adsrNumber', parseInt(v) || 0)}
+          options={adsrOptions}
+          width={100}
+          height={22}
         />
+      </layoutContainer>
+      <layoutContainer layout={{ flexDirection: 'row', gap: 16, paddingTop: 4 }}>
         <PixiKnob
           value={sa.adsrDelay}
           min={0}
@@ -492,16 +538,17 @@ export const PixiSonicArrangerPanel: React.FC<Props> = ({ instrument, onUpdate }
       </layoutContainer>
 
       <SectionHeading text="AMF (PITCH MODULATION)" />
-      <layoutContainer layout={{ flexDirection: 'row', gap: 16, paddingTop: 4 }}>
-        <PixiKnob
-          value={sa.amfNumber}
-          min={0}
-          max={255}
-          onChange={(v) => updSA('amfNumber', Math.round(v))}
-          label="Number"
-          size={KNOB_SIZE}
-          defaultValue={0}
+      <layoutContainer layout={{ flexDirection: 'row', gap: 10, alignItems: 'center', paddingTop: 4 }}>
+        <PixiLabel text="Table #" size="xs" color="textMuted" />
+        <PixiSelect
+          value={String(sa.amfNumber)}
+          onChange={(v) => updSA('amfNumber', parseInt(v) || 0)}
+          options={amfOptions}
+          width={100}
+          height={22}
         />
+      </layoutContainer>
+      <layoutContainer layout={{ flexDirection: 'row', gap: 16, paddingTop: 4 }}>
         <PixiKnob
           value={sa.amfDelay}
           min={0}
