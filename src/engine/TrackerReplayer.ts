@@ -487,11 +487,17 @@ export class TrackerReplayer {
   // Instrument lookup map (keyed by instrument ID) — avoids linear scan per note
   private instrumentMap: Map<number, InstrumentConfig> = new Map();
 
-  // Callbacks
-  public onRowChange: ((row: number, pattern: number, position: number) => void) | null = null;
-  public onChannelRowChange: ((channelRows: number[]) => void) | null = null;
-  public onSongEnd: (() => void) | null = null;
-  public onTickProcess: ((tick: number, row: number) => void) | null = null;
+  // Callbacks — owned by the PlaybackCoordinator. The fields below are
+  // accessor pairs that delegate, so external callers (DJ deck, transport,
+  // pattern editor, etc.) don't need to change.
+  public get onRowChange() { return this.coordinator.onRowChange; }
+  public set onRowChange(v) { this.coordinator.onRowChange = v; }
+  public get onChannelRowChange() { return this.coordinator.onChannelRowChange; }
+  public set onChannelRowChange(v) { this.coordinator.onChannelRowChange = v; }
+  public get onSongEnd() { return this.coordinator.onSongEnd; }
+  public set onSongEnd(v) { this.coordinator.onSongEnd = v; }
+  public get onTickProcess() { return this.coordinator.onTickProcess; }
+  public set onTickProcess(v) { this.coordinator.onTickProcess = v; }
 
   // DJ mode state
   private nudgeOffset = 0;            // Temporary BPM offset for DJ nudge
@@ -565,7 +571,7 @@ export class TrackerReplayer {
   private _uadePositionUnsub: (() => void) | null = null;
   private _uadePaulaLogInterval: number | null = null;
   private _furnaceCmdLogUnsub: (() => void) | null = null;
-  private _captureSyncInterval: number | null = null;
+  // Capture sync interval moved to coordinator.startCaptureSync/stopCaptureSync
   private _tfmxChannelUnsub: (() => void) | null = null;
 
   /** Get the active C64 SID engine (for subsong switching etc.) */
@@ -1332,10 +1338,7 @@ export class TrackerReplayer {
     }
 
     // Clear stale callbacks from previous song
-    this.onRowChange = null;
-    this.onChannelRowChange = null;
-    this.onSongEnd = null;
-    this.onTickProcess = null;
+    this.coordinator.clearCallbacks();
 
     // Furnace speed alternation: if speed2 differs from speed1, enable alternation
     if (song.speed2 !== undefined && song.speed2 !== song.initialSpeed) {
@@ -1812,17 +1815,17 @@ export class TrackerReplayer {
       }
     }
 
-    // Start automation capture → store sync (converts register writes to automation curves)
+    // Start automation capture → store sync (converts register writes to automation curves).
+    // The coordinator owns the timer; we hand it a closure that knows our song context.
     resetCaptureSync();
-    if (this._captureSyncInterval != null) clearInterval(this._captureSyncInterval);
-    this._captureSyncInterval = window.setInterval(() => {
+    this.coordinator.startCaptureSync(() => {
       if (!this.playing || !this.song) return;
       const pat = this.song.patterns[this.song.songPositions?.[this.songPos] ?? 0];
       if (!pat) return;
       const speed = this.speed || this.song.initialSpeed || 6;
       const firstTick = (this.song as any).uadeFirstTick ?? 0;
       syncCaptureToStore(pat.id, speed, firstTick, pat.length);
-    }, 100);
+    });
 
     const transportState = useTransportStore.getState();
     this.lastGrooveTemplateId = transportState.grooveTemplateId;
@@ -2232,10 +2235,7 @@ export class TrackerReplayer {
       this._furnaceCmdLogUnsub = null;
     }
     // Clean up automation capture sync
-    if (this._captureSyncInterval != null) {
-      clearInterval(this._captureSyncInterval);
-      this._captureSyncInterval = null;
-    }
+    this.coordinator.stopCaptureSync();
     resetCaptureSync();
 
     // Clean up TFMX channel subscription
