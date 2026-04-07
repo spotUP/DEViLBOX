@@ -12,7 +12,10 @@
  */
 
 import React, { useState, useCallback, useRef, useEffect } from 'react';
-import { useVocoderStore, type CarrierType } from '@/stores/useVocoderStore';
+import {
+  useVocoderStore, VOCODER_PRESETS, VOCODER_FX_PRESETS,
+  type CarrierType, type VocoderFXPreset,
+} from '@/stores/useVocoderStore';
 import { VocoderEngine } from '@/engine/vocoder/VocoderEngine';
 import { VocoderAutoTune } from '@/engine/vocoder/VocoderAutoTune';
 import type { AutoTuneScale } from '@/engine/effects/AutoTuneEffect';
@@ -24,10 +27,23 @@ const SCALE_LABELS: Record<AutoTuneScale, string> = {
   major: 'MAJ', minor: 'MIN', chromatic: 'CHR', pentatonic: 'PNT', blues: 'BLU',
 };
 
+const FX_PRESET_NAMES = Object.keys(VOCODER_FX_PRESETS) as VocoderFXPreset[];
+const FX_PRESET_LABELS: Record<VocoderFXPreset, string> = {
+  none: 'Dry',
+  'space-echo': 'Space',
+  'dub-delay': 'Dub',
+  'hall-reverb': 'Hall',
+  'plate-reverb': 'Plate',
+  'radio': 'Radio',
+};
+
 export const PixiDJVocoderControl: React.FC = () => {
   const isActive = useVocoderStore(s => s.isActive);
   const amplitude = useVocoderStore(s => s.amplitude);
   const params = useVocoderStore(s => s.params);
+  const presetName = useVocoderStore(s => s.presetName);
+  const fxEnabled = useVocoderStore(s => s.fx.enabled);
+  const fxPreset = useVocoderStore(s => s.fx.preset);
   const [error, setError] = useState<string | null>(null);
   const [muted, setMuted] = useState(false);
   /** Real pitch-correction autotune (YIN + scale snap) on the vocoder output. */
@@ -126,6 +142,32 @@ export const PixiDJVocoderControl: React.FC = () => {
     }
   }, [followMelodyEnabled]);
 
+  /** Cycle to next voice preset (Kraftwerk → Daft Punk → ... → Custom → ...). */
+  const handlePresetCycle = useCallback(() => {
+    const i = presetName ? VOCODER_PRESETS.findIndex((p) => p.name === presetName) : -1;
+    const next = VOCODER_PRESETS[(i + 1) % VOCODER_PRESETS.length];
+    if (engineRef.current) {
+      engineRef.current.loadPreset(next.name);
+    } else {
+      useVocoderStore.getState().loadPreset(next.name);
+    }
+  }, [presetName]);
+
+  /** Toggle FX on/off. */
+  const handleFXToggle = useCallback(() => {
+    const next = !fxEnabled;
+    useVocoderStore.getState().setFXEnabled(next);
+    engineRef.current?.applyFX(useVocoderStore.getState().fx);
+  }, [fxEnabled]);
+
+  /** Cycle to next FX preset. */
+  const handleFXPresetCycle = useCallback(() => {
+    const i = FX_PRESET_NAMES.indexOf(fxPreset);
+    const next = FX_PRESET_NAMES[(i + 1) % FX_PRESET_NAMES.length];
+    useVocoderStore.getState().loadFXPreset(next);
+    engineRef.current?.applyFX(useVocoderStore.getState().fx);
+  }, [fxPreset]);
+
   /** Cycle to next key on click. */
   const handleKeyCycle = useCallback(() => {
     const next = (tuneKey + 1) % 12;
@@ -163,6 +205,14 @@ export const PixiDJVocoderControl: React.FC = () => {
             size="sm"
             active={muted}
             onClick={handleMute}
+          />
+
+          {/* Voice preset cycle */}
+          <PixiButton
+            label={presetName || 'Custom'}
+            variant="ghost"
+            size="sm"
+            onClick={handlePresetCycle}
           />
 
           {/* Carrier type buttons */}
@@ -220,6 +270,24 @@ export const PixiDJVocoderControl: React.FC = () => {
             />
           </pixiContainer>
         </>
+      )}
+
+      {/* FX toggle + preset cycle — always available */}
+      <PixiButton
+        label="FX"
+        variant={fxEnabled ? 'ft2' : 'ghost'}
+        color={fxEnabled ? 'blue' : undefined}
+        size="sm"
+        active={fxEnabled}
+        onClick={handleFXToggle}
+      />
+      {fxEnabled && (
+        <PixiButton
+          label={FX_PRESET_LABELS[fxPreset]}
+          variant="ghost"
+          size="sm"
+          onClick={handleFXPresetCycle}
+        />
       )}
 
       {/* Tune (real autotune) + key/scale cycle buttons — always available */}
