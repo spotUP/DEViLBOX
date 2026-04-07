@@ -872,6 +872,45 @@ export class TrackerReplayer {
     this._activeWasmEngine = engine;
   }
 
+  /**
+   * Read the current row's pattern data and fire per-channel VU meters.
+   * Used by WASM-backed formats (libopenmpt, Hively, MusicLine, UADE,
+   * JamCracker, FC, Klystrack, etc.) where the TS scheduler doesn't run
+   * but the meters still need to animate. Wired into
+   * coordinator.context.triggerVUMeters via syncCoordinatorContext().
+   *
+   * For non-suppressNotes formats the meters fire naturally from
+   * triggerNote() inside processRow — this method is a no-op there.
+   */
+  private triggerVUMetersForRow(time: number): void {
+    if (!this._suppressNotes || !this.song) return;
+    const engine = getToneEngine();
+    if (!this.meterCallbacks) {
+      this.meterCallbacks = [];
+      this.meterStaging = new Float64Array(64);
+      for (let i = 0; i < 64; i++) {
+        const ch = i;
+        this.meterCallbacks[i] = () => {
+          engine.triggerChannelMeter(ch, this.meterStaging[ch]);
+        };
+      }
+    }
+    // Read pattern data live from the tracker store so user edits are visible
+    const storePatterns = useTrackerStore.getState().patterns;
+    const patternNum = this.song.songPositions[this.songPos];
+    const livePattern = storePatterns[patternNum];
+    if (!livePattern) return;
+    for (let ch = 0; ch < Math.min(this.channels.length, livePattern.channels.length); ch++) {
+      const row = livePattern.channels[ch]?.rows[this.pattPos];
+      if (row && row.note > 0 && row.note < 97) {
+        const vol = (row.volume !== undefined && row.volume !== null && row.volume <= 64)
+          ? row.volume / 64 : 0.7;
+        this.meterStaging[ch] = vol;
+        Tone.Draw.schedule(this.meterCallbacks[ch], time);
+      }
+    }
+  }
+
   /** Compute and apply a mute mask to the active WASM engine.
    *  Channels playing replaced instruments are muted in the WASM engine
    *  so ToneEngine can play the synth replacements without doubling. */
@@ -2196,33 +2235,10 @@ export class TrackerReplayer {
     // (libopenmpt onPosition, UADE onPositionUpdate, Hively onPositionUpdate, etc.)
     // No parallel scheduler or processTick-based hybrid block needed.
 
-    // VU meters for native-engine formats (SID, HVL, MusicLine, JamCracker):
-    // When _suppressNotes is true, processRow/triggerNote are skipped so no
-    // VU data fires. Read pattern data and trigger meters from note activity.
-    if (this._suppressNotes && readNewNote) {
-      const engine = getToneEngine();
-      if (!this.meterCallbacks) {
-        this.meterCallbacks = [];
-        this.meterStaging = new Float64Array(64);
-        for (let i = 0; i < 64; i++) {
-          const ch = i;
-          this.meterCallbacks[i] = () => {
-            engine.triggerChannelMeter(ch, this.meterStaging[ch]);
-          };
-        }
-      }
-      for (let ch = 0; ch < this.channels.length; ch++) {
-        const row = useNativeAccessor
-          ? this.accessor.getRow(this.songPos, this.pattPos, ch)
-          : pattern?.channels[ch]?.rows[this.pattPos];
-        if (row && row.note > 0 && row.note < 97) {
-          const vol = (row.volume !== undefined && row.volume !== null && row.volume <= 64)
-            ? row.volume / 64 : 0.7;
-          this.meterStaging[ch] = vol;
-          Tone.Draw.schedule(this.meterCallbacks[ch], safeTime);
-        }
-      }
-    }
+    // VU meter triggering for WASM-backed formats moved to
+    // triggerVUMetersForRow() called from coordinator.dispatchEnginePosition.
+    // The scheduler still drives processRow → triggerNote for non-suppressNotes
+    // playback, which fires VU meters from inside triggerNote naturally.
 
     // Notify tick processing
     if (this.onTickProcess) {
@@ -2290,6 +2306,7 @@ export class TrackerReplayer {
     this.coordinator.context.bpm = this.bpm;
     this.coordinator.context.speed = this.speed;
     this.coordinator.context.fireHybridNotes = (time) => this.fireHybridNotesForRow(time);
+    this.coordinator.context.triggerVUMeters = (time) => this.triggerVUMetersForRow(time);
     this.coordinator.context.audioContext = Tone.context.rawContext as AudioContext;
     // songPos / pattPos already live on coordinator (mirrored via accessor)
   }
