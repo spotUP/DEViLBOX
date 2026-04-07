@@ -209,7 +209,7 @@ const NeuralEffectEditor: React.FC<NeuralEffectEditorProps> = ({
 
         {/* Implemented Parameters */}
         {implementedParams.length > 0 && (
-          <section className="rounded-xl p-4 border border-border bg-black/30 backdrop-blur-sm shadow-inner-dark">
+          <section className="rounded-xl p-4 border border-dark-border bg-black/30 backdrop-blur-sm shadow-inner-dark">
             <SectionHeader size="lg" color="#a855f7" title="Parameters" />
             <div className="flex flex-wrap justify-around gap-4">
               {implementedParams.map((param) => (
@@ -231,7 +231,7 @@ const NeuralEffectEditor: React.FC<NeuralEffectEditorProps> = ({
 
         {/* Unimplemented Parameters (show as disabled) */}
         {unimplementedParams.length > 0 && (
-          <section className="rounded-xl p-4 border border-border bg-black/30 backdrop-blur-sm shadow-inner-dark opacity-50">
+          <section className="rounded-xl p-4 border border-dark-border bg-black/30 backdrop-blur-sm shadow-inner-dark opacity-50">
             <div className="flex items-center gap-2 mb-4">
               <AlertTriangle size={14} className="text-yellow-500" />
               <h3 className="text-[11px] font-black text-yellow-500/80 uppercase tracking-[0.15em]">
@@ -257,7 +257,7 @@ const NeuralEffectEditor: React.FC<NeuralEffectEditorProps> = ({
         )}
 
         {/* Mix */}
-        <section className="rounded-xl p-4 border border-border bg-black/30 backdrop-blur-sm shadow-inner-dark">
+        <section className="rounded-xl p-4 border border-dark-border bg-black/30 backdrop-blur-sm shadow-inner-dark">
           <SectionHeader size="lg" color="#ec4899" title="Output" />
           <div className="flex justify-center">
             <Knob
@@ -274,7 +274,7 @@ const NeuralEffectEditor: React.FC<NeuralEffectEditorProps> = ({
         </section>
 
         {/* Info */}
-        <div className="rounded-lg p-3 border border-border bg-black/20">
+        <div className="rounded-lg p-3 border border-dark-border bg-black/20">
           <p className="text-[11px] text-text-muted leading-relaxed">
             Neural effects use machine learning models for authentic amp/pedal emulation.
             Changes are applied in real-time.

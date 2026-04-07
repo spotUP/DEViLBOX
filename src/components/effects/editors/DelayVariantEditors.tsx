@@ -31,7 +31,7 @@ export const SpaceyDelayerEditor: React.FC<VisualEffectEditorProps> = ({
     <div className="space-y-4">
       <EffectOscilloscope pre={pre} post={post} color="#8b5cf6" />
       {/* Delay Controls */}
-      <section className="rounded-xl p-4 border border-border bg-black/30 backdrop-blur-sm shadow-inner-dark">
+      <section className="rounded-xl p-4 border border-dark-border bg-black/30 backdrop-blur-sm shadow-inner-dark">
         <SectionHeader size="lg" color="#8b5cf6" title="Spacey Delayer" />
         <div className="flex justify-around items-end">
           <div className={synced ? 'opacity-40 pointer-events-none' : ''}>
@@ -77,7 +77,7 @@ export const SpaceyDelayerEditor: React.FC<VisualEffectEditorProps> = ({
       </section>
 
       {/* Toggles */}
-      <section className="rounded-xl p-4 border border-border bg-black/30 backdrop-blur-sm shadow-inner-dark">
+      <section className="rounded-xl p-4 border border-dark-border bg-black/30 backdrop-blur-sm shadow-inner-dark">
         <SectionHeader size="lg" color="#a78bfa" title="Options" />
         <div className="flex gap-4">
           <button
@@ -134,7 +134,7 @@ export const RETapeEchoEditor: React.FC<VisualEffectEditorProps> = ({
     <div className="space-y-4">
       <EffectOscilloscope pre={pre} post={post} color="#dc2626" />
       {/* Main Controls */}
-      <section className="rounded-xl p-4 border border-border bg-black/30 backdrop-blur-sm shadow-inner-dark">
+      <section className="rounded-xl p-4 border border-dark-border bg-black/30 backdrop-blur-sm shadow-inner-dark">
         <SectionHeader size="lg" color="#dc2626" title="RE Tape Echo" />
         <div className="flex justify-around items-end">
           <div className={synced ? 'opacity-40 pointer-events-none' : ''}>
@@ -180,7 +180,7 @@ export const RETapeEchoEditor: React.FC<VisualEffectEditorProps> = ({
       </section>
 
       {/* Tape Imperfections */}
-      <section className="rounded-xl p-4 border border-border bg-black/30 backdrop-blur-sm shadow-inner-dark">
+      <section className="rounded-xl p-4 border border-dark-border bg-black/30 backdrop-blur-sm shadow-inner-dark">
         <SectionHeader size="lg" color="#f97316" title="Tape Character" />
         <div className="flex justify-around items-end">
           <Knob
@@ -223,7 +223,7 @@ export const RETapeEchoEditor: React.FC<VisualEffectEditorProps> = ({
       </section>
 
       {/* Mode + Toggles */}
-      <section className="rounded-xl p-4 border border-border bg-black/30 backdrop-blur-sm shadow-inner-dark">
+      <section className="rounded-xl p-4 border border-dark-border bg-black/30 backdrop-blur-sm shadow-inner-dark">
         <SectionHeader size="lg" color="#b91c1c" title="Mode & Options" />
         <div className="mb-3">
           <div className="text-xs text-text-secondary mb-2">Echo Mode</div>
@@ -292,7 +292,7 @@ export const SpaceEchoEditor: React.FC<VisualEffectEditorProps> = ({
   return (
     <div className="space-y-4">
       <EffectOscilloscope pre={pre} post={post} color="#6366f1" />
-      <section className="rounded-xl p-4 border border-border bg-black/30 backdrop-blur-sm shadow-inner-dark">
+      <section className="rounded-xl p-4 border border-dark-border bg-black/30 backdrop-blur-sm shadow-inner-dark">
         <SectionHeader size="lg" color="#6366f1" title="Echo" />
         <div className="flex justify-around items-end">
           <Knob
@@ -327,7 +327,7 @@ export const SpaceEchoEditor: React.FC<VisualEffectEditorProps> = ({
         </div>
         {renderBpmSync(effect, onUpdateParameter)}
       </section>
-      <section className="rounded-xl p-4 border border-border bg-black/30 backdrop-blur-sm shadow-inner-dark">
+      <section className="rounded-xl p-4 border border-dark-border bg-black/30 backdrop-blur-sm shadow-inner-dark">
         <SectionHeader size="lg" color="#818cf8" title="Levels & EQ" />
         <div className="flex justify-around items-end">
           <Knob
@@ -370,7 +370,7 @@ export const SpaceEchoEditor: React.FC<VisualEffectEditorProps> = ({
           />
         </div>
       </section>
-      <section className="rounded-xl p-4 border border-border bg-black/30 backdrop-blur-sm shadow-inner-dark">
+      <section className="rounded-xl p-4 border border-dark-border bg-black/30 backdrop-blur-sm shadow-inner-dark">
         <div className="flex justify-center">
           <Knob
             value={effect.wet}
@@ -419,7 +419,7 @@ export const ToneArmEditor: React.FC<VisualEffectEditorProps> = ({
       <EffectOscilloscope pre={pre} post={post} color="#a3e635" />
 
       {/* RPM selector */}
-      <section className="rounded-xl p-4 border border-border bg-black/30 backdrop-blur-sm shadow-inner-dark w-full">
+      <section className="rounded-xl p-4 border border-dark-border bg-black/30 backdrop-blur-sm shadow-inner-dark w-full">
         <SectionHeader size="lg" color="#a3e635" title="Record Speed" />
         <div className="flex gap-2">
           {TONEARM_RPM_PRESETS.map((p) => (
@@ -430,7 +430,7 @@ export const ToneArmEditor: React.FC<VisualEffectEditorProps> = ({
                 'flex-1 py-1.5 rounded-lg text-xs font-mono font-bold border transition-all',
                 activeRpm === p.label
                   ? 'bg-lime-700/70 border-lime-500 text-lime-100'
-                  : 'bg-black/40 border-border text-text-muted hover:border-lime-700 hover:text-lime-300',
+                  : 'bg-black/40 border-dark-border text-text-muted hover:border-lime-700 hover:text-lime-300',
               ].join(' ')}
             >
               {p.label}
@@ -440,7 +440,7 @@ export const ToneArmEditor: React.FC<VisualEffectEditorProps> = ({
       </section>
 
       {/* Cartridge */}
-      <section className="rounded-xl p-4 border border-border bg-black/30 backdrop-blur-sm shadow-inner-dark w-full">
+      <section className="rounded-xl p-4 border border-dark-border bg-black/30 backdrop-blur-sm shadow-inner-dark w-full">
         <SectionHeader size="lg" color="#a3e635" title="Cartridge" />
         <div className="flex justify-center gap-8 items-end">
           <Knob value={coil}    min={0} max={1} onChange={(v) => onUpdateParameter('coil',    Math.round(v * 100))} label="Coil"    color="#a3e635" formatValue={(v) => `${Math.round(v * 100)}%`} />
@@ -450,7 +450,7 @@ export const ToneArmEditor: React.FC<VisualEffectEditorProps> = ({
       </section>
 
       {/* Turntable mechanics */}
-      <section className="rounded-xl p-4 border border-border bg-black/30 backdrop-blur-sm shadow-inner-dark w-full">
+      <section className="rounded-xl p-4 border border-dark-border bg-black/30 backdrop-blur-sm shadow-inner-dark w-full">
         <SectionHeader size="lg" color="#bef264" title="Turntable" />
         <div className="flex justify-center gap-8 items-end">
           <Knob value={wow}     min={0} max={1} onChange={(v) => onUpdateParameter('wow',     Math.round(v * 100))} label="Wow"     color="#bef264" formatValue={(v) => `${Math.round(v * 100)}%`} />
@@ -459,7 +459,7 @@ export const ToneArmEditor: React.FC<VisualEffectEditorProps> = ({
       </section>
 
       {/* Surface noise */}
-      <section className="rounded-xl p-4 border border-border bg-black/30 backdrop-blur-sm shadow-inner-dark w-full">
+      <section className="rounded-xl p-4 border border-dark-border bg-black/30 backdrop-blur-sm shadow-inner-dark w-full">
         <SectionHeader size="lg" color="#d9f99d" title="Surface" />
         <div className="flex justify-center gap-8 items-end">
           <Knob value={hiss}    min={0} max={1} onChange={(v) => onUpdateParameter('hiss',    Math.round(v * 100))} label="Hiss"    color="#d9f99d" formatValue={(v) => `${Math.round(v * 100)}%`} />
@@ -555,13 +555,13 @@ export const TumultEditor: React.FC<VisualEffectEditorProps> = ({
 
   const btnBase     = 'flex-1 py-1.5 rounded-lg text-xs font-bold border transition-all';
   const btnActive   = 'bg-violet-700/70 border-violet-500 text-violet-100';
-  const btnInactive = 'bg-black/40 border-border text-text-muted hover:border-violet-700 hover:text-violet-300';
+  const btnInactive = 'bg-black/40 border-dark-border text-text-muted hover:border-violet-700 hover:text-violet-300';
 
   return (
     <div className="space-y-4">
       <EffectOscilloscope pre={pre} post={post} color="#7c3aed" />
       {/* ── Section 1: Source ─────────────────────────────────────────────── */}
-      <section className="rounded-xl p-4 border border-border bg-black/30 backdrop-blur-sm shadow-inner-dark">
+      <section className="rounded-xl p-4 border border-dark-border bg-black/30 backdrop-blur-sm shadow-inner-dark">
         <SectionHeader size="lg" color="#7c3aed" title="Source" />
 
         <div className="flex gap-2 mb-3">
@@ -617,7 +617,7 @@ export const TumultEditor: React.FC<VisualEffectEditorProps> = ({
       </section>
 
       {/* ── Section 2: Master Controls ────────────────────────────────────── */}
-      <section className="rounded-xl p-4 border border-border bg-black/30 backdrop-blur-sm shadow-inner-dark">
+      <section className="rounded-xl p-4 border border-dark-border bg-black/30 backdrop-blur-sm shadow-inner-dark">
         <SectionHeader size="lg" color="#7c3aed" title="Controls" />
 
         <div className="flex gap-6 items-start flex-wrap">
@@ -644,7 +644,7 @@ export const TumultEditor: React.FC<VisualEffectEditorProps> = ({
         </div>
 
         {switchBranch === 0 && (
-          <div className="flex gap-4 mt-3 pt-3 border-t border-border flex-wrap">
+          <div className="flex gap-4 mt-3 pt-3 border-t border-dark-border flex-wrap">
             <Knob label="Threshold" value={p('duckThreshold', -20.0)} min={-100} max={0}
               unit="dB" onChange={(v) => set('duckThreshold', v)} />
             <Knob label="Attack" value={p('duckAttack', 0)} min={0} max={500}
@@ -655,7 +655,7 @@ export const TumultEditor: React.FC<VisualEffectEditorProps> = ({
         )}
 
         {switchBranch === 1 && (
-          <div className="flex gap-4 mt-3 pt-3 border-t border-border flex-wrap">
+          <div className="flex gap-4 mt-3 pt-3 border-t border-dark-border flex-wrap">
             <Knob label="Threshold" value={p('followThreshold', -20.0)} min={-100} max={0}
               unit="dB" onChange={(v) => set('followThreshold', v)} />
             <Knob label="Attack" value={p('followAttack', 0)} min={0} max={500}
@@ -669,7 +669,7 @@ export const TumultEditor: React.FC<VisualEffectEditorProps> = ({
       </section>
 
       {/* ── Section 3: 5-Band EQ ──────────────────────────────────────────── */}
-      <section className="rounded-xl p-4 border border-border bg-black/30 backdrop-blur-sm shadow-inner-dark">
+      <section className="rounded-xl p-4 border border-dark-border bg-black/30 backdrop-blur-sm shadow-inner-dark">
         <SectionHeader size="lg" color="#7c3aed" title="EQ" />
 
         <div className="flex gap-4 flex-wrap">
@@ -717,7 +717,7 @@ const TumultEQBand: React.FC<{
       <button
         onClick={() => onSet(enableKey, enabled ? 0 : 1)}
         className={`w-4 h-4 rounded-sm border transition-all ${
-          enabled ? 'bg-violet-500 border-violet-400' : 'bg-black/40 border-border'
+          enabled ? 'bg-violet-500 border-violet-400' : 'bg-black/40 border-dark-border'
         }`}
       />
     </div>
@@ -728,7 +728,7 @@ const TumultEQBand: React.FC<{
             className={`flex-1 py-0.5 rounded text-[10px] border transition-all ${
               filterType === i
                 ? 'bg-violet-700/70 border-violet-500 text-violet-100'
-                : 'bg-black/40 border-border text-text-muted'
+                : 'bg-black/40 border-dark-border text-text-muted'
             }`}>
             {t}
           </button>

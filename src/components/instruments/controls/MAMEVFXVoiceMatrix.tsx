@@ -124,7 +124,7 @@ export const MAMEVFXVoiceMatrix: React.FC<MAMEVFXVoiceMatrixProps> = ({
 
       {/* Selected Voice Editor */}
       <div className={`p-4 rounded border ${panelBg} space-y-4 shadow-inner-dark`} style={panelStyle}>
-        <div className="flex items-center justify-between border-b border-border pb-2">
+        <div className="flex items-center justify-between border-b border-dark-border pb-2">
           <div className="flex items-center gap-2">
             <Settings size={14} className="text-text-muted" />
             <span className="text-[10px] font-bold uppercase tracking-widest text-text-secondary">
@@ -151,7 +151,7 @@ export const MAMEVFXVoiceMatrix: React.FC<MAMEVFXVoiceMatrixProps> = ({
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-           <div className="bg-black/20 p-2 rounded border border-border space-y-1">
+           <div className="bg-black/20 p-2 rounded border border-dark-border space-y-1">
               <div className="text-[8px] text-text-muted uppercase font-bold tracking-tighter">Wavetable Offset</div>
               <div className="flex justify-between text-[10px] font-mono">
                 <span className="text-text-muted">START:</span>

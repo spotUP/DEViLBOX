@@ -88,7 +88,7 @@ const PianoKeyboardComponent: React.FC<PianoKeyboardProps> = ({
                 ? 'bg-accent-primary text-text-inverse border-accent-primary brightness-110 shadow-lg'
                 : isBlack
                   ? `bg-dark-bgTertiary text-text-secondary border-dark-borderLight hover:bg-dark-bgHover ${outOfScale ? 'opacity-40' : ''}`
-                  : `bg-white text-text-muted border-border hover:bg-dark-bgHover ${outOfScale ? 'opacity-40' : ''}`
+                  : `bg-white text-text-muted border-dark-border hover:bg-dark-bgHover ${outOfScale ? 'opacity-40' : ''}`
               }
               ${isC ? 'font-bold' : ''}
             `}

@@ -90,7 +90,7 @@ Time: ${new Date().toISOString()}
       // Default error UI
       return (
         <div className="min-h-screen bg-bg flex items-center justify-center p-4 select-text">
-          <div className="max-w-lg w-full bg-bg-secondary rounded-lg border border-border p-6 text-center select-text">
+          <div className="max-w-lg w-full bg-bg-secondary rounded-lg border border-dark-border p-6 text-center select-text">
             <div className="text-6xl mb-4 select-none">💀</div>
             <h1 className="text-2xl font-bold text-text mb-2">
               Something went wrong

@@ -18,7 +18,7 @@ export const GenericEffectEditor: React.FC<VisualEffectEditorProps> = ({
 }) => {
   return (
     <div className="space-y-4">
-      <section className="rounded-xl p-4 border border-border bg-black/30 backdrop-blur-sm shadow-inner-dark">
+      <section className="rounded-xl p-4 border border-dark-border bg-black/30 backdrop-blur-sm shadow-inner-dark">
         <SectionHeader size="lg" color="#6b7280" title={effect.type} />
         <div className="flex justify-center">
           <Knob
@@ -224,7 +224,7 @@ export const WAMEffectEditor: React.FC<VisualEffectEditorProps> = ({
       {/* Native WAM GUI */}
       <div
         ref={guiContainerRef}
-        className="bg-black rounded-lg border border-border overflow-visible relative"
+        className="bg-black rounded-lg border border-dark-border overflow-visible relative"
         style={{ minHeight: hasGui ? 200 : 0, display: hasGui || isLoading ? 'block' : 'none' }}
       />
       {isLoading && (
@@ -238,7 +238,7 @@ export const WAMEffectEditor: React.FC<VisualEffectEditorProps> = ({
         </div>
       )}
       {/* Mix knob */}
-      <section className="rounded-xl p-4 border border-border bg-black/30 backdrop-blur-sm shadow-inner-dark">
+      <section className="rounded-xl p-4 border border-dark-border bg-black/30 backdrop-blur-sm shadow-inner-dark">
         <SectionHeader size="lg" color="#6b7280" title="Mix" />
         <div className="flex justify-center">
           <Knob
