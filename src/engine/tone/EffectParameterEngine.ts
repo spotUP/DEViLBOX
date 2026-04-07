@@ -21,6 +21,12 @@ import { NeuralEffectWrapper } from '../effects/NeuralEffectWrapper';
 import { WAMEffectNode } from '../wam/WAMEffectNode';
 import { SidechainCompressor } from '../effects/SidechainCompressor';
 import { TapeSaturation } from '../effects/TapeSaturation';
+import { AmbientDelayEffect } from '../effects/AmbientDelayEffect';
+import { AutoTuneEffect } from '../effects/AutoTuneEffect';
+import { GranularFreezeEffect } from '../effects/GranularFreezeEffect';
+import { ShimmerReverbEffect } from '../effects/ShimmerReverbEffect';
+import { TapeDegradationEffect } from '../effects/TapeDegradationEffect';
+import { VocoderEffect } from '../effects/VocoderEffect';
 
 export const EFFECT_RAMP_TIME = 0.02;
 
@@ -365,6 +371,84 @@ export function applyEffectParametersDiff(
       }
       break;
 
+    case 'AmbientDelay':
+      if (node instanceof AmbientDelayEffect) {
+        if ('time' in changed) node.time = Number(changed.time) / 1000;
+        if ('feedback' in changed) node.feedback = Number(changed.feedback) / 100;
+        if ('taps' in changed) node.taps = Number(changed.taps);
+        if ('filterType' in changed) node.filterType = changed.filterType as BiquadFilterType;
+        if ('filterFreq' in changed) node.filterFreq = Number(changed.filterFreq);
+        if ('filterQ' in changed) node.filterQ = Number(changed.filterQ);
+        if ('modRate' in changed) node.modRate = Number(changed.modRate) / 100;
+        if ('modDepth' in changed) node.modDepth = Number(changed.modDepth) / 100;
+        if ('stereoSpread' in changed) node.stereoSpread = Number(changed.stereoSpread) / 100;
+        if ('diffusion' in changed) node.diffusion = Number(changed.diffusion) / 100;
+      }
+      break;
+
+    case 'AutoTune':
+      if (node instanceof AutoTuneEffect) {
+        if ('key' in changed) node.setKey(Number(changed.key));
+        if ('scale' in changed) node.setScale(changed.scale as 'major' | 'minor' | 'chromatic' | 'pentatonic' | 'blues');
+        if ('strength' in changed) node.setStrength(Number(changed.strength) / 100);
+        if ('speed' in changed) node.setSpeed(Number(changed.speed) / 100);
+      }
+      break;
+
+    case 'GranularFreeze':
+      if (node instanceof GranularFreezeEffect) {
+        if ('freeze' in changed) node.setFreeze(Number(changed.freeze));
+        if ('grainSize' in changed) node.setGrainSize(Number(changed.grainSize) / 1000);
+        if ('density' in changed) node.setDensity(Number(changed.density));
+        if ('scatter' in changed) node.setScatter(Number(changed.scatter) / 100);
+        if ('pitch' in changed) node.setPitch(Number(changed.pitch));
+        if ('spray' in changed) node.setSpray(Number(changed.spray) / 100);
+        if ('shimmer' in changed) node.setShimmer(Number(changed.shimmer) / 100);
+        if ('stereoWidth' in changed) node.setStereoWidth(Number(changed.stereoWidth) / 100);
+        if ('feedback' in changed) node.setFeedback(Number(changed.feedback) / 100);
+        if ('captureLen' in changed) node.setCaptureLength(Number(changed.captureLen) / 1000);
+        if ('attack' in changed) node.setAttack(Number(changed.attack) / 1000);
+        if ('release' in changed) node.setRelease(Number(changed.release) / 1000);
+        if ('thru' in changed) node.setThru(Number(changed.thru));
+      }
+      break;
+
+    case 'ShimmerReverb':
+      if (node instanceof ShimmerReverbEffect) {
+        if ('decay' in changed) node.setDecay(Number(changed.decay) / 100);
+        if ('shimmer' in changed) node.setShimmer(Number(changed.shimmer) / 100);
+        if ('pitch' in changed) node.setPitch(Number(changed.pitch));
+        if ('damping' in changed) node.setDamping(Number(changed.damping) / 100);
+        if ('size' in changed) node.setSize(Number(changed.size) / 100);
+        if ('predelay' in changed) node.setPredelay(Number(changed.predelay) / 1000);
+        if ('modRate' in changed) node.setModRate(Number(changed.modRate) / 100);
+        if ('modDepth' in changed) node.setModDepth(Number(changed.modDepth) / 100);
+      }
+      break;
+
+    case 'TapeDegradation':
+      if (node instanceof TapeDegradationEffect) {
+        if ('wow' in changed) node.wow = Number(changed.wow) / 100;
+        if ('flutter' in changed) node.flutter = Number(changed.flutter) / 100;
+        if ('hiss' in changed) node.hiss = Number(changed.hiss) / 100;
+        if ('dropouts' in changed) node.dropouts = Number(changed.dropouts) / 100;
+        if ('saturation' in changed) node.saturation = Number(changed.saturation) / 100;
+        if ('toneShift' in changed) node.toneShift = Number(changed.toneShift) / 100;
+      }
+      break;
+
+    case 'Vocoder':
+      if (node instanceof VocoderEffect) {
+        if ('source' in changed) node.setSource(changed.source as 'self' | 'mic');
+        if ('carrierType' in changed) node.setCarrierType(Number(changed.carrierType) as 0 | 1 | 2 | 3);
+        if ('carrierFreq' in changed) node.setCarrierFreq(Number(changed.carrierFreq));
+        if ('formantShift' in changed) node.setFormantShift(Number(changed.formantShift));
+        if ('reactionTime' in changed) node.setReactionTime(Number(changed.reactionTime) / 1000);
+        if ('bands' in changed) node.setBands(Number(changed.bands));
+        if ('filtersPerBand' in changed) node.setFiltersPerBand(Number(changed.filtersPerBand));
+      }
+      break;
+
     // WAM 2.0 effects
     case 'WAMBigMuff':
     case 'WAMTS9':
@@ -441,6 +525,11 @@ export function applyBpmSyncedParam(
       case 'BiPhase':
         if (paramKey === 'rateA' && node instanceof BiPhaseEffect) {
           node.setRateA(value);
+        }
+        break;
+      case 'AmbientDelay':
+        if (paramKey === 'time' && node instanceof AmbientDelayEffect) {
+          node.time = value;
         }
         break;
     }
