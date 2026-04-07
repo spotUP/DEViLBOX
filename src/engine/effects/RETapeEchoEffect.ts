@@ -51,6 +51,7 @@ export class RETapeEchoEffect extends Tone.ToneAudioNode {
   private wetGain: Tone.Gain;
   private workletNode: AudioWorkletNode | null = null;
   private _disposed = false;
+  private _wasmReady = false;
   private _options: Required<RETapeEchoOptions>;
 
   constructor(options: RETapeEchoOptions = {}) {
@@ -107,6 +108,7 @@ export class RETapeEchoEffect extends Tone.ToneAudioNode {
 
       this.workletNode.port.onmessage = (event) => {
         if (event.data.type === 'ready') {
+          this._wasmReady = true;
           // WASM ready — send params and apply the true wet/dry levels
           this.sendParam('mode', this._options.mode);
           this.sendParam('repeatRate', this._options.repeatRate);
@@ -123,6 +125,9 @@ export class RETapeEchoEffect extends Tone.ToneAudioNode {
           this.wetGain.gain.value = this._options.wet;
         } else if (event.data.type === 'error') {
           console.error('[RETapeEcho] Worklet error:', event.data.message);
+          // WASM failed — enable wet path as passthrough so effect isn't stuck silent
+          this.dryGain.gain.value = 1 - this._options.wet;
+          this.wetGain.gain.value = this._options.wet;
         }
       };
 
@@ -138,6 +143,15 @@ export class RETapeEchoEffect extends Tone.ToneAudioNode {
       // silently fails when crossing standardized-audio-context ↔ native AudioContext.
       getNativeAudioNode(this.input)!.connect(this.workletNode);
       this.workletNode.connect(getNativeAudioNode(this.wetGain)!);
+
+      // Safety timeout: if WASM doesn't report ready within 5s, enable wet path
+      setTimeout(() => {
+        if (!this._wasmReady && !this._disposed) {
+          console.warn('[RETapeEcho] WASM not ready after 5s — enabling wet path as passthrough');
+          this.dryGain.gain.value = 1 - this._options.wet;
+          this.wetGain.gain.value = this._options.wet;
+        }
+      }, 5000);
 
     } catch (err) {
       console.error('[RETapeEcho] Init failed:', err);
