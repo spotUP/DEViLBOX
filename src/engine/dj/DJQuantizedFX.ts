@@ -29,7 +29,11 @@ interface ActiveSweep {
 
 // ── Module state ─────────────────────────────────────────────────────────────
 
-let quantizeMode: QuantizeMode = 'beat';
+// Default to 'bar' so cue/play/hot-cue/jump always land on the next downbeat
+// of the master deck. Bar quantize is strictly safer for mixing — phrases
+// line up musically and you can't drop in mid-phrase. Users can still cycle
+// to 'beat' or 'off' via the Q button on the deck transport.
+let quantizeMode: QuantizeMode = 'bar';
 const activeSweeps = new Map<string, ActiveSweep>();
 
 // ── Configuration ────────────────────────────────────────────────────────────
