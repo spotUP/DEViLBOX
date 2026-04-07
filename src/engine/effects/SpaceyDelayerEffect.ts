@@ -15,12 +15,7 @@
  */
 
 import * as Tone from 'tone';
-import { getNativeContext } from '@utils/audio-context';
-
-function getRawNode(node: Tone.Gain): AudioNode {
-  const n = node as unknown as Record<string, AudioNode | undefined>;
-  return n._gainNode ?? n._nativeAudioNode ?? n._node ?? (node as unknown as AudioNode);
-}
+import { getNativeContext, getNativeAudioNode } from '@utils/audio-context';
 
 export interface SpaceyDelayerOptions {
   firstTap?: number;    // ms (10-2000)
@@ -121,10 +116,10 @@ export class SpaceyDelayerEffect extends Tone.ToneAudioNode {
       });
 
       // Connect wet path: input → workletNode → wetGain (already connected to output)
-      // Use getRawNode() to extract the underlying native AudioNode — Tone.connect()
+      // Use getNativeAudioNode() to extract the underlying native AudioNode — Tone.connect()
       // silently fails when crossing standardized-audio-context ↔ native AudioContext.
-      getRawNode(this.input).connect(this.workletNode);
-      this.workletNode.connect(getRawNode(this.wetGain));
+      getNativeAudioNode(this.input)!.connect(this.workletNode);
+      this.workletNode.connect(getNativeAudioNode(this.wetGain)!);
 
     } catch (err) {
       console.error('[SpaceyDelayer] Init failed:', err);

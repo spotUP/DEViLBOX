@@ -1,4 +1,5 @@
 import * as Tone from 'tone';
+import { getNativeAudioNode } from '@utils/audio-context';
 
 // WASM parameter IDs (must match GranularFreezeEffect.cpp)
 const PARAM_FREEZE       = 0;
@@ -34,11 +35,6 @@ export interface GranularFreezeOptions {
 }
 
 /** Extract the underlying native AudioNode from a Tone.js wrapper */
-function getRawNode(node: Tone.Gain): AudioNode {
-  const n = node as unknown as Record<string, AudioNode | undefined>;
-  return n._gainNode ?? n._nativeAudioNode ?? n._node ?? (node as unknown as AudioNode);
-}
-
 /**
  * GranularFreezeEffect - WASM-powered granular freeze with JS ring-buffer fallback
  *
@@ -248,8 +244,8 @@ export class GranularFreezeEffect extends Tone.ToneAudioNode {
         this.fallbackFreeze!.process(inL, inR, outL, outR);
       };
 
-      const rawInput = getRawNode(this.input);
-      const rawWet = getRawNode(this.wetGain);
+      const rawInput = getNativeAudioNode(this.input)!;
+      const rawWet = getNativeAudioNode(this.wetGain)!;
 
       rawInput.connect(this.fallbackNode);
       this.fallbackNode.connect(rawWet);
@@ -275,8 +271,8 @@ export class GranularFreezeEffect extends Tone.ToneAudioNode {
       const rawContext = Tone.getContext().rawContext as AudioContext;
 
       // Connect WASM first, then disconnect fallback (avoids silent gap)
-      const rawInput = getRawNode(this.input);
-      const rawWet = getRawNode(this.wetGain);
+      const rawInput = getNativeAudioNode(this.input)!;
+      const rawWet = getNativeAudioNode(this.wetGain)!;
 
       rawInput.connect(this.workletNode);
       this.workletNode.connect(rawWet);

@@ -1,4 +1,5 @@
 import * as Tone from 'tone';
+import { getNativeAudioNode } from '@utils/audio-context';
 
 // WASM parameter IDs (must match ShimmerReverbEffect.cpp)
 const PARAM_DECAY     = 0;
@@ -30,11 +31,6 @@ export interface ShimmerReverbOptions {
  * Falls back to a simple Schroeder reverb if WASM fails to load.
  */
 /** Extract the underlying native AudioNode from a Tone.js wrapper */
-function getRawNode(node: Tone.Gain): AudioNode {
-  const n = node as unknown as Record<string, AudioNode | undefined>;
-  return n._gainNode ?? n._nativeAudioNode ?? n._node ?? (node as unknown as AudioNode);
-}
-
 export class ShimmerReverbEffect extends Tone.ToneAudioNode {
   readonly name = 'ShimmerReverb';
 
@@ -223,8 +219,8 @@ export class ShimmerReverbEffect extends Tone.ToneAudioNode {
         this.fallbackReverb!.process(inL, inR, outL, outR);
       };
 
-      const rawInput = getRawNode(this.input);
-      const rawWet = getRawNode(this.wetGain);
+      const rawInput = getNativeAudioNode(this.input)!;
+      const rawWet = getNativeAudioNode(this.wetGain)!;
 
       rawInput.connect(this.fallbackNode);
       this.fallbackNode.connect(rawWet);
@@ -250,8 +246,8 @@ export class ShimmerReverbEffect extends Tone.ToneAudioNode {
       const rawContext = Tone.getContext().rawContext as AudioContext;
 
       // Connect WASM first, then disconnect fallback (avoids silent gap)
-      const rawInput = getRawNode(this.input);
-      const rawWet = getRawNode(this.wetGain);
+      const rawInput = getNativeAudioNode(this.input)!;
+      const rawWet = getNativeAudioNode(this.wetGain)!;
 
       rawInput.connect(this.workletNode);
       this.workletNode.connect(rawWet);

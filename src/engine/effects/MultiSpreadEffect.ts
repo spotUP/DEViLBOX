@@ -1,0 +1,167 @@
+// src/engine/effects/MultiSpreadEffect.ts
+/**
+ * MultiSpreadEffect — Mono-to-stereo frequency band distribution via WASM AudioWorklet.
+ *
+ * Parameters:
+ *   bands   2..8   Number of frequency bands
+ *   spread  0..1   Spread amount
+ *   mix     0..1   Wet/dry mix (internal to WASM)
+ */
+
+import * as Tone from 'tone';
+import { getNativeAudioNode } from '@utils/audio-context';
+
+function clamp(v: number, min: number, max: number): number {
+  return Math.max(min, Math.min(max, v));
+}
+
+export interface MultiSpreadOptions {
+  bands?: number;
+  spread?: number;
+  mix?: number;
+  wet?: number;
+}
+
+export class MultiSpreadEffect extends Tone.ToneAudioNode {
+  readonly name = 'MultiSpread';
+  readonly input: Tone.Gain;
+  readonly output: Tone.Gain;
+
+  private dryGain: Tone.Gain;
+  private wetGain: Tone.Gain;
+  private workletNode: AudioWorkletNode | null = null;
+  private isWasmReady = false;
+  private pendingParams: Array<{ param: string; value: number }> = [];
+
+  private _bands: number;
+  private _spread: number;
+  private _mix: number;
+  private _wet: number;
+
+  private static wasmBinary: ArrayBuffer | null = null;
+  private static jsCode: string | null = null;
+  private static loadedContexts = new Set<BaseAudioContext>();
+  private static initPromises = new Map<BaseAudioContext, Promise<void>>();
+
+  constructor(options: MultiSpreadOptions = {}) {
+    super();
+    this._bands  = options.bands ?? 4;
+    this._spread = options.spread ?? 0.7;
+    this._mix    = options.mix ?? 1;
+    this._wet    = options.wet ?? 1.0;
+
+    this.input   = new Tone.Gain(1);
+    this.output  = new Tone.Gain(1);
+    this.dryGain = new Tone.Gain(1 - this._wet);
+    this.wetGain = new Tone.Gain(this._wet);
+
+    this.input.connect(this.dryGain);
+    this.dryGain.connect(this.output);
+    this.wetGain.connect(this.output);
+    this.input.connect(this.wetGain);
+
+    void this._initWorklet();
+  }
+
+  private async _initWorklet(): Promise<void> {
+    try {
+      const rawCtx = Tone.getContext().rawContext as AudioContext;
+      await MultiSpreadEffect.ensureInitialized(rawCtx);
+
+      this.workletNode = new AudioWorkletNode(rawCtx, 'multi-spread-processor', {
+        numberOfInputs: 1, numberOfOutputs: 1, outputChannelCount: [2],
+      });
+
+      this.workletNode.port.onmessage = (e) => {
+        if (e.data.type === 'ready') {
+          this.isWasmReady = true;
+          for (const p of this.pendingParams) {
+            this.workletNode!.port.postMessage({ type: 'parameter', param: p.param, value: p.value });
+          }
+          this.pendingParams = [];
+          try { this.input.disconnect(this.wetGain); } catch { /* */ }
+          const rawInput = getNativeAudioNode(this.input)!;
+          const rawWet = getNativeAudioNode(this.wetGain)!;
+          rawInput.connect(this.workletNode!);
+          this.workletNode!.connect(rawWet);
+        }
+      };
+
+      this.workletNode.port.postMessage(
+        { type: 'init', wasmBinary: MultiSpreadEffect.wasmBinary!, jsCode: MultiSpreadEffect.jsCode! },
+        [MultiSpreadEffect.wasmBinary!.slice(0)],
+      );
+
+      this.sendParam('bands', this._bands);
+      this.sendParam('spread', this._spread);
+      this.sendParam('mix', this._mix);
+    } catch (err) {
+      console.warn('[MultiSpread] Worklet init failed:', err);
+    }
+  }
+
+  private static async ensureInitialized(ctx: AudioContext): Promise<void> {
+    if (this.loadedContexts.has(ctx)) return;
+    const existing = this.initPromises.get(ctx);
+    if (existing) return existing;
+    const p = (async () => {
+      const base = (import.meta as { env?: { BASE_URL?: string } }).env?.BASE_URL ?? '/';
+      const [wasmResp, jsResp] = await Promise.all([
+        fetch(`${base}multi-spread/MultiSpread.wasm`), fetch(`${base}multi-spread/MultiSpread.js`),
+      ]);
+      this.wasmBinary = await wasmResp.arrayBuffer();
+      let js = await jsResp.text();
+      js = js.replace(/if\s*\(typeof exports\s*===\s*"object".*$/s, '');
+      this.jsCode = js;
+      await ctx.audioWorklet.addModule(`${base}multi-spread/MultiSpread.worklet.js`);
+      this.loadedContexts.add(ctx);
+    })();
+    this.initPromises.set(ctx, p);
+    return p;
+  }
+
+  private sendParam(param: string, value: number): void {
+    if (this.workletNode && this.isWasmReady) {
+      this.workletNode.port.postMessage({ type: 'parameter', param, value });
+    } else {
+      this.pendingParams = this.pendingParams.filter(p => p.param !== param);
+      this.pendingParams.push({ param, value });
+    }
+  }
+
+  setBands(v: number): void { this._bands = clamp(Math.round(v), 2, 8); this.sendParam('bands', this._bands); }
+  setSpread(v: number): void { this._spread = clamp(v, 0, 1); this.sendParam('spread', this._spread); }
+  setMix(v: number): void { this._mix = clamp(v, 0, 1); this.sendParam('mix', this._mix); }
+
+  get wet(): number { return this._wet; }
+  set wet(value: number) {
+    this._wet = clamp(value, 0, 1);
+    this.wetGain.gain.value = this._wet;
+    this.dryGain.gain.value = 1 - this._wet;
+  }
+
+  get bands(): number { return this._bands; }
+  get spread(): number { return this._spread; }
+  get mix(): number { return this._mix; }
+
+  setParam(param: string, value: number): void {
+    switch (param) {
+      case 'bands':  this.setBands(value);  break;
+      case 'spread': this.setSpread(value); break;
+      case 'mix':    this.setMix(value);    break;
+      case 'wet':    this.wet = value;      break;
+    }
+  }
+
+  dispose(): this {
+    if (this.workletNode) {
+      try { this.workletNode.port.postMessage({ type: 'dispose' }); } catch { /* */ }
+      try { this.workletNode.disconnect(); } catch { /* */ }
+      this.workletNode = null;
+    }
+    this.dryGain.dispose(); this.wetGain.dispose();
+    this.input.dispose(); this.output.dispose();
+    super.dispose();
+    return this;
+  }
+}

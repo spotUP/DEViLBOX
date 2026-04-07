@@ -14,13 +14,9 @@
  */
 
 import * as Tone from 'tone';
+import { getNativeAudioNode } from '@utils/audio-context';
 
-// ─── Utility: unwrap the underlying AudioNode from a Tone.Gain ────────────────
-function getRawNode(node: Tone.Gain): AudioNode {
-  const n = node as unknown as Record<string, AudioNode | undefined>;
-  return n._gainNode ?? n._nativeAudioNode ?? n._node ?? (node as unknown as AudioNode);
-}
-
+// ─── Utility ──────────────────────────────────────────────────────────────────
 function clamp01(v: number): number {
   return Math.max(0, Math.min(1, v));
 }
@@ -111,8 +107,8 @@ export class ToneArmEffect extends Tone.ToneAudioNode {
       });
 
       // input → worklet → wetGain → output
-      const rawInput = getRawNode(this.input);
-      const rawWet   = getRawNode(this.wetGain);
+      const rawInput = getNativeAudioNode(this.input)!;
+      const rawWet   = getNativeAudioNode(this.wetGain)!;
       rawInput.connect(this.workletNode);
       this.workletNode.connect(rawWet);
 
