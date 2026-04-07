@@ -26,6 +26,8 @@ interface ModularCanvasViewProps {
 
 export const ModularCanvasView: React.FC<ModularCanvasViewProps> = ({ config, onChange }) => {
   const containerRef = useRef<HTMLDivElement>(null);
+  const configRef = useRef(config);
+  useEffect(() => { configRef.current = config; }, [config]);
   const cameraRef = useRef(new CanvasCamera(config.camera));
   const [cameraState, setCameraState] = useState(cameraRef.current.getState());
   const [isPanning, setIsPanning] = useState(false);
@@ -228,39 +230,39 @@ export const ModularCanvasView: React.FC<ModularCanvasViewProps> = ({ config, on
         };
 
         onChange({
-          ...config,
-          connections: [...config.connections, newConnection],
+          ...configRef.current,
+          connections: [...configRef.current.connections, newConnection],
         });
 
         endWiring();
       }
     },
-    [wiringSource, startWiring, endWiring, onChange, config]
+    [wiringSource, startWiring, endWiring, onChange]
   );
 
-  // Module parameter change
+  // Module parameter change — uses configRef to avoid stale closures
   const handleParameterChange = useCallback(
     (moduleId: string, paramId: string, value: number) => {
-      const updatedModules = config.modules.map((m) =>
+      const updatedModules = configRef.current.modules.map((m) =>
         m.id === moduleId ? { ...m, parameters: { ...m.parameters, [paramId]: value } } : m
       );
 
-      onChange({ ...config, modules: updatedModules });
+      onChange({ ...configRef.current, modules: updatedModules });
     },
-    [config, onChange]
+    [onChange]
   );
 
   // Module delete
   const handleModuleDelete = useCallback(
     (moduleId: string) => {
-      const updatedModules = config.modules.filter((m) => m.id !== moduleId);
-      const updatedConnections = config.connections.filter(
+      const updatedModules = configRef.current.modules.filter((m) => m.id !== moduleId);
+      const updatedConnections = configRef.current.connections.filter(
         (c) => c.source.moduleId !== moduleId && c.target.moduleId !== moduleId
       );
 
-      onChange({ ...config, modules: updatedModules, connections: updatedConnections });
+      onChange({ ...configRef.current, modules: updatedModules, connections: updatedConnections });
     },
-    [config, onChange]
+    [onChange]
   );
 
   // Module drag
@@ -272,7 +274,7 @@ export const ModularCanvasView: React.FC<ModularCanvasViewProps> = ({ config, on
     (dx: number, dy: number) => {
       if (!draggedModuleId) return;
 
-      const updatedModules = config.modules.map((m) =>
+      const updatedModules = configRef.current.modules.map((m) =>
         m.id === draggedModuleId
           ? {
               ...m,
@@ -284,10 +286,10 @@ export const ModularCanvasView: React.FC<ModularCanvasViewProps> = ({ config, on
           : m
       );
 
-      onChange({ ...config, modules: updatedModules });
+      onChange({ ...configRef.current, modules: updatedModules });
       recalculateAll();
     },
-    [draggedModuleId, config, onChange, recalculateAll]
+    [draggedModuleId, onChange, recalculateAll]
   );
 
   const handleModuleDragEnd = useCallback(() => {
@@ -305,11 +307,11 @@ export const ModularCanvasView: React.FC<ModularCanvasViewProps> = ({ config, on
   const handleConnectionDelete = useCallback((id?: string) => {
     const connId = id || selectedConnectionId;
     if (connId) {
-      const updatedConnections = config.connections.filter((c) => c.id !== connId);
-      onChange({ ...config, connections: updatedConnections });
+      const updatedConnections = configRef.current.connections.filter((c) => c.id !== connId);
+      onChange({ ...configRef.current, connections: updatedConnections });
       if (selectedConnectionId === connId) selectConnection(null);
     }
-  }, [selectedConnectionId, config, onChange, selectConnection]);
+  }, [selectedConnectionId, onChange, selectConnection]);
 
   // View control handlers
   const handleZoomIn = useCallback(() => {
@@ -335,9 +337,9 @@ export const ModularCanvasView: React.FC<ModularCanvasViewProps> = ({ config, on
   const handleFitToView = useCallback(() => {
     if (!containerRef.current) return;
     const rect = containerRef.current.getBoundingClientRect();
-    cameraRef.current.fitToView(config.modules, rect.width, rect.height);
+    cameraRef.current.fitToView(configRef.current.modules, rect.width, rect.height);
     setCameraState(cameraRef.current.getState());
-  }, [config.modules]);
+  }, []);
 
   // Helper functions
   const getPortId = (portRef: PortRef) => `${portRef.moduleId}.${portRef.portId}`;
