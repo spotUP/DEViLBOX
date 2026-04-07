@@ -76,8 +76,16 @@ export class SpringReverbEffect extends Tone.ToneAudioNode {
     this.initWasm();
   }
 
-  setDecay(v: number) { this._options.decay = clamp01(v); this.sendParam(PARAM_DECAY, v); }
-  setDamping(v: number) { this._options.damping = clamp01(v); this.sendParam(PARAM_DAMPING, v); }
+  setDecay(v: number) {
+    this._options.decay = clamp01(v);
+    this.sendParam(PARAM_DECAY, v);
+    if (this.fallbackReverb) this.fallbackReverb.setFeedback(v);
+  }
+  setDamping(v: number) {
+    this._options.damping = clamp01(v);
+    this.sendParam(PARAM_DAMPING, v);
+    if (this.fallbackReverb) this.fallbackReverb.setDamping(v);
+  }
   setTension(v: number) { this._options.tension = clamp01(v); this.sendParam(PARAM_TENSION, v); }
   setSpringMix(v: number) { this._options.mix = clamp01(v); this.sendParam(PARAM_MIX, v); }
   setDrip(v: number) { this._options.drip = clamp01(v); this.sendParam(PARAM_DRIP, v); }

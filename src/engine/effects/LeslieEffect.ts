@@ -86,7 +86,11 @@ export class LeslieEffect extends Tone.ToneAudioNode {
   }
 
   setSpeed(v: number) { this._options.speed = clamp01(v); this.sendParam(PARAM_SPEED, v); }
-  setHornRate(v: number) { this._options.hornRate = Math.max(0.1, Math.min(10, v)); this.sendParam(PARAM_HORN_RATE, v); }
+  setHornRate(v: number) {
+    this._options.hornRate = Math.max(0.1, Math.min(10, v));
+    this.sendParam(PARAM_HORN_RATE, v);
+    if (this.fallbackLeslie) this.fallbackLeslie.rate = this._options.hornRate;
+  }
   setDrumRate(v: number) { this._options.drumRate = Math.max(0.1, Math.min(8, v)); this.sendParam(PARAM_DRUM_RATE, v); }
   setHornDepth(v: number) { this._options.hornDepth = clamp01(v); this.sendParam(PARAM_HORN_DEPTH, v); }
   setDrumDepth(v: number) { this._options.drumDepth = clamp01(v); this.sendParam(PARAM_DRUM_DEPTH, v); }
@@ -284,12 +288,14 @@ function clamp01(v: number): number {
  */
 class LeslieFallback {
   private phase = 0;
-  private rate = 6.8;
+  private _rate = 6.8;
   private sampleRate: number;
 
   constructor(sampleRate: number) {
     this.sampleRate = sampleRate;
   }
+
+  set rate(v: number) { this._rate = v; }
 
   process(inL: Float32Array, inR: Float32Array, outL: Float32Array, outR: Float32Array) {
     const n = inL.length;
@@ -298,7 +304,7 @@ class LeslieFallback {
       const am = 0.7 + 0.3 * mod;
       outL[i] = inL[i] * am;
       outR[i] = inR[i] * (0.7 - 0.3 * mod);
-      this.phase += this.rate / this.sampleRate;
+      this.phase += this._rate / this.sampleRate;
       if (this.phase >= 1) this.phase -= 1;
     }
   }
