@@ -52,7 +52,7 @@
 
 import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
 import type { Pattern, TrackerCell, InstrumentConfig } from '@/types';
-import type { HippelCoSoConfig, UADEChipRamInfo } from '@/types/instrument';
+import type { HippelCoSoConfig, HippelCoSoSampleEntry, UADEChipRamInfo } from '@/types/instrument';
 import type { UADEVariablePatternLayout } from '@/engine/uade/UADEPatternEncoder';
 import { hippelCoSoEncoder } from '@/engine/uade/encoders/HippelCoSoEncoder';
 
@@ -221,10 +221,37 @@ export async function parseHippelCoSoFile(
   const tracksOff   = u32BE(buf, 16);
   const songsOff    = u32BE(buf, 20);
   const headersOff  = u32BE(buf, 24);
+  const samplesDataOff = buf.length >= 32 ? u32BE(buf, 28) : buf.length;
 
   // ── Determine number of songs and samples ──────────────────────────────────
   // lastSong = (headers - songsData) / 6
   const numSongs = Math.max(1, Math.floor((headersOff - songsOff) / 6));
+
+  // ── Parse sample bank (COSO variant: 10-byte headers) ─────────────────────
+  // Per FlodJS JHPlayer.js:
+  //   len = ((samplesData - headers) / 10) - 1;
+  // Each COSO header is 10 bytes: pointer(u32 BE), length*2(u16 BE),
+  // loopPtr(u16 BE), repeat*2(u16 BE). No name, no volume.
+  const sampleBank: HippelCoSoSampleEntry[] = [];
+  if (samplesDataOff > headersOff && headersOff > 0 && headersOff + 10 <= buf.length) {
+    const rawCount = Math.floor((samplesDataOff - headersOff) / 10) - 1;
+    const numSamples = Math.max(0, Math.min(128, rawCount));
+    for (let i = 0; i < numSamples; i++) {
+      const base = headersOff + i * 10;
+      if (base + 10 > buf.length) break;
+      const pointer      = u32BE(buf, base);
+      const length       = u16BE(buf, base + 4) << 1;
+      const loopStart    = u16BE(buf, base + 6);
+      const repeatLength = u16BE(buf, base + 8) << 1;
+      sampleBank.push({
+        index: i,
+        pointer,
+        length,
+        loopStart,
+        repeatLength,
+      });
+    }
+  }
 
   // ── Parse songs ───────────────────────────────────────────────────────────
   interface CoSoSong {
@@ -347,6 +374,7 @@ export async function parseHippelCoSoFile(
       vibSpeed,
       vibDepth,
       vibDelay,
+      sampleBank,
     };
 
     // vsqOff is a file-relative byte offset to this instrument's volseq header (5 bytes)
@@ -407,6 +435,7 @@ export async function parseHippelCoSoFile(
         vibSpeed: 0,
         vibDepth: 0,
         vibDelay: 0,
+        sampleBank,
       },
       effects: [],
       volume: -6,
