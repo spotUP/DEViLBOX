@@ -845,14 +845,14 @@ export const SampleEditor: React.FC<SampleEditorProps> = ({ instrument, onChange
   }, []);
 
   const handlePlay = useCallback(async () => {
-    console.log('[SampleEditor] handlePlay called', {
+    console.log('[SampleEditor] handlePlay called ' + JSON.stringify({
       hasBuffer: !!audioBuffer,
       isPlaying,
       sourcesActive: previewSourcesRef.current.length,
       loopEnabled,
       loopStart,
       loopEnd,
-    });
+    }));
     if (!audioBuffer) {
       console.warn('[SampleEditor] handlePlay: no audioBuffer');
       return;
@@ -888,51 +888,34 @@ export const SampleEditor: React.FC<SampleEditorProps> = ({ instrument, onChange
       }
     }
 
-    // Read loop region from parameters first; fall back to
-    // instrument.sample.loopStart/loopEnd (frame indices) if the
-    // parameters are still at their defaults. This handles samples
-    // loaded from tracker files where loop info lives in `sample`.
-    let effLoopStart = loopStart;
-    let effLoopEnd = loopEnd;
-    const sampleCfg = (instrument.sample || {}) as Record<string, number | undefined>;
-    const sampleLoopStart = sampleCfg.loopStart;
-    const sampleLoopEnd = sampleCfg.loopEnd;
-    const totalFrames = audioBuffer.length;
-    if (
-      effLoopStart === 0 && effLoopEnd === 1
-      && totalFrames > 0
-      && typeof sampleLoopStart === 'number'
-      && typeof sampleLoopEnd === 'number'
-      && sampleLoopEnd > sampleLoopStart
-    ) {
-      effLoopStart = sampleLoopStart / totalFrames;
-      effLoopEnd = sampleLoopEnd / totalFrames;
-    }
-
-    const loopStartNorm = Math.max(0, Math.min(0.99, effLoopStart));
-    const loopEndNorm = Math.max(loopStartNorm + 0.001, Math.min(1, effLoopEnd));
+    // Loop region comes ONLY from parameters.loopStart/loopEnd. The
+    // instrument.sample.loopStart/loopEnd values are not authoritative
+    // here — the bridge useEffect overwrites them from the parameters,
+    // so they round-trip back to whatever the params say (including
+    // defaults), which would force the loop region to be the full
+    // buffer. The user must drag the loop markers (or use the sliders)
+    // to set a real loop region.
+    const loopStartNorm = Math.max(0, Math.min(0.99, loopStart));
+    const loopEndNorm = Math.max(loopStartNorm + 0.001, Math.min(1, loopEnd));
     const loopStartSec = loopStartNorm * duration;
     const loopEndSec = loopEndNorm * duration;
+    const totalFrames = audioBuffer.length;
 
     if (loopType === 'pingpong') {
       console.warn('[SampleEditor] pingpong loop falls back to forward in preview');
     }
 
-    console.log('[SampleEditor] play raw values', {
+    console.log('[SampleEditor] play raw values ' + JSON.stringify({
       loopEnabled,
       loopStart_param: loopStart,
       loopEnd_param: loopEnd,
-      loopStart_sample: sampleLoopStart,
-      loopEnd_sample: sampleLoopEnd,
       totalFrames,
       duration,
-      effLoopStart,
-      effLoopEnd,
       loopStartNorm,
       loopEndNorm,
       loopStartSec,
       loopEndSec,
-    });
+    }));
 
     const now = ctx.currentTime;
     setIsPlaying(true);
@@ -1013,7 +996,7 @@ export const SampleEditor: React.FC<SampleEditorProps> = ({ instrument, onChange
     animate();
   }, [
     audioBuffer, isPlaying, playbackRate, reverse, startTime, endTime,
-    loopEnabled, loopStart, loopEnd, loopType, instrument.sample,
+    loopEnabled, loopStart, loopEnd, loopType,
     setIsPlaying, setPlaybackPosition, stopPreviewSources,
   ]);
 
