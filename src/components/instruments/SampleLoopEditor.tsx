@@ -24,7 +24,24 @@ export const SampleLoopEditor: React.FC<SampleLoopEditorProps> = ({
   <div className="border-t border-dark-border pt-3">
     <div className="flex items-center gap-3 mb-2">
       <label className="flex items-center gap-2 cursor-pointer">
-        <input type="checkbox" checked={loopEnabled} onChange={(e) => { updateParam('loopEnabled', e.target.checked); e.target.blur(); }} className="w-4 h-4 rounded" />
+        <input
+          type="checkbox"
+          checked={loopEnabled}
+          onChange={(e) => {
+            const enabled = e.target.checked;
+            // When enabling the loop, if the loop region is still at the
+            // defaults (0..1), set it to a visible region (25%..75%) so
+            // the loop handles are obvious and draggable instead of being
+            // hidden behind the start/end handles at the canvas corners.
+            if (enabled && loopStart === 0 && loopEnd === 1) {
+              updateParam('loopStart', 0.25);
+              updateParam('loopEnd', 0.75);
+            }
+            updateParam('loopEnabled', enabled);
+            e.target.blur();
+          }}
+          className="w-4 h-4 rounded"
+        />
         <Repeat size={14} className="text-blue-400" />
         <span className="font-mono text-text-secondary text-xs">LOOP</span>
       </label>
