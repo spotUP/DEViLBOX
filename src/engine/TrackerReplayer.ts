@@ -418,8 +418,15 @@ export class TrackerReplayer {
   private songPos = 0;           // Current position in song order
   private pattPos = 0;           // Current row in pattern
   private currentTick = 0;       // Current tick (0 to speed-1)
-  private speed = 6;             // Ticks per row
-  private bpm = 125;             // Beats per minute
+  // Speed (ticks per row) and BPM mirror into coordinator.context so the
+  // coordinator's dispatchEnginePosition() always sees the live values when
+  // it computes the row-duration hint for the display ring buffer.
+  private _speed = 6;
+  private get speed(): number { return this._speed; }
+  private set speed(v: number) { this._speed = v; this.coordinator.context.speed = v; }
+  private _bpm = 125;
+  private get bpm(): number { return this._bpm; }
+  private set bpm(v: number) { this._bpm = v; this.coordinator.context.bpm = v; }
   private globalVolume = 64;     // Global volume (0-64)
 
   // FT2 XM period mode: true = linear periods, false = amiga periods
@@ -1534,6 +1541,11 @@ export class TrackerReplayer {
     // NOTE: _replacedInstruments is NOT cleared here — it persists across play/stop.
     // It's only cleared in loadSong() when a genuinely new song is loaded.
 
+    // Refresh the coordinator's playback context (songPositions / bpm / speed /
+    // hybrid hook / audio context). Engines that subscribe to position updates
+    // dispatch through the coordinator and read from this on every callback.
+    this.syncCoordinatorContext();
+
     await unlockIOSAudio(); // Play silent MP3 + pump AudioContext for iOS
     _playLog('unlockIOSAudio');
     if (gen !== this._playGeneration) return; // stale — another play/stop happened
@@ -2587,42 +2599,33 @@ export class TrackerReplayer {
   }
 
   /**
-   * Canonical position-update dispatch shared by every WASM engine subscription
-   * (Hively, MusicLine, libopenmpt, UADE, TFMX, ...). Each engine has its own
-   * throttling + per-format math; once it has computed `(row, position)` and
-   * (optionally) an audio timestamp, it calls into here to:
-   *   - update songPos / pattPos
-   *   - queue a display state for smooth UI scrolling
-   *   - fire onRowChange
-   *   - fire hybrid notes for any replaced instruments (unless opted out)
-   *
-   * @param row        Row within the current pattern
-   * @param position   Index into songPositions[]
-   * @param audioTime  Optional audio-context timestamp; if omitted, Tone.now() is used.
-   *                   When provided, output latency is added to keep visuals in sync.
-   * @param fireHybrid Whether to fire hybrid notes. Default true. TFMX opts out
-   *                   because the UADE position subscription already handles that.
+   * Refresh the coordinator's playback context with the replayer's current
+   * songPositions / bpm / speed / hybrid hook. Called from play() right before
+   * any engine subscription is wired up. The coordinator reads from this on
+   * every dispatchEnginePosition() call.
+   */
+  private syncCoordinatorContext(): void {
+    if (!this.song) return;
+    this.coordinator.context.songPositions = this.song.songPositions;
+    this.coordinator.context.bpm = this.bpm;
+    this.coordinator.context.speed = this.speed;
+    this.coordinator.context.fireHybridNotes = (time) => this.fireHybridNotesForRow(time);
+    this.coordinator.context.audioContext = Tone.context.rawContext as AudioContext;
+    this.coordinator.songPos = this.songPos;
+    this.coordinator.pattPos = this.pattPos;
+  }
+
+  /**
+   * Thin delegate to coordinator.dispatchEnginePosition. Engines call this
+   * (via their position subscription) once they've computed (row, position).
+   * Mirrors the new songPos/pattPos back into the replayer's own fields so
+   * the rest of the (still TS-scheduler-coupled) code keeps working.
    */
   private dispatchEnginePosition(row: number, position: number, audioTime?: number, fireHybrid: boolean = true): void {
     if (!this.playing || !this.song) return;
-    this.songPos = position;
-    this.pattPos = row;
-    const patternNum = this.song.songPositions[position] ?? 0;
-    let time: number;
-    if (audioTime != null) {
-      const rawCtx = Tone.context.rawContext as AudioContext;
-      const latency = rawCtx.outputLatency ?? rawCtx.baseLatency ?? 0;
-      time = audioTime + latency;
-    } else {
-      time = Tone.now();
-    }
-    this.queueDisplayState(time, row, patternNum, position, 0, (2.5 / this.bpm) * this.speed);
-    if (this.onRowChange) {
-      this.onRowChange(row, patternNum, position);
-    }
-    if (fireHybrid) {
-      this.fireHybridNotesForRow(time);
-    }
+    this.coordinator.dispatchEnginePosition(row, position, audioTime, Tone.now(), fireHybrid);
+    this.songPos = this.coordinator.songPos;
+    this.pattPos = this.coordinator.pattPos;
   }
 
   // ==========================================================================
