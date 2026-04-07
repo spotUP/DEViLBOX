@@ -24,8 +24,6 @@ import {
   Zap,
   Volume2,
   Waves,
-  Eye,
-  EyeOff,
   Sparkles,
   Rewind,
   Shuffle,
@@ -115,10 +113,8 @@ export const ChannelContextMenu: React.FC<ChannelContextMenuProps> = ({
     toggleChannelCollapse: s.toggleChannelCollapse,
     patterns: s.patterns,
   })));
-  const { setActiveParameter, setShowLane, getShowLane, removeCurve, getCurvesForPattern, addCurve, addPoint } = useAutomationStore(useShallow((s) => ({
+  const { setActiveParameter, removeCurve, getCurvesForPattern, addCurve, addPoint } = useAutomationStore(useShallow((s) => ({
     setActiveParameter: s.setActiveParameter,
-    setShowLane: s.setShowLane,
-    getShowLane: s.getShowLane,
     removeCurve: s.removeCurve,
     getCurvesForPattern: s.getCurvesForPattern,
     addCurve: s.addCurve,
@@ -141,7 +137,6 @@ export const ChannelContextMenu: React.FC<ChannelContextMenuProps> = ({
     notify.success(`Applied ${preset.name} to CH ${(channelIndex + 1).toString().padStart(2, '0')}`);
   }, [channel.instrumentId, channelIndex, updateInstrument]);
 
-  const showLane = getShowLane(channelIndex);
   const curves = getCurvesForPattern(patternId, channelIndex);
   const hasCurves = curves.length > 0;
 
@@ -193,26 +188,29 @@ export const ChannelContextMenu: React.FC<ChannelContextMenuProps> = ({
         ? { chipIds: furnaceNative.chipIds, channelCount: furnaceNative.subsongs[furnaceNative.activeSubsong]?.channels.length ?? 4 }
         : undefined;
 
-    const params = getParamsForFormat(fmt, config);
-    const groups = groupParams(params);
-    return groups.map(group => ({
-      id: `reg-group-${group.label}`,
-      label: group.label,
-      submenu: group.params.map(p => ({
-        id: `reg-${p.id}`,
-        label: p.label,
-        onClick: () => {
-          setActiveParameter(channelIndex, p.id);
-          setShowLane(channelIndex, true);
-          // Ensure the global automation lanes toggle is on
-          const uiState = useUIStore.getState();
-          if (!uiState.showAutomationLanes) uiState.toggleAutomationLanes();
-          // Create the curve + seed point so the lane is immediately visible
-          ensureAutomationCurve(p.id);
-        },
-      })),
-    }));
-  }, [editorMode, setActiveParameter, setShowLane, channelIndex, furnaceNative, gtSidCount, ensureAutomationCurve]);
+    // Filter to ONLY params for the right-clicked channel. Params without
+    // a channel field (e.g. SID filter/global, format-wide params) are
+    // always included so they're not hidden by the per-channel filter.
+    const allParams = getParamsForFormat(fmt, config);
+    const channelParams = allParams.filter((p) => p.channel === undefined || p.channel === channelIndex);
+    if (channelParams.length === 0) return [];
+
+    // Flat list — no per-chip-channel sub-submenu anymore. Just the params
+    // for the channel that was right-clicked.
+    const groups = groupParams(channelParams);
+    return groups.flatMap(group => group.params.map(p => ({
+      id: `reg-${p.id}`,
+      label: p.label,
+      onClick: () => {
+        setActiveParameter(channelIndex, p.id);
+        // Ensure the global automation lanes toggle is on
+        const uiState = useUIStore.getState();
+        if (!uiState.showAutomationLanes) uiState.toggleAutomationLanes();
+        // Create the curve + seed point so the lane is immediately visible
+        ensureAutomationCurve(p.id);
+      },
+    })));
+  }, [editorMode, setActiveParameter, channelIndex, furnaceNative, gtSidCount, ensureAutomationCurve]);
 
   // Wrap every menu item's onClick with a status message so the user gets
   // visual confirmation in the status bar that the action ran. Recurses
@@ -348,7 +346,6 @@ export const ChannelContextMenu: React.FC<ChannelContextMenuProps> = ({
               label: `Show ${param.label}`,
               onClick: () => {
                 setActiveParameter(channelIndex, param.id);
-                setShowLane(channelIndex, true);
               },
             })),
           ],
@@ -662,14 +659,13 @@ export const ChannelContextMenu: React.FC<ChannelContextMenuProps> = ({
         label: 'Automation',
         icon: <Waves size={14} />,
         submenu: [
-          // Quick parameter selection
+          // Quick parameter selection (NKS instrument params)
           ...automationParams.map((param) => ({
             id: `auto-${param.id}`,
             label: param.label,
             icon: <span className="w-2 h-2 rounded-full" style={{ backgroundColor: param.color }} />,
             onClick: () => {
               setActiveParameter(channelIndex, param.id);
-              setShowLane(channelIndex, true);
               // Ensure the global automation lanes toggle is on
               const uiState = useUIStore.getState();
               if (!uiState.showAutomationLanes) uiState.toggleAutomationLanes();
@@ -677,24 +673,14 @@ export const ChannelContextMenu: React.FC<ChannelContextMenuProps> = ({
               ensureAutomationCurve(param.id);
             },
           })),
-          // Register-capture lanes (SID/Paula/Furnace)
+          // Register-capture params (SID/Paula/Furnace) — flat list,
+          // filtered to this channel only.
           ...(registerParamMenuItems.length > 0 ? [
             { type: 'divider' } as const,
-            {
-              id: 'register-lanes',
-              label: 'Register Lanes',
-              submenu: registerParamMenuItems,
-            },
+            ...registerParamMenuItems,
           ] : []),
           { type: 'divider' } as const,
-          // Show/Hide lane
-          {
-            id: 'auto-toggle-lane',
-            label: showLane ? 'Hide Lane' : 'Show Lane',
-            icon: showLane ? <EyeOff size={14} /> : <Eye size={14} />,
-            onClick: () => setShowLane(channelIndex, !showLane),
-          },
-          // Clear all automation
+          // Clear all automation on this channel
           {
             id: 'auto-clear-all',
             label: 'Clear All Automation',
@@ -770,7 +756,6 @@ export const ChannelContextMenu: React.FC<ChannelContextMenuProps> = ({
     isLiveMode,
     channelIndex,
     channel,
-    showLane,
     hasCurves,
     curves,
     patterns,
@@ -804,7 +789,6 @@ export const ChannelContextMenu: React.FC<ChannelContextMenuProps> = ({
     toggleChannelCollapse,
     queueChannelAction,
     setActiveParameter,
-    setShowLane,
     removeCurve,
     handleApplyChannelFxPreset,
     automationParams,
