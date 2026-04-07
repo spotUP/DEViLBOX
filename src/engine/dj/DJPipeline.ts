@@ -22,6 +22,7 @@ import { useDJStore } from '@/stores/useDJStore';
 import type { DeckId } from './DeckEngine';
 import { getDJEngineIfActive } from './DJEngine';
 import type { BeatGridData } from './DJAudioCache';
+import { autoMatchOnLoad } from './DJAutoSync';
 
 // ── Auto-gain ────────────────────────────────────────────────────────────────
 
@@ -446,6 +447,9 @@ export class DJPipeline {
           energy: cached.energy ?? 0.5,
           danceability: cached.danceability ?? 0.5,
         });
+
+        // Auto-match BPM + phase to the master if the other deck is playing.
+        autoMatchOnLoad(deckId);
       }
 
       return {
@@ -529,6 +533,9 @@ export class DJPipeline {
             energy: serverAnalysis.energy,
             danceability: serverAnalysis.danceability,
           });
+
+          // Auto-match BPM + phase to the master if the other deck is playing.
+          autoMatchOnLoad(deckId);
         }
 
         return {
@@ -829,6 +836,9 @@ export class DJPipeline {
           energy: analysis.genre.energy,
           danceability: analysis.genre.danceability,
         });
+
+        // Auto-match BPM + phase to the master if the other deck is playing.
+        autoMatchOnLoad(task.deckId);
       } else {
         // Analysis failed but render succeeded
         useDJStore.getState().setDeckState(task.deckId, {

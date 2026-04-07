@@ -245,6 +245,79 @@ export function getBeatPhaseInfo(deckId: DeckId): PhaseInfo | null {
   return getPhaseInfo(deckId);
 }
 
+// ── Snap helpers (used by foolproof quantize wiring) ─────────────────────────
+
+/**
+ * Snap a position (in seconds) to the nearest beat or downbeat in this deck's
+ * own beat grid. Returns the input unchanged if no grid is available.
+ *
+ * Used by cueDeck / triggerHotCue / setAudioLoop to ensure stored positions
+ * always sit on the grid.
+ */
+export function snapPositionToBeat(
+  deckId: DeckId,
+  positionSec: number,
+  mode: 'beat' | 'bar' = 'beat',
+): number {
+  const state = useDJStore.getState().decks[deckId];
+  const grid = state.beatGrid;
+  if (!grid) return positionSec;
+  const arr = mode === 'bar' ? grid.downbeats : grid.beats;
+  if (!arr || arr.length === 0) return positionSec;
+
+  // Binary search for nearest entry
+  let lo = 0;
+  let hi = arr.length - 1;
+  while (lo < hi) {
+    const mid = (lo + hi) >>> 1;
+    if (arr[mid] < positionSec) lo = mid + 1;
+    else hi = mid;
+  }
+  const candA = arr[lo];
+  const candB = lo > 0 ? arr[lo - 1] : candA;
+  return Math.abs(candA - positionSec) < Math.abs(candB - positionSec) ? candA : candB;
+}
+
+/**
+ * Snap a loop length (in beats) to the nearest power-of-2 in [0.25, 16].
+ * Used by setAudioLoop and activateSeratoLoop to keep loops musical.
+ */
+const LOOP_LENGTHS = [0.25, 0.5, 1, 2, 4, 8, 16] as const;
+export function snapLoopLength(beats: number): number {
+  if (!Number.isFinite(beats) || beats <= 0) return LOOP_LENGTHS[0];
+  let best: number = LOOP_LENGTHS[0];
+  let bestDist = Math.abs(beats - best);
+  for (let i = 1; i < LOOP_LENGTHS.length; i++) {
+    const d = Math.abs(beats - LOOP_LENGTHS[i]);
+    if (d < bestDist) {
+      bestDist = d;
+      best = LOOP_LENGTHS[i];
+    }
+  }
+  return best;
+}
+
+/**
+ * Auto-match this deck to the other (master) deck if the master is currently
+ * playing and both decks have analysis-derived beat grids.
+ *
+ * Called by DJPipeline once a freshly-loaded deck's beat grid is populated.
+ * Result: load → press play and the new deck drops in on the next bar.
+ */
+export function autoMatchOnLoad(deckId: DeckId): void {
+  const otherDeckId: DeckId = deckId === 'A' ? 'B' : deckId === 'B' ? 'A' : 'A';
+  const store = useDJStore.getState();
+  const thisDeck = store.decks[deckId];
+  const otherDeck = store.decks[otherDeckId];
+
+  if (!otherDeck.isPlaying) return;
+  if (!otherDeck.beatGrid || !thisDeck.beatGrid) return;
+
+  syncBPMToOther(deckId, otherDeckId);
+  // Pre-phase-align to the bar grid so quantizedPlay drops in cleanly later.
+  phaseAlign(deckId, otherDeckId, 'bar');
+}
+
 // ── Internal helpers ─────────────────────────────────────────────────────────
 
 function getBestBPM(deckState: { beatGrid: BeatGridData | null; detectedBPM: number; effectiveBPM: number }): number {

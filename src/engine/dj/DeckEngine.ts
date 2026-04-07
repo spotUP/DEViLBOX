@@ -13,6 +13,8 @@ import { getNativeAudioNode } from '@/utils/audio-context';
 import { useSettingsStore } from '@/stores/useSettingsStore';
 import { useDJStore } from '@/stores/useDJStore';
 import { ScratchPlayback, getPatternByName } from './DJScratchEngine';
+import { snapPositionToBeat, snapLoopLength, phaseAlign } from './DJAutoSync';
+import { getQuantizeMode } from './DJQuantizedFX';
 import { DeckScratchBuffer } from './DeckScratchBuffer';
 import { DeckAudioPlayer, type AudioFileInfo } from './DeckAudioPlayer';
 import { TurntablePhysics } from '@/engine/turntable/TurntablePhysics';
@@ -736,6 +738,24 @@ export class DeckEngine {
     };
     setTimeout(hardReset, decayMs + 50);
     setTimeout(hardReset, decayMs + 300);
+
+    // After the decay settles, nudge this deck back onto the beat grid so a
+    // scratch never leaves the deck out of phase with the master. Only fires
+    // when quantize is on, the OTHER deck is currently playing with a beat
+    // grid, and this deck has its own grid.
+    setTimeout(() => {
+      if (this._isScratchActive) return;
+      const mode = getQuantizeMode();
+      if (mode === 'off') return;
+      const otherDeckId: DeckId = this.id === 'A' ? 'B' : this.id === 'B' ? 'A' : 'A';
+      const store = useDJStore.getState();
+      const otherDeck = store.decks[otherDeckId];
+      const thisDeck = store.decks[this.id];
+      if (!otherDeck.isPlaying || !otherDeck.beatGrid || !thisDeck.beatGrid) return;
+      try {
+        phaseAlign(this.id, otherDeckId, mode === 'bar' ? 'bar' : 'beat');
+      } catch { /* engine not ready */ }
+    }, decayMs + 350);
   }
 
   /** Switch from forward playback to backward (reverse scratch). */
@@ -1181,9 +1201,32 @@ export class DeckEngine {
   // AUDIO LOOP (time-based, for audio playback mode)
   // ==========================================================================
 
-  /** Set the audio loop in/out region (seconds). Both must be set for loop to activate. */
+  /**
+   * Set the audio loop in/out region (seconds). Both must be set for the
+   * loop to activate.
+   *
+   * Quantize-aware: when this deck has an analysis-derived beat grid, the
+   * loop in-point is snapped to the nearest beat and the loop length is
+   * rounded to the nearest power-of-2 beats (1/4..16). Pass nulls to clear.
+   */
   setAudioLoop(loopIn: number | null, loopOut: number | null): void {
-    this.audioPlayer.setLoopRegion(loopIn, loopOut);
+    if (loopIn == null || loopOut == null) {
+      this.audioPlayer.setLoopRegion(loopIn, loopOut);
+      return;
+    }
+
+    let snappedIn = loopIn;
+    let snappedOut = loopOut;
+    const grid = useDJStore.getState().decks[this.id].beatGrid;
+    if (grid && grid.bpm > 0) {
+      snappedIn = snapPositionToBeat(this.id, loopIn, 'beat');
+      const beatPeriod = 60 / grid.bpm;
+      const lengthBeats = (loopOut - loopIn) / beatPeriod;
+      const snappedBeats = snapLoopLength(lengthBeats);
+      snappedOut = snappedIn + snappedBeats * beatPeriod;
+    }
+
+    this.audioPlayer.setLoopRegion(snappedIn, snappedOut);
   }
 
   /** Clear the audio loop region */

@@ -80,6 +80,113 @@ function scheduleQuantized(deckId: DeckId, action: () => void): () => void {
   return fn(deckId, jitteredAction);
 }
 
+// ── quantizeAction — universal beat-quantized transport scheduler ────────────
+//
+// This is the spine that powers the foolproof beat-snap behaviour for cue,
+// play, hot cue, beat jump, loop activation, etc. Unlike scheduleQuantized
+// (which always references THIS deck's own grid and is used by FX), this
+// helper picks the best reference deck and lets the caller fall back to
+// solo behaviour for the case where no other deck is playing.
+//
+// Reference deck selection:
+//   1. The OTHER deck, if it is playing AND has a beat grid (master-locked)
+//   2. THIS deck, if `allowSolo` is true AND it has a beat grid (solo snap)
+//   3. Otherwise: fire immediately
+//
+// While the action is waiting, a `pendingAction` is set on the deck for
+// UI feedback (the cue/play button can pulse). The returned cancel fn
+// clears both the timer and the pending state.
+
+export type QuantizeOpts = {
+  /** Override the global quantize mode for this single call. */
+  mode?: QuantizeMode;
+  /** If true and no other deck is playing, fall back to THIS deck's grid. Default: true. */
+  allowSolo?: boolean;
+  /** UI hint — used to set the pendingAction kind for visual feedback. */
+  kind?: 'play' | 'cue' | 'hotcue' | 'loop' | 'jump';
+};
+
+/**
+ * Schedule a transport/cue action to fire on the next beat or bar boundary.
+ * Returns a cancel function. The action runs immediately if quantize is off,
+ * if no usable reference deck has a beat grid, or if the computed delay is
+ * less than 10ms (well within timer jitter).
+ */
+export function quantizeAction(
+  deckId: DeckId,
+  action: () => void | Promise<void>,
+  opts: QuantizeOpts = {},
+): () => void {
+  const mode: QuantizeMode = opts.mode ?? quantizeMode;
+  const allowSolo = opts.allowSolo !== false;
+  const kind = opts.kind ?? 'play';
+
+  // Off → fire immediately, no pending state.
+  if (mode === 'off') {
+    void action();
+    return () => { /* already fired */ };
+  }
+
+  // Pick the reference deck for the next-boundary calculation.
+  const store = useDJStore.getState();
+  const otherDeckId: DeckId = deckId === 'A' ? 'B' : deckId === 'B' ? 'A' : 'A';
+  const otherDeck = store.decks[otherDeckId];
+  const thisDeck = store.decks[deckId];
+
+  let refDeckId: DeckId | null = null;
+  if (otherDeck.isPlaying && otherDeck.beatGrid) {
+    refDeckId = otherDeckId;
+  } else if (allowSolo && thisDeck.beatGrid) {
+    refDeckId = deckId;
+  }
+
+  // No grid to snap to → fire now.
+  if (!refDeckId) {
+    void action();
+    return () => { /* already fired */ };
+  }
+
+  // Compute delay from the reference deck's grid.
+  const grid = store.decks[refDeckId].beatGrid!;
+  const beatPeriod = grid.bpm > 0 ? 60 / grid.bpm : 0.5;
+  const period = mode === 'bar' ? beatPeriod * (grid.timeSignature || 4) : beatPeriod;
+  const rawDelay = mode === 'bar' ? timeToNextDownbeat(refDeckId) : timeToNextBeat(refDeckId);
+
+  // Jitter guard: if we're within 50ms of a boundary, wait for the NEXT one
+  // instead — prevents starting mid-beat due to timer jitter.
+  let effectiveDelay = rawDelay;
+  if (effectiveDelay < 0.05) effectiveDelay += period;
+
+  // Sub-10ms remainder — fire now, the cost of an extra timer is wasted work.
+  if (effectiveDelay < 0.01) {
+    void action();
+    return () => { /* already fired */ };
+  }
+
+  // Set pending state for UI feedback.
+  const etaMs = effectiveDelay * 1000;
+  store.setDeckPending(deckId, {
+    kind,
+    mode,
+    startedAt: performance.now(),
+    etaMs,
+  });
+
+  let cancelled = false;
+  const timer = setTimeout(() => {
+    if (cancelled) return;
+    useDJStore.getState().setDeckPending(deckId, null);
+    void action();
+  }, etaMs);
+
+  return () => {
+    if (cancelled) return;
+    cancelled = true;
+    clearTimeout(timer);
+    useDJStore.getState().setDeckPending(deckId, null);
+  };
+}
+
 // ── EQ Kill (quantized) ─────────────────────────────────────────────────────
 
 /**
