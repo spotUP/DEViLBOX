@@ -1,13 +1,17 @@
 /**
- * OpenMPTEditBridge — Coordinates edits between TrackerStore, OpenMPT Soundlib,
- * and LibopenmptEngine so that pattern edits are reflected in playback.
+ * OpenMPTEditBridge — PRIMARY edit path for libopenmpt formats (MOD/XM/IT/S3M).
+ *
+ * The OpenMPT soundlib (CSoundFile WASM) is the canonical document model: edits
+ * flow into it directly, then a debounced hot-reload re-serializes the module
+ * and feeds it to LibopenmptEngine for playback.
  *
  * Flow:
  *   User edit → TrackerStore (UI) + OpenMPTSoundlib (WASM CSoundFile)
- *   On play → if dirty, serialize from soundlib → reload into LibopenmptEngine
+ *               → debounced hot-reload (150ms) → LibopenmptEngine.hotReload(buf)
+ *   On play  → flush() drains any pending hot-reload synchronously
  *
  * The soundlib stays loaded after import (parseWithOpenMPT doesn't destroy it).
- * This bridge tracks whether edits have been made since the last serialization.
+ * Loaded via markLoaded() at the end of parseWithOpenMPT.
  */
 
 import type { TrackerCell } from '@/types/tracker';
@@ -265,6 +269,13 @@ export async function syncFullPattern(
 export async function serialize(): Promise<ArrayBuffer | null> {
   if (!_loaded) return null;
 
+  // Cancel any pending debounced hot-reload — the caller is taking ownership
+  // of the serialized buffer (typically the play() path doing a fresh loadTune).
+  if (_hotReloadTimer) {
+    clearTimeout(_hotReloadTimer);
+    _hotReloadTimer = null;
+  }
+
   const osl = await import('@lib/import/wasm/OpenMPTSoundlib');
   const result = await osl.saveModule(_format);
   if (result) {
@@ -273,8 +284,38 @@ export async function serialize(): Promise<ArrayBuffer | null> {
   return result;
 }
 
+/**
+ * Flush any pending hot-reload immediately.
+ * Cancels the debounce timer and forces a serialization + LibopenmptEngine.hotReload
+ * if the bridge is dirty. Call this from the play() path so the engine never plays
+ * a stale buffer because edits were still queued.
+ */
+export async function flush(): Promise<void> {
+  if (_hotReloadTimer) {
+    clearTimeout(_hotReloadTimer);
+    _hotReloadTimer = null;
+  }
+  if (!_loaded || !_dirty) return;
+  try {
+    const { LibopenmptEngine } = await import('@engine/libopenmpt/LibopenmptEngine');
+    if (!LibopenmptEngine.hasInstance()) return;
+    const osl = await import('@lib/import/wasm/OpenMPTSoundlib');
+    const data = await osl.saveModule(_format);
+    if (data) {
+      LibopenmptEngine.getInstance().hotReload(data);
+      _dirty = false;
+    }
+  } catch {
+    // Serialization or engine not available
+  }
+}
+
 /** Reset the bridge state (on song unload / new import). */
 export function reset(): void {
+  if (_hotReloadTimer) {
+    clearTimeout(_hotReloadTimer);
+    _hotReloadTimer = null;
+  }
   _loaded = false;
   _dirty = false;
   _format = 'mod';
