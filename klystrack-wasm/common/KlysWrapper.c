@@ -380,11 +380,25 @@ EMSCRIPTEN_KEEPALIVE
 int klys_get_instrument_data(int idx, void *outBuf, int maxBytes)
 {
     if (!g_song_loaded || idx < 0 || idx >= g_song.num_instruments) return 0;
-    if (maxBytes < 64) return 0; /* need at least basic fields */
+    if (maxBytes < 160) return 0; /* maximized layout needs ~150 bytes for fields + program + name */
 
     MusInstrument *inst = &g_song.instrument[idx];
     Uint8 *out = (Uint8 *)outBuf;
     int pos = 0;
+
+    /* MAXIMIZED layout — every MusInstrument field, version 2.
+     * Layout (little-endian, packed):
+     *   ADSR(4) flags(4) cydflags(4) baseNote(1) finetune(1) slideSpeed(1)
+     *   pw(2) volume(1) progPeriod(1)
+     *   vibSpeed(1) vibDepth(1) pwmSpeed(1) pwmDepth(1)
+     *   cutoff(2) resonance(1) flttype(1)
+     *   ymEnvShape(1) buzzOffset(2)
+     *   fxBus(1) vibShape(1) vibDelay(1) pwmShape(1)
+     *   lfsrType(1) wavetableEntry(1) ringMod(1) syncSource(1)
+     *   fmFlags(4) fmMod(1) fmFeedback(1) fmWave(1) fmHarmonic(1)
+     *   fmAdsr(4) fmAttackStart(1)
+     *   program(64) name(33)
+     */
 
     /* ADSR (4 bytes) */
     out[pos++] = inst->adsr.a;
@@ -399,8 +413,12 @@ int klys_get_instrument_data(int idx, void *outBuf, int maxBytes)
     out[pos++] = (Uint8)((flags >> 16) & 0xFF);
     out[pos++] = (Uint8)((flags >> 24) & 0xFF);
 
-    /* Waveform (1 byte) */
-    out[pos++] = inst->cydflags;
+    /* CydFlags (4 bytes LE) — was 1 byte, now full width */
+    Uint32 cydf = inst->cydflags;
+    out[pos++] = (Uint8)(cydf & 0xFF);
+    out[pos++] = (Uint8)((cydf >> 8) & 0xFF);
+    out[pos++] = (Uint8)((cydf >> 16) & 0xFF);
+    out[pos++] = (Uint8)((cydf >> 24) & 0xFF);
 
     /* Base note (1 byte) */
     out[pos++] = inst->base_note;
@@ -443,12 +461,30 @@ int klys_get_instrument_data(int idx, void *outBuf, int maxBytes)
     /* Filter type (1 byte) */
     out[pos++] = inst->flttype;
 
+    /* YM env shape (1 byte) */
+    out[pos++] = inst->ym_env_shape;
+
+    /* Buzz offset (2 bytes LE, signed) */
+    out[pos++] = (Uint8)(inst->buzz_offset & 0xFF);
+    out[pos++] = (Uint8)((inst->buzz_offset >> 8) & 0xFF);
+
     /* FX bus (1 byte) */
     out[pos++] = inst->fx_bus;
 
-    /* Buzz offset (2 bytes LE) */
-    out[pos++] = (Uint8)(inst->buzz_offset & 0xFF);
-    out[pos++] = (Uint8)((inst->buzz_offset >> 8) & 0xFF);
+    /* Vib shape (1 byte) */
+    out[pos++] = inst->vib_shape;
+
+    /* Vib delay (1 byte) */
+    out[pos++] = inst->vib_delay;
+
+    /* PWM shape (1 byte) */
+    out[pos++] = inst->pwm_shape;
+
+    /* LFSR type (1 byte) */
+    out[pos++] = inst->lfsr_type;
+
+    /* Wavetable entry (1 byte) */
+    out[pos++] = inst->wavetable_entry;
 
     /* Ring mod source (1 byte) */
     out[pos++] = inst->ring_mod;
@@ -456,17 +492,27 @@ int klys_get_instrument_data(int idx, void *outBuf, int maxBytes)
     /* Hard sync source (1 byte) */
     out[pos++] = inst->sync_source;
 
-    /* Wavetable entry (1 byte) */
-    out[pos++] = inst->wavetable_entry;
+    /* FM flags (4 bytes LE) */
+    Uint32 fmf = inst->fm_flags;
+    out[pos++] = (Uint8)(fmf & 0xFF);
+    out[pos++] = (Uint8)((fmf >> 8) & 0xFF);
+    out[pos++] = (Uint8)((fmf >> 16) & 0xFF);
+    out[pos++] = (Uint8)((fmf >> 24) & 0xFF);
 
-    /* FM: modulator, feedback, harmonic, adsr (7 bytes) */
+    /* FM operator params */
     out[pos++] = inst->fm_modulation;
     out[pos++] = inst->fm_feedback;
+    out[pos++] = inst->fm_wave;
     out[pos++] = inst->fm_harmonic;
+
+    /* FM ADSR (4 bytes) */
     out[pos++] = inst->fm_adsr.a;
     out[pos++] = inst->fm_adsr.d;
     out[pos++] = inst->fm_adsr.s;
     out[pos++] = inst->fm_adsr.r;
+
+    /* FM attack start (1 byte) */
+    out[pos++] = inst->fm_attack_start;
 
     /* Program (32 steps, 2 bytes each = 64 bytes) */
     for (int i = 0; i < MUS_PROG_LEN && pos + 2 <= maxBytes; i++) {
@@ -839,9 +885,9 @@ int klys_set_instrument_param(int idx, int paramId, int value)
         case 2: inst->adsr.s = (Uint8)value; break;
         case 3: inst->adsr.r = (Uint8)value; break;
         case 4: inst->flags = (Uint32)value; break;
-        case 5: inst->cydflags = (Uint8)value; break;
+        case 5: inst->cydflags = (Uint32)value; break;
         case 6: inst->base_note = (Uint8)value; break;
-        case 7: inst->finetune = (Uint8)value; break;
+        case 7: inst->finetune = (Sint8)value; break;
         case 8: inst->slide_speed = (Uint8)value; break;
         case 9: inst->pw = (Uint16)value; break;
         case 10: inst->volume = (Uint8)value; break;
@@ -865,8 +911,30 @@ int klys_set_instrument_param(int idx, int paramId, int value)
         case 28: inst->fm_adsr.d = (Uint8)value; break;
         case 29: inst->fm_adsr.s = (Uint8)value; break;
         case 30: inst->fm_adsr.r = (Uint8)value; break;
+        /* MAXIMIZED — extended fields */
+        case 31: inst->ym_env_shape = (Uint8)value; break;
+        case 32: inst->vib_shape = (Uint8)value; break;
+        case 33: inst->vib_delay = (Uint8)value; break;
+        case 34: inst->pwm_shape = (Uint8)value; break;
+        case 35: inst->lfsr_type = (Uint8)value; break;
+        case 36: inst->fm_flags = (Uint32)value; break;
+        case 37: inst->fm_wave = (Uint8)value; break;
+        case 38: inst->fm_attack_start = (Uint8)value; break;
         default: return 0;
     }
+    return 1;
+}
+
+EMSCRIPTEN_KEEPALIVE
+int klys_set_instrument_name(int idx, const char *name)
+{
+    if (!g_song_loaded || idx < 0 || idx >= g_song.num_instruments) return 0;
+    if (!name) return 0;
+    MusInstrument *inst = &g_song.instrument[idx];
+    size_t n = strlen(name);
+    if (n > MUS_INSTRUMENT_NAME_LEN) n = MUS_INSTRUMENT_NAME_LEN;
+    memcpy(inst->name, name, n);
+    inst->name[n] = 0;
     return 1;
 }
 

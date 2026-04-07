@@ -1613,31 +1613,17 @@ export class TrackerReplayer {
         }).catch(() => {});
       }
 
-      // Subscribe to HivelyEngine position updates (~15fps from WASM)
-      // This replaces the TS scheduler as the authoritative position source
+      // Subscribe to HivelyEngine position updates (~15fps from WASM).
+      // The engine's subscribeToCoordinator() handles throttling + dispatch.
       if (result.hivelyEngine) {
         this.hivelyEngine = result.hivelyEngine;
-        let lastRow = -1;
-        let lastPosition = -1;
-        this._hvlPositionUnsub = this.hivelyEngine.onPositionUpdate((update: import('./hively/HivelyEngine').HivelyPositionUpdate) => {
-          if (update.row === lastRow && update.position === lastPosition) return;
-          lastRow = update.row;
-          lastPosition = update.position;
-          this.dispatchEnginePosition(update.row, update.position);
-        });
+        this._hvlPositionUnsub = this.hivelyEngine.subscribeToCoordinator(this.coordinator);
         _playLog('HVL position subscription active');
       }
 
-      // Subscribe to MusicLineEngine position updates (same dispatch path as Hively)
+      // Subscribe to MusicLineEngine position updates.
       if (result.musicLineEngine) {
-        let lastMLRow = -1;
-        let lastMLPos = -1;
-        this._mlPositionUnsub = result.musicLineEngine.onPosition((update) => {
-          if (update.row === lastMLRow && update.position === lastMLPos) return;
-          lastMLRow = update.row;
-          lastMLPos = update.position;
-          this.dispatchEnginePosition(update.row, update.position);
-        });
+        this._mlPositionUnsub = result.musicLineEngine.subscribeToCoordinator(this.coordinator);
       }
 
       // Subscribe to UADEEngine position updates for real-time row/pattern tracking.
@@ -2571,7 +2557,7 @@ export class TrackerReplayer {
    */
   private dispatchEnginePosition(row: number, position: number, audioTime?: number, fireHybrid: boolean = true): void {
     if (!this.playing || !this.song) return;
-    this.coordinator.dispatchEnginePosition(row, position, audioTime, Tone.now(), fireHybrid);
+    this.coordinator.dispatchEnginePosition(row, position, audioTime, fireHybrid);
     this.songPos = this.coordinator.songPos;
     this.pattPos = this.coordinator.pattPos;
   }

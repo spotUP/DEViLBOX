@@ -11,7 +11,6 @@
 
 import { getDevilboxAudioContext } from '@utils/audio-context';
 import { getToneEngine } from '@engine/ToneEngine';
-import * as Tone from 'tone';
 import type { PlaybackCoordinator } from '@engine/PlaybackCoordinator';
 import type { TrackerSong } from '@engine/TrackerReplayer';
 import { useSettingsStore } from '@stores/useSettingsStore';
@@ -382,7 +381,7 @@ export class LibopenmptEngine {
       if (row === lastRow && order === lastOrder) return;
       lastRow = row;
       lastOrder = order;
-      coordinator.dispatchEnginePosition(row, order, audioTime, Tone.now());
+      coordinator.dispatchEnginePosition(row, order, audioTime);
     };
 
     // Song end → coordinator.onSongEnd. The coordinator forwards to the

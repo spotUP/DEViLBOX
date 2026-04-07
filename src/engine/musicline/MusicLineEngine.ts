@@ -288,6 +288,23 @@ export class MusicLineEngine {
   }
 
   /**
+   * Wire this engine's position-update stream into a PlaybackCoordinator.
+   * Throttles to row-change events and dispatches via
+   * coordinator.dispatchEnginePosition. Returns an unsubscribe function the
+   * caller stores so it can detach on stop().
+   */
+  subscribeToCoordinator(coordinator: import('@engine/PlaybackCoordinator').PlaybackCoordinator): () => void {
+    let lastRow = -1;
+    let lastPosition = -1;
+    return this.onPosition((update) => {
+      if (update.row === lastRow && update.position === lastPosition) return;
+      lastRow = update.row;
+      lastPosition = update.position;
+      coordinator.dispatchEnginePosition(update.row, update.position);
+    });
+  }
+
+  /**
    * Generic position update interface used by NativeEngineRouting.
    * Maps MusicLine's {position, row, speed} to the {songPos, row} format.
    */

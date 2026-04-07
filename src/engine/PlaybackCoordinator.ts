@@ -237,11 +237,10 @@ export class PlaybackCoordinator {
    *
    * @param row        Row within the current pattern
    * @param position   Index into context.songPositions
-   * @param audioTime  Optional audio-context timestamp; if omitted, the caller's
-   *                   `now` (passed in) is used. When provided, output latency
-   *                   is added to keep visuals in sync with audio.
-   * @param now        Current Web Audio time (caller passes Tone.now() — we keep
-   *                   the coordinator free of Tone.js dependency).
+   * @param audioTime  Optional audio-context timestamp from the engine's worklet.
+   *                   When provided, output latency is added to keep visuals
+   *                   in sync with audio. When omitted, the coordinator reads
+   *                   `currentTime` from its own audio context.
    * @param fireHybrid Whether to fire hybrid notes via context.fireHybridNotes.
    *                   Default true. TFMX opts out because its sister UADE
    *                   subscription already handles hybrid playback.
@@ -249,8 +248,7 @@ export class PlaybackCoordinator {
   dispatchEnginePosition(
     row: number,
     position: number,
-    audioTime: number | undefined,
-    now: number,
+    audioTime?: number,
     fireHybrid: boolean = true,
   ): void {
     if (!this.stateRing.playing) return;
@@ -262,8 +260,12 @@ export class PlaybackCoordinator {
     if (audioTime != null && ctx.audioContext) {
       const latency = ctx.audioContext.outputLatency ?? ctx.audioContext.baseLatency ?? 0;
       time = audioTime + latency;
+    } else if (ctx.audioContext) {
+      time = ctx.audioContext.currentTime;
     } else {
-      time = now;
+      // No audio context wired — fall back to performance.now() in seconds.
+      // Should never happen in production; only during tests with no engine.
+      time = performance.now() / 1000;
     }
     this.stateRing.queue(time, row, patternNum, position, 0, (2.5 / ctx.bpm) * ctx.speed);
     if (this.onRowChange) {
