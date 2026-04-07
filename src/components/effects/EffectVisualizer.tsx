@@ -292,16 +292,20 @@ export const WaveshaperCurve: React.FC<WaveshaperCurveProps> = ({
     ctx.lineTo(width, height / 2);
     ctx.stroke();
 
-    // Transfer function curve
-    const numPoints = width;
+    // Transfer function curve — oversample to keep line thickness uniform
+    // in steep regions (e.g. middle of tanh S-curve at high drive)
+    const numPoints = width * 4;
 
     ctx.strokeStyle = color;
     ctx.lineWidth = 2;
+    ctx.lineJoin = 'round';
+    ctx.lineCap = 'round';
     ctx.beginPath();
 
-    for (let px = 0; px < numPoints; px++) {
+    for (let i = 0; i < numPoints; i++) {
       // x in -1..+1
-      const x = (px / (numPoints - 1)) * 2 - 1;
+      const x = (i / (numPoints - 1)) * 2 - 1;
+      const canvasX = (i / (numPoints - 1)) * width;
       let y = 0;
 
       if (type === 'Distortion') {
@@ -311,7 +315,6 @@ export const WaveshaperCurve: React.FC<WaveshaperCurveProps> = ({
         const n = Math.max(1, Math.round(order));
         const normFactor = chebyshev(n, 1);
         y = normFactor !== 0 ? chebyshev(n, x) / normFactor : chebyshev(n, x);
-        // Clamp to -1..1 range for display
         y = Math.max(-1, Math.min(1, y));
       } else if (type === 'TapeSaturation') {
         const gain = drive * 5 + 0.1;
@@ -322,17 +325,16 @@ export const WaveshaperCurve: React.FC<WaveshaperCurveProps> = ({
       } else if (type === 'BitCrusher') {
         const levels = Math.pow(2, Math.max(1, Math.round(bits)));
         y = Math.round(x * levels) / levels;
-        // Clamp to -1..1
         y = Math.max(-1, Math.min(1, y));
       }
 
       // Map y (-1..+1) to canvas coordinates
       const canvasY = (1 - y) * (height / 2);
 
-      if (px === 0) {
-        ctx.moveTo(px, canvasY);
+      if (i === 0) {
+        ctx.moveTo(canvasX, canvasY);
       } else {
-        ctx.lineTo(px, canvasY);
+        ctx.lineTo(canvasX, canvasY);
       }
     }
 
@@ -347,8 +349,10 @@ export const WaveshaperCurve: React.FC<WaveshaperCurveProps> = ({
     <canvas
       ref={canvasRef}
       style={{
-        width: '100%',
+        width: `${width}px`,
+        maxWidth: '100%',
         height: `${height}px`,
+        aspectRatio: '1',
         borderRadius: 4,
         display: 'block',
       }}

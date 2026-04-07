@@ -755,7 +755,19 @@ export function updateSynthConfig(params: Record<string, unknown>): Record<strin
 /** Add a master audio effect */
 export function addMasterEffect(params: Record<string, unknown>): Record<string, unknown> {
   const effectType = params.effectType as string;
-  useAudioStore.getState().addMasterEffect(effectType as never);
+  const force = params.force as boolean | undefined;
+  if (force) {
+    // Bypass format compatibility check (for testing/audit)
+    useAudioStore.getState().addMasterEffectConfig({
+      category: 'tonejs',
+      type: effectType as never,
+      enabled: true,
+      wet: 50,
+      parameters: {},
+    });
+  } else {
+    useAudioStore.getState().addMasterEffect(effectType as never);
+  }
   return { ok: true, effectType };
 }
 
@@ -852,10 +864,10 @@ export async function loadFile(params: Record<string, unknown>): Promise<Record<
       const libopenmptExts = /\.(mod|xm|s3m|it|stm|669|far|ult|mtm|med|mmd[0-3]|okt|okta|gdm|psm)$/i;
       const canUseLibopenmpt = useLib && libopenmptExts.test(filename);
 
-      if (canUseLibopenmpt || format?.nativeOnly) {
+      if (canUseLibopenmpt || (format?.nativeOnly && !format?.nativeParser)) {
         // Use the standard import pipeline for libopenmpt formats AND nativeOnly
-        // formats (XRNS, Furnace, etc.) that have their own parsers and must NOT
-        // fall through to parseModuleToSong → UADE.
+        // formats without dedicated parsers (XRNS, Furnace, etc.) that have their
+        // own handling in loadModuleFile and must NOT fall through to UADE.
         const { loadModuleFile } = await import('../../lib/import/ModuleLoader');
         const { importTrackerModule } = await import('../../lib/file/UnifiedFileLoader');
         const moduleInfo = await loadModuleFile(file);
@@ -913,6 +925,56 @@ export async function loadFile(params: Record<string, unknown>): Promise<Record<
   } catch (e) {
     return { error: `loadFile failed: ${(e as Error).message}` };
   }
+}
+
+// ─── Test Tone ────────────────────────────────────────────────────────────────
+
+let _testToneOsc: Tone.Oscillator | null = null;
+let _testToneGain: Tone.Gain | null = null;
+
+/** Start/stop a steady test tone routed through the master effects chain */
+export function testTone(params: Record<string, unknown>): Record<string, unknown> {
+  const action = (params.action as string) ?? 'start';
+  const freq = (params.frequency as number) ?? 440;
+  const level = (params.level as number) ?? -12; // dBFS
+
+  if (action === 'stop') {
+    if (_testToneOsc) {
+      _testToneOsc.stop();
+      _testToneOsc.dispose();
+      _testToneOsc = null;
+    }
+    if (_testToneGain) {
+      _testToneGain.dispose();
+      _testToneGain = null;
+    }
+    return { status: 'stopped' };
+  }
+
+  // Stop existing tone if any
+  if (_testToneOsc) {
+    _testToneOsc.stop();
+    _testToneOsc.dispose();
+    _testToneOsc = null;
+  }
+  if (_testToneGain) {
+    _testToneGain.dispose();
+    _testToneGain = null;
+  }
+
+  const engine = getToneEngine();
+  if (!engine) {
+    return { error: 'ToneEngine not initialized' };
+  }
+
+  // Create oscillator → gain → masterEffectsInput
+  _testToneGain = new Tone.Gain(Math.pow(10, level / 20));
+  _testToneOsc = new Tone.Oscillator({ frequency: freq, type: 'sine' });
+  _testToneOsc.connect(_testToneGain);
+  _testToneGain.connect(engine.masterEffectsInput);
+  _testToneOsc.start();
+
+  return { status: 'playing', frequency: freq, levelDb: level };
 }
 
 // ─── Audio Measurement ─────────────────────────────────────────────────────────

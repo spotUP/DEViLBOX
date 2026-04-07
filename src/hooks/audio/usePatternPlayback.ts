@@ -240,19 +240,15 @@ export const usePatternPlayback = () => {
       const wasReplayerAdvanced = replayerAdvancedRef.current > 0;
       replayerAdvancedRef.current = 0;
 
+      // Phase 5.3: when a WASM engine drives playback, the TS scheduler is
+      // skipped entirely, so replayerAdvancedRef never increments. Treat all
+      // re-renders during WASM-backed playback as natural (no reload needed).
       const isNaturalAdvancement = hasStartedRef.current &&
                                    replayer.isPlaying() &&
-                                   wasReplayerAdvanced;
+                                   (wasReplayerAdvanced || replayer.isSuppressNotes);
 
       const needsReload = hasStartedRef.current && !isNaturalAdvancement;
 
-      // DIAGNOSTIC: log when effect re-fires during active playback (debug MIDI silence on loop)
-      if (hasStartedRef.current) {
-        console.warn(`[Playback] Effect re-fired during playback: needsReload=${needsReload} wasReplayerAdvanced=${wasReplayerAdvanced} isNaturalAdvancement=${isNaturalAdvancement} key=${patternStructureKey}`);
-        if (needsReload) {
-          console.trace('[Playback] needsReload=true caller');
-        }
-      }
       // Per-channel formats (MusicLine etc.) have no importMetadata.sourceFormat on their
       // single-voice PART patterns. Fall back to 'MOD' (Amiga period math) not 'XM'.
       const format = (pattern.importMetadata?.sourceFormat as TrackerFormat)

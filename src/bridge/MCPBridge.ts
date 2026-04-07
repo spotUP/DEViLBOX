@@ -129,6 +129,7 @@ import {
   setSampleBusGain,
   setSynthBusGain,
   loadFile,
+  testTone,
   getAudioLevel,
   waitForAudio,
   analyzeInstrumentSpectrum,
@@ -338,6 +339,7 @@ const handlers: Record<string, Handler> = {
 
   // ─── File Loading & Audio Measurement ───────────────────────────────────
   load_file: loadFile,
+  test_tone: testTone,
   get_audio_level: getAudioLevel,
   wait_for_audio: waitForAudio,
 

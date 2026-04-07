@@ -251,6 +251,7 @@ export class TFMXEngine {
 
   stop(): void {
     this.sendMessage({ type: 'moduleStop' });
+    this.sendMessage({ type: 'resetPlayers' });
     this._positionCallbacks = [];
   }
 

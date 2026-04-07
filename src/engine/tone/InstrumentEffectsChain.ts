@@ -103,7 +103,8 @@ export async function buildInstrumentEffectChain(
     if (activeAnalyser) {
       output.connect(activeAnalyser.input);
     } else {
-      output.connect(ctx.getInstrumentOutputDestination(instrumentId, isNativeSynth));
+      const dest = ctx.getInstrumentOutputDestination(instrumentId, isNativeSynth);
+      output.connect(dest);
     }
 
     ctx.instrumentEffectChains.set(key, { effects: [], output });

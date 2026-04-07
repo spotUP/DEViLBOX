@@ -46,6 +46,8 @@ interface TestCase {
    * directly on an emulated chip; there are no pattern rows to inspect.
    */
   engineDriven?: boolean;
+  /** Companion file paths (e.g. TFMX smpl.* alongside mdat.*) */
+  companionPaths?: string[];
 }
 
 const TESTS: TestCase[] = [
@@ -57,12 +59,13 @@ const TESTS: TestCase[] = [
   { name: 'AceMan - Hexplosion',              family: 'HVL',  loader: 'modland', path: 'pub/modules/HivelyTracker/AceMan/hexplosion.hvl', expectedEditorMode: 'hively' },
   // ── UADE Amiga formats ──
   { name: 'Future Composer - Blaizer',        family: 'FC',   loader: 'modland', path: 'pub/modules/Future Composer 1.4/Blaizer/horizon v2.fc' },
-  { name: 'TFMX - Turrican Aliens',           family: 'TFMX', loader: 'modland', path: 'pub/modules/TFMX/Chris Huelsbeck/mdat.turrican aliens' },
   { name: 'JamCracker - bartmanintro',        family: 'JAM',  loader: 'modland', path: 'pub/modules/JamCracker/Ape/bartmanintro.jam' },
   // ── C64 SID ──
   // SID is engine-driven (6502 code on emulated CPU + SID chip) — no tracker
   // pattern data, so skip the pattern check.
   { name: 'Hubbard - Commando',               family: 'SID',  loader: 'hvsc',    path: 'MUSICIANS/H/Hubbard_Rob/Commando.sid', engineDriven: true },
+  // ── TFMX (needs companion smpl file) ──
+  { name: 'TFMX - Turrican Aliens',           family: 'TFMX', loader: 'modland', path: 'pub/modules/TFMX/Chris Huelsbeck/mdat.turrican aliens', companionPaths: ['pub/modules/TFMX/Chris Huelsbeck/smpl.turrican aliens'] },
 ];
 
 // ── WebSocket bridge client ────────────────────────────────────────────────
@@ -176,13 +179,33 @@ interface PatternStatsResp {
 async function runTest(client: MCPBridgeClient, test: TestCase): Promise<TestResult> {
   const start = Date.now();
   try {
-    // 1. Clean slate
+    // 1. Clean slate — clear console and remove any master effects that could
+    //    trigger format-compatibility dialogs during native-format loads.
     await client.call('clear_console_errors');
+    try {
+      const audioState = await client.call<{ masterEffects?: { id: string }[] }>('get_audio_state');
+      if (audioState?.masterEffects?.length) {
+        for (const fx of audioState.masterEffects) {
+          await client.call('remove_master_effect', { effectId: fx.id });
+        }
+      }
+    } catch { /* audio state read may fail on first call */ }
 
     // 2. Load — download via Express API, then send to browser via load_file
     if (test.loader === 'modland' || test.loader === 'hvsc') {
       const { filename, base64 } = await downloadFile(test.loader, test.path);
-      await client.call('load_file', { filename, data: base64 });
+
+      // Download companion files (e.g. TFMX smpl.* alongside mdat.*)
+      let companionFiles: Record<string, string> | undefined;
+      if (test.companionPaths?.length) {
+        companionFiles = {};
+        for (const cp of test.companionPaths) {
+          const companion = await downloadFile(test.loader, cp);
+          companionFiles[companion.filename] = companion.base64;
+        }
+      }
+
+      await client.call('load_file', { filename, data: base64, ...(companionFiles ? { companionFiles } : {}) });
     } else if (test.loader === 'fur') {
       await client.call('play_fur', { path: test.path });
     }
@@ -338,6 +361,8 @@ async function main(): Promise<void> {
 
   const results: TestResult[] = [];
   for (const test of TESTS) {
+    // Brief pause between tests to let AudioContext and WASM settle
+    if (results.length > 0) await sleep(2000);
     process.stdout.write(`  [${test.family.padEnd(5)}] ${test.name.padEnd(40)} `);
     const result = await runTest(client, test);
     results.push(result);
