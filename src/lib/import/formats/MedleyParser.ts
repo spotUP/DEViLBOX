@@ -120,6 +120,46 @@ export function parseMedleyFile(buffer: ArrayBuffer, filename: string): TrackerS
     }
   }
 
+  // ── Scan for sample/instrument data ────────────────────────────────────────
+  //
+  // Medley (PV Synth) modules store instrument data after the header.
+  // Scan for plausible instrument entries in the data region.
+
+  let sampleCount = 1;
+  try {
+    // The target offset from the relPtr points to the subsong table area.
+    // Instrument data is typically between the header and that offset.
+    const relPtr = u32BE(buf, 4);
+    const dataRegion = 4 + relPtr;
+    const scanStart = 8;
+    const scanEnd = Math.min(dataRegion, buf.length - 4, 4096);
+
+    // Look for a block of u16 values that could be sample lengths (word-aligned, reasonable sizes)
+    for (let off = scanStart; off < scanEnd; off += 2) {
+      const val = u16BE(buf, off);
+      // Potential sample count stored as u16
+      if (val >= 2 && val <= 32) {
+        // Check if the next N u16 values look like sample lengths or periods
+        let valid = true;
+        for (let i = 1; i <= Math.min(val, 8); i++) {
+          if (off + i * 2 + 2 > buf.length) { valid = false; break; }
+          const next = u16BE(buf, off + i * 2);
+          if (next === 0) { valid = false; break; }
+        }
+        if (valid) {
+          sampleCount = val;
+          break;
+        }
+      }
+    }
+  } catch {
+    // Fall back to default
+  }
+
+  // ── Song positions (one per subsong) ──────────────────────────────────────
+
+  const songPositions = Array.from({ length: Math.max(subsongCount, 1) }, (_, i) => i % 1);
+
   // ── Empty pattern (placeholder — UADE handles actual audio) ──────────────
 
   const emptyRows = Array.from({ length: 64 }, () => ({
@@ -154,29 +194,31 @@ export function parseMedleyFile(buffer: ArrayBuffer, filename: string): TrackerS
       importedAt: new Date().toISOString(),
       originalChannelCount: 4,
       originalPatternCount: 1,
-      originalInstrumentCount: 0,
+      originalInstrumentCount: sampleCount,
+      subsongCount,
     },
   };
 
-  const instruments: InstrumentConfig[] = [
-    {
-      id: 1,
-      name: 'Sample 1',
+  const instruments: InstrumentConfig[] = [];
+  for (let i = 0; i < sampleCount; i++) {
+    instruments.push({
+      id: i + 1,
+      name: `Medley Sample ${i + 1}`,
       type: 'synth' as const,
       synthType: 'Synth' as const,
       effects: [],
       volume: 0,
       pan: 0,
-    } as InstrumentConfig,
-  ];
+    } as InstrumentConfig);
+  }
 
   return {
     name: `${moduleName} [Medley]${subsongCount > 1 ? ` (${subsongCount} subsongs)` : ''}`,
     format: 'MOD' as TrackerFormat,
     patterns: [pattern],
     instruments,
-    songPositions: [0],
-    songLength: 1,
+    songPositions,
+    songLength: songPositions.length,
     restartPosition: 0,
     numChannels: 4,
     initialSpeed: 6,

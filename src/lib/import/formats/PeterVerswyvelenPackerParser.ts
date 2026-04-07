@@ -18,6 +18,23 @@
  *   Step table starting at offset 256: (patCount - 2) words, each must be
  *     even, bit 15 clear, <= limit, and non-decreasing
  *
+ * Binary layout:
+ *   0x00-0xF7: 31 sample headers × 8 bytes each
+ *     +0: u16BE length (in words), +2: u16BE volume (0-64),
+ *     +4: u16BE repeat offset (in words), +6: u16BE repeat length (in words)
+ *   0xF8: u16BE patCount (number of patterns)
+ *   0xFA: u16BE songLen (number of positions × 2, i.e. songLen/2 positions)
+ *   0xFC: u16BE val252 (unused for extraction)
+ *   0xFE: u16BE limit
+ *   0x100: Step table — (patCount - 2) words, non-decreasing offsets
+ *   After step table: pattern data (each pattern = 64 rows × 4 channels × 4 bytes)
+ *
+ * Pattern cell format (4 bytes, standard MOD-like):
+ *   byte 0: upper 4 bits = instrument high nibble, lower 4 bits = period high byte (bits 8-11)
+ *   byte 1: period low byte (bits 0-7)
+ *   byte 2: upper 4 bits = instrument low nibble, lower 4 bits = effect type
+ *   byte 3: effect parameter
+ *
  * File prefix: "PVP."
  * Actual audio playback is delegated to UADE.
  *
@@ -25,20 +42,63 @@
  */
 
 import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
-import type { InstrumentConfig } from '@/types';
+import type { InstrumentConfig, Pattern, TrackerCell, ChannelData } from '@/types';
+
+// ── Constants ───────────────────────────────────────────────────────────────
 
 const MIN_FILE_SIZE = 260;
+const NUM_CHANNELS = 4;
+const ROWS_PER_PATTERN = 64;
+const BYTES_PER_CELL = 4;
+const NUM_SAMPLES = 31;
+
+/** PVP period table from assembly source. */
+const PVP_PERIODS = [
+  0x358, 0x328, 0x2FA, 0x2D0, 0x2A6, 0x280, 0x25C, 0x23A, 0x21A, 0x1FC, 0x1E0, 0x1C5,
+  0x1AC, 0x194, 0x17D, 0x168, 0x153, 0x140, 0x12E, 0x11D, 0x10D, 0x0FE, 0x0F0, 0x0E2,
+  0x0D6, 0x0CA, 0x0BE, 0x0B4, 0x0AA, 0x0A0, 0x097, 0x08F, 0x087, 0x07F, 0x078, 0x071,
+];
+
+// ── Binary helpers ──────────────────────────────────────────────────────────
 
 function u16BE(buf: Uint8Array, off: number): number {
   return ((buf[off] << 8) | buf[off + 1]) >>> 0;
 }
+
+// ── Note conversion ─────────────────────────────────────────────────────────
+
+/**
+ * Convert an Amiga period value to a tracker note (1-96, FT2 style).
+ * Searches the PVP period table for the closest match.
+ * Period table index 0 = C-1 (ProTracker) = tracker note 1.
+ */
+function periodToNote(period: number): number {
+  if (period === 0) return 0;
+  let bestIdx = -1;
+  let bestDist = Infinity;
+  for (let i = 0; i < PVP_PERIODS.length; i++) {
+    const dist = Math.abs(PVP_PERIODS[i] - period);
+    if (dist < bestDist) {
+      bestDist = dist;
+      bestIdx = i;
+    }
+  }
+  if (bestIdx < 0) return 0;
+  // PVP period table: index 0 = C-1 in ProTracker = C-2 in FT2 = note 13
+  // Actually: 3 octaves × 12 notes. index 0 = lowest = C-1 (PT) = note 1 (XM C-0)
+  // Standard mapping: FT2 note 1 = C-0. PT C-1 = FT2 C-1 = note 13.
+  const note = bestIdx + 13;
+  return (note >= 1 && note <= 96) ? note : 0;
+}
+
+// ── Format detection ────────────────────────────────────────────────────────
 
 export function isPeterVerswyvelenPackerFormat(buffer: ArrayBuffer | Uint8Array): boolean {
   const buf = buffer instanceof Uint8Array ? buffer : new Uint8Array(buffer);
   if (buf.length < MIN_FILE_SIZE) return false;
 
   // Validate 31 sample headers, 8 bytes each, at offsets i*8 for i=0..30
-  for (let i = 0; i < 31; i++) {
+  for (let i = 0; i < NUM_SAMPLES; i++) {
     const base = i * 8;
 
     // word 0: bit 15 must be clear (value < 0x8000)
@@ -102,6 +162,136 @@ export function isPeterVerswyvelenPackerFormat(buffer: ArrayBuffer | Uint8Array)
   return true;
 }
 
+// ── Pattern extraction ──────────────────────────────────────────────────────
+
+/**
+ * Parse a single 4-byte MOD-like pattern cell.
+ * Returns { period, instrument, effTyp, eff }.
+ */
+function parseCell(buf: Uint8Array, off: number): { period: number; instrument: number; effTyp: number; eff: number } {
+  const b0 = buf[off];
+  const b1 = buf[off + 1];
+  const b2 = buf[off + 2];
+  const b3 = buf[off + 3];
+  const instrument = (b0 & 0xF0) | ((b2 >> 4) & 0x0F);
+  const period = ((b0 & 0x0F) << 8) | b1;
+  const effTyp = b2 & 0x0F;
+  const eff = b3;
+  return { period, instrument, effTyp, eff };
+}
+
+/**
+ * Extract patterns from the PVP binary. The step table entries are offsets
+ * that map song positions to pattern data. Unique offsets correspond to
+ * unique patterns.
+ */
+function extractPVPPatterns(
+  buf: Uint8Array,
+  patCount: number,
+  songLen: number,
+): { patterns: Pattern[]; songPositions: number[]; instrumentCount: number } | null {
+  const stepCount = patCount >= 2 ? patCount - 2 : 0;
+  const stepTableStart = 0x100; // offset 256
+  const patternDataStart = stepTableStart + stepCount * 2;
+
+  // Read step table entries (offsets into pattern data)
+  const stepEntries: number[] = [];
+  for (let i = 0; i < stepCount; i++) {
+    stepEntries.push(u16BE(buf, stepTableStart + i * 2));
+  }
+
+  // Build unique pattern offsets and a position-to-pattern map
+  // Each step table entry is a byte offset relative to pattern data start (shifted).
+  // Deduplicate to get unique patterns.
+  const uniqueOffsets: number[] = [];
+  const offsetToPatIdx = new Map<number, number>();
+  for (const off of stepEntries) {
+    if (!offsetToPatIdx.has(off)) {
+      offsetToPatIdx.set(off, uniqueOffsets.length);
+      uniqueOffsets.push(off);
+    }
+  }
+
+  // Song positions: songLen is stored as 2× actual positions
+  const numPositions = Math.floor(songLen / 2);
+  const songPositions: number[] = [];
+  for (let i = 0; i < numPositions && i < stepEntries.length; i++) {
+    songPositions.push(offsetToPatIdx.get(stepEntries[i]) ?? 0);
+  }
+  if (songPositions.length === 0) songPositions.push(0);
+
+  // Parse each unique pattern
+  const patternSize = ROWS_PER_PATTERN * NUM_CHANNELS * BYTES_PER_CELL; // 1024 bytes
+  const patterns: Pattern[] = [];
+  let maxInstrument = 0;
+
+  for (let p = 0; p < uniqueOffsets.length; p++) {
+    // The step entry offset may be a shifted value — try as direct byte offset first
+    const dataOff = patternDataStart + uniqueOffsets[p];
+    if (dataOff + patternSize > buf.length) continue;
+
+    const channels: ChannelData[] = [];
+    for (let ch = 0; ch < NUM_CHANNELS; ch++) {
+      const rows: TrackerCell[] = [];
+      for (let r = 0; r < ROWS_PER_PATTERN; r++) {
+        const cellOff = dataOff + (r * NUM_CHANNELS + ch) * BYTES_PER_CELL;
+        if (cellOff + BYTES_PER_CELL > buf.length) {
+          rows.push({ note: 0, instrument: 0, volume: 0, effTyp: 0, eff: 0, effTyp2: 0, eff2: 0 });
+          continue;
+        }
+        const cell = parseCell(buf, cellOff);
+        const note = periodToNote(cell.period);
+        if (cell.instrument > maxInstrument) maxInstrument = cell.instrument;
+        rows.push({
+          note,
+          instrument: cell.instrument,
+          volume: 0,
+          effTyp: cell.effTyp,
+          eff: cell.eff,
+          effTyp2: 0,
+          eff2: 0,
+        });
+      }
+      channels.push({
+        id: `channel-${ch}`,
+        name: `Channel ${ch + 1}`,
+        muted: false,
+        solo: false,
+        collapsed: false,
+        volume: 100,
+        pan: (ch === 0 || ch === 3) ? -50 : 50,
+        instrumentId: null,
+        color: null,
+        rows,
+      });
+    }
+
+    patterns.push({
+      id: `pattern-${p}`,
+      name: `Pattern ${p}`,
+      length: ROWS_PER_PATTERN,
+      channels,
+    });
+  }
+
+  if (patterns.length === 0) return null;
+
+  // Count notes to verify we actually extracted something meaningful
+  let totalNotes = 0;
+  for (const pat of patterns) {
+    for (const ch of pat.channels) {
+      for (const row of ch.rows) {
+        if (row.note > 0 && row.note < 97) totalNotes++;
+      }
+    }
+  }
+  if (totalNotes === 0) return null;
+
+  return { patterns, songPositions, instrumentCount: maxInstrument };
+}
+
+// ── Main parser ─────────────────────────────────────────────────────────────
+
 export function parsePeterVerswyvelenPackerFile(buffer: ArrayBuffer, filename: string): TrackerSong {
   const buf = new Uint8Array(buffer);
   if (!isPeterVerswyvelenPackerFormat(buf)) throw new Error('Not a Peter Verswyvelen Packer module');
@@ -109,47 +299,100 @@ export function parsePeterVerswyvelenPackerFile(buffer: ArrayBuffer, filename: s
   const baseName = (filename.split('/').pop() ?? filename).split('\\').pop() ?? filename;
   const moduleName = baseName.replace(/^pvp\./i, '') || baseName;
 
+  // ── Parse sample headers ────────────────────────────────────────────────
+  const patCount = u16BE(buf, 248);
+  const songLen = u16BE(buf, 250);
+
   const instruments: InstrumentConfig[] = [];
+  for (let i = 0; i < NUM_SAMPLES; i++) {
+    const base = i * 8;
+    const length = u16BE(buf, base) * 2;     // length in words → bytes
+    const volume = u16BE(buf, base + 2);
+    if (length > 0) {
+      instruments.push({
+        id: i + 1,
+        name: `Sample ${i + 1}`,
+        type: 'synth' as const,
+        synthType: 'Synth' as const,
+        effects: [],
+        volume: Math.min(64, volume),
+        pan: 0,
+      } as InstrumentConfig);
+    }
+  }
 
-  const emptyRows = Array.from({ length: 64 }, () => ({
-    note: 0, instrument: 0, volume: 0, effTyp: 0, eff: 0, effTyp2: 0, eff2: 0,
-  }));
+  // ── Extract patterns ──────────────────────────────────────────────────────
+  let patterns: Pattern[] = [];
+  let songPositions: number[] = [0];
 
-  const pattern = {
-    id: 'pattern-0',
-    name: 'Pattern 0',
-    length: 64,
-    channels: Array.from({ length: 4 }, (_, ch) => ({
-      id: `channel-${ch}`,
-      name: `Channel ${ch + 1}`,
-      muted: false,
-      solo: false,
-      collapsed: false,
-      volume: 100,
-      pan: ch === 0 || ch === 3 ? -50 : 50,
-      instrumentId: null,
-      color: null,
-      rows: emptyRows,
-    })),
-    importMetadata: {
-      sourceFormat: 'MOD' as const,
-      sourceFile: filename,
-      importedAt: new Date().toISOString(),
-      originalChannelCount: 4,
-      originalPatternCount: 1,
-      originalInstrumentCount: 0,
-    },
-  };
+  const extracted = extractPVPPatterns(buf, patCount, songLen);
+  if (extracted) {
+    patterns = extracted.patterns;
+    songPositions = extracted.songPositions;
+
+    // Ensure we have at least as many instruments as referenced in patterns
+    while (instruments.length < extracted.instrumentCount) {
+      instruments.push({
+        id: instruments.length + 1,
+        name: `Sample ${instruments.length + 1}`,
+        type: 'synth' as const,
+        synthType: 'Synth' as const,
+        effects: [],
+        volume: 0,
+        pan: 0,
+      } as InstrumentConfig);
+    }
+  }
+
+  // Fallback: empty pattern if extraction failed
+  if (patterns.length === 0) {
+    const emptyRows: TrackerCell[] = Array.from({ length: ROWS_PER_PATTERN }, () => ({
+      note: 0, instrument: 0, volume: 0, effTyp: 0, eff: 0, effTyp2: 0, eff2: 0,
+    }));
+    patterns = [{
+      id: 'pattern-0',
+      name: 'Pattern 0',
+      length: ROWS_PER_PATTERN,
+      channels: Array.from({ length: NUM_CHANNELS }, (_, ch) => ({
+        id: `channel-${ch}`,
+        name: `Channel ${ch + 1}`,
+        muted: false,
+        solo: false,
+        collapsed: false,
+        volume: 100,
+        pan: (ch === 0 || ch === 3) ? -50 : 50,
+        instrumentId: null,
+        color: null,
+        rows: emptyRows.map(r => ({ ...r })),
+      })),
+    }];
+    songPositions = [0];
+    if (instruments.length === 0) {
+      instruments.push({
+        id: 1,
+        name: 'Sample 1',
+        type: 'synth' as const,
+        synthType: 'Synth' as const,
+        effects: [],
+        volume: 0,
+        pan: 0,
+      } as InstrumentConfig);
+    }
+  }
+
+  const extractInfo = patterns.length > 1
+    ? ` (${patterns.length} pat, ${instruments.length} smp)`
+    : '';
 
   return {
-    name: `${moduleName} [Peter Verswyvelen Packer]`,
+    name: `${moduleName} [Peter Verswyvelen Packer]${extractInfo}`,
     format: 'MOD' as TrackerFormat,
-    patterns: [pattern],
+    patterns,
     instruments,
-    songPositions: [0],
-    songLength: 1,
+    songPositions,
+    songLength: songPositions.length,
     restartPosition: 0,
-    numChannels: 4,
+    numChannels: NUM_CHANNELS,
     initialSpeed: 6,
     initialBPM: 125,
     linearPeriods: false,

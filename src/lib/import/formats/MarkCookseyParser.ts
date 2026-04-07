@@ -301,23 +301,94 @@ export async function parseMarkCookseyFile(
     variant === 'old-player' ? 'Old Player (mco)' :
                                'New (mc)';
 
-  // ── Instrument placeholders ──────────────────────────────────────────────
+  // ── Sample extraction via LEA opcode scanning ─────────────────────────────
   //
-  // The format supports up to 64 samples. The exact count requires emulating
-  // the 68k InitPlayer routine to walk internal data structures, which is
-  // outside the scope of a metadata-only parser. We create 64 placeholders
-  // to ensure the TrackerSong can represent any module in the format family.
+  // Scan for $41FA (LEA d16(PC),A0) and $43FA (LEA d16(PC),A1) opcodes to
+  // locate sample/song tables. The sample table contains entries with an
+  // offset pointer (u32BE) and length (u32BE) for each sample.
   //
-  // Reference: Mark Cooksey_v2.asm EP_SampleInit, which iterates D5 = Samples - 1
-  // where Samples is populated by InitPlayer scanning the binary.
+  // Reference: Mark Cooksey_v2.asm EP_SampleInit
 
-  const NUM_PLACEHOLDER_INSTRUMENTS = 64;
+  interface MCKSample {
+    offset: number;
+    length: number;
+  }
+
+  const extractedSamples: MCKSample[] = [];
+  let subsongCount = 1;
+
+  try {
+    // Scan for LEA opcodes to find sample and song tables
+    let sampleTableAddr = 0;
+    let songTableAddr = 0;
+
+    for (let off = 0; off < buf.length - 4; off += 2) {
+      const opcode = u16BE(buf, off);
+
+      if (opcode === 0x41FA && off + 4 <= buf.length) {
+        // LEA d16(PC),A0 — often points to sample table
+        const disp = u16BE(buf, off + 2);
+        const signedDisp = disp < 0x8000 ? disp : disp - 0x10000;
+        const target = off + 2 + signedDisp;
+        if (target > 0 && target < buf.length && !sampleTableAddr) {
+          sampleTableAddr = target;
+        }
+      }
+
+      if (opcode === 0x43FA && off + 4 <= buf.length) {
+        // LEA d16(PC),A1 — often points to song table
+        const disp = u16BE(buf, off + 2);
+        const signedDisp = disp < 0x8000 ? disp : disp - 0x10000;
+        const target = off + 2 + signedDisp;
+        if (target > 0 && target < buf.length && !songTableAddr) {
+          songTableAddr = target;
+        }
+      }
+    }
+
+    // Extract samples from sample table (entries: u32 offset + u32 length)
+    if (sampleTableAddr > 0 && sampleTableAddr + 8 <= buf.length) {
+      let soff = sampleTableAddr;
+      for (let i = 0; i < 64 && soff + 8 <= buf.length; i++) {
+        const sampleOff = u32BE(buf, soff);
+        const sampleLen = u32BE(buf, soff + 4);
+        if (sampleLen === 0 || sampleLen > 0x100000) break;
+        if (sampleOff > buf.length) break;
+        extractedSamples.push({ offset: sampleOff, length: sampleLen });
+        soff += 8;
+      }
+    }
+
+    // Extract subsong count from song table (16 bytes per entry)
+    if (songTableAddr > 0 && songTableAddr + 16 <= buf.length) {
+      let count = 0;
+      let soff = songTableAddr;
+      for (let i = 0; i < 64 && soff + 16 <= buf.length; i++) {
+        // A song entry is valid if it has non-zero data in first 4 bytes
+        const marker = u32BE(buf, soff);
+        if (marker === 0) break;
+        count++;
+        soff += 16;
+      }
+      if (count > 0) subsongCount = count;
+    }
+  } catch {
+    // Binary scan failed — fall back to defaults
+  }
+
+  // ── Instruments ──────────────────────────────────────────────────────────
+
+  const sampleCount = extractedSamples.length > 0 ? extractedSamples.length : 64;
   const instruments: InstrumentConfig[] = [];
 
-  for (let i = 0; i < NUM_PLACEHOLDER_INSTRUMENTS; i++) {
+  for (let i = 0; i < sampleCount; i++) {
+    const smp = extractedSamples[i];
+    const name = smp
+      ? `Sample ${i + 1} (${smp.length} bytes)`
+      : `Sample ${i + 1}`;
     instruments.push({
       id: i + 1,
-      name: `Sample ${i + 1}`,
+      name,
       type: 'synth' as const,
       synthType: 'Synth' as const,
       effects: [],
@@ -325,6 +396,10 @@ export async function parseMarkCookseyFile(
       pan: 0,
     } as InstrumentConfig);
   }
+
+  // ── Song positions ──────────────────────────────────────────────────────
+
+  const songPositions = Array.from({ length: subsongCount }, (_, i) => i % 1);
 
   // ── Empty pattern (placeholder — UADE handles actual audio) ──────────────
 
@@ -360,17 +435,24 @@ export async function parseMarkCookseyFile(
       importedAt: new Date().toISOString(),
       originalChannelCount: 4,
       originalPatternCount: 1,
-      originalInstrumentCount: NUM_PLACEHOLDER_INSTRUMENTS,
+      originalInstrumentCount: sampleCount,
     },
   };
 
+  // ── Annotate name with extracted info ────────────────────────────────────
+
+  let displayName = `${moduleName} [Mark Cooksey ${variantLabel}]`;
+  if (subsongCount > 1) {
+    displayName += ` (${subsongCount} subsongs)`;
+  }
+
   return {
-    name: `${moduleName} [Mark Cooksey ${variantLabel}]`,
+    name: displayName,
     format: 'MOD' as TrackerFormat,
     patterns: [pattern],
     instruments,
-    songPositions: [0],
-    songLength: 1,
+    songPositions: songPositions.length > 0 ? songPositions : [0],
+    songLength: songPositions.length || 1,
     restartPosition: 0,
     numChannels: 4,
     initialSpeed: 6,
