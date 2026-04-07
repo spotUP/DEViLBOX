@@ -161,7 +161,10 @@ const defaultDeckState: DeckState = {
   pitchOffset: 0,
   effectiveBPM: 125,
   repitchLock: false,
-  keyLockEnabled: false,
+  // Key lock ON by default — pitch slider changes tempo without changing key,
+  // so BPM-matching never makes a track sound nasal/dopey or clash in pitch
+  // with the other deck. Toggleable per-deck via the Lock button.
+  keyLockEnabled: true,
   eqLow: 0,
   eqMid: 0,
   eqHigh: 0,
