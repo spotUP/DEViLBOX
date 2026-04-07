@@ -42,7 +42,7 @@ interface FCControlsProps {
   uadeChipRam?: UADEChipRamInfo;
 }
 
-type FCTab = 'envelope' | 'synth' | 'arpeggio';
+type FCTab = 'envelope' | 'synth' | 'arpeggio' | 'rawvol';
 
 // FC waveform names (0-46). Groups: 0-3 basic, 4-46 composite.
 const FC_WAVE_NAMES: Record<number, string> = {
@@ -329,7 +329,209 @@ export const FCControls: React.FC<FCControlsProps> = ({ config, onChange, uadeCh
     { id: 'envelope', label: 'Envelope' },
     { id: 'synth',    label: 'Synth Macro' },
     { id: 'arpeggio', label: 'Arpeggio' },
+    { id: 'rawvol',   label: 'Raw Vol Macro' },
   ];
+
+  // ── RAW VOL MACRO TAB ──────────────────────────────────────────────────
+  // Exposes the 59-byte vol envelope opcode stream (bytes 5..63 of the FC
+  // vol macro) as an editable hex grid, plus the `volMacroSpeed` knob (which
+  // aliases byte[0] of the vol macro — same register as `synthSpeed`).
+  //
+  // Opcode annotations match encodeFCVolEnvelope / Future Composer 1.3/1.4:
+  //   0xE0 <dest>          = LOOP → dest
+  //   0xE1                 = END
+  //   0xE8 <count>         = SUSTAIN <count>
+  //   0xEA <speed> <target>= SLIDE (volume slide opcode)
+  //   else (0..64)         = raw volume value
+  const [rawVolExpanded, setRawVolExpanded] = useState(false);
+
+  // Effective 59-byte stream: prefer stored raw bytes, else derive from ADSR.
+  const effectiveVolBytes = useMemo<number[]>(() => {
+    if (config.volMacroData && config.volMacroData.length > 0) {
+      const out = new Array(59).fill(0xE1);
+      for (let i = 0; i < Math.min(59, config.volMacroData.length); i++) {
+        out[i] = config.volMacroData[i] & 0xFF;
+      }
+      return out;
+    }
+    const encoded = encodeFCVolEnvelope(config);
+    const out = new Array(59).fill(0xE1);
+    for (let i = 0; i < Math.min(59, encoded.length); i++) out[i] = encoded[i];
+    return out;
+  }, [config]);
+
+  const annotateByte = useCallback((bytes: number[], i: number): string => {
+    const b = bytes[i];
+    if (b === 0xE1) return 'END';
+    if (b === 0xE0) {
+      const dest = bytes[i + 1];
+      return `LOOP→${dest ?? '?'}`;
+    }
+    if (b === 0xE8) {
+      const n = bytes[i + 1];
+      return `SUS ${n ?? '?'}`;
+    }
+    if (b === 0xEA) {
+      const s = bytes[i + 1];
+      const t = bytes[i + 2];
+      return `SLD ${s ?? '?'},${t ?? '?'}`;
+    }
+    // Check if previous byte was an opcode arg
+    if (i > 0) {
+      const prev = bytes[i - 1];
+      if (prev === 0xE0) return '(dest)';
+      if (prev === 0xE8) return '(count)';
+      if (prev === 0xEA) return '(speed)';
+    }
+    if (i > 1 && bytes[i - 2] === 0xEA) return '(target)';
+    if (b <= 64) return `vol ${b}`;
+    return `0x${b.toString(16).toUpperCase()}`;
+  }, []);
+
+  const updateRawVolByte = useCallback(
+    (index: number, newVal: number) => {
+      const clamped = newVal & 0xFF;
+      const current = configRef.current.volMacroData
+        ? [...configRef.current.volMacroData]
+        : [...effectiveVolBytes];
+      // Make sure it's 59 long
+      while (current.length < 59) current.push(0xE1);
+      current[index] = clamped;
+      onChange({ volMacroData: current });
+      if (uadeChipRam && UADEEngine.hasInstance()) {
+        void getEditor().writeU8(uadeChipRam.instrBase + 5 + index, clamped)
+          .catch((err) => console.warn('FC raw vol byte write failed:', err));
+      }
+    },
+    [effectiveVolBytes, onChange, uadeChipRam, getEditor],
+  );
+
+  const updateVolMacroSpeed = useCallback(
+    (value: number) => {
+      const clamped = Math.max(0, Math.min(15, Math.round(value)));
+      onChange({ volMacroSpeed: clamped });
+      if (uadeChipRam && UADEEngine.hasInstance()) {
+        // byte[0] of vol macro — shared with synthSpeed header slot
+        void getEditor().writeU8(uadeChipRam.instrBase + 0, clamped & 0xFF)
+          .catch((err) => console.warn('FC volMacroSpeed write failed:', err));
+      }
+    },
+    [onChange, uadeChipRam, getEditor],
+  );
+
+  const reencodeFromADSR = useCallback(() => {
+    const encoded = encodeFCVolEnvelope(configRef.current);
+    const out = new Array(59).fill(0xE1);
+    for (let i = 0; i < Math.min(59, encoded.length); i++) out[i] = encoded[i];
+    onChange({ volMacroData: out });
+    if (uadeChipRam && UADEEngine.hasInstance()) {
+      void getEditor().writeBlock(uadeChipRam.instrBase + 5, out)
+        .catch((err) => console.warn('FC re-encode chip RAM write failed:', err));
+    }
+  }, [onChange, uadeChipRam, getEditor]);
+
+  const renderRawVol = () => {
+    const currentSpeed = config.volMacroSpeed ?? config.synthSpeed ?? 0;
+    return (
+      <div className="flex flex-col gap-3 p-3 overflow-y-auto" style={{ maxHeight: 'calc(100vh - 280px)' }}>
+        <div className={`rounded-lg border p-3 ${panelBg}`} style={panelStyle}>
+          <SectionLabel color={accent} label="Vol Macro Speed" />
+          <div className="flex items-center gap-4">
+            <Knob
+              value={currentSpeed}
+              min={0}
+              max={15}
+              step={1}
+              onChange={(v) => updateVolMacroSpeed(v)}
+              label="Speed"
+              color={knob}
+              formatValue={(v) => Math.round(v).toString()}
+            />
+            <span className="text-[10px] text-text-muted">
+              Ticks per vol macro step (byte[0] of vol macro — aliases synthSpeed).
+            </span>
+          </div>
+        </div>
+
+        <div className={`rounded-lg border ${panelBg}`} style={panelStyle}>
+          <button
+            type="button"
+            onClick={() => setRawVolExpanded((v) => !v)}
+            className="w-full flex items-center justify-between px-3 py-2 text-left"
+          >
+            <SectionLabel color={accent} label={`Raw Vol Macro Bytes (59) ${rawVolExpanded ? '▾' : '▸'}`} />
+            <span className="text-[10px] text-text-muted">
+              {config.volMacroData ? 'custom' : 'derived from ADSR'}
+            </span>
+          </button>
+          {rawVolExpanded && (
+            <div className="px-3 pb-3">
+              <div className="flex items-center gap-2 mb-3">
+                <button
+                  type="button"
+                  onClick={reencodeFromADSR}
+                  className="text-[10px] px-2 py-1 rounded bg-yellow-900/40 text-yellow-400 hover:bg-yellow-900/60 transition-colors border border-yellow-900/60"
+                >
+                  Re-encode from ADSR
+                </button>
+                {config.volMacroData && (
+                  <button
+                    type="button"
+                    onClick={() => onChange({ volMacroData: undefined })}
+                    className="text-[10px] px-2 py-1 rounded bg-dark-bg text-text-secondary hover:text-accent-primary border border-dark-border"
+                  >
+                    Clear override (use ADSR)
+                  </button>
+                )}
+                <span className="text-[10px] text-text-muted ml-auto">
+                  0xE0=LOOP · 0xE1=END · 0xE8=SUS · 0xEA=SLD · 0..64=vol
+                </span>
+              </div>
+              <div
+                className="grid gap-1 font-mono text-[9px]"
+                style={{ gridTemplateColumns: 'repeat(12, minmax(0, 1fr))' }}
+              >
+                {effectiveVolBytes.map((b, i) => {
+                  const ann = annotateByte(effectiveVolBytes, i);
+                  const isOpcode = b >= 0xE0;
+                  return (
+                    <div
+                      key={i}
+                      className="flex flex-col items-center border rounded px-0.5 py-0.5"
+                      style={{
+                        borderColor: dim,
+                        background: isOpcode ? '#221100' : '#100d00',
+                      }}
+                      title={`byte[${i}] = 0x${b.toString(16).padStart(2, '0').toUpperCase()} (${b}) — ${ann}`}
+                    >
+                      <span className="text-[8px] text-text-muted">{i}</span>
+                      <input
+                        type="text"
+                        value={b.toString(16).padStart(2, '0').toUpperCase()}
+                        onChange={(e) => {
+                          const parsed = parseInt(e.target.value, 16);
+                          if (!isNaN(parsed)) updateRawVolByte(i, parsed);
+                        }}
+                        className="w-full text-center bg-transparent border-0 outline-none p-0"
+                        style={{ color: isOpcode ? '#ffaa44' : accent }}
+                        maxLength={2}
+                      />
+                      <span
+                        className="text-[8px] truncate w-full text-center"
+                        style={{ color: isOpcode ? '#ffaa44' : '#776633' }}
+                      >
+                        {ann}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  };
 
   // ── Sample browser pane ──────────────────────────────────────────────────
   // Future Composer waveforms come from a shared 47-entry table that lives
@@ -387,6 +589,7 @@ export const FCControls: React.FC<FCControlsProps> = ({ config, onChange, uadeCh
           {activeTab === 'envelope' && renderEnvelope()}
           {activeTab === 'synth'    && renderSynth()}
           {activeTab === 'arpeggio' && renderArpeggio()}
+          {activeTab === 'rawvol'   && renderRawVol()}
         </div>
         {showSamplePane && (
           <div className="w-[220px] flex-shrink-0 border-l border-dark-border bg-dark-bgSecondary overflow-y-auto">
