@@ -164,8 +164,52 @@ export type TickProcessCallback = (tick: number, row: number) => void;
  * Subsequent refactor phases will move in: hybrid note dispatch, mute/solo
  * masks, position tracking. See thoughts/shared/research/2026-04-07_tracker-replayer-audit.md.
  */
+/**
+ * Per-frame context the coordinator needs to dispatch a position update.
+ * Owned by TrackerReplayer (or whatever else drives playback) and read by
+ * dispatchEnginePosition() each call.
+ */
+export interface PlaybackContext {
+  /** songPositions[] from the active TrackerSong, indexed by song order. */
+  songPositions: number[];
+  /** Current beats-per-minute. Used to compute the row duration hint. */
+  bpm: number;
+  /** Current ticks-per-row. */
+  speed: number;
+  /**
+   * Optional hook to fire ToneEngine notes for replaced instruments on the
+   * current row. Called from dispatchEnginePosition() when the dispatching
+   * engine wants hybrid playback. Signature: (audioTime) => void.
+   */
+  fireHybridNotes: ((time: number) => void) | null;
+  /**
+   * Audio context, used to read outputLatency for latency-compensated visuals.
+   * If null, no latency compensation is applied.
+   */
+  audioContext: AudioContext | null;
+}
+
 export class PlaybackCoordinator {
   readonly stateRing = new DisplayStateRing();
+
+  // ── Position state ───────────────────────────────────────────────────────
+  // Mirrored from TrackerReplayer via setters so the coordinator can dispatch
+  // engine position updates without calling back into the replayer.
+  songPos = 0;
+  pattPos = 0;
+
+  /**
+   * Per-frame playback context. The replayer sets this once per play() and
+   * mutates `bpm`/`speed` as the song progresses. dispatchEnginePosition()
+   * reads from it on every position update.
+   */
+  context: PlaybackContext = {
+    songPositions: [],
+    bpm: 125,
+    speed: 6,
+    fireHybridNotes: null,
+    audioContext: null,
+  };
 
   // ── UI position callbacks ────────────────────────────────────────────────
   onRowChange: RowChangeCallback | null = null;
@@ -179,6 +223,55 @@ export class PlaybackCoordinator {
     this.onChannelRowChange = null;
     this.onSongEnd = null;
     this.onTickProcess = null;
+  }
+
+  /**
+   * Canonical position-update dispatch shared by every WASM engine subscription
+   * (Hively, MusicLine, libopenmpt, UADE, TFMX, ...). Each engine has its own
+   * throttling + per-format math; once it has computed `(row, position)` it
+   * calls into here to update song position state, queue a display state for
+   * smooth UI scrolling, fire onRowChange, and fire hybrid notes.
+   *
+   * Returns silently if the ring isn't playing — the engine kept ticking past
+   * a stop, but we don't want to update visuals or fire notes.
+   *
+   * @param row        Row within the current pattern
+   * @param position   Index into context.songPositions
+   * @param audioTime  Optional audio-context timestamp; if omitted, the caller's
+   *                   `now` (passed in) is used. When provided, output latency
+   *                   is added to keep visuals in sync with audio.
+   * @param now        Current Web Audio time (caller passes Tone.now() — we keep
+   *                   the coordinator free of Tone.js dependency).
+   * @param fireHybrid Whether to fire hybrid notes via context.fireHybridNotes.
+   *                   Default true. TFMX opts out because its sister UADE
+   *                   subscription already handles hybrid playback.
+   */
+  dispatchEnginePosition(
+    row: number,
+    position: number,
+    audioTime: number | undefined,
+    now: number,
+    fireHybrid: boolean = true,
+  ): void {
+    if (!this.stateRing.playing) return;
+    const ctx = this.context;
+    this.songPos = position;
+    this.pattPos = row;
+    const patternNum = ctx.songPositions[position] ?? 0;
+    let time: number;
+    if (audioTime != null && ctx.audioContext) {
+      const latency = ctx.audioContext.outputLatency ?? ctx.audioContext.baseLatency ?? 0;
+      time = audioTime + latency;
+    } else {
+      time = now;
+    }
+    this.stateRing.queue(time, row, patternNum, position, 0, (2.5 / ctx.bpm) * ctx.speed);
+    if (this.onRowChange) {
+      this.onRowChange(row, patternNum, position);
+    }
+    if (fireHybrid && ctx.fireHybridNotes) {
+      ctx.fireHybridNotes(time);
+    }
   }
 
   // ── Display state ring pass-throughs ─────────────────────────────────────
