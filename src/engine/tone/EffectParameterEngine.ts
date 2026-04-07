@@ -195,12 +195,11 @@ export function applyEffectParametersDiff(
 
     case 'BiPhase':
       if (node instanceof BiPhaseEffect) {
-        const biPhase = node as unknown as { rateA: number; depthA: number; rateB: number; depthB: number; feedback: number };
-        if ('rateA' in changed) biPhase.rateA = Number(changed.rateA);
-        if ('depthA' in changed) biPhase.depthA = Number(changed.depthA);
-        if ('rateB' in changed) biPhase.rateB = Number(changed.rateB);
-        if ('depthB' in changed) biPhase.depthB = Number(changed.depthB);
-        if ('feedback' in changed) biPhase.feedback = Number(changed.feedback);
+        if ('rateA' in changed) node.setRateA(Number(changed.rateA));
+        if ('depthA' in changed) node.setDepthA(Number(changed.depthA));
+        if ('rateB' in changed) node.setRateB(Number(changed.rateB));
+        if ('depthB' in changed) node.setDepthB(Number(changed.depthB));
+        if ('feedback' in changed) node.setFeedback(Number(changed.feedback));
       }
       break;
 
@@ -441,7 +440,7 @@ export function applyBpmSyncedParam(
         break;
       case 'BiPhase':
         if (paramKey === 'rateA' && node instanceof BiPhaseEffect) {
-          (node as unknown as { rateA: number }).rateA = value;
+          node.setRateA(value);
         }
         break;
     }
