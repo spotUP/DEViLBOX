@@ -65,7 +65,7 @@ interface SidMonControlsProps {
   uadeChipRam?: UADEChipRamInfo;
 }
 
-type SMTab = 'main' | 'filter' | 'arpeggio';
+type SMTab = 'main' | 'filter' | 'arpeggio' | 'pcm';
 
 // SID waveforms with visual shape hints
 const WAVEFORMS: { name: string; type: 'triangle' | 'saw' | 'square' | 'noise' }[] = [
@@ -309,10 +309,176 @@ export const SidMonControls: React.FC<SidMonControlsProps> = ({
     </div>
   );
 
+  // -- PCM TAB ---
+  const pcmCanvasRef = useRef<HTMLCanvasElement | null>(null);
+  const pcmLen = config.pcmData ? config.pcmData.length : 0;
+
+  useEffect(() => {
+    if (activeTab !== 'pcm') return;
+    const canvas = pcmCanvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    const W = canvas.width;
+    const H = canvas.height;
+    ctx.fillStyle = '#0a0012';
+    ctx.fillRect(0, 0, W, H);
+
+    // Center line
+    ctx.strokeStyle = dim;
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(0, H / 2);
+    ctx.lineTo(W, H / 2);
+    ctx.stroke();
+
+    const data = config.pcmData;
+    if (!data || data.length === 0) {
+      ctx.fillStyle = '#555';
+      ctx.font = '11px monospace';
+      ctx.fillText('(no PCM data)', 8, H / 2 - 6);
+      return;
+    }
+
+    // Waveform — treat bytes as signed 8-bit
+    ctx.strokeStyle = accent;
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    const step = Math.max(1, Math.floor(data.length / W));
+    for (let x = 0; x < W; x++) {
+      const i = Math.min(data.length - 1, x * step);
+      const b = data[i];
+      const s = b > 127 ? b - 256 : b;
+      const y = H / 2 - (s / 128) * (H / 2 - 2);
+      if (x === 0) ctx.moveTo(x, y);
+      else ctx.lineTo(x, y);
+    }
+    ctx.stroke();
+
+    // Loop region overlay
+    const ls = config.loopStart ?? 0;
+    const ll = config.loopLength ?? 0;
+    if (ll > 0 && ls >= 0 && ls < data.length) {
+      const x1 = Math.floor((ls / data.length) * W);
+      const x2 = Math.floor(((ls + ll) / data.length) * W);
+      ctx.fillStyle = accent + '22';
+      ctx.fillRect(x1, 0, Math.max(1, x2 - x1), H);
+      ctx.strokeStyle = accent;
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(x1 + 0.5, 0);
+      ctx.lineTo(x1 + 0.5, H);
+      ctx.moveTo(x2 + 0.5, 0);
+      ctx.lineTo(x2 + 0.5, H);
+      ctx.stroke();
+    }
+  }, [activeTab, config.pcmData, config.loopStart, config.loopLength, accent, dim]);
+
+  const renderPcm = () => (
+    <div className="flex flex-col gap-3 p-3 overflow-y-auto" style={{ maxHeight: 'calc(100vh - 280px)' }}>
+      <div className={`rounded-lg border p-3 ${panelBg}`} style={panelStyle}>
+        <SectionLabel color={accent} label="PCM Sample (read-only preview)" />
+        <canvas
+          ref={pcmCanvasRef}
+          width={480}
+          height={96}
+          className="w-full rounded"
+          style={{ background: '#0a0012', border: `1px solid ${dim}`, imageRendering: 'pixelated' }}
+        />
+        <div className="mt-2 text-[10px] font-mono" style={{ color: '#888' }}>
+          {pcmLen > 0
+            ? `${pcmLen.toLocaleString()} bytes (${(pcmLen / 1024).toFixed(2)} KB)`
+            : 'No PCM data loaded'}
+        </div>
+      </div>
+
+      <div className={`rounded-lg border p-3 ${panelBg}`} style={panelStyle}>
+        <SectionLabel color={accent} label="Loop Points" />
+        <div className="grid grid-cols-2 gap-3">
+          <label className="flex flex-col gap-1">
+            <span className="text-[10px] font-mono uppercase tracking-wider" style={{ color: accent }}>
+              Loop Start
+            </span>
+            <input
+              type="number"
+              min={0}
+              max={Math.max(0, pcmLen)}
+              step={1}
+              value={config.loopStart ?? 0}
+              onChange={(e) => {
+                const raw = parseInt(e.target.value, 10);
+                const v = Number.isFinite(raw) ? Math.max(0, Math.min(pcmLen, raw)) : 0;
+                upd('loopStart', v);
+              }}
+              className="px-2 py-1 text-xs font-mono rounded"
+              style={{
+                background: '#0a0012',
+                color: accent,
+                border: `1px solid ${dim}`,
+              }}
+            />
+            <span className="text-[9px] font-mono" style={{ color: '#666' }}>
+              0 .. {pcmLen}
+            </span>
+          </label>
+          <label className="flex flex-col gap-1">
+            <span className="text-[10px] font-mono uppercase tracking-wider" style={{ color: accent }}>
+              Loop Length
+            </span>
+            <input
+              type="number"
+              min={0}
+              max={Math.max(0, pcmLen)}
+              step={1}
+              value={config.loopLength ?? 0}
+              onChange={(e) => {
+                const raw = parseInt(e.target.value, 10);
+                const v = Number.isFinite(raw) ? Math.max(0, Math.min(pcmLen, raw)) : 0;
+                upd('loopLength', v);
+              }}
+              className="px-2 py-1 text-xs font-mono rounded"
+              style={{
+                background: '#0a0012',
+                color: accent,
+                border: `1px solid ${dim}`,
+              }}
+            />
+            <span className="text-[9px] font-mono" style={{ color: '#666' }}>
+              0 .. {pcmLen} (0 = no loop)
+            </span>
+          </label>
+        </div>
+      </div>
+
+      <div className={`rounded-lg border p-3 ${panelBg}`} style={panelStyle}>
+        <SectionLabel color={accent} label="Finetune" />
+        <div className="flex items-center gap-4">
+          <Knob
+            value={config.finetune ?? 0}
+            min={-8}
+            max={7}
+            step={1}
+            onChange={(v) => upd('finetune', Math.round(v))}
+            label="Finetune"
+            color={knob}
+            formatValue={(v) => {
+              const n = Math.round(v);
+              return n > 0 ? `+${n}` : n.toString();
+            }}
+          />
+          <div className="text-[10px] font-mono" style={{ color: '#888' }}>
+            -8 .. +7 (signed nibble)
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+
   const TABS: { id: SMTab; label: string }[] = [
     { id: 'main',     label: 'Main' },
     { id: 'filter',   label: 'Filter' },
     { id: 'arpeggio', label: 'Arpeggio' },
+    ...(config.type === 'pcm' ? [{ id: 'pcm' as SMTab, label: 'PCM Sample' }] : []),
   ];
 
   return (
@@ -350,6 +516,7 @@ export const SidMonControls: React.FC<SidMonControlsProps> = ({
       {activeTab === 'main'     && renderMain()}
       {activeTab === 'filter'   && renderFilter()}
       {activeTab === 'arpeggio' && renderArpeggio()}
+      {activeTab === 'pcm'      && renderPcm()}
     </div>
   );
 };
