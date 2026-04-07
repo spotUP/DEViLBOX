@@ -40,6 +40,7 @@ class UADEProcessor extends AudioWorkletProcessor {
     this._outR = null;
     this._outFrames = 256;    // Larger than 128 to handle render calls > quantum size
     this._needsReload = false; // Set after stop so next play() reloads from _lastData
+    this._lastLoadFailed = false; // Set when _uade_wasm_load returns non-zero; forces reinit on next load
 
     // Live tick capture: drain tick snapshots during playback for pattern reconstruction
     this._liveTickCapture = false;     // Enabled via 'enableLiveTickCapture' message
@@ -61,11 +62,12 @@ class UADEProcessor extends AudioWorkletProcessor {
 
       case 'reinit':
         // Preemptive reinit — called from import dialog to avoid delay during playback
-        if (this._hasRendered && this._wasmBinary) {
+        if ((this._hasRendered || this._lastLoadFailed) && this._wasmBinary) {
           console.log('[UADE.worklet] Preemptive reinit requested');
           this._wasm = null;
           this._ready = false;
           this._hasRendered = false;
+          this._lastLoadFailed = false;
           await this._init(this._sampleRate, this._wasmBinary, null);
         }
         break;
@@ -699,14 +701,17 @@ class UADEProcessor extends AudioWorkletProcessor {
       // Keep a copy so _scanSubsong() can reload without transferring back from main thread
       this._lastData = data;
       this._lastHint = filenameHint;
-      // Reinit WASM only if the engine has rendered audio (played a song).
-      // Scan-only loads don't corrupt the engine badly enough to need reinit.
-      if (this._hasRendered && this._wasmBinary) {
+      // Reinit WASM if the engine has rendered audio (played a song) or if the
+      // previous load failed (UADE's internal protocol state machine gets stuck
+      // after "score died" / "module check failed" errors — subsequent loads fail
+      // with "receiving in S state is forbidden" unless we fully reinit).
+      if ((this._hasRendered || this._lastLoadFailed) && this._wasmBinary) {
         console.log('[UADE.worklet] Reinitializing WASM for clean load...');
         try {
           this._wasm = null;
           this._ready = false;
           this._hasRendered = false;
+          this._lastLoadFailed = false;
           await this._init(this._sampleRate, this._wasmBinary, null);
           if (!this._wasm || !this._ready) {
             this.port.postMessage({ type: 'error', message: 'WASM reinit failed' });
@@ -725,6 +730,7 @@ class UADEProcessor extends AudioWorkletProcessor {
       console.log('[UADE.worklet] _uade_wasm_load returned: ' + ret);
 
       if (ret !== 0) {
+        this._lastLoadFailed = true;
         const abortInfo = this._lastAbortReason ? ' (abort: ' + this._lastAbortReason + ')' : '';
         console.error('[UADE.worklet] _uade_wasm_load failed with ret=' + ret + abortInfo);
         this.port.postMessage({
