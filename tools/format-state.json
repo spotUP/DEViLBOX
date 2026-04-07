@@ -4562,411 +4562,1971 @@
     "notes": ""
   },
   "midi": {
-    "status": "broken",
-    "notes": "some files dont import, some have wrong note data"
+    "status": "works",
+    "notes": ""
   },
   "titanicsPacker": {
     "status": "works",
     "notes": ""
   },
   "uade-activision-pro": {
-    "auditStatus": "fixed",
-    "notes": "Activision Pro — editable (layout+encoder)"
+    "auditStatus": "unknown",
+    "notes": "No Modland files for \"Activision Pro\""
   },
   "uade-amf": {
-    "auditStatus": "fixed",
-    "notes": "AMF — editable (layout+encoder)"
+    "auditStatus": "unknown",
+    "notes": "reset for openmpt refactor audit"
   },
   "uade-art-of-noise": {
     "auditStatus": "fixed",
-    "notes": "Art of Noise — editable (layout+encoder)"
+    "notes": "PASS 10/10 ch=4 pat=1 inst=4[Sampler,Synth] rms=0.2160 exp=4352b [10/10]",
+    "data": {
+      "auditStatus": "fixed",
+      "notes": "10-point PASS [10/10]"
+    }
   },
   "uade-chuck-biscuits": {
     "auditStatus": "fixed",
-    "notes": "Chuck Biscuits — editable (layout+encoder)"
+    "notes": "PASS rms=0.2378, file=diversion.mod"
   },
   "uade-composer-669": {
     "auditStatus": "fixed",
-    "notes": "Composer 669 — editable (layout+encoder)"
+    "notes": "PASS rms=0.1974, file=669 bliss.669"
   },
   "uade-david-whittaker": {
-    "auditStatus": "fixed",
-    "notes": "David Whittaker — editable (layout+encoder)"
+    "auditStatus": "fail",
+    "notes": "FAIL 8/10: silent (rms=0.000446) | export failed: No native exporter available. editorMode=\"classic\" hasUadeFileData=false uadeFil",
+    "data": {
+      "auditStatus": "fail",
+      "notes": "8/10 silent + no export"
+    }
   },
   "uade-delta-music-1": {
     "auditStatus": "fixed",
-    "notes": "Delta Music 1.x — editable (layout+encoder)"
+    "notes": "PASS 10/10 ch=4 pat=24 inst=20[Synth,DeltaMusic1Synth,Sampler] rms=0.1381 exp=18958b [10/10]",
+    "data": {
+      "auditStatus": "fixed",
+      "notes": "10-point PASS [10/10]"
+    }
   },
   "uade-delta-music-2": {
     "auditStatus": "fixed",
-    "notes": "Delta Music 2.0 — editable (layout+encoder)"
+    "notes": "PASS 10/10 ch=4 pat=72 inst=11[DeltaMusic2Synth,Sampler] rms=0.2679 exp=32432b [10/10]",
+    "data": {
+      "auditStatus": "fixed",
+      "notes": "10-point PASS [10/10]"
+    }
   },
   "uade-digibooster": {
-    "auditStatus": "fixed",
-    "notes": "DigiBooster — editable (layout+encoder)"
+    "auditStatus": "fail",
+    "notes": "FAIL 9/10: silent (rms=0.000072)",
+    "data": {
+      "auditStatus": "fail",
+      "notes": "9/10 silent only (NoneSynth fixed, now Sampler)"
+    }
   },
   "uade-digital-mugician": {
     "auditStatus": "fixed",
-    "notes": "Digital Mugician — editable (layout+encoder)"
+    "notes": "PASS 10/10 ch=4 pat=31 inst=27[DigMugSynth] rms=0.0632 exp=107216b [10/10]",
+    "data": {
+      "auditStatus": "fixed",
+      "notes": "10-point PASS [10/10]"
+    }
   },
   "uade-digital-sound-studio": {
     "auditStatus": "fixed",
-    "notes": "Digital Sound Studio — editable (layout+encoder)"
+    "notes": "PASS 10/10 ch=4 pat=9 inst=31[Sampler,Synth] rms=0.0055 exp=284838b [10/10]",
+    "data": {
+      "auditStatus": "fixed",
+      "notes": "10-point PASS [10/10]"
+    }
   },
   "uade-dsm": {
-    "auditStatus": "fixed",
-    "notes": "DSM — editable (layout+encoder)"
+    "auditStatus": "unknown",
+    "notes": "reset for openmpt refactor audit"
   },
   "uade-dtm": {
-    "auditStatus": "fixed",
-    "notes": "DTM — editable (layout+encoder)"
+    "auditStatus": "fail",
+    "notes": "Crash: No browser connected. Open DEViLBOX in a browser.",
+    "data": {
+      "auditStatus": "fail",
+      "notes": "9/10 export only (openmpt)"
+    }
   },
   "uade-ear-ache": {
-    "auditStatus": "fixed",
-    "notes": "Ear Ache — editable (layout+encoder)"
+    "auditStatus": "fail",
+    "notes": "Crash: timeout:get_audio_level",
+    "data": {
+      "auditStatus": "fail",
+      "notes": "9/10 noteDensity only (pat=1 streaming)"
+    }
   },
   "uade-far": {
-    "auditStatus": "fixed",
-    "notes": "FAR — editable (layout+encoder)"
+    "auditStatus": "fail",
+    "notes": "Crash: No browser connected. Open DEViLBOX in a browser.",
+    "data": {
+      "auditStatus": "fail",
+      "notes": "9/10 export only (openmpt)"
+    }
   },
   "uade-future-composer": {
-    "auditStatus": "fixed",
-    "notes": "Future Composer — editable (layout+encoder)"
+    "auditStatus": "fail",
+    "notes": "Crash: timeout:clear_console_errors",
+    "data": {
+      "auditStatus": "fixed",
+      "notes": "10-point PASS [10/10]"
+    }
   },
   "uade-format-669": {
-    "auditStatus": "fixed",
-    "notes": "Format 669 — editable (layout+encoder)"
+    "auditStatus": "fail",
+    "notes": "Crash: No browser connected. Open DEViLBOX in a browser.",
+    "data": {
+      "auditStatus": "fail",
+      "notes": "9/10 export only (openmpt)"
+    }
   },
   "uade-game-music-creator": {
-    "auditStatus": "fixed",
-    "notes": "Game Music Creator — editable (layout+encoder)"
+    "auditStatus": "unknown",
+    "notes": "No Modland files for \"Game Music Creator\""
   },
   "uade-gmc": {
-    "auditStatus": "fixed",
-    "notes": "GMC — editable (layout+encoder)"
+    "auditStatus": "unknown",
+    "notes": "reset for openmpt refactor audit"
   },
   "uade-graoumf-tracker": {
     "auditStatus": "fixed",
-    "notes": "Graoumf Tracker 2 — editable (layout+encoder)"
+    "notes": "rms=0.0016, file=demo2.gtk, warnings: [UADEEngine] UADE could not play: demo2.gtk (ret=-1); [NativeEngineRouting] Failed to start UADEEditable: Error: UADE could not play: "
   },
   "uade-hively": {
     "auditStatus": "fixed",
-    "notes": "HivelyTracker/AHX — editable (layout+encoder)"
+    "notes": "PASS 10/10 ch=16 pat=45 inst=36[HivelySynth] rms=0.0802 exp=39277b [10/10]",
+    "data": {
+      "auditStatus": "fixed",
+      "notes": "10-point PASS [10/10]"
+    }
   },
   "uade-ice-tracker": {
-    "auditStatus": "fixed",
-    "notes": "Ice Tracker — editable (layout+encoder)"
+    "auditStatus": "unknown",
+    "notes": "reset for openmpt refactor audit"
   },
   "uade-ims": {
-    "auditStatus": "fixed",
-    "notes": "Images Music System — editable (layout+encoder)"
+    "auditStatus": "fail",
+    "notes": "Crash: No browser connected. Open DEViLBOX in a browser.",
+    "data": {
+      "auditStatus": "fail",
+      "notes": "9/10 export only (openmpt classic mode)"
+    }
   },
   "uade-instereo-1": {
     "auditStatus": "fixed",
-    "notes": "InStereo 1.x — editable (layout+encoder)"
+    "notes": "PASS 10/10 ch=4 pat=204 inst=18[Sampler,InStereo1Synth,Synth] rms=0.0698 exp=117928b [10/10]",
+    "data": {
+      "auditStatus": "fixed",
+      "notes": "10-point PASS [10/10]"
+    }
   },
   "uade-instereo-2": {
     "auditStatus": "fixed",
-    "notes": "InStereo 2.x — editable (layout+encoder)"
+    "notes": "PASS 10/10 ch=4 pat=82 inst=9[InStereo2Synth] rms=0.1336 exp=31452b [10/10]",
+    "data": {
+      "auditStatus": "fixed",
+      "notes": "10-point PASS [10/10]"
+    }
   },
   "uade-jamcracker": {
-    "auditStatus": "fixed",
-    "notes": "JamCracker — editable (layout+encoder)"
+    "auditStatus": "fail",
+    "notes": "Crash: timeout:clear_console_errors",
+    "data": {
+      "auditStatus": "fixed",
+      "notes": "10-point PASS [10/10]"
+    }
   },
   "uade-klystrack": {
-    "auditStatus": "fixed",
-    "notes": "Klystrack — editable (layout+encoder)"
+    "auditStatus": "unknown",
+    "notes": "reset for openmpt refactor audit"
   },
   "uade-kris": {
-    "auditStatus": "fixed",
-    "notes": "KRIS — editable (layout+encoder)"
+    "auditStatus": "unknown",
+    "notes": "reset for openmpt refactor audit"
   },
   "uade-madtracker2": {
-    "auditStatus": "fixed",
-    "notes": "Mad Tracker 2 — editable (layout+encoder)"
+    "auditStatus": "unknown",
+    "notes": "reset for openmpt refactor audit"
   },
   "uade-octamed": {
-    "auditStatus": "fixed",
-    "notes": "OctaMED — editable (layout+encoder)"
+    "auditStatus": "fail",
+    "notes": "Crash: timeout:clear_console_errors",
+    "data": {
+      "auditStatus": "fixed",
+      "notes": "10-point PASS [10/10]"
+    }
   },
   "uade-mfp": {
-    "auditStatus": "fixed",
-    "notes": "MFP — editable (layout+encoder)"
+    "auditStatus": "silent",
+    "notes": "Silent: rms=0.000199, file=mfp.crystaldragon ingame, errors: [UADEEngine] UADE could not play: mfp.crystaldragon ingame (ret=-1); [NativeEngineRouting] Failed to start UADEEditable: Error: UADE could not play: "
   },
   "uade-protracker-mod": {
-    "auditStatus": "fixed",
-    "notes": "ProTracker MOD — editable (layout+encoder)"
+    "auditStatus": "fail",
+    "notes": "Crash: timeout:clear_console_errors",
+    "data": {
+      "auditStatus": "fail",
+      "notes": "9/10 export only (openmpt classic mode)"
+    }
   },
   "uade-mtm": {
-    "auditStatus": "fixed",
-    "notes": "MultiTracker — editable (layout+encoder)"
+    "auditStatus": "fail",
+    "notes": "Crash: No browser connected. Open DEViLBOX in a browser.",
+    "data": {
+      "auditStatus": "fail",
+      "notes": "9/10 export only (openmpt)"
+    }
   },
   "uade-nru": {
     "auditStatus": "fixed",
-    "notes": "NRU — editable (layout+encoder)"
+    "notes": "PASS rms=0.1017, file=nru suger bat.xm"
   },
   "uade-oktalyzer": {
-    "auditStatus": "fixed",
-    "notes": "Oktalyzer — editable (layout+encoder)"
+    "auditStatus": "fail",
+    "notes": "Crash: timeout:clear_console_errors",
+    "data": {
+      "auditStatus": "fixed",
+      "notes": "10-point PASS [10/10]"
+    }
   },
   "uade-plm": {
-    "auditStatus": "fixed",
-    "notes": "PLM — editable (layout+encoder)"
+    "auditStatus": "unknown",
+    "notes": "reset for openmpt refactor audit"
   },
   "uade-pt36": {
-    "auditStatus": "fixed",
-    "notes": "ProTracker 3.x — editable (layout+encoder)"
+    "auditStatus": "unknown",
+    "notes": "reset for openmpt refactor audit"
   },
   "uade-quadra-composer": {
     "auditStatus": "fixed",
-    "notes": "Quadra Composer — editable (layout+encoder)"
+    "notes": "PASS 10/10 ch=4 pat=8 inst=57[Sampler] rms=0.0448 exp=45896b [10/10]",
+    "data": {
+      "auditStatus": "fixed",
+      "notes": "10-point PASS [10/10]"
+    }
   },
   "uade-rob-hubbard": {
-    "auditStatus": "fixed",
-    "notes": "Rob Hubbard — editable (layout+encoder)"
+    "auditStatus": "fail",
+    "notes": "FAIL 9/10: first 1 patterns have no notes",
+    "data": {
+      "auditStatus": "fail",
+      "notes": "9/10 noteDensity only (pat=1 streaming)"
+    }
   },
   "uade-ron-klaren": {
-    "auditStatus": "fixed",
-    "notes": "Ron Klaren — editable (layout+encoder)"
+    "auditStatus": "fail",
+    "notes": "FAIL 8/10: silent (rms=0.000000) | export failed: No native exporter available. editorMode=\"classic\" hasUadeFileData=false uadeFil",
+    "data": {
+      "auditStatus": "fail",
+      "notes": "8/10 silent + no export"
+    }
   },
   "uade-scumm": {
-    "auditStatus": "fixed",
-    "notes": "SCUMM Music — editable (layout+encoder)"
+    "auditStatus": "fail",
+    "notes": "FAIL 8/10: first 1 patterns have no notes | silent (rms=0.000000)",
+    "data": {
+      "auditStatus": "fail",
+      "notes": "8/10 silent + no notes (was passing, intermittent)"
+    }
   },
   "uade-sean-connolly": {
-    "auditStatus": "fixed",
-    "notes": "Sean Connolly — editable (layout+encoder)"
+    "auditStatus": "fail",
+    "notes": "FAIL 8/10: first 1 patterns have no notes | silent (rms=0.000000)",
+    "data": {
+      "auditStatus": "fail",
+      "notes": "8/10 silent + no notes (was passing, intermittent)"
+    }
   },
   "uade-sidmon": {
-    "auditStatus": "fixed",
-    "notes": "SidMon 1.x — editable (layout+encoder)"
+    "auditStatus": "fail",
+    "notes": "Crash: No browser connected. Open DEViLBOX in a browser.",
+    "data": {
+      "auditStatus": "fail",
+      "notes": "8/10 silent + SidMon1Replayer worklet error (WASM built but browser cached old)"
+    }
   },
   "uade-sonic-arranger": {
     "auditStatus": "fixed",
-    "notes": "Sonic Arranger — editable (layout+encoder)"
+    "notes": "PASS 10/10 ch=4 pat=213 inst=14[Sampler,SonicArrangerSynth] rms=0.0777 exp=80490b [10/10]",
+    "data": {
+      "auditStatus": "fixed",
+      "notes": "10-point PASS [10/10]"
+    }
   },
   "uade-sound-control": {
     "auditStatus": "fixed",
-    "notes": "Sound Control — editable (layout+encoder)"
+    "notes": "PASS rms=0.1343, file=controlled sound.it"
   },
   "uade-soundfx": {
-    "auditStatus": "fixed",
-    "notes": "Sound FX — editable (layout+encoder)"
+    "auditStatus": "fail",
+    "notes": "FAIL 9/10: export failed: No native exporter available. editorMode=\"classic\" hasUadeFileData=false uadeFil",
+    "data": {
+      "auditStatus": "fail",
+      "notes": "9/10 export only (openmpt classic mode)"
+    }
   },
   "uade-sound-factory": {
     "auditStatus": "fixed",
-    "notes": "Sound Factory — editable (layout+encoder)"
+    "notes": "PASS rms=0.1945, file=sound factory.it"
   },
   "uade-soundmon": {
-    "auditStatus": "fixed",
-    "notes": "Sound Monitor — editable (layout+encoder)"
+    "auditStatus": "fail",
+    "notes": "Crash: timeout:clear_console_errors",
+    "data": {
+      "auditStatus": "fail",
+      "notes": "9/10 player pool errors (fixed in dedup but errors from earlier loads)"
+    }
   },
   "uade-stk": {
-    "auditStatus": "fixed",
-    "notes": "SonicTracker — editable (layout+encoder)"
+    "auditStatus": "fail",
+    "notes": "FAIL 9/10: export failed: No native exporter available. editorMode=\"classic\" hasUadeFileData=false uadeFil",
+    "data": {
+      "auditStatus": "fail",
+      "notes": "9/10 export only (openmpt)"
+    }
   },
   "uade-stm": {
-    "auditStatus": "fixed",
-    "notes": "STM — editable (layout+encoder)"
+    "auditStatus": "fail",
+    "notes": "Crash: No browser connected. Open DEViLBOX in a browser.",
+    "data": {
+      "auditStatus": "fail",
+      "notes": "9/10 export only (openmpt)"
+    }
   },
   "uade-stp": {
     "auditStatus": "fixed",
-    "notes": "STP — editable (layout+encoder)"
+    "notes": "PASS 10/10 ch=4 pat=19 inst=21[Sampler] rms=0.1643 exp=278274b [10/10]",
+    "data": {
+      "auditStatus": "fixed",
+      "notes": "10-point PASS [10/10]"
+    }
   },
   "uade-synthesis": {
-    "auditStatus": "fixed",
-    "notes": "Synthesis — editable (layout+encoder)"
+    "auditStatus": "fail",
+    "notes": "Crash: No browser connected. Open DEViLBOX in a browser.",
+    "data": {
+      "auditStatus": "fail",
+      "notes": "9/10 noteDensity only (pat=1 streaming)"
+    }
   },
   "uade-symphonie-pro": {
-    "auditStatus": "fixed",
-    "notes": "Symphonie Pro — editable (layout+encoder)"
+    "auditStatus": "fail",
+    "notes": "Crash: 404"
   },
   "uade-tcb-tracker": {
-    "auditStatus": "fixed",
-    "notes": "TCB Tracker — editable (layout+encoder)"
+    "auditStatus": "fail",
+    "notes": "FAIL 9/10: silent (rms=0.000000)",
+    "data": {
+      "auditStatus": "fail",
+      "notes": "9/10 silent only"
+    }
   },
   "uade-tfmx": {
     "auditStatus": "fixed",
-    "notes": "TFMX — editable (layout+encoder)"
+    "notes": "PASS 10/10 ch=8 pat=1 inst=128[TFMXSynth] rms=0.1088 exp=9712b [10/10]",
+    "data": {
+      "auditStatus": "fixed",
+      "notes": "10-point PASS [10/10]"
+    }
   },
   "uade-unic": {
-    "auditStatus": "fixed",
-    "notes": "UNIC — editable (layout+encoder)"
+    "auditStatus": "unknown",
+    "notes": "No Modland files for \"UNIC Tracker\""
   },
   "uade-xmf": {
-    "auditStatus": "fixed",
-    "notes": "XMF — editable (layout+encoder)"
+    "auditStatus": "unknown",
+    "notes": "reset for openmpt refactor audit"
   },
   "uade-zound-monitor": {
-    "auditStatus": "fixed",
-    "notes": "Zound Monitor — editable (layout+encoder)"
+    "auditStatus": "unknown",
+    "notes": "reset for openmpt refactor audit"
   },
   "uade-dave-lowe": {
     "auditStatus": "fail",
-    "notes": "Dave Lowe — stub only (UADE playback, no editing)"
+    "notes": "FAIL 9/10: silent (rms=0.000000)",
+    "data": {
+      "auditStatus": "fixed",
+      "notes": "10-point PASS [10/10] (intermittent silence in some runs)"
+    }
   },
   "uade-dave-lowe-new": {
     "auditStatus": "fail",
-    "notes": "Dave Lowe New — stub only (UADE playback, no editing)"
+    "notes": "FAIL 8/10: silent (rms=0.000000) | export failed: No native exporter available. editorMode=\"classic\" hasUadeFileData=false uadeFil",
+    "data": {
+      "auditStatus": "fail",
+      "notes": "8/10 silent + no export"
+    }
   },
   "uade-ben-daglish": {
     "auditStatus": "fail",
-    "notes": "Ben Daglish — stub only (UADE playback, no editing)"
+    "notes": "FAIL 9/10: first 1 patterns have no notes",
+    "data": {
+      "auditStatus": "fail",
+      "notes": "9/10 noteDensity only (pat=1 streaming)"
+    }
   },
   "uade-ben-daglish-sid": {
     "auditStatus": "fail",
-    "notes": "Ben Daglish SID — stub only (UADE playback, no editing)"
+    "notes": "FAIL 9/10: first 1 patterns have no notes",
+    "data": {
+      "auditStatus": "fail",
+      "notes": "9/10 noteDensity only (pat=1 streaming)"
+    }
   },
   "uade-fred-gray": {
     "auditStatus": "fail",
-    "notes": "Fred Gray — stub only (UADE playback, no editing)"
+    "notes": "FAIL 8/10: silent (rms=0.000089) | 1 errors: [FredEditorReplayerEngine] Unexpected token '<'",
+    "data": {
+      "auditStatus": "fail",
+      "notes": "8/10 silent + FredEditorReplayer error (WASM built but browser cached old)"
+    }
   },
   "uade-jason-brooke": {
-    "auditStatus": "fail",
-    "notes": "Jason Brooke — stub only (UADE playback, no editing)"
+    "auditStatus": "fixed",
+    "notes": "PASS 10/10 ch=4 pat=11 inst=5[Sampler] rms=0.0824 exp=46198b [10/10]",
+    "data": {
+      "auditStatus": "fixed",
+      "notes": "10-point PASS [10/10]"
+    }
   },
   "uade-jason-page": {
     "auditStatus": "fail",
-    "notes": "Jason Page — stub only (UADE playback, no editing)"
+    "notes": "FAIL 7/10: first 1 patterns have no notes | silent (rms=0.000203) | 2 errors: [UADEEngine] UADE could not play: jpn.empiresoccer94 (ret=-1; [NativeEngineRouting] Failed to start UADEEditable: Error: U",
+    "data": {
+      "auditStatus": "fail",
+      "notes": "7/10 silent + UADE play fail + no notes"
+    }
   },
   "uade-mark-cooksey": {
     "auditStatus": "fail",
-    "notes": "Mark Cooksey — stub only (UADE playback, no editing)"
+    "notes": "FAIL 9/10: first 1 patterns have no notes",
+    "data": {
+      "auditStatus": "fail",
+      "notes": "9/10 noteDensity only (pat=1 streaming)"
+    }
   },
   "uade-david-hanney": {
     "auditStatus": "fail",
-    "notes": "David Hanney — stub only (UADE playback, no editing)"
+    "notes": "Crash: No browser connected. Open DEViLBOX in a browser.",
+    "data": {
+      "auditStatus": "fail",
+      "notes": "9/10 noteDensity only (pat=1 streaming)"
+    }
   },
   "uade-paul-shields": {
     "auditStatus": "fail",
-    "notes": "Paul Shields — stub only (UADE playback, no editing)"
+    "notes": "FAIL 9/10: first 1 patterns have no notes",
+    "data": {
+      "auditStatus": "fail",
+      "notes": "9/10 noteDensity only (pat=1 streaming)"
+    }
   },
   "uade-paul-summers": {
-    "auditStatus": "fail",
-    "notes": "Paul Summers — stub only (UADE playback, no editing)"
+    "auditStatus": "fixed",
+    "notes": "PASS 10/10 ch=4 pat=8 inst=6[Sampler] rms=0.0363 exp=78358b [10/10]",
+    "data": {
+      "auditStatus": "fixed",
+      "notes": "10-point PASS [10/10]"
+    }
   },
   "uade-steve-barrett": {
     "auditStatus": "fail",
-    "notes": "Steve Barrett — stub only (UADE playback, no editing)"
+    "notes": "FAIL 9/10: first 1 patterns have no notes",
+    "data": {
+      "auditStatus": "fail",
+      "notes": "9/10 noteDensity only (pat=1 streaming)"
+    }
   },
   "uade-thomas-hermann": {
     "auditStatus": "fail",
-    "notes": "Thomas Hermann — stub only (UADE playback, no editing)"
+    "notes": "FAIL 9/10: first 1 patterns have no notes",
+    "data": {
+      "auditStatus": "fail",
+      "notes": "9/10 noteDensity only (pat=1 streaming)"
+    }
   },
   "uade-wally-beben": {
-    "auditStatus": "fail",
-    "notes": "Wally Beben — stub only (UADE playback, no editing)"
+    "auditStatus": "fixed",
+    "notes": "PASS 10/10 ch=4 pat=43 inst=19[Sampler] rms=0.0750 exp=127780b [10/10]",
+    "data": {
+      "auditStatus": "fixed",
+      "notes": "10-point PASS [10/10]"
+    }
   },
   "uade-kim-christensen": {
-    "auditStatus": "fail",
-    "notes": "Kim Christensen — stub only (UADE playback, no editing)"
+    "auditStatus": "fixed",
+    "notes": "PASS rms=0.0800, file=onslaught.jt"
   },
   "uade-jeroen-tel": {
-    "auditStatus": "fail",
-    "notes": "Jeroen Tel — stub only (UADE playback, no editing)"
+    "auditStatus": "fixed",
+    "notes": "PASS 10/10 ch=4 pat=3 inst=14[Sampler] rms=0.0743 exp=68972b [10/10]",
+    "data": {
+      "auditStatus": "fixed",
+      "notes": "10-point PASS [10/10]"
+    }
   },
   "uade-fashion-tracker": {
-    "auditStatus": "fail",
-    "notes": "Fashion Tracker — stub only (UADE playback, no editing)"
+    "auditStatus": "fixed",
+    "notes": "PASS 10/10 ch=4 pat=33 inst=128[Synth] rms=0.0700 exp=35102b [10/10]",
+    "data": {
+      "auditStatus": "fixed",
+      "notes": "10-point PASS [10/10]"
+    }
   },
   "uade-fm-tracker": {
-    "auditStatus": "fail",
-    "notes": "Tim Follin — stub only (UADE playback, no editing)"
+    "auditStatus": "unknown",
+    "notes": "reset for openmpt refactor audit"
   },
   "uade-sound-master": {
     "auditStatus": "fail",
-    "notes": "Sound Master — stub only (UADE playback, no editing)"
+    "notes": "FAIL 9/10: first 1 patterns have no notes",
+    "data": {
+      "auditStatus": "fail",
+      "notes": "9/10 noteDensity only (pat=1 streaming)"
+    }
   },
   "uade-sound-player": {
-    "auditStatus": "fail",
-    "notes": "Sound Player — stub only (UADE playback, no editing)"
+    "auditStatus": "unknown",
+    "notes": "reset for openmpt refactor audit"
   },
   "uade-time-tracker": {
-    "auditStatus": "fail",
-    "notes": "Time Tracker — stub only (UADE playback, no editing)"
+    "auditStatus": "unknown",
+    "notes": "reset for openmpt refactor audit"
   },
   "uade-tomy-tracker": {
     "auditStatus": "fail",
-    "notes": "Tomy Tracker — stub only (UADE playback, no editing)"
+    "notes": "Crash: No browser connected. Open DEViLBOX in a browser.",
+    "data": {
+      "auditStatus": "fail",
+      "notes": "9/10 noteDensity only (pat=1 streaming)"
+    }
   },
   "uade-music-maker": {
-    "auditStatus": "fail",
-    "notes": "Music Maker — stub only (UADE playback, no editing)"
+    "auditStatus": "unknown",
+    "notes": "reset for openmpt refactor audit"
   },
   "uade-quartet": {
     "auditStatus": "fail",
-    "notes": "Quartet — stub only (UADE playback, no editing)"
+    "notes": "Crash: No browser connected. Open DEViLBOX in a browser.",
+    "data": {
+      "auditStatus": "fail",
+      "notes": "9/10 export only (openmpt classic mode)"
+    }
   },
   "uade-core-design": {
     "auditStatus": "fail",
-    "notes": "Core Design — stub only (UADE playback, no editing)"
+    "notes": "FAIL 9/10: export failed: No native exporter available. editorMode=\"classic\" hasUadeFileData=false uadeFil",
+    "data": {
+      "auditStatus": "fail",
+      "notes": "9/10 export only (no uadeFileData)"
+    }
   },
   "uade-custom-made": {
     "auditStatus": "fail",
-    "notes": "Custom Made — stub only (UADE playback, no editing)"
+    "notes": "FAIL 8/10: silent (rms=0.000000) | export failed: No native exporter available. editorMode=\"classic\" hasUadeFileData=false uadeFil",
+    "data": {
+      "auditStatus": "fail",
+      "notes": "8/10 silent + no export"
+    }
   },
   "uade-desire": {
     "auditStatus": "fail",
-    "notes": "Desire — stub only (UADE playback, no editing)"
+    "notes": "FAIL 8/10: first 1 patterns have no notes | silent (rms=0.000000)",
+    "data": {
+      "auditStatus": "fail",
+      "notes": "8/10 silent + no notes"
+    }
   },
   "uade-future-player": {
-    "auditStatus": "fail",
-    "notes": "Future Player — stub only (UADE playback, no editing)"
+    "auditStatus": "fixed",
+    "notes": "PASS 10/10 ch=4 pat=64 inst=1[FuturePlayerSynth] rms=0.1043 exp=21816b [10/10]",
+    "data": {
+      "auditStatus": "fixed",
+      "notes": "10-point PASS [10/10]"
+    }
   },
   "uade-janko-mrsic-flogel": {
     "auditStatus": "fail",
-    "notes": "Janko Mrsic-Flogel — stub only (UADE playback, no editing)"
+    "notes": "FAIL 9/10: first 1 patterns have no notes",
+    "data": {
+      "auditStatus": "fail",
+      "notes": "9/10 noteDensity only (pat=1 streaming)"
+    }
   },
   "uade-kris-hatlelid": {
     "auditStatus": "fail",
-    "notes": "Kris Hatlelid — stub only (UADE playback, no editing)"
+    "notes": "FAIL 8/10: first 1 patterns have no notes | silent (rms=0.000218)",
+    "data": {
+      "auditStatus": "fail",
+      "notes": "8/10 silent + no notes"
+    }
   },
   "uade-music-line": {
-    "auditStatus": "fail",
-    "notes": "Music Line Editor — stub only (UADE playback, no editing)"
+    "auditStatus": "unknown",
+    "notes": "reset for openmpt refactor audit"
   },
   "uade-magnetic-fields": {
     "auditStatus": "fail",
-    "notes": "Magnetic Fields Packer — stub only (UADE playback, no editing)"
+    "notes": "FAIL 8/10: silent (rms=0.000000) | 2 errors: [UADEEngine] UADE could not play: mfp.crystaldragon ingame (; [NativeEngineRouting] Failed to start UADEEditable: Error: U",
+    "data": {
+      "auditStatus": "fail",
+      "notes": "8/10 silent + UADE play fail"
+    }
   },
   "uade-novo-trade": {
-    "auditStatus": "fail",
-    "notes": "Novo Trade Packer — stub only (UADE playback, no editing)"
+    "auditStatus": "fixed",
+    "notes": "PASS 10/10 ch=4 pat=5 inst=5[Sampler] rms=0.0812 exp=24324b [10/10]",
+    "data": {
+      "auditStatus": "fixed",
+      "notes": "10-point PASS [10/10]"
+    }
   },
   "uade-nick-pelling": {
-    "auditStatus": "fail",
-    "notes": "Nick Pelling Packer — stub only (UADE playback, no editing)"
+    "auditStatus": "unknown",
+    "notes": "reset for openmpt refactor audit"
   },
   "uade-blade-packer": {
-    "auditStatus": "fail",
-    "notes": "Blade Packer — stub only (UADE playback, no editing)"
+    "auditStatus": "unknown",
+    "notes": "reset for openmpt refactor audit"
   },
   "uade-alcatraz-packer": {
-    "auditStatus": "fail",
-    "notes": "Alcatraz Packer — stub only (UADE playback, no editing)"
+    "auditStatus": "unknown",
+    "notes": "reset for openmpt refactor audit"
   },
   "uade-mosh-packer": {
-    "auditStatus": "fail",
-    "notes": "Mosh Packer — stub only (UADE playback, no editing)"
+    "auditStatus": "unknown",
+    "notes": "reset for openmpt refactor audit"
   },
   "uade-titanics-packer": {
-    "auditStatus": "fail",
-    "notes": "Titanics Packer — stub only (UADE playback, no editing)"
+    "auditStatus": "unknown",
+    "notes": "No Modland files for \"Titanics Packer\""
   },
   "uade-peter-verswyvelen": {
     "auditStatus": "fail",
-    "notes": "Peter Verswyvelen Packer — stub only (UADE playback, no editing)"
+    "notes": "FAIL 8/10: silent (rms=0.000175) | export failed: No native exporter available. editorMode=\"classic\" hasUadeFileData=false uadeFil",
+    "data": {
+      "auditStatus": "fail",
+      "notes": "8/10 silent + no export"
+    }
   },
   "uade-startrekker-am": {
-    "auditStatus": "fail",
-    "notes": "Startrekker AM — stub only (UADE playback, no editing)"
+    "auditStatus": "unknown",
+    "notes": "No Modland files for \"Startrekker AM\""
   },
   "uade-chip-tracker": {
-    "auditStatus": "fail",
-    "notes": "Chip Tracker — stub only (UADE playback, no editing)"
+    "auditStatus": "unknown",
+    "notes": "reset for openmpt refactor audit"
   },
   "uade-richard-joseph": {
     "auditStatus": "fail",
-    "notes": "Richard Joseph — stub only (UADE playback, no editing)"
+    "notes": "FAIL 5/10: no instruments | first 1 patterns have no notes | silent (rms=0.000220) | export failed: No native exporter available. editorMode=\"classic\" hasUadeFileData=false uadeFil | 1 errors: [UADEEngine] UADE could not play: cannon fodder 2.ins (ret=-",
+    "data": {
+      "auditStatus": "fail",
+      "notes": "5/10 no instruments + silent + no export + UADE play fail"
+    }
+  },
+  "masterfx-distortion": {
+    "auditStatus": "fixed",
+    "notes": "audio passes; editor + param engine working",
+    "group": "tonejs",
+    "hasEditor": true,
+    "hasParamEngine": true,
+    "rmsLevel": 0.260475
+  },
+  "masterfx-reverb": {
+    "auditStatus": "fixed",
+    "notes": "audio passes; editor + param engine working",
+    "group": "tonejs",
+    "hasEditor": true,
+    "hasParamEngine": true,
+    "rmsLevel": 0.27263
+  },
+  "masterfx-delay": {
+    "auditStatus": "fixed",
+    "notes": "audio passes; editor + param engine working",
+    "group": "tonejs",
+    "hasEditor": true,
+    "hasParamEngine": true,
+    "rmsLevel": 0.274576
+  },
+  "masterfx-feedbackdelay": {
+    "auditStatus": "fixed",
+    "notes": "audio passes; editor + param engine working",
+    "group": "tonejs",
+    "hasEditor": true,
+    "hasParamEngine": true,
+    "rmsLevel": 0.255973
+  },
+  "masterfx-pingpongdelay": {
+    "auditStatus": "fixed",
+    "notes": "audio passes; editor + param engine working",
+    "group": "tonejs",
+    "hasEditor": true,
+    "hasParamEngine": true,
+    "rmsLevel": 0.26319
+  },
+  "masterfx-chorus": {
+    "auditStatus": "fixed",
+    "notes": "audio passes; editor + param engine working",
+    "group": "tonejs",
+    "hasEditor": true,
+    "hasParamEngine": true,
+    "rmsLevel": 0.278458
+  },
+  "masterfx-phaser": {
+    "auditStatus": "fixed",
+    "notes": "audio passes; editor + param engine working",
+    "group": "tonejs",
+    "hasEditor": true,
+    "hasParamEngine": true,
+    "rmsLevel": 0.119211
+  },
+  "masterfx-tremolo": {
+    "auditStatus": "fixed",
+    "notes": "audio passes; editor + param engine working",
+    "group": "tonejs",
+    "hasEditor": true,
+    "hasParamEngine": true,
+    "rmsLevel": 0.140271
+  },
+  "masterfx-vibrato": {
+    "auditStatus": "fixed",
+    "notes": "audio passes; editor + param engine working",
+    "group": "tonejs",
+    "hasEditor": true,
+    "hasParamEngine": true,
+    "rmsLevel": 0.268001
+  },
+  "masterfx-autofilter": {
+    "auditStatus": "fixed",
+    "notes": "audio passes; editor + param engine working",
+    "group": "tonejs",
+    "hasEditor": true,
+    "hasParamEngine": true,
+    "rmsLevel": 0.26255
+  },
+  "masterfx-autopanner": {
+    "auditStatus": "fixed",
+    "notes": "audio passes; editor + param engine working",
+    "group": "tonejs",
+    "hasEditor": true,
+    "hasParamEngine": true,
+    "rmsLevel": 0.270352
+  },
+  "masterfx-autowah": {
+    "auditStatus": "fixed",
+    "notes": "audio passes; editor + param engine working",
+    "group": "tonejs",
+    "hasEditor": true,
+    "hasParamEngine": true,
+    "rmsLevel": 0.279921
+  },
+  "masterfx-bitcrusher": {
+    "auditStatus": "fixed",
+    "notes": "audio passes; editor + param engine working",
+    "group": "tonejs",
+    "hasEditor": true,
+    "hasParamEngine": true,
+    "rmsLevel": 0.259387
+  },
+  "masterfx-chebyshev": {
+    "auditStatus": "fixed",
+    "notes": "audio passes; editor + param engine working",
+    "group": "tonejs",
+    "hasEditor": true,
+    "hasParamEngine": true,
+    "rmsLevel": 0.261828
+  },
+  "masterfx-frequencyshifter": {
+    "auditStatus": "fixed",
+    "notes": "audio passes; editor + param engine working",
+    "group": "tonejs",
+    "hasEditor": true,
+    "hasParamEngine": true,
+    "rmsLevel": 0.266161
+  },
+  "masterfx-pitchshift": {
+    "auditStatus": "fixed",
+    "notes": "audio passes; editor + param engine working",
+    "group": "tonejs",
+    "hasEditor": true,
+    "hasParamEngine": true,
+    "rmsLevel": 0.241618
+  },
+  "masterfx-compressor": {
+    "auditStatus": "fixed",
+    "notes": "audio passes; editor + param engine working",
+    "group": "tonejs",
+    "hasEditor": true,
+    "hasParamEngine": true,
+    "rmsLevel": 0.081399
+  },
+  "masterfx-eq3": {
+    "auditStatus": "fixed",
+    "notes": "audio passes; editor + param engine working",
+    "group": "tonejs",
+    "hasEditor": true,
+    "hasParamEngine": true,
+    "rmsLevel": 0.264299
+  },
+  "masterfx-filter": {
+    "auditStatus": "fixed",
+    "notes": "audio passes; editor + param engine working",
+    "group": "tonejs",
+    "hasEditor": true,
+    "hasParamEngine": true,
+    "rmsLevel": 0.28593
+  },
+  "masterfx-jcreverb": {
+    "auditStatus": "fixed",
+    "notes": "audio passes; editor + param engine working",
+    "group": "tonejs",
+    "hasEditor": true,
+    "hasParamEngine": true,
+    "rmsLevel": 0.286372
+  },
+  "masterfx-stereowidener": {
+    "auditStatus": "fixed",
+    "notes": "audio passes; editor + param engine working",
+    "group": "tonejs",
+    "hasEditor": true,
+    "hasParamEngine": true,
+    "rmsLevel": 0.282501
+  },
+  "masterfx-tapesaturation": {
+    "auditStatus": "fixed",
+    "notes": "audio passes; editor + param engine working",
+    "group": "tonejs",
+    "hasEditor": true,
+    "hasParamEngine": true,
+    "rmsLevel": 0.258456
+  },
+  "masterfx-sidechaincompressor": {
+    "auditStatus": "fixed",
+    "notes": "audio passes; editor + param engine working",
+    "group": "tonejs",
+    "hasEditor": true,
+    "hasParamEngine": true,
+    "rmsLevel": 0.255055
+  },
+  "masterfx-spaceecho": {
+    "auditStatus": "fixed",
+    "notes": "audio passes; editor + param engine working",
+    "group": "tonejs",
+    "hasEditor": true,
+    "hasParamEngine": true,
+    "rmsLevel": 0.248088
+  },
+  "masterfx-spaceydelayer": {
+    "auditStatus": "fixed",
+    "notes": "audio passes; editor + param engine working",
+    "group": "tonejs",
+    "hasEditor": true,
+    "hasParamEngine": true,
+    "rmsLevel": 0.265852
+  },
+  "masterfx-retapeecho": {
+    "auditStatus": "fixed",
+    "notes": "audio passes; editor + param engine working",
+    "group": "tonejs",
+    "hasEditor": true,
+    "hasParamEngine": true,
+    "rmsLevel": 0.215524
+  },
+  "masterfx-biphase": {
+    "auditStatus": "fixed",
+    "notes": "audio passes; editor + param engine working",
+    "group": "tonejs",
+    "hasEditor": true,
+    "hasParamEngine": true,
+    "rmsLevel": 0.267499
+  },
+  "masterfx-dubfilter": {
+    "auditStatus": "fixed",
+    "notes": "audio passes; editor + param engine working",
+    "group": "tonejs",
+    "hasEditor": true,
+    "hasParamEngine": true,
+    "rmsLevel": 0.280894
+  },
+  "masterfx-vinylnoise": {
+    "auditStatus": "fixed",
+    "notes": "audio passes; editor + param engine working",
+    "group": "tonejs",
+    "hasEditor": true,
+    "hasParamEngine": true,
+    "rmsLevel": 0.257649
+  },
+  "masterfx-tonearm": {
+    "auditStatus": "fixed",
+    "notes": "audio passes; editor + param engine working",
+    "group": "tonejs",
+    "hasEditor": true,
+    "hasParamEngine": true,
+    "rmsLevel": 0.271771
+  },
+  "masterfx-tapesimulator": {
+    "auditStatus": "fixed",
+    "notes": "audio passes; editor + param engine working",
+    "group": "tonejs",
+    "hasEditor": true,
+    "hasParamEngine": true,
+    "rmsLevel": 0.260811
+  },
+  "masterfx-tumult": {
+    "auditStatus": "fixed",
+    "notes": "audio passes; editor + param engine working",
+    "group": "tonejs",
+    "hasEditor": true,
+    "hasParamEngine": true,
+    "rmsLevel": 0.257393
+  },
+  "masterfx-tapedegradation": {
+    "auditStatus": "fixed",
+    "notes": "added editor + param engine; audio passes",
+    "group": "tonejs",
+    "hasEditor": false,
+    "hasParamEngine": true,
+    "rmsLevel": 0.256955
+  },
+  "masterfx-ambientdelay": {
+    "auditStatus": "fixed",
+    "notes": "added editor + param engine; audio passes",
+    "group": "tonejs",
+    "hasEditor": false,
+    "hasParamEngine": true,
+    "rmsLevel": 0.271423
+  },
+  "masterfx-moogfilter": {
+    "auditStatus": "fixed",
+    "notes": "audio passes; editor + param engine working",
+    "group": "wasm",
+    "hasEditor": true,
+    "hasParamEngine": true,
+    "rmsLevel": 0.259618
+  },
+  "masterfx-mverb": {
+    "auditStatus": "fixed",
+    "notes": "audio passes; editor + param engine working",
+    "group": "wasm",
+    "hasEditor": true,
+    "hasParamEngine": true,
+    "rmsLevel": 0.097225
+  },
+  "masterfx-leslie": {
+    "auditStatus": "fixed",
+    "notes": "audio passes; editor + param engine working",
+    "group": "wasm",
+    "hasEditor": true,
+    "hasParamEngine": true,
+    "rmsLevel": 0.101051
+  },
+  "masterfx-springreverb": {
+    "auditStatus": "fixed",
+    "notes": "audio passes; editor + param engine working",
+    "group": "wasm",
+    "hasEditor": true,
+    "hasParamEngine": true,
+    "rmsLevel": 0.089512
+  },
+  "masterfx-shimmerreverb": {
+    "auditStatus": "fixed",
+    "notes": "added editor + param engine; audio passes",
+    "group": "wasm",
+    "hasEditor": false,
+    "hasParamEngine": true,
+    "rmsLevel": 0.096094
+  },
+  "masterfx-vocoder": {
+    "auditStatus": "fixed",
+    "notes": "audio passes; editor + param engine working",
+    "group": "wasm",
+    "hasEditor": true,
+    "hasParamEngine": true,
+    "rmsLevel": 0.104052
+  },
+  "masterfx-autotune": {
+    "auditStatus": "fixed",
+    "notes": "audio passes; editor + param engine working",
+    "group": "wasm",
+    "hasEditor": true,
+    "hasParamEngine": true,
+    "rmsLevel": 0.120314
+  },
+  "masterfx-granularfreeze": {
+    "auditStatus": "fixed",
+    "notes": "added editor + param engine; audio passes",
+    "group": "wasm",
+    "hasEditor": false,
+    "hasParamEngine": true,
+    "rmsLevel": 0.120403
+  },
+  "masterfx-buzzdistortion": {
+    "auditStatus": "fixed",
+    "notes": "added editor + param engine; audio passes",
+    "group": "buzzmachine",
+    "hasEditor": false,
+    "hasParamEngine": false,
+    "rmsLevel": 0.104457
+  },
+  "masterfx-buzzoverdrive": {
+    "auditStatus": "fixed",
+    "notes": "added editor + param engine; audio passes",
+    "group": "buzzmachine",
+    "hasEditor": false,
+    "hasParamEngine": false,
+    "rmsLevel": 0.088639
+  },
+  "masterfx-buzzdistortion2": {
+    "auditStatus": "fixed",
+    "notes": "added editor + param engine; audio passes",
+    "group": "buzzmachine",
+    "hasEditor": false,
+    "hasParamEngine": false,
+    "rmsLevel": 0.035595
+  },
+  "masterfx-buzzdist2": {
+    "auditStatus": "fixed",
+    "notes": "added editor + param engine; audio passes",
+    "group": "buzzmachine",
+    "hasEditor": false,
+    "hasParamEngine": false,
+    "rmsLevel": 0.270967
+  },
+  "masterfx-buzzsoftsat": {
+    "auditStatus": "fixed",
+    "notes": "added editor + param engine; audio passes",
+    "group": "buzzmachine",
+    "hasEditor": false,
+    "hasParamEngine": false,
+    "rmsLevel": 0.278778
+  },
+  "masterfx-buzzstereodist": {
+    "auditStatus": "fixed",
+    "notes": "added editor + param engine; audio passes",
+    "group": "buzzmachine",
+    "hasEditor": false,
+    "hasParamEngine": false,
+    "rmsLevel": 0.280427
+  },
+  "masterfx-buzzsvf": {
+    "auditStatus": "fixed",
+    "notes": "added editor + param engine; audio passes",
+    "group": "buzzmachine",
+    "hasEditor": false,
+    "hasParamEngine": false,
+    "rmsLevel": 0.282163
+  },
+  "masterfx-buzzphilta": {
+    "auditStatus": "fixed",
+    "notes": "added editor + param engine; audio passes",
+    "group": "buzzmachine",
+    "hasEditor": false,
+    "hasParamEngine": false,
+    "rmsLevel": 0.247779
+  },
+  "masterfx-buzznotch": {
+    "auditStatus": "fixed",
+    "notes": "added editor + param engine; audio passes",
+    "group": "buzzmachine",
+    "hasEditor": false,
+    "hasParamEngine": false,
+    "rmsLevel": 0.256551
+  },
+  "masterfx-buzzzfilter": {
+    "auditStatus": "fixed",
+    "notes": "added editor + param engine; audio passes",
+    "group": "buzzmachine",
+    "hasEditor": false,
+    "hasParamEngine": false,
+    "rmsLevel": 0.242698
+  },
+  "masterfx-buzzdelay": {
+    "auditStatus": "fixed",
+    "notes": "added editor + param engine; audio passes",
+    "group": "buzzmachine",
+    "hasEditor": false,
+    "hasParamEngine": false,
+    "rmsLevel": 0.270957
+  },
+  "masterfx-buzzcrossdelay": {
+    "auditStatus": "fixed",
+    "notes": "added editor + param engine; audio passes",
+    "group": "buzzmachine",
+    "hasEditor": false,
+    "hasParamEngine": false,
+    "rmsLevel": 0.19317
+  },
+  "masterfx-buzzfreeverb": {
+    "auditStatus": "fixed",
+    "notes": "added editor + param engine; audio passes",
+    "group": "buzzmachine",
+    "hasEditor": false,
+    "hasParamEngine": false,
+    "rmsLevel": 0.267727
+  },
+  "masterfx-buzzpanzerdelay": {
+    "auditStatus": "fixed",
+    "notes": "added editor + param engine; audio passes",
+    "group": "buzzmachine",
+    "hasEditor": false,
+    "hasParamEngine": false,
+    "rmsLevel": 0.286157
+  },
+  "masterfx-buzzchorus": {
+    "auditStatus": "fixed",
+    "notes": "added editor + param engine; audio passes",
+    "group": "buzzmachine",
+    "hasEditor": false,
+    "hasParamEngine": false,
+    "rmsLevel": 0.262543
+  },
+  "masterfx-buzzchorus2": {
+    "auditStatus": "fixed",
+    "notes": "added editor + param engine; audio passes",
+    "group": "buzzmachine",
+    "hasEditor": false,
+    "hasParamEngine": false,
+    "rmsLevel": 0.265802
+  },
+  "masterfx-buzzwhitechorus": {
+    "auditStatus": "fixed",
+    "notes": "added editor + param engine; audio passes",
+    "group": "buzzmachine",
+    "hasEditor": false,
+    "hasParamEngine": false,
+    "rmsLevel": 0.254389
+  },
+  "masterfx-buzzfreqshift": {
+    "auditStatus": "fixed",
+    "notes": "added editor + param engine; audio passes",
+    "group": "buzzmachine",
+    "hasEditor": false,
+    "hasParamEngine": false,
+    "rmsLevel": 0.253133
+  },
+  "masterfx-buzzcompressor": {
+    "auditStatus": "fixed",
+    "notes": "added editor + param engine; audio passes",
+    "group": "buzzmachine",
+    "hasEditor": false,
+    "hasParamEngine": false,
+    "rmsLevel": 0.257438
+  },
+  "masterfx-buzzlimiter": {
+    "auditStatus": "fixed",
+    "notes": "added editor + param engine; audio passes",
+    "group": "buzzmachine",
+    "hasEditor": false,
+    "hasParamEngine": false,
+    "rmsLevel": 0.279585
+  },
+  "masterfx-buzzexciter": {
+    "auditStatus": "fixed",
+    "notes": "added editor + param engine; audio passes",
+    "group": "buzzmachine",
+    "hasEditor": false,
+    "hasParamEngine": false,
+    "rmsLevel": 0.253745
+  },
+  "masterfx-buzzmasterizer": {
+    "auditStatus": "fixed",
+    "notes": "added editor + param engine; audio passes",
+    "group": "buzzmachine",
+    "hasEditor": false,
+    "hasParamEngine": false,
+    "rmsLevel": 0.150601
+  },
+  "masterfx-buzzstereogain": {
+    "auditStatus": "fixed",
+    "notes": "added editor + param engine; audio passes",
+    "group": "buzzmachine",
+    "hasEditor": false,
+    "hasParamEngine": false,
+    "rmsLevel": 0.201819
+  },
+  "smoke-mod-spacedebris": {
+    "auditStatus": "fixed",
+    "notes": "Smoke PASS rms=0.20 (2026-04-07)"
+  },
+  "smoke-it-bookworm": {
+    "auditStatus": "fixed",
+    "notes": "Smoke PASS rms=0.13 (2026-04-07)"
+  },
+  "smoke-s3m-catchgoblin": {
+    "auditStatus": "fixed",
+    "notes": "Smoke PASS rms=0.08 (2026-04-07)"
+  },
+  "smoke-hvl-hexplosion": {
+    "auditStatus": "fixed",
+    "notes": "Smoke PASS rms=0.10 (2026-04-07)"
+  },
+  "smoke-fc-blaizer": {
+    "auditStatus": "fixed",
+    "notes": "Smoke PASS rms=0.11 (2026-04-07)"
+  },
+  "smoke-jam-bartmanintro": {
+    "auditStatus": "fixed",
+    "notes": "Smoke PASS rms=0.06 (2026-04-07)"
+  },
+  "smoke-sid-commando": {
+    "auditStatus": "fixed",
+    "notes": "Smoke PASS rms=0.05 (2026-04-07)"
+  },
+  "smoke-tfmx-turricanaliens": {
+    "auditStatus": "fixed",
+    "notes": "Smoke PASS rms=0.0001 — low but non-silent (2026-04-07)"
+  },
+  "uade-hippelcoso": {
+    "auditStatus": "fixed",
+    "notes": "PASS 10/10 ch=4 pat=36 inst=32[HippelCoSoSynth] rms=0.0328 exp=21790b [10/10]",
+    "data": {
+      "auditStatus": "fixed",
+      "notes": "10-point PASS [10/10]"
+    }
+  },
+  "fx-baseline": {
+    "auditStatus": "fixed",
+    "notes": "Baseline: -18.1 dBFS",
+    "rmsDb": -18.1
+  },
+  "fx-distortion": {
+    "auditStatus": "fixed",
+    "notes": "OK | init:1358ms OK | +0.0dB vs baseline",
+    "rmsDb": -18.1,
+    "diffDb": 0,
+    "initMs": 1358
+  },
+  "fx-reverb": {
+    "auditStatus": "fixed",
+    "notes": "OK | init:1349ms OK | +2.6dB vs baseline",
+    "rmsDb": -15.5,
+    "diffDb": 2.6,
+    "initMs": 1349
+  },
+  "fx-delay": {
+    "auditStatus": "fixed",
+    "notes": "OK | init:1340ms OK | +0.2dB vs baseline",
+    "rmsDb": -17.9,
+    "diffDb": 0.2,
+    "initMs": 1340
+  },
+  "fx-chorus": {
+    "auditStatus": "fixed",
+    "notes": "OK | init:1324ms OK | +0.2dB vs baseline",
+    "rmsDb": -18,
+    "diffDb": 0.2,
+    "initMs": 1324
+  },
+  "fx-phaser": {
+    "auditStatus": "fixed",
+    "notes": "OK | init:1317ms OK | -0.2dB vs baseline",
+    "rmsDb": -18.3,
+    "diffDb": -0.2,
+    "initMs": 1317
+  },
+  "fx-tremolo": {
+    "auditStatus": "fixed",
+    "notes": "OK | init:1316ms OK | -0.0dB vs baseline",
+    "rmsDb": -18.2,
+    "diffDb": 0,
+    "initMs": 1316
+  },
+  "fx-vibrato": {
+    "auditStatus": "fixed",
+    "notes": "OK | init:1319ms OK | -0.1dB vs baseline",
+    "rmsDb": -18.3,
+    "diffDb": -0.1,
+    "initMs": 1319
+  },
+  "fx-autofilter": {
+    "auditStatus": "fixed",
+    "notes": "OK | init:1319ms OK | +0.7dB vs baseline",
+    "rmsDb": -17.4,
+    "diffDb": 0.7,
+    "initMs": 1319
+  },
+  "fx-autopanner": {
+    "auditStatus": "fixed",
+    "notes": "OK | init:1319ms OK | +0.2dB vs baseline",
+    "rmsDb": -17.9,
+    "diffDb": 0.2,
+    "initMs": 1319
+  },
+  "fx-autowah": {
+    "auditStatus": "fixed",
+    "notes": "OK | init:1316ms OK | +0.2dB vs baseline",
+    "rmsDb": -17.9,
+    "diffDb": 0.2,
+    "initMs": 1316
+  },
+  "fx-bitcrusher": {
+    "auditStatus": "fixed",
+    "notes": "OK | init:1316ms OK | -0.2dB vs baseline",
+    "rmsDb": -18.3,
+    "diffDb": -0.2,
+    "initMs": 1316
+  },
+  "fx-chebyshev": {
+    "auditStatus": "fixed",
+    "notes": "OK | init:1318ms OK | -0.1dB vs baseline",
+    "rmsDb": -18.3,
+    "diffDb": -0.1,
+    "initMs": 1318
+  },
+  "fx-compressor": {
+    "auditStatus": "fixed",
+    "notes": "OK | init:1316ms OK | +0.2dB vs baseline",
+    "rmsDb": -17.9,
+    "diffDb": 0.2,
+    "initMs": 1316
+  },
+  "fx-eq3": {
+    "auditStatus": "fixed",
+    "notes": "OK | init:1316ms OK | -0.2dB vs baseline",
+    "rmsDb": -18.3,
+    "diffDb": -0.2,
+    "initMs": 1316
+  },
+  "fx-feedbackdelay": {
+    "auditStatus": "fixed",
+    "notes": "OK | init:1319ms OK | +0.2dB vs baseline",
+    "rmsDb": -17.9,
+    "diffDb": 0.2,
+    "initMs": 1319
+  },
+  "fx-filter": {
+    "auditStatus": "fixed",
+    "notes": "OK | init:1318ms OK | +0.2dB vs baseline",
+    "rmsDb": -18,
+    "diffDb": 0.2,
+    "initMs": 1318
+  },
+  "fx-frequencyshifter": {
+    "auditStatus": "fixed",
+    "notes": "OK | init:1317ms OK | +0.1dB vs baseline",
+    "rmsDb": -18,
+    "diffDb": 0.1,
+    "initMs": 1317
+  },
+  "fx-jcreverb": {
+    "auditStatus": "fixed",
+    "notes": "OK | init:1317ms OK | +0.1dB vs baseline",
+    "rmsDb": -18,
+    "diffDb": 0.1,
+    "initMs": 1317
+  },
+  "fx-pingpongdelay": {
+    "auditStatus": "fixed",
+    "notes": "OK | init:1315ms OK | +0.2dB vs baseline",
+    "rmsDb": -17.9,
+    "diffDb": 0.2,
+    "initMs": 1315
+  },
+  "fx-pitchshift": {
+    "auditStatus": "fixed",
+    "notes": "OK | init:1323ms OK | +0.1dB vs baseline",
+    "rmsDb": -18,
+    "diffDb": 0.1,
+    "initMs": 1323
+  },
+  "fx-stereowidener": {
+    "auditStatus": "fixed",
+    "notes": "OK | init:1314ms OK | +0.1dB vs baseline",
+    "rmsDb": -18,
+    "diffDb": 0.1,
+    "initMs": 1314
+  },
+  "fx-tapesaturation": {
+    "auditStatus": "fixed",
+    "notes": "OK | init:1316ms OK | +0.3dB vs baseline",
+    "rmsDb": -17.9,
+    "diffDb": 0.3,
+    "initMs": 1316
+  },
+  "fx-biphase": {
+    "auditStatus": "fixed",
+    "notes": "OK | init:1323ms OK | -0.0dB vs baseline",
+    "rmsDb": -18.2,
+    "diffDb": 0,
+    "initMs": 1323
+  },
+  "fx-dubfilter": {
+    "auditStatus": "fixed",
+    "notes": "OK | init:1316ms OK | -0.1dB vs baseline",
+    "rmsDb": -18.2,
+    "diffDb": -0.1,
+    "initMs": 1316
+  },
+  "fx-sidechaincompressor": {
+    "auditStatus": "fixed",
+    "notes": "OK | init:1315ms OK | -0.2dB vs baseline",
+    "rmsDb": -18.3,
+    "diffDb": -0.2,
+    "initMs": 1315
+  },
+  "fx-moogfilter": {
+    "auditStatus": "fixed",
+    "notes": "OK | init:1315ms OK | +0.1dB vs baseline",
+    "rmsDb": -18,
+    "diffDb": 0.1,
+    "initMs": 1315
+  },
+  "fx-spaceecho": {
+    "auditStatus": "fixed",
+    "notes": "OK | init:1315ms OK | -0.1dB vs baseline",
+    "rmsDb": -18.2,
+    "diffDb": -0.1,
+    "initMs": 1315
+  },
+  "fx-spaceydelayer": {
+    "auditStatus": "fixed",
+    "notes": "OK | init:1327ms OK | +0.1dB vs baseline",
+    "rmsDb": -18,
+    "diffDb": 0.1,
+    "initMs": 1327
+  },
+  "fx-retapeecho": {
+    "auditStatus": "fixed",
+    "notes": "OK | init:1327ms OK | +0.1dB vs baseline",
+    "rmsDb": -18,
+    "diffDb": 0.1,
+    "initMs": 1327
+  },
+  "fx-mverb": {
+    "auditStatus": "fixed",
+    "notes": "OK | init:1332ms OK | +0.1dB vs baseline",
+    "rmsDb": -18,
+    "diffDb": 0.1,
+    "initMs": 1332
+  },
+  "fx-leslie": {
+    "auditStatus": "fixed",
+    "notes": "OK | init:1329ms OK | +0.1dB vs baseline",
+    "rmsDb": -18,
+    "diffDb": 0.1,
+    "initMs": 1329
+  },
+  "fx-springreverb": {
+    "auditStatus": "fixed",
+    "notes": "OK | init:1324ms OK | +0.1dB vs baseline",
+    "rmsDb": -18,
+    "diffDb": 0.1,
+    "initMs": 1324
+  },
+  "fx-vinylnoise": {
+    "auditStatus": "fixed",
+    "notes": "OK | init:1317ms OK | +0.1dB vs baseline",
+    "rmsDb": -18,
+    "diffDb": 0.1,
+    "initMs": 1317
+  },
+  "fx-tonearm": {
+    "auditStatus": "fixed",
+    "notes": "OK | init:1318ms OK | +0.3dB vs baseline",
+    "rmsDb": -17.8,
+    "diffDb": 0.3,
+    "initMs": 1318
+  },
+  "fx-shimmerreverb": {
+    "auditStatus": "fixed",
+    "notes": "OK | init:1326ms OK | +0.1dB vs baseline",
+    "rmsDb": -18,
+    "diffDb": 0.1,
+    "initMs": 1326
+  },
+  "fx-granularfreeze": {
+    "auditStatus": "fixed",
+    "notes": "OK | init:1328ms OK | +0.1dB vs baseline",
+    "rmsDb": -18,
+    "diffDb": 0.1,
+    "initMs": 1328
+  },
+  "fx-tapedegradation": {
+    "auditStatus": "fixed",
+    "notes": "OK | init:1348ms OK | +0.3dB vs baseline",
+    "rmsDb": -17.8,
+    "diffDb": 0.3,
+    "initMs": 1348
+  },
+  "fx-ambientdelay": {
+    "auditStatus": "fixed",
+    "notes": "OK | init:1335ms OK | +0.0dB vs baseline",
+    "rmsDb": -18.1,
+    "diffDb": 0,
+    "initMs": 1335
+  },
+  "fx-noisegate": {
+    "auditStatus": "fixed",
+    "notes": "OK | init:1381ms OK | +0.1dB vs baseline",
+    "rmsDb": -18,
+    "diffDb": 0.1,
+    "initMs": 1381
+  },
+  "fx-limiter": {
+    "auditStatus": "fixed",
+    "notes": "OK | init:1348ms OK | -1.8dB vs baseline",
+    "rmsDb": -19.9,
+    "diffDb": -1.8,
+    "initMs": 1348
+  },
+  "fx-flanger": {
+    "auditStatus": "fixed",
+    "notes": "OK | init:1316ms OK | -2.2dB vs baseline",
+    "rmsDb": -20.4,
+    "diffDb": -2.2,
+    "initMs": 1316
+  },
+  "fx-overdrive": {
+    "auditStatus": "fixed",
+    "notes": "OK | init:1316ms OK | +4.4dB vs baseline",
+    "rmsDb": -13.7,
+    "diffDb": 4.4,
+    "initMs": 1316
+  },
+  "fx-ringmod": {
+    "auditStatus": "fixed",
+    "notes": "OK | init:1315ms OK | -2.1dB vs baseline",
+    "rmsDb": -20.2,
+    "diffDb": -2.1,
+    "initMs": 1315
+  },
+  "fx-dragonflyplate": {
+    "auditStatus": "fixed",
+    "notes": "OK | init:1316ms OK | +4.5dB vs baseline",
+    "rmsDb": -13.6,
+    "diffDb": 4.5,
+    "initMs": 1316
+  },
+  "fx-dragonflyhall": {
+    "auditStatus": "fail",
+    "notes": "VERY LOUD | init:1316ms OK | +18.8dB vs baseline",
+    "rmsDb": 0.7,
+    "diffDb": 18.8,
+    "initMs": 1316
+  },
+  "fx-dragonflyroom": {
+    "auditStatus": "fixed",
+    "notes": "OK | init:1317ms OK | -5.3dB vs baseline",
+    "rmsDb": -23.4,
+    "diffDb": -5.3,
+    "initMs": 1317
+  },
+  "fx-junochorus": {
+    "auditStatus": "fixed",
+    "notes": "OK | init:1316ms OK | -1.6dB vs baseline",
+    "rmsDb": -19.7,
+    "diffDb": -1.6,
+    "initMs": 1316
+  },
+  "fx-parametriceq": {
+    "auditStatus": "fixed",
+    "notes": "OK | init:1315ms OK | +0.1dB vs baseline",
+    "rmsDb": -18,
+    "diffDb": 0.1,
+    "initMs": 1315
+  },
+  "fx-cabinetsim": {
+    "auditStatus": "fixed",
+    "notes": "OK | init:1315ms OK | -4.6dB vs baseline",
+    "rmsDb": -22.7,
+    "diffDb": -4.6,
+    "initMs": 1315
+  },
+  "fx-tubeamp": {
+    "auditStatus": "fixed",
+    "notes": "OK | init:1315ms OK | +0.1dB vs baseline",
+    "rmsDb": -18.1,
+    "diffDb": 0.1,
+    "initMs": 1315
+  },
+  "fx-deesser": {
+    "auditStatus": "fixed",
+    "notes": "OK | init:1317ms OK | +0.1dB vs baseline",
+    "rmsDb": -18,
+    "diffDb": 0.1,
+    "initMs": 1317
+  },
+  "fx-multibandcomp": {
+    "auditStatus": "fixed",
+    "notes": "OK | init:1316ms OK | -3.5dB vs baseline",
+    "rmsDb": -21.6,
+    "diffDb": -3.5,
+    "initMs": 1316
+  },
+  "fx-transientdesigner": {
+    "auditStatus": "fixed",
+    "notes": "OK | init:1316ms OK | +0.1dB vs baseline",
+    "rmsDb": -18,
+    "diffDb": 0.1,
+    "initMs": 1316
+  },
+  "fx-bassenhancer": {
+    "auditStatus": "fixed",
+    "notes": "OK | init:1316ms OK | +0.1dB vs baseline",
+    "rmsDb": -18,
+    "diffDb": 0.1,
+    "initMs": 1316
+  },
+  "fx-expander": {
+    "auditStatus": "fixed",
+    "notes": "OK | init:1319ms OK | +0.1dB vs baseline",
+    "rmsDb": -18,
+    "diffDb": 0.1,
+    "initMs": 1319
+  },
+  "fx-reversedelay": {
+    "auditStatus": "fixed",
+    "notes": "OK | init:1317ms OK | -1.9dB vs baseline",
+    "rmsDb": -20,
+    "diffDb": -1.9,
+    "initMs": 1317
+  },
+  "fx-vintagedelay": {
+    "auditStatus": "fixed",
+    "notes": "OK | init:1316ms OK | +1.5dB vs baseline",
+    "rmsDb": -16.7,
+    "diffDb": 1.5,
+    "initMs": 1316
+  },
+  "fx-artisticdelay": {
+    "auditStatus": "fixed",
+    "notes": "OK | init:1315ms OK | +1.4dB vs baseline",
+    "rmsDb": -16.8,
+    "diffDb": 1.4,
+    "initMs": 1315
+  },
+  "fx-slapbackdelay": {
+    "auditStatus": "fixed",
+    "notes": "OK | init:1315ms OK | -4.7dB vs baseline",
+    "rmsDb": -22.9,
+    "diffDb": -4.7,
+    "initMs": 1315
+  },
+  "fx-zamdelay": {
+    "auditStatus": "fixed",
+    "notes": "OK | init:1321ms OK | +1.3dB vs baseline",
+    "rmsDb": -16.8,
+    "diffDb": 1.3,
+    "initMs": 1321
+  },
+  "fx-saturator": {
+    "auditStatus": "fail",
+    "notes": "LOUD | init:1316ms OK | +9.3dB vs baseline",
+    "rmsDb": -8.8,
+    "diffDb": 9.3,
+    "initMs": 1316
+  },
+  "fx-exciter": {
+    "auditStatus": "fixed",
+    "notes": "OK | init:1314ms OK | +2.2dB vs baseline",
+    "rmsDb": -15.9,
+    "diffDb": 2.2,
+    "initMs": 1314
+  },
+  "fx-autosat": {
+    "auditStatus": "fixed",
+    "notes": "OK | init:1314ms OK | +2.9dB vs baseline",
+    "rmsDb": -15.2,
+    "diffDb": 2.9,
+    "initMs": 1314
+  },
+  "fx-satma": {
+    "auditStatus": "fixed",
+    "notes": "OK | init:1314ms OK | +0.2dB vs baseline",
+    "rmsDb": -17.9,
+    "diffDb": 0.2,
+    "initMs": 1314
+  },
+  "fx-distortionshaper": {
+    "auditStatus": "fixed",
+    "notes": "OK | init:1316ms OK | +0.1dB vs baseline",
+    "rmsDb": -18,
+    "diffDb": 0.1,
+    "initMs": 1316
+  },
+  "fx-monocomp": {
+    "auditStatus": "fixed",
+    "notes": "OK | init:1314ms OK | +0.1dB vs baseline",
+    "rmsDb": -18.1,
+    "diffDb": 0.1,
+    "initMs": 1314
+  },
+  "fx-sidechaingate": {
+    "auditStatus": "fixed",
+    "notes": "OK | init:1315ms OK | +0.1dB vs baseline",
+    "rmsDb": -18,
+    "diffDb": 0.1,
+    "initMs": 1315
+  },
+  "fx-multibandgate": {
+    "auditStatus": "fixed",
+    "notes": "OK | init:1315ms OK | -1.1dB vs baseline",
+    "rmsDb": -19.2,
+    "diffDb": -1.1,
+    "initMs": 1315
+  },
+  "fx-multibandlimiter": {
+    "auditStatus": "fail",
+    "notes": "VERY QUIET | init:1315ms OK | -12.7dB vs baseline",
+    "rmsDb": -30.9,
+    "diffDb": -12.7,
+    "initMs": 1315
+  },
+  "fx-sidechainlimiter": {
+    "auditStatus": "fail",
+    "notes": "QUIET | init:1317ms OK | -7.4dB vs baseline",
+    "rmsDb": -25.5,
+    "diffDb": -7.4,
+    "initMs": 1317
+  },
+  "fx-clipper": {
+    "auditStatus": "fixed",
+    "notes": "OK | init:1316ms OK | +0.1dB vs baseline",
+    "rmsDb": -18.1,
+    "diffDb": 0.1,
+    "initMs": 1316
+  },
+  "fx-dynamicsproc": {
+    "auditStatus": "fixed",
+    "notes": "OK | init:1315ms OK | +0.1dB vs baseline",
+    "rmsDb": -18,
+    "diffDb": 0.1,
+    "initMs": 1315
+  },
+  "fx-x42comp": {
+    "auditStatus": "fixed",
+    "notes": "OK | init:1315ms OK | -2.4dB vs baseline",
+    "rmsDb": -20.5,
+    "diffDb": -2.4,
+    "initMs": 1315
+  },
+  "fx-ducka": {
+    "auditStatus": "fixed",
+    "notes": "OK | init:1315ms OK | -0.2dB vs baseline",
+    "rmsDb": -18.4,
+    "diffDb": -0.2,
+    "initMs": 1315
+  },
+  "fx-beatbreather": {
+    "auditStatus": "fixed",
+    "notes": "OK | init:1314ms OK | +0.1dB vs baseline",
+    "rmsDb": -18,
+    "diffDb": 0.1,
+    "initMs": 1314
+  },
+  "fx-multibandclipper": {
+    "auditStatus": "fixed",
+    "notes": "OK | init:1315ms OK | -0.5dB vs baseline",
+    "rmsDb": -18.6,
+    "diffDb": -0.5,
+    "initMs": 1315
+  },
+  "fx-multibanddynamics": {
+    "auditStatus": "fixed",
+    "notes": "OK | init:1315ms OK | +0.1dB vs baseline",
+    "rmsDb": -18,
+    "diffDb": 0.1,
+    "initMs": 1315
+  },
+  "fx-multibandexpander": {
+    "auditStatus": "fixed",
+    "notes": "OK | init:1317ms OK | +0.1dB vs baseline",
+    "rmsDb": -18,
+    "diffDb": 0.1,
+    "initMs": 1317
+  },
+  "fx-gottcomp": {
+    "auditStatus": "fixed",
+    "notes": "OK | init:1315ms OK | +1.6dB vs baseline",
+    "rmsDb": -16.5,
+    "diffDb": 1.6,
+    "initMs": 1315
+  },
+  "fx-maximizer": {
+    "auditStatus": "fixed",
+    "notes": "OK | init:1314ms OK | -3.7dB vs baseline",
+    "rmsDb": -21.8,
+    "diffDb": -3.7,
+    "initMs": 1314
+  },
+  "fx-agc": {
+    "auditStatus": "fixed",
+    "notes": "OK | init:1320ms OK | +2.1dB vs baseline",
+    "rmsDb": -16.1,
+    "diffDb": 2.1,
+    "initMs": 1320
+  },
+  "fx-panda": {
+    "auditStatus": "fixed",
+    "notes": "OK | init:1318ms OK | -0.8dB vs baseline",
+    "rmsDb": -18.9,
+    "diffDb": -0.8,
+    "initMs": 1318
+  },
+  "fx-eq5band": {
+    "auditStatus": "fixed",
+    "notes": "OK | init:1320ms OK | +0.1dB vs baseline",
+    "rmsDb": -18,
+    "diffDb": 0.1,
+    "initMs": 1320
+  },
+  "fx-eq8band": {
+    "auditStatus": "fixed",
+    "notes": "OK | init:1316ms OK | +0.2dB vs baseline",
+    "rmsDb": -18,
+    "diffDb": 0.2,
+    "initMs": 1316
+  },
+  "fx-eq12band": {
+    "auditStatus": "fixed",
+    "notes": "OK | init:1319ms OK | +0.1dB vs baseline",
+    "rmsDb": -18,
+    "diffDb": 0.1,
+    "initMs": 1319
+  },
+  "fx-geq31": {
+    "auditStatus": "fixed",
+    "notes": "OK | init:1315ms OK | +0.1dB vs baseline",
+    "rmsDb": -18,
+    "diffDb": 0.1,
+    "initMs": 1315
+  },
+  "fx-zameq2": {
+    "auditStatus": "fixed",
+    "notes": "OK | init:1320ms OK | +0.1dB vs baseline",
+    "rmsDb": -18,
+    "diffDb": 0.1,
+    "initMs": 1320
+  },
+  "fx-phonofilter": {
+    "auditStatus": "fixed",
+    "notes": "OK | init:1317ms OK | -1.2dB vs baseline",
+    "rmsDb": -19.3,
+    "diffDb": -1.2,
+    "initMs": 1317
+  },
+  "fx-dynamiceq": {
+    "auditStatus": "fixed",
+    "notes": "OK | init:1317ms OK | +0.2dB vs baseline",
+    "rmsDb": -18,
+    "diffDb": 0.2,
+    "initMs": 1317
+  },
+  "fx-kuiza": {
+    "auditStatus": "fixed",
+    "notes": "OK | init:1317ms OK | +0.1dB vs baseline",
+    "rmsDb": -18,
+    "diffDb": 0.1,
+    "initMs": 1317
+  },
+  "fx-haasenhancer": {
+    "auditStatus": "fixed",
+    "notes": "OK | init:1317ms OK | -4.8dB vs baseline",
+    "rmsDb": -22.9,
+    "diffDb": -4.8,
+    "initMs": 1317
+  },
+  "fx-multispread": {
+    "auditStatus": "fixed",
+    "notes": "OK | init:1314ms OK | -2.3dB vs baseline",
+    "rmsDb": -20.4,
+    "diffDb": -2.3,
+    "initMs": 1314
+  },
+  "fx-multibandenhancer": {
+    "auditStatus": "fixed",
+    "notes": "OK | init:1316ms OK | -1.2dB vs baseline",
+    "rmsDb": -19.3,
+    "diffDb": -1.2,
+    "initMs": 1316
+  },
+  "fx-binauralpanner": {
+    "auditStatus": "fixed",
+    "notes": "OK | init:1316ms OK | +0.1dB vs baseline",
+    "rmsDb": -18,
+    "diffDb": 0.1,
+    "initMs": 1316
+  },
+  "fx-vihda": {
+    "auditStatus": "fixed",
+    "notes": "OK | init:1318ms OK | +0.1dB vs baseline",
+    "rmsDb": -18,
+    "diffDb": 0.1,
+    "initMs": 1318
+  },
+  "fx-earlyreflections": {
+    "auditStatus": "fixed",
+    "notes": "OK | init:1320ms OK | -0.5dB vs baseline",
+    "rmsDb": -18.6,
+    "diffDb": -0.5,
+    "initMs": 1320
+  },
+  "fx-pulsator": {
+    "auditStatus": "fixed",
+    "notes": "OK | init:1328ms OK | -1.0dB vs baseline",
+    "rmsDb": -19.2,
+    "diffDb": -1,
+    "initMs": 1328
+  },
+  "fx-masha": {
+    "auditStatus": "fixed",
+    "notes": "OK | init:1317ms OK | +0.1dB vs baseline",
+    "rmsDb": -18,
+    "diffDb": 0.1,
+    "initMs": 1317
+  },
+  "fx-vinyl": {
+    "auditStatus": "fixed",
+    "notes": "OK | init:1317ms OK | +0.1dB vs baseline",
+    "rmsDb": -18,
+    "diffDb": 0.1,
+    "initMs": 1317
+  },
+  "fx-multichorus": {
+    "auditStatus": "fixed",
+    "notes": "OK | init:1325ms OK | -3.1dB vs baseline",
+    "rmsDb": -21.2,
+    "diffDb": -3.1,
+    "initMs": 1325
+  },
+  "fx-calfphaser": {
+    "auditStatus": "fixed",
+    "notes": "OK | init:1316ms OK | +1.4dB vs baseline",
+    "rmsDb": -16.8,
+    "diffDb": 1.4,
+    "initMs": 1316
+  },
+  "fx-della": {
+    "auditStatus": "fixed",
+    "notes": "OK | init:1315ms OK | +0.9dB vs baseline",
+    "rmsDb": -17.2,
+    "diffDb": 0.9,
+    "initMs": 1315
+  },
+  "fx-driva": {
+    "auditStatus": "fail",
+    "notes": "LOUD | init:1316ms OK | +10.0dB vs baseline",
+    "rmsDb": -8.1,
+    "diffDb": 10,
+    "initMs": 1316
+  },
+  "fx-roomy": {
+    "auditStatus": "fixed",
+    "notes": "OK | init:1316ms OK | -1.4dB vs baseline",
+    "rmsDb": -19.6,
+    "diffDb": -1.4,
+    "initMs": 1316
+  },
+  "fx-bitta": {
+    "auditStatus": "fixed",
+    "notes": "OK | init:1315ms OK | +0.2dB vs baseline",
+    "rmsDb": -18,
+    "diffDb": 0.2,
+    "initMs": 1315
   }
 }
