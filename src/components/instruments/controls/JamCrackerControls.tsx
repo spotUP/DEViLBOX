@@ -26,6 +26,7 @@ import type { JamCrackerConfig } from '@/types/instrument';
 import { writeWaveformByte } from '@/lib/jamcracker/waveformDraw';
 import { Knob } from '@components/controls/Knob';
 import { useInstrumentStore } from '@stores/useInstrumentStore';
+import { useTrackerStore } from '@stores';
 
 interface JamCrackerControlsProps {
   config: JamCrackerConfig;
@@ -145,7 +146,42 @@ function drawWaveform(
 export const JamCrackerControls: React.FC<JamCrackerControlsProps> = ({
   config,
   onChange,
+  instrumentId,
 }) => {
+  // Find Usage: scan patterns for any cell referencing this instrument id, then
+  // seek playback to the first song position whose pattern contains a hit.
+  const seekToUsage = useCallback(() => {
+    if (instrumentId === undefined) {
+      console.warn('[JamCracker] Find Usage: no instrumentId on this editor');
+      return;
+    }
+    const state = useTrackerStore.getState();
+    const { patterns, patternOrder, setCurrentPosition } = state;
+    const hitPatternIndices = new Set<number>();
+    for (let p = 0; p < patterns.length; p++) {
+      const pat = patterns[p];
+      let found = false;
+      for (const ch of pat.channels) {
+        for (const cell of ch.rows) {
+          if (cell.instrument === instrumentId) { found = true; break; }
+        }
+        if (found) break;
+      }
+      if (found) hitPatternIndices.add(p);
+    }
+    if (hitPatternIndices.size === 0) {
+      console.warn(`[JamCracker] instrument ${instrumentId} is not used in any pattern`);
+      return;
+    }
+    for (let i = 0; i < patternOrder.length; i++) {
+      if (hitPatternIndices.has(patternOrder[i])) {
+        setCurrentPosition(i, false);
+        return;
+      }
+    }
+    console.warn(`[JamCracker] instrument ${instrumentId} found in pattern(s) but none are in the song order`);
+  }, [instrumentId]);
+
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const configRef = useRef(config);
 
@@ -275,6 +311,14 @@ export const JamCrackerControls: React.FC<JamCrackerControlsProps> = ({
               PCM ({config.sampleSize} bytes)
             </span>
           )}
+          <button
+            onClick={seekToUsage}
+            disabled={instrumentId === undefined}
+            title="Find a song position where this instrument is used and seek the player there"
+            className="px-2 py-0.5 rounded text-[10px] font-mono border bg-dark-bg text-accent-secondary border-dark-border hover:text-accent-primary hover:border-accent-primary/50 disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            ▶ Find Usage
+          </button>
           <button
             onClick={() => setShowSamplePane((v) => !v)}
             title={`${showSamplePane ? 'Hide' : 'Show'} sample browser`}
