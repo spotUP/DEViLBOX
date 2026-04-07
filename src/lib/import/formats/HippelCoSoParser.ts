@@ -261,6 +261,47 @@ export async function parseHippelCoSoFile(
   const maxVolseqs = Math.min(32, Math.floor((patternsOff - volseqsOff) / 2));
   const instruments: InstrumentConfig[] = [];
 
+  // ── First pass: collect every sequence body file offset so we can compute
+  //   per-sequence byte budgets (next-body-offset minus this-body-offset).
+  //   Sequence bodies are not stored in any particular order — use a sorted
+  //   list of unique offsets and look up each entry's "next" boundary.
+  // -------------------------------------------------------------------------
+  const seqBodyOffsets = new Set<number>();
+  for (let i = 0; i < maxVolseqs; i++) {
+    const ptrOff = volseqsOff + i * 2;
+    if (ptrOff + 2 > buf.length) break;
+    const vsqOff = u16BE(buf, ptrOff);
+    if (vsqOff === 0 || vsqOff >= buf.length) break;
+    if (vsqOff + 5 >= buf.length) break;
+
+    /* vseq body sits 5 bytes into the volseq header */
+    seqBodyOffsets.add(vsqOff + 5);
+
+    const fseqIdx = s8(buf, vsqOff + 1);
+    if (fseqIdx !== -128 && fseqIdx >= 0) {
+      const fseqPtrOff = frqseqsOff + fseqIdx * 2;
+      if (fseqPtrOff + 2 <= buf.length) {
+        const fseqDataOff = u16BE(buf, fseqPtrOff);
+        if (fseqDataOff > 0 && fseqDataOff < buf.length) {
+          seqBodyOffsets.add(fseqDataOff);
+        }
+      }
+    }
+  }
+  const sortedBodyOffsets = Array.from(seqBodyOffsets).sort((a, b) => a - b);
+
+  /** Returns the byte budget for a sequence body starting at `off`:
+   *  the gap between `off` and the next body in the sorted list, or
+   *  end-of-file if `off` is the last one. */
+  function bodyBudget(off: number): number {
+    const idx = sortedBodyOffsets.indexOf(off);
+    if (idx < 0) return 0;
+    const next = idx < sortedBodyOffsets.length - 1
+      ? sortedBodyOffsets[idx + 1]
+      : buf.length;
+    return Math.max(0, next - off);
+  }
+
   for (let i = 0; i < maxVolseqs; i++) {
     const ptrOff = volseqsOff + i * 2;
     if (ptrOff + 2 > buf.length) break;
@@ -287,12 +328,14 @@ export async function parseHippelCoSoFile(
 
     // Resolve fseq: if fseqIdx is -128, no fseq (just hold base note)
     let fseq: number[] = [0, -31];
+    let resolvedFseqDataOff = -1;
     if (fseqIdx !== -128 && fseqIdx >= 0) {
       const fseqPtrOff = frqseqsOff + fseqIdx * 2;
       if (fseqPtrOff + 2 <= buf.length) {
         const fseqDataOff = u16BE(buf, fseqPtrOff);
         if (fseqDataOff > 0 && fseqDataOff < buf.length) {
           fseq = extractFseq(buf, fseqDataOff);
+          resolvedFseqDataOff = fseqDataOff;
         }
       }
     }
@@ -310,6 +353,10 @@ export async function parseHippelCoSoFile(
     // followed by variable-length vseq data. We record it as instrBase so the UADEChipEditor
     // can write scalar params back to chip RAM. instrSize covers the 5-byte fixed header only;
     // vseq/fseq sequences are variable-length and not written back individually.
+    const vseqBodyFileOff = vsqOff + 5;
+    const vseqBodyMaxLen = bodyBudget(vseqBodyFileOff);
+    const fseqBodyMaxLen = resolvedFseqDataOff >= 0 ? bodyBudget(resolvedFseqDataOff) : 0;
+
     const chipRam: UADEChipRamInfo = {
       moduleBase,
       moduleSize: buffer.byteLength,
@@ -322,6 +369,14 @@ export async function parseHippelCoSoFile(
         tracksData: moduleBase + tracksOff,
         songsData: moduleBase + songsOff,
         headersData: moduleBase + headersOff,
+        /* Variable-length sequence body addresses + per-body byte budgets.
+         * Used by HippelCoSoControls to write fseq/vseq edits back to chip RAM.
+         * fseqBodyAddr is -1 (encoded as 0xFFFFFFFF below) when this instrument
+         * has no resolvable fseq (fseqIdx === -128 or out of range). */
+        vseqBodyAddr: moduleBase + vseqBodyFileOff,
+        vseqBodyMaxLen,
+        fseqBodyAddr: resolvedFseqDataOff >= 0 ? (moduleBase + resolvedFseqDataOff) : 0xFFFFFFFF,
+        fseqBodyMaxLen,
       },
     };
 
