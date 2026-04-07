@@ -25,8 +25,6 @@ import { StereoSeparationNode } from './StereoSeparationNode';
 // getNativeAudioNode used in audio-context utilities
 import { getPatternScheduler } from './PatternScheduler';
 import { getAutomationPlayer } from './AutomationPlayer';
-import { getAutomationCapture } from './automation/AutomationCapture';
-import { decodeFurnaceCommand } from './automation/decoders/FurnaceCommandDecoder';
 import { syncCaptureToStore, resetCaptureSync } from './automation/AutomationCaptureSync';
 import { useTransportStore, cancelPendingRowUpdate } from '@/stores/useTransportStore';
 import { useTrackerStore } from '@/stores/useTrackerStore';
@@ -584,7 +582,7 @@ export class TrackerReplayer {
   // unwinds position subscription + Paula log polling + deferred pattern
   // reconstruction + TFMX channel subscription in one call.
   private _uadePositionUnsub: (() => void) | null = null;
-  private _furnaceCmdLogUnsub: (() => void) | null = null;
+  // Furnace cmd log subscription rolled into _seqPositionUnsub (4.6)
   // Capture sync interval moved to coordinator.startCaptureSync/stopCaptureSync
   // TFMX channel subscription moved into UADEEngine composite cleanup (4.5)
 
@@ -1694,166 +1692,38 @@ export class TrackerReplayer {
     // WASM sequencer path: if Furnace native data exists, upload it to the WASM sequencer
     // (which lives in the AudioWorklet) and delegate all tick processing there.
     // Must happen AFTER ensureWASMSynthsReady() so the dispatch engine worklet exists.
-    _log('[TrackerReplayer] WASM seq check: furnaceNative =', !!this.song.furnaceNative,
-      'subsongs:', this.song.furnaceNative?.subsongs?.length,
-      'channels:', this.song.furnaceNative?.subsongs?.[0]?.channels?.length);
+    // Furnace WASM sequencer: delegate the entire ~150-line boot sequence to
+    // FurnaceDispatchEngine.startWithCoordinator. Owns chip lifecycle, sample
+    // upload, INS2 instrument upload, sequencer serialization, position
+    // subscription, command-log capture, and seqPlay. Returns a composite
+    // cleanup we store as _seqPositionUnsub for stop().
     if (this.song.furnaceNative) {
       try {
-        _log('[TrackerReplayer] WASM seq: importing FurnaceDispatchEngine...');
         const { FurnaceDispatchEngine } = await import('@engine/furnace-dispatch/FurnaceDispatchEngine');
-        if (gen !== this._playGeneration) { _log('[TrackerReplayer] WASM seq: gen mismatch after import'); return; }
+        if (gen !== this._playGeneration) return;
         const dispatchEngine = FurnaceDispatchEngine.getInstance();
 
-        // Ensure the dispatch engine worklet is initialized.
-        // ensureWASMSynthsReady only inits it if a Furnace* synthType instrument exists,
-        // but many .fur songs use generic 'ChipSynth' instruments. We need the worklet
-        // for the WASM sequencer regardless of instrument types.
-        if (!dispatchEngine.isInitialized) {
-          _log('[TrackerReplayer] WASM seq: dispatch engine not initialized, initializing...');
-          const { getDevilboxAudioContext } = await import('@/utils/audio-context');
-          const ctx = getDevilboxAudioContext();
-          await dispatchEngine.init(ctx as unknown as Record<string, unknown>);
-          if (gen !== this._playGeneration) return;
-        } else if (!dispatchEngine.getWorkletNode() && (dispatchEngine as any)._initPromise) {
-          _log('[TrackerReplayer] WASM seq: waiting for dispatch engine init...');
-          await (dispatchEngine as any)._initPromise;
-          if (gen !== this._playGeneration) return;
-        }
-        const workletNode = dispatchEngine.getWorkletNode();
-        _log('[TrackerReplayer] WASM seq: workletNode =', !!workletNode);
-        if (!workletNode) {
-          throw new Error('FurnaceDispatchEngine worklet not initialized');
-        }
+        // Resolve the synth bus AudioNode the engine should route to.
+        const { getNativeAudioNode } = await import('@/utils/audio-context');
+        const synthBus = getNativeAudioNode(engine.synthBus as any);
 
-        // Create all chips needed by this song. For multi-chip songs (e.g. 5E01+NAMCO_CUS30)
-        // every secondary chip must also exist or those channels will fall back to the wrong
-        // chip handle and crash with "memory access out of bounds" / "table index out of bounds".
-        // Stop the sequencer BEFORE destroying old chips — the process() loop calls
-        // seqTick() which dispatches commands through dispatch handles. If those handles
-        // are destroyed while the sequencer is still ticking, we get WASM traps
-        // ("function signature mismatch", "memory access out of bounds").
-        dispatchEngine.seqStop();
-
-        // Also destroy chips from the previous song that this song doesn't use, so they don't
-        // accumulate and get rendered unnecessarily.
-        const chipIds = this.song.furnaceNative.chipIds ?? [];
-
-        // Destroy old chips not needed by new song so they don't accumulate.
-        // Keep chips that the new song also uses — avoids slow recreate on replay.
-        const newChipSet = new Set(chipIds);
-        const oldChipIds = [...(dispatchEngine as any).chips.keys() as IterableIterator<number>];
-        for (const platformType of oldChipIds) {
-          if (!newChipSet.has(platformType)) {
-            _log('[TrackerReplayer] WASM seq: destroying old chip for platform', platformType);
-            dispatchEngine.destroyChip(platformType);
-          }
-        }
-
-        // Create all chips for new song
-        for (const chipId of chipIds) {
-          if (!dispatchEngine.hasChip(chipId)) {
-            _log('[TrackerReplayer] WASM seq: creating chip for platform', chipId);
-            await dispatchEngine.createChip(chipId);
-            if (gen !== this._playGeneration) return;
-            await dispatchEngine.waitForChipCreated(chipId);
-            if (gen !== this._playGeneration) return;
-          }
-        }
-
-        // Re-upload module samples (BRR for SNES, ADPCM for other chips) and reset
-        // each dispatch so the DSP initializes with the new song's sample data.
-        // This must happen every time a song plays — not just on first chip creation —
-        // because switching songs leaves stale samples from the previous song in WASM.
-        const moduleSamples = dispatchEngine.getModuleSamples();
-        if (moduleSamples && moduleSamples.length > 0) {
-          for (const chipId of chipIds) {
-            dispatchEngine.uploadModuleSamplesToPlatform(chipId, true);
-          }
-          // Reset all chips so the DSP re-initializes with new sampleMem contents
-          for (const chipId of chipIds) {
-            dispatchEngine.reset(chipId);
-          }
-          _log(`[TrackerReplayer] WASM seq: uploaded ${moduleSamples.length} module samples + reset chips`);
-        }
-
-        // Ensure the dispatch engine audio output is routed to speakers.
-        // Normally routeNativeEngineOutput() handles this when a FurnaceDispatchSynth
-        // is created, but in the WASM sequencer path we may not have one.
-        if (!dispatchEngine.audioRouted) {
-          const sharedGain = dispatchEngine.getOrCreateSharedGain();
-          if (sharedGain) {
-            const { getNativeAudioNode } = await import('@/utils/audio-context');
-            const nativeSynthBus = getNativeAudioNode(engine.synthBus as any);
-            if (nativeSynthBus) {
-              sharedGain.connect(nativeSynthBus);
-              (dispatchEngine as any)._audioRouted = true;
-              _log('[TrackerReplayer] WASM seq: routed dispatch engine audio → synthBus');
-            }
-          }
-        }
-
-        // Pre-upload ALL instruments to the global WASM table before sequencer starts.
-        // The sequencer references instruments by index (0, 1, 2...) via DIV_CMD_INSTRUMENT.
-        // Each instrument must be in the global table or the dispatch returns a default (silence).
-        if (this.song.instruments.length > 0) {
-          let uploaded = 0;
-          for (let i = 0; i < this.song.instruments.length; i++) {
-            const inst = this.song.instruments[i];
-            const rawData = inst.rawBinaryData;
-            if (rawData && rawData.length > 4 &&
-                rawData[0] === 0x49 && rawData[1] === 0x4E && rawData[2] === 0x53 && rawData[3] === 0x32) {
-              dispatchEngine.loadIns2(i, rawData instanceof Uint8Array ? rawData : new Uint8Array(rawData));
-              uploaded++;
-            }
-          }
-          _log(`[TrackerReplayer] WASM seq: pre-uploaded ${uploaded}/${this.song.instruments.length} instruments via INS2`);
-        }
-
-        // Upload song data to the WASM sequencer in the worklet
-        _log('[TrackerReplayer] WASM seq: uploading song data...');
-        const { uploadFurnaceToSequencer } = await import('@/lib/export/FurnaceSequencerSerializer');
-        if (gen !== this._playGeneration) { _log('[TrackerReplayer] WASM seq: gen mismatch after serializer import'); return; }
-        await uploadFurnaceToSequencer(this.song.furnaceNative, this.song.furnaceActiveSubsong ?? 0);
-        if (gen !== this._playGeneration) { _log('[TrackerReplayer] WASM seq: gen mismatch after upload'); return; }
-
-        this.useWasmSequencer = true;
-        _log('[TrackerReplayer] WASM seq: upload complete, subscribing to position updates...');
-
-        // Subscribe to position updates from the WASM sequencer (~60fps)
-        this._seqPositionUnsub = dispatchEngine.onSeqPosition((order, row, audioTime) => {
-          if (!this.playing || !this.song) return;
-          this.songPos = order;
-          this.pattPos = row;
-          const patternNum = this.song.songPositions[order] ?? 0;
-
-          // Use worklet audio timestamp + output latency for accurate sync
-          const rawCtx = Tone.context.rawContext as AudioContext;
-          const latency = rawCtx.outputLatency ?? rawCtx.baseLatency ?? 0;
-          const time = audioTime != null ? audioTime + latency : Tone.now();
-          this.queueDisplayState(time, row, patternNum, order, 0, (2.5 / this.bpm) * this.speed);
-          // Fire row change callback for UI (pattern editor, transport store)
-          if (this.onRowChange) {
-            this.onRowChange(row, patternNum, order);
-          }
+        const result = await dispatchEngine.startWithCoordinator(this.coordinator, {
+          song: this.song,
+          synthBus,
+          isStillCurrent: () => gen === this._playGeneration,
+          initialSongPos: this.songPos,
+          initialPattPos: this.pattPos,
         });
+        if (gen !== this._playGeneration) return;
 
-        // Enable command log for automation capture
-        dispatchEngine.enableCmdLog(true);
-        this._furnaceCmdLogUnsub = dispatchEngine.onCmdLog((entries) => {
-          const capture = getAutomationCapture();
-          for (const entry of entries) {
-            const decoded = decodeFurnaceCommand(entry.cmd, entry.channel, entry.value1, entry.value2);
-            for (const d of decoded) {
-              capture.push(d.paramId, entry.tick, d.value);
-            }
-          }
-        });
-
-        // Start WASM sequencer from current position
-        _log('[TrackerReplayer] WASM seq: calling seqPlay(%d, %d)', this.songPos, this.pattPos);
-        dispatchEngine.seqPlay(this.songPos, this.pattPos);
-        _log('[TrackerReplayer] Using WASM sequencer for Furnace playback');
-        return;
+        if (result.started) {
+          this.useWasmSequencer = true;
+          this._seqPositionUnsub = result.cleanup;
+          _log('[TrackerReplayer] Using WASM sequencer for Furnace playback');
+          return;
+        }
+        _warn('[TrackerReplayer] WASM sequencer unavailable, falling back to TS replayer');
+        this.useWasmSequencer = false;
       } catch (err) {
         _warn('[TrackerReplayer] WASM sequencer failed, falling back to TS replayer:', err);
         this.useWasmSequencer = false;
@@ -2015,11 +1885,8 @@ export class TrackerReplayer {
       // was set. Cheap no-op for non-TFMX UADE songs.
       setFormatPlaybackPlaying(false);
     }
-    // Clean up Furnace command log subscription
-    if (this._furnaceCmdLogUnsub) {
-      this._furnaceCmdLogUnsub();
-      this._furnaceCmdLogUnsub = null;
-    }
+    // Furnace WASM seq cleanup is now part of _seqPositionUnsub (composite
+    // returned by FurnaceDispatchEngine.startWithCoordinator).
     // Clean up automation capture sync
     this.coordinator.stopCaptureSync();
     resetCaptureSync();
