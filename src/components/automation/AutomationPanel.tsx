@@ -3,12 +3,13 @@
  * Dynamically resolves parameters from the channel's instrument via NKS maps
  */
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useTrackerStore, useAutomationStore, useThemeStore } from '@stores';
 import { AutomationCurveCanvas } from './AutomationCurve';
 import { useChannelAutomationParams } from '@hooks/useChannelAutomationParams';
 import { useAutomationRecording } from '@hooks/useAutomationRecording';
 import { useFormatStore } from '@stores/useFormatStore';
+import { useUIStore } from '@stores/useUIStore';
 import { getParamsForFormat, groupParams, type AutomationFormat } from '../../engine/automation/AutomationParams';
 
 export const AutomationPanel: React.FC = () => {
@@ -197,7 +198,7 @@ export const AutomationPanel: React.FC = () => {
       </div>
 
       {/* Register parameters — chip register params (SID/Paula/Furnace) */}
-      <RegisterParamsSection channelIndex={channelIndex} patternId={pattern.id} />
+      <RegisterParamsSection channelIndex={channelIndex} patternId={pattern.id} numChannels={numChannels} />
 
       {/* Automation Curve Editor */}
       <div className="flex-1 overflow-y-auto scrollbar-modern">
@@ -213,10 +214,14 @@ export const AutomationPanel: React.FC = () => {
 };
 
 /** Register params section — chip register params selectable as automation targets */
-const RegisterParamsSection: React.FC<{ channelIndex: number; patternId: string }> = ({ channelIndex }) => {
+const RegisterParamsSection: React.FC<{ channelIndex: number; patternId: string; numChannels: number }> = ({ channelIndex, patternId, numChannels }) => {
   const editorMode = useFormatStore(s => s.editorMode);
-  const { setActiveParameter, setShowLane } = useAutomationStore();
+  const { setActiveParameter, setShowLane, addCurve, addPoint, getCurvesForPattern } = useAutomationStore();
   const furnaceNative = useFormatStore(s => s.furnaceNative);
+
+  // Selected register channel (defaults to the panel's main channel)
+  const [selectedRegCh, setSelectedRegCh] = useState<number>(channelIndex);
+  useEffect(() => { setSelectedRegCh(channelIndex); }, [channelIndex]);
 
   const fmt: AutomationFormat | null = useMemo(() => {
     if (editorMode === 'goattracker') return 'gtultra';
@@ -228,25 +233,65 @@ const RegisterParamsSection: React.FC<{ channelIndex: number; patternId: string 
     return null;
   }, [editorMode]);
 
-  const registerGroups = useMemo(() => {
+  const allRegisterParams = useMemo(() => {
     if (!fmt) return [];
     const config = fmt === 'furnace' && furnaceNative
       ? { chipIds: furnaceNative.chipIds, channelCount: furnaceNative.subsongs[furnaceNative.activeSubsong]?.channels.length ?? 4 }
       : undefined;
-    return groupParams(getParamsForFormat(fmt, config));
+    return getParamsForFormat(fmt, config);
   }, [fmt, furnaceNative]);
 
-  if (registerGroups.length === 0) return null;
+  // Filter params to ONLY those for the currently selected register channel.
+  // Params without a channel field (e.g. SID filter/global, format-wide
+  // params) are always included so they're never hidden by the channel filter.
+  const filteredParams = useMemo(() => {
+    return allRegisterParams.filter((p) => p.channel === undefined || p.channel === selectedRegCh);
+  }, [allRegisterParams, selectedRegCh]);
+
+  const filteredGroups = useMemo(() => groupParams(filteredParams), [filteredParams]);
+
+  // Ensure a curve exists with a seed point at row 0 / value 1.0 so the lane
+  // is immediately visible after registering — same pattern as the other
+  // automation entry points (channel header dropdown, cell context menu).
+  const ensureAutomationCurve = useCallback((paramId: string) => {
+    setActiveParameter(channelIndex, paramId);
+    setShowLane(channelIndex, true);
+    if (!useUIStore.getState().showAutomationLanes) useUIStore.getState().toggleAutomationLanes();
+    const existing = getCurvesForPattern(patternId, channelIndex).find((c) => c.parameter === paramId);
+    let curveId = existing?.id;
+    if (!curveId) {
+      curveId = addCurve(patternId, channelIndex, paramId);
+      if (!curveId) return;
+    }
+    if (!existing || existing.points.length === 0) {
+      addPoint(curveId, 0, 1);
+    }
+  }, [channelIndex, patternId, setActiveParameter, setShowLane, addCurve, addPoint, getCurvesForPattern]);
+
+  if (filteredGroups.length === 0) return null;
 
   return (
     <div className="border-b border-dark-border bg-dark-bgSecondary p-3">
-      <div className="flex items-center gap-2 mb-2">
+      <div className="flex items-center gap-3 mb-2">
         <span className="text-text-muted text-[10px] font-medium uppercase tracking-wider">
           Register Parameters
         </span>
+        {/* Channel dropdown — pick which register channel's params to show */}
+        <label className="flex items-center gap-1.5 text-[10px] text-text-muted">
+          <span>Channel:</span>
+          <select
+            value={selectedRegCh}
+            onChange={(e) => setSelectedRegCh(Number(e.target.value))}
+            className="px-1.5 py-0.5 text-[10px] bg-dark-bgTertiary border border-dark-border rounded text-text-secondary focus:outline-none focus:border-accent-primary"
+          >
+            {Array.from({ length: numChannels }, (_, i) => (
+              <option key={i} value={i}>Channel {i + 1}</option>
+            ))}
+          </select>
+        </label>
       </div>
       <div className="flex gap-4 flex-wrap max-h-32 overflow-y-auto scrollbar-modern">
-        {registerGroups.map((group) => (
+        {filteredGroups.map((group) => (
           <div key={group.label} className="flex flex-col gap-1">
             <div className="text-text-muted text-[9px] font-medium uppercase tracking-wider opacity-60">
               {group.label}
@@ -255,12 +300,9 @@ const RegisterParamsSection: React.FC<{ channelIndex: number; patternId: string 
               {group.params.map((p) => (
                 <button
                   key={p.id}
-                  onClick={() => {
-                    setActiveParameter(channelIndex, p.id);
-                    setShowLane(channelIndex, true);
-                  }}
+                  onClick={() => ensureAutomationCurve(p.id)}
                   className="px-2 py-0.5 text-[10px] rounded border transition-all bg-dark-bgTertiary text-text-muted border-dark-border hover:border-dark-borderLight hover:text-text-secondary"
-                  title={`Show ${p.label} automation on channel`}
+                  title={`Register ${p.label} automation on channel ${channelIndex + 1}`}
                 >
                   {p.label}
                 </button>
