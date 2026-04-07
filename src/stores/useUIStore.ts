@@ -295,7 +295,7 @@ export const useUIStore = create<UIStore>()(
       // Dialog bridge (keyboard → dialog)
       dialogOpen: null,
       showFileBrowser: false,
-      showChannelNames: false,
+      showChannelNames: true,
 
       // Non-editable song dialog
       nonEditableDialogOpen: false,
