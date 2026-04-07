@@ -362,6 +362,16 @@ function syncServerKeysToFormats(serverData) {
       families['uade-audit'].push(entry);
       knownKeys.add(key);
     }
+    // fx-* → effects audit entry
+    else if (key.startsWith('fx-')) {
+      const name = key.replace('fx-', '');
+      const label = name.replace(/([a-z])([A-Z])/g, '$1 $2').replace(/\b\w/g, c => c.toUpperCase());
+      const entry = { key, label, family: 'fx-audit', chips: '' };
+      FORMATS.push(entry);
+      if (!families['fx-audit']) families['fx-audit'] = [];
+      families['fx-audit'].push(entry);
+      knownKeys.add(key);
+    }
   }
 }
 
@@ -520,7 +530,9 @@ const familyLabels = {
   'furnace-audit-ws': '🎮 Furnace Audit — WonderSwan',
   'furnace-audit-x16': '🎮 Furnace Audit — Commander X16',
   'furnace-audit-ymz280b': '🎮 Furnace Audit — YMZ280B',
-  'furnace-audit-blank': '🎮 Furnace Audit — Blank/Misc'
+  'furnace-audit-blank': '🎮 Furnace Audit — Blank/Misc',
+  'uade-audit': '🎵 UADE Audit',
+  'fx-audit': '🎛️ Effects Audit'
 };
 
 // Populate family filter
@@ -546,10 +558,10 @@ function badges(fmt) {
 
 function statusClass(s) { return 's-' + s; }
 
-const AUDIT_FAMILIES = new Set(['furnace-audit-nes', 'furnace-audit-gb', 'furnace-audit-c64', 'furnace-audit-lynx', 'furnace-audit-sn7', 'furnace-audit-ay', 'furnace-audit-pce', 'furnace-audit-genesis', 'furnace-audit-snes', 'furnace-audit-opl', 'furnace-audit-opm', 'furnace-audit-a2600', 'furnace-audit-amiga', 'furnace-audit-arcade', 'furnace-audit-ay8930', 'furnace-audit-esfm', 'furnace-audit-msx', 'furnace-audit-multi', 'furnace-audit-opz', 'furnace-audit-vb', 'furnace-audit-x68000', 'furnace-audit-pc98', 'furnace-audit-specs2', 'furnace-audit-vic20', 'furnace-audit-ws', 'furnace-audit-x16', 'furnace-audit-ymz280b', 'furnace-audit-blank', 'uade-audit']);
+const AUDIT_FAMILIES = new Set(['furnace-audit-nes', 'furnace-audit-gb', 'furnace-audit-c64', 'furnace-audit-lynx', 'furnace-audit-sn7', 'furnace-audit-ay', 'furnace-audit-pce', 'furnace-audit-genesis', 'furnace-audit-snes', 'furnace-audit-opl', 'furnace-audit-opm', 'furnace-audit-a2600', 'furnace-audit-amiga', 'furnace-audit-arcade', 'furnace-audit-ay8930', 'furnace-audit-esfm', 'furnace-audit-msx', 'furnace-audit-multi', 'furnace-audit-opz', 'furnace-audit-vb', 'furnace-audit-x68000', 'furnace-audit-pc98', 'furnace-audit-specs2', 'furnace-audit-vic20', 'furnace-audit-ws', 'furnace-audit-x16', 'furnace-audit-ymz280b', 'furnace-audit-blank', 'uade-audit', 'fx-audit']);
 
-const AUDIT_STATUS_OPTIONS = ['untested','investigating','fixed','known-issue','wont-fix'];
-const AUDIT_STATUS_COLORS = { untested: 'var(--dim)', investigating: '#22d3ee', fixed: 'var(--green)', 'known-issue': 'var(--yellow)', 'wont-fix': 'var(--dim)' };
+const AUDIT_STATUS_OPTIONS = ['untested','investigating','fixed','fail','known-issue','wont-fix'];
+const AUDIT_STATUS_COLORS = { untested: 'var(--dim)', investigating: '#22d3ee', fixed: 'var(--green)', fail: 'var(--red)', 'known-issue': 'var(--yellow)', 'wont-fix': 'var(--dim)' };
 
 const CONSOLE_AUDIT_COLORS = { works: 'var(--green)', crashes: '#ef4444', pageCrash: '#f97316', fail: 'var(--yellow)' };
 
@@ -620,7 +632,7 @@ function render() {
   const filterFamily = document.getElementById('filterFamily').value;
   
   let html = '';
-  const order = ['furnace-audit-nes','furnace-audit-gb','furnace-audit-c64','furnace-audit-lynx','furnace-audit-sn7','furnace-audit-ay','furnace-audit-pce','furnace-audit-a2600','furnace-audit-amiga','furnace-audit-ay8930','furnace-audit-specs2','furnace-audit-vic20','furnace-audit-msx','furnace-audit-opz','furnace-audit-x68000','furnace-audit-pc98','furnace-audit-vb','furnace-audit-ws','furnace-audit-x16','furnace-audit-ymz280b','furnace-audit-esfm','furnace-audit-opl','furnace-audit-opm','furnace-audit-genesis','furnace-audit-snes','furnace-audit-arcade','furnace-audit-multi','furnace-audit-blank','uade-audit','libopenmpt','furnace','amiga-native','pc-tracker','chip-dump','c64-chip','midi'];
+  const order = ['fx-audit','furnace-audit-nes','furnace-audit-gb','furnace-audit-c64','furnace-audit-lynx','furnace-audit-sn7','furnace-audit-ay','furnace-audit-pce','furnace-audit-a2600','furnace-audit-amiga','furnace-audit-ay8930','furnace-audit-specs2','furnace-audit-vic20','furnace-audit-msx','furnace-audit-opz','furnace-audit-x68000','furnace-audit-pc98','furnace-audit-vb','furnace-audit-ws','furnace-audit-x16','furnace-audit-ymz280b','furnace-audit-esfm','furnace-audit-opl','furnace-audit-opm','furnace-audit-genesis','furnace-audit-snes','furnace-audit-arcade','furnace-audit-multi','furnace-audit-blank','uade-audit','libopenmpt','furnace','amiga-native','pc-tracker','chip-dump','c64-chip','midi'];
   
   order.forEach(fam => {
     if (filterFamily && filterFamily !== fam) return;
