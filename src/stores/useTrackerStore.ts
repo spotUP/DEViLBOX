@@ -23,6 +23,7 @@ import { useHistoryStore } from './useHistoryStore';
 import { useCursorStore } from './useCursorStore';
 import { useEditorStore } from './useEditorStore';
 import { useFormatStore } from './useFormatStore';
+import * as OpenMPTEditBridge from '@engine/libopenmpt/OpenMPTEditBridge';
 
 // ── WASM mute forwarding ─────────────────────────────────────────────────────
 // Forward mute/solo states to WASM engines.
@@ -244,13 +245,9 @@ function debouncedWasmEngineReexport(): void {
 // across all active playback engines (OpenMPT, Furnace, UADE, MusicLine etc.)
 function syncBulkEdit(patternIndex: number, pattern: import('@typedefs').Pattern): void {
   // OpenMPT soundlib sync
-  try {
-    import('@engine/libopenmpt/OpenMPTEditBridge').then(bridge => {
-      if (bridge.isActive()) {
-        bridge.syncFullPattern(patternIndex, pattern.channels);
-      }
-    });
-  } catch { /* bridge not available */ }
+  if (OpenMPTEditBridge.isActive()) {
+    OpenMPTEditBridge.syncFullPattern(patternIndex, pattern.channels);
+  }
 
   // Furnace WASM sequencer sync — iterate all cells
   try {
@@ -518,16 +515,14 @@ export const useTrackerStore = create<TrackerStore>()(
         }
       } catch { /* replayer not initialized yet */ }
       // Sync edit to OpenMPT soundlib if loaded (MOD/XM/IT/S3M)
-      try {
+      // Bridge is the primary edit path for libopenmpt formats — statically imported
+      // to eliminate the async window where the store and soundlib could diverge.
+      if (OpenMPTEditBridge.isActive()) {
         const fullCell = get().patterns[patternIndex]?.channels[channelIndex]?.rows[rowIndex];
         if (fullCell) {
-          import('@engine/libopenmpt/OpenMPTEditBridge').then(bridge => {
-            if (bridge.isActive()) {
-              bridge.syncCellEdit(patternIndex, channelIndex, rowIndex, cellUpdate, fullCell);
-            }
-          });
+          OpenMPTEditBridge.syncCellEdit(patternIndex, channelIndex, rowIndex, cellUpdate, fullCell);
         }
-      } catch { /* bridge not available */ }
+      }
       // Sync edit to UADE chip RAM if format has a pattern layout
       try {
         const replayer = getTrackerReplayer();
@@ -632,13 +627,9 @@ export const useTrackerStore = create<TrackerStore>()(
         }
       } catch { /* replayer not initialized yet */ }
       // Sync clear to OpenMPT soundlib if loaded (MOD/XM/IT/S3M)
-      try {
-        import('@engine/libopenmpt/OpenMPTEditBridge').then(bridge => {
-          if (bridge.isActive()) {
-            bridge.syncCellClear(patternIndex, channelIndex, rowIndex);
-          }
-        });
-      } catch { /* bridge not available */ }
+      if (OpenMPTEditBridge.isActive()) {
+        OpenMPTEditBridge.syncCellClear(patternIndex, channelIndex, rowIndex);
+      }
       // Sync clear to UADE chip RAM if format has a pattern layout
       try {
         const replayer = getTrackerReplayer();
