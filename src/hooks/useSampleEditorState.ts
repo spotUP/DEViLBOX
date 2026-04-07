@@ -114,6 +114,7 @@ export interface SampleEditorState {
   doRedo: () => void;
   doExportWav: () => Promise<void>;
   doFindLoop: () => void;
+  doSnapLoopToZero: () => void;
 
   // Params
   params: SampleEditorParams;
@@ -392,6 +393,25 @@ export function useSampleEditorState(opts: UseSampleEditorStateOptions): SampleE
     notify.success('Auto-loop point found');
   }, [audioBuffer, onUpdateParams]);
 
+  /** Snap loopStart and loopEnd to the nearest zero crossings. Eliminates
+   *  click/pop artifacts at the loop seam. */
+  const doSnapLoopToZero = useCallback(() => {
+    if (!audioBuffer) return;
+    const total = audioBuffer.length;
+    if (total <= 0) return;
+    const currentLoopStart = (instrumentParameters?.loopStart as number) ?? 0;
+    const currentLoopEnd = (instrumentParameters?.loopEnd as number) ?? 1;
+    const startFrame = Math.round(currentLoopStart * total);
+    const endFrame = Math.round(currentLoopEnd * total);
+    const snappedStart = WaveformProcessor.findNearestZeroCrossing(audioBuffer, startFrame);
+    const snappedEnd = WaveformProcessor.findNearestZeroCrossing(audioBuffer, endFrame);
+    onUpdateParams({
+      loopStart: snappedStart / total,
+      loopEnd: Math.max(snappedEnd, snappedStart + 1) / total,
+    });
+    notify.success('Loop points snapped to zero crossings');
+  }, [audioBuffer, instrumentParameters, onUpdateParams]);
+
   void instrumentId;
 
   return {
@@ -417,7 +437,7 @@ export function useSampleEditorState(opts: UseSampleEditorStateOptions): SampleE
     doCut, doCopy, doPaste, doCrop, doDelete, doSilence,
     doFadeIn, doFadeOut, doVolumeUp, doVolumeDown,
     doReverse, doNormalize, doDcRemoval,
-    doUndo, doRedo, doExportWav, doFindLoop,
+    doUndo, doRedo, doExportWav, doFindLoop, doSnapLoopToZero,
     params, updateParam,
   };
 }
