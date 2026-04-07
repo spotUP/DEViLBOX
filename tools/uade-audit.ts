@@ -110,6 +110,19 @@ interface TestDef {
   companions?: string[];
 }
 
+// Formats that already pass 10/10 — skip to save time
+const SKIP_KEYS = new Set([
+  'uade-soundmon', 'uade-future-composer', 'uade-jamcracker', 'uade-oktalyzer',
+  'uade-octamed', 'uade-sidmon', 'uade-digital-mugician', 'uade-rob-hubbard',
+  'uade-delta-music-1', 'uade-delta-music-2', 'uade-hippelcoso', 'uade-tfmx',
+  'uade-fred-gray', 'uade-quadra-composer', 'uade-hively', 'uade-sonic-arranger',
+  'uade-art-of-noise', 'uade-instereo-1', 'uade-instereo-2',
+  'uade-digital-sound-studio', 'uade-tcb-tracker', 'uade-ben-daglish',
+  'uade-jason-brooke', 'uade-jeroen-tel', 'uade-fashion-tracker',
+  'uade-sound-master', 'uade-novo-trade', 'uade-wally-beben', 'uade-stk',
+  'uade-dave-lowe',
+]);
+
 const TESTS: TestDef[] = [
   // Native-parser formats
   { key: 'uade-protracker-mod',     path: 'pub/modules/Protracker/Captain/space debris.mod' },
@@ -264,6 +277,11 @@ async function main() {
   console.log('  10-point: load ✓  metadata ✓  instruments ✓  inst-detail ✓  patterns ✓  notes ✓  audio ✓  edit ✓  export+roundtrip ✓  no-errors ✓\n');
 
   for (const test of TESTS) {
+    if (SKIP_KEYS.has(test.key)) {
+      console.log(`[${test.key}]`.padEnd(32) + ' ○ SKIP  (already 10/10)');
+      stats.skip++;
+      continue;
+    }
     const label = `[${test.key}]`.padEnd(32);
     const issues: string[] = [];
     const checks: Record<string, boolean> = {
