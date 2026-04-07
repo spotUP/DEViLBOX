@@ -6,11 +6,7 @@
  */
 
 import * as Tone from 'tone';
-
-function getRawNode(node: Tone.Gain): AudioNode {
-  const n = node as unknown as Record<string, AudioNode | undefined>;
-  return n._gainNode ?? n._nativeAudioNode ?? n._node ?? (node as unknown as AudioNode);
-}
+import { getNativeAudioNode } from '@utils/audio-context';
 
 // Ordered list of all 95 sample file paths (index = sampleIndex param).
 // Group order: hum(5), machine(11), static(6), vinyl(5), world(18),
@@ -201,8 +197,8 @@ export class TumultEffect extends Tone.ToneAudioNode {
         outputChannelCount: [2],
       });
 
-      const rawInput = getRawNode(this.input);
-      const rawWet   = getRawNode(this.wetGain);
+      const rawInput = getNativeAudioNode(this.input)!;
+      const rawWet   = getNativeAudioNode(this.wetGain)!;
       rawInput.connect(this.workletNode);
       this.workletNode.connect(rawWet);
 
