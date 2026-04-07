@@ -536,6 +536,36 @@ export const SonicArrangerControls: React.FC<SonicArrangerControlsProps> = ({
     ['modulation', 'Modulation'],
   ] as const, []);
 
+  // ── Sample browser pane ──────────────────────────────────────────────────
+  // Sonic Arranger carries its full waveform bank INSIDE each instrument's
+  // config as `allWaveforms: number[][]` (one signed-byte array per waveform).
+  // No cross-instrument walk needed — the data is all local to `config`.
+  // Highlight the currently-selected waveform as "(this instrument)".
+  const [showSamplePane, setShowSamplePane] = useState(false);
+
+  /** Map signed-byte waveform samples to an 8-cell ASCII bar visualization. */
+  function miniWave(data: number[]): string {
+    if (!data || data.length === 0) return '';
+    const bars = ['▁', '▂', '▃', '▄', '▅', '▆', '▇', '█'];
+    const cells = 16;
+    const out: string[] = [];
+    const step = Math.max(1, Math.floor(data.length / cells));
+    for (let i = 0; i < cells; i++) {
+      const start = i * step;
+      const end = Math.min(data.length, start + step);
+      let sum = 0;
+      for (let j = start; j < end; j++) {
+        const v = data[j];
+        const s = v > 127 ? v - 256 : v;
+        sum += Math.abs(s);
+      }
+      const avg = sum / Math.max(1, end - start); // 0..127
+      const idx = Math.min(7, Math.floor((avg / 128) * 8));
+      out.push(bars[idx]);
+    }
+    return out.join('');
+  }
+
   return (
     <div className="flex flex-col h-full">
       <div className="flex border-b" style={{ borderColor: dim }}>
@@ -551,10 +581,62 @@ export const SonicArrangerControls: React.FC<SonicArrangerControlsProps> = ({
             {label}
           </button>
         ))}
+        <button
+          onClick={() => setShowSamplePane((v) => !v)}
+          title={`${showSamplePane ? 'Hide' : 'Show'} sample browser`}
+          className={`ml-auto mr-2 my-1 px-2 py-0.5 rounded text-[10px] font-mono border ${
+            showSamplePane
+              ? 'bg-accent-primary/20 text-accent-primary border-accent-primary/60'
+              : 'bg-dark-bg text-text-secondary border-dark-border hover:text-accent-primary hover:border-accent-primary/50'
+          }`}
+        >
+          SMP
+        </button>
       </div>
-      {activeTab === 'synthesis'  && renderSynthesis()}
-      {activeTab === 'envelope'   && renderEnvelope()}
-      {activeTab === 'modulation' && renderModulation()}
+      <div className="flex flex-1 min-h-0">
+        <div className="flex-1 min-w-0 overflow-y-auto">
+          {activeTab === 'synthesis'  && renderSynthesis()}
+          {activeTab === 'envelope'   && renderEnvelope()}
+          {activeTab === 'modulation' && renderModulation()}
+        </div>
+        {showSamplePane && (
+          <div className="w-[220px] flex-shrink-0 border-l border-dark-border bg-dark-bgSecondary overflow-y-auto">
+            <div className="px-2 py-1 font-bold text-xs text-accent-primary border-b border-dark-border bg-dark-bgSecondary sticky top-0">
+              WAVEFORMS ({(config.allWaveforms ?? []).length})
+            </div>
+            {(config.allWaveforms ?? []).length === 0 && (
+              <div className="p-2 text-[10px] text-text-muted italic">
+                No waveform bank on this instrument.
+              </div>
+            )}
+            {(config.allWaveforms ?? []).map((wf, i) => {
+              const isCurrent = i === config.waveformNumber;
+              return (
+                <div
+                  key={i}
+                  className={`px-2 py-1.5 border-b border-dark-border text-[10px] ${
+                    isCurrent ? 'bg-accent-primary/10' : ''
+                  }`}
+                  title={`Waveform #${i} — ${wf.length} bytes`}
+                >
+                  <div className={`font-mono ${isCurrent ? 'text-accent-primary' : 'text-text-primary'}`}>
+                    {String(i).padStart(2, '0')}. wave{i}
+                  </div>
+                  <div className="text-text-muted mt-0.5">
+                    {wf.length} bytes
+                  </div>
+                  <div className="mt-0.5 font-mono text-accent-highlight text-[10px] leading-none tracking-tight">
+                    {miniWave(wf)}
+                  </div>
+                  {isCurrent && (
+                    <div className="mt-0.5 text-[9px] text-accent-primary">(this instrument)</div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
     </div>
   );
 };

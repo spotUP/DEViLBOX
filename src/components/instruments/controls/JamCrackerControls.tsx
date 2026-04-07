@@ -21,10 +21,11 @@
  * and Future Composer (each has a similar AM waveform + parameter model).
  */
 
-import React, { useRef, useEffect, useCallback } from 'react';
+import React, { useRef, useEffect, useCallback, useState, useMemo } from 'react';
 import type { JamCrackerConfig } from '@/types/instrument';
 import { writeWaveformByte } from '@/lib/jamcracker/waveformDraw';
 import { Knob } from '@components/controls/Knob';
+import { useInstrumentStore } from '@stores/useInstrumentStore';
 
 interface JamCrackerControlsProps {
   config: JamCrackerConfig;
@@ -224,8 +225,33 @@ export const JamCrackerControls: React.FC<JamCrackerControlsProps> = ({
     onChange({ ...cur, waveformData: generateWaveformPreset(kind, size) });
   }, [onChange]);
 
+  // ── Sample browser pane ──────────────────────────────────────────────────
+  // JamCracker stores its sample/waveform on the per-instrument config itself
+  // (either `waveformData` for AM or an external PCM buffer referenced by
+  // sampleSize). Walk all JamCracker instruments in the store and list each
+  // as one row — the sole user of each sample is the instrument it lives on.
+  const [showSamplePane, setShowSamplePane] = useState(false);
+  const allInstruments = useInstrumentStore((s) => s.instruments);
+  const sampleRows = useMemo(() => {
+    return allInstruments
+      .filter((inst) => inst.synthType === 'JamCrackerSynth' && inst.jamCracker)
+      .map((inst) => {
+        const c = inst.jamCracker!;
+        return {
+          id: inst.id,
+          instrName: inst.name || c.name || `#${inst.id}`,
+          sampleName: c.name || '(unnamed)',
+          size: c.isAM ? (c.waveformData?.length ?? 64) : c.sampleSize,
+          isAM: c.isAM,
+          hasLoop: c.hasLoop,
+          isCurrent: c === config,
+        };
+      });
+  }, [allInstruments, config]);
+
   return (
-    <div className="p-4 space-y-4 synth-controls-flow">
+    <div className="flex h-full">
+      <div className="p-4 space-y-4 synth-controls-flow flex-1 min-w-0 overflow-y-auto">
       {/* Header */}
       <div className="flex items-center gap-3 text-sm">
         <span className="text-accent-highlight font-mono font-bold">JamCracker Pro</span>
@@ -247,6 +273,17 @@ export const JamCrackerControls: React.FC<JamCrackerControlsProps> = ({
               PCM ({config.sampleSize} bytes)
             </span>
           )}
+          <button
+            onClick={() => setShowSamplePane((v) => !v)}
+            title={`${showSamplePane ? 'Hide' : 'Show'} sample browser`}
+            className={`px-2 py-0.5 rounded text-[10px] font-mono border ${
+              showSamplePane
+                ? 'bg-accent-primary/20 text-accent-primary border-accent-primary/60'
+                : 'bg-dark-bg text-text-secondary border-dark-border hover:text-accent-primary hover:border-accent-primary/50'
+            }`}
+          >
+            SMP
+          </button>
         </div>
       </div>
 
@@ -318,6 +355,44 @@ export const JamCrackerControls: React.FC<JamCrackerControlsProps> = ({
         Flags: 0x{config.flags.toString(16).padStart(2, '0')}
         {config.isAM ? ' (AM synthesis — 64-byte waveform loop with phase modulation)' : ' (PCM sample)'}
       </div>
+      </div>
+
+      {/* Sample browser pane (toggle via SMP button) */}
+      {showSamplePane && (
+        <div className="w-[220px] flex-shrink-0 border-l border-dark-border bg-dark-bgSecondary overflow-y-auto">
+          <div className="px-2 py-1 font-bold text-xs text-accent-primary border-b border-dark-border bg-dark-bgSecondary sticky top-0">
+            SAMPLES ({sampleRows.length})
+          </div>
+          {sampleRows.length === 0 && (
+            <div className="p-2 text-[10px] text-text-muted italic">
+              No JamCracker instruments loaded.
+            </div>
+          )}
+          {sampleRows.map((s) => (
+            <div
+              key={s.id}
+              className={`px-2 py-1.5 border-b border-dark-border text-[10px] ${
+                s.isCurrent ? 'bg-accent-primary/10' : ''
+              }`}
+              title={`Instrument #${s.id}: ${s.instrName}`}
+            >
+              <div className={`font-mono truncate ${s.isCurrent ? 'text-accent-primary' : 'text-text-primary'}`}>
+                {String(s.id).padStart(2, '0')}. {s.sampleName}
+              </div>
+              <div className="text-text-muted mt-0.5">
+                {s.size} bytes
+                {s.hasLoop && <span className="ml-1 text-accent-success">·loop</span>}
+              </div>
+              <div className="mt-0.5 text-[9px]">
+                <span className={s.isAM ? 'text-accent-highlight' : 'text-accent-secondary'}>
+                  {s.isAM ? 'AM SYNTH' : 'PCM'}
+                </span>
+                {s.isCurrent && <span className="ml-1 text-accent-primary">(this instrument)</span>}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 };

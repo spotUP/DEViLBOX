@@ -18,12 +18,13 @@
  * read/write paths can never drift apart.
  */
 
-import React, { useRef, useEffect, useCallback, useState } from 'react';
+import React, { useRef, useEffect, useCallback, useState, useMemo } from 'react';
 import type { FuturePlayerConfig } from '@/types/instrument/exotic';
 import { Knob } from '@components/controls/Knob';
 import { useInstrumentColors } from '@/hooks/useInstrumentColors';
 import { EnvelopeVisualization } from '@components/instruments/shared';
 import { FuturePlayerEngine } from '@/engine/futureplayer/FuturePlayerEngine';
+import { useInstrumentStore } from '@stores/useInstrumentStore';
 
 // Future Player instrument detail struct byte offsets (from FuturePlayer.c
 // update_audio() — same offsets the parser uses to read these fields).
@@ -110,8 +111,31 @@ export const FuturePlayerControls: React.FC<FuturePlayerControlsProps> = ({
     { id: 'sampleMod', label: 'Sample Mod' },
   ];
 
+  // ── Sample browser pane ──────────────────────────────────────────────────
+  // Future Player stores its sample data off-module (pointed at by
+  // instr_ptr + 8). What the config actually carries is `sampleSize` and
+  // `isWavetable` — enough for a cross-instrument summary. Walk every
+  // FuturePlayerSynth instrument in the store and emit one row each.
+  const [showSamplePane, setShowSamplePane] = useState(false);
+  const allInstruments = useInstrumentStore((s) => s.instruments);
+  const sampleRows = useMemo(() => {
+    return allInstruments
+      .filter((inst) => inst.synthType === 'FuturePlayerSynth' && inst.futurePlayer)
+      .map((inst) => {
+        const c = inst.futurePlayer!;
+        return {
+          id: inst.id,
+          instrName: inst.name || `#${inst.id}`,
+          size: c.sampleSize,
+          isWavetable: c.isWavetable,
+          isCurrent: c === config,
+        };
+      });
+  }, [allInstruments, config]);
+
   return (
-    <div className="p-3 space-y-3">
+    <div className="flex h-full">
+      <div className="p-3 space-y-3 flex-1 min-w-0 overflow-y-auto">
       {/* Type badge */}
       <div className="flex items-center gap-2 text-xs">
         <span className={`px-2 py-0.5 rounded ${isCyan ? 'bg-accent-highlight/20 text-accent-highlight' : 'bg-orange-900/30 text-orange-300'}`}>
@@ -120,6 +144,17 @@ export const FuturePlayerControls: React.FC<FuturePlayerControlsProps> = ({
         {config.sampleSize > 0 && (
           <span className="text-text-muted">{config.sampleSize} bytes</span>
         )}
+        <button
+          onClick={() => setShowSamplePane((v) => !v)}
+          title={`${showSamplePane ? 'Hide' : 'Show'} sample browser`}
+          className={`ml-auto px-2 py-0.5 rounded text-[10px] font-mono border ${
+            showSamplePane
+              ? 'bg-accent-primary/20 text-accent-primary border-accent-primary/60'
+              : 'bg-dark-bg text-text-secondary border-dark-border hover:text-accent-primary hover:border-accent-primary/50'
+          }`}
+        >
+          SMP
+        </button>
       </div>
 
       {/* Tab bar */}
@@ -344,6 +379,43 @@ export const FuturePlayerControls: React.FC<FuturePlayerControlsProps> = ({
               </div>
             )}
           </div>
+        </div>
+      )}
+      </div>
+
+      {/* Sample browser pane (toggle via SMP button) */}
+      {showSamplePane && (
+        <div className="w-[220px] flex-shrink-0 border-l border-dark-border bg-dark-bgSecondary overflow-y-auto">
+          <div className="px-2 py-1 font-bold text-xs text-accent-primary border-b border-dark-border bg-dark-bgSecondary sticky top-0">
+            SAMPLES ({sampleRows.length})
+          </div>
+          {sampleRows.length === 0 && (
+            <div className="p-2 text-[10px] text-text-muted italic">
+              No Future Player instruments loaded.
+            </div>
+          )}
+          {sampleRows.map((s) => (
+            <div
+              key={s.id}
+              className={`px-2 py-1.5 border-b border-dark-border text-[10px] ${
+                s.isCurrent ? 'bg-accent-primary/10' : ''
+              }`}
+              title={`Instrument #${s.id}: ${s.instrName}`}
+            >
+              <div className={`font-mono truncate ${s.isCurrent ? 'text-accent-primary' : 'text-text-primary'}`}>
+                {String(s.id).padStart(2, '0')}. {s.instrName}
+              </div>
+              <div className="text-text-muted mt-0.5">
+                {s.size > 0 ? `${s.size} bytes` : '—'}
+              </div>
+              <div className="mt-0.5 text-[9px]">
+                <span className={s.isWavetable ? 'text-accent-highlight' : 'text-accent-secondary'}>
+                  {s.isWavetable ? 'WAVETABLE' : 'PCM'}
+                </span>
+                {s.isCurrent && <span className="ml-1 text-accent-primary">(this instrument)</span>}
+              </div>
+            </div>
+          ))}
         </div>
       )}
     </div>

@@ -33,6 +33,7 @@ import {
 import { UADEChipEditor } from '@/engine/uade/UADEChipEditor';
 import { UADEEngine } from '@/engine/uade/UADEEngine';
 import { encodeFCVolEnvelope, encodeFCFreqMacro } from '@/engine/uade/chipRamEncoders';
+import { useInstrumentStore } from '@stores/useInstrumentStore';
 
 interface FCControlsProps {
   config: FCConfig;
@@ -330,6 +331,30 @@ export const FCControls: React.FC<FCControlsProps> = ({ config, onChange, uadeCh
     { id: 'arpeggio', label: 'Arpeggio' },
   ];
 
+  // ── Sample browser pane ──────────────────────────────────────────────────
+  // Future Composer waveforms come from a shared 47-entry table that lives
+  // in chip RAM (sections.waveData). The parser doesn't expose per-waveform
+  // length metadata via sections, but each FCConfig carries its active
+  // wave via `waveNumber` + optional `wavePCM` (the decoded samples for
+  // that single wave). Walk every FCSynth instrument in the store and
+  // list one row per instrument showing its active wave.
+  const [showSamplePane, setShowSamplePane] = useState(false);
+  const allInstruments = useInstrumentStore((s) => s.instruments);
+  const sampleRows = useMemo(() => {
+    return allInstruments
+      .filter((inst) => inst.synthType === 'FCSynth' && inst.fc)
+      .map((inst) => {
+        const c = inst.fc!;
+        return {
+          id: inst.id,
+          instrName: inst.name || `#${inst.id}`,
+          waveNumber: c.waveNumber,
+          waveSize: c.wavePCM?.length ?? 0,
+          isCurrent: c === config,
+        };
+      });
+  }, [allInstruments, config]);
+
   return (
     <div className="flex flex-col h-full">
       <div className="flex border-b" style={{ borderColor: dim }}>
@@ -345,10 +370,60 @@ export const FCControls: React.FC<FCControlsProps> = ({ config, onChange, uadeCh
             {label}
           </button>
         ))}
+        <button
+          onClick={() => setShowSamplePane((v) => !v)}
+          title={`${showSamplePane ? 'Hide' : 'Show'} sample browser`}
+          className={`ml-auto mr-2 my-1 px-2 py-0.5 rounded text-[10px] font-mono border ${
+            showSamplePane
+              ? 'bg-accent-primary/20 text-accent-primary border-accent-primary/60'
+              : 'bg-dark-bg text-text-secondary border-dark-border hover:text-accent-primary hover:border-accent-primary/50'
+          }`}
+        >
+          SMP
+        </button>
       </div>
-      {activeTab === 'envelope' && renderEnvelope()}
-      {activeTab === 'synth'    && renderSynth()}
-      {activeTab === 'arpeggio' && renderArpeggio()}
+      <div className="flex flex-1 min-h-0">
+        <div className="flex-1 min-w-0 overflow-y-auto">
+          {activeTab === 'envelope' && renderEnvelope()}
+          {activeTab === 'synth'    && renderSynth()}
+          {activeTab === 'arpeggio' && renderArpeggio()}
+        </div>
+        {showSamplePane && (
+          <div className="w-[220px] flex-shrink-0 border-l border-dark-border bg-dark-bgSecondary overflow-y-auto">
+            <div className="px-2 py-1 font-bold text-xs text-accent-primary border-b border-dark-border bg-dark-bgSecondary sticky top-0">
+              SAMPLES ({sampleRows.length})
+            </div>
+            {sampleRows.length === 0 && (
+              <div className="p-2 text-[10px] text-text-muted italic">
+                No Future Composer instruments loaded.
+              </div>
+            )}
+            {sampleRows.map((s) => (
+              <div
+                key={s.id}
+                className={`px-2 py-1.5 border-b border-dark-border text-[10px] ${
+                  s.isCurrent ? 'bg-accent-primary/10' : ''
+                }`}
+                title={`Instrument #${s.id}: ${s.instrName}`}
+              >
+                <div className={`font-mono truncate ${s.isCurrent ? 'text-accent-primary' : 'text-text-primary'}`}>
+                  {String(s.id).padStart(2, '0')}. {s.instrName}
+                </div>
+                <div className="text-text-muted mt-0.5">
+                  wave #{s.waveNumber}
+                  {s.waveSize > 0 && <span className="ml-1">· {s.waveSize}B</span>}
+                </div>
+                <div className="mt-0.5 text-[9px]">
+                  <span className={s.waveNumber < 10 ? 'text-accent-secondary' : 'text-accent-highlight'}>
+                    {s.waveNumber < 10 ? 'PCM SLOT' : 'SYNTH WAVE'}
+                  </span>
+                  {s.isCurrent && <span className="ml-1 text-accent-primary">(this instrument)</span>}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
       {uadeChipRam && (
         <div className="flex justify-end px-3 py-2 border-t border-yellow-900/30">
           <button
