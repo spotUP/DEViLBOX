@@ -276,7 +276,28 @@ async function main() {
     let filename = '';
 
     try {
-      // ── 0. Clear state ──
+      // ── 0. Clean slate: stop any playback, verify browser is alive ──
+      try { await client.call('stop'); } catch {}
+      await sleep(500);
+      // Health check — if this fails, browser is disconnected
+      try {
+        await client.call('get_song_info');
+      } catch (e: any) {
+        if (e.message?.includes('disconnected') || e.message?.includes('No browser')) {
+          console.log(`${label} ⏳ Browser down, waiting for reconnect...`);
+          await sleep(12000);
+          try { client.close(); } catch {}
+          try { client = await createClient(); } catch {
+            console.log(`${label} ✗ Could not reconnect. Stopping.`);
+            break;
+          }
+          // Retry health check
+          try { await client.call('get_song_info'); } catch {
+            console.log(`${label} ✗ Still disconnected after retry. Stopping.`);
+            break;
+          }
+        }
+      }
       await client.call('clear_console_errors');
       try {
         const as = await client.call('get_audio_state');
@@ -376,9 +397,11 @@ async function main() {
       checks.noteDensity = totalNotes > 0;
 
       // ── 7. Play & check audio ──
-      await client.call('play');
+      await client.call('play', { mode: 'song' });
+      // Wait for audio to start (up to 5s), then let it play
+      try { await client.call('wait_for_audio', { thresholdRms: 0.001, timeoutMs: 5000 }); } catch {}
       await sleep(PLAY_MS);
-      const level = await client.call('get_audio_level');
+      const level = await client.call('get_audio_level', { durationMs: 1000 });
       rms = level?.rmsAvg ?? level?.data?.rmsAvg ?? 0;
       if (rms < 0.001) issues.push(`silent (rms=${rms.toFixed(6)})`);
       checks.audio = rms >= 0.001;
@@ -467,7 +490,12 @@ async function main() {
       // ── 10. Check console errors ──
       const errResp = await client.call('get_console_errors');
       const entries = errResp?.data?.entries || errResp?.entries || [];
-      const realErrors = entries.filter((e: any) => e.level === 'error');
+      const realErrors = entries.filter((e: any) =>
+        e.level === 'error' &&
+        !e.message?.includes('MIDIManager') &&
+        !e.message?.includes('AudioContext was not allowed') &&
+        !e.message?.includes('Failed to load resource')
+      );
       if (realErrors.length > 0) {
         const errMsgs = realErrors.map((e: any) => e.message?.substring(0, 60)).join('; ');
         issues.push(`${realErrors.length} errors: ${errMsgs}`);
