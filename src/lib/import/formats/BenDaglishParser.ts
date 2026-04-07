@@ -30,7 +30,7 @@
  */
 
 import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
-import type { InstrumentConfig } from '@/types';
+import type { InstrumentConfig, Pattern, ChannelData, TrackerCell } from '@/types';
 import { createSamplerInstrument } from './AmigaUtils';
 
 // ── Constants ───────────────────────────────────────────────────────────────
@@ -44,16 +44,840 @@ import { createSamplerInstrument } from './AmigaUtils';
  */
 const DEFAULT_INSTRUMENTS = 8;
 
+const ROWS_PER_PATTERN = 64;
+const MAX_PATTERNS = 256;
+const MAX_POSITION_LIST_LEN = 4096;
+const MAX_TRACK_LEN = 4096;
+
 // ── Binary helpers ──────────────────────────────────────────────────────────
 
 function u16BE(buf: Uint8Array, off: number): number {
   return ((buf[off] << 8) | buf[off + 1]) >>> 0;
 }
 
+function s16BE(buf: Uint8Array, off: number): number {
+  const v = u16BE(buf, off);
+  return v < 0x8000 ? v : v - 0x10000;
+}
+
 function u32BE(buf: Uint8Array, off: number): number {
   return (
     ((buf[off] << 24) | (buf[off + 1] << 16) | (buf[off + 2] << 8) | buf[off + 3]) >>> 0
   );
+}
+
+// ── Feature flags (simplified — conservative defaults) ──────────────────────
+
+interface BDFeatures {
+  maxTrackValue: number;
+  maxSampleMappingValue: number;
+  usesCxTrackEffects: boolean;
+  uses9xTrackEffects: boolean;
+  enablePortamento: boolean;
+  enableVolumeFade: boolean;
+  enableFinalVolumeSlide: boolean;
+  enableC0TrackLoop: boolean;
+  enableF0TrackLoop: boolean;
+  extraTickArg: boolean;
+  masterVolumeFadeVersion: number; // -1 = none
+  setSampleMappingVersion: number;
+  getSampleMappingVersion: number;
+  checkForTicks: boolean;
+}
+
+function defaultFeatures(): BDFeatures {
+  return {
+    maxTrackValue: 0x80,
+    maxSampleMappingValue: 0x87,
+    usesCxTrackEffects: true,
+    uses9xTrackEffects: false,
+    enablePortamento: true,
+    enableVolumeFade: true,
+    enableFinalVolumeSlide: false,
+    enableC0TrackLoop: false,
+    enableF0TrackLoop: false,
+    extraTickArg: false,
+    masterVolumeFadeVersion: -1,
+    setSampleMappingVersion: 1,
+    getSampleMappingVersion: 1,
+    checkForTicks: false,
+  };
+}
+
+// ── Offset extraction (mirrors ben_daglish.c) ──────────────────────────────
+
+interface BDOffsets {
+  subSongListOffset: number;
+  sampleInfoOffsetTableOffset: number;
+  trackOffsetTableOffset: number;
+  tracksOffset: number;
+  features: BDFeatures;
+}
+
+function bdExtractInfoFromInit(
+  buf: Uint8Array, startOfInit: number,
+): { subSongListOffset: number; sampleInfoOffsetTableOffset: number } | null {
+  const searchLen = Math.min(buf.length, 0x3000);
+
+  // Find sub-song info: [0x41, 0xFA, xx, xx, 0x22, 0x08]
+  let index = startOfInit;
+  for (; index < searchLen - 6; index += 2) {
+    if (buf[index] === 0x41 && buf[index + 1] === 0xFA &&
+        buf[index + 4] === 0x22 && buf[index + 5] === 0x08) break;
+  }
+  if (index >= searchLen - 6) return null;
+
+  const subSongListOffset = s16BE(buf, index + 2) + index + 2;
+  index += 4;
+
+  // Find sample info offset table: [0x41, 0xFA, xx, xx, 0x23, 0x48]
+  for (; index < searchLen - 6; index += 2) {
+    if (buf[index] === 0x41 && buf[index + 1] === 0xFA &&
+        buf[index + 4] === 0x23 && buf[index + 5] === 0x48) break;
+  }
+  if (index >= searchLen - 6) return null;
+
+  const sampleInfoOffsetTableOffset = s16BE(buf, index + 2) + index + 2;
+  return { subSongListOffset, sampleInfoOffsetTableOffset };
+}
+
+function bdExtractInfoFromPlay(
+  buf: Uint8Array, startOfPlay: number,
+): { trackOffsetTableOffset: number; tracksOffset: number } | null {
+  const searchLen = Math.min(buf.length, 0x3000);
+
+  // Find track offset table: [0x47, 0xFA, xx, xx, {0x48,0x80 or 0xD0,0x40}]
+  let index = startOfPlay;
+  for (; index < searchLen - 6; index += 2) {
+    if (buf[index] === 0x47 && buf[index + 1] === 0xFA &&
+        ((buf[index + 4] === 0x48 && buf[index + 5] === 0x80) ||
+         (buf[index + 4] === 0xD0 && buf[index + 5] === 0x40))) break;
+  }
+  if (index >= searchLen - 6) return null;
+
+  const trackOffsetTableOffset = s16BE(buf, index + 2) + index + 2;
+  index += 4;
+
+  // Find tracks offset: [0x47, 0xFA, xx, xx, 0xD6, 0xC0]
+  for (; index < searchLen - 6; index += 2) {
+    if (buf[index] === 0x47 && buf[index + 1] === 0xFA &&
+        buf[index + 4] === 0xD6 && buf[index + 5] === 0xC0) break;
+  }
+  if (index >= searchLen - 6) return null;
+
+  const tracksOffset = s16BE(buf, index + 2) + index + 2;
+  return { trackOffsetTableOffset, tracksOffset };
+}
+
+/**
+ * Detect feature flags by scanning play routine opcodes.
+ * Mirrors bd_find_features_in_play from the C reference.
+ * On failure, returns conservative defaults so parsing can still proceed.
+ */
+function bdFindFeatures(buf: Uint8Array, startOfPlay: number): BDFeatures {
+  const f = defaultFeatures();
+  const searchLen = Math.min(buf.length, 0x3000);
+
+  // Find max_track_value: scan for [0x10, 0x1B] (move.b (A3)+,D0)
+  let index = startOfPlay;
+  for (; index < searchLen - 6; index += 2) {
+    if (buf[index] === 0x10 && buf[index + 1] === 0x1B) break;
+  }
+  if (index < searchLen - 6) {
+    if ((buf[index + 2] === 0xB0 && buf[index + 3] === 0x3C) ||
+        (buf[index + 2] === 0x0C && buf[index + 3] === 0x00)) {
+      f.maxTrackValue = buf[index + 5];
+    }
+
+    // Find loop control: scan for cmp + bge pattern
+    for (index += 4; index < searchLen - 6; index += 2) {
+      if (((buf[index] === 0xB0 && buf[index + 1] === 0x3C) ||
+           (buf[index] === 0x0C && buf[index + 1] === 0x00)) &&
+          buf[index + 4] === 0x6C) break;
+    }
+    if (index < searchLen - 6) {
+      const effect = (buf[index + 2] << 8) | buf[index + 3];
+      f.enableC0TrackLoop = effect === 0x00C0;
+      f.enableF0TrackLoop = effect === 0x00F0;
+
+      // Determine set_sample_mapping_version
+      const jumpTarget = buf[index + 5] + index + 6;
+      if (jumpTarget < buf.length - 1) {
+        if (buf[jumpTarget] === 0x02 && buf[jumpTarget + 1] === 0x40) {
+          f.setSampleMappingVersion = 1;
+        } else if (buf[jumpTarget] === 0x04 && buf[jumpTarget + 1] === 0x00) {
+          f.setSampleMappingVersion = 2;
+        }
+      }
+    }
+  }
+
+  // Find portamento/volume fade checks
+  for (index = startOfPlay; index < searchLen - 2; index += 2) {
+    if (buf[index] === 0x53 && buf[index + 1] === 0x2C) break;
+  }
+  if (index < searchLen - 2) {
+    for (; index >= startOfPlay; index -= 2) {
+      if (buf[index] === 0x49 && buf[index + 1] === 0xFA) break;
+      if (buf[index] === 0x61 && buf[index + 1] === 0x00) {
+        const methodIdx = s16BE(buf, index + 2) + index + 2;
+        if (methodIdx >= 0 && methodIdx < searchLen - 14) {
+          if (buf[methodIdx] === 0x4A && buf[methodIdx + 1] === 0x2C &&
+              buf[methodIdx + 4] === 0x67 && buf[methodIdx + 6] === 0x6A &&
+              buf[methodIdx + 8] === 0x30 && buf[methodIdx + 9] === 0x29) {
+            f.enablePortamento = true;
+          } else if (buf[methodIdx] === 0x4A && buf[methodIdx + 1] === 0x2C &&
+                     buf[methodIdx + 4] === 0x67 && buf[methodIdx + 6] === 0x4A &&
+                     buf[methodIdx + 7] === 0x2C && buf[methodIdx + 10] === 0x67) {
+            f.enableVolumeFade = true;
+          }
+        }
+      }
+    }
+  }
+
+  // Find handle_effects to detect final_volume_slide and master_volume_fade
+  if (buf[startOfPlay] === 0x61 && buf[startOfPlay + 1] === 0x00) {
+    const handleEffectsStart = s16BE(buf, startOfPlay + 2) + startOfPlay + 2;
+    if (handleEffectsStart >= 0 && handleEffectsStart < searchLen - 2) {
+      // Scan for JSR (A0) callback
+      for (index = handleEffectsStart; index < searchLen - 2; index += 2) {
+        if (buf[index] === 0x4E && buf[index + 1] === 0x90) break;
+      }
+      if (index < searchLen - 2) {
+        const callbackIdx = index;
+        // Search backward for BSR.W calls to find enable_final_volume_slide
+        for (; index >= handleEffectsStart; index -= 2) {
+          if (buf[index] === 0x4E && buf[index + 1] === 0x75) break;
+          if (buf[index] === 0x61 && buf[index + 1] === 0x00) {
+            const mi = s16BE(buf, index + 2) + index + 2;
+            if (mi >= 0 && mi < searchLen - 14) {
+              if (buf[mi] === 0x30 && buf[mi + 1] === 0x2B &&
+                  buf[mi + 4] === 0x67 && buf[mi + 6] === 0x53 && buf[mi + 7] === 0x6B) {
+                f.enableFinalVolumeSlide = true;
+              }
+            }
+          }
+        }
+        // Detect master_volume_fade
+        if (buf[handleEffectsStart] === 0x61 && buf[handleEffectsStart + 1] === 0x00) {
+          const mvfIdx = s16BE(buf, handleEffectsStart + 2) + handleEffectsStart + 2;
+          if (mvfIdx >= 0 && mvfIdx < searchLen - 24) {
+            if (buf[mvfIdx] === 0x30 && buf[mvfIdx + 1] === 0x3A &&
+                buf[mvfIdx + 4] === 0x67 && buf[mvfIdx + 5] === 0x00) {
+              f.masterVolumeFadeVersion = 1;
+            } else if (buf[mvfIdx] === 0x10 && buf[mvfIdx + 1] === 0x3A &&
+                       buf[mvfIdx + 4] === 0x67 && buf[mvfIdx + 5] === 0x00) {
+              f.masterVolumeFadeVersion = 2;
+            }
+          }
+        }
+        // Detect set_dma_in_sample_handlers (we don't need it for parsing)
+        // but we need callback_index to check BNE/BNE offset for
+        // post-callback analysis — skip for simplicity.
+        void callbackIdx;
+      }
+    }
+  }
+
+  // Detect parse_track features (extra_tick_arg, max_sample_mapping_value, etc.)
+  for (index = startOfPlay; index < searchLen - 4; index += 2) {
+    if (buf[index] === 0x60 && buf[index + 1] === 0x00) break;
+  }
+  if (index < searchLen - 4) {
+    const parseTrackStart = s16BE(buf, index + 2) + index + 2;
+    if (parseTrackStart >= 0 && parseTrackStart < searchLen) {
+      // Find extra_tick_arg check
+      for (let i2 = parseTrackStart; i2 < searchLen - 8; i2 += 2) {
+        if (buf[i2] === 0x72 && buf[i2 + 1] === 0x00 &&
+            buf[i2 + 2] === 0x12 && buf[i2 + 3] === 0x1B) {
+          f.extraTickArg = buf[i2 + 4] === 0x66;
+          break;
+        }
+      }
+
+      // Find BSR.W to parse_track_effect
+      for (let i2 = parseTrackStart; i2 < searchLen - 4; i2 += 2) {
+        if (buf[i2] === 0x61 && buf[i2 + 1] === 0x00) {
+          const pteStart = s16BE(buf, i2 + 2) + i2 + 2;
+          if (pteStart >= 0 && pteStart < searchLen - 12) {
+            // Extract max_sample_mapping_value
+            if ((buf[pteStart + 2] === 0xB0 && buf[pteStart + 3] === 0x3C) ||
+                (buf[pteStart + 2] === 0x0C && buf[pteStart + 3] === 0x00)) {
+              f.maxSampleMappingValue = buf[pteStart + 5];
+
+              if (pteStart + 11 < searchLen) {
+                if (buf[pteStart + 8] === 0x02 && buf[pteStart + 9] === 0x40 &&
+                    buf[pteStart + 10] === 0x00) {
+                  if (buf[pteStart + 11] === 0x07) f.getSampleMappingVersion = 1;
+                  else if (buf[pteStart + 11] === 0xFF) f.getSampleMappingVersion = 2;
+                }
+              }
+
+              // Find 9x vs cx track effects
+              for (let i3 = pteStart + 12; i3 < searchLen - 6; i3 += 2) {
+                if (((buf[i3] === 0xB0 && buf[i3 + 1] === 0x3C) ||
+                     (buf[i3] === 0x0C && buf[i3 + 1] === 0x00)) &&
+                    buf[i3 + 4] === 0x6C) {
+                  f.uses9xTrackEffects = (buf[i3 + 3] & 0xF0) === 0x90;
+                  f.usesCxTrackEffects = (buf[i3 + 3] & 0xF0) === 0xC0;
+                  break;
+                }
+              }
+            }
+          }
+          break;
+        }
+      }
+    }
+  }
+
+  return f;
+}
+
+function bdFindOffsets(buf: Uint8Array): BDOffsets | null {
+  const len = buf.length;
+  if (len < 0x1600) return null;
+
+  // Verify BRA instructions
+  if (buf[0] !== 0x60 || buf[1] !== 0x00 || buf[4] !== 0x60 || buf[5] !== 0x00 ||
+      buf[10] !== 0x60 || buf[11] !== 0x00) return null;
+
+  const startOfInit = s16BE(buf, 2) + 2;
+  const startOfPlay = s16BE(buf, 6) + 4 + 2;
+  const searchLimit = Math.min(len, 0x3000);
+
+  if (startOfInit < 0 || startOfInit >= searchLimit - 14) return null;
+  if (startOfPlay < 0 || startOfPlay >= searchLimit) return null;
+
+  // Validate init function signature
+  if (buf[startOfInit] !== 0x3F || buf[startOfInit + 1] !== 0x00 ||
+      buf[startOfInit + 2] !== 0x61 || buf[startOfInit + 3] !== 0x00 ||
+      buf[startOfInit + 6] !== 0x3D || buf[startOfInit + 7] !== 0x7C ||
+      buf[startOfInit + 12] !== 0x41 || buf[startOfInit + 13] !== 0xFA) return null;
+
+  const initResult = bdExtractInfoFromInit(buf, startOfInit);
+  if (!initResult) return null;
+
+  const playResult = bdExtractInfoFromPlay(buf, startOfPlay);
+  if (!playResult) return null;
+
+  const features = bdFindFeatures(buf, startOfPlay);
+
+  return {
+    subSongListOffset: initResult.subSongListOffset,
+    sampleInfoOffsetTableOffset: initResult.sampleInfoOffsetTableOffset,
+    trackOffsetTableOffset: playResult.trackOffsetTableOffset,
+    tracksOffset: playResult.tracksOffset,
+    features,
+  };
+}
+
+// ── Track command argument count (mirrors C reference) ──────────────────────
+
+function bdTrackCommandArgCount(cmd: number, nextByte: number, f: BDFeatures): number {
+  if (cmd < 0x7F) {
+    if (f.extraTickArg && nextByte === 0) return 2;
+    return 1;
+  }
+  if (cmd === 0x7F) return 1;
+  if (cmd <= f.maxSampleMappingValue) return 0;
+  if ((f.usesCxTrackEffects && cmd < 0xC0) || (f.uses9xTrackEffects && cmd < 0x9B)) return 0;
+
+  // Portamento enable (3 args)
+  if ((cmd === 0xC0 && f.usesCxTrackEffects && f.enablePortamento) ||
+      (cmd === 0x9B && f.uses9xTrackEffects && f.enablePortamento)) return 3;
+  // Portamento disable (0 args)
+  if ((cmd === 0xC1 && f.usesCxTrackEffects && f.enablePortamento) ||
+      (cmd === 0x9C && f.uses9xTrackEffects && f.enablePortamento)) return 0;
+  // Volume fade enable (3 args)
+  if ((cmd === 0xC2 && f.usesCxTrackEffects && f.enableVolumeFade) ||
+      (cmd === 0x9D && f.uses9xTrackEffects && f.enableVolumeFade)) return 3;
+  // Volume fade disable (0 args)
+  if ((cmd === 0xC3 && f.usesCxTrackEffects && f.enableVolumeFade) ||
+      (cmd === 0x9E && f.uses9xTrackEffects && f.enableVolumeFade)) return 0;
+  // Portamento2 enable (1 arg)
+  if ((cmd === 0xC4 && f.usesCxTrackEffects && f.enablePortamento) ||
+      (cmd === 0x9F && f.uses9xTrackEffects && f.enablePortamento)) return 1;
+  // Portamento2 disable (0 args)
+  if ((cmd === 0xC5 && f.usesCxTrackEffects && f.enablePortamento) ||
+      (cmd === 0xA0 && f.uses9xTrackEffects && f.enablePortamento)) return 0;
+  // Channel volume (1 or 3 args)
+  if ((cmd === 0xC6 && f.usesCxTrackEffects && f.enableVolumeFade) ||
+      (cmd === 0xA1 && f.uses9xTrackEffects && f.enableVolumeFade)) {
+    return f.enableFinalVolumeSlide ? 3 : 1;
+  }
+  // Final volume slide disable (0 args)
+  if ((cmd === 0xC7 && f.usesCxTrackEffects && f.enableFinalVolumeSlide) ||
+      (cmd === 0xA2 && f.uses9xTrackEffects && f.enableFinalVolumeSlide)) return 0;
+
+  return -1; // unknown
+}
+
+// ── Position list command argument count ────────────────────────────────────
+
+function bdPositionCommandArgCount(cmd: number, f: BDFeatures): number {
+  if (cmd < f.maxTrackValue) return 0;
+  if (f.enableC0TrackLoop) {
+    if (cmd < 0xA0) return 0;
+    if (cmd < 0xC8) return 1;
+  }
+  if (f.enableF0TrackLoop) {
+    if (cmd < 0xF0) return 0;
+    if (cmd < 0xF8) return 1;
+  }
+  if (cmd === 0xFD && f.masterVolumeFadeVersion > 0) return 1;
+  if (cmd === 0xFE) return 1;
+  return -1; // end marker or unknown
+}
+
+// ── Track loading ──────────────────────────────────────────────────────────
+
+function bdLoadSingleTrack(
+  buf: Uint8Array, offset: number, f: BDFeatures,
+): Uint8Array | null {
+  if (offset < 0 || offset >= buf.length) return null;
+
+  const data: number[] = [];
+  let pos = offset;
+
+  while (data.length < MAX_TRACK_LEN) {
+    if (pos >= buf.length) return null;
+    const cmd = buf[pos++];
+    data.push(cmd);
+    if (cmd === 0xFF) break;
+
+    if (pos >= buf.length) return null;
+    const nextByte = buf[pos];
+    const argCount = bdTrackCommandArgCount(cmd, nextByte, f);
+    if (argCount === -1) return null;
+
+    for (let i = 0; i < argCount; i++) {
+      if (pos >= buf.length) return null;
+      data.push(buf[pos++]);
+    }
+  }
+
+  return new Uint8Array(data);
+}
+
+function bdLoadTracks(buf: Uint8Array, offsets: BDOffsets): Uint8Array[] | null {
+  const numTracks = (offsets.subSongListOffset - offsets.trackOffsetTableOffset) / 2;
+  if (numTracks <= 0 || numTracks > 1024) return null;
+
+  const tablePos = offsets.trackOffsetTableOffset;
+  if (tablePos < 0 || tablePos + numTracks * 2 > buf.length) return null;
+
+  const tracks: Uint8Array[] = [];
+  for (let i = 0; i < numTracks; i++) {
+    const trackOffset = u16BE(buf, tablePos + i * 2);
+    const absOffset = offsets.tracksOffset + trackOffset;
+    const trackData = bdLoadSingleTrack(buf, absOffset, offsets.features);
+    if (!trackData) return null;
+    tracks.push(trackData);
+  }
+  return tracks;
+}
+
+// ── Sub-song and position list loading ──────────────────────────────────────
+
+interface BDSubSong {
+  positionLists: [number, number, number, number];
+}
+
+function bdLoadSubSongs(buf: Uint8Array, subSongListOffset: number): BDSubSong[] | null {
+  if (subSongListOffset < 0 || subSongListOffset >= buf.length) return null;
+
+  const songs: BDSubSong[] = [];
+  let firstPosListOffset = 0x7FFFFFFF;
+  let pos = subSongListOffset;
+
+  do {
+    if (pos + 8 > buf.length) return null;
+    const pl: [number, number, number, number] = [0, 0, 0, 0];
+    for (let i = 0; i < 4; i++) {
+      pl[i] = u16BE(buf, pos);
+      pos += 2;
+      if (pl[i] < firstPosListOffset) firstPosListOffset = pl[i];
+    }
+    songs.push({ positionLists: pl });
+  } while (pos < subSongListOffset + firstPosListOffset);
+
+  return songs.length > 0 ? songs : null;
+}
+
+function bdLoadPositionList(
+  buf: Uint8Array, offset: number, f: BDFeatures,
+): number[] | null {
+  if (offset < 0 || offset >= buf.length) return null;
+
+  const data: number[] = [];
+  let pos = offset;
+
+  while (data.length < MAX_POSITION_LIST_LEN) {
+    if (pos >= buf.length) return null;
+    const cmd = buf[pos++];
+    data.push(cmd);
+    if (cmd === 0xFF) break;
+
+    const argCount = bdPositionCommandArgCount(cmd, f);
+    if (argCount === -1) return null;
+
+    for (let i = 0; i < argCount; i++) {
+      if (pos >= buf.length) return null;
+      data.push(buf[pos++]);
+    }
+  }
+  return data;
+}
+
+// ── Event-based track interpretation ────────────────────────────────────────
+
+interface BDEvent {
+  tick: number;
+  note: number;       // tracker note 1-96, 0 = none
+  instrument: number; // 1-based, 0 = none
+  effTyp: number;
+  eff: number;
+}
+
+/**
+ * Convert a BD note value (0-0x7E) to a tracker note (1-96).
+ * BD note 0 = C-1 in Amiga convention = tracker note 25.
+ */
+function bdNoteToTrackerNote(note: number): number {
+  const n = note + 25;
+  return (n >= 1 && n <= 96) ? n : 0;
+}
+
+/**
+ * Walk a single channel's position list and all referenced tracks,
+ * producing a flat list of timed events.
+ */
+function bdExtractChannelEvents(
+  posListData: number[],
+  tracks: Uint8Array[],
+  f: BDFeatures,
+): BDEvent[] {
+  const events: BDEvent[] = [];
+  let tick = 0;
+  let transpose = 0;
+  let currentInstrument = 1;
+  let posIdx = 0;
+  const maxEvents = 32768;
+  const maxTicks = 65536;
+
+  while (posIdx < posListData.length && events.length < maxEvents && tick < maxTicks) {
+    const cmd = posListData[posIdx++];
+
+    if (cmd === 0xFF) break; // end of position list
+
+    if (cmd < f.maxTrackValue) {
+      // Track number to play
+      const trackIdx = cmd;
+      if (trackIdx >= tracks.length) break;
+      const track = tracks[trackIdx];
+
+      // Parse this track's byte stream
+      tick = bdParseTrackEvents(track, f, events, tick, transpose, currentInstrument);
+      continue;
+    }
+
+    if (cmd === 0xFE) {
+      // Transpose command
+      if (posIdx >= posListData.length) break;
+      const val = posListData[posIdx++];
+      transpose = val < 128 ? val : val - 256; // signed
+      continue;
+    }
+
+    if (cmd === 0xFD && f.masterVolumeFadeVersion > 0) {
+      posIdx++; // skip fade speed arg
+      continue;
+    }
+
+    // Sample mapping commands
+    if (f.enableC0TrackLoop && cmd >= 0xA0 && cmd < 0xC0) {
+      // Track loop count — ignore for pattern purposes
+      continue;
+    }
+    if (f.enableC0TrackLoop && cmd >= 0xC0 && cmd < 0xC8) {
+      // Sample mapping (c0 version) — next byte is sample index
+      if (posIdx >= posListData.length) break;
+      const sampleIdx = Math.floor(posListData[posIdx++] / 4);
+      const mapIndex = cmd & 0x07;
+      // We track instrument change from mapping[0] for simplicity
+      if (mapIndex === 0) currentInstrument = sampleIdx + 1;
+      continue;
+    }
+    if (f.enableF0TrackLoop && cmd >= 0xF0 && cmd < 0xF8) {
+      // Sample mapping (f0 version)
+      if (posIdx >= posListData.length) break;
+      const sampleIdx = Math.floor(posListData[posIdx++] / 4);
+      const mapIndex = cmd - 0xF0;
+      if (mapIndex === 0) currentInstrument = sampleIdx + 1;
+      continue;
+    }
+
+    // Non-loop sample mapping for set_sample_mapping_version variants
+    if (!f.enableC0TrackLoop && !f.enableF0TrackLoop) {
+      if (f.setSampleMappingVersion === 1 && cmd >= 0xC0 && cmd < 0xC8) {
+        if (posIdx >= posListData.length) break;
+        const sampleIdx = Math.floor(posListData[posIdx++] / 4);
+        const mapIndex = cmd & 0x07;
+        if (mapIndex === 0) currentInstrument = sampleIdx + 1;
+        continue;
+      }
+      if (f.setSampleMappingVersion === 2 && cmd >= 0xF0 && cmd < 0xF8) {
+        if (posIdx >= posListData.length) break;
+        const sampleIdx = Math.floor(posListData[posIdx++] / 4);
+        const mapIndex = cmd - 0xF0;
+        if (mapIndex === 0) currentInstrument = sampleIdx + 1;
+        continue;
+      }
+    }
+
+    // Loop count commands (non-mapping)
+    if (f.enableF0TrackLoop && cmd < 0xF0) continue;
+    if (f.enableC0TrackLoop && cmd < 0xA0) continue;
+  }
+
+  return events;
+}
+
+/**
+ * Parse a single track byte stream, appending events.
+ * Returns the tick position after the track ends.
+ */
+function bdParseTrackEvents(
+  track: Uint8Array,
+  f: BDFeatures,
+  events: BDEvent[],
+  startTick: number,
+  transpose: number,
+  currentInstrument: number,
+): number {
+  let tick = startTick;
+  let pos = 0;
+  let instrument = currentInstrument;
+  const maxTicks = 65536;
+
+  while (pos < track.length && tick < maxTicks) {
+    const cmd = track[pos];
+
+    if (cmd === 0xFF) break; // end of track
+
+    if (cmd < 0x7F) {
+      // Note command
+      pos++;
+      const note = cmd;
+      const transposedNote = (note + transpose) & 0x7F;
+      const trackerNote = bdNoteToTrackerNote(transposedNote);
+
+      if (pos >= track.length) break;
+      let ticks = track[pos++];
+
+      if (f.extraTickArg && ticks === 0) {
+        if (pos >= track.length) break;
+        ticks = track[pos++];
+        // Extended duration: original tick count is 0xFF, extended byte is the actual duration
+      }
+
+      if (trackerNote > 0) {
+        events.push({
+          tick,
+          note: trackerNote,
+          instrument,
+          effTyp: 0,
+          eff: 0,
+        });
+      }
+      tick += Math.max(1, ticks);
+      continue;
+    }
+
+    if (cmd === 0x7F) {
+      // Rest/sustain
+      pos++;
+      if (pos >= track.length) break;
+      const ticks = track[pos++];
+      tick += Math.max(1, ticks);
+      continue;
+    }
+
+    // Effect command (>= 0x80)
+    if (cmd <= f.maxSampleMappingValue) {
+      // Sample mapping change
+      pos++;
+      const index = (f.getSampleMappingVersion === 1) ? (cmd & 0x07) : (cmd - 0x80);
+      if (index === 0) {
+        // Direct instrument reference - use the mapping
+        instrument = index + 1;
+      }
+      // For sample mapping, the instrument is set from the mapping table
+      // We use cmd itself as a simple instrument tracker
+      instrument = (cmd & 0x07) + 1;
+      continue;
+    }
+
+    // Track effect commands
+    pos++;
+    if ((f.usesCxTrackEffects && cmd < 0xC0) || (f.uses9xTrackEffects && cmd < 0x9B)) {
+      // Control flag — no args
+      continue;
+    }
+
+    // Portamento enable (3 bytes)
+    if ((cmd === 0xC0 && f.usesCxTrackEffects && f.enablePortamento) ||
+        (cmd === 0x9B && f.uses9xTrackEffects && f.enablePortamento)) {
+      pos += 3;
+      continue;
+    }
+    // Portamento disable (0 bytes)
+    if ((cmd === 0xC1 && f.usesCxTrackEffects && f.enablePortamento) ||
+        (cmd === 0x9C && f.uses9xTrackEffects && f.enablePortamento)) continue;
+    // Volume fade enable (3 bytes)
+    if ((cmd === 0xC2 && f.usesCxTrackEffects && f.enableVolumeFade) ||
+        (cmd === 0x9D && f.uses9xTrackEffects && f.enableVolumeFade)) {
+      pos += 3;
+      continue;
+    }
+    // Volume fade disable (0 bytes)
+    if ((cmd === 0xC3 && f.usesCxTrackEffects && f.enableVolumeFade) ||
+        (cmd === 0x9E && f.uses9xTrackEffects && f.enableVolumeFade)) continue;
+    // Portamento2 enable (1 byte)
+    if ((cmd === 0xC4 && f.usesCxTrackEffects && f.enablePortamento) ||
+        (cmd === 0x9F && f.uses9xTrackEffects && f.enablePortamento)) {
+      pos += 1;
+      continue;
+    }
+    // Portamento2 disable (0 bytes)
+    if ((cmd === 0xC5 && f.usesCxTrackEffects && f.enablePortamento) ||
+        (cmd === 0xA0 && f.uses9xTrackEffects && f.enablePortamento)) continue;
+    // Channel volume (1 or 3 bytes)
+    if ((cmd === 0xC6 && f.usesCxTrackEffects && f.enableVolumeFade) ||
+        (cmd === 0xA1 && f.uses9xTrackEffects && f.enableVolumeFade)) {
+      pos += f.enableFinalVolumeSlide ? 3 : 1;
+      continue;
+    }
+    // Final volume slide disable (0 bytes)
+    if ((cmd === 0xC7 && f.usesCxTrackEffects && f.enableFinalVolumeSlide) ||
+        (cmd === 0xA2 && f.uses9xTrackEffects && f.enableFinalVolumeSlide)) continue;
+
+    // Unknown command — bail out of this track
+    break;
+  }
+
+  return tick;
+}
+
+// ── Pattern builder ─────────────────────────────────────────────────────────
+
+function bdBuildPatterns(
+  channelEvents: BDEvent[][],
+): { patterns: Pattern[]; songPositions: number[] } {
+  let maxTick = 0;
+  for (const events of channelEvents) {
+    for (const ev of events) {
+      if (ev.tick > maxTick) maxTick = ev.tick;
+    }
+  }
+
+  const totalRows = maxTick + 1;
+  const numPatterns = Math.max(1, Math.ceil(totalRows / ROWS_PER_PATTERN));
+  const patternLimit = Math.min(numPatterns, MAX_PATTERNS);
+
+  const patterns: Pattern[] = [];
+
+  // Pre-index events by tick for efficient lookup
+  const channelEventMaps: Map<number, BDEvent>[] = channelEvents.map(events => {
+    const map = new Map<number, BDEvent>();
+    for (const ev of events) map.set(ev.tick, ev);
+    return map;
+  });
+
+  for (let p = 0; p < patternLimit; p++) {
+    const startTick = p * ROWS_PER_PATTERN;
+    const channels: ChannelData[] = [];
+
+    for (let ch = 0; ch < 4; ch++) {
+      const rows: TrackerCell[] = [];
+      const eventMap = channelEventMaps[ch];
+
+      for (let r = 0; r < ROWS_PER_PATTERN; r++) {
+        const ev = eventMap?.get(startTick + r);
+        rows.push({
+          note: ev?.note ?? 0,
+          instrument: ev?.instrument ?? 0,
+          volume: 0,
+          effTyp: ev?.effTyp ?? 0,
+          eff: ev?.eff ?? 0,
+          effTyp2: 0,
+          eff2: 0,
+        });
+      }
+
+      channels.push({
+        id: `channel-${ch}`,
+        name: `Channel ${ch + 1}`,
+        muted: false,
+        solo: false,
+        collapsed: false,
+        volume: 100,
+        pan: (ch === 0 || ch === 3) ? -50 : 50,
+        instrumentId: null,
+        color: null,
+        rows,
+      });
+    }
+
+    patterns.push({
+      id: `pattern-${p}`,
+      name: `Pattern ${p}`,
+      length: ROWS_PER_PATTERN,
+      channels,
+    });
+  }
+
+  return { patterns, songPositions: patterns.map((_, i) => i) };
+}
+
+// ── Main pattern extraction entry point ─────────────────────────────────────
+
+function extractBDPatterns(
+  buf: Uint8Array,
+): { patterns: Pattern[]; songPositions: number[] } | null {
+  const offsets = bdFindOffsets(buf);
+  if (!offsets) return null;
+
+  const tracks = bdLoadTracks(buf, offsets);
+  if (!tracks || tracks.length === 0) return null;
+
+  const subSongs = bdLoadSubSongs(buf, offsets.subSongListOffset);
+  if (!subSongs || subSongs.length === 0) return null;
+
+  // Use first sub-song
+  const song = subSongs[0];
+  const f = offsets.features;
+  const channelEvents: BDEvent[][] = [];
+
+  for (let ch = 0; ch < 4; ch++) {
+    const plOffset = offsets.subSongListOffset + song.positionLists[ch];
+    const posListData = bdLoadPositionList(buf, plOffset, f);
+    if (!posListData) {
+      channelEvents.push([]);
+      continue;
+    }
+
+    const events = bdExtractChannelEvents(posListData, tracks, f);
+    channelEvents.push(events);
+  }
+
+  // Check if we got any meaningful events
+  const totalEvents = channelEvents.reduce((s, e) => s + e.length, 0);
+  if (totalEvents === 0) return null;
+
+  return bdBuildPatterns(channelEvents);
 }
 
 // ── Format detection ────────────────────────────────────────────────────────
@@ -259,51 +1083,67 @@ export async function parseBenDaglishFile(
     }
   }
 
-  // ── Empty pattern (placeholder — UADE handles actual audio) ───────────────
+  // ── Extract patterns from binary ────────────────────────────────────────────
 
-  const emptyRows = Array.from({ length: 64 }, () => ({
-    note: 0,
-    instrument: 0,
-    volume: 0,
-    effTyp: 0,
-    eff: 0,
-    effTyp2: 0,
-    eff2: 0,
-  }));
+  const patternResult = extractBDPatterns(buf);
 
-  const pattern = {
-    id: 'pattern-0',
-    name: 'Pattern 0',
-    length: 64,
-    channels: Array.from({ length: 4 }, (_, ch) => ({
-      id: `channel-${ch}`,
-      name: `Channel ${ch + 1}`,
-      muted: false,
-      solo: false,
-      collapsed: false,
-      volume: 100,
-      pan: ch === 0 || ch === 3 ? -50 : 50,
-      instrumentId: null,
-      color: null,
-      rows: emptyRows,
-    })),
-    importMetadata: {
+  let patterns: Pattern[];
+  let songPositions: number[];
+
+  if (patternResult) {
+    patterns = patternResult.patterns;
+    songPositions = patternResult.songPositions;
+  } else {
+    // Fallback: single empty pattern
+    const emptyRows: TrackerCell[] = Array.from({ length: 64 }, () => ({
+      note: 0,
+      instrument: 0,
+      volume: 0,
+      effTyp: 0,
+      eff: 0,
+      effTyp2: 0,
+      eff2: 0,
+    }));
+
+    patterns = [{
+      id: 'pattern-0',
+      name: 'Pattern 0',
+      length: 64,
+      channels: Array.from({ length: 4 }, (_, ch) => ({
+        id: `channel-${ch}`,
+        name: `Channel ${ch + 1}`,
+        muted: false,
+        solo: false,
+        collapsed: false,
+        volume: 100,
+        pan: (ch === 0 || ch === 3) ? -50 : 50,
+        instrumentId: null,
+        color: null,
+        rows: emptyRows,
+      })),
+    }];
+    songPositions = [0];
+  }
+
+  // Add import metadata to first pattern
+  if (patterns.length > 0) {
+    patterns[0].importMetadata = {
       sourceFormat: 'MOD' as const,
       sourceFile: filename,
       importedAt: new Date().toISOString(),
       originalChannelCount: 4,
-      originalPatternCount: 1,
-      originalInstrumentCount: DEFAULT_INSTRUMENTS,
-    },
-  };
+      originalPatternCount: patterns.length,
+      originalInstrumentCount: instruments.length,
+    };
+  }
 
   return {
     name: `${moduleName} [Ben Daglish]`,
     format: 'MOD' as TrackerFormat,
-    patterns: [pattern],
+    patterns,
     instruments,
-    songPositions: [0],
-    songLength: 1,
+    songPositions,
+    songLength: songPositions.length,
     restartPosition: 0,
     numChannels: 4,
     initialSpeed: 6,
