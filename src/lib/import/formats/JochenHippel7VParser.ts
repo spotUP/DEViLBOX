@@ -37,6 +37,8 @@
 
 import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
 import type { InstrumentConfig, TFMXConfig, UADEChipRamInfo, Pattern, TrackerCell } from '@/types';
+import type { UADEPatternLayout } from '@/engine/uade/UADEPatternEncoder';
+import { encodeTFMX7VCell } from '@/engine/uade/encoders/TFMX7VEncoder';
 
 const MIN_FILE_SIZE = 32;
 
@@ -566,6 +568,41 @@ export function parseJochenHippel7VFile(buffer: ArrayBuffer, filename: string): 
     songPositions.push(0);
   }
 
+  // Build a UADEPatternLayout so the standard tracker setCell path can write
+  // edited cells back to chip RAM via UADE. Mapping rules:
+  //
+  //   DOM pattern P  →  trackstep (firstStep + P)
+  //   trackstep entry → PT byte at trackTableOff + step*trackStepLen + voice*trackColumnSize
+  //   pattern body bytes start at patternsOff + PT*64
+  //   row R, channel C cell → patternsOff + PT*64 + R*2
+  //
+  // Multiple trackstep entries may share a PT, so editing a cell affects every
+  // pattern in the song that references it — that's the correct TFMX semantic
+  // (patterns are pooled, not duplicated per trackstep).
+  const uadePatternLayout: UADEPatternLayout = {
+    formatId: 'tfmx7v',
+    patternDataFileOffset: layout.patternsOff,
+    bytesPerCell: 2,
+    rowsPerPattern: 32,
+    numChannels: layout.voices,
+    numPatterns: trackerPatterns.length,
+    moduleSize: buffer.byteLength,
+    encodeCell: encodeTFMX7VCell,
+    getCellFileOffset: (pattern: number, row: number, channel: number): number => {
+      if (pattern < 0 || pattern >= trackerPatterns.length) return -1;
+      if (row < 0 || row >= 32) return -1;
+      if (channel < 0 || channel >= layout.voices) return -1;
+      const step = firstStep + pattern;
+      const stepOff = layout.trackTableOff + step * layout.trackStepLen;
+      if (stepOff + layout.trackStepLen > buf.length) return -1;
+      const pt = buf[stepOff + channel * trackColumnSize];
+      const patAbs = layout.patternsOff + pt * PATTERN_LENGTH;
+      const cellAbs = patAbs + row * 2;
+      if (cellAbs + 2 > buf.length) return -1;
+      return cellAbs;
+    },
+  };
+
   return {
     name: `${moduleName} [Jochen Hippel 7V]`,
     format: 'MOD' as TrackerFormat,
@@ -580,5 +617,6 @@ export function parseJochenHippel7VFile(buffer: ArrayBuffer, filename: string): 
     linearPeriods: false,
     uadeEditableFileData: buffer.slice(0) as ArrayBuffer,
     uadeEditableFileName: filename,
+    uadePatternLayout,
   };
 }
