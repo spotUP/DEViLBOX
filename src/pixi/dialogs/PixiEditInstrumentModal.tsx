@@ -50,6 +50,7 @@ import { PixiPresetDropdown } from '../views/instruments/PixiPresetDropdown';
 import { PixiDynamicParamPanel } from '../views/instruments/PixiDynamicParamPanel';
 import { PixiHardwareUI, hasPixiHardwareUI } from '../views/instruments/PixiHardwareUI';
 import { PixiFilterCurve } from '../views/instruments/PixiFilterCurve';
+import { writeWaveformByte } from '@/lib/jamcracker/waveformDraw';
 import { PixiADSRVisualizer } from '../views/instruments/PixiADSRVisualizer';
 import { PixiArpeggioEditor } from '../views/instruments/PixiArpeggioEditor';
 import { PixiMacroListEditor } from '../views/instruments/PixiMacroCurveEditor';
@@ -1844,6 +1845,36 @@ const JamCrackerPanel: React.FC<{
     [instrument.id, instrument.jamCracker, onUpdate],
   );
 
+  // ── AM waveform drag-draw editor ─────────────────────────────────────────
+  // Mirrors the DOM editor in JamCrackerControls.tsx via the shared
+  // writeWaveformByte() helper so DOM and GL stay 1:1.
+  const isDrawingRef = useRef(false);
+  const lastIdxRef = useRef(-1);
+  // Keep latest jc/instrument in a ref so pointer callbacks always read the
+  // current waveform buffer (avoids stale-closure overwrites during a drag).
+  const jcRef = useRef(jc);
+  useEffect(() => { jcRef.current = jc; }, [jc]);
+  const instrumentIdRef = useRef(instrument.id);
+  useEffect(() => { instrumentIdRef.current = instrument.id; }, [instrument.id]);
+
+  const writeAt = useCallback((e: import('pixi.js').FederatedPointerEvent) => {
+    const cur = jcRef.current;
+    if (!cur.isAM || !cur.waveformData) return;
+    const local = e.getLocalPosition(e.currentTarget as import('pixi.js').Container);
+    const { next, idx } = writeWaveformByte(
+      cur.waveformData,
+      local.x,
+      local.y,
+      320,
+      100,
+      lastIdxRef.current,
+    );
+    lastIdxRef.current = idx;
+    onUpdate(instrumentIdRef.current, {
+      jamCracker: { ...cur, waveformData: next },
+    });
+  }, [onUpdate]);
+
   // Draw AM waveform using Pixi Graphics
   const drawWaveform = useCallback(
     (g: import('pixi.js').Graphics) => {
@@ -1927,6 +1958,24 @@ const JamCrackerPanel: React.FC<{
               borderWidth: 1,
               borderColor: theme.border.color,
               borderRadius: 4,
+            }}
+            eventMode="static"
+            cursor="crosshair"
+            onPointerDown={(e: import('pixi.js').FederatedPointerEvent) => {
+              isDrawingRef.current = true;
+              lastIdxRef.current = -1;
+              writeAt(e);
+            }}
+            onPointerMove={(e: import('pixi.js').FederatedPointerEvent) => {
+              if (isDrawingRef.current) writeAt(e);
+            }}
+            onPointerUp={() => {
+              isDrawingRef.current = false;
+              lastIdxRef.current = -1;
+            }}
+            onPointerUpOutside={() => {
+              isDrawingRef.current = false;
+              lastIdxRef.current = -1;
             }}
           >
             <pixiGraphics draw={drawWaveform} layout={{ width: 320, height: 100 }} />
