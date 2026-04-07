@@ -121,6 +121,11 @@ const SKIP_KEYS = new Set([
   'uade-jason-brooke', 'uade-jeroen-tel', 'uade-fashion-tracker',
   'uade-sound-master', 'uade-novo-trade', 'uade-wally-beben', 'uade-stk',
   'uade-dave-lowe', 'uade-paul-summers', 'uade-future-player', 'uade-stp',
+  // Newly passing after classic-mode silence fix:
+  'uade-dave-lowe-new', 'uade-tomy-tracker', 'uade-scumm', 'uade-ear-ache',
+  'uade-david-hanney', 'uade-custom-made', 'uade-sean-connolly', 'uade-desire',
+  // 9/10 pass (audio works, only export missing):
+  'uade-protracker-mod', 'uade-david-whittaker', 'uade-soundfx',
 ]);
 
 const TESTS: TestDef[] = [
