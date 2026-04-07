@@ -755,15 +755,18 @@ export const KissOfShameEditor: React.FC<VisualEffectEditorProps> = ({
   const reelBgY = -(reelFrame * 322);
 
   return (
-    <div
-      style={{
-        position: 'relative',
-        width: 960,
-        height: containerH,
-        overflow: 'hidden',
-        userSelect: 'none',
-        cursor: 'default',
-      }}
+    <div style={{ width: '100%', overflow: 'hidden' }}>
+      <div
+        style={{
+          position: 'relative',
+          width: 960,
+          height: containerH,
+          overflow: 'hidden',
+          userSelect: 'none',
+          cursor: 'default',
+          transform: 'scale(0.625)',
+          transformOrigin: 'top left',
+        }}
       onDoubleClick={(e) => {
         // Only toggle if double-click is on the background, not a knob
         if ((e.target as HTMLElement).tagName === 'DIV' && !(e.target as HTMLElement).dataset.knob) {
@@ -963,6 +966,7 @@ export const KissOfShameEditor: React.FC<VisualEffectEditorProps> = ({
           />
         ))}
       </div>
+    </div>
     </div>
   );
 };
