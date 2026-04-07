@@ -12,12 +12,10 @@ import { useSampleEditorUndo } from './useSampleEditorUndo';
 
 // ─── Types ─────────────────────────────────────────────────────────────
 
-export type DragTarget = 'start' | 'end' | 'loopStart' | 'loopEnd' | 'selection' | null;
+export type DragTarget = 'loopStart' | 'loopEnd' | 'selection' | null;
 export type LoopType = 'off' | 'forward' | 'pingpong';
 
 export interface SampleEditorParams {
-  startTime: number;
-  endTime: number;
   loopEnabled: boolean;
   loopStart: number;
   loopEnd: number;
@@ -239,8 +237,6 @@ export function useSampleEditorState(opts: UseSampleEditorStateOptions): SampleE
   const params = useMemo((): SampleEditorParams => {
     const p = instrumentParameters || {};
     return {
-      startTime: (p.startTime as number) ?? 0,
-      endTime: (p.endTime as number) ?? 1,
       loopEnabled: (p.loopEnabled as boolean) ?? false,
       loopStart: (p.loopStart as number) ?? 0,
       loopEnd: (p.loopEnd as number) ?? 1,
