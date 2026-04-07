@@ -592,6 +592,8 @@ export async function parseSonicArrangerFile(
         instTable: instTableStart,
         ...(syarFileOffset >= 0 ? { syarBase: syarFileOffset } : {}),
         ...(syafFileOffset >= 0 ? { syafBase: syafFileOffset } : {}),
+        numAdsrTables: adsrTables.length,
+        numAmfTables: amfTables.length,
       },
     };
 
