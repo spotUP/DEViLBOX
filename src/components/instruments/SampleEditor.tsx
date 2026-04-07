@@ -125,6 +125,15 @@ export const SampleEditor: React.FC<SampleEditorProps> = ({ instrument, onChange
   const containerRef = useRef<HTMLDivElement>(null);
   const playerRef = useRef<Tone.Player | null>(null);
   const playerBlobUrlRef = useRef<string | null>(null);
+  /** Raw AudioBufferSourceNodes used by the preview Play button. Bypasses
+   *  Tone.Player so we get fully reliable loop semantics. In loop mode
+   *  there are TWO scheduled sources: one for the attack (0 → loopEnd,
+   *  no loop) and a second one that starts exactly when the first ends
+   *  and loops the [loopStart, loopEnd] region forever. This works around
+   *  a Chrome quirk where setting loop=true with offset < loopStart
+   *  immediately clamps the playhead to loopStart instead of playing the
+   *  pre-loop region first. */
+  const previewSourcesRef = useRef<AudioBufferSourceNode[]>([]);
   const animationRef = useRef<number | null>(null);
   const isFileDraggingRef = useRef(false);
   const selectionDragStart = useRef<number>(-1);
@@ -410,6 +419,12 @@ export const SampleEditor: React.FC<SampleEditorProps> = ({ instrument, onChange
         URL.revokeObjectURL(playerBlobUrlRef.current);
         playerBlobUrlRef.current = null;
       }
+      // Tear down any in-flight preview sources
+      for (const s of previewSourcesRef.current) {
+        try { s.stop(); } catch { /* ok */ }
+        try { s.disconnect(); } catch { /* ok */ }
+      }
+      previewSourcesRef.current = [];
       if (animationRef.current) cancelAnimationFrame(animationRef.current);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -820,40 +835,187 @@ export const SampleEditor: React.FC<SampleEditorProps> = ({ instrument, onChange
   );
 
   // ─── Preview playback ────────────────────────────────────────────
+  const stopPreviewSources = useCallback(() => {
+    for (const s of previewSourcesRef.current) {
+      try { s.onended = null; } catch { /* ok */ }
+      try { s.stop(); } catch { /* ok */ }
+      try { s.disconnect(); } catch { /* ok */ }
+    }
+    previewSourcesRef.current = [];
+  }, []);
+
   const handlePlay = useCallback(async () => {
-    if (!playerRef.current || !audioBuffer) return;
+    console.log('[SampleEditor] handlePlay called', {
+      hasBuffer: !!audioBuffer,
+      isPlaying,
+      sourcesActive: previewSourcesRef.current.length,
+      loopEnabled,
+      loopStart,
+      loopEnd,
+    });
+    if (!audioBuffer) {
+      console.warn('[SampleEditor] handlePlay: no audioBuffer');
+      return;
+    }
     await Tone.start();
 
-    if (isPlaying) {
-      playerRef.current.stop();
+    // Toggle: stop if currently playing
+    if (isPlaying || previewSourcesRef.current.length > 0) {
+      console.log('[SampleEditor] handlePlay: stopping playback');
+      stopPreviewSources();
       setIsPlaying(false);
       setPlaybackPosition(0);
       if (animationRef.current) cancelAnimationFrame(animationRef.current);
       return;
     }
 
-    playerRef.current.playbackRate = playbackRate;
-    playerRef.current.reverse = reverse;
+    const ctx = Tone.getContext().rawContext as AudioContext;
+    const duration = audioBuffer.duration;
+    if (!duration || duration <= 0) {
+      console.warn('[SampleEditor] cannot play: audioBuffer has no duration');
+      return;
+    }
 
-    const startOffset = startTime * audioBuffer.duration;
-    const dur = (endTime - startTime) * audioBuffer.duration;
-    playerRef.current.start(Tone.now(), startOffset, dur);
+    // Pre-flip the buffer for reverse (AudioBufferSourceNode has no
+    // built-in reverse property).
+    let bufToPlay = audioBuffer;
+    if (reverse) {
+      bufToPlay = ctx.createBuffer(audioBuffer.numberOfChannels, audioBuffer.length, audioBuffer.sampleRate);
+      for (let ch = 0; ch < audioBuffer.numberOfChannels; ch++) {
+        const src = audioBuffer.getChannelData(ch);
+        const dst = bufToPlay.getChannelData(ch);
+        for (let i = 0; i < src.length; i++) dst[i] = src[src.length - 1 - i];
+      }
+    }
+
+    // Read loop region from parameters first; fall back to
+    // instrument.sample.loopStart/loopEnd (frame indices) if the
+    // parameters are still at their defaults. This handles samples
+    // loaded from tracker files where loop info lives in `sample`.
+    let effLoopStart = loopStart;
+    let effLoopEnd = loopEnd;
+    const sampleCfg = (instrument.sample || {}) as Record<string, number | undefined>;
+    const sampleLoopStart = sampleCfg.loopStart;
+    const sampleLoopEnd = sampleCfg.loopEnd;
+    const totalFrames = audioBuffer.length;
+    if (
+      effLoopStart === 0 && effLoopEnd === 1
+      && totalFrames > 0
+      && typeof sampleLoopStart === 'number'
+      && typeof sampleLoopEnd === 'number'
+      && sampleLoopEnd > sampleLoopStart
+    ) {
+      effLoopStart = sampleLoopStart / totalFrames;
+      effLoopEnd = sampleLoopEnd / totalFrames;
+    }
+
+    const loopStartNorm = Math.max(0, Math.min(0.99, effLoopStart));
+    const loopEndNorm = Math.max(loopStartNorm + 0.001, Math.min(1, effLoopEnd));
+    const loopStartSec = loopStartNorm * duration;
+    const loopEndSec = loopEndNorm * duration;
+
+    if (loopType === 'pingpong') {
+      console.warn('[SampleEditor] pingpong loop falls back to forward in preview');
+    }
+
+    console.log('[SampleEditor] play raw values', {
+      loopEnabled,
+      loopStart_param: loopStart,
+      loopEnd_param: loopEnd,
+      loopStart_sample: sampleLoopStart,
+      loopEnd_sample: sampleLoopEnd,
+      totalFrames,
+      duration,
+      effLoopStart,
+      effLoopEnd,
+      loopStartNorm,
+      loopEndNorm,
+      loopStartSec,
+      loopEndSec,
+    });
+
+    const now = ctx.currentTime;
     setIsPlaying(true);
 
-    const startToneTime = Tone.now();
+    if (loopEnabled) {
+      // === TWO-SOURCE SCHEDULING ===
+      // Chrome clamps source.start(when, offset) to loopStart whenever
+      // loop=true and offset < loopStart, so a single source can't
+      // produce "play attack then loop". Workaround:
+      //   1) attack source: loop=false, plays 0 → loopEnd as a one-shot
+      //   2) loop source:   loop=true, scheduled to start exactly when
+      //                     the attack source ends. Begins at loopStart
+      //                     and loops [loopStart, loopEnd] forever.
+      const attackBufferSec = loopEndSec; // 0 → loopEnd in buffer-time
+      const attackWallSec = attackBufferSec / playbackRate;
+
+      const attackSrc = ctx.createBufferSource();
+      attackSrc.buffer = bufToPlay;
+      attackSrc.playbackRate.value = playbackRate;
+      attackSrc.connect(ctx.destination);
+      attackSrc.start(now, 0, attackBufferSec);
+
+      const loopSrc = ctx.createBufferSource();
+      loopSrc.buffer = bufToPlay;
+      loopSrc.playbackRate.value = playbackRate;
+      loopSrc.loop = true;
+      loopSrc.loopStart = loopStartSec;
+      loopSrc.loopEnd = loopEndSec;
+      loopSrc.connect(ctx.destination);
+      loopSrc.start(now + attackWallSec, loopStartSec);
+
+      previewSourcesRef.current = [attackSrc, loopSrc];
+    } else {
+      // === ONE-SHOT ===
+      const startOffset = startTime * duration;
+      const playDur = (endTime - startTime) * duration;
+
+      const src = ctx.createBufferSource();
+      src.buffer = bufToPlay;
+      src.playbackRate.value = playbackRate;
+      src.connect(ctx.destination);
+      src.start(now, startOffset, playDur);
+      src.onended = () => {
+        if (previewSourcesRef.current.includes(src)) {
+          stopPreviewSources();
+          setIsPlaying(false);
+          setPlaybackPosition(0);
+          if (animationRef.current) cancelAnimationFrame(animationRef.current);
+        }
+      };
+      previewSourcesRef.current = [src];
+    }
+
+    // Playhead animation
+    const startCtxTime = now;
+    const loopRegionDur = (loopEndSec - loopStartSec) / playbackRate;
+    const preLoopDur = loopEndSec / playbackRate;
+
     const animate = () => {
-      const elapsed = Tone.now() - startToneTime;
-      const progress = startTime + (elapsed / audioBuffer.duration) * (endTime - startTime) / playbackRate;
-      if (progress >= endTime) {
-        setIsPlaying(false);
-        setPlaybackPosition(0);
-        return;
+      const elapsed = ctx.currentTime - startCtxTime;
+      let progress: number;
+
+      if (loopEnabled && loopRegionDur > 0) {
+        if (elapsed < preLoopDur) {
+          progress = (elapsed * playbackRate) / duration;
+        } else {
+          const loopElapsed = (elapsed - preLoopDur) % loopRegionDur;
+          progress = loopStartNorm + (loopElapsed * playbackRate) / duration;
+        }
+      } else {
+        progress = startTime + (elapsed * playbackRate) / duration;
+        if (progress >= endTime) return; // onended will clear state
       }
+
       setPlaybackPosition(progress);
       animationRef.current = requestAnimationFrame(animate);
     };
     animate();
-  }, [audioBuffer, isPlaying, playbackRate, reverse, startTime, endTime, setIsPlaying, setPlaybackPosition]);
+  }, [
+    audioBuffer, isPlaying, playbackRate, reverse, startTime, endTime,
+    loopEnabled, loopStart, loopEnd, loopType, instrument.sample,
+    setIsPlaying, setPlaybackPosition, stopPreviewSources,
+  ]);
 
   // ─── Keyboard shortcuts (focus-gated) ─────────────────────────────
   useEffect(() => {
@@ -872,7 +1034,13 @@ export const SampleEditor: React.FC<SampleEditorProps> = ({ instrument, onChange
       if (mod && e.key === 'v') { e.preventDefault(); doPaste(); return; }
 
       if (mod && e.key === 'a') { e.preventDefault(); selectAll(); return; }
-      if (e.key === 'Escape') { clearSelection(); return; }
+      if (e.key === 'Escape') {
+        // Stop preview playback first (especially relevant when looping),
+        // then clear any selection.
+        if (isPlaying || previewSourcesRef.current.length > 0) handlePlay();
+        clearSelection();
+        return;
+      }
       if (e.key === 'Delete' || e.key === 'Backspace') {
         if (hasSelection) { e.preventDefault(); doDelete(); }
         return;
@@ -892,12 +1060,15 @@ export const SampleEditor: React.FC<SampleEditorProps> = ({ instrument, onChange
     return () => container.removeEventListener('keydown', handleKeyDown);
   }, [
     doUndo, doRedo, doCut, doCopy, doPaste, selectAll, clearSelection,
-    doDelete, hasSelection, zoomAtPosition, showAll, scrollView, handlePlay,
+    doDelete, hasSelection, zoomAtPosition, showAll, scrollView, handlePlay, isPlaying,
   ]);
 
   // ─── Clear sample ────────────────────────────────────────────────
   const handleClear = useCallback(() => {
-    if (isPlaying) { playerRef.current?.stop(); setIsPlaying(false); }
+    if (isPlaying) {
+      stopPreviewSources();
+      setIsPlaying(false);
+    }
     setAudioBuffer(null);
     clearSelection();
     updateInstrument(instrument.id, {
@@ -906,7 +1077,7 @@ export const SampleEditor: React.FC<SampleEditorProps> = ({ instrument, onChange
         ? { granular: { ...DEFAULT_GRANULAR, ...instrument.granular, sampleUrl: '' } }
         : {}),
     });
-  }, [isPlaying, setIsPlaying, setAudioBuffer, clearSelection, instrument, updateInstrument, isGranular]);
+  }, [isPlaying, setIsPlaying, setAudioBuffer, clearSelection, instrument, updateInstrument, isGranular, stopPreviewSources]);
 
   // ─── Buffer processed (enhancer / resampler / beat sync / filter) ─
   const handleBufferProcessed = useCallback(
