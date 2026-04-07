@@ -363,7 +363,7 @@ export class WaveformProcessor {
   /**
    * Find nearest zero crossing within a search range
    */
-  public static findNearestZeroCrossing(buffer: AudioBuffer, sampleIndex: number, searchRange: number = 512): AudioBuffer | number {
+  public static findNearestZeroCrossing(buffer: AudioBuffer, sampleIndex: number, searchRange: number = 512): number {
     const data = buffer.getChannelData(0);
     const len = data.length;
     let bestDist = searchRange + 1;

@@ -281,6 +281,7 @@ export const SampleEditor: React.FC<SampleEditorProps> = ({ instrument, onChange
     doRedo,
     doExportWav,
     doFindLoop,
+    doSnapLoopToZero,
     params: editorParams,
     updateParam,
   } = s;
@@ -1633,6 +1634,7 @@ export const SampleEditor: React.FC<SampleEditorProps> = ({ instrument, onChange
               loopType={loopType}
               updateParam={updateParam}
               doFindLoop={doFindLoop}
+              doSnapLoopToZero={doSnapLoopToZero}
             />
 
             {/* ─── Granular controls ──────────────────────────────── */}
