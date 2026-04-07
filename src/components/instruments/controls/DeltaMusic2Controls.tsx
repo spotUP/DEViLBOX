@@ -32,6 +32,7 @@ import { useInstrumentColors } from '@/hooks/useInstrumentColors';
 import { SectionLabel } from '@components/instruments/shared';
 import { UADEChipEditor } from '@/engine/uade/UADEChipEditor';
 import { UADEEngine } from '@/engine/uade/UADEEngine';
+import { writeWaveformByte } from '@/lib/jamcracker/waveformDraw';
 
 // ── DM2 instrument header byte offsets ─────────────────────────────────────
 
@@ -46,7 +47,7 @@ const OFF_TABLE = 40;
 
 // ── Tab type ────────────────────────────────────────────────────────────────
 
-type DM2Tab = 'envelope' | 'modulation' | 'table';
+type DM2Tab = 'envelope' | 'modulation' | 'table' | 'waveform';
 
 // ── Props ───────────────────────────────────────────────────────────────────
 
@@ -336,12 +337,224 @@ export const DeltaMusic2Controls: React.FC<DeltaMusic2ControlsProps> = ({
     );
   };
 
+  // ── WAVEFORM TAB (click+drag editor for waveformPCM) ─────────────────────
+  //
+  // waveformPCM is a signed 8-bit PCM oscillator wavetable (typically 256
+  // bytes), backfilled by DeltaMusic2Parser from the global waveform pool.
+  // The user can redraw it freehand. Edits are stored in the config and used
+  // by XM export. NOTE: the global waveform pool sits outside the per-
+  // instrument header in chip RAM, so live UADE chip-RAM patching is not
+  // performed for this field — only the config is updated.
+
+  const waveCanvasRef = useRef<HTMLCanvasElement>(null);
+  const waveDrawingRef = useRef(false);
+  const waveLastIdxRef = useRef(-1);
+
+  // Lazy redraw helper
+  const drawDM2Waveform = useCallback(() => {
+    const canvas = waveCanvasRef.current;
+    if (!canvas) return;
+    const wavePCM = configRef.current.waveformPCM;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    const dpr = window.devicePixelRatio || 1;
+    const cssW = canvas.clientWidth || 320;
+    const cssH = canvas.clientHeight || 140;
+    canvas.width = cssW * dpr;
+    canvas.height = cssH * dpr;
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.scale(dpr, dpr);
+
+    const w = cssW;
+    const h = cssH;
+    const mid = h / 2;
+
+    ctx.fillStyle = '#0a0e14';
+    ctx.fillRect(0, 0, w, h);
+
+    ctx.strokeStyle = '#1a2a3a';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(0, mid);
+    ctx.lineTo(w, mid);
+    ctx.stroke();
+
+    if (!wavePCM || wavePCM.length === 0) {
+      ctx.fillStyle = '#4a5a6a';
+      ctx.font = '12px monospace';
+      ctx.textAlign = 'center';
+      ctx.fillText('No waveform data', w / 2, mid);
+      return;
+    }
+
+    ctx.strokeStyle = accent;
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    for (let x = 0; x < w; x++) {
+      const idx = Math.min(wavePCM.length - 1, Math.floor((x / w) * wavePCM.length));
+      const v = wavePCM[idx];
+      const signed = v > 127 ? v - 256 : v;
+      const y = mid - (signed / 128) * (mid - 4);
+      if (x === 0) ctx.moveTo(x, y);
+      else ctx.lineTo(x, y);
+    }
+    ctx.stroke();
+  }, [accent]);
+
+  useEffect(() => {
+    if (activeTab !== 'waveform') return;
+    const raf = requestAnimationFrame(drawDM2Waveform);
+    const canvas = waveCanvasRef.current;
+    if (!canvas) {
+      return () => cancelAnimationFrame(raf);
+    }
+    const obs = new ResizeObserver(drawDM2Waveform);
+    obs.observe(canvas);
+    return () => {
+      cancelAnimationFrame(raf);
+      obs.disconnect();
+    };
+  }, [activeTab, drawDM2Waveform, config.waveformPCM]);
+
+  /**
+   * Convert the waveformPCM number[] to a Uint8Array, run the shared
+   * draw helper, then store the modified bytes back as a number[] on the
+   * config so it survives JSON-serialization. (waveformPCM is a number[]
+   * because it crosses the import-parser boundary.)
+   */
+  const writeWaveformFromEvent = useCallback((e: React.PointerEvent<HTMLCanvasElement>) => {
+    const cur = configRef.current;
+    if (!cur.waveformPCM || cur.isSample) return;
+    const canvas = waveCanvasRef.current;
+    if (!canvas) return;
+    const rect = canvas.getBoundingClientRect();
+
+    const u8 = new Uint8Array(cur.waveformPCM.length);
+    for (let i = 0; i < cur.waveformPCM.length; i++) {
+      u8[i] = cur.waveformPCM[i] & 0xFF;
+    }
+    const { next, idx } = writeWaveformByte(
+      u8,
+      e.clientX - rect.left,
+      e.clientY - rect.top,
+      rect.width,
+      rect.height,
+      waveLastIdxRef.current,
+    );
+    waveLastIdxRef.current = idx;
+
+    // Convert back to signed number[] (matches the parser's output shape).
+    const signed: number[] = new Array(next.length);
+    for (let i = 0; i < next.length; i++) {
+      signed[i] = next[i] > 127 ? next[i] - 256 : next[i];
+    }
+    onChange({ waveformPCM: signed });
+  }, [onChange]);
+
+  const handleWavePointerDown = useCallback((e: React.PointerEvent<HTMLCanvasElement>) => {
+    if (configRef.current.isSample || !configRef.current.waveformPCM) return;
+    e.currentTarget.setPointerCapture(e.pointerId);
+    waveDrawingRef.current = true;
+    waveLastIdxRef.current = -1;
+    writeWaveformFromEvent(e);
+  }, [writeWaveformFromEvent]);
+
+  const handleWavePointerMove = useCallback((e: React.PointerEvent<HTMLCanvasElement>) => {
+    if (!waveDrawingRef.current) return;
+    writeWaveformFromEvent(e);
+  }, [writeWaveformFromEvent]);
+
+  const handleWavePointerUp = useCallback((e: React.PointerEvent<HTMLCanvasElement>) => {
+    waveDrawingRef.current = false;
+    waveLastIdxRef.current = -1;
+    try { e.currentTarget.releasePointerCapture(e.pointerId); } catch { /* noop */ }
+  }, []);
+
+  const applyWavePreset = useCallback((kind: 'sine' | 'triangle' | 'square' | 'saw' | 'noise' | 'clear') => {
+    const cur = configRef.current;
+    if (!cur.waveformPCM || cur.isSample) return;
+    const size = cur.waveformPCM.length;
+    const out: number[] = new Array(size);
+    for (let i = 0; i < size; i++) {
+      const t = i / size;
+      let v = 0;
+      switch (kind) {
+        case 'sine':     v = Math.round(Math.sin(t * Math.PI * 2) * 127); break;
+        case 'triangle': v = Math.round((1 - Math.abs((t * 4) % 4 - 2)) * 127); break;
+        case 'square':   v = t < 0.5 ? 127 : -127; break;
+        case 'saw':      v = Math.round((t * 2 - 1) * 127); break;
+        case 'noise':    v = Math.round((Math.random() * 2 - 1) * 127); break;
+        case 'clear':    v = 0; break;
+      }
+      out[i] = Math.max(-127, Math.min(127, v));
+    }
+    onChange({ waveformPCM: out });
+  }, [onChange]);
+
+  const renderWaveform = () => {
+    if (config.isSample) {
+      return (
+        <div className="p-3 text-[11px] text-text-muted">
+          No oscillator waveform — this is a PCM sample instrument.
+        </div>
+      );
+    }
+    if (!config.waveformPCM || config.waveformPCM.length === 0) {
+      return (
+        <div className="p-3 text-[11px] text-text-muted">
+          No waveform data available for this instrument.
+        </div>
+      );
+    }
+    return (
+      <div className="flex flex-col gap-3 p-3 overflow-y-auto" style={{ maxHeight: 'calc(100vh - 280px)' }}>
+        <div className={`rounded-lg border p-3 ${panelBg}`} style={panelStyle}>
+          <SectionLabel color={accent} label="Oscillator Waveform (click + drag to draw)" />
+          <div className="text-[10px] text-text-muted mb-2">
+            {config.waveformPCM.length} bytes — signed 8-bit PCM. This is the
+            waveform selected by the wavetable sequence (Table tab).
+          </div>
+          <div className="flex gap-1 mb-2">
+            {(['sine', 'triangle', 'square', 'saw', 'noise', 'clear'] as const).map((k) => (
+              <button
+                key={k}
+                onClick={() => applyWavePreset(k)}
+                className="text-[9px] font-mono px-1.5 py-0.5 rounded border border-dark-border text-text-secondary hover:text-accent-primary hover:border-accent-primary/50 uppercase"
+                title={`Fill waveform with ${k}`}
+              >
+                {k}
+              </button>
+            ))}
+          </div>
+          <canvas
+            ref={waveCanvasRef}
+            className="w-full rounded border border-dark-border bg-[#0a0e14] cursor-crosshair"
+            style={{ height: 160, touchAction: 'none' }}
+            onPointerDown={handleWavePointerDown}
+            onPointerMove={handleWavePointerMove}
+            onPointerUp={handleWavePointerUp}
+            onPointerCancel={handleWavePointerUp}
+          />
+          <div className="mt-2 text-[9px]" style={{ color: accent, opacity: 0.6 }}>
+            Edits are saved to the instrument config and exported with .xm.
+            Live UADE chip-RAM patching is not performed for this field
+            (the waveform pool sits outside the instrument header).
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   // ── TABS ──────────────────────────────────────────────────────────────────
+
+  const hasWaveformPCM = !config.isSample && !!(config.waveformPCM && config.waveformPCM.length > 0);
 
   const tabs: Array<[DM2Tab, string]> = [
     ['envelope',   'Envelope'],
     ['modulation', 'Modulation'],
     ...(!config.isSample ? [['table', 'Table'] as [DM2Tab, string]] : []),
+    ...(hasWaveformPCM ? [['waveform', 'Waveform'] as [DM2Tab, string]] : []),
   ];
 
   return (
@@ -364,6 +577,7 @@ export const DeltaMusic2Controls: React.FC<DeltaMusic2ControlsProps> = ({
       {activeTab === 'envelope'   && renderEnvelope()}
       {activeTab === 'modulation' && renderModulation()}
       {activeTab === 'table'      && renderTable()}
+      {activeTab === 'waveform'   && renderWaveform()}
 
       {uadeChipRam && (
         <div className="flex justify-end px-3 py-2 border-t border-opacity-30"
