@@ -234,6 +234,7 @@ export function applyEffectParametersDiff(
         if ('rateB' in changed) node.setRateB(Number(changed.rateB));
         if ('depthB' in changed) node.setDepthB(Number(changed.depthB));
         if ('feedback' in changed) node.setFeedback(Number(changed.feedback));
+        if ('routing' in changed) node.setRouting(Number(changed.routing) === 0 ? 'parallel' : 'series');
       }
       break;
 
@@ -302,8 +303,12 @@ export function applyEffectParametersDiff(
       break;
 
     case 'JCReverb':
-      if (node instanceof Tone.JCReverb) {
-        if ('roomSize' in changed) node.roomSize.rampTo(Math.min(0.9, Number(changed.roomSize)), R);
+      // JCReverb now uses Tone.Reverb (ConvolverNode-based) for reliability
+      if (node instanceof Tone.Reverb) {
+        if ('roomSize' in changed) {
+          const roomVal = Math.max(0, Math.min(Number(changed.roomSize), 0.99));
+          node.decay = 0.5 + roomVal * 9.5;
+        }
       }
       break;
 
