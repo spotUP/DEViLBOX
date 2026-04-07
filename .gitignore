@@ -205,6 +205,7 @@ setbfree-wasm/build/
 sfizz-wasm/build/
 synthv1-wasm/build/
 zynaddsubfx-wasm/build/
+*-wasm/build/
 
 # Screenshot files (design reference, not source)
 *.png
