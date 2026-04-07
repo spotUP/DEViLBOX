@@ -23,6 +23,7 @@
 
 import React, { useRef, useEffect, useCallback } from 'react';
 import type { JamCrackerConfig } from '@/types/instrument';
+import { writeWaveformByte } from '@/lib/jamcracker/waveformDraw';
 import { Knob } from '@components/controls/Knob';
 
 interface JamCrackerControlsProps {
@@ -186,32 +187,14 @@ export const JamCrackerControls: React.FC<JamCrackerControlsProps> = ({
     const canvas = canvasRef.current;
     if (!canvas) return;
     const rect = canvas.getBoundingClientRect();
-    const x = Math.max(0, Math.min(rect.width, e.clientX - rect.left));
-    const y = Math.max(0, Math.min(rect.height, e.clientY - rect.top));
-    const WAVE_SIZE = Math.max(1, cur.waveformData.length);
-    const idx = Math.min(WAVE_SIZE - 1, Math.floor((x / rect.width) * WAVE_SIZE));
-    const mid = rect.height / 2;
-    const signed = Math.round(((mid - y) / (mid - 4)) * 127);
-    const clamped = Math.max(-127, Math.min(127, signed));
-    const byte = clamped < 0 ? clamped + 256 : clamped;
-
-    const next = new Uint8Array(cur.waveformData);
-    // Linear interpolate between this idx and the previous one to avoid
-    // gaps on fast drags
-    const prevIdx = lastIdxRef.current;
-    if (prevIdx >= 0 && Math.abs(idx - prevIdx) > 1) {
-      const prevVal = next[prevIdx];
-      const lo = Math.min(prevIdx, idx);
-      const hi = Math.max(prevIdx, idx);
-      for (let i = lo; i <= hi; i++) {
-        const t = (i - lo) / (hi - lo);
-        const interp = idx > prevIdx ? Math.round(prevVal + (byte - prevVal) * t)
-                                     : Math.round(byte + (prevVal - byte) * t);
-        next[i] = interp & 0xFF;
-      }
-    } else {
-      next[idx] = byte;
-    }
+    const { next, idx } = writeWaveformByte(
+      cur.waveformData,
+      e.clientX - rect.left,
+      e.clientY - rect.top,
+      rect.width,
+      rect.height,
+      lastIdxRef.current,
+    );
     lastIdxRef.current = idx;
     onChange({ ...cur, waveformData: next });
   }, [onChange]);
