@@ -9,7 +9,6 @@ import { current } from 'immer';
 import type * as Tone from 'tone';
 import type { EffectConfig, AudioEffectType as EffectType } from '@typedefs/instrument';
 import type { ToneEngine } from '@engine/ToneEngine';
-import { checkFormatViolation, getActiveFormatLimits } from '@/lib/formatCompatibility';
 import { getDefaultEffectParameters } from '@engine/InstrumentFactory';
 
 interface AudioStore {
@@ -148,13 +147,8 @@ export const useAudioStore = create<AudioStore>()(
 
     // Master Effects Actions
     addMasterEffect: (effectType) => {
-      const limits = getActiveFormatLimits();
-      if (limits) {
-        void checkFormatViolation('masterEffects',
-          `Master effects are not supported in ${limits.name} format.`,
-        ).then((ok) => { if (ok) get().addMasterEffect(effectType); });
-        return;
-      }
+      // Format compat: master effects — deferred to export-time validation
+      // (effects still work in DEViLBOX; only matters when exporting to native format)
       set((state) => {
         const newEffect: EffectConfig = {
           id: `master-fx-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
