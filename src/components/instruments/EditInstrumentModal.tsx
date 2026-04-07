@@ -107,7 +107,9 @@ export const EditInstrumentModal: React.FC<EditInstrumentModalProps> = ({
 
   // Edit mode state
   const [activeTab, setActiveTab] = useState<EditorTab>('sound');
-  const [showKeyboard, setShowKeyboard] = useState(true);
+  // Test keyboard starts collapsed — user opens it on demand. Avoids the
+  // common case where it covers editor content on shorter viewports.
+  const [showKeyboard, setShowKeyboard] = useState(false);
   const [showSaveDialog, setShowSaveDialog] = useState(false);
   const [showSynthBrowser, setShowSynthBrowser] = useState(false);
 
