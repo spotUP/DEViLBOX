@@ -1953,7 +1953,13 @@ const JamCrackerPanel: React.FC<{
         }}
       >
         <PixiLabel text="JamCracker Pro" size="sm" weight="bold" color="custom" customColor={0x00DDFF} />
-        <PixiLabel text={jc.name} size="sm" color="textSecondary" />
+        <PixiPureTextInput
+          value={jc.name}
+          onChange={(v: string) => onUpdate(instrument.id, { jamCracker: { ...jcRef.current, name: v } })}
+          width={140}
+          height={22}
+          fontSize={12}
+        />
         <layoutContainer layout={{ flex: 1 }} />
         {jc.isAM && <PixiLabel text="AM SYNTH" size="xs" weight="bold" color="custom" customColor={0xC084FC} />}
         {jc.hasLoop && <PixiLabel text="LOOP" size="xs" weight="bold" color="custom" customColor={0x4ADE80} />}
@@ -2062,10 +2068,46 @@ const JamCrackerPanel: React.FC<{
         )}
       </layoutContainer>
 
-      {/* Info */}
-      <layoutContainer layout={{ paddingTop: 4 }}>
+      {/* Flags — bitfield editor (bit0=loop, bit1=AM), mirrors parser */}
+      <layoutContainer layout={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingTop: 4 }}>
+        <PixiLabel text="FLAGS" size="xs" weight="bold" color="textMuted" />
+        <PixiToggle
+          label="Loop"
+          value={(jc.flags & 0x01) !== 0}
+          onChange={(v: boolean) => {
+            const cur = jcRef.current;
+            const newFlags = v ? (cur.flags | 0x01) : (cur.flags & ~0x01);
+            onUpdate(instrument.id, {
+              jamCracker: {
+                ...cur,
+                flags: newFlags,
+                isAM: (newFlags & 0x02) !== 0,
+                hasLoop: (newFlags & 0x01) !== 0,
+              },
+            });
+          }}
+          size="sm"
+        />
+        <PixiToggle
+          label="AM Synth"
+          value={(jc.flags & 0x02) !== 0}
+          onChange={(v: boolean) => {
+            const cur = jcRef.current;
+            const newFlags = v ? (cur.flags | 0x02) : (cur.flags & ~0x02);
+            onUpdate(instrument.id, {
+              jamCracker: {
+                ...cur,
+                flags: newFlags,
+                isAM: (newFlags & 0x02) !== 0,
+                hasLoop: (newFlags & 0x01) !== 0,
+              },
+            });
+          }}
+          size="sm"
+        />
+        <layoutContainer layout={{ flex: 1 }} />
         <PixiLabel
-          text={`Flags: 0x${jc.flags.toString(16).padStart(2, '0')}${jc.isAM ? ' — AM synthesis with 64-byte waveform loop' : ' — PCM sample playback'}`}
+          text={`0x${jc.flags.toString(16).padStart(2, '0')}${jc.isAM ? ' — AM synthesis (64-byte waveform)' : ' — PCM sample'}`}
           size="xs"
           color="textMuted"
         />
