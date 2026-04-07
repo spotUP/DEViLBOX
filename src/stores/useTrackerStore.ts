@@ -19,6 +19,7 @@ import { idGenerator } from '../utils/idGenerator';
 import { DEFAULT_PATTERN_LENGTH, DEFAULT_NUM_CHANNELS, MAX_PATTERN_LENGTH, MAX_CHANNELS, MIN_CHANNELS, MIN_PATTERN_LENGTH } from '../constants/trackerConstants';
 import { checkFormatViolation, getActiveFormatLimits } from '@/lib/formatCompatibility';
 import { SYSTEM_PRESETS, DivChanType } from '../constants/systemPresets';
+import { isSynthCompatibleWithChannel, getChannelBadge, getSynthBadge } from '../constants/channelTypeCompat';
 import { useHistoryStore } from './useHistoryStore';
 import { useCursorStore } from './useCursorStore';
 import { useEditorStore } from './useEditorStore';
@@ -467,6 +468,51 @@ const createEmptyPattern = (length: number = DEFAULT_PATTERN_LENGTH, numChannels
   })),
 });
 
+// ── Channel-type validation (fires once per mismatch type) ───────────────────
+const _warnedMismatches = new Set<string>();
+
+function validateChannelInstrumentCompat(
+  channelIndex: number,
+  instrumentId: number,
+  get: () => TrackerStore
+) {
+  try {
+    const { useUIStore } = require('./useUIStore');
+    const presetId = useUIStore.getState().activeSystemPreset;
+    if (!presetId) return; // no hardware preset active
+
+    const pattern = get().patterns[get().currentPatternIndex];
+    const channel = pattern?.channels[channelIndex];
+    const furnaceType = channel?.channelMeta?.furnaceType;
+    if (furnaceType === undefined) return; // channel has no hardware type
+
+    const { useInstrumentStore } = require('./useInstrumentStore');
+    const instrument = useInstrumentStore.getState().instruments.find(
+      (i: any) => i.id === instrumentId
+    );
+    if (!instrument?.synthType) return;
+
+    if (!isSynthCompatibleWithChannel(instrument.synthType, furnaceType)) {
+      const key = `${channelIndex}-${instrument.synthType}-${furnaceType}`;
+      if (_warnedMismatches.has(key)) return; // already warned
+      _warnedMismatches.add(key);
+
+      const chBadge = getChannelBadge(furnaceType);
+      const instBadge = getSynthBadge(instrument.synthType);
+      const chName = channel.channelMeta?.hardwareName || channel.name || `CH${channelIndex + 1}`;
+      const { notify } = require('@stores/useNotificationStore');
+      notify.warning(
+        `${instBadge.label} instrument "${instrument.name}" in ${chBadge.label} channel "${chName}" — may not play on target hardware`
+      );
+    }
+  } catch { /* stores not available */ }
+}
+
+// Reset mismatch warnings when preset changes
+export function resetChannelMismatchWarnings() {
+  _warnedMismatches.clear();
+}
+
 export const useTrackerStore = create<TrackerStore>()(
   immer((set, get) => ({
     // Initial state
@@ -607,6 +653,11 @@ export const useTrackerStore = create<TrackerStore>()(
       } catch { /* SunVox not active */ }
       // Sync edit to MusicLine WASM engine (debounced re-export)
       debouncedWasmEngineReexport();
+
+      // Channel-type validation: warn if instrument is incompatible with channel hardware type
+      if (cellUpdate.instrument !== undefined && cellUpdate.instrument >= 0) {
+        validateChannelInstrumentCompat(channelIndex, cellUpdate.instrument, get);
+      }
     },
 
     clearCell: (channelIndex, rowIndex) => {

@@ -246,18 +246,8 @@ export const useInstrumentStore = create<InstrumentStore>()(
     updateInstrument: (id, updates) => {
       const currentInstrument = get().instruments.find((inst) => inst.id === id);
 
-      // Format compat: synth type change check
-      if (updates.synthType && currentInstrument &&
-          updates.synthType !== currentInstrument.synthType &&
-          updates.synthType !== 'Sampler' && updates.synthType !== 'Player') {
-        const limits = getActiveFormatLimits();
-        if (limits) {
-          void checkFormatViolation('synthInstrument',
-            `Synth instruments are not supported in ${limits.name} format.`,
-          ).then((ok) => { if (ok) get().updateInstrument(id, updates); });
-          return;
-        }
-      }
+      // Format compat: synth type change — deferred to export-time validation
+      // (synth instruments still work in DEViLBOX; only matters when exporting to native format)
 
       // Check what's changing
       const synthTypeChanging = currentInstrument && updates.synthType && updates.synthType !== currentInstrument.synthType;
@@ -861,17 +851,8 @@ export const useInstrumentStore = create<InstrumentStore>()(
     },
 
     createInstrument: (config) => {
-      // Format compat: synth instrument check
-      const synthType = (config as Partial<InstrumentConfig>)?.synthType;
-      if (synthType && synthType !== 'Sampler' && synthType !== 'Player') {
-        const limits = getActiveFormatLimits();
-        if (limits) {
-          void checkFormatViolation('synthInstrument',
-            `Synth instruments are not supported in ${limits.name} format.`,
-          ).then((ok) => { if (ok) get().createInstrument(config); });
-          return -1;
-        }
-      }
+      // Format compat: synth instrument — deferred to export-time validation
+      // (synth instruments still work in DEViLBOX; only matters when exporting to native format)
       // Format compat: instrument count check
       const currentCount = get().instruments.length;
       const limits = getActiveFormatLimits();
@@ -939,15 +920,8 @@ export const useInstrumentStore = create<InstrumentStore>()(
     },
 
     addInstrument: (config) => {
-      if (config.synthType && config.synthType !== 'Sampler' && config.synthType !== 'Player') {
-        const limits = getActiveFormatLimits();
-        if (limits) {
-          void checkFormatViolation('synthInstrument',
-            `Synth instruments are not supported in ${limits.name} format.`,
-          ).then((ok) => { if (ok) get().addInstrument(config); });
-          return;
-        }
-      }
+      // Format compat: synth instrument — deferred to export-time validation
+      // (synth instruments still work in DEViLBOX; only matters when exporting to native format)
       set((state) => {
         // Auto-set monophonic flag for inherently monophonic synths (same as createInstrument)
         const finalConfig = { ...config };
