@@ -6,11 +6,13 @@
 import React, { useMemo, useState, useRef, useCallback } from 'react';
 import { useAutomationStore, useInstrumentStore, useTrackerStore } from '@stores';
 import { interpolateAutomationValue } from '@typedefs/automation';
-import type { AutomationCurve } from '@typedefs/automation';
+import type { AutomationCurve, AutomationPreset } from '@typedefs/automation';
 import { getSectionColor } from '@hooks/useChannelAutomationParams';
 import { getNKSParametersForSynth } from '@/midi/performance/synthParameterMaps';
 import { AUTOMATION_LANE_WIDTH, AUTOMATION_LANE_MIN } from '@hooks/views/usePatternEditor';
 import type { SynthType } from '@typedefs/instrument';
+import { ContextMenu, type MenuItemType } from '@components/common/ContextMenu';
+import { Trash2, Eraser } from 'lucide-react';
 
 /**
  * Resolve a human-readable label for an automation parameter id.
@@ -118,6 +120,70 @@ export const AutomationLanes: React.FC<AutomationLanesProps> = ({
   const addPoint = useAutomationStore((state) => state.addPoint);
   const removePoint = useAutomationStore((state) => state.removePoint);
   const channelLanes = useAutomationStore((state) => state.channelLanes);
+  const presets = useAutomationStore((state) => state.presets);
+  const applyPreset = useAutomationStore((state) => state.applyPreset);
+  const clearPoints = useAutomationStore((state) => state.clearPoints);
+  const removeCurve = useAutomationStore((state) => state.removeCurve);
+
+  // Right-click context menu state for the active lane
+  const [laneCtxMenu, setLaneCtxMenu] = useState<{
+    x: number;
+    y: number;
+    curveId: string;
+  } | null>(null);
+
+  // Apply a preset's points to a curve, scaled to fit the current pattern length.
+  // Presets are authored against a 64-row pattern; rescale row indices linearly.
+  const applyPresetScaled = useCallback((curveId: string, preset: AutomationPreset) => {
+    const PRESET_BASE_ROWS = 64;
+    const scale = (patternLength - 1) / (PRESET_BASE_ROWS - 1);
+    const scaledPreset: AutomationPreset = {
+      ...preset,
+      points: preset.points.map((p) => ({
+        ...p,
+        row: Math.round(p.row * scale),
+      })),
+    };
+    applyPreset(curveId, scaledPreset);
+  }, [patternLength, applyPreset]);
+
+  // Lane right-click handler — opens the preset/clear/remove menu
+  const handleLaneContextMenu = useCallback((e: React.MouseEvent, curveId: string) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setLaneCtxMenu({ x: e.clientX, y: e.clientY, curveId });
+  }, []);
+
+  // Build context menu items: presets submenu + clear + remove
+  const laneCtxMenuItems = useMemo<MenuItemType[]>(() => {
+    if (!laneCtxMenu) return [];
+    const curveId = laneCtxMenu.curveId;
+    return [
+      {
+        id: 'apply-preset',
+        label: 'Apply Preset',
+        submenu: presets.map((preset) => ({
+          id: `preset-${preset.id}`,
+          label: preset.name,
+          onClick: () => applyPresetScaled(curveId, preset),
+        })),
+      },
+      { type: 'divider' as const },
+      {
+        id: 'clear-points',
+        label: 'Clear Points',
+        icon: <Eraser size={14} />,
+        onClick: () => clearPoints(curveId),
+      },
+      {
+        id: 'remove-curve',
+        label: 'Remove Lane',
+        icon: <Trash2 size={14} />,
+        danger: true,
+        onClick: () => removeCurve(curveId),
+      },
+    ];
+  }, [laneCtxMenu, presets, applyPresetScaled, clearPoints, removeCurve]);
 
   // Drag state — captures the lane geometry at mousedown so we don't have to
   // recompute (and possibly miscompute, for multi-lane) on every mousemove.
@@ -464,6 +530,7 @@ export const AutomationLanes: React.FC<AutomationLanesProps> = ({
             onMouseDown={isInteractive ? (e) => handleMouseDown(e, curve, channelIndex, laneLeft, yOffset, laneWidth) : undefined}
             onMouseMove={isInteractive ? handleMouseMove : undefined}
             onMouseUp={isInteractive ? handleMouseUp : undefined}
+            onContextMenu={isInteractive ? (e) => handleLaneContextMenu(e, curve.id) : undefined}
             onDoubleClick={isInteractive ? (e) => handleDoubleClick(e, curve, yOffset) : undefined}
           >
             <svg width={laneWidth} height={pHeight}>
@@ -596,6 +663,7 @@ export const AutomationLanes: React.FC<AutomationLanesProps> = ({
           onMouseDown={isCurrentPattern ? (e) => handleMouseDown(e, curve, channelIndex, laneLeft, yOffset, lw) : undefined}
           onMouseMove={isCurrentPattern ? handleMouseMove : undefined}
           onMouseUp={isCurrentPattern ? handleMouseUp : undefined}
+          onContextMenu={isCurrentPattern ? (e) => handleLaneContextMenu(e, curve.id) : undefined}
           onDoubleClick={isCurrentPattern ? (e) => handleDoubleClick(e, curve, yOffset) : undefined}
         >
           <svg width={lw} height={pHeight}>
@@ -684,6 +752,15 @@ export const AutomationLanes: React.FC<AutomationLanesProps> = ({
         false
       )}
       {hasNextMultiLane && renderMultiLaneCurves(nextCurveGroups, nextLen, prevLen + patternLength, 0.5, 'next', false)}
+
+      {/* Right-click context menu for lane operations */}
+      {laneCtxMenu && (
+        <ContextMenu
+          items={laneCtxMenuItems}
+          position={{ x: laneCtxMenu.x, y: laneCtxMenu.y }}
+          onClose={() => setLaneCtxMenu(null)}
+        />
+      )}
     </div>
   );
 };
