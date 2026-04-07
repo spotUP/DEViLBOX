@@ -146,7 +146,7 @@ const tonejs: EffectDescriptor[] = [
       }
       return jcr;
     },
-    getDefaultParameters: () => ({ roomSize: 0.5 }),
+    getDefaultParameters: () => ({ roomSize: 0.7 }),
   },
   {
     id: 'Delay', name: 'Delay', category: 'tonejs', group: 'Reverb & Delay',

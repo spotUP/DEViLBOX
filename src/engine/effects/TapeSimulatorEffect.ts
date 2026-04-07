@@ -62,9 +62,10 @@ export class TapeSimulatorEffect extends Tone.ToneAudioNode {
     this.input  = new Tone.Gain(1);
     this.output = new Tone.Gain(1);
 
-    // WASM outputs wet-only signal; we mix externally
-    this.dryGain = new Tone.Gain(1 - this._options.wet);
-    this.wetGain = new Tone.Gain(this._options.wet);
+    // WASM outputs wet-only signal; we mix externally.
+    // Start full-dry until worklet is ready — prevents silence while WASM loads.
+    this.dryGain = new Tone.Gain(1);
+    this.wetGain = new Tone.Gain(0);
 
     // Dry path: input → dryGain → output
     this.input.connect(this.dryGain);
@@ -101,6 +102,9 @@ export class TapeSimulatorEffect extends Tone.ToneAudioNode {
           this.sendParam('shame',     this._options.shame);
           this.sendParam('hiss',      this._options.hiss);
           this.sendParam('speed',     this._options.speed);
+          // Worklet producing output — apply correct wet/dry mix
+          this.dryGain.gain.value = 1 - this._options.wet;
+          this.wetGain.gain.value = this._options.wet;
         } else if (event.data.type === 'error') {
           console.error('[TapeSimulator] Worklet error:', event.data.message);
         }
