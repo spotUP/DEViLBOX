@@ -11,6 +11,7 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { useMIDI } from '../../hooks/useMIDI';
 import { useInstrumentStore } from '../../stores';
+import { useModalClose } from '@hooks/useDialogKeyboard';
 import { getCCMapManager, type GeneralCCMapping } from '../../midi/CCMapManager';
 import { getMPKMiniDisplay } from '../../midi/MPKMiniDisplay';
 import {
@@ -63,6 +64,8 @@ export const MIDILearnModal: React.FC<MIDILearnModalProps> = ({ isOpen, onClose 
   const { devices, isSupported, isEnabled, lastMessage, enableMIDI } = useMIDI();
   const ccManager = getCCMapManager();
   const instruments = useInstrumentStore((state) => state.instruments);
+
+  useModalClose({ isOpen, onClose });
 
   // Initialize CCMapManager when modal opens
   useEffect(() => {

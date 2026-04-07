@@ -43,6 +43,7 @@ export class VinylNoiseEffect extends Tone.ToneAudioNode {
   private dryGain: Tone.Gain;
   private wetGain: Tone.Gain;
   private workletNode: AudioWorkletNode | null = null;
+  private _pendingParams = new Map<string, number>();
 
   private _hiss:            number;
   private _dust:            number;
@@ -113,6 +114,12 @@ export class VinylNoiseEffect extends Tone.ToneAudioNode {
       rawInput.connect(this.workletNode);
       this.workletNode.connect(rawWet);
 
+      // Flush any params queued before worklet was ready
+      for (const [param, value] of this._pendingParams) {
+        this.workletNode.port.postMessage({ param, value });
+      }
+      this._pendingParams.clear();
+
       // Push current params to worklet
       this._send('hiss',            this._hiss);
       this._send('dust',            this._dust);
@@ -153,7 +160,10 @@ export class VinylNoiseEffect extends Tone.ToneAudioNode {
   }
 
   private _send(param: string, value: number) {
-    if (!this.workletNode) return;
+    if (!this.workletNode) {
+      this._pendingParams.set(param, value);
+      return;
+    }
     this.workletNode.port.postMessage({ param, value });
   }
 

@@ -25,6 +25,7 @@ import { midiToXMNote } from '../../lib/xmConversions';
 import { useTrackerStore } from '../../stores/useTrackerStore';
 import { useTransportStore } from '../../stores/useTransportStore';
 import { notify } from '../../stores/useNotificationStore';
+import { useDialogKeyboard } from '@hooks/useDialogKeyboard';
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
@@ -370,6 +371,8 @@ export const AudioToMidiModal: React.FC<AudioToMidiModalProps> = ({
     notify.success(`Pattern "${pattern.name}" added at position ${newIndex + 1}`);
     onClose();
   }, [detectedNotes, bpm, settings, instrument.id, onClose]);
+
+  useDialogKeyboard({ isOpen, onConfirm: handleInsert, onCancel: onClose });
 
   const handlePlaySample = useCallback(() => {
     if (sampleStopRef.current) {

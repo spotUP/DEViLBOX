@@ -8,6 +8,7 @@
 import React from 'react';
 import { Sparkles, ExternalLink, X } from 'lucide-react';
 import { Modal } from '../ui/Modal';
+import { useDialogKeyboard } from '@hooks/useDialogKeyboard';
 
 interface ModlandContributionModalProps {
   isOpen: boolean;
@@ -25,6 +26,8 @@ export const ModlandContributionModal: React.FC<ModlandContributionModalProps> =
   hash
 }) => {
   const demozooDiscord = 'https://discord.gg/AJ2xV8X';
+
+  useDialogKeyboard({ isOpen, onConfirm: onClose, onCancel: onClose });
 
   return (
     <Modal

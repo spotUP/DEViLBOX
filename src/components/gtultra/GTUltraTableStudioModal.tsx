@@ -15,6 +15,7 @@ import React, { useCallback, useMemo, useState } from 'react';
 import { X } from 'lucide-react';
 import { WavetableEditor, type WavetableData } from '../instruments/editors/WavetableEditor';
 import { useGTUltraStore, type GTTableData } from '../../stores/useGTUltraStore';
+import { useModalClose } from '@hooks/useDialogKeyboard';
 
 interface GTUltraTableStudioModalProps {
   isOpen: boolean;
@@ -53,6 +54,8 @@ export const GTUltraTableStudioModal: React.FC<GTUltraTableStudioModalProps> = (
   React.useEffect(() => {
     if (isOpen) setLocal(initial);
   }, [isOpen, initial]);
+
+  useModalClose({ isOpen, onClose });
 
   const handleCommit = useCallback(() => {
     if (!engine) return;
