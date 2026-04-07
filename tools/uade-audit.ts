@@ -120,7 +120,7 @@ const SKIP_KEYS = new Set([
   'uade-digital-sound-studio', 'uade-tcb-tracker', 'uade-ben-daglish',
   'uade-jason-brooke', 'uade-jeroen-tel', 'uade-fashion-tracker',
   'uade-sound-master', 'uade-novo-trade', 'uade-wally-beben', 'uade-stk',
-  'uade-dave-lowe',
+  'uade-dave-lowe', 'uade-paul-summers', 'uade-future-player', 'uade-stp',
 ]);
 
 const TESTS: TestDef[] = [
