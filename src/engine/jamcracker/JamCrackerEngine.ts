@@ -286,7 +286,7 @@ export class JamCrackerEngine {
   private _saveResolve: ((data: Uint8Array) => void) | null = null;
   private _requestId = 0;
 
-  /** Get pattern data: array of rows, each row has 4 channels with 8 fields */
+  /** Get pattern data with retry on timeout */
   getPatternData(patIdx: number): Promise<{
     numRows: number;
     rows: Array<Array<{
@@ -294,19 +294,27 @@ export class JamCrackerEngine {
       vibrato: number; phase: number; volume: number; porta: number;
     }>>;
   }> {
-    return new Promise((resolve) => {
-      if (!this.workletNode) { resolve({ numRows: 0, rows: [] }); return; }
-      const requestId = `jc-pat-${this._requestId++}`;
-      const timeout = setTimeout(() => {
-        this._patternCallbacks.delete(requestId);
-        resolve({ numRows: 0, rows: [] });
-      }, 3000);
-      this._patternCallbacks.set(requestId, (data) => {
-        clearTimeout(timeout);
-        resolve(data);
+    const maxRetries = 3;
+    const attempt = (retriesLeft: number): Promise<any> =>
+      new Promise((resolve) => {
+        if (!this.workletNode) { resolve({ numRows: 0, rows: [] }); return; }
+        const requestId = `jc-pat-${this._requestId++}`;
+        const timeout = setTimeout(() => {
+          this._patternCallbacks.delete(requestId);
+          if (retriesLeft > 0) {
+            console.warn(`[JamCrackerEngine] Pattern data timeout, retrying (${retriesLeft} left)`);
+            resolve(attempt(retriesLeft - 1));
+          } else {
+            resolve({ numRows: 0, rows: [] });
+          }
+        }, 3000);
+        this._patternCallbacks.set(requestId, (data) => {
+          clearTimeout(timeout);
+          resolve(data);
+        });
+        this.workletNode.port.postMessage({ type: 'get-pattern-data', patIdx, requestId });
       });
-      this.workletNode.port.postMessage({ type: 'get-pattern-data', patIdx, requestId });
-    });
+    return attempt(maxRetries);
   }
 
   /** Set a single field in a pattern cell */
@@ -316,22 +324,30 @@ export class JamCrackerEngine {
     });
   }
 
-  /** Get song structure: song length, num patterns, num instruments, order list */
+  /** Get song structure with retry on timeout */
   getSongStructure(): Promise<{
     songLen: number; numPats: number; numInst: number; entries: number[];
   }> {
-    return new Promise((resolve) => {
-      if (!this.workletNode) { resolve({ songLen: 0, numPats: 0, numInst: 0, entries: [] }); return; }
-      const timeout = setTimeout(() => {
-        this._songStructureResolve = null;
-        resolve({ songLen: 0, numPats: 0, numInst: 0, entries: [] });
-      }, 3000);
-      this._songStructureResolve = (data) => {
-        clearTimeout(timeout);
-        resolve(data);
-      };
-      this.workletNode.port.postMessage({ type: 'get-song-structure' });
-    });
+    const maxRetries = 3;
+    const attempt = (retriesLeft: number): Promise<any> =>
+      new Promise((resolve) => {
+        if (!this.workletNode) { resolve({ songLen: 0, numPats: 0, numInst: 0, entries: [] }); return; }
+        const timeout = setTimeout(() => {
+          this._songStructureResolve = null;
+          if (retriesLeft > 0) {
+            console.warn(`[JamCrackerEngine] Song structure timeout, retrying (${retriesLeft} left)`);
+            resolve(attempt(retriesLeft - 1));
+          } else {
+            resolve({ songLen: 0, numPats: 0, numInst: 0, entries: [] });
+          }
+        }, 3000);
+        this._songStructureResolve = (data) => {
+          clearTimeout(timeout);
+          resolve(data);
+        };
+        this.workletNode.port.postMessage({ type: 'get-song-structure' });
+      });
+    return attempt(maxRetries);
   }
 
   /** Save the current module state as a .jam binary */

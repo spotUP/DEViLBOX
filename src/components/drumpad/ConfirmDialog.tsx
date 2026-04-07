@@ -4,6 +4,7 @@
 
 import React from 'react';
 import { AlertTriangle, X } from 'lucide-react';
+import { useDialogKeyboard } from '@hooks/useDialogKeyboard';
 
 interface ConfirmDialogProps {
   isOpen: boolean;
@@ -26,6 +27,8 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
   onConfirm,
   onCancel,
 }) => {
+  useDialogKeyboard({ isOpen, onConfirm, onCancel });
+
   if (!isOpen) return null;
 
   // Animation keyframes (fade in + scale)

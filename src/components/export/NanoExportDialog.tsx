@@ -2,6 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { NanoExporter } from '@/lib/export/NanoExporter';
 import { useTrackerStore, useInstrumentStore, useTransportStore } from '@/stores';
 import { X, Copy, Zap, Save, Check } from 'lucide-react';
+import { useModalClose } from '@hooks/useDialogKeyboard';
 
 interface NanoExportDialogProps {
   onClose: () => void;
@@ -35,6 +36,8 @@ export const NanoExportDialog: React.FC<NanoExportDialogProps> = ({ onClose }) =
       instr: instruments.length
     };
   }, [binaryData, instruments]);
+
+  useModalClose({ isOpen: true, onClose });
 
   const handleCopy = () => {
     navigator.clipboard.writeText(base64Data);

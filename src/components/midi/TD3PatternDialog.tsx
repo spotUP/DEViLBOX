@@ -8,6 +8,7 @@ import { useMIDIStore } from '../../stores/useMIDIStore';
 import { useTrackerStore } from '../../stores/useTrackerStore';
 import { useCursorStore } from '../../stores/useCursorStore';
 import { useInstrumentStore } from '../../stores/useInstrumentStore';
+import { useModalClose } from '@hooks/useDialogKeyboard';
 import { createDefaultTB303Instrument } from '../../lib/instrumentFactory';
 import { getMIDIManager } from '../../midi/MIDIManager';
 import { encodePattern, encodePatternRequest, formatPatternLocation } from '../../midi/sysex/TD3SysExEncoder';
@@ -53,6 +54,8 @@ export const TD3PatternDialog: React.FC<TD3PatternDialogProps> = ({ isOpen, onCl
 
   const currentPattern = patterns[currentPatternIndex];
   const channels = currentPattern?.channels || [];
+
+  useModalClose({ isOpen, onClose });
 
   // Reset state when dialog opens
   useEffect(() => {

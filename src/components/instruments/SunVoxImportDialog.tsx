@@ -4,6 +4,7 @@
  */
 import React, { useState, useEffect } from 'react';
 import type { SunVoxConfig } from '@typedefs/instrument';
+import { useDialogKeyboard } from '@hooks/useDialogKeyboard';
 
 interface SunVoxImportDialogProps {
   onClose: () => void;
@@ -69,6 +70,8 @@ export const SunVoxImportDialog: React.FC<SunVoxImportDialogProps> = ({ onClose,
     onImport(pending.name, pending.config);
     onClose();
   };
+
+  useDialogKeyboard({ isOpen: true, onConfirm: handleImport, onCancel: onClose });
 
   return (
     <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-[10050]" onClick={onClose}>

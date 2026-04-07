@@ -146,6 +146,7 @@ export class TumultEffect extends Tone.ToneAudioNode {
   private wetGain: Tone.Gain;
   private workletNode: AudioWorkletNode | null = null;
   private _params: Required<TumultOptions>;
+  private _pendingParams = new Map<string, number>();
   private _loadedSampleIndex = -1;
 
   private static loadedContexts = new Set<BaseAudioContext>();
@@ -205,6 +206,12 @@ export class TumultEffect extends Tone.ToneAudioNode {
       rawInput.connect(this.workletNode);
       this.workletNode.connect(rawWet);
 
+      // Flush any params queued before worklet was ready
+      for (const [param, value] of this._pendingParams) {
+        this.workletNode.port.postMessage({ param, value });
+      }
+      this._pendingParams.clear();
+
       // Push all current params
       const p = this._params;
       for (const [k, v] of Object.entries(p) as [string, number][]) {
@@ -238,7 +245,11 @@ export class TumultEffect extends Tone.ToneAudioNode {
   }
 
   private _send(param: string, value: number) {
-    this.workletNode?.port.postMessage({ param, value });
+    if (!this.workletNode) {
+      this._pendingParams.set(param, value);
+      return;
+    }
+    this.workletNode.port.postMessage({ param, value });
   }
 
   private async _loadSample(index: number) {
