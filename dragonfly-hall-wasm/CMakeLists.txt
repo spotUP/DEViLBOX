@@ -1,0 +1,6 @@
+cmake_minimum_required(VERSION 3.20)
+project(DragonflyHall VERSION 1.0.0)
+set(CMAKE_CXX_STANDARD 17)
+add_executable(DragonflyHall DragonflyHallWASM.cpp)
+set_target_properties(DragonflyHall PROPERTIES OUTPUT_NAME "DragonflyHall" SUFFIX ".js" RUNTIME_OUTPUT_DIRECTORY "${CMAKE_SOURCE_DIR}/../public/dragonfly-hall")
+target_link_options(DragonflyHall PRIVATE "SHELL:-s WASM=1" "SHELL:-s MODULARIZE=1" "SHELL:-s EXPORT_NAME='createDragonflyHall'" "SHELL:-s ALLOW_MEMORY_GROWTH=1" "SHELL:-s ENVIRONMENT='web,worker'" "SHELL:-s EXPORTED_RUNTIME_METHODS=['ccall','cwrap']" "SHELL:-s EXPORTED_FUNCTIONS=['_malloc','_free','_dragonfly_hall_create','_dragonfly_hall_destroy','_dragonfly_hall_process','_dragonfly_hall_set_decay','_dragonfly_hall_set_damping','_dragonfly_hall_set_predelay','_dragonfly_hall_set_width','_dragonfly_hall_set_early_level','_dragonfly_hall_set_size']" "SHELL:-s INITIAL_MEMORY=4194304" "SHELL:-s STACK_SIZE=262144" "SHELL:-s NO_EXIT_RUNTIME=1" "SHELL:-s FILESYSTEM=0" -O2)

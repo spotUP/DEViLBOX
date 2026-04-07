@@ -1,0 +1,6 @@
+cmake_minimum_required(VERSION 3.20)
+project(TubeAmp VERSION 1.0.0)
+set(CMAKE_CXX_STANDARD 17)
+add_executable(TubeAmp TubeAmpWASM.cpp)
+set_target_properties(TubeAmp PROPERTIES OUTPUT_NAME "TubeAmp" SUFFIX ".js" RUNTIME_OUTPUT_DIRECTORY "${CMAKE_SOURCE_DIR}/../public/tube-amp")
+target_link_options(TubeAmp PRIVATE "SHELL:-s WASM=1" "SHELL:-s MODULARIZE=1" "SHELL:-s EXPORT_NAME='createTubeAmp'" "SHELL:-s ALLOW_MEMORY_GROWTH=1" "SHELL:-s ENVIRONMENT='web,worker'" "SHELL:-s EXPORTED_RUNTIME_METHODS=['ccall','cwrap']" "SHELL:-s EXPORTED_FUNCTIONS=['_malloc','_free','_tube_amp_create','_tube_amp_destroy','_tube_amp_process','_tube_amp_set_drive','_tube_amp_set_bass','_tube_amp_set_mid','_tube_amp_set_treble','_tube_amp_set_presence','_tube_amp_set_master','_tube_amp_set_sag']" "SHELL:-s INITIAL_MEMORY=4194304" "SHELL:-s STACK_SIZE=262144" "SHELL:-s NO_EXIT_RUNTIME=1" "SHELL:-s FILESYSTEM=0" -O2)

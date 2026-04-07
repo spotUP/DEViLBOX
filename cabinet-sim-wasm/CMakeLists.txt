@@ -1,0 +1,6 @@
+cmake_minimum_required(VERSION 3.20)
+project(CabinetSim VERSION 1.0.0)
+set(CMAKE_CXX_STANDARD 17)
+add_executable(CabinetSim CabinetSimWASM.cpp)
+set_target_properties(CabinetSim PROPERTIES OUTPUT_NAME "CabinetSim" SUFFIX ".js" RUNTIME_OUTPUT_DIRECTORY "${CMAKE_SOURCE_DIR}/../public/cabinet-sim")
+target_link_options(CabinetSim PRIVATE "SHELL:-s WASM=1" "SHELL:-s MODULARIZE=1" "SHELL:-s EXPORT_NAME='createCabinetSim'" "SHELL:-s ALLOW_MEMORY_GROWTH=1" "SHELL:-s ENVIRONMENT='web,worker'" "SHELL:-s EXPORTED_RUNTIME_METHODS=['ccall','cwrap']" "SHELL:-s EXPORTED_FUNCTIONS=['_malloc','_free','_cabinet_sim_create','_cabinet_sim_destroy','_cabinet_sim_process','_cabinet_sim_set_cabinet','_cabinet_sim_set_mix','_cabinet_sim_set_brightness']" "SHELL:-s INITIAL_MEMORY=4194304" "SHELL:-s STACK_SIZE=262144" "SHELL:-s NO_EXIT_RUNTIME=1" "SHELL:-s FILESYSTEM=0" -O2)
