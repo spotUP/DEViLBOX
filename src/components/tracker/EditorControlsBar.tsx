@@ -97,7 +97,7 @@ export const EditorControlsBar: React.FC<EditorControlsBarProps> = React.memo(({
         <div className="flex items-center gap-1.5">
           <Cpu size={14} className="shrink-0 text-text-secondary" />
           <select
-            className="px-3 py-1.5 rounded-md text-xs font-mono border transition-all cursor-pointer border-dark-borderLight bg-dark-bgTertiary text-text-secondary hover:bg-dark-bgHover hover:text-text-primary"
+            className="px-1.5 py-1.5 rounded-md text-xs font-mono border transition-all cursor-pointer border-dark-borderLight bg-dark-bgTertiary text-text-secondary hover:bg-dark-bgHover hover:text-text-primary max-w-[180px]"
             onChange={(e) => c.handleHardwarePresetChange(e.target.value)}
             defaultValue="none"
             title="Select Hardware System Preset (NES, SMS, Genesis, etc.)"
