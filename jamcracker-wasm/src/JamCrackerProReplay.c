@@ -22,23 +22,29 @@ static int flag_z=0, flag_n=0, flag_c=0, flag_v=0, flag_x=0;
 /* Memory access — 68k is big-endian; byte-swap on little-endian hosts.
  * Uses memcpy for alignment-safe access (68k allows unaligned word/long). */
 #include <string.h>
-#define READ8(addr)   ((uintptr_t)(addr)>1048576 ? (uint8_t)0 : *((const uint8_t*)(uintptr_t)(addr)))
-#define WRITE8(addr,v)  do { if((uintptr_t)(addr)<=1048576) *((uint8_t*)(uintptr_t)(addr)) = (uint8_t)(v); } while(0)
-static inline uint16_t _rd16(uintptr_t a) { if(a>1048576) return 0; uint16_t v; memcpy(&v,(void*)a,2); return v; }
-static inline uint32_t _rd32(uintptr_t a) { if(a>1048576) return 0; uint32_t v; memcpy(&v,(void*)a,4); return v; }
+/* Memory guard: must cover the full WASM heap where module data is allocated.
+ * INITIAL_MEMORY=4MB with ALLOW_MEMORY_GROWTH, so malloc easily returns > 1MB.
+ * Hardware register writes (0xDFF0xx) are intercepted before this guard.
+ * Set limit below Amiga CIA-B (0xBFD000 ≈ 12.2MB) to cover both CIA
+ * and custom-chip register ranges that the 68k replayer may read. */
+#define MEM_GUARD 0xBFD000
+#define READ8(addr)   ((uintptr_t)(addr)>=MEM_GUARD ? (uint8_t)0 : *((const uint8_t*)(uintptr_t)(addr)))
+#define WRITE8(addr,v)  do { if((uintptr_t)(addr)<MEM_GUARD) *((uint8_t*)(uintptr_t)(addr)) = (uint8_t)(v); } while(0)
+static inline uint16_t _rd16(uintptr_t a) { if(a>=MEM_GUARD) return 0; uint16_t v; memcpy(&v,(void*)a,2); return v; }
+static inline uint32_t _rd32(uintptr_t a) { if(a>=MEM_GUARD) return 0; uint32_t v; memcpy(&v,(void*)a,4); return v; }
 static inline void _wr16(uintptr_t a,uint16_t v) {
   if(a>=0xDFF0A0&&a<=0xDFF0DF){uint16_t n=__builtin_bswap16(v);int ch=(int)((a-0xDFF0A0)>>4);int r=(int)((a-0xDFF0A0)&0xF);
     if(r==6){TRACE("  HW ch%d PER=%d\n",ch,n);paula_set_period(ch,n);}
     else if(r==8){TRACE("  HW ch%d VOL=%d\n",ch,(uint8_t)n);paula_set_volume(ch,(uint8_t)n);}
     else if(r==4){TRACE("  HW ch%d LEN=%d\n",ch,n);paula_set_length(ch,n);}return;}
   if(a==0xDFF096){uint16_t dn=__builtin_bswap16(v);TRACE("  HW DMACON=%04x (%s ch:%d%d%d%d)\n",dn,(dn&0x8000)?"ON":"OFF",(dn>>3)&1,(dn>>2)&1,(dn>>1)&1,dn&1);paula_dma_write(dn);return;}
-  if(a>1048576){return;}
+  if(a>=MEM_GUARD){return;}
   memcpy((void*)a,&v,2); }
 static inline void _wr32(uintptr_t a,uint32_t v) {
   if(a==0xDFF0A0||a==0xDFF0B0||a==0xDFF0C0||a==0xDFF0D0){int ch=(int)((a-0xDFF0A0)>>4);
     TRACE("  HW ch%d PTR=%u\n",ch,(unsigned)(uintptr_t)__builtin_bswap32(v));
     paula_set_sample_ptr(ch,(const int8_t*)(uintptr_t)__builtin_bswap32(v));return;}
-  if(a>1048576){return;}
+  if(a>=MEM_GUARD){return;}
   memcpy((void*)a,&v,4); }
 #if defined(__BYTE_ORDER__) && __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__
 #define READ16(addr)  _rd16((uintptr_t)(addr))
