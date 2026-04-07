@@ -17,7 +17,7 @@
  *   +5..: vseq data (variable)   — skip (variable-length sequence data)
  */
 
-import React, { useRef, useEffect, useCallback, useState } from 'react';
+import React, { useRef, useEffect, useCallback, useState, useMemo } from 'react';
 import type { HippelCoSoConfig, UADEChipRamInfo } from '@/types/instrument';
 import { Knob } from '@components/controls/Knob';
 import { SectionLabel, SequenceEditor } from '@components/instruments/shared';
@@ -25,6 +25,7 @@ import { useInstrumentColors } from '@/hooks/useInstrumentColors';
 import type { SequencePreset } from '@components/instruments/shared';
 import { UADEChipEditor } from '@/engine/uade/UADEChipEditor';
 import { UADEEngine } from '@/engine/uade/UADEEngine';
+import { useTrackerStore } from '@stores/useTrackerStore';
 import { Download } from 'lucide-react';
 
 interface HippelCoSoControlsProps {
@@ -66,8 +67,59 @@ export const HippelCoSoControls: React.FC<HippelCoSoControlsProps> = ({
   fseqPlaybackPosition,
   vseqPlaybackPosition,
   uadeChipRam,
+  instrumentId,
 }) => {
   const [activeTab, setActiveTab] = useState<HCSTab>('main');
+  const [showSamplePane, setShowSamplePane] = useState(false);
+
+  // ── Sample browser rows — pulled from the parser-populated sampleBank on
+  // the config. The bank is shared across every HC instrument in the song,
+  // so we simply render what this instrument carries. ───────────────────────
+  const sampleRows = useMemo(() => {
+    return (config.sampleBank ?? []).map((s) => ({
+      index: s.index,
+      pointer: s.pointer,
+      length: s.length,
+      loopStart: s.loopStart,
+      repeatLength: s.repeatLength,
+      hasLoop: s.repeatLength > 2,
+    }));
+  }, [config.sampleBank]);
+
+  // ── Find Usage — scan tracker patterns for any cell referencing this
+  // instrument's runtime id, find the song position of the first pattern that
+  // contains such a cell, and seek the player there. Mirrors TFMX macro editor
+  // seekToUsage. Returns false when the instrument is unused. ─────────────────
+  const findUsage = useCallback((): boolean => {
+    if (instrumentId === undefined) return false;
+    const store = useTrackerStore.getState();
+    const patterns = store.patterns;
+    const order = store.patternOrder;
+    // Find the first pattern index that contains the instrument
+    const usingPatternIdx = new Set<number>();
+    for (let p = 0; p < patterns.length; p++) {
+      const pat = patterns[p];
+      if (!pat) continue;
+      outer: for (const ch of pat.channels) {
+        for (const row of ch.rows) {
+          if (row && row.instrument === instrumentId) {
+            usingPatternIdx.add(p);
+            break outer;
+          }
+        }
+      }
+    }
+    if (usingPatternIdx.size === 0) return false;
+    // Walk the song order to find the first position that references one
+    // of the using patterns.
+    for (let i = 0; i < order.length; i++) {
+      if (usingPatternIdx.has(order[i])) {
+        store.setCurrentPosition(i, false);
+        return true;
+      }
+    }
+    return false;
+  }, [instrumentId]);
 
   const configRef = useRef(config);
   useEffect(() => { configRef.current = config; }, [config]);
@@ -301,26 +353,88 @@ export const HippelCoSoControls: React.FC<HippelCoSoControlsProps> = ({
             {label}
           </button>
         ))}
-        {uadeChipRam && (
+        <div className="ml-auto flex items-center gap-1 mr-2">
+          {instrumentId !== undefined && (
+            <button
+              onClick={() => {
+                const ok = findUsage();
+                if (!ok) {
+                  console.warn('[HippelCoSo] instrument is unused — nothing to seek to');
+                }
+              }}
+              title="Find a song position where this instrument is used and seek the player there"
+              className="px-2 py-1 text-[10px] font-mono bg-dark-bg hover:bg-dark-bgSecondary border border-dark-border rounded text-accent-primary hover:border-accent-primary/60 transition-colors"
+            >
+              ▶ Find Usage
+            </button>
+          )}
           <button
-            onClick={() => {
-              const editor = getEditor();
-              if (editor && uadeChipRam) {
-                editor.exportModule(uadeChipRam.moduleBase, uadeChipRam.moduleSize, 'module.hipc')
-                  .catch(console.error);
-              }
-            }}
-            className="ml-auto flex items-center gap-1 px-2 py-1 mr-2 text-[10px] font-mono bg-dark-bgSecondary hover:bg-dark-bg border rounded transition-colors"
-            title="Export module with current edits"
-            style={{ color: accent }}
+            onClick={() => setShowSamplePane((v) => !v)}
+            title={`${showSamplePane ? 'Hide' : 'Show'} sample browser`}
+            className={`px-2 py-1 text-[10px] font-mono border rounded transition-colors ${
+              showSamplePane
+                ? 'bg-accent-primary/20 text-accent-primary border-accent-primary/60'
+                : 'bg-dark-bg text-text-secondary border-dark-border hover:text-accent-primary hover:border-accent-primary/50'
+            }`}
           >
-            <Download size={10} />
-            Export .hipc
+            SMP
           </button>
+          {uadeChipRam && (
+            <button
+              onClick={() => {
+                const editor = getEditor();
+                if (editor && uadeChipRam) {
+                  editor.exportModule(uadeChipRam.moduleBase, uadeChipRam.moduleSize, 'module.hipc')
+                    .catch(console.error);
+                }
+              }}
+              className="flex items-center gap-1 px-2 py-1 text-[10px] font-mono bg-dark-bgSecondary hover:bg-dark-bg border border-dark-border rounded transition-colors"
+              title="Export module with current edits"
+              style={{ color: accent }}
+            >
+              <Download size={10} />
+              Export .hipc
+            </button>
+          )}
+        </div>
+      </div>
+      <div className="flex flex-1 min-h-0">
+        <div className="flex-1 min-w-0">
+          {activeTab === 'main'      && renderMain()}
+          {activeTab === 'sequences' && renderSequences()}
+        </div>
+        {showSamplePane && (
+          <div className="w-[240px] flex-shrink-0 border-l border-dark-border bg-dark-bgSecondary overflow-y-auto">
+            <div className="px-2 py-1 font-bold text-xs text-accent-primary border-b border-dark-border bg-dark-bgSecondary sticky top-0 z-10">
+              SAMPLES ({sampleRows.length})
+            </div>
+            {sampleRows.length === 0 && (
+              <div className="p-2 text-[10px] text-text-muted italic">
+                No sample bank — this song carries no COSO sample headers.
+              </div>
+            )}
+            {sampleRows.map((s) => (
+              <div
+                key={s.index}
+                className="px-2 py-1.5 border-b border-dark-border text-[10px]"
+                title={`Sample #${s.index} · pointer 0x${s.pointer.toString(16)}`}
+              >
+                <div className="font-mono truncate text-text-primary">
+                  {String(s.index).padStart(2, '0')}. sample
+                </div>
+                <div className="text-text-muted mt-0.5">
+                  {s.length} bytes
+                  {s.hasLoop && <span className="ml-1 text-accent-success">·loop</span>}
+                </div>
+                <div className="mt-0.5 text-[9px] text-text-muted font-mono">
+                  ptr 0x{s.pointer.toString(16)}
+                  {s.hasLoop && ` · rep ${s.repeatLength}`}
+                </div>
+              </div>
+            ))}
+          </div>
         )}
       </div>
-      {activeTab === 'main'      && renderMain()}
-      {activeTab === 'sequences' && renderSequences()}
     </div>
   );
 };
