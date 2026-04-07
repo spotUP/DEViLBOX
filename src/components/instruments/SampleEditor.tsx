@@ -985,36 +985,63 @@ export const SampleEditor: React.FC<SampleEditorProps> = ({ instrument, onChange
       // loop=true and offset < loopStart, so a single source can't
       // produce "play attack then loop". Workaround:
       //   1) attack source: loop=false, plays 0 → loopEnd as a one-shot
-      //   2) loop source:   loop=true, scheduled to start exactly when
-      //                     the attack source ends. Behavior depends on
-      //                     loopType:
-      //                     - 'forward': loops [loopStart, loopEnd]
-      //                     - 'pingpong': loops a pre-built pingpong
-      //                       cycle buffer (forward + reverse)
-      const attackBufferSec = loopEndSec; // 0 → loopEnd in buffer-time
+      //   2) loop source:   loop=true, scheduled to overlap the last
+      //                     XFADE_SEC of the attack and fade in over
+      //                     the same window. Equal-power crossfade
+      //                     masks the sample-level discontinuity at
+      //                     the handoff (attack ends at ~s[loopEnd-1],
+      //                     loop begins at s[loopStart]).
+      // Behavior depends on loopType:
+      //   'forward'  → loops [loopStart, loopEnd]
+      //   'pingpong' → loops a pre-built pingpong cycle buffer
+      //                (forward + reverse, mathematically continuous
+      //                across the wrap and the fwd↔rev turn)
+      const XFADE_SEC = 0.005;
+      const attackBufferSec = loopEndSec;
       const attackWallSec = attackBufferSec / playbackRate;
+      const attackEndTime = now + attackWallSec;
+      const loopStartTime = Math.max(now, attackEndTime - XFADE_SEC);
+
+      // Attack source + fade-out gain
+      const attackGain = ctx.createGain();
+      attackGain.gain.value = 1.0;
+      attackGain.gain.setValueAtTime(1.0, loopStartTime);
+      attackGain.gain.linearRampToValueAtTime(0.0001, attackEndTime);
+      attackGain.connect(ctx.destination);
 
       const attackSrc = ctx.createBufferSource();
       attackSrc.buffer = bufToPlay;
       attackSrc.playbackRate.value = playbackRate;
-      attackSrc.connect(ctx.destination);
+      attackSrc.connect(attackGain);
       attackSrc.start(now, 0, attackBufferSec);
+
+      // Loop source + fade-in gain
+      const loopGain = ctx.createGain();
+      loopGain.gain.value = 0.0001;
+      loopGain.gain.setValueAtTime(0.0001, loopStartTime);
+      loopGain.gain.linearRampToValueAtTime(1.0, attackEndTime);
+      loopGain.connect(ctx.destination);
 
       const loopSrc = ctx.createBufferSource();
       loopSrc.playbackRate.value = playbackRate;
       loopSrc.loop = true;
 
       if (loopType === 'pingpong') {
-        // Build a pingpong cycle buffer: forward [loopStart..loopEnd]
-        // followed by reverse [loopEnd-1..loopStart+1] (skipping the
-        // shared endpoints to avoid samples being heard twice). Looping
-        // this buffer with loop=true gives sample-perfect ping-pong.
         const startFrame = Math.round(loopStartNorm * totalFrames);
         const endFrame = Math.round(loopEndNorm * totalFrames);
         const fwdLen = endFrame - startFrame;
         const revLen = Math.max(0, fwdLen - 2);
         const cycleLen = fwdLen + revLen;
         if (cycleLen > 0) {
+          // Cycle buffer:
+          //   dst[0..fwdLen-1]            = src[loopStart..loopEnd-1]
+          //   dst[fwdLen..fwdLen+revLen-1] = src[loopEnd-2..loopStart+1]
+          // Wrap (last reverse → first forward) is s[loopStart+1] →
+          //   s[loopStart] (adjacent in original). The fwd↔rev turn at
+          //   the cycle midpoint is s[loopEnd-1] → s[loopEnd-2] (also
+          //   adjacent). Both are mathematically continuous, so the
+          //   pingpong loop has no internal discontinuities — only the
+          //   attack→loop handoff (handled by the crossfade above).
           const cycleBuf = ctx.createBuffer(
             bufToPlay.numberOfChannels,
             cycleLen,
@@ -1031,26 +1058,25 @@ export const SampleEditor: React.FC<SampleEditorProps> = ({ instrument, onChange
             }
           }
           loopSrc.buffer = cycleBuf;
-          // Loop the entire cycle buffer.
           loopSrc.loopStart = 0;
           loopSrc.loopEnd = cycleLen / bufToPlay.sampleRate;
-          loopSrc.connect(ctx.destination);
-          loopSrc.start(now + attackWallSec, 0);
+          loopSrc.connect(loopGain);
+          loopSrc.start(loopStartTime, 0);
         } else {
           // Loop region too small for pingpong — fall back to forward.
           loopSrc.buffer = bufToPlay;
           loopSrc.loopStart = loopStartSec;
           loopSrc.loopEnd = loopEndSec;
-          loopSrc.connect(ctx.destination);
-          loopSrc.start(now + attackWallSec, loopStartSec);
+          loopSrc.connect(loopGain);
+          loopSrc.start(loopStartTime, loopStartSec);
         }
       } else {
         // Forward loop
         loopSrc.buffer = bufToPlay;
         loopSrc.loopStart = loopStartSec;
         loopSrc.loopEnd = loopEndSec;
-        loopSrc.connect(ctx.destination);
-        loopSrc.start(now + attackWallSec, loopStartSec);
+        loopSrc.connect(loopGain);
+        loopSrc.start(loopStartTime, loopStartSec);
       }
 
       previewSourcesRef.current = [attackSrc, loopSrc];
