@@ -120,6 +120,76 @@ export const HippelCoSoControls: React.FC<HippelCoSoControlsProps> = ({
     onChange({ [key]: value } as Partial<HippelCoSoConfig>);
   }, [onChange]);
 
+  /**
+   * Encode a sequence as signed-int8 bytes plus a -31 sentinel terminator.
+   * Returns a Uint8Array. The terminator matches both fseq (FSEQ_END = -31) and
+   * vseq (vseq end sentinel range -31..-25, we always emit -31 as the canonical
+   * end byte).
+   */
+  function encodeSequence(values: number[]): Uint8Array {
+    /* Strip any existing trailing sentinel(s) so we don't double-terminate. */
+    let end = values.length;
+    while (end > 0) {
+      const v = values[end - 1];
+      if (v >= -31 && v <= -25) end--;
+      else break;
+    }
+    const out = new Uint8Array(end + 1);
+    for (let i = 0; i < end; i++) {
+      const v = values[i] | 0;
+      out[i] = v < 0 ? (256 + v) & 0xFF : v & 0xFF;
+    }
+    out[end] = 256 + (-31); /* 0xE1 */
+    return out;
+  }
+
+  /**
+   * Write a sequence body (fseq or vseq) into chip RAM, enforcing the original
+   * byte budget. If the encoded length would overflow the budget the edit is
+   * REJECTED with a console warning (no chip RAM is touched). Trailing bytes
+   * within the budget are zero-filled so stale sequence data can never sneak in.
+   */
+  const writeSeqToChipRam = useCallback((kind: 'fseq' | 'vseq', values: number[]) => {
+    if (!uadeChipRam) return;
+    const sections = uadeChipRam.sections as {
+      vseqBodyAddr?: number; vseqBodyMaxLen?: number;
+      fseqBodyAddr?: number; fseqBodyMaxLen?: number;
+    };
+    const addr   = kind === 'fseq' ? sections.fseqBodyAddr   : sections.vseqBodyAddr;
+    const budget = kind === 'fseq' ? sections.fseqBodyMaxLen : sections.vseqBodyMaxLen;
+    if (addr === undefined || budget === undefined) return;
+    /* fseqBodyAddr === 0xFFFFFFFF means this instrument has no resolvable fseq
+     * (fseqIdx === -128). Silently skip — the user can still edit the in-memory
+     * config but there's nowhere to write it. */
+    if (addr === 0xFFFFFFFF || budget === 0) return;
+
+    const encoded = encodeSequence(values);
+    if (encoded.length > budget) {
+      console.warn(
+        `[HippelCoSo] ${kind} sequence overflow — edit rejected ` +
+        `(encoded ${encoded.length} bytes > budget ${budget} bytes)`,
+      );
+      return;
+    }
+    const editor = getEditor();
+    if (!editor) return;
+
+    /* Pad with zeros to fill the original budget so stale bytes (e.g. an
+     * earlier longer sequence) can't be re-interpreted as live data. */
+    const padded = new Uint8Array(budget);
+    padded.set(encoded, 0);
+    void editor.writeBytes(addr, padded);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [uadeChipRam]);
+
+  const writeFseqToChipRam = useCallback((values: number[]) => {
+    writeSeqToChipRam('fseq', values);
+  }, [writeSeqToChipRam]);
+
+  const writeVseqToChipRam = useCallback((values: number[]) => {
+    writeSeqToChipRam('vseq', values);
+  }, [writeSeqToChipRam]);
+
   // ── MAIN TAB ──────────────────────────────────────────────────────────────
   const renderMain = () => (
     <div className="flex flex-col gap-3 p-3 overflow-y-auto" style={{ maxHeight: 'calc(100vh - 280px)' }}>
@@ -178,7 +248,7 @@ export const HippelCoSoControls: React.FC<HippelCoSoControlsProps> = ({
         <SequenceEditor
           label="fseq"
           data={config.fseq}
-          onChange={(d) => upd('fseq', d)}
+          onChange={(d) => { upd('fseq', d); writeFseqToChipRam(d); }}
           min={-127} max={127}
           bipolar
           showNoteNames
@@ -198,7 +268,7 @@ export const HippelCoSoControls: React.FC<HippelCoSoControlsProps> = ({
         <SequenceEditor
           label="vseq"
           data={config.vseq.map(v => Math.max(0, v))}  // clamp -128 loop markers for display
-          onChange={(d) => upd('vseq', d)}
+          onChange={(d) => { upd('vseq', d); writeVseqToChipRam(d); }}
           min={0} max={63}
           presets={VSEQ_PRESETS}
           playbackPosition={vseqPlaybackPosition}
